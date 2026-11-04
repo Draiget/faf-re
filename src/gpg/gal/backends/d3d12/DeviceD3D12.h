@@ -54,6 +54,14 @@ namespace gpg::gal
     struct Image;
   }
 
+  /**
+   * Engine addition (`ren_PrepareDeviceEarly`): starts creating the Direct3D 12 device of the first
+   * adapter on a helper thread - the driver's load, most of a device's creation - for
+   * `DeviceD3D12::Setup` to take when it picks that adapter and asks for no debug layer or DRED, which
+   * have to be on before a device exists. Otherwise it is released and Setup creates its own.
+   */
+  void D3D12_PrepareDeviceEarly();
+
   class DeviceD3D12 final : public Device, public effects::PassBinder
   {
   public:

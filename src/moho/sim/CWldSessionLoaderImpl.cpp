@@ -1,6 +1,7 @@
 #include "CWldSessionLoaderImpl.h"
 #include "platform/X87Precision.h"
 
+#include <atomic>
 #include <cfloat>
 #include <cstring>
 #include <exception>
@@ -44,6 +45,18 @@ namespace moho
       "binary does (0). The same map either way.",
       &wld_LoadMapEarly
     );
+
+    bool wld_StartSimEarly = true;
+    TConVar<bool> gTConVar_wld_StartSimEarly(
+      "wld_StartSimEarly",
+      "With wld_LoadMapEarly, build the sim's Lua state as soon as the rules are built and start a single-player "
+      "game's or a replay's sim then (1, the default), or build it after the session's copy of the rules and start "
+      "the sim once the whole load is done, as the binary does (0). The same sim either way.",
+      &wld_StartSimEarly
+    );
+
+    /// The scenario whose rules and map are ready for its sim (wld_StartSimEarly); one load runs at a time.
+    std::atomic<const SWldScenarioInfo*> gEarlySimScenario{nullptr};
 
     bool IsInterlockedLoadingEnabled()
     {
@@ -175,6 +188,15 @@ namespace moho
       bool mLoaded = false;
     };
 
+    /// The scenario takes the loaded map, dropping one it had.
+    void AcceptMap(SWldScenarioInfo* const scenario, CWldMap* const acceptedMap)
+    {
+      if (CWldMap* const previousMap = scenario->mWldMap; acceptedMap != previousMap && previousMap != nullptr) {
+        delete previousMap;
+      }
+      scenario->mWldMap = acceptedMap;
+    }
+
     /**
      * Address: 0x00885DE0 (FUN_00885DE0, func_WorldSessionUserLoad)
      *
@@ -210,6 +232,7 @@ namespace moho
       // Loader threads run with the same reduced x87 precision the sim uses, so
       // map geometry loaded here rounds identically to the way it is simulated.
       platform::SetX87PrecisionControl(_PC_24);
+      gEarlySimScenario.store(nullptr, std::memory_order_release); // a scenario at a freed one's address is not ready
 
       // Engine addition: the load reads thousands of archive entries; each archive stays open
       // between them until the load is done (CZipFileReadBatch). And it looks for each script and
@@ -252,12 +275,26 @@ namespace moho
         (void)marker;
       }
 
+      // Engine addition (wld_StartSimEarly): with the rules and the map in hand, the map is the
+      // scenario's now and the sim's copy of the rules goes first, so a session can start its sim
+      // (WLD_GetEarlySimInputs) while the session's copy and SessionInit.lua run here.
+      const bool startSimEarly = wld_StartSimEarly && loadedEarly != nullptr;
+      if (startSimEarly) {
+        AcceptMap(scenario, loadedEarly);
+        RULE_DeferScriptBlueprintRelease(scenario->mGameRules); // freed below, after the session's export
+        SIM_PrepareLuaState(scenario->mGameRules);
+        gEarlySimScenario.store(scenario, std::memory_order_release);
+        SIM_FinishPreparingLuaState(); // the session's export below would take the rules' lock first
+      }
+
       if (gSessionKeepsBlueprints) {
         scenario->mGameRules->ExportToLuaState(scenario->mState);
       }
       // Engine addition: with the session's copy done (or skipped), the sim's own copy of the rules
       // starts on a helper thread, alongside SessionInit.lua and the map load below.
-      SIM_PrepareLuaState(scenario->mGameRules);
+      if (!startSimEarly) {
+        SIM_PrepareLuaState(scenario->mGameRules);
+      }
       AdvanceLoadingProgress(loadControl);
 
       {
@@ -273,14 +310,13 @@ namespace moho
         (void)marker;
       }
 
-      msvc8::auto_ptr<CWldMap> loadedMap(earlyMap ? loadedEarly : new CWldMap());
-      if (earlyMap ? loadedEarly != nullptr : loadedMap->MapLoad(scenario->mMapName.c_str(), scenario->mState, false, *loadControl)) {
-        CWldMap* const acceptedMap = loadedMap.release();
-        if (CWldMap* const previousMap = scenario->mWldMap;
-            acceptedMap != previousMap && previousMap != nullptr) {
-          delete previousMap;
+      if (startSimEarly) {
+        RULE_ReleaseDeferredScriptBlueprints(scenario->mGameRules); // the session and the sim both have their copy
+      } else {
+        msvc8::auto_ptr<CWldMap> loadedMap(earlyMap ? loadedEarly : new CWldMap());
+        if (earlyMap ? loadedEarly != nullptr : loadedMap->MapLoad(scenario->mMapName.c_str(), scenario->mState, false, *loadControl)) {
+          AcceptMap(scenario, loadedMap.release());
         }
-        scenario->mWldMap = acceptedMap;
       }
 
       {
@@ -294,6 +330,18 @@ namespace moho
   void WLD_SetSessionKeepsBlueprints(const bool keep) noexcept
   {
     gSessionKeepsBlueprints = keep;
+  }
+
+  bool WLD_GetEarlySimInputs(
+    const SWldScenarioInfo* const scenario, RRuleGameRules** const outRules, CWldMap** const outMap
+  ) noexcept
+  {
+    if (scenario == nullptr || gEarlySimScenario.load(std::memory_order_acquire) != scenario) {
+      return false;
+    }
+    *outRules = scenario->mGameRules;
+    *outMap = scenario->mWldMap;
+    return *outRules != nullptr && *outMap != nullptr;
   }
 
   /**

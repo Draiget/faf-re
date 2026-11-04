@@ -14563,16 +14563,128 @@ namespace moho
      * (a single-player skirmish or campaign) gets the local lead; anything with a connector or more
      * clients (players or observers of a live game) keeps the original pacing.
      */
-    [[nodiscard]] ESimSessionPacing SelectSessionPacing(const CWldSession& session, IClientManager* const clientManager)
+    [[nodiscard]] ESimSessionPacing SelectSessionPacing(
+      const bool isReplay, const bool isMultiplayer, IClientManager* const clientManager
+    )
     {
-      if (session.IsReplay) {
+      if (isReplay) {
         return ESimSessionPacing::Replay;
       }
-      if (session.IsMultiplayer || clientManager == nullptr || clientManager->GetConnector() != nullptr ||
+      if (isMultiplayer || clientManager == nullptr || clientManager->GetConnector() != nullptr ||
           clientManager->NumberOfClients() != 1u || clientManager->GetLocalClient() == nullptr) {
         return ESimSessionPacing::Network;
       }
       return ESimSessionPacing::Local;
+    }
+
+    [[nodiscard]] ESimSessionPacing SelectSessionPacing(const CWldSession& session, IClientManager* const clientManager)
+    {
+      return SelectSessionPacing(session.IsReplay != 0, session.IsMultiplayer != 0, clientManager);
+    }
+
+    /**
+     * Engine addition (`wld_StartSimEarly`): a single-player game's or a replay's sim driver, created
+     * as soon as the load has the rules and the map (`WLD_GetEarlySimInputs`) rather than once the
+     * whole load is done, for `WLD_DoLoading` to hand to the session it builds then. The driver gets
+     * what it gets there, in the same order: the game version, the replay sink, the launch info's
+     * rules, map and language, the single-player clone of the launch info (made before the sim takes
+     * the map out of it), and the props.
+     */
+    struct SEarlySimStart
+    {
+      ISTIDriver* driver = nullptr;
+      boost::shared_ptr<LaunchInfoBase> launchClone;
+      std::string language; // the launch info's, checked against the session's once that exists
+    };
+    SEarlySimStart sEarlySim;
+
+    /** Shuts down and deletes a driver started early that no session took (a load given up). */
+    void DropEarlySim()
+    {
+      if (ISTIDriver* const driver = sEarlySim.driver; driver != nullptr) {
+        driver->ShutDown();
+        while (driver->HasSyncData()) {
+          SSyncData* syncData = nullptr;
+          driver->GetSyncData(syncData);
+          (void)msvc8::auto_ptr<SSyncData>(syncData);
+        }
+        delete driver;
+      }
+      sEarlySim = SEarlySimStart{};
+    }
+
+    /**
+     * Starts the sim of the session `WLD_DoLoading` waits for once its load has the rules and the
+     * map, when the session has no network: a single-player game or a replay. Otherwise, or when the
+     * user interface has no language to give it, the sim starts when the load is done, as before.
+     * The language is the user interface's `__language`: the session's comes from the same
+     * userInit.lua and preferences in its SessionInit.lua, which is still running.
+     */
+    void StartSimEarly(SWldSessionInfo* const sessionInfo, CWldSessionLoaderImpl* const loader)
+    {
+      RRuleGameRules* rules = nullptr;
+      CWldMap* map = nullptr;
+      if (sEarlySim.driver != nullptr || sessionInfo == nullptr || sessionInfo->mLaunchInfo.get() == nullptr ||
+          !WLD_GetEarlySimInputs(loader->mGameData, &rules, &map) || map->mTerrainRes == nullptr ||
+          SelectSessionPacing(sessionInfo->mIsReplay, sessionInfo->mIsMultiplayer, sessionInfo->mClientManager) ==
+            ESimSessionPacing::Network) {
+        return;
+      }
+      const LuaPlus::LuaObject userLanguage = USER_GetLuaState()->GetGlobal("__language");
+      const char* const language = userLanguage.ToString();
+      if (language == nullptr) {
+        return;
+      }
+      sEarlySim.language = language;
+
+      FAF_BeginSession(sessionInfo->mIsReplay);
+      msvc8::auto_ptr<gpg::Stream> replayStream(nullptr);
+      if (sessionInfo->mIsBeingRecorded) {
+        const msvc8::string defaultReplayName = Loc(USER_GetLuaState(), "<LOC Engine0030>LastGame");
+        replayStream = VCR_CreateReplay(sessionInfo, defaultReplayName.c_str());
+        if (replayStream.get() == nullptr) {
+          sessionInfo->mIsBeingRecorded = false;
+        }
+      }
+
+      STIMap* const launchMap = new STIMap(map->mTerrainRes->mMap);
+      LaunchInfoBase* const launchInfo = sessionInfo->mLaunchInfo.get();
+      launchInfo->mGameRules = rules;
+      if (launchMap != launchInfo->mMap && launchInfo->mMap != nullptr) {
+        delete launchInfo->mMap;
+      }
+      launchInfo->mMap = launchMap;
+      launchInfo->mLanguage.assign_owned(language);
+
+      if (!sessionInfo->mIsMultiplayer && !sessionInfo->mIsReplay) {
+        boost::SharedPtrRaw<void> createdLaunchInfo{};
+        launchInfo->Create(createdLaunchInfo);
+        boost::SharedPtrRaw<LaunchInfoBase> createdTyped{};
+        createdTyped.px = static_cast<LaunchInfoBase*>(createdLaunchInfo.px);
+        createdTyped.pi = createdLaunchInfo.pi;
+        sEarlySim.launchClone = boost::SharedPtrFromRawRetained(createdTyped);
+        createdLaunchInfo.release();
+      }
+
+      if (LaunchInfoNew* const newLaunchInfo = launchInfo->GetNew(); newLaunchInfo != nullptr) {
+        newLaunchInfo->mProps = map->mProps;
+      }
+
+      IClientManager* const clientManager = sessionInfo->mClientManager;
+      sessionInfo->mClientManager = nullptr;
+      SIM_SetSessionPacing(SelectSessionPacing(sessionInfo->mIsReplay, sessionInfo->mIsMultiplayer, clientManager));
+      ISTIDriver* driver = SIM_CreateDriver(
+        static_cast<CClientManagerImpl*>(clientManager),
+        replayStream.release(),
+        sessionInfo->mLaunchInfo,
+        sessionInfo->mSourceId
+      );
+#if FAF_SERVER_MODE
+      driver = faf::remote::client::WrapForLoopback(
+        driver, *rules, launchMap->GetBounds3D(), sessionInfo->mIsMultiplayer
+      );
+#endif
+      sEarlySim.driver = driver;
     }
 
     /**
@@ -14613,7 +14725,11 @@ namespace moho
       }
 
       CWldSessionLoaderImpl* const loader = GetWldSessionLoader();
-      if (loader == nullptr || !loader->IsLoaded()) {
+      if (loader == nullptr) {
+        return;
+      }
+      if (!loader->IsLoaded()) {
+        StartSimEarly(sessionInfo, loader); // engine addition (wld_StartSimEarly)
         return;
       }
 
@@ -14626,6 +14742,7 @@ namespace moho
       (void)loader->LoadGameData(&gameData);
 
       if (gameData.mGameRules == nullptr) {
+        DropEarlySim();
         gpg::Warnf("map %s failed.  aborting session.", sessionInfo->mMapName.c_str());
         if (gWldFrameAction != EWldFrameAction::Inactive) {
           gWldFrameAction = EWldFrameAction::Exit;
@@ -14637,15 +14754,21 @@ namespace moho
         return;
       }
 
+      // Engine addition (wld_StartSimEarly): a sim started early (StartSimEarly) has had everything
+      // up to its driver below; the session is built as before and takes that driver.
+      const bool simStartedEarly = sEarlySim.driver != nullptr;
+
       // Engine addition: fix the FAF game version - and with it the engine
       // patches the sim applies - before the replay sink records it and before
       // the driver creates the sim.
-      FAF_BeginSession(sessionInfo->mIsReplay);
+      if (!simStartedEarly) {
+        FAF_BeginSession(sessionInfo->mIsReplay);
+      }
 
       // The replay sink, when this session records one. A sink that cannot be
       // opened is not fatal - the session simply stops being a recorded one.
       msvc8::auto_ptr<gpg::Stream> replayStream(nullptr);
-      if (sessionInfo->mIsBeingRecorded) {
+      if (sessionInfo->mIsBeingRecorded && !simStartedEarly) {
         const msvc8::string defaultReplayName = Loc(USER_GetLuaState(), "<LOC Engine0030>LastGame");
         replayStream = VCR_CreateReplay(sessionInfo, defaultReplayName.c_str());
         if (replayStream.get() == nullptr) {
@@ -14663,72 +14786,85 @@ namespace moho
       msvc8::auto_ptr<CWldMap> mapOwner(gameData.mWldMap);
       gameData = SWldGameData{};
       CWldSession* const wldSession = WLD_CreateSession(stateOwner, rulesOwner, mapOwner, *sessionInfo);
+      ISTIDriver* driver = nullptr;
+      if (simStartedEarly) {
+        const char* const sessionLanguage = wldSession->mState->GetGlobal("__language").ToString();
+        if (sessionLanguage == nullptr || sEarlySim.language != sessionLanguage) {
+          gpg::Warnf("wld_StartSimEarly: the sim started with language '%s', the session's is '%s'",
+                     sEarlySim.language.c_str(), sessionLanguage != nullptr ? sessionLanguage : "");
+        }
+        if (sEarlySim.launchClone) {
+          wldSession->mLaunchInfo = sEarlySim.launchClone;
+        }
+        driver = sEarlySim.driver;
+        sEarlySim = SEarlySimStart{};
+      } else {
+        // The launch info keeps its own copy of the playable map so a restart can
+        // rebuild the session without the terrain resource still being alive.
+        auto* const playableMap =
+          wldSession->mWldMap->mTerrainRes->mMap;
+        STIMap* const launchMap = new STIMap(playableMap);
 
-      // The launch info keeps its own copy of the playable map so a restart can
-      // rebuild the session without the terrain resource still being alive.
-      auto* const playableMap =
-        wldSession->mWldMap->mTerrainRes->mMap;
-      STIMap* const launchMap = new STIMap(playableMap);
+        LaunchInfoBase* const launchInfo = sessionInfo->mLaunchInfo.get();
+        launchInfo->mGameRules = wldSession->mRules;
+        if (launchMap != launchInfo->mMap && launchInfo->mMap != nullptr) {
+          delete launchInfo->mMap;
+        }
+        launchInfo->mMap = launchMap;
 
-      LaunchInfoBase* const launchInfo = sessionInfo->mLaunchInfo.get();
-      launchInfo->mGameRules = wldSession->mRules;
-      if (launchMap != launchInfo->mMap && launchInfo->mMap != nullptr) {
-        delete launchInfo->mMap;
-      }
-      launchInfo->mMap = launchMap;
+        launchInfo->mLanguage.assign_owned(wldSession->mState->GetGlobal("__language").ToString());
 
-      launchInfo->mLanguage.assign_owned(wldSession->mState->GetGlobal("__language").ToString());
+        if (!wldSession->IsMultiplayer && !wldSession->IsReplay) {
+          // Single player: the session takes a shared owner on a fresh clone of
+          // the launch info, which is what a mid-game save serializes.
+          boost::SharedPtrRaw<void> createdLaunchInfo{};
+          launchInfo->Create(createdLaunchInfo);
 
-      if (!wldSession->IsMultiplayer && !wldSession->IsReplay) {
-        // Single player: the session takes a shared owner on a fresh clone of
-        // the launch info, which is what a mid-game save serializes.
-        boost::SharedPtrRaw<void> createdLaunchInfo{};
-        launchInfo->Create(createdLaunchInfo);
+          boost::SharedPtrRaw<LaunchInfoBase> createdTyped{};
+          createdTyped.px = static_cast<LaunchInfoBase*>(createdLaunchInfo.px);
+          createdTyped.pi = createdLaunchInfo.pi;
+          wldSession->mLaunchInfo = boost::SharedPtrFromRawRetained(createdTyped);
+          createdLaunchInfo.release();
+        }
 
-        boost::SharedPtrRaw<LaunchInfoBase> createdTyped{};
-        createdTyped.px = static_cast<LaunchInfoBase*>(createdLaunchInfo.px);
-        createdTyped.pi = createdLaunchInfo.pi;
-        wldSession->mLaunchInfo = boost::SharedPtrFromRawRetained(createdTyped);
-        createdLaunchInfo.release();
-      }
+        {
+          const std::string marker(" DoLoading 4");
+          (void)marker;
+        }
 
-      {
-        const std::string marker(" DoLoading 4");
-        (void)marker;
-      }
+        if (LaunchInfoNew* const newLaunchInfo = launchInfo->GetNew(); newLaunchInfo != nullptr) {
+          newLaunchInfo->mProps = wldSession->mWldMap->mProps;
+        }
 
-      if (LaunchInfoNew* const newLaunchInfo = launchInfo->GetNew(); newLaunchInfo != nullptr) {
-        newLaunchInfo->mProps = wldSession->mWldMap->mProps;
-      }
+        {
+          const std::string marker(" DoLoading 5");
+          (void)marker;
+        }
 
-      {
-        const std::string marker(" DoLoading 5");
-        (void)marker;
-      }
-
-      // Ownership of both the client manager and the replay sink moves into the
-      // driver; the session info gives its client manager up here.
-      IClientManager* const clientManager = sessionInfo->mClientManager;
-      sessionInfo->mClientManager = nullptr;
-      // Engine addition: replays and single-player sessions get a beat lead (`sim_ReplayLead`,
-      // `sim_LocalLead`); a session with any network connector keeps the original pacing.
-      SIM_SetSessionPacing(SelectSessionPacing(*wldSession, clientManager));
-      // 0x0088C364..0x0088C37C: the inlined `scoped_ptr::reset` - the new
-      // driver is stored first, then the previous one is deleted.
-      ISTIDriver* driver = SIM_CreateDriver(
-        static_cast<CClientManagerImpl*>(clientManager),
-        replayStream.release(),
-        sessionInfo->mLaunchInfo,
-        sessionInfo->mSourceId
-      );
+        // Ownership of both the client manager and the replay sink moves into the
+        // driver; the session info gives its client manager up here.
+        IClientManager* const clientManager = sessionInfo->mClientManager;
+        sessionInfo->mClientManager = nullptr;
+        // Engine addition: replays and single-player sessions get a beat lead (`sim_ReplayLead`,
+        // `sim_LocalLead`); a session with any network connector keeps the original pacing.
+        SIM_SetSessionPacing(SelectSessionPacing(*wldSession, clientManager));
+        // 0x0088C364..0x0088C37C: the inlined `scoped_ptr::reset` - the new
+        // driver is stored first, then the previous one is deleted.
+        driver = SIM_CreateDriver(
+          static_cast<CClientManagerImpl*>(clientManager),
+          replayStream.release(),
+          sessionInfo->mLaunchInfo,
+          sessionInfo->mSourceId
+        );
 #if FAF_SERVER_MODE
-      // Engine addition, server mode: `/loopback` runs the session through the remote
-      // driver, the lockstep driver standing in for its server (replays and single-player
-      // sessions only). Without it, unchanged.
-      driver = faf::remote::client::WrapForLoopback(
-        driver, *wldSession->mRules, launchMap->GetBounds3D(), wldSession->IsMultiplayer != 0
-      );
+        // Engine addition, server mode: `/loopback` runs the session through the remote
+        // driver, the lockstep driver standing in for its server (replays and single-player
+        // sessions only). Without it, unchanged.
+        driver = faf::remote::client::WrapForLoopback(
+          driver, *wldSession->mRules, launchMap->GetBounds3D(), wldSession->IsMultiplayer != 0
+        );
 #endif
+      }
       sSimDriver.reset(driver);
 
       gWldFrameAction = EWldFrameAction::Initialize;
@@ -15381,6 +15517,7 @@ namespace moho
    */
   void WLD_Teardown()
   {
+    DropEarlySim(); // engine addition (wld_StartSimEarly): a load given up before its session
     if (sSimDriver) {
       sSimDriver->ShutDown();
       CWldSession* const session = gActiveWldSession;
@@ -15485,6 +15622,19 @@ namespace moho
   {
     gPendingWldSessionInfo = sessionInfo;
     gWldFrameAction = EWldFrameAction::Preload;
+  }
+
+  void WLD_StartPendingSessionLoad()
+  {
+    CWldSessionLoaderImpl* const loader = GetWldSessionLoader();
+    SWldSessionInfo* const pendingSession = gPendingWldSessionInfo.get();
+    if (loader == nullptr || pendingSession == nullptr || pendingSession->mLaunchInfo.get() == nullptr) {
+      return;
+    }
+    (void)loader->CreateScenarioInfo(
+      pendingSession->mMapName.raw_data_unsafe(), &pendingSession->mLaunchInfo.get()->mGameMods
+    );
+    loader->Update();
   }
 
   /**

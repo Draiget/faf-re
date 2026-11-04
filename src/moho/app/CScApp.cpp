@@ -23,6 +23,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/Error.hpp"
+#include "gpg/gal/backends/d3d12/DeviceD3D12.h"
 #include "moho/audio/AudioEngine.h"
 #include "moho/lua/ScriptChunkCache.h"
 #include "moho/render/d3d/CD3DFont.h"
@@ -66,6 +67,8 @@ namespace gpg
 
 namespace
 {
+  void PrepareDeviceEarly(); // engine addition (ren_PrepareDeviceEarly), below
+
   constexpr std::uintptr_t kAddressSpaceQueryLimit = 0x80000000u;
   constexpr double kAddressSpaceQueryIntervalSeconds = 3.0;
 
@@ -350,6 +353,98 @@ namespace
   }
 
   /**
+   * Engine addition: what the command-line bootstrap does before it picks a session - the
+   * telemetry flags and switch defaults (issue #218), before `/con name=value;name2=value2` runs
+   * its console commands (so a launcher can set user-side console variables, e.g.
+   * `/con sim_ReplayLead=0`), then `sys_ThreadPlacement` (`/threadplacement N`) for the main
+   * thread; the sim, issue and worker threads place themselves as they start. Once, from
+   * whichever of `StartCommandLineSessionEarly` and `InitializeSessionFromCommandLine` runs first.
+   */
+  void RunCommandLinePrologue()
+  {
+    static bool sDone = false;
+    if (sDone) {
+      return;
+    }
+    sDone = true;
+
+    moho::TELEMETRY_Startup();
+
+    msvc8::vector<msvc8::string> args;
+    if (moho::CFG_GetArgOption("/con", 1, &args) && !args.empty()) {
+      std::string commands = args[0].c_str();
+      std::replace(commands.begin(), commands.end(), '=', ' ');
+      std::size_t begin = 0;
+      while (begin <= commands.size()) {
+        const std::size_t end = std::min(commands.find(';', begin), commands.size());
+        if (end > begin) {
+          moho::CON_Execute(commands.substr(begin, end - begin).c_str());
+        }
+        begin = end + 1;
+      }
+    }
+
+    moho::PlaceCurrentThread(moho::EThreadRole::Main);
+  }
+
+  bool wld_EarlyCommandLineSession = true;
+  moho::TConVar<bool> gTConVar_wld_EarlyCommandLineSession(
+    "wld_EarlyCommandLineSession",
+    "Begin a /map (or /scenario) or /replay session, and its load, right after userInit.lua while the window, the graphics "
+    "device and the user interface are set up (1, the default), or after the app's first frame as the binary does "
+    "(0). Read at startup: /noearlysession sets 0, as does wld_EarlyCommandLineSession=0 in /con.",
+    &wld_EarlyCommandLineSession
+  );
+
+  bool gEarlyCommandLineSession = false; // the /map session began in CScApp::Init
+
+  /**
+   * Engine addition (`wld_EarlyCommandLineSession`): the `/map` (or else `/replay`) branch of the
+   * command-line bootstrap, run from `CScApp::Init` once userInit.lua and the profile are in place, and the
+   * session's load requested at once (`WLD_StartPendingSessionLoad`), so the rules and the map load
+   * while the app creates its window, device and user interface instead of after its first frame.
+   * `/con` is applied first, as it is before the `/map` branch otherwise. Not with `/debug`, whose
+   * hook goes on before the session's scripts run, nor in a server-mode build, where
+   * `/connectserver` decides first. A failed setup is left to the first frame, which tries again.
+   */
+  void StartCommandLineSessionEarly()
+  {
+#if !FAF_SERVER_MODE
+    if (moho::CFG_GetArgOption("/noearlysession", 0, nullptr)) {
+      wld_EarlyCommandLineSession = false;
+    }
+    msvc8::vector<msvc8::string> mapArgs;
+    msvc8::vector<msvc8::string> replayArgs;
+    const bool map = moho::CFG_GetArgOption("/scenario", 1, &mapArgs) || moho::CFG_GetArgOption("/map", 1, &mapArgs);
+    const bool replay = !map && moho::CFG_GetArgOption("/replay", 1, &replayArgs);
+    if (!wld_EarlyCommandLineSession || moho::CFG_GetArgOption("/debug", 0, nullptr) || (map ? mapArgs.empty() : !replay || replayArgs.empty())) {
+      return;
+    }
+    RunCommandLinePrologue();
+    if (!wld_EarlyCommandLineSession) {
+      return;
+    }
+    if (map) {
+      const msvc8::string mapScenario = moho::FindMapScenario(mapArgs[0].c_str());
+      if (!moho::StartCommandLineSession(mapScenario.c_str(), false)) {
+        return;
+      }
+    } else {
+      // The /replay branch of InitializeSessionFromCommandLine; a replay it refuses is left to it.
+      SetFrontEndReplayFilename(replayArgs[0]);
+      msvc8::string failureReason;
+      msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo = moho::VCR_SetupReplaySession(replayArgs[0].c_str(), &failureReason);
+      if (sessionInfo.get() == nullptr) {
+        return;
+      }
+      moho::WLD_BeginSession(sessionInfo);
+    }
+    gEarlyCommandLineSession = true;
+    moho::WLD_StartPendingSessionLoad();
+#endif
+  }
+
+  /**
    * Address: 0x008CE3D0 (FUN_008CE3D0, func_InitializeSession)
    *
    * What it does:
@@ -372,28 +467,7 @@ namespace
       moho::CON_Execute("WIN_ShowLogDialog true");
     }
 
-    // Engine addition (issue #218): telemetry flags and the switch defaults, before /con changes them.
-    moho::TELEMETRY_Startup();
-
-    // Engine addition: `/con name=value;name2=value2` runs console commands at startup, so a
-    // launcher can set user-side console variables (e.g. `/con sim_ReplayLead=0`).
-    if (moho::CFG_GetArgOption("/con", 1, &args) && !args.empty()) {
-      std::string commands = args[0].c_str();
-      std::replace(commands.begin(), commands.end(), '=', ' ');
-      std::size_t begin = 0;
-      while (begin <= commands.size()) {
-        const std::size_t end = std::min(commands.find(';', begin), commands.size());
-        if (end > begin) {
-          moho::CON_Execute(commands.substr(begin, end - begin).c_str());
-        }
-        begin = end + 1;
-      }
-      args.clear();
-    }
-
-    // Engine addition: `sys_ThreadPlacement` (`/threadplacement N`) for the main thread; the sim,
-    // issue and worker threads place themselves as they start.
-    moho::PlaceCurrentThread(moho::EThreadRole::Main);
+    RunCommandLinePrologue();
 
 #if FAF_SERVER_MODE
     // Engine addition, server mode: `/oraclegolden <file>`, the visibility oracle's golden test
@@ -416,6 +490,9 @@ namespace
 #endif
 
     if (moho::CFG_GetArgOption("/scenario", 1, &args) || moho::CFG_GetArgOption("/map", 1, &args)) {
+      if (gEarlyCommandLineSession) {
+        return; // engine addition (wld_EarlyCommandLineSession): begun in CScApp::Init
+      }
       if (!args.empty()) {
         const msvc8::string mapScenario = moho::FindMapScenario(args[0].c_str());
         if (moho::StartCommandLineSession(mapScenario.c_str(), false)) {
@@ -428,6 +505,9 @@ namespace
     }
 
     if (moho::CFG_GetArgOption("/replay", 1, &args)) {
+      if (gEarlyCommandLineSession) {
+        return; // engine addition (wld_EarlyCommandLineSession): begun in CScApp::Init
+      }
       if (!args.empty()) {
         SetFrontEndReplayFilename(args[0]);
         msvc8::string failureReason;
@@ -1052,6 +1132,9 @@ bool CScApp::Init()
     moho::USER_SetCurrentProfile(profileArgs[0]);
   }
 
+  PrepareDeviceEarly(); // engine addition (ren_PrepareDeviceEarly): the graphics_api option needs userInit.lua
+  StartCommandLineSessionEarly(); // engine addition (wld_EarlyCommandLineSession)
+
   // The binary calls this and discards the result, then guards a single-
   // instance check on it: CreateMutexA("SupComMutex") and, on
   // ERROR_ALREADY_EXISTS, an "already running" message box and a false return.
@@ -1337,7 +1420,7 @@ namespace
    * Vulkan, then Direct3D 11, then Direct3D 9 (the 32-bit build: Direct3D 11
    * first).
    */
-  [[nodiscard]] std::vector<gpg::gal::DeviceApi> RendererAttemptOrder()
+  [[nodiscard]] std::vector<gpg::gal::DeviceApi> RendererAttemptOrder(const bool logChoice = true)
   {
     using gpg::gal::DeviceApi;
     const auto explicitApi = [](const DeviceApi api) {
@@ -1351,13 +1434,17 @@ namespace
     };
     for (const auto& [name, api] : kSwitches) {
       if (moho::CFG_GetArgOption(name, 0, nullptr)) {
-        gpg::Logf("renderer: %s from the command line", DeviceApiLogName(api));
+        if (logChoice) {
+          gpg::Logf("renderer: %s from the command line", DeviceApiLogName(api));
+        }
         return explicitApi(api);
       }
     }
 
     const msvc8::string option = moho::OPTIONS_GetString("graphics_api");
-    gpg::Logf("graphics_api option: %s", option.empty() ? "(unset)" : option.c_str());
+    if (logChoice) {
+      gpg::Logf("graphics_api option: %s", option.empty() ? "(unset)" : option.c_str());
+    }
     static constexpr std::pair<const char*, DeviceApi> kOptions[] = {
       {"d3d9", DeviceApi::Direct3D9}, {"d3d11", DeviceApi::Direct3D11}, {"d3d12", DeviceApi::Direct3D12}, {"vulkan", DeviceApi::Vulkan},
     };
@@ -1375,6 +1462,29 @@ namespace
 #else
     return {DeviceApi::Direct3D12, DeviceApi::Vulkan, DeviceApi::Direct3D11, DeviceApi::Direct3D9};
 #endif
+  }
+
+  bool ren_PrepareDeviceEarly = true;
+  moho::TConVar<bool> gTConVar_ren_PrepareDeviceEarly(
+    "ren_PrepareDeviceEarly",
+    "Create the Direct3D 12 device on a helper thread once userInit.lua has run, while the fonts, the user "
+    "interface and the window are set up (1, the default), or when the window is created (0). Read at startup: "
+    "/nodeviceearly sets 0.",
+    &ren_PrepareDeviceEarly
+  );
+
+  /**
+   * Engine addition (`ren_PrepareDeviceEarly`): when Direct3D 12 is the first renderer CreateDevice
+   * will try, its device starts being created now (`gpg::gal::D3D12_PrepareDeviceEarly`).
+   */
+  void PrepareDeviceEarly()
+  {
+    if (moho::CFG_GetArgOption("/nodeviceearly", 0, nullptr)) {
+      ren_PrepareDeviceEarly = false;
+    }
+    if (ren_PrepareDeviceEarly && RendererAttemptOrder(false).front() == gpg::gal::DeviceApi::Direct3D12) {
+      gpg::gal::D3D12_PrepareDeviceEarly();
+    }
   }
 
   /**

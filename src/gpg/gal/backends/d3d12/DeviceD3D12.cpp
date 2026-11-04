@@ -3,6 +3,7 @@
 #include "DeviceD3D12.h"
 #include "gpg/gal/backends/common/EffectSourceCache.h"
 
+#include <thread>
 #include <algorithm>
 #include <cctype>
 #include <cstdarg>
@@ -133,6 +134,38 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       lower(commandLine);
       lower(needle);
       return commandLine.find(needle) != std::string::npos;
+    }
+
+    /// Engine addition (ren_PrepareDeviceEarly): the device D3D12_PrepareDeviceEarly is creating.
+    struct SEarlyDevice
+    {
+      std::mutex lock;
+      std::thread builder;
+      Microsoft::WRL::ComPtr<ID3D12Device> device; // written by `builder`, read after joining it
+      LUID adapter{};
+    };
+
+    // Never destroyed: a builder still joinable at exit would terminate the process.
+    SEarlyDevice& EarlyDevice()
+    {
+      static auto* const early = new SEarlyDevice();
+      return *early;
+    }
+
+    /// The device made early for `adapter`, once its builder is done, or null; one for another adapter is released.
+    [[nodiscard]] Microsoft::WRL::ComPtr<ID3D12Device> TakeEarlyDevice(const LUID& adapter)
+    {
+      SEarlyDevice& early = EarlyDevice();
+      const std::lock_guard<std::mutex> guard(early.lock);
+      if (early.builder.joinable()) {
+        early.builder.join();
+      }
+      Microsoft::WRL::ComPtr<ID3D12Device> device = std::move(early.device);
+      early.device.Reset();
+      if (device != nullptr && (early.adapter.LowPart != adapter.LowPart || early.adapter.HighPart != adapter.HighPart)) {
+        device.Reset();
+      }
+      return device;
     }
 
     /** The command a DRED breadcrumb records, for the device-removed report. */
@@ -476,9 +509,14 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         gpg::Logf("D3D12: device removed extended data on");
       }
     }
-    CheckHresult(
-      "DeviceD3D12.cpp", __LINE__, mLibrary.createDevice(adapter.adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&mDevice))
-    );
+    // Engine addition (ren_PrepareDeviceEarly): the device made early for this adapter, never with
+    // the debug layer or DRED on.
+    mDevice = (debugLayer || mDredEnabled) ? nullptr : TakeEarlyDevice(adapter.desc.AdapterLuid);
+    if (mDevice == nullptr) {
+      CheckHresult(
+        "DeviceD3D12.cpp", __LINE__, mLibrary.createDevice(adapter.adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&mDevice))
+      );
+    }
     if (debugLayer) {
       static_cast<void>(mDevice.As(&mInfoQueue));
     }
@@ -761,6 +799,36 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mBlitSamplers = SamplerTable({linearClamp});
   }
 
+  void D3D12_PrepareDeviceEarly()
+  {
+    if (CommandLineHas("/d3d12gbv") || CommandLineHas("/d3d12debug") || CommandLineHas("/d3d12dred") ||
+        backend::SetupFailureRequested("d3d12")) {
+      return;
+    }
+    SEarlyDevice& early = EarlyDevice();
+    const std::lock_guard<std::mutex> guard(early.lock);
+    if (early.builder.joinable() || early.device != nullptr) {
+      return;
+    }
+    early.builder = std::thread([&early] {
+      d3d12::Library library; // d3d12.dll stays loaded, as Setup's own load keeps it
+      dxgi::Factory factory;
+      if (!library.Load() || FAILED(factory.Create())) {
+        return;
+      }
+      factory.EnumerateAdapters(DXGI_FORMAT_B8G8R8A8_UNORM);
+      if (factory.Adapters().empty()) {
+        return;
+      }
+      const dxgi::AdapterInfo& adapter = factory.Adapters().front();
+      Microsoft::WRL::ComPtr<ID3D12Device> device;
+      if (SUCCEEDED(library.createDevice(adapter.adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device)))) {
+        early.device = std::move(device);
+        early.adapter = adapter.desc.AdapterLuid;
+      }
+    });
+  }
+
   void DeviceD3D12::Setup(DeviceContext* const context)
   {
     mCurThreadId = static_cast<int>(::GetCurrentThreadId());
@@ -770,6 +838,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       ThrowError("DeviceD3D12.cpp", __LINE__, "device creation failed on request (FAF_GAL_FAIL_SETUP)");
     }
     if (!mLibrary.Load()) {
+      (void)TakeEarlyDevice(LUID{}); // engine addition (ren_PrepareDeviceEarly): nothing will take it
       ThrowError("DeviceD3D12.cpp", __LINE__, "Direct3D 12 is not available (d3d12.dll)");
     }
     effects::ShaderCompiler& compiler = effects::ShaderCompiler::Instance();

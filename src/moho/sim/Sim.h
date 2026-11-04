@@ -7426,10 +7426,17 @@ namespace moho
    * Engine addition: starts building the sim's Lua state for `rules` on a helper thread - a fresh
    * state with the core and sim bindings and the rules' blueprints exported into it, the part of
    * `Sim::Sim` that needs nothing but the rules. The session loader calls it once the session's
-   * own export is done, so the copy runs while the loader finishes; `Sim::Sim` then takes the state
-   * instead of building it. Replaces a state prepared for other rules.
+   * own export is done, so the copy runs while the loader finishes, or before that export when it
+   * starts the sim early (`wld_StartSimEarly`); `Sim::Sim` then takes the state instead of building
+   * it. Replaces a state prepared for other rules.
    */
   void SIM_PrepareLuaState(RRuleGameRules* rules);
+
+  /**
+   * Engine addition (`wld_StartSimEarly`): waits until the state `SIM_PrepareLuaState` started is
+   * built, so the session loader's own export, which takes the rules' lock, comes after the sim's.
+   */
+  void SIM_FinishPreparingLuaState();
 
   /**
    * Engine addition: drops a state `SIM_PrepareLuaState` built for `rules` that no sim took; the

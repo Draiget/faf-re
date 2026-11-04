@@ -5992,6 +5992,15 @@ void moho::SIM_PrepareLuaState(RRuleGameRules* const rules)
   });
 }
 
+void moho::SIM_FinishPreparingLuaState()
+{
+  PreparedSimLuaState& prepared = Prepared();
+  const std::lock_guard<std::mutex> guard(prepared.lock);
+  if (prepared.builder.joinable()) {
+    prepared.builder.join();
+  }
+}
+
 void moho::SIM_DiscardPreparedLuaState(const RRuleGameRules* const rules)
 {
   PreparedSimLuaState& prepared = Prepared();
