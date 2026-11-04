@@ -38,11 +38,7 @@
 // Engine addition: helpers shared with the file these functions came from.
 namespace
 {
-  enum class EGpgNetOpenMode : int
-  {
-    Read = 1,
-    Write = 2,
-  };
+  using moho::EGpgNetOpenMode;
 
   /**
    * Address: 0x00875690 (FUN_00875690, func_OpenGPGNet)
@@ -167,6 +163,11 @@ namespace
   }
   constexpr std::uint8_t kInvalidSourceIndex = 255u;
 } // namespace
+
+std::unique_ptr<gpg::Stream> moho::VCR_OpenGPGNetURI(const gpg::StrArg uri, const EGpgNetOpenMode mode)
+{
+  return OpenGPGNetURI(uri, mode);
+}
 
 
 namespace moho

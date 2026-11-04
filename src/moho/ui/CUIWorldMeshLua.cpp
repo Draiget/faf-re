@@ -55,7 +55,7 @@ namespace
     constexpr const char* kIncorrectGameObjectTypeError =
       "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
 
-    moho::CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+    moho::CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
     if (scriptObjectSlot == nullptr) {
       luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
       return nullptr;
@@ -516,7 +516,7 @@ int moho::cfunc_CUIWorldMeshDestroyL(
   const LuaPlus::LuaObject worldMeshObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldMesh* const worldMesh = ResolveCUIWorldMeshOptionalOrError(worldMeshObject, state);
   if (worldMesh != nullptr) {
-    CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(worldMeshObject);
+    CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(worldMeshObject);
     if (scriptObjectSlot != nullptr && *scriptObjectSlot != nullptr) {
       delete *scriptObjectSlot;
     }

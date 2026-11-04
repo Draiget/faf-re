@@ -33,34 +33,6 @@ using namespace moho;
 // Engine addition: helpers shared with the file these functions came from.
 namespace
 {
-  gpg::RType* CachedCScriptObjectPointerType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CScriptObject*));
-    }
-    return cached;
-  }
-
-  CScriptObject** ExtractScriptObjectSlotFromLuaObject(const LuaPlus::LuaObject& object)
-  {
-    LuaPlus::LuaObject payload(object);
-    if (payload.IsTable()) {
-      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
-    }
-
-    if (!payload.IsUserData()) {
-      return nullptr;
-    }
-
-    const gpg::RRef userDataRef = moho::SCR_UserDataRef(payload);
-    if (!userDataRef.mObj) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, CachedCScriptObjectPointerType());
-    return static_cast<CScriptObject**>(upcast.mObj);
-  }
   constexpr const char* kDestroyedGameObjectError = "Game object has been destroyed";
   constexpr const char* kExpectedGameObjectError = "Expected a game object. (Did you call with '.' instead of ':'?)";
   constexpr const char* kIncorrectGameObjectTypeError =
@@ -693,7 +665,7 @@ namespace
  */
 ScriptedDecal* moho::SCR_FromLua_ScriptedDecal(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;

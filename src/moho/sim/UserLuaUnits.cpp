@@ -6,34 +6,6 @@ namespace
 {
 
 // Engine addition: helpers shared with the file these functions came from.
-  [[nodiscard]] gpg::RType* CachedCScriptObjectPointerType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = CScriptObject::GetPointerType();
-    }
-    return sType;
-  }
-
-  [[nodiscard]] CScriptObject** ExtractScriptObjectSlotFromLuaObject(const LuaPlus::LuaObject& object)
-  {
-    LuaPlus::LuaObject payload(object);
-    if (payload.IsTable()) {
-      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
-    }
-
-    if (!payload.IsUserData()) {
-      return nullptr;
-    }
-
-    const gpg::RRef userDataRef = moho::SCR_UserDataRef(payload);
-    if (!userDataRef.mObj) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, CachedCScriptObjectPointerType());
-    return static_cast<CScriptObject**>(upcast.mObj);
-  }
   /**
    * Address: 0x008B5BB0 (FUN_008B5BB0, sub_8B5BB0)
    *
@@ -243,7 +215,7 @@ namespace
   }
   [[nodiscard]] UserUnit* ResolveUserUnitOptional(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
   {
-    CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+    CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
     if (scriptObjectSlot == nullptr) {
       luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
       return nullptr;

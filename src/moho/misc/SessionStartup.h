@@ -72,6 +72,18 @@ namespace moho
 
   static_assert(sizeof(CSavedGame) == 0x78, "CSavedGame size must be 0x78");
 
+  enum class EGpgNetOpenMode : int
+  {
+    Read = 1,
+    Write = 2,
+  };
+
+  /**
+   * Engine addition: `OpenGPGNetURI` (ReplaySessionSetup.cpp) for the client's session startup,
+   * which writes the replay it records through the same function.
+   */
+  [[nodiscard]] std::unique_ptr<gpg::Stream> VCR_OpenGPGNetURI(gpg::StrArg uri, EGpgNetOpenMode mode);
+
   /**
    * Address: 0x00875B60 (FUN_00875B60)
    * Mangled:

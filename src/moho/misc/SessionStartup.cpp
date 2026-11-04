@@ -107,11 +107,7 @@ namespace
            header.mGameIdPart4 == moho::APP_GetGameIdPart(3);
   }
 
-  enum class EGpgNetOpenMode : int
-  {
-    Read = 1,
-    Write = 2,
-  };
+  using moho::EGpgNetOpenMode;
 
   constexpr std::uint8_t kInvalidSourceIndex = 255u;
   constexpr const char* kSessionSendChatMessageHelpText = "SessionSendChatMessage([client-or-clients,] message)";
@@ -196,106 +192,6 @@ namespace
     return current;
   }
 
-  /**
-   * Address: 0x00875690 (FUN_00875690, func_OpenGPGNet)
-   *
-   * What it does:
-   * Opens one local file stream for replay/network URI fallback according to
-   * recovered GPGNet mode semantics.
-   */
-  [[nodiscard]] std::unique_ptr<gpg::Stream> OpenGPGNet(const gpg::StrArg filename, const EGpgNetOpenMode mode)
-  {
-    switch (mode) {
-    case EGpgNetOpenMode::Read: {
-      msvc8::auto_ptr<gpg::Stream> openedStream = moho::DISK_OpenFileRead(filename);
-      return std::unique_ptr<gpg::Stream>(openedStream.release());
-    }
-    case EGpgNetOpenMode::Write: {
-      msvc8::auto_ptr<gpg::Stream> openedStream = moho::DISK_OpenFileWrite(filename);
-      return std::unique_ptr<gpg::Stream>(openedStream.release());
-    }
-    default:
-      throw std::runtime_error("unexpected mode in OpenGPGNet.");
-    }
-  }
-
-  /**
-   * Address: 0x008754D0 (FUN_008754D0, sub_8754D0)
-   *
-   * What it does:
-   * Connects to GPGNet host endpoint, emits one mode byte plus replay request
-   * path payload, and returns the live TCP stream lane.
-   */
-  [[nodiscard]]
-  std::unique_ptr<gpg::Stream> OpenGPGNetSocket(
-    const gpg::StrArg host, const msvc8::string& requestPath, const EGpgNetOpenMode mode
-  )
-  {
-    constexpr u_short kDefaultGpgNetPort = 15000;
-
-    u_long address = 0;
-    u_short port = 0;
-    if (!moho::NET_GetAddrInfo(host, kDefaultGpgNetPort, true, address, port)) {
-      gpg::Logf("NET_GetAddrInfo(%s) failed: %s", host, moho::NET_GetWinsockErrorString());
-      return {};
-    }
-
-    moho::INetTCPSocket* socket = moho::NET_TCPConnect(address, port);
-    if (socket == nullptr) {
-      const msvc8::string hostName = moho::NET_GetHostName(address);
-      gpg::Logf("NET_TCPConnect(%s:%d) failed.", hostName.c_str(), static_cast<int>(port));
-      return {};
-    }
-
-    std::unique_ptr<gpg::Stream> socketStream(socket);
-
-    const char modeByte = [&]() -> char {
-      switch (mode) {
-      case EGpgNetOpenMode::Read:
-        return 'G';
-      case EGpgNetOpenMode::Write:
-        return 'P';
-      default:
-        throw std::runtime_error("unexpected mode in OpenGPGNet.");
-      }
-    }();
-
-    socketStream->Write(&modeByte, 1u);
-    socketStream->Write(requestPath);
-    socketStream->VirtFlush();
-    return socketStream;
-  }
-
-  /**
-   * Address: 0x00875770 (FUN_00875770, func_GPGNetOpenURI)
-   *
-   * What it does:
-   * Resolves `gpgnet://` URI streams or falls back to local file open policy
-   * for plain/drive-letter paths.
-   */
-  [[nodiscard]]
-  std::unique_ptr<gpg::Stream> OpenGPGNetURI(const gpg::StrArg uri, const EGpgNetOpenMode mode)
-  {
-    msvc8::string scheme{};
-    msvc8::string authority{};
-    msvc8::string uriPath{};
-    msvc8::string uriQuery{};
-    msvc8::string uriFragment{};
-    if (!moho::URI_Split(uri, &scheme, &authority, &uriPath, &uriQuery, &uriFragment)) {
-      return OpenGPGNet(uri, mode);
-    }
-
-    if (gpg::STR_CompareNoCase(scheme.c_str(), "gpgnet:") == 0 && gpg::STR_StartsWith(authority.c_str(), "//")) {
-      const msvc8::string requestPath = uriPath + uriQuery + uriFragment;
-      return OpenGPGNetSocket(authority.c_str() + 2, requestPath, mode);
-    }
-
-    if (scheme.size() == 2u) {
-      return OpenGPGNet(uri, mode);
-    }
-
-    return {};
-  }
 } // namespace
 
 namespace moho
@@ -371,7 +267,7 @@ namespace moho
       replayPath = FILE_SuggestedExt((replayDirectory + name).c_str(), USER_GetReplayExt().c_str());
     }
 
-    std::unique_ptr<gpg::Stream> replayStream = OpenGPGNetURI(replayPath.c_str(), EGpgNetOpenMode::Write);
+    std::unique_ptr<gpg::Stream> replayStream = moho::VCR_OpenGPGNetURI(replayPath.c_str(), EGpgNetOpenMode::Write);
     // Engine addition (issue #275): a peer back from a restart gets this recording from here.
     if (net_RejoinAccept != 0 && replayStream != nullptr) {
       replayStream = REJOIN_WrapRecording(std::move(replayStream));

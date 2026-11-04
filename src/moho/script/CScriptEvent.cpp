@@ -61,15 +61,6 @@ namespace
     return &sInstance;
   }
 
-  gpg::RType* CachedCScriptObjectPointerType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CScriptObject*));
-    }
-    return cached;
-  }
-
   gpg::RType* CachedCBoneEntityManipulatorType()
   {
     static gpg::RType* cached = nullptr;
@@ -400,26 +391,6 @@ namespace
   constexpr const char* kIncorrectGameObjectTypeError =
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
 
-  CScriptObject** ExtractScriptObjectSlotFromLuaObject(const LuaPlus::LuaObject& object)
-  {
-    LuaPlus::LuaObject payload(object);
-    if (payload.IsTable()) {
-      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
-    }
-
-    if (!payload.IsUserData()) {
-      return nullptr;
-    }
-
-    const gpg::RRef userDataRef = moho::SCR_UserDataRef(payload);
-    if (!userDataRef.mObj) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, CachedCScriptObjectPointerType());
-    return static_cast<CScriptObject**>(upcast.mObj);
-  }
-
   /**
    * Address: 0x004C8F00 (FUN_004C8F00, CScriptObject-pointer reflected ref store helper)
    *
@@ -647,7 +618,7 @@ void CScriptEvent::MemberSerialize(gpg::WriteArchive* const archive) const
  */
 CScriptObject* moho::SCR_GetScriptObjectFromLuaObject(const LuaPlus::LuaObject& object)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     return nullptr;
   }
@@ -657,7 +628,7 @@ CScriptObject* moho::SCR_GetScriptObjectFromLuaObject(const LuaPlus::LuaObject& 
 
 CScriptObject** moho::SCR_FromLua_CScriptObject(const LuaPlus::LuaObject& object)
 {
-  return ExtractScriptObjectSlotFromLuaObject(object);
+  return moho::SCR_ScriptObjectSlot(object);
 }
 
 /**
@@ -669,7 +640,7 @@ CScriptObject** moho::SCR_FromLua_CScriptObject(const LuaPlus::LuaObject& object
  */
 CScriptEvent* moho::SCR_FromLua_CScriptEvent(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -697,7 +668,7 @@ CScriptEvent* moho::SCR_FromLua_CScriptEvent(const LuaPlus::LuaObject& object, L
 Unit* moho::SCR_FromLua_Unit(const LuaPlus::LuaObject& object)
 {
   LuaPlus::LuaState* const activeState = object.GetActiveState();
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(activeState ? activeState->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -728,7 +699,7 @@ Unit* moho::SCR_FromLua_Unit(const LuaPlus::LuaObject& object)
  */
 CUnitScriptTask* moho::SCR_FromLua_CUnitScriptTask(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -759,7 +730,7 @@ CUnitScriptTask* moho::SCR_FromLua_CUnitScriptTask(const LuaPlus::LuaObject& obj
  */
 UnitWeapon* moho::SCR_FromLua_UnitWeapon(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -791,7 +762,7 @@ UnitWeapon* moho::SCR_FromLua_UnitWeapon(const LuaPlus::LuaObject& object, LuaPl
  */
 UnitWeapon* moho::SCR_FromLua_UnitWeaponOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -821,7 +792,7 @@ UnitWeapon* moho::SCR_FromLua_UnitWeaponOpt(const LuaPlus::LuaObject& object, Lu
  */
 CAimManipulator* moho::SCR_FromLua_CAimManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -855,7 +826,7 @@ CBoneEntityManipulator* moho::SCR_FromLua_CBoneEntityManipulator(
   LuaPlus::LuaState* const state
 )
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -890,7 +861,7 @@ CBuilderArmManipulator* moho::SCR_FromLua_CBuilderArmManipulator(
   LuaPlus::LuaState* const state
 )
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -925,7 +896,7 @@ CCollisionManipulator* moho::SCR_FromLua_CCollisionManipulator(
   LuaPlus::LuaState* const state
 )
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -956,7 +927,7 @@ CCollisionManipulator* moho::SCR_FromLua_CCollisionManipulator(
  */
 IAniManipulator* moho::SCR_FromLua_IAniManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -988,7 +959,7 @@ IAniManipulator* moho::SCR_FromLua_IAniManipulator(const LuaPlus::LuaObject& obj
  */
 IAniManipulator* moho::SCR_FromLua_IAniManipulatorOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1018,7 +989,7 @@ IAniManipulator* moho::SCR_FromLua_IAniManipulatorOpt(const LuaPlus::LuaObject& 
  */
 IEffect* moho::SCR_FromLua_IEffect(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1050,7 +1021,7 @@ IEffect* moho::SCR_FromLua_IEffect(const LuaPlus::LuaObject& object, LuaPlus::Lu
  */
 IEffect* moho::SCR_FromLua_IEffectOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1081,7 +1052,7 @@ IEffect* moho::SCR_FromLua_IEffectOpt(const LuaPlus::LuaObject& object, LuaPlus:
  */
 CDecalHandle* moho::SCR_FromLua_CDecalHandleOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1114,7 +1085,7 @@ CAnimationManipulator* moho::SCR_FromLua_CAnimationManipulator(
   LuaPlus::LuaState* const state
 )
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1148,7 +1119,7 @@ CRotateManipulator* moho::SCR_FromLua_CRotateManipulator(
   LuaPlus::LuaState* const state
 )
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1180,7 +1151,7 @@ CRotateManipulator* moho::SCR_FromLua_CRotateManipulator(
  */
 CSlaveManipulator* moho::SCR_FromLua_CSlaveManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1215,7 +1186,7 @@ CThrustManipulator* moho::SCR_FromLua_CThrustManipulator(
   LuaPlus::LuaState* const state
 )
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1247,7 +1218,7 @@ CThrustManipulator* moho::SCR_FromLua_CThrustManipulator(
  */
 CSlideManipulator* moho::SCR_FromLua_CSlideManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1279,7 +1250,7 @@ CSlideManipulator* moho::SCR_FromLua_CSlideManipulator(const LuaPlus::LuaObject&
  */
 CollisionBeamEntity* moho::SCR_FromLua_CollisionBeamEntity(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1311,7 +1282,7 @@ CollisionBeamEntity* moho::SCR_FromLua_CollisionBeamEntity(const LuaPlus::LuaObj
  */
 MotorFallDown* moho::SCR_FromLua_MotorFallDown(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1342,7 +1313,7 @@ MotorFallDown* moho::SCR_FromLua_MotorFallDown(const LuaPlus::LuaObject& object,
  */
 CUnitCommand* moho::SCR_FromLua_CUnitCommand(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1374,7 +1345,7 @@ CUnitCommand* moho::SCR_FromLua_CUnitCommand(const LuaPlus::LuaObject& object, L
  */
 HSound* moho::SCR_FromLua_HSoundOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1404,7 +1375,7 @@ HSound* moho::SCR_FromLua_HSoundOpt(const LuaPlus::LuaObject& object, LuaPlus::L
  */
 HSound* moho::SCR_FromLua_HSound(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1435,7 +1406,7 @@ HSound* moho::SCR_FromLua_HSound(const LuaPlus::LuaObject& object, LuaPlus::LuaS
  */
 CDamage* moho::SCR_FromLua_CDamage(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1467,7 +1438,7 @@ CDamage* moho::SCR_FromLua_CDamage(const LuaPlus::LuaObject& object, LuaPlus::Lu
  */
 CPathDebugger* moho::SCR_FromLua_CPathDebugger(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1498,7 +1469,7 @@ CPathDebugger* moho::SCR_FromLua_CPathDebugger(const LuaPlus::LuaObject& object,
  */
 UserEntity* moho::SCR_FromLua_UserEntity(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1529,7 +1500,7 @@ UserEntity* moho::SCR_FromLua_UserEntity(const LuaPlus::LuaObject& object, LuaPl
  */
 UserUnit* moho::SCR_FromLua_UserUnit(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1560,7 +1531,7 @@ UserUnit* moho::SCR_FromLua_UserUnit(const LuaPlus::LuaObject& object, LuaPlus::
  */
 CAiBrain* moho::SCR_FromLua_CAiBrain(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1591,7 +1562,7 @@ CAiBrain* moho::SCR_FromLua_CAiBrain(const LuaPlus::LuaObject& object, LuaPlus::
  */
 CAiAttackerImpl* moho::SCR_FromLua_CAiAttackerImpl(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1622,7 +1593,7 @@ CAiAttackerImpl* moho::SCR_FromLua_CAiAttackerImpl(const LuaPlus::LuaObject& obj
  */
 CAiPersonality* moho::SCR_FromLua_CAiPersonality(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1653,7 +1624,7 @@ CAiPersonality* moho::SCR_FromLua_CAiPersonality(const LuaPlus::LuaObject& objec
  */
 CAiNavigatorImpl* moho::SCR_FromLua_CAiNavigatorImpl(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1685,7 +1656,7 @@ CAiNavigatorImpl* moho::SCR_FromLua_CAiNavigatorImpl(const LuaPlus::LuaObject& o
  */
 CPlatoon* moho::SCR_FromLua_CPlatoonOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1715,7 +1686,7 @@ CPlatoon* moho::SCR_FromLua_CPlatoonOpt(const LuaPlus::LuaObject& object, LuaPlu
  */
 CPlatoon* moho::SCR_FromLua_CPlatoon(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1746,7 +1717,7 @@ CPlatoon* moho::SCR_FromLua_CPlatoon(const LuaPlus::LuaObject& object, LuaPlus::
  */
 CMauiBorder* moho::SCR_FromLua_CMauiBorder(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1778,7 +1749,7 @@ CMauiBorder* moho::SCR_FromLua_CMauiBorder(const LuaPlus::LuaObject& object, Lua
  */
 CMauiMesh* moho::SCR_FromLua_CMauiMesh(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1810,7 +1781,7 @@ CMauiMesh* moho::SCR_FromLua_CMauiMesh(const LuaPlus::LuaObject& object, LuaPlus
  */
 CDiscoveryService* moho::SCR_FromLua_CDiscoveryService(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1843,7 +1814,7 @@ CDiscoveryService* moho::SCR_FromLua_CDiscoveryService(const LuaPlus::LuaObject&
  */
 CDiscoveryService* moho::SCR_FromLua_CDiscoveryServiceOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1875,7 +1846,7 @@ CDiscoveryService* moho::SCR_FromLua_CDiscoveryServiceOpt(const LuaPlus::LuaObje
  */
 CLobby* moho::SCR_FromLua_CLobbyOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1906,7 +1877,7 @@ CLobby* moho::SCR_FromLua_CLobbyOpt(const LuaPlus::LuaObject& object, LuaPlus::L
  */
 CLobby* moho::SCR_FromLua_CLobby(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1938,7 +1909,7 @@ CLobby* moho::SCR_FromLua_CLobby(const LuaPlus::LuaObject& object, LuaPlus::LuaS
  */
 CameraImpl* moho::SCR_FromLua_CameraImpl(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -1974,7 +1945,7 @@ CUIWorldView* moho::SCR_FromLua_CUIWorldView(const LuaPlus::LuaObject& object, L
     activeState = object.GetActiveState();
   }
 
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(activeState ? activeState->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2006,7 +1977,7 @@ CUIWorldView* moho::SCR_FromLua_CUIWorldView(const LuaPlus::LuaObject& object, L
  */
 CUIWorldMesh* moho::SCR_FromLua_CUIWorldMesh(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2038,7 +2009,7 @@ CUIWorldMesh* moho::SCR_FromLua_CUIWorldMesh(const LuaPlus::LuaObject& object, L
  */
 CMauiHistogram* moho::SCR_FromLua_CMauiHistogram(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2070,7 +2041,7 @@ CMauiHistogram* moho::SCR_FromLua_CMauiHistogram(const LuaPlus::LuaObject& objec
  */
 CUIMapPreview* moho::SCR_FromLua_CUIMapPreview(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2102,7 +2073,7 @@ CUIMapPreview* moho::SCR_FromLua_CUIMapPreview(const LuaPlus::LuaObject& object,
  */
 CMauiCursor* moho::SCR_FromLua_CMauiCursor(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2135,7 +2106,7 @@ CMauiCursor* moho::SCR_FromLua_CMauiCursor(const LuaPlus::LuaObject& object, Lua
  */
 CMauiItemList* moho::SCR_FromLua_CMauiItemList(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2166,7 +2137,7 @@ CMauiItemList* moho::SCR_FromLua_CMauiItemList(const LuaPlus::LuaObject& object,
  */
 CMauiMovie* moho::SCR_FromLua_CMauiMovie(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2198,7 +2169,7 @@ CMauiMovie* moho::SCR_FromLua_CMauiMovie(const LuaPlus::LuaObject& object, LuaPl
  */
 CMauiScrollbar* moho::SCR_FromLua_CMauiScrollbar(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2230,7 +2201,7 @@ CMauiScrollbar* moho::SCR_FromLua_CMauiScrollbar(const LuaPlus::LuaObject& objec
  */
 CMauiText* moho::SCR_FromLua_CMauiText(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2262,7 +2233,7 @@ CMauiText* moho::SCR_FromLua_CMauiText(const LuaPlus::LuaObject& object, LuaPlus
  */
 CMauiControl* moho::SCR_FromLua_CMauiControl(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2294,7 +2265,7 @@ CMauiControl* moho::SCR_FromLua_CMauiControl(const LuaPlus::LuaObject& object, L
  */
 CMauiEdit* moho::SCR_FromLua_CMauiEdit(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2326,7 +2297,7 @@ CMauiEdit* moho::SCR_FromLua_CMauiEdit(const LuaPlus::LuaObject& object, LuaPlus
  */
 CMauiBitmap* moho::SCR_FromLua_CMauiBitmap(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2358,7 +2329,7 @@ CMauiBitmap* moho::SCR_FromLua_CMauiBitmap(const LuaPlus::LuaObject& object, Lua
  */
 CMauiFrame* moho::SCR_FromLua_CMauiFrame(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2390,7 +2361,7 @@ CMauiFrame* moho::SCR_FromLua_CMauiFrame(const LuaPlus::LuaObject& object, LuaPl
  */
 CMauiLuaDragger* moho::SCR_FromLua_CMauiLuaDragger(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2423,7 +2394,7 @@ Entity* moho::SCR_FromLua_Entity(const LuaPlus::LuaObject& object, LuaPlus::LuaS
     activeState = object.GetActiveState();
   }
 
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(activeState ? activeState->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2457,7 +2428,7 @@ Entity* moho::SCR_FromLua_EntityOpt(const LuaPlus::LuaObject& object)
 {
   LuaPlus::LuaState* const activeState = object.GetActiveState();
 
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(activeState ? activeState->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2487,7 +2458,7 @@ Entity* moho::SCR_FromLua_EntityOpt(const LuaPlus::LuaObject& object)
  */
 ReconBlip* moho::SCR_FromLua_ReconBlip(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2537,7 +2508,7 @@ Entity* moho::SCR_FromLuaNoError_Entity(const LuaPlus::LuaObject& object)
  */
 Projectile* moho::SCR_FromLua_Projectile(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2569,7 +2540,7 @@ Projectile* moho::SCR_FromLua_Projectile(const LuaPlus::LuaObject& object, LuaPl
  */
 Projectile* moho::SCR_FromLua_ProjectileOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
@@ -2595,7 +2566,7 @@ Projectile* moho::SCR_FromLua_ProjectileOpt(const LuaPlus::LuaObject& object, Lu
  */
 Prop* moho::SCR_FromLua_Prop(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;
