@@ -262,6 +262,23 @@ namespace moho
   StatItem* sEngineStat_UserSync_SessionTick_NumTickers = nullptr;
   StatItem* sEngineStat_Sync_Count = nullptr;
 
+  /// Engine addition (wld_FrameClock): whether the current session has shown a tick yet, and
+  /// whether the app should start its frame-time window afresh (`WLD_TakeFrameClockReset`).
+  /// Main thread only.
+  bool gSessionShowedTick = false;
+  bool gFrameClockResetPending = false;
+
+  /// Engine addition: this client's ready message waits for the frame after the one that built the
+  /// game interface (WLD_DoPostInitializing). Main thread only.
+  bool gReadyAfterFirstFrame = false;
+
+  bool WLD_TakeFrameClockReset() noexcept
+  {
+    const bool pending = gFrameClockResetPending;
+    gFrameClockResetPending = false;
+    return pending;
+  }
+
   /**
    * Address: 0x0089AEC0 (FUN_0089AEC0, boost::shared_ptr_SSessionSaveData::shared_ptr_SSessionSaveData)
    *
@@ -6890,6 +6907,7 @@ namespace moho
     mGameTick = 0;
     mLastBeatWasTick = 0;
     mTimeSinceLastTick = 0.0f;
+    gSessionShowedTick = false;
     mSessionPauseStateA = 0;
     mRequestingPauseState = 0;
     mRequestingPause = 0;
@@ -8965,6 +8983,14 @@ namespace moho
       (void)sEngineStat_Sync_Count->Release(0);
     }
     (void)sEngineStat_Sync_Count->SetInt(&beatsApplied);
+
+    // Engine addition (wld_FrameClock): the session's first tick reached the screen. The frames
+    // before it include the long first frame of play, which would hold up the frame clock's
+    // average for the next frames and rush the opening ticks out a few milliseconds apart.
+    if (!gSessionShowedTick && mGameTick != tickAtFrameStart) {
+      gSessionShowedTick = true;
+      gFrameClockResetPending = true;
+    }
 
     // Whatever the drain consumed comes back off the interpolation fraction, so
     // the render clock does not run ahead of the sim clock.
@@ -14807,7 +14833,11 @@ namespace moho
       // writer of `mWeAreReady`, which `DoBeat` needs before it will ever set
       // `mEveryoneIsReady` - so without this the session sits in Waiting
       // forever showing "waiting for other players", local game or not.
-      if (CClientManagerImpl* const clientManager = simDriver->GetClientManager(); clientManager != nullptr) {
+      // Engine addition (wld_ReadyAfterFirstFrame): not until the first frame of the interface just
+      // built has been drawn (WLD_DoPostInitializing); the binary declared it here.
+      if (wld_ReadyAfterFirstFrame != 0) {
+        gReadyAfterFirstFrame = true;
+      } else if (CClientManagerImpl* const clientManager = simDriver->GetClientManager(); clientManager != nullptr) {
         clientManager->Cleanup();
       }
 
@@ -14862,6 +14892,20 @@ namespace moho
 
       simDriver->Dispatch();
       CClientManagerImpl* const clientManager = simDriver->GetClientManager();
+
+      // Engine addition: the frame that built the game interface has been drawn, with the UI's
+      // first update (`OnFirstUpdate`) and the world's first render, which take a few hundred ms
+      // more. Ready now, so the session's shared start (wld_PreciseSharedStart) is when the last
+      // player can show its first tick, not that long before it. Checked next frame, once the
+      // issue thread has counted it, so a lone player does not see the waiting dialog flash.
+      if (gReadyAfterFirstFrame) {
+        gReadyAfterFirstFrame = false;
+        if (clientManager != nullptr) {
+          clientManager->Cleanup();
+        }
+        return;
+      }
+
       if (clientManager != nullptr && clientManager->IsEveryoneReady()) {
         simDriver->DecrementOutstandingRequestsAndSignal();
         gWldFrameAction = EWldFrameAction::Playing;

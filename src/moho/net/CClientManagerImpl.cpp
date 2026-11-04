@@ -3,12 +3,14 @@
 #include "CMessage.h"
 #include "CMessageStream.h"
 #include "CNetClient.h"
+#include "CNetUDPConnection.h"
 #include "CNullClient.h"
 #include "CReplayClient.h"
 #include "EClientMsg.h"
 #include "ECmdStreamOp.h"
 
 #include <algorithm>
+#include <iterator>
 #include <cstddef>
 #include <cstdint>
 #include <chrono>
@@ -164,6 +166,85 @@ CClientManagerImpl::CClientManagerImpl(
   , mPeerFeatures(std::make_unique<CPeerFeatures>(clientCount))
 {
   mClients.resize(clientCount, nullptr);
+  // A manager with no clients (`CRemoteClientManager`) stands beside a session's real one.
+  if (clientCount != 0) {
+    NET_ResetReadyDeparture();
+  }
+}
+
+/**
+ * Engine addition (wld_PreciseSharedStart): see the declaration.
+ */
+void CClientManagerImpl::NoteClientReady(const int clientIndex)
+{
+  std::scoped_lock lock(mLock);
+  mPeerFeatures->NoteReady(clientIndex, NET_SteadyClockMicroseconds());
+}
+
+/**
+ * Engine addition (wld_PreciseSharedStart): see the declaration.
+ */
+std::int64_t CClientManagerImpl::EstimateSharedStartUs(const bool logDetails)
+{
+  struct SReadyTiming
+  {
+    std::size_t mIndex;
+    std::int64_t mHandledUs;
+    float mPingMs;
+    std::int64_t mLeftUs;
+  };
+
+  std::scoped_lock lock(mLock);
+  msvc8::vector<SReadyTiming> timings;
+  std::int64_t start = 0;
+  for (std::size_t index = 0; index < mClients.size(); ++index) {
+    CClientBase* const client = mClients[index];
+    if (client == nullptr || !client->NoEjectionPending()) {
+      continue;
+    }
+    const std::int64_t handledUs = mPeerFeatures->ReadyUs(static_cast<int>(index));
+    if (handledUs == 0) {
+      return 0;
+    }
+    // Every ready message is timed as it left its sender. Ours: when our connection sent it
+    // (NET_GetReadyDepartureUs). A peer's: when it was handled here, less the one-way trip, which
+    // is half of what is left of its ping after the peer's wait before it acknowledges
+    // (`PeerAckDelayMs`: what it announced, or as this client does if it announced nothing).
+    // The local client reports a ping of 0.
+    const float pingMs = client->GetStatusMetricA();
+    std::int64_t leftUs = handledUs;
+    if (pingMs > 0.0f) {
+      const float ackDelayMs = static_cast<float>(mPeerFeatures->PeerAckDelayMs(static_cast<int>(index)));
+      const float oneWayMs = std::max(0.0f, (pingMs - ackDelayMs) * 0.5f);
+      leftUs = handledUs - static_cast<std::int64_t>(oneWayMs * 1000.0f);
+    } else if (mLocalClient == client && mClients.size() > 1) {
+      // Not known until our ready message has left; the caller asks again.
+      leftUs = NET_GetReadyDepartureUs();
+      if (leftUs == 0) {
+        return 0;
+      }
+    }
+    timings.push_back(SReadyTiming{index, handledUs, pingMs, leftUs});
+    start = std::max(start, leftUs);
+  }
+
+  if (logDetails) {
+    // Times are relative to the shared start, which is the latest departure; players on one PC
+    // read one steady clock, so the absolute time compares their estimates directly.
+    gpg::Logf("SharedStart: %lld us on the steady clock", static_cast<long long>(start));
+    for (const SReadyTiming& timing : timings) {
+      const float handledMs = static_cast<float>(timing.mHandledUs - start) * 0.001f;
+      const float leftMs = static_cast<float>(timing.mLeftUs - start) * 0.001f;
+      if (static_cast<CClientBase*>(mLocalClient) == mClients[timing.mIndex]) {
+        gpg::Logf("SharedStart: client %d (this one) queued its ready at %+.1f ms, it left at %+.1f ms",
+          static_cast<int>(timing.mIndex), handledMs, leftMs);
+      } else {
+        gpg::Logf("SharedStart: client %d's ready arrived at %+.1f ms, ping %.1f ms, so it left at %+.1f ms",
+          static_cast<int>(timing.mIndex), handledMs, timing.mPingMs, leftMs);
+      }
+    }
+  }
+  return start;
 }
 
 /**
