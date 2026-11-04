@@ -4307,7 +4307,35 @@ namespace
   // Held by `Sync` from its walk to `OnSyncWalkDone`, so a caller that removes the observer
   // knows no call into it is still running on the sim's thread.
   std::mutex sSyncObserverLock;
+
+  ISyncRouting* sSyncRouting = nullptr;
+
+  /** A command source's Lua runs under its army's focus while the routing is on (plan WP6.2). */
+  struct SSyncRoutingCommand
+  {
+    Sim& sim;
+    ISyncRouting* routing;
+    explicit SSyncRoutingCommand(Sim& owner)
+      : sim(owner)
+      , routing(sSyncRouting)
+    {
+      if (routing != nullptr) {
+        routing->EnterCommand(sim);
+      }
+    }
+    ~SSyncRoutingCommand()
+    {
+      if (routing != nullptr) {
+        routing->LeaveCommand(sim);
+      }
+    }
+  };
 } // namespace
+
+void Sim::SetSyncRouting(ISyncRouting* const routing) noexcept
+{
+  sSyncRouting = routing;
+}
 
 void Sim::SetSyncObserver(CSyncObserver* const observer) noexcept
 {
@@ -4712,6 +4740,11 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     // tagged payload. The previous stream is released only when it is not the
     // one being installed; the packet is freshly built each beat so it is
     // normally null, but that is the shape the binary has.
+#if FAF_SERVER_MODE
+    if (sSyncRouting != nullptr) {
+      sSyncRouting->OnSyncTable(*this, syncTable, *outSyncData);
+    }
+#endif
     auto* const beatStream = new gpg::MemBufferStream(256u);
     if (beatStream != outSyncData->mStream && outSyncData->mStream != nullptr) {
       delete outSyncData->mStream;
@@ -5906,6 +5939,13 @@ void Sim::Printf(const char* fmt, ...)
   va_start(args, fmt);
 
   const char* format = fmt;
+#if FAF_SERVER_MODE
+  if (sSyncRouting != nullptr && sSyncRouting->FocusForLua() >= 0) {
+    (void)sSyncRouting->Print(gpg::STR_Va(format, args));
+    va_end(args);
+    return;
+  }
+#endif
   mPrintField.push_back(gpg::STR_Va(format, args));
 
   va_end(args);
@@ -7920,6 +7960,9 @@ void Sim::ExecuteLuaInSim(const char* const functionName, const LuaPlus::LuaObje
     return;
   }
 
+#if FAF_SERVER_MODE
+  const SSyncRoutingCommand routingCommand(*this);
+#endif
   try {
     lua_State* const state = mLuaState->m_state;
     const int savedTop = lua_gettop(state);
@@ -7970,6 +8013,9 @@ void Sim::LuaSimCallback(
     }
   }
 
+#if FAF_SERVER_MODE
+  const SSyncRoutingCommand routingCommand(*this);
+#endif
   // A script error is logged, not propagated: the binary's only handler here is
   // `catch (lua_RuntimeError&)` (FuncInfo 0x00EE1C84, funclet 0x00749D74).
   // Without it one bad UI callback (e.g. a wrong-arity Issue* call inside
@@ -18439,6 +18485,11 @@ int moho::cfunc_GetFocusArmySimL(LuaPlus::LuaState* const state)
 
   Sim* const sim = ResolveGlobalSim(state->m_state);
   int focusArmy = sim->mSyncFilter.focusArmy;
+#if FAF_SERVER_MODE
+  if (sSyncRouting != nullptr) {
+    focusArmy = sSyncRouting->FocusForLua();
+  }
+#endif
   if (focusArmy != -1) {
     ++focusArmy;
   }

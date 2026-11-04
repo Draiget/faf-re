@@ -3,11 +3,14 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "remote/SyncRouting.h"
 #include "remote/ViewFrames.h"
 #include "remote/wire/ArmyLane.h"
+#include "remote/wire/LuaSyncLane.h"
 
 // Engine addition, server mode (plan WP16.5, WPR.35): headless's `--view-bench <file>`. Run
 // unfocused, every beat it does the work a dedicated server does for its players and nothing a
@@ -41,6 +44,12 @@ namespace faf::headless
     [[nodiscard]] bool IsOpen() const noexcept { return mFile != nullptr; }
     void Install();
     void Uninstall();
+    /** `--lua-routing`: the Lua lane too, each player's `Sync` as `remote/SyncRouting.h` routes it. */
+    void EnableLuaRouting(std::string dumpPrefix)
+    {
+      mLuaRouting = true;
+      mLuaRoutingDump = std::move(dumpPrefix);
+    }
     [[nodiscard]] std::string Summary() const;
     /** Lanes that did not encode, and what the check found (should stay 0). */
     [[nodiscard]] std::uint64_t Failures() const noexcept { return mEncodeFailures + HeldMismatches(); }
@@ -93,5 +102,8 @@ namespace faf::headless
     bool mHaveLastFrames = false;
     std::chrono::steady_clock::time_point mLastFrames{};
     std::uint64_t mEncodeFailures = 0;
+    bool mLuaRouting = false;
+    std::string mLuaRoutingDump;
+    std::unique_ptr<remote::CSyncRouter> mRouter; // made once the army count is known
   };
 } // namespace faf::headless

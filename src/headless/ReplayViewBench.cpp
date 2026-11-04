@@ -86,6 +86,7 @@ namespace faf::headless
 
   void CReplayViewBench::Uninstall()
   {
+    moho::Sim::SetSyncRouting(nullptr);
     moho::Sim::SetSyncObserver(nullptr);
   }
 
@@ -95,6 +96,14 @@ namespace faf::headless
     const auto armyCount = static_cast<std::size_t>(ArmyCount());
     if (mClients.size() < armyCount) {
       mClients.resize(armyCount);
+    }
+    if (mLuaRouting && mRouter == nullptr) {
+      mRouter = std::make_unique<remote::CSyncRouter>(armyCount);
+      mRouter->SetIdTranslator([this](const std::size_t view, const std::uint32_t simId) {
+        return ViewEntityId(view, simId);
+      });
+      mRouter->SetDumpPrefix(mLuaRoutingDump);
+      moho::Sim::SetSyncRouting(mRouter.get());
     }
 
     // Every army's grids, encoded once for all the views that receive them, on the workers.
@@ -261,6 +270,17 @@ namespace faf::headless
       ++client.failures;
     }
     client.grids.swap(client.gridsNext);
+
+    // Lua lane. `Sim::Sync` writes the `Sync` table after its entity walk, so these are the last
+    // beat's: a real server sends them when the beat's sync is over.
+    if (mRouter != nullptr && army < mRouter->ViewCount()) {
+      remote::wire::BitWriter luaWriter;
+      if (remote::wire::EncodeLuaSyncLane(mRouter->Payload(army), mRouter->Prints(army), luaWriter)) {
+        client.bytes += static_cast<std::uint32_t>(luaWriter.Bytes().size());
+      } else {
+        ++client.failures;
+      }
+    }
   }
 
   std::string CReplayViewBench::Summary() const

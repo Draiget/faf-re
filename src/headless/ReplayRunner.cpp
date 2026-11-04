@@ -671,6 +671,9 @@ namespace faf::headless
         return result;
       }
       viewBench->SetParallel(options.parallelViews);
+      if (options.luaRouting) {
+        viewBench->EnableLuaRouting(options.luaRoutingDump);
+      }
       viewBench->Install();
     }
     // `--inbound-check`: the decoder's messages through view ids and back (with --view-ids).
@@ -847,6 +850,23 @@ namespace faf::headless
         if (rules && !options.keepClientData && !releasedScriptBlueprints) {
           static_cast<moho::RRuleGameRulesImpl*>(rules.get())->ReleaseScriptBlueprints();
           releasedScriptBlueprints = true;
+        }
+        if (!options.syncDumpPath.empty() && packet->mStream != nullptr) {
+          static bool sStarted = false;
+          std::FILE* const dump = std::fopen(options.syncDumpPath.c_str(), sStarted ? "ab" : "wb");
+          sStarted = true;
+          if (dump != nullptr) {
+            std::string bytes;
+            char buffer[4096];
+            for (std::size_t read = packet->mStream->Read(buffer, sizeof(buffer)); read != 0u; read = packet->mStream->Read(buffer, sizeof(buffer))) {
+              bytes.append(buffer, read);
+            }
+            (void)packet->mStream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, 0);
+            const std::uint32_t head[2] = {static_cast<std::uint32_t>(packet->mCurBeat), static_cast<std::uint32_t>(bytes.size())};
+            std::fwrite(head, sizeof(head), 1u, dump);
+            std::fwrite(bytes.data(), 1u, bytes.size(), dump);
+            std::fclose(dump);
+          }
         }
         const bool syncSaysEnded =
           InspectSync(*packet, syncState, options.syncKeysPath.empty() ? nullptr : &syncKeys);
