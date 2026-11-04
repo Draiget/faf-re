@@ -1,7 +1,6 @@
 #include "moho/ai/CAiFormationInstanceTypeInfo.h"
 
 #include <cstdlib>
-#include <initializer_list>
 #include <new>
 #include <typeinfo>
 
@@ -21,28 +20,18 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
-  {
-    for (const char* const name : names) {
-      if (!name) {
-        continue;
-      }
-
-      if (gpg::RType* const type = gpg::REF_FindTypeNamed(name)) {
-        return type;
-      }
-    }
-
-    return nullptr;
-  }
-
+  /**
+   * Binary 0x0059DB00..0x0059DB19: `CFormationInstance::sType` (0x010C6F80), filled by
+   * `gpg::LookupRType(typeid(CFormationInstance))` (FUN_008E0750) on first use. A lookup by
+   * name found nothing when this type initialized before `CFormationInstance` was named, which
+   * left `CAiFormationInstance` without its base and failed every save on `isDer`.
+   */
   [[nodiscard]] gpg::RType* CachedCFormationInstanceType()
   {
-    static gpg::RType* cachedType = nullptr;
-    if (!cachedType) {
-      cachedType = ResolveTypeByAnyName({"CFormationInstance", "Moho::CFormationInstance"});
+    if (!CFormationInstance::sType) {
+      CFormationInstance::sType = gpg::LookupRType(typeid(CFormationInstance));
     }
-    return cachedType;
+    return CFormationInstance::sType;
   }
 
   [[nodiscard]] gpg::RRef MakeFormationInstanceRef(CAiFormationInstance* const object)
@@ -62,9 +51,6 @@ namespace
   void AddCFormationInstanceBaseToCAiFormationInstanceType(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedCFormationInstanceType();
-    if (!baseType) {
-      return;
-    }
 
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();

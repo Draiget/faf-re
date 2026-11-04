@@ -119,7 +119,7 @@ namespace faf::remote
   {
     wire::SEntityRecord record;
     wire::SUnitDetail detail;
-    std::uint64_t hash = 0; // `wire::HashBlipUpdate`: a view holding this one already skips it
+    std::uint64_t hash = 0; // `wire::HashBlipUpdate`: a view whose client holds this one already skips it
   };
 
   /**
@@ -289,10 +289,13 @@ namespace faf::remote
     /** Ids of the records created or changed; an id can be listed more than once. */
     [[nodiscard]] const std::vector<std::uint32_t>& TouchedIds() const noexcept { return mTouchedIds; }
     [[nodiscard]] const std::vector<SErasedRecord>& ErasedRecords() const noexcept { return mErasedRecords; }
+    /** Ids that got a record in a new slot; it may have left again (`ErasedRecords`). */
+    [[nodiscard]] const std::vector<std::uint32_t>& NewRecordIds() const noexcept { return mNewRecordIds; }
     void ClearChanges() noexcept
     {
       mTouchedIds.clear();
       mErasedRecords.clear();
+      mNewRecordIds.clear();
     }
     /**
      * Plan WPR.35: for a caller that holds no copy of `slot`'s record because its own would be
@@ -439,11 +442,11 @@ namespace faf::remote
     std::vector<std::uint32_t> mFreeSlots;
     gpg::core::ChunkedVector<wire::SEntityRecord> mLocalRecords;      // this view's own records
     std::vector<std::uint32_t> mLocalSlots;                           // per slot: index into them, or `kNoLocal`
-    std::vector<std::uint64_t> mBlipHashes;                           // per slot: the blip update its record is, or 0
     std::vector<std::uint32_t> mFreeLocal;
     bool mTrackChanges = false;
     std::vector<std::uint32_t> mTouchedIds;
     std::vector<SErasedRecord> mErasedRecords;
+    std::vector<std::uint32_t> mNewRecordIds;
     std::vector<std::uint8_t> mWatched;                  // per slot
     std::vector<const wire::SEntityRecord*> mBeforeRecords; // per slot: before this beat's changes, or null
     std::vector<std::uint32_t> mBeforeSlots;             // the slots with one

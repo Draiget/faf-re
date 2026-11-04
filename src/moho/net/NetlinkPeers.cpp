@@ -393,8 +393,21 @@ namespace moho
       std::map<std::int64_t, std::unique_ptr<EnginePeer>> mPeers;
     };
 
+    // net_LogTraffic: what actually goes to ICE, with the lane's copies.
+    void LogLinkTraffic(const int beat)
+    {
+      const faf::netlink::WireTotals wire = faf::netlink::GetWireTotals();
+      gpg::Logf(
+        "NET: links at beat %d: %llu packets, %llu bytes",
+        beat,
+        static_cast<unsigned long long>(wire.packets),
+        static_cast<unsigned long long>(wire.bytes)
+      );
+    }
+
     EngineLinks& Links()
     {
+      gNetLinkTrafficLog = LogLinkTraffic;
       static EngineLinks links;
       return links;
     }

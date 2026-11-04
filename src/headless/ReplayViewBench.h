@@ -3,11 +3,14 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "remote/SyncRouting.h"
 #include "remote/ViewFrames.h"
 #include "remote/wire/ArmyLane.h"
+#include "remote/wire/LuaSyncLane.h"
 
 // Engine addition, server mode (plan WP16.5, WPR.35): headless's `--view-bench <file>`. Run
 // unfocused, every beat it does the work a dedicated server does for its players and nothing a
@@ -41,6 +44,12 @@ namespace faf::headless
     [[nodiscard]] bool IsOpen() const noexcept { return mFile != nullptr; }
     void Install();
     void Uninstall();
+    /** `--lua-routing`: the Lua lane too, each player's `Sync` as `remote/SyncRouting.h` routes it. */
+    void EnableLuaRouting(std::string dumpPrefix)
+    {
+      mLuaRouting = true;
+      mLuaRoutingDump = std::move(dumpPrefix);
+    }
     [[nodiscard]] std::string Summary() const;
     /** Lanes that did not encode, and what the check found (should stay 0). */
     [[nodiscard]] std::uint64_t Failures() const noexcept { return mEncodeFailures + HeldMismatches(); }
@@ -60,15 +69,15 @@ namespace faf::headless
       std::uint64_t failures = 0;   // this beat
     };
 
-    /** One grid this beat: every client that holds last beat's gets the same delta, encoded once. */
+    /** One grid: every client that holds last beat's gets the same delta, encoded once. */
     struct SBeatGrid
     {
-      remote::wire::SGridSlot slot;
+      remote::wire::SGridSlot slot;                // who and which; no cells
       const moho::CIntelGrid* source = nullptr;    // the sim's grid
-      const remote::wire::SGridBits* last = nullptr; // last beat's, in `mLastGrids`
-      remote::wire::BitWriter delta;               // the slot against `last`
-      bool deltaOk = false;
+      std::vector<std::int8_t> cells;              // as of this beat, once `delta` is written
+      remote::wire::BitWriter delta;               // the slot against last beat's cells
       std::uint16_t key = 0;                       // army and kind
+      bool fresh = true;                           // no cells to go from: every client gets it whole
     };
 
     /** One beat's measurements. */
@@ -85,8 +94,7 @@ namespace faf::headless
     remote::wire::SFrameCodec mCodec;
     std::vector<SClient> mClients;
     std::size_t mViews = 0; // views built on the last beat (civilian armies have none)
-    std::vector<SBeatGrid> mBeatGrids; // every army's grids this beat, copied once
-    std::vector<SBeatGrid> mLastGrids; // last beat's; their storage is the next beat's
+    std::vector<SBeatGrid> mBeatGrids; // every army's grids, in army order; they keep their cells from beat to beat
     std::vector<SBeat> mBeats;
     std::vector<std::uint32_t> mClientBeatBytes; // one entry per client and beat
     std::uint64_t mEntities = 0;                 // in all frames, all beats
@@ -94,5 +102,8 @@ namespace faf::headless
     bool mHaveLastFrames = false;
     std::chrono::steady_clock::time_point mLastFrames{};
     std::uint64_t mEncodeFailures = 0;
+    bool mLuaRouting = false;
+    std::string mLuaRoutingDump;
+    std::unique_ptr<remote::CSyncRouter> mRouter; // made once the army count is known
   };
 } // namespace faf::headless

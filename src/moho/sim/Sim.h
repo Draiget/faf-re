@@ -46,6 +46,28 @@ namespace moho
 #if FAF_SERVER_MODE
   class Entity;
   class Sim;
+  struct SSyncData;
+
+  /**
+   * Engine addition, server mode (plan §8, WP6): lets the server route what sim Lua writes for a
+   * player (remote/SyncRouting.h). Null by default and in lockstep, where nothing below changes.
+   * Calls come on the sim's thread.
+   */
+  class ISyncRouting
+  {
+  public:
+    virtual ~ISyncRouting() = default;
+
+    /** What sim Lua's `GetFocusArmy()` sees: a 0-based army or -1. */
+    [[nodiscard]] virtual std::int32_t FocusForLua() const noexcept = 0;
+    /** A command source's `SimCallback` or Lua call starts or ends (`mCurCommandSource`). */
+    virtual void EnterCommand(Sim& sim) = 0;
+    virtual void LeaveCommand(Sim& sim) = 0;
+    /** A print line from sim Lua: true if it went to a player, and stays out of the packet. */
+    virtual bool Print(const msvc8::string& line) = 0;
+    /** The beat's `Sync` table, written and not yet emptied. */
+    virtual void OnSyncTable(Sim& sim, LuaPlus::LuaObject& syncTable, const SSyncData& packet) = 0;
+  };
 
   /**
    * Engine addition, server mode (plan WP5.1): what `Sim::Sync` tells its observer
@@ -1181,6 +1203,8 @@ namespace moho
     static void SetSyncObserver(CSyncObserver* observer) noexcept;
     /** The observer set now (null by default); one that replaces it may pass the calls on. */
     [[nodiscard]] static CSyncObserver* SyncObserver() noexcept;
+    /** Engine addition, server mode (plan WP6): null by default and in lockstep. */
+    static void SetSyncRouting(ISyncRouting* routing) noexcept;
 #endif
 
     /**

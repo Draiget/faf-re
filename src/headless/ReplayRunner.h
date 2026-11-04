@@ -1,7 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <map>
 #include <string>
+#include <vector>
 
 // Engine addition, server mode (docs/SWITCHES.md, "headless"): the headless replay runner.
 // It plays one `.scfareplay` through the same sim, driver and replay client the game uses,
@@ -34,6 +37,9 @@ namespace faf::headless
     int viewLossPercent = 0;     // with `viewFramesPath`: a simulated lossy channel per view (FrameWindow.h)
     int viewAckDelay = 0;        // its acknowledgements' delay in beats
     bool spy = false;            // with `viewFramesPath`: the spy client's checks (ReplayViewFrameStats.h)
+    bool luaRouting = false;     // with `viewBenchPath`: each player's `Sync` routed
+    std::string luaRoutingDump;  // with `luaRouting`: each view's bytes go to `<this>_<view>.bin`
+    std::string syncDumpPath;    // when set: each beat's Lua `Sync` bytes go here
     bool parallelViews = false;  // with `viewFramesPath`, `viewBenchPath` or `viewPacketsPath`: views built on the sim's workers
     bool keepClientData = false; // keep what only a client reads (`--keep-client-data`)
     bool viewBenchCheck = false; // with `viewBenchPath`: each held frame is compared with the whole one
@@ -45,8 +51,16 @@ namespace faf::headless
     std::string laneSizesPath;  // when set: per-beat element counts and bytes of every sync lane (CSV)
     std::string blueprintOrderPath; // when set: every blueprint by ordinal, in load order (plan WPL.16)
     std::string luaPairsPath;   // when set: the sim Lua state's pairs() order before BeginSession (plan WPL.18)
+    int keyframeEvery = 0;      // when > 0: save the sim every this many beats (ReplayKeyframes.h)
+    std::string keyframeDir;    // with `keyframeEvery`: where the keyframe files go
+    bool keyframeKeep = false;  // with `keyframeEvery`: keep the files after measuring them
+    std::string resumeFrom;     // when set: a keyframe of this replay; the run continues from it
+    std::function<bool(int)> stopAfter; // when set: asked after each packet's beat; true ends the run there
+    std::map<int, std::string>* keyframeIndex = nullptr; // with `keyframeEvery`: files by the beat they restore, across runs
+    bool tearDown = false;      // shut the session down at the end, as `WLD_Teardown`, instead of leaving it to the process exit
     int checksumPeriod = 0;     // when > 0: `sim_ChecksumPeriod` for this run (0 = the default)
     int replayLead = -1;        // when >= 0: `sim_ReplayLead` for this run
+    int paceMs = 0;             // when > 0: one beat per this many ms, as a live game plays (0 = as fast as it can)
     int timeoutMinutes = 180;   // wall-clock limit for the whole run
   };
 
@@ -64,6 +78,7 @@ namespace faf::headless
     std::uint64_t digestsWritten = 0;
     double loadSeconds = 0.0;
     double playSeconds = 0.0;
+    double tearDownSeconds = 0.0; // with `tearDown`
     std::string error;          // why the run could not start or finish
     std::string wireSummary;    // with `wireStatsPath`: one summary line
     std::string loopbackSummary; // with `loopback`: two lines
@@ -83,6 +98,8 @@ namespace faf::headless
     std::string inboundSummary;     // with `inboundCheck`
     std::uint64_t inboundFailures = 0;
     std::string boneSummary;    // with `boneStatsPath`: one summary line
+    std::string keyframeSummary; // with `keyframeEvery`: one summary line
+    int keyframeFailures = 0;
     std::string fpuReport;      // with `fpuReport`: one line per thread
   };
 
@@ -91,6 +108,14 @@ namespace faf::headless
    * process-wide services (VFS, preferences, user Lua state) must be up already.
    */
   [[nodiscard]] SReplayResult RunReplay(const SReplayOptions& options);
+
+  /**
+   * Plays the replay and moves to each beat of `plan` in turn, inside this process, as the replay
+   * viewer's timeline would: a beat behind the sim, or ahead of it past a keyframe, ends the session
+   * and starts a new one from the newest keyframe at or before that beat (or from the replay's start).
+   * After the last entry it plays to the end. Each session writes its own numbered digest and lane files.
+   */
+  [[nodiscard]] SReplayResult RunSeekPlan(const SReplayOptions& options, const std::vector<int>& plan);
 
   /** Counts the checksum warnings the sim logs; installed for the whole process. */
   void InstallChecksumWatch(const std::string& label);

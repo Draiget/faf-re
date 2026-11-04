@@ -330,7 +330,11 @@ RWeakPtrType<STaskEventLinkage>::RWeakPtrType()
   : gpg::RType()
   , gpg::RIndexed()
 {
-  gpg::PreRegisterRType(typeid(WeakPtr_STaskEventLinkage), this);
+  // Binary 0x00407E44 registers type descriptor 0x00F5C2F8, the one
+  // `WeakPtr_STaskEventLinkage::ResolveType` (0x004CC819) looks up: the weak pointer itself.
+  // `WeakPtr_STaskEventLinkage` is only the holder of its statics, so registering that left
+  // the weak pointer without a type and failed every save of a task waiting on an event.
+  gpg::PreRegisterRType(typeid(WeakPtr<STaskEventLinkage>), this);
 }
 
 /**

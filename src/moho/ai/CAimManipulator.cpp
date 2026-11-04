@@ -35,6 +35,7 @@
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/SPhysConstants.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SimArchiveMode.h"
 #include "moho/sim/ManipulatorLuaFunctionThunks.h"
 #include "moho/task/CTaskEvent.h"
 #include "moho/unit/core/Unit.h"
@@ -231,6 +232,19 @@ namespace
   [[nodiscard]] gpg::RRef NullOwnerRef() noexcept
   {
     return {};
+  }
+
+  /**
+   * The projectile blueprint whose `Physics` member `physics` is, or null.
+   */
+  [[nodiscard]] moho::RProjectileBlueprint*
+  ProjectileBlueprintOfPhysics(const moho::RProjectileBlueprintPhysics* const physics) noexcept
+  {
+    if (physics == nullptr) {
+      return nullptr;
+    }
+    auto* const bytes = reinterpret_cast<const std::uint8_t*>(physics) - offsetof(moho::RProjectileBlueprint, Physics);
+    return const_cast<moho::RProjectileBlueprint*>(reinterpret_cast<const moho::RProjectileBlueprint*>(bytes));
   }
 
   template <class TObject>
@@ -1926,10 +1940,11 @@ void moho::CAimManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
 
   archive->ReadPointer(&mUnitWepBlueprint, &ownerRef);
 
+  const bool exact = gSimExactArchive.load(std::memory_order_relaxed);
   if (UnitWeapon* const weapon = mWeapon.GetObjectPtr(); weapon != nullptr) {
     RProjectileBlueprint* projectileBlueprint = weapon->mProjectileBlueprint;
     archive->ReadPointer(&projectileBlueprint, &ownerRef);
-    if (projectileBlueprint != nullptr) {
+    if (projectileBlueprint != nullptr && !exact) {
       mProjPhysBlueprint = &projectileBlueprint->Physics;
     }
   }
@@ -1952,6 +1967,13 @@ void moho::CAimManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->Read(CachedQuaternionfType(), &mHeadingRot, ownerRef);
   archive->Read(CachedQuaternionfType(), &mPitchRot, ownerRef);
   archive->ReadFloat(&mHeadingOffset);
+
+  // Engine addition (keyframes): `MemberSerialize`'s exact-mode tail.
+  if (exact) {
+    RProjectileBlueprint* cachedBlueprint = nullptr;
+    archive->ReadPointer(&cachedBlueprint, &ownerRef);
+    mProjPhysBlueprint = cachedBlueprint != nullptr ? &cachedBlueprint->Physics : nullptr;
+  }
 }
 
 /**
@@ -1981,10 +2003,11 @@ void moho::CAimManipulator::MemberSerialize(gpg::WriteArchive* const archive) co
 
   archive->WritePointer<moho::RUnitBlueprintWeapon>(mUnitWepBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
 
+  const bool exact = gSimExactArchive.load(std::memory_order_relaxed);
   if (UnitWeapon* const weapon = mWeapon.GetObjectPtr(); weapon != nullptr) {
     RProjectileBlueprint* const projectileBlueprint = weapon->mProjectileBlueprint;
     archive->WritePointer<moho::RProjectileBlueprint>(projectileBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
-    if (projectileBlueprint != nullptr) {
+    if (projectileBlueprint != nullptr && !exact) {
       self->mProjPhysBlueprint = &projectileBlueprint->Physics;
     }
   }
@@ -2007,6 +2030,13 @@ void moho::CAimManipulator::MemberSerialize(gpg::WriteArchive* const archive) co
   archive->Write(CachedQuaternionfType(), &mHeadingRot, ownerRef);
   archive->Write(CachedQuaternionfType(), &mPitchRot, ownerRef);
   archive->WriteFloat(mHeadingOffset);
+
+  // Engine addition (keyframes): the cached physics as it is, which may be null or an older
+  // projectile blueprint than the weapon's current one; retail stores neither.
+  if (exact) {
+    RProjectileBlueprint* const cachedBlueprint = ProjectileBlueprintOfPhysics(mProjPhysBlueprint);
+    archive->WritePointer<moho::RProjectileBlueprint>(cachedBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
+  }
 }
 
 namespace gpg

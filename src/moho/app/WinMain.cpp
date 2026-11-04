@@ -360,8 +360,7 @@ namespace
       if (globals != nullptr && globals->node != nullptr) {
         // nil key with a non-nil value in the first hash node - Lua never
         // creates this shape; the dumper must flag it.
-        globals->node[0].i_key.tt = LUA_TNIL;
-        globals->node[0].i_key.value.p = nullptr;
+        globals->node[0].SetKey(LuaPlus::TObject());
         globals->node[0].i_val.tt = LUA_TBOOLEAN;
         globals->node[0].i_val.value.b = 1;
       }

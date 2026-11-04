@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
-#include <initializer_list>
 #include <limits>
 #include <mutex>
 #include <new>
@@ -24,6 +23,7 @@
 #include "moho/ai/IAiNavigator.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/command/SSTICommandVariableData.h"
+#include "moho/command/SSTITarget.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector3f.h"
@@ -41,7 +41,9 @@
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/sim/SimArchiveMode.h"
 #include "moho/sim/SimBlockLane.h"
+#include "moho/sim/SimKeyframe.h"
 
 namespace moho
 {
@@ -1034,29 +1036,12 @@ namespace
     return gpg::STR_Printf("%s, size=%d", base.c_str(), count);
   }
 
-  [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
-  {
-    for (const char* const name : names) {
-      if (!name) {
-        continue;
-      }
-
-      if (gpg::RType* const type = gpg::REF_FindTypeNamed(name)) {
-        return type;
-      }
-    }
-
-    return nullptr;
-  }
-
-  /// Caches into `CFormationInstance::sType`, which is where the binary keeps
-  /// it - a function-local cache leaves the class static null for every other
-  /// reader.
+  /// Caches into `CFormationInstance::sType` (0x010C6F80), which is where the binary keeps it,
+  /// from `gpg::LookupRType(typeid(CFormationInstance))` (FUN_008E0750; 0x0059E9B3..0x0059E9D4).
   [[nodiscard]] gpg::RType* CachedCFormationInstanceType()
   {
     if (!moho::CFormationInstance::sType) {
-      moho::CFormationInstance::sType =
-        ResolveTypeByAnyName({"CFormationInstance", "Moho::CFormationInstance"});
+      moho::CFormationInstance::sType = gpg::LookupRType(typeid(moho::CFormationInstance));
     }
     return moho::CFormationInstance::sType;
   }
@@ -1081,7 +1066,9 @@ namespace
   {
     static gpg::RType* type = nullptr;
     if (!type) {
-      type = gpg::LookupRType(typeid(moho::EntId));
+      // Retail's `Moho::EntId` class descriptor, which `EntIdSerializer` serializes;
+      // `typeid(moho::EntId)` is `int`'s, which has no serializer.
+      type = gpg::RTypeOf<moho::EntIdValue>();
     }
     return type;
   }
@@ -2178,9 +2165,9 @@ namespace moho
     auto* const self = const_cast<CFormationInstance*>(this);
     const gpg::RRef ownerRef{};
 
-    if (gpg::RType* const baseType = CachedCFormationInstanceType(); baseType != nullptr) {
-      archive->Write(baseType, self, ownerRef);
-    }
+    // Binary 0x005744E9..0x00574518: the base, `IFormationInstance` (0x010C6F74). Writing this
+    // object's own type here re-entered this function until the stack ran out.
+    archive->Write(CachedIFormationInstanceType(), self, ownerRef);
 
     gpg::RRef pointerRef{};
     pointerRef = gpg::MakeRRef<LuaPlus::LuaState>(mState);
@@ -2223,9 +2210,8 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    if (gpg::RType* const baseType = CachedCFormationInstanceType(); baseType != nullptr) {
-      archive->Read(baseType, this, ownerRef);
-    }
+    // Binary 0x005741E0..: the base, `IFormationInstance` (0x010C6F74), as MemberSerialize writes it.
+    archive->Read(CachedIFormationInstanceType(), this, ownerRef);
 
     (void)archive->ReadPointer(&mState, &ownerRef);
     (void)archive->ReadPointer(&mGamerules, &ownerRef);
@@ -2575,6 +2561,13 @@ namespace moho
     }
 
     mSim = ReadPointerSim(archive, owner);
+
+    // Engine addition (replay keyframes): see SIM_NoteKeyframeBlock.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      std::uint64_t saved = 0;
+      archive->ReadUInt64(&saved);
+      SIM_NoteKeyframeBlock(saved, this);
+    }
   }
 
   /**
@@ -2600,6 +2593,11 @@ namespace moho
     }
 
     WritePointerSim(archive, mSim, owner);
+
+    // Engine addition (replay keyframes): see SIM_NoteKeyframeBlock.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->WriteUInt64(reinterpret_cast<std::uintptr_t>(this));
+    }
   }
 
   /**

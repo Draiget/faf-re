@@ -671,12 +671,9 @@ CScrLuaInitForm* moho::func_ReconBlipIsKnownFake_LuaFuncDef()
  * Constructs serializer-load baseline state for `ReconBlip`.
  */
 ReconBlip::ReconBlip(Sim* const sim) :
-    Entity(
-      nullptr,
-      sim,
-      static_cast<EntId>(moho::ToRaw(moho::EEntityIdSentinel::Invalid)),
-      kUnitCollisionBucketFlags
-    ),
+    // 0x005BED98: `call 0x6779E0`, the serializer's `Entity(Sim*, int)`: the id comes from the
+    // archive, so nothing registers in the entity DB here.
+    Entity(sim, kUnitCollisionBucketFlags),
     mCreator{},
     mDeleteWhenStale(0u),
     mPad279{0, 0, 0},

@@ -1,0 +1,199 @@
+name: Nightly release
+
+# Publishes a pre-release of master's head once that night's Replay parity has passed: the x64 and
+# x86 engine, the commits since the previous nightly, and the parity run it passed. Started by hand
+# it only builds and writes the notes, unless `publish` is ticked. tools/release/README.md.
+on:
+  workflow_run:
+    workflows: ["Replay parity"]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit, branch or tag to build
+        required: true
+        default: master
+      publish:
+        description: Also publish the pre-release (otherwise the zips and notes stay this run's artifacts)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-release
+  cancel-in-progress: false
+
+env:
+  # The clang-cl maintainers build with, as in Replay check; windows-2022 for the same reason.
+  LLVM_VERSION: "22.1.7"
+  PYTHON_VERSION: "3.14"
+
+jobs:
+  plan:
+    # Only a scheduled parity run that passed: a run by hand may have played any commit or set.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'schedule' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.plan.outputs.sha }}
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+      previous: ${{ steps.plan.outputs.previous }}
+      skip: ${{ steps.plan.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.event.workflow_run.head_sha || inputs.ref }}
+        run: |
+          sha=$(gh api "repos/${{ github.repository }}/commits/$REF" --jq .sha)
+          # The last real release the commit descends from, never an earlier nightly.
+          version=$(git describe --tags --abbrev=0 --exclude='*-nightly-*' "$sha")
+          tag="$version-nightly-${sha:0:7}"
+          # The newest nightly the commit descends from, else the release itself.
+          previous=$(git tag --list '*-nightly-*' --merged "$sha" --sort=-creatordate | grep -vx "$tag" | head -n 1 || true)
+          # Master did not move since the last nightly: that release already holds this commit.
+          skip=false
+          if gh release view "$tag" > /dev/null 2>&1; then skip=true; fi
+          {
+            echo "sha=$sha"
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "previous=${previous:-$version}"
+            echo "skip=$skip"
+          } >> "$GITHUB_OUTPUT"
+          echo "$tag on $sha, changes since ${previous:-$version}, already published: $skip" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.skip != 'true'
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            exe: main_x64
+          - arch: x86
+            exe: main
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - id: downloads
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            dependencies/.downloads
+            llvm-installer
+          key: windows-downloads-${{ env.LLVM_VERSION }}-${{ hashFiles('cmake/FafDependencies.cmake') }}
+          restore-keys: windows-downloads-${{ env.LLVM_VERSION }}-
+      # Puts its Scripts folder on PATH, for the ninja pip installs.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - shell: pwsh
+        run: |
+          $exe = "llvm-installer/LLVM-$env:LLVM_VERSION-win64.exe"
+          if (-not (Test-Path $exe)) {
+            New-Item -ItemType Directory -Force llvm-installer | Out-Null
+            Invoke-WebRequest "https://github.com/llvm/llvm-project/releases/download/llvmorg-$env:LLVM_VERSION/LLVM-$env:LLVM_VERSION-win64.exe" -OutFile $exe
+          }
+          Start-Process -FilePath $exe -ArgumentList "/S", "/D=C:\llvm-$env:LLVM_VERSION" -Wait
+          "LLVM_ROOT=C:\llvm-$env:LLVM_VERSION" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          python -m pip install --disable-pip-version-check ninja
+      # The tag exists only here until the release creates it: the exe reports it as its version.
+      - shell: pwsh
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          git tag $env:TAG HEAD
+          cmake --preset clang-${{ matrix.arch }}-release
+          cmake --build --preset clang-${{ matrix.arch }}-release --target faf_main
+      - if: steps.downloads.outputs.cache-hit != 'true' && matrix.arch == 'x64'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            dependencies/.downloads
+            llvm-installer
+          key: windows-downloads-${{ env.LLVM_VERSION }}-${{ hashFiles('cmake/FafDependencies.cmake') }}
+      - shell: pwsh
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          $src = "build/clang-${{ matrix.arch }}-release/src"
+          $pkg = "pkg"
+          New-Item -ItemType Directory -Force $pkg | Out-Null
+          foreach ($f in "${{ matrix.exe }}.exe", "${{ matrix.exe }}.pdb", "dxcompiler.dll", "dxil.dll") { Copy-Item "$src/$f" $pkg -ErrorAction Stop }
+          Copy-Item "$src/fafengine" $pkg -Recurse -ErrorAction Stop
+          $head = "FAF engine $env:TAG (${{ matrix.arch }}), built $(Get-Date -Format yyyy-MM-dd)"
+          ($head, "", (Get-Content "tools/release/INSTALL_${{ matrix.arch }}.txt" -Raw)) -join "`r`n" | Set-Content "$pkg/INSTALL.txt" -NoNewline
+          Compress-Archive -Path "$pkg/*" -DestinationPath "faf-engine-$env:TAG-${{ matrix.arch }}.zip"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: zip-${{ matrix.arch }}
+          path: faf-engine-*.zip
+          retention-days: 7
+
+  release:
+    needs: [plan, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write  # the release and its tag
+      actions: read  # the parity run's report
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: zip-*
+          path: zips
+          merge-multiple: true
+      - if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v8
+        with:
+          name: report
+          path: report
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - env:
+          SHA: ${{ needs.plan.outputs.sha }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          PREVIOUS: ${{ needs.plan.outputs.previous }}
+          PARITY_RUN: ${{ github.event.workflow_run.id }}
+          PARITY_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          (cd zips && sha256sum faf-engine-*.zip > SHA256SUMS.txt)
+          python tools/release/nightly_notes.py --out notes.md
+          cat notes.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: notes
+          path: notes.md
+          retention-days: 7
+      - if: github.event_name == 'workflow_run' || inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.plan.outputs.sha }}
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          gh release create "$TAG" zips/faf-engine-*.zip zips/SHA256SUMS.txt --target "$SHA" --prerelease --latest=false \
+            --title "$TAG x64\\x86" --notes-file notes.md
+          gh release view "$TAG" --json tagName,isPrerelease,url | tee -a "$GITHUB_STEP_SUMMARY"

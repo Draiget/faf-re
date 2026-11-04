@@ -296,8 +296,8 @@ enum LOGICAL_PROCESSOR_RELATIONSHIP
   RelationAll = 0xFFFF,
 };
 struct SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
-/// Not available here: returns FALSE with ERROR_NOT_SUPPORTED and a length of 0, which the
-/// engine's processor-topology code treats as "no topology information".
+/// Physical cores and NUMA nodes from sysfs, as fixed-size records in group 0. With no topology to
+/// report: FALSE with ERROR_NOT_SUPPORTED and a length of 0.
 BOOL GetLogicalProcessorInformationEx(
   LOGICAL_PROCESSOR_RELATIONSHIP relation, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* buffer, DWORD* length
 );

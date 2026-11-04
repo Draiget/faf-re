@@ -79,29 +79,6 @@ namespace
   constexpr std::uint64_t kUnitStateBuildingMask = (1ull << static_cast<std::uint32_t>(moho::UNITSTATE_Building));
   constexpr std::uint64_t kUnitStateBusyMask = (1ull << static_cast<std::uint32_t>(moho::UNITSTATE_Busy));
 
-  /**
-   * Address: 0x005FD420 (FUN_005FD420, func_RTypeAddBaseCCommandTask)
-   *
-   * What it does:
-   * Resolves `CCommandTask` RTTI and registers it as a zero-offset reflection
-   * base lane for task-derived type-info owners.
-   */
-  [[maybe_unused]] void AddBaseCCommandTask(gpg::RType* const typeInfo)
-  {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    gpg::RType* const baseType = ResolveCCommandTaskType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
-  }
 } // namespace
 
 namespace moho

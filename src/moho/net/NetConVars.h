@@ -31,6 +31,7 @@ namespace moho
   extern int32_t net_LogBeatWaitMs;
   extern int32_t net_LogTraffic;
   extern int32_t net_LogShownBeatMs;
+  extern int32_t net_AdaptiveLagMax;
 
   // Totals of every UDP connection in this process, for net_LogTraffic.
   struct NetTrafficTotals
@@ -43,6 +44,8 @@ namespace moho
     std::atomic<std::int64_t> pingMicrosSum{0};
   };
   extern NetTrafficTotals gNetTraffic;
+  // Set once in-engine links exist; the headless builds have none. Logs what they have sent.
+  extern void (*gNetLinkTrafficLog)(int beat);
   extern int32_t net_TestBurstBeat;
   extern int32_t net_TestBurstBytes;
   extern int32_t net_NativeNetWebRtc;

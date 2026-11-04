@@ -723,13 +723,13 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::CPathPoint>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::CPathPoint>*>(objectPtr);
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
     moho::CPathPoint fill{};
     fill.mState = moho::EPathPointState::PPS_7;
-    vec.Resize(count, fill);
+    vec.resize(count, fill);
 
     gpg::RType* const elementType = ResolveCPathPointType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
@@ -1877,7 +1877,7 @@ gpg::RRef FastVectorCPathPointTypeInfo::SubscriptIndex(void* obj, const int ind)
     return out;
   }
 
-  auto& vec = *static_cast<gpg::fastvector<CPathPoint>*>(obj);
+  auto& vec = *static_cast<gpg::core::FastVectorInline<CPathPoint>*>(obj);
   if (vec.Data() == nullptr || static_cast<std::size_t>(ind) >= GetCount(obj)) {
     return out;
   }
@@ -1908,12 +1908,12 @@ void FastVectorCPathPointTypeInfo::SetCount(void* obj, const int count) const
     return;
   }
 
-  auto& vec = *static_cast<gpg::fastvector<CPathPoint>*>(obj);
+  auto& vec = *static_cast<gpg::core::FastVectorInline<CPathPoint>*>(obj);
   CPathPoint fill{};
   fill.mPosition = Wm3::Vector3f{};
   fill.mDirection = Wm3::Vector3f{};
   fill.mState = PPS_7;
-  vec.Resize(static_cast<std::size_t>(count), fill);
+  vec.resize(static_cast<std::size_t>(count), fill);
 }
 
 /**

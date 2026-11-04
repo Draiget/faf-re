@@ -572,7 +572,6 @@ namespace faf::remote
 
   wire::SEntityRecord& CViewFrameBuilder::LocalRecord(const std::uint32_t slot)
   {
-    mBlipHashes[slot] = 0u; // about to change; what changes it says otherwise
     if (mLocalSlots[slot] != kNoLocal) {
       return mLocalRecords[mLocalSlots[slot]];
     }
@@ -595,7 +594,6 @@ namespace faf::remote
 
   void CViewFrameBuilder::ReleaseLocal(const std::uint32_t slot)
   {
-    mBlipHashes[slot] = 0u;
     const std::uint32_t index = mLocalSlots[slot];
     if (index != kNoLocal) {
       mLocalRecords[index] = wire::SEntityRecord{}; // lets go of what the record shares
@@ -614,9 +612,11 @@ namespace faf::remote
       slot = static_cast<std::uint32_t>(mWorldSlots.size());
       (void)mWorldSlots.push_back(nullptr);
       mLocalSlots.push_back(kNoLocal);
-      mBlipHashes.push_back(0u);
     }
     mWorldIndex.insert(found, SWorldEntry{id, slot});
+    if (mTrackChanges) {
+      mNewRecordIds.push_back(id);
+    }
     return slot;
   }
 
@@ -854,10 +854,6 @@ namespace faf::remote
       }
       const std::uint32_t slot = mWorldIndex[cursor].slot;
       const SBlipRecord* const blipRecord = mSession == nullptr ? update.blipRecord : nullptr;
-      // Most of a late game's blip updates write what the record holds: nothing to read or compare.
-      if (blipRecord != nullptr && mBlipHashes[slot] == blipRecord->hash) {
-        continue;
-      }
       SaveBefore(slot);
       wire::SEntityRecord* const record = &LocalRecord(slot);
       if (blipRecord != nullptr) {
@@ -865,7 +861,6 @@ namespace faf::remote
         if (record->isUnit) {
           (void)record->unit.detail.Assign(blipRecord->detail);
         }
-        mBlipHashes[slot] = blipRecord->hash;
         if (mTrackChanges) {
           mTouchedIds.push_back(record->id);
         }

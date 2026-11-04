@@ -64,6 +64,40 @@ namespace faf::remote::wire
     return true;
   }
 
+  void EncodeGridDeltaInPlace(
+    const std::uint32_t width, const std::uint32_t height, const std::int8_t* const now, std::int8_t* const held, BitWriter& writer
+  )
+  {
+    writer.WriteVarUint(width);
+    writer.WriteVarUint(height);
+    constexpr std::size_t kBlock = 64;
+    const std::size_t count = static_cast<std::size_t>(width) * height;
+    bool flipped = false; // the kind of the run being counted: unchanged first
+    std::uint32_t run = 0;
+    std::size_t i = 0;
+    while (i < count) {
+      const std::size_t block = count - i < kBlock ? count - i : kBlock;
+      if (std::memcmp(now + i, held + i, block) == 0 && !flipped) {
+        run += static_cast<std::uint32_t>(block);
+        i += block;
+        continue;
+      }
+      for (const std::size_t end = i + block; i < end; ++i) {
+        const bool cellFlipped = (now[i] != 0) != (held[i] != 0);
+        held[i] = now[i];
+        if (cellFlipped != flipped) {
+          writer.WriteVarUint(run);
+          flipped = cellFlipped;
+          run = 0;
+        }
+        ++run;
+      }
+    }
+    if (run > 0u) {
+      writer.WriteVarUint(run);
+    }
+  }
+
   bool DecodeGridDelta(BitReader& reader, const SGridBits* const baseline, const std::uint32_t maxCells, SGridBits& out)
   {
     const std::uint32_t width = reader.ReadVarUint();

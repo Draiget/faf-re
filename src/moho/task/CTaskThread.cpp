@@ -113,7 +113,9 @@ namespace
    */
   CTask* DeserializeOwnedTaskPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
   {
-    return ReadTypedPointer<CTask>(archive, ownerRef, CachedCTaskType());
+    CTask* task = nullptr;
+    (void)archive->ReadPointerOwned(&task, &ownerRef); // 0x0040B564: UNOWNED or a conflict, then 0x0040B611: OWNED
+    return task;
   }
 
   /**

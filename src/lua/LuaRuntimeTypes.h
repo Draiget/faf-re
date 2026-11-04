@@ -95,25 +95,70 @@ static_assert(offsetof(TString, str) == 0x14, "TString::str must be at +0x14");
 
 struct Node
 {
+#if INTPTR_MAX == INT32_MAX
 	LuaPlus::TObject i_key; // Hash key.
 	LuaPlus::TObject i_val; // Hash value.
-#if INTPTR_MAX == INT32_MAX
 	Node* next;             // Collision chain link.
 
 	[[nodiscard]] Node* Next() const noexcept { return next; }
 	void SetNext(Node* const node) noexcept { next = node; }
+
+	[[nodiscard]] int KeyTag() const noexcept { return i_key.tt; }
+	[[nodiscard]] bool KeyIs(const int tag) const noexcept { return i_key.tt == tag; }
+	void SetKeyTag(const int tag) noexcept { i_key.tt = tag; }
+	[[nodiscard]] const LuaPlus::Value& KeyValue() const noexcept { return i_key.value; }
+	[[nodiscard]] LuaPlus::TObject Key() const noexcept { return i_key; }
+	void SetKey(const LuaPlus::TObject& key) noexcept { i_key = key; }
 #else
-	// Engine change on x64: the link is the distance within the table's node array, as a pointer
-	// would make every node 4 bytes larger. 0: the end of the chain.
-	std::int32_t nextDistance;
+	// Engine change on x64: the key's type tag and the chain link share one word, as a key's type needs
+	// 4 bits and the link is a distance within the table's node array (at most 2^24 nodes, setnodevector),
+	// so a node takes 16 bytes rather than 20. Lookups return the address of `i_val`, so the value stays
+	// a whole TObject. nblocks still counts the x86 20 (LuaMemAccounting.h).
+	LuaPlus::TObject i_val; // Hash value.
+	LuaPlus::Value keyValue; // Hash key's value.
+	std::uint32_t keyTagAndLink; // Low 4 bits: key type, kDeadKeyTag for LUA_TNONE. The rest: signed distance, 0: the end of the chain.
+
+	static constexpr std::uint32_t kKeyTagMask = 0xFu;
+	static constexpr std::uint32_t kDeadKeyTag = 0xFu;
+	static constexpr int kLinkShift = 4;
 
 	[[nodiscard]] Node* Next() const noexcept
 	{
-		return nextDistance != 0 ? const_cast<Node*>(this) + nextDistance : nullptr;
+		const std::int32_t distance = static_cast<std::int32_t>(keyTagAndLink) >> kLinkShift;
+		return distance != 0 ? const_cast<Node*>(this) + distance : nullptr;
 	}
 	void SetNext(const Node* const node) noexcept
 	{
-		nextDistance = node != nullptr ? static_cast<std::int32_t>(node - this) : 0;
+		const std::int32_t distance = node != nullptr ? static_cast<std::int32_t>(node - this) : 0;
+		keyTagAndLink = (keyTagAndLink & kKeyTagMask) | (static_cast<std::uint32_t>(distance) << kLinkShift);
+	}
+
+	[[nodiscard]] int KeyTag() const noexcept
+	{
+		const std::uint32_t tag = keyTagAndLink & kKeyTagMask;
+		return tag == kDeadKeyTag ? LUA_TNONE : static_cast<int>(tag);
+	}
+	/// `tag` is a live type, never LUA_TNONE.
+	[[nodiscard]] bool KeyIs(const int tag) const noexcept
+	{
+		return (keyTagAndLink & kKeyTagMask) == static_cast<std::uint32_t>(tag);
+	}
+	void SetKeyTag(const int tag) noexcept
+	{
+		keyTagAndLink = (keyTagAndLink & ~kKeyTagMask) | (static_cast<std::uint32_t>(tag) & kKeyTagMask);
+	}
+	[[nodiscard]] const LuaPlus::Value& KeyValue() const noexcept { return keyValue; }
+	[[nodiscard]] LuaPlus::TObject Key() const noexcept
+	{
+		LuaPlus::TObject key;
+		key.tt = KeyTag();
+		key.value = keyValue;
+		return key;
+	}
+	void SetKey(const LuaPlus::TObject& key) noexcept
+	{
+		SetKeyTag(key.tt);
+		keyValue = key.value;
 	}
 #endif
 };
@@ -124,12 +169,15 @@ struct Node
 // so a Node is exactly 20 bytes, which also pins TObject at 8 (see
 // LuaPrimitives.h). The same function reads `lsizenode` at [esi+9] and `node`
 // at [esi+14h], both already asserted on Table below.
+#if INTPTR_MAX == INT32_MAX
 static_assert(offsetof(Node, i_key) == 0x00, "Node::i_key must be at +0x00");
 static_assert(offsetof(Node, i_val) == 0x08, "Node::i_val must be at +0x08");
-#if INTPTR_MAX == INT32_MAX
 static_assert(offsetof(Node, next) == 0x10, "Node::next must be at +0x10");
-#endif
 static_assert(sizeof(Node) == 0x14, "Node size must be 0x14");
+#else
+// static_assert is off on x64 (platform/LayoutAsserts.h), so this one is an array size.
+using NodeTakes16BytesOnX64 = char[sizeof(Node) == 0x10 ? 1 : -1];
+#endif
 
 struct Table
 {

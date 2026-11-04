@@ -92,6 +92,15 @@ namespace moho
      */
     void Start();
 
+    /**
+     * Engine addition (replay keyframes), not in the binary.
+     *
+     * Reads past the messages of the first `beats` beats, before the session starts: the sim
+     * resuming from a keyframe already has them. An advance that reaches past `beats` is
+     * queued for what is left of it.
+     */
+    void SkipBeats(std::int32_t beats);
+
   private:
     /**
      * Address: 0x0053D240 (FUN_0053D240)

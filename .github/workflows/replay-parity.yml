@@ -6,13 +6,12 @@ name: Replay parity
 # fills; it fetches from FAF only what they lack. tools/parity-data/README.md.
 #
 # Run it from master (its caches are the ones every run can read) with the commit to test.
-#
-# The nightly set is ready but not scheduled yet: every replay that desynced before and random
-# others, as many as 40 jobs of 150 minutes play (20 at once, so two rounds, about 5 h 30 min).
-# Uncomment the two lines below to run it on master's head every night.
+# Every night at 20:00 UTC (00:00 UTC+4) it plays master's head on the nightly set: every replay
+# that desynced before and others picked once, the same ones each night, as many as 40 jobs of 150
+# minutes play (20 at once, so two rounds, about 5 h 30 min). Passing starts the Nightly release.
 on:
-  # schedule:
-  #   - cron: "0 20 * * *"
+  schedule:
+    - cron: "0 20 * * *"
   workflow_dispatch:
     inputs:
       ref:
@@ -163,7 +162,7 @@ jobs:
         run: >
           mkdir -p cache/index &&
           python tools/parity-data/plan.py --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz --index cache/index
-          --set ${{ inputs.set || 'nightly' }} --sample ${{ inputs.sample || '5000' }} --seed ${{ inputs.seed || github.run_number }} --slots 4
+          --set ${{ inputs.set || 'nightly' }} --sample ${{ inputs.sample || '5000' }} --seed ${{ inputs.seed || '1' }} --slots 4
           --desynced tools/parity-data/desynced/$GAME_VERSION.txt ${{ (inputs.set || 'nightly') == 'nightly' && '--max-shards 40' || '' }}
           --batch "${{ inputs.batch || '1/1' }}" --budget-minutes "$PLAY_MINUTES" ${{ inputs.after_run != '' && '--after after' || '' }}
           ${{ inputs.after_run != '' && inputs.resume && '--replays-of resumed/plan.json' || '' }}

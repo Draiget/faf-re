@@ -7,6 +7,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/REntityBlueprintTypeInfo.h"
 #include "moho/entity/REntityBlueprint.h"
+#include "moho/sim/SimArchiveMode.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/reflection/Reflection.h"
 
@@ -76,6 +77,12 @@ namespace moho
     archive->ReadFloat(&unk1);
     (void)archive->ReadPointer(&blueprint, &ownerRef);
     archive->ReadString(&unk2);
+
+    // Engine addition (replay keyframes): the binary does not save the formation script, so an order
+    // loaded before it first moves builds no formation.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->ReadInt(&mFormationScriptIndex);
+    }
   }
 
   /**
@@ -99,6 +106,10 @@ namespace moho
     archive->WritePointer<moho::REntityBlueprint>(blueprint, gpg::TrackedPointerState::Unowned, ownerRef);
 
     archive->WriteString(const_cast<msvc8::string*>(&unk2));
+
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->WriteInt(mFormationScriptIndex);
+    }
   }
 
 } // namespace moho

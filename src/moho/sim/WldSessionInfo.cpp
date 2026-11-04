@@ -8,6 +8,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/misc/CZipFile.h"
 #include "moho/sim/CBackgroundTaskControl.h"
 #include "lua/LuaObject.h"
 #include "moho/net/IClientManager.h"
@@ -334,6 +335,7 @@ namespace moho
     CBackgroundTaskControl loadControl{this};
     EWldScenarioLoadControlState finalState = EWldScenarioLoadControlState::kCompleted;
     try {
+      const CZipFileReadScope archives;
       mCallback.Invoke(&loadControl);
     } catch (const std::exception& error) {
       gpg::Warnf("Error in background task: %s", error.what());

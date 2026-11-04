@@ -39,6 +39,7 @@
 #include "moho/entity/Prop.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/entity/MotorFallDown.h"
+#include "moho/sim/SimArchiveMode.h"
 #include "moho/entity/MotorSinkAway.h"
 #include "moho/entity/PositionHistory.h"
 #include "moho/entity/EVisibilityModeTypeInfo.h"
@@ -1667,7 +1668,12 @@ namespace moho
 
     const gpg::RRef owner{};
 
-    archive->Read(CachedConstantDataType(), &id_, owner);
+    // Through a real block: Entity's flat lanes need not have its spacing (see MemberSerialize).
+    SSTIEntityConstantData constantData{};
+    archive->Read(CachedConstantDataType(), &constantData, owner);
+    id_ = static_cast<EntId>(constantData.mEntityId);
+    BluePrint = constantData.mBlueprint;
+    mTickCreated = constantData.mTickCreated;
     archive->Read(CachedScriptObjectTypeForEntity(), static_cast<CScriptObject*>(this), owner);
     archive->Read(CachedTaskType(), static_cast<CTask*>(this), owner);
     archive->Read(CachedVariableDataType(), &mVarDat.mScmResource, owner);
@@ -1726,6 +1732,15 @@ namespace moho
     (void)archive->ReadPointerOwned(&mMotor, &owner);
 
     archive->Read(CachedCollisionBoxType(), &mAABox, owner);
+
+    // Engine addition (replay keyframes): Entity:GetPosition() returns this one table and updates it
+    // in place, so Lua holding it keeps seeing the entity move.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->Read(gpg::LookupRType(typeid(LuaPlus::LuaObject)), &mLuaPositionCache, owner);
+    }
+
+    // 0x0068170C: `call 0x4FD4F0`. The grid buckets are not saved; this puts the entity back in them.
+    UpdateRect(CollisionExtents);
   }
 
   /**
@@ -1753,9 +1768,11 @@ namespace moho
     const gpg::RRef owner{};
 
     // Constant-data sub-object (+0x68). The three lanes (id/blueprint/tick) are
-    // modeled flat because they are referenced across the engine; serializing
-    // the block's first-field address is the reflection void*+RType pattern.
-    archive->Write(CachedConstantDataType(), &id_, owner);
+    // modeled flat because they are referenced across the engine. They go through
+    // a real block because only the binary's layout gives the lanes its spacing:
+    // the Linux ABI can seat `id_` in a base's tail padding, 4 bytes before `BluePrint`.
+    const SSTIEntityConstantData constantData{static_cast<std::int32_t>(id_), BluePrint, mTickCreated};
+    archive->Write(CachedConstantDataType(), &constantData, owner);
 
     // CScriptObject base subobject (+0x00).
     archive->Write(CachedScriptObjectTypeForEntity(), static_cast<const CScriptObject*>(this), owner);
@@ -1821,6 +1838,11 @@ namespace moho
 
     // Collision AABB (+0x240): min/max modeled split, first field is min.
     archive->Write(CachedCollisionBoxType(), &mAABox, owner);
+
+    // Engine addition (replay keyframes): see MemberDeserialize.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->Write(gpg::LookupRType(typeid(LuaPlus::LuaObject)), &mLuaPositionCache, owner);
+    }
   }
 
   namespace

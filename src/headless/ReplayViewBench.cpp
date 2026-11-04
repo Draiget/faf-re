@@ -86,6 +86,7 @@ namespace faf::headless
 
   void CReplayViewBench::Uninstall()
   {
+    moho::Sim::SetSyncRouting(nullptr);
     moho::Sim::SetSyncObserver(nullptr);
   }
 
@@ -96,11 +97,17 @@ namespace faf::headless
     if (mClients.size() < armyCount) {
       mClients.resize(armyCount);
     }
+    if (mLuaRouting && mRouter == nullptr) {
+      mRouter = std::make_unique<remote::CSyncRouter>(armyCount);
+      mRouter->SetIdTranslator([this](const std::size_t view, const std::uint32_t simId) {
+        return ViewEntityId(view, simId);
+      });
+      mRouter->SetDumpPrefix(mLuaRoutingDump);
+      moho::Sim::SetSyncRouting(mRouter.get());
+    }
 
-    // Every army's grids, copied and encoded once for all the views that receive them. The slots
-    // keep their storage from beat to beat, and the cells are copied on the workers.
+    // Every army's grids, encoded once for all the views that receive them, on the workers.
     std::size_t slots = 0;
-    mBeatGrids.swap(mLastGrids);
     for (std::size_t index = 0; index < sim.mArmiesList.size(); ++index) {
       const moho::CArmyImpl* const army = sim.mArmiesList[index];
       if (army == nullptr) {
@@ -122,26 +129,22 @@ namespace faf::headless
         slot.gridSize = grid->mGridSize;
         slot.bits.width = grid->mWidth;
         slot.bits.height = grid->mHeight;
+        beatGrid.fresh = beatGrid.source != grid || beatGrid.cells.size() != static_cast<std::size_t>(grid->mWidth) * grid->mHeight;
+        if (beatGrid.fresh) {
+          beatGrid.cells.assign(static_cast<std::size_t>(grid->mWidth) * grid->mHeight, 0);
+        }
         beatGrid.source = grid;
         beatGrid.key = static_cast<std::uint16_t>(index * 2u + kind);
-        const auto last = std::find_if(mLastGrids.begin(), mLastGrids.end(), [&beatGrid](const SBeatGrid& other) {
-          return other.key == beatGrid.key;
-        });
-        beatGrid.last = last != mLastGrids.end() ? &last->slot.bits : nullptr;
       }
     }
     mBeatGrids.resize(slots);
     const auto copyGrids = [this](const std::size_t begin, const std::size_t end) {
       for (std::size_t i = begin; i < end; ++i) {
         SBeatGrid& beatGrid = mBeatGrids[i];
-        remote::wire::SGridSlot& slot = beatGrid.slot;
         const moho::CIntelGrid* const grid = beatGrid.source;
-        slot.bits.cells.resize(static_cast<std::size_t>(grid->mWidth) * grid->mHeight);
-        for (std::size_t cell = 0; cell < slot.bits.cells.size(); ++cell) {
-          slot.bits.cells[cell] = grid->mGrid[cell] != 0 ? 1u : 0u;
-        }
         beatGrid.delta.Clear();
-        beatGrid.deltaOk = remote::wire::EncodeGridSlot(slot, beatGrid.last, beatGrid.delta);
+        remote::wire::WriteGridSlotHeader(beatGrid.slot, beatGrid.delta);
+        remote::wire::EncodeGridDeltaInPlace(grid->mWidth, grid->mHeight, grid->mGrid.get(), beatGrid.cells.data(), beatGrid.delta);
       }
     };
     if (Parallel() && slots > 1u) {
@@ -249,11 +252,16 @@ namespace faf::headless
       const SBeatGrid& beatGrid = *std::find_if(mBeatGrids.begin(), mBeatGrids.end(), [key](const SBeatGrid& other) {
         return other.key == key;
       });
-      if (std::find(client.grids.begin(), client.grids.end(), key) != client.grids.end()) {
+      if (!beatGrid.fresh && std::find(client.grids.begin(), client.grids.end(), key) != client.grids.end()) {
         gridWriter.Append(beatGrid.delta);
-        gridsOk = gridsOk && beatGrid.deltaOk;
       } else {
-        gridsOk = remote::wire::EncodeGridSlot(beatGrid.slot, nullptr, gridWriter) && gridsOk;
+        // A client new to this grid gets it whole, which is rare enough to make its cells here.
+        remote::wire::SGridSlot whole = beatGrid.slot;
+        whole.bits.cells.resize(beatGrid.cells.size());
+        std::transform(beatGrid.cells.begin(), beatGrid.cells.end(), whole.bits.cells.begin(), [](const std::int8_t cell) {
+          return static_cast<std::uint8_t>(cell != 0 ? 1u : 0u);
+        });
+        gridsOk = remote::wire::EncodeGridSlot(whole, nullptr, gridWriter) && gridsOk;
       }
     }
     if (gridsOk) {
@@ -262,6 +270,17 @@ namespace faf::headless
       ++client.failures;
     }
     client.grids.swap(client.gridsNext);
+
+    // Lua lane. `Sim::Sync` writes the `Sync` table after its entity walk, so these are the last
+    // beat's: a real server sends them when the beat's sync is over.
+    if (mRouter != nullptr && army < mRouter->ViewCount()) {
+      remote::wire::BitWriter luaWriter;
+      if (remote::wire::EncodeLuaSyncLane(mRouter->Payload(army), mRouter->Prints(army), luaWriter)) {
+        client.bytes += static_cast<std::uint32_t>(luaWriter.Bytes().size());
+      } else {
+        ++client.failures;
+      }
+    }
   }
 
   std::string CReplayViewBench::Summary() const

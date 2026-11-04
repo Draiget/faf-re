@@ -1234,6 +1234,16 @@ namespace gpg::gal
     TransferBarrier();
   }
 
+  void DeviceVulkan::ReleaseBufferCopy(VertexBuffer& buffer)
+  {
+    static_cast<VertexBufferVulkan&>(buffer).Storage().ReleaseCopy();
+  }
+
+  void DeviceVulkan::ReleaseBufferCopy(IndexBuffer& buffer)
+  {
+    static_cast<IndexBufferVulkan&>(buffer).Storage().ReleaseCopy();
+  }
+
   bool DeviceVulkan::CopyVertexBufferRegion(
     VertexBuffer& destination, const std::uint32_t destinationOffset, VertexBuffer& source, const std::uint32_t sourceOffset,
     const std::uint32_t byteCount

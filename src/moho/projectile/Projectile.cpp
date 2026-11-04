@@ -1,4 +1,5 @@
 #include "moho/projectile/Projectile.h"
+#include "moho/sim/SimArchiveMode.h"
 
 #include <cmath>
 #include <cstddef>
@@ -47,6 +48,7 @@
 #include "Wm3Segment3.h"
 #include "moho/misc/DiagnosticBudget.h"
 #include "moho/sim/SimBlockLane.h"
+#include "moho/sim/SimKeyframe.h"
 
 namespace moho
 {
@@ -1891,6 +1893,19 @@ namespace moho
     archive->Read(CachedVector3fType(), &mZigZagRandomOffset, ownerRef);
     archive->Read(CachedProjectileAttributesType(), &mAttributes, ownerRef);
     archive->ReadBool(&mIsChildProjectile);
+
+    // Engine addition (replay keyframes): not in a saved game, whose projectile that was about to
+    // impact (mImpactInterpolation) tells OnImpact the default type instead of what it hit.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      int impactType = 0;
+      archive->ReadInt(&impactType);
+      mImpactType = static_cast<EImpactType>(impactType);
+
+      // See SIM_NoteKeyframeBlock.
+      std::uint64_t saved = 0;
+      archive->ReadUInt64(&saved);
+      SIM_NoteKeyframeBlock(saved, this);
+    }
   }
 
   /**
@@ -1952,6 +1967,12 @@ namespace moho
     archive->Write(CachedVector3fType(), &mZigZagRandomOffset, ownerRef);
     archive->Write(CachedProjectileAttributesType(), &mAttributes, ownerRef);
     archive->WriteBool(mIsChildProjectile);
+
+    // Engine addition (replay keyframes): see MemberDeserialize.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->WriteInt(static_cast<int>(mImpactType));
+      archive->WriteUInt64(reinterpret_cast<std::uintptr_t>(this)); // see SIM_NoteKeyframeBlock
+    }
   }
 
   // Addresses 0x0069F8F0/0x006A0060 (the "ThunkA"/"ThunkB" serialization

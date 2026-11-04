@@ -52,6 +52,8 @@
 #include "moho/ai/IAiBuilder.h"
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/CAiReconDBImpl.h"
+#include "moho/sim/SimArchiveMode.h"
+#include "moho/sim/SimKeyframe.h"
 #include "moho/sim/SimWorkerPool.h"
 #include "moho/sim/DesyncRecorder.h"
 #include "lua/LuaCallGate.h"
@@ -4028,6 +4030,20 @@ void Sim::SerializeLoadBody(gpg::ReadArchive* archive)
 
   LuaPlus::LuaObject globals = mLuaState->GetGlobals();
   ReadLuaTableEntriesFromArchive(archive, globals);
+
+  // Engine addition (replay keyframes): after the entities, whose load dirties these caches.
+  if (gSimExactArchive.load(std::memory_order_relaxed)) {
+    // Not reachable from the globals, and without it a table with holes reports a shorter length,
+    // so `table.insert` writes over a live entry.
+    ReadLuaTableEntriesFromArchive(archive, mLuaState->GetTableSizes());
+    mPathTables->LoadExact(archive);
+    mOGrid->mEntityOccupationManager.LoadBucketOrder(archive, *mEntityDB);
+    // The entities' load rebuilt these bits differently from play: a prop's footprint is not
+    // occupied again, and a release clears cells a neighbour also covers until something re-marks them.
+    for (gpg::BitArray2D* const bits : {&mOGrid->terrainOccupation, &mOGrid->waterOccupation, &mOGrid->mOccupation}) {
+      archive->ReadBytes(reinterpret_cast<char*>(bits->ptr), static_cast<std::size_t>(bits->size) * sizeof(std::int32_t));
+    }
+  }
 }
 
 /**
@@ -4165,6 +4181,17 @@ void Sim::SerializeSaveBody(gpg::WriteArchive* archive)
 
   LuaPlus::LuaObject globals = mLuaState->GetGlobals();
   (void)func_ArchiveWriteLuaObj(archive, &globals);
+
+  // Engine addition (replay keyframes): see SerializeLoadBody.
+  if (gSimExactArchive.load(std::memory_order_relaxed)) {
+    LuaPlus::LuaObject tableSizes = mLuaState->GetTableSizes();
+    (void)func_ArchiveWriteLuaObj(archive, &tableSizes);
+    mPathTables->SaveExact(archive);
+    mOGrid->mEntityOccupationManager.SaveBucketOrder(archive, *mEntityDB);
+    for (gpg::BitArray2D* const bits : {&mOGrid->terrainOccupation, &mOGrid->waterOccupation, &mOGrid->mOccupation}) {
+      archive->WriteBytes(reinterpret_cast<char*>(bits->ptr), static_cast<std::size_t>(bits->size) * sizeof(std::int32_t));
+    }
+  }
 }
 
 /**
@@ -4280,7 +4307,35 @@ namespace
   // Held by `Sync` from its walk to `OnSyncWalkDone`, so a caller that removes the observer
   // knows no call into it is still running on the sim's thread.
   std::mutex sSyncObserverLock;
+
+  ISyncRouting* sSyncRouting = nullptr;
+
+  /** A command source's Lua runs under its army's focus while the routing is on (plan WP6.2). */
+  struct SSyncRoutingCommand
+  {
+    Sim& sim;
+    ISyncRouting* routing;
+    explicit SSyncRoutingCommand(Sim& owner)
+      : sim(owner)
+      , routing(sSyncRouting)
+    {
+      if (routing != nullptr) {
+        routing->EnterCommand(sim);
+      }
+    }
+    ~SSyncRoutingCommand()
+    {
+      if (routing != nullptr) {
+        routing->LeaveCommand(sim);
+      }
+    }
+  };
 } // namespace
+
+void Sim::SetSyncRouting(ISyncRouting* const routing) noexcept
+{
+  sSyncRouting = routing;
+}
 
 void Sim::SetSyncObserver(CSyncObserver* const observer) noexcept
 {
@@ -4685,6 +4740,11 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     // tagged payload. The previous stream is released only when it is not the
     // one being installed; the packet is freshly built each beat so it is
     // normally null, but that is the shape the binary has.
+#if FAF_SERVER_MODE
+    if (sSyncRouting != nullptr) {
+      sSyncRouting->OnSyncTable(*this, syncTable, *outSyncData);
+    }
+#endif
     auto* const beatStream = new gpg::MemBufferStream(256u);
     if (beatStream != outSyncData->mStream && outSyncData->mStream != nullptr) {
       delete outSyncData->mStream;
@@ -5879,6 +5939,13 @@ void Sim::Printf(const char* fmt, ...)
   va_start(args, fmt);
 
   const char* format = fmt;
+#if FAF_SERVER_MODE
+  if (sSyncRouting != nullptr && sSyncRouting->FocusForLua() >= 0) {
+    (void)sSyncRouting->Print(gpg::STR_Va(format, args));
+    va_end(args);
+    return;
+  }
+#endif
   mPrintField.push_back(gpg::STR_Va(format, args));
 
   va_end(args);
@@ -6092,6 +6159,7 @@ Sim::Sim(LaunchInfoBase* const info)
 void Sim::Setup(LaunchInfoNew* const info)
 {
   mCheatsEnabled = info->mCheatsEnabled;
+  SIM_ResetFlattenLog(); // engine addition (replay keyframes)
 
   // Disk-watcher task, staged on the disk-watcher task stage.
   (void)CTask::CreateTaskThread(new ScrDiskWatcherTask(mLuaState), &mDiskWatcherTaskStage, true);
@@ -6294,6 +6362,22 @@ void Sim::Load(LaunchInfoLoad* const loadInfo)
 {
   gpg::ReadArchive* const archive = loadInfo->mReadArchive;
 
+  // Engine addition (replay keyframes): the archive keeps only the rects of flattened terrain, and
+  // the beat count goes on from the recorded game's. The driver's opening sync publishes the beat
+  // before the keyframe's again, and SIM_FinishKeyframeRestore puts back what that sync changes.
+  const SSimKeyframeHeader* const keyframe = SIM_KeyframeRestore();
+  if (keyframe != nullptr) {
+    CHeightField* const stamped = mMapData->mHeightField.get();
+    for (const SSimFlatten& flatten : keyframe->flattens) {
+      const gpg::Rect2i rect{flatten.x0, flatten.z0, flatten.x1, flatten.z1};
+      stamped->SetElevationRect(rect, &flatten.elevation);
+    }
+    mCurBeat = keyframe->beat - 1u;
+    // No collection until SIM_FinishKeyframeRestore: what the load leaves unreachable has to stay,
+    // as it did in the game until its next collection.
+    mLuaState->m_state->l_G->GCthreshold = 0xFFFFFFFFu;
+  }
+
   // Deserialize this Sim instance from the saved archive. A failure is logged,
   // the archive section is closed as aborted, and the error rethrown
   // (std::exception, FuncInfo 0x00F0C2D4 try state 0, handler 0x00744C54).
@@ -6317,10 +6401,11 @@ void Sim::Load(LaunchInfoLoad* const loadInfo)
     heightField->UpdateBounds(fullBounds);
   }
 
-  // Walk every loaded unit: re-arm its intel handles (AddViz) and re-bind any
-  // prop entity into the entity DB bounded-prop priority queue.
-  for (CUnitIterAllArmies iter(this); iter.mItr != iter.mEnd; iter.Next()) {
-    auto* const entity = static_cast<Entity*>(iter.mCur);
+  // Walk every loaded entity: re-arm its intel handles (AddViz) and re-bind any
+  // prop entity into the entity DB bounded-prop priority queue. 0x00744A48..0x00744A55
+  // start at the first node of `mAllUnits` and end at its header, the whole map.
+  for (const auto& [entityId, entity] : mEntityDB->mAllUnits) {
+    (void)entityId;
     if (!entity) {
       continue;
     }
@@ -6336,6 +6421,17 @@ void Sim::Load(LaunchInfoLoad* const loadInfo)
     if (Prop* const prop = entity->IsProp(); prop != nullptr && prop->mHandleIndex != -1) {
       prop->mHandleIndex = mEntityDB->AddBoundedProp(prop);
     }
+  }
+
+  // Engine addition (replay keyframes): the rest tells a new session about the loaded game, and
+  // OnPostLoad changes the sim while doing so (lua/SimPingGroup.lua forks a thread). A keyframe
+  // has to continue the game as it was. What the session's start built is garbage now; it goes
+  // here, or the first real collection would take it off the keyframe's counters.
+  if (keyframe != nullptr) {
+    SIM_ResolveKeyframeFormationPointers();
+    lua_collectkeepingweaktables(mLuaState->m_state);
+    mLuaState->m_state->l_G->GCthreshold = 0xFFFFFFFFu;
+    return;
   }
 
   // Re-sync the playable rectangle through /lua/SimSync.lua::SyncPlayableRect.
@@ -7864,6 +7960,9 @@ void Sim::ExecuteLuaInSim(const char* const functionName, const LuaPlus::LuaObje
     return;
   }
 
+#if FAF_SERVER_MODE
+  const SSyncRoutingCommand routingCommand(*this);
+#endif
   try {
     lua_State* const state = mLuaState->m_state;
     const int savedTop = lua_gettop(state);
@@ -7914,6 +8013,9 @@ void Sim::LuaSimCallback(
     }
   }
 
+#if FAF_SERVER_MODE
+  const SSyncRoutingCommand routingCommand(*this);
+#endif
   // A script error is logged, not propagated: the binary's only handler here is
   // `catch (lua_RuntimeError&)` (FuncInfo 0x00EE1C84, funclet 0x00749D74).
   // Without it one bad UI callback (e.g. a wrong-arity Issue* call inside
@@ -16315,6 +16417,7 @@ void Sim::FlattenMapRect(const gpg::Rect2i& rect, const float elevation)
   }
 
   heightField->SetElevationRect(clampedRect, &elevation);
+  SIM_NoteFlatten({clampedRect.x0, clampedRect.z0, clampedRect.x1, clampedRect.z1, elevation}); // keyframes
 
   // Record the flattened rect (near edges pulled back by one, far edges kept
   // clamped) into the cached and loaded map-rect lists.
@@ -18382,6 +18485,11 @@ int moho::cfunc_GetFocusArmySimL(LuaPlus::LuaState* const state)
 
   Sim* const sim = ResolveGlobalSim(state->m_state);
   int focusArmy = sim->mSyncFilter.focusArmy;
+#if FAF_SERVER_MODE
+  if (sSyncRouting != nullptr) {
+    focusArmy = sSyncRouting->FocusForLua();
+  }
+#endif
   if (focusArmy != -1) {
     ++focusArmy;
   }

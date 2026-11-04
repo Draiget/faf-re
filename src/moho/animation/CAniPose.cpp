@@ -16,6 +16,8 @@
 #include "moho/animation/CAniSkel.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/console/CConCommand.h"
+#include "moho/sim/SimArchiveMode.h"
+#include "moho/sim/SimKeyframe.h"
 
 namespace
 {
@@ -1307,6 +1309,13 @@ namespace moho
     }
 
     archive->ReadFloat(&mMaxOffset);
+
+    // Engine addition (replay keyframes): see SIM_NoteKeyframeBlock.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      std::uint64_t saved = 0;
+      archive->ReadUInt64(&saved);
+      SIM_NoteKeyframeBlock(saved, bonesBegin);
+    }
   }
 
   /**
@@ -1323,5 +1332,10 @@ namespace moho
     archive->Write(CachedVTransformType(), &mLocalTransform, nullOwner);
     archive->Write(CachedFastVectorCAniPoseBoneType(), &mBones, nullOwner);
     archive->WriteFloat(mMaxOffset);
+
+    // Engine addition (replay keyframes): see SIM_NoteKeyframeBlock.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->WriteUInt64(reinterpret_cast<std::uintptr_t>(mBones.begin()));
+    }
   }
 } // namespace moho

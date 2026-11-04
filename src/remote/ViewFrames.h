@@ -27,6 +27,11 @@
 // foreign projectiles and foreign command ids are renumbered per view. Off until inbound
 // translation (WP5.10) exists, because a client would otherwise send back ids the sim lacks.
 
+namespace moho
+{
+  class EntityDB;
+}
+
 namespace faf::remote
 {
   class CViewFrames : public CViewPackets
@@ -75,6 +80,8 @@ namespace faf::remote
     [[nodiscard]] std::size_t HeldCount(const std::int32_t army) const { return mHeld[static_cast<std::size_t>(army)].count; }
     /** `army`'s last frame against the one before, as `wire::EncodeFrame` writes it. */
     [[nodiscard]] bool EncodeHeldFrame(std::int32_t army, wire::BitWriter& writer) const;
+    /** `simId` as `view`'s client knows it, for an id written outside its frames (plan WP6.10). */
+    [[nodiscard]] std::uint32_t ViewEntityId(std::size_t view, std::uint32_t simId);
     /** Differences the check found (should stay 0). */
     [[nodiscard]] std::uint64_t HeldMismatches() const noexcept;
 
@@ -98,6 +105,8 @@ namespace faf::remote
       std::vector<std::uint8_t> sent;           // per slot: the client holds a record
       std::vector<std::uint8_t> keep;           // per slot: in this beat's frame
       std::vector<std::uint64_t> references;    // per slot: a filter of the sim ids the record names
+      std::vector<std::uint32_t> referrers;     // the slots with a filter, and some that no longer have one
+      std::vector<std::uint8_t> isReferrer;     // per slot: in `referrers`
       std::size_t count = 0;
       std::uint32_t frameId = 0;
       std::uint32_t baselineId = wire::kNoBaseline;
@@ -114,6 +123,12 @@ namespace faf::remote
       std::uint64_t mismatches = 0;
     };
 
+    /** This beat's `mEntityIndex` from last beat's and the change set; false if that isn't the sim's entities. */
+    [[nodiscard]] bool AdvanceEntityIndex(const moho::EntityDB& database);
+    /** This beat's `mEntityIndex` from the sim's entity map. */
+    void WalkEntityIndex(const moho::EntityDB& database);
+    /** Whether the view of `viewBit` keeps `id`'s record: yes for an id with no entity (an orphan). */
+    [[nodiscard]] bool KeptByView(std::uint32_t id, std::uint32_t viewBit) const;
     /** The view's frame from its packet, keeping what did not change (`EnableHeldFrames`). */
     void BuildHeldFrame(moho::Sim& sim, std::size_t army, const moho::SSyncData& packet);
     /** Compares the held frame with the whole frame built from the same world. */
@@ -141,12 +156,30 @@ namespace faf::remote
       std::uint32_t id;
       std::uint32_t views;
       bool readEveryBeat; // the answer depends on more than the entity (`ViewsFollowFactsAlone`)
+      bool leaving;       // in its destroy pass when last read: the sim may have let go of it since
     };
     std::vector<SEntityKeep> mEntityIndex;          // the sim's entities by id, this beat
     std::vector<moho::Entity*> mEntityPointers;     // the same entities
     std::vector<SEntityKeep> mLastEntityIndex;      // and last beat
     std::vector<moho::Entity*> mLastEntityPointers;
-    std::vector<std::uint32_t> mEntityReads;        // this beat's entries to read from their entities
+    /** An entry of `mEntityIndex` whose answer is worked out this beat. */
+    struct SEntityRead
+    {
+      std::uint32_t entry;
+      std::uint32_t changed; // its index in `Entities()`, whose facts were read this beat, or `kNotChanged`
+    };
+    static constexpr std::uint32_t kNotChanged = 0xFFFFFFFFu;
+    /** A sim id some view's answer changed for since last beat. No entity: every view keeps its record. */
+    struct SKeepChange
+    {
+      std::uint32_t id;
+      std::uint32_t views;   // who keeps it now
+      std::uint32_t changed; // whose answer changed
+    };
+    std::vector<SEntityRead> mEntityReads;
+    std::vector<std::uint32_t> mLeavingEntities; // ids of `SEntityKeep::leaving`
+    std::vector<std::uint32_t> mGoneEntities;    // those no longer in the sim, this beat
+    std::vector<SKeepChange> mKeepChanges;
     std::uint64_t mEntityIndexMismatches = 0;       // the check: answers kept that a read would change
     std::vector<std::uint32_t> mLiveCommands;     // the sim's commands by id, this beat
     std::vector<std::uint32_t> mLastCommands;     // and last beat

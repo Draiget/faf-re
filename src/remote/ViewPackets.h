@@ -108,6 +108,7 @@ namespace faf::remote
       std::uint32_t created = 0;   // the views' `mInterfaceCreated`
       std::uint32_t hasVision = 0; // a blip: the views that copied its creator's vision range at least once
       std::uint32_t visions = kNoVisions; // that range per view: `mVisions[visions + army]`
+      std::uint32_t blipHashes = kNoVisions; // the update each view's client holds: `mBlipHashes[blipHashes + army]`
     };
 
     /** One changed entity as every view reads it: read once a beat, written back after the views. */
@@ -147,6 +148,8 @@ namespace faf::remote
     {
       mBuildSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - mBuildStart).count();
     }
+    /** The facts of `Entities()[index]`, read this beat. */
+    [[nodiscard]] const SEntityFacts& ChangedFacts(const std::size_t index) const noexcept { return mChanged[index].facts; }
 
   private:
     std::vector<std::unique_ptr<moho::SSyncData>> mPackets;
@@ -163,5 +166,7 @@ namespace faf::remote
     gpg::core::FlatGenerationMap<SEntityViews> mEntityViews; // entities a view has or had a vision range of
     gpg::core::ChunkedVector<std::uint32_t> mVisions; // a block of one per view for each blip with a creator
     std::vector<std::uint32_t> mFreeVisions;
+    gpg::core::ChunkedVector<std::uint64_t> mBlipHashes; // a block of one per view for each blip with shared updates
+    std::vector<std::uint32_t> mFreeBlipHashes;
   };
 } // namespace faf::remote

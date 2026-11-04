@@ -12,6 +12,7 @@
 #include <new>
 #include <typeinfo>
 #include <utility>
+#include <vector>
 
 #include "gpg/core/algorithms/AStarSearch.h"
 #include "legacy/containers/Vector.h"
@@ -29,6 +30,7 @@
 #include "moho/ai/IAiNavigator.h"
 #include "moho/path/IPathTraveler.h"
 #include "moho/path/SNamedFootprint.h"
+#include "moho/sim/SimArchiveMode.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/SOCellPos.h"
 #include "moho/sim/SRuleFootprintsBlueprint.h"
@@ -209,6 +211,13 @@ namespace moho
 
     /** Hands the path to the best cell reached back to the traveler. */
     void FinishQuery(bool reachedGoal);
+
+    /**
+     * Engine addition (replay keyframes): the search as it stands. A saved game restarts the
+     * in-flight query (0x00768AA8), which changes when its path arrives; a keyframe continues it.
+     */
+    void SaveExact(gpg::WriteArchive* archive, const PathTables& owner);
+    void LoadExact(gpg::ReadArchive* archive, const PathTables& owner);
 
     gpg::DList<IPathTraveler> mTraveler;    // +0x4C
     SOCellPos mClosestCell;                 // +0x54
@@ -1110,6 +1119,11 @@ namespace moho
     gpg::RRef travelerOwner{};
     archive->Read(dlistType, &mBase.mTraveler, travelerOwner);
 
+    if (moho::gSimExactArchive.load(std::memory_order_relaxed)) {
+      mBase.LoadExact(archive, *mOwner);
+      return;
+    }
+
     // The in-flight traveler goes back to the front of the pending list
     // (0x00768AA8), so the query restarts first.
     mPendingTravelers.splice_front(mBase.mTraveler);
@@ -1147,6 +1161,139 @@ namespace moho
 
     gpg::RRef travelerOwner{};
     archive->Write(dlistType, &mBase.mTraveler, travelerOwner);
+
+    if (moho::gSimExactArchive.load(std::memory_order_relaxed)) {
+      const_cast<ImplBase&>(mBase).SaveExact(archive, *mOwner);
+    }
+  }
+
+  void PathQueue::ImplBase::SaveExact(gpg::WriteArchive* const archive, const PathTables& owner)
+  {
+    archive->WriteInt(owner.FootprintOfClusterMap(mClusterMap));
+    archive->WriteShort(mClosestCell.x);
+    archive->WriteShort(mClosestCell.z);
+    archive->WriteFloat(mClosestDistance);
+    archive->WriteInt(mBudget);
+    archive->WriteInt(mExpandCount);
+    archive->WriteInt(mPathCap);
+
+    // Nothing is in flight between queries, and BeginQuery starts the next one clean.
+    const bool inFlight = !mTraveler.empty();
+    archive->WriteBool(inFlight);
+    if (!inFlight) {
+      return;
+    }
+
+    std::uint32_t nodeCount = 0;
+    mNodes.ForEach([&nodeCount](const node_type&) { ++nodeCount; });
+    archive->WriteUInt(nodeCount);
+    mNodes.ForEach([archive](const node_type& node) {
+      archive->WriteShort(node.mCell.x);
+      archive->WriteShort(node.mCell.z);
+      archive->WriteInt(static_cast<std::int32_t>(node.mState));
+      archive->WriteBool(node.mParent != nullptr);
+      if (node.mParent != nullptr) {
+        archive->WriteShort(node.mParent->mCell.x);
+        archive->WriteShort(node.mParent->mCell.z);
+      }
+      archive->WriteFloat(node.mCost);
+      archive->WriteFloat(node.mEstimate);
+      archive->WriteInt(node.mHandle);
+    });
+
+    const auto& entries = mOpen.Entries();
+    archive->WriteUInt(static_cast<std::uint32_t>(entries.size()));
+    for (const auto& entry : entries) {
+      archive->WriteFloat(entry.mPriority);
+      archive->WriteShort(entry.mNode->mCell.x);
+      archive->WriteShort(entry.mNode->mCell.z);
+      archive->WriteInt(entry.mHandle);
+    }
+
+    const auto& indexByHandle = mOpen.IndexByHandle();
+    archive->WriteUInt(static_cast<std::uint32_t>(indexByHandle.size()));
+    for (const std::int32_t index : indexByHandle) {
+      archive->WriteInt(index);
+    }
+    archive->WriteInt(mOpen.FreeHandle());
+  }
+
+  void PathQueue::ImplBase::LoadExact(gpg::ReadArchive* const archive, const PathTables& owner)
+  {
+    std::int32_t footprint = -1;
+    archive->ReadInt(&footprint);
+    mClusterMap = footprint >= 0 ? owner.ClusterMapForFootprint(footprint) : nullptr;
+    archive->ReadShort(&mClosestCell.x);
+    archive->ReadShort(&mClosestCell.z);
+    archive->ReadFloat(&mClosestDistance);
+    archive->ReadInt(&mBudget);
+    archive->ReadInt(&mExpandCount);
+    archive->ReadInt(&mPathCap);
+
+    bool inFlight = false;
+    archive->ReadBool(&inFlight);
+    if (!inFlight) {
+      return;
+    }
+
+    struct SParentLink
+    {
+      node_type* mNode;
+      SOCellPos mParent;
+    };
+    std::vector<SParentLink> parents;
+
+    std::uint32_t nodeCount = 0;
+    archive->ReadUInt(&nodeCount);
+    for (std::uint32_t index = 0; index < nodeCount; ++index) {
+      SOCellPos cell{};
+      archive->ReadShort(&cell.x);
+      archive->ReadShort(&cell.z);
+
+      node_type& node = FindOrCreateNode(cell);
+      std::int32_t state = 0;
+      archive->ReadInt(&state);
+      node.mState = static_cast<gpg::AStarNodeState>(state);
+
+      bool hasParent = false;
+      archive->ReadBool(&hasParent);
+      if (hasParent) {
+        SParentLink link{&node, SOCellPos{}};
+        archive->ReadShort(&link.mParent.x);
+        archive->ReadShort(&link.mParent.z);
+        parents.push_back(link);
+      }
+      archive->ReadFloat(&node.mCost);
+      archive->ReadFloat(&node.mEstimate);
+      archive->ReadInt(&node.mHandle);
+    }
+    for (const SParentLink& link : parents) {
+      link.mNode->mParent = &FindOrCreateNode(link.mParent);
+    }
+
+    std::uint32_t entryCount = 0;
+    archive->ReadUInt(&entryCount);
+    for (std::uint32_t index = 0; index < entryCount; ++index) {
+      heap_type::Entry entry{};
+      archive->ReadFloat(&entry.mPriority);
+      SOCellPos cell{};
+      archive->ReadShort(&cell.x);
+      archive->ReadShort(&cell.z);
+      entry.mNode = &FindOrCreateNode(cell);
+      archive->ReadInt(&entry.mHandle);
+      mOpen.AppendRestored(entry);
+    }
+
+    std::uint32_t indexCount = 0;
+    archive->ReadUInt(&indexCount);
+    for (std::uint32_t index = 0; index < indexCount; ++index) {
+      std::int32_t value = 0;
+      archive->ReadInt(&value);
+      mOpen.AppendRestoredIndex(value);
+    }
+    std::int32_t freeHandle = -1;
+    archive->ReadInt(&freeHandle);
+    mOpen.SetFreeHandle(freeHandle);
   }
 
   /**
@@ -1433,6 +1580,35 @@ namespace moho
   gpg::HaStar::ClusterMap* PathTables::ClusterMapForFootprint(const std::int32_t footprintIndex) const
   {
     return mImpl->mMaps[footprintIndex];
+  }
+
+  std::int32_t PathTables::FootprintOfClusterMap(const gpg::HaStar::ClusterMap* const map) const
+  {
+    for (std::size_t index = 0; index < mImpl->mMaps.size(); ++index) {
+      if (mImpl->mMaps[index] == map) {
+        return static_cast<std::int32_t>(index);
+      }
+    }
+    return -1;
+  }
+
+  void PathTables::SaveExact(gpg::WriteArchive* const archive) const
+  {
+    for (const ClusterMap* const map : mImpl->mMaps) {
+      if (map != nullptr) {
+        map->SaveExact(archive);
+      }
+    }
+  }
+
+  void PathTables::LoadExact(gpg::ReadArchive* const archive)
+  {
+    std::unordered_map<std::string, gpg::HaStar::Cluster> shared;
+    for (ClusterMap* const map : mImpl->mMaps) {
+      if (map != nullptr) {
+        map->LoadExact(archive, shared);
+      }
+    }
   }
 
   /**

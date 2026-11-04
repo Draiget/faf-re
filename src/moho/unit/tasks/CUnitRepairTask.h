@@ -64,6 +64,16 @@ namespace moho
     CUnitRepairTask(CCommandTask* parentTask, Unit* targetUnit, bool isSiloBuild);
 
     /**
+     * Address: 0x005F8BE0 (FUN_005F8BE0, ??0CUnitRepairTask@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Builds an empty task for the serializer to fill: 0x005F8BFA stores this class's vftable,
+     * then every member is cleared (the build helper's defaults, the command and both weak lanes,
+     * the four flags).
+     */
+    CUnitRepairTask();
+
+    /**
      * Address: 0x005F9E50 (FUN_005F9E50, Moho::CUnitRepairTask::operator new)
      *
      * What it does:

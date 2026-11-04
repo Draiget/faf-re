@@ -1,3 +1,12 @@
 {
+  "26831761": {"verdict": "desync", "note": "survival_the_goats_revenge reads the real-time clock in the sim (PerformanceMonitor.lua), so the result depends on playback speed; forced to the live game's tiers it plays clean (docs/RETAIL_REPLAY_PARITY.md)"},
+  "26844459": {"verdict": "desync", "note": "Players left at 11859 and 11895; retail's replay gate defect in CClientBase::UpdateState makes retail match no player from 11900. Ours equals the group of 4 at all 196 split beats, the group of 6 outvotes it"},
+  "26850929": {"verdict": "desync", "note": "Retail gives our exact hash at 16550; 2 live players recorded it and 8 another, so the live game split there"},
+  "26881061": {"verdict": "desync", "note": "Retail gives our exact hashes at beats 1650 and 2500; both live players recorded another"},
+  "26896985": {"verdict": "desync", "note": "Retail gives the exact same hash at beat 50"},
+  "26897696": {"verdict": "desync", "note": "Retail gives our exact hash at beat 50; the same two players as 26897786, whose inputs differed"},
+  "26897786": {"verdict": "desync", "note": "Retail gives our exact hashes at beats 50 and 100; the live players ran different inputs (M28AI build or game data)"},
+  "26916675": {"verdict": "error", "note": "FAF serves no file for this replay: its download returned 404 in runs 41025691648, 41204776548 and 41709411384"},
+  "26974352": {"verdict": "desync", "note": "One bad checksum at beat 39100 on retail and on ours, then clean"},
   "27051951": {"verdict": "desync", "note": "Proxima m: desyncs at beat 50, the replay's first checksum; probably the map (docs/RETAIL_REPLAY_PARITY.md)"}
 }

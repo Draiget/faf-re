@@ -496,7 +496,7 @@ namespace
     const unsigned int count = elements.Data() ? static_cast<unsigned int>(elements.Size()) : 0u;
     archive->WriteUInt(count);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->WriteUInt(*elements.Data() + (i));
+      archive->WriteUInt(elements.Data()[i]);
     }
   }
 
@@ -652,7 +652,7 @@ namespace
     const unsigned int count = elements.Data() ? static_cast<unsigned int>(elements.Size()) : 0u;
     archive->WriteUInt(count);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->WriteFloat(*elements.Data() + (i));
+      archive->WriteFloat(elements.Data()[i]);
     }
   }
 

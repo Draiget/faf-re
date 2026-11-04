@@ -23,6 +23,10 @@ namespace faf::netlink
     using namespace std::chrono_literals;
 
     // PeerIceModule / PeerConnectivityCheckerModule constants.
+    // What every link in this process has sent, with the lane's copies and echoes: GetWireTotals.
+    std::atomic<std::uint64_t> sWirePackets{0};
+    std::atomic<std::uint64_t> sWireBytes{0};
+
     constexpr auto kGatherTimeout = 5000ms;          // gatheringFuture cancel
     constexpr auto kAwaitCandidatesTimeout = 6000ms; // no answer to our candidates
     constexpr auto kCheckTimeout = 15000ms;          // startIce loop
@@ -1103,8 +1107,15 @@ namespace faf::netlink
     }
   }
 
+  WireTotals GetWireTotals()
+  {
+    return {sWirePackets.load(std::memory_order_relaxed), sWireBytes.load(std::memory_order_relaxed)};
+  }
+
   bool Link::SendFramed(const char* framed, const std::size_t size)
   {
+    sWirePackets.fetch_add(1, std::memory_order_relaxed);
+    sWireBytes.fetch_add(size, std::memory_order_relaxed);
     if (TestShaping::Get().Enabled()) {
       Clock::duration delay{};
       if (!TestShaping::Get().Roll(delay, mOptions.localId, mOptions.remoteId)) {

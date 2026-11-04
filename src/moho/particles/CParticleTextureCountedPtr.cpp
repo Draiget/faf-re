@@ -167,7 +167,7 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::CountedPtr_CParticleTexture>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::CountedPtr_CParticleTexture>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -198,7 +198,7 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::CountedPtr_CParticleTexture>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::CountedPtr_CParticleTexture>*>(objectPtr);
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
@@ -557,7 +557,7 @@ namespace gpg
       return out;
     }
 
-    auto& vec = *static_cast<gpg::fastvector<moho::CountedPtr_CParticleTexture>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::CountedPtr_CParticleTexture>*>(obj);
     if (vec.Data() == nullptr || static_cast<std::size_t>(ind) >= GetCount(obj)) {
       return out;
     }
@@ -579,7 +579,7 @@ namespace gpg
       return 0u;
     }
 
-    auto& vec = *static_cast<gpg::fastvector<moho::CountedPtr_CParticleTexture>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::CountedPtr_CParticleTexture>*>(obj);
     if (vec.Data() == nullptr) {
       return 0u;
     }
@@ -600,7 +600,7 @@ namespace gpg
       return;
     }
 
-    auto& vec = *static_cast<gpg::fastvector<moho::CountedPtr_CParticleTexture>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::CountedPtr_CParticleTexture>*>(obj);
     // `fastvector<CountedPtr<CParticleTexture>>::resize` (0x00657900, cited on FastVector.h).
     const moho::CountedPtr_CParticleTexture fill{};
     vec.resize(static_cast<std::size_t>(count), fill);
