@@ -33,7 +33,7 @@ do
             return
         end
 
-        local ok, timeline = pcall(import, '/mods/fafengine/lua/ui/game/replay_timeline.lua')
+        local ok, timeline = pcall(import, '/fafengine/lua/ui/game/replay_timeline.lua')
         if not ok or not timeline or not timeline.CreateReplayTimeline then
             ok, timeline = pcall(import, '/lua/ui/game/replay_timeline.lua')
         end
