@@ -37,9 +37,6 @@ do
         if not ok or not timeline or not timeline.CreateReplayTimeline then
             ok, timeline = pcall(import, '/lua/ui/game/replay_timeline.lua')
         end
-        if not ok or not timeline or not timeline.CreateReplayTimeline then
-            ok, timeline = pcall(import, '/mods/FAFEngine/modules/replay_timeline.lua')
-        end
 
         if ok and timeline and timeline.CreateReplayTimeline then
             if not timeline.GetTimelineControl() then
