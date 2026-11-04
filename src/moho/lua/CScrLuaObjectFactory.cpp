@@ -2,11 +2,16 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <typeinfo>
+#include <unordered_map>
+#include <unordered_set>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -27,10 +32,22 @@ extern "C"
   int luaO_log2(unsigned int x);
   void luaV_settable(lua_State* L, const LuaPlus::TObject* t, LuaPlus::TObject* key, LuaPlus::TObject* val);
 }
+#include "moho/misc/StartupHelpers.h"
+#include "moho/sim/CVFSImpl.h"
 
 namespace
 {
   constexpr const char* kFactoryObjectsGlobalName = "__factory_objects";
+  bool lua_SessionSharedBlueprints = true;
+  moho::TConVar<bool> gTConVar_lua_SessionSharedBlueprints(
+    "lua_SessionSharedBlueprints",
+    "The session's Lua copy of the blueprints keeps one table for each blueprint, reached by its number and by its id "
+    "as in the rules' own state (1, the default), or two separate copies (0). The sim's copy always has two.",
+    &lua_SessionSharedBlueprints
+  );
+
+  thread_local std::unordered_map<const void*, LuaPlus::LuaObject>* tCopiedTables = nullptr;
+
   constexpr const char* kActiveModsGlobalName = "__active_mods";
   constexpr const char* kLocationFieldName = "location";
   constexpr const char* kHookDirFieldName = "hookdir";
@@ -333,15 +350,103 @@ namespace
     return !outPath.empty();
   }
 
+  /**
+   * Engine addition: `lua_HookProbeCache`. Every doscript looks for a hook file under each hook
+   * directory and each active mod, and nearly all of those lookups find nothing, after walking every
+   * mount. One listing per hook directory and file extension answers them. A listing lasts until
+   * the file lookups are invalidated, and it isn't used with /EnableDiskWatch, where files come and
+   * go, or with /nohookcache.
+   */
+  bool lua_HookProbeCache = true;
+  moho::TConVar<bool> gTConVar_lua_HookProbeCache(
+    "lua_HookProbeCache",
+    "Answer doscript's hook file lookups from one listing per hook directory (1, the default), or look each one up "
+    "through every mount (0). Same files either way. /nohookcache turns it off at startup.",
+    &lua_HookProbeCache
+  );
+
+  [[nodiscard]] bool HookProbeVerify()
+  {
+    static const bool verify = [] {
+      const char* const value = std::getenv("FAF_HOOK_PROBE_VERIFY");
+      return value != nullptr && value[0] == '1';
+    }();
+    return verify;
+  }
+
+  /** False when no file can be there, so that the lookup can be skipped. */
+  [[nodiscard]] bool HookFileMightExist(const char* const hookRoot, const char* const hookPath, const char* const scriptPath)
+  {
+    static const bool startupOff =
+      moho::CFG_GetArgOption("/EnableDiskWatch", 0u, nullptr) || moho::CFG_GetArgOption("/nohookcache", 0u, nullptr);
+    moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
+    if (!lua_HookProbeCache || startupOff || waitHandleSet == nullptr || waitHandleSet->mHandle == nullptr || scriptPath == nullptr || scriptPath[0] != '/') {
+      return true;
+    }
+
+    std::string root(hookRoot != nullptr ? hookRoot : "");
+    root.append(hookPath != nullptr ? hookPath : "");
+    std::string path = root + scriptPath;
+    for (char& c : path) {
+      if (c >= 'A' && c <= 'Z') {
+        c = static_cast<char>(c - 'A' + 'a');
+      } else if (c == '\\') {
+        return true;
+      }
+    }
+    if (path.find("//") != std::string::npos || path.find("/.") != std::string::npos) {
+      return true;
+    }
+
+    // STR_MatchWildcard never matches a pattern that ends in `*`, as in the binary, so each listing
+    // is of one extension: `*.lua`. Paths without a plain extension take the full lookup.
+    const std::size_t lastSlash = path.rfind('/');
+    const std::size_t lastDot = path.rfind('.');
+    if (lastDot == std::string::npos || lastDot < lastSlash || lastDot + 1U == path.size() || path.find_first_of("*?") != std::string::npos) {
+      return true;
+    }
+    const std::string pattern = "*" + path.substr(lastDot);
+    const std::string listingKey = root + "|" + pattern;
+
+    static std::mutex sMutex;
+    static std::unordered_map<std::string, std::unordered_set<std::string>> sListings;
+    static std::uint64_t sGeneration = 0;
+    const std::lock_guard<std::mutex> lock(sMutex);
+    const std::uint64_t generation = moho::DISK_FileLookupGeneration();
+    if (generation != sGeneration) {
+      sListings.clear();
+      sGeneration = generation;
+    }
+    auto listing = sListings.find(listingKey);
+    if (listing == sListings.end()) {
+      msvc8::vector<msvc8::string> files;
+      waitHandleSet->mHandle->EnumerateFiles(root.c_str(), pattern.c_str(), true, &files);
+      std::unordered_set<std::string> names;
+      names.reserve(files.size());
+      for (const msvc8::string& file : files) {
+        names.emplace(file.c_str());
+      }
+      listing = sListings.emplace(listingKey, std::move(names)).first;
+    }
+    return listing->second.count(path) != 0U;
+  }
+
   void TryAppendHookScriptPath(
     msvc8::vector<msvc8::string>& outFiles,
     const char* const scriptPath,
-    const msvc8::string& candidatePath
+    const msvc8::string& candidatePath,
+    const bool mightExist
   )
   {
+    if (!mightExist && !HookProbeVerify()) {
+      return;
+    }
     msvc8::string resolvedPath{};
     if (!ResolveMountedScriptPath(candidatePath.c_str(), resolvedPath) || resolvedPath.empty()) {
       return;
+    }
+    if (!mightExist) {
+      gpg::Warnf("hook probe verify: the listing misses %s", candidatePath.c_str());
     }
 
     gpg::Logf("Hooked %s with %s", scriptPath != nullptr ? scriptPath : "", candidatePath.c_str());
@@ -394,7 +499,7 @@ namespace
       }
 
       const msvc8::string candidatePath = BuildHookCandidatePath(modLocation, hookDir, scriptPath);
-      TryAppendHookScriptPath(outFiles, scriptPath, candidatePath);
+      TryAppendHookScriptPath(outFiles, scriptPath, candidatePath, HookFileMightExist(modLocation, hookDir, scriptPath));
     }
   }
 
@@ -867,11 +972,26 @@ namespace moho
         LuaPlus::LuaObject keyHolder{};
         LuaPlus::TObject keyCopy = copy(key, keyHolder);
         if (value.tt == LUA_TTABLE) {
+          // lua_SessionSharedBlueprints: inside an SCR_CopySharedTablesScope a table reached twice is
+          // copied once, as SCR_Copy's own table case does (keyed, as there, by lua_topointer's answer).
+          const void* const sharedKey = static_cast<const void*>(value.value.p);
+          if (tCopiedTables != nullptr) {
+            if (const auto found = tCopiedTables->find(sharedKey); found != tCopiedTables->end()) {
+              LuaPlus::TObject shared = found->second.m_object;
+              luaV_settable(L, &target, &keyCopy, &shared);
+              return;
+            }
+          }
           Table* const childTable = luaH_new(L, 0, luaO_log2(0u) + 1);
           LuaPlus::TObject child{};
           child.tt = childTable->tt;
           child.value.p = childTable;
           luaV_settable(L, &target, &keyCopy, &child);
+          if (tCopiedTables != nullptr) {
+            LuaPlus::LuaObject held{};
+            held.AssignTObject(targetState, &child);
+            tCopiedTables->emplace(sharedKey, held);
+          }
           CopyTableEntries(L, static_cast<const Table*>(value.value.p), child, sourceState, targetState);
           return;
         }
@@ -887,11 +1007,27 @@ namespace moho
       }
       for (int index = 0; index < (1 << source->lsizenode); ++index) {
         if (source->node[index].i_val.tt != LUA_TNIL) {
-          copyEntry(source->node[index].i_key, source->node[index].i_val);
+          copyEntry(source->node[index].Key(), source->node[index].i_val);
         }
       }
     }
   } // namespace
+
+  SCR_CopySharedTablesScope::SCR_CopySharedTablesScope()
+  {
+    if (lua_SessionSharedBlueprints && tCopiedTables == nullptr) {
+      tCopiedTables = new std::unordered_map<const void*, LuaPlus::LuaObject>();
+      mActive = true;
+    }
+  }
+
+  SCR_CopySharedTablesScope::~SCR_CopySharedTablesScope()
+  {
+    if (mActive) {
+      delete tCopiedTables;
+      tCopiedTables = nullptr;
+    }
+  }
 
   LuaPlus::LuaObject SCR_Copy(const LuaPlus::LuaObject& source, LuaPlus::LuaState* const state)
   {
@@ -922,7 +1058,23 @@ namespace moho
         return out;
 
       case LUA_TTABLE: {
+        const void* sharedKey = nullptr;
+        if (tCopiedTables != nullptr) {
+          LuaPlus::LuaState* const sourceState = source.GetActiveState();
+          lua_State* const rawSource = sourceState->GetCState();
+          const int savedTop = lua_gettop(rawSource);
+          source.PushStack(sourceState);
+          sharedKey = lua_topointer(rawSource, -1);
+          lua_settop(rawSource, savedTop);
+          const auto found = tCopiedTables->find(sharedKey);
+          if (found != tCopiedTables->end()) {
+            return found->second;
+          }
+        }
         out.AssignNewTable(state, 0, 0);
+        if (sharedKey != nullptr) {
+          tCopiedTables->emplace(sharedKey, out);
+        }
         // Engine addition (sim_BlueprintCopyDirect): across universes - the rules' blueprints into a
         // session or sim state - the entries are copied directly (CopyTableEntries), which builds
         // the same tables.
@@ -1375,7 +1527,7 @@ namespace moho
 
     for (const msvc8::string& hookDirectory : gScriptHookDirectories) {
       const msvc8::string candidatePath = BuildHookCandidatePath(hookDirectory.c_str(), "", scriptPath);
-      TryAppendHookScriptPath(files, scriptPath, candidatePath);
+      TryAppendHookScriptPath(files, scriptPath, candidatePath, HookFileMightExist(hookDirectory.c_str(), "", scriptPath));
     }
 
     CollectActiveModHookScripts(state, scriptPath, files);

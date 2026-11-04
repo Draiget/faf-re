@@ -56,9 +56,9 @@ namespace moho
   // docs/LAUNCHER_NATIVE_NETWORK.md); 0 is the adapter path. Read when the
   // game reports Idle.
   int32_t net_NativeNet = 0;
-  // Issue #274: in native mode, offer a WebRTC data channel to peers that are
+  // Issue #274: in native mode, 1 offers a WebRTC data channel to peers that are
   // our builds too (#239). Read when a link starts.
-  int32_t net_NativeNetWebRtc = 1;
+  int32_t net_NativeNetWebRtc = 0;
   // Issue #240: in native mode, with peers running our build, game datagrams go
   // on a redundant lane that repeats each up to this many times until acked;
   // 0 sends them plainly. Read when a link starts.
@@ -74,7 +74,14 @@ namespace moho
   // Diagnostics: every this many beats log the UDP connections' totals: packets,
   // bytes, resends, acks and mean ping; 0 logs nothing. Live.
   int32_t net_LogTraffic = 0;
+  // Diagnostics: log a beat the main thread took this many ms or more after the one
+  // before it, which is the pause a player sees; 0 logs nothing. Live.
+  int32_t net_LogShownBeatMs = 0;
+  // Above 0: a pause this player sees raises their net_Lag a step, up to this many ms, and a
+  // long quiet spell lowers it again; 0 keeps net_Lag as set. Live.
+  int32_t net_AdaptiveLagMax = 0;
   NetTrafficTotals gNetTraffic;
+  void (*gNetLinkTrafficLog)(int beat) = nullptr;
   // Issue #236, test only: once beat net_TestBurstBeat is available, this game
   // sends net_TestBurstBytes incompressible filler bytes to every peer on the
   // ordered stream, the way a large order burst occupies it; peers drop it.
@@ -110,7 +117,7 @@ namespace moho
 
     TConVar<int32_t> gTConVar_net_NativeNetWebRtc(
       "net_NativeNetWebRtc",
-      "In native mode, 1 (default): move game datagrams onto a WebRTC data channel with peers running our build; 0: ICE only.",
+      "In native mode, 1: move game datagrams onto a WebRTC data channel with peers running our build; 0 (default): ICE only.",
       &net_NativeNetWebRtc
     );
 
@@ -125,6 +132,18 @@ namespace moho
       "Data waiting to be compressed keeps its send deadline when another packet goes first (1, the default), or waits "
       "for the next keepalive as the original does (0).",
       &net_FlushDeadline
+    );
+
+    TConVar<int32_t> gTConVar_net_AdaptiveLagMax(
+      "net_AdaptiveLagMax",
+      "Above 0: pauses raise this player's net_Lag up to this many ms, and quiet spells lower it again; 0 (default) keeps net_Lag as set.",
+      &net_AdaptiveLagMax
+    );
+
+    TConVar<int32_t> gTConVar_net_LogShownBeatMs(
+      "net_LogShownBeatMs",
+      "Logs a beat the main thread took this many ms or more after the one before it; 0 (default) logs nothing.",
+      &net_LogShownBeatMs
     );
 
     TConVar<int32_t> gTConVar_net_LogTraffic(

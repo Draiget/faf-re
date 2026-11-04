@@ -17,7 +17,11 @@
 
 #include "legacy/math/X87Math.h"
 #include "moho/containers/SCoordsVec2.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/SerializationError.h"
 #include "moho/entity/Entity.h"
+#include "moho/entity/EntityDb.h"
 #include "moho/collision/CColPrimitiveBase.h"
 #include "moho/math/Vector3f.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -581,6 +585,111 @@ namespace moho
     bucketHeads[bucketIndex] = node;
 
     --mFreeNodeCount;
+  }
+
+  void EntityOccupationManager::SaveBucketOrder(gpg::WriteArchive* const archive, const EntityDB& entities) const
+  {
+    int entityCount = 0;
+    for (const auto& [id, entity] : entities.mAllUnits) {
+      entityCount += entity != nullptr ? 1 : 0;
+    }
+    archive->WriteInt(entityCount);
+    for (const auto& [id, entity] : entities.mAllUnits) {
+      if (entity != nullptr) {
+        CollisionDBRect rect = *static_cast<const CollisionShape<Entity>*>(entity);
+        archive->WriteUInt(id);
+        archive->WriteBytes(reinterpret_cast<char*>(&rect), sizeof(rect));
+      }
+    }
+
+    EntityCollisionCellNode* const* const families[] = {mUnitBuckets, mPropBuckets, mEntityBuckets};
+    for (EntityCollisionCellNode* const* const buckets : families) {
+      for (int bucket = 0; bucket <= mLastIndex; ++bucket) {
+        if (buckets[bucket] == nullptr) {
+          continue;
+        }
+
+        archive->WriteInt(bucket);
+        int count = 0;
+        for (const EntityCollisionCellNode* node = buckets[bucket]; node != nullptr; node = node->next) {
+          ++count;
+        }
+        archive->WriteInt(count);
+        for (const EntityCollisionCellNode* node = buckets[bucket]; node != nullptr; node = node->next) {
+          const Entity* const entity = static_cast<const Entity*>(static_cast<const CollisionShape<Entity>*>(node->owner));
+          archive->WriteUInt(static_cast<unsigned int>(entity->id_));
+        }
+      }
+      archive->WriteInt(-1);
+    }
+  }
+
+  void EntityOccupationManager::LoadBucketOrder(gpg::ReadArchive* const archive, const EntityDB& entities)
+  {
+    EntityCollisionCellNode** const families[] = {mUnitBuckets, mPropBuckets, mEntityBuckets};
+    for (EntityCollisionCellNode** const buckets : families) {
+      for (int bucket = 0; bucket <= mLastIndex; ++bucket) {
+        for (EntityCollisionCellNode* node = buckets[bucket]; node != nullptr;) {
+          EntityCollisionCellNode* const next = node->next;
+          node->owner = nullptr;
+          node->next = mFreeNodeHead;
+          mFreeNodeHead = node;
+          ++mFreeNodeCount;
+          node = next;
+        }
+        buckets[bucket] = nullptr;
+      }
+    }
+
+    int entityCount = 0;
+    archive->ReadInt(&entityCount);
+    for (int index = 0; index < entityCount; ++index) {
+      unsigned int id = 0u;
+      archive->ReadUInt(&id);
+      CollisionDBRect rect{};
+      archive->ReadBytes(reinterpret_cast<char*>(&rect), sizeof(rect));
+
+      const auto found = entities.mAllUnits.find(id);
+      if (found == entities.mAllUnits.end() || found->second == nullptr) {
+        throw gpg::SerializationError("Keyframe: an entity with a saved grid rect was not loaded");
+      }
+      static_cast<CollisionDBRect&>(*static_cast<CollisionShape<Entity>*>(found->second)) = rect;
+    }
+
+    for (EntityCollisionCellNode** const buckets : families) {
+      for (;;) {
+        int bucket = -1;
+        archive->ReadInt(&bucket);
+        if (bucket < 0) {
+          break;
+        }
+        if (bucket > mLastIndex) {
+          throw gpg::SerializationError("Keyframe: a saved grid bucket is out of range");
+        }
+
+        int count = 0;
+        archive->ReadInt(&count);
+        EnsureSize(count);
+        EntityCollisionCellNode** link = &buckets[bucket];
+        for (int index = 0; index < count; ++index) {
+          unsigned int id = 0u;
+          archive->ReadUInt(&id);
+
+          const auto found = entities.mAllUnits.find(id);
+          if (found == entities.mAllUnits.end() || found->second == nullptr) {
+            throw gpg::SerializationError("Keyframe: an entity in a saved grid bucket was not loaded");
+          }
+
+          EntityCollisionCellNode* const node = mFreeNodeHead;
+          mFreeNodeHead = node->next;
+          --mFreeNodeCount;
+          node->owner = static_cast<CollisionShape<Entity>*>(found->second);
+          node->next = nullptr;
+          *link = node;
+          link = &node->next;
+        }
+      }
+    }
   }
 
   /**

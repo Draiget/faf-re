@@ -83,9 +83,12 @@ set(_faf_sim_patterns
   # (log file, reflection types, resource manager, data search paths) every
   # engine program sets up, headless and the game server among them.
   "^moho/app/IWinApp\\.cpp$"
-  # The emitter curve and parameter enums' reflection (the effect emitters the sim
-  # creates take them by name from Lua).
-  "^moho/render/(EEmitterCurveTypeInfo|EEmitterParamTypeInfo)\\.cpp$"
+  # The emitter curve, parameter and type enums' reflection (the effect emitters the sim
+  # creates take them by name from Lua; a saved sim writes each emitter's EmitterType).
+  "^moho/render/(EEmitterCurveTypeInfo|EEmitterParamTypeInfo|EmitterTypeTypeInfo)\\.cpp$"
+  # The texture scroll enum's reflection (an entity's CTextureScroller is sim state; a saved
+  # sim writes each scroller's EScrollType).
+  "^moho/ui/EScrollTypeTypeInfo\\.cpp$"
   # SFD movie headers (MOV_GetDuration, behind the core Lua set's GetMovieDuration).
   "^moho/movie/sfd/(SfdHeaderParser|SfdHeaderInfo)\\.cpp$")
 

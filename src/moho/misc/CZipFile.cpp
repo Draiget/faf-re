@@ -9,6 +9,7 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -17,6 +18,7 @@
 #include "gpg/core/streams/FileStream.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/console/CConCommand.h"
+#include "moho/misc/StartupHelpers.h"
 
 namespace
 {
@@ -29,6 +31,10 @@ namespace
   constexpr std::uint16_t kZipCompressionStored = 0u;
   constexpr std::uint16_t kZipCompressionDeflated = 8u;
   constexpr std::uint16_t kZipDataDescriptorFlag = 0x0008u;
+
+  [[nodiscard]] bool ReadWholeZipDirectory(
+    gpg::Stream& stream, std::uint32_t directoryOffset, std::uint32_t directorySize, std::uint32_t entryCount, std::vector<char>& outBytes
+  );
 
 #pragma pack(push, 1)
   struct SZipCentralDirectoryFileHeader
@@ -64,6 +70,39 @@ namespace
     std::uint16_t mCommentLength = 0;
   };
 #pragma pack(pop)
+
+  /**
+   * Engine addition: reads the whole central directory and checks that `entryCount` records fit it
+   * exactly as the entry-by-entry parse would walk them. On false the stream is back at its start.
+   */
+  bool ReadWholeZipDirectory(
+    gpg::Stream& stream, const std::uint32_t directoryOffset, const std::uint32_t directorySize, const std::uint32_t entryCount, std::vector<char>& outBytes
+  )
+  {
+    static const bool disabled = moho::CFG_GetArgOption("/nozipbulk", 0u, nullptr);
+    if (disabled || directorySize == 0U) {
+      return false;
+    }
+    outBytes.resize(directorySize);
+    bool walks = stream.Read(outBytes.data(), directorySize) == directorySize;
+    std::size_t cursor = 0U;
+    for (std::uint32_t index = 0U; walks && index < entryCount; ++index) {
+      SZipCentralDirectoryFileHeader header{};
+      if (cursor + sizeof(header) > outBytes.size()) {
+        walks = false;
+        break;
+      }
+      std::memcpy(&header, outBytes.data() + cursor, sizeof(header));
+      cursor += sizeof(header) + header.mFileNameLength + header.mExtraFieldLength + header.mFileCommentLength;
+      walks = header.mSignature == kZipCentralDirectoryFileHeaderMagic && cursor <= outBytes.size();
+    }
+    if (!walks) {
+      outBytes.clear();
+      (void)stream.VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, static_cast<std::int64_t>(directoryOffset));
+    }
+    return walks;
+  }
+
 
   static_assert(sizeof(SZipCentralDirectoryFileHeader) == 0x2E, "SZipCentralDirectoryFileHeader size must be 0x2E");
   static_assert(sizeof(SZipEndOfCentralDirectoryRecord) == 0x16, "SZipEndOfCentralDirectoryRecord size must be 0x16");
@@ -197,55 +236,12 @@ namespace
     return true;
   }
 
-  // Engine addition: inside a CZipFileReadBatch the thread keeps the archive it last read an entry
-  // from open for its next read; opening the file again for every entry was an eighth of blueprint
-  // loading. Creating or destroying any CZipFile moves the generation on, which retires every
-  // thread's open archive, so a stream is never reused for another archive at the same address.
-  std::atomic<std::uint64_t> gZipFileGeneration{0};
-
-  struct SOpenArchive
-  {
-    int batchDepth = 0;
-    const void* zip = nullptr;
-    std::uint64_t generation = 0;
-    std::unique_ptr<gpg::Stream> stream;
-  };
-  thread_local SOpenArchive tOpenArchive;
-
-  bool res_ArchiveKeepOpen = true;
-  moho::TConVar<bool> gTConVar_res_ArchiveKeepOpen(
-    "res_ArchiveKeepOpen",
-    "During a session load, keep each game archive open between the entries read from it (1, the default), or open "
-    "and close it for every entry as the original does (0). Read at each entry.",
-    &res_ArchiveKeepOpen
-  );
-
   // Engine addition: the lock ReadEntry holds for one entry, one of a fixed set chosen by the
   // entry's address (the archive object keeps the binary's layout, with no room for one per entry).
   [[nodiscard]] std::mutex& EntryLock(const void* const entry)
   {
     static std::mutex locks[64];
     return locks[(reinterpret_cast<std::uintptr_t>(entry) >> 4U) % 64U];
-  }
-
-  // The archive stream to read `zip`'s entry from: the thread's open one inside a batch, otherwise
-  // a fresh one in `ownedStream`, closed when the caller is done with it.
-  [[nodiscard]] gpg::Stream* OpenArchiveForRead(
-    const void* const zip, const msvc8::string& zipPath, std::unique_ptr<gpg::Stream>& ownedStream
-  )
-  {
-    if (tOpenArchive.batchDepth == 0 || !res_ArchiveKeepOpen) {
-      ownedStream = OpenZipBackingStream(zipPath);
-      return ownedStream.get();
-    }
-    const std::uint64_t generation = gZipFileGeneration.load(std::memory_order_acquire);
-    if (tOpenArchive.stream != nullptr && tOpenArchive.zip == zip && tOpenArchive.generation == generation) {
-      return tOpenArchive.stream.get();
-    }
-    tOpenArchive.stream = OpenZipBackingStream(zipPath);
-    tOpenArchive.zip = zip;
-    tOpenArchive.generation = generation;
-    return tOpenArchive.stream.get();
   }
 } // namespace
 
@@ -262,7 +258,6 @@ namespace moho
    */
   CZipFile::CZipFile(const gpg::StrArg sourcePath)
   {
-    gZipFileGeneration.fetch_add(1u, std::memory_order_acq_rel); // engine addition, see OpenArchiveForRead
     const char* const archivePath = sourcePath != nullptr ? sourcePath : "";
     mPath.assign_owned(archivePath);
 
@@ -323,10 +318,25 @@ namespace moho
       static_cast<std::int64_t>(endOfCentralDirectory.mCentralDirectoryOffset)
     );
 
+    // Engine addition: the directory in one read. Seeking past an entry's extra field drops the
+    // stream's buffer, which made two system calls per entry. Anything that doesn't walk cleanly
+    // goes the original way, entry by entry (also with /nozipbulk).
+    std::vector<char> directoryBytes;
+    const bool directoryRead = ReadWholeZipDirectory(
+      *zipStream, endOfCentralDirectory.mCentralDirectoryOffset, endOfCentralDirectory.mCentralDirectorySize,
+      endOfCentralDirectory.mTotalEntries, directoryBytes
+    );
+    std::size_t directoryCursor = 0U;
+
     mEntries.reserve(endOfCentralDirectory.mTotalEntries);
     for (std::uint32_t entryOrdinal = 0; entryOrdinal < endOfCentralDirectory.mTotalEntries; ++entryOrdinal) {
       SZipCentralDirectoryFileHeader directoryHeader{};
-      reader.ReadExact(directoryHeader);
+      if (directoryRead) {
+        std::memcpy(&directoryHeader, directoryBytes.data() + directoryCursor, sizeof(directoryHeader));
+        directoryCursor += sizeof(directoryHeader);
+      } else {
+        reader.ReadExact(directoryHeader);
+      }
       if (directoryHeader.mSignature != kZipCentralDirectoryFileHeaderMagic) {
         gpg::Warnf("Error reading zip directory entry for '%s'", archivePath);
         break;
@@ -342,7 +352,10 @@ namespace moho
       parsedEntry->mLocalHeaderOffset = directoryHeader.mLocalHeaderOffset;
       parsedEntry->mCachedDataOffset = -1;
 
-      if (directoryHeader.mFileNameLength != 0) {
+      if (directoryRead) {
+        parsedEntry->mName.assign_owned(std::string_view(directoryBytes.data() + directoryCursor, directoryHeader.mFileNameLength));
+        directoryCursor += directoryHeader.mFileNameLength;
+      } else if (directoryHeader.mFileNameLength != 0) {
         std::vector<char> fileNameBytes(directoryHeader.mFileNameLength);
         reader.ReadExactArray(fileNameBytes.data(), fileNameBytes.size());
         parsedEntry->mName.assign_owned(
@@ -354,7 +367,9 @@ namespace moho
 
       const std::size_t trailingSkipSize = static_cast<std::size_t>(directoryHeader.mExtraFieldLength) +
                                            static_cast<std::size_t>(directoryHeader.mFileCommentLength);
-      if (trailingSkipSize != 0) {
+      if (directoryRead) {
+        directoryCursor += trailingSkipSize;
+      } else if (trailingSkipSize != 0) {
         (void)zipStream->VirtSeek(
           gpg::Stream::ModeReceive, gpg::Stream::OriginCurr, static_cast<std::int64_t>(trailingSkipSize)
         );
@@ -415,19 +430,6 @@ namespace moho
   }
 #endif
 
-  CZipFileReadBatch::CZipFileReadBatch() noexcept
-  {
-    ++tOpenArchive.batchDepth;
-  }
-
-  CZipFileReadBatch::~CZipFileReadBatch()
-  {
-    if (--tOpenArchive.batchDepth == 0) {
-      tOpenArchive.stream.reset();
-      tOpenArchive.zip = nullptr;
-    }
-  }
-
   /**
    * Address: 0x0046C6E0 (FUN_0046C6E0, Moho::CZipFile::~CZipFile)
    *
@@ -436,7 +438,6 @@ namespace moho
    */
   CZipFile::~CZipFile()
   {
-    gZipFileGeneration.fetch_add(1u, std::memory_order_acq_rel); // engine addition, see OpenArchiveForRead
     // `mEntryByCanonicalPath`'s teardown is its destructor, which MSVC emits for
     // the member; only the two lanes with no destructor of their own are here.
     mEntries = msvc8::vector<SZipFileCachedEntry>();
@@ -597,7 +598,60 @@ namespace moho
   namespace
   {
     bool gKeepEntryData = true;
+
+    bool res_ZipKeepOpen = true;
+    TConVar<bool> gTConVar_res_ZipKeepOpen(
+      "res_ZipKeepOpen",
+      "A thread that is loading keeps each archive open between file reads (1, the default), or opens it for "
+      "every file (0). Same bytes. /nozipkeepopen turns it off at startup.",
+      &res_ZipKeepOpen
+    );
+
+    struct KeptArchive
+    {
+      std::string path;
+      std::unique_ptr<gpg::Stream> stream;
+    };
+
+    thread_local std::vector<KeptArchive>* tKeptArchives = nullptr;
+
+    /** This thread's open stream for `zipPath`, opened on first use; null outside a read scope. */
+    [[nodiscard]] gpg::Stream* KeptArchiveStream(const msvc8::string& zipPath)
+    {
+      if (tKeptArchives == nullptr) {
+        return nullptr;
+      }
+      const std::string_view path(zipPath.c_str());
+      for (const KeptArchive& kept : *tKeptArchives) {
+        if (kept.path == path) {
+          return kept.stream.get();
+        }
+      }
+      std::unique_ptr<gpg::Stream> stream = OpenZipBackingStream(zipPath);
+      if (stream == nullptr) {
+        return nullptr;
+      }
+      tKeptArchives->push_back(KeptArchive{std::string(path), std::move(stream)});
+      return tKeptArchives->back().stream.get();
+    }
   } // namespace
+
+  CZipFileReadScope::CZipFileReadScope()
+  {
+    static const bool startupOff = CFG_GetArgOption("/nozipkeepopen", 0u, nullptr);
+    if (res_ZipKeepOpen && !startupOff && tKeptArchives == nullptr) {
+      tKeptArchives = new std::vector<KeptArchive>();
+      mOwnsArchives = true;
+    }
+  }
+
+  CZipFileReadScope::~CZipFileReadScope()
+  {
+    if (mOwnsArchives) {
+      delete tKeptArchives;
+      tKeptArchives = nullptr;
+    }
+  }
 
   void CZipFile::SetKeepEntryData(const bool keep) noexcept
   {
@@ -629,8 +683,12 @@ namespace moho
       return MakeConstMemBuffer(cachedEntry.mData, static_cast<std::size_t>(entry.mUncompressedSize));
     }
 
-    std::unique_ptr<gpg::Stream> ownedStream;
-    gpg::Stream* const zipStream = OpenArchiveForRead(this, mPath, ownedStream);
+    std::unique_ptr<gpg::Stream> openedStream;
+    gpg::Stream* zipStream = KeptArchiveStream(mPath);
+    if (zipStream == nullptr) {
+      openedStream = OpenZipBackingStream(mPath);
+      zipStream = openedStream.get();
+    }
     if (zipStream == nullptr) {
       return {};
     }

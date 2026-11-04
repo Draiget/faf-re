@@ -209,8 +209,8 @@ namespace
 } // namespace
 
 // Defined at file scope (global namespace, external linkage) in
-// CrtRuntimeHelpers.cpp - shared by every legacy VC8 "<container> too long"
-// throw lane in that file. Forward-declared here rather than duplicated so
+// CrtRuntimeExportedHelpers.cpp - shared by every legacy VC8 "<container> too
+// long" throw lane. Forward-declared here rather than duplicated so
 // UICommandGraph's own hash-table growth guard (CheckedIncrementListSize) can
 // reuse the identical message/exception construction instead of re-emitting it
 // inline a second time. The bucket vector's own overflow lane (FUN_00830620)
@@ -14940,7 +14940,7 @@ namespace moho
         }
         const auto started = std::chrono::steady_clock::now();
         {
-          const CZipFileReadBatch archiveReads;
+          const CZipFileReadScope archiveReads;
           for (const std::string& entry : entries) {
             try {
               waitHandleSet->WarmArchiveEntry(entry.c_str());
@@ -15027,12 +15027,12 @@ namespace moho
         FILE_BeginReadRecording();
       }
 
-      // Engine addition (res_LoadDirectoryCache, res_ArchiveKeepOpen): the game interface imports its
+      // Engine addition (res_LoadDirectoryCache, res_ZipKeepOpen): the game interface imports its
       // scripts and reads its textures here, each script looked for again under every hook folder,
       // as a session load does; the main thread remembers the missing folders and keeps its last
       // archive open until the interface is built.
       const DiskLookupBatch diskLookups;
-      const CZipFileReadBatch archiveReads;
+      const CZipFileReadScope archiveReads;
 
       CWldSession* const session = gActiveWldSession;
       if (session != nullptr && session->mState != nullptr) {

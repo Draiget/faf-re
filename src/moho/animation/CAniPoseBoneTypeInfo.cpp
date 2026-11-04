@@ -83,7 +83,9 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::CAniPoseBone>*>(objectPtr);
+    // The array's own resize: on x64 an array of 11 bones goes back to SimBlockLane when freed, so it
+    // has to come from there too. A smaller block on that list overruns the next projectile.
+    auto& vec = *reinterpret_cast<moho::CAniPoseBoneArray*>(objectPtr);
     const moho::CAniPoseBone fill = MakeDefaultCAniPoseBone();
     vec.resize(static_cast<std::size_t>(count), fill);
 

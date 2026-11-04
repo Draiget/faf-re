@@ -1342,6 +1342,7 @@ void CUnitCommand::Move(Unit* const unit, CUnitCommand* const command)
     return;
   }
 
+
   if (command->mUnitSet.mVec.size() <= 1u || command->mConstDat.mFormationScriptIndex < 0) {
     return;
   }

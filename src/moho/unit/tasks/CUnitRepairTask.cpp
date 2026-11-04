@@ -175,6 +175,25 @@ namespace moho
   }
 
   /**
+   * Address: 0x005F8BE0 (FUN_005F8BE0, ??0CUnitRepairTask@Moho@@QAE@@Z)
+   *
+   * What it does:
+   * Builds an empty task for the serializer to fill.
+   */
+  CUnitRepairTask::CUnitRepairTask()
+    : CCommandTask()
+    , Listener<ECommandEvent>()
+    , mBuildHelper()
+    , mCommand(nullptr)
+    , mTargetUnit{}
+    , mBuildTargetUnit{}
+    , mInPosition(false)
+    , mIsSilo(false)
+    , mGuardAssistMode(false)
+    , mInheritingWork(false)
+  {}
+
+  /**
    * Address: 0x005F9E50 (FUN_005F9E50, Moho::CUnitRepairTask::operator new)
    *
    * IDA signature:

@@ -97,10 +97,8 @@ namespace faf::headless
       mClients.resize(armyCount);
     }
 
-    // Every army's grids, copied once for all the views that receive them. The slots keep their
-    // storage from beat to beat, and the cells are copied on the workers.
+    // Every army's grids, encoded once for all the views that receive them, on the workers.
     std::size_t slots = 0;
-    mBeatGridSources.clear();
     for (std::size_t index = 0; index < sim.mArmiesList.size(); ++index) {
       const moho::CArmyImpl* const army = sim.mArmiesList[index];
       if (army == nullptr) {
@@ -115,24 +113,29 @@ namespace faf::headless
         if (mBeatGrids.size() <= slots) {
           mBeatGrids.emplace_back();
         }
-        remote::wire::SGridSlot& slot = mBeatGrids[slots++];
+        SBeatGrid& beatGrid = mBeatGrids[slots++];
+        remote::wire::SGridSlot& slot = beatGrid.slot;
         slot.army = static_cast<std::uint8_t>(index);
         slot.kind = kind;
         slot.gridSize = grid->mGridSize;
         slot.bits.width = grid->mWidth;
         slot.bits.height = grid->mHeight;
-        mBeatGridSources.push_back(grid);
+        beatGrid.fresh = beatGrid.source != grid || beatGrid.cells.size() != static_cast<std::size_t>(grid->mWidth) * grid->mHeight;
+        if (beatGrid.fresh) {
+          beatGrid.cells.assign(static_cast<std::size_t>(grid->mWidth) * grid->mHeight, 0);
+        }
+        beatGrid.source = grid;
+        beatGrid.key = static_cast<std::uint16_t>(index * 2u + kind);
       }
     }
     mBeatGrids.resize(slots);
     const auto copyGrids = [this](const std::size_t begin, const std::size_t end) {
       for (std::size_t i = begin; i < end; ++i) {
-        remote::wire::SGridSlot& slot = mBeatGrids[i];
-        const moho::CIntelGrid* const grid = mBeatGridSources[i];
-        slot.bits.cells.resize(static_cast<std::size_t>(grid->mWidth) * grid->mHeight);
-        for (std::size_t cell = 0; cell < slot.bits.cells.size(); ++cell) {
-          slot.bits.cells[cell] = grid->mGrid[cell] != 0 ? 1u : 0u;
-        }
+        SBeatGrid& beatGrid = mBeatGrids[i];
+        const moho::CIntelGrid* const grid = beatGrid.source;
+        beatGrid.delta.Clear();
+        remote::wire::WriteGridSlotHeader(beatGrid.slot, beatGrid.delta);
+        remote::wire::EncodeGridDeltaInPlace(grid->mWidth, grid->mHeight, grid->mGrid.get(), beatGrid.cells.data(), beatGrid.delta);
       }
     };
     if (Parallel() && slots > 1u) {
@@ -195,6 +198,7 @@ namespace faf::headless
     client.bytes = 0;
     const auto view = static_cast<std::int32_t>(army);
     if (!HasView(view)) {
+      client.grids.clear();
       return; // a civilian army: no client
     }
 
@@ -224,21 +228,39 @@ namespace faf::headless
 
     // Grid lane: the view army's grids and those of every army that counts it as an ally
     // (`UserArmy::CanSeeCell`, 0x008B17F0).
-    std::vector<remote::wire::SGridSlot> grids;
-    for (const remote::wire::SGridSlot& slot : mBeatGrids) {
-      const moho::CArmyImpl* const owner = sim.mArmiesList[slot.army];
-      if ((slot.army == army || owner->mVarDat.mAllies.Contains(static_cast<unsigned int>(army)))
-          && grids.size() < remote::wire::kMaxGridSlots) {
-        grids.push_back(slot);
+    client.gridsNext.clear();
+    for (const SBeatGrid& beatGrid : mBeatGrids) {
+      const moho::CArmyImpl* const owner = sim.mArmiesList[beatGrid.slot.army];
+      if ((beatGrid.slot.army == army || owner->mVarDat.mAllies.Contains(static_cast<unsigned int>(army)))
+          && client.gridsNext.size() < remote::wire::kMaxGridSlots) {
+        client.gridsNext.push_back(beatGrid.key);
       }
     }
     remote::wire::BitWriter gridWriter;
-    if (remote::wire::EncodeGridLane(grids, client.grids, gridWriter)) {
+    gridWriter.WriteVarUint(static_cast<std::uint32_t>(client.gridsNext.size()));
+    bool gridsOk = true;
+    for (const std::uint16_t key : client.gridsNext) {
+      const SBeatGrid& beatGrid = *std::find_if(mBeatGrids.begin(), mBeatGrids.end(), [key](const SBeatGrid& other) {
+        return other.key == key;
+      });
+      if (!beatGrid.fresh && std::find(client.grids.begin(), client.grids.end(), key) != client.grids.end()) {
+        gridWriter.Append(beatGrid.delta);
+      } else {
+        // A client new to this grid gets it whole, which is rare enough to make its cells here.
+        remote::wire::SGridSlot whole = beatGrid.slot;
+        whole.bits.cells.resize(beatGrid.cells.size());
+        std::transform(beatGrid.cells.begin(), beatGrid.cells.end(), whole.bits.cells.begin(), [](const std::int8_t cell) {
+          return static_cast<std::uint8_t>(cell != 0 ? 1u : 0u);
+        });
+        gridsOk = remote::wire::EncodeGridSlot(whole, nullptr, gridWriter) && gridsOk;
+      }
+    }
+    if (gridsOk) {
       client.bytes += static_cast<std::uint32_t>(gridWriter.Bytes().size());
     } else {
       ++client.failures;
     }
-    client.grids = std::move(grids);
+    client.grids.swap(client.gridsNext);
   }
 
   std::string CReplayViewBench::Summary() const

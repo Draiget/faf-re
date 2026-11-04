@@ -89,6 +89,7 @@
 #include "moho/sim/ReconBlip.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SimArchiveMode.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SimWorkerPool.h"
 #include "moho/console/CConCommand.h"
@@ -17392,6 +17393,22 @@ void Unit::MemberSerialize(gpg::WriteArchive* const archive, const int version)
     &mReconBlips,
     ownerRef
   );
+
+  // A keyframe keeps the published ids as they stand: refreshing them on load would replace one of
+  // a creator that is gone, or a command that has ended, which the game keeps publishing until the
+  // unit next changes.
+  if (gSimExactArchive.load()) {
+    archive->WriteBool(NeedSyncGameData);
+    SSTIUnitVariableData& published = VarDat();
+    for (const gpg::fastvector_n<CmdId, 8>* const ids : {&published.mCommands, &published.mBuildQueue}) {
+      archive->WriteInt(static_cast<int>(ids->size()));
+      for (const CmdId id : *ids) {
+        archive->WriteInt(static_cast<int>(id));
+      }
+    }
+    archive->WriteBool(CommandQueue != nullptr && CommandQueue->mNeedsRefresh);
+    archive->WriteBool(AiBuilder != nullptr && AiBuilder->BuilderIsFactoryQueueDirty());
+  }
 }
 
 /**
@@ -17599,6 +17616,32 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, const int version)
     ownerRef
   );
 
+  bool needSyncGameData = true;
+  if (gSimExactArchive.load()) {
+    archive->ReadBool(&needSyncGameData); // see MemberSerialize
+    SSTIUnitVariableData& published = VarDat();
+    for (gpg::fastvector_n<CmdId, 8>* const ids : {&published.mCommands, &published.mBuildQueue}) {
+      int count = 0;
+      archive->ReadInt(&count);
+      ids->ResetStorageToInline();
+      for (int index = 0; index < count; ++index) {
+        int id = 0;
+        archive->ReadInt(&id);
+        ids->push_back(static_cast<CmdId>(id));
+      }
+    }
+    bool queueRefresh = false;
+    archive->ReadBool(&queueRefresh);
+    if (CommandQueue != nullptr) {
+      CommandQueue->mNeedsRefresh = queueRefresh;
+    }
+    bool factoryDirty = false;
+    archive->ReadBool(&factoryDirty);
+    if (AiBuilder != nullptr) {
+      AiBuilder->BuilderSetFactoryQueueDirty(factoryDirty);
+    }
+  }
+
   // Post-load fixups: re-occupy ground, re-mark the occupation rect on the
   // O-grid when it is non-degenerate, then refresh collision when present.
   if (FootprintDown) {
@@ -17611,7 +17654,7 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, const int version)
     }
   }
 
-  NeedSyncGameData = true;
+  NeedSyncGameData = needSyncGameData;
 
   if (CollisionExtents) {
     UpdateCollision();

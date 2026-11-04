@@ -179,17 +179,27 @@ namespace faf::remote::wire
     }
     writer.WriteVarUint(static_cast<std::uint32_t>(grids.size()));
     for (const SGridSlot& slot : grids) {
-      writer.WriteBits(slot.army, 8);
-      writer.WriteBits(slot.kind, 1);
-      writer.WriteVarUint(slot.gridSize);
       const auto found = std::find_if(held.begin(), held.end(), [&slot](const SGridSlot& other) {
         return other.army == slot.army && other.kind == slot.kind;
       });
-      if (!EncodeGridDelta(slot.bits, found != held.end() ? &found->bits : nullptr, writer)) {
+      if (!EncodeGridSlot(slot, found != held.end() ? &found->bits : nullptr, writer)) {
         return false;
       }
     }
     return true;
+  }
+
+  void WriteGridSlotHeader(const SGridSlot& slot, BitWriter& writer)
+  {
+    writer.WriteBits(slot.army, 8);
+    writer.WriteBits(slot.kind, 1);
+    writer.WriteVarUint(slot.gridSize);
+  }
+
+  bool EncodeGridSlot(const SGridSlot& slot, const SGridBits* const baseline, BitWriter& writer)
+  {
+    WriteGridSlotHeader(slot, writer);
+    return EncodeGridDelta(slot.bits, baseline, writer);
   }
 
   bool DecodeGridLane(BitReader& reader, std::vector<SGridSlot>& held)

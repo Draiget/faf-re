@@ -46,15 +46,6 @@ namespace moho
     &res_LoadDirectoryCache
   );
 
-  bool res_ZipListPrefixFirst = true;
-
-  TConVar<bool> gTConVar_res_ZipListPrefixFirst(
-    "res_ZipListPrefixFirst",
-    "When listing an archive's files (DiskFindFiles), test each entry's name against the folder before copying and "
-    "lowering it (1, the default), or copy and lower every entry first (0). The same files listed either way.",
-    &res_ZipListPrefixFirst
-  );
-
   int res_EnumOrderFuzz = -1;
 
   TConVar<int> gTConVar_res_EnumOrderFuzz(
@@ -159,6 +150,12 @@ namespace
       Invalidate();
     }
 
+    [[nodiscard]] std::uint64_t Generation()
+    {
+      const std::shared_lock lock(mMutex);
+      return mGeneration;
+    }
+
     void Invalidate()
     {
       const std::unique_lock lock(mMutex);
@@ -224,6 +221,11 @@ namespace
     return *sCache;
   }
 } // namespace
+
+std::uint64_t moho::DISK_FileLookupGeneration()
+{
+  return MountedFileLookups().Generation();
+}
 
 void moho::DISK_InvalidateFileLookups()
 {
@@ -479,27 +481,47 @@ namespace
   }
 
   /**
-   * Whether `name`, lowered as STR_ToLower lowers it and with '\\' as '/', starts with `prefix`
-   * (`prefixLength` characters, already in that form), without building that string.
+   * Engine addition: `res_ZipNameCache`. Each file search lowered every entry name of every mounted
+   * archive, and most searches keep few of them. An archive's names don't change while it is mounted,
+   * so they are lowered once per archive path. Results are the same and the caller sorts them.
+   * `/nozipnamecache` turns it off at startup.
    */
-  [[nodiscard]] bool CanonicalNameStartsWith(const msvc8::string& name, const char* const prefix, const std::size_t prefixLength)
+  bool res_ZipNameCache = true;
+  moho::TConVar<bool> gTConVar_res_ZipNameCache(
+    "res_ZipNameCache",
+    "Lower each mounted archive's entry names once (1, the default), or on every file search (0). Same results. "
+    "/nozipnamecache turns it off at startup.",
+    &res_ZipNameCache
+  );
+
+  /** The archive's lowered names with forward slashes, one per entry, or null when the cache is off. */
+  [[nodiscard]] const std::vector<std::string>* LoweredZipNames(const moho::CZipFile& zipFile)
   {
-    const char* const text = name.c_str();
-    for (std::size_t index = 0; index < prefixLength; ++index) {
-      char c = text[index];
-      if (c == '\0') {
-        return false;
-      }
-      if (c >= 'A' && c <= 'Z') {
-        c = static_cast<char>(c + ('a' - 'A'));
-      } else if (c == '\\') {
-        c = '/';
-      }
-      if (c != prefix[index]) {
-        return false;
+    static const bool startupOff = moho::CFG_GetArgOption("/nozipnamecache", 0u, nullptr);
+    if (!res_ZipNameCache || startupOff) {
+      return nullptr;
+    }
+    static std::shared_mutex sMutex;
+    static std::unordered_map<std::string, std::vector<std::string>> sNames;
+    const std::string key(zipFile.mPath.c_str());
+    {
+      const std::shared_lock lock(sMutex);
+      const auto found = sNames.find(key);
+      if (found != sNames.end() && found->second.size() == zipFile.mEntries.size()) {
+        return &found->second;
       }
     }
-    return true;
+    std::vector<std::string> names;
+    names.reserve(zipFile.mEntries.size());
+    for (std::size_t index = 0; index < zipFile.mEntries.size(); ++index) {
+      msvc8::string name = gpg::STR_ToLower(zipFile.GetEntryName(static_cast<std::uint32_t>(index)).c_str());
+      gpg::STR_Replace(name, "\\", "/", -1);
+      names.emplace_back(name.c_str());
+    }
+    const std::unique_lock lock(sMutex);
+    auto& stored = sNames[key];
+    stored = std::move(names);
+    return &stored;
   }
 
   /**
@@ -524,17 +546,21 @@ namespace
 
     const std::size_t prefixLength = std::strlen(relativePrefix);
     const std::size_t entryCount = zipFile->mEntries.size();
+    const std::vector<std::string>* const loweredNames = LoweredZipNames(*zipFile);
     for (std::size_t entryIndex = 0; entryIndex < entryCount; ++entryIndex) {
-      // Engine addition (res_ZipListPrefixFirst): an entry outside the prefix is passed over before
-      // its lowered copy is made.
-      if (moho::res_ZipListPrefixFirst && !CanonicalNameStartsWith(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)), relativePrefix, prefixLength)) {
-        continue;
-      }
-      msvc8::string entryPath = gpg::STR_ToLower(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)).c_str());
-      gpg::STR_Replace(entryPath, "\\", "/", -1);
+      msvc8::string entryPath;
+      if (loweredNames != nullptr) {
+        if ((*loweredNames)[entryIndex].compare(0U, prefixLength, relativePrefix) != 0) {
+          continue;
+        }
+        entryPath.assign_owned((*loweredNames)[entryIndex]);
+      } else {
+        entryPath = gpg::STR_ToLower(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)).c_str());
+        gpg::STR_Replace(entryPath, "\\", "/", -1);
 
-      if (!gpg::STR_StartsWith(entryPath.c_str(), relativePrefix)) {
-        continue;
+        if (!gpg::STR_StartsWith(entryPath.c_str(), relativePrefix)) {
+          continue;
+        }
       }
 
       const char* const relativeTail = entryPath.c_str() + prefixLength;
@@ -573,17 +599,21 @@ namespace
 
     const std::size_t prefixLength = std::strlen(relativePrefix);
     const std::size_t entryCount = zipFile->mEntries.size();
+    const std::vector<std::string>* const loweredNames = LoweredZipNames(*zipFile);
     for (std::size_t entryIndex = 0; entryIndex < entryCount; ++entryIndex) {
-      // Engine addition (res_ZipListPrefixFirst): an entry outside the prefix is passed over before
-      // its lowered copy is made.
-      if (moho::res_ZipListPrefixFirst && !CanonicalNameStartsWith(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)), relativePrefix, prefixLength)) {
-        continue;
-      }
-      msvc8::string entryPath = gpg::STR_ToLower(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)).c_str());
-      gpg::STR_Replace(entryPath, "\\", "/", -1);
+      msvc8::string entryPath;
+      if (loweredNames != nullptr) {
+        if ((*loweredNames)[entryIndex].compare(0U, prefixLength, relativePrefix) != 0) {
+          continue;
+        }
+        entryPath.assign_owned((*loweredNames)[entryIndex]);
+      } else {
+        entryPath = gpg::STR_ToLower(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)).c_str());
+        gpg::STR_Replace(entryPath, "\\", "/", -1);
 
-      if (!gpg::STR_StartsWith(entryPath.c_str(), relativePrefix)) {
-        continue;
+        if (!gpg::STR_StartsWith(entryPath.c_str(), relativePrefix)) {
+          continue;
+        }
       }
 
       const char* const firstSlash = std::strchr(entryPath.c_str() + prefixLength, '/');

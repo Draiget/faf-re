@@ -29,6 +29,7 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/StringUtils.h"
 #include "moho/net/CClientManagerImpl.h"
+#include "moho/net/CReplayClient.h"
 #include "moho/net/Common.h"
 #include "moho/net/INetTCPSocket.h"
 #include "moho/sim/FafGameVersion.h"
@@ -242,7 +243,7 @@ namespace moho
    * Engine addition: a refusal says why through `failureReason`.
    */
   msvc8::auto_ptr<SWldSessionInfo>
-  VCR_SetupReplaySession(const gpg::StrArg filename, msvc8::string* const failureReason)
+  VCR_SetupReplaySession(const gpg::StrArg filename, msvc8::string* const failureReason, const int skipBeats)
   {
     const auto refuse = [failureReason](const msvc8::string& reason) {
       if (failureReason != nullptr) {
@@ -398,7 +399,11 @@ namespace moho
 
     if (sessionInfo->mClientManager != nullptr) {
       gpg::Stream* replayStreamOwnership = replayStream.release();
-      sessionInfo->mClientManager->CreateReplayClient(&replayStreamOwnership, &replayCommandSources);
+      IClient* const replayClient =
+        sessionInfo->mClientManager->CreateReplayClient(&replayStreamOwnership, &replayCommandSources);
+      if (skipBeats > 0) {
+        static_cast<CReplayClient*>(replayClient)->SkipBeats(skipBeats); // engine addition (replay keyframes)
+      }
       if (replayStreamOwnership != nullptr) {
         delete replayStreamOwnership;
       }

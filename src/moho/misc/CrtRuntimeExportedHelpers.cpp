@@ -2,25 +2,10 @@
 //
 // CrtRuntimeExportedHelpers.cpp
 //
-// A small slice of the CRT-helper translation unit that has to stay in the
-// build.
-//
-// These bodies were recovered as part of `CrtRuntimeHelpers.cpp` and sit at
-// adjacent addresses to the rest of it (0x00A8FB50, 0x00A8FC4B, 0x00A8FC71),
-// so by spatial locality they belong there. They live here only because that
-// file is not compiled (it is not in src/sources.cmake): it redefines a cluster of reserved CRT/EH-ABI
-// symbols under their real names (`__CxxFrameHandler3`, `_CallCatchBlock2`,
-// `_UnwindNestedFrames`, `_XcptFilter`, ...) which the modern toolchain also
-// supplies, and re-enabling it needs a dedicated renaming pass.
-//
-// Meanwhile the four helpers below have engine-specific names that collide
-// with nothing, and each has a live caller that was left as an unresolved
-// external. The project links with `/FORCE`, so those unresolved call sites
-// were not build failures - they survived into `main.exe` as calls into
-// nothing.
-//
-// When `CrtRuntimeHelpers.cpp` is re-enabled, fold these back into it and
-// delete this file; keeping both would be a duplicate-symbol error.
+// The CRT helpers the engine calls by name. The binary has them at adjacent
+// addresses to the rest of its statically linked CRT (0x00A8FB50, 0x00A8FC4B,
+// 0x00A8FC71). The build takes the CRT from the toolchain, so only these,
+// whose engine-specific names the toolchain doesn't supply, are defined here.
 
 #include <cstdlib>
 #include <cwchar>

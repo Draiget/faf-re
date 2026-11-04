@@ -362,7 +362,9 @@ void CAiSiloBuildImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   GPG_ASSERT(siloListType != nullptr);
   archive->Read(siloListType, &mSiloTypes, owner);
 
-  CEconRequest* const loadedRequest = ReadPointerWithType<CEconRequest>(archive, owner, ResolveCEconRequestType());
+  // 0x005D1AD0 takes ownership; left unclaimed, the archive's EndSection frees the request.
+  CEconRequest* loadedRequest = nullptr;
+  archive->ReadPointerOwned(&loadedRequest, &owner);
   ReplaceEconomyRequestPointer(mRequest, loadedRequest);
 
   gpg::RType* const stateType = ResolveESiloBuildStageType();

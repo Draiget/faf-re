@@ -200,6 +200,9 @@ namespace moho
    */
   void DISK_InvalidateFileLookups();
 
+  /** Engine addition: changes whenever mounted file lookups are invalidated (see DISK_InvalidateFileLookups). */
+  [[nodiscard]] std::uint64_t DISK_FileLookupGeneration();
+
   /**
    * Engine addition (`res_LoadDirectoryCache`): while one of these is alive, the thread remembers
    * which folders of each mount are missing, and `CVFSImpl::FindFile` skips a mount whose folder for

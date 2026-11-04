@@ -7,6 +7,7 @@
 #include "gpg/gal/PipelineDiskCache.h"
 #include "gpg/gal/PlacedResources.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
+#include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "gpg/gal/backends/common/EffectSourceCache.h"
 #include "moho/console/CConCommand.h"
@@ -64,6 +65,15 @@ namespace moho
       "Build the GPU-driven render paths and the map's sky dome while the loading screen waits for the sim (1, the "
       "default) instead of in the first frame of play that draws them (0), where they took some 120 ms.",
       &moho::ren_PrepareDuringLoading
+    );
+
+    /** Engine addition: `ren_EffectFastScan` (see gpg/gal/backends/d3d11/EffectSourceD3D11.h). */
+    TConVar<bool> gTConVar_ren_EffectFastScan(
+      "ren_EffectFastScan",
+      "Read effect source with plain scans (1, the default) or with the std::regex searches they replaced (0), which "
+      "took about half of the time from process start to the lobby; same result. /fxregex turns it off at startup. "
+      "Read when an effect is created.",
+      &gpg::gal::d3d11::gEffectFastScan
     );
 
     /** Engine addition: `ren_BackgroundShaders` (see EffectProgram::PrepareInBackground). */

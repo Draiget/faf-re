@@ -35,7 +35,7 @@ That is the whole contract. The game never sends the adapter's callbacks: it has
 | `/nativenetrelay` | only TURN-relayed candidates: the client's "force relay" setting, or the API session's `forceRelay` |
 | `/nativenetbind <address>` | ICE host candidates use this local address. Optional; for machines that drop loopback UDP to sockets bound to every interface |
 
-`net_NativeNetWebRtc` (default 1) offers a WebRTC data channel to peers that are our builds too (#239). `net_NativeNetRedundancy` (default 2) carries game datagrams to those peers on the redundant lane, each repeated up to that many times until acked (#240). A Java adapter peer, or an older build, keeps the plain ICE link.
+`net_NativeNetWebRtc` (default 0; 1 enables it) offers a WebRTC data channel to peers that are our builds too (#239). A channel opens only when both sides offer it. It stays off because raw ICE with the lane came out ahead in the comparison posted on PR #277. `net_NativeNetRedundancy` (default 2) carries game datagrams to those peers on the redundant lane, each repeated up to that many times until acked (#240). A Java adapter peer, or an older build, keeps the plain ICE link.
 
 ## Inside the game
 

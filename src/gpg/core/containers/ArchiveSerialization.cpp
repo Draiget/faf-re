@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "TrackedPointerIndex.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -853,16 +854,31 @@ void gpg::WriteRawPointer(
     return;
   }
 
-  const auto found = archive->mObjRefs.find(objectRef);
+  // Engine addition: a fast archive keeps these in a hash index (see TrackedPointerIndex).
+  TrackedPointerIndex* const fastRefs = archive->mFastObjRefs;
   WriteArchive::TrackedPointerRecord* record = nullptr;
+  if (fastRefs != nullptr) {
+    if (TrackedPointerIndex::Entry* const entry = fastRefs->Find(objectRef)) {
+      record = &entry->record;
+    }
+  } else {
+    const auto found = archive->mObjRefs.find(objectRef);
+    if (found != archive->mObjRefs.end()) {
+      record = &found->second;
+    }
+  }
 
-  if (found == archive->mObjRefs.end()) {
+  if (record == nullptr) {
     WriteArchive::TrackedPointerRecord fresh{};
-    fresh.index = static_cast<int>(archive->mObjRefs.size());
+    fresh.index = static_cast<int>(fastRefs != nullptr ? fastRefs->Size() : archive->mObjRefs.size());
     fresh.ownership = TrackedPointerState::Reserved;
 
-    const auto inserted = archive->mObjRefs.insert({objectRef, fresh});
-    record = &inserted.first->second;
+    if (fastRefs != nullptr) {
+      record = &fastRefs->Insert(objectRef, fresh).record;
+    } else {
+      const auto inserted = archive->mObjRefs.insert({objectRef, fresh});
+      record = &inserted.first->second;
+    }
 
     archive->WriteMarker(static_cast<int>(ArchiveToken::NewObject));
 
@@ -920,7 +936,6 @@ void gpg::WriteRawPointer(
 
     archive->WriteMarker(static_cast<int>(ArchiveToken::ObjectTerminator));
   } else {
-    record = &found->second;
     if (record->ownership == TrackedPointerState::Reserved) {
       ThrowSerializationError(
         "Error while creating archive: recursively encountered a pointer to an object for which construction data is "

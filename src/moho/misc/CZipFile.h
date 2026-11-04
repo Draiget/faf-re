@@ -93,6 +93,24 @@ namespace moho
   static_assert(offsetof(SZipLocalFileHeader, mExtraFieldLength) == 0x1C, "SZipLocalFileHeader::mExtraFieldLength offset must be 0x1C");
   static_assert(sizeof(SZipLocalFileHeader) == 0x1E, "SZipLocalFileHeader size must be 0x1E");
 
+  /**
+   * Engine addition (`res_ZipKeepOpen`): while one of these lives on a thread, that thread's
+   * `CZipFile::ReadEntry` calls keep each archive open instead of opening it for every file. All of
+   * them close when it ends, as an open archive can't be replaced. Reads return the same bytes.
+   * `/nozipkeepopen` turns it off at startup.
+   */
+  class CZipFileReadScope
+  {
+  public:
+    CZipFileReadScope();
+    ~CZipFileReadScope();
+    CZipFileReadScope(const CZipFileReadScope&) = delete;
+    CZipFileReadScope& operator=(const CZipFileReadScope&) = delete;
+
+  private:
+    bool mOwnsArchives = false;
+  };
+
   class CZipFile
   {
   public:
@@ -228,19 +246,4 @@ namespace moho
   static_assert(offsetof(CZipFile, mEntryByCanonicalPath) == 0x2C, "CZipFile::mEntryByCanonicalPath offset must be 0x2C");
   static_assert(sizeof(CZipFile) == 0x38, "CZipFile size must be 0x38");
 
-  /**
-   * Engine addition: while one of these is alive, the thread keeps the archive it last read an
-   * entry from open for its next read instead of opening the file again for each entry; the
-   * archive is closed when the outermost batch ends. Outside a batch every read opens and closes
-   * the file, as in the binary, so no archive stays locked against writes between loads.
-   */
-  class CZipFileReadBatch
-  {
-  public:
-    CZipFileReadBatch() noexcept;
-    ~CZipFileReadBatch();
-
-    CZipFileReadBatch(const CZipFileReadBatch&) = delete;
-    CZipFileReadBatch& operator=(const CZipFileReadBatch&) = delete;
-  };
 } // namespace moho

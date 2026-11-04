@@ -149,7 +149,7 @@ namespace
 
   bool NodeKeyIsNil(const Node& node)
   {
-    return node.i_key.tt == LUA_TNIL;
+    return node.KeyIs(LUA_TNIL);
   }
 
   bool NodeValueIsNil(const Node& node)
@@ -187,7 +187,7 @@ namespace
       }
       char keyText[96] = {};
       char valueText[96] = {};
-      DescribeTObject(node.i_key, keyText, sizeof(keyText));
+      DescribeTObject(node.Key(), keyText, sizeof(keyText));
       DescribeTObject(node.i_val, valueText, sizeof(valueText));
       DumpLine(
         sink, "    node[%d] key=%s value=%s next=%p", i, keyText, valueText,

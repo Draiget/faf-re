@@ -3084,14 +3084,16 @@ namespace difffuzz
         }
         for (std::size_t i = 0; i < d.keyTt.size(); ++i) {
           Node& n = nodes[i];
-          n.i_key.tt = static_cast<int>(d.keyTt[i]);
+          LuaPlus::TObject key;
+          key.tt = static_cast<int>(d.keyTt[i]);
           if (d.keyTt[i] == kLuaString) {
-            n.i_key.value.p = String(d.keyBits[i]);
+            key.value.p = String(d.keyBits[i]);
           } else if (d.keyTt[i] == kLuaLightUserdata) {
-            n.i_key.value.p = reinterpret_cast<void*>(static_cast<std::uintptr_t>(d.keyBits[i]));
+            key.value.p = reinterpret_cast<void*>(static_cast<std::uintptr_t>(d.keyBits[i]));
           } else {
-            n.i_key.value.b = static_cast<int>(d.keyBits[i]);
+            key.value.b = static_cast<int>(d.keyBits[i]);
           }
+          n.SetKey(key);
           n.i_val = d.valueNil[i] != 0u ? LuaPlus::TObject() : LuaPlus::TObject(static_cast<float>(i));
           n.SetNext(d.next[i] == kNoNode ? nullptr : &nodes[d.next[i]]);
         }

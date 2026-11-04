@@ -719,6 +719,116 @@ namespace faf::remote::wire
         && appearance == other.appearance;
   }
 
+  std::uint64_t HashBlipUpdate(const SEntityRecord& record, const SUnitDetail& detail) noexcept
+  {
+    std::uint64_t hash = 0x9E3779B97F4A7C15ull;
+    const auto add = [&hash](const std::uint64_t value) {
+      hash = std::rotl(hash ^ (value * 0xC2B2AE3D27D4EB4Full), 31) * 0x9E3779B185EBCA87ull;
+    };
+    const auto addFloats = [&add](const float* const values, const std::size_t count) {
+      for (std::size_t i = 0; i < count; ++i) {
+        add(Bits(values[i]));
+      }
+    };
+    const auto addCategories = [&add](const SCategoryBits& bits) {
+      add(bits.firstWord);
+      add(bits.words.size());
+      for (const std::uint32_t word : bits.words) {
+        add(word);
+      }
+    };
+
+    const SAppearance& look = record.appearance;
+    add(look.mesh);
+    addFloats(look.scale.data(), look.scale.size());
+    add(look.attachParent);
+    add(look.attachments.size());
+    for (const std::uint32_t id : look.attachments) {
+      add(id);
+    }
+    add(Bits(look.impact));
+    addFloats(look.scroll.data(), look.scroll.size());
+    add(look.visualFlags);
+    for (const std::uint32_t value : look.intel) {
+      add(value);
+    }
+    add(look.ambientSound);
+    add(look.rumbleSound);
+    add(look.underlay);
+
+    for (const auto value : record.position) {
+      add(value);
+    }
+    add(record.farPosition ? 1u : 0u);
+    addFloats(record.farValue.data(), record.farValue.size());
+    add(record.yawOnly ? 1u : 0u);
+    add(record.orientation);
+    add(Bits(record.health));
+    add(Bits(record.maxHealth));
+    add(Bits(record.fractionComplete));
+    add(record.flags);
+
+    const SUnitFields& unit = record.unit;
+    add(Bits(unit.fuelRatio));
+    add(Bits(unit.shieldRatio));
+    add(Bits(unit.workProgress));
+    add(unit.unitStates);
+    add(unit.scriptBits);
+    for (const std::uint16_t value : unit.siloCounts) {
+      add(value);
+    }
+    add(unit.unitFlags);
+
+    add(detail.creator);
+    add(static_cast<std::uint32_t>(detail.creationTick));
+    add(static_cast<std::uint32_t>(detail.stunTicks));
+    add(static_cast<std::uint32_t>(detail.jobType));
+    add(static_cast<std::uint32_t>(detail.fireState));
+    add(static_cast<std::uint32_t>(detail.siloMaxStorage[0]));
+    add(static_cast<std::uint32_t>(detail.siloMaxStorage[1]));
+    add(detail.selectionInheritor);
+    add(detail.customName);
+    add(detail.focusUnit);
+    add(detail.guardedUnit);
+    add(detail.targetBlip);
+    add(detail.didRefresh);
+    add(static_cast<std::uint32_t>(detail.reconFlags));
+    addFloats(detail.economy.data(), detail.economy.size());
+    add(detail.commands.size());
+    for (const std::int32_t value : detail.commands) {
+      add(static_cast<std::uint32_t>(value));
+    }
+    add(detail.buildQueue.size());
+    for (const std::int32_t value : detail.buildQueue) {
+      add(static_cast<std::uint32_t>(value));
+    }
+    add(detail.weapons.size());
+    for (const SUnitWeapon& weapon : detail.weapons) {
+      addCategories(weapon.targets);
+      addCategories(weapon.secondary);
+      add(weapon.layer);
+      add(Bits(weapon.minRadius));
+      add(Bits(weapon.maxRadius));
+      add(Bits(weapon.effectiveRadius));
+      add(weapon.minRangeVisual);
+      add(weapon.maxRangeVisual);
+    }
+    const SUnitAttributes& attributes = detail.attributes;
+    add(attributes.blueprint);
+    add(attributes.reserved04);
+    addCategories(attributes.restriction);
+    addFloats(attributes.scalars.data(), attributes.scalars.size());
+    add(attributes.commandCaps);
+    add(attributes.toggleCaps);
+    for (const std::uint8_t value : attributes.flags) {
+      add(value);
+    }
+    add(attributes.reserved6C);
+
+    hash ^= hash >> 32u;
+    return hash != 0u ? hash : 1u;
+  }
+
   std::uint32_t CreationFields(const SEntityRecord& record) noexcept
   {
     return kEntityFields | kFieldKind | (record.isUnit ? kUnitFields : 0u)

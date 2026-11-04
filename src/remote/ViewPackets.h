@@ -100,6 +100,7 @@ namespace faf::remote
 
   private:
     static constexpr std::uint32_t kNoVisions = 0xFFFFFFFFu;
+    static constexpr std::size_t kBlipViews = 32; // `kMaxViews`
 
     /** What the views' clients hold of one entity beyond its packed data; a bit per view. */
     struct SEntityViews
@@ -107,6 +108,7 @@ namespace faf::remote
       std::uint32_t created = 0;   // the views' `mInterfaceCreated`
       std::uint32_t hasVision = 0; // a blip: the views that copied its creator's vision range at least once
       std::uint32_t visions = kNoVisions; // that range per view: `mVisions[visions + army]`
+      std::uint32_t blipHashes = kNoVisions; // the update each view's client holds: `mBlipHashes[blipHashes + army]`
     };
 
     /** One changed entity as every view reads it: read once a beat, written back after the views. */
@@ -121,10 +123,20 @@ namespace faf::remote
       std::atomic<std::uint32_t> hasVision{0};
       std::uint32_t creatorVision = 0; // with `hasCreator`: the range to copy
       bool hasCreator = false;
+      // A blip whose update can be shared: its different updates this beat, from `firstBlipRecord`,
+      // the army each is read for, and which one each view gets.
+      std::uint8_t blipRecordCount = 0;
+      std::uint8_t blipRecordArmy[kBlipViews]{};
+      std::uint8_t blipRecordOf[kBlipViews]{};
+      std::uint32_t firstBlipRecord = 0;
     };
 
     /** Fills `mChanged` from the change set; the views only read the sim from here on. */
     void ReadChangedEntities(moho::Sim& sim);
+    /** The range `army`'s view last copied from a blip's creator (`SyncForView`), read before the views run. */
+    [[nodiscard]] bool ViewVision(const SChangedView& changed, std::size_t army, std::uint32_t& vision) const;
+    /** Which of a blip's updates each view gets. */
+    void MatchBlipViews(moho::Sim& sim, SChangedView& changed);
     /** What the views changed goes into `mEntityViews`. */
     void WriteChangedEntities();
 
@@ -136,6 +148,8 @@ namespace faf::remote
     {
       mBuildSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - mBuildStart).count();
     }
+    /** The facts of `Entities()[index]`, read this beat. */
+    [[nodiscard]] const SEntityFacts& ChangedFacts(const std::size_t index) const noexcept { return mChanged[index].facts; }
 
   private:
     std::vector<std::unique_ptr<moho::SSyncData>> mPackets;
@@ -152,5 +166,7 @@ namespace faf::remote
     gpg::core::FlatGenerationMap<SEntityViews> mEntityViews; // entities a view has or had a vision range of
     gpg::core::ChunkedVector<std::uint32_t> mVisions; // a block of one per view for each blip with a creator
     std::vector<std::uint32_t> mFreeVisions;
+    gpg::core::ChunkedVector<std::uint64_t> mBlipHashes; // a block of one per view for each blip with shared updates
+    std::vector<std::uint32_t> mFreeBlipHashes;
   };
 } // namespace faf::remote

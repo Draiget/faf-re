@@ -1312,9 +1312,8 @@ namespace
 // 0x00A8ECD3) are defined in legacy/math/X87Math.cpp, next to the helpers that
 // read the lane.
 
-// CRT `ceil` (0x00A840A0) and its x87 fallback (0x00A9AC84) are recovered in
-// moho/misc/CrtRuntimeHelpers.cpp with the rest of the statically linked CRT;
-// this build gets `ceil` from the DLL CRT.
+// CRT `ceil` (0x00A840A0) and its x87 fallback (0x00A9AC84) belong to the
+// binary's statically linked CRT; this build gets `ceil` from the DLL CRT.
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

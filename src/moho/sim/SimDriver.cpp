@@ -28,18 +28,22 @@
 #include "moho/entity/EntityId.h"
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/console/CConCommand.h"
+#include "moho/misc/CZipFile.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/TimeBar.h"
 #include "moho/misc/CDecoder.h"
 #include "moho/net/CClientManagerImpl.h"
+#include "moho/net/NetConVars.h"
 #include "moho/render/CDecalTypes.h"
 #include "moho/sim/SSTIArmyConstantData.h"
 #include "moho/sim/SSTIArmyVariableData.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "Sim.h"
+#include "moho/sim/SimArchiveMode.h"
+#include "moho/sim/SimKeyframe.h"
 
 using namespace moho;
 
@@ -55,6 +59,22 @@ namespace
   constexpr int kMaxBeatsAheadOfExecuted = 98;
   constexpr int kMaxCatchUpBeats = 99;
   constexpr float kBlockedIssueGraceMs = 250.0f;
+  // Engine addition, net_LogShownBeatMs only: when each beat was issued, by beat number. Under mLock.
+  constexpr int kIssuedAtSlots = 1024;
+  constexpr int kIssueToShownLogBeats = 100;
+  std::int64_t sIssuedAt[kIssuedAtSlots] = {};
+  // Engine addition, net_AdaptiveLagMax only: what a player's own pauses add to net_Lag. A pause
+  // raises it a step at once; a long quiet spell takes it back down a step at a time. Under mLock.
+  constexpr float kAdaptiveLagStepMs = 50.0f;
+  constexpr float kAdaptivePauseOverBeatMs = 150.0f;
+  constexpr float kAdaptiveLagRiseEveryMs = 5000.0f;
+  constexpr float kAdaptiveLagHoldMs = 60000.0f;
+  constexpr float kAdaptiveLagDecayEveryMs = 10000.0f;
+  constexpr int kAdaptiveLagFirstBeat = 100;
+  float sAdaptiveLagExtraMs = 0.0f;
+  int sAdaptiveLastBeat = -1;
+  std::int64_t sAdaptiveLastAt = 0;
+  std::int64_t sAdaptiveChangedAt = 0;
 
   // Engine addition: set by the session before it creates its driver (see SIM_SetSessionPacing).
   // Read by that driver's issue thread.
@@ -798,6 +818,7 @@ void CSimDriver::PreparePendingSaveRequestLocked(boost::mutex::scoped_lock& lock
   try {
     gpg::WriteArchive* const archive = mSaveGameRequest->GetArchive();
     mSim->SaveState(archive);
+    gSimExactArchive.store(false); // engine addition (replay keyframes)
     mPendingSaveName.clear();
     mSaveRequestUsesSuggestedName = true;
   } catch (const std::exception& ex) {
@@ -807,6 +828,7 @@ void CSimDriver::PreparePendingSaveRequestLocked(boost::mutex::scoped_lock& lock
     mPendingSaveName.clear();
     mSaveRequestUsesSuggestedName = false;
   }
+  gSimExactArchive.store(false); // the throwing paths above too
   lock.lock();
 
   mWantsToSave = true;
@@ -846,6 +868,11 @@ void CSimDriver::FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock)
 
     ScopedStatTimer syncTimer(gEngineStatSimSync);
     mSim->Sync(mActiveSyncFilter, syncData);
+  }
+
+  // Engine addition (replay keyframes): the opening sync of a restored sim.
+  if (SIM_KeyframeRestore() != nullptr) {
+    SIM_FinishKeyframeRestore(*mSim);
   }
 
   lock.lock();
@@ -1126,6 +1153,7 @@ void CSimDriver::ThreadCreateSim()
   // driver in Failed below (std::exception, FuncInfo 0x00F29740 try state 0,
   // handler 0x0073D4C7).
   try {
+    const CZipFileReadScope archives;
     mSim.reset(Sim_Create_exxt(boost::SharedPtrRawFromSharedBorrow(mLaunchInfo)));
   } catch (const std::exception& error) {
     gpg::Logf("Sim::Create() crashed: %s", error.what());
@@ -1228,6 +1256,9 @@ void CSimDriver::ThreadRun()
     gpg::Debugf("ISSUE: thread running.");
   }
 
+  sAdaptiveLagExtraMs = 0.0f;
+  sAdaptiveLastBeat = -1;
+
   while (!mStopSimThread) {
     mClientManager->DoBeat();
 
@@ -1304,7 +1335,7 @@ void CSimDriver::ThreadRun()
         const float simRateScale = msvc8::pow(10.0f, static_cast<float>(mClientManager->GetSimRate()) * 0.1f);
         const float millisecondsPerBeat = (0.1f / simRateScale) * 1000.0f;
         const float leadMilliseconds =
-          static_cast<float>(mNextIssueBeat - pacedBeat) * millisecondsPerBeat - net_Lag;
+          static_cast<float>(mNextIssueBeat - pacedBeat) * millisecondsPerBeat - net_Lag - sAdaptiveLagExtraMs;
         const std::int64_t dueAt = mLastSyncCycleTime + gpg::time::MillisecondsToCycles(leadMilliseconds);
 
         if (dueAt >= now) {
@@ -1334,6 +1365,11 @@ void CSimDriver::ThreadRun()
       }
 
       if (lastBeatToIssue >= mNextIssueBeat) {
+        if (net_LogShownBeatMs > 0) {
+          for (int beat = mNextIssueBeat; beat <= lastBeatToIssue; ++beat) {
+            sIssuedAt[beat % kIssuedAtSlots] = now;
+          }
+        }
         mMarshaller->AdvanceBeat(lastBeatToIssue - mNextIssueBeat + 1);
         mNextIssueBeat = lastBeatToIssue + 1;
         mFirstCommandCycleTime = 0;
@@ -1386,7 +1422,7 @@ void CSimDriver::Dispatch()
   boost::mutex::scoped_lock lock(mLock);
 
   if (mWantsToSave) {
-    CSaveGameRequestImpl* request = mSaveGameRequest;
+    ISaveRequest* request = mSaveGameRequest;
     SSaveGameDispatchData data{};
     data.useSuggestedName = mSaveRequestUsesSuggestedName;
     data.saveName = mPendingSaveName;
@@ -1484,7 +1520,70 @@ void CSimDriver::GetSyncData(SSyncData*& outSyncData)
   // (FUN_0073F9C0) is preserved at the source-level callsite.
   outSyncData = PopFrontSSyncDataPtrDeque(mSyncDataQueue);
   if (outSyncData) {
-    mLastDequeuedBeat = outSyncData->mCurBeat;
+    mLastDequeuedBeat = outSyncData->mCurBeat - gSimBeatOrigin.load(std::memory_order_relaxed);
+    // Engine addition, off by default: net_Lag follows the pauses this player sees, up to net_AdaptiveLagMax.
+    if (net_AdaptiveLagMax > 0) {
+      const std::int64_t takenAt = mTimer.ElapsedCycles();
+      if (sAdaptiveLastBeat >= 0 && mLastDequeuedBeat > sAdaptiveLastBeat) {
+        const float simRateScale = msvc8::pow(10.0f, static_cast<float>(mClientManager->GetSimRate()) * 0.1f);
+        const float millisecondsPerBeat = (0.1f / simRateScale) * 1000.0f;
+        const float gap = gpg::time::CyclesToMilliseconds(takenAt - sAdaptiveLastAt);
+        const float room = static_cast<float>(net_AdaptiveLagMax) - net_Lag;
+        const float before = sAdaptiveLagExtraMs;
+        const float sinceChange = gpg::time::CyclesToMilliseconds(takenAt - sAdaptiveChangedAt);
+        const bool pause = mLastDequeuedBeat >= kAdaptiveLagFirstBeat && gap >= millisecondsPerBeat + kAdaptivePauseOverBeatMs;
+        if (pause && sAdaptiveLagExtraMs > 0.0f && sinceChange < kAdaptiveLagRiseEveryMs) {
+          // A burst of pauses is one event: a spike on the machine doesn't take it to the top at once.
+        } else if (pause) {
+          sAdaptiveLagExtraMs = std::min(sAdaptiveLagExtraMs + kAdaptiveLagStepMs, std::max(room, 0.0f));
+          sAdaptiveChangedAt = takenAt;
+        } else if (sAdaptiveLagExtraMs > 0.0f && sinceChange >= kAdaptiveLagHoldMs) {
+          sAdaptiveLagExtraMs = std::max(sAdaptiveLagExtraMs - kAdaptiveLagStepMs, 0.0f);
+          sAdaptiveChangedAt = takenAt - gpg::time::MillisecondsToCycles(kAdaptiveLagHoldMs - kAdaptiveLagDecayEveryMs);
+        }
+        if (sAdaptiveLagExtraMs != before) {
+          gpg::Logf("NET: beat %d, net_Lag follows pauses: %.0f ms", mLastDequeuedBeat, net_Lag + sAdaptiveLagExtraMs);
+        }
+      }
+      sAdaptiveLastBeat = mLastDequeuedBeat;
+      sAdaptiveLastAt = takenAt;
+    }
+    // Engine addition, off by default: the pause a player sees between beats.
+    if (net_LogShownBeatMs > 0) {
+      static int sLastShownBeat = -1;
+      static std::int64_t sLastShownAt = 0;
+      const std::int64_t shownAt = mTimer.ElapsedCycles();
+      if (sLastShownBeat >= 0 && mLastDequeuedBeat > sLastShownBeat) {
+        const float shownAfter = gpg::time::CyclesToMilliseconds(shownAt - sLastShownAt);
+        if (shownAfter >= static_cast<float>(net_LogShownBeatMs)) {
+          gpg::Logf("NET: beat %d shown %.0f ms after beat %d", mLastDequeuedBeat, shownAfter, sLastShownBeat);
+        }
+      }
+      sLastShownBeat = mLastDequeuedBeat;
+      sLastShownAt = shownAt;
+
+      // How long a beat, and an order placed just before it closed, took from issue to the player's screen.
+      static float sIssueToShownSum = 0.0f;
+      static float sIssueToShownMax = 0.0f;
+      static int sIssueToShownBeats = 0;
+      const std::int64_t issuedAt = mLastDequeuedBeat >= 0 ? sIssuedAt[mLastDequeuedBeat % kIssuedAtSlots] : 0;
+      if (issuedAt != 0 && shownAt >= issuedAt) {
+        const float issueToShown = gpg::time::CyclesToMilliseconds(shownAt - issuedAt);
+        sIssueToShownSum += issueToShown;
+        sIssueToShownMax = std::max(sIssueToShownMax, issueToShown);
+        if (++sIssueToShownBeats >= kIssueToShownLogBeats) {
+          gpg::Logf(
+            "NET: beats to beat %d shown %.0f ms after issue on average, %.0f at most",
+            mLastDequeuedBeat,
+            sIssueToShownSum / static_cast<float>(sIssueToShownBeats),
+            sIssueToShownMax
+          );
+          sIssueToShownSum = 0.0f;
+          sIssueToShownMax = 0.0f;
+          sIssueToShownBeats = 0;
+        }
+      }
+    }
   }
 
   mLastSyncCycleTime = mTimer.ElapsedCycles();
@@ -1835,7 +1934,7 @@ void CSimDriver::ReleaseInterlockRef()
  * Address: 0x0073DF60 (FUN_0073DF60), ISTIDriver slot 38
  * Queues a save-game request and wakes dispatch waiters.
  */
-void CSimDriver::RequestSaveGame(CSaveGameRequestImpl* request)
+void CSimDriver::RequestSaveGame(ISaveRequest* request)
 {
   boost::mutex::scoped_lock lock(mLock);
   mSaveGameRequest = request;

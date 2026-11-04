@@ -97,7 +97,7 @@ namespace faf::remote::client
     ) override;
     moho::Sim* ProcessEvents() override;
     void ReleaseInterlockRef() override;
-    void RequestSaveGame(moho::CSaveGameRequestImpl* request) override;
+    void RequestSaveGame(moho::ISaveRequest* request) override;
     void DrawNetworkStats(moho::CD3DPrimBatcher* batcher, float anchorX, float anchorY, float scaleX, float scaleY)
       override;
 

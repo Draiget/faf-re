@@ -47,6 +47,7 @@
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/SpecialFileType.h"
+#include "moho/core/ThreadPlacement.h"
 #include "moho/task/CTaskThread.h"
 #include "lua/LuaCrashDump.h"
 
@@ -420,7 +421,8 @@ namespace
     }
 
     const DWORD_PTR affinityMask = static_cast<DWORD_PTR>(static_cast<std::uint32_t>(luaL_checknumber(state, 1)));
-    const BOOL result = ::SetProcessAffinityMask(::GetCurrentProcess(), affinityMask);
+    // Engine change: a server given its CPUs keeps them (ThreadPlacement.h).
+    const BOOL result = moho::ProcessCpusAreLocked() ? TRUE : ::SetProcessAffinityMask(::GetCurrentProcess(), affinityMask);
     lua_pushboolean(state, result != FALSE ? 1 : 0);
     return 1;
   }
