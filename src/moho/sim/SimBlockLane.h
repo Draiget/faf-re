@@ -4,8 +4,10 @@
 
 #include <cstddef>
 #include <new>
+#include <utility>
 #include <vector>
 
+#include "moho/sim/SimArchiveMode.h"
 #include "moho/sim/SimThreadRole.h"
 
 namespace moho
@@ -33,7 +35,7 @@ namespace moho
 
     [[nodiscard]] static void* Allocate() noexcept
     {
-      if (IsSimThread()) {
+      if (IsSimThread() && !gSimKeyframeRestoring.load(std::memory_order_relaxed)) {
         std::vector<void*>& blocks = Blocks();
         if (!blocks.empty()) {
           void* const block = blocks.back();
@@ -46,7 +48,7 @@ namespace moho
 
     static void Free(void* const block) noexcept
     {
-      if (IsSimThread()) {
+      if (IsSimThread() && !gSimKeyframeRestoring.load(std::memory_order_relaxed)) {
         try {
           Blocks().push_back(block);
           return;
@@ -54,6 +56,25 @@ namespace moho
         }
       }
       ::operator delete(block);
+    }
+
+    /**
+     * Engine addition (replay keyframes): the free list is game state, as the next object of any of the three kinds
+     * takes its last block. While a keyframe loads the list stands still (`gSimKeyframeRestoring`), so what the load
+     * creates doesn't use up the blocks the saved game had free.
+     */
+    [[nodiscard]] static const std::vector<void*>& FreeBlocks() noexcept
+    {
+      return Blocks();
+    }
+
+    /** Replaces the free list. Only while no sim runs. */
+    static void SetFreeBlocks(std::vector<void*> blocks) noexcept
+    {
+      for (void* const block : Blocks()) {
+        ::operator delete(block);
+      }
+      Blocks() = std::move(blocks);
     }
 
   private:

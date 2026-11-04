@@ -125,6 +125,15 @@ namespace gpg
         /** The lowest-priority open node. Only valid while the heap is non-empty. */
         [[nodiscard]] node_type* top() const noexcept { return mEntries[0].mNode; }
 
+        // Engine addition (replay keyframes): the heap as it is, entry order and handles included.
+        [[nodiscard]] const msvc8::vector<Entry>& Entries() const noexcept { return mEntries; }
+        [[nodiscard]] const msvc8::vector<std::int32_t>& IndexByHandle() const noexcept { return mIndexByHandle; }
+        [[nodiscard]] std::int32_t FreeHandle() const noexcept { return mFreeHandle; }
+
+        void AppendRestored(const Entry& entry) { mEntries.push_back(entry); }
+        void AppendRestoredIndex(const std::int32_t index) { mIndexByHandle.push_back(index); }
+        void SetFreeHandle(const std::int32_t handle) noexcept { mFreeHandle = handle; }
+
         /**
          * Address: 0x007672E0 (FUN_007672E0, first half)
          *
@@ -395,6 +404,14 @@ namespace gpg
             mIndex.Clear();
         }
 
+        template <class TFn>
+        void ForEach(TFn&& fn)
+        {
+            for (std::size_t used = 0; used < mPoolUsed; ++used) {
+                fn(mChunks[used / kChunkNodes][used % kChunkNodes]);
+            }
+        }
+
     private:
         static constexpr std::size_t kChunkNodes = 1024;
 
@@ -498,6 +515,21 @@ namespace gpg
                 }
             }
             Legacy().clear();
+        }
+
+        /** Engine addition (replay keyframes): every node, in no particular order. */
+        template <class TFn>
+        void ForEach(TFn&& fn)
+        {
+            if constexpr (kAllowFlat) {
+                if (UseFlat()) {
+                    Flat()->ForEach(fn);
+                    return;
+                }
+            }
+            for (auto& entry : Legacy()) {
+                fn(entry.second);
+            }
         }
 
     private:

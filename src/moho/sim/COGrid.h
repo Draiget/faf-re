@@ -119,6 +119,16 @@ namespace moho
     void AddColShapeAt(CollisionShapeBase* shape, int bucketIndex);
 
     /**
+     * Engine addition (replay keyframes): every entity's rect and each bucket's list, as entity ids.
+     * A bucket is a list in the order its entities last entered it, and area queries report them in
+     * that order, which decides who is damaged first. A load adds entities in load order, under rects
+     * it computes from their current extents, while a live rect can lag those extents; so
+     * `LoadBucketOrder` drops what the load linked and rebuilds the saved rects and lists.
+     */
+    void SaveBucketOrder(gpg::WriteArchive* archive, const class EntityDB& entities) const;
+    void LoadBucketOrder(gpg::ReadArchive* archive, const class EntityDB& entities);
+
+    /**
      * Address: 0x004FCF90 (FUN_004FCF90)
      *
      * What it does:

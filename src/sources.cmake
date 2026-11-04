@@ -396,6 +396,7 @@ set(FAF_ENGINE_SOURCES
   moho/sim/SSTICommandSource.cpp
   moho/sim/IArmyTypeInfo.cpp
   moho/sim/SimDriver.cpp
+  moho/sim/SimKeyframe.cpp
   moho/sim/SimDriverNetworkStats.cpp
   moho/sim/SimWorkerPool.cpp
   moho/sim/DesyncRecorder.cpp

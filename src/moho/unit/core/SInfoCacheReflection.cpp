@@ -12,6 +12,8 @@
 #include "moho/ai/IFormationInstance.h"
 #include "moho/math/Vector3f.h"
 #include "moho/misc/WeakPtr.h"
+#include "moho/sim/SimArchiveMode.h"
+#include "moho/sim/SimKeyframe.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -228,8 +230,15 @@ namespace moho
       return;
     }
 
-    mFormationLayer =
-      reinterpret_cast<moho::CFormationInstance*>(ReadTrackedPointer<moho::IFormationInstance>(archive, ownerRef));
+    // Engine addition (replay keyframes): see MemberSerialize.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      std::uint64_t saved = 0;
+      archive->ReadUInt64(&saved);
+      SIM_NoteKeyframeFormationPointer(reinterpret_cast<void**>(&mFormationLayer), saved);
+    } else {
+      mFormationLayer =
+        reinterpret_cast<moho::CFormationInstance*>(ReadTrackedPointer<moho::IFormationInstance>(archive, ownerRef));
+    }
 
     archive->Read(CachedWeakPtrIUnitType(), &mFormationLeadRef, ownerRef);
     archive->ReadInt(&mFormationPriorityOrder);
@@ -253,12 +262,19 @@ namespace moho
       return;
     }
 
-    WriteTrackedPointer(
-      archive,
-      reinterpret_cast<const moho::IFormationInstance*>(mFormationLayer),
-      gpg::TrackedPointerState::Unowned,
-      ownerRef
-    );
+    // Engine addition (replay keyframes): this cache can name a formation that was freed, whose block
+    // may be free or hold a projectile or pose array by now (SimBlockLane), so there may be no formation
+    // to follow. Only the address counts: a new formation on that block compares equal.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->WriteUInt64(reinterpret_cast<std::uintptr_t>(mFormationLayer));
+    } else {
+      WriteTrackedPointer(
+        archive,
+        reinterpret_cast<const moho::IFormationInstance*>(mFormationLayer),
+        gpg::TrackedPointerState::Unowned,
+        ownerRef
+      );
+    }
 
     archive->Write(CachedWeakPtrIUnitType(), &mFormationLeadRef, ownerRef);
     archive->WriteInt(mFormationPriorityOrder);

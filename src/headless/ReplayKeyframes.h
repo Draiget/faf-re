@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <map>
 #include <string>
 
 // Engine addition (headless `--keyframe-every`, replay rewind): the sim saved between beats
@@ -21,8 +22,14 @@ namespace faf::headless
   class CReplayKeyframes
   {
   public:
-    /** Every `everyBeats` beats into `directory`; the files are deleted after measuring unless `keep`. */
-    CReplayKeyframes(std::string directory, int everyBeats, bool keep, std::string label);
+    /**
+     * Every `everyBeats` beats into `directory`; the files are deleted after measuring unless `keep`.
+     * With `index`: each saved file is added under the beat it restores, and nothing is saved before
+     * the next beat due after the newest one already there.
+     */
+    CReplayKeyframes(
+      std::string directory, int everyBeats, bool keep, std::string label, std::map<int, std::string>* index = nullptr
+    );
 
     CReplayKeyframes(const CReplayKeyframes&) = delete;
     CReplayKeyframes& operator=(const CReplayKeyframes&) = delete;
@@ -33,6 +40,7 @@ namespace faf::headless
     /** One line: count, sizes, times, failures. */
     [[nodiscard]] std::string Summary() const;
     [[nodiscard]] int Failures() const noexcept { return mFailures; }
+    [[nodiscard]] bool Pending() const noexcept { return mPending; }
 
     // Called by the request.
     void OnSaved(
@@ -45,6 +53,7 @@ namespace faf::headless
     int mEveryBeats;
     bool mKeep;
     int mNextBeat;
+    std::map<int, std::string>* mIndex;
     bool mPending = false;
 
     int mCount = 0;

@@ -1,3 +1,4 @@
+#include "moho/sim/SimArchiveMode.h"
 #include "moho/entity/SSTIEntityVariableData.h"
 
 #include <cstddef>
@@ -784,7 +785,12 @@ namespace moho
     // written with `WriteInt` (0x0055A11D) instead of `WriteBool`. The patch
     // only swapped the call, so the value is still the zero-extended
     // alt-footprint byte (`movzx ecx, byte ptr [edi+0A4h]`).
-    archive->WriteInt(static_cast<int>(mUsingAltFootprint));
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      // Engine addition (replay keyframes): the second byte too; the patched save above loses it.
+      archive->WriteInt(static_cast<int>(mUsingAltFootprint) | (static_cast<int>(mUsingAltFootprintSecondary) << 8));
+    } else {
+      archive->WriteInt(static_cast<int>(mUsingAltFootprint));
+    }
 
     gpg::RType* const attributesType = ResolveEntityAttributesType();
     GPG_ASSERT(attributesType != nullptr);

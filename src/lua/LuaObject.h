@@ -5,6 +5,9 @@
 #include <type_traits>
 #include "lua/LuaRuntimeTypes.h"
 
+/// Engine addition (replay keyframes), see LuaObject.cpp.
+extern "C" void lua_collectkeepingweaktables(lua_State* state);
+
 extern "C"
 {
 	/**
@@ -1184,6 +1187,12 @@ namespace LuaPlus
 		 */
 		[[nodiscard]]
 		LuaObject GetGlobals();
+
+		/**
+		 * Engine addition (replay keyframes): the registry's weak table of array sizes that
+		 * `table.insert` and `table.getn` keep, created if missing.
+		 */
+		LuaObject GetTableSizes();
 
 		/**
 		 * Address: 0x0090A510 (FUN_0090A510, LuaPlus::LuaState::CastState)

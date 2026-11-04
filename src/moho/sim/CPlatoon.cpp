@@ -50,6 +50,7 @@
 #include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/IArmy.h"
 #include "moho/sim/ReconBlip.h"
+#include "moho/sim/SimArchiveMode.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
@@ -845,6 +846,17 @@ namespace moho
     archive->ReadInt(&mLosses);
     archive->ReadFloat(&mDamageDealt);
     archive->ReadFloat(&mDamageReceived);
+
+    // Engine addition (replay keyframes): see MemberSerialize.
+    if (gSimExactArchive.load()) {
+      bool hasLuaList = false;
+      archive->ReadBool(&hasLuaList);
+      if (hasLuaList) {
+        ownerRef = {};
+        archive->Read(gpg::LookupRType(typeid(LuaPlus::LuaObject)), &mLuaUnitList, ownerRef);
+      }
+      mHasLuaList = hasLuaList;
+    }
   }
 
   /**
@@ -878,6 +890,17 @@ namespace moho
     archive->WriteInt(mLosses);
     archive->WriteFloat(mDamageDealt);
     archive->WriteFloat(mDamageReceived);
+
+    // Engine addition (replay keyframes): a script gets this same table until the platoon changes,
+    // with any unit that has died since. A list built again leaves those out, and the script can
+    // decide otherwise. Retail saves leave it out.
+    if (gSimExactArchive.load()) {
+      archive->WriteBool(mHasLuaList);
+      if (mHasLuaList) {
+        ownerRef = {};
+        archive->Write(gpg::LookupRType(typeid(LuaPlus::LuaObject)), &const_cast<CPlatoon*>(this)->mLuaUnitList, ownerRef);
+      }
+    }
   }
 
   /**

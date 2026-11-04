@@ -1,4 +1,5 @@
 #include "moho/command/CCommandDb.h"
+#include "moho/sim/SimArchiveMode.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -268,6 +269,15 @@ namespace moho
     }
 
     archive->WritePointer<moho::CUnitCommand*>(nullptr, gpg::TrackedPointerState::Owned, NullOwnerRef());
+
+    // Engine addition (replay keyframes): see MemberDeserialize.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->Write(gpg::RTypeOf<IdPool>(), &pool, NullOwnerRef());
+      archive->WriteUInt(static_cast<unsigned int>(pendingReleasedCmdIds.size()));
+      for (const CmdId cmdId : pendingReleasedCmdIds) {
+        archive->WriteInt(static_cast<int>(cmdId));
+      }
+    }
   }
 
   /**
@@ -291,6 +301,26 @@ namespace moho
     CUnitCommand* command = nullptr;
     gpg::RRef ownerRef{};
     (void)archive->ReadPointerOwned(&command, &ownerRef);
+
+    // Engine addition (replay keyframes): the binary gives every loaded command a new 0x80000000 id,
+    // the one a player's order came with too, and the pool starts over. A keyframe keeps the game's
+    // ids, which the checksum and the replay's later commands name.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      while (command != nullptr) {
+        commands.insert(CommandMap::value_type(command->mConstDat.cmd, command));
+        command = nullptr;
+        (void)archive->ReadPointerOwned(&command, &ownerRef);
+      }
+      archive->Read(gpg::RTypeOf<IdPool>(), &pool, NullOwnerRef());
+      unsigned int pending = 0u;
+      archive->ReadUInt(&pending);
+      for (unsigned int index = 0u; index < pending; ++index) {
+        int cmdId = 0;
+        archive->ReadInt(&cmdId);
+        pendingReleasedCmdIds.push_back(static_cast<CmdId>(cmdId));
+      }
+      return;
+    }
 
     while (command != nullptr) {
       BVIntSet& releasedLowIds = pool.mReleasedLows;

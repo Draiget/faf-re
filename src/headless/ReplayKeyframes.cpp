@@ -16,6 +16,7 @@
 #include "moho/sim/ISTIDriver.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimArchiveMode.h"
+#include "moho/sim/SimKeyframe.h"
 
 namespace faf::headless
 {
@@ -43,6 +44,7 @@ namespace faf::headless
         mStart = Clock::now();
         mBeat = mSim != nullptr ? mSim->mCurBeat : 0u;
         // A retail-format save changes the sim (see gSimExactArchive); a keyframe must not.
+        moho::gSimExactSaveCount.fetch_add(1u);
         moho::gSimExactArchive.store(true);
         std::FILE* file = nullptr;
         if (fopen_s(&file, mPath.c_str(), "wb") != 0 || file == nullptr) {
@@ -50,6 +52,13 @@ namespace faf::headless
           throw std::runtime_error("cannot write " + mPath);
         }
         mFile = boost::shared_ptr<std::FILE>(file, moho::SFileStarCloser{});
+        if (mSim != nullptr) {
+          moho::SSimKeyframeHeader header{};
+          moho::SIM_CaptureKeyframeHeader(*mSim, header);
+          if (!moho::SIM_WriteKeyframeHeader(file, header)) {
+            throw std::runtime_error("cannot write " + mPath);
+          }
+        }
         mArchive = gpg::CreateBinaryWriteArchive(mFile);
         return mArchive;
       }
@@ -57,7 +66,6 @@ namespace faf::headless
       void Save(const moho::SSaveGameDispatchData& data) override
       {
         const double seconds = std::chrono::duration<double>(Clock::now() - mStart).count();
-        moho::gSimExactArchive.store(false);
         delete mArchive;
         mArchive = nullptr;
         mFile.reset();
@@ -96,12 +104,16 @@ namespace faf::headless
     }
   } // namespace
 
-  CReplayKeyframes::CReplayKeyframes(std::string directory, const int everyBeats, const bool keep, std::string label)
+  CReplayKeyframes::CReplayKeyframes(
+    std::string directory, const int everyBeats, const bool keep, std::string label,
+    std::map<int, std::string>* const index
+  )
     : mDirectory(std::move(directory))
     , mLabel(std::move(label))
     , mEveryBeats(everyBeats)
     , mKeep(keep)
-    , mNextBeat(everyBeats)
+    , mNextBeat(index != nullptr && !index->empty() ? index->rbegin()->first + everyBeats : everyBeats)
+    , mIndex(index)
   {
     std::error_code ignored;
     std::filesystem::create_directories(mDirectory, ignored);
@@ -140,7 +152,7 @@ namespace faf::headless
     md5.Update(bytes.data(), bytes.size());
 
     const Clock::time_point packStart = Clock::now();
-    uLongf packedSize = compressBound(static_cast<uLong>(bytes.size()));
+    uLongf packedSize = moho::SIM_KeyframePackBound(static_cast<uLong>(bytes.size()));
     std::vector<unsigned char> packed(packedSize);
     const bool packedOk =
       compress2(packed.data(), &packedSize, bytes.data(), static_cast<uLong>(bytes.size()), 1) == Z_OK;
@@ -167,6 +179,10 @@ namespace faf::headless
       md5.Digest().ToString().c_str()
     );
     std::fflush(stdout);
+
+    if (mIndex != nullptr) {
+      (*mIndex)[static_cast<int>(beat)] = path;
+    }
 
     if (!mKeep) {
       std::error_code ignored;

@@ -194,6 +194,27 @@ namespace moho
   gpg::RType* CUnitFerryTask::sType = nullptr;
 
   /**
+   * Builds an empty task for the serializer to fill (what `CUnitFerryTaskTypeInfo::NewRef`,
+   * 0x006101B0, constructs).
+   */
+  CUnitFerryTask::CUnitFerryTask()
+    : CCommandTask()
+  {
+    mDispatch = nullptr;
+    mCommandIndex = 0;
+    mFollowsExistingRoute = false;
+
+    mRouteUnit.ClearLinkState();
+    mFerryUnit.ClearLinkState();
+
+    mPos.x = 0.0f;
+    mPos.y = 0.0f;
+    mPos.z = 0.0f;
+
+    mBeacon.ClearLinkState();
+  }
+
+  /**
    * Address: 0x0060DD70 (FUN_0060DD70, Moho::CUnitFerryTask::CUnitFerryTask)
    *
    * What it does:

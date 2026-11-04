@@ -8,6 +8,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/sim/SimArchiveMode.h"
 #include "moho/entity/EntityCategorySetVectorReflection.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/serialization/SBlackListInfoVectorReflection.h"
@@ -103,6 +104,10 @@ namespace moho
     archive->ReadFloat(&mDamage);
     archive->ReadFloat(&mUnknown_0044);
     archive->ReadFloat(&mUnknown_0048);
+    // Engine addition (replay keyframes): retail's load (0x006DF0C0) resets it to infinity.
+    if (moho::gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->ReadFloat(&mMaxHeightDiff);
+    }
   }
 
   /**
@@ -128,6 +133,9 @@ namespace moho
     archive->WriteFloat(mDamage);
     archive->WriteFloat(mUnknown_0044);
     archive->WriteFloat(mUnknown_0048);
+    if (moho::gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->WriteFloat(mMaxHeightDiff);
+    }
   }
 } // namespace moho
 

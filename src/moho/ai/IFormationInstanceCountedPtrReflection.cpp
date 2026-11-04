@@ -112,29 +112,11 @@ namespace
     const gpg::RRef& ownerRef
   )
   {
-    gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-
-    const gpg::RType* const expectedType = CachedIFormationInstanceType();
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
-    if (upcast.mObj) {
-      return static_cast<moho::IFormationInstance*>(upcast.mObj);
-    }
-
-    const char* const expected = expectedType ? expectedType->GetName() : "IFormationInstance";
-    const char* const actual = tracked.type ? tracked.type->GetName() : "null";
-    const msvc8::string message = gpg::STR_Printf(
-      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
-      expected,
-      actual
-    );
-    throw gpg::SerializationError(message.c_str());
+    // 0x006EAAD1: `call 0x6EB9E0`, which marks the object shared. An instance only commands refer to
+    // has no owner, and left unowned `ReadArchive::EndSection` would delete it.
+    moho::IFormationInstance* instance = nullptr;
+    (void)archive->ReadPointerWeak_IFormationInstance(&instance, &ownerRef);
+    return instance;
   }
 
   /**

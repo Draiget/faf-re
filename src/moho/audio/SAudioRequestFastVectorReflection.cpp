@@ -139,9 +139,9 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAudioRequest>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SAudioRequest>*>(objectPtr);
     moho::SAudioRequest fill{};
-    vec.Resize(static_cast<std::size_t>(count), fill);
+    vec.resize(static_cast<std::size_t>(count), fill);
 
     gpg::RType* const elementType = CachedSAudioRequestType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
@@ -163,7 +163,7 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAudioRequest>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SAudioRequest>*>(objectPtr);
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
@@ -266,7 +266,7 @@ namespace gpg
       return out;
     }
 
-    auto& vec = *static_cast<gpg::fastvector<moho::SAudioRequest>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SAudioRequest>*>(obj);
     if (vec.Data() == nullptr || static_cast<std::size_t>(ind) >= GetCount(obj)) {
       return out;
     }
@@ -287,7 +287,7 @@ namespace gpg
       return 0u;
     }
 
-    auto& vec = *static_cast<gpg::fastvector<moho::SAudioRequest>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SAudioRequest>*>(obj);
     if (vec.Data() == nullptr) {
       return 0u;
     }
@@ -308,9 +308,9 @@ namespace gpg
       return;
     }
 
-    auto& vec = *static_cast<gpg::fastvector<moho::SAudioRequest>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SAudioRequest>*>(obj);
     moho::SAudioRequest fill{};
-    vec.Resize(static_cast<std::size_t>(count), fill);
+    vec.resize(static_cast<std::size_t>(count), fill);
   }
 } // namespace gpg
 

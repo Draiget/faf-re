@@ -41,7 +41,9 @@
 #include "moho/unit/CUnitCommandQueue.h"
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/sim/SimArchiveMode.h"
 #include "moho/sim/SimBlockLane.h"
+#include "moho/sim/SimKeyframe.h"
 
 namespace moho
 {
@@ -2559,6 +2561,13 @@ namespace moho
     }
 
     mSim = ReadPointerSim(archive, owner);
+
+    // Engine addition (replay keyframes): see SIM_NoteKeyframeBlock.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      std::uint64_t saved = 0;
+      archive->ReadUInt64(&saved);
+      SIM_NoteKeyframeBlock(saved, this);
+    }
   }
 
   /**
@@ -2584,6 +2593,11 @@ namespace moho
     }
 
     WritePointerSim(archive, mSim, owner);
+
+    // Engine addition (replay keyframes): see SIM_NoteKeyframeBlock.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->WriteUInt64(reinterpret_cast<std::uintptr_t>(this));
+    }
   }
 
   /**

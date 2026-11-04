@@ -281,6 +281,51 @@ void CReplayClient::Start()
   mReplayWorkerCondition.notify_all();
 }
 
+void CReplayClient::SkipBeats(const std::int32_t beats)
+{
+  std::scoped_lock lock(mManager->mLock);
+
+  // What `CClientBase` would have learned from the skipped messages: it passes a message on only
+  // under a current source, and the stream names a source only when the source changes.
+  static constexpr std::uint32_t kNoCommandSource = 0xFFu;
+  std::uint32_t currentSource = mCommandSourceId;
+
+  std::int32_t skipped = 0;
+  while (skipped < beats && mReplayMessage.Read(mReplayStream)) {
+    CMessageStream stream(mReplayMessage, CMessageStream::Access::kReadOnly);
+    gpg::BinaryReader reader(&stream);
+
+    const std::uint8_t replayType = mReplayMessage.GetType().raw();
+    if (replayType == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_SetCommandSource)) {
+      std::uint8_t sourceId = 0;
+      if (mReplayMessage.GetMessageSize() >= 1) {
+        reader.ReadExact(sourceId);
+      }
+      mCurrentSourceAllowed = mReplayMessage.GetMessageSize() >= 1 && mValidCommandSources.Contains(sourceId);
+      currentSource = mCurrentSourceAllowed ? sourceId : kNoCommandSource;
+    } else if (replayType == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_CommandSourceTerminated)) {
+      if (mCurrentSourceAllowed && currentSource != kNoCommandSource) {
+        mValidCommandSources.Remove(currentSource);
+        mValidCommandSources.Finalize();
+        currentSource = kNoCommandSource;
+      }
+    } else if (replayType == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)) {
+      std::int32_t beatDelta = 0;
+      reader.ReadExact(beatDelta);
+      skipped += beatDelta;
+    }
+    mReplayMessage.Clear();
+  }
+  mCommandSourceId = currentSource;
+
+  if (skipped > beats) {
+    CMessage remainder(ECmdStreamOp::CMDST_Advance);
+    CMessageStream remainderStream(remainder);
+    remainderStream.WriteInt32(skipped - beats);
+    CClientBase::Process(remainder);
+  }
+}
+
 /**
  * Address: 0x0053D7A0 (FUN_0053D7A0, func_ReplayThread)
  */

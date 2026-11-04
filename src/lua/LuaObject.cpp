@@ -2,6 +2,7 @@
 #include "legacy/math/X87Math.h"
 #include <Windows.h>
 #include <array>
+#include <unordered_set>
 #include <vector>
 #include <thread>
 #include <mutex>
@@ -53,6 +54,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/sim/CVFSImpl.h"
+#include "moho/sim/SimArchiveMode.h"
 #include "moho/sim/SimThreadRole.h"
 #include "moho/sim/SimWorkerPool.h"
 #include "moho/console/CConCommand.h"
@@ -7464,6 +7466,13 @@ namespace
 	static thread_local std::vector<Node*> tRemovedKeyNodes;
 
 	/**
+	 * Engine addition (replay keyframes): the VM whose collection in progress treats weak tables as
+	 * strong (`lua_collectkeepingweaktables`). Workers mark too, so it is not per thread; the user VM
+	 * may collect meanwhile, so it names the VM.
+	 */
+	static std::atomic<const global_State*> sKeepWeakTablesOf{nullptr};
+
+	/**
 	 * Address: 0x00915320 (FUN_00915320, traversetable)
 	 *
 	 * What it does:
@@ -7502,7 +7511,7 @@ namespace
 			reallymarkobject(st, reinterpret_cast<GCObject*>(metatable));
 		}
 
-		if ((metatable->flags & 4) == 0) {
+		if ((metatable->flags & 4) == 0 && sKeepWeakTablesOf.load(std::memory_order_relaxed) != st->g) {
 			const TObject* const mode = luaT_gettm(metatable, kLuaTagMethodMode, st->g->tmname[kLuaTagMethodMode]);
 			if (mode != nullptr && mode->tt == LUA_TSTRING) {
 				const char* const modeText = static_cast<TString*>(mode->value.p)->str;
@@ -12586,34 +12595,6 @@ namespace
 		return frame;
 	}
 
-	void PushTObject(lua_State* state, const TObject& object)
-	{
-		switch (object.tt) {
-			case LUA_TNIL:
-				lua_pushnil(state);
-				return;
-			case LUA_TBOOLEAN:
-				lua_pushboolean(state, object.value.b ? 1 : 0);
-				return;
-			case LUA_TNUMBER:
-				lua_pushnumber(state, object.value.n);
-				return;
-			case LUA_TSTRING: {
-				const auto* str = static_cast<const TString*>(object.value.p);
-				lua_pushstring(state, str ? str->str : "");
-				return;
-			}
-			default:
-				break;
-		}
-
-		*state->top = object;
-		if (state->top >= state->ci->top) {
-			lua_checkstack(state, 1);
-		}
-		state->top += 1;
-	}
-
 	void RebindToState(LuaObject& object, LuaState* state)
 	{
 		Ensure(state != nullptr, "state");
@@ -13589,7 +13570,7 @@ namespace
 			bool weakkey = false;
 			bool weakvalue = false;
 			const auto flags = std::atomic_ref<int8_t>(metatable->flags).load(std::memory_order_relaxed);
-			if ((flags & (1 << kLuaTagMethodMode)) == 0) {
+			if ((flags & (1 << kLuaTagMethodMode)) == 0 && sKeepWeakTablesOf.load(std::memory_order_relaxed) != round.g) {
 				const TObject* const mode = luaH_getstr(metatable, round.g->tmname[kLuaTagMethodMode]);
 				if (mode->tt == LUA_TNIL) {
 					// luaT_gettm's miss: cache the absence in the metatable.
@@ -18661,6 +18642,18 @@ extern "C"
 	}
 
 	/**
+	 * Engine addition (replay keyframes): one full collection that treats weak tables as strong.
+	 * After a keyframe's load it frees what the session's start built and the keyframe replaced, and
+	 * nothing the keyframe holds, however weakly, since the game had not collected that yet.
+	 */
+	extern "C" void lua_collectkeepingweaktables(lua_State* const state)
+	{
+		sKeepWeakTablesOf.store(state->l_G, std::memory_order_relaxed);
+		luaC_collectgarbage(state);
+		sKeepWeakTablesOf.store(nullptr, std::memory_order_relaxed);
+	}
+
+	/**
 	 * Address: 0x009284A0 (FUN_009284A0, luaT_getmetatable)
 	 *
 	 * IDA signature:
@@ -20463,6 +20456,69 @@ void Table::MemberSerialize(gpg::WriteArchive* const archive, const int, const g
 	archive->WritePointer<Table>(metatable, gpg::TrackedPointerState::Unowned, ownerRef);
 
 	const int hashNodeCount = 1 << lsizenode;
+
+	// Engine addition (replay keyframes): which slot a colliding key got depends on what was
+	// inserted before it, and `next` walks the slots, so a table rebuilt by insertion can iterate in
+	// another order; freed slots still count as taken until a rehash, so it also rehashes at another
+	// time. A keyframe keeps the slots. A key hashed by address has no fixed slot in any other process,
+	// so such a table is rebuilt by insertion, and lockstep cannot depend on its order anyway.
+	if (moho::gSimExactArchive.load(std::memory_order_relaxed)) {
+		bool hashedByAddress = false;
+		for (int hashIndex = 0; hashIndex < hashNodeCount; ++hashIndex) {
+			const Node& slot = node[hashIndex];
+			const int keyType = slot.KeyTag();
+			hashedByAddress = hashedByAddress
+				|| (slot.i_val.tt != LUA_TNIL && keyType != LUA_TBOOLEAN && keyType != LUA_TNUMBER && keyType != LUA_TSTRING);
+		}
+		archive->WriteBool(hashedByAddress);
+
+		// A slot with a nil value keeps its key, and that key may already be collected: nothing can
+		// be read through it. A string still alive is kept, because assigning that key again reuses
+		// the slot. The strings alive are the string table's, gathered once per save.
+		thread_local std::uint32_t tLiveStringsSave = 0u;
+		thread_local std::unordered_set<const void*> tLiveStrings;
+		const std::uint32_t currentSave = moho::gSimExactSaveCount.load(std::memory_order_relaxed);
+		if (tLiveStringsSave != currentSave) {
+			tLiveStringsSave = currentSave;
+			tLiveStrings.clear();
+			const global_State* const globalState = ownerRef.TryUpcastLuaThreadState()->l_G;
+			for (int bucket = 0; bucket < globalState->strt.size; ++bucket) {
+				for (const GCObject* string = globalState->strt.hash[bucket]; string != nullptr; string = string->gch.next) {
+					tLiveStrings.insert(string);
+				}
+			}
+		}
+
+		if (!hashedByAddress) {
+			gpg::RType* const exactType = CachedType<TObject>(gLuaTObjectType);
+			archive->WriteInt(static_cast<int>(firstfree - node));
+			for (int arrayIndex = 0; arrayIndex < sizearray; ++arrayIndex) {
+				archive->Write(exactType, &array[arrayIndex], ownerRef);
+			}
+			for (int hashIndex = 0; hashIndex < hashNodeCount; ++hashIndex) {
+				const Node& slot = node[hashIndex];
+				if (slot.KeyIs(LUA_TNIL)) {
+					archive->WriteUByte(0u);
+					continue;
+				}
+
+				const int keyType = slot.KeyTag();
+				const bool keyReadable = slot.i_val.tt != LUA_TNIL || keyType == LUA_TBOOLEAN || keyType == LUA_TNUMBER
+					|| (keyType == LUA_TSTRING && tLiveStrings.count(slot.KeyValue().p) != 0u);
+				if (!keyReadable) {
+					archive->WriteUByte(2u); // a dead key: takes its slot, holds nothing
+				} else {
+					archive->WriteUByte(1u);
+					TObject key = slot.Key();
+					archive->Write(exactType, &key, ownerRef);
+					archive->Write(exactType, &slot.i_val, ownerRef);
+				}
+				archive->WriteInt(slot.Next() != nullptr ? static_cast<int>(slot.Next() - node) : -1);
+			}
+			return;
+		}
+	}
+
 	int nonEmptyHashCount = 0;
 	for (int hashIndex = 0; hashIndex < hashNodeCount; ++hashIndex) {
 		if (node[hashIndex].i_val.tt != LUA_TNIL) {
@@ -20521,6 +20577,48 @@ void Table::MemberDeserialize(gpg::ReadArchive* const archive, const int, const 
 	metatable = loadedMetatable;
 
 	gpg::RType* const tObjectType = CachedType<TObject>(gLuaTObjectType);
+
+	// Engine addition (replay keyframes): the slots as they were, see MemberSerialize.
+	if (moho::gSimExactArchive.load(std::memory_order_relaxed)) {
+		bool hashedByAddress = false;
+		archive->ReadBool(&hashedByAddress);
+		if (!hashedByAddress) {
+			// A new table says it has no tag methods; luaH_set clears that, and these writes bypass it.
+			flags = 0;
+			int firstFreeIndex = 0;
+			archive->ReadInt(&firstFreeIndex);
+			for (int arrayIndex = 0; arrayIndex < sizearray; ++arrayIndex) {
+				archive->Read(tObjectType, &array[arrayIndex], ownerRef);
+			}
+
+			const int hashNodeCount = 1 << lsizenode;
+			for (int hashIndex = 0; hashIndex < hashNodeCount; ++hashIndex) {
+				lu_byte slotState = 0u;
+				archive->ReadUByte(&slotState);
+				if (slotState == 0u) {
+					continue;
+				}
+
+				Node& slot = node[hashIndex];
+				if (slotState == 1u) {
+					TObject key{};
+					archive->Read(tObjectType, &key, ownerRef);
+					slot.SetKey(key);
+					archive->Read(tObjectType, &slot.i_val, ownerRef);
+				} else {
+					slot.SetKeyTag(LUA_TNONE);
+					slot.i_val.tt = LUA_TNIL;
+				}
+
+				int nextIndex = -1;
+				archive->ReadInt(&nextIndex);
+				slot.SetNext(nextIndex >= 0 ? &node[nextIndex] : nullptr);
+			}
+			firstfree = &node[firstFreeIndex];
+			return;
+		}
+	}
+
 	int hashEntryCount = 0;
 	archive->ReadInt(&hashEntryCount);
 
@@ -20627,6 +20725,29 @@ void LClosure::MemberDeserialize(gpg::ReadArchive* const archive, const int, con
 	}
 }
 
+namespace
+{
+	/**
+	 * Address: 0x00915E20 (FUN_00915E20)
+	 *
+	 * What it does:
+	 * Unlinks one `UpVal` from the global state's `rootgc` chain (`[L+0x10]+0xC`) and clears its
+	 * `next` link. A corrupt archive can name one that is not there, which the binary does not test.
+	 */
+	void UnlinkUpvalueFromRootList(lua_State* const state, GCObject* const upvalue)
+	{
+		GCObject** link = &state->l_G->rootgc;
+		while (*link != upvalue) {
+			if (*link == nullptr) {
+				throw gpg::SerializationError("Consistency check failed: u");
+			}
+			link = &(*link)->gch.next;
+		}
+		*link = upvalue->gch.next;
+		upvalue->gch.next = nullptr;
+	}
+} // namespace
+
 /**
  * Address: 0x00922DD0 (FUN_00922DD0, lua_State::MemberDeserialize)
  *
@@ -20731,15 +20852,10 @@ void lua_State::MemberDeserialize(gpg::ReadArchive* const archive, const int, co
 			throw gpg::SerializationError("Consistency check failed: u->v == &u->value");
 		}
 
+		// 0x0092303B: `call 0x915E20` moves it off the global list luaF_newupval put it on, so that its
+		// next link can chain this thread's open upvalues.
 		auto* const upvalueObject = reinterpret_cast<GCObject*>(upvalue);
-		GCObject** link = &openupval;
-		while (*link != nullptr && *link != upvalueObject) {
-			link = &(*link)->gch.next;
-		}
-		if (*link == upvalueObject) {
-			*link = upvalueObject->gch.next;
-			upvalueObject->gch.next = nullptr;
-		}
+		UnlinkUpvalueFromRootList(this, upvalueObject);
 
 		upvalue->v = &stack[upvalueStackIndex];
 		*openUpvalueInsert = upvalueObject;
@@ -20845,6 +20961,14 @@ LuaObject LuaState::GetGlobals()
 	}
 
 	return LuaObject(this, LUA_GLOBALSINDEX);
+}
+
+LuaObject LuaState::GetTableSizes()
+{
+	getsizes(m_state);
+	LuaObject sizes(this, -1);
+	lua_settop(m_state, -2);
+	return sizes;
 }
 
 /**
@@ -21724,6 +21848,14 @@ const char* LuaObject::TypeName() const
 	return luaT_typenames[type];
 }
 
+/**
+ * Address: 0x009074B0 (FUN_009074B0)
+ *
+ * What it does:
+ * Interns `key` and writes `object` into this table through `luaV_settable`. It stays off the Lua
+ * stack, so no collection can start here: a string value made by `SetString` is on no stack yet, and
+ * a collection would free it.
+ */
 void LuaObject::SetTableHelper(const char* key, TObject* object)
 {
 	Ensure(m_state != nullptr, "m_state");
@@ -21733,12 +21865,11 @@ void LuaObject::SetTableHelper(const char* key, TObject* object)
 	lua_State* lstate = GetActiveCState();
 	Ensure(lstate != nullptr, "active lua state");
 
-	const int oldTop = lua_gettop(lstate);
-	PushStack(lstate);
-	lua_pushstring(lstate, key);
-	PushTObject(lstate, *object);
-	lua_settable(lstate, -3);
-	lua_settop(lstate, oldTop);
+	TString* const interned = luaS_newlstr(lstate, key, std::strlen(key));
+	TObject keyObject{};
+	keyObject.tt = interned->tt;
+	keyObject.value.p = interned;
+	luaV_settable(lstate, &m_object, &keyObject, object);
 }
 
 /**
@@ -22453,35 +22584,6 @@ void LuaObject::SetObject(const int32_t index, LuaObject* value)
 
 namespace
 {
-	/**
-	 * Address: 0x00915E20 (FUN_00915E20)
-	 *
-	 * What it does:
-	 * Unlinks one `UpVal` node from `lua_State::openupval` forward chain and
-	 * clears the removed node's `next` link lane.
-	 */
-	GCObject** UnlinkOpenUpvalueFromState(
-		lua_State* const state,
-		GCObject* const upvalue
-	)
-	{
-		if (state == nullptr || upvalue == nullptr) {
-			return nullptr;
-		}
-
-		GCObject** link = &state->openupval;
-		while (*link != nullptr && *link != upvalue) {
-			link = &(*link)->gch.next;
-		}
-
-		if (*link == upvalue) {
-			*link = upvalue->gch.next;
-			upvalue->gch.next = nullptr;
-		}
-
-		return link;
-	}
-
 	struct OwnerWordLaneAt68
 	{
 		std::byte pad00[68];
