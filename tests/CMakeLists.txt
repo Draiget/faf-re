@@ -52,6 +52,12 @@ add_executable(faf_effect_scan_tests EXCLUDE_FROM_ALL effect_scan/EffectScanTest
 target_include_directories(faf_effect_scan_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME effect_scan COMMAND faf_effect_scan_tests)
 
+# Engine addition: ImageCodec's DDS writer against the d3dx11_43.dll the process loads, so the
+# same exe checks Microsoft's on Windows and Wine's under Wine.
+add_executable(faf_image_codec_tests EXCLUDE_FROM_ALL image_codec/ImageCodecTests.cpp)
+target_link_libraries(faf_image_codec_tests PRIVATE faf_engine)
+add_test(NAME image_codec COMMAND faf_image_codec_tests)
+
 # Engine addition (dedicated-server plan WPL.23): golden sim-math tests
 # (tests/sim_math). Built with every build, and run right after it: a change
 # that moves one result of the simulation's parity-sensitive arithmetic fails
