@@ -11,6 +11,10 @@ asin msvc8::asin(double)
 pow msvc8::pow(double, double)
 # powf: the sim driver's wall-clock pacing only (SimDriver.cpp, the beat rate from the sim rate).
 pow msvc8::powf(float, float)
+# powf: the skew clock's tick length and display factor (SimDriver.cpp), wall-clock pacing and a log
+# line; nothing it computes reaches the sim.
+powf (anonymous namespace)::ApplySharedStart((anonymous namespace)::SkewClock&, int, int, moho::CClientManagerImpl&)
+powf moho::CSimDriver::GetSyncData(moho::SSyncData*&)
 
 # Camera projection (effect culling against the sync filter's cameras, the render-side view):
 # visual only.
