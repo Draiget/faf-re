@@ -10,6 +10,6 @@ The [Nightly release workflow](../../.github/workflows/nightly-release.yml) publ
 
 A parity run that failed or lists new failures publishes nothing, and neither does a parity run started by hand, which may have played any commit or set.
 
-Started by hand, the workflow builds the commit and writes the notes as artifacts. It publishes only with `publish` ticked, and such a build has passed no parity run, as its notes say. Give `parity_run` to report a run in the notes, with any new failures named.
+Started by hand, the workflow builds the commit and writes the notes as artifacts. It publishes only with `publish` ticked, and such a build has passed no parity run, as its notes say. Give `parity_run` to report a run in the notes, with any new failures named, and `note` for a line of your own, such as what was fixed after that run.
 
 Nightly tags and releases stay until someone deletes them; nothing removes old ones.

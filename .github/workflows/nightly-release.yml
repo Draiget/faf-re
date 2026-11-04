@@ -21,6 +21,9 @@ on:
       parity_run:
         description: A Replay parity run to report in the notes, its new failures too (optional)
         required: false
+      note:
+        description: A line for the notes, such as what was fixed after that run (optional)
+        required: false
 
 permissions:
   contents: read
@@ -193,6 +196,7 @@ jobs:
           SHA: ${{ needs.plan.outputs.sha }}
           TAG: ${{ needs.plan.outputs.tag }}
           PREVIOUS: ${{ needs.plan.outputs.previous }}
+          NOTE: ${{ inputs.note }}
           PARITY_RUN: ${{ github.event.workflow_run.id || inputs.parity_run }}
           PARITY_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id || inputs.parity_run }}
         run: |

@@ -1,7 +1,7 @@
 """Writes a nightly pre-release's notes: the parity run it passed, every commit since the previous
 nightly (or release), how to install it, and the zips' checksums.
 
-usage: TAG=... SHA=... PREVIOUS=... [PARITY_RUN=... PARITY_URL=...] nightly_notes.py --out notes.md
+usage: TAG=... SHA=... PREVIOUS=... [PARITY_RUN=... PARITY_URL=... NOTE=...] nightly_notes.py --out notes.md
 
 Reads git history, zips/SHA256SUMS.txt and, when the parity run's report was downloaded, report/report.json.
 """
@@ -60,7 +60,7 @@ def main():
 
     lines = ["A nightly build of master at [`%s`](%s/commit/%s). It has had no testing beyond the checks below: "
              "use a [release](%s/releases/latest) unless you want the newest changes." % (sha[:7], REPO, sha, REPO), "",
-             parity_line(), "",
+             parity_line(), ""] + ([os.environ["NOTE"], ""] if os.environ.get("NOTE") else []) + [
              "## Changes since %s (%d)" % (previous, len(commits)), ""]
     lines += shown or ["No commits."]
     if len(shown) < len(commits):
