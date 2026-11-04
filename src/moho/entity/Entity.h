@@ -624,6 +624,14 @@ namespace moho
   {
     // Primary vftable (38 entries)
   public:
+
+    static void* operator new(std::size_t size);
+    static void* operator new(std::size_t size, std::nothrow_t) noexcept;
+    static void operator delete(void* ptr, std::size_t size) noexcept;
+
+    static void* operator new[](std::size_t) = delete;
+    static void operator delete[](void*) = delete;
+
     inline static gpg::RType* sType = nullptr;
     inline static gpg::RType* sPointerType = nullptr;
 
