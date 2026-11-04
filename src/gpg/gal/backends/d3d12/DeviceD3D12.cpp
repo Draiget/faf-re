@@ -1294,6 +1294,16 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     static_cast<IndexBufferD3D12&>(buffer).Storage().ReleaseCopy();
   }
 
+  void DeviceD3D12::CopyLockedRangeOnly(VertexBuffer& buffer)
+  {
+    static_cast<VertexBufferD3D12&>(buffer).Storage().CopyLockedRangeOnly();
+  }
+
+  void DeviceD3D12::CopyLockedRangeOnly(IndexBuffer& buffer)
+  {
+    static_cast<IndexBufferD3D12&>(buffer).Storage().CopyLockedRangeOnly();
+  }
+
   bool DeviceD3D12::CopyVertexBufferRegion(
     VertexBuffer& destination, const std::uint32_t destinationOffset, VertexBuffer& source, const std::uint32_t sourceOffset,
     const std::uint32_t byteCount

@@ -1601,17 +1601,18 @@ namespace
    * turns a typed WM_CHAR into its code-page byte, which the W dispatch then reads as a UTF-16
    * code unit: Cyrillic "П" (0xCF in 1251) reached the edit box as "Ï" (U+00CF).
    */
-  void DispatchPendingMessage()
+  bool DispatchPendingMessage()
   {
     MSG message{};
     if (::PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE) == FALSE) {
-      return;
+      return false;
     }
     if (message.message == WM_QUIT) {
       wxTheApp->ExitMainLoop(); // what wxApp::DoMessage does on WM_QUIT
-      return;
+      return true;
     }
     wxTheApp->DoMessage(reinterpret_cast<WXMSG*>(&message));
+    return true;
   }
 
   DWORD ComputeWaitTimeoutMs()
@@ -2327,8 +2328,9 @@ void moho::WIN_AppExecute(IWinApp* const app)
       acceptNewEvent = false;
     }
 
-    if (wxTheApp->Pending()) {
-      DispatchPendingMessage(); // engine change: wxTheApp->Dispatch() could block, see there
+    // Engine change: taking the message is the check, as a second PeekMessage per pass was 7 % of
+    // an uncapped frame. wxTheApp->Dispatch() could also block, see there.
+    if (DispatchPendingMessage()) {
       success = true;
       continue;
     }

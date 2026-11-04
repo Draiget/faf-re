@@ -460,5 +460,7 @@ namespace gpg::gal
     bool Device::ReadGpuBuffer(GpuBuffer&, std::uint32_t, std::uint32_t, void*) { return false; }
     void Device::ReleaseBufferCopy(VertexBuffer&) {}
     void Device::ReleaseBufferCopy(IndexBuffer&) {}
+    void Device::CopyLockedRangeOnly(VertexBuffer&) {}
+    void Device::CopyLockedRangeOnly(IndexBuffer&) {}
     bool Device::CopyVertexBufferRegion(VertexBuffer&, std::uint32_t, VertexBuffer&, std::uint32_t, std::uint32_t) { return false; }
 }

@@ -33,4 +33,12 @@ namespace gpg::gal
    * won't lock again (Device::ReleaseBufferCopy). Console variable `ren_ReleaseBufferCopies` (moho).
    */
   extern bool gReleaseBufferCopies;
+
+  /**
+   * Engine addition: Direct3D 12 and Vulkan rename a dynamic buffer into upload memory by copying
+   * all of it, as draws may read past what a lock wrote. An owner that says it doesn't
+   * (Device::CopyLockedRangeOnly) has only the locked bytes copied: the prim batcher's 0x8000 vertices
+   * for each flush were 11 % of an uncapped frame. Console variable `ren_LockedRangeOnly` (moho).
+   */
+  extern bool gLockedRangeOnly;
 } // namespace gpg::gal

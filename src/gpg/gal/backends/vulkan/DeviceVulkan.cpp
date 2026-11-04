@@ -1244,6 +1244,16 @@ namespace gpg::gal
     static_cast<IndexBufferVulkan&>(buffer).Storage().ReleaseCopy();
   }
 
+  void DeviceVulkan::CopyLockedRangeOnly(VertexBuffer& buffer)
+  {
+    static_cast<VertexBufferVulkan&>(buffer).Storage().CopyLockedRangeOnly();
+  }
+
+  void DeviceVulkan::CopyLockedRangeOnly(IndexBuffer& buffer)
+  {
+    static_cast<IndexBufferVulkan&>(buffer).Storage().CopyLockedRangeOnly();
+  }
+
   bool DeviceVulkan::CopyVertexBufferRegion(
     VertexBuffer& destination, const std::uint32_t destinationOffset, VertexBuffer& source, const std::uint32_t sourceOffset,
     const std::uint32_t byteCount

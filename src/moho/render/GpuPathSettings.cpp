@@ -44,6 +44,14 @@ namespace moho
       &gpg::gal::gSharedBuffers
     );
 
+    /** Engine addition: `ren_LockedRangeOnly` (see gpg/gal/PlacedResources.h). */
+    TConVar<bool> gTConVar_ren_LockedRangeOnly(
+      "ren_LockedRangeOnly",
+      "Direct3D 12 / Vulkan: a dynamic buffer whose owner reads only what it just wrote copies only those bytes when "
+      "it is renamed (1, the default), or copies all of it (0). Read at each unlock.",
+      &gpg::gal::gLockedRangeOnly
+    );
+
     /** Engine addition: `ren_ReleaseBufferCopies` (see gpg/gal/PlacedResources.h). */
     TConVar<bool> gTConVar_ren_ReleaseBufferCopies(
       "ren_ReleaseBufferCopies",
