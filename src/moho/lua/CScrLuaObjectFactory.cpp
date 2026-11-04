@@ -16,6 +16,7 @@
 #include "lua/LuaTableIterator.h"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/FileWaitHandleSet.h"
+#include "moho/lua/ScriptChunkCache.h"
 
 // The Lua core's own table and string primitives (defined in lua/LuaObject.cpp), for SCR_Copy's
 // table walk.
@@ -144,6 +145,62 @@ namespace
       return destination.mType->SetLexical(destination, value.GetBoolean() ? "1" : "0");
     }
     return false;
+  }
+
+  bool sim_BlueprintTableShortcuts = true;
+  moho::TConVar<bool> gTConVar_sim_BlueprintTableShortcuts(
+    "sim_BlueprintTableShortcuts",
+    "Blueprint fields: a table is first built without the field's log context and set again inside it only if "
+    "something in it cannot be set (1, the default), or always built inside the context (0). Same values and "
+    "warnings either way.",
+    &sim_BlueprintTableShortcuts
+  );
+
+  /**
+   * Engine addition: SCR_LuaBuildObject for a field's table without the log context it formats for
+   * every table field, and without its warnings: it stops at the first value it cannot set and
+   * returns false, and the caller builds the field again in full, inside the context. Every write is
+   * an assignment from the table (array sizes included), so building it again gives the same object
+   * and the same warnings. Enum flag tables keep the full path.
+   */
+  [[nodiscard]] bool TryBuildQuietly(LuaPlus::LuaObject value, const gpg::RRef& destination)
+  {
+    if (!value.IsTable()) {
+      return TrySetPlainValue(value, destination);
+    }
+    if (destination.mType->IsEnumType()) {
+      return false;
+    }
+
+    if (const gpg::RIndexed* const indexedType = destination.mType->IsIndexed()) {
+      const int count = value.GetN();
+      if (static_cast<int>(indexedType->GetCount(destination.mObj)) != count) {
+        indexedType->SetCount(destination.mObj, count);
+      }
+      for (int index = 0; index < count; ++index) {
+        if (!TryBuildQuietly(value[index + 1], indexedType->SubscriptIndex(destination.mObj, index))) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // As SCR_LuaBuildObject with ignoreMissingFields, which every nested table is built with.
+    LuaPlus::LuaTableIterator iter(&value, 1);
+    while (!iter.m_isDone) {
+      std::string keyName;
+      if (!LuaObjectTryToString(LuaPlus::LuaObject(iter.GetKey()), keyName)) {
+        return false;
+      }
+      if (const gpg::RField* const field = destination.mType->GetFieldNamed(keyName.c_str())) {
+        const gpg::RRef fieldDestination{static_cast<std::uint8_t*>(destination.mObj) + field->mOffset, field->mType};
+        if (!TryBuildQuietly(LuaPlus::LuaObject(iter.GetValue()), fieldDestination)) {
+          return false;
+        }
+      }
+      iter.Next();
+    }
+    return true;
   }
 
   /**
@@ -1242,12 +1299,24 @@ namespace moho
     loadData.pendingTrailingNewline = false;
 
     const msvc8::string chunkName = gpg::STR_Printf("@%s", files.front().c_str());
-    const int loadStatus = lua_load(
-      state->m_state,
-      reinterpret_cast<lua_Chunkreader>(func_LoadConcat),
-      &loadData,
-      chunkName.c_str()
-    );
+    int loadStatus = 0;
+    if (SCR_ScriptChunkCacheActive()) {
+      // Engine addition (res_ScriptChunkCache): the text lua_load would stream, then its function
+      // from the script cache when that holds the same text.
+      std::string source;
+      std::size_t blockSize = 0;
+      while (const char* const block = ReadLoadConcatChunk(&loadData, &blockSize)) {
+        source.append(block, blockSize);
+      }
+      loadStatus = SCR_LoadScriptChunk(state->m_state, source, chunkName.c_str());
+    } else {
+      loadStatus = lua_load(
+        state->m_state,
+        reinterpret_cast<lua_Chunkreader>(func_LoadConcat),
+        &loadData,
+        chunkName.c_str()
+      );
+    }
     if (loadStatus != 0) {
       LuaPlus::LuaStackObject errorObject{};
       errorObject.m_state = state;
@@ -1425,10 +1494,14 @@ namespace moho
           };
 
           LuaPlus::LuaObject fieldValue(iter.GetValue());
-          // Engine addition: a plain value is set without the field's log context, whose
-          // formatted text cost a third of blueprint loading; one that fails is converted again
-          // inside the context, so its warning reads as before.
-          if (!sim_BlueprintFieldShortcuts || fieldValue.IsTable() || !TrySetPlainValue(fieldValue, fieldDestination)) {
+          // Engine addition: a plain value (sim_BlueprintFieldShortcuts) or a table
+          // (sim_BlueprintTableShortcuts) is set without the field's log context, whose formatted
+          // text cost a third of blueprint loading; one that fails is set again inside the
+          // context, so its warnings read as before.
+          const bool quietlySet = fieldValue.IsTable()
+            ? sim_BlueprintTableShortcuts && TryBuildQuietly(fieldValue, fieldDestination)
+            : sim_BlueprintFieldShortcuts && TrySetPlainValue(fieldValue, fieldDestination);
+          if (!quietlySet) {
             const msvc8::string fieldContext = gpg::STR_Printf(
               "Initializing field %s of %s at %p",
               keyName.c_str(),

@@ -67,6 +67,10 @@ namespace moho
   // or more after the one before it (waiting on a peer's data); 0 logs nothing.
   // Live.
   int32_t net_LogBeatWaitMs = 0;
+  // 1: data waiting in a connection's compression filter keeps its send deadline when another
+  // packet goes out first, so it leaves within net_SendDelay; 0: it waits for the next keepalive
+  // (2 s), as the binary does (a joining peer's first message, its Join). Live.
+  int32_t net_FlushDeadline = 1;
   // Diagnostics: every this many beats log the UDP connections' totals: packets,
   // bytes, resends, acks and mean ping; 0 logs nothing. Live.
   int32_t net_LogTraffic = 0;
@@ -114,6 +118,13 @@ namespace moho
       "net_LogBeatWaitMs",
       "Log each beat that became available this many ms or more after the previous one; 0 (default) logs nothing.",
       &net_LogBeatWaitMs
+    );
+
+    TConVar<int32_t> gTConVar_net_FlushDeadline(
+      "net_FlushDeadline",
+      "Data waiting to be compressed keeps its send deadline when another packet goes first (1, the default), or waits "
+      "for the next keepalive as the original does (0).",
+      &net_FlushDeadline
     );
 
     TConVar<int32_t> gTConVar_net_LogTraffic(

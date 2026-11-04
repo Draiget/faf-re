@@ -19,6 +19,7 @@
 #include "gpg/core/streams/FileStream.h"
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/ScriptChunkCache.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/console/CConCommand.h"
 
@@ -1007,6 +1008,7 @@ int moho::cfunc_DiskFindFilesL(
   }
 
   sPFWaitHandleSet->mHandle->EnumerateFiles(directory, pattern, true, &foundPaths);
+  SCR_PrecompileScripts(foundPaths); // engine addition (res_PrecompileScripts)
 
   lua_newtable(state->m_state);
   const int resultTableIndex = lua_gettop(state->m_state);
@@ -1661,6 +1663,19 @@ msvc8::string* moho::FWaitHandleSet::GetErrorString()
 
   thread_local msvc8::string sFallbackError{};
   return &sFallbackError;
+}
+
+bool moho::FWaitHandleSet::HasArchiveFolder(const gpg::StrArg sourcePath)
+{
+  msvc8::string prefix{};
+  gpg::STR_CanonizeFilename(&prefix, sourcePath);
+  prefix.append("\\", 1u);
+
+  Wait();
+  const FWHSZipEntryMap::iterator entry = mZipEntries.lower_bound(prefix);
+  const bool found = entry != mZipEntries.end() && gpg::STR_StartsWith(entry->first.c_str(), prefix.c_str());
+  Notify();
+  return found;
 }
 
 /**

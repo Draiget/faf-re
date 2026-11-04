@@ -3,6 +3,7 @@
 #include <Windows.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -36,6 +37,24 @@ namespace moho
     &res_CacheFileLookups
   );
 
+  bool res_LoadDirectoryCache = true;
+
+  TConVar<bool> gTConVar_res_LoadDirectoryCache(
+    "res_LoadDirectoryCache",
+    "During a session load, remember which folders of each mount are missing and look for no file in them "
+    "(1, the default), or ask every mount for every file (0). Same files found either way.",
+    &res_LoadDirectoryCache
+  );
+
+  bool res_ZipListPrefixFirst = true;
+
+  TConVar<bool> gTConVar_res_ZipListPrefixFirst(
+    "res_ZipListPrefixFirst",
+    "When listing an archive's files (DiskFindFiles), test each entry's name against the folder before copying and "
+    "lowering it (1, the default), or copy and lower every entry first (0). The same files listed either way.",
+    &res_ZipListPrefixFirst
+  );
+
   int res_EnumOrderFuzz = -1;
 
   TConVar<int> gTConVar_res_EnumOrderFuzz(
@@ -63,6 +82,56 @@ namespace moho
 
 namespace
 {
+  /// Engine addition (`res_LoadDirectoryCache`): moves on whenever the lookups are invalidated.
+  std::atomic<std::uint64_t> gLoadDirectoryGeneration{0};
+
+  /// Engine addition (`res_LoadDirectoryCache`): what this thread learnt about folders in its
+  /// DiskLookupBatch, by path as FindFile builds it (on disk, or through an archive): true when the
+  /// folder is there.
+  struct SLoadDirectories
+  {
+    int batchDepth = 0;
+    std::uint64_t generation = 0;
+    std::unordered_map<std::string, bool> exists;
+  };
+  thread_local SLoadDirectories tLoadDirectories;
+
+  /**
+   * Whether `directory` (a path below the mount's `root`, no trailing separator) is there, from what
+   * this thread learnt in its batch or else from the mount: the archive's entries (`archive`), or
+   * the disk. A folder whose parent is missing is missing without asking. The root itself counts as
+   * there: FindFile then asks for the file as it would have.
+   */
+  [[nodiscard]] bool LoadDirectoryExists(const std::string_view directory, const std::string_view root, const bool archive)
+  {
+    if (directory.size() <= root.size()) {
+      return true;
+    }
+    const std::uint64_t generation = gLoadDirectoryGeneration.load(std::memory_order_acquire);
+    if (tLoadDirectories.generation != generation) {
+      tLoadDirectories.exists.clear();
+      tLoadDirectories.generation = generation;
+    }
+    std::string key(directory);
+    if (const auto known = tLoadDirectories.exists.find(key); known != tLoadDirectories.exists.end()) {
+      return known->second;
+    }
+
+    bool exists = false;
+    const std::size_t separator = directory.find_last_of('\\');
+    if (separator == std::string_view::npos || LoadDirectoryExists(directory.substr(0, separator), root, archive)) {
+      if (archive) {
+        moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
+        exists = waitHandleSet == nullptr || waitHandleSet->HasArchiveFolder(key.c_str());
+      } else {
+        const DWORD attributes = ::GetFileAttributesW(gpg::STR_Utf8ToWide(key.c_str()).c_str());
+        exists = attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+      }
+    }
+    tLoadDirectories.exists.emplace(std::move(key), exists);
+    return exists;
+  }
+
   /**
    * Engine addition (`res_CacheFileLookups`): `CVFSImpl::FindFile`'s answers, by lower-cased
    * mounted path.
@@ -96,6 +165,7 @@ namespace
       mFileSystem = nullptr;
       mFound.clear();
       ++mGeneration;
+      gLoadDirectoryGeneration.fetch_add(1u, std::memory_order_acq_rel);
     }
 
     /**
@@ -158,6 +228,18 @@ namespace
 void moho::DISK_InvalidateFileLookups()
 {
   MountedFileLookups().Invalidate();
+}
+
+moho::DiskLookupBatch::DiskLookupBatch() noexcept
+{
+  ++tLoadDirectories.batchDepth;
+}
+
+moho::DiskLookupBatch::~DiskLookupBatch()
+{
+  if (--tLoadDirectories.batchDepth == 0) {
+    tLoadDirectories.exists.clear();
+  }
 }
 
 namespace
@@ -397,6 +479,30 @@ namespace
   }
 
   /**
+   * Whether `name`, lowered as STR_ToLower lowers it and with '\\' as '/', starts with `prefix`
+   * (`prefixLength` characters, already in that form), without building that string.
+   */
+  [[nodiscard]] bool CanonicalNameStartsWith(const msvc8::string& name, const char* const prefix, const std::size_t prefixLength)
+  {
+    const char* const text = name.c_str();
+    for (std::size_t index = 0; index < prefixLength; ++index) {
+      char c = text[index];
+      if (c == '\0') {
+        return false;
+      }
+      if (c >= 'A' && c <= 'Z') {
+        c = static_cast<char>(c + ('a' - 'A'));
+      } else if (c == '\\') {
+        c = '/';
+      }
+      if (c != prefix[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
    * Address: 0x00467380 (FUN_00467380, sub_467380)
    *
    * What it does:
@@ -419,6 +525,11 @@ namespace
     const std::size_t prefixLength = std::strlen(relativePrefix);
     const std::size_t entryCount = zipFile->mEntries.size();
     for (std::size_t entryIndex = 0; entryIndex < entryCount; ++entryIndex) {
+      // Engine addition (res_ZipListPrefixFirst): an entry outside the prefix is passed over before
+      // its lowered copy is made.
+      if (moho::res_ZipListPrefixFirst && !CanonicalNameStartsWith(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)), relativePrefix, prefixLength)) {
+        continue;
+      }
       msvc8::string entryPath = gpg::STR_ToLower(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)).c_str());
       gpg::STR_Replace(entryPath, "\\", "/", -1);
 
@@ -463,6 +574,11 @@ namespace
     const std::size_t prefixLength = std::strlen(relativePrefix);
     const std::size_t entryCount = zipFile->mEntries.size();
     for (std::size_t entryIndex = 0; entryIndex < entryCount; ++entryIndex) {
+      // Engine addition (res_ZipListPrefixFirst): an entry outside the prefix is passed over before
+      // its lowered copy is made.
+      if (moho::res_ZipListPrefixFirst && !CanonicalNameStartsWith(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)), relativePrefix, prefixLength)) {
+        continue;
+      }
       msvc8::string entryPath = gpg::STR_ToLower(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)).c_str());
       gpg::STR_Replace(entryPath, "\\", "/", -1);
 
@@ -903,6 +1019,16 @@ namespace moho
       for (std::size_t index = mountpoint.mDir.size(); index < diskPath.size(); ++index) {
         if (diskPath[index] == '/') {
           diskPath[index] = '\\';
+        }
+      }
+
+      // Engine addition (res_LoadDirectoryCache): no file in a folder this load knows is missing.
+      if (res_LoadDirectoryCache && tLoadDirectories.batchDepth > 0) {
+        const std::string_view path = diskPath.view();
+        const std::size_t separator = path.find_last_of('\\');
+        if (separator != std::string_view::npos &&
+            !LoadDirectoryExists(path.substr(0, separator), mountpoint.mDir.view(), mountpoint.mZipHandle != nullptr)) {
+          continue;
         }
       }
 

@@ -24,6 +24,8 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/Error.hpp"
 #include "moho/audio/AudioEngine.h"
+#include "moho/lua/ScriptChunkCache.h"
+#include "moho/render/d3d/CD3DFont.h"
 #include "moho/console/CConCommand.h"
 #include "moho/audio/IUserSoundManager.h"
 #include "moho/audio/SofdecRuntime.h"
@@ -1025,6 +1027,11 @@ bool CScApp::Init()
     moho::USER_LoadPreferences(msvc8::string("Game.prefs"));
   }
 
+  // Engine addition (res_UiScriptChunkCache): the user interface's scripts from compiled chunks.
+  moho::SCR_BeginUiScriptChunkCache();
+  // Engine addition (snd_CreateEarly): the audio engine comes up alongside the device below.
+  moho::USER_StartSoundEarly();
+
   // The user-side Lua bootstrap, which the binary runs here: after
   // USER_LoadPreferences ("SCMain AppInit 2") and before OpenDocuments and
   // UI_Init ("AppInit 4" and "AppInit 6"). It must precede UI_Init, because
@@ -1090,6 +1097,7 @@ bool CScApp::Init()
   // the tail of CreateDevice, where this tree used to call it. CreateDevice
   // (0x008D0370) ends at func_SetupBasicMovieManager and never calls this.
   moho::OPTIONS_Apply();
+  moho::USER_FinishSoundEarly();
 
   // Single windowed head only: optionally pin the cursor to the client area.
   if (context->GetHeadCount() == 1 && context->GetHead(0).mWindowed) {
@@ -1213,6 +1221,8 @@ void CScApp::Main()
   }
 
   moho::UI_ProcessIdleGC();
+  moho::REN_SaveGlyphCache(false); // engine addition (ren_GlyphCache)
+  moho::SCR_FlushUiScriptChunkCache(false); // engine addition (res_UiScriptChunkCache)
 
   if (initialized == 0) {
     InitializeSessionFromCommandLine();
@@ -1253,6 +1263,8 @@ void CScApp::Destroy()
     gpg::Warnf("unable to reset screensaver");
   }
 
+  moho::REN_SaveGlyphCache(true); // engine addition (ren_GlyphCache)
+  moho::SCR_FlushUiScriptChunkCache(true); // engine addition (res_UiScriptChunkCache)
   moho::WLD_Teardown();
   moho::GPGNET_Shutdown();
   moho::UI_Exit();

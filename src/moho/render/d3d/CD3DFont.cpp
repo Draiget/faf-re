@@ -4,15 +4,22 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <cstdio>
+#include <cstring>
 #include <limits>
+#include <atomic>
 #include <map>
+#include <mutex>
 #include <new>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/LocalCache.h"
+#include "gpg/gal/effects/EffectRuntime.h"
 #include "moho/console/CConCommand.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/textures/DXTCodec.h"
@@ -34,6 +41,273 @@ namespace moho
       "GetPixel per pixel (0), which cost tens of ms when a frame met many new characters.",
       &ren_GlyphBitmapRead
     );
+
+    /**
+     * Engine addition: `ren_GlyphCache`. A character's glyph (its DXT5 blocks and metrics), once
+     * rasterized through GDI, is kept in glyph-cache.bin in the local cache directory, so later
+     * launches take it from there instead of rasterizing it again. An entry is keyed by the font
+     * (the face GDI selected, its text metrics and its 'head' table: revision, checksum, dates), the
+     * character, and what else decides GDI's output (the Windows build and its font smoothing
+     * settings) and this executable. The session's first glyph from the cache is rasterized too and
+     * compared; any difference drops the cache for good. (Not one per font: a font's first glyph
+     * makes GDI realize the font, most of a lobby's glyph time when each of ~30 fonts did it.)
+     */
+    bool ren_GlyphCache = true;
+
+    TConVar<bool> gTConVar_ren_GlyphCache(
+      "ren_GlyphCache",
+      "Take a character's glyph from the glyph cache kept with the shaders when an earlier launch rasterized it "
+      "(1, the default), or rasterize every glyph through GDI (0). The same glyphs either way.",
+      &ren_GlyphCache
+    );
+
+    using gpg::gal::effects::Fnv1a64;
+
+    template <class T>
+    void AddValue(Fnv1a64& hash, const T& value) noexcept
+    {
+      hash.Add(&value, sizeof(value));
+    }
+
+    /// What besides the font decides GDI's output, and this executable: hashed once.
+    [[nodiscard]] std::uint64_t GlyphEnvironment()
+    {
+      static const std::uint64_t sEnvironment = [] {
+        Fnv1a64 hash;
+        AddValue(hash, gpg::ExecutableIdentity());
+        using RtlGetVersionFn = LONG(WINAPI*)(OSVERSIONINFOW*);
+        OSVERSIONINFOW version{};
+        version.dwOSVersionInfoSize = sizeof(version);
+        if (const HMODULE ntdll = GetModuleHandleW(L"ntdll.dll"); ntdll != nullptr) {
+          if (const auto rtlGetVersion = reinterpret_cast<RtlGetVersionFn>(GetProcAddress(ntdll, "RtlGetVersion"))) {
+            (void)rtlGetVersion(&version);
+          }
+        }
+        AddValue(hash, version.dwMajorVersion);
+        AddValue(hash, version.dwMinorVersion);
+        AddValue(hash, version.dwBuildNumber);
+        for (const UINT action : {SPI_GETFONTSMOOTHING, SPI_GETFONTSMOOTHINGTYPE, SPI_GETFONTSMOOTHINGCONTRAST,
+                                  SPI_GETFONTSMOOTHINGORIENTATION}) {
+          UINT value = 0;
+          (void)SystemParametersInfoW(action, 0, &value, 0);
+          AddValue(hash, value);
+        }
+        return hash.Value();
+      }();
+      return sEnvironment;
+    }
+
+    /// One cached glyph: what GetCharInfo builds its SCharInfo from.
+    struct SCachedGlyph
+    {
+      std::uint16_t mBlockWidth = 0;
+      std::uint16_t mBlockHeight = 0;
+      float mV2 = 0.0f;
+      float mV3 = 0.0f;
+      float mV4 = 0.0f;
+      float mV5 = 0.0f;
+      float mAdvance = 0.0f;
+      std::vector<std::uint64_t> mBlocks;
+
+      [[nodiscard]] bool operator==(const SCachedGlyph& other) const
+      {
+        return mBlockWidth == other.mBlockWidth && mBlockHeight == other.mBlockHeight && mV2 == other.mV2 &&
+          mV3 == other.mV3 && mV4 == other.mV4 && mV5 == other.mV5 && mAdvance == other.mAdvance &&
+          mBlocks == other.mBlocks;
+      }
+    };
+
+    /**
+     * glyph-cache.bin: "FAFGLYP1", the environment hash, then entries {u64 key, u16 width, u16
+     * height, 5 floats, u32 block count, the blocks}. Read on first use, written whole (to a temporary
+     * file, then moved over the old one) a few seconds after the last glyph was added, and at exit.
+     */
+    class GlyphCacheStore
+    {
+    public:
+      [[nodiscard]] const SCachedGlyph* Find(const std::uint64_t key)
+      {
+        const std::lock_guard<std::mutex> lock(mLock);
+        LoadLocked();
+        const auto found = mGlyphs.find(key);
+        return found != mGlyphs.end() ? &found->second : nullptr;
+      }
+
+      void Add(const std::uint64_t key, SCachedGlyph glyph)
+      {
+        const std::lock_guard<std::mutex> lock(mLock);
+        LoadLocked();
+        mGlyphs.insert_or_assign(key, std::move(glyph));
+        mDirty = true;
+        mLastAdd = GetTickCount64();
+      }
+
+      void Drop()
+      {
+        const std::lock_guard<std::mutex> lock(mLock);
+        mGlyphs.clear();
+        mDirty = false;
+        if (const std::string path = PathLocked(); !path.empty()) {
+          (void)DeleteFileA(path.c_str());
+        }
+      }
+
+      void SaveIfIdle(const bool now)
+      {
+        const std::lock_guard<std::mutex> lock(mLock);
+        if (!mDirty || (!now && GetTickCount64() - mLastAdd < 3000u)) {
+          return;
+        }
+        mDirty = false;
+        const std::string path = PathLocked();
+        if (path.empty()) {
+          return;
+        }
+        // Another process (the other game of a local test, say) may have written glyphs this one
+        // never met since this one read the file: they are kept.
+        ReadFileLocked(path, mGlyphs);
+        const std::string temporary = path + "." + std::to_string(GetCurrentProcessId()) + ".tmp"; // each process its own
+        std::FILE* const out = std::fopen(temporary.c_str(), "wb");
+        if (out == nullptr) {
+          return;
+        }
+        bool written = std::fwrite("FAFGLYP1", 1, 8, out) == 8;
+        const std::uint64_t environment = GlyphEnvironment();
+        written = written && std::fwrite(&environment, sizeof(environment), 1, out) == 1;
+        for (const auto& [key, glyph] : mGlyphs) {
+          const std::uint32_t count = static_cast<std::uint32_t>(glyph.mBlocks.size());
+          const float metrics[] = {glyph.mV2, glyph.mV3, glyph.mV4, glyph.mV5, glyph.mAdvance};
+          written = written && std::fwrite(&key, sizeof(key), 1, out) == 1 &&
+            std::fwrite(&glyph.mBlockWidth, sizeof(glyph.mBlockWidth), 1, out) == 1 &&
+            std::fwrite(&glyph.mBlockHeight, sizeof(glyph.mBlockHeight), 1, out) == 1 &&
+            std::fwrite(metrics, sizeof(metrics), 1, out) == 1 && std::fwrite(&count, sizeof(count), 1, out) == 1 &&
+            (count == 0 || std::fwrite(glyph.mBlocks.data(), sizeof(std::uint64_t), count, out) == count);
+        }
+        written = std::fclose(out) == 0 && written;
+        if (!written || !MoveFileExA(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+          (void)DeleteFileA(temporary.c_str());
+        }
+      }
+
+    private:
+      [[nodiscard]] std::string PathLocked() const
+      {
+        const std::string& directory = gpg::LocalCacheDirectory();
+        return directory.empty() ? std::string{} : directory + "glyph-cache.bin";
+      }
+
+      void LoadLocked()
+      {
+        if (mLoaded) {
+          return;
+        }
+        mLoaded = true;
+        if (const std::string path = PathLocked(); !path.empty()) {
+          ReadFileLocked(path, mGlyphs);
+        }
+      }
+
+      /// A glyph as GetCharInfo makes them: 4 to 128 pixels each way in steps of 4, two blocks per 4x4.
+      [[nodiscard]] static bool IsGlyphShape(const std::uint16_t width, const std::uint16_t height, const std::uint32_t count)
+      {
+        const auto fits = [](const std::uint16_t size) { return size >= 4u && size <= 128u && size % 4u == 0u; };
+        return fits(width) && fits(height) && count == (width / 4u) * (height / 4u) * 2u;
+      }
+
+      /// Adds the file's glyphs that `glyphs` does not hold yet; stops at the first damaged entry.
+      static void ReadFileLocked(const std::string& path, std::unordered_map<std::uint64_t, SCachedGlyph>& glyphs)
+      {
+        std::FILE* const in = std::fopen(path.c_str(), "rb");
+        if (in == nullptr) {
+          return;
+        }
+        char magic[8] = {};
+        std::uint64_t environment = 0;
+        if (std::fread(magic, 1, 8, in) == 8 && std::memcmp(magic, "FAFGLYP1", 8) == 0 &&
+            std::fread(&environment, sizeof(environment), 1, in) == 1 && environment == GlyphEnvironment()) {
+          for (;;) {
+            std::uint64_t key = 0;
+            SCachedGlyph glyph;
+            float metrics[5] = {};
+            std::uint32_t count = 0;
+            if (std::fread(&key, sizeof(key), 1, in) != 1 ||
+                std::fread(&glyph.mBlockWidth, sizeof(glyph.mBlockWidth), 1, in) != 1 ||
+                std::fread(&glyph.mBlockHeight, sizeof(glyph.mBlockHeight), 1, in) != 1 ||
+                std::fread(metrics, sizeof(metrics), 1, in) != 1 || std::fread(&count, sizeof(count), 1, in) != 1 ||
+                !IsGlyphShape(glyph.mBlockWidth, glyph.mBlockHeight, count)) {
+              break;
+            }
+            glyph.mBlocks.resize(count);
+            if (count != 0 && std::fread(glyph.mBlocks.data(), sizeof(std::uint64_t), count, in) != count) {
+              break;
+            }
+            glyph.mV2 = metrics[0];
+            glyph.mV3 = metrics[1];
+            glyph.mV4 = metrics[2];
+            glyph.mV5 = metrics[3];
+            glyph.mAdvance = metrics[4];
+            glyphs.emplace(key, std::move(glyph));
+          }
+        }
+        std::fclose(in);
+      }
+
+      std::mutex mLock;
+      bool mLoaded = false;
+      bool mDirty = false;
+      std::uint64_t mLastAdd = 0;
+      std::unordered_map<std::uint64_t, SCachedGlyph> mGlyphs;
+    };
+
+    // Never destroyed: fonts outlive static destruction order.
+    GlyphCacheStore& GlyphCache()
+    {
+      static auto* const store = new GlyphCacheStore();
+      return *store;
+    }
+
+    std::atomic<bool> gGlyphCacheVerified{false}; // the session's first cached glyph matched its rasterization
+
+    /// Each live font's identity for the glyph cache (0: not cached).
+    std::mutex gFontIdentityLock;
+    std::unordered_map<const void*, std::uint64_t>& FontIdentities()
+    {
+      static auto* const identities = new std::unordered_map<const void*, std::uint64_t>();
+      return *identities;
+    }
+
+    /// The identity of the font selected into `dc`: its face, text metrics and 'head' table.
+    [[nodiscard]] std::uint64_t ComputeFontIdentity(HDC const dc)
+    {
+      constexpr DWORD kHeadTable = 0x64616568u; // 'head'
+      const DWORD headSize = GetFontData(dc, kHeadTable, 0, nullptr, 0);
+      if (headSize == GDI_ERROR || headSize == 0 || headSize > 4096u) {
+        return 0;
+      }
+      std::vector<unsigned char> head(headSize);
+      if (GetFontData(dc, kHeadTable, 0, head.data(), headSize) != headSize) {
+        return 0;
+      }
+      wchar_t face[LF_FACESIZE] = {};
+      const int faceLength = GetTextFaceW(dc, LF_FACESIZE, face);
+      TEXTMETRICW metrics{};
+      if (faceLength <= 0 || !GetTextMetricsW(dc, &metrics)) {
+        return 0;
+      }
+      Fnv1a64 hash;
+      hash.Add(face, static_cast<std::size_t>(faceLength) * sizeof(wchar_t));
+      AddValue(hash, metrics);
+      hash.Add(head.data(), head.size());
+      return hash.Value() | 1u; // never 0
+    }
+
+    [[nodiscard]] std::uint64_t GlyphKey(const std::uint64_t font, const wchar_t character)
+    {
+      Fnv1a64 hash;
+      AddValue(hash, font);
+      AddValue(hash, static_cast<std::uint32_t>(character));
+      return hash.Value();
+    }
 
     /**
      * The `sampleWidth` x `sampleHeight` corner of the 32-bit scratch bitmap as GetPixel
@@ -715,6 +989,13 @@ namespace moho
     mOverhang = static_cast<float>(metrics.tmOverhang);
     mIsTruetype = (metrics.tmPitchAndFamily & TMPF_TRUETYPE) != 0;
 
+    // Engine addition (ren_GlyphCache): which font this is, for the cached glyphs.
+    if (ren_GlyphCache) {
+      const std::uint64_t identity = ComputeFontIdentity(mDeviceContext);
+      const std::lock_guard<std::mutex> lock(gFontIdentityLock);
+      FontIdentities()[this] = identity;
+    }
+
     const int kerningPairCount = GetKerningPairsW(mDeviceContext, 0, nullptr);
     if (kerningPairCount <= 0) {
       return;
@@ -761,6 +1042,11 @@ namespace moho
    */
   CD3DFont::~CD3DFont()
   {
+    {
+      const std::lock_guard<std::mutex> lock(gFontIdentityLock);
+      FontIdentities().erase(this);
+    }
+
     // FUN_004272F0: the member-empty `operator=` release of the kerning vector.
     mKerningPairs = CD3DFont::KerningPairVector{};
     DestroyGlyphPageCache(mCharInfo);
@@ -803,6 +1089,40 @@ namespace moho
     SCharInfo& charInfo = page[static_cast<std::uint8_t>(chText & 0xFFu)];
     if (charInfo.mTex || mDeviceContext == nullptr) {
       return charInfo;
+    }
+
+    // Engine addition (ren_GlyphCache): the glyph an earlier launch rasterized; the session's first
+    // one is rasterized below as well and compared.
+    std::uint64_t glyphKey = 0;
+    bool verifyCached = false;
+    SCachedGlyph cachedGlyph;
+    if (ren_GlyphCache) {
+      std::uint64_t fontIdentity = 0;
+      {
+        const std::lock_guard<std::mutex> lock(gFontIdentityLock);
+        const auto found = FontIdentities().find(this);
+        if (found != FontIdentities().end()) {
+          fontIdentity = found->second;
+        }
+      }
+      if (fontIdentity != 0) {
+        glyphKey = GlyphKey(fontIdentity, chText);
+        if (const SCachedGlyph* const cached = GlyphCache().Find(glyphKey); cached != nullptr) {
+          if (gGlyphCacheVerified.load(std::memory_order_relaxed)) {
+            charInfo.mTex = CD3DBatchTexture::FromDXT5(
+              cached->mBlockWidth, cached->mBlockHeight, cached->mBlocks.data(), 16u * (cached->mBlockWidth / 4u)
+            );
+            charInfo.mV2 = cached->mV2;
+            charInfo.mV3 = cached->mV3;
+            charInfo.mV4 = cached->mV4;
+            charInfo.mV5 = cached->mV5;
+            charInfo.mAdvance = cached->mAdvance;
+            return charInfo;
+          }
+          verifyCached = true;
+          cachedGlyph = *cached;
+        }
+      }
     }
 
     (void)SetTextAlign(mDeviceContext, 0x18u);
@@ -1012,6 +1332,30 @@ namespace moho
     charInfo.mV4 = static_cast<float>((xMin + blockWidth) - baselineX);
     charInfo.mV5 = static_cast<float>(baselineAscent - yMin);
     charInfo.mAdvance = advance;
+
+    if (glyphKey != 0 && ren_GlyphCache) {
+      SCachedGlyph rasterized;
+      rasterized.mBlockWidth = static_cast<std::uint16_t>(blockWidth);
+      rasterized.mBlockHeight = static_cast<std::uint16_t>(blockHeight);
+      rasterized.mV2 = charInfo.mV2;
+      rasterized.mV3 = charInfo.mV3;
+      rasterized.mV4 = charInfo.mV4;
+      rasterized.mV5 = charInfo.mV5;
+      rasterized.mAdvance = charInfo.mAdvance;
+      rasterized.mBlocks = std::move(dxt5Blocks);
+      if (verifyCached) {
+        if (rasterized == cachedGlyph) {
+          gGlyphCacheVerified = true;
+        } else {
+          gpg::Warnf("CD3DFont: a cached glyph (u+%04x) differs from its rasterization; glyphs are rasterized from now on",
+                     static_cast<unsigned int>(chText));
+          ren_GlyphCache = false;
+          GlyphCache().Drop();
+        }
+      } else {
+        GlyphCache().Add(glyphKey, std::move(rasterized));
+      }
+    }
     return charInfo;
   }
 
@@ -1130,6 +1474,13 @@ namespace moho
       encoded = gpg::STR_DecodeUtf8Char(encoded, codepoint);
     }
     return index;
+  }
+
+  void REN_SaveGlyphCache(const bool now)
+  {
+    if (ren_GlyphCache) {
+      GlyphCache().SaveIfIdle(now);
+    }
   }
 
   /**

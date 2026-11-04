@@ -3,16 +3,22 @@
 
 #include <cfloat>
 #include <cstring>
+#include <exception>
 #include <new>
+#include <optional>
+#include <thread>
 
 #include "boost/thread.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "lua/LuaObject.h"
+#include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/ScriptChunkCache.h"
 #include "moho/misc/ScrDebugHooks.h"
 #include "moho/sim/CBackgroundTaskControl.h"
+#include "moho/sim/CVFSImpl.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/misc/CZipFile.h"
@@ -31,6 +37,14 @@ namespace moho
 
   namespace
   {
+    bool wld_LoadMapEarly = true;
+    TConVar<bool> gTConVar_wld_LoadMapEarly(
+      "wld_LoadMapEarly",
+      "Load the map on a helper thread while the rules are built (1, the default), or after SessionInit.lua as the "
+      "binary does (0). The same map either way.",
+      &wld_LoadMapEarly
+    );
+
     bool IsInterlockedLoadingEnabled()
     {
 #if defined(_WIN32)
@@ -78,6 +92,90 @@ namespace moho
     bool gSessionKeepsBlueprints = true;
 
     /**
+     * Steps 2 and 3 of the session load: the session's own Lua state, with the same two binding
+     * sets the front end gets, in the same order: engine core bindings first, then user ones.
+     */
+    void CreateSessionLuaState(SWldScenarioInfo* const scenario, CBackgroundTaskControl* const loadControl)
+    {
+      {
+        const std::string marker(" World Session Load 2", 21u);
+        (void)marker;
+      }
+
+      auto* const createdState = new LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
+      if (LuaPlus::LuaState* const previousState = scenario->mState;
+          createdState != previousState && previousState != nullptr) {
+        delete previousState;
+      }
+      scenario->mState = createdState;
+      lua::NameLuaVm(createdState->m_state, "Lobby"); // diagnostics label only
+
+      {
+        const std::string marker(" World Session Load 3", 21u);
+        (void)marker;
+      }
+
+      RunLuaInitFormSet("Core", scenario->mState);
+      RunLuaInitFormSet("User", scenario->mState);
+
+      if (SCR_IsDebugWindowActive()) {
+        lua_sethook(scenario->mState->m_state, DebugLuaHook, LUA_MASKLINE, 0);
+      }
+      AdvanceLoadingProgress(loadControl);
+    }
+
+    /**
+     * Engine addition (`wld_LoadMapEarly`): the map load on a helper thread while the rules are
+     * built. It reads only the map file and runs `/lua/TerrainTypes.lua` in a table of its own in
+     * the session's Lua state, which nothing else uses until the rules are done, so the session's
+     * state is created first and the load joins the helper before anything else uses that state.
+     * An exception the helper throws (a cancelled load) is thrown again on the loader thread.
+     */
+    class EarlyMapLoad
+    {
+    public:
+      EarlyMapLoad(SWldScenarioInfo* const scenario, CBackgroundTaskControl* const loadControl)
+        : mMap(new CWldMap())
+      {
+        mThread = std::thread([this, scenario, loadControl] {
+          gpg::SetThreadName(0xFFFFFFFFu, "Map load");
+          platform::SetX87PrecisionControl(_PC_24); // as the loader thread, see WorldSessionUserLoad
+          try {
+            mLoaded = mMap->MapLoad(scenario->mMapName.c_str(), scenario->mState, false, *loadControl);
+          } catch (...) {
+            mError = std::current_exception();
+          }
+        });
+      }
+
+      ~EarlyMapLoad()
+      {
+        if (mThread.joinable()) {
+          mThread.join();
+        }
+      }
+
+      EarlyMapLoad(const EarlyMapLoad&) = delete;
+      EarlyMapLoad& operator=(const EarlyMapLoad&) = delete;
+
+      /** Waits for the helper; the map when it loaded, else null. */
+      [[nodiscard]] CWldMap* Finish()
+      {
+        mThread.join();
+        if (mError) {
+          std::rethrow_exception(mError);
+        }
+        return mLoaded ? mMap.release() : nullptr;
+      }
+
+    private:
+      msvc8::auto_ptr<CWldMap> mMap;
+      std::thread mThread;
+      std::exception_ptr mError;
+      bool mLoaded = false;
+    };
+
+    /**
      * Address: 0x00885DE0 (FUN_00885DE0, func_WorldSessionUserLoad)
      *
      * IDA signature:
@@ -114,12 +212,24 @@ namespace moho
       platform::SetX87PrecisionControl(_PC_24);
 
       // Engine addition: the load reads thousands of archive entries; each archive stays open
-      // between them until the load is done (CZipFileReadBatch).
+      // between them until the load is done (CZipFileReadBatch). And it looks for each script and
+      // blueprint under every hook folder, which a missing folder answers (DiskLookupBatch), and
+      // compiles each of them, which the script cache answers when the source is unchanged.
       const CZipFileReadBatch archiveReads;
+      const DiskLookupBatch diskLookups;
+      const ScriptChunkCacheBatch scriptChunks;
 
       {
         const std::string marker(" World Session Load 1", 21u);
         (void)marker;
+      }
+
+      // Engine addition (wld_LoadMapEarly): the session's state first, and the map loading in it
+      // on a helper thread while the rules are built.
+      std::optional<EarlyMapLoad> earlyMap;
+      if (wld_LoadMapEarly) {
+        CreateSessionLuaState(scenario, loadControl);
+        earlyMap.emplace(scenario, loadControl);
       }
 
       RRuleGameRules* const createdRules = RRuleGameRules::Create(scenario->mGameMods, loadControl);
@@ -130,33 +240,12 @@ namespace moho
       scenario->mGameRules = createdRules;
       AdvanceLoadingProgress(loadControl);
 
-      {
-        const std::string marker(" World Session Load 2", 21u);
-        (void)marker;
+      CWldMap* loadedEarly = nullptr;
+      if (earlyMap) {
+        loadedEarly = earlyMap->Finish();
+      } else {
+        CreateSessionLuaState(scenario, loadControl);
       }
-
-      auto* const createdState = new LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
-      if (LuaPlus::LuaState* const previousState = scenario->mState;
-          createdState != previousState && previousState != nullptr) {
-        delete previousState;
-      }
-      scenario->mState = createdState;
-      lua::NameLuaVm(createdState->m_state, "Lobby"); // diagnostics label only
-
-      {
-        const std::string marker(" World Session Load 3", 21u);
-        (void)marker;
-      }
-
-      // The session's Lua state gets the same two binding sets the front end
-      // gets, in the same order: engine core bindings first, then user ones.
-      RunLuaInitFormSet("Core", scenario->mState);
-      RunLuaInitFormSet("User", scenario->mState);
-
-      if (SCR_IsDebugWindowActive()) {
-        lua_sethook(scenario->mState->m_state, DebugLuaHook, LUA_MASKLINE, 0);
-      }
-      AdvanceLoadingProgress(loadControl);
 
       {
         const std::string marker(" World Session Load 4", 21u);
@@ -184,8 +273,8 @@ namespace moho
         (void)marker;
       }
 
-      msvc8::auto_ptr<CWldMap> loadedMap(new CWldMap());
-      if (loadedMap->MapLoad(scenario->mMapName.c_str(), scenario->mState, false, *loadControl)) {
+      msvc8::auto_ptr<CWldMap> loadedMap(earlyMap ? loadedEarly : new CWldMap());
+      if (earlyMap ? loadedEarly != nullptr : loadedMap->MapLoad(scenario->mMapName.c_str(), scenario->mState, false, *loadControl)) {
         CWldMap* const acceptedMap = loadedMap.release();
         if (CWldMap* const previousMap = scenario->mWldMap;
             acceptedMap != previousMap && previousMap != nullptr) {

@@ -273,6 +273,12 @@ namespace moho
     bool GetFileInfo(gpg::StrArg sourcePath, SDiskFileInfo* outInfo, bool realOnly);
 
     /**
+     * Engine addition (`res_LoadDirectoryCache`): whether any mounted archive entry lies under the
+     * folder `sourcePath`, a path through an archive as CVFSImpl::FindFile builds it.
+     */
+    [[nodiscard]] bool HasArchiveFolder(gpg::StrArg sourcePath);
+
+    /**
      * Address: 0x00459300 (FUN_00459300, Moho::FWaitHandleSet::ReadFile)
      *
      * What it does:

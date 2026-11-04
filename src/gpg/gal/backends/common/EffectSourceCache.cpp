@@ -15,6 +15,7 @@
 #include <string_view>
 #include <thread>
 
+#include "gpg/core/utils/LocalCache.h"
 #include "gpg/gal/EffectContext.hpp"
 #include "gpg/gal/backends/common/BackendErrors.h"
 #include "gpg/gal/effects/EffectRuntime.h"
@@ -41,24 +42,6 @@ namespace gpg::gal::effects
     std::mutex gWaitingLock;
     std::map<std::uint64_t, d3d11::TranslatedEffectSource> gWaiting;
     thread_local bool tPreparing = false; // on a PrepareEffectSources worker
-
-    // This executable's size and last write time: a rebuild gets a cache of its own.
-    [[nodiscard]] std::uint64_t ExecutableIdentity()
-    {
-      static const std::uint64_t identity = [] {
-        Fnv1a64 hash;
-        wchar_t path[MAX_PATH]{};
-        WIN32_FILE_ATTRIBUTE_DATA data{};
-        const DWORD length = ::GetModuleFileNameW(nullptr, path, MAX_PATH);
-        if (length != 0U && length < MAX_PATH && ::GetFileAttributesExW(path, GetFileExInfoStandard, &data)) {
-          hash.Add(&data.nFileSizeHigh, sizeof(data.nFileSizeHigh));
-          hash.Add(&data.nFileSizeLow, sizeof(data.nFileSizeLow));
-          hash.Add(&data.ftLastWriteTime, sizeof(data.ftLastWriteTime));
-        }
-        return hash.Value();
-      }();
-      return identity;
-    }
 
     // Cached as the notes, one per line, a NUL, then the source.
     [[nodiscard]] bool ReadTranslation(const std::uint64_t key, d3d11::TranslatedEffectSource& out)
@@ -122,7 +105,7 @@ namespace gpg::gal::effects
 
     Fnv1a64 hash;
     hash.Add(kTranslationCacheVersion);
-    const std::uint64_t identity = ExecutableIdentity();
+    const std::uint64_t identity = gpg::ExecutableIdentity();
     hash.Add(&identity, sizeof(identity));
     hash.Add(source);
     const std::uint64_t key = hash.Value();

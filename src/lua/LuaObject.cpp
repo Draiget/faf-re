@@ -13015,6 +13015,7 @@ namespace moho
 	 * to source; each compiled chunk loaded is named in the log (`f_parser`).
 	 */
 	bool lua_AllowPrecompiledChunks = true;
+	thread_local bool lua_LoadingCachedChunk = false;
 
 	TConVar<bool> gTConVar_lua_AllowPrecompiledChunks(
 		"lua_AllowPrecompiledChunks",

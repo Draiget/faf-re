@@ -1487,7 +1487,10 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
   ++mNextSerialNumber;
   mInResponseTo = 0;
 
-  if (mPendingOutputData.GetLength()) {
+  // Engine addition (net_FlushDeadline): data still in the compression filter is pending too; the
+  // binary counted only what had reached mPendingOutputData, so that data lost its deadline and
+  // waited for the next keepalive.
+  if (mPendingOutputData.GetLength() || (net_FlushDeadline != 0 && mOutputFlushPending)) {
     // time in us
     mSendBy.mTime = nowUs + 1000LL * net_SendDelay;
   } else {

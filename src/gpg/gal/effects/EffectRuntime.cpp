@@ -16,6 +16,7 @@
 #include <thread>
 #include <utility>
 
+#include "gpg/core/utils/LocalCache.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/Device.hpp"
@@ -190,30 +191,7 @@ namespace gpg::gal::effects
 
   const std::string& ShaderCacheDirectory()
   {
-    static const std::string directory = [] {
-      std::string path;
-      if (const char* const configured = std::getenv("FAF_SHADER_CACHE_DIR"); configured != nullptr && configured[0] != '\0') {
-        path = configured;
-      } else {
-        char localAppData[MAX_PATH]{};
-        if (SUCCEEDED(::SHGetFolderPathA(nullptr, CSIDL_LOCAL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, localAppData))) {
-          path = std::string(localAppData) + "\\FAForever\\ShaderCache";
-        }
-      }
-      if (path.empty()) {
-        return std::string();
-      }
-      if (path.back() != '\\' && path.back() != '/') {
-        path += '\\';
-      }
-      const int result = ::SHCreateDirectoryExA(nullptr, path.c_str(), nullptr);
-      if (result != ERROR_SUCCESS && result != ERROR_ALREADY_EXISTS && result != ERROR_FILE_EXISTS) {
-        gpg::Warnf("effects: cannot create the shader cache %s (error %d); compiling every run", path.c_str(), result);
-        return std::string();
-      }
-      return path;
-    }();
-    return directory;
+    return gpg::LocalCacheDirectory();
   }
 
   EffectProgram::EffectProgram(
