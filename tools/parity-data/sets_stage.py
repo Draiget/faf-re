@@ -31,6 +31,9 @@ def main():
     parser.add_argument("--game-version", type=int, default=3835)
     parser.add_argument("--delay", type=float, default=1.0)
     args = parser.parse_args()
+    # The init file names these folders, and the engine doesn't start in this one.
+    for name in ("pack", "replays", "maps", "m28", "work", "pool"):
+        setattr(args, name, os.path.abspath(getattr(args, name)))
 
     shard_args = types.SimpleNamespace(
         pack=args.pack, replays=args.replays, maps=args.maps, m28=args.m28, work=args.work,
