@@ -1,0 +1,50 @@
+name: 3p-rejoin-leave
+description: >
+  A player leaves while another is coming back. Player 2 is killed at 4 minutes and
+  restarts 15 s later; 3 s into its handover player 3 is killed too and stays away. The
+  two left must not hang: player 2 either gets its seat back and plays on with player 1,
+  or is refused with a reason on its screen. Needs init_mpemu_localvault.lua in the FAF
+  bin folder. Do not click into the game windows.
+timeout: 20m
+
+mode: relay
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: sandbox
+  DisconnectionDelay02: '90'
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\rejoin_test.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+  saveReplays: true
+
+players:
+  - { uid: 1, name: Stays, faction: uef, args: ['/title', 'rejoin-leave-stays', '/con', 'net_PeerFeatures=1;net_RejoinAccept=1;net_CheckOrderStreams=0;net_LogShownBeatMs=500'] }
+  - { uid: 2, name: Rejoins, faction: cybran, args: ['/title', 'rejoin-leave-back', '/con', 'net_PeerFeatures=1;net_RejoinAccept=1;net_CheckOrderStreams=0;net_LogShownBeatMs=500'] }
+  - { uid: 3, name: Leaves, faction: aeon, args: ['/title', 'rejoin-leave-gone', '/con', 'net_PeerFeatures=1;net_RejoinAccept=1;net_CheckOrderStreams=0;net_LogShownBeatMs=500'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 4m
+  - kill: 2
+  - wait: 15s
+  - note: player 2 restarts and takes its seat back
+  - rejoin: { uid: 2, source: 1, peers: [{ uid: 1, source: 0 }, { uid: 3, source: 2 }] }
+  - wait: 3s
+  - note: player 3 leaves during the handover
+  - kill: 3
+  - wait: 4m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  logsAbsent:
+    - { uids: [1], pattern: 'mismatched' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'mismatched' }

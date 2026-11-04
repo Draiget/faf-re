@@ -250,8 +250,36 @@ CLuaTask::CLuaTask(CTaskThread* const thread, LuaPlus::LuaState** const newState
  * Handles running-execute guard race, releases owned LuaState when safe, then
  * tears down base task state.
  */
+namespace
+{
+  moho::ILuaThreadRouting* sThreadRouting = nullptr;
+
+  /** Around one resume of a thread that belongs to one player. */
+  struct SThreadRoutingScope
+  {
+    moho::ILuaThreadRouting* routing;
+    explicit SThreadRoutingScope(lua_State* const thread)
+      : routing(sThreadRouting != nullptr && moho::IsSimThread() && sThreadRouting->EnterThread(thread) ? sThreadRouting : nullptr)
+    {}
+    ~SThreadRoutingScope()
+    {
+      if (routing != nullptr) {
+        routing->LeaveThread();
+      }
+    }
+  };
+} // namespace
+
+void moho::LUA_SetThreadRouting(ILuaThreadRouting* const routing) noexcept
+{
+  sThreadRouting = routing;
+}
+
 CLuaTask::~CLuaTask()
 {
+  if (sThreadRouting != nullptr && IsSimThread() && mLuaState != nullptr) {
+    sThreadRouting->OnThreadEnded(mLuaState->m_state);
+  }
   if (mExecuteDestroyedFlag != nullptr) {
     if (mLuaState != nullptr) {
       mLuaState->m_luaTask = nullptr;
@@ -299,6 +327,7 @@ int CLuaTask::Execute()
     DescribeLuaThreadForProfile(state->m_state, mResumeArgCount, threadZoneName, sizeof(threadZoneName));
     FAF_PROFILE_ZONE_TRANSIENT(threadZoneName);
 #endif
+    const SThreadRoutingScope routingScope(state->m_state);
     resumeResult = lua_resume(state->m_state, mResumeArgCount);
   } catch (...) {
     if (destroyedByDtor) {
@@ -472,6 +501,10 @@ int moho::cfunc_ForkThreadL(LuaPlus::LuaState* const curState)
   for (int stackIndex = 2; stackIndex <= argumentCount; ++stackIndex) {
     const LuaPlus::LuaObject argumentObject(LuaPlus::LuaStackObject(curState, stackIndex));
     PushForkThreadArgumentAndIncrementResumeCount(task, argumentObject);
+  }
+
+  if (sThreadRouting != nullptr && IsSimThread()) {
+    sThreadRouting->OnThreadForked(curState->m_state, threadState->m_state);
   }
 
   const LuaPlus::LuaObject threadObject(threadState->m_threadObj);

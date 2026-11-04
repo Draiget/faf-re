@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/AutoPtr.h"
@@ -95,9 +96,29 @@ namespace moho
    *
    * Engine addition: when the replay is refused, `failureReason` (if given)
    * receives a sentence saying why, for the player.
+   *
+   * Engine addition (issue #275): with `commandStream`, the session gets no
+   * client manager; the stream, positioned on the first recorded command, goes
+   * to the caller, who builds one.
    */
-  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo>
-  VCR_SetupReplaySession(gpg::StrArg filename, msvc8::string* failureReason = nullptr, int skipBeats = 0);
+  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo> VCR_SetupReplaySession(
+    gpg::StrArg filename,
+    msvc8::string* failureReason = nullptr,
+    std::unique_ptr<gpg::Stream>* commandStream = nullptr,
+    int skipBeats = 0
+  );
+
+  /**
+   * Engine addition (issue #275): the same from a stream already open.
+   * `filename` only names it in messages.
+   */
+  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo> VCR_SetupReplaySessionFromStream(
+    std::unique_ptr<gpg::Stream> replayStream,
+    gpg::StrArg filename,
+    msvc8::string* failureReason,
+    std::unique_ptr<gpg::Stream>* commandStream,
+    int skipBeats = 0
+  );
 
   /**
    * Engine addition (dedicated-server plan WPL.4): the name of the local client

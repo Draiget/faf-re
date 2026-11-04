@@ -55,6 +55,7 @@
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/sim/CVFSImpl.h"
 #include "moho/sim/SimArchiveMode.h"
+#include "moho/sim/SimBlockLane.h"
 #include "moho/sim/SimThreadRole.h"
 #include "moho/sim/SimWorkerPool.h"
 #include "moho/console/CConCommand.h"
@@ -1572,6 +1573,16 @@ extern "C"
 
 		return (object != nullptr && object->tt != LUA_TNIL &&
 			(object->tt != LUA_TBOOLEAN || object->value.b != 0)) ? 1 : 0;
+	}
+
+	/** Engine addition (the binary has no use for it): the function a C function value calls. */
+	lua_CFunction lua_tocfunction(lua_State* const state, const int idx)
+	{
+		const TObject* const object = luaA_indexAcceptable(state, idx);
+		if (object == nullptr || object->tt != LUA_CFUNCTION) {
+			return nullptr;
+		}
+		return static_cast<const Closure*>(object->value.p)->c.f;
 	}
 
 	/**
@@ -3670,6 +3681,17 @@ extern "C"
 	 */
 	int setarrayvector(const int size, Table* const table, lua_State* const state)
 	{
+#if defined(_M_X64) || defined(__x86_64__)
+		// The binary's array is `size * 8` bytes (0x00927248), and realloc_0 moves it to a new block when it grows
+		// past the old one or shrinks to half of it. Landing in the 896-byte class it takes the block the next
+		// formation would have reused; ours is twice as big and doesn't come from that list (26910291 at tick 68348,
+		// `CAiBrain:GetListOfUnits`).
+		const int binaryBytes = size * 8;
+		const int binaryOldBytes = table->sizearray * 8;
+		if (binaryBytes > 768 && binaryBytes <= 896 && (binaryOldBytes <= 768 || binaryBytes * 2 <= binaryOldBytes)) {
+			moho::SimBlockLane::PassTopBlock();
+		}
+#endif
 		table->array = luaM_reallocvector<TObject>(
 			state, table->array, static_cast<lu_mem>(table->sizearray), static_cast<lu_mem>(size)
 		);

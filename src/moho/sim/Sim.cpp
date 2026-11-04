@@ -1,5 +1,6 @@
 #include "moho/lua/ScrLuaUserData.h"
 #include "moho/sim/SimPrivate2.h"
+#include "moho/sim/SimBlockLane.h"
 
 #include <mutex>
 #include <thread>
@@ -902,6 +903,16 @@ namespace moho
     const SFootprint* mFootprint;     // +0x24
     bool mStartCellIsTraversable;     // +0x28 (asm: OCCUPY_FootprintFits tested against mStartCell, not mGoalCell)
   };
+
+  static_assert(offsetof(PathPreviewFinder, mOwnerContext) == 0x0C, "PathPreviewFinder::mOwnerContext offset");
+  static_assert(offsetof(PathPreviewFinder, mSim) == 0x10, "PathPreviewFinder::mSim offset");
+  static_assert(offsetof(PathPreviewFinder, mOGrid) == 0x14, "PathPreviewFinder::mOGrid offset");
+  static_assert(offsetof(PathPreviewFinder, mPathQueue) == 0x18, "PathPreviewFinder::mPathQueue offset");
+  static_assert(offsetof(PathPreviewFinder, mStartCell) == 0x1C, "PathPreviewFinder::mStartCell offset");
+  static_assert(offsetof(PathPreviewFinder, mGoalCell) == 0x20, "PathPreviewFinder::mGoalCell offset");
+  static_assert(offsetof(PathPreviewFinder, mFootprint) == 0x24, "PathPreviewFinder::mFootprint offset");
+  static_assert(offsetof(PathPreviewFinder, mStartCellIsTraversable) == 0x28, "PathPreviewFinder::mStartCellIsTraversable offset");
+  static_assert(sizeof(PathPreviewFinder) == 0x2C, "PathPreviewFinder size must be 0x2C");
 
   PathPreviewFinder::PathPreviewFinder(CArmyImpl* const owningArmy) noexcept
     : IPathTraveler()
@@ -2278,6 +2289,15 @@ void moho::SIM_PrepareLuaState(RRuleGameRules* const rules)
   if (rules == nullptr || !sim_PrepareLuaStateEarly) {
     return;
   }
+#if defined(_M_X64) || defined(__x86_64__)
+  // A table array the sim thread sizes into the binary's 896-byte class passes a block of the
+  // sim's free list (SimBlockLane::PassTopBlock), and a helper thread never does. The list is
+  // empty until a sim frees a formation or projectile; one a previous game in this process left
+  // has the state built on the sim thread, as before.
+  if (!SimBlockLane::FreeBlocks().empty()) {
+    return;
+  }
+#endif
 
   PreparedSimLuaState& prepared = Prepared();
   const std::lock_guard<std::mutex> guard(prepared.lock);

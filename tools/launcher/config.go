@@ -186,6 +186,10 @@ type Config struct {
 	// Filled by the runner, not the scenario file.
 	HubSecret string `yaml:"-"` // MPEMU_SECRET / -secret-file
 	Advertise string `yaml:"-"` // how other machines reach games on this one
+	// RelayFollow lets the local relay follow a game whose address changes, as it does
+	// on a hub: a killed seat can come back from another machine, with the other
+	// players still talking to the same relay ports.
+	RelayFollow bool `yaml:"relayFollow"`
 	RunID     string `yaml:"-"`
 	RunDir    string `yaml:"-"`
 	HTTPAddr  string `yaml:"-"`

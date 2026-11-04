@@ -11,6 +11,13 @@ namespace moho
   extern bool net_LogPackets;            // 0x010A6381
   extern int32_t net_DebugLevel;         // 0x010A6384
   extern int32_t net_PeerFeatures;       // engine addition (issue #285), off by default
+  extern int32_t net_LobbyPeerFeatures;  // engine addition, on by default
+  extern int32_t net_RejoinAccept;       // engine addition (issue #275), off by default
+  extern int32_t net_RejoinSendRate;     // engine addition (issue #275)
+  extern int32_t net_RejoinKeyframes;    // engine addition (issue #275)
+  extern int32_t net_RejoinWindow;       // engine addition (issue #275)
+  extern int32_t net_RejoinZstd;         // engine addition (issue #275)
+  extern int32_t net_RejoinFastSave;     // engine addition (issue #275)
   extern int32_t net_AckDelay;           // 0x00F58DE0
   extern int32_t net_SendDelay;          // 0x00F58DE4
   extern int32_t net_MinResendDelay;     // 0x00F58DE8

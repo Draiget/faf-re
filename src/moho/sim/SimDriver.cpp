@@ -873,6 +873,9 @@ CSimDriver::CSimDriver(
 
   mClientManager->SelectEvent(mConnectionEvent);
 
+  // Engine addition (issue #275): 0 unless this client took its seat back from a save.
+  mDispatchBeat += mClientManager->RejoinSkippedBeats();
+
   mMarshaller.reset(new CMarshaller(mClientManager.get()));
   mMarshaller->SetCommandSource(mCommandSourceId);
 
@@ -1421,12 +1424,16 @@ void CSimDriver::ThreadRun()
   while (!mStopSimThread) {
     mClientManager->DoBeat();
 
+    // Engine addition (issue #275): a client catching up issues nothing, and
+    // then goes on from the beat the recording reached.
+    const bool holdIssue = mClientManager->RejoinHoldsIssue(mNextIssueBeat);
+
     int waitMilliseconds = kIssueThreadIdleWaitMs;
     const std::int64_t now = mTimer.ElapsedCycles();
 
     // Nothing is issued until the sim has published at least one sync, every
     // outstanding request has been answered, and the sync queue has room.
-    if (mLastSyncCycleTime != 0 && mOutstandingRequests == 0
+    if (!holdIssue && mLastSyncCycleTime != 0 && mOutstandingRequests == 0
         && mSyncDataQueue.Size() < kMaxQueuedSyncPacketsBeforeStalling) {
       int lastBeatToIssue = mNextIssueBeat - 1;
       const int beatCeiling = mLastDequeuedBeat + kMaxBeatsAheadOfExecuted;

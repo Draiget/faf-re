@@ -10,7 +10,9 @@
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/entity/Entity.h"
+#include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/entity/EntityId.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/SSTIArmyVariableData.h"
@@ -135,6 +137,16 @@ namespace faf::remote
       {"__ArmyStats", ESyncRoute::Observers},
     };
 
+    constexpr SSyncIdField kIdFields[] = {
+      {"CancelCountdown", "entity", ESyncIdAudience::Owner},  // `lua/SimSync.lua:189`
+      {"FloatingEntityText", "entity", ESyncIdAudience::Owner}, // `lua/SimSync.lua:164`
+      {"Reclaim", "", ESyncIdAudience::Anyone},               // `lua/sim/Prop.lua:390`
+      {"ReleaseIds", "", ESyncIdAudience::Owner},             // `lua/sim/Unit.lua:2173`
+      {"StartCountdown", "entity", ESyncIdAudience::Owner},   // `lua/SimSync.lua:177`
+      {"UnitData", "", ESyncIdAudience::Owner},               // `lua/sim/Unit.lua:79`
+      {"UserUnitEnhancements", "", ESyncIdAudience::Allies},  // `lua/SimSync.lua:109`
+    };
+
     /** A stream that appends to a vector, for `LuaObject::ToByteStream`. */
     class CByteVectorStream final : public gpg::Stream
     {
@@ -230,10 +242,20 @@ namespace faf::remote
       return false;
     }
 
+    /** A category set's `+`, `-` and `*`, which have no name to go by and make a new set. */
+    [[nodiscard]] bool IsCategoryOperator(lua_State* const state, lua_Debug* const debug)
+    {
+      lua_getinfo(state, "f", debug);
+      const lua_CFunction function = lua_tocfunction(state, -1);
+      lua_settop(state, -2);
+      return function == &moho::cfunc_EntityCategory__add || function == &moho::cfunc_EntityCategory__sub
+             || function == &moho::cfunc_EntityCategory__mul;
+    }
+
     void FanOutCallHook(lua_State* const state, lua_Debug* const debug)
     {
       if (lua_getinfo(state, "Sn", debug) != 0 && debug->what != nullptr && std::strcmp(debug->what, "C") == 0 && !ReadsOnly(debug->name)
-          && sActiveRouter != nullptr) {
+          && !(debug->name == nullptr && IsCategoryOperator(state, debug)) && sActiveRouter != nullptr) {
         sActiveRouter->NoteFanOutViolation(debug->name != nullptr ? debug->name : "?");
       }
     }
@@ -304,7 +326,8 @@ namespace faf::remote
       if (router != nullptr && router->CurrentSim() != nullptr && name != nullptr
           && std::strcmp(name, "SharePaintingBrushStroke") == 0) {
         moho::Sim& sim = *router->CurrentSim();
-        const std::int32_t source = router->SourceArmy(sim);
+        const std::int32_t sourceView = router->SourceView(sim);
+        const std::int32_t source = sourceView >= 0 ? router->ViewArmy(static_cast<std::size_t>(sourceView)) : -1;
         const SFanOutGuard guard(state);
         for (std::size_t view = 0; view < router->ViewCount(); ++view) {
           if (router->Allied(sim, view, source)) {
@@ -339,6 +362,24 @@ namespace faf::remote
       return 0;
     }
 
+    /**
+     * Threads that act only for their brain's player, once they start: what they write depends on
+     * that player's focus alone. `lua/aibrain.lua:286` tells the player of a voice-over only when the
+     * brain is the player's. A brain's `EnergyExcessThread`
+     * (`lua/aibrains/components/EnergyManagerBrainComponent.lua:80`) starts before a server's routing
+     * does, so it's found by its field when the routing starts.
+     */
+    struct SOwnedThread
+    {
+      const char* module;
+      const char* className;
+      const char* function;
+    };
+    constexpr SOwnedThread kOwnedThreads[] = {
+      {"/lua/aibrain.lua", "AIBrain", "PlayVOSoundThread"},
+    };
+    constexpr const char* kOwnedThreadFields[] = {"EnergyExcessThread"};
+
     /** The army (1-based) of a unit's `Army` or a brain's `GetArmyIndex()`; 0 if neither. */
     [[nodiscard]] int ArmyOfSelf(lua_State* const state, const int index)
     {
@@ -361,8 +402,8 @@ namespace faf::remote
     }
 
     /**
-     * A method that writes per-player data only under its object's own focus: once, under the
-     * owner's. `Unit:SendNotifyMessage` (`lua/sim/Unit.lua:4971`).
+     * A method that writes per-player data only under its object's own focus: under each view
+     * focused on its owner. `Unit:SendNotifyMessage` (`lua/sim/Unit.lua:4971`) writes only `Sync`.
      */
     int OwnerThunk(lua_State* const state)
     {
@@ -371,20 +412,25 @@ namespace faf::remote
       const int army = router != nullptr && router->CurrentSim() != nullptr && argumentCount > 0 && lua_istable(state, 1)
                          ? ArmyOfSelf(state, 1)
                          : 0;
-      if (army <= 0 || static_cast<std::size_t>(army) > router->ViewCount()) {
+      if (army <= 0 || router->ViewOfArmy(army - 1) < 0) {
         const int base = lua_gettop(state);
         CallOriginal(state, argumentCount, LUA_MULTRET);
         return lua_gettop(state) - base;
       }
-      SViewScope scope(*router, *router->CurrentSim(), army - 1);
-      const int base = lua_gettop(state);
-      CallOriginal(state, argumentCount, LUA_MULTRET);
-      return lua_gettop(state) - base;
+      moho::Sim& sim = *router->CurrentSim();
+      const SFanOutGuard guard(state);
+      for (std::size_t view = 0; view < router->ViewCount(); ++view) {
+        if (router->ViewArmy(view) == army - 1) {
+          SViewScope scope(*router, sim, static_cast<std::int32_t>(view));
+          CallOriginal(state, argumentCount, 0);
+        }
+      }
+      return 0;
     }
 
     /**
      * `DiplomacyHandler(action)` (`lua/SimDiplomacy.lua:6`) writes the action for its target only
-     * under the target's focus, and changes alliances once: once, under `action.To`'s.
+     * under the target's focus, and changes alliances: once, under the first view on `action.To`.
      */
     int ActionTargetThunk(lua_State* const state)
     {
@@ -397,11 +443,12 @@ namespace faf::remote
         army = lua_isnumber(state, -1) ? static_cast<int>(lua_tonumber(state, -1)) : 0;
         lua_settop(state, -2);
       }
-      if (army <= 0 || static_cast<std::size_t>(army) > router->ViewCount()) {
+      const std::int32_t view = army > 0 ? router->ViewOfArmy(army - 1) : -1;
+      if (view < 0) {
         CallOriginal(state, argumentCount, 0);
         return 0;
       }
-      SViewScope scope(*router, *router->CurrentSim(), army - 1);
+      SViewScope scope(*router, *router->CurrentSim(), view);
       CallOriginal(state, argumentCount, 0);
       return 0;
     }
@@ -430,6 +477,11 @@ namespace faf::remote
     return kRoutes;
   }
 
+  std::span<const SSyncIdField> SyncIdFields() noexcept
+  {
+    return kIdFields;
+  }
+
   ESyncRoute RouteOfSyncKey(const std::string_view key, bool& known) noexcept
   {
     const auto found = std::lower_bound(std::begin(kRoutes), std::end(kRoutes), key, [](const SSyncKeyRoute& entry, const std::string_view value) {
@@ -443,37 +495,168 @@ namespace faf::remote
     : mPlayers(viewCount)
   {
     sActiveRouter = this;
+    moho::LUA_SetThreadRouting(this);
+    for (std::size_t view = 0; view < mPlayers.size(); ++view) {
+      mPlayers[view].army = static_cast<std::int32_t>(view);
+    }
   }
 
   CSyncRouter::~CSyncRouter()
   {
     if (sActiveRouter == this) {
       sActiveRouter = nullptr;
+      moho::LUA_SetThreadRouting(nullptr);
     }
   }
 
   std::int32_t CSyncRouter::FocusForLua() const noexcept
   {
-    return mFrames.empty() ? -1 : mFrames.back().view;
+    return mFrames.empty() || mFrames.back().view < 0 ? -1 : mPlayers[static_cast<std::size_t>(mFrames.back().view)].army;
   }
 
-  std::int32_t CSyncRouter::SourceArmy(const moho::Sim& sim) const
+  std::int32_t CSyncRouter::ViewOfArmy(const std::int32_t army) const noexcept
   {
-    // `GetArmyOfCommandSource` (`lua/SimUtils.lua`): the army the source may command. A source that
-    // commands no army is an observer's.
-    const auto source = static_cast<unsigned int>(sim.mCurCommandSource);
-    for (std::size_t army = 0; army < sim.mArmiesList.size() && army < mPlayers.size(); ++army) {
-      const moho::CArmyImpl* const candidate = sim.mArmiesList[army];
-      if (candidate != nullptr && candidate->mVarDat.mValidCommandSources.Contains(source)) {
-        return static_cast<std::int32_t>(army);
+    for (std::size_t view = 0; view < mPlayers.size(); ++view) {
+      if (mPlayers[view].army == army) {
+        return static_cast<std::int32_t>(view);
       }
     }
     return -1;
   }
 
+  std::int32_t CSyncRouter::SourceView(const moho::Sim& sim) const
+  {
+    const auto source = static_cast<unsigned int>(sim.mCurCommandSource);
+    for (std::size_t view = 0; view < mPlayers.size(); ++view) {
+      if (mPlayers[view].source == static_cast<std::int32_t>(source)) {
+        return static_cast<std::int32_t>(view);
+      }
+    }
+    // Before the first sync, or a source no view's client has: the first army it may command
+    // (`GetArmyOfCommandSource`, `lua/SimUtils.lua`). One that commands no army is an observer's.
+    for (std::size_t army = 0; army < sim.mArmiesList.size(); ++army) {
+      const moho::CArmyImpl* const candidate = sim.mArmiesList[army];
+      if (candidate != nullptr && candidate->mVarDat.mValidCommandSources.Contains(source)) {
+        return ViewOfArmy(static_cast<std::int32_t>(army));
+      }
+    }
+    return -1;
+  }
+
+  void CSyncRouter::FollowCommandSources(const moho::Sim& sim)
+  {
+    // A session gives humans their sources in army order (`lua/simInit.lua:459-470`, `:480-487`), and
+    // an army can hold several: with shared control, its allies' too.
+    std::int32_t human = 0;
+    for (std::size_t view = 0; view < mPlayers.size() && view < sim.mArmiesList.size(); ++view) {
+      SPlayerSync& player = mPlayers[view];
+      if (player.source >= 0) {
+        if (player.army < 0 || static_cast<std::size_t>(player.army) >= sim.mArmiesList.size()) {
+          continue;
+        }
+        const moho::CArmyImpl* const current = sim.mArmiesList[static_cast<std::size_t>(player.army)];
+        const auto source = static_cast<unsigned int>(player.source);
+        const bool onFocus = current != nullptr && current->mVarDat.mValidCommandSources.Contains(source);
+        const bool left = player.sourceOnFocus && !onFocus;
+        player.sourceOnFocus = onFocus;
+        if (!left) {
+          continue; // a view moved with `SetFocusArmy` isn't holding its source there
+        }
+        // Gone from its army. A defeat just removes it (`lua/sim/Victory.lua:37`); a merge gives it
+        // to another.
+        for (std::size_t army = 0; army < sim.mArmiesList.size(); ++army) {
+          const moho::CArmyImpl* const candidate = sim.mArmiesList[army];
+          if (candidate != nullptr && candidate->mVarDat.mValidCommandSources.Contains(source)) {
+            MoveView(view, static_cast<std::int32_t>(army));
+            break;
+          }
+        }
+        continue;
+      }
+      const moho::CArmyImpl* const army = sim.mArmiesList[view];
+      if (army == nullptr) {
+        continue;
+      }
+      for (std::int32_t source = 0; source < 64; ++source) {
+        if (army->mVarDat.mValidCommandSources.Contains(static_cast<unsigned int>(source))) {
+          player.source = army->mVarDat.mValidCommandSources.Contains(static_cast<unsigned int>(human)) ? human : source;
+          player.sourceOnFocus = true;
+          ++human;
+          break;
+        }
+      }
+    }
+  }
+
+  void CSyncRouter::MoveView(const std::size_t view, const std::int32_t army)
+  {
+    mMoves.emplace_back(view, army);
+  }
+
+  void CSyncRouter::RequestResync(const std::size_t view)
+  {
+    mResyncs.push_back(view);
+  }
+
+  void CSyncRouter::SetFocusFromLua(const std::int32_t army)
+  {
+    // The server's own filter stays -1. A call with no view's focus set has no client to move.
+    if (!mFrames.empty() && mFrames.back().view >= 0) {
+      MoveView(static_cast<std::size_t>(mFrames.back().view), army);
+    }
+  }
+
+  void CSyncRouter::ApplyMovesAndResyncs(moho::Sim& sim)
+  {
+    const auto toLuaArmy = [](const std::int32_t army) { return army == -1 ? -1 : army + 1; };
+    for (const auto& [view, army] : mMoves) {
+      SPlayerSync& player = mPlayers[view];
+      const std::int32_t previous = player.army;
+      if (previous == army) {
+        continue;
+      }
+      player.army = army;
+      const moho::CArmyImpl* const focused =
+        army >= 0 && static_cast<std::size_t>(army) < sim.mArmiesList.size() ? sim.mArmiesList[static_cast<std::size_t>(army)] : nullptr;
+      player.sourceOnFocus = focused != nullptr && player.source >= 0
+                             && focused->mVarDat.mValidCommandSources.Contains(static_cast<unsigned int>(player.source));
+      SViewScope scope(*this, sim, static_cast<std::int32_t>(view));
+      try {
+        // What `Sim::Sync` calls when a lockstep client's focus changes.
+        const LuaPlus::LuaFunction<> note(sim.mLuaState->GetGlobal("NoteFocusArmyChanged"));
+        note.Call_Int2(toLuaArmy(army), toLuaArmy(previous));
+      } catch (const std::exception& error) {
+        gpg::Warnf("sync routing: NoteFocusArmyChanged failed: %s", error.what());
+      }
+    }
+    mMoves.clear();
+
+    for (const std::size_t view : mResyncs) {
+      SViewScope scope(*this, sim, static_cast<std::int32_t>(view));
+      try {
+        // The parts of `OnPostLoad` (`lua/simInit.lua:565`) that write only `Sync`: the others fork
+        // threads or re-add objectives, which stay as they are for everyone else.
+        for (const char* const module : {"/lua/sim/simuistate.lua", "/lua/simdialogue.lua"}) {
+          const LuaPlus::LuaFunction<> onPostLoad(moho::SCR_Import(sim.mLuaState, module)["OnPostLoad"]);
+          onPostLoad();
+        }
+        // `simInit` also imports `/lua/simsync.lua`, a second copy of what `doscript` already ran
+        // (`:5`), whose `UnitData` and `Sync` are empty and its own. The live ones are the globals, and
+        // the global `NoteFocusArmyChanged` sends the view's unit data and allies' enhancements, the
+        // latter replacing `simuistate`'s every unit's, and its pings and recall votes.
+        const std::int32_t army = toLuaArmy(mPlayers[view].army);
+        const LuaPlus::LuaFunction<> note(sim.mLuaState->GetGlobal("NoteFocusArmyChanged"));
+        note.Call_Int2(army, army);
+      } catch (const std::exception& error) {
+        gpg::Warnf("sync routing: a view's resync failed: %s", error.what());
+      }
+    }
+    mResyncs.clear();
+  }
+
   void CSyncRouter::EnterCommand(moho::Sim& sim)
   {
-    EnterView(sim, SourceArmy(sim));
+    EnterView(sim, SourceView(sim));
   }
 
   void CSyncRouter::EnterSimOwn(moho::Sim& sim)
@@ -540,14 +723,51 @@ namespace faf::remote
     }
   }
 
-  bool CSyncRouter::Print(const msvc8::string& line)
+  void CSyncRouter::OnThreadForked(lua_State* const parent, lua_State* const thread)
   {
-    const std::int32_t view = FocusForLua();
-    if (view < 0) {
+    if (mOwnedThreadFunctions.empty() || lua_gettop(parent) < 2 || !lua_istable(parent, 2)
+        || std::find(mOwnedThreadFunctions.begin(), mOwnedThreadFunctions.end(), lua_topointer(parent, 1)) == mOwnedThreadFunctions.end()) {
+      return;
+    }
+    const std::int32_t view = ViewOfArmy(ArmyOfSelf(parent, 2) - 1);
+    if (view >= 0) {
+      mThreadViews[thread] = view;
+    }
+  }
+
+  bool CSyncRouter::EnterThread(lua_State* const thread)
+  {
+    const auto found = mThreadViews.find(thread);
+    if (found == mThreadViews.end() || mSim == nullptr) {
       return false;
     }
-    mPlayers[static_cast<std::size_t>(view)].nextPrints.emplace_back(line.c_str());
+    EnterView(*mSim, found->second);
     return true;
+  }
+
+  void CSyncRouter::LeaveThread()
+  {
+    LeaveView(*mSim);
+  }
+
+  void CSyncRouter::OnThreadEnded(lua_State* const thread)
+  {
+    mThreadViews.erase(thread);
+  }
+
+  bool CSyncRouter::Print(const msvc8::string& line)
+  {
+    if (mFrames.empty() || mFrames.back().view < 0) {
+      return false;
+    }
+    mPlayers[static_cast<std::size_t>(mFrames.back().view)].nextPrints.emplace_back(line.c_str());
+    return true;
+  }
+
+  bool CSyncRouter::WroteUnderFocus(const std::size_t view, const char* const key) const
+  {
+    const SPlayerSync& player = mPlayers[view];
+    return player.contextUsed && player.context.IsTable() && !const_cast<LuaPlus::LuaObject&>(player.context)[key].IsNil();
   }
 
   void CSyncRouter::InstallWrappers(moho::Sim& sim)
@@ -556,6 +776,55 @@ namespace faf::remote
     LuaPlus::LuaState* const luaState = sim.mLuaState;
     lua_State* const state = luaState->m_state;
     LuaPlus::LuaObject globals = luaState->GetGlobals();
+
+    for (const SOwnedThread& owned : kOwnedThreads) {
+      LuaPlus::LuaObject owner = moho::SCR_Import(luaState, owned.module);
+      if (owner.IsTable()) {
+        owner = owner[owned.className];
+      }
+      LuaPlus::LuaObject function = owner.IsTable() ? owner[owned.function] : LuaPlus::LuaObject{};
+      if (function.IsFunction()) {
+        mOwnedThreadFunctions.push_back(function.m_object.value.p);
+      } else {
+        gpg::Warnf("sync routing: no %s.%s for its thread to follow", owned.className, owned.function);
+      }
+    }
+    LuaPlus::LuaObject brains = globals["ArmyBrains"];
+    if (brains.IsTable()) {
+      for (LuaPlus::LuaTableIterator entry(brains, 1); !entry.m_isDone; entry.Next()) {
+        LuaPlus::LuaObject brain = entry.GetValue();
+        if (!brain.IsTable()) {
+          continue;
+        }
+        LuaPlus::LuaObject armyField = brain["Army"];
+        const std::int32_t view = armyField.IsNumber() ? ViewOfArmy(static_cast<std::int32_t>(armyField.GetNumber()) - 1) : -1;
+        if (view < 0) {
+          continue;
+        }
+        for (const char* const field : kOwnedThreadFields) {
+          LuaPlus::LuaObject thread = brain[field];
+          if (thread.Type() == LUA_TTHREAD) {
+            mThreadViews[static_cast<lua_State*>(thread.m_object.value.p)] = view;
+          }
+        }
+      }
+    }
+
+    LuaPlus::LuaObject getVersion = moho::SCR_Import(luaState, "/lua/version.lua")["GetVersion"];
+    if (getVersion.IsFunction()) {
+      const int top = lua_gettop(state);
+      getVersion.PushStack(state);
+      lua_call(state, 0, 1);
+      const char* const version = lua_isstring(state, -1) ? lua_tostring(state, -1) : nullptr;
+      if (version == nullptr || kSyncPolicyGameVersion != version) {
+        gpg::Warnf(
+          "sync routing: the policy was audited on FAF game version %.*s, not %s: keys new since then go to observers only",
+          static_cast<int>(kSyncPolicyGameVersion.size()), kSyncPolicyGameVersion.data(), version != nullptr ? version : "(none)"
+        );
+      }
+      lua_settop(state, top);
+    }
+
     LuaPlus::LuaObject modules = globals["__modules"];
     for (const SWrappedFunction& wrapped : kWrapped) {
       LuaPlus::LuaObject owner = wrapped.module != nullptr ? moho::SCR_Import(luaState, wrapped.module) : globals;
@@ -603,13 +872,14 @@ namespace faf::remote
 
   bool CSyncRouter::Allied(const moho::Sim& sim, const std::size_t view, const std::int32_t army) const
   {
-    if (army < 0 || view >= sim.mArmiesList.size()) {
+    const std::int32_t focus = view < mPlayers.size() ? mPlayers[view].army : -1;
+    if (army < 0 || focus < 0 || static_cast<std::size_t>(focus) >= sim.mArmiesList.size()) {
       return false;
     }
-    if (view == static_cast<std::size_t>(army)) {
+    if (focus == army) {
       return true;
     }
-    const moho::CArmyImpl* const candidate = sim.mArmiesList[view];
+    const moho::CArmyImpl* const candidate = sim.mArmiesList[static_cast<std::size_t>(focus)];
     return candidate != nullptr && candidate->mVarDat.mAllies.Contains(static_cast<unsigned int>(army));
   }
 
@@ -662,7 +932,12 @@ namespace faf::remote
         continue;
       }
       const moho::Entity* const entity = sim.mEntityDB != nullptr ? sim.mEntityDB->FindEntityById(id) : nullptr;
-      std::int32_t owner = entity != nullptr ? entity->GetArmyIndex() : -1;
+      // A dead unit's id still says whose it was. A lockstep client gets every unit's death (`false`
+      // here, `lua/sim/Unit.lua:2167-2173`) whether it ever saw the unit or not; a player has nothing
+      // under another army's id to clear, so that stays with the owner.
+      std::int32_t owner = entity != nullptr                                                      ? entity->GetArmyIndex()
+                           : moho::ClassifyEntityIdFamily(id) == moho::EEntityIdFamily::Unit ? moho::ExtractEntityIdSourceIndex(id)
+                                                                                                : -1;
       if (route == ESyncRoute::EntityOwner) {
         const auto found = ownerEntry(id);
         if (found != mOwners.end() && found->first == id) {
@@ -682,7 +957,7 @@ namespace faf::remote
       Encode(entryValue, mScratch);
       for (std::size_t index = 0; index < mPlayers.size(); ++index) {
         const bool wanted = route == ESyncRoute::EntityAllies ? Allied(sim, index, owner)
-                                                              : (owner < 0 || static_cast<std::size_t>(owner) == index);
+                                                              : (owner < 0 || mPlayers[index].army == owner);
         if (!wanted) {
           continue;
         }
@@ -838,7 +1113,7 @@ namespace faf::remote
       std::vector<std::uint8_t>& out = mPlayers[index].keyBody;
       out.insert(out.end(), mScratch.begin(), mScratch.end());
       AppendString(out, "focusArmyIndex");
-      AppendNumber(out, static_cast<float>(index + 1u));
+      AppendNumber(out, static_cast<float>(mPlayers[index].army < 0 ? -1 : mPlayers[index].army + 1));
     }
     CloseKey(key, "ScoreAccum");
   }
@@ -914,6 +1189,10 @@ namespace faf::remote
     if (!mWrappersInstalled) {
       InstallWrappers(sim);
     }
+    FollowCommandSources(sim);
+    if (!mMoves.empty() || !mResyncs.empty()) {
+      ApplyMovesAndResyncs(sim);
+    }
     for (SPlayerSync& view : mPlayers) {
       view.body.clear();
       view.keyBody.clear();
@@ -960,6 +1239,10 @@ namespace faf::remote
           std::fclose(file);
         }
       }
+    }
+
+    if (mPayloadObserver) {
+      mPayloadObserver(sim);
     }
 
     // Print lines written with no focus reach every player, as they do every lockstep client, after

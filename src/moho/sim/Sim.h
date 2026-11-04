@@ -63,6 +63,8 @@ namespace moho
     /** A command source's `SimCallback` or Lua call starts or ends (`mCurCommandSource`). */
     virtual void EnterCommand(Sim& sim) = 0;
     virtual void LeaveCommand(Sim& sim) = 0;
+    /** Sim Lua's `SetFocusArmy`, which on a server moves the current view and not the sim's filter. */
+    virtual void SetFocusFromLua(std::int32_t army) = 0;
     /** A print line from sim Lua: true if it went to a player, and stays out of the packet. */
     virtual bool Print(const msvc8::string& line) = 0;
     /** The beat's `Sync` table, written and not yet emptied. */

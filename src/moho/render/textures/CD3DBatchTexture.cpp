@@ -25,7 +25,9 @@ namespace
 
 namespace moho
 {
-  boost::mutex sResourceLock{};
+  // Recursive, as the binary's CRITICAL_SECTION is: dropping the keepalive queue's
+  // last handle under this lock runs CD3DFileBatchTexture::OnClose, which takes it again.
+  std::recursive_mutex sResourceLock{};
 
   /**
    * Address: 0x00BC4340 (FUN_00BC4340, register_sResourceLock)

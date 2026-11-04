@@ -243,7 +243,12 @@ namespace moho
    * Engine addition: a refusal says why through `failureReason`.
    */
   msvc8::auto_ptr<SWldSessionInfo>
-  VCR_SetupReplaySession(const gpg::StrArg filename, msvc8::string* const failureReason, const int skipBeats)
+  VCR_SetupReplaySession(
+    const gpg::StrArg filename,
+    msvc8::string* const failureReason,
+    std::unique_ptr<gpg::Stream>* const commandStream,
+    const int skipBeats
+  )
   {
     const auto refuse = [failureReason](const msvc8::string& reason) {
       if (failureReason != nullptr) {
@@ -266,6 +271,28 @@ namespace moho
     if (replayStream == nullptr) {
       return refuse("The file could not be opened.");
     }
+
+    return VCR_SetupReplaySessionFromStream(std::move(replayStream), filename, failureReason, commandStream, skipBeats);
+  }
+
+  /**
+   * Engine addition (issue #275): `VCR_SetupReplaySession` from a stream already
+   * open, the body of the function at 0x008765E0 from its header read on.
+   */
+  msvc8::auto_ptr<SWldSessionInfo> VCR_SetupReplaySessionFromStream(
+    std::unique_ptr<gpg::Stream> replayStream,
+    const gpg::StrArg filename,
+    msvc8::string* const failureReason,
+    std::unique_ptr<gpg::Stream>* const commandStream,
+    const int skipBeats
+  )
+  {
+    const auto refuse = [failureReason](const msvc8::string& reason) {
+      if (failureReason != nullptr) {
+        *failureReason = reason;
+      }
+      return msvc8::auto_ptr<SWldSessionInfo>();
+    };
 
     // Engine addition, not in the binary: the header is read under a handler.
     // A replay is a file anyone can hand out, and the binary let a short or
@@ -394,8 +421,12 @@ namespace moho
     sessionInfo->mIsBeingRecorded = false;
     sessionInfo->mIsReplay = true;
     sessionInfo->mIsMultiplayer = false;
-    sessionInfo->mClientManager = CLIENT_CreateClientManager(2u, nullptr, 0, true);
     sessionInfo->mSourceId = kInvalidSourceIndex;
+    if (commandStream != nullptr) {
+      *commandStream = std::move(replayStream);
+      return sessionInfo;
+    }
+    sessionInfo->mClientManager = CLIENT_CreateClientManager(2u, nullptr, 0, true);
 
     if (sessionInfo->mClientManager != nullptr) {
       gpg::Stream* replayStreamOwnership = replayStream.release();

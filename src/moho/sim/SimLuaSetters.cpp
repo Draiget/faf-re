@@ -496,6 +496,12 @@ int moho::cfunc_SetFocusArmySim(lua_State* const luaContext)
 
   const int focusArmy = static_cast<int>(lua_tonumber(luaContext, 1));
 
+#if FAF_SERVER_MODE
+  if (sSyncRouting != nullptr) {
+    sSyncRouting->SetFocusFromLua(focusArmy);
+    return 0;
+  }
+#endif
   if (ISTIDriver* activeDriver = WLD_GetDriver()) {
 #if FAF_SERVER_MODE
     // Engine addition, server mode: under /loopback the session's driver stands in for a

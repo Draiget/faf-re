@@ -94,6 +94,7 @@ namespace faf::remote
 
   void CViewPackets::OnBeatChanges(moho::Sim& sim, const moho::SSyncData& packet)
   {
+    OnBeatStarting();
     mBuildStart = std::chrono::steady_clock::now();
     const std::size_t armyCount = sim.mArmiesList.size();
     while (mPackets.size() < armyCount) {

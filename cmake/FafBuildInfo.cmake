@@ -41,7 +41,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
       execute_process(COMMAND "${_git}" -C "${FAF_SOURCE_DIR}" describe --tags --exact-match
         OUTPUT_VARIABLE _out RESULT_VARIABLE _rc OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
       if(NOT _rc EQUAL 0)
-        execute_process(COMMAND "${_git}" -C "${FAF_SOURCE_DIR}" describe --tags --abbrev=7 --exclude=*-nightly-*
+        execute_process(COMMAND "${_git}" -C "${FAF_SOURCE_DIR}" describe --tags --abbrev=7 --exclude=*-nightly*
           OUTPUT_VARIABLE _out RESULT_VARIABLE _rc OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
       endif()
       if(_rc EQUAL 0 AND _out AND _dirty)

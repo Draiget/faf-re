@@ -143,6 +143,9 @@ namespace faf::remote
     void SyncForView(moho::Sim& sim, std::int32_t army, SChangedView& changed, moho::SSyncData& out);
 
   protected:
+    /** A new beat's views are about to be built. */
+    virtual void OnBeatStarting() {}
+
     /** Adds the time from this beat's start to now to `BuildSeconds` (once the views are built). */
     void AddBuildTime() noexcept
     {

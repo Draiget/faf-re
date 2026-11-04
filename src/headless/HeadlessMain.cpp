@@ -158,6 +158,9 @@ namespace
       "  --sync-keys <file>        write every top-level Lua Sync key seen, with beat counts\n"
       "  --sync-dump <file>        write each beat's Lua Sync bytes (tools/sync-routing/compare.py)\n"
       "  --lua-routing-dump <pre>  with --lua-routing: each view's Sync bytes, to <pre>_<view>.bin\n"
+      "  --lua-move-view <b:v:a>   with --lua-routing: at beat b, view v moves to army a\n"
+      "  --lua-resync <b:v>        with --lua-routing: at beat b, view v gets a reconnect's resync\n"
+      "  --focus-switch <b:a>      at beat b, the sim's focus moves to army a, as a lockstep client's does\n"
       "  --state-digests <file>    write \"beat digest\" of what the sim published, every beat\n"
       "  --fpu-report              at beat 1, every thread's x87 control word and MXCSR (sampled)\n"
       "  --keyframe-every <beats>  save the sim between beats every <beats>, as a saved game; size, zlib size, md5, time\n"
@@ -202,16 +205,24 @@ namespace
       "  --keep-client-data        keep what only a client reads: model vertices and indices, the session's and the rules' blueprint tables, files read from archives, what effects draw, the pose handles kept for a client\n"
       "  --view-bench-check        with --view-bench: every view's kept frame is compared with one built whole\n"
       "  --lua-routing             with --view-bench: the Lua lane too: each player's Sync routed (remote/SyncRouting.h)\n"
+      "  --view-pipeline <n>       with --view-bench: n threads finish the views while the sim goes on (default 0: it waits)\n"
       "  --parallel-views          with --view-frames or --view-bench: the views are built on the sim's workers\n"
       "  --cpus <list>             run on these CPUs only, for example 8-15 or 0,2,4,6; a CPU set from taskset or a\n"
       "                            container counts too, and FAF's init scripts cannot change it\n"
-      "  --spy                     with --view-frames: every view's decoded frame checked against the oracle and\n"
+      "  --spy                     with --view-bench --lua-routing: every Lua key each view receives checked;\n"
+      "                            with --view-frames: every view's decoded frame checked against the oracle and\n"
       "                            for names of entities its client does not hold\n"
       "  --inbound-check           with --view-ids: every command sent again in its army's view ids and translated\n"
       "                            back as the server would; it must marshal to the same bytes\n"
       "  --launch-check           rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
       "  --disk-trace <file>       write every file the engine finds, reads or maps and every directory listing\n"
       "  --path-spelling <file>    Linux: write each path found on disk only by ignoring case, as asked and as on disk\n"
+      "  --rejoin-source <n>       play as this command source of a live game, every other client fed from the\n"
+      "                            replay (needs --focus on its army); the rehearsal of a rejoin\n"
+      "  --rejoin-beat <n>         with --rejoin-source: the driver issues this client's beats after this one\n"
+      "  --rejoin-peers <list>     no replay: take seat --rejoin-source back in a running game from these peers,\n"
+      "                            written address:port=source,...; needs the seat's key (/rejoinkeyfile)\n"
+      "  --rejoin-port <n>         with --rejoin-peers: this client's game port\n"
       "  --checksum-period <n>     sim_ChecksumPeriod for this run (default: the game's, 50)\n"
       "  --lead <n>                beats the sim may run ahead (sim_ReplayLead, default 10)\n"
       "  --pace <ms>               one beat per this many ms, as a live game plays (100 is speed 0); time a late\n"
@@ -267,15 +278,32 @@ int main(int argc, char** argv)
   bool bad = false;
   (void)ReadOption("--label", gLabel);
   options.label = gLabel;
-  if (!ReadOption("--replay", options.replayPath) || !moho::CFG_GetArgOption("/init", 1, nullptr)) {
+  const bool liveRejoin = ReadOption("--rejoin-peers", options.rejoinPeers);
+  if ((!ReadOption("--replay", options.replayPath) && !liveRejoin) || !moho::CFG_GetArgOption("/init", 1, nullptr)) {
     PrintUsage();
     return kExitBadInput;
   }
   (void)ReadIntOption("--focus", options.focusArmy, bad);
+  (void)ReadIntOption("--rejoin-source", options.rejoinSource, bad);
+  (void)ReadIntOption("--rejoin-port", options.rejoinPort, bad);
+  (void)ReadIntOption("--rejoin-beat", options.rejoinBeat, bad);
   (void)ReadOption("--digests", options.digestPath);
   (void)ReadOption("--sync-keys", options.syncKeysPath);
   (void)ReadOption("--sync-dump", options.syncDumpPath);
   (void)ReadOption("--lua-routing-dump", options.luaRoutingDump);
+  std::string beatStep;
+  if (ReadOption("--lua-move-view", beatStep)
+      && std::sscanf(beatStep.c_str(), "%d:%d:%d", &options.luaMoveBeat, &options.luaMoveView, &options.luaMoveArmy) != 3) {
+    bad = true;
+  }
+  if (ReadOption("--lua-resync", beatStep)
+      && std::sscanf(beatStep.c_str(), "%d:%d", &options.luaResyncBeat, &options.luaResyncView) != 2) {
+    bad = true;
+  }
+  if (ReadOption("--focus-switch", beatStep)
+      && std::sscanf(beatStep.c_str(), "%d:%d", &options.focusSwitchBeat, &options.focusSwitchArmy) != 2) {
+    bad = true;
+  }
   (void)ReadOption("--sync-writers", options.syncWritersPath);
   (void)ReadOption("--wire-stats", options.wireStatsPath);
   (void)ReadOption("--state-digests", options.stateDigestPath);
@@ -329,6 +357,9 @@ int main(int argc, char** argv)
   }
   options.luaRouting = moho::CFG_GetArgOption("--lua-routing", 0, nullptr);
   options.parallelViews = moho::CFG_GetArgOption("--parallel-views", 0, nullptr);
+  if (ReadIntOption("--view-pipeline", options.viewPipelineThreads, bad) && options.viewPipelineThreads < 0) {
+    bad = true;
+  }
   {
     std::string cpuList;
     if (ReadOption("--cpus", cpuList) && !moho::AssignProcessCpus(cpuList.c_str())) {

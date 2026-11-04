@@ -151,7 +151,7 @@ func New(cfg Config, j *journal.Journal) (*Launcher, error) {
 	case cfg.Mode == ModeRelay && l.hub == nil:
 		// The relay listens where the games are: a socket bound to 127.0.0.1
 		// cannot send to -advertise's address (WSAEADDRNOTAVAIL).
-		l.relay = relay.New(j, relay.Options{Default: cfg.Link, ListenIP: net.ParseIP(localHost)})
+		l.relay = relay.New(j, relay.Options{Default: cfg.Link, ListenIP: net.ParseIP(localHost), Latch: cfg.RelayFollow})
 	case cfg.Mode == ModeContract:
 		if l.hub != nil {
 			job.Close()
@@ -733,6 +733,44 @@ func (l *Launcher) Kill(uid int) error {
 		p.seat.Kill()
 	}
 	return nil
+}
+
+// RejoinPeer is a player still in the game, for Rejoin.
+type RejoinPeer struct {
+	UID    int
+	Source int
+}
+
+// Rejoin starts player uid's game again to take its seat back. It links to every
+// peer and gets the game's recording from the first. Seats on this machine only.
+func (l *Launcher) Rejoin(uid, source, keyOf int, remote bool, peers []RejoinPeer) error {
+	p, err := l.Player(uid)
+	if err != nil {
+		return err
+	}
+	local, ok := p.seat.(*seat.Seat)
+	if !ok {
+		return fmt.Errorf("player %d: rejoin needs a seat on this machine", uid)
+	}
+	if len(peers) == 0 {
+		return fmt.Errorf("player %d: rejoin names no peers", uid)
+	}
+	list := make([]string, 0, len(peers))
+	for _, entry := range peers {
+		peer, err := l.Player(entry.UID)
+		if err != nil {
+			return err
+		}
+		endpoint, err := l.addr(p, peer)
+		if err != nil {
+			return err
+		}
+		list = append(list, fmt.Sprintf("%s=%d", endpoint, entry.Source))
+	}
+	if remote {
+		return local.RejoinElsewhere(strings.Join(list, ","), source)
+	}
+	return local.Rejoin(strings.Join(list, ","), source, keyOf)
 }
 
 // PlayerSnapshot is one row of Snapshot.

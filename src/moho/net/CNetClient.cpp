@@ -6,6 +6,7 @@
 #include "Common.h"
 #include "EClientMsg.h"
 #include "ECmdStreamOp.h"
+#include "ELobbyMsg.h"
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Logging.h"
 #include "INetConnection.h"
@@ -160,11 +161,52 @@ void CNetClient::ReceiveMessage(
     return;
   }
 
+  // Engine addition (issue #275): while catching up, what this peer says waits
+  // its turn behind the recorded stream.
+  if (mManager->mRejoinFeed != nullptr && mManager->mRejoinFeed->TakeIncoming(*this, *message)) {
+    return;
+  }
+
   // Engine addition (issue #285).
   if (message->GetType().raw() == static_cast<uint8_t>(EClientMsg::CLIMSG_PeerFeatures)) {
     mManager->mPeerFeatures->Receive(*mManager, *this, *message);
     return;
   }
 
+  // Engine addition (issue #275): when every client can rejoin, the seat stays
+  // held. A restart of the peer replaces this link, and the Connectivity dialog
+  // can still eject it. With a retail client in the game, nothing changes.
+  if (mManager->mPeerFeatures->EveryoneSupports(*mManager, EPeerFeature::Rejoin)) {
+    const std::uint8_t type = message->GetType().raw();
+    if (type == static_cast<std::uint8_t>(ELobbyMsg::LOBMSG_ConnLostErrored) ||
+        type == static_cast<std::uint8_t>(ELobbyMsg::LOBMSG_ConnLostEof)) {
+      mManager->mPeerFeatures->NoteRejoinLost(mIndex);
+      gpg::Logf("REJOIN: link to client %d:%s lost, seat held", mIndex, mNickname.c_str());
+      return;
+    }
+  }
+
   CClientBase::Process(*message);
+}
+
+/**
+ * Engine addition, not in the binary: see the declaration.
+ */
+void CNetClient::ReplaceConnection(INetConnection* const connection)
+{
+  std::scoped_lock lock(mManager->mLock);
+
+  if (mConnection != nullptr) {
+    auto* const previous = static_cast<CMessageDispatcher*>(mConnection);
+    previous->RemoveReceiver(MSGTYPE_SimBase, MSGTYPE_SimEnd, this);
+    previous->RemoveReceiver(MSGTYPE_ClientBase, MSGTYPE_ClientEnd, this);
+    previous->RemoveReceiver(MSGTYPE_LobbyBase, MSGTYPE_LobbyEnd, this);
+    mConnection->ScheduleDestroy();
+  }
+
+  mConnection = connection;
+  auto* const dispatcher = static_cast<CMessageDispatcher*>(mConnection);
+  dispatcher->PushReceiver(MSGTYPE_SimBase, MSGTYPE_SimEnd, this);
+  dispatcher->PushReceiver(MSGTYPE_ClientBase, MSGTYPE_ClientEnd, this);
+  dispatcher->PushReceiver(MSGTYPE_LobbyBase, MSGTYPE_LobbyEnd, this);
 }

@@ -260,6 +260,12 @@ void CNetUDPConnection::ScheduleDestroy()
 #endif
 }
 
+void CNetUDPConnection::SetWindow(const uint16_t window)
+{
+  boost::recursive_mutex::scoped_lock lock{mConnector->lock_};
+  mWindow = window;
+}
+
 /**
  * Address: 0x00485D30 (FUN_00485D30)
  * Address: 0x1007F7E0 (sub_1007F7E0)
@@ -855,7 +861,7 @@ void CNetUDPConnection::ProcessData(SNetPacket* packet)
     return;
   }
 
-  if (delta > 32) {
+  if (delta > static_cast<int16_t>(mWindow)) {
     // Too far in the future
     if (net_DebugLevel) {
       gpg::Logf(
@@ -1216,7 +1222,8 @@ int CNetUDPConnection::SendData()
       // Pending data only waits on the send deadline while the window can take
       // it (`HasPacketWaiting`); behind a full window that deadline is no
       // reason to wake, and an expired one would spin the same way.
-      const bool windowOpen = static_cast<int16_t>(mNextSequenceNumber - mRemoteExpectedSequenceNumber) <= 32;
+      const bool windowOpen =
+        static_cast<int16_t>(mNextSequenceNumber - mRemoteExpectedSequenceNumber) <= static_cast<int16_t>(mWindow);
       if (mSendBy.mTime != 0 &&
           (mInResponseTo != 0 || (windowOpen && (mPendingOutputData.GetLength() != 0 || mOutputFlushPending)))) {
         since = ChooseTimeout(since, TimeSince(mSendBy.mTime));
@@ -1252,7 +1259,7 @@ int CNetUDPConnection::SendData()
 bool CNetUDPConnection::HasPacketWaiting(const int64_t nowUs)
 {
   // Window check (16-bit arithmetic in asm)
-  if (static_cast<int16_t>(mNextSequenceNumber - mRemoteExpectedSequenceNumber) > 32) {
+  if (static_cast<int16_t>(mNextSequenceNumber - mRemoteExpectedSequenceNumber) > static_cast<int16_t>(mWindow)) {
     return false;
   }
 

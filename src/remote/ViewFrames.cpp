@@ -1,6 +1,7 @@
 #include "remote/ViewFrames.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <iterator>
 #include <unordered_set>
@@ -127,19 +128,19 @@ namespace faf::remote
     }
   }
 
-  void CViewFrames::AdvanceIdMap(moho::Sim& sim, const std::size_t army, CViewIdMap& map)
+  void CViewFrames::AdvanceIdMap(const std::size_t army, CViewIdMap& map)
   {
     // What the last beat retired goes first: its frame could still name those ids (a unit's
     // target blip deleted on the same beat), and named them with the ids the view had. A
     // command retires once the sim's command database no longer has it: the sim deletes a
     // finished command while it publishes the beat's commands (`CCommandDB::PublishSyncData`),
     // after the walk this observer sees, so a command released on one beat goes on the next.
-    map.AdvanceTo(sim.mCurBeat);
+    map.AdvanceTo(mViewBeat);
     map.RetireEntities(mRetired[army]);
-    if (const moho::CCommandDB* const commands = sim.mCommandDB; commands != nullptr) {
+    if (mHaveCommands) {
       map.RetireCommands(mReleasedCommands);
-      map.RetireNewCommandsUnless([commands](const std::uint32_t simId) {
-        return commands->commands.find(simId) != commands->commands.end();
+      map.RetireNewCommandsUnless([this](const std::uint32_t simId) {
+        return std::binary_search(mLiveCommands.begin(), mLiveCommands.end(), simId);
       });
     }
   }
@@ -237,7 +238,7 @@ namespace faf::remote
     return found == mEntityIndex.end() || found->id != id || (found->views & viewBit) != 0u;
   }
 
-  void CViewFrames::BuildHeldFrame(moho::Sim& sim, const std::size_t army, const moho::SSyncData& packet)
+  void CViewFrames::ApplyHeldFrame(moho::Sim& sim, const std::size_t army, const moho::SSyncData& packet)
   {
     CViewFrameBuilder& builder = *mBuilders[army];
     SHeldView& held = mHeld[army];
@@ -248,6 +249,12 @@ namespace faf::remote
     held.baselineId = held.frameId != 0u ? held.frameId : wire::kNoBaseline;
     held.frameId = stamp.frameId;
     held.beat = stamp.beat;
+  }
+
+  void CViewFrames::FinishHeldFrame(const std::size_t army, const moho::SSyncData& packet)
+  {
+    CViewFrameBuilder& builder = *mBuilders[army];
+    SHeldView& held = mHeld[army];
 
     const std::size_t slots = builder.SlotCount();
     if (held.ownSlot.size() < slots) {
@@ -346,7 +353,7 @@ namespace faf::remote
     // the command sources allowed to command the view's army (`UserCommandIssue.cpp:372` packs
     // the client's source there).
     CViewIdMap& map = *mIdMaps[army];
-    AdvanceIdMap(sim, army, map);
+    AdvanceIdMap(army, map);
     const moho::BVIntSet* sources = nullptr;
     if (army < packet.mArmyUpdates.size()) {
       sources = &packet.mArmyUpdates[army].mValidCommandSources;
@@ -446,7 +453,7 @@ namespace faf::remote
     });
     mWithheld[army] = static_cast<std::uint32_t>(builder.EntityCount()) - held.count;
     if (mHeldCheck) {
-      CheckHeldFrame(sim, army, isOwnCommand);
+      CheckHeldFrame(*mLastSim, army, isOwnCommand);
     }
     builder.ClearChanges();
   }
@@ -477,7 +484,7 @@ namespace faf::remote
       return builder.FindSlot(record.id, slot) && held.keep[slot] != 0u;
     });
     ClearUnheldReferences(whole);
-    AdvanceIdMap(sim, army, *held.checkMap);
+    AdvanceIdMap(army, *held.checkMap);
     held.checkMap->Translate(whole, isOwnCommand);
 
     std::vector<const wire::SEntityRecord*> kept;
@@ -527,7 +534,13 @@ namespace faf::remote
 
   std::uint32_t CViewFrames::ViewEntityId(const std::size_t view, const std::uint32_t simId)
   {
-    return view < mIdMaps.size() ? mIdMaps[view]->EntityId(simId) : simId;
+    if (view >= mIdMaps.size()) {
+      return simId;
+    }
+    if (mJobs != nullptr && mIdMaps[view]->MapsEntity(simId)) {
+      (void)FinishViews(); // this hands out a new id, which the view's own work may be doing too
+    }
+    return mIdMaps[view]->EntityId(simId);
   }
 
   std::uint64_t CViewFrames::HeldMismatches() const noexcept
@@ -539,8 +552,59 @@ namespace faf::remote
     return mismatches;
   }
 
+  void CViewFrames::EnablePipeline(const unsigned int threads)
+  {
+    if (mHeldOn && !mHeldCheck && threads > 0u) {
+      mJobs = std::make_unique<CViewJobs>(threads);
+    }
+  }
+
+  double CViewFrames::FinishViews()
+  {
+    if (!mJobsPending) {
+      return 0.0;
+    }
+    const auto start = std::chrono::steady_clock::now();
+    mJobs->Wait();
+    mViewWaitSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    mJobsPending = false;
+    OnViewsFinished();
+    return mViewWaitSeconds;
+  }
+
+  void CViewFrames::FinishFrame(const std::size_t army)
+  {
+    const auto view = static_cast<std::int32_t>(army);
+    if (!HasView(view)) {
+      return;
+    }
+    const moho::SSyncData& packet = Packet(view);
+    if (mHeldOn) {
+      FinishHeldFrame(army, packet);
+    }
+    if (mIdMapsOn) {
+      // A deleted or erased entity's id retires once the client holds no record of it (an
+      // orphan keeps its view id while it is shown).
+      std::unordered_set<std::uint32_t>& retiring = mRetiring[army];
+      retiring.insert(packet.mDeleteIds.begin(), packet.mDeleteIds.end());
+      retiring.insert(packet.mEraseIds.begin(), packet.mEraseIds.end());
+      std::vector<std::uint32_t>& next = mRetired[army];
+      next.clear();
+      for (auto it = retiring.begin(); it != retiring.end();) {
+        if (mBuilders[army]->Holds(*it)) {
+          ++it;
+          continue;
+        }
+        next.push_back(*it);
+        it = retiring.erase(it);
+      }
+    }
+  }
+
   void CViewFrames::OnViewPackets(moho::Sim& sim)
   {
+    mViewBeat = sim.mCurBeat;
+    mLastSim = &sim;
     const auto armyCount = static_cast<std::size_t>(ArmyCount());
     while (mBuilders.size() < armyCount) {
       mIdMaps.push_back(std::make_unique<CViewIdMap>(static_cast<std::int32_t>(mBuilders.size())));
@@ -650,6 +714,7 @@ namespace faf::remote
     // The commands the sim released since last beat, once for every view (`AdvanceIdMap`).
     mLastCommands.swap(mLiveCommands);
     mLiveCommands.clear();
+    mHaveCommands = sim.mCommandDB != nullptr;
     if (const moho::CCommandDB* const commands = sim.mCommandDB; commands != nullptr) {
       for (const auto& [id, command] : commands->commands) {
         mLiveCommands.push_back(static_cast<std::uint32_t>(id));
@@ -676,7 +741,7 @@ namespace faf::remote
       CViewFrameBuilder& builder = *mBuilders[army];
       const moho::SSyncData& packet = Packet(view);
       if (mHeldOn) {
-        BuildHeldFrame(sim, army, packet);
+        ApplyHeldFrame(sim, army, packet);
       } else {
         builder.Apply(packet);
 
@@ -708,7 +773,7 @@ namespace faf::remote
           // the command sources allowed to command the view's army (`UserCommandIssue.cpp:372`
           // packs the client's source there).
           CViewIdMap& map = *mIdMaps[army];
-          AdvanceIdMap(sim, army, map);
+          AdvanceIdMap(army, map);
           const moho::BVIntSet* sources = nullptr;
           if (army < packet.mArmyUpdates.size()) {
             sources = &packet.mArmyUpdates[army].mValidCommandSources;
@@ -721,22 +786,8 @@ namespace faf::remote
         mFrames[army] = std::move(frame);
         mWithheld[army] = withheld;
       }
-      if (mIdMapsOn) {
-        // A deleted or erased entity's id retires once the client holds no record of it (an
-        // orphan keeps its view id while it is shown).
-        std::unordered_set<std::uint32_t>& retiring = mRetiring[army];
-        retiring.insert(packet.mDeleteIds.begin(), packet.mDeleteIds.end());
-        retiring.insert(packet.mEraseIds.begin(), packet.mEraseIds.end());
-        std::vector<std::uint32_t>& next = mRetired[army];
-        next.clear();
-        for (auto it = retiring.begin(); it != retiring.end();) {
-          if (builder.Holds(*it)) {
-            ++it;
-            continue;
-          }
-          next.push_back(*it);
-          it = retiring.erase(it);
-        }
+      if (mJobs == nullptr) {
+        FinishFrame(army);
       }
     };
     if (Parallel() && armyCount > 1u) {
@@ -756,7 +807,13 @@ namespace faf::remote
       mBuilt[army] = true;
     }
     AddBuildTime();
-    mLastSim = &sim;
     OnViewFrames(sim);
+    if (mJobs != nullptr) {
+      mJobsPending = true;
+      mJobs->Start(armyCount, [this](const std::size_t army) {
+        FinishFrame(army);
+        OnViewReady(army);
+      });
+    }
   }
 } // namespace faf::remote

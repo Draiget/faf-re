@@ -20,7 +20,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include "boost/mutex.h"
+#include <mutex>
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Vector.h"
@@ -335,7 +335,7 @@ namespace
 
   CrashReportAttachmentRegistry sCrashReportAttachments;
 
-  boost::mutex* sMutexSymHandler = nullptr;
+  std::recursive_mutex* sMutexSymHandler = nullptr;
 
   /**
    * Address: 0x004A1E20 (FUN_004A1E20, Moho::InitSymHandlerMutex)
@@ -343,17 +343,19 @@ namespace
    *
    * What it does:
    * Constructs the process-global symbol-handler mutex once and publishes it
-   * through `sMutexSymHandler`.
+   * through `sMutexSymHandler`. Recursive, as the binary's CRITICAL_SECTION is:
+   * a fault inside a locked symbol call reaches the crash report's call stack
+   * on the same thread.
    */
   void InitSymHandlerMutex()
   {
-    static boost::mutex sMutex;
+    static std::recursive_mutex sMutex;
     sMutexSymHandler = &sMutex;
   }
   std::once_flag sSymHandlerMutexInitOnce;
 
   [[nodiscard]]
-  boost::mutex& GetSymHandlerMutex()
+  std::recursive_mutex& GetSymHandlerMutex()
   {
     std::call_once(sSymHandlerMutexInitOnce, &InitSymHandlerMutex);
     return *sMutexSymHandler;
@@ -385,7 +387,7 @@ moho::AppPumpStepHook moho::sAppPumpStep = nullptr;
  */
 void moho::PLAT_Init()
 {
-  boost::mutex::scoped_lock lock(GetSymHandlerMutex());
+  std::lock_guard<std::recursive_mutex> lock(GetSymHandlerMutex());
 
   if (sMohoEngineMuexInitialized) {
     return;
@@ -409,7 +411,7 @@ void moho::PLAT_Init()
  */
 void moho::PLAT_Exit()
 {
-  boost::mutex::scoped_lock lock(GetSymHandlerMutex());
+  std::lock_guard<std::recursive_mutex> lock(GetSymHandlerMutex());
 
   if (!sMohoEngineMuexInitialized) {
     return;
@@ -464,7 +466,7 @@ std::uint32_t moho::PLAT_GetCallStack(
     return 0;
   }
 
-  boost::mutex::scoped_lock lock(GetSymHandlerMutex());
+  std::lock_guard<std::recursive_mutex> lock(GetSymHandlerMutex());
   if (!sSymbolHandlerInitialized) {
     return 0;
   }
@@ -594,7 +596,7 @@ bool moho::PLAT_GetSymbolInfo(const std::uintptr_t address, SPlatSymbolInfo* con
     return false;
   }
 
-  boost::mutex::scoped_lock lock(GetSymHandlerMutex());
+  std::lock_guard<std::recursive_mutex> lock(GetSymHandlerMutex());
   if (!sSymbolHandlerInitialized) {
     return false;
   }
@@ -696,7 +698,7 @@ msvc8::string moho::PLAT_FormatCallstack(
  */
 msvc8::string moho::PLAT_UnDecorateSymbolName(const char* const name, const bool stripLeadingUnderscore)
 {
-  boost::mutex::scoped_lock lock(GetSymHandlerMutex());
+  std::lock_guard<std::recursive_mutex> lock(GetSymHandlerMutex());
 
   msvc8::string result;
   if (name == nullptr) {

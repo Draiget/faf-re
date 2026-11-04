@@ -101,10 +101,11 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/zlib" "${CMAKE_BINARY_DIR}/de
 # simulation targets build as before.
 option(FAF_FETCH_DEPENDENCIES "Fetch the net channel's Monocypher download at configure time" ON)
 if(FAF_FETCH_DEPENDENCIES)
-  set(FAF_DEPENDENCIES_ONLY monocypher)
+  set(FAF_DEPENDENCIES_ONLY monocypher zstd)
   include(FafDependencies)
 endif()
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/monocypher" "${CMAKE_BINARY_DIR}/deps/monocypher")
+add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/zstd" "${CMAKE_BINARY_DIR}/deps/zstd")
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/remote/net" "${CMAKE_BINARY_DIR}/remote/net")
 if(TARGET faf_netchannel)
   add_executable(faf_netchannel_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/NetChannelTests.cpp")
@@ -203,7 +204,7 @@ target_include_directories(faf_sim_settings INTERFACE
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_link_libraries(faf_sim_settings INTERFACE faf_codegen)
-target_link_libraries(faf_sim PUBLIC Wm3Headers zlib123)
+target_link_libraries(faf_sim PUBLIC Wm3Headers zlib123 faf_monocypher faf_zstd)
 
 set(_faf_sim_options
   # The recovered tree's x86 layout asserts, off as on Windows x64 (see the

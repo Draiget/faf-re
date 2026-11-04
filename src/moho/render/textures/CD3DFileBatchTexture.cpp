@@ -319,7 +319,7 @@ namespace moho
       return;
     }
 
-    boost::mutex::scoped_lock scopedLock(sResourceLock);
+    std::lock_guard<std::recursive_mutex> scopedLock(sResourceLock);
 
     const TextureLookup lookup(texture->GetFilename(), texture->GetBorder());
     TextureLookupMap::iterator mapIt = FindTextureLookupEntry(lookup);
@@ -358,7 +358,7 @@ namespace moho
     boost::shared_ptr<CD3DBatchTexture> outTexture;
     const char* const normalizedPath = filename != nullptr ? filename : "";
 
-    boost::mutex::scoped_lock scopedLock(sResourceLock);
+    std::lock_guard<std::recursive_mutex> scopedLock(sResourceLock);
 
     const TextureLookup lookup(normalizedPath, border);
     const TextureLookupMap::iterator cachedIt = FindTextureLookupEntry(lookup);

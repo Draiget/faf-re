@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <map>
 
-#include "boost/mutex.h"
+#include <mutex>
 #include "legacy/containers/String.h"
 #include "moho/containers/TDatList.h"
 
@@ -57,7 +57,7 @@ namespace moho
   {
     using HostMap = std::map<std::uint32_t, Host*>;
 
-    boost::mutex mLock;
+    std::mutex mLock;
     HostMap mHosts;
     TDatList<Host, void> mHostList;
 

@@ -13,7 +13,7 @@
 #include <mutex>
 #include <vector>
 
-#include "boost/mutex.h"
+#include <mutex>
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/time/Timer.h"
@@ -39,7 +39,7 @@ namespace moho
 
     struct TimeBarState
     {
-      boost::mutex mLock;
+      std::mutex mLock;
       STimeBarThreadInfo mThreadListSentinel;
       std::array<STimeBarEventRecord, kTimeBarHistoryCapacity> mHistory;
       std::int32_t mOldestHistoryIndex;
@@ -123,7 +123,7 @@ namespace moho
 
       if (gTimeBarState) {
         TimeBarState& state = *gTimeBarState;
-        boost::mutex::scoped_lock guard(state.mLock);
+        std::lock_guard<std::mutex> guard(state.mLock);
         UnlinkThreadInfoNoLock(info);
       }
 
@@ -179,7 +179,7 @@ namespace moho
       info->mColorTag = kDefaultThreadColorTag;
 
       {
-        boost::mutex::scoped_lock guard(state.mLock);
+        std::lock_guard<std::mutex> guard(state.mLock);
         LinkThreadInfoNoLock(state, info);
       }
 
@@ -216,7 +216,7 @@ namespace moho
      */
     void PushHistoryRecord(TimeBarState& state, const STimeBarEventRecord& record)
     {
-      boost::mutex::scoped_lock guard(state.mLock);
+      std::lock_guard<std::mutex> guard(state.mLock);
 
       const std::int32_t nextIndex = (state.mNextHistoryIndex + 1) % kTimeBarHistoryCapacity;
       if (nextIndex == state.mOldestHistoryIndex) {
@@ -362,7 +362,7 @@ namespace moho
 
     const std::int64_t nowCycles = QueryCurrentCycles();
 
-    boost::mutex::scoped_lock guard(state.mLock);
+    std::lock_guard<std::mutex> guard(state.mLock);
 
     for (auto* node = static_cast<STimeBarThreadInfo*>(state.mThreadListSentinel.mNext); node != &state.mThreadListSentinel;
          node = static_cast<STimeBarThreadInfo*>(node->mNext)) {

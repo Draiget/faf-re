@@ -2301,7 +2301,7 @@ namespace
 bool moho::dbg_MonitorAddressSpace = false;
 float moho::dump_Rate = 30.0f;
 float moho::efx_WaveCutoff = 400.0f;
-float moho::sc_FrameTimeClamp = 10.0f;
+float moho::sc_FrameTimeClamp = 4.0f; // engine change: the binary has 10 ms, which caps the game at 100 FPS
 bool moho::sc_SkipIntro = false;
 
 namespace moho

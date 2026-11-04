@@ -33,6 +33,7 @@
 #include "INetDatagramSocket.h"
 #include "INetNATTraversalProviderWeakPtrReflection.h"
 #include "legacy/containers/Set.h"
+#include "LobbyPeerFeatures.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/app/CWaitHandleSet.h"
 #include "moho/client/Localization.h"
@@ -524,6 +525,7 @@ CLobby::CLobby(
   , maxConnections(maxConnectionsArg)
   , mHasNAT(hasNAT)
   , localUid(localUidArg)
+  , mPeerFeatures(std::make_unique<CLobbyPeerFeatures>(*this))
 {
   if (localUidArg != -1) {
     gpg::Logf("LOBBY: starting with local uid of %d [%s]", localUidArg, playerName);
@@ -540,6 +542,8 @@ CLobby::CLobby(
 
   this->connector->SelectEvent(event);
   WIN_GetWaitHandleSet()->AddHandle(event);
+
+  mPeerFeatures->InstallSlotStyles(mLuaObj.GetActiveState()->m_state);
 
   // Engine addition (issue #215): counted last, so a constructor that throws
   // above (no destructor runs) leaves the count alone.
@@ -660,6 +664,9 @@ void CLobby::ReceiveMessage(
     case ELobbyMsg::LOBMSG_BroadcastScriptData:
     case ELobbyMsg::LOBMSG_DirectScriptData:
       OnScriptData(message, connection);
+      break;
+    case ELobbyMsg::LOBMSG_PeerFeatures:
+      OnPeerFeatures(message, connection);
       break;
     case ELobbyMsg::LOBMSG_ConnFailed:
       OnConnectionFailed(message, connection);
@@ -830,6 +837,7 @@ void CLobby::OnJoin(
     acceptStream.Write(hostedTime);
   }
   connection->Write(accept);
+  mPeerFeatures->PeerEstablished(*player);
 
   LuaPlus::LuaState* l = mLuaObj.GetActiveState();
   const msvc8::string locMsg = Loc(l, "<LOC Engine0004>Connection to %s established.");
@@ -932,6 +940,8 @@ void CLobby::OnWelcome(
 
     ProcessConnectionToHostEstablished(&pLocal, &pName, &pHost);
   }
+
+  mPeerFeatures->PeerEstablished(*peer);
 
   LuaPlus::LuaState* l = mLuaObj.GetActiveState();
   const msvc8::string locMsg = Loc(l, "<LOC Engine0004>Connection to %s established.");
@@ -1100,6 +1110,26 @@ void CLobby::OnScriptData(
   }
 
   LuaCall("DataReceived", &script);
+}
+
+/**
+ * Engine addition, not in the binary. Each side announces once its link is
+ * established, so both uids are settled by the time anything is signed.
+ */
+void CLobby::OnPeerFeatures(
+  CMessage* message,
+  INetConnection* connection
+)
+{
+  const SPeer* const peer = FindPeerByConnection(connection);
+  if (peer == nullptr || peer->state != ENetworkPlayerState::kEstablished) {
+    LogDroppedLobbyMessage("LOBBY: ignoring peer features from conn=%p.", connection);
+    return;
+  }
+
+  if (mPeerFeatures->Receive(*peer, localUid, *message)) {
+    mPeerFeatures->PaintPeer(mLuaObj.GetActiveState()->m_state, peer->uid);
+  }
 }
 
 /**

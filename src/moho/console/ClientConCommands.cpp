@@ -782,7 +782,7 @@ namespace
    */
   [[nodiscard]] std::uint32_t RandomIndexBelowExtent(const std::uint32_t extent)
   {
-    boost::mutex::scoped_lock randomLock(math_GlobalRandomMutex);
+    std::lock_guard<std::mutex> randomLock(math_GlobalRandomMutex);
     const std::uint64_t sample = math_GlobalRandomStream.twister.NextUInt32();
     return static_cast<std::uint32_t>((sample * static_cast<std::uint64_t>(extent)) >> 32);
   }
