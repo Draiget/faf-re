@@ -53,6 +53,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_FastEconStats` | 1 | `/con` | live | Bypasses string map lookups and allocations for per-tick army economy statistics by caching resolved `CArmyStatItem` pointers; bit-for-bit checksum identical to retail |
 | `mem_SmallBlockIndexTable` | 1 | `/con` | live | x86 allocator: size class by table instead of a binary search |
 | `mem_InlineTransformCopy` | 1 | `/con` | live | Transform copies inline instead of through Wm3's out-of-line `memcpy_s` |
+| `save_FastKeyframeArchive` | 1 | `/con` | live (next keyframe) | headless: a replay keyframe's save looks up tracked pointers in a hash index instead of a tree and writes through a memory buffer instead of one `fwrite` per value, in the same file format. About 3.5 to 4 times faster on Linux (replay 26915859: 6.1 to 1.7 s at 189 MB). Saved games keep the original path |
 | small-block pool (x64) | on | `/smallpool 0` or `FAF_SMALLPOOL=0` | startup only | Size-class pool for blocks up to 4 KB in front of the system heap; the log says `mem: small-block pool on/off` |
 | `res_CacheFileLookups` | 1 | `/con` | live | Remembers where the mounted file system found each file (cleared on disk-watch events, mount changes and the engine's own deletes and moves; "not found" kept only for archive-only lookups) |
 | `res_ZipNameCache` | 1 | `/nozipnamecache` turns it off at startup | live | Each mounted archive's entry names are lowered once, not on every file search (about 0.37 s from process start to a map); same results |

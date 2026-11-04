@@ -11,6 +11,7 @@
 #include "boost/shared_ptr.h"
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/containers/WriteArchive.h"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/CSaveGameRequestImpl.h"
 #include "moho/misc/ISaveRequest.h"
 #include "moho/sim/ISTIDriver.h"
@@ -23,6 +24,15 @@ namespace faf::headless
   namespace
   {
     using Clock = std::chrono::steady_clock;
+
+    /** Engine addition: see `gpg::CreateFastBinaryWriteArchive`. The file's format is the same. */
+    bool save_FastKeyframeArchive = true;
+    moho::TConVar<bool> gTConVar_save_FastKeyframeArchive(
+      "save_FastKeyframeArchive",
+      "A replay keyframe's save looks up pointers in a hash index and writes through a memory buffer (1, the default), "
+      "or as a saved game does (0). Same file format.",
+      &save_FastKeyframeArchive
+    );
 
     /**
      * One keyframe. The sim's thread calls `GetArchive` between beats and saves the sim into
@@ -59,7 +69,7 @@ namespace faf::headless
             throw std::runtime_error("cannot write " + mPath);
           }
         }
-        mArchive = gpg::CreateBinaryWriteArchive(mFile);
+        mArchive = save_FastKeyframeArchive ? gpg::CreateFastBinaryWriteArchive(mFile) : gpg::CreateBinaryWriteArchive(mFile);
         return mArchive;
       }
 
