@@ -2473,7 +2473,7 @@ bool CSimDriver::RewindToStart(
   mSyncDataQueue.ClearAndDelete();
   mDispatchBeat = startBeat;
   mNextIssueBeat = startBeat;
-  mLastDequeuedBeat = -1;
+  mLastDequeuedBeat = startBeat > 0 ? startBeat - 1 : 0;
   mSimBusy = false;
   mState = EDriverState::Startup;
   mStopCreateSimThread = false;
@@ -2486,6 +2486,7 @@ bool CSimDriver::RewindToStart(
 
   // 7. Begin keyframe restore
   moho::SIM_BeginKeyframeRestore(keyframeHeader);
+  moho::gSimBeatOrigin.store(0);
   loadInfo->mReadArchive = gpg::CreateBinaryReadArchive(keyframeFile);
   mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(loadInfo);
 
