@@ -1,4 +1,5 @@
 #include "CArmyImpl.h"
+#include "gpg/core/profiling/Profiler.h"
 
 #include <algorithm>
 #include <bit>
@@ -1706,7 +1707,10 @@ namespace moho
       SetCanSee(Simulation->mSyncFilter.focusArmy);
     }
 
-    CleanUpPlatoons();
+    {
+      FAF_PROFILE_ZONE_NAMED("Army::CleanUpPlatoons");
+      CleanUpPlatoons();
+    }
 
     // 0x006FFDBD-0x006FFDC4: the binary pushes `[army+0x1F4]` -- EconomyInfo --
     // unchecked and calls func_ArmyProcessEconomy. That is the tick's only
@@ -1715,9 +1719,13 @@ namespace moho
     // constructor and by `CopyArmyVariableData` at sync time. CSimArmyEconomyInfo
     // is the same object viewed through its economy-facing field names, exactly
     // as CArmyImpl's own ctor and Unit::HandleResourceManagement already treat it.
-    ProcessArmyEconomy(*reinterpret_cast<CEconomy*>(EconomyInfo));
+    {
+      FAF_PROFILE_ZONE_NAMED("Army::Economy");
+      ProcessArmyEconomy(*reinterpret_cast<CEconomy*>(EconomyInfo));
+    }
 
     if (Simulation != nullptr && Simulation->mCurTick > 10u && Stats != nullptr) {
+      FAF_PROFILE_ZONE_NAMED("Army::StatsUpdate");
       Stats->Update();
     }
 
@@ -1726,6 +1734,7 @@ namespace moho
       && static_cast<std::uint32_t>(mConstDat.mArmyIndex) == (Simulation->mCurTick % 30u)
       && InfluenceMap != nullptr
     ) {
+      FAF_PROFILE_ZONE_NAMED("Army::InfluenceMap");
       InfluenceMap->Update();
     }
 
@@ -1735,6 +1744,7 @@ namespace moho
     }
 
     if (AiBrain != nullptr) {
+      FAF_PROFILE_ZONE_NAMED("Army::AiStages");
       if (AiBrain->mAiThreadStage != nullptr) {
         AiBrain->mAiThreadStage->UserFrame();
       }

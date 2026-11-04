@@ -1020,6 +1020,7 @@ void CSimDriver::FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock)
   // driver lock is re-taken.
   SSyncData* syncData = nullptr;
   {
+    FAF_PROFILE_ZONE_NAMED("SyncDispatch::SimSync");
     CTimeBarSection timebar("Sim - Sync");
     if (gEngineStatSimSync == nullptr) {
       gEngineStatSimSync = GetEngineStats()->GetItem3("Sim_Sync");
@@ -1044,6 +1045,7 @@ void CSimDriver::FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock)
 
   const int32_t oldestRetainedBeat = currentBeat - 128;
   if (syncBeat >= oldestRetainedBeat && syncBeat < currentBeat) {
+    FAF_PROFILE_ZONE_NAMED("SyncDispatch::VerifyChecksum");
     const gpg::MD5Digest& expectedDigest = mSim->mSimHashes[syncBeat & 0x7F];
     if (!IsZeroDigest(expectedDigest)) {
       mMarshaller->VerifyChecksum(expectedDigest, syncBeat);

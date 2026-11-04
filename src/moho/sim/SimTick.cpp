@@ -1216,12 +1216,17 @@ void Sim::AdvanceBeat(const int amt)
     }
     {
       FAF_PROFILE_ZONE_NAMED("Sim::Recon");
-      RefreshBlips();
+      {
+        FAF_PROFILE_ZONE_NAMED("Recon::RefreshBlips");
+        RefreshBlips();
+      }
 
     if (!mArmiesList.empty() && sim_ParallelRecon && mArmiesList.size() <= kMaxParallelReconArmies &&
         CSimWorkerPool::ParallelEnabled()) {
+      FAF_PROFILE_ZONE_NAMED("Recon::Parallel");
       RunReconPhaseParallel(*this);
     } else if (!mArmiesList.empty()) {
+      FAF_PROFILE_ZONE_NAMED("Recon::Serial");
       const std::size_t armyCount = mArmiesList.size();
       const std::size_t reconTickIndex = static_cast<std::size_t>(mCurTick) % armyCount;
       for (std::size_t i = 0; i < armyCount; ++i) {
