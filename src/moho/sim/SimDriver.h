@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <new>
+#include <vector>
 
 #include "boost/condition.h"
 #include "boost/mutex.h"
@@ -1045,6 +1046,7 @@ namespace moho
   extern int sim_ReplayLead;
   extern int sim_ReplayKeyframeInterval;
   extern bool sim_ReplayKeyframeCompress;
+  extern int sim_ReplayKeyframeStorage;
   extern int sim_LocalLead;
 
   /**
@@ -1085,6 +1087,9 @@ namespace moho
    * 0 otherwise. The display clock follows it so the sim is not held to the rounded rate.
    */
   [[nodiscard]] float SIM_GetLeadSimSpeedEstimate() noexcept;
+
+  /** Engine addition: returns all ticks that currently have a keyframe snapshot. */
+  void SIM_GetReplayKeyframeTicks(std::vector<std::uint32_t>& outTicks);
 
   /**
    * Engine addition (dedicated-server plan WPL.4): CSimDriver::DrawNetworkStatsPanel for

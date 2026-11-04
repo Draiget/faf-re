@@ -62,6 +62,8 @@ namespace
     "bool IsReplayScrubbing() - return true if fast-forward scrubbing is active.";
   constexpr const char* kGetReplayScrubProgressHelpText =
     "table GetReplayScrubProgress() - return scrub progress table or nil if not scrubbing.";
+  constexpr const char* kGetReplayKeyframesHelpText =
+    "table GetReplayKeyframes() - returns an array of tick numbers that currently have keyframes saved.";
   constexpr const char* kSessionRequestPauseHelpText = "Pause the world simulation.";
   constexpr const char* kSessionRequestPauseNoActiveSessionText = "SessionRequestPause(): no active session.";
   constexpr const char* kSessionResumeHelpText = "Resume the world simulation.";
@@ -1591,6 +1593,63 @@ int moho::cfunc_GetReplayScrubProgressL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Engine addition: Replay keyframes API
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_GetReplayKeyframesL`.
+ */
+int moho::cfunc_GetReplayKeyframes(lua_State* const luaContext)
+{
+  return cfunc_GetReplayKeyframesL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Engine addition: Replay keyframes API
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `GetReplayKeyframes`.
+ */
+moho::CScrLuaInitForm* moho::func_GetReplayKeyframes_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "GetReplayKeyframes",
+    &moho::cfunc_GetReplayKeyframes,
+    nullptr,
+    "<global>",
+    kGetReplayKeyframesHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Engine addition: Replay keyframes API
+ *
+ * What it does:
+ * Returns a table array of tick numbers that currently have keyframe snapshots.
+ */
+int moho::cfunc_GetReplayKeyframesL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  moho::SCR_ExpectExactArgs(state, 0, kGetReplayKeyframesHelpText);
+
+  std::vector<std::uint32_t> ticks;
+  moho::SIM_GetReplayKeyframeTicks(ticks);
+
+  lua_newtable(rawState);
+  for (std::size_t i = 0; i < ticks.size(); ++i) {
+    lua_pushnumber(rawState, static_cast<lua_Number>(i + 1));
+    lua_pushnumber(rawState, static_cast<lua_Number>(ticks[i]));
+    lua_settable(rawState, -3);
+  }
+  return 1;
+}
+
+/**
  * Address: 0x00897E60 (FUN_00897E60, cfunc_SessionIsBeingRecorded)
  *
  * What it does:
@@ -2463,6 +2522,7 @@ namespace
       (void)::moho::func_CancelReplayScrub_LuaFuncDef();
       (void)::moho::func_IsReplayScrubbing_LuaFuncDef();
       (void)::moho::func_GetReplayScrubProgress_LuaFuncDef();
+      (void)::moho::func_GetReplayKeyframes_LuaFuncDef();
       (void)::moho::func_SessionIsBeingRecorded_LuaFuncDef();
       (void)::moho::func_SessionIsMultiplayer_LuaFuncDef();
       (void)::moho::func_SessionIsObservingAllowed_LuaFuncDef();

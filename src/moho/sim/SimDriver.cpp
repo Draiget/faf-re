@@ -79,12 +79,27 @@ namespace
   void DeleteAllKeyframesLocked()
   {
     for (const auto& kv : sReplayKeyframes) {
-      std::error_code ignored;
-      std::filesystem::remove(kv.second.path, ignored);
+      if (!kv.second.path.empty()) {
+        std::error_code ignored;
+        std::filesystem::remove(kv.second.path, ignored);
+      }
     }
     sReplayKeyframes.clear();
   }
+} // namespace
 
+void moho::SIM_GetReplayKeyframeTicks(std::vector<std::uint32_t>& outTicks)
+{
+  boost::mutex::scoped_lock lock(sReplayKeyframesMutex);
+  outTicks.clear();
+  outTicks.reserve(sReplayKeyframes.size());
+  for (const auto& kv : sReplayKeyframes) {
+    outTicks.push_back(kv.first);
+  }
+}
+
+namespace
+{
   void CaptureKeyframeLocked(moho::Sim* const sim, const std::uint32_t processId)
   {
     if (sim == nullptr) {
@@ -101,6 +116,9 @@ namespace
     try {
       moho::gSimExactSaveCount.fetch_add(1u);
       moho::gSimExactArchive.store(true);
+
+      const bool useMemory = (moho::sim_ReplayKeyframeStorage == 1 || moho::sim_ReplayKeyframeStorage == 2);
+      const bool useDisk = (moho::sim_ReplayKeyframeStorage == 0 || moho::sim_ReplayKeyframeStorage == 2);
 
       if (moho::sim_ReplayKeyframeCompress) {
         // 1. Fast in-memory serialization: does not touch disk while sim thread is paused!
@@ -125,40 +143,44 @@ namespace
           compressed.clear();
         }
 
-        // 3. Write compressed keyframe to disk
-        std::FILE* file = nullptr;
-        if (fopen_s(&file, path.c_str(), "wb") == 0 && file != nullptr) {
-          boost::shared_ptr<std::FILE> sharedFile(file, moho::SFileStarCloser{});
-          if (moho::SIM_WriteKeyframeHeader(file, header)) {
-            if (compressedOk) {
-              const std::uint32_t magic = kKeyframePayloadMagicZlib;
-              const std::uint32_t compSize = static_cast<std::uint32_t>(packedSize);
-              std::fwrite(&magic, sizeof(magic), 1u, file);
-              std::fwrite(&uncompressedSize, sizeof(uncompressedSize), 1u, file);
-              std::fwrite(&compSize, sizeof(compSize), 1u, file);
-              std::fwrite(compressed.data(), 1u, compSize, file);
-            } else {
-              std::fwrite(rawBuffer.data(), 1u, rawBuffer.size(), file);
+        // 3. Write compressed keyframe to disk if disk storage is enabled
+        if (useDisk) {
+          std::FILE* file = nullptr;
+          if (fopen_s(&file, path.c_str(), "wb") == 0 && file != nullptr) {
+            boost::shared_ptr<std::FILE> sharedFile(file, moho::SFileStarCloser{});
+            if (moho::SIM_WriteKeyframeHeader(file, header)) {
+              if (compressedOk) {
+                const std::uint32_t magic = kKeyframePayloadMagicZlib;
+                const std::uint32_t compSize = static_cast<std::uint32_t>(packedSize);
+                std::fwrite(&magic, sizeof(magic), 1u, file);
+                std::fwrite(&uncompressedSize, sizeof(uncompressedSize), 1u, file);
+                std::fwrite(&compSize, sizeof(compSize), 1u, file);
+                std::fwrite(compressed.data(), 1u, compSize, file);
+              } else {
+                std::fwrite(rawBuffer.data(), 1u, rawBuffer.size(), file);
+              }
             }
+          } else {
+            gpg::Warnf("CSimDriver: failed to open %s for keyframe", path.c_str());
           }
-        } else {
-          gpg::Warnf("CSimDriver: failed to open %s for keyframe", path.c_str());
         }
 
-        // 4. Cache compressed payload in memory for instant rewind
+        // 4. Cache in memory if RAM storage is enabled
         boost::mutex::scoped_lock lock(sReplayKeyframesMutex);
         SReplayKeyframeEntry entry;
-        entry.path = path;
+        entry.path = useDisk ? path : "";
         entry.header = header;
         entry.uncompressedSize = uncompressedSize;
-        if (compressedOk) {
+        if (useMemory && compressedOk) {
           entry.compressedPayload = std::move(compressed);
         }
         sReplayKeyframes[tick] = std::move(entry);
 
-        gpg::Logf("CSimDriver: keyframe captured at beat %u, tick %u (raw: %u KB, compressed: %u KB) to %s",
+        gpg::Logf("CSimDriver: keyframe captured at beat %u, tick %u (raw: %u KB, compressed: %u KB, storage: %s) to %s",
                   header.beat, header.tick, uncompressedSize / 1024u,
-                  (compressedOk ? static_cast<std::uint32_t>(packedSize) / 1024u : 0u), path.c_str());
+                  (compressedOk ? static_cast<std::uint32_t>(packedSize) / 1024u : 0u),
+                  (moho::sim_ReplayKeyframeStorage == 1 ? "RAM" : (moho::sim_ReplayKeyframeStorage == 0 ? "Disk" : "RAM+Disk")),
+                  (useDisk ? path.c_str() : "<in-memory>"));
       } else {
         // Fallback: uncompressed direct disk write
         std::FILE* file = nullptr;
@@ -2364,6 +2386,7 @@ ISTIDriver* moho::SIM_CreateDriver(
 int moho::sim_ReplayLead = 10;
 int moho::sim_ReplayKeyframeInterval = 120;
 bool moho::sim_ReplayKeyframeCompress = true;
+int moho::sim_ReplayKeyframeStorage = 2;
 int moho::sim_LocalLead = 2;
 int moho::sim_LeadOnSchedule = 1;
 int moho::wld_SkewCorrection = 0;
@@ -2426,6 +2449,12 @@ namespace
     "sim_ReplayKeyframeCompress",
     "Replays only: compress keyframes with zlib and keep in-memory cache (1, default) or write uncompressed to disk (0).",
     &moho::sim_ReplayKeyframeCompress
+  );
+
+  TConVar<int> gTConVar_sim_ReplayKeyframeStorage(
+    "sim_ReplayKeyframeStorage",
+    "Replays only: keyframe storage target (0 = Disk Cache files only, 1 = RAM memory only, 2 = RAM + Disk Cache).",
+    &moho::sim_ReplayKeyframeStorage
   );
 
   TConVar<int> gTConVar_sim_LocalLead(

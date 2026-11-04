@@ -66,8 +66,27 @@ do
         end,
     }
 
+    local replayKeyframeStorageOption = {
+        title = "Replay Keyframe Storage",
+        key = 'replay_keyframe_storage',
+        type = 'toggle',
+        default = '2',
+        tip = "Select where replay keyframes are stored: in RAM (Memory) for fastest snapshots and zero disk files, on Disk (Cache) to minimize RAM usage, or both (RAM + Disk Cache).",
+        custom = {
+            states = {
+                { text = "RAM (Memory only)", key = '1' },
+                { text = "Disk Cache (Files only)", key = '0' },
+                { text = "RAM + Disk Cache (Both)", key = '2' },
+            },
+        },
+        set = function(key, value)
+            ConExecute("sim_ReplayKeyframeStorage " .. tostring(value))
+        end,
+    }
+
     local targetTab = options and (options.gameplay or options.interface or options.video)
     if targetTab and targetTab.items then
         table.insert(targetTab.items, replayKeyframeOption)
+        table.insert(targetTab.items, replayKeyframeStorageOption)
     end
 end

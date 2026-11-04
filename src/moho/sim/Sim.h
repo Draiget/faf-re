@@ -5141,6 +5141,34 @@ namespace moho
   int cfunc_GetReplayScrubProgressL(LuaPlus::LuaState* state);
 
   /**
+   * Engine addition: Replay keyframes API
+   *
+   * lua_State *
+   *
+   * What it does:
+   * Unwraps Lua callback context and dispatches to `cfunc_GetReplayKeyframesL`.
+   */
+  int cfunc_GetReplayKeyframes(lua_State* luaContext);
+
+  /**
+   * Engine addition: Replay keyframes API
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `GetReplayKeyframes`.
+   */
+  CScrLuaInitForm* func_GetReplayKeyframes_LuaFuncDef();
+
+  /**
+   * Engine addition: Replay keyframes API
+   *
+   * LuaPlus::LuaState *
+   *
+   * What it does:
+   * Returns a table array of ticks currently saved as keyframes.
+   */
+  int cfunc_GetReplayKeyframesL(LuaPlus::LuaState* state);
+
+  /**
    * Engine addition: Expose GetGameTick alias in user Lua as well.
    *
    * What it does:

@@ -351,6 +351,11 @@ function CreateReplayTimeline(parent)
         ConExecute('sim_ReplayKeyframeInterval ' .. tostring(prefInterval))
     end
 
+    local prefStorage = GetPreference('options.replay_keyframe_storage', '2')
+    if prefStorage then
+        ConExecute('sim_ReplayKeyframeStorage ' .. tostring(prefStorage))
+    end
+
     local rootFrame = GetFrame(0)
     parent = rootFrame
 
@@ -453,6 +458,65 @@ function CreateReplayTimeline(parent)
     end
     if slider._background and slider._background.EnableHitTest then
         slider._background:EnableHitTest()
+    end
+
+    controls.slider = slider
+    controls.keyframeMarkers = {}
+
+    local function UpdateKeyframeMarkers(totalTicks)
+        if not slider or not is_callable(GetReplayKeyframes) then
+            return
+        end
+        if not totalTicks or totalTicks <= 0 then
+            return
+        end
+
+        local ok, kfList = pcall(GetReplayKeyframes)
+        if not ok or type(kfList) ~= 'table' then
+            return
+        end
+
+        local curMap = {}
+        for _, kfTick in ipairs(kfList) do
+            curMap[kfTick] = true
+            if not controls.keyframeMarkers[kfTick] then
+                local marker = Bitmap(slider)
+                marker:SetSolidColor('ffffcc00') -- Bright golden keyframe notch
+                LayoutHelpers.SetDimensions(marker, 3, 12)
+                marker.Depth:Set(function() return bar.Depth() + 4 end)
+                if marker.EnableHitTest then
+                    marker:EnableHitTest()
+                    marker.HandleEvent = function(self, event)
+                        if event.Type == 'ButtonPress' then
+                            if slider.OnValueSet then
+                                slider:OnValueSet(kfTick)
+                            end
+                            return true
+                        end
+                        return false
+                    end
+                end
+
+                marker.Left:Set(function()
+                    local sw = slider.Width()
+                    local sl = slider.Left()
+                    local ratio = math.min(1.0, math.max(0.0, kfTick / totalTicks))
+                    return math.floor(sl + (ratio * sw) - (marker.Width() / 2))
+                end)
+                marker.Top:Set(function()
+                    return math.floor(slider.Top() + (slider.Height() - marker.Height()) / 2)
+                end)
+
+                controls.keyframeMarkers[kfTick] = marker
+            end
+        end
+
+        for kfTick, marker in pairs(controls.keyframeMarkers) do
+            if not curMap[kfTick] then
+                marker:Destroy()
+                controls.keyframeMarkers[kfTick] = nil
+            end
+        end
     end
 
     -- Floating preview label above slider thumb while dragging
@@ -663,6 +727,13 @@ function CreateReplayTimeline(parent)
                 slider:SetEndValue(fallbackMax)
             end
             totalTimeLabel:SetText("--:--")
+        end
+
+        local markerTotal = (total and total > 0) and total or math.max(100, curTick)
+        markerUpdateTimer = (markerUpdateTimer or 0) - deltaTime
+        if markerUpdateTimer <= 0 then
+            markerUpdateTimer = 0.5
+            UpdateKeyframeMarkers(markerTotal)
         end
 
         if not loggedOnce then
