@@ -12,6 +12,7 @@ add_library(faf_netchannel STATIC
   DatagramCipher.cpp
   NetChannel.cpp
   ReliableStream.cpp
+  StyleProof.cpp
 )
 target_include_directories(faf_netchannel PUBLIC "${PROJECT_SOURCE_DIR}/src")
 target_compile_features(faf_netchannel PUBLIC cxx_std_20)

@@ -60,6 +60,12 @@ namespace moho
     CUnitFerryTask(CCommandTask* parentTask, Unit* targetUnit);
 
     /**
+     * Builds an empty task for the serializer to fill (what `CUnitFerryTaskTypeInfo::NewRef`,
+     * 0x006101B0, constructs).
+     */
+    CUnitFerryTask();
+
+    /**
      * Address: 0x0060F790 (FUN_0060F790, Moho::CUnitFerryTask::operator new)
      *
      * What it does:

@@ -1,10 +1,12 @@
 # Checks a FAF_CALL_HASH_BUILD x86 headless against tests/replay_sets, with no original game.
 #
 # usage: check_replay_sets.ps1 -BuildDir <cmake build dir> [-Replay <id>] [-Pool <folder of replays>] [-Tag <run name>]
+#                              [-GameBin <game bin folder>] [-InitPattern <init file name, {0} is the replay>]
 #
 # Without -Replay it plays every replay in tests/replay_sets/replays.tsv. Needs build.bat's
 # recorder.exe and recorder.dll, and the game folder with the init files (tools/replay-parity writes
-# them). The exe is copied there under a test name; the playable one stays.
+# them; in CI tools/parity-data/sets_stage.py does, one per replay, hence -InitPattern). The exe is
+# copied there under a test name; the playable one stays.
 # Exit code: 0 all stored hashes found and every recorded checksum matched, 1 otherwise.
 param(
   [Parameter(Mandatory = $true)][string]$BuildDir,
@@ -12,7 +14,8 @@ param(
   [string]$Pool = 'G:\projects\faf-main\tmp\parity\pool',
   [string]$GameBin = 'C:\ProgramData\FAForever\bin',
   [string]$Tag = 'replaysets',
-  [int]$TimeoutSec = 5400
+  [int]$TimeoutSec = 5400,
+  [string]$InitPattern = ''
 )
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -32,6 +35,7 @@ $allPassed = $true
 foreach ($line in Get-Content (Join-Path $golden 'replays.tsv')) {
   $id, $init, $beats = $line -split "`t"
   if ($id -eq 'replay' -or ($Replay -ne '' -and $id -ne $Replay)) { continue }
+  if ($InitPattern -ne '') { $init = $InitPattern -f $id }
   $run = "$Tag$id"
   $spec = Join-Path $work "$run.bin"
   & $python (Join-Path $here 'replay_sets.py') spec $golden $id (Join-Path $BuildDir 'src\headless.exe') (Join-Path $BuildDir 'src\headless.pdb') $spec

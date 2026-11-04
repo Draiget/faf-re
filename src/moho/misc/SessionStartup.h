@@ -97,7 +97,7 @@ namespace moho
    * receives a sentence saying why, for the player.
    */
   [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo>
-  VCR_SetupReplaySession(gpg::StrArg filename, msvc8::string* failureReason = nullptr);
+  VCR_SetupReplaySession(gpg::StrArg filename, msvc8::string* failureReason = nullptr, int skipBeats = 0);
 
   /**
    * Engine addition: Scans a replay stream from its current position for all

@@ -95,19 +95,9 @@ namespace
   constexpr const char* kReconBlipIsOnRadarHelpText = "bool = ReconBlip:IsOnRadar()";
   constexpr const char* kReconBlipIsKnownFakeName = "IsKnownFake";
   constexpr const char* kReconBlipIsKnownFakeHelpText = "bool = ReconBlip:IsKnownFake()";
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
 
   constexpr std::uint32_t kUnitCollisionBucketFlags = 0x100u;
   constexpr std::uint32_t kReconEntityFamilyPrefix = 0x300u;
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
 
   int PushReconFlagFromLuaState(
     LuaPlus::LuaState* const state, const char* const helpText, const std::uint32_t flagMask
@@ -118,10 +108,7 @@ namespace
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, helpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, helpText);
 
     const LuaPlus::LuaObject blipObject(LuaPlus::LuaStackObject(state, 1));
     ReconBlip* const blip = SCR_FromLua_ReconBlip(blipObject, state);
@@ -285,11 +272,7 @@ int moho::cfunc_ReconBlipGetBlueprint(lua_State* const luaContext)
  */
 int moho::cfunc_ReconBlipGetBlueprintL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kReconBlipGetBlueprintHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kReconBlipGetBlueprintHelpText);
 
   const LuaPlus::LuaObject blipObject(LuaPlus::LuaStackObject(state, 1));
   ReconBlip* const blip = SCR_FromLua_ReconBlip(blipObject, state);
@@ -318,10 +301,7 @@ int moho::cfunc_ReconBlipGetSource(lua_State* const luaContext)
 int moho::cfunc_ReconBlipGetSourceL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kReconBlipGetSourceHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kReconBlipGetSourceHelpText);
 
   const LuaPlus::LuaObject blipObject(LuaPlus::LuaStackObject(state, 1));
   ReconBlip* const blip = SCR_FromLua_ReconBlip(blipObject, state);
@@ -497,7 +477,7 @@ int moho::cfunc_ReconBlipIsKnownFakeL(LuaPlus::LuaState* const state)
 CScrLuaInitForm* moho::func_ReconBlipGetBlueprint_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipGetBlueprintName,
     &moho::cfunc_ReconBlipGetBlueprint,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -516,7 +496,7 @@ CScrLuaInitForm* moho::func_ReconBlipGetBlueprint_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipGetSource_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipGetSourceName,
     &moho::cfunc_ReconBlipGetSource,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -535,7 +515,7 @@ CScrLuaInitForm* moho::func_ReconBlipGetSource_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsSeenEver_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsSeenEverName,
     &moho::cfunc_ReconBlipIsSeenEver,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -554,7 +534,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsSeenEver_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsSeenNow_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsSeenNowName,
     &moho::cfunc_ReconBlipIsSeenNow,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -573,7 +553,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsSeenNow_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsMaybeDead_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsMaybeDeadName,
     &moho::cfunc_ReconBlipIsMaybeDead,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -592,7 +572,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsMaybeDead_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsOnOmni_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsOnOmniName,
     &moho::cfunc_ReconBlipIsOnOmni,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -611,7 +591,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsOnOmni_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsOnSonar_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsOnSonarName,
     &moho::cfunc_ReconBlipIsOnSonar,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -630,7 +610,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsOnSonar_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsOnRadar_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsOnRadarName,
     &moho::cfunc_ReconBlipIsOnRadar,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -649,7 +629,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsOnRadar_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsKnownFake_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsKnownFakeName,
     &moho::cfunc_ReconBlipIsKnownFake,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -671,12 +651,9 @@ CScrLuaInitForm* moho::func_ReconBlipIsKnownFake_LuaFuncDef()
  * Constructs serializer-load baseline state for `ReconBlip`.
  */
 ReconBlip::ReconBlip(Sim* const sim) :
-    Entity(
-      nullptr,
-      sim,
-      static_cast<EntId>(moho::ToRaw(moho::EEntityIdSentinel::Invalid)),
-      kUnitCollisionBucketFlags
-    ),
+    // 0x005BED98: `call 0x6779E0`, the serializer's `Entity(Sim*, int)`: the id comes from the
+    // archive, so nothing registers in the entity DB here.
+    Entity(sim, kUnitCollisionBucketFlags),
     mCreator{},
     mDeleteWhenStale(0u),
     mPad279{0, 0, 0},

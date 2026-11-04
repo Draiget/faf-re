@@ -270,22 +270,39 @@ namespace faf::remote
       read(0u, entities.size());
     }
 
-    // The blocks of vision ranges stay in place while the views fill them.
+    // The blocks of vision ranges and blip hashes stay in place while the views fill them.
     for (std::size_t i = 0; i < entities.size(); ++i) {
       SChangedView& changed = mChanged[i];
-      if (!changed.hasCreator || changed.before.visions != kNoVisions) {
+      const bool needsVisions = changed.hasCreator && changed.before.visions == kNoVisions;
+      const bool needsHashes = changed.target.blip != nullptr && changed.blipRecordCount != 0u && changed.before.blipHashes == kNoVisions;
+      if (!needsVisions && !needsHashes) {
         continue;
       }
-      if (!mFreeVisions.empty()) {
-        changed.before.visions = mFreeVisions.back();
-        mFreeVisions.pop_back();
-      } else {
-        changed.before.visions = static_cast<std::uint32_t>(mVisions.size());
-        mVisions.grow_to(mVisions.size() + kMaxViews);
+      if (needsVisions) {
+        if (!mFreeVisions.empty()) {
+          changed.before.visions = mFreeVisions.back();
+          mFreeVisions.pop_back();
+        } else {
+          changed.before.visions = static_cast<std::uint32_t>(mVisions.size());
+          mVisions.grow_to(mVisions.size() + kMaxViews);
+        }
+      }
+      if (needsHashes) {
+        if (!mFreeBlipHashes.empty()) {
+          changed.before.blipHashes = mFreeBlipHashes.back();
+          mFreeBlipHashes.pop_back();
+        } else {
+          changed.before.blipHashes = static_cast<std::uint32_t>(mBlipHashes.size());
+          mBlipHashes.grow_to(mBlipHashes.size() + kMaxViews);
+        }
+        for (std::size_t view = 0; view < kMaxViews; ++view) {
+          mBlipHashes[changed.before.blipHashes + view] = 0u;
+        }
       }
       const auto id = static_cast<std::uint32_t>(changed.target.entity->id_);
       if (SEntityViews* const found = mEntityViews.Find(id); found != nullptr) {
         found->visions = changed.before.visions;
+        found->blipHashes = changed.before.blipHashes;
       } else {
         (void)mEntityViews.Insert(id, changed.before);
       }
@@ -337,6 +354,9 @@ namespace faf::remote
       if (changed.facts.destroyed) {
         if (changed.before.visions != kNoVisions) {
           mFreeVisions.push_back(changed.before.visions);
+        }
+        if (changed.before.blipHashes != kNoVisions) {
+          mFreeBlipHashes.push_back(changed.before.blipHashes);
         }
         mEntityViews.Erase(id);
         continue;
@@ -425,6 +445,19 @@ namespace faf::remote
     }
 
     if (mDirectUpdates) {
+      // Most of a late game's blip updates are what the view's client holds already: nothing to do.
+      // An update the view takes the long way (a blip with a sound, say) leaves no hash to match.
+      const SBlipRecord* blipRecord = nullptr;
+      if (blip != nullptr && changed.blipRecordCount != 0u) {
+        blipRecord = &mSharedRecords->BlipRecord(changed.firstBlipRecord + changed.blipRecordOf[static_cast<std::size_t>(army)]);
+        std::uint64_t& held = mBlipHashes[changed.before.blipHashes + static_cast<std::size_t>(army)];
+        if (wasCreated && held == blipRecord->hash) {
+          return;
+        }
+        held = blipRecord->hash;
+      } else if (blip != nullptr && changed.before.blipHashes != kNoVisions) {
+        mBlipHashes[changed.before.blipHashes + static_cast<std::size_t>(army)] = 0u;
+      }
       // Plan WPR.35: the builder reads the sim directly, while it is stopped for this beat.
       SDirectUpdate& direct = mDirect[static_cast<std::size_t>(army)].emplace_back();
       if (shared) {
@@ -432,9 +465,7 @@ namespace faf::remote
         direct.created = !wasCreated;
       }
       direct.target = &changed.target;
-      if (blip != nullptr && changed.blipRecordCount != 0u) {
-        direct.blipRecord = &mSharedRecords->BlipRecord(changed.firstBlipRecord + changed.blipRecordOf[static_cast<std::size_t>(army)]);
-      }
+      direct.blipRecord = blipRecord;
       direct.army = static_cast<std::uint8_t>(army);
       direct.mode = static_cast<std::uint8_t>(visibility.mode);
       direct.vision = vision;

@@ -27,6 +27,7 @@ namespace gpg
 {
     class RRef;
     class RType;
+    class TrackedPointerIndex;
 
     class WriteArchive
     {
@@ -332,8 +333,12 @@ namespace gpg
          * the shared base, not in either of them. Named by the offset
          * convention for not-yet-identified fields rather than guessed at: the
          * layout is proven, the purpose is not.
+         *
+         * Engine addition: since the binary never reads the slot, it holds the
+         * hash index that replaces `mObjRefs` in a fast archive (see
+         * `CreateFastBinaryWriteArchive`), and is null in every other archive.
          */
-        std::uint32_t field_0x1C = 0;             // +0x1C
+        TrackedPointerIndex* mFastObjRefs = nullptr; // +0x1C
 
         friend void WriteRawPointer(WriteArchive* archive, const RRef& objectRef, TrackedPointerState state, const RRef& ownerRef);
     };
@@ -355,6 +360,13 @@ namespace gpg
      * Creates one file-backed concrete `WriteArchive` for save/load serializers.
      */
     WriteArchive* CreateBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file);
+
+    /**
+     * Engine addition: the same format as `CreateBinaryWriteArchive`, for a replay keyframe. Tracked pointers go
+     * through a hash index, and writes through a memory buffer instead of one `fwrite` per value. The file is only
+     * complete after `EndSection`, `Close` or the archive's destruction, so nothing else may write to it before that.
+     */
+    WriteArchive* CreateFastBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file);
 
     /**
      * Address: 0x00939280 (FUN_00939280, ?CreateTextWriteArchive@gpg@@YAPAVWriteArchive@1@ABV?$shared_ptr@V?$basic_ostream@DU?$char_traits@D@std@@@std@@@boost@@@Z_0)

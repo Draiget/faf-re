@@ -444,7 +444,7 @@ namespace moho
     if (effect == nullptr) {
       return nullptr;
     }
-    LinkActiveEffect(mActiveEffects, effect);
+    (void)LinkActiveEffect(mActiveEffects, effect);
 
     effect->SetBone(entity, boneIndex);
 
@@ -670,7 +670,7 @@ namespace moho
     }
 
     // Blend mode and every beam parameter are seeded by the blueprint ctor above.
-    LinkActiveEffect(mActiveEffects, effect);
+    (void)LinkActiveEffect(mActiveEffects, effect);
 
     if (!IsBlueprintEnabledForCurrentFidelity(beamBlueprint)) {
       DestroyEffect(effect);
@@ -701,7 +701,7 @@ namespace moho
       }
     }
 
-    LinkActiveEffect(mActiveEffects, effect);
+    (void)LinkActiveEffect(mActiveEffects, effect);
     return effect;
   }
 
@@ -723,7 +723,7 @@ namespace moho
     }
 
     // Blend mode and every beam parameter are seeded by the blueprint ctor above.
-    LinkActiveEffect(mActiveEffects, effect);
+    (void)LinkActiveEffect(mActiveEffects, effect);
 
     const VTransform sourceTransform = sourceEntity->GetBoneWorldTransform(sourceBoneIndex);
     const float sourceLane[3] = {sourceTransform.pos_.x, sourceTransform.pos_.y, sourceTransform.pos_.z};
@@ -759,7 +759,7 @@ namespace moho
     }
 
     // Blend mode and every beam parameter are seeded by the blueprint ctor above.
-    LinkActiveEffect(mActiveEffects, effect);
+    (void)LinkActiveEffect(mActiveEffects, effect);
 
     effect->AttachEntityToEntity(sourceEntity, sourceBoneIndex, targetEntity, targetBoneIndex);
 

@@ -22,6 +22,7 @@
 #include "remote/net/DatagramCipher.h"
 #include "remote/net/NetChannel.h"
 #include "remote/net/ReliableStream.h"
+#include "remote/net/StyleProof.h"
 
 using namespace faf::remote::net;
 
@@ -1071,7 +1072,52 @@ namespace
     }
   }
 
+  // --- Lobby style proof ----------------------------------------------------------------
+
+  void TestStyleProof()
+  {
+    StyleSeed seed{};
+    seed.fill(7);
+    StyleSigningKey key;
+    MakeStyleSigningKey(seed, key);
+    CHECK(seed[0] == 0); // wiped
+
+    StyleSeed otherSeed{};
+    otherSeed.fill(9);
+    StyleSigningKey otherKey;
+    MakeStyleSigningKey(otherSeed, otherKey);
+
+    StyleChallenge challenge{};
+    challenge.fill(0x11);
+    const StyleColor color{0x12, 0x34, 0x56};
+    const StyleSignature proof = SignStyle(key, 100, 200, challenge, color);
+
+    CHECK(CheckStyle(key.publicKey, 100, 200, challenge, color, proof));
+
+    // A key other than the one the engine knows.
+    const StyleSignature forged = SignStyle(otherKey, 100, 200, challenge, color);
+    CHECK(!CheckStyle(key.publicKey, 100, 200, challenge, color, forged));
+
+    // Replayed against a new challenge.
+    StyleChallenge otherChallenge = challenge;
+    otherChallenge[31] ^= 1;
+    CHECK(!CheckStyle(key.publicKey, 100, 200, otherChallenge, color, proof));
+
+    // Passed on by a third player, who forwarded the challenge to the holder.
+    CHECK(!CheckStyle(key.publicKey, 300, 200, challenge, color, proof));
+    // Shown to a player it wasn't made for.
+    CHECK(!CheckStyle(key.publicKey, 100, 300, challenge, color, proof));
+
+    // Another colour under the same signature.
+    CHECK(!CheckStyle(key.publicKey, 100, 200, challenge, StyleColor{0x12, 0x34, 0x57}, proof));
+
+    StyleSignature tampered = proof;
+    tampered[0] ^= 1;
+    CHECK(!CheckStyle(key.publicKey, 100, 200, challenge, color, tampered));
+  }
+
   const TestCase kTests[] = {
+    {"style proof", TestStyleProof},
     {"header round trip and refusals (WP10.2)", TestHeaderRoundTrip},
     {"varints", TestVarints},
     {"receive window against a model: verdicts and ack bits (WP10.2)", TestReceiveWindowModel},

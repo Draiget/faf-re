@@ -1926,6 +1926,14 @@ namespace moho
   [[nodiscard]] bool WLD_CanAdjustSimRate();
 
   /**
+   * Engine addition (wld_FrameClock): true once, on the first call after the current session
+   * showed its first tick. The frames before it include the long first frame of play; the app
+   * drops them from its frame-time window so the mean clock does not repay that frame by rushing
+   * the opening ticks out. Main thread only.
+   */
+  [[nodiscard]] bool WLD_TakeFrameClockReset() noexcept;
+
+  /**
    * Address: 0x0088D1B0 (FUN_0088D1B0, ?WLD_IncreaseSimRate@Moho@@YAXXZ)
    *
    * What it does:

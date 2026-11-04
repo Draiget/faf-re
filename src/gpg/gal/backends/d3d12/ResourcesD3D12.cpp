@@ -9,6 +9,7 @@
 #include "DeviceD3D12.h"
 #include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/D3D9Utils.h"
+#include "gpg/core/utils/Logging.h"
 #include "gpg/gal/PlacedResources.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
@@ -336,6 +337,11 @@ namespace gpg::gal
       return;
     }
     DeviceD3D12& device = RequireDevice(mKind, __LINE__);
+    if (gPlacedResources && gSharedBuffers && device.SharedBuffers().Take(mByteWidth, mTracked, mResourceOffset, mSharedRange)) {
+      mReadState = d3d12::kSharedBufferRead;
+      mUnwritten = true; // the large buffer is placed, and other buffers' uploads leave this range alone
+      return;
+    }
     D3D12_HEAP_PROPERTIES heap{};
     heap.Type = D3D12_HEAP_TYPE_DEFAULT;
     D3D12_RESOURCE_DESC desc{};
@@ -368,7 +374,7 @@ namespace gpg::gal
       return;
     }
     mUnwritten = false;
-    device.UploadBuffer(mResource, 0U, mShadow.data(), mByteWidth);
+    device.UploadBuffer(*mTracked, mResourceOffset, mShadow.data(), mByteWidth);
   }
 
   d3d12::TrackedResource* BufferStorageD3D12::CopyDestination()
@@ -377,11 +383,17 @@ namespace gpg::gal
       return nullptr;
     }
     FillUnwritten(RequireDevice(mKind, __LINE__));
-    return &mResource;
+    return mTracked;
   }
 
   BufferStorageD3D12::~BufferStorageD3D12()
   {
+    if (mSharedRange != nullptr) {
+      if (DeviceD3D12* const device = ActiveDevice()) {
+        device->RetireSharedRange(std::move(mSharedRange));
+      }
+      return;
+    }
     RetireResource(mResource.resource);
   }
 
@@ -397,7 +409,20 @@ namespace gpg::gal
     mLockSize = (size == 0U || offset + size > mByteWidth) ? (mByteWidth - offset) : size;
     mLockFlags = static_cast<std::uint32_t>(flags);
     mLocked = true;
+    if (mShadow.Released()) {
+      if (HasFlag(mLockFlags, MohoD3DLockFlags::ReadOnly)) {
+        gpg::Warnf("gal: %s read lock after its CPU copy was released reads zeros", mKind);
+      }
+      mShadow.Reset(mByteWidth);
+    }
     return mShadow.Map(offset, size, mKind);
+  }
+
+  void BufferStorageD3D12::ReleaseCopy() noexcept
+  {
+    if (gReleaseBufferCopies && !mDynamic && !mLocked && !mUnwritten) {
+      mShadow.Release();
+    }
   }
 
   void BufferStorageD3D12::Unlock()
@@ -421,7 +446,7 @@ namespace gpg::gal
         FillUnwritten(device); // the shadow holds this lock's bytes too
         return;
       }
-      device.UploadBuffer(mResource, mLockOffset, mShadow.data() + mLockOffset, mLockSize);
+      device.UploadBuffer(*mTracked, mResourceOffset + mLockOffset, mShadow.data() + mLockOffset, mLockSize);
       return;
     }
 
@@ -454,8 +479,8 @@ namespace gpg::gal
   {
     if (!mDynamic) {
       FillUnwritten(device);
-      device.Transition(mResource, mReadState);
-      return mResource.resource->GetGPUVirtualAddress();
+      device.Transition(*mTracked, mReadState);
+      return mTracked->resource->GetGPUVirtualAddress() + mResourceOffset;
     }
     if (mChunkCpu == nullptr || mChunkSerial != device.RecordingSerial()) {
       // The copy a previous submission read may be recycled; take a fresh one.
@@ -470,9 +495,9 @@ namespace gpg::gal
   {
     if (!mDynamic) {
       FillUnwritten(device);
-      device.Transition(mResource, D3D12_RESOURCE_STATE_COPY_SOURCE);
-      resource = mResource.resource.Get();
-      offset = 0U;
+      device.Transition(*mTracked, mSharedRange != nullptr ? d3d12::kSharedBufferRead : D3D12_RESOURCE_STATE_COPY_SOURCE);
+      resource = mTracked->resource.Get();
+      offset = mResourceOffset;
       return;
     }
     // Upload memory stays in GENERIC_READ, which includes COPY_SOURCE.

@@ -46,127 +46,25 @@ namespace
   // `SetNavigatorPersonalPosMaxDistance`.
   float gNavigatorPersonalPosMaxDistance = 50.0f;
 
-  gpg::RType* gNavigatorStateType = nullptr;
   gpg::RType* gPathFinderType = nullptr;
-  gpg::RType* gNavPathType = nullptr;
-  gpg::RType* gHPathCellType = nullptr;
-  gpg::RType* gNavGoalType = nullptr;
-  gpg::RType* gLayerType = nullptr;
   gpg::RType* gSimType = nullptr;
-  gpg::RType* gWeakUnitType = nullptr;
-  gpg::RType* gVector3Type = nullptr;
-  gpg::RType* gSearchType = nullptr;
-
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
-
-  [[nodiscard]] gpg::RType* CachedNavigatorStateType()
-  {
-    return CachedType<EAiPathNavigatorState>(gNavigatorStateType);
-  }
 
   [[nodiscard]] gpg::RType* CachedCAiPathFinderType()
   {
     if (!CAiPathFinder::sType) {
-      CAiPathFinder::sType = CachedType<CAiPathFinder>(gPathFinderType);
+      CAiPathFinder::sType = gpg::CachedLookup<CAiPathFinder>(gPathFinderType);
     }
     return CAiPathFinder::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedNavPathType()
-  {
-    return CachedType<SNavPath>(gNavPathType);
-  }
-
-  [[nodiscard]] gpg::RType* CachedHPathCellType()
-  {
-    return CachedType<HPathCell>(gHPathCellType);
-  }
-
-  [[nodiscard]] gpg::RType* CachedNavGoalType()
-  {
-    return CachedType<SAiNavigatorGoal>(gNavGoalType);
-  }
-
-  [[nodiscard]] gpg::RType* CachedLayerType()
-  {
-    return CachedType<ELayer>(gLayerType);
   }
 
   [[nodiscard]] gpg::RType* CachedSimType()
   {
     if (!Sim::sType) {
-      Sim::sType = CachedType<Sim>(gSimType);
+      Sim::sType = gpg::CachedLookup<Sim>(gSimType);
     }
     return Sim::sType;
   }
 
-  [[nodiscard]] gpg::RType* CachedWeakUnitType()
-  {
-    return CachedType<WeakPtr<Unit>>(gWeakUnitType);
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3Type()
-  {
-    return CachedType<Wm3::Vector3f>(gVector3Type);
-  }
-
-  [[nodiscard]] gpg::RType* CachedSearchType()
-  {
-    return CachedType<ESearchType>(gSearchType);
-  }
-
-  template <typename TObject>
-  [[nodiscard]] TObject* ReadPointerWithType(gpg::ReadArchive* const archive, const gpg::RRef& owner, gpg::RType* expectedType)
-  {
-    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, owner);
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
-    return static_cast<TObject*>(upcast.mObj);
-  }
-
-  template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType && staticType && dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType ? dynamicType : staticType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
 
   template <typename TObject>
   void WritePointerWithType(
@@ -177,7 +75,7 @@ namespace
     const gpg::RRef& owner
   )
   {
-    const gpg::RRef objectRef = MakeTypedRef(object, staticType);
+    const gpg::RRef objectRef = gpg::MakeDerivedRef(object, staticType);
     gpg::WriteRawPointer(archive, objectRef, state, owner);
   }
 
@@ -1948,7 +1846,7 @@ void CAiPathNavigator::MemberDeserialize(gpg::ReadArchive* const archive, const 
   const gpg::RRef owner{};
 
   if (version >= 1) {
-    archive->Read(CachedNavigatorStateType(), &mState, owner);
+    archive->Read(gpg::RTypeOf<EAiPathNavigatorState>(), &mState, owner);
   }
 
   CAiPathFinder* loadedPathFinder = nullptr;
@@ -1959,18 +1857,18 @@ void CAiPathNavigator::MemberDeserialize(gpg::ReadArchive* const archive, const 
     delete oldPathFinder;
   }
 
-  archive->Read(CachedNavPathType(), &mPath, owner);
-  archive->Read(CachedHPathCellType(), &mCurrentPos, owner);
-  archive->Read(CachedHPathCellType(), &mTargetPos, owner);
+  archive->Read(gpg::RTypeOf<SNavPath>(), &mPath, owner);
+  archive->Read(gpg::RTypeOf<HPathCell>(), &mCurrentPos, owner);
+  archive->Read(gpg::RTypeOf<HPathCell>(), &mTargetPos, owner);
 
   HPathCell blockedCell{};
-  archive->Read(CachedHPathCellType(), &blockedCell, owner);
+  archive->Read(gpg::RTypeOf<HPathCell>(), &blockedCell, owner);
   // Raw cell-word pun: the 4-byte HPathCell image is stored in the u32 lane.
   std::memcpy(&mLastBlockedCell, &blockedCell, sizeof(mLastBlockedCell));
 
-  archive->Read(CachedNavGoalType(), &mGoal, owner);
-  archive->Read(CachedLayerType(), &mLastPathLayerToken, owner);
-  mSim = ReadPointerWithType<Sim>(archive, owner, CachedSimType());
+  archive->Read(gpg::RTypeOf<SAiNavigatorGoal>(), &mGoal, owner);
+  archive->Read(gpg::RTypeOf<ELayer>(), &mLastPathLayerToken, owner);
+  mSim = gpg::ReadPointerAs<Sim>(archive, owner, CachedSimType());
 
   archive->ReadInt(&mLastPathNodeIndex);
   archive->ReadInt(&mPathSearchFailCount);
@@ -1988,8 +1886,8 @@ void CAiPathNavigator::MemberDeserialize(gpg::ReadArchive* const archive, const 
   archive->ReadUInt(&lastFormationSyncTickRaw);
   mLastFormationSyncTick = static_cast<std::int32_t>(lastFormationSyncTickRaw);
 
-  archive->Read(CachedWeakUnitType(), &mLeaderLink, owner);
-  archive->Read(CachedVector3Type(), &mLeaderTargetPos, owner);
+  archive->Read(gpg::RTypeOf<WeakPtr<Unit>>(), &mLeaderLink, owner);
+  archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mLeaderTargetPos, owner);
 
   bool boolValue = false;
   archive->ReadBool(&boolValue);
@@ -2007,7 +1905,7 @@ void CAiPathNavigator::MemberDeserialize(gpg::ReadArchive* const archive, const 
   archive->ReadBool(&boolValue);
   mTargetWithinOneCell = boolValue ? 1u : 0u;
   ESearchType searchType{};
-  archive->Read(CachedSearchType(), &searchType, owner);
+  archive->Read(gpg::RTypeOf<ESearchType>(), &searchType, owner);
   mPathRequestMode = static_cast<std::int32_t>(searchType);
   archive->ReadInt(&mPathRequestCountdown);
   archive->ReadInt(&mTickBucket7);
@@ -2026,21 +1924,21 @@ void CAiPathNavigator::MemberSerialize(gpg::WriteArchive* const archive, const i
   const gpg::RRef owner{};
 
   if (version >= 1) {
-    archive->Write(CachedNavigatorStateType(), &mState, owner);
+    archive->Write(gpg::RTypeOf<EAiPathNavigatorState>(), &mState, owner);
   }
 
   WritePointerWithType(archive, mPathFinder, CachedCAiPathFinderType(), gpg::TrackedPointerState::Owned, owner);
-  archive->Write(CachedNavPathType(), &mPath, owner);
-  archive->Write(CachedHPathCellType(), &mCurrentPos, owner);
-  archive->Write(CachedHPathCellType(), &mTargetPos, owner);
+  archive->Write(gpg::RTypeOf<SNavPath>(), &mPath, owner);
+  archive->Write(gpg::RTypeOf<HPathCell>(), &mCurrentPos, owner);
+  archive->Write(gpg::RTypeOf<HPathCell>(), &mTargetPos, owner);
 
   HPathCell blockedCell{};
   // Raw cell-word pun: rebuild the 4-byte HPathCell image from the u32 lane.
   std::memcpy(&blockedCell, &mLastBlockedCell, sizeof(blockedCell));
-  archive->Write(CachedHPathCellType(), &blockedCell, owner);
+  archive->Write(gpg::RTypeOf<HPathCell>(), &blockedCell, owner);
 
-  archive->Write(CachedNavGoalType(), &mGoal, owner);
-  archive->Write(CachedLayerType(), &mLastPathLayerToken, owner);
+  archive->Write(gpg::RTypeOf<SAiNavigatorGoal>(), &mGoal, owner);
+  archive->Write(gpg::RTypeOf<ELayer>(), &mLastPathLayerToken, owner);
   WritePointerWithType(archive, mSim, CachedSimType(), gpg::TrackedPointerState::Unowned, owner);
 
   archive->WriteInt(mLastPathNodeIndex);
@@ -2051,8 +1949,8 @@ void CAiPathNavigator::MemberSerialize(gpg::WriteArchive* const archive, const i
   archive->WriteUInt(static_cast<unsigned int>(mLastRepathTick));
   archive->WriteInt(mNoProgressTickCount);
   archive->WriteUInt(static_cast<unsigned int>(mLastFormationSyncTick));
-  archive->Write(CachedWeakUnitType(), &mLeaderLink, owner);
-  archive->Write(CachedVector3Type(), &mLeaderTargetPos, owner);
+  archive->Write(gpg::RTypeOf<WeakPtr<Unit>>(), &mLeaderLink, owner);
+  archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mLeaderTargetPos, owner);
   archive->WriteBool(mIsInFormation != 0u);
   archive->WriteBool(mLeaderBusy != 0u);
   archive->WriteBool(mHasLeaderTargetPos != 0u);
@@ -2061,7 +1959,7 @@ void CAiPathNavigator::MemberSerialize(gpg::WriteArchive* const archive, const i
   archive->WriteBool(mUseExtendedPathProbe != 0u);
   archive->WriteBool(mTargetWithinOneCell != 0u);
   const ESearchType searchType = static_cast<ESearchType>(mPathRequestMode);
-  archive->Write(CachedSearchType(), &searchType, owner);
+  archive->Write(gpg::RTypeOf<ESearchType>(), &searchType, owner);
   archive->WriteInt(mPathRequestCountdown);
   archive->WriteInt(mTickBucket7);
   archive->WriteInt(mTickBucket13);
@@ -2094,15 +1992,6 @@ namespace
 {
   constexpr const char* kSetNavigatorPersonalPosMaxDistanceName = "SetNavigatorPersonalPosMaxDistance";
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
 } // namespace
 
 /**
@@ -2127,7 +2016,7 @@ int moho::cfunc_SetNavigatorPersonalPosMaxDistance(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SetNavigatorPersonalPosMaxDistance_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kSetNavigatorPersonalPosMaxDistanceName,
     &moho::cfunc_SetNavigatorPersonalPosMaxDistance,
     nullptr,

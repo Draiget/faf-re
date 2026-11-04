@@ -52,45 +52,6 @@ namespace
     return unit->CommandQueue->GetCurrentCommand();
   }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSNavGoalType()
-  {
-    gpg::RType* type = moho::SNavGoal::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SNavGoal));
-      moho::SNavGoal::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitAssistMoveTaskType()
-  {
-    gpg::RType* type = moho::CUnitAssistMoveTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitAssistMoveTask));
-      moho::CUnitAssistMoveTask::sType = type;
-    }
-    return type;
-  }
-
   void ReadBoolIntoByteLane(gpg::ReadArchive* const archive, std::uint8_t& lane) noexcept
   {
     bool value = false;
@@ -98,35 +59,7 @@ namespace
     lane = value ? 1u : 0u;
   }
 
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
 
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 } // namespace
 
 namespace moho
@@ -546,13 +479,13 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), ownerRef);
 
     gpg::RRef dispatchTaskRef{};
     archive->ReadPointer(&mDispatchTask, &dispatchTaskRef);
 
-    archive->Read(CachedSNavGoalType(), &mMoveGoal, ownerRef);
-    archive->Read(CachedVector3fType(), &mMoveGoalWorldPosition, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::SNavGoal>(), &mMoveGoal, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mMoveGoalWorldPosition, ownerRef);
     ReadBoolIntoByteLane(archive, mHasPathFindingPickupCandidate);
   }
 
@@ -570,14 +503,14 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
 
     gpg::RRef dispatchTaskRef{};
     (void)gpg::RRef_CCommandTask(&dispatchTaskRef, mDispatchTask);
     gpg::WriteRawPointer(archive, dispatchTaskRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedSNavGoalType(), &mMoveGoal, ownerRef);
-    archive->Write(CachedVector3fType(), &mMoveGoalWorldPosition, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::SNavGoal>(), &mMoveGoal, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mMoveGoalWorldPosition, ownerRef);
     archive->WriteBool(mHasPathFindingPickupCandidate != 0u);
   }
 
@@ -606,7 +539,7 @@ namespace gpg
       return nullptr;
     }
 
-    *outRef = MakeDerivedRef(value, CachedCUnitAssistMoveTaskType());
+    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitAssistMoveTask>());
     return outRef;
   }
 

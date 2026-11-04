@@ -576,6 +576,17 @@ namespace moho
   }
 
   /**
+   * Engine addition: see the header.
+   */
+  void SCR_ExpectExactArgs(LuaPlus::LuaState* const state, const int expectedArgs, const char* const helpText)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != expectedArgs) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", helpText, expectedArgs, argumentCount);
+    }
+  }
+
+  /**
    * Address: 0x004D2380 (FUN_004D2380, ?SCR_ExpectArgs@Moho@@YAXPAVLuaState@LuaPlus@@HHPBD@Z)
    *
    * What it does:

@@ -1,4 +1,6 @@
 #include "moho/misc/FileWaitHandleSet.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/CZipFile.h"
 
 #include <Windows.h>
@@ -70,20 +72,6 @@ namespace
   constexpr const char* kDirnameHelpText = "base = Dirname(fullPath) -- return a path with trailing filename removed";
   constexpr const char* kFileCollapsePathHelpText =
     "path = FileCollapsePath(fullPath) -- collapse out any intermediate /./ or /../ directory names from a path";
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Core");
-    return sSet;
-  }
 
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(
     lua_State* const luaContext
@@ -984,10 +972,7 @@ int moho::cfunc_DiskFindFilesL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kDiskFindFilesHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kDiskFindFilesHelpText);
 
   msvc8::vector<msvc8::string> foundPaths{};
   FILE_EnsureWaitHandleSet();
@@ -1026,7 +1011,7 @@ int moho::cfunc_DiskFindFilesL(
 moho::CScrLuaInitForm* moho::func_DiskFindFiles_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(), "DiskFindFiles", &moho::cfunc_DiskFindFiles, nullptr, "<global>", kDiskFindFilesHelpText
+    moho::SCR_CoreLuaInitSet(), "DiskFindFiles", &moho::cfunc_DiskFindFiles, nullptr, "<global>", kDiskFindFilesHelpText
   );
   return &binder;
 }
@@ -1056,10 +1041,7 @@ int moho::cfunc_DiskGetFileInfoL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kDiskGetFileInfoHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kDiskGetFileInfoHelpText);
 
   FILE_EnsureWaitHandleSet();
   CVirtualFileSystem* const vfs = sPFWaitHandleSet->mHandle;
@@ -1124,7 +1106,7 @@ int moho::cfunc_DiskGetFileInfoL(
 moho::CScrLuaInitForm* moho::func_DiskGetFileInfo_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(), "DiskGetFileInfo", &moho::cfunc_DiskGetFileInfo, nullptr, "<global>", kDiskGetFileInfoHelpText
+    moho::SCR_CoreLuaInitSet(), "DiskGetFileInfo", &moho::cfunc_DiskGetFileInfo, nullptr, "<global>", kDiskGetFileInfoHelpText
   );
   return &binder;
 }
@@ -1153,10 +1135,7 @@ int moho::cfunc_DiskToLocalL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kDiskToLocalHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kDiskToLocalHelpText);
 
   FILE_EnsureWaitHandleSet();
   CVirtualFileSystem* const vfs = sPFWaitHandleSet->mHandle;
@@ -1183,7 +1162,7 @@ int moho::cfunc_DiskToLocalL(
 moho::CScrLuaInitForm* moho::func_DiskToLocal_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(), "DiskToLocal", &moho::cfunc_DiskToLocal, nullptr, "<global>", kDiskToLocalHelpText
+    moho::SCR_CoreLuaInitSet(), "DiskToLocal", &moho::cfunc_DiskToLocal, nullptr, "<global>", kDiskToLocalHelpText
   );
   return &binder;
 }
@@ -1213,10 +1192,7 @@ int moho::cfunc_BasenameL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kBasenameHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kBasenameHelpText);
 
   LuaPlus::LuaStackObject stripArg(state, 2);
   LuaPlus::LuaStackObject pathArg(state, 1);
@@ -1241,7 +1217,7 @@ int moho::cfunc_BasenameL(
 moho::CScrLuaInitForm* moho::func_Basename_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(), "Basename", &moho::cfunc_Basename, nullptr, "<global>", kBasenameHelpText
+    moho::SCR_CoreLuaInitSet(), "Basename", &moho::cfunc_Basename, nullptr, "<global>", kBasenameHelpText
   );
   return &binder;
 }
@@ -1270,10 +1246,7 @@ int moho::cfunc_DirnameL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kDirnameHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kDirnameHelpText);
 
   LuaPlus::LuaStackObject pathArg(state, 1);
   const char* const fullPath = lua_tostring(state->m_state, 1);
@@ -1295,7 +1268,7 @@ int moho::cfunc_DirnameL(
  */
 moho::CScrLuaInitForm* moho::func_Dirname_LuaFuncDef()
 {
-  static CScrLuaBinder binder(CoreLuaInitSet(), "Dirname", &moho::cfunc_Dirname, nullptr, "<global>", kDirnameHelpText);
+  static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), "Dirname", &moho::cfunc_Dirname, nullptr, "<global>", kDirnameHelpText);
   return &binder;
 }
 
@@ -1323,10 +1296,7 @@ int moho::cfunc_FileCollapsePathL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kFileCollapsePathHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kFileCollapsePathHelpText);
 
   LuaPlus::LuaStackObject pathArg(state, 1);
   const char* const fullPath = lua_tostring(state->m_state, 1);
@@ -1352,7 +1322,7 @@ int moho::cfunc_FileCollapsePathL(
 moho::CScrLuaInitForm* moho::func_FileCollapsePath_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(), "FileCollapsePath", &moho::cfunc_FileCollapsePath, nullptr, "<global>", kFileCollapsePathHelpText
+    moho::SCR_CoreLuaInitSet(), "FileCollapsePath", &moho::cfunc_FileCollapsePath, nullptr, "<global>", kFileCollapsePathHelpText
   );
   return &binder;
 }

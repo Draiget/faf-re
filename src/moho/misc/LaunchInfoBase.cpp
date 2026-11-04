@@ -106,7 +106,6 @@ namespace
   bool gArmyLaunchInfoTypeRegistered = false;
   bool gArmyLaunchInfoVectorTypeRegistered = false;
   gpg::RType* gArmyLaunchInfoVectorType = nullptr;
-  gpg::RType* gStringVectorType = nullptr;
 
   /**
    * Address: 0x00BF4050 (FUN_00BF4050, atexit destructor of the LaunchInfoNewTypeInfo object)
@@ -170,26 +169,10 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RType* ResolveArmyLaunchInfoType()
-  {
-    if (!moho::ArmyLaunchInfo::sType) {
-      moho::ArmyLaunchInfo::sType = gpg::LookupRType(typeid(moho::ArmyLaunchInfo));
-    }
-    return moho::ArmyLaunchInfo::sType;
-  }
-
   [[nodiscard]] gpg::RType* ResolveLaunchInfoNewType()
   {
     (void)AcquireLaunchInfoNewTypeInfo();
     return gpg::LookupRType(typeid(moho::LaunchInfoNew));
-  }
-
-  [[nodiscard]] gpg::RType* ResolveStringVectorType()
-  {
-    if (!gStringVectorType) {
-      gStringVectorType = gpg::LookupRType(typeid(msvc8::vector<msvc8::string>));
-    }
-    return gStringVectorType;
   }
 
   /**
@@ -309,7 +292,7 @@ namespace
     const gpg::RRef& ownerRef
   )
   {
-    gpg::RType* const type = ResolveStringVectorType();
+    gpg::RType* const type = gpg::RTypeOf<msvc8::vector<msvc8::string>>();
     archive->Read(type, object, ownerRef);
   }
 
@@ -326,7 +309,7 @@ namespace
     const gpg::RRef& ownerRef
   )
   {
-    gpg::RType* const type = ResolveStringVectorType();
+    gpg::RType* const type = gpg::RTypeOf<msvc8::vector<msvc8::string>>();
     archive->Write(type, object, ownerRef);
   }
 
@@ -522,7 +505,7 @@ namespace
    */
   const char* ArmyLaunchInfoVectorTypeInfo::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveArmyLaunchInfoType()->GetName());
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::ArmyLaunchInfo>()->GetName());
     return sName.c_str();
   }
 

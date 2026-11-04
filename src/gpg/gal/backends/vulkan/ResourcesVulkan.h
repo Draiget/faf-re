@@ -134,6 +134,8 @@ namespace gpg::gal
 
     [[nodiscard]] std::uint8_t* Lock(std::uint32_t offset, std::uint32_t size, MohoD3DLockFlags flags);
     void Unlock();
+    /** Device::ReleaseBufferCopy: frees the CPU copy of a static buffer, once it's on the GPU. */
+    void ReleaseCopy() noexcept;
 
     /** The buffer and offset draws read from. */
     void PrepareForDraw(DeviceVulkan& device, VkBuffer& outBuffer, VkDeviceSize& outOffset);

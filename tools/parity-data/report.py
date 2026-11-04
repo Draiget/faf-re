@@ -7,10 +7,11 @@ DIR holds the shards' results (any depth: every results.jsonl under it). Writes 
 beat and notes, replays where a live client desynced, every passing replay with its replay time,
 wall time and speedup, the time model fitted to this run), and
 appends report.md to the GitHub job summary. --after DIR merges an earlier run's results
-under this run's (a run that finishes what the earlier one had no time for). --expected lists known failures
-({"<id>": {"verdict": "desync", "note": "..."}}); exit code 1 when a replay desynced, crashed,
-stopped early, ran out of time, could not be got ready or got no result from its shard, and is
-not listed there with that verdict.
+under this run's (a run that finishes what the earlier one had no time for). --expected lists failures
+that are not bugs of this engine ({"<id>": {"verdict": "desync", "note": "..."}}): such a replay's
+verdict becomes expected-desync and it stays out of the desync count; exit code 1 when a replay
+desynced, crashed, stopped early, ran out of time, could not be got ready or got no result from its
+shard, and is not listed there with that verdict.
 """
 import argparse
 import glob
@@ -26,8 +27,8 @@ from common import clock
 FAILURES = ("desync", "crash", "incomplete", "timeout", "error", "oracle")
 # Passing replays listed in report.md (GitHub caps a job summary at 1 MiB); report.json has all.
 PASS_ROWS = 500
-ORDER = ("pass", "desync", "oracle", "crash", "incomplete", "timeout", "error", "unsupported", "not-run",
-         "not-scheduled")
+EXPECTED = "expected-"
+ORDER = ("pass",) + FAILURES + tuple(EXPECTED + v for v in FAILURES) + ("unsupported", "not-run", "not-scheduled")
 
 
 def fit_time_model(results):
@@ -96,7 +97,13 @@ def main():
     for r in results.values():
         exp = expected.get(r["id"])
         if r["verdict"] in FAILURES:
-            (known if exp and exp.get("verdict") == r["verdict"] else regressions).append(r)
+            if exp and exp.get("verdict") == r["verdict"]:
+                # A verdict of its own, so nothing counts it as a desync of ours.
+                r["verdict"] = EXPECTED + r["verdict"]
+                r["expected_note"] = exp.get("note", "")
+                known.append(r)
+            else:
+                regressions.append(r)
         elif r["verdict"] == "pass" and exp:
             fixed.append(r)
 
@@ -107,7 +114,7 @@ def main():
 
     def row(r):
         beat = r.get("first_beat", "")
-        detail = "; ".join(r.get("notes") or []) or r.get("why", "")
+        detail = r.get("expected_note") or "; ".join(r.get("notes") or []) or r.get("why", "")
         if r["verdict"] == "oracle" and r.get("oracle"):
             o = r["oracle"]
             detail = "oracle: %d of %d beats' entities differ, spatial %d of %d army-beats; %s" % (
@@ -118,7 +125,8 @@ def main():
 
     lines = ["# %s" % args.title, "",
              "Set `%s`, %d replays: %s." % (plan["settings"]["which"], len(results),
-                                            ", ".join("%d %s" % (counts[v], v) for v in ORDER if v in counts)), ""]
+                                            ", ".join("%d %s" % (counts[v], v.replace(EXPECTED, "expected "))
+                                                      for v in ORDER if v in counts)), ""]
     if regressions:
         lines += ["## New failures (%d)" % len(regressions), "",
                   "| Replay | Verdict | First mismatch | Last beat / length | Players | Map | Notes |",
@@ -126,7 +134,9 @@ def main():
     else:
         lines += ["**No new failures.**", ""]
     if known:
-        lines += ["## Known failures (%d)" % len(known), "",
+        lines += ["## Expected, not bugs of this engine (%d)" % len(known), "",
+                  "Listed in `--expected` with why: retail fails there too, the map reads the real-time clock, or the "
+                  "replay cannot be got. They do not count as desyncs.", "",
                   "| Replay | Verdict | First mismatch | Last beat / length | Players | Map | Notes |",
                   "|---|---|---|---|---|---|---|"] + [row(r) for r in sorted(known, key=lambda r: r["id"])] + [""]
     if fixed:
@@ -134,8 +144,9 @@ def main():
                   ", ".join(str(r["id"]) for r in sorted(fixed, key=lambda r: r["id"])), ""]
     live = [r for r in results.values() if r.get("live_desyncs")]
     if live:
-        lines += ["## Desynced in the live game, ignored (%d)" % len(live), "",
-                  "A live client disagreed with the others and the sim sided with the majority.", ""]
+        lines += ["## Live game split, these pass (%d)" % len(live), "",
+                  "The live players recorded different checksums at one beat and the sim equals the larger side or, "
+                  "when they tie, one of them. No build can match both, so this is not a desync.", ""]
         lines += ["- %d: %s" % (r["id"], ", ".join("%s at beat %d" % (d["client"], d["beat"]) for d in r["live_desyncs"]))
                   for r in sorted(live, key=lambda r: r["id"])] + [""]
     passed = sorted((r for r in results.values() if r["verdict"] == "pass" and r.get("wall_s")), key=lambda r: r["id"])

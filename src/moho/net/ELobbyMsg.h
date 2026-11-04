@@ -134,6 +134,16 @@ namespace moho
     LOBMSG_DiscoveryResponse = 111,
 
     /**
+     * Engine addition, not in the binary: the peer announcement while in the
+     * lobby, and its feature traffic (docs/PEER_FEATURES.md, LobbyPeerFeatures.h).
+     * A retail client logs it and returns: the jump table at FA 0x007C6454 sends
+     * it to "Ignoring unrecognized lobby message" (0x007C6412).
+     *
+     * Data payload: kind byte, then as that kind says.
+     */
+    LOBMSG_PeerFeatures = 112,
+
+    /**
      * Exclusive upper bound for lobby-message receiver range.
      * Not emitted as a normal lobby payload message.
      *

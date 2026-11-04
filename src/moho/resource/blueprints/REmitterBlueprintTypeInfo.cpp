@@ -21,36 +21,11 @@ namespace
     return sInstance;
   }
 
-  /**
-   * Address: 0x00510490 (FUN_00510490)
-   *
-   * What it does:
-   * Lazily resolves and caches RTTI metadata for `REmitterBlueprint`.
-   */
-  [[nodiscard]] gpg::RType* CachedEmitterBlueprintType()
-  {
-    gpg::RType* cached = moho::REmitterBlueprint::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::REmitterBlueprint));
-      moho::REmitterBlueprint::sType = cached;
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEffectBlueprintType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::REffectBlueprint));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeEmitterBlueprintRef(moho::REmitterBlueprint* object)
   {
     gpg::RRef out{};
     out.mObj = object;
-    out.mType = CachedEmitterBlueprintType();
+    out.mType = gpg::RTypeOf<moho::REmitterBlueprint>();
     return out;
   }
 
@@ -140,7 +115,7 @@ namespace moho
  */
 void REmitterBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeInfo)
 {
-  gpg::RType* const effectType = CachedEffectBlueprintType();
+  gpg::RType* const effectType = gpg::RTypeOf<moho::REffectBlueprint>();
   gpg::RField baseField{};
   baseField.mName = effectType->GetName();
   baseField.mType = effectType;

@@ -189,7 +189,7 @@ namespace moho
     /** Address: 0x006FDE90 (FUN_006FDE90, Moho::CArmyImpl::GetPlatoonsList) */
     void GetPlatoonsList(ArmyPool& outPool) override;
     /** Address: 0x00700410 (FUN_00700410, Moho::CArmyImpl::MakePlatoon) */
-    virtual CPlatoon* MakePlatoon(const char* platoonName, const char* aiPlan) override;
+    CPlatoon* MakePlatoon(const char* platoonName, const char* aiPlan) override;
     /** Address: 0x00700470 (FUN_00700470, Moho::CArmyImpl::GetPlatoonByName) */
     CPlatoon* GetPlatoonByName(const char* platoonName) override;
     /** Address: 0x007004E0 (FUN_007004E0, Moho::CArmyImpl::GetPlatoonFor) */

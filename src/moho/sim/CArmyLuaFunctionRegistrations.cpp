@@ -43,16 +43,6 @@ namespace
   constexpr const char* kCivilianArmyColorFieldName = "CivilianArmyColor";
   constexpr const char* kUnidentifiedColorFieldName = "UnidentifiedColor";
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
-
   /**
    * Address: 0x00506850 (FUN_00506850, Moho::GetColorLuaState)
    *
@@ -298,7 +288,7 @@ namespace moho
   CScrLuaInitForm* func_CreateInitialArmyUnit_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCreateInitialArmyUnitName,
       &cfunc_CreateInitialArmyUnit,
       nullptr,
@@ -317,7 +307,7 @@ namespace moho
   CScrLuaInitForm* func_SetArmyColorIndex_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kSetArmyColorIndexName,
       &cfunc_SetArmyColorIndex,
       nullptr,
@@ -336,7 +326,7 @@ namespace moho
   CScrLuaInitForm* func_AddBuildRestriction_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kAddBuildRestrictionName,
       &cfunc_AddBuildRestriction,
       nullptr,
@@ -355,7 +345,7 @@ namespace moho
   CScrLuaInitForm* func_RemoveBuildRestriction_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kRemoveBuildRestrictionName,
       &cfunc_RemoveBuildRestriction,
       nullptr,
@@ -402,10 +392,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSetArmyColorIndexHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetArmyColorIndexHelpText);
 
     const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
     CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
@@ -459,10 +446,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kCreateInitialArmyUnitHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kCreateInitialArmyUnitHelpText);
 
     Sim* const sim = lua_getglobaluserdata(rawState);
 
@@ -547,11 +531,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kAddBuildRestrictionHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kAddBuildRestrictionHelpText);
 
     const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
     CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
@@ -575,17 +555,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(
-        state,
-        "%s\n  expected %d args, but got %d",
-        kRemoveBuildRestrictionHelpText,
-        2,
-        argumentCount
-      );
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kRemoveBuildRestrictionHelpText);
 
     const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
     CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);

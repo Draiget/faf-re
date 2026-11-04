@@ -12,21 +12,11 @@ namespace
 {
   bool gCTaskThreadTypeInfoPreregistered = false;
 
-  [[nodiscard]] gpg::RType* CachedCTaskThreadType()
-  {
-    gpg::RType* type = moho::CTaskThread::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CTaskThread));
-      moho::CTaskThread::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RRef MakeTaskThreadRef(moho::CTaskThread* const thread)
   {
     gpg::RRef out{};
     out.mObj = thread;
-    out.mType = CachedCTaskThreadType();
+    out.mType = gpg::RTypeOf<moho::CTaskThread>();
     return out;
   }
 

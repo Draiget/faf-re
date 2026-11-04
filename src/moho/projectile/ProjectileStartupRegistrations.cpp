@@ -1,4 +1,6 @@
 #include "moho/projectile/ProjectileStartupRegistrations.h"
+#include "moho/lua/CScrLuaInitForm.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "legacy/math/X87Math.h"
 
 #include <cmath>
@@ -142,20 +144,6 @@ namespace
     return outName;
   }
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Sim"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Sim");
-    return sSet;
-  }
-
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
@@ -276,24 +264,6 @@ namespace
     return blueprint->Physics.MaxSpeed;
   }
 
-  [[nodiscard]] gpg::RType* CachedRProjectileBlueprintType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RProjectileBlueprint));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCProjectileAttributesType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CProjectileAttributes));
-    }
-    return cached;
-  }
-
   [[nodiscard]] moho::RProjectileBlueprint* ReadProjectileBlueprintPointer(
     gpg::ReadArchive* archive,
     const gpg::RRef& ownerRef
@@ -308,7 +278,7 @@ namespace
     source.mObj = tracked.object;
     source.mType = tracked.type;
 
-    gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedRProjectileBlueprintType());
+    gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::RProjectileBlueprint>());
     GPG_ASSERT(upcast.mObj != nullptr);
     return static_cast<moho::RProjectileBlueprint*>(upcast.mObj);
   }
@@ -317,19 +287,10 @@ namespace
   {
     gpg::RRef ref{};
     ref.mObj = blueprint;
-    ref.mType = CachedRProjectileBlueprintType();
+    ref.mType = gpg::RTypeOf<moho::RProjectileBlueprint>();
     return ref;
   }
 
-  gpg::RType* gProjectileImpactEventType = nullptr;
-
-  [[nodiscard]] gpg::RType* LookupProjectileImpactEventType()
-  {
-    if (gProjectileImpactEventType == nullptr) {
-      gProjectileImpactEventType = gpg::LookupRType(typeid(moho::EProjectileImpactEvent));
-    }
-    return gProjectileImpactEventType;
-  }
 
   class RManyToOneBroadcasterProjectileImpactTypeInfo final : public gpg::RType
   {
@@ -366,7 +327,7 @@ namespace
     [[nodiscard]] const char* GetName() const override
     {
       static const msvc8::string sName =
-        gpg::STR_Printf("ManyToOneBroadcaster<%s>", LookupProjectileImpactEventType()->GetName());
+        gpg::STR_Printf("ManyToOneBroadcaster<%s>", gpg::RTypeOf<moho::EProjectileImpactEvent>()->GetName());
       return sName.c_str();
     }
 
@@ -426,7 +387,7 @@ namespace
     [[nodiscard]] const char* GetName() const override
     {
       static const msvc8::string sName =
-        gpg::STR_Printf("ManyToOneListener<%s>", LookupProjectileImpactEventType()->GetName());
+        gpg::STR_Printf("ManyToOneListener<%s>", gpg::RTypeOf<moho::EProjectileImpactEvent>()->GetName());
       return sName.c_str();
     }
 
@@ -676,10 +637,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetLauncherHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kGetLauncherHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -704,7 +662,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileGetLauncher_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "GetLauncher",
       &moho::cfunc_ProjectileGetLauncher,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -741,10 +699,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetTrackingTargetHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kGetTrackingTargetHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -773,7 +728,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileGetTrackingTarget_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "GetTrackingTarget",
       &moho::cfunc_ProjectileGetTrackingTarget,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -808,11 +763,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetCurrentTargetPositionHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kGetCurrentTargetPositionHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -837,7 +788,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileGetCurrentTargetPosition_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "GetCurrentTargetPosition",
       &moho::cfunc_ProjectileGetCurrentTargetPosition,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -871,11 +822,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetNewTargetHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetNewTargetHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -899,7 +846,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetNewTarget_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetNewTarget",
       &moho::cfunc_ProjectileSetNewTarget,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -922,11 +869,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetNewTargetGroundHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetNewTargetGroundHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -967,7 +910,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetNewTargetGround_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetNewTargetGround",
       &moho::cfunc_ProjectileSetNewTargetGround,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1000,7 +943,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileGetMaxZigZag_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kGetMaxZigZagName,
       &moho::cfunc_ProjectileGetMaxZigZag,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1033,7 +976,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileGetZigZagFrequency_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kGetZigZagFrequencyName,
       &moho::cfunc_ProjectileGetZigZagFrequency,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1077,7 +1020,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileGetCurrentTargetPositionXYZ_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kGetCurrentTargetPositionXYZName,
       &moho::cfunc_ProjectileGetCurrentTargetPositionXYZ,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1127,7 +1070,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetNewTargetGroundXYZ_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kSetNewTargetGroundXYZName,
       &moho::cfunc_ProjectileSetNewTargetGroundXYZ,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1151,10 +1094,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetLifetimeHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetLifetimeHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -1190,7 +1130,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetLifetime_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetLifetime",
       &moho::cfunc_ProjectileSetLifetime,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1272,7 +1212,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetDamage_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetDamage",
       &moho::cfunc_ProjectileSetDamage,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1296,10 +1236,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetMaxSpeedHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetMaxSpeedHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -1335,7 +1272,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetMaxSpeed_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetMaxSpeed",
       &moho::cfunc_ProjectileSetMaxSpeed,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1359,10 +1296,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetAccelerationHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetAccelerationHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -1399,7 +1333,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetAcceleration_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetAcceleration",
       &moho::cfunc_ProjectileSetAcceleration,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1492,7 +1426,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetBallisticAcceleration_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetBallisticAcceleration",
       &moho::cfunc_ProjectileSetBallisticAcceleration,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1515,11 +1449,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetDestroyOnWaterHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetDestroyOnWaterHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -1551,7 +1481,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetDestroyOnWater_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetDestroyOnWater",
       &moho::cfunc_ProjectileSetDestroyOnWater,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1575,10 +1505,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetTurnRateHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetTurnRateHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -1615,7 +1542,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetTurnRate_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetTurnRate",
       &moho::cfunc_ProjectileSetTurnRate,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1639,10 +1566,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetCurrentSpeedHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kGetCurrentSpeedHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -1679,7 +1603,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileGetCurrentSpeed_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "GetCurrentSpeed",
       &moho::cfunc_ProjectileGetCurrentSpeed,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1716,10 +1640,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetVelocityHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kGetVelocityHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -1744,7 +1665,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileGetVelocity_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "GetVelocity",
       &moho::cfunc_ProjectileGetVelocity,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1835,7 +1756,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetVelocity_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetVelocity",
       &moho::cfunc_ProjectileSetVelocity,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1916,7 +1837,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetScaleVelocity_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetScaleVelocity",
       &moho::cfunc_ProjectileSetScaleVelocity,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -1940,10 +1861,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 4) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetLocalAngularVelocityHelpText, 4, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 4, kSetLocalAngularVelocityHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -1994,7 +1912,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetLocalAngularVelocity_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetLocalAngularVelocity",
       &moho::cfunc_ProjectileSetLocalAngularVelocity,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -2017,11 +1935,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetCollisionHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetCollisionHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -2055,7 +1969,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetCollision_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetCollision",
       &moho::cfunc_ProjectileSetCollision,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -2078,11 +1992,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetCollideSurfaceHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetCollideSurfaceHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -2114,7 +2024,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetCollideSurface_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetCollideSurface",
       &moho::cfunc_ProjectileSetCollideSurface,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -2137,11 +2047,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetCollideEntityHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetCollideEntityHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -2173,7 +2079,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetCollideEntity_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetCollideEntity",
       &moho::cfunc_ProjectileSetCollideEntity,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -2196,11 +2102,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kStayUnderwaterHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kStayUnderwaterHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -2232,7 +2134,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileStayUnderwater_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "StayUnderwater",
       &moho::cfunc_ProjectileStayUnderwater,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -2255,11 +2157,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kTrackTargetHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kTrackTargetHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -2290,7 +2188,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileTrackTarget_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "TrackTarget",
       &moho::cfunc_ProjectileTrackTarget,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -2312,11 +2210,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetStayUprightHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetStayUprightHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -2347,7 +2241,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetStayUpright_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetStayUpright",
       &moho::cfunc_ProjectileSetStayUpright,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -2369,11 +2263,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetVelocityAlignHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetVelocityAlignHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -2404,7 +2294,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetVelocityAlign_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetVelocityAlign",
       &moho::cfunc_ProjectileSetVelocityAlign,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -2428,10 +2318,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateChildProjectileHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kCreateChildProjectileHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const sourceProjectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -2495,7 +2382,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileCreateChildProjectile_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "CreateChildProjectile",
       &moho::cfunc_ProjectileCreateChildProjectile,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -2531,10 +2418,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetVelocityRandomUpVectorHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kSetVelocityRandomUpVectorHelpText);
 
     Sim* const sim = lua_getglobaluserdata(rawState);
     CRandomStream* const random = (sim != nullptr) ? sim->mRngState : nullptr;
@@ -2572,7 +2456,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileSetVelocityRandomUpVector_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetVelocityRandomUpVector",
       &moho::cfunc_ProjectileSetVelocityRandomUpVector,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -2596,10 +2480,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kChangeMaxZigZagHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kChangeMaxZigZagHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -2634,7 +2515,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileChangeMaxZigZag_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "ChangeMaxZigZag",
       &moho::cfunc_ProjectileChangeMaxZigZag,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -2658,10 +2539,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kChangeZigZagFrequencyHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kChangeZigZagFrequencyHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -2696,7 +2574,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileChangeZigZagFrequency_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "ChangeZigZagFrequency",
       &moho::cfunc_ProjectileChangeZigZagFrequency,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -2720,10 +2598,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kChangeDetonateAboveHeightHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kChangeDetonateAboveHeightHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -2758,7 +2633,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileChangeDetonateAboveHeight_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "ChangeDetonateAboveHeight",
       &moho::cfunc_ProjectileChangeDetonateAboveHeight,
       &CScrLuaMetatableFactory<Projectile>::Instance(),
@@ -2782,10 +2657,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kChangeDetonateBelowHeightHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kChangeDetonateBelowHeightHelpText);
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -2820,7 +2692,7 @@ namespace moho
   CScrLuaInitForm* func_ProjectileChangeDetonateBelowHeight_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "ChangeDetonateBelowHeight",
       &moho::cfunc_ProjectileChangeDetonateBelowHeight,
       &CScrLuaMetatableFactory<Projectile>::Instance(),

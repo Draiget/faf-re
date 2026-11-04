@@ -55,37 +55,6 @@ namespace
 
   static_assert(sizeof(CurveKeyVectorTypeInfo) == 0x68, "CurveKeyVectorTypeInfo size must be 0x68");
 
-  [[nodiscard]] gpg::RType* CachedRObjectType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(gpg::RObject));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEmitterCurveKeyType()
-  {
-    if (!moho::REmitterCurveKey::sType) {
-      moho::REmitterCurveKey::sType = gpg::LookupRType(typeid(moho::REmitterCurveKey));
-    }
-    return moho::REmitterCurveKey::sType;
-  }
-
-  /**
-   * Address: 0x00510450 (FUN_00510450)
-   *
-   * What it does:
-   * Lazily resolves and caches RTTI metadata for `REmitterBlueprintCurve`.
-   */
-  [[nodiscard]] gpg::RType* CachedEmitterBlueprintCurveType()
-  {
-    if (!moho::REmitterBlueprintCurve::sType) {
-      moho::REmitterBlueprintCurve::sType = gpg::LookupRType(typeid(moho::REmitterBlueprintCurve));
-    }
-    return moho::REmitterBlueprintCurve::sType;
-  }
-
   struct EmitterCurveValueTriplet
   {
     float X{0.0f};
@@ -439,7 +408,7 @@ namespace
   {
     static msvc8::string cachedName{};
     if (cachedName.empty()) {
-      const gpg::RType* const elementType = CachedEmitterCurveKeyType();
+      const gpg::RType* const elementType = gpg::RTypeOf<moho::REmitterCurveKey>();
       const char* const elementName = elementType ? elementType->GetName() : "REmitterCurveKey";
       cachedName = gpg::STR_Printf("vector<%s>", elementName);
     }
@@ -501,7 +470,7 @@ namespace
     CurveKeyVector loaded;
     loaded.reserve(count);
 
-    gpg::RType* const elementType = CachedEmitterCurveKeyType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::REmitterCurveKey>();
     for (unsigned int index = 0u; index < count; ++index) {
       moho::REmitterCurveKey key{};
       gpg::RRef elementOwner{};
@@ -535,7 +504,7 @@ namespace
       return;
     }
 
-    const gpg::RType* const elementType = CachedEmitterCurveKeyType();
+    const gpg::RType* const elementType = gpg::RTypeOf<moho::REmitterCurveKey>();
     gpg::RRef emptyOwner{};
     const gpg::RRef& effectiveOwner = ownerRef != nullptr ? *ownerRef : emptyOwner;
     for (const moho::REmitterCurveKey& element : *source) {
@@ -546,7 +515,7 @@ namespace
   gpg::RRef CurveKeyVectorTypeInfo::SubscriptIndex(void* const obj, const int ind) const
   {
     gpg::RRef out{};
-    out.mType = CachedEmitterCurveKeyType();
+    out.mType = gpg::RTypeOf<moho::REmitterCurveKey>();
     out.mObj = nullptr;
 
     auto* const storage = static_cast<CurveKeyVector*>(obj);
@@ -598,7 +567,7 @@ namespace
   {
     gpg::RRef out{};
     out.mObj = object;
-    out.mType = CachedEmitterBlueprintCurveType();
+    out.mType = gpg::RTypeOf<moho::REmitterBlueprintCurve>();
     return out;
   }
 
@@ -632,7 +601,7 @@ namespace
   {
     gpg::RRef out{};
     out.mObj = object;
-    out.mType = CachedEmitterCurveKeyType();
+    out.mType = gpg::RTypeOf<moho::REmitterCurveKey>();
     return out;
   }
 
@@ -739,14 +708,7 @@ namespace moho
    */
   void REmitterBlueprintCurveTypeInfo::AddBaseRObject(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedRObjectType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<gpg::RObject>(typeInfo);
   }
 
   /**
@@ -821,14 +783,7 @@ namespace moho
    */
   void REmitterCurveKeyTypeInfo::AddBaseRObject(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedRObjectType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<gpg::RObject>(typeInfo);
   }
 
   /**

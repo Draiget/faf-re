@@ -130,7 +130,7 @@ namespace moho
      * What it does:
      * Returns cached reflection type for this object view.
      */
-    [[nodiscard]] gpg::RType* GetClass() const;
+    [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x0062FE30 (FUN_0062FE30, Moho::CAimManipulator::GetDerivedObjectRef)
@@ -138,7 +138,7 @@ namespace moho
      * What it does:
      * Builds one reflected object reference for this manipulator instance.
      */
-    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x006306A0 (FUN_006306A0; the lost IDA database spells this

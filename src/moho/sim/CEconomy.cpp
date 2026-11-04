@@ -74,7 +74,7 @@ namespace
   constexpr int kSerializationConstructLine = 231;
 
   template <class TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* const object, gpg::RType* const staticType) noexcept
+  [[nodiscard]] gpg::RRef MakeStaticRef(TObject* const object, gpg::RType* const staticType) noexcept
   {
     gpg::RRef out{};
     out.mObj = object;
@@ -105,15 +105,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedSimType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Sim));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RType* CachedCEconStorageType()
   {
     static gpg::RType* cached = nullptr;
@@ -127,14 +118,6 @@ namespace
       }
     }
     return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCEconomyType()
-  {
-    if (moho::CEconomy::sType == nullptr) {
-      moho::CEconomy::sType = gpg::LookupRType(typeid(moho::CEconomy));
-    }
-    return moho::CEconomy::sType;
   }
 
   [[nodiscard]] moho::CEconRequest* RequestFromNode(moho::TDatListItem<void, void>* const node) noexcept
@@ -823,7 +806,7 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
 
     gpg::WriteRawPointer(
       archive,
-      MakeTypedRef(mSim, CachedSimType()),
+      MakeStaticRef(mSim, gpg::RTypeOf<moho::Sim>()),
       gpg::TrackedPointerState::Unowned,
       nullOwner
     );

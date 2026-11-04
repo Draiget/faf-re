@@ -38,50 +38,6 @@ namespace
     return &sInstance;
   }
 
-  gpg::RType* CachedCCommandTaskType()
-  {
-    if (!CCommandTask::sType) {
-      CCommandTask::sType = gpg::LookupRType(typeid(CCommandTask));
-    }
-    return CCommandTask::sType;
-  }
-
-  gpg::RType* CachedCTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CTask));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedUnitType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Unit));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedSimType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Sim));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedEAiResultType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(EAiResult));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x005F22B0 (FUN_005F22B0)
    *
@@ -94,7 +50,7 @@ namespace
       return nullptr;
     }
 
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCCommandTaskType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, gpg::RTypeOf<CCommandTask>());
     return upcast.mObj;
   }
 
@@ -115,7 +71,7 @@ namespace
     }
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Read(CachedCCommandTaskType(), objectStorage, owner);
+    archive->Read(gpg::RTypeOf<CCommandTask>(), objectStorage, owner);
     return archive;
   }
 
@@ -136,46 +92,16 @@ namespace
     }
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Write(CachedCCommandTaskType(), objectSlot, owner);
+    archive->Write(gpg::RTypeOf<CCommandTask>(), objectSlot, owner);
     return archive;
   }
 
-  template <class TObject>
-  gpg::RRef MakeDerivedRef(TObject* object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
 
   gpg::RRef MakeEAiResultRef(EAiResult* const value)
   {
     gpg::RRef out{};
     out.mObj = value;
-    out.mType = CachedEAiResultType();
+    out.mType = gpg::RTypeOf<EAiResult>();
     return out;
   }
 
@@ -508,7 +434,7 @@ void CCommandTaskTypeInfo::Init()
  */
 void CCommandTaskTypeInfo::AddBase_CTask(gpg::RType* const typeInfo)
 {
-  gpg::RType* const taskType = CachedCTaskType();
+  gpg::RType* const taskType = gpg::RTypeOf<CTask>();
   gpg::RField baseField{};
   baseField.mName = taskType->GetName();
   baseField.mType = taskType;
@@ -533,7 +459,7 @@ namespace gpg
       return nullptr;
     }
 
-    *outRef = MakeDerivedRef(value, CachedCCommandTaskType());
+    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<CCommandTask>());
     return outRef;
   }
 } // namespace gpg
@@ -591,19 +517,19 @@ namespace moho
 
     gpg::RType* taskType = CTask::sType;
     if (!taskType) {
-      taskType = CachedCTaskType();
+      taskType = gpg::RTypeOf<CTask>();
       CTask::sType = taskType;
     }
     archive->Read(taskType, static_cast<CTask*>(this), owner);
 
-    mUnit = ReadTypedPointer<Unit>(archive, owner, CachedUnitType(), "Unit");
-    mSim = ReadTypedPointer<Sim>(archive, owner, CachedSimType(), "Sim");
+    mUnit = ReadTypedPointer<Unit>(archive, owner, gpg::RTypeOf<Unit>(), "Unit");
+    mSim = ReadTypedPointer<Sim>(archive, owner, gpg::RTypeOf<Sim>(), "Sim");
 
     int taskState = 0;
     archive->ReadInt(&taskState);
     mTaskState = static_cast<ETaskState>(taskState);
 
-    gpg::RType* aiResultType = CachedEAiResultType();
+    gpg::RType* aiResultType = gpg::RTypeOf<EAiResult>();
     archive->Read(aiResultType, &mLinkResult, owner);
     mDispatchResult = ReadTypedPointer<EAiResult>(archive, owner, aiResultType, "EAiResult");
   }
@@ -624,16 +550,16 @@ namespace moho
 
     gpg::RType* taskType = CTask::sType;
     if (!taskType) {
-      taskType = CachedCTaskType();
+      taskType = gpg::RTypeOf<CTask>();
       CTask::sType = taskType;
     }
     archive->Write(taskType, static_cast<const CTask*>(this), owner);
 
-    gpg::WriteRawPointer(archive, MakeDerivedRef(mUnit, CachedUnitType()), gpg::TrackedPointerState::Unowned, owner);
-    gpg::WriteRawPointer(archive, MakeDerivedRef(mSim, CachedSimType()), gpg::TrackedPointerState::Unowned, owner);
+    gpg::WriteRawPointer(archive, gpg::MakeDerivedRef(mUnit, gpg::RTypeOf<Unit>()), gpg::TrackedPointerState::Unowned, owner);
+    gpg::WriteRawPointer(archive, gpg::MakeDerivedRef(mSim, gpg::RTypeOf<Sim>()), gpg::TrackedPointerState::Unowned, owner);
     archive->WriteInt(static_cast<int>(mTaskState));
 
-    gpg::RType* const aiResultType = CachedEAiResultType();
+    gpg::RType* const aiResultType = gpg::RTypeOf<EAiResult>();
     archive->Write(aiResultType, &mLinkResult, owner);
     gpg::WriteRawPointer(
       archive, MakeEAiResultRef(mDispatchResult), gpg::TrackedPointerState::Unowned, owner

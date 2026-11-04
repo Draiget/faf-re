@@ -78,29 +78,6 @@ namespace moho
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCUnitGetBuiltTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitGetBuiltTask));
-    }
-    return cached;
-  }
-
-  // CUnitGetBuiltTask adds no fields beyond CCommandTask (see the trivial
-  // forwarding constructors above), so the binary serializes it purely as
-  // its CCommandTask base -- both facades below read/write through the
-  // cached CCommandTask reflection type rather than a per-class member
-  // Deserialize/Serialize.
-  [[nodiscard]] gpg::RType* CachedCCommandTaskTypeForGetBuiltTask()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
 
 } // namespace
 
@@ -114,7 +91,7 @@ namespace moho
    */
   void CUnitGetBuiltTask::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
   {
-    archive->Read(CachedCCommandTaskTypeForGetBuiltTask(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), ownerRef);
   }
 
   /**
@@ -124,7 +101,7 @@ namespace moho
    */
   void CUnitGetBuiltTask::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef) const
   {
-    archive->Write(CachedCCommandTaskTypeForGetBuiltTask(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
   }
 } // namespace moho
 

@@ -21,36 +21,11 @@ namespace
     return sInstance;
   }
 
-  /**
-   * Address: 0x005104B0 (FUN_005104B0)
-   *
-   * What it does:
-   * Lazily resolves and caches RTTI metadata for `RTrailBlueprint`.
-   */
-  gpg::RType* CachedTrailBlueprintType()
-  {
-    gpg::RType* cached = moho::RTrailBlueprint::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RTrailBlueprint));
-      moho::RTrailBlueprint::sType = cached;
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedEffectBlueprintType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::REffectBlueprint));
-    }
-    return cached;
-  }
-
   gpg::RRef MakeTrailBlueprintRef(moho::RTrailBlueprint* object)
   {
     gpg::RRef out{};
     out.mObj = object;
-    out.mType = CachedTrailBlueprintType();
+    out.mType = gpg::RTypeOf<moho::RTrailBlueprint>();
     return out;
   }
 
@@ -143,7 +118,7 @@ namespace moho
  */
 void RTrailBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* typeInfo)
 {
-  gpg::RType* const effectType = CachedEffectBlueprintType();
+  gpg::RType* const effectType = gpg::RTypeOf<moho::REffectBlueprint>();
   gpg::RField baseField{};
   baseField.mName = effectType->GetName();
   baseField.mType = effectType;

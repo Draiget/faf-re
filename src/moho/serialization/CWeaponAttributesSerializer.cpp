@@ -8,6 +8,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/sim/SimArchiveMode.h"
 #include "moho/entity/EntityCategorySetVectorReflection.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/serialization/SBlackListInfoVectorReflection.h"
@@ -16,15 +17,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedRUnitBlueprintWeaponType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RUnitBlueprintWeapon));
-    }
-
-    return cached;
-  }
 
   gpg::RType* gLegacyEntityCategorySetVectorType = nullptr;
   gpg::RType* gLegacySBlackListInfoVectorType = nullptr;
@@ -42,12 +34,12 @@ namespace
     source.mObj = tracked.object;
     source.mType = tracked.type;
 
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedRUnitBlueprintWeaponType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::RUnitBlueprintWeapon>());
     if (upcast.mObj) {
       return static_cast<moho::RUnitBlueprintWeapon*>(upcast.mObj);
     }
 
-    const char* const expected = CachedRUnitBlueprintWeaponType() ? CachedRUnitBlueprintWeaponType()->GetName() : "RUnitBlueprintWeapon";
+    const char* const expected = gpg::RTypeOf<moho::RUnitBlueprintWeapon>() ? gpg::RTypeOf<moho::RUnitBlueprintWeapon>()->GetName() : "RUnitBlueprintWeapon";
     const char* const actual = source.GetTypeName();
     const msvc8::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
@@ -61,7 +53,7 @@ namespace
   {
     gpg::RRef ref{};
     ref.mObj = value;
-    ref.mType = CachedRUnitBlueprintWeaponType();
+    ref.mType = gpg::RTypeOf<moho::RUnitBlueprintWeapon>();
     return ref;
   }
 
@@ -103,6 +95,10 @@ namespace moho
     archive->ReadFloat(&mDamage);
     archive->ReadFloat(&mUnknown_0044);
     archive->ReadFloat(&mUnknown_0048);
+    // Engine addition (replay keyframes): retail's load (0x006DF0C0) resets it to infinity.
+    if (moho::gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->ReadFloat(&mMaxHeightDiff);
+    }
   }
 
   /**
@@ -128,6 +124,9 @@ namespace moho
     archive->WriteFloat(mDamage);
     archive->WriteFloat(mUnknown_0044);
     archive->WriteFloat(mUnknown_0048);
+    if (moho::gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->WriteFloat(mMaxHeightDiff);
+    }
   }
 } // namespace moho
 
@@ -158,15 +157,6 @@ namespace
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCWeaponAttributesType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CWeaponAttributes));
-    }
-
-    return cached;
-  }
 
   template <typename TObject>
   [[nodiscard]] gpg::RType* ResolveCachedArchiveType()

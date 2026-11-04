@@ -15,45 +15,6 @@ using namespace moho;
 
 namespace
 {
-  template <typename T>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(T* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType && staticType && dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType ? dynamicType : staticType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCAiAttackerImplType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CAiAttackerImpl));
-    }
-    return cached;
-  }
 
 } // namespace
 
@@ -80,7 +41,7 @@ namespace moho
     source.mObj = tracked.object;
     source.mType = tracked.type;
 
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCAiAttackerImplType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<CAiAttackerImpl>());
     if (upcast.mObj) {
       cImpl = static_cast<CAiAttackerImpl*>(upcast.mObj);
       return;
@@ -98,7 +59,7 @@ namespace moho
       return;
     }
 
-    const gpg::RRef objectRef = MakeDerivedRef(cImpl, CachedCAiAttackerImplType());
+    const gpg::RRef objectRef = gpg::MakeDerivedRef(cImpl, gpg::RTypeOf<CAiAttackerImpl>());
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
   }
 } // namespace moho

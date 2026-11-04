@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "TrackedPointerIndex.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -564,10 +565,7 @@ namespace gpg
   // the correctly-named `moho::SOffsetInfo`/`moho::SAssignedLocInfo`), which
   // are also the ones actually wired into `FastVectorUIntReflection.cpp`'s
   // `serSaveFunc_ = &moho::SaveFastVectorSOffsetInfo` / `&moho::
-  // SaveFastVectorSAssignedLocInfo` (`RFastVectorType<...>::Init()`). Both
-  // orphan copies here had zero header declaration and zero callers anywhere
-  // in src -- removed rather than left as dead, address-misattributed
-  // code, matching the `SaveFastVectorCPathPoint` resolution just below.
+  // SaveFastVectorSAssignedLocInfo` (`RFastVectorType<...>::Init()`).
 
   // DB-integrity fix: this file previously carried a second, unwired
   // `SaveFastVectorCPathPoint` here, wrongly claiming Address: 0x005B4FF0.
@@ -576,9 +574,7 @@ namespace gpg
   // loop, no a runtime-view overlay / `SaveContiguousArchiveVectorPayload`
   // calls anywhere) is `moho`-anonymous-namespace `SaveFastVectorCPathPoint`
   // in CAiPathSpline.cpp, which is also the one actually wired into
-  // `FastVectorCPathPointTypeInfo::Init()`'s `serSaveFunc_`. This orphan
-  // copy had zero header declaration and zero callers anywhere in
-  // src -- removed rather than left as dead, address-misattributed code.
+  // `FastVectorCPathPointTypeInfo::Init()`'s `serSaveFunc_`.
 
   /**
    * Address: 0x005C5860 (FUN_005C5860)
@@ -853,16 +849,31 @@ void gpg::WriteRawPointer(
     return;
   }
 
-  const auto found = archive->mObjRefs.find(objectRef);
+  // Engine addition: a fast archive keeps these in a hash index (see TrackedPointerIndex).
+  TrackedPointerIndex* const fastRefs = archive->mFastObjRefs;
   WriteArchive::TrackedPointerRecord* record = nullptr;
+  if (fastRefs != nullptr) {
+    if (TrackedPointerIndex::Entry* const entry = fastRefs->Find(objectRef)) {
+      record = &entry->record;
+    }
+  } else {
+    const auto found = archive->mObjRefs.find(objectRef);
+    if (found != archive->mObjRefs.end()) {
+      record = &found->second;
+    }
+  }
 
-  if (found == archive->mObjRefs.end()) {
+  if (record == nullptr) {
     WriteArchive::TrackedPointerRecord fresh{};
-    fresh.index = static_cast<int>(archive->mObjRefs.size());
+    fresh.index = static_cast<int>(fastRefs != nullptr ? fastRefs->Size() : archive->mObjRefs.size());
     fresh.ownership = TrackedPointerState::Reserved;
 
-    const auto inserted = archive->mObjRefs.insert({objectRef, fresh});
-    record = &inserted.first->second;
+    if (fastRefs != nullptr) {
+      record = &fastRefs->Insert(objectRef, fresh).record;
+    } else {
+      const auto inserted = archive->mObjRefs.insert({objectRef, fresh});
+      record = &inserted.first->second;
+    }
 
     archive->WriteMarker(static_cast<int>(ArchiveToken::NewObject));
 
@@ -920,7 +931,6 @@ void gpg::WriteRawPointer(
 
     archive->WriteMarker(static_cast<int>(ArchiveToken::ObjectTerminator));
   } else {
-    record = &found->second;
     if (record->ownership == TrackedPointerState::Reserved) {
       ThrowSerializationError(
         "Error while creating archive: recursively encountered a pointer to an object for which construction data is "
@@ -1082,76 +1092,6 @@ namespace
       }
     }
     return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveRDebugOverlayArchiveAdapterType()
-  {
-    gpg::RType* type = moho::RDebugOverlay::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::RDebugOverlay));
-      moho::RDebugOverlay::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveREmitterBlueprintArchiveAdapterType()
-  {
-    gpg::RType* type = moho::REmitterBlueprint::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::REmitterBlueprint));
-      moho::REmitterBlueprint::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveRTrailBlueprintArchiveAdapterType()
-  {
-    gpg::RType* type = moho::RTrailBlueprint::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::RTrailBlueprint));
-      moho::RTrailBlueprint::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCollisionBeamEntityArchiveAdapterType()
-  {
-    gpg::RType* type = moho::CollisionBeamEntity::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::CollisionBeamEntity));
-      moho::CollisionBeamEntity::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveManyToOneCollisionBeamEventArchiveAdapterType()
-  {
-    gpg::RType* type = moho::ManyToOneListener_ECollisionBeamEvent::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::ManyToOneListener_ECollisionBeamEvent));
-      moho::ManyToOneListener_ECollisionBeamEvent::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveRProjectileBlueprintArchiveAdapterType()
-  {
-    gpg::RType* type = moho::RProjectileBlueprint::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::RProjectileBlueprint));
-      moho::RProjectileBlueprint::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEntitySetBaseArchiveAdapterType()
-  {
-    gpg::RType* type = moho::EntitySetBase::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::EntitySetBase));
-      moho::EntitySetBase::sType = type;
-    }
-    return type;
   }
 
   /**
@@ -1366,7 +1306,7 @@ namespace
    */
   [[nodiscard]] moho::RDebugOverlay* func_CastRDebugOverlay(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveRDebugOverlayArchiveAdapterType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::RDebugOverlay>());
     return static_cast<moho::RDebugOverlay*>(upcast.mObj);
   }
 
@@ -1379,7 +1319,7 @@ namespace
    */
   [[nodiscard]] moho::REmitterBlueprint* func_CastREmitterBlueprint(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveREmitterBlueprintArchiveAdapterType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::REmitterBlueprint>());
     return static_cast<moho::REmitterBlueprint*>(upcast.mObj);
   }
 
@@ -1392,7 +1332,7 @@ namespace
    */
   [[nodiscard]] moho::RTrailBlueprint* func_CastRTrailBlueprint(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveRTrailBlueprintArchiveAdapterType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::RTrailBlueprint>());
     return static_cast<moho::RTrailBlueprint*>(upcast.mObj);
   }
 
@@ -1405,7 +1345,7 @@ namespace
    */
   [[nodiscard]] moho::CollisionBeamEntity* func_CastCollisionBeamEntity(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveCollisionBeamEntityArchiveAdapterType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::CollisionBeamEntity>());
     return static_cast<moho::CollisionBeamEntity*>(upcast.mObj);
   }
 
@@ -1419,7 +1359,7 @@ namespace
   [[nodiscard]] moho::ManyToOneListener_ECollisionBeamEvent*
   func_CastManyToOneListener_ECollisionBeamEvent(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveManyToOneCollisionBeamEventArchiveAdapterType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::ManyToOneListener_ECollisionBeamEvent>());
     return static_cast<moho::ManyToOneListener_ECollisionBeamEvent*>(upcast.mObj);
   }
 
@@ -1432,7 +1372,7 @@ namespace
    */
   [[nodiscard]] moho::RProjectileBlueprint* func_CastRProjectileBlueprint(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveRProjectileBlueprintArchiveAdapterType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::RProjectileBlueprint>());
     return static_cast<moho::RProjectileBlueprint*>(upcast.mObj);
   }
 
@@ -1445,7 +1385,7 @@ namespace
    */
   [[nodiscard]] moho::EntitySetBase* func_CastEntitySetBase(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveEntitySetBaseArchiveAdapterType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::EntitySetBase>());
     return static_cast<moho::EntitySetBase*>(upcast.mObj);
   }
 } // namespace
@@ -1508,15 +1448,6 @@ namespace
 
 namespace
 {
-  [[nodiscard]] gpg::RType* ResolveCDamageArchiveAdapterType()
-  {
-    gpg::RType* type = moho::CDamage::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::CDamage));
-      moho::CDamage::sType = type;
-    }
-    return type;
-  }
 
   [[nodiscard]] gpg::RType* ResolveShieldArchiveAdapterType()
   {
@@ -1571,7 +1502,7 @@ namespace
    */
   [[nodiscard]] moho::CDamage* func_CastCDamage(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveCDamageArchiveAdapterType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::CDamage>());
     return static_cast<moho::CDamage*>(upcast.mObj);
   }
 

@@ -51,15 +51,6 @@ namespace
   void DeserializeSSTITargetSerializerCallback(gpg::ReadArchive* archive, std::intptr_t objectPtr, int unusedTag, gpg::RRef* ownerRef);
   void SerializeSSTITargetSerializerCallback(gpg::WriteArchive* archive, std::intptr_t objectPtr, int unusedTag, gpg::RRef* ownerRef);
 
-  [[nodiscard]] gpg::RType* CachedSSTITargetType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::SSTITarget));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x0055B120 (FUN_0055B120, Moho::SSTITargetSerializer::Deserialize)
    *
@@ -106,26 +97,11 @@ namespace
     target->MemberSerialize(archive);
   }
 
-  [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
-  {
-    for (const char* const name : names) {
-      if (!name) {
-        continue;
-      }
-
-      if (gpg::RType* const type = gpg::REF_FindTypeNamed(name)) {
-        return type;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] gpg::RType* ResolveTargetType()
   {
     static gpg::RType* sType = nullptr;
     if (sType == nullptr) {
-      sType = ResolveTypeByAnyName(
+      sType = gpg::REF_FindFirstTypeNamed(
         {"ESTITargetType", "Moho::ESTITargetType", "EAiTargetType", "Moho::EAiTargetType"}
       );
       if (sType == nullptr) {
@@ -144,14 +120,6 @@ namespace
     return sType;
   }
 
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::LookupRType(typeid(Wm3::Vec3f));
-    }
-    return sType;
-  }
 } // namespace
 
 namespace moho
@@ -217,7 +185,7 @@ namespace moho
     }
 
     if (mType == EAiTargetType::AITARGET_Ground) {
-      gpg::RType* const vec3Type = ResolveVector3fType();
+      gpg::RType* const vec3Type = gpg::RTypeOf<Wm3::Vec3f>();
       GPG_ASSERT(vec3Type != nullptr);
       archive->Read(vec3Type, &mPos, nullOwner);
     }
@@ -250,7 +218,7 @@ namespace moho
     }
 
     if (mType == EAiTargetType::AITARGET_Ground) {
-      gpg::RType* const vec3Type = ResolveVector3fType();
+      gpg::RType* const vec3Type = gpg::RTypeOf<Wm3::Vec3f>();
       GPG_ASSERT(vec3Type != nullptr);
       archive->Write(vec3Type, &mPos, nullOwner);
     }

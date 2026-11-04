@@ -429,4 +429,5 @@ namespace moho
     gpg::MD5Context mTotalBytesDispatchedMD5;
   };
   static_assert(sizeof(CNetUDPConnection) == 0xFE8, "CNetUDPConnection size must be 0xFE8");
+
 } // namespace moho

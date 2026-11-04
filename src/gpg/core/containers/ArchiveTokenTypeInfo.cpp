@@ -8,20 +8,6 @@
 
 namespace
 {
-  /**
-   * Address: 0x0094F4D0 (FUN_0094F4D0)
-   *
-   * What it does:
-   * Lazily resolves and caches reflection RTTI for `gpg::ArchiveToken`.
-   */
-  [[maybe_unused]] gpg::RType* CachedArchiveTokenType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(gpg::ArchiveToken));
-    }
-    return cached;
-  }
 
   /**
    * Address: 0x00C0A210 (FUN_00C0A210, atexit destructor of the gpg::ArchiveTokenTypeInfo object)

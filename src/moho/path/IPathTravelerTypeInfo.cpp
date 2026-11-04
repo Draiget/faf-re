@@ -73,8 +73,6 @@ namespace
 {
   using PathTravelerList = gpg::DList<moho::IPathTraveler>;
 
-  gpg::RType* gDListVoidType = nullptr;
-  gpg::RType* gDListIPathTravelerType = nullptr;
 
   template <class TObject>
   [[nodiscard]] TObject* PointerFromArchiveInt(const std::intptr_t objectPtr)
@@ -82,23 +80,6 @@ namespace
     return reinterpret_cast<TObject*>(objectPtr);
   }
 
-  [[nodiscard]] gpg::RType* ResolveDListVoidType()
-  {
-    if (gDListVoidType == nullptr) {
-      gDListVoidType = gpg::LookupRType(typeid(void));
-    }
-
-    return gDListVoidType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveDListIPathTravelerType()
-  {
-    if (gDListIPathTravelerType == nullptr) {
-      gDListIPathTravelerType = gpg::LookupRType(typeid(moho::IPathTraveler));
-    }
-
-    return gDListIPathTravelerType;
-  }
 } // namespace
 
 gpg::RDListType_IPathTraveler::~RDListType_IPathTraveler() = default;
@@ -113,7 +94,7 @@ gpg::RDListType_IPathTraveler::~RDListType_IPathTraveler() = default;
 const char* gpg::RDListType_IPathTraveler::GetName() const
 {
   static const msvc8::string sName =
-    gpg::STR_Printf("DList<%s,%s>", ResolveDListIPathTravelerType()->GetName(), ResolveDListVoidType()->GetName());
+    gpg::STR_Printf("DList<%s,%s>", gpg::RTypeOf<moho::IPathTraveler>()->GetName(), gpg::RTypeOf<void>()->GetName());
   return sName.c_str();
 }
 

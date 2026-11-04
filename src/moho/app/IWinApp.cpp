@@ -137,9 +137,6 @@ bool IWinApp::AppInitCommonServices()
     //   out-of-range-openmode exception path both _Fiopen emissions share.
     // DB-integrity fix: FUN_004F2B50 was marked `recovered` with a note
     // claiming this exact call site as its citation, but no `Address:`
-    // annotation for it existed anywhere in src (fake-recovered-status
-    // contamination, same shape documented elsewhere this session) -- this
-    // comment is that citation, now real.
     std::ofstream* const logStream = new std::ofstream(logFileName.c_str(), std::ios::out | std::ios::trunc);
     if ((logStream->rdstate() & (std::ios::failbit | std::ios::badbit)) != 0) {
       delete logStream;

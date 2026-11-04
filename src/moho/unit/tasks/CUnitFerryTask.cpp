@@ -41,74 +41,6 @@ namespace
   constexpr const char* kFerryBeaconCategoryName = "FERRYBEACON";
   constexpr const char* kOnFerryPointSetScriptName = "OnFerryPointSet";
 
-  [[nodiscard]] gpg::RType* CachedCUnitFerryTaskType()
-  {
-    gpg::RType* type = moho::CUnitFerryTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitFerryTask));
-      moho::CUnitFerryTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedFerryTaskCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedFerryTaskVector3fType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3<float>));
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedFerryTaskWeakPtrUnitType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-    }
-    return type;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
-
   void MarkOwnerFerryTaskAssigned(moho::Unit* const ownerUnit)
   {
     if (ownerUnit == nullptr) {
@@ -192,6 +124,27 @@ namespace
 namespace moho
 {
   gpg::RType* CUnitFerryTask::sType = nullptr;
+
+  /**
+   * Builds an empty task for the serializer to fill (what `CUnitFerryTaskTypeInfo::NewRef`,
+   * 0x006101B0, constructs).
+   */
+  CUnitFerryTask::CUnitFerryTask()
+    : CCommandTask()
+  {
+    mDispatch = nullptr;
+    mCommandIndex = 0;
+    mFollowsExistingRoute = false;
+
+    mRouteUnit.ClearLinkState();
+    mFerryUnit.ClearLinkState();
+
+    mPos.x = 0.0f;
+    mPos.y = 0.0f;
+    mPos.z = 0.0f;
+
+    mBeacon.ClearLinkState();
+  }
 
   /**
    * Address: 0x0060DD70 (FUN_0060DD70, Moho::CUnitFerryTask::CUnitFerryTask)
@@ -1064,7 +1017,7 @@ namespace moho
   {
     const gpg::RRef owner{};
 
-    archive->Read(CachedFerryTaskCCommandTaskType(), static_cast<CCommandTask*>(this), owner);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), owner);
 
     CCommandTask* dispatchAsCommandTask = nullptr;
     archive->ReadPointer(&dispatchAsCommandTask, &owner);
@@ -1073,10 +1026,10 @@ namespace moho
     archive->ReadInt(&mCommandIndex);
     archive->ReadBool(&mFollowsExistingRoute);
 
-    archive->Read(CachedFerryTaskVector3fType(), &mPos, owner);
-    archive->Read(CachedFerryTaskWeakPtrUnitType(), &mRouteUnit, owner);
-    archive->Read(CachedFerryTaskWeakPtrUnitType(), &mFerryUnit, owner);
-    archive->Read(CachedFerryTaskWeakPtrUnitType(), &mBeacon, owner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3<float>>(), &mPos, owner);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mRouteUnit, owner);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mFerryUnit, owner);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mBeacon, owner);
   }
 
   /**
@@ -1092,7 +1045,7 @@ namespace moho
   {
     const gpg::RRef owner{};
 
-    archive->Write(CachedFerryTaskCCommandTaskType(), static_cast<const CCommandTask*>(this), owner);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), owner);
 
     gpg::RRef dispatchRef{};
     (void)gpg::RRef_CCommandTask(&dispatchRef, static_cast<CCommandTask*>(mDispatch));
@@ -1101,10 +1054,10 @@ namespace moho
     archive->WriteInt(mCommandIndex);
     archive->WriteBool(mFollowsExistingRoute);
 
-    archive->Write(CachedFerryTaskVector3fType(), &mPos, owner);
-    archive->Write(CachedFerryTaskWeakPtrUnitType(), &mRouteUnit, owner);
-    archive->Write(CachedFerryTaskWeakPtrUnitType(), &mFerryUnit, owner);
-    archive->Write(CachedFerryTaskWeakPtrUnitType(), &mBeacon, owner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3<float>>(), &mPos, owner);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mRouteUnit, owner);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mFerryUnit, owner);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mBeacon, owner);
   }
 
   /**
@@ -1228,7 +1181,7 @@ namespace
 
   void CUnitFerryTaskSerializerHelper::Init()
   {
-    gpg::RType* const type = CachedCUnitFerryTaskType();
+    gpg::RType* const type = gpg::RTypeOf<moho::CUnitFerryTask>();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
     type->serLoadFunc_ = mLoadCallback;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
@@ -1251,7 +1204,7 @@ namespace gpg
       return nullptr;
     }
 
-    *outRef = MakeDerivedRef(value, CachedCUnitFerryTaskType());
+    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitFerryTask>());
     return outRef;
   }
 

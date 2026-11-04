@@ -36,4 +36,23 @@ namespace moho
    * use the SMT siblings of their pool's cores. `index` is the worker index within its pool.
    */
   void PlaceCurrentThread(EThreadRole role, unsigned int index = 0);
+
+  /**
+   * Engine addition: `--cpus <list>` for a server sharing a machine, for example "8-15" or "0,2,4,6".
+   * Confines the process to those CPUs, before any other thread starts, so every thread it makes
+   * inherits them. False: the list is malformed, or the process did not end up on exactly those CPUs,
+   * as inside a container or a job that doesn't hold them all.
+   */
+  [[nodiscard]] bool AssignProcessCpus(const char* cpuList);
+
+  /**
+   * Engine addition: a server decides its CPUs from outside, through `--cpus`, taskset or a container's
+   * CPU set. FAF's init scripts set their own mask for a player's machine, which assumes the CPUs start
+   * at 0, so once a process with fewer CPUs than the machine calls this, `SetProcessAffinityMask` from
+   * Lua changes nothing. The game never calls it, so it keeps FAF's behaviour.
+   */
+  void LockAssignedProcessCpus();
+
+  /// True when `LockAssignedProcessCpus` found the process confined.
+  [[nodiscard]] bool ProcessCpusAreLocked() noexcept;
 } // namespace moho

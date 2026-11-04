@@ -225,13 +225,13 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::Entity*>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::Entity*>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
     moho::Entity* fill = nullptr;
-    vec.Resize(count, fill);
+    vec.resize(count, fill);
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
@@ -281,13 +281,13 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::Entity*>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::Entity*>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
     moho::Entity* fill = nullptr;
-    vec.Resize(count, fill);
+    vec.resize(count, fill);
 
     const gpg::RRef emptyOwner{};
     const gpg::RRef* const effectiveOwner = ownerRef ? ownerRef : &emptyOwner;
@@ -358,11 +358,11 @@ namespace
   void ResizeFastVectorEntityPointers(
     const unsigned int newSize,
     moho::Entity* const* fillItem,
-    gpg::fastvector<moho::Entity*>& vec
+    gpg::core::FastVectorInline<moho::Entity*>& vec
   )
   {
     moho::Entity* const fill = fillItem ? *fillItem : nullptr;
-    vec.Resize(newSize, fill);
+    vec.resize(newSize, fill);
   }
 
   struct EntityFastVectorReflectionBootstrap
@@ -652,7 +652,7 @@ namespace gpg
       return MakeEntityPointerSlotRef(nullptr);
     }
 
-    auto& vec = *static_cast<gpg::fastvector<moho::Entity*>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::Entity*>*>(obj);
     GPG_ASSERT(ind >= 0);
     GPG_ASSERT(static_cast<std::size_t>(ind) < GetCount(obj));
     if (vec.Data() == nullptr || ind < 0 || static_cast<std::size_t>(ind) >= GetCount(obj)) {
@@ -686,7 +686,7 @@ namespace gpg
       return;
     }
 
-    auto& vec = *static_cast<gpg::fastvector<moho::Entity*>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::Entity*>*>(obj);
     moho::Entity* fill = nullptr;
     ResizeFastVectorEntityPointers(static_cast<unsigned int>(count), &fill, vec);
   }

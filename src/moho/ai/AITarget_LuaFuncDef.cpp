@@ -10,16 +10,6 @@ namespace
   constexpr const char* kAITargetLuaHelpText = "Create a target object";
   constexpr const char* kLuaExpectedBetweenArgsWarning = "%s\n  expected between %d and %d args, but got %d";
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Core"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Core");
-    return fallbackSet;
-  }
-
   [[nodiscard]] Wm3::Vec3f ReadVector3FromLuaObject(const LuaPlus::LuaObject& object) noexcept
   {
     Wm3::Vec3f out = Wm3::Vec3f::Zero();
@@ -113,7 +103,7 @@ namespace moho
   void func_AITarget_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "AITarget",
       &cfunc_AITarget,
       nullptr,

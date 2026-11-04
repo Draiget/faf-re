@@ -30,7 +30,7 @@ namespace msvc8
      * Note: this container used to be a non-owning inspection facade with an
      * `adopt(header, size)` factory. Adopting foreign tree memory is unsound now
      * that the container frees what it holds, so `adopt` and the raw-header
-     * constructor are gone; nothing in `src/**` referenced them.
+     * constructor are gone; nothing in `src/ **` referenced them.
      */
     template<class Key, class T, class Less = std::less<Key>>
     class map
@@ -201,13 +201,7 @@ namespace msvc8
          * ProcessArmorOnDamage` (0x006A9D60, `ArmorMultipliers.find(...)` in
          * the recovered combat-math body), `Unit::GetArmorMult` (0x006A9E10,
          * same pattern), and `cfunc_UnitGetArmorMultL` (0x006C4200) via
-         * `Unit::GetArmorMult`. Previously `recovered` with an address
-         * annotation attached to `IsArmorMapSentinel` -- a trivial
-         * null-or-isNil predicate that does not implement this function's
-         * documented lower-bound-then-verify behavior at all (a
-         * mis-attribution, not a real recovery of this address); that
-         * helper is deleted and this member's real call sites (`.find()`)
-         * are the recovery now (DB-integrity fix).
+         * `Unit::GetArmorMult`.
          * Address: 0x004E1950 (FUN_004E1950 -- `find` -- lower_bound plus the equivalence check, returning the header on a miss for `msvc8::map<moho::CSndParams*, moho::HSndEntityLoop*>` (`gSharedAmbientLoopsByParams` in moho/audio/CSndParams.cpp, node 0x18, mapped handle at node+0x10); callers 0x004DF2B0; formerly `FindSndLoopNodeByParams` in moho/audio/CSndParams.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007F01D0 (FUN_007F01D0 -- `find` -- that lower bound plus the `key < candidate` check, returning the header on a miss for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007EDA40, 0x007EEE50, 0x007EF0B0; formerly `FindBlueprintExtractorRegistryEntry` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00432680 (FUN_00432680 -- `find` -- that lower bound plus the `key < candidate` check, returning the header on a miss -- for `msvc8::map<msvc8::string, std::int32_t>` (`CD3DEffect::Technique::Implementation::mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D); zero callers, unreachable; formerly `FindIntAnnotationNodeBridge` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
@@ -435,18 +429,11 @@ namespace msvc8
          * reference shape, not `find()`'s read-only shape. Three confirmed
          * real callers, all in `Unit.cpp`: `Unit::InitializeArmor`
          * (0x006A7B90, `ArmorMultipliers[damageTypeName] = armorMultiplier`
-         * seeding entries from blueprint armor definitions), an
-         * owner=<none> inlined chunk at 0x006A9DF6 (inside one of the two
-         * recovered callers above), and `cfunc_UnitAlterArmorL` (0x006C4000,
-         * the Lua `Unit:AlterArmor(damageTypeName, multiplier)` setter,
+         * seeding entries from blueprint armor definitions), an owner=<none>
+         * inlined chunk at 0x006A9DF6 (inside one of the two recovered
+         * callers above), and `cfunc_UnitAlterArmorL` (0x006C4000, the Lua
+         * `Unit:AlterArmor(damageTypeName, multiplier)` setter,
          * `unit->ArmorMultipliers[armorTypeName] = armorMultiplier`).
-         * Previously marked `external_dependency` with a generic bulk-tag
-         * note ("STL template instantiation / codec helper - external") --
-         * wrong on two counts: this is a real engine-instantiated map
-         * (`Unit`'s own armor data, not a generic/third-party codec), and
-         * per RULE ONE its recovery is this member's own call sites in
-         * `Unit.cpp`, not a hand-rolled free function or an external tag
-         * (DB-integrity fix).
          *
          * Address: 0x008A7C80 (FUN_008A7C80, sub_8A7C80) -- `msvc8::map<
          * msvc8::string, moho::TerrainEnvironmentLookupEntry>::operator[]`

@@ -144,6 +144,91 @@ namespace faf::remote
     }
   }
 
+  bool CViewFrames::AdvanceEntityIndex(const moho::EntityDB& database)
+  {
+    // A walk over the sim's entity map takes a cache miss per entity, all on the sim thread, with
+    // tens of thousands of props on some maps. An entity comes in through the change set, and goes
+    // after its destroy pass. The count at the end says whether that was all that happened.
+    const auto& entities = database.mAllUnits;
+    mGoneEntities.clear();
+    std::size_t stay = 0;
+    for (const std::uint32_t id : mLeavingEntities) {
+      if (entities.find(id) == entities.end()) {
+        mGoneEntities.push_back(id);
+      } else {
+        mLeavingEntities[stay++] = id;
+      }
+    }
+    mLeavingEntities.resize(stay);
+
+    mEntityIndex.reserve(entities.size());
+    mEntityPointers.reserve(entities.size());
+    const std::vector<SChangedEntity>& changed = Entities();
+    std::size_t last = 0;
+    std::size_t next = 0;
+    std::size_t gone = 0;
+    while (last < mLastEntityIndex.size() || next < changed.size()) {
+      const std::uint32_t lastId = last < mLastEntityIndex.size() ? mLastEntityIndex[last].id : 0xFFFFFFFFu;
+      if (next < changed.size() && static_cast<std::uint32_t>(changed[next].entity->id_) <= lastId) {
+        const auto id = static_cast<std::uint32_t>(changed[next].entity->id_);
+        mEntityReads.push_back({static_cast<std::uint32_t>(mEntityIndex.size()), static_cast<std::uint32_t>(next)});
+        mEntityIndex.push_back({id, 0u, false, false});
+        mEntityPointers.push_back(changed[next].entity);
+        last += id == lastId ? 1u : 0u;
+        ++next;
+        continue;
+      }
+      while (gone < mGoneEntities.size() && mGoneEntities[gone] < lastId) {
+        ++gone;
+      }
+      if (gone < mGoneEntities.size() && mGoneEntities[gone] == lastId) {
+        ++last;
+        continue;
+      }
+      if (mLastEntityIndex[last].readEveryBeat) {
+        mEntityReads.push_back({static_cast<std::uint32_t>(mEntityIndex.size()), kNotChanged});
+      }
+      mEntityIndex.push_back(mLastEntityIndex[last]);
+      mEntityPointers.push_back(mLastEntityPointers[last]);
+      ++last;
+    }
+    if (mEntityIndex.size() == entities.size()) {
+      return true;
+    }
+    mEntityIndex.clear();
+    mEntityPointers.clear();
+    mEntityReads.clear();
+    return false;
+  }
+
+  void CViewFrames::WalkEntityIndex(const moho::EntityDB& database)
+  {
+    const auto& entities = database.mAllUnits;
+    mEntityIndex.reserve(entities.size());
+    mEntityPointers.reserve(entities.size());
+    const std::vector<SChangedEntity>& changed = Entities();
+    std::size_t last = 0;
+    std::size_t next = 0;
+    for (const auto& [id, entity] : entities) {
+      const auto key = static_cast<std::uint32_t>(id);
+      while (last < mLastEntityIndex.size() && mLastEntityIndex[last].id < key) {
+        ++last;
+      }
+      while (next < changed.size() && static_cast<std::uint32_t>(changed[next].entity->id_) < key) {
+        ++next;
+      }
+      const bool synced = next < changed.size() && changed[next].entity == entity;
+      if (!synced && last < mLastEntityIndex.size() && mLastEntityIndex[last].id == key && mLastEntityPointers[last] == entity
+          && !mLastEntityIndex[last].readEveryBeat) {
+        mEntityIndex.push_back(mLastEntityIndex[last]);
+      } else {
+        mEntityReads.push_back({static_cast<std::uint32_t>(mEntityIndex.size()), synced ? static_cast<std::uint32_t>(next) : kNotChanged});
+        mEntityIndex.push_back({key, 0u, false, false});
+      }
+      mEntityPointers.push_back(entity);
+    }
+  }
+
   bool CViewFrames::KeptByView(const std::uint32_t id, const std::uint32_t viewBit) const
   {
     const auto found = std::lower_bound(mEntityIndex.begin(), mEntityIndex.end(), id, [](const SEntityKeep& entry, const std::uint32_t value) {
@@ -440,6 +525,11 @@ namespace faf::remote
     return wire::EncodeFrameChanges(changes, mCodec, writer);
   }
 
+  std::uint32_t CViewFrames::ViewEntityId(const std::size_t view, const std::uint32_t simId)
+  {
+    return view < mIdMaps.size() ? mIdMaps[view]->EntityId(simId) : simId;
+  }
+
   std::uint64_t CViewFrames::HeldMismatches() const noexcept
   {
     std::uint64_t mismatches = mEntityIndexMismatches;
@@ -484,30 +574,8 @@ namespace faf::remote
     mEntityIndex.clear();
     mEntityPointers.clear();
     mEntityReads.clear();
-    if (sim.mEntityDB != nullptr) {
-      mEntityIndex.reserve(sim.mEntityDB->mAllUnits.size());
-      mEntityPointers.reserve(sim.mEntityDB->mAllUnits.size());
-      const std::vector<SChangedEntity>& changed = Entities();
-      std::size_t last = 0;
-      std::size_t next = 0;
-      for (const auto& [id, entity] : sim.mEntityDB->mAllUnits) {
-        const auto key = static_cast<std::uint32_t>(id);
-        while (last < mLastEntityIndex.size() && mLastEntityIndex[last].id < key) {
-          ++last;
-        }
-        while (next < changed.size() && static_cast<std::uint32_t>(changed[next].entity->id_) < key) {
-          ++next;
-        }
-        const bool synced = next < changed.size() && changed[next].entity == entity;
-        if (!synced && last < mLastEntityIndex.size() && mLastEntityIndex[last].id == key && mLastEntityPointers[last] == entity
-            && !mLastEntityIndex[last].readEveryBeat) {
-          mEntityIndex.push_back(mLastEntityIndex[last]);
-        } else {
-          mEntityReads.push_back({static_cast<std::uint32_t>(mEntityIndex.size()), synced ? static_cast<std::uint32_t>(next) : kNotChanged});
-          mEntityIndex.push_back({key, 0u, false});
-        }
-        mEntityPointers.push_back(entity);
-      }
+    if (sim.mEntityDB != nullptr && !AdvanceEntityIndex(*sim.mEntityDB)) {
+      WalkEntityIndex(*sim.mEntityDB);
     }
     const auto readFacts = [this, &sim, armyCount](const std::size_t begin, const std::size_t end) {
       for (std::size_t i = begin; i < end; ++i) {
@@ -515,6 +583,7 @@ namespace faf::remote
         const SEntityFacts facts = mEntityReads[i].changed != kNotChanged ? ChangedFacts(mEntityReads[i].changed) : ReadEntityFacts(*mEntityPointers[entry]);
         mEntityIndex[entry].views = ViewsThatSee(sim, armyCount, facts);
         mEntityIndex[entry].readEveryBeat = !ViewsFollowFactsAlone(facts);
+        mEntityIndex[entry].leaving = facts.destroyed;
       }
     };
     constexpr std::size_t kFactsGrain = 256;
@@ -523,7 +592,26 @@ namespace faf::remote
     } else {
       readFacts(0u, mEntityReads.size());
     }
+    for (const SEntityRead& read : mEntityReads) {
+      if (mEntityIndex[read.entry].leaving) {
+        mLeavingEntities.push_back(mEntityIndex[read.entry].id);
+      }
+    }
+    std::sort(mLeavingEntities.begin(), mLeavingEntities.end());
+    mLeavingEntities.erase(std::unique(mLeavingEntities.begin(), mLeavingEntities.end()), mLeavingEntities.end());
     if (mHeldCheck) {
+      if (sim.mEntityDB != nullptr) {
+        std::size_t entry = 0;
+        for (const auto& [id, entity] : sim.mEntityDB->mAllUnits) {
+          if (entry >= mEntityIndex.size() || mEntityIndex[entry].id != static_cast<std::uint32_t>(id) || mEntityPointers[entry] != entity) {
+            if (++mEntityIndexMismatches <= 5u) {
+              std::fprintf(stderr, "view frames check: beat %u: the entity index differs from the sim's at id %08x\n", sim.mCurBeat, static_cast<std::uint32_t>(id));
+            }
+            break;
+          }
+          ++entry;
+        }
+      }
       for (std::size_t i = 0; i < mEntityIndex.size(); ++i) {
         const SEntityFacts facts = ReadEntityFacts(*mEntityPointers[i]);
         if (ViewsThatSee(sim, armyCount, facts) != mEntityIndex[i].views && ++mEntityIndexMismatches <= 5u) {

@@ -1,4 +1,6 @@
 #include "Cluster.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "platform/Interlocked.h"
 #include "legacy/math/X87Math.h"
 
@@ -55,14 +57,11 @@ namespace
 
         auto* const control = reinterpret_cast<SharedCountControl*>(sharedCount);
         if (_InterlockedExchangeAdd(&control->useCount, -1) == 1) {
-            using ControlFn = void(__thiscall*)(SharedCountControl*);
-            auto* const disposeFn = reinterpret_cast<ControlFn>(control->vtable[1]);
-            disposeFn(control);
-
-            if (_InterlockedExchangeAdd(&control->weakCount, -1) == 1) {
-                auto* const destroyFn = reinterpret_cast<ControlFn>(control->vtable[2]);
-                destroyFn(control);
-            }
+            // By name, not by vtable slot: the virtual destructor before these takes one slot on
+            // Windows and two on Linux.
+            auto* const base = reinterpret_cast<boost::detail::sp_counted_base*>(sharedCount);
+            base->dispose();
+            base->weak_release();
             return true;
         }
 
@@ -2149,6 +2148,15 @@ int Cluster::cmp(const Cluster& other) const
     }
 
     const unsigned int nodeCount = self->mNodeCount;
+
+    // The binary's inline compare (0x00954057..0x00954072) stops at the first word that differs, and the
+    // node count is the first byte, so it never reads past a smaller cluster. std::memcmp may read ahead
+    // over its whole length, which faulted at the end of a mapping (replay 26904000). Counts that differ
+    // decide the order here, as that first byte does in the binary.
+    if (nodeCount != rhs->mNodeCount) {
+        return (nodeCount < rhs->mNodeCount) ? -1 : 1;
+    }
+
     const std::size_t payloadBytes =
         (nodeCount * (nodeCount - 1u)) / 2u + 2u * nodeCount + 1u;
     const int diff = std::memcmp(&self->mNodeCount, &rhs->mNodeCount, payloadBytes);
@@ -2676,7 +2684,7 @@ void InitializeClusterCache(ClusterCache& outCache)
     auto* const control = static_cast<boost::SpCountedImplStorage<void>*>(
         ::operator new(sizeof(boost::SpCountedImplStorage<void>))
     );
-    boost::SpCountedImplPConstructClusterCacheImpl(control, impl);
+    (void)boost::SpCountedImplPConstructClusterCacheImpl(control, impl);
 
     outCache.mCacheTree = impl;
     outCache.mCacheRefs = control;
@@ -3104,6 +3112,79 @@ bool ClusterMap::WorkOnCluster(const int width, const int height, const int leve
     return true;
 }
 
+void ClusterMap::SaveExact(gpg::WriteArchive* const archive) const
+{
+    archive->WriteBool(mIsDone != 0u);
+    archive->WriteUInt(mProgress);
+
+    for (std::uint32_t level = 1u; level <= mNumLevels; ++level) {
+        const gpg::BitArray2D& bits = mCheckLevels[level];
+        archive->WriteBytes(reinterpret_cast<char*>(bits.ptr), static_cast<std::size_t>(bits.size) * sizeof(std::int32_t));
+
+        const Subcluster& clusters = mLevels[level];
+        const int count = clusters.mWidth * clusters.mHeight;
+        for (int index = 0; index < count; ++index) {
+            const Cluster::Data* const data = clusters.mArray[index].mData;
+            if (data == nullptr) {
+                archive->WriteUShort(0xFFFFu);
+                continue;
+            }
+
+            const std::size_t nodes = data->mNodeCount;
+            archive->WriteUShort(static_cast<unsigned short>(nodes));
+            const std::size_t bytes = nodes * sizeof(Cluster::Node) + nodes * (nodes - 1u) / 2u;
+            if (bytes != 0u) {
+                archive->WriteBytes(const_cast<char*>(reinterpret_cast<const char*>(&data->mNodes[0])), bytes);
+            }
+        }
+    }
+}
+
+void ClusterMap::LoadExact(gpg::ReadArchive* const archive, std::unordered_map<std::string, Cluster>& shared)
+{
+    bool isDone = false;
+    archive->ReadBool(&isDone);
+    mIsDone = isDone ? 1u : 0u;
+    archive->ReadUInt(&mProgress);
+
+    std::string payload;
+    for (std::uint32_t level = 1u; level <= mNumLevels; ++level) {
+        gpg::BitArray2D& bits = mCheckLevels[level];
+        archive->ReadBytes(reinterpret_cast<char*>(bits.ptr), static_cast<std::size_t>(bits.size) * sizeof(std::int32_t));
+
+        Subcluster& clusters = mLevels[level];
+        const int count = clusters.mWidth * clusters.mHeight;
+        for (int index = 0; index < count; ++index) {
+            unsigned short nodes = 0u;
+            archive->ReadUShort(&nodes);
+            if (nodes == 0xFFFFu) {
+                clusters.mArray[index] = Cluster{};
+                continue;
+            }
+
+            const std::size_t nodeBytes = static_cast<std::size_t>(nodes) * sizeof(Cluster::Node);
+            const std::size_t bytes = nodeBytes + static_cast<std::size_t>(nodes) * (static_cast<std::size_t>(nodes) - 1u) / 2u;
+            payload.assign(bytes + 1u, '\0');
+            payload[0] = static_cast<char>(nodes);
+            if (bytes != 0u) {
+                archive->ReadBytes(payload.data() + 1, bytes);
+            }
+
+            auto found = shared.find(payload);
+            if (found == shared.end()) {
+                Cluster built{};
+                built.SetData(
+                    reinterpret_cast<const Cluster::Node*>(payload.data() + 1),
+                    reinterpret_cast<const Cluster::Edge*>(payload.data() + 1 + nodeBytes),
+                    nodes
+                );
+                found = shared.emplace(payload, built).first;
+            }
+            clusters.mArray[index] = found->second;
+        }
+    }
+}
+
 /**
  * Address: 0x008E3BC0 (FUN_008E3BC0,
  * ?EnsureClusterExists@ClusterMap@HaStar@gpg@@QAEXHHH@Z)
@@ -3136,7 +3217,7 @@ void ClusterMap::BackgroundWork(int& budget)
                 budget = INT_MAX;
             }
 
-            WorkOnCluster(
+            (void)WorkOnCluster(
                 static_cast<int>(clusterX),
                 static_cast<int>(clusterY),
                 static_cast<int>(mNumLevels),
