@@ -453,6 +453,7 @@ namespace moho
     const std::int32_t totalBeats = VCR_ScanReplayTotalBeats(replayStream.get());
 
     msvc8::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
+    sessionInfo->mTotalBeats = totalBeats;
     sessionInfo->mMapName = replayMapName;
     (void)CopyLaunchInfoBasePtr(&sessionInfo->mLaunchInfo, launchInfo);
     sessionInfo->mIsBeingRecorded = false;
@@ -460,7 +461,6 @@ namespace moho
     sessionInfo->mIsMultiplayer = false;
     sessionInfo->mClientManager = CLIENT_CreateClientManager(2u, nullptr, 0, true);
     sessionInfo->mSourceId = kInvalidSourceIndex;
-    sessionInfo->mTotalBeats = totalBeats;
 
     if (sessionInfo->mClientManager != nullptr) {
       gpg::Stream* replayStreamOwnership = replayStream.release();

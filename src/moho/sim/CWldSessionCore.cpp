@@ -2038,9 +2038,11 @@ namespace
 
     const std::int32_t tickAtFrameStart = mGameTick;
     const std::int32_t targetTick = mGameTick + msvc8::FloorToIntX87(mTimeSinceLastTick); // 0x00895BEA..0x00895BFD
-    const bool wasScrubbing = mIsScrubbing;
 
+    // Drain the driver's sync queue. Bounded at 100 beats so a burst after a
+    // stall cannot make one frame arbitrarily long.
     std::int32_t beatsApplied = 0;
+    const bool wasScrubbing = mIsScrubbing;
     if (mIsScrubbing) {
       if (simDriver != nullptr) {
         const auto startTime = std::chrono::steady_clock::now();
@@ -2069,27 +2071,24 @@ namespace
         mIsScrubbing = false;
         mScrubTargetBeat = -1;
       }
-    } else {
-      // Drain the driver's sync queue. Bounded at 100 beats so a burst after a
-      // stall cannot make one frame arbitrarily long.
-      for (; beatsApplied < 100; ++beatsApplied) {
-        if (mReplayIsPaused) {
-          // A paused replay still applies beats until it lands on a tick.
-          if (mLastBeatWasTick != 0) {
-            break;
-          }
-        } else if (mGameTick >= targetTick && !wld_RunWithTheWind) {
+    } else
+    for (; beatsApplied < 100; ++beatsApplied) {
+      if (mReplayIsPaused) {
+        // A paused replay still applies beats until it lands on a tick.
+        if (mLastBeatWasTick != 0) {
           break;
         }
-
-        if (simDriver == nullptr || !simDriver->HasSyncData()) {
-          break;
-        }
-
-        SSyncData* packet = nullptr;
-        simDriver->GetSyncData(packet);
-        DoBeat(msvc8::auto_ptr<SSyncData>(packet));
+      } else if (mGameTick >= targetTick && !wld_RunWithTheWind) {
+        break;
       }
+
+      if (!simDriver->HasSyncData()) {
+        break;
+      }
+
+      SSyncData* packet = nullptr;
+      simDriver->GetSyncData(packet);
+      DoBeat(msvc8::auto_ptr<SSyncData>(packet));
     }
 
     if (sEngineStat_Sync_Count == nullptr) {
