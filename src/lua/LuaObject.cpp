@@ -7459,6 +7459,10 @@ namespace
 		}
 	}
 
+	/// Engine fix, see `ForgetDeadRemovedKeys`: the nodes this thread's serial traversals found with a
+	/// removed collectable key.
+	static thread_local std::vector<Node*> tRemovedKeyNodes;
+
 	/**
 	 * Address: 0x00915320 (FUN_00915320, traversetable)
 	 *
@@ -7532,6 +7536,8 @@ namespace
 			if (node->i_val.tt != LUA_TNIL) {
 				condMarkCollectable(node->Key(), !weakkey);
 				condMarkCollectable(node->i_val, !weakvalue);
+			} else if (node->KeyTag() >= LUA_TSTRING) {
+				tRemovedKeyNodes.push_back(node);
 			}
 		}
 	}
@@ -13491,6 +13497,7 @@ namespace
 			GCObject* wvTail = nullptr;
 			GCObject* wkvTail = nullptr;
 			std::vector<Table*> weakTables[3]; // the same tables by list (EWeakList), for the clear
+			std::vector<Node*> removedKeys;    // see ForgetDeadRemovedKeys
 		};
 
 		enum EWeakList : int
@@ -13510,6 +13517,7 @@ namespace
 		struct WeakSets
 		{
 			std::vector<Table*> tables[3];
+			std::vector<Node*> removedKeys; // see ForgetDeadRemovedKeys
 		};
 
 		/// Work shared between the participants: donated gray objects, and how many hold work.
@@ -13626,6 +13634,8 @@ namespace
 					if (!weakvalue) {
 						MarkValue(lists, node.i_val);
 					}
+				} else if (node.KeyTag() >= LUA_TSTRING) {
+					lists.removedKeys.push_back(const_cast<Node*>(&node));
 				}
 			}
 		}
@@ -13944,6 +13954,8 @@ namespace
 					gathered.insert(gathered.end(), lists.weakTables[kind].begin(), lists.weakTables[kind].end());
 					lists.weakTables[kind].clear();
 				}
+				weakSets.removedKeys.insert(weakSets.removedKeys.end(), lists.removedKeys.begin(), lists.removedKeys.end());
+				lists.removedKeys.clear();
 				for (lua_State* const thread : lists.threads) {
 					FinishThreadStack(thread);
 					if (thread->l_G->userGCFunction != nullptr) {
@@ -18452,6 +18464,29 @@ extern "C"
 	}
 
 	/**
+	 * Engine fix, not in the binary: `t[k] = nil` leaves k in its node with a nil value, and the binary keeps
+	 * the pointer after k is freed. A new string or object at the same address then matches that node if its
+	 * chain passes there, so it is stored outside its own chain. The next insert that moves the chain away
+	 * strands it: `next` fails with "invalid key" and `newkey` walks off the chain's end through a null node
+	 * (replay 26841630; retail crashes on the same read, 0x009279A6).
+	 *
+	 * So a removed key that this collection frees becomes a dead key, as a weak table's cleared key does.
+	 * Only those: a key still alive may be set again or be `next`'s position, and keeps its node as in the
+	 * binary. No node moves and nothing allocates from Lua, so table order and nblocks stay the same. Called
+	 * after the last mark, while every node listed still belongs to a live table.
+	 */
+	static void ForgetDeadRemovedKeys(std::vector<Node*>& nodes) noexcept
+	{
+		for (Node* const node : nodes) {
+			const LuaPlus::TObject key = node->Key();
+			if (key.tt >= LUA_TSTRING && (static_cast<GCObject*>(key.value.p)->gch.marked & 0x11u) == 0u) {
+				node->SetKeyTag(LUA_TNONE);
+			}
+		}
+		nodes.clear();
+	}
+
+	/**
 	 * Address: 0x00915CC0 (FUN_00915CC0, mark)
 	 *
 	 * IDA signature:
@@ -18587,6 +18622,9 @@ extern "C"
 			gc_verify::CheckWeakInvariant(st.g);
 			gc_verify::CheckDeadThreadUpvalues(st.g);
 		}
+
+		ForgetDeadRemovedKeys(weakSets.removedKeys);
+		ForgetDeadRemovedKeys(tRemovedKeyNodes);
 
 		return deadmem;
 	}
