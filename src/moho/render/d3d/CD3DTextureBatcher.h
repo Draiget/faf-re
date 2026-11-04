@@ -15,6 +15,13 @@ namespace moho
   class ID3DTextureSheet;
 
   /**
+   * Engine addition: `ren_TextureAtlasCache`. CD3DTextureBatcher::AddTexture runs for each glyph and
+   * strategic icon, and its tree search with a shared handle copy was 2 % of an uncapped frame. With
+   * this on it first looks at a small table of the last entries found, by texture address.
+   */
+  extern bool ren_TextureAtlasCache;
+
+  /**
    * VFTABLE: none (plain helper owner)
    *
    * What it does:

@@ -10,6 +10,7 @@
 #include <limits>
 
 #include "gpg/core/containers/Rect2.h"
+#include "gpg/gal/Device.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/StatItem.h"
@@ -344,6 +345,18 @@ namespace moho
     CD3DVertexFormat* const terrainVertexFormat = resources->GetVertexFormat(10);
     ReplaceOwned(mTerrainVertexSheet, resources->NewVertexSheet(1U, 0xFFFF, terrainVertexFormat));
     ReplaceOwned(mTerrainIndexSheet, resources->CreateIndexSheet(true, 199998));
+    // Engine addition: this frame's draws read only what UpdateRenderContext locks and writes.
+    {
+      gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
+      ID3DVertexStream::BufferHandle vertexBuffer;
+      if (mTerrainVertexSheet->GetVertStream(0U)->GetBuffer(vertexBuffer) && vertexBuffer) {
+        galDevice->CopyLockedRangeOnly(*vertexBuffer);
+      }
+      ID3DIndexSheet::BufferHandle indexBuffer;
+      if (mTerrainIndexSheet->GetBuffer(indexBuffer) && indexBuffer) {
+        galDevice->CopyLockedRangeOnly(*indexBuffer);
+      }
+    }
 
     CD3DVertexFormat* const dynamicVertexFormat = resources->GetVertexFormat(4);
     ReplaceOwned(mDynamicVertexSheet, resources->NewVertexSheet(1U, 10000, dynamicVertexFormat));
@@ -534,12 +547,7 @@ namespace moho
     const Wm3::Vector3f sunDirection = terrainRes->GetSunDirection();
     SetShaderVarMem(shaderVars.sunDirection, 3U, &sunDirection.x);
 
-    Wm3::Vector3f sunAmbience = terrainRes->GetSunAmbience();
-    if (getenv("FAF_FORCE_AMBIENT") != nullptr) {
-      sunAmbience.x = 0.5f;
-      sunAmbience.y = 0.5f;
-      sunAmbience.z = 0.5f;
-    }
+    const Wm3::Vector3f sunAmbience = terrainRes->GetSunAmbience();
     SetShaderVarMem(shaderVars.sunAmbience, 3U, &sunAmbience.x);
 
     const Wm3::Vector3f sunColor = terrainRes->GetSunColor();

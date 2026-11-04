@@ -1,5 +1,7 @@
 #include "moho/ui/UiPrivate.h"
 
+extern "C" const LuaPlus::TObject* luaH_getnum(Table* t, int key);
+
 /**
  * Address: 0x007836E0 (FUN_007836E0, ??0CScriptLazyVar_float@Moho@@QAE@@Z)
  *
@@ -60,6 +62,15 @@ float moho::CScriptLazyVar_float::GetValue(
   const LuaPlus::LuaObject& lazyVarObject = *value;
   if (lazyVarObject.m_state == nullptr) {
     return 0.0f;
+  }
+
+  // Engine change: what GetByIndex finds first when slot 1 holds a number, without linking a LuaObject
+  // into the state's used list and out again. Each UI control reads several of these each frame.
+  if (lazyVarObject.m_object.tt == LUA_TTABLE) {
+    const LuaPlus::TObject* const slot = luaH_getnum(static_cast<Table*>(lazyVarObject.m_object.value.p), 1);
+    if (slot->tt == LUA_TNUMBER) {
+      return static_cast<float>(slot->value.n);
+    }
   }
 
   LuaPlus::LuaObject resolvedValue = lazyVarObject.GetByIndex(1);

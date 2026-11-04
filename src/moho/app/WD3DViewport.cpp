@@ -147,6 +147,15 @@ void moho::WD3DViewport::OnPaint(wxPaintEvent& event)
 
   DrawBackgroundImage(dc);
 }
+
+void moho::WD3DViewport::PaintWithoutMessage()
+{
+  wxBitmap* const image = mBackgroundImage;
+  mBackgroundImage = nullptr;
+  delete image;
+  D3D_GetDevice()->Paint();
+}
+
 namespace
 {
   constexpr std::uint16_t kClientHitTestCode = HTCLIENT;
