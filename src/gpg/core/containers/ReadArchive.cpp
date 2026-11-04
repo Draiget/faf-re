@@ -939,6 +939,109 @@ namespace
     typeHandles.push_back(handle);
     return &typeHandles[insertIndex];
   }
+
+  /**
+   * Engine addition: in-memory byte buffer reader for fast keyframe restoration.
+   */
+  class MemoryReadArchive final : public gpg::ReadArchive
+  {
+  public:
+    explicit MemoryReadArchive(std::vector<std::uint8_t> buffer)
+      : mBuffer(std::move(buffer))
+    {
+    }
+
+    ~MemoryReadArchive() override = default;
+
+    void ReadBytes(char* const bytes, const size_t byteCount) override
+    {
+      if (mPos + byteCount > mBuffer.size()) {
+        ThrowSerializationError("eof");
+      }
+      if (byteCount != 0u) {
+        std::memcpy(bytes, mBuffer.data() + mPos, byteCount);
+        mPos += byteCount;
+      }
+    }
+
+    void ReadString(msvc8::string* const out) override
+    {
+      unsigned int byteCount = 0;
+      ReadPrimitive(&byteCount);
+
+      const size_t currentSize = out->size();
+      if (byteCount > currentSize) {
+        std::string resized = out->to_std();
+        resized.resize(byteCount, '\0');
+        out->assign_owned(std::string_view(resized.data(), resized.size()));
+      } else {
+        out->erase(byteCount);
+      }
+
+      if (byteCount != 0U) {
+        ReadBytes(out->raw_data_mut_unsafe(), byteCount);
+      }
+    }
+
+    void ReadFloat(float* const value) override { ReadPrimitive(value); }
+    void ReadUInt64(std::uint64_t* const value) override { ReadPrimitive(value); }
+    void ReadInt64(__int64* const value) override { ReadPrimitive(value); }
+
+    void ReadULong(unsigned long* const value) override
+    {
+      std::uint32_t stored = 0;
+      ReadPrimitive(&stored);
+      *value = static_cast<unsigned long>(stored);
+    }
+
+    void ReadLong(long* const value) override
+    {
+      std::int32_t stored = 0;
+      ReadPrimitive(&stored);
+      *value = static_cast<long>(stored);
+    }
+
+    void ReadUInt(unsigned int* const value) override { ReadPrimitive(value); }
+    void ReadInt(int* const value) override { ReadPrimitive(value); }
+    void ReadUShort(unsigned short* const value) override { ReadPrimitive(value); }
+    void ReadShort(short* const value) override { ReadPrimitive(value); }
+    void ReadUByte(unsigned __int8* const value) override { ReadPrimitive(value); }
+    void ReadByte(__int8* const value) override { ReadPrimitive(value); }
+    void ReadBool(bool* const value) override { ReadPrimitive(value); }
+
+    int NextMarker() override
+    {
+      signed char marker = 0;
+      ReadPrimitive(&marker);
+
+      switch (marker) {
+      case '}':
+        return static_cast<int>(ArchiveToken::ObjectTerminator);
+      case 'N':
+        return static_cast<int>(ArchiveToken::NewObjectToken);
+      case '0':
+        return static_cast<int>(ArchiveToken::NullPointerToken);
+      case '*':
+        return static_cast<int>(ArchiveToken::ExistingPointerToken);
+      case '{':
+        return static_cast<int>(ArchiveToken::ObjectStart);
+      default:
+        ThrowSerializationError(
+          STR_Printf("Error detected in archive: invalid marker token 0x%02x", static_cast<int>(marker))
+        );
+      }
+    }
+
+  private:
+    template <typename T>
+    void ReadPrimitive(T* const outValue)
+    {
+      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(T));
+    }
+
+    std::vector<std::uint8_t> mBuffer;
+    std::size_t mPos = 0u;
+  };
 } // namespace
 
 /**
@@ -1330,4 +1433,9 @@ void ReadArchive::EndSection(const bool)
 ReadArchive* gpg::CreateBinaryReadArchive(const boost::shared_ptr<std::FILE>& file)
 {
   return new (std::nothrow) BinaryReadArchive(file);
+}
+
+ReadArchive* gpg::CreateMemoryReadArchive(std::vector<std::uint8_t> buffer)
+{
+  return new (std::nothrow) MemoryReadArchive(std::move(buffer));
 }

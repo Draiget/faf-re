@@ -1044,6 +1044,7 @@ namespace moho
    */
   extern int sim_ReplayLead;
   extern int sim_ReplayKeyframeInterval;
+  extern bool sim_ReplayKeyframeCompress;
   extern int sim_LocalLead;
 
   /**

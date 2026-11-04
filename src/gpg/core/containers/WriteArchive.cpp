@@ -774,6 +774,73 @@ private:
     TrackedPointerIndex mIndex;
 };
 
+/**
+ * Engine addition: writes into an in-memory byte buffer instead of a file.
+ */
+class FastMemoryWriteArchive final : public gpg::WriteArchive
+{
+public:
+    explicit FastMemoryWriteArchive(std::vector<std::uint8_t>& out)
+        : mOut(out)
+    {
+        mFastObjRefs = &mIndex;
+    }
+
+    ~FastMemoryWriteArchive() override = default;
+
+    void WriteBytes(char* const bytes, const size_t byteCount) override { Put(bytes, byteCount); }
+
+    void WriteString(msvc8::string* const value) override
+    {
+        const std::uint32_t byteCount = static_cast<std::uint32_t>(value->size());
+        Scalar<4u>(byteCount);
+        if (byteCount != 0u) {
+            Put(value->raw_data_unsafe(), byteCount);
+        }
+    }
+
+    void WriteFloat(const float value) override { Scalar<4u>(value); }
+    void WriteUInt64(const uint64_t value) override { Scalar<8u>(value); }
+    void WriteInt64(const int64_t value) override { Scalar<8u>(value); }
+    void WriteULong(const unsigned long value) override { Scalar<4u>(value); }
+    void WriteLong(const long value) override { Scalar<4u>(value); }
+    void WriteUInt(const unsigned int value) override { Scalar<4u>(value); }
+    void WriteInt(const int value) override { Scalar<4u>(value); }
+    void WriteUShort(const unsigned short value) override { Scalar<2u>(value); }
+    void WriteShort(const short value) override { Scalar<2u>(value); }
+    void WriteUByte(const unsigned __int8 value) override { Scalar<1u>(value); }
+    void WriteByte(const __int8 value) override { Scalar<1u>(value); }
+    void WriteBool(const bool value) override { Scalar<1u>(value); }
+    void WriteMarker(const int marker) override { Scalar<1u>(kArchiveTokenBytes[marker]); }
+
+    void EndSection(const bool skipOwnershipValidation) override
+    {
+        gpg::WriteArchive::EndSection(skipOwnershipValidation);
+    }
+
+private:
+    template <std::size_t Width, typename T>
+    void Scalar(const T& value)
+    {
+        static_assert(Width <= sizeof(T));
+        const std::size_t cur = mOut.size();
+        mOut.resize(cur + Width);
+        std::memcpy(mOut.data() + cur, &value, Width);
+    }
+
+    void Put(const void* const bytes, const std::size_t byteCount)
+    {
+        if (byteCount != 0u) {
+            const std::size_t cur = mOut.size();
+            mOut.resize(cur + byteCount);
+            std::memcpy(mOut.data() + cur, bytes, byteCount);
+        }
+    }
+
+    std::vector<std::uint8_t>& mOut;
+    TrackedPointerIndex mIndex;
+};
+
 
 void WriteBinaryCompatibilityLane(
     BinaryWriteArchive* const archive,
@@ -1131,6 +1198,11 @@ WriteArchive* gpg::CreateBinaryWriteArchive(const boost::shared_ptr<std::FILE>& 
 WriteArchive* gpg::CreateFastBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file)
 {
     return new FastBinaryWriteArchive(file);
+}
+
+WriteArchive* gpg::CreateFastMemoryWriteArchive(std::vector<std::uint8_t>& out)
+{
+    return new (std::nothrow) FastMemoryWriteArchive(out);
 }
 
 /**

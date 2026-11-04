@@ -48,6 +48,7 @@
 #include <filesystem>
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/containers/ReadArchive.h"
+#include <zlib.h>
 
 
 using namespace moho;
@@ -63,9 +64,13 @@ namespace
 {
   bool gSimInterlocked = false;
 
-struct SReplayKeyframeEntry {
+  constexpr std::uint32_t kKeyframePayloadMagicZlib = 0x5A4C4942u; // 'ZLIB'
+
+  struct SReplayKeyframeEntry {
     std::string path;
     moho::SSimKeyframeHeader header;
+    std::uint32_t uncompressedSize = 0;
+    std::vector<std::uint8_t> compressedPayload;
   };
 
   std::map<std::uint32_t, SReplayKeyframeEntry> sReplayKeyframes;
@@ -97,35 +102,96 @@ struct SReplayKeyframeEntry {
       moho::gSimExactSaveCount.fetch_add(1u);
       moho::gSimExactArchive.store(true);
 
-      std::FILE* file = nullptr;
-      if (fopen_s(&file, path.c_str(), "wb") != 0 || file == nullptr) {
-        gpg::Warnf("CSimDriver: failed to open %s for keyframe", path.c_str());
+      if (moho::sim_ReplayKeyframeCompress) {
+        // 1. Fast in-memory serialization: does not touch disk while sim thread is paused!
+        std::vector<std::uint8_t> rawBuffer;
+        rawBuffer.reserve(16u * 1024u * 1024u);
+        gpg::WriteArchive* const archive = gpg::CreateFastMemoryWriteArchive(rawBuffer);
+        sim->SaveState(archive);
+        delete archive;
         moho::gSimExactArchive.store(false);
-        return;
-      }
 
-      boost::shared_ptr<std::FILE> sharedFile(file, moho::SFileStarCloser{});
+        const std::uint32_t uncompressedSize = static_cast<std::uint32_t>(rawBuffer.size());
 
-      if (!moho::SIM_WriteKeyframeHeader(file, header)) {
-        gpg::Warnf("CSimDriver: failed to write keyframe header to %s", path.c_str());
+        // 2. Fast zlib compression (level 1 = fast)
+        uLongf packedBound = moho::SIM_KeyframePackBound(uncompressedSize);
+        std::vector<std::uint8_t> compressed(packedBound);
+        uLongf packedSize = packedBound;
+        const int zerr = compress2(compressed.data(), &packedSize, rawBuffer.data(), uncompressedSize, 1);
+        const bool compressedOk = (zerr == Z_OK && packedSize > 0 && packedSize < uncompressedSize);
+        if (compressedOk) {
+          compressed.resize(packedSize);
+        } else {
+          compressed.clear();
+        }
+
+        // 3. Write compressed keyframe to disk
+        std::FILE* file = nullptr;
+        if (fopen_s(&file, path.c_str(), "wb") == 0 && file != nullptr) {
+          boost::shared_ptr<std::FILE> sharedFile(file, moho::SFileStarCloser{});
+          if (moho::SIM_WriteKeyframeHeader(file, header)) {
+            if (compressedOk) {
+              const std::uint32_t magic = kKeyframePayloadMagicZlib;
+              const std::uint32_t compSize = static_cast<std::uint32_t>(packedSize);
+              std::fwrite(&magic, sizeof(magic), 1u, file);
+              std::fwrite(&uncompressedSize, sizeof(uncompressedSize), 1u, file);
+              std::fwrite(&compSize, sizeof(compSize), 1u, file);
+              std::fwrite(compressed.data(), 1u, compSize, file);
+            } else {
+              std::fwrite(rawBuffer.data(), 1u, rawBuffer.size(), file);
+            }
+          }
+        } else {
+          gpg::Warnf("CSimDriver: failed to open %s for keyframe", path.c_str());
+        }
+
+        // 4. Cache compressed payload in memory for instant rewind
+        boost::mutex::scoped_lock lock(sReplayKeyframesMutex);
+        SReplayKeyframeEntry entry;
+        entry.path = path;
+        entry.header = header;
+        entry.uncompressedSize = uncompressedSize;
+        if (compressedOk) {
+          entry.compressedPayload = std::move(compressed);
+        }
+        sReplayKeyframes[tick] = std::move(entry);
+
+        gpg::Logf("CSimDriver: keyframe captured at beat %u, tick %u (raw: %u KB, compressed: %u KB) to %s",
+                  header.beat, header.tick, uncompressedSize / 1024u,
+                  (compressedOk ? static_cast<std::uint32_t>(packedSize) / 1024u : 0u), path.c_str());
+      } else {
+        // Fallback: uncompressed direct disk write
+        std::FILE* file = nullptr;
+        if (fopen_s(&file, path.c_str(), "wb") != 0 || file == nullptr) {
+          gpg::Warnf("CSimDriver: failed to open %s for keyframe", path.c_str());
+          moho::gSimExactArchive.store(false);
+          return;
+        }
+
+        boost::shared_ptr<std::FILE> sharedFile(file, moho::SFileStarCloser{});
+
+        if (!moho::SIM_WriteKeyframeHeader(file, header)) {
+          gpg::Warnf("CSimDriver: failed to write keyframe header to %s", path.c_str());
+          moho::gSimExactArchive.store(false);
+          return;
+        }
+
+        gpg::WriteArchive* const archive = gpg::CreateFastBinaryWriteArchive(sharedFile);
+        sim->SaveState(archive);
+        delete archive;
+
         moho::gSimExactArchive.store(false);
-        return;
+
+        boost::mutex::scoped_lock lock(sReplayKeyframesMutex);
+        SReplayKeyframeEntry entry;
+        entry.path = path;
+        entry.header = header;
+        entry.uncompressedSize = 0;
+        sReplayKeyframes[tick] = std::move(entry);
+
+        gpg::Logf("CSimDriver: keyframe captured at beat %u, tick %u to %s",
+                  header.beat, header.tick, path.c_str());
       }
-
-      gpg::WriteArchive* const archive = gpg::CreateFastBinaryWriteArchive(sharedFile);
-      sim->SaveState(archive);
-      delete archive;
-
-      moho::gSimExactArchive.store(false);
-
-      boost::mutex::scoped_lock lock(sReplayKeyframesMutex);
-      SReplayKeyframeEntry entry;
-      entry.path = path;
-      entry.header = header;
-      sReplayKeyframes[tick] = entry;
-
-      gpg::Logf("CSimDriver: keyframe captured at beat %u, tick %u to %s",
-                header.beat, header.tick, path.c_str());
     } catch (const std::exception& ex) {
       moho::gSimExactArchive.store(false);
       gpg::Warnf("CSimDriver: exception while capturing keyframe: %s", ex.what());
@@ -1177,6 +1243,40 @@ void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
   }
   FAF_PROFILE_FRAME("Sim Beat");
 
+  if (!mSimBusy) {
+    const float dispatchDurationMs = static_cast<float>(dispatchTimer.ElapsedMilliseconds());
+    mSimSpeedSamples.Append(dispatchDurationMs);
+
+    const float medianDispatchMs = mSimSpeedSamples.Median();
+    if (medianDispatchMs > 0.0f) {
+      const float simRateEstimate = (1000.0f / medianDispatchMs) * 0.1f;
+      // Engine addition (sim_ReplayLead / sim_LocalLead): the unrounded estimate, for the display clock.
+      gLeadSimSpeedEstimate.store(simRateEstimate, std::memory_order_relaxed);
+      const int updatedSimRate = RATE_GameRateToSpeed(simRateEstimate);
+      if (updatedSimRate != mCurrentSimRate) {
+        mCurrentSimRate = updatedSimRate;
+
+        // This is a measurement of how fast this client *can* run -- the debug
+        // readout below calls it "max speed", and `SessionStartup` reports the same
+        // lane to the lobby as `maxSP`. It is published as this client's capability
+        // through `CLIMSG_IntParam`, which every peer stores in `CClientBase::
+        // mSimRate`; `CClientManagerImpl::GetSimRate` then takes the min across
+        // clients so the session paces to the slowest machine.
+        //
+        // It must NOT go through `SetSimRate`, which broadcasts
+        // `CLIMSG_AdjustSimSpeed` and overwrites `mGameSpeed` -- the *requested*
+        // game speed. Feeding a measurement into that request built a feedback
+        // loop: a fast dispatch raised the requested speed, the higher speed made
+        // dispatch faster still, and the request ran away (observed climbing
+        // 2, 53, 61, 81, 94 ...). `GetSimRate` then returned
+        // min(runaway mGameSpeed, mSimRate's default 50) = 50, giving
+        // `simRateScale` 100000 and 0.0010 ms per beat, which is why the sim ran
+        // about eleven times real time.
+        mClientManager->BroadcastIntParam(updatedSimRate);
+      }
+    }
+  }
+
   // Engine addition: capture replay keyframes (beat 1 and periodic every sim_ReplayKeyframeInterval seconds)
   if (mClientManager != nullptr && mClientManager->IsReplay() && mSim) {
     if (beatToDispatch == 1) {
@@ -1195,44 +1295,6 @@ void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
         }
       }
     }
-  }
-
-  if (mSimBusy) {
-    return;
-  }
-
-  const float dispatchDurationMs = static_cast<float>(dispatchTimer.ElapsedMilliseconds());
-  mSimSpeedSamples.Append(dispatchDurationMs);
-
-  const float medianDispatchMs = mSimSpeedSamples.Median();
-  if (!(medianDispatchMs > 0.0f)) {
-    return;
-  }
-
-  const float simRateEstimate = (1000.0f / medianDispatchMs) * 0.1f;
-  // Engine addition (sim_ReplayLead / sim_LocalLead): the unrounded estimate, for the display clock.
-  gLeadSimSpeedEstimate.store(simRateEstimate, std::memory_order_relaxed);
-  const int updatedSimRate = RATE_GameRateToSpeed(simRateEstimate);
-  if (updatedSimRate != mCurrentSimRate) {
-    mCurrentSimRate = updatedSimRate;
-
-    // This is a measurement of how fast this client *can* run -- the debug
-    // readout below calls it "max speed", and `SessionStartup` reports the same
-    // lane to the lobby as `maxSP`. It is published as this client's capability
-    // through `CLIMSG_IntParam`, which every peer stores in `CClientBase::
-    // mSimRate`; `CClientManagerImpl::GetSimRate` then takes the min across
-    // clients so the session paces to the slowest machine.
-    //
-    // It must NOT go through `SetSimRate`, which broadcasts
-    // `CLIMSG_AdjustSimSpeed` and overwrites `mGameSpeed` -- the *requested*
-    // game speed. Feeding a measurement into that request built a feedback
-    // loop: a fast dispatch raised the requested speed, the higher speed made
-    // dispatch faster still, and the request ran away (observed climbing
-    // 2, 53, 61, 81, 94 ...). `GetSimRate` then returned
-    // min(runaway mGameSpeed, mSimRate's default 50) = 50, giving
-    // `simRateScale` 100000 and 0.0010 ms per beat, which is why the sim ran
-    // about eleven times real time.
-    mClientManager->BroadcastIntParam(updatedSimRate);
   }
 }
 
@@ -2301,6 +2363,7 @@ ISTIDriver* moho::SIM_CreateDriver(
 
 int moho::sim_ReplayLead = 10;
 int moho::sim_ReplayKeyframeInterval = 120;
+bool moho::sim_ReplayKeyframeCompress = true;
 int moho::sim_LocalLead = 2;
 int moho::sim_LeadOnSchedule = 1;
 int moho::wld_SkewCorrection = 0;
@@ -2357,6 +2420,12 @@ namespace
     "sim_ReplayKeyframeInterval",
     "Replays only: interval in seconds between keyframes for fast backward scrubbing (default 120, 0 = disabled / initial only).",
     &moho::sim_ReplayKeyframeInterval
+  );
+
+  TConVar<bool> gTConVar_sim_ReplayKeyframeCompress(
+    "sim_ReplayKeyframeCompress",
+    "Replays only: compress keyframes with zlib and keep in-memory cache (1, default) or write uncompressed to disk (0).",
+    &moho::sim_ReplayKeyframeCompress
   );
 
   TConVar<int> gTConVar_sim_LocalLead(
@@ -2452,18 +2521,65 @@ bool CSimDriver::RewindToStart(
     mSim.reset();
   }
 
-  // 4. Open keyframe file and read keyframe header
-  std::FILE* rawFile = nullptr;
-  if (fopen_s(&rawFile, bestEntry.path.c_str(), "rb") != 0 || rawFile == nullptr) {
-    gpg::Warnf("CSimDriver::RewindToStart: cannot read %s", bestEntry.path.c_str());
-    return false;
+  // 4. Restore keyframe state: check in-memory cache first, then disk
+  moho::SSimKeyframeHeader keyframeHeader = bestEntry.header;
+  std::vector<std::uint8_t> rawPayload;
+  bool loadedFromMemory = false;
+
+  if (bestEntry.uncompressedSize > 0 && !bestEntry.compressedPayload.empty()) {
+    rawPayload.resize(bestEntry.uncompressedSize);
+    uLongf destLen = bestEntry.uncompressedSize;
+    if (uncompress(rawPayload.data(), &destLen, bestEntry.compressedPayload.data(),
+                   static_cast<uLong>(bestEntry.compressedPayload.size())) == Z_OK &&
+        destLen == bestEntry.uncompressedSize) {
+      loadedFromMemory = true;
+      gpg::Logf("CSimDriver::RewindToStart: decompressed keyframe for tick %u directly from RAM cache (%u KB -> %u KB)",
+                keyframeHeader.tick,
+                static_cast<std::uint32_t>(bestEntry.compressedPayload.size() / 1024u),
+                bestEntry.uncompressedSize / 1024u);
+    } else {
+      rawPayload.clear();
+    }
   }
 
-  boost::shared_ptr<std::FILE> keyframeFile(rawFile, moho::SFileStarCloser{});
-  moho::SSimKeyframeHeader keyframeHeader{};
-  if (!moho::SIM_ReadKeyframeHeader(rawFile, keyframeHeader)) {
-    gpg::Warnf("CSimDriver::RewindToStart: %s is not a valid keyframe", bestEntry.path.c_str());
-    return false;
+  boost::shared_ptr<std::FILE> keyframeFile;
+  if (!loadedFromMemory) {
+    std::FILE* rawFile = nullptr;
+    if (fopen_s(&rawFile, bestEntry.path.c_str(), "rb") != 0 || rawFile == nullptr) {
+      gpg::Warnf("CSimDriver::RewindToStart: cannot read %s", bestEntry.path.c_str());
+      return false;
+    }
+
+    keyframeFile = boost::shared_ptr<std::FILE>(rawFile, moho::SFileStarCloser{});
+    if (!moho::SIM_ReadKeyframeHeader(rawFile, keyframeHeader)) {
+      gpg::Warnf("CSimDriver::RewindToStart: %s is not a valid keyframe", bestEntry.path.c_str());
+      return false;
+    }
+
+    const long posAfterHeader = std::ftell(rawFile);
+    std::uint32_t magic = 0;
+    if (std::fread(&magic, sizeof(magic), 1u, rawFile) == 1u && magic == kKeyframePayloadMagicZlib) {
+      std::uint32_t uncompSize = 0;
+      std::uint32_t compSize = 0;
+      if (std::fread(&uncompSize, sizeof(uncompSize), 1u, rawFile) == 1u &&
+          std::fread(&compSize, sizeof(compSize), 1u, rawFile) == 1u &&
+          uncompSize > 0 && compSize > 0) {
+        std::vector<std::uint8_t> compBuf(compSize);
+        if (std::fread(compBuf.data(), 1u, compSize, rawFile) == compSize) {
+          rawPayload.resize(uncompSize);
+          uLongf destLen = uncompSize;
+          if (uncompress(rawPayload.data(), &destLen, compBuf.data(), compSize) == Z_OK &&
+              destLen == uncompSize) {
+            loadedFromMemory = true;
+            gpg::Logf("CSimDriver::RewindToStart: decompressed keyframe from disk (%u KB -> %u KB)",
+                      compSize / 1024u, uncompSize / 1024u);
+          }
+        }
+      }
+    } else {
+      // Legacy uncompressed keyframe: seek back after header
+      std::fseek(rawFile, posAfterHeader, SEEK_SET);
+    }
   }
 
   const std::int32_t startBeat = static_cast<std::int32_t>(keyframeHeader.beat);
@@ -2487,7 +2603,11 @@ bool CSimDriver::RewindToStart(
   // 7. Begin keyframe restore
   moho::SIM_BeginKeyframeRestore(keyframeHeader);
   moho::gSimBeatOrigin.store(0);
-  loadInfo->mReadArchive = gpg::CreateBinaryReadArchive(keyframeFile);
+  if (loadedFromMemory && !rawPayload.empty()) {
+    loadInfo->mReadArchive = gpg::CreateMemoryReadArchive(std::move(rawPayload));
+  } else {
+    loadInfo->mReadArchive = gpg::CreateBinaryReadArchive(keyframeFile);
+  }
   mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(loadInfo);
 
   // 8. Restart ThreadCreateSim

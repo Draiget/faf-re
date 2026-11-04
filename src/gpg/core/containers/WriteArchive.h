@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <iosfwd>
 #include <map>
+#include <vector>
 
 #include "ArchiveSerialization.h"
 #include "legacy/containers/Map.h"
@@ -367,6 +368,12 @@ namespace gpg
      * complete after `EndSection`, `Close` or the archive's destruction, so nothing else may write to it before that.
      */
     WriteArchive* CreateFastBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file);
+
+    /**
+     * Engine addition: writes into a memory buffer instead of a file. Uses the same fast hash index
+     * as CreateFastBinaryWriteArchive.
+     */
+    WriteArchive* CreateFastMemoryWriteArchive(std::vector<std::uint8_t>& out);
 
     /**
      * Address: 0x00939280 (FUN_00939280, ?CreateTextWriteArchive@gpg@@YAPAVWriteArchive@1@ABV?$shared_ptr@V?$basic_ostream@DU?$char_traits@D@std@@@std@@@boost@@@Z_0)

@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <vector>
 #include <iosfwd>
 
 #include "ArchiveSerialization.h"
@@ -397,6 +398,11 @@ namespace gpg
    * Creates one file-backed concrete `ReadArchive` for save/load serializers.
    */
   ReadArchive* CreateBinaryReadArchive(const boost::shared_ptr<std::FILE>& file);
+
+  /**
+   * Engine addition: reads from an in-memory byte buffer instead of a file.
+   */
+  ReadArchive* CreateMemoryReadArchive(std::vector<std::uint8_t> buffer);
 
   /**
    * Address: 0x00939800 (FUN_00939800, ?CreateTextReadArchive@gpg@@YAPAVReadArchive@1@ABV?$shared_ptr@Vistream@std@@@boost@@@Z)
