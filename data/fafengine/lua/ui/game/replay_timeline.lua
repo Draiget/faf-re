@@ -346,13 +346,17 @@ function CreateReplayTimeline(parent)
         return controls.timeline
     end
 
-    local prefInterval = GetPreference('options.replay_keyframe_interval', '120')
-    if prefInterval then
+    local Prefs = import('/lua/user/prefs.lua')
+    local userOptions = Prefs and is_callable(Prefs.GetFromCurrentProfile) and Prefs.GetFromCurrentProfile('options')
+    local prefInterval = userOptions and userOptions.replay_keyframe_interval
+    if prefInterval ~= nil then
+        LOG("FAFENGINE: Setting sim_ReplayKeyframeInterval to " .. tostring(prefInterval) .. " from profile options")
         ConExecute('sim_ReplayKeyframeInterval ' .. tostring(prefInterval))
     end
 
-    local prefStorage = GetPreference('options.replay_keyframe_storage', '2')
-    if prefStorage then
+    local prefStorage = userOptions and userOptions.replay_keyframe_storage
+    if prefStorage ~= nil then
+        LOG("FAFENGINE: Setting sim_ReplayKeyframeStorage to " .. tostring(prefStorage) .. " from profile options")
         ConExecute('sim_ReplayKeyframeStorage ' .. tostring(prefStorage))
     end
 
@@ -541,20 +545,39 @@ function CreateReplayTimeline(parent)
 
     local isDragging = false
 
+    local function HasAvailableKeyframes()
+        local getKf = rawget(_G, 'GetReplayKeyframes')
+        if not is_callable(getKf) then
+            return false
+        end
+        local ok, kfList = pcall(getKf)
+        return ok and type(kfList) == 'table' and table.getn(kfList) > 0
+    end
+
     slider.OnBeginChange = function(self)
         isDragging = true
         thumbPreview:Show()
     end
 
     slider.OnScrub = function(self, val)
+        local curTick = GetCurrentTick()
         val = math.max(0, math.floor(val))
+        if val < curTick and not HasAvailableKeyframes() then
+            val = curTick
+            self:SetValue(curTick)
+        end
         curTimeLabel:SetText(FormatTicks(val))
         thumbPreview:SetText(FormatTicks(val))
     end
 
     slider.OnValueChanged = function(self, val)
         if isDragging then
+            local curTick = GetCurrentTick()
             val = math.max(0, math.floor(val))
+            if val < curTick and not HasAvailableKeyframes() then
+                val = curTick
+                self:SetValue(curTick)
+            end
             curTimeLabel:SetText(FormatTicks(val))
             thumbPreview:SetText(FormatTicks(val))
         end
@@ -582,8 +605,16 @@ function CreateReplayTimeline(parent)
             return
         end
 
-        -- If rewinding backward, clear unit selection to prevent invalid entity references in UI
+        -- If rewinding backward, check whether keyframes are available
         if targetTick < curTick then
+            if not HasAvailableKeyframes() then
+                LOG(string.format("FAFENGINE: Cannot rewind backward to tick %d: keyframes are disabled or none recorded.", targetTick))
+                slider:SetValue(curTick)
+                curTimeLabel:SetText(FormatTicks(curTick))
+                return
+            end
+
+            -- Clear unit selection to prevent invalid entity references in UI
             local su = rawget(_G, 'SelectUnits')
             if is_callable(su) then
                 pcall(su, nil)
@@ -632,6 +663,7 @@ function CreateReplayTimeline(parent)
         end
         local conExec = rawget(_G, 'ConExecute') or ConExecute
         if is_callable(conExec) then
+            pcall(conExec, "sim_ReplayKeyframeInterval 120")
             pcall(conExec, "WLD_GameSpeed 10")
         end
     end

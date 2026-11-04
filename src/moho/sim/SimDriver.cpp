@@ -1300,20 +1300,23 @@ void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
   }
 
   // Engine addition: capture replay keyframes (beat 1 and periodic every sim_ReplayKeyframeInterval seconds)
+  // sim_ReplayKeyframeInterval:
+  //   < 0 : Disabled completely (no keyframes captured, not even at start)
+  //   0   : Start only (keyframe captured only at beat 1)
+  //   > 0 : Start (beat 1) + periodic keyframe captured every sim_ReplayKeyframeInterval seconds
   if (mClientManager != nullptr && mClientManager->IsReplay() && mSim) {
-    if (beatToDispatch == 1) {
+    if (sim_ReplayKeyframeInterval >= 0) {
       boost::mutex::scoped_lock kfLock(sReplayKeyframesMutex);
-      if (sReplayKeyframes.find(1) == sReplayKeyframes.end()) {
+      if (sReplayKeyframes.empty() || beatToDispatch == 1) {
         kfLock.unlock();
         CaptureKeyframeLocked(mSim.get(), ::GetCurrentProcessId());
-      }
-    } else if (sim_ReplayKeyframeInterval > 0) {
-      const std::uint32_t intervalTicks = static_cast<std::uint32_t>(sim_ReplayKeyframeInterval) * 10u;
-      if (intervalTicks > 0 && mSim->mCurTick > 0 && (mSim->mCurTick % intervalTicks) == 0) {
-        boost::mutex::scoped_lock kfLock(sReplayKeyframesMutex);
-        if (sReplayKeyframes.find(mSim->mCurTick) == sReplayKeyframes.end()) {
-          kfLock.unlock();
-          CaptureKeyframeLocked(mSim.get(), ::GetCurrentProcessId());
+      } else if (sim_ReplayKeyframeInterval > 0) {
+        const std::uint32_t intervalTicks = static_cast<std::uint32_t>(sim_ReplayKeyframeInterval) * 10u;
+        if (intervalTicks > 0 && mSim->mCurTick > 0 && (mSim->mCurTick % intervalTicks) == 0) {
+          if (sReplayKeyframes.find(mSim->mCurTick) == sReplayKeyframes.end()) {
+            kfLock.unlock();
+            CaptureKeyframeLocked(mSim.get(), ::GetCurrentProcessId());
+          }
         }
       }
     }
@@ -2384,7 +2387,7 @@ ISTIDriver* moho::SIM_CreateDriver(
 }
 
 int moho::sim_ReplayLead = 10;
-int moho::sim_ReplayKeyframeInterval = 120;
+int moho::sim_ReplayKeyframeInterval = -1;
 bool moho::sim_ReplayKeyframeCompress = true;
 int moho::sim_ReplayKeyframeStorage = 2;
 int moho::sim_LocalLead = 2;

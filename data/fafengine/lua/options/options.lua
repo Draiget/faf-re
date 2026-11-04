@@ -50,15 +50,16 @@ do
         title = "Replay Keyframe Interval",
         key = 'replay_keyframe_interval',
         type = 'toggle',
-        default = '120',
-        tip = "Interval between keyframes saved during replay playback for fast backward scrubbing. Frequent keyframes allow faster rewinds at the cost of disk space.",
+        default = '-1',
+        tip = "Interval between keyframes saved during replay playback for fast backward scrubbing. When Disabled, keyframes are not saved and backward rewinding is unavailable.",
         custom = {
             states = {
+                { text = "Disabled", key = '-1' },
+                { text = "Start only", key = '0' },
                 { text = "Every 30 seconds", key = '30' },
                 { text = "Every 1 minute", key = '60' },
                 { text = "Every 2 minutes", key = '120' },
                 { text = "Every 5 minutes", key = '300' },
-                { text = "Disabled (Start only)", key = '0' },
             },
         },
         set = function(key, value)
