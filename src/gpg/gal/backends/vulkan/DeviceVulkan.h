@@ -280,6 +280,7 @@ namespace gpg::gal
     [[nodiscard]] VkImageView TargetView(VkFormat& format, vulkan::TrackedImage*& image, std::uint32_t& width, std::uint32_t& height);
     void Trace(const char* format, ...);
     void DumpBackBufferIfDue();
+    void LogMemoryIfDue();
     // ---- GPU-driven programs (GpuDrivenVulkan.cpp) ------------------------------
     void CreateGpuDrivenObjects();
     void ReleaseGpuDrivenObjects() noexcept;

@@ -698,6 +698,5 @@ namespace gpg::gal::d3d12
 namespace gpg::gal
 {
   bool gPlacedResources = true;
-  int gUploadIdleMB = 32;
   bool gSharedBuffers = true;
 } // namespace gpg::gal

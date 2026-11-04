@@ -15,6 +15,7 @@
 namespace gpg::gal
 {
   bool gReleaseBufferCopies = true;
+  int gUploadIdleMB = 32;
 } // namespace gpg::gal
 
 namespace gpg::gal::backend
