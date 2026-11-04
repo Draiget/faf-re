@@ -39,6 +39,13 @@ namespace faf::headless
     bool spy = false;            // with `viewFramesPath`: the spy client's checks (ReplayViewFrameStats.h)
     bool luaRouting = false;     // with `viewBenchPath`: each player's `Sync` routed
     std::string luaRoutingDump;  // with `luaRouting`: each view's bytes go to `<this>_<view>.bin`
+    int luaMoveBeat = -1;        // with `luaRouting`: at this beat view `luaMoveView` moves to army `luaMoveArmy`
+    int luaMoveView = 0;
+    int luaMoveArmy = 0;
+    int luaResyncBeat = -1;      // with `luaRouting`: at this beat view `luaResyncView` gets a reconnect's resync
+    int luaResyncView = 0;
+    int focusSwitchBeat = -1;    // at this beat the sim's focus moves to `focusSwitchArmy`, as a lockstep client's does
+    int focusSwitchArmy = 0;
     std::string syncDumpPath;    // when set: each beat's Lua `Sync` bytes go here
     bool parallelViews = false;  // with `viewFramesPath`, `viewBenchPath` or `viewPacketsPath`: views built on the sim's workers
     bool keepClientData = false; // keep what only a client reads (`--keep-client-data`)

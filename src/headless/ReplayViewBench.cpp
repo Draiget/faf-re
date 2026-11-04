@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "headless/ReplaySyncSpy.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CIntelGrid.h"
 #include "moho/sim/Sim.h"
@@ -103,7 +104,24 @@ namespace faf::headless
         return ViewEntityId(view, simId);
       });
       mRouter->SetDumpPrefix(mLuaRoutingDump);
+      if (mLuaSpyOn) {
+        mSyncSpy = std::make_unique<CReplaySyncSpy>(*mRouter);
+        mRouter->SetPayloadObserver([this](moho::Sim& observed) { mSyncSpy->Check(observed); });
+      }
       moho::Sim::SetSyncRouting(mRouter.get());
+    }
+    if (mRouter != nullptr) {
+      const auto beat = static_cast<std::int32_t>(sim.mCurBeat);
+      for (const SLuaTestStep& step : mLuaMoves) {
+        if (step.beat == beat && step.view < mRouter->ViewCount()) {
+          mRouter->MoveView(step.view, step.army);
+        }
+      }
+      for (const SLuaTestStep& step : mLuaResyncs) {
+        if (step.beat == beat && step.view < mRouter->ViewCount()) {
+          mRouter->RequestResync(step.view);
+        }
+      }
     }
 
     // Every army's grids, encoded once for all the views that receive them, on the workers.
@@ -283,6 +301,11 @@ namespace faf::headless
     }
   }
 
+  std::uint64_t CReplayViewBench::Failures() const noexcept
+  {
+    return mEncodeFailures + HeldMismatches() + (mSyncSpy != nullptr ? mSyncSpy->Failures() : 0u);
+  }
+
   std::string CReplayViewBench::Summary() const
   {
     std::vector<double> build;
@@ -314,6 +337,10 @@ namespace faf::headless
     summary += "; build+send " + Distribution(total, "ms");
     summary += "; beat interval " + Distribution(interval, "ms");
     summary += "; per client " + Distribution(perSecond, "B/s");
+    if (mSyncSpy != nullptr) {
+      summary += "\n  ";
+      summary += mSyncSpy->Summary();
+    }
     return summary;
   }
 } // namespace faf::headless

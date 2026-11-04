@@ -1574,6 +1574,16 @@ extern "C"
 			(object->tt != LUA_TBOOLEAN || object->value.b != 0)) ? 1 : 0;
 	}
 
+	/** Engine addition (the binary has no use for it): the function a C function value calls. */
+	lua_CFunction lua_tocfunction(lua_State* const state, const int idx)
+	{
+		const TObject* const object = luaA_indexAcceptable(state, idx);
+		if (object == nullptr || object->tt != LUA_CFUNCTION) {
+			return nullptr;
+		}
+		return static_cast<const Closure*>(object->value.p)->c.f;
+	}
+
 	/**
 	 * Address: 0x0090CC90 (FUN_0090CC90, lua_topointer)
 	 *

@@ -158,6 +158,9 @@ namespace
       "  --sync-keys <file>        write every top-level Lua Sync key seen, with beat counts\n"
       "  --sync-dump <file>        write each beat's Lua Sync bytes (tools/sync-routing/compare.py)\n"
       "  --lua-routing-dump <pre>  with --lua-routing: each view's Sync bytes, to <pre>_<view>.bin\n"
+      "  --lua-move-view <b:v:a>   with --lua-routing: at beat b, view v moves to army a\n"
+      "  --lua-resync <b:v>        with --lua-routing: at beat b, view v gets a reconnect's resync\n"
+      "  --focus-switch <b:a>      at beat b, the sim's focus moves to army a, as a lockstep client's does\n"
       "  --state-digests <file>    write \"beat digest\" of what the sim published, every beat\n"
       "  --fpu-report              at beat 1, every thread's x87 control word and MXCSR (sampled)\n"
       "  --keyframe-every <beats>  save the sim between beats every <beats>, as a saved game; size, zlib size, md5, time\n"
@@ -205,7 +208,8 @@ namespace
       "  --parallel-views          with --view-frames or --view-bench: the views are built on the sim's workers\n"
       "  --cpus <list>             run on these CPUs only, for example 8-15 or 0,2,4,6; a CPU set from taskset or a\n"
       "                            container counts too, and FAF's init scripts cannot change it\n"
-      "  --spy                     with --view-frames: every view's decoded frame checked against the oracle and\n"
+      "  --spy                     with --view-bench --lua-routing: every Lua key each view receives checked;\n"
+      "                            with --view-frames: every view's decoded frame checked against the oracle and\n"
       "                            for names of entities its client does not hold\n"
       "  --inbound-check           with --view-ids: every command sent again in its army's view ids and translated\n"
       "                            back as the server would; it must marshal to the same bytes\n"
@@ -276,6 +280,19 @@ int main(int argc, char** argv)
   (void)ReadOption("--sync-keys", options.syncKeysPath);
   (void)ReadOption("--sync-dump", options.syncDumpPath);
   (void)ReadOption("--lua-routing-dump", options.luaRoutingDump);
+  std::string beatStep;
+  if (ReadOption("--lua-move-view", beatStep)
+      && std::sscanf(beatStep.c_str(), "%d:%d:%d", &options.luaMoveBeat, &options.luaMoveView, &options.luaMoveArmy) != 3) {
+    bad = true;
+  }
+  if (ReadOption("--lua-resync", beatStep)
+      && std::sscanf(beatStep.c_str(), "%d:%d", &options.luaResyncBeat, &options.luaResyncView) != 2) {
+    bad = true;
+  }
+  if (ReadOption("--focus-switch", beatStep)
+      && std::sscanf(beatStep.c_str(), "%d:%d", &options.focusSwitchBeat, &options.focusSwitchArmy) != 2) {
+    bad = true;
+  }
   (void)ReadOption("--sync-writers", options.syncWritersPath);
   (void)ReadOption("--wire-stats", options.wireStatsPath);
   (void)ReadOption("--state-digests", options.stateDigestPath);

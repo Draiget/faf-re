@@ -10,6 +10,9 @@ Both files hold one record per beat: beat and size as little-endian 32-bit numbe
 `LuaObject::ToByteStream` encodes it. Prints each key with beats in which it matches, beats it's
 missing from the routed table, beats it's extra, and beats it differs, with an example of each.
 Exit code 1 if any key differs in any way.
+
+A lockstep client gets every unit's death in `UnitData` and `ReleaseIds`, and the server keeps those
+with the unit's owner. `--army` (0-based, the view's army) leaves other armies' out of the reference.
 """
 import argparse
 import collections
@@ -65,21 +68,34 @@ def empty(value):
     return isinstance(value, dict) and not value
 
 
+def drop_foreign_deaths(table, army):
+    for key in ("UnitData", "ReleaseIds"):
+        entries = table.get(key)
+        if isinstance(entries, dict):
+            for entity in [k for k, v in entries.items() if isinstance(v, bool) and isinstance(k, str) and k.isdigit()]:
+                if (int(entity) >> 20) & 0xFF != army:
+                    del entries[entity]
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("reference", help="--sync-dump of a run focused on the army")
     ap.add_argument("routed", help="that army's --lua-routing-dump file")
     ap.add_argument("--examples", type=int, default=1)
+    ap.add_argument("--army", type=int, help="the view's army, for the deaths the server keeps with their owner")
+    ap.add_argument("--from-beat", type=int, default=0, help="compare from this beat on")
     args = ap.parse_args()
 
     reference = {beat: bytes(body) for beat, body in records(args.reference)}
     routed = {beat: bytes(body) for beat, body in records(args.routed)}
-    beats = sorted(set(reference) & set(routed))
+    beats = sorted(beat for beat in set(reference) & set(routed) if beat >= args.from_beat)
     counts = collections.defaultdict(collections.Counter)
     examples = collections.defaultdict(list)
     for beat in beats:
         want = decode(reference[beat])[0] if reference[beat] else {}
         got = decode(routed[beat])[0] if routed[beat] else {}
+        if args.army is not None:
+            drop_foreign_deaths(want, args.army)
         for key in sorted(set(want) | set(got), key=str):
             a = want.get(key)
             b = got.get(key)

@@ -673,6 +673,15 @@ namespace faf::headless
       viewBench->SetParallel(options.parallelViews);
       if (options.luaRouting) {
         viewBench->EnableLuaRouting(options.luaRoutingDump);
+        if (options.spy) {
+          viewBench->EnableLuaSpy();
+        }
+        if (options.luaMoveBeat >= 0) {
+          viewBench->AddLuaMove(options.luaMoveBeat, static_cast<std::size_t>(options.luaMoveView), options.luaMoveArmy);
+        }
+        if (options.luaResyncBeat >= 0) {
+          viewBench->AddLuaResync(options.luaResyncBeat, static_cast<std::size_t>(options.luaResyncView));
+        }
       }
       viewBench->Install();
     }
@@ -824,6 +833,9 @@ namespace faf::headless
 
         ++result.beats;
         result.lastBeat = packet->mCurBeat;
+        if (packet->mCurBeat == options.focusSwitchBeat) {
+          simDriver->SetPendingFocusArmyRaw(options.focusSwitchArmy);
+        }
         result.desyncReports += static_cast<int>(packet->mDesyncs.size());
 
         if (digestFile != nullptr) {

@@ -34,6 +34,8 @@ namespace moho
 
 namespace faf::headless
 {
+  class CReplaySyncSpy;
+
   class CReplayViewBench final : public remote::CViewFrames
   {
   public:
@@ -50,9 +52,14 @@ namespace faf::headless
       mLuaRouting = true;
       mLuaRoutingDump = std::move(dumpPrefix);
     }
+    /** `--spy` with `--lua-routing`: every Lua key each view receives is checked (ReplaySyncSpy.h). */
+    void EnableLuaSpy() noexcept { mLuaSpyOn = true; }
+    /** `--lua-move-view` and `--lua-resync`: moves and resyncs at a beat, to test them on replays. */
+    void AddLuaMove(const std::int32_t beat, const std::size_t view, const std::int32_t army) { mLuaMoves.push_back({beat, view, army}); }
+    void AddLuaResync(const std::int32_t beat, const std::size_t view) { mLuaResyncs.push_back({beat, view, 0}); }
     [[nodiscard]] std::string Summary() const;
     /** Lanes that did not encode, and what the check found (should stay 0). */
-    [[nodiscard]] std::uint64_t Failures() const noexcept { return mEncodeFailures + HeldMismatches(); }
+    [[nodiscard]] std::uint64_t Failures() const noexcept;
 
   protected:
     void OnViewFrames(moho::Sim& sim) override;
@@ -105,5 +112,15 @@ namespace faf::headless
     bool mLuaRouting = false;
     std::string mLuaRoutingDump;
     std::unique_ptr<remote::CSyncRouter> mRouter; // made once the army count is known
+    struct SLuaTestStep
+    {
+      std::int32_t beat;
+      std::size_t view;
+      std::int32_t army;
+    };
+    std::vector<SLuaTestStep> mLuaMoves;
+    std::vector<SLuaTestStep> mLuaResyncs;
+    bool mLuaSpyOn = false;
+    std::unique_ptr<CReplaySyncSpy> mSyncSpy;
   };
 } // namespace faf::headless
