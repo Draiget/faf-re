@@ -3,6 +3,7 @@
 #include <zlib.h>
 
 #include <algorithm>
+#include <bit>
 #include <cstring>
 #include <limits>
 #include <memory>
@@ -193,9 +194,9 @@ namespace
       return false;
     }
 
-    if (entry.mCachedDataOffset >= 0) {
+    if (entry.mCachedDataOffset != -1) {
       (void)stream.Seek(
-        gpg::Stream::OriginBegin, static_cast<std::int64_t>(entry.mCachedDataOffset)
+        gpg::Stream::OriginBegin, static_cast<std::int64_t>(static_cast<std::uint32_t>(entry.mCachedDataOffset))
       );
       return true;
     }
@@ -225,12 +226,12 @@ namespace
     const std::uint64_t skipSize = static_cast<std::uint64_t>(localHeader.mFileNameLength) +
                                    static_cast<std::uint64_t>(localHeader.mExtraFieldLength);
     const std::uint64_t dataOffset = stream.Seek(gpg::Stream::OriginCurr, static_cast<std::int64_t>(skipSize));
-    if (dataOffset > static_cast<std::uint64_t>(std::numeric_limits<std::int32_t>::max())) {
-      entry.mLocalHeaderOffset = kInvalidZipOffset;
-      return false;
+    // The cached lane stores the original 32-bit offset bits; -1 is reserved
+    // for an uncached value. Values outside that range stay uncached.
+    if (dataOffset < static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max())) {
+      const std::uint32_t cachedOffset = static_cast<std::uint32_t>(dataOffset);
+      entry.mCachedDataOffset = std::bit_cast<std::int32_t>(cachedOffset);
     }
-
-    entry.mCachedDataOffset = static_cast<std::int32_t>(dataOffset);
     return true;
   }
 } // namespace
