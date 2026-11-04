@@ -1,6 +1,6 @@
 name: Nightly release
 
-# Publishes a pre-release of master's head once that night's Replay parity has passed: the x64 and
+# Publishes a pre-release of master's head once that night's Replay parity lists no new failure: the x64 and
 # x86 engine, the commits since the previous nightly, and the parity run it passed. Started by hand
 # it only builds and writes the notes, unless `publish` is ticked. tools/release/README.md.
 on:
@@ -33,11 +33,15 @@ env:
 
 jobs:
   plan:
-    # Only a scheduled parity run that passed: a run by hand may have played any commit or set.
+    # Only a scheduled parity run that finished: a run by hand may have played any commit or set.
+    # New failures don't fail that run, so the plan step below reads them from its report.
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.event == 'schedule' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read  # the parity run's report
     outputs:
       sha: ${{ steps.plan.outputs.sha }}
       version: ${{ steps.plan.outputs.version }}
@@ -53,6 +57,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REF: ${{ github.event.workflow_run.head_sha || inputs.ref }}
+          PARITY_RUN: ${{ github.event.workflow_run.id }}
         run: |
           sha=$(gh api "repos/${{ github.repository }}/commits/$REF" --jq .sha)
           # The last real release the commit descends from, never an earlier nightly.
@@ -63,6 +68,15 @@ jobs:
           # Master did not move since the last nightly: that release already holds this commit.
           skip=false
           if gh release view "$tag" > /dev/null 2>&1; then skip=true; fi
+          # New failures in the parity run: nothing to publish. No report at all fails this step.
+          if [ -n "$PARITY_RUN" ]; then
+            gh run download "$PARITY_RUN" -R "${{ github.repository }}" -n report -D parity-report
+            new=$(jq -r '.regressions | length' parity-report/report.json)
+            if [ "$new" != "0" ]; then
+              skip=true
+              echo "Parity run $PARITY_RUN has $new new failures: nothing to publish." | tee -a "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
           {
             echo "sha=$sha"
             echo "version=$version"
