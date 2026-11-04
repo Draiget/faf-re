@@ -30,6 +30,12 @@ namespace faf::remote::wire
 
   /** Writes `current` as a delta against `baseline` (null: all hidden). False on a malformed grid. */
   [[nodiscard]] bool EncodeGridDelta(const SGridBits& current, const SGridBits* baseline, BitWriter& writer);
+  /**
+   * `EncodeGridDelta` straight from the sim's cells, any value but 0 being a set cell, against the
+   * cells of last time in `held`, which become `now`: one pass over the two, with no copy of the
+   * grid to make first. The same bits.
+   */
+  void EncodeGridDeltaInPlace(std::uint32_t width, std::uint32_t height, const std::int8_t* now, std::int8_t* held, BitWriter& writer);
 
   /**
    * Reads one grid against `baseline` (the copy the encoder used, or null). Refuses a grid larger

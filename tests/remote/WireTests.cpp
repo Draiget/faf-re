@@ -987,6 +987,43 @@ namespace
           && held.orientationBeat == 7u);
   }
 
+  void TestGridDeltaInPlace()
+  {
+    // The same bits as `EncodeGridDelta`, on grids with long unchanged runs and with changes at
+    // block edges, and `held` ends up as the cells of now.
+    std::mt19937 rng(0x6A12u);
+    for (int round = 0; round < 300; ++round) {
+      SGridBits before{};
+      before.width = 1u + rng() % 200u;
+      before.height = 1u + rng() % 40u;
+      const std::size_t count = static_cast<std::size_t>(before.width) * before.height;
+      std::vector<std::int8_t> held(count);
+      for (std::int8_t& cell : held) {
+        cell = static_cast<std::int8_t>(rng() % 3u == 0u ? 1 + rng() % 100u : 0u);
+      }
+      std::vector<std::int8_t> now = held;
+      const std::uint32_t changes = rng() % 4u == 0u ? 0u : rng() % 40u;
+      for (std::uint32_t change = 0; change < changes; ++change) {
+        const std::size_t at = rng() % 2u == 0u ? rng() % count : (rng() % (count / 64u + 1u)) * 64u % count;
+        now[at] = static_cast<std::int8_t>(rng() % 3u == 0u ? 0u : 1 + rng() % 100u);
+      }
+      SGridBits current = before;
+      before.cells.resize(count);
+      current.cells.resize(count);
+      for (std::size_t i = 0; i < count; ++i) {
+        before.cells[i] = held[i] != 0 ? 1u : 0u;
+        current.cells[i] = now[i] != 0 ? 1u : 0u;
+      }
+      BitWriter expected;
+      CHECK(EncodeGridDelta(current, &before, expected));
+      BitWriter actual;
+      EncodeGridDeltaInPlace(before.width, before.height, now.data(), held.data(), actual);
+      CHECK(actual.BitCount() == expected.BitCount());
+      CHECK(std::equal(actual.Bytes().begin(), actual.Bytes().end(), expected.Bytes().begin(), expected.Bytes().end()));
+      CHECK(held == now);
+    }
+  }
+
   void TestBitWriterAppend()
   {
     // A lane put together from slots encoded apart is the lane encoded in one go, at any bit position.
@@ -2364,6 +2401,7 @@ namespace
     {"frame: appearance block", &TestFrameAppearance},
     {"frame: blip update hash", &TestBlipUpdateHash},
     {"grid lane: slots encoded apart", &TestBitWriterAppend},
+    {"grid lane: delta in place", &TestGridDeltaInPlace},
   };
 } // namespace
 

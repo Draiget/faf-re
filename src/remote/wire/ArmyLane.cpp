@@ -189,11 +189,16 @@ namespace faf::remote::wire
     return true;
   }
 
-  bool EncodeGridSlot(const SGridSlot& slot, const SGridBits* const baseline, BitWriter& writer)
+  void WriteGridSlotHeader(const SGridSlot& slot, BitWriter& writer)
   {
     writer.WriteBits(slot.army, 8);
     writer.WriteBits(slot.kind, 1);
     writer.WriteVarUint(slot.gridSize);
+  }
+
+  bool EncodeGridSlot(const SGridSlot& slot, const SGridBits* const baseline, BitWriter& writer)
+  {
+    WriteGridSlotHeader(slot, writer);
     return EncodeGridDelta(slot.bits, baseline, writer);
   }
 
