@@ -6,11 +6,13 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "lua/LuaObject.h"
 #include "moho/sim/Sim.h"
+#include "moho/task/CLuaTask.h"
 
 // Engine addition, server mode (plan §8, WP6, no FAF Lua changes): sim Lua writes one `Sync` table
 // for the whole game, and on a lockstep client that table is built under the client's own focus
@@ -31,13 +33,16 @@
 // 6. Reconnects (WP6.8): `RequestResync` sends what loading a saved game sends for the UI's state,
 //    with `NoteFocusArmyChanged` for the units' data, under that view's focus.
 //
+// 7. Threads of one player: a forked thread reads focus -1, and can't be wrapped, since it can't
+//    yield across a C call. The few that belong to one army wholly run under its focus, each time
+//    they run (`kOwnedThreads`).
+//
 // Every player's payload is put together from encoded pieces of those tables, so routing creates
 // no Lua tables on the way out, and the sim's own heap sees only the writes the game makes.
 //
-// What this can't reach from the engine, for the user's decision (WP6.6): code running in a forked
-// Lua thread reads focus -1 and can't be wrapped, since a thread can't yield across a C call. That
-// leaves `AIBrain:PlayVOSoundThread` (voice-overs) and `lua/sim/Recall.lua`'s voting thread, plus
-// `DiplomacyHandler`'s announcement to third parties.
+// What this can't reach from the engine, for the user's decision (WP6.6): `lua/sim/Recall.lua`'s
+// voting and status threads, which mix what they do to the sim with what each player's client is
+// told, and `DiplomacyHandler`'s announcement to third parties.
 
 namespace faf::remote
 {
@@ -88,7 +93,7 @@ namespace faf::remote
   };
   [[nodiscard]] std::span<const SSyncIdField> SyncIdFields() noexcept;
 
-  class CSyncRouter final : public moho::ISyncRouting
+  class CSyncRouter final : public moho::ISyncRouting, public moho::ILuaThreadRouting
   {
   public:
     /** A view's id for a sim id, for ids written into its payload (WP6.10). */
@@ -108,6 +113,10 @@ namespace faf::remote
     void LeaveCommand(moho::Sim& sim) override;
     bool Print(const msvc8::string& line) override;
     void SetFocusFromLua(std::int32_t army) override;
+    void OnThreadForked(lua_State* parent, lua_State* thread) override;
+    bool EnterThread(lua_State* thread) override;
+    void LeaveThread() override;
+    void OnThreadEnded(lua_State* thread) override;
     void OnSyncTable(moho::Sim& sim, LuaPlus::LuaObject& syncTable, const moho::SSyncData& packet) override;
 
     [[nodiscard]] std::size_t ViewCount() const noexcept { return mPlayers.size(); }
@@ -177,6 +186,8 @@ namespace faf::remote
 
     std::vector<SPlayerSync> mPlayers;
     std::vector<SFrame> mFrames;
+    std::unordered_map<lua_State*, std::int32_t> mThreadViews; // threads that belong to one player
+    std::vector<const void*> mOwnedThreadFunctions;            // what such a thread starts with
     std::vector<std::pair<std::size_t, std::int32_t>> mMoves; // view, army: at the next sync
     std::vector<std::size_t> mResyncs;
     std::function<void(moho::Sim&)> mPayloadObserver;

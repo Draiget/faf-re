@@ -119,7 +119,9 @@ namespace faf::headless
       }
       return;
     }
-    if (entity != nullptr && owner != walk.army) {
+    // A score's totals and a chat line's text only look like ids now and then: an energy total of
+    // 2097210, a message saying "1".
+    if (entity != nullptr && owner != walk.army && walk.topKey != "Score" && field != "text") {
       ++mUnmarked;
       Example(walk, "unmarked", id, field);
     }

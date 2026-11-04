@@ -362,6 +362,24 @@ namespace faf::remote
       return 0;
     }
 
+    /**
+     * Threads that act only for their brain's player, once they start: what they write depends on
+     * that player's focus alone. `lua/aibrain.lua:286` tells the player of a voice-over only when the
+     * brain is the player's. A brain's `EnergyExcessThread`
+     * (`lua/aibrains/components/EnergyManagerBrainComponent.lua:80`) starts before a server's routing
+     * does, so it's found by its field when the routing starts.
+     */
+    struct SOwnedThread
+    {
+      const char* module;
+      const char* className;
+      const char* function;
+    };
+    constexpr SOwnedThread kOwnedThreads[] = {
+      {"/lua/aibrain.lua", "AIBrain", "PlayVOSoundThread"},
+    };
+    constexpr const char* kOwnedThreadFields[] = {"EnergyExcessThread"};
+
     /** The army (1-based) of a unit's `Army` or a brain's `GetArmyIndex()`; 0 if neither. */
     [[nodiscard]] int ArmyOfSelf(lua_State* const state, const int index)
     {
@@ -477,6 +495,7 @@ namespace faf::remote
     : mPlayers(viewCount)
   {
     sActiveRouter = this;
+    moho::LUA_SetThreadRouting(this);
     for (std::size_t view = 0; view < mPlayers.size(); ++view) {
       mPlayers[view].army = static_cast<std::int32_t>(view);
     }
@@ -486,6 +505,7 @@ namespace faf::remote
   {
     if (sActiveRouter == this) {
       sActiveRouter = nullptr;
+      moho::LUA_SetThreadRouting(nullptr);
     }
   }
 
@@ -703,6 +723,38 @@ namespace faf::remote
     }
   }
 
+  void CSyncRouter::OnThreadForked(lua_State* const parent, lua_State* const thread)
+  {
+    if (mOwnedThreadFunctions.empty() || lua_gettop(parent) < 2 || !lua_istable(parent, 2)
+        || std::find(mOwnedThreadFunctions.begin(), mOwnedThreadFunctions.end(), lua_topointer(parent, 1)) == mOwnedThreadFunctions.end()) {
+      return;
+    }
+    const std::int32_t view = ViewOfArmy(ArmyOfSelf(parent, 2) - 1);
+    if (view >= 0) {
+      mThreadViews[thread] = view;
+    }
+  }
+
+  bool CSyncRouter::EnterThread(lua_State* const thread)
+  {
+    const auto found = mThreadViews.find(thread);
+    if (found == mThreadViews.end() || mSim == nullptr) {
+      return false;
+    }
+    EnterView(*mSim, found->second);
+    return true;
+  }
+
+  void CSyncRouter::LeaveThread()
+  {
+    LeaveView(*mSim);
+  }
+
+  void CSyncRouter::OnThreadEnded(lua_State* const thread)
+  {
+    mThreadViews.erase(thread);
+  }
+
   bool CSyncRouter::Print(const msvc8::string& line)
   {
     if (mFrames.empty() || mFrames.back().view < 0) {
@@ -724,6 +776,39 @@ namespace faf::remote
     LuaPlus::LuaState* const luaState = sim.mLuaState;
     lua_State* const state = luaState->m_state;
     LuaPlus::LuaObject globals = luaState->GetGlobals();
+
+    for (const SOwnedThread& owned : kOwnedThreads) {
+      LuaPlus::LuaObject owner = moho::SCR_Import(luaState, owned.module);
+      if (owner.IsTable()) {
+        owner = owner[owned.className];
+      }
+      LuaPlus::LuaObject function = owner.IsTable() ? owner[owned.function] : LuaPlus::LuaObject{};
+      if (function.IsFunction()) {
+        mOwnedThreadFunctions.push_back(function.m_object.value.p);
+      } else {
+        gpg::Warnf("sync routing: no %s.%s for its thread to follow", owned.className, owned.function);
+      }
+    }
+    LuaPlus::LuaObject brains = globals["ArmyBrains"];
+    if (brains.IsTable()) {
+      for (LuaPlus::LuaTableIterator entry(brains, 1); !entry.m_isDone; entry.Next()) {
+        LuaPlus::LuaObject brain = entry.GetValue();
+        if (!brain.IsTable()) {
+          continue;
+        }
+        LuaPlus::LuaObject armyField = brain["Army"];
+        const std::int32_t view = armyField.IsNumber() ? ViewOfArmy(static_cast<std::int32_t>(armyField.GetNumber()) - 1) : -1;
+        if (view < 0) {
+          continue;
+        }
+        for (const char* const field : kOwnedThreadFields) {
+          LuaPlus::LuaObject thread = brain[field];
+          if (thread.Type() == LUA_TTHREAD) {
+            mThreadViews[static_cast<lua_State*>(thread.m_object.value.p)] = view;
+          }
+        }
+      }
+    }
 
     LuaPlus::LuaObject getVersion = moho::SCR_Import(luaState, "/lua/version.lua")["GetVersion"];
     if (getVersion.IsFunction()) {
