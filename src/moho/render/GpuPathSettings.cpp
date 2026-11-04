@@ -36,6 +36,14 @@ namespace moho
       &gpg::gal::gPlacedResources
     );
 
+    /** Engine addition: `d3d_UploadIdleMB` (see gpg/gal/PlacedResources.h). */
+    TConVar<int> gTConVar_d3d_UploadIdleMB(
+      "d3d_UploadIdleMB",
+      "Direct3D 12: megabytes of idle upload pages kept for reuse; past it they are given back. Each page is 8 MB of "
+      "committed process memory. Read at each retire.",
+      &gpg::gal::gUploadIdleMB
+    );
+
     /** Engine addition: `ren_DdsDirectLoad` (see gpg/gal/backends/common/ImageCodec.h). */
     TConVar<bool> gTConVar_ren_DdsDirectLoad(
       "ren_DdsDirectLoad",

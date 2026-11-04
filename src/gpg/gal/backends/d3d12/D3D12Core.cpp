@@ -52,11 +52,6 @@ namespace gpg::gal::d3d12
   namespace
   {
     constexpr std::uint64_t kPageSize = 8ULL << 20U;
-#if defined(_M_IX86)
-    constexpr std::uint64_t kIdlePageReserve = 32ULL << 20U;   // idle pages kept for reuse
-#else
-    constexpr std::uint64_t kIdlePageReserve = 128ULL << 20U;
-#endif
 
     [[nodiscard]] std::uint64_t AlignUp(const std::uint64_t value, const std::uint64_t alignment) noexcept
     {
@@ -159,6 +154,7 @@ namespace gpg::gal::d3d12
     // normal-map rebuild) would otherwise leave its peak mapped for the rest
     // of the session, which a 32-bit process cannot afford.
     std::uint64_t idleKept = 0U;
+    const std::uint64_t idleReserve = static_cast<std::uint64_t>(std::max(gUploadIdleMB, 0)) << 20U;
     mPages.erase(
       std::remove_if(
         mPages.begin(), mPages.end(),
@@ -166,7 +162,7 @@ namespace gpg::gal::d3d12
           if (page->busy || page.get() == mCurrent) {
             return false;
           }
-          if (page->size > kPageSize || idleKept + page->size > kIdlePageReserve) {
+          if (page->size > kPageSize || idleKept + page->size > idleReserve) {
             return true;
           }
           idleKept += page->size;
@@ -533,4 +529,5 @@ namespace gpg::gal::d3d12
 namespace gpg::gal
 {
   bool gPlacedResources = true;
+  int gUploadIdleMB = 32;
 } // namespace gpg::gal

@@ -11,4 +11,12 @@ namespace gpg::gal
    * at each creation; `/con d3d_PlacedResources=0` turns it off from the start.
    */
   extern bool gPlacedResources;
+
+  /**
+   * Engine addition: megabytes of idle Direct3D 12 upload pages kept for reuse; idle pages past it
+   * are given back. Each page is 8 MB of committed process memory, and a burst (a loading screen, a
+   * terrain normal-map rebuild) would otherwise leave them mapped. Console variable
+   * `d3d_UploadIdleMB` (moho), read at each retire.
+   */
+  extern int gUploadIdleMB;
 } // namespace gpg::gal
