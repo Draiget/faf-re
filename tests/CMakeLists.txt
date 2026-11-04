@@ -13,11 +13,48 @@ add_executable(faf_replay_tests EXCLUDE_FROM_ALL moho/ReplaySetupTests.cpp)
 target_link_libraries(faf_replay_tests PRIVATE faf_engine)
 
 add_test(NAME replay_setup COMMAND faf_replay_tests)
+# Peer transports of the UDP connector (issue #232): two connectors in one
+# process, over their sockets and through transports.
+add_executable(faf_peer_transport_tests EXCLUDE_FROM_ALL net/PeerTransportTests.cpp)
+target_link_libraries(faf_peer_transport_tests PRIVATE faf_engine)
+
+add_test(NAME net_peer_transport COMMAND faf_peer_transport_tests)
+
+# net_FastRetransmit (issue #237): a lost DATA packet's recovery with the
+# switch off and on, at a fast rate and at the game's rate.
+add_executable(faf_fast_retransmit_tests EXCLUDE_FROM_ALL net/FastRetransmitTests.cpp)
+target_link_libraries(faf_fast_retransmit_tests PRIVATE faf_engine)
+
+add_test(NAME net_fast_retransmit COMMAND faf_fast_retransmit_tests)
+
+# libjuice gathering against a STUN/TURN server (issue #228), run by hand:
+#   faf_juice_gather <host> <port> [<turn user> <turn password>]
+add_executable(faf_juice_gather EXCLUDE_FROM_ALL netlink/JuiceGatherTest.cpp)
+target_link_libraries(faf_juice_gather PRIVATE faf_juice faf_codegen)
+
+# netlink (issue #229): JSON, signalling and SDP checks, then two links in one
+# process. --bind <address> where inbound UDP to 0.0.0.0 is dropped.
+add_executable(faf_netlink_tests EXCLUDE_FROM_ALL netlink/NetlinkTests.cpp)
+target_link_libraries(faf_netlink_tests PRIVATE faf_netlink faf_codegen)
+
+# libdatachannel (issue #238): two local peers open an unordered, unreliable
+# data channel and echo datagrams. --bind <address> as above.
+add_executable(faf_datachannel_test EXCLUDE_FROM_ALL netlink/DataChannelTest.cpp)
+target_link_libraries(faf_datachannel_test PRIVATE faf_datachannel faf_codegen)
+set_target_properties(faf_datachannel_test PROPERTIES CXX_STANDARD 17)
+if(MSVC)
+  target_compile_options(faf_datachannel_test PRIVATE /EHsc)
+endif()
 
 add_executable(faf_profiler_tests EXCLUDE_FROM_ALL profiling/ProfilerFacadeTests.cpp)
 target_include_directories(faf_profiler_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 add_test(NAME profiler_facade COMMAND faf_profiler_tests)
+
+# Engine addition: EffectScan.h against the std::regex patterns it replaced, on generated text.
+add_executable(faf_effect_scan_tests EXCLUDE_FROM_ALL effect_scan/EffectScanTests.cpp)
+target_include_directories(faf_effect_scan_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME effect_scan COMMAND faf_effect_scan_tests)
 
 # Engine addition (dedicated-server plan WPL.23): golden sim-math tests
 # (tests/sim_math). Built with every build, and run right after it: a change
@@ -42,6 +79,12 @@ if(EXISTS "${_faf_sim_math_golden}")
   add_test(NAME sim_math COMMAND "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args})
 endif()
 
+# Engine addition (#247): the user preferences from several threads at once
+# (tests/prefs); fails without USER_PreferencesLock.
+add_executable(faf_prefs_thread_tests EXCLUDE_FROM_ALL prefs/PrefsThreadTests.cpp)
+target_link_libraries(faf_prefs_thread_tests PRIVATE faf_engine)
+add_test(NAME prefs_threads COMMAND faf_prefs_thread_tests)
+
 # Engine addition (dedicated-server plan WPL.4, WPR.11): what the static
 # initialisers of faf_main's objects registered (tests/registry).
 add_executable(faf_registration_dump EXCLUDE_FROM_ALL registry/RegistrationDump.cpp)
@@ -53,4 +96,24 @@ target_link_libraries(faf_registration_dump PRIVATE faf_engine)
 # game's bin folder, with /init.
 add_executable(faf_terrain_check EXCLUDE_FROM_ALL terrain/TerrainCheck.cpp)
 target_link_libraries(faf_terrain_check PRIVATE faf_engine)
+
+# Engine addition (dedicated-server plan WPR.21): the difffuzz targets on the
+# engine's objects, checked against retail's outputs (tests/math_dump/golden.txt)
+# after every build (tools/difffuzz/dump.cmake).
+set(FAF_MATH_DUMP_ENGINE faf_engine)
+include("${CMAKE_SOURCE_DIR}/tools/difffuzz/dump.cmake")
 add_subdirectory(remote)
+
+add_subdirectory(memory)
+add_subdirectory(tread_rotation)
+
+# Entity update scroll snapshots and payload ownership.
+add_executable(faf_recon_scroll_packet_tests EXCLUDE_FROM_ALL sim/ReconScrollPacketTests.cpp)
+target_link_libraries(faf_recon_scroll_packet_tests PRIVATE faf_engine)
+add_test(NAME recon_scroll_packet COMMAND faf_recon_scroll_packet_tests)
+set_tests_properties(recon_scroll_packet PROPERTIES TIMEOUT 120)
+
+# Lua coroutine tests (coroutine.create / resume / yield / status / wrap).
+add_executable(faf_coroutine_tests EXCLUDE_FROM_ALL lua/CoroutineTests.cpp)
+target_link_libraries(faf_coroutine_tests PRIVATE faf_engine)
+add_test(NAME lua_coroutine COMMAND faf_coroutine_tests)

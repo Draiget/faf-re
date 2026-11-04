@@ -1,0 +1,54 @@
+name: 2p-desync-state
+description: >
+  Default desync dump (sim_DesyncDump). Two clients of our x64 build (staged
+  as bin_x64\desync_test.exe) play faf_re_lockstep with no recorder flags;
+  client 2 raises one unit's health by one float step at beat 300
+  (/desynctestbeat), a real desync. Each client must keep the hashed state of
+  recent beats in memory and write its dump next to its game log; the two
+  dumps compared with tools/desync-diff/desync_diff.py name the health value.
+  Needs init_mpemu_localvault.lua. Run with -advertise 192.168.42.77 on the
+  isolated account. Do not click into the game windows.
+timeout: 15m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: demoralization
+  GameSpeed: fast
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\desync_test.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+
+players:
+  - uid: 1
+    name: State-A
+    faction: uef
+    args: ['/title', 'state-A', '/savereplay', 'gpgnet://127.0.0.1:1/424242/State-A.SCFAreplay', '/exitattick', '450']
+  - uid: 2
+    name: State-B
+    faction: cybran
+    args: ['/title', 'state-B', '/desynctestbeat', '300', '/savereplay', 'gpgnet://127.0.0.1:1/424242/State-B.SCFAreplay',
+           '/exitattick', '450']
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 3m
+
+expect:
+  allLaunched: true
+  logsContain:
+    - { uids: all, pattern: 'Desync recorder: hashed state of recent beats in memory \(sim_DesyncDump, live multiplayer game\)' }
+    - { uids: all, pattern: 'Desync recorder: beat 300 mismatched with .*; keeping the hashed state to beat' }
+    - { uids: [1], pattern: 'Desync recorder: wrote .*desync_424242_beat300_army0\.zip' }
+    - { uids: [2], pattern: 'Desync recorder: wrote .*desync_424242_beat300_army1\.zip' }
+    - { uids: all, pattern: 'exitattick: quitting at game tick' }
+  logsAgree:
+    - { uids: all, pattern: 'Desync recorder: beat (\d+) mismatched' }

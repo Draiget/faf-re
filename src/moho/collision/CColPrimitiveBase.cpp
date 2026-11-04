@@ -12,12 +12,8 @@
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector3f.h"
 #include "moho/render/camera/VTransform.h"
+#include "moho/math/Wm3Queries.h"
 #include "moho/math/Wm3Segment3FafExtras.h"
-#include "Wm3ContBox3.h"
-#include "Wm3DistVector3Box3.h"
-#include "Wm3IntrBox3Sphere3.h"
-#include "Wm3IntrSegment3Box3.h"
-#include "Wm3IntrSegment3Sphere3.h"
 
 namespace
 {
@@ -152,7 +148,12 @@ namespace
       if (lhsMin > rhsMax || rhsMin > lhsMax) {
         return false;
       }
-      overlapAlongAxis[axisIndex] = std::fmin(lhsMax, rhsMax) - std::fmax(lhsMin, rhsMin);
+      // 0x00474E15..0x00474E2E: `comiss` selects, not fmin/fmax - an unordered
+      // compare keeps the rhs bound (fmin/fmax would drop a NaN one), and equal
+      // bounds give the rhs one (+0 against -0).
+      const float overlapMax = rhsMax > lhsMax ? lhsMax : rhsMax;
+      const float overlapMin = lhsMin > rhsMin ? lhsMin : rhsMin;
+      overlapAlongAxis[axisIndex] = overlapMax - overlapMin;
     }
 
     constexpr float kMaximumContactDepth = 1.0e9f;
@@ -373,26 +374,27 @@ namespace moho
    *
    * The query is Wild Magic's own `IntrSegment3Box3f` on the stack (ctor
    * 0x00A463A0 with `bSolid = false`, `Find` 0x00A462A0, `GetPoint(0)`
-   * 0x00A46300 once per output, `~Intersector` 0x00A45500). The outputs are
-   * written direction, distance, position, in that order.
+   * 0x00A46300 once per output, `~Intersector` 0x00A45500), here
+   * Wm3::FindSegment3Box3. The outputs are written direction, distance,
+   * position, in that order.
    */
   bool CColPrimitive<Wm3::Box3f>::CollideLine(
     const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionSegmentResult* outResult
   ) const
   {
     const Wm3::Segment3f segment = Wm3::MakeSegment3fFromEndpoints(*lineStart, *lineEnd);
-    Wm3::IntrSegment3Box3f intersection(segment, mShape, false);
-    if (!intersection.Find()) {
+    Wm3::Vector3f points[2];
+    if (Wm3::FindSegment3Box3(segment, mShape, false, points) == 0) {
       return false;
     }
+    const Wm3::Vec3f& hit = points[0];
 
     // 0x004FF36E: `NormalizeVectorInto` (0x0044F7E0) -- zero only at length 0.
     Wm3::Vec3f direction{};
-    NormalizeVectorInto(&direction, BuildBoxCenter(mShape) - intersection.GetPoint(0));
+    NormalizeVectorInto(&direction, BuildBoxCenter(mShape) - hit);
     outResult->direction = direction;
-    outResult->distanceFromLineStart =
-      Wm3::SqrtfBinary(Wm3::Vector3f::LengthSq(intersection.GetPoint(0) - *lineStart));
-    outResult->position = intersection.GetPoint(0);
+    outResult->distanceFromLineStart = Wm3::SqrtfBinary(Wm3::Vector3f::LengthSq(hit - *lineStart));
+    outResult->position = hit;
     return true;
   }
 
@@ -422,12 +424,12 @@ namespace moho
    * Tests sphere-vs-box overlap and fills penetration direction/depth.
    *
    * Wild Magic's `DistVector3Box3f` on the stack: ctor 0x00A45730,
-   * `GetSquared` 0x00A45C00, `~Distance` 0x00A38C40.
+   * `GetSquared` 0x00A45C00, `~Distance` 0x00A38C40 (Wm3::SquaredDistanceVector3Box3).
    */
   bool CColPrimitive<Wm3::Box3f>::CollideSphere(const Wm3::Sphere3f* sphere, CollisionResult* outResult) const
   {
-    Wm3::DistVector3Box3f distance(sphere->Center, mShape);
-    const float squaredDistance = distance.GetSquared();
+    Wm3::Vector3f closestOnBox;
+    const float squaredDistance = Wm3::SquaredDistanceVector3Box3(sphere->Center, mShape, closestOnBox);
     // 0x004FF1A3: `comiss r*r, squared; jbe miss` -- an unordered compare misses.
     if (!(sphere->Radius * sphere->Radius > squaredDistance)) {
       return false;
@@ -450,11 +452,11 @@ namespace moho
    * Returns true when point lies inside oriented box extents.
    *
    * Calls Wild Magic's `InBox<float>` (0x00A3BC10, Wm3ContBox3.cpp) with the
-   * point and `mShape`.
+   * point and `mShape` (Wm3::PointInBox3).
    */
   bool CColPrimitive<Wm3::Box3f>::PointInShape(const Wm3::Vec3f* point) const
   {
-    return Wm3::InBox(*point, mShape);
+    return Wm3::PointInBox3(*point, mShape);
   }
 
   /**
@@ -566,26 +568,26 @@ namespace moho
    * Tests segment-vs-sphere and fills first hit point, separation direction, and distance from line start.
    *
    * Wild Magic's `IntrSegment3Sphere3f` on the stack (ctor 0x00A46A10,
-   * `Find` 0x00A471C0, `GetPoint(0)` 0x00A46940 once per output), the same
-   * shape as the box primitive's line test.
+   * `Find` 0x00A471C0, `GetPoint(0)` 0x00A46940 once per output), here
+   * Wm3::FindSegment3Sphere3; the same shape as the box primitive's line test.
    */
   bool CColPrimitive<Wm3::Sphere3f>::CollideLine(
     const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionSegmentResult* outResult
   ) const
   {
     const Wm3::Segment3f segment = Wm3::MakeSegment3fFromEndpoints(*lineStart, *lineEnd);
-    Wm3::IntrSegment3Sphere3f intersection(segment, mShape);
-    if (!intersection.Find()) {
+    Wm3::Vector3f points[2];
+    if (Wm3::FindSegment3Sphere3(segment, mShape, points) == 0) {
       return false;
     }
+    const Wm3::Vec3f& hit = points[0];
 
     // 0x004FEA75: `NormalizeVectorInto` (0x0044F7E0) -- zero only at length 0.
     Wm3::Vec3f direction{};
-    NormalizeVectorInto(&direction, mShape.Center - intersection.GetPoint(0));
+    NormalizeVectorInto(&direction, mShape.Center - hit);
     outResult->direction = direction;
-    outResult->distanceFromLineStart =
-      Wm3::SqrtfBinary(Wm3::Vector3f::LengthSq(intersection.GetPoint(0) - *lineStart));
-    outResult->position = intersection.GetPoint(0);
+    outResult->distanceFromLineStart = Wm3::SqrtfBinary(Wm3::Vector3f::LengthSq(hit - *lineStart));
+    outResult->position = hit;
     return true;
   }
 
@@ -600,12 +602,12 @@ namespace moho
    * contact point (0x00A414C0) gives the depth. `Find`'s time limit is this
    * translation unit's copy of `gpg::pInf` (0x010A9C04, set from `_FInf`
    * by 0x00BC74B0), not `FLT_MAX`, and both velocities are Wild Magic's
-   * `Vector3<float>::ZERO` (0x00F3D21C).
+   * `Vector3<float>::ZERO` (0x00F3D21C). Here Wm3::TestBox3Sphere3 and
+   * Wm3::FindBox3Sphere3.
    */
   bool CColPrimitive<Wm3::Sphere3f>::CollideBox(const Wm3::Box3f* box, CollisionResult* outResult) const
   {
-    Wm3::IntrBox3Sphere3f intersection(*box, mShape);
-    if (!intersection.Test()) {
+    if (!Wm3::TestBox3Sphere3(*box, mShape)) {
       return false;
     }
 
@@ -615,8 +617,10 @@ namespace moho
     NormalizeVectorInto(&direction, boxToSphere);
     outResult->direction = direction;
 
-    if (intersection.Find(gpg::pInf, Wm3::Vector3f::ZERO, Wm3::Vector3f::ZERO)) {
-      const Wm3::Vec3f sphereToContact = intersection.GetContactPoint() - mShape.Center;
+    float contactTime = 0.0f;
+    Wm3::Vector3f contactPoint;
+    if (Wm3::FindBox3Sphere3(*box, mShape, gpg::pInf, Wm3::Vector3f::ZERO, Wm3::Vector3f::ZERO, contactTime, contactPoint)) {
+      const Wm3::Vec3f sphereToContact = contactPoint - mShape.Center;
       outResult->penetrationDepth = mShape.Radius - Wm3::SqrtfBinary(Wm3::Vector3f::LengthSq(sphereToContact));
     }
     return true;

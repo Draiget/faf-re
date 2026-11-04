@@ -1,0 +1,19 @@
+Needs an installed FAF client (it creates C:\ProgramData\FAForever with bin\, gamedata\ and
+fa_path.lua) and Forged Alliance itself.
+
+What is in this package
+  main.exe                  the engine
+  main.pdb                  debug symbols; optional, but crash reports are much more useful with them
+  dxcompiler.dll, dxil.dll  shader compiler for Direct3D 12 and Vulkan
+  fafengine\lua\...         the engine's own Lua hook files; must sit in a folder named fafengine
+                            next to the exe (the engine mounts it at /fafengine)
+
+Install
+  1. Unzip this package into C:\ProgramData\FAForever\bin (next to ForgedAlliance.exe;
+     keep ForgedAlliance.exe, it is still what the FAF client launches).
+
+Run, from C:\ProgramData\FAForever\bin:
+  main.exe /init init_faf.lua /nobugreport /log C:\ProgramData\FAForever\logs\main.log
+
+Crash reports are written next to the exe as faf_crash_<date>.txt; please attach them
+together with the log file from /log.

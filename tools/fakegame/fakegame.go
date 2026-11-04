@@ -41,6 +41,10 @@ type Options struct {
 	// normally finishes connecting peers within them: JoinGame and
 	// ConnectToPeer only follow Idle. Zero reports Idle at once.
 	LoadTime time.Duration
+	// BindIP is the address the lobby port binds to (/bindip). Empty binds
+	// every interface, as the game does; tests on a host that drops inbound
+	// UDP to 0.0.0.0-bound sockets pass 127.0.0.1.
+	BindIP string
 }
 
 // ParseArgs reads the options out of a game-style command line.
@@ -65,6 +69,8 @@ func ParseArgs(args []string) Options {
 			o.ExitAfter, _ = time.ParseDuration(next())
 		case "/loadtime":
 			o.LoadTime, _ = time.ParseDuration(next())
+		case "/bindip":
+			o.BindIP = next()
 		}
 	}
 	return o
@@ -191,7 +197,11 @@ func (g *game) handle(ctx context.Context, m gpgnet.Message) {
 		uid, _ := m.Int(3)
 		// Every interface, as the game binds its lobby port: peers can be on
 		// other machines or behind a hub's relay on the internet.
-		udp, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: int(port)})
+		ip := net.IPv4zero
+		if g.opts.BindIP != "" {
+			ip = net.ParseIP(g.opts.BindIP)
+		}
+		udp, err := net.ListenUDP("udp4", &net.UDPAddr{IP: ip, Port: int(port)})
 		if err != nil {
 			g.log.Printf("CreateLobby: bind udp %d: %v", port, err)
 			return

@@ -15,6 +15,7 @@
 #include <typeinfo>
 #include <vector>
 
+#include "legacy/math/X87Math.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/Entity.h"
 #include "moho/collision/CColPrimitiveBase.h"
@@ -37,23 +38,6 @@ namespace
   using moho::GridTraversalLine;
   using moho::InitGridTraversalLine;
   using moho::IsGridTraversalBeyondEnd;
-
-  // The binary's inlined floor (0x0040D908, 0x004FCBFD): `frndint; fcompi;
-  // cmovb eax,-1; fistp; add`. For every non-NaN input that equals the
-  // truncated floor below; a NaN compares unordered (cmovb takes -1) and fistp
-  // stores the integer indefinite 0x80000000, so the sum is 0x7FFFFFFF.
-  [[nodiscard]] std::int32_t FloorToInt(const float value) noexcept
-  {
-    if (std::isnan(value)) {
-      return 0x7FFFFFFF;
-    }
-    return static_cast<std::int32_t>(std::floor(value));
-  }
-
-  [[nodiscard]] std::int32_t CeilToInt(const float value) noexcept
-  {
-    return static_cast<std::int32_t>(std::ceil(value));
-  }
 
   // One collision cell spans 4 world units, so world -> cell is a shift by 2.
   inline constexpr int kWorldToCollisionCellShift = 2;
@@ -114,8 +98,9 @@ void moho::InitGridTraversalLine(
     line.zMask = zMask;
 
     const std::int32_t alignMask = -step;
-    line.xEdge = FloorToInt(line.x0) & alignMask;
-    line.zEdge = FloorToInt(line.z0) & alignMask;
+    // 0x0040D908, 0x0040D93A: the binary's inlined floor.
+    line.xEdge = msvc8::FloorToIntX87(line.x0) & alignMask;
+    line.zEdge = msvc8::FloorToIntX87(line.z0) & alignMask;
   }
 }
 
@@ -1726,10 +1711,10 @@ namespace moho
    */
   CollisionDBRect* func_AABoxToRect(CollisionDBRect* const out, const Wm3::AxisAlignedBox3f& box)
   {
-    const int minCellX = FloorToInt(box.Min.x) >> kWorldToCollisionCellShift;
-    const int minCellZ = FloorToInt(box.Min.z) >> kWorldToCollisionCellShift;
-    const int maxCellX = (CeilToInt(box.Max.x) + 3) >> kWorldToCollisionCellShift;
-    const int maxCellZ = (CeilToInt(box.Max.z) + 3) >> kWorldToCollisionCellShift;
+    const int minCellX = msvc8::FloorToIntX87(box.Min.x) >> kWorldToCollisionCellShift;
+    const int minCellZ = msvc8::FloorToIntX87(box.Min.z) >> kWorldToCollisionCellShift;
+    const int maxCellX = (msvc8::CeilToIntX87(box.Max.x) + 3) >> kWorldToCollisionCellShift;
+    const int maxCellZ = (msvc8::CeilToIntX87(box.Max.z) + 3) >> kWorldToCollisionCellShift;
 
     out->mStartX = ClampCollisionCellStartToU16(minCellX);
     out->mStartZ = ClampCollisionCellStartToU16(minCellZ);

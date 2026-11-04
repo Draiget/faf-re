@@ -1,0 +1,38 @@
+# OpenTelemetry Collector (contrib distribution) for faf-re desync telemetry: OTLP/HTTP on 4318,
+# requests without "Authorization: Bearer $FAF_UPLOAD_TOKEN" refused, every record appended as OTLP
+# JSON to /data/otel/received.jsonl (rotated) and printed in short form. Add an exporter to the
+# logs pipeline to forward the records to a log store (Loki, an OTLP backend, ...).
+extensions:
+  bearertokenauth:
+    token: ${env:FAF_UPLOAD_TOKEN}
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: bearertokenauth
+
+processors:
+  batch: {}
+
+exporters:
+  debug:
+    verbosity: basic
+  file:
+    path: /data/otel/received.jsonl
+    rotation:
+      max_megabytes: 100
+      max_days: 90
+      max_backups: 20
+
+service:
+  extensions: [bearertokenauth, health_check]
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, file]

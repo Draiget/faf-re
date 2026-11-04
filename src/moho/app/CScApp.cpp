@@ -918,7 +918,7 @@ namespace
 {
   /**
    * Engine addition: which frame time advances the session clock in replays and single-player
-   * sessions (never in network sessions, which keep the binary's clock).
+   * sessions, and in network sessions when `wld_FrameClockNetwork` is set.
    * - 0: the median of the last frames, as the binary does. When one frame per beat is long (the
    *   one that applies the beat) and the rest are short, the median is a short frame, so the game
    *   runs slower than real time even though both threads keep up.
@@ -932,6 +932,19 @@ namespace
     "Replays and single player: 0 advances the game clock by the median frame time (original), 1 by "
     "the mean, 2 by each frame's own time.",
     &wld_FrameClock
+  );
+
+  /**
+   * Engine addition: lets `wld_FrameClock` apply in network sessions too, where the clock also sets
+   * when this client issues beats to the other clients. Off by default: with a retail client in the
+   * session the mean gave no reliable gain and more frames with no beat ready (docs/SWITCHES.md).
+   */
+  int wld_FrameClockNetwork = 0;
+
+  moho::TConVar<int> gTConVar_wld_FrameClockNetwork(
+    "wld_FrameClockNetwork",
+    "Network sessions: 1 applies wld_FrameClock, 0 keeps the original median frame time.",
+    &wld_FrameClockNetwork
   );
 } // namespace
 
@@ -1156,9 +1169,10 @@ void CScApp::Main()
   moho::DISK_UpdateWatcher();
 
   float smoothedFrameSeconds = fixedFrameSeconds > 0.0f ? fixedFrameSeconds : framerates.Median();
-  // Engine addition (wld_FrameClock): outside network sessions the clock may follow real time.
+  // Engine addition (wld_FrameClock): the clock may follow real time, in network sessions only with
+  // wld_FrameClockNetwork.
   if (fixedFrameSeconds <= 0.0f && wld_FrameClock != 0 &&
-      moho::SIM_GetSessionPacing() != moho::ESimSessionPacing::Network) {
+      (moho::SIM_GetSessionPacing() != moho::ESimSessionPacing::Network || wld_FrameClockNetwork != 0)) {
     smoothedFrameSeconds = wld_FrameClock == 2 ? frameSeconds : framerates.Mean();
   }
   if (!moho::WLD_Frame(smoothedFrameSeconds) && wxTheApp != nullptr) {

@@ -523,7 +523,7 @@ namespace moho
           phaseDuration = wasForward ? mScroller.mFloat10 : mScroller.mFloat0C;
         }
 
-        mSpeed[axis] = static_cast<std::int32_t>(std::floor(phaseDuration * 10.0f));
+        mSpeed[axis] = msvc8::FloorToIntX87(phaseDuration * 10.0f); // 0x00777791, 0x007777C0
       }
 
       if (!changed) {
@@ -550,7 +550,8 @@ namespace moho
     }
 
     case SCROLLTYPE_MotionDerived: {
-      if (entityData.mCurTransform.pos_ == entityData.mLastTransform.pos_) {
+      const bool positionChanged = entityData.mCurTransform.pos_ != entityData.mLastTransform.pos_;
+      if (!positionChanged && entityData.mCurTransform.orient_ == entityData.mLastTransform.orient_) {
         return;
       }
 
@@ -596,6 +597,15 @@ namespace moho
       const float scrollScale = mScroller.mFloat28;
       const float scrollDeltaX = ((avgBasisY * leadDeltaZ) + (avgBasisZ * leadDeltaY) + (avgBasisX * leadDeltaX)) * scrollScale;
       const float scrollDeltaY = ((avgBasisX * trailDeltaX) + (avgBasisY * trailDeltaZ) + (avgBasisZ * trailDeltaY)) * scrollScale;
+
+      // Orientation-only motion can move the two tread contact points even
+      // when the chassis center is fixed. Keep the old no-motion behavior if
+      // that projection is zero (including q/-q) or cannot be used.
+      if (!positionChanged &&
+          ((!std::isfinite(scrollDeltaX) || !std::isfinite(scrollDeltaY)) ||
+           (scrollDeltaX == 0.0f && scrollDeltaY == 0.0f))) {
+        return;
+      }
 
       const float currentX = entityData.mScrollBeatEnd.x;
       const float currentY = entityData.mScrollBeatEnd.y;

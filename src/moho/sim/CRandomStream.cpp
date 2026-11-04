@@ -220,11 +220,9 @@ namespace moho
   float CRandomStream::FRand(const float lower, const float upper) noexcept
   {
     // x87 under 24-bit precision: range rounded, range * word rounded once,
-    // the 2^-32 scale exact, the sum rounded.
-    constexpr float kInvTwoTo32f = 2.3283064365386962890625e-10f;
+    // the 2^-32 scale exact, the sum rounded, all with the extended exponent.
     const std::uint32_t word = twister.NextUInt32();
-    const float range = upper - lower;
-    return lower + msvc8::MulTwisterWord(range, word) * kInvTwoTo32f;
+    return msvc8::TwisterWordInRange(lower, upper, word);
   }
 
   /**

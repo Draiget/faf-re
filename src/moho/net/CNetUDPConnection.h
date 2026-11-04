@@ -152,6 +152,12 @@ namespace moho
     bool ProcessAckInternal(const SNetPacket* packet);
 
     /**
+     * Engine addition (issue #237): early resend of packets the peer's early
+     * mask shows 3 later packets past (net_FastRetransmit).
+     */
+    void FastRetransmitFromMask(uint16_t expected, uint32_t earlyMask);
+
+    /**
        * Address: 0x00486DB0 (FUN_00486DB0)
      */
     void ProcessData(SNetPacket* packet);
@@ -175,6 +181,7 @@ namespace moho
      * Address: 0x00488170
      */
     int64_t CalcResendDelay(const SNetPacket* packet) const;
+    int64_t CalcResendDelayForCount(int resendCount) const;
 
     /**
      * Address: 0x00488260 (Moho::CNetUDPConnection::GetSentTime)

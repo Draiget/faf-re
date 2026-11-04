@@ -24,6 +24,12 @@
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
     },
     {
+      "name": "clang-x86-retail-layout",
+      "displayName": "clang-cl x86 Release with the binary's exact container layout (checks the layout asserts)",
+      "inherits": "clang-x86-release",
+      "cacheVariables": { "FAF_RETAIL_LAYOUT": "ON" }
+    },
+    {
       "name": "clang-x64-profile",
       "displayName": "clang-cl x64 Profile with Tracy (main_x64.exe)",
       "inherits": "clang-x64-release",
@@ -63,23 +69,44 @@
     },
     {
       "name": "linux-clang-x64-release",
-      "displayName": "Linux clang x64 Release (headless simulation)",
+      "displayName": "Linux clang x64 Release (headless simulation, profile-guided)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+      "toolchainFile": "${sourceDir}/cmake/toolchains/linux-clang-x64.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "FAF_PGO_PROFILE": "${sourceDir}/cmake/pgo/headless-linux-x64.profdata" }
+    },
+    {
+      "name": "linux-clang-x64-release-plain",
+      "displayName": "Linux clang x64 Release (headless simulation, no profile)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
       "toolchainFile": "${sourceDir}/cmake/toolchains/linux-clang-x64.cmake",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "linux-clang-x64-release-pgogen",
+      "displayName": "Linux clang x64 Release (records a profile, tools/pgo/record.sh)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+      "toolchainFile": "${sourceDir}/cmake/toolchains/linux-clang-x64.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "FAF_PGO_GENERATE": "ON" }
     }
   ],
   "buildPresets": [
     { "name": "clang-x64-release", "configurePreset": "clang-x64-release" },
     { "name": "clang-x86-release", "configurePreset": "clang-x86-release" },
+    { "name": "clang-x86-retail-layout", "configurePreset": "clang-x86-retail-layout" },
     { "name": "clang-x64-profile", "configurePreset": "clang-x64-profile" },
     { "name": "clang-x86-profile", "configurePreset": "clang-x86-profile" },
     { "name": "clang-x64-debug", "configurePreset": "clang-x64-debug" },
     { "name": "clang-x86-debug", "configurePreset": "clang-x86-debug" },
     { "name": "clang-x64-release-server", "configurePreset": "clang-x64-release-server" },
     { "name": "clang-x86-release-server", "configurePreset": "clang-x86-release-server" },
-    { "name": "linux-clang-x64-release", "configurePreset": "linux-clang-x64-release" }
+    { "name": "linux-clang-x64-release", "configurePreset": "linux-clang-x64-release" },
+    { "name": "linux-clang-x64-release-plain", "configurePreset": "linux-clang-x64-release-plain" },
+    { "name": "linux-clang-x64-release-pgogen", "configurePreset": "linux-clang-x64-release-pgogen" }
   ]
 }

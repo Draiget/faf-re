@@ -242,7 +242,8 @@ namespace moho
         const SFootprint& transportFootprint = transportUnit->GetFootprint();
         const float transportExtent =
           static_cast<float>(std::max(transportFootprint.mSizeX, transportFootprint.mSizeZ));
-        if (distanceToAttachPoint <= (transportExtent * 2.0f)) {
+        // 0x005FFF56 `comiss` + `jbe`: a NaN distance counts as near enough.
+        if (!(distanceToAttachPoint > (transportExtent * 2.0f))) {
           static constexpr Wm3::Vector3f kZeroFacing{0.0f, 0.0f, 0.0f};
           mUnit->UnitMotion->SetFacing(kZeroFacing);
           mUnit->UnitMotion->mHeight = gpg::pInf;

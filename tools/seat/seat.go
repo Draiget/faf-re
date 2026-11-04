@@ -73,6 +73,12 @@ type Config struct {
 	PrivateCache bool `json:"privateCache,omitempty"`
 
 	ICE *ICE `json:"ice,omitempty"`
+	// Contract puts the game behind an adapter of the FAF client's contract
+	// (contract.go) instead.
+	Contract *Contract `json:"contract,omitempty"`
+	// Native runs the game with no adapter, linking every peer itself
+	// (native.go, issue #274).
+	Native *Native `json:"native,omitempty"`
 }
 
 // CheckNoFullscreen refuses a fullscreen request anywhere on a command line.
@@ -125,6 +131,7 @@ type Seat struct {
 	adapter  *procs.Process
 	adapterC chan struct{}
 	once     sync.Once
+	contract *contractLink
 }
 
 // New validates cfg and opens the seat's GPGNet endpoint and lobby port.
@@ -162,7 +169,7 @@ func New(cfg Config, job *procs.Job, sink func(journal.Record)) (*Seat, error) {
 		return nil, err
 	}
 	s.endpoint = ep
-	if cfg.ICE == nil {
+	if cfg.ICE == nil && cfg.Contract == nil {
 		if s.lobbyPort, err = freeUDPPort(); err != nil {
 			ep.Close()
 			return nil, err
@@ -226,6 +233,26 @@ func freeTCPPort() (int, error) {
 // (or printed instructions to start it by hand).
 func (s *Seat) Start(ctx context.Context) error {
 	gpgPort := s.endpoint.Port()
+	if s.cfg.Native != nil {
+		if s.cfg.Native.Bus == nil {
+			return fmt.Errorf("player %d: native mode needs the run's IceMsg bus (local seats only)", s.cfg.UID)
+		}
+		s.cfg.Native.Bus.add(s.cfg.UID, nativeTarget{s})
+		return s.startGame(gpgPort)
+	}
+	if s.cfg.Contract != nil {
+		if err := s.startContract(ctx); err != nil {
+			return err
+		}
+		if s.cfg.Contract.JarBind != "" {
+			port, err := s.startJarBridge(ctx, s.cfg.Contract.JarBind, s.adapterPort)
+			if err != nil {
+				return err
+			}
+			return s.startGame(port)
+		}
+		return s.startGame(s.adapterPort)
+	}
 	if s.cfg.ICE != nil {
 		if err := s.startAdapter(ctx); err != nil {
 			return err
@@ -341,7 +368,24 @@ func (c Config) GameArgs(gpgPort int) []string {
 	if c.PrivateCache {
 		args = append(args, "/cachedir", filepath.Join(c.RunDir, fmt.Sprintf("cache-%d", c.UID)))
 	}
+	if c.Native != nil {
+		args = append(args, c.Native.nativeArgs()...)
+	}
+	// faf-re sends desync telemetry to its public server by default; test games stay off it
+	// unless the scenario configures telemetry itself.
+	if !hasArg(c.Args, "/telemetry") {
+		args = append(args, "/notelemetry")
+	}
 	return append(args, c.Args...)
+}
+
+func hasArg(args []string, name string) bool {
+	for _, a := range args {
+		if strings.EqualFold(a, name) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Seat) startGame(gpgPort int) error {
@@ -400,7 +444,13 @@ func (s *Seat) watchExit(proc *procs.Process, what string) {
 func (s *Seat) onMessage(m gpgnet.Message) {
 	uid := s.cfg.UID
 	s.emit(journal.Record{Kind: journal.GpgIn, UID: uid, Command: m.Command, Args: m.Args})
-	if m.Command == "GameState" && m.Str(0) == "Idle" {
+	if s.cfg.Native != nil {
+		s.nativeIncoming(m)
+		if m.Command == "GameState" && m.Str(0) == "Idle" {
+			s.nativeIceServers()
+		}
+	}
+	if m.Command == "GameState" && m.Str(0) == "Idle" && s.cfg.Contract == nil {
 		mode := 0
 		if s.cfg.AutoLobby {
 			mode = 1
@@ -415,7 +465,10 @@ func (s *Seat) onMessage(m gpgnet.Message) {
 // game runs on, so a hub known by name resolves the way this machine sees it
 // (split-horizon DNS) and no address is fixed anywhere else.
 func (s *Seat) Send(m gpgnet.Message) error {
-	if (m.Command == "JoinGame" || m.Command == "ConnectToPeer") && len(m.Args) > 0 {
+	if s.cfg.Native != nil {
+		m = s.nativeOutgoing(m)
+	}
+	if s.cfg.Native == nil && (m.Command == "JoinGame" || m.Command == "ConnectToPeer") && len(m.Args) > 0 {
 		if addr, ok := m.Args[0].(string); ok {
 			resolved, err := resolveHostPort(addr)
 			if err != nil {
@@ -451,6 +504,15 @@ func (s *Seat) Kill() {
 // Close kills the seat's processes, closes its endpoint and moves its private
 // preferences file into the run directory.
 func (s *Seat) Close() {
+	s.mu.Lock()
+	link := s.contract
+	s.mu.Unlock()
+	if link != nil {
+		_, _ = link.rpc.Call("quit")
+		time.Sleep(200 * time.Millisecond)
+		_ = link.rpcConn.Close()
+		_ = link.gpg.Close()
+	}
 	s.Kill()
 	s.endpoint.Close()
 	if s.cfg.Prefs == PrefsShared {

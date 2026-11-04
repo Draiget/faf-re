@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <bit>
 #include <climits>
 #include <condition_variable>
 #include <cstdio>
@@ -19,6 +20,7 @@
 
 #include <zlib.h>
 
+#include "faf/EngineSwitchesGenerated.h"
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/core/diagnostics/CrashReport.h"
@@ -28,6 +30,7 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/Stats.h"
 #include "moho/sim/CArmyImpl.h"
+#include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/DesyncTelemetry.h"
 #include "moho/sim/FafGameVersion.h"
 #include "moho/sim/Sim.h"
@@ -35,13 +38,24 @@
 
 namespace moho
 {
-  bool sim_DesyncRecorder = false;
+  int sim_DesyncRecorder = 0;
 
-  TConVar<bool> gTConVar_sim_DesyncRecorder(
+  TConVar<int> gTConVar_sim_DesyncRecorder(
     "sim_DesyncRecorder",
     "Keep recent beats of sync-log text in memory and write a zip next to the game log when a "
-    "checksum mismatches (next game). Same checksums either way.",
+    "checksum mismatches (next game). 0: never; 1: always; -1: live multiplayer games only. "
+    "Costs sim time while on; same checksums either way.",
     &sim_DesyncRecorder
+  );
+
+  int sim_DesyncDump = -1;
+
+  TConVar<int> gTConVar_sim_DesyncDump(
+    "sim_DesyncDump",
+    "Without sim_DesyncRecorder, keep the state each beat hashes for the recent beats in memory "
+    "(copied, nothing formatted) and write a zip next to the game log on a desync (next game). "
+    "-1: live multiplayer games only; 0: never; 1: always.",
+    &sim_DesyncDump
   );
 
   int sim_DesyncRecorderMB = 32;
@@ -139,6 +153,26 @@ namespace moho
     std::set<int> sOrdersAltered; // command sources whose orders reached us altered
     std::string sSwitchDefaults;  // ConsoleSwitches() before /con ran
 
+    [[nodiscard]] bool LiveMultiplayer()
+    {
+      std::lock_guard<std::mutex> lock(sSharedMutex);
+      return sIsMultiplayer && !sIsReplay;
+    }
+
+    /// Whether `sim_DesyncRecorder` records this game's beats: -1 records live multiplayer games
+    /// only, so replays and single-player games pay nothing for it.
+    [[nodiscard]] bool RecorderApplies()
+    {
+      return sim_DesyncRecorder >= 0 ? sim_DesyncRecorder > 0 : LiveMultiplayer();
+    }
+
+    /// Whether the hashed state of recent beats is kept for a dump (`sim_DesyncDump`): -1 in live
+    /// multiplayer games only.
+    [[nodiscard]] bool StateRingApplies()
+    {
+      return sim_DesyncDump >= 0 ? sim_DesyncDump > 0 : LiveMultiplayer();
+    }
+
     [[nodiscard]] bool DeflateRaw(const void* const data, const std::size_t size, const int level, std::vector<unsigned char>& out)
     {
       out.clear();
@@ -166,6 +200,120 @@ namespace moho
     {
       return static_cast<std::uint32_t>(crc32(0uL, static_cast<const Bytef*>(data), static_cast<uInt>(size)));
     }
+
+    /// A ring beat's raw deflate stream back to its text.
+    [[nodiscard]] bool InflateRaw(const std::vector<unsigned char>& deflated, const std::uint32_t rawSize, std::string& out)
+    {
+      out.assign(rawSize, '\0');
+      if (rawSize == 0u) {
+        return true;
+      }
+      z_stream stream;
+      std::memset(&stream, 0, sizeof(stream));
+      if (inflateInit2_(&stream, -MAX_WBITS, ZLIB_VERSION, sizeof(z_stream)) != Z_OK) {
+        return false;
+      }
+      stream.next_in = const_cast<Bytef*>(deflated.data());
+      stream.avail_in = static_cast<uInt>(deflated.size());
+      stream.next_out = reinterpret_cast<Bytef*>(out.data());
+      stream.avail_out = static_cast<uInt>(rawSize);
+      const int status = inflate(&stream, Z_FINISH);
+      const bool whole = status == Z_STREAM_END && stream.total_out == rawSize;
+      (void)inflateEnd(&stream);
+      return whole;
+    }
+
+    /// A .tar.gz written front to back: ustar entries through one gzip stream (the dump upload).
+    class CTarGzOut
+    {
+    public:
+      explicit CTarGzOut(std::FILE* const file)
+        : mFile(file)
+        , mTime(static_cast<std::uint64_t>(std::time(nullptr)))
+      {
+        std::memset(&mStream, 0, sizeof(mStream));
+        mOk = deflateInit2_(
+                &mStream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, 8, Z_DEFAULT_STRATEGY, ZLIB_VERSION, sizeof(z_stream)
+              )
+          == Z_OK;
+        mInit = mOk;
+      }
+
+      ~CTarGzOut()
+      {
+        if (mInit) {
+          (void)deflateEnd(&mStream);
+        }
+      }
+
+      CTarGzOut(const CTarGzOut&) = delete;
+      CTarGzOut& operator=(const CTarGzOut&) = delete;
+
+      void Add(const std::string& name, const std::string& data)
+      {
+        char header[512] = {};
+        std::memcpy(header, name.data(), std::min<std::size_t>(name.size(), 99u));
+        std::memcpy(header + 100, "0000644", 7u);
+        std::memcpy(header + 108, "0000000", 7u);
+        std::memcpy(header + 116, "0000000", 7u);
+        std::snprintf(header + 124, 12u, "%011llo", static_cast<unsigned long long>(data.size()));
+        std::snprintf(header + 136, 12u, "%011llo", static_cast<unsigned long long>(mTime));
+        std::memset(header + 148, ' ', 8u); // the checksum counts its own field as spaces
+        header[156] = '0';
+        std::memcpy(header + 257, "ustar", 6u);
+        std::memcpy(header + 263, "00", 2u);
+        unsigned checksum = 0;
+        for (const char c : header) {
+          checksum += static_cast<unsigned char>(c);
+        }
+        std::snprintf(header + 148, 8u, "%06o", checksum);
+        header[155] = ' ';
+        Write(header, sizeof(header));
+        Write(data.data(), data.size());
+        static const char kZeros[512] = {};
+        Write(kZeros, (512u - data.size() % 512u) % 512u);
+      }
+
+      /// Two empty blocks end the archive; false when compression or a write failed.
+      [[nodiscard]] bool Finish()
+      {
+        static const char kZeros[1024] = {};
+        Write(kZeros, sizeof(kZeros));
+        Write(nullptr, 0u, Z_FINISH);
+        return mOk;
+      }
+
+    private:
+      void Write(const void* const data, const std::size_t size, const int flush = Z_NO_FLUSH)
+      {
+        if (!mOk) {
+          return;
+        }
+        mStream.next_in = static_cast<Bytef*>(const_cast<void*>(data));
+        mStream.avail_in = static_cast<uInt>(size);
+        unsigned char chunk[64 * 1024];
+        do {
+          mStream.next_out = chunk;
+          mStream.avail_out = sizeof(chunk);
+          const int status = deflate(&mStream, flush);
+          if (status == Z_STREAM_ERROR) {
+            mOk = false;
+            return;
+          }
+          const std::size_t produced = sizeof(chunk) - mStream.avail_out;
+          if (produced != 0u && std::fwrite(chunk, 1u, produced, mFile) != produced) {
+            mOk = false;
+            return;
+          }
+        } while (mStream.avail_out == 0u || (flush == Z_FINISH && mStream.avail_in != 0u));
+      }
+
+      std::FILE* mFile;
+      std::uint64_t mTime;
+      z_stream mStream;
+      bool mInit = false;
+      bool mOk = false;
+    };
 
     /// A zip archive written front to back; the last entry can be rewritten in place later.
     class CZipOut
@@ -402,8 +550,31 @@ namespace moho
       return std::filesystem::current_path(error);
     }
 
-    /// `name=value` for every console variable whose name starts with `sim_` or `lua_`.
-    [[nodiscard]] std::string ConsoleSwitches()
+    /// Whether a dump and a telemetry record report this console variable: every `sim_` and `lua_`
+    /// one, and every engine switch docs/SWITCHES.md lists, whatever its area (render, UI, net,
+    /// memory...). The build reads the names from that file (FAF_ENGINE_SWITCHES); `telemetry_*`
+    /// is never among them, as it holds the endpoints and the token.
+    [[nodiscard]] bool ReportedSwitch(const std::string& name)
+    {
+      static const std::set<std::string> sEngineSwitches = [] {
+        std::set<std::string> names;
+        const std::string all = FAF_ENGINE_SWITCHES;
+        for (std::size_t begin = 0; begin < all.size();) {
+          const std::size_t end = all.find('\n', begin);
+          names.insert(all.substr(begin, end - begin));
+          begin = end + 1u;
+        }
+        return names;
+      }();
+      if (name.compare(0, 10, "telemetry_") == 0) {
+        return false;
+      }
+      return name.compare(0, 4, "sim_") == 0 || name.compare(0, 4, "lua_") == 0 || sEngineSwitches.count(name) != 0;
+    }
+
+    /// `name=value` for every `ReportedSwitch`; text values only with `withText` (a text switch may
+    /// hold a path, and telemetry records carry none).
+    [[nodiscard]] std::string ConsoleSwitches(const bool withText = true)
     {
       msvc8::string names;
       CON_GetCommandList(names, false);
@@ -417,7 +588,7 @@ namespace moho
         }
         const std::string name = all.substr(begin, end - begin);
         begin = end + 1u;
-        if (name.compare(0, 4, "sim_") != 0 && name.compare(0, 4, "lua_") != 0) {
+        if (!ReportedSwitch(name)) {
           continue;
         }
         CConCommand* const command = CON_FindCommand(name.c_str());
@@ -433,6 +604,9 @@ namespace moho
         } else if (const auto* const asFloat = dynamic_cast<TConVar<float>*>(command)) {
           value = Printf("%.6g", static_cast<double>(*asFloat->mValue));
         } else if (const auto* const asString = dynamic_cast<TConVar<msvc8::string>*>(command)) {
+          if (!withText) {
+            continue;
+          }
           value = asString->mValue->c_str();
         } else {
           continue; // a sim-side variable (DoSimCommand alias) or a command
@@ -446,6 +620,129 @@ namespace moho
     {
       return CSimWorkerPool::ParallelEnabled() ? CSimWorkerPool::Get().WorkerCount() : 0u;
     }
+
+    /// One beat of `StateTap` bytes in the memory ring (`sim_DesyncDump`).
+    struct SStateBeat
+    {
+      int mBeat = 0;
+      SFpuControlState mFpu{};
+      unsigned int mWorkers = 0;
+      std::string mBytes;
+    };
+
+    [[nodiscard]] std::string FloatPair(const SEconPair& pair)
+    {
+      return Printf(
+        "%.1f,%.1f [0x%08x 0x%08x]", pair.ENERGY, pair.MASS, std::bit_cast<std::uint32_t>(pair.ENERGY),
+        std::bit_cast<std::uint32_t>(pair.MASS)
+      );
+    }
+
+    /// Recorder thread: one beat's `StateTap` records as sync-log-style text (the lines
+    /// tools/desync-diff compares), each float with its bits. `armies` maps an army index to its
+    /// `"player" [army]` line.
+    [[nodiscard]] std::string DescribeState(const SStateBeat& beat, const std::map<int, std::string>& armies)
+    {
+      const std::string& bytes = beat.mBytes;
+      std::size_t at = 0;
+      const auto take = [&bytes, &at](void* const out, const std::size_t size) {
+        if (bytes.size() - at < size) {
+          return false;
+        }
+        std::memcpy(out, bytes.data() + at, size);
+        at += size;
+        return true;
+      };
+      std::string text = Printf("********** beat %d **********\n", beat.mBeat);
+      text += "(the state this beat hashed, kept by sim_DesyncDump; no call trace)\n";
+      bool inArmies = false;
+      bool inEntities = false;
+      while (at < bytes.size()) {
+        const char tag = bytes[at++];
+        if (tag == 'A') {
+          std::int32_t index = 0;
+          SEconTotals economy{};
+          if (!take(&index, sizeof(index)) || !take(&economy, sizeof(economy))) {
+            break;
+          }
+          if (!inArmies) {
+            text += "Armies\n";
+            inArmies = true;
+          }
+          const auto name = armies.find(index);
+          text += name != armies.end() ? name->second : Printf("  \"army %d\" []\n", index);
+          text += "    mStored=" + FloatPair(economy.mStored) + "\n";
+          text += "    mIncome=" + FloatPair(economy.mIncome) + "\n";
+          text += "    mReclaimed=" + FloatPair(economy.mReclaimed) + "\n";
+          text += "    mLastUseRequested=" + FloatPair(economy.mLastUseRequested) + "\n";
+          text += "    mLastUseActual=" + FloatPair(economy.mLastUseActual) + "\n";
+          text += Printf(
+            "    mMaxStorage=%llu,%llu\n", static_cast<unsigned long long>(economy.mMaxStorage.ENERGY),
+            static_cast<unsigned long long>(economy.mMaxStorage.MASS)
+          );
+        } else if (tag == 'E') {
+          std::uint32_t id = 0;
+          float health = 0.0f;
+          std::uint16_t bpLength = 0;
+          if (!take(&id, sizeof(id)) || !take(&health, sizeof(health)) || !take(&bpLength, sizeof(bpLength))) {
+            break;
+          }
+          std::string blueprint = "<NULL>";
+          if (bpLength != 0xFFFFu) {
+            blueprint.assign(bpLength, '\0');
+            if (!take(blueprint.data(), bpLength)) {
+              break;
+            }
+          }
+          float transform[7] = {};
+          float velocity[3] = {};
+          if (!take(transform, sizeof(transform)) || !take(velocity, sizeof(velocity))) {
+            break;
+          }
+          if (!inEntities) {
+            text += "Dirty Entities\n";
+            inEntities = true;
+          }
+          const float* const rot = transform; // VTransform: orient_ (w,x,y,z), then pos_
+          const float* const pos = transform + 4;
+          const auto bits = [](const float value) { return std::bit_cast<std::uint32_t>(value); };
+          text += Printf("  0x%08x\n", id);
+          text += Printf("    health: %.1f 0x%08x\n", health, bits(health));
+          text += "    bp:" + blueprint + "\n";
+          text += Printf(
+            "    pos: <%7.2f,%7.2f,%7.2f> [0x%08x 0x%08x 0x%08x]\n", pos[0], pos[1], pos[2], bits(pos[0]), bits(pos[1]),
+            bits(pos[2])
+          );
+          text += Printf(
+            "    rot: <%7.4f,%7.4f,%7.4f,%7.4f> [0x%08x 0x%08x 0x%08x 0x%08x]\n", rot[0], rot[1], rot[2], rot[3],
+            bits(rot[0]), bits(rot[1]), bits(rot[2]), bits(rot[3])
+          );
+          text += Printf(
+            "   vel: <%7.2f,%7.2f,%7.2f> [0x%08x 0x%08x 0x%08x]\n", velocity[0], velocity[1], velocity[2], bits(velocity[0]),
+            bits(velocity[1]), bits(velocity[2])
+          );
+        } else if (tag == 'G') {
+          std::string twister(0x9C0u, '\0');
+          std::uint8_t hasPair = 0;
+          std::uint32_t pair = 0;
+          if (!take(twister.data(), twister.size()) || !take(&hasPair, 1u) || !take(&pair, sizeof(pair))) {
+            break;
+          }
+          gpg::MD5Context hash{};
+          hash.Reset();
+          hash.Update(twister.data(), twister.size());
+          text += "Random\n";
+          text += Printf("    mt19937=%s\n", hash.Digest().ToString().c_str());
+          text += hasPair != 0u ? Printf("    marsaglia=0x%08x\n", pair) : std::string("    marsaglia=none\n");
+        } else {
+          break;
+        }
+      }
+      if (at < bytes.size()) {
+        text += Printf("(state record cut at byte %u of %u)\n", static_cast<unsigned>(at), static_cast<unsigned>(bytes.size()));
+      }
+      return text;
+    }
   } // namespace
 
   struct CDesyncRecorder::Impl
@@ -456,7 +753,11 @@ namespace moho
     unsigned int mBeatWorkers = 0;
     std::atomic<unsigned int> mBeatCommands{0}; // the decoder's thread may differ from the sim's
     bool mRecording = true;
-    bool mKeepText = true; // false: checksums only, for telemetry
+    bool mKeepText = true;   // false: checksums only, for telemetry (and mStateRing)
+    bool mStateRing = false; // sim_DesyncDump without the text: hashed state into mStates
+    std::string mState;      // this beat's StateTap bytes
+    std::deque<SStateBeat> mStates;
+    std::size_t mStateBytes = 0;
     std::map<int, SChecksumBeat> mChecks;
     std::size_t mCommandSourceCount = 0;
     std::map<int, int> mLastReportBeat; // per source
@@ -470,6 +771,7 @@ namespace moho
     int mForcedDumpBeat = -1; // sim_DesyncDumpBeat when the game started
     int mLocalArmy = -1;
     std::string mDumpPath;
+    std::string mDumpGameId; // the folder a dump receiver files it under
     std::size_t mPendingBytes = 0; // also read by the recorder thread under mQueueMutex
 
     // Recorder thread.
@@ -543,6 +845,22 @@ namespace moho
       }
     }
 
+    /// Recorder thread: the kept hashed state becomes the dump's beat logs (`sim_DesyncDump`).
+    void StoreStates(const std::deque<SStateBeat>& states, const std::map<int, std::string>& armies)
+    {
+      for (const SStateBeat& beat : states) {
+        SBeatRecord record;
+        record.mBeat = beat.mBeat;
+        record.mFpu = beat.mFpu;
+        record.mWorkers = beat.mWorkers;
+        StoreBeat(std::move(record), DescribeState(beat, armies), INT_MIN, SIZE_MAX);
+      }
+      mNotes.push_back(
+        "beat logs hold the state each beat hashed (sim_DesyncDump), not the sync log: no call trace; "
+        "/desyncrecorder records the full sync log"
+      );
+    }
+
     [[nodiscard]] std::string NotesText() const
     {
       std::string text;
@@ -554,9 +872,10 @@ namespace moho
     }
 
     /// Recorder thread: writes the zip. `notes.txt` goes last so a later note can rewrite it alone.
+    /// `upload`: the same files also go into `<dump>.tar.gz`, queued for telemetry_DumpEndpoint.
     void WriteDump(
-      const std::string& path, const std::string& header, const std::string& hashes, const std::string& state,
-      const std::string& recentLog
+      const std::string& path, std::string header, const std::string& hashes, const std::string& state,
+      std::string recentLog, const bool upload
     )
     {
       std::FILE* const file = std::fopen(path.c_str(), "wb");
@@ -564,6 +883,11 @@ namespace moho
         gpg::Warnf("Desync recorder: can't create %s", path.c_str());
         return;
       }
+      std::string environment = CaptureFileText(&gpg::diag::WriteEnvironmentReport);
+      const std::string modules = CaptureFileText(&gpg::diag::WriteModuleList);
+      TELEMETRY_Scrub(header); // the replay path
+      TELEMETRY_Scrub(recentLog);
+      TELEMETRY_Scrub(environment); // the command line, with /telemetrytoken
       mZip = std::make_unique<CZipOut>(file);
       mZip->AddText("header.json", header);
       mZip->AddText("hashes.csv", hashes);
@@ -585,8 +909,8 @@ namespace moho
       mZip->AddText("beats.csv", beats);
       mZip->AddText("state.txt", state);
       mZip->AddText("log.txt", recentLog);
-      mZip->AddText("environment.txt", CaptureFileText(&gpg::diag::WriteEnvironmentReport));
-      mZip->AddText("modules.txt", CaptureFileText(&gpg::diag::WriteModuleList));
+      mZip->AddText("environment.txt", environment);
+      mZip->AddText("modules.txt", modules);
       if (mDroppedBeats != 0u) {
         mNotes.push_back(Printf("%u beats were not recorded (compression failed or the recorder fell behind)", mDroppedBeats));
       }
@@ -595,9 +919,62 @@ namespace moho
       (void)std::fclose(file);
       mZip->SetFile(nullptr);
       mDumpWritten = true;
+      gpg::Logf("Desync recorder: wrote %s (%u bytes)", path.c_str(), size);
+      if (upload) {
+        WriteUpload(path, header, hashes, beats, state, recentLog, environment, modules);
+      }
       mRing.clear();
       mRingBytes = 0;
-      gpg::Logf("Desync recorder: wrote %s (%u bytes)", path.c_str(), size);
+    }
+
+    /// Recorder thread: the zip's files again as `<dump>.tar.gz` (beats inflated back to text),
+    /// handed to the telemetry sender. Notes added after this stay in the zip only.
+    void WriteUpload(
+      const std::string& zipPath, const std::string& header, const std::string& hashes, const std::string& beats,
+      const std::string& state, const std::string& recentLog, const std::string& environment, const std::string& modules
+    )
+    {
+      const std::string path = std::filesystem::path(zipPath).replace_extension(".tar.gz").string();
+      std::FILE* const file = std::fopen(path.c_str(), "wb");
+      if (file == nullptr) {
+        gpg::Warnf("Desync recorder: can't create %s", path.c_str());
+        return;
+      }
+      bool written = false;
+      {
+        CTarGzOut tar(file);
+        tar.Add("header.json", header);
+        tar.Add("hashes.csv", hashes);
+        std::string text;
+        const auto addBeat = [&tar, &text](const SBeatRecord& record) {
+          if (InflateRaw(record.mDeflated, record.mRawSize, text)) {
+            tar.Add(Printf("beats/beat%05d.log", record.mBeat), text);
+          }
+        };
+        if (mHaveBeatZero) {
+          addBeat(mBeatZero);
+        }
+        for (const SBeatRecord& record : mRing) {
+          addBeat(record);
+        }
+        tar.Add("beats.csv", beats);
+        tar.Add("state.txt", state);
+        tar.Add("log.txt", recentLog);
+        tar.Add("environment.txt", environment);
+        tar.Add("modules.txt", modules);
+        tar.Add("notes.txt", NotesText());
+        written = tar.Finish();
+      }
+      const bool closed = std::fclose(file) == 0;
+      std::error_code error;
+      if (!written || !closed) {
+        std::filesystem::remove(path, error);
+        gpg::Warnf("Desync recorder: can't write %s", path.c_str());
+        return;
+      }
+      gpg::Logf("Desync recorder: wrote %s (%u bytes) for upload", path.c_str(),
+                static_cast<unsigned>(std::filesystem::file_size(path, error)));
+      TELEMETRY_SendFile(path);
     }
 
     /// Recorder thread: one more note; once the zip exists, its notes entry is rewritten.
@@ -627,7 +1004,8 @@ namespace moho
   {
     // With only telemetry on, the recorder keeps checksums, not text: the sync-log call sites
     // stay off (IsRecording) and no dump is written.
-    mImpl->mKeepText = sim_DesyncRecorder;
+    mImpl->mKeepText = RecorderApplies();
+    mImpl->mStateRing = !mImpl->mKeepText && StateRingApplies();
     mImpl->mRecording = mImpl->mKeepText;
     if (mImpl->mKeepText) {
       mImpl->mText.reserve(1024u * 1024u);
@@ -657,7 +1035,14 @@ namespace moho
     if (!sSeeded) {
       sSeeded = true;
       if (CFG_GetArgOption("/desyncrecorder", 0u, nullptr)) {
-        sim_DesyncRecorder = true;
+        sim_DesyncRecorder = 1;
+      } else if (CFG_GetArgOption("/nodesyncrecorder", 0u, nullptr)) {
+        sim_DesyncRecorder = 0;
+      }
+      if (CFG_GetArgOption("/desyncdump", 0u, nullptr)) {
+        sim_DesyncDump = 1;
+      } else if (CFG_GetArgOption("/nodesyncdump", 0u, nullptr)) {
+        sim_DesyncDump = 0;
       }
       msvc8::vector<msvc8::string> args;
       if (CFG_GetArgOption("/desynctestbeat", 1u, &args) && !args.empty()) {
@@ -674,18 +1059,30 @@ namespace moho
       sDumpPath.clear();
       sOrdersAltered.clear();
     }
-    if (!(sim_DesyncRecorder || TELEMETRY_IsOn()) || sInstance != nullptr) {
+    const bool recording = RecorderApplies();
+    const bool stateRing = !recording && StateRingApplies();
+    if (!(recording || stateRing || TELEMETRY_IsOn()) || sInstance != nullptr) {
       return;
     }
     sInstance = new CDesyncRecorder(sim);
-    sInstance->mImpl->mForcedDumpBeat = sim_DesyncRecorder ? sim_DesyncDumpBeat : -1;
+    sInstance->mImpl->mForcedDumpBeat = recording || stateRing ? sim_DesyncDumpBeat : -1;
     sSim = &sim;
-    if (!sim_DesyncRecorder) {
+    const char* const why = sim_DesyncRecorder < 0 ? "live multiplayer game" : "sim_DesyncRecorder 1";
+    const std::string folder = DumpFolder().string();
+    if (stateRing) {
+      gpg::Logf(
+        "Desync recorder: hashed state of recent beats in memory (sim_DesyncDump, %s), cap %d MB; a desync writes its "
+        "dump to %s",
+        sim_DesyncDump < 0 ? "live multiplayer game" : "1", sim_DesyncRecorderMB, folder.c_str()
+      );
+    } else if (!recording) {
       gpg::Logf("Desync recorder: checksums only, for telemetry");
     } else if (sim_DesyncDumpBeat >= 0) {
-      gpg::Logf("Desync recorder: on, cap %d MB, dump at beat %d", sim_DesyncRecorderMB, sim_DesyncDumpBeat);
+      gpg::Logf("Desync recorder: on (%s), cap %d MB, dump at beat %d to %s", why, sim_DesyncRecorderMB, sim_DesyncDumpBeat,
+                folder.c_str());
     } else {
-      gpg::Logf("Desync recorder: on, cap %d MB", sim_DesyncRecorderMB);
+      gpg::Logf("Desync recorder: on (%s), cap %d MB; a desync writes its dump to %s", why, sim_DesyncRecorderMB,
+                folder.c_str());
     }
   }
 
@@ -731,7 +1128,7 @@ namespace moho
 
   void CDesyncRecorder::NoteSwitchDefaults()
   {
-    std::string defaults = ConsoleSwitches();
+    std::string defaults = ConsoleSwitches(false);
     std::lock_guard<std::mutex> lock(sSharedMutex);
     sSwitchDefaults = std::move(defaults);
   }
@@ -749,6 +1146,11 @@ namespace moho
       Impl* const impl = sInstance->mImpl.get();
       impl->Post([impl, line, path = sDumpPath] { impl->AddNote(line, path); });
     }
+  }
+
+  std::string* CDesyncRecorder::StateTap() noexcept
+  {
+    return mImpl->mStateRing && !mImpl->mDumpTaken ? &mImpl->mState : nullptr;
   }
 
   bool CDesyncRecorder::IsRecording() const noexcept
@@ -834,6 +1236,22 @@ namespace moho
         impl.Post([&impl] { ++impl.mDroppedBeats; });
       }
     }
+    if (impl.mStateRing && !impl.mDumpTaken) {
+      // Memory only: the beat's bytes join the ring; a trimmed beat's buffer is reused for the next.
+      impl.mStateBytes += impl.mState.size();
+      impl.mStates.push_back(SStateBeat{beat, impl.mBeatFpu, impl.mBeatWorkers, std::move(impl.mState)});
+      const int trimBefore = impl.mDesyncSeen || impl.mForcedDumpBeat >= 0 ? INT_MIN : impl.mLastAgreedBeat;
+      const std::size_t capBytes = static_cast<std::size_t>(std::max(1, sim_DesyncRecorderMB)) * 1024u * 1024u;
+      std::string reuse;
+      while (!impl.mStates.empty()
+             && (impl.mStates.size() > kMaxBeats || impl.mStateBytes > capBytes || impl.mStates.front().mBeat < trimBefore)) {
+        impl.mStateBytes -= impl.mStates.front().mBytes.size();
+        reuse = std::move(impl.mStates.front().mBytes);
+        impl.mStates.pop_front();
+      }
+      reuse.clear();
+      impl.mState = std::move(reuse);
+    }
     if (!impl.mDumpTaken) {
       impl.mBeatFpu = SFpuControlState::Capture();
       impl.mBeatWorkers = SimWorkerCount();
@@ -912,7 +1330,7 @@ namespace moho
       ? impl.mForcedDumpBeat - 1
       : std::max(beat + kDumpBeatsAfterMismatch, static_cast<int>(sim.mCurBeat) + kBeatsAfterDesync);
     impl.mDesyncs.push_back(std::move(desync));
-    if (!impl.mKeepText) {
+    if (!impl.mKeepText && !impl.mStateRing) {
       impl.mLocalArmy = sim.mSyncFilter.focusArmy;
       gpg::Warnf(
         "Desync recorder: beat %d mismatched with %s; telemetry record at beat %d", beat, sourceName.c_str(),
@@ -922,8 +1340,8 @@ namespace moho
     }
     ChooseDumpPath(sim, Printf("beat%d", beat));
     gpg::Warnf(
-      "Desync recorder: beat %d mismatched with %s; recording to beat %d, then writing %s", beat, sourceName.c_str(),
-      impl.mDumpAtBeat, impl.mDumpPath.c_str()
+      "Desync recorder: beat %d mismatched with %s; %s to beat %d, then writing %s", beat, sourceName.c_str(),
+      impl.mKeepText ? "recording" : "keeping the hashed state", impl.mDumpAtBeat, impl.mDumpPath.c_str()
     );
   }
 
@@ -937,6 +1355,7 @@ namespace moho
     }
     const std::string fileName = Printf("desync_%s_%s_army%d.zip", gameId.c_str(), tag.c_str(), impl.mLocalArmy);
     impl.mDumpPath = (DumpFolder() / fileName).string();
+    impl.mDumpGameId = gameId;
     std::lock_guard<std::mutex> lock(sSharedMutex);
     sDumpPath = impl.mDumpPath;
   }
@@ -946,7 +1365,7 @@ namespace moho
     Impl& impl = *mImpl;
     impl.mDumpTaken = true;
     impl.mRecording = false;
-    if (!impl.mKeepText) {
+    if (!impl.mKeepText && !impl.mStateRing) {
       SendDesyncTelemetry(sim);
       return;
     }
@@ -1056,8 +1475,23 @@ namespace moho
     SIM_DescribeStateForDesync(sim, state);
     const std::string recentLog = gpg::GetRecentLogLines().c_str();
 
+    if (impl.mStateRing) {
+      // The kept bytes become beat logs on the recorder's thread, ahead of the dump in its queue.
+      std::map<int, std::string> armies;
+      for (const CArmyImpl* const army : sim.mArmiesList) {
+        if (army != nullptr) {
+          armies[army->mConstDat.mArmyIndex] = Printf(
+            "  \"%s\" [%s]\n", army->mConstDat.mPlayerName.raw_data_unsafe(), army->mConstDat.mArmyName.raw_data_unsafe()
+          );
+        }
+      }
+      impl.Post([&impl, states = std::move(impl.mStates), armies = std::move(armies)] { impl.StoreStates(states, armies); });
+      impl.mStates.clear();
+      impl.mStateBytes = 0;
+    }
+    const bool upload = TelemetryApplies() && TELEMETRY_DumpUploadOn();
     impl.Post([&impl, path = impl.mDumpPath, header = std::move(header), hashes = std::move(hashes),
-               state = std::move(state), recentLog] { impl.WriteDump(path, header, hashes, state, recentLog); });
+               state = std::move(state), recentLog, upload] { impl.WriteDump(path, header, hashes, state, recentLog, upload); });
     SendDesyncTelemetry(sim);
   }
 
@@ -1071,10 +1505,12 @@ namespace moho
   {
     const Impl& impl = *mImpl;
     std::string mapName;
+    std::string gameMods;
     std::string defaults;
     {
       std::lock_guard<std::mutex> lock(sSharedMutex);
       mapName = sMapName;
+      gameMods = sGameMods;
       defaults = sSwitchDefaults;
     }
     out.Add("faf.game.id", FafGameIdFromCommandLine());
@@ -1085,14 +1521,22 @@ namespace moho
     std::string mapFolder = slash == std::string::npos ? mapName : mapName.substr(slash + 6u);
     mapFolder = mapFolder.substr(0, mapFolder.find('/'));
     out.Add("faf.map", mapFolder);
+    // As the dump header's game_mods_md5: the launch info's serialized mods table, hashed.
+    gpg::MD5Context modsHash{};
+    modsHash.Reset();
+    modsHash.Update(gameMods.data(), gameMods.size());
+    out.Add("faf.game.mods_md5", std::string(modsHash.Digest().ToString().c_str()));
+    out.Add("faf.checksum_period", static_cast<std::int64_t>(SIM_GetChecksumPeriod(sim)));
     out.Add("faf.players", static_cast<std::int64_t>(sim.mCommandSources.size()));
     out.Add("faf.army.local", static_cast<std::int64_t>(sim.mSyncFilter.focusArmy));
     out.Add("faf.sim.workers", static_cast<std::int64_t>(impl.mBeatWorkers));
     out.AddBool("faf.sse2", CFG_GetArgOption("/sse2", 0u, nullptr));
 
-    // Switch values: sim_* and lua_Parallel* hashed, and every sim_/lua_ switch that differs from
-    // its value before /con ran ("unknown" when that wasn't noted).
-    const std::string now = ConsoleSwitches();
+    // Switch values: every reported number or on/off switch with its value, sim_* and lua_Parallel*
+    // hashed, and every one that differs from its value before /con ran ("unknown" when that
+    // wasn't noted).
+    const std::string now = ConsoleSwitches(false);
+    std::string values;
     std::string hashed;
     std::string changed;
     std::map<std::string, std::string> before;
@@ -1113,6 +1557,7 @@ namespace moho
         continue;
       }
       const std::string name = line.substr(0, eq);
+      values += (values.empty() ? "" : ";") + line;
       if (name.compare(0, 4, "sim_") == 0 || name.compare(0, 12, "lua_Parallel") == 0) {
         hashed += line + "\n";
       }
@@ -1128,6 +1573,7 @@ namespace moho
     context.Update(hashed.data(), hashed.size());
     out.Add("faf.switches.hash", std::string(context.Digest().ToString().c_str()));
     out.Add("faf.switches.changed", defaults.empty() ? std::string("unknown") : changed);
+    out.Add("faf.switches", values);
   }
 
   void CDesyncRecorder::SendDesyncTelemetry(const Sim& sim)
@@ -1189,13 +1635,23 @@ namespace moho
     }
 
     // Sent from the recorder's thread after the dump is written, so its size is known.
-    impl.Post([records = std::move(records), path = impl.mDumpPath]() mutable {
+    const bool upload = (impl.mKeepText || impl.mStateRing) && TELEMETRY_DumpUploadOn();
+    std::string endpoint = telemetry_DumpEndpoint.c_str();
+    while (!endpoint.empty() && endpoint.back() == '/') {
+      endpoint.pop_back();
+    }
+    impl.Post([records = std::move(records), path = impl.mDumpPath, gameId = impl.mDumpGameId, upload, endpoint]() mutable {
       std::error_code error;
       const std::uintmax_t size = path.empty() ? 0u : std::filesystem::file_size(path, error);
       for (CTelemetryAttributes& record : records) {
         if (!path.empty() && !error) {
           record.Add("faf.dump.file", std::filesystem::path(path).filename().string());
           record.Add("faf.dump.bytes", static_cast<std::int64_t>(size));
+          if (upload) { // the name the dump endpoint gets in X-FAF-Dump, and where the receiver serves it
+            const std::string name = std::filesystem::path(path).replace_extension(".tar.gz").filename().string();
+            record.Add("faf.dump.upload", name);
+            record.Add("faf.dump.url", endpoint + "/" + gameId + "/" + name);
+          }
         }
         TELEMETRY_Send("faf.desync", 13, "WARN", record);
       }

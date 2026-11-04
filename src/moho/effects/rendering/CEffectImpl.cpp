@@ -1,4 +1,5 @@
 #include "moho/effects/rendering/CEffectImpl.h"
+#include "moho/effects/rendering/CEffectManagerImpl.h"
 
 #include <algorithm>
 #include <cstring>
@@ -252,7 +253,9 @@ namespace moho
   {
     mNewAttachment = 1;
     mEntityInfo.mAttachTargetWeak.ResetFromObject(entity);
-    entity->InitPositionHistory();
+    if (!EFFECT_LifetimeOnly()) { // nothing else reads the history
+      entity->InitPositionHistory();
+    }
     Interpolate();
   }
 
@@ -264,7 +267,9 @@ namespace moho
     mNewAttachment = 1;
     mEntityInfo.mParentBoneIndex = boneIndex < 0 ? 0 : boneIndex;
     mEntityInfo.mAttachTargetWeak.ResetFromObject(entity);
-    entity->InitPositionHistory();
+    if (!EFFECT_LifetimeOnly()) { // nothing else reads the history
+      entity->InitPositionHistory();
+    }
     Interpolate();
   }
 

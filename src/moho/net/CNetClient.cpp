@@ -4,6 +4,7 @@
 
 #include "CClientManagerImpl.h"
 #include "Common.h"
+#include "EClientMsg.h"
 #include "ECmdStreamOp.h"
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Logging.h"
@@ -156,6 +157,12 @@ void CNetClient::ReceiveMessage(
     if (sEndGameWarnings.Take(20)) {
       gpg::Warnf("Ignoring end-game command from client %d:%s.", mIndex, mNickname.c_str());
     }
+    return;
+  }
+
+  // Engine addition (issue #285).
+  if (message->GetType().raw() == static_cast<uint8_t>(EClientMsg::CLIMSG_PeerFeatures)) {
+    mManager->mPeerFeatures->Receive(*mManager, *this, *message);
     return;
   }
 

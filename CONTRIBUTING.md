@@ -25,19 +25,23 @@ A PR that ticks "Sim behaviour changes" or "Not sure", or that adds a sim consol
 
 UI, rendering, audio and movies are not in the sim and can change freely, but a change to what the original game did should say so (the reviewer adds `retail divergence`).
 
+## Features that need other players on our engine
+
+A feature that only works when other players run our engine asks one shared announcement. Don't add another way to detect our builds, or a new message type: [docs/PEER_FEATURES.md](docs/PEER_FEATURES.md) says how to add it.
+
 ## Working on recovered code
 
 Every engine function in `src/` was rebuilt from the original binary, and its behaviour is the reference.
 
 - Keep the `Address: 0x...` comment block above a recovered function, in the header and the `.cpp`. It is how anyone checks the code against the binary.
 - When you fix a function to match the binary, cite the instructions you read (`0x008581BB: ...`) in the comment or the PR.
-- Binary-facing layouts stay on the legacy types (`msvc8::vector`, `msvc8::string`, `gpg::` containers): they match the 2007 memory layout. Keep the `static_assert(sizeof(...))` checks.
+- Recovered layouts stay on the legacy types (`msvc8::vector`, `msvc8::string`, `gpg::` containers). The game's builds drop the unused word the binary keeps at the start of each container, so the `static_assert(sizeof(...))` checks and `+0x..` comments describe the binary, and the `clang-x86-retail-layout` preset is what checks them (the `Layout check` workflow compiles it on every change to the engine). Keep them, and build that preset when you change a layout.
 - Use named fields and real virtual calls, not pointer arithmetic or offsets (`*(int*)(p + 0x78)`).
 - No stub or placeholder functions.
 
 ## Commits and pull request titles
 
-Commit titles and PR titles follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/). A CI check (`Commit titles`) checks the PR title and every commit in the PR. When a PR is squash-merged its title becomes the commit title, so the title matters most.
+Commit titles and PR titles follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/). PRs are squash-merged and the PR's title becomes the commit title, so a CI check (`Commit titles`) checks that title and leaves the titles of a PR's commits free. A PR with one commit is the exception: the merge uses that commit's title, so it is checked too. Every commit on `master` is checked, and no commit in a PR may carry an AI or bot attribution line, because a squash copies commit messages into the merged one.
 
 ```
 <type>(<scope>): <what is true after this change>
@@ -64,7 +68,7 @@ Rules the check enforces:
 - A `!` after the scope marks a breaking change, e.g. a changed save or replay format: `feat(replay)!: ...`.
 - In a commit message, a blank line separates the title from the body.
 - No AI or bot `Co-authored-by:` lines and no "Generated with ..." lines. Commits are authored by the people who submit them.
-- `fixup!` and `squash!` commits are squashed before you push. Merge commits and git's own `Revert "..."` titles are accepted as they are.
+- A `fixup!` or `squash!` title is refused wherever a title is checked. Merge commits and git's own `Revert "..."` titles are accepted as they are.
 
 Write the title as what is now true, not as an instruction, and put the issue number at the end:
 

@@ -86,7 +86,10 @@ jobs:
   retail:
     runs-on: ubuntu-24.04
     # PARITY_RETAIL_URL and PARITY_RETAIL_KEY are this environment's secrets, given to master only.
-    environment: parity
+    # No deployment: the secrets come without one, and nothing is deployed.
+    environment:
+      name: parity
+      deployment: false
     steps:
       - id: have
         uses: actions/cache/restore@v6

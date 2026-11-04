@@ -11,8 +11,10 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <chrono>
 #include <cstring>
 #include <mutex>
+#include <random>
 
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/utils/Global.h"
@@ -159,6 +161,7 @@ CClientManagerImpl::CClientManagerImpl(
       net_CheckOrderStreams > 0 ? std::make_unique<CommandStreamCheck>(clientCount, net_CheckOrderStreams >= 2)
                                 : nullptr
     )
+  , mPeerFeatures(std::make_unique<CPeerFeatures>(clientCount))
 {
   mClients.resize(clientCount, nullptr);
 }
@@ -825,6 +828,10 @@ void CClientManagerImpl::Cleanup()
     mDispatchedTimer.Reset();
   }
 
+  // Engine addition (issue #285): before this client's ready, so a peer knows
+  // what it supports before the game runs.
+  mPeerFeatures->Announce(*this);
+
   CMessage message{EClientMsg::CLIMSG_Ready};
   ProcessClients(message);
 }
@@ -988,6 +995,90 @@ bool CClientManagerImpl::EveryoneResponsiveSince(const int beat)
   return true;
 }
 
+namespace
+{
+  // Engine additions (issue #236), both off by default; not members, so the
+  // manager keeps the binary's layout.
+  std::chrono::steady_clock::time_point sLastAvailableAt{};
+  int sLastAvailableBeat = -1;
+  bool sTestBurstSent = false;
+
+  // A type no client registers a receiver for once the lobby is gone (the sim
+  // takes 0-49, the clients 50-57, connection events 200-209): the peer's
+  // connection drops it after logging the first few.
+  constexpr std::uint8_t kTestBurstMessageType = 90;
+
+  // net_LogBeatWaitMs: a beat that became available long after the one before
+  // it waited on some player's data.
+  void NoteAvailableBeat(const int before, const int now)
+  {
+    if (now == before) {
+      return;
+    }
+    const auto at = std::chrono::steady_clock::now();
+    if (now < sLastAvailableBeat) {
+      sLastAvailableBeat = -1; // a new game in this process
+      sTestBurstSent = false;
+    }
+    if (net_LogBeatWaitMs > 0 && sLastAvailableBeat >= 0 && sLastAvailableBeat == before) {
+      const long long waited =
+        std::chrono::duration_cast<std::chrono::milliseconds>(at - sLastAvailableAt).count();
+      if (waited >= net_LogBeatWaitMs) {
+        gpg::Logf("NET: beat %d available %lld ms after beat %d", now, waited, before);
+      }
+    }
+    if (net_LogTraffic > 0 && now / net_LogTraffic != before / net_LogTraffic) {
+      if (gNetLinkTrafficLog != nullptr) {
+        gNetLinkTrafficLog(now);
+      }
+      const std::int64_t samples = gNetTraffic.pingSamples.load(std::memory_order_relaxed);
+      const std::int64_t pingSum = gNetTraffic.pingMicrosSum.load(std::memory_order_relaxed);
+      gpg::Logf(
+        "NET: traffic at beat %d: %lld packets, %lld bytes, %lld resends, %lld acks, mean ping %.1f ms",
+        now,
+        static_cast<long long>(gNetTraffic.packets.load(std::memory_order_relaxed)),
+        static_cast<long long>(gNetTraffic.bytes.load(std::memory_order_relaxed)),
+        static_cast<long long>(gNetTraffic.resends.load(std::memory_order_relaxed)),
+        static_cast<long long>(gNetTraffic.acks.load(std::memory_order_relaxed)),
+        samples > 0 ? static_cast<double>(pingSum) / static_cast<double>(samples) / 1000.0 : 0.0
+      );
+    }
+    sLastAvailableAt = at;
+    sLastAvailableBeat = now;
+  }
+
+  // net_TestBurstBeat / net_TestBurstBytes: filler on the ordered stream to every
+  // peer, incompressible so the deflated size on the wire is the given size.
+  void MaybeSendTestBurst(const msvc8::vector<CClientBase*>& clients, const int availableBeat)
+  {
+    if (sTestBurstSent || net_TestBurstBeat < 0 || net_TestBurstBytes <= 0 || availableBeat < net_TestBurstBeat) {
+      return;
+    }
+    sTestBurstSent = true;
+    std::minstd_rand random(static_cast<std::uint32_t>(net_TestBurstBytes));
+    int left = net_TestBurstBytes;
+    int messages = 0;
+    while (left > 0) {
+      const int size = left < 60000 ? left : 60000;
+      CMessage message{MessageType(kTestBurstMessageType), static_cast<std::size_t>(size)};
+      for (int i = 0; i < size; ++i) {
+        message.mBuff[3 + i] = static_cast<char>(random() >> 7);
+      }
+      for (CClientBase* const client : clients) {
+        if (auto* const net = dynamic_cast<CNetClient*>(client)) {
+          net->Process(message);
+        }
+      }
+      left -= size;
+      ++messages;
+    }
+    gpg::Logf(
+      "NET: test burst of %d bytes in %d messages sent to every peer at beat %d", net_TestBurstBytes, messages,
+      availableBeat
+    );
+  }
+} // namespace
+
 /**
  * Address: 0x0053EA30 (FUN_0053EA30)
  */
@@ -1031,6 +1122,7 @@ void CClientManagerImpl::DoBeat()
     } while (ClientNeedsFullyQueuedBeatsUntil(mFullyQueuedBeat + 1));
   }
 
+  const int availableBefore = mAvailableBeat;
   if (EveryoneResponsiveSince(mAvailableBeat + 1)) {
     do {
       ++mAvailableBeat;
@@ -1041,6 +1133,9 @@ void CClientManagerImpl::DoBeat()
     stream.Write(mAvailableBeat);
     ProcessClients(message);
   }
+  // Engine additions (issue #236), off by default.
+  NoteAvailableBeat(availableBefore, mAvailableBeat);
+  MaybeSendTestBurst(mClients, mAvailableBeat);
 
   const SClientBottleneckInfo bottleneckInfo = GetBottleneckInfo();
   const float currentUiBottleneckTimeMs = GetBottleneckUiTimestampMs(*this);

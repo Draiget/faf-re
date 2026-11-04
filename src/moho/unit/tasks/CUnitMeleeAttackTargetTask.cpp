@@ -267,28 +267,6 @@ namespace
     }
   }
 
-  void GatherUnitEntitiesAroundPoint(
-    gpg::core::FastVectorN<moho::Entity*, 20>& outEntities,
-    moho::COGrid& ogrid,
-    const Wm3::Vector3f& center,
-    const float radius
-  )
-  {
-    gpg::Rect2f queryRect{};
-    queryRect.x0 = center.x - radius;
-    queryRect.z0 = center.z - radius;
-    queryRect.x1 = center.x + radius;
-    queryRect.z1 = center.z + radius;
-
-    moho::CollisionDBRect collisionRect{};
-    moho::func_Rect2fToInt16(&collisionRect, queryRect);
-    (void)ogrid.mEntityOccupationManager.GatherUnmarkedEntities(
-      outEntities,
-      collisionRect,
-      moho::EEntityType::ENTITYTYPE_Unit
-    );
-  }
-
   [[nodiscard]] moho::CUnitCommand* GetCurrentCommand(moho::Unit* const unit) noexcept
   {
     if (unit == nullptr || unit->CommandQueue == nullptr) {
@@ -1056,15 +1034,14 @@ namespace moho
     CAiReconDBImpl* const reconDb = ownerArmy->GetReconDB();
     const Wm3::Vector3f ownerPosition = ownerUnit->GetPosition();
     const float guardScanRadius = ownerUnit->GetBlueprint()->AI.GuardScanRadius;
-    const float guardScanRadiusSq = guardScanRadius * guardScanRadius;
 
-    gpg::core::FastVectorN<Entity*, 20> nearbyEntities{};
-    GatherUnitEntitiesAroundPoint(nearbyEntities, *ownerUnit->SimulationRef->mOGrid, ownerPosition, guardScanRadius);
+    // 0x00616437: `func_EntitiesAroundPoint`, whose own range test is `r*r > d*d` (0x007224B5).
+    gpg::core::FastVectorN<CollisionResult, 10> nearbyEntities{};
+    EntitiesAroundPoint(nearbyEntities, guardScanRadius, *ownerUnit->SimulationRef->mOGrid, EEntityType::ENTITYTYPE_Unit, ownerPosition);
 
     EntitySetTemplate<Entity> candidateSet{};
-    const int nearbyCount = static_cast<int>(nearbyEntities.end_ - nearbyEntities.start_);
-    for (int index = 0; index < nearbyCount; ++index) {
-      Entity* const candidateEntity = nearbyEntities.start_[index];
+    for (const CollisionResult& nearby : nearbyEntities) {
+      Entity* const candidateEntity = nearby.sourceEntity;
       Unit* const candidateUnit = candidateEntity ? candidateEntity->IsUnit() : nullptr;
       if (candidateUnit == nullptr) {
         continue;
@@ -1088,13 +1065,6 @@ namespace moho
       }
 
       if (ownerAttacker != nullptr && !ownerAttacker->CanAttackTarget(&mTarget)) {
-        continue;
-      }
-
-      const Wm3::Vector3f candidatePosition = candidateUnit->GetPosition();
-      const float deltaX = ownerPosition.x - candidatePosition.x;
-      const float deltaZ = ownerPosition.z - candidatePosition.z;
-      if (((deltaX * deltaX) + (deltaZ * deltaZ)) > guardScanRadiusSq) {
         continue;
       }
 

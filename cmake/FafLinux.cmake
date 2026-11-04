@@ -7,6 +7,34 @@
 #
 #   cmake --preset linux-clang-x64-release && cmake --build --preset linux-clang-x64-release
 
+# Engine addition (#118): a profile-guided build, for a server's speed. The linux-clang-x64-release
+# preset uses the stored profile, linux-clang-x64-release-plain none, -pgogen records one
+# (tools/pgo/record.sh). See docs/SWITCHES.md.
+#   FAF_PGO_GENERATE=ON                counts what the code does; a replay writes the counts on exit
+#                                      (LLVM_PROFILE_FILE names the file), llvm-profdata merges them.
+#   FAF_PGO_PROFILE=<file.profdata>    ThinLTO with those counts. Needs llvm-ar (package llvm-18).
+option(FAF_PGO_GENERATE "Build headless to record a profile for FAF_PGO_PROFILE" OFF)
+set(FAF_PGO_PROFILE "" CACHE FILEPATH "Merged LLVM profile to optimise with")
+if(FAF_PGO_GENERATE AND FAF_PGO_PROFILE)
+  message(FATAL_ERROR "FAF_PGO_GENERATE and FAF_PGO_PROFILE exclude each other.")
+endif()
+if(FAF_PGO_GENERATE)
+  add_compile_options(-fprofile-generate)
+  add_link_options(-fprofile-generate)
+  add_compile_definitions(FAF_COVERAGE_PROFILE=1)
+elseif(FAF_PGO_PROFILE)
+  find_program(FAF_LLVM_AR NAMES llvm-ar HINTS "${FAF_LINUX_LLVM_ROOT}/bin")
+  find_program(FAF_LLVM_RANLIB NAMES llvm-ranlib HINTS "${FAF_LINUX_LLVM_ROOT}/bin")
+  if(NOT FAF_LLVM_AR OR NOT FAF_LLVM_RANLIB)
+    message(FATAL_ERROR "A profile-guided build needs llvm-ar and llvm-ranlib: install llvm-18, or use the linux-clang-x64-release-plain preset.")
+  endif()
+  set(CMAKE_AR "${FAF_LLVM_AR}")
+  set(CMAKE_RANLIB "${FAF_LLVM_RANLIB}")
+  # A profile from older source still applies to the functions that did not change.
+  add_compile_options(-flto=thin "-fprofile-use=${FAF_PGO_PROFILE}" -Wno-profile-instr-unprofiled -Wno-profile-instr-out-of-date -Wno-backend-plugin)
+  add_link_options(-flto=thin "-fprofile-use=${FAF_PGO_PROFILE}")
+endif()
+
 if(NOT FAF_LINUX)
   message(FATAL_ERROR "cmake/FafLinux.cmake needs cmake/toolchains/linux-clang-x64.cmake.")
 endif()
@@ -66,6 +94,22 @@ set(FAF_LINUX_MS_DIALECT -fms-extensions -fms-volatile)
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/wildmagic" "${CMAKE_BINARY_DIR}/deps/wildmagic")
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/zlib" "${CMAKE_BINARY_DIR}/deps/zlib")
 
+# The net channel (src/remote/net, plan WP10) and its one download, Monocypher, pinned in
+# cmake/FafDependencies.cmake; the Windows-only dependencies there are skipped. Without the
+# download (FAF_FETCH_DEPENDENCIES=OFF, or no network) the channel is left out and the
+# simulation targets build as before.
+option(FAF_FETCH_DEPENDENCIES "Fetch the net channel's Monocypher download at configure time" ON)
+if(FAF_FETCH_DEPENDENCIES)
+  set(FAF_DEPENDENCIES_ONLY monocypher)
+  include(FafDependencies)
+endif()
+add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/monocypher" "${CMAKE_BINARY_DIR}/deps/monocypher")
+add_subdirectory("${PROJECT_SOURCE_DIR}/src/remote/net" "${CMAKE_BINARY_DIR}/remote/net")
+if(TARGET faf_netchannel)
+  add_executable(faf_netchannel_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/NetChannelTests.cpp")
+  target_link_libraries(faf_netchannel_tests PRIVATE faf_netchannel faf_monocypher)
+endif()
+
 # --- faf_sim ----------------------------------------------------------------------------
 # The simulation's translation units (src/sim_sources.cmake), in the engine's
 # order, as an object library: every object is linked, so every static
@@ -84,7 +128,8 @@ list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^gpg/core/diagnostics/(CrashHooks|Cra
 # The lockstep transport: Winsock sockets driven by WSAEventSelect. Linux replays and
 # serves games without it (the server has its own channel, plan D3); moho/net/Common.cpp's
 # connector factories fail here as on a Windows host without Winsock.
-list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^moho/net/(CNetDatagramSocketImpl|CNetTCPBuf|CNetTCPConnection|CNetTCPConnector|CNetTCPServerImpl|CNetUDPConnection|CNetUDPConnector|INetDatagramSocket|INetTCPServer|INetTCPSocket)\\.cpp$")
+# NetPeerTransport (issue #232) belongs to CNetUDPConnector and goes with it.
+list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^moho/net/(CNetDatagramSocketImpl|CNetTCPBuf|CNetTCPConnection|CNetTCPConnector|CNetTCPServerImpl|CNetUDPConnection|CNetUDPConnector|NetPeerTransport|INetDatagramSocket|INetTCPServer|INetTCPSocket)\\.cpp$")
 
 set(_faf_sim_files "")
 foreach(_src IN LISTS FAF_SIM_SOURCES)
@@ -157,12 +202,12 @@ target_include_directories(faf_sim_settings INTERFACE
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_link_libraries(faf_sim_settings INTERFACE faf_codegen)
-target_link_libraries(faf_sim PUBLIC Wm3Foundation zlib123)
+target_link_libraries(faf_sim PUBLIC Wm3Headers zlib123)
 
 set(_faf_sim_options
   # The recovered tree's x86 layout asserts, off as on Windows x64 (see the
   # header).
-  "SHELL:-include platform/X64LayoutAsserts.h"
+  "SHELL:-include platform/LayoutAsserts.h"
   # The Windows names the shared code uses (plan WPL.5).
   "SHELL:-include platform/PosixCompat.h"
   ${FAF_LINUX_MS_DIALECT}
@@ -212,6 +257,13 @@ add_custom_command(TARGET faf_sim_math_tests POST_BUILD
   COMMENT "Checking the simulation's arithmetic against tests/sim_math/golden.txt"
   VERBATIM)
 
+# --- faf_math_dump (plan WPR.21) --------------------------------------------------------
+# The difffuzz targets on every faf_sim object, as Windows builds them on faf_engine,
+# checked against retail's outputs (tests/math_dump/golden.txt) after every build
+# (tools/difffuzz/dump.cmake).
+set(FAF_MATH_DUMP_ENGINE faf_sim)
+include("${PROJECT_SOURCE_DIR}/tools/difffuzz/dump.cmake")
+
 # --- faf-sim-link -----------------------------------------------------------------------
 # Every faf_sim object linked into one executable with no entry point of its
 # own, to list what the simulation references outside itself (plan WPL.3):
@@ -235,6 +287,14 @@ add_executable(headless ${_faf_headless_files})
 target_link_libraries(headless PRIVATE faf_sim)
 target_compile_definitions(headless PRIVATE FAF_SERVER_MODE=1)
 target_link_options(headless PRIVATE -Wl,--error-limit=0)
+
+# --- faf_remote_tests -------------------------------------------------------------------
+# The wire format's tests (tests/remote/WireTests.cpp) on the Linux objects, as Windows'
+# server-mode build runs them on faf_engine.
+add_executable(faf_remote_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/WireTests.cpp")
+target_link_libraries(faf_remote_tests PRIVATE faf_sim)
+target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1)
+target_link_options(faf_remote_tests PRIVATE -Wl,--error-limit=0)
 
 # The libm gate (plan WPL.13): the faf_sim objects call no host libm transcendental outside
 # tests/linux/libm_allowlist.txt; headless is not built while one does.

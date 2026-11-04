@@ -898,9 +898,8 @@ namespace moho
    * Layout-identical to `msvc8::vector<SkinPaletteEntry>` (`myProxy_@+0x00`,
    * `first_@+0x04`, `last_@+0x08`, `end_@+0x0C`) -- not a bespoke type. What
    * looked like an unused leading "reserved header" word is the vector's own
-   * debug-proxy slot (`HasDebugProxy=true`, the template default), inert in
-   * this release build but real ABI, matching every other default-args
-   * `msvc8::vector<T>` in this codebase.
+   * debug-proxy slot, which the binary never reads and the game's builds
+   * leave out (legacy/containers/Layout.h).
    */
   struct MeshShaderPaletteBuffer : msvc8::vector<SkinPaletteEntry>
   {

@@ -34,7 +34,10 @@ namespace faf::headless
     int viewLossPercent = 0;     // with `viewFramesPath`: a simulated lossy channel per view (FrameWindow.h)
     int viewAckDelay = 0;        // its acknowledgements' delay in beats
     bool spy = false;            // with `viewFramesPath`: the spy client's checks (ReplayViewFrameStats.h)
-    bool parallelViews = false;  // with `viewFramesPath` or `viewPacketsPath`: views built on the sim's workers
+    bool parallelViews = false;  // with `viewFramesPath`, `viewBenchPath` or `viewPacketsPath`: views built on the sim's workers
+    bool keepClientData = false; // keep what only a client reads (`--keep-client-data`)
+    bool viewBenchCheck = false; // with `viewBenchPath`: each held frame is compared with the whole one
+    std::string viewBenchPath;   // when set: the server's per-beat view work, timed (CSV; ReplayViewBench.h)
     bool inboundCheck = false;   // with `viewIds`: every command through view ids and back (ReplayInboundCheck.h)
     std::string stateDigestPath; // when set: "beat digest" of what the sim published, every beat
     bool fpuReport = false;     // at beat 1: every thread's x87 control word and MXCSR
@@ -75,6 +78,8 @@ namespace faf::headless
     std::string viewPacketsSummary; // with `viewPacketsPath`: one line
     std::string viewFramesSummary;  // with `viewFramesPath`: a line per army
     std::uint64_t viewFramesFailures = 0;
+    std::string viewBenchSummary;   // with `viewBenchPath`: times per beat and bytes per client
+    std::uint64_t viewBenchFailures = 0;
     std::string inboundSummary;     // with `inboundCheck`
     std::uint64_t inboundFailures = 0;
     std::string boneSummary;    // with `boneStatsPath`: one summary line

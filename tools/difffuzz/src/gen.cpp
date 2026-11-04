@@ -60,7 +60,8 @@ namespace difffuzz
     [[nodiscard]] double Perturbation(Rng& rng) noexcept
     {
       static constexpr double kEps[] = {0.0, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2};
-      return kEps[rng.Below(8)] * rng.Range(-1.0, 1.0);
+      const double eps = kEps[rng.Below(8)]; // one draw per statement: see GenFloat
+      return eps * rng.Range(-1.0, 1.0);
     }
   } // namespace
 
@@ -74,6 +75,11 @@ namespace difffuzz
     return static_cast<float>(rng.Range(-lim, lim));
   }
 
+  // One draw per expression: the order of a call's arguments is unspecified
+  // (the Microsoft ABI evaluates them right to left, System V left to right),
+  // and so is the order of a binary operator's operands (cl and clang differ).
+  // faf_math_dump compares the platforms' and retail's streams. Each ldexp
+  // draws its exponent first, the order the Windows builds always used.
   float GenFloat(Rng& rng)
   {
     switch (rng.Below(12)) {
@@ -84,19 +90,27 @@ namespace difffuzz
       return GenPlain(rng, 1000.0f);
     case 3:
       return GenPlain(rng, 1.0e6f);
-    case 4: // log-uniform over every exponent, may overflow to inf
-      return Sign(rng, std::ldexp(rng.Range(1.0, 2.0), static_cast<int>(rng.Below(280)) - 150));
+    case 4: { // log-uniform over every exponent, may overflow to inf
+      const int exponent = static_cast<int>(rng.Below(280)) - 150;
+      return Sign(rng, std::ldexp(rng.Range(1.0, 2.0), exponent));
+    }
     case 5:
       return Sanitize(rng.U32());
     case 6:
     case 7:
       return GenEdge(rng);
-    case 8: // +-k ulp around an edge value
-      return Sanitize(kEdgeBits[rng.Below(kEdgeCount)] + rng.Below(7) - 3);
-    case 9: // tiny
-      return Sign(rng, std::ldexp(rng.Range(1.0, 2.0), -40 - static_cast<int>(rng.Below(110))));
-    case 10: // huge
-      return Sign(rng, std::ldexp(rng.Range(1.0, 2.0), 40 + static_cast<int>(rng.Below(88))));
+    case 8: { // +-k ulp around an edge value
+      const std::uint32_t edge = kEdgeBits[rng.Below(kEdgeCount)];
+      return Sanitize(edge + rng.Below(7) - 3);
+    }
+    case 9: { // tiny
+      const int exponent = -40 - static_cast<int>(rng.Below(110));
+      return Sign(rng, std::ldexp(rng.Range(1.0, 2.0), exponent));
+    }
+    case 10: { // huge
+      const int exponent = 40 + static_cast<int>(rng.Below(88));
+      return Sign(rng, std::ldexp(rng.Range(1.0, 2.0), exponent));
+    }
     default:
       return static_cast<float>(rng.Below(9)) - 4.0f; // small integers incl. 0
     }
@@ -136,7 +150,8 @@ namespace difffuzz
       }
     } else { // unit direction at a random magnitude
       GenUnitVec3(rng, v);
-      const double mag = std::ldexp(rng.Range(1.0, 2.0), static_cast<int>(rng.Below(200)) - 100);
+      const int exponent = static_cast<int>(rng.Below(200)) - 100; // first: see GenFloat
+      const double mag = std::ldexp(rng.Range(1.0, 2.0), exponent);
       for (int i = 0; i < 3; ++i) {
         v[i] = static_cast<float>(v[i] * mag);
       }
@@ -152,9 +167,13 @@ namespace difffuzz
       return;
     }
     const double sign = mode < 65 ? 1.0 : -1.0;
-    const double scale = rng.Chance(50) ? 1.0 : std::ldexp(rng.Range(1.0, 2.0), static_cast<int>(rng.Below(20)) - 10);
+    double scale = 1.0;
+    if (!rng.Chance(50)) {
+      const int exponent = static_cast<int>(rng.Below(20)) - 10; // first: see GenFloat
+      scale = std::ldexp(rng.Range(1.0, 2.0), exponent);
+    }
     for (int i = 0; i < 3; ++i) {
-      v2[i] = static_cast<float>(sign * scale * v1[i] + Perturbation(rng));
+      v2[i] = DerivedFloat(sign * scale * v1[i] + Perturbation(rng));
     }
   }
 
@@ -199,7 +218,7 @@ namespace difffuzz
     }
     const double sign = mode < 70 ? 1.0 : -1.0;
     for (int i = 0; i < 4; ++i) {
-      q2[i] = static_cast<float>(sign * q1[i] + Perturbation(rng));
+      q2[i] = DerivedFloat(sign * q1[i] + Perturbation(rng));
     }
   }
 

@@ -23,6 +23,11 @@ const (
 	// over WebRTC data channels, signalled through mpemu's icebreaker and
 	// optionally relayed by its TURN server.
 	ModeICE Mode = "ice"
+	// ModeContract: every game sits behind an adapter of the FAF client's ICE
+	// adapter contract (FAF's faf-ice-adapter.jar, faf-netbridge, the launch
+	// shim), started and driven as the FAF client does
+	// (docs/LAUNCHER_ADAPTER_CONTRACT.md). Local seats only.
+	ModeContract Mode = "contract"
 )
 
 // LobbyKind selects the lobby Lua the game opens (CreateLobby's init mode).
@@ -95,6 +100,53 @@ type ICEConfig struct {
 	NoTurn bool `yaml:"noTurn"`
 }
 
+// ContractConfig configures ModeContract.
+type ContractConfig struct {
+	// NativeDir holds faf-ice-adapter.jar (the client's nativeDir); the jar
+	// runs from there with Java and the client's JavaFX jars.
+	NativeDir string `yaml:"nativeDir"`
+	// Java is the java executable (default: the FAF client's bundled one).
+	Java string `yaml:"java"`
+	// ClientLib is the FAF client's lib folder, for its javafx-* jars.
+	ClientLib string `yaml:"clientLib"`
+	// Adapter is the default per player: "jar" (NativeDir's jar, the default),
+	// the path of a native adapter (faf-netbridge.exe) run directly, or
+	// "native": no adapter, the game links every peer itself (issue #274).
+	Adapter string `yaml:"adapter"`
+	// NativeBind is /nativenetbind for "native" players: the address ICE host
+	// candidates use (e.g. 192.168.42.77 where inbound UDP to 0.0.0.0 is dropped).
+	NativeBind string `yaml:"nativeBind"`
+	// ExeArgs go after the launcher's arguments for native adapters only
+	// (e.g. --bind-address 192.168.42.77 where inbound UDP to 0.0.0.0 is dropped).
+	ExeArgs []string `yaml:"exeArgs"`
+	// JarBind is for players on FAF's jar where loopback UDP to sockets bound to
+	// every interface is dropped (e.g. 192.168.42.77): mpemu then stands between
+	// the game and the jar (seat.jarBridge).
+	JarBind string `yaml:"jarBind"`
+	// ForceRelay passes --force-relay.
+	ForceRelay bool `yaml:"forceRelay"`
+	// NoTurn hands out no ICE servers.
+	NoTurn bool `yaml:"noTurn"`
+	// IceServers, when set, are handed out instead of mpemu's own TURN server
+	// (use with noTurn), e.g. a TURN server on another machine. Every field
+	// expands %VAR% and $VAR, so a scenario names no address itself.
+	IceServers []IceServerConfig `yaml:"iceServers"`
+	// Shaping is where link steps apply: "turn" (default) in mpemu's TURN
+	// server, which shapes only paths through it; "links" in every netlink
+	// link's sends (FAF_NETLINK_TEST_SHAPING), whichever path ICE picks. Use
+	// "links" when every player is our build, the bridge or the bridge's
+	// retail game, or a game on the jar with jarBind (issue #242).
+	Shaping string `yaml:"shaping"`
+}
+
+// IceServerConfig is one entry of ContractConfig.IceServers, in the client's
+// setIceServers shape.
+type IceServerConfig struct {
+	URLs       []string `yaml:"urls"`
+	Username   string   `yaml:"username"`
+	Credential string   `yaml:"credential"`
+}
+
 // PlayerConfig is one seat.
 type PlayerConfig struct {
 	UID       int      `yaml:"uid"`
@@ -105,6 +157,8 @@ type PlayerConfig struct {
 	Exe       string   `yaml:"exe"`     // overrides GameConfig.Exe for this player
 	Args      []string `yaml:"args"`
 	Spawn     *bool    `yaml:"spawn"`
+	// Adapter overrides ContractConfig.Adapter for this player (ModeContract).
+	Adapter string `yaml:"adapter"`
 	// Agent runs this player on another machine: the name an `mpemu agent`
 	// registered with on the hub. Empty runs it here.
 	Agent string `yaml:"agent"`
@@ -119,6 +173,7 @@ type Config struct {
 	Leave      LeavePolicy       `yaml:"leave"`
 	Game       GameConfig        `yaml:"game"`
 	ICE        ICEConfig         `yaml:"ice"`
+	Contract   ContractConfig    `yaml:"contract"`
 	Link       relay.Impairment  `yaml:"link"`
 	Players    []PlayerConfig    `yaml:"players"`
 	GameOption map[string]string `yaml:"gameOptions"`
@@ -171,8 +226,22 @@ func (c *Config) Normalize() error {
 	c.Game.Init = ExpandPath(c.Game.Init)
 	c.Game.Prefs = ExpandPath(c.Game.Prefs)
 	c.ICE.Adapter = ExpandPath(c.ICE.Adapter)
+	c.Contract.NativeDir = ExpandPath(c.Contract.NativeDir)
+	c.Contract.Java = ExpandPath(c.Contract.Java)
+	c.Contract.ClientLib = ExpandPath(c.Contract.ClientLib)
+	c.Contract.Adapter = ExpandPath(c.Contract.Adapter)
+	for i := range c.Contract.ExeArgs {
+		c.Contract.ExeArgs[i] = ExpandPath(c.Contract.ExeArgs[i])
+	}
+	if c.Contract.Java == "" {
+		c.Contract.Java = `C:\Program Files\FAF Client\jre\bin\java.exe`
+	}
+	if c.Contract.ClientLib == "" {
+		c.Contract.ClientLib = `C:\Program Files\FAF Client\lib`
+	}
 	for i := range c.Players {
 		c.Players[i].Exe = ExpandPath(c.Players[i].Exe)
+		c.Players[i].Adapter = ExpandPath(c.Players[i].Adapter)
 	}
 	if c.GameID == 0 {
 		c.GameID = 100
@@ -181,9 +250,9 @@ func (c *Config) Normalize() error {
 		c.Mode = ModeDirect
 	}
 	switch c.Mode {
-	case ModeDirect, ModeRelay, ModeICE:
+	case ModeDirect, ModeRelay, ModeICE, ModeContract:
 	default:
-		return fmt.Errorf("mode %q: want direct, relay or ice", c.Mode)
+		return fmt.Errorf("mode %q: want direct, relay, ice or contract", c.Mode)
 	}
 	if c.Lobby == "" {
 		c.Lobby = LobbyAuto

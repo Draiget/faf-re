@@ -10,6 +10,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
+#include "legacy/math/X87Math.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -364,7 +365,7 @@ namespace moho
     // Reschedule interval: ceil(TargetCheckInterval * 10) clamped to at least 1,
     // then +1 (the ">= 2 => wait N-1 beats" band). This is the default return.
     const float intervalTicksFloat = weaponBlueprint->TargetCheckInterval * 10.0f;
-    int intervalTicks = static_cast<int>(std::ceil(intervalTicksFloat));
+    int intervalTicks = msvc8::CeilToIntX87(intervalTicksFloat); // 0x005D8D5B..0x005D8D6E
     if (intervalTicks < 1) {
       intervalTicks = 1;
     }

@@ -15,6 +15,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "legacy/math/X87Math.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/CAiTransportImpl.h"
@@ -438,7 +439,7 @@ namespace moho
 
       if (task.mMoving) {
         const float topSpeed = unit->mInfoCache.mFormationTopSpeed;
-        const auto expand = static_cast<std::int32_t>(std::ceil(topSpeed));
+        const auto expand = msvc8::CeilToIntX87(topSpeed); // 0x0061B644..0x0061B657
         minX -= expand;
         minZ -= expand;
         maxX += expand;

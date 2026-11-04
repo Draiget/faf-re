@@ -979,7 +979,7 @@ bool CAiPathFinder::IsInBounds(const SOCellPos& fromCell, const SOCellPos& toCel
  * Computes the octile-distance core term `max(|a|,|b|) + min(|a|,|b|) *
  * 0.41421354f` used by AI pathfinder heuristic lanes.
  */
-[[maybe_unused]] static float ComputeOctileDistanceCore(const float a, const float b) noexcept
+float moho::ComputeOctileDistanceCore(const float a, const float b) noexcept
 {
   float major = std::fabs(a);
   float minor = std::fabs(b);
@@ -1073,11 +1073,12 @@ bool CAiPathFinder::ShouldSearchRect(const gpg::Rect2i& rect) const
   // cells out). The unit followed the partial path into whatever stood in the
   // way and wedged there.
   if (mSearchType == AIPATHSEARCH_None || mUseGoalBoundaryProbe != 0u) {
-    const SOCellPos anchor{
-      static_cast<std::int16_t>(mAnchorCell.x),
-      static_cast<std::int16_t>(mAnchorCell.z),
-    };
-    if (CellInRectInclusiveExclusive(anchor, rect)) {
+    // 0x005AA8D5 reads the anchor with `movzx`: the uint16 lanes widen
+    // unsigned, so they are compared as they are rather than through the
+    // signed SOCellPos (which made 0x8000..0xFFFF negative).
+    const int anchorX = static_cast<int>(mAnchorCell.x);
+    const int anchorZ = static_cast<int>(mAnchorCell.z);
+    if (rect.x0 <= anchorX && anchorX < rect.x1 && rect.z0 <= anchorZ && anchorZ < rect.z1) {
       return true;
     }
   } else if (RectHistoryIntersects(rect)) {

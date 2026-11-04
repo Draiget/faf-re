@@ -372,7 +372,9 @@ namespace
     });
     RunFloats(r, "Atan2Plus", 3, [](const float* a) { return Hex(msvc8::Atan2Plus(a[0], a[1], a[2])); });
     RunFloats(r, "SinTimesCos", 2, [](const float* a) { return Hex(msvc8::SinTimesCos(a[0], a[1])); });
-    RunFloats(r, "SinTimes", 2, [](const float* a) { return Hex(msvc8::SinTimes(a[0], a[1])); });
+    RunFloats(r, "SinOfProductTimes", 3, [](const float* a) {
+      return Hex(msvc8::SinOfProductTimes(a[0], a[1], a[2]));
+    });
     RunFloats(r, "CosTimesCos", 2, [](const float* a) { return Hex(msvc8::CosTimesCos(a[0], a[1])); });
     RunFloats(
       r, "SlerpSphericalBlend", 11,

@@ -29,6 +29,8 @@ namespace
     &sim_RecyclePose
   );
 
+  bool gKeepClientPoseHandles = true;
+
   constexpr std::uint32_t kWatchBoneEnabledFlag = 0x8000u;
 
   // Address: 0x00BD2B60 (FUN_00BD2B60, register_CAniActorSerializer) -- MSVC's
@@ -560,7 +562,8 @@ namespace moho
     // new frame starts as a copy of the pose just retired, under a fresh
     // control block; the referent this lane held before the swap is released.
     // Engine addition (sim_RecyclePose): when unique, overwrite in-place without heap reallocation.
-    if (sim_RecyclePose && mPose != nullptr && mPose.unique()) {
+    // Not an 11-bone pose: the block order of the binary's allocator class depends on these (see SimBlockLane).
+    if (sim_RecyclePose && mPose != nullptr && mPose.unique() && mPose->mBones.size() != CAniPoseBoneArray::kBinaryLaneBones) {
       mPose->OverwritePose(*mPriorPose);
     } else {
       mPose.reset(new CAniPose(*mPriorPose));
@@ -615,6 +618,22 @@ namespace moho
   }
 
   AniBoneWriteHook gAniBoneWriteHook = nullptr;
+
+  void POSE_SetKeepClientHandles(const bool keep) noexcept
+  {
+    gKeepClientPoseHandles = keep;
+  }
+
+  bool POSE_KeepClientHandles() noexcept
+  {
+    return gKeepClientPoseHandles;
+  }
+
+  bool POSE_HoldClientHandles(const CAniActor& actor) noexcept
+  {
+    return gKeepClientPoseHandles
+      || (actor.mPose.get() != nullptr && actor.mPose->mBones.size() == CAniPoseBoneArray::kBinaryLaneBones);
+  }
 
   bool CAniActor::AllEnabledManipulators(bool (*const test)(const IAniManipulator& manipulator)) const
   {

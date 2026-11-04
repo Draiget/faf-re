@@ -896,7 +896,10 @@ namespace
 
     return nullptr;
   }
+} // namespace
 
+namespace moho
+{
   /**
    * Address: 0x0062D7E0 (FUN_0062D7E0, func_CalulateWaterRatio)
    *
@@ -904,7 +907,7 @@ namespace
    * Samples the map height field at an 8x8 grid step and returns the ratio
    * of sampled cells where water elevation is above sampled terrain elevation.
    */
-  [[nodiscard]] float CalculateMapWaterRatio(const moho::STIMap& map)
+  float CalculateMapWaterRatio(const moho::STIMap& map)
   {
     const moho::CHeightField* const heightField = map.mHeightField.get();
     const int mapWidth = heightField->width;
@@ -999,7 +1002,10 @@ namespace
 
     return underwaterSampleCount / totalSampleCount;
   }
+} // namespace moho
 
+namespace
+{
   /**
    * Address: 0x00581910 (FUN_00581910, func_CreateCAiBrainLuaObject)
    *
@@ -8301,7 +8307,7 @@ int moho::cfunc_CAiBrainBuildPlatoonL(LuaPlus::LuaState* const state)
 
     const float baseCount = static_cast<float>(baseCountObject.GetInteger());
     const float scaledCountFloat = static_cast<float>(countMultiplierObj.GetNumber()) * baseCount;
-    const int scaledCount = static_cast<int>(std::floor(scaledCountFloat));
+    const int scaledCount = msvc8::FloorToIntX87(scaledCountFloat); // 0x0058C6F5..0x0058C708
 
     const LuaPlus::LuaObject builderUnitObject = builderTable[builderIndex];
     Unit* const builderUnit = SCR_FromLua_Unit(builderUnitObject);

@@ -481,13 +481,17 @@ void moho::REF_UpdateMD5(
     || refType == GetBoolRType() || refType->IsEnumType() != nullptr;
 
   if (isPrimitiveLike) {
-    PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
+    if (traceFile != nullptr) {
+      PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
+    }
     md5.Update(ref.mObj, static_cast<std::size_t>(refType->size_));
     return;
   }
 
   if (refType == GetStringRType()) {
-    PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
+    if (traceFile != nullptr) {
+      PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
+    }
     const auto& stringValue = *static_cast<const msvc8::string*>(ref.mObj);
     md5.Update(stringValue.c_str(), stringValue.size() + 1u);
     return;
@@ -2194,8 +2198,11 @@ namespace
       return nullptr;
     }
 
-    CAiTarget target{};
-    target.DecodeFromSSTITarget(commandIssueData.mTarget, sim);
+    // 0x006F1530..0x006F1596 tests the raw target; decoding it here would draw
+    // from the sim RNG (replay 27960975 desynced at beat 31123).
+    CAiTarget noRushTarget{};
+    noRushTarget.targetType = commandIssueData.mTarget.mType;
+    noRushTarget.position = commandIssueData.mTarget.mPos;
 
     CUnitCommand* issuedCommand = nullptr;
     for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
@@ -2208,7 +2215,7 @@ namespace
         continue;
       }
 
-      if (IsOutsideArmyNoRushRadius(unit->ArmyRef, target)) {
+      if (IsOutsideArmyNoRushRadius(unit->ArmyRef, noRushTarget)) {
         continue;
       }
 
@@ -4847,6 +4854,15 @@ namespace moho
 {
   /// Engine addition: switch for MD5UpdateBatch (batched checksum updates). Live; same digests.
   bool sim_ParallelCoords = true;
+  // The trace is text only: the checksum is the same with it or without it.
+  bool dbg_RulesTraceAlways = false;
+  TConVar<bool> gTConVar_dbg_RulesTraceAlways(
+    "dbg_RulesTraceAlways",
+    "Write the rules checksum's text trace to a temporary file at every session start (1), or only when a desync "
+    "recorder is recording (0, the default), since no one else reads it.",
+    &dbg_RulesTraceAlways
+  );
+
   TConVar<bool> gTConVar_sim_ParallelCoords(
     "sim_ParallelCoords",
     "Advance entity coordinates (transforms, history, collision bounds) on sim workers; relinks and intel stay serial (needs sim_Workers > 0).",
@@ -4978,6 +4994,13 @@ void Sim::UpdateChecksum()
 {
   // Engine addition (issue #216): read once; the binary tested `mLog` at each line.
   const bool syncLog = IsSyncLogOn();
+  // Engine addition (sim_DesyncDump): the hashed values, framed, also go into the desync recorder's
+  // memory ring (CDesyncRecorder::StateTap documents the records); copied, nothing formatted.
+  CDesyncRecorder* const recorder = CDesyncRecorder::For(this);
+  std::string* const stateTap = recorder != nullptr ? recorder->StateTap() : nullptr;
+  const auto tap = [stateTap](const void* const data, const std::size_t size) {
+    stateTap->append(static_cast<const char*>(data), size);
+  };
   auto logChecksumDigest = [this, syncLog]() {
     if (!syncLog) {
       return;
@@ -4996,6 +5019,12 @@ void Sim::UpdateChecksum()
 
     const SEconTotals& economy = army->GetEconomy()->economy;
     mContext.Update(&economy, sizeof(economy));
+    if (stateTap != nullptr) {
+      const std::int32_t armyIndex = army->mConstDat.mArmyIndex;
+      stateTap->push_back('A');
+      tap(&armyIndex, sizeof(armyIndex));
+      tap(&economy, sizeof(economy));
+    }
     if (syncLog) {
       Logf("    mStored=%.1f,%.1f\n", economy.mStored.ENERGY, economy.mStored.MASS);
       Logf("    mIncome=%.1f,%.1f\n", economy.mIncome.ENERGY, economy.mIncome.MASS);
@@ -5094,6 +5123,20 @@ void Sim::UpdateChecksum()
       entityChecksum.Flush();
       logChecksumDigest();
     }
+    if (stateTap != nullptr) {
+      const std::uint16_t blueprintLength = blueprintId != nullptr
+        ? static_cast<std::uint16_t>(std::min<std::size_t>(std::strlen(blueprintId), 0xFFFEu))
+        : std::uint16_t{0xFFFFu};
+      stateTap->push_back('E');
+      tap(&entityId, sizeof(entityId));
+      tap(&health, sizeof(health));
+      tap(&blueprintLength, sizeof(blueprintLength));
+      if (blueprintId != nullptr) {
+        tap(blueprintId, blueprintLength);
+      }
+      tap(&entity->mVarDat.mCurTransform.orient_, 0x1Cu);
+      tap(&velocity, sizeof(velocity));
+    }
   }
   entityChecksum.Flush();
 
@@ -5103,6 +5146,16 @@ void Sim::UpdateChecksum()
   mContext.Update(&mRngState->hasMarsagliaPair, 1u);
   if (mRngState->hasMarsagliaPair) {
     mContext.Update(&mRngState->marsagliaPair, 4u);
+  }
+  if (stateTap != nullptr) {
+    std::uint32_t pair = 0;
+    if (mRngState->hasMarsagliaPair) {
+      std::memcpy(&pair, &mRngState->marsagliaPair, sizeof(pair));
+    }
+    stateTap->push_back('G');
+    tap(&mRngState->twister.state[0], kRngMtBytes);
+    tap(&mRngState->hasMarsagliaPair, 1u);
+    tap(&pair, sizeof(pair));
   }
 }
 
@@ -5954,6 +6007,7 @@ Sim::Sim(LaunchInfoBase* const info)
     mRules->ExportToLuaState(mLuaState);
     luaBpScope.Emit();
   }
+  static_cast<RRuleGameRulesImpl*>(mRules)->OnSimHasBlueprints();
 
   {
     LuaPlus::LuaObject globals = mLuaState->GetGlobals();
@@ -5991,7 +6045,10 @@ Sim::Sim(LaunchInfoBase* const info)
   }
 
   // Seed the rolling sim checksum from the rules and log the initial digest.
-  if (CDesyncRecorder* const recorder = CDesyncRecorder::For(this)) {
+  // Engine addition: a recorder that isn't recording drops the text, so with one like that only the
+  // /synclog file, if any, gets the trace (dbg_RulesTraceAlways 1: every session writes it, as before).
+  CDesyncRecorder* const recorder = CDesyncRecorder::For(this);
+  if (recorder != nullptr && (recorder->IsRecording() || dbg_RulesTraceAlways)) {
     // Engine addition (issue #216): REF_UpdateMD5 traces into a FILE*, so the recorder takes the
     // rules trace through a temporary file the CRT deletes when it is closed; the /synclog file,
     // when there is one, gets the same text.
@@ -7600,12 +7657,15 @@ void Sim::IssueCommand(
     collectUnit(static_cast<EntId>(value));
   });
 
-  if (selectedUnits.Empty()) {
-    ReleaseCommandIdIfUnconsumed(mCommandDB, commandIssueData.nextCommandId);
+  // 0x00749411..0x0074945E: the DestroySelf cheat test follows the entity loop
+  // directly, so CheatsEnabled() (which folds its flag into the checksum) runs
+  // even when nothing was selected, and a refused order returns without
+  // releasing the command id.
+  if (commandIssueData.mCommandType == EUnitCommandType::UNITCOMMAND_DestroySelf && !CheatsEnabled()) {
     return;
   }
 
-  if (commandIssueData.mCommandType == EUnitCommandType::UNITCOMMAND_DestroySelf && !CheatsEnabled()) {
+  if (selectedUnits.Empty()) {
     ReleaseCommandIdIfUnconsumed(mCommandDB, commandIssueData.nextCommandId);
     return;
   }
@@ -10311,7 +10371,7 @@ namespace
    *     disagreed with the header's `offsetof(REntityBlueprint,
    *     mCategories) == 0x60` and with `REntityBlueprintTypeInfo::AddFields`
    *     (FUN_00512870, `push 60h` for the reflected "Categories" field).
-   *     It does not: `msvc8::vector<T>` in this codebase is 16 bytes
+   *     It does not: the binary's vector is 16 bytes
    *     (leading `myProxy_` before `first_`/`last_`/`end_`, matching VC8's
    *     `_SECURE_SCL=1` `_Container_base12` proxy word), so `begin()`/
    *     `end()` sit at the vector object's `+0x4`/`+0x8` -- `this+0x64`/
@@ -14403,7 +14463,8 @@ int moho::cfunc_DrawLinePopL(LuaPlus::LuaState* const state)
   lineDirection.z = start.z - end.z;
 
   const float directionLengthSquared =
-    (lineDirection.x * lineDirection.x) + (lineDirection.y * lineDirection.y) + (lineDirection.z * lineDirection.z);
+    // 0x0075DF76: (z*z + y*y) + x*x.
+    ((lineDirection.z * lineDirection.z) + (lineDirection.y * lineDirection.y)) + (lineDirection.x * lineDirection.x);
   if (directionLengthSquared > 0.0f) {
     const float scale = 2.0f / std::sqrt(directionLengthSquared);
     lineDirection.x *= scale;
@@ -19007,8 +19068,9 @@ namespace
 
     const float extentX = p0z - p0x;
     const float extentZ = p1x - p0y;
-    int cursorX = static_cast<int>(std::floor(p0x));
-    int cursorZ = static_cast<int>(std::floor(p0y));
+    // FUN_0040D860's inlined floor (0x0040D908, 0x0040D93A); the step-1 mask is -1.
+    int cursorX = msvc8::FloorToIntX87(p0x);
+    int cursorZ = msvc8::FloorToIntX87(p0y);
 
     for (;;) {
       const int cellDX = dirMaskX ^ cursorX;

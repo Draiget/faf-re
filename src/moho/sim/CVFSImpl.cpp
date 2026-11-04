@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <io.h>
@@ -34,6 +35,30 @@ namespace moho
     "Remember where the mounted file system found each file until the mounts or files change (same results, less work).",
     &res_CacheFileLookups
   );
+
+  int res_EnumOrderFuzz = -1;
+
+  TConVar<int> gTConVar_res_EnumOrderFuzz(
+    "res_EnumOrderFuzz",
+    "Test switch: shuffle every directory listing with this seed before the engine sorts it; 0 off. "
+    "Results must not change (seeded from /enumorderfuzz N).",
+    &res_EnumOrderFuzz
+  );
+
+  std::uint32_t DISK_EnumerationOrderFuzzSeed()
+  {
+    if (res_EnumOrderFuzz < 0) {
+      msvc8::vector<msvc8::string> args;
+      const int seed = CFG_GetArgOption("/enumorderfuzz", 1u, &args) && !args.empty()
+        ? static_cast<int>(std::max(0L, std::strtol(args[0].c_str(), nullptr, 10)))
+        : 0;
+      if (seed != 0) {
+        gpg::Logf("res_EnumOrderFuzz: directory listings shuffled with seed %d before they are sorted", seed);
+      }
+      res_EnumOrderFuzz = seed;
+    }
+    return static_cast<std::uint32_t>(res_EnumOrderFuzz);
+  }
 } // namespace moho
 
 namespace
@@ -63,6 +88,12 @@ namespace
     void OnDiskWatchEvent(const moho::SDiskWatchEvent& /*event*/) override
     {
       Invalidate();
+    }
+
+    [[nodiscard]] std::uint64_t Generation()
+    {
+      const std::shared_lock lock(mMutex);
+      return mGeneration;
     }
 
     void Invalidate()
@@ -129,6 +160,11 @@ namespace
     return *sCache;
   }
 } // namespace
+
+std::uint64_t moho::DISK_FileLookupGeneration()
+{
+  return MountedFileLookups().Generation();
+}
 
 void moho::DISK_InvalidateFileLookups()
 {
@@ -280,6 +316,9 @@ namespace
       matches.push_back(findData);
     } while (::_findnext64(findHandle, &findData) == 0);
     (void)::_findclose(findHandle);
+    moho::DISK_FuzzEnumerationOrder(matches.begin(), matches.end(), [](const __finddata64_t& match) {
+      return match.name;
+    });
 
     // Engine addition (dedicated-server plan WPL.15): the matches in NTFS's order on every
     // platform and file system, as the shipped game sees them on NTFS. The order is the
@@ -369,6 +408,50 @@ namespace
   }
 
   /**
+   * Engine addition: `res_ZipNameCache`. Each file search lowered every entry name of every mounted
+   * archive, and most searches keep few of them. An archive's names don't change while it is mounted,
+   * so they are lowered once per archive path. Results are the same and the caller sorts them.
+   * `/nozipnamecache` turns it off at startup.
+   */
+  bool res_ZipNameCache = true;
+  moho::TConVar<bool> gTConVar_res_ZipNameCache(
+    "res_ZipNameCache",
+    "Lower each mounted archive's entry names once (1, the default), or on every file search (0). Same results. "
+    "/nozipnamecache turns it off at startup.",
+    &res_ZipNameCache
+  );
+
+  /** The archive's lowered names with forward slashes, one per entry, or null when the cache is off. */
+  [[nodiscard]] const std::vector<std::string>* LoweredZipNames(const moho::CZipFile& zipFile)
+  {
+    static const bool startupOff = moho::CFG_GetArgOption("/nozipnamecache", 0u, nullptr);
+    if (!res_ZipNameCache || startupOff) {
+      return nullptr;
+    }
+    static std::shared_mutex sMutex;
+    static std::unordered_map<std::string, std::vector<std::string>> sNames;
+    const std::string key(zipFile.mPath.c_str());
+    {
+      const std::shared_lock lock(sMutex);
+      const auto found = sNames.find(key);
+      if (found != sNames.end() && found->second.size() == zipFile.mEntries.size()) {
+        return &found->second;
+      }
+    }
+    std::vector<std::string> names;
+    names.reserve(zipFile.mEntries.size());
+    for (std::size_t index = 0; index < zipFile.mEntries.size(); ++index) {
+      msvc8::string name = gpg::STR_ToLower(zipFile.GetEntryName(static_cast<std::uint32_t>(index)).c_str());
+      gpg::STR_Replace(name, "\\", "/", -1);
+      names.emplace_back(name.c_str());
+    }
+    const std::unique_lock lock(sMutex);
+    auto& stored = sNames[key];
+    stored = std::move(names);
+    return &stored;
+  }
+
+  /**
    * Address: 0x00467380 (FUN_00467380, sub_467380)
    *
    * What it does:
@@ -390,12 +473,21 @@ namespace
 
     const std::size_t prefixLength = std::strlen(relativePrefix);
     const std::size_t entryCount = zipFile->mEntries.size();
+    const std::vector<std::string>* const loweredNames = LoweredZipNames(*zipFile);
     for (std::size_t entryIndex = 0; entryIndex < entryCount; ++entryIndex) {
-      msvc8::string entryPath = gpg::STR_ToLower(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)).c_str());
-      gpg::STR_Replace(entryPath, "\\", "/", -1);
+      msvc8::string entryPath;
+      if (loweredNames != nullptr) {
+        if ((*loweredNames)[entryIndex].compare(0U, prefixLength, relativePrefix) != 0) {
+          continue;
+        }
+        entryPath.assign_owned((*loweredNames)[entryIndex]);
+      } else {
+        entryPath = gpg::STR_ToLower(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)).c_str());
+        gpg::STR_Replace(entryPath, "\\", "/", -1);
 
-      if (!gpg::STR_StartsWith(entryPath.c_str(), relativePrefix)) {
-        continue;
+        if (!gpg::STR_StartsWith(entryPath.c_str(), relativePrefix)) {
+          continue;
+        }
       }
 
       const char* const relativeTail = entryPath.c_str() + prefixLength;
@@ -434,12 +526,21 @@ namespace
 
     const std::size_t prefixLength = std::strlen(relativePrefix);
     const std::size_t entryCount = zipFile->mEntries.size();
+    const std::vector<std::string>* const loweredNames = LoweredZipNames(*zipFile);
     for (std::size_t entryIndex = 0; entryIndex < entryCount; ++entryIndex) {
-      msvc8::string entryPath = gpg::STR_ToLower(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)).c_str());
-      gpg::STR_Replace(entryPath, "\\", "/", -1);
+      msvc8::string entryPath;
+      if (loweredNames != nullptr) {
+        if ((*loweredNames)[entryIndex].compare(0U, prefixLength, relativePrefix) != 0) {
+          continue;
+        }
+        entryPath.assign_owned((*loweredNames)[entryIndex]);
+      } else {
+        entryPath = gpg::STR_ToLower(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)).c_str());
+        gpg::STR_Replace(entryPath, "\\", "/", -1);
 
-      if (!gpg::STR_StartsWith(entryPath.c_str(), relativePrefix)) {
-        continue;
+        if (!gpg::STR_StartsWith(entryPath.c_str(), relativePrefix)) {
+          continue;
+        }
       }
 
       const char* const firstSlash = std::strchr(entryPath.c_str() + prefixLength, '/');
@@ -490,6 +591,9 @@ namespace
       return;
     }
 
+    // Engine addition (dedicated-server plan WPR.22): the paths this folder adds, in the order
+    // the file system lists it; the callers sort them (SortAndUniquePaths).
+    const std::size_t firstAdded = outPaths.size();
     do {
       msvc8::string loweredName = gpg::STR_ToLower(findData.name);
       const bool isDirectory = (findData.attrib & _A_SUBDIR) != 0u;
@@ -519,6 +623,9 @@ namespace
     } while (::_findnext64(findHandle, &findData) == 0);
 
     (void)::_findclose(findHandle);
+    moho::DISK_FuzzEnumerationOrder(outPaths.begin() + firstAdded, outPaths.end(), [](const msvc8::string& path) {
+      return path.c_str();
+    });
   }
 
   /**
@@ -546,6 +653,7 @@ namespace
       return;
     }
 
+    const std::size_t firstAdded = outPaths.size(); // engine addition (plan WPR.22), as above
     do {
       const bool isDirectory = (findData.attrib & _A_SUBDIR) != 0u;
       if (!isDirectory || std::strcmp(findData.name, ".") == 0 || std::strcmp(findData.name, "..") == 0) {
@@ -559,6 +667,9 @@ namespace
     } while (::_findnext64(findHandle, &findData) == 0);
 
     (void)::_findclose(findHandle);
+    moho::DISK_FuzzEnumerationOrder(outPaths.begin() + firstAdded, outPaths.end(), [](const msvc8::string& path) {
+      return path.c_str();
+    });
   }
 
   void RetainMountedZipHandle(moho::SFileWaitHandle* const handle)

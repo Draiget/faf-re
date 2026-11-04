@@ -10,6 +10,8 @@
 #include <type_traits>
 #include <utility>
 
+#include "legacy/containers/Layout.h"
+
 /**
  * \file RbTree.h
  * \brief Shared owning red-black tree used by `msvc8::set` and `msvc8::map`.
@@ -50,22 +52,10 @@
  * iterators a single pointer wide.
  */
 
-#ifndef MSVC8_RBTREE_DISABLE_FREE
-#define MSVC8_RBTREE_DISABLE_FREE 0
-#endif
-
 #pragma pack(push, 4)
 
 namespace msvc8
 {
-#ifndef MSVC8_CONTAINER_PROXY_DEFINED
-#define MSVC8_CONTAINER_PROXY_DEFINED 1
-    struct _Container_proxy
-    {
-        void* _Myfirstiter;
-    };
-#endif
-
     namespace detail
     {
         /** Red-black node colours, matching the MSVC8 `_Redbl` encoding. */
@@ -1747,9 +1737,9 @@ namespace msvc8
              * Address: 0x0052DA80 (FUN_0052DA80 -- a second emission of that construction; zero callers. Formerly `InitializeLuaTaskListContainerHeadLane`, same file, removed 2026-09-28.)
              * Address: 0x00528200 (FUN_00528200 -- the same construction for the set at +0x04 of a whole `RRuleGameRulesLuaExportBinding`, after storing `mRootState` at +0x00; zero callers, `ExportToLuaState` inlines it at 0x0052A28E. Formerly `InitializeLuaTaskListContainerWithProxy`, same file, removed 2026-09-28.)
              */
-            rb_tree() : proxy_(nullptr), head_(buy_head()), size_(0) {}
+            rb_tree() : head_(buy_head()), size_(0) {}
 
-            explicit rb_tree(const key_compare& comp) : carrier(comp), proxy_(nullptr), head_(buy_head()), size_(0) {}
+            explicit rb_tree(const key_compare& comp) : carrier(comp), head_(buy_head()), size_(0) {}
 
             /**
              * MSVC8 `_Tree::_Tree(const _Myt&)`: stands a fresh head sentinel up
@@ -1901,7 +1891,7 @@ namespace msvc8
              * Address: 0x008AEE40 (FUN_008AEE40 -- the copy constructor for `msvc8::set<std::int32_t>` (`SoundHandleRecord::mTrackedEntities` at +0x18; node 0x14, colour/nil at +0x10/+0x11): `buy_head` (0x008AFAC0), isNil=1, three self-links, size zero, then `_Copy` 0x008AF580; the catch `_Erase`s what was built (0x008AF1C0) and rethrows. Reached from `SoundHandleRecord`'s implicit copy constructor 0x008AECF0. It was cited on `RefreshTrackedEntitySetAfterRelocation`, which built the empty head and never copied, removed 2026-09-30.)
              */
             rb_tree(const rb_tree& other)
-                : carrier(static_cast<const carrier&>(other)), proxy_(nullptr), head_(buy_head()), size_(0)
+                : carrier(static_cast<const carrier&>(other)), head_(buy_head()), size_(0)
             {
                 try {
                     copy_from(other);
@@ -1930,7 +1920,7 @@ namespace msvc8
             }
 
             rb_tree(rb_tree&& other) noexcept
-                : carrier(static_cast<carrier&&>(other)), proxy_(nullptr), head_(nullptr), size_(0)
+                : carrier(static_cast<carrier&&>(other)), head_(nullptr), size_(0)
             {
                 adopt_from(other);
             }
@@ -5943,7 +5933,6 @@ namespace msvc8
                     return;
                 }
                 std::swap(static_cast<carrier&>(*this), static_cast<carrier&>(other));
-                std::swap(proxy_, other.proxy_);
                 std::swap(head_, other.head_);
                 std::swap(size_, other.size_);
             }
@@ -6306,11 +6295,7 @@ namespace msvc8
              */
             static void free_raw(node_type* const n) noexcept
             {
-#if !MSVC8_RBTREE_DISABLE_FREE
                 ::operator delete(n);
-#else
-                (void)n;
-#endif
             }
 
             /**
@@ -7815,10 +7800,8 @@ namespace msvc8
 
             void adopt_from(rb_tree& other) noexcept
             {
-                proxy_ = other.proxy_;
                 head_ = other.head_;
                 size_ = other.size_;
-                other.proxy_ = nullptr;
                 other.head_ = buy_head();
                 other.size_ = 0;
             }
@@ -9059,7 +9042,9 @@ namespace msvc8
              * checked-iterator category as `FUN_004E3A30` immediately above.
              */
             // ---- 12-byte payload (x86); field order is ABI ---------------------
-            _Container_proxy* proxy_; // +0x00
+#if FAF_RETAIL_LAYOUT
+            void* proxy_ = nullptr; // +0x00
+#endif
             /**
              * Address: 0x0083A630 (FUN_0083A630 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `end()` (`_Myhead` through the hidden iterator slot); zero callers, unreachable; formerly `LoadPrimaryGlobalPointerValue` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
              * Address: 0x0083B0E0 (FUN_0083B0E0 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `end()` / the `_Myhead` read the rotations and lower_bound start from; zero callers, unreachable; formerly `ReadPrimaryGlobalPointerValue` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)

@@ -30,6 +30,7 @@ import os
 import re
 import subprocess
 import sys
+import tarfile
 import time
 import zipfile
 import zlib
@@ -38,6 +39,9 @@ import zlib
 RECORDER_SWITCHES = {"sim_DesyncRecorder", "sim_DesyncRecorderMB", "sim_DesyncDumpBeat"}
 # Pacing switches headless sets for every replay run (ReplayRunner.cpp); they don't reach the sim.
 REPLAY_RUNNER_SWITCHES = {"sim_LeadOnSchedule"}
+# Dumps list these too (rendering, UI, camera, the user-side thread pool); players may set them
+# differently without touching the sim, so a difference is shown but doesn't count.
+CLIENT_SWITCH_PREFIXES = ("ren_", "ui_", "range_", "cam_", "user_", "sys_")
 
 HEADER_FIELDS = [
     ("build", "commit"), ("build", "arch"), ("build", "dirty"),
@@ -68,13 +72,18 @@ class Dump:
         self.path = path
         self.label = os.path.basename(path)
         try:
-            self.zip = zipfile.ZipFile(path)
-            self.header = json.loads(self.zip.read("header.json"))
-        except (OSError, zipfile.BadZipFile, KeyError, ValueError) as error:
+            if path.lower().endswith((".tar.gz", ".tgz")):  # the copy the engine uploads (telemetry_DumpEndpoint)
+                with tarfile.open(path, "r:gz") as tar:
+                    self.files = {m.name: tar.extractfile(m).read() for m in tar.getmembers() if m.isfile()}
+            else:
+                with zipfile.ZipFile(path) as archive:
+                    self.files = {name: archive.read(name) for name in archive.namelist()}
+            self.header = json.loads(self.files["header.json"])
+        except (OSError, zipfile.BadZipFile, tarfile.TarError, EOFError, KeyError, ValueError) as error:
             raise BadInput("%s: not a desync dump (%s)" % (path, error))
         if self.header.get("format") != 1:
             raise BadInput("%s: unknown dump format %r" % (path, self.header.get("format")))
-        names = self.zip.namelist()
+        names = list(self.files)
         self.beats = sorted(int(n[len("beats/beat"):-len(".log")]) for n in names
                             if n.startswith("beats/beat") and n.endswith(".log"))
         self.armies = {a["index"]: a for a in self.header.get("armies", [])}
@@ -89,10 +98,8 @@ class Dump:
         return dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
 
     def text(self, name):
-        try:
-            return self.zip.read(name).decode("utf-8", errors="replace").splitlines()
-        except KeyError:
-            return None
+        data = self.files.get(name)
+        return None if data is None else data.decode("utf-8", errors="replace").splitlines()
 
     def beat_log(self, beat):
         return self.text("beats/beat%05d.log" % beat)
@@ -189,6 +196,9 @@ def compare_headers(base, other):
         if a != b:
             if one_replay and name in REPLAY_RUNNER_SWITCHES:
                 print("  switch %s: %s | %s (set by the replay runner, not counted)" % (name, a, b))
+                continue
+            if name.startswith(CLIENT_SWITCH_PREFIXES):
+                print("  switch %s: %s | %s (render, UI or thread setting, not counted)" % (name, a, b))
                 continue
             print("  switch %s: %s | %s" % (name, a, b))
             found = True

@@ -9,6 +9,9 @@
 
 include(sources.cmake)
 
+# The net channel, a library of its own (no engine dependency, see its CMakeLists).
+add_subdirectory(remote/net)
+
 if(FAF_TARGET_ARCH STREQUAL "x64")
   set(_faf_default_name main_x64)
 else()
@@ -77,7 +80,9 @@ target_include_directories(faf_engine PUBLIC
   "${CMAKE_CURRENT_SOURCE_DIR}"
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
-target_link_libraries(faf_engine PUBLIC faf_codegen faf::wx Wm3Dx9Application)
+target_link_libraries(faf_engine PUBLIC faf_codegen faf::wx Wm3Headers)
+# In-engine peer links (moho/net/NetlinkPeers.cpp, issue #233; client only).
+target_link_libraries(faf_engine PUBLIC faf_netlink)
 
 set(_faf_main_options
   # C++ exceptions with extern "C" functions allowed to throw (/EHs, not
@@ -93,10 +98,10 @@ set(_faf_main_options
   # the DirectX SDK.
   "/clang:-idirafter${FAF_DXSDK_DIR}/Include")
 
-if(FAF_TARGET_ARCH STREQUAL "x64")
-  # Switches off the Win32 layout static_asserts (see the header).
-  list(APPEND _faf_main_options /FIplatform/X64LayoutAsserts.h)
-else()
+# Switches off the Win32 layout static_asserts where they don't apply (see the
+# header).
+list(APPEND _faf_main_options /FIplatform/LayoutAsserts.h)
+if(NOT FAF_TARGET_ARCH STREQUAL "x64")
   # Keeps sqrt a CRT call under the sim's _PC_24 x87 control word (see the
   # header and cmake/FafCodegen.cmake).
   list(APPEND _faf_main_options /FIplatform/X87SqrtCall.h)
@@ -124,6 +129,9 @@ list(APPEND _faf_main_options
 
 # C and C++ only (not the x64 MASM file).
 target_compile_options(faf_engine PUBLIC "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
+if(FAF_SYNTAX_ONLY)
+  target_compile_options(faf_engine PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:/Zs>")
+endif()
 
 # --- Per-file settings ---------------------------------------------------------------
 set(_fx11 "${FAF_DEPENDENCIES_DIR}/FX11")
@@ -390,7 +398,7 @@ target_include_directories(faf_sim_settings INTERFACE
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_compile_options(faf_sim_settings INTERFACE "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
-target_link_libraries(faf_sim_settings INTERFACE faf_codegen Wm3Foundation)
+target_link_libraries(faf_sim_settings INTERFACE faf_codegen Wm3Headers)
 
 # MatrixPortable.cpp (faf_main has the D3DX version) is compiled by each program that links
 # faf_sim, so its object (it has a static initialiser) links after the program's own, as
@@ -423,6 +431,9 @@ if(NOT FAF_SERVER_MODE)
 endif()
 
 add_executable(headless ${_faf_headless_sources})
+if(FAF_CALL_HASH_BUILD)
+  target_sources(headless PRIVATE headless/CallHashHooks.cpp)
+endif()
 if(FAF_TARGET_ARCH STREQUAL "x64")
   set_target_properties(headless PROPERTIES OUTPUT_NAME headless_x64)
 endif()

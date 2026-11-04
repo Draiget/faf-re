@@ -17,48 +17,51 @@ namespace faf::remote::wire
   class TSharedValue
   {
   public:
-    TSharedValue()
-      : mValue(Default())
-    {}
+    TSharedValue() = default;
 
     explicit TSharedValue(T value)
       : mValue(std::make_shared<const T>(std::move(value)))
     {}
 
-    [[nodiscard]] const T& operator*() const noexcept { return *mValue; }
-    [[nodiscard]] const T* operator->() const noexcept { return mValue.get(); }
+    [[nodiscard]] const T& operator*() const noexcept { return mValue ? *mValue : Default(); }
+    [[nodiscard]] const T* operator->() const noexcept { return &**this; }
 
     /** The value to change, no longer shared with any other holder. */
     [[nodiscard]] T& Edit()
     {
       if (mValue.use_count() != 1) {
-        mValue = std::make_shared<const T>(*mValue);
+        mValue = std::make_shared<const T>(**this);
       }
       // The object was made non-const by `make_shared`; only the pointer's type is const.
       return const_cast<T&>(*mValue);
     }
 
-    /** Replaces the value unless it is equal already (keeping the sharing). */
-    void Assign(const T& value)
+    /** Replaces the value unless it is equal already (keeping the sharing); whether it did. */
+    bool Assign(const T& value)
     {
-      if (!(*mValue == value)) {
-        mValue = std::make_shared<const T>(value);
+      if (**this == value) {
+        return false;
       }
+      mValue = std::make_shared<const T>(value);
+      return true;
     }
 
     [[nodiscard]] bool operator==(const TSharedValue& other) const noexcept
     {
-      return mValue == other.mValue || *mValue == *other.mValue;
+      return mValue == other.mValue || **this == *other;
     }
 
   private:
-    /** One default value every default-made holder shares. */
-    [[nodiscard]] static const std::shared_ptr<const T>& Default()
+    /**
+     * The value of a holder with no pointer. A pointer to a shared default would be counted on one
+     * cache line by every record copied on every sim worker (plan WPR.35).
+     */
+    [[nodiscard]] static const T& Default()
     {
-      static const std::shared_ptr<const T> value = std::make_shared<const T>();
+      static const T value{};
       return value;
     }
 
-    std::shared_ptr<const T> mValue; // never null
+    std::shared_ptr<const T> mValue; // null: the default value
   };
 } // namespace faf::remote::wire

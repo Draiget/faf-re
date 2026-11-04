@@ -9,6 +9,7 @@
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
+#include "legacy/math/X87Math.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EVisibilityModeTypeInfo.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -190,7 +191,7 @@ namespace moho
     }
 
     const float priorityValue = static_cast<float>(lua_tonumber(rawState, 2));
-    prop->mPriorityInfo.mPriority = static_cast<std::int32_t>(std::ceil(priorityValue));
+    prop->mPriorityInfo.mPriority = msvc8::CeilToIntX87(priorityValue); // 0x006FD093..0x006FD0A6
 
     Sim* const sim = prop->SimulationRef;
     prop->mPriorityInfo.mBoundedTick = static_cast<std::int32_t>(sim->mCurTick);

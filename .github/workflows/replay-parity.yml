@@ -6,7 +6,12 @@ name: Replay parity
 # fills; it fetches from FAF only what they lack. tools/parity-data/README.md.
 #
 # Run it from master (its caches are the ones every run can read) with the commit to test.
+# Every night at 20:00 UTC (00:00 UTC+4) it plays master's head on the nightly set: every replay
+# that desynced before and others picked once, the same ones each night, as many as 40 jobs of 150
+# minutes play (20 at once, so two rounds, about 5 h 30 min). Passing starts the Nightly release.
 on:
+  schedule:
+    - cron: "0 20 * * *"
   workflow_dispatch:
     inputs:
       ref:
@@ -16,10 +21,10 @@ on:
       set:
         description: Replays to play
         type: choice
-        options: [core, extended, sample, all]
+        options: [core, extended, sample, nightly, all]
         default: core
       sample:
-        description: Replays for set=sample
+        description: Replays for set=sample or nightly
         default: "1000"
       seed:
         description: Random order of the sample (and of what set=all leaves out past 256 jobs)
@@ -30,6 +35,10 @@ on:
       after_run:
         description: An earlier run's id; play only what it did not (no time left, not got ready) or what crashed, and report both
         default: ""
+      resume:
+        description: With after_run, play only what that run scheduled (resumes a cancelled run; set and batch are then that run's, give set=all and batch 1/1)
+        type: boolean
+        default: false
       oracle_check:
         description: Also check the server's visibility oracles every beat (unfocused, every army; slower), verdict oracle on a difference
         type: boolean
@@ -50,11 +59,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  GAME_VERSION: ${{ inputs.game_version }}
+  GAME_VERSION: ${{ inputs.game_version || '3835' }}
   PYTHON_VERSION: "3.14"
   # Jobs play for this long; plan.py packs shards to it, shard.py starts nothing that would not
   # end by then. A job may run 360 minutes in all.
-  PLAY_MINUTES: ${{ inputs.job_minutes }}
+  PLAY_MINUTES: ${{ inputs.job_minutes || '150' }}
   # Part of the headless build's cache key: a new value rebuilds everything once.
   BUILD_CACHE: "v1"
 
@@ -66,7 +75,7 @@ jobs:
       - id: commit
         env:
           GH_TOKEN: ${{ github.token }}
-          REF: ${{ inputs.ref }}
+          REF: ${{ inputs.ref || github.sha }}
         run: |
           sha=$(gh api "repos/${{ github.repository }}/commits/$REF" --jq .sha)
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
@@ -91,7 +100,7 @@ jobs:
           sudo apt-get update
           v=1:18.1.3-1ubuntu1
           sudo apt-get install -y --no-install-recommends ninja-build \
-            clang-18=$v lld-18=$v libc++-18-dev=$v libc++abi-18-dev=$v libunwind-18-dev=$v
+            clang-18=$v lld-18=$v llvm-18=$v libc++-18-dev=$v libc++abi-18-dev=$v libunwind-18-dev=$v
       - if: steps.built.outputs.cache-hit != 'true'
         uses: actions/cache@v6
         with:
@@ -141,12 +150,22 @@ jobs:
           path: after
           run-id: ${{ inputs.after_run }}
           github-token: ${{ github.token }}
+      # The earlier run's plan, for resume: its replays, with its own after_run and batch applied.
+      - if: inputs.after_run != '' && inputs.resume
+        uses: actions/download-artifact@v8
+        with:
+          name: plan
+          path: resumed
+          run-id: ${{ inputs.after_run }}
+          github-token: ${{ github.token }}
       - id: plan
         run: >
           mkdir -p cache/index &&
           python tools/parity-data/plan.py --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz --index cache/index
-          --set ${{ inputs.set }} --sample ${{ inputs.sample }} --seed ${{ inputs.seed }} --slots 4
-          --batch "${{ inputs.batch }}" --budget-minutes "$PLAY_MINUTES" ${{ inputs.after_run != '' && '--after after' || '' }}
+          --set ${{ inputs.set || 'nightly' }} --sample ${{ inputs.sample || '5000' }} --seed ${{ inputs.seed || '1' }} --slots 4
+          --desynced tools/parity-data/desynced/$GAME_VERSION.txt ${{ (inputs.set || 'nightly') == 'nightly' && '--max-shards 40' || '' }}
+          --batch "${{ inputs.batch || '1/1' }}" --budget-minutes "$PLAY_MINUTES" ${{ inputs.after_run != '' && '--after after' || '' }}
+          ${{ inputs.after_run != '' && inputs.resume && '--replays-of resumed/plan.json' || '' }}
           --out plan.json | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
@@ -158,8 +177,11 @@ jobs:
     needs: [build, plan]
     runs-on: ubuntu-24.04
     timeout-minutes: 350
-    # PARITY_RETAIL_KEY is this environment's secret, given to master only.
-    environment: parity
+    # PARITY_RETAIL_KEY is this environment's secret, given to master only. No deployment: the
+    # secret comes without one, and one per shard filled the environment's deployment history.
+    environment:
+      name: parity
+      deployment: false
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
@@ -255,7 +277,7 @@ jobs:
           python tools/parity-data/report.py --plan plan.json --results results
           ${{ inputs.after_run != '' && '--after after' || '' }}
           --expected tools/parity-data/expected/$GAME_VERSION.json --out report
-          --title "Replay parity: ${{ inputs.ref }}, set ${{ inputs.set }}${{ inputs.batch != '1/1' && format(' batch {0}', inputs.batch) || '' }}, game version $GAME_VERSION${{ inputs.after_run != '' && format(', after run {0}', inputs.after_run) || '' }}"
+          --title "Replay parity: ${{ inputs.ref || 'master' }}, set ${{ inputs.set || 'nightly' }}${{ inputs.batch && inputs.batch != '1/1' && format(' batch {0}', inputs.batch) || '' }}, game version $GAME_VERSION${{ inputs.after_run != '' && format(', after run {0}', inputs.after_run) || '' }}"
       - if: always()
         uses: actions/upload-artifact@v7
         with:

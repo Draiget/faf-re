@@ -1,0 +1,44 @@
+name: 2p-peer-features
+description: >
+  Issue #285. Two of our x64 clients with the announcement on: each must see the
+  other's list and answer yes when asked whether everyone supports a feature, and
+  the game must play on with no desync. 3p-peer-features-retail.yaml is the same
+  with the shipped game in the lobby, where the answer stays no. Needs
+  init_mpemu_localvault.lua in the FAF bin folder. Do not click into the game windows.
+timeout: 15m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\peerfeat_test.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+  saveReplays: true
+
+players:
+  - { uid: 1, name: OursA, faction: uef, args: ['/con', 'net_PeerFeatures=1'] }
+  - { uid: 2, name: OursB, faction: cybran, args: ['/con', 'net_PeerFeatures=1'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 2m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  logsContain:
+    - { uids: [1], pattern: 'PEERS: client \d+:OursB announced features' }
+    - { uids: [2], pattern: 'PEERS: client \d+:OursA announced features' }
+    - { uids: [1, 2], pattern: 'PEERS: everyone supports OrderStreamCheck: yes' }
+  logsAbsent:
+    - { uids: [1, 2], pattern: 'mismatched' }

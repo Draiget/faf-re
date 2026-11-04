@@ -78,6 +78,8 @@ namespace moho
       }
     }
 
+    bool gSessionKeepsBlueprints = true;
+
     /**
      * Address: 0x00885DE0 (FUN_00885DE0, func_WorldSessionUserLoad)
      *
@@ -160,7 +162,10 @@ namespace moho
         (void)marker;
       }
 
-      scenario->mGameRules->ExportToLuaState(scenario->mState);
+      if (gSessionKeepsBlueprints) {
+        const SCR_CopySharedTablesScope sharedTables;
+        scenario->mGameRules->ExportToLuaState(scenario->mState);
+      }
       AdvanceLoadingProgress(loadControl);
 
       {
@@ -193,6 +198,11 @@ namespace moho
     }
 
   } // namespace
+
+  void WLD_SetSessionKeepsBlueprints(const bool keep) noexcept
+  {
+    gSessionKeepsBlueprints = keep;
+  }
 
   /**
    * Address: 0x008855B0 (FUN_008855B0) init path (FUN_008855B0, func_GetWldSessionLoader)

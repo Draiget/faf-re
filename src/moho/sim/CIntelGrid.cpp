@@ -11,6 +11,7 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/math/X87Math.h"
 #include "moho/math/GridPos.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/STIMapReflection.h"
@@ -74,16 +75,15 @@ namespace
   // 0x005BE081..0x005BE0A7: the binary forms `1.0f / gridSize` once (divss)
   // and multiplies every coordinate by that reciprocal (mulss); it never
   // divides the coordinate itself, so the scaled value rounds like `v * (1/g)`.
+  // Then the inlined floor (0x005BE0AA, 0x005BE0D6) or ceil (0x005BE103, 0x005BE130).
   [[nodiscard]] std::int32_t FloorScaledToGridCell(const std::int32_t value, const float reciprocal) noexcept
   {
-    const float scaled = static_cast<float>(value) * reciprocal;
-    return static_cast<std::int32_t>(std::floor(scaled));
+    return msvc8::FloorToIntX87(static_cast<float>(value) * reciprocal);
   }
 
   [[nodiscard]] std::int32_t CeilScaledToGridCell(const std::int32_t value, const float reciprocal) noexcept
   {
-    const float scaled = static_cast<float>(value) * reciprocal;
-    return static_cast<std::int32_t>(std::ceil(scaled));
+    return msvc8::CeilToIntX87(static_cast<float>(value) * reciprocal);
   }
 
   /**

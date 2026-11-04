@@ -18,7 +18,9 @@ setlocal EnableDelayedExpansion
 set "HERE=%~dp0"
 for %%I in ("%HERE%..\..") do set "REPO=%%~fI"
 set "SDK=%REPO%\src"
-set "WM3=%REPO%\dependencies\WildMagic3p8\Foundation"
+rem FAF_DEPENDENCIES_DIR as CMake names it (a worktree without its own dependencies\).
+if not defined FAF_DEPENDENCIES_DIR set "FAF_DEPENDENCIES_DIR=%REPO%\dependencies"
+set "WM3=%FAF_DEPENDENCIES_DIR%\WildMagic3p8\Foundation"
 set "OUT=%HERE%build"
 
 if not defined VCToolsInstallDir (
@@ -31,13 +33,14 @@ if not exist "%OUT%" mkdir "%OUT%"
 set "WHICH=%~1"
 if "%WHICH%"=="" set "WHICH=all"
 
-set "INC=/I "%SDK%" /I "%WM3%" /I "%WM3%\Math" /I "%WM3%\System" /I "%WM3%\ObjectSystem" /I "%HERE%src""
+set "INC=/I "%SDK%" /I "%FAF_DEPENDENCIES_DIR%\boost_1_34_1" /I "%WM3%" /I "%HERE%src""
+for %%D in (Approximation Collision Containment Controllers Curves Detail Distance Effects ImageAnalysis Interpolation Intersection Math Meshes Miscellaneous Numerics ObjectSystem Physics RationalArithmetic SceneGraph Shaders SharedArrays Sorting Surfaces System Terrain Tessellation) do set "INC=!INC! /I "%WM3%\%%D""
 set "COMMON=/nologo /c /std:c++20 /permissive- /Zc:inline /fp:precise /EHsc /W3 /sdl /GS /wd4073 /wd4244 /wd4273 /wd4834 /wd4996 /D WIN32 /D _CONSOLE /D WIN32_LEAN_AND_MEAN /D NOMINMAX /D _CRT_SECURE_NO_WARNINGS /D BOOST_ALL_NO_LIB %INC%"
 
 rem Recovered engine sources under test - compiled from src, not copied.
-set "SDK_SRCS="%SDK%\moho\math\QuaternionMath.cpp" "%SDK%\moho\math\Vector3f.cpp" "%SDK%\legacy\math\X87Math.cpp" "%WM3%\System\Wm3System.cpp""
+set "SDK_SRCS="%SDK%\moho\math\QuaternionMath.cpp" "%SDK%\moho\math\Vector3f.cpp" "%SDK%\moho\math\Vector2f.cpp" "%SDK%\legacy\math\X87Math.cpp" "%SDK%\legacy\math\Libm.cpp" "%SDK%\moho\math\GridPos.cpp" "%SDK%\moho\math\Wm3Segment3FafExtras.cpp" "%SDK%\moho\math\Wm3AxisAlignedBox3FafExtras.cpp" "%SDK%\moho\math\Vector4f.cpp" "%SDK%\moho\math\Wm3Queries.cpp" "%SDK%\moho\math\Wm3FoundationStatics.cpp" "%SDK%\moho\collision\CColPrimitiveBase.cpp" "%SDK%\gpg\core\containers\BitArray2D.cpp""
 rem Harness sources.
-set "H_SRCS="%HERE%src\main.cpp" "%HERE%src\pe_image.cpp" "%HERE%src\retail_thunks.cpp" "%HERE%src\targets_math.cpp" "%HERE%src\gen.cpp" "%HERE%src\sdk_mirror.cpp""
+set "H_SRCS="%HERE%src\main.cpp" "%HERE%src\pe_image.cpp" "%HERE%src\retail_thunks.cpp" "%HERE%src\targets_math.cpp" "%HERE%src\targets_sim.cpp" "%HERE%src\gen.cpp" "%HERE%src\sdk_mirror.cpp" "%HERE%src\engine_absent.cpp" "%HERE%src\spec_rows.cpp" "%HERE%src\spec_stub.cpp" "%HERE%src\spec_run.cpp""
 
 set "LINKFLAGS=/nologo /SUBSYSTEM:CONSOLE /MACHINE:X86 /BASE:0x10000000 /FIXED:NO /DYNAMICBASE:NO /NXCOMPAT /INCREMENTAL:NO /DEBUG"
 

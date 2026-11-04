@@ -104,6 +104,14 @@ namespace moho
   );
 
   /**
+   * Captures scroll endpoints into the newest queued entity record. When that
+   * record is deferred, preserves these captured values across its later copy.
+   * Caller must establish current visibility before passing live creator data.
+   * Does not retain source pointers or modify any simulation entity payload.
+   */
+  void OverrideEntityUpdateScroll(SSyncData* syncData, const SSTIEntityVariableData& source);
+
+  /**
    * Engine addition (`sim_ParallelEntitySync`): when the newest entity-update record of
    * `syncData` was deferred, has `Finish` overwrite its mesh, health, completion and dead lanes
    * from `reconInfo` after the copy (what `ReconBlip::SyncInterface` writes) and returns true.

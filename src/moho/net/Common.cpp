@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <new>
 #include <stdexcept>
+#include <tuple>
 #include <vector>
 
 #include "CHostManager.h"
@@ -812,6 +813,20 @@ INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<IN
     gpg::Logf("NET_MakeUDPConnector: bind(%d) failed: %s", port, NET_GetWinsockErrorString());
     ::closesocket(sock);
     return nullptr;
+  }
+  // Engine addition (issue #236): socket buffer sizes, off (0) by default.
+  // A large order burst is sent in one frame and can overflow the system's
+  // default buffers on either side.
+  for (const auto& [option, bytes, label] : {std::tuple{SO_RCVBUF, net_SocketRecvBuffer, "SO_RCVBUF"},
+                                             std::tuple{SO_SNDBUF, net_SocketSendBuffer, "SO_SNDBUF"}}) {
+    if (bytes > 0) {
+      const int value = bytes;
+      if (::setsockopt(sock, SOL_SOCKET, option, reinterpret_cast<const char*>(&value), sizeof(value)) == SOCKET_ERROR) {
+        gpg::Logf("NET_MakeUDPConnector: setsockopt(%s, %d) failed: %s", label, value, NET_GetWinsockErrorString());
+      } else {
+        gpg::Logf("NET_MakeUDPConnector: %s %d", label, value);
+      }
+    }
   }
   return new CNetUDPConnector{sock, prov};
 #else

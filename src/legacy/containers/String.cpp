@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <functional>
 #include <limits>
 #include <new>
 #include <stdexcept>
@@ -57,8 +58,14 @@
 // These stay `noexcept`, so an allocation failure terminates rather than
 // unwinding as MSVC8's would. Nothing on these paths catches std::bad_alloc,
 // so the outcome is the same either way.
-msvc8::string::string(const string& other) noexcept {
-    alVal = nullptr;
+void msvc8::string::InitHeap(const char* const p, const std::size_t n) noexcept {
+    bx.buf[0] = '\0';
+    mySize = 0;
+    myRes = 15;
+    assign_owned(std::string_view(p, n));
+}
+
+void msvc8::string::CopySlow(const string& other) noexcept {
     bx.buf[0] = '\0';
     mySize = 0;
     myRes = 15;
@@ -67,7 +74,7 @@ msvc8::string::string(const string& other) noexcept {
     }
 }
 
-msvc8::string& msvc8::string::operator=(const string& other) noexcept {
+msvc8::string& msvc8::string::AssignSlow(const string& other) noexcept {
     if (this == &other) {
         return *this;
     }
@@ -84,118 +91,6 @@ msvc8::string& msvc8::string::operator=(const string& other) noexcept {
     // assignment. Lifting the fields out of `copied` by hand instead would hand
     // this string a block that `copied`'s destructor then frees.
     return *this = string(other);
-}
-
-/**
- * Address: 0x008846B0 (FUN_008846B0, the `tidy(true, 0)` specialisation) is the
- * body MSVC8 emits for `~basic_string`; see the destructor's own comment in
- * `String.h` for why it was missing and what that cost.
- *
- * What it does:
- * Releases the heap buffer when the string is not in its inline small-buffer
- * state, and leaves the object a valid empty inline string so a second tidy
- * (`scoped_string`'s destructor runs one immediately before this one) is a
- * no-op rather than a double free.
- */
-msvc8::string::~string() noexcept {
-    tidy(true, 0U);
-}
-
-msvc8::string::string(string&& other) noexcept {
-    alVal = other.alVal;
-    bx = other.bx;
-    mySize = other.mySize;
-    myRes = other.myRes;
-    other.alVal = nullptr;
-    other.bx.buf[0] = '\0';
-    other.mySize = 0;
-    other.myRes = 15;
-}
-
-msvc8::string& msvc8::string::operator=(string&& other) noexcept {
-    if (this == &other) {
-        return *this;
-    }
-
-    // Release whatever this string owned before taking the source's buffer;
-    // without this the displaced block would leak exactly as the copy
-    // assignment used to.
-    tidy(true, 0U);
-
-    alVal = other.alVal;
-    bx = other.bx;
-    mySize = other.mySize;
-    myRes = other.myRes;
-    other.alVal = nullptr;
-    other.bx.buf[0] = '\0';
-    other.mySize = 0;
-    other.myRes = 15;
-    return *this;
-}
-
-/**
- * Address: 0x00405550 (FUN_00405550, ??0string@std@@QAE@PBD@Z)
- * Mangled: ??0string@std@@QAE@PBD@Z
- *
- * IDA signature:
- * std::string *__thiscall std::string::string(std::string *this, const char *str);
- *
- * What it does:
- * Puts the string in the empty small-buffer state, then assigns the source
- * measured with strlen. The binary delegates to the (pointer, length) ctor
- * for that second step; assign_owned takes the same path here.
- *
- * The binary does not null-check the source - strlen would fault. This
- * reconstruction keeps the guard, which only turns a crash into an empty
- * string and cannot change behaviour on any input the original survived.
- */
-msvc8::string::string(const char* s) noexcept {
-    alVal = nullptr;
-    bx.buf[0] = '\0';
-    mySize = 0;
-    myRes = 15;
-    if (s != nullptr) {
-        assign_owned(std::string_view(s));
-    }
-}
-
-msvc8::string::string(std::string_view sv) noexcept {
-    alVal = nullptr;
-    bx.buf[0] = '\0';
-    mySize = 0;
-    myRes = 15;
-    assign_owned(sv);
-}
-
-msvc8::string::string(const char* p, const std::size_t n) noexcept {
-    alVal = nullptr;
-    bx.buf[0] = '\0';
-    mySize = 0;
-    myRes = 15;
-    if (p != nullptr && n != 0U) {
-        assign_owned(std::string_view(p, n));
-    }
-}
-
-bool msvc8::string::basic_sanity() const noexcept {
-    // Length must fit capacity; capacity must not be absurd.
-    constexpr uint32_t maxCap = 1u << 30; // arbitrary big guard
-
-    if (mySize > myRes) {
-        return false;
-    }
-    if (myRes > maxCap) {
-        return false;
-    }
-    if (is_sso()) {
-        if (myRes != 15) {
-            // MSVC8 used fixed 15 for SSO
-            return false; 
-        }
-    } else {
-        if (bx.ptr == nullptr) return false;
-    }
-    return true;
 }
 
 void msvc8::string::eos(const uint32_t newSize) noexcept {
@@ -466,7 +361,7 @@ bool msvc8::string::resize(const std::size_t newSize, const char ch) noexcept {
     return true;
 }
 
-bool msvc8::string::append(const char* s, const std::size_t n) noexcept {
+bool msvc8::string::AppendSlow(const char* s, const std::size_t n) noexcept {
     if (!basic_sanity() || s == nullptr) {
         return false;
     }
@@ -476,6 +371,14 @@ bool msvc8::string::append(const char* s, const std::size_t n) noexcept {
     if (n == 0) {
         return true;
     }
+
+    // The grow below releases the old buffer, which `s` may point into.
+    const char* const current = raw_data_unsafe();
+    if (!std::less<const char*>{}(s, current) && !std::less<const char*>{}(current + mySize, s)) {
+        const string source(s, n);
+        return AppendSlow(source.raw_data_unsafe(), n);
+    }
+
     if (!ensure_capacity(mySize + n)) {
         return false;
     }
@@ -486,7 +389,7 @@ bool msvc8::string::append(const char* s, const std::size_t n) noexcept {
     return true;
 }
 
-bool msvc8::string::append(const std::size_t count, const char ch) noexcept {
+bool msvc8::string::AppendSlow(const std::size_t count, const char ch) noexcept {
     if (!basic_sanity()) {
         return false;
     }
@@ -532,11 +435,9 @@ std::size_t msvc8::string::find(const char ch, const std::size_t pos) const noex
     if (!basic_sanity() || pos > mySize) {
         return npos;
     }
-    const char* p = raw_data_unsafe();
-    for (std::size_t i = pos; i < mySize; ++i) {
-        if (p[i] == ch) return i;
-    }
-    return npos;
+    const char* const p = raw_data_unsafe();
+    const void* const hit = (pos < mySize) ? std::memchr(p + pos, static_cast<unsigned char>(ch), mySize - pos) : nullptr;
+    return hit != nullptr ? static_cast<std::size_t>(static_cast<const char*>(hit) - p) : npos;
 }
 
 std::size_t msvc8::string::find(const std::string_view needle, const std::size_t pos) const noexcept {
@@ -785,16 +686,6 @@ msvc8::string msvc8::string::operator+(const std::string_view rhs) const noexcep
 
 msvc8::string msvc8::string::operator+(const char* rhs) const noexcept {
     return detail::concat_impl(view(), std::string_view(rhs ? rhs : ""));
-}
-
-// Owning concatenation; see detail::concat_impl in the header for why the
-// thread-local arena path had to go.
-msvc8::string msvc8::string::concat_impl_(const std::string_view a, const std::string_view b) noexcept {
-    string out;
-    out.reserve(a.size() + b.size());
-    (void)out.append(a.data(), a.size());
-    (void)out.append(b.data(), b.size());
-    return out;
 }
 
 msvc8::string msvc8::operator+(const std::string_view lhs, const string& rhs) noexcept {

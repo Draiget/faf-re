@@ -1,6 +1,7 @@
 ﻿// ReSharper disable CppTooWideScope
 #include "CNetUDPConnection.h"
 #include <algorithm>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -14,6 +15,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "NetConVars.h"
 #include "NetMessageRanges.h"
+#include "NetPeerTransport.h"
 using namespace moho;
 
 namespace
@@ -736,12 +738,59 @@ bool CNetUDPConnection::ProcessAckInternal(const SNetPacket* packet)
     }
   }
 
+  // Engine addition (issue #237), off by default: resend a packet the peer
+  // reports 3 later packets past without waiting for its resend timer.
+  if (NET_FastRetransmitEnabled()) {
+    FastRetransmitFromMask(expected, earlyMask);
+  }
+
   // Track far end's window head if it advanced.
   if (static_cast<int16_t>(expected - mRemoteExpectedSequenceNumber) > 0) {
     mRemoteExpectedSequenceNumber = expected;
   }
 
   return true;
+}
+
+/**
+ * Engine addition (issue #237), not in the binary.
+ *
+ * What it does:
+ * With the ACKed packets gone, makes every unACKed packet that the peer's
+ * early mask shows at least 3 later packets past due now, unless it was sent
+ * less than one round trip ago, and puts it back in send-time order
+ * (`SendData` only looks at the head). The last send time is the scheduled
+ * resend time less the delay `SendPacket` added, which it computed before
+ * counting that send.
+ */
+void CNetUDPConnection::FastRetransmitFromMask(const uint16_t expected, const uint32_t earlyMask)
+{
+  const int64_t now = mConnector->GetTime();
+  const int64_t roundTripUs = std::max<int64_t>(5'000, static_cast<int64_t>(mPingTime * 1000.0f));
+
+  SNetPacket* due[32];
+  int dueCount = 0;
+  for (SNetPacket* p : mUnAckedPayloads.owners()) {
+    const int16_t d = static_cast<int16_t>(p->header.mSequenceNumber - expected);
+    if (d < 0 || d > 31 || p->mSentTime <= now) {
+      continue;
+    }
+    // Bit i of the mask is sequence expected + 1 + i: the packets after p.
+    if (std::popcount(earlyMask >> d) < 3) {
+      continue;
+    }
+    if (now - (p->mSentTime - CalcResendDelayForCount(p->mResendCount - 1)) < roundTripUs) {
+      continue;
+    }
+    if (dueCount < 32) {
+      due[dueCount++] = p;
+    }
+  }
+  for (int i = 0; i < dueCount; ++i) {
+    due[i]->mSentTime = now;
+    InsertUnAckedSorted(due[i]);
+  }
+  NET_CountFastRetransmits(dueCount);
 }
 
 /**
@@ -944,9 +993,27 @@ bool CNetUDPConnection::ProcessGoodbye(const SNetPacket* packet)
  */
 int64_t CNetUDPConnection::CalcResendDelay(const SNetPacket* packet) const
 {
+  return CalcResendDelayForCount(packet->mResendCount);
+}
+
+/**
+ * The body of CalcResendDelay (0x00488170) for a given resend count (engine
+ * addition, issue #237: FastRetransmitFromMask needs the count of the last
+ * send, one below the packet's).
+ */
+int64_t CNetUDPConnection::CalcResendDelayForCount(int rc) const
+{
+  // Issue #237: at the game's packet rate no acknowledgement can show a loss
+  // before the timer fires, so with the switch the timer itself follows the
+  // round trip. Before the first measured round trip it stays as shipped.
+  if (rc == 0 && mPingTime > 0.0f && NET_FastRetransmitEnabled()) {
+    constexpr float kLowestFastResendMs = 10.0f;
+    const float delayMs = std::max(mPingTime * net_FastResendPings, kLowestFastResendMs);
+    return static_cast<int64_t>(delayMs * 1000.0f);
+  }
+
   const float baseMs = mPingTime * net_ResendPingMultiplier + static_cast<float>(net_ResendDelayBias);
 
-  int rc = packet->mResendCount;
   if (rc > 3) {
     rc = 3;
   }
@@ -1380,15 +1447,29 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
 
   const auto payloadLen = static_cast<int>(packet->GetPayloadSize());
   const auto payload = static_cast<const char*>(packet->GetPayload());
-  sendto(mConnector->socket_, payload, payloadLen, 0, reinterpret_cast<const sockaddr*>(&to), sizeof(to));
+  // Engine addition (issue #232): an in-process transport for this address.
+  if (!NET_PeerTransportsActive() ||
+      !NET_SendThroughPeerTransport(mConnector, mAddr, mPort, payload, static_cast<std::size_t>(payloadLen))) {
+    sendto(mConnector->socket_, payload, payloadLen, 0, reinterpret_cast<const sockaddr*>(&to), sizeof(to));
+  }
 
   const int64_t nowUs = mConnector->GetTime();
   mConnector->LogPacket(0, nowUs, mAddr, mPort, payload, payloadLen);
   mConnector->mSendStampBuffer.Add(0, nowUs, payloadLen);
+  gNetTraffic.packets.fetch_add(1, std::memory_order_relaxed);
+  gNetTraffic.bytes.fetch_add(payloadLen, std::memory_order_relaxed);
+  if (packet->header.mType == PT_Ack) {
+    gNetTraffic.acks.fetch_add(1, std::memory_order_relaxed);
+  } else if (packet->header.mType == PT_Data && packet->mResendCount > 0) {
+    gNetTraffic.resends.fetch_add(1, std::memory_order_relaxed);
+  }
 
   if (packet->header.mType == PT_Data) {
-    ++packet->mResendCount;
+    // 0x00488E62..0x00488E6D: the delay uses the count before this send
+    // (call 0x00488170, then `add [ebx+10h], 1`), so the first resend waits
+    // one base delay, not two.
     packet->mSentTime = nowUs + CalcResendDelay(packet); // microseconds
+    ++packet->mResendCount;
     InsertUnAckedSorted(packet);
   } else {
     // Return to connector pool immediately for any other:
@@ -1660,8 +1741,9 @@ void CNetUDPConnection::AdoptPacket(const SNetPacket* packet)
   mInResponseTo = packet->header.mSerialNumber;
 
   if (mSendBy.mTime == 0) {
-    // net_AckDelay (ms) -> us
-    const int64_t ackDelayUs = static_cast<int64_t>(net_AckDelay) * 1000LL;
+    // net_AckDelay (ms) -> us; issue #237: less with net_FastRetransmit.
+    const int32_t ackDelayMs = NET_FastRetransmitEnabled() ? std::min(net_AckDelay, net_FastAckDelay) : net_AckDelay;
+    const int64_t ackDelayUs = static_cast<int64_t>(ackDelayMs) * 1000LL;
     mSendBy.mTime = packet->mSentTime + ackDelayUs;
   }
 }
@@ -1710,6 +1792,8 @@ void CNetUDPConnection::UpdatePingInfoFromPacket(const SNetPacket& packet)
     mPings.Append(rawMs);
     const float filtered = mPings.Median();
     mPingTime = filtered;
+    gNetTraffic.pingSamples.fetch_add(1, std::memory_order_relaxed);
+    gNetTraffic.pingMicrosSum.fetch_add(static_cast<std::int64_t>(filtered * 1000.0f), std::memory_order_relaxed);
     const float jit = mPings.Jitter(filtered);
 
     if (net_DebugLevel) {

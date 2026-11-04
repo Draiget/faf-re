@@ -13,9 +13,7 @@
 #include <stdexcept>
 #include <vector>
 
-#ifndef MSVC8_VECTOR_DISABLE_FREE
-#define MSVC8_VECTOR_DISABLE_FREE 0
-#endif
+#include "legacy/containers/Layout.h"
 
 // The MSVC ABI ignores the standard `[[no_unique_address]]`, and other ABIs
 // don't know the `msvc::` spelling; each target reports only its own.
@@ -27,25 +25,6 @@
 
 namespace msvc8
 {
-#ifndef MSVC8_CONTAINER_PROXY_DEFINED
-#define MSVC8_CONTAINER_PROXY_DEFINED 1
-    struct _Container_proxy
-    {
-        void* _Myfirstiter;
-    };
-#endif
-
-    // Base that holds the proxy pointer (debug iterator support footprint)
-    struct _Container_base
-    {
-        _Container_proxy* _Myproxy;
-
-        _Container_base()
-            : _Myproxy(0)
-        {
-        }
-    };
-
     namespace detail
     {
         /**
@@ -1651,17 +1630,13 @@ namespace msvc8
      * Provides a minimal modern API: reserve/resize/push_back/emplace_back/clear,
      * copy/move, and conversions to/from std::vector<T>.
      *
-     * WARNING about ownership: this implementation assumes it owns the memory it allocates.
-     * If you map this struct over foreign memory from the original binary, you MUST NOT let
-     * it destroy/deallocate that memory. See MSVC8_VECTOR_DISABLE_FREE macro above.
-     *
      * Why do we have this `Dbg` in Release? This is common default practice of VS2005,
      * they have `_SECURE_SCL=1` defined in Release, so we can see that debug iterator that
      * aren't used by anything really and just sitting alone there.
      *
-     * `HasDebugProxy` (default `true`): every existing `msvc8::vector<T>` spelling
-     * in this codebase omits this parameter and is byte-for-byte unchanged by its
-     * addition. The `false` arm models a leaner, confirmed-narrower 12-byte shape
+     * `HasDebugProxy` defaults to `FAF_RETAIL_LAYOUT` (legacy/containers/Layout.h):
+     * the game's builds have no proxy word in any vector. Under the retail layout,
+     * `false` models a leaner, confirmed-narrower 12-byte shape
      * for instantiations whose binary evidence shows no reserved proxy slot at
      * all -- e.g. `Moho::CDiscoveryService::mGames` (`moho/net/CDiscoveryService.h`):
      * its constructor (0x007BF650), destructor (0x007BF7F0), and the destructor's
@@ -1671,7 +1646,7 @@ namespace msvc8
      * Per RULE ONE this is one template modeling both observed shapes, not a
      * forked per-type copy.
      */
-    template <class T, bool HasDebugProxy = true>
+    template <class T, bool HasDebugProxy = (FAF_RETAIL_LAYOUT != 0)>
     class vector
 	{
     public:
@@ -1700,7 +1675,7 @@ namespace msvc8
         using const_iterator = const T*;
 
     private:
-        MSVC8_NO_UNIQUE_ADDRESS std::conditional_t<HasDebugProxy, void*, detail::NoDebugProxy> myProxy_; // +0x0 when present (opaque _Container_proxy*)
+        MSVC8_NO_UNIQUE_ADDRESS std::conditional_t<HasDebugProxy, void*, detail::NoDebugProxy> myProxy_{}; // +0x0 when present (opaque _Container_proxy*)
         T* first_;      // +0x4 (+0x0 when HasDebugProxy=false)
         T* last_;       // +0x8 (+0x4 when HasDebugProxy=false)
         T* end_;        // +0xC (+0x8 when HasDebugProxy=false)
@@ -1717,7 +1692,6 @@ namespace msvc8
          * Address: 0x007AE820 (FUN_007AE820 -- `vector()` -- null the three lanes on the static `RCamManager` storage's `mCams` for `msvc8::vector<moho::CameraImpl*>` (`RCamManager::mCams`); zero callers, unreachable; formerly `ResetStaticCamManagerStorageVectorLanes` in moho/render/RCamManager.cpp (RULE ONE), removed 2026-09-11.)
          */
         vector() noexcept :
-    		myProxy_{},
     		first_(nullptr),
     		last_(nullptr),
     		end_(nullptr)
@@ -2078,14 +2052,10 @@ namespace msvc8
          * Move constructor (steals pointers)
          */
         vector(vector&& other) noexcept :
-    		myProxy_(other.myProxy_),
 			first_(other.first_),
 			last_(other.last_),
 			end_(other.end_)
     	{
-            if constexpr (HasDebugProxy) {
-                other.myProxy_ = nullptr;
-            }
             other.first_ = other.last_ = other.end_ = nullptr;
         }
 
@@ -2480,13 +2450,9 @@ namespace msvc8
             if (this == &rhs) return *this;
             destroy_all();
             deallocate_all();
-            myProxy_ = rhs.myProxy_;
             first_ = rhs.first_;
             last_ = rhs.last_;
             end_ = rhs.end_;
-            if constexpr (HasDebugProxy) {
-                rhs.myProxy_ = nullptr;
-            }
             rhs.first_ = rhs.last_ = rhs.end_ = nullptr;
             return *this;
         }
@@ -4139,8 +4105,8 @@ namespace msvc8
             // behaviourally identical but would stop the compiler emitting the
             // single-element `insert` the binary calls, which is why the shape
             // is preserved here rather than simplified.
-            if (size() < capacity()) {
-                uninit_fill_n(last_, 1u, value);
+            if (last_ != end_) {
+                ::new (static_cast<void*>(last_)) T(value);
                 ++last_;
             } else {
                 (void)insert(last_, value);
@@ -6900,11 +6866,11 @@ namespace msvc8
                 const std::size_t newCap = recommended_capacity(cur + count);
                 T* const newBuf = allocate_slots_checked(newCap);
                 try {
-                    uninit_move_n(first_, offset, newBuf);
+                    uninit_copy_n(first_, offset, newBuf);
                     try {
                         uninit_copy_n(src, count, newBuf + offset);
                         try {
-                            uninit_move_n(first_ + offset, cur - offset, newBuf + offset + count);
+                            uninit_copy_n(first_ + offset, cur - offset, newBuf + offset + count);
                         } catch (...) {
                             destroy_n(newBuf + offset, count);
                             throw;
@@ -6929,7 +6895,7 @@ namespace msvc8
             T* const oldLast = last_;
             const std::size_t tail = static_cast<std::size_t>(oldLast - insertAt);
             if (tail < count) {
-                uninit_move_n(insertAt, tail, insertAt + count);
+                uninit_copy_n(insertAt, tail, insertAt + count);
                 try {
                     uninit_copy_n(src + tail, count - tail, oldLast);
                 } catch (...) {
@@ -6939,7 +6905,7 @@ namespace msvc8
                 last_ = oldLast + count;
                 copy_or_move_assign(insertAt, src, tail);
             } else {
-                uninit_move_n(oldLast - count, count, oldLast);
+                uninit_copy_n(oldLast - count, count, oldLast);
                 last_ = oldLast + count;
                 copy_backward_assign(insertAt, oldLast - count, oldLast);
                 copy_or_move_assign(insertAt, src, count);
@@ -10236,6 +10202,10 @@ namespace msvc8
         static void uninit_move_n(T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
                 std::copy_n(src, n, dst);
+            } else if constexpr (std::is_nothrow_move_constructible_v<T>) {
+                for (std::size_t i = 0; i < n; ++i) {
+                    ::new (static_cast<void*>(dst + i)) T(std::move(src[i]));
+                }
             } else {
                 std::size_t i = 0;
                 try {
@@ -10849,14 +10819,10 @@ namespace msvc8
          * Address: 0x005087D0 (FUN_005087D0 -- `allocator<moho::SDelayedSubVizInfo>::deallocate`, a bare `operator delete`; zero callers, unreachable. Formerly `DeleteDelayedSubVizStorage` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          */
         void deallocate_all() noexcept {
-#if MSVC8_VECTOR_DISABLE_FREE
-            first_ = last_ = end_ = nullptr;
-#else
             if (first_) {
                 ::operator delete(static_cast<void*>(first_));
                 first_ = last_ = end_ = nullptr;
             }
-#endif
         }
 
     public:
@@ -11543,7 +11509,10 @@ namespace msvc8
             const std::size_t n = size();
 
             // Move or copy existing elements
-            if constexpr (
+            if constexpr (std::is_trivially_copyable_v<T>) {
+                std::copy_n(first_, n, newFirst);
+                newLast = newFirst + n;
+            } else if constexpr (
                 std::is_move_constructible_v<T> &&
                 (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>)
             ) {
@@ -11581,13 +11550,9 @@ namespace msvc8
 
             // Destroy old elements and free old buffer
             destroy_all(); // destroys moved-from values too (OK)
-#if MSVC8_VECTOR_DISABLE_FREE
-            // If freeing disabled, just forget the old buffer
-#else
             if (first_) {
                 ::operator delete(static_cast<void*>(first_));
             }
-#endif
 
             // Install new buffer
             first_ = newFirst;
@@ -11720,7 +11685,7 @@ namespace msvc8
     };
 
     template <class T, class Alloc = std::allocator<T> >
-    class list : public _Container_base
+    class list
     {
     public:
         typedef T                value_type;
@@ -11764,8 +11729,11 @@ namespace msvc8
         typedef typename std::allocator_traits<Alloc>::template rebind_alloc<_Node> _Node_alloc_type;
         typedef _Node_base* _Nodeptr;
 
-        _Nodeptr  _Myhead;   // offset +4 from base
-        size_type _Mysize;   // offset +8 from base
+#if FAF_RETAIL_LAYOUT
+        void*     _Myproxy = nullptr; // +0x0
+#endif
+        _Nodeptr  _Myhead;   // +0x4
+        size_type _Mysize;   // +0x8
 
     public:
         class iterator
@@ -12005,10 +11973,8 @@ namespace msvc8
             : _Myhead(other._Myhead)
             , _Mysize(other._Mysize)
         {
-            this->_Myproxy = other._Myproxy;
             other._Myhead = 0;
             other._Mysize = 0;
-            other._Myproxy = 0;
             other._Init();
         }
 
@@ -12017,13 +11983,10 @@ namespace msvc8
             if (this != &other) {
                 _Tidy();
                 _Free_head();
-                _Free_proxy();
                 _Myhead = other._Myhead;
                 _Mysize = other._Mysize;
-                this->_Myproxy = other._Myproxy;
                 other._Myhead = 0;
                 other._Mysize = 0;
-                other._Myproxy = 0;
                 other._Init();
             }
             return *this;
@@ -12038,7 +12001,6 @@ namespace msvc8
         {
             _Tidy();
             _Free_head();
-            _Free_proxy();
         }
 
         bool empty() const
@@ -12200,7 +12162,6 @@ namespace msvc8
          */
         void swap(list& other) noexcept
         {
-            std::swap(this->_Myproxy, other._Myproxy);
             std::swap(_Myhead, other._Myhead);
             std::swap(_Mysize, other._Mysize);
         }
@@ -12611,20 +12572,7 @@ namespace msvc8
 
         void _Init()
         {
-            _Alloc_proxy();
             _Buy_head();
-        }
-
-        void _Alloc_proxy()
-        {
-            this->_Myproxy = new _Container_proxy();
-            this->_Myproxy->_Myfirstiter = 0;
-        }
-
-        void _Free_proxy()
-        {
-            delete this->_Myproxy;
-            this->_Myproxy = 0;
         }
 
         /**

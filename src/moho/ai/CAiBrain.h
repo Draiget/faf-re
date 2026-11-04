@@ -2195,6 +2195,18 @@ namespace moho
   [[nodiscard]] Unit* FindAvailableFactory(
     const msvc8::vector<Unit*>& candidateList, const char* blueprintId, CAiBrain* brain
   );
+
+  class STIMap;
+
+  /**
+   * Address: 0x0062D7E0 (FUN_0062D7E0, func_CalulateWaterRatio)
+   *
+   * What it does:
+   * Samples the map height field at an 8x8 grid step and returns the ratio
+   * of sampled cells where water elevation is above sampled terrain elevation
+   * (`AIBrain:GetMapWaterRatio`).
+   */
+  [[nodiscard]] float CalculateMapWaterRatio(const STIMap& map);
 } // namespace moho
 
 /**

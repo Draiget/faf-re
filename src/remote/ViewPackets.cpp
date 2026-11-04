@@ -1,17 +1,19 @@
 #include "remote/ViewPackets.h"
 
+#include <algorithm>
 #include <bit>
 
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityId.h"
 #include "moho/entity/Prop.h"
 #include "moho/sim/ReconBlip.h"
+#include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/SSTIArmyVariableData.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SimWorkerPool.h"
 #include "moho/unit/core/Unit.h"
-#include "remote/VisibilityOracle.h"
+#include "remote/wire/ArmyLane.h"
 
 // Engine addition, server mode: see ViewPackets.h. Each step names the function it replays.
 
@@ -20,32 +22,33 @@ namespace faf::remote
   namespace
   {
     constexpr std::int32_t kUnitReconFlags = 28; // `Unit::SyncInterface`, 0x006AC4DC..0x006AC500
+    constexpr std::size_t kMaxViews = wire::kMaxArmyRecords; // no frame names more armies; `SEntityViews` has a bit per view
+    static_assert(kMaxViews <= 32u);
+    constexpr std::size_t kChangedGrain = 256;
+
+    /** What makes one view's update of a blip differ from another's; floats by their bits. */
+    struct SBlipKey
+    {
+      std::int32_t mode;
+      std::uint32_t flags;
+      const void* mesh;
+      std::uint32_t health;
+      std::uint32_t maxHealth;
+      std::uint32_t fraction;
+      std::uint32_t dead;
+      std::uint32_t vision;
+      bool hasVision;
+
+      [[nodiscard]] bool operator==(const SBlipKey&) const = default;
+    };
 
     /** The block `Entity::SyncInterface` (0x0067A290) copies, for one view. */
     [[nodiscard]] moho::SSTIEntityVariableData EntityBlockForView(
       moho::Entity& entity, const SViewVisibility& visibility, const bool requestRefreshUI
     )
     {
-      constexpr std::uint32_t kInvalidEntityId = moho::ToRaw(moho::EEntityIdSentinel::Invalid);
-
       moho::SSTIEntityVariableData data = entity.mVarDat;
-
-      // The attach parent and children as the function writes them before its copy.
-      moho::Entity* const parent = entity.mAttachInfo.GetAttachTargetEntity();
-      data.mAttachmentParentRef = parent != nullptr ? parent->id_ : kInvalidEntityId;
-      data.mAuxValueVector.resize(
-        entity.mAttachedEntities.size(), moho::SSTIEntityAttachInfo{std::bit_cast<std::int32_t>(kInvalidEntityId)}
-      );
-      for (std::size_t i = 0; i < entity.mAttachedEntities.size(); ++i) {
-        moho::Entity* const child = entity.mAttachedEntities[i];
-        data.mAuxValueVector[i].mAttachedEntityId = std::bit_cast<std::int32_t>(child != nullptr ? child->id_ : kInvalidEntityId);
-      }
-
-      // What `UpdateVisibility` would have left for this focus: published, and its mode.
-      data.mVisibilityMode = visibility.mode;
-      data.mVisibilityHidden = 1u;
-      // `Entity::Sync` clears it after the copy (0x0067A10B); the walk's value.
-      data.mRequestRefreshUI = requestRefreshUI ? 1u : 0u;
+      WriteEntityBlockForView(data, entity, visibility.mode, requestRefreshUI);
       return data;
     }
   } // namespace
@@ -95,7 +98,8 @@ namespace faf::remote
     const std::size_t armyCount = sim.mArmiesList.size();
     while (mPackets.size() < armyCount) {
       mPackets.push_back(std::make_unique<moho::SSyncData>());
-      mViews.emplace_back();
+      mHasView.push_back(1u);
+      mDirect.emplace_back();
     }
 
     // Last beat's records go on the sim thread: they hold references to sim objects (poses,
@@ -112,14 +116,28 @@ namespace faf::remote
       out.mCurBeat = static_cast<std::int32_t>(sim.mCurBeat);
       out.mCurTick = static_cast<std::int32_t>(sim.mCurTick);
       out.mFocusArmy = static_cast<std::int32_t>(army);
+      mDirect[army].clear();
+      const moho::CArmyImpl* const owner = sim.mArmiesList[army];
+      mHasView[army] = army >= kMaxViews || (mSkipCivilians && owner != nullptr && owner->IsCivilian()) ? 0u : 1u;
     }
+
+    if (mSharedRecords != nullptr) {
+      mSharedRecords->BeginBeat(Entities().size());
+    }
+    ReadChangedEntities(sim);
 
     // Each view reads the sim and the change set and writes its own packet and view state only
     // (plan I3), so the views can be built on the sim's workers (plan WP5.7).
     const auto build = [&](const std::size_t army) {
+      if (mHasView[army] == 0u) {
+        return;
+      }
       moho::SSyncData& out = *mPackets[army];
-      for (const SChangedEntity& changed : Entities()) {
-        SyncForView(sim, static_cast<std::int32_t>(army), changed, out, mViews[army]);
+      const std::uint32_t bit = std::uint32_t{1} << army;
+      for (std::size_t i = 0; i < Entities().size(); ++i) {
+        if ((mChanged[i].mayAct & bit) != 0u) {
+          SyncForView(sim, static_cast<std::int32_t>(army), mChanged[i], out);
+        }
       }
 
       // Plan WP5.4: the army lane, positionally as `Sim::Sync` fills it.
@@ -140,40 +158,229 @@ namespace faf::remote
         build(army);
       }
     }
+    WriteChangedEntities();
+    if (mSharedRecords != nullptr) {
+      mSharedRecords->Build(Entities(), mParallel);
+    }
     OnViewPackets(sim);
   }
 
-  void CViewPackets::SyncForView(
-    moho::Sim& sim, const std::int32_t army, const SChangedEntity& changed, moho::SSyncData& out,
-    std::unordered_map<std::uint32_t, SViewEntity>& view
-  )
+  bool CViewPackets::ViewVision(const SChangedView& changed, const std::size_t army, std::uint32_t& vision) const
   {
-    moho::Entity& entity = *changed.entity;
-    const auto id = static_cast<std::uint32_t>(entity.id_);
-    const SViewVisibility visibility = ResolveViewVisibility(sim, army, entity);
-    moho::Prop* const prop = entity.IsProp();
-    moho::Unit* const unit = prop == nullptr ? entity.IsUnit() : nullptr;
-    moho::ReconBlip* const blip = prop == nullptr && unit == nullptr ? entity.IsReconBlip() : nullptr;
+    if (changed.hasCreator) {
+      vision = changed.creatorVision;
+      return true;
+    }
+    if ((changed.before.hasVision & (std::uint32_t{1} << army)) != 0u) {
+      vision = mVisions[changed.before.visions + army];
+      return true;
+    }
+    vision = 0;
+    return false;
+  }
+
+  void CViewPackets::MatchBlipViews(moho::Sim& sim, SChangedView& changed)
+  {
+    SBlipKey keys[kBlipViews];
+    int count = 0;
+    const std::size_t armies = std::min(mPackets.size(), kBlipViews);
+    for (std::size_t army = 0; army < armies; ++army) {
+      if (mHasView[army] == 0u) {
+        continue;
+      }
+      const SViewVisibility visibility = ResolveViewVisibility(sim, static_cast<std::int32_t>(army), changed.facts);
+      if (!visibility.published) {
+        continue;
+      }
+      const moho::SPerArmyReconInfo& recon = changed.target.blip->mReconDat[army];
+      std::uint32_t vision = 0;
+      const bool hasVision = ViewVision(changed, army, vision);
+      const SBlipKey key{
+        static_cast<std::int32_t>(visibility.mode), static_cast<std::uint32_t>(recon.mReconFlags), recon.mStiMesh,
+        std::bit_cast<std::uint32_t>(recon.mHealth), std::bit_cast<std::uint32_t>(recon.mMaxHealth),
+        std::bit_cast<std::uint32_t>(recon.mFractionComplete), static_cast<std::uint32_t>(recon.mMaybeDead), vision, hasVision
+      };
+      int match = 0;
+      while (match < count && !(keys[match] == key)) {
+        ++match;
+      }
+      if (match == count) {
+        keys[count] = key;
+        changed.blipRecordArmy[count] = static_cast<std::uint8_t>(army);
+        ++count;
+      }
+      changed.blipRecordOf[army] = static_cast<std::uint8_t>(match);
+    }
+    changed.blipRecordCount = static_cast<std::uint8_t>(count);
+  }
+
+  void CViewPackets::ReadChangedEntities(moho::Sim& sim)
+  {
+    static_assert(kBlipViews == kMaxViews);
+    const std::vector<SChangedEntity>& entities = Entities();
+    if (entities.size() > mChangedCapacity) {
+      mChangedCapacity = entities.size() + entities.size() / 2u;
+      mChanged = std::make_unique<SChangedView[]>(mChangedCapacity);
+    }
+    const auto read = [&](const std::size_t begin, const std::size_t end) {
+      for (std::size_t i = begin; i < end; ++i) {
+        SChangedView& changed = mChanged[i];
+        moho::Entity& entity = *entities[i].entity;
+        SDirectUpdate::STarget& target = changed.target;
+        target.entity = &entity;
+        target.requestRefreshUI = entities[i].requestRefreshUI;
+        changed.prop = entity.IsProp();
+        target.unit = changed.prop == nullptr ? entity.IsUnit() : nullptr;
+        target.blip = changed.prop == nullptr && target.unit == nullptr ? entity.IsReconBlip() : nullptr;
+        target.shared = nullptr;
+        changed.facts = ReadEntityFacts(entity);
+        const SEntityViews* const found = mEntityViews.Find(static_cast<std::uint32_t>(entity.id_));
+        changed.before = found != nullptr ? *found : SEntityViews{};
+        changed.created.store(changed.before.created, std::memory_order_relaxed);
+        changed.hasVision.store(changed.before.hasVision, std::memory_order_relaxed);
+        changed.hasCreator = false;
+        // Plan WPR.35: the creation goes with the update, as the record both make is shared.
+        if (mSharedRecords != nullptr && target.unit == nullptr && target.blip == nullptr && CSharedEntityRecords::Shareable(entity)) {
+          target.shared = &mSharedRecords->Update(i);
+        }
+        if (target.unit != nullptr) {
+          // `ResolveViewVisibility`: a unit is published to its own army alone.
+          const std::int32_t own = changed.facts.armyIndex;
+          changed.mayAct = changed.before.created | (own >= 0 && static_cast<std::size_t>(own) < kMaxViews ? std::uint32_t{1} << own : 0u);
+        } else if (target.blip != nullptr) {
+          // A blip: to the armies whose recon record needs a flush.
+          changed.mayAct = changed.before.created | static_cast<std::uint32_t>(changed.facts.blipNeedsFlush);
+          if (moho::Unit* const creator = target.blip->mCreator.GetObjectPtr(); creator != nullptr) {
+            // 0x005BF00A..0x005BF027: the creator's vision range, written into the blip itself.
+            changed.creatorVision = static_cast<moho::Entity*>(creator)->mVarDat.mIntelAttributes.GetRange(moho::ENTATTR_Vision);
+            changed.hasCreator = true;
+          }
+          changed.blipRecordCount = 0;
+          if (mDirectUpdates && mSharedRecords != nullptr && CSharedEntityRecords::Shareable(entity)) {
+            MatchBlipViews(sim, changed);
+          }
+        } else {
+          changed.mayAct = ~std::uint32_t{0};
+        }
+      }
+    };
+    if (mParallel && entities.size() > kChangedGrain) {
+      moho::CSimWorkerPool::Get().ParallelFor(entities.size(), kChangedGrain, read);
+    } else {
+      read(0u, entities.size());
+    }
+
+    // The blocks of vision ranges stay in place while the views fill them.
+    for (std::size_t i = 0; i < entities.size(); ++i) {
+      SChangedView& changed = mChanged[i];
+      if (!changed.hasCreator || changed.before.visions != kNoVisions) {
+        continue;
+      }
+      if (!mFreeVisions.empty()) {
+        changed.before.visions = mFreeVisions.back();
+        mFreeVisions.pop_back();
+      } else {
+        changed.before.visions = static_cast<std::uint32_t>(mVisions.size());
+        mVisions.grow_to(mVisions.size() + kMaxViews);
+      }
+      const auto id = static_cast<std::uint32_t>(changed.target.entity->id_);
+      if (SEntityViews* const found = mEntityViews.Find(id); found != nullptr) {
+        found->visions = changed.before.visions;
+      } else {
+        (void)mEntityViews.Insert(id, changed.before);
+      }
+    }
+
+    // One update for each group of views a blip shows the same to.
+    if (mSharedRecords != nullptr) {
+      std::size_t blipRecords = 0;
+      for (std::size_t i = 0; i < entities.size(); ++i) {
+        SChangedView& changed = mChanged[i];
+        if (changed.target.blip != nullptr) {
+          changed.firstBlipRecord = static_cast<std::uint32_t>(blipRecords);
+          blipRecords += changed.blipRecordCount;
+        }
+      }
+      mSharedRecords->ReserveBlipRecords(blipRecords);
+      const auto fill = [&](const std::size_t begin, const std::size_t end) {
+        moho::SSTIEntityVariableData block;
+        for (std::size_t i = begin; i < end; ++i) {
+          const SChangedView& changed = mChanged[i];
+          if (changed.target.blip == nullptr) {
+            continue;
+          }
+          for (std::size_t k = 0; k < changed.blipRecordCount; ++k) {
+            const std::size_t army = changed.blipRecordArmy[k];
+            std::uint32_t vision = 0;
+            const bool hasVision = ViewVision(changed, army, vision);
+            mSharedRecords->FillBlipRecord(
+              mSharedRecords->BlipRecord(changed.firstBlipRecord + k), block, *changed.target.blip, changed.target.requestRefreshUI,
+              army, ResolveViewVisibility(sim, static_cast<std::int32_t>(army), changed.facts).mode, vision, hasVision
+            );
+          }
+        }
+      };
+      if (mParallel && entities.size() > kChangedGrain) {
+        moho::CSimWorkerPool::Get().ParallelFor(entities.size(), kChangedGrain, fill);
+      } else {
+        fill(0u, entities.size());
+      }
+    }
+  }
+
+  void CViewPackets::WriteChangedEntities()
+  {
+    for (std::size_t i = 0; i < Entities().size(); ++i) {
+      const SChangedView& changed = mChanged[i];
+      const auto id = static_cast<std::uint32_t>(changed.target.entity->id_);
+      // Every view unpublishes an entity in its destroy pass: a later entity with this id is a new one.
+      if (changed.facts.destroyed) {
+        if (changed.before.visions != kNoVisions) {
+          mFreeVisions.push_back(changed.before.visions);
+        }
+        mEntityViews.Erase(id);
+        continue;
+      }
+      const std::uint32_t created = changed.created.load(std::memory_order_relaxed);
+      const std::uint32_t hasVision = changed.hasVision.load(std::memory_order_relaxed);
+      if (created == changed.before.created && hasVision == changed.before.hasVision) {
+        continue;
+      }
+      SEntityViews* const found = mEntityViews.Find(id);
+      SEntityViews& views = found != nullptr ? *found : mEntityViews.Insert(id, changed.before);
+      views.created = created;
+      views.hasVision = hasVision;
+    }
+  }
+
+  void CViewPackets::SyncForView(moho::Sim& sim, const std::int32_t army, SChangedView& changed, moho::SSyncData& out)
+  {
+    moho::Entity& entity = *changed.target.entity;
+    const SViewVisibility visibility = ResolveViewVisibility(sim, army, changed.facts);
+    moho::Prop* const prop = changed.prop;
+    moho::Unit* const unit = changed.target.unit;
+    moho::ReconBlip* const blip = changed.target.blip;
+    const std::uint32_t bit = std::uint32_t{1} << army;
+    const bool wasCreated = (changed.before.created & bit) != 0u;
 
     if (!visibility.published) {
       // `Entity::Sync` 0x0067A0EA..0x0067A102 / `Prop::Sync` 0x006FA2B8..0x006FA2F1.
-      const auto found = view.find(id);
-      if (found != view.end() && found->second.created) {
+      if (wasCreated) {
         if (prop != nullptr && prop->mReclaimTerminated) {
           out.mEraseIds.push_back(entity.id_);
         } else {
           out.mDeleteIds.push_back(entity.id_);
         }
-        found->second.created = false;
-      }
-      if (entity.mOnDestroyDispatched != 0u && found != view.end()) {
-        view.erase(found); // a later entity with this id is a new one
+        changed.created.fetch_and(~bit, std::memory_order_relaxed);
       }
       return;
     }
 
-    SViewEntity& state = view[id];
-    if (!state.created) {
+    if (!wasCreated) {
+      changed.created.fetch_or(bit, std::memory_order_relaxed);
+    }
+    const bool shared = changed.target.shared != nullptr;
+    if (!wasCreated && !shared) {
       if (unit != nullptr || blip != nullptr) {
         // `Unit::CreateInterface` 0x006AC2C0 / `ReconBlip::CreateInterface` 0x005BEE90.
         moho::SCreateUnitParams params{};
@@ -198,10 +405,44 @@ namespace faf::remote
         params.mTickCreated = static_cast<std::uint32_t>(entity.mTickCreated);
         out.mNewEntities.push_back(params);
       }
-      state.created = true;
     }
 
-    moho::SSTIEntityVariableData block = EntityBlockForView(entity, visibility, changed.requestRefreshUI);
+    // The vision range this view last copied from the blip's creator.
+    std::uint32_t vision = 0;
+    bool hasVision = false;
+    if (blip != nullptr) {
+      if (changed.hasCreator) {
+        mVisions[changed.before.visions + static_cast<std::size_t>(army)] = changed.creatorVision;
+        if ((changed.before.hasVision & bit) == 0u) {
+          changed.hasVision.fetch_or(bit, std::memory_order_relaxed);
+        }
+        vision = changed.creatorVision;
+        hasVision = true;
+      } else if ((changed.before.hasVision & bit) != 0u) {
+        vision = mVisions[changed.before.visions + static_cast<std::size_t>(army)];
+        hasVision = true;
+      }
+    }
+
+    if (mDirectUpdates) {
+      // Plan WPR.35: the builder reads the sim directly, while it is stopped for this beat.
+      SDirectUpdate& direct = mDirect[static_cast<std::size_t>(army)].emplace_back();
+      if (shared) {
+        changed.target.shared->UseMode(visibility.mode);
+        direct.created = !wasCreated;
+      }
+      direct.target = &changed.target;
+      if (blip != nullptr && changed.blipRecordCount != 0u) {
+        direct.blipRecord = &mSharedRecords->BlipRecord(changed.firstBlipRecord + changed.blipRecordOf[static_cast<std::size_t>(army)]);
+      }
+      direct.army = static_cast<std::uint8_t>(army);
+      direct.mode = static_cast<std::uint8_t>(visibility.mode);
+      direct.vision = vision;
+      direct.hasVision = hasVision;
+      return;
+    }
+
+    moho::SSTIEntityVariableData block = EntityBlockForView(entity, visibility, changed.target.requestRefreshUI);
 
     if (unit != nullptr) {
       moho::SUnitVariableUpdateEntry& update = out.mUnitUpdates.emplace_back();
@@ -211,13 +452,8 @@ namespace faf::remote
     } else if (blip != nullptr) {
       const moho::SPerArmyReconInfo& recon = blip->mReconDat[static_cast<std::size_t>(army)];
       moho::Unit* const creator = blip->mCreator.GetObjectPtr();
-      if (creator != nullptr) {
-        // 0x005BF00A..0x005BF027: the creator's vision range, written into the blip itself.
-        state.vision = static_cast<moho::Entity*>(creator)->mVarDat.mIntelAttributes.GetRange(moho::ENTATTR_Vision);
-        state.hasVision = true;
-      }
-      if (state.hasVision) {
-        block.mIntelAttributes.SetIntelRadius(moho::ENTATTR_Vision, static_cast<int>(state.vision));
+      if (hasVision) {
+        block.mIntelAttributes.SetIntelRadius(moho::ENTATTR_Vision, static_cast<int>(vision));
       }
 
       moho::SUnitVariableUpdateEntry& update = out.mUnitUpdates.emplace_back();
@@ -237,6 +473,15 @@ namespace faf::remote
       block.mMaxHealth = recon.mMaxHealth;
       block.mFractionComplete = recon.mFractionComplete;
       block.mIsDead = recon.mMaybeDead;
+
+      // `ReconBlip::SyncInterface`: only an active real contact in current line of sight
+      // publishes its creator's scroll.
+      if (!blip->IsFake() && creator != nullptr && recon.mNeedsFlush != 0u && recon.mMaybeDead == 0u &&
+          (recon.mReconFlags & static_cast<std::uint32_t>(moho::RECON_LOSNow)) != 0u) {
+        const moho::SSTIEntityVariableData& creatorData = static_cast<moho::Entity*>(creator)->mVarDat;
+        block.mScrollBeatStart = creatorData.mScrollBeatStart;
+        block.mScrollBeatEnd = creatorData.mScrollBeatEnd;
+      }
     }
 
     moho::SEntityVariableUpdateEntry& update = out.mEntityUpdates.emplace_back();

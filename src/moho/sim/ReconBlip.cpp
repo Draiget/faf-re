@@ -792,7 +792,7 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
   // 0x005BE8BE..0x005BE9D8: when the source unit has an animation actor, the
   // blip shares its poses -- prior pose first (0x005BDD70), then the current
   // pose (0x005BDD50) -- for both real and jammer blips.
-  if (sourceUnit && sourceUnit->AniActor) {
+  if (sourceUnit && sourceUnit->AniActor && POSE_HoldClientHandles(*sourceUnit->AniActor)) {
     mUnitVarDat.mPriorSharedPose = sourceUnit->AniActor->GetPriorPoseShared();
     mUnitVarDat.mSharedPose = sourceUnit->AniActor->GetPoseShared();
   }
@@ -1352,6 +1352,16 @@ void ReconBlip::SyncInterface(SSyncData* const syncData)
   SetUnitUpdateReconFlags(entry, static_cast<std::int32_t>(reconInfo.mReconFlags));
 
   Entity::SyncInterface(syncData);
+
+  // Only an active real contact in current line of sight publishes creator scroll.
+  // Jammer contacts may be visible while their creator is not; keep their endpoints.
+  // Radar/sonar and last-seen contacts likewise keep the blip's own endpoints.
+  // Capture values on the sim thread: no creator pointer survives into workers.
+  const bool copyCreatorScroll = !IsFake() && creator != nullptr && reconInfo.mNeedsFlush != 0u &&
+    reconInfo.mMaybeDead == 0u && (reconInfo.mReconFlags & static_cast<std::uint32_t>(RECON_LOSNow)) != 0u;
+  if (copyCreatorScroll) {
+    OverrideEntityUpdateScroll(syncData, creator->mVarDat);
+  }
 
   // 0x005BF168..0x005BF1C4: the record `Entity::SyncInterface` just queued (sim_ParallelEntitySync:
   // the same lanes are written after the deferred copy instead).

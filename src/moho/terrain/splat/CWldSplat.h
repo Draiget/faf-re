@@ -648,7 +648,7 @@ namespace moho
   public:
     std::uint32_t mDecalCount; // +0x04
     std::uint32_t mNumDecals; // +0x08
-    msvc8::vector<CWldTerrainDecal*> mDecals; // +0x0C (4-word HasDebugProxy=true vector: proxy@0x0C,first@0x10,last@0x14,end@0x18)
+    msvc8::vector<CWldTerrainDecal*> mDecals; // +0x0C (4-word binary vector: proxy@0x0C,first@0x10,last@0x14,end@0x18)
     msvc8::map<std::uint32_t, CWldTerrainDecal*> mDecalGroupLookupByDecalIndex; // +0x1C (3-word canonical rb_tree: proxy@0x1C,head@0x20,size@0x24)
     msvc8::vector<CDecalGroup*> mDecalGroups; // +0x28
     msvc8::map<std::uint32_t, CDecalGroup*> mDecalGroupLookupBySplatIndex; // +0x38
@@ -668,8 +668,7 @@ namespace moho
   // instruction-level trace. A prior pass had `mDecals`/`mDecalGroups`/
   // `mSplats` each 4 bytes too high (offset by a phantom `mUnknown0C_0F` pad
   // and a phantom trailing word on `DecalGroupLookupTree`) because it never
-  // accounted for `msvc8::vector<T>`'s own default `HasDebugProxy=true`
-  // leading proxy word; fixed here, and the asserts un-gated now that every
+  // accounted for the binary vector's leading proxy word; fixed here, and the asserts un-gated now that every
   // offset is independently confirmed from raw disassembly (the previous
   // `MOHO_ABI_MSVC8_COMPAT` gate meant these were never actually checked --
   // that macro is defined nowhere in this tree).

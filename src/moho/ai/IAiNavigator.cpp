@@ -1060,7 +1060,6 @@ void SNavPath::FreeStorage() noexcept
   if (start) {
     ::operator delete(start);
   }
-  reserved0 = 0;
   start = nullptr;
   finish = nullptr;
   capacity = nullptr;

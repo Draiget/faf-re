@@ -183,6 +183,8 @@ set(FAF_ENGINE_SOURCES
   moho/misc/FileWaitHandleSet.cpp
   moho/net/Common.cpp
   moho/net/NetConVars.cpp
+  moho/net/NetPeerTransport.cpp
+  moho/net/NetlinkPeers.cpp
   moho/net/IClient.cpp
   moho/net/IMessageReceiver.cpp
   moho/net/INetConnection.cpp
@@ -230,6 +232,7 @@ set(FAF_ENGINE_SOURCES
   gpg/core/diagnostics/BuildInfo.cpp
   lua/LuaCrashDump.cpp
   lua/LuaMemAccounting.cpp
+  lua/LuaArena.cpp
   lua/LuaGcEventLog.cpp
   moho/serialization/PrefetchHandleBase.cpp
   moho/serialization/PrefetchHandleBaseTypeInfo.cpp
@@ -750,6 +753,8 @@ set(FAF_ENGINE_SOURCES
   moho/vision/VisionDB.cpp
   moho/math/Wm3Segment3FafExtras.cpp
   moho/math/Wm3AxisAlignedBox3FafExtras.cpp
+  moho/math/Wm3Queries.cpp
+  moho/math/Wm3FoundationStatics.cpp
   moho/unit/CUnitCommandQueueReflection.cpp
   moho/sim/CCommandLuaFunctionRegistrations.cpp
   moho/sim/UserCommandLuaFunctions.cpp
@@ -938,6 +943,7 @@ set(FAF_ENGINE_SOURCES
   moho/net/CClientManagerImpl.cpp
   moho/net/CNullClient.cpp
   moho/net/CReplayClient.cpp
+  moho/net/PeerFeatures.cpp
   moho/serialization/SSavedGameArmyInfoVectorReflection.cpp
   gpg/core/reflection/SerializationError.cpp
   gpg/core/streams/BinaryReader.cpp

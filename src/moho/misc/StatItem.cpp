@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <intrin.h>
 #include <new>
 #include <stdexcept>
 #include <string>
@@ -1550,11 +1551,7 @@ namespace moho
       }
     }
     if (sPrintStatsBoogersSquirt) {
-#if defined(_WIN32)
-      (void)InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&sPrintStatsBoogersSquirt->mPrimaryValueBits), 1L);
-#else
-      ++sPrintStatsBoogersSquirt->mPrimaryValueBits;
-#endif
+      (void)_InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&sPrintStatsBoogersSquirt->mPrimaryValueBits), 1);
     }
 
     if (!sPrintStatsDouble) {

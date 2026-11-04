@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "gpg/core/utils/Logging.h"
+#include "legacy/math/X87Math.h"
 #include "lua/LuaObject.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
@@ -119,9 +120,10 @@ namespace moho
 
   namespace
   {
+    // 0x005120A5..0x005120BC: the inlined float ceil; the low byte is stored.
     [[nodiscard]] std::uint8_t RoundExtentUpToCellCount(const float extent) noexcept
     {
-      return static_cast<std::uint8_t>(static_cast<int>(std::ceil(static_cast<double>(extent))));
+      return static_cast<std::uint8_t>(msvc8::CeilToIntX87(extent));
     }
 
     /** Where a non-absolute `StrategicIconName` is resolved from. */

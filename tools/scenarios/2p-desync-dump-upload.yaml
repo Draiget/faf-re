@@ -1,0 +1,61 @@
+name: 2p-desync-dump-upload
+description: >
+  Dump upload check (telemetry_DumpEndpoint). Two clients of our x64 build
+  (staged as bin_x64\desync_test.exe) play faf_re_lockstep with telemetry and
+  the desync recorder on. Records go to an OpenTelemetry collector on
+  127.0.0.1:4318, dumps to tools\desync-diff\receive.py on 127.0.0.1:4319
+  (start both first; see docs/SWITCHES.md, "Desync telemetry"). Client 2
+  raises one unit's health by one float step at beat 300 (/desynctestbeat), a
+  real desync. Each client must write its zip and a .tar.gz copy, and post the
+  copy with HTTP 201; the receiver then holds both armies' dumps of game
+  424242 and compares them. Needs init_mpemu_localvault.lua. Run with
+  -advertise 192.168.42.77 on the isolated account. Do not click into the game
+  windows.
+timeout: 15m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: demoralization
+  GameSpeed: fast
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\desync_test.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+
+players:
+  - uid: 1
+    name: Telemetry-A
+    faction: uef
+    args: ['/title', 'telemetry-A', '/desyncrecorder', '/telemetry', '/telemetryendpoint', 'http://127.0.0.1:4318',
+           '/telemetrytoken', 'test-token', '/telemetrydumpendpoint', 'http://127.0.0.1:4319/dumps',
+           '/savereplay', 'gpgnet://127.0.0.1:1/424242/Telemetry-A.SCFAreplay', '/exitattick', '450']
+  - uid: 2
+    name: Telemetry-B
+    faction: cybran
+    args: ['/title', 'telemetry-B', '/desyncrecorder', '/desynctestbeat', '300', '/telemetry', '/telemetryendpoint',
+           'http://127.0.0.1:4318', '/telemetrytoken', 'test-token', '/telemetrydumpendpoint', 'http://127.0.0.1:4319/dumps',
+           '/savereplay', 'gpgnet://127.0.0.1:1/424242/Telemetry-B.SCFAreplay', '/exitattick', '450']
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 3m
+
+expect:
+  allLaunched: true
+  logsContain:
+    - { uids: all, pattern: 'Telemetry: dumps go to http://127.0.0.1:4319/dumps' }
+    - { uids: [1], pattern: 'Desync recorder: wrote .*desync_424242_beat300_army0\.tar\.gz \(\d+ bytes\) for upload' }
+    - { uids: [2], pattern: 'Desync recorder: wrote .*desync_424242_beat300_army1\.tar\.gz \(\d+ bytes\) for upload' }
+    - { uids: [1], pattern: 'Telemetry: dump desync_424242_beat300_army0\.tar\.gz \(\d+ bytes\) posted, HTTP status 201' }
+    - { uids: [2], pattern: 'Telemetry: dump desync_424242_beat300_army1\.tar\.gz \(\d+ bytes\) posted, HTTP status 201' }
+    - { uids: all, pattern: 'exitattick: quitting at game tick' }
+  logsAgree:
+    - { uids: all, pattern: 'Desync recorder: beat (\d+) mismatched' }

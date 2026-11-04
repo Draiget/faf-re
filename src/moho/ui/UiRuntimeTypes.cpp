@@ -113,7 +113,7 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/UserUnit.h"
 #include "Wm3Box3.h"
-#include "Wm3IntrLine3Box3.h"
+#include "moho/math/Wm3Queries.h"
 #include "Wm3Line3.h"
 #include "lua/LuaCrashDump.h"
 
@@ -20986,8 +20986,7 @@ void moho::CUIWorldView::UpdateSelection(
           const GeomLine3 pickRay = cameraView.Unproject(mouseScreenPos);
           const Wm3::Line3f wmPickRay(pickRay.pos, pickRay.dir);
           mesh->UpdateInterpolatedFields();
-          Wm3::IntrLine3Box3f intersector(wmPickRay, mesh->box);
-          if (!intersector.Test()) {
+          if (!Wm3::TestLine3Box3(wmPickRay, mesh->box)) {
             continue;
           }
         } else {

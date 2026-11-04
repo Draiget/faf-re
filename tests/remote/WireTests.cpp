@@ -15,10 +15,12 @@
 #include <cstdio>
 #include <exception>
 #include <limits>
+#include <map>
 #include <random>
 #include <string>
 #include <vector>
 
+#include "gpg/core/containers/FlatGenerationMap.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/command/SSTITarget.h"
 #include "lua/LuaObject.h"
@@ -136,6 +138,49 @@ namespace
 
     BitReader badWidth(one);
     CHECK(badWidth.ReadBits(33) == 0u && !badWidth.Ok());
+  }
+
+  /** The bit-at-a-time writer the wire format was defined with: the byte-wise one must match it. */
+  [[nodiscard]] std::vector<std::uint8_t> ReferenceWrite(const std::vector<std::pair<std::uint32_t, int>>& writes)
+  {
+    std::vector<std::uint8_t> bytes;
+    std::size_t bitCount = 0;
+    for (const auto& [value, count] : writes) {
+      for (int bit = 0; bit < count; ++bit) {
+        if ((bitCount & 7u) == 0u) {
+          bytes.push_back(0u);
+        }
+        if (((value >> bit) & 1u) != 0u) {
+          bytes.back() = static_cast<std::uint8_t>(bytes.back() | (1u << (bitCount & 7u)));
+        }
+        ++bitCount;
+      }
+    }
+    return bytes;
+  }
+
+  void TestBitStreamMatchesBitAtATime()
+  {
+    std::mt19937 random(20261101u);
+    for (int round = 0; round < 200; ++round) {
+      std::vector<std::pair<std::uint32_t, int>> writes;
+      BitWriter writer;
+      const int count = 1 + static_cast<int>(random() % 64u);
+      for (int i = 0; i < count; ++i) {
+        const auto bits = static_cast<int>(random() % 33u);
+        const std::uint32_t value = random(); // bits above `bits` must be ignored
+        writes.emplace_back(value, bits);
+        writer.WriteBits(value, bits);
+      }
+      const std::vector<std::uint8_t> bytes = Bytes(writer);
+      CHECK(bytes == ReferenceWrite(writes));
+      BitReader reader(bytes);
+      for (const auto& [value, bits] : writes) {
+        const std::uint32_t expected = bits == 32 ? value : (value & ((1u << bits) - 1u));
+        CHECK(reader.ReadBits(bits) == expected);
+      }
+      CHECK(reader.Ok());
+    }
   }
 
   void TestBitStreamMalformedVarUint()
@@ -382,7 +427,7 @@ namespace
       case 1:
         return -0.0f;
       case 2:
-        return std::bit_cast<float>(0x7FC00001u + (mRng() & 0xFFu)); // NaN payloads survive
+        return std::bit_cast<float>(static_cast<std::uint32_t>(0x7FC00001u + (mRng() & 0xFFu))); // NaN payloads survive
       default:
         return std::uniform_real_distribution<float>(-1.0e6f, 1.0e6f)(mRng);
       }
@@ -940,6 +985,156 @@ namespace
     const std::uint32_t flatYaw[1] = {1000};
     CHECK(ApplyOrientationReckoning(held, flat, flatYaw, 7, turns, fine) && held.yawOnly && held.yawRate == 0
           && held.orientationBeat == 7u);
+  }
+
+  void TestBitWriterAppend()
+  {
+    // A lane put together from slots encoded apart is the lane encoded in one go, at any bit position.
+    std::mt19937 rng(0x6A11u);
+    for (int round = 0; round < 200; ++round) {
+      std::vector<SGridSlot> before;
+      std::vector<SGridSlot> grids;
+      const std::size_t count = 1u + rng() % 6u;
+      for (std::size_t i = 0; i < count; ++i) {
+        SGridSlot slot{};
+        slot.army = static_cast<std::uint8_t>(i);
+        slot.kind = static_cast<std::uint8_t>(rng() & 1u);
+        slot.gridSize = 4u + rng() % 60u;
+        slot.bits.width = 1u + rng() % 16u;
+        slot.bits.height = 1u + rng() % 16u;
+        slot.bits.cells.resize(static_cast<std::size_t>(slot.bits.width) * slot.bits.height);
+        for (std::uint8_t& cell : slot.bits.cells) {
+          cell = static_cast<std::uint8_t>(rng() % 4u == 0u ? 1u : 0u);
+        }
+        if (rng() % 3u != 0u) {
+          SGridSlot held = slot;
+          for (std::uint8_t& cell : held.bits.cells) {
+            cell = static_cast<std::uint8_t>(rng() % 16u == 0u ? 1u - cell : cell);
+          }
+          before.push_back(std::move(held));
+        }
+        grids.push_back(std::move(slot));
+      }
+      BitWriter whole;
+      CHECK(EncodeGridLane(grids, before, whole));
+      BitWriter parts;
+      parts.WriteVarUint(static_cast<std::uint32_t>(grids.size()));
+      for (const SGridSlot& slot : grids) {
+        const auto held = std::find_if(before.begin(), before.end(), [&slot](const SGridSlot& other) {
+          return other.army == slot.army && other.kind == slot.kind;
+        });
+        BitWriter part;
+        CHECK(EncodeGridSlot(slot, held != before.end() ? &held->bits : nullptr, part));
+        parts.Append(part);
+      }
+      CHECK(parts.BitCount() == whole.BitCount());
+      CHECK(std::equal(parts.Bytes().begin(), parts.Bytes().end(), whole.Bytes().begin(), whole.Bytes().end()));
+    }
+    BitWriter none;
+    BitWriter some;
+    some.WriteBits(5u, 3);
+    some.Append(none);
+    CHECK(some.BitCount() == 3u);
+    none.Append(some);
+    CHECK(none.BitCount() == 3u);
+    none.Clear();
+    CHECK(none.BitCount() == 0u);
+    CHECK(none.Bytes().empty());
+  }
+
+  void TestBlipUpdateHash()
+  {
+    // Every field a blip's update writes moves the fingerprint: a field it missed would leave a view
+    // holding an old value while the sim's has changed.
+    SEntityRecord record{};
+    SUnitDetail detail{};
+    detail.weapons.resize(1);
+    detail.commands = {1};
+    detail.buildQueue = {2};
+    record.appearance.attachments = {3};
+    detail.weapons[0].targets.words = {4};
+    detail.weapons[0].secondary.words = {5};
+    detail.attributes.restriction.words = {6};
+    const std::uint64_t base = HashBlipUpdate(record, detail);
+    CHECK(base != 0u);
+    CHECK(base == HashBlipUpdate(record, detail));
+    int field = 0;
+    const auto changes = [&](auto&& change) {
+      SEntityRecord r = record;
+      SUnitDetail d = detail;
+      change(r, d);
+      ++field;
+      if (HashBlipUpdate(r, d) == base) {
+        std::printf("field %d doesn't move the hash\n", field);
+        CHECK(false);
+      }
+    };
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.mesh = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.scale[2] = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.attachParent = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.attachments[0] = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.attachments.push_back(0); });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.impact = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.scroll[3] = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.visualFlags = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.intel[7] = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.ambientSound = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.rumbleSound = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.underlay = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.position[2] = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.farPosition = true; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.farValue[2] = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.yawOnly = true; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.orientation = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.health = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.health = -0.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.maxHealth = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.fractionComplete = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.flags = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.fuelRatio = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.shieldRatio = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.workProgress = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.unitStates = std::uint64_t{1} << 40u; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.scriptBits = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.siloCounts[3] = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.unitFlags = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.creator = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.creationTick = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.stunTicks = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.jobType = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.fireState = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.siloMaxStorage[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.siloMaxStorage[1] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.selectionInheritor = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.customName = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.focusUnit = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.guardedUnit = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.targetBlip = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.didRefresh = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.reconFlags = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.economy[5] = 7.0f; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.commands[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.buildQueue[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].targets.firstWord = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].targets.words[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].secondary.words[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].layer = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].minRadius = 7.0f; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].maxRadius = 7.0f; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].effectiveRadius = 7.0f; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].minRangeVisual = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].maxRangeVisual = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons.push_back(SUnitWeapon{}); });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.blueprint = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.reserved04 = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.restriction.words[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.scalars[11] = 7.0f; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.commandCaps = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.toggleCaps = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.flags[3] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.reserved6C = 7; });
+    // A value moved between two neighbours is another update.
+    changes([](SEntityRecord&, SUnitDetail& d) { d.commands = {}; d.buildQueue = {1, 2}; });
   }
 
   void TestFrameAppearance()
@@ -1582,6 +1777,98 @@ namespace
     }
   }
 
+  /** The cell-at-a-time encoder the grid delta was defined with: the word-skipping one must match it. */
+  [[nodiscard]] std::vector<std::uint8_t> ReferenceGridDelta(const SGridBits& current, const SGridBits* baseline)
+  {
+    const bool sameShape = baseline != nullptr && baseline->width == current.width && baseline->height == current.height
+                        && baseline->cells.size() == current.cells.size();
+    BitWriter writer;
+    writer.WriteVarUint(current.width);
+    writer.WriteVarUint(current.height);
+    bool flipped = false;
+    std::uint32_t run = 0;
+    for (std::size_t i = 0; i < current.cells.size(); ++i) {
+      const std::uint8_t before = sameShape ? baseline->cells[i] : 0u;
+      const bool cellFlipped = (current.cells[i] != 0u) != (before != 0u);
+      if (cellFlipped != flipped) {
+        writer.WriteVarUint(run);
+        flipped = cellFlipped;
+        run = 0;
+      }
+      ++run;
+    }
+    if (run > 0u) {
+      writer.WriteVarUint(run);
+    }
+    return Bytes(writer);
+  }
+
+  // The view packets' per-view state: inserts, finds and erases against a reference map, in a
+  // table small enough for long probe runs and wrap-around, and over clears.
+  void TestFlatMapEraseMatchesMap()
+  {
+    std::mt19937 rng(20261103u);
+    for (int round = 0; round < 40; ++round) {
+      gpg::core::FlatGenerationMap<std::uint32_t> flat(1u + rng() % 6u);
+      std::map<std::uint32_t, std::uint32_t> reference;
+      const std::uint32_t keySpace = 8u + rng() % 400u;
+      for (int step = 0; step < 4000; ++step) {
+        const std::uint32_t key = rng() % keySpace;
+        const std::uint32_t action = rng() % 100u;
+        if (action < 45u) {
+          if (flat.Find(key) == nullptr) {
+            flat.Insert(key, step);
+            reference[key] = static_cast<std::uint32_t>(step);
+          }
+        } else if (action < 90u) {
+          flat.Erase(key);
+          reference.erase(key);
+        } else if (action == 99u && step % 7 == 0) {
+          flat.Clear();
+          reference.clear();
+        }
+        const std::uint32_t* const found = flat.Find(key);
+        const auto expected = reference.find(key);
+        CHECK((found != nullptr) == (expected != reference.end()));
+        if (found != nullptr && expected != reference.end()) {
+          CHECK(*found == expected->second);
+        }
+      }
+      for (std::uint32_t key = 0; key < keySpace; ++key) {
+        CHECK((flat.Find(key) != nullptr) == reference.contains(key));
+      }
+    }
+  }
+
+  void TestGridDeltaMatchesCellAtATime()
+  {
+    std::mt19937 rng(20261102u);
+    std::uniform_int_distribution<std::uint32_t> side(1, 80);
+    for (int round = 0; round < 300; ++round) {
+      const std::uint32_t width = side(rng);
+      const std::uint32_t height = side(rng);
+      SGridBits held = RandomGrid(rng, width, height, static_cast<int>(rng() % 101u));
+      SGridBits next = held;
+      std::uniform_int_distribution<std::size_t> cell(0, next.cells.size() - 1);
+      const int flips = static_cast<int>(rng() % 40u);
+      for (int i = 0; i < flips; ++i) {
+        next.cells[cell(rng)] ^= 1u;
+      }
+      // Bytes that differ but are both "seen" (2 against 1) are unchanged cells.
+      for (int i = 0; i < 3; ++i) {
+        std::uint8_t& value = next.cells[cell(rng)];
+        if (value != 0u) {
+          value = 2u;
+        }
+      }
+      for (const SGridBits* baseline : {static_cast<const SGridBits*>(nullptr), static_cast<const SGridBits*>(&held)}) {
+        BitWriter writer;
+        CHECK(EncodeGridDelta(next, baseline, writer));
+        CHECK(Bytes(writer) == ReferenceGridDelta(next, baseline));
+      }
+    }
+  }
+
   void TestGridDeltaUnchangedIsSmall()
   {
     std::mt19937 rng(7u);
@@ -1708,7 +1995,7 @@ namespace
     // A retired id still translates inbound for the grace beats (a late command), then no more.
     CHECK(map.EntityToSim(0x30500001u, sim) && sim == 0x30500007u);
     CHECK(map.CommandToSim(0x80000001u, sim) && sim == 0x80000123u);
-    map.RetireCommandsUnless([](const std::uint32_t simId) { return simId != 0x05000009u; });
+    map.RetireNewCommandsUnless([](const std::uint32_t simId) { return simId != 0x05000009u; });
     map.AdvanceTo(CViewIdMap::kInboundGraceBeats);
     CHECK(!map.EntityToSim(0x30500001u, sim));
     CHECK(!map.CommandToSim(0x80000001u, sim));
@@ -1723,6 +2010,13 @@ namespace
     map.Translate(again, ownSource);
     CHECK(again.entities[1].id == 0x30500003u);
     CHECK(static_cast<std::uint32_t>((*again.entities[0].unit.detail).commands[0]) == 0x80000003u);
+    // A command found alive once is not asked about again; it retires when the sim releases it.
+    map.RetireNewCommandsUnless([](std::uint32_t) { return true; });
+    map.RetireNewCommandsUnless([](std::uint32_t) { return false; });
+    CHECK(map.LiveCommands() == 1u);
+    const std::uint32_t released[] = {0x80000123u};
+    map.RetireCommands(released);
+    CHECK(map.LiveCommands() == 0u);
 
     // Another view numbers on its own: army 5's view keeps its own projectile and blips get serial 1 up.
     CViewIdMap other(5);
@@ -2043,12 +2337,15 @@ namespace
     {"view ids: inbound translation of commands", &TestInboundIds},
     {"grids: delta round trip", &TestGridDeltaRoundTrip},
     {"grids: unchanged is small", &TestGridDeltaUnchangedIsSmall},
+    {"flat map: erase against a reference map", &TestFlatMapEraseMatchesMap},
+    {"grids: same bytes as cell at a time", &TestGridDeltaMatchesCellAtATime},
     {"grids: hostile input", &TestGridDeltaHostile},
     {"sounds: session table", &TestSoundTable},
     {"roster: round trip and refusals", &TestRoster},
     {"session tables: sounds and names", &TestSessionTables},
     {"bits: round trip", &TestBitStreamRoundTrip},
     {"bits: overrun", &TestBitStreamOverrun},
+    {"bits: same bytes as bit at a time", &TestBitStreamMatchesBitAtATime},
     {"bits: malformed varuint", &TestBitStreamMalformedVarUint},
     {"quantize: axis", &TestAxisQuantizer},
     {"quantize: map position bits", &TestPositionQuantizerForMap},
@@ -2065,6 +2362,8 @@ namespace
     {"frame: corruption and garbage", &TestDecoderCorruptionAndGarbage},
     {"frame: hostile counts and ids", &TestDecoderHostileCounts},
     {"frame: appearance block", &TestFrameAppearance},
+    {"frame: blip update hash", &TestBlipUpdateHash},
+    {"grid lane: slots encoded apart", &TestBitWriterAppend},
   };
 } // namespace
 

@@ -1,6 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <filesystem>
 
 #include "legacy/containers/String.h"
@@ -196,4 +199,49 @@ namespace moho
    * sees the disk as it is.
    */
   void DISK_InvalidateFileLookups();
+
+  /** Engine addition: changes whenever mounted file lookups are invalidated (see DISK_InvalidateFileLookups). */
+  [[nodiscard]] std::uint64_t DISK_FileLookupGeneration();
+
+  /**
+   * Engine addition (dedicated-server plan WPR.22, `res_EnumOrderFuzz`): the order-fuzz seed, 0
+   * when off. Resolved from `/enumorderfuzz N` on first use, then the console variable.
+   */
+  [[nodiscard]] std::uint32_t DISK_EnumerationOrderFuzzSeed();
+
+  /**
+   * Engine addition (dedicated-server plan WPR.22): with `res_EnumOrderFuzz` on, puts one
+   * directory listing, as the file system returned it, into a fixed pseudo-random order before
+   * the engine sorts it. By name first, so the result does not depend on the file system, then
+   * shuffled with the seed and a hash of the names, so one folder is shuffled alike in every run
+   * and on every platform. A sim result that changes with the switch relied on the file system's
+   * order (plan risk R10). Off, it does nothing.
+   */
+  template <class Iterator, class NameOf>
+  void DISK_FuzzEnumerationOrder(const Iterator first, const Iterator last, const NameOf nameOf)
+  {
+    const std::uint32_t seed = DISK_EnumerationOrderFuzzSeed();
+    if (seed == 0u || last - first < 2) {
+      return;
+    }
+    std::sort(first, last, [&nameOf](const auto& lhs, const auto& rhs) {
+      return std::strcmp(nameOf(lhs), nameOf(rhs)) < 0;
+    });
+    std::uint64_t state = static_cast<std::uint64_t>(seed) * 0x9E3779B97F4A7C15ull;
+    for (Iterator it = first; it != last; ++it) {
+      for (const char* c = nameOf(*it); *c != '\0'; ++c) {
+        state = (state ^ static_cast<unsigned char>(*c)) * 0x100000001B3ull;
+      }
+    }
+    if (state == 0u) {
+      state = 1u;
+    }
+    for (auto i = last - first - 1; i > 0; --i) {
+      state ^= state << 13;
+      state ^= state >> 7;
+      state ^= state << 17;
+      const auto j = static_cast<decltype(i)>(state % static_cast<std::uint64_t>(i + 1));
+      std::iter_swap(first + i, first + j);
+    }
+  }
 } // namespace moho

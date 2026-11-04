@@ -66,6 +66,17 @@ namespace moho
   );
 
   /**
+   * Engine addition: switch for `OnSimHasBlueprints`. Off on x86, where Lua frees reach the allocator
+   * classes formations and projectiles reuse addresses from (docs/RETAIL_REPLAY_PARITY.md).
+   */
+  bool rule_ReleaseScriptBlueprints = INTPTR_MAX != INT32_MAX;
+  TConVar<bool> gTConVar_rule_ReleaseScriptBlueprints(
+    "rule_ReleaseScriptBlueprints",
+    "Free the rules' Lua copy of the blueprints once the session and the sim have their own (read at sim start).",
+    &rule_ReleaseScriptBlueprints
+  );
+
+  /**
    * One blueprint file waiting to be reloaded, linked into
    * `RRuleGameRulesImpl::mPendingBlueprintReloads`. Retiring one is a plain
    * `delete` (0x0052A742..0x0052A77A: the path's destructor, then the unlink).
@@ -1123,6 +1134,24 @@ namespace moho
    * `EnqueueLuaReloadRequest` symbol must be reachable from this caller so
    * the per-T constructor body keeps its bind site.
    */
+  void RRuleGameRulesImpl::ReleaseScriptBlueprints()
+  {
+    if (mLuaState == nullptr) {
+      return;
+    }
+    const boost::mutex::scoped_lock releaseLock(RuleMutexView(*this));
+    LuaPlus::LuaObject globals = mLuaState->GetGlobals();
+    globals.SetNil("__blueprints");
+    lua_setgcthreshold(mLuaState->m_state, 0);
+  }
+
+  void RRuleGameRulesImpl::OnSimHasBlueprints()
+  {
+    if (rule_ReleaseScriptBlueprints) {
+      ReleaseScriptBlueprints();
+    }
+  }
+
   void RRuleGameRulesImpl::UpdateLuaState(LuaPlus::LuaState* luaState)
   {
     if (!luaState) {

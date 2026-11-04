@@ -13,6 +13,19 @@
 
 cmake_minimum_required(VERSION 3.25)
 
+# ON keeps the binary's exact container sizes, to check the layout asserts against
+# them (src/legacy/containers/Layout.h). Preset clang-x86-retail-layout.
+option(FAF_RETAIL_LAYOUT "Keep the 2007 binary's exact legacy container layout" OFF)
+if(FAF_RETAIL_LAYOUT)
+  add_compile_definitions(FAF_RETAIL_LAYOUT=1)
+else()
+  add_compile_definitions(FAF_RETAIL_LAYOUT=0)
+endif()
+
+# ON stops faf_engine's C and C++ files after the compiler's front end: errors and static_asserts
+# still fail the build, but no object is written, so nothing can link. For the Layout check workflow.
+option(FAF_SYNTAX_ONLY "Check faf_engine's sources without generating code" OFF)
+
 # Engine addition (dedicated-server plan WPL.2): the Linux build of the
 # simulation, chosen by its toolchain file (cmake/toolchains/linux-clang-*.cmake,
 # read by project(), sets FAF_LINUX) and described in cmake/FafLinux.cmake.
@@ -65,10 +78,23 @@ string(REGEX REPLACE "/EH[a-z-]+" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 string(REGEX REPLACE "/W[0-4]" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 string(REGEX REPLACE "/W[0-4]" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
+# x86 headless for tests/replay_sets (tools/retail-recorder/README.md): no inlining and no
+# folding, so each function has its own entry, and 8 bytes of nops there for the recorder's hook.
+# -finstrument-functions (src/headless/CallHashHooks.cpp) keeps each internal function's
+# calling convention and parameters as its PDB signature says. Build only the headless target.
+option(FAF_CALL_HASH_BUILD "Instrument the build for tests/replay_sets (x86 headless only)" OFF)
+if(FAF_CALL_HASH_BUILD)
+  string(REPLACE "/Ob2" "/Ob0" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+  string(APPEND CMAKE_CXX_FLAGS_RELEASE " /clang:-fpatchable-function-entry=8 /clang:-finstrument-functions")
+  set(_faf_icf "/OPT:NOICF")
+else()
+  set(_faf_icf "/OPT:ICF")
+endif()
+
 # Release links like the shipped binary's: debug information,
 # unreferenced code dropped, identical COMDATs folded.
 foreach(_kind EXE SHARED MODULE)
-  string(APPEND CMAKE_${_kind}_LINKER_FLAGS_RELEASE " /DEBUG /OPT:REF /OPT:ICF")
+  string(APPEND CMAKE_${_kind}_LINKER_FLAGS_RELEASE " /DEBUG /OPT:REF ${_faf_icf}")
 endforeach()
 
 # --- Locations ------------------------------------------------------------------------
@@ -99,9 +125,12 @@ option(FAF_SERVER_MODE "Build the client side of server-authoritative sessions (
 # --- Dependencies (built here, /MT, read-only sources) ----------------------------------
 add_subdirectory(cmake/deps/wxwindows)
 add_subdirectory(cmake/deps/wildmagic)
+add_subdirectory(cmake/deps/libjuice)
+add_subdirectory(cmake/deps/libdatachannel)
 if(FAF_TARGET_ARCH STREQUAL "x64")
   add_subdirectory(cmake/deps/zlib)
 endif()
+add_subdirectory(cmake/deps/monocypher)
 
 # --- Profiler (optional Tracy integration) --------------------------------------------
 option(FAF_ENABLE_TRACY "Enable Tracy profiler instrumentation" OFF)
@@ -124,6 +153,10 @@ if(FAF_ENABLE_TRACY)
   target_compile_options(TracyClient PRIVATE $<TARGET_PROPERTY:faf_codegen,INTERFACE_COMPILE_OPTIONS>)
   target_compile_definitions(TracyClient PRIVATE $<TARGET_PROPERTY:faf_codegen,INTERFACE_COMPILE_DEFINITIONS>)
 endif()
+
+# --- Peer links (issue #229) and the adapter replacement --------------------------------
+add_subdirectory(src/netlink)
+add_subdirectory(src/netbridge)
 
 # --- Engine -----------------------------------------------------------------------------
 add_subdirectory(src)

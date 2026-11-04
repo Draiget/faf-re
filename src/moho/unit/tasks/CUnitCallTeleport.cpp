@@ -9,6 +9,7 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
+#include "legacy/math/X87Math.h"
 #include "moho/ai/CAiTarget.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/ai/IAiTransport.h"
@@ -40,10 +41,10 @@ namespace moho
     [[nodiscard]] gpg::Rect2i SkirtRectToCellRect(const gpg::Rect2f& skirt) noexcept
     {
       gpg::Rect2i out{};
-      out.x0 = static_cast<int>(std::floor(skirt.x0 - 1.0f));
-      out.x1 = static_cast<int>(std::ceil(skirt.x1 + 1.0f));
-      out.z0 = static_cast<int>(std::floor(skirt.z0 - 1.0f));
-      out.z1 = static_cast<int>(std::ceil(skirt.z1 + 1.0f));
+      out.x0 = msvc8::FloorToIntX87(skirt.x0 - 1.0f);
+      out.x1 = msvc8::CeilToIntX87(skirt.x1 + 1.0f);
+      out.z0 = msvc8::FloorToIntX87(skirt.z0 - 1.0f);
+      out.z1 = msvc8::CeilToIntX87(skirt.z1 + 1.0f);
       return out;
     }
 

@@ -1,7 +1,7 @@
 #include "remote/UnderlayPaths.h"
 
+#include <atomic>
 #include <mutex>
-#include <unordered_map>
 
 // Engine addition, server mode: see UnderlayPaths.h.
 
@@ -12,11 +12,13 @@ namespace faf::remote
     // The sim thread writes, the frame builder reads (in loopback on another thread).
     std::mutex gLock;
     std::unordered_map<std::uint32_t, std::string> gPaths;
+    std::atomic<std::uint64_t> gVersion{0}; // counts the changes, written under the lock
   } // namespace
 
   void SetUnderlayPath(const std::uint32_t entityId, const std::string& path)
   {
     const std::lock_guard<std::mutex> lock(gLock);
+    gVersion.fetch_add(1u, std::memory_order_release);
     if (path.empty()) {
       gPaths.erase(entityId);
     } else {
@@ -27,6 +29,7 @@ namespace faf::remote
   void CopyUnderlayPath(const std::uint32_t fromEntityId, const std::uint32_t toEntityId)
   {
     const std::lock_guard<std::mutex> lock(gLock);
+    gVersion.fetch_add(1u, std::memory_order_release);
     if (const auto it = gPaths.find(fromEntityId); it != gPaths.end()) {
       gPaths[toEntityId] = it->second;
     } else {
@@ -37,13 +40,17 @@ namespace faf::remote
   void ForgetUnderlayPath(const std::uint32_t entityId)
   {
     const std::lock_guard<std::mutex> lock(gLock);
+    gVersion.fetch_add(1u, std::memory_order_release);
     gPaths.erase(entityId);
   }
 
-  std::string UnderlayPath(const std::uint32_t entityId)
+  void CUnderlayPathReader::Refresh()
   {
+    if (gVersion.load(std::memory_order_acquire) == mVersion) {
+      return;
+    }
     const std::lock_guard<std::mutex> lock(gLock);
-    const auto it = gPaths.find(entityId);
-    return it != gPaths.end() ? it->second : std::string();
+    mVersion = gVersion.load(std::memory_order_relaxed);
+    mPaths = gPaths;
   }
 } // namespace faf::remote

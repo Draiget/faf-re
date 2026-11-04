@@ -1342,11 +1342,14 @@ namespace moho
           const float forwardZ =
             1.0f - (((transform.orient_.y * transform.orient_.y) + (transform.orient_.x * transform.orient_.x)) * 2.0f);
 
-          Wm3::Vector3f toTarget = mTarget.GetTargetPosGun(false) - unit->GetPosition();
-          (void)Wm3::Vector3f::Normalize(&toTarget);
+          // 0x005F3CD4: `NormalizeVectorInto` (0x0044F7E0) -- zero only when the
+          // length is not positive, where `Vector3f::Normalize` zeroes at 1e-6.
+          Wm3::Vector3f toTarget{};
+          (void)NormalizeVectorInto(&toTarget, mTarget.GetTargetPosGun(false) - unit->GetPosition());
 
           float rollRadians = blueprint->AI.AttackAngle * 0.017453292f;
-          if (((toTarget.z * forwardX) - (forwardZ * toTarget.x)) <= 0.0f) {
+          // 0x005F3CFD `comiss` + `jbe`: NaN takes the negative roll.
+          if (!(((toTarget.z * forwardX) - (forwardZ * toTarget.x)) > 0.0f)) {
             rollRadians = -rollRadians;
           }
 

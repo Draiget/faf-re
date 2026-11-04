@@ -75,6 +75,20 @@ namespace moho
      */
     [[nodiscard]] boost::shared_ptr<const CAniSkel> GetSkeleton();
 
+    /**
+     * Engine addition (plan WPR.35): whether models keep their vertices and indices after they
+     * load. A program that draws nothing turns this off before it loads anything: the sim reads
+     * only the mesh's bounds, the bones and the bones' bounds, all computed at load.
+     */
+    static void SetKeepGeometry(bool keep) noexcept;
+    [[nodiscard]] static bool KeepGeometry() noexcept;
+    /**
+     * Engine addition: builds the skeleton (its bone bounds need the vertices), then keeps only the
+     * file's start, with the header, the bone names and the bones. Called while no one else holds
+     * the skeleton yet. A file whose vertices or indices come before its bones stays whole.
+     */
+    void DropGeometry();
+
   public:
     msvc8::string mName;                   // +0x08
     boost::shared_ptr<const SScmFile> mFile; // +0x24

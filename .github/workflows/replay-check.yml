@@ -1,0 +1,408 @@
+name: Replay check
+
+# The short replay check for a pull request: the core set of docs/PR_REPLAY_CHECK.md, one replay
+# per job, on Linux x64, Windows x64 and Windows x86, once for each engine flag set, every recorded
+# checksum checked. The long runs (extended, sample, all) stay with the Replay parity workflow;
+# this one reads the caches its prewarm fills and saves none. tools/parity-data/README.md.
+#
+# A pull request is checked when a maintainer adds the `replay check` label. The jobs that play
+# run the pull request's build with the retail archives decrypted next to it, so they start only
+# from that label (or a manual run): someone with write access has read the diff first. A new
+# push does not start it again; remove and add the label for that.
+on:
+  pull_request_target:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit, branch or tag to build and test
+        required: true
+        default: master
+      platforms:
+        description: Builds to play on (JSON list of linux-x64, windows-x64, windows-x86)
+        default: '["linux-x64", "windows-x64", "windows-x86"]'
+      flags:
+        description: Engine flag sets, each played on every replay and build (JSON list of {name, simworkers, args})
+        default: '[{"name": "w1", "simworkers": 1, "args": ""}, {"name": "w8", "simworkers": 8, "args": ""}]'
+
+# Nothing in this workflow writes to the repository, and nothing it runs from the pull request
+# gets a token that could.
+permissions:
+  contents: read
+
+# The label is part of the group: another label added to the pull request starts a run that
+# skips every job, and must not cancel the check.
+concurrency:
+  group: replay-check-${{ github.event.pull_request.number || inputs.ref }}-${{ github.event.label.name || 'dispatch' }}
+  cancel-in-progress: true
+
+env:
+  GAME_VERSION: "3835"
+  PYTHON_VERSION: "3.14"
+  # The clang-cl the Windows builds use, as a maintainer's build.ps1 does (LLVM 22.1.7), with
+  # Visual Studio 2022's MSVC toolset (14.44 on the maintainer's machine): the Windows jobs run on
+  # windows-2022. windows-2025 has Visual Studio 18 (MSVC 14.51), whose static runtime imports
+  # api-ms-win-core-synch-l1-2-0.dll, which headless's import check refuses (run 41295222768).
+  LLVM_VERSION: "22.1.7"
+  # Part of the Linux headless build's cache key, the same as the Replay parity workflow's.
+  BUILD_CACHE: "v1"
+  DEFAULT_PLATFORMS: '["linux-x64", "windows-x64", "windows-x86"]'
+  DEFAULT_FLAGS: '[{"name": "w1", "simworkers": 1, "args": ""}, {"name": "w8", "simworkers": 8, "args": ""}]'
+
+jobs:
+  # The commit to test, and the matrix: every core replay times every build and flag set.
+  plan:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'replay check'
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+      platforms: ${{ steps.matrix.outputs.platforms }}
+      flags: ${{ steps.matrix.outputs.flags }}
+      play: ${{ steps.matrix.outputs.play }}
+    steps:
+      - id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.event.pull_request.head.sha || inputs.ref }}
+        run: |
+          sha=$(gh api "repos/${{ github.repository }}/commits/$REF" --jq .sha)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      # The workflow's own commit (master): its tools, not the pull request's, plan and play.
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/cache/restore@v6
+        with:
+          path: cache/index
+          key: index-${{ env.GAME_VERSION }}-latest
+          restore-keys: index-${{ env.GAME_VERSION }}-
+      - run: >
+          mkdir -p cache/index &&
+          python tools/parity-data/plan.py --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz --index cache/index
+          --set core --slots 1 --budget-minutes 90 --out plan.json
+      - id: matrix
+        env:
+          PLATFORMS: ${{ inputs.platforms || env.DEFAULT_PLATFORMS }}
+          FLAGS: ${{ inputs.flags || env.DEFAULT_FLAGS }}
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, os
+          platforms = json.loads(os.environ["PLATFORMS"])
+          flags = json.loads(os.environ["FLAGS"])
+          known = {"linux-x64", "windows-x64", "windows-x86"}
+          assert platforms and set(platforms) <= known, "platforms: %s" % platforms
+          assert flags and all({"name", "simworkers"} <= set(f) for f in flags), "flags: %s" % flags
+          shards = [s["shard"] for s in json.load(open("plan.json"))["shards"]]
+          play = [{"platform": p, "flags": f, "shard": s} for p in platforms for f in flags for s in shards]
+          print("platforms=" + json.dumps(platforms))
+          print("flags=" + json.dumps(flags))
+          print("play=" + json.dumps({"include": play}))
+          EOF
+      - run: |
+          echo "Replay check of ${{ steps.commit.outputs.sha }}: core set, builds ${{ steps.matrix.outputs.platforms }}, flags ${{ steps.matrix.outputs.flags }}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: plan
+          path: plan.json
+          retention-days: 7
+
+  # The core set's replays, maps and M28AI versions, the FAF game files and the encrypted retail
+  # archives, in one artifact: the caches are saved on Linux runners and do not restore on Windows
+  # ones. Nothing in it is decrypted; the key stays with the play jobs.
+  data:
+    needs: plan
+    runs-on: ubuntu-24.04
+    # For PARITY_RETAIL_ID, this environment's variable; the job runs no code of the pull request.
+    # No deployment: the secrets and variables come without one, and a deployment per job posts
+    # "deployed to parity" to the pull request each time.
+    environment:
+      name: parity
+      deployment: false
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: plan
+      - uses: actions/cache/restore@v6
+        with:
+          path: game
+          key: game-${{ env.GAME_VERSION }}
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v6
+        with:
+          path: retail.enc
+          key: retail-${{ vars.PARITY_RETAIL_ID }}
+          fail-on-cache-miss: true
+      # A cache entry matches only a restore with the same path lines: these are the prewarm's.
+      - uses: actions/cache/restore@v6
+        with:
+          path: |
+            cache/maps
+            !cache/maps/.partial-*
+          key: maps-${{ env.GAME_VERSION }}-latest
+          restore-keys: maps-${{ env.GAME_VERSION }}-
+      - uses: actions/cache/restore@v6
+        with:
+          path: |
+            cache/m28
+            !cache/m28/.partial-*
+          key: m28-${{ env.GAME_VERSION }}-latest
+          restore-keys: m28-${{ env.GAME_VERSION }}-
+      - run: >
+          mkdir -p cache/maps cache/m28 &&
+          python tools/parity-data/stage.py --plan plan.json --maps cache/maps --m28 cache/m28 --out stage
+          --game-version "$GAME_VERSION" &&
+          mv game retail.enc stage/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: data
+          path: stage
+          retention-days: 1
+
+  build-linux:
+    needs: plan
+    if: contains(fromJSON(needs.plan.outputs.platforms), 'linux-x64')
+    runs-on: ubuntu-24.04
+    steps:
+      # A fork's code in a pull_request_target run: checkout refuses it without the opt-in. The
+      # `replay check` label is the review that makes it safe (see the top of this file).
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+          allow-unsafe-pr-checkout: true
+      # The Replay parity workflow's build of the same sources, when it made one (restore only).
+      - id: sources
+        run: |
+          tree=$(git ls-tree HEAD CMakeLists.txt CMakePresets.json cmake data dependencies src tests | sha256sum | cut -c1-20)
+          echo "key=headless-$BUILD_CACHE-$tree" >> "$GITHUB_OUTPUT"
+      - id: built
+        uses: actions/cache/restore@v6
+        with:
+          path: build/linux-clang-x64-release/headless
+          key: ${{ steps.sources.outputs.key }}
+      - if: steps.built.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          v=1:18.1.3-1ubuntu1
+          sudo apt-get install -y --no-install-recommends ninja-build \
+            clang-18=$v lld-18=$v llvm-18=$v libc++-18-dev=$v libc++abi-18-dev=$v libunwind-18-dev=$v
+      - if: steps.built.outputs.cache-hit != 'true'
+        uses: actions/cache/restore@v6
+        with:
+          path: dependencies/.downloads
+          key: deps-${{ hashFiles('cmake/FafDependencies.cmake') }}
+      - if: steps.built.outputs.cache-hit != 'true'
+        run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3;boost_1_34_1" -P cmake/FafDependencies.cmake
+      - if: steps.built.outputs.cache-hit != 'true'
+        run: cmake --preset linux-clang-x64-release
+      - if: steps.built.outputs.cache-hit != 'true'
+        run: cmake --build --preset linux-clang-x64-release --target headless
+      - run: |
+          mkdir -p out && cp build/linux-clang-x64-release/headless out/headless
+      - uses: actions/upload-artifact@v7
+        with:
+          name: headless-linux-x64
+          path: out/headless
+          retention-days: 3
+
+  # The Windows builds' downloads (boost, wxWindows, the DirectX SDK installer, ...) and the
+  # pinned LLVM installer, fetched by the workflow's own commit: the builds of the pull request
+  # only restore them, so its code never writes a cache other runs read.
+  windows-downloads:
+    needs: plan
+    if: contains(needs.plan.outputs.platforms, 'windows')
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+      - id: have
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            dependencies/.downloads
+            llvm-installer
+          key: windows-downloads-${{ env.LLVM_VERSION }}-${{ hashFiles('cmake/FafDependencies.cmake') }}
+          lookup-only: true
+      - if: steps.have.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force llvm-installer | Out-Null
+          $exe = "LLVM-$env:LLVM_VERSION-win64.exe"
+          Invoke-WebRequest "https://github.com/llvm/llvm-project/releases/download/llvmorg-$env:LLVM_VERSION/$exe" -OutFile "llvm-installer/$exe"
+          cmake -P cmake/FafDependencies.cmake
+      - if: steps.have.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            dependencies/.downloads
+            llvm-installer
+          key: windows-downloads-${{ env.LLVM_VERSION }}-${{ hashFiles('cmake/FafDependencies.cmake') }}
+
+  build-windows:
+    needs: [plan, windows-downloads]
+    if: contains(needs.plan.outputs.platforms, 'windows')
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, x86]
+    steps:
+      - id: wanted
+        shell: bash
+        run: echo "build=${{ contains(fromJSON(needs.plan.outputs.platforms), format('windows-{0}', matrix.arch)) }}" >> "$GITHUB_OUTPUT"
+      - if: steps.wanted.outputs.build == 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+          allow-unsafe-pr-checkout: true
+      - if: steps.wanted.outputs.build == 'true'
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            dependencies/.downloads
+            llvm-installer
+          key: windows-downloads-${{ env.LLVM_VERSION }}-${{ hashFiles('cmake/FafDependencies.cmake') }}
+          restore-keys: windows-downloads-${{ env.LLVM_VERSION }}-
+      # Puts its Scripts folder on PATH, for the ninja pip installs.
+      - if: steps.wanted.outputs.build == 'true'
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - if: steps.wanted.outputs.build == 'true'
+        shell: pwsh
+        run: |
+          $exe = "llvm-installer/LLVM-$env:LLVM_VERSION-win64.exe"
+          if (-not (Test-Path $exe)) {
+            New-Item -ItemType Directory -Force llvm-installer | Out-Null
+            Invoke-WebRequest "https://github.com/llvm/llvm-project/releases/download/llvmorg-$env:LLVM_VERSION/LLVM-$env:LLVM_VERSION-win64.exe" -OutFile $exe
+          }
+          Start-Process -FilePath $exe -ArgumentList "/S", "/D=C:\llvm-$env:LLVM_VERSION" -Wait
+          "LLVM_ROOT=C:\llvm-$env:LLVM_VERSION" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          & "C:\llvm-$env:LLVM_VERSION\bin\clang-cl.exe" --version
+          python -m pip install --disable-pip-version-check ninja
+      - if: steps.wanted.outputs.build == 'true'
+        shell: pwsh
+        run: |
+          cmake --preset clang-${{ matrix.arch }}-release
+          cmake --build --preset clang-${{ matrix.arch }}-release --target headless
+          $name = if ("${{ matrix.arch }}" -eq "x64") { "headless_x64.exe" } else { "headless.exe" }
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item "build/clang-${{ matrix.arch }}-release/src/$name" out/
+      - if: steps.wanted.outputs.build == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: headless-windows-${{ matrix.arch }}
+          path: out
+          retention-days: 3
+
+  play:
+    needs: [plan, data, build-linux, build-windows]
+    # A build left out of `platforms` is skipped, not failed. A failed build stops every play job
+    # (run 41294903846 started 48 that each failed on the missing download); the reports then fail.
+    if: >
+      !cancelled() && needs.plan.result == 'success' && needs.data.result == 'success' &&
+      needs.build-linux.result != 'failure' && needs.build-windows.result != 'failure'
+    runs-on: ${{ startsWith(matrix.platform, 'windows') && 'windows-2022' || 'ubuntu-24.04' }}
+    timeout-minutes: 120
+    # PARITY_RETAIL_KEY is this environment's secret, given to master only (a pull_request_target
+    # run is master's). No deployment (see the data job).
+    environment:
+      name: parity
+      deployment: false
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.play) }}
+    name: play (${{ matrix.platform }}, ${{ matrix.flags.name }}, shard ${{ matrix.shard }})
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: headless-${{ matrix.platform }}
+          path: bin
+      - uses: actions/download-artifact@v8
+        with:
+          name: plan
+      - uses: actions/download-artifact@v8
+        with:
+          name: data
+          path: data
+      # The pack: FAF's game files with the retail archives in fa/gamedata. Decrypted to a file and
+      # unpacked by Python, the same on every runner: on Windows, Windows' tar.exe reading the pipe
+      # from Git Bash's openssl hung (run 41297054548, every Windows job, 23 minutes and more).
+      - env:
+          KEY: ${{ secrets.PARITY_RETAIL_KEY }}
+        timeout-minutes: 10
+        run: |
+          KEY="$(printf '%s' "$KEY" | tr -d '[:space:]')"; export KEY
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:KEY -in data/retail.enc -out retail.tar.xz
+          rm data/retail.enc
+          python -c "import sys, tarfile; tarfile.open(sys.argv[1]).extractall(sys.argv[2], filter='data')" retail.tar.xz data/game
+          rm retail.tar.xz
+          case "${{ matrix.platform }}" in
+            linux-x64) exe=bin/headless; chmod +x "$exe" ;;
+            windows-x64) exe=bin/headless_x64.exe ;;
+            windows-x86) exe=bin/headless.exe ;;
+          esac
+          echo "EXE=$exe" >> "$GITHUB_ENV"
+      # Git Bash turns an argument that starts with / ("/con ...") into a Windows path before
+      # python.exe sees it, and the engine then ignores the switch; MSYS_NO_PATHCONV stops that.
+      - env:
+          ENGINE_ARGS: ${{ matrix.flags.args }}
+          MSYS_NO_PATHCONV: "1"
+        run: >
+          python tools/parity-data/shard.py --plan plan.json --shard ${{ matrix.shard }} --headless "$EXE"
+          --pack data/game --replays data/replays --maps data/maps --m28 data/m28 --work work
+          --out results --minutes 100 --slots 1 --simworkers ${{ matrix.flags.simworkers }}
+          --engine-args "$ENGINE_ARGS" --game-version "$GAME_VERSION"
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: results-${{ matrix.platform }}-${{ matrix.flags.name }}-${{ matrix.shard }}
+          path: results
+          retention-days: 30
+
+  # One report per build and flag set; a desync, crash, early stop or error in any fails it.
+  report:
+    needs: [plan, play]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(needs.plan.outputs.platforms) }}
+        flags: ${{ fromJSON(needs.plan.outputs.flags) }}
+    name: report (${{ matrix.platform }}, ${{ matrix.flags.name }})
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: plan
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: results-${{ matrix.platform }}-${{ matrix.flags.name }}-*
+          path: results
+      - run: >
+          mkdir -p results &&
+          python tools/parity-data/report.py --plan plan.json --results results
+          --expected tools/parity-data/expected/$GAME_VERSION.json --out report
+          --title "Replay check: ${{ needs.plan.outputs.sha }}, ${{ matrix.platform }}, ${{ matrix.flags.name }} (/simworkers ${{ matrix.flags.simworkers }} ${{ matrix.flags.args }})"
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: report-${{ matrix.platform }}-${{ matrix.flags.name }}
+          path: report
+          retention-days: 90

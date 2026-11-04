@@ -901,7 +901,7 @@ bool moho::CAimManipulator::ManipulatorUpdate()
           // 0x00630F3E..0x00630F60: `mulss` by 10.0f, then 0x00425110 -- `frndint`
           // bumped by one when the input is above the rounded value, i.e. a
           // float ceil -- clamped to at least one tick. Not round-to-nearest.
-          resetTime = static_cast<std::int32_t>(std::ceil(weapon->mWeaponBlueprint->TargetCheckInterval * 10.0f));
+          resetTime = msvc8::CeilToIntX87(weapon->mWeaponBlueprint->TargetCheckInterval * 10.0f);
           if (resetTime < 1) {
             resetTime = 1;
           }

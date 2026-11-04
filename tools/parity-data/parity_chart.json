@@ -1,0 +1,13 @@
+{
+  "run": "41025691648",
+  "commit": "7986851b6",
+  "build": "x64 headless",
+  "dates": "30–31/10/2026",
+  "causes_as_of": "master ba75dddf6, 03/11/2026",
+  "desync_causes": [
+    { "label": "Maps and content the run did not provide or a replay cannot repeat", "count": 122, "color": "blue" },
+    { "label": "Our bugs, fixed since", "count": 69, "color": "orange" },
+    { "label": "Live game split: the players' own checksums already disagreed", "count": 34, "color": "aqua" },
+    { "label": "Retail fails there too", "count": 6, "color": "yellow" }
+  ]
+}

@@ -16,9 +16,11 @@ extern "C"
 }
 #endif
 
+#include <cstddef>
 #include <cstdint>
 
 #include "legacy/containers/String.h"
+#include "lua/LuaArena.h"
 
 #ifndef LUA_MULTRET
 #define LUA_MULTRET (-1)
@@ -226,9 +228,72 @@ namespace LuaPlus
 
 	// Keep 4-byte alignment to mirror MSVC x86-era binary layout.
 #pragma pack(push, 4)
+#if INTPTR_MAX == INT32_MAX
+	using ValuePointer = void*;
+#else
+	// Engine change on x64: a Lua object's pointer in the 4 bytes the binary gives it, as every Lua
+	// object lives below 4 GB (LuaArena.h). It reads and assigns as the pointer it holds.
+	class ValuePointer
+	{
+	public:
+		ValuePointer() = default;
+		ValuePointer(std::nullptr_t) noexcept : mBits(0u) {}
+
+		template <class T>
+		ValuePointer& operator=(T* const pointer) noexcept
+		{
+			mBits = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointer));
+			return *this;
+		}
+		ValuePointer& operator=(std::nullptr_t) noexcept
+		{
+			mBits = 0u;
+			return *this;
+		}
+
+		template <class T>
+		[[nodiscard]] operator T*() const noexcept
+		{
+			return reinterpret_cast<T*>(static_cast<std::uintptr_t>(mBits));
+		}
+
+		[[nodiscard]] std::uint32_t Bits() const noexcept { return mBits; }
+
+		[[nodiscard]] friend bool operator==(const ValuePointer lhs, const ValuePointer rhs) noexcept { return lhs.mBits == rhs.mBits; }
+		[[nodiscard]] friend bool operator!=(const ValuePointer lhs, const ValuePointer rhs) noexcept { return lhs.mBits != rhs.mBits; }
+		[[nodiscard]] friend bool operator==(const ValuePointer lhs, std::nullptr_t) noexcept { return lhs.mBits == 0u; }
+		[[nodiscard]] friend bool operator!=(const ValuePointer lhs, std::nullptr_t) noexcept { return lhs.mBits != 0u; }
+
+	private:
+		std::uint32_t mBits;
+	};
+#endif
+
+#if INTPTR_MAX == INT32_MAX
+	template <class T>
+	using ObjectPointer = T*;
+#else
+	// A field naming a Lua object or a block a Lua object owns, in 4 bytes on x64 (LuaArena.h).
+	template <class T>
+	class ObjectPointer
+	{
+	public:
+		ObjectPointer() = default;
+		ObjectPointer(T* const pointer) noexcept : mBits(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointer))) {}
+
+		[[nodiscard]] operator T*() const noexcept { return Get(); }
+		[[nodiscard]] T* operator->() const noexcept { return Get(); }
+
+	private:
+		[[nodiscard]] T* Get() const noexcept { return reinterpret_cast<T*>(static_cast<std::uintptr_t>(mBits)); }
+
+		std::uint32_t mBits;
+	};
+#endif
+
 	union Value
 	{
-		void* p;
+		ValuePointer p;
 		float n;
 		int b;
 	};
@@ -262,6 +327,34 @@ namespace LuaPlus
 		 */
 		void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 	};
+
+	/// The 32 bits `luaH_mainposition` hashes for a pointer key.
+	[[nodiscard]] inline std::uint32_t ValuePointerBits(const Value& value) noexcept
+	{
+#if INTPTR_MAX == INT32_MAX
+		return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(value.p));
+#else
+		return value.p.Bits();
+#endif
+	}
+
+	/// A light userdata's pointer goes in and out of a value through these: on x64 it can lie above 4 GB.
+	inline void SetLightPointer(Value& value, void* const pointer) noexcept
+	{
+#if INTPTR_MAX == INT32_MAX
+		value.p = pointer;
+#else
+		value.p = const_cast<void**>(lua::ArenaLightCell(pointer));
+#endif
+	}
+	[[nodiscard]] inline void* LightPointer(const Value& value) noexcept
+	{
+#if INTPTR_MAX == INT32_MAX
+		return value.p;
+#else
+		return *static_cast<void**>(value.p);
+#endif
+	}
 
 	// `traverseproto` (0x009154A0) walks a Proto's constant array as
 	// `[ecx+eax*8]`, so a TObject is 8 bytes; `newkey` (0x00927970) reads the

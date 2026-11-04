@@ -1,5 +1,6 @@
 #include "remote/wire/IntelGridDelta.h"
 
+#include <cstring>
 #include <utility>
 
 // Engine addition, server mode: see IntelGridDelta.h.
@@ -27,15 +28,35 @@ namespace faf::remote::wire
     writer.WriteVarUint(current.height);
     bool flipped = false; // the kind of the run being counted: unchanged first
     std::uint32_t run = 0;
-    for (std::size_t i = 0; i < current.cells.size(); ++i) {
-      const std::uint8_t before = base != nullptr ? base->cells[i] : 0u;
-      const bool cellFlipped = (current.cells[i] != 0u) != (before != 0u);
+    const std::uint8_t* const cells = current.cells.data();
+    const std::uint8_t* const before = base != nullptr ? base->cells.data() : nullptr;
+    const std::size_t count = current.cells.size();
+    std::size_t i = 0;
+    while (i < count) {
+      // Most of a grid is unchanged between beats: while counting unchanged cells, take eight at
+      // a time when their bytes are equal (equal bytes are unchanged cells, so the runs are the same).
+      if (!flipped && i + 8u <= count) {
+        std::uint64_t now = 0;
+        std::uint64_t was = 0;
+        std::memcpy(&now, cells + i, 8u);
+        if (before != nullptr) {
+          std::memcpy(&was, before + i, 8u);
+        }
+        if (now == was) {
+          run += 8u;
+          i += 8u;
+          continue;
+        }
+      }
+      const std::uint8_t old = before != nullptr ? before[i] : 0u;
+      const bool cellFlipped = (cells[i] != 0u) != (old != 0u);
       if (cellFlipped != flipped) {
         writer.WriteVarUint(run);
         flipped = cellFlipped;
         run = 0;
       }
       ++run;
+      ++i;
     }
     if (run > 0u) {
       writer.WriteVarUint(run);

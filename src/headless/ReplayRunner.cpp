@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstring>
 #include <map>
+#include <string_view>
 #include <type_traits>
 #include <memory>
 
@@ -51,6 +52,7 @@
 #include "headless/ReplayChangeSetCheck.h"
 #include "headless/ReplayOracleCheck.h"
 #include "headless/ReplayInboundCheck.h"
+#include "headless/ReplayViewBench.h"
 #include "headless/ReplayViewFrameStats.h"
 #include "headless/ReplayViewPacketCheck.h"
 #include "headless/ReplayWireStats.h"
@@ -125,15 +127,35 @@ namespace faf::headless
       int lastBeat = -1;
     };
 
+    /** Whether this beat's Lua `Sync` bytes contain `text` (read whole and rewound). */
+    [[nodiscard]] bool SyncBytesContain(moho::SSyncData& packet, const std::string_view text)
+    {
+      std::string bytes;
+      char buffer[4096];
+      for (;;) {
+        const std::size_t read = packet.mStream->Read(buffer, sizeof(buffer));
+        if (read == 0u) {
+          break;
+        }
+        bytes.append(buffer, read);
+      }
+      (void)packet.mStream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, 0);
+      return bytes.find(text) != std::string::npos;
+    }
+
     /**
      * Decodes this beat's Lua `Sync` table as the UI's `DoBeat` does, and reports whether it
-     * says the game ended. With `keys` set, every top-level key is counted.
+     * says the game ended. With `keys` set, every top-level key is counted. A table that cannot
+     * name the key is not decoded: the garbage of a whole game's decoding is tens of megabytes.
      */
     [[nodiscard]] bool InspectSync(
       moho::SSyncData& packet, LuaPlus::LuaState* const state, std::map<std::string, SSyncKeySeen>* const keys
     )
     {
       if (packet.mStream == nullptr || state == nullptr) {
+        return false;
+      }
+      if (keys == nullptr && !SyncBytesContain(packet, "GameEnded")) {
         return false;
       }
       gpg::BinaryReader syncReader(packet.mStream);
@@ -555,6 +577,19 @@ namespace faf::headless
       );
       viewFrames->Install();
     }
+    // `--view-bench`: the server's view work alone, timed (also a sync-walk observer).
+    std::unique_ptr<CReplayViewBench> viewBench;
+    if (!options.viewBenchPath.empty()) {
+      viewBench = std::make_unique<CReplayViewBench>(
+        options.viewBenchPath, tables, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, options.viewBenchCheck
+      );
+      if (!viewBench->IsOpen()) {
+        result.error = "cannot write " + options.viewBenchPath;
+        return result;
+      }
+      viewBench->SetParallel(options.parallelViews);
+      viewBench->Install();
+    }
     // `--inbound-check`: the decoder's messages through view ids and back (with --view-ids).
     std::unique_ptr<CReplayInboundCheck> inboundCheck;
     if (options.inboundCheck && viewFrames) {
@@ -636,6 +671,7 @@ namespace faf::headless
 #endif
 
     LuaPlus::LuaState* const syncState = ReplayLuaState();
+    bool releasedScriptBlueprints = false;
     std::map<std::string, SSyncKeySeen> syncKeys;
     const Clock::time_point playStart = Clock::now();
     const double timeLimit = 60.0 * options.timeoutMinutes;
@@ -702,6 +738,11 @@ namespace faf::headless
             static_cast<unsigned long long>(DigestPublishedState(*packet))
           );
         }
+        // The first packet means the sim exists and has its copy of the blueprints.
+        if (rules && !options.keepClientData && !releasedScriptBlueprints) {
+          static_cast<moho::RRuleGameRulesImpl*>(rules.get())->ReleaseScriptBlueprints();
+          releasedScriptBlueprints = true;
+        }
         const bool syncSaysEnded =
           InspectSync(*packet, syncState, options.syncKeysPath.empty() ? nullptr : &syncKeys);
         if (!result.gameEnded && syncSaysEnded) {
@@ -745,6 +786,12 @@ namespace faf::headless
           if (moho::CClientManagerImpl* const manager = driver->GetClientManager(); manager != nullptr) {
             manager->Cleanup();
           }
+        }
+
+        // The sim's thread keeps running beats after the game-over packet. Packets it queued
+        // meanwhile are not part of the game, and how many there are depends on thread timing.
+        if (result.gameOver) {
+          break;
         }
       }
 
@@ -812,6 +859,10 @@ namespace faf::headless
     if (viewFrames) {
       result.viewFramesSummary = viewFrames->Summary();
       result.viewFramesFailures = viewFrames->Failures();
+    }
+    if (viewBench) {
+      result.viewBenchSummary = viewBench->Summary();
+      result.viewBenchFailures = viewBench->Failures();
     }
     if (inboundCheck) {
       result.inboundSummary = inboundCheck->Summary();

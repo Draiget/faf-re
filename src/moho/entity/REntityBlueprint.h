@@ -89,8 +89,9 @@ namespace moho
      * `this+0x64`/`this+0x68`(/`+0x6C`) -- at first glance 4 bytes later
      * than this field's own offset, and a prior pass flagged that as an
      * unresolved discrepancy against the reflection/destructor evidence.
-     * It is not one: `msvc8::vector<T>` in this codebase is 16 bytes
-     * (`legacy/containers/Vector.h`, `myProxy_`/`first_`/`last_`/`end_`,
+     * It is not one: the binary's vector is 16 bytes (`myProxy_`/`first_`/
+     * `last_`/`end_`, the first of which the game's builds leave out, see
+     * `legacy/containers/Layout.h`,
      * matching VC8's `_SECURE_SCL=1` `_Container_base12` proxy pointer that
      * ships even in Release), so `begin()`/`end()` (`first_`/`last_`) sit
      * at the *vector object's* `+0x4`/`+0x8`, i.e. `this+0x64`/`this+0x68`

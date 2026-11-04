@@ -21,6 +21,24 @@ namespace msvc8
    */
   [[nodiscard]] std::int32_t RoundToInt(float value) noexcept;
   /**
+   * The binary's float floor to int: `frndint`, then -1 when the value is
+   * below (or unordered with: `fcompi` sets CF for a NaN) its nearest integer,
+   * added to the `fistp` (GridPos 0x00506E49..0x00506E5C, FloorSecondsToTicks
+   * 0x0066D1E8..0x0066D1FA, CHeightField::GetElevation 0x0044FB9D..0x0044FBD0).
+   * Outside the int range the `fistp` stores the integer indefinite
+   * 0x80000000, and a NaN floors to 0x7FFFFFFF. `static_cast<int>(floor(x))`
+   * is undefined there, and clang folds `(float)(int)floor(x)` into
+   * `floor(x)` (difffuzz, plan WPR.21).
+   */
+  [[nodiscard]] std::int32_t FloorToIntX87(float value) noexcept;
+  /**
+   * The binary's float ceil to int: the same sequence with `cmova eax,1`, so
+   * +1 when the value is above its nearest integer; a NaN compares unordered
+   * and adds nothing, so it ceils to the integer indefinite 0x80000000
+   * (CAcquireTargetTask 0x005D8D5B..0x005D8D6E).
+   */
+  [[nodiscard]] std::int32_t CeilToIntX87(float value) noexcept;
+  /**
    * The MSVC8 CRT's `__ftol2_sse` (0x00A89CC0, `cvttsd2si eax`): truncation
    * toward zero, and the integer indefinite 0x80000000 for NaN or a value
    * outside the int32 range. A plain cast on x64 can convert through a 64-bit
@@ -37,6 +55,21 @@ namespace msvc8
     return static_cast<std::int32_t>(value);
   }
   /**
+   * The same for `fistp qword` under round-toward-zero (math_randomseed,
+   * 0x0091A0F5): the integer indefinite 0x8000000000000000 for NaN or a value
+   * outside the int64 range. A plain cast is undefined there, and clang's x64
+   * lowering saturates +inf and values from 2^63 up to 0x7FFFFFFFFFFFFFFF
+   * (faf_math_dump against retail, plan WPR.21).
+   */
+  [[nodiscard]] inline std::int64_t TruncateToInt64(const float value) noexcept
+  {
+    constexpr float kInt64Bound = 9223372036854775808.0f;
+    if (!(value >= -kInt64Bound && value < kInt64Bound)) {
+      return static_cast<std::int64_t>(0x8000000000000000ull);
+    }
+    return static_cast<std::int64_t>(value);
+  }
+  /**
    * `factor * word` exactly as the shipped engine forms it from a Mersenne
    * Twister word under 24-bit x87 precision control (e.g. CRandomStream::FRand,
    * 0x0051B5C0): `fild` loads the word exactly - a word at or above 2^31 loads
@@ -45,6 +78,16 @@ namespace msvc8
    * twice (53 bits, then 24) and can land one float away.
    */
   [[nodiscard]] float MulTwisterWord(float factor, std::uint32_t word) noexcept;
+  /**
+   * `lower + (upper - lower) * word * 2^-32` exactly as CRandomStream::FRand
+   * (0x0051B5C0) forms it: the word loaded as above, then the range, the
+   * product, the 2^-32 scale and the sum all on the x87 stack under 24-bit
+   * precision control, stored to float once. The extended exponent keeps a
+   * range or product beyond FLT_MAX finite until the scale brings it back
+   * (difffuzz: FRand(1.3e-15, -FLT_MAX) is -2.04e38 retail, -inf through
+   * MulTwisterWord's float product).
+   */
+  [[nodiscard]] float TwisterWordInRange(float lower, float upper, std::uint32_t word) noexcept;
 
   /**
    * Vector length clamp exactly as the 2007 toolchain computed it.
@@ -167,6 +210,14 @@ namespace msvc8
   // Inlined block from FUN_0044FB90; preserve the original operation order.
   [[nodiscard]] float BilinearHeight(float h00, float h01, float h10, float h11, float fracX, float fracZ) noexcept;
 
+  // `top - BilinearHeight(...)` with the height never stored as a float: the
+  // binary's GetElevation returns it in st0 and CHeightField::GetNormal
+  // subtracts it there (0x0069A6DA `fsubr`), so a height in the float
+  // denormal range keeps its 24-bit mantissa until the difference is stored.
+  [[nodiscard]] float SubtractBilinearHeight(
+    float top, float h00, float h01, float h10, float h11, float fracX, float fracZ
+  ) noexcept;
+
   /**
    * Single-precision transcendentals as the 2007 toolchain produced them.
    *
@@ -195,9 +246,11 @@ namespace msvc8
   // heading lane, 0x00630AB2..0x00630AB7): round24(atan2(y, x) + addend).
   [[nodiscard]] float Atan2Plus(float y, float x, float addend) noexcept;
   [[nodiscard]] float SinTimesCos(float sinArg, float cosArg) noexcept;
-  // `fld arg; fsin; fmul factor; fstp`: the sine stays unrounded and only the
-  // product rounds (CUnitMotion::HandleDivingAndSurfacing, 0x006C337A..0x006C3380).
-  [[nodiscard]] float SinTimes(float sinArg, float factor) noexcept;
+  // `fld a; fmul b; fsin; fmul factor; fstp` (CUnitMotion::HandleDivingAndSurfacing,
+  // 0x006C336C..0x006C3380): the argument product keeps the extended exponent
+  // (a denormal `a * b` is not flushed to the float grid before the sine), the
+  // sine stays unrounded, and only the final product rounds to float.
+  [[nodiscard]] float SinOfProductTimes(float a, float b, float factor) noexcept;
   /**
    * Moho::SLERP's spherical blend exactly as FUN_004EBC00 runs it at
    * 0x004EBD95..0x004EBDF2, entirely on the x87 stack:

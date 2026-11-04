@@ -1,11 +1,13 @@
 #pragma once
 
+#include <new>
 #include <cstddef>
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/render/camera/VTransform.h"
+#include "moho/sim/SimBlockLane.h"
 
 namespace gpg
 {
@@ -262,6 +264,28 @@ namespace moho
      * on the `gpg` fastvectors, and the same branch in
      * `gpg::core::FastVectorInline<T>::ReallocateInsert_`).
      */
+    /// 11 bones of 0x4C bytes are 0x344, the one bone count in the binary's 896-byte allocator class (see SimBlockLane).
+    static constexpr std::size_t kBinaryLaneBones = 11u;
+
+    [[nodiscard]] static CAniPoseBone* AllocateBones(const std::size_t count)
+    {
+#if defined(_M_X64) || defined(__x86_64__)
+      if (count == kBinaryLaneBones) {
+        static_assert(sizeof(CAniPoseBone) * kBinaryLaneBones <= SimBlockLane::kBlockBytes);
+        void* const block = SimBlockLane::Allocate();
+        if (block == nullptr) {
+          throw std::bad_alloc();
+        }
+        auto* const bones = static_cast<CAniPoseBone*>(block);
+        for (std::size_t i = 0; i < count; ++i) {
+          ::new (static_cast<void*>(bones + i)) CAniPoseBone;
+        }
+        return bones;
+      }
+#endif
+      return new CAniPoseBone[count];
+    }
+
     void resize(const std::size_t count, const CAniPoseBone& fillValue)
     {
       const std::size_t currentSize = size();
@@ -275,7 +299,7 @@ namespace moho
       }
 
       if (count > capacity()) {
-        CAniPoseBone* const grown = new CAniPoseBone[count];
+        CAniPoseBone* const grown = AllocateBones(count);
         for (std::size_t i = 0; i < currentSize; ++i) {
           grown[i] = mBegin[i];
         }
@@ -285,7 +309,7 @@ namespace moho
           // slot the live range has just vacated.
           *reinterpret_cast<CAniPoseBone**>(mOriginal) = mCapacity;
         } else {
-          delete[] mBegin;
+          FreeHeapBones();
         }
 
         mBegin = grown;
@@ -297,6 +321,18 @@ namespace moho
         *mEnd = fillValue;
         ++mEnd;
       }
+    }
+
+    /// Frees the heap buffer `mBegin` points at, by way of the capacity it was allocated with.
+    void FreeHeapBones() noexcept
+    {
+#if defined(_M_X64) || defined(__x86_64__)
+      if (capacity() == kBinaryLaneBones) {
+        SimBlockLane::Free(mBegin);
+        return;
+      }
+#endif
+      delete[] mBegin;
     }
 
     CAniPoseBone* mBegin;         // +0x00

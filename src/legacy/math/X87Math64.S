@@ -79,6 +79,41 @@ FUNC msvc8_x87_bilinear_height
     ret
 ENDF msvc8_x87_bilinear_height
 
+// float msvc8_x87_subtract_bilinear_height(top, h00, h01, h10, h11, fracX,
+// fracZ): xmm0..xmm6. The same block, then top - height before the store.
+FUNC msvc8_x87_subtract_bilinear_height
+    movss   dword ptr [rsp-36], xmm0    // top
+    movss   dword ptr [rsp-32], xmm1    // h00
+    movss   dword ptr [rsp-28], xmm2    // h01
+    movss   dword ptr [rsp-24], xmm3    // h10
+    movss   dword ptr [rsp-20], xmm4    // h11
+    movss   dword ptr [rsp-16], xmm5    // fracX
+    movss   dword ptr [rsp-12], xmm6    // fracZ
+    SET_PC24
+    fld     dword ptr [rsp-28]
+    fld     dword ptr [rsp-32]
+    fsub    st(1), st(0)
+    fld     dword ptr [rsp-12]
+    fmul    st(2), st(0)
+    fxch    st(2)
+    faddp   st(1), st(0)
+    fld     dword ptr [rsp-20]
+    fld     dword ptr [rsp-24]
+    fsub    st(1), st(0)
+    fxch    st(1)
+    fmulp   st(3), st(0)
+    faddp   st(2), st(0)
+    fsub    st(1), st(0)
+    fxch    st(1)
+    fmul    dword ptr [rsp-16]
+    faddp   st(1), st(0)
+    fsubr   dword ptr [rsp-36]
+    fstp    dword ptr [rsp-36]
+    RESTORE_CW
+    movss   xmm0, dword ptr [rsp-36]
+    ret
+ENDF msvc8_x87_subtract_bilinear_height
+
 // float msvc8_x87_sinf(float x)
 FUNC msvc8_x87_sinf
     movss   dword ptr [rsp-16], xmm0
@@ -243,19 +278,48 @@ FUNC msvc8_x87_sin_times_cos
     ret
 ENDF msvc8_x87_sin_times_cos
 
-// float msvc8_x87_sin_times(float sinArg, float factor)
-FUNC msvc8_x87_sin_times
+// float msvc8_x87_sin_of_product_times(float a, float b, float factor)
+FUNC msvc8_x87_sin_of_product_times
     movss   dword ptr [rsp-32], xmm0
     movss   dword ptr [rsp-28], xmm1
+    movss   dword ptr [rsp-24], xmm2
     SET_PC24
     fld     dword ptr [rsp-32]
-    fsin
     fmul    dword ptr [rsp-28]
+    fsin
+    fmul    dword ptr [rsp-24]
     fstp    dword ptr [rsp-32]
     RESTORE_CW
     movss   xmm0, dword ptr [rsp-32]
     ret
-ENDF msvc8_x87_sin_times
+ENDF msvc8_x87_sin_of_product_times
+
+// float msvc8_x87_twister_word_in_range(float lower, float upper, uint32_t word):
+// xmm0 = lower, xmm1 = upper, edi = word.
+FUNC msvc8_x87_twister_word_in_range
+    movss   dword ptr [rsp-32], xmm0
+    movss   dword ptr [rsp-28], xmm1
+    mov     dword ptr [rsp-24], edi
+    mov     dword ptr [rsp-20], 0x4F800000   // 2^32
+    mov     dword ptr [rsp-16], 0x2F800000   // 2^-32
+    SET_PC24
+    fild    dword ptr [rsp-24]
+    test    edi, edi
+    jge     1f
+    fadd    dword ptr [rsp-20]
+1:
+    fld     dword ptr [rsp-28]
+    fld     dword ptr [rsp-32]
+    fsub    st(1), st(0)
+    fxch    st(2)
+    fmulp   st(1), st(0)
+    fmul    dword ptr [rsp-16]
+    faddp   st(1), st(0)
+    fstp    dword ptr [rsp-32]
+    RESTORE_CW
+    movss   xmm0, dword ptr [rsp-32]
+    ret
+ENDF msvc8_x87_twister_word_in_range
 
 // void msvc8_x87_slerp_spherical_blend(float* out, const float* q1, const float* rhs,
 //                                      float angle, float oneMinusT, float t)

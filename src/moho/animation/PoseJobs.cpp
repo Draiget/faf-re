@@ -9,6 +9,7 @@
 #include "lua/LuaCallGate.h"
 #include "moho/ai/EEconResourceTypeInfo.h"
 #include "moho/animation/CAniActor.h"
+#include "moho/animation/CAniPose.h"
 #include "moho/animation/CAnimationManipulator.h"
 #include "moho/animation/CRotateManipulator.h"
 #include "moho/animation/CSlaveManipulator.h"
@@ -193,6 +194,10 @@ namespace moho
     [[nodiscard]] bool CanQueue(const CAniActor& actor)
     {
       sSawStorage = false;
+      // An 11-bone pose update allocates from the sim thread's block list in the sim's order (see SimBlockLane).
+      if (const CAniPose* const pose = actor.mPose.get(); pose != nullptr && pose->mBones.size() == CAniPoseBoneArray::kBinaryLaneBones) {
+        return false;
+      }
       return actor.AllEnabledManipulators(&IsQueueable);
     }
 

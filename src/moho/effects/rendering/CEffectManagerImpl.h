@@ -16,6 +16,14 @@ namespace gpg
 
 namespace moho
 {
+  /**
+   * Engine addition (plan WPR.35): whether effects only run out their lifetime. A program that
+   * draws nothing turns this on before any effect exists: emitters build no curves and spawn no
+   * particles, while scripts still hold them and they still end when they would.
+   */
+  void EFFECT_SetLifetimeOnly(bool lifetimeOnly) noexcept;
+  [[nodiscard]] bool EFFECT_LifetimeOnly() noexcept;
+
   class CEffectManagerImpl : public IEffectManager
   {
   public:

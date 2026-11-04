@@ -1124,8 +1124,9 @@ namespace moho
    * Address: 0x008C1880 (FUN_008C1880, ?USERUNIT_CanBeBuiltAt@Moho@@YA_NAAVCWldSession@1@PBVRUnitBlueprint@1@ABUSCoordsVec2@1@_NPAUSBuildInfo@1@PBVUserCommand@1@@Z)
    *
    * What it does:
-   * Runs world-space placement validation, then rejects when nearby static/dead
-   * visible units or queued mobile-build commands overlap the candidate skirt.
+   * Runs world-space placement validation, then rejects when nearby visible
+   * static or still-being-built units, or queued mobile-build commands, overlap
+   * the candidate skirt.
    */
   bool USERUNIT_CanBeBuiltAt(
     CWldSession& session,

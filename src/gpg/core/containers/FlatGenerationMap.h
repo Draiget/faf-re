@@ -65,6 +65,34 @@ namespace gpg::core
       return Place(key, value);
     }
 
+    /** Removes `key` if it is in the map; the entries probed past it move up, so no marker stays behind. */
+    void Erase(const std::uint32_t key) noexcept
+    {
+      std::size_t hole = Bucket(key);
+      for (;; hole = Next(hole)) {
+        const Slot& slot = mSlots[hole];
+        if (slot.generation != mGeneration) {
+          return;
+        }
+        if (slot.key == key) {
+          break;
+        }
+      }
+      --mCount;
+      for (std::size_t i = Next(hole);; i = Next(i)) {
+        const Slot& slot = mSlots[i];
+        if (slot.generation != mGeneration) {
+          break;
+        }
+        // It may fill the hole unless its own bucket lies between the hole and it.
+        if (((i - Bucket(slot.key)) & mMask) >= ((i - hole) & mMask)) {
+          mSlots[hole] = slot;
+          hole = i;
+        }
+      }
+      mSlots[hole].generation = kEmptyGeneration;
+    }
+
     /** Empties the map in O(1): slots of older generations read as empty. */
     void Clear() noexcept
     {

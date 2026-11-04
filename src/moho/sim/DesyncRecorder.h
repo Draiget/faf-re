@@ -18,14 +18,25 @@ namespace moho
   class Sim;
 
   /**
-   * Engine addition (issue #216): `sim_DesyncRecorder`, a user-side switch seeded by
-   * `/desyncrecorder` on the command line. Read when a sim is created, so a change takes effect at
-   * the next game. It never reaches the sim: the recorder only reads state and writes text.
+   * Engine addition (issue #216): `sim_DesyncRecorder`, a user-side switch for the full sync-log
+   * recording, which costs sim time. 0, the default, never records; 1 always does; -1 records live
+   * multiplayer games only. Seeded by `/desyncrecorder` (1) and `/nodesyncrecorder` (0). Read when a sim is created, so a
+   * change takes effect at the next game. It never reaches the sim: the recorder only reads state
+   * and writes text.
    */
-  extern bool sim_DesyncRecorder;
+  extern int sim_DesyncRecorder;
 
   /// Engine addition (issue #216): memory cap in MB for the recorded beats; the oldest go first.
   extern int sim_DesyncRecorderMB;
+
+  /**
+   * Engine addition: `sim_DesyncDump`. Without `sim_DesyncRecorder`, the recorder keeps the state
+   * each beat hashes (`Sim::UpdateChecksum`'s values, copied as bytes into memory, nothing
+   * formatted) for the recent beats, and a desync writes a dump whose beat logs are that state.
+   * -1, the default, does it in live multiplayer games only; 0 never, 1 always. Seeded by
+   * `/desyncdump` (1) and `/nodesyncdump` (0); read when a sim is created.
+   */
+  extern int sim_DesyncDump;
 
   /**
    * Engine addition (issue #216), test only: at this beat, this client alone raises the health of
@@ -54,11 +65,22 @@ namespace moho
   class CDesyncRecorder
   {
   public:
-    /// Creates the recorder for `sim` when `sim_DesyncRecorder` is on. Called once the sim exists.
+    /// Creates the recorder for `sim` when `sim_DesyncRecorder` applies to this game, or for
+    /// telemetry's checksums alone. Called once the sim exists.
     static void Attach(Sim& sim);
 
     /// Writes a dump still owed, waits for the recorder's thread and drops the recorder.
     static void Detach(const Sim& sim);
+
+    /**
+     * Sim thread: the buffer `Sim::UpdateChecksum` appends this beat's hashed state to
+     * (`sim_DesyncDump`), or null when none is kept. Records, little-endian, as hashed:
+     * `'A'`, army index (int32), `SEconTotals`; `'E'`, entity id (uint32), health (float),
+     * blueprint id length (uint16, 0xFFFF for none) and bytes, orientation and position (28 bytes),
+     * velocity (12 bytes); `'G'`, the Mersenne Twister state (0x9C0 bytes), the Marsaglia flag
+     * (1 byte) and pair (4 bytes).
+     */
+    [[nodiscard]] std::string* StateTap() noexcept;
 
     /// The recorder recording `sim`, or null.
     [[nodiscard]] static CDesyncRecorder* For(const Sim* const sim) noexcept

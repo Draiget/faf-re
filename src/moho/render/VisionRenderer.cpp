@@ -37,7 +37,7 @@
 #include "Wm3AxisAlignedBox3.h"
 #include "Wm3Box2.h"
 #include "Wm3Circle2.h"
-#include "Wm3IntrBox2Circle2.h"
+#include "moho/math/Wm3Queries.h"
 #include "Wm3Vector2.h"
 
 namespace
@@ -309,8 +309,7 @@ namespace
           },
           ((emitter.mCurrent.Radius - emitter.mPrevious.Radius) * interpolant) + emitter.mPrevious.Radius
         };
-        Wm3::IntrBox2Circle2f overlap{box, sampled};
-        if (overlap.Test()) {
+        if (Wm3::TestBox2Circle2(box, sampled)) {
           ++visible;
         }
       }

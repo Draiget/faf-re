@@ -719,6 +719,116 @@ namespace faf::remote::wire
         && appearance == other.appearance;
   }
 
+  std::uint64_t HashBlipUpdate(const SEntityRecord& record, const SUnitDetail& detail) noexcept
+  {
+    std::uint64_t hash = 0x9E3779B97F4A7C15ull;
+    const auto add = [&hash](const std::uint64_t value) {
+      hash = std::rotl(hash ^ (value * 0xC2B2AE3D27D4EB4Full), 31) * 0x9E3779B185EBCA87ull;
+    };
+    const auto addFloats = [&add](const float* const values, const std::size_t count) {
+      for (std::size_t i = 0; i < count; ++i) {
+        add(Bits(values[i]));
+      }
+    };
+    const auto addCategories = [&add](const SCategoryBits& bits) {
+      add(bits.firstWord);
+      add(bits.words.size());
+      for (const std::uint32_t word : bits.words) {
+        add(word);
+      }
+    };
+
+    const SAppearance& look = record.appearance;
+    add(look.mesh);
+    addFloats(look.scale.data(), look.scale.size());
+    add(look.attachParent);
+    add(look.attachments.size());
+    for (const std::uint32_t id : look.attachments) {
+      add(id);
+    }
+    add(Bits(look.impact));
+    addFloats(look.scroll.data(), look.scroll.size());
+    add(look.visualFlags);
+    for (const std::uint32_t value : look.intel) {
+      add(value);
+    }
+    add(look.ambientSound);
+    add(look.rumbleSound);
+    add(look.underlay);
+
+    for (const auto value : record.position) {
+      add(value);
+    }
+    add(record.farPosition ? 1u : 0u);
+    addFloats(record.farValue.data(), record.farValue.size());
+    add(record.yawOnly ? 1u : 0u);
+    add(record.orientation);
+    add(Bits(record.health));
+    add(Bits(record.maxHealth));
+    add(Bits(record.fractionComplete));
+    add(record.flags);
+
+    const SUnitFields& unit = record.unit;
+    add(Bits(unit.fuelRatio));
+    add(Bits(unit.shieldRatio));
+    add(Bits(unit.workProgress));
+    add(unit.unitStates);
+    add(unit.scriptBits);
+    for (const std::uint16_t value : unit.siloCounts) {
+      add(value);
+    }
+    add(unit.unitFlags);
+
+    add(detail.creator);
+    add(static_cast<std::uint32_t>(detail.creationTick));
+    add(static_cast<std::uint32_t>(detail.stunTicks));
+    add(static_cast<std::uint32_t>(detail.jobType));
+    add(static_cast<std::uint32_t>(detail.fireState));
+    add(static_cast<std::uint32_t>(detail.siloMaxStorage[0]));
+    add(static_cast<std::uint32_t>(detail.siloMaxStorage[1]));
+    add(detail.selectionInheritor);
+    add(detail.customName);
+    add(detail.focusUnit);
+    add(detail.guardedUnit);
+    add(detail.targetBlip);
+    add(detail.didRefresh);
+    add(static_cast<std::uint32_t>(detail.reconFlags));
+    addFloats(detail.economy.data(), detail.economy.size());
+    add(detail.commands.size());
+    for (const std::int32_t value : detail.commands) {
+      add(static_cast<std::uint32_t>(value));
+    }
+    add(detail.buildQueue.size());
+    for (const std::int32_t value : detail.buildQueue) {
+      add(static_cast<std::uint32_t>(value));
+    }
+    add(detail.weapons.size());
+    for (const SUnitWeapon& weapon : detail.weapons) {
+      addCategories(weapon.targets);
+      addCategories(weapon.secondary);
+      add(weapon.layer);
+      add(Bits(weapon.minRadius));
+      add(Bits(weapon.maxRadius));
+      add(Bits(weapon.effectiveRadius));
+      add(weapon.minRangeVisual);
+      add(weapon.maxRangeVisual);
+    }
+    const SUnitAttributes& attributes = detail.attributes;
+    add(attributes.blueprint);
+    add(attributes.reserved04);
+    addCategories(attributes.restriction);
+    addFloats(attributes.scalars.data(), attributes.scalars.size());
+    add(attributes.commandCaps);
+    add(attributes.toggleCaps);
+    for (const std::uint8_t value : attributes.flags) {
+      add(value);
+    }
+    add(attributes.reserved6C);
+
+    hash ^= hash >> 32u;
+    return hash != 0u ? hash : 1u;
+  }
+
   std::uint32_t CreationFields(const SEntityRecord& record) noexcept
   {
     return kEntityFields | kFieldKind | (record.isUnit ? kUnitFields : 0u)
@@ -1067,6 +1177,50 @@ namespace faf::remote::wire
     return delta;
   }
 
+  namespace
+  {
+    /** The frame's header and its removed, created and changed records. */
+    void WriteFrameChanges(
+      const std::uint32_t frameId, const std::uint32_t baselineId, const std::uint32_t beat, const std::int32_t simRate,
+      const std::uint32_t serverMs, const std::span<const std::uint32_t> removed,
+      const std::span<const SEntityRecord* const> created, const std::span<const SFrameChange> changed,
+      const SFrameCodec& codec, BitWriter& writer
+    )
+    {
+      writer.WriteBits(kLaneVersions[static_cast<std::size_t>(ELane::Entities)], 16);
+      writer.WriteBits(frameId, 32);
+      writer.WriteBits(baselineId, 32);
+      writer.WriteBits(beat, 32);
+      writer.WriteVarUint(ZigZag(simRate));
+      writer.WriteBits(serverMs, 32);
+
+      bool first = true;
+      std::uint32_t previous = 0;
+      writer.WriteVarUint(static_cast<std::uint32_t>(removed.size()));
+      for (const std::uint32_t id : removed) {
+        WriteGap(writer, first, previous, id);
+      }
+
+      first = true;
+      writer.WriteVarUint(static_cast<std::uint32_t>(created.size()));
+      for (const SEntityRecord* const record : created) {
+        WriteGap(writer, first, previous, record->id);
+        const std::uint32_t fields = CreationFields(*record);
+        writer.WriteVarUint(fields);
+        writer.WriteVarUint(record->tickCreated);
+        WriteFields(writer, *record, fields, codec, beat, nullptr);
+      }
+
+      first = true;
+      writer.WriteVarUint(static_cast<std::uint32_t>(changed.size()));
+      for (const SFrameChange& change : changed) {
+        WriteGap(writer, first, previous, change.after->id);
+        writer.WriteVarUint(change.fields);
+        WriteFields(writer, *change.after, change.fields, codec, beat, change.before);
+      }
+    }
+  } // namespace
+
   bool EncodeFrame(const SViewFrame& frame, const SViewFrame* const baseline, const SFrameCodec& codec, BitWriter& writer)
   {
     if (!frame.IsWellFormed() || (baseline != nullptr && !baseline->IsWellFormed())
@@ -1079,43 +1233,59 @@ namespace faf::remote::wire
       }
     }
 
-    const SFrameDelta delta = ComputeFrameDelta(baseline, frame);
-    writer.WriteBits(kLaneVersions[static_cast<std::size_t>(ELane::Entities)], 16);
-    writer.WriteBits(frame.frameId, 32);
-    writer.WriteBits(baseline != nullptr ? baseline->frameId : kNoBaseline, 32);
-    writer.WriteBits(frame.beat, 32);
-    writer.WriteVarUint(ZigZag(frame.simRate));
-    writer.WriteBits(frame.serverMs, 32);
-
-    bool first = true;
-    std::uint32_t previous = 0;
-    writer.WriteVarUint(static_cast<std::uint32_t>(delta.removed.size()));
-    for (const std::uint32_t id : delta.removed) {
-      WriteGap(writer, first, previous, id);
+    // ComputeFrameDelta's walk, keeping pointers into the two frames instead of copies of the
+    // records (a server encodes every view's frame each beat), and each change's baseline record.
+    std::vector<std::uint32_t> removed;
+    std::vector<const SEntityRecord*> created;
+    std::vector<SFrameChange> changed;
+    {
+      static const std::vector<SEntityRecord> kEmpty;
+      const std::vector<SEntityRecord>& before = baseline != nullptr ? baseline->entities : kEmpty;
+      const std::vector<SEntityRecord>& after = frame.entities;
+      std::size_t b = 0;
+      std::size_t a = 0;
+      while (b < before.size() || a < after.size()) {
+        if (a == after.size() || (b < before.size() && before[b].id < after[a].id)) {
+          removed.push_back(before[b].id);
+          ++b;
+        } else if (b == before.size() || after[a].id < before[b].id) {
+          created.push_back(&after[a]);
+          ++a;
+        } else {
+          if (const std::uint32_t fields = ChangedFields(before[b], after[a]); fields != 0u) {
+            changed.push_back({fields, &after[a], &before[b]});
+          }
+          ++a;
+          ++b;
+        }
+      }
     }
+    WriteFrameChanges(
+      frame.frameId, baseline != nullptr ? baseline->frameId : kNoBaseline, frame.beat, frame.simRate, frame.serverMs, removed,
+      created, changed, codec, writer
+    );
+    return true;
+  }
 
-    first = true;
-    writer.WriteVarUint(static_cast<std::uint32_t>(delta.created.size()));
-    for (const SEntityRecord& record : delta.created) {
-      WriteGap(writer, first, previous, record.id);
-      const std::uint32_t fields = CreationFields(record);
-      writer.WriteVarUint(fields);
-      writer.WriteVarUint(record.tickCreated);
-      WriteFields(writer, record, fields, codec, frame.beat, nullptr);
+  bool EncodeFrameChanges(const SFrameChanges& changes, const SFrameCodec& codec, BitWriter& writer)
+  {
+    if (changes.entityCount > codec.maxEntities) {
+      return false;
     }
-
-    first = true;
-    writer.WriteVarUint(static_cast<std::uint32_t>(delta.changed.size()));
-    for (const SFrameDelta::SChange& change : delta.changed) {
-      WriteGap(writer, first, previous, change.record.id);
-      writer.WriteVarUint(change.fields);
-      // A change's id is in the baseline (ComputeFrameDelta); both lists are in id order.
-      const auto before = std::lower_bound(
-        baseline->entities.begin(), baseline->entities.end(), change.record.id,
-        [](const SEntityRecord& record, const std::uint32_t id) { return record.id < id; }
-      );
-      WriteFields(writer, change.record, change.fields, codec, frame.beat, &*before);
+    for (const SEntityRecord* const record : changes.created) {
+      if (!FitsCodec(*record, codec, changes.beat)) {
+        return false;
+      }
     }
+    for (const SFrameChange& change : changes.changed) {
+      if (!FitsCodec(*change.after, codec, changes.beat)) {
+        return false;
+      }
+    }
+    WriteFrameChanges(
+      changes.frameId, changes.baselineId, changes.beat, changes.simRate, changes.serverMs, changes.removed, changes.created,
+      changes.changed, codec, writer
+    );
     return true;
   }
 

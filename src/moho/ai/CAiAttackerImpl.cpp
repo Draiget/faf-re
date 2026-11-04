@@ -247,7 +247,7 @@ namespace
       } else {
         const float checkInterval =
           (task->mWeapon->mWeaponBlueprint != nullptr) ? task->mWeapon->mWeaponBlueprint->TargetCheckInterval : 0.0f;
-        const int roundedFrames = static_cast<int>(std::ceil(checkInterval * 10.0f));
+        const int roundedFrames = msvc8::CeilToIntX87(checkInterval * 10.0f); // 0x005D956D..0x005D9580
         pendingFrames = (roundedFrames > 1) ? roundedFrames : 1;
       }
     }

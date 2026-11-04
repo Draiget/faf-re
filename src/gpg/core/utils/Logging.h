@@ -355,10 +355,9 @@ namespace gpg
      * container: the previously-unidentified leading `field_0x00`
      * (confirmed present via the `operator new(0x14u)` allocation in
      * `EnsureThreadState`, but whose role was not identified) is exactly
-     * `msvc8::vector<T>`'s debug-proxy slot (`HasDebugProxy=true` is this
-     * template's default, matching the rest of this codebase's `_SECURE_SCL`
-     * modeling) -- `mEntries` alone reproduces all four original fields
-     * (proxy/begin/end/cap) at their original offsets.
+     * the binary vector's debug-proxy slot (`_SECURE_SCL`; the game's builds
+     * leave it out, see legacy/containers/Layout.h) -- `mEntries` alone
+     * reproduces all four original fields (proxy/begin/end/cap).
      */
     struct ThreadState
     {

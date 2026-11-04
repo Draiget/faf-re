@@ -1,4 +1,6 @@
 #include "CNetUDPConnector.h"
+
+#include "moho/net/NetPeerTransport.h"
 #include "gpg/core/profiling/Profiler.h"
 
 #include <cstdio>
@@ -87,6 +89,10 @@ CNetUDPConnection& CNetUDPConnector::RelinkConnectionToFront(CNetUDPConnection& 
  */
 CNetUDPConnector::~CNetUDPConnector()
 {
+  // Engine addition (issue #232): before anything else, so no transport
+  // delivers into a connector being destroyed.
+  NET_ForgetPeerTransports(this);
+
   // Drain the packet free-list: 0x00489C00 deletes the front packet until the
   // list is empty, each packet's destructor unlinking it.
   while (mPacketList.mNext != &mPacketList) {
@@ -533,150 +539,25 @@ void CNetUDPConnector::ReceiveData()
       break;
     }
 
-    packet->mSize = n;
-    const int64_t timeNow = GetTime();
-    packet->mSentTime = timeNow;
-    mSendStampBuffer.Push(1, timeNow, n);
+    HandleReceivedDatagram(
+      packet, n, ntohl(static_cast<uint32_t>(from.sin_addr.s_addr)), ntohs(from.sin_port)
+    );
+  }
 
-    const uint32_t addrHost = ntohl(static_cast<uint32_t>(from.sin_addr.s_addr));
-    const uint16_t portHost = ntohs(from.sin_port);
-
-    if (net_LogPackets) {
-      LogPacket(1, timeNow, addrHost, portHost, &packet->header.mType, n);
-    }
-
-    if (net_DebugLevel >= 2) {
-      const msvc8::string packetString = packet->ToString();
-      const msvc8::string hostString = NET_GetHostName(addrHost);
-      const msvc8::string timeString = gpg::FileTimeToString(timeNow);
-      gpg::Debugf(
-        "%s:                     recv %s:%hu, %s",
-        timeString.c_str(),
-        hostString.c_str(),
-        portHost,
-        packetString.c_str()
-      );
-    }
-
-    if (n > 0 && packet->header.mType == PT_NATTraversal) {
-      // Only `Pull` drains this queue, and the game thread may not call it
-      // for a while (loading); past the cap the packet is recycled unread.
-      if (
-        CopyLiveNatTraversalProviderWeakPtr(mNatTraversalProvider).lock() &&
-        mInboundTraversalPackets.size() < kMaxQueuedTraversalPackets
-      ) {
-        packet->ListUnlink();
-        mInboundTraversalPackets.push_back({packet, addrHost, portHost});
-#if defined(_WIN32)
-        if (mSelectedEvent) {
-          SetEvent(mSelectedEvent);
-        }
-#endif
-      }
-      continue;
-    }
-
-    if (static_cast<unsigned>(n) < 15U) {
-      if (net_DebugLevel) {
-        const msvc8::string host = NET_GetHostName(addrHost);
-        gpg::Logf(
-          "CNetUDPConnector<%hu>::ReceiveData(): ignoring short (%d bytes) packet from %s:%hu",
-          GetLocalPort(),
-          n,
-          host.c_str(),
-          portHost
-        );
-      }
-      continue;
-    }
-
-    if (packet->header.mType < PT_NumTypes) {
-      const int expected = static_cast<int>(packet->header.mPayloadLength) + kNetPacketHeaderSize;
-      if (n != expected) {
-        if (net_DebugLevel) {
-          const msvc8::string host = NET_GetHostName(addrHost);
-          gpg::Logf(
-            "CNetUDPConnector<%hu>::ReceiveData(): ignoring packet with payload length mismatch "
-            "(got %d, header says %d) from %s:%hu",
-            GetLocalPort(),
-            n,
-            packet->header.mPayloadLength,
-            host.c_str(),
-            portHost
-          );
-        }
-        continue;
-      }
-
-      if (packet->header.mType == PT_Connect) {
-        ProcessConnect(packet, addrHost, portHost);
-        continue;
-      }
-
-      CNetUDPConnection* target = nullptr;
-      for (auto* connection : mConnections.owners()) {
-        if (
-          connection->GetAddr() == addrHost && connection->GetPort() == portHost && connection->IsBeforeErroredState()
-        ) {
-          target = connection;
-          break;
-        }
-      }
-
-      if (!target) {
-        if (net_DebugLevel) {
-          const msvc8::string host = NET_GetHostName(addrHost);
-          gpg::Logf(
-            "CNetUDPConnector<%hu>::ReceiveData(): ignoring packet of type %d from unknown host %s:%hu",
-            GetLocalPort(),
-            packet->header.mType,
-            host.c_str(),
-            portHost
-          );
-        }
-        continue;
-      }
-
-      switch (packet->header.mType) {
-      case PT_Answer:
-        target->ProcessAnswer(packet);
-        break;
-      case PT_Data:
-        target->ProcessData(packet);
-        break;
-      case PT_Ack:
-        target->ProcessAck(packet);
-        break;
-      case PT_KeepAlive:
-        target->ProcessKeepAlive(packet);
-        break;
-      case PT_Goodbye:
-        target->ProcessGoodbye(packet);
-        break;
-      default:
-        if (net_DebugLevel) {
-          const msvc8::string host = NET_GetHostName(addrHost);
-          gpg::Logf(
-            "CNetUDPConnector<%hu>::ReceiveData(): ignoring unimplemented packet of type %d from %s:%hu",
-            GetLocalPort(),
-            packet->header.mType,
-            host.c_str(),
-            portHost
-          );
-        }
+  // Engine addition (issue #232): datagrams in-process transports received
+  // for this connector, through the same path as the socket's.
+  if (NET_PeerTransportsActive()) {
+    std::vector<SNetDeliveredDatagram> delivered;
+    NET_TakeDeliveredDatagrams(this, delivered);
+    for (const SNetDeliveredDatagram& d : delivered) {
+      SNetPacket* packet = NewPacket();
+      if (!packet) {
         break;
       }
-    } else {
-      if (net_DebugLevel) {
-        const msvc8::string host = NET_GetHostName(addrHost);
-        gpg::Logf(
-          "CNetUDPConnector<%hu>::ReceiveData(): ignoring unknown packet type (%d) from %s:%hu",
-          GetLocalPort(),
-          packet->header.mType,
-          host.c_str(),
-          portHost
-        );
-      }
+      packet->ListLinkBefore(&acquiredPackets);
+      const int n = static_cast<int>(d.bytes.size() < 512 ? d.bytes.size() : 512);
+      std::memcpy(packet->GetPayload(), d.bytes.data(), static_cast<std::size_t>(n));
+      HandleReceivedDatagram(packet, n, d.addrHost, d.portHost);
     }
   }
 
@@ -685,6 +566,168 @@ void CNetUDPConnector::ReceiveData()
     packet->ListUnlink();
     DisposePacket(packet);
   }
+}
+
+/**
+ * Engine addition (issue #232): the per-datagram half of ReceiveData
+ * (0x0048A280), unchanged, so datagrams from in-process transports take the
+ * same path as the socket's. `packet` is linked into the caller's batch.
+ */
+void CNetUDPConnector::HandleReceivedDatagram(
+  SNetPacket* const packet, const int n, const uint32_t addrHost, const uint16_t portHost
+)
+{
+  packet->mSize = n;
+  const int64_t timeNow = GetTime();
+  packet->mSentTime = timeNow;
+  mSendStampBuffer.Push(1, timeNow, n);
+
+  if (net_LogPackets) {
+    LogPacket(1, timeNow, addrHost, portHost, &packet->header.mType, n);
+  }
+
+  if (net_DebugLevel >= 2) {
+    const msvc8::string packetString = packet->ToString();
+    const msvc8::string hostString = NET_GetHostName(addrHost);
+    const msvc8::string timeString = gpg::FileTimeToString(timeNow);
+    gpg::Debugf(
+      "%s:                     recv %s:%hu, %s",
+      timeString.c_str(),
+      hostString.c_str(),
+      portHost,
+      packetString.c_str()
+    );
+  }
+
+  if (n > 0 && packet->header.mType == PT_NATTraversal) {
+    // Only `Pull` drains this queue, and the game thread may not call it
+    // for a while (loading); past the cap the packet is recycled unread.
+    if (
+      CopyLiveNatTraversalProviderWeakPtr(mNatTraversalProvider).lock() &&
+      mInboundTraversalPackets.size() < kMaxQueuedTraversalPackets
+    ) {
+      packet->ListUnlink();
+      mInboundTraversalPackets.push_back({packet, addrHost, portHost});
+#if defined(_WIN32)
+      if (mSelectedEvent) {
+        SetEvent(mSelectedEvent);
+      }
+#endif
+    }
+    return;
+  }
+
+  if (static_cast<unsigned>(n) < 15U) {
+    if (net_DebugLevel) {
+      const msvc8::string host = NET_GetHostName(addrHost);
+      gpg::Logf(
+        "CNetUDPConnector<%hu>::ReceiveData(): ignoring short (%d bytes) packet from %s:%hu",
+        GetLocalPort(),
+        n,
+        host.c_str(),
+        portHost
+      );
+    }
+    return;
+  }
+
+  if (packet->header.mType < PT_NumTypes) {
+    const int expected = static_cast<int>(packet->header.mPayloadLength) + kNetPacketHeaderSize;
+    if (n != expected) {
+      if (net_DebugLevel) {
+        const msvc8::string host = NET_GetHostName(addrHost);
+        gpg::Logf(
+          "CNetUDPConnector<%hu>::ReceiveData(): ignoring packet with payload length mismatch "
+          "(got %d, header says %d) from %s:%hu",
+          GetLocalPort(),
+          n,
+          packet->header.mPayloadLength,
+          host.c_str(),
+          portHost
+        );
+      }
+      return;
+    }
+
+    if (packet->header.mType == PT_Connect) {
+      ProcessConnect(packet, addrHost, portHost);
+      return;
+    }
+
+    CNetUDPConnection* target = nullptr;
+    for (auto* connection : mConnections.owners()) {
+      if (
+        connection->GetAddr() == addrHost && connection->GetPort() == portHost && connection->IsBeforeErroredState()
+      ) {
+        target = connection;
+        break;
+      }
+    }
+
+    if (!target) {
+      if (net_DebugLevel) {
+        const msvc8::string host = NET_GetHostName(addrHost);
+        gpg::Logf(
+          "CNetUDPConnector<%hu>::ReceiveData(): ignoring packet of type %d from unknown host %s:%hu",
+          GetLocalPort(),
+          packet->header.mType,
+          host.c_str(),
+          portHost
+        );
+      }
+      return;
+    }
+
+    switch (packet->header.mType) {
+    case PT_Answer:
+      target->ProcessAnswer(packet);
+      break;
+    case PT_Data:
+      target->ProcessData(packet);
+      break;
+    case PT_Ack:
+      target->ProcessAck(packet);
+      break;
+    case PT_KeepAlive:
+      target->ProcessKeepAlive(packet);
+      break;
+    case PT_Goodbye:
+      target->ProcessGoodbye(packet);
+      break;
+    default:
+      if (net_DebugLevel) {
+        const msvc8::string host = NET_GetHostName(addrHost);
+        gpg::Logf(
+          "CNetUDPConnector<%hu>::ReceiveData(): ignoring unimplemented packet of type %d from %s:%hu",
+          GetLocalPort(),
+          packet->header.mType,
+          host.c_str(),
+          portHost
+        );
+      }
+      break;
+    }
+  } else {
+    if (net_DebugLevel) {
+      const msvc8::string host = NET_GetHostName(addrHost);
+      gpg::Logf(
+        "CNetUDPConnector<%hu>::ReceiveData(): ignoring unknown packet type (%d) from %s:%hu",
+        GetLocalPort(),
+        packet->header.mType,
+        host.c_str(),
+        portHost
+      );
+    }
+  }
+}
+
+/**
+ * Engine addition (issue #232): wakes the connector's thread for datagrams an
+ * in-process transport queued.
+ */
+void CNetUDPConnector::SignalPeerTransportDelivery() noexcept
+{
+  SignalSocketEvent();
 }
 
 /**
@@ -1018,14 +1061,18 @@ int32_t CNetUDPConnector::SendData()
     const auto payload = packet.mPacket->GetPayload();
     const auto payloadSize = packet.mPacket->GetPayloadSize();
 
-    ::sendto(
-      socket_,
-      static_cast<const char*>(payload),
-      static_cast<int32_t>(payloadSize),
-      0,
-      reinterpret_cast<SOCKADDR*>(&name),
-      16
-    );
+    // Engine addition (issue #232): an in-process transport for this address.
+    if (!NET_PeerTransportsActive() ||
+        !NET_SendThroughPeerTransport(this, packet.mAddr, packet.mPort, payload, payloadSize)) {
+      ::sendto(
+        socket_,
+        static_cast<const char*>(payload),
+        static_cast<int32_t>(payloadSize),
+        0,
+        reinterpret_cast<SOCKADDR*>(&name),
+        16
+      );
+    }
 
     if (net_LogPackets) {
       LogPacket(0, curTime, packet.mAddr, packet.mPort, payload, packet.mPacket->mSize);

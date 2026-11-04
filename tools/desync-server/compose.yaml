@@ -1,0 +1,42 @@
+# faf-re desync test server on one machine: the OpenTelemetry collector (records, port 4318) and
+# the dump receiver (uploads and downloads under /dumps, port 4319). See README.md.
+#
+#   cp .env.example .env    # set the two tokens
+#   docker compose up -d
+#
+# Plain HTTP: for players on the internet, put a TLS proxy in front (README.md).
+name: faf-desync
+
+services:
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.164.0
+    command: ["--config=/etc/faf/collector.yaml"]
+    environment:
+      FAF_UPLOAD_TOKEN: ${FAF_UPLOAD_TOKEN:?set it in .env}
+    volumes:
+      - ./collector.yaml:/etc/faf/collector.yaml:ro
+      - ./data/otel:/data/otel
+    ports:
+      - "4318:4318"
+    restart: unless-stopped
+    cpus: 1
+    mem_limit: 512m
+    user: "0"
+
+  dumps:
+    image: python:3.12-slim
+    command: ["python", "/opt/faf/receive.py", "--host", "0.0.0.0", "--port", "4319", "--prefix", "/dumps",
+              "--out", "/data/dumps", "--max-mb", "64"]
+    environment:
+      FAF_UPLOAD_TOKEN: ${FAF_UPLOAD_TOKEN:?set it in .env}
+      FAF_READ_TOKEN: ${FAF_READ_TOKEN:?set it in .env}
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ../desync-diff/receive.py:/opt/faf/receive.py:ro
+      - ../desync-diff/desync_diff.py:/opt/faf/desync_diff.py:ro
+      - ./data/dumps:/data/dumps
+    ports:
+      - "4319:4319"
+    restart: unless-stopped
+    cpus: 1
+    mem_limit: 512m

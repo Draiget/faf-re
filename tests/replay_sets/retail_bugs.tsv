@@ -1,0 +1,2 @@
+va	hash	name	why
+0x009081F0	D773478C582E0FFD	LuaPlus::LuaObject::SetInteger	DiskGetFileInfo on a zip entry dated 1980-01-01: GetEntryLastModTime (0x0046C8B0) passes the entry's time as the date and its date as the time, the conversion fails, and the original returns a leftover value. Ours returns the entry's date.

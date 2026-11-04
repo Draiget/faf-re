@@ -1068,8 +1068,14 @@ namespace moho
     if (!skipPrepareMove && !PrepareMove(0, mUnit, &desiredPosition, &guardedSkirt, useWholeMap)) {
       if (mUnit->SimulationRef != nullptr && mUnit->SimulationRef->mMapData != nullptr) {
         const gpg::Rect2i& playableRect = mUnit->SimulationRef->mMapData->mPlayableRect;
-        desiredPosition.x = std::clamp(desiredPosition.x, static_cast<float>(playableRect.x0), static_cast<float>(playableRect.x1));
-        desiredPosition.z = std::clamp(desiredPosition.z, static_cast<float>(playableRect.z0), static_cast<float>(playableRect.z1));
+        // 0x00613F8D..0x00613FC5: the low bound unless greater, then the high bound unless greater, so NaN gives the
+        // low bound (std::clamp would keep the NaN).
+        const auto clampToBounds = [](const float value, const float low, const float high) {
+          const float floored = value > low ? value : low;
+          return high > floored ? floored : high;
+        };
+        desiredPosition.x = clampToBounds(desiredPosition.x, static_cast<float>(playableRect.x0), static_cast<float>(playableRect.x1));
+        desiredPosition.z = clampToBounds(desiredPosition.z, static_cast<float>(playableRect.z0), static_cast<float>(playableRect.z1));
         clampedToPlayableRect = true;
       }
     }

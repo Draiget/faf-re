@@ -88,6 +88,16 @@ namespace moho
   {};
 
   /**
+   * Address: 0x005A9D60 (FUN_005A9D60)
+   *
+   * What it does:
+   * Computes the octile-distance core term `max(|a|,|b|) + min(|a|,|b|) *
+   * 0.41421354f` used by AI pathfinder heuristic lanes
+   * (`CAiPathFinder::GetHeuristicCost`).
+   */
+  [[nodiscard]] float ComputeOctileDistanceCore(float a, float b) noexcept;
+
+  /**
    * Recovered request mode latch used by CAiPathFinder.
    */
   enum EAiPathSearchType : std::int32_t

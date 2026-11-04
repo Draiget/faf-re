@@ -4,7 +4,7 @@ description: >
   bin_x64\desync_test.exe) play faf_re_lockstep with telemetry on, sending to
   an OpenTelemetry collector on 127.0.0.1:4318 (start it first; see
   docs/SWITCHES.md, "Desync telemetry"). Client 1 also runs the desync
-  recorder; client 2 runs telemetry alone and raises one unit's health by one
+  recorder; client 2 turns the recorder off (/nodesyncdump) and runs telemetry alone and raises one unit's health by one
   float step at beat 300 (/desynctestbeat), a real desync. Each client must
   send one faf.desync record (game id 424242 from its gpgnet:// /savereplay)
   and, when /exitattick quits it at tick 450, one faf.game.end record.
@@ -36,7 +36,7 @@ players:
   - uid: 2
     name: Telemetry-B
     faction: cybran
-    args: ['/title', 'telemetry-B', '/desynctestbeat', '300', '/telemetry', '/telemetryendpoint', 'http://127.0.0.1:4318',
+    args: ['/title', 'telemetry-B', '/nodesyncdump', '/desynctestbeat', '300', '/telemetry', '/telemetryendpoint', 'http://127.0.0.1:4318',
            '/telemetrytoken', 'test-token', '/savereplay', 'gpgnet://127.0.0.1:1/424242/Telemetry-B.SCFAreplay',
            '/exitattick', '450']
 

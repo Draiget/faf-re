@@ -1,8 +1,13 @@
 ﻿#pragma once
 
 #include <cstdint>
-#include <ostream>
+#include <cstring>
 #include <ios>
+#include <new>
+#include <ostream>
+#include <string_view>
+
+#include "legacy/containers/Layout.h"
 
 namespace msvc8
 {
@@ -49,7 +54,9 @@ namespace msvc8
 #pragma pack(push, 4)
     struct string
 	{
-        void* alVal; // allocator cookie / impl detail (unused for reading)
+#if FAF_RETAIL_LAYOUT
+        void* alVal = nullptr; // allocator word, never read
+#endif
 
         union Bx {
             char* ptr;    // heap pointer when not in SSO
@@ -65,7 +72,6 @@ namespace msvc8
          * Default ctor - empty SSO string.
          */
         string() noexcept : bx() {
-            alVal = nullptr;
             bx.buf[0] = '\0';
             mySize = 0;
             myRes = 15;
@@ -87,9 +93,28 @@ namespace msvc8
          *
          * Each copy therefore owns a buffer that has to be released again, which
          * is what the destructor below does.
+         *
+         * Inline strings copy here without a call; `CopySlow` and `AssignSlow`
+         * handle everything else, including a source that fails `basic_sanity`.
          */
-        string(const string& other) noexcept;
-        string& operator=(const string& other) noexcept;
+        string(const string& other) noexcept {
+            if (other.myRes == 15U && other.mySize <= 15U) {
+                bx = other.bx;
+                mySize = other.mySize;
+                myRes = 15U;
+            } else {
+                CopySlow(other);
+            }
+        }
+
+        string& operator=(const string& other) noexcept {
+            if (myRes == 15U && other.myRes == 15U && other.mySize <= 15U) {
+                bx = other.bx;
+                mySize = other.mySize;
+                return *this;
+            }
+            return AssignSlow(other);
+        }
 
         /**
          * Releases the heap buffer, exactly as MSVC8's `~basic_string` does via
@@ -128,7 +153,14 @@ namespace msvc8
          * nothing in the class produces a heap-looking string it does not own,
          * and the release below is safe.
          */
-        ~string() noexcept;
+        ~string() noexcept {
+            if (myRes >= 0x10U && bx.ptr != nullptr) {
+                ::operator delete(bx.ptr);
+            }
+            mySize = 0U;
+            myRes = 15U;
+            bx.buf[0] = '\0';
+        }
 
         /**
          * Move semantics: transfer the buffer and leave the source an empty
@@ -146,26 +178,60 @@ namespace msvc8
          * logging window exhausted the heap - `assign_owned` then memcpy'd
          * through a failed allocation.
          */
-        string(string&& other) noexcept;
-        string& operator=(string&& other) noexcept;
+        string(string&& other) noexcept : bx(other.bx), mySize(other.mySize), myRes(other.myRes) {
+            other.bx.buf[0] = '\0';
+            other.mySize = 0U;
+            other.myRes = 15U;
+        }
+
+        string& operator=(string&& other) noexcept {
+            if (this == &other) {
+                return *this;
+            }
+
+            // Release whatever this string owned before taking the source's buffer;
+            // without this the displaced block would leak exactly as the copy
+            // assignment used to.
+            if (myRes >= 0x10U && bx.ptr != nullptr) {
+                ::operator delete(bx.ptr);
+            }
+
+            bx = other.bx;
+            mySize = other.mySize;
+            myRes = other.myRes;
+            other.bx.buf[0] = '\0';
+            other.mySize = 0U;
+            other.myRes = 15U;
+            return *this;
+        }
 
         /**
          * From C-string: copies, as MSVC8's own converting ctor does. Input of
          * 15 characters or fewer lands in the inline buffer, longer input gets
          * its own heap block.
+         *
+         * The binary does not null-check the source (0x00405550: strlen would
+         * fault). The guard only turns a crash into an empty string and cannot
+         * change behaviour on any input the original survived.
          */
-        string(const char* s) noexcept;
+        string(const char* s) noexcept {
+            InitFrom(s, s != nullptr ? std::strlen(s) : 0U);
+        }
 
         /**
          * From string_view: same copying policy as above.
          */
-        explicit string(std::string_view sv) noexcept;
+        explicit string(std::string_view sv) noexcept {
+            InitFrom(sv.data(), sv.size());
+        }
 
         /**
          * From pointer + length: same copying policy as above, always NUL
          * terminated.
          */
-        explicit string(const char* p, std::size_t n) noexcept;
+        explicit string(const char* p, std::size_t n) noexcept {
+            InitFrom(p, p != nullptr ? n : 0U);
+        }
 
         /** From [first, last) pointer range. */
         explicit string(const char* first, const char* last) noexcept
@@ -204,10 +270,17 @@ namespace msvc8
         }
 
         /**
-         * Conservative sanity checks to avoid wild reads.
+         * Conservative sanity checks to avoid wild reads: the length fits the
+         * capacity, the capacity is not absurd, an inline string has MSVC8's
+         * fixed 15 and a heap string has a buffer.
          */
         [[nodiscard]]
-    	bool basic_sanity() const noexcept;
+    	bool basic_sanity() const noexcept {
+            if (mySize > myRes || myRes > maxCapGuard) {
+                return false;
+            }
+            return is_sso() ? myRes == 15U : bx.ptr != nullptr;
+        }
 
         // ReSharper disable once IdentifierTypo
         static constexpr std::size_t npos = static_cast<std::size_t>(-1);
@@ -325,9 +398,19 @@ namespace msvc8
         bool resize(std::size_t newSize, char ch = '\0') noexcept;
 
         /**
-         * append(ptr,len) - grows the buffer when needed.
+         * append(ptr,len) - grows the buffer when needed. The source may lie
+         * inside this string.
          */
-        bool append(const char* s, std::size_t n) noexcept;
+        bool append(const char* s, const std::size_t n) noexcept {
+            if (s != nullptr && basic_sanity() && n <= static_cast<std::size_t>(myRes) - mySize) {
+                char* const p = raw_data_mut_unsafe();
+                std::memmove(p + mySize, s, n);
+                mySize += static_cast<uint32_t>(n);
+                p[mySize] = '\0';
+                return true;
+            }
+            return AppendSlow(s, n);
+        }
 
         /**
          * append(string_view)
@@ -339,13 +422,22 @@ namespace msvc8
         /**
          * append(count, ch) - grows the buffer when needed.
          */
-        bool append(std::size_t count, char ch) noexcept;
+        bool append(const std::size_t count, const char ch) noexcept {
+            if (basic_sanity() && count <= static_cast<std::size_t>(myRes) - mySize) {
+                char* const p = raw_data_mut_unsafe();
+                std::memset(p + mySize, static_cast<unsigned char>(ch), count);
+                mySize += static_cast<uint32_t>(count);
+                p[mySize] = '\0';
+                return true;
+            }
+            return AppendSlow(count, ch);
+        }
 
         /**
          * push_back
          */
         bool push_back(const char ch) noexcept {
-	        return append(&ch, 1);
+            return append(std::size_t{1}, ch);
         }
 
         /**
@@ -639,12 +731,45 @@ namespace msvc8
         /** string + C-string */
         [[nodiscard]] string operator+(const char* rhs) const noexcept;
 
-        /** operator+= via concat */
+        /** operator+= appends in place, as the binary's `append` (0x004058F0) does: it grows through `_Copy` (0x00405C20) only when capacity runs out. */
         string& operator+=(const string& rhs) noexcept {
-            *this = (*this + rhs);
+            const std::string_view view = rhs.view();
+            (void)append(view.data(), view.size());
+            return *this;
+        }
+
+        string& operator+=(const char* rhs) noexcept {
+            if (rhs != nullptr) {
+                (void)append(rhs, std::strlen(rhs));
+            }
+            return *this;
+        }
+
+        string& operator+=(const char ch) noexcept {
+            (void)push_back(ch);
             return *this;
         }
     private:
+        /** Constructor body: inline up to 15 characters, its own heap block above. */
+        void InitFrom(const char* const p, const std::size_t n) noexcept {
+            if (n <= 15U) {
+                if (n != 0U) {
+                    std::memcpy(bx.buf, p, n);
+                }
+                bx.buf[n] = '\0';
+                mySize = static_cast<uint32_t>(n);
+                myRes = 15U;
+                return;
+            }
+            InitHeap(p, n);
+        }
+
+        void InitHeap(const char* p, std::size_t n) noexcept;
+        void CopySlow(const string& other) noexcept;
+        string& AssignSlow(const string& other) noexcept;
+        bool AppendSlow(const char* s, std::size_t n) noexcept;
+        bool AppendSlow(std::size_t count, char ch) noexcept;
+
         static unsigned char ascii_tolower_(unsigned char ch) noexcept {
             return (ch >= static_cast<unsigned char>('A') && ch <= static_cast<unsigned char>('Z'))
                 ? static_cast<unsigned char>(ch - static_cast<unsigned char>('A') + static_cast<unsigned char>('a'))
@@ -661,22 +786,14 @@ namespace msvc8
             if (an == 0)  return true;
             return std::memcmp(a, b, an) == 0;
         }
-
-        /** Build msvc8::string from two views: SSO when possible, else adopt TLS buffer. */
-        static string concat_impl_(std::string_view a, std::string_view b) noexcept;
     };
 #pragma pack(pop)
     static_assert(sizeof(string) == 28, "MSVC8 string must be 28 bytes on x86");
 
 #pragma pack(push, 4)
     /**
-     * Scope-owning form of the legacy string layout.
-     *
-     * The ABI-facing `msvc8::string` intentionally has no destructor because
-     * much of the reconstruction still performs explicit `_Tidy` calls. Local
-     * strings and value-container elements from the original binary did have
-     * ordinary RAII, so this same-size adapter restores that lifetime without
-     * changing the layout or globally double-freeing explicit-cleanup lanes.
+     * Same-size form of `msvc8::string` whose assignment takes the new buffer
+     * before it releases the old one and reports failures.
      */
     class scoped_string final : public string
     {
@@ -704,40 +821,6 @@ namespace msvc8
 
     namespace detail {
 
-        /** Thread-local arena for non-SSO concatenation results. */
-        struct TlsConcatArena {
-            static constexpr std::size_t kSlots = 4;
-            struct Slot { char* p; std::size_t cap; };
-            Slot slots[kSlots];
-            std::size_t idx;
-            TlsConcatArena() : slots{ {nullptr,0},{nullptr,0},{nullptr,0},{nullptr,0} }, idx(0) {}
-            ~TlsConcatArena() { for (auto& s : slots) delete[] s.p; }
-
-            char* acquire(const std::size_t need, std::size_t& outCap) {
-                idx = (idx + 1) % kSlots;
-                auto& s = slots[idx];
-                if (s.cap < need) {
-                    delete[] s.p;
-                    s.cap = std::max<std::size_t>(need, 64);
-                    s.p = new char[s.cap];
-                }
-                outCap = s.cap;
-                return s.p;
-            }
-        };
-
-        inline std::pair<char*, uint32_t> get_concat_buffer(const std::size_t needBytes) {
-            thread_local TlsConcatArena arena;
-            std::size_t cap{};
-            char* p = arena.acquire(needBytes, cap);
-            return { p, static_cast<uint32_t>(cap) };
-        }
-
-        /** Safe view helper (treat insane as empty). */
-        inline std::string_view as_view(const string& s) noexcept {
-            return s.basic_sanity() ? std::string_view{ s.raw_data_unsafe(), s.size() } : std::string_view{};
-        }
-
         /**
          * Core concatenation. The result owns its bytes.
          *
@@ -757,59 +840,4 @@ namespace msvc8
 
     } // namespace detail
 
-    // A safe, read-only facade with ergonomic operators.
-    class StringRef {
-    public:
-        // Construct from a mapped legacy object.
-        explicit StringRef(const string& s) noexcept : s_(&s) {}
-
-        // Observers
-        [[nodiscard]] const char* data() const noexcept {
-            // NOTE: For pure RE inside same address space this is fine.
-            // If your source can be invalid, consider asserting here.
-            return s_->raw_data_unsafe();
-        }
-
-        [[nodiscard]] uint32_t size() const noexcept { return s_->mySize; }
-        [[nodiscard]] bool empty() const noexcept { return size() == 0; }
-        [[nodiscard]] bool valid() const noexcept { return s_ && s_->basic_sanity(); }
-
-        // Iteration (so you can use ranges/algorithms)
-        [[nodiscard]] const char* begin() const noexcept { return data(); }
-        [[nodiscard]] const char* end()   const noexcept { return data() + size(); }
-
-        // Conversions - keep them explicit to avoid surprise lifetime bugs.
-        // Returns a non-owning view pointing into the target string memory.
-        explicit operator std::string_view() const noexcept {
-            // In debug you may add: assert(valid());
-            return { data(), size() };
-        }
-
-        // Owning copy to std::string
-        explicit operator std::string() const {
-            return { data(), size() };
-        }
-
-        // Comparisons (C++20). We delegate to std::string_view logic.
-        friend bool operator==(const StringRef& a, const std::string_view b) noexcept {
-            return std::string_view(a) == b;
-        }
-        friend std::strong_ordering operator<=>(const StringRef& a, const std::string_view b) noexcept {
-            return std::string_view(a) <=> b;
-        }
-
-        // Extra overloads for convenience
-        friend bool operator==(const StringRef& a, const char* b) noexcept {
-            return std::string_view(a) == std::string_view(b ? b : "");
-        }
-        friend bool operator==(const char* a, const StringRef& b) noexcept { return b == a; }
-
-        // Stream print
-        friend std::ostream& operator<<(std::ostream& os, const StringRef& r) {
-            return os.write(r.data(), r.size());
-        }
-
-    private:
-        const string* s_;
-    };
 }

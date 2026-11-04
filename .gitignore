@@ -27,6 +27,11 @@ dependencies/boost_1_34_1/**/*
 dependencies/wxWindows-2.4.2/**/*
 # Renderer toolchains fetched locally (docs/RENDERER_BACKENDS.md).
 dependencies/dxc/
+dependencies/libjuice/
+dependencies/libdatachannel/
+dependencies/usrsctp/
+dependencies/plog/
+dependencies/mbedtls/
 dependencies/slang/
 dependencies/*.7z
 *.7z
@@ -40,6 +45,7 @@ mcp/
 skills/
 
 .claude/**/*
+.tools/
 .github/copilot-instructions.md
 .github/instructions/**/*
 .workflows/**/*
@@ -72,6 +78,7 @@ RECOVERY_STATUS.md
 
 dependencies/.downloads/
 dependencies/dxsdk/
+dependencies/monocypher/
 
 tools/tracy/
 
