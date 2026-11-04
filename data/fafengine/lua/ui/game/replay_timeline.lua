@@ -175,9 +175,10 @@ local ScrubbingOverlay = ClassUI(Group) {
         self.targetText:SetColor('ffffffff')
         self.targetText.Depth:Set(function() return self.dialog.Depth() + 5 end)
 
-        -- Progress bar track using SupCom game slider track texture
-        local trackTexture = GetSkinFile('/game/slider/slider-back_bmp.dds')
-        self.barTrack = Bitmap(self.dialog, trackTexture)
+        -- Progress bar track, drawn: the slider's texture is a thin line with a row of dots under it,
+        -- so stretched to this size, the fill covered more than the track it showed.
+        self.barTrack = Bitmap(self.dialog)
+        self.barTrack:SetSolidColor('ff26323a')
         LayoutHelpers.SetDimensions(self.barTrack, 320, 16)
         LayoutHelpers.Below(self.barTrack, self.targetText, 14)
         LayoutHelpers.AtHorizontalCenterIn(self.barTrack, self.dialog)
@@ -381,7 +382,18 @@ function CreateReplayTimeline(parent)
     LayoutHelpers.SetHeight(slider, 20)
     LayoutHelpers.AtVerticalCenterIn(slider, bar, 4)
 
+    -- The background stays, to take clicks over the slider's height; the track is drawn on it, as the texture
+    -- is a thin line with a row of dots under it.
     LayoutHelpers.FillParent(slider._background, slider)
+    slider._background:SetAlpha(0)
+    local groove = Bitmap(slider)
+    groove:SetSolidColor('ff26323a')
+    groove:DisableHitTest()
+    groove.Left:Set(slider.Left)
+    groove.Right:Set(slider.Right)
+    LayoutHelpers.SetHeight(groove, 4)
+    LayoutHelpers.AtVerticalCenterIn(groove, slider)
+    groove.Depth:Set(function() return bar.Depth() + 3 end)
     slider._thumb.Depth:Set(function() return bar.Depth() + 6 end)
     slider._background.Depth:Set(function() return bar.Depth() + 2 end)
     if slider.EnableHitTest then
