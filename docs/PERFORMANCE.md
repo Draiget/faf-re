@@ -40,7 +40,7 @@ A few more details:
 - **Pacing**: replays and single player compute a few beats ahead of the screen, on the original rate schedule.
 - **Main thread on workers**: strategic icons, view culling, fog of war and applying each beat's unit updates.
 - **Added after this snapshot, not in the table above**: unit pose updates on sim workers (`sim_ParallelPose`: 7.8 % less wall time on 26954789 in one headless off/on/on/off test, with a spread between the two off runs larger than that), and the pose, bone and economy stat shortcuts from PR #30 (4.2 % less on 28007941 on D3D9, median of 6 runs, as measured in that PR). See [Simulation bottlenecks](RESEARCH_PERF_BOTTLENECKS.md).
-- **Loading**: blueprint registration does less per field and file, the sim's Lua state is built while the session loads, the startup effects are translated in parallel and cached, and the first frame's archive reads happen during the loading wait. Seton's Clutch with 7 AIs: about 6.4 s to 4.2 s from the map load to the sim's start; the effects at startup from about 950 ms to 90 ms.
+- **Loading**: a `/map` or `/replay` launch starts its session during startup, the Lua interpreter dispatches through computed goto, blueprint registration does less per field, scripts are kept compiled between launches, and the map, the sim's Lua state and the sim start while the rules load. SCMP_009 with 7 AIs: about 5.1 s to 3.2 s from process start to the in-game UI.
 
 ## How many games fit on a server
 
