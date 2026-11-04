@@ -2238,7 +2238,7 @@ int moho::cfunc_CLobbyGetPeerStyle(
 moho::CScrLuaInitForm* moho::func_CLobbyGetPeerStyle_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "GetPeerStyle",
     &moho::cfunc_CLobbyGetPeerStyle,
     &CScrLuaMetatableFactory<CLobby>::Instance(),
@@ -2256,10 +2256,7 @@ int moho::cfunc_CLobbyGetPeerStyleL(
   LuaPlus::LuaState* const state
 )
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCLobbyGetPeerStyleHelp, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kCLobbyGetPeerStyleHelp);
 
   LuaPlus::LuaObject lobbyObject(LuaPlus::LuaStackObject(state, 1));
   const CLobby* const lobby = SCR_FromLua_CLobby(lobbyObject, state);
