@@ -113,15 +113,6 @@ namespace
     return &sInstance;
   }
 
-  // Lazily resolves and caches the element RType* (binary Moho::SAudioRequest::sType).
-  [[nodiscard]] gpg::RType* CachedSAudioRequestType()
-  {
-    if (!moho::SAudioRequest::sType) {
-      moho::SAudioRequest::sType = gpg::LookupRType(typeid(moho::SAudioRequest));
-    }
-    return moho::SAudioRequest::sType;
-  }
-
   /**
    * Address: 0x00762220 (FUN_00762220, gpg::RFastVectorType_SAudioRequest::SerLoad)
    *
@@ -143,7 +134,7 @@ namespace
     moho::SAudioRequest fill{};
     vec.resize(static_cast<std::size_t>(count), fill);
 
-    gpg::RType* const elementType = CachedSAudioRequestType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::SAudioRequest>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Read(elementType, &vec[i], owner);
@@ -167,7 +158,7 @@ namespace
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
-    gpg::RType* const elementType = CachedSAudioRequestType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::SAudioRequest>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Write(elementType, &vec[i], owner);
@@ -208,7 +199,7 @@ namespace gpg
    */
   const char* RFastVectorType<moho::SAudioRequest>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSAudioRequestType()->GetName());
+    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::SAudioRequest>()->GetName());
     return sName.c_str();
   }
 

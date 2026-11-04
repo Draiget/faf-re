@@ -51,8 +51,7 @@ namespace moho
      */
     InstanceCounter() noexcept
     {
-      (void)::_InterlockedExchangeAdd(
-        reinterpret_cast<volatile platform::InterlockedLong*>(&GetStatItem()->mPrimaryValueBits), 1L);
+      (void)GetStatItem()->AddPrimaryBits(1);
     }
 
     /**
@@ -75,8 +74,7 @@ namespace moho
      */
     ~InstanceCounter() noexcept
     {
-      (void)::_InterlockedExchangeAdd(
-        reinterpret_cast<volatile platform::InterlockedLong*>(&GetStatItem()->mPrimaryValueBits), -1L);
+      (void)GetStatItem()->AddPrimaryBits(-1);
     }
 
     /**

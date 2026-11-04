@@ -488,7 +488,7 @@ int64_t CNetUDPConnector::GetTime()
  */
 int32_t CNetUDPConnector::ChooseTimeout(const int32_t current, const int32_t choice)
 {
-  if (current == -1 || choice != -1 && choice < current) {
+  if (current == -1 || (choice != -1 && choice < current)) {
     return choice;
   }
   return current;

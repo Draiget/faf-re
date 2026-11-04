@@ -24,33 +24,6 @@ namespace
 
   // Forward declaration: defined further down in this namespace; used by
   // SScrollerSerializer::Init() below.
-  [[nodiscard]] gpg::RType* CachedScrollerType();
-
-  [[nodiscard]] gpg::RType* CachedScrollerType()
-  {
-    if (moho::SScroller::sType == nullptr) {
-      moho::SScroller::sType = gpg::LookupRType(typeid(moho::SScroller));
-    }
-    return moho::SScroller::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEScrollType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::EScrollType));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEntityType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::Entity));
-    }
-    return cached;
-  }
 
   [[nodiscard]] gpg::ReadArchive* ReadReflectedPayload(
     gpg::ReadArchive* const archive,
@@ -85,7 +58,7 @@ namespace
    */
   [[maybe_unused]] void DeserializeEntityReflectedPayloadA(gpg::ReadArchive* const archive, void* const payload)
   {
-    (void)ReadReflectedPayload(archive, CachedEntityType(), payload);
+    (void)ReadReflectedPayload(archive, gpg::RTypeOf<moho::Entity>(), payload);
   }
 
   /**
@@ -96,7 +69,7 @@ namespace
    */
   [[maybe_unused]] void SerializeEntityReflectedPayloadA(gpg::WriteArchive* const archive, const void* const payload)
   {
-    (void)WriteReflectedPayload(archive, CachedEntityType(), payload);
+    (void)WriteReflectedPayload(archive, gpg::RTypeOf<moho::Entity>(), payload);
   }
 
   /**
@@ -107,7 +80,7 @@ namespace
    */
   [[maybe_unused]] void DeserializeEntityReflectedPayloadB(gpg::ReadArchive* const archive, void* const payload)
   {
-    (void)ReadReflectedPayload(archive, CachedEntityType(), payload);
+    (void)ReadReflectedPayload(archive, gpg::RTypeOf<moho::Entity>(), payload);
   }
 
   /**
@@ -118,7 +91,7 @@ namespace
    */
   [[maybe_unused]] void SerializeEntityReflectedPayloadB(gpg::WriteArchive* const archive, const void* const payload)
   {
-    (void)WriteReflectedPayload(archive, CachedEntityType(), payload);
+    (void)WriteReflectedPayload(archive, gpg::RTypeOf<moho::Entity>(), payload);
   }
 
   /**
@@ -130,7 +103,7 @@ namespace
    */
   [[maybe_unused]] void DeserializeEntityReflectedPayloadSwappedArgs(void* const payload, gpg::ReadArchive* const archive)
   {
-    (void)ReadReflectedPayload(archive, CachedEntityType(), payload);
+    (void)ReadReflectedPayload(archive, gpg::RTypeOf<moho::Entity>(), payload);
   }
 
   /**
@@ -142,7 +115,7 @@ namespace
    */
   [[maybe_unused]] void SerializeEntityReflectedPayloadSwappedArgs(const void* const payload, gpg::WriteArchive* const archive)
   {
-    (void)WriteReflectedPayload(archive, CachedEntityType(), payload);
+    (void)WriteReflectedPayload(archive, gpg::RTypeOf<moho::Entity>(), payload);
   }
 
   /**
@@ -158,7 +131,7 @@ namespace
     gpg::RRef* const ownerRef
   )
   {
-    return ReadReflectedPayload(archive, CachedEScrollType(), payload, ownerRef);
+    return ReadReflectedPayload(archive, gpg::RTypeOf<moho::EScrollType>(), payload, ownerRef);
   }
 
   /**
@@ -174,7 +147,7 @@ namespace
     const gpg::RRef* const ownerRef
   )
   {
-    return WriteReflectedPayload(archive, CachedEScrollType(), payload, ownerRef);
+    return WriteReflectedPayload(archive, gpg::RTypeOf<moho::EScrollType>(), payload, ownerRef);
   }
 
   /**
@@ -189,7 +162,7 @@ namespace
     gpg::RRef* const ownerRef
   )
   {
-    (void)ReadReflectedPayload(archive, CachedEScrollType(), payload, ownerRef);
+    (void)ReadReflectedPayload(archive, gpg::RTypeOf<moho::EScrollType>(), payload, ownerRef);
   }
 
   /**
@@ -204,7 +177,7 @@ namespace
     const gpg::RRef* const ownerRef
   )
   {
-    (void)WriteReflectedPayload(archive, CachedEScrollType(), payload, ownerRef);
+    (void)WriteReflectedPayload(archive, gpg::RTypeOf<moho::EScrollType>(), payload, ownerRef);
   }
 
   /**
@@ -220,7 +193,7 @@ namespace
     const gpg::RRef* const ownerRef
   )
   {
-    return WriteReflectedPayload(archive, CachedScrollerType(), payload, ownerRef);
+    return WriteReflectedPayload(archive, gpg::RTypeOf<moho::SScroller>(), payload, ownerRef);
   }
 
   /**
@@ -235,7 +208,7 @@ namespace
     gpg::RRef* const ownerRef
   )
   {
-    (void)ReadReflectedPayload(archive, CachedScrollerType(), payload, ownerRef);
+    (void)ReadReflectedPayload(archive, gpg::RTypeOf<moho::SScroller>(), payload, ownerRef);
   }
 
   /**
@@ -251,7 +224,7 @@ namespace
     const gpg::RRef* const ownerRef
   )
   {
-    (void)WriteReflectedPayload(archive, CachedScrollerType(), payload, ownerRef);
+    (void)WriteReflectedPayload(archive, gpg::RTypeOf<moho::SScroller>(), payload, ownerRef);
   }
 
   /**
@@ -268,7 +241,7 @@ namespace
       return archive;
     }
 
-    gpg::RType* const scrollerType = CachedScrollerType();
+    gpg::RType* const scrollerType = gpg::RTypeOf<moho::SScroller>();
     GPG_ASSERT(scrollerType != nullptr);
 
     const gpg::RRef nullOwner{};
@@ -789,7 +762,7 @@ namespace moho
   void SScroller::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     const gpg::RRef ownerRef{};
-    archive->Read(CachedEScrollType(), &mType, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::EScrollType>(), &mType, ownerRef);
     archive->ReadFloat(&mFloat04);
     archive->ReadFloat(&mFloat08);
     archive->ReadFloat(&mFloat0C);
@@ -812,7 +785,7 @@ namespace moho
   void SScroller::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     const gpg::RRef ownerRef{};
-    archive->Write(CachedEScrollType(), &mType, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::EScrollType>(), &mType, ownerRef);
     archive->WriteFloat(mFloat04);
     archive->WriteFloat(mFloat08);
     archive->WriteFloat(mFloat0C);

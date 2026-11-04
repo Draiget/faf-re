@@ -259,3 +259,33 @@ namespace moho
     return mDocString;
   }
 } // namespace moho
+
+moho::CScrLuaInitFormSet& moho::SCR_SimLuaInitSet()
+{
+  if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
+    return *set;
+  }
+
+  static CScrLuaInitFormSet fallbackSet("Sim");
+  return fallbackSet;
+}
+
+moho::CScrLuaInitFormSet& moho::SCR_CoreLuaInitSet()
+{
+  if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("Core"); set != nullptr) {
+    return *set;
+  }
+
+  static CScrLuaInitFormSet fallbackSet("Core");
+  return fallbackSet;
+}
+
+moho::CScrLuaInitFormSet& moho::SCR_UserLuaInitSet()
+{
+  if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("User"); set != nullptr) {
+    return *set;
+  }
+
+  static CScrLuaInitFormSet fallbackSet("User");
+  return fallbackSet;
+}

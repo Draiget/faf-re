@@ -16,7 +16,7 @@ namespace moho
   struct RMeshBlueprint;
 
   struct ClutterRegion;
-  struct ClutterRegionKey;
+  class ClutterRegionKey;
 
 
 

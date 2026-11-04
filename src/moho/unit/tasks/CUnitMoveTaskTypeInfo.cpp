@@ -13,51 +13,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedListenerEAiNavigatorEventType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Listener<moho::EAiNavigatorEvent>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedListenerEFormationdStatusType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Listener<moho::EFormationdStatus>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedListenerECommandEventType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Listener<moho::ECommandEvent>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitMoveTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitMoveTask));
-    }
-    return cached;
-  }
 
   void AddBaseField(gpg::RType* const typeInfo, gpg::RType* const baseType, const int offset)
   {
@@ -179,7 +134,7 @@ namespace moho
    */
   void CUnitMoveTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
   {
-    AddBaseField(typeInfo, CachedCCommandTaskType(), 0);
+    AddBaseField(typeInfo, gpg::RTypeOf<moho::CCommandTask>(), 0);
   }
 
   /**
@@ -190,7 +145,7 @@ namespace moho
    */
   void CUnitMoveTaskTypeInfo::AddBase_Listener_EAiNavigatorEvent(gpg::RType* const typeInfo)
   {
-    AddBaseField(typeInfo, CachedListenerEAiNavigatorEventType(), gpg::BaseSubobjectOffset<CUnitMoveTask, Listener<EAiNavigatorEvent>>());
+    AddBaseField(typeInfo, gpg::RTypeOf<moho::Listener<moho::EAiNavigatorEvent>>(), gpg::BaseSubobjectOffset<CUnitMoveTask, Listener<EAiNavigatorEvent>>());
   }
 
   /**
@@ -201,7 +156,7 @@ namespace moho
    */
   void CUnitMoveTaskTypeInfo::AddBase_Listener_EFormationdStatus(gpg::RType* const typeInfo)
   {
-    AddBaseField(typeInfo, CachedListenerEFormationdStatusType(), gpg::BaseSubobjectOffset<CUnitMoveTask, Listener<EFormationdStatus>>());
+    AddBaseField(typeInfo, gpg::RTypeOf<moho::Listener<moho::EFormationdStatus>>(), gpg::BaseSubobjectOffset<CUnitMoveTask, Listener<EFormationdStatus>>());
   }
 
   /**
@@ -212,7 +167,7 @@ namespace moho
    */
   void CUnitMoveTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
   {
-    AddBaseField(typeInfo, CachedListenerECommandEventType(), gpg::BaseSubobjectOffset<CUnitMoveTask, Listener<ECommandEvent>>());
+    AddBaseField(typeInfo, gpg::RTypeOf<moho::Listener<moho::ECommandEvent>>(), gpg::BaseSubobjectOffset<CUnitMoveTask, Listener<ECommandEvent>>());
   }
 
   /**
@@ -224,7 +179,7 @@ namespace moho
   gpg::RRef CUnitMoveTaskTypeInfo::NewRef()
   {
     auto* const task = new (std::nothrow) CUnitMoveTask();
-    return gpg::RRef{task, CachedCUnitMoveTaskType()};
+    return gpg::RRef{task, gpg::RTypeOf<moho::CUnitMoveTask>()};
   }
 
   /**
@@ -241,7 +196,7 @@ namespace moho
       new (task) CUnitMoveTask();
     }
 
-    return gpg::RRef{task, CachedCUnitMoveTaskType()};
+    return gpg::RRef{task, gpg::RTypeOf<moho::CUnitMoveTask>()};
   }
 } // namespace moho
 

@@ -19,15 +19,6 @@ namespace
     return sInstance;
   }
 
-  gpg::RType* CachedEntityBlueprintType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::REntityBlueprint));
-    }
-    return cached;
-  }
-
   struct RProjectileBlueprintTypeInfoBootstrap
   {
     RProjectileBlueprintTypeInfoBootstrap()
@@ -71,14 +62,7 @@ namespace moho
    */
   void RProjectileBlueprintTypeInfo::AddBaseREntityBlueprint(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedEntityBlueprintType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::REntityBlueprint>(typeInfo);
   }
 
   /**

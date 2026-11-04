@@ -43,14 +43,6 @@ namespace
   static_assert(sizeof(moho::CPrefetchSet) == 0x10, "moho::CPrefetchSet size must be 0x10");
 #endif
 
-  [[nodiscard]] gpg::RType* ResolvePrefetchSetType()
-  {
-    if (moho::CPrefetchSet::sType == nullptr) {
-      moho::CPrefetchSet::sType = gpg::LookupRType(typeid(moho::CPrefetchSet));
-    }
-    return moho::CPrefetchSet::sType;
-  }
-
 
   /**
    * Address: 0x004A71B0 (FUN_004A71B0, Moho::CPrefetchset::NewRef)
@@ -63,7 +55,7 @@ namespace
     // msvc8::vector's default constructor already null-initialises all three
     // lanes; the binary's explicit zeroing here IS that constructor inlined.
     moho::CPrefetchSet* const object = new (std::nothrow) moho::CPrefetchSet();
-    return gpg::RRef(object, ResolvePrefetchSetType());
+    return gpg::RRef(object, gpg::RTypeOf<moho::CPrefetchSet>());
   }
 
   /**
@@ -81,7 +73,7 @@ namespace
       // the binary's explicit lane zeroing right after it is.
       new (object) moho::CPrefetchSet();
     }
-    return gpg::RRef(object, ResolvePrefetchSetType());
+    return gpg::RRef(object, gpg::RTypeOf<moho::CPrefetchSet>());
   }
 
   /**

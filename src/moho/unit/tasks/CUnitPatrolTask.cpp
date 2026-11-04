@@ -51,35 +51,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCUnitPatrolTaskType()
-  {
-    gpg::RType* type = moho::CUnitPatrolTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitPatrolTask));
-      moho::CUnitPatrolTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSNavGoalType()
-  {
-    gpg::RType* type = moho::SNavGoal::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SNavGoal));
-      moho::SNavGoal::sType = type;
-    }
-    return type;
-  }
 
   [[nodiscard]] gpg::RType* CachedBox3fType()
   {
@@ -90,46 +61,6 @@ namespace
       cached = gpg::LookupRType(typeid(Wm3::Box3<float>));
     }
     return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEntitySetTemplateEntityType()
-  {
-    gpg::RType* type = moho::EntitySetTemplate<moho::Entity>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Entity>));
-      moho::EntitySetTemplate<moho::Entity>::sType = type;
-    }
-    return type;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
   }
 
   /**
@@ -381,7 +312,7 @@ namespace moho
   void CUnitPatrolTask::OnEvent(const ECommandEvent /*event*/)
   {
     SOCellPos cell{};
-    CUnitCommand::GetPosition(mBoundCommand, mUnit, &cell);
+    (void)CUnitCommand::GetPosition(mBoundCommand, mUnit, &cell);
 
     mGoal.minX = cell.x;
     mGoal.minZ = cell.z;
@@ -932,7 +863,7 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), ownerRef);
 
     CCommandTask* dispatchTask = static_cast<CCommandTask*>(mDispatch);
     archive->ReadPointer(&dispatchTask, &ownerRef);
@@ -942,7 +873,7 @@ namespace moho
 
     archive->ReadPointer(&mFormationInstance, &ownerRef);
 
-    archive->Read(CachedSNavGoalType(), &mGoal, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::SNavGoal>(), &mGoal, ownerRef);
 
     archive->ReadBool(&mMoving);
     archive->ReadBool(&mNavStalled);
@@ -950,7 +881,7 @@ namespace moho
 
     archive->Read(CachedBox3fType(), &mSearchBox, ownerRef);
     archive->ReadInt(&mTickCounter);
-    archive->Read(CachedEntitySetTemplateEntityType(), &mMembership, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::EntitySetTemplate<moho::Entity>>(), &mMembership, ownerRef);
   }
 
   /**
@@ -975,7 +906,7 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
 
     gpg::RRef pointerRef{};
     (void)gpg::RRef_CCommandTask(&pointerRef, static_cast<CCommandTask*>(mDispatch));
@@ -987,7 +918,7 @@ namespace moho
     (void)gpg::RRef_IFormationInstance(&pointerRef, mFormationInstance);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedSNavGoalType(), &mGoal, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::SNavGoal>(), &mGoal, ownerRef);
 
     archive->WriteBool(mMoving);
     archive->WriteBool(mNavStalled);
@@ -995,7 +926,7 @@ namespace moho
 
     archive->Write(CachedBox3fType(), &mSearchBox, ownerRef);
     archive->WriteInt(mTickCounter);
-    archive->Write(CachedEntitySetTemplateEntityType(), &mMembership, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::EntitySetTemplate<moho::Entity>>(), &mMembership, ownerRef);
   }
 
   /**

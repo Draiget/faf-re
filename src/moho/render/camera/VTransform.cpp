@@ -25,8 +25,6 @@ namespace
   constexpr int kSerializationLoadLine = 84;
   constexpr int kSerializationSaveLine = 87;
 
-  gpg::RType* gCachedVector3fType = nullptr;
-  gpg::RType* gCachedQuaternionfType = nullptr;
 
   /**
    * Address: 0x00BF1770 (FUN_00BF1770, atexit destructor of the VTransformTypeInfo object)
@@ -35,22 +33,6 @@ namespace
   {
     static moho::VTransformTypeInfo sInstance;
     return sInstance;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    if (gCachedVector3fType == nullptr) {
-      gCachedVector3fType = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return gCachedVector3fType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveQuaternionfType()
-  {
-    if (gCachedQuaternionfType == nullptr) {
-      gCachedQuaternionfType = gpg::LookupRType(typeid(Wm3::Quaternionf));
-    }
-    return gCachedQuaternionfType;
   }
 
 } // namespace
@@ -415,8 +397,8 @@ namespace moho
   {
     GPG_ASSERT(archive != nullptr);
     const gpg::RRef ownerRef{};
-    archive->Read(ResolveVector3fType(), &pos_, ownerRef);
-    archive->Read(ResolveQuaternionfType(), &orient_, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &pos_, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Quaternionf>(), &orient_, ownerRef);
   }
 
   /**
@@ -426,8 +408,8 @@ namespace moho
   {
     GPG_ASSERT(archive != nullptr);
     const gpg::RRef ownerRef{};
-    archive->Write(ResolveVector3fType(), &pos_, ownerRef);
-    archive->Write(ResolveQuaternionfType(), &orient_, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &pos_, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Quaternionf>(), &orient_, ownerRef);
   }
 
   /**

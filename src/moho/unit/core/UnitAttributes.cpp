@@ -43,36 +43,6 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RType* CachedEntityCategorySetType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::EntityCategorySet));
-    }
-
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCommandCapsType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::ERuleBPUnitCommandCaps));
-    }
-
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedToggleCapsType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::ERuleBPUnitToggleCaps));
-    }
-
-    return type;
-  }
-
   /**
    * Address: 0x006A47F0 (FUN_006A47F0)
    *
@@ -214,7 +184,7 @@ namespace moho
     archive->ReadPointer(&loadedBlueprint, &ownerRef);
     blueprint = loadedBlueprint;
 
-    archive->Read(CachedEntityCategorySetType(), &restrictionCategory, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::EntityCategorySet>(), &restrictionCategory, ownerRef);
     archive->ReadFloat(&spawnElevationOffset);
     archive->ReadFloat(&moveSpeedMult);
     archive->ReadFloat(&accelerationMult);
@@ -229,11 +199,11 @@ namespace moho
     archive->ReadFloat(&regenRate);
 
     auto commandCaps = static_cast<ERuleBPUnitCommandCaps>(commandCapsMask);
-    archive->Read(CachedCommandCapsType(), &commandCaps, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::ERuleBPUnitCommandCaps>(), &commandCaps, ownerRef);
     commandCapsMask = static_cast<std::uint32_t>(commandCaps);
 
     auto toggleCaps = static_cast<ERuleBPUnitToggleCaps>(toggleCapsMask);
-    archive->Read(CachedToggleCapsType(), &toggleCaps, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::ERuleBPUnitToggleCaps>(), &toggleCaps, ownerRef);
     toggleCapsMask = static_cast<std::uint32_t>(toggleCaps);
 
     archive->ReadBool(&mReclaimable);
@@ -253,7 +223,7 @@ namespace moho
 
     archive->WritePointer<moho::RUnitBlueprint>(const_cast<RUnitBlueprint*>(blueprint), gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedEntityCategorySetType(), &restrictionCategory, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::EntityCategorySet>(), &restrictionCategory, ownerRef);
     archive->WriteFloat(spawnElevationOffset);
     archive->WriteFloat(moveSpeedMult);
     archive->WriteFloat(accelerationMult);
@@ -268,10 +238,10 @@ namespace moho
     archive->WriteFloat(regenRate);
 
     const auto commandCaps = static_cast<ERuleBPUnitCommandCaps>(commandCapsMask);
-    archive->Write(CachedCommandCapsType(), &commandCaps, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::ERuleBPUnitCommandCaps>(), &commandCaps, ownerRef);
 
     const auto toggleCaps = static_cast<ERuleBPUnitToggleCaps>(toggleCapsMask);
-    archive->Write(CachedToggleCapsType(), &toggleCaps, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::ERuleBPUnitToggleCaps>(), &toggleCaps, ownerRef);
 
     archive->WriteBool(mReclaimable);
     archive->WriteBool(mCapturable);

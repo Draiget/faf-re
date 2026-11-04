@@ -248,7 +248,7 @@ gpg::RRef gpg::RVectorType_SSavedGameArmyInfo::SubscriptIndex(void* obj, const i
   }
 
   gpg::RRef out{};
-  BuildSavedGameArmyInfoRefLane(&(*storage)[static_cast<std::size_t>(ind)], &out);
+  (void)BuildSavedGameArmyInfoRefLane(&(*storage)[static_cast<std::size_t>(ind)], &out);
   return out;
 }
 

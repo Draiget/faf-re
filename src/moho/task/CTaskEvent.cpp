@@ -19,23 +19,6 @@ gpg::RType* CTaskEvent::sType = nullptr;
 
 namespace
 {
-  gpg::RType* CachedSTaskEventLinkageType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(STaskEventLinkage));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedWeakPtrCTaskThreadType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(WeakPtr<CTaskThread>));
-    }
-    return cached;
-  }
 
   /**
    * Address: 0x00BEE0E0 (FUN_00BEE0E0, atexit destructor of the STaskEventLinkageTypeInfo object)
@@ -63,7 +46,7 @@ namespace
    */
   [[nodiscard]] STaskEventLinkage* UpcastSTaskEventLinkage(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedSTaskEventLinkageType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<STaskEventLinkage>());
     return static_cast<STaskEventLinkage*>(upcast.mObj);
   }
 
@@ -78,20 +61,20 @@ namespace
   {
     gpg::RRef out{};
     out.mObj = nullptr;
-    out.mType = CachedSTaskEventLinkageType();
+    out.mType = gpg::RTypeOf<STaskEventLinkage>();
     if (!linkage) {
       return out;
     }
 
-    gpg::RType* dynamicType = CachedSTaskEventLinkageType();
+    gpg::RType* dynamicType = gpg::RTypeOf<STaskEventLinkage>();
     try {
       dynamicType = gpg::LookupRType(typeid(*linkage));
     } catch (...) {
-      dynamicType = CachedSTaskEventLinkageType();
+      dynamicType = gpg::RTypeOf<STaskEventLinkage>();
     }
 
     std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(CachedSTaskEventLinkageType(), &baseOffset);
+    const bool derived = dynamicType->IsDerivedFrom(gpg::RTypeOf<STaskEventLinkage>(), &baseOffset);
     GPG_ASSERT(derived);
     if (!derived) {
       out.mObj = linkage;
@@ -126,7 +109,7 @@ namespace
       return linkage;
     }
 
-    const char* const expected = CachedSTaskEventLinkageType()->GetName();
+    const char* const expected = gpg::RTypeOf<STaskEventLinkage>()->GetName();
     const char* const actual = source.GetTypeName();
     const msvc8::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
@@ -163,7 +146,7 @@ namespace
       return linkage;
     }
 
-    const char* const expected = CachedSTaskEventLinkageType()->GetName();
+    const char* const expected = gpg::RTypeOf<STaskEventLinkage>()->GetName();
     const char* const actual = source.GetTypeName();
     const msvc8::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
@@ -348,7 +331,7 @@ RWeakPtrType<STaskEventLinkage>::~RWeakPtrType() = default;
  */
 const char* RWeakPtrType<STaskEventLinkage>::GetName() const
 {
-    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedSTaskEventLinkageType()->GetName());
+    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<STaskEventLinkage>()->GetName());
     return sName.c_str();
 }
 
@@ -744,7 +727,7 @@ namespace moho
    */
   void STaskEventLinkage::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    archive->Read(CachedWeakPtrCTaskThreadType(), &mThreadRef, gpg::RRef{});
+    archive->Read(gpg::RTypeOf<WeakPtr<CTaskThread>>(), &mThreadRef, gpg::RRef{});
   }
 
   /**
@@ -754,7 +737,7 @@ namespace moho
    */
   void STaskEventLinkage::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    archive->Write(CachedWeakPtrCTaskThreadType(), &mThreadRef, gpg::RRef{});
+    archive->Write(gpg::RTypeOf<WeakPtr<CTaskThread>>(), &mThreadRef, gpg::RRef{});
   }
 } // namespace moho
 

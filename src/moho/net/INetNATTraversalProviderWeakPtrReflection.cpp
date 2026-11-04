@@ -16,20 +16,11 @@ namespace
     return moho::INetNATTraversalProvider::StaticGetClass();
   }
 
-  [[nodiscard]] gpg::RType* CachedWeakProviderType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(WeakProviderPtr));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeWeakProviderRef(WeakProviderPtr* weakProvider)
   {
     gpg::RRef out{};
     out.mObj = weakProvider;
-    out.mType = CachedWeakProviderType();
+    out.mType = gpg::RTypeOf<WeakProviderPtr>();
     return out;
   }
 
@@ -42,7 +33,7 @@ namespace
    */
   [[nodiscard]] WeakProviderPtr* TryUpcastWeakProviderOrThrow(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedWeakProviderType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<WeakProviderPtr>());
     if (!upcast.mObj) {
       throw std::bad_cast{};
     }

@@ -12,7 +12,6 @@ using namespace moho;
 
 namespace
 {
-  gpg::RType* gListenerNavPathType = nullptr;
 
   /**
    * Address: 0x005B00E0 (FUN_005B00E0)
@@ -68,14 +67,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedListenerNavPathType()
-  {
-    if (!gListenerNavPathType) {
-      gListenerNavPathType = gpg::LookupRType(typeid(moho::Listener<const moho::SNavPath&>));
-    }
-    return gListenerNavPathType;
-  }
-
 } // namespace
 
 /**
@@ -121,15 +112,7 @@ void CAiPathNavigatorTypeInfo::Init()
  */
 void __stdcall CAiPathNavigatorTypeInfo::AddBase_Listener_NavPath(gpg::RType* const typeInfo)
 {
-  gpg::RType* const baseType = CachedListenerNavPathType();
-
-  gpg::RField baseField{};
-  baseField.mName = baseType->GetName();
-  baseField.mType = baseType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBase<moho::Listener<const moho::SNavPath&>>(typeInfo);
 }
 
 /**

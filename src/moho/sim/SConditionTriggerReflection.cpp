@@ -214,15 +214,6 @@ namespace
 #if defined(MOHO_ABI_MSVC8_COMPAT)
 #endif
 
-  [[nodiscard]] gpg::RType* CachedSConditionType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::SCondition));
-    }
-    return cached;
-  }
-
   class RFastVectorSConditionTypeInfo final : public gpg::RType, public gpg::RIndexed
   {
   public:
@@ -247,7 +238,7 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSConditionType()->GetName());
+      static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::SCondition>()->GetName());
       return sName.c_str();
     }
 

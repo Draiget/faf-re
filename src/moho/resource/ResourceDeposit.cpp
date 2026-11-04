@@ -54,25 +54,6 @@ namespace
     bounds.Max.z = std::max(bounds.Max.z, pointZ);
   }
 
-  [[nodiscard]] gpg::RType* CachedRect2iType()
-  {
-    gpg::RType* cached = gpg::Rect2i::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(gpg::Rect2i));
-      gpg::Rect2i::sType = cached;
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEResourceTypeType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::EResourceType));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x00545CC0 (FUN_00545CC0)
    *
@@ -121,8 +102,8 @@ namespace moho
   void ResourceDeposit::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     const gpg::RRef ownerRef{};
-    archive->Read(CachedRect2iType(), this, ownerRef);
-    archive->Read(CachedEResourceTypeType(), &depositType, ownerRef);
+    archive->Read(gpg::RTypeOf<gpg::Rect2i>(), this, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::EResourceType>(), &depositType, ownerRef);
   }
 
   /**
@@ -136,10 +117,10 @@ namespace moho
   void ResourceDeposit::MemberSerialize(gpg::WriteArchive* const archive)
   {
     const gpg::RRef footprintOwnerRef{};
-    archive->Write(CachedRect2iType(), this, footprintOwnerRef);
+    archive->Write(gpg::RTypeOf<gpg::Rect2i>(), this, footprintOwnerRef);
 
     const gpg::RRef depositTypeOwnerRef{};
-    archive->Write(CachedEResourceTypeType(), &depositType, depositTypeOwnerRef);
+    archive->Write(gpg::RTypeOf<moho::EResourceType>(), &depositType, depositTypeOwnerRef);
   }
 
   /**

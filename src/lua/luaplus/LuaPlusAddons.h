@@ -9,7 +9,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 #ifdef _MSC_VER
 #pragma once
-#endif _MSC_VER
+#endif // _MSC_VER
 #ifndef LUAPLUSADDONS_H
 #define LUAPLUSADDONS_H
 
@@ -17,10 +17,10 @@
 	#define lua_lock(L)		if (L->l_G  &&  L->l_G->lockFunc) (*L->l_G->lockFunc)(L->l_G->lockData)
 	#define lua_unlock(L)	if (L->l_G  &&  L->l_G->unlockFunc) (*L->l_G->unlockFunc)(L->l_G->lockData)
 	LUA_API void lua_setlockfunctions(lua_State *L, void (*lockFunc)(void *), void (*unlockFunc)(void *), void *lockData);
-#else !LUA_MTSUPPORT
+#else // !LUA_MTSUPPORT
 	#define lua_lock(L)
 	#define lua_unlock(L)
-#endif LUA_MTSUPPORT
+#endif // LUA_MTSUPPORT
 
 #define LUA_ALLOC_TEMP 1
 typedef void* (*lua_ReallocFunction)(void* ptr, int oldsize, int size, void* data, const char* allocName, unsigned int flags);
@@ -75,4 +75,4 @@ LUALIB_API int luaL_loadwbuffer (lua_State *L, const lua_WChar *buff, size_t siz
 LUALIB_API int lua_dowbuffer (lua_State *L, const lua_WChar *buff, size_t size, const char *name);
 LUALIB_API int lua_dowstring (lua_State *L, const lua_WChar *str, const char *name);
 
-#endif LUAPLUSADDONS_H
+#endif // LUAPLUSADDONS_H

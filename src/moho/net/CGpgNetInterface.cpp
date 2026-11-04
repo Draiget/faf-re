@@ -48,7 +48,6 @@ using namespace moho;
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedAtLeastArgsWarning = "%s\n  expected at least %d args, but got %d";
   constexpr const char* kGpgNetActiveHelpText = "bool GpgNetActive()";
   constexpr const char* kGpgNetSendHelpText = "GpgNetSend(cmd,args...)";
@@ -601,10 +600,7 @@ int moho::cfunc_GpgNetActiveL(
     return 0;
   }
 
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 0) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGpgNetActiveHelpText, 0, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 0, kGpgNetActiveHelpText);
 
   lua_pushboolean(state->m_state, GPGNET_GetPtr() ? 1 : 0);
   (void)lua_gettop(state->m_state);
@@ -2133,10 +2129,7 @@ int moho::cfunc_LaunchGPGNetL(LuaPlus::LuaState* const state)
   }
 
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 0) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kLaunchGPGNetHelpText, 0, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 0, kLaunchGPGNetHelpText);
 
   HWND ownerWindow = nullptr;
   if (moho::sMainWindow != nullptr) {

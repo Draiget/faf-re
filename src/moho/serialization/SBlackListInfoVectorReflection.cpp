@@ -21,16 +21,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* ResolveSBlackListInfoType()
-  {
-    gpg::RType* type = moho::SBlackListInfo::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SBlackListInfo));
-      moho::SBlackListInfo::sType = type;
-    }
-    return type;
-  }
-
   /**
    * Address: 0x006DC070 (FUN_006DC070, sub_6DC070)
    *
@@ -53,7 +43,7 @@ namespace
     loaded.reserve(count);
     for (unsigned int i = 0; i < count; ++i) {
       moho::SBlackListInfo element;
-      archive->Read(ResolveSBlackListInfoType(), &element, gpg::RRef{});
+      archive->Read(gpg::RTypeOf<moho::SBlackListInfo>(), &element, gpg::RRef{});
       loaded.push_back(element);
     }
 
@@ -74,7 +64,7 @@ namespace
     const unsigned int count = static_cast<unsigned int>(storage.size());
     archive->WriteUInt(count);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(ResolveSBlackListInfoType(), &storage[i], *ownerRef);
+      archive->Write(gpg::RTypeOf<moho::SBlackListInfo>(), &storage[i], *ownerRef);
     }
   }
 
@@ -95,7 +85,7 @@ namespace moho
 
   gpg::RType* SBlackListInfo::StaticGetClass()
   {
-    return ResolveSBlackListInfoType();
+    return gpg::RTypeOf<moho::SBlackListInfo>();
   }
 } // namespace moho
 
@@ -109,7 +99,7 @@ gpg::RRef* gpg::RRef_SBlackListInfo(gpg::RRef* const outRef, moho::SBlackListInf
   }
 
   outRef->mObj = value;
-  outRef->mType = ResolveSBlackListInfoType();
+  outRef->mType = gpg::RTypeOf<moho::SBlackListInfo>();
   return outRef;
 }
 
@@ -143,7 +133,7 @@ gpg::RVectorType<moho::SBlackListInfo>::~RVectorType() = default;
  */
 const char* gpg::RVectorType<moho::SBlackListInfo>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveSBlackListInfoType()->GetName());
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::SBlackListInfo>()->GetName());
   return sName.c_str();
 }
 

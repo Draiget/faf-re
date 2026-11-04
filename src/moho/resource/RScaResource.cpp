@@ -22,15 +22,6 @@ gpg::RType* RScaResource::sType = nullptr;
 
 namespace
 {
-  [[nodiscard]] gpg::RType* ResolveRScaResourceTypeCached() noexcept
-  {
-    gpg::RType* type = moho::RScaResource::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::RScaResource));
-      moho::RScaResource::sType = type;
-    }
-    return type;
-  }
 
   class RScaResourceTypeInfo final : public gpg::RType
   {

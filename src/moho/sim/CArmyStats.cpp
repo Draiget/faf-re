@@ -315,15 +315,6 @@ namespace
 
 
 
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
-
   gpg::RType* gArmyStatsBaseType = nullptr;
   gpg::RType* gArmyNameIndexType = nullptr;
   gpg::RType* gArmyTriggerListType = nullptr;
@@ -703,9 +694,9 @@ namespace moho
     }
 
     const gpg::RRef owner{};
-    archive->Read(CachedType<Stats<CArmyStatItem>>(gArmyStatsBaseType), static_cast<Stats<CArmyStatItem>*>(this), owner);
-    archive->Read(CachedType<ArmyNameIndexTree>(gArmyNameIndexType), &mNameIndex, owner);
-    archive->Read(CachedType<ArmyTriggerList>(gArmyTriggerListType), &mTriggers, owner);
+    archive->Read(gpg::CachedLookup<Stats<CArmyStatItem>>(gArmyStatsBaseType), static_cast<Stats<CArmyStatItem>*>(this), owner);
+    archive->Read(gpg::CachedLookup<ArmyNameIndexTree>(gArmyNameIndexType), &mNameIndex, owner);
+    archive->Read(gpg::CachedLookup<ArmyTriggerList>(gArmyTriggerListType), &mTriggers, owner);
   }
 
   /**
@@ -726,12 +717,12 @@ namespace moho
 
     const gpg::RRef owner{};
     archive->Write(
-      CachedType<Stats<CArmyStatItem>>(gArmyStatsBaseType),
+      gpg::CachedLookup<Stats<CArmyStatItem>>(gArmyStatsBaseType),
       static_cast<const Stats<CArmyStatItem>*>(this),
       owner
     );
-    archive->Write(CachedType<ArmyNameIndexTree>(gArmyNameIndexType), &mNameIndex, owner);
-    archive->Write(CachedType<ArmyTriggerList>(gArmyTriggerListType), &mTriggers, owner);
+    archive->Write(gpg::CachedLookup<ArmyNameIndexTree>(gArmyNameIndexType), &mNameIndex, owner);
+    archive->Write(gpg::CachedLookup<ArmyTriggerList>(gArmyTriggerListType), &mTriggers, owner);
   }
 
   /**
@@ -749,7 +740,7 @@ namespace moho
       return nullptr;
     }
 
-    item->Release(0);
+    (void)item->Release(0);
     mNameIndex[key] = item;
     return item;
   }
@@ -765,7 +756,7 @@ namespace moho
     }
 
     CArmyStatItem* const item = TraverseTables(statPath, true);
-    item->Release(0);
+    (void)item->Release(0);
     mNameIndex[key] = item;
     return item;
   }
@@ -889,7 +880,7 @@ namespace moho
     }
 
     CArmyStatItem* const item = armyStats->TraverseTablesCreate(statPath);
-    item->Release(0);
+    (void)item->Release(0);
     armyStats->mNameIndex[key] = item;
     return item;
   }
@@ -1309,7 +1300,7 @@ namespace moho
 
     CArmyStatItem* const item = GetStringItem(key.c_str());
     if (item != nullptr) {
-      item->Release(0);
+      (void)item->Release(0);
     }
     mNameIndex[key] = item;
     return item;

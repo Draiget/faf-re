@@ -1,3 +1,4 @@
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/SessionStartup.h"
 
 #include <Windows.h>
@@ -136,22 +137,6 @@ namespace
     return luaContext ? luaContext->stateUserData : nullptr;
   }
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    // Look the set up before making one. Several translation units reach for
-    // the same set during static init, and CScrLuaInitFormSet's ctor pushes
-    // onto the front of a single global list - so a second set with the same
-    // name does not merge, it *hides* the first, and every form already linked
-    // into that one silently stops running.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("User");
-        existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet set("User");
-    return set;
-  }
-
   void EnsureDirectoryExistsOrThrow(const msvc8::string& directoryPath)
   {
     const std::wstring widePath = gpg::STR_Utf8ToWide(directoryPath.c_str());
@@ -160,20 +145,11 @@ namespace
     }
   }
 
-  [[nodiscard]] gpg::RType* CachedSessionSaveDataType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::SSessionSaveData));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeSessionSaveDataRef(moho::SSessionSaveData* const saveData)
   {
     gpg::RRef out{};
     out.mObj = saveData;
-    out.mType = CachedSessionSaveDataType();
+    out.mType = gpg::RTypeOf<moho::SSessionSaveData>();
     return out;
   }
 
@@ -569,7 +545,7 @@ namespace moho
   CScrLuaInitForm* func_LaunchReplaySession_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "LaunchReplaySession",
       &moho::cfunc_LaunchReplaySession,
       nullptr,
@@ -588,10 +564,7 @@ namespace moho
    */
   int cfunc_LaunchReplaySessionL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kLaunchReplaySessionHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kLaunchReplaySessionHelpText);
 
     LuaPlus::LuaStackObject filenameArg(state, 1);
     const char* replayFilename = lua_tostring(state->m_state, 1);
@@ -631,7 +604,7 @@ namespace moho
   CScrLuaInitForm* func_LaunchSinglePlayerSession_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "LaunchSinglePlayerSession",
       &moho::cfunc_LaunchSinglePlayerSession,
       nullptr,
@@ -651,10 +624,7 @@ namespace moho
    */
   int cfunc_LaunchSinglePlayerSessionL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kLaunchSinglePlayerSessionHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kLaunchSinglePlayerSessionHelpText);
 
     if (WLD_GetFrameAction() != EWldFrameAction::Inactive) {
       LuaPlus::LuaState::Error(state, kLaunchSinglePlayerSessionBusyMessage);
@@ -687,7 +657,7 @@ namespace moho
   CScrLuaInitForm* func_SessionSendChatMessage_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "SessionSendChatMessage",
       &moho::cfunc_SessionSendChatMessage,
       nullptr,
@@ -817,7 +787,7 @@ namespace moho
   CScrLuaInitForm* func_SessionGetCommandSourceNames_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "SessionGetCommandSourceNames",
       &moho::cfunc_SessionGetCommandSourceNames,
       nullptr,
@@ -839,11 +809,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 0) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSessionGetCommandSourceNamesHelpText, 0, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 0, kSessionGetCommandSourceNamesHelpText);
 
     CWldSession* const session = WLD_GetActiveSession();
     if (session == nullptr) {
@@ -882,10 +848,7 @@ namespace moho
   int cfunc_LoadSavedGameL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kLoadSavedGameHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kLoadSavedGameHelpText);
 
     LuaPlus::LuaStackObject filenameArg(state, 1);
     const char* const filename = lua_tostring(rawState, 1);
@@ -925,7 +888,7 @@ namespace moho
   CScrLuaInitForm* func_LoadSavedGame_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "LoadSavedGame",
       &moho::cfunc_LoadSavedGame,
       nullptr,
@@ -961,10 +924,7 @@ namespace moho
   int cfunc_PrefetchSessionL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 3) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kPrefetchSessionHelpText, 3, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 3, kPrefetchSessionHelpText);
 
     LuaPlus::LuaStackObject mapNameArg(state, 1);
     const char* const mapName = lua_tostring(rawState, 1);
@@ -992,7 +952,7 @@ namespace moho
   CScrLuaInitForm* func_PrefetchSession_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "PrefetchSession",
       &moho::cfunc_PrefetchSession,
       nullptr,
@@ -1011,7 +971,7 @@ namespace moho
   CScrLuaInitForm* func_GetSessionClients_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "GetSessionClients",
       &moho::cfunc_GetSessionClients,
       nullptr,
@@ -1047,13 +1007,7 @@ namespace moho
    */
   int cfunc_GetSessionClientsL(LuaPlus::LuaState* const state)
   {
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 0) {
-      LuaPlus::LuaState::Error(
-        state, "%s\n  expected %d args, but got %d", kGetSessionClientsHelpText, 0, argumentCount
-      );
-    }
+    moho::SCR_ExpectExactArgs(state, 0, kGetSessionClientsHelpText);
 
     LuaPlus::LuaObject clientsTable{};
 
@@ -1132,7 +1086,7 @@ namespace moho
   CScrLuaInitForm* func_InternalSaveGame_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "InternalSaveGame",
       &moho::cfunc_InternalSaveGame,
       nullptr,
@@ -1157,10 +1111,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 3) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kInternalSaveGameHelpText, 3, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 3, kInternalSaveGameHelpText);
 
     const msvc8::string saveGameDirectory = USER_GetSaveGameDir();
     EnsureDirectoryExistsOrThrow(saveGameDirectory);

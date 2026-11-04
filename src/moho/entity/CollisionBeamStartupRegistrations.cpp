@@ -42,15 +42,6 @@ namespace moho
 
 namespace
 {
-  gpg::RType* gCollisionBeamEventType = nullptr;
-
-  [[nodiscard]] gpg::RType* LookupCollisionBeamEventType()
-  {
-    if (gCollisionBeamEventType == nullptr) {
-      gCollisionBeamEventType = gpg::LookupRType(typeid(moho::ECollisionBeamEvent));
-    }
-    return gCollisionBeamEventType;
-  }
 
   class RManyToOneBroadcasterCollisionBeamEventTypeInfo final : public gpg::RType
   {
@@ -65,7 +56,7 @@ namespace
     [[nodiscard]] const char* GetName() const override
     {
       static const msvc8::string sName =
-        gpg::STR_Printf("ManyToOneBroadcaster<%s>", LookupCollisionBeamEventType()->GetName());
+        gpg::STR_Printf("ManyToOneBroadcaster<%s>", gpg::RTypeOf<moho::ECollisionBeamEvent>()->GetName());
       return sName.c_str();
     }
 
@@ -109,7 +100,7 @@ namespace
     [[nodiscard]] const char* GetName() const override
     {
       static const msvc8::string sName =
-        gpg::STR_Printf("ManyToOneListener<%s>", LookupCollisionBeamEventType()->GetName());
+        gpg::STR_Printf("ManyToOneListener<%s>", gpg::RTypeOf<moho::ECollisionBeamEvent>()->GetName());
       return sName.c_str();
     }
 

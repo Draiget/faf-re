@@ -108,53 +108,6 @@ namespace
     return lodCutoff <= 0.0f || ProjectViewportDepthRow1(viewport, emitterPosition) <= lodCutoff;
   }
 
-  [[nodiscard]] gpg::RType* ResolveCEffectImplType()
-  {
-    if (!moho::CEffectImpl::sType) {
-      moho::CEffectImpl::sType = gpg::LookupRType(typeid(moho::CEffectImpl));
-    }
-
-    return moho::CEffectImpl::sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEmitterRType()
-  {
-    static gpg::RType* sEmitterType = nullptr;
-    if (!sEmitterType) {
-      sEmitterType = gpg::LookupRType(typeid(moho::EmitterType));
-    }
-
-    return sEmitterType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveFastVectorSEfxCurveType()
-  {
-    static gpg::RType* sFastVectorSEfxCurveType = nullptr;
-    if (!sFastVectorSEfxCurveType) {
-      sFastVectorSEfxCurveType = gpg::LookupRType(typeid(gpg::fastvector<moho::SEfxCurve>));
-    }
-
-    return sFastVectorSEfxCurveType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSWorldParticleType()
-  {
-    if (!moho::SWorldParticle::sType) {
-      moho::SWorldParticle::sType = gpg::LookupRType(typeid(moho::SWorldParticle));
-    }
-
-    return moho::SWorldParticle::sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    static gpg::RType* sVector3fType = nullptr;
-    if (!sVector3fType) {
-      sVector3fType = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-
-    return sVector3fType;
-  }
 } // namespace
 
 namespace moho
@@ -721,22 +674,22 @@ namespace moho
   {
     const gpg::RRef nullOwner{};
 
-    archive->Read(ResolveCEffectImplType(), static_cast<CEffectImpl*>(this), nullOwner);
-    archive->Read(ResolveEmitterRType(), &mEmitterType, nullOwner);
-    archive->Read(ResolveFastVectorSEfxCurveType(), &mCurves, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::CEffectImpl>(), static_cast<CEffectImpl*>(this), nullOwner);
+    archive->Read(gpg::RTypeOf<moho::EmitterType>(), &mEmitterType, nullOwner);
+    archive->Read(gpg::RTypeOf<gpg::fastvector<moho::SEfxCurve>>(), &mCurves, nullOwner);
 
     const gpg::RRef blueprintOwner{};
     (void)archive->ReadPointer(&mBlueprint, &blueprintOwner);
 
     archive->ReadFloat(&mTotalEmissions);
     archive->ReadInt(reinterpret_cast<int*>(&mLife));
-    archive->Read(ResolveSWorldParticleType(), &mParticle, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::SWorldParticle>(), &mParticle, nullOwner);
     archive->ReadBool(&mValid);
     archive->ReadInt(reinterpret_cast<int*>(&mZCurveMask));
     archive->ReadInt(&mMaxLifetime);
     archive->ReadBool(&mVisible);
     archive->ReadUInt(&mLastUpdate);
-    archive->Read(ResolveVector3fType(), &mPos, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mPos, nullOwner);
   }
 
   /**
@@ -750,21 +703,21 @@ namespace moho
   {
     gpg::RRef nullOwner{};
 
-    archive->Write(ResolveCEffectImplType(), static_cast<const CEffectImpl*>(this), nullOwner);
-    archive->Write(ResolveEmitterRType(), &mEmitterType, nullOwner);
-    archive->Write(ResolveFastVectorSEfxCurveType(), &mCurves, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::CEffectImpl>(), static_cast<const CEffectImpl*>(this), nullOwner);
+    archive->Write(gpg::RTypeOf<moho::EmitterType>(), &mEmitterType, nullOwner);
+    archive->Write(gpg::RTypeOf<gpg::fastvector<moho::SEfxCurve>>(), &mCurves, nullOwner);
 
     archive->WritePointer<moho::REmitterBlueprint>(mBlueprint, gpg::TrackedPointerState::Unowned, nullOwner);
 
     archive->WriteFloat(mTotalEmissions);
     archive->WriteInt(static_cast<int>(mLife));
-    archive->Write(ResolveSWorldParticleType(), &mParticle, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::SWorldParticle>(), &mParticle, nullOwner);
     archive->WriteBool(mValid);
     archive->WriteInt(static_cast<int>(mZCurveMask));
     archive->WriteInt(mMaxLifetime);
     archive->WriteBool(mVisible);
     archive->WriteUInt(mLastUpdate);
-    archive->Write(ResolveVector3fType(), &mPos, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mPos, nullOwner);
   }
 
   /**
@@ -1158,8 +1111,7 @@ namespace moho
     }
 
     PrepareTickStats();
-    _InterlockedExchangeAdd(
-      reinterpret_cast<volatile platform::InterlockedLong*>(&sEngineStatRenderActiveEmitters->mPrimaryValueBits), 1);
+    sEngineStatRenderActiveEmitters->AddPrimaryBits(1);
 
     if (!mValid) {
       UpdateCurve();
@@ -1176,10 +1128,10 @@ namespace moho
     }
 
     for (mLife = static_cast<std::uint32_t>(subTicks); subTicks > 0; --subTicks) {
-      Tick(subTicks);
+      (void)Tick(subTicks);
     }
     mLife = 0u;
-    Tick(0);
+    (void)Tick(0);
 
     mParams.start_[EFFECT_TICKCOUNT] =
       mParams.start_[EFFECT_TICKINCREMENT] + mParams.start_[EFFECT_TICKCOUNT];

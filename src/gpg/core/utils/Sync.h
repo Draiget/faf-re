@@ -333,7 +333,7 @@ namespace gpg::core
      */
     struct SharedLock {
 #if defined(_WIN32)
-        SRWLOCK lock_{ SRWLOCK_INIT };
+        SRWLOCK lock_ = SRWLOCK_INIT;
 
         void lock_shared()   noexcept { AcquireSRWLockShared(&lock_); }
         void unlock_shared() noexcept { ReleaseSRWLockShared(&lock_); }

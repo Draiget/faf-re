@@ -96,7 +96,7 @@ namespace
   void ReleaseTrackedCountedObjectPtr(moho::CountedPtr<moho::CountedObject>& ptr) noexcept
   {
     if (ptr.tex != nullptr) {
-      ptr.tex->ReleaseReference();
+      (void)ptr.tex->ReleaseReference();
       ptr.tex = nullptr;
     }
   }
@@ -461,7 +461,7 @@ namespace moho
       CAnimTexture* const texture = CAnimTexture::FindOrCreate(mNames[slot].c_str());
       SetTrackedCountedObjectPtr(mResourceRefs[slot], texture);
       if (texture != nullptr) {
-        texture->ReleaseReference();
+        (void)texture->ReleaseReference();
       }
       return;
     }

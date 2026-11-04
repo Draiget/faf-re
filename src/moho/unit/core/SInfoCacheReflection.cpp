@@ -51,21 +51,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedIFormationInstanceType()
-  {
-    return CachedRType<moho::IFormationInstance>();
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrIUnitType()
-  {
-    return CachedRType<moho::WeakPtr<moho::IUnit>>();
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    return CachedRType<moho::Vector3f>();
-  }
-
   template <class TObject>
   [[nodiscard]] gpg::RRef MakeTrackedRef(const TObject* const object)
   {
@@ -240,12 +225,12 @@ namespace moho
         reinterpret_cast<moho::CFormationInstance*>(ReadTrackedPointer<moho::IFormationInstance>(archive, ownerRef));
     }
 
-    archive->Read(CachedWeakPtrIUnitType(), &mFormationLeadRef, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::IUnit>>(), &mFormationLeadRef, ownerRef);
     archive->ReadInt(&mFormationPriorityOrder);
     archive->ReadBool(&mHasFormationSpeedData);
     archive->ReadFloat(&mFormationTopSpeed);
     archive->ReadFloat(&mFormationDistanceMetric);
-    archive->Read(CachedVector3fType(), &mFormationHeadingHint, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::Vector3f>(), &mFormationHeadingHint, ownerRef);
   }
 
   /**
@@ -276,12 +261,12 @@ namespace moho
       );
     }
 
-    archive->Write(CachedWeakPtrIUnitType(), &mFormationLeadRef, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::IUnit>>(), &mFormationLeadRef, ownerRef);
     archive->WriteInt(mFormationPriorityOrder);
     archive->WriteBool(mHasFormationSpeedData);
     archive->WriteFloat(mFormationTopSpeed);
     archive->WriteFloat(mFormationDistanceMetric);
-    archive->Write(CachedVector3fType(), &mFormationHeadingHint, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::Vector3f>(), &mFormationHeadingHint, ownerRef);
   }
 } // namespace moho
 

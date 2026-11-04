@@ -29,15 +29,6 @@ namespace
     }
   };
 
-  gpg::RType* gQuatfType = nullptr;
-
-  [[nodiscard]] gpg::RType* ResolveQuatfType()
-  {
-    if (gQuatfType == nullptr) {
-      gQuatfType = gpg::LookupRType(typeid(Wm3::Quatf));
-    }
-    return gQuatfType;
-  }
 
 } // namespace
 
@@ -70,7 +61,7 @@ namespace moho
     const gpg::RRef ownerRef{};
     archive->ReadInt(&cmd);
 
-    gpg::RType* const quatType = ResolveQuatfType();
+    gpg::RType* const quatType = gpg::RTypeOf<Wm3::Quatf>();
     GPG_ASSERT(quatType != nullptr);
     archive->Read(quatType, &origin, ownerRef);
 
@@ -97,7 +88,7 @@ namespace moho
     const gpg::RRef ownerRef{};
     archive->WriteInt(cmd);
 
-    gpg::RType* const quatType = ResolveQuatfType();
+    gpg::RType* const quatType = gpg::RTypeOf<Wm3::Quatf>();
     GPG_ASSERT(quatType != nullptr);
     archive->Write(quatType, &origin, ownerRef);
 

@@ -7,14 +7,6 @@
 
 namespace
 {
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
 
   gpg::RType* gStatItemType = nullptr;
   gpg::RType* gBlueprintStatsType = nullptr;
@@ -45,8 +37,8 @@ namespace moho
     }
 
     const gpg::RRef owner{};
-    archive->Read(CachedType<moho::StatItem>(gStatItemType), static_cast<moho::StatItem*>(this), owner);
-    archive->Read(CachedType<moho::ArmyBlueprintStatTree>(gBlueprintStatsType), &mBlueprintStats, owner);
+    archive->Read(gpg::CachedLookup<moho::StatItem>(gStatItemType), static_cast<moho::StatItem*>(this), owner);
+    archive->Read(gpg::CachedLookup<moho::ArmyBlueprintStatTree>(gBlueprintStatsType), &mBlueprintStats, owner);
   }
 
   /**
@@ -64,11 +56,11 @@ namespace moho
 
     const gpg::RRef owner{};
     archive->Write(
-      CachedType<moho::StatItem>(gStatItemType),
+      gpg::CachedLookup<moho::StatItem>(gStatItemType),
       const_cast<moho::StatItem*>(static_cast<const moho::StatItem*>(this)),
       owner
     );
-    archive->Write(CachedType<moho::ArmyBlueprintStatTree>(gBlueprintStatsType), &mBlueprintStats, owner);
+    archive->Write(gpg::CachedLookup<moho::ArmyBlueprintStatTree>(gBlueprintStatsType), &mBlueprintStats, owner);
   }
 } // namespace moho
 

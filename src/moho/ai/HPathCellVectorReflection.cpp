@@ -29,17 +29,6 @@ namespace
     return &sInstance;
   }
 
-  // Lazily resolves and caches the element RType* (binary Moho::HPathCell::sType).
-  [[nodiscard]] gpg::RType* ResolveHPathCellType()
-  {
-    gpg::RType* type = moho::HPathCell::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::HPathCell));
-      moho::HPathCell::sType = type;
-    }
-    return type;
-  }
-
   /**
    * Address: 0x00763760 (FUN_00763760, sub_763760)
    *
@@ -65,7 +54,7 @@ namespace
     HPathCellVector loaded{};
     loaded.reserve(static_cast<std::size_t>(count));
 
-    gpg::RType* const elementType = ResolveHPathCellType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::HPathCell>();
     const gpg::RRef emptyOwner{};
     for (unsigned int i = 0; i < count; ++i) {
       moho::HPathCell element{};
@@ -96,7 +85,7 @@ namespace
     const unsigned int count = static_cast<unsigned int>(storage->size());
     archive->WriteUInt(count);
 
-    gpg::RType* const elementType = ResolveHPathCellType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::HPathCell>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Write(elementType, &(*storage)[static_cast<std::size_t>(i)], owner);
@@ -128,7 +117,7 @@ namespace moho
  */
 const char* gpg::RVectorType<moho::HPathCell>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveHPathCellType()->GetName());
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::HPathCell>()->GetName());
   return sName.c_str();
 }
 

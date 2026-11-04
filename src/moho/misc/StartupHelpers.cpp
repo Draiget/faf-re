@@ -1,4 +1,5 @@
 #include "moho/misc/StartupHelpers.h"
+#include "moho/lua/CScrLuaInitForm.h"
 
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/Set.h"
@@ -301,34 +302,6 @@ namespace
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingLuaState(lua_State* const luaContext) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("User"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("User");
-    return sSet;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Core");
-    return sSet;
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UnsafeLuaInitSet()
@@ -2100,10 +2073,7 @@ int moho::cfunc_SHGetFolderPathL(LuaPlus::LuaState* const state)
   }
 
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSHGetFolderPathHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kSHGetFolderPathHelpText);
 
   LuaPlus::LuaStackObject idArg(state, 1);
   const char* keyText = lua_tostring(rawState, 1);
@@ -2176,7 +2146,7 @@ moho::CScrLuaInitForm* moho::func_SHGetFolderPath_LuaFuncDef()
 moho::CScrLuaInitFormSet* moho::register_coreInitFormSet()
 {
   CScrLuaInitFormSet* const previousHead = CScrLuaInitFormSet::sSets;
-  CScrLuaInitFormSet& coreSet = CoreLuaInitSet();
+  CScrLuaInitFormSet& coreSet = moho::SCR_CoreLuaInitSet();
   coreSet.mNextSet = previousHead;
   CScrLuaInitFormSet::sSets = &coreSet;
   return previousHead;
@@ -2192,7 +2162,7 @@ moho::CScrLuaInitFormSet* moho::register_coreInitFormSet()
 moho::CScrLuaInitFormSet* moho::register_userInitFormSet()
 {
   CScrLuaInitFormSet* const previousHead = CScrLuaInitFormSet::sSets;
-  CScrLuaInitFormSet& userSet = UserLuaInitSet();
+  CScrLuaInitFormSet& userSet = moho::SCR_UserLuaInitSet();
   userSet.mNextSet = previousHead;
   CScrLuaInitFormSet::sSets = &userSet;
   return previousHead;
@@ -2283,7 +2253,7 @@ int moho::cfunc_GetMovieDuration(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetMovieDuration_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "GetMovieDuration",
     &moho::cfunc_GetMovieDuration,
     nullptr,
@@ -2303,12 +2273,7 @@ moho::CScrLuaInitForm* moho::func_GetMovieDuration_LuaFuncDef()
 int moho::cfunc_GetMovieDurationL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(
-      state, "%s\n  expected %d args, but got %d", kGetMovieDurationHelpText, 1, argumentCount
-    );
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kGetMovieDurationHelpText);
 
   LuaPlus::LuaStackObject moviePathArg(state, 1);
   const char* moviePath = lua_tostring(rawState, 1);

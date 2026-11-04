@@ -165,28 +165,11 @@ namespace
 {
   gpg::RType* gIAiTransportType = nullptr;
   gpg::RType* gCAiTransportImplType = nullptr;
-  gpg::RType* gUnitType = nullptr;
-  gpg::RType* gWeakPtrUnitType = nullptr;
-  gpg::RType* gEntitySetTemplateUnitType = nullptr;
-  gpg::RType* gReservedBoneVectorType = nullptr;
-  gpg::RType* gPickupInfoType = nullptr;
-  gpg::RType* gFormationInstanceType = nullptr;
-  gpg::RType* gVector3fType = nullptr;
-  gpg::RType* gAttachPointVectorType = nullptr;
-
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
 
   [[nodiscard]] gpg::RType* ResolveIAiTransportType()
   {
     if (!IAiTransport::sType) {
-      IAiTransport::sType = CachedType<IAiTransport>(gIAiTransportType);
+      IAiTransport::sType = gpg::CachedLookup<IAiTransport>(gIAiTransportType);
     }
     return IAiTransport::sType;
   }
@@ -194,49 +177,9 @@ namespace
   [[nodiscard]] gpg::RType* ResolveCAiTransportImplType()
   {
     if (!CAiTransportImpl::sType) {
-      CAiTransportImpl::sType = CachedType<CAiTransportImpl>(gCAiTransportImplType);
+      CAiTransportImpl::sType = gpg::CachedLookup<CAiTransportImpl>(gCAiTransportImplType);
     }
     return CAiTransportImpl::sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveUnitType()
-  {
-    return CachedType<Unit>(gUnitType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveWeakPtrUnitType()
-  {
-    return CachedType<WeakPtr<Unit>>(gWeakPtrUnitType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEntitySetTemplateUnitType()
-  {
-    return CachedType<EntitySetTemplate<Unit>>(gEntitySetTemplateUnitType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveReservedBoneVectorType()
-  {
-    return CachedType<msvc8::vector<SAiReservedTransportBone>>(gReservedBoneVectorType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolvePickupInfoType()
-  {
-    return CachedType<STransportPickUpInfo>(gPickupInfoType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveFormationInstanceType()
-  {
-    return CachedType<IFormationInstance>(gFormationInstanceType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    return CachedType<Wm3::Vector3<float>>(gVector3fType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveAttachPointVectorType()
-  {
-    return CachedType<msvc8::vector<SAttachPoint>>(gAttachPointVectorType);
   }
 
   [[nodiscard]] bool BlueprintBelongsToCategory(
@@ -523,9 +466,9 @@ void CAiTransportImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   GPG_ASSERT(aiTransportType != nullptr);
   archive->Read(aiTransportType, static_cast<IAiTransport*>(this), ownerRef);
 
-  mUnit = ReadPointerUnowned<Unit>(archive, ownerRef, ResolveUnitType());
+  mUnit = ReadPointerUnowned<Unit>(archive, ownerRef, gpg::RTypeOf<Unit>());
 
-  gpg::RType* const weakUnitType = ResolveWeakPtrUnitType();
+  gpg::RType* const weakUnitType = gpg::RTypeOf<WeakPtr<Unit>>();
   GPG_ASSERT(weakUnitType != nullptr);
   archive->Read(weakUnitType, &mTeleportBeacon, ownerRef);
 
@@ -540,28 +483,28 @@ void CAiTransportImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->ReadInt(&mLaunchAttachIndex);
   archive->ReadInt(&mGenericOverflow);
 
-  gpg::RType* const entitySetType = ResolveEntitySetTemplateUnitType();
+  gpg::RType* const entitySetType = gpg::RTypeOf<EntitySetTemplate<Unit>>();
   GPG_ASSERT(entitySetType != nullptr);
   archive->Read(entitySetType, &mUnitSet30, ownerRef);
   archive->Read(entitySetType, &mStoredUnits, ownerRef);
   archive->Read(entitySetType, &mUnitSet80, ownerRef);
 
-  gpg::RType* const reservedBoneVectorType = ResolveReservedBoneVectorType();
+  gpg::RType* const reservedBoneVectorType = gpg::RTypeOf<msvc8::vector<SAiReservedTransportBone>>();
   GPG_ASSERT(reservedBoneVectorType != nullptr);
   archive->Read(reservedBoneVectorType, &mReservedBones, ownerRef);
 
-  gpg::RType* const pickupInfoType = ResolvePickupInfoType();
+  gpg::RType* const pickupInfoType = gpg::RTypeOf<STransportPickUpInfo>();
   GPG_ASSERT(pickupInfoType != nullptr);
   archive->Read(pickupInfoType, &mPickupInfo, ownerRef);
 
   mWaitingFormation =
-    ReadPointerUnowned<IFormationInstance>(archive, ownerRef, ResolveFormationInstanceType());
+    ReadPointerUnowned<IFormationInstance>(archive, ownerRef, gpg::RTypeOf<IFormationInstance>());
 
-  gpg::RType* const vector3fType = ResolveVector3fType();
+  gpg::RType* const vector3fType = gpg::RTypeOf<Wm3::Vector3<float>>();
   GPG_ASSERT(vector3fType != nullptr);
   archive->Read(vector3fType, &mPickupFacing, ownerRef);
 
-  gpg::RType* const attachPointVectorType = ResolveAttachPointVectorType();
+  gpg::RType* const attachPointVectorType = gpg::RTypeOf<msvc8::vector<SAttachPoint>>();
   GPG_ASSERT(attachPointVectorType != nullptr);
   archive->Read(attachPointVectorType, &mGenericAttachPoints, ownerRef);
   archive->Read(attachPointVectorType, &mClass1AttachPoints, ownerRef);
@@ -589,9 +532,9 @@ void CAiTransportImpl::MemberSerialize(gpg::WriteArchive* const archive) const
   GPG_ASSERT(aiTransportType != nullptr);
   archive->Write(aiTransportType, static_cast<const IAiTransport*>(this), ownerRef);
 
-  WritePointerUnowned(archive, mUnit, ResolveUnitType(), ownerRef);
+  WritePointerUnowned(archive, mUnit, gpg::RTypeOf<Unit>(), ownerRef);
 
-  gpg::RType* const weakUnitType = ResolveWeakPtrUnitType();
+  gpg::RType* const weakUnitType = gpg::RTypeOf<WeakPtr<Unit>>();
   GPG_ASSERT(weakUnitType != nullptr);
   archive->Write(weakUnitType, &mTeleportBeacon, ownerRef);
 
@@ -602,27 +545,27 @@ void CAiTransportImpl::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->WriteInt(mLaunchAttachIndex);
   archive->WriteInt(mGenericOverflow);
 
-  gpg::RType* const entitySetType = ResolveEntitySetTemplateUnitType();
+  gpg::RType* const entitySetType = gpg::RTypeOf<EntitySetTemplate<Unit>>();
   GPG_ASSERT(entitySetType != nullptr);
   archive->Write(entitySetType, &mUnitSet30, ownerRef);
   archive->Write(entitySetType, &mStoredUnits, ownerRef);
   archive->Write(entitySetType, &mUnitSet80, ownerRef);
 
-  gpg::RType* const reservedBoneVectorType = ResolveReservedBoneVectorType();
+  gpg::RType* const reservedBoneVectorType = gpg::RTypeOf<msvc8::vector<SAiReservedTransportBone>>();
   GPG_ASSERT(reservedBoneVectorType != nullptr);
   archive->Write(reservedBoneVectorType, &mReservedBones, ownerRef);
 
-  gpg::RType* const pickupInfoType = ResolvePickupInfoType();
+  gpg::RType* const pickupInfoType = gpg::RTypeOf<STransportPickUpInfo>();
   GPG_ASSERT(pickupInfoType != nullptr);
   archive->Write(pickupInfoType, &mPickupInfo, ownerRef);
 
-  WritePointerUnowned(archive, mWaitingFormation, ResolveFormationInstanceType(), ownerRef);
+  WritePointerUnowned(archive, mWaitingFormation, gpg::RTypeOf<IFormationInstance>(), ownerRef);
 
-  gpg::RType* const vector3fType = ResolveVector3fType();
+  gpg::RType* const vector3fType = gpg::RTypeOf<Wm3::Vector3<float>>();
   GPG_ASSERT(vector3fType != nullptr);
   archive->Write(vector3fType, &mPickupFacing, ownerRef);
 
-  gpg::RType* const attachPointVectorType = ResolveAttachPointVectorType();
+  gpg::RType* const attachPointVectorType = gpg::RTypeOf<msvc8::vector<SAttachPoint>>();
   GPG_ASSERT(attachPointVectorType != nullptr);
   archive->Write(attachPointVectorType, &mGenericAttachPoints, ownerRef);
   archive->Write(attachPointVectorType, &mClass1AttachPoints, ownerRef);

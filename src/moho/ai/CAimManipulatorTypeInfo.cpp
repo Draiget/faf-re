@@ -21,16 +21,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
-  {
-    gpg::RType* type = moho::IAniManipulator::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::IAniManipulator));
-      moho::IAniManipulator::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RRef MakeCAimManipulatorRef(moho::CAimManipulator* const object)
   {
     return gpg::MakeRRef(object);
@@ -144,18 +134,7 @@ namespace moho
    */
   void CAimManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedIAniManipulatorType();
-    if (!baseType) {
-      return;
-    }
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::IAniManipulator>(typeInfo);
   }
 
   /**

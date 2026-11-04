@@ -37,34 +37,6 @@ namespace
     return focusLink.GetObjectPtr();
   }
 
-  [[nodiscard]] gpg::RType* ResolveWeakPtrUnitType()
-  {
-    gpg::RType* type = moho::WeakPtr<moho::Unit>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-      moho::WeakPtr<moho::Unit>::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSimType()
-  {
-    static gpg::RType* cachedType = nullptr;
-    if (!cachedType) {
-      cachedType = gpg::LookupRType(typeid(moho::Sim));
-    }
-    return cachedType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCBuildTaskHelperType()
-  {
-    static gpg::RType* cachedType = nullptr;
-    if (!cachedType) {
-      cachedType = gpg::LookupRType(typeid(moho::CBuildTaskHelper));
-    }
-    return cachedType;
-  }
-
   [[nodiscard]] bool DidCrossBuildProgressBand(const float previous, const float current) noexcept
   {
     return (previous < kQuarterProgress && current >= kQuarterProgress)
@@ -475,7 +447,7 @@ namespace moho
     ownerRef = gpg::RRef{};
     archive->ReadPointer(&mSim, &ownerRef);
 
-    gpg::RType* const weakUnitType = ResolveWeakPtrUnitType();
+    gpg::RType* const weakUnitType = gpg::RTypeOf<moho::WeakPtr<moho::Unit>>();
     GPG_ASSERT(weakUnitType != nullptr);
     if (!weakUnitType) {
       return;
@@ -512,10 +484,10 @@ namespace moho
 
     gpg::RRef simRef{};
     simRef.mObj = mSim;
-    simRef.mType = mSim ? ResolveSimType() : nullptr;
+    simRef.mType = mSim ? gpg::RTypeOf<moho::Sim>() : nullptr;
     gpg::WriteRawPointer(archive, simRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    gpg::RType* const weakUnitType = ResolveWeakPtrUnitType();
+    gpg::RType* const weakUnitType = gpg::RTypeOf<moho::WeakPtr<moho::Unit>>();
     GPG_ASSERT(weakUnitType != nullptr);
     if (!weakUnitType) {
       return;
@@ -575,7 +547,7 @@ namespace
      */
     void Init() override
     {
-      gpg::RType* const type = ResolveCBuildTaskHelperType();
+      gpg::RType* const type = gpg::RTypeOf<moho::CBuildTaskHelper>();
       GPG_ASSERT(type != nullptr);
       GPG_ASSERT(type->serLoadFunc_ == nullptr);
       type->serLoadFunc_ = mSerLoadFunc;

@@ -10,14 +10,6 @@ using namespace moho;
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3<float>));
-    }
-    return cached;
-  }
 
 } // namespace
 
@@ -35,7 +27,7 @@ namespace moho
     archive->ReadUInt(&index);
 
     const gpg::RRef ownerRef{};
-    gpg::RType* const vectorType = CachedVector3fType();
+    gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3<float>>();
     GPG_ASSERT(vectorType != nullptr);
     archive->Read(vectorType, &localPos, ownerRef);
 
@@ -54,7 +46,7 @@ namespace moho
     archive->WriteUInt(index);
 
     const gpg::RRef ownerRef{};
-    gpg::RType* const vectorType = CachedVector3fType();
+    gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3<float>>();
     GPG_ASSERT(vectorType != nullptr);
     archive->Write(vectorType, &localPos, ownerRef);
 

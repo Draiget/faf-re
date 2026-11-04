@@ -477,10 +477,7 @@ namespace
      */
     ~ScopedStatTimer()
     {
-      (void)::InterlockedExchangeAdd(
-        reinterpret_cast<volatile platform::InterlockedLong*>(&mStat->mPrimaryValueBits),
-        static_cast<long>(gpg::time::CyclesToMicroseconds(mTimer.ElapsedCycles()))
-      );
+      (void)mStat->AddPrimaryBits(gpg::time::CyclesToMicroseconds(mTimer.ElapsedCycles()));
     }
 
     ScopedStatTimer(const ScopedStatTimer&) = delete;

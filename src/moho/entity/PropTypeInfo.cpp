@@ -79,15 +79,7 @@ namespace moho
    */
   void PropTypeInfo::AddBase_Entity(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = gpg::LookupRType(typeid(Entity));
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<Entity>(typeInfo);
   }
 
   /**

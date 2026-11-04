@@ -20,29 +20,11 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedBeamBlueprintType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RBeamBlueprint));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEffectBlueprintType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::REffectBlueprint));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeBeamBlueprintRef(moho::RBeamBlueprint* object)
   {
     gpg::RRef out{};
     out.mObj = object;
-    out.mType = CachedBeamBlueprintType();
+    out.mType = gpg::RTypeOf<moho::RBeamBlueprint>();
     return out;
   }
 
@@ -135,7 +117,7 @@ namespace moho
  */
 void RBeamBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeInfo)
 {
-  gpg::RType* const effectType = CachedEffectBlueprintType();
+  gpg::RType* const effectType = gpg::RTypeOf<moho::REffectBlueprint>();
   gpg::RField baseField{};
   baseField.mName = effectType->GetName();
   baseField.mType = effectType;

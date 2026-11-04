@@ -18,14 +18,6 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedCScriptObjectType()
-  {
-    if (!moho::CScriptObject::sType) {
-      moho::CScriptObject::sType = gpg::LookupRType(typeid(moho::CScriptObject));
-    }
-    return moho::CScriptObject::sType;
-  }
-
   /**
    * Address: 0x007CB630 (FUN_007CB630)
    *
@@ -35,18 +27,7 @@ namespace
    */
   void AddCScriptObjectBaseToCLobbyType(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedCScriptObjectType();
-    if (!baseType) {
-      return;
-    }
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::CScriptObject>(typeInfo);
   }
 
   /**

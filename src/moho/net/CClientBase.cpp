@@ -808,7 +808,7 @@ void CClientBase::UpdateState(
         outPipe->Write(message.mBuff.start_, message.mBuff.Size());
 
         if (op == ECmdStreamOp::CMDST_CommandSourceTerminated) {
-          mValidCommandSources.Remove(mCommandSourceId);
+          (void)mValidCommandSources.Remove(mCommandSourceId);
           mValidCommandSources.Finalize();
           hasCommandSource = false;
           mCommandSourceId = kInvalidCommandSource;

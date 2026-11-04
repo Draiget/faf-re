@@ -410,20 +410,6 @@ namespace gpg
 
 namespace
 {
-  /**
-   * Address: 0x00402890 (FUN_00402890)
-   *
-   * What it does:
-   * Lazily resolves and caches reflection type descriptor for `unsigned int`.
-   */
-  [[nodiscard]] gpg::RType* CachedUIntType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(unsigned int));
-    }
-    return cached;
-  }
 
   /**
    * Address: 0x00552050 (FUN_00552050)
@@ -583,15 +569,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedFloatType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(float));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x00657820 (FUN_00657820)
    *
@@ -625,7 +602,7 @@ namespace
     archive->ReadUInt(&count);
 
     const float fill = 0.0f;
-    FastVectorFloatResize(&fill, count, storage);
+    (void)FastVectorFloatResize(&fill, count, storage);
 
     auto& elements = *static_cast<gpg::core::FastVectorInline<float>*>(storage);
     for (unsigned int i = 0; i < count; ++i) {
@@ -665,15 +642,6 @@ namespace
   {
     static FastVectorStringType sInstance;
     return &sInstance;
-  }
-
-  [[nodiscard]] gpg::RType* CachedStringType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(msvc8::string));
-    }
-    return cached;
   }
 
   void FastVectorStringResize(const msvc8::string* fillValue, const unsigned int newSize, void* objectStorage)
@@ -745,15 +713,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return cached;
-  }
-
   // NOTE: CachedEntIdType() (the `Moho::EntId::sType`-equivalent name-keyed
   // RType cache) and the `RFastVectorType<Moho::EntId>` SerLoad/SerSave
   // callbacks that used it now live in FastVectorEntIdReflection.cpp, next to
@@ -773,16 +732,6 @@ namespace
    */
   constexpr std::int32_t kInvalidAttachedEntityId = static_cast<std::int32_t>(0xF0000000u);
 
-  [[nodiscard]] gpg::RType* CachedSSTIEntityAttachInfoType()
-  {
-    gpg::RType* type = moho::SSTIEntityAttachInfo::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::SSTIEntityAttachInfo));
-      moho::SSTIEntityAttachInfo::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RType* CachedUnitWeaponInfoType()
   {
     static gpg::RType* cached = nullptr;
@@ -790,34 +739,6 @@ namespace
       cached = gpg::RTypeOf<moho::UnitWeaponInfo>();
     }
     return cached;
-  }
-
-  /**
-   * Element-type cache for `SOffsetInfo`, mirroring the binary's
-   * `Moho::SOffsetInfo::sType` global (0x010C6F6C).
-   */
-  [[nodiscard]] gpg::RType* CachedSOffsetInfoTypeCompat()
-  {
-    gpg::RType* type = moho::SOffsetInfo::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SOffsetInfo));
-      moho::SOffsetInfo::sType = type;
-    }
-    return type;
-  }
-
-  /**
-   * Element-type cache for `SAssignedLocInfo`, mirroring the binary's
-   * `Moho::SAssignedLocInfo::sType` global.
-   */
-  [[nodiscard]] gpg::RType* CachedSAssignedLocInfoTypeCompat()
-  {
-    gpg::RType* type = moho::SAssignedLocInfo::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SAssignedLocInfo));
-      moho::SAssignedLocInfo::sType = type;
-    }
-    return type;
   }
 
   /**
@@ -876,7 +797,7 @@ namespace
     FastVectorVector3fResize(&fill, count, storage);
 
     auto& elements = *static_cast<gpg::core::FastVectorInline<Wm3::Vector3f>*>(storage);
-    gpg::RType* const vector3Type = CachedVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3f>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Read(vector3Type, elements.Data() + (i), owner);
@@ -913,7 +834,7 @@ namespace
     auto& elements = *static_cast<gpg::core::FastVectorInline<moho::SSTIEntityAttachInfo>*>(storage);
     elements.resize(count, fill);
 
-    gpg::RType* const attachInfoType = CachedSSTIEntityAttachInfoType();
+    gpg::RType* const attachInfoType = gpg::RTypeOf<moho::SSTIEntityAttachInfo>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Read(attachInfoType, elements.Data() + (i), owner);
@@ -940,7 +861,7 @@ namespace
     const unsigned int count = elements.Data() ? static_cast<unsigned int>(elements.Size()) : 0u;
     archive->WriteUInt(count);
 
-    gpg::RType* const vector3Type = CachedVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3f>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Write(vector3Type, elements.Data() + (i), owner);
@@ -972,7 +893,7 @@ namespace
     const unsigned int count = elements.Data() ? static_cast<unsigned int>(elements.Size()) : 0u;
     archive->WriteUInt(count);
 
-    gpg::RType* const attachInfoType = CachedSSTIEntityAttachInfoType();
+    gpg::RType* const attachInfoType = gpg::RTypeOf<moho::SSTIEntityAttachInfo>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Write(attachInfoType, elements.Data() + (i), owner);
@@ -1091,7 +1012,7 @@ gpg::RFastVectorType<unsigned int>::~RFastVectorType() = default;
  */
 const char* gpg::RFastVectorType<unsigned int>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedUIntType()->GetName());
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<unsigned int>()->GetName());
   return sName.c_str();
 }
 
@@ -1133,7 +1054,7 @@ gpg::RRef gpg::RFastVectorType<unsigned int>::SubscriptIndex(void* obj, const in
   GPG_ASSERT(obj != nullptr);
   if (!obj) {
     gpg::RRef out{};
-    out.mType = CachedUIntType();
+    out.mType = gpg::RTypeOf<unsigned int>();
     out.mObj = nullptr;
     return out;
   }
@@ -1143,7 +1064,7 @@ gpg::RRef gpg::RFastVectorType<unsigned int>::SubscriptIndex(void* obj, const in
   GPG_ASSERT(static_cast<std::size_t>(ind) < GetCount(obj));
 
   gpg::RRef out{};
-  out.mType = CachedUIntType();
+  out.mType = gpg::RTypeOf<unsigned int>();
   if (ind < 0 || !elements.Data() || static_cast<std::size_t>(ind) >= GetCount(obj)) {
     out.mObj = nullptr;
     return out;
@@ -1223,7 +1144,7 @@ gpg::RFastVectorType<float>::~RFastVectorType() = default;
  */
 const char* gpg::RFastVectorType<float>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedFloatType()->GetName());
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<float>()->GetName());
   return sName.c_str();
 }
 
@@ -1279,7 +1200,7 @@ gpg::RRef gpg::RFastVectorType<float>::SubscriptIndex(void* obj, const int ind) 
   GPG_ASSERT(obj != nullptr);
   if (!obj) {
     gpg::RRef out{};
-    out.mType = CachedFloatType();
+    out.mType = gpg::RTypeOf<float>();
     out.mObj = nullptr;
     return out;
   }
@@ -1289,7 +1210,7 @@ gpg::RRef gpg::RFastVectorType<float>::SubscriptIndex(void* obj, const int ind) 
   GPG_ASSERT(static_cast<std::size_t>(ind) < GetCount(obj));
 
   gpg::RRef out{};
-  out.mType = CachedFloatType();
+  out.mType = gpg::RTypeOf<float>();
   if (ind < 0 || !elements.Data() || static_cast<std::size_t>(ind) >= GetCount(obj)) {
     out.mObj = nullptr;
     return out;
@@ -1333,7 +1254,7 @@ void gpg::RFastVectorType<float>::SetCount(void* obj, const int count) const
   }
 
   const float fill = 0.0f;
-  FastVectorFloatResize(&fill, static_cast<unsigned int>(count), obj);
+  (void)FastVectorFloatResize(&fill, static_cast<unsigned int>(count), obj);
 }
 
 // ---------------------------------------------------------------------------
@@ -1389,7 +1310,7 @@ gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::~RFastVectorType() = default;
  */
 const char* gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSSTIEntityAttachInfoType()->GetName());
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::SSTIEntityAttachInfo>()->GetName());
   return sName.c_str();
 }
 
@@ -1662,7 +1583,7 @@ gpg::RFastVectorType<moho::SOffsetInfo>::~RFastVectorType() = default;
  */
 const char* gpg::RFastVectorType<moho::SOffsetInfo>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSOffsetInfoTypeCompat()->GetName());
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::SOffsetInfo>()->GetName());
   return sName.c_str();
 }
 
@@ -1795,7 +1716,7 @@ gpg::RFastVectorType<moho::SAssignedLocInfo>::~RFastVectorType() = default;
 const char* gpg::RFastVectorType<moho::SAssignedLocInfo>::GetName() const
 {
   static const msvc8::string sName =
-    gpg::STR_Printf("fastvector<%s>", CachedSAssignedLocInfoTypeCompat()->GetName());
+    gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::SAssignedLocInfo>()->GetName());
   return sName.c_str();
 }
 
@@ -1904,7 +1825,7 @@ gpg::RFastVectorType<msvc8::string>::~RFastVectorType() = default;
  */
 const char* gpg::RFastVectorType<msvc8::string>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedStringType()->GetName());
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<msvc8::string>()->GetName());
   return sName.c_str();
 }
 
@@ -1961,7 +1882,7 @@ gpg::RRef gpg::RFastVectorType<msvc8::string>::SubscriptIndex(void* obj, const i
   GPG_ASSERT(obj != nullptr);
   if (!obj) {
     gpg::RRef out{};
-    out.mType = CachedStringType();
+    out.mType = gpg::RTypeOf<msvc8::string>();
     out.mObj = nullptr;
     return out;
   }
@@ -1971,7 +1892,7 @@ gpg::RRef gpg::RFastVectorType<msvc8::string>::SubscriptIndex(void* obj, const i
   GPG_ASSERT(static_cast<std::size_t>(ind) < GetCount(obj));
 
   gpg::RRef out{};
-  out.mType = CachedStringType();
+  out.mType = gpg::RTypeOf<msvc8::string>();
   if (ind < 0 || !elements.Data() || static_cast<std::size_t>(ind) >= GetCount(obj)) {
     out.mObj = nullptr;
     return out;
@@ -2063,7 +1984,7 @@ gpg::RFastVectorType<Wm3::Vector3f>::~RFastVectorType() = default;
  */
 const char* gpg::RFastVectorType<Wm3::Vector3f>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedVector3fType()->GetName());
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<Wm3::Vector3f>()->GetName());
   return sName.c_str();
 }
 
@@ -2109,7 +2030,7 @@ gpg::RRef gpg::RFastVectorType<Wm3::Vector3f>::SubscriptIndex(void* obj, const i
   GPG_ASSERT(obj != nullptr);
   if (!obj) {
     gpg::RRef out{};
-    out.mType = CachedVector3fType();
+    out.mType = gpg::RTypeOf<Wm3::Vector3f>();
     out.mObj = nullptr;
     return out;
   }
@@ -2119,7 +2040,7 @@ gpg::RRef gpg::RFastVectorType<Wm3::Vector3f>::SubscriptIndex(void* obj, const i
   GPG_ASSERT(static_cast<std::size_t>(ind) < GetCount(obj));
 
   gpg::RRef out{};
-  out.mType = CachedVector3fType();
+  out.mType = gpg::RTypeOf<Wm3::Vector3f>();
   if (ind < 0 || !elements.Data() || static_cast<std::size_t>(ind) >= GetCount(obj)) {
     out.mObj = nullptr;
     return out;

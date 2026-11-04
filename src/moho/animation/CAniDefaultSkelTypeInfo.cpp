@@ -53,15 +53,7 @@ namespace moho
  */
 void CAniDefaultSkelTypeInfo::AddBase_CAniSkel(gpg::RType* const typeInfo)
 {
-  gpg::RType* const baseType = gpg::LookupRType(typeid(moho::CAniSkel));
-
-  gpg::RField baseField{};
-  baseField.mName = baseType->GetName();
-  baseField.mType = baseType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBase<moho::CAniSkel>(typeInfo);
 }
 
 /**
