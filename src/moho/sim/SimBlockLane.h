@@ -63,6 +63,21 @@ namespace moho
     }
 
     /**
+     * For an object that takes a block of this class in the binary but lives elsewhere here: the block it would have
+     * taken leaves the list, so the next object gets the one under it, as in the binary.
+     */
+    static void PassTopBlock() noexcept
+    {
+      if (IsSimThread() && !gSimKeyframeRestoring.load(std::memory_order_relaxed)) {
+        std::vector<void*>& blocks = Blocks();
+        if (!blocks.empty()) {
+          ::operator delete(blocks.back());
+          blocks.pop_back();
+        }
+      }
+    }
+
+    /**
      * Engine addition (replay keyframes): the free list is game state, as the next object of any of the three kinds
      * takes its last block. While a keyframe loads the list stands still (`gSimKeyframeRestoring`), so what the load
      * creates doesn't use up the blocks the saved game had free.
