@@ -13953,13 +13953,16 @@ bool Unit::CanStartBuilding(const float energyCost, const float massCost) const
     return false;
   }
 
+  // The tests are written the way the binary's branches read (0x0062D7A5..0x0062D7DB), not simplified: its comiss
+  // leaves a NaN passing each of them, and an army's income can be NaN (replay 26939667, where a factory waited a tick
+  // too long on a NaN mass income).
   const SEconTotals& totals = economyInfo->economy;
-  if (totals.mStored.ENERGY > kBuildResourceEpsilon && totals.mStored.MASS > kBuildResourceEpsilon) {
+  if (!(kBuildResourceEpsilon >= totals.mStored.ENERGY) && !(kBuildResourceEpsilon >= totals.mStored.MASS)) {
     return true;
   }
 
-  const bool hasEnergyBudget = (energyCost <= 0.0f) || (totals.mIncome.ENERGY >= kBuildResourceEpsilon);
-  const bool hasMassBudget = (massCost <= 0.0f) || (totals.mIncome.MASS >= kBuildResourceEpsilon);
+  const bool hasEnergyBudget = !(energyCost > 0.0f) || !(kBuildResourceEpsilon > totals.mIncome.ENERGY);
+  const bool hasMassBudget = !(massCost > 0.0f) || !(kBuildResourceEpsilon > totals.mIncome.MASS);
   return hasEnergyBudget && hasMassBudget;
 }
 
