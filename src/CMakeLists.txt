@@ -299,7 +299,7 @@ endif()
 # the executable at /fafengine (DISK_SetupDataAndSearchPaths; see
 # docs/RENDERER_BACKENDS.md). And the DXC runtime (dxcompiler.dll, dxil.dll),
 # which Direct3D 12 and Vulkan load to compile their shaders.
-option(FAF_GENERATE_MOD "Assemble the FAFEngine Lua changes as a ready-to-use FAF mod in build/mods/FAFEngine" ON)
+option(FAF_GENERATE_MOD "Assemble the FAFEngine Lua changes as a ready-to-use FAF mod in build/mods/FAFEngine" OFF)
 
 set(_faf_dxc_bin "${FAF_DEPENDENCIES_DIR}/dxc/bin/${_faf_sdk_arch}")
 add_custom_command(TARGET faf_main POST_BUILD
