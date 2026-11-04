@@ -204,6 +204,58 @@ namespace faf::remote
       ~SViewScope() { router.LeaveView(sim); }
     };
 
+    /**
+     * Whether an engine function reads only, as a function run once per player must (plan WPR.26):
+     * more than one run of a write would change the sim. `Get`, `Is` and `Can` name the sim's
+     * readers; the rest are the Lua library's and the log's, which touch no sim state.
+     */
+    [[nodiscard]] bool ReadsOnly(const char* const name) noexcept
+    {
+      if (name == nullptr) {
+        return false;
+      }
+      for (const char* const prefix : {"Get", "Is", "Can"}) {
+        if (std::strncmp(name, prefix, std::strlen(prefix)) == 0) {
+          return true;
+        }
+      }
+      for (const char* const known :
+           {"insert", "remove", "getn", "getsize", "empty", "find", "pairs", "ipairs", "next", "type", "tostring", "tonumber", "unpack",
+            "rawget", "getmetatable", "setmetatable", "assert", "import", "WARN", "LOG", "SPEW", "_ALERT", "format", "len", "sub", "lower",
+            "upper", "OkayToMessWithArmy", "ArmyIsCivilian", "EntityCategoryContains"}) {
+        if (std::strcmp(name, known) == 0) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    void FanOutCallHook(lua_State* const state, lua_Debug* const debug)
+    {
+      if (lua_getinfo(state, "Sn", debug) != 0 && debug->what != nullptr && std::strcmp(debug->what, "C") == 0 && !ReadsOnly(debug->name)
+          && sActiveRouter != nullptr) {
+        sActiveRouter->NoteFanOutViolation(debug->name != nullptr ? debug->name : "?");
+      }
+    }
+
+    /** The call hook above, for the runs of one function under each player's focus. */
+    struct SFanOutGuard
+    {
+      lua_State* state;
+      lua_Hook hook;
+      int mask;
+      int count;
+      explicit SFanOutGuard(lua_State* const s)
+        : state(s)
+        , hook(lua_gethook(s))
+        , mask(lua_gethookmask(s))
+        , count(lua_gethookcount(s))
+      {
+        lua_sethook(state, &FanOutCallHook, LUA_MASKCALL, 0);
+      }
+      ~SFanOutGuard() { lua_sethook(state, hook, mask, count); }
+    };
+
     void CallOriginal(lua_State* const state, const int argumentCount, const int results)
     {
       lua_pushvalue(state, lua_upvalueindex(1));
@@ -225,6 +277,7 @@ namespace faf::remote
       const int argumentCount = lua_gettop(state);
       if (router != nullptr && router->CurrentSim() != nullptr) {
         moho::Sim& sim = *router->CurrentSim();
+        const SFanOutGuard guard(state);
         for (std::size_t view = 0; view < router->ViewCount(); ++view) {
           SViewScope scope(*router, sim, static_cast<std::int32_t>(view));
           CallOriginal(state, argumentCount, 0);
@@ -252,6 +305,7 @@ namespace faf::remote
           && std::strcmp(name, "SharePaintingBrushStroke") == 0) {
         moho::Sim& sim = *router->CurrentSim();
         const std::int32_t source = router->SourceArmy(sim);
+        const SFanOutGuard guard(state);
         for (std::size_t view = 0; view < router->ViewCount(); ++view) {
           if (router->Allied(sim, view, source)) {
             SViewScope scope(*router, sim, static_cast<std::int32_t>(view));
@@ -475,6 +529,15 @@ namespace faf::remote
       globals.SetObject("Sync", frame.previousSync);
     }
     mFrames.pop_back();
+  }
+
+  void CSyncRouter::NoteFanOutViolation(const char* const name)
+  {
+    ++mFanOutViolations;
+    if (std::find(mLoggedKeys.begin(), mLoggedKeys.end(), name) == mLoggedKeys.end()) {
+      mLoggedKeys.emplace_back(name);
+      gpg::Warnf("sync routing: a function run for each player called '%s', which isn't known to only read", name);
+    }
   }
 
   bool CSyncRouter::Print(const msvc8::string& line)

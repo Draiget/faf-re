@@ -83,6 +83,10 @@ namespace faf::remote
     [[nodiscard]] std::span<const std::uint8_t> Payload(const std::size_t view) const noexcept { return mPlayers[view].payload; }
     /** `view`'s print lines of the last beat. */
     [[nodiscard]] const std::vector<std::string>& Prints(const std::size_t view) const noexcept { return mPlayers[view].prints; }
+    /** Calls a fanned-out function made to an engine function not known to only read (should stay 0). */
+    [[nodiscard]] std::uint64_t FanOutViolations() const noexcept { return mFanOutViolations; }
+    /** Counts and logs one such call; on the sim's thread. */
+    void NoteFanOutViolation(const char* name);
     /** Writes of keys `SyncKeyRoutes` doesn't list, which only observers get. */
     [[nodiscard]] std::uint64_t UnknownKeyWrites() const noexcept { return mUnknownKeyWrites; }
 
@@ -131,6 +135,7 @@ namespace faf::remote
     std::vector<std::uint8_t> mScratch;
     std::vector<std::pair<std::uint32_t, std::int32_t>> mOwners; // sim id -> army, by id: who got its unit data
     std::uint64_t mUnknownKeyWrites = 0;
+    std::uint64_t mFanOutViolations = 0;
     std::vector<std::string> mLoggedKeys;
     std::string mDumpPrefix;
   };
