@@ -60,7 +60,15 @@ No finished game had a mismatch or crash. Games still running at the cutoff were
 
 So about 4 games per core holds at speed 0 and at +1. Past about 5 per core all games slow down together, small ones too, so a server has to refuse games before that point, and that isn't built yet. Nothing goes over a real network in these runs. 16 cores at 4 per core is 64 games, but no run has used 16 cores at once or any other CPU.
 
-The heaviest games need CPUs of their own rather than a share of a core; see `--cpus` in [Switches](SWITCHES.md).
+The heaviest games need CPUs of their own rather than a share of a core (`--cpus` in [Switches](SWITCHES.md)). These ran one game at a time at 79 ms per beat, with parallel views, on real cores of the same CPU, while other jobs used the machine at a load of about 10:
+
+| Replay | Cores | Sim workers | Behind | Worst 30 s | Peak memory |
+|---|---|---|---|---|---|
+| 26978344, 8v8, 16 views | 8 | 7 | 0.44 % | 82.1 ms | 907 MB |
+| 26978344, 8v8, 16 views | 4 | 3 | 5.0 % | 97.6 ms | 882 MB |
+| 26885749, 12 players, 12 views | 4 | 3 | 0.10 % | 79.8 ms | 520 MB |
+
+So 8 cores hold the heaviest game known at about +1, and 4 cores hold it at speed 0, with 95 windows of 10 s just over 100 ms near the end. All three had 0 mismatches.
 
 ## How it stays exact
 
