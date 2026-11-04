@@ -671,6 +671,7 @@ namespace faf::headless
         return result;
       }
       viewBench->SetParallel(options.parallelViews);
+      viewBench->EnablePipeline(static_cast<unsigned int>(options.viewPipelineThreads));
       if (options.luaRouting) {
         viewBench->EnableLuaRouting(options.luaRoutingDump);
         if (options.spy) {
@@ -1038,6 +1039,7 @@ namespace faf::headless
       result.viewFramesFailures = viewFrames->Failures();
     }
     if (viewBench) {
+      (void)viewBench->FinishViews();
       result.viewBenchSummary = viewBench->Summary();
       result.viewBenchFailures = viewBench->Failures();
     }

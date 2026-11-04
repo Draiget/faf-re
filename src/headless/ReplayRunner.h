@@ -47,6 +47,7 @@ namespace faf::headless
     int focusSwitchBeat = -1;    // at this beat the sim's focus moves to `focusSwitchArmy`, as a lockstep client's does
     int focusSwitchArmy = 0;
     std::string syncDumpPath;    // when set: each beat's Lua `Sync` bytes go here
+    int viewPipelineThreads = 0; // with `viewBenchPath`: threads that finish the views while the sim goes on
     bool parallelViews = false;  // with `viewFramesPath`, `viewBenchPath` or `viewPacketsPath`: views built on the sim's workers
     bool keepClientData = false; // keep what only a client reads (`--keep-client-data`)
     bool viewBenchCheck = false; // with `viewBenchPath`: each held frame is compared with the whole one
