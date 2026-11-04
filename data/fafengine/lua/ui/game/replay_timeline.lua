@@ -111,9 +111,32 @@ local function DoScrub(targetTick)
     end
 end
 
+local controls = {
+    timeline = false,
+    overlay = false,
+    pendingTarget = false,
+    pendingFrames = 0,
+}
+
 local function DoCancelScrub()
-    if is_callable(CancelReplayScrub) then
-        pcall(CancelReplayScrub)
+    LOG("FAFENGINE: DoCancelScrub called")
+    if controls then
+        controls.pendingTarget = false
+        controls.pendingFrames = 0
+        if controls.overlay then
+            controls.overlay._minHoldTimer = 0
+            controls.overlay:HideOverlay()
+        end
+    end
+    local fn = rawget(_G, 'CancelReplayScrub')
+    if not fn and is_callable(CancelReplayScrub) then
+        fn = CancelReplayScrub
+    end
+    if is_callable(fn) then
+        LOG("FAFENGINE: Calling CancelReplayScrub()")
+        pcall(fn)
+    else
+        WARN("FAFENGINE: CancelReplayScrub not callable!")
     end
 end
 
@@ -132,19 +155,17 @@ end
 local ScrubbingOverlay = ClassUI(Group) {
     __init = function(self, parent)
         Group.__init(self, parent, "ScrubbingModalOverlay")
-        if self.SetRenderPass and UIUtil and UIUtil.UIRP_PostGlow then
-            self:SetRenderPass(UIUtil.UIRP_PostGlow)
-        end
         LayoutHelpers.FillParent(self, parent)
-        self.Depth:Set(10000)
+        self.Depth:Set(20000)
 
         self._escPushed = false
+        self._minHoldTimer = 0
 
         -- Semi-transparent dim background covering full screen (matching SupCom popup shadow)
         self.dimBg = Bitmap(self)
         LayoutHelpers.FillParent(self.dimBg, self)
-        self.dimBg:SetSolidColor('78000000')
-        self.dimBg.Depth:Set(function() return self.Depth() end)
+        self.dimBg:SetSolidColor('98000000')
+        self.dimBg.Depth:Set(function() return self.Depth() + 1 end)
         self.dimBg.HandleEvent = function(control, event)
             -- Intercept mouse clicks while scrubbing
             return true
@@ -156,16 +177,19 @@ local ScrubbingOverlay = ClassUI(Group) {
         LayoutHelpers.AtCenterIn(self.dialog, self)
         self.dialog.Depth:Set(function() return self.Depth() + 10 end)
 
-        -- Authentic Supreme Commander dialog border
+        -- Solid dark background for the dialog (pass clicks through to buttons)
+        self.dialogBg = Bitmap(self.dialog)
+        LayoutHelpers.FillParent(self.dialogBg, self.dialog)
+        self.dialogBg:SetSolidColor('f0101520')
+        self.dialogBg.Depth:Set(function() return self.dialog.Depth() + 1 end)
+        self.dialogBg:DisableHitTest(true)
+
+        -- Authentic Supreme Commander dialog border (pass clicks through)
         if UIUtil and is_callable(UIUtil.CreateNinePatchStd) then
             local bgPatch = UIUtil.CreateNinePatchStd(self.dialog, '/scx_menu/lan-game-lobby/dialog/background/')
             LayoutHelpers.FillParentFixedBorder(bgPatch, self.dialog, 32)
-            LayoutHelpers.DepthUnderParent(bgPatch, self.dialog, 2)
-        else
-            self.dialogBg = Bitmap(self.dialog)
-            LayoutHelpers.FillParent(self.dialogBg, self.dialog)
-            self.dialogBg:SetSolidColor('f8101520')
-            self.dialogBg.Depth:Set(function() return self.dialog.Depth() end)
+            LayoutHelpers.DepthUnderParent(bgPatch, self.dialog, 1)
+            bgPatch:DisableHitTest(true)
         end
 
         -- Title text in SupCom title font
@@ -209,40 +233,42 @@ local ScrubbingOverlay = ClassUI(Group) {
         self.cancelButton = UIUtil.CreateButtonWithDropshadow(self.dialog, '/BUTTON/medium/', "<LOC _Cancel>Cancel")
         LayoutHelpers.Below(self.cancelButton, self.barTrack, 16)
         LayoutHelpers.AtHorizontalCenterIn(self.cancelButton, self.dialog)
-        self.cancelButton.Depth:Set(function() return self.dialog.Depth() + 5 end)
+        self.cancelButton.Depth:Set(function() return self.dialog.Depth() + 50 end)
+        self.cancelButton:EnableHitTest()
         self.cancelButton.OnClick = function(btn)
+            LOG("FAFENGINE: Cancel button clicked!")
             DoCancelScrub()
-            self:HideOverlay()
-        end
-
-        -- Key event intercept (ESC to cancel)
-        self.HandleEvent = function(control, event)
-            if event.Type == 'KeyDown' and event.KeyCode == 27 then -- ESC
-                DoCancelScrub()
-                self:HideOverlay()
-                return true
-            end
-            return true
         end
 
         self:Hide()
     end,
 
     ShowOverlay = function(self, targetTick)
-        if not self:IsHidden() then
-            return
-        end
+        LOG("FAFENGINE: ShowOverlay called for targetTick=" .. tostring(targetTick))
         local curTick = GetCurrentTick()
         self._isRewind = (targetTick and targetTick < curTick)
-        if targetTick then
-            if self._isRewind then
+        if self._isRewind then
+            self.titleText:SetText("REWINDING REPLAY")
+            if targetTick then
                 self.targetText:SetText(string.format("Rewinding to %s", FormatTicks(targetTick)))
             else
+                self.targetText:SetText("Rewinding...")
+            end
+        else
+            self.titleText:SetText("FAST-FORWARDING REPLAY")
+            if targetTick then
                 self.targetText:SetText(string.format("Advancing to %s", FormatTicks(targetTick)))
+            else
+                self.targetText:SetText("Advancing...")
             end
         end
         self.barFill.Width:Set(0)
         self.percentText:SetText("0%")
+        self._minHoldTimer = 0
+
+        if not self:IsHidden() then
+            return
+        end
 
         -- Intercept ESC key via EscapeHandler stack
         if not self._escPushed then
@@ -260,10 +286,24 @@ local ScrubbingOverlay = ClassUI(Group) {
         self:Show()
     end,
 
+    OnScrubFinished = function(self, targetTick)
+        LOG("FAFENGINE: OnScrubFinished for targetTick=" .. tostring(targetTick))
+        local totalTrackWidth = self.barTrack.Width()
+        self.barFill.Width:Set(totalTrackWidth)
+        self.percentText:SetText(string.format("100%% (%s)", FormatTicks(targetTick or 0)))
+        if self._isRewind then
+            self.targetText:SetText(string.format("Rewound to %s", FormatTicks(targetTick or 0)))
+        else
+            self.targetText:SetText(string.format("Advanced to %s", FormatTicks(targetTick or 0)))
+        end
+        self._minHoldTimer = 0.3
+    end,
+
     HideOverlay = function(self)
         if self:IsHidden() then
             return
         end
+        LOG("FAFENGINE: HideOverlay called")
         if self._escPushed then
             self._escPushed = false
             EscapeHandler.PopEscapeHandler()
@@ -277,8 +317,10 @@ local ScrubbingOverlay = ClassUI(Group) {
         end
         if prog.targetTick then
             if self._isRewind then
+                self.titleText:SetText("REWINDING REPLAY")
                 self.targetText:SetText(string.format("Rewinding to %s", FormatTicks(prog.targetTick)))
             else
+                self.titleText:SetText("FAST-FORWARDING REPLAY")
                 self.targetText:SetText(string.format("Advancing to %s", FormatTicks(prog.targetTick)))
             end
         end
@@ -294,10 +336,7 @@ local ScrubbingOverlay = ClassUI(Group) {
     end,
 }
 
-local controls = {
-    timeline = false,
-    overlay = false,
-}
+
 
 --- Build replay timeline bar styled for Supreme Commander
 ---@param parent Control
@@ -470,15 +509,21 @@ function CreateReplayTimeline(parent)
             end
         end
 
-        LOG(string.format("FAFENGINE: Timeline seeking replay from tick %d to tick %d", curTick, targetTick))
-        LOG("FAFENGINE: Calling DoScrub")
-        DoScrub(targetTick)
-        LOG("FAFENGINE: Returned from DoScrub")
-        if controls.overlay then
-            LOG("FAFENGINE: Calling controls.overlay:ShowOverlay")
-            controls.overlay:ShowOverlay(targetTick)
-            LOG("FAFENGINE: Returned from ShowOverlay")
+        -- Ignore repeated clicks while scrub/seek is active or scheduled
+        if controls.pendingTarget ~= false or IsScrubbing() then
+            return
         end
+
+        LOG(string.format("FAFENGINE: Timeline seeking replay from tick %d to tick %d", curTick, targetTick))
+
+        -- Show overlay immediately so the user gets instant visual feedback
+        if controls.overlay then
+            controls.overlay:ShowOverlay(targetTick)
+        end
+
+        -- Schedule DoScrub after 3 frames so Direct3D presents the overlay before synchronous work
+        controls.pendingTarget = targetTick
+        controls.pendingFrames = 3
     end
 
     local isAutoScrub = false
@@ -520,6 +565,29 @@ function CreateReplayTimeline(parent)
         local total = GetTotalTicks()
         local curTick = GetCurrentTick()
 
+        if controls.overlay and controls.overlay._minHoldTimer and controls.overlay._minHoldTimer > 0 then
+            controls.overlay._minHoldTimer = controls.overlay._minHoldTimer - deltaTime
+        end
+
+        if controls.pendingTarget ~= false then
+            if controls.pendingFrames > 0 then
+                controls.pendingFrames = controls.pendingFrames - 1
+            else
+                local target = controls.pendingTarget
+                controls.pendingTarget = false
+                LOG(string.format("FAFENGINE: Executing scheduled DoScrub(%d)", target))
+                DoScrub(target)
+                -- Only call OnScrubFinished if scrubbing is not actively running
+                -- (i.e. we rewound directly to tick 1 and no forward fast-forward is needed).
+                -- When fast-forwarding, UpdateProgress will smoothly track progress from 0% to 100%.
+                if not IsScrubbing() then
+                    if controls.overlay then
+                        controls.overlay:OnScrubFinished(target)
+                    end
+                end
+            end
+        end
+
         if isAutoScrub then
             local isScrub = IsScrubbing()
             if autoScrubCooldown > 0 then
@@ -534,13 +602,16 @@ function CreateReplayTimeline(parent)
 
             if autoScrubCooldown <= 0 then
                 if isShortScrub then
-                    if autoScrubStep == 0 and curTick >= 300 and not isScrub then
-                        autoScrubStep = 2
-                        autoScrubCooldown = 1.0
+                    if autoScrubStep == 0 and curTick >= 300 and not isScrub and controls.pendingTarget == false then
+                        autoScrubStep = 1
+                        autoScrubCooldown = 0.5
                         LOG(string.format("AUTOTEST: Step 1 -> Seeking back to tick 1 (base snapshot at beat 1) from tick %d", curTick))
                         slider:OnValueSet(1)
-                        LOG("AUTOTEST: Step 1 COMPLETE at tick 1! Now Step 2 -> Playing forward to tick 300")
-                    elseif autoScrubStep == 2 and not isScrub and curTick >= 300 then
+                    elseif autoScrubStep == 1 and not isScrub and controls.pendingTarget == false and curTick < 50 then
+                        autoScrubStep = 2
+                        autoScrubCooldown = 0.5
+                        LOG(string.format("AUTOTEST: Step 1 COMPLETE at tick %d! Now Step 2 -> Playing forward to tick 300", curTick))
+                    elseif autoScrubStep == 2 and not isScrub and controls.pendingTarget == false and curTick >= 300 then
                         autoScrubStep = 3
                         LOG(string.format("AUTOTEST: SUCCESS! Reached tick %d after rewind to base snapshot! Test passed!", curTick))
                         local exitApp = rawget(_G, 'ExitApplication') or ExitApplication
@@ -597,15 +668,16 @@ function CreateReplayTimeline(parent)
                 tostring(total), tostring(curTick)))
         end
 
-        local scrubbing = IsScrubbing()
+        local minHoldActive = controls.overlay and controls.overlay._minHoldTimer and (controls.overlay._minHoldTimer > 0)
+        local scrubbing = IsScrubbing() or (controls.pendingTarget ~= false) or minHoldActive
         if scrubbing then
             local prog = GetScrubProgress()
             if controls.overlay then
                 if controls.overlay:IsHidden() then
-                    local target = (prog and prog.targetTick) or slider:GetValue()
+                    local target = controls.pendingTarget or (prog and prog.targetTick) or slider:GetValue()
                     controls.overlay:ShowOverlay(target)
                 end
-                if prog then
+                if prog and controls.pendingTarget == false and not minHoldActive then
                     controls.overlay:UpdateProgress(prog)
                 end
             end
@@ -627,6 +699,8 @@ function CreateReplayTimeline(parent)
             controls.overlay:Destroy()
             controls.overlay = false
         end
+        controls.pendingTarget = false
+        controls.pendingFrames = 0
         controls.timeline = false
     end
 
