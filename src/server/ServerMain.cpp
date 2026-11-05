@@ -63,7 +63,9 @@
 #include "moho/sim/WldSessionInfo.h"
 #include "platform/X87Precision.h"
 #include "remote/net/UdpSocket.h"
+#include "remote/ContentTables.h"
 #include "server/ServerNet.h"
+#include "server/ServerViews.h"
 #include "server/SpeedWatch.h"
 
 namespace
@@ -81,7 +83,7 @@ namespace
 
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>]\n";
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
   // `net_Lag` is 500 ms in a lockstep game, time for every player's beats to arrive. Here it's only the
@@ -399,6 +401,7 @@ namespace
     const double statusSeconds = 60.0 * (ReadOption("--status-minutes", text) ? std::atof(text.c_str()) : kDefaultStatusMinutes);
     const float warnBeatMs = ReadOption("--warn-beat-ms", text) ? static_cast<float>(std::atof(text.c_str())) : kDefaultWarnBeatMs;
     const std::string resultPath = outDir + "/result.json";
+    const int viewThreads = ReadOption("--view-threads", text) ? std::atoi(text.c_str()) : 2;
     const float leadMs = ReadOption("--lead-ms", text) ? static_cast<float>(std::atof(text.c_str())) : kDefaultLeadMs;
     faf::server::SServerNetConfig netConfig;
     const bool listening = ReadOption("--listen", text);
@@ -511,7 +514,34 @@ namespace
     std::unique_ptr<moho::RRuleGameRules> rules(gameData.mGameRules);
     std::unique_ptr<moho::CWldMap> wldMap(gameData.mWldMap);
     gameData = moho::SWldGameData{};
-    (void)faf::headless::CompleteSessionLaunchInfo(*sessionInfo, *rules, *wldMap, *sessionState);
+    moho::STIMap* const launchMap = faf::headless::CompleteSessionLaunchInfo(*sessionInfo, *rules, *wldMap, *sessionState);
+    const Wm3::AxisAlignedBox3f mapBounds = launchMap->GetBounds3D();
+    const float mapSizeX = mapBounds.Max.x - mapBounds.Min.x;
+    const float mapSizeZ = mapBounds.Max.z - mapBounds.Min.z;
+
+    // Each player's view, before the driver: the sync walk's observer sees the sim from its first beat.
+    const faf::remote::wire::SContentTables contentTables = faf::remote::BuildContentTables(*rules);
+    std::unique_ptr<faf::server::CServerViews> views;
+    if (net && !roster.Remotes().empty()) {
+      std::map<std::size_t, std::int32_t> viewPlayers;
+      const auto& armies = sessionInfo->mLaunchInfo->mArmyLaunchInfo;
+      for (const moho::SLaunchClient& client : roster.Remotes()) {
+        for (std::size_t army = 0; army < armies.size(); ++army) {
+          if (armies[army].mUnitSources.Contains(client.commandSource)) {
+            viewPlayers[army] = client.uid;
+            break;
+          }
+        }
+        std::vector<std::uint8_t> gameInfo;
+        gameInfo.push_back(static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::GameInfo));
+        const float sizes[2] = {mapSizeX, mapSizeZ};
+        const auto* const sizeBytes = reinterpret_cast<const std::uint8_t*>(sizes);
+        gameInfo.insert(gameInfo.end(), sizeBytes, sizeBytes + sizeof(sizes));
+        net->QueueView(client.uid, std::move(gameInfo));
+      }
+      views = std::make_unique<faf::server::CServerViews>(contentTables, mapSizeX, mapSizeZ, *net, std::move(viewPlayers), static_cast<unsigned int>(std::max(viewThreads, 1)));
+      views->Install();
+    }
     sessionInfo->mLaunchInfo->mCommandSources.mOriginalSource = -1;
 
     const std::string replayPath = outDir + "/game.scfareplay";
@@ -556,6 +586,7 @@ namespace
     bool stopped = false;
     bool stalled = false;
     int statusBeats = 0;
+    std::uint64_t statusNetBytes = 0;
     double nextBeatAt = 0.0;
     std::array<std::pair<double, int>, 10> beatHistory{};
     std::size_t beatSamples = 0;
@@ -600,8 +631,11 @@ namespace
 
       if (statusSeconds > 0.0 && elapsed - lastStatus >= statusSeconds) {
         const double beatsPerSecond = (end.beats - statusBeats) / (elapsed - lastStatus);
-        Say("Status: game time %s, real time %s, speed %+d (requested %+d), %.1f beats/s, a beat takes %.0f ms, memory %ld MB, %lu warnings in the log",
-            GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(elapsed).c_str(), speed, requested, beatsPerSecond, beatMs, ResidentMegabytes(), warnings.Count());
+        const std::uint64_t netBytes = net ? net->BytesSent() : 0u;
+        Say("Status: game time %s, real time %s, speed %+d (requested %+d), %.1f beats/s, a beat takes %.0f ms, memory %ld MB, %.0f KB/s to players, %lu warnings in the log",
+            GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(elapsed).c_str(), speed, requested, beatsPerSecond, beatMs, ResidentMegabytes(),
+            static_cast<double>(netBytes - statusNetBytes) / 1024.0 / (elapsed - lastStatus), warnings.Count());
+        statusNetBytes = netBytes;
         lastStatus = elapsed;
         statusBeats = end.beats;
       }
@@ -732,6 +766,12 @@ namespace
     }
     // `WLD_Teardown`: the driver stops and gives up the packets it holds, which finishes the replay.
     driver->ShutDown();
+    if (views) {
+      if (views->Failures() != 0u) {
+        Say("WARNING: %llu view lanes didn't encode", static_cast<unsigned long long>(views->Failures()));
+      }
+      views->Uninstall();
+    }
     while (driver->HasSyncData()) {
       moho::SSyncData* rawPacket = nullptr;
       driver->GetSyncData(rawPacket);

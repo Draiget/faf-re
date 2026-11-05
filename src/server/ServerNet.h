@@ -51,6 +51,11 @@ namespace faf::server
     /** Stops the thread; no seat is touched after this returns. */
     void Stop();
 
+    /** A reliable message for a player, in order, from any thread: it waits until they've joined. */
+    void QueueView(std::int32_t uid, std::vector<std::uint8_t> message);
+    /** Bytes sent to all players so far. */
+    [[nodiscard]] std::uint64_t BytesSent() const noexcept { return mBytesSent.load(std::memory_order_relaxed); }
+
     /** The newest beat, for the players. */
     void NoteBeat(std::int32_t beat) noexcept { mBeat.store(beat, std::memory_order_relaxed); }
 
@@ -70,13 +75,17 @@ namespace faf::server
       bool loaded = false;
       bool lost = false;
       bool gone = false;
+      // A returning player has lost the frames the next one is encoded against (WP14).
+      bool viewBroken = false;
       std::uint64_t lostAtUs = 0;
+      std::uint64_t bytesSeen = 0; // its channel's count; a new channel starts again
     };
 
     void Run();
     void Tick(std::uint64_t nowUs);
     void Remove(std::int32_t uid, SSeat& seat, const std::string& why);
     void Say(std::string line);
+    void SendViews();
 
     void OnJoined(std::int32_t uid, const remote::net::SEndpoint& from, bool returning) override;
     void OnMessage(std::int32_t uid, const std::vector<std::uint8_t>& message) override;
@@ -97,6 +106,11 @@ namespace faf::server
     std::uint64_t mBadMessages = 0;
     // `OnMessage` runs inside the links' pass over their players, so they go once it's over.
     std::vector<std::int32_t> mToUnlink;
+
+    std::atomic<std::uint64_t> mBytesSent{0};
+    std::mutex mViewLock;
+    std::map<std::int32_t, std::vector<std::vector<std::uint8_t>>> mViewQueue;
+    std::vector<std::vector<std::uint8_t>> mViewSending;
 
     std::mutex mNewsLock;
     std::vector<std::string> mNews;

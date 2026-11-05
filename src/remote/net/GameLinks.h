@@ -31,6 +31,13 @@ namespace faf::remote::net
     Leaving = 3,
     /** Server to player, unreliable: the newest beat, varint. */
     Beat = 4,
+    /**
+     * Server to player, reliable, one per beat: varints beat and entities in the frame, then the frame, army,
+     * grid and Lua lanes, each a varint size and its bytes (remote/ViewLanes.h).
+     */
+    View = 5,
+    /** Server to player, reliable, once before any view: the map's size, x and z, as two 32-bit floats. */
+    GameInfo = 6,
   };
 
   struct SGameLinkStats
@@ -81,6 +88,8 @@ namespace faf::remote::net
 
     [[nodiscard]] const SGameLinkStats& Stats() const noexcept { return mStats; }
     [[nodiscard]] const ChannelStats* StatsOf(std::int32_t uid) const;
+    /** Reliable bytes the uid hasn't acknowledged. */
+    [[nodiscard]] std::uint64_t ReliableUnacked(std::int32_t uid) const;
 
   private:
     struct SPlayer

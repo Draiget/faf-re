@@ -1,27 +1,34 @@
 // Engine addition, dedicated server: a stand-in for a player, to try a game server over a real socket
 // without a game. It joins with a uid and token, says it has loaded, and at the given seconds sends
-// commands, vanishes or leaves. Prints one line per event, then what it saw.
+// commands, vanishes or leaves. Every view it receives is decoded, as a client would, and checked against
+// the entity count the server sent with it. Prints one line per event, then what it saw.
 //
 // Build: cmake --build --preset linux-clang-x64-release-plain --target faf_server_probe
-// Exit code: 0 joined and saw beats, 1 refused, 2 never got in or saw no beats, 3 bad arguments.
+// Exit code: 0 joined and saw beats, 1 refused, 2 never got in, saw no beats or a view that didn't decode,
+// 3 bad arguments.
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <span>
 #include <string>
 #include <thread>
 #include <vector>
 
 #include "remote/net/Datagram.h"
+#include "remote/FrameWindow.h"
+#include "remote/ViewLanes.h"
 #include "remote/net/GameLinks.h"
+#include "remote/wire/EntityFrame.h"
 
 using namespace faf::remote::net;
 
 namespace
 {
-  // moho/net/ECmdStreamOp.h; this tool links no engine code.
+  // moho/net/ECmdStreamOp.h.
   constexpr std::uint8_t kOpAdvance = 0;
   constexpr std::uint8_t kOpRequestPause = 4;
   constexpr std::uint8_t kOpResume = 5;
@@ -100,6 +107,67 @@ namespace
     (void)link.SendReliable(message.data(), message.size());
   }
 
+  /** What the player's game would do with its views, as far as a frame goes. */
+  struct SViews
+  {
+    faf::remote::wire::SFrameCodec codec;
+    faf::remote::CClientFrameWindow window;
+    bool haveInfo = false;
+    std::uint64_t views = 0;
+    std::uint64_t failed = 0;
+    std::uint64_t bytes = 0;
+    std::uint64_t frameBytes = 0;
+    std::uint64_t lastEntities = 0;
+    std::uint64_t lastBeat = 0;
+    std::uint64_t maxMessage = 0;
+    double firstAt = -1.0;
+    double lastAt = 0.0;
+  };
+
+  void TakeView(SViews& out, const std::vector<std::uint8_t>& message, const double elapsed)
+  {
+    if (message.empty()) {
+      return;
+    }
+    if (message[0] == static_cast<std::uint8_t>(ESeatMessage::GameInfo) && message.size() == 1u + 2u * sizeof(float)) {
+      float sizes[2] = {};
+      std::memcpy(sizes, message.data() + 1, sizeof(sizes));
+      out.codec = faf::remote::MakeViewCodec(sizes[0], sizes[1]);
+      out.haveInfo = true;
+      return;
+    }
+    if (message[0] != static_cast<std::uint8_t>(ESeatMessage::View)) {
+      return;
+    }
+    ++out.views;
+    out.bytes += message.size();
+    out.maxMessage = std::max<std::uint64_t>(out.maxMessage, message.size());
+    out.firstAt = out.firstAt < 0.0 ? elapsed : out.firstAt;
+    out.lastAt = elapsed;
+
+    ByteReader reader(message.data() + 1, message.size() - 1u);
+    const std::uint64_t beat = reader.Varint();
+    const std::uint64_t entities = reader.Varint();
+    const std::uint64_t frameSize = reader.Varint();
+    const std::uint8_t* const frame = reader.Bytes(frameSize);
+    bool ok = reader.Ok() && out.haveInfo;
+    // The other lanes' sizes must add up to the message, to its last byte.
+    for (int lane = 0; lane < 3 && ok; ++lane) {
+      const std::uint64_t size = reader.Varint();
+      (void)reader.Bytes(size);
+      ok = reader.Ok();
+    }
+    ok = ok && reader.AtEnd();
+    if (ok) {
+      faf::remote::wire::SViewFrame decoded;
+      ok = out.window.Decode(std::span<const std::uint8_t>(frame, frameSize), out.codec, decoded) && decoded.entities.size() == entities;
+      out.frameBytes += frameSize;
+      out.lastEntities = entities;
+      out.lastBeat = beat;
+    }
+    out.failed += ok ? 0u : 1u;
+  }
+
   /** Each scheduled action once, when its time has come. */
   [[nodiscard]] bool Due(double& at, const double elapsed) noexcept
   {
@@ -138,6 +206,7 @@ int main(const int argc, char** const argv)
   std::uint64_t lastBeat = 0;
   std::uint64_t joins = 0;
   std::vector<std::uint8_t> message;
+  SViews views;
 
   for (;;) {
     const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
@@ -176,6 +245,9 @@ int main(const int argc, char** const argv)
         const auto kind = static_cast<std::uint8_t>(ESeatMessage::Loaded);
         (void)link.SendReliable(&kind, 1u);
       }
+    }
+    while (link.TakeReliable(message)) {
+      TakeView(views, message, elapsed);
     }
     while (link.TakeUnreliable(message)) {
       if (!message.empty() && message[0] == static_cast<std::uint8_t>(ESeatMessage::Beat)) {
@@ -225,8 +297,15 @@ int main(const int argc, char** const argv)
   }
 
   std::printf("probe %d: joined %llu times, %llu beat messages, last beat %llu\n", options.uid, static_cast<unsigned long long>(joins), static_cast<unsigned long long>(beatMessages), static_cast<unsigned long long>(lastBeat));
+  const double viewSeconds = views.lastAt - views.firstAt;
+  std::printf(
+    "probe %d: %llu views, %llu didn't decode, last at beat %llu with %llu entities, %.1f KB/s (frames %.1f), largest %llu bytes\n", options.uid,
+    static_cast<unsigned long long>(views.views), static_cast<unsigned long long>(views.failed), static_cast<unsigned long long>(views.lastBeat),
+    static_cast<unsigned long long>(views.lastEntities), viewSeconds > 0.0 ? static_cast<double>(views.bytes) / 1024.0 / viewSeconds : 0.0,
+    viewSeconds > 0.0 ? static_cast<double>(views.frameBytes) / 1024.0 / viewSeconds : 0.0, static_cast<unsigned long long>(views.maxMessage)
+  );
   if (refused) {
     return 1;
   }
-  return joins > 0u && beatMessages > 0u ? 0 : 2;
+  return joins > 0u && beatMessages > 0u && views.failed == 0u ? 0 : 2;
 }

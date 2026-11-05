@@ -222,6 +222,12 @@ namespace faf::remote::net
     return found != mPlayers.end() && found->second.channel ? &found->second.channel->Stats() : nullptr;
   }
 
+  std::uint64_t CServerLinks::ReliableUnacked(const std::int32_t uid) const
+  {
+    const auto found = mPlayers.find(uid);
+    return found != mPlayers.end() && found->second.channel ? found->second.channel->ReliableUnacked() : 0u;
+  }
+
   CClientLink::CClientLink(const std::int32_t uid, const Token& token, const SEndpoint& server, const ChannelConfig& channel)
     : mUid(uid)
     , mToken(token)

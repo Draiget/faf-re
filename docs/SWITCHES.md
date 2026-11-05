@@ -327,6 +327,7 @@ The match file is Lua that sets `MatchConfig`, the table `CLobby.LaunchGame` tak
 | `--timeout <minutes>` | 240 | Give up after this much real time; exit code 3 |
 | `--status-minutes <n>` | 10 | A status line this often; 0 for none |
 | `--warn-beat-ms <n>` | 90 | Warn when the sim's median beat takes this long; speed -1 starts past 100 ms |
+| `--view-threads <n>` | 2 | With `--listen`: threads of their own for the players' views, so the sim goes on meanwhile |
 | `--lead-ms <n>` | 150 | How far ahead of its schedule the sim works, which a player's command waits for. A lockstep game's `net_Lag` is 500 |
 | `--listen <ip:port>` | off | Take players over UDP. Each human player needs a token in `MatchTokens` |
 | `--join-seconds <n>` | 120 | With `--listen`: how long to wait for players. Who hasn't joined by then is ejected, and if nobody came the server exits with 2 |
@@ -354,7 +355,7 @@ Between those lines it stays quiet. The speed shown is what the game really did 
 
 The server holds the requested speed by taking each beat when it is due. A sim too slow for that runs as fast as it can, with no drop to a whole slower step as in a lockstep game, and after a slow stretch it runs fast for up to 1 s to make up the time.
 
-A human player in the match file gets a seat. Every beat is queued on every seat at once, so a player can never hold the game up, and a player may send orders, sim callbacks, unit info and pause requests only: beats, checksums, command sources, cheat and debug commands are refused. Without `--listen` seats stay empty and silent. Players connect but see no game yet, as the server sends them only the beat number; a game client can't join until views go over the network.
+A human player in the match file gets a seat. Every beat is queued on every seat at once, so a player can never hold the game up, and a player may send orders, sim callbacks, unit info and pause requests only: beats, checksums, command sources, cheat and debug commands are refused. Without `--listen` seats stay empty and silent. Each player gets their own view every beat, on the reliable stream, so a lost datagram costs a resend's wait and never a wrong picture. A player who reconnects gets no view yet, and one who falls 16 MB behind is ejected. No game client can join yet: it needs the client's half.
 
 `MatchTokens` in the match file holds each human player's secret by `OwnerID`, outside `MatchConfig`, so it stays out of the replay and away from the other players. The token never goes on the wire: it keys a proof and, with an X25519 exchange, the channel's encryption keys. A forged source address costs the server nothing, as it answers with a stateless cookie and sends less than it got. `tools/server-probe` (`faf_server_probe`) plays a player over a real socket: it joins, pauses, sends forged commands, vanishes, comes back or leaves.
 

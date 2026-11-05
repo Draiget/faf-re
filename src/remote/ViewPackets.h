@@ -73,6 +73,8 @@ namespace faf::remote
      * view's packet and frame stay empty (`HasView`).
      */
     void SkipCivilianViews() noexcept { mSkipCivilians = true; }
+    /** Builds views only for the armies of these bits from the next beat on: a game server's players. */
+    void SetViewArmies(const std::uint32_t armies) noexcept { mViewArmies = armies; }
     /** Whether the last beat built `army`'s view. */
     [[nodiscard]] bool HasView(std::int32_t army) const { return mHasView[static_cast<std::size_t>(army)] != 0u; }
     /** Wall time spent building views since the start, in seconds (`AddBuildTime`). */
@@ -157,6 +159,7 @@ namespace faf::remote
   private:
     std::vector<std::unique_ptr<moho::SSyncData>> mPackets;
     std::vector<std::uint8_t> mHasView; // per army: its view is built (written on the sim thread)
+    std::uint32_t mViewArmies = 0xFFFFFFFFu;
     std::vector<std::vector<SDirectUpdate>> mDirect;
     bool mDirectUpdates = false;
     CSharedEntityRecords* mSharedRecords = nullptr;

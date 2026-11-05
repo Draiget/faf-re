@@ -16,6 +16,8 @@ namespace faf::server
     constexpr int kWaitMilliseconds = 5;
     // A stream message: type, 2 bytes of whole size, payload (moho/net/CMessage.h).
     constexpr std::size_t kCommandHeaderBytes = 3;
+    // About a minute of a big game's views: past this a player isn't keeping up, and holds memory for nothing.
+    constexpr std::uint64_t kMaxUnackedViewBytes = 16u * 1024u * 1024u;
 
     [[nodiscard]] std::uint64_t NowUs() noexcept
     {
@@ -64,8 +66,47 @@ namespace faf::server
       mNowUs = NowUs();
       // Time since the start, as a cookie's period counts from 0.
       mLinks.Pump(mNowUs - mStartUs, *this);
+      SendViews();
       Tick(mNowUs);
       mLinks.Wait(kWaitMilliseconds);
+    }
+  }
+
+  void CServerNet::QueueView(const std::int32_t uid, std::vector<std::uint8_t> message)
+  {
+    const std::scoped_lock lock(mViewLock);
+    mViewQueue[uid].push_back(std::move(message));
+  }
+
+  void CServerNet::SendViews()
+  {
+    for (auto& [uid, seat] : mSeats) {
+      if (const remote::net::ChannelStats* const stats = mLinks.StatsOf(uid); stats != nullptr) {
+        seat.bytesSeen = stats->bytesSent < seat.bytesSeen ? 0u : seat.bytesSeen;
+        mBytesSent.fetch_add(stats->bytesSent - seat.bytesSeen, std::memory_order_relaxed);
+        seat.bytesSeen = stats->bytesSent;
+      }
+      // Before the player has a channel the messages wait, as the first of them make the rest readable.
+      if (!seat.joinedEver && !seat.gone) {
+        continue;
+      }
+      mViewSending.clear();
+      {
+        const std::scoped_lock lock(mViewLock);
+        const auto queue = mViewQueue.find(uid);
+        if (queue != mViewQueue.end()) {
+          mViewSending.swap(queue->second);
+        }
+      }
+      if (seat.gone || seat.lost || seat.viewBroken) {
+        continue;
+      }
+      for (const std::vector<std::uint8_t>& message : mViewSending) {
+        (void)mLinks.SendReliable(uid, message.data(), message.size());
+      }
+      if (mLinks.ReliableUnacked(uid) > kMaxUnackedViewBytes) {
+        Remove(uid, seat, "can't keep up with the game");
+      }
     }
   }
 
@@ -137,7 +178,8 @@ namespace faf::server
     SSeat& seat = found->second;
     seat.joinedEver = true;
     seat.lost = false;
-    Say(seat.name + (returning ? " is back, from " : " joined, from ") + from.Text());
+    seat.viewBroken = seat.viewBroken || returning;
+    Say(seat.name + (returning ? " is back, from " : " joined, from ") + from.Text() + (returning ? "; its view isn't resent yet" : ""));
   }
 
   void CServerNet::OnLost(const std::int32_t uid)
@@ -194,7 +236,9 @@ namespace faf::server
       Remove(uid, seat, "left");
       return;
     case remote::net::ESeatMessage::Beat:
-      break;
+    case remote::net::ESeatMessage::View:
+    case remote::net::ESeatMessage::GameInfo:
+      break; // the server's own to send
     }
     ++mBadMessages;
   }

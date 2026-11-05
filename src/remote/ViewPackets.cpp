@@ -119,7 +119,7 @@ namespace faf::remote
       out.mFocusArmy = static_cast<std::int32_t>(army);
       mDirect[army].clear();
       const moho::CArmyImpl* const owner = sim.mArmiesList[army];
-      mHasView[army] = army >= kMaxViews || (mSkipCivilians && owner != nullptr && owner->IsCivilian()) ? 0u : 1u;
+      mHasView[army] = army >= kMaxViews || (mSkipCivilians && owner != nullptr && owner->IsCivilian()) || (mViewArmies & (std::uint32_t{1} << army)) == 0u ? 0u : 1u;
     }
 
     if (mSharedRecords != nullptr) {

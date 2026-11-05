@@ -112,8 +112,6 @@ if(TARGET faf_netchannel)
   target_link_libraries(faf_netchannel_tests PRIVATE faf_netchannel faf_monocypher)
   add_executable(faf_gamelink_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/GameLinkTests.cpp")
   target_link_libraries(faf_gamelink_tests PRIVATE faf_netchannel faf_monocypher)
-  add_executable(faf_server_probe EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeMain.cpp")
-  target_link_libraries(faf_server_probe PRIVATE faf_netchannel faf_monocypher)
 endif()
 
 # --- faf_sim ----------------------------------------------------------------------------
@@ -286,6 +284,7 @@ target_link_options(headless PRIVATE -Wl,--error-limit=0)
 add_executable(server
   "${PROJECT_SOURCE_DIR}/src/server/ServerMain.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
   "${PROJECT_SOURCE_DIR}/src/headless/SessionLoad.cpp"
   "${PROJECT_SOURCE_DIR}/src/headless/ReplayLuaState.cpp"
 )
@@ -300,6 +299,11 @@ add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/serv
 target_link_libraries(faf_seat_tests PRIVATE faf_sim)
 target_compile_definitions(faf_seat_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_seat_tests PRIVATE -Wl,--error-limit=0)
+
+add_executable(faf_server_probe EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeMain.cpp")
+target_link_libraries(faf_server_probe PRIVATE faf_sim faf_netchannel faf_monocypher)
+target_compile_definitions(faf_server_probe PRIVATE FAF_SERVER_MODE=1)
+target_link_options(faf_server_probe PRIVATE -Wl,--error-limit=0)
 
 # --- faf_remote_tests -------------------------------------------------------------------
 # The wire format's tests (tests/remote/WireTests.cpp) on the Linux objects, as Windows'
