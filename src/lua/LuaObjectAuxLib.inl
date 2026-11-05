@@ -207,7 +207,7 @@
 			case LUA_TUSERDATA: {
 				gpg::RRef reference{};
 				GetRRefFromUserdata(&reference, state, 1);
-				const msvc8::string lexical = reference.GetLexical();
+				const fa::string lexical = reference.GetLexical();
 				std::sprintf(
 					rendered,
 					"userdata: %.80s at %p = %.80s",

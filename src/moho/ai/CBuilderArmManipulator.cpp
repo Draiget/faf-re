@@ -233,7 +233,7 @@ namespace moho
         // atan2(m02, m22) - the same heading extraction the disassembly of
         // CRotateManipulator::MoveManipulator (0x00643860) spells out at
         // 0x006438CD..0x00643925.
-        mHeadingCenter = msvc8::atan2(
+        mHeadingCenter = fa::atan2(
           ((ori.w * ori.y) + (ori.x * ori.z)) * 2.0f,
           1.0f - (((ori.x * ori.x) + (ori.y * ori.y)) * 2.0f)
         );
@@ -275,7 +275,7 @@ namespace moho
    * (0x006364A5..0x006364DD, 0x00636516..0x0063654A: `_CIfmod` by 2*pi, then
    * the +-2*pi fix-up), the same body as `CAimManipulator::SetFiringArc`. The
    * sums, differences and halvings run on the x87 stack, so they go through
-   * `msvc8::HalfSumX87` / `HalfAbsDifferenceX87`, and the centre reaches
+   * `fa::HalfSumX87` / `HalfAbsDifferenceX87`, and the centre reaches
    * `_CIfmod` unrounded (`NormalizeAngleSignedRadiansX87`).
    */
   void CBuilderArmManipulator::SetAimingArc(
@@ -287,13 +287,13 @@ namespace moho
     const float pitchMaxSlew
   )
   {
-    mHeadingCenter = NormalizeAngleSignedRadiansX87(msvc8::HalfSumX87(minHeading, maxHeading));
+    mHeadingCenter = NormalizeAngleSignedRadiansX87(fa::HalfSumX87(minHeading, maxHeading));
     mHeadingMaxSlew = headingMaxSlew;
-    mHeadingHalfArc = msvc8::HalfAbsDifferenceX87(maxHeading, minHeading);
+    mHeadingHalfArc = fa::HalfAbsDifferenceX87(maxHeading, minHeading);
 
-    mPitchCenter = NormalizeAngleSignedRadiansX87(msvc8::HalfSumX87(minPitch, maxPitch));
+    mPitchCenter = NormalizeAngleSignedRadiansX87(fa::HalfSumX87(minPitch, maxPitch));
     mPitchMaxSlew = pitchMaxSlew;
-    mPitchHalfArc = msvc8::HalfAbsDifferenceX87(maxPitch, minPitch);
+    mPitchHalfArc = fa::HalfAbsDifferenceX87(maxPitch, minPitch);
   }
 
   /**
@@ -389,15 +389,15 @@ namespace moho
     float* currentAngleLane = nullptr;
     if ((trackingModeFlags & kTrackingModeHeading) != 0u) {
       currentAngleLane = &mHeading;
-      desiredAngle = msvc8::atan2(transformedTarget.x, transformedTarget.z);
+      desiredAngle = fa::atan2(transformedTarget.x, transformedTarget.z);
     } else {
       const float halfCenter = angleCenter * kHalfScale;
       // `(cos, sin, 0, 0)` in memory - a scalar-first rotation about X, the
       // same pitch basis `CAimManipulator::CheckTracking` builds at
       // 0x00630ADC..0x00630AF0.
       Wm3::Quaternionf pitchBasis{};
-      pitchBasis.w = msvc8::cos(halfCenter);
-      pitchBasis.x = msvc8::sin(halfCenter);
+      pitchBasis.w = fa::cos(halfCenter);
+      pitchBasis.x = fa::sin(halfCenter);
       pitchBasis.y = 0.0f;
       pitchBasis.z = 0.0f;
 
@@ -489,9 +489,9 @@ namespace moho
 
       const float halfHeading = mHeading * kHalfScale;
       Wm3::Quaternionf headingRotation{};
-      headingRotation.w = msvc8::cos(halfHeading);
+      headingRotation.w = fa::cos(halfHeading);
       headingRotation.x = 0.0f;
-      headingRotation.y = msvc8::sin(halfHeading);
+      headingRotation.y = fa::sin(halfHeading);
       headingRotation.z = 0.0f;
       headingBone->Rotate(headingRotation);
     }
@@ -513,8 +513,8 @@ namespace moho
 
       const float halfPitch = (-mPitch) * kHalfScale;
       Wm3::Quaternionf pitchRotation{};
-      pitchRotation.w = msvc8::cos(halfPitch);
-      pitchRotation.x = msvc8::sin(halfPitch);
+      pitchRotation.w = fa::cos(halfPitch);
+      pitchRotation.x = fa::sin(halfPitch);
       pitchRotation.y = 0.0f;
       pitchRotation.z = 0.0f;
       pitchBone->Rotate(pitchRotation);

@@ -24,8 +24,8 @@ using namespace moho;
 
 namespace
 {
-  using WeaponPointerVector = msvc8::vector<moho::UnitWeapon*>;
-  using AcquireTargetTaskPointerVector = msvc8::vector<moho::CAcquireTargetTask*>;
+  using WeaponPointerVector = fa::vector<moho::UnitWeapon*>;
+  using AcquireTargetTaskPointerVector = fa::vector<moho::CAcquireTargetTask*>;
 
 } // namespace
 

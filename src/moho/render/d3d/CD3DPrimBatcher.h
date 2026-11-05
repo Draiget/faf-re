@@ -369,8 +369,8 @@ namespace moho
     CD3DVertexSheet* mVertexSheets[3]{};                // +0x04
     std::int32_t mCurVertexSheet = 0;                   // +0x10
     CD3DIndexSheet* mIndexSheet = nullptr;              // +0x14
-    msvc8::vector<Vertex> mVertices{};                  // +0x18
-    msvc8::vector<std::int16_t> mPrimitives{};          // +0x28
+    fa::vector<Vertex> mVertices{};                  // +0x18
+    fa::vector<std::int16_t> mPrimitives{};          // +0x28
     std::uint32_t mMode = 0;                            // +0x38
     // Offsets proven from the binary, not from field order:
     //   0x00438870 `cmp [esi+3Ch], ebx` tests the incoming *sheet* pointer, and

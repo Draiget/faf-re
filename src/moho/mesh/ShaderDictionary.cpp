@@ -73,13 +73,13 @@ namespace moho
     return instance;
   }
 
-  const msvc8::string* ShaderDictionary::Lookup(const msvc8::string& requestedShaderName) const
+  const fa::string* ShaderDictionary::Lookup(const fa::string& requestedShaderName) const
   {
-    const msvc8::map<msvc8::string, msvc8::string>::const_iterator it = mRemaps.find(requestedShaderName);
+    const fa::map<fa::string, fa::string>::const_iterator it = mRemaps.find(requestedShaderName);
     return it == mRemaps.end() ? nullptr : &it->second;
   }
 
-  bool ShaderDictionary::IsDeprecated(const msvc8::string& shaderName) const
+  bool ShaderDictionary::IsDeprecated(const fa::string& shaderName) const
   {
     return mDeprecatedNames.find(shaderName) != mDeprecatedNames.end();
   }
@@ -93,8 +93,8 @@ namespace moho
    * marker.
    */
   void ShaderDictionary::AssignRemap(
-    const msvc8::string& legacyShaderName,
-    const msvc8::string& remappedShaderName
+    const fa::string& legacyShaderName,
+    const fa::string& remappedShaderName
   )
   {
     mRemaps[legacyShaderName] = remappedShaderName;
@@ -110,18 +110,18 @@ namespace moho
    * that cannot be taken in this binary, because nothing inserts into that
    * set.
    */
-  msvc8::string ResolveShaderAnnotationName(const msvc8::string& shaderName)
+  fa::string ResolveShaderAnnotationName(const fa::string& shaderName)
   {
     const ShaderDictionary& dictionary = ShaderDictionary::Instance();
-    const msvc8::string* const remapped = dictionary.Lookup(shaderName);
+    const fa::string* const remapped = dictionary.Lookup(shaderName);
     if (remapped == nullptr) {
-      return shaderName.empty() ? msvc8::string("Unit") : msvc8::string(shaderName.view());
+      return shaderName.empty() ? fa::string("Unit") : fa::string(shaderName.view());
     }
 
     if (dictionary.IsDeprecated(shaderName)) {
       gpg::Warnf("Use of 'old' shader: %s", shaderName.raw_data_unsafe());
     }
 
-    return msvc8::string(remapped->view());
+    return fa::string(remapped->view());
   }
 } // namespace moho

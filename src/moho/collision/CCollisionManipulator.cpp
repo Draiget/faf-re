@@ -189,7 +189,7 @@ namespace
     if (!upcast.mObj) {
       const char* const expected = gpg::RTypeOf<moho::IUnit>()->GetName();
       const char* const actual = source.GetTypeName();
-      const msvc8::string message = gpg::STR_Printf(
+      const fa::string message = gpg::STR_Printf(
         "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
         "instead",
         expected ? expected : "IUnit",

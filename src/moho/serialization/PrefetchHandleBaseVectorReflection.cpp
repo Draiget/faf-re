@@ -24,7 +24,7 @@ namespace
    */
   void LoadPrefetchHandleBaseVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
   {
-    auto* const storage = reinterpret_cast<msvc8::vector<moho::PrefetchHandleBase>*>(objectPtr);
+    auto* const storage = reinterpret_cast<fa::vector<moho::PrefetchHandleBase>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -34,7 +34,7 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    msvc8::vector<moho::PrefetchHandleBase> loaded{};
+    fa::vector<moho::PrefetchHandleBase> loaded{};
     loaded.resize(static_cast<std::size_t>(count));
 
     gpg::RType* const elementType = moho::PrefetchHandleBase::StaticGetClass();
@@ -55,7 +55,7 @@ namespace
    */
   void SavePrefetchHandleBaseVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
-    auto* const storage = reinterpret_cast<msvc8::vector<moho::PrefetchHandleBase>*>(objectPtr);
+    auto* const storage = reinterpret_cast<fa::vector<moho::PrefetchHandleBase>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -81,11 +81,11 @@ namespace
      *
      * What it does:
      * Constructs the global `RVectorType<PrefetchHandleBase>` reflection type
-     * instance and pre-registers it for `msvc8::vector<PrefetchHandleBase>`.
+     * instance and pre-registers it for `fa::vector<PrefetchHandleBase>`.
      */
     PrefetchHandleBaseVectorRegistration()
     {
-      gpg::PreRegisterRType(typeid(msvc8::vector<moho::PrefetchHandleBase>), &gPrefetchHandleBaseVectorType);
+      gpg::PreRegisterRType(typeid(fa::vector<moho::PrefetchHandleBase>), &gPrefetchHandleBaseVectorType);
     }
   };
 
@@ -94,7 +94,7 @@ namespace
 
 gpg::RType* gpg::ResolvePrefetchHandleBaseVectorType()
 {
-  return gpg::LookupRType(typeid(msvc8::vector<moho::PrefetchHandleBase>));
+  return gpg::LookupRType(typeid(fa::vector<moho::PrefetchHandleBase>));
 }
 
 /**
@@ -121,16 +121,16 @@ gpg::RVectorType<moho::PrefetchHandleBase>::~RVectorType() = default;
  */
 const char* gpg::RVectorType<moho::PrefetchHandleBase>::GetName() const
 {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", moho::PrefetchHandleBase::StaticGetClass()->GetName());
+    static const fa::string sName = gpg::STR_Printf("vector<%s>", moho::PrefetchHandleBase::StaticGetClass()->GetName());
     return sName.c_str();
 }
 
 /**
  * Address: 0x004A5DD0 (FUN_004A5DD0)
  */
-msvc8::string gpg::RVectorType<moho::PrefetchHandleBase>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType<moho::PrefetchHandleBase>::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 
@@ -147,8 +147,8 @@ const gpg::RIndexed* gpg::RVectorType<moho::PrefetchHandleBase>::IsIndexed() con
  */
 void gpg::RVectorType<moho::PrefetchHandleBase>::Init()
 {
-  static_assert(sizeof(msvc8::vector<moho::PrefetchHandleBase>) == 0x10, "msvc8::vector<moho::PrefetchHandleBase> is 0x10 bytes on x86");
-  size_ = sizeof(msvc8::vector<moho::PrefetchHandleBase>);
+  static_assert(sizeof(fa::vector<moho::PrefetchHandleBase>) == 0x10, "fa::vector<moho::PrefetchHandleBase> is 0x10 bytes on x86");
+  size_ = sizeof(fa::vector<moho::PrefetchHandleBase>);
   version_ = 1;
   serLoadFunc_ = &LoadPrefetchHandleBaseVector;
   serSaveFunc_ = &SavePrefetchHandleBaseVector;
@@ -159,7 +159,7 @@ void gpg::RVectorType<moho::PrefetchHandleBase>::Init()
  */
 gpg::RRef gpg::RVectorType<moho::PrefetchHandleBase>::SubscriptIndex(void* obj, const int ind) const
 {
-  auto* const storage = static_cast<msvc8::vector<moho::PrefetchHandleBase>*>(obj);
+  auto* const storage = static_cast<fa::vector<moho::PrefetchHandleBase>*>(obj);
   GPG_ASSERT(storage != nullptr);
   GPG_ASSERT(ind >= 0);
   GPG_ASSERT(static_cast<std::size_t>(ind) < GetCount(obj));
@@ -183,7 +183,7 @@ size_t gpg::RVectorType<moho::PrefetchHandleBase>::GetCount(void* obj) const
     return 0u;
   }
 
-  return static_cast<const msvc8::vector<moho::PrefetchHandleBase>*>(obj)->size();
+  return static_cast<const fa::vector<moho::PrefetchHandleBase>*>(obj)->size();
 }
 
 /**
@@ -194,7 +194,7 @@ size_t gpg::RVectorType<moho::PrefetchHandleBase>::GetCount(void* obj) const
  */
 void gpg::RVectorType<moho::PrefetchHandleBase>::SetCount(void* obj, const int count) const
 {
-  auto* const storage = static_cast<msvc8::vector<moho::PrefetchHandleBase>*>(obj);
+  auto* const storage = static_cast<fa::vector<moho::PrefetchHandleBase>*>(obj);
   GPG_ASSERT(storage != nullptr);
   GPG_ASSERT(count >= 0);
   if (!storage || count < 0) {

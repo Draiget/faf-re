@@ -42,7 +42,7 @@ namespace faf::remote::client
     float GetStatusMetricA() override;
     float GetStatusMetricB() override;
     bool NoEjectionPending() override;
-    void CollectEjecters(msvc8::vector<const moho::CClientBase*>& out) override;
+    void CollectEjecters(fa::vector<const moho::CClientBase*>& out) override;
     int32_t GetSimRate() override;
     /** A remote client exchanges no peer messages: everything comes through the server. */
     void Process(moho::CMessage& msg) override;

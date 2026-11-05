@@ -145,7 +145,7 @@ namespace moho
       gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
     );
 
-    msvc8::string DevStatus;             // +0x017C
+    fa::string DevStatus;             // +0x017C
     RProjectileBlueprintDisplay Display; // +0x0198
     RProjectileBlueprintEconomy Economy; // +0x01D0
     RProjectileBlueprintPhysics Physics; // +0x01DC

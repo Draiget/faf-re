@@ -64,12 +64,12 @@ namespace moho
      * What it does:
      * Reorders requested scenario into MRU position and optionally marks it as active game-data source.
      */
-    virtual SWldScenarioInfo* GetScenarioInfo(const char* mapName, msvc8::string* gameMods, bool setGameData) = 0;
+    virtual SWldScenarioInfo* GetScenarioInfo(const char* mapName, fa::string* gameMods, bool setGameData) = 0;
 
     /**
      * Address: 0x00885920 (FUN_00885920, ?CreateScenarioInfo@CWldSessionLoaderImpl@Moho@@...)
      */
-    virtual SWldScenarioInfo* CreateScenarioInfo(const char* mapName, msvc8::string* gameMods) = 0;
+    virtual SWldScenarioInfo* CreateScenarioInfo(const char* mapName, fa::string* gameMods) = 0;
 
     /**
      * Address: 0x00885970 (FUN_00885970, ?IsLoaded@CWldSessionLoaderImpl@Moho@@...)
@@ -119,12 +119,12 @@ namespace moho
     /**
      * Address: 0x008858A0 (FUN_008858A0)
      */
-    SWldScenarioInfo* GetScenarioInfo(const char* mapName, msvc8::string* gameMods, bool setGameData) override;
+    SWldScenarioInfo* GetScenarioInfo(const char* mapName, fa::string* gameMods, bool setGameData) override;
 
     /**
      * Address: 0x00885920 (FUN_00885920)
      */
-    SWldScenarioInfo* CreateScenarioInfo(const char* mapName, msvc8::string* gameMods) override;
+    SWldScenarioInfo* CreateScenarioInfo(const char* mapName, fa::string* gameMods) override;
 
     /**
      * Address: 0x00885970 (FUN_00885970)
@@ -150,7 +150,7 @@ namespace moho
     /**
      * Address: 0x00886200 (FUN_00886200, func_GetScenarioInfo)
      */
-    SWldScenarioInfo* FindOrCreateScenarioInfo(const char* mapName, const msvc8::string& gameMods);
+    SWldScenarioInfo* FindOrCreateScenarioInfo(const char* mapName, const fa::string& gameMods);
 
     /**
      * Address: 0x00886170 (FUN_00886170, func_MoveGameData)

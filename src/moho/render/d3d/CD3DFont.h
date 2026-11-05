@@ -30,9 +30,9 @@ namespace moho
 
     using SCharInfo = CD3DFontCharInfo;
 
-    using SCharInfoPage = msvc8::vector<SCharInfo>;
-    using SCharInfoPages = msvc8::vector<SCharInfoPage>;
-    using KerningPairVector = msvc8::vector<SKerningPair>;
+    using SCharInfoPage = fa::vector<SCharInfo>;
+    using SCharInfoPages = fa::vector<SCharInfoPage>;
+    using KerningPairVector = fa::vector<SKerningPair>;
 
     /**
      * Address: 0x00425290 (FUN_00425290,

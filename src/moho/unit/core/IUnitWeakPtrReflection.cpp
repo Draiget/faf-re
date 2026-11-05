@@ -155,7 +155,7 @@ namespace
     if (!upcast.mObj) {
       const char* const expected = CachedIUnitType()->GetName();
       const char* const actual = trackedRef.GetTypeName();
-      const msvc8::string msg = gpg::STR_Printf(
+      const fa::string msg = gpg::STR_Printf(
         "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
         "instead",
         expected ? expected : "IUnit",
@@ -235,7 +235,7 @@ namespace
  */
 const char* moho::RWeakPtrType<moho::IUnit>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedIUnitType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedIUnitType()->GetName());
   return sName.c_str();
 }
 
@@ -246,19 +246,19 @@ const char* moho::RWeakPtrType<moho::IUnit>::GetName() const
  * Returns `"NULL"` for empty weak pointers, otherwise wraps pointee lexical
  * text inside square brackets.
  */
-msvc8::string moho::RWeakPtrType<moho::IUnit>::GetLexical(const gpg::RRef& ref) const
+fa::string moho::RWeakPtrType<moho::IUnit>::GetLexical(const gpg::RRef& ref) const
 {
   auto* const weak = static_cast<const moho::WeakPtr<moho::IUnit>*>(ref.mObj);
   if (!weak || !weak->HasValue()) {
-    return msvc8::string("NULL");
+    return fa::string("NULL");
   }
 
   const gpg::RRef pointee = MakeIUnitRefFromWeakPtr(*weak);
   if (!pointee.mObj) {
-    return msvc8::string("NULL");
+    return fa::string("NULL");
   }
 
-  const msvc8::string inner = pointee.GetLexical();
+  const fa::string inner = pointee.GetLexical();
   return gpg::STR_Printf("[%s]", inner.c_str());
 }
 
@@ -318,7 +318,7 @@ gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::~RFastVectorType() = default;
  */
 const char* gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedWeakPtrIUnitType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("fastvector<%s>", CachedWeakPtrIUnitType()->GetName());
   return sName.c_str();
 }
 
@@ -328,9 +328,9 @@ const char* gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::GetName() const
  * What it does:
  * Formats vector lexical text and appends the runtime weak-pointer element count.
  */
-msvc8::string gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   const int count = static_cast<int>(GetCount(ref.mObj));
   return gpg::STR_Printf("%s, size=%d", base.c_str(), count);
 }

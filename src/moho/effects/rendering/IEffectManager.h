@@ -64,7 +64,7 @@ namespace moho
     float mLifetime;                       // +0x24
     float mWidth;                          // +0x28
     float mTextureScale;                   // +0x2C
-    msvc8::string mTexture;                // +0x30
+    fa::string mTexture;                // +0x30
     SCreateBeamTransform mSpawnTransform;  // +0x4C
     std::int32_t mBlendMode;               // +0x68
   };
@@ -199,8 +199,8 @@ namespace moho
      */
     virtual void CreateLightParticle(
       Wm3::Vector3<float> position,
-      const msvc8::string& texturePrimary,
-      const msvc8::string& textureSecondary,
+      const fa::string& texturePrimary,
+      const fa::string& textureSecondary,
       float size,
       float lifetime,
       int armyIndex

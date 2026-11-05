@@ -413,8 +413,8 @@ namespace moho
     float mMinRadius;                       // +0x54
     float mMaxRadius;                       // +0x58
     float mEffectiveRadius;                 // +0x5C
-    msvc8::string mUIMinRangeVisualId;      // +0x60
-    msvc8::string mUIMaxRangeVisualId;      // +0x7C
+    fa::string mUIMinRangeVisualId;      // +0x60
+    fa::string mUIMaxRangeVisualId;      // +0x7C
   };
   static_assert(sizeof(UnitWeaponInfo) == 0x98, "UnitWeaponInfo size must be 0x98");
   static_assert(offsetof(UnitWeaponInfo, mCat1) == 0x00, "UnitWeaponInfo::mCat1 offset must be 0x00");
@@ -556,7 +556,7 @@ namespace moho
     /// resolves the id, adds that entity to the current selection and hands it
     /// this unit's selection-set names. Points the opposite way from `mCreator`.
     EntId mSelectionInheritorId;  // +0x040
-    msvc8::string mCustomName;    // +0x044
+    fa::string mCustomName;    // +0x044
     SSTIUnitEconomyPair mProduced;         // +0x060
     SSTIUnitEconomyPair mResourcesSpent;   // +0x068
     SSTIUnitEconomyPair mMaintainenceCost; // +0x070
@@ -1011,7 +1011,7 @@ namespace moho
      * Looks up one armor multiplier by damage-type token and returns scaled
      * damage when a matching lane exists.
      */
-    [[nodiscard]] float ProcessArmorOnDamage(float amount, msvc8::string damageType) const;
+    [[nodiscard]] float ProcessArmorOnDamage(float amount, fa::string damageType) const;
 
     /**
      * Address: 0x006A9E10 (FUN_006A9E10, Moho::Unit::GetArmorMult)
@@ -1024,7 +1024,7 @@ namespace moho
      * Returns this unit's armor multiplier for one damage type, or 1.0 when
      * the type has no entry - i.e. an unlisted damage type is unmodified.
      */
-    [[nodiscard]] float GetArmorMult(const msvc8::string& damageType) const;
+    [[nodiscard]] float GetArmorMult(const fa::string& damageType) const;
 
     /**
      * Address: 0x006A9F40 (FUN_006A9F40, Moho::Unit::Materialize)
@@ -2087,7 +2087,7 @@ namespace moho
     float TransportLoadFactor;                       // 0x0564
     /**
      * Per-unit damage-type armor multiplier lookup (`std::map<std::string,
-     * float>` in the shipped binary; modeled here as `msvc8::map`, the
+     * float>` in the shipped binary; modeled here as `fa::map`, the
      * project's MSVC8-ABI-exact `std::map` reimplementation).
      *
      * Evidence:
@@ -2098,14 +2098,14 @@ namespace moho
      *   this same lane; see their bodies below for the real API call sites
      *   (`find()`/`operator[]`) and `legacy/containers/{Map,RbTree}.h` for
      *   the generic template-internal citations for this instantiation.
-     * - Node layout (48 bytes: 12-byte link triplet, 28-byte `msvc8::string`
+     * - Node layout (48 bytes: 12-byte link triplet, 28-byte `fa::string`
      *   key at +0x0C, `float` value at +0x28, color/isNil at +0x2C/+0x2D)
      *   and container layout (12-byte `{proxy,_Myhead,_Mysize}` triplet)
-     *   match `msvc8::map<msvc8::string,float>` exactly -- see
+     *   match `fa::map<fa::string,float>` exactly -- see
      *   `legacy/containers/Map.h`'s class doc comment for the shared layout
      *   derivation (confirmed independently via `Moho::CCommandDB::commands`).
      */
-    msvc8::map<msvc8::string, float> ArmorMultipliers; // 0x0568
+    fa::map<fa::string, float> ArmorMultipliers; // 0x0568
     gpg::DList<CEconomyEvent> mEconomyEventListHead; // 0x0574
     std::uint8_t CurrentTerrainType;                 // 0x057C
     bool mDebugAIStates;                             // 0x057D
@@ -2161,7 +2161,7 @@ namespace moho
   );
   static_assert(offsetof(Unit, ArmorMultipliers) == 0x0568, "Unit::ArmorMultipliers offset must be 0x0568");
   static_assert(
-    sizeof(msvc8::map<msvc8::string, float>) == 0x0C, "Unit::ArmorMultipliers (msvc8::map) size must be 0x0C"
+    sizeof(fa::map<fa::string, float>) == 0x0C, "Unit::ArmorMultipliers (fa::map) size must be 0x0C"
   );
   static_assert(
     offsetof(Unit, TransportLoadFactor) == 0x0564, "Unit::TransportLoadFactor offset must be 0x0564"
@@ -2241,7 +2241,7 @@ namespace moho
    * Loads `/lua/armordefinition.lua`, resolves the row that matches
    * `armorTypeName`, and returns all `<damageType multiplier>` string lanes.
    */
-  [[nodiscard]] msvc8::list<msvc8::string> ARMOR_GetArmorDefinations(LuaPlus::LuaState* state, gpg::StrArg armorTypeName);
+  [[nodiscard]] fa::list<fa::string> ARMOR_GetArmorDefinations(LuaPlus::LuaState* state, gpg::StrArg armorTypeName);
 
   /**
    * Address: 0x006C3AB0 (FUN_006C3AB0, cfunc_UnitGetUnitId)

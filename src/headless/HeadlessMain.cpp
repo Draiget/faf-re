@@ -126,7 +126,7 @@ namespace
 
   [[nodiscard]] bool ReadOption(const char* const name, std::string& value)
   {
-    msvc8::vector<msvc8::string> args;
+    fa::vector<fa::string> args;
     if (!moho::CFG_GetArgOption(name, 1, &args) || args.empty()) {
       return false;
     }
@@ -246,7 +246,7 @@ namespace
   /** `/con name=value;name2=value2`, as `InitializeSessionFromCommandLine` runs it. */
   void RunStartupConsoleCommands()
   {
-    msvc8::vector<msvc8::string> args;
+    fa::vector<fa::string> args;
     if (!moho::CFG_GetArgOption("/con", 1, &args) || args.empty()) {
       return;
     }
@@ -352,7 +352,7 @@ int HEADLESS_Main(int argc, char** argv)
   }
   options.changeSetCheck = moho::CFG_GetArgOption("--changeset-check", 0, nullptr);
   {
-    msvc8::vector<msvc8::string> viewArgs;
+    fa::vector<fa::string> viewArgs;
     if (moho::CFG_GetArgOption("--view-packets", 2, &viewArgs) && viewArgs.size() == 2) {
       options.viewPacketsArmy = std::atoi(viewArgs[0].c_str());
       options.viewPacketsPath = viewArgs[1].c_str();
@@ -487,11 +487,11 @@ int HEADLESS_Main(int argc, char** argv)
     std::printf("[%s] VERDICT ended=False mismatches=0 crash=True\n", gLabel.c_str());
     EndProcess(kExitCrash);
   }
-  msvc8::vector<msvc8::string> preferenceArgs;
+  fa::vector<fa::string> preferenceArgs;
   if (moho::CFG_GetArgOption("/prefs", 1, &preferenceArgs) && !preferenceArgs.empty()) {
     moho::USER_LoadPreferences(preferenceArgs[0]);
   } else {
-    moho::USER_LoadPreferences(msvc8::string("Game.prefs"));
+    moho::USER_LoadPreferences(fa::string("Game.prefs"));
   }
   // The game runs /lua/userInit.lua in the user Lua state here; headless has no user state
   // (headless/ReplayLuaState.h).

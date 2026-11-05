@@ -28,7 +28,7 @@ namespace faf::headless
   {
     constexpr std::int32_t kObserverUidBase = 900000000; // uids for observers (the header has none)
 
-    [[nodiscard]] LuaPlus::LuaObject FromString(const msvc8::string& text, LuaPlus::LuaState* const state)
+    [[nodiscard]] LuaPlus::LuaObject FromString(const fa::string& text, LuaPlus::LuaState* const state)
     {
       LuaPlus::LuaObject object;
       (void)moho::SCR_FromString(&object, text, state);
@@ -105,7 +105,7 @@ namespace faf::headless
     struct SParticipant
     {
       std::int32_t uid = 0;
-      msvc8::string name;
+      fa::string name;
     };
 
     /** The lobby's game config and participants, read back from a recorded launch. */
@@ -212,7 +212,7 @@ namespace faf::headless
     }
 
     void Compare(
-      const char* const path, const moho::LaunchInfoNew& recorded, const msvc8::string& recordedMap,
+      const char* const path, const moho::LaunchInfoNew& recorded, const fa::string& recordedMap,
       const moho::SLaunchBuild& build, LuaPlus::LuaState* const state, SLaunchCheckResult& result
     )
     {
@@ -221,12 +221,12 @@ namespace faf::headless
         result.report += std::string(path) + ": " + what + "\n";
       };
       const moho::LaunchInfoNew& built = *build.launchInfo;
-      const auto same = [](const msvc8::string& a, const msvc8::string& b) {
+      const auto same = [](const fa::string& a, const fa::string& b) {
         return a.size() == b.size() && std::char_traits<char>::compare(a.c_str(), b.c_str(), a.size()) == 0;
       };
       // A serialised Lua value: identical bytes, or (counted apart) the same content in another
       // key order.
-      const auto lua = [&](const char* name, const msvc8::string& a, const msvc8::string& b) {
+      const auto lua = [&](const char* name, const fa::string& a, const fa::string& b) {
         if (same(a, b)) {
           return;
         }
@@ -247,7 +247,7 @@ namespace faf::headless
         }
         differ(gpg::STR_Printf("%s differs in content (%zu vs %zu bytes)", name, a.size(), b.size()).c_str());
       };
-      const auto bytes = [&](const char* name, const msvc8::string& a, const msvc8::string& b) {
+      const auto bytes = [&](const char* name, const fa::string& a, const fa::string& b) {
         if (!same(a, b)) {
           std::size_t at = 0;
           while (at < a.size() && at < b.size() && a.c_str()[at] == b.c_str()[at]) {
@@ -294,7 +294,7 @@ namespace faf::headless
     )
     {
       std::vector<moho::SLaunchClient> remotes;
-      msvc8::string localName;
+      fa::string localName;
       for (const SParticipant& participant : order) {
         if (participant.uid == config.localUid) {
           localName = participant.name;
@@ -313,7 +313,7 @@ namespace faf::headless
   SLaunchCheckResult RunLaunchCheck(const std::string& replayPath, const std::string& expectPath)
   {
     SLaunchCheckResult result;
-    msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo = moho::VCR_SetupReplaySession(replayPath.c_str());
+    fa::auto_ptr<moho::SWldSessionInfo> sessionInfo = moho::VCR_SetupReplaySession(replayPath.c_str());
     if (sessionInfo.get() == nullptr || sessionInfo->mLaunchInfo.get() == nullptr
         || sessionInfo->mLaunchInfo->GetNew() == nullptr) {
       result.error = "cannot read the replay's header";
@@ -323,7 +323,7 @@ namespace faf::headless
     // The header compared with: the same replay's, or another client's of the same game (a
     // joiner builds its launch from tables it rebuilt from the host's config bytes, which is
     // what this check does with the host's header).
-    msvc8::auto_ptr<moho::SWldSessionInfo> expectInfo;
+    fa::auto_ptr<moho::SWldSessionInfo> expectInfo;
     if (!expectPath.empty()) {
       expectInfo = moho::VCR_SetupReplaySession(expectPath.c_str());
       if (expectInfo.get() == nullptr || expectInfo->mLaunchInfo.get() == nullptr

@@ -54,11 +54,11 @@ namespace moho
     archive->ReadInt(&mHeight);
     archive->ReadInt(&mGridSize);
     archive->Read(
-      gpg::CachedLookup<msvc8::map<std::uint32_t, std::int32_t>>(gBlipCellMapType),
+      gpg::CachedLookup<fa::map<std::uint32_t, std::int32_t>>(gBlipCellMapType),
       &mBlipCells,
       owner
     );
-    archive->Read(gpg::CachedLookup<msvc8::vector<moho::InfluenceGrid>>(gInfluenceGridVectorType), &mMapEntries, owner);
+    archive->Read(gpg::CachedLookup<fa::vector<moho::InfluenceGrid>>(gInfluenceGridVectorType), &mMapEntries, owner);
   }
 
   /**
@@ -83,11 +83,11 @@ namespace moho
     archive->WriteInt(mHeight);
     archive->WriteInt(mGridSize);
     archive->Write(
-      gpg::CachedLookup<msvc8::map<std::uint32_t, std::int32_t>>(gBlipCellMapType),
+      gpg::CachedLookup<fa::map<std::uint32_t, std::int32_t>>(gBlipCellMapType),
       &mBlipCells,
       owner
     );
-    archive->Write(gpg::CachedLookup<msvc8::vector<moho::InfluenceGrid>>(gInfluenceGridVectorType), &mMapEntries, owner);
+    archive->Write(gpg::CachedLookup<fa::vector<moho::InfluenceGrid>>(gInfluenceGridVectorType), &mMapEntries, owner);
   }
 } // namespace moho
 

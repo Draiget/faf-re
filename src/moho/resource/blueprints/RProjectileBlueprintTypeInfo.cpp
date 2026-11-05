@@ -73,7 +73,7 @@ namespace moho
    */
   void RProjectileBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    typeInfo->AddField<msvc8::string>("DevStatus", offsetof(RProjectileBlueprint, DevStatus), 3, "Development Status");
+    typeInfo->AddField<fa::string>("DevStatus", offsetof(RProjectileBlueprint, DevStatus), 3, "Development Status");
     gpg::RField* const displayField = typeInfo->AddField<moho::RProjectileBlueprintDisplay>("Display", offsetof(RProjectileBlueprint, Display));
     displayField->mFlags = 3;
     displayField->mDesc = "Display information for the Projectile";

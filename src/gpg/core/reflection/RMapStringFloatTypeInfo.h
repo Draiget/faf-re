@@ -13,13 +13,13 @@ namespace gpg
    * COL: from startup lane around `FUN_006B16B0`.
    *
    * `objectPtr` in `SerLoad`/`SerSave`/`GetLexical` below is reinterpreted as
-   * `msvc8::map<msvc8::string, float>*` -- the project's MSVC8-ABI-exact
+   * `fa::map<fa::string, float>*` -- the project's MSVC8-ABI-exact
    * `std::map` reimplementation, not the modern toolchain's real `std::map`
    * (whose layout differs under iterator-debug-enabled Debug builds and
    * would misinterpret this field's actual 12-byte `{proxy,_Myhead,
    * _Mysize}` bytes). Every field this descriptor is reached for (currently
    * only `Unit::ArmorMultipliers`, `moho/unit/core/Unit.h`) is declared as
-   * `msvc8::map<msvc8::string, float>` for exactly this reason. The
+   * `fa::map<fa::string, float>` for exactly this reason. The
    * `typeid(std::map<std::string, float>)` used for RTTI
    * registration/lookup (`register_MapStringFloat_Type_00` below) is a
    * separate, purely compile-time type tag -- it is never used to interpret
@@ -49,7 +49,7 @@ namespace gpg
      * What it does:
      * Formats inherited lexical text and appends current map element count.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x006AF250 (FUN_006AF250, gpg::RMapType_string_float::SerLoad)

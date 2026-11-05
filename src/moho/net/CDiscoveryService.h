@@ -117,7 +117,7 @@ namespace moho
      * dispatcher -- capacity-available fast path copy-constructs in place
      * and bumps the end pointer; capacity-exhausted path calls the generic
      * `_Insert_n` growth-and-insert core (FUN_007C9CD0, ~1.5x growth) -- i.e.
-     * exactly `msvc8::vector<T>::push_back`'s own two-branch shape. Recovered
+     * exactly `fa::vector<T>::push_back`'s own two-branch shape. Recovered
      * as `mGames.push_back(newRecord)`, not hand-duplicated growth math.
      */
     void AddDiscoveredGame(const DiscoveredGameRecord& newRecord);
@@ -133,7 +133,7 @@ namespace moho
 
     /**
      * Discovered-game storage. Bare 3-pointer, 12-byte instantiation
-     * (`HasDebugProxy=false`, see `msvc8::vector`'s class doc in Vector.h) --
+     * (`HasDebugProxy=false`, see `fa::vector`'s class doc in Vector.h) --
      * the ctor (0x007BF650), destructor (0x007BF7F0), and the destructor's
      * EH-unwind cleanup funclet (0x007C8720) each touch exactly 3
      * consecutive pointer-sized slots at +0x70/+0x74/+0x78, never a 4th, and
@@ -141,7 +141,7 @@ namespace moho
      * with no room for a reserved debug-iterator lane. `mUnknown7C` is that
      * unrelated alignment gap, not part of this vector.
      */
-    msvc8::vector<DiscoveredGameRecord, false> mGames; // +0x70 (0x70 begin, 0x74 end, 0x78 capacityEnd)
+    fa::vector<DiscoveredGameRecord, false> mGames; // +0x70 (0x70 begin, 0x74 end, 0x78 capacityEnd)
     std::uint8_t mUnknown7C[0x04]{};                  // +0x7C
     gpg::time::Timer mTimer;                          // +0x80
     float mNextDiscoveryBroadcastTimeSeconds{0.0f};   // +0x88

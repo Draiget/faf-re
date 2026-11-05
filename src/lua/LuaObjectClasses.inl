@@ -355,7 +355,7 @@ int32_t LuaStackObject::GetInteger() const
 	}
 	// 0x0041B553: tail call to `__ftol2_sse`, so NaN reads as 0x80000000 --
 	// `WaitTicks(NaN)` is then a negative tick count and ends the thread.
-	return msvc8::TruncateToInt(lua_tonumber(cState, m_stackIndex));
+	return fa::TruncateToInt(lua_tonumber(cState, m_stackIndex));
 }
 
 /**
@@ -2473,7 +2473,7 @@ namespace
 					break;
 				}
 				case kScrTagString: {
-					msvc8::string string;
+					fa::string string;
 					reader->ReadString(&string);
 					break;
 				}
@@ -2514,7 +2514,7 @@ namespace
 				break;
 			}
 			case kScrTagString: {
-				msvc8::string string;
+				fa::string string;
 				reader->ReadString(&string);
 				result.AssignString(state, string.c_str());
 				break;

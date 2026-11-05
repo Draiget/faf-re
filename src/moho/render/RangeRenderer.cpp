@@ -50,7 +50,7 @@
 
 namespace
 {
-  using RangeExtractionPayloadVector = msvc8::vector<moho::SRangeExtractionPayload>;
+  using RangeExtractionPayloadVector = fa::vector<moho::SRangeExtractionPayload>;
 
   constexpr std::uint32_t kRangeRingSegmentCount = 45u;
   constexpr std::uint32_t kRangeVertexCount = kRangeRingSegmentCount * 4u; // 180
@@ -1382,7 +1382,7 @@ namespace
       return;
     }
 
-    msvc8::vector<moho::UserUnit*> selectedUnits;
+    fa::vector<moho::UserUnit*> selectedUnits;
     session.GetSelectionUnits(selectedUnits);
     if (selectedUnits.empty()) {
       return;
@@ -1543,7 +1543,7 @@ namespace
       return;
     }
 
-    msvc8::vector<moho::UserUnit*> selectedUnits;
+    fa::vector<moho::UserUnit*> selectedUnits;
     session.GetSelectionUnits(selectedUnits);
     if (selectedUnits.empty()) {
       return;
@@ -1787,7 +1787,7 @@ namespace
    * when given, receives every unit that got a ring (see `RangeRenderer::Render`).
    */
   void RenderSelectedUnitsRange(
-    const moho::CWldSession& session, const msvc8::vector<moho::UserUnit*>& selectedUnits,
+    const moho::CWldSession& session, const fa::vector<moho::UserUnit*>& selectedUnits,
     RangeExtractionPayloadVector& outPayloads, const moho::SRangeRenderProfile& profile, const float alpha,
     std::vector<const moho::UserEntity*>* const outRingUnits = nullptr
   )
@@ -2162,7 +2162,7 @@ namespace moho
 
     // The binary gathers the selection again for every profile; it is gathered once here
     // (engine change: with thousands of units selected the repeated walk cost milliseconds a frame).
-    msvc8::vector<UserUnit*> selectedUnits;
+    fa::vector<UserUnit*> selectedUnits;
     if (range_RenderSelected) {
       worldSession->GetSelectionUnits(selectedUnits);
     }
@@ -2270,11 +2270,11 @@ namespace moho
    * Rebuilds visible range profiles by resolving each category key through the
    * range-profile tree and appending matching profile values in caller order.
    */
-  void RangeRenderer::MoveCategories(const msvc8::vector<msvc8::string>& categories)
+  void RangeRenderer::MoveCategories(const fa::vector<fa::string>& categories)
   {
     mVisibleProfiles.clear();
 
-    for (const msvc8::string& category : categories) {
+    for (const fa::string& category : categories) {
       const SRangeRenderProfileMap::const_iterator match = mRangeProfiles.find(category);
       if (match == mRangeProfiles.end()) {
         continue;
@@ -2307,7 +2307,7 @@ namespace moho
       return;
     }
 
-    msvc8::string extractorKey{};
+    fa::string extractorKey{};
     extractorKey.assign_owned(extractorName);
 
     SRangeRenderProfile profile{};

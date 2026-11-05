@@ -168,7 +168,7 @@ void CNetTCPConnection::Close()
  * What it does:
  * Returns "host:port" textual identity for logs/debug.
  */
-msvc8::string CNetTCPConnection::ToString()
+fa::string CNetTCPConnection::ToString()
 {
   const auto host = NET_GetHostName(mAddr);
   return gpg::STR_Printf("%s:%d", host.c_str(), mPort);

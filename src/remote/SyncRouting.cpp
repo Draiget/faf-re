@@ -953,7 +953,7 @@ namespace faf::remote
     mThreadViews.erase(thread);
   }
 
-  bool CSyncRouter::Print(const msvc8::string& line)
+  bool CSyncRouter::Print(const fa::string& line)
   {
     if (mFrames.empty() || mFrames.back().view < 0) {
       return false;
@@ -1605,7 +1605,7 @@ namespace faf::remote
     for (SPlayerSync& view : mPlayers) {
       view.prints.swap(view.nextPrints);
       view.nextPrints.clear();
-      for (const msvc8::string& line : packet.mPrintField) {
+      for (const fa::string& line : packet.mPrintField) {
         view.prints.emplace_back(line.c_str());
       }
     }

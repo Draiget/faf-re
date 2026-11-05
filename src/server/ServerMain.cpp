@@ -106,7 +106,7 @@ namespace
 
   [[nodiscard]] bool ReadOption(const char* const name, std::string& value)
   {
-    msvc8::vector<msvc8::string> args;
+    fa::vector<fa::string> args;
     if (!moho::CFG_GetArgOption(name, 1, &args) || args.empty()) {
       return false;
     }
@@ -181,7 +181,7 @@ namespace
       : gpg::LogTarget(true)
     {}
 
-    void OnMessage(const gpg::LogSeverity level, const msvc8::string&, const msvc8::vector<msvc8::string>&, int) override
+    void OnMessage(const gpg::LogSeverity level, const fa::string&, const fa::vector<fa::string>&, int) override
     {
       if (level == gpg::LogSeverity::Warn) {
         mWarnings.fetch_add(1, std::memory_order_relaxed);
@@ -308,7 +308,7 @@ namespace
     if (!scenarioFile.IsString()) {
       return "unnamed";
     }
-    LuaPlus::LuaObject scenario = moho::WLD_LoadScenarioInfo(msvc8::string(scenarioFile.GetString()), state);
+    LuaPlus::LuaObject scenario = moho::WLD_LoadScenarioInfo(fa::string(scenarioFile.GetString()), state);
     if (scenario.IsNil()) {
       return scenarioFile.GetString();
     }
@@ -841,7 +841,7 @@ int main(int, char**)
     Say("ERROR: the engine's services didn't start");
     return kExitCrash;
   }
-  moho::USER_LoadPreferences(msvc8::string("Game.prefs"));
+  moho::USER_LoadPreferences(fa::string("Game.prefs"));
   platform::SetX87PrecisionControl(_PC_24);
   moho::PlaceCurrentThread(moho::EThreadRole::Main);
 

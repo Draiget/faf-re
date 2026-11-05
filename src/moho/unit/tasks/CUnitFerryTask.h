@@ -144,7 +144,7 @@ namespace moho
      * queue of an army TRANSPORTATION unit currently ferrying to the same
      * beacon. An empty route source leaves the own-queue copy in place.
      */
-    void GetUnitCommands(msvc8::vector<WeakPtr<CUnitCommand>>& outCommands);
+    void GetUnitCommands(fa::vector<WeakPtr<CUnitCommand>>& outCommands);
 
     /**
      * Address: 0x0060F400 (FUN_0060F400, Moho::CUnitFerryTask::TaskTick)

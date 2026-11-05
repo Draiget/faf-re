@@ -33,12 +33,12 @@ namespace gpg
     void Write(const char* data, std::size_t size) const;
 
     /**
-     * Address: <paired with Stream::Write(msvc8::string)>
+     * Address: <paired with Stream::Write(fa::string)>
      *
      * What it does:
      * Writes one NUL-terminated legacy string payload.
      */
-    void WriteString(const msvc8::string& value) const;
+    void WriteString(const fa::string& value) const;
 
     /**
      * Address: <compat helper for pointer-style callsites>
@@ -46,7 +46,7 @@ namespace gpg
      * What it does:
      * Writes one optional NUL-terminated legacy string payload.
      */
-    void WriteString(const msvc8::string* value) const;
+    void WriteString(const fa::string* value) const;
 
     /**
      * Writes one trivially-copyable scalar by raw bytes.

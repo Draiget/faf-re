@@ -186,10 +186,10 @@ namespace moho
 
     // Shader parameter strings - array of 4 at +0x84.
     // Confirmed by: eh_vector_destructor(this+0x84, size=0x1C, n=4, std::string::~string)
-    msvc8::string mShaderNames[4]{}; // +0x84  (4 x 0x1C = 0x70 bytes)
+    fa::string mShaderNames[4]{}; // +0x84  (4 x 0x1C = 0x70 bytes)
 
-    msvc8::string mWaterCubemap{}; // +0xF4
-    msvc8::string mWaterRamp{};    // +0x110
+    fa::string mWaterCubemap{}; // +0xF4
+    fa::string mWaterRamp{};    // +0x110
 
     // Six texture-sheet handles (boost::SharedPtrRaw<ID3DTextureSheet>).
     // Confirmed by: releaseTextures() iterating mTextures[0..5].

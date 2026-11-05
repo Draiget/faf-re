@@ -83,9 +83,9 @@ namespace
    * Removes one shield entry from the active damage-iteration list and returns
    * the next iterator lane.
    */
-  [[maybe_unused]] msvc8::list<moho::Shield*>::iterator RemoveDamageShieldEntry(
-    msvc8::list<moho::Shield*>& shields,
-    const msvc8::list<moho::Shield*>::iterator current
+  [[maybe_unused]] fa::list<moho::Shield*>::iterator RemoveDamageShieldEntry(
+    fa::list<moho::Shield*>& shields,
+    const fa::list<moho::Shield*>::iterator current
   )
   {
     return shields.erase(current);
@@ -98,7 +98,7 @@ namespace
    * Clears the temporary shield-iteration list used by the damage path and
    * releases its owned entries.
    */
-  [[maybe_unused]] void ResetDamageShieldIterationList(msvc8::list<moho::Shield*>& shields)
+  [[maybe_unused]] void ResetDamageShieldIterationList(fa::list<moho::Shield*>& shields)
   {
     shields.clear();
   }
@@ -124,7 +124,7 @@ namespace
   [[maybe_unused]] [[nodiscard]] DamageShieldListSentinelNode* AllocateSelfLinkedDamageShieldSentinel()
   {
     auto* const node =
-      msvc8::detail::allocate_checked<DamageShieldListSentinelNode>(1u);
+      fa::detail::allocate_checked<DamageShieldListSentinelNode>(1u);
     node->next = node;
     node->prev = node;
     return node;
@@ -159,7 +159,7 @@ namespace
     DamageLinkedPairNode* const prev
   )
   {
-    auto* const node = msvc8::detail::allocate_checked<DamageLinkedPairNode>(1u);
+    auto* const node = fa::detail::allocate_checked<DamageLinkedPairNode>(1u);
     node->next = next;
     node->prev = prev;
     node->payload0 = seed.first;
@@ -189,7 +189,7 @@ namespace moho
     mMaxRadius = other.mMaxRadius;
     mOrigin = other.mOrigin;
     mAmount = other.mAmount;
-    mType.assign(other.mType, 0, msvc8::string::npos);
+    mType.assign(other.mType, 0, fa::string::npos);
     mDamageFriendly = other.mDamageFriendly;
     mDamageNeutral = other.mDamageNeutral;
     mDamageSelf = other.mDamageSelf;
@@ -288,7 +288,7 @@ namespace moho
     (void)typeInfo->AddField<moho::SMinMax<float>>("MinMaxRadius", offsetof(CDamage, mRadius));
     typeInfo->AddField<Wm3::Vector3f>("Origin", offsetof(CDamage, mOrigin));
     typeInfo->AddField<float>("Amount", offsetof(CDamage, mAmount));
-    typeInfo->AddField<msvc8::string>("Type", offsetof(CDamage, mType));
+    typeInfo->AddField<fa::string>("Type", offsetof(CDamage, mType));
     typeInfo->AddField<bool>("DamageFriendly", offsetof(CDamage, mDamageFriendly));
     typeInfo->AddField<bool>("DamageNeutral", offsetof(CDamage, mDamageNeutral));
     typeInfo->AddField<bool>("DamageSelf", offsetof(CDamage, mDamageSelf));
@@ -588,9 +588,9 @@ namespace moho
    * unless friendly fire is enabled -- the shield's script-driven absorption is
    * queried and, when positive, the shield is appended to `absorbingShields`.
    */
-  void SIM_DoDamage(Sim* const sim, msvc8::list<SShieldDamageEntry>& absorbingShields, const CDamage& damage)
+  void SIM_DoDamage(Sim* const sim, fa::list<SShieldDamageEntry>& absorbingShields, const CDamage& damage)
   {
-    msvc8::list<Shield*> shieldSnapshot = sim->mShields;
+    fa::list<Shield*> shieldSnapshot = sim->mShields;
     for (Shield* const shield : shieldSnapshot) {
       if (shield == nullptr) {
         continue;
@@ -664,7 +664,7 @@ namespace moho
    * damage that reaches the entity.
    */
   [[nodiscard]] float ComputeShieldedDamageForEntity(
-    Entity* const entity, const msvc8::list<SShieldDamageEntry>& absorbingShields, float amount)
+    Entity* const entity, const fa::list<SShieldDamageEntry>& absorbingShields, float amount)
   {
     for (const SShieldDamageEntry& entry : absorbingShields) {
       Shield* const shield = entry.shield;
@@ -751,7 +751,7 @@ namespace moho
    */
   void func_DoDamageRing(Sim* const sim, const CDamage& damage)
   {
-    msvc8::list<SShieldDamageEntry> absorbingShields;
+    fa::list<SShieldDamageEntry> absorbingShields;
     SIM_DoDamage(sim, absorbingShields, damage);
 
     gpg::core::FastVectorN<CollisionResult, 10> ringResults{};
@@ -813,7 +813,7 @@ namespace moho
    */
   void SIM_DoDamageArea(Sim* const sim, const CDamage& damage)
   {
-    msvc8::list<SShieldDamageEntry> absorbingShields;
+    fa::list<SShieldDamageEntry> absorbingShields;
     SIM_DoDamage(sim, absorbingShields, damage);
 
     Wm3::Sphere3f querySphere{};
@@ -887,7 +887,7 @@ namespace moho
    * in the damage's absorbing-shield list.
    */
   [[nodiscard]] bool EntityInsideAnyAbsorbingShield(
-    const msvc8::list<SShieldDamageEntry>& absorbingShields, Entity* const entity)
+    const fa::list<SShieldDamageEntry>& absorbingShields, Entity* const entity)
   {
     if (entity == nullptr) {
       return false;
@@ -915,7 +915,7 @@ namespace moho
    */
   void SIM_MetaImpactArea(Sim* const sim, const CDamage& damage)
   {
-    msvc8::list<SShieldDamageEntry> absorbingShields;
+    fa::list<SShieldDamageEntry> absorbingShields;
     SIM_DoDamage(sim, absorbingShields, damage);
 
     const EntityCategorySet* const category = sim->mRules->GetEntityCategory(damage.mType.c_str());

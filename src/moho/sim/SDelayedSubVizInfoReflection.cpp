@@ -16,7 +16,7 @@
 
 namespace
 {
-  using DelayedSubVizVector = msvc8::vector<moho::SDelayedSubVizInfo>;
+  using DelayedSubVizVector = fa::vector<moho::SDelayedSubVizInfo>;
   using DelayedSubVizVectorType = gpg::RVectorType<moho::SDelayedSubVizInfo>;
 
   // Address: 0x00BC78E0 (FUN_00BC78E0, register_SDelayedSubVizInfoSerializer)
@@ -40,7 +40,7 @@ namespace
   [[nodiscard]] gpg::RType* ConstructAndRegisterDelayedSubVizVectorType()
   {
     DelayedSubVizVectorType* const type = AcquireDelayedSubVizVectorType();
-    gpg::PreRegisterRType(typeid(msvc8::vector<moho::SDelayedSubVizInfo>), type);
+    gpg::PreRegisterRType(typeid(fa::vector<moho::SDelayedSubVizInfo>), type);
     return type;
   }
 
@@ -319,7 +319,7 @@ gpg::RRef* gpg::RRef_SDelayedSubVizInfo(gpg::RRef* const outRef, moho::SDelayedS
  */
 const char* gpg::RVectorType<moho::SDelayedSubVizInfo>::GetName() const
 {
-  static const msvc8::string sName =
+  static const fa::string sName =
     gpg::STR_Printf("vector<%s>", moho::SDelayedSubVizInfo::StaticGetClass()->GetName());
   return sName.c_str();
 }
@@ -327,9 +327,9 @@ const char* gpg::RVectorType<moho::SDelayedSubVizInfo>::GetName() const
 /**
  * Address: 0x00507B60 (FUN_00507B60, gpg::RVectorType_SDelayedSubVizInfo::GetLexical)
  */
-msvc8::string gpg::RVectorType<moho::SDelayedSubVizInfo>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType<moho::SDelayedSubVizInfo>::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 
@@ -346,8 +346,8 @@ const gpg::RIndexed* gpg::RVectorType<moho::SDelayedSubVizInfo>::IsIndexed() con
  */
 void gpg::RVectorType<moho::SDelayedSubVizInfo>::Init()
 {
-  static_assert(sizeof(msvc8::vector<moho::SDelayedSubVizInfo>) == 0x10, "msvc8::vector<moho::SDelayedSubVizInfo> is 0x10 bytes on x86");
-  size_ = sizeof(msvc8::vector<moho::SDelayedSubVizInfo>);
+  static_assert(sizeof(fa::vector<moho::SDelayedSubVizInfo>) == 0x10, "fa::vector<moho::SDelayedSubVizInfo> is 0x10 bytes on x86");
+  size_ = sizeof(fa::vector<moho::SDelayedSubVizInfo>);
   version_ = 1;
   serLoadFunc_ = &LoadSDelayedSubVizInfoVector;
   serSaveFunc_ = &SaveSDelayedSubVizInfoVector;

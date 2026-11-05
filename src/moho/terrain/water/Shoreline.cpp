@@ -587,7 +587,7 @@ namespace
    * Appends one shoreline-cell shared pointer at vector tail, using the
    * in-place lane when capacity is available and growing storage otherwise.
    */
-  void AppendShoreCellRef(msvc8::vector<ShoreCellRef>& shorelineCells, const ShoreCellRef& cell)
+  void AppendShoreCellRef(fa::vector<ShoreCellRef>& shorelineCells, const ShoreCellRef& cell)
   {
     shorelineCells.push_back(cell);
   }

@@ -86,7 +86,7 @@ namespace moho
 
     // Slot 13. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073B270 (FUN_0073B270)
     // Replaces camera list used when preparing sync snapshots.
-    virtual void SetGeomCams(const msvc8::vector<GeomCamera3>& geoCams) = 0;
+    virtual void SetGeomCams(const fa::vector<GeomCamera3>& geoCams) = 0;
 
     // Slot 14. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073B3F0 (FUN_0073B3F0)
     // Retail binary performs compare-only logic for mask block A (no state mutation in this build).

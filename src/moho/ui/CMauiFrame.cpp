@@ -536,7 +536,7 @@ void moho::CMauiFrame::Frame(
       int dumped = 0;
       for (CMauiControl* cursor = DepthFirstSuccessor(this); cursor != nullptr && dumped < 40;
            cursor = cursor->DepthFirstSuccessor(this)) {
-        const msvc8::string name = cursor->GetDebugName();
+        const fa::string name = cursor->GetDebugName();
         char line[224];
         sprintf_s(
           line,

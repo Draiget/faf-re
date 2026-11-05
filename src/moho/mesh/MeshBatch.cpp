@@ -22,7 +22,7 @@ namespace
    * exactly matches the probe string; otherwise stores `end`.
    */
   const char*** MeshBatchFindMatchingNameCursor(
-    const msvc8::string* const probeName,
+    const fa::string* const probeName,
     const char*** const outCursor,
     const char** begin,
     const char** const end
@@ -157,8 +157,8 @@ namespace moho
           mBoneRemapIndices.begin()[static_cast<std::size_t>(boneIndex)] = boneIndex;
         }
       } else {
-        msvc8::vector<const char*> meshBoneNames;
-        msvc8::vector<const char*> referenceBoneNames;
+        fa::vector<const char*> meshBoneNames;
+        fa::vector<const char*> referenceBoneNames;
         scm_file::FillBoneNamePointers(mesh, meshBoneNames);
         scm_file::FillBoneNamePointers(*reference->mFile, referenceBoneNames);
 
@@ -167,7 +167,7 @@ namespace moho
 
         for (std::int32_t boneIndex = 0; boneIndex < mBoneCount; ++boneIndex) {
           const char* const boneName = meshBoneNames.begin()[static_cast<std::size_t>(boneIndex)];
-          const msvc8::string probeName(boneName, std::strlen(boneName));
+          const fa::string probeName(boneName, std::strlen(boneName));
 
           const char** match = referenceEnd;
           MeshBatchFindMatchingNameCursor(&probeName, &match, referenceBegin, referenceEnd);
@@ -208,7 +208,7 @@ namespace moho
     // sibling "renderStage" lookup in Mesh.cpp passes.
     CD3DEffect* const meshEffect = resources->FindEffect("mesh");
     mParameterAnnotation =
-      meshEffect->GetIntegerAnnotation(lod->mat.mShaderAnnotation, msvc8::string("parameter"), 0);
+      meshEffect->GetIntegerAnnotation(lod->mat.mShaderAnnotation, fa::string("parameter"), 0);
   }
 
   /**
@@ -234,7 +234,7 @@ namespace moho
    * What it does:
    * Dispatches instance rendering in derived-defined batch slices.
    */
-  void MeshBatch::Render(const msvc8::vector<MeshInstance*>& meshInstances, const bool reflectedOnly)
+  void MeshBatch::Render(const fa::vector<MeshInstance*>& meshInstances, const bool reflectedOnly)
   {
     MeshInstance** const begin = meshInstances.begin();
     MeshInstance** const end = meshInstances.end();

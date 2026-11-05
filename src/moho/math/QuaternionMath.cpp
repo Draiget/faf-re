@@ -137,7 +137,7 @@ namespace moho
 
     // 0x0062FB59..0x0062FB67: the MSVC8 CRT `_CIfmod`, which maps a -0 angle
     // to +0 (the host CRT kept -0).
-    const double remainder = msvc8::fmod(angleRadians, static_cast<double>(kTwoPi));
+    const double remainder = fa::fmod(angleRadians, static_cast<double>(kTwoPi));
     // 0x0062FB67 `fst` rounds the float copy, but 0x0062FB77 `fcompi` tests
     // the unrounded remainder against -pi; 0x0062FB89 `comiss` tests the copy.
     const float wrapped = static_cast<float>(remainder);
@@ -527,7 +527,7 @@ namespace moho
     constexpr float kSpreadEpsilon = 0.001f;
     constexpr float kPi = 3.1415927f;
     if ((1.0f - dot) > kSpreadEpsilon) {
-      const double angleExact = msvc8::acos(static_cast<double>(dot));
+      const double angleExact = fa::acos(static_cast<double>(dot));
       const float angle = static_cast<float>(angleExact);
       if (angleExact >= static_cast<double>(kSpreadEpsilon) && (kPi - angle) >= kSpreadEpsilon
           && std::isfinite(angleExact)) {
@@ -535,7 +535,7 @@ namespace moho
         // and every `q1*w1 + rhs*w2` stay on the x87 stack (24-bit mantissa,
         // extended exponent) until the one float store per lane. Rounding
         // the weights to float first differed on denormal-range t / lanes.
-        msvc8::SlerpSphericalBlend(&out->w, &q1->w, &rhs.w, angle, oneMinusT, tClamped);
+        fa::SlerpSphericalBlend(&out->w, &q1->w, &rhs.w, angle, oneMinusT, tClamped);
         return out;
       }
     }
@@ -577,7 +577,7 @@ namespace moho
     const float qy = quat->y;
     const float qz = quat->z;
 
-    float sinHalf = msvc8::sinf(halfAngle);
+    float sinHalf = fa::sinf(halfAngle);
     const float axisLenSq = (qz * qz) + (qx * qx) + (qy * qy);
     // `comiss` + `jbe` at 0x004EB7C2: unordered (NaN) lanes reject too.
     if (!(axisLenSq > (sinHalf * sinHalf))) {
@@ -597,7 +597,7 @@ namespace moho
     quat->x = axis.x * sinHalf;
     quat->y = axis.y * sinHalf;
     quat->z = axis.z * sinHalf;
-    quat->w = msvc8::cosf(halfAngle);
+    quat->w = fa::cosf(halfAngle);
 
     return true;
   }
@@ -706,13 +706,13 @@ namespace moho
     if (!(quaternion.w > -1.0f)) {
       halfAngle = kPi;
     } else if (quaternion.w < 1.0f) {
-      halfAngle = static_cast<float>(msvc8::acos(static_cast<double>(quaternion.w)));
+      halfAngle = static_cast<float>(fa::acos(static_cast<double>(quaternion.w)));
     }
 
     *angleRadiansOut = halfAngle * 2.0f;
     // 0x006C10EF..0x006C1117: `fsqrt; fld1; fdivrp` keeps 1/|axis| on the x87
     // stack (extended exponent) across the three multiplies.
-    msvc8::ScaleVectorToLengthX87(&axisOut->x, &quaternion.x, axisLengthSquared, 1.0f);
+    fa::ScaleVectorToLengthX87(&axisOut->x, &quaternion.x, axisLengthSquared, 1.0f);
   }
 
   /**
@@ -726,12 +726,12 @@ namespace moho
   {
     const float angle = Wm3::Vector3f::Normalize(&axisAngle);
     const float halfAngle = angle * 0.5f;
-    const float sinHalfAngle = msvc8::sinf(halfAngle);
+    const float sinHalfAngle = fa::sinf(halfAngle);
 
-    quat->w = msvc8::cosf(halfAngle);
+    quat->w = fa::cosf(halfAngle);
     // 0x00697393..0x006973AD: `axis * sin` multiplies on the x87 stack, one
     // float store per lane (differs from SSE only for a denormal product).
-    msvc8::ScaleVectorX87(&quat->x, &axisAngle.x, sinHalfAngle);
+    fa::ScaleVectorX87(&quat->x, &axisAngle.x, sinHalfAngle);
     return quat;
   }
 
@@ -850,12 +850,12 @@ namespace moho
     Wm3::Vector3f* const outMatrix, const float heading, const float pitch, const float roll
   ) noexcept
   {
-    const float ch = msvc8::cosf(heading);
-    const float sh = msvc8::sinf(heading);
-    const float cp = msvc8::cosf(pitch);
-    const float sp = msvc8::sinf(pitch);
-    const float cr = msvc8::cosf(roll);
-    const float sr = msvc8::sinf(roll);
+    const float ch = fa::cosf(heading);
+    const float sh = fa::sinf(heading);
+    const float cp = fa::cosf(pitch);
+    const float sp = fa::sinf(pitch);
+    const float cr = fa::cosf(roll);
+    const float sr = fa::sinf(roll);
 
     const Wm3::Vector3f headingMatrix[3] = {
       Wm3::Vector3f{ch, 0.0f, sh}, Wm3::Vector3f{0.0f, 1.0f, 0.0f}, Wm3::Vector3f{-sh, 0.0f, ch}
@@ -973,7 +973,7 @@ namespace moho
     {
       const float lanes[3] = {a, b, 0.0f};
       float scaled[3];
-      msvc8::ScaleVectorToLengthX87(scaled, lanes, lengthSq, 1.0f);
+      fa::ScaleVectorToLengthX87(scaled, lanes, lengthSq, 1.0f);
       outA = scaled[0];
       outB = scaled[1];
     }

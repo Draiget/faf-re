@@ -179,7 +179,7 @@ namespace faf::remote::client
     mServer->SetArmyIndex(armyIndex);
   }
 
-  void CRemoteSimDriver::SetGeomCams(const msvc8::vector<moho::GeomCamera3>& geoCams)
+  void CRemoteSimDriver::SetGeomCams(const fa::vector<moho::GeomCamera3>& geoCams)
   {
     // Every frame hands the cameras over; the server needs them at a low rate only (WP11.1).
     ++mCamsReceived;
@@ -375,7 +375,7 @@ namespace faf::remote::client
       return driver;
     }
     SLoopbackOptions options;
-    msvc8::vector<msvc8::string> args;
+    fa::vector<fa::string> args;
     if (moho::CFG_GetArgOption("/loopbackdr", 1, &args) && !args.empty()) {
       options.deadReckoningTolerance = static_cast<std::uint32_t>(std::strtoul(args[0].c_str(), nullptr, 10));
     }

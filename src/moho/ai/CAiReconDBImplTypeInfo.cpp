@@ -55,7 +55,7 @@ namespace
     /**
      * Address: 0x005C4170 (FUN_005C4170, gpg::RVectorType_ReconBlipP::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x005C4200 (FUN_005C4200, gpg::RVectorType_ReconBlipP::IsIndexed)
@@ -103,7 +103,7 @@ namespace
     /**
      * Address: 0x005C4E20 (FUN_005C4E20, gpg::RMultiMapType_SReconKey_ReconBlipP::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x005C4E00 (FUN_005C4E00, gpg::RMultiMapType_SReconKey_ReconBlipP::Init)
@@ -322,13 +322,13 @@ namespace
 
   const char* ReconBlipPointerVectorType::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ReconBlip::GetPointerType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("vector<%s>", ReconBlip::GetPointerType()->GetName());
     return sName.c_str();
   }
 
-  msvc8::string ReconBlipPointerVectorType::GetLexical(const gpg::RRef& ref) const
+  fa::string ReconBlipPointerVectorType::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
@@ -339,7 +339,7 @@ namespace
 
   void ReconBlipPointerVectorType::Init()
   {
-    size_ = sizeof(msvc8::vector<ReconBlip*>);
+    size_ = sizeof(fa::vector<ReconBlip*>);
     version_ = 1;
     serLoadFunc_ = &DeserializeReconBlipPointerVector;
     serSaveFunc_ = &SerializeReconBlipPointerVector;
@@ -347,7 +347,7 @@ namespace
 
   gpg::RRef ReconBlipPointerVectorType::SubscriptIndex(void* const obj, const int ind) const
   {
-    auto* const storage = static_cast<msvc8::vector<ReconBlip*>*>(obj);
+    auto* const storage = static_cast<fa::vector<ReconBlip*>*>(obj);
     if (!storage || ind < 0 || static_cast<size_t>(ind) >= storage->size()) {
       return MakeReconBlipPointerSlotRef(nullptr);
     }
@@ -357,13 +357,13 @@ namespace
 
   size_t ReconBlipPointerVectorType::GetCount(void* const obj) const
   {
-    const auto* const storage = static_cast<const msvc8::vector<ReconBlip*>*>(obj);
+    const auto* const storage = static_cast<const fa::vector<ReconBlip*>*>(obj);
     return storage ? storage->size() : 0u;
   }
 
   void ReconBlipPointerVectorType::SetCount(void* const obj, const int count) const
   {
-    auto* const storage = static_cast<msvc8::vector<ReconBlip*>*>(obj);
+    auto* const storage = static_cast<fa::vector<ReconBlip*>*>(obj);
     GPG_ASSERT(storage != nullptr);
     GPG_ASSERT(count >= 0);
     if (!storage || count < 0) {
@@ -375,14 +375,14 @@ namespace
 
   const char* ReconBlipMapType::GetName() const
   {
-    static const msvc8::string sName =
+    static const fa::string sName =
       gpg::STR_Printf("multimap<%s,%s>", CachedSReconKeyType()->GetName(), ReconBlip::GetPointerType()->GetName());
     return sName.c_str();
   }
 
-  msvc8::string ReconBlipMapType::GetLexical(const gpg::RRef& ref) const
+  fa::string ReconBlipMapType::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     const auto* const storage = static_cast<const ReconBlipMap*>(ref.mObj);
     const std::uint32_t count = storage ? static_cast<std::uint32_t>(storage->size()) : 0u;
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(count));
@@ -417,14 +417,14 @@ namespace
     }
 
     auto* const storage =
-      reinterpret_cast<msvc8::vector<ReconBlip*>*>(objectPtr);
+      reinterpret_cast<fa::vector<ReconBlip*>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
 
-    msvc8::vector<ReconBlip*> newBlips;
+    fa::vector<ReconBlip*> newBlips;
     newBlips.reserve(static_cast<size_t>(count));
     for (unsigned int i = 0; i < count; ++i) {
       const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, owner);
@@ -443,7 +443,7 @@ namespace
       return;
     }
 
-    const auto* const storage = reinterpret_cast<const msvc8::vector<ReconBlip*>*>(
+    const auto* const storage = reinterpret_cast<const fa::vector<ReconBlip*>*>(
       objectPtr
     );
 
@@ -623,12 +623,12 @@ void moho::register_CAiReconDBImplTypeInfo()
  *
  * What it does:
  * Constructs/preregisters reflection metadata for
- * `msvc8::vector<ReconBlip*>`.
+ * `fa::vector<ReconBlip*>`.
  */
 gpg::RType* moho::preregister_RVectorType_ReconBlipPtr()
 {
   auto* const type = AcquireReconBlipPtrVectorType();
-  gpg::PreRegisterRType(typeid(msvc8::vector<ReconBlip*>), type);
+  gpg::PreRegisterRType(typeid(fa::vector<ReconBlip*>), type);
   return type;
 }
 

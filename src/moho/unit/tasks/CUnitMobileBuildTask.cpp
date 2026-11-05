@@ -341,7 +341,7 @@ namespace moho
       return nearest;
     }
 
-    for (const msvc8::string& rebuildId : mBlueprint->Economy.RebuildBonusIds) {
+    for (const fa::string& rebuildId : mBlueprint->Economy.RebuildBonusIds) {
       if (_stricmp(associatedBp.GetString(), rebuildId.c_str()) != 0) {
         continue;
       }

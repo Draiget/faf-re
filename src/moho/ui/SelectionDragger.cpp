@@ -367,7 +367,7 @@ namespace moho
       // is never used), so `priorityBuckets[i]` holds priority `i + 1`; a new
       // bucket is a copy of an empty set (`resize` 0x00867890 ->
       // `uninit_fill_n` 0x00868DB0 -> the copy constructor 0x00822210).
-      msvc8::vector<WeakSet<UserEntity>> priorityBuckets;
+      fa::vector<WeakSet<UserEntity>> priorityBuckets;
       const CGeomSolid3 selectionSolid = BuildSelectionSolid();
 
       for (UserEntity* const entity : draggedSelection) {
@@ -397,7 +397,7 @@ namespace moho
 
         if (selectionSolid.Intersects(scoredBox)) {
           const bool forceLowPriority = unit->mVariableData.mIsBeingBuilt == 1u
-            && unit->IsInCategory(msvc8::string("LOWSELECTPRIO", 13u));
+            && unit->IsInCategory(fa::string("LOWSELECTPRIO", 13u));
           const std::int32_t priority = forceLowPriority ? 6 : blueprint->General.SelectionPriority;
           const std::uint32_t bucketIndex = (priority > 1) ? static_cast<std::uint32_t>(priority) : 1u;
 

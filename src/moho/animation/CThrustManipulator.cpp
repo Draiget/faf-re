@@ -280,7 +280,7 @@ namespace moho
     const gpg::RRef owner{};
     archive->Write(IAniManipulator::StaticGetClass(), this, owner);
     archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mUnit, owner);
-    archive->WriteString(const_cast<msvc8::string*>(&mLabel));
+    archive->WriteString(const_cast<fa::string*>(&mLabel));
     archive->WriteInt(mThrustBoneIndex);
     archive->WriteBool(mThrusting);
     archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mCapMin, owner);
@@ -422,7 +422,7 @@ namespace moho
      * Address: 0x0064A280 (FUN_0064A280, Moho::CThrustManipulatorTypeInfo::dtr)
      *
      * What it does:
-     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes and
+     * Frees the `RType` base's two `fa::vector<RField>` storage lanes and
      * restores the `gpg::RObject` vftable. Defaulted in source: the
      * compiler-generated `~RType()` reproduces this behavior, matching every
      * other manipulator TypeInfo dtor in this family.

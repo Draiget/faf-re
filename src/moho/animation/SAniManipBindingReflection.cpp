@@ -73,7 +73,7 @@ namespace gpg
     ~RFastVectorType() override;
 
     [[nodiscard]] const char* GetName() const override;
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
     /**
@@ -269,16 +269,16 @@ namespace gpg
    */
   const char* RFastVectorType<moho::SAniManipBinding>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::SAniManipBinding>()->GetName());
+    static const fa::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::SAniManipBinding>()->GetName());
     return sName.c_str();
   }
 
   /**
    * Address: 0x0063C3E0 (FUN_0063C3E0, gpg::RFastVectorType_SAniManipBinding::GetLexical)
    */
-  msvc8::string RFastVectorType<moho::SAniManipBinding>::GetLexical(const gpg::RRef& ref) const
+  fa::string RFastVectorType<moho::SAniManipBinding>::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 

@@ -16,6 +16,9 @@ cmake_minimum_required(VERSION 3.25)
 # ON keeps the binary's exact container sizes, to check the layout asserts against
 # them (src/legacy/containers/Layout.h). Preset clang-x86-retail-layout.
 option(FAF_RETAIL_LAYOUT "Keep the 2007 binary's exact legacy container layout" OFF)
+# Temporary: branches written before the namespace rename still compile. Remove once they have moved over.
+add_compile_definitions(msvc8=fa)
+
 if(FAF_RETAIL_LAYOUT)
   add_compile_definitions(FAF_RETAIL_LAYOUT=1)
 else()

@@ -69,7 +69,7 @@ namespace
     return lhs.get() == rhs.get();
   }
 
-  [[nodiscard]] bool IsMsvc8StringLess(const msvc8::string& lhs, const msvc8::string& rhs) noexcept
+  [[nodiscard]] bool IsMsvc8StringLess(const fa::string& lhs, const fa::string& rhs) noexcept
   {
     const char* const lhsData = lhs.data();
     const char* const rhsData = rhs.data();
@@ -490,7 +490,7 @@ namespace moho
 
     for (auto bucketIt = beams.mBuckets.begin(); bucketIt != beams.mBuckets.end(); ++bucketIt) {
       const SBeamBucketKey& bucketKey = bucketIt->first;
-      const msvc8::vector<SWorldBeam>& beamList = bucketIt->second;
+      const fa::vector<SWorldBeam>& beamList = bucketIt->second;
       if (beamList.empty()) {
         continue;
       }
@@ -665,7 +665,7 @@ namespace moho
 
     key->texture0.reset();
     key->texture1.reset();
-    key->tag = msvc8::string{};
+    key->tag = fa::string{};
 
     key->sortScalar = trail.mSortOrder;
 

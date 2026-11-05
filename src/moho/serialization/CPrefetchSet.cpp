@@ -81,7 +81,7 @@ namespace moho
    */
   void CPrefetchSet::Update(LuaPlus::LuaObject prefetchTable, LuaPlus::LuaState* const state)
   {
-    msvc8::vector<PrefetchHandleBase> nextHandles{};
+    fa::vector<PrefetchHandleBase> nextHandles{};
 
     LuaPlus::LuaTableIterator kindIterator(&prefetchTable, 1);
     while (!kindIterator.m_isDone) {

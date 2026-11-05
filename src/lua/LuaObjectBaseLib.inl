@@ -161,7 +161,7 @@
 	 */
 	int LoadMountedFile(lua_State* const state, const char* const path)
 	{
-		msvc8::string diskPath{};
+		fa::string diskPath{};
 		moho::FILE_EnsureWaitHandleSet();
 		moho::FWaitHandleSet* const files = moho::FILE_GetWaitHandleSet();
 		if (files != nullptr && files->mHandle != nullptr) {
@@ -177,7 +177,7 @@
 			lua_pushfstring(state, "cannot read %s", path);
 			return LUA_ERRFILE;
 		}
-		const msvc8::string chunkName = gpg::STR_Printf("@%s", path);
+		const fa::string chunkName = gpg::STR_Printf("@%s", path);
 		return ::luaL_loadbuffer(
 			state, contents.mBegin, static_cast<size_t>(contents.mEnd - contents.mBegin), chunkName.c_str()
 		);
@@ -811,7 +811,7 @@
 			lua_settop(state, -2);
 		}
 
-		msvc8::string message{};
+		fa::string message{};
 		message.assign_owned(messageBuilder.str());
 		gpg::LogMessage(gpg::LogSeverity::Info, message);
 		return 0;

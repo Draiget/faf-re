@@ -85,14 +85,14 @@ namespace
     return moho::SCR_DecodeColor(state, colorObject);
   }
 
-  [[nodiscard]] msvc8::string ResolvePlayerColorNameByIndex(LuaPlus::LuaState* const /*state*/, const int colorIndex)
+  [[nodiscard]] fa::string ResolvePlayerColorNameByIndex(LuaPlus::LuaState* const /*state*/, const int colorIndex)
   {
     LuaPlus::LuaObject* const gameColorsRoot = moho::GetColors();
 
     const LuaPlus::LuaObject gameColors = (*gameColorsRoot)[kGameColorsTableName];
     const LuaPlus::LuaObject playerColors = gameColors[kPlayerColorsTableName];
     const LuaPlus::LuaObject colorObject = playerColors.GetByIndex(colorIndex + 1);
-    return msvc8::string(colorObject.GetString());
+    return fa::string(colorObject.GetString());
   }
 
   [[nodiscard]] std::uint32_t ResolvePlayerColorCount(LuaPlus::LuaState* const /*state*/)
@@ -199,7 +199,7 @@ namespace moho
    * What it does:
    * Returns one player-color token string from the game color table.
    */
-  msvc8::string GetPlayerColorName(const int idx)
+  fa::string GetPlayerColorName(const int idx)
   {
     const auto colorLock = LockColorLuaState();
     LuaPlus::LuaState* const colorState = GetColorLuaState();
@@ -463,7 +463,7 @@ namespace moho
     // 0x00709431/0x00709449: the name is copied into a string and canonized
     // through `STR_CopyFilename` (lowercase, `/` -> `\`) into the `RResId`
     // before the rules lookup; the error reports the raw, uncanonized name.
-    const msvc8::string initialUnitBlueprintName(initialUnitName);
+    const fa::string initialUnitBlueprintName(initialUnitName);
     RResId blueprintId{};
     (void)gpg::STR_CopyFilename(&blueprintId.name, &initialUnitBlueprintName);
 

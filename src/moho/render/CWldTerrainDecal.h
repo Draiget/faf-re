@@ -50,7 +50,7 @@ namespace moho
      * Resolves one decal type enum from the static decal-type descriptor table
      * and warns when the descriptor text is unknown.
      */
-    [[nodiscard]] static EWldTerrainDecalType LookupDecalType(const msvc8::string& typeDescription);
+    [[nodiscard]] static EWldTerrainDecalType LookupDecalType(const fa::string& typeDescription);
 
     struct Quad
     {
@@ -110,7 +110,7 @@ namespace moho
      * What it does:
      * Updates the decal's named texture lanes and per-slot name metadata.
      */
-    virtual void SetName(const msvc8::string& name, int slot);
+    virtual void SetName(const fa::string& name, int slot);
 
     /**
      * Address: 0x0089D310 (FUN_0089D310, ?SetHandle@CWldTerrainDecal@Moho@@QAEXH@Z)
@@ -301,7 +301,7 @@ namespace moho
      */
     virtual void Update();
 
-    static msvc8::string sTypeDesc[10];
+    static fa::string sTypeDesc[10];
 
   public:
     // +0x04 is the `WeakObject` base's `weakLinkHead_`.
@@ -315,7 +315,7 @@ namespace moho
     /// and `CDecalManager::AddDecals` copies `SDecalInfo::mFidelity` into it
     /// with a dword move (0x00878822), whose default is likewise 1.
     std::int32_t mFidelity;                    // +0x20
-    msvc8::string mNames[2];                   // +0x24
+    fa::string mNames[2];                   // +0x24
     Wm3::Vec3f mScale;                         // +0x5C
     Wm3::Vec3f mPosition;                      // +0x68
     Wm3::Vec3f mOrientation;                   // +0x74

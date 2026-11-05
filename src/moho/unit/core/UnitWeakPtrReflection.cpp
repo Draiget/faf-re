@@ -69,7 +69,7 @@ namespace
 
     const char* const expected = gpg::RTypeOf<moho::Unit>() ? gpg::RTypeOf<moho::Unit>()->GetName() : "Unit";
     const char* const actual = source.GetTypeName();
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
       expected ? expected : "Unit",
       actual ? actual : "null"
@@ -124,26 +124,26 @@ namespace moho
    */
   const char* RWeakPtrType<Unit>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<moho::Unit>()->GetName());
+    static const fa::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<moho::Unit>()->GetName());
     return sName.c_str();
   }
 
   /**
    * Address: 0x006AE050 (FUN_006AE050, Moho::RWeakPtrType_Unit::GetLexical)
    */
-  msvc8::string RWeakPtrType<Unit>::GetLexical(const gpg::RRef& ref) const
+  fa::string RWeakPtrType<Unit>::GetLexical(const gpg::RRef& ref) const
   {
     auto* const weak = static_cast<const WeakPtr<Unit>*>(ref.mObj);
     if (!weak || !weak->HasValue()) {
-      return msvc8::string("NULL");
+      return fa::string("NULL");
     }
 
     const gpg::RRef pointeeRef = MakeUnitRef(weak->GetObjectPtr());
     if (!pointeeRef.mObj) {
-      return msvc8::string("NULL");
+      return fa::string("NULL");
     }
 
-    const msvc8::string inner = pointeeRef.GetLexical();
+    const fa::string inner = pointeeRef.GetLexical();
     return gpg::STR_Printf("[%s]", inner.c_str());
   }
 

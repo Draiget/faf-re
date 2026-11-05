@@ -135,7 +135,7 @@ namespace
    * What it does:
    * Formats byte counts as `B/K/M/G` with precision rules based on magnitude.
    */
-  [[nodiscard]] msvc8::string FormatByteSize(const std::size_t valueBytes)
+  [[nodiscard]] fa::string FormatByteSize(const std::size_t valueBytes)
   {
     // x86: `std::size_t`/`std::intptr_t` are the binary's `unsigned int`/`int`,
     // including its signed view of counts above 2 GB. x64 keeps 64 bits, so a
@@ -292,7 +292,7 @@ namespace
 
   [[nodiscard]] float TryReadFixedFrameDeltaSeconds()
   {
-    msvc8::vector<msvc8::string> framerateArgs;
+    fa::vector<fa::string> framerateArgs;
     if (!moho::CFG_GetArgOption("/framerate", 1, &framerateArgs) || framerateArgs.empty()) {
       return -1.0f;
     }
@@ -310,7 +310,7 @@ namespace
     return 1.0f / rate;
   }
 
-  void SetFrontEndReplayFilename(const msvc8::string& replayPath)
+  void SetFrontEndReplayFilename(const fa::string& replayPath)
   {
     LuaPlus::LuaState* const state = moho::USER_GetLuaState();
     if (state == nullptr) {
@@ -331,9 +331,9 @@ namespace
     frontEndData.SetString("replay_filename", replayPath.c_str());
   }
 
-  [[nodiscard]] msvc8::string ResolveLoadPath(gpg::StrArg requestedPath)
+  [[nodiscard]] fa::string ResolveLoadPath(gpg::StrArg requestedPath)
   {
-    msvc8::string loadPath;
+    fa::string loadPath;
     loadPath.assign_owned(requestedPath != nullptr ? requestedPath : "");
     if (loadPath.empty()) {
       return loadPath;
@@ -355,7 +355,7 @@ namespace
    */
   void InitializeSessionFromCommandLine()
   {
-    msvc8::vector<msvc8::string> args;
+    fa::vector<fa::string> args;
 
     if (moho::CFG_GetArgOption("/debug", 0, nullptr)) {
       moho::SCR_CreateDebugWindow();
@@ -414,7 +414,7 @@ namespace
 
     if (moho::CFG_GetArgOption("/scenario", 1, &args) || moho::CFG_GetArgOption("/map", 1, &args)) {
       if (!args.empty()) {
-        const msvc8::string mapScenario = moho::FindMapScenario(args[0].c_str());
+        const fa::string mapScenario = moho::FindMapScenario(args[0].c_str());
         if (moho::StartCommandLineSession(mapScenario.c_str(), false)) {
           return;
         }
@@ -427,7 +427,7 @@ namespace
     // Engine addition (issue #275): take a seat back in a running game. Without
     // the option, every path below runs as before.
     if (moho::CFG_GetArgOption("/rejoin", 3, &args) && args.size() >= 3) {
-      msvc8::string failureReason;
+      fa::string failureReason;
       if (moho::REJOIN_BeginSetup(
             args[0].c_str(), std::atoi(args[1].c_str()), static_cast<unsigned short>(std::atoi(args[2].c_str())), &failureReason
           )) {
@@ -455,8 +455,8 @@ namespace
     if (moho::CFG_GetArgOption("/replay", 1, &args)) {
       if (!args.empty()) {
         SetFrontEndReplayFilename(args[0]);
-        msvc8::string failureReason;
-        msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo =
+        fa::string failureReason;
+        fa::auto_ptr<moho::SWldSessionInfo> sessionInfo =
           moho::REPLAY_SetupViewerSession(args[0].c_str(), &failureReason);
         if (sessionInfo.get() != nullptr) {
           moho::WLD_BeginSession(sessionInfo);
@@ -464,7 +464,7 @@ namespace
         }
 
         // Engine addition: the second line says why the replay was refused.
-        const msvc8::string message =
+        const fa::string message =
           failureReason.empty()
             ? gpg::STR_Printf("Unable to load game replay from %s", args[0].c_str())
             : gpg::STR_Printf("Unable to load game replay from %s\n\n%s", args[0].c_str(), failureReason.c_str());
@@ -478,23 +478,23 @@ namespace
 
     if (moho::CFG_GetArgOption("/load", 1, &args)) {
       if (!args.empty()) {
-        const msvc8::string loadPath = ResolveLoadPath(args[0].c_str());
+        const fa::string loadPath = ResolveLoadPath(args[0].c_str());
         try {
           moho::CSavedGame savedGame(loadPath.c_str());
-          msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo = savedGame.CreateSinglePlayerSessionInfo();
+          fa::auto_ptr<moho::SWldSessionInfo> sessionInfo = savedGame.CreateSinglePlayerSessionInfo();
           if (sessionInfo.get() != nullptr) {
             moho::WLD_BeginSession(sessionInfo);
             return;
           }
 
-          const msvc8::string message = gpg::STR_Printf("Unable to load saved game from %s", loadPath.c_str());
+          const fa::string message = gpg::STR_Printf("Unable to load saved game from %s", loadPath.c_str());
           moho::WIN_OkBox("Ack!", message.c_str());
         } catch (const std::exception& exception) {
-          const msvc8::string message =
+          const fa::string message =
             gpg::STR_Printf("Failed to load saved game from \"%s\":\n%s", loadPath.c_str(), exception.what());
           moho::WIN_OkBox("Ack!", message.c_str());
         } catch (...) {
-          const msvc8::string message = gpg::STR_Printf("Failed to load saved game from \"%s\".", loadPath.c_str());
+          const fa::string message = gpg::STR_Printf("Failed to load saved game from \"%s\".", loadPath.c_str());
           moho::WIN_OkBox("Ack!", message.c_str());
         }
       } else {
@@ -505,7 +505,7 @@ namespace
     }
 
     if (moho::CFG_GetArgOption("/hostgame", 5, &args) && args.size() == 5) {
-      const msvc8::string mapScenario = moho::FindMapScenario(args[4].c_str());
+      const fa::string mapScenario = moho::FindMapScenario(args[4].c_str());
       const int hostPort = std::atoi(args[1].c_str());
       (void)moho::UI_StartHostLobbyUI(
         args[0].c_str(), hostPort, args[2].c_str(), args[3].c_str(), mapScenario.c_str()
@@ -519,7 +519,7 @@ namespace
     }
 
     if (moho::CFG_GetArgOption("/perf", 0, nullptr)) {
-      const msvc8::string mapScenario = moho::FindMapScenario("PerfTest");
+      const fa::string mapScenario = moho::FindMapScenario("PerfTest");
       if (moho::StartCommandLineSession(mapScenario.c_str(), true)) {
         return;
       }
@@ -529,11 +529,11 @@ namespace
     }
 
     if (moho::CFG_GetArgOption("/gpgnet", 1, &args) && !args.empty()) {
-      const msvc8::string endpoint = args[0];
+      const fa::string endpoint = args[0];
       u_long address = 0;
       u_short port = 0;
       if (!moho::NET_GetAddrInfo(endpoint.c_str(), 0, true, address, port) || port == 0) {
-        const msvc8::string message =
+        const fa::string message =
           gpg::STR_Printf("Invalid address:port for connecting to the gpg.net client: \"%s\".", endpoint.c_str());
         moho::WIN_OkBox("Ack!", message.c_str());
         if (wxTheApp != nullptr) {
@@ -545,7 +545,7 @@ namespace
       try {
         moho::GPGNET_Attach(address, port);
       } catch (const std::exception& exception) {
-        const msvc8::string message =
+        const fa::string message =
           gpg::STR_Printf("Unable to connect to gpgnet endpoint \"%s\":\n%s", endpoint.c_str(), exception.what());
         moho::WIN_OkBox("Ack!", message.c_str());
         if (wxTheApp != nullptr) {
@@ -574,7 +574,7 @@ namespace
         LuaPlus::LuaFunction<void> createUiFn(createUi);
         createUiFn();
       } catch (const std::exception& exception) {
-        const msvc8::string message = gpg::STR_Printf("Unable to start gpgnet UI:\n%s", exception.what());
+        const fa::string message = gpg::STR_Printf("Unable to start gpgnet UI:\n%s", exception.what());
         moho::WIN_OkBox("Ack!", message.c_str());
         if (wxTheApp != nullptr) {
           wxTheApp->ExitMainLoop();
@@ -595,17 +595,17 @@ namespace
   constexpr std::int32_t kFullscreenFrameStyle = 0x200800;
   constexpr std::int32_t kWindowedFrameStyle = 0x20400E40;
 
-  [[nodiscard]] bool IsPositiveIntegerArg(const msvc8::string& text)
+  [[nodiscard]] bool IsPositiveIntegerArg(const fa::string& text)
   {
     return std::atoi(text.c_str()) > 0;
   }
 
-  [[nodiscard]] std::int32_t ParseIntegerArg(const msvc8::string& text)
+  [[nodiscard]] std::int32_t ParseIntegerArg(const fa::string& text)
   {
     return static_cast<std::int32_t>(std::atoi(text.c_str()));
   }
 
-  [[nodiscard]] msvc8::string BuildSplashImagePath()
+  [[nodiscard]] fa::string BuildSplashImagePath()
   {
     std::filesystem::path launchDirectory = moho::DISK_GetLaunchDirectory();
     if (launchDirectory.empty()) {
@@ -625,7 +625,7 @@ namespace
       splashPath = canonicalSplashPath;
     }
 
-    msvc8::string splashPathUtf8;
+    fa::string splashPathUtf8;
     splashPathUtf8.assign_owned(splashPath.generic_string());
     return splashPathUtf8;
   }
@@ -643,7 +643,7 @@ namespace
    * two positive integers (`width,height`) or four positive integers
    * (`w0,h0,w1,h1`).
    */
-  [[nodiscard]] bool TryGetWindowOptionArgs(msvc8::vector<msvc8::string>* const outArgs)
+  [[nodiscard]] bool TryGetWindowOptionArgs(fa::vector<fa::string>* const outArgs)
   {
     if (moho::CFG_GetArgOptionComposedAliases(
           moho::CFG_GetDualOptionAliases(),
@@ -674,7 +674,7 @@ namespace
    * Validates fullscreen command-line option arguments as two positive
    * integer dimensions.
    */
-  [[nodiscard]] bool TryGetFullscreenOptionArgs(msvc8::vector<msvc8::string>* const outArgs)
+  [[nodiscard]] bool TryGetFullscreenOptionArgs(fa::vector<fa::string>* const outArgs)
   {
     if (!moho::CFG_GetArgOptionAliases(moho::CFG_GetFullscreenOptionAliases(), 2, outArgs)) {
       return false;
@@ -690,7 +690,7 @@ namespace
    * Validates windowed command-line option arguments as two positive
    * integer dimensions.
    */
-  [[nodiscard]] bool TryGetWindowedOptionArgs(msvc8::vector<msvc8::string>* const outArgs)
+  [[nodiscard]] bool TryGetWindowedOptionArgs(fa::vector<fa::string>* const outArgs)
   {
     // 0x008D02DB-0x008D0331: `/windowed` has to be present with two positive
     // integer dimensions, and there is no fallback of any kind - every other
@@ -709,12 +709,12 @@ namespace
       && IsPositiveIntegerArg((*outArgs)[1]);
   }
 
-  [[nodiscard]] bool IsDisabledAdapterToken(const msvc8::string& value)
+  [[nodiscard]] bool IsDisabledAdapterToken(const fa::string& value)
   {
     return value.equals_no_case("disabled");
   }
 
-  [[nodiscard]] bool IsWindowedAdapterToken(const msvc8::string& value)
+  [[nodiscard]] bool IsWindowedAdapterToken(const fa::string& value)
   {
     return value.equals_no_case("windowed");
   }
@@ -1051,7 +1051,7 @@ bool CScApp::Init()
   (void)SetSse2Mode(moho::CFG_GetArgOption("/sse2", 0, nullptr) ? 1 : 0);
 
   if (moho::CFG_GetArgOption("/splash", 0, nullptr)) {
-    const msvc8::string splashImagePath = BuildSplashImagePath();
+    const fa::string splashImagePath = BuildSplashImagePath();
     moho::WINX_InitSplash(splashImagePath.c_str());
   }
 
@@ -1059,11 +1059,11 @@ bool CScApp::Init()
     return false;
   }
 
-  msvc8::vector<msvc8::string> preferenceArgs;
+  fa::vector<fa::string> preferenceArgs;
   if (moho::CFG_GetArgOption("/prefs", 1, &preferenceArgs) && !preferenceArgs.empty()) {
     moho::USER_LoadPreferences(preferenceArgs[0]);
   } else {
-    moho::USER_LoadPreferences(msvc8::string("Game.prefs"));
+    moho::USER_LoadPreferences(fa::string("Game.prefs"));
   }
 
   // The user-side Lua bootstrap, which the binary runs here: after
@@ -1081,7 +1081,7 @@ bool CScApp::Init()
 
   moho::USER_EnsureDocumentDirectories();
 
-  msvc8::vector<msvc8::string> profileArgs;
+  fa::vector<fa::string> profileArgs;
   if (moho::CFG_GetArgOption("/profile", 1, &profileArgs) && !profileArgs.empty()) {
     moho::USER_SetCurrentProfile(profileArgs[0]);
   }
@@ -1240,9 +1240,9 @@ void CScApp::Main()
   }
   // Engine addition (issue #275): false outside a client started with /rejoin.
   if (moho::REJOIN_SetupPending()) {
-    msvc8::string failureReason;
+    fa::string failureReason;
     bool failed = false;
-    msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo = moho::REJOIN_PollSetup(&failureReason, &failed);
+    fa::auto_ptr<moho::SWldSessionInfo> sessionInfo = moho::REJOIN_PollSetup(&failureReason, &failed);
     if (sessionInfo.get() != nullptr) {
       moho::UI_UpdateRejoinScreen("", -1.0f);
       moho::WLD_BeginSession(sessionInfo);
@@ -1437,7 +1437,7 @@ namespace
       }
     }
 
-    const msvc8::string option = moho::OPTIONS_GetString("graphics_api");
+    const fa::string option = moho::OPTIONS_GetString("graphics_api");
     gpg::Logf("graphics_api option: %s", option.empty() ? "(unset)" : option.c_str());
     static constexpr std::pair<const char*, DeviceApi> kOptions[] = {
       {"d3d9", DeviceApi::Direct3D9}, {"d3d11", DeviceApi::Direct3D11}, {"d3d12", DeviceApi::Direct3D12}, {"vulkan", DeviceApi::Vulkan},
@@ -1463,9 +1463,9 @@ namespace
    * `/title <label>` command-line label to the top-level window's title, e.g.
    * "Forged Alliance [D3D11] replay-26935800", so side-by-side test windows can be told apart.
    */
-  void ApplyWindowTitleDetails(const msvc8::string& baseTitle, const gpg::gal::DeviceContext& context)
+  void ApplyWindowTitleDetails(const fa::string& baseTitle, const gpg::gal::DeviceContext& context)
   {
-    msvc8::vector<msvc8::string> labelArgs;
+    fa::vector<fa::string> labelArgs;
     const bool hasLabel = moho::CFG_GetArgOption("/title", 1, &labelArgs) && !labelArgs.empty();
     const char* const apiName = DeviceApiTitleName(context.mDeviceType);
     if ((!hasLabel && apiName == nullptr) || moho::sMainWindow == nullptr) {
@@ -1511,8 +1511,8 @@ bool CScApp::CreateDevice()
   moho::sDeviceLock = true;
   DeviceLockGuard lockGuard{};
 
-  msvc8::string title("Forged Alliance");
-  msvc8::vector<msvc8::string> options;
+  fa::string title("Forged Alliance");
+  fa::vector<fa::string> options;
   moho::IUserPrefs* const preferences = moho::USER_GetPreferences();
 
   // FAF addition: the renderers to try, in order (RendererAttemptOrder). The
@@ -1569,8 +1569,8 @@ bool CScApp::CreateDevice()
   } else {
     secondarySetupMode = true;
 
-    const msvc8::string secondaryAdapter = moho::OPTIONS_GetString("secondary_adapter");
-    const msvc8::string primaryAdapter = moho::OPTIONS_GetString("primary_adapter");
+    const fa::string secondaryAdapter = moho::OPTIONS_GetString("secondary_adapter");
+    const fa::string primaryAdapter = moho::OPTIONS_GetString("primary_adapter");
 
     if (!IsDisabledAdapterToken(secondaryAdapter) && !IsWindowedAdapterToken(primaryAdapter)) {
       context.AddHead(gpg::gal::Head{});
@@ -1601,8 +1601,8 @@ bool CScApp::CreateDevice()
       }
     } else {
       primaryHead.mWindowed = false;
-      const msvc8::string widthKey("Windows.Main.width");
-      const msvc8::string heightKey("Windows.Main.height");
+      const fa::string widthKey("Windows.Main.width");
+      const fa::string heightKey("Windows.Main.height");
       primaryHead.mWidth = static_cast<std::uint32_t>(
         preferences != nullptr
           ? preferences->GetInteger(widthKey, moho::wnd_DefaultCreateWidth)
@@ -1628,7 +1628,7 @@ bool CScApp::CreateDevice()
   }
 
   const bool maximizeFromPrefs = preferences != nullptr
-                                 && preferences->GetBoolean(msvc8::string("Windows.Main.maximized"), false);
+                                 && preferences->GetBoolean(fa::string("Windows.Main.maximized"), false);
   const bool maximized = !windowedByCommandLine && !primaryHead.mWindowed && (hasMaximizeOption || maximizeFromPrefs);
 
   if (!primaryHead.mWindowed) {
@@ -1636,8 +1636,8 @@ bool CScApp::CreateDevice()
       position.x = ParseIntegerArg(options[0]);
       position.y = ParseIntegerArg(options[1]);
     } else if (preferences != nullptr) {
-      position.x = preferences->GetInteger(msvc8::string("Windows.Main.x"), position.x);
-      position.y = preferences->GetInteger(msvc8::string("Windows.Main.y"), position.y);
+      position.x = preferences->GetInteger(fa::string("Windows.Main.x"), position.x);
+      position.y = preferences->GetInteger(fa::string("Windows.Main.y"), position.y);
     }
 
     ClampPositionToMonitor(&position, primaryHead.mWidth, primaryHead.mHeight);
@@ -1710,7 +1710,7 @@ bool CScApp::CreateDevice()
  * bootstrap handoff for the startup render path.
  */
 bool CScApp::CreateAppFrame(
-  const msvc8::string& title,
+  const fa::string& title,
   const bool maximized,
   const wxPoint& position,
   gpg::gal::DeviceContext& context

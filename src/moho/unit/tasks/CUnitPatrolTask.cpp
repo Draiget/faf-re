@@ -371,7 +371,7 @@ namespace moho
 
       if (task.mMoving) {
         const float topSpeed = unit->mInfoCache.mFormationTopSpeed;
-        const auto expand = msvc8::CeilToIntX87(topSpeed); // 0x0061B644..0x0061B657
+        const auto expand = fa::CeilToIntX87(topSpeed); // 0x0061B644..0x0061B657
         minX -= expand;
         minZ -= expand;
         maxX += expand;

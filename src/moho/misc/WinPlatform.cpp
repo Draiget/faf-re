@@ -524,7 +524,7 @@ bool moho::PLAT_GetSymbolInfo(const std::uintptr_t address, SPlatSymbolInfo* con
   return true;
 }
 
-msvc8::string moho::SPlatSymbolInfo::FormatResolvedLine() const
+fa::string moho::SPlatSymbolInfo::FormatResolvedLine() const
 {
   return gpg::STR_Printf(
     "%s + %zu bytes (%s(%u) + %u bytes)",
@@ -544,11 +544,11 @@ msvc8::string moho::SPlatSymbolInfo::FormatResolvedLine() const
  * What it does:
  * Formats callstack entries from `[firstFrame, endFrame)` into text lines.
  */
-msvc8::string moho::PLAT_FormatCallstack(
+fa::string moho::PLAT_FormatCallstack(
   std::int32_t firstFrame, const std::int32_t endFrame, const std::uintptr_t* const frames
 )
 {
-  msvc8::string formatted;
+  fa::string formatted;
   formatted.assign_owned("");
   if (frames == nullptr || firstFrame >= endFrame) {
     return formatted;
@@ -565,7 +565,7 @@ msvc8::string moho::PLAT_FormatCallstack(
       assembled.append(symbolInfo.FormatResolvedLine().c_str());
       assembled.append("\r\n");
     } else {
-      const msvc8::string line = gpg::STR_Printf("\tUnknown symbol (address %p)\r\n", reinterpret_cast<const void*>(frames[frameIndex]));
+      const fa::string line = gpg::STR_Printf("\tUnknown symbol (address %p)\r\n", reinterpret_cast<const void*>(frames[frameIndex]));
       assembled.append(line.c_str());
     }
   }
@@ -583,11 +583,11 @@ msvc8::string moho::PLAT_FormatCallstack(
  * Converts one decorated symbol into undecorated text under the shared
  * symbol-handler mutex, with optional underscore stripping.
  */
-msvc8::string moho::PLAT_UnDecorateSymbolName(const char* const name, const bool stripLeadingUnderscore)
+fa::string moho::PLAT_UnDecorateSymbolName(const char* const name, const bool stripLeadingUnderscore)
 {
   std::lock_guard<std::recursive_mutex> lock(GetSymHandlerMutex());
 
-  msvc8::string result;
+  fa::string result;
   if (name == nullptr) {
     result.assign_owned("");
     return result;
@@ -611,7 +611,7 @@ msvc8::string moho::PLAT_UnDecorateSymbolName(const char* const name, const bool
  * What it does:
  * Converts current `GetLastError()` value into readable UTF-8 text.
  */
-msvc8::string moho::WIN_GetLastError()
+fa::string moho::WIN_GetLastError()
 {
   const DWORD errorCode = ::GetLastError();
 
@@ -630,7 +630,7 @@ msvc8::string moho::WIN_GetLastError()
     return gpg::STR_Printf("Unknown error 0x%08x", errorCode);
   }
 
-  const msvc8::string message = gpg::STR_WideToUtf8(messageBuffer);
+  const fa::string message = gpg::STR_WideToUtf8(messageBuffer);
   (void)::LocalFree(messageBuffer);
   return message;
 }

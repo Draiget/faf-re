@@ -231,7 +231,7 @@ namespace gpg
      * What it does:
      * Writes string bytes including trailing NUL through inline-buffer fast path or virtual write fallback.
      */
-    void Write(const msvc8::string& str);
+    void Write(const fa::string& str);
 
     /**
      * Address: 0x0043D130 (FUN_0043D130)
@@ -414,7 +414,7 @@ namespace gpg
      * Address: 0x009070B0 (FUN_009070B0)
      *
      * IDA signature:
-     * msvc8::string *__thiscall TextReader::ReadLine(TextReader *this@<ecx>, msvc8::string *result);
+     * fa::string *__thiscall TextReader::ReadLine(TextReader *this@<ecx>, fa::string *result);
      *
      * What it does:
      * Accumulates bytes up to and including the line terminator and returns
@@ -425,7 +425,7 @@ namespace gpg
      * hidden result pointer MSVC passes as the stack argument, which is why
      * the binary ends `ret 4`.
      */
-    [[nodiscard]] msvc8::string ReadLine();
+    [[nodiscard]] fa::string ReadLine();
 
   private:
     Stream* mStream{};
@@ -481,9 +481,9 @@ namespace gpg
      * Address: 0x00957210 (FUN_00957210)
      *
      * What it does:
-     * Writes one msvc8::string payload through WriteChar normalization.
+     * Writes one fa::string payload through WriteChar normalization.
      */
-    void WriteString(const msvc8::string& value);
+    void WriteString(const fa::string& value);
 
     /**
      * Address: 0x00957250 (FUN_00957250)

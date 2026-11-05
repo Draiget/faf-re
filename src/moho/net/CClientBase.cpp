@@ -174,7 +174,7 @@ void CClientBase::Debug()
   gpg::Logf("      mNickname=\"%s\"", mNickname.c_str());
   gpg::Logf("      mIndex=%d", mIndex);
 
-  msvc8::string validSources;
+  fa::string validSources;
   for (auto value = mValidCommandSources.GetNext(std::numeric_limits<unsigned>::max());
        value < mValidCommandSources.Max();
        value = mValidCommandSources.GetNext(value)) {
@@ -192,7 +192,7 @@ void CClientBase::Debug()
   gpg::Logf("      mDispatchedBeat=%d", mDispatchedBeat);
   gpg::Logf("      mAvailableBeatRemote=%d", mAvailableBeatRemote);
 
-  msvc8::string ackList;
+  fa::string ackList;
   for (size_t i = 0; i < mLatestAckReceived.size(); ++i) {
     if (!ackList.empty()) {
       ackList = ackList + ",";
@@ -230,7 +230,7 @@ void CClientBase::Debug()
  * comma-joined from `mSubobj`; the trailing millisecond field is appended only
  * when `mType != Nothing`.
  */
-msvc8::string& moho::FormatBottleneckLabel(const SClientBottleneckInfo& info, msvc8::string& out)
+fa::string& moho::FormatBottleneckLabel(const SClientBottleneckInfo& info, fa::string& out)
 {
   // Type token (switch on mType, 0..3) -> assignment (0x0053B703..0x0053B71F).
   switch (info.mType) {
@@ -830,7 +830,7 @@ bool CClientBase::NoEjectionPending()
 /**
  * Address: 0x0053CA60 (FUN_0053CA60)
  */
-const msvc8::vector<int32_t>* CClientBase::GetLatestAcksVector()
+const fa::vector<int32_t>* CClientBase::GetLatestAcksVector()
 {
   std::scoped_lock lock(mManager->mLock);
   return &mLatestAckReceived;
@@ -892,7 +892,7 @@ void CClientBase::Eject()
 /**
  * Address: 0x0053CC60 (FUN_0053CC60)
  */
-void CClientBase::CollectEjecters(msvc8::vector<const CClientBase*>& out)
+void CClientBase::CollectEjecters(fa::vector<const CClientBase*>& out)
 {
   std::scoped_lock lock(mManager->mLock);
 

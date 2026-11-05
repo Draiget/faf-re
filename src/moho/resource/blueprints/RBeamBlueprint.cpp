@@ -36,7 +36,7 @@ namespace moho
     MedFidelity = 1u;
     LowFidelity = 1u;
 
-    TextureName = msvc8::string{};
+    TextureName = fa::string{};
     StartColor = Vector4f(1.0f, 1.0f, 1.0f, 0.0f);
     EndColor = Vector4f(1.0f, 1.0f, 1.0f, 0.0f);
 
@@ -107,7 +107,7 @@ namespace moho
     RRuleGameRules* rules = nullptr;
     const gpg::RRef owner{};
     archive.ReadPointer(&rules, &owner);
-    msvc8::string id;
+    fa::string id;
     archive.ReadString(&id);
     RResId resId{};
     gpg::STR_CopyFilename(&resId.name, &id);

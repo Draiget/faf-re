@@ -98,7 +98,7 @@ namespace moho
       const VTransform& launchTransform,
       float damage,
       float damageRadius,
-      const msvc8::string& damageTypeName,
+      const fa::string& damageTypeName,
       const CAiTarget& target,
       bool isChildProjectile
     );
@@ -245,7 +245,7 @@ namespace moho
 
     float mDamage;                 // +0x2C8
     float mDamageRadius;           // +0x2CC
-    msvc8::string mDamageTypeName; // +0x2D0
+    fa::string mDamageTypeName; // +0x2D0
     CAiTarget mTargetPosData;      // +0x2EC
 
     /**
@@ -335,7 +335,7 @@ namespace moho
     const VTransform& launchTransform,
     float damage,
     float damageRadius,
-    const msvc8::string& damageTypeName,
+    const fa::string& damageTypeName,
     const CAiTarget& target,
     bool isChildProjectile
   );

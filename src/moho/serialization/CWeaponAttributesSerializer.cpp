@@ -41,7 +41,7 @@ namespace
 
     const char* const expected = gpg::RTypeOf<moho::RUnitBlueprintWeapon>() ? gpg::RTypeOf<moho::RUnitBlueprintWeapon>()->GetName() : "RUnitBlueprintWeapon";
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
       expected ? expected : "RUnitBlueprintWeapon",
       actual ? actual : "null"
@@ -119,7 +119,7 @@ namespace moho
     archive->WriteFloat(mMaxRadius);
     archive->WriteFloat(mMinRadiusSq);
     archive->WriteFloat(mMaxRadiusSq);
-    archive->WriteString(const_cast<msvc8::string*>(&mType));
+    archive->WriteString(const_cast<fa::string*>(&mType));
     archive->WriteFloat(mDamageRadius);
     archive->WriteFloat(mDamage);
     archive->WriteFloat(mUnknown_0044);
@@ -178,7 +178,7 @@ namespace
   {
     gpg::RType* type = gLegacyEntityCategorySetVectorType;
     if (!type) {
-      type = gpg::LookupRType(typeid(msvc8::vector<moho::EntityCategorySet>));
+      type = gpg::LookupRType(typeid(fa::vector<moho::EntityCategorySet>));
       gLegacyEntityCategorySetVectorType = type;
     }
     return type;
@@ -194,7 +194,7 @@ namespace
   {
     gpg::RType* type = gLegacySBlackListInfoVectorType;
     if (!type) {
-      type = gpg::LookupRType(typeid(msvc8::vector<moho::SBlackListInfo>));
+      type = gpg::LookupRType(typeid(fa::vector<moho::SBlackListInfo>));
       gLegacySBlackListInfoVectorType = type;
     }
     return type;
@@ -243,7 +243,7 @@ namespace
     gpg::RRef* const ownerRef
   )
   {
-    ReadObjectByCachedType<msvc8::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
+    ReadObjectByCachedType<fa::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
     return archive;
   }
 
@@ -277,7 +277,7 @@ namespace
     const gpg::RRef* const ownerRef
   )
   {
-    WriteObjectByCachedType<msvc8::vector<moho::EntityCategorySet>>(archive, objectPtr, ownerRef);
+    WriteObjectByCachedType<fa::vector<moho::EntityCategorySet>>(archive, objectPtr, ownerRef);
     return archive;
   }
 
@@ -294,7 +294,7 @@ namespace
     const gpg::RRef* const ownerRef
   )
   {
-    WriteObjectByCachedType<msvc8::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
+    WriteObjectByCachedType<fa::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
     return archive;
   }
 
@@ -339,7 +339,7 @@ namespace
     gpg::RRef* ownerRef
   )
   {
-    ReadObjectByCachedType<msvc8::vector<moho::EntityCategorySet>>(archive, objectPtr, ownerRef);
+    ReadObjectByCachedType<fa::vector<moho::EntityCategorySet>>(archive, objectPtr, ownerRef);
   }
 
   /**
@@ -355,7 +355,7 @@ namespace
     const gpg::RRef* ownerRef
   )
   {
-    WriteObjectByCachedType<msvc8::vector<moho::EntityCategorySet>>(archive, objectPtr, ownerRef);
+    WriteObjectByCachedType<fa::vector<moho::EntityCategorySet>>(archive, objectPtr, ownerRef);
   }
 
   /**
@@ -371,7 +371,7 @@ namespace
     gpg::RRef* ownerRef
   )
   {
-    ReadObjectByCachedType<msvc8::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
+    ReadObjectByCachedType<fa::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
   }
 
   /**
@@ -387,6 +387,6 @@ namespace
     const gpg::RRef* ownerRef
   )
   {
-    WriteObjectByCachedType<msvc8::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
+    WriteObjectByCachedType<fa::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
   }
 } // namespace

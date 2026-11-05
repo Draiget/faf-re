@@ -20,7 +20,7 @@ namespace
  * Copies the transport/attach bone indices directly, relinks the
  * `reservedUnit` weak-pointer node onto the source's owner-chain slot, and
  * assigns the nested `reservedBones` vector via its own `operator=`. The
- * binary tail-calls into `msvc8::vector<int>::operator=` (0x005ED190) for
+ * binary tail-calls into `fa::vector<int>::operator=` (0x005ED190) for
  * the vector member; the equivalent here is the plain `vector<int>`
  * assignment expression, which resolves to that same canonical template
  * method.
@@ -43,7 +43,7 @@ SAiReservedTransportBone& SAiReservedTransportBone::operator=(const SAiReservedT
  * What it does:
  * Memberwise copy construction: both bone indices, the weak unit link (which
  * links the new node into the same owner chain) and the reserved-bones
- * vector. Reached per element from `msvc8::vector<SAiReservedTransportBone>`'s
+ * vector. Reached per element from `fa::vector<SAiReservedTransportBone>`'s
  * `_Uninit_copy` (0x005EFF70) and `resize` (0x005EA590).
  */
 SAiReservedTransportBone::SAiReservedTransportBone(const SAiReservedTransportBone& other)
@@ -76,7 +76,7 @@ void SAiReservedTransportBone::MemberDeserialize(gpg::ReadArchive* const archive
   GPG_ASSERT(weakUnitType != nullptr);
   archive->Read(weakUnitType, &reservedUnit, ownerRef);
 
-  gpg::RType* const intVectorType = gpg::RTypeOf<msvc8::vector<int>>();
+  gpg::RType* const intVectorType = gpg::RTypeOf<fa::vector<int>>();
   GPG_ASSERT(intVectorType != nullptr);
   archive->Read(intVectorType, &reservedBones, ownerRef);
 }
@@ -103,7 +103,7 @@ void SAiReservedTransportBone::MemberSerialize(gpg::WriteArchive* const archive)
   GPG_ASSERT(weakUnitType != nullptr);
   archive->Write(weakUnitType, &reservedUnit, ownerRef);
 
-  gpg::RType* const intVectorType = gpg::RTypeOf<msvc8::vector<int>>();
+  gpg::RType* const intVectorType = gpg::RTypeOf<fa::vector<int>>();
   GPG_ASSERT(intVectorType != nullptr);
   archive->Write(intVectorType, &reservedBones, ownerRef);
 }

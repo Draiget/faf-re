@@ -196,15 +196,15 @@ namespace
  * What it does:
  * Pushes lua traceback text for the provided message and returns it as string.
  */
-msvc8::string moho::SCR_Traceback(LuaPlus::LuaState* const state, const gpg::StrArg message)
+fa::string moho::SCR_Traceback(LuaPlus::LuaState* const state, const gpg::StrArg message)
 {
   if (!state || !state->m_state) {
-    return msvc8::string(message ? message : "");
+    return fa::string(message ? message : "");
   }
 
   (void)lua_traceback(state->m_state, message, 1);
   const char* const traceback = lua_tostring(state->m_state, -1);
-  msvc8::string out(traceback ? traceback : "<non-string traceback>");
+  fa::string out(traceback ? traceback : "<non-string traceback>");
   lua_settop(state->m_state, -2);
   return out;
 }
@@ -374,12 +374,12 @@ int CLuaTask::Execute()
       return ticks;
     }
 
-    const msvc8::string traceback = SCR_Traceback(state, "Invalid args to yield(); tick count must be >=0");
+    const fa::string traceback = SCR_Traceback(state, "Invalid args to yield(); tick count must be >=0");
     gpg::Warnf("%s", traceback.c_str());
     return -1;
   }
 
-  const msvc8::string traceback = SCR_Traceback(state, "Invalid args to yield(); expected tick count");
+  const fa::string traceback = SCR_Traceback(state, "Invalid args to yield(); expected tick count");
   gpg::Warnf("%s", traceback.c_str());
   return -1;
 }
@@ -730,7 +730,7 @@ int moho::cfunc_ResumeThreadL(LuaPlus::LuaState* const state)
   const bool isCoroutine =
     threadState && threadState->m_rootState != threadState && threadState->m_threadObj.m_state == nullptr;
   if (!threadState || isCoroutine) {
-    const msvc8::string traceback = SCR_Traceback(state, kResumeThreadKilledTraceback);
+    const fa::string traceback = SCR_Traceback(state, kResumeThreadKilledTraceback);
     // Logged as data: a traceback quotes script text, '%' included.
     gpg::Warnf("%s", traceback.c_str());
     return 0;

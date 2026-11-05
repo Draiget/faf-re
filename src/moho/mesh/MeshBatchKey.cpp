@@ -76,7 +76,7 @@ namespace moho
    * Returns the instance vector bucketed under `key`, inserting an empty one at
    * the located gap when the key is absent.
    *
-   * The body lives on `msvc8::map::operator[]` (Map.h), which is the single
+   * The body lives on `fa::map::operator[]` (Map.h), which is the single
    * owner of this address; this is the named call shape for the one engine call
    * site (`MeshRenderer::CollectVisibleInstances`). Routing through
    * `operator[]` is what restores the shipped insert hint: 0x007E2C84 calls

@@ -48,7 +48,7 @@ namespace faf::server
     }
 
     std::unique_ptr<LuaPlus::LuaState> lua; // the decoder's own, apart from the sim's
-    msvc8::auto_ptr<gpg::Stream> noRecording;
+    fa::auto_ptr<gpg::Stream> noRecording;
     remote::client::CRemoteClientManager capture;
     std::unique_ptr<moho::CMarshaller> marshaller;
     remote::CViewIdMap noMap{-1};

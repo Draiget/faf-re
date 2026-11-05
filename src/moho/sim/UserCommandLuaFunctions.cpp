@@ -231,7 +231,7 @@ namespace
           const LuaPlus::LuaObject unitObject = bridge->GetLuaObject();
           out.SetObject("userUnit", unitObject);
 
-          const msvc8::string entityIdText = gpg::STR_Printf("%d", unit->mParams.mEntityId);
+          const fa::string entityIdText = gpg::STR_Printf("%d", unit->mParams.mEntityId);
           out.SetString("entityId", entityIdText.c_str());
         }
 
@@ -307,7 +307,7 @@ namespace
     moho::WeakSet<moho::UserEntity> originalSelection(session->mSelection);
     moho::WeakSet<moho::UserEntity> expandedSelection(session->mSelection);
 
-    const msvc8::string wallCategory("WALL");
+    const fa::string wallCategory("WALL");
 
     for (moho::UserEntity* const candidateEntity : collected) {
       moho::UserUnit* const candidate = candidateEntity->IsUserUnit();
@@ -476,8 +476,8 @@ namespace
 
       // Optional engineer/command exclusion (a9).
       if (excludeEngineerCommand) {
-        const msvc8::string engineerCategory("ENGINEER");
-        const msvc8::string commandCategory("COMMAND");
+        const fa::string engineerCategory("ENGINEER");
+        const fa::string commandCategory("COMMAND");
         if (candidate->IsInCategory(engineerCategory) || candidate->IsInCategory(commandCategory)) {
           continue;
         }
@@ -565,13 +565,13 @@ namespace
    * read from the PE `.data` initializer of `stru_F5B518`
    * ("UI_ExpandCurrentSelection").
    */
-  void UI_ExpandCurrentSelection(const msvc8::vector<msvc8::string>& args)
+  void UI_ExpandCurrentSelection(const fa::vector<fa::string>& args)
   {
     (void)args;
 
     moho::CWldSession* const session = moho::WLD_GetActiveSession();
     if (session == nullptr) {
-      const msvc8::string noSessionText = moho::Loc(moho::USER_GetLuaState(), "<LOC _No_session>");
+      const fa::string noSessionText = moho::Loc(moho::USER_GetLuaState(), "<LOC _No_session>");
       moho::CON_Printf(noSessionText.c_str());
       return;
     }
@@ -600,11 +600,11 @@ namespace
    * read from the PE `.data` initializer of `stru_F5B528`
    * ("UI_SelectByCategory").
    */
-  void UI_SelectByCategory(const msvc8::vector<msvc8::string>& args)
+  void UI_SelectByCategory(const fa::vector<fa::string>& args)
   {
     moho::CWldSession* const session = moho::WLD_GetActiveSession();
     if (session == nullptr) {
-      const msvc8::string noSessionText = moho::Loc(moho::USER_GetLuaState(), "<LOC _No_session>");
+      const fa::string noSessionText = moho::Loc(moho::USER_GetLuaState(), "<LOC _No_session>");
       moho::CON_Printf(noSessionText.c_str());
       return;
     }
@@ -632,7 +632,7 @@ namespace
     std::string categoryExpr;
 
     for (std::size_t index = 1u; index < args.size(); ++index) {
-      const msvc8::string* const token = moho::ConCommandArg(args, index);
+      const fa::string* const token = moho::ConCommandArg(args, index);
       if (token == nullptr) {
         continue;
       }
@@ -1263,7 +1263,7 @@ namespace moho
       SSTICommandIssueData factoryCommand(EUnitCommandType::UNITCOMMAND_BuildFactory);
       factoryCommand.mBlueprint = static_cast<RUnitBlueprint*>(blueprint);
 
-      const msvc8::string factoryCategory("FACTORY");
+      const fa::string factoryCategory("FACTORY");
       for (UserEntity* const selectedEntity : session->mSelection) {
         UserUnit* const selectedUnit = selectedEntity->IsUserUnit();
         const moho::IUnit* const factoryUnit = moho::GetIUnitBridge(selectedUnit);
@@ -1461,7 +1461,7 @@ namespace moho
           (void)EntityCategory::Add(&perUnit, &buildable);
 
 
-          msvc8::list<const RUnitBlueprint*> upgradeTargets;
+          fa::list<const RUnitBlueprint*> upgradeTargets;
           CollectUpgradeCommandTargetBlueprints(unit, upgradeTargets);
           for (const RUnitBlueprint* const targetBp : upgradeTargets) {
             const EntityCategorySet* const targetEconomyCat = &targetBp->Economy.CategoryCache;
@@ -1511,7 +1511,7 @@ namespace moho
         moho::ERuleBPUnitCommandCaps cap = static_cast<moho::ERuleBPUnitCommandCaps>(1u << b);
         gpg::RRef capRef{};
         capRef = gpg::MakeRRef<moho::ERuleBPUnitCommandCaps>(&cap);
-        const msvc8::string lexical = capRef.GetLexical();
+        const fa::string lexical = capRef.GetLexical();
         commandCapsTable.SetString(commandRow, lexical.c_str());
         ++commandRow;
       }
@@ -1526,7 +1526,7 @@ namespace moho
         moho::ERuleBPUnitToggleCaps cap = static_cast<moho::ERuleBPUnitToggleCaps>(1u << b);
         gpg::RRef capRef{};
         capRef = gpg::MakeRRef<moho::ERuleBPUnitToggleCaps>(&cap);
-        const msvc8::string lexical = capRef.GetLexical();
+        const fa::string lexical = capRef.GetLexical();
         toggleCapsTable.SetString(toggleRow, lexical.c_str());
         ++toggleRow;
       }
@@ -1645,7 +1645,7 @@ namespace moho
     std::vector<DockCandidate> candidates;
     {
       UserArmy* const focusArmy = session->GetFocusArmy();
-      msvc8::vector<UserUnit*> sessionUnits;
+      fa::vector<UserUnit*> sessionUnits;
       GetSessionUserUnits(session, sessionUnits);
       for (UserUnit* const platform : sessionUnits) {
         if (platform == nullptr) {
@@ -1706,7 +1706,7 @@ namespace moho
     // into every body. The instantiation is catalogued on
     // legacy/algorithms/Sort.h; platforms at equal distance only come out in
     // the original's order through that algorithm, not the modern `std::sort`.
-    msvc8::sort(candidates.data(), candidates.data() + candidates.size(), [](const DockCandidate& a, const DockCandidate& b) {
+    fa::sort(candidates.data(), candidates.data() + candidates.size(), [](const DockCandidate& a, const DockCandidate& b) {
       return a.distSq < b.distSq;
     });
 
@@ -1741,7 +1741,7 @@ namespace moho
         // as a signed `setg` on `freeCapacity` with a `comiss` `distSq`
         // tie-break; the instantiation is catalogued on
         // legacy/algorithms/Sort.h.
-        msvc8::sort(
+        fa::sort(
           nearbyPlatforms.data(),
           nearbyPlatforms.data() + nearbyPlatforms.size(),
           [](const DockCandidate& a, const DockCandidate& b) {
@@ -1982,7 +1982,7 @@ namespace moho
 
     CWldSession* const session = WLD_GetActiveSession();
     if (session == nullptr) {
-      const msvc8::string noSessionText = Loc(USER_GetLuaState(), "<LOC _No_session>");
+      const fa::string noSessionText = Loc(USER_GetLuaState(), "<LOC _No_session>");
       CON_Printf(noSessionText.c_str());
       return 0;
     }
@@ -2078,7 +2078,7 @@ namespace moho
 
     CWldSession* const session = WLD_GetActiveSession();
     if (session == nullptr) {
-      const msvc8::string noSessionText = Loc(USER_GetLuaState(), "<LOC _No_session>");
+      const fa::string noSessionText = Loc(USER_GetLuaState(), "<LOC _No_session>");
       CON_Printf("%s", noSessionText.c_str());
       return 0;
     }
@@ -2153,7 +2153,7 @@ namespace moho
     }
 
     if (WLD_GetActiveSession() == nullptr) {
-      const msvc8::string noSessionText = Loc(USER_GetLuaState(), "<LOC _No_session>");
+      const fa::string noSessionText = Loc(USER_GetLuaState(), "<LOC _No_session>");
       CON_Printf("%s", noSessionText.c_str());
       return 0;
     }

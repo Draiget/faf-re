@@ -27,7 +27,7 @@ namespace moho
 
     std::uint32_t mWidth = 0;                       // +0x00
     std::uint32_t mHeight = 0;                      // +0x04
-    msvc8::vector<std::uint8_t> mDxt5Blocks = {};  // +0x08
+    fa::vector<std::uint8_t> mDxt5Blocks = {};  // +0x08
   };
 
   /**

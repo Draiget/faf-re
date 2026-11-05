@@ -104,8 +104,8 @@ namespace moho
 
     const gpg::RRef ownerRef{};
     archive->WriteUInt(static_cast<std::uint32_t>(mArmyIndex));
-    archive->WriteString(const_cast<msvc8::string*>(&mArmyName));
-    archive->WriteString(const_cast<msvc8::string*>(&mPlayerName));
+    archive->WriteString(const_cast<fa::string*>(&mArmyName));
+    archive->WriteString(const_cast<fa::string*>(&mPlayerName));
     archive->WriteBool(mIsCivilian != 0u);
 
     const auto writeSharedGridPointer = [archive, &ownerRef](const boost::shared_ptr<CIntelGrid>& gridPointer) {

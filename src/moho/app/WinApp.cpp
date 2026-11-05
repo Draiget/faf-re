@@ -1417,7 +1417,7 @@ namespace
       (void)::CloseHandle(processInformation.hThread);
     }
 
-    const msvc8::string outputPathUtf8 = gpg::STR_WideToUtf8(outputPath.c_str());
+    const fa::string outputPathUtf8 = gpg::STR_WideToUtf8(outputPath.c_str());
     if (moho::FILE_GetFileInfo(outputPathUtf8.c_str(), nullptr, false)) {
       moho::PLAT_RegisterFileForErrorReport(outputPath.c_str());
     }
@@ -1565,7 +1565,7 @@ namespace
    * Converts lone `\n` bytes in one UTF-8 crash/body payload into CRLF
    * sequences while preserving existing `\r\n` pairs.
    */
-  [[nodiscard]] msvc8::string NormalizeDialogNewlines(const gpg::StrArg text)
+  [[nodiscard]] fa::string NormalizeDialogNewlines(const gpg::StrArg text)
   {
     const char* const source = text != nullptr ? text : "";
     std::string normalized;
@@ -1580,7 +1580,7 @@ namespace
       previous = current;
     }
 
-    msvc8::string result;
+    fa::string result;
     result.assign_owned(normalized);
     return result;
   }
@@ -1601,7 +1601,7 @@ namespace
       const std::wstring caption = gpg::STR_Utf8ToWide(initData != nullptr ? initData->caption : "");
       (void)::SetWindowTextW(hWnd, caption.c_str());
 
-      const msvc8::string normalizedBody = NormalizeDialogNewlines(initData != nullptr ? initData->body : "");
+      const fa::string normalizedBody = NormalizeDialogNewlines(initData != nullptr ? initData->body : "");
       const std::wstring bodyText = gpg::STR_Utf8ToWide(normalizedBody.c_str());
       (void)::SetDlgItemTextW(hWnd, kCrashTextControlId, bodyText.c_str());
 
@@ -1865,7 +1865,7 @@ namespace
       return;
     }
 
-    const msvc8::string callstackText =
+    const fa::string callstackText =
       moho::PLAT_FormatCallstack(0, static_cast<std::int32_t>(frameCount), stackFrames);
 
     // One Logf per frame. gpg::Logf formats through a bounded buffer, so a
@@ -2295,7 +2295,7 @@ void moho::PLAT_CatchStructuredExceptions()
  * Produces one UTF-8 log-history text blob consumed by crash/report export
  * paths. The current recovered logging backend already applies bounded history.
  */
-msvc8::string moho::LOG_GetRecentLines(const std::uint32_t maxLines)
+fa::string moho::LOG_GetRecentLines(const std::uint32_t maxLines)
 {
   (void)maxLines;
   return gpg::GetRecentLogLines();
@@ -2311,7 +2311,7 @@ msvc8::string moho::LOG_GetRecentLines(const std::uint32_t maxLines)
  */
 void moho::PLAT_CreateGameLogForReport()
 {
-  const msvc8::string recentLogLines = LOG_GetRecentLines(0);
+  const fa::string recentLogLines = LOG_GetRecentLines(0);
   const char* const appShortName = (sSupComApp != nullptr && !sSupComApp->shortName.empty())
                                      ? sSupComApp->shortName.c_str()
                                      : "SupCom";
@@ -2322,8 +2322,8 @@ void moho::PLAT_CreateGameLogForReport()
   HANDLE logFileHandle =
     ::CreateFileW(logFilePath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (logFileHandle == INVALID_HANDLE_VALUE) {
-    const msvc8::string errorText = WIN_GetLastError();
-    const msvc8::string utf8Path = gpg::STR_WideToUtf8(logFilePath.c_str());
+    const fa::string errorText = WIN_GetLastError();
+    const fa::string utf8Path = gpg::STR_WideToUtf8(logFilePath.c_str());
     gpg::Warnf(
       "PLAT_CreateGameLogForReport(\"%s\") log file creation failed: %s",
       utf8Path.c_str(),
@@ -2340,8 +2340,8 @@ void moho::PLAT_CreateGameLogForReport()
         &bytesWritten,
         nullptr
       ) == FALSE) {
-    const msvc8::string errorText = WIN_GetLastError();
-    const msvc8::string utf8Path = gpg::STR_WideToUtf8(logFilePath.c_str());
+    const fa::string errorText = WIN_GetLastError();
+    const fa::string utf8Path = gpg::STR_WideToUtf8(logFilePath.c_str());
     gpg::Warnf(
       "PLAT_CreateGameLogForReport(\"%s\") log file writing failed: %s",
       utf8Path.c_str(),
@@ -2378,7 +2378,7 @@ bool moho::PLAT_SetRegistryValue(
   // `ParseRegistryPathInPlace` can split it; the vector frees itself on every
   // return path, which is what the explicit teardown calls at each `return`
   // used to model.
-  msvc8::vector<std::uint8_t, false> keyBuffer{};
+  fa::vector<std::uint8_t, false> keyBuffer{};
   keyBuffer.resize(std::strlen(keyPath) + 1U);
 
   char* const mutableKeyPath = reinterpret_cast<char*>(keyBuffer.begin());
@@ -2472,7 +2472,7 @@ std::uint32_t moho::PLAT_GetRegistryValue(
   // `ParseRegistryPathInPlace` can split it; the vector frees itself on every
   // return path, which is what the explicit teardown calls at each `return`
   // used to model.
-  msvc8::vector<std::uint8_t, false> keyBuffer{};
+  fa::vector<std::uint8_t, false> keyBuffer{};
   keyBuffer.resize(std::strlen(keyPath) + 1U);
 
   char* const mutableKeyPath = reinterpret_cast<char*>(keyBuffer.begin());
@@ -2513,7 +2513,7 @@ std::uint32_t moho::PLAT_GetRegistryValue(
  * present), converts UTF-16 content to UTF-8, and returns empty text when
  * unavailable.
  */
-msvc8::string moho::WIN_GetClipboardText()
+fa::string moho::WIN_GetClipboardText()
 {
   const HWND ownerWindow = sMainWindow != nullptr
     ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(sMainWindow->GetHandle()))
@@ -2523,7 +2523,7 @@ msvc8::string moho::WIN_GetClipboardText()
     return {};
   }
 
-  msvc8::string clipboardText{};
+  fa::string clipboardText{};
   const HANDLE clipboardData = ::GetClipboardData(CF_UNICODETEXT);
   if (clipboardData != nullptr) {
     const wchar_t* const lockedText = static_cast<const wchar_t*>(::GlobalLock(clipboardData));
@@ -2562,13 +2562,13 @@ void moho::WIN_ShowCrashDialog(
         programFileName,
         static_cast<DWORD>(sizeof(programFileName) / sizeof(programFileName[0]))
       ) != 0) {
-    const msvc8::string programPath = gpg::STR_WideToUtf8(programFileName);
+    const fa::string programPath = gpg::STR_WideToUtf8(programFileName);
     details << "Program : " << programPath.c_str() << "\n";
   } else {
     details << "Program : <unknown>\n";
   }
 
-  const msvc8::string args = CFG_GetArgs();
+  const fa::string args = CFG_GetArgs();
   details << "Cmd line arguments : " << args.c_str() << "\n\n";
   details << "Callstack:\n";
 
@@ -2592,7 +2592,7 @@ void moho::WIN_ShowCrashDialog(
     details << "    unavailable.\n";
     gpg::Logf("CRASH callstack: unavailable.");
   } else {
-    const msvc8::string callstackText =
+    const fa::string callstackText =
       PLAT_FormatCallstack(static_cast<std::int32_t>(firstFrame), static_cast<std::int32_t>(frameCount), stackFrames);
     details << callstackText.c_str();
     gpg::Logf("CRASH callstack:\n%s", callstackText.c_str());
@@ -2600,7 +2600,7 @@ void moho::WIN_ShowCrashDialog(
 
   details << "\n";
   details << "Last 100 lines of log...\n\n";
-  const msvc8::string recentLogLines = LOG_GetRecentLines(100u);
+  const fa::string recentLogLines = LOG_GetRecentLines(100u);
   details << recentLogLines.c_str();
 
   const std::string bodyText = details.str();
@@ -2623,7 +2623,7 @@ void moho::WIN_ShowCrashDialog(
                             &CrashDialogProc,
                             reinterpret_cast<LPARAM>(&dialogInit)
                           ) == -1) {
-    const msvc8::string dialogError = WIN_GetLastError();
+    const fa::string dialogError = WIN_GetLastError();
     gpg::Logf("DialogBoxParam failed: %s", dialogError.c_str());
     WIN_OkBox(dialogInit.caption, dialogInit.body);
   }
@@ -2752,7 +2752,7 @@ wxString moho::WINX_Printf(const char* const format, ...)
   va_list args;
   va_start(args, format);
   const char* formatCursor = format;
-  const msvc8::string formatted = gpg::STR_Va(formatCursor, args);
+  const fa::string formatted = gpg::STR_Va(formatCursor, args);
   va_end(args);
 
   return wxString(gpg::STR_Utf8ToWide(formatted.c_str()).c_str());

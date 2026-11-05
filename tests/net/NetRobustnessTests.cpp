@@ -453,7 +453,7 @@ namespace
   struct DecoderFixture
   {
     CountingSink sink;
-    msvc8::auto_ptr<gpg::Stream> recording;
+    fa::auto_ptr<gpg::Stream> recording;
     CDecoder decoder{&sink, recording, nullptr, &TestLuaState()};
 
     void Feed(const ECmdStreamOp op, const std::string& payload)
@@ -572,7 +572,7 @@ namespace
     float GetTime() override { return 0.0f; }
     void Write(NetDataSpan*) override { ++writes; }
     void Close() override {}
-    msvc8::string ToString() override { return gpg::STR_Printf("fake:%u", static_cast<unsigned>(port)); }
+    fa::string ToString() override { return gpg::STR_Printf("fake:%u", static_cast<unsigned>(port)); }
     void ScheduleDestroy() override { ++destroyRequests; }
   };
 
@@ -936,7 +936,7 @@ namespace
       wire->queue.push_back({toManager, fromIndex, std::string(reinterpret_cast<const char*>(data->start), data->size())});
     }
     void Close() override {}
-    msvc8::string ToString() override { return "wire"; }
+    fa::string ToString() override { return "wire"; }
     void ScheduleDestroy() override {}
   };
 
@@ -1181,7 +1181,7 @@ namespace
       secret = root / "secret.lua";
       WriteText(secret, "return 'outside'");
 
-      msvc8::vector<SVFSMountPoint> mounts;
+      fa::vector<SVFSMountPoint> mounts;
       mounts.push_back(SVFSMountPoint((root / "game").string().c_str(), "/"));
       vfs = new CVFSImpl(mounts, root);
       previous = DISK_ExchangeVFS(vfs);
@@ -1208,7 +1208,7 @@ namespace
 
     bool Finds(const char* const path)
     {
-      msvc8::string found;
+      fa::string found;
       (void)vfs->FindFile(&found, path, nullptr);
       return !found.empty();
     }
@@ -1224,7 +1224,7 @@ namespace
     CHECK(!folder.Finds("/lua/../../secret.lua"));
     CHECK(!folder.Finds("/lua\\..\\..\\secret.lua"));
     CHECK(!folder.vfs->GetFileInfo("/../secret.lua", nullptr));
-    msvc8::vector<msvc8::string> listed;
+    fa::vector<fa::string> listed;
     folder.vfs->EnumerateFiles("/../", "*.lua", false, &listed);
     CHECK(listed.empty());
   }
@@ -1323,7 +1323,7 @@ namespace
       }
       ++tried;
       // Refused, and with a reason the player can be shown.
-      msvc8::string reason;
+      fa::string reason;
       if (VCR_SetupReplaySession(path.c_str(), &reason).get() == nullptr && !reason.empty()) {
         ++refused;
       }

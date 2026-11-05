@@ -88,7 +88,7 @@ namespace moho
     mutable std::uint16_t mState;   // +0x00
     mutable std::uint8_t mResolved; // +0x02
     std::uint8_t mReserved03;       // +0x03
-    msvc8::string mName;            // +0x04
+    fa::string mName;            // +0x04
   };
 
   /**
@@ -98,7 +98,7 @@ namespace moho
    * Returns one interned `CSndVar` for the supplied variable name, creating a
    * new descriptor on first use.
    */
-  CSndVar* SND_FindOrCreateVariable(const msvc8::string& variableName);
+  CSndVar* SND_FindOrCreateVariable(const fa::string& variableName);
 
   static_assert(offsetof(CSndVar, mState) == 0x00, "CSndVar::mState offset must be 0x00");
   static_assert(offsetof(CSndVar, mResolved) == 0x02, "CSndVar::mResolved offset must be 0x02");

@@ -120,7 +120,7 @@ namespace moho
     archive->WriteFloat(mReserved54);
     archive->Write(gpg::RTypeOf<moho::CountedPtr_CParticleTexture>(), &mTexture, nullOwner);
     archive->Write(gpg::RTypeOf<moho::CountedPtr_CParticleTexture>(), &mRampTexture, nullOwner);
-    archive->WriteString(const_cast<msvc8::string*>(&mTypeTag));
+    archive->WriteString(const_cast<fa::string*>(&mTypeTag));
     archive->WriteInt(mArmyIndex);
     archive->Write(ResolveSWorldParticleBlendModeType(), &mBlendMode, nullOwner);
     archive->Write(ResolveSWorldParticleZModeType(), &mZMode, nullOwner);

@@ -61,10 +61,10 @@ namespace moho
      */
     ~SaveLoadError() noexcept override;
 
-    [[nodiscard]] const msvc8::string& GetRawMessage() const noexcept;
+    [[nodiscard]] const fa::string& GetRawMessage() const noexcept;
 
   private:
-    msvc8::string mRawMessage;
+    fa::string mRawMessage;
   };
 
   /**
@@ -114,8 +114,8 @@ namespace moho
     ~CSaveGameRequestImpl();
 
   private:
-    msvc8::string mSavePath;                    // +0x04
-    msvc8::string mSessionName;                 // +0x20
+    fa::string mSavePath;                    // +0x04
+    fa::string mSessionName;                 // +0x20
     LuaPlus::LuaObject mCompletionCallback;     // +0x3C
     boost::shared_ptr<std::FILE> mFile;         // +0x50
     gpg::WriteArchive* mArchive = nullptr;      // +0x58

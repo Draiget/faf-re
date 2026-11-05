@@ -54,7 +54,7 @@ namespace faf::remote::client
     }
 
     template <class Entry>
-    [[nodiscard]] std::unordered_map<std::uint32_t, const Entry*> IndexById(const msvc8::vector<Entry>& entries)
+    [[nodiscard]] std::unordered_map<std::uint32_t, const Entry*> IndexById(const fa::vector<Entry>& entries)
     {
       std::unordered_map<std::uint32_t, const Entry*> index;
       index.reserve(entries.size());
@@ -64,7 +64,7 @@ namespace faf::remote::client
       return index;
     }
 
-    [[nodiscard]] std::unordered_set<std::uint32_t> IdSet(const msvc8::vector<moho::EntId>& ids)
+    [[nodiscard]] std::unordered_set<std::uint32_t> IdSet(const fa::vector<moho::EntId>& ids)
     {
       std::unordered_set<std::uint32_t> set;
       for (const moho::EntId id : ids) {
@@ -210,16 +210,16 @@ namespace faf::remote::client
 
   void CSyncRebuilder::UnpackUnitDetail(const wire::SUnitDetail& detail, moho::SSTIUnitVariableData& data)
   {
-    const auto name = [&](const std::uint32_t id) -> msvc8::string {
+    const auto name = [&](const std::uint32_t id) -> fa::string {
       if (id == wire::COrdinalTable::kNone) {
-        return msvc8::string();
+        return fa::string();
       }
       const std::string* const text = mSession != nullptr ? mSession->Names().Find(id) : nullptr;
       if (text == nullptr) {
         ++mStats.unknownTableIds;
-        return msvc8::string();
+        return fa::string();
       }
-      return msvc8::string(text->c_str());
+      return fa::string(text->c_str());
     };
     data.mCreator = static_cast<moho::EntId>(detail.creator);
     data.mCreationTick = detail.creationTick;
@@ -300,7 +300,7 @@ namespace faf::remote::client
           ++mStats.unknownTableIds;
           continue;
         }
-        item->mValue = msvc8::string(text->c_str());
+        item->mValue = fa::string(text->c_str());
       } else if (stat.realtime) {
         item->mRealtimeValueBits = static_cast<std::int32_t>(stat.bits);
       } else {
@@ -390,7 +390,7 @@ namespace faf::remote::client
       std::copy_n(sim->data, static_cast<std::size_t>(sim->width) * static_cast<std::size_t>(sim->height), mTerrain->data);
     }
     const std::vector<wire::STerrainEdit> edits = mSession->TakeTerrainEdits();
-    msvc8::vector<gpg::Rect2i> rects;
+    fa::vector<gpg::Rect2i> rects;
     for (const wire::STerrainEdit& edit : edits) {
       gpg::Rect2i rect{};
       rect.x0 = edit.dirty.x0;
@@ -441,8 +441,8 @@ namespace faf::remote::client
     }
     // The process's interned params for these names, as `Sound{...}` makes them.
     mSounds[id] = moho::SND_FindOrCreateParams(
-      msvc8::string(entry->bank.c_str()), msvc8::string(entry->cue.c_str()), msvc8::string(entry->lodCutoff.c_str()),
-      msvc8::string(entry->rpcLoop.c_str())
+      fa::string(entry->bank.c_str()), fa::string(entry->cue.c_str()), fa::string(entry->lodCutoff.c_str()),
+      fa::string(entry->rpcLoop.c_str())
     );
     return mSounds[id];
   }
@@ -542,10 +542,10 @@ namespace faf::remote::client
     const auto packetErased = IdSet(packet.mEraseIds);
     const auto packetDeleted = IdSet(packet.mDeleteIds);
 
-    msvc8::vector<moho::SCreateEntityParams> newEntities;
-    msvc8::vector<moho::SCreateUnitParams> newUnits;
-    msvc8::vector<moho::EntId> eraseIds;
-    msvc8::vector<moho::EntId> deleteIds;
+    fa::vector<moho::SCreateEntityParams> newEntities;
+    fa::vector<moho::SCreateUnitParams> newUnits;
+    fa::vector<moho::EntId> eraseIds;
+    fa::vector<moho::EntId> deleteIds;
     std::unordered_set<std::uint32_t> createdNow;
     std::unordered_set<std::uint32_t> erasedNow; // still updated this beat: `DoBeat` erases after updates
 
@@ -655,7 +655,7 @@ namespace faf::remote::client
       const auto it = mHeld.find(id);
       return it != mHeld.end() && (it->second.live || erasedNow.count(id) != 0u);
     };
-    msvc8::vector<moho::SEntityVariableUpdateEntry> entityUpdates;
+    fa::vector<moho::SEntityVariableUpdateEntry> entityUpdates;
     entityUpdates.reserve(packet.mEntityUpdates.size() + delta.changed.size() + delta.created.size());
     // `frame.entities` and the delta's changes are both in id order: one cursor walks the changes.
     auto changeCursor = delta.changed.begin();
@@ -759,7 +759,7 @@ namespace faf::remote::client
     // animation poses still come from the packet (the pose lane is WP8), so a unit the packet
     // updates gets an update too, to carry them.
     const auto packetUnitUpdates = IndexById(packet.mUnitUpdates);
-    msvc8::vector<moho::SUnitVariableUpdateEntry> unitUpdates;
+    fa::vector<moho::SUnitVariableUpdateEntry> unitUpdates;
     unitUpdates.reserve(packet.mUnitUpdates.size() + delta.changed.size());
     {
       auto changeIt = delta.changed.begin();

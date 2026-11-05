@@ -87,11 +87,11 @@ std::string FileStream::IOError::BuildMessage(const DWORD messageId)
             nullptr));
 
     if (length <= 0 || systemText == nullptr) {
-        const msvc8::string unknownText = gpg::STR_Printf("Unknown error 0x%08x", messageId);
+        const fa::string unknownText = gpg::STR_Printf("Unknown error 0x%08x", messageId);
         return std::string(unknownText.c_str());
     }
 
-    const msvc8::string utf8Message = gpg::STR_WideToUtf8(systemText);
+    const fa::string utf8Message = gpg::STR_WideToUtf8(systemText);
     ::LocalFree(systemText);
     return std::string(utf8Message.c_str());
 }

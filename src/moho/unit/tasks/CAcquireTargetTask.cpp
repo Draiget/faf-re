@@ -85,7 +85,7 @@ namespace
 
     const char* const expectedName = expectedType ? expectedType->GetName() : "null";
     const char* const actualName = source.GetTypeName();
-    const msvc8::string errorMessage = gpg::STR_Printf(
+    const fa::string errorMessage = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
       expectedName ? expectedName : "null",
       actualName ? actualName : "null"
@@ -319,7 +319,7 @@ namespace moho
     // Reschedule interval: ceil(TargetCheckInterval * 10) clamped to at least 1,
     // then +1 (the ">= 2 => wait N-1 beats" band). This is the default return.
     const float intervalTicksFloat = weaponBlueprint->TargetCheckInterval * 10.0f;
-    int intervalTicks = msvc8::CeilToIntX87(intervalTicksFloat); // 0x005D8D5B..0x005D8D6E
+    int intervalTicks = fa::CeilToIntX87(intervalTicksFloat); // 0x005D8D5B..0x005D8D6E
     if (intervalTicks < 1) {
       intervalTicks = 1;
     }

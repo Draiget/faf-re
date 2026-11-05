@@ -219,16 +219,16 @@ namespace gpg
    */
   const char* RFastVectorType<moho::CAniPoseBone>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::CAniPoseBone>()->GetName());
+    static const fa::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::CAniPoseBone>()->GetName());
     return sName.c_str();
   }
 
   /**
    * Address: 0x0054C740 (FUN_0054C740, gpg::RFastVectorType_CAniPoseBone::GetLexical)
    */
-  msvc8::string RFastVectorType<moho::CAniPoseBone>::GetLexical(const gpg::RRef& ref) const
+  fa::string RFastVectorType<moho::CAniPoseBone>::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 

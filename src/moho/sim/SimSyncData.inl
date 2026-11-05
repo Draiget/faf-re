@@ -156,7 +156,7 @@ CSyncObserver* Sim::SyncObserver() noexcept
  * What it does:
  * Builds one checksum-log file path as `<prefix>beat%05d.log`.
  */
-[[nodiscard]] static msvc8::string FormatBeatLogFilePath(const msvc8::string& logFilePrefix, const int beat)
+[[nodiscard]] static fa::string FormatBeatLogFilePath(const fa::string& logFilePrefix, const int beat)
 {
   return gpg::STR_Printf("%sbeat%05d.log", logFilePrefix.c_str(), beat);
 }
@@ -189,7 +189,7 @@ void Sim::FlushLog()
   const int checksumPeriod = ReadSimConVarInt(this, &gSimConVar_sim_ChecksumPeriod, 0);
   const int retainedLogCount = checksumPeriod + 20;
   while (static_cast<int>(mDesyncLogLines.size()) > retainedLogCount) {
-    const msvc8::string staleLogPath = mDesyncLogLines.front();
+    const fa::string staleLogPath = mDesyncLogLines.front();
     mDesyncLogLines.erase(mDesyncLogLines.begin());
 
     if (!DeleteFileA(staleLogPath.c_str())) {
@@ -397,7 +397,7 @@ namespace
    * the binary's early-out for uninitialized vectors.
    */
   template <class TDebugRecord>
-  [[nodiscard]] std::size_t DebugVectorSizeThunk(const msvc8::vector<TDebugRecord>* const vec) noexcept
+  [[nodiscard]] std::size_t DebugVectorSizeThunk(const fa::vector<TDebugRecord>* const vec) noexcept
   {
     const TDebugRecord* const first = vec ? vec->data() : nullptr;
     if (first == nullptr) {
@@ -416,13 +416,13 @@ namespace
  * int __thiscall sub_452110(int *this);
  *
  * What it does:
- * Out-of-line `msvc8::vector<SDebugWorldText>::size()` specialization
+ * Out-of-line `fa::vector<SDebugWorldText>::size()` specialization
  * thunk used by `CDebugCanvas::worldText`. Returns zero when the
  * vector's `first_` pointer is still null, matching the binary's
  * early-out; otherwise returns `(last_ - first_) / sizeof(SDebugWorldText)`
  * (element size `0x30`).
  */
-std::size_t GetDebugWorldTextCount(const msvc8::vector<SDebugWorldText>* const worldText) noexcept
+std::size_t GetDebugWorldTextCount(const fa::vector<SDebugWorldText>* const worldText) noexcept
 {
   return DebugVectorSizeThunk<SDebugWorldText>(worldText);
 }
@@ -434,11 +434,11 @@ std::size_t GetDebugWorldTextCount(const msvc8::vector<SDebugWorldText>* const w
  * int __thiscall sub_452160(int *this);
  *
  * What it does:
- * Out-of-line `msvc8::vector<SDebugScreenText>::size()` specialization
+ * Out-of-line `fa::vector<SDebugScreenText>::size()` specialization
  * thunk (element size `0x48`). Same shape as
  * `GetDebugWorldTextCount`.
  */
-std::size_t GetDebugScreenTextCount(const msvc8::vector<SDebugScreenText>* const screenText) noexcept
+std::size_t GetDebugScreenTextCount(const fa::vector<SDebugScreenText>* const screenText) noexcept
 {
   return DebugVectorSizeThunk<SDebugScreenText>(screenText);
 }
@@ -450,11 +450,11 @@ std::size_t GetDebugScreenTextCount(const msvc8::vector<SDebugScreenText>* const
  * int __thiscall sub_4521B0(int *this);
  *
  * What it does:
- * Out-of-line `msvc8::vector<SDebugDecal>::size()` specialization
+ * Out-of-line `fa::vector<SDebugDecal>::size()` specialization
  * thunk (element size `0x34`). Same shape as
  * `GetDebugWorldTextCount`.
  */
-std::size_t GetDebugDecalCount(const msvc8::vector<SDebugDecal>* const decals) noexcept
+std::size_t GetDebugDecalCount(const fa::vector<SDebugDecal>* const decals) noexcept
 {
   return DebugVectorSizeThunk<SDebugDecal>(decals);
 }
@@ -636,19 +636,19 @@ Sim::Sim(LaunchInfoBase* const info)
   (void)CopyConstructCommandSourceVector(info->mCommandSources.mSrcs, &mCommandSources);
 
   // Optionally open the per-beat synclog when /synclog was requested.
-  msvc8::vector<msvc8::string> synclogArgs;
+  fa::vector<fa::string> synclogArgs;
   if (CFG_GetArgOption("/synclog", 1u, &synclogArgs) && !synclogArgs.empty()) {
-    const msvc8::string& synclogDir = synclogArgs.front();
+    const fa::string& synclogDir = synclogArgs.front();
     ::CreateDirectoryA(synclogDir.c_str(), nullptr);
 
-    const msvc8::string filenamePrefix = LOG_GenerateFilenamePrefix();
-    const msvc8::string prefixWithSlash = synclogDir + msvc8::string("/");
-    mLogFilePrefix.assign(prefixWithSlash + filenamePrefix, 0, msvc8::string::npos);
+    const fa::string filenamePrefix = LOG_GenerateFilenamePrefix();
+    const fa::string prefixWithSlash = synclogDir + fa::string("/");
+    mLogFilePrefix.assign(prefixWithSlash + filenamePrefix, 0, fa::string::npos);
 
     ::CreateDirectoryA(mLogFilePrefix.c_str(), nullptr);
     (void)mLogFilePrefix.append("/", 1u);
 
-    const msvc8::string beatFile = FormatBeatLogFilePath(mLogFilePrefix, static_cast<int>(mCurBeat));
+    const fa::string beatFile = FormatBeatLogFilePath(mLogFilePrefix, static_cast<int>(mCurBeat));
     mLog = std::fopen(beatFile.c_str(), "w");
   }
 
@@ -692,7 +692,7 @@ Sim::Sim(LaunchInfoBase* const info)
   mLuaState->m_luaTask = reinterpret_cast<CLuaTask*>(&mDiskWatcherTaskStage);
 
   {
-    gpg::LogScopeEntry luaBpScope(msvc8::string("MEM: %i bytes LUABP"));
+    gpg::LogScopeEntry luaBpScope(fa::string("MEM: %i bytes LUABP"));
     mRules->ExportToLuaState(mLuaState);
     luaBpScope.Emit();
   }
@@ -709,7 +709,7 @@ Sim::Sim(LaunchInfoBase* const info)
 
   // Allocate the occupation grid.
   {
-    gpg::LogScopeEntry ogridScope(msvc8::string("MEM: %i bytes OGRID"));
+    gpg::LogScopeEntry ogridScope(fa::string("MEM: %i bytes OGRID"));
     auto* const newGrid = new COGrid(this);
     COGrid* const previousGrid = mOGrid;
     mOGrid = newGrid;

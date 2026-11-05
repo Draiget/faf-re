@@ -87,7 +87,7 @@ namespace gpg::gal
     [[nodiscard]] std::size_t DataSizeBytes() const noexcept;
 
     std::uint32_t source_ = 0;                            // +0x04
-    msvc8::string location_{};                            // +0x08
+    fa::string location_{};                            // +0x08
     gpg::MemBuffer<const char> dataBuffer_{};             // +0x24, shared owner and native pointer bounds
     std::uint32_t type_ = 0;                              // +0x34
     std::uint32_t usage_ = 0;                             // +0x38

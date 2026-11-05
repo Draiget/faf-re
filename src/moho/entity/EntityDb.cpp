@@ -180,7 +180,7 @@ namespace
   {
     gpg::RType* type = gLegacyEntityDbEntityListType;
     if (!type) {
-      type = gpg::LookupRType(typeid(msvc8::list<moho::Entity*>));
+      type = gpg::LookupRType(typeid(fa::list<moho::Entity*>));
       gLegacyEntityDbEntityListType = type;
     }
     return type;
@@ -305,7 +305,7 @@ namespace
   [[nodiscard]] moho::CEntityDbAllUnitsNode*
   TreeLowerBound(moho::CEntityDbAllUnitsNode* const head, const std::uint32_t lowerBoundKey) noexcept
   {
-    return msvc8::lower_bound_node<moho::CEntityDbAllUnitsNode, &moho::CEntityDbAllUnitsNode::isNil>(
+    return fa::lower_bound_node<moho::CEntityDbAllUnitsNode, &moho::CEntityDbAllUnitsNode::isNil>(
       head, lowerBoundKey, [](const auto& node, const std::uint32_t key) {
       return node.key < key;
     }
@@ -736,7 +736,7 @@ namespace
     moho::CEntityDbAllUnitsNode* const last
   )
   {
-    using Map = msvc8::map<std::uint32_t, moho::Entity*>;
+    using Map = fa::map<std::uint32_t, moho::Entity*>;
     const Map::const_iterator firstIt(reinterpret_cast<Map::const_iterator::node_type*>(first));
     const Map::const_iterator lastIt(reinterpret_cast<Map::const_iterator::node_type*>(last));
     const Map::iterator next = entityDb->mAllUnits.erase(firstIt, lastIt);
@@ -979,7 +979,7 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName = gpg::STR_Printf(
+      static const fa::string sName = gpg::STR_Printf(
         "map<%s,%s>", gpg::LookupRType(typeid(unsigned int))->GetName(), gpg::RTypeOf<moho::IdPool>()->GetName()
       );
       return sName.c_str();
@@ -991,10 +991,10 @@ namespace
      * What it does:
      * Formats inherited lexical text and appends current map element count.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override
     {
-      const msvc8::string base = gpg::RType::GetLexical(ref);
-      const auto* const map = static_cast<const msvc8::map<std::uint32_t, moho::IdPool>*>(ref.mObj);
+      const fa::string base = gpg::RType::GetLexical(ref);
+      const auto* const map = static_cast<const fa::map<std::uint32_t, moho::IdPool>*>(ref.mObj);
       const int size = map ? static_cast<int>(map->size()) : 0;
       return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
     }
@@ -1005,7 +1005,7 @@ namespace
      * What it does:
      * Sets the reflected object size to the real `map<uint,IdPool>` ABI
      * footprint (12 bytes: `{proxy, head, size}`, matching
-     * `msvc8::map<std::uint32_t, IdPool>` exactly -- not the unrelated size a
+     * `fa::map<std::uint32_t, IdPool>` exactly -- not the unrelated size a
      * modern `std::map<>` local variable would report) and installs the
      * map's load/save reflection callbacks. The binary writes these two
      * function pointers directly at `this+0x1C`/`this+0x14`; this override
@@ -1013,7 +1013,7 @@ namespace
      */
     void Init() override
     {
-      size_ = sizeof(msvc8::map<std::uint32_t, moho::IdPool>);
+      size_ = sizeof(fa::map<std::uint32_t, moho::IdPool>);
       version_ = 1;
       serLoadFunc_ = &EntityDbIdPoolMapTypeInfo::SerLoad;
       serSaveFunc_ = &EntityDbIdPoolMapTypeInfo::SerSave;
@@ -1025,13 +1025,13 @@ namespace
      * What it does:
      * Clears the destination map, reads the element count, then reads and
      * inserts `count` `(key, IdPool)` pairs in archive order. Clearing is
-     * `msvc8::map::clear()` (binary: `FUN_00688030` destroys the subtree from
+     * `fa::map::clear()` (binary: `FUN_00688030` destroys the subtree from
      * the real root, then self-links the header -- see the
      * `rb_tree::destroy_subtree`/`clear()` citations in RbTree.h); each
-     * insert is `msvc8::map::insert()`, i.e. `rb_tree::insert_unique()`
+     * insert is `fa::map::insert()`, i.e. `rb_tree::insert_unique()`
      * (`FUN_006870D0`) linking through `insert_at`/`buy_node`/the rotate pair
      * (`FUN_00687280`/`FUN_006881C0`/`FUN_006880A0`/`FUN_00688120`, all cited
-     * on their RbTree.h members) exactly as every other `msvc8::map`
+     * on their RbTree.h members) exactly as every other `fa::map`
      * instantiation in this codebase does -- no per-map reimplementation.
      */
     static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
@@ -1041,7 +1041,7 @@ namespace
      *
      * What it does:
      * Writes the element count, then walks the map in ascending key order
-     * writing each `(key, IdPool)` pair. The walk is `msvc8::map`'s
+     * writing each `(key, IdPool)` pair. The walk is `fa::map`'s
      * `begin()`/`operator++` (`FUN_006878C0`/its register-shape adapters
      * `FUN_00685FA0`/`FUN_00686CE0`, cited on `rb_increment` in RbTree.h) --
      * no separate iteration mechanic is introduced here.
@@ -1082,7 +1082,7 @@ namespace
   )
   {
     auto* const map =
-      reinterpret_cast<msvc8::map<std::uint32_t, moho::IdPool>*>(objectPtr);
+      reinterpret_cast<fa::map<std::uint32_t, moho::IdPool>*>(objectPtr);
     if (archive == nullptr || map == nullptr) {
       return;
     }
@@ -1101,7 +1101,7 @@ namespace
       moho::IdPool pool{};
       archive->Read(idPoolType, &pool, owner);
 
-      (void)map->insert(msvc8::map<std::uint32_t, moho::IdPool>::value_type(key, std::move(pool)));
+      (void)map->insert(fa::map<std::uint32_t, moho::IdPool>::value_type(key, std::move(pool)));
     }
   }
 
@@ -1120,7 +1120,7 @@ namespace
   )
   {
     const auto* const map =
-      reinterpret_cast<const msvc8::map<std::uint32_t, moho::IdPool>*>(objectPtr);
+      reinterpret_cast<const fa::map<std::uint32_t, moho::IdPool>*>(objectPtr);
     if (archive == nullptr || map == nullptr) {
       return;
     }
@@ -1163,7 +1163,7 @@ namespace moho
    * `mIdPoolTree`'s sentinel-head allocate/self-link/isNil=1 sequence, inlined
    * here in the binary via the raw node allocator (`FUN_00688180`, cited on
    * `rb_tree::alloc_raw` in RbTree.h) rather than a named `buy_head` symbol,
-   * is now `msvc8::map<std::uint32_t, IdPool>`'s own default constructor --
+   * is now `fa::map<std::uint32_t, IdPool>`'s own default constructor --
    * see the `buy_head()` citation on that member in RbTree.h. No source-level
    * call is needed here; member default-initialization runs it automatically.
    */
@@ -1179,7 +1179,7 @@ namespace moho
    *
    * `mIdPoolTree`'s teardown -- recursive subtree destroy from the tree's
    * root (`FUN_00688030`, cited on `rb_tree::destroy_subtree` in RbTree.h),
-   * then release the sentinel head -- is now `msvc8::map<std::uint32_t,
+   * then release the sentinel head -- is now `fa::map<std::uint32_t,
    * IdPool>`'s own destructor (see the `~rb_tree()` citation on that member),
    * run automatically by member destruction right after this body returns.
    * (A prior hand-rolled version of this teardown recursed from
@@ -1482,7 +1482,7 @@ namespace moho
    * Exchanges two heap slots and keeps everything that refers to them
    * correct. `.asm`-confirmed: the entry array sits at `[queue+4]` and the
    * position map at `[queue+0x14]` (`mov eax,[eax+4]` / `mov edx,[eax+14h]`
-   * -- the `_Myfirst` of two `msvc8::vector`s at `+0x00`/`+0x10`). Each
+   * -- the `_Myfirst` of two `fa::vector`s at `+0x00`/`+0x10`). Each
    * 0x14-byte slot is one `CEntityDbBoundedPropQueueNode`, and `std::swap`
    * on two of them is a copy into a temporary and two assignments through
    * the node's `operator=` (0x00687A70), which relinks each `mOwnerLink`
@@ -1517,7 +1517,7 @@ namespace moho
    * Acquires one handle slot from the free-list lane (`lastHandle`) when
    * available; otherwise appends one new handle slot and returns its index.
    * `.c`-confirmed two-way split matches this method exactly. The
-   * capacity-exhausted append path reaches `msvc8::vector<std::int32_t>::
+   * capacity-exhausted append path reaches `fa::vector<std::int32_t>::
    * push_back`/`insert` (0x00686E80/0x00687B40, ICF-shared with
    * `ClusterSearchOpenHeapRuntime::mHandleToHeapIndex`, cited on
    * `legacy/containers/Vector.h`) through `handleSlots.push_back(payload)`.
@@ -1948,7 +1948,7 @@ namespace moho
    *
    * What it does:
    * Constructs the `gpg::RListType<moho::Entity*>` static, which preregisters
-   * it for `typeid(msvc8::list<moho::Entity*>)` (`EntityDB::mEntList`), and
+   * it for `typeid(fa::list<moho::Entity*>)` (`EntityDB::mEntList`), and
    * returns it.
    *
    * `RListType<Entity*>`:

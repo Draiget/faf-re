@@ -70,7 +70,7 @@ namespace gpg::gal
      * Walks the effect's techniques by index and appends a wrapper for every
      * valid one.
      */
-    void GetTechniques(msvc8::vector<boost::shared_ptr<EffectTechnique>>& outTechniques) override;
+    void GetTechniques(fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques) override;
 
     /**
      * Address: 0x0094B8A0 (FUN_0094B8A0)

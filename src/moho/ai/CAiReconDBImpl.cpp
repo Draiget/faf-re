@@ -335,14 +335,14 @@ namespace
    * copyable POD (`Unit* sourceUnit; uint8_t fake; EReconFlags
    * detectedFlags;`) and `push_back`'s growth-fill emission at this call
    * site (`FUN_005CBC70`, a 3-dword-stride uninit_fill_n loop) matches
-   * `msvc8::vector<T>::push_back`'s shape exactly, not the real STL's.
-   * Retyped to `msvc8::vector<SNewBlip>` across this helper, `GenerateNewBlips`,
+   * `fa::vector<T>::push_back`'s shape exactly, not the real STL's.
+   * Retyped to `fa::vector<SNewBlip>` across this helper, `GenerateNewBlips`,
    * and `UpdateBlips` (see their own citations) to match the binary; this
    * caller now correctly reaches `legacy/containers/Vector.h`'s shared
    * `push_back` template member.
    */
   void AppendPendingNewBlip(
-    msvc8::vector<CAiReconDBImpl::SNewBlip>& pending,
+    fa::vector<CAiReconDBImpl::SNewBlip>& pending,
     Unit* const sourceUnit,
     const std::uint8_t fake,
     const EReconFlags detectedFlags
@@ -768,7 +768,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
     }
   }
 
-  msvc8::vector<SNewBlip> pendingNewBlips{};
+  fa::vector<SNewBlip> pendingNewBlips{};
   std::size_t queryIndex = 0; // sim_ReconQueryCache: this unit's place among the queried ones
   if (mSim->mEntityDB) {
     // 0x005C104C: `CUnitIterAllArmies(Sim*)` walks only the unit-family prefix
@@ -998,14 +998,14 @@ void CAiReconDBImpl::CheckIntelEvents(ReconBlip* const blip, const int oldFlags,
 /**
  * Address: 0x005C0A70 (FUN_005C0A70, Moho::CAiReconDBImpl::GenerateNewBlips)
  *
- * msvc8::vector<SNewBlip> const &
+ * fa::vector<SNewBlip> const &
  *
  * What it does:
  * Materializes pending blips, updates per-army blip state, inserts them into
  * the recon blip map and the influence map, and fires `OnDetectedBy` on each
  * detected unit.
  */
-void CAiReconDBImpl::GenerateNewBlips(const msvc8::vector<SNewBlip>& pending)
+void CAiReconDBImpl::GenerateNewBlips(const fa::vector<SNewBlip>& pending)
 {
   for (const SNewBlip& candidate : pending) {
     ReconBlip* const blip = FindOrCreateBlip(candidate);
@@ -1396,7 +1396,7 @@ void CAiReconDBImpl::UpdateBlip(ReconBlip* const blip, Unit* const sourceUnit, s
 /**
  * Address: 0x005C1F80 (FUN_005C1F80, Moho::CAiReconDBImpl::UpdateBlips)
  *
- * range-pair, Unit *, EReconFlags, msvc8::vector<SNewBlip> &
+ * range-pair, Unit *, EReconFlags, fa::vector<SNewBlip> &
  *
  * IDA signature:
  * void __thiscall Moho::CAiReconDBImpl::UpdateBlips(
@@ -1415,7 +1415,7 @@ void CAiReconDBImpl::UpdateBlips(
   const ReconBlipMap::iterator end,
   Unit* const sourceUnit,
   const EReconFlags detectedFlags,
-  msvc8::vector<CAiReconDBImpl::SNewBlip>& pending
+  fa::vector<CAiReconDBImpl::SNewBlip>& pending
 )
 {
   // ReconTick hands over the range it already looked up; the binary never
@@ -1988,7 +1988,7 @@ void CAiReconDBImpl::ReconGetBlips(
  * What it does:
  * Returns the per-army current blip list container by reference.
  */
-const msvc8::vector<ReconBlip*>& CAiReconDBImpl::ReconGetBlips() const
+const fa::vector<ReconBlip*>& CAiReconDBImpl::ReconGetBlips() const
 {
   return mBblips;
 }

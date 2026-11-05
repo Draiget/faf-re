@@ -31,9 +31,9 @@ namespace
  * What it does:
  * Returns a copy of the string referenced by ref.mObj.
  */
-msvc8::string RStringType::GetLexical(const gpg::RRef& ref) const
+fa::string RStringType::GetLexical(const gpg::RRef& ref) const
 {
-  const auto* const value = static_cast<const msvc8::string*>(ref.mObj);
+  const auto* const value = static_cast<const fa::string*>(ref.mObj);
   return *value;
 }
 
@@ -41,12 +41,12 @@ msvc8::string RStringType::GetLexical(const gpg::RRef& ref) const
  * Address: 0x008DF200 (FUN_008DF200, RStringType::SetLexical)
  *
  * What it does:
- * Assigns null-terminated `str` into the msvc8::string at *ref.mObj.
+ * Assigns null-terminated `str` into the fa::string at *ref.mObj.
  */
 bool RStringType::SetLexical(const gpg::RRef& ref, const char* const str) const
 {
-  auto* const out = static_cast<msvc8::string*>(ref.mObj);
-  *out = msvc8::string{str, std::strlen(str)};
+  auto* const out = static_cast<fa::string*>(ref.mObj);
+  *out = fa::string{str, std::strlen(str)};
   return true;
 }
 
@@ -58,7 +58,7 @@ RStringType::~RStringType() = default;
 stringTypeInfo::stringTypeInfo()
   : RStringType()
 {
-  gpg::PreRegisterRType(typeid(msvc8::string), this);
+  gpg::PreRegisterRType(typeid(fa::string), this);
 }
 
 stringTypeInfo::~stringTypeInfo() = default;
@@ -70,12 +70,12 @@ const char* stringTypeInfo::GetName() const { return "std::string"; }
  * Address: 0x008E0510
  *
  * What it does:
- * Sets size = 28 (msvc8::string layout) and finalizes.
+ * Sets size = 28 (fa::string layout) and finalizes.
  */
 void stringTypeInfo::Init()
 {
-  static_assert(sizeof(msvc8::string) == 28, "msvc8::string is 28 bytes on x86");
-  size_ = sizeof(msvc8::string);
+  static_assert(sizeof(fa::string) == 28, "fa::string is 28 bytes on x86");
+  size_ = sizeof(fa::string);
   Finish();
 }
 

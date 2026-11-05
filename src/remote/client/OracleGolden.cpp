@@ -323,7 +323,7 @@ namespace faf::remote::client
 
   bool InstallOracleGoldenFromCommandLine()
   {
-    msvc8::vector<msvc8::string> args;
+    fa::vector<fa::string> args;
     if (!moho::CFG_GetArgOption("/oraclegolden", 1, &args) || args.empty()) {
       return false;
     }

@@ -5,9 +5,9 @@ namespace gpg::gal
 namespace
 {
 
-    // `{proxy, first, last, end}` at 0x10 is `msvc8::vector<EffectMacro>`
+    // `{proxy, first, last, end}` at 0x10 is `fa::vector<EffectMacro>`
     // itself, so the lane is the container, not a view over it.
-    using EffectMacroVector = msvc8::vector<EffectMacro>;
+    using EffectMacroVector = fa::vector<EffectMacro>;
 
     static_assert(sizeof(EffectMacroVector) == 0x10, "EffectMacroVector size must be 0x10");
 

@@ -52,7 +52,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef NewPrefetchSetRef()
   {
-    // msvc8::vector's default constructor already null-initialises all three
+    // fa::vector's default constructor already null-initialises all three
     // lanes; the binary's explicit zeroing here IS that constructor inlined.
     moho::CPrefetchSet* const object = new (std::nothrow) moho::CPrefetchSet();
     return gpg::RRef(object, gpg::RTypeOf<moho::CPrefetchSet>());
@@ -69,7 +69,7 @@ namespace
   {
     auto* const object = static_cast<moho::CPrefetchSet*>(objectStorage);
     if (object != nullptr) {
-      // Placement-new runs msvc8::vector's default constructor, which is what
+      // Placement-new runs fa::vector's default constructor, which is what
       // the binary's explicit lane zeroing right after it is.
       new (object) moho::CPrefetchSet();
     }
@@ -92,7 +92,7 @@ namespace
       return;
     }
 
-    object->mHandles = msvc8::vector<moho::PrefetchHandleBase>{};
+    object->mHandles = fa::vector<moho::PrefetchHandleBase>{};
 
     ::operator delete(object);
   }
@@ -112,7 +112,7 @@ namespace
       return;
     }
 
-    object->mHandles = msvc8::vector<moho::PrefetchHandleBase>{};
+    object->mHandles = fa::vector<moho::PrefetchHandleBase>{};
   }
 
   /**
@@ -315,7 +315,7 @@ namespace moho
       return;
     }
 
-    msvc8::string resourcePath{};
+    fa::string resourcePath{};
     archive->ReadString(&resourcePath);
 
     const gpg::TypeHandle typeHandle = archive->ReadTypeHandle();
@@ -332,7 +332,7 @@ namespace moho
   /**
    * Address: 0x004ABE00 (FUN_004ABE00, Moho::PrefetchHandleBase::GetName)
    */
-  const msvc8::string& PrefetchHandleBase::GetName() const
+  const fa::string& PrefetchHandleBase::GetName() const
   {
     GPG_ASSERT(mPtr.get() != nullptr && mPtr->mRecord != nullptr);
     return mPtr->mRecord->mId.name;

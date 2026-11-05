@@ -57,9 +57,9 @@ namespace moho
     &telemetry_Enabled
   );
 
-  msvc8::string telemetry_Endpoint = kDefaultEndpoint.c_str();
+  fa::string telemetry_Endpoint = kDefaultEndpoint.c_str();
 
-  TConVar<msvc8::string> gTConVar_telemetry_Endpoint(
+  TConVar<fa::string> gTConVar_telemetry_Endpoint(
     "telemetry_Endpoint",
     "OpenTelemetry collector base URL for telemetry_Enabled (/v1/logs is appended); default the faf-re desync server.",
     &telemetry_Endpoint
@@ -67,17 +67,17 @@ namespace moho
 
   // The desync server's upload token. It ships with every build, so it is no secret: it only keeps
   // casual junk out. Reading what arrived needs the server's read token, which never leaves it.
-  msvc8::string telemetry_Token = "faf-ckSHHu7NnIZu3HNnseugwrGz";
+  fa::string telemetry_Token = "faf-ckSHHu7NnIZu3HNnseugwrGz";
 
-  TConVar<msvc8::string> gTConVar_telemetry_Token(
+  TConVar<fa::string> gTConVar_telemetry_Token(
     "telemetry_Token",
     "Ingest token sent as 'Authorization: Bearer <token>' with telemetry records; empty sends none.",
     &telemetry_Token
   );
 
-  msvc8::string telemetry_DumpEndpoint = (kDefaultEndpoint + "/dumps").c_str();
+  fa::string telemetry_DumpEndpoint = (kDefaultEndpoint + "/dumps").c_str();
 
-  TConVar<msvc8::string> gTConVar_telemetry_DumpEndpoint(
+  TConVar<fa::string> gTConVar_telemetry_DumpEndpoint(
     "telemetry_DumpEndpoint",
     "URL the desync dump is POSTed to as .tar.gz; default the faf-re desync server. "
     "The dump holds player names and the sync log. Empty uploads nothing.",
@@ -347,7 +347,7 @@ namespace moho
     /// The folder of `/log <file>`, else the working folder.
     [[nodiscard]] std::filesystem::path OutboxFolder()
     {
-      msvc8::vector<msvc8::string> args;
+      fa::vector<fa::string> args;
       if (CFG_GetArgOption("/log", 1u, &args) && !args.empty()) {
         std::error_code error;
         const std::filesystem::path folder = std::filesystem::path(args[0].c_str()).parent_path();
@@ -746,7 +746,7 @@ namespace moho
       return;
     }
     sStarted = true;
-    msvc8::vector<msvc8::string> args;
+    fa::vector<fa::string> args;
     if (CFG_GetArgOption("/notelemetry", 0u, nullptr)) {
       telemetry_Enabled = false;
     }

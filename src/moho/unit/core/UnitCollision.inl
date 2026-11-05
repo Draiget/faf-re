@@ -195,11 +195,11 @@ void Unit::InitializeArmor()
 
   const RUnitBlueprint* const blueprint = GetBlueprint();
   const char* const armorTypeName = (blueprint != nullptr) ? blueprint->Defense.ArmorType.c_str() : "";
-  const msvc8::list<msvc8::string> armorDefinitions = ARMOR_GetArmorDefinations(unitObject.GetActiveState(), armorTypeName);
+  const fa::list<fa::string> armorDefinitions = ARMOR_GetArmorDefinations(unitObject.GetActiveState(), armorTypeName);
 
-  for (const msvc8::string& armorDefinition : armorDefinitions) {
+  for (const fa::string& armorDefinition : armorDefinitions) {
     const char* definitionCursor = armorDefinition.c_str();
-    msvc8::string damageTypeName{};
+    fa::string damageTypeName{};
     if (!gpg::STR_GetToken(definitionCursor, " ", damageTypeName)) {
       continue;
     }
@@ -216,7 +216,7 @@ void Unit::InitializeArmor()
  * Applies one armor multiplier lane to incoming damage when the incoming
  * damage-type token exists in `ArmorMultipliers`.
  */
-float Unit::ProcessArmorOnDamage(const float amount, const msvc8::string damageType) const
+float Unit::ProcessArmorOnDamage(const float amount, const fa::string damageType) const
 {
   float scaledAmount = amount;
   if (const auto match = ArmorMultipliers.find(damageType); match != ArmorMultipliers.end()) {
@@ -233,7 +233,7 @@ float Unit::ProcessArmorOnDamage(const float amount, const msvc8::string damageT
  * Returns this unit's armor multiplier for one damage type. A damage type the
  * blueprint never listed returns 1.0, so it passes through unmodified.
  */
-float Unit::GetArmorMult(const msvc8::string& damageType) const
+float Unit::GetArmorMult(const fa::string& damageType) const
 {
   if (const auto match = ArmorMultipliers.find(damageType); match != ArmorMultipliers.end()) {
     return match->second;

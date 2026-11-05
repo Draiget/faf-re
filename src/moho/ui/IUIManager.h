@@ -148,7 +148,7 @@ namespace moho
 
   struct UICommandModeData
   {
-    msvc8::string mMode;          // +0x00
+    fa::string mMode;          // +0x00
     LuaPlus::LuaObject mPayload{}; // +0x1C
 
     /**
@@ -347,5 +347,5 @@ namespace moho
    * Builds one Lua table from desync payload strings and invokes
    * `/lua/ui/uimain.lua:ShowDesyncDialog(sessionTick, payloadTable)`.
    */
-  void UI_ShowDesyncDialog(int sessionTick, const msvc8::vector<msvc8::string>& payloadLines);
+  void UI_ShowDesyncDialog(int sessionTick, const fa::vector<fa::string>& payloadLines);
 } // namespace moho

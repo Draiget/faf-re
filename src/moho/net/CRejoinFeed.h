@@ -197,7 +197,7 @@ namespace moho
     const char* peers,
     int localSource,
     unsigned short localPort,
-    msvc8::string* failureReason
+    fa::string* failureReason
   );
 
   /// Whether `REJOIN_BeginSetup` has started something `REJOIN_PollSetup` hasn't finished.
@@ -210,7 +210,7 @@ namespace moho
    * One frame of the wait. The session once everything has come; otherwise null,
    * with `*failed` set and `failureReason` filled if it never will.
    */
-  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo> REJOIN_PollSetup(msvc8::string* failureReason, bool* failed);
+  [[nodiscard]] fa::auto_ptr<SWldSessionInfo> REJOIN_PollSetup(fa::string* failureReason, bool* failed);
 
   /**
    * Engine addition (issue #275): when a save came with this client's seat, makes

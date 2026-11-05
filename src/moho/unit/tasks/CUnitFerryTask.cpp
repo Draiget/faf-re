@@ -87,13 +87,13 @@ namespace
 
   // Owns the teardown of one local route-command vector. The binary destroys
   // these locals with `WeakPtr_CUnitCommand::destruct_range` (FUN_005A2270)
-  // followed by `operator delete`; `msvc8::vector`'s own destructor does not
+  // followed by `operator delete`; `fa::vector`'s own destructor does not
   // unlink the intrusive weak nodes, so this guard is the one owner of that
   // teardown on every exit path (including exceptions, matching the binary's
   // SEH unwind funclets).
   struct ScopedRouteCommandVector
   {
-    msvc8::vector<moho::WeakPtr<moho::CUnitCommand>> commands{};
+    fa::vector<moho::WeakPtr<moho::CUnitCommand>> commands{};
 
     ScopedRouteCommandVector() = default;
     ScopedRouteCommandVector(const ScopedRouteCommandVector&) = delete;
@@ -584,7 +584,7 @@ namespace moho
    *   (FUN_0060DAE0) compared against decoded beacon (0x0060ECB1-0x0060ECCD);
    *   on match, assign from that transport's queue (0x0060ECFC-0x0060ED0A).
    */
-  void CUnitFerryTask::GetUnitCommands(msvc8::vector<WeakPtr<CUnitCommand>>& outCommands)
+  void CUnitFerryTask::GetUnitCommands(fa::vector<WeakPtr<CUnitCommand>>& outCommands)
   {
     outCommands = mUnit->CommandQueue->mCommandVec;
 

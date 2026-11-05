@@ -202,11 +202,11 @@ namespace
     const Wm3::Vec3f& size,
     moho::Sim* const sim,
     const float duration,
-    const msvc8::string& textureNamePrimary,
-    const msvc8::string& textureNameSecondary,
+    const fa::string& textureNamePrimary,
+    const fa::string& textureNameSecondary,
     const float lodParam,
     const bool isSplat,
-    const msvc8::string& typeName,
+    const fa::string& typeName,
     const std::uint32_t armyIndex,
     const std::uint32_t fidelity
   )
@@ -1522,7 +1522,7 @@ namespace moho
     }
     const float lifetime = lua_tonumber(rawState, 5);
 
-    msvc8::string texturePrimary{};
+    fa::string texturePrimary{};
     if (lua_isstring(rawState, 6)) {
       LuaPlus::LuaStackObject textureArg(state, 6);
       const char* const textureName = lua_tostring(rawState, 6);
@@ -1532,7 +1532,7 @@ namespace moho
       texturePrimary.assign_owned(textureName);
     }
 
-    msvc8::string textureSecondary{};
+    fa::string textureSecondary{};
     if (lua_isstring(rawState, 7)) {
       LuaPlus::LuaStackObject rampArg(state, 7);
       const char* const rampName = lua_tostring(rawState, 7);
@@ -1618,7 +1618,7 @@ namespace moho
     }
     const float lifetime = lua_tonumber(rawState, 5);
 
-    msvc8::string texturePrimary{};
+    fa::string texturePrimary{};
     if (lua_isstring(rawState, 6)) {
       LuaPlus::LuaStackObject textureArg(state, 6);
       const char* const textureName = lua_tostring(rawState, 6);
@@ -1628,7 +1628,7 @@ namespace moho
       texturePrimary.assign_owned(textureName);
     }
 
-    msvc8::string textureSecondary{};
+    fa::string textureSecondary{};
     if (lua_isstring(rawState, 7)) {
       LuaPlus::LuaStackObject rampArg(state, 7);
       const char* const rampName = lua_tostring(rawState, 7);
@@ -2286,7 +2286,7 @@ namespace moho
     if (primaryTexture == nullptr) {
       primaryTextureArg.TypeError("string");
     }
-    msvc8::string textureNamePrimary{};
+    fa::string textureNamePrimary{};
     textureNamePrimary.assign_owned(primaryTexture);
 
     LuaPlus::LuaStackObject secondaryTextureArg(state, 4);
@@ -2294,7 +2294,7 @@ namespace moho
     if (secondaryTexture == nullptr) {
       secondaryTextureArg.TypeError("string");
     }
-    msvc8::string textureNameSecondary{};
+    fa::string textureNameSecondary{};
     textureNameSecondary.assign_owned(secondaryTexture);
 
     LuaPlus::LuaStackObject typeArg(state, 5);
@@ -2302,7 +2302,7 @@ namespace moho
     if (typeNameRaw == nullptr) {
       typeArg.TypeError("string");
     }
-    msvc8::string typeName{};
+    fa::string typeName{};
     typeName.assign_owned(typeNameRaw);
 
     LuaPlus::LuaStackObject sizeXArg(state, 6);
@@ -2432,7 +2432,7 @@ namespace moho
     if (textureNameRaw == nullptr) {
       textureArg.TypeError("string");
     }
-    msvc8::string textureNamePrimary{};
+    fa::string textureNamePrimary{};
     textureNamePrimary.assign_owned(textureNameRaw);
 
     LuaPlus::LuaStackObject sizeXArg(state, 4);
@@ -2473,8 +2473,8 @@ namespace moho
     }
 
     const VTransform transform = BuildHeadingTransform(position, heading);
-    const msvc8::string textureNameSecondary{};
-    const msvc8::string typeName{};
+    const fa::string textureNameSecondary{};
+    const fa::string typeName{};
 
     Sim* const sim = ResolveGlobalSim(rawState);
     (void)CreateDecalFromTransform(
@@ -2557,7 +2557,7 @@ namespace moho
     if (textureNameRaw == nullptr) {
       textureArg.TypeError("string");
     }
-    msvc8::string textureNamePrimary{};
+    fa::string textureNamePrimary{};
     textureNamePrimary.assign_owned(textureNameRaw);
 
     LuaPlus::LuaStackObject sizeXArg(state, 5);
@@ -2599,8 +2599,8 @@ namespace moho
     transform.pos_.y += worldOffset.y;
     transform.pos_.z += worldOffset.z;
 
-    const msvc8::string textureNameSecondary{};
-    const msvc8::string typeName{};
+    const fa::string textureNameSecondary{};
+    const fa::string typeName{};
 
     Sim* const sim = ResolveGlobalSim(rawState);
     (void)CreateDecalFromTransform(

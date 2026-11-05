@@ -78,7 +78,7 @@
     },
     {
       "name": "clang-x64-release-pgogen",
-      "displayName": "clang-cl x64 Release (records a profile for clang-x64-release-pgo)",
+      "displayName": "clang-cl x64 Release (records a profile for clang-x64-release)",
       "inherits": "clang-x64-release",
       "cacheVariables": { "FAF_PGO_GENERATE": "ON", "FAF_PGO_PROFILE": "" }
     },

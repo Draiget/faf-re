@@ -65,7 +65,7 @@ namespace moho
     /**
      * Address: 0x00654550 (FUN_00654550, Moho::CEffectImpl::GetStringParam)
      */
-    msvc8::string* GetStringParam(std::int32_t paramIndex) override;
+    fa::string* GetStringParam(std::int32_t paramIndex) override;
 
     /**
      * Address: 0x00654570 (FUN_00654570, Moho::CEffectImpl::GetTextureParam)
@@ -148,7 +148,7 @@ namespace moho
     std::uint32_t mUnknown44;         // +0x44
     gpg::fastvector_n<float, 26> mParams; // +0x48
     gpg::fastvector_n<CParticleTexture*, 2> mParticleTextures; // +0xC0
-    gpg::fastvector_n<msvc8::string, 2> mStrings; // +0xD8
+    gpg::fastvector_n<fa::string, 2> mStrings; // +0xD8
     SEntAttachInfo mEntityInfo;       // +0x120
     std::uint8_t mNewAttachment;      // +0x14C
     std::uint8_t mPad14D[0x03];       // +0x14D

@@ -532,8 +532,8 @@ namespace moho
      */
     void TransportFindAttachList(
       int unitClass,
-      msvc8::vector<SAttachPoint>& attachPoints,
-      msvc8::vector<SAttachPoint>& outAttachPoints,
+      fa::vector<SAttachPoint>& attachPoints,
+      fa::vector<SAttachPoint>& outAttachPoints,
       int& outAttachSize
     );
 
@@ -545,25 +545,25 @@ namespace moho
      * Rebuilds one destination attach-point vector from source lanes using the
      * same zero-init + resize + copy sequence as the VC8 helper constructor.
      */
-    static msvc8::vector<SAttachPoint>* CopyAttachPointVector(
-      const msvc8::vector<SAttachPoint>& source,
-      msvc8::vector<SAttachPoint>& destination
+    static fa::vector<SAttachPoint>* CopyAttachPointVector(
+      const fa::vector<SAttachPoint>& source,
+      fa::vector<SAttachPoint>& destination
     );
 
     /**
      * Address: 0x005E4D40 (FUN_005E4D40)
      */
-    msvc8::vector<int> GetClosestAttachPointsTo(msvc8::vector<SAttachPoint> attachPoints, int hookIndex, int attachSize);
+    fa::vector<int> GetClosestAttachPointsTo(fa::vector<SAttachPoint> attachPoints, int hookIndex, int attachSize);
 
     /**
      * Address: 0x005E4F00 (FUN_005E4F00)
      */
-    bool IsBoneReserved(msvc8::vector<int> boneIndices);
+    bool IsBoneReserved(fa::vector<int> boneIndices);
 
     /**
      * Address: 0x005E4FA0 (FUN_005E4FA0)
      */
-    void ReserveBone(unsigned int bestAttachBoneIndex, Unit* unit, unsigned int transportBoneIndex, msvc8::vector<int> boneIndices);
+    void ReserveBone(unsigned int bestAttachBoneIndex, Unit* unit, unsigned int transportBoneIndex, fa::vector<int> boneIndices);
 
   public:
     static gpg::RType* sType;
@@ -581,17 +581,17 @@ namespace moho
     EntitySetTemplate<Unit> mUnitSet30; // +0x30
     EntitySetTemplate<Unit> mStoredUnits; // +0x58
     EntitySetTemplate<Unit> mUnitSet80; // +0x80
-    msvc8::vector<SAiReservedTransportBone> mReservedBones; // +0xA8
+    fa::vector<SAiReservedTransportBone> mReservedBones; // +0xA8
     STransportPickUpInfo mPickupInfo; // +0xB8
     IFormationInstance* mWaitingFormation; // +0x110
     Wm3::Vec3f mPickupFacing; // +0x114
-    msvc8::vector<SAttachPoint> mGenericAttachPoints; // +0x120
-    msvc8::vector<SAttachPoint> mClass1AttachPoints; // +0x130
-    msvc8::vector<SAttachPoint> mClass2AttachPoints; // +0x140
-    msvc8::vector<SAttachPoint> mClass3AttachPoints; // +0x150
-    msvc8::vector<SAttachPoint> mClass4AttachPoints; // +0x160
-    msvc8::vector<SAttachPoint> mClassSAttachPoints; // +0x170
-    msvc8::vector<SAttachPoint> mLaunchAttachPoints; // +0x180
+    fa::vector<SAttachPoint> mGenericAttachPoints; // +0x120
+    fa::vector<SAttachPoint> mClass1AttachPoints; // +0x130
+    fa::vector<SAttachPoint> mClass2AttachPoints; // +0x140
+    fa::vector<SAttachPoint> mClass3AttachPoints; // +0x150
+    fa::vector<SAttachPoint> mClass4AttachPoints; // +0x160
+    fa::vector<SAttachPoint> mClassSAttachPoints; // +0x170
+    fa::vector<SAttachPoint> mLaunchAttachPoints; // +0x180
   };
 
   static_assert(sizeof(CAiTransportImpl) == 0x190, "CAiTransportImpl size must be 0x190");

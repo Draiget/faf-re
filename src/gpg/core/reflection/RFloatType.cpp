@@ -34,11 +34,11 @@ extern "C" double __cdecl EngineAtofForward(const char* text)
  * value at `ref.mObj` using `sprintf("%f", ...)` into the buffer, then trims
  * the string to the actual printed character count before returning.
  */
-msvc8::string RFloatType::GetLexical(const gpg::RRef& ref) const
+fa::string RFloatType::GetLexical(const gpg::RRef& ref) const
 {
   const float value = *static_cast<const float*>(ref.mObj);
 
-  msvc8::string result;
+  fa::string result;
   result.resize(30, '\0');
 
   const int n = std::sprintf(result.raw_data_mut_unsafe(), "%f", value);

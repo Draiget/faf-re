@@ -539,7 +539,7 @@ namespace moho
     // Both locals are built whether or not sharing is on, and live to the end
     // of the function (0x00772058 fetches the allies, 0x0077205A-0x0077208A
     // arms the two-slot inline buffer).
-    msvc8::vector<CArmyImpl*> allies;
+    fa::vector<CArmyImpl*> allies;
     army->GetAlliedArmies(&allies);
     gpg::fastvector_n<CEconomy*, 2> recipients;
 

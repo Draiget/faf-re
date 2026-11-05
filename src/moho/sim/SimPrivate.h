@@ -975,7 +975,7 @@ namespace
   // addresses, just one definition instead of two.
 
   /**
-   * Address: 0x005347A0 (FUN_005347A0, msvc8::vector<Moho::RBlueprint*>::push_back)
+   * Address: 0x005347A0 (FUN_005347A0, fa::vector<Moho::RBlueprint*>::push_back)
    *
    * IDA signature:
    * unsigned int __usercall sub_5347A0@<eax>(RBlueprint **value@<eax>,
@@ -1000,7 +1000,7 @@ namespace
       return;
     }
 
-    // push_back's capacity-full path is `msvc8::vector<RBlueprint*>::insert`
+    // push_back's capacity-full path is `fa::vector<RBlueprint*>::insert`
     // (FUN_00535D60), reached through the binary's push_back at FUN_005347A0.
     rules.mBlueprintsByOrdinal.push_back(static_cast<RBlueprint*>(blueprintObject));
   }
@@ -1018,14 +1018,14 @@ namespace
    * (RRuleGameRules.cpp), matching a pending/dirty-set role.
    *
    * The binary performs this as the loop at 0x00529BE3-0x00529C0B, calling
-   * `func_MapInsert` / `FUN_0052BC60` (`msvc8::detail::rb_tree<...>::
-   * insert_unique` for the `msvc8::set<uint32_t>` embedded at
+   * `func_MapInsert` / `FUN_0052BC60` (`fa::detail::rb_tree<...>::
+   * insert_unique` for the `fa::set<uint32_t>` embedded at
    * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` -- see the
    * citation block on `insert_unique` in RbTree.h) on `binding + 4` for
    * every existing `[mMaps.begin(), mMaps.end())` binding, using the
    * blueprint's `mBlueprintOrdinal` (+0x5C) as the key.
    *
-   * `mMaps` is a real `msvc8::vector<RRuleGameRulesLuaExportBinding>`
+   * `mMaps` is a real `fa::vector<RRuleGameRulesLuaExportBinding>`
    * (RRuleGameRules.h); this walk uses its own `begin()`/`end()` instead of
    * the hand-rolled `mBegin`/`mEnd` pointer fields the now-removed
    * `RRuleGameRulesLuaExportBindingArray` used to expose.
@@ -1112,7 +1112,7 @@ namespace
     allBlueprints.SetObject(blueprint->mBlueprintId.c_str(), luaBlueprint);
   }
 
-  [[nodiscard]] msvc8::string ResolveNormalizedBlueprintId(const LuaPlus::LuaObject& blueprintSpec)
+  [[nodiscard]] fa::string ResolveNormalizedBlueprintId(const LuaPlus::LuaObject& blueprintSpec)
   {
     LuaPlus::LuaObject idObject = blueprintSpec.GetByName("BlueprintId");
     const char* const rawId = idObject.GetString();
@@ -1154,9 +1154,9 @@ namespace
     }
 
     LuaPlus::LuaObject blueprintSpec(LuaPlus::LuaStackObject(state, 1));
-    const msvc8::string normalizedId = ResolveNormalizedBlueprintId(blueprintSpec);
+    const fa::string normalizedId = ResolveNormalizedBlueprintId(blueprintSpec);
 
-    const msvc8::string logContextText =
+    const fa::string logContextText =
       gpg::STR_Printf("Initializing %s blueprint for %s", blueprintTypeName, normalizedId.c_str());
     gpg::ScopedLogContext logScope(logContextText);
     if (CFG_GetArgOption("/spewbp", 0u, nullptr)) {
@@ -1206,9 +1206,9 @@ namespace
     }
 
     LuaPlus::LuaObject blueprintSpec(LuaPlus::LuaStackObject(state, 1));
-    const msvc8::string normalizedId = ResolveNormalizedBlueprintId(blueprintSpec);
+    const fa::string normalizedId = ResolveNormalizedBlueprintId(blueprintSpec);
 
-    const msvc8::string logContextText =
+    const fa::string logContextText =
       gpg::STR_Printf("Initializing %s blueprint for %s", blueprintTypeName, normalizedId.c_str());
     gpg::ScopedLogContext logScope(logContextText);
 

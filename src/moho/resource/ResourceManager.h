@@ -44,7 +44,7 @@ namespace moho
      */
     ResourceWatch(gpg::StrArg path, CResourceWatcher* watcher);
 
-    msvc8::string mPath;          // +0x08
+    fa::string mPath;          // +0x08
     CResourceWatcher* mWatcher;   // +0x24 (cleared when the watcher dies mid-notification)
     bool mNotifying;              // +0x28 (set while `OnDiskWatchEvent` holds this node)
   };
@@ -116,7 +116,7 @@ namespace moho
   // The node is 0x50 with the colour byte at +0x4C: the record itself is the
   // element (0x004AD790 reads the candidate's name through value+0x04/+0x18
   // and its type through value+0x1C).
-  using ResourceRecordSet = msvc8::set<ResourceRecord, ResourceRecordLess>;
+  using ResourceRecordSet = fa::set<ResourceRecord, ResourceRecordLess>;
 
   /**
    * VFTABLE: 0x00E07604
@@ -275,13 +275,13 @@ namespace moho
     [[nodiscard]] boost::shared_ptr<void> LoadRecord(ResourceRecord& record, boost::recursive_mutex::scoped_lock& lock);
 
     mutable boost::recursive_mutex mLock;                                     // +0x30
-    msvc8::vector<ResourceFactoryBase*> mPendingFactories;                    // +0x3C
-    msvc8::map<const gpg::RType*, ResourceFactoryBase*> mFactories;           // +0x4C
+    fa::vector<ResourceFactoryBase*> mPendingFactories;                    // +0x3C
+    fa::map<const gpg::RType*, ResourceFactoryBase*> mFactories;           // +0x4C
     bool mRunning;                                                            // +0x58
     int mLoadsInProgress;                                                     // +0x5C
     boost::xtime mLastLoadTime;                                               // +0x60
     ResourceRecordSet mRecords;                                               // +0x70
-    msvc8::deque<boost::weak_ptr<PrefetchData>> mPrefetchQueue;               // +0x7C
+    fa::deque<boost::weak_ptr<PrefetchData>> mPrefetchQueue;               // +0x7C
     boost::condition mPrefetchQueued;                                         // +0x90
     boost::condition mLoadFinished;                                           // +0xA8
     boost::scoped_ptr<boost::thread> mPrefetchThread;                         // +0xC0

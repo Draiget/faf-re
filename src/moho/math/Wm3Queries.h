@@ -19,7 +19,7 @@
 // from retail where an intermediate leaves the float range (difffuzz, the
 // collision primitives' rows). Moho::CColPrimitive's tests, projectiles and
 // unit steering run in the simulation, so these are ported from the retail
-// functions with msvc8::X87Float; the vision and pick-ray tests follow the same
+// functions with fa::X87Float; the vision and pick-ray tests follow the same
 // rules. Algorithms and names are Wild Magic's (Geometric Tools, Inc., Wild
 // Magic 3 license, version 1.0c; dependencies/WildMagic3p8/License).
 //

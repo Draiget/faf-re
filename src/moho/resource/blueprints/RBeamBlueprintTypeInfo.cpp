@@ -142,7 +142,7 @@ void RBeamBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeInfo
     typeInfo->AddField<float>("Lifetime", offsetof(RBeamBlueprint, Lifetime), 3, "Lifetime of the emitter");
     typeInfo->AddField<float>("Thickness", offsetof(RBeamBlueprint, Thickness), 3, "Thickness of the beam");
     typeInfo->AddField<float>("LODCutoff", offsetof(RBeamBlueprint, LODCutoff), 3, "cutoff distance");
-    typeInfo->AddField<msvc8::string>("TextureName", offsetof(RBeamBlueprint, TextureName), 3, "Filename of texture");
+    typeInfo->AddField<fa::string>("TextureName", offsetof(RBeamBlueprint, TextureName), 3, "Filename of texture");
     gpg::RField* const startColorField = typeInfo->AddField<moho::Vector4f>("StartColor", offsetof(RBeamBlueprint, StartColor));
     startColorField->mFlags = 3;
     startColorField->mDesc = "RGBA start color of beam";

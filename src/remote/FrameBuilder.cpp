@@ -158,7 +158,7 @@ namespace faf::remote
       }
     }
 
-    [[nodiscard]] std::uint32_t NameId(const msvc8::string& name, wire::CSessionTableWriters* const session)
+    [[nodiscard]] std::uint32_t NameId(const fa::string& name, wire::CSessionTableWriters* const session)
     {
       return session != nullptr ? session->Name(name.c_str()) : wire::COrdinalTable::kNone;
     }
@@ -378,13 +378,13 @@ namespace faf::remote
   )
   {
     out.clear();
-    moho::STAT_VisitItems(stats, [&](const msvc8::string& path, moho::StatItem& item) {
+    moho::STAT_VisitItems(stats, [&](const fa::string& path, moho::StatItem& item) {
       wire::SUnitStat stat{};
       stat.name = session.Name(path.c_str());
       stat.type = static_cast<std::uint8_t>(static_cast<std::uint32_t>(item.mType) & 3u);
       stat.realtime = item.mUseRealtimeSlot == 1;
       if (stat.type == wire::SUnitStat::kString) {
-        msvc8::string value;
+        fa::string value;
         (void)item.GetString(stat.realtime, &value);
         stat.text = session.Name(value.c_str());
       } else {

@@ -32,7 +32,7 @@ namespace moho
    */
   void ResetParticleRenderWorkItemIntervals(SParticleRenderWorkItem& workItem)
   {
-    // `msvc8::vector<SParticleRenderInterval>::_Tidy` (cited on Vector.h).
+    // `fa::vector<SParticleRenderInterval>::_Tidy` (cited on Vector.h).
     workItem.mIntervals.tidy();
   }
 
@@ -48,7 +48,7 @@ namespace moho
     void* const particleBuffer
   )
   {
-    ::new (static_cast<void*>(&workItem.mIntervals)) msvc8::vector<SParticleRenderInterval>();
+    ::new (static_cast<void*>(&workItem.mIntervals)) fa::vector<SParticleRenderInterval>();
     workItem.mIntervalCapacityHint = intervalCapacityHint;
     workItem.mParticleBuffer = particleBuffer;
     workItem.mRenderStartIndex = 0U;

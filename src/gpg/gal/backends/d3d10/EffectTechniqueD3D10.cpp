@@ -108,7 +108,7 @@ namespace
    * What it does:
    * Returns the wrapper's local technique name.
    */
-  msvc8::string* EffectTechniqueD3D10::GetName()
+  fa::string* EffectTechniqueD3D10::GetName()
   {
     return &name_;
   }
@@ -193,7 +193,7 @@ namespace
    * What it does:
    * Fetches a boolean annotation by name from the current technique handle.
    */
-  bool EffectTechniqueD3D10::GetAnnotationBool(bool* const outValue, const msvc8::string& annotationName)
+  bool EffectTechniqueD3D10::GetAnnotationBool(bool* const outValue, const fa::string& annotationName)
   {
     if (techniqueHandle_ == nullptr) {
       ThrowGalError("EffectTechniqueD3D10.cpp", 105, "invalid effect technique");
@@ -220,7 +220,7 @@ namespace
    * What it does:
    * Fetches an integer annotation by name from the current technique handle.
    */
-  bool EffectTechniqueD3D10::GetAnnotationInt(int* const outValue, const msvc8::string& annotationName)
+  bool EffectTechniqueD3D10::GetAnnotationInt(int* const outValue, const fa::string& annotationName)
   {
     if (techniqueHandle_ == nullptr) {
       ThrowGalError("EffectTechniqueD3D10.cpp", 124, "invalid effect technique");
@@ -245,7 +245,7 @@ namespace
    * What it does:
    * Fetches a float annotation by name from the current technique handle.
    */
-  bool EffectTechniqueD3D10::GetAnnotationFloat(float* const outValue, const msvc8::string& annotationName)
+  bool EffectTechniqueD3D10::GetAnnotationFloat(float* const outValue, const fa::string& annotationName)
   {
     if (techniqueHandle_ == nullptr) {
       ThrowGalError("EffectTechniqueD3D10.cpp", 140, "invalid effect technique");
@@ -270,7 +270,7 @@ namespace
    * What it does:
    * Fetches a string annotation by name from the current technique handle.
    */
-  bool EffectTechniqueD3D10::GetAnnotationString(msvc8::string* const outValue, const msvc8::string& annotationName)
+  bool EffectTechniqueD3D10::GetAnnotationString(fa::string* const outValue, const fa::string& annotationName)
   {
     if (techniqueHandle_ == nullptr) {
       ThrowGalError("EffectTechniqueD3D10.cpp", 156, "invalid effect technique");

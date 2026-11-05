@@ -16,8 +16,8 @@ namespace
 
   void ResetTypeInfoVectors(TypeInfo& typeInfo) noexcept
   {
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    typeInfo.fields_ = fa::vector<gpg::RField>{};
+    typeInfo.bases_ = fa::vector<gpg::RField>{};
   }
 
   /**

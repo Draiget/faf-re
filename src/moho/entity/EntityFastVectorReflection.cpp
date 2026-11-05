@@ -15,7 +15,7 @@ namespace
   using WeakPtrEntityType = moho::RWeakPtrType<moho::Entity>;
   using WeakPtrEntity = moho::WeakPtr<moho::Entity>;
   using EntityPtrVectorType = gpg::RVectorType<moho::Entity*>;
-  using EntityPtrVector = msvc8::vector<moho::Entity*>;
+  using EntityPtrVector = fa::vector<moho::Entity*>;
   using EntityPtrFastVectorType = gpg::RFastVectorType<moho::Entity*>;
 
   /**
@@ -111,7 +111,7 @@ namespace
 
     const char* const expected = gpg::RTypeOf<moho::Entity>() ? gpg::RTypeOf<moho::Entity>()->GetName() : "Entity";
     const char* const actual = source.GetTypeName();
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
       expected ? expected : "Entity",
       actual ? actual : "null"
@@ -164,7 +164,7 @@ namespace
     const std::size_t targetCount = static_cast<std::size_t>(count);
     if (targetCount > 0u) {
       // The binary grows the destination with reserve(count)
-      // (FUN_0067D9B0, msvc8::vector<Entity*>::reserve) and then fills the
+      // (FUN_0067D9B0, fa::vector<Entity*>::reserve) and then fills the
       // reserved slots. reserve() has already sized capacity to exactly
       // targetCount, so the following resize takes _Insert_n's in-place
       // branch -- no second reallocation, matching the binary.
@@ -244,7 +244,7 @@ namespace
 
       const char* const expected = gpg::RTypeOf<moho::Entity>() ? gpg::RTypeOf<moho::Entity>()->GetName() : "Entity";
       const char* const actual = source.GetTypeName();
-      const msvc8::string message = gpg::STR_Printf(
+      const fa::string message = gpg::STR_Printf(
         "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
         expected ? expected : "Entity",
         actual ? actual : "null"
@@ -396,26 +396,26 @@ namespace moho
    */
   const char* RWeakPtrType<Entity>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<moho::Entity>()->GetName());
+    static const fa::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<moho::Entity>()->GetName());
     return sName.c_str();
   }
 
   /**
    * Address: 0x0067BEB0 (FUN_0067BEB0, Moho::RWeakPtrType_Entity::GetLexical)
    */
-  msvc8::string RWeakPtrType<Entity>::GetLexical(const gpg::RRef& ref) const
+  fa::string RWeakPtrType<Entity>::GetLexical(const gpg::RRef& ref) const
   {
     auto* const weak = static_cast<const WeakPtrEntity*>(ref.mObj);
     if (!weak || !weak->HasValue()) {
-      return msvc8::string("NULL");
+      return fa::string("NULL");
     }
 
     const gpg::RRef pointeeRef = MakeEntityObjectRef(weak->GetObjectPtr());
     if (!pointeeRef.mObj) {
-      return msvc8::string("NULL");
+      return fa::string("NULL");
     }
 
-    const msvc8::string inner = pointeeRef.GetLexical();
+    const fa::string inner = pointeeRef.GetLexical();
     return gpg::STR_Printf("[%s]", inner.c_str());
   }
 
@@ -505,16 +505,16 @@ namespace gpg
    */
   const char* RVectorType<moho::Entity*>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", moho::Entity::GetPointerType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("vector<%s>", moho::Entity::GetPointerType()->GetName());
     return sName.c_str();
   }
 
   /**
    * Address: 0x0067C190 (FUN_0067C190, gpg::RVectorType_Entity_P::GetLexical)
    */
-  msvc8::string RVectorType<moho::Entity*>::GetLexical(const gpg::RRef& ref) const
+  fa::string RVectorType<moho::Entity*>::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
@@ -598,7 +598,7 @@ namespace gpg
    */
   const char* RFastVectorType<moho::Entity*>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", moho::Entity::GetPointerType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("fastvector<%s>", moho::Entity::GetPointerType()->GetName());
     return sName.c_str();
   }
 
@@ -608,9 +608,9 @@ namespace gpg
    * What it does:
    * Formats inherited lexical text and appends current fastvector element count.
    */
-  msvc8::string RFastVectorType<moho::Entity*>::GetLexical(const gpg::RRef& ref) const
+  fa::string RFastVectorType<moho::Entity*>::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
@@ -694,7 +694,7 @@ namespace moho
   gpg::RType* register_VectorEntityPtr_Type_00()
   {
     EntityPtrVectorType* const type = AcquireEntityPtrVectorType();
-    gpg::PreRegisterRType(typeid(msvc8::vector<Entity*>), type);
+    gpg::PreRegisterRType(typeid(fa::vector<Entity*>), type);
     return type;
   }
 

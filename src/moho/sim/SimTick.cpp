@@ -198,7 +198,7 @@ namespace
     }
     overlay->Tick(sim);
   }
-  void AppendLegacyStringToStd(std::string& out, const msvc8::string& value)
+  void AppendLegacyStringToStd(std::string& out, const fa::string& value)
   {
     out.append(value.c_str(), value.size());
   }
@@ -315,7 +315,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
 
   // 0x00747700..0x00747724: the camera-shake requests the beat accumulated,
   // swapped over like the lanes below. `Sim::mSyncCamShake` (Sim+0x09C8) was
-  // declared `msvc8::vector<void*> mSyncSerializeGroup1` and had no users at
+  // declared `fa::vector<void*> mSyncSerializeGroup1` and had no users at
   // all; the `ShakeCamera` Lua binding reached the same storage through a
   // `reinterpret_cast<the deleted owner-overlay*>(sim)` whose
   // `pad_0000[0x09C8]` pinned the offset. Both sides are `SCamShakeParams` now.
@@ -324,7 +324,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // 0x00747740..0x00747782: the map rectangles flattened this beat.
   // `[ebx+9FCh/0A00h/0A04h]` is `mCachedMapRects` (Sim+0x09F8) against
   // `[eax+234h/238h/23Ch]`, `SSyncData::mPlayableRectUpdates` (+0x230); both
-  // are already `msvc8::vector<gpg::Rect2i>`. `FlattenMapRect` pushes each
+  // are already `fa::vector<gpg::Rect2i>`. `FlattenMapRect` pushes each
   // clamped rect into this vector and into `mLoadedMapRects`, and only this
   // one is drained -- the loaded run is the cumulative record that stays.
   mCachedMapRects.swap(outSyncData->mPlayableRectUpdates);
@@ -332,7 +332,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // 0x007480A4..0x007480EC: the beat's accumulated print lines.
   // `[esi+0A1Ch/0A20h/0A24h]` is `mPrintField` (Sim+0x0A18) against
   // `[eax+288h/28Ch/290h]`, `SSyncData::mPrintField` (+0x284); both are
-  // `msvc8::vector<msvc8::string>`. `Sim::Printf` appends into the sim side
+  // `fa::vector<fa::string>`. `Sim::Printf` appends into the sim side
   // every time sim script writes a line, and nothing was carrying them across.
   mPrintField.swap(outSyncData->mPrintField);
 
@@ -511,7 +511,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
       "<GameStats xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n"
     );
 
-    const msvc8::string armyIndent("  ");
+    const fa::string armyIndent("  ");
     for (auto it = mArmiesList.begin(); it != mArmiesList.end(); ++it) {
       CArmyImpl* const army = *it;
       CArmyStats* const armyStats = army->GetArmyStats();
@@ -815,7 +815,7 @@ void Sim::UpdateChecksum()
       return;
     }
 
-    const msvc8::string digestText = mContext.Digest().ToString();
+    const fa::string digestText = mContext.Digest().ToString();
     Logf("      %s\n", digestText.c_str());
   };
 
@@ -1280,7 +1280,7 @@ void Sim::AdvanceBeat(const int amt)
 
     // Sync-filter extra-data packing pass. Every id in the outgoing sync
     // filter that still resolves to a live unit contributes one record.
-    // `push_back(SExtraUnitData())` is `msvc8::vector<SExtraUnitData>::
+    // `push_back(SExtraUnitData())` is `fa::vector<SExtraUnitData>::
     // push_back` (FUN_0074C160, Vector.h) -- the `.asm`-confirmed shape:
     // the record is copy-constructed in (default `pairs`, zero tag) and
     // then filled in place through the returned `back()` reference, so its

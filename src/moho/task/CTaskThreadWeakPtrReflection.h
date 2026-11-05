@@ -62,7 +62,7 @@ namespace moho
     /**
      * Address: 0x0040A3C0 (FUN_0040A3C0, Moho::RWeakPtrType_CTaskThread::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x0040A550 (FUN_0040A550, Moho::RWeakPtrType_CTaskThread::IsIndexed)

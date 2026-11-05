@@ -43,7 +43,7 @@ namespace moho
     /**
      * Address: 0x0067BEB0 (FUN_0067BEB0, Moho::RWeakPtrType_Entity::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x0067C040 (FUN_0067C040, Moho::RWeakPtrType_Entity::IsIndexed)
@@ -99,7 +99,7 @@ namespace gpg
     /**
      * Address: 0x0067C190 (FUN_0067C190, gpg::RVectorType_Entity_P::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x0067C220 (FUN_0067C220, gpg::RVectorType_Entity_P::IsIndexed)
@@ -154,7 +154,7 @@ namespace gpg
     /**
       * Alias of FUN_00694380 (non-canonical helper lane).
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
       * Alias of FUN_00694380 (non-canonical helper lane).

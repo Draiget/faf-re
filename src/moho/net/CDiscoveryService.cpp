@@ -121,7 +121,7 @@ namespace
         continue;
       }
 
-      const msvc8::string hostName = moho::NET_GetHostName(record->mHostAddress);
+      const fa::string hostName = moho::NET_GetHostName(record->mHostAddress);
       gpg::Logf("LOBBY: Discovery reply from %s:%d timed out.", hostName.c_str(), record->mHostPort);
 
       record = games.erase(record);
@@ -360,7 +360,7 @@ gpg::RRef moho::CDiscoveryService::GetDerivedObjectRef()
  * (`this=mGames`-shaped field group, `pos=mGamesEnd`, `val=&newRecord`) --
  * the generic `_Insert_n` growth-and-insert core (~1.5x growth, floor
  * `count+1`, `uninit_copy_n` head-range relocation via `sub_7CBF90`/
- * `sub_7CED40`). That is exactly `msvc8::vector<T>::push_back`'s own
+ * `sub_7CED40`). That is exactly `fa::vector<T>::push_back`'s own
  * two-branch shape (see its class doc / `Address:` catalog in Vector.h),
  * so the faithful recovery is the one-line call below, not a duplicate of
  * the growth arithmetic.

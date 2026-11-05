@@ -428,7 +428,7 @@ namespace moho
      * Address: 0x00648E60 (FUN_00648E60, Moho::CStorageManipulatorTypeInfo::dtr)
      *
      * What it does:
-     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes and
+     * Frees the `RType` base's two `fa::vector<RField>` storage lanes and
      * restores the `gpg::RObject` vftable. Defaulted in source: the
      * compiler-generated `~RType()` reproduces this behavior, matching every
      * other manipulator TypeInfo dtor in this family.

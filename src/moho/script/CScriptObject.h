@@ -89,7 +89,7 @@ namespace moho
      * Address: 0x4C70A0
      * VFTable SLOT: 3
      */
-    virtual msvc8::string GetErrorDescription();
+    virtual fa::string GetErrorDescription();
 
     /**
      * Address: 0x004C70D0

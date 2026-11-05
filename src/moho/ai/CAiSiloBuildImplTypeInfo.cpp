@@ -78,7 +78,7 @@ namespace
    *
    * What it does:
    * Constructs the `gpg::RListType<ESiloType>` static, which preregisters it
-   * for `typeid(msvc8::list<ESiloType>)`, and returns it.
+   * for `typeid(fa::list<ESiloType>)`, and returns it.
    *
    * `RListType<ESiloType>`, vtable 0x00E1DDA4:
    *
@@ -184,7 +184,7 @@ void moho::register_CAiSiloBuildImplTypeInfo()
  * Address: 0x00BCE190 (FUN_00BCE190, register_ESiloTypeListTypeInfo)
  *
  * What it does:
- * Registers reflected `msvc8::list<ESiloType>` type-info.
+ * Registers reflected `fa::list<ESiloType>` type-info.
  */
 void moho::register_ESiloTypeListTypeInfo()
 {

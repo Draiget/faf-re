@@ -163,7 +163,7 @@ namespace moho
       return;
     }
 
-    archive->WriteString(const_cast<msvc8::string*>(&mName));
+    archive->WriteString(const_cast<fa::string*>(&mName));
     archive->Write(gpg::CachedLookup<gpg::fastvector<SCondition>>(gFastVectorSConditionType), &mConditions, gpg::RRef{});
   }
 } // namespace moho

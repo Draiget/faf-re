@@ -171,7 +171,7 @@ namespace
     if (!item) {
       const char* const expectedName = gpg::RTypeOf<moho::StatItem>()->GetName();
       const char* const actualName = tracked.type ? tracked.type->GetName() : "null";
-      const msvc8::string msg = gpg::STR_Printf(
+      const fa::string msg = gpg::STR_Printf(
         "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
         "instead",
         expectedName ? expectedName : "StatItem",
@@ -365,7 +365,7 @@ namespace
    * creates missing child nodes segment-by-segment.
    */
   [[nodiscard]] moho::StatItem* WalkStatPath(
-    moho::StatItem* root, const msvc8::vector<msvc8::string>& tokens, const bool allowCreate, bool* const didCreate
+    moho::StatItem* root, const fa::vector<fa::string>& tokens, const bool allowCreate, bool* const didCreate
   )
   {
     if (didCreate != nullptr) {
@@ -943,7 +943,7 @@ namespace moho
     childNode->prev->next = childNode;
   }
 
-  StatItem* StatItem::FindDirectChildByName(const msvc8::string& token)
+  StatItem* StatItem::FindDirectChildByName(const fa::string& token)
   {
     for (StatIntrusiveNode* node = AsChildHead(this)->next; node != nullptr && node != AsChildHead(this); node = node->next) {
       StatItem* const child = node->owner;
@@ -991,7 +991,7 @@ namespace moho
   {
     boost::mutex::scoped_lock lock(mLock);
 
-    msvc8::vector<msvc8::string> tokens;
+    fa::vector<fa::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
 
     bool didCreate = false;
@@ -1009,7 +1009,7 @@ namespace moho
   {
     boost::mutex::scoped_lock lock(mLock);
 
-    msvc8::vector<msvc8::string> tokens;
+    fa::vector<fa::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
 
     bool didCreate = false;
@@ -1027,7 +1027,7 @@ namespace moho
   {
     boost::mutex::scoped_lock lock(mLock);
 
-    msvc8::vector<msvc8::string> tokens;
+    fa::vector<fa::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
 
     bool didCreate = false;
@@ -1113,7 +1113,7 @@ namespace moho
    * What it does:
    * Builds a local-time filename prefix as `YYYY-MM-DD.HH-MM`.
    */
-  msvc8::string LOG_GenerateFilenamePrefix()
+  fa::string LOG_GenerateFilenamePrefix()
   {
     CTimeStamp timestamp{};
     timestamp.time = static_cast<std::int64_t>(_time64(nullptr));
@@ -1149,7 +1149,7 @@ namespace moho
       return 0.0f;
     }
 
-    const msvc8::string prefix = LOG_GenerateFilenamePrefix();
+    const fa::string prefix = LOG_GenerateFilenamePrefix();
     mResolvedLogFilePath = prefix + "-" + mLogFileName;
 
     gpg::FileStream logFile(mResolvedLogFilePath.c_str(), gpg::Stream::ModeSend, 0u, 0x1000);
@@ -1201,7 +1201,7 @@ namespace moho
     BuildStatReportRecursive(rootItem, reportBody, 0u, depthNameWidths);
     ApplyDepthPlaceholderFormatting(reportBody, depthNameWidths);
 
-    writer.WriteString(msvc8::string(reportBody.c_str()));
+    writer.WriteString(fa::string(reportBody.c_str()));
 
     if (rootItem) {
       CommitStatSampleRangesRecursive(rootItem);
@@ -1261,10 +1261,10 @@ namespace moho
   /**
    * Address: 0x004162C0 (FUN_004162C0, Moho::CON_ClearStats)
    */
-  void CON_ClearStats(const msvc8::vector<msvc8::string>& args)
+  void CON_ClearStats(const fa::vector<fa::string>& args)
   {
 
-    const msvc8::string* targetPath = nullptr;
+    const fa::string* targetPath = nullptr;
     if (args.size() >= 2u) {
       targetPath = ConCommandArg(args, 1u);
     }
@@ -1276,11 +1276,11 @@ namespace moho
   /**
    * Address: 0x004163A0 (FUN_004163A0, Moho::CON_BeginLoggingStats)
    */
-  void CON_BeginLoggingStats(const msvc8::vector<msvc8::string>& args)
+  void CON_BeginLoggingStats(const fa::vector<fa::string>& args)
   {
     EngineStats* const engineStats = GetEngineStats();
 
-    const msvc8::string* requestedPath = nullptr;
+    const fa::string* requestedPath = nullptr;
     if (args.size() >= 2u) {
       requestedPath = ConCommandArg(args, 1u);
     } else {
@@ -1288,7 +1288,7 @@ namespace moho
     }
 
     if (requestedPath && !requestedPath->empty()) {
-      engineStats->mLogFileName.assign(*requestedPath, 0, msvc8::string::npos);
+      engineStats->mLogFileName.assign(*requestedPath, 0, fa::string::npos);
     }
 
     engineStats->mLogFrameCount = 0;
@@ -1314,13 +1314,13 @@ namespace moho
         break;
       }
 
-      msvc8::string valueText;
+      fa::string valueText;
       child->GetString(false, &valueText);
 
-      msvc8::string indent;
+      fa::string indent;
       indent.assign(static_cast<std::size_t>(depth * 4), ' ');
 
-      const msvc8::string line = indent + child->mName + ": " + valueText;
+      const fa::string line = indent + child->mName + ": " + valueText;
       gpg::Logf("%s", line.c_str());
 
       DumpStatsTreeRecursive(child, depth + 1);
@@ -1349,7 +1349,7 @@ namespace moho
    * Populates one debug stats subtree with representative values and emits a
    * recursive text dump to the log sink.
    */
-  void CON_PrintStats(const msvc8::vector<msvc8::string>& /*args*/)
+  void CON_PrintStats(const fa::vector<fa::string>& /*args*/)
   {
     if (!sPrintStatsBoogers) {
       sPrintStatsBoogers = GetEngineStats()->GetItem("Boogers", true);
@@ -1391,7 +1391,7 @@ namespace moho
       }
     }
     if (sPrintStatsDoubleFarts) {
-      const msvc8::string value("Boogers!");
+      const fa::string value("Boogers!");
       sPrintStatsDoubleFarts->SetValue(value);
     }
 
@@ -1424,7 +1424,7 @@ namespace moho
       }
     }
     if (sPrintStatsDeepStuff) {
-      const msvc8::string value("woohoo!");
+      const fa::string value("woohoo!");
       sPrintStatsDeepStuff->SetValue(value);
     }
 
@@ -1457,7 +1457,7 @@ namespace moho
   /**
    * Address: 0x00416480 (FUN_00416480, Moho::CON_EndLoggingStats)
    */
-  void CON_EndLoggingStats(const msvc8::vector<msvc8::string>& /*args*/)
+  void CON_EndLoggingStats(const fa::vector<fa::string>& /*args*/)
   {
     (void)GetEngineStats()->EndLogging();
   }
@@ -1593,7 +1593,7 @@ namespace moho
 
     if (shouldExit) {
       const char* const logPath = GetEngineStats()->mResolvedLogFilePath.c_str();
-      const msvc8::string message = gpg::STR_Printf(
+      const fa::string message = gpg::STR_Printf(
         "Performance test run complete!\n"
         "\n"
         "Your 'SupComMark' composite score is: %7.0f   (higher is better)\n"
@@ -1704,19 +1704,19 @@ namespace moho
   /**
    * Address: 0x00417FE0 (FUN_00417FE0, Moho::StatItem::SetValue_0)
    */
-  void StatItem::SetValueCopy(msvc8::string* outValue)
+  void StatItem::SetValueCopy(fa::string* outValue)
   {
     boost::mutex::scoped_lock lock(mLock);
-    outValue->assign(mValue, 0, msvc8::string::npos);
+    outValue->assign(mValue, 0, fa::string::npos);
   }
 
   /**
    * Address: 0x00415220 (FUN_00415220, Moho::StatItem::SetValue)
    */
-  void StatItem::SetValue(const msvc8::string& value)
+  void StatItem::SetValue(const fa::string& value)
   {
     boost::mutex::scoped_lock lock(mLock);
-    mValue.assign(value, 0, msvc8::string::npos);
+    mValue.assign(value, 0, fa::string::npos);
   }
 
   /**
@@ -1918,15 +1918,15 @@ namespace moho
       archive->WriteInt(mRealtimeValueBits);
       break;
     case EStatType::kString:
-      archive->WriteString(const_cast<msvc8::string*>(&mValue));
-      archive->WriteString(const_cast<msvc8::string*>(&mScratchValue));
+      archive->WriteString(const_cast<fa::string*>(&mValue));
+      archive->WriteString(const_cast<fa::string*>(&mScratchValue));
       break;
     default:
       gpg::HandleAssertFailure("Reached the supposably unreachable.", 360, "c:\\work\\rts\\main\\code\\src\\core\\Stats.cpp");
       break;
     }
 
-    archive->WriteString(const_cast<msvc8::string*>(&mName));
+    archive->WriteString(const_cast<fa::string*>(&mName));
     archive->Write(sEPulseMode, const_cast<std::int32_t*>(&mUseRealtimeSlot), gpg::RRef{});
     SerializeList(archive);
   }
@@ -1934,7 +1934,7 @@ namespace moho
   /**
    * Address: 0x00418750 (FUN_00418750, Moho::StatItem::GetString)
    */
-  msvc8::string* StatItem::GetString(const bool useRealtimeValue, msvc8::string* outValue)
+  fa::string* StatItem::GetString(const bool useRealtimeValue, fa::string* outValue)
   {
     if (mType == EStatType::kFloat) {
       *outValue = gpg::STR_Printf("%.2f", AsFloatBits(ReadNumericSlot(this, useRealtimeValue)));
@@ -1963,7 +1963,7 @@ namespace moho
       return ReadNumericSlot(this, useRealtimeValue);
     }
 
-    msvc8::string value;
+    fa::string value;
     SetValueCopy(&value);
     return std::atoi(value.c_str());
   }
@@ -1981,7 +1981,7 @@ namespace moho
       return static_cast<float>(ReadNumericSlot(this, useRealtimeValue));
     }
 
-    msvc8::string value;
+    fa::string value;
     SetValueCopy(&value);
     return static_cast<float>(std::atof(value.c_str()));
   }
@@ -2061,7 +2061,7 @@ namespace moho
       outObject->SetString("Type", "Integer");
       break;
     case EStatType::kString: {
-      msvc8::string value;
+      fa::string value;
       GetString(useRealtimeValue, &value);
       if (!value.empty()) {
         outObject->SetString("Value", value.c_str());
@@ -2216,7 +2216,7 @@ namespace moho
    */
   const char* StatsRType<StatItem>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("Stats<%s>", gpg::RTypeOf<moho::StatItem>()->GetName());
+    static const fa::string sName = gpg::STR_Printf("Stats<%s>", gpg::RTypeOf<moho::StatItem>()->GetName());
     return sName.c_str();
   }
 
@@ -2348,23 +2348,23 @@ namespace moho
   }
 #if FAF_SERVER_MODE
   // Engine addition, server mode: see the declaration.
-  void STAT_VisitItems(Stats<StatItem>& stats, const std::function<void(const msvc8::string& path, StatItem& item)>& visit)
+  void STAT_VisitItems(Stats<StatItem>& stats, const std::function<void(const fa::string& path, StatItem& item)>& visit)
   {
     boost::mutex::scoped_lock lock(stats.mLock);
-    const std::function<void(StatItem*, const msvc8::string&)> walk = [&](StatItem* const parent, const msvc8::string& prefix) {
+    const std::function<void(StatItem*, const fa::string&)> walk = [&](StatItem* const parent, const fa::string& prefix) {
       for (StatIntrusiveNode* node = AsChildHead(parent)->next; node != nullptr && node != AsChildHead(parent);
            node = node->next) {
         StatItem* const child = node->owner;
         if (child == nullptr) {
           break;
         }
-        const msvc8::string path = prefix.empty() ? child->mName : (prefix + "_") + child->mName;
+        const fa::string path = prefix.empty() ? child->mName : (prefix + "_") + child->mName;
         visit(path, *child);
         walk(child, path);
       }
     };
     if (stats.mItem) {
-      walk(stats.mItem.get(), msvc8::string());
+      walk(stats.mItem.get(), fa::string());
     }
   }
 #endif

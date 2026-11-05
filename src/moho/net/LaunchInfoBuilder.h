@@ -49,7 +49,7 @@ namespace moho
 
     /** `ownerId`'s command source, appending one to `commandSources` the first time. */
     virtual std::uint32_t AssignCommandSource(
-      std::int32_t timeouts, std::int32_t ownerId, msvc8::vector<SSTICommandSource>& commandSources,
+      std::int32_t timeouts, std::int32_t ownerId, fa::vector<SSTICommandSource>& commandSources,
       std::uint32_t& localSource
     ) = 0;
   };
@@ -59,7 +59,7 @@ namespace moho
     /** Non-null: the launch failed before anything was assigned; the `LaunchFailed` reason. */
     const char* failure = nullptr;
     boost::shared_ptr<LaunchInfoNew> launchInfo;
-    msvc8::string mapName;
+    fa::string mapName;
     std::int32_t clientCount = 0;        // client indices handed out
     std::int32_t localClientIndex = -1;
     std::uint32_t localSourceId = 0xFFu;
@@ -82,7 +82,7 @@ namespace moho
   struct SLaunchClient
   {
     std::int32_t uid = 0;
-    msvc8::string name;                  // the command source takes this name
+    fa::string name;                  // the command source takes this name
     std::int32_t clientIndex = -1;       // -1: not assigned
     std::uint32_t commandSource = 0xFFu; // 0xFF: none
   };
@@ -94,7 +94,7 @@ namespace moho
   class CLaunchRoster final : public ILaunchParticipants
   {
   public:
-    CLaunchRoster(std::int32_t localUid, msvc8::string localName, std::vector<SLaunchClient> remotes);
+    CLaunchRoster(std::int32_t localUid, fa::string localName, std::vector<SLaunchClient> remotes);
 
     [[nodiscard]] std::int32_t LocalUid() const override { return mLocalUid; }
     /** What `lobbyComm.lua` returns, as a roster's Lua state has no `import` to read it with. */
@@ -102,7 +102,7 @@ namespace moho
     void AssignClientIndex(std::int32_t& clientIndex, std::int32_t ownerId, const char* name, std::int32_t& localIndex)
       override;
     std::uint32_t AssignCommandSource(
-      std::int32_t timeouts, std::int32_t ownerId, msvc8::vector<SSTICommandSource>& commandSources,
+      std::int32_t timeouts, std::int32_t ownerId, fa::vector<SSTICommandSource>& commandSources,
       std::uint32_t& localSource
     ) override;
 
@@ -112,7 +112,7 @@ namespace moho
     [[nodiscard]] SLaunchClient* Find(std::int32_t uid) noexcept;
 
     std::int32_t mLocalUid;
-    msvc8::string mLocalName;
+    fa::string mLocalName;
     std::vector<SLaunchClient> mRemotes;
   };
   /** The game speed a launch asks for, as `CLobby::LaunchGame` reads `GameOptions.GameSpeed`. */

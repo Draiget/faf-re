@@ -6,7 +6,7 @@
 #include "legacy/containers/Set.h"
 #include "legacy/containers/Vector.h"
 
-namespace msvc8
+namespace fa
 {
   struct string;
 }
@@ -22,18 +22,18 @@ namespace moho
    * Split by commas, trim tokens, skip empty.
    * Writes into out (appends).
    */
-  void SplitByComma(const msvc8::string& src, msvc8::vector<msvc8::string>& out);
+  void SplitByComma(const fa::string& src, fa::vector<fa::string>& out);
 
   /**
    * Join strings with a separator.
    */
-  msvc8::string Join(const msvc8::vector<msvc8::string>& items, const char* sep);
+  fa::string Join(const fa::vector<fa::string>& items, const char* sep);
 
   /**
    * Check exact, case-sensitive membership in comma-separated list.
    * Returns true if 'name' equals any trimmed token in 'ignoreList'.
    */
-  bool IsNameIgnored(const msvc8::string& ignoreList, const char* name);
+  bool IsNameIgnored(const fa::string& ignoreList, const char* name);
 
   /**
    * Address: 0x0050E010 (FUN_0050E010, ?BP_ShortId@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV23@@Z)
@@ -42,7 +42,7 @@ namespace moho
    * Returns the substring between the slash and dot lookup lanes used by
    * binary BP id canonicalization.
    */
-  msvc8::string BP_ShortId(const msvc8::string& idText);
+  fa::string BP_ShortId(const fa::string& idText);
 
   /**
    * Address: 0x0048E0C0 (FUN_0048E0C0, Moho::URI_Split)
@@ -55,10 +55,10 @@ namespace moho
    */
   bool URI_Split(
     gpg::StrArg uri,
-    msvc8::string* scheme,
-    msvc8::string* authority,
-    msvc8::string* path,
-    msvc8::string* query,
-    msvc8::string* fragment
+    fa::string* scheme,
+    fa::string* authority,
+    fa::string* path,
+    fa::string* query,
+    fa::string* fragment
   );
 } // namespace moho

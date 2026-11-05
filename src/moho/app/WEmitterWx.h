@@ -583,11 +583,11 @@ namespace moho
     // Raised by LoadFromEffect so the control writes do not refresh the effect.
     bool mRefreshGuard;                         // +0x1E0
 
-    msvc8::vector<WCurveEditorPanel*> mCurvePanels; // +0x1E4, one per EEmitterCurve
+    fa::vector<WCurveEditorPanel*> mCurvePanels; // +0x1E4, one per EEmitterCurve
     WeakPtr<IEffect> mPreviewEffect;            // +0x1F4
     WeakPtr<Unit> mAttachedUnit;                // +0x1FC
-    msvc8::string mBoneName;                    // +0x204
-    msvc8::string mBlueprintName;               // +0x220, VFS name of the loaded blueprint
+    fa::string mBoneName;                    // +0x204
+    fa::string mBlueprintName;               // +0x220, VFS name of the loaded blueprint
     wxMenuBar* mMenuBar;                        // +0x23C
     wxMenu* mFileMenu;                          // +0x240
     wxMenu* mOptionsMenu;                       // +0x244

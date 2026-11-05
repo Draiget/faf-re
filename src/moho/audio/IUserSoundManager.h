@@ -50,7 +50,7 @@ namespace moho
      * Address: 0x00A82547 (_purecall)
      * Slot: 3
      */
-    virtual void Play(const msvc8::string& bankName, const msvc8::string& cueName) = 0;
+    virtual void Play(const fa::string& bankName, const fa::string& cueName) = 0;
 
     /**
      * Address: 0x00A82547 (_purecall)

@@ -85,7 +85,7 @@ namespace
    *
    * What it does:
    * Constructs the `gpg::RListType<gpg::Rect2i>` static, which preregisters
-   * it for `typeid(msvc8::list<gpg::Rect2i>)`, and returns it.
+   * it for `typeid(fa::list<gpg::Rect2i>)`, and returns it.
    *
    * `RListType<Rect2<int>>`, vtable 0x00E1C36C:
    *

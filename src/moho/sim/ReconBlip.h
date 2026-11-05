@@ -503,7 +503,7 @@ namespace moho
     Wm3::Vec3f mJamOffset;                    // +0x27C
     SReconBlipUnitConstData mUnitConstDat;    // +0x288
     SSTIUnitVariableData mUnitVarDat;         // +0x298
-    msvc8::vector<SPerArmyReconInfo> mReconDat; // +0x4C0
+    fa::vector<SPerArmyReconInfo> mReconDat; // +0x4C0
   };
 
   static_assert(offsetof(ReconBlip, mCreator) == 0x270, "ReconBlip::mCreator offset must be 0x270");

@@ -193,7 +193,7 @@ namespace
    * recovered once, generically, on the container template itself, never as
    * a per-type free-function reimplementation).
    *
-   * `ArmorMultipliers` is now a real `msvc8::map<msvc8::string, float>` (see
+   * `ArmorMultipliers` is now a real `fa::map<fa::string, float>` (see
    * the field's doc comment in `Unit.h`). Real callers use its API directly:
    * `.find()` (`Unit::ProcessArmorOnDamage`, `Unit::GetArmorMult`) and
    * `operator[]` (`Unit::InitializeArmor`, `cfunc_UnitAlterArmorL`, below).
@@ -202,7 +202,7 @@ namespace
    * `insert_hint`/`insert_unique`/`insert_at`/`buy_head`/`buy_node` in
    * `legacy/containers/RbTree.h`) carry this instantiation's own `Address:`
    * citations (0x006ADD30/0x006ADBF0/0x006AEDD0/0x006AF840/0x006AFA40/
-   * 0x006AFBF0/0x006B01C0/0x006B0200) alongside every other `msvc8::map`
+   * 0x006AFBF0/0x006B01C0/0x006B0200) alongside every other `fa::map`
    * instantiation already documented there.
    */
 

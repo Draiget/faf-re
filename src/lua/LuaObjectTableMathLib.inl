@@ -463,7 +463,7 @@
 	 *
 	 * The binary's frexp is the MSVC8 CRT's (0x00A8DA05), which answers -0
 	 * with +0 where the current CRT keeps -0 (difffuzz `lua_frexp`), so this
-	 * goes through `msvc8::frexp`.
+	 * goes through `fa::frexp`.
 	 */
 	double LuaFrexpMantissaBridgeA(const lua_Number value, int* const exponentOut)
 	{
@@ -472,7 +472,7 @@
 			return 0.0;
 		}
 
-		return msvc8::frexp(static_cast<double>(value), exponentOut);
+		return fa::frexp(static_cast<double>(value), exponentOut);
 	}
 
 	/**
@@ -558,22 +558,22 @@
 	 * gets re-proposed; the 24-bit precision control is what neutralises it.
 	 *
 	 * sin/cos/tan/atan/atan2 run those same x87 instructions through
-	 * `msvc8::sinf` and friends (legacy/math/X87Math.h). The CRT's software
+	 * `fa::sinf` and friends (legacy/math/X87Math.h). The CRT's software
 	 * routines would be vendor independent, but they are not the binary's, and
 	 * the x86 and x64 CRTs disagree with each other in the last bit, which would
 	 * split an x86 client from an x64 one. exp/log/log10 are inline x87
-	 * expansions in the binary too (`msvc8::IntrinsicExp` and friends; exp's
+	 * expansions in the binary too (`fa::IntrinsicExp` and friends; exp's
 	 * fmul/fadd steps round at 24 bits, so a correctly rounded exp differs).
 	 * asin/acos/pow/mod go through the MSVC8 CRT's `_CI*` entries. The game
 	 * calls _set_SSE2_enable(0), so those take their x87 bodies, whose
 	 * arithmetic rounds under the simulation's _PC_24 and is not correctly
-	 * rounded; `msvc8::asin`/`acos`/`pow`/`fmod` reproduce them. Every
+	 * rounded; `fa::asin`/`acos`/`pow`/`fmod` reproduce them. Every
 	 * `math.*` entry has a difffuzz row (`--filter lua_`).
 	 */
 	int math_sin(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(msvc8::sinf(value)));
+		lua_pushnumber(state, static_cast<lua_Number>(fa::sinf(value)));
 		return 1;
 	}
 
@@ -587,7 +587,7 @@
 	int math_cos(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(msvc8::cosf(value)));
+		lua_pushnumber(state, static_cast<lua_Number>(fa::cosf(value)));
 		return 1;
 	}
 
@@ -601,7 +601,7 @@
 	int math_tan(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(msvc8::tanf(value)));
+		lua_pushnumber(state, static_cast<lua_Number>(fa::tanf(value)));
 		return 1;
 	}
 
@@ -615,7 +615,7 @@
 	int math_acos(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(msvc8::acos(static_cast<double>(value)))); // _CIacos lane dispatch
+		lua_pushnumber(state, static_cast<lua_Number>(fa::acos(static_cast<double>(value)))); // _CIacos lane dispatch
 		return 1;
 	}
 
@@ -629,7 +629,7 @@
 	int math_atan(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(msvc8::atanf(value)));
+		lua_pushnumber(state, static_cast<lua_Number>(fa::atanf(value)));
 		return 1;
 	}
 
@@ -644,7 +644,7 @@
 	{
 		const lua_Number numerator = luaL_checknumber(state, 1);
 		const lua_Number denominator = luaL_checknumber(state, 2);
-		lua_pushnumber(state, static_cast<lua_Number>(msvc8::atan2f(numerator, denominator)));
+		lua_pushnumber(state, static_cast<lua_Number>(fa::atan2f(numerator, denominator)));
 		return 1;
 	}
 
@@ -691,7 +691,7 @@
 		// -0 dividend where the current CRT keeps -0.
 		lua_pushnumber(
 			state,
-			static_cast<lua_Number>(msvc8::fmod(static_cast<double>(left), static_cast<double>(right)))
+			static_cast<lua_Number>(fa::fmod(static_cast<double>(left), static_cast<double>(right)))
 		);
 		return 1;
 	}
@@ -723,7 +723,7 @@
 		const lua_Number exponent = luaL_checknumber(state, 2);
 		lua_pushnumber(
 			state,
-			static_cast<lua_Number>(msvc8::pow(static_cast<double>(base), static_cast<double>(exponent)))
+			static_cast<lua_Number>(fa::pow(static_cast<double>(base), static_cast<double>(exponent)))
 		);
 		return 1;
 	}
@@ -738,7 +738,7 @@
 	int math_log(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(msvc8::IntrinsicLn(value))); // fldln2; fyl2x
+		lua_pushnumber(state, static_cast<lua_Number>(fa::IntrinsicLn(value))); // fldln2; fyl2x
 		return 1;
 	}
 
@@ -751,7 +751,7 @@
 	int math_log10(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(msvc8::IntrinsicLog10(value))); // fldlg2; fyl2x
+		lua_pushnumber(state, static_cast<lua_Number>(fa::IntrinsicLog10(value))); // fldlg2; fyl2x
 		return 1;
 	}
 
@@ -764,7 +764,7 @@
 	int math_exp(lua_State* const state)
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
-		lua_pushnumber(state, static_cast<lua_Number>(msvc8::IntrinsicExp(value))); // f2xm1/fscale expansion
+		lua_pushnumber(state, static_cast<lua_Number>(fa::IntrinsicExp(value))); // f2xm1/fscale expansion
 		return 1;
 	}
 
@@ -779,7 +779,7 @@
 		const lua_Number value = luaL_checknumber(state, 1);
 		// 0x00919D9D `fmul dword ptr [0x00D46340]` on the x87 stack: a product in
 		// the denormal range rounds twice, unlike one SSE multiply.
-		lua_pushnumber(state, msvc8::MultiplyX87(value, 57.29578f));
+		lua_pushnumber(state, fa::MultiplyX87(value, 57.29578f));
 		return 1;
 	}
 
@@ -793,7 +793,7 @@
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		// 0x00919DCD `fmul dword ptr [0x00D46344]`, as in math_deg.
-		lua_pushnumber(state, msvc8::MultiplyX87(value, 0.017453292f));
+		lua_pushnumber(state, fa::MultiplyX87(value, 0.017453292f));
 		return 1;
 	}
 
@@ -886,7 +886,7 @@
 		// >= 2^32 seeds wrap modulo 2^32 rather than hitting a float-to-unsigned
 		// conversion that is undefined for them, and NaN, infinities and values
 		// beyond int64 seed 0 (the integer indefinite's low dword).
-		const auto seed = static_cast<unsigned int>(msvc8::TruncateToInt64(luaL_checknumber(state, 1)));
+		const auto seed = static_cast<unsigned int>(fa::TruncateToInt64(luaL_checknumber(state, 1)));
 		std::srand(seed);
 		return 0;
 	}
@@ -902,7 +902,7 @@
 	{
 		const lua_Number value = luaL_checknumber(state, 1);
 		// 0x00919B20: `_CIasin` (0x00A8DE20) with the float on the x87 stack.
-		lua_pushnumber(state, static_cast<lua_Number>(msvc8::asin(static_cast<double>(value))));
+		lua_pushnumber(state, static_cast<lua_Number>(fa::asin(static_cast<double>(value))));
 		return 1;
 	}
 
@@ -935,7 +935,7 @@
 	 * one less whenever the exact product sits just under an integer that the
 	 * float rounding reaches. A 24-bit sample times a 31-bit span needs up to
 	 * 55 bits, so a double multiply can round first and hand the float
-	 * conversion a false tie (spans above 2^29); `msvc8::MultiplyIntegerX87`
+	 * conversion a false tie (spans above 2^29); `fa::MultiplyIntegerX87`
 	 * rounds the exact product once. The trailing `fadd 1.0f` /
 	 * `fiadd lower` is one more single-rounded op. The span
 	 * `upper - lower + 1` is the binary's wrapping `sub esi, ebx; add esi, 1`.
@@ -955,7 +955,7 @@
 			if (upper < 1) {
 				luaL_argerror(state, 1, "interval is empty");
 			}
-			const float scaled = msvc8::MultiplyIntegerX87(upper, sample);
+			const float scaled = fa::MultiplyIntegerX87(upper, sample);
 			const float picked = std::floor(scaled);
 			lua_pushnumber(state, picked + 1.0f);
 			return 1;
@@ -972,7 +972,7 @@
 		}
 		const auto span =
 			static_cast<std::int32_t>(static_cast<std::uint32_t>(upper) - static_cast<std::uint32_t>(lower) + 1u);
-		const float scaled = msvc8::MultiplyIntegerX87(span, sample);
+		const float scaled = fa::MultiplyIntegerX87(span, sample);
 		const float picked = std::floor(scaled);
 		// `fiadd lower` adds the exact integer and rounds once to single.
 		lua_pushnumber(state, static_cast<float>(static_cast<double>(picked) + static_cast<double>(lower)));

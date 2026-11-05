@@ -2146,8 +2146,8 @@
 			}
 
 			luaD_poscall(state, nResults, firstResult);
-		} catch (const msvc8::exception& error) {
-			// Every lua_Error arrives here: msvc8::exception is what MSVC8's
+		} catch (const fa::exception& error) {
+			// Every lua_Error arrives here: fa::exception is what MSVC8's
 			// std::exception was, and the original caught exactly that.
 			unwindFrameForError(error.what());
 			throw;

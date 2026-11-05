@@ -104,7 +104,7 @@ namespace moho
     }
 
     mOwnedStreamMask.Reset();
-    mStreams = msvc8::vector<CD3DVertexStream*>{};
+    mStreams = fa::vector<CD3DVertexStream*>{};
   }
 
   /**

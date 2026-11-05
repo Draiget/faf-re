@@ -62,7 +62,7 @@ namespace moho
    *
    * The shipped type is `std::map<Wm3::IVector2<int>, Moho::SBuildReserveInfo>`
    * - reflection registers it under exactly that name and `Init()` declares
-   * `size_ = 0x0C`, the MSVC8 `{proxy, _Myhead, _Mysize}` triplet. `msvc8::map`
+   * `size_ = 0x0C`, the MSVC8 `{proxy, _Myhead, _Mysize}` triplet. `fa::map`
    * is that layout, so the field is the container itself rather than a
    * hand-rolled node/header pair with the red-black mechanics duplicated
    * alongside the ones in `RbTree.h`.
@@ -71,7 +71,7 @@ namespace moho
    * `{left@0x00, parent@0x04, right@0x08, pair@0x0C, color@0x24, isnil@0x25}`,
    * 0x28 bytes, with the mapped `SBuildReserveInfo` at +0x14.
    */
-  using SBuildStructurePositionMap = msvc8::map<Wm3::Vector2i, SBuildReserveInfo>;
+  using SBuildStructurePositionMap = fa::map<Wm3::Vector2i, SBuildReserveInfo>;
   static_assert(sizeof(SBuildStructurePositionMap) == 0x0C, "SBuildStructurePositionMap size must be 0x0C");
 
   // `SAiAttackVectorDebug` (`{Wm3::Vector3f mOrigin@0x00, mDirection@0x0C}`,
@@ -276,8 +276,8 @@ namespace moho
     CArmyImpl* mArmy;                              // +0x34
     CArmyImpl* mCurrentEnemy;                      // +0x38
     CAiPersonality* mPersonality;                  // +0x3C
-    msvc8::string mCurrentPlan;                    // +0x40
-    msvc8::vector<SPointVector> mAttackVectors;  // +0x5C
+    fa::string mCurrentPlan;                    // +0x40
+    fa::vector<SPointVector> mAttackVectors;  // +0x5C
     std::uint32_t mAttackVectorMeta6C;             // +0x6C (unknown; written/used outside recovered scope)
     EntityCategorySet mBuildCategoryRange;     // +0x70
     SBuildStructurePositionMap mBuildStructureMap; // +0x98
@@ -1577,7 +1577,7 @@ namespace moho
    *
    * What it does:
    * Reads `(brain, position, ring, restriction[, threatType, armyIndex])` from
-   * the Lua stack, fills a `msvc8::vector<SPositionThreat>` via
+   * the Lua stack, fills a `fa::vector<SPositionThreat>` via
    * `CInfluenceMap::GetThreatsAroundPosition`, and returns it as a Lua array of
    * `{ x, z, threat }` rows.
    */
@@ -2193,7 +2193,7 @@ namespace moho
    * id is unknown.
    */
   [[nodiscard]] Unit* FindAvailableFactory(
-    const msvc8::vector<Unit*>& candidateList, const char* blueprintId, CAiBrain* brain
+    const fa::vector<Unit*>& candidateList, const char* blueprintId, CAiBrain* brain
   );
 
   class STIMap;

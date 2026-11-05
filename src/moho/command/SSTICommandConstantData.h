@@ -30,7 +30,7 @@ namespace moho
     Wm3::Quatf origin;
     float unk1;
     REntityBlueprint* blueprint;
-    msvc8::string unk2;
+    fa::string unk2;
 
     /**
      * Address: 0x00554630 (FUN_00554630, Moho::SSTICommandConstantData::MemberDeserialize)

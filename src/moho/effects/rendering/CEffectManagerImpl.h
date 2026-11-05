@@ -186,8 +186,8 @@ namespace moho
      */
     void CreateLightParticle(
       Wm3::Vector3<float> position,
-      const msvc8::string& texturePrimary,
-      const msvc8::string& textureSecondary,
+      const fa::string& texturePrimary,
+      const fa::string& textureSecondary,
       float size,
       float lifetime,
       int armyIndex

@@ -90,7 +90,7 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
-    msvc8::string mName;                                    // +0x00
+    fa::string mName;                                    // +0x00
     std::uint32_t mUnk1C;                                   // +0x1C
     gpg::fastvector_n<SCondition, 2> mConditions;           // +0x20 (0x10 header + two inline conditions)
   };

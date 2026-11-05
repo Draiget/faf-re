@@ -16,7 +16,7 @@ namespace gpg
    *   0x006DB410 / 0x006DB450
    *
    * What it is:
-   * Reflection/indexing adapter for `msvc8::vector<moho::EntityCategorySet>`.
+   * Reflection/indexing adapter for `fa::vector<moho::EntityCategorySet>`.
    */
   template <>
   class RVectorType<moho::EntityCategorySet> final : public gpg::RType, public gpg::RIndexed
@@ -35,7 +35,7 @@ namespace gpg
     /**
      * Address: 0x006DB340 (FUN_006DB340, gpg::RVectorType_BVSet_PRBlueprint::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x006DB3D0 (FUN_006DB3D0, gpg::RVectorType_BVSet_PRBlueprint::IsIndexed)
@@ -69,8 +69,8 @@ namespace gpg
   );
 
   static_assert(
-    sizeof(msvc8::vector<moho::EntityCategorySet>) == 0x10,
-    "msvc8::vector<moho::EntityCategorySet> size must be 0x10"
+    sizeof(fa::vector<moho::EntityCategorySet>) == 0x10,
+    "fa::vector<moho::EntityCategorySet> size must be 0x10"
   );
 } // namespace gpg
 
@@ -93,16 +93,16 @@ namespace moho
   void register_EntityCategorySetVectorTypeStartup();
 
   /**
-   * Address: 0x006DB010 (FUN_006DB010, msvc8::vector<EntityCategorySet>::push_back)
+   * Address: 0x006DB010 (FUN_006DB010, fa::vector<EntityCategorySet>::push_back)
    *
    * What it does:
    * Per-T canonical-template-helper binding for the engine-instantiated
-   * `msvc8::vector<EntityCategorySet>::push_back(const&)` fast/slow-path
+   * `fa::vector<EntityCategorySet>::push_back(const&)` fast/slow-path
    * body (40-byte element stride). Used to preserve the MSVC8 per-T
    * template emission symbol when callers (`UnitWeapon::Set...Priorities`,
    * `CPlatoon::SetPrioritizedTargetList`) push category-set entries.
    */
   void PushBackEntityCategorySetVector(
-    msvc8::vector<EntityCategorySet>& destination,
+    fa::vector<EntityCategorySet>& destination,
     const EntityCategorySet& value);
 } // namespace moho

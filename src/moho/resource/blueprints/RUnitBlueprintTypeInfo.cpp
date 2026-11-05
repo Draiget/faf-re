@@ -25,7 +25,7 @@ namespace
    *
    * What it does:
    * Constructs and preregisters startup reflection RTTI for
-   * `msvc8::vector<moho::RUnitBlueprintWeapon>`.
+   * `fa::vector<moho::RUnitBlueprintWeapon>`.
    */
   [[nodiscard]] gpg::RType* preregister_VectorRUnitBlueprintWeaponTypeStartup()
   {
@@ -119,7 +119,7 @@ namespace moho
     intelField->mFlags = 3;
     intelField->mDesc = "Intel information for the unit";
 
-    gpg::RField* const weaponField = typeInfo->AddField<msvc8::vector<moho::RUnitBlueprintWeapon>>("Weapons", offsetof(RUnitBlueprint, Weapons));
+    gpg::RField* const weaponField = typeInfo->AddField<fa::vector<moho::RUnitBlueprintWeapon>>("Weapons", offsetof(RUnitBlueprint, Weapons));
     weaponField->mName = "Weapon";
     weaponField->mFlags = 3;
     weaponField->mDesc = "Weapon information for the unit";

@@ -73,7 +73,7 @@ namespace moho
     TextureResourceHandle& GetTexture(TextureResourceHandle& outTexture);
 
   public:
-    msvc8::string mTexturePath;             // +0x08
+    fa::string mTexturePath;             // +0x08
     TextureResourceHandle mTextureResource; // +0x24
   };
 

@@ -1545,7 +1545,7 @@ namespace gpg::gal
 
   void DeviceVulkan::Func1() const {}
 
-  void DeviceVulkan::GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, const int adapterIndex)
+  void DeviceVulkan::GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, const int adapterIndex)
   {
     static_cast<void>(adapterIndex);
     outModes.clear(); // windowed and borderless only: no exclusive modes on this backend
@@ -1976,13 +1976,13 @@ namespace gpg::gal
     to->DiscardCpuCopy();
   }
 
-  void DeviceVulkan::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const msvc8::string& filePath)
+  void DeviceVulkan::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath)
   {
     static_cast<void>(cubeTarget);
     static_cast<void>(filePath);
   }
 
-  void DeviceVulkan::SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const msvc8::string& filePath, const int fileFormat)
+  void DeviceVulkan::SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, const int fileFormat)
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     auto* const target = static_cast<RenderTargetVulkan*>(renderTarget.get());
@@ -1995,7 +1995,7 @@ namespace gpg::gal
   }
 
   void DeviceVulkan::SaveTexture(
-    const boost::shared_ptr<Texture>& texture, const msvc8::string& filePath, const int fileFormat, gpg::MemBuffer<char>* const outBuffer
+    const boost::shared_ptr<Texture>& texture, const fa::string& filePath, const int fileFormat, gpg::MemBuffer<char>* const outBuffer
   )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);

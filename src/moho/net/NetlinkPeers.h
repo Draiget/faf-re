@@ -23,7 +23,7 @@ namespace moho
 
   // A Netlink* command from the bridge. False for any other command. Main
   // thread (CGpgNetInterface::PullTask).
-  bool NETLINK_HandleCommand(const msvc8::string& name, const msvc8::vector<SNetCommandArg>& args);
+  bool NETLINK_HandleCommand(const fa::string& name, const fa::vector<SNetCommandArg>& args);
 
   // Closes every link (GPGNet shut down).
   void NETLINK_Shutdown();
@@ -42,7 +42,7 @@ namespace moho
   // ConnectToPeer start a link and are rewritten to the shipped form with the
   // peer's engine address; DisconnectFromPeer and HostGame close links. False
   // leaves the command to PullTask. Main thread.
-  bool NATIVENET_HandleCommand(const msvc8::string& name, msvc8::vector<SNetCommandArg>& args);
+  bool NATIVENET_HandleCommand(const fa::string& name, fa::vector<SNetCommandArg>& args);
 
   // A command the game sends to the launcher (CGpgNetInterface::WriteCommand*):
   // GameEnded stops link restarts. Any thread.

@@ -53,7 +53,7 @@ namespace gpg
      * What it does:
      * Formats inherited map lexical text with current element count.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x00718D30 (FUN_00718D30, gpg::RMapType_uint_int::Init)
@@ -83,7 +83,7 @@ namespace gpg
      * What it does:
      * Formats inherited map lexical text with current element count.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x007190A0 (FUN_007190A0, gpg::RMapType_uint_InfluenceMapEntry::Init)
@@ -121,7 +121,7 @@ namespace gpg
      * What it does:
      * Formats inherited vector lexical text with current `InfluenceGrid` count.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x00718F30 (FUN_00718F30, gpg::RVectorType_InfluenceGrid::IsIndexed)
@@ -187,7 +187,7 @@ namespace gpg
      * What it does:
      * Formats inherited vector lexical text with current `SThreat` count.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x007192A0 (FUN_007192A0, gpg::RVectorType_SThreat::IsIndexed)
@@ -229,10 +229,10 @@ namespace gpg
 
 namespace
 {
-  using UIntIntMap = msvc8::map<std::uint32_t, int>;
-  using UIntInfluenceMapEntryMap = msvc8::map<std::uint32_t, moho::InfluenceMapEntry>;
-  using InfluenceGridVector = msvc8::vector<moho::InfluenceGrid>;
-  using SThreatVector = msvc8::vector<moho::SThreat>;
+  using UIntIntMap = fa::map<std::uint32_t, int>;
+  using UIntInfluenceMapEntryMap = fa::map<std::uint32_t, moho::InfluenceMapEntry>;
+  using InfluenceGridVector = fa::vector<moho::InfluenceGrid>;
+  using SThreatVector = fa::vector<moho::SThreat>;
   using InfluenceEntryIterator = UIntInfluenceMapEntryMap::iterator;
 
   template <class TMap>
@@ -252,7 +252,7 @@ namespace
       return 0u;
     }
 
-    const auto* const vector = static_cast<const msvc8::vector<TValue>*>(object);
+    const auto* const vector = static_cast<const fa::vector<TValue>*>(object);
     return vector->size();
   }
 
@@ -654,7 +654,7 @@ namespace
 
   // The tree walks formerly transcribed here over two private node overlays
   // (an isNil@+0x3D node for `InfluenceGrid::entries`, an isNil@+0x15 node for
-  // `CInfluenceMap::mBlipCells`) are emissions of `msvc8::detail::rb_min`,
+  // `CInfluenceMap::mBlipCells`) are emissions of `fa::detail::rb_min`,
   // `rb_max`, `rb_decrement` and `rb_iterator::operator++/--` for those two
   // trees (RULE ONE); their addresses belong on those RbTree.h members.
 
@@ -689,7 +689,7 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    // Instantiates `msvc8::vector<InfluenceGrid>::reserve` (FUN_0071B730).
+    // Instantiates `fa::vector<InfluenceGrid>::reserve` (FUN_0071B730).
     InfluenceGridVector loaded;
     loaded.reserve(count);
 
@@ -901,7 +901,7 @@ namespace
  */
 const char* gpg::RMapType_uint_int::GetName() const
 {
-  static const msvc8::string sName =
+  static const fa::string sName =
     gpg::STR_Printf("map<%s,%s>", CachedUIntType()->GetName(), CachedIntType()->GetName());
   return sName.c_str();
 }
@@ -912,10 +912,10 @@ const char* gpg::RMapType_uint_int::GetName() const
  * What it does:
  * Formats inherited map lexical text with current element count.
  */
-msvc8::string gpg::RMapType_uint_int::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RMapType_uint_int::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
-  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyMapElements<msvc8::map<unsigned int, int>>(ref.mObj)));
+  const fa::string base = gpg::RType::GetLexical(ref);
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyMapElements<fa::map<unsigned int, int>>(ref.mObj)));
 }
 
 /**
@@ -926,8 +926,8 @@ msvc8::string gpg::RMapType_uint_int::GetLexical(const gpg::RRef& ref) const
  */
 void gpg::RMapType_uint_int::Init()
 {
-  static_assert(sizeof(msvc8::map<unsigned int, int>) == 0x0C, "msvc8::map<unsigned int, int> is 0x0C bytes on x86");
-  size_ = sizeof(msvc8::map<unsigned int, int>);
+  static_assert(sizeof(fa::map<unsigned int, int>) == 0x0C, "fa::map<unsigned int, int> is 0x0C bytes on x86");
+  size_ = sizeof(fa::map<unsigned int, int>);
   version_ = 1;
   serLoadFunc_ = &LoadUIntIntMap;
   serSaveFunc_ = &SaveUIntIntMap;
@@ -942,7 +942,7 @@ void gpg::RMapType_uint_int::Init()
  */
 const char* gpg::RMapType_uint_InfluenceMapEntry::GetName() const
 {
-  static const msvc8::string sName =
+  static const fa::string sName =
     gpg::STR_Printf("map<%s,%s>", CachedUIntType()->GetName(), gpg::CachedLookup<moho::InfluenceMapEntry>(moho::InfluenceMapEntry::sType)->GetName());
   return sName.c_str();
 }
@@ -953,10 +953,10 @@ const char* gpg::RMapType_uint_InfluenceMapEntry::GetName() const
  * What it does:
  * Formats inherited map lexical text with current element count.
  */
-msvc8::string gpg::RMapType_uint_InfluenceMapEntry::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RMapType_uint_InfluenceMapEntry::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
-  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyMapElements<msvc8::map<unsigned int, moho::InfluenceMapEntry>>(ref.mObj)));
+  const fa::string base = gpg::RType::GetLexical(ref);
+  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyMapElements<fa::map<unsigned int, moho::InfluenceMapEntry>>(ref.mObj)));
 }
 
 /**
@@ -967,8 +967,8 @@ msvc8::string gpg::RMapType_uint_InfluenceMapEntry::GetLexical(const gpg::RRef& 
  */
 void gpg::RMapType_uint_InfluenceMapEntry::Init()
 {
-  static_assert(sizeof(msvc8::map<unsigned int, moho::InfluenceMapEntry>) == 0x0C, "msvc8::map<unsigned int, moho::InfluenceMapEntry> is 0x0C bytes on x86");
-  size_ = sizeof(msvc8::map<unsigned int, moho::InfluenceMapEntry>);
+  static_assert(sizeof(fa::map<unsigned int, moho::InfluenceMapEntry>) == 0x0C, "fa::map<unsigned int, moho::InfluenceMapEntry> is 0x0C bytes on x86");
+  size_ = sizeof(fa::map<unsigned int, moho::InfluenceMapEntry>);
   version_ = 1;
   serLoadFunc_ = &LoadUIntInfluenceMapEntryMap;
   serSaveFunc_ = &SaveUIntInfluenceMapEntryMap;
@@ -1047,7 +1047,7 @@ void gpg::RMapType_uint_InfluenceMapEntry::Init()
  */
 const char* gpg::RVectorType_InfluenceGrid::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::CachedLookup<moho::InfluenceGrid>(moho::InfluenceGrid::sType)->GetName());
+  static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::CachedLookup<moho::InfluenceGrid>(moho::InfluenceGrid::sType)->GetName());
   return sName.c_str();
 }
 
@@ -1057,9 +1057,9 @@ const char* gpg::RVectorType_InfluenceGrid::GetName() const
  * What it does:
  * Formats inherited vector lexical text with current `InfluenceGrid` count.
  */
-msvc8::string gpg::RVectorType_InfluenceGrid::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_InfluenceGrid::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf(
     "%s, size=%d",
     base.c_str(),
@@ -1076,8 +1076,8 @@ msvc8::string gpg::RVectorType_InfluenceGrid::GetLexical(const gpg::RRef& ref) c
  */
 void gpg::RVectorType_InfluenceGrid::Init()
 {
-  static_assert(sizeof(msvc8::vector<moho::InfluenceGrid>) == 0x10, "msvc8::vector<moho::InfluenceGrid> is 0x10 bytes on x86");
-  size_ = sizeof(msvc8::vector<moho::InfluenceGrid>);
+  static_assert(sizeof(fa::vector<moho::InfluenceGrid>) == 0x10, "fa::vector<moho::InfluenceGrid> is 0x10 bytes on x86");
+  size_ = sizeof(fa::vector<moho::InfluenceGrid>);
   version_ = 1;
   serLoadFunc_ = &LoadInfluenceGridVectorArchive;
   serSaveFunc_ = &SaveInfluenceGridVectorArchive;
@@ -1181,7 +1181,7 @@ void gpg::RVectorType_InfluenceGrid::SetCount(void* const obj, const int count) 
  */
 const char* gpg::RVectorType_SThreat::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::CachedLookup<moho::SThreat>(moho::SThreat::sType)->GetName());
+  static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::CachedLookup<moho::SThreat>(moho::SThreat::sType)->GetName());
   return sName.c_str();
 }
 
@@ -1191,9 +1191,9 @@ const char* gpg::RVectorType_SThreat::GetName() const
  * What it does:
  * Formats inherited vector lexical text with current `SThreat` count.
  */
-msvc8::string gpg::RVectorType_SThreat::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_SThreat::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyVectorElements<moho::SThreat>(ref.mObj)));
 }
 
@@ -1564,7 +1564,7 @@ namespace moho
    *   3) the aggregate `threat` / `decay` lanes are the two 56-byte
    *      `rep movsd` blocks at 0x0071C192 and 0x0071C19F.
    *
-   * This is the element copy lane the `msvc8::vector<InfluenceGrid>` growth and
+   * This is the element copy lane the `fa::vector<InfluenceGrid>` growth and
    * fill paths use (`_Insert_n` at FUN_0071B970 takes its `_Tmp` copy through
    * it at 0x0071B9A2).
    * Address: 0x0071EE20 (FUN_0071EE20 -- `InfluenceGrid::InfluenceGrid(const InfluenceGrid&)` -- member-wise copy of the entry set and the threat vector; zero callers, unreachable; formerly `CopyConstructInfluenceGridIfPresentPrimary` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
@@ -1572,7 +1572,7 @@ namespace moho
    * Address: 0x0071AA60 (FUN_0071AA60 -- the entry-set half of `InfluenceGrid`'s copy constructor; callers 0x00715440, 0x00716140, 0x00716350; formerly `CopyInfluenceGridEntries` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
    * Address: 0x0071C1F0 (FUN_0071C1F0 -- the entry-set half of `InfluenceGrid`'s copy constructor (the placement-new form); callers 0x0071C150, 0x0071C1E0; formerly `CopyConstructInfluenceGridEntries` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
    * Address: 0x0071C6C0/0x0071C9A0 (FUN_0071C6C0, FUN_0071C9A0 -- the outer clone and
-   * `msvc8::_Tree<InfluenceMapEntry>::_Copy` it wraps, now absorbed by the
+   * `fa::_Tree<InfluenceMapEntry>::_Copy` it wraps, now absorbed by the
    * `entries(other.entries)` member-init and `entries = source.entries` in
    * AssignInfluenceGridValue; formerly `CopyInfluenceEntryTreeStorage` (RULE ONE), removed 2026-10-03.)
    */
@@ -2037,7 +2037,7 @@ namespace moho
    */
   /**
    * Orders collected samples strongest-threat-first; the sort's emitted bodies
-   * are cited on the `msvc8::sort` members in `legacy/algorithms/Sort.h`.
+   * are cited on the `fa::sort` members in `legacy/algorithms/Sort.h`.
    */
   struct ThreatDescending
   {
@@ -2047,8 +2047,8 @@ namespace moho
     }
   };
 
-  msvc8::vector<SPositionThreat>* CInfluenceMap::GetThreatsAroundPosition(
-    msvc8::vector<SPositionThreat>& out,
+  fa::vector<SPositionThreat>* CInfluenceMap::GetThreatsAroundPosition(
+    fa::vector<SPositionThreat>& out,
     const Wm3::Vec3f& pos,
     const int ring,
     const bool restrictToPlayable,
@@ -2100,7 +2100,7 @@ namespace moho
         const float worldZ = static_cast<float>((mGridSize / 2) + (z * mGridSize));
 
         const SPositionThreat sample{worldX, 0.0f, worldZ, threat};
-        // push_back's capacity-full path is `msvc8::vector<SPositionThreat>::insert`
+        // push_back's capacity-full path is `fa::vector<SPositionThreat>::insert`
         // (FUN_0071BEE0), reached through the binary's push_back at FUN_00718A40.
         // `_Insert_n` (0071BEE0) itself calls FUN_0071A1F0 to relocate the
         // existing `[begin, insertPos)` run into the freshly-grown buffer: a
@@ -2122,14 +2122,14 @@ namespace moho
 
     if (sim && sim->IsSyncLogOn()) {
       const gpg::MD5Digest digest = sim->mContext.Digest();
-      const msvc8::string checksum = digest.ToString();
+      const fa::string checksum = digest.ToString();
       sim->Logf("after GetThreatsAroundPosition checksum=%s\n", checksum.c_str());
     }
 
     // 0x0071E200 with `(begin, end, (end - begin) >> 4, <empty functor>)`: the
     // callers want the strongest threat first, so the samples leave sorted by
     // descending `threat`.
-    msvc8::sort(out.begin(), out.end(), ThreatDescending{});
+    fa::sort(out.begin(), out.end(), ThreatDescending{});
 
     return &out;
   }
@@ -2275,7 +2275,7 @@ namespace moho
 
     if (sim && sim->IsSyncLogOn()) {
       const gpg::MD5Digest digest = sim->mContext.Digest();
-      const msvc8::string checksum = digest.ToString();
+      const fa::string checksum = digest.ToString();
       sim->Logf("after inf checksum=%s\n", checksum.c_str());
     }
   }
@@ -2310,7 +2310,7 @@ namespace moho
   }
 
   /**
-   * Covered by typed source construct: msvc8::map<uint32_t,int32_t>::operator[].
+   * Covered by typed source construct: fa::map<uint32_t,int32_t>::operator[].
    * The binary emits FUN_00718360 for the actual InsertEntry callsite.
    */
   void CInfluenceMap::UpsertBlipCell(const std::uint32_t blipId, const std::int32_t cellIndex)
@@ -2620,7 +2620,7 @@ namespace moho
     }
     archive->Read(entryMapType, &entries, owner);
 
-    gpg::RType* const threatVectorType = gpg::RTypeOf<msvc8::vector<moho::SThreat>>();
+    gpg::RType* const threatVectorType = gpg::RTypeOf<fa::vector<moho::SThreat>>();
     GPG_ASSERT(threatVectorType != nullptr);
     if (!threatVectorType) {
       return;
@@ -2658,7 +2658,7 @@ namespace moho
     }
     archive->Write(entryMapType, &entries, owner);
 
-    gpg::RType* const threatVectorType = gpg::RTypeOf<msvc8::vector<moho::SThreat>>();
+    gpg::RType* const threatVectorType = gpg::RTypeOf<fa::vector<moho::SThreat>>();
     GPG_ASSERT(threatVectorType != nullptr);
     if (!threatVectorType) {
       return;

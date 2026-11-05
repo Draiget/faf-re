@@ -15,7 +15,7 @@ using namespace moho;
 
 namespace
 {
-  using SPointVectorVector = msvc8::vector<moho::SPointVector>;
+  using SPointVectorVector = fa::vector<moho::SPointVector>;
   using SPointVectorVectorType = gpg::RVectorType<moho::SPointVector>;
 
   /**
@@ -160,7 +160,7 @@ void SPointVector::MemberSerialize(gpg::WriteArchive* const archive) const
  */
 const char* gpg::RVectorType<moho::SPointVector>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<SPointVector>()->GetName());
+  static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<SPointVector>()->GetName());
   return sName.c_str();
 }
 
@@ -171,9 +171,9 @@ const char* gpg::RVectorType<moho::SPointVector>::GetName() const
  * Returns one base lexical string plus `size=<count>` for reflected
  * `vector<SPointVector>` payloads.
  */
-msvc8::string gpg::RVectorType<moho::SPointVector>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType<moho::SPointVector>::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 
@@ -354,12 +354,12 @@ void moho::register_SPointVectorTypeInfo()
  * Address: 0x005825A0 (FUN_005825A0, register_SPointVectorVectorType)
  *
  * What it does:
- * Constructs/preregisters RTTI for `msvc8::vector<moho::SPointVector>`.
+ * Constructs/preregisters RTTI for `fa::vector<moho::SPointVector>`.
  */
 gpg::RType* moho::register_SPointVectorVectorType()
 {
   auto* const type = &AcquireSPointVectorVectorType();
-  gpg::PreRegisterRType(typeid(msvc8::vector<moho::SPointVector>), type);
+  gpg::PreRegisterRType(typeid(fa::vector<moho::SPointVector>), type);
   return type;
 }
 

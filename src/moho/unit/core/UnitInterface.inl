@@ -94,7 +94,7 @@ void Unit::ShowAIDebugInfo(const bool isEnabled)
     return;
   }
 
-  const msvc8::string debugStatPath = msvc8::string("AIDebug_") + GetUniqueName();
+  const fa::string debugStatPath = fa::string("AIDebug_") + GetUniqueName();
   armyStats->Delete(debugStatPath.c_str());
 }
 

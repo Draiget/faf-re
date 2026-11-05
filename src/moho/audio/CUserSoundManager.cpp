@@ -370,7 +370,7 @@ namespace
   }
 
   void WarnCuePlayFailure(
-    const int xactResult, const std::uint16_t cueId, const std::uint16_t bankId, const msvc8::string& bankName
+    const int xactResult, const std::uint16_t cueId, const std::uint16_t bankId, const fa::string& bankName
   )
   {
     if (xactResult >= 0 || xactResult == kXactErrCuePreparedOnly) {
@@ -479,7 +479,7 @@ namespace
 
   /**
    * Layout of the 12-byte intrusive tree-node the original MSVC8-era
-   * `msvc8::set<IXACTCue*>` allocates for each insertion. Only the three
+   * `fa::set<IXACTCue*>` allocates for each insertion. Only the three
    * leading link pointers are observable in the binary's initialization
    * routine (`FUN_008AF8D0`); the comparison key is stored through the
    * `leftOrValue` lane because the set is used as a FIFO destroy queue and
@@ -532,19 +532,19 @@ namespace
   /**
    * Inserts one cue pointer into the pending-destroy set using the same
    * node-layout contract the release binary records via
-   * `StorePendingDestroyCueNodeLinks`. The msvc8::set rewrite owns the
+   * `StorePendingDestroyCueNodeLinks`. The fa::set rewrite owns the
    * allocation; we bind the initialized node-links layout alongside it so
    * the insertion retains an explicit invocation of the recovered helper
    * name rather than dropping it through opaque STL internals.
    */
   void EnqueuePendingDestroyCue(
-    msvc8::set<moho::IXACTCue*>& pendingCues, moho::IXACTCue* const cue
+    fa::set<moho::IXACTCue*>& pendingCues, moho::IXACTCue* const cue
   )
   {
     // Build the node-link triplet FUN_008AF8D0 would have written: the
     // left/parent lanes both reference the cue key (the set keys by the
     // pointer value itself), and the `right` lane starts empty just like
-    // the binary stages before `msvc8::set::insert` links the node.
+    // the binary stages before `fa::set::insert` links the node.
     PendingDestroyCueNodeLinks stagedLinks{};
     (void)StorePendingDestroyCueNodeLinks(&stagedLinks, cue, cue, nullptr);
 
@@ -552,7 +552,7 @@ namespace
   }
 
   [[nodiscard]] int DrainFinishedPendingCues(
-    msvc8::set<moho::IXACTCue*>& pendingCues, moho::AudioEngine* const voiceEngine
+    fa::set<moho::IXACTCue*>& pendingCues, moho::AudioEngine* const voiceEngine
   )
   {
     const bool canQueryCueState =
@@ -1289,7 +1289,7 @@ namespace moho
         continue;
       }
 
-      const msvc8::string baseLine = gpg::STR_Printf(
+      const fa::string baseLine = gpg::STR_Printf(
         "%4i: %s.%s",
         static_cast<int>(handleIndex),
         record.mParams->mBank.c_str(),
@@ -1297,7 +1297,7 @@ namespace moho
       );
 
       if (record.mPlayingSeconds > 0.0f) {
-        const msvc8::string stoppingLine = gpg::STR_Printf("%s (stopping %2.2f)", baseLine.c_str(), record.mPlayingSeconds);
+        const fa::string stoppingLine = gpg::STR_Printf("%s (stopping %2.2f)", baseLine.c_str(), record.mPlayingSeconds);
         gpg::Logf("%s", stoppingLine.c_str());
         continue;
       }
@@ -1380,17 +1380,17 @@ namespace moho
   /**
    * Address: 0x008AAC50 (FUN_008AAC50)
    *
-   * msvc8::string const&, msvc8::string const&
+   * fa::string const&, fa::string const&
    *
    * IDA signature:
-   * void __thiscall Moho::CUserSoundManager::Play(Moho::CUserSoundManager *this, msvc8::string const& bankName,
-   * msvc8::string const& cueName);
+   * void __thiscall Moho::CUserSoundManager::Play(Moho::CUserSoundManager *this, fa::string const& bankName,
+   * fa::string const& cueName);
    *
    * What it does:
    * Builds transient cue params from bank+cue names and plays a one-shot on
    * the voice engine.
    */
-  void CUserSoundManager::Play(const msvc8::string& bankName, const msvc8::string& cueName)
+  void CUserSoundManager::Play(const fa::string& bankName, const fa::string& cueName)
   {
     CSndParams params(bankName, cueName, nullptr, nullptr, mVoiceEngine);
     if (!ParamsHasResolvedEngine(params)) {
@@ -1905,7 +1905,7 @@ namespace moho
     if (!categoryPtr) {
       LuaPlus::LuaStackObject::TypeError(&categoryArg, "string");
     }
-    const msvc8::string category(categoryPtr);
+    const fa::string category(categoryPtr);
 
     LuaPlus::LuaStackObject pausedArg(state, 2);
     const bool paused = LuaPlus::LuaStackObject::GetBoolean(&pausedArg);
@@ -1966,7 +1966,7 @@ namespace moho
     if (!categoryPtr) {
       LuaPlus::LuaStackObject::TypeError(&categoryArg, "string");
     }
-    const msvc8::string category(categoryPtr);
+    const fa::string category(categoryPtr);
 
     LuaPlus::LuaStackObject pausedArg(state, 2);
     const bool paused = LuaPlus::LuaStackObject::GetBoolean(&pausedArg);

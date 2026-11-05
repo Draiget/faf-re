@@ -55,7 +55,7 @@ namespace moho
    */
   struct SRangeRenderProfile
   {
-    msvc8::string mExtractorName;                  // +0x00
+    fa::string mExtractorName;                  // +0x00
     std::uint32_t mReserved1C = 0u;                // +0x1C
     EntityCategorySet mCategoryFilter;         // +0x20
     RangeRingColor mBuildRingColor;                // +0x48
@@ -84,11 +84,11 @@ namespace moho
    * `lea edx,[ecx+ecx*2]; shl edx,6`) with the key at `node+0x10` and the
    * profile at `node+0x30`: `_Lbound` (`FUN_007F13A0`) hands `node+0x10` to
    * the key comparison as `this` and reads `_Mysize` at `this+0x14`, which is
-   * the 0x1C `msvc8::string` layout. The value therefore starts four bytes
+   * the 0x1C `fa::string` layout. The value therefore starts four bytes
    * past the end of the key, and the node four past the end of the links -
    * `SRangeRenderProfile` is 8-aligned, because `EntityCategorySet` is.
    */
-  using SRangeRenderProfileMap = msvc8::map<msvc8::string, SRangeRenderProfile>;
+  using SRangeRenderProfileMap = fa::map<fa::string, SRangeRenderProfile>;
   static_assert(sizeof(SRangeRenderProfileMap) == 0x0C, "SRangeRenderProfileMap size must be 0x0C");
   static_assert(
     sizeof(SRangeRenderProfileMap::value_type) == 0xA8, "SRangeRenderProfileMap::value_type size must be 0xA8"
@@ -161,7 +161,7 @@ namespace moho
      * Rebuilds the visible-profile vector from category-name keys using the
      * profile map tree.
      */
-    void MoveCategories(const msvc8::vector<msvc8::string>& categories);
+    void MoveCategories(const fa::vector<fa::string>& categories);
 
     /**
      * Address: 0x007EE430 (FUN_007EE430, sub_7EE430)
@@ -176,7 +176,7 @@ namespace moho
 
   public:
     SRangeRenderProfileMap mRangeProfiles;                             // +0x04
-    msvc8::vector<SRangeRenderProfile> mVisibleProfiles;              // +0x10
+    fa::vector<SRangeRenderProfile> mVisibleProfiles;              // +0x10
     std::uint32_t mIndexCount;                                        // +0x20
     std::uint32_t mVertexCount;                                       // +0x24
     RenderGeometryBuffers mGeometry;                                  // +0x28
@@ -221,7 +221,7 @@ namespace moho
    * The binary appends one entry per successfully extracted candidate using
    * `AppendRangeExtractionPayload` lane behavior.
    */
-  using SRangeExtractionPayloadVector = msvc8::vector<SRangeExtractionPayload>;
+  using SRangeExtractionPayloadVector = fa::vector<SRangeExtractionPayload>;
 
   /**
    * Address: 0x007EF0B0 (FUN_007EF0B0, Moho::func_ExtractRanges)

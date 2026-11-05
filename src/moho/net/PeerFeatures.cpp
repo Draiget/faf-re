@@ -189,7 +189,7 @@ void CPeerFeatures::OfferRejoinToLauncher(CClientManagerImpl& manager)
   }
   mRejoinOffered = true;
 
-  msvc8::string seats;
+  fa::string seats;
   for (const CClientBase* const client : manager.mClients) {
     if (client != nullptr) {
       if (!seats.empty()) {

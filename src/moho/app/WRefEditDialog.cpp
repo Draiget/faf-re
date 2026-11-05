@@ -61,11 +61,11 @@ namespace moho
      * Copies the row's reference, edit flag and label; its children are not
      * listed yet.
      */
-    CRefTreeItemData(const gpg::RRef& ref, bool editable, const msvc8::string& name);
+    CRefTreeItemData(const gpg::RRef& ref, bool editable, const fa::string& name);
 
     gpg::RRef mRef;      // +0x08
     bool mEditable;      // +0x10
-    msvc8::string mName; // +0x14
+    fa::string mName; // +0x14
     bool mPopulated;     // +0x30
   };
 
@@ -108,7 +108,7 @@ namespace moho
      * `parent` is not set. The row gets an expand button when the value has
      * fields or elements.
      */
-    wxTreeItemId AddItem(const wxTreeItemId& parent, const msvc8::string& name, const gpg::RRef& ref, bool editable);
+    wxTreeItemId AddItem(const wxTreeItemId& parent, const fa::string& name, const gpg::RRef& ref, bool editable);
 
     /**
      * Address: 0x004A4260 (FUN_004A4260)
@@ -203,7 +203,7 @@ END_EVENT_TABLE()
 /**
  * Address: 0x004A3CB0 (FUN_004A3CB0)
  */
-moho::CRefTreeItemData::CRefTreeItemData(const gpg::RRef& ref, const bool editable, const msvc8::string& name)
+moho::CRefTreeItemData::CRefTreeItemData(const gpg::RRef& ref, const bool editable, const fa::string& name)
   : mRef(ref)
   , mEditable(editable)
   , mName(name)
@@ -236,7 +236,7 @@ moho::WRefEditDialog::WRefEditDialog(const gpg::RRef& ref, const char* const nam
  * Address: 0x004A4110 (FUN_004A4110)
  */
 wxTreeItemId moho::WRefEditDialog::AddItem(
-  const wxTreeItemId& parent, const msvc8::string& name, const gpg::RRef& ref, const bool editable
+  const wxTreeItemId& parent, const fa::string& name, const gpg::RRef& ref, const bool editable
 )
 {
   const wxString label(name.c_str(), wxConvUTF8);
@@ -285,7 +285,7 @@ void moho::WRefEditDialog::AddChildren(const wxTreeItemId& parent, const gpg::RR
 void moho::WRefEditDialog::SetValue(const wxString& value)
 {
   const CRefTreeItemData* const data = static_cast<CRefTreeItemData*>(mTree->GetItemData(mActiveItem));
-  const msvc8::string text = gpg::STR_WideToUtf8(value.c_str());
+  const fa::string text = gpg::STR_WideToUtf8(value.c_str());
   data->mRef.SetLexical(text.c_str());
   mTree->SetItemText(mActiveItem, 1, wxString(data->mRef.GetLexical().c_str(), wxConvUTF8));
 }
@@ -404,7 +404,7 @@ void moho::func_SC_CreateEntityDialog_chunk()
     return;
   }
 
-  msvc8::vector<UserUnit*> selectedUnits{};
+  fa::vector<UserUnit*> selectedUnits{};
   session->GetSelectionUnits(selectedUnits);
   if (selectedUnits.empty()) {
     return;

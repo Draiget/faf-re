@@ -481,7 +481,7 @@ bool Sim::LocationIsFree(Sim* const sim, Unit* const ignore, gpg::Rect2i* const 
       CUnitCommandQueue* const queue = unit->CommandQueue;
       bool idle = (queue == nullptr);
       if (!idle) {
-        const msvc8::vector<WeakPtr<CUnitCommand>>& commands = queue->mCommandVec;
+        const fa::vector<WeakPtr<CUnitCommand>>& commands = queue->mCommandVec;
         if (commands.empty()) {
           idle = true;
         } else {
@@ -602,8 +602,8 @@ namespace
     const float extentX = p0z - p0x;
     const float extentZ = p1x - p0y;
     // FUN_0040D860's inlined floor (0x0040D908, 0x0040D93A); the step-1 mask is -1.
-    int cursorX = msvc8::FloorToIntX87(p0x);
-    int cursorZ = msvc8::FloorToIntX87(p0y);
+    int cursorX = fa::FloorToIntX87(p0x);
+    int cursorZ = fa::FloorToIntX87(p0y);
 
     for (;;) {
       const int cellDX = dirMaskX ^ cursorX;

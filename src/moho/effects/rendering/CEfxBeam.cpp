@@ -286,7 +286,7 @@ namespace moho
     mParams.resize(BEAM_LASTPARAM, 0.0f);
     mParticleTextures.resize(2, nullptr);
     {
-      const msvc8::string emptyString;
+      const fa::string emptyString;
       mStrings.resize(2, emptyString);
     }
 
@@ -345,7 +345,7 @@ namespace moho
     mParams.resize(BEAM_LASTPARAM, 0.0f);
     mParticleTextures.resize(2, nullptr);
     {
-      const msvc8::string emptyString;
+      const fa::string emptyString;
       mStrings.resize(2, emptyString);
     }
 
@@ -737,7 +737,7 @@ namespace moho
     }
 
     Sim* const sim = mManager->GetSim();
-    const msvc8::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
+    const fa::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
     for (std::size_t cameraIndex = 0; cameraIndex < cameras.size(); ++cameraIndex) {
       if (CanSeeCam(&cameras[cameraIndex])) {
         sim->GetParticleBuffer()->mBeams.push_back(mBeam);

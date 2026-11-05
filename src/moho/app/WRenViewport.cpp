@@ -252,7 +252,7 @@ void moho::WRenViewport::AddWorldView(
   WRenViewport* const viewport = moho::ren_Viewport;
   viewport->RemoveWorldView(view);
 
-  msvc8::vector<SWorldViewInfo>& worldViews = viewport->mWorldViews;
+  fa::vector<SWorldViewInfo>& worldViews = viewport->mWorldViews;
   SWorldViewInfo* insertPos = worldViews.begin();
   while (insertPos != worldViews.end() && depth >= insertPos->mDepth) {
     ++insertPos;
@@ -318,8 +318,8 @@ namespace
   // modeled here at their proven types and byte-verified defaults:
   //   dump_frameRate         @ 0x010A6334 (?dump_frameRate@Moho@@3HA)          int, 0
   //   dump_outputFrameNumber @ 0x010A6418 (?dump_outputFrameNumber@Moho@@3HA)  int, 0
-  //   dump_Timestamp         @ 0x00F5A8A4 (msvc8::string)                      empty
-  //   dump_frameDumpName     @ 0x00F5A8C0 (msvc8::string)                      empty
+  //   dump_Timestamp         @ 0x00F5A8A4 (fa::string)                      empty
+  //   dump_frameDumpName     @ 0x00F5A8C0 (fa::string)                      empty
   // The timestamp / base-name strings are populated by the frame-dump console
   // command elsewhere; here they are only consumed to build the output path.
 }
@@ -347,14 +347,14 @@ namespace moho
    *
    * Timestamp token embedded in dumped frame filenames. Default empty.
    */
-  msvc8::string dump_Timestamp{};
+  fa::string dump_Timestamp{};
 
   /**
    * Address: 0x00F5A8C0 (?dump_frameDumpName@Moho@@3V?$basic_string@...@std@@A)
    *
    * Base directory / name prefix for dumped frame files. Default empty.
    */
-  msvc8::string dump_frameDumpName{};
+  fa::string dump_frameDumpName{};
 
   void REN_MaybeDumpFrame(ID3DRenderTarget* renderTarget);
 }
@@ -408,7 +408,7 @@ void moho::REN_MaybeDumpFrame(moho::ID3DRenderTarget* const renderTarget)
 
   // Build the numbered output path: "<name>\SCFrame_<timestamp>_<NNNNN>.bmp".
   const int frameNumber = moho::dump_outputFrameNumber++;
-  const msvc8::string dest = gpg::STR_Printf(
+  const fa::string dest = gpg::STR_Printf(
     "%s\\SCFrame_%s_%05d.bmp",
     moho::dump_frameDumpName.c_str(),
     moho::dump_Timestamp.c_str(),
@@ -663,7 +663,7 @@ namespace
       int labelValue = 0;            // ebp (v50), steps by axisStep
       unsigned int rowYAccum = 0;    // esi (v49), steps by the row-height slot y_low
       for (int row = 0; row < 5; ++row) { // var_138 == 5
-        const msvc8::string text = gpg::STR_Printf("%5d", labelValue); // 0x007F46B0
+        const fa::string text = gpg::STR_Printf("%5d", labelValue); // 0x007F46B0
         // Baseline Y = (peakScale-derived base) - (rowYAccum >> 2), fild + the
         // MSVC unsigned->float fixup (0x007F46BC..0x007F46E1).
         const int rawY = static_cast<int>(gRenBandwidthPeakScale) - static_cast<int>(rowYAccum >> 2);
@@ -950,7 +950,7 @@ namespace
  * ren_Ui is set, then the debug overlays (REN_DebugStuff) and the editor
  * render hook.
  */
-void moho::WRenViewport::RenderUI(const msvc8::vector<SWorldViewInfo>& worldViews)
+void moho::WRenViewport::RenderUI(const fa::vector<SWorldViewInfo>& worldViews)
 {
   // 0x007F88CA..0x007F88FD: bind the head render target, disable secondary
   // color write.
@@ -1108,7 +1108,7 @@ void moho::WRenViewport::RenderCameraOutline(
  * `head` and the vector (the one call site, WRenViewport::Render
  * 0x007F97AF..0x007F97B2, pushes the three) and passes a dead DeviceD3D9* in
  * edi. The vector is read at +4/+8 only - its first and last element
- * pointers, past msvc8::vector's leading proxy word.
+ * pointers, past fa::vector's leading proxy word.
  *
  * What it does:
  * Renders the cartographic ("strategic"/top-down) view for every world-view
@@ -1161,7 +1161,7 @@ void moho::WRenViewport::RenderCameraOutline(
  */
 unsigned int moho::WRenViewport::RenderCartographic(
   const int head,
-  msvc8::vector<SWorldViewInfo>& worldViews
+  fa::vector<SWorldViewInfo>& worldViews
 )
 {
   IWldTerrainRes* const terrain = moho::REN_GetTerrainRes();
@@ -1524,7 +1524,7 @@ void moho::WRenViewport::D3DWindowOnDeviceRender()
       // Debug mode: render only the first registered world view. The binary
       // copy-constructs a fresh one-element vector from the first entry for
       // the duration of the call rather than passing the live vector.
-      msvc8::vector<SWorldViewInfo> firstViewOnly{};
+      fa::vector<SWorldViewInfo> firstViewOnly{};
       firstViewOnly.push_back(mWorldViews.front());
       Render(head, firstViewOnly);
     } else {
@@ -1651,7 +1651,7 @@ void moho::WRenViewport::RenderPreviewImage([[maybe_unused]] const bool forceReg
     (void)worldViewEntry.mTerrain->Create(terrainRes);
   }
 
-  msvc8::vector<SWorldViewInfo> previewWorldViews{};
+  fa::vector<SWorldViewInfo> previewWorldViews{};
   previewWorldViews.push_back(worldViewEntry);
   Render(0, previewWorldViews);
 
@@ -2118,7 +2118,7 @@ void moho::WRenViewport::RenderWorldView(
  * ren_OnlyFirstView a copy of the first view. An earlier revision walked
  * mWorldViews here, so both drew every registered view.
  */
-void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& worldViews)
+void moho::WRenViewport::Render(const int head, fa::vector<SWorldViewInfo>& worldViews)
 {
   moho::CD3DDevice* const device = moho::D3D_GetDevice();
   if (device == nullptr) {
@@ -2392,7 +2392,7 @@ void moho::WRenViewport::RenderSkyDome()
 
   // The dispatcher hands the cumulus pass an empty per-cloud instance stream;
   // the producer that fills it is a separate (unrecovered) upload path.
-  const msvc8::vector<moho::SkyDome::CumulusVertex> cumulusVertices{};
+  const fa::vector<moho::SkyDome::CumulusVertex> cumulusVertices{};
 
   const moho::GeomCamera3& cam = *mCam;
   const float simDeltaSeconds = moho::REN_GetSimDeltaSeconds();

@@ -51,7 +51,7 @@ namespace moho
     /// `/simworkers N` on the command line, otherwise the exe's default, leaving two CPUs for the main and sim threads.
     [[nodiscard]] int CommandLineWorkerCount()
     {
-      msvc8::vector<msvc8::string> args;
+      fa::vector<fa::string> args;
       if (CFG_GetArgOption("/simworkers", 1u, &args) && !args.empty()) {
         return static_cast<int>(std::max(0L, std::strtol(args[0].c_str(), nullptr, 10)));
       }

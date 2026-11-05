@@ -14,8 +14,8 @@ namespace moho
    * Resets output string, appends first string in `[begin,end)`, then appends
    * `separator` + each subsequent item.
    */
-  [[nodiscard]] inline msvc8::string AppendJoinedStringRange(
-    const msvc8::string* const begin, const msvc8::string* const end, const char* separator
+  [[nodiscard]] inline fa::string AppendJoinedStringRange(
+    const fa::string* const begin, const fa::string* const end, const char* separator
   )
   {
     std::string joined;
@@ -25,13 +25,13 @@ namespace moho
 
     if (begin != nullptr && end != nullptr && begin < end) {
       joined.append(begin->view());
-      for (const msvc8::string* cursor = begin + 1; cursor < end; ++cursor) {
+      for (const fa::string* cursor = begin + 1; cursor < end; ++cursor) {
         joined.append(separator);
         joined.append(cursor->view());
       }
     }
 
-    msvc8::string out;
+    fa::string out;
     out.assign_owned(joined);
     return out;
   }

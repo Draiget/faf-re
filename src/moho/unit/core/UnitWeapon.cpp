@@ -182,7 +182,7 @@ namespace
    * logical vector end back to begin without releasing capacity storage.
    */
   [[nodiscard]] moho::SBlackListInfo* ResetBlacklistRangeToBegin(
-    msvc8::vector<moho::SBlackListInfo>& blacklist
+    fa::vector<moho::SBlackListInfo>& blacklist
   ) noexcept
   {
     if (!blacklist.empty()) {
@@ -289,7 +289,7 @@ namespace
       const float headingY = ((unitOrientation.z * unitOrientation.x) + (unitOrientation.w * unitOrientation.y)) * 2.0f;
       const float headingX =
         1.0f - (((unitOrientation.y * unitOrientation.y) + (unitOrientation.x * unitOrientation.x)) * 2.0f);
-      const float headingToTarget = msvc8::Atan2Difference(
+      const float headingToTarget = fa::Atan2Difference(
         targetPosition.x - muzzlePosition.x, targetPosition.z - muzzlePosition.z, headingY, headingX
       );
 
@@ -481,7 +481,7 @@ namespace
 
     const char* const expectedTypeName = gpg::RTypeOf<T>() ? gpg::RTypeOf<T>()->GetName() : "null";
     const char* const actualTypeName = source.GetTypeName();
-    const msvc8::string errorMessage = gpg::STR_Printf(
+    const fa::string errorMessage = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expectedTypeName ? expectedTypeName : "null",
@@ -1109,7 +1109,7 @@ namespace moho
         damage.mTarget = helper.mEntity;
         damage.mInstigator.Set(static_cast<Entity*>(firingUnit));
         damage.mAmount = weapon.mAttributes.GetDamage();
-        damage.mType.assign(weapon.mAttributes.GetName(), 0, msvc8::string::npos);
+        damage.mType.assign(weapon.mAttributes.GetName(), 0, fa::string::npos);
         const Wm3::Vec3f& firingPosition = firingUnit->GetPosition();
         const Wm3::Vec3f& impactPosition = impactEntity->mVarDat.mCurTransform.pos_;
         damage.mVector.x = firingPosition.x - impactPosition.x;
@@ -1129,7 +1129,7 @@ namespace moho
 
     CArmyStats* const armyStats = firingUnit->ArmyRef->GetArmyStats();
     const bool impactResolved = helper.mEntity.HasValue();
-    const msvc8::string statPath = msvc8::string("RealTimeStats_") + firingUnit->GetUniqueName()
+    const fa::string statPath = fa::string("RealTimeStats_") + firingUnit->GetUniqueName()
       + (impactResolved ? "_Shots_Hit" : "_Shots_Missed");
     CArmyStatItem* const shotItem = armyStats->GetItem(statPath.c_str());
     shotItem->SynchronizeAsInt();
@@ -1805,7 +1805,7 @@ namespace moho
       return 0;
     }
 
-    weapon->ChangeProjectileBlueprint(msvc8::string(blueprintText));
+    weapon->ChangeProjectileBlueprint(fa::string(blueprintText));
     return 0;
   }
 
@@ -2294,7 +2294,7 @@ namespace moho
       damageTypeArg.TypeError("string");
     }
 
-    weapon->mAttributes.SetType(msvc8::string(damageTypeName));
+    weapon->mAttributes.SetType(fa::string(damageTypeName));
     return 0;
   }
 
@@ -2555,7 +2555,7 @@ namespace moho
    * What it does:
    * Copies this weapon label into caller-provided output string storage.
    */
-  msvc8::string* UnitWeapon::GetLabel(msvc8::string* const outLabel) const
+  fa::string* UnitWeapon::GetLabel(fa::string* const outLabel) const
   {
     *outLabel = mLabel;
     return outLabel;
@@ -2605,7 +2605,7 @@ namespace moho
    * Resolves one projectile blueprint id text into a projectile blueprint
    * resource and updates this weapon's silo-dependent projectile lane.
    */
-  void UnitWeapon::ChangeProjectileBlueprint(const msvc8::string& blueprint)
+  void UnitWeapon::ChangeProjectileBlueprint(const fa::string& blueprint)
   {
     if (blueprint.empty()) {
       return;
@@ -2784,7 +2784,7 @@ namespace moho
 
     LuaPlus::LuaObject scriptClass = mUnit->GetWeaponClass(weaponBlueprintClass);
     if (!scriptClass) {
-      const msvc8::string classNameText =
+      const fa::string classNameText =
         !mWeaponBlueprint->Label.empty() ? gpg::STR_Printf("\"%s\"", mWeaponBlueprint->Label.c_str())
                                          : gpg::STR_Printf("%d", mWeaponIndex);
 
@@ -2845,7 +2845,7 @@ namespace moho
       // range has been erased.
       EntityCategorySet* const newEnd = std::copy(rangeEnd, liveEnd, rangeBegin);
 
-      // Shrink the active size lane to the new end. `msvc8::vector::resize`
+      // Shrink the active size lane to the new end. `fa::vector::resize`
       // runs `~EntityCategorySet` on every slot in `[newEnd, liveEnd)`,
       // mirroring the MSVC8 destructor dispatch that FUN_006DBB50 delegated
       // to `sub_6DEB80`.
@@ -2884,7 +2884,7 @@ namespace moho
     }
 
     // Unlink each blacklist entry's mEntity WeakPtr from its owner chain before
-    // the msvc8::vector<SBlackListInfo> member destructor frees the storage
+    // the fa::vector<SBlackListInfo> member destructor frees the storage
     // (binary sub_6DBD70 at 0x006D4AA4). SBlackListInfo has no destructor and
     // WeakPtr<Entity>::~WeakPtr is trivial, so the member vector teardown would
     // leave every blacklisted entity's weak node dangling in its owner chain
@@ -3194,8 +3194,8 @@ namespace moho
         const float ownerHalfSizeZ = static_cast<float>(ownerFootprint.mSizeZ) * 0.5f;
         // 0x006D58B0 / 0x006D58D5: `fld; fistp` (round to nearest), then the
         // low 16 bits (`movsx word`).
-        const std::int16_t ownerGridMinX = static_cast<std::int16_t>(msvc8::RoundToInt(ownerPosition.x - ownerHalfSizeX));
-        const std::int16_t ownerGridMinZ = static_cast<std::int16_t>(msvc8::RoundToInt(ownerPosition.z - ownerHalfSizeZ));
+        const std::int16_t ownerGridMinX = static_cast<std::int16_t>(fa::RoundToInt(ownerPosition.x - ownerHalfSizeX));
+        const std::int16_t ownerGridMinZ = static_cast<std::int16_t>(fa::RoundToInt(ownerPosition.z - ownerHalfSizeZ));
 
         const Wm3::Vec3f probeCenter{
           static_cast<float>(ownerGridMinX) + ownerHalfSizeX,
@@ -3458,10 +3458,10 @@ namespace moho
         return;
       }
 
-      const msvc8::string statPrefix = msvc8::string("RealTimeStats_") + unit.GetUniqueName();
+      const fa::string statPrefix = fa::string("RealTimeStats_") + unit.GetUniqueName();
 
       // _Shots_Fired: integer counter, atomically incremented by one.
-      const msvc8::string shotsFiredPath = statPrefix + "_Shots_Fired";
+      const fa::string shotsFiredPath = statPrefix + "_Shots_Fired";
       {
         CArmyStatItem* const shotsFired = armyStats->GetItem(shotsFiredPath.c_str());
         shotsFired->Synchronize();
@@ -3473,7 +3473,7 @@ namespace moho
 
       // _Shots_MaxFireRange: store the weapon's configured max radius.
       {
-        const msvc8::string statPath = statPrefix + "_Shots_MaxFireRange";
+        const fa::string statPath = statPrefix + "_Shots_MaxFireRange";
         const float maxFireRange = weapon.mWeaponBlueprint->MaxRadius;
         SetArmyFloatStat(*armyStats, statPath.c_str(), maxFireRange);
       }
@@ -3488,7 +3488,7 @@ namespace moho
 
       // _Shots_TotalFireRange: accumulate the actual range, then average it.
       {
-        const msvc8::string totalPath = statPrefix + "_Shots_TotalFireRange";
+        const fa::string totalPath = statPrefix + "_Shots_TotalFireRange";
 
         CArmyStatItem* const totalRange = ResolveArmyStatItemCachedCreate(armyStats, totalPath.c_str());
         totalRange->SynchronizeAsFloat();
@@ -3498,7 +3498,7 @@ namespace moho
         const float accumulatedTotal = armyStats->TraverseTablesCreate(totalPath.c_str())->GetFloat(false);
 
         // _Shots_AvgFireRange: accumulated total divided by the shots-fired count.
-        const msvc8::string avgPath = statPrefix + "_Shots_AvgFireRange";
+        const fa::string avgPath = statPrefix + "_Shots_AvgFireRange";
         const float averageRange = accumulatedTotal / static_cast<float>(shotCount);
         SetArmyFloatStat(*armyStats, avgPath.c_str(), averageRange);
       }
@@ -3692,7 +3692,7 @@ namespace moho
 
     if (mSim->IsSyncLogOn()) {
       const char* targetEntityText = "NULL";
-      msvc8::string targetEntityIdText{};
+      fa::string targetEntityIdText{};
       if (targetEntity != nullptr) {
         targetEntityIdText = gpg::STR_Printf("0x%08x", static_cast<std::uint32_t>(targetEntity->id_));
         targetEntityText = targetEntityIdText.c_str();
@@ -3804,7 +3804,7 @@ namespace moho
       : mAttributes.mDamageRadius;
     const float damage = (mAttributes.mDamage < 0.0f && mAttributes.mBlueprint != nullptr) ? mAttributes.mBlueprint->Damage
                                                                                             : mAttributes.mDamage;
-    const msvc8::string damageType = mAttributes.GetName();
+    const fa::string damageType = mAttributes.GetName();
     const bool ignoreAlly = (mWeaponBlueprint != nullptr) ? (mWeaponBlueprint->IgnoresAlly != 0u) : false;
 
     Projectile* const projectile = PROJ_Create(
@@ -4155,8 +4155,8 @@ namespace moho
     archive->Read(gpg::RTypeOf<EntityCategorySet>(), &mCat2, ownerRef);
     archive->Read(gpg::RTypeOf<ELayer>(), &mFireTargetLayerCaps, ownerRef);
     archive->ReadFloat(&mFiringRandomness);
-    archive->Read(gpg::RTypeOf<msvc8::vector<EntityCategorySet>>(), &mTargetPriorities, ownerRef);
-    archive->Read(gpg::RTypeOf<msvc8::vector<SBlackListInfo>>(), &mBlacklist, ownerRef);
+    archive->Read(gpg::RTypeOf<fa::vector<EntityCategorySet>>(), &mTargetPriorities, ownerRef);
+    archive->Read(gpg::RTypeOf<fa::vector<SBlackListInfo>>(), &mBlacklist, ownerRef);
     archive->ReadInt(&mUnknown170);
 
     bool unknown174 = (mUnknown174 != 0u);
@@ -4184,7 +4184,7 @@ namespace moho
     archive->WriteInt(mWeaponIndex);
     archive->WriteInt(mBone);
     archive->WriteBool(mEnabled != 0u);
-    archive->WriteString(const_cast<msvc8::string*>(&mLabel));
+    archive->WriteString(const_cast<fa::string*>(&mLabel));
     archive->Write(gpg::RTypeOf<CAiTarget>(), &mTarget, ownerRef);
     WriteTrackedPointer(*archive, mFireWeaponTask, gpg::TrackedPointerState::Owned, ownerRef);
     archive->WriteBool(mCanFire != 0u);
@@ -4192,8 +4192,8 @@ namespace moho
     archive->Write(gpg::RTypeOf<EntityCategorySet>(), &mCat2, ownerRef);
     archive->Write(gpg::RTypeOf<ELayer>(), &mFireTargetLayerCaps, ownerRef);
     archive->WriteFloat(mFiringRandomness);
-    archive->Write(gpg::RTypeOf<msvc8::vector<EntityCategorySet>>(), &mTargetPriorities, ownerRef);
-    archive->Write(gpg::RTypeOf<msvc8::vector<SBlackListInfo>>(), &mBlacklist, ownerRef);
+    archive->Write(gpg::RTypeOf<fa::vector<EntityCategorySet>>(), &mTargetPriorities, ownerRef);
+    archive->Write(gpg::RTypeOf<fa::vector<SBlackListInfo>>(), &mBlacklist, ownerRef);
     archive->WriteInt(mUnknown170);
     archive->WriteBool(mUnknown174 != 0u);
     archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mAimingAt, ownerRef);

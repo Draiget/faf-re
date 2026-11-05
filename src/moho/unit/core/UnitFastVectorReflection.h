@@ -32,7 +32,7 @@ namespace gpg
     /**
      * Address: 0x006AE4C0 (FUN_006AE4C0, gpg::RFastVectorType_WeakPtr_Entity::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x006AE550 (FUN_006AE550, gpg::RFastVectorType_WeakPtr_Entity::IsIndexed)
@@ -82,7 +82,7 @@ namespace gpg
     /**
      * Address: 0x006AE6D0 (FUN_006AE6D0, gpg::RFastVectorType_ReconBlip_P::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x006AE760 (FUN_006AE760, gpg::RFastVectorType_ReconBlip_P::IsIndexed)

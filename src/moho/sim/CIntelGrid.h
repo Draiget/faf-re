@@ -58,7 +58,7 @@ namespace moho
     /**
      * Address: 0x00508840 (FUN_00508840 -- the compiler-generated copy of this
      * 20-byte aggregate (three field copies), emitted out of line for
-     * `msvc8::vector<SDelayedSubVizInfo>`'s element-wise copy and fill steps;
+     * `fa::vector<SDelayedSubVizInfo>`'s element-wise copy and fill steps;
      * no source line, it is the implicit `operator=`. Formerly transcribed as
      * `CopyDelayedSubVizInfoVariant1` in SDelayedSubVizInfoReflection.cpp,
      * removed 2026-09-10.)
@@ -89,7 +89,7 @@ namespace moho
   };
 
   static_assert(sizeof(SDelayedSubVizInfo) == 0x14, "SDelayedSubVizInfo size must be 0x14");
-  static_assert(sizeof(msvc8::vector<SDelayedSubVizInfo>) == 0x10, "msvc8::vector<SDelayedSubVizInfo> size must be 0x10");
+  static_assert(sizeof(fa::vector<SDelayedSubVizInfo>) == 0x10, "fa::vector<SDelayedSubVizInfo> size must be 0x10");
 
   class CIntelGrid
   {
@@ -266,7 +266,7 @@ namespace moho
     boost::scoped_array<std::int8_t> mGrid;      // +0x04
     std::uint32_t mWidth;                        // +0x08
     std::uint32_t mHeight;                       // +0x0C
-    msvc8::vector<SDelayedSubVizInfo> mUpdateList;   // +0x10
+    fa::vector<SDelayedSubVizInfo> mUpdateList;   // +0x10
     std::uint32_t mGridSize;                     // +0x20
   };
 

@@ -623,7 +623,7 @@ namespace moho
    */
   bool UserEntity::IsSelectable() const
   {
-    const msvc8::string selectableCategory("SELECTABLE", 10u);
+    const fa::string selectableCategory("SELECTABLE", 10u);
     return IsInCategory(selectableCategory);
   }
 
@@ -878,7 +878,7 @@ namespace moho
    * Address: 0x008B97C0 (FUN_008B97C0,
    * ?IsInCategory@UserEntity@Moho@@QBE_NABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
    */
-  bool UserEntity::IsInCategory(const msvc8::string& category) const
+  bool UserEntity::IsInCategory(const fa::string& category) const
   {
     if (!mSession || !mParams.mBlueprint) {
       return false;

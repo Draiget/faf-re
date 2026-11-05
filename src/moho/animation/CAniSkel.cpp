@@ -22,7 +22,7 @@ namespace
   /**
    * Ordering of `CAniSkel::mBoneNameToIndex`: by bone name (`strcmp`), then
    * by bone index. Stateless, so the binary inlines it at every comparison
-   * of the `msvc8::sort` instantiation in `CAniSkel::CAniSkel` and pushes a
+   * of the `fa::sort` instantiation in `CAniSkel::CAniSkel` and pushes a
    * dead null predicate argument through the sort family.
    */
   [[nodiscard]] bool BoneNameIndexLess(
@@ -151,7 +151,7 @@ namespace moho
     const std::uint32_t boneCount = scmFile.mBoneTotalCount;
 
     // Gather one name pointer per bone from the file's name string block.
-    msvc8::vector<const char*> boneNamePointers{};
+    fa::vector<const char*> boneNamePointers{};
     moho::scm_file::FillBoneNamePointers(scmFile, boneNamePointers);
 
     mBones.resize(boneCount);
@@ -208,8 +208,8 @@ namespace moho
     // `_Rotate` (0x005502C0), `make_heap`/`sort_heap` (0x0054F990/
     // 0x0054F9E0) and `_Adjust_heap`/`_Push_heap` (0x0054FD90/0x005501E0).
     // The call seeds the recursion budget with the element count, which is
-    // `msvc8::sort`'s own `sort_impl(first, last, last - first, comp)` entry.
-    msvc8::sort(mBoneNameToIndex.begin(), mBoneNameToIndex.end(), BoneNameIndexLess);
+    // `fa::sort`'s own `sort_impl(first, last, last - first, comp)` entry.
+    fa::sort(mBoneNameToIndex.begin(), mBoneNameToIndex.end(), BoneNameIndexLess);
 
     UpdateBoneBounds();
   }
@@ -259,7 +259,7 @@ namespace moho
    */
   void CAniSkel::CollectChildBoneIndices(
     const std::int32_t parentBoneIndex,
-    msvc8::vector<std::int32_t>& outIndices
+    fa::vector<std::int32_t>& outIndices
   ) const
   {
     outIndices.clear();

@@ -107,14 +107,14 @@ bool moho::PLAT_GetSymbolInfo(const std::uintptr_t address, SPlatSymbolInfo* con
   return true;
 }
 
-msvc8::string moho::SPlatSymbolInfo::FormatResolvedLine() const
+fa::string moho::SPlatSymbolInfo::FormatResolvedLine() const
 {
   return gpg::STR_Printf("%s + %zu bytes (%s(%u) + %u bytes)", symbol.c_str(), symDis, filename.c_str(), lineNum, lineDis);
 }
 
-msvc8::string moho::PLAT_FormatCallstack(std::int32_t firstFrame, const std::int32_t endFrame, const std::uintptr_t* const frames)
+fa::string moho::PLAT_FormatCallstack(std::int32_t firstFrame, const std::int32_t endFrame, const std::uintptr_t* const frames)
 {
-  msvc8::string formatted;
+  fa::string formatted;
   formatted.assign_owned("");
   if (frames == nullptr || firstFrame >= endFrame) {
     return formatted;
@@ -130,7 +130,7 @@ msvc8::string moho::PLAT_FormatCallstack(std::int32_t firstFrame, const std::int
       assembled.append(symbolInfo.FormatResolvedLine().c_str());
       assembled.append("\r\n");
     } else {
-      const msvc8::string line =
+      const fa::string line =
         gpg::STR_Printf("\tUnknown symbol (address %p)\r\n", reinterpret_cast<const void*>(frames[frameIndex]));
       assembled.append(line.c_str());
     }
@@ -139,10 +139,10 @@ msvc8::string moho::PLAT_FormatCallstack(std::int32_t firstFrame, const std::int
   return formatted;
 }
 
-msvc8::string moho::PLAT_UnDecorateSymbolName(const char* const name, const bool stripLeadingUnderscore)
+fa::string moho::PLAT_UnDecorateSymbolName(const char* const name, const bool stripLeadingUnderscore)
 {
   (void)stripLeadingUnderscore;
-  msvc8::string result;
+  fa::string result;
   if (name == nullptr) {
     result.assign_owned("");
     return result;
@@ -154,7 +154,7 @@ msvc8::string moho::PLAT_UnDecorateSymbolName(const char* const name, const bool
   return result;
 }
 
-msvc8::string moho::WIN_GetLastError()
+fa::string moho::WIN_GetLastError()
 {
   const DWORD errorCode = ::GetLastError();
   // The shim's error codes are Win32 numbers for the common cases and errno values otherwise.

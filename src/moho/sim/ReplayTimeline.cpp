@@ -528,7 +528,7 @@ namespace moho
         return;
       }
       wchar_t exePath[MAX_PATH] = {};
-      msvc8::vector<msvc8::string> initArgs;
+      fa::vector<fa::string> initArgs;
       if (::GetModuleFileNameW(nullptr, exePath, MAX_PATH) == 0 || !CFG_GetArgOption("/init", 1u, &initArgs) || initArgs.empty()) {
         gpg::Logf("Replay timeline: no keyframes prepared ahead: no /init to give the hidden process");
         return;
@@ -850,11 +850,11 @@ namespace moho
     }
   } // namespace
 
-  msvc8::auto_ptr<SWldSessionInfo> REPLAY_SetupViewerSession(const char* const path, msvc8::string* const failureReason)
+  fa::auto_ptr<SWldSessionInfo> REPLAY_SetupViewerSession(const char* const path, fa::string* const failureReason)
   {
     gVcrScanReplayLength = true;
     gVcrReplayBeats = 0;
-    msvc8::auto_ptr<SWldSessionInfo> sessionInfo = VCR_SetupReplaySession(path, failureReason);
+    fa::auto_ptr<SWldSessionInfo> sessionInfo = VCR_SetupReplaySession(path, failureReason);
     gVcrScanReplayLength = false;
     if (sessionInfo.get() == nullptr) {
       return sessionInfo;
@@ -1107,12 +1107,12 @@ namespace moho
     return sRestartWanted;
   }
 
-  msvc8::auto_ptr<SWldSessionInfo> REPLAY_CreateRestartSession()
+  fa::auto_ptr<SWldSessionInfo> REPLAY_CreateRestartSession()
   {
     sRestartWanted = false;
     const int skipBeats = sRestoreFile.get() != nullptr ? static_cast<int>(sRestoreHeader.beat) - 1 : 0;
-    msvc8::string failure;
-    msvc8::auto_ptr<SWldSessionInfo> sessionInfo = VCR_SetupReplaySession(sReplayPath.c_str(), &failure, nullptr, skipBeats);
+    fa::string failure;
+    fa::auto_ptr<SWldSessionInfo> sessionInfo = VCR_SetupReplaySession(sReplayPath.c_str(), &failure, nullptr, skipBeats);
     if (sessionInfo.get() == nullptr) {
       gpg::Warnf("Replay timeline: can't restart the replay: %s", failure.c_str());
       sRestoreFile.reset();

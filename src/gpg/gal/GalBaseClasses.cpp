@@ -146,8 +146,8 @@ namespace
     : keyText_()
     , valueText_()
   {
-    keyText_.assign(other.keyText_, 0U, msvc8::string::npos);
-    valueText_.assign(other.valueText_, 0U, msvc8::string::npos);
+    keyText_.assign(other.keyText_, 0U, fa::string::npos);
+    valueText_.assign(other.valueText_, 0U, fa::string::npos);
   }
 
   /**
@@ -185,7 +185,7 @@ namespace
    * Initializes one `gpg::gal::Error` payload with canonical "<unknown>"
    * source/file lane and "<undefined>" message lane, used as the default
    * allocation-failure exception body in GAL backend paths. The decompiled
-   * form directly built the embedded `msvc8::string` SSO lanes with literal
+   * form directly built the embedded `fa::string` SSO lanes with literal
    * constants; this is the typed 1:1 equivalent.
    */
   Error::Error()
@@ -203,12 +203,12 @@ namespace
    * What it does:
    * Initializes file/line/message payload lanes for gal error exceptions.
    */
-  Error::Error(const msvc8::string& file, const int line, const msvc8::string& message)
+  Error::Error(const fa::string& file, const int line, const fa::string& message)
     : std::exception()
   {
-    file_.assign(file, 0U, msvc8::string::npos);
+    file_.assign(file, 0U, fa::string::npos);
     line_ = line;
-    message_.assign(message, 0U, msvc8::string::npos);
+    message_.assign(message, 0U, fa::string::npos);
   }
 
   /**
@@ -329,7 +329,7 @@ namespace
     framesPerSecond = other.framesPerSecond;
     antialiasingHigh = other.antialiasingHigh;
     antialiasingLow = other.antialiasingLow;
-    name.assign(other.name, 0U, msvc8::string::npos);
+    name.assign(other.name, 0U, fa::string::npos);
     mStrs = other.mStrs;
     adapterModes = other.adapterModes;
     validFormats2 = other.validFormats2;
@@ -372,7 +372,7 @@ namespace
    * What it does:
    * Nothing of its own. Everything 0x008E6EA0 runs after the vftable store is
    * a member destructor MSVC emits in reverse declaration order: the three
-   * `msvc8::vector` `_Tidy`s at `+0x74`, `+0x64` and `+0x54`, then
+   * `fa::vector` `_Tidy`s at `+0x74`, `+0x64` and `+0x54`, then
    * `~vector<HeadSampleOption>` at `+0x40` (its `destroy_range` at 0x00437850
    * tidies each element's 0x1C label string, then the block is freed), then
    * `~string` at `+0x24`. `0x00436990` is the scalar-deleting thunk that

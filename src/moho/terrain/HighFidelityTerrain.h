@@ -324,7 +324,7 @@ namespace moho
      */
     void DrawTerrain(
       boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
-      const msvc8::string* techniqueName
+      const fa::string* techniqueName
     ) override;
 
     /**

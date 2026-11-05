@@ -55,11 +55,11 @@ namespace moho
 
   /**
    * The queued silo types. The 0x0C `{proxy, head, size}` head sits over a
-   * 0x0C `{next, prev, ESiloType}` node, which is `msvc8::list`'s node for a
+   * 0x0C `{next, prev, ESiloType}` node, which is `fa::list`'s node for a
    * 4-byte element -- the same instantiation the reflection side
    * (`CAiSiloBuildImplTypeInfo.cpp`) already names.
    */
-  using SSiloTypeList = msvc8::list<ESiloType>;
+  using SSiloTypeList = fa::list<ESiloType>;
 
   /**
    * VFTABLE: 0x00E1DDD4

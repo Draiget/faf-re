@@ -1284,7 +1284,7 @@ namespace moho
     }
 
     const Wm3::Vector3f candidatePosition = candidateUnit->GetPosition();
-    msvc8::vector<WeakPtr<CUnitCommand>>& builderQueue = mUnit->AiBuilder->BuilderGetFactoryCommandQueue();
+    fa::vector<WeakPtr<CUnitCommand>>& builderQueue = mUnit->AiBuilder->BuilderGetFactoryCommandQueue();
     for (WeakPtr<CUnitCommand>& commandRef : builderQueue) {
       const CUnitCommand* const command = commandRef.GetObjectPtr();
       if (command == nullptr || command->mVarDat.mCmdType != EUnitCommandType::UNITCOMMAND_Guard) {

@@ -155,7 +155,7 @@ namespace moho
   /**
    * Address: 0x00654550 (FUN_00654550, Moho::CEffectImpl::GetStringParam)
    */
-  msvc8::string* CEffectImpl::GetStringParam(const std::int32_t paramIndex)
+  fa::string* CEffectImpl::GetStringParam(const std::int32_t paramIndex)
   {
     return &mStrings.start_[paramIndex];
   }

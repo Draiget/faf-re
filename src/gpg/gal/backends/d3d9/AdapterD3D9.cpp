@@ -32,9 +32,9 @@ namespace gpg::gal
     AdapterD3D9::AdapterD3D9(
         const std::uint32_t vendorIdValue,
         const std::uint32_t deviceIdValue,
-        const msvc8::string& driverName,
-        const msvc8::string& deviceNameText,
-        const msvc8::string& descriptionText
+        const fa::string& driverName,
+        const fa::string& deviceNameText,
+        const fa::string& descriptionText
     )
         : vendorId(vendorIdValue)
         , deviceId(deviceIdValue)
@@ -43,9 +43,9 @@ namespace gpg::gal
         , description()
         , modes()
     {
-        driver.assign(driverName, 0U, msvc8::string::npos);
-        deviceName.assign(deviceNameText, 0U, msvc8::string::npos);
-        description.assign(descriptionText, 0U, msvc8::string::npos);
+        driver.assign(driverName, 0U, fa::string::npos);
+        deviceName.assign(deviceNameText, 0U, fa::string::npos);
+        description.assign(descriptionText, 0U, fa::string::npos);
     }
 
     /**

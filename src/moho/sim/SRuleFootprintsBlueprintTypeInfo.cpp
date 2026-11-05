@@ -87,7 +87,7 @@ namespace
    */
   gpg::RField* SRuleFootprintsBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    return typeInfo->AddField<msvc8::list<moho::SNamedFootprint>>(
+    return typeInfo->AddField<fa::list<moho::SNamedFootprint>>(
       "Footprints", offsetof(moho::SRuleFootprintsBlueprint, mFootprints)
     );
   }

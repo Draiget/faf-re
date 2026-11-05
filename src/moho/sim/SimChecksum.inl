@@ -65,7 +65,7 @@ bool Sim::CheatsEnabled()
   if (IsSimDebugCheatsEnabled()) {
     // 0x00747230/0x0074723D refer to the same array after stack-argument pushes.
     std::uintptr_t frames[16]{};
-    msvc8::string callstackText{};
+    fa::string callstackText{};
     const int frameCount = GetCallStackFrames(frames);
     FormatCallStack(&callstackText, frameCount, frames);
     Logf("%s", callstackText.c_str());
@@ -218,8 +218,8 @@ void Sim::VerifyChecksum(const gpg::MD5Digest& checksum, const CSeqNo beat)
   const SDesyncInfo desync(beat, mCurCommandSource, *expected, checksum);
   mDesyncs.push_back(desync);
 
-  const msvc8::string incomingHash = checksum.ToString();
-  const msvc8::string simHash = expected->ToString();
+  const fa::string incomingHash = checksum.ToString();
+  const fa::string simHash = expected->ToString();
 
   gpg::Warnf(
     "Checksum for beat %d mismatched: %s (sim) != %s (%s).",

@@ -17,8 +17,8 @@ namespace moho
   CAniDefaultSkel::CAniDefaultSkel()
   {
     mFile.reset();
-    mBones = msvc8::vector<SAniSkelBone>{};
-    mBoneNameToIndex = msvc8::vector<SAniSkelBoneNameIndex>{};
+    mBones = fa::vector<SAniSkelBone>{};
+    mBoneNameToIndex = fa::vector<SAniSkelBoneNameIndex>{};
 
     SAniSkelBone rootBone{};
     rootBone.mBoneName = "Root";

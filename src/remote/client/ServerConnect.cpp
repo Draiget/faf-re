@@ -34,7 +34,7 @@ namespace faf::remote
 
     [[nodiscard]] bool ReadOneArg(const char* const option, std::string& value)
     {
-      msvc8::vector<msvc8::string> args;
+      fa::vector<fa::string> args;
       if (!moho::CFG_GetArgOption(option, 1, &args) || args.empty()) {
         return false;
       }

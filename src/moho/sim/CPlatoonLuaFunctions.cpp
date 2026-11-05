@@ -1394,9 +1394,9 @@ namespace moho
     // strings before scanning the squad specs. They are not consumed by the
     // feasibility test, but the extraction is a preserved side effect.
     const LuaPlus::LuaObject nameObject = templatesObject[1];
-    const msvc8::string platoonName(nameObject.GetString());
+    const fa::string platoonName(nameObject.GetString());
     const LuaPlus::LuaObject planObject = templatesObject[2];
-    const msvc8::string platoonPlan(planObject.GetString());
+    const fa::string platoonPlan(planObject.GetString());
     (void)platoonName;
     (void)platoonPlan;
 
@@ -1422,7 +1422,7 @@ namespace moho
       // that could shift the floor result by one at boundary values.
       const float scaledSize =
         static_cast<float>(sizeObject.GetNumber()) * static_cast<float>(countObject.GetInteger());
-      const int requiredSize = msvc8::FloorToIntX87(scaledSize); // 0x0072D220..0x0072D236
+      const int requiredSize = fa::FloorToIntX87(scaledSize); // 0x0072D220..0x0072D236
 
       if (argumentCount <= 4) {
         int available;
@@ -1524,9 +1524,9 @@ namespace moho
 
     const int templateCount = templatesObject.GetCount();
     const LuaPlus::LuaObject nameObject = templatesObject[1];
-    const msvc8::string platoonName(nameObject.GetString());
+    const fa::string platoonName(nameObject.GetString());
     const LuaPlus::LuaObject planObject = templatesObject[2];
-    const msvc8::string platoonPlan(planObject.GetString());
+    const fa::string platoonPlan(planObject.GetString());
 
     CPlatoon* const newPlatoon = platoon->mArmy->MakePlatoon(platoonName.data(), platoonPlan.data());
 
@@ -1546,7 +1546,7 @@ namespace moho
       // row's [3] count and floored, exactly as CanFormPlatoon scales row [2].
       const LuaPlus::LuaObject formationObject = squadSpec[5];
       const float scaledSize = static_cast<float>(sizeObject.GetNumber()) * static_cast<float>(baseCount);
-      const int requiredSize = msvc8::FloorToIntX87(scaledSize); // 0x0072DC15..0x0072DC28
+      const int requiredSize = fa::FloorToIntX87(scaledSize); // 0x0072DC15..0x0072DC28
 
       ESquadClass squadClass = static_cast<ESquadClass>(0);
       gpg::RRef enumRef{};
@@ -1585,7 +1585,7 @@ namespace moho
         const float radius = static_cast<float>(lua_tonumber(state->m_state, 5));
         const float radiusSquared = radius * radius;
 
-        msvc8::vector<PlatoonUnitSearchEntry> nearbyUnits;
+        fa::vector<PlatoonUnitSearchEntry> nearbyUnits;
         for (Entity* const* entityIt = candidates.mVec.begin(); entityIt != candidates.mVec.end(); ++entityIt) {
           Entity* const entity = *entityIt;
           if (entity == nullptr) {
@@ -1611,7 +1611,7 @@ namespace moho
         // legacy/algorithms/Sort.h. Units at equal distance are taken in the
         // order that algorithm leaves them, which the modern `std::sort` does
         // not reproduce.
-        msvc8::sort(
+        fa::sort(
           nearbyUnits.begin(),
           nearbyUnits.end(),
           [](const PlatoonUnitSearchEntry& lhs, const PlatoonUnitSearchEntry& rhs) noexcept {
@@ -1731,7 +1731,7 @@ namespace moho
     }
     SCR_GetEnum(state, squadClassName, enumRef);
 
-    msvc8::vector<EntityCategorySet> prioritizedCategories{};
+    fa::vector<EntityCategorySet> prioritizedCategories{};
     const LuaPlus::LuaObject categoryTable(LuaPlus::LuaStackObject(state, 3));
     if (categoryTable.IsTable()) {
       const int categoryCount = categoryTable.GetCount();
@@ -2379,7 +2379,7 @@ namespace moho
       SCR_GetEnum(state, squadClassName, enumRef);
     }
 
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->AttackTarget(target, squadClass);
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->AttackTarget(target, squadClass);
 
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
@@ -2472,7 +2472,7 @@ namespace moho
       SCR_GetEnum(state, squadClassName, enumRef);
     }
 
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->MoveToTarget(target, useTransports, squadClass);
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->MoveToTarget(target, useTransports, squadClass);
 
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
@@ -2571,7 +2571,7 @@ namespace moho
       SCR_GetEnum(state, squadClassName, enumRef);
     }
 
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->MoveToLocation(targetPoint, useTransports, squadClass);
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->MoveToLocation(targetPoint, useTransports, squadClass);
 
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
@@ -2661,7 +2661,7 @@ namespace moho
       SCR_GetEnum(state, squadClassName, enumRef);
     }
 
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->AggressiveMoveToLocation(targetPoint, squadClass);
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->AggressiveMoveToLocation(targetPoint, squadClass);
 
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
@@ -2735,7 +2735,7 @@ namespace moho
       LuaPlus::LuaState::Error(state, "Platoon:FerryToLocation Passed in an invalid target point");
     }
 
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->FerryToLocation(targetPos);
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->FerryToLocation(targetPos);
 
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
@@ -2839,7 +2839,7 @@ namespace moho
     const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
     EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
 
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->LoadUnits(categorySet);
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->LoadUnits(categorySet);
 
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
@@ -2887,7 +2887,7 @@ namespace moho
       LuaPlus::LuaState::Error(state, "Platoon:UnloadUnitsAtLocation Passed in an invalid target point");
     }
 
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->UnloadUnitsAtLocation(category, targetPos);
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->UnloadUnitsAtLocation(category, targetPos);
 
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
@@ -2961,7 +2961,7 @@ namespace moho
       LuaPlus::LuaState::Error(state, "Platoon:UnloadAllAtLocation Passed in an invalid target point");
     }
 
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->UnloadAllAtLocation(targetPos);
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->UnloadAllAtLocation(targetPos);
 
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
@@ -3130,7 +3130,7 @@ namespace moho
       SCR_GetEnum(state, squadClassName, enumRef);
     }
 
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->GuardTarget(guardTarget, squadClass);
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->GuardTarget(guardTarget, squadClass);
 
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
@@ -3338,7 +3338,7 @@ namespace moho
     const LuaPlus::LuaObject beaconObject(LuaPlus::LuaStackObject(state, 3));
     Unit* const beacon = SCR_FromLua_Unit(beaconObject);
 
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->UseFerryBeacon(category, beacon);
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->UseFerryBeacon(category, beacon);
 
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
@@ -3433,7 +3433,7 @@ namespace moho
       SCR_GetEnum(state, squadClassName, enumRef);
     }
 
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->UseTeleporter(teleporter, squadClass);
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands = platoon->UseTeleporter(teleporter, squadClass);
 
     LuaPlus::LuaObject commandTable{};
     commandTable.AssignNewTable(state, static_cast<int>(issuedCommands.size()), 0);
@@ -3507,7 +3507,7 @@ namespace moho
       formationText = "";
     }
 
-    msvc8::string formationOverride{};
+    fa::string formationOverride{};
     if (_stricmp(formationText, "None") != 0) {
       formationOverride.assign(formationText);
     }

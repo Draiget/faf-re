@@ -969,7 +969,7 @@ namespace
 
     (void)archive->ReadPointerOwned(&CollisionExtents, &owner);
 
-    archive->Read(gpg::RTypeOf<msvc8::vector<Entity*>>(), &mAttachedEntities, owner);
+    archive->Read(gpg::RTypeOf<fa::vector<Entity*>>(), &mAttachedEntities, owner);
     archive->Read(gpg::RTypeOf<SEntAttachInfo>(), &mAttachInfo, owner);
 
     bool queueRelinkBlocked = false;
@@ -1073,7 +1073,7 @@ namespace
     archive->WritePointer<moho::CColPrimitiveBase>(CollisionExtents, gpg::TrackedPointerState::Owned, owner);
 
     // Attached-entity vector (+0x17C).
-    archive->Write(gpg::RTypeOf<msvc8::vector<Entity*>>(), &mAttachedEntities, owner);
+    archive->Write(gpg::RTypeOf<fa::vector<Entity*>>(), &mAttachedEntities, owner);
 
     // Attach-info payload (+0x18C).
     archive->Write(gpg::RTypeOf<SEntAttachInfo>(), &mAttachInfo, owner);
@@ -1102,7 +1102,7 @@ namespace
     archive->WritePointer<moho::SPhysBody>(mPhysBody, gpg::TrackedPointerState::Owned, owner);
 
     archive->WriteBool(RealtimeStatsEnabled != 0u);
-    archive->WriteString(const_cast<msvc8::string*>(&mUniqueName));
+    archive->WriteString(const_cast<fa::string*>(&mUniqueName));
 
     // Shooter set (+0x218): EntitySetBase IS-A EntitySetTemplate<Entity>.
     archive->Write(gpg::RTypeOf<EntitySetTemplate<Entity>>(), &mShooters, owner);
@@ -1233,7 +1233,7 @@ namespace
     mLuaPositionCache = LuaPlus::LuaObject{};
 
     mShooters.Clear();
-    mUniqueName = msvc8::string{};
+    mUniqueName = fa::string{};
 
     delete mPhysBody;
     mPhysBody = nullptr;
@@ -1245,7 +1245,7 @@ namespace
     mIntelManager = nullptr;
 
     if (Entity* const parent = mAttachInfo.GetAttachTargetEntity(); parent != nullptr) {
-      msvc8::vector<Entity*>& siblings = parent->GetAttachedEntities();
+      fa::vector<Entity*>& siblings = parent->GetAttachedEntities();
       for (Entity** it = siblings.begin(); it != siblings.end(); ++it) {
         if (*it == this) {
           siblings.erase(it);
@@ -1661,7 +1661,7 @@ namespace
    * `Error running %s script in %s: %s` line raised for entities, units,
    * props and projectiles.
    */
-  msvc8::string Entity::GetErrorDescription()
+  fa::string Entity::GetErrorDescription()
   {
     return gpg::STR_Printf("Entity %s at %08x", GetBlueprintId(), reinterpret_cast<std::uintptr_t>(this));
   }
@@ -2438,7 +2438,7 @@ namespace
    * Replaces entity motor from auto_ptr handoff storage, then wakes the task
    * thread so the new motor actually gets ticked.
    */
-  void Entity::SetMotor(msvc8::auto_ptr<Motor>& motor)
+  void Entity::SetMotor(fa::auto_ptr<Motor>& motor)
   {
     Motor* const newMotor = motor.release();
     Motor* oldMotor = mMotor;
@@ -2470,7 +2470,7 @@ namespace
   /**
    * Address: 0x005BDC10 (FUN_005BDC10)
    */
-  msvc8::vector<Entity*>& Entity::GetAttachedEntities()
+  fa::vector<Entity*>& Entity::GetAttachedEntities()
   {
     return mAttachedEntities;
   }
@@ -2500,7 +2500,7 @@ namespace
    *
    * What it does:
    * Queues this entity's id (`id_`, +0x68) onto the sync packet's delete-id lane
-   * (`SSyncData::mDeleteIds`, +0x168) -- `msvc8::vector<EntId>::push_back`
+   * (`SSyncData::mDeleteIds`, +0x168) -- `fa::vector<EntId>::push_back`
    * emitted out of line as FUN_0067B810 (`call sub_67B810` at 0x0067A27A),
    * cited on Vector.h's `push_back` -- then clears the interface-created
    * flag (`mInterfaceCreated`, +0x1EC).
@@ -2565,7 +2565,7 @@ namespace
    * Validates parent attach chain, appends this entity to parent attached-list,
    * repairs queued runtime-link state, then applies attach payload into `mAttachInfo`.
    * MSVC inlines the `parentChildren.push_back(this)` fast path here and calls
-   * `msvc8::vector<Entity*>::_Insert_n` (0x0067DB40) directly at 0x0067961C for
+   * `fa::vector<Entity*>::_Insert_n` (0x0067DB40) directly at 0x0067961C for
    * the capacity-full arm, so no out-of-line `push_back` exists for this element.
    */
   bool Entity::AttachTo(const SEntAttachInfo& attachInfo)
@@ -2588,7 +2588,7 @@ namespace
       }
     }
 
-    msvc8::vector<Entity*>& parentChildren = parent->GetAttachedEntities();
+    fa::vector<Entity*>& parentChildren = parent->GetAttachedEntities();
     if (std::find(parentChildren.begin(), parentChildren.end(), this) != parentChildren.end()) {
       return false;
     }
@@ -2634,7 +2634,7 @@ namespace
       return false;
     }
 
-    msvc8::vector<Entity*>& parentChildren = parent->GetAttachedEntities();
+    fa::vector<Entity*>& parentChildren = parent->GetAttachedEntities();
     for (Entity** it = parentChildren.begin(); it != parentChildren.end(); ++it) {
       if (*it != this) {
         continue;
@@ -3193,9 +3193,9 @@ namespace
    * What it does:
    * Returns the entity's unique runtime name string.
    */
-  msvc8::string Entity::GetUniqueName() const
+  fa::string Entity::GetUniqueName() const
   {
-    return msvc8::string(mUniqueName.data(), mUniqueName.size());
+    return fa::string(mUniqueName.data(), mUniqueName.size());
   }
 
   /**
@@ -3524,7 +3524,7 @@ namespace
       // Otherwise pick the channel by the alliance relation between this
       // entity's army and the focus army. (0x00678AB5-0x00678AF2)
       CArmyImpl* focusArmyImpl = nullptr;
-      const msvc8::vector<CArmyImpl*>& armies = SimulationRef->mArmiesList;
+      const fa::vector<CArmyImpl*>& armies = SimulationRef->mArmiesList;
       if (static_cast<std::uint32_t>(focusArmy) < armies.size()) {
         focusArmyImpl = armies[static_cast<std::size_t>(focusArmy)];
       }
@@ -3740,10 +3740,10 @@ namespace
     const float halfHeading = heading * 0.5f;
     const float halfPitch = pitch * 0.5f;
 
-    const float cosHeading = msvc8::cos(halfHeading);
-    const float sinHeading = msvc8::sin(halfHeading);
-    const float cosPitch = msvc8::cos(halfPitch);
-    const float sinPitch = msvc8::sin(halfPitch);
+    const float cosHeading = fa::cos(halfHeading);
+    const float sinHeading = fa::sin(halfHeading);
+    const float cosPitch = fa::cos(halfPitch);
+    const float sinPitch = fa::sin(halfPitch);
 
     Wm3::Quaternionf orientation{};
     orientation.w = cosHeading * cosPitch;
@@ -3807,12 +3807,12 @@ namespace
    */
   Wm3::Vector3f COORDS_ForwardVector(const float heading, const float pitch) noexcept
   {
-    const float cosPitch = msvc8::cos(pitch);
+    const float cosPitch = fa::cos(pitch);
 
     Wm3::Vector3f result{};
-    result.x = msvc8::sin(heading) * cosPitch;
-    result.y = -msvc8::sin(pitch);
-    result.z = cosPitch * msvc8::cos(heading);
+    result.x = fa::sin(heading) * cosPitch;
+    result.y = -fa::sin(pitch);
+    result.z = cosPitch * fa::cos(heading);
     return result;
   }
 
@@ -3969,9 +3969,9 @@ namespace
   gpg::Rect2i* COORDS_ToGridRect(gpg::Rect2i* const result, const SCoordsVec2& centerXZ, const int sizeX, const int sizeZ)
   {
     const std::int16_t halfSizeX =
-      static_cast<std::int16_t>(msvc8::RoundToInt(centerXZ.x - (static_cast<float>(sizeX) * 0.5f)));
+      static_cast<std::int16_t>(fa::RoundToInt(centerXZ.x - (static_cast<float>(sizeX) * 0.5f)));
     const std::int16_t halfSizeZ =
-      static_cast<std::int16_t>(msvc8::RoundToInt(centerXZ.z - (static_cast<float>(sizeZ) * 0.5f)));
+      static_cast<std::int16_t>(fa::RoundToInt(centerXZ.z - (static_cast<float>(sizeZ) * 0.5f)));
     result->x0 = halfSizeX;
     result->z0 = halfSizeZ;
     result->x1 = sizeX + halfSizeX;

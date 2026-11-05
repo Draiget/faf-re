@@ -25,8 +25,8 @@ namespace
   )
   {
     destination.mMarkerState = source.mMarkerState;
-    destination.mLineNumberText.assign(source.mLineNumberText, 0U, msvc8::string::npos);
-    destination.mSourceText.assign(source.mSourceText, 0U, msvc8::string::npos);
+    destination.mLineNumberText.assign(source.mLineNumberText, 0U, fa::string::npos);
+    destination.mSourceText.assign(source.mSourceText, 0U, fa::string::npos);
     return destination;
   }
 
@@ -43,7 +43,7 @@ namespace
    * thrown exception, invokes the non-deleting destructor for every already-
    * constructed row and rethrows. Matches the legacy
    * `std::_Uninitialized_copy_n<ScrFileLine*>` instantiation used by
-   * `msvc8::vector<ScrFileLine>` growth paths.
+   * `fa::vector<ScrFileLine>` growth paths.
    */
   [[maybe_unused]] moho::ScrFileLine* UninitializedConstructScrFileLineRun(
     moho::ScrFileLine* const destinationBegin,
@@ -68,10 +68,10 @@ namespace
     }
   }
 
-  void ExpandTabsToVisualColumns(msvc8::string& text)
+  void ExpandTabsToVisualColumns(fa::string& text)
   {
     std::size_t tabIndex = text.find("\t", 0U, 1U);
-    while (tabIndex != msvc8::string::npos) {
+    while (tabIndex != fa::string::npos) {
       const std::size_t replacementWidth = 4U - (tabIndex & 0x3U);
       const std::string spaces(replacementWidth, ' ');
       if (!text.replace(tabIndex, 1U, spaces)) {
@@ -85,20 +85,20 @@ namespace
 /**
  * Address: 0x004C1C60 (FUN_004C1C60, Moho::ScrFileLine::ScrFileLine)
  *
- * int,msvc8::string const &
+ * int,fa::string const &
  *
  * What it does:
  * Initializes one script-source line row with line-number text and tab-expanded
  * source content.
  */
-moho::ScrFileLine::ScrFileLine(const int lineNumberOneBased, const msvc8::string& sourceLineText)
+moho::ScrFileLine::ScrFileLine(const int lineNumberOneBased, const fa::string& sourceLineText)
   : mMarkerState(-1)
   , mLineNumberText()
   , mSourceText()
 {
   const std::string lineNumberText = std::to_string(lineNumberOneBased);
   mLineNumberText.assign(lineNumberText.c_str(), lineNumberText.size());
-  mSourceText.assign(sourceLineText, 0U, msvc8::string::npos);
+  mSourceText.assign(sourceLineText, 0U, fa::string::npos);
   ExpandTabsToVisualColumns(mSourceText);
 }
 

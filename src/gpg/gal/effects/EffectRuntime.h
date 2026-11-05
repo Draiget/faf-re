@@ -173,7 +173,7 @@ namespace gpg::gal
     ~ProgramEffect() override;
 
     EffectContext* GetContext() override;
-    void GetTechniques(msvc8::vector<boost::shared_ptr<EffectTechnique>>& outTechniques) override;
+    void GetTechniques(fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques) override;
     boost::shared_ptr<EffectVariable> GetVariable(const char* name) override;
     boost::shared_ptr<EffectTechnique> GetTechnique(const char* name) override;
     void OnReset() override;
@@ -191,21 +191,21 @@ namespace gpg::gal
     ProgramEffectTechnique(std::shared_ptr<effects::EffectProgram> program, std::uint32_t technique, effects::PassBinder& binder);
     ~ProgramEffectTechnique() override;
 
-    msvc8::string* GetName() override;
+    fa::string* GetName() override;
     int BeginTechnique() override;
     void EndTechnique() override;
     void BeginPass(int pass) override;
     void EndPass() override;
-    bool GetAnnotationBool(bool* outValue, const msvc8::string& annotationName) override;
-    bool GetAnnotationInt(int* outValue, const msvc8::string& annotationName) override;
-    bool GetAnnotationFloat(float* outValue, const msvc8::string& annotationName) override;
-    bool GetAnnotationString(msvc8::string* outValue, const msvc8::string& annotationName) override;
+    bool GetAnnotationBool(bool* outValue, const fa::string& annotationName) override;
+    bool GetAnnotationInt(int* outValue, const fa::string& annotationName) override;
+    bool GetAnnotationFloat(float* outValue, const fa::string& annotationName) override;
+    bool GetAnnotationString(fa::string* outValue, const fa::string& annotationName) override;
 
   private:
     std::shared_ptr<effects::EffectProgram> mProgram;
     std::uint32_t mTechnique = 0;
     effects::PassBinder& mBinder;
-    msvc8::string mName;
+    fa::string mName;
     bool mBegun = false;
   };
 
@@ -216,7 +216,7 @@ namespace gpg::gal
     ProgramEffectVariable(std::shared_ptr<effects::EffectProgram> program, std::int32_t parameter, const char* name);
     ~ProgramEffectVariable() override;
 
-    msvc8::string* GetName() override;
+    fa::string* GetName() override;
     /** No cube targets on these backends yet, as on D3D10 and D3D11. */
     void SetCubeRenderTarget(boost::shared_ptr<CubeRenderTarget> cubeTarget) override;
     void SetRenderTarget(boost::shared_ptr<RenderTarget> renderTarget) override;
@@ -230,16 +230,16 @@ namespace gpg::gal
     void SetBool(bool value) override;
     void SetMatrixArray(std::uint32_t count, const Matrix* matrices) override;
     void SetVectorArray(std::uint32_t count, const float* vectors4) override;
-    bool GetAnnotationBool(bool* outValue, const msvc8::string& annotationName) override;
-    bool GetAnnotationInt(int* outValue, const msvc8::string& annotationName) override;
-    bool GetAnnotationFloat(float* outValue, const msvc8::string& annotationName) override;
-    bool GetAnnotationString(msvc8::string* outValue, const msvc8::string& annotationName) override;
+    bool GetAnnotationBool(bool* outValue, const fa::string& annotationName) override;
+    bool GetAnnotationInt(int* outValue, const fa::string& annotationName) override;
+    bool GetAnnotationFloat(float* outValue, const fa::string& annotationName) override;
+    bool GetAnnotationString(fa::string* outValue, const fa::string& annotationName) override;
 
   private:
     [[nodiscard]] const effects::Annotations* OwnAnnotations() const;
 
     std::shared_ptr<effects::EffectProgram> mProgram;
     std::int32_t mParameter = -1;
-    msvc8::string mName;
+    fa::string mName;
   };
 } // namespace gpg::gal

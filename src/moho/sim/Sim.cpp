@@ -101,20 +101,20 @@ moho::CPrfTimeLogItem::~CPrfTimeLogItem()
 }
 namespace
 {
-  [[nodiscard]] msvc8::string BuildMd5TraceIndent(const std::size_t indentDepth)
+  [[nodiscard]] fa::string BuildMd5TraceIndent(const std::size_t indentDepth)
   {
-    msvc8::string indent{};
+    fa::string indent{};
     (void)indent.resize(indentDepth * 2u, ' ');
     return indent;
   }
 
-  void PrintMd5TraceLexical(FILE* const traceFile, const std::size_t indentDepth, const msvc8::string& lexical)
+  void PrintMd5TraceLexical(FILE* const traceFile, const std::size_t indentDepth, const fa::string& lexical)
   {
     if (traceFile == nullptr) {
       return;
     }
 
-    const msvc8::string indent = BuildMd5TraceIndent(indentDepth);
+    const fa::string indent = BuildMd5TraceIndent(indentDepth);
     std::fprintf(traceFile, "%s%s\n", indent.c_str(), lexical.c_str());
   }
 
@@ -124,7 +124,7 @@ namespace
       return;
     }
 
-    const msvc8::string indent = BuildMd5TraceIndent(indentDepth);
+    const fa::string indent = BuildMd5TraceIndent(indentDepth);
     std::fprintf(traceFile, "%s%s:\n", indent.c_str(), fieldName != nullptr ? fieldName : "");
   }
 
@@ -134,7 +134,7 @@ namespace
       return;
     }
 
-    const msvc8::string indent = BuildMd5TraceIndent(indentDepth);
+    const fa::string indent = BuildMd5TraceIndent(indentDepth);
     std::fprintf(traceFile, "%s[%u]:\n", indent.c_str(), index);
   }
 }
@@ -173,11 +173,11 @@ void moho::REF_UpdateMD5(
     return;
   }
 
-  if (refType == gpg::RTypeOf<msvc8::string>()) {
+  if (refType == gpg::RTypeOf<fa::string>()) {
     if (traceFile != nullptr) {
       PrintMd5TraceLexical(traceFile, depth, ref.GetLexical());
     }
-    const auto& stringValue = *static_cast<const msvc8::string*>(ref.mObj);
+    const auto& stringValue = *static_cast<const fa::string*>(ref.mObj);
     md5.Update(stringValue.c_str(), stringValue.size() + 1u);
     return;
   }
@@ -195,7 +195,7 @@ void moho::REF_UpdateMD5(
     if (pointerCount != 0u) {
       REF_UpdateMD5(md5, pointerType->SubscriptIndex(ref.mObj, 0), traceFile, indentDepth);
     } else if (traceFile != nullptr) {
-      const msvc8::string indent = BuildMd5TraceIndent(depth);
+      const fa::string indent = BuildMd5TraceIndent(depth);
       std::fprintf(traceFile, "%s<NULL>\n", indent.c_str());
     }
     return;
@@ -700,7 +700,7 @@ namespace
     return moho::console::PlatformGetCallStack(outFrames, 0x10u);
   }
 
-  void FormatCallStack(msvc8::string* outText, const int frameCount, const std::uintptr_t* frames)
+  void FormatCallStack(fa::string* outText, const int frameCount, const std::uintptr_t* frames)
   {
     moho::console::PlatformFormatCallstack(outText, frameCount, frames);
   }
@@ -1080,10 +1080,10 @@ namespace
    * it has one (`IAiBuilder` slot 8, 0x00764C2B), otherwise the unit's command
    * queue (`Unit::CommandQueue` +0x4B4, list at +0x0C).
    */
-  [[nodiscard]] const msvc8::vector<WeakPtr<CUnitCommand>>* PathPreviewCommandList(Unit& unit)
+  [[nodiscard]] const fa::vector<WeakPtr<CUnitCommand>>* PathPreviewCommandList(Unit& unit)
   {
     if (IAiBuilder* const builder = unit.AiBuilder; builder != nullptr) {
-      const msvc8::vector<WeakPtr<CUnitCommand>>& factoryQueue = builder->BuilderGetFactoryCommandQueue();
+      const fa::vector<WeakPtr<CUnitCommand>>& factoryQueue = builder->BuilderGetFactoryCommandQueue();
       if (!factoryQueue.empty()) {
         return &factoryQueue;
       }
@@ -1115,7 +1115,7 @@ namespace
    */
   Wm3::Vector3f* PathPreviewResolveEndPosition(Wm3::Vector3f* const outPos, Unit* const unit)
   {
-    if (const msvc8::vector<WeakPtr<CUnitCommand>>* const commands = PathPreviewCommandList(*unit); commands != nullptr) {
+    if (const fa::vector<WeakPtr<CUnitCommand>>* const commands = PathPreviewCommandList(*unit); commands != nullptr) {
       // Newest first. The binary dereferences each command without a null
       // test (`[esi+98h]` at 0x00764C80), so a dead entry is not skipped here.
       for (std::size_t index = commands->size(); index != 0u; --index) {

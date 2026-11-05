@@ -80,7 +80,7 @@ namespace moho
     float mMaxRadius;             // +0x4C
     Wm3::Vec3f mOrigin;           // +0x50
     float mAmount;                // +0x5C
-    msvc8::string mType;          // +0x60
+    fa::string mType;          // +0x60
     std::uint8_t mDamageFriendly; // +0x7C
     std::uint8_t mDamageNeutral;  // +0x7D
     std::uint8_t mDamageSelf;     // +0x7E

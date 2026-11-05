@@ -88,14 +88,14 @@ namespace moho
   /**
    * Engine addition (issue #275), not in the binary: no-op default (see the header).
    */
-  void IClientMgrUIInterface::NoteRejoinOffer(const msvc8::string&, const msvc8::string&)
+  void IClientMgrUIInterface::NoteRejoinOffer(const fa::string&, const fa::string&)
   {}
 
   /**
    * Engine addition, not in the binary: no-op default (see the header).
    */
   void IClientMgrUIInterface::NoteOrdersDiffer(
-    const msvc8::string& sender, const msvc8::string& reporter, const bool selfReport, const bool stopped
+    const fa::string& sender, const fa::string& reporter, const bool selfReport, const bool stopped
   )
   {
     (void)sender;

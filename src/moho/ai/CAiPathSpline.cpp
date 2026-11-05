@@ -54,7 +54,7 @@ namespace
   void ScalePlanarToLength(float& x, float& z, const float lengthSq, const float length) noexcept
   {
     Wm3::Vector3f planar{x, 0.0f, z};
-    msvc8::ScaleVectorToLengthX87(&planar.x, &planar.x, lengthSq, length);
+    fa::ScaleVectorToLengthX87(&planar.x, &planar.x, lengthSq, length);
     x = planar.x;
     z = planar.z;
   }
@@ -343,7 +343,7 @@ Wm3::Vector2f* RotateDirectionTowardTargetLimited(
   const float sourceLength = std::sqrt((sourceX * sourceX) + (sourceZ * sourceZ));
   const float targetLength = std::sqrt((targetX * targetX) + (targetZ * targetZ));
   const float lengthProduct = sourceLength * targetLength;
-  const float maxTurnCos = msvc8::cos(maxTurnRadians);
+  const float maxTurnCos = fa::cos(maxTurnRadians);
 
   if (lengthProduct == 0.0f) {
     outDirection->x = sourceX;
@@ -424,7 +424,7 @@ namespace
      * Demangled: gpg::RFastVectorType_CPathPoint::dtr (scalar-deleting)
      *
      * What it does:
-     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes
+     * Frees the `RType` base's two `fa::vector<RField>` storage lanes
      * (`bases_._Myfirst` @ +0x2C, `fields_._Myfirst` @ +0x3C), restores the
      * `gpg::RObject` vftable, and conditionally deletes `this`. Defaulted in
      * source: the compiler-generated `~RType()` reproduces this behavior,
@@ -439,7 +439,7 @@ namespace
     ~FastVectorCPathPointTypeInfo() override = default;
 
     [[nodiscard]] const char* GetName() const override;
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
@@ -1644,7 +1644,7 @@ SCollisionInfoTypeInfo::SCollisionInfoTypeInfo()
  * Demangled: Moho::SCollisionInfoTypeInfo::dtr (scalar-deleting)
  *
  * What it does:
- * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes
+ * Frees the `RType` base's two `fa::vector<RField>` storage lanes
  * (`bases_._Myfirst` @ +0x2C, `fields_._Myfirst` @ +0x3C), restores the
  * `gpg::RObject` vftable, and conditionally deletes `this`. Defaulted in
  * source: the compiler-generated `~RType()` reproduces this behavior,
@@ -1763,7 +1763,7 @@ void EPathPointStateTypeInfo::Init()
  */
 const char* FastVectorCPathPointTypeInfo::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::CPathPoint>()->GetName());
+  static const fa::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::CPathPoint>()->GetName());
   return sName.c_str();
 }
 
@@ -1773,9 +1773,9 @@ const char* FastVectorCPathPointTypeInfo::GetName() const
  * What it does:
  * Formats vector lexical text and appends the runtime path-point count.
  */
-msvc8::string FastVectorCPathPointTypeInfo::GetLexical(const gpg::RRef& ref) const
+fa::string FastVectorCPathPointTypeInfo::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 

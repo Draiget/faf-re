@@ -7,7 +7,7 @@
 namespace moho
 {
     std::uint32_t PLAT_GetCallStack(void* contextRecord, std::uint32_t maxFrames, std::uintptr_t* outFrames);
-    msvc8::string PLAT_FormatCallstack(std::int32_t firstFrame, std::int32_t endFrame, const std::uintptr_t* frames);
+    fa::string PLAT_FormatCallstack(std::int32_t firstFrame, std::int32_t endFrame, const std::uintptr_t* frames);
 } // namespace moho
 
 using namespace moho;
@@ -74,7 +74,7 @@ const char* XException::what() const noexcept
         mMsg = std::runtime_error::what();
         if (mTopStack != 0) {
             mMsg.append("\n\nOriginal callstack:\n\n");
-            const msvc8::string formatted =
+            const fa::string formatted =
                 moho::PLAT_FormatCallstack(0, static_cast<std::int32_t>(mTopStack), mCallstack.data());
             mMsg.append(formatted.c_str());
         }

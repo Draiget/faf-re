@@ -484,7 +484,7 @@ namespace gpg
 namespace gpg
 {
   [[nodiscard]] REnumType::ROptionValue* AppendEnumOptionValue(
-    msvc8::vector<REnumType::ROptionValue>& options,
+    fa::vector<REnumType::ROptionValue>& options,
     const REnumType::ROptionValue& value
   );
 }

@@ -174,7 +174,7 @@ std::uint8_t BinaryReader::ReadChar() const
  * What it does:
  * Reads one NUL-terminated string from stream bytes.
  */
-void BinaryReader::ReadString(msvc8::string* out) const
+void BinaryReader::ReadString(fa::string* out) const
 {
     std::string ownedValue{};
     Stream* const stream = mStream;
@@ -206,7 +206,7 @@ void BinaryReader::ReadString(msvc8::string* out) const
  * What it does:
  * Reads one 32-bit length-prefixed byte string into legacy string storage.
  */
-void BinaryReader::ReadLengthPrefixedString(msvc8::string* out) const
+void BinaryReader::ReadLengthPrefixedString(fa::string* out) const
 {
     if (out == nullptr) {
         return;

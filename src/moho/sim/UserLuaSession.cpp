@@ -766,7 +766,7 @@ int moho::cfunc_RandomUserL(LuaPlus::LuaState* const state)
     // 0x008BEB38..0x008BEB4D: `fild; jge; fadd 2^32; fmul [0x00E4F7B0]`, the
     // float 2^-32 (0x2F800000), stored to float once.
     constexpr float kInvTwoTo32 = 0x1p-32f;
-    const float value = msvc8::MulTwisterWord(kInvTwoTo32, math_GlobalRandomStream.twister.NextUInt32());
+    const float value = fa::MulTwisterWord(kInvTwoTo32, math_GlobalRandomStream.twister.NextUInt32());
     lua_pushnumber(rawState, value);
     return 1;
   }

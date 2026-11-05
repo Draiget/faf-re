@@ -11,7 +11,7 @@
 #include "legacy/containers/Map.h"
 #include "boost/shared_ptr.h"
 
-namespace msvc8
+namespace fa
 {
     struct string;
 }
@@ -85,7 +85,7 @@ namespace gpg
          * Slot: 2
          * Demangled: _purecall
          */
-        virtual void WriteString(msvc8::string*) = 0;
+        virtual void WriteString(fa::string*) = 0;
 
         /**
          * Address: 0x00A82547
@@ -311,8 +311,8 @@ namespace gpg
          * IDA types that tree `std::map_RRef_TrackedPointer`, and `RRef` is
          * 0x08 -- so the key is the whole `RRef` and the record is 0x10.
          */
-        msvc8::map<const RType*, int> mRefCounts;                  // +0x04
-        msvc8::map<RRef, TrackedPointerRecord, RRefCompare> mObjRefs; // +0x10
+        fa::map<const RType*, int> mRefCounts;                  // +0x04
+        fa::map<RRef, TrackedPointerRecord, RRefCompare> mObjRefs; // +0x10
 
         /**
          * One 4-byte slot at +0x1C that this class's own ctor and dtor never
@@ -346,10 +346,10 @@ namespace gpg
     // The size gate holds now. It could not while the two members were
     // `std::map`, whose size depends on the toolchain's iterator-debugging
     // level and so differs between the isolated-TU check and the full Debug
-    // build; `msvc8::map` is the legacy 0x0C head in both, which is what the
+    // build; `fa::map` is the legacy 0x0C head in both, which is what the
     // binary has, so the 0x20 base the two derived archives imply is now
     // something the compiler can check.
-    static_assert(sizeof(msvc8::map<const RType*, int>) == 0x0C, "the legacy map head must be 0x0C");
+    static_assert(sizeof(fa::map<const RType*, int>) == 0x0C, "the legacy map head must be 0x0C");
     static_assert(sizeof(WriteArchive) == 0x20, "gpg::WriteArchive size must be 0x20");
 
     /**

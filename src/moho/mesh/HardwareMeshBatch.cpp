@@ -94,7 +94,7 @@ namespace moho
       const MeshInstance& meshInstance,
       const CAniPose& pose,
       const CAniSkel& skeleton,
-      const msvc8::vector<std::int32_t>& boneRemapIndices,
+      const fa::vector<std::int32_t>& boneRemapIndices,
       const std::int32_t boneCount,
       SkinPaletteEntry* const transPalette,
       SkinPaletteEntry* const rotPalette,
@@ -278,7 +278,7 @@ namespace moho
         const MeshInstance& meshInstance,
         const CAniPose& pose,
         const CAniSkel& skeleton,
-        const msvc8::vector<std::int32_t>& boneRemapIndices,
+        const fa::vector<std::int32_t>& boneRemapIndices,
         const std::int32_t boneCount
       )
       {
@@ -291,7 +291,7 @@ namespace moho
       }
 
       /// Records the bases just written for one bucket's instances, in order.
-      void RecordBucket(const msvc8::vector<MeshInstance*>& instances, const std::size_t firstBase)
+      void RecordBucket(const fa::vector<MeshInstance*>& instances, const std::size_t firstBase)
       {
         mPrepared[instances.end()] = PreparedBucket{instances.begin(), instances.size(), firstBase};
       }
@@ -1064,7 +1064,7 @@ namespace moho
           staging.meshColor = meshInstance->meshColor;
           // 0x007E8235..0x007E8242: `fmod(float, float)` (0x00422920 -> _CIfmod).
           staging.shaderTime = static_cast<float>(
-            msvc8::fmod(static_cast<float>(meshInstance->gameTick), kMeshShaderTimeWrapSeconds)
+            fa::fmod(static_cast<float>(meshInstance->gameTick), kMeshShaderTimeWrapSeconds)
           );
           staging.useSecondaryData = mUseSecondaryData;
           staging.parameter = (&meshInstance->parameters)[mParameterAnnotation];
@@ -1249,7 +1249,7 @@ namespace moho
    * `FillBatch` finds them by the bucket's end and the instance's position.
    * Instances without a pose (which `FillBatch` skips) record no base.
    */
-  void HardwareMeshBatch::PrepareBonePalettes(const msvc8::vector<MeshInstance*>& instances)
+  void HardwareMeshBatch::PrepareBonePalettes(const fa::vector<MeshInstance*>& instances)
   {
     if (mBoneCount <= 0 || instances.empty()) {
       return;

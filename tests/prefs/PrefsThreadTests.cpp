@@ -28,7 +28,7 @@ namespace
   constexpr int kThreads = 4;
   constexpr int kKeysPerThread = 32;
 
-  msvc8::string KeyOf(const int thread, const int slot)
+  fa::string KeyOf(const int thread, const int slot)
   {
     return gpg::STR_Printf("prefs_thread_test.t%d.k%d", thread, slot);
   }
@@ -50,10 +50,10 @@ int main(int argc, char** argv)
       ++ready;
       while (ready.load() < kThreads) {
       }
-      const msvc8::string missing("prefs_thread_test.missing");
-      const msvc8::string fallback("fallback");
+      const fa::string missing("prefs_thread_test.missing");
+      const fa::string fallback("fallback");
       for (int i = 0; i < iterations; ++i) {
-        const msvc8::string key = KeyOf(t, i % kKeysPerThread);
+        const fa::string key = KeyOf(t, i % kKeysPerThread);
         prefs->SetInteger(key, i);
         (void)prefs->GetInteger(key, -1);
         (void)prefs->GetString(missing, fallback);

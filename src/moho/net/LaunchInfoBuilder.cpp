@@ -85,7 +85,7 @@ namespace moho
   }
 
   CLaunchRoster::CLaunchRoster(
-    const std::int32_t localUid, msvc8::string localName, std::vector<SLaunchClient> remotes
+    const std::int32_t localUid, fa::string localName, std::vector<SLaunchClient> remotes
   )
     : mLocalUid(localUid)
     , mLocalName(std::move(localName))
@@ -117,7 +117,7 @@ namespace moho
     if (client == nullptr) {
       SLaunchClient created{};
       created.uid = ownerId;
-      created.name = msvc8::string(name != nullptr ? name : "");
+      created.name = fa::string(name != nullptr ? name : "");
       mRemotes.push_back(created);
       client = &mRemotes.back();
     }
@@ -127,7 +127,7 @@ namespace moho
   }
 
   std::uint32_t CLaunchRoster::AssignCommandSource(
-    const std::int32_t timeouts, const std::int32_t ownerId, msvc8::vector<SSTICommandSource>& commandSources,
+    const std::int32_t timeouts, const std::int32_t ownerId, fa::vector<SSTICommandSource>& commandSources,
     std::uint32_t& localSource
   )
   {
@@ -162,7 +162,7 @@ namespace moho
 
     const LuaPlus::LuaObject scenarioFileObject = gameOptions["ScenarioFile"];
     const char* const scenarioFileText = scenarioFileObject.GetString();
-    const msvc8::string scenarioFile{scenarioFileText ? scenarioFileText : ""};
+    const fa::string scenarioFile{scenarioFileText ? scenarioFileText : ""};
 
     LuaPlus::LuaObject scenarioInfo = WLD_LoadScenarioInfo(scenarioFile, state);
     if (scenarioInfo.IsNil()) {
@@ -190,7 +190,7 @@ namespace moho
       return build;
     }
 
-    msvc8::vector<msvc8::string> ffaArmies;
+    fa::vector<fa::string> ffaArmies;
     {
       LuaPlus::LuaTableIterator teamIt(&teamsConfig, 1);
       while (!teamIt.m_isDone) {
@@ -204,7 +204,7 @@ namespace moho
             LuaPlus::LuaObject armyNameObject = armyIt.GetValue();
             const char* const armyName = armyNameObject.GetString();
             if (armyName != nullptr) {
-              ffaArmies.push_back(msvc8::string(armyName));
+              ffaArmies.push_back(fa::string(armyName));
             }
             armyIt.Next();
           }
@@ -214,7 +214,7 @@ namespace moho
       }
     }
 
-    msvc8::vector<LaunchPlayerOptionEntry> playerOptions;
+    fa::vector<LaunchPlayerOptionEntry> playerOptions;
     LuaPlus::LuaObject playerOptionsTable = dat["PlayerOptions"];
     if (!playerOptionsTable.IsNil()) {
       LuaPlus::LuaTableIterator optionIt(&playerOptionsTable, 1);
@@ -277,9 +277,9 @@ namespace moho
         LuaPlus::LuaObject extraArmiesObject = scenarioInfo.Lookup("Configurations.standard.customprops.ExtraArmies");
         if (extraArmiesObject.IsString()) {
           const char* const extraArmiesText = extraArmiesObject.GetString();
-          msvc8::vector<msvc8::string> extraArmies;
+          fa::vector<fa::string> extraArmies;
           gpg::STR_GetTokens(extraArmiesText ? extraArmiesText : "", " ", extraArmies);
-          for (const msvc8::string& extraArmyName : extraArmies) {
+          for (const fa::string& extraArmyName : extraArmies) {
             LuaPlus::LuaObject civilianOptions = participants.DefaultPlayerOptions(state);
             civilianOptions.SetString("PlayerName", "civilian");
             civilianOptions.SetString("ArmyName", extraArmyName.c_str());

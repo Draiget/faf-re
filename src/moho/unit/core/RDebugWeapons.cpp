@@ -64,7 +64,7 @@ namespace
     return out;
   }
 
-  // FUN_00653790 (`msvc8::vector<moho::SDebugWorldText>::uninit_copy_n`'s
+  // FUN_00653790 (`fa::vector<moho::SDebugWorldText>::uninit_copy_n`'s
   // per-element step) and its null-guarded wrapper FUN_00653E00 are cited on
   // `uninit_copy_n` in src/legacy/containers/Vector.h (RULE ONE) - both
   // are zero-caller, zero-xref, linker-retained emissions of that template

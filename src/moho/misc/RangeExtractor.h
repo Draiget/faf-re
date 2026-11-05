@@ -5,7 +5,7 @@
 
 #include "Wm3Vector3.h"
 
-namespace msvc8
+namespace fa
 {
   struct string;
 }
@@ -140,7 +140,7 @@ namespace moho
    * Looks up a registered extractor by blueprint range key and returns
    * the associated instance, or `nullptr` when no mapping exists.
    */
-  [[nodiscard]] RangeExtractor* GetRangeExtractor(const msvc8::string& extractorName);
+  [[nodiscard]] RangeExtractor* GetRangeExtractor(const fa::string& extractorName);
 
 #if defined(_M_IX86)
   static_assert(sizeof(RangeExtractor) == 0x04, "RangeExtractor size must be 0x04");

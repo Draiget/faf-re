@@ -711,7 +711,7 @@ namespace moho
    */
   void MediumFidelityTerrain::DrawTerrain(
     boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
-    const msvc8::string* const techniqueName
+    const fa::string* const techniqueName
   )
   {
     auto& shaderVars = GetTerrainShaderVars();
@@ -1213,10 +1213,10 @@ namespace moho
     // The technique name is an annotation on the stratum material's shader
     // rather than a literal, so a map can override the normal pass.
     CD3DEffect* const effect = device->GetCurEffect();
-    const msvc8::string technique = effect->GetStringAnnotation(
+    const fa::string technique = effect->GetStringAnnotation(
       terrainRes->GetStratumMaterial().mShaderName,
-      msvc8::string{"normals"},
-      msvc8::string{"TTerrainNormals"});
+      fa::string{"normals"},
+      fa::string{"TTerrainNormals"});
     device->SelectTechnique(technique.c_str());
 
     LoadTerrainLighting(nullptr);

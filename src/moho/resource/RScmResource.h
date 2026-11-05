@@ -90,7 +90,7 @@ namespace moho
     void DropGeometry();
 
   public:
-    msvc8::string mName;                   // +0x08
+    fa::string mName;                   // +0x08
     boost::shared_ptr<const SScmFile> mFile; // +0x24
     CAniSkel* mSkeleton;                   // +0x2C
     Wm3::AxisAlignedBox3f mBounds;         // +0x30

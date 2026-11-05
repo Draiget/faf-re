@@ -83,7 +83,7 @@ namespace moho
    *
    * The comparator is stateless, which is what keeps the owning map at the
    * shipped 12-byte `{proxy, _Myhead, _Mysize}` footprint through the
-   * empty-base optimisation in `msvc8::detail::rb_compare_carrier`.
+   * empty-base optimisation in `fa::detail::rb_compare_carrier`.
    */
   struct MeshBatchKeyLess
   {
@@ -97,11 +97,11 @@ namespace moho
    * `RenderDepth` signatures (Mesh.h), whose map parameter spells the mapped
    * type `std::vector<Moho::MeshInstance*, std::allocator<...>>`, and from the
    * shipped `{proxy, _Myfirst, _Mylast, _Myend}` 0x10-byte footprint that
-   * `msvc8::vector` already models. `MeshBatch::Render` consumes exactly this
+   * `fa::vector` already models. `MeshBatch::Render` consumes exactly this
    * type, so the render loops hand a bucket's mapped value straight to it with
    * no cast.
    */
-  using MeshBatchInstanceVector = msvc8::vector<MeshInstance*>;
+  using MeshBatchInstanceVector = fa::vector<MeshInstance*>;
 
   /**
    * `std::map<Moho::MeshBatchKey, std::vector<Moho::MeshInstance*>>`.
@@ -110,10 +110,10 @@ namespace moho
    * `_Insert` (0x007E3F10), `_Lrotate` (0x007E4AC0), `_Rrotate` (0x007E4B30),
    * `_Inc` (0x007E42F0), `_Dec` (0x007E4FA0), `insert` (0x007E3CF0),
    * hinted `insert` (0x007E3340) and `operator[]` (0x007E2C60) - live in
-   * `msvc8::detail::rb_tree` / `msvc8::map`, which is the single owner of
+   * `fa::detail::rb_tree` / `fa::map`, which is the single owner of
    * those addresses. This header no longer re-implements any of them.
    */
-  using MeshBatchBucketTree = msvc8::map<MeshBatchKey, MeshBatchInstanceVector, MeshBatchKeyLess>;
+  using MeshBatchBucketTree = fa::map<MeshBatchKey, MeshBatchInstanceVector, MeshBatchKeyLess>;
 
   /**
    * One stored element: `std::pair<const MeshBatchKey, std::vector<MeshInstance*>>`.
@@ -153,7 +153,7 @@ namespace moho
    * here; recovered behaviour code reaches elements through the container's
    * iterators, never through this type.
    */
-  using MeshBatchBucketNode = msvc8::detail::rb_node<MeshBatchBucket>;
+  using MeshBatchBucketNode = fa::detail::rb_node<MeshBatchBucket>;
 
   /**
    * Address: 0x007E2C60 (FUN_007E2C60, `std::map<MeshBatchKey, vector<MeshInstance*>>::operator[]`)
@@ -161,7 +161,7 @@ namespace moho
    * What it does:
    * Returns the instance vector bucketed under `key`, default-constructing an
    * empty one at the located gap when the key is absent. The body is
-   * `msvc8::map::operator[]` (Map.h), which owns the address: it takes the
+   * `fa::map::operator[]` (Map.h), which owns the address: it takes the
    * `lower_bound` cursor (`call sub_7E40C0` at 0x007E2C84) and feeds it back
    * as the insert hint (`push edi` at 0x007E2CDE, then
    * `call sub_7E3340`), so the located gap is filled without a second descent.

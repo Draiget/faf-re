@@ -191,7 +191,7 @@ namespace
       const boost::shared_ptr<const moho::CAniSkel> skeleton = ownerActor ? ownerActor->GetSkeleton() : boost::shared_ptr<const moho::CAniSkel>{};
       const int boneIndex = skeleton ? skeleton->FindBoneIndex(boneName) : -1;
       if (boneIndex < 0) {
-        const msvc8::string msg = gpg::STR_Printf("Unknown bone %s", boneName);
+        const fa::string msg = gpg::STR_Printf("Unknown bone %s", boneName);
         RaiseLuaErrorWithMessage(rawState, msg.c_str());
       }
       return boneIndex;
@@ -208,7 +208,7 @@ namespace
     const moho::SAniSkelBone* const bone =
       (skeleton != nullptr && boneIndex >= 0) ? skeleton->GetBone(static_cast<std::uint32_t>(boneIndex)) : nullptr;
     if (bone == nullptr) {
-      const msvc8::string msg = gpg::STR_Printf("Unknown bone %i", boneIndex);
+      const fa::string msg = gpg::STR_Printf("Unknown bone %i", boneIndex);
       RaiseLuaErrorWithMessage(rawState, msg.c_str());
     }
 
@@ -238,14 +238,14 @@ namespace
    * Copies one packed vector<bool>-cursor lane, advances it by `bitDelta`,
    * then stores the advanced `{word,bit}` pair in caller output storage.
    */
-  [[maybe_unused]] msvc8::detail::vector_bool_word_cursor* AdvanceVectorBoolCursorPackedLane(
-    const msvc8::detail::vector_bool_word_cursor* const sourceCursor,
-    msvc8::detail::vector_bool_word_cursor* const destinationCursor,
+  [[maybe_unused]] fa::detail::vector_bool_word_cursor* AdvanceVectorBoolCursorPackedLane(
+    const fa::detail::vector_bool_word_cursor* const sourceCursor,
+    fa::detail::vector_bool_word_cursor* const destinationCursor,
     const int bitDelta
   )
   {
     *destinationCursor = *sourceCursor;
-    (void)msvc8::detail::AdvanceCursorBits(destinationCursor, bitDelta);
+    (void)fa::detail::AdvanceCursorBits(destinationCursor, bitDelta);
     return destinationCursor;
   }
 
@@ -1461,7 +1461,7 @@ namespace moho
       return;
     }
 
-    msvc8::vector<std::int32_t> childBoneIndices;
+    fa::vector<std::int32_t> childBoneIndices;
     skeleton->CollectChildBoneIndices(boneIndex, childBoneIndices);
 
     const std::int32_t* const childBegin = childBoneIndices.begin();
@@ -1780,7 +1780,7 @@ namespace moho
    */
   float WrapPositiveModulo(const float value, const float range) noexcept
   {
-    float wrapped = static_cast<float>(msvc8::fmod(value, range));
+    float wrapped = static_cast<float>(fa::fmod(value, range));
     if ((0.0f > wrapped) != (0.0f > range)) {
       wrapped += range;
     }

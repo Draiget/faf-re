@@ -127,8 +127,8 @@ namespace faf::headless
 
       void OnMessage(
         const gpg::LogSeverity level,
-        const msvc8::string& message,
-        const msvc8::vector<msvc8::string>& context,
+        const fa::string& message,
+        const fa::vector<fa::string>& context,
         const int previousDepth
       ) override
       {
@@ -435,15 +435,15 @@ namespace faf::headless
     const bool liveRejoin = !options.rejoinPeers.empty();
     const bool rejoinRehearsal = options.rejoinSource >= 0 && !liveRejoin;
     std::unique_ptr<gpg::Stream> rejoinRecording;
-    msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo;
+    fa::auto_ptr<moho::SWldSessionInfo> sessionInfo;
     if (liveRejoin) {
       // Issue #275: as `CScApp` does for /rejoin, without a window to wait in.
-      msvc8::string reason;
+      fa::string reason;
       bool failed = !moho::REJOIN_BeginSetup(
         options.rejoinPeers.c_str(), options.rejoinSource, static_cast<unsigned short>(options.rejoinPort), &reason
       );
       while (!failed && sessionInfo.get() == nullptr) {
-        msvc8::auto_ptr<moho::SWldSessionInfo> polled = moho::REJOIN_PollSetup(&reason, &failed);
+        fa::auto_ptr<moho::SWldSessionInfo> polled = moho::REJOIN_PollSetup(&reason, &failed);
         if (polled.get() != nullptr) {
           sessionInfo = polled;
         } else if (!failed) {

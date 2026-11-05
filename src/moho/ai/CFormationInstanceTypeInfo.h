@@ -36,7 +36,7 @@ namespace moho
      * Address: 0x0056A7B0 (FUN_0056A7B0, Moho::CFormationInstanceTypeInfo::dtr)
      *
      * What it does:
-     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes
+     * Frees the `RType` base's two `fa::vector<RField>` storage lanes
      * (`bases_`, `fields_`) and restores the `gpg::RObject` vftable.
      * Defaulted in source: the compiler-generated `~RType()` reproduces this
      * behavior, matching `SPointVectorTypeInfo::~SPointVectorTypeInfo()`'s

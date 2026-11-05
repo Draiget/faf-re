@@ -559,7 +559,7 @@ moho::Prop* RRef::TryUpcastProp() const
  * What it does:
  * Reads this reference as lexical text using the bound reflection type.
  */
-msvc8::string RRef::GetLexical() const
+fa::string RRef::GetLexical() const
 {
   return mType->GetLexical(*this);
 }
@@ -815,7 +815,7 @@ RRef RType::NewRef() const
  * What it does:
  * Returns default lexical text in the form `"<name> at 0x<ptr>"`.
  */
-msvc8::string RType::GetLexical(const RRef& ref) const
+fa::string RType::GetLexical(const RRef& ref) const
 {
   const auto name = GetName();
   return STR_Printf("%s at 0x%p", name, ref.mObj);
@@ -877,7 +877,7 @@ void RType::Init() {}
  *
  * What it does:
  * Finalization: builds indices over 20-byte member records. Sorts `fields_`
- * by `mName` using the binary's own MSVC8 introsort (`msvc8::sort`, not
+ * by `mName` using the binary's own MSVC8 introsort (`fa::sort`, not
  * `std::sort` -- the 2007 implementation's tie-breaking/pivot-selection
  * shape is observably different, see `legacy/algorithms/Sort.h`). This is
  * the real instantiation root for that header's `gpg::RField` sort family:
@@ -901,7 +901,7 @@ void RType::Finish()
     return;
   }
 
-  msvc8::sort(first, last, [](const RField& a, const RField& b) {
+  fa::sort(first, last, [](const RField& a, const RField& b) {
     return std::strcmp(a.mName, b.mName) < 0;
   });
 }
@@ -989,7 +989,7 @@ void RType::RegisterType()
   //
   // The binary (FUN_008DF960) inlines the fast append and, when the vector
   // is at capacity, calls the out-of-line grow lane
-  // `msvc8::vector<RType*>::insert` (FUN_008DD050) as `_Insert_n(_Mylast, 1, this)`.
+  // `fa::vector<RType*>::insert` (FUN_008DD050) as `_Insert_n(_Mylast, 1, this)`.
   // Mirror that shape so the front-end emits that per-T `insert` symbol: fast
   // path when there is spare capacity, otherwise invoke `insert(end(), 1, this)`.
   TypeVec& typeVec = GetRTypeVec();
@@ -1104,7 +1104,7 @@ gpg::REnumType::REnumType()
   , mEnumNames()
 {}
 
-msvc8::string REnumType::GetLexical(const RRef& ref) const
+fa::string REnumType::GetLexical(const RRef& ref) const
 {
   const int* enumValue = static_cast<const int*>(ref.mObj);
   const int value = enumValue ? *enumValue : 0;
@@ -1113,7 +1113,7 @@ msvc8::string REnumType::GetLexical(const RRef& ref) const
   const ROptionValue* end = mEnumNames.end();
   for (; it != end; ++it) {
     if (it->mValue == value) {
-      return msvc8::string(it->mName ? it->mName : "");
+      return fa::string(it->mName ? it->mName : "");
     }
   }
 

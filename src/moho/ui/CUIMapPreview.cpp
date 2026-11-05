@@ -103,7 +103,7 @@ bool moho::CUIMapPreview::SetTextureFromMap(
     return false;
   }
 
-  msvc8::auto_ptr<CWldMap> loadedMap = WLD_LoadMapPreview(mapPath);
+  fa::auto_ptr<CWldMap> loadedMap = WLD_LoadMapPreview(mapPath);
   if (loadedMap.get() != nullptr && loadedMap->mMapPreviewChunk != nullptr) {
     mTexture = loadedMap->mMapPreviewChunk->mPreviewTexture;
   }

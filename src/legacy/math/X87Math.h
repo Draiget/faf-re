@@ -6,14 +6,14 @@
 
 /**
  * The CRT's SSE2 math lane (`_set_SSE2_enable`, FUN_00A8ECD3 func_SetSSE2):
- * CScApp turns it off unless /sse2 is given, so the `_CI*` entries msvc8::acos,
+ * CScApp turns it off unless /sse2 is given, so the `_CI*` entries fa::acos,
  * asin and pow reproduce take their x87 bodies. Defined in X87Math.cpp next to
  * the helpers that read it.
  */
 extern "C" int global_mode_sse2;
 extern "C" int __cdecl SetSse2Mode(int enableSse2);
 
-namespace msvc8
+namespace fa
 {
   /**
    * Inlined block from FUN_006BDEE0: float-to-cell conversion uses the
@@ -303,7 +303,7 @@ namespace msvc8
    * functions go through a double routine and round once, which is what the
    * x86 CRT's own float overloads do; x64's CRT has separate float
    * implementations that disagree with them. asinf, expf and logf use the
-   * engine's double routines (msvc8::libm, plan WPL.11), equal after the
+   * engine's double routines (fa::libm, plan WPL.11), equal after the
    * rounding to the Windows x64 UCRT's for every float; powf still uses the
    * host's (its only caller is the sim driver's wall-clock pacing).
    */
@@ -386,4 +386,4 @@ namespace msvc8
   float atan2(Y y, X x) = delete;
   template <class B, class E, std::enable_if_t<!(std::is_same_v<B, float> && std::is_same_v<E, float>), int> = 0>
   float pow(B base, E exponent) = delete;
-} // namespace msvc8
+} // namespace fa

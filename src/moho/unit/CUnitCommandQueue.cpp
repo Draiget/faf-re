@@ -159,7 +159,7 @@ void CUnitCommandQueue::MemberDeserialize(gpg::ReadArchive* const archive)
 {
   gpg::RRef ownerRef{};
   archive->Read(ResolveCachedType<Broadcaster<EUnitCommandQueueStatus>>(gQueueBaseType), static_cast<Broadcaster<EUnitCommandQueueStatus>*>(this), ownerRef);
-  archive->Read(ResolveCachedType<msvc8::vector<WeakPtr<CUnitCommand>>>(gQueueWeakCommandVectorType), &mCommandVec, ownerRef);
+  archive->Read(ResolveCachedType<fa::vector<WeakPtr<CUnitCommand>>>(gQueueWeakCommandVectorType), &mCommandVec, ownerRef);
   archive->Read(ResolveCachedType<EUnitCommandType>(gQueueCommandTypeEnumType), &mCommandType, ownerRef);
 
   unsigned int decodedCounter = 0u;
@@ -178,7 +178,7 @@ void CUnitCommandQueue::MemberSerialize(gpg::WriteArchive* const archive) const
 {
   gpg::RRef ownerRef{};
   archive->Write(ResolveCachedType<Broadcaster<EUnitCommandQueueStatus>>(gQueueBaseType), static_cast<const Broadcaster<EUnitCommandQueueStatus>*>(this), ownerRef);
-  archive->Write(ResolveCachedType<msvc8::vector<WeakPtr<CUnitCommand>>>(gQueueWeakCommandVectorType), &mCommandVec, ownerRef);
+  archive->Write(ResolveCachedType<fa::vector<WeakPtr<CUnitCommand>>>(gQueueWeakCommandVectorType), &mCommandVec, ownerRef);
   archive->Write(ResolveCachedType<EUnitCommandType>(gQueueCommandTypeEnumType), &mCommandType, ownerRef);
   archive->WriteUInt(static_cast<unsigned int>(unk0));
 }

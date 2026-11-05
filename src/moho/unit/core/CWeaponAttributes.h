@@ -61,7 +61,7 @@ namespace moho
     float mMinRadiusSq;               // +0x14
     float mMaxRadiusSq;               // +0x18
     float mMaxHeightDiff;             // +0x1C
-    msvc8::string mType;              // +0x20
+    fa::string mType;              // +0x20
     float mDamageRadius;              // +0x3C
     float mDamage;                    // +0x40
     float mUnknown_0044;              // +0x44
@@ -90,7 +90,7 @@ namespace moho
      * What it does:
      * Replaces the stored type string with the provided value.
      */
-    void SetType(msvc8::string type);
+    void SetType(fa::string type);
 
     /**
      * Address: 0x006D3430 (FUN_006D3430, Moho::CWeaponAttributes::GetName)
@@ -99,7 +99,7 @@ namespace moho
      * Returns the explicit local type string when present; otherwise returns
      * the backing blueprint damage-type string.
      */
-    [[nodiscard]] msvc8::string GetName() const;
+    [[nodiscard]] fa::string GetName() const;
 
     /**
      * Address: 0x006D32E0 (FUN_006D32E0)

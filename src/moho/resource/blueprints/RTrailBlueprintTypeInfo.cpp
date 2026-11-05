@@ -153,8 +153,8 @@ void RTrailBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* typeInfo)
     typeInfo->AddField<float>("LODCutoff", offsetof(RTrailBlueprint, LODCutoff), 3, "cutoff distance");
     typeInfo->AddField<bool>("EmitIfVisible", offsetof(RTrailBlueprint, EmitIfVisible), 3, "Emit particles ONLY if this is emitter is visible");
     typeInfo->AddField<bool>("CatchupEmit", offsetof(RTrailBlueprint, CatchupEmit), 3, "catchup particles for the ticks that we weren't visible");
-    typeInfo->AddField<msvc8::string>("RepeatTexture", offsetof(RTrailBlueprint, RepeatTexture), 3, "name of texture that repeats");
-    typeInfo->AddField<msvc8::string>("RampTexture", offsetof(RTrailBlueprint, RampTexture), 3, "RampTextureName");
+    typeInfo->AddField<fa::string>("RepeatTexture", offsetof(RTrailBlueprint, RepeatTexture), 3, "name of texture that repeats");
+    typeInfo->AddField<fa::string>("RampTexture", offsetof(RTrailBlueprint, RampTexture), 3, "RampTextureName");
   }
 
   /**

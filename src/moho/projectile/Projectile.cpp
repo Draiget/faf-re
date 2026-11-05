@@ -211,7 +211,7 @@ namespace
     try {
       LuaPlus::LuaFunction<bool> callback(script);
       return callback(collidedEntity->mLuaObj, projectile);
-    } catch (const msvc8::runtime_error& error) {
+    } catch (const fa::runtime_error& error) {
       moho::CScriptObject::LogScriptWarning(
         weakGuard.GetObjectPtr(), "OnCollisionCheck", error.what()
       );
@@ -321,7 +321,7 @@ namespace moho
     const VTransform& launchTransform,
     const float damage,
     const float damageRadius,
-    const msvc8::string& damageTypeName,
+    const fa::string& damageTypeName,
     const CAiTarget& target,
     const bool isChildProjectile
   )
@@ -645,7 +645,7 @@ namespace moho
       // Previously modeled via the RULE ONE offset-magic helper
       // `AppendProjectileLaneFromOwnerOffsetRuntime` (SimRecoveryRuntime.cpp,
       // reach-in through `ownerBase + 0x9B8`) -- collapsed onto
-      // `msvc8::vector<SCamFollowParams>::push_back` (Vector.h) instead; see
+      // `fa::vector<SCamFollowParams>::push_back` (Vector.h) instead; see
       // that citation for the full fast/slow-path evidence chain.
       if (blueprint->Display.CameraFollowsProjectile != 0) {
         SimulationRef->mSyncSerializeGroup0.push_back(SCamFollowParams{
@@ -761,7 +761,7 @@ namespace moho
    */
   void Projectile::SetLifetime(const float lifetimeSeconds)
   {
-    const std::uint32_t lifetimeTicks = static_cast<std::uint32_t>(msvc8::RoundToInt(lifetimeSeconds * 10.0f));
+    const std::uint32_t lifetimeTicks = static_cast<std::uint32_t>(fa::RoundToInt(lifetimeSeconds * 10.0f));
     mLifetimeEnd = SimulationRef->mCurTick + lifetimeTicks;
   }
 
@@ -1107,7 +1107,7 @@ namespace moho
         CArmyImpl* const launcherArmy = launcherEntity->ArmyRef;
         if (launcherArmy != nullptr) {
           CArmyStats* const stats = launcherArmy->GetArmyStats();
-          msvc8::string statPath = msvc8::string("RealTimeStats_") + launcherEntity->GetUniqueName();
+          fa::string statPath = fa::string("RealTimeStats_") + launcherEntity->GetUniqueName();
           const bool didHit = mTargetPosData.ImpactDidHitEntity(collidedEntity, mImpactType);
           statPath = statPath + (didHit ? "_Shots_Hit" : "_Shots_Missed");
           const std::int32_t delta = 1;
@@ -1904,7 +1904,7 @@ namespace moho
 
     archive->WriteFloat(mDamage);
     archive->WriteFloat(mDamageRadius);
-    archive->WriteString(const_cast<msvc8::string*>(&mDamageTypeName));
+    archive->WriteString(const_cast<fa::string*>(&mDamageTypeName));
 
     archive->Write(gpg::RTypeOf<moho::CAiTarget>(), &mTargetPosData, ownerRef);
     archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mImpactPosition, ownerRef);

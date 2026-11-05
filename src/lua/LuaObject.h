@@ -1360,7 +1360,7 @@ namespace LuaPlus
 		lua_pushstring(L, s ? s : "");
 	}
 
-	inline void LuaPush(lua_State* L, const msvc8::string& s)
+	inline void LuaPush(lua_State* L, const fa::string& s)
 	{
 		lua_pushlstring(L, s.c_str(), static_cast<size_t>(s.size()));
 	}
@@ -3164,7 +3164,7 @@ namespace LuaPlus
 		Call_UDP(
 			const bool useUdp,
 			const int localPort,
-			const msvc8::string& playerName,
+			const fa::string& playerName,
 			const char* playerUidText,
 			const LuaObject* natTraversalObject,
 			const int natPort

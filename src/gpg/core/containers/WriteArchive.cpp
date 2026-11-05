@@ -29,7 +29,7 @@ struct LegacyValueFloatLane
     throw SerializationError(message ? message : "");
 }
 
-[[noreturn]] void ThrowSerializationError(const msvc8::string& message)
+[[noreturn]] void ThrowSerializationError(const fa::string& message)
 {
     throw SerializationError(message.c_str());
 }
@@ -40,7 +40,7 @@ const char* SafeTypeName(const RType* const type)
 }
 
 constexpr char kArchiveTokenBytes[] = {'}', 'N', '0', '*', '{'};
-using TrackedPointerMap = msvc8::map<RRef, WriteArchive::TrackedPointerRecord, RRefCompare>;
+using TrackedPointerMap = fa::map<RRef, WriteArchive::TrackedPointerRecord, RRefCompare>;
 
 class BinaryWriteArchive;
 
@@ -234,7 +234,7 @@ public:
         int lineColumn = 0;
         for (size_t i = 0; i < byteCount; ++i) {
             const unsigned char value = static_cast<unsigned char>(bytes[i]);
-            const msvc8::string encodedByte = STR_Printf("%02x", static_cast<unsigned int>(value));
+            const fa::string encodedByte = STR_Printf("%02x", static_cast<unsigned int>(value));
             (*mStream) << encodedByte.c_str();
 
             ++lineColumn;
@@ -262,7 +262,7 @@ public:
      * Writes one quoted, escaped text lane (`\\n`, `\\t`, `\\\"`, `\\\\`, octal
      * escapes for non-printable bytes), then terminates the record with newline.
      */
-    void WriteString(msvc8::string* const value) override
+    void WriteString(fa::string* const value) override
     {
         mStream->put('"');
         const char* const data = value->c_str();
@@ -284,7 +284,7 @@ public:
                 break;
             default:
                 if (c < 0x20u || c > 0x7Eu) {
-                    const msvc8::string octalByte = STR_Printf("%03o", static_cast<unsigned int>(c));
+                    const fa::string octalByte = STR_Printf("%03o", static_cast<unsigned int>(c));
                     (*mStream) << "\\" << octalByte.c_str();
                 } else {
                     mStream->put(static_cast<char>(c));
@@ -468,7 +468,7 @@ public:
      * Writes one length-prefixed string lane to the archive stream and throws
      * `SerializationError("nowrite")` when either write fails.
      */
-    void WriteString(msvc8::string* const value) override
+    void WriteString(fa::string* const value) override
     {
         std::FILE* const file = mCachedFile;
         const std::uint32_t byteCount = static_cast<std::uint32_t>(value->size());
@@ -706,7 +706,7 @@ public:
 
     void WriteBytes(char* const bytes, const size_t byteCount) override { Put(bytes, byteCount); }
 
-    void WriteString(msvc8::string* const value) override
+    void WriteString(fa::string* const value) override
     {
         const std::uint32_t byteCount = static_cast<std::uint32_t>(value->size());
         Scalar<4u>(byteCount);
@@ -976,10 +976,10 @@ WriteArchive* WriteArchive::WriteCFunction(CClosure* const closure, const RRef& 
  */
 void WriteArchive::WriteRefCounts(const RType* const type)
 {
-    const msvc8::map<const RType*, int>::iterator it = mRefCounts.find(type);
+    const fa::map<const RType*, int>::iterator it = mRefCounts.find(type);
     if (it == mRefCounts.end()) {
         WriteInt(-1);
-        msvc8::string typeName(type->GetName());
+        fa::string typeName(type->GetName());
         WriteString(&typeName);
         WriteInt(type->version_);
         (void)mRefCounts.insert({type, static_cast<int>(mRefCounts.size())});

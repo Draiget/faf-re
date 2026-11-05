@@ -71,7 +71,7 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName =
+      static const fa::string sName =
         gpg::STR_Printf("Broadcaster<%s>", ResolveECommandEventTypeCachePrimary()->GetName());
       return sName.c_str();
     }
@@ -118,7 +118,7 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName =
+      static const fa::string sName =
         gpg::STR_Printf("Broadcaster<%s>", gpg::RTypeOf<moho::EUnitCommandQueueStatus>()->GetName());
       return sName.c_str();
     }
@@ -183,7 +183,7 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName =
+      static const fa::string sName =
         gpg::STR_Printf("Listener<%s>", gpg::RTypeOf<moho::EUnitCommandQueueStatus>()->GetName());
       return sName.c_str();
     }
@@ -374,7 +374,7 @@ namespace
    */
   const char* RListenerRType_ECommandEvent::GetName() const
   {
-    static const msvc8::string sName =
+    static const fa::string sName =
       gpg::STR_Printf("Listener<%s>", ResolveECommandEventTypeCachePrimary()->GetName());
     return sName.c_str();
   }

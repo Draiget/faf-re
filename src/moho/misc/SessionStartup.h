@@ -62,10 +62,10 @@ namespace moho
      * What it does:
      * Builds one single-player `SWldSessionInfo` from loaded save payload.
      */
-    [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo> CreateSinglePlayerSessionInfo();
+    [[nodiscard]] fa::auto_ptr<SWldSessionInfo> CreateSinglePlayerSessionInfo();
 
   private:
-    msvc8::string mFilename;      // +0x00
+    fa::string mFilename;      // +0x00
     gpg::ReadArchive* mReader;    // +0x1C
     SSavedGameHeader mHeader;     // +0x20
   };
@@ -98,7 +98,7 @@ namespace moho
    * owner when the session carries no `LaunchInfoNew` or the sink cannot be
    * opened; `WLD_DoLoading` treats that as "this session is not recorded".
    */
-  [[nodiscard]] msvc8::auto_ptr<gpg::Stream> VCR_CreateReplay(const SWldSessionInfo* sessionInfo, gpg::StrArg name);
+  [[nodiscard]] fa::auto_ptr<gpg::Stream> VCR_CreateReplay(const SWldSessionInfo* sessionInfo, gpg::StrArg name);
 
   /**
    * Address: 0x008765E0 (FUN_008765E0)
@@ -116,9 +116,9 @@ namespace moho
    * client manager; the stream, positioned on the first recorded command, goes
    * to the caller, who builds one.
    */
-  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo> VCR_SetupReplaySession(
+  [[nodiscard]] fa::auto_ptr<SWldSessionInfo> VCR_SetupReplaySession(
     gpg::StrArg filename,
-    msvc8::string* failureReason = nullptr,
+    fa::string* failureReason = nullptr,
     std::unique_ptr<gpg::Stream>* commandStream = nullptr,
     int skipBeats = 0
   );
@@ -127,10 +127,10 @@ namespace moho
    * Engine addition (issue #275): the same from a stream already open.
    * `filename` only names it in messages.
    */
-  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo> VCR_SetupReplaySessionFromStream(
+  [[nodiscard]] fa::auto_ptr<SWldSessionInfo> VCR_SetupReplaySessionFromStream(
     std::unique_ptr<gpg::Stream> replayStream,
     gpg::StrArg filename,
-    msvc8::string* failureReason,
+    fa::string* failureReason,
     std::unique_ptr<gpg::Stream>* commandStream,
     int skipBeats = 0
   );
@@ -148,7 +148,7 @@ namespace moho
    * SessionStartup.cpp (user side) sets this during static initialisation;
    * without a user side the name is the key's text, "Local".
    */
-  using ReplayLocalClientNameHook = msvc8::string (*)();
+  using ReplayLocalClientNameHook = fa::string (*)();
   extern ReplayLocalClientNameHook sReplayLocalClientName;
 
   /**
@@ -158,7 +158,7 @@ namespace moho
    * file whose values do not, while their reader can still say why.
    */
   [[nodiscard]] bool LaunchInfoStringsDecode(
-    const LaunchInfoBase& launchInfo, const msvc8::vector<msvc8::string>& armySetups
+    const LaunchInfoBase& launchInfo, const fa::vector<fa::string>& armySetups
   );
 
   /**
@@ -179,7 +179,7 @@ namespace moho
    * What it does:
    * Builds one single-player `SWldSessionInfo` from Lua launch payload.
    */
-  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo> WLD_SetupSessionInfo(const LuaPlus::LuaObject& launchData);
+  [[nodiscard]] fa::auto_ptr<SWldSessionInfo> WLD_SetupSessionInfo(const LuaPlus::LuaObject& launchData);
 
   /**
    * Address: 0x00876DD0 (FUN_00876DD0, cfunc_LaunchReplaySession)

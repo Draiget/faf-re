@@ -21,10 +21,10 @@ namespace gpg::gal
    * Address: 0x008EA3B0 (FUN_008EA3B0, gpg::gal::STR_FindInRange)
    *
    * What it does:
-   * Scans a contiguous `msvc8::string` range and returns the first entry that
+   * Scans a contiguous `fa::string` range and returns the first entry that
    * exactly matches `*search`; returns `end` when not found.
    */
-  [[nodiscard]] msvc8::string* STR_FindInRange(
-    msvc8::string* start, msvc8::string* end, const char* const* search
+  [[nodiscard]] fa::string* STR_FindInRange(
+    fa::string* start, fa::string* end, const char* const* search
   ) noexcept;
 } // namespace gpg::gal

@@ -120,7 +120,7 @@ public:
    * bootstrap handoff for the startup render path.
    */
   bool CreateAppFrame(
-    const msvc8::string& title,
+    const fa::string& title,
     bool maximized,
     const wxPoint& position,
     gpg::gal::DeviceContext& context

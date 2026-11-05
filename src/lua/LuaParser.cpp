@@ -2620,9 +2620,9 @@ namespace
     } catch (const lua::lua_Error& error) {
       plantErrorAtOldTop(error.what());
       status = error.code;
-    } catch (const msvc8::runtime_error& error) {
+    } catch (const fa::runtime_error& error) {
       // MSVC8's `catch (const std::runtime_error&)` is spelled twice: the
-      // msvc8 hierarchy the Lua errors use, and the modern one the rest of
+      // `fa` hierarchy the Lua errors use, and the modern one the rest of
       // the tree still throws. They share no base below std::exception, and
       // a logic_error (LuaAssertion) must still pass through as in retail.
       plantErrorAtOldTop(error.what());

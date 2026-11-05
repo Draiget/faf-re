@@ -265,7 +265,7 @@ Unit::Unit(Sim* sim) : IUnit(), Entity(sim, ENTITYTYPE_Unit)
   FootprintDown = false;
   TransportLoadFactor = -1.0f;
 
-  // ArmorMultipliers (msvc8::map<msvc8::string,float>) self-constructs its
+  // ArmorMultipliers (fa::map<fa::string,float>) self-constructs its
   // sentinel head via its own default constructor (member init) -- see
   // legacy/containers/RbTree.h's buy_head(), cited for this instantiation
   // (0x006B01C0) exactly where the binary's manual head-alloc-and-self-link
@@ -323,10 +323,10 @@ namespace
   [[nodiscard]] gpg::Rect2i SkirtRectToOgridRect(const gpg::Rect2f& skirt) noexcept
   {
     return gpg::Rect2i{
-      msvc8::FloorToIntX87(skirt.x0),
-      msvc8::FloorToIntX87(skirt.z0),
-      msvc8::CeilToIntX87(skirt.x1),
-      msvc8::CeilToIntX87(skirt.z1),
+      fa::FloorToIntX87(skirt.x0),
+      fa::FloorToIntX87(skirt.z0),
+      fa::CeilToIntX87(skirt.x1),
+      fa::CeilToIntX87(skirt.z1),
     };
   }
 }
@@ -400,7 +400,7 @@ Unit::Unit(const SUnitConstructionParams& params)
   FootprintDown = false;
   TransportLoadFactor = -1.0f;
 
-  // ArmorMultipliers (msvc8::map<msvc8::string,float>) self-constructs its
+  // ArmorMultipliers (fa::map<fa::string,float>) self-constructs its
   // sentinel head via its own default constructor (member init); see the
   // sibling constructor above for the full citation.
 
@@ -494,11 +494,11 @@ Unit::Unit(const SUnitConstructionParams& params)
 
   // --- placeholder mesh --------------------------------------------------
   RMeshBlueprint* placeholderMesh = nullptr;
-  const msvc8::string placeholderName = gpg::STR_ToLower(blueprint.Display.PlaceholderMeshName.c_str());
+  const fa::string placeholderName = gpg::STR_ToLower(blueprint.Display.PlaceholderMeshName.c_str());
   if (!placeholderName.empty()) {
-    const msvc8::string meshPath =
+    const fa::string meshPath =
       gpg::STR_Printf("/units/%s/%s_mesh", placeholderName.c_str(), placeholderName.c_str());
-    msvc8::string meshFileName{};
+    fa::string meshFileName{};
     (void)gpg::STR_CopyFilename(&meshFileName, &meshPath);
 
     RResId placeholderId{};
@@ -713,7 +713,7 @@ Unit::~Unit()
   }
 
   ClearUnitOwnedSidecars(*this);
-  // ArmorMultipliers (msvc8::map<msvc8::string,float>) tears itself down via
+  // ArmorMultipliers (fa::map<fa::string,float>) tears itself down via
   // its own destructor (member teardown, reverse declaration order) -- see
   // legacy/containers/RbTree.h's ~rb_tree()/destroy_subtree, matching the
   // binary's 0x006A5380 teardown shape this used to hand-model.

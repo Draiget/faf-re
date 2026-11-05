@@ -39,10 +39,10 @@ namespace gpg
     return rhs->vals[0] != vals[0] || rhs->vals[1] != vals[1] || rhs->vals[2] != vals[2] || rhs->vals[3] != vals[3];
   }
 
-  msvc8::string MD5Digest::ToString() const
+  fa::string MD5Digest::ToString() const
   {
     static constexpr char HEX[] = "0123456789abcdef";
-    msvc8::string out;
+    fa::string out;
     out.resize(32); // reserve exactly 32 characters
 
     // Iterate raw bytes in memory order (matches original ToString)

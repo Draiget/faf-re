@@ -407,10 +407,10 @@ bool Unit::HasMeleeSpaceAroundLargeTarget(Unit* const target, SOCellPos* const i
   CollisionResult collisionResult{};
 
   // 0x0062C558..0x0062C5F0: the binary's inlined floor and ceil.
-  const int minX = msvc8::FloorToIntX87(target->mAABox.Min.x) - static_cast<int>(moverFootprint.mSizeX);
-  const int maxX = msvc8::CeilToIntX87(target->mAABox.Max.x) + 1;
-  const int minZ = msvc8::FloorToIntX87(target->mAABox.Min.z) - static_cast<int>(moverFootprint.mSizeZ);
-  const int maxZ = msvc8::CeilToIntX87(target->mAABox.Max.z) + 1;
+  const int minX = fa::FloorToIntX87(target->mAABox.Min.x) - static_cast<int>(moverFootprint.mSizeX);
+  const int maxX = fa::CeilToIntX87(target->mAABox.Max.x) + 1;
+  const int minZ = fa::FloorToIntX87(target->mAABox.Min.z) - static_cast<int>(moverFootprint.mSizeZ);
+  const int maxZ = fa::CeilToIntX87(target->mAABox.Max.z) + 1;
   if (minZ > maxZ) {
     return false;
   }

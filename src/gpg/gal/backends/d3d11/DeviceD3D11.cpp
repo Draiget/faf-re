@@ -765,7 +765,7 @@ namespace gpg::gal
 
   void DeviceD3D11::Func1() const {}
 
-  void DeviceD3D11::GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, const int adapterIndex)
+  void DeviceD3D11::GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, const int adapterIndex)
   {
     outModes.clear();
     const auto& adapters = mFactory.Adapters();
@@ -1371,14 +1371,14 @@ namespace gpg::gal
     destinationTexture->DiscardCpuCopy();
   }
 
-  void DeviceD3D11::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const msvc8::string& filePath)
+  void DeviceD3D11::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath)
   {
     static_cast<void>(cubeTarget);
     static_cast<void>(filePath);
   }
 
   void DeviceD3D11::SaveRenderTarget(
-    const boost::shared_ptr<RenderTarget>& renderTarget, const msvc8::string& filePath, const int fileFormat
+    const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, const int fileFormat
   )
   {
     auto* const target = static_cast<RenderTargetD3D11*>(renderTarget.get());
@@ -1390,7 +1390,7 @@ namespace gpg::gal
 
   void DeviceD3D11::SaveTexture(
     const boost::shared_ptr<Texture>& texture,
-    const msvc8::string& filePath,
+    const fa::string& filePath,
     const int fileFormat,
     gpg::MemBuffer<char>* const outBuffer
   )

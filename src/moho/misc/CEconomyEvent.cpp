@@ -651,7 +651,7 @@ void moho::CEconomyEvent::ProcessTick()
         try {
           const float progress = 1.0f - static_cast<float>(mRemainingTicks) / static_cast<float>(mTotalTicks);
           progressCallback.Call_ObjectNum(mUnit->GetLuaObject(), progress);
-        } catch (const msvc8::runtime_error& error) {
+        } catch (const fa::runtime_error& error) {
           gpg::Warnf("Error executing progress function: %s", error.what());
         }
       }

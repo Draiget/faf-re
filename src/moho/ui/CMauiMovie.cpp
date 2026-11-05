@@ -222,7 +222,7 @@ void moho::CMauiMovie::Frame(
 
   moviePlayback->UpdatePlaybackFrame();
 
-  const msvc8::string* const subtitle = moviePlayback->GetSubtitleText();
+  const fa::string* const subtitle = moviePlayback->GetSubtitleText();
   if (subtitle != nullptr && mSubtitleCache.view() != subtitle->view()) {
     mSubtitleCache.assign_owned(subtitle->view());
     const char* subtitleText = subtitle->c_str();

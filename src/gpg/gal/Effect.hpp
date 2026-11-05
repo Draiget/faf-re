@@ -61,7 +61,7 @@ namespace gpg::gal
          * What it does:
          * Appends every technique the device can run to `outTechniques`.
          */
-        virtual void GetTechniques(msvc8::vector<boost::shared_ptr<EffectTechnique>>& outTechniques) = 0;
+        virtual void GetTechniques(fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques) = 0;
 
         /**
          * Slot: 3

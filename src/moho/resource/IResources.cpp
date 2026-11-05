@@ -2,12 +2,12 @@
 
 namespace
 {
-  [[nodiscard]] msvc8::string* ResourceDepositTypeNameTable() noexcept
+  [[nodiscard]] fa::string* ResourceDepositTypeNameTable() noexcept
   {
-    static msvc8::string sResourceDepositTypeNames[3] = {
-      msvc8::string(""),
-      msvc8::string("Mass"),
-      msvc8::string("Hydrocarbon"),
+    static fa::string sResourceDepositTypeNames[3] = {
+      fa::string(""),
+      fa::string("Mass"),
+      fa::string("Hydrocarbon"),
     };
 
     return sResourceDepositTypeNames;
@@ -43,13 +43,13 @@ namespace moho
    * Walks one `[begin,end)` string array and returns the first exact match for
    * `value`; otherwise returns `end`.
    */
-  msvc8::string* SearchStringArrayFor(
-    msvc8::string* const begin,
-    msvc8::string* const end,
-    const msvc8::string* const value
+  fa::string* SearchStringArrayFor(
+    fa::string* const begin,
+    fa::string* const end,
+    const fa::string* const value
   )
   {
-    msvc8::string* cursor = begin;
+    fa::string* cursor = begin;
     while (cursor != end) {
       if (cursor->compare(value->view()) == 0) {
         break;
@@ -66,11 +66,11 @@ namespace moho
    * Finds one deposit type enum by searching the static type-name table and
    * returns `kNone` when the text is unknown.
    */
-  EDepositType IResources::Translate(const msvc8::string& depositTypeName)
+  EDepositType IResources::Translate(const fa::string& depositTypeName)
   {
-    msvc8::string* const begin = ResourceDepositTypeNameTable();
-    msvc8::string* const end = begin + 3;
-    msvc8::string* const found = SearchStringArrayFor(begin, end, &depositTypeName);
+    fa::string* const begin = ResourceDepositTypeNameTable();
+    fa::string* const end = begin + 3;
+    fa::string* const found = SearchStringArrayFor(begin, end, &depositTypeName);
     if (found == end) {
       return kNone;
     }
@@ -84,9 +84,9 @@ namespace moho
    * What it does:
    * Resolves one deposit-type enum lane back to its string table entry.
    */
-  const msvc8::string* IResources::Translate(const EDepositType depositType)
+  const fa::string* IResources::Translate(const EDepositType depositType)
   {
-    msvc8::string* const begin = ResourceDepositTypeNameTable();
+    fa::string* const begin = ResourceDepositTypeNameTable();
     return begin + static_cast<int>(depositType);
   }
 } // namespace moho

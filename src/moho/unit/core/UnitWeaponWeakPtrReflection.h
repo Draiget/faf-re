@@ -41,7 +41,7 @@ namespace moho
     /**
      * Address: 0x00674C70 (FUN_00674C70, Moho::RWeakPtrType_UnitWeapon::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x00674E00 (FUN_00674E00, Moho::RWeakPtrType_UnitWeapon::IsIndexed)

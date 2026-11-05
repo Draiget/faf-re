@@ -291,7 +291,7 @@ namespace
    *
    * What it does:
    * Drops one reservation out of both owner weak-link chains and then erases it
-   * from the map, returning a cursor on the following element. `msvc8::map`
+   * from the map, returning a cursor on the following element. `fa::map`
    * frees the node itself; the two intrusive lanes have to leave their owners'
    * chains first or the owner keeps a link into freed storage.
    */
@@ -801,7 +801,7 @@ namespace
         LuaPlus::LuaState* const luaState = mSim->GetLuaState();
         LuaPlus::LuaObject scoreModule = SCR_Import(luaState, scoreScript);
         scorerFunctionObject = scoreModule[scoreFunc];
-      } catch (const msvc8::runtime_error& error) {
+      } catch (const fa::runtime_error& error) {
         gpg::Warnf(kAiBrainPickBestAttackVectorLoadCallbackError, error.what());
       }
     }
@@ -831,7 +831,7 @@ namespace
           if (!approved) {
             continue;
           }
-        } catch (const msvc8::runtime_error& error) {
+        } catch (const fa::runtime_error& error) {
           gpg::Warnf(kAiBrainPickBestAttackVectorRunCallbackError, error.what());
         }
       }
@@ -1134,7 +1134,7 @@ void CAiBrain::MemberSerialize(gpg::WriteArchive* const archive) const
 
   archive->WritePointer<moho::CAiPersonality>(mPersonality, gpg::TrackedPointerState::Owned, owner);
 
-  archive->WriteString(const_cast<msvc8::string*>(&mCurrentPlan));
+  archive->WriteString(const_cast<fa::string*>(&mCurrentPlan));
 
   gpg::RType* const attackVectorType = CachedAttackVectorType();
   GPG_ASSERT(attackVectorType != nullptr);
@@ -1287,7 +1287,7 @@ void CAiBrain::ProcessAttackVectors()
 
   // One growable per-row bitset, one bit per column: bit set means the
   // enemy has at least one unit inside that grid cell.
-  msvc8::vector<SAttackVectorGridRow> grid;
+  fa::vector<SAttackVectorGridRow> grid;
 
   float cellZ = halfCell;
   for (std::int32_t row = 0; row < rowCount; ++row, cellZ += static_cast<float>(kAiDebugGridStep)) {
@@ -1515,10 +1515,10 @@ EntitySetTemplate<Unit>* CAiBrain::GetAvailableFactories(
  * must not grow.
  */
 moho::Unit* moho::FindAvailableFactory(
-  const msvc8::vector<Unit*>& candidateList, const char* const blueprintId, CAiBrain* const brain
+  const fa::vector<Unit*>& candidateList, const char* const blueprintId, CAiBrain* const brain
 )
 {
-  msvc8::vector<Unit*> candidates(candidateList);
+  fa::vector<Unit*> candidates(candidateList);
 
   // Resolve target blueprint once (by normalized filename).
   RResId blueprintResId{};

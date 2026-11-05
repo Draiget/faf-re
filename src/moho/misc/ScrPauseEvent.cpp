@@ -8,7 +8,7 @@ DEFINE_EVENT_TYPE(moho::EVT_SCR_PAUSE)
 /**
  * Address: 0x004B4330 (FUN_004B4330)
  */
-moho::ScrPauseEvent::ScrPauseEvent(const msvc8::string& sourceName, const int sourceLine)
+moho::ScrPauseEvent::ScrPauseEvent(const fa::string& sourceName, const int sourceLine)
   : wxEvent(0, EVT_SCR_PAUSE)
   , mSourceName(sourceName)
   , mSourceLine(sourceLine)

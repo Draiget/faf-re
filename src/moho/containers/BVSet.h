@@ -38,7 +38,7 @@ namespace moho
    * field and puts this record on an eight-byte boundary inside everything
    * that embeds it. Read off `EntityCategoryLookupTable`
    * (RRuleGameRules.h), whose fallback set follows a 0x0C-byte
-   * `msvc8::map` at **+0x10**: `FindOrFallback` (0x005552C0) returns
+   * `fa::map` at **+0x10**: `FindOrFallback` (0x005552C0) returns
    * `lea eax,[esi+10h]` on its miss path. The same alignment is why that
    * map's nodes put their value at `node+0x10` rather than `node+0x0C` and
    * come out 0x60 bytes rather than 0x54 (`FUN_005569C0` / `FUN_005579D0`).

@@ -96,7 +96,7 @@ namespace moho
 
     archive->WritePointer<moho::REntityBlueprint>(blueprint, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->WriteString(const_cast<msvc8::string*>(&unk2));
+    archive->WriteString(const_cast<fa::string*>(&unk2));
 
     if (gSimExactArchive.load(std::memory_order_relaxed)) {
       archive->WriteInt(mFormationScriptIndex);

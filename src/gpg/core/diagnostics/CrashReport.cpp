@@ -563,7 +563,7 @@ namespace gpg::diag
     {
       // gpg::GetRecentLogLines returns one UTF-8 blob; split it into lines so
       // each gets its own flush (the blob can be a few hundred KB).
-      const msvc8::string recent = gpg::GetRecentLogLines();
+      const fa::string recent = gpg::GetRecentLogLines();
       const char* text = recent.c_str();
       std::size_t lineStart = 0;
       for (std::size_t i = 0;; ++i) {

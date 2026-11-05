@@ -35,7 +35,7 @@ using namespace moho;
 namespace
 {
   using RebuildMapStorage = std::map<unsigned int, const RUnitBlueprint*>;
-  using FactoryCommandQueueStorage = msvc8::vector<WeakPtr<CUnitCommand>>;
+  using FactoryCommandQueueStorage = fa::vector<WeakPtr<CUnitCommand>>;
 
   [[nodiscard]] gpg::RType* CachedRebuildMapType()
   {
@@ -124,7 +124,7 @@ namespace
 
     const char* const expected = expectedType->GetName();
     const char* const actual = source.GetTypeName();
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "Unit",
@@ -438,7 +438,7 @@ void CAiBuilderImpl::BuilderSetFactoryQueueDirty(const bool dirty)
 /**
  * Address: 0x0059F470 (FUN_0059F470)
  */
-msvc8::vector<WeakPtr<CUnitCommand>>& CAiBuilderImpl::BuilderGetFactoryCommandQueue()
+fa::vector<WeakPtr<CUnitCommand>>& CAiBuilderImpl::BuilderGetFactoryCommandQueue()
 {
   return mFactoryCommands;
 }

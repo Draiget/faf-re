@@ -76,15 +76,15 @@ Unit* Sim::TransferUnit(Unit* const unit, CArmyImpl* const newArmy)
 
   // Cargo transferred out of this unit's transport storage (parallel to
   // transferredCargo below), and the children transferred after detach.
-  msvc8::vector<Unit*> transferredCargo;    // v57 (result of recursive transfer of stored units)
-  msvc8::vector<Unit*> transferredChildren; // v56 (result of recursive transfer of attached units)
-  msvc8::vector<Unit*> detachedChildren;    // v63 (mobile attached units, pre-detach)
-  msvc8::vector<int> childParentBones;      // v65 (each child's mParentBoneIndex, captured pre-detach)
-  msvc8::vector<int> childChildBones;       // v64 (each child's mChildBoneIndex, captured pre-detach)
+  fa::vector<Unit*> transferredCargo;    // v57 (result of recursive transfer of stored units)
+  fa::vector<Unit*> transferredChildren; // v56 (result of recursive transfer of attached units)
+  fa::vector<Unit*> detachedChildren;    // v63 (mobile attached units, pre-detach)
+  fa::vector<int> childParentBones;      // v65 (each child's mParentBoneIndex, captured pre-detach)
+  fa::vector<int> childChildBones;       // v64 (each child's mChildBoneIndex, captured pre-detach)
 
   // --- Phase A: drain transport storage and recursively transfer the cargo ---
   if (IAiTransport* const transport = unit->AiTransport) {
-    msvc8::vector<Unit*> storedCargo; // a2a
+    fa::vector<Unit*> storedCargo; // a2a
 
     EntitySetTemplate<Unit> storedUnits = transport->TransportGetStoredUnits();
     for (Unit* const storedUnit : storedUnits) {
@@ -109,7 +109,7 @@ Unit* Sim::TransferUnit(Unit* const unit, CArmyImpl* const newArmy)
     // there is no transport, so the attached-child capture, detach and
     // transfer below run only for units that have one.
     // --- Phase B: capture mobile attached child units and their attach bones ---
-    const msvc8::vector<Entity*>& attached = unit->GetAttachedEntities();
+    const fa::vector<Entity*>& attached = unit->GetAttachedEntities();
     for (Entity* const attachedEntity : attached) {
       if (!attachedEntity) {
         continue;
@@ -1023,10 +1023,10 @@ int Sim::DumpUnits(
     return 0;
   }
 
-  // ABI: msvc8::vector so counts.push_back(...) names the MSVC8 STL grow lane
+  // ABI: fa::vector so counts.push_back(...) names the MSVC8 STL grow lane
   // vector<DumpUnitsCountEntry>::_Insert_n (FUN_0075F810) on the capacity-full
   // path, matching the original binary; std::vector would inline its own grow.
-  msvc8::vector<DumpUnitsCountEntry> counts;
+  fa::vector<DumpUnitsCountEntry> counts;
   EntityDB* const entityDb = sim->mEntityDB;
   CEntityDbAllUnitsNode* node = entityDb->AllUnitsEnd(0u);
   CEntityDbAllUnitsNode* const end = entityDb->AllUnitsEnd();

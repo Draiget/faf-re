@@ -537,7 +537,7 @@ namespace moho
   public:
     boost::recursive_mutex mLock;
     IClientMgrUIInterface* mInterface{nullptr};
-    msvc8::vector<CClientBase*> mClients;
+    fa::vector<CClientBase*> mClients;
     INetConnector* mConnector{nullptr};
     CClientBase* mLocalClient{nullptr};
     bool mWeAreReady{false};

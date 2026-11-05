@@ -65,7 +65,7 @@ int main(int argc, char** argv)
     std::fprintf(out, "pretype %s\n", name.c_str());
   }
 
-  msvc8::string commands;
+  fa::string commands;
   moho::CON_GetCommandList(commands, false);
   std::fprintf(out, "commands\n%s\n", commands.c_str());
 

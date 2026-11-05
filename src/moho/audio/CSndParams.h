@@ -118,7 +118,7 @@ namespace moho
     /**
      * Address: 0x004E0740 (FUN_004E0740)
      *
-     * msvc8::string const&, msvc8::string const&, Moho::CSndVar*,
+     * fa::string const&, fa::string const&, Moho::CSndVar*,
      * Moho::CSndVar*, boost::weak_ptr<Moho::AudioEngine> const&
      *
      * What it does:
@@ -126,8 +126,8 @@ namespace moho
      * engine ownership for later playback.
      */
     CSndParams(
-      const msvc8::string& bankName,
-      const msvc8::string& cueName,
+      const fa::string& bankName,
+      const fa::string& cueName,
       CSndVar* lodCutoffVar,
       CSndVar* rpcLoopVar,
       const boost::weak_ptr<AudioEngine>& engine
@@ -171,8 +171,8 @@ namespace moho
     [[nodiscard]] boost::shared_ptr<AudioEngine> DoResolve() const;
 
   public:
-    msvc8::string mBank;                    // +0x00
-    msvc8::string mCue;                     // +0x1C
+    fa::string mBank;                    // +0x00
+    fa::string mCue;                     // +0x1C
     CSndVar* mLodCutoff;                    // +0x38
     CSndVar* mRpcLoopVariable;              // +0x3C
     mutable std::uint32_t mResolvePolicy;   // +0x40
@@ -208,8 +208,8 @@ namespace moho
    * remote client resolves the sounds the server names this way. Empty names: no variable.
    */
   [[nodiscard]] CSndParams* SND_FindOrCreateParams(
-    const msvc8::string& bankName, const msvc8::string& cueName, const msvc8::string& lodCutoffName,
-    const msvc8::string& rpcLoopName
+    const fa::string& bankName, const fa::string& cueName, const fa::string& lodCutoffName,
+    const fa::string& rpcLoopName
   );
 #endif
 

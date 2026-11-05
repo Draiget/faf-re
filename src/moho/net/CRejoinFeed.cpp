@@ -1626,7 +1626,7 @@ bool moho::REJOIN_BeginSetup(
   const char* const peers,
   const int localSource,
   const unsigned short localPort,
-  msvc8::string* const failureReason
+  fa::string* const failureReason
 )
 {
   const auto refuse = [failureReason](const char* const reason) {
@@ -1715,7 +1715,7 @@ float moho::REJOIN_SetupProgress()
   return sSetup != nullptr ? sSetup->list.front()->receiver.RecordingProgress() : -1.0f;
 }
 
-msvc8::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(msvc8::string* const failureReason, bool* const failed)
+fa::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(fa::string* const failureReason, bool* const failed)
 {
   SSetup& setup = *sSetup;
   INetConnector* const connector = setup.connector;
@@ -1728,7 +1728,7 @@ msvc8::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(msvc8::string* const fai
     *failed = true;
     connector->Destroy();
     sSetup.reset();
-    return msvc8::auto_ptr<SWldSessionInfo>();
+    return fa::auto_ptr<SWldSessionInfo>();
   };
 
   const auto now = std::chrono::steady_clock::now();
@@ -1776,7 +1776,7 @@ msvc8::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(msvc8::string* const fai
         "Not every player answered. The game may be over, a player may have left it, or the players may not allow coming back to a game."
       );
     }
-    return msvc8::auto_ptr<SWldSessionInfo>();
+    return fa::auto_ptr<SWldSessionInfo>();
   }
 
   const std::vector<char>& bytes = list.front()->receiver.Recording();
@@ -1786,7 +1786,7 @@ msvc8::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(msvc8::string* const fai
     std::chrono::duration<double>(std::chrono::steady_clock::now() - sRejoinStart).count()
   );
   std::unique_ptr<gpg::Stream> recording;
-  msvc8::auto_ptr<SWldSessionInfo> sessionInfo = VCR_SetupReplaySessionFromStream(
+  fa::auto_ptr<SWldSessionInfo> sessionInfo = VCR_SetupReplaySessionFromStream(
     std::make_unique<gpg::MemBufferStream>(gpg::CopyMemBuffer(bytes.data(), bytes.size())), "the peer's recording",
     failureReason, &recording
   );

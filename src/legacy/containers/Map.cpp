@@ -1,2 +1,2 @@
 #include "Map.h"
-using namespace msvc8;
+using namespace fa;

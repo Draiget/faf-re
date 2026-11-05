@@ -93,7 +93,7 @@ namespace gpg::gal
      * `shared_ptr<EffectTechnique>`, whose constructor the binary inlines
      * around `shared_count(EffectTechniqueD3D9*)` 0x009417B0.
      */
-    void EffectD3D9::GetTechniques(msvc8::vector<boost::shared_ptr<EffectTechnique>>& outTechniques)
+    void EffectD3D9::GetTechniques(fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques)
     {
         if (dxEffect_ == nullptr)
         {

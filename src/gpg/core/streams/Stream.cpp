@@ -75,9 +75,9 @@ int TextReader::ReadByte()
  * Reads one line, terminator included. See the header for the CR/LF decode
  * table; end of input ends the line without appending anything.
  */
-msvc8::string TextReader::ReadLine()
+fa::string TextReader::ReadLine()
 {
-  msvc8::string line;
+  fa::string line;
 
   // Gate order follows the binary: end of input at 0x00907121, CR at
   // 0x0090712A, then LF at 0x0090712F sharing the append with the ordinary
@@ -281,7 +281,7 @@ std::uint64_t Stream::Seek(const SeekOrigin origin, const std::int64_t pos)
  * What it does:
  * Writes string bytes including trailing NUL via inline buffer or virtual write fallback.
  */
-void Stream::Write(const msvc8::string& str)
+void Stream::Write(const fa::string& str)
 {
   Write(str.c_str(), str.size() + 1);
 }
@@ -589,9 +589,9 @@ void TextWriter::WriteCString(const char* value)
  * Address: 0x00957210 (FUN_00957210)
  *
  * What it does:
- * Writes one msvc8::string payload through WriteChar normalization.
+ * Writes one fa::string payload through WriteChar normalization.
  */
-void TextWriter::WriteString(const msvc8::string& value)
+void TextWriter::WriteString(const fa::string& value)
 {
   const char* const raw = value.data();
   const std::size_t length = value.size();
@@ -611,7 +611,7 @@ void TextWriter::Printf(const char* const format, ...)
   va_list va;
   va_start(va, format);
   const char* formatRef = format;
-  const msvc8::string rendered = STR_Va(formatRef, va);
+  const fa::string rendered = STR_Va(formatRef, va);
   va_end(va);
   WriteString(rendered);
 }
