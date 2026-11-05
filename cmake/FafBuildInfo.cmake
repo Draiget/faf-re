@@ -54,7 +54,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
         set(_describe "${_short}")
       endif()
 
-      # A clean build of a commit tagged as a release or nightly (2026.11.1, 2026.11.2-nightly)
+      # A clean build of a commit tagged as a release or nightly (2026.11.001, 2026.11.002-nightly)
       # goes by that tag, a release before a nightly, the highest number among releases. Old
       # tags such as v1.1.2 and 2026.05.11.001-nightly don't count: tools/release/README.md.
       if(NOT _dirty)
