@@ -1368,6 +1368,7 @@ namespace moho
      * Copy-constructs one path occupation-source binding owner pair.
      */
     OccupySourceBinding(const OccupySourceBinding& other);
+    OccupySourceBinding& operator=(const OccupySourceBinding&) = default;
 
     /**
      * Address: 0x0076B770 (FUN_0076B770, Moho::OccupySourceBinding::GetOccupyData)
