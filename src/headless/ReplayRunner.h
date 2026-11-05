@@ -65,6 +65,7 @@ namespace faf::headless
     std::string luaPairsPath;   // when set: the sim Lua state's pairs() order before BeginSession (plan WPL.18)
     int keyframeEvery = 0;      // when > 0: save the sim every this many beats (ReplayKeyframes.h)
     std::string keyframeDir;    // with `keyframeEvery`: where the keyframe files go
+    bool keyframePrepare = false;
     bool keyframeKeep = false;  // with `keyframeEvery`: keep the files after measuring them
     std::string resumeFrom;     // when set: a keyframe of this replay; the run continues from it
     std::function<bool(int)> stopAfter; // when set: asked after each packet's beat; true ends the run there

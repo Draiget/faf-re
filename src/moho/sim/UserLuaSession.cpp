@@ -2065,6 +2065,92 @@ int moho::cfunc_GetSimRateL(LuaPlus::LuaState* const state)
   lua_pushnumber(rawState, static_cast<float>(clientManager->GetSimRate()));
   return 1;
 }
+/**
+ * Engine addition (replay timeline): the viewer's bar, `/lua/ui/game/replay_timeline.lua`.
+ */
+namespace
+{
+  template <int (*Body)(lua_State*)>
+  int ReplayTimelineBinding(lua_State* const luaContext)
+  {
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
+    return state != nullptr && state->m_state != nullptr ? Body(state->m_state) : 0;
+  }
+
+  int ReplayTotalTicksBody(lua_State* const rawState)
+  {
+    lua_pushnumber(rawState, static_cast<lua_Number>(moho::REPLAY_TotalTicks()));
+    return 1;
+  }
+
+  int ReplayKeyframeTicksBody(lua_State* const rawState)
+  {
+    const std::vector<std::int32_t> ticks = moho::REPLAY_KeyframeTicks();
+    lua_newtable(rawState);
+    int index = 1;
+    for (const std::int32_t tick : ticks) {
+      lua_pushnumber(rawState, static_cast<lua_Number>(index));
+      lua_pushnumber(rawState, static_cast<lua_Number>(tick));
+      lua_rawset(rawState, -3);
+      ++index;
+    }
+    return 1;
+  }
+
+  int ReplaySeekBody(lua_State* const rawState)
+  {
+    moho::CWldSession* const session = moho::WLD_GetActiveSession();
+    if (session != nullptr && lua_isnumber(rawState, 1)) {
+      moho::REPLAY_SeekTo(*session, static_cast<std::int32_t>(lua_tonumber(rawState, 1)));
+    }
+    return 0;
+  }
+
+  int ReplayCancelSeekBody(lua_State* const)
+  {
+    moho::REPLAY_CancelSeek();
+    return 0;
+  }
+
+  int ReplaySeekProgressBody(lua_State* const rawState)
+  {
+    moho::CWldSession* const session = moho::WLD_GetActiveSession();
+    if (session == nullptr || !moho::REPLAY_IsSeeking()) {
+      lua_pushnil(rawState);
+      return 1;
+    }
+    const moho::SReplaySeekProgress progress = moho::REPLAY_SeekProgress(*session);
+    lua_newtable(rawState);
+    lua_pushstring(rawState, "targetTick");
+    lua_pushnumber(rawState, static_cast<lua_Number>(progress.targetTick));
+    lua_rawset(rawState, -3);
+    lua_pushstring(rawState, "currentTick");
+    lua_pushnumber(rawState, static_cast<lua_Number>(progress.currentTick));
+    lua_rawset(rawState, -3);
+    lua_pushstring(rawState, "progress");
+    lua_pushnumber(rawState, static_cast<lua_Number>(progress.progress));
+    lua_rawset(rawState, -3);
+    lua_pushstring(rawState, "restarting");
+    lua_pushboolean(rawState, progress.restarting ? 1 : 0);
+    lua_rawset(rawState, -3);
+    return 1;
+  }
+
+  void RegisterReplayTimelineBindings()
+  {
+    static CScrLuaBinder total(moho::SCR_UserLuaInitSet(), "GetReplayTotalTicks", &ReplayTimelineBinding<&ReplayTotalTicksBody>, nullptr, "<global>",
+      "int GetReplayTotalTicks() - the replay's length in ticks; 0 when not known.");
+    static CScrLuaBinder keyframes(moho::SCR_UserLuaInitSet(), "GetReplayKeyframeTicks", &ReplayTimelineBinding<&ReplayKeyframeTicksBody>, nullptr, "<global>",
+      "table GetReplayKeyframeTicks() - the ticks with a keyframe to move back to, in order.");
+    static CScrLuaBinder seek(moho::SCR_UserLuaInitSet(), "ReplaySeek", &ReplayTimelineBinding<&ReplaySeekBody>, nullptr, "<global>",
+      "ReplaySeek(tick) - moves the replay to a tick, either way, keeping the view.");
+    static CScrLuaBinder cancel(moho::SCR_UserLuaInitSet(), "ReplayCancelSeek", &ReplayTimelineBinding<&ReplayCancelSeekBody>, nullptr, "<global>",
+      "ReplayCancelSeek() - stops a seek where it is.");
+    static CScrLuaBinder progress(moho::SCR_UserLuaInitSet(), "ReplaySeekProgress", &ReplayTimelineBinding<&ReplaySeekProgressBody>, nullptr, "<global>",
+      "table ReplaySeekProgress() - targetTick, currentTick, progress, restarting; nil when not seeking.");
+  }
+} // namespace
+
 namespace
 {
   /**
@@ -2076,6 +2162,7 @@ namespace
   {
     UserLuaFuncDefBootstrap()
     {
+      RegisterReplayTimelineBindings();
       (void)::moho::func_ParseEntityCategoryUser_LuaFuncDef();
       (void)::moho::func_GetUnitCommandFromCommandCap_LuaFuncDef();
       (void)::moho::func_EjectSessionClient_LuaFuncDef();

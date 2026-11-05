@@ -783,8 +783,12 @@ namespace faf::headless
     std::unique_ptr<CReplayKeyframes> keyframes;
     if (options.keyframeEvery > 0) {
       keyframes = std::make_unique<CReplayKeyframes>(
-        options.keyframeDir, options.keyframeEvery, options.keyframeKeep, options.label, options.keyframeIndex
+        options.keyframeDir, options.keyframeEvery, options.keyframeKeep || options.keyframePrepare, options.label, options.keyframeIndex
       );
+    }
+
+    if (keyframes) {
+      keyframes->SetPreparing(options.keyframePrepare);
     }
 
     std::unique_ptr<CReplayBoneStats> boneStats;

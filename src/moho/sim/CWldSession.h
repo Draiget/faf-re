@@ -602,6 +602,12 @@ namespace moho
      */
     void DoBeat(msvc8::auto_ptr<SSyncData> syncData);
 
+    /**
+     * Engine addition (replay timeline): drops everything the last sim published, just before the
+     * opening sync of the sim that replaces it. The map, the rules, the camera and the UI stay.
+     */
+    void ResetForNewReplaySim();
+
 #if FAF_SERVER_MODE
     /**
      * Engine addition, server mode (plan WP4.4): a function `DoBeat` calls once the beat's

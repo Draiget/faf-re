@@ -65,6 +65,8 @@ namespace moho
     &sim_BlueprintLookupFast
   );
 
+  bool gRuleKeepScriptBlueprints = false;
+
   /**
    * Engine addition: switch for `OnSimHasBlueprints`. Off on x86, where Lua frees reach the allocator
    * classes formations and projectiles reuse addresses from (docs/RETAIL_REPLAY_PARITY.md).
@@ -1147,7 +1149,7 @@ namespace moho
 
   void RRuleGameRulesImpl::OnSimHasBlueprints()
   {
-    if (rule_ReleaseScriptBlueprints) {
+    if (rule_ReleaseScriptBlueprints && !gRuleKeepScriptBlueprints) {
       ReleaseScriptBlueprints();
     }
   }

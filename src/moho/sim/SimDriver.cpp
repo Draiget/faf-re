@@ -1,4 +1,6 @@
 #include "SimDriver.h"
+
+#include "moho/sim/ReplayTimeline.h"
 #include "gpg/core/profiling/Profiler.h"
 #include "platform/Interlocked.h"
 #include "moho/core/ThreadPlacement.h"
@@ -64,6 +66,8 @@ namespace
   constexpr int kIssueThreadIdleWaitMs = 1000;
   constexpr std::uint32_t kMaxQueuedSyncPacketsBeforeStalling = 10u;
   constexpr int kMaxBeatsAheadOfExecuted = 98;
+  // Engine addition (replay timeline): beats issued past the last one dequeued while fast-forwarding.
+  constexpr int kFastForwardLeadBeats = 20;
   constexpr int kMaxCatchUpBeats = 99;
   constexpr float kBlockedIssueGraceMs = 250.0f;
   // Engine addition, net_LogShownBeatMs only: when each beat was issued, by beat number. Under mLock.
@@ -1460,6 +1464,9 @@ void CSimDriver::ThreadRun()
         } else {
           lastBeatToIssue = std::min(partiallyQueuedBeat, beatCeiling);
         }
+      } else if (gReplayFastForward.load(std::memory_order_relaxed)) {
+        // Engine addition (replay timeline): as fast as the sim takes them; the queue cap above still holds.
+        lastBeatToIssue = std::max(lastBeatToIssue, mLastDequeuedBeat + kFastForwardLeadBeats);
       } else if (const int leadBeats = SessionLeadBeats(); leadBeats > 0 && sim_LeadOnSchedule == 0) {
         // Engine addition (sim_ReplayLead / sim_LocalLead): outside network sessions, keep
         // `leadBeats` beats issued past the last one the main thread dequeued, so the sim works on

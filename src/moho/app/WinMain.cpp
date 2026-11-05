@@ -24,6 +24,7 @@
 
 #include <shellapi.h>
 
+#include "headless/HeadlessMain.h"
 #include "CScApp.h"
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
@@ -460,6 +461,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   (void)hPrevInstance;
   (void)lpCmdLine;
   (void)nShowCmd;
+
+  // Engine addition (replay timeline): the viewer's hidden process, this same exe with no window or device.
+  if (moho::CFG_GetArgOption("/replaykeyframes", 0, nullptr)) {
+    return HEADLESS_Main(0, nullptr);
+  }
 
   gpg::SetThreadName(0xFFFFFFFFu, "Main");
 

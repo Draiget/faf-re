@@ -132,6 +132,10 @@ namespace moho
     int skipBeats = 0
   );
 
+  /** Engine addition (replay timeline): set, `VCR_SetupReplaySession` also reads the replay's length into `gVcrReplayBeats`. */
+  extern bool gVcrScanReplayLength;
+  extern std::int32_t gVcrReplayBeats;
+
   /**
    * Engine addition (dedicated-server plan WPL.4): the name of the local client
    * VCR_SetupReplaySession creates, `Loc(USER_GetLuaState(), "<LOC

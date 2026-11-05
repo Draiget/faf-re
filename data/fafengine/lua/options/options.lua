@@ -43,3 +43,26 @@ do
         table.insert(video.items, position, graphicsApi)
     end
 end
+
+-- The replay viewer's keyframes: saved game states it moves back to. Compressed, in replay_keyframes next to the exe.
+do
+    local gameplay = options and options.gameplay
+    if gameplay and gameplay.items then
+        table.insert(gameplay.items, {
+            title = "Replay keyframe cache (MB)",
+            key = 'replay_keyframe_budget',
+            type = 'slider',
+            default = 2048,
+            tip = "Disk space a replay may use for its saved positions, in the replay_keyframes folder next to the game. "
+                .. "Over this, the oldest are thinned out, and moving far back takes longer. Cleared when the next replay starts.",
+            set = function(key, value, startup)
+                ConExecute("replay_KeyframeMaxMB " .. tostring(value))
+            end,
+            custom = {
+                min = 256,
+                max = 16384,
+                inc = 256,
+            },
+        })
+    end
+end

@@ -35,6 +35,7 @@
 #include "moho/sim/CWldSessionLoaderImpl.h"
 #include "platform/X87Precision.h"
 #include "headless/ReplayLaunchCheck.h"
+#include "headless/HeadlessMain.h"
 #include "headless/ReplayRunner.h"
 #include "moho/animation/CAniActor.h"
 
@@ -166,6 +167,7 @@ namespace
       "  --keyframe-every <beats>  save the sim between beats every <beats>, as a saved game; size, zlib size, md5, time\n"
       "  --keyframe-dir <dir>      where the keyframe files go (default: keyframes)\n"
       "  --keyframe-keep           keep the keyframe files after measuring them\n"
+      "  --keyframe-prepare        for the replay viewer: files get their names when complete, nothing is measured\n"
       "  --resume-from <file>      continue the replay from one of its keyframes instead of its start\n"
       "  --seek <beat,beat,...>    with --keyframe-every: move to each beat in turn inside this process, by ending\n"
       "                            the session and restoring the newest keyframe before it, then play to the end;\n"
@@ -254,7 +256,7 @@ namespace
   }
 } // namespace
 
-int main(int argc, char** argv)
+int HEADLESS_Main(int argc, char** argv)
 {
   (void)argc;
   (void)argv;
@@ -317,6 +319,7 @@ int main(int argc, char** argv)
     options.keyframeDir = "keyframes";
   }
   options.keyframeKeep = moho::CFG_GetArgOption("--keyframe-keep", 0, nullptr);
+  options.keyframePrepare = moho::CFG_GetArgOption("--keyframe-prepare", 0, nullptr);
   (void)ReadOption("--resume-from", options.resumeFrom);
   std::vector<int> seekPlan;
   {

@@ -712,6 +712,17 @@ namespace moho
     }
   }
 
+  void CDecalManager::RemoveAllDecals()
+  {
+    while (!mDecals.empty()) {
+      (void)RemoveDecalFromManagerAndReturnNextSlot(*this, mDecals.end()[-1]);
+    }
+    for (CWldSplat* const splat : mSplats) {
+      delete splat;
+    }
+    mSplats.clear();
+  }
+
   /**
    * Address: 0x00878BE0 (FUN_00878BE0, Moho::CDecalManager::EntitiesInView)
    *

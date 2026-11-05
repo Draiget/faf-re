@@ -36,6 +36,7 @@
 #include "moho/net/CRejoinFeed.h"
 #include "moho/net/NetConVars.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
+#include "moho/sim/ReplayTimeline.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/net/Common.h"
 #include "moho/net/INetTCPSocket.h"
@@ -479,7 +480,7 @@ namespace moho
       replayFilename = "";
     }
 
-    msvc8::auto_ptr<SWldSessionInfo> sessionInfo = VCR_SetupReplaySession(replayFilename);
+    msvc8::auto_ptr<SWldSessionInfo> sessionInfo = REPLAY_SetupViewerSession(replayFilename, nullptr);
     const bool launchStarted = sessionInfo.get() != nullptr;
     if (launchStarted) {
       WLD_BeginSession(sessionInfo);

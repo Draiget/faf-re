@@ -21,6 +21,7 @@ set(FAF_HEADLESS_SOURCES
   headless/ReplaySyncSpy.cpp
   headless/ReplayViewBench.cpp
   headless/ReplayViewFrameStats.cpp
+  headless/HeadlessEntry.cpp
   headless/HeadlessMain.cpp
   headless/ReplayRunner.cpp
   headless/ReplaySyncWriters.cpp

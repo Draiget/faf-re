@@ -9,6 +9,7 @@
 // directly after Sim.cpp: its bootstrap below registers these forms in the
 // order Sim.cpp's did, so the user init set keeps its order.
 #include "moho/sim/Sim.h"
+#include "moho/sim/ReplayTimeline.h"
 #include "legacy/math/X87Math.h"
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/utils/Global.h"

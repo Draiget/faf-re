@@ -30,7 +30,10 @@
 #include "moho/misc/StringUtils.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/net/CReplayClient.h"
+#include "moho/net/CMessage.h"
+#include "moho/net/CMessageStream.h"
 #include "moho/net/Common.h"
+#include "moho/net/ECmdStreamOp.h"
 #include "moho/net/INetTCPSocket.h"
 #include "moho/sim/FafGameVersion.h"
 #include "moho/sim/WldSessionInfo.h"
@@ -229,6 +232,38 @@ namespace moho
     }
   } // namespace
 
+  bool gVcrScanReplayLength = false;
+  std::int32_t gVcrReplayBeats = 0;
+
+  namespace
+  {
+    /** Engine addition (replay timeline): sums the stream's beats from here to its end, and comes back here. */
+    [[nodiscard]] std::int32_t ScanReplayBeats(gpg::Stream& stream)
+    {
+      std::int32_t beats = 0;
+      try {
+        const std::uint64_t start = stream.VirtTell(gpg::Stream::ModeReceive);
+        CMessage message;
+        while (message.Read(&stream)) {
+          if (message.GetType().raw() == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)
+              && message.GetMessageSize() >= static_cast<int>(sizeof(std::int32_t))) {
+            CMessageStream input(message, CMessageStream::Access::kReadOnly);
+            gpg::BinaryReader reader(&input);
+            std::int32_t delta = 0;
+            reader.ReadExact(delta);
+            beats += std::max(delta, 0);
+          }
+          message.Clear();
+        }
+        (void)stream.Seek(gpg::Stream::OriginBegin, static_cast<std::int64_t>(start));
+      } catch (const std::exception& error) {
+        gpg::Warnf("Couldn't read the length of a replay: %s", error.what());
+        return 0;
+      }
+      return beats;
+    }
+  } // namespace
+
   /**
    * Address: 0x008765E0 (FUN_008765E0)
    * Mangled:
@@ -414,6 +449,10 @@ namespace moho
     } catch (const std::exception& error) {
       gpg::Warnf("Unable to read the header of replay %s: %s", filename, error.what());
       return refuse(gpg::STR_Printf("The file is damaged (%s).", error.what()));
+    }
+
+    if (gVcrScanReplayLength && replayStream != nullptr) {
+      gVcrReplayBeats = ScanReplayBeats(*replayStream);
     }
 
     msvc8::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());

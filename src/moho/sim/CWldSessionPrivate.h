@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <chrono>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -102,7 +103,9 @@
 #include "moho/sim/CWldSessionLoaderImpl.h"
 #include "moho/client/Localization.h"
 #include "moho/misc/SessionStartup.h"
+#include "moho/sim/ReplayTimeline.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/SimKeyframe.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/PauseListener.h"
 #include "moho/sim/SOCellPos.h"
@@ -153,6 +156,9 @@
   extern msvc8::vector<SFormationPreviewGhost> gFormationPreviews;
 namespace moho
 {
+  /** Engine addition (replay timeline): a new sim is on its way behind the session, which takes no beats until then. */
+  [[nodiscard]] bool WLD_IsReplaySimSwapping();
+
   extern std::uint64_t gUserSyncBeats;
 
   struct UICommandGraphNode

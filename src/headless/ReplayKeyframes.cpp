@@ -57,7 +57,8 @@ namespace faf::headless
         moho::gSimExactSaveCount.fetch_add(1u);
         moho::gSimExactArchive.store(true);
         std::FILE* file = nullptr;
-        if (fopen_s(&file, mPath.c_str(), "wb") != 0 || file == nullptr) {
+        const std::string writePath = mOwner.IsPreparing() ? mPath + ".part" : mPath;
+        if (fopen_s(&file, writePath.c_str(), "wb") != 0 || file == nullptr) {
           // `Sim::SaveState` writes through the archive it is given; the driver catches the throw.
           throw std::runtime_error("cannot write " + mPath);
         }
@@ -79,7 +80,13 @@ namespace faf::headless
         delete mArchive;
         mArchive = nullptr;
         mFile.reset();
-        mOwner.OnSaved(mBeat, mPath, seconds, data.useSuggestedName, data.saveName.c_str());
+        if (mOwner.IsPreparing() && data.useSuggestedName) {
+          std::error_code ignored;
+          std::filesystem::rename(mPath + ".part", mPath, ignored);
+          mOwner.OnPrepared(mBeat, seconds);
+        } else {
+          mOwner.OnSaved(mBeat, mPath, seconds, data.useSuggestedName, data.saveName.c_str());
+        }
         delete this;
       }
 
@@ -198,6 +205,16 @@ namespace faf::headless
       std::error_code ignored;
       std::filesystem::remove(path, ignored);
     }
+  }
+
+  void CReplayKeyframes::OnPrepared(const std::uint32_t beat, const double saveSeconds)
+  {
+    mPending = false;
+    ++mCount;
+    mLongestSave = std::max(mLongestSave, saveSeconds);
+    mTotalSave += saveSeconds;
+    std::printf("[%s] keyframe beat %u prepared in %.0f ms\n", mLabel.c_str(), beat, saveSeconds * 1000.0);
+    std::fflush(stdout);
   }
 
   std::string CReplayKeyframes::Summary() const

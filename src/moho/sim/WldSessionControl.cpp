@@ -38,6 +38,21 @@ namespace
 namespace
 {
 
+    // Engine addition (replay timeline): a new sim on its way behind the running session.
+    enum class EReplaySimSwap
+    {
+      None,
+      WaitingForSync,
+      WaitingForReady,
+      Holding,
+    };
+    EReplaySimSwap sReplaySimSwap = EReplaySimSwap::None;
+    // The new sim's beats until the move's target: the session and what it draws stay as they are.
+    std::vector<SSyncData*> sReplayHeldBeats;
+    int sReplaySwapRate = 0;
+    std::int32_t sReplaySwapFocus = -1;
+    std::chrono::steady_clock::time_point sReplaySwapStart{};
+
     // ---- Crash-report "Sim" section (new diagnostics functionality) ----
     //
     // Everything a crash report reader asks first: what map, live or replay,
@@ -398,6 +413,7 @@ namespace
       sessionInfo->mClientManager = nullptr;
       // Engine addition (issue #275): does nothing unless a save came with this client's seat.
       REJOIN_PrepareRestore(*sessionInfo);
+      REPLAY_PrepareSession(*sessionInfo); // engine addition (replay timeline)
       // Engine addition: replays and single-player sessions get a beat lead (`sim_ReplayLead`,
       // `sim_LocalLead`); a session with any network connector keeps the original pacing.
       SIM_SetSessionPacing(SelectSessionPacing(*wldSession, clientManager));
@@ -430,6 +446,152 @@ namespace
       }
 
       ReleaseWldGameDataHandles(&gameData);
+    }
+
+    /**
+     * Engine addition (replay timeline): replaces the sim behind the running session with one at
+     * the replay's keyframe or start. It is `WLD_DoLoading`'s part from the session info on; the
+     * session's map, rules, UI and camera stay. What the old sim published stays until the new one
+     * reaches the target, so that is what the screen shows until then.
+     */
+    [[nodiscard]] bool StartReplaySim(CWldSession& session)
+    {
+      sReplaySwapRate = sSimDriver->GetClientManager()->GetSimRateRequested();
+      sReplaySwapFocus = session.FocusArmy;
+      sReplaySwapStart = std::chrono::steady_clock::now();
+
+      // Its last syncs only say that everything is gone, and they go with the driver.
+      sSimDriver->ShutDown();
+      sSimDriver.reset();
+
+      msvc8::auto_ptr<SWldSessionInfo> sessionInfo = REPLAY_CreateRestartSession();
+      if (sessionInfo.get() == nullptr) {
+        return false;
+      }
+
+      STIMap* const launchMap = REPLAY_CloneStartMap();
+      LaunchInfoBase* const launchInfo = sessionInfo->mLaunchInfo.get();
+      launchInfo->mGameRules = session.mRules;
+      launchInfo->mMap = launchMap;
+      launchInfo->mLanguage.assign_owned(session.mState->GetGlobal("__language").ToString());
+      if (LaunchInfoNew* const newLaunchInfo = launchInfo->GetNew(); newLaunchInfo != nullptr) {
+        newLaunchInfo->mProps = session.mWldMap->mProps;
+      }
+
+      IClientManager* const clientManager = sessionInfo->mClientManager;
+      sessionInfo->mClientManager = nullptr;
+      clientManager->SetUIInterface(&sCWldUiInterface);
+      REPLAY_PrepareSession(*sessionInfo);
+      SIM_SetSessionPacing(SelectSessionPacing(session, clientManager));
+      ISTIDriver* driver = SIM_CreateDriver(
+        static_cast<CClientManagerImpl*>(clientManager),
+        nullptr,
+        sessionInfo->mLaunchInfo,
+        sessionInfo->mSourceId
+      );
+#if FAF_SERVER_MODE
+      driver = faf::remote::client::WrapForLoopback(
+        driver, *session.mRules, launchMap->GetBounds3D(), session.IsMultiplayer != 0
+      );
+#endif
+      sSimDriver.reset(driver);
+      gpg::Logf(
+        "Replay timeline: the old sim went in %.2f s",
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - sReplaySwapStart).count()
+      );
+      return true;
+    }
+
+    /**
+     * Engine addition (replay timeline): one frame of a sim swap: the steps of `WLD_DoInitializing`
+     * and `WLD_DoPostInitializing` without their UI, then the new sim's beats are held until the
+     * target, and applied in one frame. True while the session has no beats to take.
+     */
+    [[nodiscard]] bool StepReplaySimSwap(CWldSession& session)
+    {
+      constexpr double kNewSimLimitSeconds = 300.0;
+
+      if (sReplaySimSwap == EReplaySimSwap::None) {
+        if (!REPLAY_RestartWanted()) {
+          return false;
+        }
+        sReplaySimSwap = EReplaySimSwap::WaitingForSync;
+        if (!StartReplaySim(session)) {
+          gWldFrameAction = EWldFrameAction::Exit;
+          return true;
+        }
+      }
+
+      ISTIDriver* const simDriver = sSimDriver.get();
+      if (simDriver == nullptr) {
+        return true;
+      }
+      simDriver->Dispatch();
+
+      if (sReplaySimSwap == EReplaySimSwap::WaitingForSync) {
+        if (!simDriver->HasSyncData()) {
+          const std::chrono::duration<double> waited = std::chrono::steady_clock::now() - sReplaySwapStart;
+          if (waited.count() > kNewSimLimitSeconds) {
+            gpg::Warnf("Replay timeline: the new sim gave nothing in %.0f s, leaving the replay", waited.count());
+            gWldFrameAction = EWldFrameAction::Exit;
+          }
+          return true;
+        }
+
+        SSyncData* syncData = nullptr;
+        simDriver->GetSyncData(syncData);
+        // The new sim doesn't know whose view this is yet; the UI must not see a change for one beat.
+        syncData->mFocusArmy = sReplaySwapFocus;
+        sReplayHeldBeats.push_back(syncData);
+        REPLAY_NoteHeldTick(syncData->mCurTick);
+        gpg::Logf(
+          "Replay timeline: the new sim's first sync after %.2f s",
+          std::chrono::duration<double>(std::chrono::steady_clock::now() - sReplaySwapStart).count()
+        );
+
+        if (CClientManagerImpl* const clientManager = simDriver->GetClientManager(); clientManager != nullptr) {
+          clientManager->Cleanup();
+          clientManager->SetSimRate(sReplaySwapRate);
+        }
+        simDriver->SetArmyIndex(sReplaySwapFocus);
+        sReplaySimSwap = EReplaySimSwap::WaitingForReady;
+      }
+
+      if (sReplaySimSwap == EReplaySimSwap::WaitingForReady) {
+        CClientManagerImpl* const clientManager = simDriver->GetClientManager();
+        if (clientManager != nullptr && !clientManager->IsEveryoneReady()) {
+          return true;
+        }
+        simDriver->DecrementOutstandingRequestsAndSignal();
+        sReplaySimSwap = EReplaySimSwap::Holding;
+      }
+
+      simDriver->SetGeomCams(CAM_GetAllCameras());
+      bool gameOver = false;
+      while (!gameOver && !REPLAY_HoldIsDone(sReplayHeldBeats.size()) && simDriver->HasSyncData()) {
+        SSyncData* syncData = nullptr;
+        simDriver->GetSyncData(syncData);
+        sReplayHeldBeats.push_back(syncData);
+        REPLAY_NoteHeldTick(syncData->mCurTick);
+        gameOver = syncData->mGameOver;
+      }
+      if (!gameOver && !REPLAY_HoldIsDone(sReplayHeldBeats.size())) {
+        return true;
+      }
+
+      const auto applyStart = std::chrono::steady_clock::now();
+      session.ResetForNewReplaySim();
+      for (SSyncData* const held : sReplayHeldBeats) {
+        session.DoBeat(msvc8::auto_ptr<SSyncData>(held));
+      }
+      gpg::Logf(
+        "Replay timeline: %d held beats applied in %.2f s", static_cast<int>(sReplayHeldBeats.size()),
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - applyStart).count()
+      );
+      sReplayHeldBeats.clear();
+      sReplaySimSwap = EReplaySimSwap::None;
+      REPLAY_SimRestarted(session);
+      return false;
     }
 
     /**
@@ -646,9 +808,17 @@ namespace
      */
     void WLD_DoPlayingAction(const float deltaSeconds)
     {
-      if (ISTIDriver* const simDriver = sSimDriver.get(); simDriver != nullptr) {
+      // Engine addition (replay timeline): a new sim behind this session, and keyframes.
+      CWldSession* const replaySession = WLD_GetActiveSession();
+      const bool simSwapping = replaySession != nullptr && StepReplaySimSwap(*replaySession);
+
+      if (ISTIDriver* const simDriver = sSimDriver.get(); simDriver != nullptr && !simSwapping) {
         REJOIN_MainFrame(*simDriver);
         simDriver->Dispatch();
+
+        if (replaySession != nullptr) {
+          REPLAY_MainFrame(*simDriver, *replaySession);
+        }
 
         // Snapshot every active GeomCamera and forward to the sim driver so
         // visibility/projection state matches the upcoming session frame.
@@ -963,8 +1133,19 @@ namespace
    * carry entity deletions and command releases the session would otherwise
    * never apply before it is destroyed.
    */
+  bool WLD_IsReplaySimSwapping()
+  {
+    return sReplaySimSwap != EReplaySimSwap::None;
+  }
+
   void WLD_Teardown()
   {
+    REPLAY_OnTeardown(); // engine addition (replay timeline)
+    sReplaySimSwap = EReplaySimSwap::None;
+    for (SSyncData* const held : sReplayHeldBeats) {
+      delete held;
+    }
+    sReplayHeldBeats.clear();
     if (sSimDriver) {
       sSimDriver->ShutDown();
       CWldSession* const session = gActiveWldSession;

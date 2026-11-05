@@ -1050,6 +1050,7 @@ set(FAF_ENGINE_SOURCES
   moho/sim/CWldSessionCore.cpp
   moho/sim/CWldSessionCommands.cpp
   moho/sim/WldSessionControl.cpp
+  moho/sim/ReplayTimeline.cpp
   moho/sim/WldSessionState.cpp
   moho/sim/WldScenarioInfo.cpp
   moho/sim/BlueprintLoaderContext.cpp

@@ -586,6 +586,10 @@ namespace moho
      * (WRenViewport::Render, 0x007F9779..0x007F979C).
      */
     void ClearPendingChanges() override;
+
+    /** Engine addition (replay timeline): at once, with no fade, for a sim that replaces the last one. */
+    void RemoveAllDecals();
+
     /**
      * Address: 0x00877A60 (FUN_00877A60, Moho::CDecalManager::CDecalManager)
      *

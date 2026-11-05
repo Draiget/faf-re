@@ -1,4 +1,5 @@
 #include "CScApp.h"
+#include "moho/sim/ReplayTimeline.h"
 #include "gpg/core/profiling/Profiler.h"
 
 #include <Windows.h>
@@ -443,7 +444,7 @@ namespace
         SetFrontEndReplayFilename(args[0]);
         msvc8::string failureReason;
         msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo =
-          moho::VCR_SetupReplaySession(args[0].c_str(), &failureReason);
+          moho::REPLAY_SetupViewerSession(args[0].c_str(), &failureReason);
         if (sessionInfo.get() != nullptr) {
           moho::WLD_BeginSession(sessionInfo);
           return;
@@ -1195,7 +1196,11 @@ void CScApp::Main()
   // FAF FA-Binary-Patches (hooks/GetFPS.cpp): StoreFPS keeps the frame time it
   // finds being pushed here (0x008D1A85) as OnRenderWorld's `delta`.
   moho::UI_SetRenderWorldFrameSeconds(frameSeconds);
-  moho::SND_Frame();
+  // Engine addition (replay timeline): a fast-forward spends its frames on the sim, with the world neither drawn nor heard.
+  const bool fastForwarding = moho::gReplayFastForward.load(std::memory_order_relaxed);
+  if (!fastForwarding) {
+    moho::SND_Frame();
+  }
   moho::DISK_UpdateWatcher();
 
   float smoothedFrameSeconds = fixedFrameSeconds > 0.0f ? fixedFrameSeconds : framerates.Median();
@@ -1228,15 +1233,19 @@ void CScApp::Main()
   moho::CWldSession* const activeSession = moho::WLD_GetActiveSession();
   const std::int32_t gameTick = activeSession != nullptr ? activeSession->mGameTick : 0;
   const float simDeltaSeconds = activeSession != nullptr ? activeSession->mTimeSinceLastTick : 0.0f;
-  moho::CAM_GetManager()->Frame(simDeltaSeconds, frameSeconds);
+  if (!fastForwarding) {
+    moho::CAM_GetManager()->Frame(simDeltaSeconds, frameSeconds);
+  }
   if (moho::sUserStage != nullptr) {
     FAF_PROFILE_ZONE_NAMED("UserStage");
     moho::sUserStage->UserFrame();
   }
   ::ADXM_ExecMain();
-  moho::REN_Frame(gameTick, simDeltaSeconds, frameSeconds);
-  if (moho::IUserSoundManager* const userSound = moho::USER_GetSound(); userSound != nullptr) {
-    userSound->Frame(simDeltaSeconds, frameSeconds);
+  if (!fastForwarding) {
+    moho::REN_Frame(gameTick, simDeltaSeconds, frameSeconds);
+    if (moho::IUserSoundManager* const userSound = moho::USER_GetSound(); userSound != nullptr) {
+      userSound->Frame(simDeltaSeconds, frameSeconds);
+    }
   }
 
   if (moho::IUIManager* const uiManager = moho::UI_GetManager()) {

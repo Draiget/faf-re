@@ -1580,6 +1580,45 @@ namespace
    * This is the sole consumer of the driver's sync queue - without it the queue
    * fills, the issue thread stops issuing, and the game clock never advances.
    */
+  void CWldSession::ResetForNewReplaySim()
+  {
+    (void)SCR_LuaDoString("import('/fafengine/lua/ui/game/replay_timeline.lua').OnSimReplaced()", mState);
+    SetSelection(WeakSet<UserEntity>());
+    USER_GetSound()->StopAllSounds();
+    USER_GetSound()->SetListenerArmy(nullptr);
+    sWorldParticles.ClearRenderBuckets();
+    gFormationPreviews.clear();
+
+    while (!mEntities.empty()) {
+      UserEntity* const entity = mEntities.begin()->second;
+      RemoveEntity(entity);
+      delete entity;
+    }
+    for (auto orphan = mOrphans.begin(); orphan != mOrphans.end();) {
+      UserEntity* const entity = *orphan;
+      ++orphan;
+      delete entity;
+    }
+    while (!mCommandManager->mCommands.empty()) {
+      delete mCommandManager->mCommands.begin()->second;
+    }
+    for (std::size_t armyIndex = 0; armyIndex < userArmies.size(); ++armyIndex) {
+      delete userArmies[armyIndex];
+      userArmies[armyIndex] = nullptr;
+    }
+    mDebugCanvas.release();
+    mBeatDebugCanvas.release();
+    IsGameOver = 0u;
+    mLastBeatWasTick = 0;
+    mTimeSinceLastTick = 0.0f;
+
+    // The terrain flattened since the keyframe has to go back, and the sim's heights are the truth.
+    IWldTerrainRes* const terrainRes = mWldMap->mTerrainRes;
+    static_cast<CDecalManager*>(terrainRes->GetDecalManager())->RemoveAllDecals();
+    const CHeightField* const field = mWldMap->mTerrainRes->mMap->mHeightField.get();
+    terrainRes->NotifyMapChange(gpg::Rect2i{0, 0, field->width - 1, field->height - 1});
+  }
+
   void CWldSession::DoBeat(msvc8::auto_ptr<SSyncData> syncData)
   {
     const CTimeBarSection beatSection("Sync");
@@ -1949,7 +1988,8 @@ namespace
     // Interpolation between ticks. Running with the wind means "do not
     // interpolate, just consume beats", so the fraction is pinned at a whole
     // tick and the drain below never waits for the clock.
-    if (mLastBeatWasTick == 0 || wld_RunWithTheWind) {
+    const std::int32_t fastForwardTarget = REPLAY_FastForwardTarget(); // engine addition (replay timeline)
+    if (mLastBeatWasTick == 0 || wld_RunWithTheWind || fastForwardTarget >= 0) {
       mTimeSinceLastTick = 1.0f;
     } else {
       mTimeSinceLastTick += WLD_GetSimRate() * deltaSeconds * 10.0f;
@@ -1968,7 +2008,23 @@ namespace
     // Drain the driver's sync queue. Bounded at 100 beats so a burst after a
     // stall cannot make one frame arbitrarily long.
     std::int32_t beatsApplied = 0;
-    for (; beatsApplied < 100; ++beatsApplied) {
+    // Engine addition (replay timeline): a fast-forward takes what the sim has ready for most of a frame, so the
+    // UI stays responsive, and a paused replay moves too.
+    if (fastForwardTarget >= 0) {
+      constexpr std::chrono::milliseconds kFastForwardFrameBudget{15};
+      const auto frameStart = std::chrono::steady_clock::now();
+      while (mGameTick < fastForwardTarget && IsGameOver == 0 && simDriver->HasSyncData()) {
+        SSyncData* packet = nullptr;
+        simDriver->GetSyncData(packet);
+        DoBeat(msvc8::auto_ptr<SSyncData>(packet));
+        ++beatsApplied;
+        if (std::chrono::steady_clock::now() - frameStart >= kFastForwardFrameBudget) {
+          break;
+        }
+      }
+      REPLAY_AfterFastForwardFrame(*this, beatsApplied);
+    } else
+    for (; beatsApplied < 100 && !WLD_IsReplaySimSwapping(); ++beatsApplied) {
       if (mReplayIsPaused) {
         // A paused replay still applies beats until it lands on a tick.
         if (mLastBeatWasTick != 0) {
@@ -2003,7 +2059,9 @@ namespace
 
     // Whatever the drain consumed comes back off the interpolation fraction, so
     // the render clock does not run ahead of the sim clock.
-    if (!wld_RunWithTheWind) {
+    if (fastForwardTarget >= 0) {
+      mTimeSinceLastTick = 0.0f;
+    } else if (!wld_RunWithTheWind) {
       const float remainder = mTimeSinceLastTick - static_cast<float>(mGameTick - tickAtFrameStart);
       mTimeSinceLastTick = std::max(0.0f, std::min(remainder, 1.0f));
     }
