@@ -62,8 +62,8 @@ namespace moho
     bool replay_PrepareKeyframes = true;
     TConVar<bool> gTConVar_replay_PrepareKeyframes(
       "replay_PrepareKeyframes",
-      "A hidden copy of this exe, below normal priority, writes a replay's keyframes ahead of the viewer (read when a "
-      "replay opens).",
+      "A hidden copy of this exe, below normal priority, writes a replay's keyframes ahead of the viewer. Read when a "
+      "replay opens; turning it off also stops one that is running.",
       &replay_PrepareKeyframes
     );
 
@@ -76,6 +76,8 @@ namespace moho
     // A save stops the sim, so the next keyframe waits this many ticks per second the last save took:
     // at normal speed, saving takes at most 5% of the time however big the game gets.
     constexpr double kKeyframeTicksPerSaveSecond = 200.0;
+    // The first keyframe comes this early: loading it is quicker than starting the replay over, and thinning keeps it.
+    constexpr std::int32_t kFirstKeyframeTick = 20;
     // Keyframes this close are the same place as far as a move is concerned.
     constexpr std::int32_t kKeyframeSameSpotTicks = 60;
     // However small the budget, these stay.
@@ -94,8 +96,7 @@ namespace moho
     };
     std::map<std::int32_t, SKeyframeFile> sKeyframes;
     std::uint64_t sKeyframeBytes = 0;
-    std::int32_t sKeyframeInterval = 0;
-    std::int32_t sNextKeyframeTick = 0;
+    std::int32_t sLastKeyframeTick = 0;
     bool sKeyframePending = false;
     double sLastSaveSeconds = 0.0;
 
@@ -416,9 +417,11 @@ namespace moho
 
       char every[32];
       std::snprintf(every, sizeof(every), "%d", replay_KeyframeEvery);
+      char first[16];
+      std::snprintf(first, sizeof(first), "%d", kFirstKeyframeTick);
       const std::string command = "\"" + self.string() + "\" /replaykeyframes --keep-client-data --label prepare --replay \"" + sReplayPath + "\" /init \""
         + initArgs[0].c_str() + "\" /nobugreport /nosound /log \"" + (directory / "prepare.log").string()
-        + "\" --keyframe-every " + every + " --keyframe-dir \"" + directory.string() + "\" --keyframe-prepare";
+        + "\" --keyframe-every " + every + " --keyframe-first " + first + " --keyframe-dir \"" + directory.string() + "\" --keyframe-prepare";
 
       STARTUPINFOA startup{};
       startup.cb = sizeof(startup);
@@ -446,6 +449,12 @@ namespace moho
     }
 
     /** Takes in what the hidden process has finished, once a second: its files move up and are compressed like our own. */
+    [[nodiscard]] bool HaveKeyframeNear(const std::int32_t tick)
+    {
+      const auto next = sKeyframes.lower_bound(tick - kKeyframeSameSpotTicks);
+      return next != sKeyframes.end() && next->first <= tick + kKeyframeSameSpotTicks;
+    }
+
     void TakePreparedKeyframes()
     {
       if (sPrepareProcess == nullptr) {
@@ -473,9 +482,7 @@ namespace moho
         }
         const std::int32_t tick = static_cast<std::int32_t>(header.tick);
         // One the viewer saved as it passed here is as good, and a second only takes disk.
-        const auto next = sKeyframes.lower_bound(tick - kKeyframeSameSpotTicks);
-        const bool haveOneHere = next != sKeyframes.end() && next->first <= tick + kKeyframeSameSpotTicks;
-        if (!readable || haveOneHere) {
+        if (!readable || HaveKeyframeNear(tick)) {
           sPreparedTick = readable ? std::max(sPreparedTick, tick) : sPreparedTick;
           std::filesystem::remove(file, ignored);
           continue;
@@ -500,8 +507,7 @@ namespace moho
       StopKeyframeCompression();
       sKeyframes.clear();
       sKeyframeBytes = 0;
-      sKeyframeInterval = 0;
-      sNextKeyframeTick = 0;
+      sLastKeyframeTick = 0;
       sLastSaveSeconds = 0.0;
     }
 
@@ -833,6 +839,12 @@ namespace moho
     if (sPrepareStartDue) {
       StartKeyframePreparation();
     }
+    // Turned off while it runs: the CPU it uses comes back at once, and what it has written stays.
+    if (!replay_PrepareKeyframes && sPrepareProcess != nullptr) {
+      sNextPrepareCheck = Clock::time_point{};
+      TakePreparedKeyframes();
+      StopKeyframePreparation();
+    }
     TakePreparedKeyframes();
     TakeCompressedKeyframes();
 
@@ -846,20 +858,17 @@ namespace moho
     if (replay_KeyframeEvery <= 0 || sKeyframePending || sRestarting) {
       return;
     }
-    if (sKeyframeInterval == 0) {
-      sKeyframeInterval = replay_KeyframeEvery;
-      sNextKeyframeTick = sKeyframeInterval;
-    }
     const std::int32_t tick = session.mGameTick;
-    if (tick < sNextKeyframeTick) {
+    const std::int32_t spacing = std::max(replay_KeyframeEvery, static_cast<std::int32_t>(sLastSaveSeconds * kKeyframeTicksPerSaveSecond));
+    if (tick < (sLastKeyframeTick == 0 ? kFirstKeyframeTick : sLastKeyframeTick + spacing)) {
       return;
     }
-    sNextKeyframeTick = tick + std::max(sKeyframeInterval, static_cast<std::int32_t>(sLastSaveSeconds * kKeyframeTicksPerSaveSecond));
+    sLastKeyframeTick = tick;
     // The hidden process is past here: this sim needn't stop to save.
     if (sPreparedTick >= tick) {
       return;
     }
-    if (sKeyframes.count(tick) != 0u) {
+    if (HaveKeyframeNear(tick)) {
       return;
     }
 

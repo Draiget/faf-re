@@ -789,6 +789,9 @@ namespace faf::headless
 
     if (keyframes) {
       keyframes->SetPreparing(options.keyframePrepare);
+      if (options.keyframeFirst > 0) {
+        keyframes->SetFirstBeat(options.keyframeFirst);
+      }
     }
 
     std::unique_ptr<CReplayBoneStats> boneStats;

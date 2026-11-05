@@ -47,6 +47,18 @@ function OnSimReplaced()
     import('/lua/ui/notify/notify.lua').KillAllWatchers()
 end
 
+--- Esc, before anything else it does: true when it stopped a move, or has to wait as the sim is being replaced.
+function OnEscape()
+    local progress = bar and ReplaySeekProgress()
+    if not progress then
+        return false
+    end
+    if not progress.restarting then
+        ReplayCancelSeek()
+    end
+    return true
+end
+
 --- The hotkey: keeps the bar shown, or leaves it to the mouse again.
 function Toggle()
     pinned = not pinned
@@ -196,10 +208,19 @@ function Create()
         bar = false
     end
 
-    -- The options screen sets it when changed; a game starts with the engine's default.
-    local budget = import('/lua/user/prefs.lua').GetOption('replay_keyframe_budget')
+    -- The options screen sets these when changed; a game starts with the engine's defaults.
+    local GetOption = import('/lua/user/prefs.lua').GetOption
+    local budget = GetOption('replay_keyframe_budget')
     if budget then
         ConExecute("replay_KeyframeMaxMB " .. tostring(budget))
+    end
+    local spacing = GetOption('replay_keyframe_spacing')
+    if spacing then
+        ConExecute("replay_KeyframeEvery " .. tostring(math.floor(spacing) * 10))
+    end
+    local prepare = GetOption('replay_keyframe_prepare')
+    if prepare then
+        ConExecute("replay_PrepareKeyframes " .. tostring(prepare))
     end
 
     bar:SetShown(false)

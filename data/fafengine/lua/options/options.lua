@@ -64,5 +64,38 @@ do
                 inc = 256,
             },
         })
+        table.insert(gameplay.items, {
+            title = "Replay keyframe spacing (seconds)",
+            key = 'replay_keyframe_spacing',
+            type = 'slider',
+            default = 30,
+            tip = "Game time between a replay's saved positions. Closer ones make moves shorter and use more of the cache. "
+                .. "The background preparation takes a new value from the next replay.",
+            set = function(key, value, startup)
+                ConExecute("replay_KeyframeEvery " .. tostring(math.floor(value) * 10))
+            end,
+            custom = {
+                min = 10,
+                max = 300,
+                inc = 10,
+            },
+        })
+        table.insert(gameplay.items, {
+            title = "Replay background preparation",
+            key = 'replay_keyframe_prepare',
+            type = 'toggle',
+            default = 1,
+            tip = "A hidden low-priority copy of the game saves positions ahead of a replay you watch, so a first jump forward "
+                .. "can load one. Off saves CPU, and jumps forward play through the game instead.",
+            set = function(key, value, startup)
+                ConExecute("replay_PrepareKeyframes " .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    {text = "<LOC _On>", key = 1},
+                    {text = "<LOC _Off>", key = 0},
+                },
+            },
+        })
     end
 end

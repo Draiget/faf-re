@@ -165,6 +165,7 @@ namespace
       "  --state-digests <file>    write \"beat digest\" of what the sim published, every beat\n"
       "  --fpu-report              at beat 1, every thread's x87 control word and MXCSR (sampled)\n"
       "  --keyframe-every <beats>  save the sim between beats every <beats>, as a saved game; size, zlib size, md5, time\n"
+      "  --keyframe-first <beat>   with --keyframe-every: the first save at this beat instead of at <beats>\n"
       "  --keyframe-dir <dir>      where the keyframe files go (default: keyframes)\n"
       "  --keyframe-keep           keep the keyframe files after measuring them\n"
       "  --keyframe-prepare        for the replay viewer: files get their names when complete, nothing is measured\n"
@@ -315,6 +316,7 @@ int HEADLESS_Main(int argc, char** argv)
   (void)ReadOption("--bone-stats", options.boneStatsPath);
   options.fpuReport = moho::CFG_GetArgOption("--fpu-report", 0, nullptr);
   (void)ReadIntOption("--keyframe-every", options.keyframeEvery, bad);
+  (void)ReadIntOption("--keyframe-first", options.keyframeFirst, bad);
   if (!ReadOption("--keyframe-dir", options.keyframeDir)) {
     options.keyframeDir = "keyframes";
   }
