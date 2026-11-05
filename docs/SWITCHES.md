@@ -154,6 +154,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `ren_SplatAtlasFix` | 1 | `/con` | size at each map load, the rest each frame | terrain splats (tread and scorch marks) use a 2048x2048 texture atlas that is cleared and refilled when a frame's splats don't fit, and a splat without a place isn't drawn; 0 is the original 1024x1024 atlas that is never cleared during a game, where a texture that finds no room (the Fatboy's 512x512 treads after a Galactic Colossus's) draws pieces of other textures |
 | `ren_MeshPaletteUsedOnly` | 1 | `/con` | at each batch | Direct3D 12 and Vulkan: a mesh batch sends only the bones its instances use instead of both whole palettes |
 | `ren_BuildGhostsPerBeat` | 1 | `/con` | each frame | the ghosts at queued build orders are rebuilt once per sim beat instead of for each view of each frame |
+| `ren_ShadowVolumeCache` | 1 | `/con` | each frame | The shadow volume's terrain intersection is kept while the frustum and terrain stay the same |
 | `ren_TerrainGpuBuffers` | 1 | `/con` | when a terrain is created | Direct3D 12 and Vulkan keep the terrain's vertices and indices in GPU memory and upload them only after a rebuild |
 | `ren_MeshPoseStill` | 1 | `/con` | when a pose is blended | A unit's pose is blended once while its start and end poses match, instead of each frame |
 | `ren_PipelineMemo` | 1 | `/con` | each draw | Direct3D 12 and Vulkan find a draw's pipeline in a small table of recent ones before building its full key |

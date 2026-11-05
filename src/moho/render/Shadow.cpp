@@ -17,6 +17,7 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
 #include "moho/collision/CGeomSolid3.h"
+#include "moho/console/CConCommand.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 #include "moho/terrain/water/WaterSurface.h"
@@ -364,6 +365,29 @@ namespace moho
    * still reach it. The 8-unit lift on the box top is the same idea for
    * casters standing above the terrain.
    */
+  bool ren_ShadowVolumeCache = true;
+  namespace
+  {
+    struct ShadowVolumeMemo
+    {
+      static constexpr std::uint32_t kPlanes = 8U;
+      bool valid = false;
+      const CHeightField* field = nullptr;
+      std::uint64_t terrainRevision = 0U;
+      std::uint32_t planeCount = 0U;
+      Wm3::Plane3f planes[kPlanes]{};
+      Wm3::AxisAlignedBox3f volume{};
+    };
+    ShadowVolumeMemo sShadowVolume;
+
+    TConVar<bool> gTConVar_ren_ShadowVolumeCache(
+      "ren_ShadowVolumeCache",
+      "The shadow volume's terrain intersection is kept while the frustum and terrain stay the same (1, the default), "
+      "or computed each frame (0). Read each frame.",
+      &ren_ShadowVolumeCache
+    );
+  } // namespace
+
   bool Shadow::PrepareLightCamera(
     const GeomCamera3& viewCamera,
     const Wm3::Vector3f& sunDirection,
@@ -417,7 +441,30 @@ namespace moho
     shadowFrustum.planes_[5].Constant =
       (ren_ShadowCoeff * zoom) - shadowFrustum.planes_[4].Constant;
 
-    Wm3::AxisAlignedBox3f volume = heightField->ConvexIntersection(shadowFrustum);
+    // Engine change (ren_ShadowVolumeCache): the same frustum and terrain give the same box, and this
+    // walk of the height field's tiers was 2 % of a frame at near zoom.
+    Wm3::AxisAlignedBox3f volume{};
+    const std::uint64_t terrainRevision = HeightFieldRevision();
+    const std::uint32_t planeCount = static_cast<std::uint32_t>(shadowFrustum.planes_.Size());
+    bool cached = ren_ShadowVolumeCache && sShadowVolume.valid && sShadowVolume.field == heightField &&
+      sShadowVolume.terrainRevision == terrainRevision && sShadowVolume.planeCount == planeCount &&
+      planeCount <= ShadowVolumeMemo::kPlanes;
+    for (std::uint32_t index = 0U; cached && index < planeCount; ++index) {
+      cached = std::memcmp(&sShadowVolume.planes[index], &shadowFrustum.planes_[index], sizeof(Wm3::Plane3f)) == 0;
+    }
+    if (cached) {
+      volume = sShadowVolume.volume;
+    } else {
+      volume = heightField->ConvexIntersection(shadowFrustum);
+      sShadowVolume.valid = planeCount <= ShadowVolumeMemo::kPlanes;
+      sShadowVolume.field = heightField;
+      sShadowVolume.terrainRevision = terrainRevision;
+      sShadowVolume.planeCount = planeCount;
+      for (std::uint32_t index = 0U; sShadowVolume.valid && index < planeCount; ++index) {
+        sShadowVolume.planes[index] = shadowFrustum.planes_[index];
+      }
+      sShadowVolume.volume = volume;
+    }
     if (volume.Max.X() <= volume.Min.X()) {
       return false;
     }
