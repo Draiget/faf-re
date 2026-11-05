@@ -1461,7 +1461,7 @@ RType* gpg::RVectorType<moho::SimArmy*>::GetPointeeType() const
  * storage. Bound as `RType::serLoadFunc_`; `version`/`ownerRef` are unused by
  * this body (the binary loads a fresh vector, not an owner-anchored slot).
  */
-void gpg::DeserializeSimArmyPtrVector(ReadArchive* const archive, const std::intptr_t vectorPtr, int /*version*/, RRef* /*ownerRef*/)
+void DeserializeSimArmyPtrVector(ReadArchive* const archive, const std::intptr_t vectorPtr, int /*version*/, RRef* /*ownerRef*/)
 {
     auto* const outVector = reinterpret_cast<msvc8::vector<moho::SimArmy*>*>(vectorPtr);
 
@@ -1489,7 +1489,7 @@ void gpg::DeserializeSimArmyPtrVector(ReadArchive* const archive, const std::int
  * unowned tracked raw pointer (`RRef_SimArmy` + `WriteRawPointer`). Bound as
  * `RType::serSaveFunc_`; `version`/`ownerRef` are unused by this body.
  */
-void gpg::SerializeSimArmyPtrVector(WriteArchive* const archive, const std::intptr_t vectorPtr, int /*version*/, RRef* /*ownerRef*/)
+void SerializeSimArmyPtrVector(WriteArchive* const archive, const std::intptr_t vectorPtr, int /*version*/, RRef* /*ownerRef*/)
 {
     const auto* const vector = reinterpret_cast<const msvc8::vector<moho::SimArmy*>*>(vectorPtr);
 
