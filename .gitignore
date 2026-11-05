@@ -33,6 +33,7 @@ dependencies/usrsctp/
 dependencies/plog/
 dependencies/mbedtls/
 dependencies/slang/
+dependencies/zstd/
 dependencies/*.7z
 *.7z
 *.pdb
