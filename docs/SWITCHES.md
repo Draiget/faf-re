@@ -28,6 +28,8 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_ReconProbeCellCache` | 1 | `/con` | live | A recon point probe computes each intel-grid cell once per grid size |
 | `sim_ReconSkipSelfAlly` | 1 | `/con` | live | Recon merges skip the army's own database on its repeat ally-loop visit |
 | `sim_ReconBlipHandleAssign` | 1 | `/con` | live | Blip refresh copies mesh and pose handles without temporaries (no refcount traffic when unchanged) |
+| `sim_ReconFlatWalk` | 1 | `/con` | live | Recon refresh walks the blip list with prefetches instead of the blip tree (same blips, same order) |
+| `sim_SyncInPlace` | 1 | `/con` | live | The serial unit-update queue builds each record in place, not from a default copy |
 | `sim_IntelRasterRows` | 1 | `/con` | live | Intel circles rastered row by row instead of column by column |
 | `sim_IntelSameCellMove` | 1 | `/con` | live | An intel source moving inside its grid cell skips the two rasters that would cancel |
 | `sim_BlueprintNameCache` | 1 | `/con` | live | Emitter, trail and projectile blueprint lookups by name remembered per game rules (positive results only) |

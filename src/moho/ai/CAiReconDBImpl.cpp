@@ -417,6 +417,14 @@ namespace moho
     "Recon flag merges skip the army's own recon database on its second, ally-loop visit (same results).",
     &sim_ReconSkipSelfAlly
   );
+  /// Engine addition: ReconRefresh walks `mBblips`, the map's blips in map order, loading what it reads ahead of time.
+  bool sim_ReconFlatWalk = true;
+  TConVar<bool> gTConVar_sim_ReconFlatWalk(
+    "sim_ReconFlatWalk",
+    "Recon refresh walks the blip list with prefetches instead of the blip tree (same blips, same order).",
+    &sim_ReconFlatWalk
+  );
+
   bool sim_ReconBlipHandleAssign = true;
   TConVar<bool> gTConVar_sim_ReconBlipHandleAssign(
     "sim_ReconBlipHandleAssign",
@@ -838,6 +846,69 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
   TickAllReconGrids(this, dTicks);
 }
 
+namespace
+{
+  // Entries ahead of the walk: the blip first, then, once its cache line has arrived, what it points to.
+  constexpr std::size_t kBlipPrefetchFar = 12u;
+  constexpr std::size_t kBlipPrefetchNear = 6u;
+
+  void PrefetchBlipsAhead(
+    ReconBlip* const* const blips, const std::size_t index, const std::size_t count, const std::int32_t armyIndex
+  ) noexcept
+  {
+    if (index + kBlipPrefetchFar < count) {
+      const ReconBlip* const blip = blips[index + kBlipPrefetchFar];
+      __builtin_prefetch(&blip->mCreator);
+      __builtin_prefetch(&blip->mReconDat);
+    }
+    if (index + kBlipPrefetchNear < count) {
+      ReconBlip* const blip = blips[index + kBlipPrefetchNear];
+      __builtin_prefetch(blip->GetPerArmyReconInfo(armyIndex));
+      if (const Unit* const sourceUnit = blip->mCreator.GetObjectPtr(); sourceUnit != nullptr) {
+        __builtin_prefetch(&sourceUnit->DestroyQueuedFlag);
+        __builtin_prefetch(&sourceUnit->mVarDat.mHealth);
+        __builtin_prefetch(&sourceUnit->AniActor);
+      }
+    }
+  }
+
+  /**
+   * Calls `visit(blip, sourceUnit)` in map order for each mapped blip whose source unit lives.
+   *
+   * Engine addition (sim_ReconFlatWalk): everything that changes the map (`ReconTick`, `Flush`,
+   * `ReconFlushBlipsInRect`) leaves `mBblips` as the map's blips in map order, then the orphans. When
+   * a blip in the map or among the orphans is null the sizes differ, and the walk stays on the tree.
+   */
+  template <class TVisit>
+  void ForEachMappedBlipWithSource(CAiReconDBImpl& db, const std::int32_t armyIndex, TVisit&& visit)
+  {
+    const std::size_t count = db.mBlipMap.size();
+    if (sim_ReconFlatWalk && db.mBblips.size() == count + db.mTempBlips.size()) {
+      ReconBlip* const* const blips = db.mBblips.begin();
+      for (std::size_t i = 0u; i < count; ++i) {
+        PrefetchBlipsAhead(blips, i, count, armyIndex);
+        ReconBlip* const blip = blips[i];
+        Unit* const sourceUnit = blip->mCreator.GetObjectPtr();
+        if (sourceUnit != nullptr && sourceUnit->DestroyQueuedFlag == 0u) {
+          visit(blip, sourceUnit);
+        }
+      }
+      return;
+    }
+
+    for (auto it = db.mBlipMap.begin(); it != db.mBlipMap.end(); ++it) {
+      ReconBlip* const blip = it->second;
+      if (!blip) {
+        continue;
+      }
+      Unit* const sourceUnit = DecodeBlipSourceUnit(blip);
+      if (sourceUnit != nullptr && sourceUnit->DestroyQueuedFlag == 0u) {
+        visit(blip, sourceUnit);
+      }
+    }
+  }
+} // namespace
+
 /**
  * Address: 0x005C14E0 (FUN_005C14E0)
  *
@@ -852,21 +923,10 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
  */
 void CAiReconDBImpl::ReconRefresh()
 {
-  for (auto it = mBlipMap.begin(); it != mBlipMap.end();) {
-    const auto node = it++;
-
-    ReconBlip* const blip = node->second;
-    if (!blip) {
-      continue;
-    }
-
-    Unit* const sourceUnit = DecodeBlipSourceUnit(blip);
-    if (!sourceUnit || sourceUnit->DestroyQueued()) {
-      continue;
-    }
-
+  const std::int32_t armyIndex = mArmy != nullptr ? mArmy->mConstDat.mArmyIndex : -1;
+  ForEachMappedBlipWithSource(*this, armyIndex, [this](ReconBlip* const blip, Unit* const sourceUnit) {
     RefreshBlip(blip, sourceUnit);
-  }
+  });
 }
 
 /**
@@ -1192,18 +1252,13 @@ void CAiReconDBImpl::RefreshDeferringHandles(SRefreshFixups& fixups)
   // ReconRefresh's walk and RefreshBlip's body with the handle assignments held back. Every
   // other write is a plain field copy into this army's slot, so their order relative to the
   // deferred assignments is unobservable.
-  for (auto it = mBlipMap.begin(); it != mBlipMap.end(); ++it) {
-    ReconBlip* const blip = it->second;
-    if (!blip) {
-      continue;
-    }
-    Unit* const sourceUnit = DecodeBlipSourceUnit(blip);
-    if (!sourceUnit || sourceUnit->DestroyQueued() || blip->IsFake()) {
-      continue;
+  ForEachMappedBlipWithSource(*this, armyIndex, [&fixups, armyIndex](ReconBlip* const blip, Unit* const sourceUnit) {
+    if (blip->IsFake()) {
+      return;
     }
     SPerArmyReconInfo* const perArmy = blip->GetPerArmyReconInfo(armyIndex);
     if (!perArmy) {
-      continue;
+      return;
     }
 
     if ((perArmy->mReconFlags & static_cast<std::uint32_t>(RECON_LOSNow)) != 0u) {
@@ -1224,7 +1279,7 @@ void CAiReconDBImpl::RefreshDeferringHandles(SRefreshFixups& fixups)
     if ((perArmy->mReconFlags & static_cast<std::uint32_t>(RECON_AnySense)) != 0u) {
       perArmy->mMaybeDead = static_cast<std::uint8_t>(sourceUnit->IsDead() ? 1u : 0u);
     }
-  }
+  });
 }
 
 void CAiReconDBImpl::ApplyRefreshFixups(SRefreshFixups& fixups)

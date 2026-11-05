@@ -28,6 +28,7 @@
 #include "moho/net/IClient.h"
 #include "moho/audio/SAudioRequest.h"
 #include "moho/entity/EntityId.h"
+#include "moho/sim/UnitUpdateFill.h"
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/CZipFile.h"
@@ -640,6 +641,14 @@ moho::SUnitVariableUpdateEntry* moho::QueueUnitVariableUpdate(
 {
   if (!syncData) {
     return nullptr;
+  }
+
+  // Engine change (sim_SyncInPlace): the same record without building and copying a default one.
+  if (sim_SyncInPlace) {
+    SUnitVariableUpdateEntry& entry = syncData->mUnitUpdates.emplace_back();
+    entry.mEntityId = entityId;
+    entry.mVariableData = variableData;
+    return &entry;
   }
 
   SUnitVariableUpdateEntry defaultEntry{};

@@ -1217,34 +1217,6 @@ bool ReconBlip::IsFake() const noexcept
   return mUnitConstDat.mFake != 0u;
 }
 
-SPerArmyReconInfo* ReconBlip::GetPerArmyReconInfo(const std::int32_t armyIndex) noexcept
-{
-  if (armyIndex < 0 || mReconDat.begin() == nullptr || mReconDat.end() == nullptr) {
-    return nullptr;
-  }
-
-  const std::ptrdiff_t count = mReconDat.end() - mReconDat.begin();
-  if (armyIndex >= count) {
-    return nullptr;
-  }
-
-  return mReconDat.begin() + armyIndex;
-}
-
-const SPerArmyReconInfo* ReconBlip::GetPerArmyReconInfo(const std::int32_t armyIndex) const noexcept
-{
-  if (armyIndex < 0 || mReconDat.begin() == nullptr || mReconDat.end() == nullptr) {
-    return nullptr;
-  }
-
-  const std::ptrdiff_t count = mReconDat.end() - mReconDat.begin();
-  if (armyIndex >= count) {
-    return nullptr;
-  }
-
-  return mReconDat.begin() + armyIndex;
-}
-
 /**
  * Address: 0x005BEE90 (FUN_005BEE90)
  * Mangled: ?CreateInterface@ReconBlip@Moho@@MAEXPAUSSyncData@2@@Z
