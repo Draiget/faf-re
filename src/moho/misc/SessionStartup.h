@@ -82,6 +82,9 @@ namespace moho
    * Engine addition: `OpenGPGNetURI` (ReplaySessionSetup.cpp) for the client's session startup,
    * which writes the replay it records through the same function.
    */
+  /** Engine addition: the header of a replay, for what records one (`VCR_CreateReplay`, the dedicated server). */
+  void VCR_WriteReplayHeader(gpg::Stream& stream, const SWldSessionInfo& sessionInfo);
+
   [[nodiscard]] std::unique_ptr<gpg::Stream> VCR_OpenGPGNetURI(gpg::StrArg uri, EGpgNetOpenMode mode);
 
   /**

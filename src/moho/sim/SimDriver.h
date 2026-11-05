@@ -1023,6 +1023,12 @@ namespace moho
   [[nodiscard]] ESimSessionPacing SIM_GetSessionPacing() noexcept;
 
   /**
+   * Engine addition: the rate the sim last measured it can hold, from its median beat time, whatever
+   * the pacing. 1.0 is speed +0 (100 ms a beat); 0 before its first measure.
+   */
+  [[nodiscard]] float SIM_GetMeasuredGameRate() noexcept;
+
+  /**
    * Engine addition: user-side console variables. Outside network sessions the issue thread keeps
    * this many beats issued beyond the last one the main thread has taken off the sync queue
    * (on top of the original rate schedule, see `sim_LeadOnSchedule`), so the sim computes the

@@ -235,7 +235,7 @@ Server-authoritative sessions are being built: one server runs the only sim, and
 
 ## headless
 
-The engine builds three programs: `main` (the game client: `main_x64.exe`, or `main.exe` on x86), `headless` (below) and, later, `server`, the dedicated game server.
+The engine builds three programs: `main` (the game client: `main_x64.exe`, or `main.exe` on x86), `headless` (below) and `server`, the dedicated game server (below).
 
 Every build also produces `headless_x64.exe` (`headless.exe` on x86; `headless` on Linux), a console program that plays one replay with no window, render device or audio engine and reports whether every checksum the players recorded matches. It runs the game's sim, sim driver and replay client; it does not build the world session the game's UI runs on. Put it in a folder of its own next to the game's `bin` folder (it reads `../Installed.Prefs` and mounts the `fafengine` folder next to itself, as the game does) and give it the game's init file:
 
@@ -304,6 +304,57 @@ The last line it prints is `VERDICT ended=<True|False> mismatches=<n> crash=<Tru
 | `--label text` | `headless` | Prefix of every printed line |
 
 Engine switches work as in the game: `/init`, `/log`, `/synclog`, `/simworkers`, `/con`, `/prefs`, `/sse2`, `/noversioncheck`. Exit code: 0 every recorded checksum matched and the replay reached its end; 1 a mismatch; 2 the end was not reached in time; 3 a crash or fatal error; 4 bad arguments or a replay that could not be loaded.
+
+## server
+
+`server` (Linux only for now) is the dedicated game server. Today it plays a match with no players connected: the armies in the match file are AIs, and the server is an observer. Seats, the lobby and the network come next.
+
+```
+server --match match.lua --out /srv/game1 /init /data/faf/bin/init_replay.lua /simworkers 3
+```
+
+The match file is Lua that sets `MatchConfig`, the table `CLobby.LaunchGame` takes (`GameOptions`, `PlayerOptions`, `GameMods`, `Observers`), and optionally `MatchSeed` and `MatchName`.
+
+| Flag | Default | What it does |
+|---|---|---|
+| `--match <file>` | required | The match to play |
+| `--out <dir>` | required | Where `game.scfareplay`, `result.json` and `server.log` go; created if missing |
+| `--speed <n>` | the match's `GameSpeed` (`normal` +0, `fast` +4) | The requested game speed |
+| `--stop-beat <n>` | none | Stop at this beat (a beat is a tenth of a second of game time) |
+| `--timeout <minutes>` | 240 | Give up after this much real time; exit code 3 |
+| `--status-minutes <n>` | 10 | A status line this often; 0 for none |
+| `--warn-beat-ms <n>` | 90 | Warn when the sim's median beat takes this long; speed -1 starts past 100 ms |
+
+The console shows what someone running the server wants to see, and everything else the engine says goes to `server.log` (or the `/log` file, if given):
+
+```
+[2026-11-05 12:00:01] faf-re dedicated server, build abc1234 x64-linux Release (master, v1.1.0)
+[2026-11-05 12:00:03] Hosting game "Seton's Clutch" on /maps/SCMP_009/SCMP_009.scmap, 2 players, speed +0
+[2026-11-05 12:00:03]   AI One, team 2, AI
+[2026-11-05 12:00:03]   AI Two, team 3, AI
+[2026-11-05 12:00:03] Loading the map
+[2026-11-05 12:00:07] Map loaded in 3.6 s
+[2026-11-05 12:00:07] Game started
+[2026-11-05 12:10:07] Status: game time 00:10:00, real time 00:10:00, speed +0 (requested +0), 10.0 beats/s, a beat takes 12 ms, memory 610 MB, 1 warnings in the log
+[2026-11-05 12:31:40] WARNING: the sim is close to speed -1: a beat takes 92 ms, -1 starts at 100 ms
+[2026-11-05 12:34:02] Sim speed -1 (was +0, requested +0), a beat takes 104 ms
+[2026-11-05 12:41:15] AI Two: defeat
+[2026-11-05 12:41:15] AI One: victory
+[2026-11-05 12:41:15] Game ended: game time 00:41:08, real time 00:41:08
+```
+
+Between those lines it stays quiet. The speed shown is what the game really did over the last 10 s, rounded to a step. A new speed is printed once it has held for 15 s, so a speed flickering between two steps prints nothing. The warning needs 5 s over the limit and clears after 30 s under 85% of it. No beat for 30 s also warns.
+
+The server holds the requested speed by taking each beat when it is due. A sim too slow for that runs as fast as it can, with no drop to a whole slower step as in a lockstep game, and after a slow stretch it runs fast for up to 1 s to make up the time.
+
+Exit codes: 0 the game ended or reached `--stop-beat`, 3 crash or `--timeout`, 4 bad input, 5 stopped by SIGINT or SIGTERM (the replay and `result.json` are still finished). `result.json` holds the game's name and map, whether it ended, the beats played, why it stopped, and each army's result.
+
+`tools/server-image/Dockerfile` makes the image: one game per container, not root, game data mounted read-only.
+
+```
+docker build -t faf-server <folder with the built server> -f tools/server-image/Dockerfile
+docker run --read-only --tmpfs /tmp --cap-drop ALL -v /srv/data:/data:ro -v /srv/game1:/out -v /srv/match.lua:/match.lua:ro faf-server --match /match.lua --out /out /init /data/faf/bin/init_replay.lua
+```
 
 ## Desync recorder
 

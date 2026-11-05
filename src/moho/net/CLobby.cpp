@@ -3286,23 +3286,11 @@ void CLobby::LaunchGame(
   const int32_t clientIndex = build.clientCount;
   const int32_t localClientIndex = build.localClientIndex;
 
-  int gameSpeed = 0;
-  bool adjustableGameSpeed = false;
-  const LuaPlus::LuaObject gameSpeedObject = gameOptions["GameSpeed"];
-  if (gameSpeedObject.IsString()) {
-    const char* const gameSpeedName = gameSpeedObject.GetString();
-    if (gameSpeedName != nullptr) {
-      if (_stricmp(gameSpeedName, "fast") == 0) {
-        gameSpeed = 4;
-      } else if (_stricmp(gameSpeedName, "adjustable") == 0) {
-        adjustableGameSpeed = true;
-      }
-    }
-  }
+  const SLaunchSpeed launchSpeed = ReadLaunchSpeed(gameOptions);
 
   connector->SelectEvent(nullptr);
   sessionInfo->mClientManager =
-    CLIENT_CreateClientManager(static_cast<std::size_t>(clientIndex), connector, gameSpeed, adjustableGameSpeed);
+    CLIENT_CreateClientManager(static_cast<std::size_t>(clientIndex), connector, launchSpeed.speed, launchSpeed.adjustable);
   connector = nullptr;
 
   sessionInfo->mClientManager->CreateLocalClient(

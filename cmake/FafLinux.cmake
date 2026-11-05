@@ -277,6 +277,20 @@ target_link_libraries(headless PRIVATE faf_sim)
 target_compile_definitions(headless PRIVATE FAF_SERVER_MODE=1)
 target_link_options(headless PRIVATE -Wl,--error-limit=0)
 
+# --- server (plan WP1.1) --------------------------------------------------------------------
+# The dedicated server, Linux only (plan D2): the sim, and what `headless` shares for loading a game.
+add_executable(server
+  "${PROJECT_SOURCE_DIR}/src/server/ServerMain.cpp"
+  "${PROJECT_SOURCE_DIR}/src/headless/SessionLoad.cpp"
+  "${PROJECT_SOURCE_DIR}/src/headless/ReplayLuaState.cpp"
+)
+target_link_libraries(server PRIVATE faf_sim)
+target_compile_definitions(server PRIVATE FAF_SERVER_MODE=1)
+target_link_options(server PRIVATE -Wl,--error-limit=0)
+
+add_executable(faf_server_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SpeedWatchTests.cpp")
+target_include_directories(faf_server_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
+
 # --- faf_remote_tests -------------------------------------------------------------------
 # The wire format's tests (tests/remote/WireTests.cpp) on the Linux objects, as Windows'
 # server-mode build runs them on faf_engine.

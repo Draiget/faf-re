@@ -2295,6 +2295,11 @@ moho::ESimSessionPacing moho::SIM_GetSessionPacing() noexcept
   return gDriverSessionPacing.load(std::memory_order_relaxed);
 }
 
+float moho::SIM_GetMeasuredGameRate() noexcept
+{
+  return gLeadSimSpeedEstimate.load(std::memory_order_relaxed);
+}
+
 float moho::SIM_GetLeadSimSpeedEstimate() noexcept
 {
   if (SessionLeadBeats() <= 0) {

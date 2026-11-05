@@ -19,6 +19,7 @@ set(FAF_HEADLESS_SOURCES
   headless/ReplayOracleCheck.cpp
   headless/ReplayViewPacketCheck.cpp
   headless/ReplaySyncSpy.cpp
+  headless/SessionLoad.cpp
   headless/ReplayViewBench.cpp
   headless/ReplayViewFrameStats.cpp
   headless/HeadlessEntry.cpp
