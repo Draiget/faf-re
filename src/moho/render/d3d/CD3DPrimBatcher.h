@@ -118,6 +118,20 @@ namespace moho
      */
     void SetTexture(boost::shared_ptr<ID3DTextureSheet> sheet);
 
+    /** FAF addition: what `SetTexture` bound, so a draw with its own texture can put it back. */
+    struct TextureBinding
+    {
+      boost::shared_ptr<CD3DDynamicTextureSheet> mSheet;
+      boost::shared_ptr<CD3DBatchTexture> mTexture;
+      float mP1x;
+      float mP1y;
+      float mP2x;
+      float mP2y;
+    };
+
+    [[nodiscard]] TextureBinding GetTextureBinding() const;
+    void SetTextureBinding(const TextureBinding& binding);
+
     /**
      * Address: 0x004389A0 (?DrawQuad@CD3DPrimBatcher@Moho@@QAEXABUVertex@12@000@Z)
      *
