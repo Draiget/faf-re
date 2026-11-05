@@ -44,6 +44,7 @@ end
 --- by id, so they would go on using the old ones; a change of focus army is what drops them.
 function OnSimReplaced()
     import('/lua/ui/game/avatars.lua').FocusArmyChanged()
+    import('/lua/ui/notify/notify.lua').KillAllWatchers()
 end
 
 --- The hotkey: keeps the bar shown, or leaves it to the mouse again.
