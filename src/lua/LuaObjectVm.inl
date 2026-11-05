@@ -892,23 +892,172 @@
 	}
 
 	/**
-	 * Address: 0x00929C60 (FUN_00929C60, luaV_execute)
-	 *
-	 * IDA signature:
-	 * TObject *__cdecl luaV_execute(lua_State *L);
-	 *
-	 * What it does:
-	 * Runs Lua bytecode. Returns the first result of the frame that finished
-	 * when control has to go back to whatever C code called in, or null when the
-	 * interpreter was unwound by a yield.
-	 *
-	 * The loop is entered twice over: `callentry` for a fresh call, which fires
-	 * the call hook first, and `retentry` for resuming a caller whose callee has
-	 * just returned. A Lua-to-Lua call therefore never recurses into this
-	 * function - OP_CALL jumps back to the top with the new frame in place, and
-	 * OP_RETURN jumps back with the old one restored.
+	 * Engine addition (lua_ThreadedDispatch): the array-part slot `key` names in `table`, or null -
+	 * what luaH_get and luaH_set reach through luaH_getnum for a whole number from 1 to the array's
+	 * size, without their general lookup. Null for anything else, which they then look up as before.
 	 */
-	TObject* luaV_execute(lua_State* L)
+	[[nodiscard]] static inline TObject* LuaArraySlot(Table* const table, const TObject* const key) noexcept
+	{
+		if (key->tt != LUA_TNUMBER) {
+			return nullptr;
+		}
+		const float number = key->value.n;
+		const int size = table->sizearray;
+		if (!(number >= 1.0f && number <= static_cast<float>(size))) {
+			return nullptr;
+		}
+		const int index = static_cast<int>(number);
+		if (static_cast<float>(index) != number || index > size) {
+			return nullptr;
+		}
+		return &table->array[index - 1];
+	}
+
+	namespace
+	{
+		inline void RunLuaCallGate(moho::LuaCFunctionPtr function); // below, with luaD_precall
+	} // namespace
+
+	/**
+	 * Engine addition (lua_ThreadedDispatch): what luaH_next does from the slot after `index`
+	 * (luaH_index's answer for the current key), writing the next key and value at `key`. 0 at the end.
+	 */
+	[[nodiscard]] static int LuaNextFrom(Table* const table, int index, TObject* const key) noexcept
+	{
+		++index;
+		const int sizearray = table->sizearray;
+		if (index < sizearray) {
+			TObject* arraySlot = &table->array[index];
+			while (arraySlot->tt == LUA_TNIL) {
+				++index;
+				++arraySlot;
+				if (index >= sizearray) {
+					break;
+				}
+			}
+			if (index < sizearray) {
+				key->tt = LUA_TNUMBER;
+				key->value.n = static_cast<float>(index + 1);
+				key[1] = table->array[index];
+				return 1;
+			}
+		}
+		int nodeIndex = index - sizearray;
+		const int nodeCount = 1 << table->lsizenode;
+		if (nodeIndex >= nodeCount) {
+			return 0;
+		}
+		Node* const nodeBase = table->node;
+		while (nodeBase[nodeIndex].i_val.tt == LUA_TNIL) {
+			if (++nodeIndex >= nodeCount) {
+				return 0;
+			}
+		}
+		key[0] = nodeBase[nodeIndex].Key();
+		key[1] = nodeBase[nodeIndex].i_val;
+		return 1;
+	}
+
+	/**
+	 * Engine addition (lua_ThreadedDispatch): OP_TFORLOOP's call of the built-in `next` (luaB_next)
+	 * over a table, done in place: what luaD_call, luaD_precall, luaB_next, lua_next and luaD_poscall
+	 * do, in the same order and to the same stack slots - the C-call depth, the closure's invocation
+	 * count, the call gate, the next key and value where luaH_next leaves them, the results moved down
+	 * and padded with nils to `nvar`, the top, then the collection check luaD_call ends with - without
+	 * the frame. False, having done nothing, whenever the call could do more than that: another
+	 * function, a call or return hook, a C-function hook, a depth at the limit, a call-info array or a
+	 * stack that would have to grow, or a key luaH_index refuses (the call raises that error itself).
+	 */
+	[[nodiscard]] static bool LuaInlineNextCall(lua_State* const L, StkId const callBase, const int nvar)
+	{
+		constexpr unsigned int kMaxCCalls = 200;
+		constexpr int kMinCStackSlots = 20;
+		constexpr int kHookMaskCallOrReturn = (1 << 0) | (1 << 1);
+
+		if (callBase[0].tt != LUA_TFUNCTION || callBase[1].tt != LUA_TTABLE) {
+			return false;
+		}
+		Closure* const closure = &static_cast<GCObject*>(callBase[0].value.p)->cl;
+		if (closure->c.isC == 0 || closure->c.f != &luaB_next || (L->l_G->hookmask & kHookMaskCallOrReturn) != 0 ||
+		    gLuaCFunctionCallHook != nullptr || static_cast<unsigned int>(L->nCcalls) + 1u >= kMaxCCalls ||
+		    &L->ci[1] == L->end_ci || L->stack_last - L->top <= kMinCStackSlots) {
+			return false;
+		}
+
+		// luaH_index, without its error.
+		Table* const table = static_cast<Table*>(callBase[1].value.p);
+		TObject* const key = &callBase[2];
+		int index = -1;
+		if (key->tt != LUA_TNIL) {
+			bool inArray = false;
+			if (key->tt == LUA_TNUMBER) {
+				const float numericKey = key->value.n;
+				const int integerKey = msvc8::TruncateToInt(numericKey);
+				if (static_cast<float>(integerKey) == numericKey && integerKey >= 1) {
+					const int zeroBased = integerKey - 1;
+					if ((zeroBased & 0xFF000000) == 0 && integerKey <= table->sizearray) {
+						index = zeroBased;
+						inArray = true;
+					}
+				}
+			}
+			if (!inArray) {
+				const TObject* const slot = luaH_get(table, key);
+				if (slot == &luaO_nilobject) {
+					return false;
+				}
+				const auto nodeBase = reinterpret_cast<std::uintptr_t>(static_cast<Node*>(table->node));
+				const auto slotAddress = reinterpret_cast<std::uintptr_t>(slot);
+				index = table->sizearray +
+					static_cast<int>((slotAddress - nodeBase - offsetof(Node, i_val)) / static_cast<std::uintptr_t>(sizeof(Node)));
+			}
+		}
+
+		// luaD_call and luaD_precall up to the C function.
+		++L->nCcalls;
+		std::uint32_t& invocationsLow = reinterpret_cast<std::uint32_t&>(closure->c.upvalue_m1[0].tt);
+		std::uint32_t& invocationsHigh = reinterpret_cast<std::uint32_t&>(closure->c.upvalue_m1[0].value.b);
+		const std::uint32_t previousLow = invocationsLow++;
+		if (invocationsLow < previousLow) {
+			++invocationsHigh;
+		}
+		RunLuaCallGate(closure->c.f);
+
+		// luaB_next: lua_next over (state, control), then the nil it pushes at the end.
+		int produced = 2;
+		if (LuaNextFrom(table, index, key) == 0) {
+			key->tt = LUA_TNIL;
+			produced = 1;
+		}
+
+		// luaD_poscall.
+		StkId result = callBase;
+		StkId firstResult = callBase + 2;
+		StkId const top = firstResult + produced;
+		int wanted = nvar;
+		for (; wanted != 0 && firstResult < top; --wanted) {
+			*result++ = *firstResult++;
+		}
+		for (; wanted > 0; --wanted) {
+			(result++)->tt = LUA_TNIL;
+		}
+		L->top = result;
+
+		--L->nCcalls;
+		luaC_checkGC(L);
+		return true;
+	}
+
+	extern "C++"
+	{
+	/**
+	 * Engine addition (lua_ThreadedDispatch): the body of luaV_execute, once for each way of reaching an
+	 * instruction's handler. `kThreaded` jumps straight to it through a table of label addresses, so
+	 * each handler ends in a jump of its own and the branch predictor learns opcode pairs; otherwise
+	 * the one `switch` the binary has. The same handlers either way.
+	 */
+	template <bool kThreaded>
+	TObject* LuaExecute(lua_State* L)
 	{
 		global_State* const G = L->l_G;
 		lua_State* const previousActiveThread = G->lstate;
@@ -1004,16 +1153,55 @@
 				return (index >= kLuaMaxStack) ? &k[index - kLuaMaxStack] : &base[index];
 			};
 
+			if constexpr (kThreaded) {
+				static_assert(kOpClosure + 1 == 39 && kLuaSizeOp == 6);
+				static void* const kTargets[64] = {
+					&&op_Move, &&op_LoadK, &&op_LoadBool, &&op_LoadNil, &&op_GetUpval, &&op_GetGlobal,
+					&&op_GetTable, &&op_SetGlobal, &&op_SetUpval, &&op_SetTable, &&op_NewTable, &&op_Self,
+					&&op_Add, &&op_Sub, &&op_Mul, &&op_Div, &&op_BAnd, &&op_BOr,
+					&&op_BShl, &&op_BShr, &&op_BXor, &&op_Unm, &&op_Not, &&op_Concat,
+					&&op_Jmp, &&op_Eq, &&op_Lt, &&op_Le, &&op_Test, &&op_Call,
+					&&op_TailCall, &&op_Return, &&op_ForLoop, &&op_TForLoop, &&op_TForPrep, &&op_SetList,
+					&&op_SetListO, &&op_Close, &&op_Closure,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+					&&op_Default,
+				};
+				goto* kTargets[LuaGetOpcode(i)];
+			}
+
 			switch (LuaGetOpcode(i)) {
-			case kOpMove:
+			case kOpMove: op_Move:
 				*ra = *rb();
 				break;
 
-			case kOpLoadK:
+			case kOpLoadK: op_LoadK:
 				*ra = k[LuaGetArgBx(i)];
 				break;
 
-			case kOpLoadBool:
+			case kOpLoadBool: op_LoadBool:
 				ra->value.b = LuaGetArgB(i);
 				ra->tt = LUA_TBOOLEAN;
 				if (LuaGetArgC(i) != 0) {
@@ -1021,7 +1209,7 @@
 				}
 				break;
 
-			case kOpLoadNil: {
+			case kOpLoadNil: op_LoadNil: {
 				StkId slot = rb();
 				do {
 					slot->tt = LUA_TNIL;
@@ -1030,7 +1218,7 @@
 				break;
 			}
 
-			case kOpGetUpval: {
+			case kOpGetUpval: op_GetUpval: {
 				const int upIndex = LuaGetArgB(i);
 				if (upIndex >= static_cast<int>(cl->nupvalues) || cl->upvals[upIndex] == nullptr) {
 					static int sGetUpvalBudget = 0;
@@ -1056,7 +1244,7 @@
 				break;
 			}
 
-			case kOpGetGlobal: {
+			case kOpGetGlobal: op_GetGlobal: {
 				const TObject* const key = &k[LuaGetArgBx(i)];
 				const TObject* value = luaH_getstr(
 					static_cast<Table*>(cl->g.value.p),
@@ -1069,10 +1257,23 @@
 				break;
 			}
 
-			case kOpGetTable: {
+			case kOpGetTable: op_GetTable: {
 				StkId const table = rb();
 				const TObject* const key = rkc();
 				const TObject* value = nullptr;
+				if constexpr (kThreaded) {
+					// The slot luaH_get would find for a string or an array key, when it holds a value.
+					if (table->tt == LUA_TTABLE) {
+						Table* const h = static_cast<Table*>(table->value.p);
+						const TObject* const found = (key->tt == LUA_TSTRING)
+							? luaH_getstr(h, static_cast<TString*>(key->value.p))
+							: LuaArraySlot(h, key);
+						if (found != nullptr && found->tt != LUA_TNIL) {
+							*ra = *found;
+							break;
+						}
+					}
+				}
 				if (table->tt == LUA_TTABLE) {
 					value = luaH_get(static_cast<Table*>(table->value.p), key);
 					if (value->tt == LUA_TNIL) {
@@ -1085,11 +1286,11 @@
 				break;
 			}
 
-			case kOpSetGlobal:
+			case kOpSetGlobal: op_SetGlobal:
 				luaV_settable(L, &cl->g, &k[LuaGetArgBx(i)], ra);
 				break;
 
-			case kOpSetUpval: {
+			case kOpSetUpval: op_SetUpval: {
 				const int upIndex = LuaGetArgB(i);
 				if (upIndex >= static_cast<int>(cl->nupvalues) || cl->upvals[upIndex] == nullptr) {
 					static int sSetUpvalBudget = 0;
@@ -1117,11 +1318,27 @@
 				break;
 			}
 
-			case kOpSetTable:
+			case kOpSetTable: op_SetTable:
+				if constexpr (kThreaded) {
+					// A string or an array key whose slot holds a value: what luaV_settable does with it
+					// (luaH_set's flags reset, then the store), as no __newindex applies to a set slot.
+					if (ra->tt == LUA_TTABLE) {
+						Table* const h = static_cast<Table*>(ra->value.p);
+						const TObject* const key = rkb();
+						TObject* const slot = (key->tt == LUA_TSTRING)
+							? const_cast<TObject*>(luaH_getstr(h, static_cast<TString*>(key->value.p)))
+							: LuaArraySlot(h, key);
+						if (slot != nullptr && slot->tt != LUA_TNIL) {
+							h->flags = 0;
+							*slot = *rkc();
+							break;
+						}
+					}
+				}
 				luaV_settable(L, ra, rkb(), rkc());
 				break;
 
-			case kOpNewTable: {
+			case kOpNewTable: op_NewTable: {
 				// B is a floating byte: three mantissa bits and an exponent, as
 				// packed by luaO_int2fb.
 				const int sizeHint = LuaGetArgB(i);
@@ -1132,7 +1349,7 @@
 				break;
 			}
 
-			case kOpSelf: {
+			case kOpSelf: op_Self: {
 				StkId const object = rb();
 				const TObject* const key = rkc();
 				if (key->tt != LUA_TSTRING) {
@@ -1162,7 +1379,7 @@
 				break;
 			}
 
-			case kOpAdd: {
+			case kOpAdd: op_Add: {
 				const TObject* const b = rkb();
 				const TObject* const c = rkc();
 				if (b->tt == LUA_TNUMBER && c->tt == LUA_TNUMBER) {
@@ -1177,7 +1394,7 @@
 				break;
 			}
 
-			case kOpSub: {
+			case kOpSub: op_Sub: {
 				const TObject* const b = rkb();
 				const TObject* const c = rkc();
 				if (b->tt == LUA_TNUMBER && c->tt == LUA_TNUMBER) {
@@ -1190,7 +1407,7 @@
 				break;
 			}
 
-			case kOpMul: {
+			case kOpMul: op_Mul: {
 				const TObject* const b = rkb();
 				const TObject* const c = rkc();
 				if (b->tt == LUA_TNUMBER && c->tt == LUA_TNUMBER) {
@@ -1203,7 +1420,7 @@
 				break;
 			}
 
-			case kOpDiv: {
+			case kOpDiv: op_Div: {
 				const TObject* const b = rkb();
 				const TObject* const c = rkc();
 				if (b->tt == LUA_TNUMBER && c->tt == LUA_TNUMBER) {
@@ -1216,11 +1433,11 @@
 				break;
 			}
 
-			case kOpBAnd:
-			case kOpBOr:
-			case kOpBShl:
-			case kOpBShr:
-			case kOpBXor: {
+			case kOpBAnd: op_BAnd:
+			case kOpBOr: op_BOr:
+			case kOpBShl: op_BShl:
+			case kOpBShr: op_BShr:
+			case kOpBXor: op_BXor: {
 				const TObject* const b = rkb();
 				const TObject* const c = rkc();
 				if (b->tt == LUA_TNUMBER && c->tt == LUA_TNUMBER) {
@@ -1245,7 +1462,7 @@
 				break;
 			}
 
-			case kOpUnm: {
+			case kOpUnm: op_Unm: {
 				const TObject* operand = rb();
 				TObject coerced{};
 				if (operand->tt != LUA_TNUMBER) {
@@ -1270,12 +1487,12 @@
 				break;
 			}
 
-			case kOpNot:
+			case kOpNot: op_Not:
 				ra->value.b = LuaIsFalse(rb()) ? 1 : 0;
 				ra->tt = LUA_TBOOLEAN;
 				break;
 
-			case kOpConcat: {
+			case kOpConcat: op_Concat: {
 				const int b = LuaGetArgB(i);
 				const int c = LuaGetArgC(i);
 				luaV_concat(L, c - b + 1, c); // may change the stack
@@ -1284,16 +1501,28 @@
 				break;
 			}
 
-			case kOpJmp:
+			case kOpJmp: op_Jmp:
 				pc += LuaGetArgSBx(i);
 				break;
 
-			case kOpEq: {
+			case kOpEq: op_Eq: {
 				const TObject* const b = rkb();
 				const TObject* const c = rkc();
 				int equal = 0;
 				if (b->tt == c->tt) {
-					equal = luaV_equalval(L, rkb(), rkc()) ? 1 : 0;
+					// luaV_equalval's answer for the tags that never reach __eq (lua_ThreadedDispatch).
+					const int tag = b->tt;
+					if (kThreaded && tag == LUA_TNUMBER) {
+						equal = (b->value.n == c->value.n) ? 1 : 0;
+					} else if (kThreaded && (tag == LUA_TNIL)) {
+						equal = 1;
+					} else if (kThreaded && tag == LUA_TBOOLEAN) {
+						equal = (b->value.b == c->value.b) ? 1 : 0;
+					} else if (kThreaded && tag == LUA_TSTRING) {
+						equal = (b->value.p == c->value.p) ? 1 : 0;
+					} else {
+						equal = luaV_equalval(L, rkb(), rkc()) ? 1 : 0;
+					}
 				}
 				if (equal == LuaGetArgA(i)) {
 					pc += LuaGetArgSBx(*pc) + 1;
@@ -1303,23 +1532,27 @@
 				break;
 			}
 
-			case kOpLt:
-				if (luaV_lessthan(L, rkb(), rkc()) == LuaGetArgA(i)) {
+			case kOpLt: op_Lt:
+				if ((kThreaded && rkb()->tt == LUA_TNUMBER && rkc()->tt == LUA_TNUMBER
+				       ? (rkc()->value.n > rkb()->value.n ? 1 : 0) // luaV_lessthan's number case (lua_ThreadedDispatch)
+				       : luaV_lessthan(L, rkb(), rkc())) == LuaGetArgA(i)) {
 					pc += LuaGetArgSBx(*pc) + 1;
 				} else {
 					++pc;
 				}
 				break;
 
-			case kOpLe:
-				if (luaV_lessequal(L, rkb(), rkc()) == LuaGetArgA(i)) {
+			case kOpLe: op_Le:
+				if ((kThreaded && rkb()->tt == LUA_TNUMBER && rkc()->tt == LUA_TNUMBER
+				       ? (rkc()->value.n >= rkb()->value.n ? 1 : 0) // luaV_lessequal's number case (lua_ThreadedDispatch)
+				       : luaV_lessequal(L, rkb(), rkc())) == LuaGetArgA(i)) {
 					pc += LuaGetArgSBx(*pc) + 1;
 				} else {
 					++pc;
 				}
 				break;
 
-			case kOpTest: {
+			case kOpTest: op_Test: {
 				StkId const value = rb();
 				if ((LuaIsFalse(value) ? 1 : 0) == LuaGetArgC(i)) {
 					++pc;
@@ -1330,8 +1563,8 @@
 				break;
 			}
 
-			case kOpCall:
-			case kOpTailCall: {
+			case kOpCall: op_Call:
+			case kOpTailCall: op_TailCall: {
 				if (LuaGetArgB(i) != 0) {
 					L->top = ra + LuaGetArgB(i);
 				}
@@ -1381,7 +1614,7 @@
 				break;
 			}
 
-			case kOpReturn: {
+			case kOpReturn: op_Return: {
 				CallInfo* const caller = &L->ci[-1];
 				const int b = LuaGetArgB(i);
 				if (b != 0) {
@@ -1410,7 +1643,7 @@
 				goto retentry;
 			}
 
-			case kOpForLoop: {
+			case kOpForLoop: op_ForLoop: {
 				if (ra->tt != LUA_TNUMBER) {
 					luaG_runerror(L, "`for' initial value must be a number");
 				}
@@ -1443,14 +1676,20 @@
 				break;
 			}
 
-			case kOpTForLoop: {
+			case kOpTForLoop: op_TForLoop: {
 				const int nvar = LuaGetArgC(i) + 1;
 				StkId callBase = ra + nvar + 2;
 				callBase[0] = ra[0];
 				callBase[1] = ra[1];
 				callBase[2] = ra[2];
 				L->top = callBase + 3; // iterator + state + control
-				(void)luaD_call(L, callBase, nvar);
+				bool calledInPlace = false;
+				if constexpr (kThreaded) {
+					calledInPlace = LuaInlineNextCall(L, callBase, nvar);
+				}
+				if (!calledInPlace) {
+					(void)luaD_call(L, callBase, nvar);
+				}
 
 				L->top = L->ci->top;
 				// the call may have moved the stack, so find the slots again
@@ -1467,7 +1706,7 @@
 				break;
 			}
 
-			case kOpTForPrep: {
+			case kOpTForPrep: op_TForPrep: {
 				if (ra->tt == LUA_TTABLE) {
 					// `for x in t' is shorthand for `for x in next, t'.
 					ra[1].tt = LUA_TTABLE;
@@ -1482,8 +1721,8 @@
 				break;
 			}
 
-			case kOpSetList:
-			case kOpSetListO: {
+			case kOpSetList: op_SetList:
+			case kOpSetListO: op_SetListO: {
 				if (ra->tt != LUA_TTABLE) {
 					// Only a table constructor emits these, so a chunk that
 					// reaches here with anything else is not runnable.
@@ -1508,11 +1747,11 @@
 				break;
 			}
 
-			case kOpClose:
+			case kOpClose: op_Close:
 				luaF_close(L, ra);
 				break;
 
-			case kOpClosure: {
+			case kOpClosure: op_Closure: {
 				Proto* const proto = cl->p->p[LuaGetArgBx(i)];
 				const int nups = proto->nups;
 				Closure* const closure = luaF_newLclosure(L, nups, &cl->g);
@@ -1534,12 +1773,35 @@
 				break;
 			}
 
-			default:
+			default: op_Default:
 				break;
 			}
 
 			L->ci->savedpc = pc;
 		}
+	}
+	} // extern "C++"
+
+	/**
+	 * Address: 0x00929C60 (FUN_00929C60, luaV_execute)
+	 *
+	 * IDA signature:
+	 * TObject *__cdecl luaV_execute(lua_State *L);
+	 *
+	 * What it does:
+	 * Runs Lua bytecode. Returns the first result of the frame that finished
+	 * when control has to go back to whatever C code called in, or null when the
+	 * interpreter was unwound by a yield.
+	 *
+	 * The loop is entered twice over: `callentry` for a fresh call, which fires
+	 * the call hook first, and `retentry` for resuming a caller whose callee has
+	 * just returned. A Lua-to-Lua call therefore never recurses into this
+	 * function - OP_CALL jumps back to the top with the new frame in place, and
+	 * OP_RETURN jumps back with the old one restored.
+	 */
+	TObject* luaV_execute(lua_State* L)
+	{
+		return moho::lua_ThreadedDispatch ? LuaExecute<true>(L) : LuaExecute<false>(L);
 	}
 
 

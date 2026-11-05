@@ -1489,6 +1489,7 @@ namespace moho
 	 * to source; each compiled chunk loaded is named in the log (`f_parser`).
 	 */
 	bool lua_AllowPrecompiledChunks = true;
+	thread_local bool lua_LoadingCachedChunk = false;
 
 	TConVar<bool> gTConVar_lua_AllowPrecompiledChunks(
 		"lua_AllowPrecompiledChunks",
@@ -1503,6 +1504,15 @@ namespace moho
 	 * userdata separation (`parallel_sweep::SeparateUserdata`). On by default; it only acts while
 	 * `sim_Workers` > 0.
 	 */
+	bool lua_ThreadedDispatch = true;
+
+	TConVar<bool> gTConVar_lua_ThreadedDispatch(
+		"lua_ThreadedDispatch",
+		"Reach each Lua instruction's handler through a jump table of its own per handler (1, the default), or "
+		"through the one switch the binary has (0). The same handlers either way; Lua runs faster with 1.",
+		&lua_ThreadedDispatch
+	);
+
 	bool lua_ParallelMark = true;
 
 	TConVar<bool> gTConVar_lua_ParallelMark(

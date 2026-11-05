@@ -966,17 +966,32 @@ msvc8::string gpg::STR_Chop(
  * then produced "cZ\programdata\...\supcomdatapathNlua", so no absolute path
  * could ever be opened and startup died in gpg::Die on the data-path script.
  */
+bool gpg::str_LowerInPlace = true;
+
 msvc8::string gpg::STR_ToLower(
   StrArg str
 )
 {
   msvc8::string builder{};
-  builder.reserve(strlen(str));
-  for (char c = *str; c != '\0'; c = *++str) {
-    if (c >= 'A' && c <= 'Z') {
-      c += 'a' - 'A';
+  if (!str_LowerInPlace) {
+    builder.reserve(strlen(str));
+    for (char c = *str; c != '\0'; c = *++str) {
+      if (c >= 'A' && c <= 'Z') {
+        c += 'a' - 'A';
+      }
+      builder.append(1, c);
     }
-    builder.append(1, c);
+    return builder;
+  }
+
+  // Engine addition (res_LowerInPlace): copied whole and lowered in place; appending one character
+  // at a time was a fifth of blueprint loading, through the path lookups that canonize every name.
+  builder.assign_owned(std::string_view(str, strlen(str)));
+  char* const text = builder.raw_data_mut_unsafe();
+  for (std::size_t i = 0; i < builder.size(); ++i) {
+    if (text[i] >= 'A' && text[i] <= 'Z') {
+      text[i] += 'a' - 'A';
+    }
   }
   return builder;
 }
@@ -1095,10 +1110,32 @@ void gpg::STR_CanonizeFilename(
     return;
   }
 
-  out->assign_owned(STR_ToLower(in ? in : "").view());
+  if (!str_LowerInPlace) {
+    out->assign_owned(STR_ToLower(in ? in : "").view());
+    for (std::size_t i = 0; i < out->size(); ++i) {
+      if ((*out)[i] == '/') {
+        (*out)[i] = '\\';
+      }
+    }
+    return;
+  }
+
+  // Engine addition (res_LowerInPlace): one copy, lowered and separated in place, rather than
+  // through a lowered temporary. A source inside `out` itself is already in place: assigning would
+  // free it first.
+  const char* const source = in ? in : "";
+  const char* const current = out->raw_data_unsafe();
+  if (source < current || source > current + out->size()) {
+    out->assign_owned(std::string_view(source, strlen(source)));
+  } else if (source != current) {
+    out->assign_owned(std::string(source));
+  }
+  char* const text = out->raw_data_mut_unsafe();
   for (std::size_t i = 0; i < out->size(); ++i) {
-    if ((*out)[i] == '/') {
-      (*out)[i] = '\\';
+    if (text[i] >= 'A' && text[i] <= 'Z') {
+      text[i] += 'a' - 'A';
+    } else if (text[i] == '/') {
+      text[i] = '\\';
     }
   }
 }

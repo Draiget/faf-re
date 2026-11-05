@@ -1864,6 +1864,13 @@ namespace moho
   void WLD_BeginSession(msvc8::auto_ptr<SWldSessionInfo> sessionInfo);
 
   /**
+   * Engine addition (`wld_EarlyCommandLineSession`): asks the session loader for the pending
+   * session's map and mods - the request `WLD_DoPreload` makes, which then finds this one - and
+   * starts its load at once, for a session begun before the app's first frame.
+   */
+  void WLD_StartPendingSessionLoad();
+
+  /**
    * Address: 0x0088D0B0 (FUN_0088D0B0, ?WLD_GetSimRate@Moho@@YAMXZ)
    *
    * What it does:

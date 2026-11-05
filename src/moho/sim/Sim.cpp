@@ -1,5 +1,11 @@
 #include "moho/lua/ScrLuaUserData.h"
 #include "moho/sim/SimPrivate2.h"
+#include "moho/sim/SimBlockLane.h"
+
+#include <mutex>
+#include <thread>
+
+#include "platform/X87Precision.h"
 
 namespace moho
 {
@@ -138,6 +144,7 @@ namespace
     std::fprintf(traceFile, "%s[%u]:\n", indent.c_str(), index);
   }
 }
+
 
 
 

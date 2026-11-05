@@ -245,4 +245,5 @@ namespace moho
   static_assert(offsetof(CZipFile, mEntries) == 0x1C, "CZipFile::mEntries offset must be 0x1C");
   static_assert(offsetof(CZipFile, mEntryByCanonicalPath) == 0x2C, "CZipFile::mEntryByCanonicalPath offset must be 0x2C");
   static_assert(sizeof(CZipFile) == 0x38, "CZipFile size must be 0x38");
+
 } // namespace moho

@@ -20,7 +20,9 @@
 #include "gpg/core/streams/FileStream.h"
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaBinder.h"
+#include "moho/lua/ScriptChunkCache.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/console/CConCommand.h"
 
 namespace moho
 {
@@ -990,6 +992,7 @@ int moho::cfunc_DiskFindFilesL(
   }
 
   sPFWaitHandleSet->mHandle->EnumerateFiles(directory, pattern, true, &foundPaths);
+  SCR_PrecompileScripts(foundPaths); // engine addition (res_PrecompileScripts)
 
   lua_newtable(state->m_state);
   const int resultTableIndex = lua_gettop(state->m_state);
@@ -1706,6 +1709,17 @@ gpg::MemBuffer<char> moho::FWaitHandleSet::ReadFile(
   DISK_TraceAccess("read", canonicalPath.c_str());
   return diskBytes;
 }
+
+namespace
+{
+  moho::TConVar<bool> gTConVar_res_LowerInPlace(
+    "res_LowerInPlace",
+    "Lowercase and canonize file names by copying them once and editing in place (1, the default), or a character "
+    "at a time as the original does (0). Same names either way.",
+    &gpg::str_LowerInPlace
+  );
+
+} // namespace
 
 /**
  * Address: 0x004596C0 (FUN_004596C0, Moho::FWaitHandleSet::MemoryMapFile)

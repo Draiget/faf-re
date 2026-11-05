@@ -363,6 +363,11 @@ namespace
   }
 }
 
+bool moho::REN_PrepareGpuVisionCaster()
+{
+  return GpuVisionCaster::Get().IsActive();
+}
+
 namespace moho
 {
   /**

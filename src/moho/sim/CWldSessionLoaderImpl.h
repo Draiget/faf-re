@@ -15,6 +15,20 @@ namespace moho
    */
   void WLD_SetSessionKeepsBlueprints(bool keep) noexcept;
 
+  class CWldMap;
+  class RRuleGameRules;
+
+  /**
+   * Engine addition (`wld_StartSimEarly`): the rules and the map of `scenario` once its load has both
+   * and has started building the sim's Lua state, so a session can start its sim while the rest of
+   * the load (the session's copy of the rules and SessionInit.lua) is still running. False until
+   * then, and always for a load with the switch off or without an early map (`wld_LoadMapEarly`).
+   * Both stay the scenario's; nothing else in the load changes them.
+   */
+  [[nodiscard]] bool WLD_GetEarlySimInputs(
+    const SWldScenarioInfo* scenario, RRuleGameRules** outRules, CWldMap** outMap
+  ) noexcept;
+
   // Every virtual below except the destructor is pure. IWldSessionLoader's
   // vftable (0x00E49FA4) has all 7 of its slots pointing at _purecall
   // (0x00A82547), so this interface contributes no bodies; the stubs that used

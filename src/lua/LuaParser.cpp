@@ -3261,8 +3261,9 @@ namespace
     }
 
     // Engine addition: compiled chunks can be refused (LuaObject.cpp). While they are
-    // allowed, each one is named in the log so its author can move it to source.
-    if (parser->bin != 0) {
+    // allowed, each one is named in the log so its author can move it to source. The engine's
+    // own script cache (lua_LoadingCachedChunk) holds only what it compiled from source.
+    if (parser->bin != 0 && !moho::lua_LoadingCachedChunk) {
       if (!moho::lua_AllowPrecompiledChunks) {
         luaG_runerror(state, "compiled Lua chunks are not loaded (source only; see lua_AllowPrecompiledChunks)");
       }

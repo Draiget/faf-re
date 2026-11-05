@@ -78,6 +78,9 @@ namespace moho
     &rule_ReleaseScriptBlueprints
   );
 
+  /// The rules whose Lua blueprints the session loader frees (RULE_DeferScriptBlueprintRelease).
+  std::atomic<const RRuleGameRules*> gLoaderReleasesBlueprints{nullptr};
+
   /**
    * One blueprint file waiting to be reloaded, linked into
    * `RRuleGameRulesImpl::mPendingBlueprintReloads`. Retiring one is a plain
@@ -1028,6 +1031,11 @@ namespace moho
    */
   RRuleGameRulesImpl::~RRuleGameRulesImpl()
   {
+    // Engine addition: a sim Lua state prepared for these rules that no sim took holds an export
+    // binding into them; it goes first.
+    SIM_DiscardPreparedLuaState(this);
+    const RRuleGameRules* expected = this; // engine addition (wld_StartSimEarly): a later rules object may get this address
+    (void)gLoaderReleasesBlueprints.compare_exchange_strong(expected, nullptr);
     gRulesGeneration.fetch_add(1u, std::memory_order_relaxed); // engine addition, see BlueprintNameCache
     DestroyBlueprintObjectsFromOrdinalArray(*this);
 
@@ -1149,8 +1157,20 @@ namespace moho
 
   void RRuleGameRulesImpl::OnSimHasBlueprints()
   {
-    if (rule_ReleaseScriptBlueprints && !gRuleKeepScriptBlueprints) {
+    if (rule_ReleaseScriptBlueprints && !gRuleKeepScriptBlueprints && gLoaderReleasesBlueprints.load(std::memory_order_acquire) != this) {
       ReleaseScriptBlueprints();
+    }
+  }
+
+  void RULE_DeferScriptBlueprintRelease(RRuleGameRules* const rules) noexcept
+  {
+    gLoaderReleasesBlueprints.store(rules, std::memory_order_release);
+  }
+
+  void RULE_ReleaseDeferredScriptBlueprints(RRuleGameRules* const rules)
+  {
+    if (rule_ReleaseScriptBlueprints && !gRuleKeepScriptBlueprints && rules != nullptr && gLoaderReleasesBlueprints.load(std::memory_order_acquire) == rules) {
+      static_cast<RRuleGameRulesImpl*>(rules)->ReleaseScriptBlueprints();
     }
   }
 
