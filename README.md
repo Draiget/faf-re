@@ -144,7 +144,7 @@ The client collects only while a profiler is connected (`TRACY_ON_DEMAND`): star
 | `data/fafengine/` | Engine-owned Lua hooks copied next to the exe (for example the Graphics API option) |
 | `tools/` | Go multiplayer test harness (`mpemu`) and checkers; see [tools/README.md](tools/README.md) |
 | `scripts/` | Sampling profiler, benchmark and replay helpers (`perf/`), shader and texture checks (`effects/`), and the hang stack dumper (`stackdump.cpp`) |
-| `docs/` | [Performance](docs/PERFORMANCE.md), [Simulation bottlenecks](docs/RESEARCH_PERF_BOTTLENECKS.md), [Switches](docs/SWITCHES.md), [Retail replay parity](docs/RETAIL_REPLAY_PARITY.md), [PR replay check](docs/PR_REPLAY_CHECK.md), [Renderer backends](docs/RENDERER_BACKENDS.md), [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md), [Desync diagnostics](docs/DESYNC_DIAGNOSTICS.md) |
+| `docs/` | [Performance](docs/PERFORMANCE.md), [Simulation bottlenecks](docs/RESEARCH_PERF_BOTTLENECKS.md), [Switches](docs/SWITCHES.md), [Retail replay parity](docs/RETAIL_REPLAY_PARITY.md), [PR replay check](docs/PR_REPLAY_CHECK.md), [Renderer backends](docs/RENDERER_BACKENDS.md), [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md), [Desync diagnostics](docs/DESYNC_DIAGNOSTICS.md), [Replay viewer](docs/REPLAY_VIEWER.md) |
 
 ## Libraries the engine uses
 

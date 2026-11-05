@@ -158,6 +158,9 @@ function Create()
     scrubber.OnSeek = function(self, tick)
         Seek(tick)
     end
+    scrubber.SeekKind = function(self, tick)
+        return ReplaySeekKind(tick)
+    end
 
     status = CreateStatus(parent, bar)
 

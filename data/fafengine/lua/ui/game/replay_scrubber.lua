@@ -21,6 +21,11 @@ local kGrooveHeight = 4
 local kGrooveHeightOver = 6
 local kPlayheadHeight = 18
 local kBubbleLift = 10
+-- What a click at the time under the mouse would do, by what `SeekKind` returns.
+local kSeekLooks = {
+    load = {text = "Jump", color = 'ff7fd4ff'},
+    play = {text = "Fast forward", color = kActual},
+}
 
 Scrubber = ClassUI(Group) {
     --- `format` turns ticks into the text of the time bubble.
@@ -32,6 +37,7 @@ Scrubber = ClassUI(Group) {
         self.mOver = false
         self.mMouseX = 0
         self.mDragTick = false
+        self.mShownLook = false
 
         -- Takes the events, and is the only part here that does.
         local catcher = Bitmap(self)
@@ -203,9 +209,19 @@ Scrubber = ClassUI(Group) {
             local tick = self.mDragTick != false and self.mDragTick or self:TargetAt(self.mMouseX)
             local x = self:XOf(tick)
             self.mHover.Left:Set(x)
-            self.mBubbleText:SetText(self.mFormat(tick))
+            local look = kSeekLooks[self:SeekKind(tick) or '']
+            self.mBubbleText:SetText(look and LOCF("%s  %s", self.mFormat(tick), look.text) or self.mFormat(tick))
+            if look != self.mShownLook then
+                self.mShownLook = look
+                self.mBubbleText:SetColor(look and look.color or UIUtil.fontColor())
+                self.mHover:SetSolidColor(look and look.color or kHoverLine)
+            end
             self.mBubble.Left:Set(math.floor(x - self.mBubble.Width() / 2))
         end
+    end,
+
+    --- What a move to this tick would do: a key of `kSeekLooks`, or nil to say nothing.
+    SeekKind = function(self, tick)
     end,
 
     --- While dragging: the tick under the mouse.

@@ -831,6 +831,23 @@ namespace moho
       sRestartWanted = true;
       sRestarting = true;
     }
+
+    /**
+     * What a move from `current` does: true to load a keyframe, false to play the ticks in between. Back always loads.
+     * Forward loads when the ticks a keyframe saves would take longer to play than it takes to load.
+     */
+    bool SeekLoadsKeyframe(const std::int32_t current, const std::int32_t tick)
+    {
+      if (tick < current) {
+        return true;
+      }
+      const auto next = sKeyframes.upper_bound(tick);
+      if (next == sKeyframes.begin()) {
+        return false;
+      }
+      const std::int32_t saved = std::prev(next)->first - current;
+      return static_cast<double>(saved) > sLoadSeconds * sTicksPerSecond;
+    }
   } // namespace
 
   msvc8::auto_ptr<SWldSessionInfo> REPLAY_SetupViewerSession(const char* const path, msvc8::string* const failureReason)
@@ -902,21 +919,20 @@ namespace moho
       return;
     }
     StartSeekClock(current);
-    if (tick < current) {
+    if (SeekLoadsKeyframe(current, tick)) {
       RequestRestart(tick);
       return;
     }
-
-    // Forward: a keyframe when the ticks it saves would take longer to play than it takes to load.
-    const auto next = sKeyframes.upper_bound(tick);
-    if (next != sKeyframes.begin()) {
-      const std::int32_t saved = std::prev(next)->first - current;
-      if (static_cast<double>(saved) > sLoadSeconds * sTicksPerSecond) {
-        RequestRestart(tick);
-        return;
-      }
-    }
     StartFastForward(session, tick);
+  }
+
+  EReplaySeekKind REPLAY_SeekKind(const CWldSession& session, const std::int32_t tick)
+  {
+    // While the sim is being replaced, the tick a new move would start from isn't known yet.
+    if (!session.IsReplay || sReplayPath.empty() || sRestartWanted || sRestarting || tick == session.mGameTick) {
+      return EReplaySeekKind::None;
+    }
+    return SeekLoadsKeyframe(session.mGameTick, tick) ? EReplaySeekKind::LoadKeyframe : EReplaySeekKind::PlayForward;
   }
 
   void REPLAY_CancelSeek()
