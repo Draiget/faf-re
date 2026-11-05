@@ -83,6 +83,11 @@ void CNetClient::Process(
     return;
   }
 
+  // Engine addition (issue #275): the backlog this client is about to get holds this.
+  if (msg.GetType().raw() < static_cast<uint8_t>(EClientMsg::CLIMSG_Ack) && REJOIN_BacklogPending(*this)) {
+    return;
+  }
+
   const auto bytes = static_cast<int>(msg.mBuff.Size());
   const auto elapsedUs = gpg::time::CyclesToMicroseconds(mManager->mTimer3.ElapsedCycles());
   mManager->mStampBuffer.Push(0, elapsedUs, bytes);

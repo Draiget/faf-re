@@ -88,8 +88,8 @@ namespace moho
     void FinishCatchUp();
     /// One peer's report. When every peer has reported, settles the cut and tells them.
     void NotePeerReport(const CNetClient& peer, CMessage& msg);
-    /// Queues one client's messages from `backlog`, skipping those of beats up to `skipThrough`.
-    void QueueBacklog(CClientBase& client, gpg::PipeStream& backlog, int32_t startBeat, int32_t skipThrough, int32_t stopAt);
+    /// Queues one client's messages from `backlog`, skipping those of beats up to `skipThrough`. Returns the beat it reached.
+    int32_t QueueBacklog(CClientBase& client, gpg::PipeStream& backlog, int32_t startBeat, int32_t skipThrough, int32_t stopAt);
     /// Reads one recorded beat: other clients' data into their queues, the local client's into `mHeld`.
     [[nodiscard]] bool ReadRecordedBeat();
     /// Moves one beat of `mHeld` into the local client's queue.
@@ -154,6 +154,13 @@ namespace moho
    * the game does not hold. Anything else that connects is rejected.
    */
   void REJOIN_ServeRestartedPeers(CClientManagerImpl& manager);
+
+  /**
+   * Engine addition (issue #275), with `mLock` held: `seat` has a new link and has not
+   * had its backlog yet. The command stream stays off that link until then, as all of
+   * it will be in the backlog, and would otherwise reach the client twice.
+   */
+  [[nodiscard]] bool REJOIN_BacklogPending(const CNetClient& seat);
 
   /**
    * Engine addition (issue #275), with `mLock` held, as the player here votes to eject

@@ -416,7 +416,7 @@ void CRejoinFeed::NotePeerReport(const CNetClient& peer, CMessage& msg)
   }
 }
 
-void CRejoinFeed::QueueBacklog(
+int32_t CRejoinFeed::QueueBacklog(
   CClientBase& client, gpg::PipeStream& backlog, const std::int32_t startBeat, const std::int32_t skipThrough, const std::int32_t stopAt
 )
 {
@@ -437,6 +437,7 @@ void CRejoinFeed::QueueBacklog(
     }
     beat += delta;
   }
+  return beat;
 }
 
 void CRejoinFeed::FinishCatchUp()
@@ -445,6 +446,7 @@ void CRejoinFeed::FinishCatchUp()
   const auto recordingPeer = static_cast<std::size_t>(mRecordingPeer);
   const std::vector<std::int32_t>& recordingQueued = mPeerQueued[recordingPeer];
   const std::int32_t merged = mMergedBeat;
+  std::vector<std::int32_t> ownCopyEnd(mManager.mClients.size(), -1);
 
   for (CClientBase* const client : mManager.mClients) {
     const auto index = static_cast<std::size_t>(client->GetIndex());
@@ -453,7 +455,7 @@ void CRejoinFeed::FinishCatchUp()
     // with the orders it has not ended a beat for.
     QueueBacklog(*client, *mBacklog[recordingPeer][index], merged, merged, client == mLocal ? mHandoverBeat : kNoStop);
     if (client != mLocal && index != recordingPeer && dynamic_cast<CNetClient*>(client) != nullptr) {
-      QueueBacklog(*client, *mBacklog[index][index], mPeerDispatched[index], recordingQueued[index], kNoStop);
+      ownCopyEnd[index] = QueueBacklog(*client, *mBacklog[index][index], mPeerDispatched[index], recordingQueued[index], kNoStop);
     }
   }
 
@@ -490,8 +492,21 @@ void CRejoinFeed::FinishCatchUp()
     }
   }
 
+  // A peer that sent its own copy first has gone on live since, and a recording peer
+  // that sent its copy later holds those beats too: each beat is taken once.
   for (CClientBase* const client : mManager.mClients) {
-    for (CMessage& message : mHeldIncoming[static_cast<std::size_t>(client->GetIndex())]) {
+    const auto index = static_cast<std::size_t>(client->GetIndex());
+    std::int32_t beat = ownCopyEnd[index];
+    for (CMessage& message : mHeldIncoming[index]) {
+      if (beat >= 0 && message.GetType().raw() < static_cast<std::uint8_t>(EClientMsg::CLIMSG_Ack)) {
+        const bool endsBeat = message.GetType().raw() == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance);
+        const std::int32_t delta = endsBeat ? ReadInt32Payload(message) : 0;
+        const bool covered = beat < recordingQueued[index];
+        beat += delta;
+        if (covered) {
+          continue;
+        }
+      }
       client->CClientBase::Process(message);
     }
   }
@@ -1422,6 +1437,13 @@ namespace
   }
 } // namespace
 
+bool moho::REJOIN_BacklogPending(const CNetClient& seat)
+{
+  return std::any_of(sPendingServes.begin(), sPendingServes.end(), [&seat](const SPendingServe& pending) {
+    return pending.peer == &seat;
+  });
+}
+
 void moho::REJOIN_NoteSeatEjected(CClientManagerImpl& manager, CNetClient& seat)
 {
   INetConnection& link = *seat.mConnection;
@@ -1479,6 +1501,11 @@ void moho::REJOIN_ServeRestartedPeers(CClientManagerImpl& manager)
 
   for (std::size_t index = 0; index < sPendingServes.size();) {
     const SPendingServe pending = sPendingServes[index];
+    // Voted out since it asked: its link is gone, and the save would go nowhere.
+    if (pending.peer->mEjectPending || pending.peer->mEjected) {
+      sPendingServes.erase(sPendingServes.begin() + static_cast<std::ptrdiff_t>(index));
+      continue;
+    }
     if (pending.wantRecording) {
       std::vector<char> bytes;
       int beats = 0;
