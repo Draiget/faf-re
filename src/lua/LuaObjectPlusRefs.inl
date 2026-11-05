@@ -1439,11 +1439,11 @@ extern "C"
 	 */
 	void* __cdecl luaHelper_ReallocFunction(
 		void* const ptr,
-		const int oldsize,
+		[[maybe_unused]] const int oldsize,
 		const int size,
-		void* const data,
-		const char* const allocName,
-		const unsigned int flags
+		void* const /*data*/,
+		const char* const /*allocName*/,
+		const unsigned int /*flags*/
 	)
 	{
 #if INTPTR_MAX == INT32_MAX
@@ -1464,8 +1464,8 @@ extern "C"
 	 */
 	void __cdecl luaHelper_FreeFunction(
 		void* const ptr,
-		const int oldsize,
-		void* const data
+		const int /*oldsize*/,
+		void* const /*data*/
 	)
 	{
 #if INTPTR_MAX == INT32_MAX
