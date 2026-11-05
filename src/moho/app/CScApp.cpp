@@ -1194,7 +1194,11 @@ bool CScApp::Init()
   moho::REN_Init();
 
   moho::UI_Init();
-  if (!CreateDevice()) {
+  const bool deviceCreated = CreateDevice();
+  // Engine addition (wld_EarlyCommandLineSession): an early load's unit icons may use the device now,
+  // or find there is none, as a load that starts after this does.
+  moho::WLD_HoldDeviceUse(false);
+  if (!deviceCreated) {
     return false;
   }
 

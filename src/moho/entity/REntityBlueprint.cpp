@@ -9,6 +9,7 @@
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RBlueprint.h"
+#include "moho/sim/CWldSessionLoaderImpl.h"
 
 namespace moho
 {
@@ -205,6 +206,10 @@ namespace moho
     if (mStrategicIconName.empty() || FILE_IsAbsolute(mStrategicIconName.c_str())) {
       return;
     }
+
+    // Engine addition (wld_EarlyCommandLineSession): an early load's rules can get here while the app is
+    // still creating its graphics device, which the icon textures below need.
+    WLD_WaitForDeviceUse();
 
     const msvc8::string iconBasePath = msvc8::string(kStrategicIconDirectory) + mStrategicIconName;
 

@@ -23,6 +23,19 @@ namespace moho
    */
   void WLD_HoldSessionScripts(bool hold) noexcept;
 
+  /**
+   * Engine addition (`wld_EarlyCommandLineSession`): while held, code on a load's threads that needs the
+   * graphics device (a unit blueprint's strategic icons, `REntityBlueprint::OnInitBlueprint`) waits in
+   * `WLD_WaitForDeviceUse`. `WLD_StartPendingSessionLoad` holds it, as that load starts before the app
+   * has created its device, and `CScApp::Init` lets it go once `CreateDevice` returns, either way.
+   * Otherwise a unit registered while the device is still being created gets no icons, or on
+   * Direct3D 9 its texture call fails ("Invalid call") and the rules with it.
+   */
+  void WLD_HoldDeviceUse(bool hold) noexcept;
+
+  /** Engine addition: returns once `WLD_HoldDeviceUse` holds nothing (at once on the holding thread). */
+  void WLD_WaitForDeviceUse() noexcept;
+
   class CWldMap;
   class RRuleGameRules;
 

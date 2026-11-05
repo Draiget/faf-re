@@ -1426,6 +1426,7 @@ namespace
       pendingSession->mMapName.raw_data_unsafe(), &pendingSession->mLaunchInfo.get()->mGameMods
     );
     WLD_HoldSessionScripts(true);
+    WLD_HoldDeviceUse(true); // CScApp::Init lets it go once CreateDevice returns
     loader->Update();
   }
 

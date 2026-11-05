@@ -62,6 +62,11 @@ namespace moho
     /// Set while a load began before the app has its UI frames (WLD_HoldSessionScripts).
     std::atomic<bool> gSessionScriptsHeld{false};
 
+    /// Set while a load began before the app has its graphics device (WLD_HoldDeviceUse), and the
+    /// thread that holds it, which never waits for itself.
+    std::atomic<bool> gDeviceUseHeld{false};
+    std::atomic<std::thread::id> gDeviceUseHolder{};
+
     bool IsInterlockedLoadingEnabled()
     {
 #if defined(_WIN32)
@@ -346,6 +351,20 @@ namespace moho
   void WLD_HoldSessionScripts(const bool hold) noexcept
   {
     gSessionScriptsHeld.store(hold, std::memory_order_release);
+  }
+
+  void WLD_HoldDeviceUse(const bool hold) noexcept
+  {
+    gDeviceUseHolder.store(std::this_thread::get_id(), std::memory_order_relaxed);
+    gDeviceUseHeld.store(hold, std::memory_order_release);
+  }
+
+  void WLD_WaitForDeviceUse() noexcept
+  {
+    while (gDeviceUseHeld.load(std::memory_order_acquire) &&
+           gDeviceUseHolder.load(std::memory_order_relaxed) != std::this_thread::get_id()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
   }
 
   bool WLD_GetEarlySimInputs(
