@@ -27,7 +27,7 @@ namespace gpg::diag
   /// Whether tracked files had local edits.
   [[nodiscard]] bool BuildDirty() noexcept;
 
-  /// The line shown to players: "FAF-RE, Draiget & contributors, build 2026.11.001 x64" on a
+  /// The line shown to players: "FAF-RE, Draiget & contributors, build 2026.11.1 x64" on a
   /// release or nightly, "... build a48d131-dirty x64" on anything else (the lobby label and
   /// the first line of the network-stats panel).
   [[nodiscard]] const char* BuildLabel() noexcept;
