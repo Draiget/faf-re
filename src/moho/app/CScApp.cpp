@@ -35,6 +35,7 @@
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/sim/DesyncTelemetry.h"
+#include "moho/sim/SimWorkerPool.h"
 #include "moho/misc/TimeBar.h"
 #include "moho/misc/CDiskWatch.h"
 #include "moho/net/CRejoinFeed.h"
@@ -1306,6 +1307,7 @@ void CScApp::Main()
   moho::UI_ProcessIdleGC();
 
   if (initialized == 0) {
+    moho::gSimDefaultWorkers = 4; // engine addition, see its declaration
     InitializeSessionFromCommandLine();
     initialized = 1;
   }
