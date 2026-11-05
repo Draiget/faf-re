@@ -227,6 +227,7 @@ namespace
       }
 
       gWldFrameAction = EWldFrameAction::Loading;
+      WLD_HoldSessionScripts(false); // engine addition (wld_EarlyCommandLineSession): the UI frames exist now
 
       // ` DoPreload 2` bracket marker (paired with the opening marker
       // above): same profiler/log-string discard pattern.
@@ -1424,6 +1425,7 @@ namespace
     (void)loader->CreateScenarioInfo(
       pendingSession->mMapName.raw_data_unsafe(), &pendingSession->mLaunchInfo.get()->mGameMods
     );
+    WLD_HoldSessionScripts(true);
     loader->Update();
   }
 

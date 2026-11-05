@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <cfloat>
+#include <chrono>
 #include <cstring>
 #include <exception>
 #include <new>
@@ -57,6 +58,9 @@ namespace moho
 
     /// The scenario whose rules and map are ready for its sim (wld_StartSimEarly); one load runs at a time.
     std::atomic<const SWldScenarioInfo*> gEarlySimScenario{nullptr};
+
+    /// Set while a load began before the app has its UI frames (WLD_HoldSessionScripts).
+    std::atomic<bool> gSessionScriptsHeld{false};
 
     bool IsInterlockedLoadingEnabled()
     {
@@ -301,6 +305,14 @@ namespace moho
         (void)marker;
       }
 
+      // Engine addition (wld_EarlyCommandLineSession): SessionInit.lua loads UserSync.lua, whose imports
+      // call GetFrame(0). Without the UI frames it stops there, and the session has no OnSync and no world
+      // view. A load begun before the frames waits for them here, and the map goes on loading.
+      while (gSessionScriptsHeld.load(std::memory_order_acquire)) {
+        AdvanceLoadingProgress(loadControl); // the abort point, for a game that quits while it waits
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
+
       (void)SCR_LuaDoScript(scenario->mState, "/lua/SessionInit.lua", nullptr);
       AdvanceLoadingProgress(loadControl);
 
@@ -329,6 +341,11 @@ namespace moho
   void WLD_SetSessionKeepsBlueprints(const bool keep) noexcept
   {
     gSessionKeepsBlueprints = keep;
+  }
+
+  void WLD_HoldSessionScripts(const bool hold) noexcept
+  {
+    gSessionScriptsHeld.store(hold, std::memory_order_release);
   }
 
   bool WLD_GetEarlySimInputs(

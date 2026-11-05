@@ -15,6 +15,14 @@ namespace moho
    */
   void WLD_SetSessionKeepsBlueprints(bool keep) noexcept;
 
+  /**
+   * Engine addition (`wld_EarlyCommandLineSession`): while held, a session's load waits before
+   * SessionInit.lua, which needs the UI frames. `WLD_StartPendingSessionLoad` holds it, as that load
+   * starts before the app has the frames, and `WLD_DoPreload` lets it go once they exist. Stopping
+   * the load also ends the wait.
+   */
+  void WLD_HoldSessionScripts(bool hold) noexcept;
+
   class CWldMap;
   class RRuleGameRules;
 

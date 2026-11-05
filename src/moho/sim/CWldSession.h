@@ -1866,7 +1866,9 @@ namespace moho
   /**
    * Engine addition (`wld_EarlyCommandLineSession`): asks the session loader for the pending
    * session's map and mods - the request `WLD_DoPreload` makes, which then finds this one - and
-   * starts its load at once, for a session begun before the app's first frame.
+   * starts its load at once, for a session begun before the app's first frame. The load waits before
+   * SessionInit.lua until `WLD_DoPreload` has made the UI frames (`WLD_HoldSessionScripts`), so this
+   * can't be used with `/interlocked`, where the load runs on the calling thread.
    */
   void WLD_StartPendingSessionLoad();
 

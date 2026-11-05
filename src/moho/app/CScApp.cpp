@@ -403,7 +403,8 @@ namespace
    * session's load requested at once (`WLD_StartPendingSessionLoad`), so the rules and the map load
    * while the app creates its window, device and user interface instead of after its first frame.
    * `/con` is applied first, as it is before the `/map` branch otherwise. Not with `/debug`, whose
-   * hook goes on before the session's scripts run, nor in a server-mode build, where
+   * hook goes on before the session's scripts run, nor with `/interlocked`, whose load would run on
+   * this thread and wait for UI frames only this thread can make, nor in a server-mode build, where
    * `/connectserver` decides first. A failed setup is left to the first frame, which tries again.
    */
   void StartCommandLineSessionEarly()
@@ -416,7 +417,8 @@ namespace
     msvc8::vector<msvc8::string> replayArgs;
     const bool map = moho::CFG_GetArgOption("/scenario", 1, &mapArgs) || moho::CFG_GetArgOption("/map", 1, &mapArgs);
     const bool replay = !map && moho::CFG_GetArgOption("/replay", 1, &replayArgs);
-    if (!wld_EarlyCommandLineSession || moho::CFG_GetArgOption("/debug", 0, nullptr) || (map ? mapArgs.empty() : !replay || replayArgs.empty())) {
+    if (!wld_EarlyCommandLineSession || moho::CFG_GetArgOption("/debug", 0, nullptr) || moho::CFG_GetArgOption("/interlocked", 0, nullptr) ||
+        (map ? mapArgs.empty() : !replay || replayArgs.empty())) {
       return;
     }
     RunCommandLinePrologue();
