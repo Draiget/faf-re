@@ -162,7 +162,7 @@ namespace
  * Releases one `sp_counted_impl_p<AudioEngine>` owned slot by destroying the
  * pointed `AudioEngineImpl` and deleting the slot storage.
  */
-void DestroyAudioEngineImplOwnedByCountedBlock(
+[[maybe_unused]] void DestroyAudioEngineImplOwnedByCountedBlock(
   SpCountedImplAudioEngineBlock* const countedBlock
 ) noexcept
 {
@@ -685,7 +685,7 @@ namespace
    * What it does:
    * Stores one `AudioEngineRef*` advanced by one element index.
    */
-  [[nodiscard]] moho::AudioEngineRef** ComputeAudioEngineRefOffset(
+  [[maybe_unused]] [[nodiscard]] moho::AudioEngineRef** ComputeAudioEngineRefOffset(
     moho::AudioEngineRef** const outSlot,
     moho::AudioEngineRef* const* const base,
     const int index

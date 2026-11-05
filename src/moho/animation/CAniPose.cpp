@@ -249,31 +249,6 @@ namespace
     return laneView;
   }
 
-  [[nodiscard]] constexpr std::intptr_t PoseBoneStrideBytes() noexcept
-  {
-    return static_cast<std::intptr_t>(sizeof(moho::CAniPoseBone));
-  }
-
-  [[nodiscard]] moho::CAniPoseBone* PoseBoneByteOffset(
-    moho::CAniPoseBone* const begin,
-    const std::int32_t elementOffset
-  ) noexcept
-  {
-    const std::intptr_t beginBytes = reinterpret_cast<std::intptr_t>(begin);
-    const std::intptr_t offsetBytes = static_cast<std::intptr_t>(elementOffset) * PoseBoneStrideBytes();
-    return reinterpret_cast<moho::CAniPoseBone*>(beginBytes + offsetBytes);
-  }
-
-  [[nodiscard]] const moho::CAniPoseBone* PoseBoneByteOffset(
-    const moho::CAniPoseBone* const begin,
-    const std::int32_t elementOffset
-  ) noexcept
-  {
-    const std::intptr_t beginBytes = reinterpret_cast<std::intptr_t>(begin);
-    const std::intptr_t offsetBytes = static_cast<std::intptr_t>(elementOffset) * PoseBoneStrideBytes();
-    return reinterpret_cast<const moho::CAniPoseBone*>(beginBytes + offsetBytes);
-  }
-
   /**
    * Address: 0x0054C210 (FUN_0054C210)
    *

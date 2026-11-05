@@ -297,7 +297,7 @@ namespace
    * destination lanes, and on exception destroys already-written lanes before
    * rethrowing.
    */
-  void CopyAssignCommandArgRangeWithRollback(
+  [[maybe_unused]] void CopyAssignCommandArgRangeWithRollback(
     const SNetCommandArg& prototype,
     std::uint32_t count,
     SNetCommandArg* const destination

@@ -340,7 +340,7 @@ namespace moho
      * What it does:
      * Computes element pointer for one indexed glyph-info slot.
      */
-    [[nodiscard]] CD3DFont::SCharInfo* GetGlyphInfoAt(CD3DFont::SCharInfo* const begin, const std::size_t index)
+    [[maybe_unused]] [[nodiscard]] CD3DFont::SCharInfo* GetGlyphInfoAt(CD3DFont::SCharInfo* const begin, const std::size_t index)
     {
       return begin + index;
     }
@@ -515,7 +515,7 @@ namespace moho
      * What it does:
      * Resizes one DXT scratch lane as zero-filled 8-byte word-pairs.
      */
-    void ResizeDxtWordPairScratchZeroFill(const std::size_t count, DxtWordPairVector& scratch)
+    [[maybe_unused]] void ResizeDxtWordPairScratchZeroFill(const std::size_t count, DxtWordPairVector& scratch)
     {
       const DxtWordPair fill{};
       ResizeDxtWordPairScratch(count, scratch, fill);

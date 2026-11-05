@@ -166,12 +166,6 @@ namespace
   }
 
 
-  void PrintLocalizedConsoleLine(const char* const locToken)
-  {
-    const msvc8::string localizedText = Loc(USER_GetLuaState(), locToken != nullptr ? locToken : "");
-    CON_Printf("%s", localizedText.c_str());
-  }
-
 
   /**
    * Address: 0x0047BB90 (FUN_0047BB90, func_AppendStrings)

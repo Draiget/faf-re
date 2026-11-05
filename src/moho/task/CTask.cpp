@@ -56,7 +56,7 @@ namespace
    * Runs the shared `CTask` teardown lane for the `CPullTask<CGpgNetInterface>`
    * deleting-destructor vtable slot and frees storage when requested.
    */
-  [[nodiscard]] CTask* DestroyPullTaskGpgNetInterfaceDeleting(
+  [[maybe_unused]] [[nodiscard]] CTask* DestroyPullTaskGpgNetInterfaceDeleting(
     CTask* const task,
     const unsigned char deleteFlag
   )
@@ -75,7 +75,7 @@ namespace
    * Runs the shared `CTask` teardown lane for the `CPullTask<CDiscoveryService>`
    * deleting-destructor vtable slot and frees storage when requested.
    */
-  [[nodiscard]] CTask* DestroyPullTaskDiscoveryServiceDeleting(
+  [[maybe_unused]] [[nodiscard]] CTask* DestroyPullTaskDiscoveryServiceDeleting(
     CTask* const task,
     const unsigned char deleteFlag
   )
@@ -94,7 +94,7 @@ namespace
    * Runs the shared `CTask` teardown lane for the `CPushTask<CDiscoveryService>`
    * deleting-destructor vtable slot and frees storage when requested.
    */
-  [[nodiscard]] CTask* DestroyPushTaskDiscoveryServiceDeleting(
+  [[maybe_unused]] [[nodiscard]] CTask* DestroyPushTaskDiscoveryServiceDeleting(
     CTask* const task,
     const unsigned char deleteFlag
   )

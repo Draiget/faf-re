@@ -42,7 +42,7 @@ namespace moho
      * `source` into destination storage, then tears down constructed elements
      * before rethrowing if construction fails.
      */
-    RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponCountedRangeWithRollback(
+    [[maybe_unused]] RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponCountedRangeWithRollback(
       int count,
       RUnitBlueprintWeapon* destination,
       const RUnitBlueprintWeapon* source
@@ -74,7 +74,7 @@ namespace moho
      * Copy-constructs one contiguous source range into destination storage and
      * destroys already-built destination elements before rethrowing on failure.
      */
-    RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponRangeWithRollback(
+    [[maybe_unused]] RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponRangeWithRollback(
       RUnitBlueprintWeapon* destinationBegin,
       RUnitBlueprintWeapon* destinationEnd,
       const RUnitBlueprintWeapon* sourceBegin

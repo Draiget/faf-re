@@ -322,7 +322,7 @@ namespace
      * What it does:
      * Initializes one inline byte-buffer cursor block and returns `state`.
      */
-    InlineByteCursorBuffer200* InitializeInlineByteCursorBuffer200(
+    [[maybe_unused]] InlineByteCursorBuffer200* InitializeInlineByteCursorBuffer200(
       InlineByteCursorBuffer200* const state
     ) noexcept
     {
@@ -340,7 +340,7 @@ namespace
      * What it does:
      * Returns the current cursor lane from one inline byte-buffer state.
      */
-    [[nodiscard]] std::uint8_t* InlineByteCursorCurrent(
+    [[maybe_unused]] [[nodiscard]] std::uint8_t* InlineByteCursorCurrent(
       const InlineByteCursorBuffer* const state
     ) noexcept
     {
@@ -353,7 +353,7 @@ namespace
      * What it does:
      * Returns used-byte count (`current - begin`) for one inline byte-buffer.
      */
-    [[nodiscard]] std::ptrdiff_t InlineByteCursorUsedBytes(
+    [[maybe_unused]] [[nodiscard]] std::ptrdiff_t InlineByteCursorUsedBytes(
       const InlineByteCursorBuffer* const state
     ) noexcept
     {
@@ -366,7 +366,7 @@ namespace
      * What it does:
      * Returns total capacity in bytes (`end - begin`) for one inline buffer.
      */
-    [[nodiscard]] std::ptrdiff_t InlineByteCursorCapacityBytes(
+    [[maybe_unused]] [[nodiscard]] std::ptrdiff_t InlineByteCursorCapacityBytes(
       const InlineByteCursorBuffer* const state
     ) noexcept
     {
@@ -379,7 +379,7 @@ namespace
      * What it does:
      * Returns `begin + byteOffset` for one inline byte-buffer.
      */
-    [[nodiscard]] std::uint8_t* InlineByteCursorAtOffset(
+    [[maybe_unused]] [[nodiscard]] std::uint8_t* InlineByteCursorAtOffset(
       const InlineByteCursorBuffer* const state,
       const std::ptrdiff_t byteOffset
     ) noexcept
@@ -447,7 +447,7 @@ namespace
      * What it does:
      * Unlinks `node` and inserts it immediately before `anchor`.
      */
-    IntrusiveRingNode* RelinkIntrusiveRingNodeBeforeAnchor(
+    [[maybe_unused]] IntrusiveRingNode* RelinkIntrusiveRingNodeBeforeAnchor(
       IntrusiveRingNode* const node,
       IntrusiveRingNode* const anchor
     ) noexcept
@@ -467,7 +467,7 @@ namespace
      * What it does:
      * Alias lane that unlinks one intrusive ring node and re-self-links it.
      */
-    IntrusiveRingNode* UnlinkIntrusiveRingNode_B(
+    [[maybe_unused]] IntrusiveRingNode* UnlinkIntrusiveRingNode_B(
       IntrusiveRingNode* const node
     ) noexcept
     {
@@ -480,7 +480,7 @@ namespace
      * What it does:
      * Alias lane that initializes one intrusive ring node as self-linked.
      */
-    IntrusiveRingNode* InitializeIntrusiveRingNode_B(
+    [[maybe_unused]] IntrusiveRingNode* InitializeIntrusiveRingNode_B(
       IntrusiveRingNode* const node
     ) noexcept
     {
@@ -493,7 +493,7 @@ namespace
      * What it does:
      * Returns one intrusive node `next` link lane.
      */
-    [[nodiscard]] IntrusiveRingNode* GetIntrusiveRingNodeNext(
+    [[maybe_unused]] [[nodiscard]] IntrusiveRingNode* GetIntrusiveRingNodeNext(
       const IntrusiveRingNode* const node
     ) noexcept
     {
@@ -525,7 +525,7 @@ namespace
      * What it does:
      * Alias lane that unlinks one intrusive ring node and re-self-links it.
      */
-    IntrusiveRingNode* UnlinkIntrusiveRingNode_C(
+    [[maybe_unused]] IntrusiveRingNode* UnlinkIntrusiveRingNode_C(
       IntrusiveRingNode* const node
     ) noexcept
     {
@@ -538,7 +538,7 @@ namespace
      * What it does:
      * Copies one `(4 dword + 1 word)` lane bundle and binds one external tail lane.
      */
-    FourDwordWordAndTail* CopyFourDwordWordBundleWithTailLane(
+    [[maybe_unused]] FourDwordWordAndTail* CopyFourDwordWordBundleWithTailLane(
       FourDwordWordAndTail* const destination,
       const FourDwordWord* const sourceBundle,
       const std::uint32_t* const tailLaneSource
@@ -559,7 +559,7 @@ namespace
      * What it does:
      * Copies one 32-bit lane into destination storage.
      */
-    std::uint32_t* CopyDwordLane_A(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
+    [[maybe_unused]] std::uint32_t* CopyDwordLane_A(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -571,7 +571,7 @@ namespace
      * What it does:
      * Copies one 8-bit lane into destination storage.
      */
-    std::uint8_t* CopyByteLane_A(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
+    [[maybe_unused]] std::uint8_t* CopyByteLane_A(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -583,7 +583,7 @@ namespace
      * What it does:
      * Alias lane that copies one 32-bit value.
      */
-    std::uint32_t* CopyDwordLane_B(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
+    [[maybe_unused]] std::uint32_t* CopyDwordLane_B(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -595,7 +595,7 @@ namespace
      * What it does:
      * Alias lane that copies one 8-bit value.
      */
-    std::uint8_t* CopyByteLane_B(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
+    [[maybe_unused]] std::uint8_t* CopyByteLane_B(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -607,7 +607,7 @@ namespace
      * What it does:
      * Writes one `(dword, byte)` lane pair into destination storage.
      */
-    DwordAndByteLanes* WriteDwordAndByteLanes_A(
+    [[maybe_unused]] DwordAndByteLanes* WriteDwordAndByteLanes_A(
       DwordAndByteLanes* const destination,
       const std::uint32_t* const dwordLaneSource,
       const std::uint8_t* const byteLaneSource
@@ -624,7 +624,7 @@ namespace
      * What it does:
      * Alias lane that writes one `(dword, byte)` pair.
      */
-    DwordAndByteLanes* WriteDwordAndByteLanes_B(
+    [[maybe_unused]] DwordAndByteLanes* WriteDwordAndByteLanes_B(
       DwordAndByteLanes* const destination,
       const std::uint32_t* const dwordLaneSource,
       const std::uint8_t* const byteLaneSource
@@ -647,7 +647,7 @@ namespace
      * What it does:
      * Stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLane* StoreSingleDwordLane_A(
+    [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_A(
       SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
@@ -662,7 +662,7 @@ namespace
      * What it does:
      * Alias lane that stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLane* StoreSingleDwordLane_B(
+    [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_B(
       SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
@@ -677,7 +677,7 @@ namespace
      * What it does:
      * Alias lane that stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLane* StoreSingleDwordLane_C(
+    [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_C(
       SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
@@ -692,7 +692,7 @@ namespace
      * What it does:
      * Alias lane that stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLane* StoreSingleDwordLane_D(
+    [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_D(
       SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
@@ -713,7 +713,7 @@ namespace
      * What it does:
      * Loads the dword lane at vtable slot index 4.
      */
-    int LoadVtableDwordSlot04(const VtableProbe* const object) noexcept
+    [[maybe_unused]] int LoadVtableDwordSlot04(const VtableProbe* const object) noexcept
     {
       return static_cast<int>(object->vtable[4]);
     }
@@ -724,7 +724,7 @@ namespace
      * What it does:
      * Loads the dword lane at vtable slot index 15.
      */
-    int LoadVtableDwordSlot15(const VtableProbe* const object) noexcept
+    [[maybe_unused]] int LoadVtableDwordSlot15(const VtableProbe* const object) noexcept
     {
       return static_cast<int>(object->vtable[15]);
     }
@@ -930,24 +930,6 @@ namespace
       return lhs + ((rhs * (rhs - 1u)) >> 1u);
     }
 
-    [[nodiscard]] std::uint8_t* CopyByteRangeForward(
-      const std::uint8_t* sourceBegin,
-      const std::uint8_t* sourceEnd,
-      std::uint8_t* destination
-    ) noexcept
-    {
-      const std::uint8_t* sourceCursor = sourceBegin;
-      std::uint8_t* writeCursor = destination;
-      while (sourceCursor != sourceEnd) {
-        if (writeCursor != nullptr) {
-          *writeCursor = *sourceCursor;
-        }
-        ++sourceCursor;
-        ++writeCursor;
-      }
-      return writeCursor;
-    }
-
     // `{start, end, capacity, inline}` at 0x10 is `gpg::core::FastVectorInline`:
     // the reset reads the saved capacity back out of the first word of the
     // inline block, and the append grows by `max(size + 1, capacity * 2)` and
@@ -964,7 +946,7 @@ namespace
      * Gathers boundary nodes from 4x4 child clusters into one packed `uint16`
      * node list, then sorts and de-duplicates that packed node lane in-place.
      */
-    [[nodiscard]] std::uint16_t* BuildSubclusterPackedNodeList(
+    [[maybe_unused]] [[nodiscard]] std::uint16_t* BuildSubclusterPackedNodeList(
       const gpg::HaStar::SubclusterData& subcluster,
       PackedNodeVector& outNodes
     )
@@ -1113,7 +1095,7 @@ namespace
      * `gpg::HaStar::Cluster`, handling both vector-destruct (`flags&2`) and
      * optional storage release (`flags&1`).
      */
-    void* DestroyClusterWithDeleteFlags(gpg::HaStar::Cluster* start, const std::uint8_t flags)
+    [[maybe_unused]] void* DestroyClusterWithDeleteFlags(gpg::HaStar::Cluster* start, const std::uint8_t flags)
     {
         if ((flags & 0x02u) != 0u) {
 #if INTPTR_MAX == INT32_MAX
@@ -1177,7 +1159,7 @@ namespace
      * What it does:
      * Stores two source dword lanes into one two-dword destination record.
      */
-    TwoDwordLane* StoreTwoDwordLanesFromSources_A(
+    [[maybe_unused]] TwoDwordLane* StoreTwoDwordLanesFromSources_A(
       TwoDwordLane* const destination,
       const std::uint32_t* const sourceLane00,
       const std::uint32_t* const sourceLane04
@@ -1195,7 +1177,7 @@ namespace
      * Alias lane that stores two source dword lanes into one destination
      * two-dword record.
      */
-    TwoDwordLane* StoreTwoDwordLanesFromSources_B(
+    [[maybe_unused]] TwoDwordLane* StoreTwoDwordLanesFromSources_B(
       TwoDwordLane* const destination,
       const std::uint32_t* const sourceLane00,
       const std::uint32_t* const sourceLane04
@@ -1610,7 +1592,7 @@ namespace
      * Computes geometric node-to-node distance, quantizes traversal cost, and
      * writes one edge-cost byte into `out`.
      */
-    std::uint8_t* QuantizeClusterNodeEdgeCost(
+    [[maybe_unused]] std::uint8_t* QuantizeClusterNodeEdgeCost(
       std::uint8_t* const out,
       const ClusterNodeCoordinate& from,
       const ClusterNodeCoordinate& to,

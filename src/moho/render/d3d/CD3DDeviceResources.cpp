@@ -57,7 +57,7 @@ namespace moho
      * Resolves RD3D texture RTTI on demand and registers the prefetch type key
      * used by the D3D texture resource pipeline.
      */
-    void RegisterTexturePrefetchType()
+    [[maybe_unused]] void RegisterTexturePrefetchType()
     {
       gpg::RType* const textureType = resource_reflection::ResolveRD3DTextureResourceType();
       RES_RegisterPrefetchType("d3d_textures", textureType);

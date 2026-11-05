@@ -614,22 +614,13 @@ namespace
   return upcast.mObj;
 }
 
-msvc8::string BuildPointerName(RType* const pointeeType)
-{
-    const char* pointeeName = pointeeType ? pointeeType->GetName() : "null";
-    if (!pointeeName) {
-        pointeeName = "null";
-    }
-    return STR_Printf("%s*", pointeeName);
-}
-
 /**
  * Address: 0x004C8AA0 (FUN_004C8AA0, sub_4C8AA0)
  *
  * What it does:
  * Binds new/construct callback lanes for `CScriptObject*` pointer reflection.
  */
-gpg::RPointerTypeBase* BindCScriptObjectPointerNewAndConstruct(gpg::RPointerTypeBase* const typeInfo)
+[[maybe_unused]] gpg::RPointerTypeBase* BindCScriptObjectPointerNewAndConstruct(gpg::RPointerTypeBase* const typeInfo)
 {
     typeInfo->newRefFunc_ = &NewCScriptObjectPointerSlotRef;
     typeInfo->ctorRefFunc_ = &ConstructCScriptObjectPointerSlotRef;
@@ -642,7 +633,7 @@ gpg::RPointerTypeBase* BindCScriptObjectPointerNewAndConstruct(gpg::RPointerType
  * What it does:
  * Binds copy/move callback lanes for `CScriptObject*` pointer reflection.
  */
-gpg::RPointerTypeBase* BindCScriptObjectPointerCopyAndMove(gpg::RPointerTypeBase* const typeInfo)
+[[maybe_unused]] gpg::RPointerTypeBase* BindCScriptObjectPointerCopyAndMove(gpg::RPointerTypeBase* const typeInfo)
 {
     typeInfo->cpyRefFunc_ = &CopyCScriptObjectPointerSlotRef;
     typeInfo->movRefFunc_ = &MoveCScriptObjectPointerSlotRef;

@@ -28,7 +28,7 @@ namespace
    * What it does:
    * Constructs one `shared_ptr<ShoreCell>` from one raw shoreline-cell pointer lane.
    */
-  ShoreCellRef* ConstructSharedShoreCellFromRaw(ShoreCellRef* const outShoreCell, moho::ShoreCell* const shoreCell)
+  [[maybe_unused]] ShoreCellRef* ConstructSharedShoreCellFromRaw(ShoreCellRef* const outShoreCell, moho::ShoreCell* const shoreCell)
   {
     return ::new (outShoreCell) ShoreCellRef(shoreCell);
   }

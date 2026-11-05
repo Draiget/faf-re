@@ -3248,7 +3248,7 @@ namespace
    * What it does:
    * Stores one path pointer lane in a single-word helper wrapper.
    */
-  void SetPathPointerLane(const msvc8::string*& outPath, const msvc8::string* const path) noexcept
+  [[maybe_unused]] void SetPathPointerLane(const msvc8::string*& outPath, const msvc8::string* const path) noexcept
   {
     outPath = path;
   }
@@ -4092,7 +4092,7 @@ namespace
    * Initializes destination string storage from one source string and
    * canonicalizes it as a filesystem token.
    */
-  msvc8::string* SetCanonicalFilenameFromString(msvc8::string* const out, const msvc8::string& sourcePath)
+  [[maybe_unused]] msvc8::string* SetCanonicalFilenameFromString(msvc8::string* const out, const msvc8::string& sourcePath)
   {
     return func_StringSetFilename2(out, sourcePath.c_str());
   }

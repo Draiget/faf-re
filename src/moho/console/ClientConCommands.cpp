@@ -117,7 +117,7 @@ namespace
    * category (+ optional engineer/command exclusion), then either replaces or
    * extends the world selection. Optionally frames the result with the camera.
    */
-  void SelectUnitsByCategory(
+  [[maybe_unused]] void SelectUnitsByCategory(
     moho::CWldSession* const session,
     moho::CameraImpl* const camera,
     const char* const categoryExpr,

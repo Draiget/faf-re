@@ -587,7 +587,7 @@ namespace
    * Runs one deleting-destructor thunk for `BinaryReadArchive`, forwarding
    * through non-deleting teardown and optional storage release.
    */
-  [[nodiscard]] BinaryReadArchive* DestroyBinaryReadArchiveDeleting(
+  [[maybe_unused]] [[nodiscard]] BinaryReadArchive* DestroyBinaryReadArchiveDeleting(
     BinaryReadArchive* const archive,
     const unsigned char deleteFlag
   )

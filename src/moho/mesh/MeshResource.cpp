@@ -114,16 +114,6 @@ namespace moho
 namespace
 {
 
-  [[nodiscard]] bool AxisAlignedBoxContains(
-    const Wm3::AxisAlignedBox3f& outerBounds,
-    const Wm3::AxisAlignedBox3f& innerBounds
-  ) noexcept
-  {
-    return outerBounds.Min.x <= innerBounds.Min.x && innerBounds.Max.x <= outerBounds.Max.x &&
-      outerBounds.Min.y <= innerBounds.Min.y && innerBounds.Max.y <= outerBounds.Max.y &&
-      outerBounds.Min.z <= innerBounds.Min.z && innerBounds.Max.z <= outerBounds.Max.z;
-  }
-
   [[nodiscard]] std::uintptr_t PointerOrderKey(const void* const ptr) noexcept
   {
     return reinterpret_cast<std::uintptr_t>(ptr);

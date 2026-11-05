@@ -41,7 +41,7 @@ namespace
    * Captures caller `EIP/ESP/EBP` seed registers for `StackWalk` when no
    * external context record is supplied.
    */
-  void CaptureStackWalkSeedRegisters(StackWalkSeedRegisters* const outRegisters)
+  [[maybe_unused]] void CaptureStackWalkSeedRegisters(StackWalkSeedRegisters* const outRegisters)
   {
 #if defined(_M_IX86)
     if (outRegisters == nullptr) {

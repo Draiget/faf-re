@@ -222,7 +222,7 @@ namespace
    * Copies the four `SParamKey` string lanes (`Cue`, `Bank`, `LodCutoff`,
    * `RpcLoopVar`) from `sourceKey` into `outKey`.
    */
-  [[nodiscard]] moho::SParamKey* CopySParamKeyStringLanes(
+  [[maybe_unused]] [[nodiscard]] moho::SParamKey* CopySParamKeyStringLanes(
     const moho::SParamKey* const sourceKey,
     moho::SParamKey* const outKey
   )
@@ -311,7 +311,7 @@ namespace
    * What it does:
    * Clears one two-word runtime state pair to zero.
    */
-  [[nodiscard]] TwoWordState* ClearTwoWordState(TwoWordState* const state) noexcept
+  [[maybe_unused]] [[nodiscard]] TwoWordState* ClearTwoWordState(TwoWordState* const state) noexcept
   {
     if (state == nullptr) {
       return state;
@@ -336,7 +336,7 @@ namespace
    * What it does:
    * Advances one intrusive cursor slot to its current node's `next` link.
    */
-  [[nodiscard]] IntrusiveLinkNode** AdvanceIntrusiveCursor(IntrusiveLinkNode** const cursorSlot) noexcept
+  [[maybe_unused]] [[nodiscard]] IntrusiveLinkNode** AdvanceIntrusiveCursor(IntrusiveLinkNode** const cursorSlot) noexcept
   {
     if (cursorSlot != nullptr && *cursorSlot != nullptr) {
       *cursorSlot = (*cursorSlot)->mNext;
@@ -373,7 +373,7 @@ namespace
    * What it does:
    * Writes one `(head,tail)` pair from two source value slots.
    */
-  [[nodiscard]] PairHeadTail* CopyPairHeadTail_A(
+  [[maybe_unused]] [[nodiscard]] PairHeadTail* CopyPairHeadTail_A(
     PairHeadTail* const outPair,
     const std::uint32_t* const headValueSlot,
     const std::uint32_t* const tailValueSlot
@@ -388,7 +388,7 @@ namespace
    * What it does:
    * Writes one `(head,tail)` pair from two source value slots.
    */
-  [[nodiscard]] PairHeadTail* CopyPairHeadTail_B(
+  [[maybe_unused]] [[nodiscard]] PairHeadTail* CopyPairHeadTail_B(
     PairHeadTail* const outPair,
     const std::uint32_t* const headValueSlot,
     const std::uint32_t* const tailValueSlot
@@ -403,7 +403,7 @@ namespace
    * What it does:
    * Writes one `(head,tail)` pair from two source value slots.
    */
-  [[nodiscard]] PairHeadTail* CopyPairHeadTail_C(
+  [[maybe_unused]] [[nodiscard]] PairHeadTail* CopyPairHeadTail_C(
     PairHeadTail* const outPair,
     const std::uint32_t* const headValueSlot,
     const std::uint32_t* const tailValueSlot
@@ -452,7 +452,7 @@ namespace
    * What it does:
    * Reads the root-word lane from one owner header slot (`owner->mHeaderSlot[0]`).
    */
-  [[nodiscard]] std::uint32_t* ReadHeaderRootWord_A(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderRootWord_A(
     std::uint32_t* const outWord,
     const HeaderPointerOwner* const owner
   ) noexcept
@@ -466,7 +466,7 @@ namespace
    * What it does:
    * Reads the header-pointer lane (`owner->mHeaderSlot`) as one 32-bit word.
    */
-  [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_A(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_A(
     std::uint32_t* const outWord,
     const HeaderPointerOwner* const owner
   ) noexcept
@@ -480,7 +480,7 @@ namespace
    * What it does:
    * Reads the root-word lane from one owner header slot (`owner->mHeaderSlot[0]`).
    */
-  [[nodiscard]] std::uint32_t* ReadHeaderRootWord_B(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderRootWord_B(
     std::uint32_t* const outWord,
     const HeaderPointerOwner* const owner
   ) noexcept
@@ -494,7 +494,7 @@ namespace
    * What it does:
    * Reads the header-pointer lane (`owner->mHeaderSlot`) as one 32-bit word.
    */
-  [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_B(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_B(
     std::uint32_t* const outWord,
     const HeaderPointerOwner* const owner
   ) noexcept
@@ -508,7 +508,7 @@ namespace
    * What it does:
    * Reads the root-word lane from one owner header slot (`owner->mHeaderSlot[0]`).
    */
-  [[nodiscard]] std::uint32_t* ReadHeaderRootWord_C(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderRootWord_C(
     std::uint32_t* const outWord,
     const HeaderPointerOwner* const owner
   ) noexcept
@@ -522,7 +522,7 @@ namespace
    * What it does:
    * Reads the header-pointer lane (`owner->mHeaderSlot`) as one 32-bit word.
    */
-  [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_C(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_C(
     std::uint32_t* const outWord,
     const HeaderPointerOwner* const owner
   ) noexcept

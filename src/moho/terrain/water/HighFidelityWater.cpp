@@ -78,13 +78,6 @@ namespace moho
       }
     }
 
-    void SetShaderVarRawData(ShaderVar& shaderVar, const void* const data, const std::uint32_t byteCount)
-    {
-      if (shaderVar.Exists()) {
-        shaderVar.mEffectVariable->SetValue(data, byteCount);
-      }
-    }
-
     void BindTextureShaderVar(ShaderVar& shaderVar, const boost::shared_ptr<ID3DTextureSheet>& texture)
     {
       shaderVar.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture));

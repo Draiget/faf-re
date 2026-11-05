@@ -294,7 +294,7 @@ namespace
     return paramIndex;
   }
 
-  void RecomputeEmitterCurveYBounds(moho::SEfxCurve& curve)
+  [[maybe_unused]] void RecomputeEmitterCurveYBounds(moho::SEfxCurve& curve)
   {
     curve.mBoundsMin.y = std::numeric_limits<float>::infinity();
     curve.mBoundsMax.y = -std::numeric_limits<float>::infinity();

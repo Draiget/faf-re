@@ -72,7 +72,7 @@ namespace
    * Runs one deleting-destructor thunk for `WaveGenerator`, forwarding through
    * non-deleting `WaveGenerator::~WaveGenerator` and optional storage release.
    */
-  [[nodiscard]] moho::WaveGenerator* DestroyWaveGeneratorDeleting(
+  [[maybe_unused]] [[nodiscard]] moho::WaveGenerator* DestroyWaveGeneratorDeleting(
     moho::WaveGenerator* const generator,
     const unsigned char deleteFlag
   )

@@ -121,7 +121,7 @@ namespace
     return reinterpret_cast<OVERLAPPED*>(&watch.mReadOverlapped);
   }
 
-  [[nodiscard]]
+  [[maybe_unused]] [[nodiscard]]
   const OVERLAPPED* AsOverlapped(const CDiskDirWatch& watch)
   {
     return reinterpret_cast<const OVERLAPPED*>(&watch.mReadOverlapped);

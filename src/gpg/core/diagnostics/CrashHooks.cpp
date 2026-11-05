@@ -201,7 +201,7 @@ namespace gpg::diag
   namespace
   {
 
-    int CrtReportToDiagLog(const int reportType, char* const message, int* const returnValue)
+    [[maybe_unused]] int CrtReportToDiagLog(const int reportType, char* const message, int* const returnValue)
     {
       static const char* const kKind[] = {"WARN", "ERROR", "ASSERT"};
       const char* const kind =

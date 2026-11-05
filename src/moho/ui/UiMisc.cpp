@@ -1817,7 +1817,7 @@ namespace
    * Element count of one 0x30-stride queue lane, short-circuiting to zero when
    * `_Myfirst` is null instead of dividing a null-based difference.
    */
-  [[nodiscard]] std::uint32_t FactoryQueueItemCount(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t FactoryQueueItemCount(
     const FactoryQueueItem* const begin,
     const FactoryQueueItem* const end
   ) noexcept

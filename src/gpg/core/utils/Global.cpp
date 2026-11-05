@@ -803,14 +803,14 @@ namespace
      * What it does:
      * Pushes one node to the lane head and increments lane count.
      */
-    void PushLaneNode(ThreadSmallBlockLane& lane, SmallBlockNode* const node)
+    [[maybe_unused]] void PushLaneNode(ThreadSmallBlockLane& lane, SmallBlockNode* const node)
     {
         node->next = lane.head;
         lane.head = node;
         ++lane.count;
     }
 
-    [[nodiscard]] ThreadSmallBlockLane& GetLane(ThreadHeapCache* const cache, const std::uint32_t kind)
+    [[maybe_unused]] [[nodiscard]] ThreadSmallBlockLane& GetLane(ThreadHeapCache* const cache, const std::uint32_t kind)
     {
         return cache->lanes[kind];
     }
@@ -1077,7 +1077,7 @@ namespace
      * What it does:
      * Optionally enters allocator critical section and marks lock state.
      */
-    [[nodiscard]] AllocatorLockToken* EnterAllocatorLock(AllocatorLockToken* const token, const bool shouldLock)
+    [[maybe_unused]] [[nodiscard]] AllocatorLockToken* EnterAllocatorLock(AllocatorLockToken* const token, const bool shouldLock)
     {
         token->hasLock = 0;
         if (shouldLock) {
@@ -1093,7 +1093,7 @@ namespace
      * What it does:
      * Leaves allocator critical section if lock token still owns it.
      */
-    void LeaveAllocatorLock(AllocatorLockToken* const token)
+    [[maybe_unused]] void LeaveAllocatorLock(AllocatorLockToken* const token)
     {
         if (ReadAllocatorLockStateLane(token) != 0) {
             ::LeaveCriticalSection(&gAllocatorSentinel);
@@ -1555,7 +1555,7 @@ namespace
      * What it does:
      * Allocates a free-region record and splits any leftover pages.
      */
-    [[nodiscard]] HeapRecord* AllocateAndSplitFreeRegion(const std::uint32_t pages)
+    [[maybe_unused]] [[nodiscard]] HeapRecord* AllocateAndSplitFreeRegion(const std::uint32_t pages)
     {
         HeapRecord* const block = AllocateFreeRegion(pages, true);
         if (block != nullptr) {
@@ -1570,7 +1570,7 @@ namespace
      * What it does:
      * Allocates a large block (>= 4 KiB) and tracks it in the large-allocation list.
      */
-    [[nodiscard]] void* AllocateLargeRegion(const std::uint32_t bytes)
+    [[maybe_unused]] [[nodiscard]] void* AllocateLargeRegion(const std::uint32_t bytes)
     {
         const std::uint32_t pages = BytesToPages(bytes);
         HeapRecord* const block = AllocateFreeRegion(pages, true);
@@ -1695,7 +1695,7 @@ namespace
      * What it does:
      * Returns current thread heap-cache object, allocating it on first use.
      */
-    [[nodiscard]] ThreadHeapCache* GetOrCreateThreadHeapCache()
+    [[maybe_unused]] [[nodiscard]] ThreadHeapCache* GetOrCreateThreadHeapCache()
     {
         if (gThreadHeapCache != nullptr) {
             return gThreadHeapCache;

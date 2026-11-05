@@ -64,14 +64,6 @@ namespace
     lane = nullptr;
   }
 
-  void ReleaseSharedCount(boost::detail::sp_counted_base*& sharedCount) noexcept
-  {
-    if (sharedCount != nullptr) {
-      sharedCount->release();
-      sharedCount = nullptr;
-    }
-  }
-
   struct LowFidelityTriangleBatch
   {
     std::uint32_t pad00[5];         // +0x00
