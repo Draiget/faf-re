@@ -26,6 +26,8 @@ namespace moho
   class ScrWatchCtrl : public wxTreeListCtrl
   {
   public:
+    using wxTreeListCtrl::Update; // wxWindow's own, which the row update below would hide.
+
     /**
      * Address: 0x004D6FF0 (FUN_004D6FF0, ??0ScrWatchCtrl@Moho@@QAE@PAVwxWindow@@ABHHHHABVwxPoint@@ABVwxSize@@@Z)
      *
