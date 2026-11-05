@@ -49,6 +49,7 @@
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SimKeyframe.h"
 #include "moho/sim/WldSessionInfo.h"
+#include "netlink/EngineLinks.h"
 
 using namespace moho;
 
@@ -1653,7 +1654,12 @@ bool moho::REJOIN_BeginSetup(
     }
     auto peer = std::make_unique<SSetupPeer>();
     peer->source = std::atoi(entry.c_str() + equals + 1);
-    if (!NET_GetAddrInfo(entry.substr(0, equals).c_str(), 0, false, peer->address, peer->port) || peer->port == 0) {
+    // In native mode the launcher knows players, not the addresses the game gives their links.
+    std::string address = entry.substr(0, equals);
+    if (!address.empty() && address.find_first_not_of("0123456789") == std::string::npos) {
+      address = faf::netlink::EngineAddressText(std::atoll(address.c_str()));
+    }
+    if (!NET_GetAddrInfo(address.c_str(), 0, false, peer->address, peer->port) || peer->port == 0) {
       return refuse("A peer's address could not be read.");
     }
     setup->list.push_back(std::move(peer));

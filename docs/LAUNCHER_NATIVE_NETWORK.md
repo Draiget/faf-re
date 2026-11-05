@@ -27,6 +27,17 @@ This page is what a launcher needs to support the mode: downlords-faf-client and
 
 That is the whole contract. The game never sends the adapter's callbacks: it has no `onIceConnectionStateChanged` or `onConnected` for the launcher. Link states are in the game log (`NETLINK: peer …`).
 
+## When the game crashes in a match
+
+With `/rejoinoffer` the game can come back to its match (issue #275). There's no adapter to keep the links, so they die with the game and the returning game builds new ones. The launcher stays connected to the lobby server, doesn't report the game as ended, and:
+
+1. **Remembers every `JoinGame` and `ConnectToPeer` for the game**, as the server sent them, and forgets a player when `DisconnectFromPeer` names them. The server sends these once and won't send them again.
+2. **Keeps its GPGNet listener open**, as the returning game connects to the same port. It drops `IceMsg` for the game while none is connected. Players' links retry, so nothing is lost by that.
+3. **Starts the game again** with its usual arguments plus `/rejoin <peers> <source> 0`. `<peers>` is `player id=source,...`, from the `RejoinOffer` the game sent, without the player's own entry. `<source>` is the first field of that message.
+4. **On the new connection, sends without waiting:** `IceServers`, `CreateLobby` as before, then the remembered messages in their original order. The returning game sends no `GameState`, and these messages start no lobby, so the launcher can't wait for `Idle`. Every other message goes on as usual, `IceMsg` in both directions included.
+
+The lobby server needs no change: it routes `IceMsg` by player, and the player's connection never closed.
+
 ## Game command line
 
 | Option | Meaning |

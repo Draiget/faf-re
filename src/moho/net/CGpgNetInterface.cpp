@@ -1560,6 +1560,8 @@ void CGpgNetInterface::Connected(
   // again" (FAF server, gameconnection.py), and the game is running. Results still go as usual.
   if (moho::CFG_GetArgOption(gpg::StrArg{"/rejoin"}, 0u, nullptr)) {
     gpg::Logf("GPGNET: coming back to a running game, so no lobby states.");
+    // In native mode its links died with it. The launcher sends what it needs for new ones.
+    NATIVENET_Start();
     return;
   }
 

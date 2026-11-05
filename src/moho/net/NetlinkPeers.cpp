@@ -516,6 +516,8 @@ namespace moho
     if (!Links().IsNative()) {
       return false;
     }
+    // Issue #275: a game coming back has no lobby. These messages only set up its links.
+    static const bool comingBack = CFG_GetArgOption("/rejoin", 0u, nullptr);
     const auto command = name.view();
     const auto isString = [&](const std::size_t i) {
       return args.size() > i && args[i].mType == SNetCommandArg::NETARG_String;
@@ -542,11 +544,11 @@ namespace moho
     }
     if (command == "CreateLobby" && isNumber(3)) {
       Links().SetLocalId(IntArg(args[3]));
-      return false;
+      return comingBack;
     }
     if (command == "HostGame") {
       Links().RemoveAll(); // a new game session, as the adapter's createGameSession
-      return false;
+      return comingBack;
     }
     // The lobby server's JoinGame [login, id]: link to the host as answerer.
     if (command == "JoinGame" && args.size() == 2 && isString(0) && isNumber(1)) {
@@ -555,7 +557,7 @@ namespace moho
       const std::string login = StrArg(args[0]);
       Links().AddPeer(id, login, false);
       toShipped(id, login);
-      return false;
+      return comingBack;
     }
     // ConnectToPeer [login, id, offer]: the shipped form has a string second.
     if (command == "ConnectToPeer" && args.size() == 3 && isString(0) && isNumber(1) && isNumber(2)) {
@@ -563,11 +565,11 @@ namespace moho
       const std::string login = StrArg(args[0]);
       Links().AddPeer(id, login, IntArg(args[2]) != 0);
       toShipped(id, login);
-      return false;
+      return comingBack;
     }
     if (command == "DisconnectFromPeer" && isNumber(0)) {
       Links().RemovePeer(IntArg(args[0]));
-      return false;
+      return comingBack;
     }
     if (command.rfind("Netlink", 0) == 0) {
       gpg::Logf("NETLINK: %s ignored in native mode", name.c_str());
