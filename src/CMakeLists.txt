@@ -405,7 +405,7 @@ add_executable(headless ${_faf_headless_sources})
 # The game has the replay player too: `/replaykeyframes` (moho/sim/ReplayTimeline.cpp).
 set(_faf_main_replay_player ${_faf_headless_sources})
 list(REMOVE_ITEM _faf_main_replay_player headless/HeadlessEntry.cpp)
-target_sources(faf_main PRIVATE ${_faf_main_replay_player})
+target_sources(faf_main PRIVATE ${_faf_main_replay_player} headless/GameEntry.cpp)
 if(FAF_CALL_HASH_BUILD)
   target_sources(headless PRIVATE headless/CallHashHooks.cpp)
 endif()

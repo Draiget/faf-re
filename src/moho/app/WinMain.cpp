@@ -455,6 +455,8 @@ namespace
  * Applies startup command-line behavior, executes CScApp through WIN_AppExecute,
  * restores input system settings, and returns IWinApp::exitValue.
  */
+int (*gGameReplayPlayerMain)(int argc, char** argv) = nullptr;
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
   (void)hInstance;
@@ -463,8 +465,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   (void)nShowCmd;
 
   // Engine addition (replay timeline): the viewer's hidden process, this same exe with no window or device.
-  if (moho::CFG_GetArgOption("/replaykeyframes", 0, nullptr)) {
-    return HEADLESS_Main(0, nullptr);
+  if (gGameReplayPlayerMain != nullptr && moho::CFG_GetArgOption("/replaykeyframes", 0, nullptr)) {
+    return gGameReplayPlayerMain(0, nullptr);
   }
 
   gpg::SetThreadName(0xFFFFFFFFu, "Main");
