@@ -587,6 +587,13 @@ namespace moho
   void GPGNET_SubmitArmyStats(const msvc8::string& statsPayload);
 
   /**
+   * Engine addition (issue #275), not in the binary: tells a launcher that passed `/rejoinoffer`
+   * that this client could come back to this game, with what it needs to start it so: this
+   * client's source, and `playerId=source,...` for every player.
+   */
+  void GPGNET_ReportRejoinOffer(const msvc8::string& localSource, const msvc8::string& seats);
+
+  /**
    * Address: 0x007B9360 (FUN_007B9360, ?GPGNET_Attach@Moho@@YAXIG@Z)
    *
    * What it does:

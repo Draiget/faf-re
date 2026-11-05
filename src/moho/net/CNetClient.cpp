@@ -187,9 +187,9 @@ void CNetClient::ReceiveMessage(
   // held. A restart of the peer replaces this link, and the Connectivity dialog
   // can still eject it. With a retail client in the game, nothing changes.
   if (mManager->mPeerFeatures->EveryoneSupports(*mManager, EPeerFeature::Rejoin)) {
-    const std::uint8_t type = message->GetType().raw();
-    if (type == static_cast<std::uint8_t>(ELobbyMsg::LOBMSG_ConnLostErrored) ||
-        type == static_cast<std::uint8_t>(ELobbyMsg::LOBMSG_ConnLostEof)) {
+    // A player who quits says goodbye, and that link ends cleanly (`LOBMSG_ConnLostEof`): they
+    // left, as in any game. Only a link that was lost keeps the seat for them.
+    if (message->GetType().raw() == static_cast<std::uint8_t>(ELobbyMsg::LOBMSG_ConnLostErrored)) {
       mManager->mPeerFeatures->NoteRejoinLost(mIndex);
       gpg::Logf("REJOIN: link to client %d:%s lost, seat held", mIndex, mNickname.c_str());
       return;

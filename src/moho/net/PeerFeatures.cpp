@@ -11,6 +11,7 @@
 #include "EClientMsg.h"
 #include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/misc/StartupHelpers.h"
 #include "moho/sim/SimDriver.h"
 #include "NetConVars.h"
 
@@ -24,6 +25,8 @@ namespace
 
   // Loading a large map shows no progress for a while, so this is generous.
   constexpr std::chrono::seconds kRejoinSilenceSeconds{60};
+  // The other stages report every second.
+  constexpr std::chrono::seconds kRejoinReportingSilenceSeconds{20};
 } // namespace
 
 void moho::WritePeerAnnouncement(CMessageStream& stream, const std::uint64_t mask)
@@ -174,6 +177,29 @@ void CPeerFeatures::Receive(CClientManagerImpl& manager, CNetClient& client, CMe
   gpg::Logf(
     "PEERS: everyone supports OrderStreamCheck: %s", EveryoneSupports(manager, EPeerFeature::OrderStreamCheck) ? "yes" : "no"
   );
+  OfferRejoinToLauncher(manager);
+}
+
+void CPeerFeatures::OfferRejoinToLauncher(CClientManagerImpl& manager)
+{
+  // A game coming back makes none: its launcher has one from the first start.
+  if (mRejoinOffered || !EveryoneSupports(manager, EPeerFeature::Rejoin) || !CFG_GetArgOption(gpg::StrArg{"/rejoinoffer"}, 0u, nullptr) ||
+      CFG_GetArgOption(gpg::StrArg{"/rejoin"}, 0u, nullptr)) {
+    return;
+  }
+  mRejoinOffered = true;
+
+  msvc8::string seats;
+  for (const CClientBase* const client : manager.mClients) {
+    if (client != nullptr) {
+      if (!seats.empty()) {
+        seats = seats + ",";
+      }
+      seats += gpg::STR_Printf("%d=%d", client->GetOwnerId(), client->GetIndex());
+    }
+  }
+  manager.mInterface->NoteRejoinOffer(gpg::STR_Printf("%d", manager.mLocalClient->GetIndex()), seats);
+  gpg::Logf("REJOIN: told the launcher this client could come back: source %d, %s", manager.mLocalClient->GetIndex(), seats.c_str());
 }
 
 void CPeerFeatures::NoteRejoinEjected(const int clientIndex, const std::uint32_t address, const std::uint16_t port)
@@ -264,9 +290,20 @@ SRejoinStatus CPeerFeatures::RejoinStatus(const int clientIndex) const
       return peer.rejoin;
     case ERejoinStage::Back:
       return silence > kRejoinBackSeconds ? SRejoinStatus{} : peer.rejoin;
-    default:
+    case ERejoinStage::Loading:
       return silence > kRejoinSilenceSeconds ? SRejoinStatus{ERejoinStage::Lost, -1.0f} : peer.rejoin;
+    default:
+      return silence > kRejoinReportingSilenceSeconds ? SRejoinStatus{ERejoinStage::Lost, -1.0f} : peer.rejoin;
   }
+}
+
+float CPeerFeatures::RejoinSilenceSeconds(const int clientIndex) const
+{
+  if (clientIndex < 0 || static_cast<std::size_t>(clientIndex) >= mPeers.size()) {
+    return 0.0f;
+  }
+  const auto silence = std::chrono::steady_clock::now() - mPeers[static_cast<std::size_t>(clientIndex)].rejoinNoted;
+  return std::chrono::duration<float>(silence).count();
 }
 
 const char* moho::RejoinStageName(const ERejoinStage stage)

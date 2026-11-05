@@ -972,6 +972,9 @@ namespace moho
           }
           if (rejoin.stage != ERejoinStage::Lost) {
             clientEntry.SetNumber("quiet", 0.0f);
+            if (static_cast<IClient*>(client) != localClient) {
+              clientEntry.SetNumber("rejoinSilent", clientManager->mPeerFeatures->RejoinSilenceSeconds(static_cast<int>(clientIndex)));
+            }
           }
         }
       }

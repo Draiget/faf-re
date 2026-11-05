@@ -86,6 +86,12 @@ namespace moho
   {}
 
   /**
+   * Engine addition (issue #275), not in the binary: no-op default (see the header).
+   */
+  void IClientMgrUIInterface::NoteRejoinOffer(const msvc8::string&, const msvc8::string&)
+  {}
+
+  /**
    * Engine addition, not in the binary: no-op default (see the header).
    */
   void IClientMgrUIInterface::NoteOrdersDiffer(

@@ -430,6 +430,18 @@ namespace
       if (moho::REJOIN_BeginSetup(
             args[0].c_str(), std::atoi(args[1].c_str()), static_cast<unsigned short>(std::atoi(args[2].c_str())), &failureReason
           )) {
+        // The launcher, if there is one, still wants this game's results.
+        if (moho::CFG_GetArgOption("/gpgnet", 1, &args) && !args.empty()) {
+          u_long address = 0;
+          u_short port = 0;
+          if (moho::NET_GetAddrInfo(args[0].c_str(), 0, true, address, port) && port != 0) {
+            try {
+              moho::GPGNET_Attach(address, port);
+            } catch (const std::exception& exception) {
+              gpg::Warnf("REJOIN: can't reach the launcher: %s", exception.what());
+            }
+          }
+        }
         (void)moho::UI_StartRejoinScreen();
         return;
       }

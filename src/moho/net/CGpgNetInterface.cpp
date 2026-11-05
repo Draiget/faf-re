@@ -523,6 +523,21 @@ void moho::GPGNET_SubmitArmyStats(
 }
 
 /**
+ * Engine addition (issue #275), not in the binary.
+ */
+void moho::GPGNET_ReportRejoinOffer(const msvc8::string& localSource, const msvc8::string& seats)
+{
+  const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
+  if (!active) {
+    return;
+  }
+
+  const SNetCommandArg sourceArg(localSource);
+  const SNetCommandArg seatsArg(seats);
+  active->WriteCommandWith2Args("RejoinOffer", &sourceArg, &seatsArg);
+}
+
+/**
  * Address: 0x007B9360 (FUN_007B9360, ?GPGNET_Attach@Moho@@YAXIG@Z)
  *
  * What it does:
@@ -1539,6 +1554,13 @@ void CGpgNetInterface::Connected(
 {
   if (!args.empty()) {
     throw std::runtime_error("Wrong number of arguments to Connected command, expected 0");
+  }
+
+  // Engine addition (issue #275): the lobby server takes Idle from a host as "this game is a lobby
+  // again" (FAF server, gameconnection.py), and the game is running. Results still go as usual.
+  if (moho::CFG_GetArgOption(gpg::StrArg{"/rejoin"}, 0u, nullptr)) {
+    gpg::Logf("GPGNET: coming back to a running game, so no lobby states.");
+    return;
   }
 
   gpg::Logf("GPGNET: entering idle state.");

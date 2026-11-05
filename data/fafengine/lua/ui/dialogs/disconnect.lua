@@ -37,6 +37,15 @@ do
         return ''
     end
 
+    --- A returning player reports every second. Loading a map can go quiet by itself.
+    local function IsSilent(client)
+        local allowed = 5
+        if client.rejoinStage == 'loading' then
+            allowed = 30
+        end
+        return client.rejoinSilent and client.rejoinSilent > allowed
+    end
+
     --- What the row says for the stage the player is in.
     local function StageText(index, client)
         local stage = client.rejoinStage
@@ -176,9 +185,24 @@ do
         if IsReturning(client) then
             slot.ping:Hide()
             slot.status:Show()
-            slot.status:SetText(StageText(index, client))
             slot.track:Show()
-            if client.rejoinProgress then
+            if IsSilent(client) then
+                slot.status:SetText(LOCF("<LOC rejoin_0008>No response for %s", ElapsedText(client.rejoinSilent)))
+                slot.status:SetColor('FFe24f2d')
+                slot.fill:SetSolidColor('ff707070')
+                if not slot.silent then
+                    slot.silent = true
+                    LOG('REJOIN: showing ' .. client.name .. ' as not responding')
+                end
+            else
+                slot.status:SetText(StageText(index, client))
+                slot.status:SetColor('FFbadbdb')
+                slot.fill:SetSolidColor('ff4fa0e0')
+                slot.silent = false
+            end
+            if IsSilent(client) then
+                -- The bar stays where it stopped.
+            elseif client.rejoinProgress then
                 LayoutHelpers.AtLeftTopIn(slot.fill, slot.track, 0, 0)
                 LayoutHelpers.SetWidth(slot.fill, math.max(1, trackWidth * client.rejoinProgress))
             else
