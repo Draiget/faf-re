@@ -687,7 +687,7 @@ namespace
       }
 
       for (const EntId entityId : helper.mVariableData.mEntIds) {
-        if (entityId == candidateUnit->mParams.mEntityId) {
+        if (static_cast<std::uint32_t>(entityId) == candidateUnit->mParams.mEntityId) {
           return true;
         }
       }

@@ -810,7 +810,7 @@ UserUnit::~UserUnit()
   // over on the way out. The successor only joins the selection if this unit
   // was itself selected, so an off-screen death never steals the player's
   // current selection.
-  if (mUnitVarDat.mSelectionInheritorId != ToRaw(EEntityIdSentinel::Invalid)) {
+  if (static_cast<std::uint32_t>(mUnitVarDat.mSelectionInheritorId) != ToRaw(EEntityIdSentinel::Invalid)) {
     WeakSet<UserEntity> selectionSnapshot(entityView->mSession->mSelection);
     if (selectionSnapshot.Find(entityView) != selectionSnapshot.end()) {
       UserEntity* const inheritor =
@@ -958,7 +958,7 @@ bool UserUnit::UnitDataUpdateRunsLua(const SSTIUnitVariableData& payload) const
     return false;
   }
   const UserEntity* const heldCreator = mCreator.GetObjectPtr();
-  if (heldCreator != nullptr && heldCreator->mParams.mEntityId == replicatedCreator) {
+  if (heldCreator != nullptr && heldCreator->mParams.mEntityId == static_cast<std::uint32_t>(replicatedCreator)) {
     return false;
   }
   const UserEntity* const creator = WLD_GetActiveSession()->LookupEntityId(static_cast<EntId>(replicatedCreator));
@@ -973,7 +973,7 @@ void UserUnit::FinishUnitDataLinks()
     mCreator.UnlinkFromOwnerChain();
   } else {
     const UserEntity* const heldCreator = mCreator.GetObjectPtr();
-    if (heldCreator == nullptr || heldCreator->mParams.mEntityId != replicatedCreator) {
+    if (heldCreator == nullptr || heldCreator->mParams.mEntityId != static_cast<std::uint32_t>(replicatedCreator)) {
       mCreator.ResetFromObject(WLD_GetActiveSession()->LookupEntityId(static_cast<EntId>(replicatedCreator)));
 
       UserEntity* const creator = mCreator.GetObjectPtr();
