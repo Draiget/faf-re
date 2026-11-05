@@ -17,7 +17,7 @@ The latest measured result. The [Replay parity workflow](../.github/workflows/re
 | **Pass** | **2,127** | every recorded checksum matches |
 | New failure | 7 | a checksum differs and the replay isn't on the expected list, so it counts as our bug until shown otherwise |
 | Expected desync | 5 | a checksum differs, and the cause isn't this engine: listed with its reason in [expected/3835.json](../tools/parity-data/expected/3835.json) |
-| Expected error | 1 | 26916675: FAF serves no file for this replay |
+| Expected error | 1 | 26916675: its map, `na_alps`, isn't on FAF's map server (HTTP 404), so it can't be played |
 | Not run | 334 | 306 had no time left in their job, 28 have no reason recorded |
 | Not scheduled | 1,055 | past the 40 jobs the run holds |
 | Unsupported | 1,471 | sim mods or another game version |
