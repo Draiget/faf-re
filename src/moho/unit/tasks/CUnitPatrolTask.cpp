@@ -1,4 +1,5 @@
 #include "moho/unit/tasks/CUnitPatrolTask.h"
+#include "gpg/core/profiling/Profiler.h"
 #include "moho/unit/tasks/CUnitPatrolTaskTypeInfo.h"
 
 #include <cmath>
@@ -773,6 +774,7 @@ namespace moho
 
     // Refuel/repair platform handoff (only when not formation-bound).
     if (mFormationInstance == nullptr) {
+      FAF_PROFILE_ZONE_NAMED("Patrol::FindPlatform");
       if (Unit* const platform = unit->FindPlatform(); platform != nullptr) {
         if (IAiTransport* const platformTransport = platform->AiTransport; platformTransport != nullptr) {
           platformTransport->TransportResetReservation();
@@ -784,7 +786,12 @@ namespace moho
     }
 
     // Best-enemy attack handoff.
-    if (Entity* const enemy = FindTarget(); enemy != nullptr) {
+    Entity* enemy = nullptr;
+    {
+      FAF_PROFILE_ZONE_NAMED("Patrol::FindTarget");
+      enemy = FindTarget();
+    }
+    if (enemy != nullptr) {
       unit->GuardedPos = unit->GetPosition();
 
       CAiTarget attackTarget{};
@@ -797,7 +804,11 @@ namespace moho
     }
 
     // Patrol reclaim/attack evaluation.
-    Entity* const reclaimCandidate = EvaluatePatrolReclaimAttack();
+    Entity* reclaimCandidate = nullptr;
+    {
+      FAF_PROFILE_ZONE_NAMED("Patrol::ReclaimEval");
+      reclaimCandidate = EvaluatePatrolReclaimAttack();
+    }
     if (reclaimCandidate == nullptr) {
       if (unit->IsUnitState(UNITSTATE_NeedToTerminateTask)) {
         return TASKSTATUS_Done;
