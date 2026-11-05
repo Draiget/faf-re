@@ -184,7 +184,9 @@ namespace faf::remote::net
   {
     const std::uint64_t prefix = mAcked.PrefixEnd();
     const std::uint64_t consumed = prefix - mBase;
-    if (consumed >= kCompactStep || (consumed > 0 && prefix == mEnd)) {
+    // Moving what's left costs as much as there is left, so a long queue waits until half of it is gone.
+    const std::uint64_t left = mEnd - prefix;
+    if ((consumed >= kCompactStep && consumed >= left) || (consumed > 0 && prefix == mEnd)) {
       mBuffer.erase(mBuffer.begin(), mBuffer.begin() + static_cast<std::ptrdiff_t>(consumed));
       mBase = prefix;
     }

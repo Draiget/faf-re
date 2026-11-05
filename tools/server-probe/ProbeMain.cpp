@@ -175,6 +175,7 @@ namespace
     double fuzzAt = -1.0;
     double floodAt = -1.0;
     double beatMs = 0.0; // the game's beat, to tell how late views come; 0: no telling
+    bool noDecode = false; // the channel's limit alone, as decoding takes a while
     int fuzzCount = 2000;
     CImpairedPath::SConfig path;
     bool noLoad = false;
@@ -191,6 +192,10 @@ namespace
       const std::string name = argv[i];
       if (name == "--no-load") {
         out.noLoad = true;
+        continue;
+      }
+      if (name == "--no-decode") {
+        out.noDecode = true;
         continue;
       }
       if (i + 1 >= argc) {
@@ -327,6 +332,7 @@ namespace
     float mapZ = 0.0f;
     std::int32_t army = -1;
     std::uint32_t source = 0;
+    bool noDecode = false;
     double beatMs = 0.0;
     double lateBase = 0.0;      // the seconds at which beat 0 would have come
     bool haveLateBase = false;
@@ -370,6 +376,11 @@ namespace
     ByteReader reader(message.data() + 1, message.size() - 1u);
     const std::uint64_t beat = reader.Varint();
     const std::uint64_t entities = reader.Varint();
+    if (out.noDecode) {
+      out.lastEntities = entities;
+      out.lastBeat = beat;
+      return;
+    }
     const std::uint64_t frameSize = reader.Varint();
     const std::uint8_t* const frame = reader.Bytes(frameSize);
     bool ok = reader.Ok() && out.haveInfo;
@@ -498,6 +509,7 @@ int main(const int argc, char** const argv)
   std::vector<std::uint8_t> message;
   SViews views;
   views.beatMs = options.beatMs;
+  views.noDecode = options.noDecode;
   std::deque<const char*> asked; // what each answer will be about, in order
   std::uint64_t answers[3] = {};
   std::uint32_t nextCommand = 1u;
@@ -581,6 +593,8 @@ int main(const int argc, char** const argv)
         continue;
       }
       TakeView(views, message, elapsed);
+      // A view takes a while to decode, and the link mustn't go quiet meanwhile.
+      link.Pump(static_cast<std::uint64_t>(std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() * 1e6));
     }
     if (watch.active && views.haveFrame) {
       if (const auto* const record = FindEntity(views, watch.unit); record != nullptr) {
