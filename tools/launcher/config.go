@@ -236,6 +236,7 @@ func (c *Config) Normalize() error {
 	c.Contract.Java = ExpandPath(c.Contract.Java)
 	c.Contract.ClientLib = ExpandPath(c.Contract.ClientLib)
 	c.Contract.Adapter = ExpandPath(c.Contract.Adapter)
+	c.Contract.NativeBind = ExpandPath(c.Contract.NativeBind)
 	for i := range c.Contract.ExeArgs {
 		c.Contract.ExeArgs[i] = ExpandPath(c.Contract.ExeArgs[i])
 	}

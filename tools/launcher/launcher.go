@@ -755,6 +755,13 @@ func (l *Launcher) Rejoin(uid, source, keyOf int, launcher bool, remote bool, pe
 	if len(peers) == 0 {
 		return fmt.Errorf("player %d: rejoin names no peers", uid)
 	}
+	if local.IsNative() {
+		list := make([]string, 0, len(peers))
+		for _, entry := range peers {
+			list = append(list, fmt.Sprintf("%d=%d", entry.UID, entry.Source))
+		}
+		return local.RejoinNative(strings.Join(list, ","), source, keyOf)
+	}
 	if l.cfg.Mode == ModeContract {
 		sources := make(map[int]int, len(peers))
 		for _, entry := range peers {

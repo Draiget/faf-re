@@ -77,6 +77,71 @@ func (s *Seat) nativeOutgoing(m gpgnet.Message) gpgnet.Message {
 	return m
 }
 
+// nativeRemember keeps what the lobby server said about this game's peers, in
+// the server's form. The server says it once, and a game started again needs it
+// once more (issue #275).
+func (s *Seat) nativeRemember(m gpgnet.Message) {
+	switch m.Command {
+	case "JoinGame", "ConnectToPeer", "DisconnectFromPeer":
+	default:
+		return
+	}
+	at := 1
+	if m.Command == "DisconnectFromPeer" {
+		at = 0
+	}
+	id, ok := m.Int(at)
+	if !ok {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	kept := s.nativePeers[:0]
+	for _, known := range s.nativePeers {
+		if other, _ := known.Int(1); other != id {
+			kept = append(kept, known)
+		}
+	}
+	s.nativePeers = kept
+	if m.Command != "DisconnectFromPeer" {
+		s.nativePeers = append(s.nativePeers, m)
+	}
+}
+
+// RejoinNative starts the game again as FAF's client would after a crash, with
+// no adapter: peers is "player id=source,...". The game's links died with it, so
+// when it connects it gets what it got the first time, and no lobby starts.
+func (s *Seat) RejoinNative(peers string, source, keyOf int) error {
+	if s.cfg.Native == nil {
+		return fmt.Errorf("player %d: not in native mode", s.cfg.UID)
+	}
+	s.mu.Lock()
+	s.nativeReturning = true
+	s.mu.Unlock()
+	return s.Rejoin(peers, source, keyOf, true)
+}
+
+// IsNative reports whether this seat runs with no adapter.
+func (s *Seat) IsNative() bool { return s.cfg.Native != nil }
+
+// nativeOnConnected sends a game coming back what it needs for new links.
+func (s *Seat) nativeOnConnected() {
+	s.mu.Lock()
+	returning := s.nativeReturning
+	s.nativeReturning = false
+	peers := append([]gpgnet.Message(nil), s.nativePeers...)
+	lobbyPort := s.lobbyPort
+	s.mu.Unlock()
+	if !returning {
+		return
+	}
+	s.nativeIceServers()
+	_ = s.Send(gpgnet.New("CreateLobby", 0, lobbyPort, s.cfg.Name, s.cfg.UID, 1))
+	for _, m := range peers {
+		_ = s.Send(m)
+	}
+}
+
 // nativeIncoming handles what the game sends that the lobby server would act
 // on: IceMsg [receiver, text] goes to the receiver's seat as IceMsg [sender,
 // text].
