@@ -200,7 +200,7 @@ namespace
    *
    * Unlike `std::sort` (unstable, so a different valid implementation can
    * legally produce a different tie-break order for equal elements -- see
-   * `legacy/algorithms/Sort.h`'s `msvc8::sort`, which therefore *is*
+   * `legacy/algorithms/Sort.h`'s `fa::sort`, which therefore *is*
    * byte-faithfully reimplemented), `std::stable_sort`'s output order is
    * fully pinned by the standard's stability guarantee: for any input and
    * comparator, every conforming implementation -- MSVC8's 2007 one and a
@@ -213,7 +213,7 @@ namespace
    * not engine code.
    */
   void SortRenderedChildrenByDepth(
-    msvc8::vector<moho::CMauiControl*>& renderedChildren
+    fa::vector<moho::CMauiControl*>& renderedChildren
   )
   {
     moho::CMauiControl** const begin = renderedChildren.begin();
@@ -1156,7 +1156,7 @@ int moho::cfunc_CMauiControlGetNameL(
   LuaPlus::LuaObject controlObject(LuaPlus::LuaStackObject(state, 1));
   CMauiControl* const control = SCR_FromLua_CMauiControl(controlObject, state);
 
-  const msvc8::string debugName = control->GetDebugName();
+  const fa::string debugName = control->GetDebugName();
   lua_pushstring(state->m_state, debugName.c_str());
   (void)lua_gettop(state->m_state);
   return 1;
@@ -1218,7 +1218,7 @@ int moho::cfunc_CMauiControlSetNameL(
     debugName = "";
   }
 
-  control->SetDebugName(msvc8::string(debugName));
+  control->SetDebugName(fa::string(debugName));
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -1669,11 +1669,11 @@ int moho::cfunc_CMauiControlSetAlphaL(
 
   float alpha = static_cast<float>(lua_tonumber(state->m_state, 2));
   if (alpha < 0.0f) {
-    const msvc8::string debugName = control->GetDebugName();
+    const fa::string debugName = control->GetDebugName();
     gpg::Warnf(kCMauiControlNegativeAlphaWarning, static_cast<int>(alpha), debugName.c_str());
     alpha = 0.0f;
   } else if (alpha > 1.0f) {
-    const msvc8::string debugName = control->GetDebugName();
+    const fa::string debugName = control->GetDebugName();
     gpg::Warnf(kCMauiControlAboveOneAlphaWarning, static_cast<int>(alpha), debugName.c_str());
   }
 
@@ -1950,7 +1950,7 @@ gpg::RType* moho::CMauiControl::StaticGetClass()
 moho::CMauiControl::CMauiControl(
   LuaPlus::LuaObject* const luaObject,
   CMauiControl* const parent,
-  msvc8::string controlKind
+  fa::string controlKind
 )
   : CScriptObject()
   , TDatListItem<CMauiControl, void>()
@@ -2494,7 +2494,7 @@ bool moho::CMauiControl::IsScrollable(
   EMauiScrollAxis axisCopy = axis;
   gpg::RRef axisRef{};
   axisRef = gpg::MakeRRef<moho::EMauiScrollAxis>(&axisCopy);
-  const msvc8::string axisLexical = axisRef.GetLexical();
+  const fa::string axisLexical = axisRef.GetLexical();
   return GetIsScrollable(axisLexical.c_str());
 }
 
@@ -2630,7 +2630,7 @@ void moho::CMauiControl::ScrollLines(
   EMauiScrollAxis axisCopy = axis;
   gpg::RRef axisRef{};
   axisRef = gpg::MakeRRef<moho::EMauiScrollAxis>(&axisCopy);
-  const msvc8::string axisLexical = axisRef.GetLexical();
+  const fa::string axisLexical = axisRef.GetLexical();
   RunScriptStringNum("ScrollLines", axisLexical.c_str(), amount);
 }
 
@@ -2649,7 +2649,7 @@ void moho::CMauiControl::ScrollPages(
   EMauiScrollAxis axisCopy = axis;
   gpg::RRef axisRef{};
   axisRef = gpg::MakeRRef<moho::EMauiScrollAxis>(&axisCopy);
-  const msvc8::string axisLexical = axisRef.GetLexical();
+  const fa::string axisLexical = axisRef.GetLexical();
   RunScriptStringNum("ScrollLines", axisLexical.c_str(), amount);
 }
 
@@ -2667,7 +2667,7 @@ void moho::CMauiControl::ScrollSetTop(
   EMauiScrollAxis axisCopy = axis;
   gpg::RRef axisRef{};
   axisRef = gpg::MakeRRef<moho::EMauiScrollAxis>(&axisCopy);
-  const msvc8::string axisLexical = axisRef.GetLexical();
+  const fa::string axisLexical = axisRef.GetLexical();
   RunScriptStringNum("ScrollSetTop", axisLexical.c_str(), amount);
 }
 
@@ -2904,7 +2904,7 @@ void moho::CMauiControl::ApplyFunction(
  * What it does:
  * Returns one copied debug-name string from the control runtime lane.
  */
-msvc8::string moho::CMauiControl::GetDebugName()
+fa::string moho::CMauiControl::GetDebugName()
 {
   return mDebugName;
 }
@@ -2916,7 +2916,7 @@ msvc8::string moho::CMauiControl::GetDebugName()
  * Copies one debug-name string into the control debug-name lane.
  */
 void moho::CMauiControl::SetDebugName(
-  msvc8::string debugName
+  fa::string debugName
 )
 {
   mDebugName = debugName;
@@ -2933,7 +2933,7 @@ void moho::CMauiControl::Dump()
   gpg::Logf("--");
 
   const char* parentName = "no parent";
-  msvc8::string parentNameStorage{};
+  fa::string parentNameStorage{};
   if (mParent != nullptr) {
     parentNameStorage = mParent->GetDebugName();
     parentName = parentNameStorage.c_str();

@@ -9,7 +9,7 @@
 
 namespace
 {
-  using EntityCategorySetVector = msvc8::vector<moho::EntityCategorySet>;
+  using EntityCategorySetVector = fa::vector<moho::EntityCategorySet>;
   using EntityCategorySetVectorType = gpg::RVectorType<moho::EntityCategorySet>;
 
   /**
@@ -43,7 +43,7 @@ namespace
    *
    * What it does:
    * Loads a `vector<EntityCategorySet>` payload and replaces destination storage.
-   * Uses `msvc8::vector<EntityCategorySet>`'s uninitialized copy to materialize the destination
+   * Uses `fa::vector<EntityCategorySet>`'s uninitialized copy to materialize the destination
    * slots from a single empty BVSet template before per-element archive reads,
    * matching the binary's reserve-then-read pattern where each grown slot is
    * copy-constructed from a default-initialized prototype.
@@ -137,16 +137,16 @@ gpg::RVectorType<moho::EntityCategorySet>::~RVectorType() = default;
  */
 const char* gpg::RVectorType<moho::EntityCategorySet>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::EntityCategorySet>()->GetName());
+  static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::EntityCategorySet>()->GetName());
   return sName.c_str();
 }
 
 /**
  * Address: 0x006DB340 (FUN_006DB340, gpg::RVectorType_BVSet_PRBlueprint::GetLexical)
  */
-msvc8::string gpg::RVectorType<moho::EntityCategorySet>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType<moho::EntityCategorySet>::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 
@@ -163,8 +163,8 @@ const gpg::RIndexed* gpg::RVectorType<moho::EntityCategorySet>::IsIndexed() cons
  */
 void gpg::RVectorType<moho::EntityCategorySet>::Init()
 {
-  static_assert(sizeof(msvc8::vector<moho::EntityCategorySet>) == 0x10, "msvc8::vector<moho::EntityCategorySet> is 0x10 bytes on x86");
-  size_ = sizeof(msvc8::vector<moho::EntityCategorySet>);
+  static_assert(sizeof(fa::vector<moho::EntityCategorySet>) == 0x10, "fa::vector<moho::EntityCategorySet> is 0x10 bytes on x86");
+  size_ = sizeof(fa::vector<moho::EntityCategorySet>);
   version_ = 1;
   serLoadFunc_ = &LoadEntityCategorySetVector;
   serSaveFunc_ = &SaveEntityCategorySetVector;
@@ -215,7 +215,7 @@ void gpg::RVectorType<moho::EntityCategorySet>::SetCount(void* const obj, const 
   }
 
   const moho::EntityCategorySet zeroFill{};
-  // resize's growth path is `msvc8::vector<EntityCategorySet>::insert` (FUN_006DC600),
+  // resize's growth path is `fa::vector<EntityCategorySet>::insert` (FUN_006DC600),
   // reached through the binary's by-value resize at FUN_006DC4E0.
   storage->resize(static_cast<std::size_t>(count), zeroFill);
 }
@@ -229,7 +229,7 @@ void gpg::RVectorType<moho::EntityCategorySet>::SetCount(void* const obj, const 
 gpg::RType* moho::register_EntityCategorySetVectorType()
 {
   EntityCategorySetVectorType* const type = AcquireEntityCategorySetVectorType();
-  gpg::PreRegisterRType(typeid(msvc8::vector<moho::EntityCategorySet>), type);
+  gpg::PreRegisterRType(typeid(fa::vector<moho::EntityCategorySet>), type);
   return type;
 }
 
@@ -249,11 +249,11 @@ namespace
 } // namespace
 
 /**
- * Address: 0x006DB010 (FUN_006DB010, msvc8::vector<EntityCategorySet>::push_back)
+ * Address: 0x006DB010 (FUN_006DB010, fa::vector<EntityCategorySet>::push_back)
  *
  * What it does:
  * Per-T canonical-template-helper binding for the engine-instantiated
- * `msvc8::vector<EntityCategorySet>::push_back(const&)` fast/slow-path
+ * `fa::vector<EntityCategorySet>::push_back(const&)` fast/slow-path
  * body (40-byte element stride). Forwards to the templated push_back so
  * the compiler emits the per-T out-of-line body that the linker keeps
  * bound from explicit-name call sites.
@@ -263,11 +263,11 @@ namespace
  *  - `CPlatoon::cfunc_CPlatoonSetPrioritizedTargetListL` (FUN_0072E940)
  */
 void moho::PushBackEntityCategorySetVector(
-  msvc8::vector<moho::EntityCategorySet>& destination,
+  fa::vector<moho::EntityCategorySet>& destination,
   const moho::EntityCategorySet& value)
 {
   // push_back's capacity-full path is the single-value insert lane (FUN_006DBAE0),
-  // which tail-calls `msvc8::vector<EntityCategorySet>::_Insert_n` (FUN_006DC600).
+  // which tail-calls `fa::vector<EntityCategorySet>::_Insert_n` (FUN_006DC600).
   destination.push_back(value);
 }
 

@@ -49,7 +49,7 @@ namespace
   }
 
   // 0x00736450 / 0x00736470 are `rb_max`/`rb_min` of `sSimConList`'s
-  // `msvc8::map` (node 0x30, isNil@+0x2D), cited on those members in
+  // `fa::map` (node 0x30, isNil@+0x2D), cited on those members in
   // legacy/containers/RbTree.h.
 
   /**
@@ -271,7 +271,7 @@ namespace
     archive->ReadString(&mName);
 
     ownerRef = {};
-    archive->Read(gpg::RTypeOf<msvc8::vector<moho::EntityCategorySet>>(), &mCats, ownerRef);
+    archive->Read(gpg::RTypeOf<fa::vector<moho::EntityCategorySet>>(), &mCats, ownerRef);
   }
 
   /**
@@ -293,12 +293,12 @@ namespace
 
     ownerRef = {};
     archive->Write(gpg::RTypeOf<moho::ESquadClass>(), const_cast<ESquadClass*>(&mSquadClass), ownerRef);
-    archive->WriteString(const_cast<msvc8::string*>(&mName));
+    archive->WriteString(const_cast<fa::string*>(&mName));
 
     ownerRef = {};
     archive->Write(
-      gpg::RTypeOf<msvc8::vector<moho::EntityCategorySet>>(),
-      const_cast<msvc8::vector<EntityCategorySet>*>(&mCats),
+      gpg::RTypeOf<fa::vector<moho::EntityCategorySet>>(),
+      const_cast<fa::vector<EntityCategorySet>*>(&mCats),
       ownerRef
     );
   }
@@ -371,10 +371,10 @@ namespace
 
     WritePlatoonSquadPointersToArchive(archive, const_cast<CPlatoon*>(this));
 
-    archive->WriteString(const_cast<msvc8::string*>(&mName));
-    archive->WriteString(const_cast<msvc8::string*>(&mPlan));
-    archive->WriteString(const_cast<msvc8::string*>(&mUniqueName));
-    archive->WriteString(const_cast<msvc8::string*>(&mFormation));
+    archive->WriteString(const_cast<fa::string*>(&mName));
+    archive->WriteString(const_cast<fa::string*>(&mPlan));
+    archive->WriteString(const_cast<fa::string*>(&mUniqueName));
+    archive->WriteString(const_cast<fa::string*>(&mFormation));
     archive->WriteBool(mDisbandOnIdle);
     archive->WriteInt(mKills);
     archive->WriteInt(mLosses);
@@ -565,7 +565,7 @@ namespace
    * Address: 0x00725990 (FUN_00725990, sub_725990)
    */
   void CPlatoon::SetPrioritizedTargetList(
-    const ESquadClass squadClass, const msvc8::vector<EntityCategorySet>& categories
+    const ESquadClass squadClass, const fa::vector<EntityCategorySet>& categories
   )
   {
     if (CSquad* const squad = GetSquad(squadClass)) {
@@ -620,11 +620,11 @@ namespace
    * per transport, issues `UNITCOMMAND_TransportLoadUnits`, and returns issued
    * command weak-links.
    */
-  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::LoadUnits(const EntityCategorySet* const categorySet)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::LoadUnits(const EntityCategorySet* const categorySet)
   {
     constexpr const char* kTransportationCategoryName = "TRANSPORTATION";
 
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
     EntitySetTemplate<Unit> transportUnits{};
     EntitySetTemplate<Unit> unitsToLoad{};
 
@@ -837,7 +837,7 @@ namespace
   /**
    * Address: 0x0072B730 (FUN_0072B730, Moho::CPlatoon::SetPlatoonFormationOverride)
    */
-  void CPlatoon::SetPlatoonFormationOverride(const msvc8::string& formationName)
+  void CPlatoon::SetPlatoonFormationOverride(const fa::string& formationName)
   {
     mFormation = formationName;
   }
@@ -925,7 +925,7 @@ namespace
 
     // Snapshot the squad's prioritized target-category list (the binary copies
     // squad->mCats into a local vector and frees it in the epilogue).
-    const msvc8::vector<EntityCategorySet> priorityList = squad->mCats;
+    const fa::vector<EntityCategorySet> priorityList = squad->mCats;
 
     // Gather every unit within `radius` of `center` ("ALLUNITS", alliance-filtered).
     EntitySetTemplate<Unit> gatheredUnits{};
@@ -1176,7 +1176,7 @@ namespace
     EntitySetTemplate<Unit>& units,
     Entity* const target,
     const int formationScriptIndex,
-    msvc8::vector<WeakPtr<CUnitCommand>>& issuedCommands
+    fa::vector<WeakPtr<CUnitCommand>>& issuedCommands
   )
   {
     const bool useFormation = formationScriptIndex >= 0 && units.Size() > 1u;
@@ -1207,7 +1207,7 @@ namespace
    *
    * IDA signature:
    * void __stdcall CPlatoon::AttackTarget(CPlatoon *this,
-   *     msvc8::vector<WeakPtr<CUnitCommand>> *outCommands, Entity *target,
+   *     fa::vector<WeakPtr<CUnitCommand>> *outCommands, Entity *target,
    *     ESquadClass squadClass)
    *
    * What it does:
@@ -1218,9 +1218,9 @@ namespace
    * Each set is issued as FormAttack when a formation script resolves and it holds
    * more than one unit, else a plain Attack. Returns the issued command weak-links.
    */
-  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::AttackTarget(Entity* const target, const ESquadClass squadClass)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::AttackTarget(Entity* const target, const ESquadClass squadClass)
   {
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
 
@@ -1260,7 +1260,7 @@ namespace
     EntitySetTemplate<Unit>& units,
     Entity* const target,
     const int formationScriptIndex,
-    msvc8::vector<WeakPtr<CUnitCommand>>& issuedCommands
+    fa::vector<WeakPtr<CUnitCommand>>& issuedCommands
   )
   {
     const bool useFormation = formationScriptIndex >= 0 && units.Size() > 1u;
@@ -1291,7 +1291,7 @@ namespace
    *
    * IDA signature:
    * void __stdcall CPlatoon::MoveToTarget(CPlatoon *this,
-   *     msvc8::vector<WeakPtr<CUnitCommand>> *outCommands, Entity *target,
+   *     fa::vector<WeakPtr<CUnitCommand>> *outCommands, Entity *target,
    *     char useTransports, ESquadClass squadClass)
    *
    * What it does:
@@ -1304,11 +1304,11 @@ namespace
    *   - else: moves each requested squad class independently (classes 1..5).
    * Returns the issued command weak-links.
    */
-  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::MoveToTarget(
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::MoveToTarget(
     Entity* const target, const bool useTransports, const ESquadClass squadClass
   )
   {
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
 
@@ -1382,7 +1382,7 @@ namespace
     EntitySetTemplate<Unit>& units,
     const Wm3::Vector3f& target,
     const int formationScriptIndex,
-    msvc8::vector<WeakPtr<CUnitCommand>>& issuedCommands
+    fa::vector<WeakPtr<CUnitCommand>>& issuedCommands
   )
   {
     const bool useFormation = formationScriptIndex >= 0 && units.Size() > 1u;
@@ -1411,7 +1411,7 @@ namespace
    *
    * IDA signature:
    * void __stdcall CPlatoon::MoveToLocation(CPlatoon *this,
-   *     msvc8::vector<WeakPtr<CUnitCommand>> *outCommands, Wm3::Vector3f *pos,
+   *     fa::vector<WeakPtr<CUnitCommand>> *outCommands, Wm3::Vector3f *pos,
    *     char useTransports, ESquadClass squadClass)
    *
    * What it does:
@@ -1425,7 +1425,7 @@ namespace
    *   - else: moves each requested squad class independently (classes 1..5).
    * Returns the issued command weak-links.
    */
-  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::MoveToLocation(
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::MoveToLocation(
     Wm3::Vector3f& pos, const bool useTransports, const ESquadClass squadClass
   )
   {
@@ -1437,7 +1437,7 @@ namespace
     }
     pos.y = surfaceElevation;
 
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
 
@@ -1509,7 +1509,7 @@ namespace
     EntitySetTemplate<Unit>& units,
     const Wm3::Vector3f& pos,
     const int formationScriptIndex,
-    msvc8::vector<WeakPtr<CUnitCommand>>& issuedCommands
+    fa::vector<WeakPtr<CUnitCommand>>& issuedCommands
   )
   {
     SSTICommandIssueData commandIssueData(
@@ -1545,7 +1545,7 @@ namespace
    * formation script, else a plain AggressiveMove. Returns the issued command
    * weak-links.
    */
-  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::AggressiveMoveToLocation(Wm3::Vector3f& pos, const ESquadClass squadClass)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::AggressiveMoveToLocation(Wm3::Vector3f& pos, const ESquadClass squadClass)
   {
     // Snap the requested point to the terrain (or water, when higher) surface.
     STIMap* const mapData = mSim->mMapData;
@@ -1555,7 +1555,7 @@ namespace
     }
     pos.y = surfaceElevation;
 
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     CAiFormationDBImpl* const formationDb = mSim->mFormationDB;
 
@@ -1588,9 +1588,9 @@ namespace
    * (and alive, not-being-built) units across all squad classes, and issues a
    * single `UNITCOMMAND_Ferry` to that ground point.
    */
-  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::FerryToLocation(Wm3::Vector3f& targetPos)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::FerryToLocation(Wm3::Vector3f& targetPos)
   {
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     // Snap the requested point to the terrain (or water, when higher) surface.
     STIMap* const mapData = mSim->mMapData;
@@ -1648,9 +1648,9 @@ namespace
    * carrier itself is added too. Finally issues one
    * UNITCOMMAND_TransportUnloadSpecificUnits to the snapped ground point.
    */
-  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::UnloadUnitsAtLocation(const EntityCategorySet* const category, Wm3::Vector3f& pos)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::UnloadUnitsAtLocation(const EntityCategorySet* const category, Wm3::Vector3f& pos)
   {
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     // Snap the requested point to the terrain (or water, when higher) surface.
     STIMap* const mapData = mSim->mMapData;
@@ -1714,9 +1714,9 @@ namespace
    * Collects transport/carrier units (alive, not-being-built) across all squad
    * classes and issues one `UNITCOMMAND_TransportUnloadUnits` to `targetPos`.
    */
-  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::UnloadAllAtLocation(const Wm3::Vector3f& targetPos)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::UnloadAllAtLocation(const Wm3::Vector3f& targetPos)
   {
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     EntitySetTemplate<Unit> carriers{};
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
@@ -1835,9 +1835,9 @@ namespace
   /**
    * Address: 0x00728420 (FUN_00728420, func_IssueGuardTargetToPlatoon)
    */
-  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::GuardTarget(Unit* const guardTarget, const ESquadClass squadClass)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::GuardTarget(Unit* const guardTarget, const ESquadClass squadClass)
   {
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     const auto issueGuardOnUnits = [&](EntitySetTemplate<Unit>& units) {
       SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Guard);
@@ -1944,9 +1944,9 @@ namespace
    * `category` into a single set, then issues one UNITCOMMAND_TransportLoadUnits
    * targeted at the ferry-beacon entity so those units load onto the beacon.
    */
-  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::UseFerryBeacon(const EntityCategorySet* const category, Unit* const beacon)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::UseFerryBeacon(const EntityCategorySet* const category, Unit* const beacon)
   {
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     EntitySetTemplate<Unit> loadableUnits{};
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
@@ -1994,9 +1994,9 @@ namespace
    * single `UNITCOMMAND_TransportLoadUnits` targeting the teleporter. Returns
    * the issued command weak-links.
    */
-  msvc8::vector<WeakPtr<CUnitCommand>> CPlatoon::UseTeleporter(Unit* const teleporter, const ESquadClass squadClass)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::UseTeleporter(Unit* const teleporter, const ESquadClass squadClass)
   {
-    msvc8::vector<WeakPtr<CUnitCommand>> issuedCommands{};
+    fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     EntitySetTemplate<Unit> selectedUnits{};
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {

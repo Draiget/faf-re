@@ -92,7 +92,7 @@ namespace moho
    *
    * What it does:
    * Constructs/preregisters reflection metadata for
-   * `msvc8::vector<SPerArmyReconInfo>`.
+   * `fa::vector<SPerArmyReconInfo>`.
    */
   [[nodiscard]] gpg::RType* preregister_RVectorType_SPerArmyReconInfo();
 

@@ -208,7 +208,7 @@ namespace moho
           return -1;
         }
 
-        const float blend = (msvc8::cos(mBeamupTime * kPi * 0.1f) * 0.5f) + 0.5f;
+        const float blend = (fa::cos(mBeamupTime * kPi * 0.1f) * 0.5f) + 0.5f;
         mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
 
         if (const RUnitBlueprint* const blueprint = mUnit->GetBlueprint(); blueprint != nullptr) {

@@ -165,7 +165,7 @@ namespace moho
    * Formats one `VAxes3` basis as `X=(...) Y=(...) Z=(...)` by reusing the
    * vector-lane string formatter.
    */
-  [[nodiscard]] msvc8::string ToString(const VAxes3& value);
+  [[nodiscard]] fa::string ToString(const VAxes3& value);
 
 
 

@@ -31,6 +31,7 @@ namespace faf::headless
     bool commandCheck = false;  // every command decoded and marshalled again, compared (ReplayCommandCheck.h)
     bool seats = false;         // the commands through the game server's seats (ReplaySeats.h)
     std::string seatsListen;    // with `seats`, Linux: the whole server's load: views and players over UDP at this address
+    bool targetAudit = false;   // with `seatsListen`: how many recorded targets a server's view wouldn't have held
     bool oracleCheck = false;   // the visibility oracle against the sim's own publication (ReplayOracleCheck.h)
     std::string oracleDigestsPath; // with `oracleCheck`: per beat and army, the oracle's answers as a digest
     bool changeSetCheck = false; // the sync walk's change set against its packet (ReplayChangeSetCheck.h)
@@ -54,6 +55,8 @@ namespace faf::headless
     int focusSwitchArmy = 0;
     std::string syncDumpPath;    // when set: each beat's Lua `Sync` bytes go here
     int viewPipelineThreads = 0; // with `viewBenchPath`: threads that finish the views while the sim goes on
+    bool viewTeams = false;      // with `viewPipelineThreads`: one view per team and each player's own units
+    std::string viewDumpPath;    // with `viewBenchPath`: what each client holds, every 2000 beats, to compare two runs
     bool parallelViews = false;  // with `viewFramesPath`, `viewBenchPath` or `viewPacketsPath`: views built on the sim's workers
     bool keepClientData = false; // keep what only a client reads (`--keep-client-data`)
     bool viewBenchCheck = false; // with `viewBenchPath`: each held frame is compared with the whole one

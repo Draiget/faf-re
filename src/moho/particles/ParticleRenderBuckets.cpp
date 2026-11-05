@@ -187,7 +187,7 @@ namespace
     moho::SParticleRenderWorkItem& workItem, const float beginFrame, const float lifeFrames
   )
   {
-    // `msvc8::vector<SParticleRenderInterval>::push_back` (0x00496950, cited on Vector.h).
+    // `fa::vector<SParticleRenderInterval>::push_back` (0x00496950, cited on Vector.h).
     const moho::SParticleRenderInterval intervalValue{beginFrame, lifeFrames};
     workItem.mIntervals.push_back(intervalValue);
     return true;
@@ -301,7 +301,7 @@ namespace moho
   {
     bucket.texture0.reset();
     bucket.texture1.reset();
-    bucket.tag = msvc8::string{};
+    bucket.tag = fa::string{};
     bucket.blendMode = 0;
     bucket.zMode = 0;
     bucket.pendingParticles.clear();
@@ -322,7 +322,7 @@ namespace moho
     }
     bucket.texture1 = texture1;
 
-    bucket.tag.assign(particle.mTypeTag, 0U, msvc8::string::npos);
+    bucket.tag.assign(particle.mTypeTag, 0U, fa::string::npos);
     bucket.blendMode = static_cast<std::int32_t>(particle.mBlendMode);
     bucket.zMode = static_cast<std::int32_t>(particle.mZMode);
     return &bucket;
@@ -343,7 +343,7 @@ namespace moho
   {
     bucket.texture0.reset();
     bucket.texture1.reset();
-    bucket.tag = msvc8::string{};
+    bucket.tag = fa::string{};
     bucket.blendMode = 0;
     bucket.renderStartIndex = 0U;
     bucket.pendingTrails.clear();
@@ -382,7 +382,7 @@ namespace moho
   void UploadPendingParticlesIntoWorkItem(
     SParticleRenderWorkItem& workItem,
     const float frameDelta,
-    msvc8::vector<SWorldParticle>& pendingParticles
+    fa::vector<SWorldParticle>& pendingParticles
   )
   {
     const std::size_t pendingCount = pendingParticles.size();
@@ -992,7 +992,7 @@ namespace moho
   bool UploadPendingTrailsIntoWorkItem(
     SParticleRenderWorkItem& workItem,
     const float frameDelta,
-    msvc8::vector<SWorldTrail>& pendingTrails
+    fa::vector<SWorldTrail>& pendingTrails
   )
   {
     const std::size_t pendingCount = pendingTrails.size();

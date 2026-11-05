@@ -32,7 +32,7 @@ namespace
    * What it does:
    * Appends one visible decal payload into the pending publish vector.
    */
-  void AppendVisibleDecal(msvc8::vector<SDecalInfo>& visibleDecals, const SDecalInfo& decalInfo)
+  void AppendVisibleDecal(fa::vector<SDecalInfo>& visibleDecals, const SDecalInfo& decalInfo)
   {
 #if defined(_M_X64) || defined(__x86_64__)
     // 6 entries of 0x90 bytes land in the binary's 896-byte class (0x0077ACC0).
@@ -162,7 +162,7 @@ CDecalBuffer::~CDecalBuffer()
  * Swaps runtime storage pointers for both decal publish vectors:
  * visible decals and pending hide object-id lanes.
  */
-void CDecalBuffer::SwapVectors(msvc8::vector<SDecalInfo>* const addDecals, msvc8::vector<std::uint32_t>* const removeDecals)
+void CDecalBuffer::SwapVectors(fa::vector<SDecalInfo>* const addDecals, fa::vector<std::uint32_t>* const removeDecals)
 {
   // Exchanging all three lanes pairwise is vector::swap.
   mVisibleDecals.swap(*addDecals);

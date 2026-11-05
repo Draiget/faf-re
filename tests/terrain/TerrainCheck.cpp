@@ -90,7 +90,7 @@ namespace
       return result;
     }
 
-    msvc8::auto_ptr<gpg::Stream> stream = moho::DISK_OpenFileRead(path.c_str());
+    fa::auto_ptr<gpg::Stream> stream = moho::DISK_OpenFileRead(path.c_str());
     if (!stream.get()) {
       result.error = "cannot open";
       return result;
@@ -250,7 +250,7 @@ int main()
   ::SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
   gpg::SetDieHandler(&TerrainCheckDieHandler);
 
-  msvc8::vector<msvc8::string> mapsArgs;
+  fa::vector<fa::string> mapsArgs;
   if (!moho::CFG_GetArgOption("--maps", 1, &mapsArgs) || mapsArgs.empty() || !moho::CFG_GetArgOption("/init", 1, nullptr)) {
     std::printf("usage: faf_terrain_check --maps <list> /init <init.lua> [/log <file>]\n");
     return kExitBadInput;

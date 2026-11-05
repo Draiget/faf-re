@@ -263,7 +263,7 @@ namespace
 
       const char* const expectedName = expectedType ? expectedType->GetName() : "CPlatoon";
       const char* const actualName = tracked.type ? tracked.type->GetName() : "null";
-      const msvc8::string message = gpg::STR_Printf(
+      const fa::string message = gpg::STR_Printf(
         "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
         "instead",
         expectedName ? expectedName : "CPlatoon",
@@ -508,10 +508,10 @@ namespace
     dstPlatoons.SetSizeUnchecked(srcSize);
   }
 
-  [[nodiscard]] msvc8::string GetUnitUniqueName(const moho::Unit* unit)
+  [[nodiscard]] fa::string GetUnitUniqueName(const moho::Unit* unit)
   {
     if (unit == nullptr) {
-      return msvc8::string();
+      return fa::string();
     }
 
     // Evidence:
@@ -521,28 +521,28 @@ namespace
     return entity->GetUniqueName();
   }
 
-  [[nodiscard]] msvc8::string GetSquadClassLexical(const moho::ESquadClass squadClass)
+  [[nodiscard]] fa::string GetSquadClassLexical(const moho::ESquadClass squadClass)
   {
     switch (squadClass) {
     case moho::ESquadClass::Unassigned:
-      return msvc8::string("Unassigned");
+      return fa::string("Unassigned");
     case moho::ESquadClass::Attack:
-      return msvc8::string("Attack");
+      return fa::string("Attack");
     case moho::ESquadClass::Artillery:
-      return msvc8::string("Artillery");
+      return fa::string("Artillery");
     case moho::ESquadClass::Guard:
-      return msvc8::string("Guard");
+      return fa::string("Guard");
     case moho::ESquadClass::Support:
-      return msvc8::string("Support");
+      return fa::string("Support");
     case moho::ESquadClass::Scout:
-      return msvc8::string("Scout");
+      return fa::string("Scout");
     default:
       break;
     }
 
     char numeric[32] = {};
     std::snprintf(numeric, sizeof(numeric), "%d", static_cast<int>(squadClass));
-    return msvc8::string(numeric);
+    return fa::string(numeric);
   }
 
   [[nodiscard]] moho::EntitySetTemplate<moho::Unit>* ResolveCategorySetForUnit(moho::CArmyImpl* army, moho::Unit* unit)
@@ -878,8 +878,8 @@ namespace
   }
   /**
    * Absorbs binary helpers:
-   * Address: 0x00701D20 (FUN_00701D20, msvc8::map<RResId, RUnitBlueprint*>::map copy ctor)
-   * Address: 0x0052D170 (FUN_0052D170, msvc8::map<RResId, RUnitBlueprint*>::~map SEH-cleanup dtor)
+   * Address: 0x00701D20 (FUN_00701D20, fa::map<RResId, RUnitBlueprint*>::map copy ctor)
+   * Address: 0x0052D170 (FUN_0052D170, fa::map<RResId, RUnitBlueprint*>::~map SEH-cleanup dtor)
    *
    * The binary's CArmyImpl::CArmyImpl made a defensive copy of the rules'
    * unit-blueprint map into a local stack variable via FUN_00701D20 and then
@@ -1250,9 +1250,9 @@ namespace moho
   /**
    * Address: 0x006FDC40 (FUN_006FDC40, Moho::CArmyImpl::SetArmyPlans)
    */
-  void CArmyImpl::SetArmyPlans(const msvc8::string& armyPlans)
+  void CArmyImpl::SetArmyPlans(const fa::string& armyPlans)
   {
-    ArmyPlans.assign(armyPlans, 0, msvc8::string::npos);
+    ArmyPlans.assign(armyPlans, 0, fa::string::npos);
   }
 
   /**
@@ -1387,7 +1387,7 @@ namespace moho
     GPG_ASSERT(categoryVectorType != nullptr);
     if (categoryVectorType != nullptr) {
       // `RVectorType<EntitySetTemplate<Unit>>::Init()` sets `size_ =
-      // sizeof(msvc8::vector<EntitySetTemplate<Unit>>)` (0x10) and its
+      // sizeof(fa::vector<EntitySetTemplate<Unit>>)` (0x10) and its
       // SubscriptIndex/GetCount/SetCount cast `obj` straight to the real
       // vector type -- the reflected object is `UnitCategorySets` itself,
       // not a 3-word begin/end/capacityEnd view starting 4 bytes into it.
@@ -1454,7 +1454,7 @@ namespace moho
       gpg::TrackedPointerState::Owned,
       owner
     );
-    archive->WriteString(const_cast<msvc8::string*>(&ArmyPlans));
+    archive->WriteString(const_cast<fa::string*>(&ArmyPlans));
 
     WritePointerTyped(
       archive,
@@ -1527,8 +1527,8 @@ namespace moho
     constexpr float kStartFractionScale = 0x1.999998p-33f;
     constexpr float kStartFractionMargin = 0.1f;
 
-    const float rx = msvc8::MulTwisterWord(kStartFractionScale, rng.NextUInt32()) + kStartFractionMargin;
-    const float ry = msvc8::MulTwisterWord(kStartFractionScale, rng.NextUInt32()) + kStartFractionMargin;
+    const float rx = fa::MulTwisterWord(kStartFractionScale, rng.NextUInt32()) + kStartFractionMargin;
+    const float ry = fa::MulTwisterWord(kStartFractionScale, rng.NextUInt32()) + kStartFractionMargin;
 
     mVarDat.mArmyStart.x = (width > 0) ? static_cast<float>(width - 1) * rx : 0.0f;
     mVarDat.mArmyStart.y = (height > 0) ? static_cast<float>(height - 1) * ry : 0.0f;
@@ -1652,7 +1652,7 @@ namespace moho
    */
   void CArmyImpl::CleanUpPlatoons()
   {
-    msvc8::vector<CPlatoon*> platoonsToDestroy;
+    fa::vector<CPlatoon*> platoonsToDestroy;
     CPlatoon* const armyPool = GetPlatoonByName(kArmyPoolName);
 
     auto& platoons = PlatoonPool.platoons;
@@ -2181,7 +2181,7 @@ namespace moho
       return;
     }
 
-    const msvc8::string debugPrefix = msvc8::string("AIDebug_") + GetUnitUniqueName(unit);
+    const fa::string debugPrefix = fa::string("AIDebug_") + GetUnitUniqueName(unit);
 
     ESquadClass squadClass = ESquadClass::Unassigned;
     CPlatoon* const platoon = GetPlatoonFor(unit, &squadClass);
@@ -2189,16 +2189,16 @@ namespace moho
       return;
     }
 
-    const msvc8::string platoonNameKey = debugPrefix + "_PlatoonName";
-    const msvc8::string squadClassKey = debugPrefix + "_SquadClass";
-    const msvc8::string aiPlanKey = debugPrefix + "_AIPlan";
+    const fa::string platoonNameKey = debugPrefix + "_PlatoonName";
+    const fa::string squadClassKey = debugPrefix + "_SquadClass";
+    const fa::string aiPlanKey = debugPrefix + "_AIPlan";
 
     // 0x00700B3D / 0x00700D30: the platoon-name stat is `mUniqueName` (+0xA8,
     // capacity word at +0xC0) and the AI-plan stat is `mPlan` (+0x8C, capacity
     // word at +0xA4), each copied through its `c_str()`.
-    Stats->SetStringValueByPath(platoonNameKey.data(), msvc8::string(platoon->mUniqueName.c_str()));
+    Stats->SetStringValueByPath(platoonNameKey.data(), fa::string(platoon->mUniqueName.c_str()));
     Stats->SetStringValueByPath(squadClassKey.data(), GetSquadClassLexical(squadClass));
-    Stats->SetStringValueByPath(aiPlanKey.data(), msvc8::string(platoon->mPlan.c_str()));
+    Stats->SetStringValueByPath(aiPlanKey.data(), fa::string(platoon->mPlan.c_str()));
   }
 
   /**
@@ -2296,9 +2296,9 @@ namespace moho
    * and appends it to `outArmyList` using the binary's inline fast-path
    * `push_back` followed by the OOL slow-path `_Insert_n` slow body when
    * capacity is exhausted. The slow body is the recovered helper
-   * `msvc8::detail::LegacyVectorDwordInsertN` (FUN_007027A0).
+   * `fa::detail::LegacyVectorDwordInsertN` (FUN_007027A0).
    */
-  msvc8::vector<CArmyImpl*>* CArmyImpl::GetAlliedArmies(msvc8::vector<CArmyImpl*>* outArmyList)
+  fa::vector<CArmyImpl*>* CArmyImpl::GetAlliedArmies(fa::vector<CArmyImpl*>* outArmyList)
   {
     if (outArmyList == nullptr) {
       return nullptr;
@@ -2308,7 +2308,7 @@ namespace moho
     // *(a2+12)=0`) rather than freeing, because every call site hands it a
     // freshly stack-constructed vector. _Tidy() is that plus a free of the
     // block, which is a no-op on the empty input this is always given.
-    *outArmyList = msvc8::vector<CArmyImpl*>{};
+    *outArmyList = fa::vector<CArmyImpl*>{};
 
     if (mVarDat.mAllies.mWords.start_ == nullptr || mVarDat.mAllies.mWords.end_ == nullptr) {
       return outArmyList;

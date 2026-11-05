@@ -30,6 +30,14 @@
 //     block and overrides both from the view's recon record (`ReconBlip::SyncInterface`
 //     0x005BEFB0), and keeps the vision range the view last copied from its creator.
 //
+// Plan WPR.35, `EnableTeams`: players on one team see nearly the same world (over 26978344's 16 players,
+// about 80 % of what a view changes in a beat is changed the same in a teammate's), so most of it is
+// worked out once. A team gets one more view, after the armies' views: plain entities, props and blips,
+// the last from the record of the member who has it. An army's own view then holds only its real units.
+// A player's client holds the two together, less the blips of its own units, which their army byte tells.
+// Mutual allies share vision, so this shows a teammate nothing it couldn't see anyway; what can differ
+// from a lockstep client is that a blip's update reaches all of a team when it reaches one of them.
+//
 // The entity lanes are filled (creations, entity and unit updates, deletes and erases) and the
 // army lane (plan WP5.4: every army's public record, the focus-only fields for the view's own
 // army alone, `mIsAlly` for the view). The other lanes (Lua `Sync`, grids, commands, decals,
@@ -59,7 +67,31 @@ namespace faf::remote
     ~CViewPackets() override;
 
     /** The armies the last beat was built for (the sim's army count). */
-    [[nodiscard]] std::int32_t ArmyCount() const noexcept { return static_cast<std::int32_t>(mPackets.size()); }
+    [[nodiscard]] std::int32_t ArmyCount() const noexcept { return mArmySlots; }
+    /** The views the last beat was built for: one per army, then one per team with `EnableTeams`. */
+    [[nodiscard]] std::size_t ViewSlots() const noexcept { return mPackets.size(); }
+
+    /**
+     * Plan WPR.35: from the first beat on, one view per team and an army's own view holding only its
+     * real units (see above). Teams are every army with a view that is a mutual ally of all the rest.
+     */
+    void EnableTeams() noexcept { mWantTeams = true; }
+    [[nodiscard]] bool TeamsOn() const noexcept { return mTeamsOn; }
+    /** The team view of an army's view; the army's own without teams. */
+    [[nodiscard]] std::size_t TeamSlotOf(const std::size_t army) const noexcept
+    {
+      return mTeamsOn && army < mTeamOfArmy.size() && mTeamOfArmy[army] >= 0 ? static_cast<std::size_t>(mArmySlots + mTeamOfArmy[army]) : army;
+    }
+    /** How many teams there are. */
+    [[nodiscard]] std::size_t TeamCount() const noexcept { return mTeams.size(); }
+    /** A team's view slot. */
+    [[nodiscard]] std::size_t TeamSlot(const std::size_t team) const noexcept { return static_cast<std::size_t>(mArmySlots) + team; }
+    /** The armies of a team, with or without views still. */
+    [[nodiscard]] const std::vector<std::int32_t>& TeamMembers(const std::size_t team) const noexcept { return mTeams[team].members; }
+    /** The team's armies, one bit each. */
+    [[nodiscard]] std::uint32_t TeamMask(const std::size_t team) const noexcept { return mTeams[team].mask; }
+    /** Whether alliances have changed since the teams were made: their views no longer match who may see what. */
+    [[nodiscard]] bool TeamsOutOfDate() const noexcept { return mTeamsOutOfDate; }
 
     /**
      * Builds the views on the sim's workers (plan WP5.7, under I3) from the next beat on. Off by
@@ -128,10 +160,25 @@ namespace faf::remote
       // A blip whose update can be shared: its different updates this beat, from `firstBlipRecord`,
       // the army each is read for, and which one each view gets.
       std::uint8_t blipRecordCount = 0;
-      std::uint8_t blipRecordArmy[kBlipViews]{};
+      std::uint8_t blipRecordView[kBlipViews]{};
       std::uint8_t blipRecordOf[kBlipViews]{};
       std::uint32_t firstBlipRecord = 0;
     };
+
+    /** One team's view. */
+    struct STeam
+    {
+      std::vector<std::int32_t> members;
+      std::uint32_t mask = 0; // `members`, one bit each
+    };
+
+    /** The teams from who's allied with whom now. */
+    void BuildTeams(const moho::Sim& sim);
+    [[nodiscard]] bool TeamsStillMatch(const moho::Sim& sim) const;
+    /** What a view does with an entity: the oracle's answer for an army's view, or as the section above says. */
+    [[nodiscard]] SViewVisibility VisibilityFor(const moho::Sim& sim, std::int32_t view, const SEntityFacts& facts) const;
+    /** The army whose recon record a view shows of a blip: its own, or the first of its team that has one. */
+    [[nodiscard]] std::int32_t ReconArmyFor(std::int32_t view, const SEntityFacts& facts) const noexcept;
 
     /** Fills `mChanged` from the change set; the views only read the sim from here on. */
     void ReadChangedEntities(moho::Sim& sim);
@@ -155,9 +202,18 @@ namespace faf::remote
     }
     /** The facts of `Entities()[index]`, read this beat. */
     [[nodiscard]] const SEntityFacts& ChangedFacts(const std::size_t index) const noexcept { return mChanged[index].facts; }
+    /** The views that keep an entity with these facts (`ViewsThatSee`, by slot), one bit each. */
+    [[nodiscard]] std::uint32_t ViewsKeeping(const moho::Sim& sim, const SEntityFacts& facts) const;
 
   private:
     std::vector<std::unique_ptr<moho::SSyncData>> mPackets;
+    std::int32_t mArmySlots = 0;
+    bool mWantTeams = false;
+    bool mTeamsOn = false;
+    bool mTeamsOutOfDate = false;
+    std::vector<STeam> mTeams;
+    std::vector<std::int32_t> mTeamOfArmy; // -1: none
+    std::uint32_t mTeamBits = 0;           // the team views' slots, one bit each
     std::vector<std::uint8_t> mHasView; // per army: its view is built (written on the sim thread)
     std::uint32_t mViewArmies = 0xFFFFFFFFu;
     std::vector<std::vector<SDirectUpdate>> mDirect;

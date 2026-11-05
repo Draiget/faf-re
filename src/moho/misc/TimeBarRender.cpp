@@ -69,7 +69,7 @@ namespace moho
      * `node+0x0C`, which is the ordinary 4-aligned shape for an 0x0C
      * `pair<const char*, TimeBarTrackLayout>`.
      */
-    using TimeBarTrackMap = msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>;
+    using TimeBarTrackMap = fa::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>;
 
     void BuildTrackLayout(
       CD3DFont& font,
@@ -144,7 +144,7 @@ namespace moho
       }
     }
 
-    void BuildEventViews(const msvc8::vector<STimeBarEventRecord>& events, std::vector<TimeBarEvent>& outEventViews)
+    void BuildEventViews(const fa::vector<STimeBarEventRecord>& events, std::vector<TimeBarEvent>& outEventViews)
     {
       outEventViews.clear();
       outEventViews.reserve(events.size());
@@ -239,7 +239,7 @@ namespace moho
     const boost::shared_ptr<CD3DFont> font = boost::SharedPtrFromRawRetained(rawFont);
     rawFont.release();
 
-    msvc8::vector<STimeBarEventRecord> events;
+    fa::vector<STimeBarEventRecord> events;
     TIME_CollectTimeBarEvents(events, ren_FrameTimeSeconds);
 
     std::vector<TimeBarEvent> eventViews;

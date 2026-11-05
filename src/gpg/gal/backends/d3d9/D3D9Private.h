@@ -62,15 +62,15 @@ namespace
 {
         constexpr int kCubeFaceCount = 6;
 
-        msvc8::string MakeShortString(const char* const text)
+        fa::string MakeShortString(const char* const text)
         {
             if (text == nullptr)
             {
-                return msvc8::string();
+                return fa::string();
             }
 
             const std::size_t length = std::strlen(text);
-            return msvc8::string(text, length);
+            return fa::string(text, length);
         }
 
         [[noreturn]] void ThrowGalError(const char* const file, const int line, const char* const message)

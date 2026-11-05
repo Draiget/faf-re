@@ -98,7 +98,7 @@ namespace moho
     RRuleGameRules* rules = nullptr;
     const gpg::RRef owner{};
     archive.ReadPointer(&rules, &owner);
-    msvc8::string id;
+    fa::string id;
     archive.ReadString(&id);
     RResId resId{};
     gpg::STR_CopyFilename(&resId.name, &id);

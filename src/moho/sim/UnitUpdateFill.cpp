@@ -218,6 +218,13 @@ namespace moho
     return true;
   }
 
+  bool sim_SyncInPlace = true;
+  TConVar<bool> gTConVar_sim_SyncInPlace(
+    "sim_SyncInPlace",
+    "The serial unit-update queue builds each record in place, not from a default copy (same packet).",
+    &sim_SyncInPlace
+  );
+
   bool sim_ParallelSyncHeap = true;
   TConVar<bool> gTConVar_sim_ParallelSyncHeap(
     "sim_ParallelSyncHeap",

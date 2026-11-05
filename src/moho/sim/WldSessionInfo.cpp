@@ -499,7 +499,7 @@ namespace moho
   /**
    * Address: 0x00885530 (FUN_00885530, ??0struct_ScenarioInfo@@QAE@@Z)
    */
-  SWldScenarioInfo::SWldScenarioInfo(const char* const mapName, const msvc8::string& gameMods)
+  SWldScenarioInfo::SWldScenarioInfo(const char* const mapName, const fa::string& gameMods)
   {
     mMapName = gpg::STR_ToLower(mapName ? mapName : "");
     mGameMods = gameMods;

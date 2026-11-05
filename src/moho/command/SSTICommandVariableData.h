@@ -27,7 +27,7 @@ namespace moho
   using EntId = std::int32_t;
 
   /**
-   * Both element lists are `gpg::fastvector_n`, not `msvc8::vector`. The
+   * Both element lists are `gpg::fastvector_n`, not `fa::vector`. The
    * constructor at 0x00552A00 binds four pointer lanes per list to an inline
    * window that sits inside the payload:
    *
@@ -40,7 +40,7 @@ namespace moho
    * confirms the element type from the other side: it looks up
    * `gpg::fastvector<Moho::EntId>` and `gpg::fastvector<Moho::SOCellPos>`.
    *
-   * Modelling these as `msvc8::vector` kept the struct the right SIZE while
+   * Modelling these as `fa::vector` kept the struct the right SIZE while
    * shifting every lane one word: the debug-proxy word landed on `start_`, so
    * anything reading the list through the binary's own offsets -- e.g.
    * `func_GetEntitiesUnderCursor` (0x008B43F0), which iterates

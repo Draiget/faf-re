@@ -67,7 +67,7 @@ namespace moho
      * The modern name `requestedShaderName` remaps to, or null when the
      * dictionary does not know it.
      */
-    [[nodiscard]] const msvc8::string* Lookup(const msvc8::string& requestedShaderName) const;
+    [[nodiscard]] const fa::string* Lookup(const fa::string& requestedShaderName) const;
 
     /**
      * Whether `shaderName` is one of the names a lookup warns about.
@@ -77,7 +77,7 @@ namespace moho
      * real - the constructor buys its header sentinel (0x004DD460) and the
      * destructor frees it - so it is kept rather than folded away.
      */
-    [[nodiscard]] bool IsDeprecated(const msvc8::string& shaderName) const;
+    [[nodiscard]] bool IsDeprecated(const fa::string& shaderName) const;
 
     /**
      * Address: 0x007DBE90 (FUN_007DBE90, sub_7DBE90)
@@ -86,7 +86,7 @@ namespace moho
      * Writes one remap pair into the dictionary, stamping the resulting
      * entry with the current generation marker.
      */
-    void AssignRemap(const msvc8::string& legacyShaderName, const msvc8::string& remappedShaderName);
+    void AssignRemap(const fa::string& legacyShaderName, const fa::string& remappedShaderName);
 
   private:
     /**
@@ -95,7 +95,7 @@ namespace moho
      * 0x1C key with colour/nil at `+0x28`/`+0x29`, which is a set and not a
      * map. Never inserted into anywhere in this binary.
      */
-    msvc8::set<msvc8::string> mDeprecatedNames{};                  // +0x04
+    fa::set<fa::string> mDeprecatedNames{};                  // +0x04
 
     /**
      * Legacy annotation -> modern shader name. Node 0x48 -- its header
@@ -103,10 +103,10 @@ namespace moho
      * is 0x38, two 0x1C strings. `ResolveShaderAnnotationName` reads the
      * mapped name at `node+0x28`, which is exactly `pair::second`.
      */
-    msvc8::map<msvc8::string, msvc8::string> mRemaps{};             // +0x10
+    fa::map<fa::string, fa::string> mRemaps{};             // +0x10
 
-    static_assert(sizeof(msvc8::set<msvc8::string>) == 0x0C, "the legacy set head is 0x0C");
-    static_assert(sizeof(msvc8::map<msvc8::string, msvc8::string>) == 0x0C, "the legacy map head is 0x0C");
+    static_assert(sizeof(fa::set<fa::string>) == 0x0C, "the legacy set head is 0x0C");
+    static_assert(sizeof(fa::map<fa::string, fa::string>) == 0x0C, "the legacy map head is 0x0C");
   };
 
   static_assert(sizeof(ShaderDictionary) == 0x1C, "ShaderDictionary size must be 0x1C");
@@ -120,5 +120,5 @@ namespace moho
    * empty). Emits a `Use of 'old' shader: %s` warning when the entry's
    * stored generation no longer matches the dictionary's current marker.
    */
-  [[nodiscard]] msvc8::string ResolveShaderAnnotationName(const msvc8::string& shaderName);
+  [[nodiscard]] fa::string ResolveShaderAnnotationName(const fa::string& shaderName);
 } // namespace moho

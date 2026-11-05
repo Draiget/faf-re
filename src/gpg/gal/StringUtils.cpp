@@ -81,11 +81,11 @@ namespace gpg::gal
    * Iterates `[start, end)` and returns the first string that exactly matches
    * `*search`; returns `end` when no exact match is present.
    */
-  msvc8::string* STR_FindInRange(
-    msvc8::string* start, msvc8::string* end, const char* const* search
+  fa::string* STR_FindInRange(
+    fa::string* start, fa::string* end, const char* const* search
   ) noexcept
   {
-    msvc8::string* iter = start;
+    fa::string* iter = start;
     if (iter == end) {
       return iter;
     }

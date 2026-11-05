@@ -30,7 +30,7 @@ namespace moho
   inline std::atomic<bool> gReplayFastForward{false};
 
   /** `VCR_SetupReplaySession` for a viewer: remembers the file and its length, for the bar and for restarts. */
-  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo> REPLAY_SetupViewerSession(const char* path, msvc8::string* failureReason);
+  [[nodiscard]] fa::auto_ptr<SWldSessionInfo> REPLAY_SetupViewerSession(const char* path, fa::string* failureReason);
 
   [[nodiscard]] std::int32_t REPLAY_TotalTicks();
 
@@ -39,6 +39,16 @@ namespace moho
 
   /** Moves to `tick`, either way, keeping the session and its view. */
   void REPLAY_SeekTo(CWldSession& session, std::int32_t tick);
+
+  enum class EReplaySeekKind
+  {
+    None,
+    LoadKeyframe,
+    PlayForward,
+  };
+
+  /** What `REPLAY_SeekTo` would do for `tick` now, by the same rule, for the bar to show before the click. */
+  [[nodiscard]] EReplaySeekKind REPLAY_SeekKind(const CWldSession& session, std::int32_t tick);
 
   /** Stops a seek where it is. A restart already under way still finishes loading. */
   void REPLAY_CancelSeek();
@@ -70,7 +80,7 @@ namespace moho
   [[nodiscard]] bool REPLAY_RestartWanted();
 
   /** What the new sim starts from: the replay, moved to the keyframe's beat when it has one. Null on failure. */
-  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo> REPLAY_CreateRestartSession();
+  [[nodiscard]] fa::auto_ptr<SWldSessionInfo> REPLAY_CreateRestartSession();
 
   /** Before the driver is created: makes this session load the keyframe, or start clean when it has none. */
   void REPLAY_PrepareSession(SWldSessionInfo& sessionInfo);

@@ -26,7 +26,7 @@ namespace moho
      * What it does:
      * Resolves one mounted path and fills disk metadata for the first matching entry.
      */
-    virtual msvc8::string* FindFile(msvc8::string* outPath, gpg::StrArg sourcePath, SDiskFileInfo* outInfo) = 0;
+    virtual fa::string* FindFile(fa::string* outPath, gpg::StrArg sourcePath, SDiskFileInfo* outInfo) = 0;
 
     /**
      * Address: 0x00466C60 (FUN_00466C60, Moho::CVFSImpl::ToMountedPath)
@@ -35,7 +35,7 @@ namespace moho
      * What it does:
      * Maps an on-disk path to its mounted virtual-file-system path.
      */
-    virtual msvc8::string* ToMountedPath(msvc8::string* outPath, gpg::StrArg sourcePath) = 0;
+    virtual fa::string* ToMountedPath(fa::string* outPath, gpg::StrArg sourcePath) = 0;
 
     /**
      * Address: 0x00466E50 (FUN_00466E50, Moho::CVFSImpl::GetFileInfo)
@@ -57,7 +57,7 @@ namespace moho
       gpg::StrArg mountPrefix,
       gpg::StrArg queryPath,
       bool allowPrefixWildcard,
-      msvc8::vector<msvc8::string>* outPaths
+      fa::vector<fa::string>* outPaths
     ) = 0;
 
     /**
@@ -67,6 +67,6 @@ namespace moho
      * What it does:
      * Enumerates child path entries under one mounted prefix.
      */
-    virtual void EnumerateChildren(gpg::StrArg mountPrefix, msvc8::vector<msvc8::string>* outPaths) = 0;
+    virtual void EnumerateChildren(gpg::StrArg mountPrefix, fa::vector<fa::string>* outPaths) = 0;
   };
 } // namespace moho

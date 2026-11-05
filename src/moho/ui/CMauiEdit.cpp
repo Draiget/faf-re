@@ -506,7 +506,7 @@ namespace
   }
 
   void CopyUtf8TextToClipboard(
-    const msvc8::string& text
+    const fa::string& text
   )
   {
     const std::wstring wideText = gpg::STR_Utf8ToWide(text.c_str());
@@ -575,7 +575,7 @@ namespace
   void RenderEditTextAt(
     moho::CMauiEdit* const edit,
     moho::CD3DPrimBatcher* const primBatcher,
-    const msvc8::string& text,
+    const fa::string& text,
     const float x,
     const float y,
     const std::uint32_t color
@@ -599,7 +599,7 @@ namespace
   float RenderEditTextRun(
     moho::CMauiEdit* const edit,
     moho::CD3DPrimBatcher* const primBatcher,
-    const msvc8::string& text,
+    const fa::string& text,
     const float x,
     const float baselineY,
     const std::uint32_t color
@@ -1125,7 +1125,7 @@ int moho::cfunc_CMauiEditSetTextL(
     text = "";
   }
 
-  edit->SetText(msvc8::string(text));
+  edit->SetText(fa::string(text));
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -1176,7 +1176,7 @@ int moho::cfunc_CMauiEditGetTextL(
 
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
-  const msvc8::string text = edit->GetText();
+  const fa::string text = edit->GetText();
   lua_pushstring(state->m_state, text.c_str());
   (void)lua_gettop(state->m_state);
   return 1;
@@ -2567,7 +2567,7 @@ void moho::CMauiEdit::DoRender(
   }
 
   if (firstRunEnd > clipStart) {
-    const msvc8::string runText = gpg::STR_Utf8SubString(mText.c_str(), clipStart, firstRunEnd - clipStart);
+    const fa::string runText = gpg::STR_Utf8SubString(mText.c_str(), clipStart, firstRunEnd - clipStart);
     penX += RenderEditTextRun(this, primBatcher, runText, penX, baselineY, mForegroundColor);
   }
 
@@ -2582,7 +2582,7 @@ void moho::CMauiEdit::DoRender(
   }
 
   if (selectedEnd > selectedStart) {
-    const msvc8::string runText =
+    const fa::string runText =
       gpg::STR_Utf8SubString(mText.c_str(), selectedStart, selectedEnd - selectedStart);
     const float runAdvance = font->GetAdvance(runText.c_str(), 0);
 
@@ -2608,7 +2608,7 @@ void moho::CMauiEdit::DoRender(
   }
 
   if (clipEnd > suffixStart) {
-    const msvc8::string runText = gpg::STR_Utf8SubString(mText.c_str(), suffixStart, clipEnd - suffixStart);
+    const fa::string runText = gpg::STR_Utf8SubString(mText.c_str(), suffixStart, clipEnd - suffixStart);
     (void)RenderEditTextRun(this, primBatcher, runText, penX, baselineY, mForegroundColor);
   }
 
@@ -2621,7 +2621,7 @@ void moho::CMauiEdit::DoRender(
     return;
   }
 
-  const msvc8::string caretPrefix =
+  const fa::string caretPrefix =
     gpg::STR_Utf8SubString(mText.c_str(), clipStart, caretPosition - clipStart);
   const float caretX = left + font->GetAdvance(caretPrefix.c_str(), 0);
   const float caretBottom = top + font->mAscent + font->mDescent;
@@ -2687,9 +2687,9 @@ void moho::CMauiEdit::LosingKeyboardFocus()
  * What it does:
  * Returns the currently selected UTF-8 substring from the edit text lane.
  */
-msvc8::string moho::CMauiEdit::GetSelection()
+fa::string moho::CMauiEdit::GetSelection()
 {
-  msvc8::string selectionText{};
+  fa::string selectionText{};
 
   const int selectionStart = mSelectionStart;
   const int selectionEnd = mSelectionEnd;
@@ -2761,11 +2761,11 @@ void moho::CMauiEdit::InsertChar(
  * max-char lane), then emits `OnTextChanged` when callback guard allows.
  */
 void moho::CMauiEdit::ReplaceSelection(
-  const msvc8::string& replacementText
+  const fa::string& replacementText
 )
 {
 
-  msvc8::string insertText{};
+  fa::string insertText{};
   const int replacementLength = gpg::STR_Utf8Len(replacementText.c_str());
   const int currentLength = gpg::STR_Utf8Len(mText.c_str());
   if ((currentLength + replacementLength) <= mMaxChars) {
@@ -2780,7 +2780,7 @@ void moho::CMauiEdit::ReplaceSelection(
   }
 
   DeleteSelection(false);
-  const msvc8::string oldText = mText;
+  const fa::string oldText = mText;
 
   if (insertText.size() != 0u) {
     const int caretPosition = mCaretPosition;
@@ -2844,7 +2844,7 @@ void moho::CMauiEdit::DeleteSelection(
     return;
   }
 
-  const msvc8::string oldText = mText;
+  const fa::string oldText = mText;
   const int textLength = gpg::STR_Utf8Len(mText.c_str());
   if (mSelectionEnd > textLength) {
     mSelectionEnd = textLength;
@@ -2877,7 +2877,7 @@ void moho::CMauiEdit::DeleteSelection(
  * What it does:
  * Returns one copy of the current edit text lane.
  */
-msvc8::string moho::CMauiEdit::GetText()
+fa::string moho::CMauiEdit::GetText()
 {
   return mText;
 }
@@ -2893,7 +2893,7 @@ void moho::CMauiEdit::DeleteCharAtCaret(
   const bool deleteToRight
 )
 {
-  const msvc8::string oldText = mText;
+  const fa::string oldText = mText;
 
   if (mSelectionStart != mSelectionEnd) {
     DeleteSelection(false);
@@ -3102,7 +3102,7 @@ void moho::CMauiEdit::HandleClickEvent(
   }
 
   const float localMouseX = eventData->mMousePos.x - CScriptLazyVar_float::GetValue(&mLeftLV);
-  msvc8::string clippedText =
+  fa::string clippedText =
     gpg::STR_Utf8SubString(mText.c_str(), mClipOffset, mClipLength);
   const int nearestCharacterIndex = mFont->GetNearestCharacterIndex(clippedText.c_str(), localMouseX);
 
@@ -3139,7 +3139,7 @@ void moho::CMauiEdit::DragMove(
 )
 {
   const float localMouseX = eventData->mMousePos.x - CScriptLazyVar_float::GetValue(&mLeftLV);
-  msvc8::string clippedText = gpg::STR_Utf8SubString(mText.c_str(), mClipOffset, mClipLength);
+  fa::string clippedText = gpg::STR_Utf8SubString(mText.c_str(), mClipOffset, mClipLength);
   const int caretIndex = mFont->GetNearestCharacterIndex(clippedText.c_str(), localMouseX) + mClipOffset;
 
   const int dragStart = mDragStart;
@@ -3397,7 +3397,7 @@ void moho::CMauiEdit::DragRelease(
   const float left = CScriptLazyVar_float::GetValue(&mLeftLV);
   const float releaseX = eventData->mMousePos.x - left;
 
-  msvc8::string clippedText =
+  fa::string clippedText =
     gpg::STR_Utf8SubString(mText.c_str(), mClipOffset, mClipLength);
   const int releaseCaret =
     mFont->GetNearestCharacterIndex(clippedText.c_str(), releaseX) + mClipOffset;
@@ -3417,8 +3417,8 @@ void moho::CMauiEdit::DragRelease(
  * (runtime_error, handler 0x0079505C).
  */
 void moho::CMauiEdit::TextChanged(
-  const msvc8::string& newText,
-  const msvc8::string& oldText
+  const fa::string& newText,
+  const fa::string& oldText
 )
 {
   (void)RunScript("OnTextChanged", newText.c_str(), oldText.c_str());
@@ -3432,10 +3432,10 @@ void moho::CMauiEdit::TextChanged(
  * state, and emits `OnTextChanged` callback when reentrancy guard allows.
  */
 void moho::CMauiEdit::SetText(
-  const msvc8::string& text
+  const fa::string& text
 )
 {
-  const msvc8::string previousText = mText;
+  const fa::string previousText = mText;
 
   mText = gpg::STR_Utf8SubString(text.c_str(), 0, mMaxChars);
   mCaretPosition = gpg::STR_Utf8Len(mText.c_str());
@@ -3459,7 +3459,7 @@ void moho::CMauiEdit::SetText(
  */
 void moho::CMauiEdit::ClearText()
 {
-  const msvc8::string previousText = mText;
+  const fa::string previousText = mText;
 
   mText.clear();
   mCaretPosition = 0;

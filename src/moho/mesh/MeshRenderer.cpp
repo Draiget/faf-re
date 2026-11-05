@@ -24,7 +24,7 @@ namespace moho
 namespace
 {
 
-  // The mesh-cache tree is `msvc8::map<MeshKey, boost::weak_ptr<Mesh>,
+  // The mesh-cache tree is `fa::map<MeshKey, boost::weak_ptr<Mesh>,
   // MeshKeyLess>` (Mesh.h). Its storage lifecycle - header sentinel
   // allocation (0x007E4770/0x007E2B50), buy_node (0x007E6090),
   // insert_unique/insert_at/link_and_rebalance (0x007E5B20/0x007E5DF0),
@@ -36,12 +36,12 @@ namespace
   // the same nodes, so they are gone; call sites use the map's own API
   // (FindOrCreateMesh, below).
 
-  // The mesh-batch bucket tree is `msvc8::map<MeshBatchKey,
-  // msvc8::vector<MeshInstance*>, MeshBatchKeyLess>` (MeshBatchKey.h). Its
+  // The mesh-batch bucket tree is `fa::map<MeshBatchKey,
+  // fa::vector<MeshInstance*>, MeshBatchKeyLess>` (MeshBatchKey.h). Its
   // storage lifecycle - header sentinel allocation (0x007E2C30), the recursive
   // payload teardown plus header relink (0x007E2D90) and the full tidy that
   // frees the header too (0x007E2B20) - is the container's own ctor / `clear()`
-  // / dtor, and `msvc8::vector` owns the bucket payload's growth and release.
+  // / dtor, and `fa::vector` owns the bucket payload's growth and release.
   // The hand-rolled copies that used to live here re-implemented all of that a
   // second time over the same nodes, so they are gone; call sites use the
   // container operations directly.
@@ -130,7 +130,7 @@ namespace
     // DestroyMeshCacheTree(meshCacheTree) explicitly, right after the
     // instance-list unlink below - years too early relative to the real
     // binary's actual reverse-declaration-order destruction sequence. Both
-    // trees are real typed `msvc8::map` members now, so both teardowns are
+    // trees are real typed `fa::map` members now, so both teardowns are
     // just implicit member destruction, naturally landing in the same
     // reverse-declaration order the binary shows: meshSpatialDb, meshes,
     // ..., insectlookupTex, anisotropiclookupTex, meshEnvironmentTex,
@@ -449,7 +449,7 @@ namespace
   // ---------------------------------------------------------------------------
 
   // AppendDefaultPaletteEntries removed: MeshShaderPaletteBuffer is
-  // msvc8::vector<SkinPaletteEntry> (see Mesh.h), so its 0x007E9280 body is
+  // fa::vector<SkinPaletteEntry> (see Mesh.h), so its 0x007E9280 body is
   // this template's own insert(pos,count,value) member for the 16-byte
   // element -- see the Address: citations added there.
 
@@ -505,7 +505,7 @@ namespace
     RegisterShaderVar(name, paletteVar, "mesh");
 
     // No explicit triplet reset needed: mPalette is a real
-    // msvc8::vector<SkinPaletteEntry> here, already empty from
+    // fa::vector<SkinPaletteEntry> here, already empty from
     // MeshShaderPaletteVar's own (implicit) default construction.
     paletteVar->mPalette.ReserveToPaletteCapacity();
     return paletteVar;
@@ -669,7 +669,7 @@ namespace
     frameSeconds += deltaFrame;
     // `fmod(float, float)` (0x00422920 -> _CIfmod): the time is stored to a
     // float argument before the call.
-    const float shaderTime = static_cast<float>(msvc8::fmod(static_cast<float>(frameSeconds), 36000.0f)); // flt_F57F08
+    const float shaderTime = static_cast<float>(fa::fmod(static_cast<float>(frameSeconds), 36000.0f)); // flt_F57F08
     if (sv.time.Exists()) {
       sv.time.SetFloat(shaderTime);
     }
@@ -914,7 +914,7 @@ namespace
     {
       if (material.mShaderIndex < 0) {
         material.mShaderIndex =
-          effect->GetIntegerAnnotation(material.mShaderAnnotation, msvc8::string("renderStage"), 0);
+          effect->GetIntegerAnnotation(material.mShaderAnnotation, fa::string("renderStage"), 0);
       }
       return material.mShaderIndex;
     }
@@ -984,7 +984,7 @@ namespace
     frameSeconds += deltaFrame;
     // `fmod(float, float)` (0x00422920 -> _CIfmod): the time is stored to a
     // float argument before the call.
-    const float shaderTime = static_cast<float>(msvc8::fmod(static_cast<float>(frameSeconds), 36000.0f)); // flt_F57F08
+    const float shaderTime = static_cast<float>(fa::fmod(static_cast<float>(frameSeconds), 36000.0f)); // flt_F57F08
     if (sv.time.Exists()) {
       sv.time.SetFloat(shaderTime);
     }
@@ -1022,7 +1022,7 @@ namespace
 
     // Walk the batch-bucket map in key order. The binary's `begin()` is
     // `head->left` and its `end()` is the header itself, stepped by `_Inc`
-    // (0x007E42F0) - which is what `msvc8::map`'s iterator does.
+    // (0x007E42F0) - which is what `fa::map`'s iterator does.
     for (const MeshBatchBucket& bucket : meshMap) {
       // A recycled bucket can sit empty over a released mesh; see
       // RecycleBatchBuckets. Skip it before touching its LOD.
@@ -1039,8 +1039,8 @@ namespace
       // renderStage gate — the only per-material gate is a non-empty technique.
       if (!material.mCartographicTechniqueResolved) {
         material.mCartographicTechniqueResolved = true;
-        const msvc8::string cartographicTechnique =
-          effect->GetStringAnnotation(material.mShaderAnnotation, msvc8::string("cartographicTechnique"), msvc8::string(""));
+        const fa::string cartographicTechnique =
+          effect->GetStringAnnotation(material.mShaderAnnotation, fa::string("cartographicTechnique"), fa::string(""));
         material.mCartographicTechnique.assign_owned(cartographicTechnique.view());
       }
 
@@ -1159,10 +1159,10 @@ namespace
    * `depthTechnique` string annotation; only the albedo sampler is bound; and
    * the batch is always drawn un-mirrored.
    *
-   * The depth-technique string is `MeshMaterial::mDepthTechnique` (a msvc8::string at
+   * The depth-technique string is `MeshMaterial::mDepthTechnique` (a fa::string at
    * mMat+0x70). The binary's reads at mMat+0x74 / +0x84 / +0x88 (`_Bx`,
    * `_Mysize`, `_Myres`) are that same string's internal members at
-   * string+0x04 / +0x14 / +0x18 — normal msvc8::string access, not a separate
+   * string+0x04 / +0x14 / +0x18 — normal fa::string access, not a separate
    * field. Cross-checked from FUN_007E03B0.asm via mAlbedoSheet at esi+0x2C =
    * mMat+0x20, mShaderIndex at esi+0x5C = mMat+0x50, mDepthTechniqueResolved at esi+0x99
    * = mMat+0x8D.
@@ -1194,7 +1194,7 @@ namespace
     frameSeconds += deltaFrame;
     // `fmod(float, float)` (0x00422920 -> _CIfmod): the time is stored to a
     // float argument before the call.
-    const float shaderTime = static_cast<float>(msvc8::fmod(static_cast<float>(frameSeconds), 36000.0f)); // flt_F57F08
+    const float shaderTime = static_cast<float>(fa::fmod(static_cast<float>(frameSeconds), 36000.0f)); // flt_F57F08
     if (sv.time.Exists()) {
       sv.time.SetFloat(shaderTime);
     }
@@ -1243,8 +1243,8 @@ namespace
       // mMat.mStr3 = GetStringAnnotation(mAnnot,"depthTechnique",""); }`).
       if (!material.mDepthTechniqueResolved) {
         material.mDepthTechniqueResolved = true;
-        const msvc8::string depthTechnique =
-          meshEffect->GetStringAnnotation(material.mShaderAnnotation, msvc8::string("depthTechnique"), msvc8::string(""));
+        const fa::string depthTechnique =
+          meshEffect->GetStringAnnotation(material.mShaderAnnotation, fa::string("depthTechnique"), fa::string(""));
         material.mDepthTechnique.assign_owned(depthTechnique.view());
       }
 
@@ -1363,8 +1363,8 @@ namespace
       // the stored word is the one the binary stores.
       if (!material.mEnvironmentSheet) {
         if (terrainRes != nullptr) {
-          const msvc8::string environmentKey =
-            meshEffect->GetStringAnnotation(material.mShaderAnnotation, msvc8::string("environment"), msvc8::string("<default>"));
+          const fa::string environmentKey =
+            meshEffect->GetStringAnnotation(material.mShaderAnnotation, fa::string("environment"), fa::string("<default>"));
           material.mEnvironmentSheet = terrainRes->GetEnvLookup(environmentKey);
         } else {
           material.mEnvironmentSheet = meshEnvironmentTex;
@@ -1556,7 +1556,7 @@ namespace
     boost::shared_ptr<MeshBatch> batchHandle;
     lod->GetStaticBatch(batchHandle);
     if (batchHandle) {
-      msvc8::vector<MeshInstance*> singleInstance;
+      fa::vector<MeshInstance*> singleInstance;
       singleInstance.push_back(meshInstance);
       batchHandle->Render(singleInstance, false);
     }
@@ -1641,7 +1641,8 @@ namespace
         + fadePlane.x * worldPos.x
         + fadePlane.w;
 
-      const boost::shared_ptr<Mesh> mesh = instance->GetMesh();
+      // Engine change: the instance holds its mesh, so this walk needs no counted copy per instance.
+      Mesh* const mesh = instance->mesh.get();
       const MeshLOD* const lod = mesh->ComputeLOD(distance);
 
       if (lod == nullptr || distance > (mesh->GetMaxCutoff() + ren_MeshDissolve)) {

@@ -105,7 +105,7 @@ namespace gal {
        * Slot: 5
        * Demangled: gpg::gal::DeviceD3D9::GetModesForAdapter
        */
-      void GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
+      void GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
       /**
        * Address: 0x008EAB20 (FUN_008EAB20)
        * Slot: 7
@@ -253,7 +253,7 @@ namespace gal {
        */
       void SaveCubeRenderTarget(
           const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
-          const msvc8::string& filePath
+          const fa::string& filePath
        ) override;
       /**
        * Address: 0x008EC970 (FUN_008EC970)
@@ -265,7 +265,7 @@ namespace gal {
        */
       void SaveRenderTarget(
           const boost::shared_ptr<RenderTarget>& renderTarget,
-          const msvc8::string& filePath,
+          const fa::string& filePath,
           int fileFormat
        ) override;
       /**
@@ -278,7 +278,7 @@ namespace gal {
        */
       void SaveTexture(
           const boost::shared_ptr<Texture>& texture,
-          const msvc8::string& filePath,
+          const fa::string& filePath,
           int fileFormat,
           gpg::MemBuffer<char>* outBuffer
        ) override;
@@ -677,7 +677,7 @@ namespace gal {
 
     public:
       int mCurThreadId = 0;                                    // +0x24 thread that ran Setup
-      msvc8::vector<AdapterD3D9> mAdapters;                    // +0x28
+      fa::vector<AdapterD3D9> mAdapters;                    // +0x28
       DeviceContext mDeviceContext{DeviceApi::Unset};          // +0x38 the context actually in force
       boost::shared_ptr<PipelineStateD3D9> mPipelineState;     // +0x6C
       IDirect3D9* mDirect3D = nullptr;                         // +0x74

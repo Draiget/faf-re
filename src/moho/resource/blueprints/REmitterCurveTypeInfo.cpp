@@ -16,7 +16,7 @@ namespace
 {
   using CurveTypeInfo = moho::REmitterBlueprintCurveTypeInfo;
   using CurveKeyTypeInfo = moho::REmitterCurveKeyTypeInfo;
-  using CurveKeyVector = msvc8::vector<moho::REmitterCurveKey>;
+  using CurveKeyVector = fa::vector<moho::REmitterCurveKey>;
 
   class CurveKeyVectorTypeInfo final : public gpg::RType, public gpg::RIndexed
   {
@@ -32,9 +32,9 @@ namespace
      *
      * What it does:
      * Returns base lexical text plus reflected vector size for one
-     * `msvc8::vector<moho::REmitterCurveKey>` instance.
+     * `fa::vector<moho::REmitterCurveKey>` instance.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     /**
      * Address: 0x00515C40 (FUN_00515C40, gpg::RVectorType_REmitterCurveKey::Init)
@@ -402,11 +402,11 @@ namespace
    *
    * What it does:
    * Builds and caches lexical reflection name `vector<element>` for
-   * `msvc8::vector<moho::REmitterCurveKey>`.
+   * `fa::vector<moho::REmitterCurveKey>`.
    */
   const char* CurveKeyVectorTypeInfo::GetName() const
   {
-    static msvc8::string cachedName{};
+    static fa::string cachedName{};
     if (cachedName.empty()) {
       const gpg::RType* const elementType = gpg::RTypeOf<moho::REmitterCurveKey>();
       const char* const elementName = elementType ? elementType->GetName() : "REmitterCurveKey";
@@ -420,11 +420,11 @@ namespace
    *
    * What it does:
    * Returns base lexical text plus reflected vector size for one
-   * `msvc8::vector<moho::REmitterCurveKey>` instance.
+   * `fa::vector<moho::REmitterCurveKey>` instance.
    */
-  msvc8::string CurveKeyVectorTypeInfo::GetLexical(const gpg::RRef& ref) const
+  fa::string CurveKeyVectorTypeInfo::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
@@ -438,7 +438,7 @@ namespace
    *
    * What it does:
    * Sets vector type metadata and installs serializer callbacks for
-   * `msvc8::vector<moho::REmitterCurveKey>`.
+   * `fa::vector<moho::REmitterCurveKey>`.
    */
   void CurveKeyVectorTypeInfo::Init()
   {
@@ -835,7 +835,7 @@ namespace moho
   gpg::RType* preregister_VectorREmitterCurveKeyType()
   {
     auto* const typeInfo = &AcquireREmitterCurveKeyVectorTypeInfo();
-    gpg::PreRegisterRType(typeid(msvc8::vector<REmitterCurveKey>), typeInfo);
+    gpg::PreRegisterRType(typeid(fa::vector<REmitterCurveKey>), typeInfo);
     return typeInfo;
   }
 

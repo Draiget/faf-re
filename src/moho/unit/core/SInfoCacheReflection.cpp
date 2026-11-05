@@ -110,7 +110,7 @@ namespace
 
     const char* const expected = expectedType ? expectedType->GetName() : "null";
     const char* const actual = tracked.type ? tracked.type->GetName() : "null";
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
       expected,
       actual
@@ -168,8 +168,8 @@ namespace moho
    */
   SInfoCacheTypeInfo::~SInfoCacheTypeInfo()
   {
-    fields_ = msvc8::vector<gpg::RField>{};
-    bases_ = msvc8::vector<gpg::RField>{};
+    fields_ = fa::vector<gpg::RField>{};
+    bases_ = fa::vector<gpg::RField>{};
   }
 
   /**

@@ -150,7 +150,7 @@ namespace
     ReleaseAdapterOutputAndDeviceRefs(this);
     // Each entry's inner mode vector goes with the outer one; both are real
     // containers, so `modes_ = {}` is the whole teardown (0x008F76C0).
-    modes_ = msvc8::vector<AdapterModeD3D10>{};
+    modes_ = fa::vector<AdapterModeD3D10>{};
   }
 }
 

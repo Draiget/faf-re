@@ -18,7 +18,7 @@ namespace moho
   class Sim;
   class Unit;
 
-  using SRectList = msvc8::list<gpg::Rect2i>;
+  using SRectList = fa::list<gpg::Rect2i>;
 
   static_assert(sizeof(SRectList) == 0x0C, "SRectList size must be 0x0C");
 

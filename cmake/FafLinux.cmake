@@ -275,6 +275,7 @@ foreach(_src IN LISTS FAF_HEADLESS_SOURCES)
   list(APPEND _faf_headless_files "${PROJECT_SOURCE_DIR}/src/${_src}")
 endforeach()
 add_executable(headless ${_faf_headless_files}
+  "${PROJECT_SOURCE_DIR}/src/headless/ReplayTargetAudit.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"

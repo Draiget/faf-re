@@ -101,7 +101,7 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
-    msvc8::vector<SPickUpInfo> mPickupQueue;  // 0x30
+    fa::vector<SPickUpInfo> mPickupQueue;  // 0x30
     EntitySetTemplate<Unit> mRequestedUnits;   // 0x40
     Wm3::Vector3f mPickupCenter;              // 0x68
     std::int32_t mReadyUnitCount;             // 0x74

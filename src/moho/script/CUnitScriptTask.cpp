@@ -182,7 +182,7 @@ namespace
 
     const char* const expected = gpg::RTypeOf<CUnitCommand>() ? gpg::RTypeOf<CUnitCommand>()->GetName() : "CUnitCommand";
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
       expected ? expected : "CUnitCommand",
       actual ? actual : "null"
@@ -472,8 +472,8 @@ int moho::cfunc_LUnitMoveL(LuaPlus::LuaState* const state)
   // targets fold the same way as in the shipped engine.
   const float halfFootprintX = static_cast<float>(footprint.mSizeX) * 0.5f;
   const float halfFootprintZ = static_cast<float>(footprint.mSizeZ) * 0.5f;
-  const int originX = static_cast<int>(static_cast<std::int16_t>(msvc8::RoundToInt(targetPos.x - halfFootprintX)));
-  const int originZ = static_cast<int>(static_cast<std::int16_t>(msvc8::RoundToInt(targetPos.z - halfFootprintZ)));
+  const int originX = static_cast<int>(static_cast<std::int16_t>(fa::RoundToInt(targetPos.x - halfFootprintX)));
+  const int originZ = static_cast<int>(static_cast<std::int16_t>(fa::RoundToInt(targetPos.z - halfFootprintZ)));
 
   SNavGoal goal{};
   goal.mPos1 = gpg::Rect2i{originX, originZ, originX + 1, originZ + 1};
@@ -553,8 +553,8 @@ namespace
       // `fld`/`fistp` (round to nearest, ties to even -- not `__ftol`
       // truncation), then read back through `movsx word` so out-of-range
       // ground targets fold to int16 the same way.
-      const auto originX = static_cast<std::int16_t>(msvc8::RoundToInt(target->position.x - 0.5f));
-      const auto originZ = static_cast<std::int16_t>(msvc8::RoundToInt(target->position.z - 0.5f));
+      const auto originX = static_cast<std::int16_t>(fa::RoundToInt(target->position.x - 0.5f));
+      const auto originZ = static_cast<std::int16_t>(fa::RoundToInt(target->position.z - 0.5f));
       out->x0 = originX;
       out->z0 = originZ;
       out->x1 = originX + 1;

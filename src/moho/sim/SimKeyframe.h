@@ -91,6 +91,9 @@ namespace moho
   [[nodiscard]] bool SIM_WriteKeyframeHeader(std::FILE* file, const SSimKeyframeHeader& header);
   [[nodiscard]] bool SIM_ReadKeyframeHeader(std::FILE* file, SSimKeyframeHeader& header);
 
+  /** The compression of the keyframes the replay viewer keeps. */
+  constexpr int kSimKeyframeZstdLevel = 3;
+
   /**
    * Makes the next `Sim::Load` restore a keyframe with this header: exact archive mode (see
    * gSimExactArchive), the terrain stamps, and no post-load Lua, which would change the sim.

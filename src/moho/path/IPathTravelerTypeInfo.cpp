@@ -38,7 +38,7 @@ namespace gpg
      * What it does:
      * Returns inherited lexical text for the reflected DList lane.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x00767480 (FUN_00767480, gpg::RDListType_IPathTraveler::SerSave)
@@ -93,7 +93,7 @@ gpg::RDListType_IPathTraveler::~RDListType_IPathTraveler() = default;
  */
 const char* gpg::RDListType_IPathTraveler::GetName() const
 {
-  static const msvc8::string sName =
+  static const fa::string sName =
     gpg::STR_Printf("DList<%s,%s>", gpg::RTypeOf<moho::IPathTraveler>()->GetName(), gpg::RTypeOf<void>()->GetName());
   return sName.c_str();
 }
@@ -104,9 +104,9 @@ const char* gpg::RDListType_IPathTraveler::GetName() const
  * What it does:
  * Returns inherited lexical text for the reflected DList lane.
  */
-msvc8::string gpg::RDListType_IPathTraveler::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RDListType_IPathTraveler::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s", base.c_str());
 }
 

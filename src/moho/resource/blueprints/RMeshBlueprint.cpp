@@ -58,23 +58,23 @@ namespace moho
         return false;
       }
 
-      msvc8::string requestedPath{};
+      fa::string requestedPath{};
       requestedPath.assign_owned(resourceName);
 
-      msvc8::string resolvedPath{};
-      const msvc8::string* const resolved =
+      fa::string resolvedPath{};
+      const fa::string* const resolved =
         waitHandleSet->mHandle->FindFile(&resolvedPath, requestedPath.c_str(), nullptr);
       return resolved != nullptr && !resolved->empty();
     }
 
     void ResolveExplicitOrFallbackPath(
-      msvc8::string& destination, const std::string_view sourcePath, const std::string_view fallbackName
+      fa::string& destination, const std::string_view sourcePath, const std::string_view fallbackName
     )
     {
       if (!destination.empty()) {
-        msvc8::string sourcePathText;
+        fa::string sourcePathText;
         sourcePathText.assign_owned(sourcePath);
-        const msvc8::string completedPath = RES_CompletePath(destination.c_str(), sourcePathText.c_str());
+        const fa::string completedPath = RES_CompletePath(destination.c_str(), sourcePathText.c_str());
         destination.assign_owned(completedPath.view());
         return;
       }
@@ -238,12 +238,12 @@ namespace moho
    * fallback naming rules (`_lod%d.scm`, `_albedo.dds`, `_normalsTS.dds`,
    * `_SpecTeam.dds`, `_lookup.dds`).
    */
-  void RMeshBlueprintLOD::Init(const msvc8::string& sourcePath, const std::uint32_t lodIndex)
+  void RMeshBlueprintLOD::Init(const fa::string& sourcePath, const std::uint32_t lodIndex)
   {
     const std::string sourcePrefix = ExtractMeshFamilyPrefix(sourcePath.view());
 
     if (!mMeshName.empty()) {
-      const msvc8::string completedPath = RES_CompletePath(mMeshName.c_str(), sourcePath.c_str());
+      const fa::string completedPath = RES_CompletePath(mMeshName.c_str(), sourcePath.c_str());
       mMeshName.assign_owned(completedPath.view());
     } else {
       const std::string lodMeshName = sourcePrefix + "_lod" + std::to_string(lodIndex) + ".scm";
@@ -348,7 +348,7 @@ namespace moho
     RRuleGameRules* rules = nullptr;
     const gpg::RRef owner{};
     archive.ReadPointer(&rules, &owner);
-    msvc8::string id;
+    fa::string id;
     archive.ReadString(&id);
     RResId resId{};
     gpg::STR_CopyFilename(&resId.name, &id);

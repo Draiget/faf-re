@@ -295,7 +295,7 @@ namespace
 
   [[nodiscard]] moho::UserEntity* ActiveCameraTargetEntity(const moho::CameraImpl& camera) noexcept
   {
-    using TargetList = msvc8::list<moho::WeakPtr<moho::UserEntity>>;
+    using TargetList = fa::list<moho::WeakPtr<moho::UserEntity>>;
     const TargetList::const_iterator active = camera.mActiveTarget;
     if (active == TargetList::const_iterator{} || active == camera.mTargetEntities.end()) {
       return nullptr;
@@ -598,7 +598,7 @@ moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus:
  * heap-allocated `CameraTimeSource` slots (`SystemTimeSource` at index
  * 0 and `GameTimeSource` at index 1) through their scalar-deleting vtable
  * slot (mirroring the binary's `eh vector destructor iterator`). Destroys
- * the embedded `GeomCamera3` and `msvc8::string` name lanes, runs
+ * the embedded `GeomCamera3` and `fa::string` name lanes, runs
  * `CScriptEvent::~CScriptEvent` on the sub-object at +0x0C, and finally
  * chains through `RCamCamera::~RCamCamera` (via `DetachRuntimeCameraBase`)
  * to forget this camera from the global manager and rejoin the broadcaster
@@ -651,7 +651,7 @@ moho::CameraImpl::~CameraImpl()
   }
 
   // The embedded `GeomCamera3` (which releases solid-frustum heap storage)
-  // and the `mName` `msvc8::string` are destroyed by the compiler after this
+  // and the `mName` `fa::string` are destroyed by the compiler after this
   // body returns, because both are members. The binary's teardown of those
   // two lanes is that emitted epilogue, not a source line -- destroying them
   // explicitly here would run each destructor twice and double-free the
@@ -670,7 +670,7 @@ moho::CameraImpl::~CameraImpl()
  * What it does:
  * Applies one camera acceleration mode token to runtime lane `mAccType`.
  */
-void moho::CameraImpl::CameraSetAccType(const msvc8::string& accType)
+void moho::CameraImpl::CameraSetAccType(const fa::string& accType)
 {
   if (_stricmp(accType.c_str(), kCameraAccTypeLinearName) == 0) {
     mAccType = kCameraAccTypeLinear;
@@ -1384,7 +1384,7 @@ void moho::CameraImpl::TimedMoveInit(const float seconds, const float transition
 [[nodiscard]] static float NormalizeQuadrantRelative(const float angleRadians, const float referenceRadians) noexcept
 {
   // 0x007A88A9..0x007A88B2: the MSVC8 CRT `_CIfmod`.
-  float normalized = static_cast<float>(msvc8::fmod(static_cast<double>(angleRadians), static_cast<double>(kTwoPi)));
+  float normalized = static_cast<float>(fa::fmod(static_cast<double>(angleRadians), static_cast<double>(kTwoPi)));
 
   if (normalized < -kPi) {
     normalized += kTwoPi;
@@ -3345,7 +3345,7 @@ int moho::cfunc_CameraImplSetAccModeL(LuaPlus::LuaState* const state)
     modeObject.TypeError("string");
   }
 
-  msvc8::string accTypeName{};
+  fa::string accTypeName{};
   accTypeName.assign_owned(modeText != nullptr ? modeText : "");
   camera->CameraSetAccType(accTypeName);
   return 0;

@@ -48,7 +48,7 @@ namespace gpg
     /**
      * Address: 0x00553110 (FUN_00553110, gpg::RFastVectorType_SOCellPos::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x005531A0 (FUN_005531A0, gpg::RFastVectorType_SOCellPos::IsIndexed)

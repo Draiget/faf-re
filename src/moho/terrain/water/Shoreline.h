@@ -106,7 +106,7 @@ namespace moho
     // +0x04, which lands mCells exactly on +0x94. It used to be an 8-byte
     // handle plus an opaque mUnknown0C_93[0x88] tail.
     SpatialDB<ShoreCell> mSpatialDb;                             // +0x04
-    msvc8::vector<boost::shared_ptr<ShoreCell>> mCells;          // +0x94
+    fa::vector<boost::shared_ptr<ShoreCell>> mCells;          // +0x94
     boost::shared_ptr<ID3DVertexSheet> mVertexSheet;             // +0xA4
     std::int32_t mShorelineTris;                                 // +0xAC
   };

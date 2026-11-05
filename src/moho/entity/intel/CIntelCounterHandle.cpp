@@ -23,7 +23,7 @@ namespace
   {
     const char* const expected = expectedType ? expectedType->GetName() : "null";
     const char* const actual = source.mType ? source.mType->GetName() : "null";
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected,

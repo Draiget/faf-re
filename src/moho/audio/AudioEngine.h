@@ -261,10 +261,10 @@ namespace moho
     virtual std::int32_t __stdcall GetGlobalVariable(std::uint16_t variableIndex, float* outValue) = 0; // +0x5C
   };
 
-  // `{proxy, first, last, end}` at 0x10 is `msvc8::vector<void*>` itself: the
+  // `{proxy, first, last, end}` at 0x10 is `fa::vector<void*>` itself: the
   // bank and handle vectors hold opaque loader/handle pointers that the engine
   // destroys through their own vtables before the storage is freed.
-  using AudioPointerVectorStorage = msvc8::vector<void*>;
+  using AudioPointerVectorStorage = fa::vector<void*>;
 
   static_assert(sizeof(AudioPointerVectorStorage) == 0x10, "AudioPointerVectorStorage size must be 0x10");
 
@@ -404,15 +404,15 @@ namespace moho
     /**
      * Set of currently-paused category names.
      *
-     * Real `msvc8::set<msvc8::string>` instantiation (`rb_tree<rb_set_traits<
-     * msvc8::string, Less>>`; `value_type == msvc8::string`, no separate
+     * Real `fa::set<fa::string>` instantiation (`rb_tree<rb_set_traits<
+     * fa::string, Less>>`; `value_type == fa::string`, no separate
      * mapped value -- see `Set.h`). Was previously modelled as a hand-rolled,
      * hand-walked `AudioMapStorage`/`AudioMap1CategoryNode` tree whose insert
      * path had no rebalancing step at all -- see RbTree.h's
      * `insert_unique`/`insert_at` citations for this instantiation and
      * `.memory/project_audiomap1_missing_rebalance_bug.md`.
      */
-    msvc8::set<msvc8::string> mPausedCategoryNames; // +0x28
+    fa::set<fa::string> mPausedCategoryNames; // +0x28
     IXACTEngine* mInstance;             // +0x34
     Audio3DListener mListener;          // +0x38
 
@@ -421,7 +421,7 @@ namespace moho
      * (`1.0f`) the first time it is touched by either `AudioEngine::
      * SetVolume` or `AudioEngine::GetVolume`.
      *
-     * Real `msvc8::map<std::uint16_t, float>` instantiation (`rb_tree<
+     * Real `fa::map<std::uint16_t, float>` instantiation (`rb_tree<
      * rb_map_traits<std::uint16_t, float, Less>>`; key = XACT category id,
      * mapped value = volume scalar -- see `Map.h`). Was previously modelled
      * as a hand-rolled, hand-walked `AudioMapStorage`/`AudioCategoryVolumeNode`
@@ -429,7 +429,7 @@ namespace moho
      * `insert_hint`/`insert_at`/`insert_unique` citations for this
      * instantiation and `.memory/project_handrolled_rbtrees_are_the_wall.md`.
      */
-    msvc8::map<std::uint16_t, float> mCategoryVolumes; // +0x6C
+    fa::map<std::uint16_t, float> mCategoryVolumes; // +0x6C
     float mGlobalCategoryVolume;        // +0x78
     Audio3DDspSettings mSettings;       // +0x7C
     Audio3DEmitter mEmitter;            // +0xAC
@@ -727,7 +727,7 @@ namespace moho
    * What it does:
    * Returns the registered name for one global sound variable id.
    */
-  msvc8::string SND_GetVariableName(int variableId);
+  fa::string SND_GetVariableName(int variableId);
 
   /**
    * Address: 0x004D8810 (FUN_004D8810, func_HandleSoundEvent)

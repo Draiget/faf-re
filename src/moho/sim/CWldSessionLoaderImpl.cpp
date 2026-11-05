@@ -191,7 +191,7 @@ namespace moho
       }
 
     private:
-      msvc8::auto_ptr<CWldMap> mMap;
+      fa::auto_ptr<CWldMap> mMap;
       std::thread mThread;
       std::exception_ptr mError;
       bool mLoaded = false;
@@ -329,7 +329,7 @@ namespace moho
       if (startSimEarly) {
         RULE_ReleaseDeferredScriptBlueprints(scenario->mGameRules); // the session and the sim both have their copy
       } else {
-        msvc8::auto_ptr<CWldMap> loadedMap(earlyMap ? loadedEarly : new CWldMap());
+        fa::auto_ptr<CWldMap> loadedMap(earlyMap ? loadedEarly : new CWldMap());
         if (earlyMap ? loadedEarly != nullptr : loadedMap->MapLoad(scenario->mMapName.c_str(), scenario->mState, false, *loadControl)) {
           AcceptMap(scenario, loadedMap.release());
         }
@@ -413,9 +413,9 @@ namespace moho
    * Address: 0x00886200 (FUN_00886200, func_GetScenarioInfo)
    */
   SWldScenarioInfo*
-  CWldSessionLoaderImpl::FindOrCreateScenarioInfo(const char* const mapName, const msvc8::string& gameMods)
+  CWldSessionLoaderImpl::FindOrCreateScenarioInfo(const char* const mapName, const fa::string& gameMods)
   {
-    const msvc8::string loweredMap = gpg::STR_ToLower(mapName ? mapName : "");
+    const fa::string loweredMap = gpg::STR_ToLower(mapName ? mapName : "");
 
     for (auto* node = mScenarioHead.mNext; node != &mScenarioHead; node = node->mNext) {
       auto* const scenario = static_cast<SWldScenarioInfo*>(node);
@@ -433,12 +433,12 @@ namespace moho
    * Address: 0x008858A0 (FUN_008858A0)
    */
   SWldScenarioInfo* CWldSessionLoaderImpl::GetScenarioInfo(
-    const char* const mapName, msvc8::string* const gameMods, const bool setGameData
+    const char* const mapName, fa::string* const gameMods, const bool setGameData
   )
   {
     SetCreated();
 
-    const msvc8::string requestedMods = gameMods ? *gameMods : msvc8::string{};
+    const fa::string requestedMods = gameMods ? *gameMods : fa::string{};
     SWldScenarioInfo* result = FindOrCreateScenarioInfo(mapName, requestedMods);
     result->ListLinkAfter(&mScenarioHead);
 
@@ -458,11 +458,11 @@ namespace moho
   /**
    * Address: 0x00885920 (FUN_00885920)
    */
-  SWldScenarioInfo* CWldSessionLoaderImpl::CreateScenarioInfo(const char* const mapName, msvc8::string* const gameMods)
+  SWldScenarioInfo* CWldSessionLoaderImpl::CreateScenarioInfo(const char* const mapName, fa::string* const gameMods)
   {
     SetCreated();
 
-    const msvc8::string requestedMods = gameMods ? *gameMods : msvc8::string{};
+    const fa::string requestedMods = gameMods ? *gameMods : fa::string{};
     SWldScenarioInfo* const scenario = FindOrCreateScenarioInfo(mapName, requestedMods);
     mGameData = scenario;
     scenario->ListLinkAfter(&mScenarioHead);
@@ -644,7 +644,7 @@ namespace moho
 
         if (!IsInterlockedLoadingEnabled()) {
           if (!scenario->mLoadTask) {
-            const msvc8::string workerName = gpg::STR_Printf("Map loader %s", scenario->mMapName.c_str());
+            const fa::string workerName = gpg::STR_Printf("Map loader %s", scenario->mMapName.c_str());
             SWldScenarioLoadTask* const createdTask =
               SWldScenarioLoadTask::Create(workerName.c_str(), scenario, &WorldSessionUserLoad);
             SWldScenarioLoadTask::AssignWithRelease(scenario->mLoadTask, createdTask);

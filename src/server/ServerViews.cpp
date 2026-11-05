@@ -38,7 +38,7 @@ namespace faf::server
 
   CServerViews::CServerViews(
     const remote::wire::SContentTables& tables, moho::RRuleGameRules& rules, const float mapSizeX, const float mapSizeZ, CServerNet& net,
-    std::map<std::size_t, std::int32_t> players, const unsigned int threads
+    std::map<std::size_t, std::int32_t> players, const unsigned int threads, const bool teams
   )
     : CViewLanes(tables, mapSizeX, mapSizeZ)
     , mRules(rules)
@@ -57,6 +57,9 @@ namespace faf::server
     EnableHeldFrames(false);
     SetParallel(true);
     EnablePipeline(threads);
+    if (teams) {
+      EnableTeamViews();
+    }
     EnableLuaRouting({});
   }
 
@@ -100,6 +103,7 @@ namespace faf::server
       [this](const std::int32_t army) -> const remote::CViewIdMap* {
         return army >= 0 && static_cast<std::size_t>(army) < ViewCount() ? &IdMap(army) : nullptr;
       },
+      [this](const std::int32_t army, const std::uint32_t id) { return army >= 0 && ViewHoldsEntity(static_cast<std::size_t>(army), id); },
       [this](const std::int32_t uid, std::vector<std::uint8_t> message) { mNet.QueueView(uid, std::move(message)); }
     );
   }
@@ -110,17 +114,21 @@ namespace faf::server
     if (player == mPlayers.end()) {
       return;
     }
-    mFrameBytes.fetch_add(lanes.frame.Bytes().size(), std::memory_order_relaxed);
+    static const remote::wire::BitWriter noFrame;
+    const remote::wire::BitWriter& teamFrame = lanes.team != nullptr ? *lanes.team : noFrame;
+    mFrameBytes.fetch_add(lanes.frame.Bytes().size() + teamFrame.Bytes().size(), std::memory_order_relaxed);
     mArmyBytes.fetch_add(lanes.armies.Bytes().size(), std::memory_order_relaxed);
     mGridBytes.fetch_add(lanes.grids.Bytes().size(), std::memory_order_relaxed);
     mLuaBytes.fetch_add(lanes.lua.Bytes().size(), std::memory_order_relaxed);
     std::vector<std::uint8_t> message;
-    message.reserve(16u + lanes.frame.Bytes().size() + lanes.armies.Bytes().size() + lanes.grids.Bytes().size() + lanes.lua.Bytes().size());
+    message.reserve(24u + lanes.frame.Bytes().size() + teamFrame.Bytes().size() + lanes.armies.Bytes().size() + lanes.grids.Bytes().size() + lanes.lua.Bytes().size());
     remote::net::ByteWriter writer(message);
     writer.Byte(static_cast<std::uint8_t>(remote::net::ESeatMessage::View));
     writer.Varint(ViewBeat());
     writer.Varint(HeldCount(static_cast<std::int32_t>(army)));
+    writer.Varint(lanes.teamEntities);
     WriteLane(writer, lanes.frame);
+    WriteLane(writer, teamFrame);
     WriteLane(writer, lanes.armies);
     WriteLane(writer, lanes.grids);
     WriteLane(writer, lanes.lua);

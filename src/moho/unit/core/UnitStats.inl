@@ -186,7 +186,7 @@ void Unit::LookForStructureRebuilder()
       continue;
     }
 
-    const msvc8::vector<WeakPtr<CUnitCommand>> commandSnapshot(rebuilder->CommandQueue->mCommandVec);
+    const fa::vector<WeakPtr<CUnitCommand>> commandSnapshot(rebuilder->CommandQueue->mCommandVec);
     for (const WeakPtr<CUnitCommand>& commandRef : commandSnapshot) {
       CUnitCommand* const command = commandRef.GetObjectPtr();
       if (command == nullptr || command->mVarDat.mCmdType != EUnitCommandType::UNITCOMMAND_Guard) {

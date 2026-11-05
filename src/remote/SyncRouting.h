@@ -116,7 +116,7 @@ namespace faf::remote
     [[nodiscard]] std::int32_t FocusForLua() const noexcept override;
     void EnterCommand(moho::Sim& sim) override;
     void LeaveCommand(moho::Sim& sim) override;
-    bool Print(const msvc8::string& line) override;
+    bool Print(const fa::string& line) override;
     void SetFocusFromLua(std::int32_t army) override;
     void OnThreadForked(lua_State* parent, lua_State* thread) override;
     bool EnterThread(lua_State* thread) override;

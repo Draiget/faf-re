@@ -131,7 +131,7 @@ namespace moho
 
   int FAF_GetGameDataVersion()
   {
-    msvc8::string diskPath{};
+    fa::string diskPath{};
     if (CVirtualFileSystem* const vfs = DISK_GetVFS(); vfs != nullptr) {
       (void)vfs->FindFile(&diskPath, "/lua/version.lua", nullptr);
     }

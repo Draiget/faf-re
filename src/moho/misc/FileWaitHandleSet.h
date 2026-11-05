@@ -104,7 +104,7 @@ namespace moho
    * `{left, parent, right, std::pair<const std::string, FWHSEntry>, colour, isNil}`
    * with a 0x1C-byte key and an 8-byte value.
    */
-  using FWHSZipEntryMap = msvc8::map<msvc8::string, FWHSEntry>;
+  using FWHSZipEntryMap = fa::map<fa::string, FWHSEntry>;
 
   static_assert(sizeof(FWHSZipEntryMap) == 0x0C, "FWHSZipEntryMap size must be 0x0C");
   static_assert(sizeof(FWHSZipEntryMap::value_type) == 0x24, "FWHSZipEntryMap::value_type size must be 0x24");
@@ -117,7 +117,7 @@ namespace moho
    * and the record at `node+0x30` because `SDiskFileInfo` is 8-aligned (see
    * its declaration above), which also makes the node 0x48 rather than 0x40.
    */
-  using FWHSFileInfoMap = msvc8::map<msvc8::string, SDiskFileInfo>;
+  using FWHSFileInfoMap = fa::map<fa::string, SDiskFileInfo>;
 
   static_assert(sizeof(FWHSFileInfoMap) == 0x0C, "FWHSFileInfoMap size must be 0x0C");
   static_assert(sizeof(FWHSFileInfoMap::value_type) == 0x30, "FWHSFileInfoMap::value_type size must be 0x30");
@@ -294,7 +294,7 @@ namespace moho
      * Returns one thread-local error string storage lane for this wait-handle
      * set owner.
      */
-    [[nodiscard]] msvc8::string* ErrorString();
+    [[nodiscard]] fa::string* ErrorString();
 
     /**
      * Address: 0x00458280 (FUN_00458280, Moho::FWaitHandleSet::GetErrorString)
@@ -302,7 +302,7 @@ namespace moho
      * What it does:
      * Returns the process-global wait-handle thread-local error string storage.
      */
-    [[nodiscard]] static msvc8::string* GetErrorString();
+    [[nodiscard]] static fa::string* GetErrorString();
 
     /**
      * Address: 0x00459070 (FUN_00459070, Moho::FWaitHandleSet::InvalidateFileInfoCache)
@@ -363,7 +363,7 @@ namespace moho
    * Opens one canonicalized file path for read, preferring mounted zip entries
    * from the wait-handle set before falling back to a regular file stream.
    */
-  [[nodiscard]] msvc8::auto_ptr<gpg::Stream> DISK_OpenFileRead(gpg::StrArg sourcePath);
+  [[nodiscard]] fa::auto_ptr<gpg::Stream> DISK_OpenFileRead(gpg::StrArg sourcePath);
 
   /**
    * Address: 0x00459B90 (FUN_00459B90, ?DISK_OpenFileWrite@Moho@@YA?AV?$auto_ptr@VStream@gpg@@@std@@VStrArg@gpg@@@Z)
@@ -373,7 +373,7 @@ namespace moho
    * What it does:
    * Opens one file path for write using the legacy buffered file-stream mode.
    */
-  [[nodiscard]] msvc8::auto_ptr<gpg::Stream> DISK_OpenFileWrite(gpg::StrArg sourcePath);
+  [[nodiscard]] fa::auto_ptr<gpg::Stream> DISK_OpenFileWrite(gpg::StrArg sourcePath);
 
   /**
    * Address: 0x00459AF0 (FUN_00459AF0, ?DISK_MountZipFile@Moho@@YA?AVCDiskMountedZipHandle@1@VStrArg@gpg@@@Z)
@@ -424,7 +424,7 @@ namespace moho
    * What it does:
    * Returns a copy of the current thread-local disk error text.
    */
-  [[nodiscard]] msvc8::string DISK_GetLastError();
+  [[nodiscard]] fa::string DISK_GetLastError();
 
   /**
    * Address: 0x00459DC0 (FUN_00459DC0, ?DISK_GetVFS@Moho@@YAPAVCVirtualFileSystem@1@XZ)
@@ -669,5 +669,5 @@ namespace moho
    */
   bool FILE_GetFileInfo(gpg::StrArg sourcePath, SDiskFileInfo* outInfo, bool realOnly);
 
-  msvc8::string* FILE_ToMountedPath(msvc8::string* outPath, gpg::StrArg sourcePath);
+  fa::string* FILE_ToMountedPath(fa::string* outPath, gpg::StrArg sourcePath);
 } // namespace moho

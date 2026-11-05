@@ -57,6 +57,7 @@
 #include "headless/ReplaySeats.h"
 #endif
 #if FAF_HEADLESS_NET
+#include "headless/ReplayTargetAudit.h"
 #include "remote/net/UdpSocket.h"
 #include "server/ServerNet.h"
 #include "server/ServerViews.h"
@@ -126,8 +127,8 @@ namespace faf::headless
 
       void OnMessage(
         const gpg::LogSeverity level,
-        const msvc8::string& message,
-        const msvc8::vector<msvc8::string>& context,
+        const fa::string& message,
+        const fa::vector<fa::string>& context,
         const int previousDepth
       ) override
       {
@@ -434,15 +435,15 @@ namespace faf::headless
     const bool liveRejoin = !options.rejoinPeers.empty();
     const bool rejoinRehearsal = options.rejoinSource >= 0 && !liveRejoin;
     std::unique_ptr<gpg::Stream> rejoinRecording;
-    msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo;
+    fa::auto_ptr<moho::SWldSessionInfo> sessionInfo;
     if (liveRejoin) {
       // Issue #275: as `CScApp` does for /rejoin, without a window to wait in.
-      msvc8::string reason;
+      fa::string reason;
       bool failed = !moho::REJOIN_BeginSetup(
         options.rejoinPeers.c_str(), options.rejoinSource, static_cast<unsigned short>(options.rejoinPort), &reason
       );
       while (!failed && sessionInfo.get() == nullptr) {
-        msvc8::auto_ptr<moho::SWldSessionInfo> polled = moho::REJOIN_PollSetup(&reason, &failed);
+        fa::auto_ptr<moho::SWldSessionInfo> polled = moho::REJOIN_PollSetup(&reason, &failed);
         if (polled.get() != nullptr) {
           sessionInfo = polled;
         } else if (!failed) {
@@ -521,6 +522,7 @@ namespace faf::headless
       }
       netConfig.joinSeconds = 1.0e9;
       netConfig.reconnectSeconds = 1.0e9;
+      netConfig.holdViewsForJoin = !options.targetAudit;
       seatNet = std::make_unique<faf::server::CServerNet>(netConfig);
       for (faf::remote::CServerClient* const seat : seatFeed->Seats()) {
         seatNet->AddSeat(seat->GetIndex(), seat->GetNickname().c_str(), "seat-" + std::to_string(seat->GetIndex()), *seat);
@@ -711,6 +713,7 @@ namespace faf::headless
     }
     // `--view-bench`: the server's view work alone, timed (also a sync-walk observer).
     std::unique_ptr<CReplayViewBench> viewBench;
+    std::FILE* viewDumpFile = nullptr; // left open: the sim may run on past this function's end
     if (!options.viewBenchPath.empty()) {
       viewBench = std::make_unique<CReplayViewBench>(
         options.viewBenchPath, tables, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, options.viewBenchCheck
@@ -721,6 +724,13 @@ namespace faf::headless
       }
       viewBench->SetParallel(options.parallelViews);
       viewBench->EnablePipeline(static_cast<unsigned int>(options.viewPipelineThreads));
+      if (options.viewTeams) {
+        viewBench->EnableTeamViews();
+      }
+      if (!options.viewDumpPath.empty()) {
+        viewDumpFile = std::fopen(options.viewDumpPath.c_str(), "wb");
+        viewBench->SetViewDump(viewDumpFile);
+      }
       if (options.luaRouting) {
         viewBench->EnableLuaRouting(options.luaRoutingDump);
         if (options.spy) {
@@ -763,9 +773,14 @@ namespace faf::headless
       }
       seatViews = std::make_unique<faf::server::CServerViews>(
         tables, *rules, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, *seatNet, std::move(players),
-        static_cast<unsigned int>(std::max(options.viewPipelineThreads, 1))
+        static_cast<unsigned int>(std::max(options.viewPipelineThreads, 1)), options.viewTeams
       );
       seatViews->Install();
+    }
+    std::unique_ptr<CReplayTargetAudit> targetAudit;
+    if (seatViews && options.targetAudit) {
+      targetAudit = std::make_unique<CReplayTargetAudit>(*rules, *seatViews);
+      targetAudit->Install();
     }
 #endif
 
@@ -1114,6 +1129,9 @@ namespace faf::headless
       );
       if (seatViews) {
         std::printf("[%s] %s\n[%s] %s\n", label, seatViews->LaneReport().c_str(), label, seatNet->Intake().Report().c_str());
+      }
+      if (targetAudit) {
+        std::printf("[%s] %s\n", label, targetAudit->Summary().c_str());
       }
       std::fflush(stdout);
     }

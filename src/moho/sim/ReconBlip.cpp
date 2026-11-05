@@ -814,7 +814,7 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
 ReconBlip::~ReconBlip()
 {
   // `mReconDat` is the last-declared member, so MSVC emits its
-  // `msvc8::vector<SPerArmyReconInfo>::~vector()` (FUN_005C5580, called at
+  // `fa::vector<SPerArmyReconInfo>::~vector()` (FUN_005C5580, called at
   // 0x005BECBB) as the first teardown step of this epilogue. Nothing to write.
   // FUN_005BEC90 destroys the payload in place and re-inits it before the
   // rest of the epilogue runs; `mUnitVarDat`'s own destructor then sees an
@@ -1215,34 +1215,6 @@ bool ReconBlip::IsMaybeDead(CArmyImpl* const army) const
 bool ReconBlip::IsFake() const noexcept
 {
   return mUnitConstDat.mFake != 0u;
-}
-
-SPerArmyReconInfo* ReconBlip::GetPerArmyReconInfo(const std::int32_t armyIndex) noexcept
-{
-  if (armyIndex < 0 || mReconDat.begin() == nullptr || mReconDat.end() == nullptr) {
-    return nullptr;
-  }
-
-  const std::ptrdiff_t count = mReconDat.end() - mReconDat.begin();
-  if (armyIndex >= count) {
-    return nullptr;
-  }
-
-  return mReconDat.begin() + armyIndex;
-}
-
-const SPerArmyReconInfo* ReconBlip::GetPerArmyReconInfo(const std::int32_t armyIndex) const noexcept
-{
-  if (armyIndex < 0 || mReconDat.begin() == nullptr || mReconDat.end() == nullptr) {
-    return nullptr;
-  }
-
-  const std::ptrdiff_t count = mReconDat.end() - mReconDat.begin();
-  if (armyIndex >= count) {
-    return nullptr;
-  }
-
-  return mReconDat.begin() + armyIndex;
 }
 
 /**

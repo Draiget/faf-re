@@ -46,7 +46,7 @@ namespace moho
    * Pushes lua traceback text for the provided message and returns it.
    */
   [[nodiscard]]
-  msvc8::string SCR_Traceback(LuaPlus::LuaState* state, gpg::StrArg message);
+  fa::string SCR_Traceback(LuaPlus::LuaState* state, gpg::StrArg message);
 
   class MOHO_CLANG_EMPTY_BASE_LAYOUT CLuaTask : public CTask, public InstanceCounter<CLuaTask>
   {

@@ -49,6 +49,7 @@
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SimKeyframe.h"
 #include "moho/sim/WldSessionInfo.h"
+#include "netlink/EngineLinks.h"
 
 using namespace moho;
 
@@ -1625,7 +1626,7 @@ bool moho::REJOIN_BeginSetup(
   const char* const peers,
   const int localSource,
   const unsigned short localPort,
-  msvc8::string* const failureReason
+  fa::string* const failureReason
 )
 {
   const auto refuse = [failureReason](const char* const reason) {
@@ -1653,7 +1654,12 @@ bool moho::REJOIN_BeginSetup(
     }
     auto peer = std::make_unique<SSetupPeer>();
     peer->source = std::atoi(entry.c_str() + equals + 1);
-    if (!NET_GetAddrInfo(entry.substr(0, equals).c_str(), 0, false, peer->address, peer->port) || peer->port == 0) {
+    // In native mode the launcher knows players, not the addresses the game gives their links.
+    std::string address = entry.substr(0, equals);
+    if (!address.empty() && address.find_first_not_of("0123456789") == std::string::npos) {
+      address = faf::netlink::EngineAddressText(std::atoll(address.c_str()));
+    }
+    if (!NET_GetAddrInfo(address.c_str(), 0, false, peer->address, peer->port) || peer->port == 0) {
       return refuse("A peer's address could not be read.");
     }
     setup->list.push_back(std::move(peer));
@@ -1709,7 +1715,7 @@ float moho::REJOIN_SetupProgress()
   return sSetup != nullptr ? sSetup->list.front()->receiver.RecordingProgress() : -1.0f;
 }
 
-msvc8::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(msvc8::string* const failureReason, bool* const failed)
+fa::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(fa::string* const failureReason, bool* const failed)
 {
   SSetup& setup = *sSetup;
   INetConnector* const connector = setup.connector;
@@ -1722,7 +1728,7 @@ msvc8::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(msvc8::string* const fai
     *failed = true;
     connector->Destroy();
     sSetup.reset();
-    return msvc8::auto_ptr<SWldSessionInfo>();
+    return fa::auto_ptr<SWldSessionInfo>();
   };
 
   const auto now = std::chrono::steady_clock::now();
@@ -1770,7 +1776,7 @@ msvc8::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(msvc8::string* const fai
         "Not every player answered. The game may be over, a player may have left it, or the players may not allow coming back to a game."
       );
     }
-    return msvc8::auto_ptr<SWldSessionInfo>();
+    return fa::auto_ptr<SWldSessionInfo>();
   }
 
   const std::vector<char>& bytes = list.front()->receiver.Recording();
@@ -1780,7 +1786,7 @@ msvc8::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(msvc8::string* const fai
     std::chrono::duration<double>(std::chrono::steady_clock::now() - sRejoinStart).count()
   );
   std::unique_ptr<gpg::Stream> recording;
-  msvc8::auto_ptr<SWldSessionInfo> sessionInfo = VCR_SetupReplaySessionFromStream(
+  fa::auto_ptr<SWldSessionInfo> sessionInfo = VCR_SetupReplaySessionFromStream(
     std::make_unique<gpg::MemBufferStream>(gpg::CopyMemBuffer(bytes.data(), bytes.size())), "the peer's recording",
     failureReason, &recording
   );

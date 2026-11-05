@@ -455,7 +455,7 @@ bool moho::CRotateManipulator::ManipulatorUpdate()
       // second argument.
       const float y =
         1.0f - (((composite.orient_.x * composite.orient_.x) + (composite.orient_.y * composite.orient_.y)) * 2.0f);
-      mGoalAngle = msvc8::atan2(x, y);
+      mGoalAngle = fa::atan2(x, y);
     }
   }
 

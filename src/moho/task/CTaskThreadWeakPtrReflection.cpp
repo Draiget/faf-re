@@ -65,7 +65,7 @@ namespace
 
     const char* const expected = gpg::RTypeOf<moho::CTaskThread>()->GetName();
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "CTaskThread",
@@ -124,7 +124,7 @@ moho::RWeakPtrType<moho::CTaskThread>::~RWeakPtrType() = default;
  */
 const char* moho::RWeakPtrType<moho::CTaskThread>::GetName() const
 {
-    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<moho::CTaskThread>()->GetName());
+    static const fa::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<moho::CTaskThread>()->GetName());
     return sName.c_str();
 }
 
@@ -143,19 +143,19 @@ void moho::RWeakPtrType<moho::CTaskThread>::Init()
 /**
  * Address: 0x0040A3C0 (FUN_0040A3C0, Moho::RWeakPtrType_CTaskThread::GetLexical)
  */
-msvc8::string moho::RWeakPtrType<moho::CTaskThread>::GetLexical(const gpg::RRef& ref) const
+fa::string moho::RWeakPtrType<moho::CTaskThread>::GetLexical(const gpg::RRef& ref) const
 {
   auto* const weak = static_cast<const moho::WeakPtr<moho::CTaskThread>*>(ref.mObj);
   if (!weak || !weak->HasValue()) {
-    return msvc8::string("NULL");
+    return fa::string("NULL");
   }
 
   const gpg::RRef pointee = MakeCTaskThreadRef(weak->GetObjectPtr());
   if (!pointee.mObj) {
-    return msvc8::string("NULL");
+    return fa::string("NULL");
   }
 
-  const msvc8::string inner = pointee.GetLexical();
+  const fa::string inner = pointee.GetLexical();
   return gpg::STR_Printf("[%s]", inner.c_str());
 }
 

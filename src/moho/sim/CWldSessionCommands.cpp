@@ -49,9 +49,9 @@ namespace
       return entity;
     }
 
-    void RemoveUnitIfPresent(msvc8::vector<UserUnit*>& units, const UserUnit* const unit)
+    void RemoveUnitIfPresent(fa::vector<UserUnit*>& units, const UserUnit* const unit)
     {
-      msvc8::vector<UserUnit*> filteredUnits{};
+      fa::vector<UserUnit*> filteredUnits{};
       filteredUnits.reserve(units.size());
       for (UserUnit* const candidate : units) {
         if (candidate != unit) {
@@ -70,7 +70,7 @@ namespace
      */
     [[nodiscard]] bool SelectionContainsTeleportationUnit(WeakSet<UserEntity>& selection)
     {
-      msvc8::string teleportationCategory("TELEPORTATION");
+      fa::string teleportationCategory("TELEPORTATION");
       for (UserEntity* const entity : selection) {
         if (entity != nullptr && entity->IsInCategory(teleportationCategory)) {
           return true;
@@ -166,7 +166,7 @@ namespace
         return false;
       }
 
-      const msvc8::string podCategory("POD");
+      const fa::string podCategory("POD");
 
       for (UserEntity* const entity : selection) {
         UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
@@ -496,7 +496,7 @@ namespace
       WeakSet<UserEntity>& otherSet
     )
     {
-      const msvc8::string rallyPointCategory("RALLYPOINT");
+      const fa::string rallyPointCategory("RALLYPOINT");
 
 
       for (UserEntity* const entity : source) {
@@ -538,10 +538,10 @@ namespace
       WeakSet<UserEntity>& landUnitSet
     )
     {
-      const msvc8::string transportationCategory("TRANSPORTATION");
-      const msvc8::string airCategory("AIR");
-      const msvc8::string airStagingCategory("AIRSTAGINGPLATFORM");
-      const msvc8::string landCategory("LAND");
+      const fa::string transportationCategory("TRANSPORTATION");
+      const fa::string airCategory("AIR");
+      const fa::string airStagingCategory("AIRSTAGINGPLATFORM");
+      const fa::string landCategory("LAND");
 
       for (UserEntity* const entity : source) {
         UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
@@ -587,7 +587,7 @@ namespace
       WeakSet<UserEntity>& rebuilderSet
     )
     {
-      const msvc8::string rebuilderCategory("REBUILDER");
+      const fa::string rebuilderCategory("REBUILDER");
 
       for (UserEntity* const entity : source) {
         UserUnit* const userUnit = entity != nullptr ? entity->IsUserUnit() : nullptr;
@@ -1029,13 +1029,13 @@ namespace
       //   if (IsInCategory(hover,"FERRYBEACON")
       //       || (skip = 1, !IsInCategory(selected,"COMMAND"))) { accept: skip = 0; }
       // so `skip` survives as 1 only when the selected unit IS COMMAND.
-      const bool hoverTakesCommander = hoverEntity->IsInCategory(msvc8::string("CANTRANSPORTCOMMANDER")) ||
-                                       hoverEntity->IsInCategory(msvc8::string("FERRYBEACON"));
+      const bool hoverTakesCommander = hoverEntity->IsInCategory(fa::string("CANTRANSPORTCOMMANDER")) ||
+                                       hoverEntity->IsInCategory(fa::string("FERRYBEACON"));
       // Group 2: does the hovered entity want air transport?
-      const bool wantsAir = hoverEntity->IsInCategory(msvc8::string("TRANSPORTATION")) ||
-                            hoverEntity->IsInCategory(msvc8::string("TELEPORTATION")) ||
-                            hoverEntity->IsInCategory(msvc8::string("FERRYBEACON"));
-      if (!wantsAir && !hoverEntity->IsInCategory(msvc8::string("AIRSTAGINGPLATFORM"))) {
+      const bool wantsAir = hoverEntity->IsInCategory(fa::string("TRANSPORTATION")) ||
+                            hoverEntity->IsInCategory(fa::string("TELEPORTATION")) ||
+                            hoverEntity->IsInCategory(fa::string("FERRYBEACON"));
+      if (!wantsAir && !hoverEntity->IsInCategory(fa::string("AIRSTAGINGPLATFORM"))) {
         return false; // no selected unit can be accepted
       }
       const CNamedCategory command{"COMMAND"};
@@ -1116,10 +1116,10 @@ namespace
       //
       // Group 1: TELEPORTATION(candidate) or EXPERIMENTAL(hover) skips the candidate, so an
       // experimental hover skips them all.
-      if (reinterpret_cast<const UserEntity*>(hoverUnit)->IsInCategory(msvc8::string("EXPERIMENTAL"))) {
+      if (reinterpret_cast<const UserEntity*>(hoverUnit)->IsInCategory(fa::string("EXPERIMENTAL"))) {
         return false;
       }
-      const bool hoverIsCommander = reinterpret_cast<const UserEntity*>(hoverUnit)->IsInCategory(msvc8::string("COMMAND"));
+      const bool hoverIsCommander = reinterpret_cast<const UserEntity*>(hoverUnit)->IsInCategory(fa::string("COMMAND"));
       const CNamedCategory teleportation{"TELEPORTATION"};
       const CNamedCategory transportFocus{"TRANSPORTFOCUS"};
       const CNamedCategory canTransportCommander{"CANTRANSPORTCOMMANDER"};
@@ -1864,7 +1864,7 @@ namespace
 
         bool hoveredIsStructure = false;
         if (hoveredBlueprint != nullptr) {
-          const msvc8::string structureCategory("STRUCTURE");
+          const fa::string structureCategory("STRUCTURE");
           hoveredIsStructure = hovered->IsInCategory(structureCategory);
         }
 
@@ -2093,7 +2093,7 @@ namespace
     )
     {
       if (hovered != nullptr) {
-        const msvc8::string teleportBeaconCategory("TELEPORTBEACON");
+        const fa::string teleportBeaconCategory("TELEPORTBEACON");
         if (hovered->IsInCategory(teleportBeaconCategory) && SelectionContainsTeleportationUnit(selection)) {
           IssueOrderAtEntity(
             selection, EUnitCommandType::UNITCOMMAND_TransportUnloadUnits, *hovered, clearQueue
@@ -2123,7 +2123,7 @@ namespace
           if (entity->mVariableData.mIsDead == 0u && entity->IsUserUnit() != nullptr) {
             (void)unloadTargets.Add(entity);
 
-            const msvc8::string podCategory("POD");
+            const fa::string podCategory("POD");
             if (!entity->IsInCategory(podCategory)) {
               onlyPods = false;
             }
@@ -2174,9 +2174,9 @@ namespace
       const bool clearQueue
     )
     {
-      const bool hoveredIsAirStaging = hovered.IsInCategory(msvc8::string("AIRSTAGINGPLATFORM"));
-      const bool hoveredIsCarrier = hovered.IsInCategory(msvc8::string("CARRIER"));
-      const bool hoveredIsFerryBeacon = hovered.IsInCategory(msvc8::string("FERRYBEACON"));
+      const bool hoveredIsAirStaging = hovered.IsInCategory(fa::string("AIRSTAGINGPLATFORM"));
+      const bool hoveredIsCarrier = hovered.IsInCategory(fa::string("CARRIER"));
+      const bool hoveredIsFerryBeacon = hovered.IsInCategory(fa::string("FERRYBEACON"));
 
       SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_TransportLoadUnits);
       SetEntityTarget(commandData, hovered);
@@ -2404,7 +2404,7 @@ namespace
 
           bool reclaimable = false;
           {
-            const msvc8::string reclaimableCategory("RECLAIMABLE");
+            const fa::string reclaimableCategory("RECLAIMABLE");
             reclaimable = hovered->IsInCategory(reclaimableCategory) || hovered->IsBeingBuilt();
           }
           if (!reclaimable) {
@@ -2577,14 +2577,14 @@ namespace
     ESTITargetType targetType = static_cast<ESTITargetType>(static_cast<std::int32_t>(commandIssueData.mTarget.mType));
     gpg::RRef targetTypeRef{};
     targetTypeRef = gpg::MakeRRef<moho::ESTITargetType>(&targetType);
-    const msvc8::string targetTypeLexical = targetTypeRef.GetLexical();
+    const fa::string targetTypeLexical = targetTypeRef.GetLexical();
     targetTable.SetString("Type", targetTypeLexical.c_str());
 
     if (commandIssueData.mTarget.mType == EAiTargetType::AITARGET_Entity) {
       const EntId targetEntityId = static_cast<EntId>(commandIssueData.mTarget.mEntityId);
       if (CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
         if (UserEntity* const targetEntity = session->LookupEntityId(targetEntityId); targetEntity != nullptr) {
-          const msvc8::string entityIdLexical = gpg::STR_Printf("%d", static_cast<std::int32_t>(targetEntityId));
+          const fa::string entityIdLexical = gpg::STR_Printf("%d", static_cast<std::int32_t>(targetEntityId));
           targetTable.SetString("EntityId", entityIdLexical.c_str());
 
           const LuaPlus::LuaObject targetPositionObject =
@@ -2608,7 +2608,7 @@ namespace
     EUnitCommandType commandType = commandIssueData.mCommandType;
     gpg::RRef commandTypeRef{};
     commandTypeRef = gpg::MakeRRef<moho::EUnitCommandType>(&commandType);
-    const msvc8::string commandTypeLexical = commandTypeRef.GetLexical();
+    const fa::string commandTypeLexical = commandTypeRef.GetLexical();
     outCommandObject->SetString("CommandType", commandTypeLexical.c_str());
     outCommandObject->SetBoolean("Clear", doClear);
     return outCommandObject;
@@ -2801,7 +2801,7 @@ namespace
     constexpr std::uint32_t kShiftCtrlMask = kShiftMask | kCtrlMask;
 
     const std::uint32_t modifierBits = static_cast<std::uint32_t>(modifiers);
-    msvc8::vector<UserUnit*> nextSelection{};
+    fa::vector<UserUnit*> nextSelection{};
 
     UserEntity* const hoveredEntity = this->GetHoveredUserEntity();
     UserUnit* const hoveredUnit = hoveredEntity != nullptr ? hoveredEntity->IsUserUnit() : nullptr;
@@ -2823,7 +2823,7 @@ namespace
     }
 
     if ((modifierBits & kCtrlMask) != 0u) {
-      msvc8::vector<UserUnit*> currentSelection{};
+      fa::vector<UserUnit*> currentSelection{};
       GetSelectionUnits(currentSelection);
 
       const IUnit* const hoveredBridge = GetIUnitBridge(hoveredUnit);
@@ -2845,7 +2845,7 @@ namespace
         nextSelection = currentSelection;
       }
 
-      msvc8::vector<UserUnit*> allSessionUnits{};
+      fa::vector<UserUnit*> allSessionUnits{};
       CollectSessionUserUnits(this, allSessionUnits);
       const UserArmy* const focusArmy = GetFocusUserArmy();
       for (UserUnit* const sessionUnit : allSessionUnits) {
@@ -2917,7 +2917,7 @@ namespace
     }
 
     const RUnitBlueprint* const targetBlueprint = hoveredBridge->GetBlueprint();
-    msvc8::vector<UserUnit*> nextSelection{};
+    fa::vector<UserUnit*> nextSelection{};
     GetSelectionUnits(nextSelection);
 
     auto* const frustumUnits = camera != nullptr ? camera->GetArmyUnitsInFrustum() : nullptr;
@@ -3163,15 +3163,15 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
 
   // --- Hover branch --------------------------------------------------------
   const bool isBeingBuilt = hoverEntity->IsBeingBuilt();
-  const bool isFerryBeacon = hoverEntity->IsInCategory(msvc8::string("FERRYBEACON"));
-  const bool isCampaignGate = hoverEntity->IsInCategory(msvc8::string("CAMPAIGNGATE"));
+  const bool isFerryBeacon = hoverEntity->IsInCategory(fa::string("FERRYBEACON"));
+  const bool isCampaignGate = hoverEntity->IsInCategory(fa::string("CAMPAIGNGATE"));
 
   // Reclaim eligibility: RECLAIMABLE (or under-construction) targets are
   // reclaim-valid; everything else is not.
   bool reclaimTargetValid = true;
   if (hoverEntity->mParams.mBlueprint != nullptr) {
     const bool reclaimable =
-      hoverEntity->IsInCategory(msvc8::string("RECLAIMABLE")) || hoverEntity->IsBeingBuilt();
+      hoverEntity->IsInCategory(fa::string("RECLAIMABLE")) || hoverEntity->IsBeingBuilt();
     if (!reclaimable) {
       reclaimTargetValid = false;
     }
@@ -3218,7 +3218,7 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
     // valid with reclaim-capable selection resolve to Order+Reclaim.
     if (!resolved) {
       const bool reclaimEligible =
-        (isEnemy || hoverArmy == nullptr || hoverEntity->IsInCategory(msvc8::string("RECLAIMFRIENDLY")))
+        (isEnemy || hoverArmy == nullptr || hoverEntity->IsInCategory(fa::string("RECLAIMFRIENDLY")))
         && reclaimTargetValid && (selectionCommandCaps & RULEUCC_Reclaim) != 0;
       if (reclaimEligible) {
         commandModeData.mMode = COMMOD_Order;
@@ -3273,8 +3273,8 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
           if (repairCap != 0 && hoverEntity->IsBeingBuilt()) {
             if (UserUnit* const builtUnit = hoverEntity->IsUserUnit()) {
               if (GetIUnitBridge(builtUnit)->IsMobile()
-                  || (!hoverEntity->IsInCategory(msvc8::string("FACTORY"))
-                      && !hoverEntity->IsInCategory(msvc8::string("SILO")))) {
+                  || (!hoverEntity->IsInCategory(fa::string("FACTORY"))
+                      && !hoverEntity->IsInCategory(fa::string("SILO")))) {
                 repairUnderConstruction = true;
               }
             }

@@ -166,13 +166,13 @@ namespace
 
   struct Msvc8StringLess
   {
-    [[nodiscard]] bool operator()(const msvc8::string& lhs, const msvc8::string& rhs) const noexcept
+    [[nodiscard]] bool operator()(const fa::string& lhs, const fa::string& rhs) const noexcept
     {
       return std::strcmp(lhs.c_str(), rhs.c_str()) < 0;
     }
   };
 
-  using ColorNameMap = std::map<msvc8::string, std::uint32_t, Msvc8StringLess>;
+  using ColorNameMap = std::map<fa::string, std::uint32_t, Msvc8StringLess>;
 
   constexpr const char* kUnknownColorFmt = "Unknown color: %s";
   constexpr const char* kInvalidColorTypeText = "Invalid color, must be a string.";
@@ -218,7 +218,7 @@ namespace
  */
 bool moho::SCR_ParseColor(const char* const colorText, std::uint32_t* const outColor)
 {
-  const msvc8::string loweredColor = gpg::STR_ToLower(colorText);
+  const fa::string loweredColor = gpg::STR_ToLower(colorText);
   const ColorNameMap& colorMap = GetColorNameMap();
   const auto foundIt = colorMap.find(loweredColor);
   if (foundIt != colorMap.end()) {
@@ -279,11 +279,11 @@ std::uint32_t moho::SCR_DecodeColor(LuaPlus::LuaState* const state, const LuaPlu
  * Decodes one color string into packed ARGB and throws `XDataError` on
  * unknown color names/hex payloads.
  */
-std::uint32_t moho::SCR_DecodeColor(const msvc8::string& colorText)
+std::uint32_t moho::SCR_DecodeColor(const fa::string& colorText)
 {
   std::uint32_t decodedColor = 0;
   if (!SCR_ParseColor(colorText.c_str(), &decodedColor)) {
-    const msvc8::string errorMessage = gpg::STR_Printf(kUnknownColorFmt, colorText.c_str());
+    const fa::string errorMessage = gpg::STR_Printf(kUnknownColorFmt, colorText.c_str());
     throw XDataError(errorMessage.c_str());
   }
 

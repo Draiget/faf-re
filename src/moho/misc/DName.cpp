@@ -3,7 +3,7 @@
 #include <new>
 #include <utility>
 
-namespace msvc8
+namespace fa
 {
 
 namespace
@@ -1370,4 +1370,4 @@ DNameNode* DNameNode::clone() noexcept
   return new (pointerNodeStorage) DNamePointerNode(nestedNameStorage);
 }
 
-} // namespace msvc8
+} // namespace fa

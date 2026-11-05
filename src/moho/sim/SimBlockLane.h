@@ -3,6 +3,8 @@
 #if defined(_M_X64) || defined(__x86_64__)
 
 #include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <new>
 #include <utility>
 #include <vector>
@@ -96,19 +98,21 @@ namespace moho
       }
       const bool restoring = gSimKeyframeRestoring.load(std::memory_order_relaxed);
       try {
-        Held().push_back(HeldBlock{storage, bytes, restoring ? nullptr : Allocate()});
+        AddHeld(HeldBlock{storage, bytes, restoring ? nullptr : Allocate()});
       } catch (...) {
       }
     }
 
     static void NoteStorageFreed(const void* const storage) noexcept
     {
-      if (!IsSimThread()) {
+      // This runs for every free of `unsigned int` storage, and nearly none of it holds a block.
+      if (!IsSimThread() || HeldFilterSlot(storage) == 0u) {
         return;
       }
       std::vector<HeldBlock>& held = Held();
       for (std::size_t i = held.size(); i != 0u; --i) {
         if (held[i - 1u].storage == storage) {
+          --HeldFilterSlot(storage);
           void* const block = held[i - 1u].block;
           held[i - 1u] = held.back();
           held.pop_back();
@@ -139,6 +143,7 @@ namespace moho
         ::operator delete(held.block);
       }
       Held().clear();
+      std::memset(HeldFilterSlots(), 0, kHeldFilterSlots * sizeof(std::uint32_t));
     }
 
     struct HeldBlock
@@ -177,7 +182,7 @@ namespace moho
       for (const HeldBlock& candidate : saved) {
         if (candidate.block != nullptr) {
           try {
-            Held().push_back(HeldBlock{nullptr, candidate.bytes, candidate.block});
+            AddHeld(HeldBlock{nullptr, candidate.bytes, candidate.block});
           } catch (...) {
           }
         }
@@ -185,6 +190,27 @@ namespace moho
     }
 
   private:
+    static constexpr std::size_t kHeldFilterSlots = std::size_t{1} << 16u;
+
+    /** Held entries per hash of their storage: zero means no entry has it, and a shared slot only costs a walk. Static, as a heap allocation here would move what the sim gets next. */
+    [[nodiscard]] static std::uint32_t* HeldFilterSlots() noexcept
+    {
+      static std::uint32_t sSlots[kHeldFilterSlots] = {};
+      return sSlots;
+    }
+
+    [[nodiscard]] static std::uint32_t& HeldFilterSlot(const void* const storage) noexcept
+    {
+      const std::uintptr_t address = reinterpret_cast<std::uintptr_t>(storage);
+      return HeldFilterSlots()[((address >> 4u) ^ (address >> 20u)) & (kHeldFilterSlots - 1u)];
+    }
+
+    static void AddHeld(const HeldBlock& entry)
+    {
+      Held().push_back(entry);
+      ++HeldFilterSlot(entry.storage);
+    }
+
     [[nodiscard]] static std::vector<HeldBlock>& Held() noexcept
     {
       static std::vector<HeldBlock> sHeld;

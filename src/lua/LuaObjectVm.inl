@@ -992,7 +992,7 @@
 			bool inArray = false;
 			if (key->tt == LUA_TNUMBER) {
 				const float numericKey = key->value.n;
-				const int integerKey = msvc8::TruncateToInt(numericKey);
+				const int integerKey = fa::TruncateToInt(numericKey);
 				if (static_cast<float>(integerKey) == numericKey && integerKey >= 1) {
 					const int zeroBased = integerKey - 1;
 					if ((zeroBased & 0xFF000000) == 0 && integerKey <= table->sizearray) {
@@ -2408,8 +2408,8 @@
 			}
 
 			luaD_poscall(state, nResults, firstResult);
-		} catch (const msvc8::exception& error) {
-			// Every lua_Error arrives here: msvc8::exception is what MSVC8's
+		} catch (const fa::exception& error) {
+			// Every lua_Error arrives here: fa::exception is what MSVC8's
 			// std::exception was, and the original caught exactly that.
 			unwindFrameForError(error.what());
 			throw;

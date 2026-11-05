@@ -22,6 +22,7 @@ namespace moho
   /// only act while `sim_ParallelSync` defers unit records. The packet only goes to the client:
   /// the allocations land on worker threads (the engine allocator is thread-safe) and in a
   /// different order, and every byte the client reads is the serial one.
+  extern bool sim_SyncInPlace;
   extern bool sim_ParallelSyncHeap;
   extern bool sim_ParallelEntitySync;
 

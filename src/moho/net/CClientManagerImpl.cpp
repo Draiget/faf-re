@@ -195,7 +195,7 @@ std::int64_t CClientManagerImpl::EstimateSharedStartUs(const bool logDetails)
   };
 
   std::scoped_lock lock(mLock);
-  msvc8::vector<SReadyTiming> timings;
+  fa::vector<SReadyTiming> timings;
   std::int64_t start = 0;
   for (std::size_t index = 0; index < mClients.size(); ++index) {
     CClientBase* const client = mClients[index];
@@ -252,15 +252,15 @@ std::int64_t CClientManagerImpl::EstimateSharedStartUs(const bool logDetails)
  */
 void CClientManagerImpl::NoteDivergentOrders()
 {
-  const auto nickname = [this](const int index) -> msvc8::string {
+  const auto nickname = [this](const int index) -> fa::string {
     const bool known = index >= 0 && static_cast<std::size_t>(index) < mClients.size() && mClients[index] != nullptr;
-    return known ? mClients[static_cast<std::size_t>(index)]->GetNickname() : msvc8::string("?");
+    return known ? mClients[static_cast<std::size_t>(index)]->GetNickname() : fa::string("?");
   };
   const bool stopped = mStreamCheck->StopsOnDivergence();
 
   for (const CommandStreamCheck::Divergence& divergence : mStreamCheck->TakeFindings()) {
-    const msvc8::string sender = nickname(divergence.sender);
-    const msvc8::string reporter = nickname(divergence.reporter);
+    const fa::string sender = nickname(divergence.sender);
+    const fa::string reporter = nickname(divergence.reporter);
     const bool selfReport = divergence.sender == divergence.reporter;
 
     if (selfReport) {
@@ -1139,7 +1139,7 @@ namespace
 
   // net_TestBurstBeat / net_TestBurstBytes: filler on the ordered stream to every
   // peer, incompressible so the deflated size on the wire is the given size.
-  void MaybeSendTestBurst(const msvc8::vector<CClientBase*>& clients, const int availableBeat)
+  void MaybeSendTestBurst(const fa::vector<CClientBase*>& clients, const int availableBeat)
   {
     if (sTestBurstSent || net_TestBurstBeat < 0 || net_TestBurstBytes <= 0 || availableBeat < net_TestBurstBeat) {
       return;

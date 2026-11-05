@@ -77,7 +77,7 @@ namespace moho
     archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mJamOffset, ownerRef);
     archive->Read(gpg::RTypeOf<moho::SSTIUnitConstantData>(), &mUnitConstDat, ownerRef);
     archive->Read(gpg::RTypeOf<moho::SSTIUnitVariableData>(), &mUnitVarDat, ownerRef);
-    archive->Read(gpg::RTypeOf<msvc8::vector<moho::SPerArmyReconInfo>>(), &mReconDat, ownerRef);
+    archive->Read(gpg::RTypeOf<fa::vector<moho::SPerArmyReconInfo>>(), &mReconDat, ownerRef);
   }
 
   /**
@@ -96,7 +96,7 @@ namespace moho
     archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mJamOffset, ownerRef);
     archive->Write(gpg::RTypeOf<moho::SSTIUnitConstantData>(), &mUnitConstDat, ownerRef);
     archive->Write(gpg::RTypeOf<moho::SSTIUnitVariableData>(), &mUnitVarDat, ownerRef);
-    archive->Write(gpg::RTypeOf<msvc8::vector<moho::SPerArmyReconInfo>>(), &mReconDat, ownerRef);
+    archive->Write(gpg::RTypeOf<fa::vector<moho::SPerArmyReconInfo>>(), &mReconDat, ownerRef);
   }
 } // namespace moho
 

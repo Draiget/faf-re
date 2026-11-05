@@ -598,14 +598,14 @@ namespace
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
 
   using UiKeyMask = std::uint32_t;
-  using UiKeyActionMapBase = msvc8::map<UiKeyMask, msvc8::string>;
-  using UiKeyRepeatMap = msvc8::map<UiKeyMask, bool>;
+  using UiKeyActionMapBase = fa::map<UiKeyMask, fa::string>;
+  using UiKeyRepeatMap = fa::map<UiKeyMask, bool>;
 
   /**
-   * Owns the legacy action map while compensating for `msvc8::string`'s
+   * Owns the legacy action map while compensating for `fa::string`'s
    * intentionally destructor-less compatibility wrapper. The shipped map
    * destroys each mapped string before freeing its node; this same-size owner
-   * performs that release before delegating node destruction to `msvc8::map`.
+   * performs that release before delegating node destruction to `fa::map`.
    */
   class UiKeyActionMap final : public UiKeyActionMapBase
   {
@@ -870,7 +870,7 @@ namespace
      * Initializes one minimap dragger and copies its camera-name lane from the
      * incoming string payload.
      */
-    explicit CMiniMapDragger(msvc8::string cameraName);
+    explicit CMiniMapDragger(fa::string cameraName);
 
     /**
      * Address: 0x0086E430 (FUN_0086E430, Moho::CMiniMapDragger::~CMiniMapDragger)
@@ -905,7 +905,7 @@ namespace
      */
     void OnCurrentDraggerReplaced() override;
 
-    msvc8::string mCameraName{}; // +0x08
+    fa::string mCameraName{}; // +0x08
   };
 
   static_assert(offsetof(CMiniMapDragger, mCameraName) == 0x8, "CMiniMapDragger::mCameraName offset must be 0x8");
@@ -942,7 +942,7 @@ namespace
   // changes.
   extern POINT sMouseScrubLanded;
 
-  extern msvc8::vector<moho::WeakPtr<moho::CMauiControl>> sInputCapture;
+  extern fa::vector<moho::WeakPtr<moho::CMauiControl>> sInputCapture;
 namespace
 {
 
@@ -989,7 +989,7 @@ namespace
     // slot high. That order is kept. Where the binary would then erase one
     // past the end (two stale entries at the very top) and walk its copy loop
     // off the buffer, RemoveInputCaptureAt's bounds check stops it instead.
-    msvc8::vector<std::int32_t> staleIndices;
+    fa::vector<std::int32_t> staleIndices;
     const std::int32_t count = static_cast<std::int32_t>(sInputCapture.size());
     for (std::int32_t index = 0; index < count; ++index) {
       if (sInputCapture[static_cast<std::size_t>(index)].GetObjectPtr() == nullptr) {
@@ -1338,4 +1338,4 @@ namespace ui_detail
 using namespace ui_detail;
 
 
-  extern msvc8::list<SCommandFeedbackBlip> sCommandFeedbackBlips;
+  extern fa::list<SCommandFeedbackBlip> sCommandFeedbackBlips;

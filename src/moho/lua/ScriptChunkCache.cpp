@@ -476,11 +476,11 @@ namespace
   class Precompiler
   {
   public:
-    void Add(const msvc8::vector<msvc8::string>& mountedPaths)
+    void Add(const fa::vector<fa::string>& mountedPaths)
     {
       {
         const std::lock_guard<std::mutex> lock(mMutex);
-        for (const msvc8::string& path : mountedPaths) {
+        for (const fa::string& path : mountedPaths) {
           const std::string_view name = path.view();
           if (name.ends_with(".bp") || name.ends_with(".lua")) {
             mQueue.emplace_back(name);
@@ -544,7 +544,7 @@ namespace
       if (waitHandleSet == nullptr || waitHandleSet->mHandle == nullptr) {
         return;
       }
-      msvc8::string diskPath{};
+      fa::string diskPath{};
       waitHandleSet->mHandle->FindFile(&diskPath, mountedPath.c_str(), nullptr);
       if (diskPath.empty()) {
         return;
@@ -624,7 +624,7 @@ void moho::SCR_FlushUiScriptChunkCache(const bool now)
   UiChunks().Flush(now);
 }
 
-void moho::SCR_PrecompileScripts(const msvc8::vector<msvc8::string>& mountedPaths)
+void moho::SCR_PrecompileScripts(const fa::vector<fa::string>& mountedPaths)
 {
   if (SCR_ScriptChunkCacheActive() && res_PrecompileScripts && tBatchChunks == &Chunks()) {
     Precompile().Add(mountedPaths);

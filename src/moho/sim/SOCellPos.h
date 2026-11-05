@@ -58,12 +58,12 @@ namespace moho
    * Address: 0x00769560 (FUN_00769560) / 0x0076AC60 / 0x007692F0 (inlined `stdext::hash_value`)
    *
    * What it does:
-   * Hashes one cell for `msvc8::hash_map`. Found by argument-dependent lookup,
+   * Hashes one cell for `fa::hash_map`. Found by argument-dependent lookup,
    * which is how the container picks this up in place of the integral default.
    */
   [[nodiscard]] inline std::size_t hash_value(const SOCellPos& cell) noexcept
   {
-    return msvc8::hash_value(static_cast<long>(static_cast<std::int32_t>(PackCellKey(cell))));
+    return fa::hash_value(static_cast<long>(static_cast<std::int32_t>(PackCellKey(cell))));
   }
 
   /**

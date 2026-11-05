@@ -4,7 +4,7 @@
   /**
    * Session-global ghost list for the formation-placement preview.
    *
-   * This is one plain `msvc8::vector` parked at 0x010C4258, not the three loose
+   * This is one plain `fa::vector` parked at 0x010C4258, not the three loose
    * pointer globals an earlier pass modelled:
    *   myProxy_ +0x00 -> 0x010C4258   first_ +0x04 -> 0x010C425C
    *   last_    +0x08 -> 0x010C4260   end_   +0x0C -> 0x010C4264
@@ -18,7 +18,7 @@
    * `CWldSession::RenderMeshPreviews` (0x008599D0) is the only writer: it
    * clears the vector at the top of every frame and repopulates it.
    */
-  msvc8::vector<SFormationPreviewGhost> gFormationPreviews;
+  fa::vector<SFormationPreviewGhost> gFormationPreviews;
 
   // `StrategicIconAux` (the real type) and `gStrategicIconAuxiliary`
   // live in the `moho`-scoped anonymous namespace alongside the type's
@@ -27,7 +27,7 @@
   // incomplete type in *this* (global-scope) anonymous namespace instead.
 
   // The formation-preview container emissions used to live here as one
-  // hand-written free function per operation. They are `msvc8::vector`
+  // hand-written free function per operation. They are `fa::vector`
   // members, so the addresses now sit on the template in
   // `legacy/containers/Vector.h` and the call sites just use the container:
   //
@@ -96,7 +96,7 @@ namespace moho
   std::uint32_t ui_FuelWarningColor = 0xFFFF0000u; // 0x00F57BB0 (0x0085D135)
   std::uint32_t ui_ShieldBarColor = 0xFF00C3F7u;  // 0x00F57BB4 (0x0085D0DA)
   std::uint32_t ui_ProgressBarColor = 0xFFFF9900u; // 0x00F57BB8 (0x0085D14B)
-  msvc8::string ui_CustomNameFont("Arial");       // 0x00F5B300 (0x0085E124), built "Arial" by FUN_00BE5720
+  fa::string ui_CustomNameFont("Arial");       // 0x00F5B300 (0x0085E124), built "Arial" by FUN_00BE5720
   bool ui_ForceLifbarsOnEnemy = false;            // 0x010A644A (0x0085C031)
   bool ui_AlwaysRenderStrategicIcons = false;     // 0x010A644B (0x0085C148)
 
@@ -217,14 +217,14 @@ namespace
      *    `shared_ptr` releases in reverse declaration order);
      *  - 0x0085CB00 is the compiler-generated `operator=`;
      *  - 0x0085ED70 / 0x0085EED0 / 0x0085F1B0 / 0x0085F290 are
-     *    `msvc8::vector<UnitIconData>`'s `reserve` / `push_back` /
+     *    `fa::vector<UnitIconData>`'s `reserve` / `push_back` /
      *    `erase(first,last)` / destructor, and 0x0085F140, 0x0085F930,
      *    0x0085FDB0, 0x0085FFB0 and 0x0085F310 are that same instantiation's
      *    grow, allocate, copy-construct, uninitialised-copy and length-error
-     *    lanes. They belong on `msvc8::vector<T>` in
+     *    lanes. They belong on `fa::vector<T>` in
      *    src/legacy/containers/Vector.h next to the other per-type
      *    emissions listed there, not as a second set of container primitives.
-     * Address: 0x0085F740 (FUN_0085F740 -- the implicit copy constructor `UnitIconData(const UnitIconData&)`, emitted out of line for `msvc8::vector<UnitIconData>`'s placement copies: member-wise in declaration order (the two pointers, the three floats through `fld`/`fstp`, each `shared_ptr` with a `lock xadd` +1 on the non-null control block's `use_count_` at +0x18/+0x20/+0x28, then the five flag bytes up to +0x30), no release, so a construction rather than `operator=` 0x0085CB00; callers 0x0085F414 (`_Insert_n` 0x0085F3F0's `_Tmp = _Val`), 0x0085FDC8 (`_Uninit_fill_n` 0x0085FDB0), 0x0085FFC9 (`_Uninit_copy` 0x0085FFB0), 0x0085FFF8 (0x0085FFE0), and the null-guarded tail jumps 0x0085FE64 / 0x0085FF24 (`_Construct` / `allocator::construct`, nothing references them); formerly `CopyRefCountedPayload49Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0085F740 (FUN_0085F740 -- the implicit copy constructor `UnitIconData(const UnitIconData&)`, emitted out of line for `fa::vector<UnitIconData>`'s placement copies: member-wise in declaration order (the two pointers, the three floats through `fld`/`fstp`, each `shared_ptr` with a `lock xadd` +1 on the non-null control block's `use_count_` at +0x18/+0x20/+0x28, then the five flag bytes up to +0x30), no release, so a construction rather than `operator=` 0x0085CB00; callers 0x0085F414 (`_Insert_n` 0x0085F3F0's `_Tmp = _Val`), 0x0085FDC8 (`_Uninit_fill_n` 0x0085FDB0), 0x0085FFC9 (`_Uninit_copy` 0x0085FFB0), 0x0085FFF8 (0x0085FFE0), and the null-guarded tail jumps 0x0085FE64 / 0x0085FF24 (`_Construct` / `allocator::construct`, nothing references them); formerly `CopyRefCountedPayload49Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      */
     struct UnitIconData
     {
@@ -299,7 +299,7 @@ namespace
      *    (`&_Myfirst[2 * iconType]`), and 0x0085F020 sizes it to exactly 8.
      *  - `+0x38`/`+0x40` the pause and stunned rest textures.
      *  - `+0x48`, `+0x58`, `+0x68`, `+0x78`, `+0x88` the five icon runs, each
-     *    a 0x10-byte `msvc8::vector` header the frame entry clears in turn
+     *    a 0x10-byte `fa::vector` header the frame entry clears in turn
      *    (`lea eax, [ebp+48h]` .. `lea eax, [ebp+88h]`,
      *    0x0085B7C3..0x0085B82D) and the constructor reserves at
      *    0x200/0x200/0x40/0x80/0x80 elements.
@@ -329,14 +329,14 @@ namespace
       /// Sub-tick interpolant for this frame; see the `+0x1C` note above.
       float mTickFraction = 0.0f;                                       // +0x1C
       boost::shared_ptr<CD3DBatchTexture> mWhiteTexture;                // +0x20
-      msvc8::vector<boost::shared_ptr<CD3DBatchTexture>> mGenericIcons; // +0x28
+      fa::vector<boost::shared_ptr<CD3DBatchTexture>> mGenericIcons; // +0x28
       boost::shared_ptr<CD3DBatchTexture> mPauseRestTexture;            // +0x38
       boost::shared_ptr<CD3DBatchTexture> mStunnedRestTexture;          // +0x40
-      msvc8::vector<UnitIconData> mGroundIcons;       // +0x48
-      msvc8::vector<UnitIconData> mAirIcons;          // +0x58
-      msvc8::vector<UnitIconData> mHighPriorityIcons; // +0x68
-      msvc8::vector<UnitIconData> mSelectedIcons;     // +0x78
-      msvc8::vector<UnitIconData> mLifebarIcons;      // +0x88
+      fa::vector<UnitIconData> mGroundIcons;       // +0x48
+      fa::vector<UnitIconData> mAirIcons;          // +0x58
+      fa::vector<UnitIconData> mHighPriorityIcons; // +0x68
+      fa::vector<UnitIconData> mSelectedIcons;     // +0x78
+      fa::vector<UnitIconData> mLifebarIcons;      // +0x88
       std::uint32_t mSelfColor = 0u;         // +0x98
       std::uint32_t mNeutralColor = 0u;      // +0x9C
       std::uint32_t mAllyColor = 0u;         // +0xA0
@@ -367,9 +367,9 @@ namespace
        * Loads `/lua/ui/game/strategicIcons.lua`'s `GenericIcons` table and
        * fills one `mGenericIcons` slot per `EGenericIconType` key with the
        * named batch texture. `mGenericIcons` is sized to exactly 8 first
-       * (0x0085F020, the `msvc8::vector<boost::shared_ptr<CD3DBatchTexture>>`
+       * (0x0085F020, the `fa::vector<boost::shared_ptr<CD3DBatchTexture>>`
        * resize lane for this instantiation - a per-type container emission
-       * already covered generically by `msvc8::vector<T>::resize`, the same
+       * already covered generically by `fa::vector<T>::resize`, the same
        * way the sibling `UnitIconData` instantiation's reserve/push_back/erase
        * lanes are documented above rather than hand-recovered).
        */
@@ -484,7 +484,7 @@ namespace
         }
         return;
       }
-      msvc8::vector<UnitIconData>* target = nullptr;
+      fa::vector<UnitIconData>* target = nullptr;
       switch (run) {
         case EStrategicIconRun::Ground:
           target = &aux.mGroundIcons;
@@ -656,10 +656,10 @@ namespace
       // Decoded in the binary's source order (Self/Ally/Enemy/Neutral); the
       // storage order (Self/Neutral/Ally/Enemy) is just field layout, not a
       // reordering of which key feeds which member.
-      mSelfColor = SCR_DecodeColor(msvc8::string(teamColorMode["Self"].GetString()));
-      mAllyColor = SCR_DecodeColor(msvc8::string(teamColorMode["Ally"].GetString()));
-      mEnemyColor = SCR_DecodeColor(msvc8::string(teamColorMode["Enemy"].GetString()));
-      mNeutralColor = SCR_DecodeColor(msvc8::string(teamColorMode["Neutral"].GetString()));
+      mSelfColor = SCR_DecodeColor(fa::string(teamColorMode["Self"].GetString()));
+      mAllyColor = SCR_DecodeColor(fa::string(teamColorMode["Ally"].GetString()));
+      mEnemyColor = SCR_DecodeColor(fa::string(teamColorMode["Enemy"].GetString()));
+      mNeutralColor = SCR_DecodeColor(fa::string(teamColorMode["Neutral"].GetString()));
 
       mUnidentifiedColor = moho::GetUnidentifiedColor();
     }
@@ -831,7 +831,7 @@ namespace
       return iconData.mBlueprint->mStrategicIconRest;
     }
     /** `TELEPORTBEACON` category the teleport-beacon splat/icon branch tests for (0x00851C5D). */
-    const msvc8::string kCommandSplatTeleportBeaconCategory("TELEPORTBEACON", 14u);
+    const fa::string kCommandSplatTeleportBeaconCategory("TELEPORTBEACON", 14u);
 
     /** Default (non-teleport) command-splat line colour, `0x80800000` (0x00851D22). */
     constexpr std::uint32_t kCommandSplatDefaultColor = 0x80800000u;
@@ -985,8 +985,8 @@ namespace
     primBatcher->SetViewProjMatrix(*camera);
     primBatcher->SetTexture(CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
 
-    msvc8::vector<Wm3::Vector3f> attackIconPositions{};
-    msvc8::vector<Wm3::Vector3f> teleportIconPositions{};
+    fa::vector<Wm3::Vector3f> attackIconPositions{};
+    fa::vector<Wm3::Vector3f> teleportIconPositions{};
 
     // `mSyncExtraUnitData` is the per-beat extra-unit-data run
     // `CWldSession::DoBeat` copies wholesale from `beat.mSyncExtraUnitData`
@@ -1156,12 +1156,12 @@ namespace
             // secondary maps are left empty (0x00859C3F..0x00859C71).
             const RMeshBlueprintLOD& lod = *meshBlueprint->mLods.begin();
             preview.mMaterial = MeshMaterial::Create(
-              msvc8::string{"UnitFormationPreview"},
+              fa::string{"UnitFormationPreview"},
               lod.mAlbedoName,
               lod.mNormalsName,
               lod.mSpecularName,
-              msvc8::string{},
-              msvc8::string{},
+              fa::string{},
+              fa::string{},
               nullptr
             );
 
@@ -1319,7 +1319,7 @@ namespace
     [[nodiscard]] float FuelWarningBlinkPhase(const StrategicIconAux& aux)
     {
       const double simTime = static_cast<double>(aux.mSession->mGameTick) + static_cast<double>(aux.mTickFraction);
-      return static_cast<float>(msvc8::fmod(simTime * static_cast<double>(ui_FuelEmptyBlinkRate), 1.0));
+      return static_cast<float>(fa::fmod(simTime * static_cast<double>(ui_FuelEmptyBlinkRate), 1.0));
     }
 
     /**
@@ -1584,10 +1584,10 @@ namespace
       UserUnit* const unit = icon.mUnit->IsUserUnit();
 
       // `UserUnit::GetCustomName` (vtable slot 24, `[vftable+0x60]`) hands back
-      // the address of the unit's `msvc8::string`, not a C string - the binary
+      // the address of the unit's `fa::string`, not a C string - the binary
       // reads `_Mysize` at +0x14 and picks the inline buffer or heap pointer off
       // `_Myres` at +0x18. Same reinterpret the console command family uses.
-      const auto& customName = *reinterpret_cast<const msvc8::string*>(unit->GetCustomName());
+      const auto& customName = *reinterpret_cast<const fa::string*>(unit->GetCustomName());
       if (customName.empty()) {
         return InvalidScreenPoint();
       }
@@ -1676,7 +1676,7 @@ namespace
      * down-right first, same as the custom name label.
      *
      * The joined string is built by walking `unit->mSelectionSets` in its
-     * own key order (`msvc8::set<msvc8::string>`'s `begin()`/`end()`/
+     * own key order (`fa::set<fa::string>`'s `begin()`/`end()`/
      * `operator++`, i.e. the already-recovered `rb_increment` at
      * FUN_004DDD30 - also reached from `UserUnit::AddToSelectionSet` and
      * `cfunc_UserUnitGetSelectionSetsL`, confirming this is the same
@@ -1707,8 +1707,8 @@ namespace
 
       CD3DFont* const font = CustomNameFont();
 
-      msvc8::string joinedNames{};
-      for (const msvc8::string& name : unit->mSelectionSets) {
+      fa::string joinedNames{};
+      for (const fa::string& name : unit->mSelectionSets) {
         joinedNames.append(name.view());
         joinedNames.append(" ", 1);
       }
@@ -2378,7 +2378,7 @@ namespace
 
       if (iconData.mIsFriendly) {
         UserEntity* const attachmentParent = entity->GetAttachmentParent();
-        if (attachmentParent != nullptr && attachmentParent->IsInCategory(msvc8::string("CARRIER"))) {
+        if (attachmentParent != nullptr && attachmentParent->IsInCategory(fa::string("CARRIER"))) {
           return;
         }
       } else if (asUnit != nullptr && asUnit->mUnitVarDat.mIsBusy && asUnit->GetBlueprint()->Air.CanFly) {
@@ -2507,7 +2507,7 @@ namespace
       // `classify`'s two unconditional early-outs that read only beat data.
       if (friendly) {
         UserEntity* const attachmentParent = entity->GetAttachmentParent();
-        if (attachmentParent != nullptr && attachmentParent->IsInCategory(msvc8::string("CARRIER"))) {
+        if (attachmentParent != nullptr && attachmentParent->IsInCategory(fa::string("CARRIER"))) {
           return;
         }
       } else if (asUnit != nullptr && asUnit->mUnitVarDat.mIsBusy && asUnit->GetBlueprint()->Air.CanFly) {
@@ -3964,7 +3964,7 @@ namespace
     boost::shared_ptr<CD3DBatchTexture> gEconOverlayLeftTexture{};  // 0x010C4230
     boost::shared_ptr<CD3DBatchTexture> gEconOverlayRightTexture{}; // 0x010C4238
     boost::shared_ptr<CD3DBatchTexture> gEconOverlayMidTexture{};   // 0x010C4244
-    msvc8::string gEconOverlayFontName{};                           // 0x00F5B210
+    fa::string gEconOverlayFontName{};                           // 0x00F5B210
     std::int32_t gEconOverlayFontSize = 12;                         // 0x00F57C04
     float gEconOverlayEnergyTopOffset = 0.0f;                       // 0x010A6458
     float gEconOverlayMassTopOffset = 14.0f;                        // 0x00F57C08
@@ -4042,7 +4042,7 @@ namespace
      * released before the draw, as in the binary.
      */
     void FormatEconomyRateInto(
-      msvc8::string& out,
+      fa::string& out,
       const float ratePerSecond,
       const char* const wholeFormat,
       const char* const decimalFormat
@@ -4050,10 +4050,10 @@ namespace
     {
       const bool useDecimals =
         kEconOverlayDecimalCutoff > ratePerSecond && ratePerSecond > -kEconOverlayDecimalCutoff;
-      const msvc8::string formatted =
+      const fa::string formatted =
         useDecimals ? gpg::STR_Printf(decimalFormat, static_cast<double>(ratePerSecond))
                     : gpg::STR_Printf(wholeFormat, static_cast<std::int32_t>(ratePerSecond));
-      (void)out.assign(formatted, 0, msvc8::string::npos);
+      (void)out.assign(formatted, 0, fa::string::npos);
     }
 
     /**
@@ -4084,7 +4084,7 @@ namespace
     void DrawEconomyOverlayLabel(
       CD3DFont& font,
       CD3DPrimBatcher& primBatcher,
-      const msvc8::string& text,
+      const fa::string& text,
       const float x,
       const float y,
       const std::uint32_t color
@@ -4201,8 +4201,8 @@ namespace
       const Wm3::Vector2f screenPosition =
         view.Project(worldPosition, 0.0f, viewportWidth, viewportHeight, 0.0f);
 
-      msvc8::string energyText{};
-      msvc8::string massText{};
+      fa::string energyText{};
+      fa::string massText{};
       FormatEconomyRateInto(energyText, energyPerSecond, "%+4i ", "%+4.1f ");
       FormatEconomyRateInto(massText, massPerSecond, "%+4i", "%+4.1f");
 

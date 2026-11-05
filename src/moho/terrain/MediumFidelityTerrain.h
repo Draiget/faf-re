@@ -40,10 +40,10 @@ namespace moho
    * fidelity class that overrides that slot.
    *
    * Derived from FUN_00805B50's operands, which all normalise to the same
-   * stack argument: the technique name is an `msvc8::string` at +0x00 whose
+   * stack argument: the technique name is an `fa::string` at +0x00 whose
    * `_Myres` the binary tests at +0x18 and whose SSO buffer it reads at
    * +0x04; the two matrices sit at +0x1C and +0x5C. Those tile exactly:
-   * a 28-byte msvc8::string ends at 0x1C, and 0x1C + 0x40 == 0x5C. The
+   * a 28-byte fa::string ends at 0x1C, and 0x1C + 0x40 == 0x5C. The
    * low-fidelity override (FUN_00809050) reads the same three offsets
    * (0x0080907A `cmp [eax+18h], 10h`, 0x008090B0 `lea eax, [edi+5Ch]`,
    * 0x008090CF `add edi, 1Ch`).
@@ -55,7 +55,7 @@ namespace moho
    */
   struct STerrainTechniqueDrawParams
   {
-    msvc8::string mTechniqueName; // +0x00
+    fa::string mTechniqueName; // +0x00
     VMatrix4 mProjection;         // +0x1C
     VMatrix4 mView;               // +0x5C
   };
@@ -226,7 +226,7 @@ namespace moho
      */
     void DrawTerrain(
       boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
-      const msvc8::string* techniqueName
+      const fa::string* techniqueName
     ) override;
 
     /**

@@ -386,8 +386,8 @@ boost::shared_ptr<moho::MeshInstance> moho::CBuildDragPreview::CreateBuildPrevie
 )
 {
   if (!mUnitPlaceMaterial) {
-    const msvc8::string shaderName("UnitPlace");
-    const msvc8::string emptyTextureName;
+    const fa::string shaderName("UnitPlace");
+    const fa::string emptyTextureName;
     mUnitPlaceMaterial = moho::MeshMaterial::Create(
       shaderName, emptyTextureName, emptyTextureName, emptyTextureName, emptyTextureName, emptyTextureName, nullptr
     );
@@ -507,7 +507,7 @@ void moho::CBuildDragPreview::RefreshQueuedBuildGhosts()
 
   // Built from scratch every pass. Whatever stays behind in the map this one
   // displaces belongs to orders that are gone, and dies with it below.
-  msvc8::map<moho::CmdId, boost::shared_ptr<moho::MeshInstance>> refreshed;
+  fa::map<moho::CmdId, boost::shared_ptr<moho::MeshInstance>> refreshed;
 
   for (const auto& [commandId, helper] : session->mCommandManager->mCommands) {
     static_cast<void>(commandId);
@@ -550,8 +550,8 @@ void moho::CBuildDragPreview::RefreshQueuedBuildGhosts()
       // reads as the unit it previews, but through the `UnitPlace` shader; the
       // lookup and secondary lanes stay empty.
       const moho::RMeshBlueprintLOD& topLod = *meshBlueprint->mLods.begin();
-      const msvc8::string shaderName("UnitPlace");
-      const msvc8::string emptyTextureName;
+      const fa::string shaderName("UnitPlace");
+      const fa::string emptyTextureName;
       boost::shared_ptr<moho::MeshMaterial> ghostMaterial = moho::MeshMaterial::Create(
         shaderName,
         topLod.mAlbedoName,
@@ -1037,7 +1037,7 @@ void moho::CBuildDragPreview::UpdateDragPreview()
           stampOrigin.x + entry.mPos.x, stampOrigin.y + entry.mPos.y, stampOrigin.z + entry.mPos.z
         };
 
-        // `RResId` is a bare `msvc8::string` wrapper, which is why the binary
+        // `RResId` is a bare `fa::string` wrapper, which is why the binary
         // hands the canonicalised path buffer straight to the rules lookup.
         moho::RResId blueprintPath;
         (void)gpg::STR_InitFilename(&blueprintPath.name, entry.mBlueprintId.c_str());
@@ -1167,11 +1167,11 @@ static void func_ProcessMouseScrubbing()
  * site copy-constructs a temporary before the call (0x00870DB5).
  */
 CMiniMapDragger::CMiniMapDragger(
-  msvc8::string cameraName
+  fa::string cameraName
 )
   : moho::IMauiDragger()
 {
-  mCameraName.assign(cameraName, 0, msvc8::string::npos);
+  mCameraName.assign(cameraName, 0, fa::string::npos);
 }
 
 /**
@@ -1807,7 +1807,7 @@ moho::CUIWorldView::CUIWorldView(
   const bool isMiniMap,
   const char* const cameraTrack
 )
-  : CMauiControl(luaObj, parent, msvc8::string("World View"))
+  : CMauiControl(luaObj, parent, fa::string("World View"))
   , mIsMiniMap(isMiniMap)
   , mWorldViewDepth(depth)
   , mWldSession(moho::WLD_GetActiveSession()) // 0x0086E6A8 reads the global sWldSession
@@ -1818,7 +1818,7 @@ moho::CUIWorldView::CUIWorldView(
   // ??_7CUIWorldView@Moho@@6BIRenderWorldView@Moho@@@): the interface base,
   // then this class. Every member is constructed by then, with the values the
   // stores at 0x0086E4F9..0x0086E742 write.
-  SetDebugName(msvc8::string(name));
+  SetDebugName(fa::string(name));
 
   moho::STIMap* const map =
     mWldSession->mWldMap->mTerrainRes->mMap;
@@ -1945,7 +1945,7 @@ int moho::cfunc_CUIWorldView__initL(
   LuaPlus::LuaObject parentObject(LuaPlus::LuaStackObject(state, 2));
   CMauiControl* const parent = SCR_FromLua_CMauiControl(parentObject, state);
 
-  msvc8::string trackCamera;
+  fa::string trackCamera;
   bool isMiniMap = false;
 
   if (lua_gettop(state->m_state) == 5) {
@@ -1960,7 +1960,7 @@ int moho::cfunc_CUIWorldView__initL(
     if (trackStr == nullptr) {
       trackArg.TypeError("string");
     }
-    trackCamera = msvc8::string(trackStr, std::strlen(trackStr));
+    trackCamera = fa::string(trackStr, std::strlen(trackStr));
   }
 
   void* const storage = AllocateZeroedUiObject<void>(sizeof(CUIWorldView));
@@ -2189,7 +2189,7 @@ int moho::cfunc_CUIWorldViewGetRightMouseButtonOrderL(
     if (commandMode.mMode == COMMOD_Order) {
       gpg::RRef commandCapRef{};
       commandCapRef = gpg::MakeRRef<moho::ERuleBPUnitCommandCaps>(&commandMode.mCommandCaps);
-      const msvc8::string commandLexical = commandCapRef.GetLexical();
+      const fa::string commandLexical = commandCapRef.GetLexical();
       lua_pushstring(state->m_state, commandLexical.c_str());
       (void)lua_gettop(state->m_state);
       return 1;
@@ -3713,7 +3713,7 @@ namespace
       return {};
     }
 
-    msvc8::string blueprintId(LuaStringOrEmpty(meshDescriptor.GetByName("BlueprintID")));
+    fa::string blueprintId(LuaStringOrEmpty(meshDescriptor.GetByName("BlueprintID")));
     moho::RResId normalizedBlueprintId{};
     gpg::STR_CopyFilename(&normalizedBlueprintId.name, &blueprintId);
 
@@ -3780,9 +3780,9 @@ int moho::cfunc_AddCommandFeedbackBlipL(
 
   const Wm3::Vector3f worldPosition = SCR_FromLuaCopy<Wm3::Vector3f>(meshDescriptor.GetByName("Position"));
 
-  const msvc8::string textureName(LuaStringOrEmpty(meshDescriptor.GetByName("TextureName")));
-  const msvc8::string shaderName(LuaStringOrEmpty(meshDescriptor.GetByName("ShaderName")));
-  const msvc8::string emptyTextureName{};
+  const fa::string textureName(LuaStringOrEmpty(meshDescriptor.GetByName("TextureName")));
+  const fa::string shaderName(LuaStringOrEmpty(meshDescriptor.GetByName("ShaderName")));
+  const fa::string emptyTextureName{};
 
   const boost::shared_ptr<MeshMaterial> material = MeshMaterial::Create(
     shaderName, textureName, emptyTextureName, emptyTextureName, emptyTextureName, emptyTextureName, nullptr

@@ -94,7 +94,7 @@ namespace
      * What it does:
      * Returns the local technique-name string lane.
      */
-    msvc8::string* EffectTechniqueD3D9::GetName()
+    fa::string* EffectTechniqueD3D9::GetName()
     {
         return &name_;
     }
@@ -230,7 +230,7 @@ namespace
      * What it does:
      * Looks up and reads a bool annotation from the active technique.
      */
-    bool EffectTechniqueD3D9::GetAnnotationBool(bool* const outValue, const msvc8::string& annotationName)
+    bool EffectTechniqueD3D9::GetAnnotationBool(bool* const outValue, const fa::string& annotationName)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 121);
         ID3DXEffect* const dxEffect = effect->GetDxEffect();
@@ -257,7 +257,7 @@ namespace
      * What it does:
      * Looks up and reads an integer annotation from the active technique.
      */
-    bool EffectTechniqueD3D9::GetAnnotationInt(int* const outValue, const msvc8::string& annotationName)
+    bool EffectTechniqueD3D9::GetAnnotationInt(int* const outValue, const fa::string& annotationName)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 141);
         ID3DXEffect* const dxEffect = effect->GetDxEffect();
@@ -282,7 +282,7 @@ namespace
      * What it does:
      * Looks up and reads a float annotation from the active technique.
      */
-    bool EffectTechniqueD3D9::GetAnnotationFloat(float* const outValue, const msvc8::string& annotationName)
+    bool EffectTechniqueD3D9::GetAnnotationFloat(float* const outValue, const fa::string& annotationName)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 158);
         ID3DXEffect* const dxEffect = effect->GetDxEffect();
@@ -307,7 +307,7 @@ namespace
      * What it does:
      * Looks up and reads a string annotation from the active technique.
      */
-    bool EffectTechniqueD3D9::GetAnnotationString(msvc8::string* const outValue, const msvc8::string& annotationName)
+    bool EffectTechniqueD3D9::GetAnnotationString(fa::string* const outValue, const fa::string& annotationName)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 175);
         ID3DXEffect* const dxEffect = effect->GetDxEffect();

@@ -17,7 +17,7 @@
 
 #include <cstddef>
 
-namespace msvc8
+namespace fa
 {
     /**
      * Shifts every element of `(first, last)` that does not equal `value`
@@ -26,7 +26,7 @@ namespace msvc8
      * This is the second half of `remove` below; MSVC8 emits it as its own
      * body because `remove` tail-calls it after the find pass.
      *
-     * Address: 0x007B1B10 (FUN_007B1B10 -- `remove_shift` -- the write pass, entered with the hole already found for `msvc8::vector<moho::CameraImpl*>` (`RCamManager::mCams`); callers 0x007B0DE0, 0x007B15E0; formerly `CompactCameraPointerRangeExcludingNeedle` in moho/render/RCamManager.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x007B1B10 (FUN_007B1B10 -- `remove_shift` -- the write pass, entered with the hole already found for `fa::vector<moho::CameraImpl*>` (`RCamManager::mCams`); callers 0x007B0DE0, 0x007B15E0; formerly `CompactCameraPointerRangeExcludingNeedle` in moho/render/RCamManager.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x007B15E0 (FUN_007B15E0 -- a register-shape bridge into that write pass; zero callers, unreachable; formerly `CompactCameraPointerRangeExcludingNeedleAdapter` in moho/render/RCamManager.cpp (RULE ONE), removed 2026-09-11.)
      */
     template <class ForwardIt, class T>
@@ -108,4 +108,4 @@ namespace msvc8
         ++next;
         return remove_if_shift(first, next, last, pred);
     }
-} // namespace msvc8
+} // namespace fa

@@ -235,7 +235,7 @@ int moho::cfunc_UnitAlterArmorL(LuaPlus::LuaState* const state)
     damageTypeArg.TypeError("string");
     damageTypeName = "";
   }
-  const msvc8::string armorTypeName(damageTypeName);
+  const fa::string armorTypeName(damageTypeName);
 
   const LuaPlus::LuaStackObject armorMultiplierArg(state, 3);
   if (lua_type(rawState, 3) != LUA_TNUMBER) {
@@ -611,7 +611,7 @@ int moho::cfunc_UnitPrintCommandQueueL(LuaPlus::LuaState* const state)
     return 0;
   }
 
-  const msvc8::vector<WeakPtr<CUnitCommand>> commandSnapshot = commandQueue->mCommandVec;
+  const fa::vector<WeakPtr<CUnitCommand>> commandSnapshot = commandQueue->mCommandVec;
 
   const RUnitBlueprint* const unitBlueprint = unit->GetBlueprint();
   const char* const unitName = (unitBlueprint != nullptr) ? unitBlueprint->mBlueprintId.c_str() : "";
@@ -1550,7 +1550,7 @@ int cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
   //    skipping the upgrade command that produced `dest`. The copied weak-ptr
   //    vector unlinks + frees on scope exit (matches the binary's manual cleanup).
   if (CUnitCommandQueue* const sourceQueue = source->CommandQueue) {
-    const msvc8::vector<WeakPtr<CUnitCommand>> commandsSnapshot = sourceQueue->mCommandVec;
+    const fa::vector<WeakPtr<CUnitCommand>> commandsSnapshot = sourceQueue->mCommandVec;
     const RUnitBlueprint* const destBlueprint = dest->GetBlueprint();
     for (const WeakPtr<CUnitCommand>& weakCommand : commandsSnapshot) {
       CUnitCommand* const command = weakCommand.GetObjectPtr();
@@ -1567,7 +1567,7 @@ int cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
   // 2) Builder factory-command transfer.
   if (source->AiBuilder != nullptr && dest->AiBuilder != nullptr) {
     dest->AiBuilder->BuilderClearFactoryCommandQueue();
-    const msvc8::vector<WeakPtr<CUnitCommand>>& builderCommands = source->AiBuilder->BuilderGetFactoryCommandQueue();
+    const fa::vector<WeakPtr<CUnitCommand>>& builderCommands = source->AiBuilder->BuilderGetFactoryCommandQueue();
     for (std::size_t i = 0; i < builderCommands.size(); ++i) {
       CUnitCommand* const builderCommand = source->AiBuilder->BuilderGetFactoryCommand(static_cast<int>(i));
       if (builderCommand != nullptr) {
@@ -1613,7 +1613,7 @@ int cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
   dest->GuardedPos = source->GuardedPos;
 
   // Snapshot the guard slots first: SetGuardedUnit mutates source->GuardedByList.
-  msvc8::vector<Unit*> guards;
+  fa::vector<Unit*> guards;
   for (Entity* const entry : source->GuardedByList.mVec) {
     guards.push_back(static_cast<Unit*>(entry));
   }
@@ -1630,7 +1630,7 @@ int cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
       static_cast<std::int32_t>(source->GetEntityId()),
       static_cast<std::int32_t>(dest->GetEntityId())
     };
-    // push_back's capacity-full path is `msvc8::vector<SUpgradeNotifyPair>::insert`
+    // push_back's capacity-full path is `fa::vector<SUpgradeNotifyPair>::insert`
     // (FUN_006D1A90), reached through the binary's push_back (FUN_006D1960).
     globalUserdata->mAllyUpgradeNotifications.push_back(pair);
   }
@@ -1745,8 +1745,8 @@ int cfunc_CreateUnit2L(LuaPlus::LuaState* const state)
   // 0x006D0349-0x006D0358: `fmul 0.017453292f` then `fmul 0.5f` on the float
   // lua_Number, single-precision under the sim's `_PC_24` word.
   const float halfAngle = (static_cast<float>(lua_tonumber(rawState, 6)) * 0.017453292f) * 0.5f;
-  const float sinHalfAngle = msvc8::sin(halfAngle);
-  const float cosHalfAngle = msvc8::cos(halfAngle);
+  const float sinHalfAngle = fa::sin(halfAngle);
+  const float cosHalfAngle = fa::cos(halfAngle);
 
   // 0x006D0381-0x006D03A1: the x and z lanes are `sinH * 0.0f`, not literal
   // zeros, so a negative heading leaves them -0.0f.
@@ -1978,14 +1978,14 @@ int cfunc_CreateUnitHPRL(LuaPlus::LuaState* const state)
 
   Sim* const sim = lua_getglobaluserdata_typed(rawState);
 
-  // arg1: blueprint id (string) -> kept as an msvc8::string for the lookup + errors.
+  // arg1: blueprint id (string) -> kept as an fa::string for the lookup + errors.
   const LuaPlus::LuaStackObject blueprintArg(state, 1);
   const char* blueprintText = lua_tostring(rawState, 1);
   if (!blueprintText) {
     blueprintArg.TypeError("string");
     blueprintText = "";
   }
-  const msvc8::string blueprintName(blueprintText, std::strlen(blueprintText));
+  const fa::string blueprintName(blueprintText, std::strlen(blueprintText));
 
   // arg2: owning army as a Lua object (not a 1-based index).
   const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 2));

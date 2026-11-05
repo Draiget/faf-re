@@ -76,7 +76,7 @@ namespace moho
     EntityCollisionCellNode** mEntityBuckets;            // +0x18
     EntityCollisionCellNode* mFreeNodeHead;              // +0x1C
     std::int32_t mFreeNodeCount;                         // +0x20
-    msvc8::vector<EntityCollisionCellNode*> mAllBlocks;  // +0x24
+    fa::vector<EntityCollisionCellNode*> mAllBlocks;  // +0x24
 
     /**
      * Address: 0x004FCD20 (FUN_004FCD20, Moho::EntityOccupationManager::EntityOccupationManager)

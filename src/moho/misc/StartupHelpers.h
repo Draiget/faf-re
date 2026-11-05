@@ -112,7 +112,7 @@ namespace moho
     const CfgAliasSet& leftAliases,
     const CfgAliasSet& rightAliases,
     std::uint32_t requiredArgCount,
-    msvc8::vector<msvc8::string>* outArgs
+    fa::vector<fa::string>* outArgs
   );
 
   /**
@@ -126,7 +126,7 @@ namespace moho
    * `prefix + alias`.
    */
   bool CFG_GetArgOptionAliases(
-    const CfgAliasSet& aliases, std::uint32_t requiredArgCount, msvc8::vector<msvc8::string>* outArgs
+    const CfgAliasSet& aliases, std::uint32_t requiredArgCount, fa::vector<fa::string>* outArgs
   );
 
   /**
@@ -239,23 +239,23 @@ namespace moho
      */
     virtual ~IUserPrefs() = 0;
 
-    virtual msvc8::string* GetStr1() = 0;
-    virtual msvc8::string* GetStr2() = 0;
-    virtual bool GetBoolean(const msvc8::string& key, bool fallback) = 0;
-    virtual std::int32_t GetInteger(const msvc8::string& key, std::int32_t fallback) = 0;
-    virtual float GetNumber(const msvc8::string& key, float fallback) = 0;
-    virtual std::uint32_t GetHex(const msvc8::string& key, std::uint32_t fallback) = 0;
-    virtual msvc8::string GetString(const msvc8::string& key, const msvc8::string& fallback) = 0;
-    virtual msvc8::list<msvc8::string> GetStringArr(
-      const msvc8::string& key,
-      const msvc8::list<msvc8::string>& fallback
+    virtual fa::string* GetStr1() = 0;
+    virtual fa::string* GetStr2() = 0;
+    virtual bool GetBoolean(const fa::string& key, bool fallback) = 0;
+    virtual std::int32_t GetInteger(const fa::string& key, std::int32_t fallback) = 0;
+    virtual float GetNumber(const fa::string& key, float fallback) = 0;
+    virtual std::uint32_t GetHex(const fa::string& key, std::uint32_t fallback) = 0;
+    virtual fa::string GetString(const fa::string& key, const fa::string& fallback) = 0;
+    virtual fa::list<fa::string> GetStringArr(
+      const fa::string& key,
+      const fa::list<fa::string>& fallback
     ) = 0;
-    virtual void SetBoolean(const msvc8::string& key, bool value) = 0;
-    virtual void SetInteger(const msvc8::string& key, std::int32_t value) = 0;
-    virtual void SetNumber(const msvc8::string& key, float value) = 0;
-    virtual void SetHex(const msvc8::string& key, std::uint32_t value) = 0;
-    virtual void SetString(const msvc8::string& key, const msvc8::string& value) = 0;
-    virtual void SetStringArr(const msvc8::string& key, const msvc8::list<msvc8::string>& values) = 0;
+    virtual void SetBoolean(const fa::string& key, bool value) = 0;
+    virtual void SetInteger(const fa::string& key, std::int32_t value) = 0;
+    virtual void SetNumber(const fa::string& key, float value) = 0;
+    virtual void SetHex(const fa::string& key, std::uint32_t value) = 0;
+    virtual void SetString(const fa::string& key, const fa::string& value) = 0;
+    virtual void SetStringArr(const fa::string& key, const fa::list<fa::string>& values) = 0;
     /**
      * Address: 0x008C7EA0 (FUN_008C7EA0, Moho::CUserPrefs::LookupCurrentOption)
      *
@@ -267,7 +267,7 @@ namespace moho
      * that chain is missing). Callers copy it across with `SCR_Copy` before
      * pushing it on another state.
      */
-    virtual LuaPlus::LuaObject LookupCurrentOption(const msvc8::string& key) = 0;
+    virtual LuaPlus::LuaObject LookupCurrentOption(const fa::string& key) = 0;
     /**
      * Address: 0x008C8040 (FUN_008C8040, Moho::CUserPrefs::LookupKey)
      *
@@ -276,7 +276,7 @@ namespace moho
      * What it does:
      * Resolves one dotted key from the root preference table.
      */
-    virtual LuaPlus::LuaObject LookupKey(const msvc8::string& key) = 0;
+    virtual LuaPlus::LuaObject LookupKey(const fa::string& key) = 0;
     /**
      * Address: 0x008C8020 (FUN_008C8020, Moho::CUserPrefs::GetPreferenceTable)
      *
@@ -287,7 +287,7 @@ namespace moho
      * Returns a copy of the root preference table Lua object.
      */
     virtual LuaPlus::LuaObject GetPreferenceTable() = 0;
-    virtual void SetObject(const msvc8::string& key, void* valueObject) = 0;
+    virtual void SetObject(const fa::string& key, void* valueObject) = 0;
     virtual void* GetState() = 0;
   };
 
@@ -345,7 +345,7 @@ namespace moho
    * Mangled:
    * ?OPTIONS_GetString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@@Z
    */
-  [[nodiscard]] msvc8::string OPTIONS_GetString(gpg::StrArg key);
+  [[nodiscard]] fa::string OPTIONS_GetString(gpg::StrArg key);
 
   /**
    * Address: 0x008C6BF0 (FUN_008C6BF0)
@@ -401,7 +401,7 @@ namespace moho
    * Invokes `/lua/user/prefs.lua:GetCurrentProfile()` and returns the
    * profile `Name` field.
    */
-  [[nodiscard]] msvc8::string OPTIONS_GetCurrentProfileName();
+  [[nodiscard]] fa::string OPTIONS_GetCurrentProfileName();
 
   /**
    * Address: 0x008D21E0 (FUN_008D21E0)
@@ -450,7 +450,7 @@ namespace moho
    *
    * No vtable: `SetupBasicMovieManager` allocates it with `operator new(0xC)`
    * (0x00874C3A) and the constructor's first two stores are the COM pointers
-   * at +0x00/+0x04. Its one owner is a static `msvc8::auto_ptr` in
+   * at +0x00/+0x04. Its one owner is a static `fa::auto_ptr` in
    * StartupHelpers.cpp.
    */
   class CMovieManager
@@ -581,9 +581,9 @@ namespace moho
 
   struct SAppIdentity
   {
-    msvc8::string mCompanyName;
-    msvc8::string mProductName;
-    msvc8::string mPreferencePrefix;
+    fa::string mCompanyName;
+    fa::string mProductName;
+    fa::string mPreferencePrefix;
     std::uint32_t mGameIdParts[4]{};
   };
   static_assert(sizeof(SAppIdentity) == 0x64, "SAppIdentity size must be 0x64");
@@ -642,7 +642,7 @@ namespace moho
    * `NetName`, and writes `profile.current`; if missing, invokes
    * `/lua/user/prefs.lua:CreateProfile(profileName)`.
    */
-  void USER_SetCurrentProfile(const msvc8::string& profileName);
+  void USER_SetCurrentProfile(const fa::string& profileName);
 
   /**
    * Address: 0x008CAE10 (FUN_008CAE10, USER_GetGameId)
@@ -661,9 +661,9 @@ namespace moho
    */
   void USER_LuaFrame();
 
-  [[nodiscard]] const msvc8::string& APP_GetCompanyName();
-  [[nodiscard]] const msvc8::string& APP_GetProductName();
-  [[nodiscard]] const msvc8::string& APP_GetPreferencePrefix();
+  [[nodiscard]] const fa::string& APP_GetCompanyName();
+  [[nodiscard]] const fa::string& APP_GetProductName();
+  [[nodiscard]] const fa::string& APP_GetPreferencePrefix();
 
   /**
    * Returns one dword from the fixed savegame id tuple:
@@ -696,7 +696,7 @@ namespace moho
    * Finds a command-line option case-insensitively and optionally copies
    * its following positional arguments.
    */
-  bool CFG_GetArgOption(gpg::StrArg option, std::uint32_t requiredArgCount, msvc8::vector<msvc8::string>* outArgs);
+  bool CFG_GetArgOption(gpg::StrArg option, std::uint32_t requiredArgCount, fa::vector<fa::string>* outArgs);
 
   /**
    * Address: 0x00500A90 (FUN_00500A90, Moho::P4_Info)
@@ -733,7 +733,7 @@ namespace moho
    * Concatenates process command-line arguments (argv[1..]) with single-space
    * separators and trims the trailing separator.
    */
-  msvc8::string CFG_GetArgs();
+  fa::string CFG_GetArgs();
 
   /**
    * Address: 0x0041B790 (FUN_0041B790, cfunc_GetCommandLineArg)
@@ -1151,7 +1151,7 @@ namespace moho
    * Returns `inputPath` unchanged when it already has an extension, otherwise
    * appends `suggestedExt` (with leading `.` normalization).
    */
-  msvc8::string FILE_SuggestedExt(gpg::StrArg inputPath, gpg::StrArg suggestedExt);
+  fa::string FILE_SuggestedExt(gpg::StrArg inputPath, gpg::StrArg suggestedExt);
 
   /**
    * Address: 0x0040FA50 (FUN_0040FA50)
@@ -1194,7 +1194,7 @@ namespace moho
    * (`filename`) while preserving drive/UNC semantics and emitting the same
    * validation failures as the original startup helper.
    */
-  [[nodiscard]] msvc8::string FILE_MakeAbsolute(gpg::StrArg dir, gpg::StrArg filename);
+  [[nodiscard]] fa::string FILE_MakeAbsolute(gpg::StrArg dir, gpg::StrArg filename);
 
   /**
    * Address: 0x00457D40 (FUN_00457D40, sub_457D40)
@@ -1205,8 +1205,8 @@ namespace moho
    * Resolves one path token against one base path and stores the resolved text
    * in `outPath`.
    */
-  msvc8::string* PATH_ResolveAgainstBase(
-    const msvc8::string& path, const msvc8::string& basePath, msvc8::string* outPath
+  fa::string* PATH_ResolveAgainstBase(
+    const fa::string& path, const fa::string& basePath, fa::string* outPath
   );
 
   /**
@@ -1234,7 +1234,7 @@ namespace moho
    * Forces a filename extension by removing existing extension and appending
    * `.` + `ext` when provided.
    */
-  [[nodiscard]] msvc8::string FILE_ForcedExt(gpg::StrArg filename, gpg::StrArg ext);
+  [[nodiscard]] fa::string FILE_ForcedExt(gpg::StrArg filename, gpg::StrArg ext);
 
   /**
    * Address: 0x00410A10 (FUN_00410A10)
@@ -1244,7 +1244,7 @@ namespace moho
    * What it does:
    * Normalizes slashes and returns directory prefix text for `filename`.
    */
-  [[nodiscard]] msvc8::string FILE_DirPrefix(gpg::StrArg filename, bool unusedFlag = false);
+  [[nodiscard]] fa::string FILE_DirPrefix(gpg::StrArg filename, bool unusedFlag = false);
 
   /**
    * Address: 0x00410C60 (FUN_00410C60)
@@ -1254,7 +1254,7 @@ namespace moho
    * What it does:
    * Builds a normalized system-directory path for `filename`.
    */
-  [[nodiscard]] msvc8::string FILE_Dir(gpg::StrArg filename);
+  [[nodiscard]] fa::string FILE_Dir(gpg::StrArg filename);
 
   /**
    * Address: 0x004111C0 (FUN_004111C0)
@@ -1264,7 +1264,7 @@ namespace moho
    * What it does:
    * Returns final path segment text, optionally stripping extension.
    */
-  [[nodiscard]] msvc8::string FILE_Base(gpg::StrArg filename, bool stripExtension);
+  [[nodiscard]] fa::string FILE_Base(gpg::StrArg filename, bool stripExtension);
 
   /**
    * Address: 0x004115A0 (FUN_004115A0)
@@ -1274,7 +1274,7 @@ namespace moho
    * What it does:
    * Collapses `.`/`..` path segments and normalizes separators.
    */
-  [[nodiscard]] msvc8::string FILE_CollapsePath(gpg::StrArg filename, bool* success);
+  [[nodiscard]] fa::string FILE_CollapsePath(gpg::StrArg filename, bool* success);
 
   /**
    * Address: 0x0046AE90 (FUN_0046AE90, sub_46AE90)
@@ -1285,7 +1285,7 @@ namespace moho
    * Compares two canonical path strings by reverse component order (leaf
    * token first, then parent tokens toward root).
    */
-  [[nodiscard]] bool PATH_ReverseComponentLess(const msvc8::string& lhs, const msvc8::string& rhs);
+  [[nodiscard]] bool PATH_ReverseComponentLess(const fa::string& lhs, const fa::string& rhs);
 
   /**
    * Address: 0x00411A20 (FUN_00411A20)
@@ -1295,7 +1295,7 @@ namespace moho
    * What it does:
    * Maps CRT errno values used by FILE_* path helpers to user-facing text.
    */
-  [[nodiscard]] msvc8::string FILE_GetErrorFromErrno(int err);
+  [[nodiscard]] fa::string FILE_GetErrorFromErrno(int err);
 
   /**
    * Address: 0x008C9D10 (FUN_008C9D10)
@@ -1304,7 +1304,7 @@ namespace moho
    * Returns local-appdata path suffix:
    * `<LocalAppData>\\Gas Powered Games\\Supreme Commander Forged Alliance`.
    */
-  [[nodiscard]] msvc8::string USER_GetAppLocalDataDir();
+  [[nodiscard]] fa::string USER_GetAppLocalDataDir();
 
   /**
    * Address: 0x008C9F90 (FUN_008C9F90)
@@ -1313,7 +1313,7 @@ namespace moho
    * Returns `<USER_GetAppLocalDataDir()> + "\\cache"` and ensures the
    * cache directory exists.
    */
-  [[nodiscard]] msvc8::string USER_GetAppCacheDir();
+  [[nodiscard]] fa::string USER_GetAppCacheDir();
 
   /**
    * Address: 0x008CA070 (FUN_008CA070)
@@ -1330,7 +1330,7 @@ namespace moho
    * Returns user documents path suffix:
    * `<Documents>\\My Games\\<Company>\\<Product>\\`.
    */
-  [[nodiscard]] msvc8::string USER_GetAppDocDir();
+  [[nodiscard]] fa::string USER_GetAppDocDir();
 
   /**
    * Address: 0x008CAF70 (FUN_008CAF70, func_OpenDocuments)
@@ -1347,7 +1347,7 @@ namespace moho
    * What it does:
    * Returns `<USER_GetAppDocDir()> + "savegames\\"`.
    */
-  [[nodiscard]] msvc8::string USER_GetSaveGameDir();
+  [[nodiscard]] fa::string USER_GetSaveGameDir();
 
   /**
    * Address: 0x008CA380 (FUN_008CA380)
@@ -1355,7 +1355,7 @@ namespace moho
    * What it does:
    * Returns `<APP preference prefix> + "SaveGame"`.
    */
-  [[nodiscard]] msvc8::string USER_GetSaveGameExt();
+  [[nodiscard]] fa::string USER_GetSaveGameExt();
 
   /**
    * Address: 0x008CA3A0 (FUN_008CA3A0)
@@ -1363,7 +1363,7 @@ namespace moho
    * What it does:
    * Returns `<USER_GetAppDocDir()> + "replays\\"`.
    */
-  [[nodiscard]] msvc8::string USER_GetReplayDir();
+  [[nodiscard]] fa::string USER_GetReplayDir();
 
   /**
    * Address: 0x008CA450 (FUN_008CA450)
@@ -1371,7 +1371,7 @@ namespace moho
    * What it does:
    * Returns `<APP preference prefix> + "Replay"`.
    */
-  [[nodiscard]] msvc8::string USER_GetReplayExt();
+  [[nodiscard]] fa::string USER_GetReplayExt();
 
   /**
    * Address: 0x008CA470 (FUN_008CA470)
@@ -1379,7 +1379,7 @@ namespace moho
    * What it does:
    * Returns `<APP preference prefix> + "CampaignSave"`.
    */
-  [[nodiscard]] msvc8::string USER_GetCampaignSaveExt();
+  [[nodiscard]] fa::string USER_GetCampaignSaveExt();
 
   /**
    * Address: 0x008CA490 (FUN_008CA490)
@@ -1388,7 +1388,7 @@ namespace moho
    * Returns `<USER_GetAppDocDir()> + "screenshots\\"` and ensures the
    * screenshot directory exists.
    */
-  [[nodiscard]] msvc8::string USER_GetScreenshotDir();
+  [[nodiscard]] fa::string USER_GetScreenshotDir();
 
   /**
    * Address: 0x008CA650 (FUN_008CA650, USER_GetSpecialFiles)
@@ -1404,7 +1404,7 @@ namespace moho
     ESpecialFileType specialFileType,
     std::string& outDirectory,
     std::string& outExtension,
-    msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>& outFilesByProfile
+    fa::map<fa::string, fa::vector<fa::string>>& outFilesByProfile
   );
 
   /**
@@ -1423,7 +1423,7 @@ namespace moho
    * (or fallback `Installed.Prefs` defaults), and installs the process-global
    * `IUserPrefs` singleton.
    */
-  void USER_LoadPreferences(const msvc8::string& preferenceFileName);
+  void USER_LoadPreferences(const fa::string& preferenceFileName);
 
   /**
    * Address: 0x008C91A0 (FUN_008C91A0, USER_SavePreferences)
@@ -1441,7 +1441,7 @@ namespace moho
    * Returns `/maps/<map>/<map>_scenario.lua` for plain map tokens, or the
    * input unchanged when it is already a path-like scenario reference.
    */
-  [[nodiscard]] msvc8::string FindMapScenario(gpg::StrArg mapName);
+  [[nodiscard]] fa::string FindMapScenario(gpg::StrArg mapName);
 
   /**
    * Address: 0x008CE2A0 (FUN_008CE2A0, func_StartCommandLineSession)
@@ -1489,7 +1489,7 @@ namespace moho
    * Validates and records launch-directory/data-script bootstrap paths for
    * early startup services. `/init <file>` replaces the default script name.
    */
-  bool DISK_SetupDataAndSearchPaths(msvc8::string dataPathScriptName, const std::filesystem::path& launchDir);
+  bool DISK_SetupDataAndSearchPaths(fa::string dataPathScriptName, const std::filesystem::path& launchDir);
 
   /**
    * Address: 0x00459DA0 (FUN_00459DA0, ?DISK_GetAllowedProtocols@Moho@@YA?AV?$vector@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@V?$allocator@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@@2@@std@@XZ)

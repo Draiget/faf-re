@@ -542,13 +542,7 @@ void moho::CSlaveManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const 
     return;
   }
 
-  gpg::RField baseField{};
-  baseField.mName = baseType->GetName();
-  baseField.mType = baseType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBaseType(typeInfo, baseType);
 }
 
 /**

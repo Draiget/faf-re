@@ -31,7 +31,7 @@ namespace moho
    * Address: 0x00BC4690 (FUN_00BC4690, dynamic initializer for `sProtocols`)
    * Address: 0x00BEF5B0 (FUN_00BEF5B0, dynamic atexit destructor for `sProtocols`)
    */
-  msvc8::vector<msvc8::string> sProtocols{};
+  fa::vector<fa::string> sProtocols{};
 } // namespace moho
 
 /**
@@ -164,7 +164,7 @@ void SSendStampWindow::AppendStamp(const SSendStamp& stamp)
   items.push_back(stamp);
 }
 
-void moho::ENetworkPlayerStateToStr(const ENetworkPlayerState state, msvc8::string& out)
+void moho::ENetworkPlayerStateToStr(const ENetworkPlayerState state, fa::string& out)
 {
   if (state >= ENetworkPlayerState::_Last) {
     out = gpg::STR_Printf("%d", static_cast<int32_t>(state));
@@ -196,7 +196,7 @@ void moho::ENetworkPlayerStateToStr(const ENetworkPlayerState state, msvc8::stri
   }
 }
 
-void moho::NetPacketTypeToStr(const EPacketType state, msvc8::string& out)
+void moho::NetPacketTypeToStr(const EPacketType state, fa::string& out)
 {
   switch (state) {
   case PT_Connect:
@@ -388,13 +388,13 @@ void SBandwidthUsageSeries::EnsureSampleCount(const uint32_t count)
 namespace
 {
   template <typename T>
-  [[nodiscard]] T* VectorData(msvc8::vector<T>& values) noexcept
+  [[nodiscard]] T* VectorData(fa::vector<T>& values) noexcept
   {
     return values.empty() ? nullptr : &values[0];
   }
 
   template <typename T>
-  [[nodiscard]] const T* VectorData(const msvc8::vector<T>& values) noexcept
+  [[nodiscard]] const T* VectorData(const fa::vector<T>& values) noexcept
   {
     return values.empty() ? nullptr : &values[0];
   }
@@ -406,7 +406,7 @@ namespace
   }
 
   template <typename T>
-  [[nodiscard]] size_t ClampVectorIndexFromPointer(const msvc8::vector<T>& values, const T* pointer) noexcept
+  [[nodiscard]] size_t ClampVectorIndexFromPointer(const fa::vector<T>& values, const T* pointer) noexcept
   {
     const T* const base = VectorData(values);
     if (!base || !pointer) {
@@ -467,7 +467,7 @@ namespace
   }
 
   template <typename T>
-  [[nodiscard]] T* EraseRangeShiftLeft(msvc8::vector<T>& values, T* const destination, const T* const source)
+  [[nodiscard]] T* EraseRangeShiftLeft(fa::vector<T>& values, T* const destination, const T* const source)
   {
     T* const base = VectorData(values);
     if (!base) {
@@ -495,7 +495,7 @@ namespace
 
   template <typename T>
   [[nodiscard]] T* InsertValueCopies(
-    msvc8::vector<T>& values, T* const position, const uint32_t count, const T& value
+    fa::vector<T>& values, T* const position, const uint32_t count, const T& value
   )
   {
     if (count == 0u) {
@@ -677,12 +677,12 @@ void moho::NET_BuildBandwidthUsageSeries(
 }
 
 
-msvc8::string moho::NET_ReadLengthPrefixedArgPayload(gpg::BinaryReader& reader)
+fa::string moho::NET_ReadLengthPrefixedArgPayload(gpg::BinaryReader& reader)
 {
   uint32_t payloadLen = 0;
   reader.ReadExact(payloadLen);
 
-  msvc8::string payload;
+  fa::string payload;
   if (payloadLen != 0) {
     std::vector<char> payloadBuffer(payloadLen);
     reader.Read(payloadBuffer.data(), payloadLen);
@@ -928,7 +928,7 @@ CHostManager* moho::NET_GetHostManager()
  * What it does:
  * Resolves/caches a host-order IPv4 address through the global CHostManager cache.
  */
-msvc8::string moho::NET_GetHostName(const u_long address)
+fa::string moho::NET_GetHostName(const u_long address)
 {
   const auto manager = NET_GetHostManager();
   return manager->GetHostName(address);
@@ -1074,7 +1074,7 @@ const char* moho::NET_GetWinsockErrorString() noexcept
  * What it does:
  * Formats host-order IPv4 as "A.B.C.D".
  */
-msvc8::string moho::NET_GetDottedOctetFromUInt32(const uint32_t number)
+fa::string moho::NET_GetDottedOctetFromUInt32(const uint32_t number)
 {
   return gpg::STR_Printf(
     "%d.%d.%d.%d", (number >> 24) & 0xFF, (number >> 16) & 0xFF, (number >> 8) & 0xFF, number & 0xFF
@@ -1085,16 +1085,16 @@ msvc8::string moho::NET_GetDottedOctetFromUInt32(const uint32_t number)
  * Address: 0x00480200 (FUN_00480200)
  * Mangled: ?NET_GetUInt32FromDottedOcted@Moho@@YAIV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
  *
- * msvc8::string
+ * fa::string
  *
  * What it does:
  * Splits dotted IPv4 text by '.' and folds tokens using (acc << 8) | atoi(token).
  */
-uint32_t moho::NET_GetUInt32FromDottedOcted(const msvc8::string& host)
+uint32_t moho::NET_GetUInt32FromDottedOcted(const fa::string& host)
 {
   uint32_t value = 0;
   const char* cursor = host.c_str();
-  msvc8::string token;
+  fa::string token;
 
   while (gpg::STR_GetToken(cursor, ".", token)) {
     value = (value << 8) | static_cast<uint32_t>(std::atoi(token.c_str()));
@@ -1110,20 +1110,20 @@ uint32_t moho::NET_GetUInt32FromDottedOcted(const msvc8::string& host)
  * Converts `ENetProtocolType` to canonical display text.
  * Unsupported enum values throw `std::domain_error`.
  */
-msvc8::string moho::NET_GetProtocolName(const ENetProtocolType protocol)
+fa::string moho::NET_GetProtocolName(const ENetProtocolType protocol)
 {
   switch (protocol) {
   case ENetProtocolType::kNone:
-    return msvc8::string("None");
+    return fa::string("None");
   case ENetProtocolType::kTcp:
-    return msvc8::string("TCP");
+    return fa::string("TCP");
   case ENetProtocolType::kUdp:
-    return msvc8::string("UDP");
+    return fa::string("UDP");
   default:
     break;
   }
 
-  const msvc8::string msg = gpg::STR_Printf("invalid protocol (%d)", static_cast<int32_t>(protocol));
+  const fa::string msg = gpg::STR_Printf("invalid protocol (%d)", static_cast<int32_t>(protocol));
   throw std::domain_error(msg.c_str());
 }
 
@@ -1146,6 +1146,6 @@ ENetProtocolType moho::NET_ProtocolFromString(const char* str)
     return ENetProtocolType::kUdp;
   }
 
-  const msvc8::string msg = gpg::STR_Printf("invalid protocol (\"%s\")", str);
+  const fa::string msg = gpg::STR_Printf("invalid protocol (\"%s\")", str);
   throw std::domain_error(msg.c_str());
 }

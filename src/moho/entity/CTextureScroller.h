@@ -192,7 +192,7 @@ namespace moho
      * Address: 0x007775E0 (FUN_007775E0, Moho::CTextureScrollerTypeInfo::dtr)
      *
      * What it does:
-     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes and
+     * Frees the `RType` base's two `fa::vector<RField>` storage lanes and
      * restores the `gpg::RObject` vftable. Defaulted in source: the
      * compiler-generated `~RType()` reproduces this behavior.
      */

@@ -26,7 +26,7 @@
 
 namespace moho
 {
-  msvc8::string WIN_GetLastError();
+  fa::string WIN_GetLastError();
 }
 
 namespace
@@ -38,7 +38,7 @@ namespace
   std::atomic<std::FILE*> sAccessTrace{nullptr};
   std::mutex sAccessTraceLock;
 
-  using DiskThreadStateStringMap = std::unordered_map<const moho::FWHSThreadState*, msvc8::string*>;
+  using DiskThreadStateStringMap = std::unordered_map<const moho::FWHSThreadState*, fa::string*>;
 
   /**
    * Per-thread error-string storage, standing in for the
@@ -89,7 +89,7 @@ namespace
    * Releases one heap-allocated disk thread-state error string value.
    */
   void DestroyDiskThreadStateString(
-    msvc8::string* const value
+    fa::string* const value
   )
   {
     delete value;
@@ -107,12 +107,12 @@ namespace
   }
 
   [[nodiscard]]
-  msvc8::string* GetOrCreateDiskThreadStateValue(
+  fa::string* GetOrCreateDiskThreadStateValue(
     moho::FWHSThreadState& runtime
   )
   {
-    if (msvc8::string*& slot = DiskThreadStateStrings()[&runtime]; slot == nullptr) {
-      slot = new msvc8::string();
+    if (fa::string*& slot = DiskThreadStateStrings()[&runtime]; slot == nullptr) {
+      slot = new fa::string();
     }
     return DiskThreadStateStrings()[&runtime];
   }
@@ -269,7 +269,7 @@ namespace
 
   [[nodiscard]]
   bool TryQueryFileAttributes(
-    const msvc8::string& canonicalPath,
+    const fa::string& canonicalPath,
     moho::SDiskFileInfo* const outInfo
   )
   {
@@ -328,14 +328,14 @@ namespace
 
   void SetWaitHandleErrorString(
     moho::FWaitHandleSet* const waitHandleSet,
-    const msvc8::string& errorText
+    const fa::string& errorText
   )
   {
     if (waitHandleSet == nullptr) {
       return;
     }
 
-    if (msvc8::string* const errorSlot = waitHandleSet->ErrorString(); errorSlot != nullptr) {
+    if (fa::string* const errorSlot = waitHandleSet->ErrorString(); errorSlot != nullptr) {
       errorSlot->assign_owned(errorText.view());
     }
   }
@@ -421,12 +421,12 @@ namespace
    * otherwise opens a plain file stream from disk.
    */
   [[nodiscard]]
-  msvc8::auto_ptr<gpg::Stream> OpenFileReadFromWaitHandleSet(
+  fa::auto_ptr<gpg::Stream> OpenFileReadFromWaitHandleSet(
     moho::FWaitHandleSet& waitHandleSet,
     const gpg::StrArg sourcePath
   )
   {
-    msvc8::string canonicalPath{};
+    fa::string canonicalPath{};
     gpg::STR_CanonizeFilename(&canonicalPath, sourcePath != nullptr ? sourcePath : "");
 
     ScopedWaitNotify notifyGuard(waitHandleSet);
@@ -439,7 +439,7 @@ namespace
       notifyGuard.NotifyNow();
 
       if (handle == nullptr || handle->mZipFile == nullptr) {
-        return msvc8::auto_ptr<gpg::Stream>(nullptr);
+        return fa::auto_ptr<gpg::Stream>(nullptr);
       }
 
       moho::DISK_TraceAccess("open", canonicalPath.c_str());
@@ -447,7 +447,7 @@ namespace
     }
 
     moho::DISK_TraceAccess("open", canonicalPath.c_str());
-    return msvc8::auto_ptr<gpg::Stream>(
+    return fa::auto_ptr<gpg::Stream>(
       new gpg::FileStream(canonicalPath.c_str(), gpg::Stream::ModeReceive, 0x0Bu, 4096)
     );
   }
@@ -510,7 +510,7 @@ namespace
   [[nodiscard]]
   moho::SFileWaitHandle* FindMountedZipHandleByCanonicalPath(
     moho::FWaitHandleSet& waitHandleSet,
-    const msvc8::string& canonicalPath
+    const fa::string& canonicalPath
   )
   {
     for (moho::SFileWaitHandle* const node : waitHandleSet.mZipFiles.owners()) {
@@ -548,7 +548,7 @@ namespace
     const gpg::StrArg sourcePath
   )
   {
-    msvc8::string canonicalPath{};
+    fa::string canonicalPath{};
     gpg::STR_CanonizeFilename(&canonicalPath, sourcePath != nullptr ? sourcePath : "");
 
     waitHandleSet.Lock();
@@ -581,7 +581,7 @@ namespace
     mountedHandle->mZipFile = mountedZip.release();
     mountedHandle->mLock = 1;
 
-    msvc8::string mountedPathPrefix{};
+    fa::string mountedPathPrefix{};
     mountedPathPrefix.assign_owned(canonicalPath.view());
     if (mountedPathPrefix.empty() || mountedPathPrefix[mountedPathPrefix.size() - 1] != '\\') {
       (void)mountedPathPrefix.push_back('\\');
@@ -591,13 +591,13 @@ namespace
     try {
       const std::size_t entryCount = mountedHandle->mZipFile->mEntries.size();
       for (std::size_t entryIndex = 0; entryIndex < entryCount; ++entryIndex) {
-        const msvc8::string loweredEntryName =
+        const fa::string loweredEntryName =
           gpg::STR_ToLower(mountedHandle->mZipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)).c_str());
         if (!loweredEntryName.empty() && loweredEntryName[loweredEntryName.size() - 1] == '/') {
           continue;
         }
 
-        msvc8::string mountedEntryPath = mountedPathPrefix + loweredEntryName;
+        fa::string mountedEntryPath = mountedPathPrefix + loweredEntryName;
         for (std::size_t cursor = prefixSize; cursor < mountedEntryPath.size(); ++cursor) {
           if (mountedEntryPath[cursor] == '/') {
             mountedEntryPath[cursor] = '\\';
@@ -724,13 +724,13 @@ moho::FWaitHandleSet* moho::FILE_GetWaitHandleSet()
  * Opens one source path for read through the file wait-handle owner and
  * mounted zip-entry lookup chain.
  */
-msvc8::auto_ptr<gpg::Stream> moho::DISK_OpenFileRead(
+fa::auto_ptr<gpg::Stream> moho::DISK_OpenFileRead(
   const gpg::StrArg sourcePath
 )
 {
   FILE_EnsureWaitHandleSet();
   if (sPFWaitHandleSet == nullptr) {
-    return msvc8::auto_ptr<gpg::Stream>(nullptr);
+    return fa::auto_ptr<gpg::Stream>(nullptr);
   }
 
   return OpenFileReadFromWaitHandleSet(*sPFWaitHandleSet, sourcePath);
@@ -747,17 +747,17 @@ msvc8::auto_ptr<gpg::Stream> moho::DISK_OpenFileRead(
  * disk error, read back by `DISK_GetLastError`, and returns null; callers such
  * as `VCR_CreateReplay` then log and carry on without the file.
  */
-msvc8::auto_ptr<gpg::Stream> moho::DISK_OpenFileWrite(
+fa::auto_ptr<gpg::Stream> moho::DISK_OpenFileWrite(
   const gpg::StrArg sourcePath
 )
 {
   try {
-    return msvc8::auto_ptr<gpg::Stream>(
+    return fa::auto_ptr<gpg::Stream>(
       new gpg::FileStream(sourcePath != nullptr ? sourcePath : "", gpg::Stream::ModeSend, 0u, 4096)
     );
   } catch (const std::exception& error) {
     FWaitHandleSet::GetErrorString()->assign_owned(error.what());
-    return msvc8::auto_ptr<gpg::Stream>(nullptr);
+    return fa::auto_ptr<gpg::Stream>(nullptr);
   }
 }
 
@@ -853,10 +853,10 @@ gpg::MemBuffer<const char> moho::DISK_MemoryMapFile(
  * What it does:
  * Returns a copy of the current thread-local disk error text.
  */
-msvc8::string moho::DISK_GetLastError()
+fa::string moho::DISK_GetLastError()
 {
-  msvc8::string copiedError{};
-  if (const msvc8::string* const currentError = FWaitHandleSet::GetErrorString(); currentError != nullptr) {
+  fa::string copiedError{};
+  if (const fa::string* const currentError = FWaitHandleSet::GetErrorString(); currentError != nullptr) {
     copiedError.assign_owned(currentError->view());
   }
   return copiedError;
@@ -976,7 +976,7 @@ int moho::cfunc_DiskFindFilesL(
 {
   moho::SCR_ExpectExactArgs(state, 2, kDiskFindFilesHelpText);
 
-  msvc8::vector<msvc8::string> foundPaths{};
+  fa::vector<fa::string> foundPaths{};
   FILE_EnsureWaitHandleSet();
 
   LuaPlus::LuaStackObject patternArg(state, 2);
@@ -1074,7 +1074,7 @@ int moho::cfunc_DiskGetFileInfoL(
 
     const std::uint64_t rawTimestamp = (static_cast<std::uint64_t>(fileInfo.mLastWriteTime.dwHighDateTime) << 32U) |
       static_cast<std::uint64_t>(fileInfo.mLastWriteTime.dwLowDateTime);
-    const msvc8::string timestampText = gpg::STR_Printf("%016llx", rawTimestamp);
+    const fa::string timestampText = gpg::STR_Printf("%016llx", rawTimestamp);
     flagsTable.SetString("TimeStamp", timestampText.c_str());
 
     FILETIME localFileTime{};
@@ -1149,7 +1149,7 @@ int moho::cfunc_DiskToLocalL(
     pathArg.TypeError("string");
   }
 
-  msvc8::string mountedPath{};
+  fa::string mountedPath{};
   (void)vfs->ToMountedPath(&mountedPath, sourcePath);
   lua_pushstring(state->m_state, mountedPath.c_str());
   (void)lua_gettop(state->m_state);
@@ -1205,7 +1205,7 @@ int moho::cfunc_BasenameL(
   }
 
   const bool stripExtension = stripArg.GetBoolean();
-  const msvc8::string basename = FILE_Base(fullPath, stripExtension);
+  const fa::string basename = FILE_Base(fullPath, stripExtension);
   lua_pushstring(state->m_state, basename.c_str());
   (void)lua_gettop(state->m_state);
   return 1;
@@ -1257,7 +1257,7 @@ int moho::cfunc_DirnameL(
     pathArg.TypeError("string");
   }
 
-  const msvc8::string dirname = FILE_DirPrefix(fullPath);
+  const fa::string dirname = FILE_DirPrefix(fullPath);
   lua_pushstring(state->m_state, dirname.c_str());
   (void)lua_gettop(state->m_state);
   return 1;
@@ -1308,7 +1308,7 @@ int moho::cfunc_FileCollapsePathL(
   }
 
   bool success = false;
-  const msvc8::string collapsedPath = FILE_CollapsePath(fullPath, &success);
+  const fa::string collapsedPath = FILE_CollapsePath(fullPath, &success);
   lua_pushstring(state->m_state, collapsedPath.c_str());
   (void)lua_gettop(state->m_state);
   lua_pushboolean(state->m_state, success ? 1 : 0);
@@ -1544,7 +1544,7 @@ bool moho::FWaitHandleSet::GetFileInfo(
     return false;
   }
 
-  msvc8::string canonicalPath{};
+  fa::string canonicalPath{};
   gpg::STR_CanonizeFilename(&canonicalPath, sourcePath);
 
   Wait();
@@ -1612,7 +1612,7 @@ bool moho::FWaitHandleSet::GetFileInfo(
  * Returns one thread-local error string storage lane for this wait-handle
  * set owner.
  */
-msvc8::string* moho::FWaitHandleSet::ErrorString()
+fa::string* moho::FWaitHandleSet::ErrorString()
 {
   return GetOrCreateDiskThreadStateValue(mThreadStateInd);
 }
@@ -1623,14 +1623,14 @@ msvc8::string* moho::FWaitHandleSet::ErrorString()
  * What it does:
  * Returns the process-global wait-handle thread-local error string storage.
  */
-msvc8::string* moho::FWaitHandleSet::GetErrorString()
+fa::string* moho::FWaitHandleSet::GetErrorString()
 {
   FILE_EnsureWaitHandleSet();
   if (sPFWaitHandleSet != nullptr) {
     return sPFWaitHandleSet->ErrorString();
   }
 
-  thread_local msvc8::string sFallbackError{};
+  thread_local fa::string sFallbackError{};
   return &sFallbackError;
 }
 
@@ -1651,7 +1651,7 @@ gpg::MemBuffer<char> moho::FWaitHandleSet::ReadFile(
     return {};
   }
 
-  msvc8::string canonicalPath{};
+  fa::string canonicalPath{};
   gpg::STR_CanonizeFilename(&canonicalPath, sourcePath);
 
   ScopedWaitNotify notifyGuard(*this);
@@ -1738,7 +1738,7 @@ gpg::MemBuffer<const char> moho::FWaitHandleSet::MemoryMapFile(
     return {};
   }
 
-  msvc8::string canonicalPath{};
+  fa::string canonicalPath{};
   gpg::STR_CanonizeFilename(&canonicalPath, sourcePath);
 
   ScopedWaitNotify notifyGuard(*this);
@@ -1812,7 +1812,7 @@ void moho::FWaitHandleSet::InvalidateFileInfoCache(
     return;
   }
 
-  msvc8::string canonicalPath{};
+  fa::string canonicalPath{};
   gpg::STR_CanonizeFilename(&canonicalPath, sourcePath);
 
   Lock();
@@ -1849,8 +1849,8 @@ bool moho::FILE_GetFileInfo(
   return false;
 }
 
-msvc8::string* moho::FILE_ToMountedPath(
-  msvc8::string* const outPath,
+fa::string* moho::FILE_ToMountedPath(
+  fa::string* const outPath,
   const gpg::StrArg sourcePath
 )
 {

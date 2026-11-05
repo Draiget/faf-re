@@ -26,7 +26,7 @@
 
 namespace moho
 {
-  msvc8::string GetEngineVersion();
+  fa::string GetEngineVersion();
 
   namespace
   {
@@ -144,7 +144,7 @@ technique TMsdfText
      * (FUN_0042BB80) - so capacity cannot distinguish a defined lane from an
      * untouched one. Length can, and length is what the binary reads.
      *
-     * The word is lane+0x18. mName sits at lane+0x04 and msvc8::string keeps
+     * The word is lane+0x18. mName sits at lane+0x04 and fa::string keeps
      * its allocator cookie at +0x00, so the layout is bx at lane+0x08,
      * mySize at lane+0x18, myRes at lane+0x1C - which is exactly what the
      * Implementation constructor stores (`mov [esi+1Ch], 0Fh` for the
@@ -221,9 +221,9 @@ technique TMsdfText
    * What it does:
    * Initializes one implementation lane and copies one lane-name string.
    */
-  CD3DEffect::Technique::Implementation::Implementation(const msvc8::string& implementationName)
+  CD3DEffect::Technique::Implementation::Implementation(const fa::string& implementationName)
   {
-    mName.assign(implementationName, 0U, msvc8::string::npos);
+    mName.assign(implementationName, 0U, fa::string::npos);
   }
 
   /**
@@ -250,7 +250,7 @@ technique TMsdfText
     const Implementation& other
   )
   {
-    mName.assign(other.mName, 0U, msvc8::string::npos);
+    mName.assign(other.mName, 0U, fa::string::npos);
     mIntegerAnnotations = other.mIntegerAnnotations;
     mStringAnnotations = other.mStringAnnotations;
     return *this;
@@ -263,7 +263,7 @@ technique TMsdfText
    * Looks up one integer annotation by key and writes the found value.
    */
   bool CD3DEffect::Technique::Implementation::TryGetIntegerAnnotation(
-    const msvc8::string& annotationName,
+    const fa::string& annotationName,
     std::int32_t* const outValue
   ) const
   {
@@ -283,8 +283,8 @@ technique TMsdfText
    * Looks up one string annotation by key and copies the stored value.
    */
   bool CD3DEffect::Technique::Implementation::TryGetStringAnnotation(
-    const msvc8::string& annotationName,
-    msvc8::string* const outValue
+    const fa::string& annotationName,
+    fa::string* const outValue
   ) const
   {
     const auto node = mStringAnnotations.find(annotationName);
@@ -292,7 +292,7 @@ technique TMsdfText
       return false;
     }
 
-    outValue->assign(node->second, 0U, msvc8::string::npos);
+    outValue->assign(node->second, 0U, fa::string::npos);
     return true;
   }
 
@@ -307,9 +307,9 @@ technique TMsdfText
    * What it does:
    * Initializes one technique with name text and three implementation lanes.
    */
-  CD3DEffect::Technique::Technique(const msvc8::string& techniqueName)
+  CD3DEffect::Technique::Technique(const fa::string& techniqueName)
   {
-    mName.assign(techniqueName, 0U, msvc8::string::npos);
+    mName.assign(techniqueName, 0U, fa::string::npos);
 
     Implementation* const lanes = GetImplementationLanes();
     std::uint32_t constructedCount = 0;
@@ -451,13 +451,13 @@ technique TMsdfText
    * What it does:
    * Parses one sample-count argument and forwards it to the active D3D device.
    */
-  void CD3DEffect::CON_d3d_AntiAliasingSamples(const msvc8::vector<msvc8::string>& args)
+  void CD3DEffect::CON_d3d_AntiAliasingSamples(const fa::vector<fa::string>& args)
   {
     if (args.size() != 2U) {
       return;
     }
 
-    const msvc8::string* const sampleCountText = ConCommandArg(args, 1U);
+    const fa::string* const sampleCountText = ConCommandArg(args, 1U);
     if (sampleCountText == nullptr) {
       return;
     }
@@ -480,7 +480,7 @@ technique TMsdfText
    */
   bool CD3DEffect::InitEffectFromFile(const char* const effectFilePath)
   {
-    const msvc8::string engineVersion = GetEngineVersion();
+    const fa::string engineVersion = GetEngineVersion();
     mEffect.reset();
 
     try {
@@ -497,13 +497,13 @@ technique TMsdfText
         return false;
       }
 
-      msvc8::string compatPath{};
+      fa::string compatPath{};
       (void)waitHandleSet->mHandle->FindFile(&compatPath, compatResourcePath, nullptr);
       const gpg::MemBuffer<const char> compatStateBuffer = DISK_MemoryMapFile(compatPath.c_str());
-      const msvc8::string cacheDirectory = USER_GetAppCacheDir();
-      const msvc8::string effectBaseName = FILE_Base(effectFilePath, true);
+      const fa::string cacheDirectory = USER_GetAppCacheDir();
+      const fa::string effectBaseName = FILE_Base(effectFilePath, true);
 
-      mName.assign(effectBaseName, 0U, msvc8::string::npos);
+      mName.assign(effectBaseName, 0U, fa::string::npos);
       mFile.assign(effectFilePath, std::char_traits<char>::length(effectFilePath));
 
       SDiskFileInfo sourceInfo{};
@@ -529,14 +529,14 @@ technique TMsdfText
       // does `msdfText`, the source with the MSDF technique appended.
       const auto createEffect = [&](const bool boneTexture, const bool msdfText = false) {
         const char* const variant = boneTexture ? ".bonetex." : (msdfText ? ".msdf." : ".");
-        const msvc8::string cachePath = cacheDirectory + "/" + mName + variant + engineVersion;
+        const fa::string cachePath = cacheDirectory + "/" + mName + variant + engineVersion;
         SDiskFileInfo cacheInfo{};
         bool useCachePayload = false;
         if (waitHandleSet->GetFileInfo(cachePath.c_str(), &cacheInfo, false)) {
           useCachePayload = IsDiskFileInfoNotOlder(cacheInfo, sourceInfo);
         }
 
-        msvc8::vector<gpg::gal::EffectMacro> effectMacros{};
+        fa::vector<gpg::gal::EffectMacro> effectMacros{};
         if (boneTexture) {
           effectMacros.push_back(gpg::gal::EffectMacro("FAF_BONE_TEXTURE", "1"));
         }
@@ -573,13 +573,13 @@ technique TMsdfText
 
       mTechniques.clear();
 
-      msvc8::vector<msvc8::string> techniqueImplementationNames{};
+      fa::vector<fa::string> techniqueImplementationNames{};
       EnumerateValidTechniques(techniqueImplementationNames);
-      for (const msvc8::string& implementationName : techniqueImplementationNames) {
-        msvc8::string abstractTechniqueName{};
-        const msvc8::string abstractTechniqueToken("abstractTechnique", 17U);
+      for (const fa::string& implementationName : techniqueImplementationNames) {
+        fa::string abstractTechniqueName{};
+        const fa::string abstractTechniqueToken("abstractTechnique", 17U);
         if (!GetImplAnnotation(&abstractTechniqueName, implementationName, abstractTechniqueToken)) {
-          abstractTechniqueName.assign(implementationName, 0U, msvc8::string::npos);
+          abstractTechniqueName.assign(implementationName, 0U, fa::string::npos);
         }
 
         const TechniqueSet::iterator definition = mTechniques.emplace(abstractTechniqueName).first;
@@ -602,7 +602,7 @@ technique TMsdfText
         }
 
         std::int32_t fidelityIndex = -1;
-        const msvc8::string fidelityToken("fidelity", 8U);
+        const fa::string fidelityToken("fidelity", 8U);
         (void)GetImplAnnotation(&fidelityIndex, implementationName, fidelityToken);
         if (fidelityIndex < 0 || fidelityIndex > 2) {
           gpg::Warnf(
@@ -655,9 +655,9 @@ technique TMsdfText
    * What it does:
    * Queries the current effect for valid techniques and appends their names.
    */
-  void CD3DEffect::EnumerateValidTechniques(msvc8::vector<msvc8::string>& outTechniqueNames)
+  void CD3DEffect::EnumerateValidTechniques(fa::vector<fa::string>& outTechniqueNames)
   {
-    msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>> techniques{};
+    fa::vector<boost::shared_ptr<gpg::gal::EffectTechnique>> techniques{};
     mEffect->GetTechniques(techniques);
 
     for (const boost::shared_ptr<gpg::gal::EffectTechnique>& technique : techniques) {
@@ -674,7 +674,7 @@ technique TMsdfText
    */
   void CD3DEffect::SetTechnique(const char* const techniqueName)
   {
-    const msvc8::string lookupName(techniqueName, std::char_traits<char>::length(techniqueName));
+    const fa::string lookupName(techniqueName, std::char_traits<char>::length(techniqueName));
     const Technique lookupTechnique(lookupName);
     const TechniqueSet::iterator definition = GetFidelityDefinitions(lookupTechnique);
 
@@ -712,8 +712,8 @@ technique TMsdfText
    */
   bool CD3DEffect::GetImplAnnotation(
     std::int32_t* const outValue,
-    const msvc8::string& implementationName,
-    const msvc8::string& annotationName
+    const fa::string& implementationName,
+    const fa::string& annotationName
   )
   {
     const boost::shared_ptr<gpg::gal::EffectTechnique> technique = mEffect->GetTechnique(implementationName.c_str());
@@ -732,8 +732,8 @@ technique TMsdfText
    * resolving from implementation annotation when cache is missing.
    */
   std::int32_t CD3DEffect::GetIntegerAnnotation(
-    const msvc8::string& techniqueName,
-    const msvc8::string& annotationName,
+    const fa::string& techniqueName,
+    const fa::string& annotationName,
     const std::int32_t defaultValue
   )
   {
@@ -770,9 +770,9 @@ technique TMsdfText
    * Reads one string annotation from one implementation technique lane.
    */
   bool CD3DEffect::GetImplAnnotation(
-    msvc8::string* const outValue,
-    const msvc8::string& implementationName,
-    const msvc8::string& annotationName
+    fa::string* const outValue,
+    const fa::string& implementationName,
+    const fa::string& annotationName
   )
   {
     const boost::shared_ptr<gpg::gal::EffectTechnique> technique = mEffect->GetTechnique(implementationName.c_str());
@@ -790,14 +790,14 @@ technique TMsdfText
    * Returns one string annotation for the selected technique/fidelity lane,
    * resolving from implementation annotation when cache is missing.
    */
-  msvc8::string CD3DEffect::GetStringAnnotation(
-    const msvc8::string& techniqueName,
-    const msvc8::string& annotationName,
-    const msvc8::string& defaultValue
+  fa::string CD3DEffect::GetStringAnnotation(
+    const fa::string& techniqueName,
+    const fa::string& annotationName,
+    const fa::string& defaultValue
   )
   {
-    msvc8::string resolvedValue{};
-    resolvedValue.assign(defaultValue, 0U, msvc8::string::npos);
+    fa::string resolvedValue{};
+    resolvedValue.assign(defaultValue, 0U, fa::string::npos);
 
     if (!mEffect) {
       gpg::Warnf("attempt to retrieve annotation from invalid effect");

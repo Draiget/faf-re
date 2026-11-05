@@ -110,16 +110,16 @@ void CSimDriver::DrawNetworkStatsPanel(
   // ---- Table columns: index, nickname, ping, maxsp, data, behind, avail, then
   // one ack column per client (0x0073E078: numClients + 7 inner vectors).
   constexpr std::size_t kFirstAckColumn = 7;
-  msvc8::vector<msvc8::vector<msvc8::string>> columns(numClients + kFirstAckColumn);
+  fa::vector<fa::vector<fa::string>> columns(numClients + kFirstAckColumn);
 
   // Header row (0x0073E098..0x0073E28F).
-  columns[0].push_back(msvc8::string(""));        // 0x0073E098 index header (empty)
-  columns[1].push_back(msvc8::string(""));        // 0x0073E0FA nickname header (empty)
-  columns[2].push_back(msvc8::string(" ping"));   // 0x0073E14B
-  columns[3].push_back(msvc8::string(" maxsp"));  // 0x0073E19C
-  columns[4].push_back(msvc8::string(" data"));   // 0x0073E1ED
-  columns[5].push_back(msvc8::string(" behind")); // 0x0073E23E
-  columns[6].push_back(msvc8::string(" avail"));  // 0x0073E28F
+  columns[0].push_back(fa::string(""));        // 0x0073E098 index header (empty)
+  columns[1].push_back(fa::string(""));        // 0x0073E0FA nickname header (empty)
+  columns[2].push_back(fa::string(" ping"));   // 0x0073E14B
+  columns[3].push_back(fa::string(" maxsp"));  // 0x0073E19C
+  columns[4].push_back(fa::string(" data"));   // 0x0073E1ED
+  columns[5].push_back(fa::string(" behind")); // 0x0073E23E
+  columns[6].push_back(fa::string(" avail"));  // 0x0073E28F
 
   // Each ack column is headed by the index of the client whose data it
   // counts (0x0073E2E8..0x0073E357: " %3d" into columns[7 + i]).
@@ -144,7 +144,7 @@ void CSimDriver::DrawNetworkStatsPanel(
       // Ejection pending: every remaining column, the ack columns included,
       // gets an empty cell so the rows stay aligned (0x0073E929..0x0073E9AB).
       for (std::size_t c = 2; c < columns.size(); ++c) {
-        columns[c].push_back(msvc8::string("")); // 0x0073E96D
+        columns[c].push_back(fa::string("")); // 0x0073E96D
       }
       continue;
     }
@@ -174,23 +174,23 @@ void CSimDriver::DrawNetworkStatsPanel(
     // One ack cell per client j: how far this client has acked j's data past
     // its own dispatch. A client being ejected gets a blank cell
     // (0x0073E5A1 GetClient(j), 0x0073E5AA NoEjectionPending, 0x0073E600).
-    const msvc8::vector<int32_t>* const acks = client->GetLatestAcksVector(); // 0x0073E57F (client slot 4)
+    const fa::vector<int32_t>* const acks = client->GetLatestAcksVector(); // 0x0073E57F (client slot 4)
     for (std::size_t j = 0; j < numClients; ++j) {
-      msvc8::vector<msvc8::string>& ackColumn = columns[kFirstAckColumn + j];
+      fa::vector<fa::string>& ackColumn = columns[kFirstAckColumn + j];
       if (mClientManager->GetClient(static_cast<int>(j))->NoEjectionPending()) {
         ackColumn.push_back(gpg::STR_Printf(" %3d", (*acks)[j] - remoteDispatched)); // 0x0073E5C0
       } else {
-        ackColumn.push_back(msvc8::string("")); // 0x0073E620
+        ackColumn.push_back(fa::string("")); // 0x0073E620
       }
     }
   }
 
   // ---- Summary block: 4 lines (0x0073E687..0x0073E876).
-  msvc8::vector<msvc8::string> summary;
+  fa::vector<fa::string> summary;
 
   // Engine addition (issue #215): the exe's build as the first line, so F11 (FAF's
   // connectivity screen turns this panel on) tells which build each player runs.
-  summary.push_back(msvc8::string(gpg::diag::BuildLabel()));
+  summary.push_back(fa::string(gpg::diag::BuildLabel()));
 
   {
     int availableBeat = 0;
@@ -218,9 +218,9 @@ void CSimDriver::DrawNetworkStatsPanel(
 
   {
     const SClientBottleneckInfo bottleneck = mClientManager->GetBottleneckInfo(); // 0x0073E7EB (mgr slot 24)
-    msvc8::string bottleneckLabel;
+    fa::string bottleneckLabel;
     FormatBottleneckLabel(bottleneck, bottleneckLabel);                 // 0x0073E80F (FUN_0053B6B0)
-    summary.push_back(msvc8::string("bottleneck: ") + bottleneckLabel); // 0x0073E859 operator+
+    summary.push_back(fa::string("bottleneck: ") + bottleneckLabel); // 0x0073E859 operator+
   }
 
   // ---- Per-column max-advance measurement (0x0073E9BC..0x0073EB2F).
@@ -231,7 +231,7 @@ void CSimDriver::DrawNetworkStatsPanel(
   // Running total table width, seeded with 6.0 (flt_E4F71C @0x0073E90E).
   float totalWidth = 6.0f;
   for (std::size_t c = 0; c < columns.size(); ++c) { // trip = columns.size() (0x0073E9B0)
-    for (const msvc8::string& cell : columns[c]) {
+    for (const fa::string& cell : columns[c]) {
       const float advance = font->GetAdvance(cell.c_str(), -1); // 0x0073EA68
       colWidths[c] = std::max(colWidths[c], advance);           // 0x0073EA75..0x0073EA7F
     }
@@ -246,7 +246,7 @@ void CSimDriver::DrawNetworkStatsPanel(
   // small game's table and would run past the backdrop. The 3.0 is the left margin; add
   // it again for the right one.
   float summaryMax = 0.0f;
-  for (const msvc8::string& line : summary) {
+  for (const fa::string& line : summary) {
     const float advance = font->GetAdvance(line.c_str(), -1) + 3.0f; // 0x0073EB06/0x0073EB0B (flt_E4F718 == 3.0)
     summaryMax = std::max(summaryMax, advance);                      // 0x0073EB13..0x0073EB1A
   }
@@ -307,7 +307,7 @@ void CSimDriver::DrawNetworkStatsPanel(
   float penY = rectTop + font->mAscent + 3.0f; // 0x0073ED86..0x0073EDB6 (mAscent @ CD3DFont+0x14)
 
   // Summary lines, left-anchored at rectLeft+3 (loop over var_DC). 0x0073EDAD..0x0073EED0.
-  for (const msvc8::string& line : summary) {
+  for (const fa::string& line : summary) {
     const Vector3f origin{rectLeft + 3.0f, penY, 0.0f}; // 0x0073EE28..0x0073EE6E
     (void)font->Render(
       line.c_str(), batcher, origin, xAxis, yAxis, kTextColor, kGlyphScale, kNoMaxAdvance); // 0x0073EEA7
@@ -323,11 +323,11 @@ void CSimDriver::DrawNetworkStatsPanel(
   for (std::size_t row = 0; row < tableRowCount; ++row) {
     float cellX = rectLeft + 3.0f; // running X base, reset per row (0x0073EF22..0x0073EF44)
     for (std::size_t c = 0; c < columns.size(); ++c) {
-      const msvc8::vector<msvc8::string>& column = columns[c];
+      const fa::vector<fa::string>& column = columns[c];
       // The retail grid is rectangular (all data columns carry one row per
       // client); shorter columns simply contribute an empty cell for the tail
       // rows rather than reading past their storage.
-      const msvc8::string cell = (row < column.size()) ? column[row] : msvc8::string();
+      const fa::string cell = (row < column.size()) ? column[row] : fa::string();
 
       float originX;
       if (c < 2) {

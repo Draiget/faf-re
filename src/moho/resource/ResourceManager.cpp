@@ -72,7 +72,7 @@ namespace
   /**
    * MSVC8's `std::set<T>::iterator` was mutable -- the const-element rule came
    * with C++11 -- and the shipped code updates a record in place through it.
-   * `msvc8::set` follows the modern rule, so those writes go through this one
+   * `fa::set` follows the modern rule, so those writes go through this one
    * accessor; the two ordering fields are never touched.
    */
   [[nodiscard]] moho::ResourceRecord& Record(const moho::ResourceRecordSet::iterator it) noexcept
@@ -93,9 +93,9 @@ namespace
   /**
    * Where the mounted file system puts `path`; empty when it has no such file.
    */
-  [[nodiscard]] msvc8::string FindMountedFile(const char* const path)
+  [[nodiscard]] fa::string FindMountedFile(const char* const path)
   {
-    msvc8::string found;
+    fa::string found;
     (void)moho::FILE_GetWaitHandleSet()->mHandle->FindFile(&found, path, nullptr);
     return found;
   }
@@ -126,7 +126,7 @@ namespace moho
    * Address: 0x004A9A40 (FUN_004A9A40)
    */
   ResourceRecord::ResourceRecord(const gpg::StrArg name, const gpg::RType* const type)
-    : mId{msvc8::string(name)}
+    : mId{fa::string(name)}
     , mType(type)
     , mLoading(false)
     , mReloadPending(false)
@@ -410,7 +410,7 @@ namespace moho
   {
     boost::recursive_mutex::scoped_lock lock(mLock);
 
-    const msvc8::string name = IsLiteralName(path) ? msvc8::string(path) : FindMountedFile(path);
+    const fa::string name = IsLiteralName(path) ? fa::string(path) : FindMountedFile(path);
     if (name.empty()) {
       return PrefetchHandleBase();
     }
@@ -451,7 +451,7 @@ namespace moho
   {
     boost::recursive_mutex::scoped_lock lock(mLock);
 
-    msvc8::string name;
+    fa::string name;
     if (IsLiteralName(path)) {
       name = path;
     } else if (path != nullptr && path[0] == '/' && path[1] != ':' && path[1] != '/') {

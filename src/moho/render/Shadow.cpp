@@ -441,7 +441,7 @@ namespace moho
    * When blur is on the depth map is turned into a variance map by two
    * separable passes, shadow map -> A -> B, each drawing the unit quad.
    */
-  void Shadow::RenderShadowMap(TerrainCommon* const /*terrain*/, const GeomCamera3& viewCamera)
+  void Shadow::RenderShadowMap(TerrainCommon* const terrain, const GeomCamera3& viewCamera)
   {
     if (mShadowFidelity == 0) {
       return;
@@ -497,6 +497,7 @@ namespace moho
     device->SetRenderTarget1(mShadowMap.get(), mDepthStencil.get(), true, -1, 1.0f, 0);
     bindTargetWithBorder(mShadowMap);
 
+    terrain->DrawTerrainDepth(mCamera);
 
     MeshRenderer* const meshRenderer = MeshRenderer::GetInstance();
     meshRenderer->Batch(REN_GetGameTick(), REN_GetSimDeltaSeconds(), mCamera, viewCamera.viewport.r[1]);

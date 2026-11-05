@@ -132,7 +132,7 @@ namespace
 
     const char* const expectedTypeName = expectedType ? expectedType->GetName() : expectedName;
     const char* const actualTypeName = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expectedTypeName ? expectedTypeName : expectedName,

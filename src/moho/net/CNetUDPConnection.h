@@ -76,7 +76,7 @@ namespace moho
      * Slot: 6
      * Demangled: moho::CNetUDPConnection::ToString
      */
-    msvc8::string ToString() override;
+    fa::string ToString() override;
 
     /**
      * Address: 0x00489660

@@ -85,14 +85,6 @@ namespace
     return cached;
   }
 
-  gpg::RType* CachedCAnimationManipulatorType()
-  {
-    if (!CAnimationManipulator::sType) {
-      CAnimationManipulator::sType = gpg::LookupRType(typeid(CAnimationManipulator));
-    }
-    return CAnimationManipulator::sType;
-  }
-
   gpg::RType* CachedCRotateManipulatorType()
   {
     static gpg::RType* cached = nullptr;
@@ -1098,7 +1090,7 @@ CAnimationManipulator* moho::SCR_FromLua_CAnimationManipulator(
   }
 
   const gpg::RRef sourceRef = SCR_MakeScriptObjectRef(scriptObject);
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, CachedCAnimationManipulatorType());
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, gpg::CachedLookup<CAnimationManipulator>(CAnimationManipulator::sType));
   if (!upcast.mObj) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kIncorrectGameObjectTypeError);
     return nullptr;
@@ -2638,13 +2630,7 @@ void moho::register_CScriptEventTypeInfo()
 void CScriptEventTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
 {
   gpg::RType* const scriptObjectType = gpg::RTypeOf<CScriptObject>();
-  gpg::RField baseField{};
-  baseField.mName = scriptObjectType->GetName();
-  baseField.mType = scriptObjectType;
-  baseField.mOffset = gpg::BaseSubobjectOffset<CScriptEvent, CScriptObject>();
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBaseType(typeInfo, scriptObjectType, gpg::BaseSubobjectOffset<CScriptEvent, CScriptObject>());
 }
 
 /**

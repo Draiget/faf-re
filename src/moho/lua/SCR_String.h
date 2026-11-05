@@ -23,7 +23,7 @@ namespace moho
    * Returns the populated LuaObject by output parameter (RVO slot).
    */
   LuaPlus::LuaObject* SCR_FromString(
-      LuaPlus::LuaObject* outObject, const msvc8::string& source, LuaPlus::LuaState* state);
+      LuaPlus::LuaObject* outObject, const fa::string& source, LuaPlus::LuaState* state);
 
   /**
    * Address: 0x004D3D30 (FUN_004D3D30, Moho::GetEngineVersion)
@@ -31,7 +31,7 @@ namespace moho
    * What it does:
    * Builds the fixed engine version string used by Lua and console callbacks.
    */
-  [[nodiscard]] msvc8::string GetEngineVersion();
+  [[nodiscard]] fa::string GetEngineVersion();
 
   /**
    * Address: 0x004D3470 (FUN_004D3470, cfunc_STR_xtoi)

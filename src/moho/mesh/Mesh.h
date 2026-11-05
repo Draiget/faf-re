@@ -167,12 +167,12 @@ namespace moho
      * Creates one mesh material and resolves per-texture sheet handles from paths.
      */
     static boost::shared_ptr<MeshMaterial> Create(
-      const msvc8::string& shaderName,
-      const msvc8::string& albedoName,
-      const msvc8::string& normalsName,
-      const msvc8::string& specularName,
-      const msvc8::string& lookupName,
-      const msvc8::string& secondaryName,
+      const fa::string& shaderName,
+      const fa::string& albedoName,
+      const fa::string& normalsName,
+      const fa::string& specularName,
+      const fa::string& lookupName,
+      const fa::string& secondaryName,
       CResourceWatcher* resourceWatcher
     );
 
@@ -186,7 +186,7 @@ namespace moho
     // type that both producers and the `ShaderVar::GetTexture` consumer accept
     // is their shared `ID3DTextureSheet` base, which sits at offset 0 in each,
     // so the raw pointer stored is the same word the binary stores.
-    msvc8::string mShaderAnnotation;                      // +0x04
+    fa::string mShaderAnnotation;                      // +0x04
     boost::shared_ptr<ID3DTextureSheet> mAlbedoSheet;      // +0x20
     boost::shared_ptr<ID3DTextureSheet> mNormalsSheet;     // +0x28
     boost::shared_ptr<ID3DTextureSheet> mSpecularSheet;    // +0x30
@@ -199,8 +199,8 @@ namespace moho
     // (`"cartographicTechnique"` in RenderCartographic 0x007DFF30,
     // `"depthTechnique"` in RenderDepth 0x007E03B0), each with the byte that
     // records it was looked up -- an empty name is a valid, cached answer.
-    msvc8::string mCartographicTechnique;                 // +0x54
-    msvc8::string mDepthTechnique;                        // +0x70
+    fa::string mCartographicTechnique;                 // +0x54
+    fa::string mDepthTechnique;                        // +0x70
     bool mCartographicTechniqueResolved;                  // +0x8C
     bool mDepthTechniqueResolved;                         // +0x8D
     std::uint8_t mPad8E_8F[0x02]{};
@@ -440,7 +440,7 @@ namespace moho
     const RMeshBlueprint* bp;                  // +0x20
     boost::shared_ptr<MeshMaterial> material;  // +0x24
     std::uint32_t unk2C;                       // +0x2C
-    msvc8::vector<MeshLOD*> lods;              // +0x30
+    fa::vector<MeshLOD*> lods;              // +0x30
     std::uint32_t unk3C;                       // +0x3C
   };
 
@@ -487,9 +487,9 @@ namespace moho
   };
 
   /**
-   * Comparator for `MeshRendererMeshCacheTree`'s `msvc8::map` instantiation.
+   * Comparator for `MeshRendererMeshCacheTree`'s `fa::map` instantiation.
    * Stateless, so the tree's empty-base optimisation of the comparator
-   * (`msvc8::detail::rb_compare_carrier`) still applies, matching
+   * (`fa::detail::rb_compare_carrier`) still applies, matching
    * `MeshBatchKeyLess` (`MeshBatchKey.h`) for the sibling batch-bucket tree.
    */
   struct MeshKeyLess
@@ -751,7 +751,9 @@ namespace moho
     std::uint8_t hasStanceUpdatePending; // +0xA4
     std::uint8_t isStaticPose;           // +0xA5
     std::uint8_t isLocked;               // +0xA6
-    std::uint8_t pad_A7{};
+    // Engine addition in the padding (ren_MeshPoseStill): curPose already holds startPose and endPose,
+    // which match, so blending them again would give the same pose.
+    std::uint8_t poseStill{};              // +0xA7
     boost::shared_ptr<CAniPose> startPose; // +0xA8
     boost::shared_ptr<CAniPose> endPose;   // +0xB0
     boost::shared_ptr<CAniPose> curPose;   // +0xB8
@@ -809,7 +811,7 @@ namespace moho
    * `weak_ptr<Mesh>::lock()` - a real owning `shared_ptr` member would
    * never need that check.
    *
-   * Routed through the canonical `msvc8::map<K,T,Less>` (`legacy/containers/
+   * Routed through the canonical `fa::map<K,T,Less>` (`legacy/containers/
    * Map.h`/`RbTree.h`) rather than a hand-rolled tree: this instantiation's
    * `buy_node`/`buy_head`/`insert_unique`/`insert_at`/`link_and_rebalance`/
    * `rb_decrement`/`lower_bound_node`/`find_node`/`~rb_tree()` members are
@@ -817,11 +819,11 @@ namespace moho
    * `0x007E6090`, `0x007E4770`, `0x007E2B50`, `0x007E5B20`, `0x007E5DF0`,
    * `0x007E60F0`, `0x007E6050`, `0x007E5C00`, `0x007DF2D0`) -- this is the
    * same node/head layout (12-byte `{proxy, head, size}` header, EBO'd
-   * comparator) every other real `msvc8::map`/`msvc8::set` instantiation in
+   * comparator) every other real `fa::map`/`fa::set` instantiation in
    * this codebase already uses, matching `MeshBatchBucketTree`
    * (`MeshBatchKey.h`), this file's own sibling batch-bucket tree.
    */
-  using MeshRendererMeshCacheTree = msvc8::map<MeshKey, boost::weak_ptr<Mesh>, MeshKeyLess>;
+  using MeshRendererMeshCacheTree = fa::map<MeshKey, boost::weak_ptr<Mesh>, MeshKeyLess>;
 
   /**
    * Process-wide mesh-render shader-constant lane. The binary holds each of
@@ -895,13 +897,13 @@ namespace moho
    * reserve helpers (0x007E9130 / 0x007E96A0).
    */
   /**
-   * Layout-identical to `msvc8::vector<SkinPaletteEntry>` (`myProxy_@+0x00`,
+   * Layout-identical to `fa::vector<SkinPaletteEntry>` (`myProxy_@+0x00`,
    * `first_@+0x04`, `last_@+0x08`, `end_@+0x0C`) -- not a bespoke type. What
    * looked like an unused leading "reserved header" word is the vector's own
    * debug-proxy slot, which the binary never reads and the game's builds
    * leave out (legacy/containers/Layout.h).
    */
-  struct MeshShaderPaletteBuffer : msvc8::vector<SkinPaletteEntry>
+  struct MeshShaderPaletteBuffer : fa::vector<SkinPaletteEntry>
   {
     /// Max bone count the skinning palette is reserved to (0x50 entries).
     static constexpr std::uint32_t kPaletteCapacity = 0x50;
@@ -1009,8 +1011,8 @@ namespace moho
   static_assert(sizeof(SkinPaletteEntry) == 0x10, "SkinPaletteEntry size must be 0x10");
   static_assert(sizeof(MeshShaderPaletteBuffer) == 0x10, "MeshShaderPaletteBuffer size must be 0x10");
   static_assert(
-    sizeof(MeshShaderPaletteBuffer) == sizeof(msvc8::vector<SkinPaletteEntry>),
-    "MeshShaderPaletteBuffer must add no state beyond msvc8::vector<SkinPaletteEntry>"
+    sizeof(MeshShaderPaletteBuffer) == sizeof(fa::vector<SkinPaletteEntry>),
+    "MeshShaderPaletteBuffer must add no state beyond fa::vector<SkinPaletteEntry>"
   );
   static_assert(offsetof(MeshShaderPaletteVar, mPalette) == 0x48, "MeshShaderPaletteVar::mPalette offset must be 0x48");
   static_assert(sizeof(MeshShaderPaletteVar) == 0x58, "MeshShaderPaletteVar size must be 0x58");
@@ -1380,9 +1382,9 @@ namespace moho
   static_assert(sizeof(MeshInstance) == 0x160, "MeshInstance size must be 0x160");
   static_assert(sizeof(TDatList<MeshInstance, void>) == 0x08, "TDatList<MeshInstance, void> size must be 0x08");
 
-  // MeshRendererMeshCacheTree is msvc8::map<MeshKey, boost::weak_ptr<Mesh>,
+  // MeshRendererMeshCacheTree is fa::map<MeshKey, boost::weak_ptr<Mesh>,
   // MeshKeyLess> -- the 12-byte {proxy, head, size} header this size guards
-  // is shared by every msvc8::map/msvc8::set instantiation regardless of
+  // is shared by every fa::map/fa::set instantiation regardless of
   // K/V/Less (comparator EBO'd away), already spot-checked generically in
   // Map.h (`static_assert(sizeof(map<void*, void*>) == 0x0C, ...)`). Only
   // the overall size needs re-asserting here, to guard MeshRenderer's own

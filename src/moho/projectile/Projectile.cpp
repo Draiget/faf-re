@@ -64,18 +64,6 @@ namespace
   constexpr float kProjectileUnsetValue = -1.0f;
   constexpr float kProjectileBounceVelocityDampingDefault = 0.5f;
 
-  [[nodiscard]] gpg::RType* CachedEntityType()
-  {
-    static gpg::RType* cached = nullptr;
-    return gpg::CachedLookup<moho::Entity>(cached);
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    return gpg::CachedLookup<Wm3::Vector3f>(cached);
-  }
-
   [[nodiscard]] gpg::RRef MakeProjectileRef(moho::Projectile* const object)
   {
     // Delegates to the recovered gpg::RRef_Projectile (FUN_0069FEA0), which
@@ -223,7 +211,7 @@ namespace
     try {
       LuaPlus::LuaFunction<bool> callback(script);
       return callback(collidedEntity->mLuaObj, projectile);
-    } catch (const msvc8::runtime_error& error) {
+    } catch (const fa::runtime_error& error) {
       moho::CScriptObject::LogScriptWarning(
         weakGuard.GetObjectPtr(), "OnCollisionCheck", error.what()
       );
@@ -333,7 +321,7 @@ namespace moho
     const VTransform& launchTransform,
     const float damage,
     const float damageRadius,
-    const msvc8::string& damageTypeName,
+    const fa::string& damageTypeName,
     const CAiTarget& target,
     const bool isChildProjectile
   )
@@ -657,7 +645,7 @@ namespace moho
       // Previously modeled via the RULE ONE offset-magic helper
       // `AppendProjectileLaneFromOwnerOffsetRuntime` (SimRecoveryRuntime.cpp,
       // reach-in through `ownerBase + 0x9B8`) -- collapsed onto
-      // `msvc8::vector<SCamFollowParams>::push_back` (Vector.h) instead; see
+      // `fa::vector<SCamFollowParams>::push_back` (Vector.h) instead; see
       // that citation for the full fast/slow-path evidence chain.
       if (blueprint->Display.CameraFollowsProjectile != 0) {
         SimulationRef->mSyncSerializeGroup0.push_back(SCamFollowParams{
@@ -773,7 +761,7 @@ namespace moho
    */
   void Projectile::SetLifetime(const float lifetimeSeconds)
   {
-    const std::uint32_t lifetimeTicks = static_cast<std::uint32_t>(msvc8::RoundToInt(lifetimeSeconds * 10.0f));
+    const std::uint32_t lifetimeTicks = static_cast<std::uint32_t>(fa::RoundToInt(lifetimeSeconds * 10.0f));
     mLifetimeEnd = SimulationRef->mCurTick + lifetimeTicks;
   }
 
@@ -1119,7 +1107,7 @@ namespace moho
         CArmyImpl* const launcherArmy = launcherEntity->ArmyRef;
         if (launcherArmy != nullptr) {
           CArmyStats* const stats = launcherArmy->GetArmyStats();
-          msvc8::string statPath = msvc8::string("RealTimeStats_") + launcherEntity->GetUniqueName();
+          fa::string statPath = fa::string("RealTimeStats_") + launcherEntity->GetUniqueName();
           const bool didHit = mTargetPosData.ImpactDidHitEntity(collidedEntity, mImpactType);
           statPath = statPath + (didHit ? "_Shots_Hit" : "_Shots_Missed");
           const std::int32_t delta = 1;
@@ -1816,12 +1804,12 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    archive->Read(CachedEntityType(), this, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::Entity>(), this, ownerRef);
     archive->Read(gpg::RTypeOf<moho::ManyToOneBroadcaster_EProjectileImpactEvent>(), &mImpactEventBroadcaster, ownerRef);
     archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mLauncherWeak, ownerRef);
-    archive->Read(CachedVector3fType(), &mVelocity, ownerRef);
-    archive->Read(CachedVector3fType(), &mLocalAngularVelocity, ownerRef);
-    archive->Read(CachedVector3fType(), &mScaleVelocity, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mVelocity, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mLocalAngularVelocity, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mScaleVelocity, ownerRef);
 
     archive->ReadFloat(&mImpactInterpolation);
     archive->ReadBool(&mCollideSurface);
@@ -1836,8 +1824,8 @@ namespace moho
     archive->ReadFloat(&mTurnRateDegrees);
     archive->ReadFloat(&mMaxSpeed);
     archive->ReadFloat(&mAcceleration);
-    archive->Read(CachedVector3fType(), &mBallisticAcceleration, ownerRef);
-    archive->Read(CachedVector3fType(), &mCachedAimPoint, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mBallisticAcceleration, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mCachedAimPoint, ownerRef);
     archive->ReadBool(&mKeepLastAimLatch);
 
     archive->ReadFloat(&mDamage);
@@ -1845,7 +1833,7 @@ namespace moho
     archive->ReadString(&mDamageTypeName);
 
     archive->Read(gpg::RTypeOf<moho::CAiTarget>(), &mTargetPosData, ownerRef);
-    archive->Read(CachedVector3fType(), &mImpactPosition, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mImpactPosition, ownerRef);
     archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mCollidedEntityWeak, ownerRef);
 
     archive->ReadUInt(&mLifetimeEnd);
@@ -1853,10 +1841,10 @@ namespace moho
     archive->ReadInt(&mBounceLimit);
     archive->ReadInt(&mGroundTick);
     archive->ReadBool(&mDirectAwayFromGround);
-    archive->Read(CachedVector3fType(), &mGroundDirection, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mGroundDirection, ownerRef);
     archive->ReadFloat(&mBounceVelocityDamping);
     archive->ReadInt(&mZigZagNextTick);
-    archive->Read(CachedVector3fType(), &mZigZagRandomOffset, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mZigZagRandomOffset, ownerRef);
     archive->Read(gpg::RTypeOf<moho::CProjectileAttributes>(), &mAttributes, ownerRef);
     archive->ReadBool(&mIsChildProjectile);
 
@@ -1890,12 +1878,12 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    archive->Write(CachedEntityType(), this, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::Entity>(), this, ownerRef);
     archive->Write(gpg::RTypeOf<moho::ManyToOneBroadcaster_EProjectileImpactEvent>(), &mImpactEventBroadcaster, ownerRef);
     archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mLauncherWeak, ownerRef);
-    archive->Write(CachedVector3fType(), &mVelocity, ownerRef);
-    archive->Write(CachedVector3fType(), &mLocalAngularVelocity, ownerRef);
-    archive->Write(CachedVector3fType(), &mScaleVelocity, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mVelocity, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mLocalAngularVelocity, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mScaleVelocity, ownerRef);
 
     archive->WriteFloat(mImpactInterpolation);
     archive->WriteBool(mCollideSurface);
@@ -1910,16 +1898,16 @@ namespace moho
     archive->WriteFloat(mTurnRateDegrees);
     archive->WriteFloat(mMaxSpeed);
     archive->WriteFloat(mAcceleration);
-    archive->Write(CachedVector3fType(), &mBallisticAcceleration, ownerRef);
-    archive->Write(CachedVector3fType(), &mCachedAimPoint, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mBallisticAcceleration, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mCachedAimPoint, ownerRef);
     archive->WriteBool(mKeepLastAimLatch);
 
     archive->WriteFloat(mDamage);
     archive->WriteFloat(mDamageRadius);
-    archive->WriteString(const_cast<msvc8::string*>(&mDamageTypeName));
+    archive->WriteString(const_cast<fa::string*>(&mDamageTypeName));
 
     archive->Write(gpg::RTypeOf<moho::CAiTarget>(), &mTargetPosData, ownerRef);
-    archive->Write(CachedVector3fType(), &mImpactPosition, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mImpactPosition, ownerRef);
     archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mCollidedEntityWeak, ownerRef);
 
     archive->WriteUInt(mLifetimeEnd);
@@ -1927,10 +1915,10 @@ namespace moho
     archive->WriteInt(mBounceLimit);
     archive->WriteInt(mGroundTick);
     archive->WriteBool(mDirectAwayFromGround);
-    archive->Write(CachedVector3fType(), &mGroundDirection, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mGroundDirection, ownerRef);
     archive->WriteFloat(mBounceVelocityDamping);
     archive->WriteInt(mZigZagNextTick);
-    archive->Write(CachedVector3fType(), &mZigZagRandomOffset, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mZigZagRandomOffset, ownerRef);
     archive->Write(gpg::RTypeOf<moho::CProjectileAttributes>(), &mAttributes, ownerRef);
     archive->WriteBool(mIsChildProjectile);
 

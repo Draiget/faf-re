@@ -61,7 +61,7 @@ namespace moho
      * What it does:
      * Replaces the rows with `watches`, sorted by name.
      */
-    void Update(const msvc8::vector<ScrWatch>& watches);
+    void Update(const fa::vector<ScrWatch>& watches);
 
     /**
      * Address: 0x004D7380 (FUN_004D7380, ?OnItemActivate@ScrWatchCtrl@Moho@@QAEXAAVwxTreeEvent@@@Z)

@@ -43,8 +43,8 @@ namespace
   template <class TTypeInfo>
   void ResetTypeInfoVectors(TTypeInfo& typeInfo) noexcept
   {
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    typeInfo.fields_ = fa::vector<gpg::RField>{};
+    typeInfo.bases_ = fa::vector<gpg::RField>{};
   }
 
   /**
@@ -69,12 +69,12 @@ namespace
   // Then the inlined floor (0x005BE0AA, 0x005BE0D6) or ceil (0x005BE103, 0x005BE130).
   [[nodiscard]] std::int32_t FloorScaledToGridCell(const std::int32_t value, const float reciprocal) noexcept
   {
-    return msvc8::FloorToIntX87(static_cast<float>(value) * reciprocal);
+    return fa::FloorToIntX87(static_cast<float>(value) * reciprocal);
   }
 
   [[nodiscard]] std::int32_t CeilScaledToGridCell(const std::int32_t value, const float reciprocal) noexcept
   {
-    return msvc8::CeilToIntX87(static_cast<float>(value) * reciprocal);
+    return fa::CeilToIntX87(static_cast<float>(value) * reciprocal);
   }
 
   /**
@@ -400,7 +400,7 @@ namespace moho
     update.mLastPos = position;
     update.mRadius = static_cast<float>(radius);
     update.mTicksTilUpdate = 30;
-    // `msvc8::vector<SDelayedSubVizInfo>::push_back` (0x005079C0, cited on Vector.h).
+    // `fa::vector<SDelayedSubVizInfo>::push_back` (0x005079C0, cited on Vector.h).
     mUpdateList.push_back(update);
   }
 

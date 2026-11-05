@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <cstring>
 
-namespace msvc8
+namespace fa
 {
   /**
    * A value on the x87 register stack under the simulation's 24-bit precision
@@ -110,4 +110,4 @@ namespace msvc8
   {
     return static_cast<float>(Abs(X87Float(static_cast<float>(value))));
   }
-} // namespace msvc8
+} // namespace fa

@@ -1842,10 +1842,10 @@ namespace moho
       return;
     }
 
-    msvc8::vector<msvc8::string> fontFiles{};
+    fa::vector<fa::string> fontFiles{};
     waitHandleSet->mHandle->EnumerateFiles("/fonts", "*.ttf", true, &fontFiles);
 
-    for (const msvc8::string& fontFile : fontFiles) {
+    for (const fa::string& fontFile : fontFiles) {
       gpg::Logf("adding font file %s", fontFile.c_str());
 
       FILE_EnsureWaitHandleSet();
@@ -1854,7 +1854,7 @@ namespace moho
         continue;
       }
 
-      msvc8::string mountedPath{};
+      fa::string mountedPath{};
       (void)waitHandleSet->mHandle->FindFile(&mountedPath, fontFile.c_str(), nullptr);
       if (mountedPath.empty()) {
         continue;
@@ -1862,7 +1862,7 @@ namespace moho
 
       gpg::MemBuffer<char> fontBytes = DISK_ReadFile(mountedPath.c_str());
       if (fontBytes.mBegin == nullptr) {
-        const msvc8::string diskError = DISK_GetLastError();
+        const fa::string diskError = DISK_GetLastError();
         gpg::Warnf("D3D_InitFonts: %s", diskError.c_str());
         continue;
       }

@@ -36,7 +36,7 @@ namespace moho
     void ResetCubeMapPathStorage();
 
   public:
-    msvc8::string mCubeMapPath;               // +0x04
+    fa::string mCubeMapPath;               // +0x04
     float mFallbackLightMultiplier;           // +0x20
     Wm3::Vec3f mFallbackSunDiffuseColor;      // +0x24
     Wm3::Vec3f mFallbackSunAmbientColor;      // +0x30

@@ -125,7 +125,7 @@ namespace moho
     CUnitCommand* mSourceCommand;      // +0x70
     LuaPlus::LuaObject mSourceLuaObj;  // +0x74
     LuaPlus::LuaObject mTaskClassLua;  // +0x88
-    msvc8::string mTaskScriptPath;     // +0x9C
+    fa::string mTaskScriptPath;     // +0x9C
   };
 
   /**

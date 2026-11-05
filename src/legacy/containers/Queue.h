@@ -9,12 +9,12 @@
 
 #pragma pack(push, 4)
 
-namespace msvc8
+namespace fa
 {
     // Forward declare list so queue can use it as default
     template <class T, class Alloc> class list;
 
-    template <class T, class Container = msvc8::list<T, std::allocator<T> > >
+    template <class T, class Container = fa::list<T, std::allocator<T> > >
     class queue
     {
     public:
@@ -146,6 +146,6 @@ namespace msvc8
         a.swap(b);
     }
 
-} // namespace msvc8
+} // namespace fa
 
 #pragma pack(pop)

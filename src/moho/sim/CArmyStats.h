@@ -31,14 +31,14 @@ namespace moho
    * The per-blueprint stat table is a plain `std::map<const RUnitBlueprint*, float>`
    * in the original: the node is 0x18 with the links at 0/4/8, the key pointer
    * at +0x0C, the float at +0x10 and the colour/nil pair at +0x14/+0x15, which
-   * is exactly what `msvc8::map` lays out for an 8-byte `value_type`. The key
+   * is exactly what `fa::map` lays out for an 8-byte `value_type`. The key
    * comparison in the binary is a raw pointer compare, so the default
    * `std::less` is the right predicate rather than a name-ordering one.
    * The consumers read the key's `mBlueprintId` (+0x08), `mBlueprintLabel`
    * (+0x24) and `mCategoryBitIndex` (+0x5C); callers pass unit blueprints.
    */
-  using ArmyBlueprintStatTree = msvc8::map<const RUnitBlueprint*, float>;
-  // The 0x18 node is not nameable from here -- `msvc8::map` keeps `node_type`
+  using ArmyBlueprintStatTree = fa::map<const RUnitBlueprint*, float>;
+  // The 0x18 node is not nameable from here -- `fa::map` keeps `node_type`
   // private -- but it is pinned by construction: links at 0/4/8, an 8-byte
   // `pair<const RUnitBlueprint*, float>` at +0x0C, colour at +0x14 and
   // nil at +0x15, which the RbTree node template lays out exactly.
@@ -49,7 +49,7 @@ namespace moho
     ArmyNameIndexNode* left;   // +0x00
     ArmyNameIndexNode* parent; // +0x04
     ArmyNameIndexNode* right;  // +0x08
-    msvc8::string key;         // +0x0C
+    fa::string key;         // +0x0C
     CArmyStatItem* value;      // +0x28
     std::uint8_t color;        // +0x2C
     std::uint8_t isNil;        // +0x2D
@@ -63,24 +63,24 @@ namespace moho
    * The by-name item index is `std::map<std::string, CArmyStatItem*>`: the
    * node is 0x30 with links at 0/4/8, the 0x1C-byte key string at +0x0C, the
    * item pointer at +0x28 and the colour/nil pair at +0x2C/+0x2D -- what
-   * `msvc8::map` lays out for a 0x20-byte `value_type`.
+   * `fa::map` lays out for a 0x20-byte `value_type`.
    *
    * The header is 0x0C, not the 0x10 this was modelled as. The fourth dword
    * belonged to the trigger list that follows: 0x14 + 0x0C = 0x20, and the
    * trigger list's own 0x0C head then runs 0x20..0x2B, which is
    * `sizeof(CArmyStats) == 0x2C`.
    */
-  using ArmyNameIndexTree = msvc8::map<msvc8::string, CArmyStatItem*>;
+  using ArmyNameIndexTree = fa::map<fa::string, CArmyStatItem*>;
 
   static_assert(sizeof(ArmyNameIndexTree) == 0x0C, "ArmyNameIndexTree size must be 0x0C");
 
   /**
    * The army's triggers. The 0x0C `{proxy, head, size}` head at `+0x20` sits
    * over a 0x10 `{next, prev, shared_ptr<STrigger>}` node, which is exactly
-   * `msvc8::list`'s node for an 8-byte element: the sentinel allocator at
+   * `fa::list`'s node for an 8-byte element: the sentinel allocator at
    * 0x00702090 asks for 16 bytes and self-links `{next, prev}`.
    */
-  using ArmyTriggerList = msvc8::list<boost::shared_ptr<STrigger>>;
+  using ArmyTriggerList = fa::list<boost::shared_ptr<STrigger>>;
   static_assert(sizeof(ArmyTriggerList) == 0x0C, "ArmyTriggerList size must be 0x0C");
 
   class CArmyStatItem : public StatItem
@@ -266,7 +266,7 @@ namespace moho
      * Builds one indented `<Army>` XML subtree containing per-blueprint unit,
      * category summary, and economy summary stats for sync submission.
      */
-    [[nodiscard]] msvc8::string ArmyXmlStatsNode(const msvc8::string& indent);
+    [[nodiscard]] fa::string ArmyXmlStatsNode(const fa::string& indent);
 
     /**
      * Address: 0x0070C160 (FUN_0070C160, Moho::CArmyStats::DumpStats)
@@ -415,14 +415,14 @@ namespace moho
      * Resolves one string-stat path through the cached lookup and writes one
      * string value to that stat item.
      */
-    void SetStringValueByPath(gpg::StrArg statPath, const msvc8::string& value);
+    void SetStringValueByPath(gpg::StrArg statPath, const fa::string& value);
 
   private:
     // No source-level `EraseNameIndexNodeAndAdvance`/`DestroyNameIndexTree`
-    // helpers here: 0x00703700 is `msvc8::map`'s own `erase(iterator)` for
+    // helpers here: 0x00703700 is `fa::map`'s own `erase(iterator)` for
     // this tree shape, already reached by `Delete()`'s `mNameIndex.erase(it)`
     // call below and cited on that container member in RbTree.h; `mNameIndex`
-    // (a real `msvc8::map<msvc8::string, CArmyStatItem*>`) is destroyed
+    // (a real `fa::map<fa::string, CArmyStatItem*>`) is destroyed
     // automatically in `~CArmyStats()`'s compiler-generated epilogue, matching
     // the binary's own inlined `erase_range`-then-delete-then-zero sequence
     // (cited on `~rb_tree()`/`erase_range` in RbTree.h) -- there is no
@@ -474,7 +474,7 @@ namespace moho
    * (moho/app/SnapshotDirectoryDialog.cpp); a headless build leaves it null and
    * keeps the default.
    */
-  using SnapshotDirectoryPrompt = void (*)(msvc8::string& directory);
+  using SnapshotDirectoryPrompt = void (*)(fa::string& directory);
   extern SnapshotDirectoryPrompt sSnapshotDirectoryPrompt;
 } // namespace moho
 

@@ -133,6 +133,11 @@ type Seat struct {
 	once     sync.Once
 	contract *contractLink
 	bridge   *jarBridge
+
+	// Native mode: what the lobby server said about the peers, and whether the
+	// next game to connect is one coming back (native.go).
+	nativePeers     []gpgnet.Message
+	nativeReturning bool
 }
 
 // New validates cfg and opens the seat's GPGNet endpoint and lobby port.
@@ -156,6 +161,9 @@ func New(cfg Config, job *procs.Job, sink func(journal.Record)) (*Seat, error) {
 				s.once.Do(func() { close(s.adapterC) })
 			}
 			s.emit(journal.Record{Kind: journal.GpgConnect, UID: uid, Text: remote})
+			if cfg.Native != nil {
+				s.nativeOnConnected()
+			}
 		},
 		Message: s.onMessage,
 		Disconnected: func(err error) {
@@ -542,6 +550,7 @@ func (s *Seat) onMessage(m gpgnet.Message) {
 func (s *Seat) Send(m gpgnet.Message) error {
 	if s.cfg.Native != nil {
 		m = s.nativeOutgoing(m)
+		s.nativeRemember(m)
 	}
 	if s.cfg.Native == nil && (m.Command == "JoinGame" || m.Command == "ConnectToPeer") && len(m.Args) > 0 {
 		if addr, ok := m.Args[0].(string); ok {

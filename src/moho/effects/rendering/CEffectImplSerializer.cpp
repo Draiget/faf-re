@@ -44,7 +44,7 @@ namespace moho
     archive->Read(moho::IEffect::StaticGetClass(), this, gpg::RRef{});
     archive->Read(gpg::RTypeOf<gpg::fastvector<float>>(), &mParams, gpg::RRef{});
     archive->Read(ResolveFastVectorCountedParticleTextureType(), &mParticleTextures, gpg::RRef{});
-    archive->Read(gpg::RTypeOf<gpg::fastvector<msvc8::string>>(), &mStrings, gpg::RRef{});
+    archive->Read(gpg::RTypeOf<gpg::fastvector<fa::string>>(), &mStrings, gpg::RRef{});
     archive->Read(
       gpg::CachedLookup<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType), &mEntityInfo, gpg::RRef{}
     );
@@ -69,7 +69,7 @@ namespace moho
     archive->Write(moho::IEffect::StaticGetClass(), this, gpg::RRef{});
     archive->Write(gpg::RTypeOf<gpg::fastvector<float>>(), &mParams, gpg::RRef{});
     archive->Write(ResolveFastVectorCountedParticleTextureType(), &mParticleTextures, gpg::RRef{});
-    archive->Write(gpg::RTypeOf<gpg::fastvector<msvc8::string>>(), &mStrings, gpg::RRef{});
+    archive->Write(gpg::RTypeOf<gpg::fastvector<fa::string>>(), &mStrings, gpg::RRef{});
     archive->Write(
       gpg::CachedLookup<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType), &mEntityInfo, gpg::RRef{}
     );

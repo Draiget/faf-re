@@ -406,7 +406,7 @@
 
 			if (node.KeyIs(LUA_TNUMBER)) {
 				const float numericKey = node.KeyValue().n;
-				const int integerKey = msvc8::TruncateToInt(numericKey); // the binary's cvttss2si
+				const int integerKey = fa::TruncateToInt(numericKey); // the binary's cvttss2si
 				if (static_cast<float>(integerKey) == numericKey && integerKey >= 1
 					&& ((integerKey - 1) & 0xFF000000) == 0) {
 					const int logIndex = luaO_log2(static_cast<unsigned int>(integerKey - 1));
@@ -711,7 +711,7 @@
 		TObject* valueSlot = nullptr;
 		if (key->tt == LUA_TNUMBER) {
 			const float numericKey = key->value.n;
-			const int integerKey = msvc8::TruncateToInt(numericKey); // the binary's cvttss2si
+			const int integerKey = fa::TruncateToInt(numericKey); // the binary's cvttss2si
 			if (static_cast<float>(integerKey) == numericKey) {
 				valueSlot = const_cast<TObject*>(luaH_getnum(table, integerKey));
 			}
@@ -739,7 +739,7 @@
 		const TObject* slot = nullptr;
 		if (key->tt == LUA_TNUMBER) {
 			const float numericKey = key->value.n;
-			const int integerKey = msvc8::TruncateToInt(numericKey); // the binary's cvttss2si
+			const int integerKey = fa::TruncateToInt(numericKey); // the binary's cvttss2si
 			if (static_cast<float>(integerKey) == numericKey) {
 				slot = luaH_getnum(table, integerKey);
 			}

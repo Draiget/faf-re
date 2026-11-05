@@ -101,7 +101,7 @@ namespace
    * first assigns the source to the output, and that assign frees the buffer
    * it is reading, so every `__diskwatch` callback got an empty path.
    */
-  void ResolvePathForLua(const SDiskWatchEvent& event, msvc8::string& normalizedPath)
+  void ResolvePathForLua(const SDiskWatchEvent& event, fa::string& normalizedPath)
   {
     (void)FILE_ToMountedPath(&normalizedPath, event.mPath.c_str());
   }
@@ -112,7 +112,7 @@ namespace
    * What it does:
    * Calls Lua callback with `(path, actionCode)` and restores stack top.
    */
-  void LuaCallStrInt(const LuaPlus::LuaObject& callback, const msvc8::string& path, const int actionCode)
+  void LuaCallStrInt(const LuaPlus::LuaObject& callback, const fa::string& path, const int actionCode)
   {
     lua_State* const activeState = callback.GetActiveCState();
     const int savedTop = lua_gettop(activeState);
@@ -182,11 +182,11 @@ int ScrDiskWatcherTask::Execute()
     return 1;
   }
 
-  msvc8::vector<SDiskWatchEvent> pendingEvents;
+  fa::vector<SDiskWatchEvent> pendingEvents;
   mListener.CopyAndClearPendingChanges(pendingEvents);
 
   for (const SDiskWatchEvent& event : pendingEvents) {
-    msvc8::string normalizedPath;
+    fa::string normalizedPath;
     ResolvePathForLua(event, normalizedPath);
 
     LuaPlus::LuaTableIterator iter(&watchCallbacks, 1);
@@ -269,13 +269,7 @@ void ScrDiskWatcherTaskTypeInfo::AddBase_CTask(gpg::RType* const typeInfo)
     CTask::sType = taskType;
   }
 
-  gpg::RField baseField{};
-  baseField.mName = taskType->GetName();
-  baseField.mType = taskType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBaseType(typeInfo, taskType);
 }
 
 /**

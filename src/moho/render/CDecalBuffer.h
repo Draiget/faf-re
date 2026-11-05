@@ -32,8 +32,8 @@ namespace moho
    * at +0x1C/+0x1D. The inner node is 0x14: links 0x0C, the handle pointer at
    * +0x0C, colour and nil at +0x10/+0x11.
    */
-  using CDecalBucketSet = msvc8::set<CDecalHandle*>;
-  using CDecalStartTickMapStorage = msvc8::map<std::uint32_t, CDecalBucketSet>;
+  using CDecalBucketSet = fa::set<CDecalHandle*>;
+  using CDecalStartTickMapStorage = fa::map<std::uint32_t, CDecalBucketSet>;
   static_assert(sizeof(CDecalStartTickMapStorage) == 0x0C, "CDecalStartTickMapStorage size must be 0x0C");
 
   class CDecalBuffer
@@ -137,7 +137,7 @@ namespace moho
      * Swaps runtime storage pointers for both decal publish vectors:
      * visible decals and pending hide object-id lanes.
      */
-    void SwapVectors(msvc8::vector<SDecalInfo>* addDecals, msvc8::vector<std::uint32_t>* removeDecals);
+    void SwapVectors(fa::vector<SDecalInfo>* addDecals, fa::vector<std::uint32_t>* removeDecals);
 
   private:
     /**
@@ -169,8 +169,8 @@ namespace moho
     IdPool mPool;                                       // +0x0008
     CDecalHandleList mHandleListHead;                   // +0x0CB8
     CDecalStartTickMapStorage mStartTickBuckets;        // +0x0CC0
-    msvc8::vector<SDecalInfo> mVisibleDecals;           // +0x0CCC
-    msvc8::vector<std::uint32_t> mPendingHideObjectIds; // +0x0CDC
+    fa::vector<SDecalInfo> mVisibleDecals;           // +0x0CCC
+    fa::vector<std::uint32_t> mPendingHideObjectIds; // +0x0CDC
     std::uint32_t mPendingHideObjectIdsAux;             // +0x0CEC
   };
 

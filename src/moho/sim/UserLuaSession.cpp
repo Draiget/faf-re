@@ -766,7 +766,7 @@ int moho::cfunc_RandomUserL(LuaPlus::LuaState* const state)
     // 0x008BEB38..0x008BEB4D: `fild; jge; fadd 2^32; fmul [0x00E4F7B0]`, the
     // float 2^-32 (0x2F800000), stored to float once.
     constexpr float kInvTwoTo32 = 0x1p-32f;
-    const float value = msvc8::MulTwisterWord(kInvTwoTo32, math_GlobalRandomStream.twister.NextUInt32());
+    const float value = fa::MulTwisterWord(kInvTwoTo32, math_GlobalRandomStream.twister.NextUInt32());
     lua_pushnumber(rawState, value);
     return 1;
   }
@@ -2106,6 +2106,27 @@ namespace
     return 0;
   }
 
+  int ReplaySeekKindBody(lua_State* const rawState)
+  {
+    moho::CWldSession* const session = moho::WLD_GetActiveSession();
+    if (session == nullptr || !lua_isnumber(rawState, 1)) {
+      lua_pushnil(rawState);
+      return 1;
+    }
+    switch (moho::REPLAY_SeekKind(*session, static_cast<std::int32_t>(lua_tonumber(rawState, 1)))) {
+    case moho::EReplaySeekKind::LoadKeyframe:
+      lua_pushstring(rawState, "load");
+      break;
+    case moho::EReplaySeekKind::PlayForward:
+      lua_pushstring(rawState, "play");
+      break;
+    default:
+      lua_pushnil(rawState);
+      break;
+    }
+    return 1;
+  }
+
   int ReplayCancelSeekBody(lua_State* const)
   {
     moho::REPLAY_CancelSeek();
@@ -2144,6 +2165,8 @@ namespace
       "table GetReplayKeyframeTicks() - the ticks with a keyframe to move back to, in order.");
     static CScrLuaBinder seek(moho::SCR_UserLuaInitSet(), "ReplaySeek", &ReplayTimelineBinding<&ReplaySeekBody>, nullptr, "<global>",
       "ReplaySeek(tick) - moves the replay to a tick, either way, keeping the view.");
+    static CScrLuaBinder seekKind(moho::SCR_UserLuaInitSet(), "ReplaySeekKind", &ReplayTimelineBinding<&ReplaySeekKindBody>, nullptr, "<global>",
+      "string ReplaySeekKind(tick) - what ReplaySeek(tick) would do now: 'load' a keyframe or 'play' forward; nil when nothing or not known yet.");
     static CScrLuaBinder cancel(moho::SCR_UserLuaInitSet(), "ReplayCancelSeek", &ReplayTimelineBinding<&ReplayCancelSeekBody>, nullptr, "<global>",
       "ReplayCancelSeek() - stops a seek where it is.");
     static CScrLuaBinder progress(moho::SCR_UserLuaInitSet(), "ReplaySeekProgress", &ReplayTimelineBinding<&ReplaySeekProgressBody>, nullptr, "<global>",

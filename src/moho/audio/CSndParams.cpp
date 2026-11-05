@@ -79,16 +79,16 @@ namespace
   std::recursive_mutex gSndParamsRegistryMutex;
 
   /**
-   * Address: 0x010A92AC (`msvc8::list<CSndParams*>`; `_Myhead` 0x010A92B0,
+   * Address: 0x010A92AC (`fa::list<CSndParams*>`; `_Myhead` 0x010A92B0,
    *   `_Mysize` 0x010A92B4). Node `_Buynode` 0x004E2530 over
    *   `allocator<_Node>::allocate` 0x004E4F70 (0x0C bytes), self-linked by the
    *   constructor group at 0x004DFD2F. Reached only by
    *   `RegisterSndParamsInstance` (0x004DFA50).
    */
-  msvc8::list<moho::CSndParams*> gSndParamsRegistry;
+  fa::list<moho::CSndParams*> gSndParamsRegistry;
 
   /**
-   * Address: 0x010A9288 (`msvc8::multimap<std::uint32_t, CSndParams*>`, the
+   * Address: 0x010A9288 (`fa::multimap<std::uint32_t, CSndParams*>`, the
    *   shipped `Moho::sSndParamsCache`; `_Myhead` 0x010A928C, `_Mysize`
    *   0x010A9290). Node `_Buynode` 0x004E3B50 over `allocator<_Node>::allocate`
    *   0x004E5160 (0x18 bytes), initialised by the constructor group at
@@ -99,12 +99,12 @@ namespace
    * equivalence probe at all before linking, which is `insert_equal`. Key at
    * node+0x0C, the descriptor pointer at node+0x10.
    */
-  msvc8::multimap<std::uint32_t, moho::CSndParams*> gSndParamsHashCache;
+  fa::multimap<std::uint32_t, moho::CSndParams*> gSndParamsHashCache;
 
   // The shipped cache is an RB-tree keyed on the descriptor pointer: the
   // mapped handle sits at node+0x10 (0x004DF2B0 reads `[found+0x10]` and
   // compares the result against the header).
-  using SharedAmbientLoopMap = msvc8::map<moho::CSndParams*, moho::HSndEntityLoop*>;
+  using SharedAmbientLoopMap = fa::map<moho::CSndParams*, moho::HSndEntityLoop*>;
 
   /**
    * Address: 0x010A92D0 (`boost::mutex`) -- constructed by the constructor
@@ -126,7 +126,7 @@ namespace
   std::mutex gSharedAmbientLoopMutex;
 
   /**
-   * Address: 0x010A92A0 (`msvc8::map<CSndParams*, HSndEntityLoop*>`; `_Myhead`
+   * Address: 0x010A92A0 (`fa::map<CSndParams*, HSndEntityLoop*>`; `_Myhead`
    *   0x010A92A4, `_Mysize` 0x010A92A8). Node `_Buynode` 0x004E4340 over
    *   `allocator<_Node>::allocate` 0x004E50A0 (0x18 bytes), initialised by the
    *   constructor group at 0x004DFD00. Reached by
@@ -144,10 +144,10 @@ namespace
 
   struct CSndParamsTemp
   {
-    msvc8::string mCue1;      // +0x00
-    msvc8::string mBank;      // +0x1C
-    msvc8::string mLodCutoff; // +0x38
-    msvc8::string mCue2;      // +0x54
+    fa::string mCue1;      // +0x00
+    fa::string mBank;      // +0x1C
+    fa::string mLodCutoff; // +0x38
+    fa::string mCue2;      // +0x54
   };
 
   static_assert(offsetof(CSndParamsTemp, mCue1) == 0x00, "CSndParamsTemp::mCue1 offset must be 0x00");
@@ -178,12 +178,12 @@ namespace
   constexpr const char* kRpcSoundHelpText = "RPCSound( {cue,bank,cutoff} ) - Make a sound parameters object";
   constexpr const char* kGetCueBankHelpText = "cue,bank = GetCueBank(params)";
 
-  [[nodiscard]] msvc8::string SndVarNameOrEmpty(const moho::CSndVar* const value)
+  [[nodiscard]] fa::string SndVarNameOrEmpty(const moho::CSndVar* const value)
   {
-    return value != nullptr ? value->mName : msvc8::string("");
+    return value != nullptr ? value->mName : fa::string("");
   }
 
-  [[nodiscard]] std::uint32_t HashStringWithSalt(const msvc8::string& value, const std::uint32_t salt)
+  [[nodiscard]] std::uint32_t HashStringWithSalt(const fa::string& value, const std::uint32_t salt)
   {
     const std::string hashInput(value.c_str(), value.size());
     return gpg::Hash(hashInput, salt);
@@ -587,7 +587,7 @@ namespace
     return loop;
   }
 
-  [[nodiscard]] msvc8::string ReadRequiredTableStringField(
+  [[nodiscard]] fa::string ReadRequiredTableStringField(
     LuaPlus::LuaState* const state,
     const int tableIndex,
     const char* const fieldName
@@ -603,12 +603,12 @@ namespace
       LuaPlus::LuaStackObject::TypeError(&fieldObject, "string");
     }
 
-    const msvc8::string out = fieldValue != nullptr ? msvc8::string(fieldValue) : msvc8::string("");
+    const fa::string out = fieldValue != nullptr ? fa::string(fieldValue) : fa::string("");
     lua_settop(rawState, savedTop);
     return out;
   }
 
-  [[nodiscard]] msvc8::string ReadOptionalTableStringField(
+  [[nodiscard]] fa::string ReadOptionalTableStringField(
     LuaPlus::LuaState* const state,
     const int tableIndex,
     const char* const fieldName
@@ -623,7 +623,7 @@ namespace
     LuaPlus::LuaObject fieldValueObject(fieldObject);
     if (fieldValueObject.IsNil()) {
       lua_settop(rawState, savedTop);
-      return msvc8::string("");
+      return fa::string("");
     }
 
     const char* const fieldValue = lua_tostring(rawState, fieldObject.m_stackIndex);
@@ -631,7 +631,7 @@ namespace
       LuaPlus::LuaStackObject::TypeError(&fieldObject, "string");
     }
 
-    const msvc8::string out = fieldValue != nullptr ? msvc8::string(fieldValue) : msvc8::string("");
+    const fa::string out = fieldValue != nullptr ? fa::string(fieldValue) : fa::string("");
     lua_settop(rawState, savedTop);
     return out;
   }
@@ -652,7 +652,7 @@ namespace
     temp.mCue1 = ReadRequiredTableStringField(tableObject.m_state, tableObject.m_stackIndex, "Cue");
     temp.mBank = ReadRequiredTableStringField(tableObject.m_state, tableObject.m_stackIndex, "Bank");
     temp.mLodCutoff = ReadOptionalTableStringField(tableObject.m_state, tableObject.m_stackIndex, "LodCutoff");
-    temp.mCue2 = hasRpcLoopVar ? temp.mCue1 : msvc8::string("");
+    temp.mCue2 = hasRpcLoopVar ? temp.mCue1 : fa::string("");
 
     moho::SParamKey key{};
     key.mCueName = temp.mCue1;
@@ -779,8 +779,8 @@ namespace moho
    * used by lazy cue resolution.
    */
   CSndParams::CSndParams(
-    const msvc8::string& bankName,
-    const msvc8::string& cueName,
+    const fa::string& bankName,
+    const fa::string& cueName,
     CSndVar* const lodCutoffVar,
     CSndVar* const rpcLoopVar,
     const boost::weak_ptr<AudioEngine>& engine
@@ -1100,8 +1100,8 @@ namespace moho
   // Engine addition, server mode: see the declaration.
 #if FAF_SERVER_MODE
   CSndParams* SND_FindOrCreateParams(
-    const msvc8::string& bankName, const msvc8::string& cueName, const msvc8::string& lodCutoffName,
-    const msvc8::string& rpcLoopName
+    const fa::string& bankName, const fa::string& cueName, const fa::string& lodCutoffName,
+    const fa::string& rpcLoopName
   )
   {
     SParamKey key{};

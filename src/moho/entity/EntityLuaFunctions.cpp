@@ -156,7 +156,7 @@ namespace
 #endif
   }
 
-  void AccumulateArmyRealtimeStat(CArmyImpl* const army, const msvc8::string& statPath, const long delta)
+  void AccumulateArmyRealtimeStat(CArmyImpl* const army, const fa::string& statPath, const long delta)
   {
     if (army == nullptr || statPath.empty()) {
       return;
@@ -185,14 +185,14 @@ namespace
     // 0x00692080 / 0x00692181 (cfunc_EntityKillL): each lane is gated on that
     // entity's own `RealtimeStatsEnabled` byte (+0x1F8) before its ArmyRef.
     if (victim->IsRealtimeStatsEnabled() && victim->ArmyRef != nullptr) {
-      msvc8::string statPath = msvc8::string(kEntityRealtimeStatsPrefix) + victim->GetUniqueName();
+      fa::string statPath = fa::string(kEntityRealtimeStatsPrefix) + victim->GetUniqueName();
       statPath += gpg::STR_Printf("_KilledBy_Army%d_", instigator->GetArmyIndex()); // 0x006920E6: 0-based
       statPath += ResolveEntityBlueprintId(instigator);
       AccumulateArmyRealtimeStat(victim->ArmyRef, statPath, 1L);
     }
 
     if (instigator->IsRealtimeStatsEnabled() && instigator->ArmyRef != nullptr) {
-      msvc8::string statPath = msvc8::string(kEntityRealtimeStatsPrefix) + instigator->GetUniqueName();
+      fa::string statPath = fa::string(kEntityRealtimeStatsPrefix) + instigator->GetUniqueName();
       statPath += gpg::STR_Printf("_Kills_Army%d_", victim->GetArmyIndex()); // 0x006921E6: 0-based
       statPath += ResolveEntityBlueprintId(victim);
       AccumulateArmyRealtimeStat(instigator->ArmyRef, statPath, 1L);
@@ -329,7 +329,7 @@ namespace
    * What it does:
    * Appends one camera-shake request to the sim sync camera-shake queue.
    */
-  void func_ShakeCamera(msvc8::vector<moho::SCamShakeParams>& shakeQueue, const moho::SCamShakeParams& request)
+  void func_ShakeCamera(fa::vector<moho::SCamShakeParams>& shakeQueue, const moho::SCamShakeParams& request)
   {
     shakeQueue.push_back(request);
   }
@@ -571,7 +571,7 @@ namespace moho
     launchTransform.pos_.z = sourceTransform.pos_.z + launchOffset.z;
 
     const CAiTarget target = MakeDefaultProjectileTarget();
-    const msvc8::string damageTypeName("Normal");
+    const fa::string damageTypeName("Normal");
 
     Projectile* const projectile = PROJ_Create(
       sim,
@@ -653,7 +653,7 @@ namespace moho
         ? RULE_FindProjectileBlueprintByName(entity->SimulationRef->mRules, projectileBlueprintName)
         : nullptr;
     if (!projectileBlueprint) {
-      const msvc8::string message = gpg::STR_Printf("CreateProjectileAtBone: Invalid blueprint %s", projectileBlueprintName);
+      const fa::string message = gpg::STR_Printf("CreateProjectileAtBone: Invalid blueprint %s", projectileBlueprintName);
       lua_pushstring(rawState, message.c_str());
       (void)lua_gettop(rawState);
       lua_error(rawState);
@@ -677,7 +677,7 @@ namespace moho
     const float launchSpeed = projectileBlueprint->GetRandomInitialSpeed(random);
 
     const CAiTarget target = MakeDefaultProjectileTarget();
-    const msvc8::string damageTypeName("Normal");
+    const fa::string damageTypeName("Normal");
 
     Projectile* const projectile = PROJ_Create(
       entity->SimulationRef,
@@ -2288,7 +2288,7 @@ namespace moho
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
-    const msvc8::string entityIdText = gpg::STR_Printf("%d", static_cast<int>(entity->id_));
+    const fa::string entityIdText = gpg::STR_Printf("%d", static_cast<int>(entity->id_));
     lua_pushstring(rawState, entityIdText.c_str());
     return 1;
   }
@@ -2332,7 +2332,7 @@ namespace moho
   int cfunc_EntityDetachAllL(LuaPlus::LuaState* const state)
   {
     const EntityDetachAllArgs args = DecodeEntityDetachAllArgs(state);
-    const msvc8::vector<Entity*> attachedSnapshot(args.entity->GetAttachedEntities());
+    const fa::vector<Entity*> attachedSnapshot(args.entity->GetAttachedEntities());
 
     for (Entity* const attached : attachedSnapshot) {
       if (attached == nullptr || attached->mAttachInfo.mParentBoneIndex != args.parentBoneIndex) {
@@ -2625,7 +2625,7 @@ namespace moho
     const Wm3::Quatf& orientation = entity->mVarDat.mCurTransform.orient_;
     const float numerator = ((orientation.z * orientation.x) + (orientation.w * orientation.y)) * 2.0f;
     const float denominator = 1.0f - (((orientation.y * orientation.y) + (orientation.x * orientation.x)) * 2.0f);
-    const float heading = msvc8::atan2f(numerator, denominator);
+    const float heading = fa::atan2f(numerator, denominator);
     lua_pushnumber(rawState, heading);
     return 1;
   }
@@ -2868,13 +2868,13 @@ namespace moho
       meshName = "";
     }
 
-    const msvc8::string meshResourcePath(meshName);
+    const fa::string meshResourcePath(meshName);
     const std::string meshPathStd = meshResourcePath.to_std();
     if (meshPathStd.find("<none>") == std::string::npos) {
       const bool keepActor = LuaPlus::LuaStackObject(state, 3).GetBoolean();
       const bool allowExplicitPlaceholder = !keepActor;
 
-      msvc8::string normalizedPath;
+      fa::string normalizedPath;
       gpg::STR_CopyFilename(&normalizedPath, &meshResourcePath);
 
       RResId meshResourceId{};
@@ -3498,7 +3498,7 @@ namespace moho
     MotorFallDown* const motor = new MotorFallDown(state);
     motor->mLuaObj.PushStack(state);
 
-    msvc8::auto_ptr<Motor> motorOwnership(motor);
+    fa::auto_ptr<Motor> motorOwnership(motor);
     entity->SetMotor(motorOwnership);
     return 1;
   }
@@ -3562,7 +3562,7 @@ namespace moho
     MotorSinkAway* const motor = new MotorSinkAway(state, sinkDeltaY);
     motor->mLuaObj.PushStack(state);
 
-    msvc8::auto_ptr<Motor> motorOwnership(motor);
+    fa::auto_ptr<Motor> motorOwnership(motor);
     entity->SetMotor(motorOwnership);
     return 1;
   }

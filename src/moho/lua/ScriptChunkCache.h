@@ -42,7 +42,7 @@ namespace moho
    * found to helpers that compile them into the batch's chunks ahead of their doscript, when this
    * thread is in a batch (SCR_ScriptChunkCacheActive).
    */
-  void SCR_PrecompileScripts(const msvc8::vector<msvc8::string>& mountedPaths);
+  void SCR_PrecompileScripts(const fa::vector<fa::string>& mountedPaths);
 
   /**
    * Engine addition (res_UiScriptChunkCache): opens a batch on this thread (the main thread, which

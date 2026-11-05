@@ -117,19 +117,19 @@ RRef MakePointeeRef(T* const object, RType* const baseType)
 }
 
 template <class T>
-msvc8::string BuildPointerLexical(void* const slotObject, RType* const pointeeType)
+fa::string BuildPointerLexical(void* const slotObject, RType* const pointeeType)
 {
     auto* const slot = static_cast<T**>(slotObject);
     if (!slot || !*slot) {
-        return msvc8::string("NULL");
+        return fa::string("NULL");
     }
 
     const RRef pointeeRef = MakePointeeRef<T>(*slot, pointeeType);
     if (!pointeeRef.mObj) {
-        return msvc8::string("NULL");
+        return fa::string("NULL");
     }
 
-    const msvc8::string inner = pointeeRef.GetLexical();
+    const fa::string inner = pointeeRef.GetLexical();
     return STR_Printf("[%s]", inner.c_str());
 }
 
@@ -1423,7 +1423,7 @@ gpg::RPointerType<moho::CTaskThread>::RPointerType()
  */
 const char* gpg::RPointerType<moho::CTaskThread>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -1431,7 +1431,7 @@ const char* gpg::RPointerType<moho::CTaskThread>::GetName() const
  * Address: 0x0040C950 (FUN_0040C950)
  * Demangled: gpg::RPointerType_CTaskThread::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::CTaskThread>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::CTaskThread>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::CTaskThread>(ref.mObj, GetPointeeType());
 }
@@ -1479,7 +1479,7 @@ RType* gpg::RPointerType<moho::CTaskThread>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::CAcquireTargetTask>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -1487,7 +1487,7 @@ const char* gpg::RPointerType<moho::CAcquireTargetTask>::GetName() const
  * Address: 0x005DE0B0 (FUN_005DE0B0)
  * Demangled: gpg::RPointerType_CAcquireTargetTask::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::CAcquireTargetTask>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::CAcquireTargetTask>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::CAcquireTargetTask>(ref.mObj, GetPointeeType());
 }
@@ -1554,7 +1554,7 @@ RType* gpg::RPointerType<moho::CAcquireTargetTask>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::SimArmy>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -1566,7 +1566,7 @@ const char* gpg::RPointerType<moho::SimArmy>::GetName() const
  * Renders a reflected `SimArmy*` slot as `"[<pointee lexical>]"`, or `"NULL"`
  * when the slot is empty.
  */
-msvc8::string gpg::RPointerType<moho::SimArmy>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::SimArmy>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::SimArmy>(ref.mObj, GetPointeeType());
 }
@@ -1667,7 +1667,7 @@ RType* gpg::RPointerType<moho::SimArmy>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::Shield>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -1679,7 +1679,7 @@ const char* gpg::RPointerType<moho::Shield>::GetName() const
  * Renders a reflected `Shield*` slot as `"[<pointee lexical>]"`, or `"NULL"`
  * when the slot is empty.
  */
-msvc8::string gpg::RPointerType<moho::Shield>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::Shield>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::Shield>(ref.mObj, GetPointeeType());
 }
@@ -1783,7 +1783,7 @@ RType* gpg::RPointerType<moho::Shield>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::CDecalHandle>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -1795,7 +1795,7 @@ const char* gpg::RPointerType<moho::CDecalHandle>::GetName() const
  * Renders a reflected `CDecalHandle*` slot as `"[<pointee lexical>]"`, or
  * `"NULL"` when the slot is empty.
  */
-msvc8::string gpg::RPointerType<moho::CDecalHandle>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::CDecalHandle>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::CDecalHandle>(ref.mObj, GetPointeeType());
 }
@@ -1896,7 +1896,7 @@ RType* gpg::RPointerType<moho::CDecalHandle>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::RBlueprint>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -1904,7 +1904,7 @@ const char* gpg::RPointerType<moho::RBlueprint>::GetName() const
  * Address: 0x00557090 (FUN_00557090)
  * Demangled: gpg::RPointerType_RBlueprint::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::RBlueprint>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::RBlueprint>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::RBlueprint>(ref.mObj, GetPointeeType());
 }
@@ -1998,7 +1998,7 @@ RType* gpg::RPointerType<moho::RBlueprint>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::UnitWeapon>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -2006,7 +2006,7 @@ const char* gpg::RPointerType<moho::UnitWeapon>::GetName() const
  * Address: 0x005DDCA0 (FUN_005DDCA0)
  * Demangled: gpg::RPointerType_UnitWeapon::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::UnitWeapon>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::UnitWeapon>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::UnitWeapon>(ref.mObj, GetPointeeType());
 }
@@ -2099,7 +2099,7 @@ RType* gpg::RPointerType<moho::UnitWeapon>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::IAniManipulator>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -2107,7 +2107,7 @@ const char* gpg::RPointerType<moho::IAniManipulator>::GetName() const
  * Address: 0x0063DCD0 (FUN_0063DCD0)
  * Demangled: gpg::RPointerType_IAniManipulator::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::IAniManipulator>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::IAniManipulator>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::IAniManipulator>(ref.mObj, GetPointeeType());
 }
@@ -2179,7 +2179,7 @@ gpg::RPointerType<moho::IEffect>::RPointerType()
  */
 const char* gpg::RPointerType<moho::IEffect>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -2187,7 +2187,7 @@ const char* gpg::RPointerType<moho::IEffect>::GetName() const
  * Address: 0x0066CBD0 (FUN_0066CBD0)
  * Demangled: gpg::RPointerType_IEffect::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::IEffect>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::IEffect>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::IEffect>(ref.mObj, GetPointeeType());
 }
@@ -2250,7 +2250,7 @@ RType* gpg::RPointerType<moho::IEffect>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::CUnitCommand>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -2258,7 +2258,7 @@ const char* gpg::RPointerType<moho::CUnitCommand>::GetName() const
  * Address: 0x006E3840 (FUN_006E3840)
  * Demangled: gpg::RPointerType_CUnitCommand::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::CUnitCommand>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::CUnitCommand>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::CUnitCommand>(ref.mObj, GetPointeeType());
 }
@@ -2322,7 +2322,7 @@ RType* gpg::RPointerType<moho::CUnitCommand>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::Entity>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -2330,7 +2330,7 @@ const char* gpg::RPointerType<moho::Entity>::GetName() const
  * Address: 0x0067E4B0 (FUN_0067E4B0)
  * Demangled: gpg::RPointerType_Entity::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::Entity>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::Entity>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::Entity>(ref.mObj, GetPointeeType());
 }
@@ -2394,7 +2394,7 @@ RType* gpg::RPointerType<moho::Entity>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::CEconomyEvent>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -2402,7 +2402,7 @@ const char* gpg::RPointerType<moho::CEconomyEvent>::GetName() const
  * Address: 0x006B26A0 (FUN_006B26A0)
  * Demangled: gpg::RPointerType_CEconomyEvent::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::CEconomyEvent>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::CEconomyEvent>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::CEconomyEvent>(ref.mObj, GetPointeeType());
 }
@@ -2475,7 +2475,7 @@ gpg::RPointerType<moho::CLuaConOutputHandler>::RPointerType()
  */
 const char* gpg::RPointerType<moho::CLuaConOutputHandler>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -2483,7 +2483,7 @@ const char* gpg::RPointerType<moho::CLuaConOutputHandler>::GetName() const
  * Address: 0x00421340 (FUN_00421340)
  * Demangled: gpg::RPointerType_CLuaConOutputHandler::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::CLuaConOutputHandler>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::CLuaConOutputHandler>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::CLuaConOutputHandler>(ref.mObj, GetPointeeType());
 }
@@ -2530,7 +2530,7 @@ RType* gpg::RPointerType<moho::CLuaConOutputHandler>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::CScriptObject>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -2538,7 +2538,7 @@ const char* gpg::RPointerType<moho::CScriptObject>::GetName() const
  * Address: 0x004C8780 (FUN_004C8780)
  * Demangled: gpg::RPointerType_CScriptObject::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::CScriptObject>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::CScriptObject>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::CScriptObject>(ref.mObj, GetPointeeType());
 }
@@ -2615,7 +2615,7 @@ RType* gpg::RPointerType<moho::CScriptObject>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::CSndParams>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -2623,7 +2623,7 @@ const char* gpg::RPointerType<moho::CSndParams>::GetName() const
  * Address: 0x004E5D50 (FUN_004E5D50)
  * Demangled: gpg::RPointerType_CSndParams::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::CSndParams>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::CSndParams>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::CSndParams>(ref.mObj, GetPointeeType());
 }
@@ -2720,7 +2720,7 @@ RType* gpg::RPointerType<moho::CSndParams>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::IFormationInstance>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -2728,7 +2728,7 @@ const char* gpg::RPointerType<moho::IFormationInstance>::GetName() const
  * Address: 0x0059D650 (FUN_0059D650)
  * Demangled: gpg::RPointerType_IFormationInstance::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::IFormationInstance>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::IFormationInstance>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::IFormationInstance>(ref.mObj, GetPointeeType());
 }
@@ -2791,7 +2791,7 @@ RType* gpg::RPointerType<moho::IFormationInstance>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::RUnitBlueprint>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -2799,7 +2799,7 @@ const char* gpg::RPointerType<moho::RUnitBlueprint>::GetName() const
  * Address: 0x005A1680 (FUN_005A1680)
  * Demangled: gpg::RPointerType_RUnitBlueprint::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::RUnitBlueprint>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::RUnitBlueprint>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::RUnitBlueprint>(ref.mObj, GetPointeeType());
 }
@@ -2921,7 +2921,7 @@ RType* gpg::RPointerType<moho::RUnitBlueprint>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::ReconBlip>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -2929,7 +2929,7 @@ const char* gpg::RPointerType<moho::ReconBlip>::GetName() const
  * Address: 0x005C8210 (FUN_005C8210)
  * Demangled: gpg::RPointerType_ReconBlip::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::ReconBlip>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::ReconBlip>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::ReconBlip>(ref.mObj, GetPointeeType());
 }
@@ -2992,7 +2992,7 @@ RType* gpg::RPointerType<moho::ReconBlip>::GetPointeeType() const
  */
 const char* gpg::RPointerType<moho::CArmyStatItem>::GetName() const
 {
-    static const msvc8::string sName = msvc8::string(GetPointeeType()->GetName()) + "*";
+    static const fa::string sName = fa::string(GetPointeeType()->GetName()) + "*";
     return sName.c_str();
 }
 
@@ -3000,7 +3000,7 @@ const char* gpg::RPointerType<moho::CArmyStatItem>::GetName() const
  * Address: 0x00711760 (FUN_00711760)
  * Demangled: gpg::RPointerType_CArmyStatItem::GetLexical
  */
-msvc8::string gpg::RPointerType<moho::CArmyStatItem>::GetLexical(const RRef& ref) const
+fa::string gpg::RPointerType<moho::CArmyStatItem>::GetLexical(const RRef& ref) const
 {
     return BuildPointerLexical<moho::CArmyStatItem>(ref.mObj, GetPointeeType());
 }

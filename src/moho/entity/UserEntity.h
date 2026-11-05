@@ -257,7 +257,7 @@ namespace moho
      * What it does:
      * Resolves category bitset and tests membership for this entity category id.
      */
-    [[nodiscard]] bool IsInCategory(const msvc8::string& category) const;
+    [[nodiscard]] bool IsInCategory(const fa::string& category) const;
 
     /**
      * Address: 0x008B8CF0 (FUN_008B8CF0, ?GetInterpolatedTransform@UserEntity@Moho@@QBE?AVVTransform@2@M@Z)

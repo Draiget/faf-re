@@ -30,8 +30,8 @@ namespace faf::remote
   void CViewLanes::OnViewFrames(moho::Sim& sim)
   {
     const auto armyCount = static_cast<std::size_t>(ArmyCount());
-    if (mClients.size() < armyCount) {
-      mClients.resize(armyCount);
+    if (mClients.size() < ViewSlots()) {
+      mClients.resize(ViewSlots());
     }
     if (mLuaRouting && mRouter == nullptr) {
       mRouter = std::make_unique<CSyncRouter>(armyCount);
@@ -138,6 +138,14 @@ namespace faf::remote
       client.grids.clear();
       return; // no client
     }
+    if (army >= static_cast<std::size_t>(ArmyCount())) {
+      // A team's view: its frame, once, for its players' messages.
+      client.teamFrame.Clear();
+      if (!EncodeHeldFrame(view, client.teamFrame)) {
+        ++client.failures;
+      }
+      return;
+    }
     bool ok = true;
 
     // Entity lanes: the view's frame against the one its client holds.
@@ -200,6 +208,12 @@ namespace faf::remote
     }
     client.grids.swap(client.gridsNext);
 
-    OnLanesEncoded(army, SLanes{frameWriter, armyWriter, gridWriter, client.lua, ok});
+    SLanes lanes{frameWriter, armyWriter, gridWriter, client.lua, ok};
+    if (const std::size_t teamSlot = TeamSlotOf(army); teamSlot != army) {
+      lanes.team = &mClients[teamSlot].teamFrame;
+      lanes.teamEntities = HeldCount(static_cast<std::int32_t>(teamSlot));
+      client.bytes += static_cast<std::uint32_t>(lanes.team->Bytes().size());
+    }
+    OnLanesEncoded(army, lanes);
   }
 } // namespace faf::remote

@@ -33,8 +33,8 @@ namespace moho
 
     // Y-axis half-angle build orientation.
     const float halfAngleRad = angle * 0.017453292f * -0.5f;
-    const float sinHalf = msvc8::sin(halfAngleRad);
-    const float cosHalf = msvc8::cos(halfAngleRad);
+    const float sinHalf = fa::sin(halfAngleRad);
+    const float cosHalf = fa::cos(halfAngleRad);
 
     SCoordsVec2 cellPos{};
     cellPos.x = pos->x;
@@ -907,7 +907,7 @@ int moho::cfunc_CAiBrainCreateUnitNearSpotL(LuaPlus::LuaState* const state)
   tryPos.x = posX;
   tryPos.z = posY;
 
-  msvc8::string blueprintName;
+  fa::string blueprintName;
   gpg::STR_InitFilename(&blueprintName, unitName);
   RUnitBlueprint* const blueprint = sim->mRules->GetUnitBlueprint(RResId(blueprintName));
 
@@ -919,10 +919,10 @@ int moho::cfunc_CAiBrainCreateUnitNearSpotL(LuaPlus::LuaState* const state)
   // `fld; fistp` (current x87 rounding mode, round-to-nearest), not a
   // truncating `_ftol`, so an `x.5` army start rounds rather than truncates.
   gpg::Rect2i occupyRect{};
-  occupyRect.x0 = msvc8::RoundToInt(startPosition.x) - 5;
-  occupyRect.x1 = msvc8::RoundToInt(startPosition.x) + 5;
-  occupyRect.z0 = msvc8::RoundToInt(startPosition.y) - 5;
-  occupyRect.z1 = msvc8::RoundToInt(startPosition.y) + 5;
+  occupyRect.x0 = fa::RoundToInt(startPosition.x) - 5;
+  occupyRect.x1 = fa::RoundToInt(startPosition.x) + 5;
+  occupyRect.z0 = fa::RoundToInt(startPosition.y) - 5;
+  occupyRect.z1 = fa::RoundToInt(startPosition.y) + 5;
 
   const EOccupancyCaps occupancyCaps = blueprint->mFootprint.mOccupancyCaps;
   grid->ExecuteOccupy(occupancyCaps, occupyRect);
@@ -1039,7 +1039,7 @@ int moho::cfunc_CAiBrainCreateResourceBuildingNearestL(LuaPlus::LuaState* const 
 
   RUnitBlueprint* structureBlueprint = nullptr;
   {
-    msvc8::string blueprintName;
+    fa::string blueprintName;
     gpg::STR_InitFilename(&blueprintName, structureName);
     structureBlueprint = sim->mRules->GetUnitBlueprint(RResId(blueprintName));
   }
@@ -1050,7 +1050,7 @@ int moho::cfunc_CAiBrainCreateResourceBuildingNearestL(LuaPlus::LuaState* const 
     EntityCategory::HasBlueprint(structureBlueprint, hydrocarbonCategory) ? kHydrocarbon : kMass;
 
   CSimResources* const resources = sim->mSimResources.px;
-  const msvc8::vector<ResourceDeposit>& deposits = resources->GetDeposits();
+  const fa::vector<ResourceDeposit>& deposits = resources->GetDeposits();
 
   // A candidate is one deposit footprint centre plus its squared distance from
   // the requested point; the list is walked nearest-first.
@@ -1072,7 +1072,7 @@ int moho::cfunc_CAiBrainCreateResourceBuildingNearestL(LuaPlus::LuaState* const 
     candidates.push_back(SDepositCandidate{centerX, centerZ, (dx * dx) + (dz * dz)});
   }
 
-  msvc8::sort(candidates.data(), candidates.data() + candidates.size(), [](const SDepositCandidate& a, const SDepositCandidate& b) {
+  fa::sort(candidates.data(), candidates.data() + candidates.size(), [](const SDepositCandidate& a, const SDepositCandidate& b) {
     return a.distanceSq < b.distanceSq;
   });
 
@@ -2354,7 +2354,7 @@ int moho::cfunc_CAiBrainBuildPlatoonL(LuaPlus::LuaState* const state)
 
     const float baseCount = static_cast<float>(baseCountObject.GetInteger());
     const float scaledCountFloat = static_cast<float>(countMultiplierObj.GetNumber()) * baseCount;
-    const int scaledCount = msvc8::FloorToIntX87(scaledCountFloat); // 0x0058C6F5..0x0058C708
+    const int scaledCount = fa::FloorToIntX87(scaledCountFloat); // 0x0058C6F5..0x0058C708
 
     const LuaPlus::LuaObject builderUnitObject = builderTable[builderIndex];
     Unit* const builderUnit = SCR_FromLua_Unit(builderUnitObject);
@@ -2561,9 +2561,9 @@ int moho::cfunc_CAiBrainMakePlatoonL(LuaPlus::LuaState* const state)
 
   // Cache name/plan into local strings since the Lua-side strings may be
   // invalidated by subsequent table lookups.
-  msvc8::string platoonName;
+  fa::string platoonName;
   platoonName.assign(platoonNameRow.GetString());
-  msvc8::string platoonPlan;
+  fa::string platoonPlan;
   platoonPlan.assign(platoonPlanRow.GetString());
 
   CPlatoon* const newPlatoon = brain->mArmy->MakePlatoon(platoonName.c_str(), platoonPlan.c_str());

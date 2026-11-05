@@ -365,7 +365,7 @@ namespace moho
         // cannot hoist that load and neither may we: a script that destroys an
         // attached unit erases it from this very list, and a cached `end()`
         // would then read the slot the erase vacated.
-        const msvc8::vector<Entity*>& attachedEntities = targetEntity->GetAttachedEntities();
+        const fa::vector<Entity*>& attachedEntities = targetEntity->GetAttachedEntities();
         for (Entity* const* cursor = attachedEntities.begin(); cursor != attachedEntities.end(); ++cursor) {
           Entity* const attachedEntity = *cursor;
           Unit* const attachedUnit = (attachedEntity != nullptr) ? attachedEntity->IsUnit() : nullptr;

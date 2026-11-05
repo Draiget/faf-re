@@ -142,7 +142,7 @@ void moho::WWinLogTextBuilder::WriteWideLiteral(
  * Emits one UTF-8 fragment by widening it then appending with width behavior.
  */
 void moho::WWinLogTextBuilder::WriteUtf8Text(
-  const msvc8::string& text
+  const fa::string& text
 )
 {
   WriteWideText(gpg::STR_Utf8ToWide(text.c_str()));
@@ -263,7 +263,7 @@ std::size_t moho::CWinLogTarget::CommittedLineCount() const
   return mCommittedLines.size();
 }
 
-const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() const
+const fa::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() const
 {
   return mCommittedLines;
 }
@@ -275,14 +275,14 @@ const msvc8::vector<moho::CWinLogLine>& moho::CWinLogTarget::CommittedLines() co
  * Replaces committed-line storage with a copy of `nextCommittedLines`.
  */
 void moho::CWinLogTarget::ReplaceCommittedLines(
-  const msvc8::vector<CWinLogLine>& nextCommittedLines
+  const fa::vector<CWinLogLine>& nextCommittedLines
 )
 {
   mCommittedLines = nextCommittedLines;
 }
 
 void moho::CWinLogTarget::SnapshotCommittedLines(
-  msvc8::vector<CWinLogLine>* const outLines
+  fa::vector<CWinLogLine>* const outLines
 )
 {
   if (outLines == nullptr) {
@@ -294,12 +294,12 @@ void moho::CWinLogTarget::SnapshotCommittedLines(
 }
 
 void moho::CWinLogTarget::ResetCommittedLinesFromReplayBuffer(
-  const msvc8::vector<msvc8::string>& replayLines
+  const fa::vector<fa::string>& replayLines
 )
 {
   boost::mutex::scoped_lock scopedLock(lock);
 
-  msvc8::vector<CWinLogLine> rebuiltLines;
+  fa::vector<CWinLogLine> rebuiltLines;
   rebuiltLines.reserve(replayLines.size());
   for (std::size_t index = 0; index < replayLines.size(); ++index) {
     CWinLogLine replayLine{};
@@ -340,15 +340,15 @@ void moho::CWinLogTarget::MergePendingLines()
 /**
  * Address: 0x004F6860 (FUN_004F6860)
  *
- * gpg::LogSeverity level, msvc8::string const &, msvc8::vector<msvc8::string> const &, int
+ * gpg::LogSeverity level, fa::string const &, fa::vector<fa::string> const &, int
  *
  * What it does:
  * Queues replay/context lines plus the current line into the pending log queue.
  */
 void moho::CWinLogTarget::OnMessage(
   const gpg::LogSeverity level,
-  const msvc8::string& message,
-  const msvc8::vector<msvc8::string>& context,
+  const fa::string& message,
+  const fa::vector<fa::string>& context,
   const int previousDepth
 )
 {
@@ -445,11 +445,11 @@ moho::WWinLogWindow::WWinLogWindow()
   const auto checkBoxes = CategoryCheckBoxes();
   for (std::size_t index = 0; index < checkBoxes.size(); ++index) {
     checkBoxes[index]->SetValue(
-      preferences->GetBoolean(msvc8::string(kLogCategoryPreferenceKeys[index]), kLogCategoryPreferenceDefaults[index])
+      preferences->GetBoolean(fa::string(kLogCategoryPreferenceKeys[index]), kLogCategoryPreferenceDefaults[index])
     );
   }
 
-  mFilterText = preferences->GetString(msvc8::string(kLogFilterPreferenceKey), msvc8::string(kLogFilterPreferenceDefault));
+  mFilterText = preferences->GetString(fa::string(kLogFilterPreferenceKey), fa::string(kLogFilterPreferenceDefault));
   mFilterTextControl->SetValue(gpg::STR_Utf8ToWide(mFilterText.c_str()).c_str());
 
   for (wxCheckBox* const checkBox : checkBoxes) {
@@ -476,11 +476,11 @@ moho::WWinLogWindow::WWinLogWindow()
   topSizer->Fit(this);
 
   const std::int32_t height =
-    preferences->GetInteger(msvc8::string(kLogWindowHeightPreferenceKey), kLogWindowGeometryFallback);
+    preferences->GetInteger(fa::string(kLogWindowHeightPreferenceKey), kLogWindowGeometryFallback);
   const std::int32_t width =
-    preferences->GetInteger(msvc8::string(kLogWindowWidthPreferenceKey), kLogWindowGeometryFallback);
-  const std::int32_t y = preferences->GetInteger(msvc8::string(kLogWindowYPreferenceKey), kLogWindowGeometryFallback);
-  const std::int32_t x = preferences->GetInteger(msvc8::string(kLogWindowXPreferenceKey), kLogWindowGeometryFallback);
+    preferences->GetInteger(fa::string(kLogWindowWidthPreferenceKey), kLogWindowGeometryFallback);
+  const std::int32_t y = preferences->GetInteger(fa::string(kLogWindowYPreferenceKey), kLogWindowGeometryFallback);
+  const std::int32_t x = preferences->GetInteger(fa::string(kLogWindowXPreferenceKey), kLogWindowGeometryFallback);
   SetSize(x, y, width, height, kLogWindowSetSizeFlags);
 
   RebuildVisibleLinesFromControls();
@@ -552,9 +552,9 @@ void moho::WWinLogWindow::OnFilterOrCategoryControlsChanged(wxCommandEvent& even
   IUserPrefs* const preferences = USER_GetPreferences();
   const auto checkBoxes = CategoryCheckBoxes();
   for (std::size_t index = 0; index < checkBoxes.size(); ++index) {
-    preferences->SetBoolean(msvc8::string(kLogCategoryPreferenceKeys[index]), checkBoxes[index]->GetValue());
+    preferences->SetBoolean(fa::string(kLogCategoryPreferenceKeys[index]), checkBoxes[index]->GetValue());
   }
-  preferences->SetString(msvc8::string(kLogFilterPreferenceKey), mFilterText);
+  preferences->SetString(fa::string(kLogFilterPreferenceKey), mFilterText);
 }
 
 /**
@@ -573,8 +573,8 @@ void moho::WWinLogWindow::OnSize(wxSizeEvent& event)
   }
 
   IUserPrefs* const preferences = USER_GetPreferences();
-  preferences->SetInteger(msvc8::string(kLogWindowWidthPreferenceKey), GetSize().x);
-  preferences->SetInteger(msvc8::string(kLogWindowHeightPreferenceKey), GetSize().y);
+  preferences->SetInteger(fa::string(kLogWindowWidthPreferenceKey), GetSize().x);
+  preferences->SetInteger(fa::string(kLogWindowHeightPreferenceKey), GetSize().y);
 }
 
 /**
@@ -592,8 +592,8 @@ void moho::WWinLogWindow::OnMove(wxMoveEvent& event)
   }
 
   IUserPrefs* const preferences = USER_GetPreferences();
-  preferences->SetInteger(msvc8::string(kLogWindowXPreferenceKey), GetPosition().x);
-  preferences->SetInteger(msvc8::string(kLogWindowYPreferenceKey), GetPosition().y);
+  preferences->SetInteger(fa::string(kLogWindowXPreferenceKey), GetPosition().x);
+  preferences->SetInteger(fa::string(kLogWindowYPreferenceKey), GetPosition().y);
 }
 
 /**
@@ -653,7 +653,7 @@ bool moho::WWinLogWindow::ShouldDisplayCommittedLine(
     return false;
   }
 
-  const msvc8::string loweredLineText = gpg::STR_ToLower(line.text.c_str());
+  const fa::string loweredLineText = gpg::STR_ToLower(line.text.c_str());
   return std::strstr(loweredLineText.c_str(), mFilterText.c_str()) != nullptr;
 }
 
@@ -733,7 +733,7 @@ void moho::WWinLogWindow::RebuildVisibleLinesFromControls()
   mFirstVisibleLine = 0;
   mBufferedLines.clear();
 
-  const msvc8::vector<CWinLogLine>& committedLines = mOwnerTarget->CommittedLines();
+  const fa::vector<CWinLogLine>& committedLines = mOwnerTarget->CommittedLines();
   for (std::size_t index = 0; index < committedLines.size(); ++index) {
     AppendCommittedLine(committedLines[index]);
   }

@@ -32,8 +32,9 @@ namespace faf::remote::net
     /** Server to player, unreliable: the newest beat, varint. */
     Beat = 4,
     /**
-     * Server to player, reliable, one per beat: varints beat and entities in the frame, then the frame, army,
-     * grid and Lua lanes, each a varint size and its bytes (remote/ViewLanes.h).
+     * Server to player, reliable, one per beat: varints beat, entities in the player's own frame and in their team's,
+     * then the own frame, team frame (empty without one), army, grid and Lua lanes, each a varint size and its bytes
+     * (remote/ViewLanes.h). The player's client holds both frames; a blip of the player's own unit is theirs to leave out.
      */
     View = 5,
     /**

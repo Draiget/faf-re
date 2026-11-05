@@ -28,7 +28,7 @@ moho::FactoryQueueDisplayItem::FactoryQueueDisplayItem() noexcept
  * triple at +0x24/+0x28/+0x2C.
  */
 moho::FactoryQueueDisplayItem::FactoryQueueDisplayItem(
-  const msvc8::string& sourceBlueprintId,
+  const fa::string& sourceBlueprintId,
   const std::int32_t sourceCount
 )
   : blueprintId(sourceBlueprintId)
@@ -69,7 +69,7 @@ moho::FactoryQueueDisplayItem& moho::FactoryQueueDisplayItem::operator=(
   const FactoryQueueDisplayItem& other
 )
 {
-  blueprintId.assign(other.blueprintId, 0u, msvc8::string::npos);
+  blueprintId.assign(other.blueprintId, 0u, fa::string::npos);
   count = other.count;
   commands = other.commands;
   return *this;

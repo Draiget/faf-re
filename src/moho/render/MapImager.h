@@ -73,7 +73,7 @@ namespace moho
      * from the requested mesh blueprint name, and appends it to the border
      * instance vector when creation succeeds.
      */
-    void AddBorder(const msvc8::string& meshBlueprintPath);
+    void AddBorder(const fa::string& meshBlueprintPath);
 
     /**
      * Address: 0x007D9DD0 (FUN_007D9DD0, ?UpdateMeshStances@MapImager@Moho@@QAEXXZ)
@@ -93,7 +93,7 @@ namespace moho
     void UpdateMeshStances();
 
   public:
-    msvc8::vector<MeshInstance*> mMeshInstances;          // +0x04
+    fa::vector<MeshInstance*> mMeshInstances;          // +0x04
   };
 
 #if defined(MOHO_ABI_MSVC8_COMPAT)
@@ -125,7 +125,7 @@ namespace moho
    * Console callback that expects exactly two tokens and adds the requested
    * border mesh blueprint to the active viewport's MapImager.
    */
-  void REN_MapBorderAdd(const msvc8::vector<msvc8::string>& args);
+  void REN_MapBorderAdd(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x007F65B0 (FUN_007F65B0, Moho::REN_MapBorderClear)
@@ -134,7 +134,7 @@ namespace moho
    * Console callback that clears the active viewport's MapImager border
    * decoration meshes when a viewport is present.
    */
-  void REN_MapBorderClear(const msvc8::vector<msvc8::string>& args);
+  void REN_MapBorderClear(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x007FA1E0 (FUN_007FA1E0, sub_7FA1E0)
@@ -143,7 +143,7 @@ namespace moho
    * Adds one border mesh blueprint to the active viewport map-imager lane
    * when a render viewport exists.
    */
-  void REN_AddBorderToActiveViewport(const msvc8::string& meshBlueprintPath);
+  void REN_AddBorderToActiveViewport(const fa::string& meshBlueprintPath);
 
   /**
    * Address: 0x00848260 (FUN_00848260, cfunc_MapBorderAdd)

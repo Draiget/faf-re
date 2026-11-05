@@ -314,7 +314,7 @@ namespace moho
      */
     virtual void DrawTerrain(
       boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
-      const msvc8::string* techniqueName) = 0;
+      const fa::string* techniqueName) = 0;
 
     /**
      * Primary vtable slot 14.

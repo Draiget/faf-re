@@ -48,7 +48,7 @@ namespace gpg::gal
          * What it does:
          * Returns the variable name.
          */
-        msvc8::string* GetName() override;
+        fa::string* GetName() override;
 
         /**
          * Address: 0x0094C0F0 (FUN_0094C0F0)
@@ -168,7 +168,7 @@ namespace gpg::gal
          * What it does:
          * Reads the variable's bool annotation `annotationName`.
          */
-        bool GetAnnotationBool(bool* outValue, const msvc8::string& annotationName) override;
+        bool GetAnnotationBool(bool* outValue, const fa::string& annotationName) override;
 
         /**
          * Address: 0x0094CFE0 (FUN_0094CFE0)
@@ -177,7 +177,7 @@ namespace gpg::gal
          * What it does:
          * Reads the variable's int annotation `annotationName`.
          */
-        bool GetAnnotationInt(int* outValue, const msvc8::string& annotationName) override;
+        bool GetAnnotationInt(int* outValue, const fa::string& annotationName) override;
 
         /**
          * Address: 0x0094D150 (FUN_0094D150)
@@ -186,7 +186,7 @@ namespace gpg::gal
          * What it does:
          * Reads the variable's float annotation `annotationName`.
          */
-        bool GetAnnotationFloat(float* outValue, const msvc8::string& annotationName) override;
+        bool GetAnnotationFloat(float* outValue, const fa::string& annotationName) override;
 
         /**
          * Address: 0x0094D2C0 (FUN_0094D2C0)
@@ -195,10 +195,10 @@ namespace gpg::gal
          * What it does:
          * Reads the variable's string annotation `annotationName`.
          */
-        bool GetAnnotationString(msvc8::string* outValue, const msvc8::string& annotationName) override;
+        bool GetAnnotationString(fa::string* outValue, const fa::string& annotationName) override;
 
     public:
-        msvc8::string name_{};           // +0x04
+        fa::string name_{};           // +0x04
         ID3D10Effect* dxEffect_ = nullptr;               // +0x20 held (AddRef) while the wrapper lives
         ID3D10EffectVariable* variableHandle_ = nullptr; // +0x24 owned by the effect
     };

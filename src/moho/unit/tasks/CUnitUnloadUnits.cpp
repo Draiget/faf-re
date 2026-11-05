@@ -211,7 +211,7 @@ namespace moho
    */
   int CUnitUnloadUnits::Execute()
   {
-    const msvc8::vector<Entity*>& attachedEntities = mUnit->GetAttachedEntities();
+    const fa::vector<Entity*>& attachedEntities = mUnit->GetAttachedEntities();
     if (attachedEntities.begin() == nullptr || attachedEntities.begin() == attachedEntities.end()) {
       return -1;
     }

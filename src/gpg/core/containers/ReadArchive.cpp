@@ -104,7 +104,7 @@ namespace
     throw SerializationError(message ? message : "");
   }
 
-  [[noreturn]] void ThrowSerializationError(const msvc8::string& message)
+  [[noreturn]] void ThrowSerializationError(const fa::string& message)
   {
     throw SerializationError(message.c_str());
   }
@@ -221,7 +221,7 @@ namespace
      * Reads one length-prefixed string payload by first loading a 32-bit byte
      * count, resizing the destination string, and then reading raw bytes.
      */
-    void ReadString(msvc8::string* const out) override
+    void ReadString(fa::string* const out) override
     {
       unsigned int byteCount = 0;
       ReadInt2(&byteCount);
@@ -811,7 +811,7 @@ namespace
      * (`\n`, `\t`, `\"`, `\\`, and up to 3-digit octal `\NNN`) into `out`.
      * Throws SerializationError on a malformed or truncated primitive.
      */
-    void ReadString(msvc8::string* const out) override
+    void ReadString(fa::string* const out) override
     {
       std::istream& stream = *mCachedStream;
       stream >> std::ws;
@@ -933,7 +933,7 @@ namespace
    * Appends one reflected `TypeHandle` lane to the archive-local handle table,
    * preserving the in-capacity fast path and vector-growth fallback behavior.
    */
-  TypeHandle* AppendTypeHandle(msvc8::vector<TypeHandle>& typeHandles, const TypeHandle& handle)
+  TypeHandle* AppendTypeHandle(fa::vector<TypeHandle>& typeHandles, const TypeHandle& handle)
   {
     const std::size_t insertIndex = typeHandles.size();
     typeHandles.push_back(handle);
@@ -1002,7 +1002,7 @@ TypeHandle ReadArchive::ReadTypeHandle()
   ReadInt(&index);
 
   if (index == -1) {
-    msvc8::string typeName;
+    fa::string typeName;
     ReadString(&typeName);
 
     RType* type = REF_FindTypeNamed(typeName.c_str());
@@ -1061,7 +1061,7 @@ void ReadArchive::Read(const RType* const type, void* const object, const RRef& 
   if (marker != static_cast<int>(ArchiveToken::ObjectStart)) {
     ArchiveToken tokenCopy = static_cast<ArchiveToken>(marker);
     const RRef tokenRef = RRef_ArchiveToken(&tokenCopy);
-    const msvc8::string tokenLexical = tokenRef.mType ? tokenRef.GetLexical() : STR_Printf("%d", marker);
+    const fa::string tokenLexical = tokenRef.mType ? tokenRef.GetLexical() : STR_Printf("%d", marker);
     ThrowSerializationError(STR_Printf(
       "Error detected in archive: expected an OBJECT_START token marking the beginning of a \"%s\", but got a %s "
       "instead.",

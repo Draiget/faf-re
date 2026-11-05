@@ -513,7 +513,7 @@ void TString::MemberConstruct(
 )
 {
 	lua_State* const state = ownerRef.TryUpcastLuaThreadState();
-	msvc8::string characters;
+	fa::string characters;
 	archive.ReadString(&characters);
 	result.SetOwned(gpg::MakeRRef(luaS_newlstr(state, characters.c_str(), characters.size())), 0u);
 }
@@ -525,7 +525,7 @@ void TString::MemberSaveConstructArgs(
 	gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
 )
 {
-	msvc8::string characters(str, len);
+	fa::string characters(str, len);
 	archive.WriteString(&characters);
 	result.SetOwned(0u);
 }

@@ -24,7 +24,7 @@ namespace moho
 
   struct SLaunchCommandSources
   {
-    msvc8::vector<SSTICommandSource> mSrcs;     // +0x00
+    fa::vector<SSTICommandSource> mSrcs;     // +0x00
     std::int32_t v4 = 0;                        // +0x10
     std::int32_t mOriginalSource = -1;          // +0x14
   };
@@ -125,11 +125,11 @@ namespace moho
   public:
     RRuleGameRules* mGameRules;                  // +0x04
     STIMap* mMap;                                // +0x08
-    msvc8::string mGameMods;                     // +0x0C
-    msvc8::string mScenarioInfo;                 // +0x28
-    msvc8::vector<ArmyLaunchInfo> mArmyLaunchInfo; // +0x44
+    fa::string mGameMods;                     // +0x0C
+    fa::string mScenarioInfo;                 // +0x28
+    fa::vector<ArmyLaunchInfo> mArmyLaunchInfo; // +0x44
     SLaunchCommandSources mCommandSources;       // +0x54
-    msvc8::string mLanguage;                     // +0x6C
+    fa::string mLanguage;                     // +0x6C
     bool mCheatsEnabled;                         // +0x88
     std::uint8_t pad_89[3];                      // +0x89
   };
@@ -200,7 +200,7 @@ namespace moho
     // Borrowed from CWldMap; the session hands the loaded map's prop list
     // straight over and Sim::Setup walks it to spawn each entry.
     CWldProps* mProps;                           // +0x8C
-    msvc8::vector<msvc8::string> mStrVec;        // +0x90
+    fa::vector<fa::string> mStrVec;        // +0x90
     std::int32_t mInitSeed;                      // +0xA0
   };
 
@@ -400,14 +400,14 @@ namespace moho
    * What it does:
    * Appends one `ArmyLaunchInfo` entry to the launch-info army-vector lane.
    * Wraps the compiler-emitted out-of-line specialization of
-   * `msvc8::vector<ArmyLaunchInfo>::push_back(const ArmyLaunchInfo&)` so that
+   * `fa::vector<ArmyLaunchInfo>::push_back(const ArmyLaunchInfo&)` so that
    * the inline-fast-path (capacity available -> in-place copy-construct via
    * `BVIntSet`'s copy ctor) and the slow grow-path (`_Insert_n` reallocation)
    * are both reachable from typed call sites. The entry is copied; the source
    * value remains valid after the call.
    */
   void AppendArmyLaunchInfo(
-    msvc8::vector<ArmyLaunchInfo>& armyLaunchInfo,
+    fa::vector<ArmyLaunchInfo>& armyLaunchInfo,
     const ArmyLaunchInfo& entry
   );
 

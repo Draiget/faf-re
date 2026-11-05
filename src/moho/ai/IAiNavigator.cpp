@@ -312,7 +312,7 @@ namespace
  */
 const char* moho::RBroadcasterRType_EAiNavigatorEvent::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("Broadcaster<%s>", ResolveEAiNavigatorEventType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("Broadcaster<%s>", ResolveEAiNavigatorEventType()->GetName());
   return sName.c_str();
 }
 
@@ -386,7 +386,7 @@ void moho::RBroadcasterRType_EAiNavigatorEvent::SerSave(
  */
 const char* moho::RListenerRType_EAiNavigatorEvent::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("Listener<%s>", ResolveEAiNavigatorEventType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("Listener<%s>", ResolveEAiNavigatorEventType()->GetName());
   return sName.c_str();
 }
 

@@ -101,13 +101,13 @@ namespace mirror
   /// Mirrors src\moho\ai\CAimManipulator.cpp moho::CAimManipulator::SetFiringArc (0x00630CB0).
   void AimSetFiringArc(AimArcLanes& self, const AimFiringArc arc)
   {
-    self.mMinHeading = moho::NormalizeAngleSignedRadiansX87(msvc8::HalfSumX87(arc.mMinHeading, arc.mMaxHeading));
+    self.mMinHeading = moho::NormalizeAngleSignedRadiansX87(fa::HalfSumX87(arc.mMinHeading, arc.mMaxHeading));
     self.mHeadingMaxSlew = arc.mHeadingMaxSlew;
-    self.mMaxHeading = msvc8::HalfAbsDifferenceX87(arc.mMaxHeading, arc.mMinHeading);
+    self.mMaxHeading = fa::HalfAbsDifferenceX87(arc.mMaxHeading, arc.mMinHeading);
 
-    self.mMinPitch = moho::NormalizeAngleSignedRadiansX87(msvc8::HalfSumX87(arc.mMinPitch, arc.mMaxPitch));
+    self.mMinPitch = moho::NormalizeAngleSignedRadiansX87(fa::HalfSumX87(arc.mMinPitch, arc.mMaxPitch));
     self.mPitchMaxSlew = arc.mPitchMaxSlew;
-    self.mMaxPitch = msvc8::HalfAbsDifferenceX87(arc.mMaxPitch, arc.mMinPitch);
+    self.mMaxPitch = fa::HalfAbsDifferenceX87(arc.mMaxPitch, arc.mMinPitch);
   }
 
   /// Mirrors src\moho\ai\CBuilderArmManipulator.cpp
@@ -122,13 +122,13 @@ namespace mirror
     const float pitchMaxSlew
   )
   {
-    self.mHeadingCenter = moho::NormalizeAngleSignedRadiansX87(msvc8::HalfSumX87(minHeading, maxHeading));
+    self.mHeadingCenter = moho::NormalizeAngleSignedRadiansX87(fa::HalfSumX87(minHeading, maxHeading));
     self.mHeadingMaxSlew = headingMaxSlew;
-    self.mHeadingHalfArc = msvc8::HalfAbsDifferenceX87(maxHeading, minHeading);
+    self.mHeadingHalfArc = fa::HalfAbsDifferenceX87(maxHeading, minHeading);
 
-    self.mPitchCenter = moho::NormalizeAngleSignedRadiansX87(msvc8::HalfSumX87(minPitch, maxPitch));
+    self.mPitchCenter = moho::NormalizeAngleSignedRadiansX87(fa::HalfSumX87(minPitch, maxPitch));
     self.mPitchMaxSlew = pitchMaxSlew;
-    self.mPitchHalfArc = msvc8::HalfAbsDifferenceX87(maxPitch, minPitch);
+    self.mPitchHalfArc = fa::HalfAbsDifferenceX87(maxPitch, minPitch);
   }
 
   /// Mirrors src\moho\ai\CBuilderArmManipulator.cpp
@@ -149,12 +149,12 @@ namespace mirror
     float* currentAngleLane = nullptr;
     if ((trackingModeFlags & kTrackingModeHeading) != 0u) {
       currentAngleLane = &self.mHeading;
-      desiredAngle = msvc8::atan2(transformedTarget.x, transformedTarget.z);
+      desiredAngle = fa::atan2(transformedTarget.x, transformedTarget.z);
     } else {
       const float halfCenter = angleCenter * kHalfScale;
       Wm3::Quaternionf pitchBasis{};
-      pitchBasis.w = msvc8::cos(halfCenter);
-      pitchBasis.x = msvc8::sin(halfCenter);
+      pitchBasis.w = fa::cos(halfCenter);
+      pitchBasis.x = fa::sin(halfCenter);
       pitchBasis.y = 0.0f;
       pitchBasis.z = 0.0f;
 
@@ -221,12 +221,12 @@ namespace mirror
     float* currentAngleLane = nullptr;
     if ((trackingModeFlags & kTrackingModeHeading) != 0u) {
       currentAngleLane = &self.mHeading;
-      desiredAngle = msvc8::Atan2Plus(transformedTarget.x, transformedTarget.z, self.mHeadingOffset);
+      desiredAngle = fa::Atan2Plus(transformedTarget.x, transformedTarget.z, self.mHeadingOffset);
     } else {
       const float halfCenter = minAngleCenter * kHalfScale;
       Wm3::Quaternionf pitchBasis{};
-      pitchBasis.w = msvc8::cos(halfCenter);
-      pitchBasis.x = msvc8::sin(halfCenter);
+      pitchBasis.w = fa::cos(halfCenter);
+      pitchBasis.x = fa::sin(halfCenter);
       pitchBasis.y = 0.0f;
       pitchBasis.z = 0.0f;
 
@@ -274,7 +274,7 @@ namespace mirror
   /// Mirrors src\moho\animation\CAnimTexture.cpp moho::WrapPositiveModulo (0x00422940).
   float WrapPositiveModulo(const float value, const float range) noexcept
   {
-    float wrapped = static_cast<float>(msvc8::fmod(value, range));
+    float wrapped = static_cast<float>(fa::fmod(value, range));
     if ((0.0f > wrapped) != (0.0f > range)) {
       wrapped += range;
     }
@@ -286,9 +286,9 @@ namespace mirror
   /// Mirrors src\moho\sim\SimDriver.cpp moho::RATE_GameRateToSpeed (0x0055AE10).
   int RATE_GameRateToSpeed(const float rate)
   {
-    const float speed = msvc8::IntrinsicLnQuotient(rate, 10.0) * 10.0f;
+    const float speed = fa::IntrinsicLnQuotient(rate, 10.0) * 10.0f;
     const float nearest = std::nearbyint(speed);
-    const auto whole = static_cast<std::uint32_t>(msvc8::RoundToInt(nearest));
+    const auto whole = static_cast<std::uint32_t>(fa::RoundToInt(nearest));
     const std::uint32_t borrow = (speed < nearest || std::isunordered(speed, nearest)) ? 1u : 0u;
     return static_cast<int>(whole - borrow);
   }
@@ -296,10 +296,10 @@ namespace mirror
   /// Mirrors src\gpg\core\algorithms\Cluster.cpp gpg::HaStar::Cluster::QuantizeEdgeCost (0x0092D8B0).
   float QuantizeEdgeCost(const float a, const float b)
   {
-    const float scaled = msvc8::ScaledLnQuotient(a, b, 6.0f);
+    const float scaled = fa::ScaledLnQuotient(a, b, 6.0f);
     const float nearest = std::nearbyint(scaled);
     int quantized = static_cast<int>(
-      static_cast<std::uint32_t>(msvc8::RoundToInt(nearest)) + (scaled > nearest ? 1u : 0u)
+      static_cast<std::uint32_t>(fa::RoundToInt(nearest)) + (scaled > nearest ? 1u : 0u)
     );
     if (quantized > 31) {
       quantized = 31;
@@ -313,8 +313,8 @@ namespace mirror
   /// Mirrors src\moho\entity\Entity.cpp moho::COORDS_ToGridRect (0x0050AFA0).
   void COORDS_ToGridRect(int* const outRect, const float centerX, const float centerZ, const int sizeX, const int sizeZ)
   {
-    const std::int16_t halfSizeX = static_cast<std::int16_t>(msvc8::RoundToInt(centerX - (static_cast<float>(sizeX) * 0.5f)));
-    const std::int16_t halfSizeZ = static_cast<std::int16_t>(msvc8::RoundToInt(centerZ - (static_cast<float>(sizeZ) * 0.5f)));
+    const std::int16_t halfSizeX = static_cast<std::int16_t>(fa::RoundToInt(centerX - (static_cast<float>(sizeX) * 0.5f)));
+    const std::int16_t halfSizeZ = static_cast<std::int16_t>(fa::RoundToInt(centerZ - (static_cast<float>(sizeZ) * 0.5f)));
     outRect[0] = halfSizeX;
     outRect[1] = halfSizeZ;
     outRect[2] = sizeX + halfSizeX;
@@ -325,7 +325,7 @@ namespace mirror
   void ProjectBoxOntoAxis(const float* const box, const float* const axis, float* const outMin, float* const outMax) noexcept
   {
     const float centerProjection = (axis[1] * box[1] + axis[2] * box[2]) + axis[0] * box[0];
-    const float radius = msvc8::BoxRadiusOnAxisX87(box, axis);
+    const float radius = fa::BoxRadiusOnAxisX87(box, axis);
     *outMin = centerProjection - radius;
     *outMax = centerProjection + radius;
   }
@@ -451,8 +451,8 @@ namespace mirror
   /// Mirrors src\moho\sim\STIMap.cpp moho::CHeightField::GetElevation (0x0044FB90).
   float HeightFieldElevation(const std::uint16_t* const data, const int width, const int height, const float x, const float z)
   {
-    const int fx = msvc8::FloorToIntX87(x);
-    const int fz = msvc8::FloorToIntX87(z);
+    const int fx = fa::FloorToIntX87(x);
+    const int fz = fa::FloorToIntX87(z);
 
     const float fracX = x - static_cast<float>(fx);
     const float fracZ = z - static_cast<float>(fz);
@@ -472,7 +472,7 @@ namespace mirror
     const float h10 = static_cast<float>(data[x1 + z0 * width]) * 0.0078125f;
     const float h11 = static_cast<float>(data[x1 + z1 * width]) * 0.0078125f;
 
-    return msvc8::BilinearHeight(h00, h01, h10, h11, fracX, fracZ);
+    return fa::BilinearHeight(h00, h01, h10, h11, fracX, fracZ);
   }
 
   /// Mirrors src\moho\sim\CRandomStream.cpp CMersenneTwister::ShuffleState (0x0040EBB0),
@@ -506,7 +506,7 @@ namespace mirror
     word ^= (word & 0xFFFFDF8Cu) << 15;
     word = (word >> 18) ^ word;
 
-    return msvc8::TwisterWordInRange(lower, upper, word);
+    return fa::TwisterWordInRange(lower, upper, word);
   }
 
   /// Mirrors src\moho\render\camera\VTransform.cpp moho::VTransform::Inverse (0x0046FBF0).

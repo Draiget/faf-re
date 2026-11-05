@@ -92,7 +92,7 @@ namespace moho
    * Holds one loaded SCA (SupCom Animation) file in memory.
    *
    * Binary evidence from LoadScaFile (0x0053A4D0):
-   *   - mFilename at +0x00 (msvc8::string, ctor call at `ecx = edi`)
+   *   - mFilename at +0x00 (fa::string, ctor call at `ecx = edi`)
    *   - mMem at +0x1C (MemBuffer<char>, operator= call at `lea ecx, [edi+1Ch]`)
    *   - mStart at +0x2C (char*, raw pointer into loaded data)
    *   - mEnd at +0x30 (char*, pointer to animation data section)
@@ -153,7 +153,7 @@ namespace moho
      * What it does:
      * Compiler-emitted defaulted destructor body. Releases the held
      * `MemBuffer<char>` shared-count control lane at +0x20 and tears down
-     * the embedded `msvc8::string mFilename` (freeing the heap buffer
+     * the embedded `fa::string mFilename` (freeing the heap buffer
      * when the string is not in SSO mode and zeroing the SSO marker).
      * The trailing `mStart`/`mEnd` raw pointers do not need destruction.
      * Invoked from `boost::detail::sp_counted_impl_p<RScaResource>::dispose`
@@ -163,7 +163,7 @@ namespace moho
     ~RScaResource() noexcept = default;
 
   public:
-    msvc8::string mFilename{};          // +0x00
+    fa::string mFilename{};          // +0x00
     gpg::MemBuffer<char> mMem{};        // +0x1C
     char* mStart = nullptr;             // +0x2C
     char* mEnd = nullptr;               // +0x30

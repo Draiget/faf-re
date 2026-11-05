@@ -25,7 +25,7 @@ namespace moho
 
     [[nodiscard]] std::string KeyFilePath()
     {
-      msvc8::vector<msvc8::string> args;
+      fa::vector<fa::string> args;
       if (CFG_GetArgOption("/rejoinkeyfile", 1, &args) && !args.empty()) {
         return args[0].c_str();
       }

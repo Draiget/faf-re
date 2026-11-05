@@ -55,7 +55,7 @@ void Sim::Setup(LaunchInfoNew* const info)
   LuaPlus::LuaObject scenarioInfo{};
   (void)SCR_FromString(&scenarioInfo, info->mScenarioInfo, mLuaState);
 
-  msvc8::vector<LuaPlus::LuaObject> armySetupObjects{};
+  fa::vector<LuaPlus::LuaObject> armySetupObjects{};
   LuaPlus::LuaObject armySetupTable{};
   armySetupTable.AssignNewTable(mLuaState, 0, 0);
 
@@ -70,8 +70,8 @@ void Sim::Setup(LaunchInfoNew* const info)
     // string made GetString raise a Lua error out of sim construction; such an
     // army is named by its slot the way FAF names armies.
     const LuaPlus::LuaObject armyNameObject = armySetup["ArmyName"];
-    const msvc8::string armyName = armyNameObject.IsString()
-      ? msvc8::string(armyNameObject.GetString())
+    const fa::string armyName = armyNameObject.IsString()
+      ? fa::string(armyNameObject.GetString())
       : gpg::STR_Printf("ARMY_%d", static_cast<int>(armyIndex + 1));
     armySetupTable.SetObject(armyName.c_str(), armySetup);
   }
@@ -84,7 +84,7 @@ void Sim::Setup(LaunchInfoNew* const info)
     const LuaPlus::LuaFunction<> setupSession(mLuaState->GetGlobal("SetupSession"));
     try {
       setupSession.Call();
-    } catch (const msvc8::runtime_error& error) {
+    } catch (const fa::runtime_error& error) {
       gpg::Warnf("Error running SetupSession in SimInit.lua: %s", error.what());
     }
   }
@@ -236,7 +236,7 @@ Sim* Sim::Create(const boost::SharedPtrRaw<LaunchInfoBase>& launchInfo)
     return sim;
   }
 
-  const msvc8::string message =
+  const fa::string message =
     gpg::STR_Printf("Unknown subclass of LaunchInfoBase: %s", typeid(*info).name());
   throw std::runtime_error(message.c_str());
 }
@@ -347,7 +347,7 @@ Sim::~Sim()
     }
   }
   while (!mDesyncLogLines.empty()) {
-    const msvc8::string logFile = mDesyncLogLines.front();
+    const fa::string logFile = mDesyncLogLines.front();
     (void)mDesyncLogLines.erase(mDesyncLogLines.begin());
     if (!::DeleteFileA(logFile.c_str())) {
       gpg::Warnf("Error deleting sim log file: %s", logFile.c_str());
@@ -404,8 +404,8 @@ Sim::~Sim()
  * is true when the iteration index equals `mSyncFilter.focusArmy`.
  */
 void Sim::CreateArmies(
-  const msvc8::vector<ArmyLaunchInfo>& launchInfo,
-  const msvc8::vector<LuaPlus::LuaObject>& armySetupObjects,
+  const fa::vector<ArmyLaunchInfo>& launchInfo,
+  const fa::vector<LuaPlus::LuaObject>& armySetupObjects,
   const LuaPlus::LuaObject& scenarioInfoOptions
 )
 {

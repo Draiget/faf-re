@@ -193,13 +193,7 @@ namespace moho
       return;
     }
 
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = gpg::BaseSubobjectOffset<CUnitCommand, Broadcaster<ECommandEvent>>();
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::BaseSubobjectOffset<CUnitCommand, Broadcaster<ECommandEvent>>());
   }
 
   /**

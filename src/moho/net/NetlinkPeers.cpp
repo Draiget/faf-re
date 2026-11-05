@@ -180,12 +180,12 @@ namespace moho
         nl::LinkCallbacks cb;
         cb.onSignal = [this, id](const nl::CandidatesMessage& m) {
           SNetCommandArg remote(static_cast<std::int32_t>(id));
-          SNetCommandArg text(msvc8::string(nl::ToJson(m).c_str()));
+          SNetCommandArg text(fa::string(nl::ToJson(m).c_str()));
           Write(nl::kCmdIceMsg, &remote, &text);
         };
         cb.onSignalText = [this, id](const std::string& text) {
           SNetCommandArg remote(static_cast<std::int32_t>(id));
-          SNetCommandArg body(msvc8::string(text.c_str()));
+          SNetCommandArg body(fa::string(text.c_str()));
           Write(nl::kCmdIceMsg, &remote, &body);
         };
         cb.onState = [this, id](const nl::LinkState) { ReportState(id); };
@@ -314,7 +314,7 @@ namespace moho
           return;
         }
         SNetCommandArg remote(static_cast<std::int32_t>(id));
-        SNetCommandArg state(msvc8::string(nl::LinkStateName(link->GetState())));
+        SNetCommandArg state(fa::string(nl::LinkStateName(link->GetState())));
         SNetCommandArg connected(link->IsConnected() ? 1 : 0);
         boost::shared_ptr<CGpgNetInterface> gpgnet = GpgNet();
         if (gpgnet) {
@@ -447,7 +447,7 @@ namespace moho
     gpgnet.WriteCommandWith1Arg(faf::netlink::kCmdHello, &version);
   }
 
-  bool NETLINK_HandleCommand(const msvc8::string& name, const msvc8::vector<SNetCommandArg>& args)
+  bool NETLINK_HandleCommand(const fa::string& name, const fa::vector<SNetCommandArg>& args)
   {
     namespace nl = faf::netlink;
     const auto command = name.view();
@@ -495,7 +495,7 @@ namespace moho
     // Ours, for test hosts and players who pin an interface: the address ICE
     // host candidates bind to (empty: every interface).
     std::string bindAddress;
-    msvc8::vector<msvc8::string> bindArgs;
+    fa::vector<fa::string> bindArgs;
     if (CFG_GetArgOption("/nativenetbind", 1u, &bindArgs) && !bindArgs.empty()) {
       bindAddress.assign(bindArgs[0].c_str(), bindArgs[0].size());
     }
@@ -510,12 +510,14 @@ namespace moho
     );
   }
 
-  bool NATIVENET_HandleCommand(const msvc8::string& name, msvc8::vector<SNetCommandArg>& args)
+  bool NATIVENET_HandleCommand(const fa::string& name, fa::vector<SNetCommandArg>& args)
   {
     namespace nl = faf::netlink;
     if (!Links().IsNative()) {
       return false;
     }
+    // Issue #275: a game coming back has no lobby. These messages only set up its links.
+    static const bool comingBack = CFG_GetArgOption("/rejoin", 0u, nullptr);
     const auto command = name.view();
     const auto isString = [&](const std::size_t i) {
       return args.size() > i && args[i].mType == SNetCommandArg::NETARG_String;
@@ -525,9 +527,9 @@ namespace moho
     };
     // The shipped form with the peer's engine address, for PullTask's handler.
     const auto toShipped = [&](const std::int64_t id, const std::string& login) {
-      msvc8::vector<SNetCommandArg> shipped;
-      shipped.push_back(SNetCommandArg(msvc8::string(nl::EngineAddressText(id).c_str())));
-      shipped.push_back(SNetCommandArg(msvc8::string(login.c_str())));
+      fa::vector<SNetCommandArg> shipped;
+      shipped.push_back(SNetCommandArg(fa::string(nl::EngineAddressText(id).c_str())));
+      shipped.push_back(SNetCommandArg(fa::string(login.c_str())));
       shipped.push_back(SNetCommandArg(static_cast<std::int32_t>(id)));
       args = shipped;
     };
@@ -542,11 +544,11 @@ namespace moho
     }
     if (command == "CreateLobby" && isNumber(3)) {
       Links().SetLocalId(IntArg(args[3]));
-      return false;
+      return comingBack;
     }
     if (command == "HostGame") {
       Links().RemoveAll(); // a new game session, as the adapter's createGameSession
-      return false;
+      return comingBack;
     }
     // The lobby server's JoinGame [login, id]: link to the host as answerer.
     if (command == "JoinGame" && args.size() == 2 && isString(0) && isNumber(1)) {
@@ -555,7 +557,7 @@ namespace moho
       const std::string login = StrArg(args[0]);
       Links().AddPeer(id, login, false);
       toShipped(id, login);
-      return false;
+      return comingBack;
     }
     // ConnectToPeer [login, id, offer]: the shipped form has a string second.
     if (command == "ConnectToPeer" && args.size() == 3 && isString(0) && isNumber(1) && isNumber(2)) {
@@ -563,11 +565,11 @@ namespace moho
       const std::string login = StrArg(args[0]);
       Links().AddPeer(id, login, IntArg(args[2]) != 0);
       toShipped(id, login);
-      return false;
+      return comingBack;
     }
     if (command == "DisconnectFromPeer" && isNumber(0)) {
       Links().RemovePeer(IntArg(args[0]));
-      return false;
+      return comingBack;
     }
     if (command.rfind("Netlink", 0) == 0) {
       gpg::Logf("NETLINK: %s ignored in native mode", name.c_str());

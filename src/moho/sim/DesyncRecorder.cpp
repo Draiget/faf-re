@@ -482,7 +482,7 @@ namespace moho
     /// The FAF game id from `/savereplay gpgnet://host:port/<game id>/<player>.SCFAreplay`, or empty.
     [[nodiscard]] std::string FafGameIdFromCommandLine()
     {
-      msvc8::vector<msvc8::string> args;
+      fa::vector<fa::string> args;
       if (!CFG_GetArgOption("/savereplay", 1u, &args) || args.empty()) {
         return {};
       }
@@ -504,7 +504,7 @@ namespace moho
     /// The folder of `/log <file>`, else the working folder.
     [[nodiscard]] std::filesystem::path DumpFolder()
     {
-      msvc8::vector<msvc8::string> args;
+      fa::vector<fa::string> args;
       if (CFG_GetArgOption("/log", 1u, &args) && !args.empty()) {
         std::error_code error;
         const std::filesystem::path folder = std::filesystem::path(args[0].c_str()).parent_path();
@@ -542,7 +542,7 @@ namespace moho
     /// hold a path, and telemetry records carry none).
     [[nodiscard]] std::string ConsoleSwitches(const bool withText = true)
     {
-      msvc8::string names;
+      fa::string names;
       CON_GetCommandList(names, false);
       std::string out;
       const std::string all = names.c_str();
@@ -569,7 +569,7 @@ namespace moho
           value = std::to_string(static_cast<unsigned>(*asByte->mValue));
         } else if (const auto* const asFloat = dynamic_cast<TConVar<float>*>(command)) {
           value = Printf("%.6g", static_cast<double>(*asFloat->mValue));
-        } else if (const auto* const asString = dynamic_cast<TConVar<msvc8::string>*>(command)) {
+        } else if (const auto* const asString = dynamic_cast<TConVar<fa::string>*>(command)) {
           if (!withText) {
             continue;
           }
@@ -1010,7 +1010,7 @@ namespace moho
       } else if (CFG_GetArgOption("/nodesyncdump", 0u, nullptr)) {
         sim_DesyncDump = 0;
       }
-      msvc8::vector<msvc8::string> args;
+      fa::vector<fa::string> args;
       if (CFG_GetArgOption("/desynctestbeat", 1u, &args) && !args.empty()) {
         sim_DesyncTestNudgeBeat = std::atoi(args[0].c_str());
       }
@@ -1415,7 +1415,7 @@ namespace moho
     );
     header += TELEMETRY_JsonString(ConsoleSwitches()) + "},\n";
 
-    msvc8::vector<msvc8::string> replayArgs;
+    fa::vector<fa::string> replayArgs;
     const std::string replayPath =
       CFG_GetArgOption("/savereplay", 1u, &replayArgs) && !replayArgs.empty() ? replayArgs[0].c_str() : "";
     header += "  \"replay\": " + TELEMETRY_JsonString(replayPath) + "\n";

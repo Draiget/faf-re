@@ -242,7 +242,7 @@ namespace
     UserCommandIssueHelper& helper, const CmdId cmdId, const ECommandIssueEvent kind, UserUnit* const unit
   )
   {
-    msvc8::deque<UserCommandIssueLocalEvent>& events = helper.mLocalQueue;
+    fa::deque<UserCommandIssueLocalEvent>& events = helper.mLocalQueue;
     if (events.empty() || events.back().mType != kind || events.back().mCmdId != cmdId) {
       const UserCommandIssueLocalEvent event(cmdId, kind);
       events.push_back(event);
@@ -443,9 +443,9 @@ namespace moho
     if (ResolveCommandIssueHelperCommandType(*helper) == static_cast<EUnitCommandType>(22)) {
       if (target.targetType == UserTargetType::Entity && target.targetEntity.HasValue()) {
         UserEntity* const targetEntity = DecodeEntityFromCommandTargetIfEntity(&target);
-        const bool isEligibleEntity = targetEntity->IsInCategory(msvc8::string("FERRYBEACON", 11u)) ||
-          targetEntity->IsInCategory(msvc8::string("TRANSPORTATION", 14u)) ||
-          targetEntity->IsInCategory(msvc8::string("AIRSTAGINGPLATFORM", 18u));
+        const bool isEligibleEntity = targetEntity->IsInCategory(fa::string("FERRYBEACON", 11u)) ||
+          targetEntity->IsInCategory(fa::string("TRANSPORTATION", 14u)) ||
+          targetEntity->IsInCategory(fa::string("AIRSTAGINGPLATFORM", 18u));
         if (!isEligibleEntity) {
           return;
         }
@@ -534,7 +534,7 @@ namespace moho
    * Real disassembly calls `std::map_CmdId_CommandIssueHelper::find`
    * (FUN_008B6160) then, on a miss, `sub_8B5DF0` (`insert(const value_type&)`)
    * -- both cited on `rb_tree::find_node`/`insert_unique` in `RbTree.h` for
-   * this `msvc8::map<CmdId, UserCommandIssueHelper*>` instantiation
+   * this `fa::map<CmdId, UserCommandIssueHelper*>` instantiation
    * (`CommandManager::mCommands`, `CommandManager.h`). This used to reach in
    * through a bespoke `CommandDbMapStorageView`/`CommandDbMapNodeView` pair
    * (`CommandIssueMapOf` + `FindCommandNode`/`InsertCommandNode`) that
@@ -578,7 +578,7 @@ namespace moho
    */
   void DeleteCommandIssueHelpers(
     CommandManager& commandManager,
-    const msvc8::vector<CmdId>& commandIds
+    const fa::vector<CmdId>& commandIds
   ) noexcept
   {
     for (const CmdId* cursor = commandIds.begin(); cursor != commandIds.end(); ++cursor) {
@@ -603,7 +603,7 @@ namespace moho
    * the manager id-pool recycle history.
    *
    * Real disassembly walks `mCommands` in ascending-key order via an inlined
-   * successor step (the same walk `msvc8::map`'s iterator performs through
+   * successor step (the same walk `fa::map`'s iterator performs through
    * `rb_increment`), calling `AdvanceLocalEventsToBeat` on each mapped helper.
    *
    * It reads the mapped helper *before* that successor step (0x008B5D08 loads

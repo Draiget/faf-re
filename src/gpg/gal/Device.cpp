@@ -22,14 +22,14 @@ namespace gpg::gal
          * and its exit-time destructor (0x00C095F0) deletes whatever device is
          * still live.
          */
-        msvc8::auto_ptr<Device> sDeviceD3D;
+        fa::auto_ptr<Device> sDeviceD3D;
 
         [[noreturn]] void ThrowDeviceContextError(const int line, const char* const message)
         {
             throw Error(
-                msvc8::string("c:\\work\\rts\\main\\code\\src\\libs\\gpggal\\Device.cpp"),
+                fa::string("c:\\work\\rts\\main\\code\\src\\libs\\gpggal\\Device.cpp"),
                 line,
-                msvc8::string(message)
+                fa::string(message)
             );
         }
 
@@ -39,7 +39,7 @@ namespace gpg::gal
          * What it does:
          * Returns the number of `Head` elements currently stored in one vector lane.
          */
-        [[nodiscard]] int CountHeadVectorEntries(const msvc8::vector<Head>& heads) noexcept
+        [[nodiscard]] int CountHeadVectorEntries(const fa::vector<Head>& heads) noexcept
         {
             const Head* const start = heads.begin();
             if (start == nullptr)
@@ -388,7 +388,7 @@ namespace gpg::gal
      * `insert(end(), 1, value)` into a conditional fast-path uninitialized fill
      * (`FUN_008E6F90`, taken when `size < capacity`) plus the `_Insert_n` grow
      * body (`FUN_008E71D0`); together they add exactly one element. Both cite
-     * `msvc8::vector<T>::insert` in Vector.h, along with the copy-construct
+     * `fa::vector<T>::insert` in Vector.h, along with the copy-construct
      * range (`FUN_008D7C20`) and its four calling-convention trampolines.
      * `Head` copies route through the recovered `Head` copy-ctor
      * (`FUN_004368B0`), never a raw byte copy.

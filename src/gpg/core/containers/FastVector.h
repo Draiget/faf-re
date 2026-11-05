@@ -90,7 +90,7 @@ namespace gpg::core
      * Assignment, not construction: the destination slots already hold live
      * objects. The 0x00562A80 emission is for `T = Moho::UnitWeaponInfo` and
      * calls its operator= (0x0055F210) per element, which is why a byte-wise
-     * move is wrong for that T - it owns two msvc8::string members.
+     * move is wrong for that T - it owns two fa::string members.
      * Address: 0x0061CE90 (FUN_0061CE90 -- the `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion` emission: `WeakPtr::operator=` per slot, walking backward; formerly `AssignIntrusiveWeakRefRangeBackwardRelink` over a look-alike node struct, removed 2026-09-30.)
      * Address: 0x0061CF00 (FUN_0061CF00 -- an ICF twin of 0x0061CE90.)
      */
@@ -806,8 +806,8 @@ namespace gpg::core
      * has nothing left to do.
      * Address: 0x0056B4D0 (FUN_0056B4D0 -- the destructor of `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the element destructor the `eh vector destructor iterator` runs for `mOffsetInfo[2]` in `~CFormationInstance`.)
      * Address: 0x0057E9D0 (FUN_0057E9D0 -- the destructor of `gpg::fastvector_n<Moho::CollisionResult, 10>`, the stack buffer every COGrid collision query fills; its 12 callers are the scope exits of those locals (`Sim::LocationIsFree`, `Projectile::CheckCollision`, `CUnitMotion::ProcessSurfaceCollisionFromLastMove`, ...). The FUN_00401DE0 body with `this` in ESI instead of ECX and the vector at +0x00; no element loop, `CollisionResult` being trivially destructible.)
-     * Address: 0x00545280 (FUN_00545280 -- the FUN_00401DE0 body with `this` in ESI: the destructor of the `gpg::fastvector_n<unsigned int, 2>` at `+0x08` of `moho::BVIntSet` (`mWords`), i.e. the implicit `~ArmyLaunchInfo` / `~BVIntSet` of the 0x20-byte element of `msvc8::vector<moho::ArmyLaunchInfo>`; callers 0x00545130 (`uninit_fill_n`), 0x005454A0 / 0x005457A0 / 0x00545880 (the `uninit_copy_n` bodies' catch rollback loops, stride 0x20); formerly `ResetSwapBackedArrayRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
-     * Address: 0x006DF040 (FUN_006DF040 -- the same destructor body for the `gpg::fastvector_n<unsigned int, 2>` at `+0x10` of `moho::EntityCategorySet` (`mBits.mWords`), i.e. the implicit `~BVSet` of the 0x28-byte element of `msvc8::vector<moho::EntityCategorySet>`, `this` in ESI; callers 0x006DEA30 (`uninit_fill_n`), 0x006DFFF0 / 0x006E0400 (`uninit_copy_n`), 0x006E00A0 -- each a catch rollback loop, stride 0x28; formerly `ResetSwapBackedArrayRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00545280 (FUN_00545280 -- the FUN_00401DE0 body with `this` in ESI: the destructor of the `gpg::fastvector_n<unsigned int, 2>` at `+0x08` of `moho::BVIntSet` (`mWords`), i.e. the implicit `~ArmyLaunchInfo` / `~BVIntSet` of the 0x20-byte element of `fa::vector<moho::ArmyLaunchInfo>`; callers 0x00545130 (`uninit_fill_n`), 0x005454A0 / 0x005457A0 / 0x00545880 (the `uninit_copy_n` bodies' catch rollback loops, stride 0x20); formerly `ResetSwapBackedArrayRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x006DF040 (FUN_006DF040 -- the same destructor body for the `gpg::fastvector_n<unsigned int, 2>` at `+0x10` of `moho::EntityCategorySet` (`mBits.mWords`), i.e. the implicit `~BVSet` of the 0x28-byte element of `fa::vector<moho::EntityCategorySet>`, `this` in ESI; callers 0x006DEA30 (`uninit_fill_n`), 0x006DFFF0 / 0x006E0400 (`uninit_copy_n`), 0x006E00A0 -- each a catch rollback loop, stride 0x28; formerly `ResetSwapBackedArrayRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      * Address: 0x008AF710 (FUN_008AF710 -- the destructor of `gpg::fastvector_n<moho::SoundHandleRecord, 256>` (`CUserSoundManager::mSoundHandles`, element 0x28): `~SoundHandleRecord` (0x008AB160) per slot, then the heap block freed and the lanes rebound to the inline window; callers `~CUserSoundManager` (0x008AABC7) and the constructor's unwind (0x008AA800). Formerly `ClearSoundHandleVector`, removed 2026-09-30.)
      */
     ~FastVectorInline()
@@ -932,7 +932,7 @@ namespace gpg::core
      * Address: 0x004ACD80 (FUN_004ACD80 -- `InsertRange` for `gpg::fastvector_n<moho::ResourceWatch*, N>` (`CResourceWatcher::mWatches`, N = 2, and `ResourceManager::OnDiskWatchEvent`'s local, N = 8): the
      * `push_back`s of `ResourceManager::GetResource` (0x004AA220) and
      * `OnDiskWatchEvent` (0x004AB780) and 0x004AC050; growth doubles. It was
-     * cited on `msvc8::vector::insert`; formerly `InsertDwordRangeIntoVectorRuntime`
+     * cited on `fa::vector::insert`; formerly `InsertDwordRangeIntoVectorRuntime`
      * in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
      *
      * What it does:
@@ -1069,7 +1069,7 @@ namespace gpg::core
      * Address: 0x00553A80 (FUN_00553A80, the `Moho::SOCellPos` instantiation
      * reached from the reflected `SetCount`/`SerLoad` resize at 0x005532F0.)
      * Address: 0x004ADCE0 (FUN_004ADCE0 -- the same step for `gpg::fastvector_n<moho::ResourceWatch*, N>` (`CResourceWatcher::mWatches`, N = 2, and `ResourceManager::OnDiskWatchEvent`'s local, N = 8);
-     * callers 0x004ACD80. It was cited on `msvc8::vector::insert`; formerly
+     * callers 0x004ACD80. It was cited on `fa::vector::insert`; formerly
      * `ReallocateAndSpliceDwordRange_004ADCE0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
      *
      * Buy a `newCapacity` block, uninitialized-copy the prefix, the inserted
@@ -1676,7 +1676,7 @@ namespace gpg::core
      * `Unit::Sync`'s `mWeaponInfo.resize(weaponCount, UnitWeaponInfo{})`
      * (Unit.cpp) on a `fastvector_n<UnitWeaponInfo, 1>` -- any unit with two or
      * more weapons exceeds the single inline slot and takes the grow path --
-     * faulting in `~UnitWeaponInfo` -> `msvc8::string::tidy` on an unmapped
+     * faulting in `~UnitWeaponInfo` -> `fa::string::tidy` on an unmapped
      * address, via `FastVector::resize` -> `FastVector::Reserve`.
      *
      * These forward to the inline-aware members above, whose semantics match
@@ -1731,7 +1731,7 @@ namespace gpg::core
      *
      * The +0x04/+0x08 pair is what identifies the container as a fastvector:
      * its layout is {start_, end_, capacity_}, so a last-vs-capacity test lands
-     * there, whereas msvc8::vector's {proxy, first, last, end} would put the
+     * there, whereas fa::vector's {proxy, first, last, end} would put the
      * same test at +0x08/+0x0C.)
      * Address: 0x0059C750 (FUN_0059C750, gpg::fastvector_n64_SAssignedLocInfo::push_back)
      * Address: 0x0061C5E0 (FUN_0061C5E0, `push_back` for
@@ -1863,11 +1863,11 @@ namespace gpg::core
      * build; its per-element copies are the relinking `WeakPtr` copy
      * constructor, so it takes the deep-copy path below)
      * Address: 0x0084E570 (FUN_0084E570, gpg::fastvector_n<boost::shared_ptr<Moho::CMauiFrame>, 2>::InsertAt)
-     * Address: 0x0083B6F0 (FUN_0083B6F0, gpg::fastvector_n<msvc8::string, 4>::InsertAt)
+     * Address: 0x0083B6F0 (FUN_0083B6F0, gpg::fastvector_n<fa::string, 4>::InsertAt)
      * Address: 0x00767370 (FUN_00767370, gpg::fastvector_n<gpg::AStarNeighbour<Moho::SOCellPos>, 200>::InsertAt -- `AStarSearch::WorkOnce`'s candidate buffer (gpg/core/algorithms/AStarSearch.h), a 0x10 head at [esp+650h] and 200 8-byte entries at [esp+660h]..[esp+CA0h]; reached from the two `push_back` full-storage arms at 0x00766490 (EnumerateAdjacentCells) and 0x0076674D (EnumerateClusterEdges), whose `mov eax,[edi+4]; cmp eax,[edi+8]` guards at 0x0076646A / 0x0076671A are the template's `end_ == capacity_` test. Doubles the capacity when short and tail-calls GrowInsert at 0x007673B4.)
      * Address: 0x008489D0 (FUN_008489D0,
      * gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>::InsertAt -- the
-     * deep-copy lane (44-byte element owning an `msvc8::string`). Confirmed
+     * deep-copy lane (44-byte element owning an `fa::string`). Confirmed
      * via `sub_899790`'s IDA-typed call `sub_8489D0(result, result->finish, v7,
      * v2->finish)` (`gpg::fastvector_n16_SBuildTemplateInfo *result`), and via
      * its own asm: `(a4-a3)/44` insert-count division, `requiredSize >
@@ -1903,7 +1903,7 @@ namespace gpg::core
      *    @0x0057FE30 and UserEntity ptr @0x005050A0; and the POD structs
      *    SAssignedLocInfo @0x0059CC10) blit
      *    the tail with memcpy/memmove (the fast path below).
-     *  - Deep-copy T (msvc8::string @0x0083B6F0, LuaPlus::LuaObject @0x004C7EB0,
+     *  - Deep-copy T (fa::string @0x0083B6F0, LuaPlus::LuaObject @0x004C7EB0,
      *    boost::shared_ptr<CMauiFrame> @0x0084E570, SFormationRunScriptCandidate
      *    @0x0056E620, WeakPtr<IUnit> @0x0056B2F0, SOffsetInfo @0x0056D3F0) must
      *    NOT relocate raw bytes
@@ -2539,7 +2539,7 @@ namespace gpg::core
      * only (slack slots hold default-constructed values instead of being
      * genuinely unallocated) and is the same accepted trade-off already made
      * for every other deep-copy element type on this method
-     * (`msvc8::string`, `LuaPlus::LuaObject`, `boost::shared_ptr<CMauiFrame>`).)
+     * (`fa::string`, `LuaPlus::LuaObject`, `boost::shared_ptr<CMauiFrame>`).)
      * Address: 0x0056FAB0 (FUN_0056FAB0, gpg::fastvector_n<Moho::
      * SFormationRunScriptCandidate,16>::GrowInsert lane -- the reallocate arm
      * of `InsertAt` (0x0056E620) for the 72-byte "Cand72" candidate, and the
@@ -2717,7 +2717,7 @@ namespace gpg::core
      * shape: `.c`-confirmed count<=1 assigns directly into the existing
      * (inline) `start_`, else calls `sub_74DBA0` to buy an exact
      * `count`-element block (`allocate_slots_checked`-guarded, matching
-     * `new T[count]`) and copies into it. Reached from `msvc8::vector<
+     * `new T[count]`) and copies into it. Reached from `fa::vector<
      * moho::SExtraUnitData>::vector(const vector&)` (`FUN_00753020`) and
      * its `uninit_fill_n`/`uninit_copy_n` element-construction emissions
      * (`FUN_00753AF0`, `FUN_00756A00` and siblings, `legacy/containers/
@@ -2855,7 +2855,7 @@ namespace gpg::core
      * originalVec_) { end_ = start_; return; } operator delete[](start_);
      * start_ = originalVec_; capacity_ = *reinterpret_cast<T**>(start_);
      * end_ = start_;` -- exactly this free function's body. Called per
-     * element, inlined into a range loop, by `msvc8::vector<
+     * element, inlined into a range loop, by `fa::vector<
      * moho::SExtraUnitData>::destroy_range` (`FUN_00742170`,
      * `legacy/containers/Vector.h`) when the outer vector destroys or
      * reallocates its elements. Migrated off

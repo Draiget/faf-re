@@ -110,7 +110,7 @@ namespace
      * Appends `size=` metadata to inherited lexical text for one reflected
      * `vector<string>` value.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
 
@@ -154,7 +154,7 @@ namespace
 
   static_assert(sizeof(RStringVectorTypeInfo) == 0x68, "RStringVectorTypeInfo size must be 0x68");
 
-  using StringVector = msvc8::vector<msvc8::string>;
+  using StringVector = fa::vector<fa::string>;
   constexpr std::size_t kStringVectorMaxElements = 0x9249249u;
 
   /**
@@ -172,13 +172,13 @@ namespace
    */
   const char* RStringVectorTypeInfo::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<msvc8::string>()->GetName());
+    static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<fa::string>()->GetName());
     return sName.c_str();
   }
 
-  msvc8::string RStringVectorTypeInfo::GetLexical(const gpg::RRef& ref) const
+  fa::string RStringVectorTypeInfo::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
@@ -189,7 +189,7 @@ namespace
 
   void RStringVectorTypeInfo::Init()
   {
-    size_ = sizeof(msvc8::vector<msvc8::string>);
+    size_ = sizeof(fa::vector<fa::string>);
     version_ = 1;
     serLoadFunc_ = &RStringVectorTypeInfo::SerLoad;
     serSaveFunc_ = &RStringVectorTypeInfo::SerSave;
@@ -202,7 +202,7 @@ namespace
    * What it does:
    * Ensures a reflected string vector has enough capacity for a pending load
    * or append sequence and preserves any pre-existing elements. The binary
-   * body's move-relocate loop is `msvc8::vector<msvc8::string>::reserve`'s
+   * body's move-relocate loop is `fa::vector<fa::string>::reserve`'s
    * own growth step (FUN_00513980, cited on `reserve` in
    * legacy/containers/Vector.h), so the canonical template call covers it.
    */
@@ -246,7 +246,7 @@ namespace
     (void)EnsureStringVectorCapacity(loaded, static_cast<std::size_t>(count));
 
     for (unsigned int index = 0; index < count; ++index) {
-      msvc8::string value{};
+      fa::string value{};
       archive->ReadString(&value);
       loaded.push_back(value);
     }
@@ -273,7 +273,7 @@ namespace
       return;
     }
 
-    for (msvc8::string& value : *storage) {
+    for (fa::string& value : *storage) {
       archive->WriteString(&value);
     }
   }
@@ -281,7 +281,7 @@ namespace
   gpg::RRef RStringVectorTypeInfo::SubscriptIndex(void* const obj, const int ind) const
   {
     gpg::RRef out{};
-    out.mType = gpg::RTypeOf<msvc8::string>();
+    out.mType = gpg::RTypeOf<fa::string>();
 
     auto* const storage = static_cast<StringVector*>(obj);
     if (!storage || ind < 0 || static_cast<std::size_t>(ind) >= storage->size()) {
@@ -301,7 +301,7 @@ namespace
   /**
    * Address: 0x00512DC0 (FUN_00512DC0, gpg::RVectorType_string::SetCount)
    * Address: 0x005130E0 (FUN_005130E0, the `resize(n, value)` emission this
-   * call produces for `msvc8::vector<msvc8::string>`)
+   * call produces for `fa::vector<fa::string>`)
    *
    * What it does:
    * Resizes one reflected string-vector lane to a requested count using a
@@ -314,7 +314,7 @@ namespace
       return;
     }
 
-    msvc8::string fill{};
+    fa::string fill{};
     storage->resize(static_cast<std::size_t>(count), fill);
   }
 
@@ -339,12 +339,12 @@ namespace
    *
    * What it does:
    * Materializes the reflected `vector<string>` descriptor and preregisters
-   * it against `typeid(msvc8::vector<msvc8::string>)`.
+   * it against `typeid(fa::vector<fa::string>)`.
    */
   [[nodiscard]] RStringVectorTypeInfo* AcquireRStringVectorTypeInfo()
   {
     static RStringVectorTypeInfo sInstance;
-    gpg::PreRegisterRType(typeid(msvc8::vector<msvc8::string>), &sInstance);
+    gpg::PreRegisterRType(typeid(fa::vector<fa::string>), &sInstance);
     return &sInstance;
   }
 
@@ -517,11 +517,11 @@ namespace moho
    */
   void REntityBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    gpg::RField* const categoriesField = typeInfo->AddField<msvc8::vector<msvc8::string>>("Categories", offsetof(REntityBlueprint, mCategories));
+    gpg::RField* const categoriesField = typeInfo->AddField<fa::vector<fa::string>>("Categories", offsetof(REntityBlueprint, mCategories));
     categoriesField->mFlags = 3;
     categoriesField->mDesc = "Named categories that this entity belongs to";
-    typeInfo->AddField<msvc8::string>("ScriptModule", offsetof(REntityBlueprint, mScriptModule), 3, "Module defining entity's class.");
-    typeInfo->AddField<msvc8::string>("ScriptClass", offsetof(REntityBlueprint, mScriptClass), 3, "Name of entity's class.");
+    typeInfo->AddField<fa::string>("ScriptModule", offsetof(REntityBlueprint, mScriptModule), 3, "Module defining entity's class.");
+    typeInfo->AddField<fa::string>("ScriptClass", offsetof(REntityBlueprint, mScriptClass), 3, "Name of entity's class.");
     gpg::RField* const collisionShapeField = typeInfo->AddField<moho::ECollisionShape>("CollisionShape", offsetof(REntityBlueprint, mCollisionShape));
     collisionShapeField->mFlags = 3;
     collisionShapeField->mDesc = "Shape to use for collision db, 'None' for no collision.";

@@ -46,6 +46,8 @@ namespace faf::server
 
     /** The id map of an army's view; null: none yet, or no such view. */
     using MapOfArmy = std::function<const remote::CViewIdMap*(std::int32_t army)>;
+    /** Whether an army's client holds a record with this id; see remote/InboundIds.h. */
+    using ViewHolds = std::function<bool(std::int32_t army, std::uint32_t id)>;
     /** A reliable message for a player. */
     using Answer = std::function<void(std::int32_t uid, std::vector<std::uint8_t> message)>;
 
@@ -66,7 +68,7 @@ namespace faf::server
     void Forget(std::int32_t uid);
 
     /** On the sim's thread, with no view's work going on. `rules`, for blueprint ids: the same each time. */
-    void Drain(moho::RRuleGameRules* rules, const MapOfArmy& maps, const Answer& answer);
+    void Drain(moho::RRuleGameRules* rules, const MapOfArmy& maps, const ViewHolds& holds, const Answer& answer);
 
     [[nodiscard]] std::uint64_t Applied() const noexcept { return mApplied; }
     [[nodiscard]] std::uint64_t Refused() const noexcept { return mRefused; }

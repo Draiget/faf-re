@@ -71,7 +71,7 @@ namespace gpg::gal
   /**
    * Address: 0x0094BC60 (FUN_0094BC60)
    *
-   * msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>> &
+   * fa::vector<boost::shared_ptr<gpg::gal::EffectTechnique>> &
    *
    * What it does:
    * Walks the techniques by index and appends a wrapper for every valid one:
@@ -79,7 +79,7 @@ namespace gpg::gal
    * 0x0094BE69), on a temporary whose constructor the binary inlines around
    * `shared_count(EffectTechniqueD3D10*)` 0x0094B6C0.
    */
-  void EffectD3D10::GetTechniques(msvc8::vector<boost::shared_ptr<EffectTechnique>>& outTechniques)
+  void EffectD3D10::GetTechniques(fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques)
   {
     if (dxEffect_ == nullptr) {
       ThrowGalError("EffectD3D10.cpp", 52, "invalid effect");

@@ -48,10 +48,10 @@ namespace moho
       [[nodiscard]] bool operator()(const TextureAtlasEntry& lhs, const TextureAtlasEntry& rhs) const noexcept;
     };
 
-    using AvailableRectVector = msvc8::vector<gpg::Rect2i>;
+    using AvailableRectVector = fa::vector<gpg::Rect2i>;
     using DynamicTextureSheetHandle = boost::shared_ptr<CD3DDynamicTextureSheet>;
-    using TextureAtlasSet = msvc8::set<TextureAtlasEntry, TextureAtlasEntryLess>;
-    using PixelByteVector = msvc8::vector<std::uint8_t>;
+    using TextureAtlasSet = fa::set<TextureAtlasEntry, TextureAtlasEntryLess>;
+    using PixelByteVector = fa::vector<std::uint8_t>;
 
     /**
      * Address: 0x00448A60 (FUN_00448A60)

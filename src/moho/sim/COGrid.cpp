@@ -103,8 +103,8 @@ void moho::InitGridTraversalLine(
 
     const std::int32_t alignMask = -step;
     // 0x0040D908, 0x0040D93A: the binary's inlined floor.
-    line.xEdge = msvc8::FloorToIntX87(line.x0) & alignMask;
-    line.zEdge = msvc8::FloorToIntX87(line.z0) & alignMask;
+    line.xEdge = fa::FloorToIntX87(line.x0) & alignMask;
+    line.zEdge = fa::FloorToIntX87(line.z0) & alignMask;
   }
 }
 
@@ -1820,10 +1820,10 @@ namespace moho
    */
   CollisionDBRect* func_AABoxToRect(CollisionDBRect* const out, const Wm3::AxisAlignedBox3f& box)
   {
-    const int minCellX = msvc8::FloorToIntX87(box.Min.x) >> kWorldToCollisionCellShift;
-    const int minCellZ = msvc8::FloorToIntX87(box.Min.z) >> kWorldToCollisionCellShift;
-    const int maxCellX = (msvc8::CeilToIntX87(box.Max.x) + 3) >> kWorldToCollisionCellShift;
-    const int maxCellZ = (msvc8::CeilToIntX87(box.Max.z) + 3) >> kWorldToCollisionCellShift;
+    const int minCellX = fa::FloorToIntX87(box.Min.x) >> kWorldToCollisionCellShift;
+    const int minCellZ = fa::FloorToIntX87(box.Min.z) >> kWorldToCollisionCellShift;
+    const int maxCellX = (fa::CeilToIntX87(box.Max.x) + 3) >> kWorldToCollisionCellShift;
+    const int maxCellZ = (fa::CeilToIntX87(box.Max.z) + 3) >> kWorldToCollisionCellShift;
 
     out->mStartX = ClampCollisionCellStartToU16(minCellX);
     out->mStartZ = ClampCollisionCellStartToU16(minCellZ);

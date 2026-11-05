@@ -54,7 +54,7 @@ namespace
   constexpr const char* kDefaultHookDirPath = "/hook";
   constexpr const char kConcatSyntheticNewline[] = "\n";
   std::int32_t gRecoveredCScrLuaMetatableFactoryCScriptObjectIndex = 0;
-  msvc8::vector<msvc8::string> gScriptHookDirectories{};
+  fa::vector<fa::string> gScriptHookDirectories{};
 
   struct LuaFileLoaderDat final
   {
@@ -66,7 +66,7 @@ namespace
   struct LuaConcatLoadData final
   {
     gpg::MemBuffer<const char> currentChunk{};
-    const msvc8::vector<msvc8::string>* files{nullptr};
+    const fa::vector<fa::string>* files{nullptr};
     std::uint32_t nextFileIndex{0};
     bool pendingTrailingNewline{false};
   };
@@ -337,7 +337,7 @@ namespace
     return nilObject;
   }
 
-  [[nodiscard]] bool ResolveMountedScriptPath(const char* const sourcePath, msvc8::string& outPath)
+  [[nodiscard]] bool ResolveMountedScriptPath(const char* const sourcePath, fa::string& outPath)
   {
     moho::FILE_EnsureWaitHandleSet();
     moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
@@ -419,11 +419,11 @@ namespace
     }
     auto listing = sListings.find(listingKey);
     if (listing == sListings.end()) {
-      msvc8::vector<msvc8::string> files;
+      fa::vector<fa::string> files;
       waitHandleSet->mHandle->EnumerateFiles(root.c_str(), pattern.c_str(), true, &files);
       std::unordered_set<std::string> names;
       names.reserve(files.size());
-      for (const msvc8::string& file : files) {
+      for (const fa::string& file : files) {
         names.emplace(file.c_str());
       }
       listing = sListings.emplace(listingKey, std::move(names)).first;
@@ -432,16 +432,16 @@ namespace
   }
 
   void TryAppendHookScriptPath(
-    msvc8::vector<msvc8::string>& outFiles,
+    fa::vector<fa::string>& outFiles,
     const char* const scriptPath,
-    const msvc8::string& candidatePath,
+    const fa::string& candidatePath,
     const bool mightExist
   )
   {
     if (!mightExist && !HookProbeVerify()) {
       return;
     }
-    msvc8::string resolvedPath{};
+    fa::string resolvedPath{};
     if (!ResolveMountedScriptPath(candidatePath.c_str(), resolvedPath) || resolvedPath.empty()) {
       return;
     }
@@ -453,13 +453,13 @@ namespace
     outFiles.push_back(resolvedPath);
   }
 
-  [[nodiscard]] msvc8::string BuildHookCandidatePath(
+  [[nodiscard]] fa::string BuildHookCandidatePath(
     const char* const rootPath,
     const char* const hookPath,
     const char* const scriptPath
   )
   {
-    msvc8::string candidate(rootPath != nullptr ? rootPath : "");
+    fa::string candidate(rootPath != nullptr ? rootPath : "");
     candidate.append(hookPath != nullptr ? hookPath : "");
     candidate.append(scriptPath != nullptr ? scriptPath : "");
     return candidate;
@@ -468,7 +468,7 @@ namespace
   void CollectActiveModHookScripts(
     LuaPlus::LuaState* const state,
     const char* const scriptPath,
-    msvc8::vector<msvc8::string>& outFiles
+    fa::vector<fa::string>& outFiles
   )
   {
     const LuaPlus::LuaObject activeMods = state->GetGlobal(kActiveModsGlobalName);
@@ -498,7 +498,7 @@ namespace
         hookDir = kDefaultHookDirPath;
       }
 
-      const msvc8::string candidatePath = BuildHookCandidatePath(modLocation, hookDir, scriptPath);
+      const fa::string candidatePath = BuildHookCandidatePath(modLocation, hookDir, scriptPath);
       TryAppendHookScriptPath(outFiles, scriptPath, candidatePath, HookFileMightExist(modLocation, hookDir, scriptPath));
     }
   }
@@ -547,12 +547,12 @@ namespace
     }
 
     while (true) {
-      const msvc8::vector<msvc8::string>* const files = data->files;
+      const fa::vector<fa::string>* const files = data->files;
       if (files == nullptr || data->nextFileIndex >= files->size()) {
         return nullptr;
       }
 
-      const msvc8::string& filePath = (*files)[data->nextFileIndex];
+      const fa::string& filePath = (*files)[data->nextFileIndex];
       ++data->nextFileIndex;
 
       data->currentChunk = moho::DISK_MemoryMapFile(filePath.c_str());
@@ -753,7 +753,7 @@ namespace moho
       lua_pushstring(lstate, modulePath);
       lua_call(lstate, 1, 1);
       return LuaPlus::LuaObject(state, -1);
-    } catch (const msvc8::runtime_error& error) {
+    } catch (const fa::runtime_error& error) {
       gpg::Warnf("Error importing %s:\n%s", modulePath, error.what());
       return LuaPlus::LuaObject(state);
     }
@@ -850,11 +850,11 @@ namespace moho
    * Returns one Lua-quoted string literal with escaping for matching quote
    * char, backslash, tab/newline, and non-printable bytes.
    */
-  msvc8::string SCR_QuoteLuaString(const gpg::StrArg text)
+  fa::string SCR_QuoteLuaString(const gpg::StrArg text)
   {
     const char* const source = text != nullptr ? text : "";
 
-    msvc8::string quoted{};
+    fa::string quoted{};
     const char quoteChar = std::strchr(source, '\'') != nullptr ? '"' : '\'';
     quoted.push_back(quoteChar);
 
@@ -892,7 +892,7 @@ namespace moho
   /**
    * Address: 0x004D2F70 (FUN_004D2F70)
    */
-  msvc8::string SCR_ToString(const LuaPlus::LuaObject& object)
+  fa::string SCR_ToString(const LuaPlus::LuaObject& object)
   {
     gpg::MemBufferStream stream(256u);
     LuaPlus::LuaObject copy = object;
@@ -903,7 +903,7 @@ namespace moho
       return {};
     }
 
-    return msvc8::string(stream.mWriteStart, serializedSize);
+    return fa::string(stream.mWriteStart, serializedSize);
   }
 
   /**
@@ -1235,7 +1235,7 @@ namespace moho
       return;
     }
 
-    const msvc8::string lexicalValue = source.GetLexical();
+    const fa::string lexicalValue = source.GetLexical();
     destination.AssignString(state, lexicalValue.c_str());
   }
 
@@ -1269,15 +1269,15 @@ namespace moho
       return;
     }
 
-    msvc8::string validOptions{};
+    fa::string validOptions{};
     if (const gpg::REnumType* const enumType = ref.mType != nullptr ? ref.mType->IsEnumType() : nullptr; enumType) {
-      const msvc8::vector<gpg::REnumType::ROptionValue>& options = enumType->GetEnumOptions();
+      const fa::vector<gpg::REnumType::ROptionValue>& options = enumType->GetEnumOptions();
       for (const gpg::REnumType::ROptionValue* it = options.begin(); it != options.end(); ++it) {
         validOptions.append(gpg::STR_Printf("   %s\n", it->mName != nullptr ? it->mName : "").view());
       }
     }
 
-    const msvc8::string errorMessage =
+    const fa::string errorMessage =
       gpg::STR_Printf("Invalid enum value %s\nValid Options are:\n%s", lexicalValue, validOptions.c_str());
     LuaPlus::LuaState::Error(state, "%s", errorMessage.c_str());
   }
@@ -1355,7 +1355,7 @@ namespace moho
     loaderData.buf = mappedFile;
     loaderData.done = false;
 
-    const msvc8::string chunkName = gpg::STR_Printf("@%s", filename);
+    const fa::string chunkName = gpg::STR_Printf("@%s", filename);
     const int loadStatus = lua_load(
       rawState,
       reinterpret_cast<lua_Chunkreader>(func_LuaFileLoader),
@@ -1448,7 +1448,7 @@ namespace moho
   void SCR_LuaDoFileConcat(
     LuaPlus::LuaState* const state,
     LuaPlus::LuaObject* const outEnvironment,
-    msvc8::vector<msvc8::string> files
+    fa::vector<fa::string> files
   )
   {
     if (files.empty()) {
@@ -1461,7 +1461,7 @@ namespace moho
     loadData.nextFileIndex = 0;
     loadData.pendingTrailingNewline = false;
 
-    const msvc8::string chunkName = gpg::STR_Printf("@%s", files.front().c_str());
+    const fa::string chunkName = gpg::STR_Printf("@%s", files.front().c_str());
     int loadStatus = 0;
     if (SCR_ScriptChunkCacheActive()) {
       // Engine addition (res_ScriptChunkCache): the text lua_load would stream, then its function
@@ -1527,17 +1527,17 @@ namespace moho
       return;
     }
 
-    msvc8::string resolvedPath{};
+    fa::string resolvedPath{};
     if (!ResolveMountedScriptPath(scriptPath, resolvedPath) || resolvedPath.empty()) {
-      const msvc8::string errorText = gpg::STR_Printf("Unable to find file %s", scriptPath);
+      const fa::string errorText = gpg::STR_Printf("Unable to find file %s", scriptPath);
       LuaPlus::LuaState::Error(state, "%s", errorText.c_str());
     }
 
-    msvc8::vector<msvc8::string> files{};
+    fa::vector<fa::string> files{};
     files.push_back(resolvedPath);
 
-    for (const msvc8::string& hookDirectory : gScriptHookDirectories) {
-      const msvc8::string candidatePath = BuildHookCandidatePath(hookDirectory.c_str(), "", scriptPath);
+    for (const fa::string& hookDirectory : gScriptHookDirectories) {
+      const fa::string candidatePath = BuildHookCandidatePath(hookDirectory.c_str(), "", scriptPath);
       TryAppendHookScriptPath(files, scriptPath, candidatePath, HookFileMightExist(hookDirectory.c_str(), "", scriptPath));
     }
 
@@ -1553,7 +1553,7 @@ namespace moho
    */
   void SCR_AddHookDirectory(const char* const hookDirectory)
   {
-    gScriptHookDirectories.push_back(msvc8::string(hookDirectory != nullptr ? hookDirectory : ""));
+    gScriptHookDirectories.push_back(fa::string(hookDirectory != nullptr ? hookDirectory : ""));
   }
 
   /**
@@ -1665,7 +1665,7 @@ namespace moho
             ? sim_BlueprintTableShortcuts && TryBuildQuietly(fieldValue, fieldDestination)
             : sim_BlueprintFieldShortcuts && TrySetPlainValue(fieldValue, fieldDestination);
           if (!quietlySet) {
-            const msvc8::string fieldContext = gpg::STR_Printf(
+            const fa::string fieldContext = gpg::STR_Printf(
               "Initializing field %s of %s at %p",
               keyName.c_str(),
               destination.GetName(),

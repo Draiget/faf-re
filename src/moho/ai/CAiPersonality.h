@@ -121,8 +121,8 @@ namespace moho
     static gpg::RType* sType;
 
     Sim* mSim;                                // +0x34
-    msvc8::string mPersonalityName;           // +0x38
-    msvc8::string mChatPersonality;           // +0x54
+    fa::string mPersonalityName;           // +0x38
+    fa::string mChatPersonality;           // +0x54
     SAiPersonalityRange mArmySize;            // +0x70
     SAiPersonalityRange mPlatoonSize;         // +0x78
     SAiPersonalityRange mAttackFrequency;     // +0x80
@@ -138,7 +138,7 @@ namespace moho
     SAiPersonalityRange mFactoryTycoon;       // +0xD0
     SAiPersonalityRange mIntelBuildingTycoon; // +0xD8
     SAiPersonalityRange mSuperWeaponTendency; // +0xE0
-    msvc8::vector<msvc8::string> mFavouriteStructures; // +0xE8
+    fa::vector<fa::string> mFavouriteStructures; // +0xE8
     SAiPersonalityRange mAirUnitsEmphasis;            // +0xF8
     SAiPersonalityRange mTankUnitsEmphasis;           // +0x100
     SAiPersonalityRange mBotUnitsEmphasis;            // +0x108
@@ -147,7 +147,7 @@ namespace moho
     SAiPersonalityRange mSupportUnitsEmphasis;        // +0x120
     SAiPersonalityRange mDirectDamageEmphasis;        // +0x128
     SAiPersonalityRange mIndirectDamageEmphasis;      // +0x130
-    msvc8::vector<msvc8::string> mFavouriteUnits;     // +0x138
+    fa::vector<fa::string> mFavouriteUnits;     // +0x138
     SAiPersonalityRange mSurvivalEmphasis;            // +0x148
     SAiPersonalityRange mTeamSupport;                 // +0x150
     SAiPersonalityRange mFormationUse;                // +0x158

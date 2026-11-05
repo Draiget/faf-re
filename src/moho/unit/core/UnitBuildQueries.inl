@@ -157,10 +157,10 @@ bool Unit::PickTargetPointAboveWater(std::int32_t& outTargetPoint) const
   const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
 
   const RUnitBlueprint* const blueprint = GetBlueprint();
-  const msvc8::vector<msvc8::string>& targetBones = blueprint->AI.TargetBones;
+  const fa::vector<fa::string>& targetBones = blueprint->AI.TargetBones;
   const std::int32_t targetBoneCount = static_cast<std::int32_t>(targetBones.size());
   if (targetBoneCount > 0) {
-    msvc8::vector<std::int32_t> candidateIndices{};
+    fa::vector<std::int32_t> candidateIndices{};
     for (std::int32_t targetIndex = 0; targetIndex < targetBoneCount; ++targetIndex) {
       if (GetTargetPoint(targetIndex).y > waterElevation) {
         candidateIndices.push_back(targetIndex);
@@ -195,10 +195,10 @@ bool Unit::PickTargetPointBelowWater(std::int32_t& outTargetPoint) const
   const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
 
   const RUnitBlueprint* const blueprint = GetBlueprint();
-  const msvc8::vector<msvc8::string>& targetBones = blueprint->AI.TargetBones;
+  const fa::vector<fa::string>& targetBones = blueprint->AI.TargetBones;
   const std::int32_t targetBoneCount = static_cast<std::int32_t>(targetBones.size());
   if (targetBoneCount > 0) {
-    msvc8::vector<std::int32_t> candidateIndices{};
+    fa::vector<std::int32_t> candidateIndices{};
     for (std::int32_t targetIndex = 0; targetIndex < targetBoneCount; ++targetIndex) {
       if (GetTargetPoint(targetIndex).y < waterElevation) {
         candidateIndices.push_back(targetIndex);
@@ -241,7 +241,7 @@ Wm3::Vec3f Unit::GetTargetPoint(std::int32_t targetPoint) const
 
   const RUnitBlueprint* const blueprint = GetBlueprint();
   if (targetPoint >= 0 && blueprint != nullptr) {
-    const msvc8::vector<msvc8::string>& targetBones = blueprint->AI.TargetBones;
+    const fa::vector<fa::string>& targetBones = blueprint->AI.TargetBones;
     const std::int32_t maxIndex = static_cast<std::int32_t>(targetBones.size()) - 1;
     if (targetPoint >= maxIndex) {
       targetPoint = maxIndex;

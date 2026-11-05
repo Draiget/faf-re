@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <deque>
 #include <memory>
 #include <unordered_set>
 #include <utility>
@@ -44,10 +46,20 @@ namespace faf::remote
     /** Renumbers the frames' ids per view from the next beat on (remote/ViewIdMap.h). */
     void EnableIdMaps() noexcept { mIdMapsOn = true; }
     [[nodiscard]] bool IdMapsOn() const noexcept { return mIdMapsOn; }
-    /** `army`'s id map (with `EnableIdMaps`, once a beat has been built). */
-    [[nodiscard]] const CViewIdMap& IdMap(std::int32_t army) const { return *mIdMaps[static_cast<std::size_t>(army)]; }
+    /** `army`'s id map (with `EnableIdMaps`, once a beat has been built): its team's, with teams. */
+    [[nodiscard]] const CViewIdMap& IdMap(std::int32_t army) const { return *mIdMaps[TeamSlotOf(static_cast<std::size_t>(army))]; }
     /** The views built so far (0 before the first beat). */
     [[nodiscard]] std::size_t ViewCount() const noexcept { return mIdMaps.size(); }
+    /**
+     * Plan WPR.35: `CViewPackets::EnableTeams` for a server: needs `EnableHeldFrames` without its check, and
+     * `EnablePipeline`, which finishes a team's view and then its players' on one thread, as they share an id map.
+     */
+    void EnableTeamViews() noexcept
+    {
+      if (mHeldOn && !mHeldCheck && mJobs != nullptr) {
+        EnableTeams();
+      }
+    }
     /** The sim of the last beat built (null before it); for checks that run on the sim thread. */
     [[nodiscard]] moho::Sim* LastSim() const noexcept { return mLastSim; }
 
@@ -90,8 +102,15 @@ namespace faf::remote
     double FinishViews();
     /** The records in `army`'s last frame (with `EnableHeldFrames`). */
     [[nodiscard]] std::size_t HeldCount(const std::int32_t army) const { return mHeld[static_cast<std::size_t>(army)].count; }
+    /** `--view-dump`: from now on, every 2000 beats, what each player's client holds, by sim id with a hash of each record. */
+    void SetViewDump(std::FILE* const file) noexcept { mViewDump = file; }
     /** `army`'s last frame against the one before, as `wire::EncodeFrame` writes it. */
     [[nodiscard]] bool EncodeHeldFrame(std::int32_t army, wire::BitWriter& writer) const;
+    /**
+     * With `EnableHeldFrames`, between a beat's views: whether `army`'s client holds a record with this
+     * id, or held one within `CViewIdMap::kInboundGraceBeats` (its order may be on its way).
+     */
+    [[nodiscard]] bool ViewHoldsEntity(std::size_t army, std::uint32_t id) const;
     /** `simId` as `view`'s client knows it, for an id written outside its frames (plan WP6.10). */
     [[nodiscard]] std::uint32_t ViewEntityId(std::size_t view, std::uint32_t simId);
     /** Differences the check found (should stay 0). */
@@ -138,6 +157,7 @@ namespace faf::remote
       std::uint32_t beat = 0;
       std::vector<std::uint32_t> candidates;
       std::vector<std::uint32_t> removed;
+      std::deque<std::pair<std::uint32_t, std::uint32_t>> recentlyGone; // beat, id; oldest first
       std::vector<const wire::SEntityRecord*> created;
       std::vector<wire::SFrameChange> changed;
       gpg::core::ChunkedVector<wire::SEntityRecord> before; // changed `own` records as the client held them
@@ -160,6 +180,12 @@ namespace faf::remote
     void FinishHeldFrame(std::size_t army, const moho::SSyncData& packet);
     /** The part of a view's beat `FinishHeldFrame` is, and the ids that retire. */
     void FinishFrame(std::size_t army);
+    /** Writes `--view-dump`'s sample. */
+    void DumpViews();
+    /** Whether a slot's client holds a record now, or held one lately. */
+    [[nodiscard]] bool SlotHoldsEntity(std::size_t slot, std::uint32_t id) const;
+    /** A view's own-command test: the commands of its army, or with teams its whole team's. */
+    [[nodiscard]] CViewIdMap::OwnCommandTest OwnCommands(std::size_t slot) const;
     /** Compares the held frame with the whole frame built from the same world. */
     void CheckHeldFrame(moho::Sim& sim, std::size_t army, const CViewIdMap::OwnCommandTest& isOwnCommand);
     /** The retirements of a beat before ids are translated, on `map`. */
@@ -220,6 +246,7 @@ namespace faf::remote
     bool mJobsPending = false;
     double mViewWaitSeconds = 0.0;
     std::unique_ptr<CViewJobs> mJobs;
+    std::FILE* mViewDump = nullptr;
     std::vector<std::unique_ptr<CViewIdMap>> mIdMaps;
     std::vector<std::unordered_set<std::uint32_t>> mRetiring; // per view: deleted or erased, still held
     std::vector<std::vector<std::uint32_t>> mRetired;         // per view: no longer held; retired next beat

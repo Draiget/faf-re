@@ -307,12 +307,12 @@ namespace
     };
 
     auto growWords = [&throwTooLong, &allocateWords](
-                       msvc8::detail::vector_bool_storage* const storage,
+                       fa::detail::vector_bool_storage* const storage,
                        std::uint32_t* const insertAt,
                        const std::size_t count,
                        const std::uint32_t value
                      ) {
-      (void)msvc8::detail::InsertFillWords(
+      (void)fa::detail::InsertFillWords(
         storage,
         insertAt,
         count,
@@ -323,7 +323,7 @@ namespace
     };
 
     auto eraseWords = [](
-                        msvc8::detail::vector_bool_storage* const storage,
+                        fa::detail::vector_bool_storage* const storage,
                         std::uint32_t* const first,
                         std::uint32_t* const last
                       ) {
@@ -339,7 +339,7 @@ namespace
       storage->end -= static_cast<std::ptrdiff_t>(last - first);
     };
 
-    (void)msvc8::detail::ResizeWordStorage(
+    (void)fa::detail::ResizeWordStorage(
       &editWordBuffer,
       desiredWordCount,
       fillWord,
@@ -478,9 +478,9 @@ namespace
     moho::ID3DDeviceResources* const resources = device->GetResources();
     moho::CD3DEffect* const terrainEffect = resources->FindEffect("terrain");
 
-    const msvc8::string defaultUsage{"undefined", 9U};
-    const msvc8::string usageAnnotationName{"usage", 5U};
-    const msvc8::string usage =
+    const fa::string defaultUsage{"undefined", 9U};
+    const fa::string usageAnnotationName{"usage", 5U};
+    const fa::string usage =
       terrainEffect->GetStringAnnotation(strata.mShaderName, usageAnnotationName, defaultUsage);
 
     // 0x0089F401-0x0089F420: compare(0, size(), "composite", 9) != 0 -> the
@@ -958,7 +958,7 @@ namespace moho
     }
 
     gpg::MemBuffer<char> encodedTexture{};
-    msvc8::string imageFormatName{"", std::size_t{0}};
+    fa::string imageFormatName{"", std::size_t{0}};
 
     // 0x00890B21: the return value is discarded - the call only forces the D3D
     // device online before the GAL singleton is queried.
@@ -1037,7 +1037,7 @@ namespace moho
    * Stores terrain background texture path and resolves the corresponding D3D
    * texture resource handle.
    */
-  void CWldTerrainRes::SetBackground(const msvc8::string& texturePath)
+  void CWldTerrainRes::SetBackground(const fa::string& texturePath)
   {
     mBackgroundFile = texturePath;
 
@@ -1058,7 +1058,7 @@ namespace moho
    * Stores terrain skycube texture path and resolves the corresponding D3D
    * texture resource handle.
    */
-  void CWldTerrainRes::SetSkycube(const msvc8::string& texturePath)
+  void CWldTerrainRes::SetSkycube(const fa::string& texturePath)
   {
     mSkycubeFile = texturePath;
 
@@ -1099,7 +1099,7 @@ namespace moho
    *
    * What it does: see the header -- returns the stored path by reference.
    */
-  const msvc8::string& CWldTerrainRes::GetBackgroundFile() const
+  const fa::string& CWldTerrainRes::GetBackgroundFile() const
   {
     return mBackgroundFile;
   }
@@ -1109,7 +1109,7 @@ namespace moho
    *
    * What it does: see the header -- returns the stored path by reference.
    */
-  const msvc8::string& CWldTerrainRes::GetSkycubeFile() const
+  const fa::string& CWldTerrainRes::GetSkycubeFile() const
   {
     return mSkycubeFile;
   }
@@ -1123,7 +1123,7 @@ namespace moho
    * environment-lookup storage under the provided environment key: the
    * real binary always resolves the D3D texture handle first (0x008A1323-
    * 0x008A1331), then reaches the map slot for `environmentKey` through
-   * `msvc8::map<msvc8::string, TerrainEnvironmentLookupEntry>::operator[]`
+   * `fa::map<fa::string, TerrainEnvironmentLookupEntry>::operator[]`
    * (0x008A1380, FUN_008A7C80, cited on that member in `Map.h` -- IDA's own
    * inferred name for this address is `find`, which is wrong the same way
    * it is for the sibling `Unit::ArmorMultipliers`/`operator[]` emission:
@@ -1137,7 +1137,7 @@ namespace moho
    * `map[key] = value` assignment, on both the cache-hit and cache-miss
    * paths alike.
    */
-  void CWldTerrainRes::AddEnvLookup(const msvc8::string& environmentKey, const msvc8::string& texturePath)
+  void CWldTerrainRes::AddEnvLookup(const fa::string& environmentKey, const fa::string& texturePath)
   {
     ID3DDeviceResources::TextureResourceHandle texture;
     if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
@@ -1157,7 +1157,7 @@ namespace moho
    * What it does:
    * Removes one environment-lookup entry by key when the key exists.
    */
-  void CWldTerrainRes::RemoveEnvLookup(const msvc8::string& environmentKey)
+  void CWldTerrainRes::RemoveEnvLookup(const fa::string& environmentKey)
   {
     moho::TerrainEnvironmentLookupMap& map = mEnvLookup;
     (void)map.erase(environmentKey);
@@ -1170,13 +1170,13 @@ namespace moho
    * What it does:
    * Returns one environment texture by key, with `<default>` fallback.
    */
-  boost::shared_ptr<ID3DTextureSheet> CWldTerrainRes::GetEnvLookup(const msvc8::string& environmentKey) const
+  boost::shared_ptr<ID3DTextureSheet> CWldTerrainRes::GetEnvLookup(const fa::string& environmentKey) const
   {
     const moho::TerrainEnvironmentLookupMap& map = mEnvLookup;
 
     moho::TerrainEnvironmentLookupMap::const_iterator entry = map.find(environmentKey);
     if (entry == map.end()) {
-      entry = map.find(msvc8::string("<default>"));
+      entry = map.find(fa::string("<default>"));
     }
 
     if (entry == map.end()) {
@@ -1404,7 +1404,7 @@ namespace moho
    * What it does:
    * Returns the debug dirty-rectangle list lane.
    */
-  const msvc8::list<gpg::Rect2i>& CWldTerrainRes::GetDebugDirtyRects() const
+  const fa::list<gpg::Rect2i>& CWldTerrainRes::GetDebugDirtyRects() const
   {
     return mDebugDirtyRects;
   }
@@ -1497,8 +1497,8 @@ namespace moho
 
     // 0x008A6373-0x008A6421: default sky/background art, each built as a
     // transient `std::string` from a literal + explicit length.
-    SetBackground(msvc8::string("/textures/environment/defaultbackground.dds", 43u));
-    SetSkycube(msvc8::string("/textures/environment/defaultskycube.dds", 40u));
+    SetBackground(fa::string("/textures/environment/defaultbackground.dds", 43u));
+    SetSkycube(fa::string("/textures/environment/defaultskycube.dds", 40u));
 
     // 0x008A6422-0x008A6449: the binary inlines `CWldTerrainRes::ClearEnvLookup`
     // (0x008A1640) here - same subtree sweep plus sentinel rebind - so the call is
@@ -1509,8 +1509,8 @@ namespace moho
     // Note the texture request at 0x008A64B7 passes the string literal directly,
     // not the `std::string` that is handed to the entry constructor.
     {
-      const msvc8::string defaultEnvironmentName("/textures/environment/defaultenvcube.dds", 40u);
-      const msvc8::string defaultEnvironmentKey("<default>", 9u);
+      const fa::string defaultEnvironmentName("/textures/environment/defaultenvcube.dds", 40u);
+      const fa::string defaultEnvironmentKey("<default>", 9u);
 
       ID3DDeviceResources::TextureResourceHandle defaultEnvironmentTexture;
       resources->GetTexture(
@@ -2930,7 +2930,7 @@ namespace moho
     // Binary reads the string into a temporary, then assign()s the full range
     // into outLayer.mPath; the temporary is destroyed inline. RAII on `scratch`
     // reproduces that exactly.
-    msvc8::string scratch;
+    fa::string scratch;
     reader.ReadString(&scratch);
     outLayer.mPath.assign(scratch, 0u, 0xFFFFFFFFu);
 
@@ -2959,7 +2959,7 @@ namespace moho
 
     if (version < 54) {
       // Legacy flat texturing layout.
-      msvc8::string scratch;
+      fa::string scratch;
 
       // Discarded shader-name string and a discarded 4-byte lane.
       reader.ReadString(&scratch);
@@ -3163,34 +3163,34 @@ namespace moho
     // Stratum shader byte1 (version-gated), shader name, background, skycube.
     mStrata.byte1 = version < 0x36u ? std::uint8_t{0} : reader.ReadChar();
     {
-      msvc8::string shaderName;
+      fa::string shaderName;
       reader.ReadString(&shaderName);
       mStrata.mShaderName.assign(shaderName, 0u, 0xFFFFFFFFu);
     }
     mStrata.byte0 = 0;
     {
-      msvc8::string backgroundPath;
+      fa::string backgroundPath;
       reader.ReadString(&backgroundPath);
       SetBackground(backgroundPath);
     }
     {
-      msvc8::string skycubePath;
+      fa::string skycubePath;
       reader.ReadString(&skycubePath);
       SetSkycube(skycubePath);
     }
 
     // Environment lookups: single <default> pair before 0x37, else counted loop.
     if (version < 0x37u) {
-      const msvc8::string defaultKey("<default>");
-      msvc8::string environmentName;
+      const fa::string defaultKey("<default>");
+      fa::string environmentName;
       reader.ReadString(&environmentName);
       AddEnvLookup(defaultKey, environmentName);
     } else {
       std::int32_t envCount = 0;
       reader.ReadExact(envCount);
       for (; envCount > 0; --envCount) {
-        msvc8::string environmentKey;
-        msvc8::string environmentName;
+        fa::string environmentKey;
+        fa::string environmentName;
         reader.ReadString(&environmentKey);
         reader.ReadString(&environmentName);
         AddEnvLookup(environmentKey, environmentName);
@@ -3345,7 +3345,7 @@ namespace moho
           reader.Read(payload.data(), payload.size());
         }
 
-        const msvc8::string sheetLocation = gpg::STR_Printf("_utilityc%d.dds", waterMapIndex);
+        const fa::string sheetLocation = gpg::STR_Printf("_utilityc%d.dds", waterMapIndex);
         if (waterMapIndex == 0) {
           CD3DDevice* const device = D3D_GetDevice();
           ID3DDeviceResources* const resources = device != nullptr ? device->GetResources() : nullptr;
@@ -3380,8 +3380,8 @@ namespace moho
 
     // Legacy album/normal strings discarded on pre-0x35 maps.
     if (version < 0x35u) {
-      msvc8::string discardedAlbum;
-      msvc8::string discardedNormal;
+      fa::string discardedAlbum;
+      fa::string discardedNormal;
       reader.ReadString(&discardedAlbum);
       reader.ReadString(&discardedNormal);
     }
@@ -3552,13 +3552,13 @@ namespace moho
     FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
     CVirtualFileSystem* const fileSystem = waitHandleSet->mHandle;
 
-    msvc8::string mountedDirectory;
+    fa::string mountedDirectory;
     mountedDirectory.tidy(false, 0U);
     (void)fileSystem->FindFile(&mountedDirectory, FILE_DirPrefix(mapName).c_str(), nullptr);
 
     // 0x008910E2-0x0089114E: "<mounted dir>\<base name>". All three string
     // temporaries are destroyed once the stream has been opened.
-    msvc8::auto_ptr<gpg::Stream> stream =
+    fa::auto_ptr<gpg::Stream> stream =
       DISK_OpenFileWrite((mountedDirectory + "\\" + FILE_Base(mapName, false)).c_str());
     if (stream.get() == nullptr) {
       return false;

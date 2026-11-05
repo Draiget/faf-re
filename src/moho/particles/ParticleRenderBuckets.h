@@ -51,11 +51,11 @@ namespace moho
   /**
    * The trail-segment owner pool is `std::set<STrailSegmentBuffer*>`:
    * the node is 0x14 with links at 0/4/8, the buffer pointer at +0x0C and the
-   * colour/nil pair at +0x10/+0x11, which is exactly what `msvc8::set` lays
+   * colour/nil pair at +0x10/+0x11, which is exactly what `fa::set` lays
    * out for a 4-byte value. Ordering is by raw pointer, so the default
    * `std::less` is the right predicate.
    */
-  using TrailSegmentPool = msvc8::set<STrailSegmentBuffer*>;
+  using TrailSegmentPool = fa::set<STrailSegmentBuffer*>;
 
   static_assert(sizeof(TrailSegmentPool) == 0x0C, "TrailSegmentPool size must be 0x0C");
 
@@ -88,11 +88,11 @@ namespace moho
     std::uint8_t statePadding01_03[0x03]{};                    // +0x01
     CParticleTexture::TextureResourceHandle texture0;          // +0x04
     CParticleTexture::TextureResourceHandle texture1;          // +0x0C
-    msvc8::string tag;                                         // +0x14
+    fa::string tag;                                         // +0x14
     std::int32_t blendMode = 0;                                // +0x30
     std::int32_t zMode = 0;                                    // +0x34
-    msvc8::vector<SWorldParticle> pendingParticles; // +0x38
-    msvc8::vector<SParticleRenderWorkItem*> activeWorkItems; // +0x48
+    fa::vector<SWorldParticle> pendingParticles; // +0x38
+    fa::vector<SParticleRenderWorkItem*> activeWorkItems; // +0x48
     CWorldParticles* owner = nullptr;                          // +0x58
   };
 
@@ -157,11 +157,11 @@ namespace moho
 
     CParticleTexture::TextureResourceHandle texture0;         // +0x00
     CParticleTexture::TextureResourceHandle texture1;         // +0x08
-    msvc8::string tag;                                        // +0x10
+    fa::string tag;                                        // +0x10
     std::int32_t blendMode = 0;                               // +0x2C  blueprint BlendMode
     std::uint32_t renderStartIndex = 0U;                      // +0x30
-    msvc8::vector<SWorldTrail> pendingTrails; // +0x34
-    msvc8::vector<SParticleRenderWorkItem*> activeWorkItems; // +0x44
+    fa::vector<SWorldTrail> pendingTrails; // +0x34
+    fa::vector<SParticleRenderWorkItem*> activeWorkItems; // +0x44
     CWorldParticles* owner = nullptr;                         // +0x54
   };
 
@@ -238,7 +238,7 @@ namespace moho
   bool UploadPendingTrailsIntoWorkItem(
     SParticleRenderWorkItem& workItem,
     float frameDelta,
-    msvc8::vector<SWorldTrail>& pendingTrails
+    fa::vector<SWorldTrail>& pendingTrails
   );
 
   /**
@@ -278,7 +278,7 @@ namespace moho
   void UploadPendingParticlesIntoWorkItem(
     SParticleRenderWorkItem& workItem,
     float frameDelta,
-    msvc8::vector<SWorldParticle>& pendingParticles
+    fa::vector<SWorldParticle>& pendingParticles
   );
 
   /**

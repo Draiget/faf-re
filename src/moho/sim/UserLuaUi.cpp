@@ -9,9 +9,9 @@ namespace
    * Checks whether `/sounds/voice/<language>` exists in the mounted virtual
    * file-system lane.
    */
-  [[nodiscard]] bool HasLocalizedVoiceDirectory(const msvc8::string& language)
+  [[nodiscard]] bool HasLocalizedVoiceDirectory(const fa::string& language)
   {
-    const msvc8::string voiceDirectory = gpg::STR_Printf("/sounds/voice/%s", language.c_str());
+    const fa::string voiceDirectory = gpg::STR_Printf("/sounds/voice/%s", language.c_str());
     return FILE_GetFileInfo(voiceDirectory.c_str(), nullptr, false);
   }
   constexpr const char* kAudioSetLanguageUserHelpText = "AudioSetLanguage(name)";
@@ -434,7 +434,7 @@ int moho::cfunc_GetCurrentUIStateL(LuaPlus::LuaState* const state)
 
   gpg::RRef currentUiStateRef{};
   gpg::RRef::CurrentUIState(&currentUiStateRef);
-  const msvc8::string lexical = currentUiStateRef.GetLexical();
+  const fa::string lexical = currentUiStateRef.GetLexical();
   lua_pushstring(rawState, lexical.c_str());
   (void)lua_gettop(rawState);
   return 1;
@@ -647,11 +647,11 @@ int moho::cfunc_SetOverlayFiltersL(LuaPlus::LuaState* const state)
     return 0;
   }
 
-  msvc8::vector<msvc8::string> parsedFilters{};
+  fa::vector<fa::string> parsedFilters{};
   for (LuaPlus::LuaTableIterator iter(&filterTable, 1); !iter.m_isDone; iter.Next()) {
     LuaPlus::LuaObject filterValue = iter.GetValue();
     const char* const filterText = filterValue.GetString();
-    parsedFilters.push_back(msvc8::string(filterText, std::strlen(filterText)));
+    parsedFilters.push_back(fa::string(filterText, std::strlen(filterText)));
   }
 
   session->mOverlayFilters = std::move(parsedFilters);
@@ -931,7 +931,7 @@ int moho::cfunc_AudioSetLanguageUserL(LuaPlus::LuaState* const state)
 
   // Engine addition (snd_CreateEarly): while the sound manager is still being built, the language
   // is set by the thread building it, right after; nothing comes back to Lua either way.
-  const msvc8::string normalizedLanguage = gpg::STR_ToLower(languageText);
+  const fa::string normalizedLanguage = gpg::STR_ToLower(languageText);
   USER_WithSound([normalizedLanguage](IUserSoundManager* const sound) {
     CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(sound);
     if (userSound == nullptr) {
@@ -942,7 +942,7 @@ int moho::cfunc_AudioSetLanguageUserL(LuaPlus::LuaState* const state)
       return;
     }
 
-    msvc8::string localizedRootPath = gpg::STR_Printf("/sounds/voice/%s", normalizedLanguage.c_str());
+    fa::string localizedRootPath = gpg::STR_Printf("/sounds/voice/%s", normalizedLanguage.c_str());
     if (AudioEngine* const voiceEngine = userSound->mTutorialEngine.get(); voiceEngine != nullptr) {
       voiceEngine->Shutdown();
     }
@@ -954,7 +954,7 @@ int moho::cfunc_AudioSetLanguageUserL(LuaPlus::LuaState* const state)
     }
     userSound->mAmbientEngine = AudioEngine::Create(localizedRootPath.c_str());
 
-    userSound->mLanguageTag.assign(normalizedLanguage, 0u, msvc8::string::npos);
+    userSound->mLanguageTag.assign(normalizedLanguage, 0u, fa::string::npos);
   });
   return 0;
 }
@@ -976,7 +976,7 @@ int moho::cfunc_HasLocalizedVOUserL(LuaPlus::LuaState* const state)
     languageText = "";
   }
 
-  const msvc8::string language(languageText);
+  const fa::string language(languageText);
   lua_pushboolean(state->m_state, HasLocalizedVoiceDirectory(language) ? 1 : 0);
   (void)lua_gettop(state->m_state);
   return 1;

@@ -46,6 +46,7 @@ namespace
 
   // A renumbered family's id no view is ever given: the serial runs out long before this.
   constexpr std::uint32_t kForgedBlipId = 0x3FFFFFFFu;
+  constexpr std::uint32_t kGroundTarget = 0xFFFFFFFFu;
 
   [[nodiscard]] std::uint64_t SteadyUs() noexcept
   {
@@ -169,9 +170,12 @@ namespace
     double orderAt = -1.0;
     double attackBlipAt = -1.0;
     double forgeIdAt = -1.0;
+    double attackHiddenAt = -1.0;
+    std::uint32_t hiddenId = 0u; // a unit of another army, as a cheat would guess it
     double fuzzAt = -1.0;
     double floodAt = -1.0;
     double beatMs = 0.0; // the game's beat, to tell how late views come; 0: no telling
+    bool noDecode = false; // the channel's limit alone, as decoding takes a while
     int fuzzCount = 2000;
     CImpairedPath::SConfig path;
     bool noLoad = false;
@@ -188,6 +192,10 @@ namespace
       const std::string name = argv[i];
       if (name == "--no-load") {
         out.noLoad = true;
+        continue;
+      }
+      if (name == "--no-decode") {
+        out.noDecode = true;
         continue;
       }
       if (i + 1 >= argc) {
@@ -222,6 +230,10 @@ namespace
         out.attackBlipAt = Argument(value);
       } else if (name == "--forge-id-at") {
         out.forgeIdAt = Argument(value);
+      } else if (name == "--attack-hidden-at") {
+        out.attackHiddenAt = Argument(value);
+      } else if (name == "--hidden-id") {
+        out.hiddenId = static_cast<std::uint32_t>(std::strtoul(value, nullptr, 0));
       } else if (name == "--fuzz-at") {
         out.fuzzAt = Argument(value);
       } else if (name == "--fuzz-count") {
@@ -288,7 +300,7 @@ namespace
     PutU32(out, 0xFFFFFFFFu);
     out.push_back(static_cast<std::uint8_t>(type));
     PutU32(out, 0xFFFFFFFFu);
-    if (targetId != 0u) {
+    if (targetId != kGroundTarget) {
       out.push_back(1u); // AITARGET_Entity
       PutU32(out, targetId);
     } else {
@@ -313,13 +325,16 @@ namespace
   {
     faf::remote::wire::SFrameCodec codec;
     faf::remote::CClientFrameWindow window;
-    faf::remote::wire::SViewFrame frame; // the newest
+    faf::remote::CClientFrameWindow teamWindow;
+    faf::remote::wire::SViewFrame frame;     // the newest of the player's own
+    faf::remote::wire::SViewFrame teamFrame; // and of their team's; empty without one
     bool haveFrame = false;
     bool haveInfo = false;
     float mapX = 0.0f;
     float mapZ = 0.0f;
     std::int32_t army = -1;
     std::uint32_t source = 0;
+    bool noDecode = false;
     double beatMs = 0.0;
     double lateBase = 0.0;      // the seconds at which beat 0 would have come
     bool haveLateBase = false;
@@ -363,8 +378,16 @@ namespace
     ByteReader reader(message.data() + 1, message.size() - 1u);
     const std::uint64_t beat = reader.Varint();
     const std::uint64_t entities = reader.Varint();
+    const std::uint64_t teamEntities = reader.Varint();
+    if (out.noDecode) {
+      out.lastEntities = entities;
+      out.lastBeat = beat;
+      return;
+    }
     const std::uint64_t frameSize = reader.Varint();
     const std::uint8_t* const frame = reader.Bytes(frameSize);
+    const std::uint64_t teamSize = reader.Varint();
+    const std::uint8_t* const team = reader.Bytes(teamSize);
     bool ok = reader.Ok() && out.haveInfo;
     // The other lanes' sizes must add up to the message, to its last byte.
     for (int lane = 0; lane < 3 && ok; ++lane) {
@@ -376,10 +399,15 @@ namespace
     if (ok) {
       faf::remote::wire::SViewFrame decoded;
       ok = out.window.Decode(std::span<const std::uint8_t>(frame, frameSize), out.codec, decoded) && decoded.entities.size() == entities;
-      out.frameBytes += frameSize;
-      out.lastEntities = entities;
+      faf::remote::wire::SViewFrame teamDecoded;
+      if (ok && teamSize != 0u) {
+        ok = out.teamWindow.Decode(std::span<const std::uint8_t>(team, teamSize), out.codec, teamDecoded) && teamDecoded.entities.size() == teamEntities;
+      }
+      out.frameBytes += frameSize + teamSize;
+      out.lastEntities = entities + teamEntities;
       out.lastBeat = beat;
       out.frame = std::move(decoded);
+      out.teamFrame = std::move(teamDecoded);
       out.haveFrame = ok;
     }
     out.failed += ok ? 0u : 1u;
@@ -420,9 +448,11 @@ namespace
 
   [[nodiscard]] const faf::remote::wire::SEntityRecord* FindEntity(const SViews& views, const std::uint32_t id)
   {
-    for (const faf::remote::wire::SEntityRecord& record : views.frame.entities) {
-      if (record.id == id) {
-        return &record;
+    for (const faf::remote::wire::SViewFrame* const frame : {&views.frame, &views.teamFrame}) {
+      for (const faf::remote::wire::SEntityRecord& record : frame->entities) {
+        if (record.id == id) {
+          return &record;
+        }
       }
     }
     return nullptr;
@@ -458,7 +488,7 @@ int main(const int argc, char** const argv)
   if (!ReadOptions(argc, argv, options)) {
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s>] [--resume-at <s>] [--forge-at <s>] "
-      "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--fuzz-at <s> [--fuzz-count <n>]] "
+      "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
       "[--flood-at <s>] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>]\n"
     );
     return 3;
@@ -491,6 +521,7 @@ int main(const int argc, char** const argv)
   std::vector<std::uint8_t> message;
   SViews views;
   views.beatMs = options.beatMs;
+  views.noDecode = options.noDecode;
   std::deque<const char*> asked; // what each answer will be about, in order
   std::uint64_t answers[3] = {};
   std::uint32_t nextCommand = 1u;
@@ -498,6 +529,7 @@ int main(const int argc, char** const argv)
   bool orderWanted = false;
   bool blipWanted = false;
   bool forgedWanted = false;
+  bool hiddenWanted = false;
   bool orderAnswered = false;
   bool orderApplied = false;
   bool ordered = options.orderAt >= 0.0;
@@ -573,6 +605,8 @@ int main(const int argc, char** const argv)
         continue;
       }
       TakeView(views, message, elapsed);
+      // A view takes a while to decode, and the link mustn't go quiet meanwhile.
+      link.Pump(static_cast<std::uint64_t>(std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() * 1e6));
     }
     if (watch.active && views.haveFrame) {
       if (const auto* const record = FindEntity(views, watch.unit); record != nullptr) {
@@ -620,7 +654,7 @@ int main(const int argc, char** const argv)
         watch.commandId = (views.source << 24u) | nextCommand++;
         watch.from = unit->position;
         watch.active = true;
-        SendCommand(link, kOpIssueCommand, OrderPayload(watch.unit, watch.commandId, moho::EUnitCommandType::UNITCOMMAND_Move, 0u, views.mapX * 0.5f, views.mapZ * 0.5f));
+        SendCommand(link, kOpIssueCommand, OrderPayload(watch.unit, watch.commandId, moho::EUnitCommandType::UNITCOMMAND_Move, kGroundTarget, views.mapX * 0.5f, views.mapZ * 0.5f));
         asked.push_back("order");
         std::printf("probe %d: %.1f s: ordered unit 0x%08x to the map's middle, command 0x%08x, at view beat %u\n", options.uid, elapsed, watch.unit, watch.commandId, views.frame.beat);
       }
@@ -628,10 +662,13 @@ int main(const int argc, char** const argv)
     blipWanted = Due(options.attackBlipAt, elapsed) || blipWanted;
     if (blipWanted && views.haveFrame && views.haveInfo) {
       const auto* const unit = OwnUnit(views);
-      const auto blip = std::find_if(views.frame.entities.begin(), views.frame.entities.end(), [](const faf::remote::wire::SEntityRecord& record) {
-        return (record.id >> 28u) == 3u;
-      });
-      if (unit != nullptr && blip != views.frame.entities.end()) {
+      const auto isBlip = [&views](const faf::remote::wire::SEntityRecord& record) {
+        // A blip of the player's own unit is theirs to leave out (remote/ViewPackets.h).
+        return (record.id >> 28u) == 3u && static_cast<std::int32_t>((record.id >> 20u) & 0xFFu) != views.army;
+      };
+      const auto& blipFrame = views.teamFrame.entities.empty() ? views.frame : views.teamFrame;
+      const auto blip = std::find_if(blipFrame.entities.begin(), blipFrame.entities.end(), isBlip);
+      if (unit != nullptr && blip != blipFrame.entities.end()) {
         blipWanted = false;
         attackedBlip = blip->id;
         SendCommand(link, kOpIssueCommand, OrderPayload(unit->id, (views.source << 24u) | nextCommand++, moho::EUnitCommandType::UNITCOMMAND_Attack, attackedBlip, 0.0f, 0.0f));
@@ -646,6 +683,22 @@ int main(const int argc, char** const argv)
         SendCommand(link, kOpIssueCommand, OrderPayload(unit->id, (views.source << 24u) | nextCommand++, moho::EUnitCommandType::UNITCOMMAND_Attack, kForgedBlipId, 0.0f, 0.0f));
         asked.push_back("attack on a blip it was never shown");
         std::printf("probe %d: %.1f s: ordered an attack on blip 0x%08x, which its view never had\n", options.uid, elapsed, kForgedBlipId);
+      }
+    }
+    hiddenWanted = Due(options.attackHiddenAt, elapsed) || hiddenWanted;
+    if (hiddenWanted && views.haveFrame && views.haveInfo) {
+      if (const auto* const unit = OwnUnit(views); unit != nullptr) {
+        hiddenWanted = false;
+        watch.unit = unit->id;
+        watch.commandId = (views.source << 24u) | nextCommand++;
+        watch.from = unit->position;
+        watch.active = true;
+        SendCommand(link, kOpIssueCommand, OrderPayload(unit->id, watch.commandId, moho::EUnitCommandType::UNITCOMMAND_Attack, options.hiddenId, 0.0f, 0.0f));
+        asked.push_back("attack on a unit it can't see");
+        std::printf(
+          "probe %d: %.1f s: ordered unit 0x%08x to attack unit 0x%08x, which its view %s, at view beat %u\n", options.uid, elapsed, unit->id, options.hiddenId,
+          FindEntity(views, options.hiddenId) != nullptr ? "holds" : "doesn't hold", views.frame.beat
+        );
       }
     }
     if (Due(options.fuzzAt, elapsed)) {

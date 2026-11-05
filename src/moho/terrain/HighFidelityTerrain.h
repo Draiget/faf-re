@@ -324,7 +324,7 @@ namespace moho
      */
     void DrawTerrain(
       boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
-      const msvc8::string* techniqueName
+      const fa::string* techniqueName
     ) override;
 
     /**
@@ -374,7 +374,9 @@ namespace moho
     Shoreline mShoreline;                                 // +0x2F34
     CD3DVertexSheet* mTerrainVertexSheet = nullptr;       // +0x2FE4
     CD3DIndexSheet* mTerrainIndexSheet = nullptr;         // +0x2FE8
-    std::uint32_t mPad2FEC = 0u;                          // +0x2FEC
+    // Engine addition in the padding (ren_TerrainGpuBuffers): 1 while the two sheets above live in GPU
+    // memory, 2 added until their first upload.
+    std::uint32_t mTerrainSheetState = 0u;                // +0x2FEC
 
     gpg::core::FastVectorN<CWldSplat::SplatVertex, 10000> mSplatVertices; // +0x2FF0
     CD3DVertexSheet* mDynamicVertexSheet = nullptr;       // +0x475C0

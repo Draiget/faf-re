@@ -14,7 +14,7 @@
 
 namespace
 {
-  using ResourceDepositVector = msvc8::vector<moho::ResourceDeposit>;
+  using ResourceDepositVector = fa::vector<moho::ResourceDeposit>;
 
   /**
    * Address: 0x00549850 (FUN_00549850)
@@ -22,7 +22,7 @@ namespace
    * What it does:
    * Lazily resolves `vector<ResourceDeposit>` reflection type and dispatches
    * one archive read for `CSimResources::deposits_` (x86 `+0x0C`, the only
-   * `msvc8::vector<ResourceDeposit>` member at that offset; same body as the
+   * `fa::vector<ResourceDeposit>` member at that offset; same body as the
    * CSimResources serializer's load half).
    */
   [[maybe_unused]] void ReadResourceDepositVectorFieldArchiveAdapter(void* const object, gpg::ReadArchive* const archive)
@@ -83,11 +83,11 @@ gpg::RVectorType_ResourceDeposit::~RVectorType_ResourceDeposit() = default;
  *
  * What it does:
  * Builds and caches lexical reflection name `vector<element>` for
- * `msvc8::vector<moho::ResourceDeposit>`.
+ * `fa::vector<moho::ResourceDeposit>`.
  */
 const char* gpg::RVectorType_ResourceDeposit::GetName() const
 {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::ResourceDeposit>()->GetName());
+    static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::ResourceDeposit>()->GetName());
     return sName.c_str();
 }
 
@@ -96,11 +96,11 @@ const char* gpg::RVectorType_ResourceDeposit::GetName() const
  *
  * What it does:
  * Returns base lexical text plus reflected vector size for one
- * `msvc8::vector<moho::ResourceDeposit>` instance.
+ * `fa::vector<moho::ResourceDeposit>` instance.
  */
-msvc8::string gpg::RVectorType_ResourceDeposit::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_ResourceDeposit::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 
@@ -250,7 +250,7 @@ void gpg::RVectorType_ResourceDeposit::SetCount(void* const obj, const int count
  *
  * What it does:
  * Constructs/preregisters RTTI metadata for
- * `msvc8::vector<moho::ResourceDeposit>`.
+ * `fa::vector<moho::ResourceDeposit>`.
  */
 gpg::RType* moho::preregister_VectorResourceDepositType()
 {

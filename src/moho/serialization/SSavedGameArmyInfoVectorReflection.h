@@ -13,7 +13,7 @@ namespace gpg
    * - 0x008826C0 / 0x008827F0
    *
    * What it is:
-   * Reflection/indexing adapter for `msvc8::vector<moho::SSavedGameArmyInfo>`.
+   * Reflection/indexing adapter for `fa::vector<moho::SSavedGameArmyInfo>`.
    */
   class RVectorType_SSavedGameArmyInfo final : public gpg::RType, public gpg::RIndexed
   {
@@ -31,7 +31,7 @@ namespace gpg
     /**
      * Address: 0x008821C0 (FUN_008821C0)
      */
-    msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x00882250 (FUN_00882250)
@@ -71,13 +71,13 @@ namespace gpg
    *
    * What it does:
    * Constructs/preregisters RTTI metadata for
-   * `msvc8::vector<moho::SSavedGameArmyInfo>`.
+   * `fa::vector<moho::SSavedGameArmyInfo>`.
    */
   [[nodiscard]] RType* preregister_SSavedGameArmyInfoVectorTypeStartup();
 
   /**
    * Lazily ensures preregistration and returns RTTI for
-   * `msvc8::vector<moho::SSavedGameArmyInfo>`.
+   * `fa::vector<moho::SSavedGameArmyInfo>`.
    */
   [[nodiscard]] RType* ResolveSavedGameArmyInfoVectorType();
 } // namespace gpg

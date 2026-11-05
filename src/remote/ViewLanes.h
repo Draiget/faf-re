@@ -54,6 +54,8 @@ namespace faf::remote
       const wire::BitWriter& grids;
       const wire::BitWriter& lua;
       bool ok;
+      const wire::BitWriter* team = nullptr; // the player's team's frame, with teams
+      std::size_t teamEntities = 0;
     };
 
     void OnViewFrames(moho::Sim& sim) override;
@@ -90,6 +92,7 @@ namespace faf::remote
       std::vector<std::uint16_t> grids; // the slots it received last beat (`SBeatGrid::key`)
       std::vector<std::uint16_t> gridsNext;
       wire::BitWriter lua;              // this beat's Lua lane, which is ready before the others
+      wire::BitWriter teamFrame;        // a team's view: this beat's frame, for its players' messages
       std::uint32_t bytes = 0;          // this beat
       std::uint64_t failures = 0;       // since `TakeClientFailures`
     };

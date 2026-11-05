@@ -174,7 +174,7 @@ UnitWeaponInfo::UnitWeaponInfo(const UnitWeaponInfo& other)
 UnitWeaponInfo& UnitWeaponInfo::operator=(const UnitWeaponInfo& other)
 {
   // No self-assignment guard: the binary has none. Aliasing is absorbed by the
-  // fastvector copy lane and by msvc8::string::assign.
+  // fastvector copy lane and by fa::string::assign.
   mCat1.mUniverse = other.mCat1.mUniverse;
   mCat1.mBits.mFirstWordIndex = other.mCat1.mBits.mFirstWordIndex;
   {
@@ -242,8 +242,8 @@ void UnitWeaponInfo::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->WriteFloat(mMinRadius);
   archive->WriteFloat(mMaxRadius);
   archive->WriteFloat(mEffectiveRadius);
-  archive->WriteString(const_cast<msvc8::string*>(&mUIMinRangeVisualId));
-  archive->WriteString(const_cast<msvc8::string*>(&mUIMaxRangeVisualId));
+  archive->WriteString(const_cast<fa::string*>(&mUIMinRangeVisualId));
+  archive->WriteString(const_cast<fa::string*>(&mUIMaxRangeVisualId));
 }
 
 SSTIUnitVariableData& Unit::VarDat() noexcept

@@ -130,7 +130,7 @@ namespace moho
     float mUnknown14;            // 0x14
     float mUnknown18;            // 0x18
     float mDelta;                // 0x1C
-    msvc8::string mActionName;   // 0x20
+    fa::string mActionName;   // 0x20
     float mFractionComplete;     // 0x3C
     bool mIsSilo;                // 0x40
     std::uint8_t mPad41_43[3];   // 0x41

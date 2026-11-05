@@ -22,13 +22,13 @@ namespace moho
     /**
      * Address: 0x004AFF80 (FUN_004AFF80, Moho::ScrActivation::ScrActivation)
      *
-     * msvc8::string const &,msvc8::string const &,int
+     * fa::string const &,fa::string const &,int
      *
      * What it does:
      * Initializes one script activation entry from file/name string lanes and
      * stores the associated source line.
      */
-    ScrActivation(const msvc8::string& filePath, const msvc8::string& activationName, int lineNumber);
+    ScrActivation(const fa::string& filePath, const fa::string& activationName, int lineNumber);
 
     /**
      * Address: 0x004B0000 (FUN_004B0000, Moho::ScrActivation::~ScrActivation)
@@ -39,8 +39,8 @@ namespace moho
     virtual ~ScrActivation();
 
   public:
-    msvc8::string file; // +0x04
-    msvc8::string name; // +0x20
+    fa::string file; // +0x04
+    fa::string name; // +0x20
     int line;           // +0x3C
   };
 

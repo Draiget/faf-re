@@ -27,7 +27,7 @@ namespace moho
    */
   void CSimResources::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    gpg::RType* const vectorType = gpg::RTypeOf<msvc8::vector<moho::ResourceDeposit>>();
+    gpg::RType* const vectorType = gpg::RTypeOf<fa::vector<moho::ResourceDeposit>>();
     GPG_ASSERT(vectorType != nullptr);
     archive->Read(vectorType, &deposits_, NullOwnerRef());
   }
@@ -37,7 +37,7 @@ namespace moho
    */
   void CSimResources::MemberSerialize(gpg::WriteArchive* const archive)
   {
-    gpg::RType* const vectorType = gpg::RTypeOf<msvc8::vector<moho::ResourceDeposit>>();
+    gpg::RType* const vectorType = gpg::RTypeOf<fa::vector<moho::ResourceDeposit>>();
     GPG_ASSERT(vectorType != nullptr);
     archive->Write(vectorType, &deposits_, NullOwnerRef());
   }

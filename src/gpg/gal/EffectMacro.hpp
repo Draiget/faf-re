@@ -41,8 +41,8 @@ namespace gpg::gal
         virtual ~EffectMacro();
 
     public:
-        msvc8::string keyText_;   // +0x04
-        msvc8::string valueText_; // +0x20
+        fa::string keyText_;   // +0x04
+        fa::string valueText_; // +0x20
     };
 
     static_assert(offsetof(EffectMacro, keyText_) == 0x04, "EffectMacro::keyText_ offset must be 0x04");

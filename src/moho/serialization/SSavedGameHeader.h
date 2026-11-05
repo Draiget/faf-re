@@ -64,10 +64,10 @@ namespace moho
     ~SSavedGameHeader();
 
     std::int32_t mVersion;                                // +0x00
-    msvc8::string mMapName;                               // +0x04
+    fa::string mMapName;                               // +0x04
     std::int32_t mFocusArmy;                              // +0x20
-    msvc8::vector<SSavedGameArmyInfo> mArmyInfo;          // +0x24
-    msvc8::string mScenarioInfoText;                      // +0x34
+    fa::vector<SSavedGameArmyInfo> mArmyInfo;          // +0x24
+    fa::string mScenarioInfoText;                      // +0x34
     boost::SharedPtrRaw<LaunchInfoBase> mLaunchInfo;      // +0x50
   };
 

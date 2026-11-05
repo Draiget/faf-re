@@ -281,9 +281,9 @@ namespace moho
     // fsin/fcos results; only -sin(elevation) is stored straight.
     const float elevationAngle = mFallAngleRadians - kHalfPi;
     const Wm3::Vec3f targetAxis{
-      msvc8::SinTimesCos(mFallDirectionRadians, elevationAngle),
-      -msvc8::sin(elevationAngle),
-      msvc8::CosTimesCos(mFallDirectionRadians, elevationAngle),
+      fa::SinTimesCos(mFallDirectionRadians, elevationAngle),
+      -fa::sin(elevationAngle),
+      fa::CosTimesCos(mFallDirectionRadians, elevationAngle),
     };
 
     VTransform pendingTransform = entity->mVarDat.mCurTransform;
@@ -360,13 +360,7 @@ namespace moho
   void MotorFallDownTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedCScriptObjectType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = gpg::RType::BaseSubobjectOffset<MotorFallDown, CScriptObject>();
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::RType::BaseSubobjectOffset<MotorFallDown, CScriptObject>());
   }
 
   /**
@@ -376,13 +370,7 @@ namespace moho
   void MotorFallDownTypeInfo::AddBase_Motor(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedMotorType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType);
   }
 
   /**
@@ -456,7 +444,7 @@ namespace moho
     )
     {
       if (!motor->mBreakOnWhack) {
-        motor->mFallDirectionRadians = msvc8::atan2(normalXYZ[0], normalXYZ[2]);
+        motor->mFallDirectionRadians = fa::atan2(normalXYZ[0], normalXYZ[2]);
         motor->mBreakOnWhack = doBreak;
       }
 

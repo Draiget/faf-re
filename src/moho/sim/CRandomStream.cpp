@@ -212,7 +212,7 @@ namespace moho
     // x87 under 24-bit precision: range rounded, range * word rounded once,
     // the 2^-32 scale exact, the sum rounded, all with the extended exponent.
     const std::uint32_t word = twister.NextUInt32();
-    return msvc8::TwisterWordInRange(lower, upper, word);
+    return fa::TwisterWordInRange(lower, upper, word);
   }
 
   /**
@@ -276,7 +276,7 @@ namespace moho
     // exact). The CRT's double `log` rounded to float picks the neighbouring
     // float whenever the two approximations straddle a float midpoint, so the
     // log goes through the same `fyl2x` the engine runs.
-    const float scale = std::sqrt((-2.0f * msvc8::IntrinsicLn(radiusSquared)) / radiusSquared);
+    const float scale = std::sqrt((-2.0f * fa::IntrinsicLn(radiusSquared)) / radiusSquared);
     hasMarsagliaPair = 1;
     marsagliaPair = y * scale;
     return x * scale;

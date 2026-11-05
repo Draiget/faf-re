@@ -498,7 +498,7 @@ namespace moho
     archive->WriteFloat(mUnknown14);
     archive->WriteFloat(mUnknown18);
     archive->WriteFloat(mDelta);
-    archive->WriteString(const_cast<msvc8::string*>(&mActionName));
+    archive->WriteString(const_cast<fa::string*>(&mActionName));
     archive->WriteFloat(mFractionComplete);
     archive->WriteBool(mIsSilo);
   }

@@ -99,16 +99,16 @@ namespace moho
      * zeroes +0x28. `UpdateLuaState` calls it on a fresh 0x2C allocation
      * (0x0052A5A1).
      */
-    LuaReloadRequestNode(float reloadAt, const msvc8::string& path);
+    LuaReloadRequestNode(float reloadAt, const fa::string& path);
 
     float reloadAtSeconds;    // +0x08
-    msvc8::string sourcePath; // +0x0C
+    fa::string sourcePath; // +0x0C
     std::uint32_t reserved28; // +0x28
   };
 
   static_assert(sizeof(LuaReloadRequestNode) == 0x2C, "LuaReloadRequestNode size must be 0x2C");
 
-  LuaReloadRequestNode::LuaReloadRequestNode(const float reloadAt, const msvc8::string& path)
+  LuaReloadRequestNode::LuaReloadRequestNode(const float reloadAt, const fa::string& path)
     : reloadAtSeconds(reloadAt)
     , sourcePath(path)
     , reserved28(0u)
@@ -126,7 +126,7 @@ namespace moho
   // CategoryLookupMap, a per-TU duplicate of the exact same
   // hand-rolled-tree anti-pattern Sim.cpp's CategoryLookupMapView/
   // CategoryLookupNodeView had -- see commit 5bf090ef for that sibling fix).
-  // Migrated to a real `msvc8::map<msvc8::string, CategoryLookupValue>`; the
+  // Migrated to a real `fa::map<fa::string, CategoryLookupValue>`; the
   // full type (shared with Sim.cpp, which reaches into the same live object
   // through `RRuleGameRulesImpl::mEntityCategoryLookup`) now lives in
   // RRuleGameRules.h instead of being forward-declared there and redefined
@@ -314,12 +314,12 @@ namespace moho
         return nullptr;
       }
 
-      // Exact: `resId.name` already is the map's `key_type` (msvc8::string), so
-      // finding with it runs the same `std::less<msvc8::string>` compares as the
+      // Exact: `resId.name` already is the map's `key_type` (fa::string), so
+      // finding with it runs the same `std::less<fa::string>` compares as the
       // former byte-identical temporary copy - without allocating one.
       // Engine change (sim_BlueprintLookupFast); off, the binary's temporary copy is searched.
       const bool fastLookup = sim_BlueprintLookupFast;
-      if (const auto found = fastLookup ? map.find(resId.name) : map.find(msvc8::string(resId.name.view()));
+      if (const auto found = fastLookup ? map.find(resId.name) : map.find(fa::string(resId.name.view()));
           found != map.end()) {
         return static_cast<TBlueprint*>(found->second);
       }
@@ -336,7 +336,7 @@ namespace moho
         return nullptr;
       }
 
-      msvc8::string slashNormalized(name);
+      fa::string slashNormalized(name);
       gpg::STR_NormalizeFilenameLowerSlash(slashNormalized);
 
       const auto fallbackFound = map.find(slashNormalized);
@@ -437,7 +437,7 @@ namespace moho
      * `ExportToLuaState`'s own capacity check ahead of its `insert` call,
      * cited in full on `legacy/containers/Vector.h`'s `insert(pos, count,
      * value)` member as `FUN_0052DBE0`). Delegates entirely to
-     * `msvc8::vector<T>::reserve()`, which is the fix for a genuine
+     * `fa::vector<T>::reserve()`, which is the fix for a genuine
      * behavioral divergence the previous hand-rolled body had: it allocated
      * via `new RRuleGameRulesLuaExportBinding[requestedCapacity]{}`
      * (default-constructing every slot up to the full new capacity, not
@@ -478,7 +478,7 @@ namespace moho
     }
 
     /**
-     * Address: 0x0052DBE0 (FUN_0052DBE0, `msvc8::vector<
+     * Address: 0x0052DBE0 (FUN_0052DBE0, `fa::vector<
      * RRuleGameRulesLuaExportBinding>::insert(pos, count, value)`, cited in
      * full on that member in `legacy/containers/Vector.h`) -- the "not
      * found" path below now calls this method by name instead of hand-
@@ -504,7 +504,7 @@ namespace moho
       RRuleGameRulesLuaExportBinding freshBinding{};
       freshBinding.mRootState = rootState;
       // `mPendingBlueprintOrdinals` is already a freshly default-constructed
-      // empty `msvc8::set<uint32_t>` via `RRuleGameRulesLuaExportBinding{}`'s
+      // empty `fa::set<uint32_t>` via `RRuleGameRulesLuaExportBinding{}`'s
       // member init -- no separate `.clear()` needed.
 
       // `insert`'s own internal `cur+count <= capacity()` check subsumes the
@@ -516,7 +516,7 @@ namespace moho
 
     /**
      * Address: 0x0052BEE0 (FUN_0052BEE0) + 0x00536DA0 (FUN_00536DA0) --
-     * `msvc8::vector<RRuleGameRulesLuaExportBinding>::erase(iterator)`'s
+     * `fa::vector<RRuleGameRulesLuaExportBinding>::erase(iterator)`'s
      * real emission for this element type, cited in full on that method in
      * `legacy/containers/Vector.h`. The binary keeps this method's shift
      * LOOP inlined directly into `RRuleGameRulesImpl::CancelExport`
@@ -569,7 +569,7 @@ namespace moho
      */
     void EnqueueLuaReloadRequest(
       RRuleGameRulesImpl& rules,
-      const msvc8::string& sourcePath,
+      const fa::string& sourcePath,
       const float reloadDelaySeconds)
     {
       auto& pending = rules.mPendingBlueprintReloads;
@@ -594,7 +594,7 @@ namespace moho
      * file-watcher integration). `DrainFileWatcherIntoReloadQueue` consumes
      * the slot on each `UpdateLuaState` tick.
      */
-    msvc8::string gPendingBlueprintReloadPath{};
+    fa::string gPendingBlueprintReloadPath{};
 
     /**
      * Drains file-watcher notifications into the pending-reload ring. The
@@ -607,7 +607,7 @@ namespace moho
      */
     void DrainFileWatcherIntoReloadQueue(RRuleGameRulesImpl& rules)
     {
-      msvc8::string& pendingPath = gPendingBlueprintReloadPath;
+      fa::string& pendingPath = gPendingBlueprintReloadPath;
       if (pendingPath.empty()) {
         return;
       }
@@ -684,7 +684,7 @@ namespace moho
       // ahead of the remaining member teardown. Drain it through a scoped
       // swap so the vector's own deallocation lane runs at that point,
       // instead of a hand-rolled `operator delete` on the begin lane.
-      msvc8::vector<RBlueprint*> drained;
+      fa::vector<RBlueprint*> drained;
       drained.swap(rules.mBlueprintsByOrdinal);
     }
 
@@ -701,7 +701,7 @@ namespace moho
       // RBlueprint has mDescription, and its derived payload at +0x40, where
       // RBlueprint has mSource. Casting to RBlueprint* therefore ran
       // ~RBlueprint over the wrong fields, and its first statement --
-      // mSource.tidy -- handed msvc8::string a pointer assembled out of
+      // mSource.tidy -- handed fa::string a pointer assembled out of
       // whatever the derived type keeps there. That reached free() with an
       // address no page record owns, which is where quitting a game faulted.
       //
@@ -757,7 +757,7 @@ namespace moho
   ) noexcept
   {
     // `mCategoryMap`'s sentinel head is already live at this point (member
-    // default-initialization runs before this body, real `msvc8::map`
+    // default-initialization runs before this body, real `fa::map`
     // default ctor -> `RbTree.h` `buy_head()`, cited FUN_00556DE0). The
     // binary re-runs the whole-subtree destroyer on the fresh (already
     // empty) head before re-asserting the empty-tree links one more time -
@@ -772,7 +772,7 @@ namespace moho
   }
 
   const EntityCategorySet* EntityCategoryLookupTable::TryFind(
-    const msvc8::string& categoryName
+    const fa::string& categoryName
   ) const
   {
     const CategoryLookupMap::const_iterator found = mCategoryMap.find(categoryName);
@@ -780,14 +780,14 @@ namespace moho
   }
 
   const EntityCategorySet* EntityCategoryLookupTable::FindOrFallback(
-    const msvc8::string& categoryName
+    const fa::string& categoryName
   ) const
   {
     const EntityCategorySet* const found = TryFind(categoryName);
     return found != nullptr ? found : &mCategoryFallback;
   }
 
-  // No explicit destructor: `mCategoryMap` (`msvc8::map<msvc8::string,
+  // No explicit destructor: `mCategoryMap` (`fa::map<fa::string,
   // CategoryLookupValue>`) and `mCategoryFallback` (`EntityCategorySet`)
   // are both real typed members, so implicit member destruction already runs
   // their own real destructors in reverse declaration order - exactly
@@ -818,7 +818,7 @@ namespace moho
     std::atomic<std::uint64_t> gRulesGeneration{0u};
   } // namespace
 
-  RRuleGameRulesImpl::RRuleGameRulesImpl(const msvc8::string& activeMods, CBackgroundTaskControl* const initHandler)
+  RRuleGameRulesImpl::RRuleGameRulesImpl(const fa::string& activeMods, CBackgroundTaskControl* const initHandler)
     : mUnknown04(0u)
     , mLockStorage{}
     , mLuaState(nullptr)
@@ -843,7 +843,7 @@ namespace moho
     lua::NameLuaVm(mLuaState->m_state, "GameRules"); // diagnostics label only
 
     // `mMaps{}` in the member-init list above already default-constructs a
-    // real, empty `msvc8::vector<RRuleGameRulesLuaExportBinding>` (null
+    // real, empty `fa::vector<RRuleGameRulesLuaExportBinding>` (null
     // proxy/first_/last_/end_) -- no separate field-by-field reset needed
     // now that it is a real vector rather than a hand-rolled pointer quad.
 
@@ -887,7 +887,7 @@ namespace moho
     LuaPlus::LuaObject globals = mLuaState->GetGlobals();
     globals.SetObject("__active_mods", activeModsValue);
 
-    gpg::LogScopeEntry ruleMemoryScope(msvc8::string("MEM: %i bytes RULE"));
+    gpg::LogScopeEntry ruleMemoryScope(fa::string("MEM: %i bytes RULE"));
     {
       // Everything /lua/RuleInit.lua registers lands on this rules object, and
       // its progress callbacks report to the load control that asked for it.
@@ -927,7 +927,7 @@ namespace moho
    * Allocates one `RRuleGameRulesImpl` object and runs the concrete
    * constructor with active-mod payload + optional init wait-set pointer.
    */
-  RRuleGameRules* RRuleGameRules::Create(const msvc8::string& activeMods, CBackgroundTaskControl* const initHandler)
+  RRuleGameRules* RRuleGameRules::Create(const fa::string& activeMods, CBackgroundTaskControl* const initHandler)
   {
     auto* const storage = static_cast<RRuleGameRulesImpl*>(::operator new(sizeof(RRuleGameRulesImpl), std::nothrow));
     if (storage == nullptr) {
@@ -943,10 +943,10 @@ namespace moho
    * What it does:
    * Adapter overload for callsites that still pass normalized id strings.
    */
-  RPropBlueprint* RRuleGameRules::GetPropBlueprint(const msvc8::string& blueprintId)
+  RPropBlueprint* RRuleGameRules::GetPropBlueprint(const fa::string& blueprintId)
   {
     RResId lookup{};
-    lookup.name = msvc8::string(blueprintId.data(), blueprintId.size());
+    lookup.name = fa::string(blueprintId.data(), blueprintId.size());
     return GetPropBlueprint(lookup);
   }
 
@@ -995,7 +995,7 @@ namespace moho
     DestroyEffectBlueprintsInMap(mEmitterBlueprints);
     DestroyEffectBlueprintsInMap(mTrailBlueprints);
 
-    // No manual teardown here: `mMaps` (now a real `msvc8::vector<
+    // No manual teardown here: `mMaps` (now a real `fa::vector<
     // RRuleGameRulesLuaExportBinding>`) is destroyed by ordinary implicit
     // member destruction after this body returns, exactly matching
     // `FUN_00529700`'s own instruction sequence -- its recorded evidence
@@ -1004,7 +1004,7 @@ namespace moho
     // `delete[]`) is the per-element destroy loop (`FUN_00536DF0`,
     // `skip`-classified as compiler-emitted glue) followed by a raw
     // `operator delete` on the buffer, which is precisely what
-    // `msvc8::vector<T>::~vector()` (`destroy_range` + `operator delete`,
+    // `fa::vector<T>::~vector()` (`destroy_range` + `operator delete`,
     // `legacy/containers/Vector.h`) already does. Same pattern already used
     // just below for the seven blueprint maps.
     // `mPendingBlueprintReloads` is not drained: the binary only unlinks its

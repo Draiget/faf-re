@@ -296,7 +296,7 @@ namespace
    * investigation. It is now fully recovered: raw asm for `Deserialize`
    * (0x00763190) and `Serialize` (0x007631D0) shows both operate through
    * the `std::vector<Moho::HPathCell>` RType (`gpg::LookupRType(typeid(
-   * msvc8::vector<moho::HPathCell>))`, cached), calling `archive->Read/
+   * fa::vector<moho::HPathCell>))`, cached), calling `archive->Read/
    * Write(type, objectPtr, RRef{})` directly on the raw object pointer with
    * NO field-offset adjustment and a *fresh empty* owner ref (the real
    * caller's owner ref is not forwarded) -- so this recovery does not need
@@ -388,7 +388,7 @@ namespace
     gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const
   )
   {
-    gpg::RType* const type = CachedCompatRType<msvc8::vector<moho::HPathCell>>();
+    gpg::RType* const type = CachedCompatRType<fa::vector<moho::HPathCell>>();
     const gpg::RRef emptyOwner{};
     archive->Read(type, reinterpret_cast<void*>(objectPtr), emptyOwner);
   }
@@ -397,7 +397,7 @@ namespace
     gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const
   )
   {
-    gpg::RType* const type = CachedCompatRType<msvc8::vector<moho::HPathCell>>();
+    gpg::RType* const type = CachedCompatRType<fa::vector<moho::HPathCell>>();
     const gpg::RRef emptyOwner{};
     archive->Write(type, reinterpret_cast<void*>(objectPtr), emptyOwner);
   }
@@ -578,7 +578,7 @@ namespace gpg
     }
 
     const auto* const storage =
-      reinterpret_cast<const msvc8::vector<moho::SPerArmyReconInfo>*>(objectPtr);
+      reinterpret_cast<const fa::vector<moho::SPerArmyReconInfo>*>(objectPtr);
     SaveContiguousArchiveVectorPayload(
       archive, storage->data(), static_cast<unsigned int>(storage->size()),
       CachedCompatRType<moho::SPerArmyReconInfo>(), ownerRef ? *ownerRef : gpg::RRef{}
@@ -615,12 +615,12 @@ namespace gpg
   )
   {
     auto* const outVector =
-      reinterpret_cast<msvc8::vector<moho::SPerArmyReconInfo>*>(objectPtr);
+      reinterpret_cast<fa::vector<moho::SPerArmyReconInfo>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    msvc8::vector<moho::SPerArmyReconInfo> loaded;
+    fa::vector<moho::SPerArmyReconInfo> loaded;
     loaded.reserve(count);
 
     if (!moho::SPerArmyReconInfo::sType) {
@@ -648,7 +648,7 @@ namespace
     throw SerializationError(message ? message : "");
   }
 
-  [[noreturn]] void ThrowSerializationError(const msvc8::string& message)
+  [[noreturn]] void ThrowSerializationError(const fa::string& message)
   {
     throw SerializationError(message.c_str());
   }

@@ -206,9 +206,9 @@ namespace moho
     // head of sub_5FA340 / InheritCommandsTo.
     void SnapshotFactoryCommandQueue(
       Unit* const factoryUnit, WeakPtr<Unit>& rallyPointUnit,
-      msvc8::vector<WeakPtr<CUnitCommand>>& commands)
+      fa::vector<WeakPtr<CUnitCommand>>& commands)
     {
-      // `msvc8::vector<WeakPtr<CUnitCommand>>`'s copy (0x005DB610) and, between
+      // `fa::vector<WeakPtr<CUnitCommand>>`'s copy (0x005DB610) and, between
       // the two copies, its `_Tidy` (0x005A07A0): both cited on Vector.h.
       commands = factoryUnit->AiBuilder->BuilderGetFactoryCommandQueue();
       if (Unit* const rallyUnit = rallyPointUnit.GetObjectPtr();
@@ -236,7 +236,7 @@ namespace moho
       return;
     }
 
-    msvc8::vector<WeakPtr<CUnitCommand>> commands{};
+    fa::vector<WeakPtr<CUnitCommand>> commands{};
     SnapshotFactoryCommandQueue(factoryUnit, mRallyPointUnit, commands);
 
     for (const WeakPtr<CUnitCommand>& commandLink : commands) {
@@ -271,7 +271,7 @@ namespace moho
       return;
     }
 
-    msvc8::vector<WeakPtr<CUnitCommand>> commands{};
+    fa::vector<WeakPtr<CUnitCommand>> commands{};
     SnapshotFactoryCommandQueue(factoryUnit, mRallyPointUnit, commands);
 
     bool suppressLeadingMove = true;

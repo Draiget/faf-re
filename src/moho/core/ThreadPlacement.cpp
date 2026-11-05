@@ -184,7 +184,7 @@ namespace moho
     [[nodiscard]] int ResolvePlacementMode()
     {
       if (sys_ThreadPlacement < 0) {
-        msvc8::vector<msvc8::string> args;
+        fa::vector<fa::string> args;
         if (CFG_GetArgOption("/threadplacement", 1u, &args) && !args.empty()) {
           sys_ThreadPlacement = static_cast<int>(std::strtol(args[0].c_str(), nullptr, 10));
         } else {

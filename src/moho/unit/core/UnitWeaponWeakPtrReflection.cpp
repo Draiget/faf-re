@@ -23,40 +23,30 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedUnitWeaponType()
-  {
-    gpg::RType* cached = moho::UnitWeapon::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::UnitWeapon));
-      moho::UnitWeapon::sType = cached;
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeUnitWeaponRef(moho::UnitWeapon* weapon)
   {
     gpg::RRef out{};
     out.mObj = nullptr;
-    out.mType = CachedUnitWeaponType();
+    out.mType = gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType);
     if (!weapon) {
       return out;
     }
 
-    gpg::RType* dynamicType = CachedUnitWeaponType();
+    gpg::RType* dynamicType = gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType);
     try {
       dynamicType = gpg::LookupRType(typeid(*weapon));
     } catch (...) {
-      dynamicType = CachedUnitWeaponType();
+      dynamicType = gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType);
     }
 
     std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType != nullptr && CachedUnitWeaponType() != nullptr &&
-      dynamicType->IsDerivedFrom(CachedUnitWeaponType(), &baseOffset);
+    const bool isDerived = dynamicType != nullptr && gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType) != nullptr &&
+      dynamicType->IsDerivedFrom(gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType), &baseOffset);
 
     out.mObj = isDerived
       ? reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(weapon) - static_cast<std::uintptr_t>(baseOffset))
       : static_cast<void*>(weapon);
-    out.mType = dynamicType ? dynamicType : CachedUnitWeaponType();
+    out.mType = dynamicType ? dynamicType : gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType);
     return out;
   }
 
@@ -71,14 +61,14 @@ namespace
     source.mObj = tracked.object;
     source.mType = tracked.type;
 
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedUnitWeaponType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType));
     if (upcast.mObj) {
       return static_cast<moho::UnitWeapon*>(upcast.mObj);
     }
 
-    const char* const expected = CachedUnitWeaponType() ? CachedUnitWeaponType()->GetName() : "UnitWeapon";
+    const char* const expected = gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType) ? gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType)->GetName() : "UnitWeapon";
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
       expected ? expected : "UnitWeapon",
       actual ? actual : "null"
@@ -134,26 +124,26 @@ namespace moho
    */
   const char* RWeakPtrType<UnitWeapon>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedUnitWeaponType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType)->GetName());
     return sName.c_str();
   }
 
   /**
    * Address: 0x00674C70 (FUN_00674C70, Moho::RWeakPtrType_UnitWeapon::GetLexical)
    */
-  msvc8::string RWeakPtrType<UnitWeapon>::GetLexical(const gpg::RRef& ref) const
+  fa::string RWeakPtrType<UnitWeapon>::GetLexical(const gpg::RRef& ref) const
   {
     auto* const weak = static_cast<const WeakPtr<UnitWeapon>*>(ref.mObj);
     if (!weak || !weak->HasValue()) {
-      return msvc8::string("NULL");
+      return fa::string("NULL");
     }
 
     const gpg::RRef pointeeRef = MakeUnitWeaponRef(weak->GetObjectPtr());
     if (!pointeeRef.mObj) {
-      return msvc8::string("NULL");
+      return fa::string("NULL");
     }
 
-    const msvc8::string inner = pointeeRef.GetLexical();
+    const fa::string inner = pointeeRef.GetLexical();
     return gpg::STR_Printf("[%s]", inner.c_str());
   }
 

@@ -431,6 +431,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mSwapChains.clear();
     mGarbage.clear();
     mPipelineCache.Close();
+    mPipelineMemo.Clear();
     mPipelines.clear();
     mBlitPipelines.clear();
     mPipelineState.reset();
@@ -1704,7 +1705,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
 
   void DeviceD3D12::Func1() const {}
 
-  void DeviceD3D12::GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, const int adapterIndex)
+  void DeviceD3D12::GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, const int adapterIndex)
   {
     outModes.clear();
     const auto& adapters = mFactory.Adapters();
@@ -2317,13 +2318,13 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     destinationTexture->DiscardCpuCopy();
   }
 
-  void DeviceD3D12::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const msvc8::string& filePath)
+  void DeviceD3D12::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath)
   {
     static_cast<void>(cubeTarget);
     static_cast<void>(filePath);
   }
 
-  void DeviceD3D12::SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const msvc8::string& filePath, const int fileFormat)
+  void DeviceD3D12::SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, const int fileFormat)
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     imaging::Image image;
@@ -2335,7 +2336,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   }
 
   void DeviceD3D12::SaveTexture(
-    const boost::shared_ptr<Texture>& texture, const msvc8::string& filePath, const int fileFormat, gpg::MemBuffer<char>* const outBuffer
+    const boost::shared_ptr<Texture>& texture, const fa::string& filePath, const int fileFormat, gpg::MemBuffer<char>* const outBuffer
   )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -3041,6 +3042,25 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       depthFormat = static_cast<DepthStencilTargetD3D12*>(outputContext_.depthStencil.get())->DepthFormat();
     }
 
+    // Engine change (ren_PipelineMemo): recent pipelines are found without building the string key below.
+    PipelineInputs inputs;
+    std::memset(static_cast<void*>(&inputs), 0, sizeof(inputs));
+    inputs.vertexKey = pass.vertexShader->key;
+    inputs.pixelKey = (pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL;
+    inputs.format = mBoundFormat;
+    inputs.sampleMask = pass.state.sampleMask;
+    inputs.blend = pass.state.blend;
+    inputs.depth = pass.state.depthStencil;
+    inputs.rasterizer = pass.state.rasterizer;
+    inputs.renderFormat = renderFormat;
+    inputs.depthFormat = depthFormat;
+    inputs.topologyType = topologyType;
+    if (gPipelineMemo) {
+      if (ID3D12PipelineState* const known = mPipelineMemo.Find(inputs)) {
+        return known;
+      }
+    }
+
     KeyWriter key;
     key.Add(pass.vertexShader->key);
     key.Add((pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL);
@@ -3054,6 +3074,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     key.Add(topologyType);
     auto found = mPipelines.find(key.Key());
     if (found != mPipelines.end()) {
+      mPipelineMemo.Store(inputs, found->second.Get());
       return found->second.Get();
     }
 

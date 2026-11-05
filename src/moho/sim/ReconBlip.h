@@ -483,8 +483,18 @@ namespace moho
 
     [[nodiscard]] Unit* GetSourceUnit() const noexcept;
     [[nodiscard]] bool IsFake() const noexcept;
-    [[nodiscard]] SPerArmyReconInfo* GetPerArmyReconInfo(std::int32_t armyIndex) noexcept;
-    [[nodiscard]] const SPerArmyReconInfo* GetPerArmyReconInfo(std::int32_t armyIndex) const noexcept;
+    [[nodiscard]] SPerArmyReconInfo* GetPerArmyReconInfo(const std::int32_t armyIndex) noexcept
+    {
+      return const_cast<SPerArmyReconInfo*>(static_cast<const ReconBlip*>(this)->GetPerArmyReconInfo(armyIndex));
+    }
+    [[nodiscard]] const SPerArmyReconInfo* GetPerArmyReconInfo(const std::int32_t armyIndex) const noexcept
+    {
+      if (armyIndex < 0 || mReconDat.begin() == nullptr || mReconDat.end() == nullptr) {
+        return nullptr;
+      }
+      const std::ptrdiff_t count = mReconDat.end() - mReconDat.begin();
+      return armyIndex < count ? mReconDat.begin() + armyIndex : nullptr;
+    }
 
   public:
     WeakPtr<Unit> mCreator;                   // +0x270
@@ -493,7 +503,7 @@ namespace moho
     Wm3::Vec3f mJamOffset;                    // +0x27C
     SReconBlipUnitConstData mUnitConstDat;    // +0x288
     SSTIUnitVariableData mUnitVarDat;         // +0x298
-    msvc8::vector<SPerArmyReconInfo> mReconDat; // +0x4C0
+    fa::vector<SPerArmyReconInfo> mReconDat; // +0x4C0
   };
 
   static_assert(offsetof(ReconBlip, mCreator) == 0x270, "ReconBlip::mCreator offset must be 0x270");

@@ -158,7 +158,7 @@ namespace moho
     }
 
     CameraImpl* const needle = const_cast<CameraImpl*>(camera);
-    CameraImpl** const compactedEnd = msvc8::remove(mCams.begin(), mCams.end(), needle);
+    CameraImpl** const compactedEnd = fa::remove(mCams.begin(), mCams.end(), needle);
     if (compactedEnd != mCams.end()) {
       mCams.erase(compactedEnd, mCams.end());
     }
@@ -186,7 +186,7 @@ namespace moho
    * Returns the camera vector by value; the copy is `mCams`' own copy
    * constructor at 0x007AE840.
    */
-  msvc8::vector<CameraImpl*> RCamManager::GetAllCameras()
+  fa::vector<CameraImpl*> RCamManager::GetAllCameras()
   {
     return mCams;
   }
@@ -198,11 +198,11 @@ namespace moho
    * Copies all non-minimap camera views from the manager into one returned
    * vector.
    */
-  msvc8::vector<GeomCamera3> CAM_GetAllCameras()
+  fa::vector<GeomCamera3> CAM_GetAllCameras()
   {
-    msvc8::vector<GeomCamera3> result{};
+    fa::vector<GeomCamera3> result{};
     RCamManager* const manager = CAM_GetManager();
-    msvc8::vector<CameraImpl*> allCameras = manager->GetAllCameras();
+    fa::vector<CameraImpl*> allCameras = manager->GetAllCameras();
     const std::size_t cameraCount = allCameras.size();
     for (std::size_t i = 0; i < cameraCount; ++i) {
       CameraImpl* const camera = allCameras[i];
@@ -221,16 +221,16 @@ namespace moho
    * a freshly allocated result vector and returns it. The binary builds a
    * temporary from RCamManager::GetAllCameras(), copies each element into the
    * result through a manual push_back loop (routing the capacity-full path
-   * through the msvc8::vector<RCamCamera*>::_Insert_n grow lane FUN_007B0340),
+   * through the fa::vector<RCamCamera*>::_Insert_n grow lane FUN_007B0340),
    * then frees the temporary's buffer on scope exit.
    */
-  msvc8::vector<CameraImpl*> CAM_GetAllRCamCameras()
+  fa::vector<CameraImpl*> CAM_GetAllRCamCameras()
   {
-    msvc8::vector<CameraImpl*> result{};
+    fa::vector<CameraImpl*> result{};
     RCamManager* const manager = CAM_GetManager();
     // Temporary; its buffer is released on scope exit == the binary's
     // operator delete(start) at the end of the copy loop.
-    msvc8::vector<CameraImpl*> allCameras = manager->GetAllCameras();
+    fa::vector<CameraImpl*> allCameras = manager->GetAllCameras();
     const std::size_t cameraCount = allCameras.size();
     for (std::size_t i = 0; i < cameraCount; ++i) {
       result.push_back(allCameras[i]);
@@ -321,7 +321,7 @@ namespace moho
    * the initial `atoi`-selected float, so all four commands carry the same
    * selected LOD value.
    */
-  void SC_CameraScaleLOD(const msvc8::vector<msvc8::string>& args)
+  void SC_CameraScaleLOD(const fa::vector<fa::string>& args)
   {
     if (args.size() != 2) {
       return;

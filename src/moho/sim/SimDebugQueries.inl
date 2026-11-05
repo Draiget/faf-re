@@ -437,7 +437,7 @@ int Sim::AddLightParticle(
 
   float lifetime = 2.0f;
   float size = 1.0f;
-  msvc8::string texturePrimary{};
+  fa::string texturePrimary{};
 
   if (commandArgs && commandArgs->size() > 1u) {
     for (std::size_t i = 1u; i < commandArgs->size(); ++i) {
@@ -457,7 +457,7 @@ int Sim::AddLightParticle(
     }
   }
 
-  const msvc8::string textureSecondary("ramp_white_01");
+  const fa::string textureSecondary("ramp_white_01");
   effectManager->CreateLightParticle(*worldPos, texturePrimary, textureSecondary, size, lifetime, -1);
   return 0;
 }
@@ -567,7 +567,7 @@ int Sim::SimError(
 /**
  * Address: 0x00699D20 (FUN_00699D20, Moho::Sim::sim_Gravity)
  *
- * Moho::Sim *, std::vector<msvc8::string> *
+ * Moho::Sim *, std::vector<fa::string> *
  *
  * What it does:
  * Prints the current gravity value, or parses a new scalar and stores it as
@@ -861,7 +861,7 @@ int Sim::DebugSetPlayableRect(
     return 0;
   }
 
-  const msvc8::string syncCommand = gpg::STR_Printf(
+  const fa::string syncCommand = gpg::STR_Printf(
     kDebugSetPlayableRectSyncFormat,
     commandArgs->at(1u).c_str(),
     commandArgs->at(3u).c_str(),
@@ -900,7 +900,7 @@ int Sim::DebugMoveCamera(
     return 0;
   }
 
-  const msvc8::string commandText = gpg::STR_Printf(
+  const fa::string commandText = gpg::STR_Printf(
     "DebugMoveCamera(%s,%s,%s,%s)",
     commandArgs->at(1).c_str(),
     commandArgs->at(2).c_str(),

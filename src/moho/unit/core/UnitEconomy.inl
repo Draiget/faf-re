@@ -141,8 +141,8 @@ void Unit::RenderAIDebugInfo()
     return;
   }
 
-  const msvc8::string debugPrefix = msvc8::string("AIDebug_") + GetUniqueName();
-  const msvc8::string unitStatePrefix = debugPrefix + "_UnitStates";
+  const fa::string debugPrefix = fa::string("AIDebug_") + GetUniqueName();
+  const fa::string unitStatePrefix = debugPrefix + "_UnitStates";
 
   const CUnitCommand* headCommand = nullptr;
   if (CommandQueue != nullptr && !CommandQueue->mCommandVec.empty()) {

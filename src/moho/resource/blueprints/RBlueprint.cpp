@@ -70,7 +70,7 @@ namespace moho
   void RBlueprint::InitIdentity(
     RRuleGameRules* const owner,
     const RResId& resId,
-    msvc8::string& outBlueprintId,
+    fa::string& outBlueprintId,
     std::int32_t& outOrdinal
   )
   {
@@ -265,15 +265,15 @@ void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
    */
   gpg::RField* RBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    gpg::RField* field = typeInfo->AddField<msvc8::string>("BlueprintId", offsetof(RBlueprint, mBlueprintId));
+    gpg::RField* field = typeInfo->AddField<fa::string>("BlueprintId", offsetof(RBlueprint, mBlueprintId));
     field->mFlags = 1;
     field->mDesc = "Blueprint Id";
 
-    field = typeInfo->AddField<msvc8::string>("Description", offsetof(RBlueprint, mDescription));
+    field = typeInfo->AddField<fa::string>("Description", offsetof(RBlueprint, mDescription));
     field->mFlags = 3;
     field->mDesc = "Generic type of unit (non-display name)";
 
-    field = typeInfo->AddField<msvc8::string>("Source", offsetof(RBlueprint, mSource));
+    field = typeInfo->AddField<fa::string>("Source", offsetof(RBlueprint, mSource));
     field->mFlags = 1;
     field->mDesc = "File this blueprint was defined in";
 

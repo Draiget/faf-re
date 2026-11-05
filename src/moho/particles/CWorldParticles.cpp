@@ -211,7 +211,7 @@ namespace
    * What it does:
    * Owns the shared trail-quad index sheet (binary global 0x010A828C).
    */
-  msvc8::auto_ptr<moho::ID3DIndexSheet> sSharedTrailQuadIndexSheet;
+  fa::auto_ptr<moho::ID3DIndexSheet> sSharedTrailQuadIndexSheet;
 
   /**
    * Address: 0x00BC5570 (FUN_00BC5570, dynamic initializer for `gTConVar_efx_ParticleWaterSurface`)
@@ -531,7 +531,7 @@ namespace
 
     key->texture0.reset();
     key->texture1.reset();
-    key->tag = msvc8::string{};
+    key->tag = fa::string{};
 
     key->sortScalar = particle.mReserved54;
     key->dragEnabled = particle.mDragEnabled;
@@ -548,19 +548,19 @@ namespace
     }
     boost::AssignSharedPairRetain(&key->texture1, &texture1);
 
-    key->tag.assign(particle.mTypeTag, 0U, msvc8::string::npos);
+    key->tag.assign(particle.mTypeTag, 0U, fa::string::npos);
     key->blendMode = static_cast<std::int32_t>(particle.mBlendMode);
     key->zMode = static_cast<std::int32_t>(particle.mZMode);
     return key;
   }
 
   // 0x0049EE50 / 0x0049E0B0 (particle) and 0x0049EE80 / 0x0049E1F0 (trail) are
-  // the copy constructors MSVC emits for `msvc8::map<Key, Bucket*>::value_type`
+  // the copy constructors MSVC emits for `fa::map<Key, Bucket*>::value_type`
   // on the insert path -- a `std::pair<const Key, Bucket*>` whose first member
   // is the 0x3C / 0x34 bucket key. They were transcribed here as
   // `ParticleBucketKeyValueRuntime` / `TrailBucketKeyValueRuntime` plus four
   // free `CopyConstruct*` helpers, two of which had no caller at all. Cited on
-  // `msvc8::map::insert(const value_type&)` (legacy/containers/Map.h) and
+  // `fa::map::insert(const value_type&)` (legacy/containers/Map.h) and
   // removed; the source line that produces them is the `buckets[key] = bucket`
   // in `CWorldParticles`.
 
@@ -844,7 +844,7 @@ namespace
    * Returns whether one legacy string and one C-string differ by value.
    */
   [[maybe_unused]] bool AreMsvc8StringAndCStringDifferent(
-    const msvc8::string& lhs,
+    const fa::string& lhs,
     const char* const rhs
   ) noexcept
   {
@@ -913,7 +913,7 @@ namespace moho
     ID3DDeviceResources* const resources = device->GetResources();
 
     sSharedTrailQuadIndexSheet =
-      msvc8::auto_ptr<ID3DIndexSheet>(resources->CreateIndexSheet(false, kSharedTrailIndexSheetSize));
+      fa::auto_ptr<ID3DIndexSheet>(resources->CreateIndexSheet(false, kSharedTrailIndexSheetSize));
 
     if (sSharedTrailQuadIndexSheet.get() == nullptr) {
       return 0;
@@ -1107,7 +1107,7 @@ namespace moho
       auto bucketEntry = mRefractingParticleBuckets.find(lookupKey);
       if (bucketEntry == mRefractingParticleBuckets.end()) {
         // Must be constructed, not just allocated: the bucket owns two
-        // shared_ptr texture handles, an msvc8::string and two vectors, and
+        // shared_ptr texture handles, an fa::string and two vectors, and
         // InitializeParticleRenderBucketFromWorldParticle's first act is to
         // `reset()` those handles.
         auto* const newBucket = new SParticleRenderBucket();

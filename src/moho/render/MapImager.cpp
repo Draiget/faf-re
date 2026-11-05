@@ -110,7 +110,7 @@ void MapImager::ClearBorder()
  * the requested mesh blueprint name, and appends it to the border instance
  * vector when creation succeeds.
  */
-void MapImager::AddBorder(const msvc8::string& meshBlueprintPath)
+void MapImager::AddBorder(const fa::string& meshBlueprintPath)
 {
   const CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr || session->mRules == nullptr || session->mWldMap == nullptr || session->mWldMap->mTerrainRes == nullptr) {
@@ -138,7 +138,7 @@ void MapImager::AddBorder(const msvc8::string& meshBlueprintPath)
   const Wm3::Quaternionf borderOrientation = Wm3::Quaternionf::Identity();
   const VTransform borderTransform(borderPosition, borderOrientation);
 
-  msvc8::string normalizedBlueprintPath{};
+  fa::string normalizedBlueprintPath{};
   gpg::STR_CopyFilename(&normalizedBlueprintPath, &meshBlueprintPath);
 
   RResId meshBlueprintId{};
@@ -230,7 +230,7 @@ void MapImager::UpdateMeshStances()
  * Adds one map-border blueprint to the active viewport map-imager lane when
  * a render viewport is present.
  */
-void REN_AddBorderToActiveViewport(const msvc8::string& meshBlueprintPath)
+void REN_AddBorderToActiveViewport(const fa::string& meshBlueprintPath)
 {
   if (MapImager* const mapImager = ActiveViewportMapImager(); mapImager != nullptr) {
     mapImager->AddBorder(meshBlueprintPath);
@@ -254,7 +254,7 @@ void REN_RenderShadowDebugOverlay()
  * Console callback that expects exactly two tokens and adds the requested
  * border mesh blueprint to the active viewport's MapImager.
  */
-void REN_MapBorderAdd(const msvc8::vector<msvc8::string>& args)
+void REN_MapBorderAdd(const fa::vector<fa::string>& args)
 {
   if (args.size() != 2u) {
     return;
@@ -274,7 +274,7 @@ void REN_MapBorderAdd(const msvc8::vector<msvc8::string>& args)
  * Console callback that clears the active viewport's MapImager border
  * decoration meshes when a viewport is present.
  */
-void REN_MapBorderClear(const msvc8::vector<msvc8::string>& args)
+void REN_MapBorderClear(const fa::vector<fa::string>& args)
 {
   (void)args;
   ClearActiveViewportMapBorder();
@@ -329,7 +329,7 @@ int cfunc_MapBorderAddL(LuaPlus::LuaState* const state)
   }
 
   if (MapImager* const mapImager = ActiveViewportMapImager(); mapImager != nullptr) {
-    mapImager->AddBorder(msvc8::string(blueprintId));
+    mapImager->AddBorder(fa::string(blueprintId));
   }
 
   return 0;

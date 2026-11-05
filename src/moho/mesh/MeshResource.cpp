@@ -121,7 +121,7 @@ namespace
 
   void AssignMaterialTextureSheet(
     boost::shared_ptr<moho::ID3DTextureSheet>& destination,
-    const msvc8::string& textureName,
+    const fa::string& textureName,
     moho::CResourceWatcher* const resourceWatcher
   )
   {
@@ -245,17 +245,17 @@ namespace moho
    * Creates one mesh material and resolves per-texture sheet handles from paths.
    */
   boost::shared_ptr<MeshMaterial> MeshMaterial::Create(
-    const msvc8::string& shaderName,
-    const msvc8::string& albedoName,
-    const msvc8::string& normalsName,
-    const msvc8::string& specularName,
-    const msvc8::string& lookupName,
-    const msvc8::string& secondaryName,
+    const fa::string& shaderName,
+    const fa::string& albedoName,
+    const fa::string& normalsName,
+    const fa::string& specularName,
+    const fa::string& lookupName,
+    const fa::string& secondaryName,
     CResourceWatcher* const resourceWatcher
   )
   {
     boost::shared_ptr<MeshMaterial> material(new MeshMaterial());
-    const msvc8::string resolvedShaderName = ResolveShaderAnnotationName(shaderName);
+    const fa::string resolvedShaderName = ResolveShaderAnnotationName(shaderName);
     material->mShaderAnnotation.assign_owned(resolvedShaderName.view());
     AssignMaterialTextureSheet(material->mAlbedoSheet, albedoName, resourceWatcher);
     AssignMaterialTextureSheet(material->mNormalsSheet, normalsName, resourceWatcher);

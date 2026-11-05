@@ -116,7 +116,7 @@ namespace
 
   /**
    * No standalone address: this call site invokes real
-   * `msvc8::map<CmdId, UserCommandIssueHelper*>::find` on
+   * `fa::map<CmdId, UserCommandIssueHelper*>::find` on
    * `CommandManager::mCommands`, whose compiled internals
    * (`find_node`/`lower_bound_node`, e.g. FUN_008B6160 and siblings) are
    * already cited on `RbTree.h`'s shared `rb_tree<Traits>` template from
@@ -306,7 +306,7 @@ namespace
   [[nodiscard]] const UserCommandIssueLocalEvent*
   FindLatestIssueEvent(const UserCommandIssueHelper& helper, const ECommandIssueEvent type) noexcept
   {
-    const msvc8::deque<UserCommandIssueLocalEvent>& events = helper.mLocalQueue;
+    const fa::deque<UserCommandIssueLocalEvent>& events = helper.mLocalQueue;
     for (std::size_t index = events.size(); index != 0u; --index) {
       const UserCommandIssueLocalEvent& event = events[index - 1u];
       if (event.mType == type) {
@@ -356,7 +356,7 @@ namespace
   [[maybe_unused]] [[nodiscard]] std::int32_t ResolveHelperBuildCount(const UserCommandIssueHelper& helper) noexcept
   {
     std::int32_t count = helper.mVariableData.mCount;
-    const msvc8::deque<UserCommandIssueLocalEvent>& events = helper.mLocalQueue;
+    const fa::deque<UserCommandIssueLocalEvent>& events = helper.mLocalQueue;
     for (std::size_t index = 0; index != events.size(); ++index) {
       const UserCommandIssueLocalEvent& event = events[index];
       if (event.mType == ECommandIssueEvent::DecreaseCount) {

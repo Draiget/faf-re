@@ -107,7 +107,7 @@ namespace
     ~RVectorTypeBool() override;
 
     [[nodiscard]] const char* GetName() const override;
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
     static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
@@ -139,7 +139,7 @@ namespace
     return reinterpret_cast<const TObject*>(objectPtr);
   }
 
-  thread_local msvc8::detail::vector_bool_word_cursor gRecoveredRVectorTypeBoolSubscriptCursorScratch{};
+  thread_local fa::detail::vector_bool_word_cursor gRecoveredRVectorTypeBoolSubscriptCursorScratch{};
 
   /**
    * Address: 0x00BFB080 (FUN_00BFB080, atexit destructor of the RVectorTypeBool object)
@@ -197,7 +197,7 @@ namespace
    */
   const char* RVectorTypeBool::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<bool>()->GetName());
+    static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<bool>()->GetName());
     return sName.c_str();
   }
 
@@ -207,9 +207,9 @@ namespace
    * What it does:
    * Formats inherited lexical text and appends current vector<bool> size.
    */
-  msvc8::string RVectorTypeBool::GetLexical(const gpg::RRef& ref) const
+  fa::string RVectorTypeBool::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
@@ -471,7 +471,7 @@ namespace
 
     gRecoveredRVectorTypeBoolSubscriptCursorScratch.word = storage ? storage->mWords : nullptr;
     gRecoveredRVectorTypeBoolSubscriptCursorScratch.bit = 0;
-    (void)msvc8::detail::AdvanceCursorBits(&gRecoveredRVectorTypeBoolSubscriptCursorScratch, ind);
+    (void)fa::detail::AdvanceCursorBits(&gRecoveredRVectorTypeBoolSubscriptCursorScratch, ind);
 
     gpg::RRef out{};
     auto* const reference = reinterpret_cast<std::vector<bool>::reference*>(&gRecoveredRVectorTypeBoolSubscriptCursorScratch);

@@ -54,11 +54,11 @@ namespace
   {
     switch (mode) {
     case EGpgNetOpenMode::Read: {
-      msvc8::auto_ptr<gpg::Stream> openedStream = moho::DISK_OpenFileRead(filename);
+      fa::auto_ptr<gpg::Stream> openedStream = moho::DISK_OpenFileRead(filename);
       return std::unique_ptr<gpg::Stream>(openedStream.release());
     }
     case EGpgNetOpenMode::Write: {
-      msvc8::auto_ptr<gpg::Stream> openedStream = moho::DISK_OpenFileWrite(filename);
+      fa::auto_ptr<gpg::Stream> openedStream = moho::DISK_OpenFileWrite(filename);
       return std::unique_ptr<gpg::Stream>(openedStream.release());
     }
     default:
@@ -74,7 +74,7 @@ namespace
    */
   [[nodiscard]]
   std::unique_ptr<gpg::Stream> OpenGPGNetSocket(
-    const gpg::StrArg host, const msvc8::string& requestPath, const EGpgNetOpenMode mode
+    const gpg::StrArg host, const fa::string& requestPath, const EGpgNetOpenMode mode
   )
   {
     constexpr u_short kDefaultGpgNetPort = 15000;
@@ -88,7 +88,7 @@ namespace
 
     moho::INetTCPSocket* socket = moho::NET_TCPConnect(address, port);
     if (socket == nullptr) {
-      const msvc8::string hostName = moho::NET_GetHostName(address);
+      const fa::string hostName = moho::NET_GetHostName(address);
       gpg::Logf("NET_TCPConnect(%s:%d) failed.", hostName.c_str(), static_cast<int>(port));
       return {};
     }
@@ -122,17 +122,17 @@ namespace
   [[nodiscard]]
   std::unique_ptr<gpg::Stream> OpenGPGNetURI(const gpg::StrArg uri, const EGpgNetOpenMode mode)
   {
-    msvc8::string scheme{};
-    msvc8::string authority{};
-    msvc8::string uriPath{};
-    msvc8::string uriQuery{};
-    msvc8::string uriFragment{};
+    fa::string scheme{};
+    fa::string authority{};
+    fa::string uriPath{};
+    fa::string uriQuery{};
+    fa::string uriFragment{};
     if (!moho::URI_Split(uri, &scheme, &authority, &uriPath, &uriQuery, &uriFragment)) {
       return OpenGPGNet(uri, mode);
     }
 
     if (gpg::STR_CompareNoCase(scheme.c_str(), "gpgnet:") == 0 && gpg::STR_StartsWith(authority.c_str(), "//")) {
-      const msvc8::string requestPath = uriPath + uriQuery + uriFragment;
+      const fa::string requestPath = uriPath + uriQuery + uriFragment;
       return OpenGPGNetSocket(authority.c_str() + 2, requestPath, mode);
     }
 
@@ -191,7 +191,7 @@ void moho::VCR_WriteReplayHeader(gpg::Stream& stream, const SWldSessionInfo& ses
   stream.Write(scenarioInfoBytes);
   stream.Write(launchInfo->mScenarioInfo.c_str(), static_cast<std::size_t>(scenarioInfoBytes));
 
-  const msvc8::vector<SSTICommandSource>& commandSources = launchInfo->mCommandSources.mSrcs;
+  const fa::vector<SSTICommandSource>& commandSources = launchInfo->mCommandSources.mSrcs;
   const auto commandSourceCount = static_cast<std::uint8_t>(commandSources.size());
   stream.Write(commandSourceCount);
   for (const SSTICommandSource& commandSource : commandSources) {
@@ -202,11 +202,11 @@ void moho::VCR_WriteReplayHeader(gpg::Stream& stream, const SWldSessionInfo& ses
 
   stream.Write(static_cast<std::uint8_t>(launchInfo->mCheatsEnabled ? 1 : 0));
 
-  const msvc8::vector<msvc8::string>& armyNames = launchInfo->mStrVec;
+  const fa::vector<fa::string>& armyNames = launchInfo->mStrVec;
   const auto armyCount = static_cast<std::uint8_t>(armyNames.size());
   stream.Write(armyCount);
   for (std::size_t armyIndex = 0; armyIndex < armyNames.size(); ++armyIndex) {
-    const msvc8::string& armyName = armyNames[armyIndex];
+    const fa::string& armyName = armyNames[armyIndex];
     const std::int32_t armyNameBytes = static_cast<std::int32_t>(armyName.size());
     stream.Write(armyNameBytes);
     stream.Write(armyName.c_str(), static_cast<std::size_t>(armyNameBytes));
@@ -240,13 +240,13 @@ namespace moho
    * while its reader can still say so.
    */
   bool LaunchInfoStringsDecode(
-    const LaunchInfoBase& launchInfo, const msvc8::vector<msvc8::string>& armySetups
+    const LaunchInfoBase& launchInfo, const fa::vector<fa::string>& armySetups
   )
   {
     LuaPlus::LuaState scratch(LuaPlus::LuaState::LIB_NONE);
     // Each of them is a table where it is used (Sim::Setup writes into the
     // army setups and the scenario), so anything else is refused too.
-    const auto decodesTo = [&scratch](const msvc8::string& text, const bool nilAllowed) {
+    const auto decodesTo = [&scratch](const fa::string& text, const bool nilAllowed) {
       try {
         LuaPlus::LuaObject value;
         (void)SCR_FromString(&value, text, &scratch);
@@ -264,7 +264,7 @@ namespace moho
     if (!decodesTo(launchInfo.mScenarioInfo, false)) {
       return false;
     }
-    for (const msvc8::string& armySetup : armySetups) {
+    for (const fa::string& armySetup : armySetups) {
       if (!decodesTo(armySetup, false)) {
         return false;
       }
@@ -277,12 +277,12 @@ namespace moho
   namespace
   {
     /// The local client's name: localised by the user side when there is one.
-    [[nodiscard]] msvc8::string ReplayLocalClientName()
+    [[nodiscard]] fa::string ReplayLocalClientName()
     {
       if (sReplayLocalClientName != nullptr) {
         return sReplayLocalClientName();
       }
-      msvc8::string name;
+      fa::string name;
       name.assign_owned("Local");
       return name;
     }
@@ -330,19 +330,19 @@ namespace moho
    *
    * Engine addition: a refusal says why through `failureReason`.
    */
-  msvc8::auto_ptr<SWldSessionInfo>
+  fa::auto_ptr<SWldSessionInfo>
   VCR_SetupReplaySession(
     const gpg::StrArg filename,
-    msvc8::string* const failureReason,
+    fa::string* const failureReason,
     std::unique_ptr<gpg::Stream>* const commandStream,
     const int skipBeats
   )
   {
-    const auto refuse = [failureReason](const msvc8::string& reason) {
+    const auto refuse = [failureReason](const fa::string& reason) {
       if (failureReason != nullptr) {
         *failureReason = reason;
       }
-      return msvc8::auto_ptr<SWldSessionInfo>();
+      return fa::auto_ptr<SWldSessionInfo>();
     };
 
     if (filename == nullptr || filename[0] == '\0') {
@@ -367,19 +367,19 @@ namespace moho
    * Engine addition (issue #275): `VCR_SetupReplaySession` from a stream already
    * open, the body of the function at 0x008765E0 from its header read on.
    */
-  msvc8::auto_ptr<SWldSessionInfo> VCR_SetupReplaySessionFromStream(
+  fa::auto_ptr<SWldSessionInfo> VCR_SetupReplaySessionFromStream(
     std::unique_ptr<gpg::Stream> replayStream,
     const gpg::StrArg filename,
-    msvc8::string* const failureReason,
+    fa::string* const failureReason,
     std::unique_ptr<gpg::Stream>* const commandStream,
     const int skipBeats
   )
   {
-    const auto refuse = [failureReason](const msvc8::string& reason) {
+    const auto refuse = [failureReason](const fa::string& reason) {
       if (failureReason != nullptr) {
         *failureReason = reason;
       }
-      return msvc8::auto_ptr<SWldSessionInfo>();
+      return fa::auto_ptr<SWldSessionInfo>();
     };
 
     // Engine addition, not in the binary: the header is read under a handler.
@@ -388,10 +388,10 @@ namespace moho
     // replay is now refused like one of the wrong version.
     boost::shared_ptr<LaunchInfoNew> launchInfo;
     BVIntSet replayCommandSources{};
-    msvc8::string replayMapName{};
+    fa::string replayMapName{};
     try {
       gpg::BinaryReader replayReader(replayStream.get());
-      msvc8::string replayVersion{};
+      fa::string replayVersion{};
       replayReader.ReadString(&replayVersion);
 
       // The binary accepts only its own build ("Supreme Commander v1.50.3835"). This engine
@@ -427,7 +427,7 @@ namespace moho
       }
       FAF_SetReplayGameVersion(recordedGameVersion);
 
-      msvc8::string ignoredString{};
+      fa::string ignoredString{};
       replayReader.ReadString(&ignoredString);
 
       std::array<char, 14> replaySignature{};
@@ -472,7 +472,7 @@ namespace moho
       launchInfo->mStrVec.reserve(armyCount);
 
       for (std::uint32_t armyIndex = 0; armyIndex < armyCount; ++armyIndex) {
-        msvc8::string armyLabel{};
+        fa::string armyLabel{};
         replayReader.ReadLengthPrefixedString(&armyLabel);
         launchInfo->mStrVec.push_back(armyLabel);
 
@@ -507,7 +507,7 @@ namespace moho
       gVcrReplayBeats = VCR_ScanReplayBeats(*replayStream);
     }
 
-    msvc8::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
+    fa::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
     sessionInfo->mMapName = replayMapName;
     (void)CopyLaunchInfoBasePtr(&sessionInfo->mLaunchInfo, launchInfo);
     sessionInfo->mIsBeingRecorded = false;
@@ -531,7 +531,7 @@ namespace moho
         delete replayStreamOwnership;
       }
 
-      const msvc8::string localName = ReplayLocalClientName();
+      const fa::string localName = ReplayLocalClientName();
       sessionInfo->mClientManager->CreateLocalClient(localName.c_str(), 1, 1, kInvalidSourceIndex);
     }
 

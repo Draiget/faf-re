@@ -326,22 +326,22 @@ namespace moho
    */
   const char* RCountedPtrType<moho::IFormationInstance>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("CountedPtr<%s>", gpg::RTypeOf<moho::IFormationInstance>()->GetName());
+    static const fa::string sName = gpg::STR_Printf("CountedPtr<%s>", gpg::RTypeOf<moho::IFormationInstance>()->GetName());
     return sName.c_str();
   }
 
   /**
    * Address: 0x006E9E40 (FUN_006E9E40, Moho::RCountedPtrType<Moho::IFormationInstance>::GetLexical)
    */
-  msvc8::string RCountedPtrType<moho::IFormationInstance>::GetLexical(const gpg::RRef& ref) const
+  fa::string RCountedPtrType<moho::IFormationInstance>::GetLexical(const gpg::RRef& ref) const
   {
     auto* const slot = AsSlot(ref.mObj);
     if (!slot || !*slot) {
-      return msvc8::string("NULL");
+      return fa::string("NULL");
     }
 
     const gpg::RRef instanceRef = MakeIFormationInstanceRef(*slot);
-    const msvc8::string inner = instanceRef.GetLexical();
+    const fa::string inner = instanceRef.GetLexical();
     return gpg::STR_Printf("[%s]", inner.c_str());
   }
 

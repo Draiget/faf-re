@@ -280,7 +280,7 @@ namespace
   void RunAll(Results& r)
   {
     // fistp-style rounding (float-to-cell conversions).
-    RunUnary(r, "RoundToInt", [](const float x) { return Hex(msvc8::RoundToInt(x)); });
+    RunUnary(r, "RoundToInt", [](const float x) { return Hex(fa::RoundToInt(x)); });
 
     // Twister word scaling (CRandomStream::FRand).
     {
@@ -288,123 +288,123 @@ namespace
       const std::uint32_t words[] = {0u, 1u, 0x7FFFFFFFu, 0x80000000u, 0x80000001u, 0xFFFFFF7Fu, 0xFFFFFF80u, 0xFFFFFFFFu};
       for (const float factor : EdgeFloats()) {
         for (const std::uint32_t word : words) {
-          r.Add("MulTwisterWord", index++, Join(factor, word), Hex(msvc8::MulTwisterWord(factor, word)));
+          r.Add("MulTwisterWord", index++, Join(factor, word), Hex(fa::MulTwisterWord(factor, word)));
         }
       }
       InputStream in("MulTwisterWord", 2);
       for (int i = 0; i < kRandomCases; ++i) {
         const float factor = in.Float();
         const std::uint32_t word = static_cast<std::uint32_t>(in.Next());
-        r.Add("MulTwisterWord", index++, Join(factor, word), Hex(msvc8::MulTwisterWord(factor, word)));
+        r.Add("MulTwisterWord", index++, Join(factor, word), Hex(fa::MulTwisterWord(factor, word)));
       }
     }
 
     // Vector lengths and scales.
     RunFloats(r, "ScaleVectorByMaxLengthX87", 4, [](const float* a) {
       float x = a[0], y = a[1], z = a[2];
-      msvc8::ScaleVectorByMaxLengthX87(x, y, z, a[3]);
+      fa::ScaleVectorByMaxLengthX87(x, y, z, a[3]);
       return Join(x, y, z);
     });
     RunFloats(r, "ScaleVectorToLengthX87", 5, [](const float* a) {
       float out[3];
-      msvc8::ScaleVectorToLengthX87(out, a, a[3], a[4]);
+      fa::ScaleVectorToLengthX87(out, a, a[3], a[4]);
       return JoinFloats(out, 3);
     });
     RunFloats(r, "ScaleVectorX87", 4, [](const float* a) {
       float out[3];
-      msvc8::ScaleVectorX87(out, a, a[3]);
+      fa::ScaleVectorX87(out, a, a[3]);
       return JoinFloats(out, 3);
     });
     RunFloats(r, "ScaleVectorToLengthOfX87", 7, [](const float* a) {
       float out[3];
-      msvc8::ScaleVectorToLengthOfX87(out, a, a + 3, a[6]);
+      fa::ScaleVectorToLengthOfX87(out, a, a + 3, a[6]);
       return JoinFloats(out, 3);
     });
-    RunFloats(r, "VectorLengthZYXX87", 3, [](const float* a) { return Hex(msvc8::VectorLengthZYXX87(a)); });
+    RunFloats(r, "VectorLengthZYXX87", 3, [](const float* a) { return Hex(fa::VectorLengthZYXX87(a)); });
 
     // Box-vs-box separating-axis radius: box = center(3), axes(9), extents(3); then the axis.
     RunFloats(
-      r, "BoxRadiusOnAxisX87", 18, [](const float* a) { return Hex(msvc8::BoxRadiusOnAxisX87(a, a + 15)); },
+      r, "BoxRadiusOnAxisX87", 18, [](const float* a) { return Hex(fa::BoxRadiusOnAxisX87(a, a + 15)); },
       kRandomCasesWide
     );
 
     // MSVC8 CRT fmod/frexp.
-    RunDoubles(r, "fmod", 2, [](const double* a) { return Hex(msvc8::fmod(a[0], a[1])); });
+    RunDoubles(r, "fmod", 2, [](const double* a) { return Hex(fa::fmod(a[0], a[1])); });
     RunDoubles(r, "frexp", 1, [](const double* a) {
       int exponent = 0x5A5A5A5A;
-      const double mantissa = msvc8::frexp(a[0], &exponent);
+      const double mantissa = fa::frexp(a[0], &exponent);
       return Join(mantissa, static_cast<std::int32_t>(exponent));
     });
 
     // Products and half sums under 24-bit precision.
-    RunFloats(r, "MultiplyX87", 2, [](const float* a) { return Hex(msvc8::MultiplyX87(a[0], a[1])); });
+    RunFloats(r, "MultiplyX87", 2, [](const float* a) { return Hex(fa::MultiplyX87(a[0], a[1])); });
     {
       int index = 0;
       InputStream in("MultiplyIntegerX87", 2);
       const std::int32_t ints[] = {0, 1, -1, 2028178766, 0x7FFFFFFF, static_cast<std::int32_t>(0x80000000u), 16777217, -16777217};
       for (const float factor : EdgeFloats()) {
         for (const std::int32_t integer : ints) {
-          r.Add("MultiplyIntegerX87", index++, Join(integer, factor), Hex(msvc8::MultiplyIntegerX87(integer, factor)));
+          r.Add("MultiplyIntegerX87", index++, Join(integer, factor), Hex(fa::MultiplyIntegerX87(integer, factor)));
         }
       }
       for (int i = 0; i < kRandomCases; ++i) {
         const std::int32_t integer = in.Int();
         const float factor = in.Float();
-        r.Add("MultiplyIntegerX87", index++, Join(integer, factor), Hex(msvc8::MultiplyIntegerX87(integer, factor)));
+        r.Add("MultiplyIntegerX87", index++, Join(integer, factor), Hex(fa::MultiplyIntegerX87(integer, factor)));
       }
     }
-    RunFloats(r, "HalfSumX87", 2, [](const float* a) { return Hex(msvc8::HalfSumX87(a[0], a[1])); });
-    RunFloats(r, "HalfAbsDifferenceX87", 2, [](const float* a) { return Hex(msvc8::HalfAbsDifferenceX87(a[0], a[1])); });
+    RunFloats(r, "HalfSumX87", 2, [](const float* a) { return Hex(fa::HalfSumX87(a[0], a[1])); });
+    RunFloats(r, "HalfAbsDifferenceX87", 2, [](const float* a) { return Hex(fa::HalfAbsDifferenceX87(a[0], a[1])); });
 
     // Terrain interpolation.
     RunFloats(r, "BilinearHeight", 6, [](const float* a) {
-      return Hex(msvc8::BilinearHeight(a[0], a[1], a[2], a[3], a[4], a[5]));
+      return Hex(fa::BilinearHeight(a[0], a[1], a[2], a[3], a[4], a[5]));
     });
 
     // x87 transcendentals.
-    RunUnary(r, "sinf", [](const float x) { return Hex(msvc8::sinf(x)); });
-    RunUnary(r, "cosf", [](const float x) { return Hex(msvc8::cosf(x)); });
-    RunUnary(r, "tanf", [](const float x) { return Hex(msvc8::tanf(x)); });
-    RunUnary(r, "atanf", [](const float x) { return Hex(msvc8::atanf(x)); });
-    RunFloats(r, "atan2f", 2, [](const float* a) { return Hex(msvc8::atan2f(a[0], a[1])); });
+    RunUnary(r, "sinf", [](const float x) { return Hex(fa::sinf(x)); });
+    RunUnary(r, "cosf", [](const float x) { return Hex(fa::cosf(x)); });
+    RunUnary(r, "tanf", [](const float x) { return Hex(fa::tanf(x)); });
+    RunUnary(r, "atanf", [](const float x) { return Hex(fa::atanf(x)); });
+    RunFloats(r, "atan2f", 2, [](const float* a) { return Hex(fa::atan2f(a[0], a[1])); });
     RunFloats(r, "Atan2Difference", 4, [](const float* a) {
-      return Hex(msvc8::Atan2Difference(a[0], a[1], a[2], a[3]));
+      return Hex(fa::Atan2Difference(a[0], a[1], a[2], a[3]));
     });
-    RunFloats(r, "Atan2Plus", 3, [](const float* a) { return Hex(msvc8::Atan2Plus(a[0], a[1], a[2])); });
-    RunFloats(r, "SinTimesCos", 2, [](const float* a) { return Hex(msvc8::SinTimesCos(a[0], a[1])); });
+    RunFloats(r, "Atan2Plus", 3, [](const float* a) { return Hex(fa::Atan2Plus(a[0], a[1], a[2])); });
+    RunFloats(r, "SinTimesCos", 2, [](const float* a) { return Hex(fa::SinTimesCos(a[0], a[1])); });
     RunFloats(r, "SinOfProductTimes", 3, [](const float* a) {
-      return Hex(msvc8::SinOfProductTimes(a[0], a[1], a[2]));
+      return Hex(fa::SinOfProductTimes(a[0], a[1], a[2]));
     });
-    RunFloats(r, "CosTimesCos", 2, [](const float* a) { return Hex(msvc8::CosTimesCos(a[0], a[1])); });
+    RunFloats(r, "CosTimesCos", 2, [](const float* a) { return Hex(fa::CosTimesCos(a[0], a[1])); });
     RunFloats(
       r, "SlerpSphericalBlend", 11,
       [](const float* a) {
         float out[4];
-        msvc8::SlerpSphericalBlend(out, a, a + 4, a[8], a[9], a[10]);
+        fa::SlerpSphericalBlend(out, a, a + 4, a[8], a[9], a[10]);
         return JoinFloats(out, 4);
       },
       kRandomCasesWide
     );
 
     // /Oi exp and log expansions; the edge-cost logarithm; the Gaussian's (IntrinsicLn).
-    RunUnary(r, "IntrinsicExp", [](const float x) { return Hex(msvc8::IntrinsicExp(x)); });
-    RunUnary(r, "IntrinsicLn", [](const float x) { return Hex(msvc8::IntrinsicLn(x)); });
-    RunUnary(r, "IntrinsicLog10", [](const float x) { return Hex(msvc8::IntrinsicLog10(x)); });
+    RunUnary(r, "IntrinsicExp", [](const float x) { return Hex(fa::IntrinsicExp(x)); });
+    RunUnary(r, "IntrinsicLn", [](const float x) { return Hex(fa::IntrinsicLn(x)); });
+    RunUnary(r, "IntrinsicLog10", [](const float x) { return Hex(fa::IntrinsicLog10(x)); });
     RunFloats(r, "IntrinsicLnQuotient", 2, [](const float* a) {
-      return Hex(msvc8::IntrinsicLnQuotient(a[0], static_cast<double>(a[1])));
+      return Hex(fa::IntrinsicLnQuotient(a[0], static_cast<double>(a[1])));
     });
-    RunFloats(r, "ScaledLnQuotient", 3, [](const float* a) { return Hex(msvc8::ScaledLnQuotient(a[0], a[1], a[2])); });
+    RunFloats(r, "ScaledLnQuotient", 3, [](const float* a) { return Hex(fa::ScaledLnQuotient(a[0], a[1], a[2])); });
 
     // CRT-dispatched functions (x87 bodies at the caller's precision; the
     // others through the host CRT, WPL.11).
-    RunUnary(r, "asinf", [](const float x) { return Hex(msvc8::asinf(x)); });
-    RunUnary(r, "acosf", [](const float x) { return Hex(msvc8::acosf(x)); });
-    RunDoubles(r, "acos", 1, [](const double* a) { return Hex(msvc8::acos(a[0])); });
-    RunDoubles(r, "asin", 1, [](const double* a) { return Hex(msvc8::asin(a[0])); });
-    RunDoubles(r, "pow", 2, [](const double* a) { return Hex(msvc8::pow(a[0], a[1])); });
-    RunUnary(r, "expf", [](const float x) { return Hex(msvc8::expf(x)); });
-    RunUnary(r, "logf", [](const float x) { return Hex(msvc8::logf(x)); });
-    RunFloats(r, "powf", 2, [](const float* a) { return Hex(msvc8::powf(a[0], a[1])); });
+    RunUnary(r, "asinf", [](const float x) { return Hex(fa::asinf(x)); });
+    RunUnary(r, "acosf", [](const float x) { return Hex(fa::acosf(x)); });
+    RunDoubles(r, "acos", 1, [](const double* a) { return Hex(fa::acos(a[0])); });
+    RunDoubles(r, "asin", 1, [](const double* a) { return Hex(fa::asin(a[0])); });
+    RunDoubles(r, "pow", 2, [](const double* a) { return Hex(fa::pow(a[0], a[1])); });
+    RunUnary(r, "expf", [](const float x) { return Hex(fa::expf(x)); });
+    RunUnary(r, "logf", [](const float x) { return Hex(fa::logf(x)); });
+    RunFloats(r, "powf", 2, [](const float* a) { return Hex(fa::powf(a[0], a[1])); });
 
     // sqrt as sim code calls it: float in and out, and a widened float in double.
     RunUnary(r, "sqrt_float", [](const float x) { return Hex(std::sqrt(x)); });
@@ -543,19 +543,19 @@ namespace
       UnaryFloat fn;
     };
     static const Entry kFunctions[] = {
-      {"sinf", [](const float x) { return msvc8::sinf(x); }},
-      {"cosf", [](const float x) { return msvc8::cosf(x); }},
-      {"tanf", [](const float x) { return msvc8::tanf(x); }},
-      {"atanf", [](const float x) { return msvc8::atanf(x); }},
-      {"asinf", [](const float x) { return msvc8::asinf(x); }},
-      {"acosf", [](const float x) { return msvc8::acosf(x); }},
-      {"expf", [](const float x) { return msvc8::expf(x); }},
-      {"logf", [](const float x) { return msvc8::logf(x); }},
-      {"IntrinsicExp", [](const float x) { return msvc8::IntrinsicExp(x); }},
-      {"IntrinsicLn", [](const float x) { return msvc8::IntrinsicLn(x); }},
-      {"IntrinsicLog10", [](const float x) { return msvc8::IntrinsicLog10(x); }},
+      {"sinf", [](const float x) { return fa::sinf(x); }},
+      {"cosf", [](const float x) { return fa::cosf(x); }},
+      {"tanf", [](const float x) { return fa::tanf(x); }},
+      {"atanf", [](const float x) { return fa::atanf(x); }},
+      {"asinf", [](const float x) { return fa::asinf(x); }},
+      {"acosf", [](const float x) { return fa::acosf(x); }},
+      {"expf", [](const float x) { return fa::expf(x); }},
+      {"logf", [](const float x) { return fa::logf(x); }},
+      {"IntrinsicExp", [](const float x) { return fa::IntrinsicExp(x); }},
+      {"IntrinsicLn", [](const float x) { return fa::IntrinsicLn(x); }},
+      {"IntrinsicLog10", [](const float x) { return fa::IntrinsicLog10(x); }},
       {"sqrt_float", [](const float x) { return std::sqrt(x); }},
-      {"RoundToInt", [](const float x) { return std::bit_cast<float>(msvc8::RoundToInt(x)); }},
+      {"RoundToInt", [](const float x) { return std::bit_cast<float>(fa::RoundToInt(x)); }},
     };
     UnaryFloat fn = nullptr;
     for (const Entry& entry : kFunctions) {

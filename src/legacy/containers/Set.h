@@ -12,13 +12,13 @@
 
 #pragma pack(push, 4)
 
-namespace msvc8
+namespace fa
 {
     /**
      * \brief Owning MSVC8-layout `std::set`.
      *
      * All red-black mechanics live in `detail::rb_tree` (RbTree.h), which this
-     * container shares with `msvc8::map`; the key extractor is the identity, so
+     * container shares with `fa::map`; the key extractor is the identity, so
      * `value_type` is the key itself.
      *
      * Layout is the shipped 12-byte `{proxy, _Myhead, _Mysize}` triplet with the
@@ -51,7 +51,7 @@ namespace msvc8
 
         /**
          * Address: 0x00822C50 (FUN_00822C50 -- `set(first, last)` for
-         *   `msvc8::set<moho::WeakSet<moho::UserEntity>::Entry>`, the source a
+         *   `fa::set<moho::WeakSet<moho::UserEntity>::Entry>`, the source a
          *   `WeakSet` walk: `_Init` (the head bought through 0x007B08D0,
          *   isNil=1, self-linked, count zero), then per element the `Entry` the
          *   source's `T*` converts to, `insert` 0x007AEDC0, `~Entry`, and the
@@ -74,7 +74,7 @@ namespace msvc8
         }
 
         /**
-         * Address: 0x008C5B10 (FUN_008C5B10, msvc8::set<msvc8::string>::set(const set&))
+         * Address: 0x008C5B10 (FUN_008C5B10, fa::set<fa::string>::set(const set&))
          *
          * What it does:
          * Stands a fresh empty tree up and copies every key across through
@@ -109,19 +109,19 @@ namespace msvc8
 
         // -------- lookup --------
         /**
-         * Address: 0x008C5B90 (FUN_008C5B90, msvc8::set<msvc8::string>::find)
+         * Address: 0x008C5B90 (FUN_008C5B90, fa::set<fa::string>::find)
          *
          * What it does:
          * Runs the `_Lbound` descent and confirms the landed key is not ordered
          * after the probe, returning `end()` when the key is absent.
-         * Address: 0x008D5020 (FUN_008D5020 -- `find` -- that lower bound plus the equivalence check, returning the header on a miss for `msvc8::set<moho::Resolution>` (the adapter-mode dedup tree in moho/misc/StartupHelpers.cpp, node 0x20, element 0x10 at node+0x0C, isNil@+0x1D); callers 0x008D21E0, 0x008D26D0; formerly `ResolveAdapterModeSortInsertionAnchor` in moho/misc/StartupHelpers.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x007D7C20 (FUN_007D7C20 -- `find` -- lower bound plus the `key < candidate` check, returning the header on a miss for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D64D0 (unreached); formerly `FindRegionKeyExactOrHead` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008D5020 (FUN_008D5020 -- `find` -- that lower bound plus the equivalence check, returning the header on a miss for `fa::set<moho::Resolution>` (the adapter-mode dedup tree in moho/misc/StartupHelpers.cpp, node 0x20, element 0x10 at node+0x0C, isNil@+0x1D); callers 0x008D21E0, 0x008D26D0; formerly `ResolveAdapterModeSortInsertionAnchor` in moho/misc/StartupHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D7C20 (FUN_007D7C20 -- `find` -- lower bound plus the `key < candidate` check, returning the header on a miss for `fa::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D64D0 (unreached); formerly `FindRegionKeyExactOrHead` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] iterator find(const key_type& k) const { return iterator(tree_.find_node(k)); }
 
         /**
          * `rb_tree::count` (RbTree.h) carries this method's real address
-         * (0x004DB770, `msvc8::set<msvc8::string>`) -- see that citation
+         * (0x004DB770, `fa::set<fa::string>`) -- see that citation
          * for the full evidence trail, including why the general
          * equal-range-based shape (not a `find`+ternary shortcut) is what
          * the binary actually emits.
@@ -129,17 +129,17 @@ namespace msvc8
         [[nodiscard]] size_type count(const key_type& k) const { return tree_.count(k); }
 
         /**
-         * Address: 0x004AD790 (FUN_004AD790 -- `lower_bound` for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`, node 0x50, value 0x40, isNil@+0x4D); callers 0x004AB780, 0x004AC9B0; formerly `LowerBoundPrefetchRequestEntry_004AD790` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AD790 (FUN_004AD790 -- `lower_bound` for `fa::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`, node 0x50, value 0x40, isNil@+0x4D); callers 0x004AB780, 0x004AC9B0; formerly `LowerBoundPrefetchRequestEntry_004AD790` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] iterator lower_bound(const key_type& k) const { return iterator(tree_.lower_bound_node(k)); }
         /**
-         * Address: 0x004AD800 (FUN_004AD800 -- `upper_bound` for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`, node 0x50, value 0x40, isNil@+0x4D); callers 0x004AB780, 0x004AC9C0; formerly `UpperBoundPrefetchRequestEntry_004AD800` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AD800 (FUN_004AD800 -- `upper_bound` for `fa::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`, node 0x50, value 0x40, isNil@+0x4D); callers 0x004AB780, 0x004AC9C0; formerly `UpperBoundPrefetchRequestEntry_004AD800` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] iterator upper_bound(const key_type& k) const { return iterator(tree_.upper_bound_node(k)); }
 
         /**
          * `rb_tree::equal_range` (RbTree.h) carries this method's real
-         * addresses (0x00A59E20/0x00A59E80, `msvc8::set<std::uint32_t>`) --
+         * addresses (0x00A59E20/0x00A59E80, `fa::set<std::uint32_t>`) --
          * see that citation for the full evidence trail.
          */
         [[nodiscard]] std::pair<iterator, iterator> equal_range(const key_type& k) const
@@ -153,8 +153,8 @@ namespace msvc8
         void clear() MSVC8_SET_NOEXCEPT { tree_.clear(); }
 
         /**
-         * Address: 0x004AC890 (FUN_004AC890 -- the caller-side half of that same `insert(value)` for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`, node 0x50, value 0x40, isNil@+0x4D); callers 0x004AA220, 0x004AAC20; formerly `FindOrInsertPrefetchRequestEntry` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x004AD5E0 (FUN_004AD5E0 -- `insert(value)` -- lower_bound, then `_Buynode` at that hint when the element is not already there for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`, node 0x50, value 0x40, isNil@+0x4D); callers 0x004AC890; formerly `InsertPrefetchRequestEntry_004AD5E0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AC890 (FUN_004AC890 -- the caller-side half of that same `insert(value)` for `fa::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`, node 0x50, value 0x40, isNil@+0x4D); callers 0x004AA220, 0x004AAC20; formerly `FindOrInsertPrefetchRequestEntry` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AD5E0 (FUN_004AD5E0 -- `insert(value)` -- lower_bound, then `_Buynode` at that hint when the element is not already there for `fa::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`, node 0x50, value 0x40, isNil@+0x4D); callers 0x004AC890; formerly `InsertPrefetchRequestEntry_004AD5E0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          */
         std::pair<iterator, bool> insert(const value_type& v)
         {
@@ -166,7 +166,7 @@ namespace msvc8
 
         /**
          * Address: 0x00868AF0 (FUN_00868AF0 -- `insert(first, last)` for
-         *   `msvc8::set<moho::WeakSet<moho::UserEntity>::Entry>` over a
+         *   `fa::set<moho::WeakSet<moho::UserEntity>::Entry>` over a
          *   `gpg::fastvector<moho::UserEntity*>` range: a stack `Entry` per
          *   element, `insert` 0x007AEDC0, `~Entry`; `WeakSet::Add(first, last)`
          *   for `SelectionDragger`'s collected entities.)
@@ -199,7 +199,7 @@ namespace msvc8
         }
 
         /**
-         * Address: 0x00718410 (FUN_00718410, msvc8::set<Moho::InfluenceMapEntry, Moho::InfluenceMapEntryLess>::erase)
+         * Address: 0x00718410 (FUN_00718410, fa::set<Moho::InfluenceMapEntry, Moho::InfluenceMapEntryLess>::erase)
          *
          * What it does:
          * Unlinks the node under `pos`, repairs the black-height deficit, frees
@@ -210,11 +210,11 @@ namespace msvc8
 
         /**
          * `rb_tree::erase(const key_type&)` (RbTree.h) carries this method's
-         * real addresses (0x00A65B60/0x00A65C10, `msvc8::set<std::uint32_t>`)
+         * real addresses (0x00A65B60/0x00A65C10, `fa::set<std::uint32_t>`)
          * -- see that citation for the full evidence trail, including why
          * the general equal-range-based shape (not a `find`+single-`erase`
          * shortcut) is what the binary actually emits.
-         * Address: 0x007D7B90 (FUN_007D7B90 -- `erase(const key_type&)` -- count the equal range, then erase it for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D7080; formerly `EraseRegionKeyRange` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D7B90 (FUN_007D7B90 -- `erase(const key_type&)` -- count the equal range, then erase it for `fa::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D7080; formerly `EraseRegionKeyRange` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
          */
         size_type erase(const key_type& k) { return tree_.erase(k); }
 
@@ -226,7 +226,7 @@ namespace msvc8
          * this replaced agreed on the returned cursor, but it had no fast path:
          * clearing a whole tree ran one rebalancing erase per element instead of
          * the single recursive `_Erase` plus header reset the binary performs.
-         * Address: 0x004AE2B0 (FUN_004AE2B0 -- `erase(first, last)`, each element's request state released first for `msvc8::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`, node 0x50, value 0x40, isNil@+0x4D); callers 0x004A9C00, 0x004A9DD0, 0x004AC870; formerly `ErasePrefetchRequestEntryRange_004AE2B0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AE2B0 (FUN_004AE2B0 -- `erase(first, last)`, each element's request state released first for `fa::set<moho::ResourceRecord, moho::ResourceRecordLess>` (`ResourceManager::mRecords`, node 0x50, value 0x40, isNil@+0x4D); callers 0x004A9C00, 0x004A9DD0, 0x004AC870; formerly `ErasePrefetchRequestEntryRange_004AE2B0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(iterator first, iterator last)
         {
@@ -342,9 +342,9 @@ namespace msvc8
     };
 
     // Size check (x86)
-    static_assert(sizeof(set<int>) == 12, "msvc8::set must be 12 bytes on x86");
-    static_assert(sizeof(multiset<int>) == 12, "msvc8::multiset must be 12 bytes on x86");
+    static_assert(sizeof(set<int>) == 12, "fa::set must be 12 bytes on x86");
+    static_assert(sizeof(multiset<int>) == 12, "fa::multiset must be 12 bytes on x86");
 
-} // namespace msvc8
+} // namespace fa
 
 #pragma pack(pop)

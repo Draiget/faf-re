@@ -75,7 +75,7 @@ namespace
     header.mLaunchInfo = boost::SharedPtrRawFromSharedRetained(session->mLaunchInfo);
     return header;
   }
-  [[nodiscard]] msvc8::string MakeTempSavePath(const msvc8::string& basePath)
+  [[nodiscard]] fa::string MakeTempSavePath(const fa::string& basePath)
   {
     return basePath + ".NEW";
   }
@@ -137,7 +137,7 @@ namespace
     return luaContext ? luaContext->stateUserData : nullptr;
   }
 
-  void EnsureDirectoryExistsOrThrow(const msvc8::string& directoryPath)
+  void EnsureDirectoryExistsOrThrow(const fa::string& directoryPath)
   {
     const std::wstring widePath = gpg::STR_Utf8ToWide(directoryPath.c_str());
     if (::CreateDirectoryW(widePath.c_str(), nullptr) == FALSE && ::GetLastError() != ERROR_ALREADY_EXISTS) {
@@ -239,24 +239,24 @@ namespace moho
    *   index as one byte, and 0xFF to close the list,
    *   u32 init seed.
    */
-  msvc8::auto_ptr<gpg::Stream> VCR_CreateReplay(const SWldSessionInfo* const sessionInfo, const gpg::StrArg name)
+  fa::auto_ptr<gpg::Stream> VCR_CreateReplay(const SWldSessionInfo* const sessionInfo, const gpg::StrArg name)
   {
     LaunchInfoBase* const launchInfoBase = sessionInfo != nullptr ? sessionInfo->mLaunchInfo.get() : nullptr;
     LaunchInfoNew* const launchInfo = launchInfoBase != nullptr ? launchInfoBase->GetNew() : nullptr;
     if (launchInfo == nullptr) {
-      return msvc8::auto_ptr<gpg::Stream>(nullptr);
+      return fa::auto_ptr<gpg::Stream>(nullptr);
     }
 
-    msvc8::string replayPath{};
-    msvc8::vector<msvc8::string> savedReplayArgs{};
+    fa::string replayPath{};
+    fa::vector<fa::string> savedReplayArgs{};
     if (CFG_GetArgOption("/savereplay", 1u, &savedReplayArgs)) {
       replayPath = FILE_SuggestedExt(savedReplayArgs[0].c_str(), USER_GetReplayExt().c_str());
     } else {
-      msvc8::string replayDirectory{};
+      fa::string replayDirectory{};
       // A name that already carries a separator is taken as a path and used
       // as-is; only a bare name goes under the per-profile replay directory.
       if (std::strchr(name, '/') == nullptr && std::strchr(name, '\\') == nullptr) {
-        const msvc8::string replayRoot = USER_GetReplayDir();
+        const fa::string replayRoot = USER_GetReplayDir();
         EnsureDirectoryExistsOrThrow(replayRoot);
         replayDirectory = replayRoot + OPTIONS_GetCurrentProfileName() + "\\";
         EnsureDirectoryExistsOrThrow(replayDirectory);
@@ -274,7 +274,7 @@ namespace moho
       // Two clients sharing one profile both target LastGame; the second open
       // fails and that client simply does not record.
       gpg::Logf("Can't create replay file \"%s\"", replayPath.c_str());
-      return msvc8::auto_ptr<gpg::Stream>(nullptr);
+      return fa::auto_ptr<gpg::Stream>(nullptr);
     }
 
     gpg::Logf("Saving replay to \"%s\"", replayPath.c_str());
@@ -284,7 +284,7 @@ namespace moho
       REJOIN_SealRecordingHeader(stream);
     }
 
-    return msvc8::auto_ptr<gpg::Stream>(replayStream.release());
+    return fa::auto_ptr<gpg::Stream>(replayStream.release());
   }
 
 
@@ -338,7 +338,7 @@ namespace moho
    * What it does:
    * Builds one single-player session bootstrap payload from Lua launch data.
    */
-  msvc8::auto_ptr<SWldSessionInfo> WLD_SetupSessionInfo(const LuaPlus::LuaObject& launchData)
+  fa::auto_ptr<SWldSessionInfo> WLD_SetupSessionInfo(const LuaPlus::LuaObject& launchData)
   {
     boost::shared_ptr<LaunchInfoNew> launchInfo(new LaunchInfoNew());
     launchInfo->mCommandSources.mOriginalSource = 0;
@@ -367,7 +367,7 @@ namespace moho
       }
     }
 
-    msvc8::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
+    fa::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
     const char* const mapName = scenarioInfo["map"].GetString();
     sessionInfo->mMapName = mapName != nullptr ? mapName : "";
     sessionInfo->mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(launchInfo);
@@ -431,7 +431,7 @@ namespace moho
       replayFilename = "";
     }
 
-    msvc8::auto_ptr<SWldSessionInfo> sessionInfo = REPLAY_SetupViewerSession(replayFilename, nullptr);
+    fa::auto_ptr<SWldSessionInfo> sessionInfo = REPLAY_SetupViewerSession(replayFilename, nullptr);
     const bool launchStarted = sessionInfo.get() != nullptr;
     if (launchStarted) {
       WLD_BeginSession(sessionInfo);
@@ -489,7 +489,7 @@ namespace moho
     }
 
     const LuaPlus::LuaObject launchData(LuaPlus::LuaStackObject(state, 1));
-    msvc8::auto_ptr<SWldSessionInfo> sessionInfo = WLD_SetupSessionInfo(launchData);
+    fa::auto_ptr<SWldSessionInfo> sessionInfo = WLD_SetupSessionInfo(launchData);
     WLD_BeginSession(sessionInfo);
     return 0;
   }
@@ -715,7 +715,7 @@ namespace moho
     }
 
     try {
-      msvc8::auto_ptr<SWldSessionInfo> sessionInfo;
+      fa::auto_ptr<SWldSessionInfo> sessionInfo;
       {
         CSavedGame savedGame(filename);
         sessionInfo = savedGame.CreateSinglePlayerSessionInfo();
@@ -791,7 +791,7 @@ namespace moho
     }
 
     LuaPlus::LuaObject modsObject(LuaPlus::LuaStackObject(state, 2));
-    msvc8::string gameMods = SCR_ToString(modsObject);
+    fa::string gameMods = SCR_ToString(modsObject);
 
     LuaPlus::LuaStackObject highPriorityArg(state, 3);
     const bool highPriority = highPriorityArg.GetBoolean();
@@ -940,7 +940,7 @@ namespace moho
       }
       clientEntry.SetObject("authorizedCommandSources", commandSources);
 
-      msvc8::vector<const CClientBase*> ejecters;
+      fa::vector<const CClientBase*> ejecters;
       client->CollectEjecters(ejecters);
 
       LuaPlus::LuaObject ejectedByTable{};
@@ -1005,7 +1005,7 @@ namespace moho
     lua_State* const rawState = state->m_state;
     moho::SCR_ExpectExactArgs(state, 3, kInternalSaveGameHelpText);
 
-    const msvc8::string saveGameDirectory = USER_GetSaveGameDir();
+    const fa::string saveGameDirectory = USER_GetSaveGameDir();
     EnsureDirectoryExistsOrThrow(saveGameDirectory);
 
     const LuaPlus::LuaStackObject savePathArg(state, 1);
@@ -1014,7 +1014,7 @@ namespace moho
       savePathArg.TypeError("string");
     }
 
-    const msvc8::string saveTargetDirectory = FILE_Dir(savePath);
+    const fa::string saveTargetDirectory = FILE_Dir(savePath);
     EnsureDirectoryExistsOrThrow(saveTargetDirectory);
 
     ISTIDriver* const driver = WLD_GetDriver();
@@ -1099,7 +1099,7 @@ namespace moho
    * What it does:
    * Builds one single-player `SWldSessionInfo` from loaded save payload.
    */
-  msvc8::auto_ptr<SWldSessionInfo> CSavedGame::CreateSinglePlayerSessionInfo()
+  fa::auto_ptr<SWldSessionInfo> CSavedGame::CreateSinglePlayerSessionInfo()
   {
     // MSVC8 emitted the boost::shared_ptr<LaunchInfoLoad>(LaunchInfoLoad*) ctor
     // out-of-line (FUN_00883F60); invoke it by name so the front-end keeps that
@@ -1119,7 +1119,7 @@ namespace moho
       throw SaveLoadError("InvalidFormat");
     }
 
-    const msvc8::string localArmyName = mHeader.mArmyInfo[static_cast<std::size_t>(focusArmyIndex)].mPlayerName;
+    const fa::string localArmyName = mHeader.mArmyInfo[static_cast<std::size_t>(focusArmyIndex)].mPlayerName;
 
     launchInfo->mCommandSources.mSrcs.clear();
     SSTICommandSource source{};
@@ -1154,7 +1154,7 @@ namespace moho
       throw SaveLoadError("InvalidFormat");
     }
 
-    msvc8::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
+    fa::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
     sessionInfo->mMapName = mHeader.mMapName;
     sessionInfo->mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(launchInfo);
     sessionInfo->mIsBeingRecorded = false;
@@ -1176,7 +1176,7 @@ namespace
 {
   /// Engine addition (plan WPL.4): the localised local-client name
   /// VCR_SetupReplaySession (moho/misc/ReplaySessionSetup.cpp) asks for.
-  [[nodiscard]] msvc8::string LocalizedReplayLocalClientName()
+  [[nodiscard]] fa::string LocalizedReplayLocalClientName()
   {
     return moho::Loc(moho::USER_GetLuaState(), "<LOC Engine0031>Local");
   }
@@ -1245,7 +1245,7 @@ namespace moho
     , mArchive(nullptr)
   {
     const SSavedGameHeader header = BuildSavedGameHeader(WLD_GetActiveSession());
-    const msvc8::string tempPath = MakeTempSavePath(mSavePath);
+    const fa::string tempPath = MakeTempSavePath(mSavePath);
     const std::wstring wideTempPath = gpg::STR_Utf8ToWide(tempPath.c_str());
     std::FILE* file = nullptr;
     if (_wfopen_s(&file, wideTempPath.c_str(), L"wb") != 0) {
@@ -1254,7 +1254,7 @@ namespace moho
     mFile.reset(file, moho::SFileStarCloser{});
 
     if (!file) {
-      const msvc8::string message = gpg::STR_Printf("Error opening %s for write", tempPath.c_str());
+      const fa::string message = gpg::STR_Printf("Error opening %s for write", tempPath.c_str());
       throw gpg::SerializationError(message.c_str());
     }
 

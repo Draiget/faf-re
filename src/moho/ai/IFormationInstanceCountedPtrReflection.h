@@ -56,7 +56,7 @@ namespace moho
      * Address: 0x006E9E40 (FUN_006E9E40, Moho::RCountedPtrType<Moho::IFormationInstance>::GetLexical)
      * Slot: 4
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x006E9FC0 (FUN_006E9FC0, Moho::RCountedPtrType<Moho::IFormationInstance>::IsIndexed)

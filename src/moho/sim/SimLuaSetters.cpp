@@ -1170,7 +1170,7 @@ int moho::cfunc_SetArmyAIPersonalityL(LuaPlus::LuaState* const state)
   }
 
   if (personalityName[0] != '\0') {
-    army->mVarDat.mArmyType.assign(personalityName, 0U, msvc8::string::npos);
+    army->mVarDat.mArmyType.assign(personalityName, 0U, fa::string::npos);
   }
   return 0;
 }
@@ -1288,7 +1288,7 @@ int moho::cfunc_SetArmyPlansL(LuaPlus::LuaState* const state)
     }
   }
 
-  const msvc8::string plansValue(plansText ? plansText : "");
+  const fa::string plansValue(plansText ? plansText : "");
   const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
   CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
   army->SetArmyPlans(plansValue);

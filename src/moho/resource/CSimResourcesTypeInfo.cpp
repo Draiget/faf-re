@@ -87,7 +87,7 @@ namespace
     moho::CSimResources* const object
   )
   {
-    gpg::RType* const vectorType = gpg::RTypeOf<msvc8::vector<moho::ResourceDeposit>>();
+    gpg::RType* const vectorType = gpg::RTypeOf<fa::vector<moho::ResourceDeposit>>();
     gpg::RRef ownerRef{};
     archive->Read(vectorType, &object->deposits_, ownerRef);
   }
@@ -104,7 +104,7 @@ namespace
     moho::CSimResources* const object
   )
   {
-    gpg::RType* const vectorType = gpg::RTypeOf<msvc8::vector<moho::ResourceDeposit>>();
+    gpg::RType* const vectorType = gpg::RTypeOf<fa::vector<moho::ResourceDeposit>>();
     gpg::RRef ownerRef{};
     archive->Write(vectorType, &object->deposits_, ownerRef);
   }

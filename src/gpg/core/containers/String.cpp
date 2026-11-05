@@ -4,7 +4,7 @@
 #include <string_view>
 using namespace gpg;
 
-msvc8::string gpg::sWhitespaceChars{" \n\t\r"};
+fa::string gpg::sWhitespaceChars{" \n\t\r"};
 
 /**
  * Address: 0x009380A0 (FUN_009380A0, gpg::STR_Utf8ByteOffset)
@@ -95,7 +95,7 @@ const char* gpg::STR_PreviousUtf8Char(
  * Walks UTF-8 codepoint boundaries to extract one `[pos, pos+len)` codepoint
  * range; throws `std::out_of_range` when `pos` is past end-of-string.
  */
-msvc8::string gpg::STR_Utf8SubString(
+fa::string gpg::STR_Utf8SubString(
   StrArg str,
   const int pos,
   const int len
@@ -108,7 +108,7 @@ msvc8::string gpg::STR_Utf8SubString(
     }
     if (i == pos + len) {
       if (str != nullptr) {
-        return msvc8::string{start, static_cast<std::size_t>(str - start)};
+        return fa::string{start, static_cast<std::size_t>(str - start)};
       }
       break;
     }
@@ -118,9 +118,9 @@ msvc8::string gpg::STR_Utf8SubString(
     str = STR_NextUtf8Char(str);
   }
   if (start == nullptr) {
-    throw std::out_of_range{msvc8::string{"offset past end of string"}.to_std()};
+    throw std::out_of_range{fa::string{"offset past end of string"}.to_std()};
   }
-  return msvc8::string{start, static_cast<std::size_t>(str - start)};
+  return fa::string{start, static_cast<std::size_t>(str - start)};
 }
 
 /**
@@ -224,11 +224,11 @@ const char* gpg::STR_DecodeUtf8Char(
  * Encodes one wide-character string as UTF-8 via `STR_EncodeUtf8Char`,
  * appending each codepoint until the terminating NUL.
  */
-msvc8::string gpg::STR_WideToUtf8(
+fa::string gpg::STR_WideToUtf8(
   const wchar_t* str
 )
 {
-  msvc8::string builder{};
+  fa::string builder{};
   if (str != nullptr) {
     char buff[4];
     for (wchar_t c = *str; c; c = *++str) {
@@ -272,7 +272,7 @@ std::wstring gpg::STR_Utf8ToWide(
 bool gpg::STR_GetToken(
   StrArg& find,
   const char* str,
-  msvc8::string& dest
+  fa::string& dest
 )
 {
   int c = *find;
@@ -309,10 +309,10 @@ bool gpg::STR_GetToken(
 void gpg::STR_GetTokens(
   StrArg find,
   const char* str,
-  msvc8::vector<msvc8::string>& vec
+  fa::vector<fa::string>& vec
 )
 {
-  msvc8::string token{};
+  fa::string token{};
   const char* const delimiters = str;
   if (STR_GetToken(find, delimiters, token)) {
     do {
@@ -329,7 +329,7 @@ void gpg::STR_GetTokens(
  * start index of the current/previous word boundary.
  */
 int gpg::STR_GetWordStartIndex(
-  msvc8::string& str,
+  fa::string& str,
   const int pos
 )
 {
@@ -348,11 +348,11 @@ int gpg::STR_GetWordStartIndex(
     const auto whitespacePos = sWhitespaceChars.find(&c, 0, 1);
 
     if (boundary) {
-      if (whitespacePos != msvc8::string::npos) {
+      if (whitespacePos != fa::string::npos) {
         return index;
       }
     } else {
-      boundary = whitespacePos == msvc8::string::npos;
+      boundary = whitespacePos == fa::string::npos;
     }
 
     --index;
@@ -364,7 +364,7 @@ int gpg::STR_GetWordStartIndex(
 /**
  * Address: 0x00938570 (FUN_00938570, gpg::STR_GetNextWordStartIndex)
  *
- * msvc8::string &, int
+ * fa::string &, int
  *
  * IDA signature:
  * int __cdecl gpg::STR_GetNextWordStartIndex(std::string *str, int pos);
@@ -374,7 +374,7 @@ int gpg::STR_GetWordStartIndex(
  * after the next whitespace separator; returns UTF-8 length when none exists.
  */
 int gpg::STR_GetNextWordStartIndex(
-  msvc8::string& str,
+  fa::string& str,
   int pos
 )
 {
@@ -390,7 +390,7 @@ int gpg::STR_GetNextWordStartIndex(
 
   while (*cursor != '\0') {
     const char c = *cursor;
-    const bool isWhitespace = (sWhitespaceChars.find(&c, 0, 1) != msvc8::string::npos);
+    const bool isWhitespace = (sWhitespaceChars.find(&c, 0, 1) != fa::string::npos);
 
     if (seenWhitespace) {
       if (!isWhitespace) {
@@ -548,9 +548,9 @@ bool gpg::STR_ContainsNoCase(
     return false;
   }
 
-  const msvc8::string haystackLower = STR_ToLower(str);
-  const msvc8::string needleLower = STR_ToLower(needle);
-  return haystackLower.find(needleLower.data(), 0, needleLower.size()) != msvc8::string::npos;
+  const fa::string haystackLower = STR_ToLower(str);
+  const fa::string needleLower = STR_ToLower(needle);
+  return haystackLower.find(needleLower.data(), 0, needleLower.size()) != fa::string::npos;
 }
 
 bool gpg::STR_EqualsNoCase(
@@ -597,7 +597,7 @@ bool gpg::STR_IsIdent(
  * non-zero, returning the number of replacements performed.
  */
 int gpg::STR_Replace(
-  msvc8::string& str,
+  fa::string& str,
   const StrArg what,
   const StrArg with,
   const unsigned int unk
@@ -609,7 +609,7 @@ int gpg::STR_Replace(
   int replaceCount = 0;
   if (unk != 0u) {
     std::size_t searchPos = 0u;
-    while ((searchPos = str.find(what, searchPos, whatLength)) != msvc8::string::npos) {
+    while ((searchPos = str.find(what, searchPos, whatLength)) != fa::string::npos) {
       str.replace(searchPos, whatLength, std::string_view{with, withLength});
       searchPos += withLength;
       ++replaceCount;
@@ -925,9 +925,9 @@ bool gpg::STR_WildcardValidPrefix(
 }
 
 // 0x00938C80
-msvc8::string gpg::STR_GetWhitespaceCharacters()
+fa::string gpg::STR_GetWhitespaceCharacters()
 {
-  return msvc8::string{sWhitespaceChars};
+  return fa::string{sWhitespaceChars};
 }
 
 /**
@@ -937,7 +937,7 @@ msvc8::string gpg::STR_GetWhitespaceCharacters()
  * Returns `str` without its trailing `chr` delimiter (or without the last
  * character when `chr==0`).
  */
-msvc8::string gpg::STR_Chop(
+fa::string gpg::STR_Chop(
   const StrArg str,
   const char chr
 )
@@ -947,9 +947,9 @@ msvc8::string gpg::STR_Chop(
     if (!chr || str[size - 1] == chr) {
       --size;
     }
-    return msvc8::string{str, &str[size]};
+    return fa::string{str, &str[size]};
   } else {
-    return msvc8::string{""};
+    return fa::string{""};
   }
 }
 
@@ -969,11 +969,11 @@ bool gpg::str_LowerInPlace = true;
  * then produced "cZ\programdata\...\supcomdatapathNlua", so no absolute path
  * could ever be opened and startup died in gpg::Die on the data-path script.
  */
-msvc8::string gpg::STR_ToLower(
+fa::string gpg::STR_ToLower(
   StrArg str
 )
 {
-  msvc8::string builder{};
+  fa::string builder{};
   if (!str_LowerInPlace) {
     builder.reserve(strlen(str));
     for (char c = *str; c != '\0'; c = *++str) {
@@ -1006,11 +1006,11 @@ msvc8::string gpg::STR_ToLower(
  * `lea ecx, [eax-61h] / cmp ecx, 19h / ja` - the same unsigned range test as
  * STR_ToLower, so only 'a'..'z' are touched.
  */
-msvc8::string gpg::STR_ToUpper(
+fa::string gpg::STR_ToUpper(
   StrArg str
 )
 {
-  msvc8::string builder{};
+  fa::string builder{};
   builder.reserve(strlen(str));
   for (char c = *str; c != '\0'; c = *++str) {
     if (c >= 'a' && c <= 'z') {
@@ -1022,7 +1022,7 @@ msvc8::string gpg::STR_ToUpper(
 }
 
 void gpg::STR_NormalizeFilenameLowerSlash(
-  msvc8::string& inOut
+  fa::string& inOut
 )
 {
   for (std::size_t i = 0; i < inOut.size(); ++i) {
@@ -1060,8 +1060,8 @@ void gpg::STR_NormalizeFilenameLowerSlash(
  * Initializes destination string into empty SSO state, then canonicalizes one
  * filename/path token to lowercase backslash form.
  */
-msvc8::string* gpg::STR_InitFilename(
-  msvc8::string* const out,
+fa::string* gpg::STR_InitFilename(
+  fa::string* const out,
   const StrArg in
 )
 {
@@ -1074,8 +1074,8 @@ msvc8::string* gpg::STR_InitFilename(
   return out;
 }
 
-msvc8::string* gpg::STR_SetFilename(
-  msvc8::string* const out,
+fa::string* gpg::STR_SetFilename(
+  fa::string* const out,
   const StrArg in
 )
 {
@@ -1088,9 +1088,9 @@ msvc8::string* gpg::STR_SetFilename(
  * What it does:
  * Routes one source filename string through `STR_SetFilename` into `out`.
  */
-msvc8::string* gpg::STR_CopyFilename(
-  msvc8::string* const out,
-  const msvc8::string* const filename
+fa::string* gpg::STR_CopyFilename(
+  fa::string* const out,
+  const fa::string* const filename
 )
 {
   return STR_SetFilename(out, filename->raw_data_unsafe());
@@ -1103,7 +1103,7 @@ msvc8::string* gpg::STR_CopyFilename(
  * Lowercases one path and normalizes `/` separators to `\\`.
  */
 void gpg::STR_CanonizeFilename(
-  msvc8::string* const out,
+  fa::string* const out,
   const StrArg in
 )
 {
@@ -1148,11 +1148,11 @@ void gpg::STR_CanonizeFilename(
  * Skips leading ASCII whitespace bytes, copies the remaining text, then trims
  * trailing ASCII whitespace bytes from the copied buffer.
  */
-msvc8::string gpg::STR_TrimWhitespace(
+fa::string gpg::STR_TrimWhitespace(
   StrArg str
 )
 {
-  msvc8::string builder{};
+  fa::string builder{};
   if (str != nullptr) {
     const char* cursor = str;
     while (*cursor == ' ' || *cursor == '\t' || *cursor == '\r' || *cursor == '\n') {
@@ -1180,7 +1180,7 @@ msvc8::string gpg::STR_TrimWhitespace(
  * What it does:
  * Starts one varargs lane at `fmt` and forwards formatting through `STR_Va`.
  */
-msvc8::string gpg::STR_Printf(
+fa::string gpg::STR_Printf(
   const char* fmt,
   ...
 )
@@ -1188,7 +1188,7 @@ msvc8::string gpg::STR_Printf(
   va_list va;
   va_start(va, fmt);
   const char* forwardedFormat = fmt;
-  const msvc8::string ret = STR_Va(forwardedFormat, va);
+  const fa::string ret = STR_Va(forwardedFormat, va);
   va_end(va);
   return ret;
 }
@@ -1201,14 +1201,14 @@ msvc8::string gpg::STR_Printf(
  * Formats one vararg message into a 256-byte stack buffer first, then retries
  * in a growable heap buffer until `_vsnprintf` returns a concrete length.
  */
-msvc8::string gpg::STR_Va(
+fa::string gpg::STR_Va(
   const char*& fmt,
   va_list va
 )
 {
-  // Build through msvc8::string's concatenation path, not append().
+  // Build through fa::string's concatenation path, not append().
   //
-  // msvc8::string is the legacy non-owning wrapper: it holds an inline buffer
+  // fa::string is the legacy non-owning wrapper: it holds an inline buffer
   // of 15 chars and never reallocates, so append() returns false and copies
   // nothing once mySize + n exceeds myRes. Formatted diagnostics are almost
   // always longer than 15 characters, so appending into a default-constructed
@@ -1239,7 +1239,7 @@ msvc8::string gpg::STR_Va(
   int formattedLength = std::vsnprintf(stackBuffer, sizeof(stackBuffer), fmt, attempt);
   va_end(attempt);
   if (didNotFit(formattedLength, sizeof(stackBuffer))) {
-    msvc8::vector<char> dynamicBuffer{};
+    fa::vector<char> dynamicBuffer{};
     std::size_t capacity = sizeof(stackBuffer);
     do {
       capacity *= 2;
@@ -1252,13 +1252,13 @@ msvc8::string gpg::STR_Va(
         // loop always terminated. The C99 function also returns negative for a
         // genuine encoding error, which would spin here forever; there is no
         // message to recover in that case.
-        return msvc8::string{};
+        return fa::string{};
       }
     } while (didNotFit(formattedLength, capacity));
 
-    return msvc8::string{} +
+    return fa::string{} +
            std::string_view(dynamicBuffer.data(), static_cast<std::size_t>(formattedLength));
   }
 
-  return msvc8::string{} + std::string_view(stackBuffer, static_cast<std::size_t>(formattedLength));
+  return fa::string{} + std::string_view(stackBuffer, static_cast<std::size_t>(formattedLength));
 }

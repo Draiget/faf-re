@@ -396,7 +396,7 @@ namespace moho
     // -----------------------------------------------------------------------
     WeakPtr<Unit> mUnit{};                                 // +0x80
     WeakPtr<UnitWeapon> mWeapon{};                         // +0x88
-    msvc8::string mLabel{};                                // +0x90
+    fa::string mLabel{};                                // +0x90
     RUnitBlueprintWeapon* mUnitWepBlueprint = nullptr;     // +0xAC
     RProjectileBlueprintPhysics* mProjPhysBlueprint = nullptr; // +0xB0
     bool mEnabled = false;                                 // +0xB4

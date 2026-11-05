@@ -1843,7 +1843,7 @@ void gpg::Die(const char* args, ...)
 {
     va_list va;
     va_start(va, args);
-    const msvc8::string msg = STR_Va(args, va);
+    const fa::string msg = STR_Va(args, va);
     va_end(va);
     InvokeDieHandler(msg.c_str());
     __debugbreak();

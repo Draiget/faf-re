@@ -148,14 +148,14 @@ namespace
     return volume.Intersects(bounds);
   }
 
-  // The spatial maps are `moho::SpatialMap<T>` -- an `msvc8::multiset` of
+  // The spatial maps are `moho::SpatialMap<T>` -- an `fa::multiset` of
   // `SpatialEntry<T>` in `SpatialEntryLess` order -- and the shard arrays are
-  // `msvc8::vector`s (SpatialDb.h). Every tree and vector body the database
+  // `fa::vector`s (SpatialDb.h). Every tree and vector body the database
   // emitted in 0x00504310..0x00506230 (insert, hinted insert, `_Insert`,
   // erase, the rotations, `_Inc`/`_Dec`, `_Min`/`_Max`, `_Buynode`, `~_Tree`,
   // `resize`, `_Insert_n`, `_Xlen`, the word moves) is the containers' own and
-  // is cited on `msvc8::multiset`, `msvc8::detail::rb_tree` and
-  // `msvc8::vector`. The hand-rolled copies that used to live here implemented
+  // is cited on `fa::multiset`, `fa::detail::rb_tree` and
+  // `fa::vector`. The hand-rolled copies that used to live here implemented
   // all of it a second time over the same nodes -- the erase as a silent no-op
   // for a while (564d7e57d) -- so they are gone, and the source says
   // `map.insert(entry)` and `mShards.resize(16)`.
@@ -562,7 +562,7 @@ namespace
    */
   template <class T>
   [[nodiscard]] bool CollectInVolumeParallel(
-    msvc8::vector<moho::SpatialShard<T>*>& shards,
+    fa::vector<moho::SpatialShard<T>*>& shards,
     moho::SpatialShardData<T>& rootData,
     const moho::EEntityType type,
     moho::CGeomSolid3& volume,

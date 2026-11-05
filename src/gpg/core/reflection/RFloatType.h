@@ -25,10 +25,10 @@ public:
    *
    * What it does:
    * Formats the float value referenced by `ref.mObj` using `"%f"` and returns
-   * it as an `msvc8::string`.  Pre-allocates 30 characters to guarantee
+   * it as an `fa::string`.  Pre-allocates 30 characters to guarantee
    * sprintf buffer capacity, then trims to the actual output length.
    */
-  [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+  [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
   /**
    * Address: 0x008DF060 (FUN_008DF060)

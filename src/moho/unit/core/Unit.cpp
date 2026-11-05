@@ -1,4 +1,5 @@
 #include "moho/unit/core/UnitPrivate2.h"
+#include "moho/collision/AxisAlignedProbe.h"
 
 namespace moho
 {
@@ -459,7 +460,7 @@ namespace
              position.x > static_cast<float>(playableRect.x1) || position.z > static_cast<float>(playableRect.z1));
   }
 
-  void IncrementAIDebugStateStat(CArmyStats* const armyStats, const msvc8::string& statPath)
+  void IncrementAIDebugStateStat(CArmyStats* const armyStats, const fa::string& statPath)
   {
     if (!armyStats || statPath.empty()) {
       return;
@@ -624,36 +625,10 @@ namespace
     }
   }
 
-  [[nodiscard]] Wm3::Box3f BuildAxisAlignedCollisionProbe(
-    const Wm3::Vec3f& center,
-    const Wm3::Vec3f& extents
-  ) noexcept
-  {
-    Wm3::Box3f probe{};
-    probe.Center[0] = center.x;
-    probe.Center[1] = center.y;
-    probe.Center[2] = center.z;
-
-    probe.Axis[0][0] = 1.0f;
-    probe.Axis[0][1] = 0.0f;
-    probe.Axis[0][2] = 0.0f;
-    probe.Axis[1][0] = 0.0f;
-    probe.Axis[1][1] = 1.0f;
-    probe.Axis[1][2] = 0.0f;
-    probe.Axis[2][0] = 0.0f;
-    probe.Axis[2][1] = 0.0f;
-    probe.Axis[2][2] = 1.0f;
-
-    probe.Extent[0] = extents.x;
-    probe.Extent[1] = extents.y;
-    probe.Extent[2] = extents.z;
-    return probe;
-  }
-
   // 0x006A7827..0x006A784F: `addss 0.5`, stored to float, then the inlined floor.
   [[nodiscard]] std::int32_t RoundOccupyRectEdge(const float value) noexcept
   {
-    return msvc8::FloorToIntX87(value + 0.5f);
+    return fa::FloorToIntX87(value + 0.5f);
   }
 
   void DrawRaisedPlatformEdge(
@@ -762,12 +737,12 @@ LuaPlus::LuaObject CScrLuaMetatableFactory<Unit>::Create(LuaPlus::LuaState* cons
  * Loads `/lua/armordefinition.lua`, resolves `armordefinition` table rows for
  * one armor type, and returns raw `<damageType multiplier>` string lanes.
  */
-msvc8::list<msvc8::string> moho::ARMOR_GetArmorDefinations(
+fa::list<fa::string> moho::ARMOR_GetArmorDefinations(
   LuaPlus::LuaState* const state,
   const gpg::StrArg armorTypeName
 )
 {
-  msvc8::list<msvc8::string> definitions{};
+  fa::list<fa::string> definitions{};
 
   LuaPlus::LuaObject armorModule = SCR_Import(state, "/lua/armordefinition.lua");
   if (armorModule.IsNil()) {
@@ -799,7 +774,7 @@ msvc8::list<msvc8::string> moho::ARMOR_GetArmorDefinations(
       LuaPlus::LuaObject definitionObject = armorClass.GetByIndex(definitionIndex);
       const char* const definitionText = definitionObject.GetString();
       if (definitionText) {
-        definitions.push_back(msvc8::string(definitionText));
+        definitions.push_back(fa::string(definitionText));
       }
     }
 
@@ -956,7 +931,7 @@ namespace
    */
   void AppendLiveCommandIdsToSnapshot(
     gpg::fastvector_n<moho::CmdId, 8>& snapshot,
-    const msvc8::vector<moho::WeakPtr<moho::CUnitCommand>>& source
+    const fa::vector<moho::WeakPtr<moho::CUnitCommand>>& source
   )
   {
     for (const moho::WeakPtr<moho::CUnitCommand>& commandWeakPtr : source) {

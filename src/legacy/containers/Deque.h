@@ -9,7 +9,7 @@
 
 #include "legacy/containers/Layout.h"
 
-namespace msvc8
+namespace fa
 {
     /**
      * MSVC8-compatible deque (x86) with strict 0x14-bytes layout:
@@ -133,20 +133,20 @@ namespace msvc8
 
         /**
          * Address: 0x008B5210 (FUN_008B5210 -- `~deque` for
-         * `msvc8::deque<Moho::UserCommandIssueLocalEvent>` (0x50-byte element,
+         * `fa::deque<Moho::UserCommandIssueLocalEvent>` (0x50-byte element,
          * block size 1): `pop_back` until empty (each event's implicit
          * destructor 0x008B4800), then every node from the top of the map
          * down, then the map; `UserCommandIssueHelper::~UserCommandIssueHelper`
          * 0x008B3F80 runs it on `mLocalQueue`.)
-         * Address: 0x0074DF10 (FUN_0074DF10 -- `~deque` for `msvc8::deque<void*>`,
+         * Address: 0x0074DF10 (FUN_0074DF10 -- `~deque` for `fa::deque<void*>`,
          * `Sim::mDeletionQueue` (+0xA48): the same `pop_back` drain (a no-op
          * element destructor, so only `_Mysize`/`_Myoff` move), the nodes from
          * the top down, then the map. Reached from `Sim::~Sim` 0x007458E0.)
          * Address: 0x0074C940 (FUN_0074C940 -- a one-instruction `jmp` thunk to
          * 0x0074DF10, reached from `Sim::Sim`'s unwind path 0x007434D0 and from
          * `Sim::~Sim`.)
-         * Address: 0x00740860 (FUN_00740860 -- `~deque` for `msvc8::deque<Moho::SSyncData*>` (`SSyncDataQueue::mSyncdat`), a one-instruction `jmp` to its teardown body 0x007411A0 (cited on `clear()`), the same shape as 0x0074C940; reached only from unwind funclets: 0x00BAC240 (0x0073FA70), 0x00BAC260 (0x0073BA10), 0x00BAC280 (`SSyncDataQueue::~SSyncDataQueue` 0x0073B940) and 0x00BBB9A7 (`CSimDriver::~CSimDriver` 0x0073BA50); formerly `ForwardOwnerCleanupThunkRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
-         * Address: 0x004ADA70 (FUN_004ADA70 -- `~deque` for `msvc8::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2): `pop_back`
+         * Address: 0x00740860 (FUN_00740860 -- `~deque` for `fa::deque<Moho::SSyncData*>` (`SSyncDataQueue::mSyncdat`), a one-instruction `jmp` to its teardown body 0x007411A0 (cited on `clear()`), the same shape as 0x0074C940; reached only from unwind funclets: 0x00BAC240 (0x0073FA70), 0x00BAC260 (0x0073BA10), 0x00BAC280 (`SSyncDataQueue::~SSyncDataQueue` 0x0073B940) and 0x00BBB9A7 (`CSimDriver::~CSimDriver` 0x0073BA50); formerly `ForwardOwnerCleanupThunkRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x004ADA70 (FUN_004ADA70 -- `~deque` for `fa::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2): `pop_back`
          *   until empty, releasing each `weak_ptr`, then the nodes from the top of
          *   the map down and the map. `~ResourceManager` 0x004A9C00; formerly
          *   `CleanupPrefetchWeakPairRingQueue_004ADA70` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
@@ -207,7 +207,7 @@ namespace msvc8
          * non-trivial T so this stays real `clear()` semantics; only the
          * offset reset was missing before this citation.
          * Address: 0x008B7B50 (FUN_008B7B50 -- `_Tidy` for
-         * `msvc8::deque<Moho::UserManagerHelperEntry>` (`UserCommandQueue::
+         * `fa::deque<Moho::UserManagerHelperEntry>` (`UserCommandQueue::
          * issueQueue`, 0x10-byte element, block size 1): the drain, each node
          * from the top of the map down, then the map. Reached from
          * `issueQueue.clear()` in `ResetUserUnitManagerState` 0x008B6E60, from
@@ -234,16 +234,16 @@ namespace msvc8
         }
 
         /**
-         * Address: 0x0067B870 (FUN_0067B870, msvc8::deque<void*>::push_back
+         * Address: 0x0067B870 (FUN_0067B870, fa::deque<void*>::push_back
          * specialization for `Moho::Sim::mDeletionQueue`) — grows the node map
          * when the write slot's map index wraps onto a full map (`_Growmap`),
          * lazily allocates the target node if unset, then constructs the value
          * at the computed slot and bumps `_Mysize`. Emitted via
          * SimulationRef->mDeletionQueue.push_back(this) in Entity::Destroy
          * (Entity.cpp:4559).
-         * Address: 0x007408F0 (FUN_007408F0, msvc8::deque<Moho::SSyncData*>::
+         * Address: 0x007408F0 (FUN_007408F0, fa::deque<Moho::SSyncData*>::
          * Address: 0x008B76D0 (FUN_008B76D0 -- `push_back` for
-         *          `msvc8::deque<Moho::UserManagerHelperEntry>` (block size 1):
+         *          `fa::deque<Moho::UserManagerHelperEntry>` (block size 1):
          *          `_Growmap` 0x008B79E0 when `_Mapsize <= _Mysize + 1`, the node
          *          allocated through 0x008B8010, the 0x10-byte edit copied in.
          *          Callers: the queue edits `UserUnitManagerAdd` 0x008B6DE0,
@@ -254,7 +254,7 @@ namespace msvc8
          *          push_back -- same body, 4-byte T / kBlockSize==4
          *          instantiation; sole caller is `SSyncDataQueue::PushBack`'s
          *          guard `FUN_0073F940`, see SimDriver.cpp).
-         * Address: 0x007BB440 (FUN_007BB440, msvc8::deque<Moho::SNetCommand>::
+         * Address: 0x007BB440 (FUN_007BB440, fa::deque<Moho::SNetCommand>::
          *          push_back -- 0x30-byte T / kBlockSize==1 instantiation:
          *          the "grow if within one slot of full" guard, wraparound
          *          slot computation, and lazy per-slot node allocation are
@@ -266,7 +266,7 @@ namespace msvc8
          *          (CGpgNetInterface.cpp), itself called from
          *          `CGpgNetInterface::EnqueueCommand`.)
          * Address: 0x008B4E80 (FUN_008B4E80 -- `push_back` for
-         *          `msvc8::deque<Moho::UserCommandIssueLocalEvent>` (0x50-byte
+         *          `fa::deque<Moho::UserCommandIssueLocalEvent>` (0x50-byte
          *          element, block size 1, so the `% _DEQUESIZ` test folds away
          *          and the grow test is `_Mapsize <= _Mysize + 1`); the slot is
          *          bought through the checked one-element allocator 0x008B55D0
@@ -276,7 +276,7 @@ namespace msvc8
          * Address: 0x008B55D0 (FUN_008B55D0 -- that instantiation's one-element
          *          node allocator: `0xFFFFFFFF / n < 0x50` throws `bad_alloc`,
          *          else `operator new(0x50 * n)`; `allocate_node` here.)
-         * Address: 0x004ACB00 (FUN_004ACB00 -- `push_back` for `msvc8::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2): the
+         * Address: 0x004ACB00 (FUN_004ACB00 -- `push_back` for `fa::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2): the
          *          element is a `weak_ptr` built from the queued `shared_ptr`.
          *          `ResourceManager::PrefetchResource` 0x004AAC20; formerly
          *          `PushPrefetchWeakPairRingBack` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
@@ -310,7 +310,7 @@ namespace msvc8
          * replaced would leave `_Myoff` pointing at an uninitialized slot
          * if `T`'s copy constructor throws.
          *
-         * Address: 0x004ACA20 (FUN_004ACA20 -- `push_front` for `msvc8::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2): a
+         * Address: 0x004ACA20 (FUN_004ACA20 -- `push_front` for `fa::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2): a
          *   prefetch the file changed under goes back to the front.
          *   `ResourceManager::PrefetchThread` 0x004AB180; formerly
          *   `PushPrefetchWeakPairRingFront` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
@@ -330,7 +330,7 @@ namespace msvc8
         }
 
         /**
-         * Address: 0x007BC110 (FUN_007BC110, msvc8::deque<Moho::SNetCommand>::pop_back)
+         * Address: 0x007BC110 (FUN_007BC110, fa::deque<Moho::SNetCommand>::pop_back)
          *
          * What it does:
          * Destroys the back element and decrements size, additionally
@@ -350,8 +350,8 @@ namespace msvc8
         }
 
         /**
-         * Address: 0x007BB400 (FUN_007BB400, msvc8::deque<Moho::SNetCommand>::pop_front)
-         * Address: 0x004ACAA0 (FUN_004ACAA0 -- `pop_front` for `msvc8::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2), releasing the
+         * Address: 0x007BB400 (FUN_007BB400, fa::deque<Moho::SNetCommand>::pop_front)
+         * Address: 0x004ACAA0 (FUN_004ACAA0 -- `pop_front` for `fa::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2), releasing the
          *          front `weak_ptr`; `ResourceManager::PrefetchThread` 0x004AB180;
          *          formerly `PopPrefetchWeakPairRingFront` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
          *
@@ -374,7 +374,7 @@ namespace msvc8
         }
 
         /**
-         * Address: 0x007BCF50 (FUN_007BCF50, msvc8::deque<Moho::SNetCommand>::swap)
+         * Address: 0x007BCF50 (FUN_007BCF50, fa::deque<Moho::SNetCommand>::swap)
          * Address: 0x007BC5B0 (FUN_007BC5B0) - linker-emitted thunk that
          *          tail-calls 0x007BCF50 directly (IDA marks it
          *          `attributes: thunk`); no separate body to recover.
@@ -395,7 +395,7 @@ namespace msvc8
         allocator_type get_allocator() const { return allocator_type(); }
 
         /**
-         * Address: 0x007BBA90 (FUN_007BBA90, msvc8::deque<Moho::SNetCommand>::
+         * Address: 0x007BBA90 (FUN_007BBA90, fa::deque<Moho::SNetCommand>::
          * clear-and-release lane, 0x30-byte element / kBlockSize==1) --
          * drains every live element in logical order (the loop inlines
          * `SNetCommand::~SNetCommand()` field-by-field: releases `mArgs`'
@@ -491,26 +491,26 @@ namespace msvc8
         }
 
         /**
-         * Address: 0x007BB920 (FUN_007BB920, msvc8::deque<Moho::SNetCommand>::_Growmap)
+         * Address: 0x007BB920 (FUN_007BB920, fa::deque<Moho::SNetCommand>::_Growmap)
          * Address: 0x008B79E0 (FUN_008B79E0 -- `_Growmap` for
-         *          `msvc8::deque<Moho::UserManagerHelperEntry>`, block size 1, its
+         *          `fa::deque<Moho::UserManagerHelperEntry>`, block size 1, its
          *          map allocated through 0x008B80A0; reached from `push_back`
          *          0x008B76D0. Formerly `GrowUserManagerIssueQueueMap` in
          *          moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
          * Address: 0x008B7E00 (FUN_008B7E00 -- that instantiation's `_Xlen`,
          *          `throw length_error("deque<T> too long")`.)
          * Address: 0x008B50A0 (FUN_008B50A0 -- `_Growmap` for
-         *          `msvc8::deque<Moho::UserCommandIssueLocalEvent>`, block size
+         *          `fa::deque<Moho::UserCommandIssueLocalEvent>`, block size
          *          1; its map allocator is 0x008B5690.)
          * Address: 0x008B5410 (FUN_008B5410 -- that instantiation's `_Xlen`,
          *          `throw length_error("deque<T> too long")` once the map
          *          reaches `kMaxSlots` (0x3333333 for the 0x50-byte element).)
-         * Address: 0x00741030 (FUN_00741030, msvc8::deque<Moho::SSyncData*>::
+         * Address: 0x00741030 (FUN_00741030, fa::deque<Moho::SSyncData*>::
          *          _Growmap -- confirms the same body for a 4-byte T /
          *          kBlockSize==4 instantiation; sole caller is
          *          `FUN_007408F0` = `push_back`, called from
          *          `SSyncDataQueue::PushBack` guard `FUN_0073F940`)
-         * Address: 0x004AD900 (FUN_004AD900 -- `_Growmap` for `msvc8::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2), ceiling
+         * Address: 0x004AD900 (FUN_004AD900 -- `_Growmap` for `fa::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2), ceiling
          *          0x0FFFFFFF; its callers are `push_back` 0x004ACB00 and
          *          `push_front` 0x004ACA20; formerly
          *          `GrowPrefetchWeakPairRingChunkIndex_004AD900` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
@@ -591,6 +591,6 @@ namespace msvc8
         }
     };
 
-    static_assert(sizeof(deque<int>) == 0x14, "msvc8::deque must be 20 bytes on x86.");
-    static_assert(sizeof(deque<void*>) == 0x14, "msvc8::deque must be 20 bytes on x86.");
-} // namespace msvc8
+    static_assert(sizeof(deque<int>) == 0x14, "fa::deque must be 20 bytes on x86.");
+    static_assert(sizeof(deque<void*>) == 0x14, "fa::deque must be 20 bytes on x86.");
+} // namespace fa

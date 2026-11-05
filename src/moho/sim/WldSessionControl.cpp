@@ -113,7 +113,7 @@ namespace
      *   on this global: release the source, delete the old value when it
      *   differs, return the global) - WLD_BeginSession's assignment.
      */
-    msvc8::auto_ptr<SWldSessionInfo> gPendingWldSessionInfo;
+    fa::auto_ptr<SWldSessionInfo> gPendingWldSessionInfo;
 
     [[nodiscard]] std::intptr_t DispatchSessionListenerAttachAndReturnLastResult(
       WldTeardownCallbackVector* const callbacks
@@ -286,7 +286,7 @@ namespace
         while (driver->HasSyncData()) {
           SSyncData* syncData = nullptr;
           driver->GetSyncData(syncData);
-          (void)msvc8::auto_ptr<SSyncData>(syncData);
+          (void)fa::auto_ptr<SSyncData>(syncData);
         }
         delete driver;
       }
@@ -318,9 +318,9 @@ namespace
       sEarlySim.language = language;
 
       FAF_BeginSession(sessionInfo->mIsReplay);
-      msvc8::auto_ptr<gpg::Stream> replayStream(nullptr);
+      fa::auto_ptr<gpg::Stream> replayStream(nullptr);
       if (sessionInfo->mIsBeingRecorded) {
-        const msvc8::string defaultReplayName = Loc(USER_GetLuaState(), "<LOC Engine0030>LastGame");
+        const fa::string defaultReplayName = Loc(USER_GetLuaState(), "<LOC Engine0030>LastGame");
         replayStream = VCR_CreateReplay(sessionInfo, defaultReplayName.c_str());
         if (replayStream.get() == nullptr) {
           sessionInfo->mIsBeingRecorded = false;
@@ -479,9 +479,9 @@ namespace
 
       // The replay sink, when this session records one. A sink that cannot be
       // opened is not fatal - the session simply stops being a recorded one.
-      msvc8::auto_ptr<gpg::Stream> replayStream(nullptr);
+      fa::auto_ptr<gpg::Stream> replayStream(nullptr);
       if (sessionInfo->mIsBeingRecorded && !simStartedEarly) {
-        const msvc8::string defaultReplayName = Loc(USER_GetLuaState(), "<LOC Engine0030>LastGame");
+        const fa::string defaultReplayName = Loc(USER_GetLuaState(), "<LOC Engine0030>LastGame");
         replayStream = VCR_CreateReplay(sessionInfo, defaultReplayName.c_str());
         if (replayStream.get() == nullptr) {
           sessionInfo->mIsBeingRecorded = false;
@@ -493,9 +493,9 @@ namespace
         (void)marker;
       }
 
-      msvc8::auto_ptr<LuaPlus::LuaState> stateOwner(gameData.mState);
-      msvc8::auto_ptr<RRuleGameRules> rulesOwner(gameData.mGameRules);
-      msvc8::auto_ptr<CWldMap> mapOwner(gameData.mWldMap);
+      fa::auto_ptr<LuaPlus::LuaState> stateOwner(gameData.mState);
+      fa::auto_ptr<RRuleGameRules> rulesOwner(gameData.mGameRules);
+      fa::auto_ptr<CWldMap> mapOwner(gameData.mWldMap);
       gameData = SWldGameData{};
       CWldSession* const wldSession = WLD_CreateSession(stateOwner, rulesOwner, mapOwner, *sessionInfo);
       ISTIDriver* driver = nullptr;
@@ -611,7 +611,7 @@ namespace
       sSimDriver->ShutDown();
       sSimDriver.reset();
 
-      msvc8::auto_ptr<SWldSessionInfo> sessionInfo = REPLAY_CreateRestartSession();
+      fa::auto_ptr<SWldSessionInfo> sessionInfo = REPLAY_CreateRestartSession();
       if (sessionInfo.get() == nullptr) {
         return false;
       }
@@ -729,7 +729,7 @@ namespace
       const auto applyStart = std::chrono::steady_clock::now();
       session.ResetForNewReplaySim();
       for (SSyncData* const held : sReplayHeldBeats) {
-        session.DoBeat(msvc8::auto_ptr<SSyncData>(held));
+        session.DoBeat(fa::auto_ptr<SSyncData>(held));
       }
       gpg::Logf(
         "Replay timeline: %d held beats applied in %.2f s", static_cast<int>(sReplayHeldBeats.size()),
@@ -793,7 +793,7 @@ namespace
       if (session != nullptr) {
         SSyncData* syncData = nullptr;
         simDriver->GetSyncData(syncData);
-        session->DoBeat(msvc8::auto_ptr<SSyncData>(syncData));
+        session->DoBeat(fa::auto_ptr<SSyncData>(syncData));
       }
 
       IWldUIProvider* const wldUIProvider = ResolveWldUIProvider();
@@ -984,7 +984,7 @@ namespace
 
         // Snapshot every active GeomCamera and forward to the sim driver so
         // visibility/projection state matches the upcoming session frame.
-        const msvc8::vector<GeomCamera3> cameras = CAM_GetAllCameras();
+        const fa::vector<GeomCamera3> cameras = CAM_GetAllCameras();
         simDriver->SetGeomCams(cameras);
       }
 
@@ -1027,7 +1027,7 @@ namespace
         return;
       }
 
-      msvc8::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
+      fa::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
       sessionInfo->mMapName = session->mMapName;
       sessionInfo->mLaunchInfo = session->mLaunchInfo;
       sessionInfo->mIsBeingRecorded = session->IsBeingRecorded;
@@ -1107,7 +1107,7 @@ namespace
    * initializer 0x00BE7510 (instruction 0x00BE7530 stores the callback
    * address in the command object's slot at 0x00F5B770).
    */
-  void CON_WLD_ClientDebugDump(const msvc8::vector<msvc8::string>& args)
+  void CON_WLD_ClientDebugDump(const fa::vector<fa::string>& args)
   {
     (void)args;
 
@@ -1123,7 +1123,7 @@ namespace
    * Console-command callback that requests world-session exit when frame
    * dispatch is currently active.
    */
-  void CON_WLD_RequestEndSession(const msvc8::vector<msvc8::string>& args)
+  void CON_WLD_RequestEndSession(const fa::vector<fa::string>& args)
   {
     (void)args;
 
@@ -1315,7 +1315,7 @@ namespace
       while (sSimDriver->HasSyncData()) {
         SSyncData* syncData = nullptr;
         sSimDriver->GetSyncData(syncData);
-        session->DoBeat(msvc8::auto_ptr<SSyncData>(syncData));
+        session->DoBeat(fa::auto_ptr<SSyncData>(syncData));
       }
     }
 
@@ -1346,9 +1346,9 @@ namespace
    * auto_ptr lanes, and updates the global active-session pointer.
    */
   CWldSession* WLD_CreateSession(
-    msvc8::auto_ptr<LuaPlus::LuaState>& state,
-    msvc8::auto_ptr<RRuleGameRules>& gameRules,
-    msvc8::auto_ptr<CWldMap>& wldMap,
+    fa::auto_ptr<LuaPlus::LuaState>& state,
+    fa::auto_ptr<RRuleGameRules>& gameRules,
+    fa::auto_ptr<CWldMap>& wldMap,
     SWldSessionInfo& sessionInfo
   )
   {
@@ -1409,7 +1409,7 @@ namespace
    * What it does:
    * Replaces pending world-session bootstrap info and schedules preload.
    */
-  void WLD_BeginSession(msvc8::auto_ptr<SWldSessionInfo> sessionInfo)
+  void WLD_BeginSession(fa::auto_ptr<SWldSessionInfo> sessionInfo)
   {
     gPendingWldSessionInfo = sessionInfo;
     gWldFrameAction = EWldFrameAction::Preload;
