@@ -25,6 +25,7 @@
 #include "moho/console/CConCommand.h"
 #include "moho/misc/CZipFile.h"
 #include "moho/misc/FileWaitHandleSet.h"
+#include "moho/misc/StartupHelpers.h"
 #include "moho/sim/CVFSImpl.h"
 #include "platform/X87Precision.h"
 
@@ -53,7 +54,8 @@ namespace moho
   TConVar<bool> gTConVar_res_UiScriptChunkCache(
     "res_UiScriptChunkCache",
     "Take each script the user interface runs on the main thread (menus, lobby, in-game UI) from a compiled-chunk "
-    "cache of its own when it holds the same source (1, the default), or compile them (0). Read at startup.",
+    "cache of its own when it holds the same source (1, the default), or compile them (0). Read at startup, before "
+    "/con: /nouichunkcache sets 0.",
     &res_UiScriptChunkCache
   );
 } // namespace moho
@@ -439,6 +441,16 @@ namespace
     return 0;
   }
 
+  /**
+   * A chunk that is already compiled (a mod's precompiled script) starts with the signature's escape
+   * byte, as lua_load tells them apart. Such a chunk is never kept: each load goes to the parser,
+   * which logs it and refuses it when lua_AllowPrecompiledChunks is off.
+   */
+  [[nodiscard]] bool IsCompiledChunk(const std::string_view text) noexcept
+  {
+    return !text.empty() && text.front() == '\033';
+  }
+
   [[nodiscard]] int LoadBuffer(lua_State* const state, const std::string_view text, const char* const chunkName)
   {
     SWholeBuffer buffer{text};
@@ -542,6 +554,9 @@ namespace
         return;
       }
       std::string source(file.mBegin, file.mEnd);
+      if (IsCompiledChunk(source)) {
+        return; // never cached (IsCompiledChunk): doscript loads it as before
+      }
       if (source.back() != '\n') {
         source += '\n';
       }
@@ -593,6 +608,9 @@ moho::ScriptChunkCacheBatch::~ScriptChunkCacheBatch()
 
 void moho::SCR_BeginUiScriptChunkCache()
 {
+  if (CFG_GetArgOption("/nouichunkcache", 0, nullptr)) {
+    res_UiScriptChunkCache = false; // read before /con runs, so the switch has a startup flag
+  }
   if (tBatchDepth != 0 || !res_UiScriptChunkCache || !res_ScriptChunkCache) {
     return;
   }
@@ -620,6 +638,9 @@ bool moho::SCR_ScriptChunkCacheActive()
 
 int moho::SCR_LoadScriptChunk(lua_State* const state, const std::string_view source, const char* const chunkName)
 {
+  if (IsCompiledChunk(source)) {
+    return LoadBuffer(state, source, chunkName); // never cached, so the parser checks it each time
+  }
   const SChunkKey key = KeyOf(chunkName, source);
 
   ScriptChunks& chunks = *tBatchChunks;
