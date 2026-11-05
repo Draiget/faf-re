@@ -896,7 +896,7 @@ void moho::CameraImpl::CameraReset()
 void moho::CameraImpl::CameraFollow(const SCamFollowParams& followParams)
 {
   UserEntity* const currentTarget = GetTargetEntity();
-  if (currentTarget == nullptr || currentTarget->mParams.mEntityId != followParams.mCurrentEntityId) {
+  if (currentTarget == nullptr || currentTarget->mParams.mEntityId != static_cast<std::uint32_t>(followParams.mCurrentEntityId)) {
     return;
   }
 
