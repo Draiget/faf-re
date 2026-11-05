@@ -199,6 +199,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/d3d/CD3DFont.cpp
   moho/render/font/MsdfFontCook.cpp
   moho/render/font/MsdfFontRegistry.cpp
+  moho/render/font/MsdfTextGpuRenderer.cpp
   moho/render/d3d/CD3DEffectTechnique.cpp
   moho/render/d3d/CD3DDeviceResources.cpp
   moho/render/d3d/CD3DPrimBatcher.cpp

@@ -110,7 +110,7 @@ namespace faf::remote
     CClientBase::Debug();
   }
 
-  bool CServerClient::ReceiveCommand(moho::CMessage& message)
+  bool CServerClient::ReceiveCommand(moho::CMessage& message, std::int32_t* const beat)
   {
     std::scoped_lock lock(mManager->mLock);
 
@@ -127,6 +127,9 @@ namespace faf::remote
       return false;
     }
     CClientBase::Process(message);
+    if (beat != nullptr) {
+      *beat = static_cast<std::int32_t>(mQueuedBeat);
+    }
     return true;
   }
 

@@ -64,59 +64,6 @@ namespace
     lane = nullptr;
   }
 
-  struct LowFidelityTriangleBatch
-  {
-    std::uint32_t pad00[5];         // +0x00
-    moho::CD3DVertexSheet* vtx;     // +0x14
-    moho::CD3DIndexSheet* idx;      // +0x18
-    std::uint32_t pad1C;            // +0x1C
-    std::int32_t indexCount;        // +0x20
-    std::int32_t endVertexInclusive; // +0x24
-  };
-  static_assert(offsetof(LowFidelityTriangleBatch, vtx) == 0x14, "LowFidelityTriangleBatch::vtx");
-  static_assert(offsetof(LowFidelityTriangleBatch, idx) == 0x18, "LowFidelityTriangleBatch::idx");
-  static_assert(
-    offsetof(LowFidelityTriangleBatch, indexCount) == 0x20,
-    "LowFidelityTriangleBatch::indexCount"
-  );
-  static_assert(
-    offsetof(LowFidelityTriangleBatch, endVertexInclusive) == 0x24,
-    "LowFidelityTriangleBatch::endVertexInclusive"
-  );
-
-  /**
-   * Address: 0x00807F50 (FUN_00807F50, low-fidelity indexed draw helper)
-   *
-   * What it does:
-   * Issues one triangle-list draw for one prebuilt low-fidelity terrain batch
-   * when the batch has a non-zero index count.
-   */
-  void DrawLowFidelityTerrainBatch(const LowFidelityTriangleBatch& batch)
-  {
-    if (batch.indexCount == 0 || batch.vtx == nullptr || batch.idx == nullptr) {
-      return;
-    }
-
-    moho::CD3DDevice* const device = moho::D3D_GetDevice();
-    if (device == nullptr) {
-      return;
-    }
-
-    moho::SD3DVertexRange vertexView{};
-    vertexView.sheet = batch.vtx;
-    vertexView.startVertex = 0;
-    vertexView.baseVertex = 0;
-    vertexView.endVertex = batch.endVertexInclusive;
-
-    moho::SD3DIndexRange indexView{};
-    indexView.sheet = batch.idx;
-    indexView.startIndex = 0;
-    indexView.indexCount = batch.indexCount;
-
-    std::int32_t primitiveType = 4;
-    (void)device->DrawTriangleList(&vertexView, &indexView, &primitiveType);
-  }
-
   // ----- Decal / splat draw helpers -----
   // mDecalDrawCommands (+0x50) holds up to 500 TerrainDecalDrawCommand and
   // mSplatVertices (+0x2F40) up to 1000 CWldSplat::SplatVertex.
@@ -406,6 +353,40 @@ namespace moho
   }
 
   /**
+   * Address: 0x00807F50 (FUN_00807F50, low-fidelity indexed draw helper)
+   *
+   * What it does:
+   * Issues one triangle-list draw of the prebuilt terrain batch when it has a
+   * non-zero index count. The binary reads this+0x14 and +0x18 for the sheets,
+   * +0x20 for the index count and +0x24 for the end vertex (0x00807F59-0x00807F7D).
+   */
+  void LowFidelityTerrain::DrawTriangles()
+  {
+    if (mSkirtStartIndex == 0u || mTerrainVertexSheet == nullptr || mTerrainIndexSheet == nullptr) {
+      return;
+    }
+
+    CD3DDevice* const device = D3D_GetDevice();
+    if (device == nullptr) {
+      return;
+    }
+
+    SD3DVertexRange vertexView{};
+    vertexView.sheet = mTerrainVertexSheet;
+    vertexView.startVertex = 0;
+    vertexView.baseVertex = 0;
+    vertexView.endVertex = static_cast<std::int32_t>(mTerrainEndVertex);
+
+    SD3DIndexRange indexView{};
+    indexView.sheet = mTerrainIndexSheet;
+    indexView.startIndex = 0;
+    indexView.indexCount = static_cast<std::int32_t>(mSkirtStartIndex);
+
+    std::int32_t primitiveType = kTriangleListPrimitiveType;
+    (void)device->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+  }
+
+  /**
    * Address: 0x00808F90 (FUN_00808F90, Moho::LowFidelityTerrain::DrawTerrainDepth)
    *
    * IDA signature:
@@ -441,7 +422,7 @@ namespace moho
       shaderVars.heightScale.SetFloat(mTesselator->GetHeightScale());
     }
 
-    DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatch&>(*this));
+    DrawTriangles();
   }
 
   /**
@@ -492,7 +473,7 @@ namespace moho
       shaderVars.heightScale.SetFloat(heightScale);
     }
 
-    DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatch&>(*this));
+    DrawTriangles();
   }
 
   /**
@@ -884,7 +865,7 @@ namespace moho
     CD3DDevice* const device = D3D_GetDevice();
 
     LoadShaderVars();
-    DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatch&>(*this));
+    DrawTriangles();
     LoadTerrainLighting(shadowContext);
 
     auto* const terrainRes = mTerrainResource;
@@ -1000,7 +981,7 @@ namespace moho
       }
 
       mSkirtStartIndex = static_cast<std::uint32_t>(mTesselator->GetSkirtIndexStart());
-      mUnknown24 = static_cast<std::uint32_t>(mTesselator->GetSkirtVertexStart() - 1);
+      mTerrainEndVertex = static_cast<std::uint32_t>(mTesselator->GetSkirtVertexStart() - 1);
       mSkirtEndIndex = static_cast<std::uint32_t>(mTesselator->GetCollisionIndexCount());
       mSkirtEndVertex = mTesselator->GetRectCacheCount() - 1;
 

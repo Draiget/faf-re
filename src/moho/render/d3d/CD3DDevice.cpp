@@ -34,6 +34,7 @@
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/font/MsdfFontRegistry.h"
+#include "moho/render/font/MsdfTextGpuRenderer.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/particles/CWorldParticles.h"
@@ -659,6 +660,7 @@ namespace moho
 
   bool CD3DDevice::Refresh()
   {
+    MSDF_FlushPendingText();
     if (WRenViewport* const viewport = GetViewport(); viewport != nullptr) {
       // A hidden window gets no WM_PAINT, so it draws nothing here either.
       const HWND window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(viewport->GetHandle()));
@@ -1174,6 +1176,7 @@ namespace moho
     const int stencil
   )
   {
+    MSDF_FlushPendingText();
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
 
     ID3DRenderTarget::SurfaceHandle renderSurface{};
@@ -1341,6 +1344,7 @@ namespace moho
     ID3DVertexSheet* const vertexSheet, ID3DIndexSheet* const indexSheet, std::int32_t* const primitiveType
   )
   {
+    MSDF_FlushPendingText();
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     try {
       vertexSheet->Func9();
@@ -1393,6 +1397,7 @@ namespace moho
     const SD3DVertexRange* const vertexSheetView, std::int32_t* const primitiveType
   )
   {
+    MSDF_FlushPendingText();
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     try {
       vertexSheetView->sheet->Func9();
@@ -1443,6 +1448,7 @@ namespace moho
     std::int32_t* const primitiveType
   )
   {
+    MSDF_FlushPendingText();
     const int vertexCount = (vertexSheetView->endVertex - vertexSheetView->startVertex) + 1;
     if (vertexCount == 0) {
       return true;
@@ -1509,6 +1515,7 @@ namespace moho
    */
   bool CD3DDevice::SetCurEffect(CD3DEffect* const effect)
   {
+    MSDF_FlushPendingText();
     mCurEffect = effect;
     return effect != nullptr;
   }
@@ -1538,6 +1545,7 @@ namespace moho
    */
   bool CD3DDevice::SelectTechnique(const char* const techniqueName)
   {
+    MSDF_FlushPendingText();
     CD3DEffect* const effect = GetCurEffect();
     if (effect == nullptr) {
       return false;

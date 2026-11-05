@@ -274,7 +274,13 @@ set(_faf_headless_files "")
 foreach(_src IN LISTS FAF_HEADLESS_SOURCES)
   list(APPEND _faf_headless_files "${PROJECT_SOURCE_DIR}/src/${_src}")
 endforeach()
-add_executable(headless ${_faf_headless_files})
+add_executable(headless ${_faf_headless_files}
+  "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
+)
+target_compile_definitions(headless PRIVATE FAF_HEADLESS_NET=1)
+target_link_libraries(headless PRIVATE faf_netchannel faf_monocypher)
 target_link_libraries(headless PRIVATE faf_sim)
 target_compile_definitions(headless PRIVATE FAF_SERVER_MODE=1)
 target_link_options(headless PRIVATE -Wl,--error-limit=0)
@@ -283,6 +289,7 @@ target_link_options(headless PRIVATE -Wl,--error-limit=0)
 # The dedicated server, Linux only (plan D2): the sim, and what `headless` shares for loading a game.
 add_executable(server
   "${PROJECT_SOURCE_DIR}/src/server/ServerMain.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
   "${PROJECT_SOURCE_DIR}/src/headless/SessionLoad.cpp"
@@ -295,8 +302,8 @@ target_link_options(server PRIVATE -Wl,--error-limit=0)
 add_executable(faf_server_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SpeedWatchTests.cpp")
 target_include_directories(faf_server_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
 
-add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp")
-target_link_libraries(faf_seat_tests PRIVATE faf_sim)
+add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp" "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp")
+target_link_libraries(faf_seat_tests PRIVATE faf_sim faf_netchannel faf_monocypher)
 target_compile_definitions(faf_seat_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_seat_tests PRIVATE -Wl,--error-limit=0)
 

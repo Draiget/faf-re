@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "remote/net/GameLinks.h"
+#include "server/SeatIntake.h"
 
 // Engine addition, dedicated server (plan WP1.1, WP3.5, WP10.1, WP10.5): the players' network. Its own
 // thread takes what arrives on the socket and hands each player's commands to their seat, so a slow
@@ -59,6 +60,12 @@ namespace faf::server
     /** The newest beat, for the players. */
     void NoteBeat(std::int32_t beat) noexcept { mBeat.store(beat, std::memory_order_relaxed); }
 
+    /** Where the players' commands wait for the sim's thread. */
+    [[nodiscard]] CSeatIntake& Intake() noexcept { return mIntake; }
+
+    /** Players gone for good since the last call: nobody needs their views any more. */
+    [[nodiscard]] std::vector<std::int32_t> TakeGone();
+
     /** Lines for the console since the last call. */
     [[nodiscard]] std::vector<std::string> TakeNews();
     /** The wait is over and nobody ever joined. */
@@ -92,6 +99,7 @@ namespace faf::server
     void OnLost(std::int32_t uid) override;
 
     SServerNetConfig mConfig;
+    CSeatIntake mIntake;
     remote::net::CServerLinks mLinks;
     std::map<std::int32_t, SSeat> mSeats;
     std::thread mThread;
@@ -102,7 +110,7 @@ namespace faf::server
     std::uint64_t mStartUs = 0;
     std::uint64_t mNowUs = 0;
     bool mJoinWaitOver = false;
-    std::uint64_t mRefusedCommands = 0;
+    std::vector<std::int32_t> mGone; // under mNewsLock
     std::uint64_t mBadMessages = 0;
     // `OnMessage` runs inside the links' pass over their players, so they go once it's over.
     std::vector<std::int32_t> mToUnlink;
