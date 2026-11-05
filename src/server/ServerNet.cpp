@@ -1,10 +1,8 @@
 #include "server/ServerNet.h"
 
 #include <chrono>
-#include <cstring>
 #include <utility>
 
-#include "moho/net/CMessage.h"
 #include "remote/ServerClient.h"
 #include "remote/net/Datagram.h"
 
@@ -14,7 +12,7 @@ namespace faf::server
   {
     // How long the thread sleeps with nothing arriving: the time a beat's news and a resend can wait.
     constexpr int kWaitMilliseconds = 5;
-    // A stream message: type, 2 bytes of whole size, payload (moho/net/CMessage.h).
+    // A stream message: type, 2 bytes of whole size, payload (moho/net/CMessage.h). The intake takes it from here.
     constexpr std::size_t kCommandHeaderBytes = 3;
     // About a minute of a big game's views: past this a player isn't keeping up, and holds memory for nothing.
     constexpr std::uint64_t kMaxUnackedViewBytes = 16u * 1024u * 1024u;
@@ -39,6 +37,7 @@ namespace faf::server
     SSeat& entry = mSeats[uid];
     entry.name = name;
     entry.seat = &seat;
+    mIntake.AddSeat(uid, seat);
     mLinks.AddPlayer(uid, remote::net::MakeToken(token));
   }
 
@@ -153,7 +152,12 @@ namespace faf::server
     seat.gone = true;
     seat.lost = false;
     seat.seat->Eject();
+    mIntake.Forget(uid);
     mToUnlink.push_back(uid);
+    {
+      const std::scoped_lock lock(mNewsLock);
+      mGone.push_back(uid);
+    }
     Say(seat.name + " is out of the game: " + why);
   }
 
@@ -161,6 +165,12 @@ namespace faf::server
   {
     const std::scoped_lock lock(mNewsLock);
     mNews.push_back(std::move(line));
+  }
+
+  std::vector<std::int32_t> CServerNet::TakeGone()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    return std::exchange(mGone, {});
   }
 
   std::vector<std::string> CServerNet::TakeNews()
@@ -216,12 +226,8 @@ namespace faf::server
         ++mBadMessages;
         return;
       }
-      moho::CMessage command(moho::MessageType(body[0]), bodySize - kCommandHeaderBytes);
-      if (bodySize > kCommandHeaderBytes) {
-        std::memcpy(command.mBuff.start_ + kCommandHeaderBytes, body + kCommandHeaderBytes, bodySize - kCommandHeaderBytes);
-      }
-      if (!seat.seat->ReceiveCommand(command)) {
-        ++mRefusedCommands;
+      if (!mIntake.Push(uid, body, bodySize)) {
+        Remove(uid, seat, "sends commands faster than a game can");
       }
       return;
     }
@@ -238,6 +244,7 @@ namespace faf::server
     case remote::net::ESeatMessage::Beat:
     case remote::net::ESeatMessage::View:
     case remote::net::ESeatMessage::GameInfo:
+    case remote::net::ESeatMessage::CommandAnswer:
       break; // the server's own to send
     }
     ++mBadMessages;

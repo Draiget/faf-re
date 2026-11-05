@@ -144,6 +144,8 @@ namespace faf::remote
     [[nodiscard]] bool CallbackIds(const char* name, const LuaPlus::LuaObject& args);
     void LogUnmarked(const char* name, const LuaPlus::LuaObject& value, const std::string& path, int depth);
 
+    static constexpr std::uint64_t kDropsLogged = 32u;
+
     moho::ICommandSink& mNext;
     std::uint64_t mUnmarkedIds = 0;
     std::uint64_t mCommands = 0;

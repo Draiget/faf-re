@@ -37,6 +37,9 @@ namespace faf::headless
       const moho::LaunchInfoBase& launchInfo, std::unique_ptr<gpg::Stream> recording, moho::CClientManagerImpl*& manager
     );
 
+    /** One per command source, in their order; the manager owns them. */
+    [[nodiscard]] const std::vector<remote::CServerClient*>& Seats() const noexcept { return mSeats; }
+
     /** The last beat the recording holds. */
     [[nodiscard]] std::int32_t LastBeat() const noexcept { return mLastBeat; }
 

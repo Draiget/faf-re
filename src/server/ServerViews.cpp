@@ -1,6 +1,7 @@
 #include "server/ServerViews.h"
 
 #include <cstdint>
+#include <cstring>
 #include <utility>
 #include <vector>
 
@@ -21,23 +22,38 @@ namespace faf::server
     }
   } // namespace
 
+  std::vector<std::uint8_t> MakeGameInfo(const float mapSizeX, const float mapSizeZ, const std::int32_t army, const std::uint32_t source)
+  {
+    std::vector<std::uint8_t> message(1u + 2u * sizeof(float) + sizeof(army) + sizeof(source));
+    message[0] = static_cast<std::uint8_t>(remote::net::ESeatMessage::GameInfo);
+    std::uint8_t* out = message.data() + 1;
+    const float sizes[2] = {mapSizeX, mapSizeZ};
+    std::memcpy(out, sizes, sizeof(sizes));
+    out += sizeof(sizes);
+    std::memcpy(out, &army, sizeof(army));
+    out += sizeof(army);
+    std::memcpy(out, &source, sizeof(source));
+    return message;
+  }
+
   CServerViews::CServerViews(
-    const remote::wire::SContentTables& tables, const float mapSizeX, const float mapSizeZ, CServerNet& net, std::map<std::size_t, std::int32_t> players,
-    const unsigned int threads
+    const remote::wire::SContentTables& tables, moho::RRuleGameRules& rules, const float mapSizeX, const float mapSizeZ, CServerNet& net,
+    std::map<std::size_t, std::int32_t> players, const unsigned int threads
   )
     : CViewLanes(tables, mapSizeX, mapSizeZ)
+    , mRules(rules)
     , mNet(net)
     , mPlayers(std::move(players))
   {
     EnableIdMaps();
     SkipCivilianViews();
-    std::uint32_t views = 0u;
     for (const auto& [army, uid] : mPlayers) {
       if (army < 32u) {
-        views |= std::uint32_t{1} << army;
+        mViewMask |= std::uint32_t{1} << army;
       }
+      mNet.Intake().SetArmy(uid, static_cast<std::int32_t>(army));
     }
-    SetViewArmies(views);
+    SetViewArmies(mViewMask);
     EnableHeldFrames(false);
     SetParallel(true);
     EnablePipeline(threads);
@@ -66,12 +82,38 @@ namespace faf::server
     moho::Sim::SetSyncObserver(nullptr);
   }
 
+  void CServerViews::OnBeatStarting()
+  {
+    CViewLanes::OnBeatStarting();
+
+    for (const std::int32_t uid : mNet.TakeGone()) {
+      for (const auto& [army, player] : mPlayers) {
+        if (player == uid && army < 32u) {
+          mViewMask &= ~(std::uint32_t{1} << army);
+          SetViewArmies(mViewMask);
+        }
+      }
+    }
+
+    mNet.Intake().Drain(
+      &mRules,
+      [this](const std::int32_t army) -> const remote::CViewIdMap* {
+        return army >= 0 && static_cast<std::size_t>(army) < ViewCount() ? &IdMap(army) : nullptr;
+      },
+      [this](const std::int32_t uid, std::vector<std::uint8_t> message) { mNet.QueueView(uid, std::move(message)); }
+    );
+  }
+
   void CServerViews::OnLanesEncoded(const std::size_t army, const SLanes& lanes)
   {
     const auto player = mPlayers.find(army);
     if (player == mPlayers.end()) {
       return;
     }
+    mFrameBytes.fetch_add(lanes.frame.Bytes().size(), std::memory_order_relaxed);
+    mArmyBytes.fetch_add(lanes.armies.Bytes().size(), std::memory_order_relaxed);
+    mGridBytes.fetch_add(lanes.grids.Bytes().size(), std::memory_order_relaxed);
+    mLuaBytes.fetch_add(lanes.lua.Bytes().size(), std::memory_order_relaxed);
     std::vector<std::uint8_t> message;
     message.reserve(16u + lanes.frame.Bytes().size() + lanes.armies.Bytes().size() + lanes.grids.Bytes().size() + lanes.lua.Bytes().size());
     remote::net::ByteWriter writer(message);
@@ -83,6 +125,14 @@ namespace faf::server
     WriteLane(writer, lanes.grids);
     WriteLane(writer, lanes.lua);
     mNet.QueueView(player->second, std::move(message));
+  }
+
+  std::string CServerViews::LaneReport() const
+  {
+    const auto megabytes = [](const std::atomic<std::uint64_t>& bytes) {
+      return std::to_string(bytes.load(std::memory_order_relaxed) / (1024u * 1024u));
+    };
+    return "views so far: entities " + megabytes(mFrameBytes) + " MB, armies " + megabytes(mArmyBytes) + " MB, grids " + megabytes(mGridBytes) + " MB, Lua " + megabytes(mLuaBytes) + " MB";
   }
 
   void CServerViews::OnViewsFinished()

@@ -185,6 +185,8 @@ namespace
       "                            (server-mode build)\n"
       "  --seats                   the commands through the game server's seats, one per command source\n"
       "                            (server-mode build)\n"
+      "  --seats-listen <ip:port>  with --seats, Linux: and each seat's view over UDP to whoever joins as it, uid\n"
+      "                            the source's index, token seat-<uid> (--view-pipeline: its threads)\n"
       "  --oracle-check            the visibility oracle for the --focus army against what the sim publishes,\n"
       "                            every entity and beat (server-mode build)\n"
       "  --oracle-digests <file>  with --oracle-check: per beat, the oracle's answers for every army (unfocused)\n"
@@ -340,6 +342,7 @@ int HEADLESS_Main(int argc, char** argv)
   options.loopback = moho::CFG_GetArgOption("--loopback", 0, nullptr);
   options.commandCheck = moho::CFG_GetArgOption("--command-check", 0, nullptr);
   options.seats = moho::CFG_GetArgOption("--seats", 0, nullptr);
+  (void)ReadOption("--seats-listen", options.seatsListen);
   options.oracleCheck = moho::CFG_GetArgOption("--oracle-check", 0, nullptr);
   if (ReadOption("--oracle-digests", options.oracleDigestsPath)) {
     options.oracleCheck = true;

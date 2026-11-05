@@ -526,20 +526,17 @@ namespace
       std::map<std::size_t, std::int32_t> viewPlayers;
       const auto& armies = sessionInfo->mLaunchInfo->mArmyLaunchInfo;
       for (const moho::SLaunchClient& client : roster.Remotes()) {
+        std::int32_t playerArmy = -1;
         for (std::size_t army = 0; army < armies.size(); ++army) {
           if (armies[army].mUnitSources.Contains(client.commandSource)) {
             viewPlayers[army] = client.uid;
+            playerArmy = static_cast<std::int32_t>(army);
             break;
           }
         }
-        std::vector<std::uint8_t> gameInfo;
-        gameInfo.push_back(static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::GameInfo));
-        const float sizes[2] = {mapSizeX, mapSizeZ};
-        const auto* const sizeBytes = reinterpret_cast<const std::uint8_t*>(sizes);
-        gameInfo.insert(gameInfo.end(), sizeBytes, sizeBytes + sizeof(sizes));
-        net->QueueView(client.uid, std::move(gameInfo));
+        net->QueueView(client.uid, faf::server::MakeGameInfo(mapSizeX, mapSizeZ, playerArmy, client.commandSource));
       }
-      views = std::make_unique<faf::server::CServerViews>(contentTables, mapSizeX, mapSizeZ, *net, std::move(viewPlayers), static_cast<unsigned int>(std::max(viewThreads, 1)));
+      views = std::make_unique<faf::server::CServerViews>(contentTables, *rules, mapSizeX, mapSizeZ, *net, std::move(viewPlayers), static_cast<unsigned int>(std::max(viewThreads, 1)));
       views->Install();
     }
     sessionInfo->mLaunchInfo->mCommandSources.mOriginalSource = -1;
@@ -771,6 +768,8 @@ namespace
         Say("WARNING: %llu view lanes didn't encode", static_cast<unsigned long long>(views->Failures()));
       }
       views->Uninstall();
+      Say("%s", net->Intake().Report().c_str());
+      Say("%s", views->LaneReport().c_str());
     }
     while (driver->HasSyncData()) {
       moho::SSyncData* rawPacket = nullptr;

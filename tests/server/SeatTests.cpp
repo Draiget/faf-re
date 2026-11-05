@@ -7,10 +7,13 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "gpg/core/streams/BinaryReader.h"
+#include "moho/command/SSTICommandIssueData.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/net/CMessage.h"
 #include "moho/net/CMessageStream.h"
@@ -18,6 +21,10 @@
 #include "moho/net/ECmdStreamOp.h"
 #include "moho/net/IMessageReceiver.h"
 #include "remote/ServerClient.h"
+#include "remote/ViewIdMap.h"
+#include "remote/net/Datagram.h"
+#include "remote/net/GameLinks.h"
+#include "server/SeatIntake.h"
 
 namespace
 {
@@ -60,6 +67,9 @@ namespace
         reader.ReadExact(source);
         entry.source = source;
       }
+      if (entry.type == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_IssueCommand)) {
+        mLastOrder.assign(message->mBuff.start_, message->mBuff.start_ + message->mBuff.Size());
+      }
       mEntries.push_back(entry);
     }
 
@@ -87,6 +97,7 @@ namespace
     }
 
     std::vector<SEntry> mEntries;
+    std::vector<char> mLastOrder; // as the sim gets it, its header too
   };
 
   /** A manager as the server makes one: its own client, then two seats. */
@@ -250,6 +261,154 @@ namespace
     Check(beats.size() == 3u && beats[0] == 0 && beats[1] == 1 && beats[2] == 2, "once per beat, in order");
   }
 
+  void PutU32(std::vector<std::uint8_t>& out, const std::uint32_t value)
+  {
+    for (int shift = 0; shift < 32; shift += 8) {
+      out.push_back(static_cast<std::uint8_t>(value >> shift));
+    }
+  }
+
+  /** A whole stream message, as a player sends one. */
+  [[nodiscard]] std::vector<std::uint8_t> Command(const ECmdStreamOp op, const std::vector<std::uint8_t>& payload = {})
+  {
+    const std::size_t whole = 3u + payload.size();
+    std::vector<std::uint8_t> out{static_cast<std::uint8_t>(op), static_cast<std::uint8_t>(whole), static_cast<std::uint8_t>(whole >> 8)};
+    out.insert(out.end(), payload.begin(), payload.end());
+    return out;
+  }
+
+  // Where an order's target id lies: header, one unit in the set, command ids, type, index, target's kind.
+  constexpr std::size_t kOrderTargetAt = 3u + 8u + 8u + 1u + 4u + 1u;
+
+  /** An attack order: `unit` on the entity `target`, with command id `commandId`. */
+  [[nodiscard]] std::vector<std::uint8_t> AttackOrder(const std::uint32_t unit, const std::uint32_t commandId, const std::uint32_t target)
+  {
+    std::vector<std::uint8_t> payload;
+    PutU32(payload, 1u);
+    PutU32(payload, unit);
+    PutU32(payload, commandId);
+    PutU32(payload, 0xFFFFFFFFu);
+    payload.push_back(static_cast<std::uint8_t>(moho::EUnitCommandType::UNITCOMMAND_Attack));
+    PutU32(payload, 0xFFFFFFFFu);
+    payload.push_back(1u); // AITARGET_Entity
+    PutU32(payload, target);
+    payload.push_back(0u); // AITARGET_None
+    PutU32(payload, 0xFFFFFFFFu);
+    payload.push_back(0u); // no blueprint
+    PutU32(payload, 0u);   // no cells
+    PutU32(payload, 1u);
+    PutU32(payload, 1u);
+    payload.push_back(2u); // Lua nil
+    payload.push_back(1u); // clear the queue
+    return Command(ECmdStreamOp::CMDST_IssueCommand, payload);
+  }
+
+  void TheIntakeHandsOnWhatItCanTranslate()
+  {
+    using faf::remote::net::ECommandAnswer;
+    SGame game;
+    faf::server::CSeatIntake intake;
+    intake.AddSeat(1, *game.one);
+    intake.SetArmy(1, 0);
+
+    faf::remote::CViewIdMap map(0);
+    constexpr std::uint32_t kSimBlip = 0x30100123u; // an enemy's blip: family 3, source byte 1
+    const std::uint32_t viewBlip = map.EntityId(kSimBlip);
+    Check(viewBlip != kSimBlip, "a blip has its own number in a view");
+
+    std::vector<std::pair<std::uint64_t, ECommandAnswer>> answers;
+    const auto drain = [&] {
+      intake.Drain(
+        nullptr, [&map](const std::int32_t army) -> const faf::remote::CViewIdMap* { return army == 0 ? &map : nullptr; },
+        [&answers](const std::int32_t uid, std::vector<std::uint8_t> message) {
+          Check(uid == 1, "the answer goes to who asked");
+          faf::remote::net::ByteReader reader(message.data(), message.size());
+          Check(reader.Byte() == static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::CommandAnswer), "it's an answer");
+          const std::uint64_t beat = reader.Varint();
+          const auto answer = static_cast<ECommandAnswer>(reader.Byte());
+          Check(reader.Ok() && reader.AtEnd(), "and nothing else");
+          answers.emplace_back(beat, answer);
+        }
+      );
+    };
+    const auto push = [&intake](const std::vector<std::uint8_t>& command) { return intake.Push(1, command.data(), command.size()); };
+
+    // In the order sent, each answered, whichever way it ends.
+    game.IssueBeats(3);
+    (void)game.Available();
+    const std::vector<std::uint8_t> order = AttackOrder(0x00000001u, 0x01000001u, viewBlip);
+    Check(push(order), "an order is taken");
+    Check(push(AttackOrder(0x00000001u, 0x01000002u, 0x3FFFFFFFu)), "so is one naming what the view never saw, for now");
+    std::vector<std::uint8_t> truncated = order;
+    truncated.resize(order.size() - 8u);
+    truncated[1] = static_cast<std::uint8_t>(truncated.size());
+    truncated[2] = static_cast<std::uint8_t>(truncated.size() >> 8);
+    Check(push(truncated), "and one cut short");
+    Check(push(Command(ECmdStreamOp::CMDST_CreateUnit)), "and a cheat");
+    Check(push(Command(ECmdStreamOp::CMDST_RequestPause)), "and a pause");
+    drain();
+    Check(answers.size() == 5u, "every command gets an answer");
+    if (answers.size() == 5u) {
+      Check(answers[0].second == ECommandAnswer::Applied && answers[0].first == 3u, "the order applied, in the next beat");
+      Check(answers[1].second == ECommandAnswer::Dropped, "an id the view was never given stops it");
+      Check(answers[2].second == ECommandAnswer::Dropped, "a command that doesn't decode stops");
+      Check(answers[3].second == ECommandAnswer::Refused, "a cheat is refused");
+      Check(answers[4].second == ECommandAnswer::Applied && answers[4].first == 3u, "a pause applied");
+    }
+    Check(intake.Applied() == 2u && intake.Dropped() == 2u && intake.Refused() == 1u, "and they're counted");
+    Check(intake.IdsTranslated() >= 1u, "the blip's id was translated");
+
+    game.IssueBeats(1);
+    (void)game.Available();
+    game.manager->UpdateStates(4);
+    Check(game.merged.Count(ECmdStreamOp::CMDST_IssueCommand) == 1, "only the good order reaches the sim");
+    Check(game.merged.SourceOf(ECmdStreamOp::CMDST_IssueCommand) == static_cast<int>(kSeatOneSource), "under the seat's source");
+    Check(game.merged.mLastOrder.size() == order.size(), "the same size as sent");
+    if (game.merged.mLastOrder.size() == order.size()) {
+      std::uint32_t target = 0u;
+      std::memcpy(&target, game.merged.mLastOrder.data() + kOrderTargetAt, sizeof(target));
+      Check(target == kSimBlip, "with the sim's id for the blip");
+      std::vector<char> expected(order.begin(), order.end());
+      std::memcpy(expected.data() + kOrderTargetAt, &kSimBlip, sizeof(kSimBlip));
+      Check(std::memcmp(expected.data(), game.merged.mLastOrder.data(), expected.size()) == 0, "and otherwise the bytes sent");
+    }
+
+    // A flood waits its turn, and past the limit the player is told on.
+    answers.clear();
+    const std::vector<std::uint8_t> pause = Command(ECmdStreamOp::CMDST_RequestPause);
+    for (std::size_t i = 0; i < faf::server::CSeatIntake::kMaxCommandsPerBeat + 10u; ++i) {
+      (void)push(pause);
+    }
+    drain();
+    Check(answers.size() == faf::server::CSeatIntake::kMaxCommandsPerBeat, "one beat takes only so many");
+    drain();
+    Check(answers.size() == faf::server::CSeatIntake::kMaxCommandsPerBeat + 10u, "the rest go next beat");
+    answers.clear();
+    std::size_t taken = 0;
+    for (std::size_t i = 0; i < faf::server::CSeatIntake::kMaxWaiting + 10u; ++i) {
+      taken += push(pause) ? 1u : 0u;
+    }
+    Check(taken == faf::server::CSeatIntake::kMaxWaiting, "and only so many can wait");
+    intake.Forget(1);
+    drain();
+    Check(answers.empty(), "what a player leaves behind goes with them");
+
+    // Big commands wait too.
+    SGame other;
+    faf::server::CSeatIntake bytes;
+    bytes.AddSeat(1, *other.one);
+    const std::vector<std::uint8_t> big = Command(ECmdStreamOp::CMDST_RequestPause, std::vector<std::uint8_t>(40000u, 0u));
+    (void)bytes.Push(1, big.data(), big.size());
+    (void)bytes.Push(1, big.data(), big.size());
+    std::size_t answered = 0;
+    const auto count = [&answered](std::int32_t, std::vector<std::uint8_t>) { ++answered; };
+    const auto noMaps = [](std::int32_t) -> const faf::remote::CViewIdMap* { return nullptr; };
+    bytes.Drain(nullptr, noMaps, count);
+    Check(answered == 1u, "one beat takes only so many bytes");
+    bytes.Drain(nullptr, noMaps, count);
+    Check(answered == 2u, "and the next takes the rest");
+  }
+
   void LoadedCountsForTheStart()
   {
     SGame game;
@@ -273,6 +432,7 @@ int main()
   ForgedOpsNeverReachTheSim();
   EjectionEndsTheSourceAndFreesTheGame();
   TheHookRunsAheadOfEachBeat();
+  TheIntakeHandsOnWhatItCanTranslate();
   LoadedCountsForTheStart();
   std::printf("%d checks, %d failures\n", gChecks, gFailures);
   return gFailures;

@@ -49,8 +49,11 @@ namespace faf::remote
 
     void Debug() override;
 
-    /** A command from this seat's player. False: refused, as the op isn't allowed or the seat has ended. */
-    [[nodiscard]] bool ReceiveCommand(moho::CMessage& message);
+    /**
+     * A command from this seat's player. False: refused, as the op isn't allowed or the seat has ended.
+     * `beat`, if given: the beat it went in.
+     */
+    [[nodiscard]] bool ReceiveCommand(moho::CMessage& message, std::int32_t* beat = nullptr);
 
     /** A message the server itself puts in this seat's stream, never one a player sent. */
     void AppendFromServer(moho::CMessage& message);

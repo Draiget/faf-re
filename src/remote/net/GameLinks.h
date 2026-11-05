@@ -36,8 +36,26 @@ namespace faf::remote::net
      * grid and Lua lanes, each a varint size and its bytes (remote/ViewLanes.h).
      */
     View = 5,
-    /** Server to player, reliable, once before any view: the map's size, x and z, as two 32-bit floats. */
+    /**
+     * Server to player, reliable, once before any view: the map's size, x and z, as two 32-bit floats, then the
+     * player's army (-1: none) and command source, as two 32-bit integers.
+     */
     GameInfo = 6,
+    /**
+     * Server to player, reliable, one per command in the order sent: varint the beat it went in (0 if it
+     * didn't), then an `ECommandAnswer` byte.
+     */
+    CommandAnswer = 7,
+  };
+
+  /** What became of a player's command. */
+  enum class ECommandAnswer : std::uint8_t
+  {
+    Applied = 0,
+    /** A kind of command a player may not send, or the seat has ended. */
+    Refused = 1,
+    /** It doesn't decode, or names an id the player's view was never given. */
+    Dropped = 2,
   };
 
   struct SGameLinkStats

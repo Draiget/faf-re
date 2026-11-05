@@ -30,6 +30,7 @@ namespace faf::headless
     int loopbackTurnTolerance = 0; // with dead reckoning: orientation tolerance in 1/65536 turns (0: off)
     bool commandCheck = false;  // every command decoded and marshalled again, compared (ReplayCommandCheck.h)
     bool seats = false;         // the commands through the game server's seats (ReplaySeats.h)
+    std::string seatsListen;    // with `seats`, Linux: the whole server's load: views and players over UDP at this address
     bool oracleCheck = false;   // the visibility oracle against the sim's own publication (ReplayOracleCheck.h)
     std::string oracleDigestsPath; // with `oracleCheck`: per beat and army, the oracle's answers as a digest
     bool changeSetCheck = false; // the sync walk's change set against its packet (ReplayChangeSetCheck.h)

@@ -56,6 +56,11 @@
 #if FAF_SERVER_MODE
 #include "headless/ReplaySeats.h"
 #endif
+#if FAF_HEADLESS_NET
+#include "remote/net/UdpSocket.h"
+#include "server/ServerNet.h"
+#include "server/ServerViews.h"
+#endif
 #include "headless/ReplayFpuReport.h"
 #include "headless/ReplayKeyframes.h"
 #if FAF_SERVER_MODE
@@ -498,6 +503,35 @@ namespace faf::headless
       sessionInfo->mClientManager = seatManager;
     }
 #endif
+#if !FAF_HEADLESS_NET
+    if (!options.seatsListen.empty()) {
+      result.error = "--seats-listen needs the Linux build";
+      return result;
+    }
+#endif
+#if FAF_HEADLESS_NET
+    // `--seats-listen`: the players' network on those seats. Nobody is waited for or put out: this
+    // measures the load, and the recording goes on whoever is there.
+    std::unique_ptr<faf::server::CServerNet> seatNet;
+    if (seatFeed && !options.seatsListen.empty()) {
+      faf::server::SServerNetConfig netConfig;
+      if (!faf::remote::net::ParseEndpoint(options.seatsListen, netConfig.listen)) {
+        result.error = "--seats-listen takes <ip:port>";
+        return result;
+      }
+      netConfig.joinSeconds = 1.0e9;
+      netConfig.reconnectSeconds = 1.0e9;
+      seatNet = std::make_unique<faf::server::CServerNet>(netConfig);
+      for (faf::remote::CServerClient* const seat : seatFeed->Seats()) {
+        seatNet->AddSeat(seat->GetIndex(), seat->GetNickname().c_str(), "seat-" + std::to_string(seat->GetIndex()), *seat);
+      }
+      std::string netError;
+      if (!seatNet->Start(netError)) {
+        result.error = netError;
+        return result;
+      }
+    }
+#endif
 
     if (sessionInfo->mClientManager != nullptr) {
       sessionInfo->mClientManager->SetUIInterface(&gReplayClientEvents);
@@ -709,6 +743,32 @@ namespace faf::headless
     }
 #endif
 
+#if FAF_HEADLESS_NET
+    std::unique_ptr<faf::server::CServerViews> seatViews;
+    if (seatNet) {
+      std::map<std::size_t, std::int32_t> players;
+      const auto& armies = launchInfo->mArmyLaunchInfo;
+      for (faf::remote::CServerClient* const seat : seatFeed->Seats()) {
+        std::int32_t playerArmy = -1;
+        for (std::size_t army = 0; army < armies.size(); ++army) {
+          if (armies[army].mUnitSources.Contains(static_cast<unsigned int>(seat->GetIndex()))) {
+            players[army] = seat->GetIndex();
+            playerArmy = static_cast<std::int32_t>(army);
+            break;
+          }
+        }
+        seatNet->QueueView(
+          seat->GetIndex(), faf::server::MakeGameInfo(mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, playerArmy, static_cast<std::uint32_t>(seat->GetIndex()))
+        );
+      }
+      seatViews = std::make_unique<faf::server::CServerViews>(
+        tables, *rules, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, *seatNet, std::move(players),
+        static_cast<unsigned int>(std::max(options.viewPipelineThreads, 1))
+      );
+      seatViews->Install();
+    }
+#endif
+
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;
     sessionInfo->mClientManager = nullptr;
     moho::SIM_SetSessionPacing(rejoinRehearsal || liveRejoin ? moho::ESimSessionPacing::Network : moho::ESimSessionPacing::Replay);
@@ -716,6 +776,19 @@ namespace faf::headless
       static_cast<moho::CClientManagerImpl*>(clientManager), nullptr, sessionInfo->mLaunchInfo, sessionInfo->mSourceId
     ));
     auto* const simDriver = static_cast<moho::CSimDriver*>(driver.get());
+#if FAF_HEADLESS_NET
+    // Ahead of the driver going away, on every way out: the network's thread touches its seats.
+    struct SStopSeatNet
+    {
+      faf::server::CServerNet* net;
+      ~SStopSeatNet()
+      {
+        if (net != nullptr) {
+          net->Stop();
+        }
+      }
+    } const stopSeatNet{seatNet.get()};
+#endif
     result.loadSeconds = SecondsSince(loadStart);
     std::printf("[%s] loaded in %.1fs: %d armies, focus %d\n", label, result.loadSeconds, armyCount, options.focusArmy);
     std::fflush(stdout);
@@ -931,6 +1004,15 @@ namespace faf::headless
           result.gameOver = true;
         }
 #if FAF_SERVER_MODE
+#if FAF_HEADLESS_NET
+        if (seatNet) {
+          seatNet->NoteBeat(packet->mCurBeat);
+          for (const std::string& line : seatNet->TakeNews()) {
+            std::printf("[%s] beat %d: %s\n", label, packet->mCurBeat, line.c_str());
+            std::fflush(stdout);
+          }
+        }
+#endif
         // With every source gone before its end, a recording has nobody left to end the game.
         if (seatFeed && packet->mCurBeat > seatFeed->LastBeat() + 1) {
           stopped = true;
@@ -1020,6 +1102,19 @@ namespace faf::headless
 #if FAF_SERVER_MODE
     if (seatFeed) {
       std::printf("[%s] %s\n", label, seatFeed->Report().c_str());
+      std::fflush(stdout);
+    }
+#endif
+#if FAF_HEADLESS_NET
+    if (seatNet) {
+      std::printf(
+        "[%s] seat network: %.1f MB sent, %.1f KB/s, %llu view lanes failed\n", label, static_cast<double>(seatNet->BytesSent()) / 1048576.0,
+        static_cast<double>(seatNet->BytesSent()) / 1024.0 / std::max(SecondsSince(playStart), 1.0),
+        static_cast<unsigned long long>(seatViews ? seatViews->Failures() : 0u)
+      );
+      if (seatViews) {
+        std::printf("[%s] %s\n[%s] %s\n", label, seatViews->LaneReport().c_str(), label, seatNet->Intake().Report().c_str());
+      }
       std::fflush(stdout);
     }
 #endif
