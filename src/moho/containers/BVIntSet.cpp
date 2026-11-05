@@ -9,6 +9,18 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/sim/SimBlockLane.h"
+
+#if defined(_M_X64) || defined(__x86_64__)
+namespace
+{
+  const bool gSimBlockLaneWatchesUIntStorage = []() noexcept {
+    gpg::core::detail::gUIntStorageAllocated = &moho::SimBlockLane::NoteStorageAllocated;
+    gpg::core::detail::gUIntStorageFreed = &moho::SimBlockLane::NoteStorageFreed;
+    return true;
+  }();
+} // namespace
+#endif
 
 using namespace moho;
 
