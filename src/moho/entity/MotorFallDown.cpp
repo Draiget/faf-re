@@ -28,8 +28,8 @@
 
 namespace
 {
-  constexpr float kPi = 3.1415927f;
-  constexpr float kHalfPi = 1.5707964f;
+  [[maybe_unused]] constexpr float kPi = 3.1415927f;
+  [[maybe_unused]] constexpr float kHalfPi = 1.5707964f;
   constexpr float kQuarterPi = 0.78539819f;
   constexpr float kFourOverPi = 1.2732395f;
   constexpr float kQuatUpdateThreshold = 0.0001f;

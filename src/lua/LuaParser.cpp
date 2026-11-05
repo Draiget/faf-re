@@ -80,7 +80,6 @@ namespace
   // exactly 25, 26, 27, 28 and 33 - EQ, LT, LE, TEST and TFORLOOP.
   constexpr std::int32_t OP_MOVE = 0x00;
   constexpr std::int32_t OP_LOADK = 0x01;
-  constexpr std::int32_t OP_LOADBOOL = 0x02;
   constexpr std::int32_t OP_LOADNIL = 0x03;
   constexpr std::int32_t OP_GETUPVAL = 0x04;
   constexpr std::int32_t OP_GETGLOBAL = 0x05;
@@ -106,7 +105,6 @@ namespace
   constexpr std::int32_t OP_TFORLOOP = 0x21;
   constexpr std::int32_t OP_TFORPREP = 0x22;
   constexpr std::int32_t OP_SETLIST = 0x23;
-  constexpr std::int32_t OP_SETLISTO = 0x24;
   constexpr std::int32_t OP_CLOSE = 0x25;
   constexpr std::int32_t OP_CLOSURE = 0x26;
   constexpr std::int32_t OP_SUB = 0x0D;

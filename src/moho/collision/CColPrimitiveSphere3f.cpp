@@ -13,13 +13,6 @@
 
 namespace
 {
-  constexpr const char* kSerializationSourcePath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-  constexpr int kSerializationLoadLine = 84;
-  constexpr int kSerializationSaveLine = 87;
-  constexpr int kSaveConstructArgsLine = 189;
-  constexpr int kConstructLine = 231;
-
   [[nodiscard]] gpg::RType* CachedVector3fType()
   {
     static gpg::RType* cached = nullptr;

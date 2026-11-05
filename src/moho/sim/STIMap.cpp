@@ -3497,8 +3497,8 @@ namespace moho
     // (0.0078125f) gives the real elevation.
     constexpr float kHeightSampleToWorld = 1.0f / 128.0f;
     // Decompiled value at `func_Rect2fToInt16`: world-to-collision-cell quantization.
-    constexpr int kWorldToCollisionCellShift = 2;
-    constexpr int kCollisionCellMax = 0xFFFF;
+    [[maybe_unused]] constexpr int kWorldToCollisionCellShift = 2;
+    [[maybe_unused]] constexpr int kCollisionCellMax = 0xFFFF;
 
     [[nodiscard]] float SampleClampedElevation(
       const CHeightField& field, const int cellX, const int cellZ

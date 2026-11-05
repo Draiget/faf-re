@@ -64,14 +64,14 @@ namespace
   // Exact source location cited by every `HandleAssertFailure` call this
   // file's real double-registration guards raise (confirmed per-assert from
   // raw disassembly: gpgcore/reflection/serialization.h, lines 84/87/231).
-  constexpr const char* kSerializationSourcePath =
+  [[maybe_unused]] constexpr const char* kSerializationSourcePath =
     "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-  constexpr const char* kLoadAssertText = "!type->mSerLoadFunc";
-  constexpr const char* kSaveAssertText = "!type->mSerSaveFunc";
-  constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
-  constexpr int kSerializationLoadLine = 84;
-  constexpr int kSerializationSaveLine = 87;
-  constexpr int kSerializationConstructLine = 231;
+  [[maybe_unused]] constexpr const char* kLoadAssertText = "!type->mSerLoadFunc";
+  [[maybe_unused]] constexpr const char* kSaveAssertText = "!type->mSerSaveFunc";
+  [[maybe_unused]] constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
+  [[maybe_unused]] constexpr int kSerializationLoadLine = 84;
+  [[maybe_unused]] constexpr int kSerializationSaveLine = 87;
+  [[maybe_unused]] constexpr int kSerializationConstructLine = 231;
 
   template <class TObject>
   [[nodiscard]] gpg::RRef MakeStaticRef(TObject* const object, gpg::RType* const staticType) noexcept

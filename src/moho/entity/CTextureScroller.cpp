@@ -19,9 +19,6 @@
 
 namespace
 {
-  constexpr const char* kSerializationHeaderPath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.h";
-
   // Forward declaration: defined further down in this namespace; used by
   // SScrollerSerializer::Init() below.
 

@@ -150,7 +150,6 @@ namespace
   constexpr std::uint32_t kAllUnitsShieldFamilyBoundaryKey = 0x40000000u;
   constexpr std::uint32_t kAllUnitsOtherFamilyBoundaryKey = 0x50000000u;
   constexpr std::uint32_t kAllUnitsLateFamilyBoundaryKey = 0x60000000u;
-  constexpr std::uint32_t kEntityIdFamilyNibbleMask = 0xF0000000u;
 
   gpg::RType* gLegacyEntityDbIdPoolMapType = nullptr;
   gpg::RType* gLegacyEntityDbEntityListType = nullptr;
