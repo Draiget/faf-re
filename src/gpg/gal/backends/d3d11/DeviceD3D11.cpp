@@ -1397,10 +1397,13 @@ namespace gpg::gal
   {
     auto* const sourceTexture = static_cast<TextureD3D11*>(texture.get());
     if (outBuffer == nullptr) {
-      CheckHresult(
-        "DeviceD3D11.cpp", __LINE__,
-        mD3DX11->saveTextureToFile(mImmediate.Get(), sourceTexture->GetResource(), ImageFileFormat(fileFormat), filePath.c_str())
-      );
+      const HRESULT saved = mD3DX11->saveTextureToFile(mImmediate.Get(), sourceTexture->GetResource(), ImageFileFormat(fileFormat), filePath.c_str());
+      if (FAILED(saved) && fileFormat == 0) {
+        // D3DX11 answers E_FAIL for a frame as a BMP, which is what dump_Frame asks for.
+        DumpTexture(sourceTexture->GetTexture2D(), filePath.c_str());
+        return;
+      }
+      CheckHresult("DeviceD3D11.cpp", __LINE__, saved);
       return;
     }
 
@@ -2280,7 +2283,8 @@ namespace gpg::gal
     // World shapes (ren_GpuShapes): a paused same-process A/B of FAF's shapes plus a 2,000-segment
     // UI_DrawLine stroke against the path off, pixel-identical outside two animated unit glows.
     return kGpuPathStrategicIcons | kGpuPathIconClassify | kGpuPathFogOfWar | kGpuPathSelectBrackets |
-      kGpuPathProjectileIcons | kGpuPathWorldShapes;
+      // MSDF text and the interface's quads: 0 pixels differ in a same-process A/B of a panel of text.
+      kGpuPathProjectileIcons | kGpuPathWorldShapes | kGpuPathMsdfText;
   }
 
   boost::shared_ptr<GpuBuffer> DeviceD3D11::CreateGpuBuffer(const GpuBufferDesc& desc)
