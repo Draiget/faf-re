@@ -78,7 +78,7 @@ namespace moho
    */
   void CWeaponAttributes::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    if (archive == nullptr || this == nullptr) {
+    if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
     }
 
