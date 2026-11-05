@@ -885,8 +885,8 @@ namespace
   }
 
   /**
-   * Engine addition (issue #215): gpg::diag::BuildLabel ("FAF-RE by Draiget, build
-   * <commit> <arch>") in small gray text, centred at the bottom of the first head, while
+   * Engine addition (issue #215): gpg::diag::BuildLabel ("FAF-RE, Draiget & contributors,
+   * build <commit> <arch>") in small gray text, centred at the bottom of the first head, while
    * the lobby screen is up (a CLobby exists and no game session runs). In a game the
    * same line heads the network-stats panel (F11) instead. The engine draws it after the UI, from
    * the commit compiled into the exe, so no Lua code can change or hide it; there is
