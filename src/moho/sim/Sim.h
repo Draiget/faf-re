@@ -254,8 +254,13 @@ namespace moho
      *
      * Virtual in the binary (`??1Sim@Moho@@UAE@XZ`); `ICommandSink` does not yet
      * declare a virtual destructor in this model, so `override` cannot be used.
+     * The `virtual` is what gives it its vtable slot, so it stays though the class
+     * is final.
      */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunnecessary-virtual-specifier"
     virtual ~Sim();
+#pragma clang diagnostic pop
 
     /**
      * Address: 0x0062DA50 (FUN_0062DA50, ?LocationIsFree@Sim@Moho@@SA_NPAV12@PAVUnit@2@PAV?$Rect2@H@gpg@@D@Z)
