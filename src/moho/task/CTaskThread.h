@@ -266,4 +266,18 @@ namespace moho
    * Materializes the startup `CTaskStageTypeInfo` descriptor.
    */
   void register_CTaskStageTypeInfo();
+  /**
+   * Engine addition: lets a staged or sleeping thread run again on the next tick.
+   */
+  inline void WakeTaskThreadForImmediateTick(CTaskThread* const ownerThread)
+  {
+    if (ownerThread == nullptr) {
+      return;
+    }
+
+    ownerThread->mPendingFrames = 0;
+    if (ownerThread->mStaged) {
+      ownerThread->Unstage();
+    }
+  }
 } // namespace moho

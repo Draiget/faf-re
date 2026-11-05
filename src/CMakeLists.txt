@@ -64,8 +64,10 @@ if(NOT EXISTS "${_faf_ffmpeg}/faf/CMakeLists.txt")
                       "(git submodule update --init dependencies/ffmpeg); see docs/FAF_SFD_COMPATIBILITY.md.")
 endif()
 add_subdirectory("${_faf_ffmpeg}/faf" "${CMAKE_BINARY_DIR}/dependencies/ffmpeg")
+include(FafWarnings)
 foreach(_lib IN LISTS FFMPEG_FAF_LIBRARIES)
   target_link_libraries(${_lib} PRIVATE faf_codegen)
+  target_compile_options(${_lib} PRIVATE "$<$<COMPILE_LANGUAGE:C>:${FAF_FFMPEG_WARNING_OPTIONS}>")
 endforeach()
 
 # --- Compilation ----------------------------------------------------------------------
@@ -83,6 +85,10 @@ target_include_directories(faf_engine PUBLIC
 target_link_libraries(faf_engine PUBLIC faf_codegen faf::wx Wm3Headers)
 # In-engine peer links (moho/net/NetlinkPeers.cpp, issue #233; client only).
 target_link_libraries(faf_engine PUBLIC faf_netlink)
+# The rejoin key's signatures (moho/net/RejoinKey.cpp) and the rejoin save's packing (issue #275).
+target_link_libraries(faf_engine PUBLIC faf_monocypher faf_zstd)
+# MSDF text (moho/render/font, issue #306): both static, client only.
+target_link_libraries(faf_engine PUBLIC faf_freetype faf_msdfgen)
 
 set(_faf_main_options
   # C++ exceptions with extern "C" functions allowed to throw (/EHs, not
@@ -107,28 +113,14 @@ if(NOT FAF_TARGET_ARCH STREQUAL "x64")
   list(APPEND _faf_main_options /FIplatform/X87SqrtCall.h)
 endif()
 
-# Diagnostics: the recovered tree is written against MSVC; keep clang's
-# portability chatter out of the log so real problems stand out.
-list(APPEND _faf_main_options
-  -Wno-microsoft
-  -Wno-unused-parameter -Wno-unused-variable -Wno-unused-private-field
-  -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-but-set-variable
-  -Wno-unused-lambda-capture -Wno-unused-value -Wno-unused-command-line-argument
-  -Wno-missing-field-initializers -Wno-sign-compare -Wno-switch
-  -Wno-invalid-offsetof -Wno-keyword-macro -Wno-unknown-pragmas
-  -Wno-ignored-pragma-intrinsic -Wno-pragma-pack -Wno-ignored-attributes
-  -Wno-deprecated-declarations -Wno-deprecated-enum-enum-conversion
-  -Wno-nonportable-include-path -Wno-reorder-ctor
-  -Wno-delete-non-abstract-non-virtual-dtor -Wno-overloaded-virtual
-  -Wno-inconsistent-missing-override -Wno-missing-braces -Wno-braced-scalar-init
-  -Wno-char-subscripts -Wno-parentheses -Wno-dangling-else
-  -Wno-tautological-constant-out-of-range-compare
-  -Wno-tautological-undefined-compare -Wno-undefined-var-template
-  -Wno-writable-strings -Wno-comment -Wno-extra-tokens -Wno-nontrivial-memcall
-  -Wno-mismatched-tags -Wno-extra-qualification)
+list(APPEND _faf_main_options ${FAF_WARNING_OPTIONS})
 
 # C and C++ only (not the x64 MASM file).
 target_compile_options(faf_engine PUBLIC "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
+if(FAF_SYNTAX_ONLY)
+  # /Zs doesn't use the -c the build rule passes.
+  target_compile_options(faf_engine PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:/Zs;-Wno-unused-command-line-argument>")
+endif()
 
 # --- Per-file settings ---------------------------------------------------------------
 set(_fx11 "${FAF_DEPENDENCIES_DIR}/FX11")
@@ -139,6 +131,9 @@ set_property(SOURCE
     gpg/gal/backends/d3d11/D3D11VertexLayouts.cpp
     gpg/gal/backends/d3d11/DeviceD3D11.cpp
   APPEND PROPERTY INCLUDE_DIRECTORIES "${_fx11}/inc")
+
+set_property(SOURCE ${FAF_WX_EVENT_TABLE_SOURCES}
+  APPEND PROPERTY COMPILE_OPTIONS ${FAF_WX_EVENT_TABLE_OPTIONS})
 
 set_property(SOURCE gpg/gal/effects/ShaderCompiler.cpp
   APPEND PROPERTY INCLUDE_DIRECTORIES "${FAF_DEPENDENCIES_DIR}/dxc/inc")
@@ -189,6 +184,8 @@ set_property(SOURCE ${_boost_thread_sources} APPEND PROPERTY COMPILE_OPTIONS /W0
 set_property(SOURCE "${_boost_thread}/condition.cpp" APPEND PROPERTY COMPILE_OPTIONS /UUNICODE /U_UNICODE)
 
 set_property(SOURCE moho/movie/sfd/FfmpegSfdDecoder.cpp APPEND PROPERTY COMPILE_OPTIONS -Wno-everything)
+include(FafPrecompiledHeaders)
+faf_precompile(faf_engine)
 
 # --- Link -----------------------------------------------------------------------------
 if(FAF_TARGET_ARCH STREQUAL "x64")
@@ -385,6 +382,8 @@ target_sources(faf_sim INTERFACE ${_faf_sim_objects} "${CMAKE_CURRENT_SOURCE_DIR
 add_dependencies(faf_sim faf_engine)
 target_link_libraries(faf_sim INTERFACE
   faf_sim_settings
+  faf_monocypher
+  faf_zstd
   ws2_32 legacy_stdio_definitions legacy_stdio_wide_specifiers
   dbghelp winmm version shlwapi faultrep
   ${_faf_zlib}
@@ -408,6 +407,11 @@ if(NOT FAF_SERVER_MODE)
 endif()
 
 add_executable(headless ${_faf_headless_sources})
+
+# The game has the replay player too: `/replaykeyframes` (moho/sim/ReplayTimeline.cpp).
+set(_faf_main_replay_player ${_faf_headless_sources})
+list(REMOVE_ITEM _faf_main_replay_player headless/HeadlessEntry.cpp)
+target_sources(faf_main PRIVATE ${_faf_main_replay_player} headless/GameEntry.cpp)
 if(FAF_CALL_HASH_BUILD)
   target_sources(headless PRIVATE headless/CallHashHooks.cpp)
 endif()

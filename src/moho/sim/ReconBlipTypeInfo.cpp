@@ -20,10 +20,18 @@ namespace
       return "SPerArmyReconInfo";
     }
 
+    /**
+     * Address: 0x005BE3E0
+     *
+     * What it does:
+     * Size, base init, then version 1 (0x005BE3F4), which `SPerArmyReconInfo::MemberSerialize`
+     * requires: without it every save with a recon blip failed on "unsupported version.".
+     */
     void Init() override
     {
       size_ = sizeof(moho::SPerArmyReconInfo);
       gpg::RType::Init();
+      version_ = 1;
       Finish();
     }
   };

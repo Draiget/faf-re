@@ -60,36 +60,6 @@ namespace
     return out;
   }
 
-  [[nodiscard]] gpg::RType* CachedCAiNavigatorImplType()
-  {
-    if (!CAiNavigatorImpl::sType) {
-      CAiNavigatorImpl::sType = gpg::LookupRType(typeid(CAiNavigatorImpl));
-    }
-    return CAiNavigatorImpl::sType;
-  }
-
-  /**
-   * The reflected type of the destination lane. 0x005A912C reads its cached
-   * `RType` through the type descriptor at 0x00F6B8A4, whose name is
-   * `.?AV?$WeakPtr@VEntity@Moho@@@Moho@@`.
-   */
-  [[nodiscard]] gpg::RType* CachedWeakEntityType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(WeakPtr<Entity>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return cached;
-  }
 } // namespace
 
 gpg::RType* CAiNavigatorAir::sType = nullptr;
@@ -140,11 +110,11 @@ void CAiNavigatorAir::MemberDeserialize(gpg::ReadArchive* const archive)
   }
 
   const gpg::RRef ownerRef{};
-  archive->Read(CachedCAiNavigatorImplType(), this, ownerRef);
+  archive->Read(gpg::RTypeOf<CAiNavigatorImpl>(), this, ownerRef);
 
-  archive->Read(CachedWeakEntityType(), &mDestinationEntity, ownerRef);
-  archive->Read(CachedVector3fType(), &mCurrentTargetPos, ownerRef);
-  archive->Read(CachedVector3fType(), &mGoalPos, ownerRef);
+  archive->Read(gpg::RTypeOf<WeakPtr<Entity>>(), &mDestinationEntity, ownerRef);
+  archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mCurrentTargetPos, ownerRef);
+  archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mGoalPos, ownerRef);
 
   bool trackFormation = false;
   archive->ReadBool(&trackFormation);
@@ -165,11 +135,11 @@ void CAiNavigatorAir::MemberSerialize(gpg::WriteArchive* const archive) const
   }
 
   const gpg::RRef ownerRef{};
-  archive->Write(CachedCAiNavigatorImplType(), this, ownerRef);
+  archive->Write(gpg::RTypeOf<CAiNavigatorImpl>(), this, ownerRef);
 
-  archive->Write(CachedWeakEntityType(), &mDestinationEntity, ownerRef);
-  archive->Write(CachedVector3fType(), &mCurrentTargetPos, ownerRef);
-  archive->Write(CachedVector3fType(), &mGoalPos, ownerRef);
+  archive->Write(gpg::RTypeOf<WeakPtr<Entity>>(), &mDestinationEntity, ownerRef);
+  archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mCurrentTargetPos, ownerRef);
+  archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mGoalPos, ownerRef);
   archive->WriteBool(mTrackFormationTarget != 0u);
 }
 

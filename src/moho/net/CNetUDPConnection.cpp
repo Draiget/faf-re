@@ -5,9 +5,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <vector>
 
 #include "CLobby.h"
 #include "CNetUDPConnector.h"
+#include "EClientMsg.h"
 #include "ELobbyMsg.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/ZLibOutputFilterStream.h"
@@ -27,6 +29,17 @@ namespace
 
   // "No receiver for message type" warnings logged per connection.
   constexpr std::uint32_t kMaxUnroutedMessageWarnings = 8;
+
+  // Engine addition (wld_PreciseSharedStart): connections holding a queued ready message that has
+  // not left yet, and the packet that carried it on each connection once it has (both guarded by
+  // the connector lock).
+  struct SReadyCarrier
+  {
+    const CNetUDPConnection* mConnection;
+    std::uint16_t mSequenceNumber;
+  };
+  std::vector<const CNetUDPConnection*> gReadyAwaitingDeparture;
+  std::vector<SReadyCarrier> gReadyCarriers;
 } // namespace
 
 /**
@@ -147,6 +160,11 @@ void CNetUDPConnection::Write(NetDataSpan* data)
     mPendingOutputData.VirtWrite(reinterpret_cast<const char*>(begin), len);
   }
 
+  // Engine addition (wld_PreciseSharedStart): the ready message is timed when it leaves (SendPacket).
+  if (len != 0 && begin[0] == static_cast<uint8_t>(EClientMsg::CLIMSG_Ready) &&
+      std::find(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this) == gReadyAwaitingDeparture.end()) {
+    gReadyAwaitingDeparture.push_back(this);
+  }
   // Schedule earliest send time once:
   // mSendBy = now + net_SendDelay * 1000 (ms > us ticks in bin)
   if (mSendBy.mTime == 0) {
@@ -240,6 +258,12 @@ void CNetUDPConnection::ScheduleDestroy()
 #if defined(_WIN32)
   mConnector->SignalSocketEvent();
 #endif
+}
+
+void CNetUDPConnection::SetWindow(const uint16_t window)
+{
+  boost::recursive_mutex::scoped_lock lock{mConnector->lock_};
+  mWindow = window;
 }
 
 /**
@@ -355,7 +379,7 @@ CNetUDPConnection::CNetUDPConnection(
   }
 
   // Initialize pings structure and ping time
-  std::memset(&mPings, 0, sizeof(mPings));
+  std::memset(static_cast<void*>(&mPings), 0, sizeof(mPings));
   mPingTime = 0.0f;
 }
 
@@ -369,6 +393,17 @@ CNetUDPConnection::CNetUDPConnection(
  */
 CNetUDPConnection::~CNetUDPConnection()
 {
+  // Engine addition (wld_PreciseSharedStart): a connection that goes before its ready message left.
+  gReadyAwaitingDeparture.erase(
+    std::remove(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this), gReadyAwaitingDeparture.end()
+  );
+  gReadyCarriers.erase(
+    std::remove_if(
+      gReadyCarriers.begin(), gReadyCarriers.end(), [this](const SReadyCarrier& carrier) { return carrier.mConnection == this; }
+    ),
+    gReadyCarriers.end()
+  );
+
   constexpr int poolCap = 0x14u;
 
   auto recyclePacket = [this](SNetPacket* p) noexcept {
@@ -826,7 +861,7 @@ void CNetUDPConnection::ProcessData(SNetPacket* packet)
     return;
   }
 
-  if (delta > 32) {
+  if (delta > static_cast<int16_t>(mWindow)) {
     // Too far in the future
     if (net_DebugLevel) {
       gpg::Logf(
@@ -1003,6 +1038,15 @@ int64_t CNetUDPConnection::CalcResendDelay(const SNetPacket* packet) const
  */
 int64_t CNetUDPConnection::CalcResendDelayForCount(int rc) const
 {
+  // Issue #237: at the game's packet rate no acknowledgement can show a loss
+  // before the timer fires, so with the switch the timer itself follows the
+  // round trip. Before the first measured round trip it stays as shipped.
+  if (rc == 0 && mPingTime > 0.0f && NET_FastRetransmitEnabled()) {
+    constexpr float kLowestFastResendMs = 10.0f;
+    const float delayMs = std::max(mPingTime * net_FastResendPings, kLowestFastResendMs);
+    return static_cast<int64_t>(delayMs * 1000.0f);
+  }
+
   const float baseMs = mPingTime * net_ResendPingMultiplier + static_cast<float>(net_ResendDelayBias);
 
   if (rc > 3) {
@@ -1128,7 +1172,6 @@ int CNetUDPConnection::SendData()
 
   case kNetStateEstablishing: {
     const int64_t curTime = mConnector->GetTime();
-    const int64_t idle = curTime - mLastRecv;
 
     if (curTime - mLastRecv > 10'000'000) {
       if (net_DebugLevel) {
@@ -1178,7 +1221,8 @@ int CNetUDPConnection::SendData()
       // Pending data only waits on the send deadline while the window can take
       // it (`HasPacketWaiting`); behind a full window that deadline is no
       // reason to wake, and an expired one would spin the same way.
-      const bool windowOpen = static_cast<int16_t>(mNextSequenceNumber - mRemoteExpectedSequenceNumber) <= 32;
+      const bool windowOpen =
+        static_cast<int16_t>(mNextSequenceNumber - mRemoteExpectedSequenceNumber) <= static_cast<int16_t>(mWindow);
       if (mSendBy.mTime != 0 &&
           (mInResponseTo != 0 || (windowOpen && (mPendingOutputData.GetLength() != 0 || mOutputFlushPending)))) {
         since = ChooseTimeout(since, TimeSince(mSendBy.mTime));
@@ -1214,7 +1258,7 @@ int CNetUDPConnection::SendData()
 bool CNetUDPConnection::HasPacketWaiting(const int64_t nowUs)
 {
   // Window check (16-bit arithmetic in asm)
-  if (static_cast<int16_t>(mNextSequenceNumber - mRemoteExpectedSequenceNumber) > 32) {
+  if (static_cast<int16_t>(mNextSequenceNumber - mRemoteExpectedSequenceNumber) > static_cast<int16_t>(mWindow)) {
     return false;
   }
 
@@ -1424,6 +1468,29 @@ SNetPacket* CNetUDPConnection::NewPacket(const bool inherit, const int size, con
  */
 void CNetUDPConnection::SendPacket(SNetPacket* packet)
 {
+  // Engine addition (wld_PreciseSharedStart): the first new payload after a queued ready message
+  // carries it; a resend of older data goes before it and says nothing about it. A resend of the
+  // carrier moves the time, as the peer times the copy that reached it: a lost first copy would
+  // otherwise leave the two players a whole resend wait apart on the shared start. When only the
+  // ACK was lost the peer timed the earlier copy, so that gap remains; the reply echoes the last
+  // serial it saw (`AdoptPacket`) either way, and nothing here can tell the two cases apart.
+  if (packet->header.mType == PT_Data && packet->header.mPayloadLength != 0) {
+    if (packet->mResendCount != 0) {
+      for (const SReadyCarrier& carrier : gReadyCarriers) {
+        if (carrier.mConnection == this && carrier.mSequenceNumber == packet->header.mSequenceNumber) {
+          NET_NoteReadyLeftNow();
+          break;
+        }
+      }
+    } else if (!gReadyAwaitingDeparture.empty()) {
+      const auto awaiting = std::find(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this);
+      if (awaiting != gReadyAwaitingDeparture.end()) {
+        gReadyAwaitingDeparture.erase(awaiting);
+        gReadyCarriers.push_back(SReadyCarrier{this, packet->header.mSequenceNumber});
+        NET_NoteReadyLeftNow();
+      }
+    }
+  }
   packet->header.mSerialNumber = mNextSerialNumber;
   packet->header.mInResponseTo = mInResponseTo;
 
@@ -1478,10 +1545,21 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
   ++mNextSerialNumber;
   mInResponseTo = 0;
 
+  // Not in the binary: bytes still in the output filter (`mOutputFlushPending`, with deflate on) keep
+  // their deadline. The binary cleared it whenever the flushed buffer was empty, so an ACK or a resend
+  // sent while a message sat in the filter -- an ACK falls due on the very microsecond the message's
+  // deadline expires, since `HasPacketWaiting` holds data until `now > mSendBy` and the ACK goes at
+  // `now >= mSendBy` -- left nothing to wake the connector for it (`SendData` only waits on a set
+  // deadline), and the message stayed in the filter until the next one was written. A ready message
+  // queued at the start of the long first frame of play waited out the whole frame, some 250 ms.
+  // Behind a full window the bytes cannot go anyway (`HasPacketWaiting`), and an expired deadline
+  // kept there would take every later ACK at once instead of after net_AckDelay (`AdoptPacket` only
+  // arms a clear deadline); the peer's ACK wakes the connector when the window opens.
+  const bool sendWindowOpen = static_cast<int16_t>(mNextSequenceNumber - mRemoteExpectedSequenceNumber) <= 32;
   if (mPendingOutputData.GetLength()) {
     // time in us
     mSendBy.mTime = nowUs + 1000LL * net_SendDelay;
-  } else {
+  } else if (!mOutputFlushPending || !sendWindowOpen) {
     mSendBy.mTime = 0;
   }
 
@@ -1732,8 +1810,8 @@ void CNetUDPConnection::AdoptPacket(const SNetPacket* packet)
   mInResponseTo = packet->header.mSerialNumber;
 
   if (mSendBy.mTime == 0) {
-    // net_AckDelay (ms) -> us
-    const int64_t ackDelayUs = static_cast<int64_t>(net_AckDelay) * 1000LL;
+    // net_AckDelay (ms) -> us; issue #237: less with net_FastRetransmit.
+    const int64_t ackDelayUs = static_cast<int64_t>(NET_AckDelayMs()) * 1000LL;
     mSendBy.mTime = packet->mSentTime + ackDelayUs;
   }
 }

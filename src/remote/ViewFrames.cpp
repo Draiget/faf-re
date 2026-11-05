@@ -1,7 +1,9 @@
 #include "remote/ViewFrames.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
+#include <iterator>
 #include <unordered_set>
 #include <utility>
 
@@ -126,27 +128,120 @@ namespace faf::remote
     }
   }
 
-  void CViewFrames::AdvanceIdMap(moho::Sim& sim, const std::size_t army, CViewIdMap& map)
+  void CViewFrames::AdvanceIdMap(const std::size_t army, CViewIdMap& map)
   {
     // What the last beat retired goes first: its frame could still name those ids (a unit's
     // target blip deleted on the same beat), and named them with the ids the view had. A
     // command retires once the sim's command database no longer has it: the sim deletes a
     // finished command while it publishes the beat's commands (`CCommandDB::PublishSyncData`),
     // after the walk this observer sees, so a command released on one beat goes on the next.
-    map.AdvanceTo(sim.mCurBeat);
+    map.AdvanceTo(mViewBeat);
     map.RetireEntities(mRetired[army]);
-    if (const moho::CCommandDB* const commands = sim.mCommandDB; commands != nullptr) {
-      map.RetireCommandsUnless([commands](const std::uint32_t simId) {
-        return commands->commands.find(simId) != commands->commands.end();
+    if (mHaveCommands) {
+      map.RetireCommands(mReleasedCommands);
+      map.RetireNewCommandsUnless([this](const std::uint32_t simId) {
+        return std::binary_search(mLiveCommands.begin(), mLiveCommands.end(), simId);
       });
     }
   }
 
-  void CViewFrames::BuildHeldFrame(moho::Sim& sim, const std::size_t army, const moho::SSyncData& packet)
+  bool CViewFrames::AdvanceEntityIndex(const moho::EntityDB& database)
+  {
+    // A walk over the sim's entity map takes a cache miss per entity, all on the sim thread, with
+    // tens of thousands of props on some maps. An entity comes in through the change set, and goes
+    // after its destroy pass. The count at the end says whether that was all that happened.
+    const auto& entities = database.mAllUnits;
+    mGoneEntities.clear();
+    std::size_t stay = 0;
+    for (const std::uint32_t id : mLeavingEntities) {
+      if (entities.find(id) == entities.end()) {
+        mGoneEntities.push_back(id);
+      } else {
+        mLeavingEntities[stay++] = id;
+      }
+    }
+    mLeavingEntities.resize(stay);
+
+    mEntityIndex.reserve(entities.size());
+    mEntityPointers.reserve(entities.size());
+    const std::vector<SChangedEntity>& changed = Entities();
+    std::size_t last = 0;
+    std::size_t next = 0;
+    std::size_t gone = 0;
+    while (last < mLastEntityIndex.size() || next < changed.size()) {
+      const std::uint32_t lastId = last < mLastEntityIndex.size() ? mLastEntityIndex[last].id : 0xFFFFFFFFu;
+      if (next < changed.size() && static_cast<std::uint32_t>(changed[next].entity->id_) <= lastId) {
+        const auto id = static_cast<std::uint32_t>(changed[next].entity->id_);
+        mEntityReads.push_back({static_cast<std::uint32_t>(mEntityIndex.size()), static_cast<std::uint32_t>(next)});
+        mEntityIndex.push_back({id, 0u, false, false});
+        mEntityPointers.push_back(changed[next].entity);
+        last += id == lastId ? 1u : 0u;
+        ++next;
+        continue;
+      }
+      while (gone < mGoneEntities.size() && mGoneEntities[gone] < lastId) {
+        ++gone;
+      }
+      if (gone < mGoneEntities.size() && mGoneEntities[gone] == lastId) {
+        ++last;
+        continue;
+      }
+      if (mLastEntityIndex[last].readEveryBeat) {
+        mEntityReads.push_back({static_cast<std::uint32_t>(mEntityIndex.size()), kNotChanged});
+      }
+      mEntityIndex.push_back(mLastEntityIndex[last]);
+      mEntityPointers.push_back(mLastEntityPointers[last]);
+      ++last;
+    }
+    if (mEntityIndex.size() == entities.size()) {
+      return true;
+    }
+    mEntityIndex.clear();
+    mEntityPointers.clear();
+    mEntityReads.clear();
+    return false;
+  }
+
+  void CViewFrames::WalkEntityIndex(const moho::EntityDB& database)
+  {
+    const auto& entities = database.mAllUnits;
+    mEntityIndex.reserve(entities.size());
+    mEntityPointers.reserve(entities.size());
+    const std::vector<SChangedEntity>& changed = Entities();
+    std::size_t last = 0;
+    std::size_t next = 0;
+    for (const auto& [id, entity] : entities) {
+      const auto key = static_cast<std::uint32_t>(id);
+      while (last < mLastEntityIndex.size() && mLastEntityIndex[last].id < key) {
+        ++last;
+      }
+      while (next < changed.size() && static_cast<std::uint32_t>(changed[next].entity->id_) < key) {
+        ++next;
+      }
+      const bool synced = next < changed.size() && changed[next].entity == entity;
+      if (!synced && last < mLastEntityIndex.size() && mLastEntityIndex[last].id == key && mLastEntityPointers[last] == entity
+          && !mLastEntityIndex[last].readEveryBeat) {
+        mEntityIndex.push_back(mLastEntityIndex[last]);
+      } else {
+        mEntityReads.push_back({static_cast<std::uint32_t>(mEntityIndex.size()), synced ? static_cast<std::uint32_t>(next) : kNotChanged});
+        mEntityIndex.push_back({key, 0u, false, false});
+      }
+      mEntityPointers.push_back(entity);
+    }
+  }
+
+  bool CViewFrames::KeptByView(const std::uint32_t id, const std::uint32_t viewBit) const
+  {
+    const auto found = std::lower_bound(mEntityIndex.begin(), mEntityIndex.end(), id, [](const SEntityKeep& entry, const std::uint32_t value) {
+      return entry.id < value;
+    });
+    return found == mEntityIndex.end() || found->id != id || (found->views & viewBit) != 0u;
+  }
+
+  void CViewFrames::ApplyHeldFrame(moho::Sim& sim, const std::size_t army, const moho::SSyncData& packet)
   {
     CViewFrameBuilder& builder = *mBuilders[army];
     SHeldView& held = mHeld[army];
-    const auto view = static_cast<std::int32_t>(army);
     builder.TrackChanges();
     builder.ClearBefore();
     builder.Apply(packet, Direct(static_cast<std::int32_t>(army)));
@@ -154,6 +249,12 @@ namespace faf::remote
     held.baselineId = held.frameId != 0u ? held.frameId : wire::kNoBaseline;
     held.frameId = stamp.frameId;
     held.beat = stamp.beat;
+  }
+
+  void CViewFrames::FinishHeldFrame(const std::size_t army, const moho::SSyncData& packet)
+  {
+    CViewFrameBuilder& builder = *mBuilders[army];
+    SHeldView& held = mHeld[army];
 
     const std::size_t slots = builder.SlotCount();
     if (held.ownSlot.size() < slots) {
@@ -161,6 +262,7 @@ namespace faf::remote
       held.sent.resize(slots, 0u);
       held.keep.resize(slots, 0u);
       held.references.resize(slots, 0u);
+      held.isReferrer.resize(slots, 0u);
     }
     held.candidates.clear();
     held.removed.clear();
@@ -194,6 +296,7 @@ namespace faf::remote
     // has, an orphan, stays). A record that comes or goes can change the records that name it.
     std::uint64_t membership = 0;
     for (const CViewFrameBuilder::SErasedRecord& erased : builder.ErasedRecords()) {
+      held.references[erased.slot] = 0u;
       if (held.sent[erased.slot] != 0u) {
         const std::uint32_t own = held.ownSlot[erased.slot];
         held.removed.push_back(own != kNoOwn ? held.own[own].id : erased.id);
@@ -203,27 +306,45 @@ namespace faf::remote
         membership |= ReferenceBit(erased.id);
       }
     }
-    std::uint32_t withheld = 0;
-    auto index = mEntityIndex.cbegin();
-    builder.ForEachRecord([&](const std::uint32_t id, const std::uint32_t slot) {
-      while (index != mEntityIndex.cend() && index->first < id) {
-        ++index;
-      }
-      const bool keep = index == mEntityIndex.cend() || index->first != id || CanViewSee(sim, view, index->second);
+    // Every record the view held last beat is sent if and only if it was kept, so only an answer
+    // that changed and a new record's can differ from what the client has: no walk over the records.
+    const std::uint32_t viewBit = std::uint32_t{1} << army;
+    const auto setKeep = [&](const std::uint32_t id, const std::uint32_t slot, const bool keep) {
       held.keep[slot] = keep ? 1u : 0u;
-      withheld += keep ? 0u : 1u;
       if (keep != (held.sent[slot] != 0u)) {
         held.candidates.push_back(id);
         membership |= ReferenceBit(id);
       }
-    });
+    };
+    std::size_t changeCursor = 0;
+    for (const SKeepChange& change : mKeepChanges) {
+      std::uint32_t slot = 0;
+      if ((change.changed & viewBit) != 0u && builder.FindSlotFrom(changeCursor, change.id, slot)) {
+        setKeep(change.id, slot, (change.views & viewBit) != 0u);
+      }
+    }
+    for (const std::uint32_t id : builder.NewRecordIds()) {
+      std::uint32_t slot = 0;
+      if (builder.FindSlot(id, slot)) {
+        setKeep(id, slot, KeptByView(id, viewBit));
+      }
+    }
     held.candidates.insert(held.candidates.end(), builder.TouchedIds().begin(), builder.TouchedIds().end());
     if (membership != 0u) {
-      builder.ForEachRecord([&](const std::uint32_t id, const std::uint32_t slot) {
-        if (held.sent[slot] != 0u && (held.references[slot] & membership) != 0u) {
-          held.candidates.push_back(id);
+      for (std::size_t i = 0; i < held.referrers.size();) {
+        const std::uint32_t slot = held.referrers[i];
+        const std::uint64_t references = held.references[slot];
+        if (references == 0u) {
+          held.isReferrer[slot] = 0u;
+          held.referrers[i] = held.referrers.back();
+          held.referrers.pop_back();
+          continue;
         }
-      });
+        if (held.sent[slot] != 0u && (references & membership) != 0u) {
+          held.candidates.push_back(builder.RecordAt(slot).id);
+        }
+        ++i;
+      }
     }
     std::sort(held.candidates.begin(), held.candidates.end());
     held.candidates.erase(std::unique(held.candidates.begin(), held.candidates.end()), held.candidates.end());
@@ -232,7 +353,7 @@ namespace faf::remote
     // the command sources allowed to command the view's army (`UserCommandIssue.cpp:372` packs
     // the client's source there).
     CViewIdMap& map = *mIdMaps[army];
-    AdvanceIdMap(sim, army, map);
+    AdvanceIdMap(army, map);
     const moho::BVIntSet* sources = nullptr;
     if (army < packet.mArmyUpdates.size()) {
       sources = &packet.mArmyUpdates[army].mValidCommandSources;
@@ -249,9 +370,10 @@ namespace faf::remote
       std::uint32_t slot = 0;
       return !builder.FindSlot(id, slot) || held.keep[slot] == 0u;
     };
+    std::size_t cursor = 0;
     for (const std::uint32_t id : held.candidates) {
       std::uint32_t slot = 0;
-      if (!builder.FindSlot(id, slot)) {
+      if (!builder.FindSlotFrom(cursor, id, slot)) {
         continue;
       }
       const bool wasSent = held.sent[slot] != 0u;
@@ -268,6 +390,10 @@ namespace faf::remote
         continue;
       }
       held.references[slot] = ReferenceFilter(world);
+      if (held.references[slot] != 0u && held.isReferrer[slot] == 0u) {
+        held.isReferrer[slot] = 1u;
+        held.referrers.push_back(slot);
+      }
       if (!NeedsOwnRecord(world, map, unheld)) {
         // The client's record is the world's, without a copy; the elements stay in place.
         if (!wasSent) {
@@ -325,9 +451,9 @@ namespace faf::remote
     std::sort(held.changed.begin(), held.changed.end(), [](const wire::SFrameChange& a, const wire::SFrameChange& b) {
       return a.after->id < b.after->id;
     });
-    mWithheld[army] = withheld;
+    mWithheld[army] = static_cast<std::uint32_t>(builder.EntityCount()) - held.count;
     if (mHeldCheck) {
-      CheckHeldFrame(sim, army, isOwnCommand);
+      CheckHeldFrame(*mLastSim, army, isOwnCommand);
     }
     builder.ClearChanges();
   }
@@ -341,6 +467,12 @@ namespace faf::remote
         std::fprintf(stderr, "view frames check: view %zu beat %u: %s (id %08x)\n", army, sim.mCurBeat, what, id);
       }
     };
+    builder.ForEachRecord([&](const std::uint32_t id, const std::uint32_t slot) {
+      const bool keep = KeptByView(id, std::uint32_t{1} << army);
+      if (keep != (held.keep[slot] != 0u) || keep != (held.sent[slot] != 0u)) {
+        report("kept or sent is not what the sim's answer says", id);
+      }
+    });
     if (!held.checkMap) {
       held.checkMap = std::make_unique<CViewIdMap>(static_cast<std::int32_t>(army));
     }
@@ -352,7 +484,7 @@ namespace faf::remote
       return builder.FindSlot(record.id, slot) && held.keep[slot] != 0u;
     });
     ClearUnheldReferences(whole);
-    AdvanceIdMap(sim, army, *held.checkMap);
+    AdvanceIdMap(army, *held.checkMap);
     held.checkMap->Translate(whole, isOwnCommand);
 
     std::vector<const wire::SEntityRecord*> kept;
@@ -400,17 +532,79 @@ namespace faf::remote
     return wire::EncodeFrameChanges(changes, mCodec, writer);
   }
 
+  std::uint32_t CViewFrames::ViewEntityId(const std::size_t view, const std::uint32_t simId)
+  {
+    if (view >= mIdMaps.size()) {
+      return simId;
+    }
+    if (mJobs != nullptr && mIdMaps[view]->MapsEntity(simId)) {
+      (void)FinishViews(); // this hands out a new id, which the view's own work may be doing too
+    }
+    return mIdMaps[view]->EntityId(simId);
+  }
+
   std::uint64_t CViewFrames::HeldMismatches() const noexcept
   {
-    std::uint64_t mismatches = 0;
+    std::uint64_t mismatches = mEntityIndexMismatches;
     for (const SHeldView& held : mHeld) {
       mismatches += held.mismatches;
     }
     return mismatches;
   }
 
+  void CViewFrames::EnablePipeline(const unsigned int threads)
+  {
+    if (mHeldOn && !mHeldCheck && threads > 0u) {
+      mJobs = std::make_unique<CViewJobs>(threads);
+    }
+  }
+
+  double CViewFrames::FinishViews()
+  {
+    if (!mJobsPending) {
+      return 0.0;
+    }
+    const auto start = std::chrono::steady_clock::now();
+    mJobs->Wait();
+    mViewWaitSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    mJobsPending = false;
+    OnViewsFinished();
+    return mViewWaitSeconds;
+  }
+
+  void CViewFrames::FinishFrame(const std::size_t army)
+  {
+    const auto view = static_cast<std::int32_t>(army);
+    if (!HasView(view)) {
+      return;
+    }
+    const moho::SSyncData& packet = Packet(view);
+    if (mHeldOn) {
+      FinishHeldFrame(army, packet);
+    }
+    if (mIdMapsOn) {
+      // A deleted or erased entity's id retires once the client holds no record of it (an
+      // orphan keeps its view id while it is shown).
+      std::unordered_set<std::uint32_t>& retiring = mRetiring[army];
+      retiring.insert(packet.mDeleteIds.begin(), packet.mDeleteIds.end());
+      retiring.insert(packet.mEraseIds.begin(), packet.mEraseIds.end());
+      std::vector<std::uint32_t>& next = mRetired[army];
+      next.clear();
+      for (auto it = retiring.begin(); it != retiring.end();) {
+        if (mBuilders[army]->Holds(*it)) {
+          ++it;
+          continue;
+        }
+        next.push_back(*it);
+        it = retiring.erase(it);
+      }
+    }
+  }
+
   void CViewFrames::OnViewPackets(moho::Sim& sim)
   {
+    mViewBeat = sim.mCurBeat;
+    mLastSim = &sim;
     const auto armyCount = static_cast<std::size_t>(ArmyCount());
     while (mBuilders.size() < armyCount) {
       mIdMaps.push_back(std::make_unique<CViewIdMap>(static_cast<std::int32_t>(mBuilders.size())));
@@ -435,30 +629,101 @@ namespace faf::remote
       }
     }
 
-    // The sim's entities in ascending id order with what the oracle reads from each, once for
+    // The sim's entities in ascending id order with the views that keep each, worked out once for
     // every view (plan WPR.35): a frame's records are in that order too, so each view finds its
-    // records' facts in one forward pass.
+    // records' answers in one forward pass. An entity that didn't sync keeps last beat's answer
+    // unless that answer depends on more than the entity, so most entities aren't read at all.
+    mLastEntityIndex.swap(mEntityIndex);
+    mLastEntityPointers.swap(mEntityPointers);
     mEntityIndex.clear();
     mEntityPointers.clear();
-    if (sim.mEntityDB != nullptr) {
-      mEntityIndex.reserve(sim.mEntityDB->mAllUnits.size());
-      mEntityPointers.reserve(sim.mEntityDB->mAllUnits.size());
-      for (const auto& [id, entity] : sim.mEntityDB->mAllUnits) {
-        mEntityIndex.emplace_back(id, SEntityFacts{});
-        mEntityPointers.push_back(entity);
-      }
+    mEntityReads.clear();
+    if (sim.mEntityDB != nullptr && !AdvanceEntityIndex(*sim.mEntityDB)) {
+      WalkEntityIndex(*sim.mEntityDB);
     }
-    const auto readFacts = [this](const std::size_t begin, const std::size_t end) {
+    const auto readFacts = [this, &sim, armyCount](const std::size_t begin, const std::size_t end) {
       for (std::size_t i = begin; i < end; ++i) {
-        mEntityIndex[i].second = ReadEntityFacts(*mEntityPointers[i]);
+        const std::uint32_t entry = mEntityReads[i].entry;
+        const SEntityFacts facts = mEntityReads[i].changed != kNotChanged ? ChangedFacts(mEntityReads[i].changed) : ReadEntityFacts(*mEntityPointers[entry]);
+        mEntityIndex[entry].views = ViewsThatSee(sim, armyCount, facts);
+        mEntityIndex[entry].readEveryBeat = !ViewsFollowFactsAlone(facts);
+        mEntityIndex[entry].leaving = facts.destroyed;
       }
     };
     constexpr std::size_t kFactsGrain = 256;
-    if (Parallel() && mEntityIndex.size() > kFactsGrain) {
-      moho::CSimWorkerPool::Get().ParallelFor(mEntityIndex.size(), kFactsGrain, readFacts);
+    if (Parallel() && mEntityReads.size() > kFactsGrain) {
+      moho::CSimWorkerPool::Get().ParallelFor(mEntityReads.size(), kFactsGrain, readFacts);
     } else {
-      readFacts(0u, mEntityIndex.size());
+      readFacts(0u, mEntityReads.size());
     }
+    for (const SEntityRead& read : mEntityReads) {
+      if (mEntityIndex[read.entry].leaving) {
+        mLeavingEntities.push_back(mEntityIndex[read.entry].id);
+      }
+    }
+    std::sort(mLeavingEntities.begin(), mLeavingEntities.end());
+    mLeavingEntities.erase(std::unique(mLeavingEntities.begin(), mLeavingEntities.end()), mLeavingEntities.end());
+    if (mHeldCheck) {
+      if (sim.mEntityDB != nullptr) {
+        std::size_t entry = 0;
+        for (const auto& [id, entity] : sim.mEntityDB->mAllUnits) {
+          if (entry >= mEntityIndex.size() || mEntityIndex[entry].id != static_cast<std::uint32_t>(id) || mEntityPointers[entry] != entity) {
+            if (++mEntityIndexMismatches <= 5u) {
+              std::fprintf(stderr, "view frames check: beat %u: the entity index differs from the sim's at id %08x\n", sim.mCurBeat, static_cast<std::uint32_t>(id));
+            }
+            break;
+          }
+          ++entry;
+        }
+      }
+      for (std::size_t i = 0; i < mEntityIndex.size(); ++i) {
+        const SEntityFacts facts = ReadEntityFacts(*mEntityPointers[i]);
+        if (ViewsThatSee(sim, armyCount, facts) != mEntityIndex[i].views && ++mEntityIndexMismatches <= 5u) {
+          std::fprintf(
+            stderr, "view frames check: beat %u: entity %08x kept views %08x, a read says %08x (kind %d)\n", sim.mCurBeat, mEntityIndex[i].id,
+            mEntityIndex[i].views, ViewsThatSee(sim, armyCount, facts), static_cast<int>(facts.kind)
+          );
+        }
+      }
+    }
+
+    // Whose answers changed since last beat, once for every view. An id without an entity has
+    // every view's answer "keep" (`KeptByView`).
+    mKeepChanges.clear();
+    {
+      constexpr std::uint32_t kEveryView = 0xFFFFFFFFu;
+      std::size_t last = 0;
+      std::size_t now = 0;
+      while (last < mLastEntityIndex.size() || now < mEntityIndex.size()) {
+        if (now == mEntityIndex.size() || (last < mLastEntityIndex.size() && mLastEntityIndex[last].id < mEntityIndex[now].id)) {
+          mKeepChanges.push_back({mLastEntityIndex[last].id, kEveryView, ~mLastEntityIndex[last].views});
+          ++last;
+        } else if (last == mLastEntityIndex.size() || mEntityIndex[now].id < mLastEntityIndex[last].id) {
+          mKeepChanges.push_back({mEntityIndex[now].id, mEntityIndex[now].views, ~mEntityIndex[now].views});
+          ++now;
+        } else {
+          if (mLastEntityIndex[last].views != mEntityIndex[now].views) {
+            mKeepChanges.push_back({mEntityIndex[now].id, mEntityIndex[now].views, mLastEntityIndex[last].views ^ mEntityIndex[now].views});
+          }
+          ++last;
+          ++now;
+        }
+      }
+    }
+
+    // The commands the sim released since last beat, once for every view (`AdvanceIdMap`).
+    mLastCommands.swap(mLiveCommands);
+    mLiveCommands.clear();
+    mHaveCommands = sim.mCommandDB != nullptr;
+    if (const moho::CCommandDB* const commands = sim.mCommandDB; commands != nullptr) {
+      for (const auto& [id, command] : commands->commands) {
+        mLiveCommands.push_back(static_cast<std::uint32_t>(id));
+      }
+    }
+    mReleasedCommands.clear();
+    std::set_difference(
+      mLastCommands.begin(), mLastCommands.end(), mLiveCommands.begin(), mLiveCommands.end(), std::back_inserter(mReleasedCommands)
+    );
 
     // Each view's builder, id map and frame are its own; the sim is only read (plan I3), so the
     // views can be built on the sim's workers (plan WP5.7, `SetParallel`).
@@ -476,19 +741,20 @@ namespace faf::remote
       CViewFrameBuilder& builder = *mBuilders[army];
       const moho::SSyncData& packet = Packet(view);
       if (mHeldOn) {
-        BuildHeldFrame(sim, army, packet);
+        ApplyHeldFrame(sim, army, packet);
       } else {
         builder.Apply(packet);
 
         // Plan §6: a plain entity in mode ReconGrid goes out only while the view sees it. A record
         // the sim no longer has (an orphan) stays.
         std::uint32_t withheld = 0;
+        const std::uint32_t viewBit = std::uint32_t{1} << army;
         auto index = mEntityIndex.cbegin();
         wire::SViewFrame frame = builder.Build(sim.mCurBeat, [&](const wire::SEntityRecord& record) {
-          while (index != mEntityIndex.cend() && index->first < record.id) {
+          while (index != mEntityIndex.cend() && index->id < record.id) {
             ++index;
           }
-          if (index == mEntityIndex.cend() || index->first != record.id || CanViewSee(sim, view, index->second)) {
+          if (index == mEntityIndex.cend() || index->id != record.id || (index->views & viewBit) != 0u) {
             return true;
           }
           ++withheld;
@@ -507,7 +773,7 @@ namespace faf::remote
           // the command sources allowed to command the view's army (`UserCommandIssue.cpp:372`
           // packs the client's source there).
           CViewIdMap& map = *mIdMaps[army];
-          AdvanceIdMap(sim, army, map);
+          AdvanceIdMap(army, map);
           const moho::BVIntSet* sources = nullptr;
           if (army < packet.mArmyUpdates.size()) {
             sources = &packet.mArmyUpdates[army].mValidCommandSources;
@@ -520,22 +786,8 @@ namespace faf::remote
         mFrames[army] = std::move(frame);
         mWithheld[army] = withheld;
       }
-      if (mIdMapsOn) {
-        // A deleted or erased entity's id retires once the client holds no record of it (an
-        // orphan keeps its view id while it is shown).
-        std::unordered_set<std::uint32_t>& retiring = mRetiring[army];
-        retiring.insert(packet.mDeleteIds.begin(), packet.mDeleteIds.end());
-        retiring.insert(packet.mEraseIds.begin(), packet.mEraseIds.end());
-        std::vector<std::uint32_t>& next = mRetired[army];
-        next.clear();
-        for (auto it = retiring.begin(); it != retiring.end();) {
-          if (builder.Holds(*it)) {
-            ++it;
-            continue;
-          }
-          next.push_back(*it);
-          it = retiring.erase(it);
-        }
+      if (mJobs == nullptr) {
+        FinishFrame(army);
       }
     };
     if (Parallel() && armyCount > 1u) {
@@ -555,7 +807,13 @@ namespace faf::remote
       mBuilt[army] = true;
     }
     AddBuildTime();
-    mLastSim = &sim;
     OnViewFrames(sim);
+    if (mJobs != nullptr) {
+      mJobsPending = true;
+      mJobs->Start(armyCount, [this](const std::size_t army) {
+        FinishFrame(army);
+        OnViewReady(army);
+      });
+    }
   }
 } // namespace faf::remote

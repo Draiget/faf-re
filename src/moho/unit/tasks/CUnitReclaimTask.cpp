@@ -169,95 +169,6 @@ namespace
     economy->mTotals.mReclaimed.MASS += reclaimedMass;
   }
 
-  [[nodiscard]] gpg::RType* CachedCUnitReclaimTaskType()
-  {
-    gpg::RType* type = moho::CUnitReclaimTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitReclaimTask));
-      moho::CUnitReclaimTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrEntityType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::Entity>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSEconValueType()
-  {
-    gpg::RType* type = moho::SEconValue::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SEconValue));
-      moho::SEconValue::sType = type;
-    }
-    return type;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
-
-  void WakeTaskThreadForImmediateTick(moho::CTaskThread* const ownerThread)
-  {
-    if (ownerThread == nullptr) {
-      return;
-    }
-
-    ownerThread->mPendingFrames = 0;
-    if (ownerThread->mStaged) {
-      ownerThread->Unstage();
-    }
-  }
 
   void DestroyEconomyRequestPointer(moho::CEconRequest*& request)
   {
@@ -436,7 +347,7 @@ namespace moho
 
     mTargetHasNoMotor = (commandTargetEntity == nullptr);
     mTaskState = TASKSTATE_Preparing;
-    WakeTaskThreadForImmediateTick(mOwnerThread);
+    moho::WakeTaskThreadForImmediateTick(mOwnerThread);
   }
 
   /**
@@ -771,11 +682,11 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), nullOwner);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), nullOwner);
     archive->ReadPointer(&mCommand, &nullOwner);
-    archive->Read(CachedWeakPtrEntityType(), &mTargetEntity, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mTargetEntity, nullOwner);
     archive->ReadBool(&mTargetHasNoMotor);
-    archive->Read(CachedVector3fType(), &mTargetPosition, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mTargetPosition, nullOwner);
     archive->ReadBool(&mHasStarted);
 
     CEconRequest* loadedRequest = nullptr;
@@ -786,7 +697,7 @@ namespace moho
     DestroyEconomyRequestPointer(previousRequest);
 
     archive->ReadFloat(&mReclaimRate);
-    archive->Read(CachedSEconValueType(), &mReclaimPerSecond, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::SEconValue>(), &mReclaimPerSecond, nullOwner);
   }
 
   /**
@@ -803,19 +714,19 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), nullOwner);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), nullOwner);
 
     archive->WritePointer<moho::CUnitCommand>(mCommand, gpg::TrackedPointerState::Unowned, nullOwner);
 
-    archive->Write(CachedWeakPtrEntityType(), &mTargetEntity, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mTargetEntity, nullOwner);
     archive->WriteBool(mTargetHasNoMotor);
-    archive->Write(CachedVector3fType(), &mTargetPosition, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mTargetPosition, nullOwner);
     archive->WriteBool(mHasStarted);
 
     archive->WritePointer<moho::CEconRequest>(mConsumptionData, gpg::TrackedPointerState::Owned, nullOwner);
 
     archive->WriteFloat(mReclaimRate);
-    archive->Write(CachedSEconValueType(), &mReclaimPerSecond, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::SEconValue>(), &mReclaimPerSecond, nullOwner);
   }
 
   /**
@@ -889,12 +800,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitReclaimTask(gpg::RRef* const outRef, moho::CUnitReclaimTask* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = MakeDerivedRef(value, CachedCUnitReclaimTaskType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 } // namespace gpg
 

@@ -1,4 +1,5 @@
 #include "headless/ReplayRunner.h"
+#include "headless/SessionLoad.h"
 #include "headless/ReplayLuaState.h"
 #include "headless/ReplaySyncWriters.h"
 
@@ -7,22 +8,29 @@
 #endif
 
 #include <Windows.h>
+#if defined(_WIN32)
+#include <Psapi.h>
+#endif
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
 #include <map>
 #include <string_view>
 #include <type_traits>
 #include <memory>
 
 #include "gpg/core/algorithms/MD5.h"
+#include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/entity/REntityBlueprint.h"
+#include "moho/misc/CSaveGameRequestImpl.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/misc/SessionStartup.h"
 #include "moho/render/CDecalTypes.h"
@@ -41,10 +49,20 @@
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/SimKeyframe.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/unit/core/Unit.h"
 #include "headless/ReplayBoneStats.h"
+#if FAF_SERVER_MODE
+#include "headless/ReplaySeats.h"
+#endif
+#if FAF_HEADLESS_NET
+#include "remote/net/UdpSocket.h"
+#include "server/ServerNet.h"
+#include "server/ServerViews.h"
+#endif
 #include "headless/ReplayFpuReport.h"
+#include "headless/ReplayKeyframes.h"
 #if FAF_SERVER_MODE
 // The wire format and the remote client (src/remote), built only with FAF_SERVER_MODE:
 // --wire-stats, --loopback and --command-check (docs/SWITCHES.md, "headless").
@@ -68,6 +86,32 @@ namespace faf::headless
     [[nodiscard]] double SecondsSince(const Clock::time_point start)
     {
       return std::chrono::duration<double>(Clock::now() - start).count();
+    }
+
+    /** This process's private bytes (Linux: resident), in MB. */
+    [[nodiscard]] double ProcessMegabytes()
+    {
+#if defined(_WIN32)
+      PROCESS_MEMORY_COUNTERS_EX counters{};
+      counters.cb = sizeof(counters);
+      if (::K32GetProcessMemoryInfo(
+            ::GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters)
+          )) {
+        return static_cast<double>(counters.PrivateUsage) / 1048576.0;
+      }
+      return 0.0;
+#else
+      long pages = 0;
+      long resident = 0;
+      std::FILE* const statm = std::fopen("/proc/self/statm", "r");
+      if (statm != nullptr) {
+        if (std::fscanf(statm, "%ld %ld", &pages, &resident) != 2) {
+          resident = 0;
+        }
+        std::fclose(statm);
+      }
+      return static_cast<double>(resident) * 4096.0 / 1048576.0;
+#endif
     }
 
     // The game logs every recorded checksum that differs from the sim's as
@@ -128,20 +172,6 @@ namespace faf::headless
     };
 
     /** Whether this beat's Lua `Sync` bytes contain `text` (read whole and rewound). */
-    [[nodiscard]] bool SyncBytesContain(moho::SSyncData& packet, const std::string_view text)
-    {
-      std::string bytes;
-      char buffer[4096];
-      for (;;) {
-        const std::size_t read = packet.mStream->Read(buffer, sizeof(buffer));
-        if (read == 0u) {
-          break;
-        }
-        bytes.append(buffer, read);
-      }
-      (void)packet.mStream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, 0);
-      return bytes.find(text) != std::string::npos;
-    }
 
     /**
      * Decodes this beat's Lua `Sync` table as the UI's `DoBeat` does, and reports whether it
@@ -286,6 +316,12 @@ namespace faf::headless
         digest.Add(data.mTargetBlip);
         digest.Add(data.mScriptbits);
         digest.Add(data.mUnitStates);
+        for (const moho::CmdId id : data.mCommands) {
+          digest.Add(id);
+        }
+        for (const moho::CmdId id : data.mBuildQueue) {
+          digest.Add(id);
+        }
       }
       for (const moho::EntId id : packet.mEraseIds) {
         digest.Add(id);
@@ -355,39 +391,6 @@ namespace faf::headless
       );
     }
 
-    /**
-     * The world session's loading steps that the sim needs (`WLD_DoPreload`, `WLD_DoLoading`):
-     * the session loader builds rules, session Lua state and map on its worker thread.
-     */
-    [[nodiscard]] bool LoadScenario(moho::SWldSessionInfo& sessionInfo, moho::SWldGameData& gameData, std::string& error)
-    {
-      moho::CWldSessionLoaderImpl* const loader = moho::GetWldSessionLoader();
-      moho::LaunchInfoBase* const launchInfo = sessionInfo.mLaunchInfo.get();
-      if (loader == nullptr || launchInfo == nullptr) {
-        error = "no session loader or launch info";
-        return false;
-      }
-
-      (void)loader->GetScenarioInfo(sessionInfo.mMapName.raw_data_unsafe(), &launchInfo->mGameMods, true);
-      while (true) {
-        // `WLD_DoLoading` beats the client manager every frame while the map loads.
-        if (sessionInfo.mClientManager != nullptr) {
-          sessionInfo.mClientManager->DoBeat();
-        }
-        loader->Update();
-        if (loader->IsLoaded()) {
-          break;
-        }
-        ::Sleep(5);
-      }
-
-      (void)loader->LoadGameData(&gameData);
-      if (gameData.mGameRules == nullptr || gameData.mWldMap == nullptr || gameData.mState == nullptr) {
-        error = "map " + std::string(sessionInfo.mMapName.c_str()) + " failed to load";
-        return false;
-      }
-      return true;
-    }
   } // namespace
 
   void InstallChecksumWatch(const std::string& label)
@@ -408,7 +411,53 @@ namespace faf::headless
     const Clock::time_point loadStart = Clock::now();
     const char* const label = options.label.c_str();
 
-    msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo = moho::VCR_SetupReplaySession(options.replayPath.c_str());
+    // `--resume-from`: the keyframe's header says how far into the stream the session starts.
+    boost::shared_ptr<std::FILE> keyframeFile;
+    moho::SSimKeyframeHeader keyframeHeader{};
+    if (!options.resumeFrom.empty()) {
+      std::FILE* rawFile = nullptr;
+      if (fopen_s(&rawFile, options.resumeFrom.c_str(), "rb") != 0 || rawFile == nullptr) {
+        result.error = "cannot read " + options.resumeFrom;
+        return result;
+      }
+      keyframeFile = boost::shared_ptr<std::FILE>(rawFile, moho::SFileStarCloser{});
+      if (!moho::SIM_ReadKeyframeHeader(rawFile, keyframeHeader)) {
+        result.error = options.resumeFrom + " is not a keyframe";
+        return result;
+      }
+    }
+    const int skipBeats = keyframeFile.get() != nullptr ? static_cast<int>(keyframeHeader.beat) - 1 : 0;
+    if (keyframeFile.get() == nullptr) {
+      moho::gSimBeatOrigin.store(0); // an earlier session in this process may have been restored
+    }
+
+    const bool liveRejoin = !options.rejoinPeers.empty();
+    const bool rejoinRehearsal = options.rejoinSource >= 0 && !liveRejoin;
+    std::unique_ptr<gpg::Stream> rejoinRecording;
+    msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo;
+    if (liveRejoin) {
+      // Issue #275: as `CScApp` does for /rejoin, without a window to wait in.
+      msvc8::string reason;
+      bool failed = !moho::REJOIN_BeginSetup(
+        options.rejoinPeers.c_str(), options.rejoinSource, static_cast<unsigned short>(options.rejoinPort), &reason
+      );
+      while (!failed && sessionInfo.get() == nullptr) {
+        msvc8::auto_ptr<moho::SWldSessionInfo> polled = moho::REJOIN_PollSetup(&reason, &failed);
+        if (polled.get() != nullptr) {
+          sessionInfo = polled;
+        } else if (!failed) {
+          ::Sleep(20);
+        }
+      }
+      if (failed) {
+        result.error = std::string("the rejoin was refused: ") + reason.c_str();
+        return result;
+      }
+    } else {
+      sessionInfo = moho::VCR_SetupReplaySession(
+        options.replayPath.c_str(), nullptr, rejoinRehearsal || options.seats ? &rejoinRecording : nullptr, skipBeats
+      );
+    }
     if (sessionInfo.get() == nullptr) {
       result.error = "cannot open the replay, or its game version is not supported";
       return result;
@@ -421,6 +470,69 @@ namespace faf::headless
       return result;
     }
 
+    // Issue #275: this client's view of a live game, as `CLobby::LaunchGame` sets it up.
+    if (rejoinRehearsal) {
+      if (static_cast<std::size_t>(options.rejoinSource) >= launchInfo->mCommandSources.mSrcs.size()) {
+        result.error = "--rejoin-source out of range";
+        return result;
+      }
+      if (options.focusArmy < 0
+          || !launchInfo->mArmyLaunchInfo[static_cast<std::size_t>(options.focusArmy)].mUnitSources.Contains(
+            static_cast<unsigned int>(options.rejoinSource)
+          )) {
+        result.error = "--rejoin-source needs --focus on an army of that source";
+        return result;
+      }
+      sessionInfo->mSourceId = static_cast<std::uint32_t>(options.rejoinSource);
+      sessionInfo->mClientManager = moho::REJOIN_CreateRehearsalManager(
+        *launchInfo, std::move(rejoinRecording), options.rejoinSource, options.rejoinBeat, skipBeats
+      );
+    }
+
+#if FAF_SERVER_MODE
+    // `--seats`: outlives the driver, whose manager calls it.
+    std::unique_ptr<CReplaySeatFeed> seatFeed;
+    if (options.seats) {
+      if (skipBeats > 0 || options.rejoinSource >= 0 || liveRejoin) {
+        result.error = "--seats plays a replay from its start, and not as a rejoin";
+        return result;
+      }
+      moho::SIM_SetIssueWhilePaused(true);
+      moho::CClientManagerImpl* seatManager = nullptr;
+      seatFeed = std::make_unique<CReplaySeatFeed>(*launchInfo, std::move(rejoinRecording), seatManager);
+      sessionInfo->mClientManager = seatManager;
+    }
+#endif
+#if !FAF_HEADLESS_NET
+    if (!options.seatsListen.empty()) {
+      result.error = "--seats-listen needs the Linux build";
+      return result;
+    }
+#endif
+#if FAF_HEADLESS_NET
+    // `--seats-listen`: the players' network on those seats. Nobody is waited for or put out: this
+    // measures the load, and the recording goes on whoever is there.
+    std::unique_ptr<faf::server::CServerNet> seatNet;
+    if (seatFeed && !options.seatsListen.empty()) {
+      faf::server::SServerNetConfig netConfig;
+      if (!faf::remote::net::ParseEndpoint(options.seatsListen, netConfig.listen)) {
+        result.error = "--seats-listen takes <ip:port>";
+        return result;
+      }
+      netConfig.joinSeconds = 1.0e9;
+      netConfig.reconnectSeconds = 1.0e9;
+      seatNet = std::make_unique<faf::server::CServerNet>(netConfig);
+      for (faf::remote::CServerClient* const seat : seatFeed->Seats()) {
+        seatNet->AddSeat(seat->GetIndex(), seat->GetNickname().c_str(), "seat-" + std::to_string(seat->GetIndex()), *seat);
+      }
+      std::string netError;
+      if (!seatNet->Start(netError)) {
+        result.error = netError;
+        return result;
+      }
+    }
+#endif
+
     if (sessionInfo->mClientManager != nullptr) {
       sessionInfo->mClientManager->SetUIInterface(&gReplayClientEvents);
     }
@@ -432,7 +544,7 @@ namespace faf::headless
     );
 
     moho::SWldGameData gameData{};
-    if (!LoadScenario(*sessionInfo, gameData, result.error)) {
+    if (!LoadSessionScenario(*sessionInfo, gameData, result.error)) {
       moho::ReleaseWldGameDataHandles(&gameData);
       return result;
     }
@@ -478,22 +590,42 @@ namespace faf::headless
     gameData = moho::SWldGameData{};
 
     // The launch info, completed as `WLD_DoLoading` completes it from the world session.
-    moho::STIMap* const launchMap = new moho::STIMap(wldMap->mTerrainRes->mMap);
-    const Wm3::AxisAlignedBox3f mapBounds = launchMap->GetBounds3D(); // the sim takes the map
-    launchInfo->mGameRules = rules.get();
-    if (launchInfo->mMap != nullptr && launchInfo->mMap != launchMap) {
-      delete launchInfo->mMap;
-    }
-    launchInfo->mMap = launchMap;
-    launchInfo->mLanguage.assign_owned(sessionState->GetGlobal("__language").ToString());
-    if (moho::LaunchInfoNew* const newLaunchInfo = launchInfo->GetNew(); newLaunchInfo != nullptr) {
-      newLaunchInfo->mProps = wldMap->mProps;
-    }
+    moho::STIMap* const launchMap = CompleteSessionLaunchInfo(*sessionInfo, *rules, *wldMap, *sessionState);
+    [[maybe_unused]] const Wm3::AxisAlignedBox3f mapBounds = launchMap->GetBounds3D(); // the sim takes the map
 
     // The focus army: the sim and the driver both start from the launch info's original
     // source, which a lockstep client sets to its own army (CLobby::LaunchGame) and a replay
     // viewer to -1.
-    launchInfo->mCommandSources.mOriginalSource = options.focusArmy;
+    if (!liveRejoin) {
+      launchInfo->mCommandSources.mOriginalSource = options.focusArmy;
+    } else {
+      moho::REJOIN_PrepareRestore(*sessionInfo);
+    }
+
+    // `--resume-from`: the same launch info, as `CSavedGame::CreateSinglePlayerSessionInfo` builds
+    // a saved game's; the sim comes from the archive behind the header.
+    if (keyframeFile.get() != nullptr) {
+      boost::shared_ptr<moho::LaunchInfoLoad> loadInfo;
+      (void)boost::ConstructSharedLaunchInfoLoadFromRaw(&loadInfo, new moho::LaunchInfoLoad());
+      loadInfo->mGameRules = launchInfo->mGameRules;
+      loadInfo->mMap = launchInfo->mMap;
+      launchInfo->mMap = nullptr;
+      loadInfo->mGameMods = launchInfo->mGameMods;
+      loadInfo->mScenarioInfo = launchInfo->mScenarioInfo;
+      loadInfo->mArmyLaunchInfo = launchInfo->mArmyLaunchInfo;
+      loadInfo->mCommandSources = launchInfo->mCommandSources;
+      loadInfo->mLanguage = launchInfo->mLanguage;
+      loadInfo->mCheatsEnabled = launchInfo->mCheatsEnabled;
+      loadInfo->mReadArchive = gpg::CreateBinaryReadArchive(keyframeFile);
+      std::printf("[%s] resuming from beat %u, tick %u\n", label, keyframeHeader.beat, keyframeHeader.tick);
+      std::fflush(stdout);
+      moho::SIM_BeginKeyframeRestore(keyframeHeader);
+      if (rejoinRehearsal) {
+        // As REJOIN_PrepareRestore: this session's clients count in the game's own beats.
+        moho::gSimBeatOrigin.store(0);
+      }
+      sessionInfo->mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(loadInfo);
+    }
 
     if (options.checksumPeriod > 0) {
       moho::gSimConVar_sim_ChecksumPeriod.mDefaultValue = options.checksumPeriod;
@@ -588,6 +720,19 @@ namespace faf::headless
         return result;
       }
       viewBench->SetParallel(options.parallelViews);
+      viewBench->EnablePipeline(static_cast<unsigned int>(options.viewPipelineThreads));
+      if (options.luaRouting) {
+        viewBench->EnableLuaRouting(options.luaRoutingDump);
+        if (options.spy) {
+          viewBench->EnableLuaSpy();
+        }
+        if (options.luaMoveBeat >= 0) {
+          viewBench->AddLuaMove(options.luaMoveBeat, static_cast<std::size_t>(options.luaMoveView), options.luaMoveArmy);
+        }
+        if (options.luaResyncBeat >= 0) {
+          viewBench->AddLuaResync(options.luaResyncBeat, static_cast<std::size_t>(options.luaResyncView));
+        }
+      }
       viewBench->Install();
     }
     // `--inbound-check`: the decoder's messages through view ids and back (with --view-ids).
@@ -598,13 +743,52 @@ namespace faf::headless
     }
 #endif
 
+#if FAF_HEADLESS_NET
+    std::unique_ptr<faf::server::CServerViews> seatViews;
+    if (seatNet) {
+      std::map<std::size_t, std::int32_t> players;
+      const auto& armies = launchInfo->mArmyLaunchInfo;
+      for (faf::remote::CServerClient* const seat : seatFeed->Seats()) {
+        std::int32_t playerArmy = -1;
+        for (std::size_t army = 0; army < armies.size(); ++army) {
+          if (armies[army].mUnitSources.Contains(static_cast<unsigned int>(seat->GetIndex()))) {
+            players[army] = seat->GetIndex();
+            playerArmy = static_cast<std::int32_t>(army);
+            break;
+          }
+        }
+        seatNet->QueueView(
+          seat->GetIndex(), faf::server::MakeGameInfo(mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, playerArmy, static_cast<std::uint32_t>(seat->GetIndex()))
+        );
+      }
+      seatViews = std::make_unique<faf::server::CServerViews>(
+        tables, *rules, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, *seatNet, std::move(players),
+        static_cast<unsigned int>(std::max(options.viewPipelineThreads, 1))
+      );
+      seatViews->Install();
+    }
+#endif
+
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;
     sessionInfo->mClientManager = nullptr;
-    moho::SIM_SetSessionPacing(moho::ESimSessionPacing::Replay);
+    moho::SIM_SetSessionPacing(rejoinRehearsal || liveRejoin ? moho::ESimSessionPacing::Network : moho::ESimSessionPacing::Replay);
     std::unique_ptr<moho::ISTIDriver> driver(moho::SIM_CreateDriver(
       static_cast<moho::CClientManagerImpl*>(clientManager), nullptr, sessionInfo->mLaunchInfo, sessionInfo->mSourceId
     ));
     auto* const simDriver = static_cast<moho::CSimDriver*>(driver.get());
+#if FAF_HEADLESS_NET
+    // Ahead of the driver going away, on every way out: the network's thread touches its seats.
+    struct SStopSeatNet
+    {
+      faf::server::CServerNet* net;
+      ~SStopSeatNet()
+      {
+        if (net != nullptr) {
+          net->Stop();
+        }
+      }
+    } const stopSeatNet{seatNet.get()};
+#endif
     result.loadSeconds = SecondsSince(loadStart);
     std::printf("[%s] loaded in %.1fs: %d armies, focus %d\n", label, result.loadSeconds, armyCount, options.focusArmy);
     std::fflush(stdout);
@@ -629,6 +813,21 @@ namespace faf::headless
       digestFile = nullptr;
       result.error = "cannot write " + options.digestPath;
       return result;
+    }
+
+    // `--keyframe-every`: the sim saved between beats, as a saved game is.
+    std::unique_ptr<CReplayKeyframes> keyframes;
+    if (options.keyframeEvery > 0) {
+      keyframes = std::make_unique<CReplayKeyframes>(
+        options.keyframeDir, options.keyframeEvery, options.keyframeKeep || options.keyframePrepare, options.label, options.keyframeIndex
+      );
+    }
+
+    if (keyframes) {
+      keyframes->SetPreparing(options.keyframePrepare);
+      if (options.keyframeFirst > 0) {
+        keyframes->SetFirstBeat(options.keyframeFirst);
+      }
     }
 
     std::unique_ptr<CReplayBoneStats> boneStats;
@@ -678,8 +877,13 @@ namespace faf::headless
     double lastReport = 0.0;
     bool ready = false;
     const HANDLE syncAvailable = driver->GetSyncDataAvailableEvent();
+    const double pacePeriod = options.paceMs / 1000.0;
+    double nextPacedBeat = 0.0; // seconds of play: when the next beat may leave the queue
+    int lateBeats = 0;
+    double lateSeconds = 0.0;
 
-    while (!result.gameOver) {
+    bool stopped = false;
+    while (!result.gameOver && !stopped) {
       const double elapsed = SecondsSince(playStart);
       if (elapsed > timeLimit) {
         result.timedOut = true;
@@ -691,7 +895,19 @@ namespace faf::headless
         break;
       }
 
+      if (liveRejoin) {
+        moho::REJOIN_MainFrame(*driver);
+      }
       driver->Dispatch();
+      // `--pace`: the issue thread tops up only past the last beat taken from the queue, so holding
+      // the next one back holds the sim too.
+      if (pacePeriod > 0.0 && ready) {
+        const double waitSeconds = nextPacedBeat - SecondsSince(playStart);
+        if (waitSeconds > 0.0) {
+          ::Sleep(std::max(1, static_cast<int>(waitSeconds * 1000.0)));
+          continue;
+        }
+      }
       if (!driver->HasSyncData()) {
         // `WLD_DoPostInitializing` / `WLD_DoWaiting`: the first beat is out and this client
         // is ready; once every client is, the issue thread may run.
@@ -716,6 +932,9 @@ namespace faf::headless
 
         ++result.beats;
         result.lastBeat = packet->mCurBeat;
+        if (packet->mCurBeat == options.focusSwitchBeat) {
+          simDriver->SetPendingFocusArmyRaw(options.focusSwitchArmy);
+        }
         result.desyncReports += static_cast<int>(packet->mDesyncs.size());
 
         if (digestFile != nullptr) {
@@ -743,6 +962,23 @@ namespace faf::headless
           static_cast<moho::RRuleGameRulesImpl*>(rules.get())->ReleaseScriptBlueprints();
           releasedScriptBlueprints = true;
         }
+        if (!options.syncDumpPath.empty() && packet->mStream != nullptr) {
+          static bool sStarted = false;
+          std::FILE* const dump = std::fopen(options.syncDumpPath.c_str(), sStarted ? "ab" : "wb");
+          sStarted = true;
+          if (dump != nullptr) {
+            std::string bytes;
+            char buffer[4096];
+            for (std::size_t read = packet->mStream->Read(buffer, sizeof(buffer)); read != 0u; read = packet->mStream->Read(buffer, sizeof(buffer))) {
+              bytes.append(buffer, read);
+            }
+            (void)packet->mStream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, 0);
+            const std::uint32_t head[2] = {static_cast<std::uint32_t>(packet->mCurBeat), static_cast<std::uint32_t>(bytes.size())};
+            std::fwrite(head, sizeof(head), 1u, dump);
+            std::fwrite(bytes.data(), 1u, bytes.size(), dump);
+            std::fclose(dump);
+          }
+        }
         const bool syncSaysEnded =
           InspectSync(*packet, syncState, options.syncKeysPath.empty() ? nullptr : &syncKeys);
         if (!result.gameEnded && syncSaysEnded) {
@@ -761,10 +997,26 @@ namespace faf::headless
         if (boneStats) {
           boneStats->OnPacket(*packet);
         }
+        if (keyframes && !packet->mGameOver) {
+          keyframes->OnBeat(*driver, simDriver->GetSimForReplayCheck(), packet->mCurBeat);
+        }
         if (packet->mGameOver) {
           result.gameOver = true;
         }
 #if FAF_SERVER_MODE
+#if FAF_HEADLESS_NET
+        if (seatNet) {
+          seatNet->NoteBeat(packet->mCurBeat);
+          for (const std::string& line : seatNet->TakeNews()) {
+            std::printf("[%s] beat %d: %s\n", label, packet->mCurBeat, line.c_str());
+            std::fflush(stdout);
+          }
+        }
+#endif
+        // With every source gone before its end, a recording has nobody left to end the game.
+        if (seatFeed && packet->mCurBeat > seatFeed->LastBeat() + 1) {
+          stopped = true;
+        }
         if (loopback) {
           if (moho::CClientManagerImpl* const standIn = driver->GetClientManager(); standIn != nullptr) {
             loopback->SetServerSimRate(standIn->GetSimRate());
@@ -793,6 +1045,23 @@ namespace faf::headless
         if (result.gameOver) {
           break;
         }
+
+        if (options.stopAfter && options.stopAfter(packet->mCurBeat)) {
+          stopped = true;
+          break;
+        }
+
+        if (pacePeriod > 0.0 && ready) {
+          // A game that lost time doesn't get it back: the next beat is one period from here.
+          const double now = SecondsSince(playStart);
+          const double late = now - nextPacedBeat;
+          if (late > 0.002 && nextPacedBeat > 0.0) {
+            ++lateBeats;
+            lateSeconds += late;
+          }
+          nextPacedBeat = (late > 0.002 ? now : nextPacedBeat) + pacePeriod;
+          break;
+        }
       }
 
       if (elapsed - lastReport >= 30.0) {
@@ -817,7 +1086,42 @@ namespace faf::headless
     moho::Sim::SetSyncObserver(nullptr);
 #endif
     result.playSeconds = SecondsSince(playStart);
+
+    // A session about to go first finishes the keyframe it asked for: the request reports to `keyframes`.
+    const Clock::time_point tearDownStart = Clock::now();
+    while (options.tearDown && keyframes && keyframes->Pending() && SecondsSince(tearDownStart) < 120.0) {
+      driver->Dispatch();
+      while (driver->HasSyncData()) {
+        moho::SSyncData* rawPacket = nullptr;
+        driver->GetSyncData(rawPacket);
+        delete rawPacket;
+      }
+      (void)::WaitForSingleObject(syncAvailable, 50);
+    }
     result.mismatches = ChecksumMismatchCount();
+#if FAF_SERVER_MODE
+    if (seatFeed) {
+      std::printf("[%s] %s\n", label, seatFeed->Report().c_str());
+      std::fflush(stdout);
+    }
+#endif
+#if FAF_HEADLESS_NET
+    if (seatNet) {
+      std::printf(
+        "[%s] seat network: %.1f MB sent, %.1f KB/s, %llu view lanes failed\n", label, static_cast<double>(seatNet->BytesSent()) / 1048576.0,
+        static_cast<double>(seatNet->BytesSent()) / 1024.0 / std::max(SecondsSince(playStart), 1.0),
+        static_cast<unsigned long long>(seatViews ? seatViews->Failures() : 0u)
+      );
+      if (seatViews) {
+        std::printf("[%s] %s\n[%s] %s\n", label, seatViews->LaneReport().c_str(), label, seatNet->Intake().Report().c_str());
+      }
+      std::fflush(stdout);
+    }
+#endif
+    if (pacePeriod > 0.0) {
+      std::printf("[%s] pace %d ms: %d of %d beats late, %.1f s lost\n", label, options.paceMs, lateBeats, result.beats, lateSeconds);
+      std::fflush(stdout);
+    }
     if (digestFile != nullptr) {
       std::fclose(digestFile);
     }
@@ -829,6 +1133,10 @@ namespace faf::headless
     }
     if (boneStats) {
       result.boneSummary = boneStats->Finish();
+    }
+    if (keyframes) {
+      result.keyframeSummary = keyframes->Summary();
+      result.keyframeFailures = keyframes->Failures();
     }
     if (attributeSyncWrites) {
       result.syncWritersSummary = syncWriters.Write(options.syncWritersPath);
@@ -861,6 +1169,12 @@ namespace faf::headless
       result.viewFramesFailures = viewFrames->Failures();
     }
     if (viewBench) {
+      // Lua routing lives in the sim's Lua from here on, and the bench holds it: the sim can't run
+      // on past this function, as it otherwise does until the process exits.
+      if (options.luaRouting && !options.tearDown) {
+        driver->ShutDown();
+      }
+      (void)viewBench->FinishViews();
       result.viewBenchSummary = viewBench->Summary();
       result.viewBenchFailures = viewBench->Failures();
     }
@@ -879,6 +1193,27 @@ namespace faf::headless
         std::fclose(keysFile);
       }
     }
+    // `WLD_Teardown`: the driver stops and gives up the packets it holds, the session's objects
+    // go, then the driver with the sim.
+    if (options.tearDown) {
+      if (keyframes && keyframes->Pending()) {
+        result.error = "a keyframe was still being saved after two minutes";
+      } else {
+        driver->ShutDown();
+        while (driver->HasSyncData()) {
+          moho::SSyncData* rawPacket = nullptr;
+          driver->GetSyncData(rawPacket);
+          delete rawPacket;
+        }
+        sessionState.reset();
+        rules.reset();
+        wldMap.reset();
+        driver.reset();
+        result.tearDownSeconds = SecondsSince(tearDownStart);
+        return result;
+      }
+    }
+
     // The driver, sim and session objects are left to the process exit: the caller ends the
     // process once the verdict is out, as nothing after it is observed.
     (void)driver.release();
@@ -886,5 +1221,92 @@ namespace faf::headless
     (void)rules.release();
     (void)wldMap.release();
     return result;
+  }
+
+  SReplayResult RunSeekPlan(const SReplayOptions& options, const std::vector<int>& plan)
+  {
+    const char* const label = options.label.c_str();
+    std::map<int, std::string> keyframes;
+    std::size_t step = 0;
+    Clock::time_point seekStart = Clock::now();
+
+    SReplayOptions run = options;
+    run.tearDown = true;
+    run.keyframeKeep = true;
+    run.keyframeIndex = &keyframes;
+    run.stopAfter = [&](const int beat) {
+      if (step >= plan.size() || beat < plan[step]) {
+        return false;
+      }
+      std::printf("[%s] seek %zu: at beat %d, %.2fs after it was asked for\n", label, step, beat, SecondsSince(seekStart));
+      std::fflush(stdout);
+      ++step;
+      seekStart = Clock::now();
+      if (step >= plan.size()) {
+        return false;
+      }
+      if (plan[step] <= beat) {
+        return true;
+      }
+      const auto after = keyframes.upper_bound(plan[step]);
+      return after != keyframes.begin() && std::prev(after)->first > beat;
+    };
+
+    SReplayResult total{};
+    total.started = true;
+    for (int session = 0;; ++session) {
+      if (!options.digestPath.empty()) {
+        run.digestPath = options.digestPath + "." + std::to_string(session);
+      }
+      if (!options.stateDigestPath.empty()) {
+        run.stateDigestPath = options.stateDigestPath + "." + std::to_string(session);
+      }
+      if (!options.laneSizesPath.empty()) {
+        run.laneSizesPath = options.laneSizesPath + "." + std::to_string(session);
+      }
+
+      const SReplayResult result = RunReplay(run);
+      std::printf(
+        "[%s] seek session %d: up to beat %d, %d beats, load %.2fs, play %.1fs, teardown %.2fs, process %.0f MB\n",
+        label, session, result.lastBeat, result.beats, result.loadSeconds, result.playSeconds, result.tearDownSeconds,
+        ProcessMegabytes()
+      );
+      if (!result.keyframeSummary.empty()) {
+        std::printf("[%s] %s\n", label, result.keyframeSummary.c_str());
+      }
+      std::fflush(stdout);
+
+      total.started = total.started && result.started;
+      total.gameOver = result.gameOver;
+      total.gameEnded = result.gameEnded;
+      total.timedOut = total.timedOut || result.timedOut;
+      total.crashed = total.crashed || result.crashed;
+      total.beats += result.beats;
+      total.lastBeat = result.lastBeat;
+      total.mismatches = result.mismatches;
+      total.desyncReports += result.desyncReports;
+      total.digestsWritten += result.digestsWritten;
+      total.loadSeconds += result.loadSeconds;
+      total.playSeconds += result.playSeconds;
+      total.tearDownSeconds += result.tearDownSeconds;
+      total.keyframeFailures += result.keyframeFailures;
+      if (!result.error.empty() || result.timedOut || result.crashed || result.gameOver) {
+        total.error = result.error;
+        break;
+      }
+
+      const auto after = keyframes.upper_bound(plan[step]);
+      run.resumeFrom = after != keyframes.begin() ? std::prev(after)->second : std::string{};
+      seekStart = Clock::now();
+      std::printf(
+        "[%s] seek %zu: from beat %d to beat %d, by %s\n", label, step, result.lastBeat, plan[step],
+        run.resumeFrom.empty() ? "the replay's start" : run.resumeFrom.c_str()
+      );
+      std::fflush(stdout);
+    }
+    if (step < plan.size()) {
+      std::printf("[%s] seek: the game ended with %zu of %zu moves left\n", label, plan.size() - step, plan.size());
+    }
+    return total;
   }
 } // namespace faf::headless

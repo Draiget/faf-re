@@ -291,6 +291,12 @@ namespace moho
    */
   [[nodiscard]] bool UI_UpdateDisconnectDialogCallback();
 
+  /// Engine addition (issue #275): the screen of a client started with /rejoin, before it has a session.
+  [[nodiscard]] bool UI_StartRejoinScreen();
+
+  /// Engine addition (issue #275): `/lua/ui/uimain.lua:UpdateRejoinScreen(stage, progress)`.
+  void UI_UpdateRejoinScreen(const char* stage, float progress);
+
   /**
    * Address: 0x0083DDA0 (FUN_0083DDA0, ?UI_GetCommandMode@Moho@@YA?AUUICommandModeData@1@XZ)
    *

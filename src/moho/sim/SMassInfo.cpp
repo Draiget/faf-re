@@ -9,15 +9,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedSCoordsVec2Type()
-  {
-    gpg::RType* type = moho::SCoordsVec2::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SCoordsVec2));
-      moho::SCoordsVec2::sType = type;
-    }
-    return type;
-  }
 } // namespace
 
 namespace moho
@@ -47,7 +38,7 @@ namespace moho
       return;
     }
 
-    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    gpg::RType* const coordsType = gpg::RTypeOf<moho::SCoordsVec2>();
     gpg::RRef ownerRef{};
     archive->Read(coordsType, &mPosition, ownerRef);
     archive->ReadFloat(&mVal);
@@ -75,7 +66,7 @@ namespace moho
       return;
     }
 
-    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    gpg::RType* const coordsType = gpg::RTypeOf<moho::SCoordsVec2>();
     gpg::RRef ownerRef{};
     archive->Write(coordsType, &mPosition, ownerRef);
     archive->WriteFloat(mVal);

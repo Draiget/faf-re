@@ -13,9 +13,10 @@
 //      on 2026-11-01, three runs each: resent 109-124 ms after the loss with
 //      the switch off, 47-93 ms with it on; median wait 126.5 / 78.6 ms.
 //   2. The game's rate (a message every 66 ms, about 15 DATA packets a second
-//      as measured in game): 3 later packets take about 200 ms, so the timer
-//      always comes first and the switch changes nothing (resent 102-125 ms
-//      after the loss with it on). This is why no gain was measured in games.
+//      as measured in game): 3 later packets take about 200 ms, so only the
+//      switch's resend timer, which follows the round trip, can come first.
+//      In games at 50 ms round trip and 2 % loss a lost packet came back in a
+//      median of 100.2 ms with the switch off and 66.5-68.7 ms with it on.
 //
 // Build: cmake --build --preset clang-x64-release --target faf_fast_retransmit_tests
 // Run:   build\clang-x64-release\tests\faf_fast_retransmit_tests.exe   (exit code = failures)
@@ -252,9 +253,11 @@ int main()
   Check(fastOff >= 90, "switch off: the lost packet is resent by the timer (100 ms)");
   Check(fastOn >= 0 && fastOn + 20 <= fastOff, "switch on: it is resent at least 20 ms sooner");
 
-  // 2. The game's rate: the timer always fires first, so the switch cannot help.
+  // 2. The game's rate: the mask fills too late, the timer that follows the round trip comes first.
+  const double gameOff = median(66, 40, false, "message every 66 ms, net_FastRetransmit 0");
   const double gameOn = median(66, 40, true, "message every 66 ms, net_FastRetransmit 1");
-  Check(gameOn >= 90, "game rate, switch on: still resent by the timer, no early resend possible");
+  Check(gameOff >= 90, "game rate, switch off: resent by the timer (100 ms)");
+  Check(gameOn >= 0 && gameOn + 20 <= gameOff, "game rate, switch on: resent at least 20 ms sooner");
 
   net_FastRetransmit = 0;
   std::printf("%s (%d failures)\n", gFailures == 0 ? "PASS" : "FAIL", gFailures);

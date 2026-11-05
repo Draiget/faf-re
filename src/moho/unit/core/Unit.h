@@ -779,7 +779,7 @@ namespace moho
      * What it does:
      * Returns this unit pointer through the const RTTI/downcast lane.
      */
-    virtual Unit const* IsUnit() const;
+    Unit const* IsUnit() const override;
 
     /**
      * Address: 0x006A4BB0 (FUN_006A4BB0)
@@ -787,91 +787,91 @@ namespace moho
      * What it does:
      * Returns this unit pointer through the mutable RTTI/downcast lane.
      */
-    virtual Unit* IsUnit();
+    Unit* IsUnit() override;
 
     /**
      * Address: 0x006A48E0 (FUN_006A48E0)
      * Slot: 2
      * Demangled: public: virtual class moho::UserUnit const near * __thiscall moho::IUnit::IsUserUnit(void)const
      */
-    virtual UserUnit const* IsUserUnit() const;
+    UserUnit const* IsUserUnit() const override;
 
     /**
      * Address: 0x006A48D0 (FUN_006A48D0)
      * Slot: 3
      * Demangled: public: virtual class moho::UserUnit near * __thiscall moho::IUnit::IsUserUnit(void)
      */
-    virtual UserUnit* IsUserUnit();
+    UserUnit* IsUserUnit() override;
 
     /**
      * Address: 0x006A49A0 (FUN_006A49A0)
      * Slot: 4
      * Demangled: public: virtual class moho::EntId __thiscall moho::Unit::GetEntityId(void)const
      */
-    virtual EntId GetEntityId() const;
+    EntId GetEntityId() const override;
 
     /**
      * Address: 0x006A49B0 (FUN_006A49B0)
      * Slot: 5
      * Demangled: public: virtual class Wm3::Vec3f const near & __thiscall moho::Unit::GetPosition(void)const
      */
-    virtual Wm3::Vec3f const& GetPosition() const;
+    Wm3::Vec3f const& GetPosition() const override;
 
     /**
      * Address: 0x006A49C0 (FUN_006A49C0)
      * Slot: 6
      * Demangled: public: virtual class moho::VTransform const near & __thiscall moho::Unit::GetTransform(void)const
      */
-    virtual VTransform const& GetTransform() const;
+    VTransform const& GetTransform() const override;
 
     /**
      * Address: 0x006A8B20 (FUN_006A8B20)
      * Slot: 7
      * Demangled: public: virtual class moho::RUnitBlueprint const near * __thiscall moho::Unit::GetBlueprint(void)const
      */
-    virtual RUnitBlueprint const* GetBlueprint() const;
+    RUnitBlueprint const* GetBlueprint() const override;
 
     /**
      * Address: 0x006A49D0 (FUN_006A49D0)
      * Slot: 8
      * Demangled: public: virtual class LuaPlus::LuaObject __thiscall moho::Unit::GetLuaObject(void)
      */
-    virtual LuaPlus::LuaObject GetLuaObject();
+    LuaPlus::LuaObject GetLuaObject() override;
 
     /**
      * Address: 0x006A8B30 (FUN_006A8B30)
      * Slot: 9
      * Demangled: public: virtual float __thiscall moho::Unit::CalcTransportLoadFactor(void)const
      */
-    virtual float CalcTransportLoadFactor() const;
+    float CalcTransportLoadFactor() const override;
 
     /**
      * Address: 0x006A49F0 (FUN_006A49F0)
      * Slot: 10
      * Demangled: public: virtual bool __thiscall moho::Unit::IsDead(void)const
      */
-    virtual bool IsDead() const;
+    bool IsDead() const override;
 
     /**
      * Address: 0x006A4A00 (FUN_006A4A00)
      * Slot: 11
      * Demangled: public: virtual bool __thiscall moho::Unit::DestroyQueued(void)const
      */
-    virtual bool DestroyQueued() const;
+    bool DestroyQueued() const override;
 
     /**
      * Address: 0x006A4A10 (FUN_006A4A10)
      * Slot: 12
      * Demangled: public: virtual bool __thiscall moho::Unit::IsMobile(void)const
      */
-    virtual bool IsMobile() const;
+    bool IsMobile() const override;
 
     /**
      * Address: 0x006A4A20 (FUN_006A4A20)
      * Slot: 13
      * Demangled: public: virtual bool __thiscall moho::Unit::IsBeingBuilt(void)const
      */
-    virtual bool IsBeingBuilt() const;
+    bool IsBeingBuilt() const override;
 
     /**
      * Address: 0x006A4BD0 (FUN_006A4BD0, Moho::Unit::GetUniformScale)
@@ -1062,7 +1062,7 @@ namespace moho
      * Slot: 14
      * Demangled: public: virtual bool __thiscall moho::Unit::IsNavigatorIdle(void)const
      */
-    virtual bool IsNavigatorIdle() const;
+    bool IsNavigatorIdle() const override;
 
     /**
      * Address: 0x006A7D10 (FUN_006A7D10, Moho::Unit::IsBusy)
@@ -1185,14 +1185,14 @@ namespace moho
      * Slot: 15
      * Demangled: public: virtual bool __thiscall moho::Unit::IsUnitState(enum moho::EUnitState)const
      */
-    virtual bool IsUnitState(EUnitState) const;
+    bool IsUnitState(EUnitState) const override;
 
     /**
      * Address: 0x006A4990 (FUN_006A4990)
      * Slot: 16
      * Demangled: public: virtual struct moho::UnitAttributes near & __thiscall moho::Unit::GetAttributes(void)
      */
-    virtual UnitAttributes& GetAttributes();
+    UnitAttributes& GetAttributes() override;
 
     /**
      * Address: 0x006A4980 (FUN_006A4980)
@@ -1200,7 +1200,7 @@ namespace moho
      * Demangled: public: virtual struct moho::UnitAttributes const near & __thiscall
      * moho::Unit::GetAttributes(void)const
      */
-    virtual UnitAttributes const& GetAttributes() const;
+    UnitAttributes const& GetAttributes() const override;
 
     /**
      * Address: 0x006A4B90 (FUN_006A4B90)
@@ -1208,8 +1208,8 @@ namespace moho
      * Demangled: public: virtual class moho::StatItem near * __thiscall moho::Unit::GetStat(class gpg::StrArg,class
      * std::basic_string<char,struct std::char_traits<char>,class std::allocator<char>> const near &)
      */
-    virtual StatItem*
-    GetStat(gpg::StrArg, std::basic_string<char, std::char_traits<char>, std::allocator<char>> const&);
+    StatItem*
+    GetStat(gpg::StrArg, std::basic_string<char, std::char_traits<char>, std::allocator<char>> const&) override;
 
     /**
      * Address: 0x006A4B70 (FUN_006A4B70)
@@ -1217,7 +1217,7 @@ namespace moho
      * Demangled: public: virtual class moho::StatItem near * __thiscall moho::Unit::GetStat(class gpg::StrArg,float
      * const near &)
      */
-    virtual StatItem* GetStat(gpg::StrArg, float const&);
+    StatItem* GetStat(gpg::StrArg, float const&) override;
 
     /**
      * Address: 0x006A4B50 (FUN_006A4B50)
@@ -1225,14 +1225,14 @@ namespace moho
      * Demangled: public: virtual class moho::StatItem near * __thiscall moho::Unit::GetStat(class gpg::StrArg,int const
      * near &)
      */
-    virtual StatItem* GetStat(gpg::StrArg, int const&);
+    StatItem* GetStat(gpg::StrArg, int const&) override;
 
     /**
      * Address: 0x006A4B30 (FUN_006A4B30)
      * Slot: 21
      * Demangled: public: virtual class moho::StatItem near * __thiscall moho::Unit::GetStat(class gpg::StrArg)
      */
-    virtual StatItem* GetStat(gpg::StrArg);
+    StatItem* GetStat(gpg::StrArg) override;
 
     /**
      * Address: 0x006A73A0 (FUN_006A73A0)

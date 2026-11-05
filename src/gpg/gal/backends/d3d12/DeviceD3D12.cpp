@@ -344,8 +344,25 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     std::uint64_t textureVersion = 0;
     const RenderTarget* tableSurface = nullptr; // the colour target bound when the table was built
     D3D12_GPU_DESCRIPTOR_HANDLE table{};
-    std::shared_ptr<const std::vector<effects::TextureBinding>> tableBindings;
+    std::vector<effects::TextureBinding> tableBindings;
   };
+
+  namespace
+  {
+    const effects::TextureBinding kNoTextureBinding{};
+
+    // A slot's handles are copied only when they changed: each copy is an atomic increment, and a
+    // decal draw keeps all but a few of its effect's textures.
+    void KeepBinding(effects::TextureBinding& slot, const effects::TextureBinding& binding)
+    {
+      if (slot.texture.get() != binding.texture.get()) {
+        slot.texture = binding.texture;
+      }
+      if (slot.renderTarget.get() != binding.renderTarget.get()) {
+        slot.renderTarget = binding.renderTarget;
+      }
+    }
+  } // namespace
 
   // ---------------------------------------------------------------------------
   // Construction and setup
@@ -387,6 +404,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mCursor.Destroy();
     mUpload.Release();
     mPlacedTextures.Release();
+    mSharedBuffers.Release();
     mPlacedBuffers.Release();
     mRtvPool.Release();
     mDsvPool.Release();
@@ -502,6 +520,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mUpload.Initialize(mDevice.Get());
     mPlacedTextures.Initialize(mDevice.Get(), D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES, L"placed textures");
     mPlacedBuffers.Initialize(mDevice.Get(), D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS, L"placed buffers");
+    mSharedBuffers.Initialize(&mPlacedBuffers);
     mRtvPool.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 256U);
     mDsvPool.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 256U);
     mSrvPool.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096U);
@@ -1282,6 +1301,26 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     FinishDraw();
   }
 
+  void DeviceD3D12::ReleaseBufferCopy(VertexBuffer& buffer)
+  {
+    static_cast<VertexBufferD3D12&>(buffer).Storage().ReleaseCopy();
+  }
+
+  void DeviceD3D12::ReleaseBufferCopy(IndexBuffer& buffer)
+  {
+    static_cast<IndexBufferD3D12&>(buffer).Storage().ReleaseCopy();
+  }
+
+  void DeviceD3D12::CopyLockedRangeOnly(VertexBuffer& buffer)
+  {
+    static_cast<VertexBufferD3D12&>(buffer).Storage().CopyLockedRangeOnly();
+  }
+
+  void DeviceD3D12::CopyLockedRangeOnly(IndexBuffer& buffer)
+  {
+    static_cast<IndexBufferD3D12&>(buffer).Storage().CopyLockedRangeOnly();
+  }
+
   bool DeviceD3D12::CopyVertexBufferRegion(
     VertexBuffer& destination, const std::uint32_t destinationOffset, VertexBuffer& source, const std::uint32_t sourceOffset,
     const std::uint32_t byteCount
@@ -1305,12 +1344,18 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (sourceResource == nullptr) {
       return false;
     }
+    // Two buffers sharing one large buffer: it cannot be source and destination at once.
+    if (target->resource.Get() == sourceResource) {
+      return false;
+    }
     // In command order: earlier draws reading the destination are recorded
     // before this barrier, and later draws move it back to VERTEX_AND_CONSTANT
     // in PrepareForDraw.
     Transition(*target, D3D12_RESOURCE_STATE_COPY_DEST);
     FlushBarriers();
-    mList->CopyBufferRegion(target->resource.Get(), destinationOffset, sourceResource, sourceBase + sourceOffset, byteCount);
+    mList->CopyBufferRegion(
+      target->resource.Get(), to.ResourceOffset() + destinationOffset, sourceResource, sourceBase + sourceOffset, byteCount
+    );
     return true;
   }
 
@@ -1478,6 +1523,15 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     Garbage garbage;
     garbage.serial = RecordingSerial();
     garbage.resource = std::move(resource);
+    mGarbage.push_back(std::move(garbage));
+  }
+
+  void DeviceD3D12::RetireSharedRange(ComPtr<IUnknown> range)
+  {
+    const std::lock_guard<std::recursive_mutex> lock(mMutex);
+    Garbage garbage;
+    garbage.serial = RecordingSerial();
+    garbage.sharedRange = std::move(range);
     mGarbage.push_back(std::move(garbage));
   }
 
@@ -2813,8 +2867,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         state.tableSurface != outputContext_.surface.get()) {
       const auto& slots = program.Modern().textures;
       const auto& slotParameters = program.TextureSlotParameters();
-      auto bindings = std::make_shared<std::vector<effects::TextureBinding>>();
-      bindings->reserve(slots.size());
+      std::vector<effects::TextureBinding>& bindings = state.tableBindings;
+      bindings.resize(std::min<std::size_t>(slots.size(), effects::kMaxTextureSlots));
       D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
       const D3D12_GPU_DESCRIPTOR_HANDLE table = AllocateTable(effects::kMaxTextureSlots, cpu);
       const UINT increment = mFrames[mFrameIndex].views.Increment();
@@ -2822,8 +2876,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       for (std::size_t index = 0U; index < slots.size() && index < effects::kMaxTextureSlots; ++index) {
         const effects::TextureSlot& slot = slots[index];
         const std::int32_t parameter = slotParameters[index];
-        const effects::TextureBinding binding =
-          (parameter >= 0) ? parameters.Binding(static_cast<std::uint32_t>(parameter)) : effects::TextureBinding{};
+        const effects::TextureBinding& binding =
+          (parameter >= 0) ? parameters.Binding(static_cast<std::uint32_t>(parameter)) : kNoTextureBinding;
         D3D12_CPU_DESCRIPTOR_HANDLE view = mNullViews[static_cast<int>(slot.dimension)];
         if (binding.texture != nullptr) {
           auto* const texture = static_cast<TextureD3D12*>(binding.texture.get());
@@ -2842,7 +2896,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
             if (logged.size() < 32U && logged.insert(techniqueName).second) {
               gpg::Logf("D3D12: %s samples its own colour target; bound as a null view", techniqueName.c_str());
             }
-            bindings->push_back(effects::TextureBinding{});
+            KeepBinding(bindings[index], kNoTextureBinding);
             written = static_cast<std::uint32_t>(index + 1U);
             D3D12_CPU_DESCRIPTOR_HANDLE destination = cpu;
             destination.ptr += static_cast<SIZE_T>(index) * increment;
@@ -2854,7 +2908,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         D3D12_CPU_DESCRIPTOR_HANDLE destination = cpu;
         destination.ptr += static_cast<SIZE_T>(index) * increment;
         mDevice->CopyDescriptorsSimple(1U, destination, view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        bindings->push_back(binding);
+        KeepBinding(bindings[index], binding);
         written = static_cast<std::uint32_t>(index + 1U);
       }
       if (written < effects::kMaxTextureSlots) {
@@ -2863,7 +2917,6 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         mDevice->CopyDescriptorsSimple(effects::kMaxTextureSlots - written, rest, mNullViewRun, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
       }
       state.table = table;
-      state.tableBindings = std::move(bindings);
       state.tableFrame = mFrameCount;
       state.tableEpoch = mArenaEpoch;
       state.textureVersion = parameters.TextureVersion();
@@ -2872,7 +2925,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     bound.textures = state.table;
     bound.tableFrame = state.tableFrame;
     bound.tableEpoch = state.tableEpoch;
-    bound.sampled = state.tableBindings;
+    bound.sampled = &state.tableBindings;
     bound.samplers = state.samplers;
     bound.techniqueIndex = technique;
     bound.passIndex = pass;

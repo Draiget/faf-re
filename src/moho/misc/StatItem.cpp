@@ -1,4 +1,5 @@
 #include "StatItem.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "platform/Interlocked.h"
 
 #include <algorithm>
@@ -103,73 +104,12 @@ namespace
   moho::StatItemSerializer gStatItemSerializer;
   moho::StatsRType<moho::StatItem> gStatsRTypeStatItem;
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Core");
-    return sSet;
-  }
-
   template <typename TObject>
   void MaterializeReflectionSingleton(TObject& singleton)
   {
     (void)singleton;
   }
 
-  [[nodiscard]] gpg::RType* CachedStatItemType()
-  {
-    if (!moho::StatItem::sType) {
-      moho::StatItem::sType = gpg::LookupRType(typeid(moho::StatItem));
-    }
-    return moho::StatItem::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedStatsStatItemType()
-  {
-    if (!moho::Stats<moho::StatItem>::sType) {
-      moho::Stats<moho::StatItem>::sType = gpg::LookupRType(typeid(moho::Stats<moho::StatItem>));
-    }
-    return moho::Stats<moho::StatItem>::sType;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    int baseOffset = 0;
-    const bool isDerived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    GPG_ASSERT(isDerived);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
 
   /**
    * Address: 0x0041A8B0 (FUN_0041A8B0, gpg::RRef_StatItem)
@@ -179,7 +119,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef MakeStatItemRef(moho::StatItem* object)
   {
-    return MakeTypedRef(object, CachedStatItemType());
+    return gpg::MakeTypedRef(object, gpg::RTypeOf<moho::StatItem>());
   }
 
   /**
@@ -190,7 +130,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef MakeStatsStatItemRef(moho::Stats<moho::StatItem>* object)
   {
-    return MakeTypedRef(object, CachedStatsStatItemType());
+    return gpg::MakeTypedRef(object, gpg::RTypeOf<moho::Stats<moho::StatItem>>());
   }
 
   /**
@@ -201,7 +141,7 @@ namespace
    */
   [[nodiscard]] moho::StatItem* CastStatItemFromRef(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedStatItemType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::StatItem>());
     return static_cast<moho::StatItem*>(upcast.mObj);
   }
 
@@ -229,7 +169,7 @@ namespace
 
     moho::StatItem* const item = CastStatItemFromRef(source);
     if (!item) {
-      const char* const expectedName = CachedStatItemType()->GetName();
+      const char* const expectedName = gpg::RTypeOf<moho::StatItem>()->GetName();
       const char* const actualName = tracked.type ? tracked.type->GetName() : "null";
       const msvc8::string msg = gpg::STR_Printf(
         "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
@@ -247,7 +187,7 @@ namespace
   /**
    * Address: 0x00419DE0 (FUN_00419DE0, func_ReadArchive_Stats_StatItem)
    */
-  void DeserializeStatsStatItem(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void DeserializeStatsStatItem(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* /*ownerRef*/)
   {
     auto* const stats = reinterpret_cast<moho::Stats<moho::StatItem>*>(objectPtr);
     GPG_ASSERT(stats != nullptr);
@@ -304,7 +244,7 @@ namespace
    */
   void DeleteStatsStatItem(void* object)
   {
-    delete static_cast<moho::Stats<moho::StatItem>*>(object);
+    GPG_NONVIRTUAL_DESTROY(delete static_cast<moho::Stats<moho::StatItem>*>(object));
   }
 
   /**
@@ -474,67 +414,22 @@ namespace
 
   [[nodiscard]] std::int32_t ReadAtomicI32(volatile std::int32_t* value)
   {
-#if defined(_WIN32)
-    return static_cast<std::int32_t>(InterlockedCompareExchange(reinterpret_cast<volatile platform::InterlockedLong*>(value), 0, 0));
-#else
-    return *value;
-#endif
+    return platform::AtomicLoad(value);
   }
 
   void AtomicStoreI32(volatile std::int32_t* value, const std::int32_t wanted)
   {
-#if defined(_WIN32)
-    for (;;) {
-      const std::int32_t observed = ReadAtomicI32(value);
-      const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile platform::InterlockedLong*>(value), static_cast<long>(wanted), static_cast<long>(observed)
-      ));
-      if (exchanged == observed) {
-        return;
-      }
-    }
-#else
-    *value = wanted;
-#endif
+    (void)platform::AtomicExchange(value, wanted);
   }
 
   [[nodiscard]] std::int32_t AtomicExchangeI32(volatile std::int32_t* value, const std::int32_t wanted)
   {
-#if defined(_WIN32)
-    for (;;) {
-      const std::int32_t observed = ReadAtomicI32(value);
-      const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile platform::InterlockedLong*>(value), static_cast<long>(wanted), static_cast<long>(observed)
-      ));
-      if (exchanged == observed) {
-        return exchanged;
-      }
-    }
-#else
-    const std::int32_t previous = *value;
-    *value = wanted;
-    return previous;
-#endif
+    return platform::AtomicExchange(value, wanted);
   }
 
   [[nodiscard]] std::int32_t AtomicStoreSlotFromPtr(volatile std::int32_t* const slot, const std::int32_t* const wanted)
   {
-    const std::int32_t target = wanted ? *wanted : 0;
-#if defined(_WIN32)
-    for (;;) {
-      const std::int32_t observed = ReadAtomicI32(slot);
-      const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile platform::InterlockedLong*>(slot), static_cast<long>(target), static_cast<long>(observed)
-      ));
-      if (exchanged == observed) {
-        return exchanged;
-      }
-    }
-#else
-    const std::int32_t previous = *slot;
-    *slot = target;
-    return previous;
-#endif
+    return platform::AtomicExchange(slot, wanted ? *wanted : 0);
   }
 
   /**
@@ -558,24 +453,15 @@ namespace
    */
   [[nodiscard]] std::int32_t SyncRealtimeValueBitsFromPrimary(moho::StatItem* const item)
   {
-#if defined(_WIN32)
     for (;;) {
-      const std::int32_t observedRealtime = ReadAtomicI32(&item->mRealtimeValueBits);
-      const std::int32_t observedPrimary = ReadAtomicI32(&item->mPrimaryValueBits);
-      const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile platform::InterlockedLong*>(&item->mRealtimeValueBits),
-        static_cast<long>(observedPrimary),
-        static_cast<long>(observedRealtime)
-      ));
+      const std::int32_t observedRealtime = platform::AtomicLoad(&item->mRealtimeValueBits);
+      const std::int32_t observedPrimary = platform::AtomicLoad(&item->mPrimaryValueBits);
+      const std::int32_t exchanged =
+        platform::AtomicCompareExchange(&item->mRealtimeValueBits, observedPrimary, observedRealtime);
       if (exchanged == observedRealtime) {
         return exchanged;
       }
     }
-#else
-    const std::int32_t previous = item->mRealtimeValueBits;
-    item->mRealtimeValueBits = item->mPrimaryValueBits;
-    return previous;
-#endif
   }
 
   [[nodiscard]] std::int32_t ReadNumericSlot(moho::StatItem* item, const bool useRealtimeValue)
@@ -929,9 +815,7 @@ namespace moho
      * `_gmtimebuf` field is unset, lazily `malloc(0x24)`s the `struct tm`
      * scratch buffer the `*time64` family fills and returns a pointer into
      * -- textbook CRT internals (`_tiddata`, `_gmtimebuf`, `_errno`), not
-     * engine code. Both were mass-mis-attributed to `CrtRuntimeHelpers.cpp`
-     * by the 2026-08-24 DB-integrity bulk pass (address not present in that
-     * file); classified `external_dependency` here with a real citation.
+     * engine code.
      */
     const std::tm* const localTime = _localtime64(selectedTime);
     if (localTime == nullptr) {
@@ -1551,7 +1435,7 @@ namespace moho
       }
     }
     if (sPrintStatsBoogersSquirt) {
-      (void)_InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&sPrintStatsBoogersSquirt->mPrimaryValueBits), 1);
+      (void)sPrintStatsBoogersSquirt->AddPrimaryBits(1);
     }
 
     if (!sPrintStatsDouble) {
@@ -1665,7 +1549,7 @@ namespace moho
   CScrLuaInitForm* func_BeginLoggingStats_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "BeginLoggingStats",
       &moho::cfunc_BeginLoggingStats,
       nullptr,
@@ -1744,7 +1628,7 @@ namespace moho
   CScrLuaInitForm* func_EndLoggingStats_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "EndLoggingStats",
       &moho::cfunc_EndLoggingStats,
       nullptr,
@@ -2123,32 +2007,7 @@ namespace moho
    */
   std::int32_t StatItem::AddFloat(float* const delta)
   {
-    volatile std::int32_t* const pCounter = &mPrimaryValueBits;
-#if defined(_WIN32)
-    do {
-      const std::int32_t observedBits = ReadAtomicI32(pCounter);
-      const float currentValue = AsFloatBits(observedBits);
-      const float nextValue = currentValue + *delta;
-      const std::int32_t nextBits = std::bit_cast<std::int32_t>(nextValue);
-      const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile platform::InterlockedLong*>(pCounter), static_cast<long>(nextBits), static_cast<long>(observedBits)
-      ));
-      if (exchanged == observedBits) {
-        return exchanged;
-      }
-    } while (true);
-#else
-    for (;;) {
-      const std::int32_t observedBits = *pCounter;
-      const float currentValue = AsFloatBits(observedBits);
-      const float nextValue = currentValue + *delta;
-      const std::int32_t nextBits = std::bit_cast<std::int32_t>(nextValue);
-      if (*pCounter == observedBits) {
-        *pCounter = nextBits;
-        return observedBits;
-      }
-    }
-#endif
+    return platform::AtomicAddFloat(&mPrimaryValueBits, *delta);
   }
 
   /**
@@ -2357,7 +2216,7 @@ namespace moho
    */
   const char* StatsRType<StatItem>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("Stats<%s>", CachedStatItemType()->GetName());
+    static const msvc8::string sName = gpg::STR_Printf("Stats<%s>", gpg::RTypeOf<moho::StatItem>()->GetName());
     return sName.c_str();
   }
 

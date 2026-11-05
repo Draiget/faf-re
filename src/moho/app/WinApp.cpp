@@ -1,4 +1,5 @@
 #include "WinApp.h"
+#include "moho/misc/WideStringRange.h"
 #include "platform/X87Precision.h"
 
 #include "platform/Platform.h"
@@ -42,6 +43,7 @@
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/TimeBar.h"
+#include "moho/render/d3d/CD3DDevice.h"
 #include "moho/resource/ResourceManager.h"
 #include "moho/core/Thread.h"
 
@@ -88,7 +90,7 @@ namespace
   HHOOK sWindowHook = nullptr;
   gpg::time::Timer wakeupTimer;
   float wakeupTimerDur = kInfiniteWakeupMs;
-  constexpr DWORD kPlatformSymbolHandlerOptions =
+  [[maybe_unused]] constexpr DWORD kPlatformSymbolHandlerOptions =
     SYMOPT_FAIL_CRITICAL_ERRORS | // suppress critical-error UI while probing symbols.
     SYMOPT_LOAD_LINES | // include source line records for resolved addresses.
     SYMOPT_DEFERRED_LOADS | // lazily load module symbols as needed.
@@ -97,8 +99,6 @@ namespace
     kPlatformSymbolHandlerOptions == 0x216u,
     "PLAT_Init symbol options must match recovered SymSetOptions(0x216)"
   );
-
-  moho::CWinLogTarget& sLogWindowTarget = moho::sLogWindowTarget;
 
   /**
    * The splash screen WINX_InitSplash shows (0x010A9BE4), a VC8
@@ -384,7 +384,6 @@ namespace
   // the boost::function1 manage / clear / manage::do_alloc lanes.
   LegacyUnaryDispatchAdapter gLegacyTssAdapterUnaryDispatchAdapter = nullptr;
   LegacyTypeInfoDispatchAdapter gLegacyTssAdapterTypeInfoDispatchAdapter = nullptr;
-  bool gLegacyTssAdapterDispatchPairPublished = false;
 
   // Synthetic engine-T binding for the `boost::detail::tss_adapter<T>` RTTI
   // Type Descriptor referenced at 0x00F61928 in the binary.
@@ -909,7 +908,7 @@ namespace
     if (sourceCallback != nullptr) {
       sourceLifecycle = sourceCallback->lifecycleAdapter;
     }
-    return reinterpret_cast<LegacyUnaryDispatchAdapter>(sourceLifecycle);
+    return reinterpret_cast<LegacyUnaryDispatchAdapter>(reinterpret_cast<void (*)()>(sourceLifecycle));
   }
 
   /**
@@ -1031,65 +1030,6 @@ namespace
 
 
   /**
-   * Address: 0x004A1AE0 (FUN_004A1AE0)
-   * Mangled: ?append@wstring@std@@QAEAAV12@ABV12@II@Z
-   *
-   * What it does:
-   * Appends a clamped substring range from `source` into `destination`.
-   */
-  [[maybe_unused]] std::wstring* AppendWideSubstringRangeClamped(
-    std::wstring* const destination,
-    const std::wstring& source,
-    std::size_t count,
-    const std::size_t sourceOffset
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-    if (sourceOffset > source.size()) {
-      throw std::out_of_range("wstring::append sourceOffset");
-    }
-
-    const std::size_t available = source.size() - sourceOffset;
-    if (count > available) {
-      count = available;
-    }
-
-    destination->append(source, sourceOffset, count);
-    return destination;
-  }
-
-  /**
-   * Address: 0x004A19E0 (FUN_004A19E0)
-   * Mangled: ??Ywstring@std@@VQAEAAV01@PB_W@Z
-   *
-   * What it does:
-   * Appends one wide source range into destination while preserving overlapping
-   * source semantics.
-   */
-  [[maybe_unused]] std::wstring* AppendWideRangePreservingOverlap(
-    std::wstring* const destination,
-    const wchar_t* const source,
-    const std::size_t sourceLength
-  )
-  {
-    if (destination == nullptr || source == nullptr) {
-      return destination;
-    }
-
-    const wchar_t* const destinationData = destination->data();
-    const wchar_t* const destinationEnd = destinationData + destination->size();
-    if (source >= destinationData && source < destinationEnd) {
-      const std::size_t sourceOffset = static_cast<std::size_t>(source - destinationData);
-      return AppendWideSubstringRangeClamped(destination, *destination, sourceLength, sourceOffset);
-    }
-
-    destination->append(source, sourceLength);
-    return destination;
-  }
-
-  /**
    * Address: 0x004A1820 (FUN_004A1820, sub_4A1820)
    *
    * What it does:
@@ -1101,7 +1041,7 @@ namespace
   )
   {
     const wchar_t* const safeSource = (source != nullptr) ? source : L"";
-    return AppendWideRangePreservingOverlap(destination, safeSource, std::wcslen(safeSource));
+    return moho::AppendWideRangePreservingOverlap(destination, safeSource, std::wcslen(safeSource));
   }
 
   /**
@@ -1118,69 +1058,6 @@ namespace
     return AppendWideStringFromNullTerminatedInputA(destination, source);
   }
 
-
-  /**
-   * Address: 0x004A1950 (FUN_004A1950)
-   * Mangled: ?compare@?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@QBEHPB_W@Z
-   *
-   * What it does:
-   * Lexicographically compares up to `lhsRequestedLength` characters from one
-   * wide string against one raw wide range and returns `-1/0/1`.
-   */
-  [[maybe_unused]] int CompareWideStringPrefixRange(
-    std::size_t lhsRequestedLength,
-    const std::wstring* const lhs,
-    const std::size_t rhsLength,
-    const wchar_t* const rhs
-  ) noexcept
-  {
-    if (lhs == nullptr || rhs == nullptr) {
-      return (lhs == nullptr) ? ((rhs == nullptr) ? 0 : -1) : 1;
-    }
-
-    std::size_t lhsLength = lhsRequestedLength;
-    if (lhs->size() < lhsLength) {
-      lhsLength = lhs->size();
-    }
-
-    std::size_t compareCount = lhsLength;
-    if (compareCount > rhsLength) {
-      compareCount = rhsLength;
-    }
-
-    for (std::size_t i = 0; i < compareCount; ++i) {
-      const wchar_t left = (*lhs)[i];
-      const wchar_t right = rhs[i];
-      if (left != right) {
-        return (left < right) ? -1 : 1;
-      }
-    }
-
-    if (lhsLength >= rhsLength) {
-      return (lhsLength != rhsLength) ? 1 : 0;
-    }
-    return -1;
-  }
-
-  /**
-   * Address: 0x004A1880 (FUN_004A1880, sub_4A1880)
-   *
-   * What it does:
-   * Compares one wide string against one zero-terminated wide source.
-   */
-  [[maybe_unused]] int CompareWideStringWithNullTerminatedInput(
-    const std::wstring* const lhs,
-    const wchar_t* const rhs
-  ) noexcept
-  {
-    const wchar_t* const safeRhs = (rhs != nullptr) ? rhs : L"";
-    return CompareWideStringPrefixRange(
-      (lhs != nullptr) ? lhs->size() : 0U,
-      lhs,
-      std::wcslen(safeRhs),
-      safeRhs
-    );
-  }
 
   /**
    * Address: 0x004A1850 (FUN_004A1850, sub_4A1850)
@@ -1601,17 +1478,18 @@ namespace
    * turns a typed WM_CHAR into its code-page byte, which the W dispatch then reads as a UTF-16
    * code unit: Cyrillic "П" (0xCF in 1251) reached the edit box as "Ï" (U+00CF).
    */
-  void DispatchPendingMessage()
+  bool DispatchPendingMessage()
   {
     MSG message{};
     if (::PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE) == FALSE) {
-      return;
+      return false;
     }
     if (message.message == WM_QUIT) {
       wxTheApp->ExitMainLoop(); // what wxApp::DoMessage does on WM_QUIT
-      return;
+      return true;
     }
     wxTheApp->DoMessage(reinterpret_cast<WXMSG*>(&message));
+    return true;
   }
 
   DWORD ComputeWaitTimeoutMs()
@@ -2327,15 +2205,25 @@ void moho::WIN_AppExecute(IWinApp* const app)
       acceptNewEvent = false;
     }
 
-    if (wxTheApp->Pending()) {
-      DispatchPendingMessage(); // engine change: wxTheApp->Dispatch() could block, see there
+    // Engine change: taking the message is the check, as a second PeekMessage per pass was 7 % of
+    // an uncapped frame. wxTheApp->Dispatch() could also block, see there.
+    if (DispatchPendingMessage()) {
       success = true;
       continue;
     }
 
+    // Engine addition: where the frame's WM_PAINT would come, after the messages and before idle.
+    if (moho::D3D_RunDirectPaint()) {
+      success = true;
+    }
+
+    // Engine change: with idle work done this goes on to the next frame without asking for messages
+    // a second or third time; one that arrives now waits for the top of the next frame.
     if (success) {
       success = wxTheApp->ProcessIdle();
-      continue;
+      if (success) {
+        continue;
+      }
     }
 
     if (!wxGetApp().KeepGoing()) {
@@ -2350,7 +2238,8 @@ void moho::WIN_AppExecute(IWinApp* const app)
 
     const DWORD timeoutMs = ComputeWaitTimeoutMs();
     wakeupTimerDur = kInfiniteWakeupMs;
-    WIN_GetWaitHandleSet()->MsgWaitEx(timeoutMs);
+    // Engine addition: no paint message wakes this wait for a frame that draws without one.
+    WIN_GetWaitHandleSet()->MsgWaitEx(moho::D3D_IsDirectPaintPending() ? 0u : timeoutMs);
   }
 
   app->Destroy();

@@ -1,4 +1,5 @@
 #include "CArmyImpl.h"
+#include "gpg/core/profiling/Profiler.h"
 
 #include <algorithm>
 #include <bit>
@@ -159,25 +160,13 @@ namespace
     "vector<EntitySetTemplate<Unit>>"
   };
 
-  gpg::RType* gSimType = nullptr;
   gpg::RType* gCAiBrainType = nullptr;
   gpg::RType* gCAiReconDBImplType = nullptr;
   gpg::RType* gIAiReconDBType = nullptr;
   gpg::RType* gCEconomyType = nullptr;
-  gpg::RType* gCArmyStatsType = nullptr;
-  gpg::RType* gCInfluenceMapType = nullptr;
   gpg::RType* gPathQueueType = nullptr;
   gpg::RType* gCPlatoonType = nullptr;
   gpg::RType* gEntitySetTemplateUnitVectorType = nullptr;
-
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
 
   template <std::size_t NameCount>
   [[nodiscard]] gpg::RType* ResolveTypeByNames(gpg::RType*& slot, const char* const (&typeNames)[NameCount])
@@ -200,11 +189,6 @@ namespace
     return nullptr;
   }
 
-  [[nodiscard]] gpg::RType* ResolveSimType()
-  {
-    return CachedType<moho::Sim>(gSimType);
-  }
-
   [[nodiscard]] gpg::RType* ResolveCAiBrainType()
   {
     return ResolveTypeByNames(gCAiBrainType, kCAiBrainTypeNames);
@@ -223,16 +207,6 @@ namespace
   [[nodiscard]] gpg::RType* ResolveCEconomyType()
   {
     return ResolveTypeByNames(gCEconomyType, kCEconomyTypeNames);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCArmyStatsType()
-  {
-    return CachedType<moho::CArmyStats>(gCArmyStatsType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCInfluenceMapType()
-  {
-    return CachedType<moho::CInfluenceMap>(gCInfluenceMapType);
   }
 
   [[nodiscard]] gpg::RType* ResolvePathQueueType()
@@ -423,7 +397,7 @@ namespace
     }
 
     field = value;
-    delete prior;
+    GPG_NONVIRTUAL_DESTROY(delete prior);
   }
 
   void ReplaceEconomyOwnedPointer(moho::CSimArmyEconomyInfo*& field, moho::CSimArmyEconomyInfo* const value)
@@ -1232,7 +1206,7 @@ namespace moho
     InfluenceMap = nullptr;
 
     if (Stats != nullptr) {
-      delete Stats;
+      GPG_NONVIRTUAL_DESTROY(delete Stats);
       Stats = nullptr;
     }
 
@@ -1387,7 +1361,7 @@ namespace moho
     const gpg::RRef owner{};
     archive->Read(SimArmy::StaticGetClass(), static_cast<SimArmy*>(this), owner);
 
-    Simulation = ReadPointerTyped<Sim>(archive, owner, ResolveSimType(), false);
+    Simulation = ReadPointerTyped<Sim>(archive, owner, gpg::RTypeOf<moho::Sim>(), false);
     ReplaceDeleteOwnedPointer(AiBrain, ReadPointerTyped<CAiBrain>(archive, owner, ResolveCAiBrainType(), true));
     ReplaceDeleteOwnedPointer(
       AiReconDb, ReadPointerTyped<CAiReconDBImpl>(archive, owner, ResolveCAiReconDBImplType(), true)
@@ -1396,9 +1370,9 @@ namespace moho
 
     archive->ReadString(&ArmyPlans);
 
-    ReplaceDeleteOwnedPointer(Stats, ReadPointerTyped<CArmyStats>(archive, owner, ResolveCArmyStatsType(), true));
+    ReplaceDeleteOwnedPointer(Stats, ReadPointerTyped<CArmyStats>(archive, owner, gpg::RTypeOf<moho::CArmyStats>(), true));
     ReplaceDeleteOwnedPointer(
-      InfluenceMap, ReadPointerTyped<CInfluenceMap>(archive, owner, ResolveCInfluenceMapType(), true)
+      InfluenceMap, ReadPointerTyped<CInfluenceMap>(archive, owner, gpg::RTypeOf<moho::CInfluenceMap>(), true)
     );
     {
       // Canonical PathQueue owned-pointer read (recovered from FUN_00707460);
@@ -1449,7 +1423,7 @@ namespace moho
     WritePointerTyped(
       archive,
       Simulation,
-      ResolveDynamicTypeOr(ResolveSimType(), Simulation),
+      ResolveDynamicTypeOr(gpg::RTypeOf<moho::Sim>(), Simulation),
       gpg::TrackedPointerState::Unowned,
       owner
     );
@@ -1485,14 +1459,14 @@ namespace moho
     WritePointerTyped(
       archive,
       Stats,
-      ResolveDynamicTypeOr(ResolveCArmyStatsType(), Stats),
+      ResolveDynamicTypeOr(gpg::RTypeOf<moho::CArmyStats>(), Stats),
       gpg::TrackedPointerState::Owned,
       owner
     );
     WritePointerTyped(
       archive,
       InfluenceMap,
-      ResolveDynamicTypeOr(ResolveCInfluenceMapType(), InfluenceMap),
+      ResolveDynamicTypeOr(gpg::RTypeOf<moho::CInfluenceMap>(), InfluenceMap),
       gpg::TrackedPointerState::Owned,
       owner
     );
@@ -1733,7 +1707,10 @@ namespace moho
       SetCanSee(Simulation->mSyncFilter.focusArmy);
     }
 
-    CleanUpPlatoons();
+    {
+      FAF_PROFILE_ZONE_NAMED("Army::CleanUpPlatoons");
+      CleanUpPlatoons();
+    }
 
     // 0x006FFDBD-0x006FFDC4: the binary pushes `[army+0x1F4]` -- EconomyInfo --
     // unchecked and calls func_ArmyProcessEconomy. That is the tick's only
@@ -1742,9 +1719,13 @@ namespace moho
     // constructor and by `CopyArmyVariableData` at sync time. CSimArmyEconomyInfo
     // is the same object viewed through its economy-facing field names, exactly
     // as CArmyImpl's own ctor and Unit::HandleResourceManagement already treat it.
-    ProcessArmyEconomy(*reinterpret_cast<CEconomy*>(EconomyInfo));
+    {
+      FAF_PROFILE_ZONE_NAMED("Army::Economy");
+      ProcessArmyEconomy(*reinterpret_cast<CEconomy*>(EconomyInfo));
+    }
 
     if (Simulation != nullptr && Simulation->mCurTick > 10u && Stats != nullptr) {
+      FAF_PROFILE_ZONE_NAMED("Army::StatsUpdate");
       Stats->Update();
     }
 
@@ -1753,6 +1734,7 @@ namespace moho
       && static_cast<std::uint32_t>(mConstDat.mArmyIndex) == (Simulation->mCurTick % 30u)
       && InfluenceMap != nullptr
     ) {
+      FAF_PROFILE_ZONE_NAMED("Army::InfluenceMap");
       InfluenceMap->Update();
     }
 
@@ -1762,6 +1744,7 @@ namespace moho
     }
 
     if (AiBrain != nullptr) {
+      FAF_PROFILE_ZONE_NAMED("Army::AiStages");
       if (AiBrain->mAiThreadStage != nullptr) {
         AiBrain->mAiThreadStage->UserFrame();
       }
@@ -1962,7 +1945,7 @@ namespace moho
    */
   void CArmyImpl::OnCommandSourceTerminated(const std::uint32_t sourceId)
   {
-    mVarDat.mValidCommandSources.Remove(sourceId);
+    (void)mVarDat.mValidCommandSources.Remove(sourceId);
     if (mVarDat.mValidCommandSources.WordCount() == 0u && AiBrain != nullptr) {
       AiBrain->CallbackStr("AbandonedByPlayer");
     }

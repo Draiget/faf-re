@@ -1,3 +1,5 @@
+#include "gpg/core/reflection/Reflection.h"
+#include "moho/lua/ScrLuaUserData.h"
 #include "moho/unit/core/UnitWeapon.h"
 #include "platform/Interlocked.h"
 #include "legacy/math/X87Math.h"
@@ -59,7 +61,6 @@
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kUnitWeaponLuaClassName = "UnitWeapon";
   constexpr const char* kUnitWeaponPlaySoundName = "PlaySound";
   constexpr const char* kUnitWeaponPlaySoundHelpText = "UnitWeapon:PlaySound(weapon,ParamTable)";
@@ -197,30 +198,6 @@ namespace
     return blacklist.begin();
   }
 
-
-  /**
-   * The reflected reference is assembled from the userdata HEADER, not read out
-   * of its payload. This fork carries the `gpg::RType*` in `Udata::len`, and the
-   * value itself starts one header past the allocation, which is exactly what
-   * `LuaPlus::LuaObject::GetUserData` (0x00907540) does:
-   *
-   *     lea edx, [ecx+10h]   ; mObj  = payload, laid out after the header
-   *     mov ecx, [ecx+0Ch]   ; mType = Udata::len reinterpreted as RType*
-   *
-   * Reading `*(gpg::RRef*)lua_touserdata(...)` instead - as this helper used to -
-   * takes the first eight payload bytes as if they were a reference. For a
-   * `_c_object` slot those bytes are the `CScriptObject*` value followed by
-   * whatever the allocator left, so every upcast failed and each caller reported
-   * "Expected a game object" for a perfectly good object.
-   */
-  [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
-  {
-    if (!userDataObject.IsUserData()) {
-      return gpg::RRef{};
-    }
-
-    return userDataObject.GetUserData();
-  }
 
   /**
    * The `Sound{}` userdata holds a `CSndParams*`, so the reflection upcast
@@ -513,27 +490,6 @@ namespace
     }
   }
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
-
-  template <class T>
-  [[nodiscard]] gpg::RType* CachedRType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(T));
-    }
-
-    return cached;
-  }
-
   template <class T>
   [[nodiscard]] T* ReadTrackedPointer(gpg::ReadArchive& archive, const gpg::RRef& ownerRef)
   {
@@ -543,12 +499,12 @@ namespace
     }
 
     const gpg::RRef source{tracked.object, tracked.type};
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedRType<T>());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<T>());
     if (upcast.mObj) {
       return static_cast<T*>(upcast.mObj);
     }
 
-    const char* const expectedTypeName = CachedRType<T>() ? CachedRType<T>()->GetName() : "null";
+    const char* const expectedTypeName = gpg::RTypeOf<T>() ? gpg::RTypeOf<T>()->GetName() : "null";
     const char* const actualTypeName = source.GetTypeName();
     const msvc8::string errorMessage = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
@@ -564,7 +520,7 @@ namespace
   {
     gpg::RRef out{};
     out.mObj = nullptr;
-    out.mType = CachedRType<T>();
+    out.mType = gpg::RTypeOf<T>();
     if (!object) {
       return out;
     }
@@ -601,7 +557,7 @@ namespace
   {
     gpg::RRef out{};
     out.mObj = layerMask;
-    out.mType = CachedRType<moho::ELayer>();
+    out.mType = gpg::RTypeOf<moho::ELayer>();
     return out;
   }
 
@@ -712,7 +668,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponPlaySound_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponPlaySoundName,
       &moho::cfunc_UnitWeaponPlaySound,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -731,10 +687,7 @@ namespace moho
   int cfunc_UnitWeaponPlaySoundL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponPlaySoundHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponPlaySoundHelpText);
 
     Sim* const sim = lua_getglobaluserdata(rawState);
 
@@ -773,7 +726,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponSetEnabled_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponSetEnabledName,
       &moho::cfunc_UnitWeaponSetEnabled,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -792,10 +745,7 @@ namespace moho
   int cfunc_UnitWeaponSetEnabledL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponSetEnabledHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponSetEnabledHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -824,7 +774,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponSetTargetEntity_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponSetTargetEntityName,
       &moho::cfunc_UnitWeaponSetTargetEntity,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -855,11 +805,7 @@ namespace moho
    */
   int cfunc_UnitWeaponSetTargetEntityL(LuaPlus::LuaState* const state)
   {
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponSetTargetEntityHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponSetTargetEntityHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -885,7 +831,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponSetTargetGround_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponSetTargetGroundName,
       &moho::cfunc_UnitWeaponSetTargetGround,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -916,11 +862,7 @@ namespace moho
    */
   int cfunc_UnitWeaponSetTargetGroundL(LuaPlus::LuaState* const state)
   {
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponSetTargetGroundHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponSetTargetGroundHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -951,7 +893,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponResetTarget_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponResetTargetName,
       &moho::cfunc_UnitWeaponResetTarget,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -983,11 +925,7 @@ namespace moho
    */
   int cfunc_UnitWeaponResetTargetL(LuaPlus::LuaState* const state)
   {
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponResetTargetHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kUnitWeaponResetTargetHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -1023,7 +961,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponCreateProjectile_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponCreateProjectileName,
       &moho::cfunc_UnitWeaponCreateProjectile,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -1042,11 +980,7 @@ namespace moho
    */
   int cfunc_UnitWeaponCreateProjectileL(LuaPlus::LuaState* const state)
   {
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponCreateProjectileHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponCreateProjectileHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -1073,7 +1007,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponDoInstaHit_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponDoInstaHitName,
       &moho::cfunc_UnitWeaponDoInstaHit,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -1105,10 +1039,7 @@ namespace moho
   int cfunc_UnitWeaponDoInstaHitL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 9) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponDoInstaHitHelpText, 9, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 9, kUnitWeaponDoInstaHitHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -1227,7 +1158,7 @@ namespace moho
       + (impactResolved ? "_Shots_Hit" : "_Shots_Missed");
     CArmyStatItem* const shotItem = armyStats->GetItem(statPath.c_str());
     shotItem->SynchronizeAsInt();
-    (void)_InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&shotItem->mPrimaryValueBits), 1);
+    (void)shotItem->AddPrimaryBits(1);
   }
 
   /**
@@ -1282,7 +1213,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponGetProjectileBlueprint_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponGetProjectileBlueprintName,
       &moho::cfunc_UnitWeaponGetProjectileBlueprint,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -1301,7 +1232,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponHasTarget_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponHasTargetName,
       &moho::cfunc_UnitWeaponHasTarget,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -1320,7 +1251,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponFireWeapon_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponFireWeaponName,
       &moho::cfunc_UnitWeaponFireWeapon,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -1350,11 +1281,7 @@ namespace moho
    */
   int cfunc_UnitWeaponFireWeaponL(LuaPlus::LuaState* const state)
   {
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponFireWeaponHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kUnitWeaponFireWeaponHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -1373,7 +1300,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponIsFireControl_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponIsFireControlName,
       &moho::cfunc_UnitWeaponIsFireControl,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -1393,10 +1320,7 @@ namespace moho
   int cfunc_UnitWeaponIsFireControlL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponIsFireControlHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponIsFireControlHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -1435,7 +1359,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponGetCurrentTarget_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponGetCurrentTargetName,
       &moho::cfunc_UnitWeaponGetCurrentTarget,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -1454,7 +1378,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponGetCurrentTargetPos_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponGetCurrentTargetPosName,
       &moho::cfunc_UnitWeaponGetCurrentTargetPos,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -1473,7 +1397,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponCanFire_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponCanFireName,
       &moho::cfunc_UnitWeaponCanFire,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -1492,7 +1416,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponSetTargetingPriorities_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponSetTargetingPrioritiesName,
       &moho::cfunc_UnitWeaponSetTargetingPriorities,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -1511,7 +1435,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponGetFiringRandomness_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponGetFiringRandomnessName,
       &moho::cfunc_UnitWeaponGetFiringRandomness,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -1530,7 +1454,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponGetFireClockPct_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponGetFireClockPctName,
       &moho::cfunc_UnitWeaponGetFireClockPct,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -1549,7 +1473,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponChangeProjectileBlueprint_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponChangeProjectileBlueprintName,
       &moho::cfunc_UnitWeaponChangeProjectileBlueprint,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -1568,7 +1492,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponTransferTarget_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponTransferTargetName,
       &moho::cfunc_UnitWeaponTransferTarget,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -1587,7 +1511,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponBeenDestroyed_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponBeenDestroyedName,
       &moho::cfunc_UnitWeaponBeenDestroyed,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -1605,11 +1529,7 @@ namespace moho
    */
   int cfunc_UnitWeaponGetProjectileBlueprintL(LuaPlus::LuaState* const state)
   {
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponGetProjectileBlueprintHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kUnitWeaponGetProjectileBlueprintHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -1640,10 +1560,7 @@ namespace moho
   int cfunc_UnitWeaponHasTargetL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponHasTargetHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kUnitWeaponHasTargetHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -1675,10 +1592,7 @@ namespace moho
   int cfunc_UnitWeaponGetCurrentTargetL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponGetCurrentTargetHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kUnitWeaponGetCurrentTargetHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -1713,10 +1627,7 @@ namespace moho
   int cfunc_UnitWeaponGetCurrentTargetPosL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponGetCurrentTargetPosHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kUnitWeaponGetCurrentTargetPosHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -1753,10 +1664,7 @@ namespace moho
   int cfunc_UnitWeaponCanFireL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponCanFireHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kUnitWeaponCanFireHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -1794,11 +1702,7 @@ namespace moho
    */
   int cfunc_UnitWeaponSetTargetingPrioritiesL(LuaPlus::LuaState* const state)
   {
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponSetTargetingPrioritiesHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponSetTargetingPrioritiesHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -1848,10 +1752,7 @@ namespace moho
   int cfunc_UnitWeaponGetFiringRandomnessL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponGetFiringRandomnessHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kUnitWeaponGetFiringRandomnessHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -1881,10 +1782,7 @@ namespace moho
   int cfunc_UnitWeaponGetFireClockPctL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponGetFireClockPctHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kUnitWeaponGetFireClockPctHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -1920,10 +1818,7 @@ namespace moho
   int cfunc_UnitWeaponChangeProjectileBlueprintL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponChangeProjectileBlueprintHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponChangeProjectileBlueprintHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -1962,11 +1857,7 @@ namespace moho
    */
   int cfunc_UnitWeaponTransferTargetL(LuaPlus::LuaState* const state)
   {
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponTransferTargetHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponTransferTargetHelpText);
 
     const LuaPlus::LuaObject sourceWeaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const sourceWeapon = SCR_FromLua_UnitWeapon(sourceWeaponObject, state);
@@ -1999,10 +1890,7 @@ namespace moho
   int cfunc_UnitWeaponBeenDestroyedL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponBeenDestroyedHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kUnitWeaponBeenDestroyedHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     const UnitWeapon* const weapon = SCR_FromLua_UnitWeaponOpt(weaponObject, state);
@@ -2031,11 +1919,7 @@ namespace moho
    */
   int cfunc_UnitWeaponGetBlueprintL(LuaPlus::LuaState* const state)
   {
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponGetBlueprintHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kUnitWeaponGetBlueprintHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -2069,7 +1953,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponGetBlueprint_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponGetBlueprintName,
       &moho::cfunc_UnitWeaponGetBlueprint,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -2100,7 +1984,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponSetFireControl_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponSetFireControlName,
       &moho::cfunc_UnitWeaponSetFireControl,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -2119,10 +2003,7 @@ namespace moho
   int cfunc_UnitWeaponSetFireControlL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponSetFireControlHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponSetFireControlHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -2147,10 +2028,7 @@ namespace moho
   int cfunc_UnitWeaponChangeFiringToleranceL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponChangeFiringToleranceHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponChangeFiringToleranceHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -2185,7 +2063,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponChangeFiringTolerance_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponChangeFiringToleranceName,
       &moho::cfunc_UnitWeaponChangeFiringTolerance,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -2204,10 +2082,7 @@ namespace moho
   int cfunc_UnitWeaponChangeRateOfFireL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponChangeRateOfFireHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponChangeRateOfFireHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -2242,7 +2117,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponChangeRateOfFire_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponChangeRateOfFireName,
       &moho::cfunc_UnitWeaponChangeRateOfFire,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -2261,10 +2136,7 @@ namespace moho
   int cfunc_UnitWeaponChangeMinRadiusL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponChangeMinRadiusHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponChangeMinRadiusHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -2304,7 +2176,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponChangeMinRadius_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponChangeMinRadiusName,
       &moho::cfunc_UnitWeaponChangeMinRadius,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -2323,10 +2195,7 @@ namespace moho
   int cfunc_UnitWeaponChangeMaxRadiusL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponChangeMaxRadiusHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponChangeMaxRadiusHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -2366,7 +2235,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponChangeMaxRadius_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponChangeMaxRadiusName,
       &moho::cfunc_UnitWeaponChangeMaxRadius,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -2385,10 +2254,7 @@ namespace moho
   int cfunc_UnitWeaponChangeMaxHeightDiffL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponChangeMaxHeightDiffHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponChangeMaxHeightDiffHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -2423,7 +2289,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponChangeMaxHeightDiff_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponChangeMaxHeightDiffName,
       &moho::cfunc_UnitWeaponChangeMaxHeightDiff,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -2442,10 +2308,7 @@ namespace moho
   int cfunc_UnitWeaponChangeDamageTypeL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponChangeDamageTypeHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponChangeDamageTypeHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -2481,7 +2344,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponChangeDamageType_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponChangeDamageTypeName,
       &moho::cfunc_UnitWeaponChangeDamageType,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -2500,10 +2363,7 @@ namespace moho
   int cfunc_UnitWeaponChangeDamageRadiusL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponChangeDamageRadiusHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponChangeDamageRadiusHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -2538,7 +2398,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponChangeDamageRadius_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponChangeDamageRadiusName,
       &moho::cfunc_UnitWeaponChangeDamageRadius,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -2557,10 +2417,7 @@ namespace moho
   int cfunc_UnitWeaponChangeDamageL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponChangeDamageHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponChangeDamageHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -2594,7 +2451,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponChangeDamage_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponChangeDamageName,
       &moho::cfunc_UnitWeaponChangeDamage,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -2613,10 +2470,7 @@ namespace moho
   int cfunc_UnitWeaponSetFiringRandomnessL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponSetFiringRandomnessHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponSetFiringRandomnessHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -2651,7 +2505,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponSetFiringRandomness_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponSetFiringRandomnessName,
       &moho::cfunc_UnitWeaponSetFiringRandomness,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -2670,10 +2524,7 @@ namespace moho
   int cfunc_UnitWeaponSetFireTargetLayerCapsL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUnitWeaponSetFireTargetLayerCapsHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kUnitWeaponSetFireTargetLayerCapsHelpText);
 
     const LuaPlus::LuaObject weaponObject(LuaPlus::LuaStackObject(state, 1));
     UnitWeapon* const weapon = SCR_FromLua_UnitWeapon(weaponObject, state);
@@ -2713,7 +2564,7 @@ namespace moho
   CScrLuaInitForm* func_UnitWeaponSetFireTargetLayerCaps_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kUnitWeaponSetFireTargetLayerCapsName,
       &moho::cfunc_UnitWeaponSetFireTargetLayerCaps,
       &CScrLuaMetatableFactory<UnitWeapon>::Instance(),
@@ -3536,15 +3387,7 @@ namespace moho
       CArmyStatItem* const item = ResolveArmyStatItemCachedCreate(&armyStats, statPath);
       item->SynchronizeAsFloat();
 
-      volatile platform::InterlockedLong* const counter = reinterpret_cast<volatile platform::InterlockedLong*>(&item->mPrimaryValueBits);
-      const std::int32_t desiredBits = std::bit_cast<std::int32_t>(value);
-      for (;;) {
-        const std::int32_t observed = _InterlockedCompareExchange(counter, 0, 0);
-        const std::int32_t result = _InterlockedCompareExchange(counter, desiredBits, observed);
-        if (result == observed) {
-          return;
-        }
-      }
+      (void)platform::AtomicExchange(&item->mPrimaryValueBits, std::bit_cast<std::int32_t>(value));
     }
 
     /**
@@ -3647,7 +3490,7 @@ namespace moho
       {
         CArmyStatItem* const shotsFired = armyStats->GetItem(shotsFiredPath.c_str());
         shotsFired->Synchronize();
-        (void)_InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&shotsFired->mPrimaryValueBits), 1);
+        (void)shotsFired->AddPrimaryBits(1);
       }
 
       // Number of shots fired so far, used to average the fire-range lanes.
@@ -4309,7 +4152,7 @@ namespace moho
     mWeaponBlueprint = ReadTrackedPointer<RUnitBlueprintWeapon>(*archive, ownerRef);
     mProjectileBlueprint = ReadTrackedPointer<RProjectileBlueprint>(*archive, ownerRef);
     mAttacker = ReadTrackedPointer<IAiAttacker>(*archive, ownerRef);
-    archive->Read(CachedRType<CWeaponAttributes>(), &mAttributes, ownerRef);
+    archive->Read(gpg::RTypeOf<CWeaponAttributes>(), &mAttributes, ownerRef);
     mUnit = ReadTrackedPointer<Unit>(*archive, ownerRef);
     archive->ReadInt(&mWeaponIndex);
     archive->ReadInt(&mBone);
@@ -4319,7 +4162,7 @@ namespace moho
     mEnabled = enabled ? 1u : 0u;
 
     archive->ReadString(&mLabel);
-    archive->Read(CachedRType<CAiTarget>(), &mTarget, ownerRef);
+    archive->Read(gpg::RTypeOf<CAiTarget>(), &mTarget, ownerRef);
 
     CFireWeaponTask* loadedTask = nullptr;
     archive->ReadPointerOwned(&loadedTask, &ownerRef);
@@ -4333,19 +4176,19 @@ namespace moho
     archive->ReadBool(&canFire);
     mCanFire = canFire ? 1u : 0u;
 
-    archive->Read(CachedRType<EntityCategorySet>(), &mCat1, ownerRef);
-    archive->Read(CachedRType<EntityCategorySet>(), &mCat2, ownerRef);
-    archive->Read(CachedRType<ELayer>(), &mFireTargetLayerCaps, ownerRef);
+    archive->Read(gpg::RTypeOf<EntityCategorySet>(), &mCat1, ownerRef);
+    archive->Read(gpg::RTypeOf<EntityCategorySet>(), &mCat2, ownerRef);
+    archive->Read(gpg::RTypeOf<ELayer>(), &mFireTargetLayerCaps, ownerRef);
     archive->ReadFloat(&mFiringRandomness);
-    archive->Read(CachedRType<msvc8::vector<EntityCategorySet>>(), &mTargetPriorities, ownerRef);
-    archive->Read(CachedRType<msvc8::vector<SBlackListInfo>>(), &mBlacklist, ownerRef);
+    archive->Read(gpg::RTypeOf<msvc8::vector<EntityCategorySet>>(), &mTargetPriorities, ownerRef);
+    archive->Read(gpg::RTypeOf<msvc8::vector<SBlackListInfo>>(), &mBlacklist, ownerRef);
     archive->ReadInt(&mUnknown170);
 
     bool unknown174 = (mUnknown174 != 0u);
     archive->ReadBool(&unknown174);
     mUnknown174 = unknown174 ? 1u : 0u;
 
-    archive->Read(CachedRType<Wm3::Vector3f>(), &mAimingAt, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mAimingAt, ownerRef);
     archive->ReadInt(&mShotsAtTarget);
   }
 
@@ -4361,24 +4204,24 @@ namespace moho
     WriteTrackedPointer(*archive, mWeaponBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
     WriteTrackedPointer(*archive, mProjectileBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
     WriteTrackedPointer(*archive, mAttacker, gpg::TrackedPointerState::Unowned, ownerRef);
-    archive->Write(CachedRType<CWeaponAttributes>(), &mAttributes, ownerRef);
+    archive->Write(gpg::RTypeOf<CWeaponAttributes>(), &mAttributes, ownerRef);
     WriteTrackedPointer(*archive, mUnit, gpg::TrackedPointerState::Unowned, ownerRef);
     archive->WriteInt(mWeaponIndex);
     archive->WriteInt(mBone);
     archive->WriteBool(mEnabled != 0u);
     archive->WriteString(const_cast<msvc8::string*>(&mLabel));
-    archive->Write(CachedRType<CAiTarget>(), &mTarget, ownerRef);
+    archive->Write(gpg::RTypeOf<CAiTarget>(), &mTarget, ownerRef);
     WriteTrackedPointer(*archive, mFireWeaponTask, gpg::TrackedPointerState::Owned, ownerRef);
     archive->WriteBool(mCanFire != 0u);
-    archive->Write(CachedRType<EntityCategorySet>(), &mCat1, ownerRef);
-    archive->Write(CachedRType<EntityCategorySet>(), &mCat2, ownerRef);
-    archive->Write(CachedRType<ELayer>(), &mFireTargetLayerCaps, ownerRef);
+    archive->Write(gpg::RTypeOf<EntityCategorySet>(), &mCat1, ownerRef);
+    archive->Write(gpg::RTypeOf<EntityCategorySet>(), &mCat2, ownerRef);
+    archive->Write(gpg::RTypeOf<ELayer>(), &mFireTargetLayerCaps, ownerRef);
     archive->WriteFloat(mFiringRandomness);
-    archive->Write(CachedRType<msvc8::vector<EntityCategorySet>>(), &mTargetPriorities, ownerRef);
-    archive->Write(CachedRType<msvc8::vector<SBlackListInfo>>(), &mBlacklist, ownerRef);
+    archive->Write(gpg::RTypeOf<msvc8::vector<EntityCategorySet>>(), &mTargetPriorities, ownerRef);
+    archive->Write(gpg::RTypeOf<msvc8::vector<SBlackListInfo>>(), &mBlacklist, ownerRef);
     archive->WriteInt(mUnknown170);
     archive->WriteBool(mUnknown174 != 0u);
-    archive->Write(CachedRType<Wm3::Vector3f>(), &mAimingAt, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mAimingAt, ownerRef);
     archive->WriteInt(mShotsAtTarget);
   }
 } // namespace moho

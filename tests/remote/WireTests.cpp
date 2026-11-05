@@ -34,6 +34,7 @@
 #include "remote/wire/BitStream.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/IntelGridDelta.h"
+#include "remote/wire/LuaSyncLane.h"
 #include "remote/wire/OrdinalTable.h"
 #include "remote/wire/NameTable.h"
 #include "remote/wire/Quantize.h"
@@ -987,6 +988,223 @@ namespace
           && held.orientationBeat == 7u);
   }
 
+  void TestGridDeltaInPlace()
+  {
+    // The same bits as `EncodeGridDelta`, on grids with long unchanged runs and with changes at
+    // block edges, and `held` ends up as the cells of now.
+    std::mt19937 rng(0x6A12u);
+    for (int round = 0; round < 300; ++round) {
+      SGridBits before{};
+      before.width = 1u + rng() % 200u;
+      before.height = 1u + rng() % 40u;
+      const std::size_t count = static_cast<std::size_t>(before.width) * before.height;
+      std::vector<std::int8_t> held(count);
+      for (std::int8_t& cell : held) {
+        cell = static_cast<std::int8_t>(rng() % 3u == 0u ? 1 + rng() % 100u : 0u);
+      }
+      std::vector<std::int8_t> now = held;
+      const std::uint32_t changes = rng() % 4u == 0u ? 0u : rng() % 40u;
+      for (std::uint32_t change = 0; change < changes; ++change) {
+        const std::size_t at = rng() % 2u == 0u ? rng() % count : (rng() % (count / 64u + 1u)) * 64u % count;
+        now[at] = static_cast<std::int8_t>(rng() % 3u == 0u ? 0u : 1 + rng() % 100u);
+      }
+      SGridBits current = before;
+      before.cells.resize(count);
+      current.cells.resize(count);
+      for (std::size_t i = 0; i < count; ++i) {
+        before.cells[i] = held[i] != 0 ? 1u : 0u;
+        current.cells[i] = now[i] != 0 ? 1u : 0u;
+      }
+      BitWriter expected;
+      CHECK(EncodeGridDelta(current, &before, expected));
+      BitWriter actual;
+      EncodeGridDeltaInPlace(before.width, before.height, now.data(), held.data(), actual);
+      CHECK(actual.BitCount() == expected.BitCount());
+      CHECK(std::equal(actual.Bytes().begin(), actual.Bytes().end(), expected.Bytes().begin(), expected.Bytes().end()));
+      CHECK(held == now);
+    }
+  }
+
+  void TestLuaSyncLane()
+  {
+    const std::vector<std::uint8_t> table = {4u, 1u, 'a', 0u, 3u, 1u, 5u};
+    const std::vector<std::string> prints = {"first line", "", "third"};
+    BitWriter writer;
+    writer.WriteBits(5u, 3); // not on a byte edge
+    CHECK(EncodeLuaSyncLane(table, prints, writer));
+    BitReader reader(writer.Bytes());
+    CHECK(reader.ReadBits(3) == 5u);
+    std::vector<std::uint8_t> decodedTable;
+    std::vector<std::string> decodedPrints;
+    CHECK(DecodeLuaSyncLane(reader, decodedTable, decodedPrints));
+    CHECK(decodedTable == table);
+    CHECK(decodedPrints == prints);
+
+    // A size past what's there fails the reader and allocates nothing for it.
+    BitWriter hostile;
+    hostile.WriteVarUint(kMaxLuaSyncBytes);
+    BitReader hostileReader(hostile.Bytes());
+    std::vector<std::uint8_t> hostileTable;
+    std::vector<std::string> hostilePrints;
+    CHECK(!DecodeLuaSyncLane(hostileReader, hostileTable, hostilePrints));
+    CHECK(hostileTable.empty());
+    CHECK(!hostileReader.Ok());
+
+    BitWriter tooLong;
+    const std::vector<std::string> longLine = {std::string(kMaxLuaSyncLineBytes + 1u, 'x')};
+    CHECK(!EncodeLuaSyncLane({}, longLine, tooLong));
+  }
+
+  void TestBitWriterAppend()
+  {
+    // A lane put together from slots encoded apart is the lane encoded in one go, at any bit position.
+    std::mt19937 rng(0x6A11u);
+    for (int round = 0; round < 200; ++round) {
+      std::vector<SGridSlot> before;
+      std::vector<SGridSlot> grids;
+      const std::size_t count = 1u + rng() % 6u;
+      for (std::size_t i = 0; i < count; ++i) {
+        SGridSlot slot{};
+        slot.army = static_cast<std::uint8_t>(i);
+        slot.kind = static_cast<std::uint8_t>(rng() & 1u);
+        slot.gridSize = 4u + rng() % 60u;
+        slot.bits.width = 1u + rng() % 16u;
+        slot.bits.height = 1u + rng() % 16u;
+        slot.bits.cells.resize(static_cast<std::size_t>(slot.bits.width) * slot.bits.height);
+        for (std::uint8_t& cell : slot.bits.cells) {
+          cell = static_cast<std::uint8_t>(rng() % 4u == 0u ? 1u : 0u);
+        }
+        if (rng() % 3u != 0u) {
+          SGridSlot held = slot;
+          for (std::uint8_t& cell : held.bits.cells) {
+            cell = static_cast<std::uint8_t>(rng() % 16u == 0u ? 1u - cell : cell);
+          }
+          before.push_back(std::move(held));
+        }
+        grids.push_back(std::move(slot));
+      }
+      BitWriter whole;
+      CHECK(EncodeGridLane(grids, before, whole));
+      BitWriter parts;
+      parts.WriteVarUint(static_cast<std::uint32_t>(grids.size()));
+      for (const SGridSlot& slot : grids) {
+        const auto held = std::find_if(before.begin(), before.end(), [&slot](const SGridSlot& other) {
+          return other.army == slot.army && other.kind == slot.kind;
+        });
+        BitWriter part;
+        CHECK(EncodeGridSlot(slot, held != before.end() ? &held->bits : nullptr, part));
+        parts.Append(part);
+      }
+      CHECK(parts.BitCount() == whole.BitCount());
+      CHECK(std::equal(parts.Bytes().begin(), parts.Bytes().end(), whole.Bytes().begin(), whole.Bytes().end()));
+    }
+    BitWriter none;
+    BitWriter some;
+    some.WriteBits(5u, 3);
+    some.Append(none);
+    CHECK(some.BitCount() == 3u);
+    none.Append(some);
+    CHECK(none.BitCount() == 3u);
+    none.Clear();
+    CHECK(none.BitCount() == 0u);
+    CHECK(none.Bytes().empty());
+  }
+
+  void TestBlipUpdateHash()
+  {
+    // Every field a blip's update writes moves the fingerprint: a field it missed would leave a view
+    // holding an old value while the sim's has changed.
+    SEntityRecord record{};
+    SUnitDetail detail{};
+    detail.weapons.resize(1);
+    detail.commands = {1};
+    detail.buildQueue = {2};
+    record.appearance.attachments = {3};
+    detail.weapons[0].targets.words = {4};
+    detail.weapons[0].secondary.words = {5};
+    detail.attributes.restriction.words = {6};
+    const std::uint64_t base = HashBlipUpdate(record, detail);
+    CHECK(base != 0u);
+    CHECK(base == HashBlipUpdate(record, detail));
+    int field = 0;
+    const auto changes = [&](auto&& change) {
+      SEntityRecord r = record;
+      SUnitDetail d = detail;
+      change(r, d);
+      ++field;
+      if (HashBlipUpdate(r, d) == base) {
+        std::printf("field %d doesn't move the hash\n", field);
+        CHECK(false);
+      }
+    };
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.mesh = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.scale[2] = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.attachParent = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.attachments[0] = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.attachments.push_back(0); });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.impact = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.scroll[3] = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.visualFlags = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.intel[7] = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.ambientSound = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.rumbleSound = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.underlay = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.position[2] = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.farPosition = true; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.farValue[2] = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.yawOnly = true; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.orientation = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.health = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.health = -0.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.maxHealth = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.fractionComplete = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.flags = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.fuelRatio = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.shieldRatio = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.workProgress = 7.0f; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.unitStates = std::uint64_t{1} << 40u; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.scriptBits = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.siloCounts[3] = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.unitFlags = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.creator = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.creationTick = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.stunTicks = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.jobType = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.fireState = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.siloMaxStorage[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.siloMaxStorage[1] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.selectionInheritor = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.customName = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.focusUnit = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.guardedUnit = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.targetBlip = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.didRefresh = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.reconFlags = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.economy[5] = 7.0f; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.commands[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.buildQueue[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].targets.firstWord = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].targets.words[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].secondary.words[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].layer = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].minRadius = 7.0f; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].maxRadius = 7.0f; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].effectiveRadius = 7.0f; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].minRangeVisual = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].maxRangeVisual = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons.push_back(SUnitWeapon{}); });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.blueprint = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.reserved04 = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.restriction.words[0] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.scalars[11] = 7.0f; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.commandCaps = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.toggleCaps = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.flags[3] = 7; });
+    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.reserved6C = 7; });
+    // A value moved between two neighbours is another update.
+    changes([](SEntityRecord&, SUnitDetail& d) { d.commands = {}; d.buildQueue = {1, 2}; });
+  }
+
   void TestFrameAppearance()
   {
     // A creation with the default appearance sends none of it; each non-default field costs
@@ -1845,7 +2063,7 @@ namespace
     // A retired id still translates inbound for the grace beats (a late command), then no more.
     CHECK(map.EntityToSim(0x30500001u, sim) && sim == 0x30500007u);
     CHECK(map.CommandToSim(0x80000001u, sim) && sim == 0x80000123u);
-    map.RetireCommandsUnless([](const std::uint32_t simId) { return simId != 0x05000009u; });
+    map.RetireNewCommandsUnless([](const std::uint32_t simId) { return simId != 0x05000009u; });
     map.AdvanceTo(CViewIdMap::kInboundGraceBeats);
     CHECK(!map.EntityToSim(0x30500001u, sim));
     CHECK(!map.CommandToSim(0x80000001u, sim));
@@ -1860,6 +2078,13 @@ namespace
     map.Translate(again, ownSource);
     CHECK(again.entities[1].id == 0x30500003u);
     CHECK(static_cast<std::uint32_t>((*again.entities[0].unit.detail).commands[0]) == 0x80000003u);
+    // A command found alive once is not asked about again; it retires when the sim releases it.
+    map.RetireNewCommandsUnless([](std::uint32_t) { return true; });
+    map.RetireNewCommandsUnless([](std::uint32_t) { return false; });
+    CHECK(map.LiveCommands() == 1u);
+    const std::uint32_t released[] = {0x80000123u};
+    map.RetireCommands(released);
+    CHECK(map.LiveCommands() == 0u);
 
     // Another view numbers on its own: army 5's view keeps its own projectile and blips get serial 1 up.
     CViewIdMap other(5);
@@ -2205,6 +2430,10 @@ namespace
     {"frame: corruption and garbage", &TestDecoderCorruptionAndGarbage},
     {"frame: hostile counts and ids", &TestDecoderHostileCounts},
     {"frame: appearance block", &TestFrameAppearance},
+    {"frame: blip update hash", &TestBlipUpdateHash},
+    {"grid lane: slots encoded apart", &TestBitWriterAppend},
+    {"lua lane: round trip and limits", &TestLuaSyncLane},
+    {"grid lane: delta in place", &TestGridDeltaInPlace},
   };
 } // namespace
 

@@ -111,13 +111,13 @@ namespace gpg
     gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int /*version*/, gpg::RRef* const ownerRef
   )
   {
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SEfxCurve>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SEfxCurve>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
     const moho::SEfxCurve fill{};
-    vec.Resize(count, fill);
+    vec.resize(count, fill);
 
     for (unsigned int i = 0; i < count; ++i) {
       gpg::RType* elementType = CachedSEfxCurveType();
@@ -135,7 +135,7 @@ namespace gpg
     gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int /*version*/, gpg::RRef* const ownerRef
   )
   {
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SEfxCurve>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SEfxCurve>*>(objectPtr);
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
@@ -205,7 +205,7 @@ namespace gpg
   gpg::RRef RFastVectorType<moho::SEfxCurve>::SubscriptIndex(void* obj, const int ind) const
   {
     gpg::RRef out{};
-    auto& vec = *static_cast<gpg::fastvector<moho::SEfxCurve>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SEfxCurve>*>(obj);
     out = gpg::MakeRRef<moho::SEfxCurve>(vec.Data() + ind);
     return out;
   }
@@ -229,9 +229,9 @@ namespace gpg
    */
   void RFastVectorType<moho::SEfxCurve>::SetCount(void* obj, const int count) const
   {
-    auto& vec = *static_cast<gpg::fastvector<moho::SEfxCurve>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SEfxCurve>*>(obj);
     const moho::SEfxCurve fill{};
-    vec.Resize(static_cast<std::size_t>(count), fill);
+    vec.resize(static_cast<std::size_t>(count), fill);
   }
 
   /**

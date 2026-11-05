@@ -105,21 +105,6 @@ namespace moho
       return out;
     }
 
-    /**
-     * Address: 0x00528340 (FUN_00528340)
-     *
-     * What it does:
-     * Lazily resolves and caches RTTI metadata for `RMeshBlueprint`.
-     */
-    [[nodiscard]] gpg::RType* ResolveRMeshBlueprintType()
-    {
-      gpg::RType* type = RMeshBlueprint::sType;
-      if (!type) {
-        type = gpg::LookupRType(typeid(RMeshBlueprint));
-        RMeshBlueprint::sType = type;
-      }
-      return type;
-    }
   } // namespace
 
   gpg::RType* RMeshBlueprint::sType = nullptr;
@@ -285,7 +270,7 @@ namespace moho
    */
   gpg::RType* RMeshBlueprint::GetClass() const
   {
-    return ResolveRMeshBlueprintType();
+    return gpg::RTypeOf<RMeshBlueprint>();
   }
 
   /**

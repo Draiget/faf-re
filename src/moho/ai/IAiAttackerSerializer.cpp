@@ -12,15 +12,6 @@ using namespace moho;
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedAttackerBroadcasterType()
-  {
-    gpg::RType* type = Broadcaster<EAiAttackerEvent>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Broadcaster<EAiAttackerEvent>));
-      Broadcaster<EAiAttackerEvent>::sType = type;
-    }
-    return type;
-  }
 
 } // namespace
 
@@ -35,8 +26,8 @@ namespace moho
       return;
     }
 
-    void* const broadcasterLane = (this != nullptr) ? static_cast<void*>(static_cast<Broadcaster<EAiAttackerEvent>*>(this)) : nullptr;
-    gpg::RType* const broadcasterType = CachedAttackerBroadcasterType();
+    void* const broadcasterLane = (static_cast<const void*>(this) != nullptr) ? static_cast<void*>(static_cast<Broadcaster<EAiAttackerEvent>*>(this)) : nullptr;
+    gpg::RType* const broadcasterType = gpg::RTypeOf<Broadcaster<EAiAttackerEvent>>();
     GPG_ASSERT(broadcasterType != nullptr);
     const gpg::RRef ownerRef{};
     archive->Read(broadcasterType, broadcasterLane, ownerRef);
@@ -51,8 +42,8 @@ namespace moho
       return;
     }
 
-    const void* const broadcasterLane = (this != nullptr) ? static_cast<const void*>(static_cast<const Broadcaster<EAiAttackerEvent>*>(this)) : nullptr;
-    gpg::RType* const broadcasterType = CachedAttackerBroadcasterType();
+    const void* const broadcasterLane = (static_cast<const void*>(this) != nullptr) ? static_cast<const void*>(static_cast<const Broadcaster<EAiAttackerEvent>*>(this)) : nullptr;
+    gpg::RType* const broadcasterType = gpg::RTypeOf<Broadcaster<EAiAttackerEvent>>();
     GPG_ASSERT(broadcasterType != nullptr);
     const gpg::RRef ownerRef{};
     archive->Write(broadcasterType, broadcasterLane, ownerRef);

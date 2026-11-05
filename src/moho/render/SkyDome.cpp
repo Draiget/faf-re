@@ -42,7 +42,7 @@ namespace
 
   static_assert(sizeof(SkyDomeVertex) == 0x14, "SkyDomeVertex size must be 0x14");
 
-  constexpr float kHalfPi = 1.5707964f;
+  [[maybe_unused]] constexpr float kHalfPi = 1.5707964f;
   constexpr float kTwoPi = 6.2831855f;
 
   constexpr std::array<float, 8> kDecalBillboardQuadVertices = {

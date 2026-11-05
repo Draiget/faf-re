@@ -1,0 +1,126 @@
+name: Network compatibility
+
+# The part of the compatibility matrix (issue #242, docs/NETBRIDGE.md) a hosted runner can do:
+# netlink tests, then FAF's faf-ice-adapter.jar and faf-netbridge linked to each other, direct and
+# through a relay, with the client's contract driving them and tools/fakegame as the game. No real
+# game runs here: the full matrix (tools/netmatrix) plays real games and runs by hand. Neither does
+# anything that links the engine: faf_peer_transport_tests needs d3dx9_43.dll and X3DAudio1_7.dll,
+# which a runner doesn't have (run 41600266286, exit 0xC0000135). A pull request's code runs here with a read-only token and no secrets, and only restores the
+# caches.
+on:
+  push:
+    branches: [master]
+    paths: &paths
+      - "src/netlink/**"
+      - "src/netbridge/**"
+      - "src/moho/net/**"
+      - "tests/netlink/**"
+      - "tests/net/**"
+      - "tools/fafclient/**"
+      - "tools/fakegame/**"
+      - "tools/cmd/fafclient/**"
+      - ".github/workflows/net-compat.yml"
+  pull_request:
+    paths: *paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: net-compat-${{ github.event.pull_request.number || github.ref }}
+  # Master's pushes each finish: on a busy day, cancelling would leave none that did.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PYTHON_VERSION: "3.14"
+  # The clang-cl the Windows builds use; the same pin as the Replay check workflow's.
+  LLVM_VERSION: "22.1.7"
+  # The adapter the FAF client ships (docs/LAUNCHER_ADAPTER_CONTRACT.md), with JavaFX in the jar.
+  ADAPTER_VERSION: "3.3.14"
+
+jobs:
+  links:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/cache/restore@v6
+        with:
+          path: |
+            dependencies/.downloads
+            llvm-installer
+          key: windows-downloads-${{ env.LLVM_VERSION }}-${{ hashFiles('cmake/FafDependencies.cmake') }}
+          restore-keys: windows-downloads-${{ env.LLVM_VERSION }}-
+      # Puts its Scripts folder on PATH, for the ninja pip install.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "25"
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: tools/go.mod
+          cache: false
+      - run: |
+          $exe = "llvm-installer/LLVM-$env:LLVM_VERSION-win64.exe"
+          if (-not (Test-Path $exe)) {
+            New-Item -ItemType Directory -Force llvm-installer | Out-Null
+            Invoke-WebRequest "https://github.com/llvm/llvm-project/releases/download/llvmorg-$env:LLVM_VERSION/LLVM-$env:LLVM_VERSION-win64.exe" -OutFile $exe
+          }
+          Start-Process -FilePath $exe -ArgumentList "/S", "/D=C:\llvm-$env:LLVM_VERSION" -Wait
+          "LLVM_ROOT=C:\llvm-$env:LLVM_VERSION" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          python -m pip install --disable-pip-version-check ninja
+      - run: |
+          cmake --preset clang-x64-release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build --preset clang-x64-release --target faf_netbridge faf_netlink_tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: netlink tests
+        run: |
+          & "build/clang-x64-release/tests/faf_netlink_tests.exe"
+          Write-Host "faf_netlink_tests: exit $LASTEXITCODE"
+          exit $LASTEXITCODE
+      # Every pairing of the two adapters, then the mixed pair through the relay.
+      - run: |
+          New-Item -ItemType Directory -Force adapter, results | Out-Null
+          $tag = $env:ADAPTER_VERSION
+          Invoke-WebRequest "https://github.com/FAForever/java-ice-adapter/releases/download/$tag/faf-ice-adapter-$tag-win.jar" -OutFile adapter/faf-ice-adapter.jar
+          $bridge = (Resolve-Path "build/clang-x64-release/src/netbridge/faf-netbridge.exe").Path
+          $adapter = (Resolve-Path adapter).Path
+          $results = (Resolve-Path results).Path
+          $java = (Get-Command java).Source
+          Set-Location tools
+          go build -o fafclient.exe ./cmd/fafclient
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $runs = @(
+            @{ name = "jar-jar";       exe = "jar,jar";          relay = $false }
+            @{ name = "jar-bridge";    exe = "jar,$bridge";      relay = $false }
+            @{ name = "bridge-bridge"; exe = "$bridge,$bridge";  relay = $false }
+            @{ name = "jar-bridge-relay"; exe = "jar,$bridge";   relay = $true }
+          )
+          $failed = 0
+          foreach ($run in $runs) {
+            $flags = @("-players", "2", "-native-dir", $adapter, "-java", $java, "-client-lib", "", "-exe", $run.exe,
+                       "-hold", "20s", "-timeout", "120s", "-q", "-disconnect",
+                       "-trace", "$results/$($run.name).jsonl", "-logs", "$results/$($run.name)")
+            if ($run.relay) { $flags += "-force-relay" }
+            ./fafclient.exe @flags
+            Write-Host "$($run.name): exit $LASTEXITCODE"
+            if ($LASTEXITCODE -ne 0) { $failed++ }
+          }
+          exit $failed
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: net-compat-results
+          path: results
+          if-no-files-found: ignore
+          retention-days: 14

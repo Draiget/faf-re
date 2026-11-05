@@ -1,4 +1,6 @@
 #include "SimDriver.h"
+
+#include "moho/sim/ReplayTimeline.h"
 #include "gpg/core/profiling/Profiler.h"
 #include "platform/Interlocked.h"
 #include "moho/core/ThreadPlacement.h"
@@ -28,20 +30,31 @@
 #include "moho/entity/EntityId.h"
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/console/CConCommand.h"
+#include "moho/misc/CZipFile.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/TimeBar.h"
 #include "moho/misc/CDecoder.h"
 #include "moho/net/CClientManagerImpl.h"
+#include "moho/net/NetConVars.h"
 #include "moho/render/CDecalTypes.h"
 #include "moho/sim/SSTIArmyConstantData.h"
 #include "moho/sim/SSTIArmyVariableData.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "Sim.h"
+#include "moho/sim/SimArchiveMode.h"
+#include "moho/sim/SimKeyframe.h"
 
 using namespace moho;
+
+namespace moho
+{
+  // Display-clock skew correction tuning (moho/misc/RuntimeTuningGlobals.cpp), read for the skew log.
+  extern float wld_SkewRateAdjustBase;
+  extern float wld_SkewRateAdjustMax;
+} // namespace moho
 
 namespace
 {
@@ -53,12 +66,31 @@ namespace
   constexpr int kIssueThreadIdleWaitMs = 1000;
   constexpr std::uint32_t kMaxQueuedSyncPacketsBeforeStalling = 10u;
   constexpr int kMaxBeatsAheadOfExecuted = 98;
+  // Engine addition (replay timeline): beats issued past the last one dequeued while fast-forwarding.
+  constexpr int kFastForwardLeadBeats = 20;
   constexpr int kMaxCatchUpBeats = 99;
   constexpr float kBlockedIssueGraceMs = 250.0f;
+  // Engine addition, net_LogShownBeatMs only: when each beat was issued, by beat number. Under mLock.
+  constexpr int kIssuedAtSlots = 1024;
+  constexpr int kIssueToShownLogBeats = 100;
+  std::int64_t sIssuedAt[kIssuedAtSlots] = {};
+  // Engine addition, net_AdaptiveLagMax only: what a player's own pauses add to net_Lag. A pause
+  // raises it a step at once; a long quiet spell takes it back down a step at a time. Under mLock.
+  constexpr float kAdaptiveLagStepMs = 50.0f;
+  constexpr float kAdaptivePauseOverBeatMs = 150.0f;
+  constexpr float kAdaptiveLagRiseEveryMs = 5000.0f;
+  constexpr float kAdaptiveLagHoldMs = 60000.0f;
+  constexpr float kAdaptiveLagDecayEveryMs = 10000.0f;
+  constexpr int kAdaptiveLagFirstBeat = 100;
+  float sAdaptiveLagExtraMs = 0.0f;
+  int sAdaptiveLastBeat = -1;
+  std::int64_t sAdaptiveLastAt = 0;
+  std::int64_t sAdaptiveChangedAt = 0;
 
   // Engine addition: set by the session before it creates its driver (see SIM_SetSessionPacing).
   // Read by that driver's issue thread.
   std::atomic<ESimSessionPacing> gDriverSessionPacing{ESimSessionPacing::Network};
+  std::atomic<bool> gIssueWhilePaused{false};
 
   /// Engine addition: the beat lead the issue thread keeps for this session, or 0 (original pacing).
   [[nodiscard]] int SessionLeadBeats() noexcept
@@ -77,6 +109,161 @@ namespace
   // Engine addition: the sim's own speed estimate (game seconds per real second, from the median
   // beat time) before `RATE_GameRateToSpeed` rounds it down to a whole rate step.
   std::atomic<float> gLeadSimSpeedEstimate{0.0f};
+
+  /**
+   * Engine addition (wld_SkewCorrection): how far the beat on screen is behind real time, for
+   * `CSimDriver::GetSimSpeed`. The retail driver returns 0 there, which leaves the skew correction
+   * in `WLD_GetSimRate` at 1x for good.
+   *
+   * The divergence from real time is worked out for each tick taken off the sync queue. Beats
+   * that do not advance a tick are a pause, and are not counted. Counting starts at the session's
+   * first tick on screen; the app drops the long first frame of play before it from the frame
+   * clock's window once that tick is shown (`WLD_TakeFrameClockReset`), so the ticks after it come
+   * a tick apart. In a network session, with wld_PreciseSharedStart, the count is then measured
+   * against the moment the last player's ready message left its sender, which every player times
+   * alike (`CClientManagerImpl::EstimateSharedStartUs`): tick N is due that long after it on every
+   * screen, so a player whose screen started late catches up instead of keeping the others'
+   * screens that far ahead of its own, out of the input window.
+   * Only the main thread touches it (`GetSyncData`, `GetSimSpeed`).
+   */
+  struct SkewClock
+  {
+    bool mStarted = false;
+    bool mPausedSinceTick = false;
+    std::int32_t mLastTick = 0;
+    std::int64_t mLastTickCycles = 0;
+    std::int64_t mNextLogCycles = 0;
+    float mLagMs = 0.0f;   // clamped to +/- wld_SkewMaxLag: what the correction acts on
+    float mDriftMs = 0.0f; // unclamped: what actually happened, for the log
+    bool mSharedStartPending = false; // network session: not measured against the shared start yet
+    std::int32_t mFirstTick = 0;
+    bool mCorrecting = false; // the display clock acts on it: wld_SkewCorrection, for every player of a network game
+  };
+
+  SkewClock gSkewClock;
+
+  // Ticks after the first one the shared start may still be waited for (our own ready message can
+  // leave after the first tick is on screen); past them the count stays on this client's own.
+  constexpr std::int32_t kSharedStartWaitTicks = 50;
+
+  /// A tick's length in ms at `simRate` (10 ticks a second at 0, x10 per 10 steps).
+  [[nodiscard]] float TickMs(const int simRate)
+  {
+    return 100.0f / std::pow(10.0f, static_cast<float>(simRate) * 0.1f);
+  }
+
+  /// A lag within +/- wld_SkewMaxLag: what the correction acts on.
+  [[nodiscard]] float ClampLag(const float lagMs)
+  {
+    const float maxLagMs = std::max(0.0f, wld_SkewMaxLag) * 1000.0f;
+    return std::clamp(lagMs, -maxLagMs, maxLagMs);
+  }
+
+  /// The display-clock factor `WLD_GetSimRate` makes of a lag, for the log.
+  [[nodiscard]] float SkewDisplayFactor(const float lagMs)
+  {
+    if (!gSkewClock.mCorrecting) {
+      return 1.0f;
+    }
+    const float sample = std::pow(wld_SkewRateAdjustBase, lagMs / 100.0f);
+    return std::max(1.0f / wld_SkewRateAdjustMax, std::min(wld_SkewRateAdjustMax, sample));
+  }
+
+  /// Network sessions: once the shared start is known, the tick just shown is measured against it.
+  void ApplySharedStart(SkewClock& clock, const std::int32_t tick, const int simRate, CClientManagerImpl& manager)
+  {
+    if (tick - clock.mFirstTick > kSharedStartWaitTicks) {
+      clock.mSharedStartPending = false;
+      gpg::Logf("SkewClock: no shared start by tick %d; counting from this client's first tick", tick);
+      return;
+    }
+    const std::int64_t sharedStartUs = manager.EstimateSharedStartUs(wld_SkewLog > 0);
+    if (sharedStartUs == 0) {
+      return;
+    }
+    clock.mSharedStartPending = false;
+    const std::int64_t shownUs = NET_SteadyClockMicroseconds();
+    const float tickMs = TickMs(simRate);
+    const float lagMs = static_cast<float>(shownUs - sharedStartUs) * 0.001f - static_cast<float>(tick) * tickMs;
+    clock.mLagMs = ClampLag(lagMs);
+    clock.mDriftMs = lagMs;
+    if (wld_SkewLog > 0) {
+      gpg::Logf("SkewClock: tick %d shown %+.3f s after the shared start, due at %+.3f s: lag %+.3f s", tick,
+        static_cast<float>(shownUs - sharedStartUs) * 0.000001f, static_cast<float>(tick) * tickMs * 0.001f, lagMs * 0.001f);
+    }
+  }
+
+  void LogSkewCorrection(const bool correcting, const std::int32_t tick)
+  {
+    if (wld_SkewCorrection == 0) {
+      return;
+    }
+    gpg::Logf(
+      "SkewClock: tick %d correction %s", tick,
+      correcting ? "on, every player runs it"
+                 : "waits: it needs a network game where every player announces it (net_PeerFeatures)"
+    );
+  }
+
+  void UpdateSkewClock(
+    const SSyncData& beat, const std::int64_t now, const int simRate, CClientManagerImpl* const sharedStartFrom,
+    const bool correcting
+  )
+  {
+    SkewClock& clock = gSkewClock;
+    if (clock.mStarted && correcting != clock.mCorrecting) {
+      LogSkewCorrection(correcting, beat.mCurTick);
+      // The last player without it has left: what built up while it waited is not paid back in one go.
+      if (correcting) {
+        clock.mLagMs = 0.0f;
+      }
+    }
+    clock.mCorrecting = correcting;
+    if (!beat.mAdvanced) {
+      clock.mPausedSinceTick = true;
+      return;
+    }
+
+    if (!clock.mStarted || beat.mCurTick <= clock.mLastTick) {
+      LogSkewCorrection(correcting, beat.mCurTick);
+      clock = SkewClock{};
+      clock.mCorrecting = correcting;
+      clock.mStarted = true;
+      clock.mLastTick = beat.mCurTick;
+      clock.mLastTickCycles = now;
+      clock.mNextLogCycles = now;
+      clock.mFirstTick = beat.mCurTick;
+      clock.mSharedStartPending = sharedStartFrom != nullptr;
+      if (clock.mSharedStartPending) {
+        ApplySharedStart(clock, beat.mCurTick, simRate, *sharedStartFrom);
+      } else if (wld_SkewLog > 0) {
+        gpg::Logf("SkewClock: counting from tick %d, this client's first tick on screen", beat.mCurTick);
+      }
+      return;
+    }
+
+    if (!clock.mPausedSinceTick) {
+      const float elapsedMs = gpg::time::CyclesToMilliseconds(now - clock.mLastTickCycles);
+      const float errorMs = elapsedMs - static_cast<float>(beat.mCurTick - clock.mLastTick) * TickMs(simRate);
+      clock.mLagMs = ClampLag(clock.mLagMs + errorMs);
+      clock.mDriftMs += errorMs;
+    }
+    clock.mPausedSinceTick = false;
+    clock.mLastTick = beat.mCurTick;
+    clock.mLastTickCycles = now;
+    if (clock.mSharedStartPending && sharedStartFrom != nullptr) {
+      ApplySharedStart(clock, beat.mCurTick, simRate, *sharedStartFrom);
+    }
+
+    if (wld_SkewLog > 0 && now >= clock.mNextLogCycles) {
+      gpg::Logf(
+        "SkewClock: tick %d lag %+.3f s (unclamped %+.3f s), display speed x%.3f, sim rate %d, correction %s",
+        beat.mCurTick, clock.mLagMs * 0.001f, clock.mDriftMs * 0.001f, SkewDisplayFactor(clock.mLagMs), simRate,
+        clock.mCorrecting ? "on" : "off"
+      );
+      clock.mNextLogCycles = now + gpg::time::MillisecondsToCycles(static_cast<float>(wld_SkewLog) * 1000.0f);
+    }
+  }
 
   // Sim bootstrap, from CSimDriver::ThreadCreateSim (0x0073D260).
   constexpr std::uint32_t kSimThreadTimeBarColor = 0xFFFF0000u;
@@ -101,7 +288,11 @@ namespace
 
     OSVERSIONINFOW versionInfo{};
     versionInfo.dwOSVersionInfoSize = sizeof(versionInfo);
+    // Deprecated since Windows 8.1; kept so what the /NUMA pin reads doesn't change.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     if (!GetVersionExW(&versionInfo) || versionInfo.dwPlatformId != VER_PLATFORM_WIN32_NT) {
+#pragma clang diagnostic pop
       return;
     }
     if (versionInfo.dwMajorVersion < 5) {
@@ -295,10 +486,7 @@ namespace
      */
     ~ScopedStatTimer()
     {
-      (void)::InterlockedExchangeAdd(
-        reinterpret_cast<volatile platform::InterlockedLong*>(&mStat->mPrimaryValueBits),
-        static_cast<long>(gpg::time::CyclesToMicroseconds(mTimer.ElapsedCycles()))
-      );
+      (void)mStat->AddPrimaryBits(gpg::time::CyclesToMicroseconds(mTimer.ElapsedCycles()));
     }
 
     ScopedStatTimer(const ScopedStatTimer&) = delete;
@@ -694,6 +882,9 @@ CSimDriver::CSimDriver(
 
   mClientManager->SelectEvent(mConnectionEvent);
 
+  // Engine addition (issue #275): 0 unless this client took its seat back from a save.
+  mDispatchBeat += mClientManager->RejoinSkippedBeats();
+
   mMarshaller.reset(new CMarshaller(mClientManager.get()));
   mMarshaller->SetCommandSource(mCommandSourceId);
 
@@ -798,6 +989,7 @@ void CSimDriver::PreparePendingSaveRequestLocked(boost::mutex::scoped_lock& lock
   try {
     gpg::WriteArchive* const archive = mSaveGameRequest->GetArchive();
     mSim->SaveState(archive);
+    gSimExactArchive.store(false); // engine addition (replay keyframes)
     mPendingSaveName.clear();
     mSaveRequestUsesSuggestedName = true;
   } catch (const std::exception& ex) {
@@ -807,6 +999,7 @@ void CSimDriver::PreparePendingSaveRequestLocked(boost::mutex::scoped_lock& lock
     mPendingSaveName.clear();
     mSaveRequestUsesSuggestedName = false;
   }
+  gSimExactArchive.store(false); // the throwing paths above too
   lock.lock();
 
   mWantsToSave = true;
@@ -836,6 +1029,7 @@ void CSimDriver::FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock)
   // driver lock is re-taken.
   SSyncData* syncData = nullptr;
   {
+    FAF_PROFILE_ZONE_NAMED("SyncDispatch::SimSync");
     CTimeBarSection timebar("Sim - Sync");
     if (gEngineStatSimSync == nullptr) {
       gEngineStatSimSync = GetEngineStats()->GetItem3("Sim_Sync");
@@ -848,6 +1042,11 @@ void CSimDriver::FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock)
     mSim->Sync(mActiveSyncFilter, syncData);
   }
 
+  // Engine addition (replay keyframes): the opening sync of a restored sim.
+  if (SIM_KeyframeRestore() != nullptr) {
+    SIM_FinishKeyframeRestore(*mSim);
+  }
+
   lock.lock();
 
   const int32_t currentBeat = static_cast<int32_t>(mSim->mCurBeat);
@@ -855,6 +1054,7 @@ void CSimDriver::FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock)
 
   const int32_t oldestRetainedBeat = currentBeat - 128;
   if (syncBeat >= oldestRetainedBeat && syncBeat < currentBeat) {
+    FAF_PROFILE_ZONE_NAMED("SyncDispatch::VerifyChecksum");
     const gpg::MD5Digest& expectedDigest = mSim->mSimHashes[syncBeat & 0x7F];
     if (!IsZeroDigest(expectedDigest)) {
       mMarshaller->VerifyChecksum(expectedDigest, syncBeat);
@@ -1126,6 +1326,7 @@ void CSimDriver::ThreadCreateSim()
   // driver in Failed below (std::exception, FuncInfo 0x00F29740 try state 0,
   // handler 0x0073D4C7).
   try {
+    const CZipFileReadScope archives;
     mSim.reset(Sim_Create_exxt(boost::SharedPtrRawFromSharedBorrow(mLaunchInfo)));
   } catch (const std::exception& error) {
     gpg::Logf("Sim::Create() crashed: %s", error.what());
@@ -1228,20 +1429,27 @@ void CSimDriver::ThreadRun()
     gpg::Debugf("ISSUE: thread running.");
   }
 
+  sAdaptiveLagExtraMs = 0.0f;
+  sAdaptiveLastBeat = -1;
+
   while (!mStopSimThread) {
     mClientManager->DoBeat();
+
+    // Engine addition (issue #275): a client catching up issues nothing, and
+    // then goes on from the beat the recording reached.
+    const bool holdIssue = mClientManager->RejoinHoldsIssue(mNextIssueBeat);
 
     int waitMilliseconds = kIssueThreadIdleWaitMs;
     const std::int64_t now = mTimer.ElapsedCycles();
 
     // Nothing is issued until the sim has published at least one sync, every
     // outstanding request has been answered, and the sync queue has room.
-    if (mLastSyncCycleTime != 0 && mOutstandingRequests == 0
+    if (!holdIssue && mLastSyncCycleTime != 0 && mOutstandingRequests == 0
         && mSyncDataQueue.Size() < kMaxQueuedSyncPacketsBeforeStalling) {
       int lastBeatToIssue = mNextIssueBeat - 1;
       const int beatCeiling = mLastDequeuedBeat + kMaxBeatsAheadOfExecuted;
 
-      if (mSimBusy) {
+      if (mSimBusy && !gIssueWhilePaused.load(std::memory_order_relaxed)) {
         int partiallyQueuedBeat = 0;
         mClientManager->GetPartiallyQueuedBeat(partiallyQueuedBeat);
 
@@ -1261,6 +1469,9 @@ void CSimDriver::ThreadRun()
         } else {
           lastBeatToIssue = std::min(partiallyQueuedBeat, beatCeiling);
         }
+      } else if (gReplayFastForward.load(std::memory_order_relaxed)) {
+        // Engine addition (replay timeline): as fast as the sim takes them; the queue cap above still holds.
+        lastBeatToIssue = std::max(lastBeatToIssue, mLastDequeuedBeat + kFastForwardLeadBeats);
       } else if (const int leadBeats = SessionLeadBeats(); leadBeats > 0 && sim_LeadOnSchedule == 0) {
         // Engine addition (sim_ReplayLead / sim_LocalLead): outside network sessions, keep
         // `leadBeats` beats issued past the last one the main thread dequeued, so the sim works on
@@ -1304,7 +1515,7 @@ void CSimDriver::ThreadRun()
         const float simRateScale = msvc8::pow(10.0f, static_cast<float>(mClientManager->GetSimRate()) * 0.1f);
         const float millisecondsPerBeat = (0.1f / simRateScale) * 1000.0f;
         const float leadMilliseconds =
-          static_cast<float>(mNextIssueBeat - pacedBeat) * millisecondsPerBeat - net_Lag;
+          static_cast<float>(mNextIssueBeat - pacedBeat) * millisecondsPerBeat - net_Lag - sAdaptiveLagExtraMs;
         const std::int64_t dueAt = mLastSyncCycleTime + gpg::time::MillisecondsToCycles(leadMilliseconds);
 
         if (dueAt >= now) {
@@ -1334,6 +1545,11 @@ void CSimDriver::ThreadRun()
       }
 
       if (lastBeatToIssue >= mNextIssueBeat) {
+        if (net_LogShownBeatMs > 0) {
+          for (int beat = mNextIssueBeat; beat <= lastBeatToIssue; ++beat) {
+            sIssuedAt[beat % kIssuedAtSlots] = now;
+          }
+        }
         mMarshaller->AdvanceBeat(lastBeatToIssue - mNextIssueBeat + 1);
         mNextIssueBeat = lastBeatToIssue + 1;
         mFirstCommandCycleTime = 0;
@@ -1386,7 +1602,7 @@ void CSimDriver::Dispatch()
   boost::mutex::scoped_lock lock(mLock);
 
   if (mWantsToSave) {
-    CSaveGameRequestImpl* request = mSaveGameRequest;
+    ISaveRequest* request = mSaveGameRequest;
     SSaveGameDispatchData data{};
     data.useSuggestedName = mSaveRequestUsesSuggestedName;
     data.saveName = mPendingSaveName;
@@ -1484,7 +1700,70 @@ void CSimDriver::GetSyncData(SSyncData*& outSyncData)
   // (FUN_0073F9C0) is preserved at the source-level callsite.
   outSyncData = PopFrontSSyncDataPtrDeque(mSyncDataQueue);
   if (outSyncData) {
-    mLastDequeuedBeat = outSyncData->mCurBeat;
+    mLastDequeuedBeat = outSyncData->mCurBeat - gSimBeatOrigin.load(std::memory_order_relaxed);
+    // Engine addition, off by default: net_Lag follows the pauses this player sees, up to net_AdaptiveLagMax.
+    if (net_AdaptiveLagMax > 0) {
+      const std::int64_t takenAt = mTimer.ElapsedCycles();
+      if (sAdaptiveLastBeat >= 0 && mLastDequeuedBeat > sAdaptiveLastBeat) {
+        const float simRateScale = msvc8::pow(10.0f, static_cast<float>(mClientManager->GetSimRate()) * 0.1f);
+        const float millisecondsPerBeat = (0.1f / simRateScale) * 1000.0f;
+        const float gap = gpg::time::CyclesToMilliseconds(takenAt - sAdaptiveLastAt);
+        const float room = static_cast<float>(net_AdaptiveLagMax) - net_Lag;
+        const float before = sAdaptiveLagExtraMs;
+        const float sinceChange = gpg::time::CyclesToMilliseconds(takenAt - sAdaptiveChangedAt);
+        const bool pause = mLastDequeuedBeat >= kAdaptiveLagFirstBeat && gap >= millisecondsPerBeat + kAdaptivePauseOverBeatMs;
+        if (pause && sAdaptiveLagExtraMs > 0.0f && sinceChange < kAdaptiveLagRiseEveryMs) {
+          // A burst of pauses is one event: a spike on the machine doesn't take it to the top at once.
+        } else if (pause) {
+          sAdaptiveLagExtraMs = std::min(sAdaptiveLagExtraMs + kAdaptiveLagStepMs, std::max(room, 0.0f));
+          sAdaptiveChangedAt = takenAt;
+        } else if (sAdaptiveLagExtraMs > 0.0f && sinceChange >= kAdaptiveLagHoldMs) {
+          sAdaptiveLagExtraMs = std::max(sAdaptiveLagExtraMs - kAdaptiveLagStepMs, 0.0f);
+          sAdaptiveChangedAt = takenAt - gpg::time::MillisecondsToCycles(kAdaptiveLagHoldMs - kAdaptiveLagDecayEveryMs);
+        }
+        if (sAdaptiveLagExtraMs != before) {
+          gpg::Logf("NET: beat %d, net_Lag follows pauses: %.0f ms", mLastDequeuedBeat, net_Lag + sAdaptiveLagExtraMs);
+        }
+      }
+      sAdaptiveLastBeat = mLastDequeuedBeat;
+      sAdaptiveLastAt = takenAt;
+    }
+    // Engine addition, off by default: the pause a player sees between beats.
+    if (net_LogShownBeatMs > 0) {
+      static int sLastShownBeat = -1;
+      static std::int64_t sLastShownAt = 0;
+      const std::int64_t shownAt = mTimer.ElapsedCycles();
+      if (sLastShownBeat >= 0 && mLastDequeuedBeat > sLastShownBeat) {
+        const float shownAfter = gpg::time::CyclesToMilliseconds(shownAt - sLastShownAt);
+        if (shownAfter >= static_cast<float>(net_LogShownBeatMs)) {
+          gpg::Logf("NET: beat %d shown %.0f ms after beat %d", mLastDequeuedBeat, shownAfter, sLastShownBeat);
+        }
+      }
+      sLastShownBeat = mLastDequeuedBeat;
+      sLastShownAt = shownAt;
+
+      // How long a beat, and an order placed just before it closed, took from issue to the player's screen.
+      static float sIssueToShownSum = 0.0f;
+      static float sIssueToShownMax = 0.0f;
+      static int sIssueToShownBeats = 0;
+      const std::int64_t issuedAt = mLastDequeuedBeat >= 0 ? sIssuedAt[mLastDequeuedBeat % kIssuedAtSlots] : 0;
+      if (issuedAt != 0 && shownAt >= issuedAt) {
+        const float issueToShown = gpg::time::CyclesToMilliseconds(shownAt - issuedAt);
+        sIssueToShownSum += issueToShown;
+        sIssueToShownMax = std::max(sIssueToShownMax, issueToShown);
+        if (++sIssueToShownBeats >= kIssueToShownLogBeats) {
+          gpg::Logf(
+            "NET: beats to beat %d shown %.0f ms after issue on average, %.0f at most",
+            mLastDequeuedBeat,
+            sIssueToShownSum / static_cast<float>(sIssueToShownBeats),
+            sIssueToShownMax
+          );
+          sIssueToShownSum = 0.0f;
+          sIssueToShownMax = 0.0f;
+          sIssueToShownBeats = 0;
+        }
+      }
+    }
   }
 
   mLastSyncCycleTime = mTimer.ElapsedCycles();
@@ -1495,15 +1774,45 @@ void CSimDriver::GetSyncData(SSyncData*& outSyncData)
   if (mSyncDataQueue.Empty() && mSyncDataAvailableEvent) {
     ResetEvent(mSyncDataAvailableEvent);
   }
+
+  // Engine addition (wld_SkewCorrection): outside the driver lock, since the sim rate takes the
+  // client manager's.
+  const std::int64_t dequeuedAt = mLastSyncCycleTime;
+  lock.unlock();
+  if (wld_SkewCorrection == 0 && wld_SkewLog <= 0) {
+    gSkewClock.mStarted = false;
+  } else if (outSyncData) {
+    // The shared start is measured against, and the display clock corrected, in network sessions
+    // only: a paused replay issues no beats, so its pause would read as lag, and a lead-paced
+    // session's display follows the sim's measured speed, not the rate this clock counts by. The
+    // correction only pays off when every player runs it, so it asks them (docs/PEER_FEATURES.md).
+    const bool network = gDriverSessionPacing.load(std::memory_order_relaxed) == ESimSessionPacing::Network;
+    bool correcting = false;
+    if (network && wld_SkewCorrection != 0) {
+      std::scoped_lock managerLock(mClientManager->mLock);
+      correcting = mClientManager->mPeerFeatures->EveryoneSupports(*mClientManager, EPeerFeature::SkewCorrection);
+    }
+    CClientManagerImpl* const sharedStartFrom = network && wld_PreciseSharedStart != 0 ? mClientManager.get() : nullptr;
+    UpdateSkewClock(*outSyncData, dequeuedAt, mClientManager->GetSimRate(), sharedStartFrom, correcting);
+  }
 }
 
 /**
  * Address: 0x0073C630 (FUN_0073C630), ISTIDriver slot 11
  * Returns the driver sim-speed metric (retail implementation returns 0.0).
+ *
+ * Engine addition (wld_SkewCorrection): with the switch on in a network game where every player
+ * announces it, the skew of the beat on screen in beats, positive when ahead of real time.
+ * `WLD_GetSimRate` turns it into a display-clock factor of `wld_SkewRateAdjustBase^-skew`, capped at
+ * `wld_SkewRateAdjustMax`, so a session behind real time runs slightly fast until it has caught up,
+ * and one ahead slightly slow.
  */
 double CSimDriver::GetSimSpeed()
 {
-  return 0.0;
+  if (wld_SkewCorrection == 0 || !gSkewClock.mStarted || !gSkewClock.mCorrecting) {
+    return 0.0;
+  }
+  return -static_cast<double>(gSkewClock.mLagMs) / 100.0;
 }
 
 /**
@@ -1835,7 +2144,7 @@ void CSimDriver::ReleaseInterlockRef()
  * Address: 0x0073DF60 (FUN_0073DF60), ISTIDriver slot 38
  * Queues a save-game request and wakes dispatch waiters.
  */
-void CSimDriver::RequestSaveGame(CSaveGameRequestImpl* request)
+void CSimDriver::RequestSaveGame(ISaveRequest* request)
 {
   boost::mutex::scoped_lock lock(mLock);
   mSaveGameRequest = request;
@@ -1904,15 +2213,56 @@ ISTIDriver* moho::SIM_CreateDriver(
 {
   msvc8::auto_ptr<CClientManagerImpl> clientOwner(clientManager);
   msvc8::auto_ptr<gpg::Stream> streamOwner(stream);
+  gSkewClock = SkewClock{};
   return new CSimDriver(streamOwner, clientOwner, launchInfo, commandSourceId);
 }
 
 int moho::sim_ReplayLead = 10;
 int moho::sim_LocalLead = 2;
 int moho::sim_LeadOnSchedule = 1;
+int moho::wld_SkewCorrection = 0;
+float moho::wld_SkewMaxLag = 2.0f;
+int moho::wld_SkewLog = 0;
+int moho::wld_PreciseSharedStart = 1;
+int moho::wld_ReadyAfterFirstFrame = 1;
 
 namespace
 {
+  TConVar<int> gTConVar_wld_SkewCorrection(
+    "wld_SkewCorrection",
+    "1 feeds the beat on screen's skew from real time to the display clock's skew correction "
+    "(wld_SkewRateAdjustBase per beat, capped at wld_SkewRateAdjustMax), so a session that fell "
+    "behind catches up and one ahead waits; 0 = original (no correction).",
+    &moho::wld_SkewCorrection
+  );
+
+  TConVar<float> gTConVar_wld_SkewMaxLag(
+    "wld_SkewMaxLag",
+    "Most real time, in seconds, the skew correction will try to make up (or give back when ahead).",
+    &moho::wld_SkewMaxLag
+  );
+
+  TConVar<int> gTConVar_wld_SkewLog(
+    "wld_SkewLog",
+    "Log the session's drift from real time every this many seconds (0 = off).",
+    &moho::wld_SkewLog
+  );
+
+  TConVar<int> gTConVar_wld_PreciseSharedStart(
+    "wld_PreciseSharedStart",
+    "Network sessions: the skew is counted from the moment the last player's ready message left its sender, the "
+    "same on every screen (1, the default), or from this client's own first tick on screen (0). Read when the first "
+    "tick is shown.",
+    &moho::wld_PreciseSharedStart
+  );
+
+  TConVar<int> gTConVar_wld_ReadyAfterFirstFrame(
+    "wld_ReadyAfterFirstFrame",
+    "1 sends this client's ready message once the first frame of the game interface is drawn; 0 sends it before that "
+    "frame, as the original does.",
+    &moho::wld_ReadyAfterFirstFrame
+  );
+
   TConVar<int> gTConVar_sim_ReplayLead(
     "sim_ReplayLead",
     "Replays only: beats the sim may compute ahead of the beat on screen (0 = original pacing, "
@@ -1935,6 +2285,11 @@ namespace
   );
 } // namespace
 
+void moho::SIM_SetIssueWhilePaused(const bool issue) noexcept
+{
+  gIssueWhilePaused.store(issue, std::memory_order_relaxed);
+}
+
 void moho::SIM_SetSessionPacing(const ESimSessionPacing pacing) noexcept
 {
   gDriverSessionPacing.store(pacing, std::memory_order_relaxed);
@@ -1944,6 +2299,11 @@ void moho::SIM_SetSessionPacing(const ESimSessionPacing pacing) noexcept
 moho::ESimSessionPacing moho::SIM_GetSessionPacing() noexcept
 {
   return gDriverSessionPacing.load(std::memory_order_relaxed);
+}
+
+float moho::SIM_GetMeasuredGameRate() noexcept
+{
+  return gLeadSimSpeedEstimate.load(std::memory_order_relaxed);
 }
 
 float moho::SIM_GetLeadSimSpeedEstimate() noexcept

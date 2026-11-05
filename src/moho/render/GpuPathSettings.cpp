@@ -7,6 +7,7 @@
 #include "gpg/gal/PipelineDiskCache.h"
 #include "gpg/gal/PlacedResources.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
+#include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "moho/console/CConCommand.h"
 
@@ -35,12 +36,53 @@ namespace moho
       &gpg::gal::gPlacedResources
     );
 
+    /** Engine addition: `d3d_SharedBuffers` (see gpg/gal/PlacedResources.h). */
+    TConVar<bool> gTConVar_d3d_SharedBuffers(
+      "d3d_SharedBuffers",
+      "Direct3D 12: small static buffers sit at offsets inside large buffers (1, the default), or each takes at "
+      "least 64 KB of a heap (0). Needs d3d_PlacedResources. Read at each creation.",
+      &gpg::gal::gSharedBuffers
+    );
+
+    /** Engine addition: `ren_LockedRangeOnly` (see gpg/gal/PlacedResources.h). */
+    TConVar<bool> gTConVar_ren_LockedRangeOnly(
+      "ren_LockedRangeOnly",
+      "Direct3D 12 / Vulkan: a dynamic buffer whose owner reads only what it just wrote copies only those bytes when "
+      "it is renamed (1, the default), or copies all of it (0). Read at each unlock.",
+      &gpg::gal::gLockedRangeOnly
+    );
+
+    /** Engine addition: `ren_ReleaseBufferCopies` (see gpg/gal/PlacedResources.h). */
+    TConVar<bool> gTConVar_ren_ReleaseBufferCopies(
+      "ren_ReleaseBufferCopies",
+      "Direct3D 12 / Vulkan: free the CPU copy of a static buffer its owner won't lock again, such as a mesh's (1, the "
+      "default), or keep every copy (0). Read when the owner releases it.",
+      &gpg::gal::gReleaseBufferCopies
+    );
+
+    /** Engine addition: `d3d_UploadIdleMB` (see gpg/gal/PlacedResources.h). */
+    TConVar<int> gTConVar_d3d_UploadIdleMB(
+      "d3d_UploadIdleMB",
+      "Direct3D 12: megabytes of idle upload pages kept for reuse; past it they are given back. Each page is 8 MB of "
+      "committed process memory. Read at each retire.",
+      &gpg::gal::gUploadIdleMB
+    );
+
     /** Engine addition: `ren_DdsDirectLoad` (see gpg/gal/backends/common/ImageCodec.h). */
     TConVar<bool> gTConVar_ren_DdsDirectLoad(
       "ren_DdsDirectLoad",
       "Direct3D 12 / Vulkan: read DXT1/3/5 DDS textures straight from the file (1, the default) instead of decoding "
       "every texture through D3DX11 on a software device (0), which takes 25-45 ms per 1024x1024 texture.",
       &gpg::gal::imaging::gDdsDirectLoad
+    );
+
+    /** Engine addition: `ren_EffectFastScan` (see gpg/gal/backends/d3d11/EffectSourceD3D11.h). */
+    TConVar<bool> gTConVar_ren_EffectFastScan(
+      "ren_EffectFastScan",
+      "Read effect source with plain scans (1, the default) or with the std::regex searches they replaced (0), which "
+      "took about half of the time from process start to the lobby; same result. /fxregex turns it off at startup. "
+      "Read when an effect is created.",
+      &gpg::gal::d3d11::gEffectFastScan
     );
 
     /** Engine addition: `ren_BackgroundShaders` (see EffectProgram::PrepareInBackground). */
@@ -70,6 +112,7 @@ namespace moho
   extern int ren_GpuProjectileIcons;
   extern int ren_GpuShapes;
   extern int ren_GpuRanges;
+  extern int ren_GpuText;
 
   namespace
   {
@@ -92,6 +135,7 @@ namespace moho
        gpg::gal::kGpuFeatureVertexPulling},
       {"ren_GpuShapes", &ren_GpuShapes, gpg::gal::kGpuPathWorldShapes, gpg::gal::kGpuFeatureVertexPulling},
       {"ren_GpuRanges", &ren_GpuRanges, gpg::gal::kGpuPathRanges, gpg::gal::kGpuFeatureVertexPulling},
+      {"ren_GpuText", &ren_GpuText, gpg::gal::kGpuPathMsdfText, gpg::gal::kGpuFeatureVertexPulling},
     };
   } // namespace
 

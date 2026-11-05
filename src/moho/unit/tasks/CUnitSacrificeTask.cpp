@@ -78,37 +78,6 @@ namespace
     return (cost > 0.0f) ? (value / cost) : kUnknownCostFraction;
   }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    gpg::RType* type = moho::WeakPtr<moho::Unit>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-      moho::WeakPtr<moho::Unit>::sType = type;
-    }
-    return type;
-  }
-
-  void WakeTaskThreadForImmediateTick(moho::CTaskThread* const ownerThread)
-  {
-    if (ownerThread == nullptr) {
-      return;
-    }
-
-    ownerThread->mPendingFrames = 0;
-    if (ownerThread->mStaged) {
-      ownerThread->Unstage();
-    }
-  }
 } // namespace
 
 namespace moho
@@ -230,7 +199,7 @@ namespace moho
 
     mTargetUnit.Set(commandTargetUnit);
     mTaskState = TASKSTATE_Preparing;
-    WakeTaskThreadForImmediateTick(mOwnerThread);
+    moho::WakeTaskThreadForImmediateTick(mOwnerThread);
   }
 
   /**
@@ -247,9 +216,9 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), ownerRef);
     archive->ReadPointer(&mCommand, &ownerRef);
-    archive->Read(CachedWeakPtrUnitType(), &mTargetUnit, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTargetUnit, ownerRef);
   }
 
   /**
@@ -266,11 +235,11 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
 
     archive->WritePointer<moho::CUnitCommand>(mCommand, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedWeakPtrUnitType(), &mTargetUnit, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTargetUnit, ownerRef);
   }
 
   /**
@@ -469,14 +438,6 @@ namespace moho
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCUnitSacrificeTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitSacrificeTask));
-    }
-    return cached;
-  }
 
   /**
    * Address: 0x005FB0D0 (FUN_005FB0D0, Moho::CUnitSacrificeTaskSerializer::Deserialize)
@@ -487,7 +448,7 @@ namespace
    * (FUN_005FF2C0 body); `version` and the owner-ref lane are unused by the
    * member (mirrors the binary tail call).
    */
-  void DeserializeCUnitSacrificeTaskSerializerCallback(
+  [[maybe_unused]] void DeserializeCUnitSacrificeTaskSerializerCallback(
     gpg::ReadArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -510,7 +471,7 @@ namespace
    * (FUN_005FF360 body); `version` and the owner-ref lane are unused by the
    * member (mirrors the binary tail call).
    */
-  void SerializeCUnitSacrificeTaskSerializerCallback(
+  [[maybe_unused]] void SerializeCUnitSacrificeTaskSerializerCallback(
     gpg::WriteArchive* const archive,
     const std::intptr_t objectPtr,
     const int,

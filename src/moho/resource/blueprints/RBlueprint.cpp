@@ -19,15 +19,6 @@ namespace
 {
   using TypeInfo = moho::RBlueprintTypeInfo;
 
-  [[nodiscard]] gpg::RType* CachedRObjectType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(gpg::RObject));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x00BF23C0 (FUN_00BF23C0, atexit destructor of the
    *   RBlueprintTypeInfo object)
@@ -230,14 +221,7 @@ namespace moho
 */
 void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
 {
-  gpg::RType* const rObjectType = CachedRObjectType();
-  gpg::RField baseField{};
-  baseField.mName = rObjectType->GetName();
-  baseField.mType = rObjectType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBase<gpg::RObject>(typeInfo);
 }
 
 /**

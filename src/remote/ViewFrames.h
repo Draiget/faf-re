@@ -9,6 +9,7 @@
 
 #include "remote/FrameBuilder.h"
 #include "remote/ViewIdMap.h"
+#include "remote/ViewJobs.h"
 #include "gpg/core/containers/ChunkedVector.h"
 #include "remote/ViewPackets.h"
 #include "remote/VisibilityOracle.h"
@@ -26,6 +27,11 @@
 // With `EnableIdMaps` (plan WP5.9) every frame then goes through its view's `CViewIdMap`: blips,
 // foreign projectiles and foreign command ids are renumbered per view. Off until inbound
 // translation (WP5.10) exists, because a client would otherwise send back ids the sim lacks.
+
+namespace moho
+{
+  class EntityDB;
+}
 
 namespace faf::remote
 {
@@ -71,10 +77,23 @@ namespace faf::remote
       SetSharedRecords(&mSharedRecords);
     }
     [[nodiscard]] bool HeldFramesOn() const noexcept { return mHeldOn; }
+    /**
+     * Plan WPR.35, with `EnableHeldFrames` and without its check: what's left of a view's beat once
+     * its records are applied doesn't read the sim, so `threads` threads do it while the sim goes on
+     * to its next beat. `FinishViews` waits for it; a new beat's views do so first. Frames and bytes
+     * stay the same; whatever reads them (`HeldCount`, `EncodeHeldFrame`) must wait, or be in
+     * `OnViewReady`.
+     */
+    void EnablePipeline(unsigned int threads);
+    [[nodiscard]] bool PipelineOn() const noexcept { return mJobs != nullptr; }
+    /** Waits for the last beat's view work. Returns the seconds waited. */
+    double FinishViews();
     /** The records in `army`'s last frame (with `EnableHeldFrames`). */
     [[nodiscard]] std::size_t HeldCount(const std::int32_t army) const { return mHeld[static_cast<std::size_t>(army)].count; }
     /** `army`'s last frame against the one before, as `wire::EncodeFrame` writes it. */
     [[nodiscard]] bool EncodeHeldFrame(std::int32_t army, wire::BitWriter& writer) const;
+    /** `simId` as `view`'s client knows it, for an id written outside its frames (plan WP6.10). */
+    [[nodiscard]] std::uint32_t ViewEntityId(std::size_t view, std::uint32_t simId);
     /** Differences the check found (should stay 0). */
     [[nodiscard]] std::uint64_t HeldMismatches() const noexcept;
 
@@ -84,8 +103,21 @@ namespace faf::remote
   protected:
     void OnViewPackets(moho::Sim& sim) override;
 
-    /** The views' frames of a sealed beat are ready (`Frame`). */
+    /**
+     * The views' frames of a sealed beat are ready (`Frame`). With a pipeline they are not yet:
+     * this is the last call of the beat that may read the sim, and the frames come later.
+     */
     virtual void OnViewFrames(moho::Sim& sim) { (void)sim; }
+    /** With a pipeline, on one of its threads: `army`'s frame is ready. Must not read the sim. */
+    virtual void OnViewReady(const std::size_t army) { (void)army; }
+    /** With a pipeline, on the sim thread: every view's `OnViewReady` of the last beat is over. */
+    virtual void OnViewsFinished() {}
+
+    void OnBeatStarting() override { (void)FinishViews(); }
+    /** The beat `OnViewPackets` last handled. */
+    [[nodiscard]] std::uint32_t ViewBeat() const noexcept { return mViewBeat; }
+    /** How long the sim thread waited for the last beat's view work (in `OnViewsFinished`). */
+    [[nodiscard]] double ViewWaitSeconds() const noexcept { return mViewWaitSeconds; }
 
   private:
     /** One view's frame kept between beats, and what its last beat changed. */
@@ -98,6 +130,8 @@ namespace faf::remote
       std::vector<std::uint8_t> sent;           // per slot: the client holds a record
       std::vector<std::uint8_t> keep;           // per slot: in this beat's frame
       std::vector<std::uint64_t> references;    // per slot: a filter of the sim ids the record names
+      std::vector<std::uint32_t> referrers;     // the slots with a filter, and some that no longer have one
+      std::vector<std::uint8_t> isReferrer;     // per slot: in `referrers`
       std::size_t count = 0;
       std::uint32_t frameId = 0;
       std::uint32_t baselineId = wire::kNoBaseline;
@@ -114,12 +148,22 @@ namespace faf::remote
       std::uint64_t mismatches = 0;
     };
 
-    /** The view's frame from its packet, keeping what did not change (`EnableHeldFrames`). */
-    void BuildHeldFrame(moho::Sim& sim, std::size_t army, const moho::SSyncData& packet);
+    /** This beat's `mEntityIndex` from last beat's and the change set; false if that isn't the sim's entities. */
+    [[nodiscard]] bool AdvanceEntityIndex(const moho::EntityDB& database);
+    /** This beat's `mEntityIndex` from the sim's entity map. */
+    void WalkEntityIndex(const moho::EntityDB& database);
+    /** Whether the view of `viewBit` keeps `id`'s record: yes for an id with no entity (an orphan). */
+    [[nodiscard]] bool KeptByView(std::uint32_t id, std::uint32_t viewBit) const;
+    /** The view's frame from its packet, keeping what did not change (`EnableHeldFrames`). Reads the sim. */
+    void ApplyHeldFrame(moho::Sim& sim, std::size_t army, const moho::SSyncData& packet);
+    /** The rest of that, from what the view keeps. Doesn't read the sim, without the check. */
+    void FinishHeldFrame(std::size_t army, const moho::SSyncData& packet);
+    /** The part of a view's beat `FinishHeldFrame` is, and the ids that retire. */
+    void FinishFrame(std::size_t army);
     /** Compares the held frame with the whole frame built from the same world. */
     void CheckHeldFrame(moho::Sim& sim, std::size_t army, const CViewIdMap::OwnCommandTest& isOwnCommand);
     /** The retirements of a beat before ids are translated, on `map`. */
-    void AdvanceIdMap(moho::Sim& sim, std::size_t army, CViewIdMap& map);
+    void AdvanceIdMap(std::size_t army, CViewIdMap& map);
     /** References to entities `frame` does not hold become the sim's "none" (plan WP5.12). */
     static void ClearUnheldReferences(wire::SViewFrame& frame);
 
@@ -135,10 +179,47 @@ namespace faf::remote
     std::vector<bool> mHavePrevious; // per view: mPreviousFrames holds a frame (written on the sim thread only)
     std::vector<bool> mBuilt;        // per view: mFrames holds a built frame (likewise)
     std::vector<std::uint32_t> mWithheld;
-    std::vector<std::pair<std::uint32_t, SEntityFacts>> mEntityIndex; // the sim's entities by id, this beat
-    std::vector<moho::Entity*> mEntityPointers;                       // the same entities, while their facts are read
+    /** One of the sim's entities this beat: its id and the views that keep it (`ViewsThatSee`). */
+    struct SEntityKeep
+    {
+      std::uint32_t id;
+      std::uint32_t views;
+      bool readEveryBeat; // the answer depends on more than the entity (`ViewsFollowFactsAlone`)
+      bool leaving;       // in its destroy pass when last read: the sim may have let go of it since
+    };
+    std::vector<SEntityKeep> mEntityIndex;          // the sim's entities by id, this beat
+    std::vector<moho::Entity*> mEntityPointers;     // the same entities
+    std::vector<SEntityKeep> mLastEntityIndex;      // and last beat
+    std::vector<moho::Entity*> mLastEntityPointers;
+    /** An entry of `mEntityIndex` whose answer is worked out this beat. */
+    struct SEntityRead
+    {
+      std::uint32_t entry;
+      std::uint32_t changed; // its index in `Entities()`, whose facts were read this beat, or `kNotChanged`
+    };
+    static constexpr std::uint32_t kNotChanged = 0xFFFFFFFFu;
+    /** A sim id some view's answer changed for since last beat. No entity: every view keeps its record. */
+    struct SKeepChange
+    {
+      std::uint32_t id;
+      std::uint32_t views;   // who keeps it now
+      std::uint32_t changed; // whose answer changed
+    };
+    std::vector<SEntityRead> mEntityReads;
+    std::vector<std::uint32_t> mLeavingEntities; // ids of `SEntityKeep::leaving`
+    std::vector<std::uint32_t> mGoneEntities;    // those no longer in the sim, this beat
+    std::vector<SKeepChange> mKeepChanges;
+    std::uint64_t mEntityIndexMismatches = 0;       // the check: answers kept that a read would change
+    std::vector<std::uint32_t> mLiveCommands;     // the sim's commands by id, this beat
+    std::vector<std::uint32_t> mLastCommands;     // and last beat
+    std::vector<std::uint32_t> mReleasedCommands; // last beat's that are gone
     bool mIdMapsOn = false;
     moho::Sim* mLastSim = nullptr;
+    std::uint32_t mViewBeat = 0;
+    bool mHaveCommands = false;
+    bool mJobsPending = false;
+    double mViewWaitSeconds = 0.0;
+    std::unique_ptr<CViewJobs> mJobs;
     std::vector<std::unique_ptr<CViewIdMap>> mIdMaps;
     std::vector<std::unordered_set<std::uint32_t>> mRetiring; // per view: deleted or erased, still held
     std::vector<std::vector<std::uint32_t>> mRetired;         // per view: no longer held; retired next beat

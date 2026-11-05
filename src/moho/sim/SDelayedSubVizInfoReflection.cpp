@@ -34,15 +34,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3<float>));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x00508270 (FUN_00508270, delayed-sub-viz RTTI cache resolve)
    */
@@ -109,7 +100,7 @@ namespace
   /**
    * Address: 0x00508E90 (FUN_00508E90, delayed-sub-viz typed read helper duplicate)
    */
-  void ReadDelayedSubVizInfoViaRTypeVariant2(
+  [[maybe_unused]] void ReadDelayedSubVizInfoViaRTypeVariant2(
     gpg::ReadArchive* const archive, void* const object, const gpg::RRef* const ownerRef
   )
   {
@@ -133,7 +124,7 @@ namespace
   /**
    * Address: 0x00508EC0 (FUN_00508EC0, delayed-sub-viz typed write helper duplicate)
    */
-  void WriteDelayedSubVizInfoViaRTypeVariant2(
+  [[maybe_unused]] void WriteDelayedSubVizInfoViaRTypeVariant2(
     gpg::WriteArchive* const archive, const void* const object, const gpg::RRef* const ownerRef
   )
   {
@@ -143,7 +134,7 @@ namespace
   /**
    * Address: 0x00508AD0 (FUN_00508AD0, delayed-sub-viz RRef fill helper)
    */
-  gpg::RRef* FillDelayedSubVizRef(
+  [[maybe_unused]] gpg::RRef* FillDelayedSubVizRef(
     moho::SDelayedSubVizInfo* const value, gpg::RRef* const outRef
   )
   {
@@ -285,7 +276,7 @@ namespace moho
       return;
     }
 
-    gpg::RType* const vector3Type = ResolveVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3<float>>();
     gpg::RRef ownerRef{};
     archive->Read(vector3Type, &mLastPos, ownerRef);
     archive->ReadFloat(&mRadius);
@@ -302,7 +293,7 @@ namespace moho
       return;
     }
 
-    gpg::RType* const vector3Type = ResolveVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3<float>>();
     gpg::RRef ownerRef{};
     archive->Write(vector3Type, &mLastPos, ownerRef);
     archive->WriteFloat(mRadius);

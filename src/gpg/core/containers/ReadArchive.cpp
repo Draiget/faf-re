@@ -114,44 +114,6 @@ namespace
     return type ? type->GetName() : "null";
   }
 
-  [[nodiscard]] gpg::RType* CachedCSndParamsType2()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CSndParams));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedRUnitBlueprintType2()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RUnitBlueprint));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCParticleTextureType()
-  {
-    gpg::RType* type = moho::CParticleTexture::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CParticleTexture));
-      moho::CParticleTexture::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedIFormationInstanceType()
-  {
-    gpg::RType* type = moho::IFormationInstance::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::IFormationInstance));
-      moho::IFormationInstance::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RType* CachedListenerNavPathType()
   {
     static gpg::RType* cached = nullptr;
@@ -195,7 +157,7 @@ namespace
    */
   [[nodiscard]] moho::CParticleTexture* UpcastToCParticleTexture(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCParticleTextureType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::CParticleTexture>());
     return static_cast<moho::CParticleTexture*>(upcast.mObj);
   }
 
@@ -625,7 +587,7 @@ namespace
    * Runs one deleting-destructor thunk for `BinaryReadArchive`, forwarding
    * through non-deleting teardown and optional storage release.
    */
-  [[nodiscard]] BinaryReadArchive* DestroyBinaryReadArchiveDeleting(
+  [[maybe_unused]] [[nodiscard]] BinaryReadArchive* DestroyBinaryReadArchiveDeleting(
     BinaryReadArchive* const archive,
     const unsigned char deleteFlag
   )
@@ -1161,7 +1123,7 @@ ReadArchive* ReadArchive::ReadPointer_CParticleTexture(
 
   *outValue = UpcastToCParticleTexture(source);
   if (!*outValue) {
-    const char* const expectedName = SafeTypeName(CachedCParticleTextureType());
+    const char* const expectedName = SafeTypeName(gpg::RTypeOf<moho::CParticleTexture>());
     const char* const actualName = source.GetTypeName();
     ThrowSerializationError(STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
@@ -1286,10 +1248,10 @@ ReadArchive* ReadArchive::ReadPointerWeak_IFormationInstance(
   source.mObj = tracked.object;
   source.mType = tracked.type;
 
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIFormationInstanceType());
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::IFormationInstance>());
   *outValue = static_cast<moho::IFormationInstance*>(upcast.mObj);
   if (!*outValue) {
-    const char* const expectedName = SafeTypeName(CachedIFormationInstanceType());
+    const char* const expectedName = SafeTypeName(gpg::RTypeOf<moho::IFormationInstance>());
     const char* const actualName = source.GetTypeName();
     ThrowSerializationError(STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "

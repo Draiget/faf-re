@@ -100,6 +100,12 @@ namespace moho
     virtual void NoteOrdersDiffer(
       const msvc8::string& sender, const msvc8::string& reporter, bool selfReport, bool stopped
     );
+
+    /**
+     * Engine addition (issue #275): a launcher asked (`/rejoinoffer`), and this client could
+     * come back to this game. `seats` is `playerId=source,...`. No-op in the base.
+     */
+    virtual void NoteRejoinOffer(const msvc8::string& localSource, const msvc8::string& seats);
   };
 
   /**
@@ -159,6 +165,8 @@ namespace moho
     void NoteOrdersDiffer(
       const msvc8::string& sender, const msvc8::string& reporter, bool selfReport, bool stopped
     ) override;
+
+    void NoteRejoinOffer(const msvc8::string& localSource, const msvc8::string& seats) override;
   };
 
   /**

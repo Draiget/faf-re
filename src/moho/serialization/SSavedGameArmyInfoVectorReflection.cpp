@@ -52,7 +52,7 @@ namespace
    * Releases backing storage for one saved-game-army-info vector lane and
    * resets begin/end/capacity pointers to null.
    */
-  void ReleaseSavedGameArmyInfoVectorStorage(msvc8::vector<moho::SSavedGameArmyInfo>& storage)
+  [[maybe_unused]] void ReleaseSavedGameArmyInfoVectorStorage(msvc8::vector<moho::SSavedGameArmyInfo>& storage)
   {
     // Per-element destructor sweep, free, then null all three lanes: VC8
     // _Tidy(), which is what move-assigning an empty vector compiles to.
@@ -248,7 +248,7 @@ gpg::RRef gpg::RVectorType_SSavedGameArmyInfo::SubscriptIndex(void* obj, const i
   }
 
   gpg::RRef out{};
-  BuildSavedGameArmyInfoRefLane(&(*storage)[static_cast<std::size_t>(ind)], &out);
+  (void)BuildSavedGameArmyInfoRefLane(&(*storage)[static_cast<std::size_t>(ind)], &out);
   return out;
 }
 

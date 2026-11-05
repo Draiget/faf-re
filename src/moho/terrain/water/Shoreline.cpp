@@ -28,7 +28,7 @@ namespace
    * What it does:
    * Constructs one `shared_ptr<ShoreCell>` from one raw shoreline-cell pointer lane.
    */
-  ShoreCellRef* ConstructSharedShoreCellFromRaw(ShoreCellRef* const outShoreCell, moho::ShoreCell* const shoreCell)
+  [[maybe_unused]] ShoreCellRef* ConstructSharedShoreCellFromRaw(ShoreCellRef* const outShoreCell, moho::ShoreCell* const shoreCell)
   {
     return ::new (outShoreCell) ShoreCellRef(shoreCell);
   }
@@ -122,11 +122,7 @@ namespace
       return;
     }
 
-    volatile long* const counter = reinterpret_cast<volatile long*>(&slot->mPrimaryValueBits);
-    long observed = 0;
-    do {
-      observed = ::InterlockedCompareExchange(counter, 0, 0);
-    } while (::InterlockedCompareExchange(counter, static_cast<long>(value), observed) != observed);
+    slot->StorePrimaryBits(value);
   }
 
   [[nodiscard]] float ReadHeightSampleMeters(

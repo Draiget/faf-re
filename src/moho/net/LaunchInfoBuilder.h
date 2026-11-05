@@ -32,6 +32,9 @@ namespace moho
 
     [[nodiscard]] virtual std::int32_t LocalUid() const = 0;
 
+    /** Options for an army with no player behind it: `GetDefaultPlayerOptions` in `lobbyComm.lua`. */
+    [[nodiscard]] virtual LuaPlus::LuaObject DefaultPlayerOptions(LuaPlus::LuaState* state);
+
     /**
      * Called once, just before the first player is assigned: where the lobby's original
      * `LaunchGame` began the part that cleans up its peers when it throws.
@@ -94,6 +97,8 @@ namespace moho
     CLaunchRoster(std::int32_t localUid, msvc8::string localName, std::vector<SLaunchClient> remotes);
 
     [[nodiscard]] std::int32_t LocalUid() const override { return mLocalUid; }
+    /** What `lobbyComm.lua` returns, as a roster's Lua state has no `import` to read it with. */
+    [[nodiscard]] LuaPlus::LuaObject DefaultPlayerOptions(LuaPlus::LuaState* state) override;
     void AssignClientIndex(std::int32_t& clientIndex, std::int32_t ownerId, const char* name, std::int32_t& localIndex)
       override;
     std::uint32_t AssignCommandSource(
@@ -110,4 +115,13 @@ namespace moho
     msvc8::string mLocalName;
     std::vector<SLaunchClient> mRemotes;
   };
+  /** The game speed a launch asks for, as `CLobby::LaunchGame` reads `GameOptions.GameSpeed`. */
+  struct SLaunchSpeed
+  {
+    int speed = 0;
+    bool adjustable = false;
+  };
+
+  [[nodiscard]] SLaunchSpeed ReadLaunchSpeed(const LuaPlus::LuaObject& gameOptions);
+
 } // namespace moho

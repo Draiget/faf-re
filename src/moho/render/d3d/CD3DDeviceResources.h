@@ -312,7 +312,7 @@ namespace moho
      * Address: 0x004424A0 (FUN_004424A0, Moho::CD3DDeviceResources::DevResInitResources)
      *
      * What it does:
-     * Clears existing effects and compiles all `/effects/*.fx` resources.
+     * Clears existing effects and compiles all `/effects/ *.fx` resources.
      */
     void DevResInitResources();
 

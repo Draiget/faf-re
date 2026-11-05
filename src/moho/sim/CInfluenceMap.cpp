@@ -15,6 +15,7 @@
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/containers/String.h"
 #include "moho/ai/IAiReconDB.h"
+#include "moho/command/SSTITarget.h"
 #include "moho/console/CConAlias.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
@@ -316,7 +317,7 @@ namespace
    * `sim->mContext.Update(&value, sizeof(float))` step `CInfluenceMap::Update`
    * performs per entry.
    */
-  void UpdateSimChecksumWord(const void* const word, moho::Sim* const sim)
+  [[maybe_unused]] void UpdateSimChecksumWord(const void* const word, moho::Sim* const sim)
   {
     sim->mContext.Update(word, 4u);
   }
@@ -449,7 +450,7 @@ namespace
    * Loads one reflected `InfluenceMapEntry` payload through cached RTTI lookup
    * and returns the archive pointer for chaining.
    */
-  gpg::ReadArchive* ReadInfluenceMapEntryArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::ReadArchive* ReadInfluenceMapEntryArchiveAndReturnArchive(
     gpg::ReadArchive* const archive,
     void* const objectPtr,
     gpg::RRef* const ownerRef
@@ -472,7 +473,7 @@ namespace
    * Saves one reflected `InfluenceMapEntry` payload through cached RTTI lookup
    * and returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteInfluenceMapEntryArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteInfluenceMapEntryArchiveAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
@@ -495,7 +496,7 @@ namespace
    * Loads one reflected `SThreat` payload through cached RTTI lookup and
    * returns the archive pointer for chaining.
    */
-  gpg::ReadArchive* ReadSThreatArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::ReadArchive* ReadSThreatArchiveAndReturnArchive(
     gpg::ReadArchive* const archive,
     void* const objectPtr,
     gpg::RRef* const ownerRef
@@ -518,7 +519,7 @@ namespace
    * Saves one reflected `SThreat` payload through cached RTTI lookup and
    * returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteSThreatArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteSThreatArchiveAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
@@ -541,7 +542,7 @@ namespace
    * Read-callback bridge that loads one reflected `InfluenceGrid` payload
    * through cached RTTI lookup.
    */
-  void ReadInfluenceGridArchiveCallback(
+  [[maybe_unused]] void ReadInfluenceGridArchiveCallback(
     gpg::ReadArchive* const archive,
     void* const objectPtr,
     gpg::RRef* const ownerRef
@@ -557,7 +558,7 @@ namespace
    * Write-callback bridge that saves one reflected `InfluenceGrid` payload
    * through cached RTTI lookup.
    */
-  void WriteInfluenceGridArchiveCallback(
+  [[maybe_unused]] void WriteInfluenceGridArchiveCallback(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
@@ -603,7 +604,7 @@ namespace
    * What it does:
    * Resolves and caches RTTI for one `map<unsigned int, int>` lane.
    */
-  [[nodiscard]] gpg::RType* CachedUIntIntMapTypeLegacyLane()
+  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedUIntIntMapTypeLegacyLane()
   {
     static gpg::RType* type = nullptr;
     if (!type) {
@@ -618,7 +619,7 @@ namespace
    * What it does:
    * Resolves and caches RTTI for one `vector<InfluenceGrid>` lane.
    */
-  [[nodiscard]] gpg::RType* CachedInfluenceGridVectorTypeLegacyLane()
+  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedInfluenceGridVectorTypeLegacyLane()
   {
     static gpg::RType* type = nullptr;
     if (!type) {
@@ -984,7 +985,7 @@ namespace
    * Adapts one linear cell index into `(x, z)` and forwards to
    * `CInfluenceMap::GetThreatRect`.
    */
-  float GetThreatRectByLinearCellIndex(
+  [[maybe_unused]] float GetThreatRectByLinearCellIndex(
     const moho::CInfluenceMap* const influenceMap,
     const int linearIndex,
     const int radius,
@@ -1765,7 +1766,7 @@ namespace moho
    * Allocates contiguous storage for `count` `SThreat` elements with the same
    * overflow guard semantics as the original VC8 array-allocation helper.
    */
-  static SThreat* func_NewArray_SThreat(const unsigned int count)
+  [[maybe_unused]] static SThreat* func_NewArray_SThreat(const unsigned int count)
   {
     if (count != 0u && (0xFFFFFFFFu / count) < sizeof(SThreat)) {
       throw std::bad_alloc{};
@@ -1781,7 +1782,7 @@ namespace moho
    * Allocates contiguous storage for `count` `InfluenceGrid` elements with the
    * same overflow guard semantics as the original VC8 array-allocation helper.
    */
-  static InfluenceGrid* func_NewArray_InfluenceMap(const unsigned int count)
+  [[maybe_unused]] static InfluenceGrid* func_NewArray_InfluenceMap(const unsigned int count)
   {
     if (count != 0u && (0xFFFFFFFFu / count) < sizeof(InfluenceGrid)) {
       throw std::bad_alloc{};
@@ -2715,7 +2716,7 @@ namespace moho
    */
   void InfluenceGrid::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef&)
   {
-    if (archive == nullptr || this == nullptr) {
+    if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
     }
 
@@ -2753,7 +2754,7 @@ namespace moho
    */
   void InfluenceGrid::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef&) const
   {
-    if (archive == nullptr || this == nullptr) {
+    if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
     }
 
@@ -2801,7 +2802,7 @@ namespace moho
 
     static gpg::RType* entIdType = nullptr;
     if (entIdType == nullptr) {
-      entIdType = gpg::LookupRType(typeid(moho::EntId));
+      entIdType = gpg::RTypeOf<moho::EntIdValue>(); // `Moho::EntId`, not `int`
     }
     archive->Read(entIdType, &entityId, ownerRef);
 
@@ -2852,7 +2853,7 @@ namespace moho
 
     static gpg::RType* entIdType = nullptr;
     if (entIdType == nullptr) {
-      entIdType = gpg::LookupRType(typeid(moho::EntId));
+      entIdType = gpg::RTypeOf<moho::EntIdValue>(); // `Moho::EntId`, not `int`
     }
     archive->Write(entIdType, &entityId, ownerRef);
 

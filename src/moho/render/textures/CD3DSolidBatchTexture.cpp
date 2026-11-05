@@ -295,7 +295,7 @@ namespace moho
    */
   CD3DSolidBatchTexture::~CD3DSolidBatchTexture()
   {
-    boost::mutex::scoped_lock scopedLock(sResourceLock);
+    std::lock_guard<std::recursive_mutex> scopedLock(sResourceLock);
 
     SolidTextureMap& solidTextureMap = GetSolidTextureMap();
     const SolidTextureMap::iterator it = FindSolidTextureEntry(mColor);
@@ -368,7 +368,7 @@ namespace moho
    */
   boost::shared_ptr<CD3DBatchTexture> CD3DBatchTexture::FromSolidColor(const std::uint32_t rgba)
   {
-    boost::mutex::scoped_lock scopedLock(sResourceLock);
+    std::lock_guard<std::recursive_mutex> scopedLock(sResourceLock);
     (void)InitializeSolidTextureMapStorage();
 
     SolidTextureMap& solidTextureMap = GetSolidTextureMap();

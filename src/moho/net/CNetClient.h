@@ -103,6 +103,12 @@ namespace moho
      */
     void ReceiveMessage(CMessage* message, CMessageDispatcher* dispatcher) override;
 
+    /**
+     * Engine addition (issue #275): the peer restarted and reconnected; its old
+     * link goes and `connection` takes its place. Takes the manager lock.
+     */
+    void ReplaceConnection(INetConnection* connection);
+
   public:
     INetConnection* mConnection{nullptr}; // 0x0E4
   };

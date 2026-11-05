@@ -26,30 +26,13 @@ namespace moho
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vec3f));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCIntelGridType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CIntelGrid));
-    }
-    return cached;
-  }
 
   [[nodiscard]]
   gpg::RRef MakeSharedIntelGridRef(moho::CIntelGrid* const intelGrid)
   {
     gpg::RRef out{};
     out.mObj = intelGrid;
-    out.mType = CachedCIntelGridType();
+    out.mType = gpg::RTypeOf<moho::CIntelGrid>();
     return out;
   }
 
@@ -267,7 +250,7 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Read(CachedVector3fType(), &mLastPos, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vec3f>(), &mLastPos, ownerRef);
     archive->ReadUInt(&mRadius);
 
     bool enabled = false;
@@ -316,7 +299,7 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Write(CachedVector3fType(), &mLastPos, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vec3f>(), &mLastPos, ownerRef);
     archive->WriteUInt(mRadius);
     archive->WriteBool(mEnabled != 0u);
 
@@ -414,7 +397,7 @@ namespace moho
    */
   void CIntelPosHandle::Destroy(const int shouldDelete)
   {
-    this->~CIntelPosHandle();
+    this->CIntelPosHandle::~CIntelPosHandle();
     if ((shouldDelete & 1) != 0) {
       ::operator delete(this);
     }

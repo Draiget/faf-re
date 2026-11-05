@@ -5,6 +5,7 @@
 #include <functional>
 #include <span>
 #include <unordered_map>
+#include <vector>
 
 #include "remote/wire/EntityFrame.h"
 
@@ -49,6 +50,8 @@ namespace faf::remote
      * into view ids, allocating on first appearance, and sorts the records by their new ids.
      */
     void Translate(wire::SViewFrame& frame, const OwnCommandTest& isOwnCommand);
+    /** `simId` as this view's client knows it, allocating on first appearance. */
+    [[nodiscard]] std::uint32_t EntityId(const std::uint32_t simId) { return MapsEntity(simId) ? Entity(simId) : simId; }
     /** `Translate` for one record, without the sort. */
     void TranslateRecord(wire::SEntityRecord& record, const OwnCommandTest& isOwnCommand);
 
@@ -67,8 +70,11 @@ namespace faf::remote
     void RetireEntities(std::span<const std::uint32_t> simIds);
     /** The sim released these commands: their view ids retire. */
     void RetireCommands(std::span<const std::uint32_t> simIds);
-    /** Retires every mapped command for which `alive(simId)` is false. */
-    void RetireCommandsUnless(const std::function<bool(std::uint32_t simId)>& alive);
+    /**
+     * Retires each command mapped since the last call for which `alive(simId)` is false. The ones
+     * still alive retire through `RetireCommands`, once the sim has released them.
+     */
+    void RetireNewCommandsUnless(const std::function<bool(std::uint32_t simId)>& alive);
 
     /** The sim id behind a view id (inbound translation), or false when the view never got it. */
     [[nodiscard]] bool EntityToSim(std::uint32_t viewId, std::uint32_t& simId) const;
@@ -116,6 +122,7 @@ namespace faf::remote
     std::unordered_map<std::uint32_t, std::uint32_t> mEntityToSim;
     std::unordered_map<std::uint32_t, std::uint32_t> mCommandToView;
     std::unordered_map<std::uint32_t, std::uint32_t> mCommandToSim;
+    std::vector<std::uint32_t> mNewCommands; // mapped since the last `RetireNewCommandsUnless`
     std::unordered_map<std::uint32_t, std::uint32_t> mNextSerial; // family and source (id >> 20) -> next serial
     struct SGrace
     {

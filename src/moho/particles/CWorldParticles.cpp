@@ -203,11 +203,6 @@ namespace
   constexpr int kSharedTrailIndexSheetSize = 0x18000;
   constexpr std::uint32_t kSharedTrailQuadCount = 0x4000U;
   constexpr std::uint32_t kIndicesPerTrailQuad = 6U;
-  constexpr std::size_t kLegacyVectorMaxCount = 0x3FFFFFFFU;
-  constexpr const char* kParticleRendererSourcePath = "c:\\work\\rts\\main\\code\\src\\core\\ParticleRenderer.cpp";
-  constexpr const char* kUnreachableAssertText = "Reached the supposably unreachable.";
-  constexpr int kParticleSelectTechniqueAssertLine = 1359;
-  constexpr int kParticleSelectTechniqueWithDragAssertLine = 1026;
 
   /**
    * Address: 0x00BC57F0 (FUN_00BC57F0, dynamic initializer for `sSharedTrailQuadIndexSheet`)
@@ -410,17 +405,6 @@ namespace
   // real binary emission. Removed; BeamRenderHelpers.cpp's copy is the
   // evidenced one.
 
-  void BindParticleTextureShaderVar(
-    moho::ShaderVar& shaderVar,
-    const moho::CParticleTexture::TextureResourceHandle& textureResource
-  )
-  {
-    // RD3DTextureResource is an ID3DTextureSheet, so the sheet binder does the
-    // GetTexture-then-SetTexture pair itself - there is no reason to resolve the
-    // handle here and re-wrap it.
-    shaderVar.GetTexture(textureResource);
-  }
-
   void BindParticleCameraShaderState(
     moho::GeomCamera3* const camera,
     const int tick,
@@ -471,15 +455,13 @@ namespace
     }
   }
 
-  constexpr std::uint32_t kLegacyDwordVectorMaxCount = 0x3FFFFFFFU;
-
   /**
    * Address: 0x0049C670 (FUN_0049C670, sub_49C670)
    *
    * What it does:
    * Returns one fixed legacy list-size cap constant.
    */
-  [[nodiscard]] std::uint32_t GetLegacyListMaxElementCount_0x3FFFFFFF_DuplicateB() noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint32_t GetLegacyListMaxElementCount_0x3FFFFFFF_DuplicateB() noexcept
   {
     return 0x3FFFFFFFU;
   }
@@ -558,19 +540,13 @@ namespace
     if (particle.mTexture.tex != nullptr) {
       particle.mTexture.tex->GetTexture(texture0);
     }
-    boost::AssignSharedPairRetain(
-      reinterpret_cast<boost::SharedCountPair*>(&key->texture0),
-      reinterpret_cast<const boost::SharedCountPair*>(&texture0)
-    );
+    boost::AssignSharedPairRetain(&key->texture0, &texture0);
 
     moho::CParticleTexture::TextureResourceHandle texture1{};
     if (particle.mRampTexture.tex != nullptr) {
       particle.mRampTexture.tex->GetTexture(texture1);
     }
-    boost::AssignSharedPairRetain(
-      reinterpret_cast<boost::SharedCountPair*>(&key->texture1),
-      reinterpret_cast<const boost::SharedCountPair*>(&texture1)
-    );
+    boost::AssignSharedPairRetain(&key->texture1, &texture1);
 
     key->tag.assign(particle.mTypeTag, 0U, msvc8::string::npos);
     key->blendMode = static_cast<std::int32_t>(particle.mBlendMode);
@@ -594,7 +570,7 @@ namespace
    * What it does:
    * Writes one dword lane into caller output storage.
    */
-  std::uint32_t* WriteDwordSlotFromRegisterLike(
+  [[maybe_unused]] std::uint32_t* WriteDwordSlotFromRegisterLike(
     std::uint32_t* const outValueSlot,
     const std::uint32_t value
   ) noexcept
@@ -623,7 +599,7 @@ namespace
    * What it does:
    * Duplicate ptr-map null payload guard helper retained for binary parity.
    */
-  void EnsurePtrMapInsertPayloadNotNullDuplicate(void* const payload)
+  [[maybe_unused]] void EnsurePtrMapInsertPayloadNotNullDuplicate(void* const payload)
   {
     EnsurePtrMapInsertPayloadNotNull(payload);
   }
@@ -669,7 +645,7 @@ namespace
    * Comparator thunk forwarding to the recovered particle-bucket key ordering
    * predicate.
    */
-  [[nodiscard]] bool CompareParticleBucketKeysThunk(
+  [[maybe_unused]] [[nodiscard]] bool CompareParticleBucketKeysThunk(
     const moho::SParticleBucketKey& lhs,
     const moho::SParticleBucketKey& rhs
   ) noexcept
@@ -684,7 +660,7 @@ namespace
    * Comparator thunk forwarding to the recovered trail-bucket key ordering
    * predicate.
    */
-  [[nodiscard]] bool CompareTrailBucketKeysThunk(
+  [[maybe_unused]] [[nodiscard]] bool CompareTrailBucketKeysThunk(
     const moho::STrailBucketKey& lhs,
     const moho::STrailBucketKey& rhs
   ) noexcept
@@ -698,7 +674,7 @@ namespace
    * What it does:
    * Returns one fixed legacy map helper constant (`0x03FFFFFF`).
    */
-  std::uint32_t GetLegacyMapHelperConstant_0x03FFFFFF_DuplicateA() noexcept
+  [[maybe_unused]] std::uint32_t GetLegacyMapHelperConstant_0x03FFFFFF_DuplicateA() noexcept
   {
     return 0x03FFFFFFU;
   }
@@ -709,7 +685,7 @@ namespace
    * What it does:
    * Returns one fixed legacy map helper constant (`0x03FFFFFF`).
   */
-  std::uint32_t GetLegacyMapHelperConstant_0x03FFFFFF() noexcept
+  [[maybe_unused]] std::uint32_t GetLegacyMapHelperConstant_0x03FFFFFF() noexcept
   {
     return 0x03FFFFFFU;
   }
@@ -720,7 +696,7 @@ namespace
    * What it does:
    * Returns one fixed legacy map helper constant (`0x04924924`).
    */
-  std::uint32_t GetLegacyMapHelperConstant_0x04924924() noexcept
+  [[maybe_unused]] std::uint32_t GetLegacyMapHelperConstant_0x04924924() noexcept
   {
     return 0x04924924U;
   }
@@ -731,7 +707,7 @@ namespace
    * What it does:
    * Duplicate particle-bucket destroy+delete thunk.
    */
-  void DestroyAndDeleteParticleRenderBucketDuplicateA(
+  [[maybe_unused]] void DestroyAndDeleteParticleRenderBucketDuplicateA(
     moho::SParticleRenderBucket* const bucket
   ) noexcept
   {
@@ -744,7 +720,7 @@ namespace
    * What it does:
    * Duplicate trail-bucket destroy+delete thunk.
    */
-  void DestroyAndDeleteTrailRenderBucketDuplicateA(
+  [[maybe_unused]] void DestroyAndDeleteTrailRenderBucketDuplicateA(
     moho::STrailRenderBucket* const bucket
   ) noexcept
   {
@@ -757,7 +733,7 @@ namespace
    * What it does:
    * Duplicate particle-bucket destroy+delete thunk.
    */
-  void DestroyAndDeleteParticleRenderBucketDuplicateB(
+  [[maybe_unused]] void DestroyAndDeleteParticleRenderBucketDuplicateB(
     moho::SParticleRenderBucket* const bucket
   ) noexcept
   {
@@ -770,7 +746,7 @@ namespace
    * What it does:
    * Duplicate trail-bucket destroy+delete thunk.
    */
-  void DestroyAndDeleteTrailRenderBucketDuplicateB(
+  [[maybe_unused]] void DestroyAndDeleteTrailRenderBucketDuplicateB(
     moho::STrailRenderBucket* const bucket
   ) noexcept
   {
@@ -783,7 +759,7 @@ namespace
    * What it does:
    * Duplicate particle-bucket destroy+delete thunk.
    */
-  void DestroyAndDeleteParticleRenderBucketDuplicateC(
+  [[maybe_unused]] void DestroyAndDeleteParticleRenderBucketDuplicateC(
     moho::SParticleRenderBucket* const bucket
   ) noexcept
   {
@@ -796,7 +772,7 @@ namespace
    * What it does:
    * Duplicate trail-bucket destroy+delete thunk.
    */
-  void DestroyAndDeleteTrailRenderBucketDuplicateC(
+  [[maybe_unused]] void DestroyAndDeleteTrailRenderBucketDuplicateC(
     moho::STrailRenderBucket* const bucket
   ) noexcept
   {
@@ -809,7 +785,7 @@ namespace
    * What it does:
    * Duplicate particle-bucket destroy+delete thunk.
    */
-  void DestroyAndDeleteParticleRenderBucketDuplicateD(
+  [[maybe_unused]] void DestroyAndDeleteParticleRenderBucketDuplicateD(
     moho::SParticleRenderBucket* const bucket
   ) noexcept
   {
@@ -822,7 +798,7 @@ namespace
    * What it does:
    * Duplicate trail-bucket destroy+delete thunk.
    */
-  void DestroyAndDeleteTrailRenderBucketDuplicateD(
+  [[maybe_unused]] void DestroyAndDeleteTrailRenderBucketDuplicateD(
     moho::STrailRenderBucket* const bucket
   ) noexcept
   {
@@ -836,7 +812,7 @@ namespace
    * Destroys and deletes one particle-bucket payload and returns the input
    * pointer.
    */
-  moho::SParticleRenderBucket* DestroyAndDeleteParticleRenderBucketAndReturnInput(
+  [[maybe_unused]] moho::SParticleRenderBucket* DestroyAndDeleteParticleRenderBucketAndReturnInput(
     moho::SParticleRenderBucket* const bucket
   ) noexcept
   {
@@ -852,7 +828,7 @@ namespace
    * Destroys and deletes one trail-bucket payload and returns the input
    * pointer.
    */
-  moho::STrailRenderBucket* DestroyAndDeleteTrailRenderBucketAndReturnInput(
+  [[maybe_unused]] moho::STrailRenderBucket* DestroyAndDeleteTrailRenderBucketAndReturnInput(
     moho::STrailRenderBucket* const bucket
   ) noexcept
   {
@@ -867,7 +843,7 @@ namespace
    * What it does:
    * Returns whether one legacy string and one C-string differ by value.
    */
-  bool AreMsvc8StringAndCStringDifferent(
+  [[maybe_unused]] bool AreMsvc8StringAndCStringDifferent(
     const msvc8::string& lhs,
     const char* const rhs
   ) noexcept
@@ -1442,7 +1418,6 @@ namespace moho
   void CWorldParticles::ClearRenderBuckets()
   {
     CWorldParticles& worldParticles = *this;
-    CWorldParticles& runtime = worldParticles;
 
     // Each entry owns its bucket, so the payload goes before the node.
     for (const auto& [bucketKey, bucket] : mParticleBuckets) {

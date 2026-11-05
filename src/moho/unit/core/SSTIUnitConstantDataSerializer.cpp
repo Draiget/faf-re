@@ -48,19 +48,9 @@ namespace
     return gpg::RRef{};
   }
 
-  [[nodiscard]] gpg::RType* CachedStatsStatItemType()
-  {
-    gpg::RType* type = moho::Stats<moho::StatItem>::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::Stats<moho::StatItem>));
-      moho::Stats<moho::StatItem>::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RRef MakeStatsStatItemRef(moho::Stats<moho::StatItem>* const value)
   {
-    return gpg::RRef(value, CachedStatsStatItemType());
+    return gpg::RRef(value, gpg::RTypeOf<moho::Stats<moho::StatItem>>());
   }
 
   /**
@@ -87,13 +77,13 @@ namespace
    * Runs one `Stats_StatItem` destructor and frees storage when the incoming
    * pointer lane is non-null.
    */
-  void DestroyStatsStatItemIfPresent(moho::Stats_StatItem* const statItem) noexcept
+  [[maybe_unused]] void DestroyStatsStatItemIfPresent(moho::Stats_StatItem* const statItem) noexcept
   {
     if (statItem == nullptr) {
       return;
     }
 
-    delete statItem;
+    GPG_NONVIRTUAL_DESTROY(delete statItem);
   }
 
 } // namespace
@@ -143,7 +133,7 @@ namespace moho
     try {
       InitializeStatsRootSharedControl(statsRootRaw.pi, statsRoot);
     } catch (...) {
-      delete statsRoot;
+      GPG_NONVIRTUAL_DESTROY(delete statsRoot);
       throw;
     }
 

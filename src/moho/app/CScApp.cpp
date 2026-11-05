@@ -1,4 +1,5 @@
 #include "CScApp.h"
+#include "moho/sim/ReplayTimeline.h"
 #include "gpg/core/profiling/Profiler.h"
 
 #include <Windows.h>
@@ -34,8 +35,10 @@
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/sim/DesyncTelemetry.h"
+#include "moho/sim/SimWorkerPool.h"
 #include "moho/misc/TimeBar.h"
 #include "moho/misc/CDiskWatch.h"
+#include "moho/net/CRejoinFeed.h"
 #include "moho/net/CGpgNetInterface.h"
 #include "moho/net/Common.h"
 #include "moho/app/CWaitHandleSet.h"
@@ -179,11 +182,7 @@ namespace
       return;
     }
 
-    volatile long* const counter = reinterpret_cast<volatile long*>(&slot->mPrimaryValueBits);
-    long observed = 0;
-    do {
-      observed = ::InterlockedCompareExchange(counter, 0, 0);
-    } while (::InterlockedCompareExchange(counter, static_cast<long>(value), observed) != observed);
+    slot->StorePrimaryBits(value);
   }
 
   /**
@@ -425,12 +424,40 @@ namespace
       return;
     }
 
+    // Engine addition (issue #275): take a seat back in a running game. Without
+    // the option, every path below runs as before.
+    if (moho::CFG_GetArgOption("/rejoin", 3, &args) && args.size() >= 3) {
+      msvc8::string failureReason;
+      if (moho::REJOIN_BeginSetup(
+            args[0].c_str(), std::atoi(args[1].c_str()), static_cast<unsigned short>(std::atoi(args[2].c_str())), &failureReason
+          )) {
+        // The launcher, if there is one, still wants this game's results.
+        if (moho::CFG_GetArgOption("/gpgnet", 1, &args) && !args.empty()) {
+          u_long address = 0;
+          u_short port = 0;
+          if (moho::NET_GetAddrInfo(args[0].c_str(), 0, true, address, port) && port != 0) {
+            try {
+              moho::GPGNET_Attach(address, port);
+            } catch (const std::exception& exception) {
+              gpg::Warnf("REJOIN: can't reach the launcher: %s", exception.what());
+            }
+          }
+        }
+        (void)moho::UI_StartRejoinScreen();
+        return;
+      }
+      gpg::Warnf("REJOIN: refused: %s", failureReason.c_str());
+      moho::WIN_OkBox("Ack!", gpg::STR_Printf("Unable to rejoin the game.\n\n%s", failureReason.c_str()).c_str());
+      (void)moho::UI_StartSplashScreens();
+      return;
+    }
+
     if (moho::CFG_GetArgOption("/replay", 1, &args)) {
       if (!args.empty()) {
         SetFrontEndReplayFilename(args[0]);
         msvc8::string failureReason;
         msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo =
-          moho::VCR_SetupReplaySession(args[0].c_str(), &failureReason);
+          moho::REPLAY_SetupViewerSession(args[0].c_str(), &failureReason);
         if (sessionInfo.get() != nullptr) {
           moho::WLD_BeginSession(sessionInfo);
           return;
@@ -946,6 +973,20 @@ namespace
     "Network sessions: 1 applies wld_FrameClock, 0 keeps the original median frame time.",
     &wld_FrameClockNetwork
   );
+
+  /**
+   * Engine addition: when the clock follows real time, it starts its window afresh once the
+   * session's first tick is on screen. Otherwise the long first frame of play stays in the mean and
+   * the clock repays it by rushing the next ticks out a few milliseconds apart.
+   */
+  int wld_FrameClockOpening = 1;
+
+  moho::TConVar<int> gTConVar_wld_FrameClockOpening(
+    "wld_FrameClockOpening",
+    "1 drops the long first frame of play from the mean frame clock once the first tick is shown; 0 keeps it, and the "
+    "clock rushes the next ticks to repay it.",
+    &wld_FrameClockOpening
+  );
 } // namespace
 
 /**
@@ -1036,7 +1077,7 @@ bool CScApp::Init()
   // with the real Lua one. Run it any later and those early imports get the
   // stub: SCR_Import hands back a boolean and the callers fail with
   // "index expected but got boolean".
-  moho::SCR_LuaDoScript(moho::USER_GetLuaState(), "/lua/userInit.lua", nullptr);
+  (void)moho::SCR_LuaDoScript(moho::USER_GetLuaState(), "/lua/userInit.lua", nullptr);
 
   moho::USER_EnsureDocumentDirectories();
 
@@ -1117,6 +1158,19 @@ bool CScApp::Init()
  * frame updates, one-time session bootstrap, and minimized wait-handle/timer
  * routing.
  */
+namespace
+{
+  bool sc_FrameTimeCarry = true;
+  float sFrameCapCarryMs = 0.0f;
+
+  moho::TConVar<bool> gTConVar_sc_FrameTimeCarry(
+    "sc_FrameTimeCarry",
+    "A frame that sc_FrameTimeClamp released late gives that time back to the next frame (1, the default), so the "
+    "cap is held on average, or doesn't (0). Read each frame.",
+    &sc_FrameTimeCarry
+  );
+} // namespace
+
 void CScApp::Main()
 {
   FAF_PROFILE_ZONE_NAMED("AppFrame");
@@ -1143,11 +1197,16 @@ void CScApp::Main()
       frameSeconds = fixedFrameSeconds;
     } else {
       float elapsed = curTime.ElapsedMilliseconds();
-      if (moho::sc_FrameTimeClamp > elapsed)
+      // Engine change (sc_FrameTimeCarry): a wait ends late, as it sleeps in whole milliseconds, and
+      // each frame's clock starts over. The next frame gets that time back, or a 4 ms cap holds 215 FPS
+      // with frames to spare. At most half the cap, so a long frame isn't followed by a burst.
+      const float shortestFrame = moho::sc_FrameTimeClamp - sFrameCapCarryMs;
+      if (shortestFrame > elapsed)
       {
-        moho::WIN_SetWakeupTimer(moho::sc_FrameTimeClamp - elapsed);
+        moho::WIN_SetWakeupTimer(shortestFrame - elapsed);
         return;
       }
+      sFrameCapCarryMs = sc_FrameTimeCarry ? std::min(elapsed - shortestFrame, moho::sc_FrameTimeClamp * 0.5f) : 0.0f;
       frameSeconds = static_cast<float>(elapsed * 0.001);
     }
 
@@ -1155,20 +1214,49 @@ void CScApp::Main()
   }
 
   gpg::diag::FrameSamplerMark(); // debugging aid, off unless FAF_FRAME_SAMPLER is set
+  // Engine addition (wld_FrameClock): the clock may follow real time, in network sessions only with
+  // wld_FrameClockNetwork. With wld_FrameClockOpening it then drops the session's opening frames (its
+  // long first frame of play) from the window once its first tick is on screen; the median ignores
+  // one long frame, so the original clock keeps its window.
+  const bool realTimeClock = fixedFrameSeconds <= 0.0f && wld_FrameClock != 0 &&
+    (moho::SIM_GetSessionPacing() != moho::ESimSessionPacing::Network || wld_FrameClockNetwork != 0);
+  if (moho::WLD_TakeFrameClockReset() && realTimeClock && wld_FrameClockOpening != 0) {
+    framerates.Reset();
+  }
   (void)framerates.Push(frameSeconds);
   // FAF FA-Binary-Patches (hooks/GetFPS.cpp): StoreFPS keeps the frame time it
   // finds being pushed here (0x008D1A85) as OnRenderWorld's `delta`.
   moho::UI_SetRenderWorldFrameSeconds(frameSeconds);
-  moho::SND_Frame();
+  // Engine addition (replay timeline): a fast-forward spends its frames on the sim, with the world neither drawn nor heard.
+  const bool fastForwarding = moho::gReplayFastForward.load(std::memory_order_relaxed);
+  if (!fastForwarding) {
+    moho::SND_Frame();
+  }
   moho::DISK_UpdateWatcher();
 
   float smoothedFrameSeconds = fixedFrameSeconds > 0.0f ? fixedFrameSeconds : framerates.Median();
-  // Engine addition (wld_FrameClock): the clock may follow real time, in network sessions only with
-  // wld_FrameClockNetwork.
-  if (fixedFrameSeconds <= 0.0f && wld_FrameClock != 0 &&
-      (moho::SIM_GetSessionPacing() != moho::ESimSessionPacing::Network || wld_FrameClockNetwork != 0)) {
+  if (realTimeClock) {
     smoothedFrameSeconds = wld_FrameClock == 2 ? frameSeconds : framerates.Mean();
   }
+  // Engine addition (issue #275): false outside a client started with /rejoin.
+  if (moho::REJOIN_SetupPending()) {
+    msvc8::string failureReason;
+    bool failed = false;
+    msvc8::auto_ptr<moho::SWldSessionInfo> sessionInfo = moho::REJOIN_PollSetup(&failureReason, &failed);
+    if (sessionInfo.get() != nullptr) {
+      moho::UI_UpdateRejoinScreen("", -1.0f);
+      moho::WLD_BeginSession(sessionInfo);
+    } else if (failed) {
+      gpg::Warnf("REJOIN: refused: %s", failureReason.c_str());
+      moho::UI_UpdateRejoinScreen("", -1.0f);
+      moho::WIN_OkBox("Ack!", gpg::STR_Printf("Unable to rejoin the game.\n\n%s", failureReason.c_str()).c_str());
+      (void)moho::UI_StartSplashScreens();
+    } else {
+      const float progress = moho::REJOIN_SetupProgress();
+      moho::UI_UpdateRejoinScreen(progress >= 0.0f ? "transfer" : "connecting", progress);
+    }
+  }
+
   if (!moho::WLD_Frame(smoothedFrameSeconds) && wxTheApp != nullptr) {
     wxTheApp->ExitMainLoop();
   }
@@ -1176,15 +1264,19 @@ void CScApp::Main()
   moho::CWldSession* const activeSession = moho::WLD_GetActiveSession();
   const std::int32_t gameTick = activeSession != nullptr ? activeSession->mGameTick : 0;
   const float simDeltaSeconds = activeSession != nullptr ? activeSession->mTimeSinceLastTick : 0.0f;
-  moho::CAM_GetManager()->Frame(simDeltaSeconds, frameSeconds);
+  if (!fastForwarding) {
+    moho::CAM_GetManager()->Frame(simDeltaSeconds, frameSeconds);
+  }
   if (moho::sUserStage != nullptr) {
     FAF_PROFILE_ZONE_NAMED("UserStage");
     moho::sUserStage->UserFrame();
   }
   ::ADXM_ExecMain();
-  moho::REN_Frame(gameTick, simDeltaSeconds, frameSeconds);
-  if (moho::IUserSoundManager* const userSound = moho::USER_GetSound(); userSound != nullptr) {
-    userSound->Frame(simDeltaSeconds, frameSeconds);
+  if (!fastForwarding) {
+    moho::REN_Frame(gameTick, simDeltaSeconds, frameSeconds);
+    if (moho::IUserSoundManager* const userSound = moho::USER_GetSound(); userSound != nullptr) {
+      userSound->Frame(simDeltaSeconds, frameSeconds);
+    }
   }
 
   if (moho::IUIManager* const uiManager = moho::UI_GetManager()) {
@@ -1215,6 +1307,7 @@ void CScApp::Main()
   moho::UI_ProcessIdleGC();
 
   if (initialized == 0) {
+    moho::gSimDefaultWorkers = 4; // engine addition, see its declaration
     InitializeSessionFromCommandLine();
     initialized = 1;
   }

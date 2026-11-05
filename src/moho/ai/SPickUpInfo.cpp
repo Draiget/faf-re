@@ -10,25 +10,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* ResolveWeakPtrUnitType()
-  {
-    gpg::RType* type = moho::WeakPtr<moho::Unit>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-      moho::WeakPtr<moho::Unit>::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSPickUpInfoType()
-  {
-    gpg::RType* type = moho::SPickUpInfo::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SPickUpInfo));
-      moho::SPickUpInfo::sType = type;
-    }
-    return type;
-  }
 
 } // namespace
 
@@ -66,7 +47,7 @@ namespace moho
       return;
     }
 
-    gpg::RType* const weakUnitType = ResolveWeakPtrUnitType();
+    gpg::RType* const weakUnitType = gpg::RTypeOf<moho::WeakPtr<moho::Unit>>();
     GPG_ASSERT(weakUnitType != nullptr);
 
     const gpg::RRef ownerRef{};
@@ -89,7 +70,7 @@ namespace moho
       return;
     }
 
-    gpg::RType* const weakUnitType = ResolveWeakPtrUnitType();
+    gpg::RType* const weakUnitType = gpg::RTypeOf<moho::WeakPtr<moho::Unit>>();
     GPG_ASSERT(weakUnitType != nullptr);
 
     const gpg::RRef ownerRef{};

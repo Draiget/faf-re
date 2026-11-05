@@ -248,6 +248,46 @@ namespace faf::remote
     return ViewCanSeePoint(sim, viewArmy, facts.pos, facts.underwater);
   }
 
+  std::uint32_t ViewsThatSee(const moho::Sim& sim, const std::size_t viewCount, const SEntityFacts& facts)
+  {
+    const std::uint32_t all = viewCount >= 32u ? ~std::uint32_t{0} : (std::uint32_t{1} << viewCount) - 1u;
+    // Units and blips are sent whenever published (`CanViewSee`): to the own army, or by recon record.
+    if (IsClientUnit(facts)) {
+      if (facts.destroyed) {
+        return 0u;
+      }
+      if (facts.kind == SEntityFacts::EKind::Blip) {
+        return static_cast<std::uint32_t>(facts.blipNeedsFlush) & all;
+      }
+      return facts.armyIndex >= 0 && facts.armyIndex < 32 ? (std::uint32_t{1} << facts.armyIndex) & all : 0u;
+    }
+    if (facts.destroyed) {
+      return 0u;
+    }
+    // One channel for every view and no grid to test: the answer is the same for all of them.
+    if (ViewsFollowFactsAlone(facts)) {
+      const bool published = facts.army == nullptr || facts.kind == SEntityFacts::EKind::Prop || facts.vizToNeutrals != moho::VIZMODE_Never;
+      return published ? all : 0u;
+    }
+    std::uint32_t views = 0;
+    for (std::size_t view = 0; view < viewCount && view < 32u; ++view) {
+      if (CanViewSee(sim, static_cast<std::int32_t>(view), facts)) {
+        views |= std::uint32_t{1} << view;
+      }
+    }
+    return views;
+  }
+
+  bool ViewsFollowFactsAlone(const SEntityFacts& facts) noexcept
+  {
+    if (IsClientUnit(facts) || facts.destroyed) {
+      return true;
+    }
+    const std::int32_t viz = facts.vizToNeutrals;
+    return (facts.army == nullptr || (facts.vizToFocusPlayer == viz && facts.vizToAllies == viz && facts.vizToEnemies == viz))
+        && static_cast<moho::EUserEntityVisibilityMode>(viz) != moho::EUserEntityVisibilityMode::ReconGrid;
+  }
+
   bool ViewShowsMesh(const moho::Sim& sim, const std::int32_t viewArmy, moho::Entity& entity)
   {
     const SEntityFacts facts = ReadEntityFacts(entity);

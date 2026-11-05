@@ -96,7 +96,7 @@ public:
      */
     void Enable(const std::int32_t maxMessages)
     {
-        boost::recursive_mutex::scoped_lock lock(mLock);
+        std::lock_guard<std::recursive_mutex> lock(mLock);
         mMaxMessages = maxMessages;
         TrimLocked();
     }
@@ -115,7 +115,7 @@ public:
         const int previousDepth
     ) override
     {
-        boost::recursive_mutex::scoped_lock lock(mLock);
+        std::lock_guard<std::recursive_mutex> lock(mLock);
 
         int startDepth = previousDepth;
         if (startDepth < 0) {
@@ -156,7 +156,7 @@ public:
     {
         msvc8::list<Entry> snapshot{};
         {
-            boost::recursive_mutex::scoped_lock lock(mLock);
+            std::lock_guard<std::recursive_mutex> lock(mLock);
             if (mEntries.empty()) {
                 return;
             }
@@ -195,7 +195,7 @@ public:
         }
 
         {
-            boost::recursive_mutex::scoped_lock lock(mLock);
+            std::lock_guard<std::recursive_mutex> lock(mLock);
             if (mReplayDepth > 0) {
                 --mReplayDepth;
             }
@@ -270,7 +270,7 @@ private:
         }
     }
 
-    boost::recursive_mutex mLock{};
+    std::recursive_mutex mLock{};
     // A list, as in the binary (node alloc 0x008E42C0, unlink 0x008E4660):
     // once the cap is reached every new message evicts the oldest one, which is
     // an O(1) unlink here. As a vector, each eviction shifted every retained
@@ -897,7 +897,7 @@ PipeBuf::int_type PipeBuf::overflow(const int_type ch)
 
     auto* const fresh = new StreamBuffer{};
     {
-        boost::mutex::scoped_lock lock(mMutex);
+        std::lock_guard<std::mutex> lock(mMutex);
         if (IsSingleBuffer()) {
             mReadLimit = reinterpret_cast<std::uint8_t*>(putEnd);
         }
@@ -944,7 +944,7 @@ std::streamsize PipeBuf::xsputn(const char* const src, const std::streamsize cou
 
         auto* const fresh = new StreamBuffer{};
         {
-            boost::mutex::scoped_lock lock(mMutex);
+            std::lock_guard<std::mutex> lock(mMutex);
             if (IsSingleBuffer()) {
                 mReadLimit = reinterpret_cast<std::uint8_t*>(epptr());
             }
@@ -970,7 +970,7 @@ std::streamsize PipeBuf::xsputn(const char* const src, const std::streamsize cou
  */
 std::streamsize PipeBuf::showmanyc()
 {
-    boost::mutex::scoped_lock lock(mMutex);
+    std::lock_guard<std::mutex> lock(mMutex);
 
     StreamBuffer* const head = HeadBuffer();
     StreamBuffer* const tail = TailBuffer();
@@ -1006,7 +1006,7 @@ PipeBuf::int_type PipeBuf::underflow()
     }
 
     while (true) {
-        boost::mutex::scoped_lock lock(mMutex);
+        std::lock_guard<std::mutex> lock(mMutex);
 
         StreamBuffer* head = HeadBuffer();
         StreamBuffer* tail = TailBuffer();
@@ -1081,7 +1081,7 @@ std::streamsize PipeBuf::xsgetn(char* const dst, const std::streamsize count)
             continue;
         }
 
-        boost::mutex::scoped_lock lock(mMutex);
+        std::lock_guard<std::mutex> lock(mMutex);
         StreamBuffer* head = HeadBuffer();
         StreamBuffer* tail = TailBuffer();
         if (!head || !tail) {
@@ -1130,7 +1130,7 @@ std::streamsize PipeBuf::xsgetn(char* const dst, const std::streamsize count)
  */
 int PipeBuf::sync()
 {
-    boost::mutex::scoped_lock lock(mMutex);
+    std::lock_guard<std::mutex> lock(mMutex);
     mWriteCommit = reinterpret_cast<std::uint8_t*>(pptr());
     if (IsSingleBuffer()) {
         mReadLimit = mWriteCommit;

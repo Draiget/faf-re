@@ -135,6 +135,10 @@ namespace gpg::gal
     void BeginProfileRegion(std::uint32_t region) override;
     void EndProfileRegion(std::uint32_t region) override;
     bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out) override;
+    void ReleaseBufferCopy(VertexBuffer& buffer) override;
+    void ReleaseBufferCopy(IndexBuffer& buffer) override;
+    void CopyLockedRangeOnly(VertexBuffer& buffer) override;
+    void CopyLockedRangeOnly(IndexBuffer& buffer) override;
     bool CopyVertexBufferRegion(
       VertexBuffer& destination, std::uint32_t destinationOffset, VertexBuffer& source, std::uint32_t sourceOffset, std::uint32_t byteCount
     ) override;
@@ -188,7 +192,7 @@ namespace gpg::gal
       const std::uint8_t* constantsCpu = nullptr; // the same snapshot, CPU side (upload memory)
       std::uint32_t constantsBytes = 0;
       std::uint64_t constantsSerial = 0;          // the submission whose upload memory holds it
-      std::shared_ptr<const std::vector<effects::TextureBinding>> sampled;
+      const std::vector<effects::TextureBinding>* sampled = nullptr; // in the effect's state
     };
 
     struct ProgramState;
@@ -278,6 +282,7 @@ namespace gpg::gal
     [[nodiscard]] VkImageView TargetView(VkFormat& format, vulkan::TrackedImage*& image, std::uint32_t& width, std::uint32_t& height);
     void Trace(const char* format, ...);
     void DumpBackBufferIfDue();
+    void LogMemoryIfDue();
     // ---- GPU-driven programs (GpuDrivenVulkan.cpp) ------------------------------
     void CreateGpuDrivenObjects();
     void ReleaseGpuDrivenObjects() noexcept;

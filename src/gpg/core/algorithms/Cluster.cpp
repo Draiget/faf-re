@@ -1,4 +1,6 @@
 #include "Cluster.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
 #include "platform/Interlocked.h"
 #include "legacy/math/X87Math.h"
 
@@ -55,14 +57,11 @@ namespace
 
         auto* const control = reinterpret_cast<SharedCountControl*>(sharedCount);
         if (_InterlockedExchangeAdd(&control->useCount, -1) == 1) {
-            using ControlFn = void(__thiscall*)(SharedCountControl*);
-            auto* const disposeFn = reinterpret_cast<ControlFn>(control->vtable[1]);
-            disposeFn(control);
-
-            if (_InterlockedExchangeAdd(&control->weakCount, -1) == 1) {
-                auto* const destroyFn = reinterpret_cast<ControlFn>(control->vtable[2]);
-                destroyFn(control);
-            }
+            // By name, not by vtable slot: the virtual destructor before these takes one slot on
+            // Windows and two on Linux.
+            auto* const base = reinterpret_cast<boost::detail::sp_counted_base*>(sharedCount);
+            base->dispose();
+            base->weak_release();
             return true;
         }
 
@@ -323,7 +322,7 @@ namespace
      * What it does:
      * Initializes one inline byte-buffer cursor block and returns `state`.
      */
-    InlineByteCursorBuffer200* InitializeInlineByteCursorBuffer200(
+    [[maybe_unused]] InlineByteCursorBuffer200* InitializeInlineByteCursorBuffer200(
       InlineByteCursorBuffer200* const state
     ) noexcept
     {
@@ -341,7 +340,7 @@ namespace
      * What it does:
      * Returns the current cursor lane from one inline byte-buffer state.
      */
-    [[nodiscard]] std::uint8_t* InlineByteCursorCurrent(
+    [[maybe_unused]] [[nodiscard]] std::uint8_t* InlineByteCursorCurrent(
       const InlineByteCursorBuffer* const state
     ) noexcept
     {
@@ -354,7 +353,7 @@ namespace
      * What it does:
      * Returns used-byte count (`current - begin`) for one inline byte-buffer.
      */
-    [[nodiscard]] std::ptrdiff_t InlineByteCursorUsedBytes(
+    [[maybe_unused]] [[nodiscard]] std::ptrdiff_t InlineByteCursorUsedBytes(
       const InlineByteCursorBuffer* const state
     ) noexcept
     {
@@ -367,7 +366,7 @@ namespace
      * What it does:
      * Returns total capacity in bytes (`end - begin`) for one inline buffer.
      */
-    [[nodiscard]] std::ptrdiff_t InlineByteCursorCapacityBytes(
+    [[maybe_unused]] [[nodiscard]] std::ptrdiff_t InlineByteCursorCapacityBytes(
       const InlineByteCursorBuffer* const state
     ) noexcept
     {
@@ -380,7 +379,7 @@ namespace
      * What it does:
      * Returns `begin + byteOffset` for one inline byte-buffer.
      */
-    [[nodiscard]] std::uint8_t* InlineByteCursorAtOffset(
+    [[maybe_unused]] [[nodiscard]] std::uint8_t* InlineByteCursorAtOffset(
       const InlineByteCursorBuffer* const state,
       const std::ptrdiff_t byteOffset
     ) noexcept
@@ -448,7 +447,7 @@ namespace
      * What it does:
      * Unlinks `node` and inserts it immediately before `anchor`.
      */
-    IntrusiveRingNode* RelinkIntrusiveRingNodeBeforeAnchor(
+    [[maybe_unused]] IntrusiveRingNode* RelinkIntrusiveRingNodeBeforeAnchor(
       IntrusiveRingNode* const node,
       IntrusiveRingNode* const anchor
     ) noexcept
@@ -468,7 +467,7 @@ namespace
      * What it does:
      * Alias lane that unlinks one intrusive ring node and re-self-links it.
      */
-    IntrusiveRingNode* UnlinkIntrusiveRingNode_B(
+    [[maybe_unused]] IntrusiveRingNode* UnlinkIntrusiveRingNode_B(
       IntrusiveRingNode* const node
     ) noexcept
     {
@@ -481,7 +480,7 @@ namespace
      * What it does:
      * Alias lane that initializes one intrusive ring node as self-linked.
      */
-    IntrusiveRingNode* InitializeIntrusiveRingNode_B(
+    [[maybe_unused]] IntrusiveRingNode* InitializeIntrusiveRingNode_B(
       IntrusiveRingNode* const node
     ) noexcept
     {
@@ -494,7 +493,7 @@ namespace
      * What it does:
      * Returns one intrusive node `next` link lane.
      */
-    [[nodiscard]] IntrusiveRingNode* GetIntrusiveRingNodeNext(
+    [[maybe_unused]] [[nodiscard]] IntrusiveRingNode* GetIntrusiveRingNodeNext(
       const IntrusiveRingNode* const node
     ) noexcept
     {
@@ -526,7 +525,7 @@ namespace
      * What it does:
      * Alias lane that unlinks one intrusive ring node and re-self-links it.
      */
-    IntrusiveRingNode* UnlinkIntrusiveRingNode_C(
+    [[maybe_unused]] IntrusiveRingNode* UnlinkIntrusiveRingNode_C(
       IntrusiveRingNode* const node
     ) noexcept
     {
@@ -539,7 +538,7 @@ namespace
      * What it does:
      * Copies one `(4 dword + 1 word)` lane bundle and binds one external tail lane.
      */
-    FourDwordWordAndTail* CopyFourDwordWordBundleWithTailLane(
+    [[maybe_unused]] FourDwordWordAndTail* CopyFourDwordWordBundleWithTailLane(
       FourDwordWordAndTail* const destination,
       const FourDwordWord* const sourceBundle,
       const std::uint32_t* const tailLaneSource
@@ -560,7 +559,7 @@ namespace
      * What it does:
      * Copies one 32-bit lane into destination storage.
      */
-    std::uint32_t* CopyDwordLane_A(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
+    [[maybe_unused]] std::uint32_t* CopyDwordLane_A(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -572,7 +571,7 @@ namespace
      * What it does:
      * Copies one 8-bit lane into destination storage.
      */
-    std::uint8_t* CopyByteLane_A(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
+    [[maybe_unused]] std::uint8_t* CopyByteLane_A(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -584,7 +583,7 @@ namespace
      * What it does:
      * Alias lane that copies one 32-bit value.
      */
-    std::uint32_t* CopyDwordLane_B(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
+    [[maybe_unused]] std::uint32_t* CopyDwordLane_B(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -596,7 +595,7 @@ namespace
      * What it does:
      * Alias lane that copies one 8-bit value.
      */
-    std::uint8_t* CopyByteLane_B(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
+    [[maybe_unused]] std::uint8_t* CopyByteLane_B(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -608,7 +607,7 @@ namespace
      * What it does:
      * Writes one `(dword, byte)` lane pair into destination storage.
      */
-    DwordAndByteLanes* WriteDwordAndByteLanes_A(
+    [[maybe_unused]] DwordAndByteLanes* WriteDwordAndByteLanes_A(
       DwordAndByteLanes* const destination,
       const std::uint32_t* const dwordLaneSource,
       const std::uint8_t* const byteLaneSource
@@ -625,7 +624,7 @@ namespace
      * What it does:
      * Alias lane that writes one `(dword, byte)` pair.
      */
-    DwordAndByteLanes* WriteDwordAndByteLanes_B(
+    [[maybe_unused]] DwordAndByteLanes* WriteDwordAndByteLanes_B(
       DwordAndByteLanes* const destination,
       const std::uint32_t* const dwordLaneSource,
       const std::uint8_t* const byteLaneSource
@@ -648,7 +647,7 @@ namespace
      * What it does:
      * Stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLane* StoreSingleDwordLane_A(
+    [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_A(
       SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
@@ -663,7 +662,7 @@ namespace
      * What it does:
      * Alias lane that stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLane* StoreSingleDwordLane_B(
+    [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_B(
       SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
@@ -678,7 +677,7 @@ namespace
      * What it does:
      * Alias lane that stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLane* StoreSingleDwordLane_C(
+    [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_C(
       SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
@@ -693,7 +692,7 @@ namespace
      * What it does:
      * Alias lane that stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLane* StoreSingleDwordLane_D(
+    [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_D(
       SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
@@ -714,7 +713,7 @@ namespace
      * What it does:
      * Loads the dword lane at vtable slot index 4.
      */
-    int LoadVtableDwordSlot04(const VtableProbe* const object) noexcept
+    [[maybe_unused]] int LoadVtableDwordSlot04(const VtableProbe* const object) noexcept
     {
       return static_cast<int>(object->vtable[4]);
     }
@@ -725,7 +724,7 @@ namespace
      * What it does:
      * Loads the dword lane at vtable slot index 15.
      */
-    int LoadVtableDwordSlot15(const VtableProbe* const object) noexcept
+    [[maybe_unused]] int LoadVtableDwordSlot15(const VtableProbe* const object) noexcept
     {
       return static_cast<int>(object->vtable[15]);
     }
@@ -931,24 +930,6 @@ namespace
       return lhs + ((rhs * (rhs - 1u)) >> 1u);
     }
 
-    [[nodiscard]] std::uint8_t* CopyByteRangeForward(
-      const std::uint8_t* sourceBegin,
-      const std::uint8_t* sourceEnd,
-      std::uint8_t* destination
-    ) noexcept
-    {
-      const std::uint8_t* sourceCursor = sourceBegin;
-      std::uint8_t* writeCursor = destination;
-      while (sourceCursor != sourceEnd) {
-        if (writeCursor != nullptr) {
-          *writeCursor = *sourceCursor;
-        }
-        ++sourceCursor;
-        ++writeCursor;
-      }
-      return writeCursor;
-    }
-
     // `{start, end, capacity, inline}` at 0x10 is `gpg::core::FastVectorInline`:
     // the reset reads the saved capacity back out of the first word of the
     // inline block, and the append grows by `max(size + 1, capacity * 2)` and
@@ -965,7 +946,7 @@ namespace
      * Gathers boundary nodes from 4x4 child clusters into one packed `uint16`
      * node list, then sorts and de-duplicates that packed node lane in-place.
      */
-    [[nodiscard]] std::uint16_t* BuildSubclusterPackedNodeList(
+    [[maybe_unused]] [[nodiscard]] std::uint16_t* BuildSubclusterPackedNodeList(
       const gpg::HaStar::SubclusterData& subcluster,
       PackedNodeVector& outNodes
     )
@@ -1114,7 +1095,7 @@ namespace
      * `gpg::HaStar::Cluster`, handling both vector-destruct (`flags&2`) and
      * optional storage release (`flags&1`).
      */
-    void* DestroyClusterWithDeleteFlags(gpg::HaStar::Cluster* start, const std::uint8_t flags)
+    [[maybe_unused]] void* DestroyClusterWithDeleteFlags(gpg::HaStar::Cluster* start, const std::uint8_t flags)
     {
         if ((flags & 0x02u) != 0u) {
 #if INTPTR_MAX == INT32_MAX
@@ -1178,7 +1159,7 @@ namespace
      * What it does:
      * Stores two source dword lanes into one two-dword destination record.
      */
-    TwoDwordLane* StoreTwoDwordLanesFromSources_A(
+    [[maybe_unused]] TwoDwordLane* StoreTwoDwordLanesFromSources_A(
       TwoDwordLane* const destination,
       const std::uint32_t* const sourceLane00,
       const std::uint32_t* const sourceLane04
@@ -1196,7 +1177,7 @@ namespace
      * Alias lane that stores two source dword lanes into one destination
      * two-dword record.
      */
-    TwoDwordLane* StoreTwoDwordLanesFromSources_B(
+    [[maybe_unused]] TwoDwordLane* StoreTwoDwordLanesFromSources_B(
       TwoDwordLane* const destination,
       const std::uint32_t* const sourceLane00,
       const std::uint32_t* const sourceLane04
@@ -1611,7 +1592,7 @@ namespace
      * Computes geometric node-to-node distance, quantizes traversal cost, and
      * writes one edge-cost byte into `out`.
      */
-    std::uint8_t* QuantizeClusterNodeEdgeCost(
+    [[maybe_unused]] std::uint8_t* QuantizeClusterNodeEdgeCost(
       std::uint8_t* const out,
       const ClusterNodeCoordinate& from,
       const ClusterNodeCoordinate& to,
@@ -2149,6 +2130,15 @@ int Cluster::cmp(const Cluster& other) const
     }
 
     const unsigned int nodeCount = self->mNodeCount;
+
+    // The binary's inline compare (0x00954057..0x00954072) stops at the first word that differs, and the
+    // node count is the first byte, so it never reads past a smaller cluster. std::memcmp may read ahead
+    // over its whole length, which faulted at the end of a mapping (replay 26904000). Counts that differ
+    // decide the order here, as that first byte does in the binary.
+    if (nodeCount != rhs->mNodeCount) {
+        return (nodeCount < rhs->mNodeCount) ? -1 : 1;
+    }
+
     const std::size_t payloadBytes =
         (nodeCount * (nodeCount - 1u)) / 2u + 2u * nodeCount + 1u;
     const int diff = std::memcmp(&self->mNodeCount, &rhs->mNodeCount, payloadBytes);
@@ -2676,7 +2666,7 @@ void InitializeClusterCache(ClusterCache& outCache)
     auto* const control = static_cast<boost::SpCountedImplStorage<void>*>(
         ::operator new(sizeof(boost::SpCountedImplStorage<void>))
     );
-    boost::SpCountedImplPConstructClusterCacheImpl(control, impl);
+    (void)boost::SpCountedImplPConstructClusterCacheImpl(control, impl);
 
     outCache.mCacheTree = impl;
     outCache.mCacheRefs = control;
@@ -3104,6 +3094,79 @@ bool ClusterMap::WorkOnCluster(const int width, const int height, const int leve
     return true;
 }
 
+void ClusterMap::SaveExact(gpg::WriteArchive* const archive) const
+{
+    archive->WriteBool(mIsDone != 0u);
+    archive->WriteUInt(mProgress);
+
+    for (std::uint32_t level = 1u; level <= mNumLevels; ++level) {
+        const gpg::BitArray2D& bits = mCheckLevels[level];
+        archive->WriteBytes(reinterpret_cast<char*>(bits.ptr), static_cast<std::size_t>(bits.size) * sizeof(std::int32_t));
+
+        const Subcluster& clusters = mLevels[level];
+        const int count = clusters.mWidth * clusters.mHeight;
+        for (int index = 0; index < count; ++index) {
+            const Cluster::Data* const data = clusters.mArray[index].mData;
+            if (data == nullptr) {
+                archive->WriteUShort(0xFFFFu);
+                continue;
+            }
+
+            const std::size_t nodes = data->mNodeCount;
+            archive->WriteUShort(static_cast<unsigned short>(nodes));
+            const std::size_t bytes = nodes * sizeof(Cluster::Node) + nodes * (nodes - 1u) / 2u;
+            if (bytes != 0u) {
+                archive->WriteBytes(const_cast<char*>(reinterpret_cast<const char*>(&data->mNodes[0])), bytes);
+            }
+        }
+    }
+}
+
+void ClusterMap::LoadExact(gpg::ReadArchive* const archive, std::unordered_map<std::string, Cluster>& shared)
+{
+    bool isDone = false;
+    archive->ReadBool(&isDone);
+    mIsDone = isDone ? 1u : 0u;
+    archive->ReadUInt(&mProgress);
+
+    std::string payload;
+    for (std::uint32_t level = 1u; level <= mNumLevels; ++level) {
+        gpg::BitArray2D& bits = mCheckLevels[level];
+        archive->ReadBytes(reinterpret_cast<char*>(bits.ptr), static_cast<std::size_t>(bits.size) * sizeof(std::int32_t));
+
+        Subcluster& clusters = mLevels[level];
+        const int count = clusters.mWidth * clusters.mHeight;
+        for (int index = 0; index < count; ++index) {
+            unsigned short nodes = 0u;
+            archive->ReadUShort(&nodes);
+            if (nodes == 0xFFFFu) {
+                clusters.mArray[index] = Cluster{};
+                continue;
+            }
+
+            const std::size_t nodeBytes = static_cast<std::size_t>(nodes) * sizeof(Cluster::Node);
+            const std::size_t bytes = nodeBytes + static_cast<std::size_t>(nodes) * (static_cast<std::size_t>(nodes) - 1u) / 2u;
+            payload.assign(bytes + 1u, '\0');
+            payload[0] = static_cast<char>(nodes);
+            if (bytes != 0u) {
+                archive->ReadBytes(payload.data() + 1, bytes);
+            }
+
+            auto found = shared.find(payload);
+            if (found == shared.end()) {
+                Cluster built{};
+                built.SetData(
+                    reinterpret_cast<const Cluster::Node*>(payload.data() + 1),
+                    reinterpret_cast<const Cluster::Edge*>(payload.data() + 1 + nodeBytes),
+                    nodes
+                );
+                found = shared.emplace(payload, built).first;
+            }
+            clusters.mArray[index] = found->second;
+        }
+    }
+}
+
 /**
  * Address: 0x008E3BC0 (FUN_008E3BC0,
  * ?EnsureClusterExists@ClusterMap@HaStar@gpg@@QAEXHHH@Z)
@@ -3136,7 +3199,7 @@ void ClusterMap::BackgroundWork(int& budget)
                 budget = INT_MAX;
             }
 
-            WorkOnCluster(
+            (void)WorkOnCluster(
                 static_cast<int>(clusterX),
                 static_cast<int>(clusterY),
                 static_cast<int>(mNumLevels),

@@ -44,8 +44,7 @@ namespace
    * neither is ever live): `FUN_005E8B60` and `FUN_005E9E10`. The previous
    * recovery wrongly modeled `FUN_005E9E10` as a helper function CALLED BY
    * `register_EAiTransportEventPrimitiveSerializer()` -- the real ctor's
-   * disassembly sets its fields inline and calls no such helper. Both dead
-   * duplicates marked `skip`.
+   * disassembly sets its fields inline and calls no such helper.
    *
    * The previous recovery also modeled this as a hand-rolled raw-struct
    * mimic of `SerHelperBase` plus a fabricated

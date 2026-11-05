@@ -361,6 +361,14 @@ namespace moho
   }
 
   /**
+   * Engine addition (issue #275), not in the binary.
+   */
+  void CWldUiInterface::NoteRejoinOffer(const msvc8::string& localSource, const msvc8::string& seats)
+  {
+    GPGNET_ReportRejoinOffer(localSource, seats);
+  }
+
+  /**
    * Engine addition, not in the binary: posts the notice to the main thread,
    * as NoteDisconnect does.
    */

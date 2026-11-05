@@ -8,14 +8,19 @@
 #include <cstdio>
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <new>
 #include <stdexcept>
 #include <string>
+#include <thread>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -38,6 +43,7 @@
 #include "moho/math/Vector4f.h"
 #include "moho/math/MathReflection.h"
 #include "moho/math/QuaternionMath.h"
+#include "moho/console/CConCommand.h"
 #include "moho/console/CVarAccess.h"
 #include "moho/render/Cartographic.h"
 #include "moho/render/RCamManager.h"
@@ -57,6 +63,7 @@
 #include "moho/terrain/splat/CWldSplat.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
 #include "moho/terrain/water/WaveSystem.h"
+#include "platform/X87Precision.h"
 
 // Engine addition: helpers shared with the file these functions came from.
 namespace
@@ -601,6 +608,168 @@ namespace
       loadControl.mHandle->UpdateLoadingProgress();
     }
   }
+
+  /**
+   * One 4x4 block of the normal map, as two DXT words.
+   */
+  void EncodeNormalBlock(
+    const moho::CHeightField& field,
+    const std::int32_t x,
+    const std::int32_t z,
+    std::uint64_t* const out
+  )
+  {
+    TerrainNormalEncodeBlock block{};
+
+    for (std::int32_t sampleRow = 0; sampleRow < 4; ++sampleRow) {
+      const std::int32_t rowOffset = sampleRow * 4;
+      for (std::int32_t sampleCol = 0; sampleCol < 4; ++sampleCol) {
+        const float worldX = static_cast<float>(x + sampleCol) + 0.5f;
+        const float worldZ = static_cast<float>(z + sampleRow) + 0.5f;
+        const Wm3::Vec3f normal = field.GetNormal(worldX, worldZ);
+        const std::int32_t sampleIndex = rowOffset + sampleCol;
+        block.mNormalX[sampleIndex] = EncodeNormalLaneByte(normal.x);
+        block.mNormalZ[sampleIndex] = EncodeNormalLaneByte(normal.z);
+      }
+    }
+
+    out[0] = moho::DXT_EncodeAlphaBlock(block.mNormalX, 1, 4);
+    out[1] = moho::DXT_EncodeGreenBlock(block.mNormalZ);
+  }
+} // namespace
+
+namespace moho
+{
+  /**
+   * Engine addition: the map loader encodes the normal map, so that `Finalize` on the render
+   * thread only copies it. Encoding there held the loading screen still for 6.7 s on an 81 km map.
+   */
+  bool ren_NormalMapOnLoader = true;
+
+  namespace
+  {
+    TConVar<bool> gTConVar_ren_NormalMapOnLoader(
+      "ren_NormalMapOnLoader",
+      "The map loader encodes the terrain normal map (1, the default), or the first frame after a map "
+      "load does as in the original (0). Read when a map loads.",
+      &ren_NormalMapOnLoader
+    );
+  } // namespace
+} // namespace moho
+
+namespace
+{
+  // Beside the terrain object, whose size is the binary's.
+  struct PrebuiltNormalMap
+  {
+    std::int32_t blocksWide = 0;
+    std::int32_t blocksHigh = 0;
+    std::vector<std::uint64_t> words;
+  };
+
+  std::mutex sPrebuiltNormalMapsLock;
+
+  [[nodiscard]] std::unordered_map<const moho::CWldTerrainRes*, PrebuiltNormalMap>& PrebuiltNormalMaps()
+  {
+    // Never destroyed: a terrain object can outlive the other statics.
+    static auto* const maps = new std::unordered_map<const moho::CWldTerrainRes*, PrebuiltNormalMap>();
+    return *maps;
+  }
+
+  void DropPrebuiltNormalMap(const moho::CWldTerrainRes* const owner)
+  {
+    const std::lock_guard<std::mutex> lock(sPrebuiltNormalMapsLock);
+    PrebuiltNormalMaps().erase(owner);
+  }
+
+  [[nodiscard]] PrebuiltNormalMap TakePrebuiltNormalMap(const moho::CWldTerrainRes* const owner)
+  {
+    const std::lock_guard<std::mutex> lock(sPrebuiltNormalMapsLock);
+    auto& maps = PrebuiltNormalMaps();
+    const auto found = maps.find(owner);
+    if (found == maps.end()) {
+      return {};
+    }
+    PrebuiltNormalMap taken = std::move(found->second);
+    maps.erase(found);
+    return taken;
+  }
+
+  /**
+   * Runs on the map loader thread, with a few helpers. Rows go to whichever thread is free;
+   * only the loader's own thread reports progress, as that is where an abort throws.
+   */
+  void PrebuildNormalMap(
+    const moho::CWldTerrainRes* const owner,
+    const moho::CHeightField& field,
+    moho::CBackgroundTaskControl& loadControl
+  )
+  {
+    static const bool startupOff = moho::CFG_GetArgOption("/nonormalmaponloader", 0u, nullptr);
+    if (!moho::ren_NormalMapOnLoader || startupOff || field.width <= 1 || field.height <= 1) {
+      return;
+    }
+
+    const auto start = std::chrono::steady_clock::now();
+
+    PrebuiltNormalMap built{};
+    built.blocksWide = AlignUpTo4(field.width - 1) / 4;
+    built.blocksHigh = AlignUpTo4(field.height - 1) / 4;
+    built.words.resize(static_cast<std::size_t>(built.blocksWide) * static_cast<std::size_t>(built.blocksHigh) * 2u);
+
+    std::atomic<std::int32_t> nextRow{0};
+    const auto encodeRows = [&](const bool reportProgress) {
+      for (;;) {
+        const std::int32_t row = nextRow.fetch_add(1);
+        if (row >= built.blocksHigh) {
+          return;
+        }
+        std::uint64_t* out = built.words.data() + static_cast<std::size_t>(row) * built.blocksWide * 2u;
+        for (std::int32_t column = 0; column < built.blocksWide; ++column, out += 2) {
+          EncodeNormalBlock(field, column * 4, row * 4, out);
+        }
+        if (reportProgress) {
+          TickLoadingProgress(loadControl);
+        }
+      }
+    };
+
+    struct Helpers
+    {
+      std::atomic<std::int32_t>& nextRow;
+      std::int32_t rowCount;
+      std::vector<std::thread> threads;
+      ~Helpers()
+      {
+        nextRow.store(rowCount);
+        for (std::thread& thread : threads) {
+          thread.join();
+        }
+      }
+    } helpers{nextRow, built.blocksHigh, {}};
+
+    const std::uint32_t threadCount = std::clamp(std::thread::hardware_concurrency() / 2u, 1u, 4u);
+    for (std::uint32_t i = 1u; i < threadCount; ++i) {
+      helpers.threads.emplace_back([&encodeRows] {
+        // As the loader and render threads run, so the texture comes out the same.
+        platform::SetX87PrecisionControl(_PC_24);
+        encodeRows(false);
+      });
+    }
+    encodeRows(true);
+    for (std::thread& thread : helpers.threads) {
+      thread.join();
+    }
+    helpers.threads.clear();
+
+    gpg::Logf(
+      "Terrain: normal map encoded on the loader in %.2f s, %u threads",
+      std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), threadCount
+    );
+
+    const std::lock_guard<std::mutex> lock(sPrebuiltNormalMapsLock);
+    PrebuiltNormalMaps()[owner] = std::move(built);
+  }
 } // namespace
 
 
@@ -712,6 +881,8 @@ namespace moho
    */
   CWldTerrainRes::~CWldTerrainRes()
   {
+    DropPrebuiltNormalMap(this); // engine addition, for a map loaded and never drawn
+
     // mDecalManager: virtual scalar-deleting dtor dispatch (delete p).
     if (mDecalManager != nullptr) {
       delete mDecalManager;
@@ -1282,6 +1453,8 @@ namespace moho
     // (0x008A694B) - both `lea` the same frame slot.
     CBackgroundTaskControl loadControl{};
     loadControl.mHandle = nullptr;
+
+    DropPrebuiltNormalMap(this); // engine addition: the map it was encoded from goes below
 
     // 0x008A6246-0x008A6252: the device-resource lane is captured once up front
     // and reused for every texture allocation below. The binary performs no null
@@ -2053,6 +2226,7 @@ namespace moho
     }
 
     if (syncedAnyRect) {
+      DropPrebuiltNormalMap(this);
       field->UpdateError(syncedBounds);
     }
   }
@@ -2088,6 +2262,15 @@ namespace moho
     CHeightField* const field = mMap->mHeightField.get();
     if (field == nullptr || field->width <= 1 || field->height <= 1) {
       return;
+    }
+
+    // Engine addition (ren_NormalMapOnLoader): a whole-map rebuild takes what the loader encoded.
+    PrebuiltNormalMap prebuilt{};
+    if (rect.x0 <= 0 && rect.z0 <= 0 && rect.x1 >= field->width - 1 && rect.z1 >= field->height - 1) {
+      prebuilt = TakePrebuiltNormalMap(this);
+      if (prebuilt.blocksWide != AlignUpTo4(field->width - 1) / 4 || prebuilt.blocksHigh != AlignUpTo4(field->height - 1) / 4) {
+        prebuilt = {};
+      }
     }
 
     const std::size_t tileCount = mNormalMap.size();
@@ -2145,25 +2328,22 @@ namespace moho
         auto* blockRowBytes = static_cast<std::uint8_t*>(mappedBits);
         for (std::int32_t localZ = lockRect.z0; localZ < lockRect.z1; localZ += 4) {
           auto* blockOutput = reinterpret_cast<std::uint64_t*>(blockRowBytes);
-          for (std::int32_t localX = lockRect.x0; localX < lockRect.x1; localX += 4) {
-            TerrainNormalEncodeBlock block{};
+          if (!prebuilt.words.empty()) {
+            // Tile bases are multiples of 2048, so a tile's blocks sit on the map's block grid.
+            const std::size_t sourceBlock = static_cast<std::size_t>((tileZBase + localZ) / 4) * prebuilt.blocksWide +
+              static_cast<std::size_t>((tileXBase + lockRect.x0) / 4);
+            std::memcpy(
+              blockOutput,
+              prebuilt.words.data() + sourceBlock * 2u,
+              static_cast<std::size_t>((lockRect.x1 - lockRect.x0) / 4) * 2u * sizeof(std::uint64_t)
+            );
+          } else {
+            for (std::int32_t localX = lockRect.x0; localX < lockRect.x1; localX += 4) {
+              EncodeNormalBlock(*field, tileXBase + localX, tileZBase + localZ, blockOutput);
+              blockOutput += 2;
 
-            for (std::int32_t sampleRow = 0; sampleRow < 4; ++sampleRow) {
-              const std::int32_t rowOffset = sampleRow * 4;
-              for (std::int32_t sampleCol = 0; sampleCol < 4; ++sampleCol) {
-                const float worldX = static_cast<float>(tileXBase + localX + sampleCol) + 0.5f;
-                const float worldZ = static_cast<float>(tileZBase + localZ + sampleRow) + 0.5f;
-                const Wm3::Vec3f normal = field->GetNormal(worldX, worldZ);
-                const std::int32_t sampleIndex = rowOffset + sampleCol;
-                block.mNormalX[sampleIndex] = EncodeNormalLaneByte(normal.x);
-                block.mNormalZ[sampleIndex] = EncodeNormalLaneByte(normal.z);
-              }
+              TickLoadingProgress(loadControl);
             }
-
-            *blockOutput++ = moho::DXT_EncodeAlphaBlock(block.mNormalX, 1, 4);
-            *blockOutput++ = moho::DXT_EncodeGreenBlock(block.mNormalZ);
-
-            TickLoadingProgress(loadControl);
           }
 
           blockRowBytes += pitchBytes;
@@ -2200,8 +2380,12 @@ namespace moho
    */
   void CWldTerrainRes::NotifyMapChange(const gpg::Rect2i& rect)
   {
-    if (!GetBool() && Finalize()) {
-      return;
+    if (!GetBool()) {
+      // The map just changed, so what the loader encoded no longer holds.
+      DropPrebuiltNormalMap(this);
+      if (Finalize()) {
+        return;
+      }
     }
 
     UpdateNormalMap(rect);
@@ -3225,6 +3409,8 @@ namespace moho
     if (version >= 0x3Bu) {
       mCartographic.ReadDecals(version, reader);
     }
+
+    PrebuildNormalMap(this, *mMap->mHeightField.get(), loadControl); // engine addition
 
     return true;
   }

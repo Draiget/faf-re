@@ -1,4 +1,5 @@
 #include "moho/misc/StartupHelpers.h"
+#include "moho/lua/CScrLuaInitForm.h"
 
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/Set.h"
@@ -47,6 +48,7 @@
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/SpecialFileType.h"
+#include "moho/core/ThreadPlacement.h"
 #include "moho/task/CTaskThread.h"
 #include "lua/LuaCrashDump.h"
 
@@ -302,34 +304,6 @@ namespace
     return luaContext ? luaContext->stateUserData : nullptr;
   }
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("User"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("User");
-    return sSet;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Core");
-    return sSet;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& UnsafeLuaInitSet()
   {
     // Every file that wants this set must resolve the one that already
@@ -420,7 +394,8 @@ namespace
     }
 
     const DWORD_PTR affinityMask = static_cast<DWORD_PTR>(static_cast<std::uint32_t>(luaL_checknumber(state, 1)));
-    const BOOL result = ::SetProcessAffinityMask(::GetCurrentProcess(), affinityMask);
+    // Engine change: a server given its CPUs keeps them (ThreadPlacement.h).
+    const BOOL result = moho::ProcessCpusAreLocked() ? TRUE : ::SetProcessAffinityMask(::GetCurrentProcess(), affinityMask);
     lua_pushboolean(state, result != FALSE ? 1 : 0);
     return 1;
   }
@@ -2098,10 +2073,7 @@ int moho::cfunc_SHGetFolderPathL(LuaPlus::LuaState* const state)
   }
 
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSHGetFolderPathHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kSHGetFolderPathHelpText);
 
   LuaPlus::LuaStackObject idArg(state, 1);
   const char* keyText = lua_tostring(rawState, 1);
@@ -2174,7 +2146,7 @@ moho::CScrLuaInitForm* moho::func_SHGetFolderPath_LuaFuncDef()
 moho::CScrLuaInitFormSet* moho::register_coreInitFormSet()
 {
   CScrLuaInitFormSet* const previousHead = CScrLuaInitFormSet::sSets;
-  CScrLuaInitFormSet& coreSet = CoreLuaInitSet();
+  CScrLuaInitFormSet& coreSet = moho::SCR_CoreLuaInitSet();
   coreSet.mNextSet = previousHead;
   CScrLuaInitFormSet::sSets = &coreSet;
   return previousHead;
@@ -2190,7 +2162,7 @@ moho::CScrLuaInitFormSet* moho::register_coreInitFormSet()
 moho::CScrLuaInitFormSet* moho::register_userInitFormSet()
 {
   CScrLuaInitFormSet* const previousHead = CScrLuaInitFormSet::sSets;
-  CScrLuaInitFormSet& userSet = UserLuaInitSet();
+  CScrLuaInitFormSet& userSet = moho::SCR_UserLuaInitSet();
   userSet.mNextSet = previousHead;
   CScrLuaInitFormSet::sSets = &userSet;
   return previousHead;
@@ -2281,7 +2253,7 @@ int moho::cfunc_GetMovieDuration(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetMovieDuration_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "GetMovieDuration",
     &moho::cfunc_GetMovieDuration,
     nullptr,
@@ -2301,12 +2273,7 @@ moho::CScrLuaInitForm* moho::func_GetMovieDuration_LuaFuncDef()
 int moho::cfunc_GetMovieDurationL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(
-      state, "%s\n  expected %d args, but got %d", kGetMovieDurationHelpText, 1, argumentCount
-    );
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kGetMovieDurationHelpText);
 
   LuaPlus::LuaStackObject moviePathArg(state, 1);
   const char* moviePath = lua_tostring(rawState, 1);
@@ -2642,7 +2609,6 @@ namespace
    * What it does:
    * Parses one leading root token span and reports token start/length.
    */
-  [[nodiscard]]
   void ParsePathRootTokenSpan(const msvc8::string& path, std::uint32_t* const outStart, std::uint32_t* const outLength)
   {
     if (outStart != nullptr) {
@@ -3282,7 +3248,7 @@ namespace
    * What it does:
    * Stores one path pointer lane in a single-word helper wrapper.
    */
-  void SetPathPointerLane(const msvc8::string*& outPath, const msvc8::string* const path) noexcept
+  [[maybe_unused]] void SetPathPointerLane(const msvc8::string*& outPath, const msvc8::string* const path) noexcept
   {
     outPath = path;
   }
@@ -4126,7 +4092,7 @@ namespace
    * Initializes destination string storage from one source string and
    * canonicalizes it as a filesystem token.
    */
-  msvc8::string* SetCanonicalFilenameFromString(msvc8::string* const out, const msvc8::string& sourcePath)
+  [[maybe_unused]] msvc8::string* SetCanonicalFilenameFromString(msvc8::string* const out, const msvc8::string& sourcePath)
   {
     return func_StringSetFilename2(out, sourcePath.c_str());
   }

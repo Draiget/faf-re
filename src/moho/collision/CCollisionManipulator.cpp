@@ -1,4 +1,5 @@
 #include "CCollisionManipulator.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 #include <cstddef>
 #include <cstdlib>
@@ -165,92 +166,31 @@ namespace
     return upcast.mObj;
   }
 
-  /**
-   * Resolves `IAniManipulator`'s descriptor for the base registration at
-   * 0x006388D0. The cache lives on `IAniManipulator::sType`, not in a
-   * function-local static: that class static is what the other manipulator
-   * reflection paths read first, so a local cache leaves them resolving null.
-   */
-  gpg::RType* CachedIAniManipulatorType()
-  {
-    if (moho::IAniManipulator::sType == nullptr) {
-      moho::IAniManipulator::sType = gpg::LookupRType(typeid(moho::IAniManipulator));
-    }
-    return moho::IAniManipulator::sType;
-  }
-
-  gpg::RType* CachedIUnitType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::IUnit));
-    }
-    return cached;
-  }
-
-  template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    GPG_ASSERT(derived);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
 
   void AddIAniManipulatorBase(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedIAniManipulatorType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::IAniManipulator>(typeInfo);
   }
 
   [[nodiscard]] gpg::RRef MakeIUnitRef(const moho::Unit* unit)
   {
     gpg::RRef out{};
     out.mObj = nullptr;
-    out.mType = CachedIUnitType();
+    out.mType = gpg::RTypeOf<moho::IUnit>();
     if (!unit) {
       return out;
     }
 
     auto* const iunit = const_cast<moho::IUnit*>(static_cast<const moho::IUnit*>(unit));
-    gpg::RType* dynamicType = CachedIUnitType();
+    gpg::RType* dynamicType = gpg::RTypeOf<moho::IUnit>();
     try {
       dynamicType = gpg::LookupRType(typeid(*iunit));
     } catch (...) {
-      dynamicType = CachedIUnitType();
+      dynamicType = gpg::RTypeOf<moho::IUnit>();
     }
 
     std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(CachedIUnitType(), &baseOffset);
+    const bool derived = dynamicType->IsDerivedFrom(gpg::RTypeOf<moho::IUnit>(), &baseOffset);
     GPG_ASSERT(derived);
     if (!derived) {
       out.mObj = iunit;
@@ -275,9 +215,9 @@ namespace
     source.mObj = tracked.object;
     source.mType = tracked.type;
 
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedIUnitType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::IUnit>());
     if (!upcast.mObj) {
-      const char* const expected = CachedIUnitType()->GetName();
+      const char* const expected = gpg::RTypeOf<moho::IUnit>()->GetName();
       const char* const actual = source.GetTypeName();
       const msvc8::string message = gpg::STR_Printf(
         "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
@@ -325,7 +265,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef CreateCollisionManipulatorRefOwned()
   {
-    return MakeTypedRef(new moho::CCollisionManipulator(), CachedCCollisionManipulatorType());
+    return gpg::MakeTypedRef(new moho::CCollisionManipulator(), CachedCCollisionManipulatorType());
   }
 
   /**
@@ -345,7 +285,7 @@ namespace
     if (object) {
       new (object) moho::CCollisionManipulator();
     }
-    return MakeTypedRef(object, CachedCCollisionManipulatorType());
+    return gpg::MakeTypedRef(object, CachedCCollisionManipulatorType());
   }
 
   /**
@@ -388,12 +328,7 @@ namespace moho
   LuaPlus::LuaObject*
   func_CreateCollisionManipulatorObject(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
   {
-    if (object == nullptr) {
-      return nullptr;
-    }
-
-    *object = CScrLuaMetatableFactory<CCollisionManipulator>::Instance().Get(state);
-    return object;
+    return SCR_WriteMetatable<CCollisionManipulator>(object, state);
   }
 
   /**
@@ -444,7 +379,7 @@ namespace moho
   void CCollisionManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     const gpg::RRef owner{};
-    archive->Read(CachedIAniManipulatorType(), static_cast<IAniManipulator*>(this), owner);
+    archive->Read(gpg::RTypeOf<moho::IAniManipulator>(), static_cast<IAniManipulator*>(this), owner);
     mOwnerUnit = ReadUnitPointer(archive, owner);
     archive->ReadBool(&mCollisionCallbacksEnabled);
     archive->ReadBool(&mTerrainCollisionCheckEnabled);
@@ -461,7 +396,7 @@ namespace moho
   void CCollisionManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     const gpg::RRef owner{};
-    archive->Write(CachedIAniManipulatorType(), static_cast<const IAniManipulator*>(this), owner);
+    archive->Write(gpg::RTypeOf<moho::IAniManipulator>(), static_cast<const IAniManipulator*>(this), owner);
     WriteUnitPointer(archive, mOwnerUnit, owner);
     archive->WriteBool(mCollisionCallbacksEnabled);
     archive->WriteBool(mTerrainCollisionCheckEnabled);
@@ -480,7 +415,7 @@ namespace moho
    */
   gpg::RRef CCollisionManipulator::GetDerivedObjectRef()
   {
-    return MakeTypedRef(this, CachedCCollisionManipulatorType());
+    return gpg::MakeTypedRef(this, CachedCCollisionManipulatorType());
   }
 
   /**
@@ -511,16 +446,7 @@ namespace moho
       return 0;
     }
 
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(
-        state,
-        "%s\n  expected %d args, but got %d",
-        kCollisionManipulatorCreateCollisionDetectorHelpText,
-        1,
-        argumentCount
-      );
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kCollisionManipulatorCreateCollisionDetectorHelpText);
 
     LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
     Unit* const ownerUnit = SCR_FromLua_Unit(unitObject);
@@ -573,16 +499,7 @@ namespace moho
       return 0;
     }
 
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(
-        state,
-        "%s\n  expected %d args, but got %d",
-        kCollisionManipulatorEnableTerrainCheckHelpText,
-        2,
-        argumentCount
-      );
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kCollisionManipulatorEnableTerrainCheckHelpText);
 
     LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
     CCollisionManipulator* const manipulator = SCR_FromLua_CCollisionManipulator(manipulatorObject, state);
@@ -624,10 +541,7 @@ namespace moho
       return 0;
     }
 
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kCollisionManipulatorEnableHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kCollisionManipulatorEnableHelpText);
 
     LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
     CCollisionManipulator* const manipulator = SCR_FromLua_CCollisionManipulator(manipulatorObject, state);
@@ -667,10 +581,7 @@ namespace moho
       return 0;
     }
 
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kCollisionManipulatorDisableHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kCollisionManipulatorDisableHelpText);
 
     LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
     CCollisionManipulator* const manipulator = SCR_FromLua_CCollisionManipulator(manipulatorObject, state);
@@ -710,10 +621,7 @@ namespace moho
       return 0;
     }
 
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kCollisionManipulatorWatchBoneHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kCollisionManipulatorWatchBoneHelpText);
 
     LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
     CCollisionManipulator* const manipulator = SCR_FromLua_CCollisionManipulator(manipulatorObject, state);
@@ -1021,7 +929,7 @@ namespace gpg
       return nullptr;
     }
 
-    *outRef = MakeTypedRef(value, CachedCCollisionManipulatorType());
+    *outRef = gpg::MakeTypedRef(value, CachedCCollisionManipulatorType());
     return outRef;
   }
 

@@ -43,3 +43,59 @@ do
         table.insert(video.items, position, graphicsApi)
     end
 end
+
+-- The replay viewer's keyframes: saved game states it moves back to. Compressed, in replay_keyframes next to the exe.
+do
+    local gameplay = options and options.gameplay
+    if gameplay and gameplay.items then
+        table.insert(gameplay.items, {
+            title = "Replay keyframe cache (MB)",
+            key = 'replay_keyframe_budget',
+            type = 'slider',
+            default = 2048,
+            tip = "Disk space a replay may use for its saved positions, in the replay_keyframes folder next to the game. "
+                .. "Over this, the oldest are thinned out, and moving far back takes longer. Cleared when the next replay starts.",
+            set = function(key, value, startup)
+                ConExecute("replay_KeyframeMaxMB " .. tostring(value))
+            end,
+            custom = {
+                min = 256,
+                max = 16384,
+                inc = 256,
+            },
+        })
+        table.insert(gameplay.items, {
+            title = "Replay keyframe spacing (seconds)",
+            key = 'replay_keyframe_spacing',
+            type = 'slider',
+            default = 30,
+            tip = "Game time between a replay's saved positions. Closer ones make moves shorter and use more of the cache. "
+                .. "The background preparation takes a new value from the next replay.",
+            set = function(key, value, startup)
+                ConExecute("replay_KeyframeEvery " .. tostring(math.floor(value) * 10))
+            end,
+            custom = {
+                min = 10,
+                max = 300,
+                inc = 10,
+            },
+        })
+        table.insert(gameplay.items, {
+            title = "Replay background preparation",
+            key = 'replay_keyframe_prepare',
+            type = 'toggle',
+            default = 1,
+            tip = "A hidden low-priority copy of the game saves positions ahead of a replay you watch, so a first jump forward "
+                .. "can load one. Off saves CPU, and jumps forward play through the game instead.",
+            set = function(key, value, startup)
+                ConExecute("replay_PrepareKeyframes " .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    {text = "<LOC _On>", key = 1},
+                    {text = "<LOC _Off>", key = 0},
+                },
+            },
+        })
+    end
+end

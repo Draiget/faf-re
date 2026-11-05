@@ -34,15 +34,6 @@ namespace
     return typeInfo;
   }
 
-  [[nodiscard]] gpg::RType* CachedCScriptObjectType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CScriptObject));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x005B9520 (FUN_005B9520)
    *
@@ -52,18 +43,7 @@ namespace
    */
   void AddCScriptObjectBaseToCAiPersonalityType(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedCScriptObjectType();
-    if (!baseType) {
-      return;
-    }
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<CScriptObject>(typeInfo);
   }
 } // namespace
 

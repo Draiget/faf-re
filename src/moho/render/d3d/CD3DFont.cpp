@@ -4,8 +4,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <limits>
 #include <map>
+#include <memory>
 #include <new>
 #include <stdexcept>
 #include <string>
@@ -13,8 +15,18 @@
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/core/utils/Global.h"
+#include "gpg/gal/Effect.hpp"
+#include "gpg/gal/EffectTechnique.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "moho/console/CConCommand.h"
+#include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
+#include "moho/render/d3d/ShaderVar.h"
+#include "moho/render/font/MsdfFontRegistry.h"
+#include "moho/render/font/MsdfTextGpuRenderer.h"
+#include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/render/textures/DXTCodec.h"
 
 namespace moho
@@ -34,6 +46,283 @@ namespace moho
       "GetPixel per pixel (0), which cost tens of ms when a frame met many new characters.",
       &ren_GlyphBitmapRead
     );
+
+    /**
+     * Engine addition: `ren_MsdfText` (issue #307). Screen-space text at `ren_MsdfTextMinSize` pixels or
+     * more draws from an MSDF atlas (a texture of distances to each glyph's outline) when one is ready.
+     * Advances still come from the GDI font, so Lua's layout and word wrapping don't move.
+     */
+    bool ren_MsdfText = true;
+    int ren_MsdfTextMinSize = 1;
+
+    TConVar<bool> gTConVar_ren_MsdfText(
+      "ren_MsdfText",
+      "Draw screen-space text from MSDF atlases where one is ready (1, the default), or always through GDI glyphs (0).",
+      &ren_MsdfText
+    );
+    TConVar<int> gTConVar_ren_MsdfTextMinSize(
+      "ren_MsdfTextMinSize",
+      "The smallest text in pixels ren_MsdfText draws from an atlas; smaller text stays on GDI glyphs.",
+      &ren_MsdfTextMinSize
+    );
+
+    constexpr const char* kMsdfTechnique = "TMsdfText";
+    constexpr const char* kScreenTextTechnique = "TAlphaBlendLinearSampleNoDepth";
+    constexpr std::uint32_t kAtlasTextureFormat = 2u; // 32-bit; byte order doesn't matter to the median
+
+    /** What a `CD3DFont` needs for MSDF text. Kept beside it: the class's layout is the binary's. */
+    struct MsdfBinding
+    {
+      std::string mFace;
+      std::int32_t mPointSize = 0;
+      std::shared_ptr<const SMsdfFontAtlas> mAtlas;
+    };
+
+    /**
+     * Every font's atlas on one GPU texture, so a change of font doesn't split a draw. A device reset
+     * replaces the sheet's texture and loses its pixels, so they're written again.
+     */
+    struct MsdfAtlasPage
+    {
+      struct PlacedFont
+      {
+        const SMsdfFontAtlas* mAtlas = nullptr;
+        std::int32_t mX = 0;
+        std::int32_t mY = 0;
+      };
+
+      boost::shared_ptr<CD3DDynamicTextureSheet> mSheet;
+      const void* mUploadedTexture = nullptr;
+      std::vector<PlacedFont> mFonts;
+      std::int32_t mShelfX = 0;
+      std::int32_t mShelfY = 0;
+      std::int32_t mShelfHeight = 0;
+    };
+
+    constexpr std::int32_t kMsdfPageWidth = 2048;
+    constexpr std::int32_t kMsdfPageHeight = 4096;
+    constexpr std::int32_t kMsdfPageSpacing = 3; // empty texels between fonts, as between glyph boxes
+
+    std::map<const CD3DFont*, MsdfBinding> sMsdfBindings;
+    MsdfAtlasPage sMsdfPage;
+
+    [[nodiscard]] const SMsdfGlyph* FindMsdfGlyph(const SMsdfFontAtlas& atlas, const std::uint32_t codepoint)
+    {
+      const auto found = std::lower_bound(
+        atlas.mGlyphs.begin(), atlas.mGlyphs.end(), codepoint,
+        [](const SMsdfGlyph& glyph, const std::uint32_t value) { return glyph.mCodepoint < value; }
+      );
+      return found != atlas.mGlyphs.end() && found->mCodepoint == codepoint ? &*found : nullptr;
+    }
+
+    /** Writes one font's pixels and the empty texels to its right and below it, which keep the next font apart. */
+    [[nodiscard]] bool WriteFontToPage(const MsdfAtlasPage::PlacedFont& placed)
+    {
+      const SMsdfFontAtlas& atlas = *placed.mAtlas;
+      const std::int32_t right = (std::min)(placed.mX + atlas.mWidth + kMsdfPageSpacing, kMsdfPageWidth);
+      const std::int32_t bottom = (std::min)(placed.mY + atlas.mHeight + kMsdfPageSpacing, kMsdfPageHeight);
+      const RECT rect{placed.mX, placed.mY, right, bottom};
+      std::uint32_t pitch = 0u;
+      void* bits = nullptr;
+      if (!sMsdfPage.mSheet->LockRect(&rect, &pitch, &bits) || bits == nullptr) {
+        return false;
+      }
+      const std::size_t lockedRowBytes = static_cast<std::size_t>(right - placed.mX) * 4u;
+      const std::size_t atlasRowBytes = static_cast<std::size_t>(atlas.mWidth) * 4u;
+      for (std::int32_t row = 0; row < bottom - placed.mY; ++row) {
+        auto* const out = static_cast<std::uint8_t*>(bits) + static_cast<std::size_t>(pitch) * static_cast<std::size_t>(row);
+        std::memset(out, 0, lockedRowBytes);
+        if (row < atlas.mHeight) {
+          std::memcpy(out, atlas.mPixels.data() + atlasRowBytes * static_cast<std::size_t>(row), atlasRowBytes);
+        }
+      }
+      (void)sMsdfPage.mSheet->Unlock();
+      return true;
+    }
+
+    /**
+     * Where an atlas sits on the page, placing it on first use and rewriting the page after a device reset.
+     * False when the page is full or can't be made; that font stays on GDI glyphs.
+     */
+    [[nodiscard]] bool AcquireMsdfPlacement(const SMsdfFontAtlas& atlas, std::int32_t& outX, std::int32_t& outY)
+    {
+      MsdfAtlasPage& page = sMsdfPage;
+      if (!page.mSheet) {
+        CD3DDevice* const device = D3D_GetDevice();
+        ID3DDeviceResources* const resources = device != nullptr ? device->GetResources() : nullptr;
+        if (resources == nullptr) {
+          return false;
+        }
+        (void)resources->NewDynamicTextureSheet(page.mSheet, kMsdfPageWidth, kMsdfPageHeight, kAtlasTextureFormat);
+        if (!page.mSheet) {
+          return false;
+        }
+      }
+
+      CD3DDynamicTextureSheet::TextureHandle texture;
+      page.mSheet->GetTexture(texture);
+      if (texture.get() != page.mUploadedTexture) {
+        for (const MsdfAtlasPage::PlacedFont& placed : page.mFonts) {
+          if (!WriteFontToPage(placed)) {
+            return false;
+          }
+        }
+        page.mUploadedTexture = texture.get();
+      }
+
+      for (const MsdfAtlasPage::PlacedFont& placed : page.mFonts) {
+        if (placed.mAtlas == &atlas) {
+          outX = placed.mX;
+          outY = placed.mY;
+          return true;
+        }
+      }
+
+      if (page.mShelfX + atlas.mWidth > kMsdfPageWidth) {
+        page.mShelfY += page.mShelfHeight + kMsdfPageSpacing;
+        page.mShelfX = 0;
+        page.mShelfHeight = 0;
+      }
+      if (atlas.mWidth > kMsdfPageWidth || page.mShelfY + atlas.mHeight > kMsdfPageHeight) {
+        return false;
+      }
+      const MsdfAtlasPage::PlacedFont placed{&atlas, page.mShelfX, page.mShelfY};
+      if (!WriteFontToPage(placed)) {
+        return false;
+      }
+      page.mFonts.push_back(placed);
+      page.mShelfX += atlas.mWidth + kMsdfPageSpacing;
+      page.mShelfHeight = (std::max)(page.mShelfHeight, atlas.mHeight);
+      outX = placed.mX;
+      outY = placed.mY;
+      return true;
+    }
+
+    /**
+     * Draws a string from its font's MSDF atlas. Returns false, having drawn nothing, when the old path
+     * has to: no atlas yet, small text, text not on the screen plane, a character the atlas lacks, or a
+     * caller drawing with a technique other than the UI's.
+     */
+    [[nodiscard]] bool RenderMsdfText(
+      CD3DFont& font, const char* const text, CD3DPrimBatcher& primBatcher, const Vector3f& origin, const Vector3f& xAxis,
+      const Vector3f& yAxis, const std::uint32_t color, const float maxAdvance, Vector3f& outCursor
+    )
+    {
+      const auto bound = sMsdfBindings.find(&font);
+      if (bound == sMsdfBindings.end() || bound->second.mPointSize < ren_MsdfTextMinSize) {
+        return false;
+      }
+      if (xAxis.x != 1.0f || xAxis.y != 0.0f || xAxis.z != 0.0f || yAxis.x != 0.0f || yAxis.y != -1.0f || yAxis.z != 0.0f) {
+        return false;
+      }
+      MsdfBinding& binding = bound->second;
+      if (!binding.mAtlas) {
+        binding.mAtlas = MSDF_FindAtlas(binding.mFace.c_str());
+        if (!binding.mAtlas) {
+          return false;
+        }
+      }
+      const SMsdfFontAtlas& atlas = *binding.mAtlas;
+
+      wchar_t codepoint = 0;
+      for (const char* encoded = gpg::STR_DecodeUtf8Char(text, codepoint); codepoint != 0;
+           encoded = gpg::STR_DecodeUtf8Char(encoded, codepoint)) {
+        if (FindMsdfGlyph(atlas, static_cast<std::uint32_t>(codepoint)) == nullptr) {
+          return false;
+        }
+      }
+
+      CD3DDevice* const device = D3D_GetDevice();
+      CD3DEffect* const effect = device != nullptr ? device->GetCurEffect() : nullptr;
+      if (effect == nullptr || std::strcmp(effect->mName.c_str(), "primbatcher") != 0
+          || !effect->mCurrentTechnique || std::strcmp(effect->mCurrentTechnique->GetName()->c_str(), kScreenTextTechnique) != 0) {
+        return false;
+      }
+      std::int32_t pageX = 0;
+      std::int32_t pageY = 0;
+      if (!AcquireMsdfPlacement(atlas, pageX, pageY)) {
+        return false;
+      }
+      const boost::shared_ptr<CD3DDynamicTextureSheet>& sheet = sMsdfPage.mSheet;
+
+      const float size = static_cast<float>(binding.mPointSize);
+      const float pixelRange = atlas.mDistanceRange * size / atlas.mEmPixels;
+
+      // One instanced draw from a GPU buffer where the backend has it; through the batcher otherwise.
+      MsdfTextGpuRenderer& instancedText = MsdfTextGpuRenderer::Get();
+      const bool instanced = instancedText.IsActive() && instancedText.BeginString(primBatcher, sheet);
+      CD3DPrimBatcher::TextureBinding previousTexture{};
+      boost::shared_ptr<gpg::gal::EffectTechnique> previousTechnique;
+      if (!instanced) {
+        if (!shaderVarPrimBatcherMsdfPixelRange.Exists()) {
+          return false;
+        }
+        primBatcher.Flush();
+        previousTexture = primBatcher.GetTextureBinding();
+        previousTechnique = effect->mCurrentTechnique;
+        effect->SetTechnique(kMsdfTechnique);
+        shaderVarPrimBatcherMsdfPixelRange.mEffectVariable->SetFloat(pixelRange);
+        primBatcher.SetTexture(boost::static_pointer_cast<ID3DTextureSheet>(sheet));
+      }
+
+      const float inverseWidth = 1.0f / static_cast<float>(kMsdfPageWidth);
+      const float inverseHeight = 1.0f / static_cast<float>(kMsdfPageHeight);
+      const auto corner = [&](const Vector3f& pen, const float x, const float y) {
+        return Vector3f{pen.x + x * size, pen.y - y * size, pen.z};
+      };
+      Vector3f cursor = origin;
+      float totalAdvance = 0.0f;
+      for (const char* encoded = gpg::STR_DecodeUtf8Char(text, codepoint); codepoint != 0;
+           encoded = gpg::STR_DecodeUtf8Char(encoded, codepoint)) {
+        const float advance = font.GetCharInfo(codepoint).mAdvance;
+        totalAdvance += advance;
+        if (std::isfinite(maxAdvance) && totalAdvance > maxAdvance) {
+          break;
+        }
+        const SMsdfGlyph& glyph = *FindMsdfGlyph(atlas, static_cast<std::uint32_t>(codepoint));
+        if (glyph.mAtlasRight > glyph.mAtlasLeft) {
+          const Vector3f topLeft = corner(cursor, glyph.mPlaneLeft, glyph.mPlaneTop);
+          const Vector3f bottomRight = corner(cursor, glyph.mPlaneRight, glyph.mPlaneBottom);
+          const float u0 = (glyph.mAtlasLeft + static_cast<float>(pageX)) * inverseWidth;
+          const float u1 = (glyph.mAtlasRight + static_cast<float>(pageX)) * inverseWidth;
+          const float v0 = (glyph.mAtlasTop + static_cast<float>(pageY)) * inverseHeight;
+          const float v1 = (glyph.mAtlasBottom + static_cast<float>(pageY)) * inverseHeight;
+          if (instanced) {
+            MsdfUiQuad quad;
+            const float xs[4] = {topLeft.x, bottomRight.x, bottomRight.x, topLeft.x};
+            const float ys[4] = {topLeft.y, topLeft.y, bottomRight.y, bottomRight.y};
+            const float us[4] = {u0, u1, u1, u0};
+            const float vs[4] = {v0, v0, v1, v1};
+            for (int c = 0; c < 4; ++c) {
+              quad.mX[c] = xs[c];
+              quad.mY[c] = ys[c];
+              quad.mU[c] = us[c];
+              quad.mV[c] = vs[c];
+              quad.mColor[c] = color;
+            }
+            quad.mPixelRange = pixelRange;
+            quad.mZ = topLeft.z;
+            instancedText.AddGlyph(quad);
+          } else {
+            primBatcher.DrawQuad(
+              CD3DPrimBatcher::Vertex{topLeft.x, topLeft.y, topLeft.z, color, u0, v0},
+              CD3DPrimBatcher::Vertex{bottomRight.x, topLeft.y, topLeft.z, color, u1, v0},
+              CD3DPrimBatcher::Vertex{bottomRight.x, bottomRight.y, topLeft.z, color, u1, v1},
+              CD3DPrimBatcher::Vertex{topLeft.x, bottomRight.y, topLeft.z, color, u0, v1}
+            );
+          }
+        }
+        cursor.x += advance;
+      }
+
+      if (!instanced) {
+        primBatcher.Flush();
+        effect->mCurrentTechnique = previousTechnique;
+        primBatcher.SetTextureBinding(previousTexture);
+      }
+      outCursor = cursor;
+      return true;
+    }
 
     /**
      * The `sampleWidth` x `sampleHeight` corner of the 32-bit scratch bitmap as GetPixel
@@ -340,7 +629,7 @@ namespace moho
      * What it does:
      * Computes element pointer for one indexed glyph-info slot.
      */
-    [[nodiscard]] CD3DFont::SCharInfo* GetGlyphInfoAt(CD3DFont::SCharInfo* const begin, const std::size_t index)
+    [[maybe_unused]] [[nodiscard]] CD3DFont::SCharInfo* GetGlyphInfoAt(CD3DFont::SCharInfo* const begin, const std::size_t index)
     {
       return begin + index;
     }
@@ -515,7 +804,7 @@ namespace moho
      * What it does:
      * Resizes one DXT scratch lane as zero-filled 8-byte word-pairs.
      */
-    void ResizeDxtWordPairScratchZeroFill(const std::size_t count, DxtWordPairVector& scratch)
+    [[maybe_unused]] void ResizeDxtWordPairScratchZeroFill(const std::size_t count, DxtWordPairVector& scratch)
     {
       const DxtWordPair fill{};
       ResizeDxtWordPairScratch(count, scratch, fill);
@@ -653,6 +942,8 @@ namespace moho
       return {};
     }
 
+    sMsdfBindings[createdFont] = MsdfBinding{lookup.mFace, pointSize, nullptr};
+
     ++createdFont->mRefCount; // cache-owned reference
     const auto [insertedIt, inserted] = InsertFontCacheEntry(lookup, createdFont);
     if (!inserted) {
@@ -761,6 +1052,8 @@ namespace moho
    */
   CD3DFont::~CD3DFont()
   {
+    sMsdfBindings.erase(this);
+
     // FUN_004272F0: the member-empty `operator=` release of the kerning vector.
     mKerningPairs = CD3DFont::KerningPairVector{};
     DestroyGlyphPageCache(mCharInfo);
@@ -1034,6 +1327,10 @@ namespace moho
   )
   {
     Vector3f cursor = origin;
+    if (ren_MsdfText && RenderMsdfText(*this, text, *primBatcher, origin, xAxis, yAxis, color, maxAdvance, cursor)) {
+      return cursor;
+    }
+
     float totalAdvance = 0.0f;
 
     wchar_t codepoint = 0;

@@ -1,7 +1,6 @@
 #include "moho/ai/CAiFormationInstanceTypeInfo.h"
 
 #include <cstdlib>
-#include <initializer_list>
 #include <new>
 #include <typeinfo>
 
@@ -21,30 +20,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
-  {
-    for (const char* const name : names) {
-      if (!name) {
-        continue;
-      }
-
-      if (gpg::RType* const type = gpg::REF_FindTypeNamed(name)) {
-        return type;
-      }
-    }
-
-    return nullptr;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCFormationInstanceType()
-  {
-    static gpg::RType* cachedType = nullptr;
-    if (!cachedType) {
-      cachedType = ResolveTypeByAnyName({"CFormationInstance", "Moho::CFormationInstance"});
-    }
-    return cachedType;
-  }
-
   [[nodiscard]] gpg::RRef MakeFormationInstanceRef(CAiFormationInstance* const object)
   {
     gpg::RRef out{};
@@ -61,18 +36,7 @@ namespace
    */
   void AddCFormationInstanceBaseToCAiFormationInstanceType(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedCFormationInstanceType();
-    if (!baseType) {
-      return;
-    }
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<CFormationInstance>(typeInfo);
   }
 
 } // namespace
@@ -154,10 +118,7 @@ gpg::RRef CAiFormationInstanceTypeInfo::NewRef()
  */
 gpg::RRef CAiFormationInstanceTypeInfo::CtrRef(void* const objectStorage)
 {
-  auto* const object = static_cast<CAiFormationInstance*>(objectStorage);
-  if (object) {
-    new (object) CAiFormationInstance();
-  }
+  auto* const object = gpg::ConstructInStorage<CAiFormationInstance>(objectStorage);
   return MakeFormationInstanceRef(object);
 }
 

@@ -49,16 +49,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedCScriptObjectType()
-  {
-    gpg::RType* type = moho::CScriptObject::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CScriptObject));
-      moho::CScriptObject::sType = type;
-    }
-    return type;
-  }
-
   /**
    * Address: 0x00739B30 (FUN_00739B30)
    *
@@ -275,10 +265,7 @@ namespace moho
    */
   gpg::RRef CDamage::GetDerivedObjectRef()
   {
-    gpg::RRef ref{};
-    ref.mObj = this;
-    ref.mType = GetClass();
-    return ref;
+    return gpg::MakeSelfRef(this);
   }
 
   /**
@@ -302,14 +289,7 @@ namespace moho
    */
   void CDamageTypeInfo::AddBaseScriptObject(gpg::RType* const typeInfo)
   {
-    gpg::RType* const scriptObjectType = CachedCScriptObjectType();
-    gpg::RField baseField{};
-    baseField.mName = scriptObjectType->GetName();
-    baseField.mType = scriptObjectType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::CScriptObject>(typeInfo);
   }
 
   /**

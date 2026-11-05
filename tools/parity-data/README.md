@@ -1,6 +1,6 @@
 # Replay parity in CI
 
-The [Replay parity workflow](../../.github/workflows/replay-parity.yml) plays FAF vault replays of one game version (3835 now) on the Linux `headless` build and checks every checksum the live players recorded, as [tools/replay-parity](../replay-parity/README.md) does on Windows, with the same verdicts and the same rule for a desync that happened in the live game. The [Parity prewarm workflow](../../.github/workflows/parity-prewarm.yml) fills the caches it plays from. The tools here fetch the game files, replays and maps from FAF, strip them, split a run into jobs packed to their time limit, play each job's replays and merge the results.
+The [Replay parity workflow](../../.github/workflows/replay-parity.yml) plays FAF vault replays of one game version (3835 now) on the Linux `headless` build and checks every checksum the live players recorded, as [tools/replay-parity](../replay-parity/README.md) does on Windows, with the same verdicts and the same rule for a desync that happened in the live game (the sim matches at least as many of the recorded clients as the checksum that differs, so the live game had already split). The [Parity prewarm workflow](../../.github/workflows/parity-prewarm.yml) fills the caches it plays from. The tools here fetch the game files, replays and maps from FAF, strip them, split a run into jobs packed to their time limit, play each job's replays and merge the results.
 
 ## The workflows
 
@@ -18,9 +18,11 @@ The [Replay parity workflow](../../.github/workflows/replay-parity.yml) plays FA
 | Job | What it does |
 |---|---|
 | `build` | Builds `headless` from the commit given, with the pinned toolchain |
-| `plan` | Picks the replays (`core`, `extended`, a seeded `sample` or `all`) and packs them into jobs |
+| `plan` | Picks the replays (`core`, `extended`, a seeded `sample`, `nightly` or `all`) and packs them into jobs |
 | `run` | One job per shard: puts the pack together (FAF's game files and the retail archives), plays its replays four at a time, and uploads `results.jsonl` and the logs of every replay that did not pass. It starts a replay only if its estimate, scaled by how much longer than estimated the job's finished replays took, ends before the job's 300 minutes; a replay that does not fit, or is still playing then, is `not-run` |
-| `report` | Merges the results, writes the job summary and `report.json` (passing replays with replay time, wall time and speedup), and fails on any new desync, crash, early stop, timeout or error (a replay that could not be got ready, or a shard that died) |
+| `report` | Merges the results, writes the job summary and `report.json` (passing replays with replay time, wall time and speedup), and lists under `regressions` any new desync, crash, early stop, timeout or error (a replay that could not be got ready, or a shard that died). These don't fail the run: the report is its result, with a warning on the run |
+
+**The nightly run** starts at 20:00 UTC (00:00 UTC+4) on master's head; by hand it is `set=nightly`, `sample=5000`, `seed=1`, `job_minutes=150`. It plays the `nightly` set: the core and extended sets, every replay in [desynced/3835.txt](desynced/3835.txt), and others picked once by a fixed seed. They are the same replays every night, so a failure that is new means a change since the night before, and passing starts the [Nightly release](../release/README.md). It keeps as many as 40 jobs of 150 minutes hold. GitHub runs 20 jobs at once on Free, so that is two rounds, about 5 h 30 min with a fresh build; a job holds one replay bucket, so 40 short jobs fill the runners where 25 buckets in full-length jobs could not end in time. While it runs, pull request checks wait for a free runner and another parity run queues behind it. Add a replay to `desynced/` when it desyncs; a failure the report calls new turns the night red until it is fixed or listed in `expected/` with its reason.
 
 A run whose jobs ran out of time leaves replays `not-run`. Start another with `after_run` set to its run id: it plays only those (and any `error`, `timeout` or `crash`), and its report covers both runs.
 
@@ -65,6 +67,13 @@ A pull request's workflow can read master's caches too, a fork's included, which
 | `PARITY_RETAIL_KEY` | `parity` environment secret | the file's passphrase |
 | `PARITY_RETAIL_ID` | `parity` environment variable | names the retail file, for example `v1`; change it when the file changes (only the jobs in the environment use it) |
 
+**Charts.** After a full run, update the run, the commit and the causes in `parity_chart.json`, then redraw the charts in `docs/images/` (the README and `docs/RETAIL_REPLAY_PARITY.md` show them). The script refuses a causes list that doesn't add up to the report's desyncs:
+
+```
+gh run download <run id> -R Draiget/faf-re -n report -D tmp/parity-ci/run-<run id>/report
+python tools/parity-data/chart.py --report tmp/parity-ci/run-<run id>/report/report.json
+```
+
 ## The corpus
 
 [corpus/3835.tsv.gz](corpus/3835.tsv.gz) lists the replays CI may play: every 3835 game in the vault with 2 or more players, at least 5 minutes of game, a replay, and a map that can be had (generated maps cannot), plus the core and extended sets of [PR_REPLAY_CHECK.md](../../docs/PR_REPLAY_CHECK.md). One line per replay: id, ticks, players, map folder, and where its map comes from: `retail` (a map the game ships, cached from FAF's map vault), `cached` (one of the 500 most played vault maps) or `download` (fetched by the job that plays it). On 29/10/2026: 43,091 replays, 9,194 on retail maps, 28,989 on the top 500 maps, 4,908 on others. About 30% of them need a sim mod and are left out when the prewarm reads them.
@@ -80,7 +89,7 @@ python corpus.py build --export tmp/claude/export3835 --retail-maps <pack>/fa/ma
 
 26,825,749 to 27,067,140 are the vault ids of game version 3835: the first replay whose engine version (inside the replay, `Supreme Commander v1.50.3835`) is 3835, and the last whose header names 3835. Headers name 3835 from 26,825,350 on, but the replays up to 26,825,721 were recorded by the 3834 engine. The export asks for one page of 100 games a second, about 1,000 requests. The login is the FAF client's (its client id and the device-code sign-in of `api/TokenRetriever.java`), as FAF has no client registered for this project.
 
-Known failures, which the report lists but does not fail on, are in [expected/3835.json](expected/3835.json).
+Failures that are not bugs of this engine are in [expected/3835.json](expected/3835.json), each with why: retail fails there too, the map reads the real-time clock, or the replay cannot be got. The report gives them the verdict `expected-desync` (or `expected-crash`, `expected-error`), leaves them out of the desync count and does not fail on them. A bug of ours does not belong in this file: fix it. A live game split needs no entry: when the players recorded different checksums and the sim equals the larger side, or one side of a tie, the replay passes and the report lists the split.
 
 ## The pack
 

@@ -66,6 +66,7 @@ namespace faf::remote
     const std::uint32_t viewId = kViewCommandTop | mNextCommand;
     mCommandToView.emplace(simId, viewId);
     mCommandToSim[viewId] = simId;
+    mNewCommands.push_back(simId);
     ++mCommandsMapped;
     return viewId;
   }
@@ -142,17 +143,14 @@ namespace faf::remote
     }
   }
 
-  void CViewIdMap::RetireCommandsUnless(const std::function<bool(std::uint32_t simId)>& alive)
+  void CViewIdMap::RetireNewCommandsUnless(const std::function<bool(std::uint32_t simId)>& alive)
   {
-    for (auto it = mCommandToView.begin(); it != mCommandToView.end();) {
-      if (alive(it->first)) {
-        ++it;
-        continue;
+    for (const std::uint32_t simId : mNewCommands) {
+      if (!alive(simId)) {
+        RetireCommands(std::span<const std::uint32_t>(&simId, 1u));
       }
-      mGrace.push_back({mBeat + kInboundGraceBeats, it->second, it->first, true});
-      mGraceCommands[it->first] = it->second;
-      it = mCommandToView.erase(it);
     }
+    mNewCommands.clear();
   }
 
   void CViewIdMap::AdvanceTo(const std::uint32_t beat)

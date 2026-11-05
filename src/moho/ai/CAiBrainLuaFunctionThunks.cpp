@@ -82,20 +82,6 @@ namespace moho
 
 namespace
 {
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_ResourceDepositStartup = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_ResourceDepositStartup = nullptr;
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindLuaInitFormSetByName(const char* const setName) noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, setName) == 0) {
-        return set;
-      }
-    }
-
-    return nullptr;
-  }
-
   template <moho::CScrLuaInitForm* (*Target)()>
   [[nodiscard]] moho::CScrLuaInitForm* ForwardAiBrainLuaRegistrationThunk() noexcept
   {
@@ -832,16 +818,6 @@ namespace moho
     return ForwardAiBrainLuaRegistrationThunk<&func_CAiBrainGetNoRushTicks_LuaFuncDef>();
   }
 
-  [[nodiscard]] static CScrLuaInitFormSet& ClassBinderSimLuaInitSet()
-  {
-    if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
-
   /**
    * Address: 0x00BCB6C0 (FUN_00BCB6C0, sub_BCB6C0)
    *
@@ -852,7 +828,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_resourceDepositFactoryAnchor()
   {
     static CScrLuaClassBinder binder(
-      ClassBinderSimLuaInitSet(), "moho.aibrain_methods", &CScrLuaMetatableFactory<CAiBrain>::Instance(), "CAiBrain", ""
+      moho::SCR_SimLuaInitSet(), "moho.aibrain_methods", &CScrLuaMetatableFactory<CAiBrain>::Instance(), "CAiBrain", ""
     );
     return &binder;
   }

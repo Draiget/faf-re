@@ -45,6 +45,45 @@ namespace moho
 
   } // namespace
 
+  SLaunchSpeed ReadLaunchSpeed(const LuaPlus::LuaObject& gameOptions)
+  {
+    SLaunchSpeed launchSpeed{};
+    const LuaPlus::LuaObject gameSpeedObject = gameOptions["GameSpeed"];
+    if (gameSpeedObject.IsString()) {
+      const char* const gameSpeedName = gameSpeedObject.GetString();
+      if (gameSpeedName != nullptr) {
+        if (_stricmp(gameSpeedName, "fast") == 0) {
+          launchSpeed.speed = 4;
+        } else if (_stricmp(gameSpeedName, "adjustable") == 0) {
+          launchSpeed.adjustable = true;
+        }
+      }
+    }
+    return launchSpeed;
+  }
+
+  LuaPlus::LuaObject ILaunchParticipants::DefaultPlayerOptions(LuaPlus::LuaState* const state)
+  {
+    return RULE_GetDefaultPlayerOptions(state);
+  }
+
+  LuaPlus::LuaObject CLaunchRoster::DefaultPlayerOptions(LuaPlus::LuaState* const state)
+  {
+    LuaPlus::LuaObject options;
+    options.AssignNewTable(state, 0, 10u);
+    options.SetInteger("Team", 1);
+    options.SetInteger("PlayerColor", 1);
+    options.SetInteger("ArmyColor", 1);
+    options.SetInteger("StartSpot", 1);
+    options.SetBoolean("Ready", false);
+    options.SetInteger("Faction", 5); // `table.getn(Factions) + 1`, the lobby's "random"
+    options.SetString("PlayerName", "player");
+    options.SetString("AIPersonality", "");
+    options.SetBoolean("Human", true);
+    options.SetBoolean("Civilian", false);
+    return options;
+  }
+
   CLaunchRoster::CLaunchRoster(
     const std::int32_t localUid, msvc8::string localName, std::vector<SLaunchClient> remotes
   )
@@ -220,7 +259,7 @@ namespace moho
     }
 
     if (playerOptions.empty()) {
-      LuaPlus::LuaObject defaultOptions = RULE_GetDefaultPlayerOptions(state);
+      LuaPlus::LuaObject defaultOptions = participants.DefaultPlayerOptions(state);
       defaultOptions.SetString("PlayerName", "default");
       defaultOptions.SetString("ArmyName", "default");
       defaultOptions.SetBoolean("Human", false);
@@ -241,7 +280,7 @@ namespace moho
           msvc8::vector<msvc8::string> extraArmies;
           gpg::STR_GetTokens(extraArmiesText ? extraArmiesText : "", " ", extraArmies);
           for (const msvc8::string& extraArmyName : extraArmies) {
-            LuaPlus::LuaObject civilianOptions = RULE_GetDefaultPlayerOptions(state);
+            LuaPlus::LuaObject civilianOptions = participants.DefaultPlayerOptions(state);
             civilianOptions.SetString("PlayerName", "civilian");
             civilianOptions.SetString("ArmyName", extraArmyName.c_str());
             civilianOptions.SetBoolean("Civilian", true);

@@ -49,12 +49,6 @@ namespace
     return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
   }
 
-  [[nodiscard]] bool IsUsableEntitySlot(const moho::Entity* const entity) noexcept
-  {
-    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(entity);
-    return raw != 0u && raw != kInvalidEntitySlot;
-  }
-
   [[nodiscard]] bool IsUsableUnitSlot(const moho::Unit* const unit) noexcept
   {
     const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(unit);
@@ -171,43 +165,6 @@ namespace
     return unit->GetFerryUnit() == nullptr;
   }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedPickupQueueType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(msvc8::vector<moho::SPickUpInfo>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedUnitEntitySetType()
-  {
-    gpg::RType* type = moho::EntitySetTemplate<moho::Unit>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Unit>));
-      moho::EntitySetTemplate<moho::Unit>::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3Type()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return type;
-  }
 } // namespace
 
 namespace moho
@@ -713,10 +670,10 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
-    archive->Read(CachedPickupQueueType(), &mPickupQueue, ownerRef);
-    archive->Read(CachedUnitEntitySetType(), &mRequestedUnits, ownerRef);
-    archive->Read(CachedVector3Type(), &mPickupCenter, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(gpg::RTypeOf<msvc8::vector<moho::SPickUpInfo>>(), &mPickupQueue, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>(), &mRequestedUnits, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mPickupCenter, ownerRef);
     archive->ReadInt(&mReadyUnitCount);
     archive->ReadInt(&mLoadedUnitCount);
     archive->ReadInt(&mProcessingTicks);
@@ -739,10 +696,10 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
-    archive->Write(CachedPickupQueueType(), &mPickupQueue, ownerRef);
-    archive->Write(CachedUnitEntitySetType(), &mRequestedUnits, ownerRef);
-    archive->Write(CachedVector3Type(), &mPickupCenter, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<msvc8::vector<moho::SPickUpInfo>>(), &mPickupQueue, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>(), &mRequestedUnits, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mPickupCenter, ownerRef);
     archive->WriteInt(mReadyUnitCount);
     archive->WriteInt(mLoadedUnitCount);
     archive->WriteInt(mProcessingTicks);

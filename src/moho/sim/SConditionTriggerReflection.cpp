@@ -214,15 +214,6 @@ namespace
 #if defined(MOHO_ABI_MSVC8_COMPAT)
 #endif
 
-  [[nodiscard]] gpg::RType* CachedSConditionType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::SCondition));
-    }
-    return cached;
-  }
-
   class RFastVectorSConditionTypeInfo final : public gpg::RType, public gpg::RIndexed
   {
   public:
@@ -247,7 +238,7 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSConditionType()->GetName());
+      static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::SCondition>()->GetName());
       return sName.c_str();
     }
 
@@ -585,7 +576,7 @@ namespace
   {
     auto* const stats = new (std::nothrow) moho::Stats<moho::CArmyStatItem>();
     if (constructResult == nullptr) {
-      delete stats;
+      GPG_NONVIRTUAL_DESTROY(delete stats);
       return;
     }
 
@@ -603,7 +594,7 @@ namespace
    */
   void DeleteStatsCArmyStatItemOwnedObject(void* const object)
   {
-    delete static_cast<moho::Stats<moho::CArmyStatItem>*>(object);
+    GPG_NONVIRTUAL_DESTROY(delete static_cast<moho::Stats<moho::CArmyStatItem>*>(object));
   }
 
   class RMapUnitBlueprintFloatTypeInfo final : public gpg::RType
@@ -701,9 +692,9 @@ namespace
     {
       size_ = sizeof(moho::Stats<moho::CArmyStatItem>);
       version_ = 1;
-      serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(&DeserializeStatsCArmyStatItemOwnedRootLane);
+      serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(reinterpret_cast<void (*)()>(&DeserializeStatsCArmyStatItemOwnedRootLane));
       serSaveFunc_ = &SerializeStatsCArmyStatItemOwnedRoot;
-      serConstructFunc_ = reinterpret_cast<gpg::RType::construct_func_t>(&ConstructStatsCArmyStatItemForSerializer);
+      serConstructFunc_ = reinterpret_cast<gpg::RType::construct_func_t>(reinterpret_cast<void (*)()>(&ConstructStatsCArmyStatItemForSerializer));
       deleteFunc_ = &DeleteStatsCArmyStatItemOwnedObject;
     }
   };

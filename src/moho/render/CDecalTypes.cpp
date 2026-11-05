@@ -17,30 +17,6 @@
 
 namespace
 {
-  /**
-   * Address: 0x0077B940 (FUN_0077B940)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for `SDecalInfo`.
-   */
-  [[nodiscard]] gpg::RType* CachedSDecalInfoType()
-  {
-    gpg::RType* type = moho::SDecalInfo::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SDecalInfo));
-      moho::SDecalInfo::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3<float>));
-    }
-    return type;
-  }
 
   [[nodiscard]] gpg::ReadArchive* ReadReflectedSDecalInfoPayload(
     gpg::ReadArchive* const archive,
@@ -49,7 +25,7 @@ namespace
   )
   {
     gpg::RRef nullOwner{};
-    archive->Read(CachedSDecalInfoType(), payload, ownerRef ? *ownerRef : nullOwner);
+    archive->Read(gpg::RTypeOf<moho::SDecalInfo>(), payload, ownerRef ? *ownerRef : nullOwner);
     return archive;
   }
 
@@ -60,7 +36,7 @@ namespace
   )
   {
     gpg::RRef nullOwner{};
-    archive->Write(CachedSDecalInfoType(), payload, ownerRef ? *ownerRef : nullOwner);
+    archive->Write(gpg::RTypeOf<moho::SDecalInfo>(), payload, ownerRef ? *ownerRef : nullOwner);
     return archive;
   }
 
@@ -255,7 +231,7 @@ namespace
    * destination range; semantically identical to this canonical helper, so
    * this single typed definition services every callsite in the TU.
    */
-  [[nodiscard]] moho::SDecalInfo* CopyAssignSDecalInfoRangeForward(
+  [[maybe_unused]] [[nodiscard]] moho::SDecalInfo* CopyAssignSDecalInfoRangeForward(
     moho::SDecalInfo* destinationBegin,
     const moho::SDecalInfo* sourceBegin,
     const moho::SDecalInfo* sourceEnd
@@ -463,7 +439,7 @@ namespace moho
       return;
     }
 
-    gpg::RType* const vector3fType = CachedVector3fType();
+    gpg::RType* const vector3fType = gpg::RTypeOf<Wm3::Vector3<float>>();
     gpg::RRef ownerRef{};
     archive->Read(vector3fType, &mPos, ownerRef);
     archive->Read(vector3fType, &mSize, ownerRef);
@@ -504,7 +480,7 @@ namespace moho
       return;
     }
 
-    gpg::RType* const vector3fType = CachedVector3fType();
+    gpg::RType* const vector3fType = gpg::RTypeOf<Wm3::Vector3<float>>();
     gpg::RRef ownerRef{};
     archive->Write(vector3fType, &mPos, ownerRef);
     archive->Write(vector3fType, &mSize, ownerRef);

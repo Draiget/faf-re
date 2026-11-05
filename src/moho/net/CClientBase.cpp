@@ -452,6 +452,8 @@ void CClientBase::Process(CMessage& msg)
 
   case static_cast<uint8_t>(EClientMsg::CLIMSG_Ready):
     mReady = true;
+    // Engine addition (wld_PreciseSharedStart): note when this ready was handled, for the shared start.
+    mManager->NoteClientReady(mIndex);
     return;
 
   case static_cast<uint8_t>(EClientMsg::CLIMSG_Eject): {
@@ -630,6 +632,7 @@ void CClientBase::UpdateState(
   // Decompile line 48: `v30 = mCommandSource != 255;`. Set here and nowhere
   // else -- see the authorized branch below.
   bool hasCommandSource = mCommandSourceId != kInvalidCommandSource;
+  const bool startedWithoutSource = !hasCommandSource;
   if (hasCommandSource) {
     WriteSetCommandSourceMessage(mCommandSourceId, outPipe, lastEmittedSource);
   }
@@ -788,6 +791,16 @@ void CClientBase::UpdateState(
       }
 
       if (hasCommandSource) {
+        // [DELIBERATE-FIX] companion, not in the binary: a replay's opening
+        // stretch, before its first `CMDST_Advance`, starts with the gate closed
+        // and the binary never reopens it, so retail compares no beat-0 report.
+        // We keep the stretch's commands, which the live players ran, and drop
+        // only those reports. In 26880558 one player's beat-0 hash differs and
+        // every later one agrees: retail passes it, and so must we.
+        if (op == ECmdStreamOp::CMDST_VerifyChecksum && startedWithoutSource && mDispatchedBeat == 0) {
+          continue;
+        }
+
         // No `WriteSetCommandSourceMessage` here: 0x0053C756 falls straight
         // through to the pipe append. The source was already emitted either at
         // entry or by the branch above, so the dedup made the extra call a
@@ -795,7 +808,7 @@ void CClientBase::UpdateState(
         outPipe->Write(message.mBuff.start_, message.mBuff.Size());
 
         if (op == ECmdStreamOp::CMDST_CommandSourceTerminated) {
-          mValidCommandSources.Remove(mCommandSourceId);
+          (void)mValidCommandSources.Remove(mCommandSourceId);
           mValidCommandSources.Finalize();
           hasCommandSource = false;
           mCommandSourceId = kInvalidCommandSource;

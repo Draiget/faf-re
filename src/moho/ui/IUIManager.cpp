@@ -65,9 +65,6 @@ namespace
     return outNormalizedPoint;
   }
 
-  std::uint32_t gUiRuntimeScratchLaneA = 0u;
-  std::uint32_t gUiRuntimeScratchLaneB = 0u;
-
   template <typename TCall>
   bool StartUIMainEntryWithState(
     LuaPlus::LuaState* const state,
@@ -685,5 +682,30 @@ void moho::UI_ShowDesyncDialog(const int sessionTick, const msvc8::vector<msvc8:
       "Error running '/lua/ui/uimain.lua:ShowDesyncDialog': %s",
       exception.what() != nullptr ? exception.what() : ""
     );
+  }
+}
+
+bool moho::UI_StartRejoinScreen()
+{
+  return StartUIMainEntry(UIS_splash, "StartRejoinScreen", [](const LuaPlus::LuaFunction<void>& entryPointFn) {
+    entryPointFn();
+  });
+}
+
+void moho::UI_UpdateRejoinScreen(const char* const stage, const float progress)
+{
+  CUIManager* const manager = g_UIManager;
+  LuaPlus::LuaState* const state = manager != nullptr ? manager->mLuaState : nullptr;
+  if (state == nullptr) {
+    return;
+  }
+
+  try {
+    const LuaPlus::LuaObject uiMainModule = SCR_Import(state, "/lua/ui/uimain.lua");
+    const LuaPlus::LuaObject updateRejoinScreenObj = uiMainModule["UpdateRejoinScreen"];
+    LuaPlus::LuaFunction<void> updateRejoinScreenFn(updateRejoinScreenObj);
+    updateRejoinScreenFn(stage, progress);
+  } catch (const msvc8::runtime_error& error) {
+    gpg::Warnf("Error running '/lua/ui/uimain.lua:UpdateRejoinScreen': %s", error.what());
   }
 }

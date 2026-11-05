@@ -119,8 +119,14 @@ type ContractConfig struct {
 	// ExeArgs go after the launcher's arguments for native adapters only
 	// (e.g. --bind-address 192.168.42.77 where inbound UDP to 0.0.0.0 is dropped).
 	ExeArgs []string `yaml:"exeArgs"`
+	// JarBind is for players on FAF's jar where loopback UDP to sockets bound to
+	// every interface is dropped (e.g. 192.168.42.77): mpemu then stands between
+	// the game and the jar (seat.jarBridge).
+	JarBind string `yaml:"jarBind"`
 	// ForceRelay passes --force-relay.
 	ForceRelay bool `yaml:"forceRelay"`
+	// KeepSession: seconds the adapter keeps its links after a running game exits (issue #275).
+	KeepSession int `yaml:"keepSession"`
 	// NoTurn hands out no ICE servers.
 	NoTurn bool `yaml:"noTurn"`
 	// IceServers, when set, are handed out instead of mpemu's own TURN server
@@ -131,7 +137,7 @@ type ContractConfig struct {
 	// server, which shapes only paths through it; "links" in every netlink
 	// link's sends (FAF_NETLINK_TEST_SHAPING), whichever path ICE picks. Use
 	// "links" when every player is our build, the bridge or the bridge's
-	// retail game, never with the Java adapter (issue #242).
+	// retail game, or a game on the jar with jarBind (issue #242).
 	Shaping string `yaml:"shaping"`
 }
 
@@ -182,6 +188,10 @@ type Config struct {
 	// Filled by the runner, not the scenario file.
 	HubSecret string `yaml:"-"` // MPEMU_SECRET / -secret-file
 	Advertise string `yaml:"-"` // how other machines reach games on this one
+	// RelayFollow lets the local relay follow a game whose address changes, as it does
+	// on a hub: a killed seat can come back from another machine, with the other
+	// players still talking to the same relay ports.
+	RelayFollow bool `yaml:"relayFollow"`
 	RunID     string `yaml:"-"`
 	RunDir    string `yaml:"-"`
 	HTTPAddr  string `yaml:"-"`

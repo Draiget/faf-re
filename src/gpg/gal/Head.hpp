@@ -29,6 +29,7 @@ namespace gpg::gal
          * owned label text.
          */
         HeadSampleOption(const HeadSampleOption& other);
+        HeadSampleOption& operator=(const HeadSampleOption&) = default;
 
         std::uint32_t sampleType = 0;  // +0x00
         std::uint32_t sampleQuality = 0; // +0x04

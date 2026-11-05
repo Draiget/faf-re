@@ -32,15 +32,6 @@ using namespace moho;
 
 namespace
 {
-  template <class T>
-  [[nodiscard]] gpg::RType* CachedRType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(T));
-    }
-    return cached;
-  }
 
   [[nodiscard]] gpg::RType* CachedCTaskType()
   {
@@ -50,27 +41,12 @@ namespace
     return CTask::sType;
   }
 
-  [[nodiscard]] gpg::RType* CachedUnitWeaponType()
-  {
-    return CachedRType<UnitWeapon>();
-  }
-
-  [[nodiscard]] gpg::RType* CachedCAiAttackerImplType()
-  {
-    return CachedRType<CAiAttackerImpl>();
-  }
-
-  [[nodiscard]] gpg::RType* CachedUnitType()
-  {
-    return CachedRType<Unit>();
-  }
-
   template <class T>
   [[nodiscard]] gpg::RRef MakeTrackedRef(T* object)
   {
     gpg::RRef out{};
     out.mObj = nullptr;
-    out.mType = CachedRType<T>();
+    out.mType = gpg::RTypeOf<T>();
     if (!object) {
       return out;
     }
@@ -109,7 +85,7 @@ namespace
     source.mObj = tracked.object;
     source.mType = tracked.type;
 
-    const gpg::RType* const expectedType = CachedRType<T>();
+    const gpg::RType* const expectedType = gpg::RTypeOf<T>();
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
     if (upcast.mObj) {
       return static_cast<T*>(upcast.mObj);
@@ -135,20 +111,6 @@ namespace
   {
     const gpg::RRef pointerRef = MakeTrackedRef(pointer);
     gpg::WriteRawPointer(archive, pointerRef, state, ownerRef);
-  }
-
-  void AddBase(gpg::RType* const ownerType, gpg::RType* const baseType, const std::int32_t offset)
-  {
-    GPG_ASSERT(ownerType != nullptr);
-    GPG_ASSERT(baseType != nullptr);
-
-    gpg::RField field{};
-    field.mName = baseType->GetName();
-    field.mType = baseType;
-    field.mOffset = offset;
-    field.mFlags = 0;
-    field.mDesc = nullptr;
-    ownerType->AddBase(field);
   }
 
   constexpr std::int32_t kAcquireTargetRetargetCooldownTicks = 30;

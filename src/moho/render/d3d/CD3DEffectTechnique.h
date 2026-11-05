@@ -40,7 +40,7 @@ namespace moho
     class Technique
     {
     public:
-      class Implementation
+      class Implementation final
       {
       public:
         // The two annotation trees. Node geometry names both element types:
@@ -107,7 +107,11 @@ namespace moho
          */
         [[nodiscard]] bool TryGetStringAnnotation(const msvc8::string& annotationName, msvc8::string* outValue) const;
 
+        // The `virtual` is what gives the class the vtable the binary's layout has.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunnecessary-virtual-specifier"
         virtual void UnknownVirtualSlot();
+#pragma clang diagnostic pop
 
       public:
         msvc8::string mName;                     // +0x04

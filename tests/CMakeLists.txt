@@ -47,6 +47,17 @@ target_include_directories(faf_profiler_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 add_test(NAME profiler_facade COMMAND faf_profiler_tests)
 
+# Engine addition: EffectScan.h against the std::regex patterns it replaced, on generated text.
+add_executable(faf_effect_scan_tests EXCLUDE_FROM_ALL effect_scan/EffectScanTests.cpp)
+target_include_directories(faf_effect_scan_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME effect_scan COMMAND faf_effect_scan_tests)
+
+# Engine addition: ImageCodec's DDS writer against the d3dx11_43.dll the process loads, so the
+# same exe checks Microsoft's on Windows and Wine's under Wine.
+add_executable(faf_image_codec_tests EXCLUDE_FROM_ALL image_codec/ImageCodecTests.cpp)
+target_link_libraries(faf_image_codec_tests PRIVATE faf_engine)
+add_test(NAME image_codec COMMAND faf_image_codec_tests)
+
 # Engine addition (dedicated-server plan WPL.23): golden sim-math tests
 # (tests/sim_math). Built with every build, and run right after it: a change
 # that moves one result of the simulation's parity-sensitive arithmetic fails
@@ -69,6 +80,12 @@ if(EXISTS "${_faf_sim_math_golden}")
     VERBATIM)
   add_test(NAME sim_math COMMAND "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args})
 endif()
+
+# Engine addition (replay timeline): reading a replay's length leaves the stream as it was
+# (tests/replay).
+add_executable(faf_replay_scan_tests EXCLUDE_FROM_ALL replay/ReplayScanTests.cpp)
+target_link_libraries(faf_replay_scan_tests PRIVATE faf_engine)
+add_test(NAME replay_scan COMMAND faf_replay_scan_tests)
 
 # Engine addition (#247): the user preferences from several threads at once
 # (tests/prefs); fails without USER_PreferencesLock.
@@ -103,3 +120,14 @@ add_executable(faf_recon_scroll_packet_tests EXCLUDE_FROM_ALL sim/ReconScrollPac
 target_link_libraries(faf_recon_scroll_packet_tests PRIVATE faf_engine)
 add_test(NAME recon_scroll_packet COMMAND faf_recon_scroll_packet_tests)
 set_tests_properties(recon_scroll_packet PROPERTIES TIMEOUT 120)
+
+# Lua coroutine tests (coroutine.create / resume / yield / status / wrap).
+add_executable(faf_coroutine_tests EXCLUDE_FROM_ALL lua/CoroutineTests.cpp)
+target_link_libraries(faf_coroutine_tests PRIVATE faf_engine)
+add_test(NAME lua_coroutine COMMAND faf_coroutine_tests)
+
+# Engine addition: the MSDF font cook (issue #306), with FreeType and msdfgen linked statically.
+add_executable(faf_msdf_cook_tests EXCLUDE_FROM_ALL font/MsdfFontCookTests.cpp ${CMAKE_SOURCE_DIR}/src/moho/render/font/MsdfFontCook.cpp)
+target_include_directories(faf_msdf_cook_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_msdf_cook_tests PRIVATE faf_freetype faf_msdfgen faf_zstd)
+add_test(NAME msdf_font_cook COMMAND faf_msdf_cook_tests)

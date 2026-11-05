@@ -1,6 +1,8 @@
 #include "moho/net/NetConVars.h"
 
+#include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 
 #include "gpg/core/utils/Logging.h"
@@ -27,6 +29,25 @@ namespace moho
   // made (`net_CheckOrderStreams`) or for every message sent
   // (`net_DebugAlterOrdersTo`).
   int32_t net_CheckOrderStreams = 1;
+  // Read as a game finishes loading (issue #285).
+  int32_t net_PeerFeatures = 0;
+  // Read as a lobby link is established and for each message on it.
+  int32_t net_LobbyPeerFeatures = 1;
+  // Read as peers' messages arrive (issue #275). Off: a lost link and a
+  // restarted peer behave as in the binary.
+  int32_t net_RejoinAccept = 0;
+  // net_MaxSendRate while a peer's history goes out: 2048 bytes a second would
+  // keep every player waiting for minutes after a long game.
+  int32_t net_RejoinSendRate = 1048576;
+  // Read when a restarted client asks for the game and when a peer answers.
+  // Off, or between different builds, the client replays the recording instead.
+  int32_t net_RejoinKeyframes = 1;
+  // Every player waits while the save is made; 0 writes it through the plain archive.
+  int32_t net_RejoinFastSave = 1;
+  // Every player waits while the save is packed and sent.
+  int32_t net_RejoinZstd = 1;
+  // A link's 32 packets on the way carry 16 KB a round trip, far under net_RejoinSendRate.
+  int32_t net_RejoinWindow = 128;
   int32_t net_DebugAlterOrdersTo = -1;
   // Read when a game's UDP socket is made (NET_MakeUDPConnector); 0 keeps the
   // system's buffer size, as the binary does (issue #236).
@@ -40,14 +61,23 @@ namespace moho
   // (CNetUDPConnection::FastRetransmitFromMask); 0 waits for the resend
   // timer, as the binary does. Live.
   int32_t net_FastRetransmit = 0;
+  // Issue #237: with net_FastRetransmit, a packet's first resend is due this
+  // many round trips after its send, under net_MinResendDelay and
+  // net_ResendDelayBias. The game sends too few packets for acknowledgements to
+  // show a loss sooner. Live.
+  float net_FastResendPings = 1.15f;
+  // Issue #237: with net_FastRetransmit, a received packet is acknowledged within
+  // this many ms, if net_AckDelay is longer. The peer's ping includes the wait,
+  // so its timer can't go under the time an acknowledgement takes without it. Live.
+  int32_t net_FastAckDelay = 5;
   // Issue #274: 1 makes the game run every peer link itself with the launcher
   // talking to it directly, no ICE adapter (NetlinkPeers.cpp,
   // docs/LAUNCHER_NATIVE_NETWORK.md); 0 is the adapter path. Read when the
   // game reports Idle.
   int32_t net_NativeNet = 0;
-  // Issue #274: in native mode, offer a WebRTC data channel to peers that are
+  // Issue #274: in native mode, 1 offers a WebRTC data channel to peers that are
   // our builds too (#239). Read when a link starts.
-  int32_t net_NativeNetWebRtc = 1;
+  int32_t net_NativeNetWebRtc = 0;
   // Issue #240: in native mode, with peers running our build, game datagrams go
   // on a redundant lane that repeats each up to this many times until acked;
   // 0 sends them plainly. Read when a link starts.
@@ -59,7 +89,14 @@ namespace moho
   // Diagnostics: every this many beats log the UDP connections' totals: packets,
   // bytes, resends, acks and mean ping; 0 logs nothing. Live.
   int32_t net_LogTraffic = 0;
+  // Diagnostics: log a beat the main thread took this many ms or more after the one
+  // before it, which is the pause a player sees; 0 logs nothing. Live.
+  int32_t net_LogShownBeatMs = 0;
+  // Above 0: a pause this player sees raises their net_Lag a step, up to this many ms, and a
+  // long quiet spell lowers it again; 0 keeps net_Lag as set. Live.
+  int32_t net_AdaptiveLagMax = 0;
   NetTrafficTotals gNetTraffic;
+  void (*gNetLinkTrafficLog)(int beat) = nullptr;
   // Issue #236, test only: once beat net_TestBurstBeat is available, this game
   // sends net_TestBurstBytes incompressible filler bytes to every peer on the
   // ordered stream, the way a large order burst occupies it; peers drop it.
@@ -71,8 +108,20 @@ namespace moho
   {
     TConVar<int32_t> gTConVar_net_FastRetransmit(
       "net_FastRetransmit",
-      "1: resend a packet once the peer has received 3 later ones, at most once a round trip; 0 (default) waits for the resend timer.",
+      "1: resend a packet once the peer has received 3 later ones or after net_FastResendPings round trips, and acknowledge within net_FastAckDelay; 0 (default) is as shipped.",
       &net_FastRetransmit
+    );
+
+    TConVar<float> gTConVar_net_FastResendPings(
+      "net_FastResendPings",
+      "With net_FastRetransmit, a packet's first resend is due this many round trips after its send (default 1.15).",
+      &net_FastResendPings
+    );
+
+    TConVar<int32_t> gTConVar_net_FastAckDelay(
+      "net_FastAckDelay",
+      "With net_FastRetransmit, acknowledge a received packet within this many ms, if net_AckDelay is longer (default 5).",
+      &net_FastAckDelay
     );
 
     TConVar<int32_t> gTConVar_net_NativeNet(
@@ -83,7 +132,7 @@ namespace moho
 
     TConVar<int32_t> gTConVar_net_NativeNetWebRtc(
       "net_NativeNetWebRtc",
-      "In native mode, 1 (default): move game datagrams onto a WebRTC data channel with peers running our build; 0: ICE only.",
+      "In native mode, 1: move game datagrams onto a WebRTC data channel with peers running our build; 0 (default): ICE only.",
       &net_NativeNetWebRtc
     );
 
@@ -91,6 +140,18 @@ namespace moho
       "net_LogBeatWaitMs",
       "Log each beat that became available this many ms or more after the previous one; 0 (default) logs nothing.",
       &net_LogBeatWaitMs
+    );
+
+    TConVar<int32_t> gTConVar_net_AdaptiveLagMax(
+      "net_AdaptiveLagMax",
+      "Above 0: pauses raise this player's net_Lag up to this many ms, and quiet spells lower it again; 0 (default) keeps net_Lag as set.",
+      &net_AdaptiveLagMax
+    );
+
+    TConVar<int32_t> gTConVar_net_LogShownBeatMs(
+      "net_LogShownBeatMs",
+      "Logs a beat the main thread took this many ms or more after the one before it; 0 (default) logs nothing.",
+      &net_LogShownBeatMs
     );
 
     TConVar<int32_t> gTConVar_net_LogTraffic(
@@ -121,6 +182,58 @@ namespace moho
       "net_InEngineLinks",
       "1: run the peer links in the game when the ICE adapter is faf-netbridge; 0 (default) leaves them to the adapter.",
       &net_InEngineLinks
+    );
+
+    TConVar<int32_t> gTConVar_net_PeerFeatures(
+      "net_PeerFeatures",
+      "1: tell every other player what this engine supports as the game finishes loading (docs/PEER_FEATURES.md); "
+      "0 (default): send nothing, as the original game. Next game.",
+      &net_PeerFeatures
+    );
+
+    TConVar<int32_t> gTConVar_net_LobbyPeerFeatures(
+      "net_LobbyPeerFeatures",
+      "1 (default): tell every other player in the lobby what this engine supports (docs/PEER_FEATURES.md); "
+      "0: send nothing and ignore theirs, as the original game. Next lobby link.",
+      &net_LobbyPeerFeatures
+    );
+
+    TConVar<int32_t> gTConVar_net_RejoinAccept(
+      "net_RejoinAccept",
+      "1: a peer whose link is lost keeps its seat until ejected, and may take it back by restarting with /rejoin; "
+      "0 (default) as the original game.",
+      &net_RejoinAccept
+    );
+
+    TConVar<int32_t> gTConVar_net_RejoinSendRate(
+      "net_RejoinSendRate",
+      "Bytes per second any one client may be sent while a restarted peer gets the game's history (net_RejoinAccept).",
+      &net_RejoinSendRate
+    );
+
+    TConVar<int32_t> gTConVar_net_RejoinWindow(
+      "net_RejoinWindow",
+      "Packets that may be on the way on a link to a restarted peer of the same build; 32 as every other link.",
+      &net_RejoinWindow
+    );
+
+    TConVar<int32_t> gTConVar_net_RejoinZstd(
+      "net_RejoinZstd",
+      "1 (default): the save for a restarted peer is packed with zstd; 0: with zlib, as replay keyframes are.",
+      &net_RejoinZstd
+    );
+
+    TConVar<int32_t> gTConVar_net_RejoinFastSave(
+      "net_RejoinFastSave",
+      "1 (default): the save for a restarted peer goes through the fast archive; 0: the plain one.",
+      &net_RejoinFastSave
+    );
+
+    TConVar<int32_t> gTConVar_net_RejoinKeyframes(
+      "net_RejoinKeyframes",
+      "1 (default): a restarted peer of the same build loads a save of the running game; "
+      "0: it replays the game from the start (net_RejoinAccept).",
+      &net_RejoinKeyframes
     );
 
     TConVar<int32_t> gTConVar_net_CheckOrderStreams(
@@ -228,6 +341,11 @@ namespace moho
     return net_FastRetransmit != 0 || sFromCommandLine;
   }
 
+  int32_t NET_AckDelayMs()
+  {
+    return NET_FastRetransmitEnabled() ? std::min(net_AckDelay, net_FastAckDelay) : net_AckDelay;
+  }
+
   void NET_CountFastRetransmits(const int count)
   {
     static std::atomic<std::uint64_t> sTotal{0};
@@ -239,5 +357,31 @@ namespace moho
     if (before == 0 || before / 1000 != after / 1000) {
       gpg::Logf("NET: %llu packets resent early so far (net_FastRetransmit)", static_cast<unsigned long long>(after));
     }
+  }
+
+  namespace
+  {
+    std::atomic<std::int64_t> gReadyDepartureUs{0};
+  } // namespace
+
+  std::int64_t NET_GetReadyDepartureUs() noexcept
+  {
+    return gReadyDepartureUs.load(std::memory_order_relaxed);
+  }
+
+  void NET_NoteReadyLeftNow() noexcept
+  {
+    const std::int64_t nowUs = NET_SteadyClockMicroseconds();
+    gReadyDepartureUs.store(std::max(gReadyDepartureUs.load(std::memory_order_relaxed), nowUs), std::memory_order_relaxed);
+  }
+
+  void NET_ResetReadyDeparture() noexcept
+  {
+    gReadyDepartureUs.store(0, std::memory_order_relaxed);
+  }
+
+  std::int64_t NET_SteadyClockMicroseconds() noexcept
+  {
+    return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
   }
 } // namespace moho

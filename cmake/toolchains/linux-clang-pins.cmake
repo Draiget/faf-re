@@ -23,8 +23,11 @@
 #   python3            3.12.3-0ubuntu2.1
 #   binutils           (ar, ranlib, nm; the LLVM packages above have no llvm-ar)
 #
-# Not installed: libclang-rt-18-dev (sanitizer runtimes), llvm-18 (llvm-ar,
-# llvm-nm, llvm-symbolizer).
+#   llvm-18            1:18.1.3-1ubuntu1    llvm-ar and llvm-ranlib, for the profile-guided
+#                                           preset (cmake/FafLinux.cmake); -plain needs none
+#
+# Not installed: libclang-rt-18-dev (sanitizer and profile runtimes; only
+# tools/pgo/record.sh needs it).
 #
 # A container image built from these pins is plan WP1.6.
 

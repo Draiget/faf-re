@@ -242,6 +242,51 @@ namespace faf::remote
         | (data.mOverchargePaused ? 64u : 0u)
       );
     }
+
+    /** 0x005BF168..0x005BF1C4: the entity block from the view's recon record. */
+    void WriteReconBlock(
+      moho::SSTIEntityVariableData& block, const moho::SPerArmyReconInfo& recon, const std::uint32_t vision, const bool hasVision
+    )
+    {
+      if (hasVision) {
+        block.mIntelAttributes.SetIntelRadius(moho::ENTATTR_Vision, static_cast<int>(vision));
+      }
+      block.mMeshBlueprint = recon.mStiMesh;
+      block.mHealth = recon.mHealth;
+      block.mMaxHealth = recon.mMaxHealth;
+      block.mFractionComplete = recon.mFractionComplete;
+      block.mIsDead = recon.mMaybeDead;
+    }
+
+    /** What `ApplyVariableData` and `ApplyUnitData` write, from a record they wrote (`wire::HashBlipUpdate` covers the same). */
+    void CopyBlipRecord(wire::SEntityRecord& record, const wire::SEntityRecord& from)
+    {
+      record.appearance = from.appearance;
+      record.position = from.position;
+      record.farPosition = from.farPosition;
+      record.farValue = from.farValue;
+      if (from.farPosition) {
+        record.velocity = {};
+        record.anchorBeat = 0;
+      }
+      record.yawOnly = from.yawOnly;
+      record.orientation = from.orientation;
+      record.health = from.health;
+      record.maxHealth = from.maxHealth;
+      record.fractionComplete = from.fractionComplete;
+      record.flags = static_cast<std::uint16_t>(from.flags | (record.flags & kEntityFlagOrphaned));
+      if (record.isUnit) {
+        wire::SUnitFields& unit = record.unit;
+        const wire::SUnitFields& fields = from.unit;
+        unit.fuelRatio = fields.fuelRatio;
+        unit.shieldRatio = fields.shieldRatio;
+        unit.workProgress = fields.workProgress;
+        unit.unitStates = fields.unitStates;
+        unit.scriptBits = fields.scriptBits;
+        unit.siloCounts = fields.siloCounts;
+        unit.unitFlags = fields.unitFlags;
+      }
+    }
   } // namespace
 
   std::uint16_t PackEntityFlags(const moho::SSTIEntityVariableData& data) noexcept
@@ -476,6 +521,34 @@ namespace faf::remote
     }
   }
 
+  void CSharedEntityRecords::ReserveBlipRecords(const std::size_t count)
+  {
+    if (count > mBlipRecords.size()) {
+      mBlipRecords.grow_to(count);
+    }
+  }
+
+  void CSharedEntityRecords::FillBlipRecord(
+    SBlipRecord& out, moho::SSTIEntityVariableData& block, moho::ReconBlip& blip, const bool requestRefreshUI, const std::size_t army,
+    const moho::EUserEntityVisibilityMode mode, const std::uint32_t vision, const bool hasVision
+  ) const
+  {
+    moho::Entity& entity = blip;
+    CopyEntityBlockReadByBuilder(block, entity.mVarDat);
+    WriteEntityBlockForView(block, entity, mode, requestRefreshUI);
+    const moho::SPerArmyReconInfo& recon = blip.mReconDat[army];
+    WriteReconBlock(block, recon, vision, hasVision);
+    out.record.id = static_cast<std::uint32_t>(entity.id_);
+    std::uint64_t unknownUnderlays = 0; // none: `Shareable`
+    ApplyVariableData(out.record, block, mCodec, mTables, nullptr, mNoUnderlays, unknownUnderlays);
+    ApplyUnitData(out.record.unit, blip.mUnitVarDat);
+    ApplyUnitDetail(out.detail, blip.mUnitVarDat, static_cast<std::int32_t>(recon.mReconFlags), mTables, nullptr);
+    if (const moho::Unit* const creator = blip.mCreator.GetObjectPtr(); creator != nullptr) {
+      out.detail.stunTicks = creator->mUnitVarDat.mStunTicks != 0 ? 1 : 0;
+    }
+    out.hash = wire::HashBlipUpdate(out.record, out.detail);
+  }
+
   void CViewFrameBuilder::ClearBefore() noexcept
   {
     for (const std::uint32_t slot : mBeforeSlots) {
@@ -541,6 +614,9 @@ namespace faf::remote
       mLocalSlots.push_back(kNoLocal);
     }
     mWorldIndex.insert(found, SWorldEntry{id, slot});
+    if (mTrackChanges) {
+      mNewRecordIds.push_back(id);
+    }
     return slot;
   }
 
@@ -572,16 +648,17 @@ namespace faf::remote
     return local;
   }
 
-  void CViewFrameBuilder::ApplySharedUpdate(const SDirectUpdate& update)
+  void CViewFrameBuilder::ApplySharedUpdate(const SDirectUpdate& update, std::size_t& cursor)
   {
-    const auto id = static_cast<std::uint32_t>(update.entity->id_);
-    const wire::SEntityRecord* const record = update.shared->records[SSharedUpdate::ModeIndex(update.mode)];
-    const auto found = LowerBound(id);
+    const auto id = static_cast<std::uint32_t>(update.target->entity->id_);
+    const wire::SEntityRecord* const record = update.target->shared->records[SSharedUpdate::ModeIndex(update.Mode())];
+    cursor = SeekWorld(cursor, id);
+    const auto found = mWorldIndex.cbegin() + static_cast<std::ptrdiff_t>(cursor);
     const bool exists = found != mWorldIndex.end() && found->id == id;
     std::uint32_t slot;
     if (update.created) {
       mOrphanedAt.erase(id); // an id the sim reuses is a new entity
-      if (record->blueprint == wire::COrdinalTable::kNone && update.entity->BluePrint != nullptr) {
+      if (record->blueprint == wire::COrdinalTable::kNone && update.target->entity->BluePrint != nullptr) {
         ++mUnknownBlueprints;
       }
       if (exists) {
@@ -762,37 +839,46 @@ namespace faf::remote
         }
       }
     }
+    std::size_t cursor = 0;
     for (const SDirectUpdate& update : direct) {
-      if (update.shared != nullptr) {
-        ApplySharedUpdate(update);
+      const SDirectUpdate::STarget& target = *update.target;
+      if (target.shared != nullptr) {
+        ApplySharedUpdate(update, cursor);
         continue;
       }
-      moho::Entity& entity = *update.entity;
-      wire::SEntityRecord* const record = FindRecord(static_cast<std::uint32_t>(entity.id_));
-      if (record == nullptr) {
+      moho::Entity& entity = *target.entity;
+      const auto id = static_cast<std::uint32_t>(entity.id_);
+      cursor = SeekWorld(cursor, id);
+      if (cursor == mWorldIndex.size() || mWorldIndex[cursor].id != id) {
+        continue;
+      }
+      const std::uint32_t slot = mWorldIndex[cursor].slot;
+      const SBlipRecord* const blipRecord = mSession == nullptr ? update.blipRecord : nullptr;
+      SaveBefore(slot);
+      wire::SEntityRecord* const record = &LocalRecord(slot);
+      if (blipRecord != nullptr) {
+        CopyBlipRecord(*record, blipRecord->record);
+        if (record->isUnit) {
+          (void)record->unit.detail.Assign(blipRecord->detail);
+        }
+        if (mTrackChanges) {
+          mTouchedIds.push_back(record->id);
+        }
         continue;
       }
       CopyEntityBlockReadByBuilder(mBlockScratch, entity.mVarDat);
-      WriteEntityBlockForView(mBlockScratch, entity, update.mode, update.requestRefreshUI);
+      WriteEntityBlockForView(mBlockScratch, entity, update.Mode(), target.requestRefreshUI);
       const moho::SSTIUnitVariableData* unitData = nullptr;
       std::int32_t reconFlags = kUnitReconFlags;
       const moho::Unit* creator = nullptr;
-      if (update.unit != nullptr) {
-        unitData = &update.unit->VarDat();
-      } else if (update.blip != nullptr) {
-        const moho::SPerArmyReconInfo& recon = update.blip->mReconDat[static_cast<std::size_t>(update.army)];
-        creator = update.blip->mCreator.GetObjectPtr();
-        unitData = &update.blip->mUnitVarDat;
+      if (target.unit != nullptr) {
+        unitData = &target.unit->VarDat();
+      } else if (target.blip != nullptr) {
+        const moho::SPerArmyReconInfo& recon = target.blip->mReconDat[update.army];
+        creator = target.blip->mCreator.GetObjectPtr();
+        unitData = &target.blip->mUnitVarDat;
         reconFlags = static_cast<std::int32_t>(recon.mReconFlags);
-        if (update.hasVision) {
-          mBlockScratch.mIntelAttributes.SetIntelRadius(moho::ENTATTR_Vision, static_cast<int>(update.vision));
-        }
-        // 0x005BF168..0x005BF1C4: the entity block from the recon record.
-        mBlockScratch.mMeshBlueprint = recon.mStiMesh;
-        mBlockScratch.mHealth = recon.mHealth;
-        mBlockScratch.mMaxHealth = recon.mMaxHealth;
-        mBlockScratch.mFractionComplete = recon.mFractionComplete;
-        mBlockScratch.mIsDead = recon.mMaybeDead;
+        WriteReconBlock(mBlockScratch, recon, update.vision, update.hasVision);
       }
       ApplyVariableData(*record, mBlockScratch, mCodec, mTables, mSession, mUnderlays, mUnknownUnderlays);
       if (unitData != nullptr && record->isUnit) {

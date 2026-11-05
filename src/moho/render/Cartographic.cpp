@@ -268,8 +268,7 @@ namespace
    * std::list-equivalent ABI relies on `::operator new` exhaustion
    * to surface allocation failure. Restoring the explicit check
    * would require a typed `RuntimeIncrementListCountWithOverflowCheck`
-   * helper that pairs with the throw lane at
-   * `CrtRuntimeHelpers.cpp:37372`.
+   * helper that pairs with that throw.
    */
   void AppendCartographicDecalListNodeBeforeSentinel(
     moho::CartographicDecalList& destination,
@@ -1178,8 +1177,8 @@ namespace moho
   */
   void CartographicDecalBatch::Write(gpg::BinaryWriter& writer)
   {
-    writer.Write(reinterpret_cast<const char*>(&mTechniqueName), sizeof(mTechniqueName));
-    writer.Write(reinterpret_cast<const char*>(&mTexturePath), sizeof(mTexturePath));
+    writer.WriteString(mTechniqueName);
+    writer.WriteString(mTexturePath);
     writer.Write(mDecals.mDecalCount);
 
     const CartographicDecalNode* const sentinel = mDecals.mDecalSentinel;

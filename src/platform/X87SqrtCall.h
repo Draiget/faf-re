@@ -23,5 +23,8 @@
  * arithmetic to 24 bits, which broke log/log10 parity in the same test.
  */
 #if defined(_M_IX86)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wignored-pragma-intrinsic"
 #pragma function(sqrt)
+#pragma clang diagnostic pop
 #endif

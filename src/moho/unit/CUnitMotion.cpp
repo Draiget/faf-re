@@ -1,4 +1,5 @@
 #include "moho/unit/CUnitMotion.h"
+#include "moho/sim/SimArchiveMode.h"
 #include "legacy/math/X87Math.h"
 
 #include <algorithm>
@@ -530,14 +531,6 @@ namespace moho
       return elevation;
     }
 
-    [[nodiscard]] gpg::RRef MakeCUnitMotionRef(CUnitMotion* const value) noexcept
-    {
-      gpg::RRef out{};
-      out.mObj = value;
-      out.mType = CUnitMotion::StaticGetClass();
-      return out;
-    }
-
     template <class TObject>
     [[nodiscard]] gpg::RType* ResolveCachedType()
     {
@@ -986,6 +979,12 @@ namespace moho
     ReplaceEconomyRequestPointer(mEconomyRequest, loadedRequest);
 
     ReadTypedValue(*archive, mRepairConsumption, ownerRef);
+
+    // Engine addition (replay keyframes): rebuilt only while moving, and read by the first move after
+    // a stop, so a keyframe of a unit at rest has to keep it.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->Read(gpg::LookupRType(typeid(gpg::fastvector<WeakPtr<Entity>>)), &mRaisedPlatformCandidates, ownerRef);
+    }
   }
 
   /**
@@ -1072,6 +1071,11 @@ namespace moho
     );
 
     WriteTypedValue(*archive, mRepairConsumption, ownerRef);
+
+    // Engine addition (replay keyframes): see MemberDeserialize.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->Write(gpg::LookupRType(typeid(gpg::fastvector<WeakPtr<Entity>>)), &mRaisedPlatformCandidates, ownerRef);
+    }
   }
 
   /**

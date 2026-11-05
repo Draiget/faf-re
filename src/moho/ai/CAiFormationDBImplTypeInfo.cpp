@@ -144,10 +144,7 @@ gpg::RRef CAiFormationDBImplTypeInfo::NewRef()
  */
 gpg::RRef CAiFormationDBImplTypeInfo::CtrRef(void* const objectStorage)
 {
-  CAiFormationDBImpl* const object = static_cast<CAiFormationDBImpl*>(objectStorage);
-  if (object) {
-    new (object) CAiFormationDBImpl();
-  }
+  auto* const object = gpg::ConstructInStorage<CAiFormationDBImpl>(objectStorage);
 
   return MakeCAiFormationDBImplRef(object);
 }

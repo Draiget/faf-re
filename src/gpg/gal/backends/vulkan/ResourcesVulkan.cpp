@@ -6,7 +6,9 @@
 #include <cstring>
 
 #include "DeviceVulkan.h"
+#include "gpg/core/utils/Logging.h"
 #include "gpg/gal/DrawStatistics.h"
+#include "gpg/gal/PlacedResources.h"
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
@@ -294,7 +296,20 @@ namespace gpg::gal
     mLockSize = (size == 0U || offset + size > mByteWidth) ? (mByteWidth - offset) : size;
     mLockFlags = static_cast<std::uint32_t>(flags);
     mLocked = true;
+    if (mShadow.Released()) {
+      if (HasFlag(mLockFlags, MohoD3DLockFlags::ReadOnly)) {
+        gpg::Warnf("gal: %s read lock after its CPU copy was released reads zeros", mKind);
+      }
+      mShadow.Reset(mByteWidth);
+    }
     return mShadow.Map(offset, size, mKind);
+  }
+
+  void BufferStorageVulkan::ReleaseCopy() noexcept
+  {
+    if (gReleaseBufferCopies && !mDynamic && !mLocked) {
+      mShadow.Release();
+    }
   }
 
   void BufferStorageVulkan::Unlock()
@@ -321,7 +336,11 @@ namespace gpg::gal
     // The whole buffer, DISCARD too: bytes outside the locked range keep their
     // last values, as a D3D9 driver's renamed buffer does (see BufferStorageD3D12).
     const vulkan::UploadAllocation chunk = device.AllocateUpload(mByteWidth, 256U);
-    std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
+    if (mLockedRangeOnly && gLockedRangeOnly) {
+      std::memcpy(chunk.cpu + mLockOffset, mShadow.data() + mLockOffset, mLockSize);
+    } else {
+      std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
+    }
     mChunkBuffer = chunk.buffer;
     mChunkOffset = chunk.offset;
     mChunkCpu = chunk.cpu;

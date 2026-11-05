@@ -122,9 +122,9 @@ namespace moho
     mReady = false;
     mType = 2;
 
-    std::memset(&mStart, 0, sizeof(mStart));
-    std::memset(&mFinish, 0, sizeof(mFinish));
-    std::memset(&mMousePos, 0, sizeof(mMousePos));
+    std::memset(static_cast<void*>(&mStart), 0, sizeof(mStart));
+    std::memset(static_cast<void*>(&mFinish), 0, sizeof(mFinish));
+    std::memset(static_cast<void*>(&mMousePos), 0, sizeof(mMousePos));
 
     mNumFormationScripts = 0;
     mDirection = Wm3::Quaternionf(/*w*/ 0.0f, /*x*/ 0.0f, /*y*/ 0.0f, /*z*/ 1.0f);

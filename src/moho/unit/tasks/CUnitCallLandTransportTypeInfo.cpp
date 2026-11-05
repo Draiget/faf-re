@@ -69,20 +69,7 @@ namespace moho
    */
   void __stdcall CUnitCallLandTransportTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
   {
-    gpg::RType* baseType = CCommandTask::sType;
-    if (!baseType) {
-      baseType = gpg::LookupRType(typeid(CCommandTask));
-      CCommandTask::sType = baseType;
-    }
-
-    GPG_ASSERT(baseType != nullptr);
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseViaSlot<CCommandTask>(typeInfo);
   }
 
   /**
@@ -99,10 +86,7 @@ namespace moho
    */
   gpg::RRef CUnitCallLandTransportTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitCallLandTransport*>(objectStorage);
-    if (task) {
-      new (task) CUnitCallLandTransport();
-    }
+    auto* const task = gpg::ConstructInStorage<CUnitCallLandTransport>(objectStorage);
     return gpg::RRef{task, gpg::LookupRType(typeid(CUnitCallLandTransport))};
   }
 

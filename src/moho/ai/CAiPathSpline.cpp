@@ -547,14 +547,7 @@ namespace
   // just call `ResetLinks()`) via `atexit`.
   moho::CPathPointSerializer gCPathPointSerializer;
 
-  gpg::RType* gWeakUnitType = nullptr;
-  gpg::RType* gSCollisionInfoType = nullptr;
-  gpg::RType* gECollisionTypeType = nullptr;
-  gpg::RType* gEPathPointStateType = nullptr;
-  gpg::RType* gVector3fType = nullptr;
-  gpg::RType* gCPathPointType = nullptr;
   gpg::RType* gFastVectorCPathPointType = nullptr;
-  gpg::RType* gPathSplineTypeType = nullptr;
   gpg::RType* gPathSplineContinuationType = nullptr;
   template <typename TSerializer>
   [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
@@ -584,30 +577,6 @@ namespace
     return self;
   }
 
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    if (gVector3fType == nullptr) {
-      gVector3fType = gpg::LookupRType(typeid(Wm3::Vector3<float>));
-    }
-    return gVector3fType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveWeakUnitType()
-  {
-    if (gWeakUnitType == nullptr) {
-      gWeakUnitType = gpg::LookupRType(typeid(WeakPtr<Unit>));
-    }
-    return gWeakUnitType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSCollisionInfoType()
-  {
-    if (gSCollisionInfoType == nullptr) {
-      gSCollisionInfoType = gpg::LookupRType(typeid(moho::SCollisionInfo));
-    }
-    return gSCollisionInfoType;
-  }
-
   /**
    * Address: 0x00598470 (FUN_00598470)
    *
@@ -616,31 +585,12 @@ namespace
    */
   [[nodiscard]] gpg::RType* ResolveECollisionTypeTypePrimary()
   {
-    if (gECollisionTypeType == nullptr) {
-      gECollisionTypeType = gpg::LookupRType(typeid(moho::ECollisionType));
-    }
-    return gECollisionTypeType;
+    return gpg::RTypeOf<moho::ECollisionType>();
   }
 
   [[nodiscard]] gpg::RType* ResolveECollisionTypeType()
   {
     return ResolveECollisionTypeTypePrimary();
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEPathPointStateType()
-  {
-    if (gEPathPointStateType == nullptr) {
-      gEPathPointStateType = gpg::LookupRType(typeid(moho::EPathPointState));
-    }
-    return gEPathPointStateType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCPathPointType()
-  {
-    if (gCPathPointType == nullptr) {
-      gCPathPointType = gpg::LookupRType(typeid(moho::CPathPoint));
-    }
-    return gCPathPointType;
   }
 
   /**
@@ -683,14 +633,6 @@ namespace
     return gFastVectorCPathPointType;
   }
 
-  [[nodiscard]] gpg::RType* ResolvePathSplineTypeType()
-  {
-    if (gPathSplineTypeType == nullptr) {
-      gPathSplineTypeType = gpg::LookupRType(typeid(moho::EPathType));
-    }
-    return gPathSplineTypeType;
-  }
-
   [[nodiscard]] gpg::RType* ResolvePathSplineContinuationType()
   {
     if (gPathSplineContinuationType == nullptr) {
@@ -723,15 +665,15 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::CPathPoint>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::CPathPoint>*>(objectPtr);
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
     moho::CPathPoint fill{};
     fill.mState = moho::EPathPointState::PPS_7;
-    vec.Resize(count, fill);
+    vec.resize(count, fill);
 
-    gpg::RType* const elementType = ResolveCPathPointType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::CPathPoint>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Read(elementType, &vec[i], owner);
@@ -741,21 +683,16 @@ namespace
   /**
    * Address: 0x005B4FF0 (FUN_005B4FF0)
    *
-   * What it does:
-   * Writes one contiguous `fastvector<CPathPoint>` payload: element count
-   * via `(end-begin)/28` (direct pointer arithmetic, not a `.size()` call --
-   * confirmed against the `.asm`), then each reflected lane in order. The
-   * element type is resolved through `moho::CPathPoint::sType2` directly
-   * (lazily populated via `gpg::LookupRType` on first use, matching the
-   * class's own public static member) rather than through this file's
-   * generic `ResolveCPathPointType()` helper -- a real, deliberate
-   * difference from the `Load` side confirmed against the `.c`/`.asm`.
-   * Bound as `RType::serSaveFunc_` via `FastVectorCPathPointTypeInfo::Init`
-   * below. DB-integrity fix: a second, unwired copy of this function
-   * previously lived in `gpg/core/containers/ArchiveSerialization.cpp`
-   * wrongly claiming this same address through a generic container-view
-   * helper pair whose calls do not appear anywhere in this address's real
-   * disassembly -- removed there; this is the real, already-wired body.
+   * What it does: Writes one contiguous `fastvector<CPathPoint>` payload:
+   * element count via `(end-begin)/28` (direct pointer arithmetic, not a
+   * `.size()` call -- confirmed against the `.asm`), then each reflected
+   * lane in order. The element type is resolved through
+   * `moho::CPathPoint::sType2` directly (lazily populated via
+   * `gpg::LookupRType` on first use, matching the class's own public static
+   * member) rather than through this file's generic
+   * `gpg::RTypeOf<moho::CPathPoint>()` helper -- a real, deliberate difference from
+   * the `Load` side confirmed against the `.c`/`.asm`. Bound as
+   * `RType::serSaveFunc_` via `FastVectorCPathPointTypeInfo::Init` below.
    */
   void SaveFastVectorCPathPoint(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
@@ -767,7 +704,7 @@ namespace
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
-    gpg::RType* const elementType = ResolveCPathPointType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::CPathPoint>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Write(elementType, const_cast<moho::CPathPoint*>(&vec[i]), owner);
@@ -840,8 +777,8 @@ void SCollisionInfo::MemberDeserialize(gpg::ReadArchive* const archive)
   }
 
   const gpg::RRef ownerRef{};
-  gpg::RType* const weakUnitType = ResolveWeakUnitType();
-  gpg::RType* const vectorType = ResolveVector3fType();
+  gpg::RType* const weakUnitType = gpg::RTypeOf<WeakPtr<Unit>>();
+  gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3<float>>();
   gpg::RType* const collisionType = ResolveECollisionTypeType();
   GPG_ASSERT(weakUnitType != nullptr);
   GPG_ASSERT(vectorType != nullptr);
@@ -863,8 +800,8 @@ void SCollisionInfo::MemberSerialize(gpg::WriteArchive* const archive) const
   }
 
   const gpg::RRef ownerRef{};
-  gpg::RType* const weakUnitType = ResolveWeakUnitType();
-  gpg::RType* const vectorType = ResolveVector3fType();
+  gpg::RType* const weakUnitType = gpg::RTypeOf<WeakPtr<Unit>>();
+  gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3<float>>();
   gpg::RType* const collisionType = ResolveECollisionTypeType();
   GPG_ASSERT(weakUnitType != nullptr);
   GPG_ASSERT(vectorType != nullptr);
@@ -886,8 +823,8 @@ void SContinueInfo::MemberDeserialize(gpg::ReadArchive* const archive)
   }
 
   const gpg::RRef ownerRef{};
-  gpg::RType* const vectorType = ResolveVector3fType();
-  gpg::RType* const stateType = ResolveEPathPointStateType();
+  gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3<float>>();
+  gpg::RType* const stateType = gpg::RTypeOf<moho::EPathPointState>();
   GPG_ASSERT(vectorType != nullptr);
   GPG_ASSERT(stateType != nullptr);
 
@@ -907,8 +844,8 @@ void SContinueInfo::MemberSerialize(gpg::WriteArchive* const archive) const
   }
 
   const gpg::RRef ownerRef{};
-  gpg::RType* const vectorType = ResolveVector3fType();
-  gpg::RType* const stateType = ResolveEPathPointStateType();
+  gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3<float>>();
+  gpg::RType* const stateType = gpg::RTypeOf<moho::EPathPointState>();
   GPG_ASSERT(vectorType != nullptr);
   GPG_ASSERT(stateType != nullptr);
 
@@ -1644,7 +1581,7 @@ void CAiPathSpline::MemberDeserialize(gpg::ReadArchive* const archive)
   // `nodes` is this class's first member (offset 0x00), which is why the
   // binary passes `this` straight to the fastvector<CPathPoint> reflection type.
   const std::size_t nodeCount = nodes.size();
-  gpg::RType* const nodeType = ResolveCPathPointType();
+  gpg::RType* const nodeType = gpg::RTypeOf<moho::CPathPoint>();
   for (std::size_t i = 0; i < nodeCount; ++i) {
     gpg::RRef nodeRef{};
     nodeRef.mObj = &nodes[i];
@@ -1655,7 +1592,7 @@ void CAiPathSpline::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->ReadUInt(&mCurrentNodeIndex);
   archive->ReadUInt(&mNodeCount);
 
-  gpg::RType* const pathTypeType = ResolvePathSplineTypeType();
+  gpg::RType* const pathTypeType = gpg::RTypeOf<moho::EPathType>();
   archive->Read(pathTypeType, &mPathType, ownerRef);
 
   gpg::RType* const continuationType = ResolvePathSplineContinuationType();
@@ -1676,7 +1613,7 @@ void CAiPathSpline::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->Write(pathNodeVectorType, this, ownerRef);
 
   const std::size_t nodeCount = nodes.size();
-  gpg::RType* const nodeType = ResolveCPathPointType();
+  gpg::RType* const nodeType = gpg::RTypeOf<moho::CPathPoint>();
   for (std::size_t i = 0; i < nodeCount; ++i) {
     gpg::RRef nodeRef{};
     nodeRef.mObj = const_cast<CPathPoint*>(&nodes[i]);
@@ -1687,7 +1624,7 @@ void CAiPathSpline::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->WriteUInt(mCurrentNodeIndex);
   archive->WriteUInt(mNodeCount);
 
-  gpg::RType* const pathTypeType = ResolvePathSplineTypeType();
+  gpg::RType* const pathTypeType = gpg::RTypeOf<moho::EPathType>();
   archive->Write(pathTypeType, &mPathType, ownerRef);
 
   gpg::RType* const continuationType = ResolvePathSplineContinuationType();
@@ -1826,7 +1763,7 @@ void EPathPointStateTypeInfo::Init()
  */
 const char* FastVectorCPathPointTypeInfo::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", ResolveCPathPointType()->GetName());
+  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::CPathPoint>()->GetName());
   return sName.c_str();
 }
 
@@ -1850,14 +1787,11 @@ const gpg::RIndexed* FastVectorCPathPointTypeInfo::IsIndexed() const
 /**
  * Address: 0x005B49F0 (FUN_005B49F0, gpg::RFastVectorType_CPathPoint::Init)
  *
- * What it does:
- * Records the element byte-size (16 = `sizeof(gpg::fastvector<
- * moho::CPathPoint>)`), version 1, and installs the element (de)serialize
- * callbacks (`serLoadFunc_ = &LoadFastVectorCPathPoint`, `serSaveFunc_ =
- * &SaveFastVectorCPathPoint`). DB-integrity fix: was fake-recovered (note
- * cited `gpg/core/reflection/Reflection.cpp`, but this class -- and both
- * callbacks it wires -- has always lived here in CAiPathSpline.cpp; the
- * address was simply never annotated).
+ * What it does: Records the element byte-size (16 =
+ * `sizeof(gpg::fastvector< moho::CPathPoint>)`), version 1, and installs
+ * the element (de)serialize callbacks (`serLoadFunc_ =
+ * &LoadFastVectorCPathPoint`, `serSaveFunc_ =
+ * &SaveFastVectorCPathPoint`).
  */
 void FastVectorCPathPointTypeInfo::Init()
 {
@@ -1871,13 +1805,13 @@ void FastVectorCPathPointTypeInfo::Init()
 gpg::RRef FastVectorCPathPointTypeInfo::SubscriptIndex(void* obj, const int ind) const
 {
   gpg::RRef out{};
-  out.mType = ResolveCPathPointType();
+  out.mType = gpg::RTypeOf<moho::CPathPoint>();
   out.mObj = nullptr;
   if (!obj || ind < 0) {
     return out;
   }
 
-  auto& vec = *static_cast<gpg::fastvector<CPathPoint>*>(obj);
+  auto& vec = *static_cast<gpg::core::FastVectorInline<CPathPoint>*>(obj);
   if (vec.Data() == nullptr || static_cast<std::size_t>(ind) >= GetCount(obj)) {
     return out;
   }
@@ -1908,12 +1842,12 @@ void FastVectorCPathPointTypeInfo::SetCount(void* obj, const int count) const
     return;
   }
 
-  auto& vec = *static_cast<gpg::fastvector<CPathPoint>*>(obj);
+  auto& vec = *static_cast<gpg::core::FastVectorInline<CPathPoint>*>(obj);
   CPathPoint fill{};
   fill.mPosition = Wm3::Vector3f{};
   fill.mDirection = Wm3::Vector3f{};
   fill.mState = PPS_7;
-  vec.Resize(static_cast<std::size_t>(count), fill);
+  vec.resize(static_cast<std::size_t>(count), fill);
 }
 
 /**
@@ -1930,7 +1864,7 @@ void CPathPoint::MemberDeserialize(gpg::ReadArchive* const archive)
   }
 
   gpg::RRef positionOwner{};
-  gpg::RType* const vectorType = ResolveVector3fType();
+  gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3<float>>();
   GPG_ASSERT(vectorType != nullptr);
   if (vectorType == nullptr) {
     return;
@@ -1941,7 +1875,7 @@ void CPathPoint::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->Read(vectorType, &mDirection, directionOwner);
 
   gpg::RRef stateOwner{};
-  gpg::RType* const stateType = ResolveEPathPointStateType();
+  gpg::RType* const stateType = gpg::RTypeOf<moho::EPathPointState>();
   GPG_ASSERT(stateType != nullptr);
   if (stateType == nullptr) {
     return;
@@ -1966,12 +1900,12 @@ void CPathPoint::MemberSerialize(gpg::WriteArchive* const archive) const
   gpg::RRef directionOwner{};
   gpg::RRef stateOwner{};
 
-  gpg::RType* const vectorType = ResolveVector3fType();
+  gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3<float>>();
   GPG_ASSERT(vectorType != nullptr);
   archive->Write(vectorType, &mPosition, positionOwner);
   archive->Write(vectorType, &mDirection, directionOwner);
 
-  gpg::RType* const stateType = ResolveEPathPointStateType();
+  gpg::RType* const stateType = gpg::RTypeOf<moho::EPathPointState>();
   GPG_ASSERT(stateType != nullptr);
   archive->Write(stateType, &mState, stateOwner);
 }

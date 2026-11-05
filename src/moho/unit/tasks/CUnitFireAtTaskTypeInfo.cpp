@@ -24,28 +24,9 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitFireAtTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitFireAtTask));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeCUnitFireAtTaskRef(moho::CUnitFireAtTask* const object)
   {
-    return gpg::RRef{object, CachedCUnitFireAtTaskType()};
+    return gpg::RRef{object, gpg::RTypeOf<moho::CUnitFireAtTask>()};
   }
 } // namespace
 
@@ -96,15 +77,7 @@ namespace moho
    */
   void __stdcall CUnitFireAtTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedCCommandTaskType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
 
   /**
@@ -125,10 +98,7 @@ namespace moho
    */
   gpg::RRef CUnitFireAtTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<moho::CUnitFireAtTask*>(objectStorage);
-    if (object) {
-      new (object) moho::CUnitFireAtTask();
-    }
+    auto* const object = gpg::ConstructInStorage<moho::CUnitFireAtTask>(objectStorage);
     return MakeCUnitFireAtTaskRef(object);
   }
 

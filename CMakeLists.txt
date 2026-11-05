@@ -22,6 +22,10 @@ else()
   add_compile_definitions(FAF_RETAIL_LAYOUT=0)
 endif()
 
+# ON stops faf_engine's C and C++ files after the compiler's front end: errors and static_asserts
+# still fail the build, but no object is written, so nothing can link. For the Layout check workflow.
+option(FAF_SYNTAX_ONLY "Check faf_engine's sources without generating code" OFF)
+
 # Engine addition (dedicated-server plan WPL.2): the Linux build of the
 # simulation, chosen by its toolchain file (cmake/toolchains/linux-clang-*.cmake,
 # read by project(), sets FAF_LINUX) and described in cmake/FafLinux.cmake.
@@ -112,6 +116,7 @@ if(NOT EXISTS "${FAF_DXSDK_DIR}/Include/d3dx9.h")
   message(FATAL_ERROR "DirectX SDK (June 2010) not found: FAF_DXSDK_DIR=${FAF_DXSDK_DIR}")
 endif()
 
+include(FafPgoWindows)
 include(FafCodegen)
 
 # Server-authoritative sessions (docs/SWITCHES.md, "Server mode"): the client's
@@ -127,6 +132,9 @@ if(FAF_TARGET_ARCH STREQUAL "x64")
   add_subdirectory(cmake/deps/zlib)
 endif()
 add_subdirectory(cmake/deps/monocypher)
+add_subdirectory(cmake/deps/zstd)
+add_subdirectory(cmake/deps/freetype)
+add_subdirectory(cmake/deps/msdfgen)
 
 # --- Profiler (optional Tracy integration) --------------------------------------------
 option(FAF_ENABLE_TRACY "Enable Tracy profiler instrumentation" OFF)

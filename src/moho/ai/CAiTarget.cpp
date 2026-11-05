@@ -39,33 +39,6 @@ namespace
     return entityDb != nullptr ? entityDb->FindEntityById(static_cast<std::uint32_t>(entityId)) : nullptr;
   }
 
-  [[nodiscard]] gpg::RType* CachedEAiTargetType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(EAiTargetType));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrEntityType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(WeakPtr<Entity>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return cached;
-  }
-
   [[nodiscard]] const char* ToAiTargetTypeLexical(const EAiTargetType targetType) noexcept
   {
     switch (targetType) {
@@ -721,9 +694,9 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Read(CachedEAiTargetType(), &targetType, nullOwner);
-    archive->Read(CachedWeakPtrEntityType(), &targetEntity, nullOwner);
-    archive->Read(CachedVector3fType(), &position, nullOwner);
+    archive->Read(gpg::RTypeOf<EAiTargetType>(), &targetType, nullOwner);
+    archive->Read(gpg::RTypeOf<WeakPtr<Entity>>(), &targetEntity, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &position, nullOwner);
     archive->ReadInt(&targetPoint);
     archive->ReadBool(&targetIsMobile);
   }
@@ -742,9 +715,9 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Write(CachedEAiTargetType(), &targetType, nullOwner);
-    archive->Write(CachedWeakPtrEntityType(), &targetEntity, nullOwner);
-    archive->Write(CachedVector3fType(), &position, nullOwner);
+    archive->Write(gpg::RTypeOf<EAiTargetType>(), &targetType, nullOwner);
+    archive->Write(gpg::RTypeOf<WeakPtr<Entity>>(), &targetEntity, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &position, nullOwner);
     archive->WriteInt(targetPoint);
     archive->WriteBool(targetIsMobile);
   }

@@ -28,80 +28,10 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* ResolveCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCBuildTaskHelperType()
-  {
-    static gpg::RType* type = nullptr;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::CBuildTaskHelper));
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCFactoryBuildTaskType()
-  {
-    static gpg::RType* type = nullptr;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::CFactoryBuildTask));
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveWeakPtrUnitType()
-  {
-    gpg::RType* type = moho::WeakPtr<moho::Unit>::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-      moho::WeakPtr<moho::Unit>::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveWeakPtrCUnitCommandType()
-  {
-    gpg::RType* type = moho::WeakPtr<moho::CUnitCommand>::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::CUnitCommand>));
-      moho::WeakPtr<moho::CUnitCommand>::sType = type;
-    }
-    return type;
-  }
 
   constexpr std::uint64_t kUnitStateBuildingMask = (1ull << static_cast<std::uint32_t>(moho::UNITSTATE_Building));
   constexpr std::uint64_t kUnitStateBusyMask = (1ull << static_cast<std::uint32_t>(moho::UNITSTATE_Busy));
 
-  /**
-   * Address: 0x005FD420 (FUN_005FD420, func_RTypeAddBaseCCommandTask)
-   *
-   * What it does:
-   * Resolves `CCommandTask` RTTI and registers it as a zero-offset reflection
-   * base lane for task-derived type-info owners.
-   */
-  [[maybe_unused]] void AddBaseCCommandTask(gpg::RType* const typeInfo)
-  {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    gpg::RType* const baseType = ResolveCCommandTaskType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
-  }
 } // namespace
 
 namespace moho
@@ -195,7 +125,7 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Read(ResolveCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), ownerRef);
 
     CCommandTask* dispatchTask = nullptr;
     archive->ReadPointer(&dispatchTask, &ownerRef);
@@ -205,11 +135,11 @@ namespace moho
     archive->ReadPointer(&blueprint, &ownerRef);
     mBlueprint = blueprint;
 
-    archive->Read(ResolveCBuildTaskHelperType(), &mBuildHelper, ownerRef);
-    archive->Read(ResolveWeakPtrUnitType(), &mRallyPointUnit, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CBuildTaskHelper>(), &mBuildHelper, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mRallyPointUnit, ownerRef);
     archive->ReadInt(&mBuildCount);
     archive->ReadBool(&mHasCommand);
-    archive->Read(ResolveWeakPtrCUnitCommandType(), &mCommand, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::CUnitCommand>>(), &mCommand, ownerRef);
   }
 
   /**
@@ -227,7 +157,7 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Write(ResolveCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
 
     gpg::RRef dispatchRef{};
     (void)gpg::RRef_CCommandTask(&dispatchRef, static_cast<CCommandTask*>(mDispatch));
@@ -235,11 +165,11 @@ namespace moho
 
     archive->WritePointer<moho::RUnitBlueprint>(const_cast<RUnitBlueprint*>(mBlueprint), gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(ResolveCBuildTaskHelperType(), &mBuildHelper, ownerRef);
-    archive->Write(ResolveWeakPtrUnitType(), &mRallyPointUnit, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CBuildTaskHelper>(), &mBuildHelper, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mRallyPointUnit, ownerRef);
     archive->WriteInt(mBuildCount);
     archive->WriteBool(mHasCommand);
-    archive->Write(ResolveWeakPtrCUnitCommandType(), &mCommand, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::CUnitCommand>>(), &mCommand, ownerRef);
   }
 
   /**
@@ -599,7 +529,7 @@ namespace
      */
     void Init() override
     {
-      gpg::RType* const type = ResolveCFactoryBuildTaskType();
+      gpg::RType* const type = gpg::RTypeOf<moho::CFactoryBuildTask>();
       GPG_ASSERT(type != nullptr);
       GPG_ASSERT(type->serLoadFunc_ == nullptr);
       type->serLoadFunc_ = mSerLoadFunc;

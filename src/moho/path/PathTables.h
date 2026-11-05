@@ -200,6 +200,13 @@ namespace moho
      */
     [[nodiscard]] gpg::HaStar::ClusterMap* ClusterMapForFootprint(std::int32_t footprintIndex) const;
 
+    /** Engine addition (replay keyframes): the footprint index of one of this table's maps, or -1. */
+    [[nodiscard]] std::int32_t FootprintOfClusterMap(const gpg::HaStar::ClusterMap* map) const;
+
+    /** Engine addition (replay keyframes): every cluster map exactly, see `ClusterMap::SaveExact`. */
+    void SaveExact(gpg::WriteArchive* archive) const;
+    void LoadExact(gpg::ReadArchive* archive);
+
   private:
     Impl* mImpl;
   };

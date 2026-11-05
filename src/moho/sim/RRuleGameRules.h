@@ -49,6 +49,12 @@ namespace moho
   // to an incomplete type is a legal declaration.
   class RRuleGameRules;
   class RRuleGameRulesImpl;
+
+  /**
+   * Engine addition (replay timeline): the viewer starts more sims from one set of rules, and each
+   * copies the rules' Lua blueprints, so `rule_ReleaseScriptBlueprints` has to leave them in place.
+   */
+  extern bool gRuleKeepScriptBlueprints;
   struct LuaReloadRequestNode;
 
   /**
@@ -600,6 +606,12 @@ namespace moho
      * its copy. For a program that reloads no blueprints and exports to no other state.
      */
     void ReleaseScriptBlueprints();
+
+    /**
+     * Engine addition: the sim has exported, after the session did when it wants a copy, and only
+     * those two states ever export. `rule_ReleaseScriptBlueprints` frees the rules' copy here.
+     */
+    void OnSimHasBlueprints();
 
     /**
      * Address: 0x0052A3D0 (FUN_0052A3D0)

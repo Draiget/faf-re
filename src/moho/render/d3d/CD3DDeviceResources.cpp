@@ -57,7 +57,7 @@ namespace moho
      * Resolves RD3D texture RTTI on demand and registers the prefetch type key
      * used by the D3D texture resource pipeline.
      */
-    void RegisterTexturePrefetchType()
+    [[maybe_unused]] void RegisterTexturePrefetchType()
     {
       gpg::RType* const textureType = resource_reflection::ResolveRD3DTextureResourceType();
       RES_RegisterPrefetchType("d3d_textures", textureType);
@@ -668,7 +668,7 @@ namespace moho
         kTextureFormatRenderTarget,
         false
       );
-      boost::ResetSharedFromRaw(&currentSheet, replacementSheet);
+      (void)boost::ResetSharedFromRaw(&currentSheet, replacementSheet);
       sheet = currentSheet.get();
       if (sheet != nullptr) {
         sheet->mContext.usage_ = kTextureUsageRenderTargetCopy;
@@ -689,7 +689,7 @@ namespace moho
       }
     }
 
-    boost::CopySharedRetain(&outSheet, currentSheet);
+    (void)boost::CopySharedRetain(&outSheet, currentSheet);
     return outSheet;
   }
 
@@ -782,7 +782,7 @@ namespace moho
    * Address: 0x004424A0 (FUN_004424A0, Moho::CD3DDeviceResources::DevResInitResources)
    *
    * What it does:
-   * Clears existing effects and compiles all `/effects/*.fx` resources.
+   * Clears existing effects and compiles all `/effects/ *.fx` resources.
    */
   void CD3DDeviceResources::DevResInitResources()
   {
@@ -923,7 +923,7 @@ namespace moho
   void CD3DDeviceResources::ClearCachedVertexFormats()
   {
     for (CD3DVertexFormat* const vertexFormat : mVertexFormats) {
-      delete vertexFormat;
+      GPG_NONVIRTUAL_DESTROY(delete vertexFormat);
     }
     mVertexFormats.clear();
   }

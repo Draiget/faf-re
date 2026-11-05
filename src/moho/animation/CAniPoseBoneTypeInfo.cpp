@@ -31,15 +31,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedCAniPoseBoneType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CAniPoseBone));
-    }
-    return cached;
-  }
-
   [[nodiscard]] moho::CAniPoseBone MakeDefaultCAniPoseBone()
   {
     moho::CAniPoseBone fill{};
@@ -83,11 +74,12 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::CAniPoseBone>*>(objectPtr);
+    // The array's own resize: on x64 an array of 11 bones is a block of SimBlockLane's size, freed as one.
+    auto& vec = *reinterpret_cast<moho::CAniPoseBoneArray*>(objectPtr);
     const moho::CAniPoseBone fill = MakeDefaultCAniPoseBone();
     vec.resize(static_cast<std::size_t>(count), fill);
 
-    gpg::RType* const elementType = CachedCAniPoseBoneType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::CAniPoseBone>();
     if (!elementType) {
       return;
     }
@@ -114,7 +106,7 @@ namespace
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
-    gpg::RType* const elementType = CachedCAniPoseBoneType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::CAniPoseBone>();
     if (!elementType) {
       return;
     }
@@ -181,12 +173,7 @@ namespace moho
    */
   [[maybe_unused]] void cleanup_CAniPoseBoneTypeInfoRTypeBase(CAniPoseBoneTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**
@@ -232,7 +219,7 @@ namespace gpg
    */
   const char* RFastVectorType<moho::CAniPoseBone>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedCAniPoseBoneType()->GetName());
+    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::CAniPoseBone>()->GetName());
     return sName.c_str();
   }
 
@@ -272,7 +259,7 @@ namespace gpg
   {
     gpg::RRef out{};
     out.mObj = nullptr;
-    out.mType = CachedCAniPoseBoneType();
+    out.mType = gpg::RTypeOf<moho::CAniPoseBone>();
 
     if (!obj || ind < 0) {
       return out;

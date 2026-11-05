@@ -44,6 +44,7 @@ namespace moho
     float x{}, y{}, z{}, w{};
 
     Vector4f() noexcept = default;
+    Vector4f(const Vector4f&) noexcept = default;
 
     /**
      * Address: 0x0046FAB0 (FUN_0046FAB0, Moho::Vector4f::Vector4f)

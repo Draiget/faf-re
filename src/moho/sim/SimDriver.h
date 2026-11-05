@@ -22,7 +22,7 @@
 #include "moho/command/SSTICommandConstantData.h"
 #include "moho/command/SSTICommandVariableData.h"
 #include "moho/entity/SSTIEntityVariableData.h"
-#include "moho/misc/CSaveGameRequestImpl.h"
+#include "moho/misc/ISaveRequest.h"
 #include "moho/audio/SAudioRequest.h"
 #include "moho/net/Common.h"
 #include "platform/Platform.h"
@@ -795,7 +795,7 @@ namespace moho
     /**
      * Address: 0x0073DF60 (FUN_0073DF60)
      */
-    void RequestSaveGame(CSaveGameRequestImpl* request) override;
+    void RequestSaveGame(ISaveRequest* request) override;
     /**
      * Address: 0x0073DFE0 (FUN_0073DFE0)
      */
@@ -950,7 +950,7 @@ namespace moho
     int32_t mInterlockRefCount = 0;                   // +0xAC
     SSyncFilter mPendingSyncFilter;                   // +0xB0
     SSyncFilter mActiveSyncFilter;                    // +0x120
-    CSaveGameRequestImpl* mSaveGameRequest = nullptr; // +0x190
+    ISaveRequest* mSaveGameRequest = nullptr; // +0x190
     bool mWantsToSave = false;                        // +0x194
     // +0x195..+0x197: compiler-inserted alignment before 4-byte aligned flag group.
     alignas(4) bool mSaveRequestUsesSuggestedName = false; // +0x198
@@ -1019,8 +1019,21 @@ namespace moho
 
   void SIM_SetSessionPacing(ESimSessionPacing pacing) noexcept;
 
+  /**
+   * Engine addition (game server): keep issuing beats while the sim is paused. A lockstep client
+   * waits for some player's beat there, as any command of a player comes with one. A server's seats
+   * only follow its beats, so without any a player's resume would never reach the sim.
+   */
+  void SIM_SetIssueWhilePaused(bool issue) noexcept;
+
   /// Engine addition: the pacing `SIM_SetSessionPacing` last set.
   [[nodiscard]] ESimSessionPacing SIM_GetSessionPacing() noexcept;
+
+  /**
+   * Engine addition: the rate the sim last measured it can hold, from its median beat time, whatever
+   * the pacing. 1.0 is speed +0 (100 ms a beat); 0 before its first measure.
+   */
+  [[nodiscard]] float SIM_GetMeasuredGameRate() noexcept;
 
   /**
    * Engine addition: user-side console variables. Outside network sessions the issue thread keeps
@@ -1043,6 +1056,30 @@ namespace moho
    * frame take at most about that many beats and caps the session at lead x frame rate.
    */
   extern int sim_LeadOnSchedule;
+
+  /**
+   * Engine addition: user-side console variables for the display-clock skew correction, which the
+   * retail engine carries but never feeds (`CSimDriver::GetSimSpeed` returns 0).
+   * - `wld_SkewCorrection` (default 0): 1 announces it to the other players (`net_PeerFeatures`); in
+   *   a network game where all of them announce it, `GetSimSpeed` returns how many beats the beat on
+   *   screen is ahead of real time (negative when behind), measured tick by tick from the first
+   *   tick on screen with paused time left out. `WLD_GetSimRate` then runs the display clock at
+   *   `wld_SkewRateAdjustBase^-skew`, within [1 / `wld_SkewRateAdjustMax`, `wld_SkewRateAdjustMax`].
+   *   It changes when beats are issued, never what the sim computes.
+   * - `wld_SkewMaxLag` (default 2 s): the skew is clamped to this much real time either way.
+   * - `wld_SkewLog` (default 0): log the drift every this many seconds.
+   * - `wld_PreciseSharedStart` (default 1): in a network session the count is measured against the
+   *   moment the last player's ready message left its sender (`CClientManagerImpl::EstimateSharedStartUs`),
+   *   which every player times alike, so every player's screen keeps to one schedule; 0 counts
+   *   from this client's own first tick on screen, as outside network sessions.
+   * - `wld_ReadyAfterFirstFrame` (default 1): this client's ready message waits for the first frame
+   *   of the game interface to be drawn; 0 sends it before that frame, as the binary does.
+   */
+  extern int wld_SkewCorrection;
+  extern float wld_SkewMaxLag;
+  extern int wld_SkewLog;
+  extern int wld_PreciseSharedStart;
+  extern int wld_ReadyAfterFirstFrame;
 
   /**
    * Engine addition: while a lead paces the session (see above), the sim's measured speed (game

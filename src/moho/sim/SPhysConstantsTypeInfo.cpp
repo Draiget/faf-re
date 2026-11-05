@@ -93,7 +93,7 @@ namespace
    * Deserializes one `Vector3f` object lane using one local null-owner
    * reference.
    */
-  void ReadVector3fArchiveObjectWithNullOwnerVariantA(gpg::ReadArchive* const archive, void* const object)
+  [[maybe_unused]] void ReadVector3fArchiveObjectWithNullOwnerVariantA(gpg::ReadArchive* const archive, void* const object)
   {
     gpg::RRef ownerRef{};
     archive->Read(CachedVector3fType(), object, ownerRef);
@@ -106,7 +106,7 @@ namespace
    * Serializes one `Vector3f` object lane using one local null-owner
    * reference.
    */
-  void WriteVector3fArchiveObjectWithNullOwnerVariantA(gpg::WriteArchive* const archive, void** const objectSlot)
+  [[maybe_unused]] void WriteVector3fArchiveObjectWithNullOwnerVariantA(gpg::WriteArchive* const archive, void** const objectSlot)
   {
     const gpg::RRef ownerRef{};
     archive->Write(CachedVector3fType(), objectSlot, ownerRef);
@@ -119,7 +119,7 @@ namespace
    * Secondary deserialization lane for one `Vector3f` object using one local
    * null-owner reference.
    */
-  void ReadVector3fArchiveObjectWithNullOwnerVariantB(gpg::ReadArchive* const archive, void* const object)
+  [[maybe_unused]] void ReadVector3fArchiveObjectWithNullOwnerVariantB(gpg::ReadArchive* const archive, void* const object)
   {
     gpg::RRef ownerRef{};
     archive->Read(CachedVector3fType(), object, ownerRef);
@@ -132,7 +132,7 @@ namespace
    * Secondary serialization lane for one `Vector3f` object using one local
    * null-owner reference.
    */
-  void WriteVector3fArchiveObjectWithNullOwnerVariantB(gpg::WriteArchive* const archive, void** const objectSlot)
+  [[maybe_unused]] void WriteVector3fArchiveObjectWithNullOwnerVariantB(gpg::WriteArchive* const archive, void** const objectSlot)
   {
     const gpg::RRef ownerRef{};
     archive->Write(CachedVector3fType(), objectSlot, ownerRef);
@@ -145,7 +145,7 @@ namespace
    * Stdcall bridge that deserializes one `Vector3f` object lane using one
    * local null-owner reference.
    */
-  void ReadVector3fArchiveObjectWithNullOwnerStdCall(void* const object, gpg::ReadArchive* const archive)
+  [[maybe_unused]] void ReadVector3fArchiveObjectWithNullOwnerStdCall(void* const object, gpg::ReadArchive* const archive)
   {
     gpg::RRef ownerRef{};
     archive->Read(CachedVector3fType(), object, ownerRef);
@@ -158,7 +158,7 @@ namespace
    * Stdcall bridge that serializes one `Vector3f` object lane using one local
    * null-owner reference.
    */
-  void WriteVector3fArchiveObjectWithNullOwnerStdCall(void** const objectSlot, gpg::WriteArchive* const archive)
+  [[maybe_unused]] void WriteVector3fArchiveObjectWithNullOwnerStdCall(void** const objectSlot, gpg::WriteArchive* const archive)
   {
     const gpg::RRef ownerRef{};
     archive->Write(CachedVector3fType(), objectSlot, ownerRef);
@@ -196,12 +196,7 @@ namespace moho
    */
   [[maybe_unused]] void DestroySPhysConstantsTypeInfoBody(SPhysConstantsTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**

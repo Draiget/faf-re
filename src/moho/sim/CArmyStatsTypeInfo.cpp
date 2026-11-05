@@ -68,19 +68,7 @@ namespace moho
    */
   void CArmyStatsTypeInfo::AddBase_StatsCArmyStatItem(gpg::RType* const typeInfo)
   {
-    gpg::RType* baseType = Stats<CArmyStatItem>::sType;
-    if (!baseType) {
-      baseType = gpg::LookupRType(typeid(Stats<CArmyStatItem>));
-      Stats<CArmyStatItem>::sType = baseType;
-    }
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseViaSlot<Stats<CArmyStatItem>>(typeInfo);
   }
 } // namespace moho
 

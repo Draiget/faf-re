@@ -32,15 +32,6 @@ namespace
     destination.push_back(value);
   }
 
-  [[nodiscard]] gpg::RType* CachedRUnitBlueprintWeaponType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RUnitBlueprintWeapon));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RVectorType_RUnitBlueprintWeapon& AcquireRUnitBlueprintWeaponVectorType()
   {
     static gpg::RVectorType_RUnitBlueprintWeapon sInstance;
@@ -110,7 +101,7 @@ namespace
    * copy through `CopyAssignRUnitBlueprintWeapon` (FUN_00527680) by name so the
    * out-of-line copy-assignment symbol stays bound.
    */
-  const moho::RUnitBlueprintWeapon* CopyAssignUnitBlueprintWeaponRange(
+  [[maybe_unused]] const moho::RUnitBlueprintWeapon* CopyAssignUnitBlueprintWeaponRange(
     moho::RUnitBlueprintWeapon* destinationBegin,
     moho::RUnitBlueprintWeapon* destinationEnd,
     const moho::RUnitBlueprintWeapon* sourceBegin
@@ -276,7 +267,7 @@ gpg::RVectorType_RUnitBlueprintWeapon::~RVectorType_RUnitBlueprintWeapon() = def
  */
 const char* gpg::RVectorType_RUnitBlueprintWeapon::GetName() const
 {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedRUnitBlueprintWeaponType()->GetName());
+    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::RUnitBlueprintWeapon>()->GetName());
     return sName.c_str();
 }
 
@@ -340,7 +331,7 @@ void gpg::RVectorType_RUnitBlueprintWeapon::SerLoad(
   WeaponVector loaded{};
   EnsureWeaponVectorCapacity(loaded, static_cast<std::size_t>(count));
 
-  gpg::RType* const elementType = CachedRUnitBlueprintWeaponType();
+  gpg::RType* const elementType = gpg::RTypeOf<moho::RUnitBlueprintWeapon>();
   if (!elementType) {
     *storage = loaded;
     return;
@@ -385,7 +376,7 @@ void gpg::RVectorType_RUnitBlueprintWeapon::SerSave(
     return;
   }
 
-  gpg::RType* const elementType = CachedRUnitBlueprintWeaponType();
+  gpg::RType* const elementType = gpg::RTypeOf<moho::RUnitBlueprintWeapon>();
   if (!elementType) {
     return;
   }
@@ -403,7 +394,7 @@ void gpg::RVectorType_RUnitBlueprintWeapon::SerSave(
 gpg::RRef gpg::RVectorType_RUnitBlueprintWeapon::SubscriptIndex(void* const obj, const int ind) const
 {
   gpg::RRef out{};
-  out.mType = CachedRUnitBlueprintWeaponType();
+  out.mType = gpg::RTypeOf<moho::RUnitBlueprintWeapon>();
   out.mObj = nullptr;
 
   auto* const storage = static_cast<WeaponVector*>(obj);

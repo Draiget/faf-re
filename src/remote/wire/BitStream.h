@@ -22,6 +22,16 @@ namespace faf::remote::wire
     void WriteVarUint(std::uint32_t value);
     /** The float's exact bit pattern: for values the UI shows as numbers (§7.2). */
     void WriteFloatExact(float value);
+    /** Appends these bytes whole, in one go where this writer stands on a byte edge. */
+    void WriteBytes(std::span<const std::uint8_t> bytes);
+    /** Appends all of `other`'s bits, wherever this writer stands. */
+    void Append(const BitWriter& other);
+    /** Empty again; keeps the storage. */
+    void Clear() noexcept
+    {
+      mBytes.clear();
+      mBitCount = 0;
+    }
 
     [[nodiscard]] std::size_t BitCount() const noexcept { return mBitCount; }
     [[nodiscard]] std::span<const std::uint8_t> Bytes() const noexcept { return mBytes; }

@@ -152,7 +152,7 @@ gpg::RRef CAiPathFinderTypeInfo::NewRef()
  */
 void CAiPathFinderTypeInfo::Delete(void* const objectStorage)
 {
-  delete static_cast<CAiPathFinder*>(objectStorage);
+  GPG_NONVIRTUAL_DESTROY(delete static_cast<CAiPathFinder*>(objectStorage));
 }
 
 /**
@@ -164,10 +164,7 @@ void CAiPathFinderTypeInfo::Delete(void* const objectStorage)
  */
 gpg::RRef CAiPathFinderTypeInfo::CtrRef(void* const objectStorage)
 {
-  auto* const pathFinder = static_cast<CAiPathFinder*>(objectStorage);
-  if (pathFinder != nullptr) {
-    new (pathFinder) CAiPathFinder();
-  }
+  auto* const pathFinder = gpg::ConstructInStorage<CAiPathFinder>(objectStorage);
 
   gpg::RRef out{};
   out = gpg::MakeRRef<moho::CAiPathFinder>(pathFinder);
@@ -183,10 +180,7 @@ gpg::RRef CAiPathFinderTypeInfo::CtrRef(void* const objectStorage)
  */
 void CAiPathFinderTypeInfo::Destruct(void* const objectStorage)
 {
-  auto* const pathFinder = static_cast<CAiPathFinder*>(objectStorage);
-  if (pathFinder != nullptr) {
-    pathFinder->~CAiPathFinder();
-  }
+  gpg::DestructInStorage<CAiPathFinder>(objectStorage);
 }
 
 /**

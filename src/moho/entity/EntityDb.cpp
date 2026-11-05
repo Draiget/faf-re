@@ -150,7 +150,6 @@ namespace
   constexpr std::uint32_t kAllUnitsShieldFamilyBoundaryKey = 0x40000000u;
   constexpr std::uint32_t kAllUnitsOtherFamilyBoundaryKey = 0x50000000u;
   constexpr std::uint32_t kAllUnitsLateFamilyBoundaryKey = 0x60000000u;
-  constexpr std::uint32_t kEntityIdFamilyNibbleMask = 0xF0000000u;
 
   gpg::RType* gLegacyEntityDbIdPoolMapType = nullptr;
   gpg::RType* gLegacyEntityDbEntityListType = nullptr;
@@ -224,7 +223,7 @@ namespace
     }
 
 #if defined(_WIN32)
-    ::InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&statItem->mPrimaryValueBits), static_cast<long>(delta));
+    statItem->AddPrimaryBits(delta);
 #else
     statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
 #endif
@@ -320,7 +319,7 @@ namespace
    * Stores the first all-units node at/after one source upper-bound key
    * `((sourceIndex + 1) << 20)` into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreAllUnitsSourceUpperBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreAllUnitsSourceUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t sourceIndex,
     const moho::EntityDB* const entityDb
@@ -341,7 +340,7 @@ namespace
    * What it does:
    * Stores the left-most all-units tree node (minimum key) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreAllUnitsLeftmostNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreAllUnitsLeftmostNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -390,7 +389,7 @@ namespace
    * Returns the exact all-units payload pointer for one `entityId`, or `nullptr`
    * when lookup resolves to the map head/sentinel lane.
    */
-  moho::Entity* FindEntityPayloadByIdNode(
+  [[maybe_unused]] moho::Entity* FindEntityPayloadByIdNode(
     moho::EntityDB* const entityDb,
     const std::uint32_t entityId
   ) noexcept
@@ -414,7 +413,7 @@ namespace
    * Stores the first all-units node at/after the high-family boundary key
    * (`0x20000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreHighFamilyBoundaryLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreHighFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -434,7 +433,7 @@ namespace
    * Stores the first all-units node at/after the mid-family boundary key
    * (`0x30000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreMidFamilyBoundaryLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreMidFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -454,7 +453,7 @@ namespace
    * Stores the first all-units node at/after the shield-family boundary key
    * (`0x40000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreShieldFamilyBoundaryLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreShieldFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -475,7 +474,7 @@ namespace
    * Stores the first all-units node at/after the other-family boundary key
    * (`0x50000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreOtherFamilyBoundaryLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreOtherFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -495,7 +494,7 @@ namespace
    * Stores the first all-units node at/after the late-family boundary key
    * (`0x60000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreLateFamilyBoundaryLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreLateFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -537,7 +536,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` prop-family
    * purge lower-bound query.
    */
-  moho::CEntityDbAllUnitsNode** StorePurgePropFamilyUpperBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgePropFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::EntityDB* const entityDb
@@ -575,7 +574,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` projectile-family
    * purge lower-bound query.
    */
-  moho::CEntityDbAllUnitsNode** StorePurgeProjectileFamilyUpperBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeProjectileFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::EntityDB* const entityDb
@@ -613,7 +612,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` shield-family
    * purge lower-bound query.
    */
-  moho::CEntityDbAllUnitsNode** StorePurgeShieldFamilyUpperBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeShieldFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::EntityDB* const entityDb
@@ -651,7 +650,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` other-family
    * purge lower-bound query.
    */
-  moho::CEntityDbAllUnitsNode** StorePurgeOtherFamilyUpperBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeOtherFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::EntityDB* const entityDb
@@ -667,7 +666,7 @@ namespace
    * Stores the first all-units node at/after the non-unit family boundary
    * (`0x10000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreFirstNonUnitFamilyLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreFirstNonUnitFamilyLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -687,7 +686,7 @@ namespace
    * Stores the first all-units node at/after the high-family boundary
    * (`0x20000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreFirstHighFamilyLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreFirstHighFamilyLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -770,7 +769,7 @@ namespace
    * Register-shape adapter that advances one all-armies iterator object and
    * returns the same iterator pointer.
    */
-  moho::CUnitIterAllArmies* AdvanceAllArmiesIteratorLane(
+  [[maybe_unused]] moho::CUnitIterAllArmies* AdvanceAllArmiesIteratorLane(
     moho::CUnitIterAllArmies* const iterator
   ) noexcept
   {
@@ -787,7 +786,7 @@ namespace
    * Stores the current all-armies iterator node lane into `outIterator`, then
    * advances the iterator with `Next()` and returns `outIterator`.
    */
-  moho::CEntityDbAllUnitsNode** StoreAndAdvanceAllArmiesIteratorPostIncrement(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreAndAdvanceAllArmiesIteratorPostIncrement(
     moho::CUnitIterAllArmies* const iterator,
     moho::CEntityDbAllUnitsNode** const outIterator
   ) noexcept
@@ -894,12 +893,7 @@ namespace
    */
   void DestroyEntityDbTypeInfoBody(EntityDbTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   EntityDbTypeInfo::~EntityDbTypeInfo()
@@ -967,20 +961,6 @@ namespace
     static_cast<moho::EntityDB*>(objectStorage)->~EntityDB();
   }
 
-  /**
-   * Shared `IdPool` RTTI cache lookup, used by `EntityDbIdPoolMapTypeInfo::
-   * GetName`/`SerLoad`/`SerSave` (all three resolve the same element type).
-   */
-  [[nodiscard]] gpg::RType* CachedIdPoolElementType()
-  {
-    gpg::RType* type = moho::IdPool::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::IdPool));
-      moho::IdPool::sType = type;
-    }
-    return type;
-  }
-
   class EntityDbIdPoolMapTypeInfo final : public gpg::RType
   {
   public:
@@ -1000,7 +980,7 @@ namespace
     [[nodiscard]] const char* GetName() const override
     {
       static const msvc8::string sName = gpg::STR_Printf(
-        "map<%s,%s>", gpg::LookupRType(typeid(unsigned int))->GetName(), CachedIdPoolElementType()->GetName()
+        "map<%s,%s>", gpg::LookupRType(typeid(unsigned int))->GetName(), gpg::RTypeOf<moho::IdPool>()->GetName()
       );
       return sName.c_str();
     }
@@ -1079,12 +1059,7 @@ namespace
    */
   void DestroyEntityDbIdPoolMapTypeInfoBody(EntityDbIdPoolMapTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   EntityDbIdPoolMapTypeInfo::~EntityDbIdPoolMapTypeInfo()
@@ -1116,7 +1091,7 @@ namespace
     archive->ReadUInt(&count);
     map->clear();
 
-    gpg::RType* const idPoolType = CachedIdPoolElementType();
+    gpg::RType* const idPoolType = gpg::RTypeOf<moho::IdPool>();
     gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
 
     for (unsigned int i = 0; i < count; ++i) {
@@ -1152,7 +1127,7 @@ namespace
 
     archive->WriteUInt(static_cast<unsigned int>(map->size()));
 
-    gpg::RType* const idPoolType = CachedIdPoolElementType();
+    gpg::RType* const idPoolType = gpg::RTypeOf<moho::IdPool>();
     gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
 
     for (const auto& [key, pool] : *map) {
@@ -1217,19 +1192,14 @@ namespace moho
    * `AllUnitsHead()`'s teardown is the shipped body's direct call `sub_686EF0(
    * this, &outIter, AllUnitsHead()->_Myhead->_Left, AllUnitsHead()->_Myhead)` --
    * `EraseAllUnitsRange(leftmost(), header())`, cited on that member above
-   * (0x00686EF0) -- not an inlined recursive destroy. DB-integrity fix:
-   * this body previously called `DestroyAllUnitsSubtreeRecursive(AllUnitsHead()
-   * ->left)` directly, i.e. from the *leftmost* node instead of the real
-   * root (`AllUnitsHead()->parent`) -- the exact same wrong-root bug already
-   * documented and fixed for `mIdPoolTree` above, independently reintroduced
-   * here for `AllUnitsHead()`. Since leftmost() has no left child by definition,
-   * that call would destroy at most leftmost's own right subtree and then
-   * stop, leaking essentially the entire all-units tree (every tracked
-   * `Unit`) on every `EntityDB` teardown. Routing through the already-
-   * recovered `EraseAllUnitsRange` (which internally calls
+   * (0x00686EF0) -- not an inlined recursive destroy. Since leftmost() has no
+   * left child by definition, that call would destroy at most leftmost's own
+   * right subtree and then stop, leaking essentially the entire all-units tree
+   * (every tracked `Unit`) on every `EntityDB` teardown. Routing through the
+   * already- recovered `EraseAllUnitsRange` (which internally calls
    * `DestroyAllUnitsSubtreeRecursive(head->parent)`, the correct root, via
-   * `EraseAllUnitsTreeRange`'s whole-tree fast path) fixes the leak and
-   * matches the real call target.
+   * `EraseAllUnitsTreeRange`'s whole-tree fast path) fixes the leak and matches
+   * the real call target.
    */
   EntityDB::~EntityDB()
   {
@@ -1617,7 +1587,7 @@ namespace moho
    * `moho/sim/SimRecoveryRuntime.cpp` under the same private
    * `PriorityQueue20Runtime` type as `Swap`/`AcquireHandle`/`SiftUp` above
    * -- that copy carried this same address but had no real caller
-   * anywhere in `src/**`; removed rather than left as a citation
+   * anywhere in `src/ **`; removed rather than left as a citation
    * duplicate.
    */
   void CEntityDbBoundedPropQueue::SiftDown(std::int32_t index, const std::int32_t count) noexcept

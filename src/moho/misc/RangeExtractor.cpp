@@ -295,8 +295,7 @@ namespace moho
    * `std::unique_ptr<moho::RangeExtractor>` values -- a move-only owning
    * smart pointer this project's binary-layout-focused `msvc8::map` has no
    * way to model or store -- so the real `std::map` here is an intentional
-   * substitution, not a fidelity gap to migrate away. `FUN_007F1990` marked
-   * `skip` for this reason.
+   * substitution, not a fidelity gap to migrate away.
    */
   void InitializeBlueprintExtractors()
   {

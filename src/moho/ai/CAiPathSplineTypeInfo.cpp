@@ -1,4 +1,5 @@
 #include "moho/ai/CAiPathSplineTypeInfo.h"
+#include "gpg/core/reflection/Reflection.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -33,46 +34,6 @@ namespace
     CAiPathSplineTypeInfo* const typeInfo = AcquireCAiPathSplineTypeInfo();
     gpg::PreRegisterRType(typeid(CAiPathSpline), typeInfo);
     return typeInfo;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCAiPathSplineType()
-  {
-    if (!CAiPathSpline::sType) {
-      CAiPathSpline::sType = gpg::LookupRType(typeid(CAiPathSpline));
-    }
-    return CAiPathSpline::sType;
-  }
-
-  template <typename T>
-  [[nodiscard]] gpg::RRef MakeTypedRef(T* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    GPG_ASSERT(derived);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
   }
 
   /**
@@ -114,11 +75,8 @@ namespace
    */
   [[nodiscard]] gpg::RRef ConstructAiPathSplineRefInPlace(void* objectStorage)
   {
-    auto* const spline = static_cast<CAiPathSpline*>(objectStorage);
-    if (spline) {
-      new (spline) CAiPathSpline();
-    }
-    return MakeTypedRef(spline, CachedCAiPathSplineType());
+    auto* const spline = gpg::ConstructInStorage<CAiPathSpline>(objectStorage);
+    return gpg::MakeTypedRef(spline, gpg::RTypeOf<CAiPathSpline>());
   }
 
   /**

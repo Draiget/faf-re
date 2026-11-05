@@ -536,7 +536,7 @@ namespace
   /**
    * Address: 0x0047E570 (FUN_0047E570, ExtractArgumentHighByteAlias)
    */
-  unsigned char ExtractArgumentHighByteAlias(const uint32_t value) noexcept
+  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias(const uint32_t value) noexcept
   {
     return ExtractArgumentHighByte(value);
   }
@@ -544,7 +544,7 @@ namespace
   /**
    * Address: 0x0047E5C0 (FUN_0047E5C0, ExtractArgumentHighByteAlias2)
    */
-  unsigned char ExtractArgumentHighByteAlias2(const uint32_t value) noexcept
+  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias2(const uint32_t value) noexcept
   {
     return ExtractArgumentHighByte(value);
   }
@@ -552,7 +552,7 @@ namespace
   /**
    * Address: 0x0047E630 (FUN_0047E630, ExtractArgumentHighByteAlias3)
    */
-  unsigned char ExtractArgumentHighByteAlias3(const uint32_t value) noexcept
+  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias3(const uint32_t value) noexcept
   {
     return ExtractArgumentHighByte(value);
   }
@@ -560,7 +560,7 @@ namespace
   /**
    * Address: 0x0047E6F0 (FUN_0047E6F0, ExtractArgumentHighByteAlias4)
    */
-  unsigned char ExtractArgumentHighByteAlias4(const uint32_t value) noexcept
+  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias4(const uint32_t value) noexcept
   {
     return ExtractArgumentHighByte(value);
   }
@@ -568,7 +568,7 @@ namespace
   /**
    * Address: 0x0047E930 (FUN_0047E930, ExtractArgumentHighByteAlias5)
    */
-  unsigned char ExtractArgumentHighByteAlias5(const uint32_t value) noexcept
+  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias5(const uint32_t value) noexcept
   {
     return ExtractArgumentHighByte(value);
   }

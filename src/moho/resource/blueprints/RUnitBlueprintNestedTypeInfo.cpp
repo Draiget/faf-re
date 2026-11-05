@@ -49,7 +49,7 @@ namespace
    * Copies one contiguous float range `[sourceBegin, sourceEnd)` into
    * destination storage and returns one-past the last destination lane.
    */
-  float* CopyFloatRangeNullable(
+  [[maybe_unused]] float* CopyFloatRangeNullable(
     float* destination,
     const float* const sourceBegin,
     const float* const sourceEnd

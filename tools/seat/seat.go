@@ -132,6 +132,7 @@ type Seat struct {
 	adapterC chan struct{}
 	once     sync.Once
 	contract *contractLink
+	bridge   *jarBridge
 }
 
 // New validates cfg and opens the seat's GPGNet endpoint and lobby port.
@@ -244,6 +245,13 @@ func (s *Seat) Start(ctx context.Context) error {
 		if err := s.startContract(ctx); err != nil {
 			return err
 		}
+		if s.cfg.Contract.JarBind != "" {
+			port, err := s.startJarBridge(ctx, s.cfg.Contract.JarBind, s.adapterPort)
+			if err != nil {
+				return err
+			}
+			return s.startGame(port)
+		}
 		return s.startGame(s.adapterPort)
 	}
 	if s.cfg.ICE != nil {
@@ -318,6 +326,7 @@ func (c Config) GameArgs(gpgPort int) []string {
 		"/nobugreport",
 		"/gpgnet", fmt.Sprintf("127.0.0.1:%d", gpgPort),
 		"/log", filepath.Join(c.RunDir, fmt.Sprintf("game-%d.log", c.UID)),
+		"/rejoinkeyfile", filepath.Join(c.RunDir, fmt.Sprintf("rejoin-%d.key", c.UID)),
 		// Always windowed: display preferences alone are not trusted to keep
 		// an instance off the whole screen.
 		"/windowed", strconv.Itoa(c.Window.Width), strconv.Itoa(c.Window.Height),
@@ -427,6 +436,79 @@ func (s *Seat) startGame(gpgPort int) error {
 	return nil
 }
 
+// RejoinElsewhere starts nothing here: it writes what a client on another machine
+// needs to take this seat back, to rejoin-<uid>.txt in the run folder, as the peers
+// list, the source, then the path of the seat's key. Whoever runs that client copies
+// the key there, as a player's own machine would hold it.
+func (s *Seat) RejoinElsewhere(peers string, source int) error {
+	c := s.cfg
+	key := filepath.Join(c.RunDir, fmt.Sprintf("rejoin-%d.key", c.UID))
+	text := fmt.Sprintf("%s\n%d\n%s\n", peers, source, key)
+	return os.WriteFile(filepath.Join(c.RunDir, fmt.Sprintf("rejoin-%d.txt", c.UID)), []byte(text), 0o644)
+}
+
+// Rejoin starts the game again as a client taking its seat back (issue #275): it
+// links to the peers from this seat's lobby port and gets the game's recording
+// from them. It gets no GPGNet endpoint, as the launcher's part ended when the
+// game launched.
+//
+// keyOf, when above 0, starts it with that player's key instead of its own: the test
+// that a player who is not this seat's gets nothing.
+func (s *Seat) Rejoin(peers string, source, keyOf int, launcher bool) error {
+	c, uid := s.cfg, s.cfg.UID
+	dir := c.Dir
+	if dir == "" {
+		dir = filepath.Dir(c.Exe)
+	}
+	var args []string
+	gpgPort := s.endpoint.Port()
+	if c.Contract != nil {
+		gpgPort = s.adapterPort
+		if s.bridge != nil {
+			gpgPort = s.bridge.ln.Addr().(*net.TCPAddr).Port
+		}
+	}
+	base := c.GameArgs(gpgPort)
+	for i := 0; i < len(base); i++ {
+		switch base[i] {
+		case "/gpgnet":
+			if launcher {
+				break
+			}
+			i++
+			continue
+		case "/log":
+			args = append(args, "/log", filepath.Join(c.RunDir, fmt.Sprintf("game-%d-rejoin.log", uid)))
+			i++
+			continue
+		case "/savereplay":
+			args = append(args, "/savereplay", filepath.Join(c.RunDir, fmt.Sprintf("replay-%d-rejoin", uid)))
+			i++
+			continue
+		case "/rejoinkeyfile":
+			if keyOf > 0 {
+				args = append(args, "/rejoinkeyfile", filepath.Join(c.RunDir, fmt.Sprintf("rejoin-%d.key", keyOf)))
+				i++
+				continue
+			}
+		}
+		args = append(args, base[i])
+	}
+	args = append(args, "/rejoin", peers, strconv.Itoa(source), strconv.Itoa(s.lobbyPort))
+
+	proc, err := procs.Start(procs.Spec{Name: fmt.Sprintf("game-%d-rejoin", uid), Exe: c.Exe, Dir: dir, Args: args}, s.job)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.game = proc
+	s.mu.Unlock()
+	s.emit(journal.Record{Kind: journal.ProcStart, UID: uid, Text: "game (rejoin)",
+		Data: map[string]any{"pid": proc.Pid(), "cmd": procs.CommandLine(c.Exe, args), "dir": dir}})
+	go s.watchExit(proc, "game")
+	return nil
+}
+
 func (s *Seat) watchExit(proc *procs.Process, what string) {
 	<-proc.Done()
 	s.emit(journal.Record{Kind: journal.ProcExit, UID: s.cfg.UID, Text: what,
@@ -488,6 +570,10 @@ func (s *Seat) Kill() {
 	s.mu.Unlock()
 	if game != nil {
 		game.Kill()
+	}
+	// A game's crash leaves an adapter that was asked to keep its session: that is what it is for.
+	if s.cfg.Contract != nil && s.cfg.Contract.KeepSession > 0 {
+		return
 	}
 	if adapter != nil {
 		adapter.Kill()

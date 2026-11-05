@@ -21,33 +21,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* ResolveEntityCategorySetType()
-  {
-    gpg::RType* type = moho::EntityCategorySet::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::EntityCategorySet));
-      moho::EntityCategorySet::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RRef MakeEntityCategorySetRef(moho::EntityCategorySet* value)
-  {
-    gpg::RRef out{};
-    out.mObj = value;
-    out.mType = ResolveEntityCategorySetType();
-    return out;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEntityCategorySetVectorArchiveAdapterType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(EntityCategorySetVector));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x006DFDE0 (FUN_006DFDE0)
    *
@@ -55,13 +28,13 @@ namespace
    * Deserializes one `vector<EntityCategorySet>` object lane through archive
    * owner context and returns the archive instance.
    */
-  gpg::ReadArchive* ReadEntityCategorySetVectorArchiveAdapter(
+  [[maybe_unused]] gpg::ReadArchive* ReadEntityCategorySetVectorArchiveAdapter(
     gpg::ReadArchive* const archive,
     void* const object,
     gpg::RRef* const ownerRef
   )
   {
-    archive->Read(ResolveEntityCategorySetVectorArchiveAdapterType(), object, *ownerRef);
+    archive->Read(gpg::RTypeOf<EntityCategorySetVector>(), object, *ownerRef);
     return archive;
   }
 
@@ -99,7 +72,7 @@ namespace
       loaded.resize(targetCount, moho::EntityCategorySet{});
     }
 
-    gpg::RType* const elementType = ResolveEntityCategorySetType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::EntityCategorySet>();
     if (!elementType) {
       *storage = std::move(loaded);
       return;
@@ -128,7 +101,7 @@ namespace
       return;
     }
 
-    gpg::RType* const elementType = ResolveEntityCategorySetType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::EntityCategorySet>();
     if (!elementType) {
       return;
     }
@@ -164,7 +137,7 @@ gpg::RVectorType<moho::EntityCategorySet>::~RVectorType() = default;
  */
 const char* gpg::RVectorType<moho::EntityCategorySet>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveEntityCategorySetType()->GetName());
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::EntityCategorySet>()->GetName());
   return sName.c_str();
 }
 
@@ -208,7 +181,7 @@ gpg::RRef gpg::RVectorType<moho::EntityCategorySet>::SubscriptIndex(void* const 
   GPG_ASSERT(storage != nullptr && static_cast<std::size_t>(ind) < GetCount(obj));
 
   gpg::RRef out{};
-  out.mType = ResolveEntityCategorySetType();
+  out.mType = gpg::RTypeOf<moho::EntityCategorySet>();
   if (!storage || ind < 0 || static_cast<std::size_t>(ind) >= GetCount(obj)) {
     return out;
   }

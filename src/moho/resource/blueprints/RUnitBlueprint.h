@@ -843,7 +843,7 @@ namespace moho
      * Runs base entity-blueprint initialization, computes derived unit physics,
      * applies air/display defaults, and post-initializes weapon records.
      */
-    void OnInitBlueprint();
+    void OnInitBlueprint() override;
 
     /**
      * Address: 0x00529E90 (FUN_00529E90, Moho::RUnitBlueprint::AddEconomyRestrictions)
@@ -879,7 +879,7 @@ namespace moho
      * Returns the reflected runtime type descriptor for this
      * `RUnitBlueprint` instance.
      */
-    [[nodiscard]] gpg::RType* GetClass() const;
+    [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x0051E440 (FUN_0051E440, ?GetDerivedObjectRef@RUnitBlueprint@Moho@@UAE?AVRRef@gpg@@XZ)
@@ -887,7 +887,7 @@ namespace moho
      * What it does:
      * Packs `{this, GetClass()}` as a reflected object reference handle.
      */
-    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x0051E460 (FUN_0051E460)

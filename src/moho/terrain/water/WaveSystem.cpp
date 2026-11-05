@@ -26,7 +26,7 @@ namespace
   constexpr std::int32_t kWaveSpatialRoutingMask = 0x800;
   constexpr float kWaveDefaultDissolveCutoff = 0.0f;
   constexpr float kWaveBoundsHalfHeight = 0.1f;
-  constexpr float kPi = 3.1415925f;
+  [[maybe_unused]] constexpr float kPi = 3.1415925f;
 
   void ReleaseParticleTextureRef(moho::CParticleTexture*& texture) noexcept
   {
@@ -34,7 +34,7 @@ namespace
       return;
     }
 
-    static_cast<moho::CountedObject*>(texture)->ReleaseReferenceAtomic();
+    (void)static_cast<moho::CountedObject*>(texture)->ReleaseReferenceAtomic();
     texture = nullptr;
   }
 
@@ -72,7 +72,7 @@ namespace
    * Runs one deleting-destructor thunk for `WaveGenerator`, forwarding through
    * non-deleting `WaveGenerator::~WaveGenerator` and optional storage release.
    */
-  [[nodiscard]] moho::WaveGenerator* DestroyWaveGeneratorDeleting(
+  [[maybe_unused]] [[nodiscard]] moho::WaveGenerator* DestroyWaveGeneratorDeleting(
     moho::WaveGenerator* const generator,
     const unsigned char deleteFlag
   )
@@ -882,7 +882,7 @@ namespace moho
       static_cast<std::uint32_t>(static_cast<std::int64_t>(mTextureSelectionRange));
     std::uint32_t randomSample = 0u;
     {
-      boost::mutex::scoped_lock randomLock(math_GlobalRandomMutex);
+      std::lock_guard<std::mutex> randomLock(math_GlobalRandomMutex);
       randomSample = math_GlobalRandomStream.twister.NextUInt32();
     }
     const std::uint32_t scaledSelection = static_cast<std::uint32_t>(

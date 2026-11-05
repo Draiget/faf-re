@@ -8,7 +8,6 @@
 #include <span>
 #include <streambuf>
 
-#include "boost/mutex.h"
 #include "gpg/core/containers/DList.h"
 #include "Sync.h"
 #include "Tss.h"
@@ -162,9 +161,9 @@ namespace gpg
     private:
         std::ostream* mStream{};
         std::uint8_t mOwnStream{};
-        std::uint8_t mPad0{};
-        std::uint8_t mPad1{};
-        std::uint8_t mPad2{};
+        [[maybe_unused]] std::uint8_t mPad0{};
+        [[maybe_unused]] std::uint8_t mPad1{};
+        [[maybe_unused]] std::uint8_t mPad2{};
     };
     static_assert(sizeof(StreamLogTarget) == 0x10, "StreamLogTarget size must be 0x10");
 
@@ -259,7 +258,7 @@ namespace gpg
         StreamBuffer* TailBuffer();
         bool IsSingleBuffer();
 
-        boost::mutex mMutex{};
+        std::mutex mMutex{};
         DList<StreamBuffer, void> mChunks{};
         std::uint8_t* mReadLimit{};
         std::uint8_t* mWriteCommit{};
@@ -355,10 +354,9 @@ namespace gpg
      * container: the previously-unidentified leading `field_0x00`
      * (confirmed present via the `operator new(0x14u)` allocation in
      * `EnsureThreadState`, but whose role was not identified) is exactly
-     * `msvc8::vector<T>`'s debug-proxy slot (`HasDebugProxy=true` is this
-     * template's default, matching the rest of this codebase's `_SECURE_SCL`
-     * modeling) -- `mEntries` alone reproduces all four original fields
-     * (proxy/begin/end/cap) at their original offsets.
+     * the binary vector's debug-proxy slot (`_SECURE_SCL`; the game's builds
+     * leave it out, see legacy/containers/Layout.h) -- `mEntries` alone
+     * reproduces all four original fields (proxy/begin/end/cap).
      */
     struct ThreadState
     {

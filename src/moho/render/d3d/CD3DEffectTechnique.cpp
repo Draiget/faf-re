@@ -50,6 +50,59 @@ namespace moho
     }
 
     /**
+     * FAF addition, not in the shipped binary (issue #307).
+     *
+     * The technique MSDF text draws with, appended to `primbatcher.fx`, which is FAF's game data. It
+     * uses that file's vertex shader, sampler and variables. The distance range in screen pixels comes
+     * as a constant rather than from `fwidth`, so it stays within `ps_2_0` for Direct3D 9.
+     */
+    constexpr const char kMsdfTechniqueSource[] = R"fx(
+
+float MsdfPixelRange = 1.0;
+
+float4 MsdfTextPS(
+    float4 Pos : POSITION,
+    float4 Diff : COLOR0,
+    float2 Tex1 : TEXCOORD0) : COLOR
+{
+    float3 field = tex2D(LinearSampler, Tex1).rgb;
+    float median = max(min(field.r, field.g), min(max(field.r, field.g), field.b));
+    float4 color = Diff;
+    color.a *= saturate(MsdfPixelRange * (median - 0.5) + 0.5) * AlphaMultiplier;
+    return color;
+}
+
+technique TMsdfText
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_SrcAlpha_InvSrcAlpha_Write_RGB )
+        DepthState( Depth_Disable )
+        RasterizerState( Rasterizer_Cull_None )
+
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0;
+        AlphaFunc = Greater;
+#endif
+
+        VertexShader = compile vs_1_1 PrimBatcherVS();
+        PixelShader = compile ps_2_0 MsdfTextPS();
+    }
+}
+)fx";
+
+    [[nodiscard]] gpg::MemBuffer<char> AppendMsdfTechnique(const gpg::MemBuffer<char>& source)
+    {
+      const std::size_t sourceBytes = source.Size();
+      const std::size_t tailBytes = sizeof(kMsdfTechniqueSource) - 1u;
+      gpg::MemBuffer<char> merged = gpg::AllocMemBuffer(sourceBytes + tailBytes);
+      std::memcpy(merged.data(), source.data(), sourceBytes);
+      std::memcpy(merged.data() + sourceBytes, kMsdfTechniqueSource, tailBytes);
+      return merged;
+    }
+
+    /**
      * FAF addition, not in the shipped binary.
      *
      * What it does:
@@ -267,7 +320,7 @@ namespace moho
     } catch (...) {
       while (constructedCount > 0U) {
         --constructedCount;
-        lanes[constructedCount].~Implementation();
+        lanes[constructedCount].Implementation::~Implementation();
       }
       throw;
     }
@@ -284,7 +337,7 @@ namespace moho
   {
     Implementation* const lanes = GetImplementationLanes();
     for (std::int32_t index = 2; index >= 0; --index) {
-      lanes[index].~Implementation();
+      lanes[index].Implementation::~Implementation();
     }
 
     mName.tidy(true, 0U);
@@ -472,10 +525,11 @@ namespace moho
       // Builds the effect, from its compiled copy in the cache when that is at
       // least as new as the source. FAF: `boneTexture` compiles the variant
       // with FAF_BONE_TEXTURE defined (see WantsBoneTextureVariant); it turns
-      // into different shaders, so it is cached under a name of its own.
-      const auto createEffect = [&](const bool boneTexture) {
-        const msvc8::string cachePath =
-          cacheDirectory + "/" + mName + (boneTexture ? ".bonetex." : ".") + engineVersion;
+      // into different shaders, so it is cached under a name of its own. So
+      // does `msdfText`, the source with the MSDF technique appended.
+      const auto createEffect = [&](const bool boneTexture, const bool msdfText = false) {
+        const char* const variant = boneTexture ? ".bonetex." : (msdfText ? ".msdf." : ".");
+        const msvc8::string cachePath = cacheDirectory + "/" + mName + variant + engineVersion;
         SDiskFileInfo cacheInfo{};
         bool useCachePayload = false;
         if (waitHandleSet->GetFileInfo(cachePath.c_str(), &cacheInfo, false)) {
@@ -487,7 +541,7 @@ namespace moho
           effectMacros.push_back(gpg::gal::EffectMacro("FAF_BONE_TEXTURE", "1"));
         }
         const gpg::gal::EffectContext context(
-          useCachePayload, mFile.c_str(), cachePath.c_str(), mergedBuffer, effectMacros
+          useCachePayload, mFile.c_str(), cachePath.c_str(), msdfText ? AppendMsdfTechnique(mergedBuffer) : mergedBuffer, effectMacros
         );
         mEffect = gpg::gal::Effect::Create(context);
       };
@@ -499,6 +553,17 @@ namespace moho
           createEffect(true);
         } catch (const std::exception& exception) {
           gpg::Warnf("%s: %s; building it without FAF_BONE_TEXTURE", effectFilePath, exception.what());
+          mEffect.reset();
+        }
+      }
+      // The MSDF technique goes on the end of primbatcher.fx, which is FAF's
+      // game data and which every renderer compiles from this same buffer. If
+      // it doesn't compile against that file, text stays on the old path.
+      if (!mEffect && std::strcmp(mName.c_str(), "primbatcher") == 0) {
+        try {
+          createEffect(false, true);
+        } catch (const std::exception& exception) {
+          gpg::Warnf("%s: %s; building it without MSDF text", effectFilePath, exception.what());
           mEffect.reset();
         }
       }

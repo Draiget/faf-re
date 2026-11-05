@@ -32,18 +32,7 @@ namespace
    */
   void AddBaseIAiTransportToCAiTransportImplTypeInfo(gpg::RType* const typeInfo)
   {
-    if (IAiTransport::sType == nullptr) {
-      IAiTransport::sType = gpg::LookupRType(typeid(IAiTransport));
-    }
-
-    gpg::RType* const baseType = IAiTransport::sType;
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseViaSlot<IAiTransport>(typeInfo);
   }
 } // namespace
 

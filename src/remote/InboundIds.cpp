@@ -20,7 +20,10 @@ namespace faf::remote
     char text[160];
     std::snprintf(text, sizeof(text), "%s: unknown %s id 0x%08x", message, kind, id);
     mLastDrop = text;
-    gpg::Warnf("command ids: dropped %s", text);
+    // A player can send these at will, so only the first few.
+    if (mDropped <= kDropsLogged) {
+      gpg::Warnf("command ids: dropped %s", text);
+    }
   }
 
   bool CCommandIdRewriter::Entity(const char* const message, std::uint32_t& id)

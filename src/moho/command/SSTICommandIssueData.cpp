@@ -101,8 +101,8 @@ namespace moho
     , unk04(-1)
     , mIndex(-1)
     , mCommandType(commandType)
-    , mTarget{EAiTargetType::AITARGET_None, 0xF0000000u, Wm3::Vec3f{0.0f, 0.0f, 0.0f}}
-    , mTarget2{EAiTargetType::AITARGET_None, 0xF0000000u, Wm3::Vec3f{0.0f, 0.0f, 0.0f}}
+    , mTarget{EAiTargetType::AITARGET_None, {0xF0000000u}, {Wm3::Vec3f{0.0f, 0.0f, 0.0f}}}
+    , mTarget2{EAiTargetType::AITARGET_None, {0xF0000000u}, {Wm3::Vec3f{0.0f, 0.0f, 0.0f}}}
     , unk38(-1)
     , mOri(1.0f, 0.0f, 0.0f, 0.0f)
     , unk4C(1.0f)

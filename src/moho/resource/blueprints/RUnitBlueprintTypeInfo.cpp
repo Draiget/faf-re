@@ -20,15 +20,6 @@ namespace
     return sInstance;
   }
 
-  gpg::RType* CachedEntityBlueprintType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::REntityBlueprint));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x005263B0 (FUN_005263B0, preregister_VectorRUnitBlueprintWeaponTypeStartup)
    *
@@ -85,14 +76,7 @@ namespace moho
    */
   void RUnitBlueprintTypeInfo::AddBaseREntityBlueprint(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedEntityBlueprintType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::REntityBlueprint>(typeInfo);
   }
 
   /**

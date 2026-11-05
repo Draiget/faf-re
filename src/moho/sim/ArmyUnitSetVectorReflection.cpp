@@ -1,4 +1,5 @@
 #include "moho/sim/ArmyUnitSetVectorReflection.h"
+#include "gpg/core/reflection/Reflection.h"
 
 #include <cstdlib>
 #include <new>
@@ -34,55 +35,6 @@ namespace
     // nothing ever registers it - and since LookupRType throws on a miss, the
     // name-based candidate search that used to follow was unreachable.
     return gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Unit>));
-  }
-
-  /**
-   * Cached lookup of the same `EntitySetTemplate<Unit>` RTTI descriptor,
-   * mirroring the binary's own `sType`-style cache (confirmed against
-   * FUN_00705320's disassembly: a static slot checked before falling back to
-   * `LookupRType`). `ResolveEntitySetTemplateUnitType()` above re-resolves on
-   * every call and is kept as-is for its own existing callers; this cached
-   * accessor is for the `MakeDerivedRef` path below, which the binary calls
-   * far more often (every vector-subscript access).
-   */
-  [[nodiscard]] gpg::RType* CachedEntitySetTemplateUnitReflType()
-  {
-    gpg::RType* type = moho::EntitySetTemplate<moho::Unit>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Unit>));
-      moho::EntitySetTemplate<moho::Unit>::sType = type;
-    }
-    return type;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
   }
 
   struct EntitySetTemplateUnitVectorTypeBootstrap
@@ -132,7 +84,7 @@ gpg::RRef* gpg::MakeUnitSetDerivedRef(gpg::RRef* const outRef, moho::EntitySetTe
     return nullptr;
   }
 
-  *outRef = MakeDerivedRef(value, CachedEntitySetTemplateUnitReflType());
+  *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>());
   return outRef;
 }
 
@@ -160,7 +112,7 @@ gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::~RVectorType() = default;
  */
 const char* gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedEntitySetTemplateUnitReflType()->GetName());
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>()->GetName());
   return sName.c_str();
 }
 
@@ -203,7 +155,7 @@ void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SerLoad(
   const RRef owner{};
   for (unsigned int index = 0; index < count; ++index) {
     moho::EntitySetTemplate<moho::Unit> element;
-    archive->Read(CachedEntitySetTemplateUnitReflType(), &element, owner);
+    archive->Read(gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>(), &element, owner);
     loaded.push_back(element);
   }
   storage->swap(loaded);
@@ -216,7 +168,7 @@ void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SerSave(
   const auto* const storage = reinterpret_cast<const EntitySetVector*>(objectPtr);
   archive->WriteUInt(static_cast<unsigned int>(storage->size()));
   for (const auto& element : *storage) {
-    archive->Write(CachedEntitySetTemplateUnitReflType(), &element, *ownerRef);
+    archive->Write(gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>(), &element, *ownerRef);
   }
 }
 

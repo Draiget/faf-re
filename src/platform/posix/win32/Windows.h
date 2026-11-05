@@ -296,8 +296,8 @@ enum LOGICAL_PROCESSOR_RELATIONSHIP
   RelationAll = 0xFFFF,
 };
 struct SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
-/// Not available here: returns FALSE with ERROR_NOT_SUPPORTED and a length of 0, which the
-/// engine's processor-topology code treats as "no topology information".
+/// Physical cores and NUMA nodes from sysfs, as fixed-size records in group 0. With no topology to
+/// report: FALSE with ERROR_NOT_SUPPORTED and a length of 0.
 BOOL GetLogicalProcessorInformationEx(
   LOGICAL_PROCESSOR_RELATIONSHIP relation, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* buffer, DWORD* length
 );
@@ -403,6 +403,9 @@ SIZE_T HeapSize(HANDLE heap, DWORD flags, const void* memory);
 BOOL CreateDirectoryA(const char* path, void* attributes);
 /// `_fullpath`: the absolute, lexically normalised form of `path` (which need not exist).
 char* _fullpath(char* absolutePath, const char* relativePath, std::size_t maxLength);
+/// Plan WPR.23 (headless `--path-spelling`): from now on `file` gets one `requested<TAB>on disk` line
+/// for each path found on disk only by ignoring case, each once.
+void FAF_SetPathSpellingTrace(std::FILE* file);
 
 // Code pages: the ANSI and OEM code pages are UTF-8 here.
 #define CP_ACP 0u

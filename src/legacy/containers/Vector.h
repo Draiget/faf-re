@@ -564,16 +564,16 @@ namespace msvc8
             if (currentCapacity >= currentSize + count) {
                 const std::size_t tailCount = static_cast<std::size_t>(view->end - insertAt);
                 if (tailCount < count) {
-                    MoveWordRange(insertAt + count, insertAt, view->end);
+                    (void)MoveWordRange(insertAt + count, insertAt, view->end);
                     view->end += count;
-                    FillWordsFromValuePointer(&fillValue, insertAt, count);
+                    (void)FillWordsFromValuePointer(&fillValue, insertAt, count);
                     return insertAt;
                 }
 
-                MoveWordRange(view->end, view->end - count, view->end);
+                (void)MoveWordRange(view->end, view->end - count, view->end);
                 view->end += count;
-                MoveWordRange(insertAt + count, insertAt, view->end - count);
-                FillWordsFromValuePointer(&fillValue, insertAt, count);
+                (void)MoveWordRange(insertAt + count, insertAt, view->end - count);
+                (void)FillWordsFromValuePointer(&fillValue, insertAt, count);
                 return insertAt;
             }
 
@@ -590,9 +590,9 @@ namespace msvc8
                 : static_cast<std::uint32_t*>(::operator new(0));
             std::uint32_t* const newInsert = newBegin + insertIndex;
 
-            MoveWordRange(newBegin, view->begin, view->begin + insertIndex);
-            FillWordsFromValuePointer(&fillValue, newInsert, count);
-            MoveWordRange(newInsert + count, insertAt, view->end);
+            (void)MoveWordRange(newBegin, view->begin, view->begin + insertIndex);
+            (void)FillWordsFromValuePointer(&fillValue, newInsert, count);
+            (void)MoveWordRange(newInsert + count, insertAt, view->end);
 
             if (view->begin != nullptr) {
                 ::operator delete(view->begin);
@@ -2031,7 +2031,7 @@ namespace msvc8
          * Address: 0x007AE840 (FUN_007AE840 -- `vector<T>::vector(const vector&)` for the 4-byte `moho::CameraImpl*` element (`_Xlen` 0x007AFF20, buy 0x007B1240, `_Ucopy` 0x007B1B70, `_Tidy` 0x007AF380 on the throw path): reached from `RCamManager::GetAllCameras` 0x007AAB60's `return mCams;`; callers 0x007AAB60; formerly `CopyConstructVectorOfCameraImplPtr` in moho/misc/EngineVectorHelpers.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x007BAFE0 (FUN_007BAFE0 -- `vector<T>::vector(const vector&)` for the 0x24-byte `moho::SNetCommandArg` element: reached from both `SNetCommand` constructors (0x007B6720, 0x007BCE70), which copy `mArgs` in the member-init list; callers 0x007B6720, 0x007BCE70; formerly `CopyConstructVectorOfSNetCommandArg` in moho/misc/EngineVectorHelpers.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x008FE700 (FUN_008FE700 -- `vector<T>::vector(const vector&)` -- reached from both `EffectContext` copy sites, which placement-copy-construct the macro table into freshly allocated runtime storage for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext`'s macro table; the 0x3C element is two `msvc8::string`s, so every element step routes through `msvc8::string::assign`); callers 0x008FE7E0, 0x0093FCC0, 0x0093FD90; formerly `CopyConstructEffectMacroVector` in gpg/gal/ContextInterfaces.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x008EFB60 (FUN_008EFB60 -- `vector(const vector&)`: `_Buy` inlined (`_Xlen` 0x008EAA50 past 0x0FFFFFFF, allocate 0x008E87F0), `_Ucopy` through the const-source `_Uninit_copy` 0x008EA490, `_Tidy` 0x008EA7D0 and rethrow on a throw, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008F0020, the `modes` member copy in `AdapterD3D9`'s copy constructor 0x008EFF80, whose recovered body default-constructed `modes` and assigned it instead. Was DB `external_dependency`; it is engine code.)
+         * Address: 0x008EFB60 (FUN_008EFB60 -- `vector(const vector&)`: `_Buy` inlined (`_Xlen` 0x008EAA50 past 0x0FFFFFFF, allocate 0x008E87F0), `_Ucopy` through the const-source `_Uninit_copy` 0x008EA490, `_Tidy` 0x008EA7D0 and rethrow on a throw, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008F0020, the `modes` member copy in `AdapterD3D9`'s copy constructor 0x008EFF80, whose recovered body default-constructed `modes` and assigned it instead.)
          */
         vector(const vector& other) : vector() {
             // VC8: `if (_Buy(other.size())) { try { _Mylast = _Ucopy(...); }
@@ -3084,16 +3084,13 @@ namespace msvc8
          * newSize, last_)` (`FUN_00537C10`, not yet individually recovered)
          * on shrink, or straight to its `_Insert_n` grow core
          * (`FUN_00537C60`, cited above on `insert`) on growth, passing
-         * `newSize - size()` as the count and the address of a
-         * stack-local `nullptr` as the value -- behaviourally identical to
+         * `newSize - size()` as the count and the address of a stack-local
+         * `nullptr` as the value -- behaviourally identical to
          * `resize(newSize, T())`, just without a separate out-of-line
          * `resize(n,value)` symbol to tail-call. Reached from
-         * `FillSScmBoneNamePointers` (`FUN_005379D0`,
-         * `CAniSkel.cpp`, already recovered), itself reached from
-         * `CAniSkel::CAniSkel` (`FUN_0054A0A0`, already recovered).
-         * Previously mis-tracked `skip` as a generic RULE ONE boilerplate
-         * note with no caller evidence; this pass supplies the concrete
-         * caller chain.
+         * `FillSScmBoneNamePointers` (`FUN_005379D0`, `CAniSkel.cpp`,
+         * already recovered), itself reached from `CAniSkel::CAniSkel`
+         * (`FUN_0054A0A0`, already recovered).
          * Address: 0x006EA710 (FUN_006EA710 -- the `_Ufill` grow step of `resize(n)` (`_Insert_n(end(), n - size(), T())`) for `moho::WeakPtr<CUnitCommand>`, materialising the value-initialised temporary; source call `RVectorType<WeakPtr<CUnitCommand>>::SetCount` 0x006E9D10. Zero callers in the index (folded into its caller), unreachable.)
          * Address: 0x00507F40 (FUN_00507F40 -- `resize(n)` (value-initialised fill) for `moho::SDelayedSubVizInfo`, a register-order adapter over 0x005083C0; zero callers, unreachable. Formerly `ResizeDelayedSubVizVectorWithDefaultFill` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x0067DAA0 (FUN_0067DAA0 -- `vector<T>::resize(n)` for a 4-byte pointer / id element (zero-fills the appended tail); callers 0x0067C250, 0x0067CAA0; formerly `ResizePointerVectorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
@@ -3243,16 +3240,13 @@ namespace msvc8
          * against `size()` (not `capacity()`, ruling out a real `reserve`),
          * no-ops when equal, tail-calls the shrink erase body `sub_74F880`
          * when `newSize < size()`, tail-calls the grow `_Insert_n` body
-         * FUN_0074F8E0 (cited on `insert(pos,count,value)` below) with
-         * `count = newSize - size()` otherwise. Was wrongly classified
-         * `external_dependency` ("STL template instantiation / codec helper")
-         * -- `Moho::CSimConVarInstanceBase` is an engine type
-         * (`moho/sim/CSimConVarInstanceBase.h`), not external. Reached from
-         * two real call sites, both already recovered: `Sim.cpp:8161`
+         * FUN_0074F8E0 (cited on `insert(pos,count,value)` below) with `count
+         * = newSize - size()` otherwise. Reached from two real call sites,
+         * both already recovered: `Sim.cpp:8161`
          * (`mSimVars.resize(GetSimConVarIndexCounter(), nullptr)`, the
          * `CSimConVarBase::mIndex`-driven grow-to-index path) and
-         * `Sim.cpp:8297` (`mSimVars.resize(index + 1u, nullptr)`, the
-         * same grow-by-index pattern in a sibling registration function).)
+         * `Sim.cpp:8297` (`mSimVars.resize(index + 1u, nullptr)`, the same
+         * grow-by-index pattern in a sibling registration function).)
          *
          * Address: 0x0074D190 (FUN_0074D190, `msvc8::vector<Moho::
          * SSTIArmyConstantData>::resize` for `SSyncData::mNewGrids`
@@ -3504,7 +3498,7 @@ namespace msvc8
          * Address: 0x00891560 (FUN_00891560 -- a third emission of that `_Tidy` for `msvc8::vector<moho::CWldPropEntry>` (`CWldProps` is that head and nothing else; the 0x38 element leads with an 0x1C blueprint-path string, so `max_size()` is 0x04924924); zero callers, unreachable; formerly `ClearOwnedWldPropsEntriesStorageLaneC` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x005EA550 (FUN_005EA550 -- `_Tidy` -- destroy the live range, free the block, null the three lanes for `msvc8::vector<moho::SAiReservedTransportBone>` (the 0x1C element owns an inner `msvc8::vector<int>` and a `WeakPtr<Unit>` that unlinks itself); callers 0x005ED2D0 (unreached); formerly `ResetReservedTransportBoneVectorStorage` in moho/ai/SAiReservedTransportBoneSerializer.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00432290 (FUN_00432290 -- `_Tidy`: destroy the live range (0x004331C0), free the block, null the three pointers, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x008FE797, 0x0093F980 (`~EffectContext`'s member destructor); formerly `DestroyEffectMacroStorage` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp, whose 'also emitted at 0x00942380' was a point inside `EffectD3D9::GetDxEffect`, (RULE ONE), removed 2026-09-24.)
-         * Address: 0x008EA7D0 (FUN_008EA7D0 -- `_Tidy`: each element through its virtual destructor (flag 0), free the block, null the three pointers, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x00940CBF (`~AdapterD3D9`'s member teardown), 0x008EFC0D (the copy constructor's throw path), 0x008EAA40 (`~vector`). Was DB `external_dependency`; it is engine code.)
+         * Address: 0x008EA7D0 (FUN_008EA7D0 -- `_Tidy`: each element through its virtual destructor (flag 0), free the block, null the three pointers, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x00940CBF (`~AdapterD3D9`'s member teardown), 0x008EFC0D (the copy constructor's throw path), 0x008EAA40 (`~vector`).)
          * Address: 0x0092ECF0 (FUN_0092ECF0 -- `tidy()` (free, null the triple) for the bucket vector `hash_table::mVec` (`vector<list<...>::iterator>`, 4-byte element) of the HaStar subcluster search's node table: the `catch (...) { tidy(); throw; }` arm (0x00930165) of `vector(count, value)` 0x009300D0, which `hash_table()` 0x00930790 runs for `mVec(min_buckets + 1, end())`; callers 0x009300D0; formerly `ReleaseLegacyBufferTripleRuntimeD` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
          * Address: 0x00933120 (FUN_00933120 -- `tidy()` for the bucket vector `hash_table::mVec` of `OccupationCacheMap` (`ClusterInternalCache<OccupationData>`'s `msvc8::hash_map<OccupationCacheKey, Cluster::Data*>`, 0x20-byte node, head bought by 0x009327A0): the `catch (...) { tidy(); throw; }` arm (0x00934235) of `vector(count, value)` 0x009341A0, run by `hash_table()` 0x00934820; callers 0x009341A0; formerly `ReleaseLegacyBufferTripleRuntimeE` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
          * Address: 0x00933150 (FUN_00933150 -- `tidy()` for the bucket vector `hash_table::mVec` of `SubclusterCacheMap` (`ClusterInternalCache<SubclusterData>`'s `msvc8::hash_map<SubclusterCacheKey, Cluster::Data*>`, 0x50-byte node, head bought by 0x009327E0): the `catch (...) { tidy(); throw; }` arm (0x009342E5) of `vector(count, value)` 0x00934250, run by `hash_table()` 0x00934B60; callers 0x00934250; formerly `ReleaseLegacyBufferTripleRuntimeF` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
@@ -3809,13 +3803,7 @@ namespace msvc8
          * FUN_0074F060 (cited alongside it). Emitted via
          * `mDesyncs.push_back(desync)` in `Sim::VerifyChecksum`
          * (FUN_007487C0, already recovered, `Sim.cpp`) -- the only path this
-         * element type is ever appended through. DB-integrity fix: was
-         * mis-tagged `external_dependency` ("External library:
-         * std::vector_SDesyncInfo::push_back") -- despite the IDA-inferred
-         * `std::vector_...` name looking library-shaped, this is this
-         * project's own `msvc8::vector<T>` internals for an engine-owned
-         * element type declared in `moho/sim/SDesyncInfo.h`; nothing here is
-         * external.)
+         * element type is ever appended through.)
          * Address: 0x008F1760 (FUN_008F1760, sub_8F1760) --
          * `msvc8::vector<gpg::gal::HeadSampleOption>::push_back` for
          * `Head::mStrs` (`Head.hpp`, 0x24/36-byte element -- `{sampleType,
@@ -3927,11 +3915,6 @@ namespace msvc8
          * single-element `insert(end(), value)` wrapper `FUN_00952DD0`
          * (cited above on `insert`) with `pos=this->_Mylast`. Confirmed
          * `.c`-exact match against this member's own two-branch shape.
-         * DB-integrity fix: was mis-tagged `external_dependency` ("STL
-         * template instantiation / codec helper - external") with no
-         * citation -- `gpg::ReadArchive::TrackedPointerInfo` is an engine
-         * type (`ArchiveSerialization.h:72`); both real binary callers
-         * (`FUN_00953720`, `FUN_00953B30`) are already `recovered`.
          *
          * Address: 0x0074C160 (FUN_0074C160, `msvc8::vector<moho::
          * SExtraUnitData>::push_back` for the 0x20-byte element -- `Moho::
@@ -4005,22 +3988,16 @@ namespace msvc8
          * `cfunc_CAiBrainCreateResourceBuildingNearestL` and
          * `cfunc_CAiBrainFindPlaceToBuildL`, `moho/ai/CAiBrain.cpp`). Same
          * two-way split as this member's other instantiations:
-         * `size()<capacity()` fast path constructs the pushed value at
-         * `mLast` through this element's `uninit_fill_n` core (`FUN_00594A20`,
-         * cited below, `n=1`) then advances `mLast` by 12 in place; the
+         * `size()<capacity()` fast path constructs the pushed value at `mLast`
+         * through this element's `uninit_fill_n` core (`FUN_00594A20`, cited
+         * below, `n=1`) then advances `mLast` by 12 in place; the
          * capacity-exhausted path tail-calls `insert(mLast, value)`
          * (`FUN_00591F40`, cited below on `insert`), whose grow core is the
          * count=1-specialized `_Insert_n` emission `FUN_00592460` (cited
          * above). Emitted via `candidates.push_back(SDepositCandidate{
-         * centerX, centerZ, distanceSq})` in both Lua-callback candidate
-         * scans named above, `.asm`-confirmed against `FUN_00589E30`'s
-         * pushed-temp construction at `0x0058A1BB`-`0x0058A1CF`. DB-integrity
-         * fix: both real callers were already `recovered` but had used
-         * `std::vector<SDepositCandidate>` (modern STL) instead of
-         * `msvc8::vector<SDepositCandidate>`, so this template family had no
-         * matching source-level instantiation anywhere in the tree; fixed by
-         * retyping both callers' `candidates` locals and adding the
-         * `legacy/containers/Vector.h` include.
+         * centerX, centerZ, distanceSq})` in both Lua-callback candidate scans
+         * named above, `.asm`-confirmed against `FUN_00589E30`'s pushed-temp
+         * construction at `0x0058A1BB`-`0x0058A1CF`.
          *
          * What it does:
          * Appends one value at the end, growing capacity when the active range
@@ -4513,7 +4490,7 @@ namespace msvc8
          * Address: 0x00519D40 (FUN_00519D40 -- `erase(first, last)` -- destroy `[first, last)` in place at a 0xCC stride, rewind `_Mylast` to `first`, hand `first` back through the caller's slot. This is the shrink half of `resize` for `msvc8::vector<moho::RMeshBlueprintLOD>` (`RMeshBlueprint::mLods`; the element is 0xCC and owns seven legacy strings, so every element step routes through its constructor 0x005183D0 or its destructor 0x00519800); callers 0x00519A10, 0x0051A900, 0x0051AACF; formerly `EraseTrailingLodRange` in moho/resource/blueprints/RMeshBlueprintLODTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00951E40 (FUN_00951E40 -- `erase(first, last)` for `msvc8::vector<gpg::TrackedPointerInfo>` (`gpg::ReadArchive::mTrackedPtrs` at +0x14): move the survivors down through the element's copy-assign 0x009506F0, release the vacated tail's control blocks, rebase `_Mylast`, hand `first` back through the caller's slot; zero callers, unreachable; formerly `EraseTrackedPointerRangeAndStoreCursorRuntime` in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-18.)
          * Address: 0x009427F0 (FUN_009427F0 -- `erase(first, last)`: `_Copy_opt` the tail down, destroy the rest through the virtual destructor, return `first`, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x009428DE (`clear()`), 0x00942BA0 (the empty-source path of `operator=`); formerly `EraseEffectMacroTailRange` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
-         * Address: 0x008EA6F0 (FUN_008EA6F0 -- `erase(first, last)`: `std::copy` the tail down (0x008EA190), destroy the vacated tail through the virtual destructor, rebase `_Mylast`, hand `first` back through the hidden slot, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EF8A4 (the empty-source path of `operator=` 0x008EF870) and 0x008EA8EE, an IDA-unboxed `clear()` at 0x008EA8E0 with no references. Was DB `external_dependency`; it is engine code.)
+         * Address: 0x008EA6F0 (FUN_008EA6F0 -- `erase(first, last)`: `std::copy` the tail down (0x008EA190), destroy the vacated tail through the virtual destructor, rebase `_Mylast`, hand `first` back through the hidden slot, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EF8A4 (the empty-source path of `operator=` 0x008EF870) and 0x008EA8EE, an IDA-unboxed `clear()` at 0x008EA8E0 with no references.)
          * Address: 0x007A58C0 (FUN_007A58C0 -- `erase(first, last)` for `msvc8::vector<WeakPtr<CMauiControl>>` (`sInputCapture`, the MAUI input-capture stack in moho/ui/UiRuntimeTypes.cpp),
          *   iterator through the result slot. Formerly `EraseInputCaptureRangeCompacting`.)
          * Address: 0x007A5F60 (FUN_007A5F60 -- the `std::copy` of the tail it makes for the
@@ -5465,21 +5442,16 @@ namespace msvc8
          * tail-calls the count-based core `FUN_005C7B10` (cited below), then
          * rebuilds `*outIterator = _Myfirst + 12*offset` from the
          * post-reallocation `_Myfirst`. Direct caller (`.asm`-confirmed):
-         * `AppendPendingNewBlip` (`FUN_005C4CA0`, `CAiReconDBImpl.cpp`,
-         * cited above on `uninit_fill_n`)'s `pending.push_back(SNewBlip{...})`
-         * on its capacity-exhausted path (`push_back`'s own `else { insert(
-         * last_, value); }` branch). DB-integrity fix: was wrongly `skip`
-         * ("drift-audit-demoted... behavior absorbed into owning subsystem
-         * sources" -- no such absorption exists; zero real citation
-         * anywhere in `src` before this pass, and this shape is a
-         * distinct, real, uncollapsed emission, not something any other
-         * recovered function already models).
+         * `AppendPendingNewBlip` (`FUN_005C4CA0`, `CAiReconDBImpl.cpp`, cited
+         * above on `uninit_fill_n`)'s `pending.push_back(SNewBlip{...})` on
+         * its capacity-exhausted path (`push_back`'s own `else { insert(
+         * last_, value); }` branch).
          *
          * Address: 0x007198E0 (FUN_007198E0, msvc8::vector<Moho::SThreat>::
          * insert(pos,value) for the 0x38-byte element) -- same
          * "capture offset up front, tail-call the count=1 core, rebuild the
-         * iterator from the offset afterwards" shape: `.c`-confirmed
-         * `v6 = a3 - v5` (offset, guarded by `v5 && (_Mylast-_Myfirst)/56`
+         * iterator from the offset afterwards" shape: `.c`-confirmed `v6 =
+         * a3 - v5` (offset, guarded by `v5 && (_Mylast-_Myfirst)/56`
          * mirroring `size()==0`) computed before the call, tail-calls the
          * count=1 `_Insert_n` core `FUN_0071AF90` (`msvc8::vector<
          * moho::SThreat>::_Insert_n`, cited above on `resize`/`insert(pos,
@@ -5491,9 +5463,8 @@ namespace msvc8
          * `else { insert(last_, value); }` branch exactly. That push_back is
          * reached from `Moho::CInfluenceMap`'s threat-accumulation path
          * (`FUN_00716140`, `CInfluenceMap.cpp`, already `recovered`) and
-         * from `FUN_0071A6F0` (also `recovered`). DB-integrity fix: was
-         * `blocked` with no citation anywhere in `src`; `Moho::SThreat`
-         * is an engine type, not third-party library code.
+         * from `FUN_0071A6F0` (also `recovered`). `Moho::SThreat` is an
+         * engine type, not third-party library code.
          *
          * Address: 0x00952DD0 (FUN_00952DD0, msvc8::vector<gpg::ReadArchive::
          * TrackedPointerInfo>::insert(pos,value) for the 0x14-byte element,
@@ -5512,8 +5483,7 @@ namespace msvc8
          * capacity-exhausted path, matching this member's own `else {
          * insert(last_, value); }` branch exactly. That push_back is
          * reached from `FUN_00953720`/`FUN_00953B30` (both `recovered`,
-         * `ArchiveSerialization.cpp`/`ReadArchive.cpp`). DB-integrity fix:
-         * was `blocked` with no citation anywhere in `src`;
+         * `ArchiveSerialization.cpp`/`ReadArchive.cpp`).
          * `gpg::ReadArchive::TrackedPointerInfo` is an engine type
          * (`ArchiveSerialization.h:72`), not third-party library code.
          *
@@ -5523,21 +5493,13 @@ namespace msvc8
          * front, tail-call the count=1 core, rebuild the iterator from the
          * offset afterwards" shape: `.asm`-confirmed `esi = (ebx-[edi+4])/
          * 144` (offset, guarded by `[edi+4] && ...` mirroring `size()==0`)
-         * computed before the call, tail-calls the count=1 core
-         * `sub_77B990` (cited below on the 3-arg `insert`). Direct caller
+         * computed before the call, tail-calls the count=1 core `sub_77B990`
+         * (cited below on the 3-arg `insert`). Direct caller
          * (`.asm`-confirmed, `sub_77A0A0(this=eax, value=ecx)` at
          * 0x0077A121): `msvc8::vector<SDecalInfo>::push_back` (`sub_77A0A0`,
          * cited below) on its capacity-exhausted branch, matching this
          * member's own `else { insert(last_, value); }` branch exactly.
-         * DB-integrity fix: was `skip`-tagged ("Bulk: __noreturn
-         * 1-statement tail-call typed throw shim") -- wrong on both counts:
-         * IDA's decompiler mis-tags this `__noreturn` (it has a normal
-         * `retn` epilogue reached through its tail-call), and its `.c`
-         * pseudocode genuinely is one statement (`sub_77B990(a4,a1,a3);`)
-         * but that statement is a real tail-call into a ~700-byte `insert`
-         * core, not a throw shim -- the "1-statement" heuristic a bulk
-         * pass used to classify this as dead conflated brevity with
-         * triviality. Corrected to `recovered` in this pass.
+         * Corrected to `recovered` in this pass.
          *
          * Address: 0x0069ED40 (FUN_0069ED40, sub_69ED40, `msvc8::vector<
          * moho::SCamFollowParams>::insert(pos,value)` for the 0x0C-byte
@@ -5570,13 +5532,7 @@ namespace msvc8
          * (`FUN_00591C90`, cited above) on its capacity-exhausted branch,
          * itself reached from the two Lua-callback candidate-list builders
          * named above via `candidates.push_back(SDepositCandidate{...})`
-         * inside their nearest-first deposit scan. DB-integrity note: this
-         * token and its callers were `blocked`/`skip` as generic
-         * "owner/dependent type not yet reconstructed" -- the real blocker
-         * was that both callers had been recovered with `std::vector`
-         * (wrong ABI) instead of `msvc8::vector`, so no source line in the
-         * tree actually instantiated this template; fixed by retyping both
-         * callers' `candidates` locals.
+         * inside their nearest-first deposit scan.
          *
          * What it does:
          * The VC8 single-element `insert`. The offset is captured up front and
@@ -5934,12 +5890,7 @@ namespace msvc8
          * dest, count*4, rangeBegin, count*4)` when `count != 0`, returns
          * `dest + count*4` (the new range end). Reached from `FUN_0074F8E0`
          * above's in-place branch (tail-shift-by-memmove for the trivially-
-         * copyable pointer element). DB previously mis-attributed this
-         * token to `CrtRuntimeHelpers.cpp` with no real citation there (same
-         * "DB-integrity bulk fix 2026-08-24... plausible-sounding
-         * boilerplate" contamination documented for several other tokens
-         * this session); corrected to `recovered` here, resolving the
-         * "not individually cited yet" follow-up noted just above.)
+         * copyable pointer element).)
          * Address: 0x008F7770 (FUN_008F7770, `msvc8::vector<AdapterModeD3D10>::
          * insert(pos, count, value)` / `_Insert_n` core for the 0x74-byte
          * (116) non-trivial `AdapterModeD3D10` element -- `AdapterD3D10::
@@ -6119,23 +6070,16 @@ namespace msvc8
          * path via `FUN_00687B40`.)
          * Address: 0x00936FF0 (FUN_00936FF0, `msvc8::vector<gpg::
          * ThreadCtxEntry*>::insert(iterator, size_type, const T&)` --
-         * `gpg::ThreadState::mEntries`, `Logging.h`. Same 4-byte-pointer
-         * shape again: `max_size` folds to `0x3FFFFFFF`, 1.5x growth
-         * (`v10 = (v7 >> 1) + v7`, confirmed against the `.asm`), throw helper
+         * `gpg::ThreadState::mEntries`, `Logging.h`. Same 4-byte-pointer shape
+         * again: `max_size` folds to `0x3FFFFFFF`, 1.5x growth (`v10 = (v7 >>
+         * 1) + v7`, confirmed against the `.asm`), throw helper
          * `FUN_00936DB0`, allocate `FUN_00935B20`, copy/relocate step
-         * `FUN_00936990` (cited above on `uninit_move_n`, called three
-         * times: twice for the in-place tail-shift, once per half for the
+         * `FUN_00936990` (cited above on `uninit_move_n`, called three times:
+         * twice for the in-place tail-shift, once per half for the
          * reallocation branch), fill step `FUN_00936B00` (cited below on
          * `uninit_fill_n`). Reached from `gpg::PushThreadContext`'s
          * `tls->mEntries.push_back(entry)` (`Logging.cpp`) capacity-full
-         * path. Previously mass-mis-attributed to `CrtRuntimeHelpers.cpp`
-         * by the 2026-08-24 DB-integrity bulk pass (address not present in
-         * that file); marked `skip` in `recovered_progress.json` rather
-         * than `recovered` since `push_back(entry)` above is the
-         * programmer-written source line this address's whole family
-         * compiles to, matching every other `push_back`-reached `insert`
-         * instantiation in this member -- but it had no source-side
-         * citation at all before this pass, unlike its siblings.)
+         * path.)
          *
          * Address: 0x00627800 (FUN_00627800, sub_627800) --
          * `msvc8::vector<Moho::SPickUpInfo>::insert(iterator, size_type,
@@ -6335,15 +6279,14 @@ namespace msvc8
          * folds onto a decompiler-mislabeled `LuaObject::j_Dtr_9` symbol --
          * a coincidental address overlap, not a real reference to
          * `LuaObject`, matching `0xFFFFFFFF/352`), the `(cap>>1)+cap` 1.5x
-         * growth formula via `FUN_560E90`, allocation via `FUN_562700`,
-         * and calls this instantiation's own uninit-copy/shift helpers
+         * growth formula via `FUN_560E90`, allocation via `FUN_562700`, and
+         * calls this instantiation's own uninit-copy/shift helpers
          * (`FUN_757430`/`FUN_7519D0`) on the reallocation and in-place
          * paths respectively. IDA's own decompile carries a spurious
          * `__noreturn` tag -- the function returns normally in every
          * observed path; matches this member's shape once the mislabeled
          * symbol and `__noreturn` tag are set aside. Sole caller is
-         * `reserve`'s `FUN_0074D2B0` above. DB-integrity fix: was
-         * `blocked` with no specific note.
+         * `reserve`'s `FUN_0074D2B0` above.
          *
          * Address: 0x0074E770 (FUN_0074E770, sub_74E770) -- `msvc8::
          * vector<Moho::SSTIArmyConstantData>::insert(pos, count, value)`
@@ -6504,24 +6447,19 @@ namespace msvc8
          * funclets destroying the partially-constructed new buffer before
          * rethrowing; formerly modeled as a standalone free function in
          * `moho/containers/LegacyContainerFillLanes.cpp` with no
-         * source-level caller anywhere in `src/**` -- collapsed into
-         * this template's own generic `destroy_range<T>`, which already
-         * resolves to `ClutterSurfaceElement`'s own destructor). Reached
-         * from `AppendSurfaceSeed`'s (`Clutter.cpp`)
-         * `mSeeds.insert(mSeeds.end(), seed)` call on the capacity-exhausted
-         * path. DB-integrity fix: was fake-recovered (batch r14, zero real
-         * src citation).
+         * source-level caller anywhere in `src/ **` -- collapsed into this
+         * template's own generic `destroy_range<T>`, which already resolves
+         * to `ClutterSurfaceElement`'s own destructor). Reached from
+         * `AppendSurfaceSeed`'s (`Clutter.cpp`) `mSeeds.insert(mSeeds.end(),
+         * seed)` call on the capacity-exhausted path.
          *
          * Address: 0x007D9620 (FUN_007D9620, sub_7D9620) -- the non-
          * trivially-copyable tail-shift-by-one-slot loop this member's fast
-         * path takes when a live tail follows the insertion point:
-         * `for (i=tail-1; i>0; --i) insertAt[i] = std::move(insertAt[i-1]);`
+         * path takes when a live tail follows the insertion point: `for
+         * (i=tail-1; i>0; --i) insertAt[i] = std::move(insertAt[i-1]);`
          * per-field copy (vtable/selectionWeight/uniformScale/meshBlueprint)
          * since `ClutterSurfaceElement` has no move-aware type to dispatch
-         * to. DB-integrity fix: was blocked (owner_layout) citing a stale
-         * `CLobby.cpp` lead from earlier research that does not match this
-         * function's real body at all -- this and `FUN_007D8620` are
-         * `Moho::Clutter::Surface`'s seed vector, not lobby/networking code.
+         * to.
          *
          * Address: 0x005C7B10 (FUN_005C7B10, msvc8::vector<Moho::
          * CAiReconDBImpl::SNewBlip>::insert for the 12-byte element with
@@ -6543,11 +6481,7 @@ namespace msvc8
          * capacity-exhausted forward, which is itself reached from
          * `AppendPendingNewBlip`'s (`FUN_005C4CA0`, already recovered,
          * `CAiReconDBImpl.cpp`) `pending.push_back(SNewBlip{...})` on its
-         * own capacity-exhausted branch. DB-integrity fix: was left `wip`
-         * pending this element-type identification (its own note already
-         * confirmed the 12-byte/max_size shape); real caller and sibling
-         * `uninit_fill_n` emissions were independently recovered by another
-         * pass on `AppendPendingNewBlip` -- this closes the loop.
+         * own capacity-exhausted branch.
          *
          * Address: 0x005CA0A0 (FUN_005CA0A0, single-element uninit_move_n
          * adapter) -- register-shuffling thunk that forwards into this
@@ -6555,9 +6489,8 @@ namespace msvc8
          * `uninit_move_n(dest, src, src+1)` (count=1, expressed as a
          * one-element range rather than a count parameter). Reached from
          * `insert`'s (`FUN_005C7B10`) fast-path tail-shift branch to move
-         * the current last element into the newly-opened slot beyond the
-         * old end. DB-integrity fix: was blocked citing a stale `CLobby.cpp`
-         * lead -- real home is `CAiReconDBImpl.cpp`'s `SNewBlip` vector.
+         * the current last element into the newly-opened slot beyond the old
+         * end.
          *
          * Address: 0x0074F3E0 (FUN_0074F3E0, `msvc8::vector<moho::
          * SExtraUnitData>::insert` core for the 0x20-byte element, `count`
@@ -7050,7 +6983,7 @@ namespace msvc8
          * Formerly modeled as a standalone free function in
          * `moho/containers/LegacyContainerFillLanes.cpp`
          * (`DestroyVirtualRange16`, over a raw a deleted overlay)
-         * with no source-level caller anywhere in `src/**` -- collapsed
+         * with no source-level caller anywhere in `src/ **` -- collapsed
          * into this template instantiation, RULE ONE.)
          * Address: 0x0088A3E0 (FUN_0088A3E0, `msvc8::vector<Moho::
          * WaveParameters>::destroy_range` for the 136-byte (`0x88`)
@@ -7076,7 +7009,7 @@ namespace msvc8
          * modeled as a standalone free function in
          * `moho/containers/LegacyContainerFillLanes.cpp`
          * (`DestroyVirtualRange136`, over a raw a deleted overlay)
-         * with no source-level caller anywhere in `src/**` -- collapsed
+         * with no source-level caller anywhere in `src/ **` -- collapsed
          * into this template instantiation, RULE ONE.)
          * Address: 0x005CC280 (FUN_005CC280, `msvc8::vector<Moho::
          * SCreateUnitParams>::destroy_range` for the 28-byte (`0x1C`)
@@ -7127,7 +7060,7 @@ namespace msvc8
          * a deleted overlay/
          * `ReleaseSharedOwnerRangeStride28` pair in
          * `moho/containers/LegacyContainerFillLanes.cpp` with no
-         * source-level caller anywhere in `src/**` -- collapsed into
+         * source-level caller anywhere in `src/ **` -- collapsed into
          * this template instantiation, RULE ONE.)
          *
          * Address: 0x00742170 (FUN_00742170, `msvc8::vector<moho::
@@ -7202,7 +7135,7 @@ namespace msvc8
          *     Formerly modeled as an orphaned `[[maybe_unused]]`
          *     `DestroySDecalInfoRangeThiscallAdapter` free function in
          *     `moho/render/CDecalTypes.cpp` with no source-level caller
-         *     anywhere in `src/**` -- the same "mis-cited standalone
+         *     anywhere in `src/ **` -- the same "mis-cited standalone
          *     body" bug already fixed once in this file for this exact
          *     element's `uninit_copy_n` adapter (`FUN_0077DA50`, cited
          *     below: "previously mis-cited as having its canonical body in
@@ -7225,7 +7158,7 @@ namespace msvc8
          *     of 0x00741B10 as a raw `DWORD` anywhere in the complete PE
          *     image (rules out a vtable slot, a jump table, or a
          *     function-pointer table entry). Not given a source-level home
-         *     in `src/**` pending real caller evidence -- recorded
+         *     in `src/ **` pending real caller evidence -- recorded
          *     here rather than guessed at.
          *   - 0x0077E17B (owner 0x0077E100, `operator=(const vector&)`,
          *     cited below, this element's instantiation): the
@@ -7361,7 +7294,7 @@ namespace msvc8
          * (`REmitterBlueprintCurve::Keys`; the 0x10 element is a reflected object, so each step is its
          * deleting destructor through vtable +0x08 with flag 0); first in ESI, last in EDI; callers
          * 0x00516310 (`reserve`), 0x00516970 (`insert`); formerly a deleted overlay in moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.)
-         * Address: 0x004331C0 (FUN_004331C0 -- `_Destroy` through the element's virtual destructor (`push 0; call [vtbl]`) at stride 0x3C, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x004314F1, 0x004322A1, 0x00940045, 0x00940086, 0x00940150, 0x00942C01, 0x00942CA8. It was marked `skip` as a non-engine STL helper; it is this engine instantiation.)
+         * Address: 0x004331C0 (FUN_004331C0 -- `_Destroy` through the element's virtual destructor (`push 0; call [vtbl]`) at stride 0x3C, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x004314F1, 0x004322A1, 0x00940045, 0x00940086, 0x00940150, 0x00942C01, 0x00942CA8.)
          * Address: 0x004FADE0 (FUN_004FADE0 -- `destroy_range` for `moho::managedWindows` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedDialog>>`): each slot's `~WeakPtr` unlinks it from its dialog's owner chain; `first` in ECX, `last` in EDX; callers 0x004F8195 (the destructor body 0x004F8180), 0x004F8E1C, 0x004F8E5B and 0x004F8EDC (`insert`, 0x004F8CA0), 0x004F8C95, 0x004FA6B5. Formerly anchored in moho/app/WinApp.cpp.)
          * Address: 0x004FAED0 (FUN_004FAED0 -- the same for `moho::managedFrames` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedFrame>>`); callers 0x004F82E5 (0x004F82D0), 0x004F91CC, 0x004F920B and 0x004F928C (`insert`, 0x004F9050), 0x004F9045, 0x004FA775. Formerly anchored in moho/app/WinApp.cpp.)
          * Address: 0x00798D10 (FUN_00798D10 -- `destroy_range` for `msvc8::vector<moho::SHistogramColumn>` (`CMauiHistogram::mColumns` at +0x124; the 0x14 element's destructor is its `msvc8::vector<float>`'s `_Tidy`); callers 0x00797840 (`~CMauiHistogram`) and six more emissions for that vector (0x00798150, 0x00798360, 0x00798400, 0x00798490, 0x007984B0, 0x00798AD0); formerly `ReleaseHistogramColumnValueBuffers` in moho/ui/UiRuntimeTypes.cpp, removed 2026-09-25.)
@@ -7932,9 +7865,7 @@ namespace msvc8
          * five raw code xrefs, four (`FUN_005C9FA0`/`FUN_005CBF80`/
          * `FUN_005CD2C0`/`FUN_005CDA50`) are themselves confirmed zero-caller
          * dead fragments (`call_edges` has no incoming edge for any of the
-         * four), leaving `FUN_005C7680` as the only live path. Previously
-         * mis-tracked `blocked` citing `CrtRuntimeHelpers.cpp` boilerplate
-         * the address never appeared in.
+         * four), leaving `FUN_005C7680` as the only live path.
          *
          * Address: 0x007574E0 (FUN_007574E0, sub_7574E0) --
          * `msvc8::vector<Moho::SimArmy*>::uninit_copy_n` for the 4-byte
@@ -8863,20 +8794,16 @@ namespace msvc8
          * Address: 0x005CBC70 (FUN_005CBC70, `msvc8::vector<Moho::
          * CAiReconDBImpl::SNewBlip>::uninit_fill_n` for the 12-byte
          * trivially-copyable element (`Unit* sourceUnit; uint8_t fake; enum
-         * detectedFlags;`) -- `(dst@eax, srcValue@edx, count@ecx)` loop:
-         * `*dst = *srcValue` (3-dword copy) then `dst += 3`, `srcValue`
-         * never advanced, once per remaining count; the `if (dst)` null
-         * guard wraps only the copy body, the same defensive-null shape as
-         * the 16-byte `CDiscoveredGameRecord` instantiation above. Reached
-         * with `count = 1` from `AppendPendingNewBlip`'s (0x005C4CA0,
-         * `CAiReconDBImpl.cpp`) capacity-available fast path -- this
-         * method's own `if (size() < capacity()) { uninit_fill_n(last_, 1u,
-         * value); ++last_; }` branch -- which is `AppendPendingNewBlip`'s
-         * entire real body, `pending.push_back(SNewBlip{...})`.
-         * DB-integrity fix: `pending`'s declared type (`AppendPendingNewBlip`/
-         * `GenerateNewBlips`/`UpdateBlips`, `CAiReconDBImpl.h`/`.cpp`) had
-         * drifted to real `std::vector<SNewBlip>`, which would not emit this
-         * symbol on rebuild; retyped to `msvc8::vector<SNewBlip>` to match.)
+         * detectedFlags;`) -- `(dst@eax, srcValue@edx, count@ecx)` loop: `*dst
+         * = *srcValue` (3-dword copy) then `dst += 3`, `srcValue` never
+         * advanced, once per remaining count; the `if (dst)` null guard wraps
+         * only the copy body, the same defensive-null shape as the 16-byte
+         * `CDiscoveredGameRecord` instantiation above. Reached with `count =
+         * 1` from `AppendPendingNewBlip`'s (0x005C4CA0, `CAiReconDBImpl.cpp`)
+         * capacity-available fast path -- this method's own `if (size() <
+         * capacity()) { uninit_fill_n(last_, 1u, value); ++last_; }` branch --
+         * which is `AppendPendingNewBlip`'s entire real body,
+         * `pending.push_back(SNewBlip{...})`.)
          * Address: 0x005C6190 (FUN_005C6190, sub_5C6190) -- this
          * instantiation's own `_Ufill` advance-returning adapter: `sub_5CBC70
          * (dst@edi, srcValue@edx, count@esi); return &dst[3*count];`, the
@@ -8931,20 +8858,18 @@ namespace msvc8
          * Address: 0x006274B0 (FUN_006274B0, sub_6274B0) -- the `_Ufill`
          * advance-returning adapter for `msvc8::vector<Moho::SPickUpInfo>`'s
          * fill loop, for the 12-byte intrusive-weak `{WeakPtr<Unit>, float}`
-         * element (`CUnitLoadUnits::mPickupQueue`)
-         * -- `sub_628AE0(a1,a2,a3); return a1 + 12*a2;`, the same
-         * "wrap the core fill loop, return `dst + n*sizeof(T)`" shape as
-         * `FUN_0092E920`/`FUN_0092EB70` above, confirmed against the `.asm`
-         * (3 instructions of setup, one `call`, one `lea`, `retn`). The
-         * wrapped core loop (`FUN_00628200`/`FUN_00628230`, this
-         * instantiation's own `WeakPtr<Unit>`-relinking element constructor,
-         * not yet individually recovered) is passed through unchanged.
-         * Reached from the `_Insert_n` grow core `FUN_00627800`'s (cited
-         * above on `insert`) `tail < count` sub-branch -- the one
-         * `push_back`'s `count=1`-at-`end()` insert always takes, since
-         * `tail == last_ - insertAt == 0` there. Previously mis-tracked
-         * `blocked` citing `CrtRuntimeHelpers.cpp` boilerplate the address
-         * never appeared in.
+         * element (`CUnitLoadUnits::mPickupQueue`) -- `sub_628AE0(a1,a2,a3);
+         * return a1 + 12*a2;`, the same "wrap the core fill loop, return
+         * `dst + n*sizeof(T)`" shape as `FUN_0092E920`/`FUN_0092EB70` above,
+         * confirmed against the `.asm` (3 instructions of setup, one `call`,
+         * one `lea`, `retn`). The wrapped core loop
+         * (`FUN_00628200`/`FUN_00628230`, this instantiation's own
+         * `WeakPtr<Unit>`-relinking element constructor, not yet
+         * individually recovered) is passed through unchanged. Reached from
+         * the `_Insert_n` grow core `FUN_00627800`'s (cited above on
+         * `insert`) `tail < count` sub-branch -- the one `push_back`'s
+         * `count=1`-at-`end()` insert always takes, since `tail == last_ -
+         * insertAt == 0` there.
          *
          * Address: 0x008EF7E0 (FUN_008EF7E0, sub_8EF7E0) -- `msvc8::
          * vector<gpg::gal::HeadSampleOption>::uninit_fill_n` for `Head::
@@ -8976,28 +8901,21 @@ namespace msvc8
          * (const HeadSampleOption&)`), confirmed field-for-field identical:
          * raw dword copy of `sampleType`(+0x00)/`sampleQuality`(+0x04),
          * `label`(+0x08) reset to empty-SSO state then `std::string::
-         * assign`ed from `other.label`. DB-integrity fix: was mis-tagged
-         * `external_dependency` ("template/helper instantiation artifact")
-         * -- it is this project's own `HeadSampleOption`, not a generic/
-         * external type. No new source needed: this address is the
-         * compiler's own out-of-line copy of the already-recovered ctor
-         * body, reached through this member's placement-new rather than a
-         * separate hand-written call.
+         * assign`ed from `other.label`. No new source needed: this address
+         * is the compiler's own out-of-line copy of the already-recovered
+         * ctor body, reached through this member's placement-new rather
+         * than a separate hand-written call.
          *
          * Address: 0x00437900 (FUN_00437900, sub_437900) -- this
          * instantiation's own destroy helper for `HeadSampleOption::label`
          * (SSO-aware `msvc8::string` teardown: `if (_Myres>=0x10) operator
          * delete(_Bx._Ptr);` then reset to empty state), invoked from
-         * `destroy_n`'s per-element loop on this member's SEH cleanup
-         * path. `HeadSampleOption` declares no explicit destructor in
-         * `Head.hpp` -- this is the compiler-emitted implicit destructor's
-         * out-of-line body for the `label` sub-object, not hand-written
-         * source (CLAUDE.md's "member destructors are compiler-emitted, not
-         * hand-written" applies directly). DB-integrity fix: was mis-tagged
-         * `external_dependency` ("STL/wxWidgets string dtor... external
-         * runtime") -- `label` is this project's own `msvc8::string`
-         * member, and this teardown is only reachable during unwind of
-         * this project's own `uninit_fill_n<HeadSampleOption>`.
+         * `destroy_n`'s per-element loop on this member's SEH cleanup path.
+         * `HeadSampleOption` declares no explicit destructor in `Head.hpp`
+         * -- this is the compiler-emitted implicit destructor's out-of-line
+         * body for the `label` sub-object, not hand-written source
+         * (CLAUDE.md's "member destructors are compiler-emitted, not
+         * hand-written" applies directly).
          *
          * Address: 0x008F0090 (FUN_008F0090, sub_8F0090) -- `msvc8::
          * vector<gpg::gal::AdapterD3D9>::uninit_fill_n` for
@@ -9018,27 +8936,22 @@ namespace msvc8
          * Address: 0x00753A90 (FUN_00753A90, `msvc8::vector<moho::
          * SDesyncInfo>::uninit_fill_n` for the 0x28-byte element
          * (`Sim::mDesyncs`, `Sim.h`) -- `(count@eax, dst@edx, srcValue@ecx)`
-         * loop: `*dst = *srcValue` (unrolled 10-dword copy) then `dst +=
-         * 10` (0x28-byte stride), `srcValue` never advanced, once per
-         * remaining count; the `test edx,edx`/`if (dst)` null guard wraps
-         * only the copy body while `dst` still advances every iteration
-         * regardless, matching the same defensive-null shape already
-         * documented on FUN_00549BC0/FUN_00832B80/FUN_007CCEB0 above (the
-         * destination is freshly-allocated or in-place storage the compiler
-         * cannot prove non-null). Reached with `count=1` from `push_back`'s
-         * (FUN_0074C060, cited above on `push_back`) capacity-available
-         * fast path -- this method's own `if (size() < capacity()) {
+         * loop: `*dst = *srcValue` (unrolled 10-dword copy) then `dst += 10`
+         * (0x28-byte stride), `srcValue` never advanced, once per remaining
+         * count; the `test edx,edx`/`if (dst)` null guard wraps only the
+         * copy body while `dst` still advances every iteration regardless,
+         * matching the same defensive-null shape already documented on
+         * FUN_00549BC0/FUN_00832B80/FUN_007CCEB0 above (the destination is
+         * freshly-allocated or in-place storage the compiler cannot prove
+         * non-null). Reached with `count=1` from `push_back`'s
+         * (FUN_0074C060, cited above on `push_back`) capacity-available fast
+         * path -- this method's own `if (size() < capacity()) {
          * uninit_fill_n(last_, 1u, value); ++last_; }` branch -- which is
          * `Sim::VerifyChecksum`'s entire `mDesyncs.push_back(desync)` call
          * (already recovered, `Sim.cpp`), and with `count=1` again from the
          * `_Insert_n` core FUN_0074F060's at-end sub-branch (cited above on
          * `insert`) via the advance-returning adapter FUN_0074DAC0
-         * immediately below. DB-integrity fix: was `blocked` citing
-         * `src/moho/misc/CrtRuntimeHelpers.cpp` boilerplate that does
-         * not contain this address at all (systematic DB-integrity
-         * contamination pattern); this is this project's own
-         * `msvc8::vector<T>` internals for an engine-owned element type,
-         * not CRT code.)
+         * immediately below.)
          * Address: 0x0074DAC0 (FUN_0074DAC0, the advance-returning `_Ufill`
          * adapter around FUN_00753A90 above, for this same `SDesyncInfo`
          * specialization -- `int __userpurge sub_74DAC0(dest@edi, count@esi,
@@ -9114,12 +9027,7 @@ namespace msvc8
          * `FUN_0074DAC0`/`FUN_0092EA50` above. Called once from `_Insert_n`
          * `FUN_0064E490`'s at-end sub-branch (`count=1`) to construct the
          * newly-appended element from the aliasing-safe local copy and
-         * obtain the advanced end pointer. DB-integrity fix: was
-         * mis-tagged `skip` ("`__noreturn` 1-statement tail-call typed
-         * throw shim") -- its only callee, `FUN_0064F910`, is this
-         * project's own `uninit_fill_n` core, not a throw helper; the
-         * `__noreturn` tag both functions carry is the same spurious-tag
-         * artifact called out above, not evidence of throw-only behavior.
+         * obtain the advanced end pointer.
          *
          * Address: 0x007D9970 (FUN_007D9970, sub_7D9970) --
          * `msvc8::vector<moho::ClutterSurfaceElement>::uninit_fill_n` for the
@@ -9399,10 +9307,7 @@ namespace msvc8
          * stack args popped; verified against the `.asm`), used by
          * `FUN_00936FF0`'s reallocation-branch tail fill. Both
          * `FUN_00936050` and `FUN_00936B00` model this one member; recovered
-         * together. DB-integrity fix: both were duplicated as
-         * two lettered copies in
-         * `LegacyContainerFillLanesB.cpp` (orphans, never reached from that
-         * file's own source); removed from there in favor of this citation.)
+         * together.)
          * Address: 0x008F9A50 (FUN_008F9A50, `msvc8::vector<void*>::
          * uninit_fill_n` for the D3D10 backend swap-chain vector (`_Insert_n`
          * core `FUN_008FE010`, cited above on `insert`) -- `[begin,end)`
@@ -9413,10 +9318,7 @@ namespace msvc8
          * sibling emission -- `(dst, count, value)` form, verified against
          * the `.asm`; same relationship to `FUN_008F9A50` as `FUN_00936B00`
          * has to `FUN_00936050` above. Reached from `FUN_008FE010`'s
-         * reallocation-branch tail fill. DB-integrity fix: both were
-         * duplicated as two lettered copies in
-         * `LegacyContainerFillLanesB.cpp` (orphans); removed from there in
-         * favor of this citation.)
+         * reallocation-branch tail fill.)
          * Address: 0x0094FE90 (FUN_0094FE90, `msvc8::vector<gpg::
          * TypeHandle>::uninit_fill_n` for the 8-byte `{type,version}`
          * element -- `[begin,end)` pointer-pair fill loop (2-dword copy per
@@ -9459,10 +9361,7 @@ namespace msvc8
          * sub_77E720(a2,a3,a1);`, forwarding into `FUN_0077E720` above with
          * a zeroed low byte on the reused register slot). Reached from
          * `insert`'s (`sub_77B990`, cited above) in-place branch gap-fill
-         * step. DB-integrity fix: was `blocked` ("noreturn wrapper depends
-         * on unresolved FUN_0077E720") -- `FUN_0077E720` was not actually
-         * unresolved (see above); the dependency was already satisfied,
-         * just uncited. Corrected to `recovered` in this pass.
+         * step. Corrected to `recovered` in this pass.
          *
          * Address: 0x007E98D0 (FUN_007E98D0, sub_7E98D0) --
          * `msvc8::vector<Moho::SkinPaletteEntry>::uninit_fill_n` for the
@@ -10006,38 +9905,31 @@ namespace msvc8
          * count*4)` when `count != 0`, returns `dst + count*4`. Reached from
          * the single-value `insert(pos, value)` overload's capacity-available
          * branch, `FUN_0084F200` (cited below on that overload) -- there it
-         * serves as the "move the current last element into the freshly
-         * grown one-past-end slot" step (`count = 1`), the same role
-         * `FUN_007BCD00` documents above for the 36-byte `SNetCommandArg`
-         * element. DB previously mis-attributed this token to
-         * `CrtRuntimeHelpers.cpp` with no real citation there ("DB-integrity
-         * bulk fix 2026-08-24" boilerplate contamination documented for
-         * several other tokens this session); corrected to `recovered` here.)
+         * serves as the "move the current last element into the freshly grown
+         * one-past-end slot" step (`count = 1`), the same role `FUN_007BCD00`
+         * documents above for the 36-byte `SNetCommandArg` element.)
          *
          * Address: 0x00936990 (FUN_00936990, `msvc8::vector<gpg::
          * ThreadCtxEntry*>::uninit_move_n` for the 4-byte pointer element --
          * `gpg::ThreadState::mEntries`, `Logging.h`. `memmove_s(dst, n*4,
          * src, n*4)` range form, `[Source,SourceEnd) -> Destination`,
-         * returning `Destination + n` -- confirmed against its own `.c`:
-         * `if ((a2-Source)>>2) memmove_s(Destination, 4*((a2-Source)>>2),
-         * Source, 4*((a2-Source)>>2)); return &Destination[4*((a2-Source)>>2)];`.
-         * Reached from this instantiation's `_Insert_n` (`FUN_00936FF0`,
-         * cited above on `insert`) three times: twice for the in-place
-         * tail-shift (degenerate/zero-length in practice, since this
-         * vector's sole mutator `PushThreadContext`/`mEntries.push_back`
-         * always inserts at `end()` -- same "compiled but not separately
-         * exercised by the one real call site" shape already documented on
-         * this member's other `push_back`-only instantiations), and once
-         * (twice, for the pre-gap/post-gap halves) for the reallocation
-         * branch's relocate-into-new-buffer step, which real `push_back`
-         * growth does exercise. Previously mass-mis-attributed to
-         * `CrtRuntimeHelpers.cpp` by the 2026-08-24 DB-integrity bulk pass
-         * (address not present in that file); `gpg::ThreadState` was also
-         * a hand-rolled `begin`/`end`/`cap` triple with its own doubling
-         * (not MSVC8's real ~1.5x) growth helper at the time, corrected to
-         * `msvc8::vector<ThreadCtxEntry*>` alongside this citation so the
-         * real call site this member documents now actually exists in
-         * source (`Logging.cpp`'s `PushThreadContext`).
+         * returning `Destination + n` -- confirmed against its own `.c`: `if
+         * ((a2-Source)>>2) memmove_s(Destination, 4*((a2-Source)>>2), Source,
+         * 4*((a2-Source)>>2)); return &Destination[4*((a2-Source)>>2)];`. Reached
+         * from this instantiation's `_Insert_n` (`FUN_00936FF0`, cited above on
+         * `insert`) three times: twice for the in-place tail-shift
+         * (degenerate/zero-length in practice, since this vector's sole mutator
+         * `PushThreadContext`/`mEntries.push_back` always inserts at `end()` --
+         * same "compiled but not separately exercised by the one real call site"
+         * shape already documented on this member's other `push_back`-only
+         * instantiations), and once (twice, for the pre-gap/post-gap halves) for
+         * the reallocation branch's relocate-into-new-buffer step, which real
+         * `push_back` growth does exercise. `gpg::ThreadState` was also a
+         * hand-rolled `begin`/`end`/`cap` triple with its own doubling (not
+         * MSVC8's real ~1.5x) growth helper at the time, corrected to
+         * `msvc8::vector<ThreadCtxEntry*>` alongside this citation so the real
+         * call site this member documents now actually exists in source
+         * (`Logging.cpp`'s `PushThreadContext`).
          *
          * NOTE on why this is `uninit_move_n` and not a true move: proving
          * this address is what pinned down a real divergence in this
@@ -10073,8 +9965,8 @@ namespace msvc8
          * advance-returning calling-convention variant of this member for
          * `msvc8::vector<const char*>` (4-byte trivially-copyable pointer
          * element; `CAniSkel.cpp`'s `FillSScmBoneNamePointers` scratch
-         * vector). Takes `(dst, first, last)` instead of `(src, n, dst)`
-         * and returns `dst + (last-first)` instead of `void` -- confirmed
+         * vector). Takes `(dst, first, last)` instead of `(src, n, dst)` and
+         * returns `dst + (last-first)` instead of `void` -- confirmed
          * against the `.asm`: `n = (last-first)>>2; if (n) memmove_s(dst,
          * 4n, first, 4n); return dst+4n;`, the same trivially-copyable
          * `memmove` fast path this member's `if constexpr
@@ -10084,28 +9976,22 @@ namespace msvc8
          * its tail-shift step -- a structural no-op for this instantiation's
          * only live caller (`resize`, which always inserts at `end()`, so
          * `tail == 0`), present because the emission is the general
-         * insert-at-any-position shape. Previously mis-tracked `blocked`
-         * citing `CrtRuntimeHelpers.cpp` boilerplate the address never
-         * appeared in.
+         * insert-at-any-position shape.
          *
          * Address: 0x00733A80 (FUN_00733A80, sub_733A80) -- calling-
-         * convention bridge into `FUN_00734440` (this instantiation's real
-         * move core, not yet individually recovered) for `msvc8::vector<
-         * PlatoonUnitSearchEntry>` (8-byte `{Unit*, float}` element;
-         * `CPlatoon.cpp`'s `cfunc_CPlatoonFormPlatoonL` nearest-first
-         * candidate scratch vector). A pure register/stack reshuffle with no logic of its
-         * own -- 15 bytes of setup, one `call FUN_00734440`, `retn 8` --
-         * confirmed against the `.asm`. Called twice from `insert(pos,
-         * value)`'s emission for this instantiation (`FUN_007336C0`, cited
-         * above): once in the in-place branch's `tail > 0` sub-case as
-         * `sub_733A80(oldLast-8, oldLast)`, moving the current last
-         * element into the freshly grown slot (this member's
-         * `uninit_move_n(oldLast-1, 1, oldLast)` shape for `count=1`), and
-         * once in the `tail == 0` (append) sub-case as `sub_733A80(pos,
-         * pos+8)`, a zero-length structural no-op present only because the
-         * emission is the general insert-at-any-position shape. Previously
-         * mis-tracked `blocked` citing `CrtRuntimeHelpers.cpp` boilerplate
-         * the address never appeared in.
+         * convention bridge into `FUN_00734440` (this instantiation's real move core, not
+         * yet individually recovered) for `msvc8::vector< PlatoonUnitSearchEntry>`
+         * (8-byte `{Unit*, float}` element; `CPlatoon.cpp`'s `cfunc_CPlatoonFormPlatoonL`
+         * nearest-first candidate scratch vector). A pure register/stack reshuffle with
+         * no logic of its own -- 15 bytes of setup, one `call FUN_00734440`, `retn 8` --
+         * confirmed against the `.asm`. Called twice from `insert(pos, value)`'s emission
+         * for this instantiation (`FUN_007336C0`, cited above): once in the in-place
+         * branch's `tail > 0` sub-case as `sub_733A80(oldLast-8, oldLast)`, moving the
+         * current last element into the freshly grown slot (this member's
+         * `uninit_move_n(oldLast-1, 1, oldLast)` shape for `count=1`), and once in the
+         * `tail == 0` (append) sub-case as `sub_733A80(pos, pos+8)`, a zero-length
+         * structural no-op present only because the emission is the general
+         * insert-at-any-position shape.
          *
          * Address: 0x0092ED90 (FUN_0092ED90, sub_92ED90) -- the `__stdcall`
          * calling-convention entry `insert`'s in-place branches call for
@@ -10166,10 +10052,7 @@ namespace msvc8
          * (present only because this is the shared general-position
          * emission -- the same "harmless same-value rewrite on the at-end
          * branch" shape already documented on the `SDesyncInfo`
-         * instantiation above). DB-integrity fix: was mis-tagged `skip`
-         * ("1-statement tail-call thunk (compiler-emitted ABI shim)") with
-         * no element-type identification; corrected to a real,
-         * address-cited adapter.
+         * instantiation above).
          *
          * Address: 0x007E99D0 (FUN_007E99D0, sub_7E99D0) --
          * `msvc8::vector<Moho::SkinPaletteEntry>::uninit_move_n` for the
@@ -11168,10 +11051,7 @@ namespace msvc8
          * newCap` (the 1.5x-growth-or-needed-size candidate). Two further
          * callers, `FUN_0064EEBF` and `FUN_0074E10F`, are not yet exported
          * as their own functions in this namespace; not needed to satisfy
-         * this instantiation's caller evidence. DB-integrity fix: was
-         * `blocked` ("DB integrity revert... zero citation anywhere in
-         * src... needs real recovery from scratch"); this is that real
-         * recovery.
+         * this instantiation's caller evidence.
          *
          * IDA signature:
          * void *__fastcall sub_xxxxxxxx(unsigned int a1);
@@ -11281,7 +11161,7 @@ namespace msvc8
          * Address: 0x0051A530 (FUN_0051A530 -- `_Allocate` -- `count * 0xCC` bytes through `operator new`, throwing on the 32-bit multiply overflow; the ecx-only register shape keeps it a leaf of `_Buy` for `msvc8::vector<moho::RMeshBlueprintLOD>` (`RMeshBlueprint::mLods`; the element is 0xCC and owns seven legacy strings, so every element step routes through its constructor 0x005183D0 or its destructor 0x00519800); callers 0x00519570, 0x005198F0, 0x00519C6F; formerly `AllocateMeshBlueprintLodArrayOrThrow` in moho/resource/blueprints/RMeshBlueprintLODTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x008F8E70 (FUN_008F8E70 -- `_Allocate` -- `count * 0x13C` bytes through `operator new`, throwing on the 32-bit multiply overflow for `msvc8::vector<gpg::gal::AdapterD3D10>` (`DeviceD3D10::mAdapters` at +0x94; the 0x13C element owns a DXGI descriptor and an inner mode vector, so every element step routes through its copy constructor 0x008FF450 or its destructor); callers 0x008F9937, 0x008FDF70, 0x00900630; formerly `AllocateStride13CArray` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00432240 (FUN_00432240 -- `_Buy(n)`: null the three pointers, `false` for zero, `_Xlen` (0x004331F0) past 0x4444444 (`max_size()` for the 0x3C element), else allocate through 0x00435C30 and set first/last/end, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x008FE74B, 0x00942CC3; formerly `TryReserveEffectMacroStorage` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp, whose 'also emitted at 0x00942330' was a point inside `EffectD3D9::OnLost`, (RULE ONE), removed 2026-09-24.)
-         * Address: 0x00435C30 (FUN_00435C30 -- `_Allocate(n)`, `operator new(n * 60)`, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x0043226D, 0x00433297, 0x0093FFB1. It was marked `external_dependency`; it is this engine instantiation.)
+         * Address: 0x00435C30 (FUN_00435C30 -- `_Allocate(n)`, `operator new(n * 60)`, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x0043226D, 0x00433297, 0x0093FFB1.)
          */
         [[nodiscard]] static T* allocate_slots_checked(const std::size_t count)
         {
@@ -11480,12 +11360,12 @@ namespace msvc8
          * Address: 0x0047E090 (FUN_0047E090 -- `_Xlen` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DD80, 0x007F4C49; formerly `ThrowBandwidthSampleVectorTooLong` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004ADFF0 (FUN_004ADFF0 -- `_Xlen` for a 4-byte element; callers 0x004AD098, 0x004ADDE0; formerly `ThrowVectorTooLong_004ADFF0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004241C0 (FUN_004241C0 -- `throw_too_long` -- the length_error the growth cap raises for `msvc8::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px, pi}` element retains and releases its control block on every copy); callers 0x00423948, 0x00423EB0; formerly `ThrowAnimTextureFrameVectorTooLong` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x004331F0 (FUN_004331F0 -- `_Xlen`, `length_error("vector<T> too long")`, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x00432266, 0x0093FF3B. It was marked `skip` as a non-engine runtime helper; it is this engine instantiation.)
+         * Address: 0x004331F0 (FUN_004331F0 -- `_Xlen`, `length_error("vector<T> too long")`, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x00432266, 0x0093FF3B.)
          * Address: 0x008EAA50 (FUN_008EAA50 -- `_Xlen`, `length_error("vector<T> too long")`, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EF776 (`_Buy` 0x008EF750), 0x008EFBB3 (the copy constructor), 0x00940DBC (`_Insert_n` 0x00940D40). It had no anchor.)
          * Address: 0x00505750 (FUN_00505750 -- `_Xlen`, `length_error("vector<T> too long")`, for `msvc8::vector<moho::SpatialShard<T>*>` (moho/mesh/SpatialDb.h); callers 0x00505530.)
          * Address: 0x00505A70 (FUN_00505A70 -- the same `_Xlen` for `msvc8::vector<moho::SpatialShardData<T>*>`; callers 0x00505850.)
          * Address: 0x008D6570 (FUN_008D6570 -- `_Xlen` for the bucket array of `msvc8::hash_set<unsigned int>` `MemHookAddr` (moho/app/WinMain.cpp); caller 0x008D5DD4 (`_Insert_n` 0x008D5D70).)
-         * Address: 0x0076C730 (FUN_0076C730 -- `_Xlen` for `msvc8::vector<moho::OccupySourceBinding>` (`PathTables::Impl::mSources`); callers 0x0076C1D9, 0x0076C490 (`_Insert_n`). Its old anchor sat on a stale block in the excluded moho/misc/CrtRuntimeHelpers.cpp.)
+         * Address: 0x0076C730 (FUN_0076C730 -- `_Xlen` for `msvc8::vector<moho::OccupySourceBinding>` (`PathTables::Impl::mSources`); callers 0x0076C1D9, 0x0076C490 (`_Insert_n`).)
          * Address: 0x0076CA70 (FUN_0076CA70 -- `_Xlen` for `msvc8::vector<gpg::HaStar::ClusterMap*>` (`PathTables::Impl::mMaps`); callers 0x0076C309, 0x0076C850 (`_Insert_n`).)
          * Address: 0x00733910 (FUN_00733910 -- `_Xlen`, `length_error("vector<T> too long")`, for `msvc8::vector<PlatoonUnitSearchEntry>` (max_size 0x1FFFFFFF); callers 0x007335A0, 0x007336C0.)
          */
@@ -11616,7 +11496,7 @@ namespace msvc8
          * Address: 0x00783190 (FUN_00783190 -- `_Buy` for a 8-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x007983B0 (FUN_007983B0 -- `_Buy` for a 20-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x007C92B0 (FUN_007C92B0 -- `_Buy` for a 16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-         * Address: 0x008EF750 (FUN_008EF750 -- `_Buy`: null the three pointers, then for a non-zero count `_Xlen` past 0x0FFFFFFF and allocate through 0x008E87F0, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EF999 (`operator=` 0x008EF870's reallocating path). Was DB `external_dependency`; it is engine code.)
+         * Address: 0x008EF750 (FUN_008EF750 -- `_Buy`: null the three pointers, then for a non-zero count `_Xlen` past 0x0FFFFFFF and allocate through 0x008E87F0, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EF999 (`operator=` 0x008EF870's reallocating path).)
          * Address: 0x004F8140 (FUN_004F8140 -- `_Buy` specialised to `moho::managedWindows` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedDialog>>`) (0x010A9B94), the 8-byte element: `_Xlen` past 0x1FFFFFFF, the allocation (0x004FA720, or `operator new(0)` for a zero count, which this copy does not return early on), then `last_ = first_`, `end_ = first_ + count`; zero callers, a linker-retained copy nothing runs. Formerly `InitializeManagedWindowsStorage` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-24.)
          */
         bool buy(const std::size_t count) {

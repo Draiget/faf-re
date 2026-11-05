@@ -427,6 +427,13 @@ namespace moho
      * Address: 0x007F87F0 (FUN_007F87F0)
      * Mangled: ?UpdateRenderViewportCoordinates@WRenViewport@Moho@@AAEXXZ
      */
+    /**
+     * Engine addition: one world view of `Render`'s per-view loop.
+     */
+    void RenderWorldView(
+      const SWorldViewInfo* worldView, int head, const SWorldViewInfo* begin, bool regenerateShoreline
+    );
+
     void UpdateRenderViewportCoordinates();
 
     /**

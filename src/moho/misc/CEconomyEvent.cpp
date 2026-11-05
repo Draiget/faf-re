@@ -1,4 +1,6 @@
 #include "moho/misc/CEconomyEvent.h"
+#include "moho/lua/CScrLuaInitForm.h"
+#include "gpg/core/reflection/Reflection.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -37,20 +39,6 @@ namespace
   constexpr const char* kIncorrectGameObjectTypeError =
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Sim"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Sim");
-    return sSet;
-  }
-
   /**
    * Address: 0x00775630 (FUN_00775630, context unwrap)
    * Address: 0x00775910 (FUN_00775910, context unwrap)
@@ -78,14 +66,6 @@ namespace
     return moho::CEconomyEvent::sType;
   }
 
-  [[nodiscard]] gpg::RType* CachedCScriptEventType()
-  {
-    if (!moho::CScriptEvent::sType) {
-      moho::CScriptEvent::sType = gpg::LookupRType(typeid(moho::CScriptEvent));
-    }
-    return moho::CScriptEvent::sType;
-  }
-
   [[nodiscard]] gpg::RType* CachedCScriptObjectPointerType()
   {
     static gpg::RType* cached = nullptr;
@@ -93,14 +73,6 @@ namespace
       cached = gpg::LookupRType(typeid(moho::CScriptObject*));
     }
     return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSEconValueType()
-  {
-    if (!moho::SEconValue::sType) {
-      moho::SEconValue::sType = gpg::LookupRType(typeid(moho::SEconValue));
-    }
-    return moho::SEconValue::sType;
   }
 
   struct TypeInfoRTypePair
@@ -114,8 +86,6 @@ namespace
     bool initialized;
     TypeInfoRTypePair entries[3];
   };
-
-  thread_local TypeInfoCache3 gCEconRequestRRefCache{false, {}};
 
   template <typename TObject>
   [[nodiscard]] gpg::RRef* BuildTypedRefWithCache(
@@ -196,38 +166,6 @@ namespace
     return outRef;
   }
 
-  template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    GPG_ASSERT(derived);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
-
   void IntrusiveUnlink(moho::TDatListItem<void, void>& node)
   {
     node.ListUnlink();
@@ -247,7 +185,7 @@ namespace
    */
   void AddCScriptEventBaseToCEconomyEventType(gpg::RType* typeInfo)
   {
-    gpg::RType* const baseType = CachedCScriptEventType();
+    gpg::RType* const baseType = gpg::RTypeOf<moho::CScriptEvent>();
     gpg::RField baseField(baseType->GetName(), baseType, 0, 0, nullptr);
     typeInfo->AddBase(baseField);
   }
@@ -562,7 +500,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    gpg::RType* const econValueType = CachedSEconValueType();
+    gpg::RType* const econValueType = gpg::RTypeOf<moho::SEconValue>();
     GPG_ASSERT(econValueType != nullptr);
 
     archive->Read(econValueType, &mRequested, nullOwner);
@@ -582,7 +520,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    gpg::RType* const econValueType = CachedSEconValueType();
+    gpg::RType* const econValueType = gpg::RTypeOf<moho::SEconValue>();
     GPG_ASSERT(econValueType != nullptr);
 
     archive->Write(econValueType, &mRequested, nullOwner);
@@ -700,7 +638,7 @@ gpg::RType* moho::CEconomyEvent::GetClass() const
  */
 gpg::RRef moho::CEconomyEvent::GetDerivedObjectRef()
 {
-  return MakeTypedRef(this, CachedCEconomyEventType());
+  return gpg::MakeTypedRef(this, CachedCEconomyEventType());
 }
 
 /**
@@ -815,7 +753,7 @@ int moho::cfunc_CreateEconomyEvent(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CreateEconomyEvent_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     "CreateEconomyEvent",
     &moho::cfunc_CreateEconomyEvent,
     nullptr,
@@ -870,7 +808,7 @@ int moho::cfunc_RemoveEconomyEvent(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_RemoveEconomyEvent_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     "RemoveEconomyEvent",
     &moho::cfunc_RemoveEconomyEvent,
     nullptr,
@@ -914,7 +852,7 @@ int moho::cfunc_EconomyEventIsDone(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_EconomyEventIsDone_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     "EconomyEventIsDone",
     &moho::cfunc_EconomyEventIsDone,
     nullptr,
@@ -983,7 +921,7 @@ namespace
   const CEconomyEventLuaFuncDefBootstrap gCEconomyEventLuaFuncDefBootstrap{};
 
   moho::CScrLuaClassBinder gEconomyEventClassBinder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     "moho.EconomyEvent",
     &moho::CScrLuaMetatableFactory<moho::CEconomyEvent>::Instance(),
     "CEconomyEvent",

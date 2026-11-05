@@ -1,9 +1,11 @@
 #pragma once
+#include <new>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <map>
 #include <type_traits>
+#include <initializer_list>
 #include <typeinfo>
 #include <vector>
 
@@ -278,7 +280,7 @@ namespace gpg
    * Base of every `Ser{Construct,SaveConstruct,SaveLoad}Helper_<T>` reflection
    * bootstrap singleton (`CIntelPosHandleConstruct`, `Rect2iSerializer`, the
    * per-file `...ConstructHelper`/`...Serializer` globals throughout
-   * `src/**`). Each of those helpers self-registers at static-init time,
+   * `src/ **`). Each of those helpers self-registers at static-init time,
    * waits on the process-global pending list below, then gets dispatched once
    * (via `Init()`) to bind its construct/delete or load/save callback(s) onto
    * a reflected `RType`.
@@ -1091,6 +1093,36 @@ namespace gpg
    * in moho/sim/CDamage.cpp, removed 2026-09-30.)
    * Address: 0x0054CFC0 (FUN_0054CFC0 -- `RTypeOf<moho::CAniDefaultSkel>`; formerly `CachedDefaultSkelType` in
    * moho/animation/CAniDefaultSkelConstruct.cpp, removed 2026-09-30.)
+   * Address: 0x00786160 (FUN_00786160 -- `RTypeOf<moho::CMauiBorder>`; formerly `CachedCMauiBorderUpcastType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.)
+   * Address: 0x0078D920 (FUN_0078D920 -- `RTypeOf<moho::CMauiCursor>`; formerly `CachedCMauiCursorUpcastType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.)
+   * Address: 0x00794E40 (FUN_00794E40 -- `RTypeOf<moho::CMauiEdit>`; formerly `CachedCMauiEditType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.)
+   * Address: 0x007A23C0 (FUN_007A23C0 -- `RTypeOf<moho::CMauiScrollbar>`; formerly `CachedCMauiScrollbarType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.)
+   * Address: 0x007C8D70 (FUN_007C8D70 -- `RTypeOf<moho::CLobby>`; formerly `CachedCLobbyTypeBridge` in moho/net/CLobby.cpp, removed 2026-11-04.)
+   * Address: 0x0086A380 (FUN_0086A380 -- `RTypeOf<moho::CLuaWldUIProvider>`; formerly `CachedCLuaWldUIProviderUpcastType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.)
+   * Address: 0x0087F010 (FUN_0087F010 -- `RTypeOf<ScriptedDecal>`; formerly `CachedScriptedDecalType` in moho/script/ScriptedDecal.cpp, removed 2026-11-04.)
+   * Address: 0x004023E0 (FUN_004023E0 -- `RTypeOf<RType>`; formerly `CachedRTypeDescriptor` in gpg/core/reflection/Reflection.cpp, removed 2026-11-04.)
+   * Address: 0x00402890 (FUN_00402890 -- `RTypeOf<unsigned int>`; formerly `CachedUIntType` in gpg/core/containers/FastVectorUIntReflection.cpp, removed 2026-11-04.)
+   * Address: 0x0040E140 (FUN_0040E140 -- `RTypeOf<float>`; formerly `CachedFloatType` in gpg/core/reflection/Reflection.cpp, removed 2026-11-04.)
+   * Address: 0x004A4E10 (FUN_004A4E10 -- `RTypeOf<char>`; formerly `GetCharRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x004A4E30 (FUN_004A4E30 -- `RTypeOf<short>`; formerly `GetShortRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x004A4E50 (FUN_004A4E50 -- `RTypeOf<int>`; formerly `GetIntRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x004A4E70 (FUN_004A4E70 -- `RTypeOf<long>`; formerly `GetLongRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x004A4E90 (FUN_004A4E90 -- `RTypeOf<signed char>`; formerly `GetSignedCharRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x004A4EB0 (FUN_004A4EB0 -- `RTypeOf<unsigned char>`; formerly `GetUnsignedCharRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x004A4ED0 (FUN_004A4ED0 -- `RTypeOf<bool>`; formerly `GetBoolRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x004A4EF0 (FUN_004A4EF0 -- `RTypeOf<msvc8::string>`; formerly `GetStringRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x0050CAB0 (FUN_0050CAB0 -- `RTypeOf<moho::SCoordsVec2>`; formerly `ResolveSCoordsVec2Type` in moho/containers/SCoordsVec2TypeInfo.cpp, removed 2026-11-04.)
+   * Address: 0x0050CAD0 (FUN_0050CAD0 -- `RTypeOf<moho::SOCellPos>`; formerly `ResolveSOCellPosType` in moho/sim/SOCellPosTypeInfo.cpp, removed 2026-11-04.)
+   * Address: 0x0050CB10 (FUN_0050CB10 -- `RTypeOf<SPointVector>`; formerly `CachedSPointVectorType` in moho/ai/SPointVectorTypeInfo.cpp, removed 2026-11-04.)
+   * Address: 0x00510450 (FUN_00510450 -- `RTypeOf<moho::REmitterBlueprintCurve>`; formerly `CachedEmitterBlueprintCurveType` in moho/resource/blueprints/REmitterCurveTypeInfo.cpp, removed 2026-11-04.)
+   * Address: 0x00510490 (FUN_00510490 -- `RTypeOf<moho::REmitterBlueprint>`; formerly `CachedEmitterBlueprintType` in moho/resource/blueprints/REmitterBlueprintTypeInfo.cpp, removed 2026-11-04.)
+   * Address: 0x005104B0 (FUN_005104B0 -- `RTypeOf<moho::RTrailBlueprint>`; formerly `CachedTrailBlueprintType` in moho/resource/blueprints/RTrailBlueprintTypeInfo.cpp, removed 2026-11-04.)
+   * Address: 0x0051CC40 (FUN_0051CC40 -- `RTypeOf<RProjectileBlueprint>`; formerly `ResolveRProjectileBlueprintType` in moho/resource/blueprints/RProjectileBlueprint.cpp, removed 2026-11-04.)
+   * Address: 0x00528340 (FUN_00528340 -- `RTypeOf<RMeshBlueprint>`; formerly `ResolveRMeshBlueprintType` in moho/resource/blueprints/RMeshBlueprint.cpp, removed 2026-11-04.)
+   * Address: 0x0054CFE0 (FUN_0054CFE0 -- `RTypeOf<CAniPose>`; formerly `CachedCAniPoseType` in moho/animation/CAniPoseTypeInfo.cpp, removed 2026-11-04.)
+   * Address: 0x0072AA20 (FUN_0072AA20 -- `RTypeOf<moho::CSquad>`; formerly `CachedCSquadType` in moho/sim/CPlatoon.cpp, removed 2026-11-04.)
+   * Address: 0x0077B940 (FUN_0077B940 -- `RTypeOf<moho::SDecalInfo>`; formerly `CachedSDecalInfoType` in moho/render/CDecalTypes.cpp, removed 2026-11-04.)
+   * Address: 0x0094F4D0 (FUN_0094F4D0 -- `RTypeOf<gpg::ArchiveToken>`; formerly `CachedArchiveTokenType` in gpg/core/containers/ArchiveTokenTypeInfo.cpp, removed 2026-11-04.)
    * Address: 0x0050D390 (FUN_0050D390 -- `RTypeOf<gpg::Rect2i>`, slot 0x010C6D98; formerly `CachedRect2iType`
    * in gpg/core/reflection/Reflection.cpp, removed 2026-10-01.)
    * Address: 0x006D2EA0 (FUN_006D2EA0 -- `RTypeOf<moho::WeakEntitySetTemplate<moho::Unit>>`; formerly
@@ -2922,7 +2954,7 @@ namespace gpg
 
     static void Delete(void* const object)
     {
-      delete static_cast<T*>(object);
+      GPG_NONVIRTUAL_DESTROY(delete static_cast<T*>(object));
     }
 
     RType::construct_func_t mConstructFunc; // +0x0C
@@ -6130,6 +6162,268 @@ namespace gpg
    * pointer `T` that is the pointee's `RPointerType`, the reference to a
    * pointer slot.
    */
+  /**
+   * Engine addition: fills a caller's type slot from the first lookup and returns it.
+   */
+  template <class T>
+  [[nodiscard]] RType* CachedLookup(RType*& slot)
+  {
+    if (!slot) {
+      slot = LookupRType(typeid(T));
+    }
+    return slot;
+  }
+
+  /**
+   * Engine addition: as above, for a type the caller holds as a `type_info`.
+   */
+  [[nodiscard]] inline RType* CachedLookup(RType*& slot, const std::type_info& typeInfo)
+  {
+    if (!slot) {
+      slot = LookupRType(typeInfo);
+    }
+    return slot;
+  }
+
+  /**
+   * Engine addition: the first registered type among several spellings of a name.
+   */
+  [[nodiscard]] inline RType* REF_FindFirstTypeNamed(const std::initializer_list<const char*> names)
+  {
+    for (const char* const name : names) {
+      if (!name) {
+        continue;
+      }
+      if (RType* const type = REF_FindTypeNamed(name)) {
+        return type;
+      }
+    }
+    return nullptr;
+  }
+
+  /**
+   * Engine addition: reads a tracked pointer and upcasts it to `expectedType`.
+   */
+  template <typename TObject>
+  [[nodiscard]] TObject* ReadPointerAs(ReadArchive* const archive, const RRef& owner, RType* const expectedType)
+  {
+    const TrackedPointerInfo tracked = ReadRawPointer(archive, owner);
+    if (!tracked.object) {
+      return nullptr;
+    }
+
+    RRef source{};
+    source.mObj = tracked.object;
+    source.mType = tracked.type;
+    const RRef upcast = REF_UpcastPtr(source, expectedType);
+    return static_cast<TObject*>(upcast.mObj);
+  }
+
+  /**
+   * Engine addition: the reference the recovered code built by hand in each
+   * file. Asks the object for its dynamic type and rebases the pointer to it.
+   */
+  template <class TObject>
+  [[nodiscard]] RRef MakeDerivedRef(TObject* const object, RType* const baseType)
+  {
+    RRef out{};
+    out.mObj = nullptr;
+    out.mType = baseType;
+    if (!object) {
+      return out;
+    }
+
+    RType* dynamicType = baseType;
+    try {
+      dynamicType = LookupRType(typeid(*object));
+    } catch (...) {
+      dynamicType = baseType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
+    if (!isDerived) {
+      out.mObj = object;
+      out.mType = dynamicType;
+      return out;
+    }
+
+    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
+    out.mType = dynamicType;
+    return out;
+  }
+
+  /**
+   * Engine addition: a class's `GetDerivedObjectRef`: itself, under the type it reports.
+   */
+  template <class T>
+  [[nodiscard]] RRef MakeSelfRef(T* const self)
+  {
+    RRef out{};
+    out.mObj = self;
+    out.mType = self->GetClass();
+    return out;
+  }
+
+  /**
+   * Engine addition: an `RRef_*` function: `MakeDerivedRef` into `out`, unless `out` is null. The type
+   * is looked up only then.
+   */
+  template <class TObject>
+  RRef* WriteDerivedRef(RRef* const out, TObject* const value, RType* (*const baseType)())
+  {
+    if (!out) {
+      return nullptr;
+    }
+
+    *out = MakeDerivedRef(value, baseType());
+    return out;
+  }
+
+  /**
+   * Engine addition: as above, with the type `RTypeOf` finds for the object's static type.
+   */
+  template <class TObject>
+  RRef* WriteDerivedRef(RRef* const out, TObject* const value)
+  {
+    if (!out) {
+      return nullptr;
+    }
+
+    *out = MakeDerivedRef(value, RTypeOf<TObject>());
+    return out;
+  }
+
+  /**
+   * Engine addition: an `RType` teardown lane: empties the field and base lists, unless null.
+   */
+  template <class TType>
+  void ClearTypeLists(TType* const typeInfo)
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
+  /**
+   * Engine addition: the construct step of a TypeInfo's `CtrRef`: default-constructs `T` in
+   * `storage` unless it is null, and returns it.
+   */
+  template <class T>
+  T* ConstructInStorage(void* const storage)
+  {
+    auto* const object = static_cast<T*>(storage);
+    if (object) {
+      new (object) T();
+    }
+    return object;
+  }
+
+  /**
+   * Engine addition: a TypeInfo's `Destruct`: destroys the `T` in `storage` unless it is null.
+   */
+  template <class T>
+  void DestructInStorage(void* const storage)
+  {
+    auto* const object = static_cast<T*>(storage);
+    if (object) {
+      GPG_NONVIRTUAL_DESTROY(object->~T());
+    }
+  }
+
+  /**
+   * Engine addition: as MakeDerivedRef, for a type that must derive from
+   * `staticType`, which it asserts.
+   */
+  template <class T>
+  [[nodiscard]] RRef MakeTypedRef(T* object, RType* staticType)
+  {
+    RRef out{};
+    out.mObj = nullptr;
+    out.mType = staticType;
+    if (!object) {
+      return out;
+    }
+
+    RType* dynamicType = staticType;
+    try {
+      dynamicType = LookupRType(typeid(*object));
+    } catch (...) {
+      dynamicType = staticType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool derived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
+    GPG_ASSERT(derived);
+    if (!derived) {
+      out.mObj = object;
+      out.mType = dynamicType;
+      return out;
+    }
+
+    out.mObj =
+      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
+    out.mType = dynamicType;
+    return out;
+  }
+
+  /**
+   * Engine addition: declares `Base` as a reflected base of `typeInfo`, the body
+   * of every `AddBase_*`. `offset` is where the base sits in the object.
+   */
+  template <class Base>
+  void AddReflectedBase(RType* const typeInfo, const int offset = 0)
+  {
+    RType* const baseType = RTypeOf<Base>();
+
+    RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = offset;
+    baseField.mFlags = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
+  }
+
+  /**
+   * Engine addition: as AddReflectedBase, for a base type the caller already has.
+   */
+  inline void AddReflectedBaseType(RType* const typeInfo, RType* const baseType)
+  {
+    RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = 0;
+    baseField.mFlags = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
+  }
+
+  /**
+   * Engine addition: as AddReflectedBase, for code that fills `Base::sType` on
+   * the way, which RTypeOf doesn't.
+   */
+  template <class Base>
+  void AddReflectedBaseViaSlot(RType* const typeInfo, const int offset = 0)
+  {
+    RType* baseType = Base::sType;
+    if (!baseType) {
+      baseType = LookupRType(typeid(Base));
+      Base::sType = baseType;
+    }
+
+    RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = offset;
+    baseField.mFlags = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
+  }
+
   template <class T>
   [[nodiscard]] RRef MakeRRef(T* const value)
   {

@@ -92,24 +92,6 @@ namespace gpg::gal
             );
         }
 
-        void AssignSharedCount(
-            boost::detail::sp_counted_base*& target,
-            boost::detail::sp_counted_base* const source
-        ) noexcept
-        {
-            if (source != nullptr)
-            {
-                source->add_ref_copy();
-            }
-
-            if (target != nullptr)
-            {
-                target->release();
-            }
-
-            target = source;
-        }
-
         /**
          * Address: 0x008E7B00 (FUN_008E7B00)
          *

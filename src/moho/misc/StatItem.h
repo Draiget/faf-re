@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 
@@ -8,6 +9,7 @@
 #include "legacy/containers/String.h"
 #include "moho/containers/TDatTreeItem.h"
 #include "moho/misc/Stats.h"
+#include "platform/Interlocked.h"
 
 namespace LuaPlus
 {
@@ -126,6 +128,30 @@ namespace moho
   class StatItem : public TDatTreeItem<StatItem>
   {
   public:
+    /**
+     * Engine addition: atomic add on the primary lane, returning the value before it.
+     */
+    std::int32_t AddPrimaryBits(const std::int32_t delta) noexcept
+    {
+      return platform::AtomicAdd(&mPrimaryValueBits, delta);
+    }
+
+    /**
+     * Engine addition: atomic exchange on the primary lane, returning the value before it.
+     */
+    std::int32_t ExchangePrimaryBits(const std::int32_t value) noexcept
+    {
+      return platform::AtomicExchange(&mPrimaryValueBits, value);
+    }
+
+    /**
+     * Engine addition: atomic store on the primary lane.
+     */
+    void StorePrimaryBits(const std::int32_t value) noexcept
+    {
+      platform::AtomicField(&mPrimaryValueBits).store(value);
+    }
+
     /**
      * Address: 0x00408730 (FUN_00408730, Moho::StatItem::StatItem)
      */

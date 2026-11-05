@@ -102,7 +102,6 @@ namespace
   constexpr const char* kIEffectOffsetEmitterHelpText = "Effect:OffsetEmitter(x,y,z)";
   constexpr const char* kIEffectDestroyHelpText = "Effect:Destroy()";
   constexpr const char* kCDecalHandleDestroyHelpText = "DecalHandle:Destroy()";
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedArgRangeWarning = "%s\n  expected between %d and %d args, but got %d";
   constexpr const char* kInvalidEffectParameterErrorText = "Invalid Effect Parameter %s";
   constexpr const char* kInvalidEmitterCurveParameterErrorText = "Invalid Emitter Curve Parameter %s";
@@ -295,7 +294,7 @@ namespace
     return paramIndex;
   }
 
-  void RecomputeEmitterCurveYBounds(moho::SEfxCurve& curve)
+  [[maybe_unused]] void RecomputeEmitterCurveYBounds(moho::SEfxCurve& curve)
   {
     curve.mBoundsMin.y = std::numeric_limits<float>::infinity();
     curve.mBoundsMax.y = -std::numeric_limits<float>::infinity();
@@ -530,10 +529,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateBeamEmitterHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kCreateBeamEmitterHelpText);
 
     LuaPlus::LuaStackObject blueprintArg(state, 1);
     const char* const blueprintName = lua_tostring(rawState, 1);
@@ -630,10 +626,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 4) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateBeamEmitterOnEntityHelpText, 4, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 4, kCreateBeamEmitterOnEntityHelpText);
 
     Sim* const sim = ResolveGlobalSim(rawState);
 
@@ -723,10 +716,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 6) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateBeamEntityToEntityHelpText, 6, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 6, kCreateBeamEntityToEntityHelpText);
 
     Sim* const sim = ResolveGlobalSim(rawState);
 
@@ -828,10 +818,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 6) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kAttachBeamEntityToEntityHelpText, 6, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 6, kAttachBeamEntityToEntityHelpText);
 
     Sim* const sim = ResolveGlobalSim(rawState);
 
@@ -950,10 +937,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 4) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kAttachBeamToEntityHelpText, 4, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 4, kAttachBeamToEntityHelpText);
 
     LuaPlus::LuaObject effectObject(LuaPlus::LuaStackObject(state, 1));
     IEffect* const effect = SCR_FromLua_IEffect(effectObject, state);
@@ -1025,10 +1009,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 4) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateAttachedEmitterHelpText, 4, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 4, kCreateAttachedEmitterHelpText);
 
     LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
@@ -1100,10 +1081,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 4) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateTrailHelpText, 4, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 4, kCreateTrailHelpText);
 
     LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
@@ -1176,10 +1154,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 6) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateAttachedBeamHelpText, 6, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 6, kCreateAttachedBeamHelpText);
 
     SCreateBeamParams params{};
     params.mAttachEntity = nullptr;
@@ -1277,10 +1252,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 7) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateBeamToEntityBoneHelpText, 7, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 7, kCreateBeamToEntityBoneHelpText);
 
     LuaPlus::LuaObject sourceEntityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const sourceEntity = SCR_FromLua_Entity(sourceEntityObject, state);
@@ -1366,10 +1338,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 3) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateEmitterAtEntityHelpText, 3, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 3, kCreateEmitterAtEntityHelpText);
 
     LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
@@ -1439,10 +1408,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 3) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateEmitterOnEntityHelpText, 3, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 3, kCreateEmitterOnEntityHelpText);
 
     LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
@@ -1531,10 +1497,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 7) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateLightParticleHelpText, 7, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 7, kCreateLightParticleHelpText);
 
     LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
@@ -1630,10 +1593,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 7) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateLightParticleIntelHelpText, 7, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 7, kCreateLightParticleIntelHelpText);
 
     LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
@@ -1726,10 +1686,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 4) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateEmitterAtBoneHelpText, 4, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 4, kCreateEmitterAtBoneHelpText);
 
     LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
@@ -1798,10 +1755,7 @@ namespace moho
    */
   int cfunc_IEffectSetBeamParamL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 3) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIEffectSetBeamParamHelpText, 3, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 3, kIEffectSetBeamParamHelpText);
 
     return ApplyIEffectNamedFloatParam(state, ResolveEBeamParamType());
   }
@@ -1848,10 +1802,7 @@ namespace moho
    */
   int cfunc_IEffectSetEmitterParamL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 3) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIEffectSetEmitterParamHelpText, 3, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 3, kIEffectSetEmitterParamHelpText);
 
     return ApplyIEffectNamedFloatParam(state, ResolveEEmitterParamType());
   }
@@ -1898,10 +1849,7 @@ namespace moho
    */
   int cfunc_IEffectScaleEmitterL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIEffectScaleEmitterHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIEffectScaleEmitterHelpText);
 
     LuaPlus::LuaObject effectObject(LuaPlus::LuaStackObject(state, 1));
     IEffect* const effect = SCR_FromLua_IEffectOpt(effectObject, state);
@@ -1943,10 +1891,7 @@ namespace moho
    */
   int cfunc_IEffectResizeEmitterCurveL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 3) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIEffectResizeEmitterCurveHelpText, 3, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 3, kIEffectResizeEmitterCurveHelpText);
 
     lua_State* const rawState = state->m_state;
     LuaPlus::LuaObject effectObject(LuaPlus::LuaStackObject(state, 1));
@@ -2002,10 +1947,7 @@ namespace moho
    */
   int cfunc_IEffectSetEmitterCurveParamL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 4) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIEffectSetEmitterCurveParamHelpText, 4, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 4, kIEffectSetEmitterCurveParamHelpText);
 
     lua_State* const rawState = state->m_state;
     LuaPlus::LuaObject effectObject(LuaPlus::LuaStackObject(state, 1));
@@ -2058,10 +2000,7 @@ namespace moho
    */
   int cfunc_IEffectOffsetEmitterL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 4) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIEffectOffsetEmitterHelpText, 4, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 4, kIEffectOffsetEmitterHelpText);
 
     lua_State* const rawState = state->m_state;
     LuaPlus::LuaObject effectObject(LuaPlus::LuaStackObject(state, 1));
@@ -2118,10 +2057,7 @@ namespace moho
    */
   int cfunc_IEffectDestroyL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIEffectDestroyHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kIEffectDestroyHelpText);
 
     LuaPlus::LuaObject effectObject(LuaPlus::LuaStackObject(state, 1));
     IEffect* const effect = SCR_FromLua_IEffectOpt(effectObject, state);
@@ -2155,10 +2091,7 @@ namespace moho
    */
   int cfunc_CDecalHandleDestroyL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCDecalHandleDestroyHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kCDecalHandleDestroyHelpText);
 
     LuaPlus::LuaObject decalHandleObject(LuaPlus::LuaStackObject(state, 1));
     CDecalHandle* const decalHandle = SCR_FromLua_CDecalHandleOpt(decalHandleObject, state);
@@ -2605,10 +2538,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 9) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateSplatOnBoneHelpText, 9, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 9, kCreateSplatOnBoneHelpText);
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);

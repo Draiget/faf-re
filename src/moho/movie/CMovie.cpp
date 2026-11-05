@@ -473,10 +473,7 @@ namespace moho
     boost::shared_ptr<ID3DTextureSheet>* const outHandle
   )
   {
-    (void)boost::AssignSharedPairRetain(
-      reinterpret_cast<boost::SharedCountPair*>(outHandle),
-      reinterpret_cast<const boost::SharedCountPair*>(&mTextureSheet)
-    );
+    (void)boost::AssignSharedPairRetain(outHandle, &mTextureSheet);
     return outHandle;
   }
 

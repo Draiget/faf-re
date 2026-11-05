@@ -151,23 +151,6 @@ namespace
     return msvc8::string("");
   }
 
-  [[nodiscard]] gpg::RType* ResolveCSndVarType()
-  {
-    gpg::RType* type = moho::CSndVar::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::CSndVar));
-      moho::CSndVar::sType = type;
-    }
-    return type;
-  }
-
-  constexpr int kSerializationSaveConstructLine = 189;
-  constexpr int kSerializationConstructLine = 231;
-  constexpr const char* kSerializationSourcePath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-  constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
-  constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
-
 } // namespace
 
 namespace moho

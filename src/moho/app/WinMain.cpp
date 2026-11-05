@@ -24,6 +24,7 @@
 
 #include <shellapi.h>
 
+#include "headless/HeadlessMain.h"
 #include "CScApp.h"
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
@@ -360,8 +361,7 @@ namespace
       if (globals != nullptr && globals->node != nullptr) {
         // nil key with a non-nil value in the first hash node - Lua never
         // creates this shape; the dumper must flag it.
-        globals->node[0].i_key.tt = LUA_TNIL;
-        globals->node[0].i_key.value.p = nullptr;
+        globals->node[0].SetKey(LuaPlus::TObject());
         globals->node[0].i_val.tt = LUA_TBOOLEAN;
         globals->node[0].i_val.value.b = 1;
       }
@@ -455,12 +455,19 @@ namespace
  * Applies startup command-line behavior, executes CScApp through WIN_AppExecute,
  * restores input system settings, and returns IWinApp::exitValue.
  */
+int (*gGameReplayPlayerMain)(int argc, char** argv) = nullptr;
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
   (void)hInstance;
   (void)hPrevInstance;
   (void)lpCmdLine;
   (void)nShowCmd;
+
+  // Engine addition (replay timeline): the viewer's hidden process, this same exe with no window or device.
+  if (gGameReplayPlayerMain != nullptr && moho::CFG_GetArgOption("/replaykeyframes", 0, nullptr)) {
+    return gGameReplayPlayerMain(0, nullptr);
+  }
 
   gpg::SetThreadName(0xFFFFFFFFu, "Main");
 

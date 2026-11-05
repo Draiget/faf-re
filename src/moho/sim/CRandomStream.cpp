@@ -24,7 +24,6 @@ namespace moho
     constexpr std::uint32_t kTemperMaskB = 0xFF3A58ADu;
     constexpr std::uint32_t kTemperMaskC = 0xFFFFDF8Cu;
     constexpr std::uint32_t kTwistMagTable[2] = {0u, 0x9908B0DFu};
-    constexpr double kInvTwoTo31 = 4.656612873077392578125e-10;  // 1 / 2^31
     constexpr double kInvTwoTo32 = 2.3283064365386962890625e-10; // 1 / 2^32
 
     // 0x0040EF3A: the shipped code runs on x87 with 24-bit precision control,
@@ -45,15 +44,6 @@ namespace moho
       return kNullOwner;
     }
 
-    [[nodiscard]] gpg::RType* CachedCMersenneTwisterType()
-    {
-      gpg::RType* type = CMersenneTwister::sType;
-      if (!type) {
-        type = gpg::LookupRType(typeid(CMersenneTwister));
-        CMersenneTwister::sType = type;
-      }
-      return type;
-    }
   } // namespace
 
   /**
@@ -305,7 +295,7 @@ namespace moho
       return;
     }
 
-    archive->Read(CachedCMersenneTwisterType(), &twister, NullOwnerRef());
+    archive->Read(gpg::RTypeOf<CMersenneTwister>(), &twister, NullOwnerRef());
     archive->ReadFloat(&marsagliaPair);
     archive->ReadBool(&hasMarsagliaPair);
   }
@@ -323,7 +313,7 @@ namespace moho
       return;
     }
 
-    archive->Write(CachedCMersenneTwisterType(), &twister, NullOwnerRef());
+    archive->Write(gpg::RTypeOf<CMersenneTwister>(), &twister, NullOwnerRef());
     archive->WriteFloat(marsagliaPair);
     archive->WriteBool(hasMarsagliaPair);
   }

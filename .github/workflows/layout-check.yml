@@ -1,11 +1,13 @@
 name: Layout check
 
-# Compiles the engine in the form that keeps the 2007 binary's exact container layout
+# Checks the engine in the form that keeps the 2007 binary's exact container layout
 # (src/legacy/containers/Layout.h, preset clang-x86-retail-layout). That is the one build where the
 # layout static_asserts are on: every other build switches them off (src/platform/LayoutAsserts.h),
-# so without this job they could break unnoticed, wire-format checks among them. It compiles
-# faf_engine's objects and links nothing; no game runs. A pull request's code runs here with a
-# read-only token and no secrets, and only restores the caches.
+# so without this job they could break unnoticed, wire-format checks among them. It stops after the
+# compiler's front end (FAF_SYNTAX_ONLY), where a static_assert fails, so it writes no objects and
+# links nothing; no game runs. An error only code generation finds shows up in the Replay check's
+# builds instead. A pull request's code runs here with a read-only token and no secrets, and only
+# restores the caches.
 on:
   push:
     branches: [master]
@@ -63,6 +65,6 @@ jobs:
       # A failed layout assert fails the compile; -k 0 lists every one instead of stopping at the first.
       - shell: pwsh
         run: |
-          cmake --preset clang-x86-retail-layout
+          cmake --preset clang-x86-retail-layout -DFAF_SYNTAX_ONLY=ON
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build --preset clang-x86-retail-layout --target faf_engine -- -k 0

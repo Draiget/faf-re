@@ -7,6 +7,34 @@
 #
 #   cmake --preset linux-clang-x64-release && cmake --build --preset linux-clang-x64-release
 
+# Engine addition (#118): a profile-guided build, for a server's speed. The linux-clang-x64-release
+# preset uses the stored profile, linux-clang-x64-release-plain none, -pgogen records one
+# (tools/pgo/record.sh). See docs/SWITCHES.md.
+#   FAF_PGO_GENERATE=ON                counts what the code does; a replay writes the counts on exit
+#                                      (LLVM_PROFILE_FILE names the file), llvm-profdata merges them.
+#   FAF_PGO_PROFILE=<file.profdata>    ThinLTO with those counts. Needs llvm-ar (package llvm-18).
+option(FAF_PGO_GENERATE "Build headless to record a profile for FAF_PGO_PROFILE" OFF)
+set(FAF_PGO_PROFILE "" CACHE FILEPATH "Merged LLVM profile to optimise with")
+if(FAF_PGO_GENERATE AND FAF_PGO_PROFILE)
+  message(FATAL_ERROR "FAF_PGO_GENERATE and FAF_PGO_PROFILE exclude each other.")
+endif()
+if(FAF_PGO_GENERATE)
+  add_compile_options(-fprofile-generate)
+  add_link_options(-fprofile-generate)
+  add_compile_definitions(FAF_COVERAGE_PROFILE=1)
+elseif(FAF_PGO_PROFILE)
+  find_program(FAF_LLVM_AR NAMES llvm-ar HINTS "${FAF_LINUX_LLVM_ROOT}/bin")
+  find_program(FAF_LLVM_RANLIB NAMES llvm-ranlib HINTS "${FAF_LINUX_LLVM_ROOT}/bin")
+  if(NOT FAF_LLVM_AR OR NOT FAF_LLVM_RANLIB)
+    message(FATAL_ERROR "A profile-guided build needs llvm-ar and llvm-ranlib: install llvm-18, or use the linux-clang-x64-release-plain preset.")
+  endif()
+  set(CMAKE_AR "${FAF_LLVM_AR}")
+  set(CMAKE_RANLIB "${FAF_LLVM_RANLIB}")
+  # A profile from older source still applies to the functions that did not change.
+  add_compile_options(-flto=thin "-fprofile-use=${FAF_PGO_PROFILE}" -Wno-profile-instr-unprofiled -Wno-profile-instr-out-of-date -Wno-backend-plugin)
+  add_link_options(-flto=thin "-fprofile-use=${FAF_PGO_PROFILE}")
+endif()
+
 if(NOT FAF_LINUX)
   message(FATAL_ERROR "cmake/FafLinux.cmake needs cmake/toolchains/linux-clang-x64.cmake.")
 endif()
@@ -39,6 +67,7 @@ set(FAF_DEPENDENCIES_DIR "${PROJECT_SOURCE_DIR}/dependencies" CACHE PATH
     "Third-party tree (dependencies/ in the repository)")
 
 include(FafCodegen)
+include(FafWarnings)
 
 # --- Toolchain check ------------------------------------------------------------------
 # tests/linux/ToolchainCheck.cpp: data model, char signedness, no FMA
@@ -72,14 +101,17 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/zlib" "${CMAKE_BINARY_DIR}/de
 # simulation targets build as before.
 option(FAF_FETCH_DEPENDENCIES "Fetch the net channel's Monocypher download at configure time" ON)
 if(FAF_FETCH_DEPENDENCIES)
-  set(FAF_DEPENDENCIES_ONLY monocypher)
+  set(FAF_DEPENDENCIES_ONLY monocypher zstd)
   include(FafDependencies)
 endif()
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/monocypher" "${CMAKE_BINARY_DIR}/deps/monocypher")
+add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/zstd" "${CMAKE_BINARY_DIR}/deps/zstd")
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/remote/net" "${CMAKE_BINARY_DIR}/remote/net")
 if(TARGET faf_netchannel)
   add_executable(faf_netchannel_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/NetChannelTests.cpp")
   target_link_libraries(faf_netchannel_tests PRIVATE faf_netchannel faf_monocypher)
+  add_executable(faf_gamelink_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/GameLinkTests.cpp")
+  target_link_libraries(faf_gamelink_tests PRIVATE faf_netchannel faf_monocypher)
 endif()
 
 # --- faf_sim ----------------------------------------------------------------------------
@@ -174,7 +206,7 @@ target_include_directories(faf_sim_settings INTERFACE
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_link_libraries(faf_sim_settings INTERFACE faf_codegen)
-target_link_libraries(faf_sim PUBLIC Wm3Headers zlib123)
+target_link_libraries(faf_sim PUBLIC Wm3Headers zlib123 faf_monocypher faf_zstd)
 
 set(_faf_sim_options
   # The recovered tree's x86 layout asserts, off as on Windows x64 (see the
@@ -185,23 +217,8 @@ set(_faf_sim_options
   ${FAF_LINUX_MS_DIALECT}
   # boost.thread checks for the compiler's threading mode (_REENTRANT).
   -pthread
-  # The Windows build's diagnostics settings (src/CMakeLists.txt).
-  -Wno-microsoft
-  -Wno-unused-parameter -Wno-unused-variable -Wno-unused-private-field
-  -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-but-set-variable
-  -Wno-unused-lambda-capture -Wno-unused-value -Wno-unused-command-line-argument
-  -Wno-missing-field-initializers -Wno-sign-compare -Wno-switch
-  -Wno-invalid-offsetof -Wno-keyword-macro -Wno-unknown-pragmas
-  -Wno-ignored-pragma-intrinsic -Wno-pragma-pack -Wno-ignored-attributes
-  -Wno-deprecated-declarations -Wno-deprecated-enum-enum-conversion
-  -Wno-nonportable-include-path -Wno-reorder-ctor
-  -Wno-delete-non-abstract-non-virtual-dtor -Wno-overloaded-virtual
-  -Wno-inconsistent-missing-override -Wno-missing-braces -Wno-braced-scalar-init
-  -Wno-char-subscripts -Wno-parentheses -Wno-dangling-else
-  -Wno-tautological-constant-out-of-range-compare
-  -Wno-tautological-undefined-compare -Wno-undefined-var-template
-  -Wno-writable-strings -Wno-comment -Wno-extra-tokens -Wno-nontrivial-memcall
-  -Wno-mismatched-tags -Wno-extra-qualification
+  -Wall
+  ${FAF_WARNING_OPTIONS}
   # Options clang 18 does not know yet (the Windows build uses a newer clang).
   -Wno-unknown-warning-option)
 target_compile_options(faf_sim_settings INTERFACE "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_sim_options}>")
@@ -214,6 +231,8 @@ foreach(_src IN LISTS _faf_sim_files)
     set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_OPTIONS -w)
   endif()
 endforeach()
+include(FafPrecompiledHeaders)
+faf_precompile(faf_sim)
 
 # --- faf_sim_math_tests (plan WPL.23) ---------------------------------------------------
 # The golden sim-math tests (tests/sim_math) on every faf_sim object, as Windows runs
@@ -255,10 +274,43 @@ set(_faf_headless_files "")
 foreach(_src IN LISTS FAF_HEADLESS_SOURCES)
   list(APPEND _faf_headless_files "${PROJECT_SOURCE_DIR}/src/${_src}")
 endforeach()
-add_executable(headless ${_faf_headless_files})
+add_executable(headless ${_faf_headless_files}
+  "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
+)
+target_compile_definitions(headless PRIVATE FAF_HEADLESS_NET=1)
+target_link_libraries(headless PRIVATE faf_netchannel faf_monocypher)
 target_link_libraries(headless PRIVATE faf_sim)
 target_compile_definitions(headless PRIVATE FAF_SERVER_MODE=1)
 target_link_options(headless PRIVATE -Wl,--error-limit=0)
+
+# --- server (plan WP1.1) --------------------------------------------------------------------
+# The dedicated server, Linux only (plan D2): the sim, and what `headless` shares for loading a game.
+add_executable(server
+  "${PROJECT_SOURCE_DIR}/src/server/ServerMain.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
+  "${PROJECT_SOURCE_DIR}/src/headless/SessionLoad.cpp"
+  "${PROJECT_SOURCE_DIR}/src/headless/ReplayLuaState.cpp"
+)
+target_link_libraries(server PRIVATE faf_sim faf_netchannel faf_monocypher)
+target_compile_definitions(server PRIVATE FAF_SERVER_MODE=1)
+target_link_options(server PRIVATE -Wl,--error-limit=0)
+
+add_executable(faf_server_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SpeedWatchTests.cpp")
+target_include_directories(faf_server_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
+
+add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp" "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp")
+target_link_libraries(faf_seat_tests PRIVATE faf_sim faf_netchannel faf_monocypher)
+target_compile_definitions(faf_seat_tests PRIVATE FAF_SERVER_MODE=1)
+target_link_options(faf_seat_tests PRIVATE -Wl,--error-limit=0)
+
+add_executable(faf_server_probe EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeMain.cpp")
+target_link_libraries(faf_server_probe PRIVATE faf_sim faf_netchannel faf_monocypher)
+target_compile_definitions(faf_server_probe PRIVATE FAF_SERVER_MODE=1)
+target_link_options(faf_server_probe PRIVATE -Wl,--error-limit=0)
 
 # --- faf_remote_tests -------------------------------------------------------------------
 # The wire format's tests (tests/remote/WireTests.cpp) on the Linux objects, as Windows'

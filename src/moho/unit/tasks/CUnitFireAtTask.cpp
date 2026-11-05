@@ -53,79 +53,6 @@ namespace
     return false;
   }
 
-  [[nodiscard]] gpg::RType* CachedCUnitFireAtTaskType()
-  {
-    gpg::RType* type = moho::CUnitFireAtTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitFireAtTask));
-      moho::CUnitFireAtTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCAiTargetType()
-  {
-    gpg::RType* type = moho::CAiTarget::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CAiTarget));
-      moho::CAiTarget::sType = type;
-    }
-    return type;
-  }
-
-  // Mirrors the file-local `CachedESiloTypeType()` helper already established
-  // in CAiSiloBuildImplTypeInfo.cpp: `ESiloType` is an enum, so it cannot
-  // host its own `sType` static member the way class/struct reflected types
-  // do -- IDA's decompiler displays the underlying global as
-  // `Moho::ESiloType::sType`, but that is a plain per-TU cache, not a member.
-  [[nodiscard]] gpg::RType* CachedESiloTypeType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::ESiloType));
-    }
-    return cached;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 } // namespace
 
 namespace moho
@@ -420,15 +347,15 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), ownerRef);
 
     CCommandTask* dispatchAsCommandTask = nullptr;
     archive->ReadPointer(&dispatchAsCommandTask, &ownerRef);
     mDispatch = static_cast<IAiCommandDispatchImpl*>(dispatchAsCommandTask);
 
-    archive->Read(CachedCAiTargetType(), &mTarget, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CAiTarget>(), &mTarget, ownerRef);
     archive->ReadPointer(&mWeapon, &ownerRef);
-    archive->Read(CachedESiloTypeType(), &mIsNuclear, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::ESiloType>(), &mIsNuclear, ownerRef);
   }
 
   /**
@@ -451,17 +378,17 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
 
     gpg::RRef dispatchRef{};
     (void)gpg::RRef_CCommandTask(&dispatchRef, static_cast<CCommandTask*>(mDispatch));
     gpg::WriteRawPointer(archive, dispatchRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedCAiTargetType(), &mTarget, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CAiTarget>(), &mTarget, ownerRef);
 
     archive->WritePointer<moho::UnitWeapon>(mWeapon, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedESiloTypeType(), &mIsNuclear, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::ESiloType>(), &mIsNuclear, ownerRef);
   }
 
   namespace
@@ -520,12 +447,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitFireAtTask(gpg::RRef* const outRef, moho::CUnitFireAtTask* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = MakeDerivedRef(value, CachedCUnitFireAtTaskType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

@@ -17,15 +17,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* ResolveRPropBlueprintTypeCached() noexcept
-  {
-    gpg::RType* type = moho::RPropBlueprint::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::RPropBlueprint));
-      moho::RPropBlueprint::sType = type;
-    }
-    return type;
-  }
 
 } // namespace
 
@@ -99,10 +90,7 @@ namespace moho
    */
   gpg::RRef RPropBlueprint::GetDerivedObjectRef()
   {
-    gpg::RRef out{};
-    out.mObj = this;
-    out.mType = GetClass();
-    return out;
+    return gpg::MakeSelfRef(this);
   }
 
   /**

@@ -27,15 +27,6 @@ namespace moho
 
 namespace
 {
-  [[nodiscard]] gpg::RType* ResolveRScmResourceTypeCached() noexcept
-  {
-    gpg::RType* resourceType = moho::RScmResource::sType;
-    if (resourceType == nullptr) {
-      resourceType = gpg::LookupRType(typeid(moho::RScmResource));
-      moho::RScmResource::sType = resourceType;
-    }
-    return resourceType;
-  }
 
   struct RScmResourcePrefetchBootstrap
   {

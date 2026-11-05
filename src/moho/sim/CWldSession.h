@@ -86,6 +86,7 @@ namespace moho
      * id).
      */
     SBuildTemplateInfo(const SBuildTemplateInfo& other);
+    SBuildTemplateInfo& operator=(const SBuildTemplateInfo&) = default;
   };
   static_assert(sizeof(SBuildTemplateInfo) == 0x2C, "SBuildTemplateInfo size must be 0x2C");
   static_assert(offsetof(SBuildTemplateInfo, mBuildOrder) == 0x0C, "SBuildTemplateInfo::mBuildOrder offset must be 0x0C");
@@ -600,6 +601,12 @@ namespace moho
      * The parameter is by-value ownership; nothing else may free the packet.
      */
     void DoBeat(msvc8::auto_ptr<SSyncData> syncData);
+
+    /**
+     * Engine addition (replay timeline): drops everything the last sim published, just before the
+     * opening sync of the sim that replaces it. The map, the rules, the camera and the UI stay.
+     */
+    void ResetForNewReplaySim();
 
 #if FAF_SERVER_MODE
     /**
@@ -1873,6 +1880,14 @@ namespace moho
    * changes (`replay`, focused local army, or non-multiplayer).
    */
   [[nodiscard]] bool WLD_CanAdjustSimRate();
+
+  /**
+   * Engine addition (wld_FrameClock): true once, on the first call after the current session
+   * showed its first tick. The frames before it include the long first frame of play; the app
+   * drops them from its frame-time window so the mean clock does not repay that frame by rushing
+   * the opening ticks out. Main thread only.
+   */
+  [[nodiscard]] bool WLD_TakeFrameClockReset() noexcept;
 
   /**
    * Address: 0x0088D1B0 (FUN_0088D1B0, ?WLD_IncreaseSimRate@Moho@@YAXXZ)

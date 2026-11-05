@@ -62,14 +62,7 @@ namespace moho
    */
   void IEffectTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CScriptObject::StaticGetClass();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, CScriptObject::StaticGetClass());
   }
 } // namespace moho
 

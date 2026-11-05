@@ -76,7 +76,7 @@ namespace
    * helper performs that identical refcount-preserving raw copy through the
    * SharedPtrRaw machinery so no open `{px,pi}` arithmetic leaks into Load.
    */
-  void AdoptWaterMapSheetFromResource(
+  [[maybe_unused]] void AdoptWaterMapSheetFromResource(
     boost::shared_ptr<moho::CD3DDynamicTextureSheet>& waterMap,
     const moho::ID3DDeviceResources::TextureResourceHandle& sheet
   ) noexcept
@@ -92,20 +92,6 @@ namespace
   }
 
 
-  void AdoptDynamicSheetAsStratumMask(
-    boost::SharedPtrRaw<moho::RD3DTextureResource>& mask,
-    const boost::shared_ptr<moho::CD3DDynamicTextureSheet>& sheet
-  ) noexcept
-  {
-    const boost::SharedPtrRaw<moho::CD3DDynamicTextureSheet> borrow =
-      boost::SharedPtrRawFromSharedBorrow(sheet);
-
-    boost::SharedPtrRaw<moho::RD3DTextureResource> reinterpreted{};
-    reinterpreted.px = reinterpret_cast<moho::RD3DTextureResource*>(borrow.px);
-    reinterpreted.pi = borrow.pi;
-    mask.assign_retain(reinterpreted);
-  }
-
 
   /**
    * Address: 0x008915F0 (FUN_008915F0, sub_8915F0)
@@ -114,7 +100,7 @@ namespace
    * Writes two contiguous 32-bit lanes to a binary writer in one 8-byte
    * payload.
    */
-  void WriteBinaryWriterPairU32(gpg::BinaryWriter& writer, const std::uint32_t first, const std::uint32_t second)
+  [[maybe_unused]] void WriteBinaryWriterPairU32(gpg::BinaryWriter& writer, const std::uint32_t first, const std::uint32_t second)
   {
     const std::uint32_t pair[2]{first, second};
     writer.Write(reinterpret_cast<const char*>(pair), sizeof(pair));

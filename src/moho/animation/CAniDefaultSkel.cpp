@@ -49,7 +49,7 @@ namespace moho
 
 namespace moho
 {
-  void CAniDefaultSkel::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CAniDefaultSkel::MemberConstruct(gpg::ReadArchive& /*archive*/, const int, const gpg::RRef&, gpg::SerConstructResult& result)
   {
     result.SetShared(CAniSkel::GetDefaultSkeleton(), 1u);
   }

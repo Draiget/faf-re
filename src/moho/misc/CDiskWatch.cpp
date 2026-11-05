@@ -32,8 +32,6 @@ namespace
 {
   std::mutex gDiskWatchInitMutex;
   CDiskWatch* gDiskWatch = nullptr;
-  constexpr std::uint8_t kWatchMapColorRed = 0u;
-  constexpr std::uint8_t kWatchMapColorBlack = 1u;
   constexpr std::size_t kDefaultReadBufferSize = 0x1000u;
 #if defined(_WIN32)
   constexpr DWORD kDirectoryNotifyFilter =
@@ -121,7 +119,7 @@ namespace
     return reinterpret_cast<OVERLAPPED*>(&watch.mReadOverlapped);
   }
 
-  [[nodiscard]]
+  [[maybe_unused]] [[nodiscard]]
   const OVERLAPPED* AsOverlapped(const CDiskDirWatch& watch)
   {
     return reinterpret_cast<const OVERLAPPED*>(&watch.mReadOverlapped);
@@ -222,17 +220,6 @@ namespace
 #endif
   }
 
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
-  [[nodiscard]]
   /**
    * Address: 0x00463220 (FUN_00463220, disk-watch singleton init helper)
    *

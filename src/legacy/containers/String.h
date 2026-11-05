@@ -18,18 +18,15 @@ namespace msvc8
      * IDA signature:
      * void __cdecl __noreturn std::_String_base::_Xlen(void);
      *
-     * What it does:
-     * Dinkumware's shared (non-templated) "requested string length is not
-     * representable" helper - throws std::length_error("string too long")
-     * and never returns. In the binary it is called from every
+     * What it does: Dinkumware's shared (non-templated) "requested string
+     * length is not representable" helper - throws std::length_error("string
+     * too long") and never returns. In the binary it is called from every
      * basic_string<char>/basic_string<wchar_t> growth path: std::string::assign
      * (0x004056FE), std::string::append (0x00405829, 0x00405840), insert,
      * replace, and the wstring equivalents (18 call sites total, decoded from
-     * the raw E8 bytes; see FUN_00ABF013.xrefs.txt). Those STL-internal bodies
-     * are tracked `skip` in recovered_progress.json (generic Dinkumware
-     * library code, not FA engine logic); `msvc8::string::assign_owned_strong`
-     * is this project's higher-level stand-in for their length guard, so that
-     * is where this is wired.
+     * the raw E8 bytes; see FUN_00ABF013.xrefs.txt).
+     * `msvc8::string::assign_owned_strong` is this project's higher-level
+     * stand-in for their length guard, so that is where this is wired.
      */
     [[noreturn]] void ThrowStringTooLong();
 
@@ -731,7 +728,7 @@ namespace msvc8
         /** string + C-string */
         [[nodiscard]] string operator+(const char* rhs) const noexcept;
 
-        /** operator+= appends in place, as MSVC8's does. */
+        /** operator+= appends in place, as the binary's `append` (0x004058F0) does: it grows through `_Copy` (0x00405C20) only when capacity runs out. */
         string& operator+=(const string& rhs) noexcept {
             const std::string_view view = rhs.view();
             (void)append(view.data(), view.size());

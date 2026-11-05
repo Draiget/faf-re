@@ -376,7 +376,6 @@ namespace
   constexpr const char* kIssueDockCommandName = "IssueDockCommand";
   constexpr const char* kIssueUnitCommandHelpText = "IssueUnitCommand(unitList,command,[string],[clear])";
   constexpr const char* kIssueUnitCommandName = "IssueUnitCommand";
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kOpenURLHelpText =
     "OpenURL(string) - open the default browser window to the specified URL";
   constexpr const char* kOpenURLName = "OpenURL";
@@ -687,19 +686,6 @@ namespace
       excludeEngineerCommand
     );
   }
-  /**
-   * Sixteen of this file's binders go into the user set, not the sim one -
-   * the command-queue accessors the UI reads while a game is running.
-   */
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("User");
-    return fallbackSet;
-  }
 } // namespace
 
 
@@ -800,7 +786,7 @@ namespace moho
   CScrLuaInitForm* func_DecreaseBuildCountInQueue_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kDecreaseBuildCountInQueueName,
       &moho::cfunc_DecreaseBuildCountInQueue,
       nullptr,
@@ -820,7 +806,7 @@ namespace moho
   CScrLuaInitForm* func_IncreaseBuildCountInQueue_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kIncreaseBuildCountInQueueName,
       &moho::cfunc_IncreaseBuildCountInQueue,
       nullptr,
@@ -839,7 +825,7 @@ namespace moho
   CScrLuaInitForm* func_GetUnitCommandData_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kGetUnitCommandDataName,
       &moho::cfunc_GetUnitCommandData,
       nullptr,
@@ -858,7 +844,7 @@ namespace moho
   CScrLuaInitForm* func_IssueDockCommand_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kIssueDockCommandName,
       &moho::cfunc_IssueDockCommand,
       nullptr,
@@ -877,7 +863,7 @@ namespace moho
   CScrLuaInitForm* func_IssueCommand_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kIssueCommandName,
       &moho::cfunc_IssueCommand,
       nullptr,
@@ -896,7 +882,7 @@ namespace moho
   CScrLuaInitForm* func_IssueUnitCommand_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kIssueUnitCommandName,
       &moho::cfunc_IssueUnitCommand,
       nullptr,
@@ -916,7 +902,7 @@ namespace moho
   CScrLuaInitForm* func_IssueBlueprintCommand_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kIssueBlueprintCommandName,
       &moho::cfunc_IssueBlueprintCommand,
       nullptr,
@@ -935,7 +921,7 @@ namespace moho
   CScrLuaInitForm* func_GetRolloverInfo_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kGetRolloverInfoName,
       &moho::cfunc_GetRolloverInfo,
       nullptr,
@@ -955,7 +941,7 @@ namespace moho
   CScrLuaInitForm* func_UISelectionByCategory_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kUISelectionByCategoryName,
       &moho::cfunc_UISelectionByCategory,
       nullptr,
@@ -974,7 +960,7 @@ namespace moho
   CScrLuaInitForm* func_UISelectAndZoomTo_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kUISelectAndZoomToName,
       &moho::cfunc_UISelectAndZoomTo,
       nullptr,
@@ -993,7 +979,7 @@ namespace moho
   CScrLuaInitForm* func_UIZoomTo_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kUIZoomToName,
       &moho::cfunc_UIZoomTo,
       nullptr,
@@ -1012,7 +998,7 @@ namespace moho
   CScrLuaInitForm* func_SetOverlayFilter_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kSetOverlayFilterName,
       &moho::cfunc_SetOverlayFilter,
       nullptr,
@@ -1031,7 +1017,7 @@ namespace moho
   CScrLuaInitForm* func_GetActiveBuildTemplate_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kGetActiveBuildTemplateName,
       &moho::cfunc_GetActiveBuildTemplate,
       nullptr,
@@ -1050,7 +1036,7 @@ namespace moho
   CScrLuaInitForm* func_SetActiveBuildTemplate_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kSetActiveBuildTemplateName,
       &moho::cfunc_SetActiveBuildTemplate,
       nullptr,
@@ -1069,7 +1055,7 @@ namespace moho
   CScrLuaInitForm* func_OpenURL_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kOpenURLName,
       &moho::cfunc_OpenURL,
       nullptr,
@@ -1088,7 +1074,7 @@ namespace moho
   CScrLuaInitForm* func_SetCursor_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       kSetCursorName,
       &moho::cfunc_SetCursor,
       nullptr,
@@ -1214,7 +1200,7 @@ namespace moho
       return 0;
     }
     EUnitCommandType commandType = EUnitCommandType::UNITCOMMAND_None;
-    TryParseUnitCommandTypeLexical(commandLexical, commandType);
+    (void)TryParseUnitCommandTypeLexical(commandLexical, commandType);
 
     // Arg 2: blueprint id -> normalized filename -> resolved blueprint pointer.
     const LuaPlus::LuaStackObject blueprintArg(state, 2);
@@ -1423,10 +1409,7 @@ namespace moho
    */
   int cfunc_GetUnitCommandDataL(LuaPlus::LuaState* const state)
   {
-    const int argc = lua_gettop(state->m_state);
-    if (argc != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetUnitCommandDataHelpText, 1, argc);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kGetUnitCommandDataHelpText);
 
     CWldSession* const session = WLD_GetActiveSession();
     if (session == nullptr) {
@@ -1592,10 +1575,7 @@ namespace moho
    */
   int cfunc_IssueDockCommandL(LuaPlus::LuaState* const state)
   {
-    const int argc = lua_gettop(state->m_state);
-    if (argc != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueDockCommandHelpText, 1, argc);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kIssueDockCommandHelpText);
 
     CWldSession* const session = WLD_GetActiveSession();
     if (session == nullptr) {
@@ -1905,17 +1885,13 @@ namespace moho
    */
   int cfunc_GetRolloverInfoL(LuaPlus::LuaState* const state)
   {
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 0) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetRolloverInfoHelpText, 0, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 0, kGetRolloverInfoHelpText);
 
     CWldSession* const session = WLD_GetActiveSession();
 
     // Snapshot the hovered-unit weak slot and pin it with a transient guard node
     // linked into the entity's weak-owner chain (mirrors FUN_00842920 var_48 dance).
-    moho::WeakObject* hoverOwner = nullptr;
+    [[maybe_unused]] moho::WeakObject* hoverOwner = nullptr;
     UserEntity* hoveredEntity = nullptr;
     bool inWorld = false;
     if (session != nullptr) {
@@ -2002,10 +1978,7 @@ namespace moho
   int cfunc_UISelectionByCategoryL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 5) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kUISelectionByCategoryHelpText, 5, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 5, kUISelectionByCategoryHelpText);
 
     CWldSession* const session = WLD_GetActiveSession();
     if (session == nullptr) {
@@ -2268,10 +2241,7 @@ namespace moho
       return 0;
     }
 
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 9) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetOverlayFilterHelpText, 9, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 9, kSetOverlayFilterHelpText);
 
     if (moho::WLD_GetActiveSession() == nullptr || moho::ren_Viewport == nullptr) {
       return 0;
@@ -2412,10 +2382,7 @@ namespace moho
    */
   int cfunc_SetActiveBuildTemplateL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSetActiveBuildTemplateHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kSetActiveBuildTemplateHelpText);
 
     CWldSession* const session = moho::WLD_GetActiveSession();
     if (session == nullptr) {
@@ -2482,10 +2449,7 @@ namespace moho
   int cfunc_OpenURLL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kOpenURLHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kOpenURLHelpText);
 
     const LuaPlus::LuaStackObject urlArgument(state, 1);
     const char* const urlText = lua_tostring(rawState, 1);
@@ -2533,10 +2497,7 @@ namespace moho
       return 0;
     }
 
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetCursorHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kSetCursorHelpText);
 
     CMauiCursor* cursor = nullptr;
     if (lua_type(state->m_state, 1) != LUA_TNIL) {

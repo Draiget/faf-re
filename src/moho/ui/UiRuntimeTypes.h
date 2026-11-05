@@ -218,7 +218,7 @@ namespace moho
      * What it does:
      * Returns the cached RTTI descriptor for this provider class.
      */
-    [[nodiscard]] gpg::RType* GetClass() const;
+    [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x0086A3C0 (FUN_0086A3C0, Moho::CLuaWldUIProvider::GetDerivedObjectRef)
@@ -226,7 +226,7 @@ namespace moho
      * What it does:
      * Builds one reflected reference for this provider instance.
      */
-    gpg::RRef GetDerivedObjectRef();
+    gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x0086A650 (FUN_0086A650, Moho::CLuaWldUIProvider::StartLoadingDialog)
@@ -904,6 +904,9 @@ namespace moho
     /// whenever that flips, copies it into every `mPreviewPositions` mesh's
     /// hidden flag, so the ghosts give way while the full graph is drawn.
     bool mQueuedGhostsHidden = false;                       // +0x5D
+    /// Engine addition, in the tail padding (`ren_BuildGhostsPerBeat`): the beat and order count the
+    /// queued ghosts were last rebuilt for.
+    std::uint16_t mQueuedGhostStamp = 0xFFFFU;              // +0x5E
   };
   static_assert(offsetof(CBuildDragPreview, mSession) == 0x00, "CBuildDragPreview::mSession offset must be 0x00");
   static_assert(
@@ -3419,7 +3422,7 @@ namespace moho
      * by RTTI on first use (overrides the base CMauiControl accessor with the
      * mesh-specific type cache).
      */
-    [[nodiscard]] gpg::RType* GetClass() const;
+    [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x0079DC30 (FUN_0079DC30, Moho::CMauiMesh::GetDerivedObjectRef)
@@ -3427,7 +3430,7 @@ namespace moho
      * What it does:
      * Packs {this, GetClass()} into a reflection reference handle.
      */
-    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef() override;
 
     /** Per-type cached reflection descriptor (lazy-initialized by GetClass). */
     static gpg::RType* sType;
@@ -3936,7 +3939,7 @@ namespace moho
      * What it does:
      * Returns cached reflection descriptor for this `CMauiBorder` instance.
      */
-    [[nodiscard]] gpg::RType* GetClass() const;
+    [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x00784880 (FUN_00784880, Moho::CMauiBorder::GetDerivedObjectRef)
@@ -3944,7 +3947,7 @@ namespace moho
      * What it does:
      * Packs `{this, GetClass()}` as a reflection reference handle.
      */
-    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x00784D60 (FUN_00784D60, Moho::CMauiBorder::SetTextures)
@@ -4219,14 +4222,14 @@ namespace moho
      *
      * VFTable SLOT: 0
      */
-    [[nodiscard]] gpg::RType* GetClass() const;
+    [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x0086DB90 (FUN_0086DB90, Moho::CUIWorldView::GetDerivedObjectRef)
      *
      * VFTable SLOT: 1
      */
-    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x0086EF40 (FUN_0086EF40, Moho::CUIWorldView::DoRender)

@@ -28,8 +28,8 @@
 
 namespace
 {
-  constexpr float kPi = 3.1415927f;
-  constexpr float kHalfPi = 1.5707964f;
+  [[maybe_unused]] constexpr float kPi = 3.1415927f;
+  [[maybe_unused]] constexpr float kHalfPi = 1.5707964f;
   constexpr float kQuarterPi = 0.78539819f;
   constexpr float kFourOverPi = 1.2732395f;
   constexpr float kQuatUpdateThreshold = 0.0001f;
@@ -126,7 +126,7 @@ namespace
   /**
    * Address: 0x00695F00 (FUN_00695F00, gpg::RRef_MotorFallDown)
    */
-  [[nodiscard]] gpg::RRef MakeMotorFallDownRef(moho::MotorFallDown* const object)
+  [[maybe_unused]] [[nodiscard]] gpg::RRef MakeMotorFallDownRef(moho::MotorFallDown* const object)
   {
     gpg::RRef ref{};
     ref.mObj = object;
@@ -231,10 +231,7 @@ namespace moho
    */
   gpg::RRef MotorFallDown::GetDerivedObjectRef()
   {
-    gpg::RRef ref{};
-    ref.mObj = this;
-    ref.mType = GetClass();
-    return ref;
+    return gpg::MakeSelfRef(this);
   }
 
   /**
@@ -338,12 +335,7 @@ namespace moho
    */
   void DestroyMotorFallDownTypeInfoBody(MotorFallDownTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**
@@ -505,12 +497,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 6) {
-      LuaPlus::LuaState::Error(
-        state, "%s\n  expected %d args, but got %d", kMotorFallDownWhackHelpText, 6, argumentCount
-      );
-    }
+    moho::SCR_ExpectExactArgs(state, 6, kMotorFallDownWhackHelpText);
 
     const LuaPlus::LuaObject selfObject(LuaPlus::LuaStackObject(state, 1));
     MotorFallDown* const motor = SCR_FromLua_MotorFallDown(selfObject, state);

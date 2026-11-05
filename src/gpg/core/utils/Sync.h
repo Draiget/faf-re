@@ -286,54 +286,17 @@ namespace gpg::core
     };
 #pragma pack(pop)
 
-    /**
-     * Simple RAII guard.
-     */
-    struct MutexGuard {
-        explicit MutexGuard(Mutex& m) noexcept : m_(m) { m_.lock(); }
-        ~MutexGuard() { m_.unlock(); }
-        MutexGuard(const MutexGuard&) = delete;
-        MutexGuard& operator=(const MutexGuard&) = delete;
-    private:
-        Mutex& m_;
-    };
-
     static_assert(sizeof(Mutex) == 8, "Mutex must be 8 bytes on x86");
 #if defined(_WIN64)
     static_assert(sizeof(void*) == 8, "Audit layout for x64 sites.");
 #endif
 
     /**
-     * Lightweight fast mutex (no std::mutex).
-     */
-    struct FastMutex {
-#if defined(_WIN32)
-        CRITICAL_SECTION cs{};
-        FastMutex() { InitializeCriticalSection(&cs); }
-        ~FastMutex() { DeleteCriticalSection(&cs); }
-        void lock() { EnterCriticalSection(&cs); }
-        void unlock() { LeaveCriticalSection(&cs); }
-#else
-        pthread_mutex_t m{};
-        FastMutex() {
-            pthread_mutexattr_t a{};
-            pthread_mutexattr_init(&a);
-            pthread_mutexattr_settype(&a, PTHREAD_MUTEX_NORMAL);
-            pthread_mutex_init(&m, &a);
-            pthread_mutexattr_destroy(&a);
-        }
-        ~FastMutex() { pthread_mutex_destroy(&m); }
-        void lock() { pthread_mutex_lock(&m); }
-        void unlock() { pthread_mutex_unlock(&m); }
-#endif
-    };
-
-    /**
      * Portable read-write lock without std::shared_mutex.
      */
     struct SharedLock {
 #if defined(_WIN32)
-        SRWLOCK lock_{ SRWLOCK_INIT };
+        SRWLOCK lock_ = SRWLOCK_INIT;
 
         void lock_shared()   noexcept { AcquireSRWLockShared(&lock_); }
         void unlock_shared() noexcept { ReleaseSRWLockShared(&lock_); }
@@ -368,21 +331,4 @@ namespace gpg::core
     inline void func_LockExclusive(SharedLock* l) { l->lock(); }
     inline void func_UnlockExclusive(SharedLock* l) { l->unlock(); }
 
-    /**
-     * Read-guard RAII.
-     */
-    struct SharedReadGuard {
-        SharedLock& L;
-        explicit SharedReadGuard(SharedLock& l) : L(l) { L.lock_shared(); }
-        ~SharedReadGuard() { L.unlock_shared(); }
-    };
-
-    /**
-     * Write-guard RAII.
-     */
-    struct SharedWriteGuard {
-        SharedLock& L;
-        explicit SharedWriteGuard(SharedLock& l) : L(l) { L.lock(); }
-        ~SharedWriteGuard() { L.unlock(); }
-    };
 }
