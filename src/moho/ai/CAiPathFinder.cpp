@@ -475,8 +475,8 @@ void moho::RBroadcasterRType_NavPath::Init()
   static_assert(sizeof(moho::Broadcaster<const moho::SNavPath&>) == 8, "moho::Broadcaster<const moho::SNavPath&> is 8 bytes on x86");
   size_ = sizeof(moho::Broadcaster<const moho::SNavPath&>);
   version_ = 1;
-  serLoadFunc_ = reinterpret_cast<load_func_t>(&gpg::ReadAndLinkNavPathListeners);
-  serSaveFunc_ = reinterpret_cast<save_func_t>(&WriteNavPathListeners);
+  serLoadFunc_ = reinterpret_cast<load_func_t>(reinterpret_cast<void (*)()>(&gpg::ReadAndLinkNavPathListeners));
+  serSaveFunc_ = reinterpret_cast<save_func_t>(reinterpret_cast<void (*)()>(&WriteNavPathListeners));
 }
 
 /**

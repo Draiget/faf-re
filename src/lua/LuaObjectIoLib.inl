@@ -429,7 +429,7 @@
 		newRefFunc_ = &NewWrapFileStorageRef;
 		ctorRefFunc_ = &ConstructWrapFileStorageRef;
 		deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
-		dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
+		dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(reinterpret_cast<void (*)()>(&FinalizeWrapFileStorage));
 		Finish();
 	}
 
@@ -550,7 +550,7 @@
 	[[maybe_unused]] gpg::RType* ConfigureWrapFileCleanupCallbacks(gpg::RType* const type)
 	{
 		type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
-		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
+		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(reinterpret_cast<void (*)()>(&FinalizeWrapFileStorage));
 		return type;
 	}
 
@@ -580,7 +580,7 @@
 		type->newRefFunc_ = &NewWrapFileStorageRef;
 		type->ctorRefFunc_ = &ConstructWrapFileStorageRef;
 		type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
-		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
+		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(reinterpret_cast<void (*)()>(&FinalizeWrapFileStorage));
 		return type;
 	}
 
@@ -596,7 +596,7 @@
 		type->newRefFunc_ = &NewWrapFileStorageRef;
 		type->ctorRefFunc_ = &ConstructWrapFileStorageRef;
 		type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
-		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
+		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(reinterpret_cast<void (*)()>(&FinalizeWrapFileStorage));
 	}
 
 	/**

@@ -692,9 +692,9 @@ namespace
     {
       size_ = sizeof(moho::Stats<moho::CArmyStatItem>);
       version_ = 1;
-      serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(&DeserializeStatsCArmyStatItemOwnedRootLane);
+      serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(reinterpret_cast<void (*)()>(&DeserializeStatsCArmyStatItemOwnedRootLane));
       serSaveFunc_ = &SerializeStatsCArmyStatItemOwnedRoot;
-      serConstructFunc_ = reinterpret_cast<gpg::RType::construct_func_t>(&ConstructStatsCArmyStatItemForSerializer);
+      serConstructFunc_ = reinterpret_cast<gpg::RType::construct_func_t>(reinterpret_cast<void (*)()>(&ConstructStatsCArmyStatItemForSerializer));
       deleteFunc_ = &DeleteStatsCArmyStatItemOwnedObject;
     }
   };
