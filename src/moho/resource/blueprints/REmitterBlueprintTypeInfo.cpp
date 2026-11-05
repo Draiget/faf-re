@@ -115,14 +115,7 @@ namespace moho
  */
 void REmitterBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeInfo)
 {
-  gpg::RType* const effectType = gpg::RTypeOf<moho::REffectBlueprint>();
-  gpg::RField baseField{};
-  baseField.mName = effectType->GetName();
-  baseField.mType = effectType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBase<moho::REffectBlueprint>(typeInfo);
 }
 
 /**

@@ -404,12 +404,7 @@ namespace moho
    */
   LuaPlus::LuaObject* func_CreateLuaCameraImpl(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
   {
-    if (object == nullptr) {
-      return nullptr;
-    }
-
-    *object = CScrLuaMetatableFactory<CameraImpl>::Instance().Get(state);
-    return object;
+    return SCR_WriteMetatable<CameraImpl>(object, state);
   }
 } // namespace moho
 
@@ -931,10 +926,7 @@ void moho::CameraImpl::CameraFollow(const SCamFollowParams& followParams)
  */
 gpg::RRef moho::CameraImpl::GetDerivedObjectRef()
 {
-  gpg::RRef objectRef{};
-  objectRef.mObj = this;
-  objectRef.mType = GetClass();
-  return objectRef;
+  return gpg::MakeSelfRef(this);
 }
 
 /**

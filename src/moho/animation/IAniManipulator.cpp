@@ -233,14 +233,7 @@ namespace
    */
   void AddIAniManipulatorBase(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = moho::IAniManipulator::StaticGetClass();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, moho::IAniManipulator::StaticGetClass());
   }
 
   [[nodiscard]] gpg::RRef CreateFootPlantManipulatorRefCallback();

@@ -806,12 +806,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitScriptTask(gpg::RRef* const outRef, moho::CUnitScriptTask* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, CachedCUnitScriptTaskType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value, &CachedCUnitScriptTaskType);
   }
 } // namespace gpg
 

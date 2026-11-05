@@ -167,6 +167,62 @@ namespace
   constexpr std::uint8_t kInvalidSourceIndex = 255u;
 } // namespace
 
+void moho::VCR_WriteReplayHeader(gpg::Stream& stream, const SWldSessionInfo& sessionInfo)
+{
+  constexpr char kReplayFormatBanner[] = "Replay v1.9\r\n";
+  constexpr std::size_t kReplayFormatBannerBytes = sizeof(kReplayFormatBanner) - 1u;
+  constexpr double kReplayEngineVersion = 1.5;
+  constexpr std::uint8_t kReplayUnitSourceListEnd = 0xFFu;
+
+  const LaunchInfoNew* const launchInfo = sessionInfo.mLaunchInfo->GetNew();
+// FAF addition: the build is the game version this session runs as (`FAF_BeginSession` ran
+  // before the sink was opened), so a replay always names the patches it was recorded with.
+  stream.Write(gpg::STR_Printf("Supreme Commander v%1.2f.%4i", kReplayEngineVersion, FAF_GetSessionGameVersion()));
+  stream.Write("\r\n");
+  stream.Write(kReplayFormatBanner, kReplayFormatBannerBytes);
+  stream.Write(sessionInfo.mMapName);
+  stream.Write("\r\n");
+
+  const std::int32_t gameModsBytes = static_cast<std::int32_t>(launchInfo->mGameMods.size());
+  stream.Write(gameModsBytes);
+  stream.Write(launchInfo->mGameMods.c_str(), static_cast<std::size_t>(gameModsBytes));
+
+  const std::int32_t scenarioInfoBytes = static_cast<std::int32_t>(launchInfo->mScenarioInfo.size());
+  stream.Write(scenarioInfoBytes);
+  stream.Write(launchInfo->mScenarioInfo.c_str(), static_cast<std::size_t>(scenarioInfoBytes));
+
+  const msvc8::vector<SSTICommandSource>& commandSources = launchInfo->mCommandSources.mSrcs;
+  const auto commandSourceCount = static_cast<std::uint8_t>(commandSources.size());
+  stream.Write(commandSourceCount);
+  for (const SSTICommandSource& commandSource : commandSources) {
+    // Names go out with their terminator - the reader scans for it.
+    stream.Write(commandSource.mName.c_str(), commandSource.mName.size() + 1u);
+    stream.Write(commandSource.mTimeouts);
+  }
+
+  stream.Write(static_cast<std::uint8_t>(launchInfo->mCheatsEnabled ? 1 : 0));
+
+  const msvc8::vector<msvc8::string>& armyNames = launchInfo->mStrVec;
+  const auto armyCount = static_cast<std::uint8_t>(armyNames.size());
+  stream.Write(armyCount);
+  for (std::size_t armyIndex = 0; armyIndex < armyNames.size(); ++armyIndex) {
+    const msvc8::string& armyName = armyNames[armyIndex];
+    const std::int32_t armyNameBytes = static_cast<std::int32_t>(armyName.size());
+    stream.Write(armyNameBytes);
+    stream.Write(armyName.c_str(), static_cast<std::size_t>(armyNameBytes));
+
+    const BVIntSet& unitSources = launchInfo->mArmyLaunchInfo[armyIndex].mUnitSources;
+    const unsigned int endOfSet = unitSources.Max();
+    for (unsigned int source = unitSources.GetNext(~0u); source != endOfSet;
+         source = unitSources.GetNext(source)) {
+      stream.Write(static_cast<std::uint8_t>(source));
+    }
+    stream.Write(kReplayUnitSourceListEnd);
+  }
+
+  stream.Write(launchInfo->mInitSeed);
+}
+
 std::unique_ptr<gpg::Stream> moho::VCR_OpenGPGNetURI(const gpg::StrArg uri, const EGpgNetOpenMode mode)
 {
   return OpenGPGNetURI(uri, mode);

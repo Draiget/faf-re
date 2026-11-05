@@ -17,8 +17,10 @@ set(FAF_HEADLESS_SOURCES
   headless/ReplayLaunchCheck.cpp
   headless/ReplayLuaState.cpp
   headless/ReplayOracleCheck.cpp
+  headless/ReplaySeats.cpp
   headless/ReplayViewPacketCheck.cpp
   headless/ReplaySyncSpy.cpp
+  headless/SessionLoad.cpp
   headless/ReplayViewBench.cpp
   headless/ReplayViewFrameStats.cpp
   headless/HeadlessEntry.cpp
@@ -33,6 +35,7 @@ set(FAF_HEADLESS_SERVER_SOURCES
   headless/ReplayCommandCheck.cpp
   headless/ReplayInboundCheck.cpp
   headless/ReplayOracleCheck.cpp
+  headless/ReplaySeats.cpp
   headless/ReplayViewPacketCheck.cpp
   headless/ReplaySyncSpy.cpp
   headless/ReplayViewBench.cpp

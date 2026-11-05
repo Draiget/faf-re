@@ -286,10 +286,7 @@ gpg::RType* Unit::GetClass() const
  */
 gpg::RRef Unit::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 namespace moho
 {

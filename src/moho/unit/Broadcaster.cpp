@@ -207,12 +207,7 @@ namespace
     RBroadcasterRType_ECommandEvent* const typeInfo
   ) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   RBroadcasterRType_ECommandEvent::~RBroadcasterRType_ECommandEvent()

@@ -476,6 +476,21 @@ namespace moho
     runtime->mP1y = 1.0f;
   }
 
+  CD3DPrimBatcher::TextureBinding CD3DPrimBatcher::GetTextureBinding() const
+  {
+    return {mDynamicTexSheet, mTexture, mP1x, mP1y, mP2x, mP2y};
+  }
+
+  void CD3DPrimBatcher::SetTextureBinding(const TextureBinding& binding)
+  {
+    mDynamicTexSheet = binding.mSheet;
+    mTexture = binding.mTexture;
+    mP1x = binding.mP1x;
+    mP1y = binding.mP1y;
+    mP2x = binding.mP2x;
+    mP2y = binding.mP2y;
+  }
+
   /**
    * Address: 0x004389A0 (?DrawQuad@CD3DPrimBatcher@Moho@@QAEXABUVertex@12@000@Z)
    *

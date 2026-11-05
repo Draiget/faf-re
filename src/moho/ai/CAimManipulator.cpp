@@ -1929,12 +1929,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CAimManipulator(gpg::RRef* const outRef, moho::CAimManipulator* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, CachedCAimManipulatorType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value, &CachedCAimManipulatorType);
   }
 
   /**

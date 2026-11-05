@@ -2652,14 +2652,7 @@ void CScriptEventTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
  */
 void CScriptEventTypeInfo::AddBase_CTaskEvent(gpg::RType* const typeInfo)
 {
-  gpg::RType* const taskEventType = gpg::RTypeOf<CTaskEvent>();
-  gpg::RField baseField{};
-  baseField.mName = taskEventType->GetName();
-  baseField.mType = taskEventType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBase<CTaskEvent>(typeInfo);
 }
 
 /**

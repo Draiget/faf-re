@@ -1479,10 +1479,7 @@ gpg::RType* CAiAttackerImpl::GetClass() const
  */
 gpg::RRef CAiAttackerImpl::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**

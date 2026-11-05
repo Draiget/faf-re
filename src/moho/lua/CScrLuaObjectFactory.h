@@ -368,6 +368,21 @@ namespace moho
     CScrLuaMetatableFactory() = default;
   };
 
+  /**
+   * Engine addition: a `func_Create*Object` function: the factory's metatable into `object`, unless null.
+   * Instantiated in the file that calls it, where `T`'s factory specialization is visible.
+   */
+  template <class T>
+  LuaPlus::LuaObject* SCR_WriteMetatable(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  {
+    if (object == nullptr) {
+      return nullptr;
+    }
+
+    *object = CScrLuaMetatableFactory<T>::Instance().Get(state);
+    return object;
+  }
+
   template <>
   class CScrLuaMetatableFactory<CScriptObject*> final : public CScrLuaObjectFactory
   {

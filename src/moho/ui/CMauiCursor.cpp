@@ -206,10 +206,7 @@ gpg::RType* moho::CMauiCursor::GetClass() const
  */
 gpg::RRef moho::CMauiCursor::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**

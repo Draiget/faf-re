@@ -1,4 +1,5 @@
 #include "moho/render/CDecalBuffer.h"
+#include "moho/sim/SimBlockLane.h"
 
 #include <algorithm>
 #include <cmath>
@@ -8,6 +9,7 @@
 #include <new>
 #include <stdexcept>
 #include <typeinfo>
+#include <vector>
 #include <utility>
 
 #include "gpg/core/containers/ReadArchive.h"
@@ -32,7 +34,18 @@ namespace
    */
   void AppendVisibleDecal(msvc8::vector<SDecalInfo>& visibleDecals, const SDecalInfo& decalInfo)
   {
+#if defined(_M_X64) || defined(__x86_64__)
+    // 6 entries of 0x90 bytes land in the binary's 896-byte class (0x0077ACC0).
+    const void* const oldStorage = visibleDecals.begin();
     visibleDecals.push_back(decalInfo);
+    const void* const newStorage = visibleDecals.begin();
+    if (newStorage != oldStorage) {
+      SimBlockLane::NoteStorageAllocated(newStorage, visibleDecals.capacity() * 0x90u);
+      SimBlockLane::NoteStorageFreed(oldStorage);
+    }
+#else
+    visibleDecals.push_back(decalInfo);
+#endif
   }
 
   [[nodiscard]]
@@ -392,7 +405,18 @@ void CDecalBuffer::CleanupTick()
     CDecalBucketSet expired;
     expired.swap(first->second);
     mStartTickBuckets.erase(first);
-    for (CDecalHandle* const handle : expired) {
+#if defined(_M_X64) || defined(__x86_64__)
+    // The set is sorted by pointer, and each release can grow the id set's words, whose storage takes blocks
+    // (`SimBlockLane`). Retail's heap gives this order nearly always: 26992801, ticks 4155 to 4157, has 2 of 204 ids
+    // out of it, and it takes the same blocks retail does at all three.
+    std::vector<CDecalHandle*> ordered(expired.begin(), expired.end());
+    std::sort(ordered.begin(), ordered.end(), [](const CDecalHandle* const lhs, const CDecalHandle* const rhs) {
+      return lhs->mInfo.mObj > rhs->mInfo.mObj;
+    });
+#else
+    const CDecalBucketSet& ordered = expired;
+#endif
+    for (CDecalHandle* const handle : ordered) {
       handle->mInfo.mStartTick = 0u;
       DestroyHandle(handle);
     }

@@ -231,10 +231,7 @@ namespace moho
    */
   gpg::RRef MotorFallDown::GetDerivedObjectRef()
   {
-    gpg::RRef ref{};
-    ref.mObj = this;
-    ref.mType = GetClass();
-    return ref;
+    return gpg::MakeSelfRef(this);
   }
 
   /**
@@ -338,12 +335,7 @@ namespace moho
    */
   void DestroyMotorFallDownTypeInfoBody(MotorFallDownTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**

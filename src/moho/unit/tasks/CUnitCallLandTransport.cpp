@@ -330,12 +330,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitCallLandTransport(gpg::RRef* const outRef, moho::CUnitCallLandTransport* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitCallLandTransport>());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

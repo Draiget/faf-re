@@ -152,10 +152,7 @@ namespace moho
    */
   gpg::RRef RProjectileBlueprint::GetDerivedObjectRef()
   {
-    gpg::RRef out{};
-    out.mObj = this;
-    out.mType = GetClass();
-    return out;
+    return gpg::MakeSelfRef(this);
   }
 
   /**

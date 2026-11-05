@@ -29,8 +29,8 @@ namespace moho
    */
   void POSE_SetKeepClientHandles(bool keep) noexcept;
   /**
-   * Whether `actor`'s poses are held for a client. Those of 11 bones always are: when they are
-   * freed decides which block the next formation gets (`SimBlockLane`), which the sim can observe.
+   * Whether `actor`'s poses are held for a client. Those of 11 bones always are, as each update
+   * has to take a new block from `SimBlockLane`, which decides the block the next formation gets.
    */
   [[nodiscard]] bool POSE_HoldClientHandles(const CAniActor& actor) noexcept;
   /** The mesh handles of the recon records, which no sim code reads. */

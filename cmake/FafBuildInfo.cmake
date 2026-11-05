@@ -55,10 +55,10 @@ if(CMAKE_SCRIPT_MODE_FILE)
       endif()
 
       # A clean build of a commit tagged as a release or nightly (2026.11.001, 2026.11.002-nightly)
-      # goes by that tag, a release before a nightly. Old tags such as v1.1.2 and
-      # 2026.05.11.001-nightly don't count: tools/release/README.md.
+      # goes by that tag, a release before a nightly, the highest number among releases. Old
+      # tags such as v1.1.2 and 2026.05.11.001-nightly don't count: tools/release/README.md.
       if(NOT _dirty)
-        execute_process(COMMAND "${_git}" -C "${FAF_SOURCE_DIR}" tag --points-at HEAD
+        execute_process(COMMAND "${_git}" -C "${FAF_SOURCE_DIR}" tag --points-at HEAD --sort=version:refname
           OUTPUT_VARIABLE _out RESULT_VARIABLE _rc OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
         if(_rc EQUAL 0 AND _out)
           string(REPLACE "\n" ";" _tags "${_out}")

@@ -228,6 +228,21 @@ set(_faf_download_zstd
     "eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3"
     "zstd-1.5.7")
 
+# FreeType 2.15.0 (FTL): reads font outlines for MSDF text (moho/render/font, issue #306). The
+# release archive, checksum from the release announcement; cmake/deps/freetype builds it as a
+# static library with only what that needs.
+set(_faf_download_freetype
+    "https://download.savannah.gnu.org/releases/freetype/freetype-2.15.0.tar.gz"
+    "9186627467a616d9a9e3e574748ac0c45fa77398e6364edef3041a8ba8d92f64"
+    "freetype-2.15.0")
+# msdfgen 1.13 (MIT): generates MSDF glyphs from those outlines (issue #306). The tag's source
+# archive; cmake/deps/msdfgen builds the static library.
+set(_faf_download_msdfgen
+    "https://github.com/Chlumsky/msdfgen/archive/refs/tags/v1.13.tar.gz"
+    "93cd1ad8918c1a78c5c96e82d4f4c77f0eb86c2e7e8579a0967e54196c4b7167"
+    "msdfgen-1.13"
+    "msdfgen-1.13.tar.gz")
+
 function(_faf_download_tree name)
   list(GET _faf_download_${name} 0 _url)
   list(GET _faf_download_${name} 1 _sha256)
@@ -395,6 +410,12 @@ faf_dependency_download(usrsctp)
 faf_dependency_download(plog)
 faf_dependency_download(mbedtls)
 faf_dependency_download(monocypher)
+if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})
+  faf_dependency_download(freetype)
+endif()
+if(NOT FAF_MSDFGEN_DIR AND NOT DEFINED ENV{FAF_MSDFGEN_DIR})
+  faf_dependency_download(msdfgen)
+endif()
 if(NOT FAF_ZSTD_DIR)
   faf_dependency_download(zstd)
 endif()

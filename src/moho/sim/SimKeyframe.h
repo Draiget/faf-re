@@ -57,6 +57,11 @@ namespace moho
     // `Unit::GetFormationVector` reads through it. Empty on x86, which has no such list.
     std::vector<std::uint64_t> laneBlocks;
     std::vector<std::uint8_t> laneBytes;
+    // The blocks live storage holds there: the block's address, the storage's size in the binary's class, and what the
+    // block held. They go back to the list when the storage goes.
+    std::vector<std::uint64_t> heldBlocks;
+    std::vector<std::uint64_t> heldSizes;
+    std::vector<std::uint8_t> heldBytes;
   };
 
   /**

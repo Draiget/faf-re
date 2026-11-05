@@ -4,7 +4,7 @@ The [Nightly release workflow](../../.github/workflows/nightly-release.yml) publ
 
 | Job | What it does |
 |---|---|
-| `plan` | The tag: the UTC year and month, the month's next number and `-nightly`, for example `2026.11.001-nightly`, a real release being the same without `-nightly`. Releases and nightlies share the numbers, which go back to 001 each month. The newest release or nightly the commit descends from, for the change list. It builds nothing when that tag's release already exists, as master did not move |
+| `plan` | The tag: the UTC year and month, the month's next number and `-nightly`, for example `2026.11.001-nightly`, a real release being the same without `-nightly`. Releases and nightlies share the numbers, which go back to 001 each month and always have at least three digits, so a number can't be read as a day. The newest release or nightly the commit descends from, for the change list. It builds nothing when that tag's release already exists, as master did not move |
 | `build` | Builds `main_x64.exe` and `main.exe` with clang-cl and zips them as a release is zipped: exe, pdb, the DXC DLLs, `fafengine\` and `INSTALL.txt` ([x64](INSTALL_x64.txt), [x86](INSTALL_x86.txt)). The exe reports the nightly tag as its version |
 | `release` | Writes the notes ([nightly_notes.py](nightly_notes.py)): the parity counts, every commit since the previous release or nightly, and the checksums. Publishes them with the zips and the two exes on their own as a pre-release, never marked as the latest release |
 

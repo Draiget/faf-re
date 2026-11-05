@@ -544,12 +544,7 @@ namespace moho
   LuaPlus::LuaObject*
   func_GetProjectileFactory(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
   {
-    if (object == nullptr) {
-      return nullptr;
-    }
-
-    *object = CScrLuaMetatableFactory<Projectile>::Instance().Get(state);
-    return object;
+    return SCR_WriteMetatable<Projectile>(object, state);
   }
 
   /**
@@ -2784,12 +2779,7 @@ namespace moho
    */
   [[maybe_unused]] void DestroyCProjectileAttributesTypeInfoBody(CProjectileAttributesTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**

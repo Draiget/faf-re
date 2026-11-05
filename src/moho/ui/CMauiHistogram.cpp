@@ -325,8 +325,5 @@ gpg::RType* moho::CMauiHistogram::GetClass() const
  */
 gpg::RRef moho::CMauiHistogram::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }

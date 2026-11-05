@@ -687,12 +687,7 @@ namespace moho
     LuaPlus::LuaState* const state
   )
   {
-    if (object == nullptr) {
-      return nullptr;
-    }
-
-    *object = CScrLuaMetatableFactory<UserUnit>::Instance().Get(state);
-    return object;
+    return SCR_WriteMetatable<UserUnit>(object, state);
   }
 }
 
@@ -1214,10 +1209,7 @@ gpg::RType* UserUnit::GetClass() const
  */
 gpg::RRef UserUnit::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**

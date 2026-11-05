@@ -893,12 +893,7 @@ namespace
    */
   void DestroyEntityDbTypeInfoBody(EntityDbTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   EntityDbTypeInfo::~EntityDbTypeInfo()
@@ -1064,12 +1059,7 @@ namespace
    */
   void DestroyEntityDbIdPoolMapTypeInfoBody(EntityDbIdPoolMapTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   EntityDbIdPoolMapTypeInfo::~EntityDbIdPoolMapTypeInfo()

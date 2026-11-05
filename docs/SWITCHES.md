@@ -137,6 +137,8 @@ Every performance change has a switch that brings back the original path, and bo
 | `ren_EffectFastScan` | 1 | `/fxregex` turns it off before the first effect loads | when an effect is created | Effect text is read with plain scans (`EffectScan.h`) instead of `std::regex` over the whole text, which took about half of the time from process start to the lobby (about 1.1 s); same output. `FAF_FX_SCAN_VERIFY=1` translates each effect both ways and logs `same` or `DIFFERENT` |
 | `ren_BackgroundShaders` | 1 | `/con` | when an effect is created | Direct3D 12 and Vulkan prepare every shader of an effect on low-priority background threads (a quarter of the cores, 1 to 4) when the effect is created: the cached ones are read first, then the rest are compiled and added to the cache. Without it a draw opened the cache file (several ms each; half of a 330 ms zoom frame) or ran the compiler (15–300 ms each; a 383 ms zoom frame with an empty cache, as after every update that changes the shaders) in the frame that first used the shader; a draw that needs a shader a worker is still preparing waits for it |
 | `ren_GlyphBitmapRead` | 1 | `/con` | live | A new character's glyph is read from the font's scratch bitmap in one call instead of one `GetPixel` per pixel as the original did (tens of ms when a frame meets many new characters); the session's first glyph is read both ways and any difference turns it off |
+| `ren_MsdfText` | 1 | `/con` | live | Screen-space text draws from an MSDF atlas (distances to each glyph's outline, so one texture stays sharp at any size) where one is ready, on every renderer. Atlases cook in the background on first use and stay in `<local data>/fontcache`. Advances stay GDI's, so layout doesn't move. A string with a character the atlas lacks draws through GDI as before (#307) |
+| `ren_MsdfTextMinSize` | 1 | `/con` | live | The smallest text in pixels `ren_MsdfText` draws from an atlas; smaller text stays on GDI glyphs |
 | `sys_ThreadPlacement` | 0 | `/threadplacement N` | next thread start | Thread placement on cores (0 leaves it to the OS). Works on Linux too. 2 gives the main, sim and issue threads a physical core each, so the workers only have the rest: use it on 8 or more cores |
 | XACT process clock | on | `/realtickcount` turns it off | startup only | XACT 2.9 times itself from process start instead of Windows boot, so sound keeps working after 24.8 days of uptime without UptimeFaker; the log says `SND: xactengine2_9.dll clock imports patched` (`FAF_TEST_TICK_OFFSET_DAYS=N` in the environment fakes N more days of uptime, for testing) |
 
@@ -250,7 +252,7 @@ Server-authoritative sessions are being built: one server runs the only sim, and
 
 ## headless
 
-The engine builds three programs: `main` (the game client: `main_x64.exe`, or `main.exe` on x86), `headless` (below) and, later, `server`, the dedicated game server.
+The engine builds three programs: `main` (the game client: `main_x64.exe`, or `main.exe` on x86), `headless` (below) and `server`, the dedicated game server (below).
 
 Every build also produces `headless_x64.exe` (`headless.exe` on x86; `headless` on Linux), a console program that plays one replay with no window, render device or audio engine and reports whether every checksum the players recorded matches. It runs the game's sim, sim driver and replay client; it does not build the world session the game's UI runs on. Put it in a folder of its own next to the game's `bin` folder (it reads `../Installed.Prefs` and mounts the `fafengine` folder next to itself, as the game does) and give it the game's init file:
 
@@ -285,6 +287,7 @@ The last line it prints is `VERDICT ended=<True|False> mismatches=<n> crash=<Tru
 | `--wire-stats file` | — | Server-mode build. Runs the wire format's entities lane on every beat: the entities the sim published to this run's focus become a view frame, encoded against the previous beat's, decoded and compared; writes one CSV line per beat (entities, created, removed, changed, delta bytes, full-frame bytes every 100 beats) and prints a summary |
 | `--loopback` | off | Server-mode build. Every packet, after the switches above have seen it, goes through the wire format and the client's rebuild as with the game's `/loopback` (no UI applies it here); prints the `loopback end:` and `checks:` lines, and a check count above 0 makes the exit code 1. The army records and the focus army's intel grids go over the wire too (plan WP5.13, `src/remote/wire/ArmyLane.h`): the grids are copied on the sim thread (so `--loopback` runs alone among the sync-walk switches), the client's records replace the packet's, and the `armies and grids:` line gives both lanes' KB/s and their checks; in the game's `/loopback` the session's armies read the client's own grids. `--loopback-dr steps` adds dead reckoning, `--loopback-turns units` orientation reckoning (as `/loopbackdr` and `/loopbackturns`) |
 | `--command-check` | off | Server-mode build. Every command message the sim's decoder receives is also decoded by a second decoder into a `CMarshaller` (the sending half a remote client uses) and the message it builds is compared with the replay's bytes; prints `command check:` with the counts by opcode (the first few differences in hex), and a difference makes the exit code 1. A command the decoder drops (as the sim drops it) is counted apart |
+| `--seats` | off | Server-mode build. The replay's commands go through the game server's seats, one per command source, as a player's would: the seat's filter takes or refuses each, a source that ended is ejected there, and the server's own client issues the beats. Every recorded checksum is checked as usual; prints `seats:` with the counts. What the filter refuses is counted and delivered anyway, as the recorded game had it. Not with `--rejoin-source` or `--resume-from` |
 | `--oracle-check` | off | Server-mode build. After every `Sim::Sync` the visibility oracle (`src/remote/VisibilityOracle.h`, plan WP4.1) is asked about every entity for the `--focus` army and compared with what the sim itself just published: whether the entity has its client interface and, when both publish it, its visibility mode. Every beat it also builds the spatial oracle (`src/remote/SpatialOracle.h`, plan WPR.44) and compares its set with the brute-force set for every army (unfocused) or the focus army (plan WPR.54). Prints `oracle check:` with the counts per entity class (units, blips, props, projectiles, other): how many both publish, how many the server would send (`CanViewSee`) and how many the client would draw (`ViewShowsMesh`), then the spatial comparison and the first 20 differences; any difference makes the exit code 1. Reads only; the sim's checksums are the same with it on |
 | `--changeset-check` | off | Server-mode build; not with `--oracle-check` (both observe the sync walk). Every beat, the change set the server builds its views from (`src/remote/BeatChangeSet.h`, plan WP5.1: the entities `Sim::Sync`'s walk synced) is checked against the packet the same walk built: every entity id the packet carries (creations, updates, deletes, erases) must be in the change set, and an entity the focus army's view publishes must have a packet record. Prints `change-set check:` with the counts, the synced entities not published at this focus by kind, and the first 20 differences; a difference makes the exit code 1 |
 | `--view-packets <army> <file>` | — | Server-mode build; one sync-walk check at a time. Every beat, one line with a digest per entity lane (creations, unit creations, entity and unit updates, deletes, erases) of `army`'s packet: when unfocused (as the server runs), the packet rebuilt for that army from the change set (`src/remote/ViewPackets.h`, plan WP5.2); when focused on that army, the packet the sim built itself. The two files of a replay must be equal line for line; animation poses are left out (plan WP8) |
@@ -319,6 +322,68 @@ The last line it prints is `VERDICT ended=<True|False> mismatches=<n> crash=<Tru
 | `--label text` | `headless` | Prefix of every printed line |
 
 Engine switches work as in the game: `/init`, `/log`, `/synclog`, `/simworkers`, `/con`, `/prefs`, `/sse2`, `/noversioncheck`. Exit code: 0 every recorded checksum matched and the replay reached its end; 1 a mismatch; 2 the end was not reached in time; 3 a crash or fatal error; 4 bad arguments or a replay that could not be loaded.
+
+## server
+
+`server` (Linux only for now) is the dedicated game server. Today it plays a match with no players connected: the armies in the match file are AIs, and the server is an observer. Seats, the lobby and the network come next.
+
+```
+server --match match.lua --out /srv/game1 /init /data/faf/bin/init_replay.lua /simworkers 3
+```
+
+The match file is Lua that sets `MatchConfig`, the table `CLobby.LaunchGame` takes (`GameOptions`, `PlayerOptions`, `GameMods`, `Observers`), and optionally `MatchSeed` and `MatchName`.
+
+| Flag | Default | What it does |
+|---|---|---|
+| `--match <file>` | required | The match to play |
+| `--out <dir>` | required | Where `game.scfareplay`, `result.json` and `server.log` go; created if missing |
+| `--speed <n>` | the match's `GameSpeed` (`normal` +0, `fast` +4) | The requested game speed |
+| `--stop-beat <n>` | none | Stop at this beat (a beat is a tenth of a second of game time) |
+| `--timeout <minutes>` | 240 | Give up after this much real time; exit code 3 |
+| `--status-minutes <n>` | 10 | A status line this often; 0 for none |
+| `--warn-beat-ms <n>` | 90 | Warn when the sim's median beat takes this long; speed -1 starts past 100 ms |
+| `--view-threads <n>` | 2 | With `--listen`: threads of their own for the players' views, so the sim goes on meanwhile |
+| `--lead-ms <n>` | 150 | How far ahead of its schedule the sim works, which a player's command waits for. A lockstep game's `net_Lag` is 500 |
+| `--listen <ip:port>` | off | Take players over UDP. Each human player needs a token in `MatchTokens` |
+| `--join-seconds <n>` | 120 | With `--listen`: how long to wait for players. Who hasn't joined by then is ejected, and if nobody came the server exits with 2 |
+| `--reconnect-seconds <n>` | 60 | With `--listen`: how long a player who lost the connection may come back, counted from the channel's 10 s timeout. Then they're ejected |
+
+The console shows what someone running the server wants to see, and everything else the engine says goes to `server.log` (or the `/log` file, if given):
+
+```
+[2026-11-05 12:00:01] faf-re dedicated server, build abc1234 x64-linux Release (master, v1.1.0)
+[2026-11-05 12:00:03] Hosting game "Seton's Clutch" on /maps/SCMP_009/SCMP_009.scmap, 2 players, speed +0
+[2026-11-05 12:00:03]   AI One, team 2, AI
+[2026-11-05 12:00:03]   AI Two, team 3, AI
+[2026-11-05 12:00:03] Loading the map
+[2026-11-05 12:00:07] Map loaded in 3.6 s
+[2026-11-05 12:00:07] Game started
+[2026-11-05 12:10:07] Status: game time 00:10:00, real time 00:10:00, speed +0 (requested +0), 10.0 beats/s, a beat takes 12 ms, memory 610 MB, 1 warnings in the log
+[2026-11-05 12:31:40] WARNING: the sim is close to speed -1: a beat takes 92 ms, -1 starts at 100 ms
+[2026-11-05 12:34:02] Sim speed -1 (was +0, requested +0), a beat takes 104 ms
+[2026-11-05 12:41:15] AI Two: defeat
+[2026-11-05 12:41:15] AI One: victory
+[2026-11-05 12:41:15] Game ended: game time 00:41:08, real time 00:41:08
+```
+
+Between those lines it stays quiet. The speed shown is what the game really did over the last 10 s, rounded to a step. A new speed is printed once it has held for 15 s, so a speed flickering between two steps prints nothing. The warning needs 5 s over the limit and clears after 30 s under 85% of it. No beat for 30 s also warns.
+
+The server holds the requested speed by taking each beat when it is due. A sim too slow for that runs as fast as it can, with no drop to a whole slower step as in a lockstep game, and after a slow stretch it runs fast for up to 1 s to make up the time.
+
+A human player in the match file gets a seat. Every beat is queued on every seat at once, so a player can never hold the game up, and a player may send orders, sim callbacks, unit info and pause requests only: beats, checksums, command sources, cheat and debug commands are refused. Without `--listen` seats stay empty and silent. Each player gets their own view every beat, on the reliable stream, so a lost datagram costs a resend's wait and never a wrong picture. A player who reconnects gets no view yet, and one who falls 16 MB behind is ejected. No game client can join yet: it needs the client's half.
+
+`MatchTokens` in the match file holds each human player's secret by `OwnerID`, outside `MatchConfig`, so it stays out of the replay and away from the other players. The token never goes on the wire: it keys a proof and, with an X25519 exchange, the channel's encryption keys. A forged source address costs the server nothing, as it answers with a stateless cookie and sends less than it got. `tools/server-probe` (`faf_server_probe`) plays a player over a real socket: it joins, pauses, sends forged commands, vanishes, comes back or leaves.
+
+SIGUSR1 pauses the game, and resumes it when it is paused. Beats go on while a game is paused, with no game time, so a player's resume can reach the sim.
+
+Exit codes: 0 the game ended or reached `--stop-beat`, 2 nobody connected in time, 3 crash or `--timeout`, 4 bad input, 5 stopped by SIGINT or SIGTERM (the replay and `result.json` are still finished). `result.json` holds the game's name and map, whether it ended, the beats played, why it stopped, and each army's result.
+
+`tools/server-image/Dockerfile` makes the image: one game per container, not root, game data mounted read-only.
+
+```
+docker build -t faf-server <folder with the built server> -f tools/server-image/Dockerfile
+docker run --read-only --tmpfs /tmp --cap-drop ALL -v /srv/data:/data:ro -v /srv/game1:/out -v /srv/match.lua:/match.lua:ro faf-server --match /match.lua --out /out /init /data/faf/bin/init_replay.lua
+```
 
 ## Desync recorder
 

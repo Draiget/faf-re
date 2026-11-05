@@ -121,10 +121,7 @@ namespace moho
    */
   gpg::RRef RDebugOverlayClass::GetDerivedObjectRef()
   {
-    gpg::RRef out{};
-    out.mObj = this;
-    out.mType = GetClass();
-    return out;
+    return gpg::MakeSelfRef(this);
   }
 
   /**

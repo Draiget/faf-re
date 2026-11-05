@@ -237,10 +237,7 @@ namespace moho
    */
   gpg::RRef MotorSinkAway::GetDerivedObjectRef()
   {
-    gpg::RRef ref{};
-    ref.mObj = this;
-    ref.mType = GetClass();
-    return ref;
+    return gpg::MakeSelfRef(this);
   }
 
   /**
@@ -276,12 +273,7 @@ namespace moho
    */
   void DestroyMotorSinkAwayTypeInfoBody(MotorSinkAwayTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**
@@ -428,12 +420,7 @@ namespace gpg
    */
   gpg::RRef* RRef_MotorSinkAway(gpg::RRef* const out, moho::MotorSinkAway* const value)
   {
-    if (!out) {
-      return nullptr;
-    }
-
-    *out = gpg::MakeDerivedRef(value, CachedMotorSinkAwayType());
-    return out;
+    return gpg::WriteDerivedRef(out, value, &CachedMotorSinkAwayType);
   }
 } // namespace gpg
 

@@ -1,4 +1,5 @@
 #include "headless/ReplayRunner.h"
+#include "headless/SessionLoad.h"
 #include "headless/ReplayLuaState.h"
 #include "headless/ReplaySyncWriters.h"
 
@@ -52,6 +53,9 @@
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/unit/core/Unit.h"
 #include "headless/ReplayBoneStats.h"
+#if FAF_SERVER_MODE
+#include "headless/ReplaySeats.h"
+#endif
 #include "headless/ReplayFpuReport.h"
 #include "headless/ReplayKeyframes.h"
 #if FAF_SERVER_MODE
@@ -163,20 +167,6 @@ namespace faf::headless
     };
 
     /** Whether this beat's Lua `Sync` bytes contain `text` (read whole and rewound). */
-    [[nodiscard]] bool SyncBytesContain(moho::SSyncData& packet, const std::string_view text)
-    {
-      std::string bytes;
-      char buffer[4096];
-      for (;;) {
-        const std::size_t read = packet.mStream->Read(buffer, sizeof(buffer));
-        if (read == 0u) {
-          break;
-        }
-        bytes.append(buffer, read);
-      }
-      (void)packet.mStream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, 0);
-      return bytes.find(text) != std::string::npos;
-    }
 
     /**
      * Decodes this beat's Lua `Sync` table as the UI's `DoBeat` does, and reports whether it
@@ -396,39 +386,6 @@ namespace faf::headless
       );
     }
 
-    /**
-     * The world session's loading steps that the sim needs (`WLD_DoPreload`, `WLD_DoLoading`):
-     * the session loader builds rules, session Lua state and map on its worker thread.
-     */
-    [[nodiscard]] bool LoadScenario(moho::SWldSessionInfo& sessionInfo, moho::SWldGameData& gameData, std::string& error)
-    {
-      moho::CWldSessionLoaderImpl* const loader = moho::GetWldSessionLoader();
-      moho::LaunchInfoBase* const launchInfo = sessionInfo.mLaunchInfo.get();
-      if (loader == nullptr || launchInfo == nullptr) {
-        error = "no session loader or launch info";
-        return false;
-      }
-
-      (void)loader->GetScenarioInfo(sessionInfo.mMapName.raw_data_unsafe(), &launchInfo->mGameMods, true);
-      while (true) {
-        // `WLD_DoLoading` beats the client manager every frame while the map loads.
-        if (sessionInfo.mClientManager != nullptr) {
-          sessionInfo.mClientManager->DoBeat();
-        }
-        loader->Update();
-        if (loader->IsLoaded()) {
-          break;
-        }
-        ::Sleep(5);
-      }
-
-      (void)loader->LoadGameData(&gameData);
-      if (gameData.mGameRules == nullptr || gameData.mWldMap == nullptr || gameData.mState == nullptr) {
-        error = "map " + std::string(sessionInfo.mMapName.c_str()) + " failed to load";
-        return false;
-      }
-      return true;
-    }
   } // namespace
 
   void InstallChecksumWatch(const std::string& label)
@@ -493,7 +450,7 @@ namespace faf::headless
       }
     } else {
       sessionInfo = moho::VCR_SetupReplaySession(
-        options.replayPath.c_str(), nullptr, rejoinRehearsal ? &rejoinRecording : nullptr, skipBeats
+        options.replayPath.c_str(), nullptr, rejoinRehearsal || options.seats ? &rejoinRecording : nullptr, skipBeats
       );
     }
     if (sessionInfo.get() == nullptr) {
@@ -527,6 +484,21 @@ namespace faf::headless
       );
     }
 
+#if FAF_SERVER_MODE
+    // `--seats`: outlives the driver, whose manager calls it.
+    std::unique_ptr<CReplaySeatFeed> seatFeed;
+    if (options.seats) {
+      if (skipBeats > 0 || options.rejoinSource >= 0 || liveRejoin) {
+        result.error = "--seats plays a replay from its start, and not as a rejoin";
+        return result;
+      }
+      moho::SIM_SetIssueWhilePaused(true);
+      moho::CClientManagerImpl* seatManager = nullptr;
+      seatFeed = std::make_unique<CReplaySeatFeed>(*launchInfo, std::move(rejoinRecording), seatManager);
+      sessionInfo->mClientManager = seatManager;
+    }
+#endif
+
     if (sessionInfo->mClientManager != nullptr) {
       sessionInfo->mClientManager->SetUIInterface(&gReplayClientEvents);
     }
@@ -538,7 +510,7 @@ namespace faf::headless
     );
 
     moho::SWldGameData gameData{};
-    if (!LoadScenario(*sessionInfo, gameData, result.error)) {
+    if (!LoadSessionScenario(*sessionInfo, gameData, result.error)) {
       moho::ReleaseWldGameDataHandles(&gameData);
       return result;
     }
@@ -584,17 +556,8 @@ namespace faf::headless
     gameData = moho::SWldGameData{};
 
     // The launch info, completed as `WLD_DoLoading` completes it from the world session.
-    moho::STIMap* const launchMap = new moho::STIMap(wldMap->mTerrainRes->mMap);
+    moho::STIMap* const launchMap = CompleteSessionLaunchInfo(*sessionInfo, *rules, *wldMap, *sessionState);
     [[maybe_unused]] const Wm3::AxisAlignedBox3f mapBounds = launchMap->GetBounds3D(); // the sim takes the map
-    launchInfo->mGameRules = rules.get();
-    if (launchInfo->mMap != nullptr && launchInfo->mMap != launchMap) {
-      delete launchInfo->mMap;
-    }
-    launchInfo->mMap = launchMap;
-    launchInfo->mLanguage.assign_owned(sessionState->GetGlobal("__language").ToString());
-    if (moho::LaunchInfoNew* const newLaunchInfo = launchInfo->GetNew(); newLaunchInfo != nullptr) {
-      newLaunchInfo->mProps = wldMap->mProps;
-    }
 
     // The focus army: the sim and the driver both start from the launch info's original
     // source, which a lockstep client sets to its own army (CLobby::LaunchGame) and a replay
@@ -968,6 +931,10 @@ namespace faf::headless
           result.gameOver = true;
         }
 #if FAF_SERVER_MODE
+        // With every source gone before its end, a recording has nobody left to end the game.
+        if (seatFeed && packet->mCurBeat > seatFeed->LastBeat() + 1) {
+          stopped = true;
+        }
         if (loopback) {
           if (moho::CClientManagerImpl* const standIn = driver->GetClientManager(); standIn != nullptr) {
             loopback->SetServerSimRate(standIn->GetSimRate());
@@ -1050,6 +1017,12 @@ namespace faf::headless
       (void)::WaitForSingleObject(syncAvailable, 50);
     }
     result.mismatches = ChecksumMismatchCount();
+#if FAF_SERVER_MODE
+    if (seatFeed) {
+      std::printf("[%s] %s\n", label, seatFeed->Report().c_str());
+      std::fflush(stdout);
+    }
+#endif
     if (pacePeriod > 0.0) {
       std::printf("[%s] pace %d ms: %d of %d beats late, %.1f s lost\n", label, options.paceMs, lateBeats, result.beats, lateSeconds);
       std::fflush(stdout);

@@ -1378,12 +1378,7 @@ namespace gpg
     moho::CUnitMeleeAttackTargetTask* const value
   )
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitMeleeAttackTargetTask>());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 } // namespace gpg
 

@@ -90,10 +90,7 @@ namespace moho
    */
   gpg::RRef RPropBlueprint::GetDerivedObjectRef()
   {
-    gpg::RRef out{};
-    out.mObj = this;
-    out.mType = GetClass();
-    return out;
+    return gpg::MakeSelfRef(this);
   }
 
   /**

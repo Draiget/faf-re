@@ -631,12 +631,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CSlaveManipulator(gpg::RRef* const outRef, moho::CSlaveManipulator* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CSlaveManipulator>());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 } // namespace gpg
 

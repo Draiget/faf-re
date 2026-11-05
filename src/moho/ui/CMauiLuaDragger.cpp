@@ -73,10 +73,7 @@ gpg::RType* moho::CMauiLuaDragger::GetClass() const
  */
 gpg::RRef moho::CMauiLuaDragger::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**

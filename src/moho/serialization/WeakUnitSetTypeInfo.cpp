@@ -43,12 +43,7 @@ namespace moho
    */
   [[maybe_unused]] void DestroyWeakUnitSetTypeInfoBody(WeakUnitSetTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**

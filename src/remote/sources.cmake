@@ -15,10 +15,12 @@ set(FAF_REMOTE_SOURCES
   remote/BeatChangeSet.cpp
   remote/ViewPackets.cpp
   remote/ViewFrames.cpp
+  remote/ViewLanes.cpp
   remote/SyncRouting.cpp
   remote/ViewIdMap.cpp
   remote/ViewJobs.cpp
   remote/InboundIds.cpp
+  remote/ServerClient.cpp
   remote/FrameWindow.cpp
   remote/ArmyRecords.cpp
   remote/wire/ArmyLane.cpp

@@ -221,14 +221,7 @@ namespace moho
 */
 void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
 {
-  gpg::RType* const rObjectType = gpg::RTypeOf<gpg::RObject>();
-  gpg::RField baseField{};
-  baseField.mName = rObjectType->GetName();
-  baseField.mType = rObjectType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBase<gpg::RObject>(typeInfo);
 }
 
 /**

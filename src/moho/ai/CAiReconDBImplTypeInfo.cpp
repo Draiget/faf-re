@@ -317,14 +317,7 @@ namespace
    */
   void AddIAiReconDBBase(gpg::RType* typeInfo)
   {
-    gpg::RType* const baseType = gpg::RTypeOf<IAiReconDB>();
-    gpg::RField field{};
-    field.mName = baseType->GetName();
-    field.mType = baseType;
-    field.mOffset = 0;
-    field.mFlags = 0;
-    field.mDesc = nullptr;
-    typeInfo->AddBase(field);
+    gpg::AddReflectedBase<IAiReconDB>(typeInfo);
   }
 
   const char* ReconBlipPointerVectorType::GetName() const

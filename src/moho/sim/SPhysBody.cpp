@@ -635,12 +635,7 @@ namespace moho
    */
   [[maybe_unused]] void DestroySPhysBodyTypeInfoBody(SPhysBodyTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**

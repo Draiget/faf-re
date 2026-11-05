@@ -3542,8 +3542,5 @@ gpg::RType* moho::CMauiEdit::GetClass() const
  */
 gpg::RRef moho::CMauiEdit::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }

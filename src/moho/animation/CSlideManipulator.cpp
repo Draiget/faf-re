@@ -1181,12 +1181,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CSlideManipulator(gpg::RRef* const outRef, moho::CSlideManipulator* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, CachedCSlideManipulatorType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value, &CachedCSlideManipulatorType);
   }
 } // namespace gpg
 
