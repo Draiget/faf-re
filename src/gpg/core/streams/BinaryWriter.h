@@ -64,9 +64,9 @@ namespace gpg
 
   private:
     Stream* mStream = nullptr;   // +0x00
-    std::uint32_t mPort = 0u;    // +0x04
-    std::uint32_t mReserved0 = 0u; // +0x08
-    std::uint32_t mReserved1 = 0u; // +0x0C
+    [[maybe_unused]] std::uint32_t mPort = 0u;    // +0x04
+    [[maybe_unused]] std::uint32_t mReserved0 = 0u; // +0x08
+    [[maybe_unused]] std::uint32_t mReserved1 = 0u; // +0x0C
   };
 
   static_assert(sizeof(BinaryWriter) == 0x10, "gpg::BinaryWriter size must be 0x10");

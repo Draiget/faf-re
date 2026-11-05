@@ -161,9 +161,9 @@ namespace gpg
     private:
         std::ostream* mStream{};
         std::uint8_t mOwnStream{};
-        std::uint8_t mPad0{};
-        std::uint8_t mPad1{};
-        std::uint8_t mPad2{};
+        [[maybe_unused]] std::uint8_t mPad0{};
+        [[maybe_unused]] std::uint8_t mPad1{};
+        [[maybe_unused]] std::uint8_t mPad2{};
     };
     static_assert(sizeof(StreamLogTarget) == 0x10, "StreamLogTarget size must be 0x10");
 

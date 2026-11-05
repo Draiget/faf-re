@@ -343,7 +343,7 @@ namespace moho
 
     std::int32_t mBeatsSincePause = 0;                       // +0xC4
     bool mInstantiated = false;                              // +0xC8
-    std::uint8_t mPaddingC9_CB[0x03]{};                      // +0xC9
+    [[maybe_unused]] std::uint8_t mPaddingC9_CB[0x03]{};                      // +0xC9
     SBeamBucketContainer mBeams;                             // +0xCC
   };
 
