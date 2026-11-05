@@ -26,10 +26,26 @@ set(FAF_WARNING_OPTIONS
 # log: on x86, boost 1.34's member-function-pointer tester alone gave 50,544. By
 # include name, because /external:I would change the include search order, and
 # src/boost/ wraps boost's own headers. Generated code doesn't change.
-foreach(_faf_third_party_prefix boost/ wx/)
+# Wild Magic is named without a folder ("Wm3Vector3.h"); its .inl files follow their
+# header. An engine header under moho/math with a Wm3 name is included by path, so
+# it isn't caught.
+foreach(_faf_third_party_prefix boost/ wx/ Wm3)
   if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     list(APPEND FAF_WARNING_OPTIONS "/clang:--system-header-prefix=${_faf_third_party_prefix}")
   else()
     list(APPEND FAF_WARNING_OPTIONS "--system-header-prefix=${_faf_third_party_prefix}")
   endif()
 endforeach()
+
+# FFmpeg 7.1.3 is a pinned submodule, compiled as released. These are what its own
+# sources do: raw demuxers it builds but we don't use (unused-function), INT64_MAX
+# as a double in its option tables (implicit-const-int-float-conversion), its own
+# deprecated codec fields (deprecated-declarations), a late declaration in demux.c
+# (declaration-after-statement) and an enum forward reference in hwcontext_stub.c
+# (microsoft-enum-forward-reference).
+set(FAF_FFMPEG_WARNING_OPTIONS
+  -Wno-unused-function
+  -Wno-implicit-const-int-float-conversion
+  -Wno-deprecated-declarations
+  -Wno-declaration-after-statement
+  -Wno-microsoft-enum-forward-reference)

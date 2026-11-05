@@ -64,8 +64,10 @@ if(NOT EXISTS "${_faf_ffmpeg}/faf/CMakeLists.txt")
                       "(git submodule update --init dependencies/ffmpeg); see docs/FAF_SFD_COMPATIBILITY.md.")
 endif()
 add_subdirectory("${_faf_ffmpeg}/faf" "${CMAKE_BINARY_DIR}/dependencies/ffmpeg")
+include(FafWarnings)
 foreach(_lib IN LISTS FFMPEG_FAF_LIBRARIES)
   target_link_libraries(${_lib} PRIVATE faf_codegen)
+  target_compile_options(${_lib} PRIVATE "$<$<COMPILE_LANGUAGE:C>:${FAF_FFMPEG_WARNING_OPTIONS}>")
 endforeach()
 
 # --- Compilation ----------------------------------------------------------------------
@@ -109,7 +111,6 @@ if(NOT FAF_TARGET_ARCH STREQUAL "x64")
   list(APPEND _faf_main_options /FIplatform/X87SqrtCall.h)
 endif()
 
-include(FafWarnings)
 list(APPEND _faf_main_options ${FAF_WARNING_OPTIONS})
 
 # C and C++ only (not the x64 MASM file).
