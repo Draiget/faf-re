@@ -200,7 +200,8 @@ jobs:
           PARITY_RUN: ${{ github.event.workflow_run.id || inputs.parity_run }}
           PARITY_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id || inputs.parity_run }}
         run: |
-          (cd zips && sha256sum faf-engine-*.zip > SHA256SUMS.txt)
+          # The exes also ship on their own, for replacing one that is already installed.
+          (cd zips && for z in faf-engine-*.zip; do unzip -j -o "$z" 'main*.exe'; done && sha256sum faf-engine-*.zip main*.exe > SHA256SUMS.txt)
           python tools/release/nightly_notes.py --out notes.md
           cat notes.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
@@ -214,6 +215,6 @@ jobs:
           SHA: ${{ needs.plan.outputs.sha }}
           TAG: ${{ needs.plan.outputs.tag }}
         run: |
-          gh release create "$TAG" zips/faf-engine-*.zip zips/SHA256SUMS.txt --target "$SHA" --prerelease --latest=false \
+          gh release create "$TAG" zips/faf-engine-*.zip zips/main*.exe zips/SHA256SUMS.txt --target "$SHA" --prerelease --latest=false \
             --title "$TAG x64\\x86" --notes-file notes.md
           gh release view "$TAG" --json tagName,isPrerelease,url | tee -a "$GITHUB_STEP_SUMMARY"
