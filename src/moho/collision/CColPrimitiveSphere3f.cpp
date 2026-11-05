@@ -103,13 +103,7 @@ namespace moho
     GPG_ASSERT(typeInfo != nullptr);
     GPG_ASSERT(!typeInfo->initFinished_);
 
-    gpg::RField baseField{};
-    baseField.mName = gpg::RTypeOf<moho::CColPrimitiveBase>()->GetName();
-    baseField.mType = gpg::RTypeOf<moho::CColPrimitiveBase>();
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, gpg::RTypeOf<moho::CColPrimitiveBase>());
   }
 
   /**

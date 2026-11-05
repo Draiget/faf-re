@@ -233,13 +233,7 @@ namespace moho
       cachedEntityType = gpg::LookupRType(typeid(Entity));
     }
 
-    gpg::RField baseField{};
-    baseField.mName = cachedEntityType->GetName();
-    baseField.mType = cachedEntityType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, cachedEntityType);
   }
 
   /**

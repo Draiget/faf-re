@@ -298,13 +298,7 @@ namespace moho
   void MotorSinkAwayTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedCScriptObjectType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = gpg::RType::BaseSubobjectOffset<MotorSinkAway, CScriptObject>();
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::RType::BaseSubobjectOffset<MotorSinkAway, CScriptObject>());
   }
 
   /**
@@ -314,13 +308,7 @@ namespace moho
   void MotorSinkAwayTypeInfo::AddBase_Motor(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedMotorType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType);
   }
 
   /**

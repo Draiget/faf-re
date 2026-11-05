@@ -6426,12 +6426,12 @@ namespace gpg
   /**
    * Engine addition: as AddReflectedBase, for a base type the caller already has.
    */
-  inline void AddReflectedBaseType(RType* const typeInfo, RType* const baseType)
+  inline void AddReflectedBaseType(RType* const typeInfo, RType* const baseType, const int offset = 0)
   {
     RField baseField{};
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
-    baseField.mOffset = 0;
+    baseField.mOffset = offset;
     baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);

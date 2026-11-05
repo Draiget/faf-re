@@ -42,13 +42,7 @@ namespace moho::debug_reflection
       return;
     }
 
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    owner->AddBase(baseField);
+    gpg::AddReflectedBaseType(owner, baseType);
   }
 
   void AddBaseRDebugOverlay(gpg::RType* const owner)

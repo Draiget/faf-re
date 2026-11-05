@@ -77,13 +77,7 @@ namespace moho
     }
 
     GPG_ASSERT(taskType != nullptr);
-    gpg::RField baseField{};
-    baseField.mName = taskType->GetName();
-    baseField.mType = taskType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, taskType);
   }
 
   /**

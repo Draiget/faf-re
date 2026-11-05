@@ -41,13 +41,7 @@ namespace
       return;
     }
 
-    gpg::RField field{};
-    field.mName = baseType->GetName();
-    field.mType = baseType;
-    field.mOffset = baseOffset;
-    field.mFlags = 0;
-    field.mDesc = nullptr;
-    typeInfo->AddBase(field);
+    gpg::AddReflectedBaseType(typeInfo, baseType, baseOffset);
   }
 
   /**

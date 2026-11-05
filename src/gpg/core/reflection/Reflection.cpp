@@ -1167,13 +1167,7 @@ void AddBaseIfPresent(RType* const typeInfo, RType* const baseType, const std::i
     return;
   }
 
-  RField baseField{};
-  baseField.mName = baseType->GetName();
-  baseField.mType = baseType;
-  baseField.mOffset = offset;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBaseType(typeInfo, baseType, offset);
 }
 
 /**

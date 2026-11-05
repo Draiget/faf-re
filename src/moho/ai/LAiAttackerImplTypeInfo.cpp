@@ -85,13 +85,7 @@ void __stdcall LAiAttackerImplTypeInfo::AddBase_CTask(gpg::RType* const typeInfo
 {
   gpg::RType* const baseType = gpg::CachedLookup<CTask>(CTask::sType);
 
-  gpg::RField baseField{};
-  baseField.mName = baseType->GetName();
-  baseField.mType = baseType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBaseType(typeInfo, baseType);
 }
 
 /**

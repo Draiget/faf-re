@@ -1,4 +1,5 @@
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/collision/AxisAlignedProbe.h"
 #include "moho/lua/ScrLuaUserData.h"
 #include "moho/unit/core/UnitWeapon.h"
 #include "platform/Interlocked.h"
@@ -214,32 +215,6 @@ namespace
   [[nodiscard]] bool IsFiniteVector3(const Wm3::Vec3f& value) noexcept
   {
     return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
-  }
-
-  [[nodiscard]] Wm3::Box3f BuildAxisAlignedCollisionProbe(
-    const Wm3::Vec3f& center,
-    const Wm3::Vec3f& extents
-  ) noexcept
-  {
-    Wm3::Box3f probe{};
-    probe.Center[0] = center.x;
-    probe.Center[1] = center.y;
-    probe.Center[2] = center.z;
-
-    probe.Axis[0][0] = 1.0f;
-    probe.Axis[0][1] = 0.0f;
-    probe.Axis[0][2] = 0.0f;
-    probe.Axis[1][0] = 0.0f;
-    probe.Axis[1][1] = 1.0f;
-    probe.Axis[1][2] = 0.0f;
-    probe.Axis[2][0] = 0.0f;
-    probe.Axis[2][1] = 0.0f;
-    probe.Axis[2][2] = 1.0f;
-
-    probe.Extent[0] = extents.x;
-    probe.Extent[1] = extents.y;
-    probe.Extent[2] = extents.z;
-    return probe;
   }
 
   /**

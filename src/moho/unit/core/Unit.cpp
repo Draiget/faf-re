@@ -1,4 +1,5 @@
 #include "moho/unit/core/UnitPrivate2.h"
+#include "moho/collision/AxisAlignedProbe.h"
 
 namespace moho
 {
@@ -622,32 +623,6 @@ namespace
     } else {
       unit.SimulationRef->mOGrid->VacateRect(ogridRect);
     }
-  }
-
-  [[nodiscard]] Wm3::Box3f BuildAxisAlignedCollisionProbe(
-    const Wm3::Vec3f& center,
-    const Wm3::Vec3f& extents
-  ) noexcept
-  {
-    Wm3::Box3f probe{};
-    probe.Center[0] = center.x;
-    probe.Center[1] = center.y;
-    probe.Center[2] = center.z;
-
-    probe.Axis[0][0] = 1.0f;
-    probe.Axis[0][1] = 0.0f;
-    probe.Axis[0][2] = 0.0f;
-    probe.Axis[1][0] = 0.0f;
-    probe.Axis[1][1] = 1.0f;
-    probe.Axis[1][2] = 0.0f;
-    probe.Axis[2][0] = 0.0f;
-    probe.Axis[2][1] = 0.0f;
-    probe.Axis[2][2] = 1.0f;
-
-    probe.Extent[0] = extents.x;
-    probe.Extent[1] = extents.y;
-    probe.Extent[2] = extents.z;
-    return probe;
   }
 
   // 0x006A7827..0x006A784F: `addss 0.5`, stored to float, then the inlined floor.

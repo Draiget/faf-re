@@ -1,4 +1,5 @@
 #include "moho/console/CConCommand.h"
+#include "moho/console/ConCommandJoin.h"
 
 #include <algorithm>
 #include <cctype>
@@ -165,36 +166,6 @@ namespace
   }
 
 
-
-  /**
-   * Address: 0x0047BB90 (FUN_0047BB90, func_AppendStrings)
-   *
-   * What it does:
-   * Resets output string, appends first string in `[begin,end)`, then appends
-   * `separator` + each subsequent item.
-   */
-  [[nodiscard]]
-  msvc8::string AppendJoinedStringRange(
-    const msvc8::string* const begin, const msvc8::string* const end, const char* separator
-  )
-  {
-    std::string joined;
-    if (separator == nullptr) {
-      separator = "";
-    }
-
-    if (begin != nullptr && end != nullptr && begin < end) {
-      joined.append(begin->view());
-      for (const msvc8::string* cursor = begin + 1; cursor < end; ++cursor) {
-        joined.append(separator);
-        joined.append(cursor->view());
-      }
-    }
-
-    msvc8::string out;
-    out.assign_owned(joined);
-    return out;
-  }
 
 
   static_assert(sizeof(Wm3::Vector2f) == 0x8, "Wm3::Vector2f size must be 0x8");

@@ -2630,13 +2630,7 @@ void moho::register_CScriptEventTypeInfo()
 void CScriptEventTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
 {
   gpg::RType* const scriptObjectType = gpg::RTypeOf<CScriptObject>();
-  gpg::RField baseField{};
-  baseField.mName = scriptObjectType->GetName();
-  baseField.mType = scriptObjectType;
-  baseField.mOffset = gpg::BaseSubobjectOffset<CScriptEvent, CScriptObject>();
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBaseType(typeInfo, scriptObjectType, gpg::BaseSubobjectOffset<CScriptEvent, CScriptObject>());
 }
 
 /**
