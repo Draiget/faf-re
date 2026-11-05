@@ -1,5 +1,5 @@
-# Profile-guided Windows x64 build (docs/SWITCHES.md): the clang-x64-release-pgo preset. Opt-in;
-# the default presets, and so the playable exe, don't use it.
+# Profile-guided Windows x64 build (docs/SWITCHES.md): the clang-x64-release preset uses it, and
+# clang-x64-release-plain doesn't.
 #
 #   FAF_PGO_GENERATE=ON                counts what the code does; headless writes the counts when it
 #                                      ends (LLVM_PROFILE_FILE names the file; docs/SWITCHES.md).
