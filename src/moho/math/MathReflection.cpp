@@ -1351,7 +1351,7 @@ namespace moho
   void VAxes3::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     GPG_ASSERT(archive != nullptr);
-    if (archive == nullptr || this == nullptr) {
+    if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
     }
 
@@ -1367,7 +1367,7 @@ namespace moho
   void VAxes3::MemberSerialize(gpg::WriteArchive* const archive)
   {
     GPG_ASSERT(archive != nullptr);
-    if (archive == nullptr || this == nullptr) {
+    if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
     }
 

@@ -2716,7 +2716,7 @@ namespace moho
    */
   void InfluenceGrid::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef&)
   {
-    if (archive == nullptr || this == nullptr) {
+    if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
     }
 
@@ -2754,7 +2754,7 @@ namespace moho
    */
   void InfluenceGrid::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef&) const
   {
-    if (archive == nullptr || this == nullptr) {
+    if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
     }
 

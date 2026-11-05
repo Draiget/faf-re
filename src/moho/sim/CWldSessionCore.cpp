@@ -2215,7 +2215,7 @@ namespace
   {
     const UserEntity* const entity = reinterpret_cast<const UserEntity*>(unit);
     const bool selectableByArmy = entity != nullptr && entity->IsSelectable() && entity->mArmy == GetFocusUserArmy();
-    return selectableByArmy || (UI_SelectAnything && this != nullptr && IsCheatsEnabled);
+    return selectableByArmy || (UI_SelectAnything && static_cast<const void*>(this) != nullptr && IsCheatsEnabled);
   }
 
   /**
