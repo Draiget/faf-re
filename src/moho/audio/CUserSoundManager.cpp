@@ -716,7 +716,8 @@ namespace moho
     early.builder = std::thread([&early] {
       gpg::SetThreadName(0xFFFFFFFFu, "Sound init");
       // The XACT engine is a free-threaded ("Both") COM object, made here in the process's
-      // multithreaded apartment; this thread never leaves it, so the apartment outlives the engines.
+      // multithreaded apartment. The thread ends without CoUninitialize, so its hold keeps the
+      // apartment up after it, for as long as the engines are used.
       (void)::CoInitializeEx(nullptr, COINIT_MULTITHREADED);
       tBuildingSound = true;
       IUserSoundManager* manager = nullptr;

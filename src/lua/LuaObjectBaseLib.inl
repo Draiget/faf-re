@@ -1498,21 +1498,26 @@ namespace moho
 	);
 
 	/**
+	 * Engine addition: `lua_ThreadedDispatch`. On, the interpreter reaches each instruction's handler
+	 * through a table of label addresses and takes its fast paths (LuaExecute); off, the binary's switch.
+	 */
+	bool lua_ThreadedDispatch = true;
+
+	TConVar<bool> gTConVar_lua_ThreadedDispatch(
+		"lua_ThreadedDispatch",
+		"Reach each Lua instruction's handler through a table of label addresses, with fast paths for table "
+		"slots, comparisons and next() loops (1, the default), or through the binary's switch (0). The same "
+		"results either way; Lua runs faster with 1.",
+		&lua_ThreadedDispatch
+	);
+
+	/**
 	 * Engine addition: `lua_ParallelMark`, a user-side switch. When set, the mark phase of a sim
 	 * Lua collection runs on the sim worker pool: propagation (`PropagateMarksForCollection`), the
 	 * LuaPlus root objects (`MarkRootForCollection`), weak-table clearing (`parallel_weak`) and the
 	 * userdata separation (`parallel_sweep::SeparateUserdata`). On by default; it only acts while
 	 * `sim_Workers` > 0.
 	 */
-	bool lua_ThreadedDispatch = true;
-
-	TConVar<bool> gTConVar_lua_ThreadedDispatch(
-		"lua_ThreadedDispatch",
-		"Reach each Lua instruction's handler through a jump table of its own per handler (1, the default), or "
-		"through the one switch the binary has (0). The same handlers either way; Lua runs faster with 1.",
-		&lua_ThreadedDispatch
-	);
-
 	bool lua_ParallelMark = true;
 
 	TConVar<bool> gTConVar_lua_ParallelMark(

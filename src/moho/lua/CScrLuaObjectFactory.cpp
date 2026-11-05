@@ -22,6 +22,8 @@
 #include "moho/console/CConCommand.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/lua/ScriptChunkCache.h"
+#include "moho/misc/StartupHelpers.h"
+#include "moho/sim/CVFSImpl.h"
 
 // The Lua core's own table and string primitives (defined in lua/LuaObject.cpp), for SCR_Copy's
 // table walk.
@@ -32,8 +34,6 @@ extern "C"
   int luaO_log2(unsigned int x);
   void luaV_settable(lua_State* L, const LuaPlus::TObject* t, LuaPlus::TObject* key, LuaPlus::TObject* val);
 }
-#include "moho/misc/StartupHelpers.h"
-#include "moho/sim/CVFSImpl.h"
 
 namespace
 {

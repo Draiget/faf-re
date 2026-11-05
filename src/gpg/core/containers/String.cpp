@@ -953,6 +953,9 @@ msvc8::string gpg::STR_Chop(
   }
 }
 
+/// Engine addition (`res_LowerInPlace`, String.h): STR_ToLower and STR_CanonizeFilename edit one copy in place.
+bool gpg::str_LowerInPlace = true;
+
 /**
  * Address: 0x00938A80 (FUN_00938A80, gpg::STR_ToLower)
  *
@@ -966,8 +969,6 @@ msvc8::string gpg::STR_Chop(
  * then produced "cZ\programdata\...\supcomdatapathNlua", so no absolute path
  * could ever be opened and startup died in gpg::Die on the data-path script.
  */
-bool gpg::str_LowerInPlace = true;
-
 msvc8::string gpg::STR_ToLower(
   StrArg str
 )

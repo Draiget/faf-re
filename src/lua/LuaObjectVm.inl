@@ -1052,9 +1052,9 @@
 	{
 	/**
 	 * Engine addition (lua_ThreadedDispatch): the body of luaV_execute, once for each way of reaching an
-	 * instruction's handler. `kThreaded` jumps straight to it through a table of label addresses, so
-	 * each handler ends in a jump of its own and the branch predictor learns opcode pairs; otherwise
-	 * the one `switch` the binary has. The same handlers either way.
+	 * instruction's handler. `kThreaded` jumps to it through a table of label addresses (computed goto)
+	 * at the fetch, with no range check, and the fast paths below that it guards; otherwise the
+	 * binary's `switch`. Handlers `break` back to the one fetch either way, and are the same handlers.
 	 */
 	template <bool kThreaded>
 	TObject* LuaExecute(lua_State* L)
