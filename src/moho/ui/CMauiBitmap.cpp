@@ -1863,8 +1863,5 @@ gpg::RType* moho::CMauiBitmap::GetClass() const
  */
 gpg::RRef moho::CMauiBitmap::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }

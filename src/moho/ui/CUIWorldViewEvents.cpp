@@ -1896,10 +1896,7 @@ gpg::RType* moho::CUIWorldView::GetClass() const
  */
 gpg::RRef moho::CUIWorldView::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**

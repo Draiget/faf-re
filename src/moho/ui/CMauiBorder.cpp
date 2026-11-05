@@ -268,10 +268,7 @@ gpg::RType* moho::CMauiBorder::GetClass() const
  */
 gpg::RRef moho::CMauiBorder::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**

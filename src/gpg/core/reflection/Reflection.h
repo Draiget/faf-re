@@ -6254,6 +6254,47 @@ namespace gpg
   }
 
   /**
+   * Engine addition: a class's `GetDerivedObjectRef`: itself, under the type it reports.
+   */
+  template <class T>
+  [[nodiscard]] RRef MakeSelfRef(T* const self)
+  {
+    RRef out{};
+    out.mObj = self;
+    out.mType = self->GetClass();
+    return out;
+  }
+
+  /**
+   * Engine addition: an `RRef_*` function: `MakeDerivedRef` into `out`, unless `out` is null. The type
+   * is looked up only then.
+   */
+  template <class TObject>
+  RRef* WriteDerivedRef(RRef* const out, TObject* const value, RType* (*const baseType)())
+  {
+    if (!out) {
+      return nullptr;
+    }
+
+    *out = MakeDerivedRef(value, baseType());
+    return out;
+  }
+
+  /**
+   * Engine addition: an `RType` teardown lane: empties the field and base lists, unless null.
+   */
+  template <class TType>
+  void ClearTypeLists(TType* const typeInfo)
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
+  /**
    * Engine addition: the construct step of a TypeInfo's `CtrRef`: default-constructs `T` in
    * `storage` unless it is null, and returns it.
    */

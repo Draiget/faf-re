@@ -155,10 +155,7 @@ namespace moho
    */
   gpg::RRef CThrustManipulator::GetDerivedObjectRef()
   {
-    gpg::RRef ref{};
-    ref.mObj = this;
-    ref.mType = GetClass();
-    return ref;
+    return gpg::MakeSelfRef(this);
   }
 
   /**

@@ -374,8 +374,5 @@ gpg::RType* moho::CUIMapPreview::GetClass() const
  */
 gpg::RRef moho::CUIMapPreview::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }

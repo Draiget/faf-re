@@ -818,8 +818,5 @@ gpg::RType* moho::CMauiText::GetClass() const
  */
 gpg::RRef moho::CMauiText::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }

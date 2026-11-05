@@ -852,10 +852,7 @@ void ReconBlip::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg:
  */
 gpg::RRef ReconBlip::GetDerivedObjectRef()
 {
-  gpg::RRef objectRef{};
-  objectRef.mObj = this;
-  objectRef.mType = GetClass();
-  return objectRef;
+  return gpg::MakeSelfRef(this);
 }
 
 /**

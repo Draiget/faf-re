@@ -638,12 +638,7 @@ namespace moho
    */
   void DestroyPositionHistoryTypeInfoBody(PositionHistoryTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**

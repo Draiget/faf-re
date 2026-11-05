@@ -1278,10 +1278,7 @@ gpg::RType* CAiNavigatorImpl::GetClass() const
  */
 gpg::RRef CAiNavigatorImpl::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**

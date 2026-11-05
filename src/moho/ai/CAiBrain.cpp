@@ -1057,10 +1057,7 @@ gpg::RType* CAiBrain::GetClass() const
  */
 gpg::RRef CAiBrain::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**

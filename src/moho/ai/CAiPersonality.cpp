@@ -1881,10 +1881,7 @@ gpg::RType* CAiPersonality::GetClass() const
  */
 gpg::RRef CAiPersonality::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**

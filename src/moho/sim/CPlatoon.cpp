@@ -155,10 +155,7 @@ namespace moho
    */
   gpg::RRef CPlatoon::GetDerivedObjectRef()
   {
-    gpg::RRef objectRef{};
-    objectRef.mObj = this;
-    objectRef.mType = GetClass();
-    return objectRef;
+    return gpg::MakeSelfRef(this);
   }
 
   /**

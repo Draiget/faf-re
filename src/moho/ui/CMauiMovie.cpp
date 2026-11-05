@@ -824,8 +824,5 @@ gpg::RType* moho::CMauiMovie::GetClass() const
  */
 gpg::RRef moho::CMauiMovie::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }

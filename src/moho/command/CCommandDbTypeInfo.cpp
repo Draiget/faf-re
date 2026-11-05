@@ -57,12 +57,7 @@ namespace moho
    */
   [[maybe_unused]] void DestroyCCommandDbTypeInfoBody(CCommandDBTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**

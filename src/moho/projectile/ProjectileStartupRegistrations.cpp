@@ -2784,12 +2784,7 @@ namespace moho
    */
   [[maybe_unused]] void DestroyCProjectileAttributesTypeInfoBody(CProjectileAttributesTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**

@@ -1214,10 +1214,7 @@ gpg::RType* UserUnit::GetClass() const
  */
 gpg::RRef UserUnit::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**

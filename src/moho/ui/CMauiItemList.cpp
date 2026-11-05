@@ -1909,8 +1909,5 @@ gpg::RType* moho::CMauiItemList::GetClass() const
  */
 gpg::RRef moho::CMauiItemList::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
