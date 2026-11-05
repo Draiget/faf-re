@@ -249,6 +249,8 @@ Counted by the CPU on one thread against the plain preset, both builds running a
 
 Changed code keeps working with an older profile: a function that changed is compiled as if unprofiled, so the gain fades slowly and nothing breaks. Code no recorded game runs is treated as cold, so a new hot path gains nothing until the profile is recorded again. To record: `tools/pgo/record.sh --init <init_replay.lua> <replay files>` (needs `libclang-rt-18-dev` as well), then compare with the plain preset, both builds running at once.
 
+**Profile-guided Windows build.** The `clang-x64-release-pgo` preset compiles x64 with `cmake/pgo/headless-windows-x64.profdata`. It is opt-in: the default presets and the playable exe don't use it, and x86 can't. To record the profile again, build `headless` with the `clang-x64-release-pgogen` preset, play replays with `LLVM_PROFILE_FILE` set to a path containing `%p`, and merge the files with `llvm-profdata merge`. The stored one comes from the 8 core replays. Wall time against the plain preset, both running on a shared machine: 18.8 % lower on those 8 replays, and 6.8 % lower on 3 it wasn't recorded from (26975290, 26953273, 27034831), with no mismatch on any of them.
+
 The last line it prints is `VERDICT ended=<True|False> mismatches=<n> crash=<True|False>`, the same verdict `tools/runs/replay_20261013/run_replay.py` prints for the game. `ended` is the sim's Lua `Sync.GameEnded`, which the game reports to FAF; the run itself stops at the sim's game-over beat (a victory, or the end of the recorded commands).
 
 | Switch | Default | What it does |

@@ -116,6 +116,7 @@ if(NOT EXISTS "${FAF_DXSDK_DIR}/Include/d3dx9.h")
   message(FATAL_ERROR "DirectX SDK (June 2010) not found: FAF_DXSDK_DIR=${FAF_DXSDK_DIR}")
 endif()
 
+include(FafPgoWindows)
 include(FafCodegen)
 
 # Server-authoritative sessions (docs/SWITCHES.md, "Server mode"): the client's

@@ -68,6 +68,18 @@
       "cacheVariables": { "FAF_SERVER_MODE": "ON" }
     },
     {
+      "name": "clang-x64-release-pgo",
+      "displayName": "clang-cl x64 Release, profile-guided (main_x64.exe)",
+      "inherits": "clang-x64-release",
+      "cacheVariables": { "FAF_PGO_PROFILE": "${sourceDir}/cmake/pgo/headless-windows-x64.profdata" }
+    },
+    {
+      "name": "clang-x64-release-pgogen",
+      "displayName": "clang-cl x64 Release (records a profile for clang-x64-release-pgo)",
+      "inherits": "clang-x64-release",
+      "cacheVariables": { "FAF_PGO_GENERATE": "ON" }
+    },
+    {
       "name": "linux-clang-x64-release",
       "displayName": "Linux clang x64 Release (headless simulation, profile-guided)",
       "generator": "Ninja",
@@ -98,6 +110,8 @@
   "buildPresets": [
     { "name": "clang-x64-release", "configurePreset": "clang-x64-release" },
     { "name": "clang-x86-release", "configurePreset": "clang-x86-release" },
+    { "name": "clang-x64-release-pgo", "configurePreset": "clang-x64-release-pgo" },
+    { "name": "clang-x64-release-pgogen", "configurePreset": "clang-x64-release-pgogen" },
     { "name": "clang-x86-retail-layout", "configurePreset": "clang-x86-retail-layout" },
     { "name": "clang-x64-profile", "configurePreset": "clang-x64-profile" },
     { "name": "clang-x86-profile", "configurePreset": "clang-x86-profile" },
