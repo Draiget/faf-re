@@ -1524,7 +1524,7 @@ namespace moho
  * guarded/guard links from the source unit to the destination unit during an
  * upgrade, and queues an allied-upgrade sync notification.
  */
-int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
+int cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kNotifyUpgradeHelpText);
@@ -1644,7 +1644,7 @@ int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps the Lua callback binding state and forwards to `cfunc_NotifyUpgradeL`.
  */
-int moho::cfunc_NotifyUpgrade(lua_State* const luaContext)
+int cfunc_NotifyUpgrade(lua_State* const luaContext)
 {
   return cfunc_NotifyUpgradeL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1656,7 +1656,7 @@ int moho::cfunc_NotifyUpgrade(lua_State* const luaContext)
  * Publishes the global `NotifyUpgrade(from,to)` Lua binder and links it into the
  * sim script init form set.
  */
-void moho::func_NotifyUpgrade_LuaFuncDef()
+void func_NotifyUpgrade_LuaFuncDef()
 {
   static CScrLuaBinder binder(
     moho::SCR_SimLuaInitSet(),
@@ -1682,7 +1682,7 @@ void moho::func_NotifyUpgrade_LuaFuncDef()
  * (x, 0, z) with a yaw quaternion built from the heading (degrees), spawns the unit
  * through the sim, and pushes the created unit's script object back to Lua.
  */
-int moho::cfunc_CreateUnit2L(LuaPlus::LuaState* const state)
+int cfunc_CreateUnit2L(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 6, kCreateUnit2HelpText);
@@ -1772,7 +1772,7 @@ int moho::cfunc_CreateUnit2L(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps the Lua callback binding state and forwards to `cfunc_CreateUnit2L`.
  */
-int moho::cfunc_CreateUnit2(lua_State* const luaContext)
+int cfunc_CreateUnit2(lua_State* const luaContext)
 {
   return cfunc_CreateUnit2L(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1784,7 +1784,7 @@ int moho::cfunc_CreateUnit2(lua_State* const luaContext)
  * Publishes the global `CreateUnit2(blueprint, army, layer, x, z, heading)` Lua
  * binder and links it into the sim script init form set.
  */
-CScrLuaInitForm* moho::func_CreateUnit2_LuaFuncDef()
+CScrLuaInitForm* func_CreateUnit2_LuaFuncDef()
 {
   static CScrLuaBinder binder(
     moho::SCR_SimLuaInitSet(),
@@ -1813,7 +1813,7 @@ CScrLuaInitForm* moho::func_CreateUnit2_LuaFuncDef()
  * Numeric arguments are read right-to-left, while the constructed position
  * retains the Lua API's x, y, z order.
  */
-int moho::cfunc_CreateUnitL(LuaPlus::LuaState* const state)
+int cfunc_CreateUnitL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);
@@ -1932,7 +1932,7 @@ int moho::cfunc_CreateUnitL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps the Lua callback binding state and forwards to `cfunc_CreateUnitL`.
  */
-int moho::cfunc_CreateUnit(lua_State* const luaContext)
+int cfunc_CreateUnit(lua_State* const luaContext)
 {
   return cfunc_CreateUnitL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1944,7 +1944,7 @@ int moho::cfunc_CreateUnit(lua_State* const luaContext)
  * Publishes the global `CreateUnit(...)` Lua binder and links it into the sim
  * script init form set.
  */
-CScrLuaInitForm* moho::func_CreateUnit_LuaFuncDef()
+CScrLuaInitForm* func_CreateUnit_LuaFuncDef()
 {
   static CScrLuaBinder binder(
     moho::SCR_SimLuaInitSet(),
@@ -1971,7 +1971,7 @@ CScrLuaInitForm* moho::func_CreateUnit_LuaFuncDef()
  * and converts it to an orientation quaternion, spawns the unit through the sim,
  * and pushes its script object.
  */
-int moho::cfunc_CreateUnitHPRL(LuaPlus::LuaState* const state)
+int cfunc_CreateUnitHPRL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 8, kCreateUnitHPRHelpText);
@@ -2057,7 +2057,7 @@ int moho::cfunc_CreateUnitHPRL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps the Lua callback binding state and forwards to `cfunc_CreateUnitHPRL`.
  */
-int moho::cfunc_CreateUnitHPR(lua_State* const luaContext)
+int cfunc_CreateUnitHPR(lua_State* const luaContext)
 {
   return cfunc_CreateUnitHPRL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2069,7 +2069,7 @@ int moho::cfunc_CreateUnitHPR(lua_State* const luaContext)
  * Publishes the global `CreateUnitHPR(...)` Lua binder and links it into the sim
  * script init form set.
  */
-CScrLuaInitForm* moho::func_CreateUnitHPR_LuaFuncDef()
+CScrLuaInitForm* func_CreateUnitHPR_LuaFuncDef()
 {
   static CScrLuaBinder binder(
     moho::SCR_SimLuaInitSet(),
