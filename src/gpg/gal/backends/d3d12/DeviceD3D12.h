@@ -40,6 +40,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/OutputContext.hpp"
+#include "gpg/gal/backends/common/PipelineMemo.h"
 #include "gpg/gal/backends/common/WindowsCursor.h"
 #include "gpg/gal/backends/dxgi/DxgiFactory.h"
 #include "gpg/gal/backends/dxgi/DxgiSwapChain.h"
@@ -353,6 +354,21 @@ namespace gpg::gal
 
     // ---- pipeline state ------------------------------------------------------
     std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D12PipelineState>> mPipelines;
+    /** Everything mPipelines' string key is built from; see PipelineMemo. */
+    struct PipelineInputs
+    {
+      std::uint64_t vertexKey;
+      std::uint64_t pixelKey;
+      std::uint32_t format;
+      std::uint32_t sampleMask;
+      effects::BlendDesc blend;
+      effects::DepthStencilDesc depth;
+      effects::RasterizerDesc rasterizer;
+      DXGI_FORMAT renderFormat;
+      DXGI_FORMAT depthFormat;
+      D3D12_PRIMITIVE_TOPOLOGY_TYPE topologyType;
+    };
+    PipelineMemo<PipelineInputs, ID3D12PipelineState*> mPipelineMemo;
     d3d12::PipelineCache mPipelineCache; // engine addition: mPipelines' entries kept on disk across sessions
     std::map<std::string, D3D12_GPU_DESCRIPTOR_HANDLE> mSamplerTables; // by content
     std::uint64_t mArenaEpoch = 0; // bumped when a frame's view arena is emptied mid-frame

@@ -7,6 +7,7 @@
 #include "gpg/gal/PipelineDiskCache.h"
 #include "gpg/gal/PlacedResources.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
+#include "gpg/gal/backends/common/PipelineMemo.h"
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "moho/console/CConCommand.h"
@@ -42,6 +43,14 @@ namespace moho
       "Direct3D 12: small static buffers sit at offsets inside large buffers (1, the default), or each takes at "
       "least 64 KB of a heap (0). Needs d3d_PlacedResources. Read at each creation.",
       &gpg::gal::gSharedBuffers
+    );
+
+    /** Engine addition: `ren_PipelineMemo` (see gpg/gal/backends/common/PipelineMemo.h). */
+    TConVar<bool> gTConVar_ren_PipelineMemo(
+      "ren_PipelineMemo",
+      "Direct3D 12 / Vulkan: a draw finds its pipeline in a small table of recent ones (1, the default), or always builds "
+      "the full key (0). Read at each draw.",
+      &gpg::gal::gPipelineMemo
     );
 
     /** Engine addition: `ren_LockedRangeOnly` (see gpg/gal/PlacedResources.h). */

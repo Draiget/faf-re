@@ -301,6 +301,7 @@ namespace gpg::gal
         garbage.serial = 0U;
       }
       CollectCompleted();
+      mPipelineMemo.Clear();
       for (auto& [key, pipeline] : mPipelines) {
         if (pipeline != VK_NULL_HANDLE) {
           Vk().vkDestroyPipeline(mDevice, pipeline, nullptr);
@@ -2769,6 +2770,29 @@ namespace gpg::gal
       depthFormat = static_cast<DepthStencilTargetVulkan*>(outputContext_.depthStencil.get())->Image().format;
     }
 
+    // Engine change (ren_PipelineMemo): recent pipelines are found without building the string key below.
+    PipelineInputs inputs;
+    std::memset(static_cast<void*>(&inputs), 0, sizeof(inputs));
+    inputs.vertexKey = pass.vertexShader->key;
+    inputs.pixelKey = (pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL;
+    inputs.format = mBoundFormat;
+    inputs.sampleMask = pass.state.sampleMask;
+    for (std::uint32_t slot = 0U; slot < 16U; ++slot) {
+      inputs.strides[slot] = mStreams[slot].stride;
+    }
+    inputs.blend = pass.state.blend;
+    inputs.depth = pass.state.depthStencil;
+    inputs.rasterizer = pass.state.rasterizer;
+    inputs.colorFormat = colorFormat;
+    inputs.depthFormat = depthFormat;
+    inputs.topology = topology;
+    if (gPipelineMemo) {
+      const VkPipeline known = mPipelineMemo.Find(inputs);
+      if (known != VK_NULL_HANDLE) {
+        return known;
+      }
+    }
+
     KeyWriter key;
     key.Add(pass.vertexShader->key);
     key.Add((pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL);
@@ -2808,6 +2832,7 @@ namespace gpg::gal
     key.Add(topology);
     auto found = mPipelines.find(key.Key());
     if (found != mPipelines.end()) {
+      mPipelineMemo.Store(inputs, found->second);
       return found->second;
     }
 

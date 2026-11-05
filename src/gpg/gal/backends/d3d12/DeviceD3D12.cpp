@@ -398,6 +398,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mSwapChains.clear();
     mGarbage.clear();
     mPipelineCache.Close();
+    mPipelineMemo.Clear();
     mPipelines.clear();
     mBlitPipelines.clear();
     mPipelineState.reset();
@@ -2972,6 +2973,25 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       depthFormat = static_cast<DepthStencilTargetD3D12*>(outputContext_.depthStencil.get())->DepthFormat();
     }
 
+    // Engine change (ren_PipelineMemo): recent pipelines are found without building the string key below.
+    PipelineInputs inputs;
+    std::memset(static_cast<void*>(&inputs), 0, sizeof(inputs));
+    inputs.vertexKey = pass.vertexShader->key;
+    inputs.pixelKey = (pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL;
+    inputs.format = mBoundFormat;
+    inputs.sampleMask = pass.state.sampleMask;
+    inputs.blend = pass.state.blend;
+    inputs.depth = pass.state.depthStencil;
+    inputs.rasterizer = pass.state.rasterizer;
+    inputs.renderFormat = renderFormat;
+    inputs.depthFormat = depthFormat;
+    inputs.topologyType = topologyType;
+    if (gPipelineMemo) {
+      if (ID3D12PipelineState* const known = mPipelineMemo.Find(inputs)) {
+        return known;
+      }
+    }
+
     KeyWriter key;
     key.Add(pass.vertexShader->key);
     key.Add((pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL);
@@ -2985,6 +3005,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     key.Add(topologyType);
     auto found = mPipelines.find(key.Key());
     if (found != mPipelines.end()) {
+      mPipelineMemo.Store(inputs, found->second.Get());
       return found->second.Get();
     }
 

@@ -36,6 +36,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/OutputContext.hpp"
+#include "gpg/gal/backends/common/PipelineMemo.h"
 #include "gpg/gal/backends/common/WindowsCursor.h"
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "gpg/gal/effects/SpirvReflect.h"
@@ -339,6 +340,22 @@ namespace gpg::gal
     std::map<std::pair<std::uint64_t, std::uint64_t>, VkShaderModule> mLinkedModules;
     std::unordered_map<std::uint64_t, effects::SpirvInterface> mInterfaces;
     std::unordered_map<std::string, VkPipeline> mPipelines;
+    /** Everything mPipelines' string key is built from; see PipelineMemo. */
+    struct PipelineInputs
+    {
+      std::uint64_t vertexKey;
+      std::uint64_t pixelKey;
+      std::uint32_t format;
+      std::uint32_t sampleMask;
+      std::uint32_t strides[16];
+      effects::BlendDesc blend;
+      effects::DepthStencilDesc depth;
+      effects::RasterizerDesc rasterizer;
+      VkFormat colorFormat;
+      VkFormat depthFormat;
+      VkPrimitiveTopology topology;
+    };
+    PipelineMemo<PipelineInputs, VkPipeline> mPipelineMemo;
 
     // ---- heads ---------------------------------------------------------------
     std::vector<SwapChain> mSwapChains;
