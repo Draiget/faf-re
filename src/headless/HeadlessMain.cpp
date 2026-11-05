@@ -169,6 +169,7 @@ namespace
       "  --keyframe-dir <dir>      where the keyframe files go (default: keyframes)\n"
       "  --keyframe-keep           keep the keyframe files after measuring them\n"
       "  --keyframe-prepare        for the replay viewer: files get their names when complete, nothing is measured\n"
+      "  --keyframe-quiet          with --keyframe-prepare: compressed as they are saved, named by their tick; the init file can't raise the priority\n"
       "  --resume-from <file>      continue the replay from one of its keyframes instead of its start\n"
       "  --seek <beat,beat,...>    with --keyframe-every: move to each beat in turn inside this process, by ending\n"
       "                            the session and restoring the newest keyframe before it, then play to the end;\n"

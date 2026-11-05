@@ -212,17 +212,18 @@ function Create()
         bar = false
     end
 
-    -- The options screen sets these when changed; a game starts with the engine's defaults.
-    local GetOption = import('/lua/user/prefs.lua').GetOption
-    local budget = GetOption('replay_keyframe_budget')
+    -- The options screen sets these when changed; a game starts with the engine's defaults. GetOptions and not
+    -- GetOption, which gives an unset option's default, and that would overwrite /con.
+    local GetOptions = import('/lua/user/prefs.lua').GetOptions
+    local budget = GetOptions('replay_keyframe_budget')
     if budget then
         ConExecute("replay_KeyframeMaxMB " .. tostring(budget))
     end
-    local spacing = GetOption('replay_keyframe_spacing')
+    local spacing = GetOptions('replay_keyframe_spacing')
     if spacing then
         ConExecute("replay_KeyframeEvery " .. tostring(math.floor(spacing) * 10))
     end
-    local prepare = GetOption('replay_keyframe_prepare')
+    local prepare = GetOptions('replay_keyframe_prepare')
     if prepare then
         ConExecute("replay_PrepareKeyframes " .. tostring(prepare))
     end

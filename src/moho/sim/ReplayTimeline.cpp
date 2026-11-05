@@ -5,6 +5,8 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <deque>
 #include <filesystem>
 #include <map>
@@ -67,6 +69,15 @@ namespace moho
       &replay_PrepareKeyframes
     );
 
+    bool replay_KeyframeQuietDisk = true;
+    TConVar<bool> gTConVar_replay_KeyframeQuietDisk(
+      "replay_KeyframeQuietDisk",
+      "The hidden process stays below normal priority and compresses keyframes as it saves them; the viewer's are marked temporary, so they stay in the "
+      "system's file cache until compressed; their file work runs on a background thread; and the viewer's sim doesn't "
+      "stop to save while the hidden process runs. Read for the hidden process when a replay opens.",
+      &replay_KeyframeQuietDisk
+    );
+
     // Moves shorter than this say too little about the speed.
     constexpr std::int32_t kMinTicksToMeasure = 50;
     // A longer way than this from a keyframe plays forward in view: holding it would take too much memory.
@@ -82,7 +93,6 @@ namespace moho
     constexpr std::int32_t kKeyframeSameSpotTicks = 60;
     // However small the budget, these stay.
     constexpr std::size_t kMinKeyframes = 4;
-    constexpr int kKeyframeZstdLevel = 3;
 
     using Clock = std::chrono::steady_clock;
 
@@ -222,7 +232,7 @@ namespace moho
       if (!context) {
         return false;
       }
-      (void)ZSTD_CCtx_setParameter(context.get(), ZSTD_c_compressionLevel, kKeyframeZstdLevel);
+      (void)ZSTD_CCtx_setParameter(context.get(), ZSTD_c_compressionLevel, kSimKeyframeZstdLevel);
       std::vector<char> inBuffer(ZSTD_CStreamInSize());
       std::vector<char> outBuffer(ZSTD_CStreamOutSize());
       bool ended = false;
@@ -288,6 +298,20 @@ namespace moho
     std::atomic<bool> sCompressStop{false};
     std::thread* sCompressThread = nullptr;
 
+    /** A keyframe the hidden process finished, moved up by the background thread. An empty path: one here already. */
+    struct SPreparedKeyframe
+    {
+      std::int32_t tick = 0;
+      std::string path;
+      std::uint64_t bytes = 0;
+      bool compressed = false;
+    };
+    std::deque<std::string> sRemoveQueue;
+    std::vector<SPreparedKeyframe> sPreparedFound;
+    bool sPrepareScanning = false;
+    std::filesystem::path sPrepareScanFrom;
+    std::filesystem::path sPrepareScanTo;
+
     void CompressOneKeyframe(const std::int32_t tick, const std::string& plainPath)
     {
       SCompressedKeyframe done;
@@ -319,20 +343,108 @@ namespace moho
       sCompressDone.push_back(std::move(done));
     }
 
+    /** On the background thread, once a second: what the hidden process has finished moves up to the keyframes. */
+    void ScanPreparedKeyframes(const std::filesystem::path& from, const std::filesystem::path& to)
+    {
+      std::error_code ignored;
+      std::vector<std::filesystem::path> finished;
+      for (const auto& entry : std::filesystem::directory_iterator(from, ignored)) {
+        if (entry.path().extension() == ".bin") {
+          finished.push_back(entry.path());
+        } else if (entry.path().extension() == ".zst") {
+          // Compressed by the hidden process: keyframe_<tick>.bin.zst, its tick in its name.
+          SPreparedKeyframe found;
+          found.tick = std::atoi(entry.path().filename().string().c_str() + std::strlen("keyframe_"));
+          const std::filesystem::path target = to / entry.path().filename();
+          found.bytes = static_cast<std::uint64_t>(std::filesystem::file_size(entry.path(), ignored));
+          std::error_code renameFailed;
+          std::filesystem::rename(entry.path(), target, renameFailed);
+          if (renameFailed) {
+            continue; // tried again next time
+          }
+          found.path = target.string();
+          found.compressed = true;
+          const std::lock_guard<std::mutex> lock(sCompressLock);
+          sPreparedFound.push_back(std::move(found));
+        }
+      }
+      for (const std::filesystem::path& file : finished) {
+        SSimKeyframeHeader header{};
+        bool readable = false;
+        std::FILE* input = nullptr;
+        if (fopen_s(&input, file.string().c_str(), "rb") == 0 && input != nullptr) {
+          readable = SIM_ReadKeyframeHeader(input, header);
+          std::fclose(input);
+        }
+        if (!readable) {
+          std::filesystem::remove(file, ignored);
+          continue;
+        }
+        SPreparedKeyframe found;
+        found.tick = static_cast<std::int32_t>(header.tick);
+        const std::filesystem::path target = to / ("keyframe_" + std::to_string(found.tick) + ".bin");
+        if (std::filesystem::exists(target, ignored)) {
+          std::filesystem::remove(file, ignored);
+        } else {
+          const std::uintmax_t size = std::filesystem::file_size(file, ignored);
+          std::error_code renameFailed;
+          std::filesystem::rename(file, target, renameFailed);
+          if (renameFailed) {
+            continue; // tried again next time
+          }
+          found.path = target.string();
+          found.bytes = static_cast<std::uint64_t>(size);
+        }
+        const std::lock_guard<std::mutex> lock(sCompressLock);
+        sPreparedFound.push_back(std::move(found));
+      }
+    }
+
     void CompressThreadMain()
     {
       ::SetThreadPriority(::GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+      Clock::time_point nextScan = Clock::now();
       std::unique_lock<std::mutex> lock(sCompressLock);
       while (!sCompressStop.load()) {
-        if (sCompressQueue.empty()) {
-          sCompressWake.wait(lock);
+        if (!sRemoveQueue.empty()) {
+          const std::string path = std::move(sRemoveQueue.front());
+          sRemoveQueue.pop_front();
+          lock.unlock();
+          RemoveFile(path);
+          lock.lock();
           continue;
         }
-        const auto [tick, plainPath] = sCompressQueue.front();
-        sCompressQueue.pop_front();
-        lock.unlock();
-        CompressOneKeyframe(tick, plainPath);
-        lock.lock();
+        if (sPrepareScanning && Clock::now() >= nextScan) {
+          nextScan = Clock::now() + std::chrono::seconds(1);
+          const std::filesystem::path from = sPrepareScanFrom;
+          const std::filesystem::path to = sPrepareScanTo;
+          lock.unlock();
+          ScanPreparedKeyframes(from, to);
+          lock.lock();
+          continue;
+        }
+        if (!sCompressQueue.empty()) {
+          const auto [tick, plainPath] = sCompressQueue.front();
+          sCompressQueue.pop_front();
+          lock.unlock();
+          CompressOneKeyframe(tick, plainPath);
+          lock.lock();
+          continue;
+        }
+        if (sPrepareScanning) {
+          sCompressWake.wait_until(lock, nextScan);
+        } else {
+          sCompressWake.wait(lock);
+        }
+      }
+    }
+
+    /** With `sCompressLock` held. */
+    void StartFileThread()
+    {
+      if (sCompressThread == nullptr) {
+        sCompressStop.store(false);
+        sCompressThread = new std::thread(&CompressThreadMain);
       }
     }
 
@@ -340,10 +452,16 @@ namespace moho
     {
       const std::lock_guard<std::mutex> lock(sCompressLock);
       sCompressQueue.emplace_back(tick, plainPath);
-      if (sCompressThread == nullptr) {
-        sCompressStop.store(false);
-        sCompressThread = new std::thread(&CompressThreadMain);
-      }
+      StartFileThread();
+      sCompressWake.notify_one();
+    }
+
+    /** A delete can wait for the disk, and the main thread must not. */
+    void RemoveFileLater(const std::string& path)
+    {
+      const std::lock_guard<std::mutex> lock(sCompressLock);
+      sRemoveQueue.push_back(path);
+      StartFileThread();
       sCompressWake.notify_one();
     }
 
@@ -353,6 +471,8 @@ namespace moho
         const std::lock_guard<std::mutex> lock(sCompressLock);
         sCompressStop.store(true);
         sCompressQueue.clear();
+        sRemoveQueue.clear();
+        sPreparedFound.clear();
         sCompressWake.notify_one();
       }
       if (sCompressThread != nullptr) {
@@ -374,7 +494,6 @@ namespace moho
     HANDLE sPrepareJob = nullptr;
     HANDLE sPrepareProcess = nullptr;
     std::int32_t sPreparedTick = -1;
-    Clock::time_point sNextPrepareCheck{};
     bool sPrepareStartDue = false;
 
     [[nodiscard]] std::filesystem::path PrepareDirectory()
@@ -386,6 +505,10 @@ namespace moho
     {
       sPrepareStartDue = false;
       sPreparedTick = -1;
+      {
+        const std::lock_guard<std::mutex> lock(sCompressLock);
+        sPrepareScanning = false;
+      }
       if (sPrepareProcess != nullptr) {
         ::TerminateProcess(sPrepareProcess, 0u);
         ::WaitForSingleObject(sPrepareProcess, 3000u);
@@ -421,7 +544,8 @@ namespace moho
       std::snprintf(first, sizeof(first), "%d", kFirstKeyframeTick);
       const std::string command = "\"" + self.string() + "\" /replaykeyframes --keep-client-data --label prepare --replay \"" + sReplayPath + "\" /init \""
         + initArgs[0].c_str() + "\" /nobugreport /nosound /log \"" + (directory / "prepare.log").string()
-        + "\" --keyframe-every " + every + " --keyframe-first " + first + " --keyframe-dir \"" + directory.string() + "\" --keyframe-prepare";
+        + "\" --keyframe-every " + every + " --keyframe-first " + first + " --keyframe-dir \"" + directory.string() + "\" --keyframe-prepare"
+        + (replay_KeyframeQuietDisk ? " --keyframe-quiet" : "");
 
       STARTUPINFOA startup{};
       startup.cb = sizeof(startup);
@@ -445,10 +569,18 @@ namespace moho
       ::ResumeThread(process.hThread);
       ::CloseHandle(process.hThread);
       sPrepareProcess = process.hProcess;
+      {
+        const std::lock_guard<std::mutex> lock(sCompressLock);
+        sPrepareScanFrom = directory;
+        sPrepareScanTo = KeyframeDirectory();
+        sPrepareScanning = true;
+        StartFileThread();
+        sCompressWake.notify_one();
+      }
       gpg::Logf("Replay timeline: preparing keyframes ahead with a hidden %s", self.string().c_str());
     }
 
-    /** Takes in what the hidden process has finished, once a second: its files move up and are compressed like our own. */
+    /** Takes in what the background thread has moved up from the hidden process: compressed like our own. */
     [[nodiscard]] bool HaveKeyframeNear(const std::int32_t tick)
     {
       const auto next = sKeyframes.lower_bound(tick - kKeyframeSameSpotTicks);
@@ -457,46 +589,32 @@ namespace moho
 
     void TakePreparedKeyframes()
     {
-      if (sPrepareProcess == nullptr) {
-        return;
+      std::vector<SPreparedKeyframe> found;
+      {
+        const std::lock_guard<std::mutex> lock(sCompressLock);
+        found.swap(sPreparedFound);
       }
-      const Clock::time_point now = Clock::now();
-      if (now < sNextPrepareCheck) {
-        return;
-      }
-      sNextPrepareCheck = now + std::chrono::seconds(1);
-      std::error_code ignored;
-      std::vector<std::filesystem::path> finished;
-      for (const auto& entry : std::filesystem::directory_iterator(PrepareDirectory(), ignored)) {
-        if (entry.path().extension() == ".bin") {
-          finished.push_back(entry.path());
-        }
-      }
-      for (const std::filesystem::path& file : finished) {
-        SSimKeyframeHeader header{};
-        bool readable = false;
-        std::FILE* input = nullptr;
-        if (fopen_s(&input, file.string().c_str(), "rb") == 0 && input != nullptr) {
-          readable = SIM_ReadKeyframeHeader(input, header);
-          std::fclose(input);
-        }
-        const std::int32_t tick = static_cast<std::int32_t>(header.tick);
-        // One the viewer saved as it passed here is as good, and a second only takes disk.
-        if (!readable || HaveKeyframeNear(tick)) {
-          sPreparedTick = readable ? std::max(sPreparedTick, tick) : sPreparedTick;
-          std::filesystem::remove(file, ignored);
+      for (const SPreparedKeyframe& prepared : found) {
+        const std::int32_t tick = prepared.tick;
+        sPreparedTick = std::max(sPreparedTick, tick);
+        if (prepared.path.empty()) {
           continue;
         }
-        const std::string path = (KeyframeDirectory() / ("keyframe_" + std::to_string(tick) + ".bin")).string();
-        const std::uintmax_t size = std::filesystem::file_size(file, ignored);
-        std::error_code renameFailed;
-        std::filesystem::rename(file, path, renameFailed);
-        if (renameFailed) {
-          continue; // tried again next time
+        // The same file as one here, which the move up has replaced.
+        if (const auto same = sKeyframes.find(tick); same != sKeyframes.end() && same->second.path == prepared.path) {
+          continue;
         }
-        sKeyframeBytes += size;
-        sKeyframes[tick] = SKeyframeFile{path, static_cast<std::uint64_t>(size)};
-        sPreparedTick = std::max(sPreparedTick, tick);
+        // One the viewer saved as it passed here is as good, and a second only takes disk.
+        if (HaveKeyframeNear(tick)) {
+          RemoveFileLater(prepared.path);
+          continue;
+        }
+        const std::string& path = prepared.path;
+        sKeyframeBytes += prepared.bytes;
+        sKeyframes[tick] = SKeyframeFile{path, prepared.bytes};
+        if (prepared.compressed) {
+          continue;
+        }
         QueueKeyframeCompression(tick, path);
       }
     }
@@ -526,7 +644,7 @@ namespace moho
             ++entry;
           } else {
             sKeyframeBytes -= std::min(entry->second.bytes, sKeyframeBytes);
-            RemoveFile(entry->second.path);
+            RemoveFileLater(entry->second.path);
             entry = sKeyframes.erase(entry);
           }
           keep = !keep;
@@ -552,7 +670,7 @@ namespace moho
           continue; // it stays plain, or the budget has already removed it
         }
         if (entry == sKeyframes.end() || entry->second.path != keyframe.plainPath) {
-          RemoveFile(keyframe.path);
+          RemoveFileLater(keyframe.path);
           continue;
         }
         sKeyframeBytes = sKeyframeBytes - std::min(entry->second.bytes, sKeyframeBytes) + keyframe.bytes;
@@ -583,7 +701,7 @@ namespace moho
         return nullptr;
       }
       bool ok = false;
-      if (fopen_s(&file, plainPath.c_str(), "w+bD") == 0 && file != nullptr) {
+      if (fopen_s(&file, plainPath.c_str(), replay_KeyframeQuietDisk ? "w+bDT" : "w+bD") == 0 && file != nullptr) {
         ok = DecompressStream(input, file) && std::fflush(file) == 0;
       }
       std::fclose(input);
@@ -614,7 +732,7 @@ namespace moho
         gSimExactSaveCount.fetch_add(1u);
         gSimExactArchive.store(true);
         std::FILE* file = nullptr;
-        if (fopen_s(&file, mPath.c_str(), "wb") != 0 || file == nullptr) {
+        if (fopen_s(&file, mPath.c_str(), replay_KeyframeQuietDisk ? "wbT" : "wb") != 0 || file == nullptr) {
           throw std::runtime_error("cannot write " + mPath);
         }
         mFile = boost::shared_ptr<std::FILE>(file, SFileStarCloser{});
@@ -841,7 +959,6 @@ namespace moho
     }
     // Turned off while it runs: the CPU it uses comes back at once, and what it has written stays.
     if (!replay_PrepareKeyframes && sPrepareProcess != nullptr) {
-      sNextPrepareCheck = Clock::time_point{};
       TakePreparedKeyframes();
       StopKeyframePreparation();
     }
@@ -866,6 +983,10 @@ namespace moho
     sLastKeyframeTick = tick;
     // The hidden process is past here: this sim needn't stop to save.
     if (sPreparedTick >= tick) {
+      return;
+    }
+    // Or will be: a save stops the sim, which shows.
+    if (replay_KeyframeQuietDisk && sPrepareProcess != nullptr && ::WaitForSingleObject(sPrepareProcess, 0u) == WAIT_TIMEOUT) {
       return;
     }
     if (HaveKeyframeNear(tick)) {

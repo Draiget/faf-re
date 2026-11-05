@@ -370,6 +370,12 @@ namespace
     }
 
     const auto priorityClass = static_cast<DWORD>(static_cast<std::uint32_t>(luaL_checknumber(state, 1)));
+    // Engine change: the replay viewer's hidden process runs the game's init file, which asks for high priority.
+    // It stays below normal, or it competes with the game it works for.
+    if (moho::CFG_GetArgOption("--keyframe-quiet", 0, nullptr)) {
+      lua_pushboolean(state, 1);
+      return 1;
+    }
     const HMODULE kernelModule = ::GetModuleHandleA("kernel32.dll");
     using SetPriorityClassFn = BOOL(WINAPI*)(HANDLE, DWORD);
     auto* const setPriorityClass = kernelModule != nullptr

@@ -368,6 +368,17 @@ namespace gpg
      */
     WriteArchive* CreateFastBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file);
 
+    /** Engine addition: where a fast archive's bytes go instead of a file. */
+    class WriteArchiveSink
+    {
+    public:
+        virtual ~WriteArchiveSink() = default;
+        [[nodiscard]] virtual bool Write(const void* bytes, std::size_t byteCount) = 0;
+    };
+
+    /** The same, into a sink that outlives the archive. */
+    WriteArchive* CreateFastBinaryWriteArchive(WriteArchiveSink& sink);
+
     /**
      * Address: 0x00939280 (FUN_00939280, ?CreateTextWriteArchive@gpg@@YAPAVWriteArchive@1@ABV?$shared_ptr@V?$basic_ostream@DU?$char_traits@D@std@@@std@@@boost@@@Z_0)
      *

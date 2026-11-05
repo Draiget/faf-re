@@ -691,10 +691,17 @@ public:
         mFastObjRefs = &mIndex;
     }
 
+    explicit FastBinaryWriteArchive(gpg::WriteArchiveSink& sink)
+        : mSink(&sink)
+        , mBuffer(std::make_unique<char[]>(kBufferBytes))
+    {
+        mFastObjRefs = &mIndex;
+    }
+
     ~FastBinaryWriteArchive() override
     {
         // After a failed write the caller has its exception, and a flush that fails here shows in the file's size.
-        (void)std::fwrite(mBuffer.get(), mUsed, 1u, mFile.get());
+        (void)Emit(mBuffer.get(), mUsed);
     }
 
     void WriteBytes(char* const bytes, const size_t byteCount) override { Put(bytes, byteCount); }
@@ -747,7 +754,7 @@ private:
         if (kBufferBytes - mUsed < byteCount) {
             Flush();
             if (byteCount >= kBufferBytes) {
-                if (std::fwrite(bytes, byteCount, 1u, mFile.get()) != 1u) {
+                if (!Emit(bytes, byteCount)) {
                     ThrowSerializationError("nowrite");
                 }
                 return;
@@ -763,12 +770,21 @@ private:
     {
         const std::size_t used = mUsed;
         mUsed = 0u;
-        if (used != 0u && std::fwrite(mBuffer.get(), used, 1u, mFile.get()) != 1u) {
+        if (used != 0u && !Emit(mBuffer.get(), used)) {
             ThrowSerializationError("nowrite");
         }
     }
 
+    [[nodiscard]] bool Emit(const void* const bytes, const std::size_t byteCount)
+    {
+        if (mSink != nullptr) {
+            return mSink->Write(bytes, byteCount);
+        }
+        return byteCount == 0u || std::fwrite(bytes, byteCount, 1u, mFile.get()) == 1u;
+    }
+
     boost::shared_ptr<std::FILE> mFile;
+    gpg::WriteArchiveSink* mSink = nullptr;
     std::unique_ptr<char[]> mBuffer;
     std::size_t mUsed = 0u;
     TrackedPointerIndex mIndex;
@@ -1131,6 +1147,11 @@ WriteArchive* gpg::CreateBinaryWriteArchive(const boost::shared_ptr<std::FILE>& 
 WriteArchive* gpg::CreateFastBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file)
 {
     return new FastBinaryWriteArchive(file);
+}
+
+WriteArchive* gpg::CreateFastBinaryWriteArchive(WriteArchiveSink& sink)
+{
+    return new FastBinaryWriteArchive(sink);
 }
 
 /**
