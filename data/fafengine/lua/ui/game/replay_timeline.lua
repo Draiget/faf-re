@@ -168,11 +168,15 @@ function Create()
     watcher:DisableHitTest()
     watcher:SetNeedsFrameUpdate(true)
     local untilKeyframeRefresh = 0
+    local atBottom = false
     watcher.OnFrame = function(self, delta)
         local progress = ReplaySeekProgress()
 
-        local mouse = GetMouseScreenPos()
-        local atBottom = mouse[2] >= parent.Bottom() - LayoutHelpers.ScaleNumber(kBottomEdge)
+        -- Off the world view, which includes over this bar, the height is NaN: the last one known stands.
+        local mouseY = GetMouseScreenPos()[2]
+        if mouseY == mouseY then
+            atBottom = mouseY >= parent.Bottom() - LayoutHelpers.ScaleNumber(kBottomEdge)
+        end
         bar:Fade(pinned or atBottom or scrubber:IsDragging() or progress != nil, delta, kFadeSeconds)
 
         local tick = GameTick()
