@@ -205,12 +205,7 @@ namespace moho
     LuaPlus::LuaState* const state
   )
   {
-    if (object == nullptr) {
-      return nullptr;
-    }
-
-    *object = CScrLuaMetatableFactory<CPlatoon>::Instance().Get(state);
-    return object;
+    return SCR_WriteMetatable<CPlatoon>(object, state);
   }
 
   /**

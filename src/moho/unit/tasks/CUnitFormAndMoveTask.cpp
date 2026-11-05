@@ -430,12 +430,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitFormAndMoveTask(gpg::RRef* const outRef, moho::CUnitFormAndMoveTask* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitFormAndMoveTask>());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

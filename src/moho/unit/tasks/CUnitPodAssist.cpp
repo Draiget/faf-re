@@ -603,12 +603,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitPodAssist(gpg::RRef* const outRef, moho::CUnitPodAssist* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitPodAssist>());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 } // namespace gpg
 

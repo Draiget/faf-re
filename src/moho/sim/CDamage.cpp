@@ -289,14 +289,7 @@ namespace moho
    */
   void CDamageTypeInfo::AddBaseScriptObject(gpg::RType* const typeInfo)
   {
-    gpg::RType* const scriptObjectType = gpg::RTypeOf<moho::CScriptObject>();
-    gpg::RField baseField{};
-    baseField.mName = scriptObjectType->GetName();
-    baseField.mType = scriptObjectType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::CScriptObject>(typeInfo);
   }
 
   /**

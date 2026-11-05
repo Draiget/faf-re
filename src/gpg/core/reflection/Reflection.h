@@ -6281,6 +6281,20 @@ namespace gpg
   }
 
   /**
+   * Engine addition: as above, with the type `RTypeOf` finds for the object's static type.
+   */
+  template <class TObject>
+  RRef* WriteDerivedRef(RRef* const out, TObject* const value)
+  {
+    if (!out) {
+      return nullptr;
+    }
+
+    *out = MakeDerivedRef(value, RTypeOf<TObject>());
+    return out;
+  }
+
+  /**
    * Engine addition: an `RType` teardown lane: empties the field and base lists, unless null.
    */
   template <class TType>
@@ -6369,6 +6383,20 @@ namespace gpg
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
     baseField.mOffset = offset;
+    baseField.mFlags = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
+  }
+
+  /**
+   * Engine addition: as AddReflectedBase, for a base type the caller already has.
+   */
+  inline void AddReflectedBaseType(RType* const typeInfo, RType* const baseType)
+  {
+    RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = 0;
     baseField.mFlags = 0;
     baseField.mDesc = nullptr;
     typeInfo->AddBase(baseField);

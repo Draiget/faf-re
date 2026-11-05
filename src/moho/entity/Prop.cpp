@@ -102,12 +102,7 @@ namespace moho
    */
   LuaPlus::LuaObject* func_GetPropFactory(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
   {
-    if (object == nullptr) {
-      return nullptr;
-    }
-
-    *object = CScrLuaMetatableFactory<Prop>::Instance().Get(state);
-    return object;
+    return SCR_WriteMetatable<Prop>(object, state);
   }
 
   /**

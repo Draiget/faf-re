@@ -740,12 +740,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitCallTeleport(gpg::RRef* const outRef, moho::CUnitCallTeleport* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitCallTeleport>());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

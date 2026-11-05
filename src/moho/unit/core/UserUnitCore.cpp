@@ -687,12 +687,7 @@ namespace moho
     LuaPlus::LuaState* const state
   )
   {
-    if (object == nullptr) {
-      return nullptr;
-    }
-
-    *object = CScrLuaMetatableFactory<UserUnit>::Instance().Get(state);
-    return object;
+    return SCR_WriteMetatable<UserUnit>(object, state);
   }
 }
 

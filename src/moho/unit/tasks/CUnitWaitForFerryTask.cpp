@@ -376,12 +376,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitWaitForFerryTask(gpg::RRef* const outRef, moho::CUnitWaitForFerryTask* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitWaitForFerryTask>());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

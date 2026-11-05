@@ -328,12 +328,7 @@ namespace moho
   LuaPlus::LuaObject*
   func_CreateCollisionManipulatorObject(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
   {
-    if (object == nullptr) {
-      return nullptr;
-    }
-
-    *object = CScrLuaMetatableFactory<CCollisionManipulator>::Instance().Get(state);
-    return object;
+    return SCR_WriteMetatable<CCollisionManipulator>(object, state);
   }
 
   /**

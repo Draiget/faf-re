@@ -404,12 +404,7 @@ namespace moho
    */
   LuaPlus::LuaObject* func_CreateLuaCameraImpl(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
   {
-    if (object == nullptr) {
-      return nullptr;
-    }
-
-    *object = CScrLuaMetatableFactory<CameraImpl>::Instance().Get(state);
-    return object;
+    return SCR_WriteMetatable<CameraImpl>(object, state);
   }
 } // namespace moho
 

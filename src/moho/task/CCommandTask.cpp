@@ -434,14 +434,7 @@ void CCommandTaskTypeInfo::Init()
  */
 void CCommandTaskTypeInfo::AddBase_CTask(gpg::RType* const typeInfo)
 {
-  gpg::RType* const taskType = gpg::RTypeOf<CTask>();
-  gpg::RField baseField{};
-  baseField.mName = taskType->GetName();
-  baseField.mType = taskType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBase<CTask>(typeInfo);
 }
 
 namespace gpg
@@ -455,12 +448,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CCommandTask(gpg::RRef* const outRef, moho::CCommandTask* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<CCommandTask>());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 } // namespace gpg
 
