@@ -1806,7 +1806,7 @@ int moho::cfunc_CAimManipulatorSetAimHeadingOffsetL(LuaPlus::LuaState* const sta
  */
 void moho::CAimManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
 {
-  if (this == nullptr || archive == nullptr) {
+  if (static_cast<const void*>(this) == nullptr || archive == nullptr) {
     return;
   }
 
@@ -1863,7 +1863,7 @@ void moho::CAimManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
  */
 void moho::CAimManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
 {
-  if (this == nullptr || archive == nullptr) {
+  if (static_cast<const void*>(this) == nullptr || archive == nullptr) {
     return;
   }
 

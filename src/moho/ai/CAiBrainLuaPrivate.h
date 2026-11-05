@@ -53,12 +53,12 @@ namespace
     return resource == moho::ECON_MASS ? value.MASS : value.ENERGY;
   }
 
-  [[nodiscard]] const float& SelectResourceLane(const moho::SEconPair& value, const moho::EEconResource resource) noexcept
+  [[maybe_unused]] [[nodiscard]] const float& SelectResourceLane(const moho::SEconPair& value, const moho::EEconResource resource) noexcept
   {
     return resource == moho::ECON_MASS ? value.MASS : value.ENERGY;
   }
 
-  [[nodiscard]] std::uint64_t SelectResourceLane(
+  [[maybe_unused]] [[nodiscard]] std::uint64_t SelectResourceLane(
     const moho::SEconStoragePair& value, const moho::EEconResource resource
   ) noexcept
   {

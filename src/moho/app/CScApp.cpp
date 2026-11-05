@@ -38,6 +38,7 @@
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/sim/DesyncTelemetry.h"
+#include "moho/sim/SimWorkerPool.h"
 #include "moho/misc/TimeBar.h"
 #include "moho/misc/CDiskWatch.h"
 #include "moho/net/CRejoinFeed.h"
@@ -509,6 +510,18 @@ namespace
       if (moho::REJOIN_BeginSetup(
             args[0].c_str(), std::atoi(args[1].c_str()), static_cast<unsigned short>(std::atoi(args[2].c_str())), &failureReason
           )) {
+        // The launcher, if there is one, still wants this game's results.
+        if (moho::CFG_GetArgOption("/gpgnet", 1, &args) && !args.empty()) {
+          u_long address = 0;
+          u_short port = 0;
+          if (moho::NET_GetAddrInfo(args[0].c_str(), 0, true, address, port) && port != 0) {
+            try {
+              moho::GPGNET_Attach(address, port);
+            } catch (const std::exception& exception) {
+              gpg::Warnf("REJOIN: can't reach the launcher: %s", exception.what());
+            }
+          }
+        }
         (void)moho::UI_StartRejoinScreen();
         return;
       }
@@ -1151,7 +1164,7 @@ bool CScApp::Init()
   // with the real Lua one. Run it any later and those early imports get the
   // stub: SCR_Import hands back a boolean and the callers fail with
   // "index expected but got boolean".
-  moho::SCR_LuaDoScript(moho::USER_GetLuaState(), "/lua/userInit.lua", nullptr);
+  (void)moho::SCR_LuaDoScript(moho::USER_GetLuaState(), "/lua/userInit.lua", nullptr);
 
   moho::USER_EnsureDocumentDirectories();
 
@@ -1387,6 +1400,7 @@ void CScApp::Main()
   moho::SCR_FlushUiScriptChunkCache(false); // engine addition (res_UiScriptChunkCache)
 
   if (initialized == 0) {
+    moho::gSimDefaultWorkers = 4; // engine addition, see its declaration
     InitializeSessionFromCommandLine();
     initialized = 1;
   }

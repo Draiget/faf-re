@@ -19,9 +19,6 @@
 
 namespace
 {
-  constexpr const char* kSerializationHeaderPath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.h";
-
   // Forward declaration: defined further down in this namespace; used by
   // SScrollerSerializer::Init() below.
 
@@ -673,7 +670,7 @@ namespace
   void DeserializeCTextureScrollerSerializerCallback(gpg::ReadArchive* archive, std::intptr_t objectPtr, int unusedTag, gpg::RRef* ownerRef);
   void SerializeCTextureScrollerSerializerCallback(gpg::WriteArchive* archive, std::intptr_t objectPtr, int unusedTag, gpg::RRef* ownerRef);
 
-  void DeserializeCTextureScrollerSerializerCallback(
+  [[maybe_unused]] void DeserializeCTextureScrollerSerializerCallback(
     gpg::ReadArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -683,7 +680,7 @@ namespace
     reinterpret_cast<moho::CTextureScroller*>(objectPtr)->MemberDeserialize(archive);
   }
 
-  void SerializeCTextureScrollerSerializerCallback(
+  [[maybe_unused]] void SerializeCTextureScrollerSerializerCallback(
     gpg::WriteArchive* const archive,
     const std::intptr_t objectPtr,
     const int,

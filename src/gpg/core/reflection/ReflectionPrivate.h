@@ -363,7 +363,7 @@ moho::CScriptObject** TryUpcastCScriptObjectPointerSlotOrThrow(const RRef& sourc
  * What it does:
  * Allocates one `CScriptObject*` slot and returns it as typed `RRef`.
  */
-RRef NewCScriptObjectPointerSlotRef()
+[[maybe_unused]] RRef NewCScriptObjectPointerSlotRef()
 {
     auto* const slot = static_cast<moho::CScriptObject**>(::operator new(sizeof(moho::CScriptObject*)));
     RRef out{};
@@ -377,7 +377,7 @@ RRef NewCScriptObjectPointerSlotRef()
  * What it does:
  * Allocates one `CScriptObject*` slot and copies pointer lane value from source.
  */
-RRef CopyCScriptObjectPointerSlotRef(RRef* const sourceRef)
+[[maybe_unused]] RRef CopyCScriptObjectPointerSlotRef(RRef* const sourceRef)
 {
     auto* slot = static_cast<moho::CScriptObject**>(::operator new(sizeof(moho::CScriptObject*)));
     if (slot) {
@@ -398,7 +398,7 @@ RRef CopyCScriptObjectPointerSlotRef(RRef* const sourceRef)
  * What it does:
  * Wraps existing `CScriptObject*` slot storage as typed `RRef`.
  */
-RRef ConstructCScriptObjectPointerSlotRef(void* const slotObject)
+[[maybe_unused]] RRef ConstructCScriptObjectPointerSlotRef(void* const slotObject)
 {
     RRef out{};
     out = gpg::MakeRRef<moho::CScriptObject*>(static_cast<moho::CScriptObject**>(slotObject));
@@ -411,7 +411,7 @@ RRef ConstructCScriptObjectPointerSlotRef(void* const slotObject)
  * What it does:
  * Moves/copies pointer lane value into destination `CScriptObject*` slot.
  */
-RRef MoveCScriptObjectPointerSlotRef(void* const slotObject, RRef* const sourceRef)
+[[maybe_unused]] RRef MoveCScriptObjectPointerSlotRef(void* const slotObject, RRef* const sourceRef)
 {
     auto* slot = static_cast<moho::CScriptObject**>(slotObject);
     if (slot) {
@@ -451,7 +451,7 @@ RRef MoveCScriptObjectPointerSlotRef(void* const slotObject, RRef* const sourceR
    * Constructs the `Rect2<int>` reflection type descriptor, whose constructor
    * preregisters it under `typeid(Rect2i)`.
    */
-  void register_Rect2iTypeInfo()
+  [[maybe_unused]] void register_Rect2iTypeInfo()
   {
     (void)GetRect2iTypeInfo();
   }
@@ -463,7 +463,7 @@ RRef MoveCScriptObjectPointerSlotRef(void* const slotObject, RRef* const sourceR
    * Constructs the `Rect2<float>` reflection type descriptor, whose
    * constructor preregisters it under `typeid(Rect2f)`.
    */
-  void register_Rect2fTypeInfo()
+  [[maybe_unused]] void register_Rect2fTypeInfo()
   {
     (void)GetRect2fTypeInfo();
   }

@@ -263,7 +263,7 @@ namespace
    * `version` and the owner-ref lane are unused by the member (mirrors the
    * binary tail call).
    */
-  void DeserializeCUnitCarrierLandSerializerCallback(
+  [[maybe_unused]] void DeserializeCUnitCarrierLandSerializerCallback(
     gpg::ReadArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -286,7 +286,7 @@ namespace
    * `version` and the owner-ref lane are unused by the member (mirrors the
    * binary tail call).
    */
-  void SerializeCUnitCarrierLandSerializerCallback(
+  [[maybe_unused]] void SerializeCUnitCarrierLandSerializerCallback(
     gpg::WriteArchive* const archive,
     const std::intptr_t objectPtr,
     const int,

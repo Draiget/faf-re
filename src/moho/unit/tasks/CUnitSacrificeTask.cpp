@@ -448,7 +448,7 @@ namespace
    * (FUN_005FF2C0 body); `version` and the owner-ref lane are unused by the
    * member (mirrors the binary tail call).
    */
-  void DeserializeCUnitSacrificeTaskSerializerCallback(
+  [[maybe_unused]] void DeserializeCUnitSacrificeTaskSerializerCallback(
     gpg::ReadArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -471,7 +471,7 @@ namespace
    * (FUN_005FF360 body); `version` and the owner-ref lane are unused by the
    * member (mirrors the binary tail call).
    */
-  void SerializeCUnitSacrificeTaskSerializerCallback(
+  [[maybe_unused]] void SerializeCUnitSacrificeTaskSerializerCallback(
     gpg::WriteArchive* const archive,
     const std::intptr_t objectPtr,
     const int,

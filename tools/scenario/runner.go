@@ -284,7 +284,7 @@ func (r *runner) step(ctx context.Context, s Step) error {
 		for _, p := range s.Rejoin.Peers {
 			peers = append(peers, launcher.RejoinPeer{UID: p.UID, Source: p.Source})
 		}
-		return r.l.Rejoin(s.Rejoin.UID, s.Rejoin.Source, s.Rejoin.KeyOf, s.Rejoin.Remote, peers)
+		return r.l.Rejoin(s.Rejoin.UID, s.Rejoin.Source, s.Rejoin.KeyOf, s.Rejoin.Launcher, s.Rejoin.Remote, peers)
 	case s.Send != nil:
 		return r.l.Send(s.Send.UID, gpgnet.New(s.Send.Cmd, normalizeArgs(s.Send.Args)...))
 	case s.Check != nil:

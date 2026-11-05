@@ -101,7 +101,7 @@ namespace
    * copy through `CopyAssignRUnitBlueprintWeapon` (FUN_00527680) by name so the
    * out-of-line copy-assignment symbol stays bound.
    */
-  const moho::RUnitBlueprintWeapon* CopyAssignUnitBlueprintWeaponRange(
+  [[maybe_unused]] const moho::RUnitBlueprintWeapon* CopyAssignUnitBlueprintWeaponRange(
     moho::RUnitBlueprintWeapon* destinationBegin,
     moho::RUnitBlueprintWeapon* destinationEnd,
     const moho::RUnitBlueprintWeapon* sourceBegin

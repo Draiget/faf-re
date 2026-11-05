@@ -455,11 +455,6 @@ namespace
     return moho::cfunc_CAiPersonalityGetSuperWeaponTendencyL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetFavouriteStructures(lua_State* const luaContext)
-  {
-    return moho::cfunc_CAiPersonalityGetFavouriteStructures(luaContext);
-  }
-
   int LuaCallback_CAiPersonalityGetAirUnitsEmphasis(lua_State* const luaContext)
   {
     return moho::cfunc_CAiPersonalityGetAirUnitsEmphasisL(moho::SCR_ResolveBindingState(luaContext));
@@ -498,11 +493,6 @@ namespace
   int LuaCallback_CAiPersonalityGetInDirectDamageEmphasis(lua_State* const luaContext)
   {
     return moho::cfunc_CAiPersonalityGetInDirectDamageEmphasisL(moho::SCR_ResolveBindingState(luaContext));
-  }
-
-  int LuaCallback_CAiPersonalityGetFavouriteUnits(lua_State* const luaContext)
-  {
-    return moho::cfunc_CAiPersonalityGetFavouriteUnits(luaContext);
   }
 
   int LuaCallback_CAiPersonalityGetSurvivalEmphasis(lua_State* const luaContext)

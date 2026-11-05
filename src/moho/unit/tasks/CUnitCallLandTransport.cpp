@@ -28,7 +28,7 @@ namespace
   constexpr std::uint64_t kUnitStateMaskCallLandTransportPending = 0x0000000000000100ull;
   constexpr std::uint64_t kUnitStateMaskWaitingForTransport = 0x0000000000000080ull;
   constexpr std::uint64_t kUnitStateMaskTeleporting = 0x0000000000080000ull;
-  constexpr float kPi = 3.1415927f;
+  [[maybe_unused]] constexpr float kPi = 3.1415927f;
   constexpr std::int16_t kInvalidCellPosComponent = static_cast<std::int16_t>(0x8000);
 
   [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept

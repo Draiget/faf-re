@@ -791,7 +791,7 @@ void WriteBinaryCompatibilityLane(
  * Runs one deleting-destructor thunk for `BinaryWriteArchive`, forwarding
  * through non-deleting teardown and optional storage release.
  */
-[[nodiscard]] BinaryWriteArchive* DestroyBinaryWriteArchiveDeleting(
+[[maybe_unused]] [[nodiscard]] BinaryWriteArchive* DestroyBinaryWriteArchiveDeleting(
     BinaryWriteArchive* const archive,
     const unsigned char deleteFlag
 )

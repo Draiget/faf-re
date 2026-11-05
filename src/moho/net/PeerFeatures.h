@@ -178,6 +178,9 @@ namespace moho
      */
     [[nodiscard]] SRejoinStatus RejoinStatus(int clientIndex) const;
 
+    /// How long since `clientIndex` last said where it has got taking its seat back.
+    [[nodiscard]] float RejoinSilenceSeconds(int clientIndex) const;
+
     /// What this client announces, for this session's switches.
     [[nodiscard]] static std::uint64_t LocalMask(const CClientManagerImpl& manager);
 
@@ -202,6 +205,10 @@ namespace moho
 
     void SendKeyTo(CClientManagerImpl& manager, CNetClient& peer);
 
+    /// Once every player has announced rejoin: tells a launcher that asked (`/rejoinoffer`).
+    void OfferRejoinToLauncher(CClientManagerImpl& manager);
+
     std::vector<SPeer> mPeers;
+    bool mRejoinOffered{false};
   };
 } // namespace moho

@@ -297,7 +297,7 @@ namespace
    * destination lanes, and on exception destroys already-written lanes before
    * rethrowing.
    */
-  void CopyAssignCommandArgRangeWithRollback(
+  [[maybe_unused]] void CopyAssignCommandArgRangeWithRollback(
     const SNetCommandArg& prototype,
     std::uint32_t count,
     SNetCommandArg* const destination
@@ -520,6 +520,21 @@ void moho::GPGNET_SubmitArmyStats(
 
   const SNetCommandArg payloadArg(statsPayload);
   active->WriteCommandWith1Arg("Stats", &payloadArg);
+}
+
+/**
+ * Engine addition (issue #275), not in the binary.
+ */
+void moho::GPGNET_ReportRejoinOffer(const msvc8::string& localSource, const msvc8::string& seats)
+{
+  const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
+  if (!active) {
+    return;
+  }
+
+  const SNetCommandArg sourceArg(localSource);
+  const SNetCommandArg seatsArg(seats);
+  active->WriteCommandWith2Args("RejoinOffer", &sourceArg, &seatsArg);
 }
 
 /**
@@ -1539,6 +1554,13 @@ void CGpgNetInterface::Connected(
 {
   if (!args.empty()) {
     throw std::runtime_error("Wrong number of arguments to Connected command, expected 0");
+  }
+
+  // Engine addition (issue #275): the lobby server takes Idle from a host as "this game is a lobby
+  // again" (FAF server, gameconnection.py), and the game is running. Results still go as usual.
+  if (moho::CFG_GetArgOption(gpg::StrArg{"/rejoin"}, 0u, nullptr)) {
+    gpg::Logf("GPGNET: coming back to a running game, so no lobby states.");
+    return;
   }
 
   gpg::Logf("GPGNET: entering idle state.");

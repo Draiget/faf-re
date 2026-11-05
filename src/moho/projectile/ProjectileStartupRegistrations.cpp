@@ -344,10 +344,10 @@ namespace
       size_ = sizeof(moho::ManyToOneBroadcaster_EProjectileImpactEvent);
       version_ = 1;
       serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(
-        &gpg::LoadAndBroadcastManyToOneListenerEProjectileImpactEvent
+        reinterpret_cast<void (*)()>(&gpg::LoadAndBroadcastManyToOneListenerEProjectileImpactEvent)
       );
       serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(
-        &gpg::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1
+        reinterpret_cast<void (*)()>(&gpg::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1)
       );
     }
   };

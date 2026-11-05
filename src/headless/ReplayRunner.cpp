@@ -585,7 +585,7 @@ namespace faf::headless
 
     // The launch info, completed as `WLD_DoLoading` completes it from the world session.
     moho::STIMap* const launchMap = new moho::STIMap(wldMap->mTerrainRes->mMap);
-    const Wm3::AxisAlignedBox3f mapBounds = launchMap->GetBounds3D(); // the sim takes the map
+    [[maybe_unused]] const Wm3::AxisAlignedBox3f mapBounds = launchMap->GetBounds3D(); // the sim takes the map
     launchInfo->mGameRules = rules.get();
     if (launchInfo->mMap != nullptr && launchInfo->mMap != launchMap) {
       delete launchInfo->mMap;
@@ -789,6 +789,9 @@ namespace faf::headless
 
     if (keyframes) {
       keyframes->SetPreparing(options.keyframePrepare);
+      if (options.keyframeFirst > 0) {
+        keyframes->SetFirstBeat(options.keyframeFirst);
+      }
     }
 
     std::unique_ptr<CReplayBoneStats> boneStats;

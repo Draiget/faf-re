@@ -282,7 +282,7 @@ namespace
    * Loads one reflected `SSTICommandConstantData` payload through cached RTTI
    * lookup and returns the archive pointer for chaining.
    */
-  gpg::ReadArchive* ReadSSTICommandConstantDataArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::ReadArchive* ReadSSTICommandConstantDataArchiveAndReturnArchive(
     gpg::ReadArchive* const archive,
     void* const objectPtr,
     gpg::RRef* const ownerRef
@@ -305,7 +305,7 @@ namespace
    * Loads one reflected `SSTICommandVariableData` payload through cached RTTI
    * lookup and returns the archive pointer for chaining.
    */
-  gpg::ReadArchive* ReadSSTICommandVariableDataArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::ReadArchive* ReadSSTICommandVariableDataArchiveAndReturnArchive(
     gpg::ReadArchive* const archive,
     void* const objectPtr,
     gpg::RRef* const ownerRef
@@ -328,7 +328,7 @@ namespace
    * Loads one reflected `CountedPtr<IFormationInstance>` payload through
    * cached RTTI lookup and returns the archive pointer for chaining.
    */
-  gpg::ReadArchive* ReadCountedPtrIFormationInstanceArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::ReadArchive* ReadCountedPtrIFormationInstanceArchiveAndReturnArchive(
     gpg::ReadArchive* const archive,
     void* const objectPtr,
     gpg::RRef* const ownerRef
@@ -351,7 +351,7 @@ namespace
    * Saves one reflected `Broadcaster<ECommandEvent>` payload through cached
    * RTTI lookup and returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteBroadcasterCommandEventArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteBroadcasterCommandEventArchiveAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
@@ -374,7 +374,7 @@ namespace
    * Saves one reflected `SSTICommandConstantData` payload through cached RTTI
    * lookup and returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteSSTICommandConstantDataArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteSSTICommandConstantDataArchiveAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
@@ -397,7 +397,7 @@ namespace
    * Saves one reflected `SSTICommandVariableData` payload through cached RTTI
    * lookup and returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteSSTICommandVariableDataArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteSSTICommandVariableDataArchiveAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
@@ -420,7 +420,7 @@ namespace
    * Saves one reflected `CountedPtr<IFormationInstance>` payload through
    * cached RTTI lookup and returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteCountedPtrIFormationInstanceArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteCountedPtrIFormationInstanceArchiveAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
@@ -443,7 +443,7 @@ namespace
    * Read-callback bridge that loads one reflected `Broadcaster<ECommandEvent>`
    * payload through cached RTTI lookup.
    */
-  void ReadBroadcasterCommandEventArchiveCallback(
+  [[maybe_unused]] void ReadBroadcasterCommandEventArchiveCallback(
     gpg::ReadArchive* const archive,
     void* const objectPtr,
     gpg::RRef* const ownerRef
@@ -463,7 +463,7 @@ namespace
     return static_cast<Broadcaster<ECommandEvent>*>(command);
   }
 
-  [[nodiscard]] const void* BroadcasterSubobjectPtr(const CUnitCommand* const command) noexcept
+  [[maybe_unused]] [[nodiscard]] const void* BroadcasterSubobjectPtr(const CUnitCommand* const command) noexcept
   {
     return static_cast<const Broadcaster<ECommandEvent>*>(command);
   }

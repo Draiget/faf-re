@@ -150,7 +150,6 @@ namespace
   constexpr std::uint32_t kAllUnitsShieldFamilyBoundaryKey = 0x40000000u;
   constexpr std::uint32_t kAllUnitsOtherFamilyBoundaryKey = 0x50000000u;
   constexpr std::uint32_t kAllUnitsLateFamilyBoundaryKey = 0x60000000u;
-  constexpr std::uint32_t kEntityIdFamilyNibbleMask = 0xF0000000u;
 
   gpg::RType* gLegacyEntityDbIdPoolMapType = nullptr;
   gpg::RType* gLegacyEntityDbEntityListType = nullptr;
@@ -320,7 +319,7 @@ namespace
    * Stores the first all-units node at/after one source upper-bound key
    * `((sourceIndex + 1) << 20)` into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreAllUnitsSourceUpperBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreAllUnitsSourceUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t sourceIndex,
     const moho::EntityDB* const entityDb
@@ -341,7 +340,7 @@ namespace
    * What it does:
    * Stores the left-most all-units tree node (minimum key) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreAllUnitsLeftmostNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreAllUnitsLeftmostNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -390,7 +389,7 @@ namespace
    * Returns the exact all-units payload pointer for one `entityId`, or `nullptr`
    * when lookup resolves to the map head/sentinel lane.
    */
-  moho::Entity* FindEntityPayloadByIdNode(
+  [[maybe_unused]] moho::Entity* FindEntityPayloadByIdNode(
     moho::EntityDB* const entityDb,
     const std::uint32_t entityId
   ) noexcept
@@ -414,7 +413,7 @@ namespace
    * Stores the first all-units node at/after the high-family boundary key
    * (`0x20000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreHighFamilyBoundaryLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreHighFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -434,7 +433,7 @@ namespace
    * Stores the first all-units node at/after the mid-family boundary key
    * (`0x30000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreMidFamilyBoundaryLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreMidFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -454,7 +453,7 @@ namespace
    * Stores the first all-units node at/after the shield-family boundary key
    * (`0x40000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreShieldFamilyBoundaryLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreShieldFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -475,7 +474,7 @@ namespace
    * Stores the first all-units node at/after the other-family boundary key
    * (`0x50000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreOtherFamilyBoundaryLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreOtherFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -495,7 +494,7 @@ namespace
    * Stores the first all-units node at/after the late-family boundary key
    * (`0x60000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreLateFamilyBoundaryLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreLateFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -537,7 +536,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` prop-family
    * purge lower-bound query.
    */
-  moho::CEntityDbAllUnitsNode** StorePurgePropFamilyUpperBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgePropFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::EntityDB* const entityDb
@@ -575,7 +574,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` projectile-family
    * purge lower-bound query.
    */
-  moho::CEntityDbAllUnitsNode** StorePurgeProjectileFamilyUpperBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeProjectileFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::EntityDB* const entityDb
@@ -613,7 +612,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` shield-family
    * purge lower-bound query.
    */
-  moho::CEntityDbAllUnitsNode** StorePurgeShieldFamilyUpperBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeShieldFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::EntityDB* const entityDb
@@ -651,7 +650,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` other-family
    * purge lower-bound query.
    */
-  moho::CEntityDbAllUnitsNode** StorePurgeOtherFamilyUpperBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeOtherFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::EntityDB* const entityDb
@@ -667,7 +666,7 @@ namespace
    * Stores the first all-units node at/after the non-unit family boundary
    * (`0x10000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreFirstNonUnitFamilyLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreFirstNonUnitFamilyLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -687,7 +686,7 @@ namespace
    * Stores the first all-units node at/after the high-family boundary
    * (`0x20000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreFirstHighFamilyLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreFirstHighFamilyLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -770,7 +769,7 @@ namespace
    * Register-shape adapter that advances one all-armies iterator object and
    * returns the same iterator pointer.
    */
-  moho::CUnitIterAllArmies* AdvanceAllArmiesIteratorLane(
+  [[maybe_unused]] moho::CUnitIterAllArmies* AdvanceAllArmiesIteratorLane(
     moho::CUnitIterAllArmies* const iterator
   ) noexcept
   {
@@ -787,7 +786,7 @@ namespace
    * Stores the current all-armies iterator node lane into `outIterator`, then
    * advances the iterator with `Next()` and returns `outIterator`.
    */
-  moho::CEntityDbAllUnitsNode** StoreAndAdvanceAllArmiesIteratorPostIncrement(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreAndAdvanceAllArmiesIteratorPostIncrement(
     moho::CUnitIterAllArmies* const iterator,
     moho::CEntityDbAllUnitsNode** const outIterator
   ) noexcept

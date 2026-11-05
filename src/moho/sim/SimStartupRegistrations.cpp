@@ -24,7 +24,6 @@ namespace
 {
 
   moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane21 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane21 = nullptr;
 
   int gRecoveredCScrLuaMetatableFactoryReconBlipIndex = 0;
   int gRecoveredCScrLuaMetatableFactoryEntityIndex = 0;

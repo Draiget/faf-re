@@ -89,7 +89,7 @@ namespace
   HHOOK sWindowHook = nullptr;
   gpg::time::Timer wakeupTimer;
   float wakeupTimerDur = kInfiniteWakeupMs;
-  constexpr DWORD kPlatformSymbolHandlerOptions =
+  [[maybe_unused]] constexpr DWORD kPlatformSymbolHandlerOptions =
     SYMOPT_FAIL_CRITICAL_ERRORS | // suppress critical-error UI while probing symbols.
     SYMOPT_LOAD_LINES | // include source line records for resolved addresses.
     SYMOPT_DEFERRED_LOADS | // lazily load module symbols as needed.
@@ -98,8 +98,6 @@ namespace
     kPlatformSymbolHandlerOptions == 0x216u,
     "PLAT_Init symbol options must match recovered SymSetOptions(0x216)"
   );
-
-  moho::CWinLogTarget& sLogWindowTarget = moho::sLogWindowTarget;
 
   /**
    * The splash screen WINX_InitSplash shows (0x010A9BE4), a VC8
@@ -385,7 +383,6 @@ namespace
   // the boost::function1 manage / clear / manage::do_alloc lanes.
   LegacyUnaryDispatchAdapter gLegacyTssAdapterUnaryDispatchAdapter = nullptr;
   LegacyTypeInfoDispatchAdapter gLegacyTssAdapterTypeInfoDispatchAdapter = nullptr;
-  bool gLegacyTssAdapterDispatchPairPublished = false;
 
   // Synthetic engine-T binding for the `boost::detail::tss_adapter<T>` RTTI
   // Type Descriptor referenced at 0x00F61928 in the binary.
@@ -910,7 +907,7 @@ namespace
     if (sourceCallback != nullptr) {
       sourceLifecycle = sourceCallback->lifecycleAdapter;
     }
-    return reinterpret_cast<LegacyUnaryDispatchAdapter>(sourceLifecycle);
+    return reinterpret_cast<LegacyUnaryDispatchAdapter>(reinterpret_cast<void (*)()>(sourceLifecycle));
   }
 
   /**

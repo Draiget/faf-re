@@ -65,9 +65,6 @@ namespace
     return outNormalizedPoint;
   }
 
-  std::uint32_t gUiRuntimeScratchLaneA = 0u;
-  std::uint32_t gUiRuntimeScratchLaneB = 0u;
-
   template <typename TCall>
   bool StartUIMainEntryWithState(
     LuaPlus::LuaState* const state,

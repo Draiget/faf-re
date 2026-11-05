@@ -81,6 +81,12 @@ if(EXISTS "${_faf_sim_math_golden}")
   add_test(NAME sim_math COMMAND "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args})
 endif()
 
+# Engine addition (replay timeline): reading a replay's length leaves the stream as it was
+# (tests/replay).
+add_executable(faf_replay_scan_tests EXCLUDE_FROM_ALL replay/ReplayScanTests.cpp)
+target_link_libraries(faf_replay_scan_tests PRIVATE faf_engine)
+add_test(NAME replay_scan COMMAND faf_replay_scan_tests)
+
 # Engine addition (#247): the user preferences from several threads at once
 # (tests/prefs); fails without USER_PreferencesLock.
 add_executable(faf_prefs_thread_tests EXCLUDE_FROM_ALL prefs/PrefsThreadTests.cpp)

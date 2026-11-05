@@ -614,22 +614,13 @@ namespace
   return upcast.mObj;
 }
 
-msvc8::string BuildPointerName(RType* const pointeeType)
-{
-    const char* pointeeName = pointeeType ? pointeeType->GetName() : "null";
-    if (!pointeeName) {
-        pointeeName = "null";
-    }
-    return STR_Printf("%s*", pointeeName);
-}
-
 /**
  * Address: 0x004C8AA0 (FUN_004C8AA0, sub_4C8AA0)
  *
  * What it does:
  * Binds new/construct callback lanes for `CScriptObject*` pointer reflection.
  */
-gpg::RPointerTypeBase* BindCScriptObjectPointerNewAndConstruct(gpg::RPointerTypeBase* const typeInfo)
+[[maybe_unused]] gpg::RPointerTypeBase* BindCScriptObjectPointerNewAndConstruct(gpg::RPointerTypeBase* const typeInfo)
 {
     typeInfo->newRefFunc_ = &NewCScriptObjectPointerSlotRef;
     typeInfo->ctorRefFunc_ = &ConstructCScriptObjectPointerSlotRef;
@@ -642,7 +633,7 @@ gpg::RPointerTypeBase* BindCScriptObjectPointerNewAndConstruct(gpg::RPointerType
  * What it does:
  * Binds copy/move callback lanes for `CScriptObject*` pointer reflection.
  */
-gpg::RPointerTypeBase* BindCScriptObjectPointerCopyAndMove(gpg::RPointerTypeBase* const typeInfo)
+[[maybe_unused]] gpg::RPointerTypeBase* BindCScriptObjectPointerCopyAndMove(gpg::RPointerTypeBase* const typeInfo)
 {
     typeInfo->cpyRefFunc_ = &CopyCScriptObjectPointerSlotRef;
     typeInfo->movRefFunc_ = &MoveCScriptObjectPointerSlotRef;
@@ -1470,7 +1461,7 @@ RType* gpg::RVectorType<moho::SimArmy*>::GetPointeeType() const
  * storage. Bound as `RType::serLoadFunc_`; `version`/`ownerRef` are unused by
  * this body (the binary loads a fresh vector, not an owner-anchored slot).
  */
-void gpg::DeserializeSimArmyPtrVector(ReadArchive* const archive, const std::intptr_t vectorPtr, int /*version*/, RRef* /*ownerRef*/)
+void DeserializeSimArmyPtrVector(ReadArchive* const archive, const std::intptr_t vectorPtr, int /*version*/, RRef* /*ownerRef*/)
 {
     auto* const outVector = reinterpret_cast<msvc8::vector<moho::SimArmy*>*>(vectorPtr);
 
@@ -1498,7 +1489,7 @@ void gpg::DeserializeSimArmyPtrVector(ReadArchive* const archive, const std::int
  * unowned tracked raw pointer (`RRef_SimArmy` + `WriteRawPointer`). Bound as
  * `RType::serSaveFunc_`; `version`/`ownerRef` are unused by this body.
  */
-void gpg::SerializeSimArmyPtrVector(WriteArchive* const archive, const std::intptr_t vectorPtr, int /*version*/, RRef* /*ownerRef*/)
+void SerializeSimArmyPtrVector(WriteArchive* const archive, const std::intptr_t vectorPtr, int /*version*/, RRef* /*ownerRef*/)
 {
     const auto* const vector = reinterpret_cast<const msvc8::vector<moho::SimArmy*>*>(vectorPtr);
 

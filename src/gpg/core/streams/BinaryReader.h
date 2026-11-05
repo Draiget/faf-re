@@ -148,9 +148,9 @@ namespace gpg
 
     private:
         Stream* mStream = nullptr; // +0
-        uint32_t mPort = 0;        // +4
-        uint32_t mReserved0 = 0;   // +8
-        uint32_t mReserved1 = 0;   // +12
+        [[maybe_unused]] uint32_t mPort = 0;        // +4
+        [[maybe_unused]] uint32_t mReserved0 = 0;   // +8
+        [[maybe_unused]] uint32_t mReserved1 = 0;   // +12
 	};
 
     static_assert(sizeof(BinaryReader) == 16, "BinaryReader size must be 16");

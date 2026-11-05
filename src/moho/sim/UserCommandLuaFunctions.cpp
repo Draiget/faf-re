@@ -1891,7 +1891,7 @@ namespace moho
 
     // Snapshot the hovered-unit weak slot and pin it with a transient guard node
     // linked into the entity's weak-owner chain (mirrors FUN_00842920 var_48 dance).
-    moho::WeakObject* hoverOwner = nullptr;
+    [[maybe_unused]] moho::WeakObject* hoverOwner = nullptr;
     UserEntity* hoveredEntity = nullptr;
     bool inWorld = false;
     if (session != nullptr) {

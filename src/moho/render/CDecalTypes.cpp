@@ -231,7 +231,7 @@ namespace
    * destination range; semantically identical to this canonical helper, so
    * this single typed definition services every callsite in the TU.
    */
-  [[nodiscard]] moho::SDecalInfo* CopyAssignSDecalInfoRangeForward(
+  [[maybe_unused]] [[nodiscard]] moho::SDecalInfo* CopyAssignSDecalInfoRangeForward(
     moho::SDecalInfo* destinationBegin,
     const moho::SDecalInfo* sourceBegin,
     const moho::SDecalInfo* sourceEnd

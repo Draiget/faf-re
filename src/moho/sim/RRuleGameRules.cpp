@@ -119,30 +119,6 @@ namespace moho
 
     using BlueprintMapHeadAllocator = RRuleGameRulesBlueprintNode* (*)();
 
-    [[nodiscard]] int CompareLex(const std::string_view lhs, const std::string_view rhs) noexcept
-    {
-      const std::size_t common = std::min(lhs.size(), rhs.size());
-      if (common > 0) {
-        const int prefix = std::char_traits<char>::compare(lhs.data(), rhs.data(), common);
-        if (prefix != 0) {
-          return prefix;
-        }
-      }
-
-      if (lhs.size() < rhs.size()) {
-        return -1;
-      }
-      if (lhs.size() > rhs.size()) {
-        return 1;
-      }
-      return 0;
-    }
-
-    [[nodiscard]] int CompareBlueprintIds(const msvc8::string& lhs, const msvc8::string& rhs) noexcept
-    {
-      return CompareLex(lhs.view(), rhs.view());
-    }
-
   } // namespace
 
   // EntityCategoryLookupTable used to own a hand-rolled RB-tree
@@ -199,7 +175,7 @@ namespace moho
      * What it does:
      * Stores one opaque pointer lane into caller output storage.
      */
-    [[nodiscard]] void** StoreOpaquePointerLaneA(void** const outValue, void* const value) noexcept
+    [[maybe_unused]] [[nodiscard]] void** StoreOpaquePointerLaneA(void** const outValue, void* const value) noexcept
     {
       return StoreOpaquePointerLane(outValue, value);
     }
@@ -210,7 +186,7 @@ namespace moho
      * What it does:
      * Stores one opaque pointer lane into caller output storage.
      */
-    [[nodiscard]] void** StoreOpaquePointerLaneB(void** const outValue, void* const value) noexcept
+    [[maybe_unused]] [[nodiscard]] void** StoreOpaquePointerLaneB(void** const outValue, void* const value) noexcept
     {
       return StoreOpaquePointerLane(outValue, value);
     }
@@ -221,7 +197,7 @@ namespace moho
      * What it does:
      * Stores one opaque pointer lane into caller output storage.
      */
-    [[nodiscard]] void** StoreOpaquePointerLaneC(void** const outValue, void* const value) noexcept
+    [[maybe_unused]] [[nodiscard]] void** StoreOpaquePointerLaneC(void** const outValue, void* const value) noexcept
     {
       return StoreOpaquePointerLane(outValue, value);
     }
@@ -232,7 +208,7 @@ namespace moho
      * What it does:
      * Swaps two 32-bit value lanes and returns the left-hand storage pointer.
      */
-    [[nodiscard]] std::uint32_t* SwapDwordLaneValues(
+    [[maybe_unused]] [[nodiscard]] std::uint32_t* SwapDwordLaneValues(
       std::uint32_t* const lhs,
       std::uint32_t* const rhs
     ) noexcept
@@ -249,7 +225,7 @@ namespace moho
      * What it does:
      * Stores one iterator-node pointer lane into caller output storage.
      */
-    [[nodiscard]] void** StoreIteratorNodePointerLaneA(void** const outValue, void* const value) noexcept
+    [[maybe_unused]] [[nodiscard]] void** StoreIteratorNodePointerLaneA(void** const outValue, void* const value) noexcept
     {
       return StoreOpaquePointerLane(outValue, value);
     }
@@ -260,7 +236,7 @@ namespace moho
      * What it does:
      * Stores one iterator-node pointer lane into caller output storage.
      */
-    [[nodiscard]] void** StoreIteratorNodePointerLaneB(void** const outValue, void* const value) noexcept
+    [[maybe_unused]] [[nodiscard]] void** StoreIteratorNodePointerLaneB(void** const outValue, void* const value) noexcept
     {
       return StoreOpaquePointerLane(outValue, value);
     }
@@ -271,7 +247,7 @@ namespace moho
      * What it does:
      * Stores one iterator-node pointer lane into caller output storage.
      */
-    [[nodiscard]] void** StoreIteratorNodePointerLaneC(void** const outValue, void* const value) noexcept
+    [[maybe_unused]] [[nodiscard]] void** StoreIteratorNodePointerLaneC(void** const outValue, void* const value) noexcept
     {
       return StoreOpaquePointerLane(outValue, value);
     }
@@ -449,22 +425,9 @@ namespace moho
      * What it does:
      * Releases one raw runtime storage lane through global `operator delete`.
      */
-    void DeleteStorageLane(void* const storage)
+    [[maybe_unused]] void DeleteStorageLane(void* const storage)
     {
       ::operator delete(storage);
-    }
-
-    /**
-     * Returns the live export-binding count. Trivial forwarding wrapper kept
-     * as a named helper (rather than inlining `.size()` at each call site)
-     * because `AddOrGetExportBinding` and `ReserveExportBindingCapacity`
-     * both already spelled it out this way before the `mMaps` migration --
-     * no address of its own; the binary computes this inline at each of its
-     * own call sites rather than as a separate out-of-line symbol.
-     */
-    [[nodiscard]] std::size_t ExportBindingCount(const RRuleGameRulesImpl& rules) noexcept
-    {
-      return rules.mMaps.size();
     }
 
     /**
@@ -488,7 +451,7 @@ namespace moho
      * delete`, never `delete[]`, which only pairs with a real vector's
      * raw-allocate/exact-construct shape).
      */
-    void ReserveExportBindingCapacity(RRuleGameRulesImpl& rules, const std::size_t requestedCapacity)
+    [[maybe_unused]] void ReserveExportBindingCapacity(RRuleGameRulesImpl& rules, const std::size_t requestedCapacity)
     {
       rules.mMaps.reserve(requestedCapacity);
     }
@@ -508,7 +471,7 @@ namespace moho
       return nullptr;
     }
 
-    [[nodiscard]] const RRuleGameRulesLuaExportBinding*
+    [[maybe_unused]] [[nodiscard]] const RRuleGameRulesLuaExportBinding*
     FindExportBinding(const RRuleGameRulesImpl& rules, LuaPlus::LuaState* const rootState) noexcept
     {
       return FindExportBinding(const_cast<RRuleGameRulesImpl&>(rules), rootState);
@@ -632,17 +595,6 @@ namespace moho
      * the slot on each `UpdateLuaState` tick.
      */
     msvc8::string gPendingBlueprintReloadPath{};
-
-    /**
-     * Public TU-local API used by tooling/Lua bindings to queue a blueprint
-     * reload by path. The path is captured into the staging slot and
-     * subsequently drained into the reload queue on the next
-     * `UpdateLuaState` invocation through `EnqueueLuaReloadRequest`.
-     */
-    void StageBlueprintReloadByPath(const msvc8::string& path)
-    {
-      gPendingBlueprintReloadPath = path;
-    }
 
     /**
      * Drains file-watcher notifications into the pending-reload ring. The
@@ -1074,7 +1026,7 @@ namespace moho
     mLuaState = nullptr;
 
     RuleMutexView(*this).~mutex();
-    std::destroy_at(&DiskWatchListener());
+    DiskWatchListener().CDiskWatchListener::~CDiskWatchListener();
   }
 
   /**

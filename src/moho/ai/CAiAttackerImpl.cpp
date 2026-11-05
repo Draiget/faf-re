@@ -155,7 +155,6 @@ namespace
   constexpr const char* kAiAttackerImplForceEngageHelpText = "Force to engage enemy target";
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
 
-  constexpr std::int32_t kExtraDataMissingValue = static_cast<std::int32_t>(0xF0000000u);
   constexpr EAiAttackerEvent kAiAttackerEventCanTarget = static_cast<EAiAttackerEvent>(0x9);
   constexpr const char* kEngineerCategoryName = "ENGINEER";
   constexpr std::array<float, 4> kBallisticArcHeightFactors{
@@ -166,7 +165,7 @@ namespace
   };
   std::int32_t gRecoveredCScrLuaMetatableFactoryCAiAttackerImplIndex = 0;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A00 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F599F0 = nullptr;
+  [[maybe_unused]] moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F599F0 = nullptr;
 
   [[nodiscard]] CAiTarget BuildClearedTarget()
   {

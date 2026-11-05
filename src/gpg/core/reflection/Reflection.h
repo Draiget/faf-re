@@ -2954,7 +2954,7 @@ namespace gpg
 
     static void Delete(void* const object)
     {
-      delete static_cast<T*>(object);
+      GPG_NONVIRTUAL_DESTROY(delete static_cast<T*>(object));
     }
 
     RType::construct_func_t mConstructFunc; // +0x0C
@@ -6275,7 +6275,7 @@ namespace gpg
   {
     auto* const object = static_cast<T*>(storage);
     if (object) {
-      object->~T();
+      GPG_NONVIRTUAL_DESTROY(object->~T());
     }
   }
 

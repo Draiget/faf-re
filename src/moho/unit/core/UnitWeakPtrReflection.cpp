@@ -32,18 +32,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-      if (!cached) {
-        cached = moho::register_WeakPtr_Unit_Type_00();
-      }
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeUnitRef(moho::Unit* unit)
   {
     gpg::RRef out{};

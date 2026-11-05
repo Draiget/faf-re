@@ -242,12 +242,15 @@ void CSimDriver::DrawNetworkStatsPanel(
   // frame overwrites that stack slot with the panel-bottom coordinate before it is
   // ever consumed -- so the result is dead. Preserved 1:1 (0x0073EAB6..0x0073EB2F,
   // slot reused at 0x0073EC10). Latent 2007 debug-HUD quirk.
+  // [DELIBERATE-FIX] The panel uses it: the build line (issue #215) is longer than a
+  // small game's table and would run past the backdrop. The 3.0 is the left margin; add
+  // it again for the right one.
   float summaryMax = 0.0f;
   for (const msvc8::string& line : summary) {
     const float advance = font->GetAdvance(line.c_str(), -1) + 3.0f; // 0x0073EB06/0x0073EB0B (flt_E4F718 == 3.0)
     summaryMax = std::max(summaryMax, advance);                      // 0x0073EB13..0x0073EB1A
   }
-  (void)summaryMax; // dead in retail (overwritten by rectBottom before use)
+  totalWidth = std::max(totalWidth, summaryMax + 3.0f);
 
   // ---- Backdrop rectangle geometry (0x0073EB2F..0x0073EC10).
   const int rowCount = static_cast<int>(columns[0].size());       // 0x0073EB2F..0x0073EB57

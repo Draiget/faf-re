@@ -61,18 +61,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedWeakPtrVectorCUnitCommandType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(msvc8::vector<moho::WeakPtr<moho::CUnitCommand>>));
-      if (!cached) {
-        cached = moho::register_WeakPtr_CUnitCommand_VectorType_00();
-      }
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeCUnitCommandRef(moho::CUnitCommand* command)
   {
     gpg::RRef out{};

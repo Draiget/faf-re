@@ -155,7 +155,7 @@ namespace
   constexpr const char* kCameraImplSpinHelpText = "Camera:Spin(headingRate[,zoomRate])";
   constexpr float kDegreesToRadians = 0.017453292f;
   constexpr float kPi = 3.1415927f;
-  constexpr float kHalfPi = 1.5707964f;
+  [[maybe_unused]] constexpr float kHalfPi = 1.5707964f;
   constexpr float kTwoPi = 6.2831855f;
   constexpr float kCameraSpinPitchUpperBound = 1.5607964f;
   constexpr std::int32_t kCameraTargetTypeLocation = 0;
@@ -896,7 +896,7 @@ void moho::CameraImpl::CameraReset()
 void moho::CameraImpl::CameraFollow(const SCamFollowParams& followParams)
 {
   UserEntity* const currentTarget = GetTargetEntity();
-  if (currentTarget == nullptr || currentTarget->mParams.mEntityId != followParams.mCurrentEntityId) {
+  if (currentTarget == nullptr || currentTarget->mParams.mEntityId != static_cast<std::uint32_t>(followParams.mCurrentEntityId)) {
     return;
   }
 

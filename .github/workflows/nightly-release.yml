@@ -65,10 +65,11 @@ jobs:
           PARITY_RUN: ${{ github.event.workflow_run.id }}
         run: |
           sha=$(gh api "repos/${{ github.repository }}/commits/$REF" --jq .sha)
-          # YYYY.DD.MM.NNN-nightly: the day's next number, counting its releases and nightlies alike.
-          day=$(date -u +%Y.%d.%m)
-          last=$(git tag --list "$day.*" | sed -E "s/^$day\.([0-9]+).*$/\1/" | sort -n | tail -n 1)
-          tag=$(printf '%s.%03d-nightly' "$day" "$((10#${last:-0} + 1))")
+          # YYYY.MM.NNN-nightly: the month's next number, counting its releases and nightlies alike.
+          # The sed pattern leaves out the old YYYY.DD.MM.NNN tags, which have one more part.
+          month=$(date -u +%Y.%m)
+          last=$(git tag --list "$month.*" | sed -nE "s/^$month\.([0-9]+)(-nightly)?$/\1/p" | sort -n | tail -n 1)
+          tag=$(printf '%s.%03d-nightly' "$month" "$((10#${last:-0} + 1))")
           # The newest release or nightly the commit descends from.
           previous=$(git tag --merged "$sha" --sort=-creatordate | head -n 1)
           # Master did not move since the last nightly: that release already holds this commit.

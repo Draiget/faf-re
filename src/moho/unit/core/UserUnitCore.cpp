@@ -77,7 +77,7 @@ namespace
    * What it does:
    * Returns the fixed transport-load factor used by the UserUnit IUnit bridge.
    */
-  [[nodiscard]] float IUnitBridgeCalcTransportLoadFactor(const IUnit* const bridge) noexcept
+  [[maybe_unused]] [[nodiscard]] float IUnitBridgeCalcTransportLoadFactor(const IUnit* const bridge) noexcept
   {
     (void)bridge;
     return 1.0f;
@@ -89,7 +89,7 @@ namespace
    * What it does:
    * Returns false for the UserUnit IUnit bridge destroy-queued lane.
    */
-  [[nodiscard]] bool IUnitBridgeDestroyQueued(const IUnit* const bridge) noexcept
+  [[maybe_unused]] [[nodiscard]] bool IUnitBridgeDestroyQueued(const IUnit* const bridge) noexcept
   {
     (void)bridge;
     return false;
@@ -101,7 +101,7 @@ namespace
    * What it does:
    * Returns false for the UserUnit IUnit bridge navigator-idle lane.
    */
-  [[nodiscard]] bool IUnitBridgeIsNavigatorIdle(const IUnit* const bridge) noexcept
+  [[maybe_unused]] [[nodiscard]] bool IUnitBridgeIsNavigatorIdle(const IUnit* const bridge) noexcept
   {
     (void)bridge;
     return false;
@@ -139,7 +139,7 @@ namespace
     return self->mVisionHandle;
   }
 
-  [[nodiscard]] const VisionDB::Handle* GetUserUnitVisionHandle(const UserUnit* const self) noexcept
+  [[maybe_unused]] [[nodiscard]] const VisionDB::Handle* GetUserUnitVisionHandle(const UserUnit* const self) noexcept
   {
     return self->mVisionHandle;
   }
@@ -810,7 +810,7 @@ UserUnit::~UserUnit()
   // over on the way out. The successor only joins the selection if this unit
   // was itself selected, so an off-screen death never steals the player's
   // current selection.
-  if (mUnitVarDat.mSelectionInheritorId != ToRaw(EEntityIdSentinel::Invalid)) {
+  if (static_cast<std::uint32_t>(mUnitVarDat.mSelectionInheritorId) != ToRaw(EEntityIdSentinel::Invalid)) {
     WeakSet<UserEntity> selectionSnapshot(entityView->mSession->mSelection);
     if (selectionSnapshot.Find(entityView) != selectionSnapshot.end()) {
       UserEntity* const inheritor =
@@ -958,7 +958,7 @@ bool UserUnit::UnitDataUpdateRunsLua(const SSTIUnitVariableData& payload) const
     return false;
   }
   const UserEntity* const heldCreator = mCreator.GetObjectPtr();
-  if (heldCreator != nullptr && heldCreator->mParams.mEntityId == replicatedCreator) {
+  if (heldCreator != nullptr && heldCreator->mParams.mEntityId == static_cast<std::uint32_t>(replicatedCreator)) {
     return false;
   }
   const UserEntity* const creator = WLD_GetActiveSession()->LookupEntityId(static_cast<EntId>(replicatedCreator));
@@ -973,7 +973,7 @@ void UserUnit::FinishUnitDataLinks()
     mCreator.UnlinkFromOwnerChain();
   } else {
     const UserEntity* const heldCreator = mCreator.GetObjectPtr();
-    if (heldCreator == nullptr || heldCreator->mParams.mEntityId != replicatedCreator) {
+    if (heldCreator == nullptr || heldCreator->mParams.mEntityId != static_cast<std::uint32_t>(replicatedCreator)) {
       mCreator.ResetFromObject(WLD_GetActiveSession()->LookupEntityId(static_cast<EntId>(replicatedCreator)));
 
       UserEntity* const creator = mCreator.GetObjectPtr();

@@ -43,7 +43,7 @@ expect:
   noDesync: true
   noCrash: true
   logsContain:
-    - { uids: [2], suffix: '-rejoin', pattern: 'REJOIN: refused' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'REJOIN: refused: Not every player answered' }
   logsAbsent:
     - { uids: [1, 3], pattern: 'proved its seat' }
     - { uids: [1, 3], pattern: 'REJOIN: sending client' }

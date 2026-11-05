@@ -417,7 +417,7 @@ func (l *Launcher) contractFor(pc PlayerConfig) *seat.Contract {
 		a.Exe = choice
 		a.Extra = c.ExeArgs
 	}
-	sc := &seat.Contract{Adapter: a, GameID: l.cfg.GameID, Bus: l.contractBus, JarBind: jarBind}
+	sc := &seat.Contract{Adapter: a, GameID: l.cfg.GameID, Bus: l.contractBus, JarBind: jarBind, KeepSession: c.KeepSession}
 	if len(c.IceServers) > 0 {
 		sc.IceServers = []map[string]any{}
 		for _, s := range c.IceServers {
@@ -743,7 +743,7 @@ type RejoinPeer struct {
 
 // Rejoin starts player uid's game again to take its seat back. It links to every
 // peer and gets the game's recording from the first. Seats on this machine only.
-func (l *Launcher) Rejoin(uid, source, keyOf int, remote bool, peers []RejoinPeer) error {
+func (l *Launcher) Rejoin(uid, source, keyOf int, launcher bool, remote bool, peers []RejoinPeer) error {
 	p, err := l.Player(uid)
 	if err != nil {
 		return err
@@ -754,6 +754,13 @@ func (l *Launcher) Rejoin(uid, source, keyOf int, remote bool, peers []RejoinPee
 	}
 	if len(peers) == 0 {
 		return fmt.Errorf("player %d: rejoin names no peers", uid)
+	}
+	if l.cfg.Mode == ModeContract {
+		sources := make(map[int]int, len(peers))
+		for _, entry := range peers {
+			sources[entry.UID] = entry.Source
+		}
+		return local.RejoinViaAdapter(context.Background(), sources, source)
 	}
 	list := make([]string, 0, len(peers))
 	for _, entry := range peers {
@@ -770,7 +777,7 @@ func (l *Launcher) Rejoin(uid, source, keyOf int, remote bool, peers []RejoinPee
 	if remote {
 		return local.RejoinElsewhere(strings.Join(list, ","), source)
 	}
-	return local.Rejoin(strings.Join(list, ","), source, keyOf)
+	return local.Rejoin(strings.Join(list, ","), source, keyOf, launcher)
 }
 
 // PlayerSnapshot is one row of Snapshot.

@@ -64,8 +64,10 @@ if(NOT EXISTS "${_faf_ffmpeg}/faf/CMakeLists.txt")
                       "(git submodule update --init dependencies/ffmpeg); see docs/FAF_SFD_COMPATIBILITY.md.")
 endif()
 add_subdirectory("${_faf_ffmpeg}/faf" "${CMAKE_BINARY_DIR}/dependencies/ffmpeg")
+include(FafWarnings)
 foreach(_lib IN LISTS FFMPEG_FAF_LIBRARIES)
   target_link_libraries(${_lib} PRIVATE faf_codegen)
+  target_compile_options(${_lib} PRIVATE "$<$<COMPILE_LANGUAGE:C>:${FAF_FFMPEG_WARNING_OPTIONS}>")
 endforeach()
 
 # --- Compilation ----------------------------------------------------------------------
@@ -109,7 +111,6 @@ if(NOT FAF_TARGET_ARCH STREQUAL "x64")
   list(APPEND _faf_main_options /FIplatform/X87SqrtCall.h)
 endif()
 
-include(FafWarnings)
 list(APPEND _faf_main_options ${FAF_WARNING_OPTIONS})
 
 # C and C++ only (not the x64 MASM file).
@@ -128,6 +129,9 @@ set_property(SOURCE
     gpg/gal/backends/d3d11/D3D11VertexLayouts.cpp
     gpg/gal/backends/d3d11/DeviceD3D11.cpp
   APPEND PROPERTY INCLUDE_DIRECTORIES "${_fx11}/inc")
+
+set_property(SOURCE ${FAF_WX_EVENT_TABLE_SOURCES}
+  APPEND PROPERTY COMPILE_OPTIONS ${FAF_WX_EVENT_TABLE_OPTIONS})
 
 set_property(SOURCE gpg/gal/effects/ShaderCompiler.cpp
   APPEND PROPERTY INCLUDE_DIRECTORIES "${FAF_DEPENDENCIES_DIR}/dxc/inc")
@@ -405,7 +409,7 @@ add_executable(headless ${_faf_headless_sources})
 # The game has the replay player too: `/replaykeyframes` (moho/sim/ReplayTimeline.cpp).
 set(_faf_main_replay_player ${_faf_headless_sources})
 list(REMOVE_ITEM _faf_main_replay_player headless/HeadlessEntry.cpp)
-target_sources(faf_main PRIVATE ${_faf_main_replay_player})
+target_sources(faf_main PRIVATE ${_faf_main_replay_player} headless/GameEntry.cpp)
 if(FAF_CALL_HASH_BUILD)
   target_sources(headless PRIVATE headless/CallHashHooks.cpp)
 endif()

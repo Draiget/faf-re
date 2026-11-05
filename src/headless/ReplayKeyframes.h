@@ -44,6 +44,13 @@ namespace faf::headless
 
     /** For the replay viewer's hidden process: each file gets its name only once complete, and nothing is measured. */
     void SetPreparing(const bool preparing) noexcept { mPreparing = preparing; }
+    /** Before any keyframe: the first comes at this beat. A later session of a `--seek` run goes on from what it has. */
+    void SetFirstBeat(const int beat) noexcept
+    {
+      if (mIndex == nullptr || mIndex->empty()) {
+        mNextBeat = beat;
+      }
+    }
     [[nodiscard]] bool IsPreparing() const noexcept { return mPreparing; }
 
     // Called by the request.

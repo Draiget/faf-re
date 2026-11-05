@@ -87,7 +87,7 @@ namespace
    * Recreates one vertex-sheet slot from device resources with fixed stream
    * usage token `1`, releasing the replaced sheet when the pointer changes.
    */
-  moho::ID3DVertexSheet* RecreateVertexSheetWithUsageTokenOne(
+  [[maybe_unused]] moho::ID3DVertexSheet* RecreateVertexSheetWithUsageTokenOne(
     moho::ID3DVertexSheet*& vertexSheet,
     moho::CD3DVertexFormat* const vertexFormat,
     const std::int32_t streamFrequencyToken
@@ -182,9 +182,6 @@ namespace
     (void)device->DrawTriangleList(&vertexSheetView, &indexSheetView, &primitiveType);
   }
 
-  constexpr std::uint8_t kTrailSegmentPoolColorRed = 0U;
-  constexpr std::uint8_t kTrailSegmentPoolColorBlack = 1U;
-
 
   [[nodiscard]] bool AppendInterval(
     moho::SParticleRenderWorkItem& workItem, const float beginFrame, const float lifeFrames
@@ -276,7 +273,7 @@ namespace
    * What it does:
    * Writes one pointer-sized value to caller output storage.
    */
-  const void** WritePointerToOutputSlot(
+  [[maybe_unused]] const void** WritePointerToOutputSlot(
     const void** const outPointer,
     const void* const value
   ) noexcept

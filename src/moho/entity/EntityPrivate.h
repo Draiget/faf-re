@@ -133,7 +133,7 @@ namespace
    * Upcasts one reflected object reference to `RPropBlueprint` and returns
    * the typed pointer when compatible.
    */
-  [[nodiscard]] moho::RPropBlueprint* func_CastRPropBlueprint(const gpg::RRef& source)
+  [[maybe_unused]] [[nodiscard]] moho::RPropBlueprint* func_CastRPropBlueprint(const gpg::RRef& source)
   {
     gpg::RType* type = moho::RPropBlueprint::sType;
     if (!type) {

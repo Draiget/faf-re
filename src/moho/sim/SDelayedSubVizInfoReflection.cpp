@@ -100,7 +100,7 @@ namespace
   /**
    * Address: 0x00508E90 (FUN_00508E90, delayed-sub-viz typed read helper duplicate)
    */
-  void ReadDelayedSubVizInfoViaRTypeVariant2(
+  [[maybe_unused]] void ReadDelayedSubVizInfoViaRTypeVariant2(
     gpg::ReadArchive* const archive, void* const object, const gpg::RRef* const ownerRef
   )
   {
@@ -124,7 +124,7 @@ namespace
   /**
    * Address: 0x00508EC0 (FUN_00508EC0, delayed-sub-viz typed write helper duplicate)
    */
-  void WriteDelayedSubVizInfoViaRTypeVariant2(
+  [[maybe_unused]] void WriteDelayedSubVizInfoViaRTypeVariant2(
     gpg::WriteArchive* const archive, const void* const object, const gpg::RRef* const ownerRef
   )
   {
@@ -134,7 +134,7 @@ namespace
   /**
    * Address: 0x00508AD0 (FUN_00508AD0, delayed-sub-viz RRef fill helper)
    */
-  gpg::RRef* FillDelayedSubVizRef(
+  [[maybe_unused]] gpg::RRef* FillDelayedSubVizRef(
     moho::SDelayedSubVizInfo* const value, gpg::RRef* const outRef
   )
   {

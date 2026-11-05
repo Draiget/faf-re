@@ -531,14 +531,6 @@ namespace moho
       return elevation;
     }
 
-    [[nodiscard]] gpg::RRef MakeCUnitMotionRef(CUnitMotion* const value) noexcept
-    {
-      gpg::RRef out{};
-      out.mObj = value;
-      out.mType = CUnitMotion::StaticGetClass();
-      return out;
-    }
-
     template <class TObject>
     [[nodiscard]] gpg::RType* ResolveCachedType()
     {

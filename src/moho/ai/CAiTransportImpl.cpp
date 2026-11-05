@@ -164,7 +164,6 @@ void STransportPickUpInfo::MemberSerialize(gpg::WriteArchive* const archive) con
 namespace
 {
   gpg::RType* gIAiTransportType = nullptr;
-  gpg::RType* gCAiTransportImplType = nullptr;
 
   [[nodiscard]] gpg::RType* ResolveIAiTransportType()
   {
@@ -172,14 +171,6 @@ namespace
       IAiTransport::sType = gpg::CachedLookup<IAiTransport>(gIAiTransportType);
     }
     return IAiTransport::sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCAiTransportImplType()
-  {
-    if (!CAiTransportImpl::sType) {
-      CAiTransportImpl::sType = gpg::CachedLookup<CAiTransportImpl>(gCAiTransportImplType);
-    }
-    return CAiTransportImpl::sType;
   }
 
   [[nodiscard]] bool BlueprintBelongsToCategory(

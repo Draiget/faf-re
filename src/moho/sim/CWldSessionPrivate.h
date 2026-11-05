@@ -1158,7 +1158,7 @@ namespace
      * released before returning. Callers: `func_ProcessCommandDrag`
      * (0x00829B40) and `EstimateDrawNodeWorkTicks` (0x00826F10).
      */
-    [[nodiscard]] UserEntity* ResolveCommandTargetEntity(const UserCommandIssueHelper& helper)
+    [[maybe_unused]] [[nodiscard]] UserEntity* ResolveCommandTargetEntity(const UserCommandIssueHelper& helper)
     {
       const UserTarget target = ResolveCommandIssueTarget(helper);
       return target.targetType == UserTargetType::Entity ? target.targetEntity.GetObjectPtr() : nullptr;
@@ -1172,7 +1172,7 @@ namespace
      * 0x008BED50): the named entity's position, the ground position, or the
      * invalid vector. The transient target is released on the way out.
      */
-    [[nodiscard]] Wm3::Vector3f* ResolveCommandIssueTargetPosition(
+    [[maybe_unused]] [[nodiscard]] Wm3::Vector3f* ResolveCommandIssueTargetPosition(
       Wm3::Vector3f* const outPosition, const UserCommandIssueHelper& helper
     )
     {
@@ -1184,7 +1184,7 @@ namespace
       return outPosition;
     }
 
-    void CollectSessionUserUnits(CWldSession* const session, msvc8::vector<UserUnit*>& outUnits)
+    [[maybe_unused]] void CollectSessionUserUnits(CWldSession* const session, msvc8::vector<UserUnit*>& outUnits)
     {
       outUnits.clear();
       if (session == nullptr) {
@@ -1212,7 +1212,7 @@ namespace
      * Looks one live command-issue helper up by id, returning null when the
      * manager's map has no entry (the walk lands on the sentinel head).
      */
-    [[nodiscard]] UserCommandIssueHelper* FindCommandIssueHelper(CommandManager& manager, const CmdId commandId)
+    [[maybe_unused]] [[nodiscard]] UserCommandIssueHelper* FindCommandIssueHelper(CommandManager& manager, const CmdId commandId)
     {
       const auto found = manager.mCommands.find(commandId);
       return found == manager.mCommands.end() ? nullptr : found->second;

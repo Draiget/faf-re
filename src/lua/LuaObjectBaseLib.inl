@@ -309,7 +309,7 @@
 	 * Applies one coroutine resume step: restores pending frame state when
 	 * resuming after yield, executes VM, then finalizes any immediate return.
 	 */
-	void resume(int* const userData, lua_State* const state)
+	[[maybe_unused]] void resume(int* const userData, lua_State* const state)
 	{
 		const int argumentCount = *userData;
 		CallInfo* const currentFrame = state->ci;

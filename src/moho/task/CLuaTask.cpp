@@ -92,7 +92,7 @@ namespace
    * `CLuaTask::MemberDeserialize`. Invoked from
    * `CLuaTaskSerializer::Deserialize` below.
    */
-  void DeserializeCLuaTaskThunk(gpg::ReadArchive* const archive, CLuaTask* const task)
+  [[maybe_unused]] void DeserializeCLuaTaskThunk(gpg::ReadArchive* const archive, CLuaTask* const task)
   {
     GPG_ASSERT(task != nullptr);
     task->MemberDeserialize(archive);
@@ -116,7 +116,7 @@ namespace
    * `CLuaTask::MemberSerialize`. Invoked from `CLuaTaskSerializer::Serialize`
    * below.
    */
-  void SerializeCLuaTaskThunk(gpg::WriteArchive* const archive, CLuaTask* const task)
+  [[maybe_unused]] void SerializeCLuaTaskThunk(gpg::WriteArchive* const archive, CLuaTask* const task)
   {
     GPG_ASSERT(task != nullptr);
     task->MemberSerialize(archive);

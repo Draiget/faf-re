@@ -18,11 +18,6 @@ namespace
 {
   constexpr float kTerrainHeightWordScale = 1.0f / 128.0f;
 
-  constexpr const char* kSerializationSourcePath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-  constexpr int kSerializationLoadLine = 84;
-  constexpr int kSerializationSaveLine = 87;
-
   [[nodiscard]] int ClampTerrainSampleIndex(const int value, const int maxInclusive) noexcept
   {
     // Preserve binary clamp order: upper clamp first, then clamp to zero.

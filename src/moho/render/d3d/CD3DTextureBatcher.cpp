@@ -95,7 +95,7 @@ namespace moho
      * Disposes one `sp_counted_impl_p<CD3DTextureBatcher>` payload by running
      * non-deleting `CD3DTextureBatcher` teardown and releasing owned storage.
      */
-    void DisposeCountedTextureBatcherStorage(
+    [[maybe_unused]] void DisposeCountedTextureBatcherStorage(
       boost::SpCountedImplStorage<CD3DTextureBatcher>* const countedStorage
     )
     {

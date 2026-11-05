@@ -81,7 +81,7 @@ namespace
    * What it does:
    * Resolves and caches RTTI for one `WeakEntitySetTemplate<Entity>` lane.
    */
-  [[nodiscard]] gpg::RType* ResolveWeakEntitySetType()
+  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveWeakEntitySetType()
   {
     gpg::RType* type = WeakEntitySet::sType;
     if (!type) {
@@ -136,7 +136,7 @@ namespace
    * Deserializes one `EntitySetBase` object lane through archive owner context
    * and returns the archive instance.
    */
-  gpg::ReadArchive* ReadEntitySetBaseArchiveAdapter(
+  [[maybe_unused]] gpg::ReadArchive* ReadEntitySetBaseArchiveAdapter(
     gpg::ReadArchive* const archive,
     void* const object,
     gpg::RRef* const ownerRef
@@ -153,7 +153,7 @@ namespace
    * Serializes one `EntitySetBase` object lane through archive owner context
    * and returns the archive instance.
    */
-  gpg::WriteArchive* WriteEntitySetBaseArchiveAdapter(
+  [[maybe_unused]] gpg::WriteArchive* WriteEntitySetBaseArchiveAdapter(
     gpg::WriteArchive* const archive,
     void** const objectSlot,
     const gpg::RRef* const ownerRef
@@ -169,7 +169,7 @@ namespace
    * What it does:
    * Deserializes one `EntitySetBase` object lane through archive owner context.
    */
-  void ReadEntitySetBaseArchiveObjectLane1(
+  [[maybe_unused]] void ReadEntitySetBaseArchiveObjectLane1(
     gpg::ReadArchive* const archive,
     void* const object,
     gpg::RRef* const ownerRef
@@ -184,7 +184,7 @@ namespace
    * What it does:
    * Serializes one `EntitySetBase` object lane through archive owner context.
    */
-  void WriteEntitySetBaseArchiveObjectLane1(
+  [[maybe_unused]] void WriteEntitySetBaseArchiveObjectLane1(
     gpg::WriteArchive* const archive,
     void** const objectSlot,
     const gpg::RRef* const ownerRef
@@ -200,7 +200,7 @@ namespace
    * Deserializes one `fastvector<Entity*>` object lane through archive owner
    * context and returns the archive instance.
    */
-  gpg::ReadArchive* ReadFastVectorEntityPointerArchiveAdapter(
+  [[maybe_unused]] gpg::ReadArchive* ReadFastVectorEntityPointerArchiveAdapter(
     gpg::ReadArchive* const archive,
     void* const object,
     gpg::RRef* const ownerRef
@@ -217,7 +217,7 @@ namespace
    * Serializes one `fastvector<Entity*>` object lane through archive owner
    * context and returns the archive instance.
    */
-  gpg::WriteArchive* WriteFastVectorEntityPointerArchiveAdapter(
+  [[maybe_unused]] gpg::WriteArchive* WriteFastVectorEntityPointerArchiveAdapter(
     gpg::WriteArchive* const archive,
     void** const objectSlot,
     const gpg::RRef* const ownerRef
@@ -234,7 +234,7 @@ namespace
    * Deserializes one `fastvector<Entity*>` object lane through archive owner
    * context.
    */
-  void ReadFastVectorEntityPointerArchiveObjectLane1(
+  [[maybe_unused]] void ReadFastVectorEntityPointerArchiveObjectLane1(
     gpg::ReadArchive* const archive,
     void* const object,
     gpg::RRef* const ownerRef
@@ -250,7 +250,7 @@ namespace
    * Serializes one `fastvector<Entity*>` object lane through archive owner
    * context.
    */
-  void WriteFastVectorEntityPointerArchiveObjectLane1(
+  [[maybe_unused]] void WriteFastVectorEntityPointerArchiveObjectLane1(
     gpg::WriteArchive* const archive,
     void** const objectSlot,
     const gpg::RRef* const ownerRef

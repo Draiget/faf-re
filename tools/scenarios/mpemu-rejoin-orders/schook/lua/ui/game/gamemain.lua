@@ -23,6 +23,16 @@ do
                 end
             end)
         end
+        -- /testquit: quits normally at 3:00 of game time.
+        if HasCommandLineArg('/testquit') then
+            ForkThread(function()
+                while GetGameTimeSeconds() < 180 do
+                    WaitSeconds(1)
+                end
+                LOG('rejoin-test: quitting')
+                ExitApplication()
+            end)
+        end
         -- /testpausebefore: pauses at 3:00 of game time, so before the kill, until the player is back.
         -- /testpauseduring: pauses for 20 s once the player is on the way back.
         local function FindStage(stage)

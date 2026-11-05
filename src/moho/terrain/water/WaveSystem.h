@@ -320,13 +320,13 @@ namespace moho
     void RebuildSpatialBounds();
 
   private:
-    std::uint32_t mReserved04;             // +0x04
+    [[maybe_unused]] std::uint32_t mReserved04;             // +0x04
     SpatialDBEntry<WaveGenerator> mSpatialEntry; // +0x08
     Wm3::AxisAlignedBox3f mBounds;         // +0x10
     Wm3::Vec3f mBoundsCenter;              // +0x28
     VAxes3 mBoundsAxes;                    // +0x34
     Wm3::Vec3f mBoundsHalfExtents;         // +0x58
-    std::uint32_t mReserved64;             // +0x64
+    [[maybe_unused]] std::uint32_t mReserved64;             // +0x64
     double mCurrentTime;                   // +0x68
     double mUpdateInterval;                // +0x70
     msvc8::string mPrimaryTexturePath;     // +0x78
@@ -346,7 +346,7 @@ namespace moho
     float mMinFramerate;                   // +0xF0
     float mMaxFramerate;                   // +0xF4
     float mTextureSelectionRange;          // +0xF8
-    std::uint8_t mTailPaddingFC[0x04];     // +0xFC
+    [[maybe_unused]] std::uint8_t mTailPaddingFC[0x04];     // +0xFC
   };
 
   class WaveSystem

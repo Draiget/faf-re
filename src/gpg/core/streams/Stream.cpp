@@ -220,7 +220,7 @@ size_t Stream::VirtReadNonBlocking(char* buf, size_t len)
  * What it does:
  * Default unget lane throws UnsupportedOperation.
  */
-void Stream::VirtUnGetByte(int unknown)
+void Stream::VirtUnGetByte(int /*unknown*/)
 {
   throw UnsupportedOperation{};
 }
@@ -242,7 +242,7 @@ bool Stream::VirtAtEnd()
  * What it does:
  * Default write lane throws UnsupportedOperation.
  */
-void Stream::VirtWrite(const char* data, size_t size)
+void Stream::VirtWrite(const char* /*data*/, size_t /*size*/)
 {
   throw UnsupportedOperation{};
 }

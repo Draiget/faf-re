@@ -171,7 +171,7 @@ CAiNavigatorLand::~CAiNavigatorLand()
 {
   mDestinationEntity.ResetFromObject(nullptr);
 
-  delete mPathNavigator;
+  GPG_NONVIRTUAL_DESTROY(delete mPathNavigator);
   mPathNavigator = nullptr;
 }
 
@@ -197,7 +197,7 @@ void CAiNavigatorLand::MemberDeserialize(gpg::ReadArchive* const archive)
   CAiPathNavigator* const oldPathNavigator = mPathNavigator;
   mPathNavigator = loadedPathNavigator;
   if (oldPathNavigator) {
-    delete oldPathNavigator;
+    GPG_NONVIRTUAL_DESTROY(delete oldPathNavigator);
   }
 
   archive->Read(gpg::RTypeOf<WeakPtr<Entity>>(), &mDestinationEntity, ownerRef);

@@ -3,6 +3,14 @@
 #include "Wm3Vector3.h"
 #include "Wm3Quaternion.h"
 
+// Defined in Wm3FoundationStatics.cpp. Wild Magic's header declares the member but
+// not the specialisation, so a use elsewhere can't see that one exists.
+namespace Wm3
+{
+  template <>
+  const Vector3<float> Vector3<float>::ZERO;
+}
+
 namespace moho
 {
   using Vector3f = Wm3::Vector3f;

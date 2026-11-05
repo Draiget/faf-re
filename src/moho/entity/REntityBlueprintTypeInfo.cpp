@@ -360,8 +360,6 @@ namespace
     TypeInfoRTypePair entries[3];
   };
 
-  thread_local TypeInfoCache3 gREntityBlueprintRRefCache{false, {}};
-
   template <typename TObject>
   [[nodiscard]] gpg::RRef* BuildTypedRefWithCache(
     gpg::RRef* const outRef,

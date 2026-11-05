@@ -29,33 +29,13 @@ namespace
      * Allocates `count * 4` bytes with overflow guard and throws
      * `std::bad_alloc` on overflow.
      */
-    void* AllocateStride04Array(const std::uint32_t count)
+    [[maybe_unused]] void* AllocateStride04Array(const std::uint32_t count)
     {
       return AllocateArrayOrThrow(count, 0x04U);
     }
 
     // Defined later in this TU; used by the vector<void*>::_Insert_n grow lane below.
     [[noreturn]] void ThrowVectorTooLongLengthErrorB();
-
-    void ReleaseSharedCount(boost::detail::sp_counted_base*& sharedCount) noexcept
-    {
-      if (sharedCount != nullptr) {
-        sharedCount->release();
-        sharedCount = nullptr;
-      }
-    }
-
-    void AssignSharedCount(
-      boost::detail::sp_counted_base*& destination, boost::detail::sp_counted_base* const source
-    ) noexcept
-    {
-      if (source != nullptr) {
-        source->add_ref_copy();
-      }
-
-      ReleaseSharedCount(destination);
-      destination = source;
-    }
 
     /**
      * Address: 0x008FAA50 (FUN_008FAA50)
@@ -64,7 +44,7 @@ namespace
      * Throws the legacy MSVC vector-length error used by effect-macro vector
      * growth helpers.
      */
-    [[noreturn]] void ThrowVectorTooLongLengthErrorA()
+    [[maybe_unused]] [[noreturn]] void ThrowVectorTooLongLengthErrorA()
     {
       throw std::length_error("vector<T> too long");
     }
@@ -76,7 +56,7 @@ namespace
      * Throws the legacy MSVC vector-length error used by effect-macro vector
      * growth helpers.
      */
-    [[noreturn]] void ThrowVectorTooLongLengthErrorB()
+    [[maybe_unused]] [[noreturn]] void ThrowVectorTooLongLengthErrorB()
     {
       throw std::length_error("vector<T> too long");
     }
@@ -92,7 +72,7 @@ namespace
      * used by bounds-checked `operator[]` instantiations for the D3D device
      * caps / adapter-mode / antialiasing-option vectors.
      */
-    [[noreturn]] void ThrowVectorSubscriptOutOfRange()
+    [[maybe_unused]] [[noreturn]] void ThrowVectorSubscriptOutOfRange()
     {
       throw std::out_of_range("invalid vector<T> subscript");
     }
@@ -117,7 +97,7 @@ namespace
      * Clone entry that returns the same stable process-lifetime wide-zero
      * storage lane as `FUN_008F8CA0`.
      */
-    wchar_t* GetLegacyWideZeroStorageLaneCloneA() noexcept
+    [[maybe_unused]] wchar_t* GetLegacyWideZeroStorageLaneCloneA() noexcept
     {
       return GetLegacyWideZeroStorageLane();
     }

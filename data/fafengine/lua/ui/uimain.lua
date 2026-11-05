@@ -133,3 +133,12 @@ do
         UpdateRejoinScreen('connecting', -1)
     end
 end
+
+do
+    local OldEscapeHandler = EscapeHandler
+    function EscapeHandler()
+        if not import('/fafengine/lua/ui/game/replay_timeline.lua').OnEscape() then
+            OldEscapeHandler()
+        end
+    end
+end

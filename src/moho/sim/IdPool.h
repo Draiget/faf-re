@@ -71,6 +71,11 @@ namespace moho
      * `IdPool`'s implicit copy constructor (0x00686DF0), which inlines it.
      */
     SimSubRes2& operator=(const SimSubRes2& other);
+
+    // Spelled out because operator= above is user-provided; both stay what the
+    // compiler generated (`IdPool`'s implicit copy relies on this one).
+    SimSubRes2() = default;
+    SimSubRes2(const SimSubRes2&) = default;
   };
   static_assert(offsetof(SimSubRes2, mData) == 0x0000, "SimSubRes2::mData offset must be 0x0000");
   static_assert(offsetof(SimSubRes2, mStart) == 0x0C80, "SimSubRes2::mStart offset must be 0x0C80");

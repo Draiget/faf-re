@@ -506,7 +506,7 @@ namespace
      * teardown pass uses (see `DoTeardownCallbacks`, FUN_008698B0, which takes
      * `*v4 + 4`).
      */
-    void DispatchSessionListenerAttach(WldTeardownCallbackVector* const callbacks)
+    [[maybe_unused]] void DispatchSessionListenerAttach(WldTeardownCallbackVector* const callbacks)
     {
       const std::size_t callbackCount = callbacks->size();
       for (std::size_t i = 0; i < callbackCount; ++i) {
@@ -531,7 +531,7 @@ namespace
      * What it does:
      * Returns one first-dword lane from one build-template helper payload.
      */
-    [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane0(const void* const value) noexcept
+    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane0(const void* const value) noexcept
     {
       if (value == nullptr) {
         return 0u;
@@ -545,7 +545,7 @@ namespace
      * What it does:
      * Returns one second-dword lane from one build-template helper payload.
      */
-    [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane4(const void* const value) noexcept
+    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane4(const void* const value) noexcept
     {
       if (value == nullptr) {
         return 0u;
@@ -646,38 +646,6 @@ namespace
       return &previewTransform;
     }
 
-    [[nodiscard]] bool ContainsEntityPtr(const msvc8::vector<UserEntity*>& entities, const UserEntity* const entity)
-    {
-      return std::find(entities.begin(), entities.end(), entity) != entities.end();
-    }
-
-    void CollectSelectionEntities(const WeakSet<UserEntity>& selection, msvc8::vector<UserEntity*>& outEntities)
-    {
-      outEntities.clear();
-
-      for (UserEntity* const entity : selection) {
-        if (ContainsEntityPtr(outEntities, entity)) {
-          continue;
-        }
-        outEntities.push_back(entity);
-      }
-    }
-
-    [[nodiscard]] bool
-    AreEntitySetsEqual(const msvc8::vector<UserEntity*>& lhs, const msvc8::vector<UserEntity*>& rhs)
-    {
-      if (lhs.size() != rhs.size()) {
-        return false;
-      }
-
-      for (const UserEntity* const entity : lhs) {
-        if (!ContainsEntityPtr(rhs, entity)) {
-          return false;
-        }
-      }
-
-      return true;
-    }
 }
 
 

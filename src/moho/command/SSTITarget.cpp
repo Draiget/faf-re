@@ -60,7 +60,7 @@ namespace
    * (FUN_0055B3A0 body); `version` and the owner-ref lane are unused by the
    * member (mirrors the binary tail call).
    */
-  void DeserializeSSTITargetSerializerCallback(
+  [[maybe_unused]] void DeserializeSSTITargetSerializerCallback(
     gpg::ReadArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -83,7 +83,7 @@ namespace
    * (FUN_0055B460 body); `version` and the owner-ref lane are unused by the
    * member (mirrors the binary tail call).
    */
-  void SerializeSSTITargetSerializerCallback(
+  [[maybe_unused]] void SerializeSSTITargetSerializerCallback(
     gpg::WriteArchive* const archive,
     const std::intptr_t objectPtr,
     const int,

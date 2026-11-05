@@ -270,7 +270,7 @@ namespace
    * runtime lane with null-fill, and loads each `Entity*` through
    * `ReadArchive::ReadPointer_Entity`.
    */
-  void LoadFastVectorEntityPointerLane1(
+  [[maybe_unused]] void LoadFastVectorEntityPointerLane1(
     gpg::ReadArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -303,7 +303,7 @@ namespace
    * Writes one `fastvector<Entity*>` payload: emits count and serializes each
    * lane as one unowned tracked pointer built by `RRef_Entity`.
    */
-  void SaveFastVectorEntityPointerLane1(
+  [[maybe_unused]] void SaveFastVectorEntityPointerLane1(
     gpg::WriteArchive* const archive,
     const std::intptr_t objectPtr,
     const int,

@@ -429,7 +429,7 @@
 		newRefFunc_ = &NewWrapFileStorageRef;
 		ctorRefFunc_ = &ConstructWrapFileStorageRef;
 		deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
-		dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
+		dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(reinterpret_cast<void (*)()>(&FinalizeWrapFileStorage));
 		Finish();
 	}
 
@@ -440,7 +440,7 @@
 	 * Tears down one `WrapFileTypeInfo` descriptor via `gpg::RType` base
 	 * teardown and conditionally frees storage when `deleteFlag & 1`.
 	 */
-	gpg::RType* DestroyWrapFileTypeInfoDeleting(
+	[[maybe_unused]] gpg::RType* DestroyWrapFileTypeInfoDeleting(
 		WrapFileTypeInfo* const typeInfo,
 		const unsigned char deleteFlag
 	)
@@ -459,7 +459,7 @@
 	 * Tears down one `TObjectTypeInfo` descriptor via `gpg::RType` base teardown
 	 * and conditionally frees storage when `deleteFlag & 1`.
 	 */
-	gpg::RType* DestroyTObjectTypeInfoDeleting(
+	[[maybe_unused]] gpg::RType* DestroyTObjectTypeInfoDeleting(
 		TObjectTypeInfo* const typeInfo,
 		const unsigned char deleteFlag
 	)
@@ -547,10 +547,10 @@
 	 * Binds WrapFile cleanup callbacks (`delete`, `destruct`) onto one
 	 * reflection type descriptor lane.
 	 */
-	gpg::RType* ConfigureWrapFileCleanupCallbacks(gpg::RType* const type)
+	[[maybe_unused]] gpg::RType* ConfigureWrapFileCleanupCallbacks(gpg::RType* const type)
 	{
 		type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
-		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
+		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(reinterpret_cast<void (*)()>(&FinalizeWrapFileStorage));
 		return type;
 	}
 
@@ -561,7 +561,7 @@
 	 * Binds WrapFile `new-ref` and `construct-ref` callbacks onto one
 	 * reflection type descriptor lane.
 	 */
-	gpg::RType* ConfigureWrapFileRefCallbacks(gpg::RType* const type)
+	[[maybe_unused]] gpg::RType* ConfigureWrapFileRefCallbacks(gpg::RType* const type)
 	{
 		type->newRefFunc_ = &NewWrapFileStorageRef;
 		type->ctorRefFunc_ = &ConstructWrapFileStorageRef;
@@ -575,12 +575,12 @@
 	 * Binds full WrapFile callback suite (`new/construct/delete/destruct`) onto
 	 * one reflection type descriptor lane.
 	 */
-	gpg::RType* ConfigureWrapFileAllCallbacks(gpg::RType* const type)
+	[[maybe_unused]] gpg::RType* ConfigureWrapFileAllCallbacks(gpg::RType* const type)
 	{
 		type->newRefFunc_ = &NewWrapFileStorageRef;
 		type->ctorRefFunc_ = &ConstructWrapFileStorageRef;
 		type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
-		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
+		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(reinterpret_cast<void (*)()>(&FinalizeWrapFileStorage));
 		return type;
 	}
 
@@ -591,12 +591,12 @@
 	 * Binds the full WrapFile callback suite directly onto one reflection type
 	 * descriptor lane without returning the descriptor.
 	 */
-	void ConfigureWrapFileAllCallbacksInPlace(gpg::RType* const type)
+	[[maybe_unused]] void ConfigureWrapFileAllCallbacksInPlace(gpg::RType* const type)
 	{
 		type->newRefFunc_ = &NewWrapFileStorageRef;
 		type->ctorRefFunc_ = &ConstructWrapFileStorageRef;
 		type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
-		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(&FinalizeWrapFileStorage);
+		type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(reinterpret_cast<void (*)()>(&FinalizeWrapFileStorage));
 	}
 
 	/**
@@ -650,7 +650,7 @@
 	 * What it does:
 	 * Validates that one userdata stack lane resolves to a WrapFile payload.
 	 */
-	void ValidateWrapFileUserdataAt(lua_State* const state, const int index)
+	[[maybe_unused]] void ValidateWrapFileUserdataAt(lua_State* const state, const int index)
 	{
 		gpg::RRef reference{};
 		GetRRefFromUserdata(&reference, state, index);

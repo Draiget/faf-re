@@ -24,7 +24,6 @@ namespace
   gpg::RType* gQueueBaseType = nullptr;
   gpg::RType* gQueueWeakCommandVectorType = nullptr;
   gpg::RType* gQueueCommandTypeEnumType = nullptr;
-  gpg::RType* gQueueUnitType = nullptr;
 
   template <class TObject>
   [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cache)
@@ -49,14 +48,6 @@ namespace
     source.mType = tracked.type;
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveCachedType<TObject>(cache));
     return static_cast<TObject*>(upcast.mObj);
-  }
-
-  [[nodiscard]] gpg::RRef MakeQueueRef(CUnitCommandQueue* const queue)
-  {
-    gpg::RRef out{};
-    out.mObj = queue;
-    out.mType = CUnitCommandQueue::StaticGetClass();
-    return out;
   }
 
   [[nodiscard]] bool ShouldMarkOwnerSyncStateForQueueHead(const CUnitCommandQueue& queue)

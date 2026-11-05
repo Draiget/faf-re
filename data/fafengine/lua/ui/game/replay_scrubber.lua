@@ -16,6 +16,7 @@ local kPlayhead = 'ffffffff'
 local kHoverLine = 'a0ffffff'
 local kKeyframeLine = '90a8c4cc'
 local kKeyframeLineHeight = 12
+local kKeyframeSnap = 3
 local kGrooveHeight = 4
 local kGrooveHeightOver = 6
 local kPlayheadHeight = 18
@@ -64,6 +65,7 @@ Scrubber = ClassUI(Group) {
         self.mPlayhead.Height:Set(function() return LayoutHelpers.ScaleNumber(kPlayheadHeight) end)
 
         self.mKeyframeLines = {}
+        self.mKeyframeTicks = {}
 
         self.mBubble = FlatPanel.FlatPanel(self, "ReplayScrubberBubble")
         self.mBubble.Depth:Set(function() return self.Depth() + 20 end)
@@ -89,6 +91,20 @@ Scrubber = ClassUI(Group) {
         return math.floor(share * self.mTotal)
     end,
 
+    --- The tick a click here would go to: a keyframe line this close, as nothing is quicker to reach.
+    TargetAt = function(self, x)
+        local reach = LayoutHelpers.ScaleNumber(kKeyframeSnap)
+        local target = self:TickAt(x)
+        for _, tick in self.mKeyframeTicks do
+            local distance = math.abs(self:XOf(tick) - x)
+            if distance <= reach then
+                reach = distance
+                target = tick
+            end
+        end
+        return target
+    end,
+
     IsDragging = function(self)
         return self.mDragTick != false
     end,
@@ -109,16 +125,16 @@ Scrubber = ClassUI(Group) {
     end,
 
     BeginDrag = function(self, event)
-        self.mDragTick = self:TickAt(event.MouseX)
+        self.mDragTick = self:TargetAt(event.MouseX)
         self:OnScrub(self.mDragTick)
         local dragger = Dragger()
         dragger.OnMove = function(control, x, y)
             self.mMouseX = x
-            self.mDragTick = self:TickAt(x)
+            self.mDragTick = self:TargetAt(x)
             self:OnScrub(self.mDragTick)
         end
         dragger.OnRelease = function(control, x, y)
-            local tick = self:TickAt(x)
+            local tick = self:TargetAt(x)
             self.mDragTick = false
             dragger:Destroy()
             self:OnSeek(tick)
@@ -132,6 +148,7 @@ Scrubber = ClassUI(Group) {
 
     --- Thin lines at these ticks, where a move back is quick.
     SetKeyframes = function(self, ticks)
+        self.mKeyframeTicks = ticks
         local count = table.getn(ticks)
         for index = table.getn(self.mKeyframeLines) + 1, count do
             local line = FlatPanel.Rectangle(self, kKeyframeLine, 4)
@@ -183,7 +200,7 @@ Scrubber = ClassUI(Group) {
         FlatPanel.SetVisible(self.mHover, showBubble and self.mDragTick == false)
         FlatPanel.SetVisible(self.mBubble, showBubble)
         if showBubble then
-            local tick = self.mDragTick != false and self.mDragTick or self:TickAt(self.mMouseX)
+            local tick = self.mDragTick != false and self.mDragTick or self:TargetAt(self.mMouseX)
             local x = self:XOf(tick)
             self.mHover.Left:Set(x)
             self.mBubbleText:SetText(self.mFormat(tick))

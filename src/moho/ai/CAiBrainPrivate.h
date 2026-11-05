@@ -381,7 +381,7 @@ namespace
    * Constructs/preregisters reflection metadata for
    * `std::map<Wm3::IVector2<int>,Moho::SBuildReserveInfo>`.
    */
-  [[nodiscard]] gpg::RType* preregister_BuildReserveMapTypeInfo()
+  [[maybe_unused]] [[nodiscard]] gpg::RType* preregister_BuildReserveMapTypeInfo()
   {
     BuildReserveMapTypeInfo& typeInfo = AcquireBuildReserveMapTypeInfo();
     gpg::PreRegisterRType(typeid(BuildReserveMapStorage), &typeInfo);

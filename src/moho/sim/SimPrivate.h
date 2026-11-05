@@ -251,7 +251,7 @@ namespace
    * Thin wrapper around `func_FindArmyWithName` used by army-Lua argument
    * decoding helpers.
    */
-  [[nodiscard]] ArmyListCursor
+  [[maybe_unused]] [[nodiscard]] ArmyListCursor
   func_GetArmyWithName(ArmyListCursor begin, const ArmyListCursor end, const std::string_view armyName)
   {
     return func_FindArmyWithName(begin, end, armyName);
@@ -311,7 +311,7 @@ namespace
    * still the unresolved `0xFF......` sentinel, and one Sim.cpp path
    * deliberately passes a possibly-null `mCommandDB`.
    */
-  void ReleaseCommandIdIfUnconsumed(CCommandDB* commandDb, const CmdId cmdId)
+  [[maybe_unused]] void ReleaseCommandIdIfUnconsumed(CCommandDB* commandDb, const CmdId cmdId)
   {
     if (!commandDb) {
       return;
@@ -458,7 +458,7 @@ namespace
    * Applies per-unit command-family validation and rejection side-effects
    * before queue insertion in `UNIT_IssueCommand`.
    */
-  [[nodiscard]] bool ProcessIssuedUnitCommand(
+  [[maybe_unused]] [[nodiscard]] bool ProcessIssuedUnitCommand(
     Sim* const sim,
     const SSTICommandIssueData& commandIssueData,
     Unit* const unit,
@@ -853,7 +853,7 @@ namespace
    * `REntityBlueprint::mBlueprintId` (+0x08) of the entity's blueprint:
    * `[bp+0x20]` capacity test, `[bp+0x0C]` buffer (0x0074A9FE, 0x0068BF9A).
    */
-  const char* ResolveBlueprintIdCString(const Entity* entity)
+  [[maybe_unused]] const char* ResolveBlueprintIdCString(const Entity* entity)
   {
     if (!entity || !entity->BluePrint) {
       return "";
@@ -870,7 +870,7 @@ namespace
    * Writes all key/value lanes from one Lua table iterator into archive object
    * stream as `LuaObject` entries, then writes one trailing nil marker object.
    */
-  LuaPlus::LuaObject* func_ArchiveWriteLuaObj(gpg::WriteArchive* const archive, LuaPlus::LuaObject* const tableObject)
+  [[maybe_unused]] LuaPlus::LuaObject* func_ArchiveWriteLuaObj(gpg::WriteArchive* const archive, LuaPlus::LuaObject* const tableObject)
   {
     if (!archive || !tableObject) {
       return tableObject;
@@ -905,7 +905,7 @@ namespace
   );
   static_assert(offsetof(CUnitCommand, mTarget) == 0x11C, "CUnitCommand::mTarget offset must be 0x11C (0x00764CCE)");
 
-  void AdvanceCoords(Entity* entity)
+  [[maybe_unused]] void AdvanceCoords(Entity* entity)
   {
     if (!entity) {
       return;
@@ -1264,7 +1264,7 @@ namespace
     );
   }
 
-  int RegisterMeshBlueprintFromState(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterMeshBlueprintFromState(LuaPlus::LuaState* const state)
   {
     RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
     if (!rules) {
@@ -1284,7 +1284,7 @@ namespace
    * then applies reflected field values from the Lua object into that
    * blueprint instance.
    */
-  int RegisterTrailEmitterBlueprintFromState(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterTrailEmitterBlueprintFromState(LuaPlus::LuaState* const state)
   {
     RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
     if (!rules) {
@@ -1312,7 +1312,7 @@ namespace
    * then applies reflected field values from the Lua object into that
    * blueprint instance.
    */
-  int RegisterEmitterBlueprintFromState(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterEmitterBlueprintFromState(LuaPlus::LuaState* const state)
   {
     RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
     if (!rules) {
@@ -1339,7 +1339,7 @@ namespace
    * Creates or resolves one beam blueprint from Lua stack lane 1, then applies
    * reflected field values from the Lua object into that blueprint instance.
    */
-  int RegisterBeamBlueprintFromState(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterBeamBlueprintFromState(LuaPlus::LuaState* const state)
   {
     RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
     if (!rules) {
@@ -1358,7 +1358,7 @@ namespace
     );
     return 0;
   }
-  void TickBlueprintLoaderProgressFromLoaderContext()
+  [[maybe_unused]] void TickBlueprintLoaderProgressFromLoaderContext()
   {
     moho::CBackgroundTaskControl* const initHandler = moho::BlueprintLoaderContext().mInitHandler;
     if (initHandler != nullptr && initHandler->mHandle != nullptr) {

@@ -330,12 +330,12 @@ namespace
       throw Error(MakeShortString(file), line, MakeShortString(message));
     }
 
-    [[noreturn]] void ThrowGalErrorFromHresult(const char* const file, const int line, const HRESULT code)
+    [[maybe_unused]] [[noreturn]] void ThrowGalErrorFromHresult(const char* const file, const int line, const HRESULT code)
     {
       throw Error(MakeShortString(file), line, MakeShortString(::gpg::D3DErrorToString(static_cast<long>(code))));
     }
 
-    msvc8::string MakeD3DErrorString(const HRESULT code)
+    [[maybe_unused]] msvc8::string MakeD3DErrorString(const HRESULT code)
     {
       return MakeShortString(::gpg::D3DErrorToString(static_cast<long>(code)));
     }
@@ -347,7 +347,7 @@ namespace
      * Copies rows `(0,1,2)`, `(4,5,6)`, `(8,9,10)`, `(12,13,14)` from one
      * source 4x4 matrix into four contiguous 3-float destination rows.
      */
-    const Matrix* CopyMatrix4x3Rows(
+    [[maybe_unused]] const Matrix* CopyMatrix4x3Rows(
       float* const outRow0,
       float* const outRow1,
       float* const outRow2,
@@ -372,7 +372,7 @@ namespace
      * Releases retained output COM lanes for every cached adapter-mode entry,
      * then releases the retained DXGI adapter lane.
      */
-    void ReleaseAdapterOutputAndDeviceRefs(AdapterD3D10* const adapter) noexcept
+    [[maybe_unused]] void ReleaseAdapterOutputAndDeviceRefs(AdapterD3D10* const adapter) noexcept
     {
       for (AdapterModeD3D10& mode : adapter->modes_) {
         SafeRelease(mode.output_);
@@ -387,7 +387,7 @@ namespace
      * Converts GAL texture format token to its backing DXGI format token by scanning
      * the recovered 89-entry mapping table.
      */
-    int MapGalTextureFormatToDxgi(const int galFormat)
+    [[maybe_unused]] int MapGalTextureFormatToDxgi(const int galFormat)
     {
       for (const DXGIFormatPair& pair : kTextureDxgiGalPairs) {
         if (pair.gal == galFormat) {
@@ -404,7 +404,7 @@ namespace
      * What it does:
      * Returns byte size per texel/block for recovered GAL texture format IDs.
      */
-    unsigned int GetTextureFormatBlockBytes(const unsigned int format)
+    [[maybe_unused]] unsigned int GetTextureFormatBlockBytes(const unsigned int format)
     {
       switch (format) {
       case 2:
@@ -470,7 +470,7 @@ namespace
      * Validates one vertex-format token and returns the matching static
      * element-layout table pointer.
      */
-    const D3D10_INPUT_ELEMENT_DESC* GetVertexLayoutElementsOrThrow(const std::uint32_t format)
+    [[maybe_unused]] const D3D10_INPUT_ELEMENT_DESC* GetVertexLayoutElementsOrThrow(const std::uint32_t format)
     {
       if (format >= 24U) {
         ThrowGalError("VertexFormatD3D10.cpp", 426, "invalid vertex format specified");
@@ -485,7 +485,7 @@ namespace
      * What it does:
      * Validates one vertex-format token and returns the static element count.
      */
-    std::uint32_t GetVertexLayoutElementCountOrThrow(const std::uint32_t format)
+    [[maybe_unused]] std::uint32_t GetVertexLayoutElementCountOrThrow(const std::uint32_t format)
     {
       if (format >= 24U) {
         ThrowGalError("VertexFormatD3D10.cpp", 432, "invalid vertex format specified");
@@ -497,7 +497,7 @@ namespace
      * The blend state both packs create (0x0090282B, 0x00902C0B): no
      * blending, colour writes on render target 0 only.
      */
-    [[nodiscard]] D3D10_BLEND_DESC OpaqueBlendDesc()
+    [[maybe_unused]] [[nodiscard]] D3D10_BLEND_DESC OpaqueBlendDesc()
     {
       D3D10_BLEND_DESC blendDesc{};
       blendDesc.AlphaToCoverageEnable = FALSE;

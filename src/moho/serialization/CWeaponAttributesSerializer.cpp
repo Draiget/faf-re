@@ -78,7 +78,7 @@ namespace moho
    */
   void CWeaponAttributes::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    if (archive == nullptr || this == nullptr) {
+    if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
     }
 
@@ -237,7 +237,7 @@ namespace
    * Loads one reflected `vector<SBlackListInfo>` payload using the cached RTTI
    * descriptor and returns the archive pointer for chaining.
    */
-  gpg::ReadArchive* ReadCachedSBlackListInfoVectorAndReturnArchive(
+  [[maybe_unused]] gpg::ReadArchive* ReadCachedSBlackListInfoVectorAndReturnArchive(
     gpg::ReadArchive* const archive,
     void* const objectPtr,
     gpg::RRef* const ownerRef
@@ -254,7 +254,7 @@ namespace
    * Saves one reflected `CWeaponAttributes` payload using the cached RTTI
    * descriptor and returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteCachedCWeaponAttributesAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteCachedCWeaponAttributesAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
@@ -271,7 +271,7 @@ namespace
    * Saves one reflected `vector<EntityCategorySet>` payload using cached RTTI
    * lookup and returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteCachedEntityCategorySetVectorAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteCachedEntityCategorySetVectorAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
@@ -288,7 +288,7 @@ namespace
    * Saves one reflected `vector<SBlackListInfo>` payload using cached RTTI
    * lookup and returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteCachedSBlackListInfoVectorAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteCachedSBlackListInfoVectorAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
@@ -305,7 +305,7 @@ namespace
    * Read-callback bridge that loads one reflected `CWeaponAttributes` payload
    * through cached RTTI lookup.
    */
-  void ReadCachedCWeaponAttributesCallback(gpg::ReadArchive* archive, void* objectPtr, gpg::RRef* ownerRef)
+  [[maybe_unused]] void ReadCachedCWeaponAttributesCallback(gpg::ReadArchive* archive, void* objectPtr, gpg::RRef* ownerRef)
   {
     ReadObjectByCachedType<moho::CWeaponAttributes>(archive, objectPtr, ownerRef);
   }
@@ -317,7 +317,7 @@ namespace
    * Write-callback bridge that saves one reflected `CWeaponAttributes` payload
    * through cached RTTI lookup.
    */
-  void WriteCachedCWeaponAttributesCallback(
+  [[maybe_unused]] void WriteCachedCWeaponAttributesCallback(
     gpg::WriteArchive* archive,
     void* objectPtr,
     const gpg::RRef* ownerRef
@@ -333,7 +333,7 @@ namespace
    * Read-callback bridge that loads one reflected
    * `vector<EntityCategorySet>` payload through cached RTTI lookup.
    */
-  void ReadCachedEntityCategorySetVectorCallback(
+  [[maybe_unused]] void ReadCachedEntityCategorySetVectorCallback(
     gpg::ReadArchive* archive,
     void* objectPtr,
     gpg::RRef* ownerRef
@@ -349,7 +349,7 @@ namespace
    * Write-callback bridge that saves one reflected
    * `vector<EntityCategorySet>` payload through cached RTTI lookup.
    */
-  void WriteCachedEntityCategorySetVectorCallback(
+  [[maybe_unused]] void WriteCachedEntityCategorySetVectorCallback(
     gpg::WriteArchive* archive,
     void* objectPtr,
     const gpg::RRef* ownerRef
@@ -365,7 +365,7 @@ namespace
    * Read-callback bridge that loads one reflected `vector<SBlackListInfo>`
    * payload through cached RTTI lookup.
    */
-  void ReadCachedSBlackListInfoVectorCallback(
+  [[maybe_unused]] void ReadCachedSBlackListInfoVectorCallback(
     gpg::ReadArchive* archive,
     void* objectPtr,
     gpg::RRef* ownerRef
@@ -381,7 +381,7 @@ namespace
    * Write-callback bridge that saves one reflected `vector<SBlackListInfo>`
    * payload through cached RTTI lookup.
    */
-  void WriteCachedSBlackListInfoVectorCallback(
+  [[maybe_unused]] void WriteCachedSBlackListInfoVectorCallback(
     gpg::WriteArchive* archive,
     void* objectPtr,
     const gpg::RRef* ownerRef

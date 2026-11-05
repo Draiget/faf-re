@@ -441,7 +441,7 @@ namespace moho
    * When blur is on the depth map is turned into a variance map by two
    * separable passes, shadow map -> A -> B, each drawing the unit quad.
    */
-  void Shadow::RenderShadowMap(TerrainCommon* const terrain, const GeomCamera3& viewCamera)
+  void Shadow::RenderShadowMap(TerrainCommon* const /*terrain*/, const GeomCamera3& viewCamera)
   {
     if (mShadowFidelity == 0) {
       return;

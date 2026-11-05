@@ -64,6 +64,7 @@ namespace faf::headless
     std::string blueprintOrderPath; // when set: every blueprint by ordinal, in load order (plan WPL.16)
     std::string luaPairsPath;   // when set: the sim Lua state's pairs() order before BeginSession (plan WPL.18)
     int keyframeEvery = 0;      // when > 0: save the sim every this many beats (ReplayKeyframes.h)
+    int keyframeFirst = 0;      // with `keyframeEvery`, when > 0: the beat of the first save
     std::string keyframeDir;    // with `keyframeEvery`: where the keyframe files go
     bool keyframePrepare = false;
     bool keyframeKeep = false;  // with `keyframeEvery`: keep the files after measuring them

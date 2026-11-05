@@ -975,7 +975,7 @@ namespace msvc8
     return PowPositiveBase(controlWord, x, y);
   }
 
-  static double PowPositiveBase(const unsigned int controlWord, const double x, const double y) noexcept
+  static double PowPositiveBase([[maybe_unused]] const unsigned int controlWord, const double x, const double y) noexcept
   {
 #if defined(_M_IX86)
     double result;

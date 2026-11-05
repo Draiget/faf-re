@@ -90,11 +90,6 @@ namespace
     }
   }
 
-  [[nodiscard]] int CompareNameIndexKey(const msvc8::string& lhs, const msvc8::string& rhs)
-  {
-    return std::strcmp(lhs.c_str(), rhs.c_str());
-  }
-
   [[nodiscard]] float IntBitsToFloat(const std::int32_t bits) noexcept
   {
     return std::bit_cast<float>(bits);

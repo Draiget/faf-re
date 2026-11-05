@@ -27,22 +27,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedSPhysBodyType()
-  {
-    return moho::SPhysBody::StaticGetClass();
-  }
-
-  [[nodiscard]] gpg::RType* CachedSPhysConstantsType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::SPhysConstants));
-    }
-
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
   [[nodiscard]] gpg::RType* CachedVector3fType()
   {
     static gpg::RType* cached = nullptr;

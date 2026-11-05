@@ -80,7 +80,6 @@ namespace
   // exactly 25, 26, 27, 28 and 33 - EQ, LT, LE, TEST and TFORLOOP.
   constexpr std::int32_t OP_MOVE = 0x00;
   constexpr std::int32_t OP_LOADK = 0x01;
-  constexpr std::int32_t OP_LOADBOOL = 0x02;
   constexpr std::int32_t OP_LOADNIL = 0x03;
   constexpr std::int32_t OP_GETUPVAL = 0x04;
   constexpr std::int32_t OP_GETGLOBAL = 0x05;
@@ -106,7 +105,6 @@ namespace
   constexpr std::int32_t OP_TFORLOOP = 0x21;
   constexpr std::int32_t OP_TFORPREP = 0x22;
   constexpr std::int32_t OP_SETLIST = 0x23;
-  constexpr std::int32_t OP_SETLISTO = 0x24;
   constexpr std::int32_t OP_CLOSE = 0x25;
   constexpr std::int32_t OP_CLOSURE = 0x26;
   constexpr std::int32_t OP_SUB = 0x0D;
@@ -179,12 +177,6 @@ namespace
   {
     i = (i & ~(static_cast<Instruction>(MAXARG_C) << kPosC))
       | (static_cast<Instruction>(c) << kPosC);
-  }
-
-  constexpr void SETARG_sBx(Instruction& i, const std::int32_t offset) noexcept
-  {
-    i = (i & ~(static_cast<Instruction>(LUA_MAXARG_Bx) << kPosBx))
-      | (static_cast<Instruction>(offset + LUA_MAXARG_sBx) << kPosBx);
   }
 
   [[nodiscard]] constexpr Instruction
@@ -344,7 +336,7 @@ namespace
    * Returns `1` when `stackValue` is within one call frame stack window
    * `[base, top)`; returns `0` otherwise.
    */
-  [[nodiscard]] std::int32_t isinstack(CallInfo* const callInfo, LuaPlus::TObject* const stackValue)
+  [[maybe_unused]] [[nodiscard]] std::int32_t isinstack(CallInfo* const callInfo, LuaPlus::TObject* const stackValue)
   {
     LuaPlus::StkId cursor = callInfo->base;
     const LuaPlus::StkId top = callInfo->top;

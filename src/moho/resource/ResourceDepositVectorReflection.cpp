@@ -25,7 +25,7 @@ namespace
    * `msvc8::vector<ResourceDeposit>` member at that offset; same body as the
    * CSimResources serializer's load half).
    */
-  void ReadResourceDepositVectorFieldArchiveAdapter(void* const object, gpg::ReadArchive* const archive)
+  [[maybe_unused]] void ReadResourceDepositVectorFieldArchiveAdapter(void* const object, gpg::ReadArchive* const archive)
   {
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(object != nullptr);
@@ -45,7 +45,7 @@ namespace
    * Lazily resolves `vector<ResourceDeposit>` reflection type and dispatches
    * one archive write for `CSimResources::deposits_` (x86 `+0x0C`).
    */
-  void WriteResourceDepositVectorFieldArchiveAdapter(void* const object, gpg::WriteArchive* const archive)
+  [[maybe_unused]] void WriteResourceDepositVectorFieldArchiveAdapter(void* const object, gpg::WriteArchive* const archive)
   {
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(object != nullptr);

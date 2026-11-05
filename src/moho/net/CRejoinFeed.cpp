@@ -799,6 +799,7 @@ namespace
   public:
     void ReceiveMessage(CMessage* const message, CMessageDispatcher* const) override
     {
+      mHeard = true;
       if (IsPeerMessage(*message, EPeerMessageKind::RejoinBacklog) &&
           (BacklogIndex(*message) == kRecordingBacklog || BacklogIndex(*message) == kKeyframeBacklog)) {
         const auto* const payload = message->mBuff.start_ + 5;
@@ -856,6 +857,7 @@ namespace
     [[nodiscard]] bool Reported() const { return mReported; }
     [[nodiscard]] bool Refused() const { return mRefused; }
     [[nodiscard]] ERejoinRefusal Refusal() const { return mRefusal; }
+    [[nodiscard]] bool Heard() const { return mHeard; }
     [[nodiscard]] const std::vector<char>& Recording() const { return mRecording; }
     [[nodiscard]] std::vector<CMessage>& Held() { return mHeld; }
 
@@ -866,6 +868,7 @@ namespace
     std::int32_t mRecordingSize{0};
     bool mReported{false};
     bool mRefused{false};
+    bool mHeard{false};
     ERejoinRefusal mRefusal{ERejoinRefusal::Key};
     INetConnection* mLink{nullptr};
     int mLocalSource{-1};
@@ -1757,8 +1760,15 @@ msvc8::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(msvc8::string* const fai
       setup.receivedBytes = received;
       setup.deadline = now + kWait;
     }
-    if (now >= setup.deadline) {
-      return refuse("A peer did not answer in time.");
+    // Any peer that lets clients back answers within a round trip, whatever else it is doing.
+    constexpr std::chrono::seconds kSilentPeerWait{30};
+    const bool silentPeer = now - sRejoinStart >= kSilentPeerWait && std::any_of(list.begin(), list.end(), [](const auto& peer) {
+      return !peer->receiver.Heard();
+    });
+    if (silentPeer || now >= setup.deadline) {
+      return refuse(
+        "Not every player answered. The game may be over, a player may have left it, or the players may not allow coming back to a game."
+      );
     }
     return msvc8::auto_ptr<SWldSessionInfo>();
   }

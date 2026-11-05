@@ -136,7 +136,7 @@ namespace
       version_ = 1;
       serLoadFunc_ = &RBroadcasterRType_EUnitCommandQueueStatus::SerLoad;
       serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(
-        &gpg::SaveBroadcasterListenerChainEUnitCommandQueueStatus
+        reinterpret_cast<void (*)()>(&gpg::SaveBroadcasterListenerChainEUnitCommandQueueStatus)
       );
     }
   };

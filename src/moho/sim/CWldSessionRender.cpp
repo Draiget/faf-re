@@ -156,7 +156,7 @@ namespace
      * What it does:
      * Returns the global strategic-icon auxiliary object lane.
      */
-    [[nodiscard]] StrategicIconAux* GetStrategicIconAuxiliaryLaneA() noexcept
+    [[maybe_unused]] [[nodiscard]] StrategicIconAux* GetStrategicIconAuxiliaryLaneA() noexcept
     {
       return gStrategicIconAuxiliary;
     }
@@ -167,7 +167,7 @@ namespace
      * What it does:
      * Secondary entrypoint returning the strategic-icon auxiliary object lane.
      */
-    [[nodiscard]] StrategicIconAux* GetStrategicIconAuxiliaryLaneB() noexcept
+    [[maybe_unused]] [[nodiscard]] StrategicIconAux* GetStrategicIconAuxiliaryLaneB() noexcept
     {
       return gStrategicIconAuxiliary;
     }
@@ -178,7 +178,7 @@ namespace
      * What it does:
      * Third entrypoint returning the strategic-icon auxiliary object lane.
      */
-    [[nodiscard]] StrategicIconAux* GetStrategicIconAuxiliaryLaneC() noexcept
+    [[maybe_unused]] [[nodiscard]] StrategicIconAux* GetStrategicIconAuxiliaryLaneC() noexcept
     {
       return gStrategicIconAuxiliary;
     }

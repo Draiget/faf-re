@@ -134,7 +134,7 @@ namespace
    * Disposes one `sp_counted_impl_p<CD3DPrimBatcher>` payload by running
    * non-deleting `CD3DPrimBatcher` teardown and releasing owned storage.
    */
-  void DisposeCountedPrimBatcherStorage(
+  [[maybe_unused]] void DisposeCountedPrimBatcherStorage(
     boost::SpCountedImplStorage<moho::CD3DPrimBatcher>* const countedStorage
   )
   {

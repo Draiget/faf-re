@@ -36,7 +36,7 @@ namespace
    * constructor (`FUN_0055D6F0`), destroying already-constructed entries
    * before rethrowing if a copy step throws.
    */
-  UnitWeaponInfo* CopyUnitWeaponInfoRangeWithRollback(
+  [[maybe_unused]] UnitWeaponInfo* CopyUnitWeaponInfoRangeWithRollback(
     const UnitWeaponInfo* const sourceBegin,
     const UnitWeaponInfo* const sourceEnd,
     UnitWeaponInfo* const destinationBegin

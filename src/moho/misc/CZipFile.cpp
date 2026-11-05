@@ -383,7 +383,7 @@ namespace moho
         continue;
       }
 
-      const std::uint32_t newEntryIndex = static_cast<std::uint32_t>(mEntries.size());
+      [[maybe_unused]] const std::uint32_t newEntryIndex = static_cast<std::uint32_t>(mEntries.size());
       SZipFileCachedEntry cachedEntry{};
       cachedEntry.mEntry = parsedEntry;
       mEntries.push_back(cachedEntry);

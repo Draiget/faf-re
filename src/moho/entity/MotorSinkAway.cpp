@@ -86,7 +86,7 @@ namespace
    * Deserializes one `Motor` object lane through archive owner context and
    * returns the archive instance.
    */
-  gpg::ReadArchive* ReadMotorArchiveAdapter(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
+  [[maybe_unused]] gpg::ReadArchive* ReadMotorArchiveAdapter(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
   {
     archive->Read(CachedMotorType(), object, *ownerRef);
     return archive;
@@ -99,7 +99,7 @@ namespace
    * Serializes one `Motor` object lane through archive owner context and
    * returns the archive instance.
    */
-  gpg::WriteArchive* WriteMotorArchiveAdapter(
+  [[maybe_unused]] gpg::WriteArchive* WriteMotorArchiveAdapter(
     gpg::WriteArchive* const archive,
     void** const objectSlot,
     const gpg::RRef* const ownerRef
@@ -115,7 +115,7 @@ namespace
    * What it does:
    * Deserializes one `Motor` object lane through archive owner context.
    */
-  void ReadMotorArchiveObjectLane1(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
+  [[maybe_unused]] void ReadMotorArchiveObjectLane1(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
   {
     archive->Read(CachedMotorType(), object, *ownerRef);
   }
@@ -126,7 +126,7 @@ namespace
    * What it does:
    * Serializes one `Motor` object lane through archive owner context.
    */
-  void WriteMotorArchiveObjectLane1(
+  [[maybe_unused]] void WriteMotorArchiveObjectLane1(
     gpg::WriteArchive* const archive,
     void** const objectSlot,
     const gpg::RRef* const ownerRef
