@@ -43,6 +43,7 @@
 #include "gpg/gal/RenderTargetContext.hpp"
 #include "gpg/gal/TextureContext.h"
 #include "gpg/gal/VertexBufferContext.hpp"
+#include "gpg/gal/backends/common/TextureQuality.h"
 
 namespace gpg::gal
 {
@@ -870,10 +871,10 @@ namespace gpg::gal
       const char* const data = context->dataBuffer_.mBegin;
       const SIZE_T bytes = context->DataSizeBytes();
 
-      // The texture-quality option skips top mip levels (D3D9 passes it as
-      // D3DX_SKIP_DDS_MIP_LEVELS, `reserved0x44_`); a file with too few
-      // levels for that loads whole.
-      const UINT skipLevels = context->reserved0x44_ & 0x1FU;
+      // Original D3D9 applies the quality skip only to 2D DDS textures;
+      // environment cubes and volumes retain their top mip. A 2D file with
+      // too few levels for the requested skip still falls back to loading whole.
+      const UINT skipLevels = imaging::TextureQualityMipLevels(data, bytes, context->reserved0x44_ & 0x1FU);
       HRESULT result = E_FAIL;
       if (skipLevels != 0U) {
         D3DX11_IMAGE_LOAD_INFO loadInfo;

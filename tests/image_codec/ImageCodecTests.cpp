@@ -252,6 +252,119 @@ namespace
     Check(SUCCEEDED(result) && reloaded.cube && reloaded.arraySize == 6U && SameLevels(source, reloaded), "a BC3 cube keeps its six faces", detail);
   }
 
+  // The original applies texture-quality skip only to 2D. Run both decode
+  // routes; RGB cubes always use D3DX, while full-chain BC cubes can load direct.
+  void TestQualityKeepsCubeTopMip(ImageCodec& codec)
+  {
+    const bool oldDirect = gpg::gal::imaging::gDdsDirectLoad;
+    for (const bool direct : {false, true}) {
+      gpg::gal::imaging::gDdsDirectLoad = direct;
+      for (const DXGI_FORMAT format : {DXGI_FORMAT_BC3_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM}) {
+        for (const bool cube : {false, true}) {
+          const Image source = MakeImage(format, 64U, 64U, 7U, cube);
+          std::vector<std::uint8_t> file;
+          const HRESULT written = ImageCodec::WriteDds(source, file);
+          Image baseline;
+          const HRESULT baselineRead = SUCCEEDED(written) ?
+            codec.Decode(file.data(), file.size(), DecodeOptions{}, baseline) : written;
+          const bool baselineShape = SUCCEEDED(baselineRead) && baseline.width == 64U && baseline.height == 64U &&
+            baseline.mipLevels == 7U && baseline.arraySize == (cube ? 6U : 1U) && baseline.cube == cube;
+          Check(baselineShape, "zero-skip baseline has the source dimensions");
+          if (!baselineShape) {
+            continue;
+          }
+          for (const std::uint32_t skip : {0U, 1U, 2U}) {
+            DecodeOptions options;
+            options.skipMipLevels = skip;
+            Image reloaded;
+            const HRESULT read =
+              SUCCEEDED(written) ? codec.Decode(file.data(), file.size(), options, reloaded) : written;
+            const std::uint32_t firstMip = cube ? 0U : skip;
+            Image expected;
+            expected.Allocate(baseline.format, 64U >> firstMip, 64U >> firstMip, 7U - firstMip, cube ? 6U : 1U);
+            expected.cube = cube;
+            for (std::uint32_t face = 0U; face < expected.arraySize; ++face) {
+              for (std::uint32_t mip = 0U; mip < expected.mipLevels; ++mip) {
+                const Image::Subresource& from = baseline.subresources[face * baseline.mipLevels + firstMip + mip];
+                const Image::Subresource& to = expected.subresources[face * expected.mipLevels + mip];
+                std::memcpy(expected.bytes.data() + to.offset, baseline.bytes.data() + from.offset, to.slicePitch);
+              }
+            }
+            char detail[96]{};
+            std::snprintf(
+              detail,
+              sizeof(detail),
+              "format %d, cube %u, direct %u, skip %u",
+              static_cast<int>(format),
+              cube ? 1U : 0U,
+              direct ? 1U : 0U,
+              skip
+            );
+            Check(
+              SUCCEEDED(read) && reloaded.cube == cube && SameLevels(expected, reloaded),
+              "texture quality skips only 2D mips",
+              detail
+            );
+          }
+        }
+      }
+    }
+    gpg::gal::imaging::gDdsDirectLoad = oldDirect;
+  }
+
+  // A synthetic uncompressed DDS volume: WriteDds deliberately does not encode volumes.
+  void TestQualityKeepsVolumeTopMip(ImageCodec& codec)
+  {
+    std::vector<std::uint8_t> file(128U, 0U);
+    const auto word = [&file](const std::size_t offset, const std::uint32_t value) {
+      std::memcpy(file.data() + offset, &value, sizeof(value));
+    };
+    word(0U, 0x20534444U);
+    word(4U, 124U);
+    word(8U, 0x82100FU); // CAPS, HEIGHT, WIDTH, PITCH, PIXELFORMAT, MIPMAPCOUNT, DEPTH
+    word(12U, 8U);
+    word(16U, 8U);
+    word(20U, 32U);
+    word(24U, 8U);
+    word(28U, 4U);
+    word(76U, 32U);
+    word(80U, 0x41U);
+    word(88U, 32U);
+    word(92U, 0x00FF0000U);
+    word(96U, 0x0000FF00U);
+    word(100U, 0x000000FFU);
+    word(104U, 0xFF000000U);
+    word(108U, 0x401008U); // COMPLEX, TEXTURE, MIPMAP
+    word(112U, 0x200000U); // VOLUME
+    for (std::uint32_t mip = 0U; mip < 4U; ++mip) {
+      const std::uint32_t side = 8U >> mip;
+      file.insert(file.end(), side * side * side * 4U, static_cast<std::uint8_t>(32U + mip));
+    }
+    for (const std::uint32_t skip : {0U, 1U, 2U}) {
+      DecodeOptions options;
+      options.skipMipLevels = skip;
+      Image reloaded;
+      const HRESULT read = codec.Decode(file.data(), file.size(), options, reloaded);
+      bool same = SUCCEEDED(read) && reloaded.volume && !reloaded.cube && reloaded.width == 8U &&
+        reloaded.height == 8U && reloaded.depth == 8U && reloaded.mipLevels == 4U && reloaded.subresources.size() == 4U;
+      std::size_t expectedOffset = 0U;
+      for (std::uint32_t mip = 0U; same && mip < 4U; ++mip) {
+        const std::uint32_t side = 8U >> mip;
+        const Image::Subresource& level = reloaded.subresources[mip];
+        const std::size_t levelBytes = static_cast<std::size_t>(side) * side * side * 4U;
+        same = level.width == side && level.height == side && level.depth == side &&
+          level.rowPitch == side * 4U && level.rowCount == side && level.slicePitch == side * side * 4U &&
+          level.offset == expectedOffset && expectedOffset + levelBytes <= reloaded.bytes.size();
+        for (std::size_t at = expectedOffset; same && at < expectedOffset + levelBytes; ++at) {
+          same = reloaded.bytes[at] == static_cast<std::uint8_t>(32U + mip);
+        }
+        expectedOffset += levelBytes;
+      }
+      same = same && expectedOffset == reloaded.bytes.size();
+      Check(same, "texture quality leaves volume dimensions and mip bytes unchanged");
+    }
+  }
+
   /** Encode, which is D3DX11's writer where it has one: the same texels come back either way. */
   void TestEncodeMatchesWriteDds(ImageCodec& codec)
   {
@@ -305,6 +418,8 @@ int main()
   TestResizeKeepsColour(*codec);
   TestReloadInBlockFormat(*codec);
   TestCube(*codec);
+  TestQualityKeepsCubeTopMip(*codec);
+  TestQualityKeepsVolumeTopMip(*codec);
   TestEncodeMatchesWriteDds(*codec);
 
   std::printf("%d failed\n", gFailures);
