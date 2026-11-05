@@ -11,6 +11,8 @@
 
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/gal/Device.hpp"
+#include "gpg/gal/DeviceContext.hpp"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/StatItem.h"
@@ -329,6 +331,17 @@ namespace moho
    * Rebuilds high-fidelity terrain sheets/tessellation, regenerates shoreline
    * cells, and lazily initializes shared terrain texture helpers.
    */
+  bool ren_TerrainGpuBuffers = true;
+  namespace
+  {
+    TConVar<bool> gTConVar_ren_TerrainGpuBuffers(
+      "ren_TerrainGpuBuffers",
+      "Direct3D 12 / Vulkan: the terrain's vertices and indices stay in GPU memory and upload only after a rebuild (1, the "
+      "default), or are copied each frame (0). Read when a terrain is created.",
+      &ren_TerrainGpuBuffers
+    );
+  } // namespace
+
   bool HighFidelityTerrain::Init()
   {
     if (mTerrainResource == nullptr) {
@@ -343,8 +356,13 @@ namespace moho
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
 
     CD3DVertexFormat* const terrainVertexFormat = resources->GetVertexFormat(10);
-    ReplaceOwned(mTerrainVertexSheet, resources->NewVertexSheet(1U, 0xFFFF, terrainVertexFormat));
-    ReplaceOwned(mTerrainIndexSheet, resources->CreateIndexSheet(true, 199998));
+    // Engine change (ren_TerrainGpuBuffers): upload memory is recycled, so a dynamic sheet is copied again
+    // each frame though the mesh rarely changes. In GPU memory it uploads only after a rebuild.
+    const gpg::gal::DeviceApi deviceApi = gpg::gal::Device::GetInstance()->GetDeviceContext()->mDeviceType;
+    const bool gpuSheets = ren_TerrainGpuBuffers && (deviceApi == gpg::gal::DeviceApi::Direct3D12 || deviceApi == gpg::gal::DeviceApi::Vulkan);
+    mTerrainSheetState = gpuSheets ? 3u : 0u;
+    ReplaceOwned(mTerrainVertexSheet, resources->NewVertexSheet(gpuSheets ? 0U : 1U, 0xFFFF, terrainVertexFormat));
+    ReplaceOwned(mTerrainIndexSheet, resources->CreateIndexSheet(!gpuSheets, 199998));
     // Engine addition: this frame's draws read only what UpdateRenderContext locks and writes.
     {
       gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
@@ -676,7 +694,8 @@ namespace moho
 
       mShoreline.Update(*mCamera);
 
-      if (ren_GenerateMesh && (dirty || decalsDirty)) {
+      const bool rebuildMesh = ren_GenerateMesh && (dirty || decalsDirty);
+      if (rebuildMesh) {
         mTesselator->Rebuild(mCamera, terrainRes);
 
         if (shaderVarTerrainHeightScale.Exists()) {
@@ -856,14 +875,19 @@ namespace moho
         collisionIndexCount = kSkirtMaxIndexCount;
       }
 
-      if (rectCacheCount > 0) {
+      // GPU sheets keep their contents until the mesh is rebuilt; decals are appended in that rebuild too.
+      const bool uploadMesh = (mTerrainSheetState == 0u) || rebuildMesh || (mTerrainSheetState & 2u) != 0u;
+      if (uploadMesh) {
+        mTerrainSheetState &= ~2u;
+      }
+      if (uploadMesh && rectCacheCount > 0) {
         void* const lockedVertices = mTerrainVertexSheet->GetVertStream(0U)->Lock(0, rectCacheCount, false, true);
         // Raw GPU upload: tessellator rect blob into the locked stream.
         std::copy_n(mTesselator->GetRectCacheData(), rectCacheCount, static_cast<CTesselator::Rect16*>(lockedVertices));
         mTerrainVertexSheet->GetVertStream(0U)->Unlock();
       }
 
-      if (collisionIndexCount > 0) {
+      if (uploadMesh && collisionIndexCount > 0) {
         std::int16_t* const lockedIndices = mTerrainIndexSheet->Lock(0, collisionIndexCount, false, true);
         // Raw GPU upload: collision index blob into the locked sheet.
         std::copy_n(mTesselator->GetCollisionIndexData(), collisionIndexCount, lockedIndices);
