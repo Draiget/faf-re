@@ -351,6 +351,7 @@ namespace
     pending.push_back(CAiReconDBImpl::SNewBlip{
       .sourceUnit = sourceUnit,
       .fake = fake,
+      .pad_09_0B = {},
       .detectedFlags = detectedFlags,
     });
   }
