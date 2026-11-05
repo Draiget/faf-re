@@ -445,6 +445,12 @@ namespace faf::remote
       builder.UnwatchRecord(slot);
     }
     std::sort(held.removed.begin(), held.removed.end());
+    for (const std::uint32_t id : held.removed) {
+      held.recentlyGone.emplace_back(held.beat, id);
+    }
+    while (!held.recentlyGone.empty() && held.recentlyGone.front().first + CViewIdMap::kInboundGraceBeats < held.beat) {
+      held.recentlyGone.pop_front();
+    }
     std::sort(held.created.begin(), held.created.end(), [](const wire::SEntityRecord* const a, const wire::SEntityRecord* const b) {
       return a->id < b->id;
     });
@@ -530,6 +536,19 @@ namespace faf::remote
     changes.created = held.created;
     changes.changed = held.changed;
     return wire::EncodeFrameChanges(changes, mCodec, writer);
+  }
+
+  bool CViewFrames::ViewHoldsEntity(const std::size_t army, const std::uint32_t id) const
+  {
+    if (army >= mHeld.size()) {
+      return false;
+    }
+    const SHeldView& held = mHeld[army];
+    std::uint32_t slot = 0;
+    if (mBuilders[army]->FindSlot(id, slot) && slot < held.sent.size() && held.sent[slot] != 0u) {
+      return true;
+    }
+    return std::any_of(held.recentlyGone.begin(), held.recentlyGone.end(), [id](const auto& gone) { return gone.second == id; });
   }
 
   std::uint32_t CViewFrames::ViewEntityId(const std::size_t view, const std::uint32_t simId)

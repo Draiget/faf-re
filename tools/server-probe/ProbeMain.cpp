@@ -46,6 +46,7 @@ namespace
 
   // A renumbered family's id no view is ever given: the serial runs out long before this.
   constexpr std::uint32_t kForgedBlipId = 0x3FFFFFFFu;
+  constexpr std::uint32_t kGroundTarget = 0xFFFFFFFFu;
 
   [[nodiscard]] std::uint64_t SteadyUs() noexcept
   {
@@ -169,6 +170,8 @@ namespace
     double orderAt = -1.0;
     double attackBlipAt = -1.0;
     double forgeIdAt = -1.0;
+    double attackHiddenAt = -1.0;
+    std::uint32_t hiddenId = 0u; // a unit of another army, as a cheat would guess it
     double fuzzAt = -1.0;
     double floodAt = -1.0;
     double beatMs = 0.0; // the game's beat, to tell how late views come; 0: no telling
@@ -222,6 +225,10 @@ namespace
         out.attackBlipAt = Argument(value);
       } else if (name == "--forge-id-at") {
         out.forgeIdAt = Argument(value);
+      } else if (name == "--attack-hidden-at") {
+        out.attackHiddenAt = Argument(value);
+      } else if (name == "--hidden-id") {
+        out.hiddenId = static_cast<std::uint32_t>(std::strtoul(value, nullptr, 0));
       } else if (name == "--fuzz-at") {
         out.fuzzAt = Argument(value);
       } else if (name == "--fuzz-count") {
@@ -288,7 +295,7 @@ namespace
     PutU32(out, 0xFFFFFFFFu);
     out.push_back(static_cast<std::uint8_t>(type));
     PutU32(out, 0xFFFFFFFFu);
-    if (targetId != 0u) {
+    if (targetId != kGroundTarget) {
       out.push_back(1u); // AITARGET_Entity
       PutU32(out, targetId);
     } else {
@@ -458,7 +465,7 @@ int main(const int argc, char** const argv)
   if (!ReadOptions(argc, argv, options)) {
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s>] [--resume-at <s>] [--forge-at <s>] "
-      "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--fuzz-at <s> [--fuzz-count <n>]] "
+      "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
       "[--flood-at <s>] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>]\n"
     );
     return 3;
@@ -498,6 +505,7 @@ int main(const int argc, char** const argv)
   bool orderWanted = false;
   bool blipWanted = false;
   bool forgedWanted = false;
+  bool hiddenWanted = false;
   bool orderAnswered = false;
   bool orderApplied = false;
   bool ordered = options.orderAt >= 0.0;
@@ -620,7 +628,7 @@ int main(const int argc, char** const argv)
         watch.commandId = (views.source << 24u) | nextCommand++;
         watch.from = unit->position;
         watch.active = true;
-        SendCommand(link, kOpIssueCommand, OrderPayload(watch.unit, watch.commandId, moho::EUnitCommandType::UNITCOMMAND_Move, 0u, views.mapX * 0.5f, views.mapZ * 0.5f));
+        SendCommand(link, kOpIssueCommand, OrderPayload(watch.unit, watch.commandId, moho::EUnitCommandType::UNITCOMMAND_Move, kGroundTarget, views.mapX * 0.5f, views.mapZ * 0.5f));
         asked.push_back("order");
         std::printf("probe %d: %.1f s: ordered unit 0x%08x to the map's middle, command 0x%08x, at view beat %u\n", options.uid, elapsed, watch.unit, watch.commandId, views.frame.beat);
       }
@@ -646,6 +654,22 @@ int main(const int argc, char** const argv)
         SendCommand(link, kOpIssueCommand, OrderPayload(unit->id, (views.source << 24u) | nextCommand++, moho::EUnitCommandType::UNITCOMMAND_Attack, kForgedBlipId, 0.0f, 0.0f));
         asked.push_back("attack on a blip it was never shown");
         std::printf("probe %d: %.1f s: ordered an attack on blip 0x%08x, which its view never had\n", options.uid, elapsed, kForgedBlipId);
+      }
+    }
+    hiddenWanted = Due(options.attackHiddenAt, elapsed) || hiddenWanted;
+    if (hiddenWanted && views.haveFrame && views.haveInfo) {
+      if (const auto* const unit = OwnUnit(views); unit != nullptr) {
+        hiddenWanted = false;
+        watch.unit = unit->id;
+        watch.commandId = (views.source << 24u) | nextCommand++;
+        watch.from = unit->position;
+        watch.active = true;
+        SendCommand(link, kOpIssueCommand, OrderPayload(unit->id, watch.commandId, moho::EUnitCommandType::UNITCOMMAND_Attack, options.hiddenId, 0.0f, 0.0f));
+        asked.push_back("attack on a unit it can't see");
+        std::printf(
+          "probe %d: %.1f s: ordered unit 0x%08x to attack unit 0x%08x, which its view %s, at view beat %u\n", options.uid, elapsed, unit->id, options.hiddenId,
+          FindEntity(views, options.hiddenId) != nullptr ? "holds" : "doesn't hold", views.frame.beat
+        );
       }
     }
     if (Due(options.fuzzAt, elapsed)) {

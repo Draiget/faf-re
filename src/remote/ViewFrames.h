@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <unordered_set>
 #include <utility>
@@ -92,6 +93,11 @@ namespace faf::remote
     [[nodiscard]] std::size_t HeldCount(const std::int32_t army) const { return mHeld[static_cast<std::size_t>(army)].count; }
     /** `army`'s last frame against the one before, as `wire::EncodeFrame` writes it. */
     [[nodiscard]] bool EncodeHeldFrame(std::int32_t army, wire::BitWriter& writer) const;
+    /**
+     * With `EnableHeldFrames`, between a beat's views: whether `army`'s client holds a record with this
+     * id, or held one within `CViewIdMap::kInboundGraceBeats` (its order may be on its way).
+     */
+    [[nodiscard]] bool ViewHoldsEntity(std::size_t army, std::uint32_t id) const;
     /** `simId` as `view`'s client knows it, for an id written outside its frames (plan WP6.10). */
     [[nodiscard]] std::uint32_t ViewEntityId(std::size_t view, std::uint32_t simId);
     /** Differences the check found (should stay 0). */
@@ -138,6 +144,7 @@ namespace faf::remote
       std::uint32_t beat = 0;
       std::vector<std::uint32_t> candidates;
       std::vector<std::uint32_t> removed;
+      std::deque<std::pair<std::uint32_t, std::uint32_t>> recentlyGone; // beat, id; oldest first
       std::vector<const wire::SEntityRecord*> created;
       std::vector<wire::SFrameChange> changed;
       gpg::core::ChunkedVector<wire::SEntityRecord> before; // changed `own` records as the client held them

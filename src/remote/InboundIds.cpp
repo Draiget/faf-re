@@ -54,6 +54,10 @@ namespace faf::remote
       return true;
     }
     std::uint32_t id = target.mEntityId;
+    if (!AllowTarget(id)) {
+      Drop(message, "target", id);
+      return false;
+    }
     if (!Entity(message, id)) {
       return false;
     }

@@ -86,7 +86,7 @@ namespace faf::server
         seat.bytesSeen = stats->bytesSent;
       }
       // Before the player has a channel the messages wait, as the first of them make the rest readable.
-      if (!seat.joinedEver && !seat.gone) {
+      if (!seat.joinedEver && !seat.gone && mConfig.holdViewsForJoin) {
         continue;
       }
       mViewSending.clear();

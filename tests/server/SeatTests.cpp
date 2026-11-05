@@ -316,10 +316,13 @@ namespace
     const std::uint32_t viewBlip = map.EntityId(kSimBlip);
     Check(viewBlip != kSimBlip, "a blip has its own number in a view");
 
+    constexpr std::uint32_t kSeenUnit = 0x00100009u;
+    constexpr std::uint32_t kHiddenUnit = 0x00100007u;
     std::vector<std::pair<std::uint64_t, ECommandAnswer>> answers;
     const auto drain = [&] {
       intake.Drain(
         nullptr, [&map](const std::int32_t army) -> const faf::remote::CViewIdMap* { return army == 0 ? &map : nullptr; },
+        [](const std::int32_t army, const std::uint32_t id) { return army == 0 && id == kSeenUnit; },
         [&answers](const std::int32_t uid, std::vector<std::uint8_t> message) {
           Check(uid == 1, "the answer goes to who asked");
           faf::remote::net::ByteReader reader(message.data(), message.size());
@@ -373,6 +376,17 @@ namespace
       Check(std::memcmp(expected.data(), game.merged.mLastOrder.data(), expected.size()) == 0, "and otherwise the bytes sent");
     }
 
+    // A real unit keeps the sim's number, so anyone can guess one: it must be one the view holds.
+    answers.clear();
+    Check(push(AttackOrder(0x00000001u, 0x01000003u, kHiddenUnit)), "an order on a unit the view doesn't hold is taken");
+    Check(push(AttackOrder(0x00000001u, 0x01000004u, kSeenUnit)), "and one on a unit it does");
+    drain();
+    Check(answers.size() == 2u, "both are answered");
+    if (answers.size() == 2u) {
+      Check(answers[0].second == ECommandAnswer::Dropped, "a target the view doesn't hold stops the order");
+      Check(answers[1].second == ECommandAnswer::Applied, "a target it holds doesn't");
+    }
+
     // A flood waits its turn, and past the limit the player is told on.
     answers.clear();
     const std::vector<std::uint8_t> pause = Command(ECmdStreamOp::CMDST_RequestPause);
@@ -403,9 +417,10 @@ namespace
     std::size_t answered = 0;
     const auto count = [&answered](std::int32_t, std::vector<std::uint8_t>) { ++answered; };
     const auto noMaps = [](std::int32_t) -> const faf::remote::CViewIdMap* { return nullptr; };
-    bytes.Drain(nullptr, noMaps, count);
+    const auto holdsNothing = [](std::int32_t, std::uint32_t) { return false; };
+    bytes.Drain(nullptr, noMaps, holdsNothing, count);
     Check(answered == 1u, "one beat takes only so many bytes");
-    bytes.Drain(nullptr, noMaps, count);
+    bytes.Drain(nullptr, noMaps, holdsNothing, count);
     Check(answered == 2u, "and the next takes the rest");
   }
 

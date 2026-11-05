@@ -43,7 +43,9 @@ namespace faf::server
       , marshaller(std::make_unique<moho::CMarshaller>(&capture))
       , translator(*marshaller, noMap)
       , decoder(std::make_unique<moho::CDecoder>(&translator, noRecording, rules, lua.get()))
-    {}
+    {
+      translator.SetHeldTest([this](const std::uint32_t id) { return (*holds)(army, id); });
+    }
 
     std::unique_ptr<LuaPlus::LuaState> lua; // the decoder's own, apart from the sim's
     msvc8::auto_ptr<gpg::Stream> noRecording;
@@ -53,6 +55,8 @@ namespace faf::server
     remote::CInboundIdTranslator translator;
     std::unique_ptr<moho::CDecoder> decoder;
     remote::CServerClient* seat = nullptr;
+    std::int32_t army = -1;
+    const ViewHolds* holds = nullptr;
     remote::net::ECommandAnswer answer = remote::net::ECommandAnswer::Dropped;
     std::int32_t beat = 0;
   };
@@ -97,7 +101,7 @@ namespace faf::server
     }
   }
 
-  void CSeatIntake::Drain(moho::RRuleGameRules* const rules, const MapOfArmy& maps, const Answer& answer)
+  void CSeatIntake::Drain(moho::RRuleGameRules* const rules, const MapOfArmy& maps, const ViewHolds& holds, const Answer& answer)
   {
     if (mWaiting.load(std::memory_order_relaxed) == 0u) {
       return;
@@ -139,6 +143,8 @@ namespace faf::server
       } else {
         const remote::CViewIdMap* const map = maps(taken.seat->army);
         decoding.translator.SetMap(map != nullptr ? *map : decoding.noMap);
+        decoding.army = taken.seat->army;
+        decoding.holds = &holds;
         decoding.decoder->ReceiveMessage(&message, nullptr);
       }
 

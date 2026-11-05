@@ -187,6 +187,7 @@ namespace
       "                            (server-mode build)\n"
       "  --seats-listen <ip:port>  with --seats, Linux: and each seat's view over UDP to whoever joins as it, uid\n"
       "                            the source's index, token seat-<uid> (--view-pipeline: its threads)\n"
+      "  --target-audit            with --seats-listen: how many recorded targets a server's view wouldn't have held\n"
       "  --oracle-check            the visibility oracle for the --focus army against what the sim publishes,\n"
       "                            every entity and beat (server-mode build)\n"
       "  --oracle-digests <file>  with --oracle-check: per beat, the oracle's answers for every army (unfocused)\n"
@@ -343,6 +344,7 @@ int HEADLESS_Main(int argc, char** argv)
   options.commandCheck = moho::CFG_GetArgOption("--command-check", 0, nullptr);
   options.seats = moho::CFG_GetArgOption("--seats", 0, nullptr);
   (void)ReadOption("--seats-listen", options.seatsListen);
+  options.targetAudit = moho::CFG_GetArgOption("--target-audit", 0, nullptr);
   options.oracleCheck = moho::CFG_GetArgOption("--oracle-check", 0, nullptr);
   if (ReadOption("--oracle-digests", options.oracleDigestsPath)) {
     options.oracleCheck = true;

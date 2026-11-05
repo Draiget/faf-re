@@ -35,6 +35,8 @@ namespace faf::server
     remote::net::SEndpoint listen;
     double joinSeconds = 120.0;
     double reconnectSeconds = 60.0;
+    /** Views wait for a player who hasn't joined yet; off when nobody's expected, as they'd pile up. */
+    bool holdViewsForJoin = true;
   };
 
   class CServerNet final : private remote::net::CServerLinks::IEvents

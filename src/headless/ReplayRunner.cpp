@@ -57,6 +57,7 @@
 #include "headless/ReplaySeats.h"
 #endif
 #if FAF_HEADLESS_NET
+#include "headless/ReplayTargetAudit.h"
 #include "remote/net/UdpSocket.h"
 #include "server/ServerNet.h"
 #include "server/ServerViews.h"
@@ -521,6 +522,7 @@ namespace faf::headless
       }
       netConfig.joinSeconds = 1.0e9;
       netConfig.reconnectSeconds = 1.0e9;
+      netConfig.holdViewsForJoin = !options.targetAudit;
       seatNet = std::make_unique<faf::server::CServerNet>(netConfig);
       for (faf::remote::CServerClient* const seat : seatFeed->Seats()) {
         seatNet->AddSeat(seat->GetIndex(), seat->GetNickname().c_str(), "seat-" + std::to_string(seat->GetIndex()), *seat);
@@ -766,6 +768,11 @@ namespace faf::headless
         static_cast<unsigned int>(std::max(options.viewPipelineThreads, 1))
       );
       seatViews->Install();
+    }
+    std::unique_ptr<CReplayTargetAudit> targetAudit;
+    if (seatViews && options.targetAudit) {
+      targetAudit = std::make_unique<CReplayTargetAudit>(*rules, *seatViews);
+      targetAudit->Install();
     }
 #endif
 
@@ -1114,6 +1121,9 @@ namespace faf::headless
       );
       if (seatViews) {
         std::printf("[%s] %s\n[%s] %s\n", label, seatViews->LaneReport().c_str(), label, seatNet->Intake().Report().c_str());
+      }
+      if (targetAudit) {
+        std::printf("[%s] %s\n", label, targetAudit->Summary().c_str());
       }
       std::fflush(stdout);
     }

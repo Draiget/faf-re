@@ -100,6 +100,7 @@ namespace faf::server
       [this](const std::int32_t army) -> const remote::CViewIdMap* {
         return army >= 0 && static_cast<std::size_t>(army) < ViewCount() ? &IdMap(army) : nullptr;
       },
+      [this](const std::int32_t army, const std::uint32_t id) { return army >= 0 && ViewHoldsEntity(static_cast<std::size_t>(army), id); },
       [this](const std::int32_t uid, std::vector<std::uint8_t> message) { mNet.QueueView(uid, std::move(message)); }
     );
   }
