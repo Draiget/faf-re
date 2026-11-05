@@ -285,23 +285,23 @@ SSTIUnitVariableData::SSTIUnitVariableData()
   , mSelectionInheritorId(static_cast<EntId>(0xF0000000u))
   , mCustomName()
   , mProduced{0.0f, 0.0f}
+  , mResourcesSpent{0.0f, 0.0f}
+  , mMaintainenceCost{0.0f, 0.0f}
   , mFocusUnit(static_cast<EntId>(0xF0000000u))
   , mGuardedUnit(static_cast<EntId>(0xF0000000u))
   , mTargetBlip(static_cast<EntId>(0xF0000000u))
   , mPriorSharedPose()
   , mSharedPose()
   , mPad094_097{}
+  , mCommands()
+  , mBuildQueue()
+  , mWeaponInfo(0)
+  , mAttributes{}
   , mScriptbits(0)
   , mUnitStates(0)
   , mDidRefresh(true)
   , mOverchargePaused(false)
   , mPad222_227{}
-  , mResourcesSpent{0.0f, 0.0f}
-  , mMaintainenceCost{0.0f, 0.0f}
-  , mCommands()
-  , mBuildQueue()
-  , mWeaponInfo(0)
-  , mAttributes{}
 {
   mCustomName.tidy(false, 0U);
 
