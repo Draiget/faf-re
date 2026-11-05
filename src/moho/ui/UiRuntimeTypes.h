@@ -904,6 +904,9 @@ namespace moho
     /// whenever that flips, copies it into every `mPreviewPositions` mesh's
     /// hidden flag, so the ghosts give way while the full graph is drawn.
     bool mQueuedGhostsHidden = false;                       // +0x5D
+    /// Engine addition, in the tail padding (`ren_BuildGhostsPerBeat`): the beat and order count the
+    /// queued ghosts were last rebuilt for.
+    std::uint16_t mQueuedGhostStamp = 0xFFFFU;              // +0x5E
   };
   static_assert(offsetof(CBuildDragPreview, mSession) == 0x00, "CBuildDragPreview::mSession offset must be 0x00");
   static_assert(

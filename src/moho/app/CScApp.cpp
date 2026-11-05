@@ -1236,6 +1236,19 @@ bool CScApp::Init()
  * frame updates, one-time session bootstrap, and minimized wait-handle/timer
  * routing.
  */
+namespace
+{
+  bool sc_FrameTimeCarry = true;
+  float sFrameCapCarryMs = 0.0f;
+
+  moho::TConVar<bool> gTConVar_sc_FrameTimeCarry(
+    "sc_FrameTimeCarry",
+    "A frame that sc_FrameTimeClamp released late gives that time back to the next frame (1, the default), so the "
+    "cap is held on average, or doesn't (0). Read each frame.",
+    &sc_FrameTimeCarry
+  );
+} // namespace
+
 void CScApp::Main()
 {
   FAF_PROFILE_ZONE_NAMED("AppFrame");
@@ -1262,11 +1275,16 @@ void CScApp::Main()
       frameSeconds = fixedFrameSeconds;
     } else {
       float elapsed = curTime.ElapsedMilliseconds();
-      if (moho::sc_FrameTimeClamp > elapsed)
+      // Engine change (sc_FrameTimeCarry): a wait ends late, as it sleeps in whole milliseconds, and
+      // each frame's clock starts over. The next frame gets that time back, or a 4 ms cap holds 215 FPS
+      // with frames to spare. At most half the cap, so a long frame isn't followed by a burst.
+      const float shortestFrame = moho::sc_FrameTimeClamp - sFrameCapCarryMs;
+      if (shortestFrame > elapsed)
       {
-        moho::WIN_SetWakeupTimer(moho::sc_FrameTimeClamp - elapsed);
+        moho::WIN_SetWakeupTimer(shortestFrame - elapsed);
         return;
       }
+      sFrameCapCarryMs = sc_FrameTimeCarry ? std::min(elapsed - shortestFrame, moho::sc_FrameTimeClamp * 0.5f) : 0.0f;
       frameSeconds = static_cast<float>(elapsed * 0.001);
     }
 

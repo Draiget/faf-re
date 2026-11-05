@@ -21,6 +21,7 @@
 #include "gpg/gal/EffectVariable.hpp"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
+#include "moho/console/CConCommand.h"
 #include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
@@ -884,6 +885,17 @@ namespace moho
    * Returns the number of instances actually packed, which is what
    * `MeshBatch::Render` hands to `DrawBatch`.
    */
+  bool ren_MeshPaletteUsedOnly = true;
+  namespace
+  {
+    TConVar<bool> gTConVar_ren_MeshPaletteUsedOnly(
+      "ren_MeshPaletteUsedOnly",
+      "Direct3D 12 / Vulkan: a mesh batch sends only the bones its instances use (1, the default), or both whole bone "
+      "palettes (0). Read at each batch.",
+      &ren_MeshPaletteUsedOnly
+    );
+  } // namespace
+
   std::int32_t HardwareMeshBatch::FillBatch(
     MeshInstance**& current,
     MeshInstance** const end,
@@ -1065,16 +1077,25 @@ namespace moho
     }
 
     if (!boneTexture) {
+      std::uint32_t transEntries = static_cast<std::uint32_t>(transPaletteVar.mPalette.size());
+      std::uint32_t rotEntries = static_cast<std::uint32_t>(rotPaletteVar.mPalette.size());
+      // Engine change (ren_MeshPaletteUsedOnly): this draw reads only the bones of the instances packed
+      // above. Direct3D 12 and Vulkan take just those; the older renderers keep their whole array.
+      const gpg::gal::DeviceApi deviceApi = gpg::gal::Device::GetInstance()->GetDeviceContext()->mDeviceType;
+      if (ren_MeshPaletteUsedOnly && deviceApi != gpg::gal::DeviceApi::Direct3D9 && deviceApi != gpg::gal::DeviceApi::Direct3D10 &&
+          deviceApi != gpg::gal::DeviceApi::Direct3D11) {
+        const std::uint32_t used = static_cast<std::uint32_t>(std::max(std::max(packedCount, 1) * mBoneCount, 1));
+        transEntries = std::min(transEntries, used);
+        rotEntries = std::min(rotEntries, used);
+      }
       if (transPaletteVar.Exists()) {
         transPaletteVar.mEffectVariable->SetValue(
-          transPaletteVar.mPalette.begin(),
-          static_cast<std::uint32_t>(transPaletteVar.mPalette.size()) * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
+          transPaletteVar.mPalette.begin(), transEntries * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
         );
       }
       if (rotPaletteVar.Exists()) {
         rotPaletteVar.mEffectVariable->SetValue(
-          rotPaletteVar.mPalette.begin(),
-          static_cast<std::uint32_t>(rotPaletteVar.mPalette.size()) * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
+          rotPaletteVar.mPalette.begin(), rotEntries * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
         );
       }
     }

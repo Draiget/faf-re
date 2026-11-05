@@ -1098,6 +1098,11 @@ namespace faf::headless
       result.viewFramesFailures = viewFrames->Failures();
     }
     if (viewBench) {
+      // Lua routing lives in the sim's Lua from here on, and the bench holds it: the sim can't run
+      // on past this function, as it otherwise does until the process exits.
+      if (options.luaRouting && !options.tearDown) {
+        driver->ShutDown();
+      }
       (void)viewBench->FinishViews();
       result.viewBenchSummary = viewBench->Summary();
       result.viewBenchFailures = viewBench->Failures();

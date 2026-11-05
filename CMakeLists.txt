@@ -91,33 +91,6 @@ else()
   set(_faf_icf "/OPT:ICF")
 endif()
 
-# Engine addition: a profile-guided Windows build, as cmake/FafLinux.cmake's is for the server. Off,
-# the build is as usual.
-#   -DFAF_PGO_GENERATE=ON              counts what the code does; a game, replay or headless run writes
-#                                      the counts as it exits (LLVM_PROFILE_FILE names the file), and
-#                                      llvm-profdata merges them.
-#   -DFAF_PGO_PROFILE=<file.profdata>  optimises with those counts (cmake/pgo/main-windows-x64.profdata).
-#                                      No ThinLTO, unlike Linux: it reorders the static initialisers
-#                                      across objects, and some (RScaResource's, among others) look up
-#                                      types other objects register first, in link order.
-# The floating-point model is FafCodegen.cmake's either way, so the code computes the same values.
-# See docs/SWITCHES.md.
-option(FAF_PGO_GENERATE "Build to record a profile for FAF_PGO_PROFILE" OFF)
-set(FAF_PGO_PROFILE "" CACHE FILEPATH "Merged LLVM profile to optimise with")
-if(FAF_PGO_GENERATE AND FAF_PGO_PROFILE)
-  message(FATAL_ERROR "FAF_PGO_GENERATE and FAF_PGO_PROFILE exclude each other.")
-endif()
-if(FAF_PGO_GENERATE)
-  add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-fprofile-generate>")
-  add_compile_definitions(FAF_COVERAGE_PROFILE=1)
-  # The objects ask for clang's profile runtime; lld-link is not told where clang keeps it.
-  execute_process(COMMAND "${CMAKE_CXX_COMPILER}" /clang:-print-resource-dir OUTPUT_VARIABLE _faf_clang_resource OUTPUT_STRIP_TRAILING_WHITESPACE)
-  add_link_options("/LIBPATH:${_faf_clang_resource}/lib/windows")
-elseif(FAF_PGO_PROFILE)
-  # A profile from older source still applies to the functions that did not change.
-  add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-fprofile-use=${FAF_PGO_PROFILE};-Wno-profile-instr-unprofiled;-Wno-profile-instr-out-of-date;-Wno-backend-plugin>")
-endif()
-
 # Release links like the shipped binary's: debug information,
 # unreferenced code dropped, identical COMDATs folded.
 foreach(_kind EXE SHARED MODULE)
@@ -143,6 +116,7 @@ if(NOT EXISTS "${FAF_DXSDK_DIR}/Include/d3dx9.h")
   message(FATAL_ERROR "DirectX SDK (June 2010) not found: FAF_DXSDK_DIR=${FAF_DXSDK_DIR}")
 endif()
 
+include(FafPgoWindows)
 include(FafCodegen)
 
 # Server-authoritative sessions (docs/SWITCHES.md, "Server mode"): the client's

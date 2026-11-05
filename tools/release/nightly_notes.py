@@ -69,6 +69,7 @@ def main():
               "## Install", "",
               "- **x64:** extract `faf-engine-%s-x64.zip` into the folder you run the x64 engine from. `INSTALL.txt` inside lists the steps." % tag,
               "- **x86:** extract `faf-engine-%s-x86.zip` into FAF's `bin` folder." % tag,
+              "- `main_x64.exe` and `main.exe` are the same exes on their own, for updating an install that already has the rest of the zip.",
               "- The `.pdb` files are optional, but crash reports are much more useful with them. Crash reports are written next to the exe as `faf_crash_<date>.txt`; please attach them with your log.",
               "", "SHA-256:", "", "```", sums, "```", ""]
     with open(args.out, "w", encoding="utf-8", newline="\n") as f:
