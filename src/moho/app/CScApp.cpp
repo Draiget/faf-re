@@ -1064,7 +1064,7 @@ bool CScApp::Init()
   // with the real Lua one. Run it any later and those early imports get the
   // stub: SCR_Import hands back a boolean and the callers fail with
   // "index expected but got boolean".
-  moho::SCR_LuaDoScript(moho::USER_GetLuaState(), "/lua/userInit.lua", nullptr);
+  (void)moho::SCR_LuaDoScript(moho::USER_GetLuaState(), "/lua/userInit.lua", nullptr);
 
   moho::USER_EnsureDocumentDirectories();
 

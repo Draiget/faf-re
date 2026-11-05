@@ -2033,7 +2033,7 @@ extern "C" void __cdecl free_0(void* ptr)
         ThreadHeapCache* const threadCache = GetOrCreateThreadHeapCache();
         if (threadCache == kThreadCacheDisabled || threadCache == nullptr) {
             ::EnterCriticalSection(&gAllocatorSentinel);
-            PushHeapBlock(static_cast<SmallBlockNode*>(ptr), static_cast<std::int32_t>(kind));
+            (void)PushHeapBlock(static_cast<SmallBlockNode*>(ptr), static_cast<std::int32_t>(kind));
             ::LeaveCriticalSection(&gAllocatorSentinel);
         } else {
             ThreadSmallBlockLane& lane = GetLane(threadCache, kind);
@@ -2042,7 +2042,7 @@ extern "C" void __cdecl free_0(void* ptr)
 
             if (threadCache->cachedBytes >= static_cast<std::int32_t>(kThreadCacheTrimBytes)) {
                 AllocatorLockToken token{};
-                EnterAllocatorLock(&token, true);
+                (void)EnterAllocatorLock(&token, true);
                 TrimThreadCache(threadCache, false);
                 LeaveAllocatorLock(&token);
             }
@@ -2059,7 +2059,7 @@ extern "C" void __cdecl free_0(void* ptr)
 
         ::EnterCriticalSection(&gAllocatorSentinel);
         UnlinkRecord(record);
-        ReleaseHeapRecord(record);
+        (void)ReleaseHeapRecord(record);
         gHeapCommitted -= byteSize;
         gHeapInUse -= byteSize;
         ::LeaveCriticalSection(&gAllocatorSentinel);
