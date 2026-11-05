@@ -113,7 +113,6 @@ namespace
   constexpr const char* kConExecuteHelpText = "ConExecute('command string') -- Perform a console command";
   constexpr const char* kConExecuteSaveHelpText =
     "ConExecuteSave('command string') -- Perform a console command, saved to stack";
-  constexpr const char* kNoSessionLocToken = "<LOC _No_session>";
 
   /**
    * Address: 0x00BC3890 (FUN_00BC3890, dynamic initializer for `gSavedConsoleCommands`)

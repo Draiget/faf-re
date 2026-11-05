@@ -203,11 +203,6 @@ namespace
   constexpr int kSharedTrailIndexSheetSize = 0x18000;
   constexpr std::uint32_t kSharedTrailQuadCount = 0x4000U;
   constexpr std::uint32_t kIndicesPerTrailQuad = 6U;
-  constexpr std::size_t kLegacyVectorMaxCount = 0x3FFFFFFFU;
-  constexpr const char* kParticleRendererSourcePath = "c:\\work\\rts\\main\\code\\src\\core\\ParticleRenderer.cpp";
-  constexpr const char* kUnreachableAssertText = "Reached the supposably unreachable.";
-  constexpr int kParticleSelectTechniqueAssertLine = 1359;
-  constexpr int kParticleSelectTechniqueWithDragAssertLine = 1026;
 
   /**
    * Address: 0x00BC57F0 (FUN_00BC57F0, dynamic initializer for `sSharedTrailQuadIndexSheet`)
@@ -459,8 +454,6 @@ namespace
       ::operator delete(segmentBuffer);
     }
   }
-
-  constexpr std::uint32_t kLegacyDwordVectorMaxCount = 0x3FFFFFFFU;
 
   /**
    * Address: 0x0049C670 (FUN_0049C670, sub_49C670)

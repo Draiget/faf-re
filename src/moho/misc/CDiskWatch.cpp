@@ -32,8 +32,6 @@ namespace
 {
   std::mutex gDiskWatchInitMutex;
   CDiskWatch* gDiskWatch = nullptr;
-  constexpr std::uint8_t kWatchMapColorRed = 0u;
-  constexpr std::uint8_t kWatchMapColorBlack = 1u;
   constexpr std::size_t kDefaultReadBufferSize = 0x1000u;
 #if defined(_WIN32)
   constexpr DWORD kDirectoryNotifyFilter =

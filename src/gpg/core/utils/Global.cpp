@@ -44,7 +44,7 @@ namespace
     constexpr std::uint32_t kPrimaryHeapReserveBytes = 0x20000000u;
     constexpr std::uint32_t kThreadCacheSizeBytes = 0x214u;
     constexpr std::uint32_t kHeapRecordSizeBytes = 0x28u;
-    constexpr std::uint32_t kThreadCacheTrimBytes = 0x200000u;
+    [[maybe_unused]] constexpr std::uint32_t kThreadCacheTrimBytes = 0x200000u;
 
     constexpr std::uintptr_t kRecordTagFree = 0u;
     constexpr std::uintptr_t kRecordTagSmallBlocks = 1u;

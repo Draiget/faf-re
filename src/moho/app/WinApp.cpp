@@ -89,7 +89,7 @@ namespace
   HHOOK sWindowHook = nullptr;
   gpg::time::Timer wakeupTimer;
   float wakeupTimerDur = kInfiniteWakeupMs;
-  constexpr DWORD kPlatformSymbolHandlerOptions =
+  [[maybe_unused]] constexpr DWORD kPlatformSymbolHandlerOptions =
     SYMOPT_FAIL_CRITICAL_ERRORS | // suppress critical-error UI while probing symbols.
     SYMOPT_LOAD_LINES | // include source line records for resolved addresses.
     SYMOPT_DEFERRED_LOADS | // lazily load module symbols as needed.

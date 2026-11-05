@@ -182,9 +182,6 @@ namespace
     (void)device->DrawTriangleList(&vertexSheetView, &indexSheetView, &primitiveType);
   }
 
-  constexpr std::uint8_t kTrailSegmentPoolColorRed = 0U;
-  constexpr std::uint8_t kTrailSegmentPoolColorBlack = 1U;
-
 
   [[nodiscard]] bool AppendInterval(
     moho::SParticleRenderWorkItem& workItem, const float beginFrame, const float lifeFrames

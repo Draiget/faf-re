@@ -30,7 +30,6 @@ namespace gpg::diag
 
     constexpr std::size_t kMaxSections = 8;
     constexpr std::uint32_t kMaxFramesPerThread = 64;
-    constexpr std::size_t kMaxSuspendedThreads = 64;
 
     struct SectionRegistry
     {

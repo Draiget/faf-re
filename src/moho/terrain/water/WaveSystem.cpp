@@ -26,7 +26,7 @@ namespace
   constexpr std::int32_t kWaveSpatialRoutingMask = 0x800;
   constexpr float kWaveDefaultDissolveCutoff = 0.0f;
   constexpr float kWaveBoundsHalfHeight = 0.1f;
-  constexpr float kPi = 3.1415925f;
+  [[maybe_unused]] constexpr float kPi = 3.1415925f;
 
   void ReleaseParticleTextureRef(moho::CParticleTexture*& texture) noexcept
   {
