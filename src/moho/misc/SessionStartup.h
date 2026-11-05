@@ -135,6 +135,8 @@ namespace moho
   /** Engine addition (replay timeline): set, `VCR_SetupReplaySession` also reads the replay's length into `gVcrReplayBeats`. */
   extern bool gVcrScanReplayLength;
   extern std::int32_t gVcrReplayBeats;
+  /** Engine addition (replay timeline): sums the stream's beats from here to its end, and comes back here. */
+  [[nodiscard]] std::int32_t VCR_ScanReplayBeats(gpg::Stream& stream);
 
   /**
    * Engine addition (dedicated-server plan WPL.4): the name of the local client

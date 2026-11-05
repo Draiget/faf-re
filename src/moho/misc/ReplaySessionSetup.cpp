@@ -235,34 +235,30 @@ namespace moho
   bool gVcrScanReplayLength = false;
   std::int32_t gVcrReplayBeats = 0;
 
-  namespace
+  std::int32_t VCR_ScanReplayBeats(gpg::Stream& stream)
   {
-    /** Engine addition (replay timeline): sums the stream's beats from here to its end, and comes back here. */
-    [[nodiscard]] std::int32_t ScanReplayBeats(gpg::Stream& stream)
-    {
-      std::int32_t beats = 0;
-      try {
-        const std::uint64_t start = stream.VirtTell(gpg::Stream::ModeReceive);
-        CMessage message;
-        while (message.Read(&stream)) {
-          if (message.GetType().raw() == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)
-              && message.GetMessageSize() >= static_cast<int>(sizeof(std::int32_t))) {
-            CMessageStream input(message, CMessageStream::Access::kReadOnly);
-            gpg::BinaryReader reader(&input);
-            std::int32_t delta = 0;
-            reader.ReadExact(delta);
-            beats += std::max(delta, 0);
-          }
-          message.Clear();
+    std::int32_t beats = 0;
+    try {
+      const std::uint64_t start = stream.VirtTell(gpg::Stream::ModeReceive);
+      CMessage message;
+      while (message.Read(&stream)) {
+        if (message.GetType().raw() == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)
+            && message.GetMessageSize() >= static_cast<int>(sizeof(std::int32_t))) {
+          CMessageStream input(message, CMessageStream::Access::kReadOnly);
+          gpg::BinaryReader reader(&input);
+          std::int32_t delta = 0;
+          reader.ReadExact(delta);
+          beats += std::max(delta, 0);
         }
-        (void)stream.Seek(gpg::Stream::OriginBegin, static_cast<std::int64_t>(start));
-      } catch (const std::exception& error) {
-        gpg::Warnf("Couldn't read the length of a replay: %s", error.what());
-        return 0;
+        message.Clear();
       }
-      return beats;
+      (void)stream.Seek(gpg::Stream::OriginBegin, static_cast<std::int64_t>(start));
+    } catch (const std::exception& error) {
+      gpg::Warnf("Couldn't read the length of a replay: %s", error.what());
+      return 0;
     }
-  } // namespace
+    return beats;
+  }
 
   /**
    * Address: 0x008765E0 (FUN_008765E0)
@@ -452,7 +448,7 @@ namespace moho
     }
 
     if (gVcrScanReplayLength && replayStream != nullptr) {
-      gVcrReplayBeats = ScanReplayBeats(*replayStream);
+      gVcrReplayBeats = VCR_ScanReplayBeats(*replayStream);
     }
 
     msvc8::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
