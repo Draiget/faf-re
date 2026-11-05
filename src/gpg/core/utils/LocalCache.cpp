@@ -28,13 +28,21 @@ namespace gpg
       if (folder.empty()) {
         return std::string();
       }
+      // The caches open their files through narrow names. A folder the system code page can't hold
+      // has none, and asking for one throws: those players go without the caches.
+      std::string path;
+      try {
+        path = folder.string();
+      } catch (const std::system_error& conversion) {
+        gpg::Warnf("the cache directory's name doesn't fit the system code page (%s); nothing is cached", conversion.what());
+        return std::string();
+      }
       std::error_code error;
       std::filesystem::create_directories(folder, error);
       if (error) {
-        gpg::Warnf("cannot create the cache directory %s (%s); nothing is cached", folder.string().c_str(), error.message().c_str());
+        gpg::Warnf("cannot create the cache directory %s (%s); nothing is cached", path.c_str(), error.message().c_str());
         return std::string();
       }
-      std::string path = folder.string();
       if (path.back() != '\\' && path.back() != '/') {
         path += static_cast<char>(std::filesystem::path::preferred_separator);
       }
