@@ -1172,7 +1172,6 @@ int CNetUDPConnection::SendData()
 
   case kNetStateEstablishing: {
     const int64_t curTime = mConnector->GetTime();
-    const int64_t idle = curTime - mLastRecv;
 
     if (curTime - mLastRecv > 10'000'000) {
       if (net_DebugLevel) {

@@ -1418,7 +1418,6 @@ namespace moho
   void CWorldParticles::ClearRenderBuckets()
   {
     CWorldParticles& worldParticles = *this;
-    CWorldParticles& runtime = worldParticles;
 
     // Each entry owns its bucket, so the payload goes before the node.
     for (const auto& [bucketKey, bucket] : mParticleBuckets) {

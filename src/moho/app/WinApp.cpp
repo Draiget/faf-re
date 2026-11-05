@@ -99,8 +99,6 @@ namespace
     "PLAT_Init symbol options must match recovered SymSetOptions(0x216)"
   );
 
-  moho::CWinLogTarget& sLogWindowTarget = moho::sLogWindowTarget;
-
   /**
    * The splash screen WINX_InitSplash shows (0x010A9BE4), a VC8
    * `std::auto_ptr<wxSplashScreen>` in the binary: its static constructor
@@ -385,7 +383,6 @@ namespace
   // the boost::function1 manage / clear / manage::do_alloc lanes.
   LegacyUnaryDispatchAdapter gLegacyTssAdapterUnaryDispatchAdapter = nullptr;
   LegacyTypeInfoDispatchAdapter gLegacyTssAdapterTypeInfoDispatchAdapter = nullptr;
-  bool gLegacyTssAdapterDispatchPairPublished = false;
 
   // Synthetic engine-T binding for the `boost::detail::tss_adapter<T>` RTTI
   // Type Descriptor referenced at 0x00F61928 in the binary.
