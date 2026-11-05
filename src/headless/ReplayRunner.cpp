@@ -53,6 +53,9 @@
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/unit/core/Unit.h"
 #include "headless/ReplayBoneStats.h"
+#if FAF_SERVER_MODE
+#include "headless/ReplaySeats.h"
+#endif
 #include "headless/ReplayFpuReport.h"
 #include "headless/ReplayKeyframes.h"
 #if FAF_SERVER_MODE
@@ -447,7 +450,7 @@ namespace faf::headless
       }
     } else {
       sessionInfo = moho::VCR_SetupReplaySession(
-        options.replayPath.c_str(), nullptr, rejoinRehearsal ? &rejoinRecording : nullptr, skipBeats
+        options.replayPath.c_str(), nullptr, rejoinRehearsal || options.seats ? &rejoinRecording : nullptr, skipBeats
       );
     }
     if (sessionInfo.get() == nullptr) {
@@ -480,6 +483,21 @@ namespace faf::headless
         *launchInfo, std::move(rejoinRecording), options.rejoinSource, options.rejoinBeat, skipBeats
       );
     }
+
+#if FAF_SERVER_MODE
+    // `--seats`: outlives the driver, whose manager calls it.
+    std::unique_ptr<CReplaySeatFeed> seatFeed;
+    if (options.seats) {
+      if (skipBeats > 0 || options.rejoinSource >= 0 || liveRejoin) {
+        result.error = "--seats plays a replay from its start, and not as a rejoin";
+        return result;
+      }
+      moho::SIM_SetIssueWhilePaused(true);
+      moho::CClientManagerImpl* seatManager = nullptr;
+      seatFeed = std::make_unique<CReplaySeatFeed>(*launchInfo, std::move(rejoinRecording), seatManager);
+      sessionInfo->mClientManager = seatManager;
+    }
+#endif
 
     if (sessionInfo->mClientManager != nullptr) {
       sessionInfo->mClientManager->SetUIInterface(&gReplayClientEvents);
@@ -913,6 +931,10 @@ namespace faf::headless
           result.gameOver = true;
         }
 #if FAF_SERVER_MODE
+        // With every source gone before its end, a recording has nobody left to end the game.
+        if (seatFeed && packet->mCurBeat > seatFeed->LastBeat() + 1) {
+          stopped = true;
+        }
         if (loopback) {
           if (moho::CClientManagerImpl* const standIn = driver->GetClientManager(); standIn != nullptr) {
             loopback->SetServerSimRate(standIn->GetSimRate());
@@ -995,6 +1017,12 @@ namespace faf::headless
       (void)::WaitForSingleObject(syncAvailable, 50);
     }
     result.mismatches = ChecksumMismatchCount();
+#if FAF_SERVER_MODE
+    if (seatFeed) {
+      std::printf("[%s] %s\n", label, seatFeed->Report().c_str());
+      std::fflush(stdout);
+    }
+#endif
     if (pacePeriod > 0.0) {
       std::printf("[%s] pace %d ms: %d of %d beats late, %.1f s lost\n", label, options.paceMs, lateBeats, result.beats, lateSeconds);
       std::fflush(stdout);

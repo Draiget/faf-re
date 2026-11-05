@@ -183,6 +183,8 @@ namespace
       "                            (server-mode build)\n"
       "  --command-check           every command decoded and marshalled again as a client sends it, compared\n"
       "                            (server-mode build)\n"
+      "  --seats                   the commands through the game server's seats, one per command source\n"
+      "                            (server-mode build)\n"
       "  --oracle-check            the visibility oracle for the --focus army against what the sim publishes,\n"
       "                            every entity and beat (server-mode build)\n"
       "  --oracle-digests <file>  with --oracle-check: per beat, the oracle's answers for every army (unfocused)\n"
@@ -337,6 +339,7 @@ int HEADLESS_Main(int argc, char** argv)
   }
   options.loopback = moho::CFG_GetArgOption("--loopback", 0, nullptr);
   options.commandCheck = moho::CFG_GetArgOption("--command-check", 0, nullptr);
+  options.seats = moho::CFG_GetArgOption("--seats", 0, nullptr);
   options.oracleCheck = moho::CFG_GetArgOption("--oracle-check", 0, nullptr);
   if (ReadOption("--oracle-digests", options.oracleDigestsPath)) {
     options.oracleCheck = true;
@@ -413,11 +416,11 @@ int HEADLESS_Main(int argc, char** argv)
   }
 #if !FAF_SERVER_MODE
   // The wire format and the remote client (src/remote) are built only with FAF_SERVER_MODE.
-  if (!options.wireStatsPath.empty() || options.loopback || options.commandCheck || options.oracleCheck
+  if (!options.wireStatsPath.empty() || options.loopback || options.commandCheck || options.seats || options.oracleCheck
       || options.changeSetCheck || !options.viewPacketsPath.empty() || !options.viewFramesPath.empty()
       || !options.viewBenchPath.empty()) {
     std::printf(
-      "[%s] --wire-stats, --loopback, --command-check, --oracle-check, --changeset-check, --view-packets, --view-frames and "
+      "[%s] --wire-stats, --loopback, --command-check, --seats, --oracle-check, --changeset-check, --view-packets, --view-frames and "
       "--view-bench need a "
       "server-mode build "
       "(FAF_SERVER_MODE, the *-server presets)\n",

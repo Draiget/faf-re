@@ -291,6 +291,11 @@ target_link_options(server PRIVATE -Wl,--error-limit=0)
 add_executable(faf_server_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SpeedWatchTests.cpp")
 target_include_directories(faf_server_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
 
+add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp")
+target_link_libraries(faf_seat_tests PRIVATE faf_sim)
+target_compile_definitions(faf_seat_tests PRIVATE FAF_SERVER_MODE=1)
+target_link_options(faf_seat_tests PRIVATE -Wl,--error-limit=0)
+
 # --- faf_remote_tests -------------------------------------------------------------------
 # The wire format's tests (tests/remote/WireTests.cpp) on the Linux objects, as Windows'
 # server-mode build runs them on faf_engine.

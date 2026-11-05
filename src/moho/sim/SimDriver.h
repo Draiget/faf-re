@@ -1019,6 +1019,13 @@ namespace moho
 
   void SIM_SetSessionPacing(ESimSessionPacing pacing) noexcept;
 
+  /**
+   * Engine addition (game server): keep issuing beats while the sim is paused. A lockstep client
+   * waits for some player's beat there, as any command of a player comes with one. A server's seats
+   * only follow its beats, so without any a player's resume would never reach the sim.
+   */
+  void SIM_SetIssueWhilePaused(bool issue) noexcept;
+
   /// Engine addition: the pacing `SIM_SetSessionPacing` last set.
   [[nodiscard]] ESimSessionPacing SIM_GetSessionPacing() noexcept;
 

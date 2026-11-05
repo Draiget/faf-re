@@ -90,6 +90,7 @@ namespace
   // Engine addition: set by the session before it creates its driver (see SIM_SetSessionPacing).
   // Read by that driver's issue thread.
   std::atomic<ESimSessionPacing> gDriverSessionPacing{ESimSessionPacing::Network};
+  std::atomic<bool> gIssueWhilePaused{false};
 
   /// Engine addition: the beat lead the issue thread keeps for this session, or 0 (original pacing).
   [[nodiscard]] int SessionLeadBeats() noexcept
@@ -1448,7 +1449,7 @@ void CSimDriver::ThreadRun()
       int lastBeatToIssue = mNextIssueBeat - 1;
       const int beatCeiling = mLastDequeuedBeat + kMaxBeatsAheadOfExecuted;
 
-      if (mSimBusy) {
+      if (mSimBusy && !gIssueWhilePaused.load(std::memory_order_relaxed)) {
         int partiallyQueuedBeat = 0;
         mClientManager->GetPartiallyQueuedBeat(partiallyQueuedBeat);
 
@@ -2283,6 +2284,11 @@ namespace
     &moho::sim_LeadOnSchedule
   );
 } // namespace
+
+void moho::SIM_SetIssueWhilePaused(const bool issue) noexcept
+{
+  gIssueWhilePaused.store(issue, std::memory_order_relaxed);
+}
 
 void moho::SIM_SetSessionPacing(const ESimSessionPacing pacing) noexcept
 {

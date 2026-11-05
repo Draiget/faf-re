@@ -51,6 +51,7 @@
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/net/LaunchInfoBuilder.h"
 #include "moho/sim/CWldMap.h"
+#include "remote/ServerClient.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
 #include "moho/sim/FafGameVersion.h"
@@ -86,6 +87,7 @@ namespace
   using Clock = std::chrono::steady_clock;
 
   volatile std::sig_atomic_t gStopSignal = 0;
+  volatile std::sig_atomic_t gPauseRequests = 0;
 
   [[nodiscard]] double SecondsSince(const Clock::time_point start)
   {
@@ -149,6 +151,11 @@ namespace
     const int length = std::snprintf(text, sizeof(text), "server: crash, signal %d\n", signalNumber);
     (void)!::write(STDOUT_FILENO, text, static_cast<std::size_t>(length));
     std::_Exit(kExitCrash);
+  }
+
+  void PauseSignal(const int)
+  {
+    gPauseRequests = gPauseRequests + 1;
   }
 
   void StopSignal(const int signalNumber)
@@ -407,6 +414,15 @@ namespace
     sessionInfo->mClientManager =
       moho::CLIENT_CreateClientManager(static_cast<std::size_t>(build.clientCount), nullptr, launchSpeed.speed, launchSpeed.adjustable);
     sessionInfo->mClientManager->CreateLocalClient(kServerName, build.localClientIndex, kServerUid, sessionInfo->mSourceId);
+    // With no network yet nobody can sit in these: they count as loaded and stay silent, and the game goes on regardless.
+    for (const moho::SLaunchClient& client : roster.Remotes()) {
+      faf::remote::CServerClient::Create(
+        *static_cast<moho::CClientManagerImpl*>(sessionInfo->mClientManager), client.name.c_str(), client.clientIndex, client.uid, client.commandSource
+      ).MarkLoaded();
+    }
+    if (!roster.Remotes().empty()) {
+      Say("%d seats stay empty: this build takes no players over the network yet", static_cast<int>(roster.Remotes().size()));
+    }
 
     Say("Loading the map");
     const Clock::time_point loadStart = Clock::now();
@@ -440,6 +456,7 @@ namespace
     // game's pace is when beats are taken: a client's frames, or this program's loop below.
     moho::sim_LocalLead = 0;
     moho::SIM_SetSessionPacing(moho::ESimSessionPacing::Local);
+    moho::SIM_SetIssueWhilePaused(true);
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;
     sessionInfo->mClientManager = nullptr;
     std::unique_ptr<moho::ISTIDriver> driver(moho::SIM_CreateDriver(
@@ -462,6 +479,10 @@ namespace
     double lastSample = 0.0;
     double lastStatus = 0.0;
     double lastBeatAt = 0.0;
+    // Beats go on while the game is paused, and no game time with them.
+    int pausedBeats = 0;
+    std::int32_t pausedBy = -1;
+    int pauseRequestsDone = 0;
 
     const auto watchSpeed = [&](const double elapsed) {
       moho::CClientManagerImpl* const manager = driver->GetClientManager();
@@ -497,7 +518,7 @@ namespace
       if (statusSeconds > 0.0 && elapsed - lastStatus >= statusSeconds) {
         const double beatsPerSecond = (end.beats - statusBeats) / (elapsed - lastStatus);
         Say("Status: game time %s, real time %s, speed %+d (requested %+d), %.1f beats/s, a beat takes %.0f ms, memory %ld MB, %lu warnings in the log",
-            GameClockText(end.lastBeat).c_str(), ClockText(elapsed).c_str(), speed, requested, beatsPerSecond, beatMs, ResidentMegabytes(), warnings.Count());
+            GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(elapsed).c_str(), speed, requested, beatsPerSecond, beatMs, ResidentMegabytes(), warnings.Count());
         lastStatus = elapsed;
         statusBeats = end.beats;
       }
@@ -518,12 +539,21 @@ namespace
         Say("Stopping on signal %d", gStopSignal);
         break;
       }
+      if (const int requests = gPauseRequests; started && requests != pauseRequestsDone) {
+        pauseRequestsDone = requests;
+        Say("The operator asks to %s the game", pausedBy == -1 ? "pause" : "resume");
+        if (pausedBy == -1) {
+          driver->RequestPause();
+        } else {
+          driver->Resume();
+        }
+      }
       if (started && elapsed - lastSample >= 1.0) {
         lastSample = elapsed;
         watchSpeed(elapsed);
         if (!stalled && elapsed - lastBeatAt >= kStallSeconds) {
           stalled = true;
-          Say("WARNING: no beat for %.0f s, at game time %s", kStallSeconds, GameClockText(end.lastBeat).c_str());
+          Say("WARNING: no beat for %.0f s, at game time %s", kStallSeconds, GameClockText(end.lastBeat - pausedBeats).c_str());
         }
       }
 
@@ -557,12 +587,24 @@ namespace
         ++end.beats;
         end.lastBeat = packet->mCurBeat;
         lastBeatAt = SecondsSince(playStart);
+        pausedBeats += packet->mPausedBy != -1 ? 1 : 0;
+        if (packet->mPausedBy != pausedBy) {
+          const auto& sources = sessionInfo->mLaunchInfo->mCommandSources.mSrcs;
+          if (packet->mPausedBy == -1) {
+            Say("Game resumed, at game time %s", GameClockText(end.lastBeat - pausedBeats).c_str());
+          } else if (static_cast<std::size_t>(packet->mPausedBy) < sources.size()) {
+            Say("Game paused by %s, at game time %s", sources[static_cast<std::size_t>(packet->mPausedBy)].mName.c_str(), GameClockText(end.lastBeat - pausedBeats).c_str());
+          } else {
+            Say("Game paused, at game time %s", GameClockText(end.lastBeat - pausedBeats).c_str());
+          }
+          pausedBy = packet->mPausedBy;
+        }
         if (moho::CClientManagerImpl* const manager = driver->GetClientManager(); manager != nullptr) {
           nextBeatAt = std::max(nextBeatAt, lastBeatAt - kMaxCatchUpSeconds) + faf::server::SecondsPerBeat(manager->GetSimRateRequested());
         }
         if (stalled) {
           stalled = false;
-          Say("Beats are coming again, at game time %s", GameClockText(end.lastBeat).c_str());
+          Say("Beats are coming again, at game time %s", GameClockText(end.lastBeat - pausedBeats).c_str());
         }
         if (!started) {
           // `WLD_DoInitializing`: the first beat is applied, then this client declares itself ready.
@@ -606,11 +648,11 @@ namespace
 
     WriteResult(resultPath, end);
     if (end.ended) {
-      Say("Game ended: game time %s, real time %s", GameClockText(end.lastBeat).c_str(), ClockText(end.seconds).c_str());
+      Say("Game ended: game time %s, real time %s", GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(end.seconds).c_str());
     } else if (!end.error.empty()) {
-      Say("ERROR: the game didn't finish: %s, at game time %s, real time %s", end.error.c_str(), GameClockText(end.lastBeat).c_str(), ClockText(end.seconds).c_str());
+      Say("ERROR: the game didn't finish: %s, at game time %s, real time %s", end.error.c_str(), GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(end.seconds).c_str());
     } else {
-      Say("Game stopped (%s): game time %s, real time %s", end.stoppedBy.c_str(), GameClockText(end.lastBeat).c_str(), ClockText(end.seconds).c_str());
+      Say("Game stopped (%s): game time %s, real time %s", end.stoppedBy.c_str(), GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(end.seconds).c_str());
     }
     Say("Replay %s, result %s, %lu warnings in the log", replayPath.c_str(), resultPath.c_str(), warnings.Count());
     if (!end.error.empty()) {
@@ -628,6 +670,7 @@ int main(int, char**)
   for (const int signalNumber : {SIGINT, SIGTERM}) {
     (void)std::signal(signalNumber, &StopSignal);
   }
+  (void)std::signal(SIGUSR1, &PauseSignal);
   std::setvbuf(stdout, nullptr, _IOLBF, 0);
 
   // `WinMain` / `CScApp::CScApp`, and `CScApp::Init` without the splash, fonts, UI manager and device.
