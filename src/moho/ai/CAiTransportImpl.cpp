@@ -164,7 +164,6 @@ void STransportPickUpInfo::MemberSerialize(gpg::WriteArchive* const archive) con
 namespace
 {
   gpg::RType* gIAiTransportType = nullptr;
-  gpg::RType* gCAiTransportImplType = nullptr;
 
   [[nodiscard]] gpg::RType* ResolveIAiTransportType()
   {

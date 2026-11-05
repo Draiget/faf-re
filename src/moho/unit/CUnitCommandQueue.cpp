@@ -24,7 +24,6 @@ namespace
   gpg::RType* gQueueBaseType = nullptr;
   gpg::RType* gQueueWeakCommandVectorType = nullptr;
   gpg::RType* gQueueCommandTypeEnumType = nullptr;
-  gpg::RType* gQueueUnitType = nullptr;
 
   template <class TObject>
   [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cache)

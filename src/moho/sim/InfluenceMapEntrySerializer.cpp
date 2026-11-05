@@ -8,12 +8,6 @@
 #include "moho/sim/CInfluenceMap.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 
-namespace
-{
-  gpg::RType* gVec3fType = nullptr;
-
-} // namespace
-
 namespace moho
 {
 } // namespace moho

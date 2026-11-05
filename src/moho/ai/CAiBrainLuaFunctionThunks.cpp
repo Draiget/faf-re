@@ -82,9 +82,6 @@ namespace moho
 
 namespace
 {
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_ResourceDepositStartup = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_ResourceDepositStartup = nullptr;
-
   template <moho::CScrLuaInitForm* (*Target)()>
   [[nodiscard]] moho::CScrLuaInitForm* ForwardAiBrainLuaRegistrationThunk() noexcept
   {
