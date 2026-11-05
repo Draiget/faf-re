@@ -366,7 +366,7 @@ namespace gpg::diag
         }
       }
 
-      int flags = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
+      [[maybe_unused]] int flags = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
       flags |= _CRTDBG_ALLOC_MEM_DF | checkFlag;
       (void)_CrtSetDbgFlag(flags);
       DiagLine("[CRTDIAG] /heapcheck on: validating the heap %s", checkName);
