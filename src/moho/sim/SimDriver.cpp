@@ -287,7 +287,11 @@ namespace
 
     OSVERSIONINFOW versionInfo{};
     versionInfo.dwOSVersionInfoSize = sizeof(versionInfo);
+    // Deprecated since Windows 8.1; kept so what the /NUMA pin reads doesn't change.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     if (!GetVersionExW(&versionInfo) || versionInfo.dwPlatformId != VER_PLATFORM_WIN32_NT) {
+#pragma clang diagnostic pop
       return;
     }
     if (versionInfo.dwMajorVersion < 5) {
