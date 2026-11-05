@@ -83,7 +83,7 @@ namespace
       return;
     }
 
-    delete statItem;
+    GPG_NONVIRTUAL_DESTROY(delete statItem);
   }
 
 } // namespace
@@ -133,7 +133,7 @@ namespace moho
     try {
       InitializeStatsRootSharedControl(statsRootRaw.pi, statsRoot);
     } catch (...) {
-      delete statsRoot;
+      GPG_NONVIRTUAL_DESTROY(delete statsRoot);
       throw;
     }
 

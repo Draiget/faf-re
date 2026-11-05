@@ -355,7 +355,7 @@ CIntelCounterHandle::CIntelCounterHandle(
    */
   void CIntelCounterHandle::Destroy(const int shouldDelete)
   {
-    this->~CIntelCounterHandle();
+    this->CIntelCounterHandle::~CIntelCounterHandle();
     if ((shouldDelete & 1) != 0) {
       ::operator delete(this);
     }

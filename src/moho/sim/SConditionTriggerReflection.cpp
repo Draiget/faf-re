@@ -576,7 +576,7 @@ namespace
   {
     auto* const stats = new (std::nothrow) moho::Stats<moho::CArmyStatItem>();
     if (constructResult == nullptr) {
-      delete stats;
+      GPG_NONVIRTUAL_DESTROY(delete stats);
       return;
     }
 
@@ -594,7 +594,7 @@ namespace
    */
   void DeleteStatsCArmyStatItemOwnedObject(void* const object)
   {
-    delete static_cast<moho::Stats<moho::CArmyStatItem>*>(object);
+    GPG_NONVIRTUAL_DESTROY(delete static_cast<moho::Stats<moho::CArmyStatItem>*>(object));
   }
 
   class RMapUnitBlueprintFloatTypeInfo final : public gpg::RType

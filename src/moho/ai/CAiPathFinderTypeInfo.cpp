@@ -152,7 +152,7 @@ gpg::RRef CAiPathFinderTypeInfo::NewRef()
  */
 void CAiPathFinderTypeInfo::Delete(void* const objectStorage)
 {
-  delete static_cast<CAiPathFinder*>(objectStorage);
+  GPG_NONVIRTUAL_DESTROY(delete static_cast<CAiPathFinder*>(objectStorage));
 }
 
 /**

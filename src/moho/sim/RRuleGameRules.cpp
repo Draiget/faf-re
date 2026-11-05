@@ -1018,7 +1018,7 @@ namespace moho
     mLuaState = nullptr;
 
     RuleMutexView(*this).~mutex();
-    std::destroy_at(&DiskWatchListener());
+    DiskWatchListener().CDiskWatchListener::~CDiskWatchListener();
   }
 
   /**

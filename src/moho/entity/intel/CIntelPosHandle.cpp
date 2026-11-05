@@ -397,7 +397,7 @@ namespace moho
    */
   void CIntelPosHandle::Destroy(const int shouldDelete)
   {
-    this->~CIntelPosHandle();
+    this->CIntelPosHandle::~CIntelPosHandle();
     if ((shouldDelete & 1) != 0) {
       ::operator delete(this);
     }

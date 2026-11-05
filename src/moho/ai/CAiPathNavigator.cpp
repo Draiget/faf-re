@@ -906,7 +906,7 @@ CAiPathNavigator::~CAiPathNavigator()
   mPath.FreeStorage();
 
   if (mPathFinder) {
-    delete mPathFinder;
+    GPG_NONVIRTUAL_DESTROY(delete mPathFinder);
     mPathFinder = nullptr;
   }
 
@@ -1846,7 +1846,7 @@ void CAiPathNavigator::MemberDeserialize(gpg::ReadArchive* const archive, const 
   CAiPathFinder* const oldPathFinder = mPathFinder;
   mPathFinder = loadedPathFinder;
   if (oldPathFinder) {
-    delete oldPathFinder;
+    GPG_NONVIRTUAL_DESTROY(delete oldPathFinder);
   }
 
   archive->Read(gpg::RTypeOf<SNavPath>(), &mPath, owner);

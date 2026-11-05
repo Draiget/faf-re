@@ -397,7 +397,7 @@ namespace
     }
 
     field = value;
-    delete prior;
+    GPG_NONVIRTUAL_DESTROY(delete prior);
   }
 
   void ReplaceEconomyOwnedPointer(moho::CSimArmyEconomyInfo*& field, moho::CSimArmyEconomyInfo* const value)
@@ -1206,7 +1206,7 @@ namespace moho
     InfluenceMap = nullptr;
 
     if (Stats != nullptr) {
-      delete Stats;
+      GPG_NONVIRTUAL_DESTROY(delete Stats);
       Stats = nullptr;
     }
 
