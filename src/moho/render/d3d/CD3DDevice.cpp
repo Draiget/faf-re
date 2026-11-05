@@ -33,6 +33,7 @@
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/render/font/MsdfFontRegistry.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/particles/CWorldParticles.h"
@@ -1863,6 +1864,8 @@ namespace moho
       if (::AddFontMemResourceEx(fontBytes.mBegin, byteSize, nullptr, &loadedFontCount) == 0) {
         gpg::Warnf("D3D_InitFonts: Error loading font %s", mountedPath.c_str());
       }
+      // FAF addition: the same file can also draw through an MSDF atlas (issue #306).
+      MSDF_RegisterFontFile(fontFile.c_str(), fontBytes.mBegin, byteSize);
     }
   }
 

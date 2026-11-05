@@ -165,6 +165,8 @@ CMake configure fetches all of them at the exact version below and applies the p
 | plog | commit 94899e0b, the one libdatachannel 0.24.6 pins (MIT) | [commit archive](https://github.com/SergiusTheBest/plog/archive/94899e0b926ac1b0f4750bfbd495167b4a6ae9ef.tar.gz) | none; headers only, libdatachannel's log |
 | Mbed TLS | 3.6.7 LTS (Apache-2.0 or GPL-2.0-or-later; used under Apache-2.0) | [release archive](https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.7/mbedtls-3.6.7.tar.bz2) | none; DTLS for libdatachannel, `MBEDTLS_SSL_DTLS_SRTP` turned on through `cmake/deps/libdatachannel/faf_mbedtls_config.h` |
 | Monocypher | 4.0.2 (BSD-2-Clause or CC0, at the user's choice) | [4.0.2 source archive](https://github.com/LoupVaillant/Monocypher/archive/refs/tags/4.0.2.tar.gz) | none; encrypts and authenticates the [net channel](docs/NET_CHANNEL.md)'s datagrams |
+| FreeType | 2.15.0 (FTL) | [freetype-2.15.0.tar.gz](https://download.savannah.gnu.org/releases/freetype/freetype-2.15.0.tar.gz) | none; built by `cmake/deps/freetype` as a static library, TrueType and CFF only, no bytecode interpreter. Portions of this software are copyright © 2026 The FreeType Project (www.freetype.org). All rights reserved. |
+| msdfgen | 1.13 (MIT) | [v1.13 source archive](https://github.com/Chlumsky/msdfgen/archive/refs/tags/v1.13.tar.gz) | none; built by `cmake/deps/msdfgen` as a static library, for MSDF text |
 | DirectX Shader Compiler | 1.9.2609 | [DXC release](https://github.com/microsoft/DirectXShaderCompiler/releases/tag/v1.9.2609) | none |
 | DirectX SDK | June 2010 | an installed SDK, else extracted from [Microsoft's installer](https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe) | none |
 

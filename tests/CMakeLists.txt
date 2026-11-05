@@ -125,3 +125,9 @@ set_tests_properties(recon_scroll_packet PROPERTIES TIMEOUT 120)
 add_executable(faf_coroutine_tests EXCLUDE_FROM_ALL lua/CoroutineTests.cpp)
 target_link_libraries(faf_coroutine_tests PRIVATE faf_engine)
 add_test(NAME lua_coroutine COMMAND faf_coroutine_tests)
+
+# Engine addition: the MSDF font cook (issue #306), with FreeType and msdfgen linked statically.
+add_executable(faf_msdf_cook_tests EXCLUDE_FROM_ALL font/MsdfFontCookTests.cpp ${CMAKE_SOURCE_DIR}/src/moho/render/font/MsdfFontCook.cpp)
+target_include_directories(faf_msdf_cook_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_msdf_cook_tests PRIVATE faf_freetype faf_msdfgen faf_zstd)
+add_test(NAME msdf_font_cook COMMAND faf_msdf_cook_tests)
