@@ -751,7 +751,9 @@ namespace moho
     std::uint8_t hasStanceUpdatePending; // +0xA4
     std::uint8_t isStaticPose;           // +0xA5
     std::uint8_t isLocked;               // +0xA6
-    std::uint8_t pad_A7{};
+    // Engine addition in the padding (ren_MeshPoseStill): curPose already holds startPose and endPose,
+    // which match, so blending them again would give the same pose.
+    std::uint8_t poseStill{};              // +0xA7
     boost::shared_ptr<CAniPose> startPose; // +0xA8
     boost::shared_ptr<CAniPose> endPose;   // +0xB0
     boost::shared_ptr<CAniPose> curPose;   // +0xB8

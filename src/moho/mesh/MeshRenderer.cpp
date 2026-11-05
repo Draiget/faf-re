@@ -1641,7 +1641,8 @@ namespace
         + fadePlane.x * worldPos.x
         + fadePlane.w;
 
-      const boost::shared_ptr<Mesh> mesh = instance->GetMesh();
+      // Engine change: the instance holds its mesh, so this walk needs no counted copy per instance.
+      Mesh* const mesh = instance->mesh.get();
       const MeshLOD* const lod = mesh->ComputeLOD(distance);
 
       if (lod == nullptr || distance > (mesh->GetMaxCutoff() + ren_MeshDissolve)) {

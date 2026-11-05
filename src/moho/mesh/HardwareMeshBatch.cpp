@@ -963,15 +963,16 @@ namespace moho
 
       // The reflection pass only draws instances that are flagged reflectable.
       if (!reflectedOnly || meshInstance->isReflected != 0) {
-        boost::shared_ptr<CAniPose> pose;
-        CaptureMeshInstanceCurrentPose(&pose, meshInstance);
+        // Engine change: the instance holds its pose and the pose its skeleton through this draw, so
+        // they need no counted copies, which were over 1 % of a frame.
+        meshInstance->UpdateInterpolatedFields();
+        const CAniPose* const pose = meshInstance->curPose.get();
 
         // An instance whose pose (or whose pose's skeleton) has gone away is
         // skipped without consuming a slot in the draw.
-        const boost::shared_ptr<const CAniSkel> skeleton =
-          pose.get() != nullptr ? pose->GetSkeleton() : boost::shared_ptr<const CAniSkel>{};
+        const CAniSkel* const skeleton = pose != nullptr ? pose->mSkeleton.get() : nullptr;
 
-        if (pose.get() != nullptr && skeleton.get() != nullptr) {
+        if (pose != nullptr && skeleton != nullptr) {
           staging.instanceIndex = static_cast<std::uint8_t>(packedCount);
           staging.color = meshInstance->color;
           staging.meshColor = meshInstance->meshColor;
@@ -1171,13 +1172,13 @@ namespace moho
     BonePaletteTexture& palette = GetBonePaletteTexture();
     const std::size_t firstBase = palette.mBases.size();
     for (MeshInstance* const meshInstance : instances) {
-      boost::shared_ptr<CAniPose> pose;
-      CaptureMeshInstanceCurrentPose(&pose, meshInstance);
-      const boost::shared_ptr<const CAniSkel> skeleton =
-        pose.get() != nullptr ? pose->GetSkeleton() : boost::shared_ptr<const CAniSkel>{};
+      // No counted copies, as in FillBatch.
+      meshInstance->UpdateInterpolatedFields();
+      const CAniPose* const pose = meshInstance->curPose.get();
+      const CAniSkel* const skeleton = pose != nullptr ? pose->mSkeleton.get() : nullptr;
 
       std::uint32_t base = BonePaletteTexture::kNoBase;
-      if (pose.get() != nullptr && skeleton.get() != nullptr) {
+      if (pose != nullptr && skeleton != nullptr) {
         base = palette.WriteInstance(*meshInstance, *pose, *skeleton, mBoneRemapIndices, mBoneCount);
       }
       palette.mBases.push_back(base);
