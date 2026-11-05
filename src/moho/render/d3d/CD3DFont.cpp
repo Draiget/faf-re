@@ -25,6 +25,7 @@
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/render/font/MsdfFontRegistry.h"
+#include "moho/render/font/MsdfTextGpuRenderer.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/render/textures/DXTCodec.h"
 
@@ -77,15 +78,33 @@ namespace moho
       std::shared_ptr<const SMsdfFontAtlas> mAtlas;
     };
 
-    /** One atlas on the GPU. The sheet's texture is replaced by a device reset, which loses the pixels. */
-    struct MsdfAtlasSheet
+    /**
+     * Every font's atlas on one GPU texture, so a change of font doesn't split a draw. A device reset
+     * replaces the sheet's texture and loses its pixels, so they're written again.
+     */
+    struct MsdfAtlasPage
     {
+      struct PlacedFont
+      {
+        const SMsdfFontAtlas* mAtlas = nullptr;
+        std::int32_t mX = 0;
+        std::int32_t mY = 0;
+      };
+
       boost::shared_ptr<CD3DDynamicTextureSheet> mSheet;
       const void* mUploadedTexture = nullptr;
+      std::vector<PlacedFont> mFonts;
+      std::int32_t mShelfX = 0;
+      std::int32_t mShelfY = 0;
+      std::int32_t mShelfHeight = 0;
     };
 
+    constexpr std::int32_t kMsdfPageWidth = 2048;
+    constexpr std::int32_t kMsdfPageHeight = 4096;
+    constexpr std::int32_t kMsdfPageSpacing = 3; // empty texels between fonts, as between glyph boxes
+
     std::map<const CD3DFont*, MsdfBinding> sMsdfBindings;
-    std::map<const SMsdfFontAtlas*, MsdfAtlasSheet> sMsdfSheets;
+    MsdfAtlasPage sMsdfPage;
 
     [[nodiscard]] const SMsdfGlyph* FindMsdfGlyph(const SMsdfFontAtlas& atlas, const std::uint32_t codepoint)
     {
@@ -96,43 +115,87 @@ namespace moho
       return found != atlas.mGlyphs.end() && found->mCodepoint == codepoint ? &*found : nullptr;
     }
 
-    /** The atlas's sheet with its pixels on it; made and filled on first use and after a device reset. */
-    [[nodiscard]] boost::shared_ptr<CD3DDynamicTextureSheet> AcquireMsdfSheet(const SMsdfFontAtlas& atlas)
+    /** Writes one font's pixels and the empty texels to its right and below it, which keep the next font apart. */
+    [[nodiscard]] bool WriteFontToPage(const MsdfAtlasPage::PlacedFont& placed)
     {
-      MsdfAtlasSheet& entry = sMsdfSheets[&atlas];
-      if (!entry.mSheet) {
+      const SMsdfFontAtlas& atlas = *placed.mAtlas;
+      const std::int32_t right = (std::min)(placed.mX + atlas.mWidth + kMsdfPageSpacing, kMsdfPageWidth);
+      const std::int32_t bottom = (std::min)(placed.mY + atlas.mHeight + kMsdfPageSpacing, kMsdfPageHeight);
+      const RECT rect{placed.mX, placed.mY, right, bottom};
+      std::uint32_t pitch = 0u;
+      void* bits = nullptr;
+      if (!sMsdfPage.mSheet->LockRect(&rect, &pitch, &bits) || bits == nullptr) {
+        return false;
+      }
+      const std::size_t lockedRowBytes = static_cast<std::size_t>(right - placed.mX) * 4u;
+      const std::size_t atlasRowBytes = static_cast<std::size_t>(atlas.mWidth) * 4u;
+      for (std::int32_t row = 0; row < bottom - placed.mY; ++row) {
+        auto* const out = static_cast<std::uint8_t*>(bits) + static_cast<std::size_t>(pitch) * static_cast<std::size_t>(row);
+        std::memset(out, 0, lockedRowBytes);
+        if (row < atlas.mHeight) {
+          std::memcpy(out, atlas.mPixels.data() + atlasRowBytes * static_cast<std::size_t>(row), atlasRowBytes);
+        }
+      }
+      (void)sMsdfPage.mSheet->Unlock();
+      return true;
+    }
+
+    /**
+     * Where an atlas sits on the page, placing it on first use and rewriting the page after a device reset.
+     * False when the page is full or can't be made; that font stays on GDI glyphs.
+     */
+    [[nodiscard]] bool AcquireMsdfPlacement(const SMsdfFontAtlas& atlas, std::int32_t& outX, std::int32_t& outY)
+    {
+      MsdfAtlasPage& page = sMsdfPage;
+      if (!page.mSheet) {
         CD3DDevice* const device = D3D_GetDevice();
         ID3DDeviceResources* const resources = device != nullptr ? device->GetResources() : nullptr;
         if (resources == nullptr) {
-          return {};
+          return false;
         }
-        (void)resources->NewDynamicTextureSheet(entry.mSheet, atlas.mWidth, atlas.mHeight, kAtlasTextureFormat);
-        if (!entry.mSheet) {
-          return {};
+        (void)resources->NewDynamicTextureSheet(page.mSheet, kMsdfPageWidth, kMsdfPageHeight, kAtlasTextureFormat);
+        if (!page.mSheet) {
+          return false;
         }
       }
 
       CD3DDynamicTextureSheet::TextureHandle texture;
-      entry.mSheet->GetTexture(texture);
-      if (texture.get() == entry.mUploadedTexture) {
-        return entry.mSheet;
+      page.mSheet->GetTexture(texture);
+      if (texture.get() != page.mUploadedTexture) {
+        for (const MsdfAtlasPage::PlacedFont& placed : page.mFonts) {
+          if (!WriteFontToPage(placed)) {
+            return false;
+          }
+        }
+        page.mUploadedTexture = texture.get();
       }
 
-      std::uint32_t pitch = 0u;
-      void* bits = nullptr;
-      if (!entry.mSheet->Lock(&pitch, &bits) || bits == nullptr) {
-        return {};
+      for (const MsdfAtlasPage::PlacedFont& placed : page.mFonts) {
+        if (placed.mAtlas == &atlas) {
+          outX = placed.mX;
+          outY = placed.mY;
+          return true;
+        }
       }
-      const std::size_t rowBytes = static_cast<std::size_t>(atlas.mWidth) * 4u;
-      for (std::int32_t row = 0; row < atlas.mHeight; ++row) {
-        std::memcpy(
-          static_cast<std::uint8_t*>(bits) + static_cast<std::size_t>(pitch) * static_cast<std::size_t>(row),
-          atlas.mPixels.data() + rowBytes * static_cast<std::size_t>(row), rowBytes
-        );
+
+      if (page.mShelfX + atlas.mWidth > kMsdfPageWidth) {
+        page.mShelfY += page.mShelfHeight + kMsdfPageSpacing;
+        page.mShelfX = 0;
+        page.mShelfHeight = 0;
       }
-      (void)entry.mSheet->Unlock();
-      entry.mUploadedTexture = texture.get();
-      return entry.mSheet;
+      if (atlas.mWidth > kMsdfPageWidth || page.mShelfY + atlas.mHeight > kMsdfPageHeight) {
+        return false;
+      }
+      const MsdfAtlasPage::PlacedFont placed{&atlas, page.mShelfX, page.mShelfY};
+      if (!WriteFontToPage(placed)) {
+        return false;
+      }
+      page.mFonts.push_back(placed);
+      page.mShelfX += atlas.mWidth + kMsdfPageSpacing;
+      page.mShelfHeight = (std::max)(page.mShelfHeight, atlas.mHeight);
+      outX = placed.mX;
+      outY = placed.mY;
+      return true;
     }
 
     /**
@@ -172,26 +235,38 @@ namespace moho
       CD3DDevice* const device = D3D_GetDevice();
       CD3DEffect* const effect = device != nullptr ? device->GetCurEffect() : nullptr;
       if (effect == nullptr || std::strcmp(effect->mName.c_str(), "primbatcher") != 0
-          || !shaderVarPrimBatcherMsdfPixelRange.Exists()
           || !effect->mCurrentTechnique || std::strcmp(effect->mCurrentTechnique->GetName()->c_str(), kScreenTextTechnique) != 0) {
         return false;
       }
-      const boost::shared_ptr<CD3DDynamicTextureSheet> sheet = AcquireMsdfSheet(atlas);
-      if (!sheet) {
+      std::int32_t pageX = 0;
+      std::int32_t pageY = 0;
+      if (!AcquireMsdfPlacement(atlas, pageX, pageY)) {
         return false;
       }
+      const boost::shared_ptr<CD3DDynamicTextureSheet>& sheet = sMsdfPage.mSheet;
 
-      primBatcher.Flush();
-      const CD3DPrimBatcher::TextureBinding previousTexture = primBatcher.GetTextureBinding();
-      const boost::shared_ptr<gpg::gal::EffectTechnique> previousTechnique = effect->mCurrentTechnique;
-
-      effect->SetTechnique(kMsdfTechnique);
       const float size = static_cast<float>(binding.mPointSize);
-      shaderVarPrimBatcherMsdfPixelRange.mEffectVariable->SetFloat(atlas.mDistanceRange * size / atlas.mEmPixels);
-      primBatcher.SetTexture(boost::static_pointer_cast<ID3DTextureSheet>(sheet));
+      const float pixelRange = atlas.mDistanceRange * size / atlas.mEmPixels;
 
-      const float inverseWidth = 1.0f / static_cast<float>(atlas.mWidth);
-      const float inverseHeight = 1.0f / static_cast<float>(atlas.mHeight);
+      // One instanced draw from a GPU buffer where the backend has it; through the batcher otherwise.
+      MsdfTextGpuRenderer& instancedText = MsdfTextGpuRenderer::Get();
+      const bool instanced = instancedText.IsActive() && instancedText.BeginString(primBatcher, sheet);
+      CD3DPrimBatcher::TextureBinding previousTexture{};
+      boost::shared_ptr<gpg::gal::EffectTechnique> previousTechnique;
+      if (!instanced) {
+        if (!shaderVarPrimBatcherMsdfPixelRange.Exists()) {
+          return false;
+        }
+        primBatcher.Flush();
+        previousTexture = primBatcher.GetTextureBinding();
+        previousTechnique = effect->mCurrentTechnique;
+        effect->SetTechnique(kMsdfTechnique);
+        shaderVarPrimBatcherMsdfPixelRange.mEffectVariable->SetFloat(pixelRange);
+        primBatcher.SetTexture(boost::static_pointer_cast<ID3DTextureSheet>(sheet));
+      }
+
+      const float inverseWidth = 1.0f / static_cast<float>(kMsdfPageWidth);
+      const float inverseHeight = 1.0f / static_cast<float>(kMsdfPageHeight);
       const auto corner = [&](const Vector3f& pen, const float x, const float y) {
         return Vector3f{pen.x + x * size, pen.y - y * size, pen.z};
       };
@@ -208,23 +283,43 @@ namespace moho
         if (glyph.mAtlasRight > glyph.mAtlasLeft) {
           const Vector3f topLeft = corner(cursor, glyph.mPlaneLeft, glyph.mPlaneTop);
           const Vector3f bottomRight = corner(cursor, glyph.mPlaneRight, glyph.mPlaneBottom);
-          const float u0 = glyph.mAtlasLeft * inverseWidth;
-          const float u1 = glyph.mAtlasRight * inverseWidth;
-          const float v0 = glyph.mAtlasTop * inverseHeight;
-          const float v1 = glyph.mAtlasBottom * inverseHeight;
-          primBatcher.DrawQuad(
-            CD3DPrimBatcher::Vertex{topLeft.x, topLeft.y, topLeft.z, color, u0, v0},
-            CD3DPrimBatcher::Vertex{bottomRight.x, topLeft.y, topLeft.z, color, u1, v0},
-            CD3DPrimBatcher::Vertex{bottomRight.x, bottomRight.y, topLeft.z, color, u1, v1},
-            CD3DPrimBatcher::Vertex{topLeft.x, bottomRight.y, topLeft.z, color, u0, v1}
-          );
+          const float u0 = (glyph.mAtlasLeft + static_cast<float>(pageX)) * inverseWidth;
+          const float u1 = (glyph.mAtlasRight + static_cast<float>(pageX)) * inverseWidth;
+          const float v0 = (glyph.mAtlasTop + static_cast<float>(pageY)) * inverseHeight;
+          const float v1 = (glyph.mAtlasBottom + static_cast<float>(pageY)) * inverseHeight;
+          if (instanced) {
+            MsdfUiQuad quad;
+            const float xs[4] = {topLeft.x, bottomRight.x, bottomRight.x, topLeft.x};
+            const float ys[4] = {topLeft.y, topLeft.y, bottomRight.y, bottomRight.y};
+            const float us[4] = {u0, u1, u1, u0};
+            const float vs[4] = {v0, v0, v1, v1};
+            for (int c = 0; c < 4; ++c) {
+              quad.mX[c] = xs[c];
+              quad.mY[c] = ys[c];
+              quad.mU[c] = us[c];
+              quad.mV[c] = vs[c];
+              quad.mColor[c] = color;
+            }
+            quad.mPixelRange = pixelRange;
+            quad.mZ = topLeft.z;
+            instancedText.AddGlyph(quad);
+          } else {
+            primBatcher.DrawQuad(
+              CD3DPrimBatcher::Vertex{topLeft.x, topLeft.y, topLeft.z, color, u0, v0},
+              CD3DPrimBatcher::Vertex{bottomRight.x, topLeft.y, topLeft.z, color, u1, v0},
+              CD3DPrimBatcher::Vertex{bottomRight.x, bottomRight.y, topLeft.z, color, u1, v1},
+              CD3DPrimBatcher::Vertex{topLeft.x, bottomRight.y, topLeft.z, color, u0, v1}
+            );
+          }
         }
         cursor.x += advance;
       }
 
-      primBatcher.Flush();
-      effect->mCurrentTechnique = previousTechnique;
-      primBatcher.SetTextureBinding(previousTexture);
+      if (!instanced) {
+        primBatcher.Flush();
+        effect->mCurrentTechnique = previousTechnique;
+        primBatcher.SetTextureBinding(previousTexture);
+      }
       outCursor = cursor;
       return true;
     }

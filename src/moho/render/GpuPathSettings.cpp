@@ -112,6 +112,7 @@ namespace moho
   extern int ren_GpuProjectileIcons;
   extern int ren_GpuShapes;
   extern int ren_GpuRanges;
+  extern int ren_GpuText;
 
   namespace
   {
@@ -134,6 +135,7 @@ namespace moho
        gpg::gal::kGpuFeatureVertexPulling},
       {"ren_GpuShapes", &ren_GpuShapes, gpg::gal::kGpuPathWorldShapes, gpg::gal::kGpuFeatureVertexPulling},
       {"ren_GpuRanges", &ren_GpuRanges, gpg::gal::kGpuPathRanges, gpg::gal::kGpuFeatureVertexPulling},
+      {"ren_GpuText", &ren_GpuText, gpg::gal::kGpuPathMsdfText, gpg::gal::kGpuFeatureVertexPulling},
     };
   } // namespace
 
