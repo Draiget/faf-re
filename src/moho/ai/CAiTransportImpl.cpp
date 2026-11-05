@@ -174,14 +174,6 @@ namespace
     return IAiTransport::sType;
   }
 
-  [[nodiscard]] gpg::RType* ResolveCAiTransportImplType()
-  {
-    if (!CAiTransportImpl::sType) {
-      CAiTransportImpl::sType = gpg::CachedLookup<CAiTransportImpl>(gCAiTransportImplType);
-    }
-    return CAiTransportImpl::sType;
-  }
-
   [[nodiscard]] bool BlueprintBelongsToCategory(
     const RUnitBlueprint* const blueprint,
     const EntityCategorySet* const category

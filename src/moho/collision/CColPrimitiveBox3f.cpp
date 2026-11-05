@@ -30,16 +30,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedBox3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Box3<float>));
-    }
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
   moho::Box3fTypeInfo gBox3fTypeInfo;
 
   struct Box3fTypeInfoBootstrap

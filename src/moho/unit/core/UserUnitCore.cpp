@@ -77,7 +77,7 @@ namespace
    * What it does:
    * Returns the fixed transport-load factor used by the UserUnit IUnit bridge.
    */
-  [[nodiscard]] float IUnitBridgeCalcTransportLoadFactor(const IUnit* const bridge) noexcept
+  [[maybe_unused]] [[nodiscard]] float IUnitBridgeCalcTransportLoadFactor(const IUnit* const bridge) noexcept
   {
     (void)bridge;
     return 1.0f;
@@ -89,7 +89,7 @@ namespace
    * What it does:
    * Returns false for the UserUnit IUnit bridge destroy-queued lane.
    */
-  [[nodiscard]] bool IUnitBridgeDestroyQueued(const IUnit* const bridge) noexcept
+  [[maybe_unused]] [[nodiscard]] bool IUnitBridgeDestroyQueued(const IUnit* const bridge) noexcept
   {
     (void)bridge;
     return false;
@@ -101,7 +101,7 @@ namespace
    * What it does:
    * Returns false for the UserUnit IUnit bridge navigator-idle lane.
    */
-  [[nodiscard]] bool IUnitBridgeIsNavigatorIdle(const IUnit* const bridge) noexcept
+  [[maybe_unused]] [[nodiscard]] bool IUnitBridgeIsNavigatorIdle(const IUnit* const bridge) noexcept
   {
     (void)bridge;
     return false;
@@ -139,7 +139,7 @@ namespace
     return self->mVisionHandle;
   }
 
-  [[nodiscard]] const VisionDB::Handle* GetUserUnitVisionHandle(const UserUnit* const self) noexcept
+  [[maybe_unused]] [[nodiscard]] const VisionDB::Handle* GetUserUnitVisionHandle(const UserUnit* const self) noexcept
   {
     return self->mVisionHandle;
   }

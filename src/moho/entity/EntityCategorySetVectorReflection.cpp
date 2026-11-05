@@ -21,14 +21,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeEntityCategorySetRef(moho::EntityCategorySet* value)
-  {
-    gpg::RRef out{};
-    out.mObj = value;
-    out.mType = gpg::RTypeOf<moho::EntityCategorySet>();
-    return out;
-  }
-
   /**
    * Address: 0x006DFDE0 (FUN_006DFDE0)
    *
@@ -36,7 +28,7 @@ namespace
    * Deserializes one `vector<EntityCategorySet>` object lane through archive
    * owner context and returns the archive instance.
    */
-  gpg::ReadArchive* ReadEntityCategorySetVectorArchiveAdapter(
+  [[maybe_unused]] gpg::ReadArchive* ReadEntityCategorySetVectorArchiveAdapter(
     gpg::ReadArchive* const archive,
     void* const object,
     gpg::RRef* const ownerRef

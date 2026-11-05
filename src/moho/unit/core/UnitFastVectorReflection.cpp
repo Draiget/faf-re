@@ -59,30 +59,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedFastVectorWeakPtrEntityType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(gpg::fastvector<moho::WeakPtr<moho::Entity>>));
-      if (!cached) {
-        cached = moho::register_FastVectorWeakPtrEntityType_00();
-      }
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedFastVectorReconBlipPointerType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(gpg::fastvector<moho::ReconBlip*>));
-      if (!cached) {
-        cached = moho::register_FastVectorReconBlipPtrType_00();
-      }
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeWeakPtrEntityRef(moho::WeakPtr<moho::Entity>* value)
   {
     gpg::RRef out{};

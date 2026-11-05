@@ -687,7 +687,7 @@ namespace
      * dispatch to `Playing`, and notifies the active world-UI provider through
      * `OnStart` when present.
      */
-    int WLD_EnterPlayingAndNotifyUIProvider()
+    [[maybe_unused]] int WLD_EnterPlayingAndNotifyUIProvider()
     {
       int dispatchResult = 0;
       if (ISTIDriver* const simDriver = sSimDriver.get(); simDriver != nullptr) {

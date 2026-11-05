@@ -113,20 +113,6 @@ namespace
     gpg::WriteRawPointer(archive, pointerRef, state, ownerRef);
   }
 
-  void AddBase(gpg::RType* const ownerType, gpg::RType* const baseType, const std::int32_t offset)
-  {
-    GPG_ASSERT(ownerType != nullptr);
-    GPG_ASSERT(baseType != nullptr);
-
-    gpg::RField field{};
-    field.mName = baseType->GetName();
-    field.mType = baseType;
-    field.mOffset = offset;
-    field.mFlags = 0;
-    field.mDesc = nullptr;
-    ownerType->AddBase(field);
-  }
-
   constexpr std::int32_t kAcquireTargetRetargetCooldownTicks = 30;
   constexpr std::int32_t kAcquireTargetRetargetReprobeThresholdPrimary = 5;
   constexpr std::int32_t kAcquireTargetRetargetReprobeThresholdSecondary = 10;

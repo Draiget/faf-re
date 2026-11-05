@@ -126,7 +126,7 @@ namespace
   /**
    * Address: 0x00695F00 (FUN_00695F00, gpg::RRef_MotorFallDown)
    */
-  [[nodiscard]] gpg::RRef MakeMotorFallDownRef(moho::MotorFallDown* const object)
+  [[maybe_unused]] [[nodiscard]] gpg::RRef MakeMotorFallDownRef(moho::MotorFallDown* const object)
   {
     gpg::RRef ref{};
     ref.mObj = object;

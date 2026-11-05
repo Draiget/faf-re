@@ -17,7 +17,7 @@ namespace
   // in moho/command/SSTICommandVariableData.cpp next to the command type it
   // classifies; the formation code calls it too.
 
-  [[nodiscard]] gpg::RRef MakeUnitStateRef(EUnitState* const unitState)
+  [[maybe_unused]] [[nodiscard]] gpg::RRef MakeUnitStateRef(EUnitState* const unitState)
   {
     gpg::RRef enumRef{};
     if (unitState == nullptr) {
@@ -51,7 +51,7 @@ namespace
     return enumRef;
   }
 
-  [[nodiscard]] gpg::RRef MakeRuleUnitCommandCapsRef(ERuleBPUnitCommandCaps* const commandCap)
+  [[maybe_unused]] [[nodiscard]] gpg::RRef MakeRuleUnitCommandCapsRef(ERuleBPUnitCommandCaps* const commandCap)
   {
     gpg::RRef enumRef{};
     if (commandCap == nullptr) {
@@ -68,7 +68,7 @@ namespace
     return enumRef;
   }
 
-  [[nodiscard]] int ScriptBitIndexFromToggleCapValue(int toggleCapValue) noexcept
+  [[maybe_unused]] [[nodiscard]] int ScriptBitIndexFromToggleCapValue(int toggleCapValue) noexcept
   {
     int bitIndex = 0;
     if (toggleCapValue == 1) {

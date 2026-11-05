@@ -232,14 +232,6 @@ namespace
     return static_cast<std::uint32_t>(unit->mVarDat.mLayerMask);
   }
 
-  void ClearUnitPathBits(Unit* const unit)
-  {
-    if (!unit) {
-      return;
-    }
-    unit->mUnitVarDat.mUnitStates &= ~(kUnitPathFlag | kUnitPathingBusyFlag | kUnitPatrolStallFlag);
-  }
-
   void ClearUnitPathingBusyBit(Unit* const unit)
   {
     if (!unit) {

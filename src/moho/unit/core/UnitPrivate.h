@@ -622,7 +622,7 @@ namespace
 {
   constexpr const char* kUnitOnAssignedFocusEntityScript = "OnAssignedFocusEntity";
 
-  [[nodiscard]] bool IsMeleeCandidateCellNavigable(
+  [[maybe_unused]] [[nodiscard]] bool IsMeleeCandidateCellNavigable(
     Unit& moveUnit,
     Unit* ignoreUnit,
     const SFootprint& moverFootprint,

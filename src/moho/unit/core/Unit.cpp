@@ -1009,7 +1009,7 @@ namespace
    * and the owner-ref lane are unused by the member (mirrors the binary tail
    * call).
    */
-  void DeserializeUnitWeaponInfoSerializerCallback(
+  [[maybe_unused]] void DeserializeUnitWeaponInfoSerializerCallback(
     gpg::ReadArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -1032,7 +1032,7 @@ namespace
    * and the owner-ref lane are unused by the member (mirrors the binary tail
    * call).
    */
-  void SerializeUnitWeaponInfoSerializerCallback(
+  [[maybe_unused]] void SerializeUnitWeaponInfoSerializerCallback(
     gpg::WriteArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -1058,7 +1058,7 @@ namespace
    * owner-ref lane are unused by the member (mirrors the binary tail-jump into
    * FUN_0055E030).
    */
-  void SSTIUnitVariableDataSerializerDeserialize(
+  [[maybe_unused]] void SSTIUnitVariableDataSerializerDeserialize(
     gpg::ReadArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -1084,7 +1084,7 @@ namespace
    * owner-ref lane are unused by the member (mirrors the binary tail-jump into
    * FUN_0055E420).
    */
-  void SSTIUnitVariableDataSerializerSerialize(
+  [[maybe_unused]] void SSTIUnitVariableDataSerializerSerialize(
     gpg::WriteArchive* const archive,
     const std::intptr_t objectPtr,
     const int,

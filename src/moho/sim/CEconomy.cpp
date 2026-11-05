@@ -105,21 +105,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedCEconStorageType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      constexpr const char* kTypeNames[] = {"Moho::CEconStorage", "CEconStorage", "class Moho::CEconStorage"};
-      for (const char* const typeName : kTypeNames) {
-        cached = gpg::REF_FindTypeNamed(typeName);
-        if (cached != nullptr) {
-          break;
-        }
-      }
-    }
-    return cached;
-  }
-
   [[nodiscard]] moho::CEconRequest* RequestFromNode(moho::TDatListItem<void, void>* const node) noexcept
   {
     return reinterpret_cast<moho::CEconRequest*>(node);

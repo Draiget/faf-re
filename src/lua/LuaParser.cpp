@@ -181,12 +181,6 @@ namespace
       | (static_cast<Instruction>(c) << kPosC);
   }
 
-  constexpr void SETARG_sBx(Instruction& i, const std::int32_t offset) noexcept
-  {
-    i = (i & ~(static_cast<Instruction>(LUA_MAXARG_Bx) << kPosBx))
-      | (static_cast<Instruction>(offset + LUA_MAXARG_sBx) << kPosBx);
-  }
-
   [[nodiscard]] constexpr Instruction
   CREATE_ABC(const std::int32_t o, const std::int32_t a, const std::int32_t b, const std::int32_t c) noexcept
   {
@@ -344,7 +338,7 @@ namespace
    * Returns `1` when `stackValue` is within one call frame stack window
    * `[base, top)`; returns `0` otherwise.
    */
-  [[nodiscard]] std::int32_t isinstack(CallInfo* const callInfo, LuaPlus::TObject* const stackValue)
+  [[maybe_unused]] [[nodiscard]] std::int32_t isinstack(CallInfo* const callInfo, LuaPlus::TObject* const stackValue)
   {
     LuaPlus::StkId cursor = callInfo->base;
     const LuaPlus::StkId top = callInfo->top;

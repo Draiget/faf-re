@@ -17,7 +17,7 @@ namespace
    * What it does:
    * Resolves and caches the `CPlatoon` reflection type.
    */
-  [[nodiscard]] gpg::RType* CachedCPlatoonType()
+  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedCPlatoonType()
   {
     if (moho::CPlatoon::sType == nullptr) {
       moho::CPlatoon::sType = gpg::LookupRType(typeid(moho::CPlatoon));

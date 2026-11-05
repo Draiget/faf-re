@@ -142,7 +142,7 @@ namespace
    * Copies one source entity mesh shared-pair `(px,pi)` and retains one shared
    * control-block owner when the control lane is non-null.
    */
-  [[nodiscard]] boost::SharedPtrRaw<RScmResource> CopyEntityMeshSharedRetained(const Entity* const source) noexcept
+  [[maybe_unused]] [[nodiscard]] boost::SharedPtrRaw<RScmResource> CopyEntityMeshSharedRetained(const Entity* const source) noexcept
   {
     boost::SharedPtrRaw<RScmResource> out{};
     if (source == nullptr) {
@@ -192,13 +192,6 @@ namespace
     return {direction.x * randomScale, direction.y * randomScale, direction.z * randomScale};
   }
 
-  [[nodiscard]] gpg::RRef MakeReconBlipRef(ReconBlip* const object) noexcept
-  {
-    gpg::RRef ref{};
-    ref.mObj = object;
-    ref.mType = object ? ReconBlip::StaticGetClass() : nullptr;
-    return ref;
-  }
 } // namespace
 
 gpg::RType* SPerArmyReconInfo::sType = nullptr;

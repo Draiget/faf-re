@@ -30,15 +30,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedSphere3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Sphere3<float>));
-    }
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
 } // namespace
 
 namespace Wm3

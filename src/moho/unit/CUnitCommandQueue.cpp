@@ -51,14 +51,6 @@ namespace
     return static_cast<TObject*>(upcast.mObj);
   }
 
-  [[nodiscard]] gpg::RRef MakeQueueRef(CUnitCommandQueue* const queue)
-  {
-    gpg::RRef out{};
-    out.mObj = queue;
-    out.mType = CUnitCommandQueue::StaticGetClass();
-    return out;
-  }
-
   [[nodiscard]] bool ShouldMarkOwnerSyncStateForQueueHead(const CUnitCommandQueue& queue)
   {
     if (queue.mCommandVec.empty()) {

@@ -82,7 +82,7 @@ namespace
 
   [[nodiscard]] gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* RebuildAndGetUserUnitManagerQueue(UserCommandQueue* managerPtr) noexcept;
 
-  [[nodiscard]] const gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* ResolveUserCommandQueueRange(
+  [[maybe_unused]] [[nodiscard]] const gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* ResolveUserCommandQueueRange(
     const UserCommandQueue* const queue
   ) noexcept
   {
@@ -101,7 +101,7 @@ namespace
    * Resolves one command-manager queue view and returns the most recent
    * non-null helper entry, scanning backward from the logical tail.
    */
-  [[nodiscard]] UserCommandIssueHelper* GetLastQueuedUserCommandHelper(
+  [[maybe_unused]] [[nodiscard]] UserCommandIssueHelper* GetLastQueuedUserCommandHelper(
     UserCommandQueue* const managerPtr
   ) noexcept
   {
@@ -252,7 +252,7 @@ namespace
    * resolved run is then invalidated back onto its inline storage and marked
    * dirty so the next reader rebuilds it.
    */
-  void ResyncUserCommandQueueLinks(UserCommandQueue* const queue, const CmdId* const idBegin, const CmdId* const idEnd)
+  [[maybe_unused]] void ResyncUserCommandQueueLinks(UserCommandQueue* const queue, const CmdId* const idBegin, const CmdId* const idEnd)
   {
     if (queue == nullptr) {
       return;
@@ -335,7 +335,7 @@ namespace
     return helper.mVariableData.mCmdType;
   }
 
-  [[nodiscard]] Wm3::Vector3<float>
+  [[maybe_unused]] [[nodiscard]] Wm3::Vector3<float>
   ResolveHelperTargetPosition(const UserCommandIssueHelper& helper, CWldSession* const session) noexcept
   {
     if (const UserCommandIssueLocalEvent* const event = FindLatestIssueEvent(helper, ECommandIssueEvent::SetTarget);
@@ -353,7 +353,7 @@ namespace
    * Resolves one effective queued-build count from helper baseline count and
    * queued increase/decrease issue events.
    */
-  [[nodiscard]] std::int32_t ResolveHelperBuildCount(const UserCommandIssueHelper& helper) noexcept
+  [[maybe_unused]] [[nodiscard]] std::int32_t ResolveHelperBuildCount(const UserCommandIssueHelper& helper) noexcept
   {
     std::int32_t count = helper.mVariableData.mCount;
     const msvc8::deque<UserCommandIssueLocalEvent>& events = helper.mLocalQueue;
@@ -396,7 +396,7 @@ namespace
    * Resolves the reflected `UserUnit` type once into the static the binary
    * caches at 0x010C77AC.
    */
-  [[nodiscard]] gpg::RType* CachedUserUnitType()
+  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedUserUnitType()
   {
     if (UserUnit::sType == nullptr) {
       UserUnit::sType = gpg::LookupRType(typeid(UserUnit));

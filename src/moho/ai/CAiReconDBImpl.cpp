@@ -108,18 +108,6 @@ namespace
       !(static_cast<float>(rect.z0) > pos.z) && !(pos.z > static_cast<float>(rect.z1));
   }
 
-  [[nodiscard]] bool IsInsideRadiusXZ(const Wm3::Vec3f& center, const float radius, const Wm3::Vec3f& pos) noexcept
-  {
-    const float dx = pos.x - center.x;
-    const float dz = pos.z - center.z;
-    return (dx * dx) + (dz * dz) <= (radius * radius);
-  }
-
-  [[nodiscard]] EReconFlags SetFlag(const EReconFlags value, const EReconFlags bit) noexcept
-  {
-    return static_cast<EReconFlags>(static_cast<std::int32_t>(value) | static_cast<std::int32_t>(bit));
-  }
-
   [[nodiscard]] EReconFlags MergeFlags(const EReconFlags lhs, const EReconFlags rhs) noexcept
   {
     return static_cast<EReconFlags>(static_cast<std::int32_t>(lhs) | static_cast<std::int32_t>(rhs));

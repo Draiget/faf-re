@@ -1675,7 +1675,7 @@ namespace
 	 * Stores one 32-bit value into owner field `+0x44` (`+0x68` bytes) and
 	 * returns the owner pointer lane.
 	 */
-	OwnerWordLaneAt68* StoreOwnerWordLaneAt68(
+	[[maybe_unused]] OwnerWordLaneAt68* StoreOwnerWordLaneAt68(
 		OwnerWordWritePair* const writePair
 	)
 	{

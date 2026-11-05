@@ -77,7 +77,7 @@ namespace
    * Runs one `Stats_StatItem` destructor and frees storage when the incoming
    * pointer lane is non-null.
    */
-  void DestroyStatsStatItemIfPresent(moho::Stats_StatItem* const statItem) noexcept
+  [[maybe_unused]] void DestroyStatsStatItemIfPresent(moho::Stats_StatItem* const statItem) noexcept
   {
     if (statItem == nullptr) {
       return;

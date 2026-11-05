@@ -42,14 +42,6 @@ namespace
     return gWeakPtrUnitType;
   }
 
-  [[nodiscard]] gpg::RType* ResolvePerArmyReconInfoType()
-  {
-    if (!moho::SPerArmyReconInfo::sType) {
-      moho::SPerArmyReconInfo::sType = gpg::LookupRType(typeid(moho::SPerArmyReconInfo));
-    }
-    return moho::SPerArmyReconInfo::sType;
-  }
-
   // Addresses 0x005C90D0/0x005CAF90 (deserialize "ThunkA"/"ThunkB" pair) and
   // 0x005C90E0/0x005CAFA0 (serialize "ThunkA"/"ThunkB" pair) formerly modeled
   // here are dead: zero data_refs and zero call_edges in the callgraph index

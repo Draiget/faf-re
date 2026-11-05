@@ -49,12 +49,6 @@ namespace
     return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
   }
 
-  [[nodiscard]] bool IsUsableEntitySlot(const moho::Entity* const entity) noexcept
-  {
-    const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(entity);
-    return raw != 0u && raw != kInvalidEntitySlot;
-  }
-
   [[nodiscard]] bool IsUsableUnitSlot(const moho::Unit* const unit) noexcept
   {
     const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(unit);
