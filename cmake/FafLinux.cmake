@@ -110,6 +110,10 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/src/remote/net" "${CMAKE_BINARY_DIR}/rem
 if(TARGET faf_netchannel)
   add_executable(faf_netchannel_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/NetChannelTests.cpp")
   target_link_libraries(faf_netchannel_tests PRIVATE faf_netchannel faf_monocypher)
+  add_executable(faf_gamelink_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/GameLinkTests.cpp")
+  target_link_libraries(faf_gamelink_tests PRIVATE faf_netchannel faf_monocypher)
+  add_executable(faf_server_probe EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeMain.cpp")
+  target_link_libraries(faf_server_probe PRIVATE faf_netchannel faf_monocypher)
 endif()
 
 # --- faf_sim ----------------------------------------------------------------------------
@@ -281,10 +285,11 @@ target_link_options(headless PRIVATE -Wl,--error-limit=0)
 # The dedicated server, Linux only (plan D2): the sim, and what `headless` shares for loading a game.
 add_executable(server
   "${PROJECT_SOURCE_DIR}/src/server/ServerMain.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
   "${PROJECT_SOURCE_DIR}/src/headless/SessionLoad.cpp"
   "${PROJECT_SOURCE_DIR}/src/headless/ReplayLuaState.cpp"
 )
-target_link_libraries(server PRIVATE faf_sim)
+target_link_libraries(server PRIVATE faf_sim faf_netchannel faf_monocypher)
 target_compile_definitions(server PRIVATE FAF_SERVER_MODE=1)
 target_link_options(server PRIVATE -Wl,--error-limit=0)
 

@@ -24,6 +24,7 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -52,6 +53,7 @@
 #include "moho/net/LaunchInfoBuilder.h"
 #include "moho/sim/CWldMap.h"
 #include "remote/ServerClient.h"
+#include "moho/console/CConCommand.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
 #include "moho/sim/FafGameVersion.h"
@@ -60,12 +62,15 @@
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "platform/X87Precision.h"
+#include "remote/net/UdpSocket.h"
+#include "server/ServerNet.h"
 #include "server/SpeedWatch.h"
 
 namespace
 {
   // WP1.5.
   constexpr int kExitEnded = 0;
+  constexpr int kExitNobodyCame = 2;
   constexpr int kExitCrash = 3;
   constexpr int kExitBadInput = 4;
   constexpr int kExitStopped = 5;
@@ -76,9 +81,12 @@ namespace
 
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>]\n";
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
+  // `net_Lag` is 500 ms in a lockstep game, time for every player's beats to arrive. Here it's only the
+  // sim's head start on the next beat, and a player's command waits for all of it.
+  constexpr float kDefaultLeadMs = 150.0f;
   constexpr float kDefaultWarnBeatMs = 90.0f; // speed -1 starts at `faf::server::kSpeedZeroBeatMs`
   constexpr double kStallSeconds = 30.0;
   // After a slow stretch the game runs fast for at most this long to make up the time.
@@ -242,6 +250,24 @@ namespace
     return true;
   }
 
+  /** `MatchTokens`, by `OwnerID`: outside `MatchConfig`, as what's in there goes in the replay and to every player. */
+  [[nodiscard]] std::map<std::int32_t, std::string> ReadTokens(LuaPlus::LuaState* const state)
+  {
+    std::map<std::int32_t, std::string> tokens;
+    LuaPlus::LuaObject table = state->GetGlobal("MatchTokens");
+    if (!table.IsTable()) {
+      return tokens;
+    }
+    for (LuaPlus::LuaTableIterator it(&table, 1); !it.m_isDone; it.Next()) {
+      const LuaPlus::LuaObject key = it.GetKey();
+      const LuaPlus::LuaObject value = it.GetValue();
+      if (key.IsString() && value.IsString()) {
+        tokens[std::atoi(key.GetString())] = value.GetString();
+      }
+    }
+    return tokens;
+  }
+
   [[nodiscard]] std::vector<SMatchPlayer> ReadPlayers(const LuaPlus::LuaObject& config)
   {
     std::vector<SMatchPlayer> players;
@@ -373,6 +399,20 @@ namespace
     const double statusSeconds = 60.0 * (ReadOption("--status-minutes", text) ? std::atof(text.c_str()) : kDefaultStatusMinutes);
     const float warnBeatMs = ReadOption("--warn-beat-ms", text) ? static_cast<float>(std::atof(text.c_str())) : kDefaultWarnBeatMs;
     const std::string resultPath = outDir + "/result.json";
+    const float leadMs = ReadOption("--lead-ms", text) ? static_cast<float>(std::atof(text.c_str())) : kDefaultLeadMs;
+    faf::server::SServerNetConfig netConfig;
+    const bool listening = ReadOption("--listen", text);
+    if (listening && !faf::remote::net::ParseEndpoint(text, netConfig.listen)) {
+      end.error = "--listen takes <ip:port>, not " + text;
+      Say("Can't host: %s", end.error.c_str());
+      return kExitBadInput;
+    }
+    if (ReadOption("--join-seconds", text)) {
+      netConfig.joinSeconds = std::atof(text.c_str());
+    }
+    if (ReadOption("--reconnect-seconds", text)) {
+      netConfig.reconnectSeconds = std::atof(text.c_str());
+    }
 
     LuaPlus::LuaState* const state = faf::headless::ReplayLuaState();
     LuaPlus::LuaObject config;
@@ -414,15 +454,46 @@ namespace
     sessionInfo->mClientManager =
       moho::CLIENT_CreateClientManager(static_cast<std::size_t>(build.clientCount), nullptr, launchSpeed.speed, launchSpeed.adjustable);
     sessionInfo->mClientManager->CreateLocalClient(kServerName, build.localClientIndex, kServerUid, sessionInfo->mSourceId);
-    // With no network yet nobody can sit in these: they count as loaded and stay silent, and the game goes on regardless.
+    // Not listening, nobody can sit in these: they count as loaded and stay silent, and the game goes on regardless.
+    std::unique_ptr<faf::server::CServerNet> net;
+    if (listening) {
+      net = std::make_unique<faf::server::CServerNet>(netConfig);
+    }
+    const std::map<std::int32_t, std::string> tokens = ReadTokens(state);
     for (const moho::SLaunchClient& client : roster.Remotes()) {
-      faf::remote::CServerClient::Create(
+      faf::remote::CServerClient& seat = faf::remote::CServerClient::Create(
         *static_cast<moho::CClientManagerImpl*>(sessionInfo->mClientManager), client.name.c_str(), client.clientIndex, client.uid, client.commandSource
-      ).MarkLoaded();
+      );
+      if (!net) {
+        seat.MarkLoaded();
+        continue;
+      }
+      const auto token = tokens.find(client.uid);
+      if (token == tokens.end() || token->second.empty()) {
+        end.error = std::string("MatchTokens has no token for ") + client.name.c_str();
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      }
+      net->AddSeat(client.uid, client.name.c_str(), token->second, seat);
     }
-    if (!roster.Remotes().empty()) {
-      Say("%d seats stay empty: this build takes no players over the network yet", static_cast<int>(roster.Remotes().size()));
+    if (net) {
+      std::string netError;
+      if (!net->Start(netError)) {
+        end.error = netError;
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      }
+      Say("Listening on %s, %d seats, %.0f s to join", net->Local().Text().c_str(), static_cast<int>(roster.Remotes().size()), netConfig.joinSeconds);
+    } else if (!roster.Remotes().empty()) {
+      Say("%d seats stay empty: this server isn't listening (--listen)", static_cast<int>(roster.Remotes().size()));
     }
+    const auto sayNetNews = [&net] {
+      if (net) {
+        for (const std::string& line : net->TakeNews()) {
+          Say("%s", line.c_str());
+        }
+      }
+    };
 
     Say("Loading the map");
     const Clock::time_point loadStart = Clock::now();
@@ -455,6 +526,7 @@ namespace
     // The issue thread only keeps `net_Lag` of beats ready past the last one taken, so what sets the
     // game's pace is when beats are taken: a client's frames, or this program's loop below.
     moho::sim_LocalLead = 0;
+    moho::net_Lag = leadMs;
     moho::SIM_SetSessionPacing(moho::ESimSessionPacing::Local);
     moho::SIM_SetIssueWhilePaused(true);
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;
@@ -463,6 +535,17 @@ namespace
       static_cast<moho::CClientManagerImpl*>(clientManager), replay.release(), sessionInfo->mLaunchInfo, sessionInfo->mSourceId
     ));
     auto* const simDriver = static_cast<moho::CSimDriver*>(driver.get());
+    // Ahead of the driver going away, on every way out: the network's thread touches its seats.
+    struct SStopNet
+    {
+      faf::server::CServerNet* net;
+      ~SStopNet()
+      {
+        if (net != nullptr) {
+          net->Stop();
+        }
+      }
+    } const stopNet{net.get()};
     Say("Map loaded in %.1f s", SecondsSince(loadStart));
 
     const Clock::time_point playStart = Clock::now();
@@ -539,6 +622,12 @@ namespace
         Say("Stopping on signal %d", gStopSignal);
         break;
       }
+      sayNetNews();
+      if (net && net->NobodyCame()) {
+        end.stoppedBy = "nobody connected";
+        Say("Nobody connected in time");
+        break;
+      }
       if (const int requests = gPauseRequests; started && requests != pauseRequestsDone) {
         pauseRequestsDone = requests;
         Say("The operator asks to %s the game", pausedBy == -1 ? "pause" : "resume");
@@ -587,6 +676,9 @@ namespace
         ++end.beats;
         end.lastBeat = packet->mCurBeat;
         lastBeatAt = SecondsSince(playStart);
+        if (net) {
+          net->NoteBeat(end.lastBeat);
+        }
         pausedBeats += packet->mPausedBy != -1 ? 1 : 0;
         if (packet->mPausedBy != pausedBy) {
           const auto& sources = sessionInfo->mLaunchInfo->mCommandSources.mSrcs;
@@ -634,6 +726,10 @@ namespace
     }
 
     end.seconds = SecondsSince(playStart);
+    if (net) {
+      net->Stop();
+      sayNetNews();
+    }
     // `WLD_Teardown`: the driver stops and gives up the packets it holds, which finishes the replay.
     driver->ShutDown();
     while (driver->HasSyncData()) {
@@ -657,6 +753,9 @@ namespace
     Say("Replay %s, result %s, %lu warnings in the log", replayPath.c_str(), resultPath.c_str(), warnings.Count());
     if (!end.error.empty()) {
       return kExitCrash;
+    }
+    if (end.stoppedBy == "nobody connected") {
+      return kExitNobodyCame;
     }
     return gStopSignal != 0 ? kExitStopped : kExitEnded;
   }
