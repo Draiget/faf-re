@@ -1,5 +1,21 @@
 #include "moho/ui/UiPrivate.h"
+#include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+
+namespace moho
+{
+  bool ren_BuildGhostsPerBeat = true;
+
+  namespace
+  {
+    TConVar<bool> gTConVar_ren_BuildGhostsPerBeat(
+      "ren_BuildGhostsPerBeat",
+      "The ghosts at queued build orders are rebuilt once per sim beat (1, the default), or for each view of each "
+      "frame as in the original (0). Read each frame.",
+      &ren_BuildGhostsPerBeat
+    );
+  } // namespace
+} // namespace moho
 
 namespace
 {
@@ -477,11 +493,22 @@ namespace
  */
 void moho::CBuildDragPreview::RefreshQueuedBuildGhosts()
 {
+  moho::CWldSession* const session = moho::WLD_GetActiveSession();
+
+  // Engine change: orders reach this map from the sim, once per beat, and walking every army's orders
+  // for each view of each frame was 3 % of a frame in a 12-player game.
+  const std::uint16_t stamp = static_cast<std::uint16_t>(
+    static_cast<std::uint32_t>(session->mGameTick) * 31U + static_cast<std::uint32_t>(session->mCommandManager->mCommands.size())
+  );
+  if (moho::ren_BuildGhostsPerBeat && stamp == mQueuedGhostStamp) {
+    return;
+  }
+  mQueuedGhostStamp = stamp;
+
   // Built from scratch every pass. Whatever stays behind in the map this one
   // displaces belongs to orders that are gone, and dies with it below.
   msvc8::map<moho::CmdId, boost::shared_ptr<moho::MeshInstance>> refreshed;
 
-  moho::CWldSession* const session = moho::WLD_GetActiveSession();
   for (const auto& [commandId, helper] : session->mCommandManager->mCommands) {
     static_cast<void>(commandId);
     if (helper == nullptr) {
