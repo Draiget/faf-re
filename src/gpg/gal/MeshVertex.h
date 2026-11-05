@@ -86,6 +86,28 @@ namespace gpg::gal
     static_assert(offsetof(HardwareVertex, boneIndices) == 0x44, "HardwareVertex::boneIndices offset must be 0x44");
     static_assert(sizeof(HardwareVertex) == 0x48, "HardwareVertex size must be 0x48");
 
+    /** Engine addition: the gal vertex format of `PackedHardwareVertex`. Stream 1 is format 14's. */
+    inline constexpr std::uint32_t kPackedHardwareVertexFormat = 23U;
+
+    /**
+     * Engine addition (ren_MeshPackedVertices): stream 0 at half the size of `HardwareVertex`, in formats
+     * the card unpacks to the floats the shaders declare. Only for a mesh whose values fit: unit
+     * directions, and texture coordinates from 0 to 1.
+     */
+    struct PackedHardwareVertex
+    {
+        float position[3];            // +0x00 POSITION (R32G32B32_FLOAT; the shaders read a float3)
+        std::int8_t normal[4];        // +0x0C NORMAL (R8G8B8A8_SNORM)
+        std::int8_t tangent[4];       // +0x10 TANGENT
+        std::int8_t binormal[4];      // +0x14 BINORMAL
+        std::uint16_t texCoords[4];   // +0x18 TEXCOORD0 (R16G16B16A16_UNORM)
+        std::uint8_t boneIndices[4];  // +0x20 BLENDINDICES0-3
+    };
+
+    static_assert(offsetof(PackedHardwareVertex, texCoords) == 0x18, "PackedHardwareVertex::texCoords offset must be 0x18");
+    static_assert(offsetof(PackedHardwareVertex, boneIndices) == 0x20, "PackedHardwareVertex::boneIndices offset must be 0x20");
+    static_assert(sizeof(PackedHardwareVertex) == 0x24, "PackedHardwareVertex size must be 0x24");
+
     /**
      * Vertex format 14, stream 1: the full-precision per-instance record
      * (stride 0x4C).
