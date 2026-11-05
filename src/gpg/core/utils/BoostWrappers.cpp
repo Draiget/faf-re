@@ -1487,7 +1487,7 @@ namespace boost
         return;
       }
 
-      delete countedImpl->px;
+      GPG_NONVIRTUAL_DESTROY(delete countedImpl->px);
       countedImpl->px = nullptr;
     }
 

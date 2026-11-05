@@ -923,7 +923,7 @@ namespace moho
   void CD3DDeviceResources::ClearCachedVertexFormats()
   {
     for (CD3DVertexFormat* const vertexFormat : mVertexFormats) {
-      delete vertexFormat;
+      GPG_NONVIRTUAL_DESTROY(delete vertexFormat);
     }
     mVertexFormats.clear();
   }

@@ -244,7 +244,7 @@ namespace
    */
   void DeleteStatsStatItem(void* object)
   {
-    delete static_cast<moho::Stats<moho::StatItem>*>(object);
+    GPG_NONVIRTUAL_DESTROY(delete static_cast<moho::Stats<moho::StatItem>*>(object));
   }
 
   /**

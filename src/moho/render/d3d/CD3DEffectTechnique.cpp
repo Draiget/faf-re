@@ -267,7 +267,7 @@ namespace moho
     } catch (...) {
       while (constructedCount > 0U) {
         --constructedCount;
-        lanes[constructedCount].~Implementation();
+        lanes[constructedCount].Implementation::~Implementation();
       }
       throw;
     }
@@ -284,7 +284,7 @@ namespace moho
   {
     Implementation* const lanes = GetImplementationLanes();
     for (std::int32_t index = 2; index >= 0; --index) {
-      lanes[index].~Implementation();
+      lanes[index].Implementation::~Implementation();
     }
 
     mName.tidy(true, 0U);

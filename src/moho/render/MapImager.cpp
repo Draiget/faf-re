@@ -74,7 +74,7 @@ MapImager::~MapImager()
  */
 void MapImager::VirtualDtor()
 {
-  this->~MapImager();
+  this->MapImager::~MapImager();
 }
 
 /**
