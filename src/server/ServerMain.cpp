@@ -83,7 +83,7 @@ namespace
 
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>]\n";
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
   // `net_Lag` is 500 ms in a lockstep game, time for every player's beats to arrive. Here it's only the
@@ -401,7 +401,8 @@ namespace
     const double statusSeconds = 60.0 * (ReadOption("--status-minutes", text) ? std::atof(text.c_str()) : kDefaultStatusMinutes);
     const float warnBeatMs = ReadOption("--warn-beat-ms", text) ? static_cast<float>(std::atof(text.c_str())) : kDefaultWarnBeatMs;
     const std::string resultPath = outDir + "/result.json";
-    const int viewThreads = ReadOption("--view-threads", text) ? std::atoi(text.c_str()) : 2;
+    const int viewThreads = ReadOption("--view-threads", text) ? std::atoi(text.c_str()) : 1;
+    const bool perPlayerViews = moho::CFG_GetArgOption("--per-player-views", 0, nullptr);
     const float leadMs = ReadOption("--lead-ms", text) ? static_cast<float>(std::atof(text.c_str())) : kDefaultLeadMs;
     faf::server::SServerNetConfig netConfig;
     const bool listening = ReadOption("--listen", text);
@@ -536,7 +537,7 @@ namespace
         }
         net->QueueView(client.uid, faf::server::MakeGameInfo(mapSizeX, mapSizeZ, playerArmy, client.commandSource));
       }
-      views = std::make_unique<faf::server::CServerViews>(contentTables, *rules, mapSizeX, mapSizeZ, *net, std::move(viewPlayers), static_cast<unsigned int>(std::max(viewThreads, 1)));
+      views = std::make_unique<faf::server::CServerViews>(contentTables, *rules, mapSizeX, mapSizeZ, *net, std::move(viewPlayers), static_cast<unsigned int>(std::max(viewThreads, 1)), !perPlayerViews);
       views->Install();
     }
     sessionInfo->mLaunchInfo->mCommandSources.mOriginalSource = -1;

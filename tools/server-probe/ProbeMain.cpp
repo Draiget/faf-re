@@ -325,7 +325,9 @@ namespace
   {
     faf::remote::wire::SFrameCodec codec;
     faf::remote::CClientFrameWindow window;
-    faf::remote::wire::SViewFrame frame; // the newest
+    faf::remote::CClientFrameWindow teamWindow;
+    faf::remote::wire::SViewFrame frame;     // the newest of the player's own
+    faf::remote::wire::SViewFrame teamFrame; // and of their team's; empty without one
     bool haveFrame = false;
     bool haveInfo = false;
     float mapX = 0.0f;
@@ -376,6 +378,7 @@ namespace
     ByteReader reader(message.data() + 1, message.size() - 1u);
     const std::uint64_t beat = reader.Varint();
     const std::uint64_t entities = reader.Varint();
+    const std::uint64_t teamEntities = reader.Varint();
     if (out.noDecode) {
       out.lastEntities = entities;
       out.lastBeat = beat;
@@ -383,6 +386,8 @@ namespace
     }
     const std::uint64_t frameSize = reader.Varint();
     const std::uint8_t* const frame = reader.Bytes(frameSize);
+    const std::uint64_t teamSize = reader.Varint();
+    const std::uint8_t* const team = reader.Bytes(teamSize);
     bool ok = reader.Ok() && out.haveInfo;
     // The other lanes' sizes must add up to the message, to its last byte.
     for (int lane = 0; lane < 3 && ok; ++lane) {
@@ -394,10 +399,15 @@ namespace
     if (ok) {
       faf::remote::wire::SViewFrame decoded;
       ok = out.window.Decode(std::span<const std::uint8_t>(frame, frameSize), out.codec, decoded) && decoded.entities.size() == entities;
-      out.frameBytes += frameSize;
-      out.lastEntities = entities;
+      faf::remote::wire::SViewFrame teamDecoded;
+      if (ok && teamSize != 0u) {
+        ok = out.teamWindow.Decode(std::span<const std::uint8_t>(team, teamSize), out.codec, teamDecoded) && teamDecoded.entities.size() == teamEntities;
+      }
+      out.frameBytes += frameSize + teamSize;
+      out.lastEntities = entities + teamEntities;
       out.lastBeat = beat;
       out.frame = std::move(decoded);
+      out.teamFrame = std::move(teamDecoded);
       out.haveFrame = ok;
     }
     out.failed += ok ? 0u : 1u;
@@ -438,9 +448,11 @@ namespace
 
   [[nodiscard]] const faf::remote::wire::SEntityRecord* FindEntity(const SViews& views, const std::uint32_t id)
   {
-    for (const faf::remote::wire::SEntityRecord& record : views.frame.entities) {
-      if (record.id == id) {
-        return &record;
+    for (const faf::remote::wire::SViewFrame* const frame : {&views.frame, &views.teamFrame}) {
+      for (const faf::remote::wire::SEntityRecord& record : frame->entities) {
+        if (record.id == id) {
+          return &record;
+        }
       }
     }
     return nullptr;
@@ -650,10 +662,13 @@ int main(const int argc, char** const argv)
     blipWanted = Due(options.attackBlipAt, elapsed) || blipWanted;
     if (blipWanted && views.haveFrame && views.haveInfo) {
       const auto* const unit = OwnUnit(views);
-      const auto blip = std::find_if(views.frame.entities.begin(), views.frame.entities.end(), [](const faf::remote::wire::SEntityRecord& record) {
-        return (record.id >> 28u) == 3u;
-      });
-      if (unit != nullptr && blip != views.frame.entities.end()) {
+      const auto isBlip = [&views](const faf::remote::wire::SEntityRecord& record) {
+        // A blip of the player's own unit is theirs to leave out (remote/ViewPackets.h).
+        return (record.id >> 28u) == 3u && static_cast<std::int32_t>((record.id >> 20u) & 0xFFu) != views.army;
+      };
+      const auto& blipFrame = views.teamFrame.entities.empty() ? views.frame : views.teamFrame;
+      const auto blip = std::find_if(blipFrame.entities.begin(), blipFrame.entities.end(), isBlip);
+      if (unit != nullptr && blip != blipFrame.entities.end()) {
         blipWanted = false;
         attackedBlip = blip->id;
         SendCommand(link, kOpIssueCommand, OrderPayload(unit->id, (views.source << 24u) | nextCommand++, moho::EUnitCommandType::UNITCOMMAND_Attack, attackedBlip, 0.0f, 0.0f));

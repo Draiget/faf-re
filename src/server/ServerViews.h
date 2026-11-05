@@ -33,10 +33,10 @@ namespace faf::server
   class CServerViews final : public remote::CViewLanes
   {
   public:
-    /** `players`: army to uid. */
+    /** `players`: army to uid. `teams`: one view per team and each player's own units (remote/ViewPackets.h). */
     CServerViews(
       const remote::wire::SContentTables& tables, moho::RRuleGameRules& rules, float mapSizeX, float mapSizeZ, CServerNet& net,
-      std::map<std::size_t, std::int32_t> players, unsigned int threads
+      std::map<std::size_t, std::int32_t> players, unsigned int threads, bool teams
     );
     ~CServerViews() override;
 

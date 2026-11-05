@@ -713,6 +713,7 @@ namespace faf::headless
     }
     // `--view-bench`: the server's view work alone, timed (also a sync-walk observer).
     std::unique_ptr<CReplayViewBench> viewBench;
+    std::FILE* viewDumpFile = nullptr; // left open: the sim may run on past this function's end
     if (!options.viewBenchPath.empty()) {
       viewBench = std::make_unique<CReplayViewBench>(
         options.viewBenchPath, tables, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, options.viewBenchCheck
@@ -723,6 +724,13 @@ namespace faf::headless
       }
       viewBench->SetParallel(options.parallelViews);
       viewBench->EnablePipeline(static_cast<unsigned int>(options.viewPipelineThreads));
+      if (options.viewTeams) {
+        viewBench->EnableTeamViews();
+      }
+      if (!options.viewDumpPath.empty()) {
+        viewDumpFile = std::fopen(options.viewDumpPath.c_str(), "wb");
+        viewBench->SetViewDump(viewDumpFile);
+      }
       if (options.luaRouting) {
         viewBench->EnableLuaRouting(options.luaRoutingDump);
         if (options.spy) {
@@ -765,7 +773,7 @@ namespace faf::headless
       }
       seatViews = std::make_unique<faf::server::CServerViews>(
         tables, *rules, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, *seatNet, std::move(players),
-        static_cast<unsigned int>(std::max(options.viewPipelineThreads, 1))
+        static_cast<unsigned int>(std::max(options.viewPipelineThreads, 1)), options.viewTeams
       );
       seatViews->Install();
     }
