@@ -907,7 +907,7 @@ namespace
     if (sourceCallback != nullptr) {
       sourceLifecycle = sourceCallback->lifecycleAdapter;
     }
-    return reinterpret_cast<LegacyUnaryDispatchAdapter>(sourceLifecycle);
+    return reinterpret_cast<LegacyUnaryDispatchAdapter>(reinterpret_cast<void (*)()>(sourceLifecycle));
   }
 
   /**

@@ -130,6 +130,9 @@ set_property(SOURCE
     gpg/gal/backends/d3d11/DeviceD3D11.cpp
   APPEND PROPERTY INCLUDE_DIRECTORIES "${_fx11}/inc")
 
+set_property(SOURCE ${FAF_WX_EVENT_TABLE_SOURCES}
+  APPEND PROPERTY COMPILE_OPTIONS ${FAF_WX_EVENT_TABLE_OPTIONS})
+
 set_property(SOURCE gpg/gal/effects/ShaderCompiler.cpp
   APPEND PROPERTY INCLUDE_DIRECTORIES "${FAF_DEPENDENCIES_DIR}/dxc/inc")
 
