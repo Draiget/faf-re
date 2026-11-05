@@ -33,17 +33,6 @@ namespace
     return ref;
   }
 
-  [[nodiscard]] gpg::RType* CachedIdPoolType()
-  {
-    gpg::RType* type = moho::IdPool::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::IdPool));
-      moho::IdPool::sType = type;
-    }
-    GPG_ASSERT(type != nullptr);
-    return type;
-  }
-
   void DestroyIdPoolMembers(moho::IdPool& pool)
   {
     pool.mSubRes2.Reset();
@@ -116,7 +105,7 @@ namespace moho
   gpg::RRef IdPoolTypeInfo::NewRef()
   {
     IdPool* const object = new (std::nothrow) IdPool();
-    return MakeReflectionRef(object, CachedIdPoolType());
+    return MakeReflectionRef(object, gpg::CachedLookup<moho::IdPool>(moho::IdPool::sType));
   }
 
   /**
@@ -128,7 +117,7 @@ namespace moho
     if (object) {
       new (object) IdPool();
     }
-    return MakeReflectionRef(object, CachedIdPoolType());
+    return MakeReflectionRef(object, gpg::CachedLookup<moho::IdPool>(moho::IdPool::sType));
   }
 
   /**

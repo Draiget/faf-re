@@ -379,22 +379,6 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x00579570 (FUN_00579570)
-   *
-   * What it does:
-   * Resolves and caches the reflected runtime type for `CAiBrain`.
-   */
-  [[nodiscard]] gpg::RType* ResolveCAiBrainTypeCachePrimary()
-  {
-    gpg::RType* type = moho::CAiBrain::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CAiBrain));
-      moho::CAiBrain::sType = type;
-    }
-    return type;
-  }
-
   template <class TObject>
   [[nodiscard]] gpg::RRef MakePointerRef(TObject* const object, gpg::RType* const type)
   {
@@ -1049,7 +1033,7 @@ void CAiBrain::Initialize()
  */
 gpg::RType* CAiBrain::GetClass() const
 {
-  return ResolveCAiBrainTypeCachePrimary();
+  return gpg::CachedLookup<moho::CAiBrain>(moho::CAiBrain::sType);
 }
 
 /**

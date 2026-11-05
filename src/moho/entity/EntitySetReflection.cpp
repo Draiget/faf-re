@@ -46,54 +46,6 @@ namespace
   }
 
   /**
-   * Address: 0x00689740 (FUN_00689740)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `EntitySetBase` lane.
-   */
-  [[nodiscard]] gpg::RType* ResolveEntitySetBaseType()
-  {
-    gpg::RType* type = moho::EntitySetBase::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::EntitySetBase));
-      moho::EntitySetBase::sType = type;
-    }
-
-    GPG_ASSERT(type != nullptr);
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEntitySetType()
-  {
-    gpg::RType* type = EntitySet::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(EntitySet));
-      EntitySet::sType = type;
-    }
-
-    GPG_ASSERT(type != nullptr);
-    return type;
-  }
-
-  /**
-   * Address: 0x006940F0 (FUN_006940F0)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `WeakEntitySetTemplate<Entity>` lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveWeakEntitySetType()
-  {
-    gpg::RType* type = WeakEntitySet::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(WeakEntitySet));
-      WeakEntitySet::sType = type;
-    }
-
-    GPG_ASSERT(type != nullptr);
-    return type;
-  }
-
-  /**
    * Address: 0x006947C0 (FUN_006947C0)
    *
    * What it does:
@@ -125,7 +77,7 @@ namespace
   {
     gpg::RRef ref{};
     ref.mObj = object;
-    ref.mType = ResolveEntitySetBaseType();
+    ref.mType = gpg::CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType);
     return ref;
   }
 
@@ -142,7 +94,7 @@ namespace
     gpg::RRef* const ownerRef
   )
   {
-    archive->Read(ResolveEntitySetBaseType(), object, *ownerRef);
+    archive->Read(gpg::CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType), object, *ownerRef);
     return archive;
   }
 
@@ -159,7 +111,7 @@ namespace
     const gpg::RRef* const ownerRef
   )
   {
-    archive->Write(ResolveEntitySetBaseType(), objectSlot, *ownerRef);
+    archive->Write(gpg::CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType), objectSlot, *ownerRef);
     return archive;
   }
 
@@ -175,7 +127,7 @@ namespace
     gpg::RRef* const ownerRef
   )
   {
-    archive->Read(ResolveEntitySetBaseType(), object, *ownerRef);
+    archive->Read(gpg::CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType), object, *ownerRef);
   }
 
   /**
@@ -190,7 +142,7 @@ namespace
     const gpg::RRef* const ownerRef
   )
   {
-    archive->Write(ResolveEntitySetBaseType(), objectSlot, *ownerRef);
+    archive->Write(gpg::CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType), objectSlot, *ownerRef);
   }
 
   /**
@@ -415,7 +367,7 @@ namespace moho
     gpg::RType* const typeInfo
   )
   {
-    gpg::RType* const baseType = ResolveEntitySetBaseType();
+    gpg::RType* const baseType = gpg::CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType);
 
     GPG_ASSERT(typeInfo != nullptr);
     GPG_ASSERT(baseType != nullptr);
@@ -488,7 +440,7 @@ namespace moho
     gpg::RType* const typeInfo
   )
   {
-    gpg::RType* const baseType = ResolveEntitySetType();
+    gpg::RType* const baseType = gpg::CachedLookup<EntitySet>(EntitySet::sType);
 
     GPG_ASSERT(typeInfo != nullptr);
     GPG_ASSERT(baseType != nullptr);

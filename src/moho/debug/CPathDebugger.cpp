@@ -17,35 +17,6 @@ namespace
   constexpr const char* kCPathDebuggerDestroyName = "Destroy";
   constexpr const char* kCPathDebuggerDestroyHelpText = "Destroy the path debugger";
 
-  /**
-   * Address: 0x007B5C30 (FUN_007B5C30)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for `CPathDebugger`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedCPathDebuggerTypePrimary()
-  {
-    if (!moho::CPathDebugger::sType) {
-      moho::CPathDebugger::sType = gpg::LookupRType(typeid(moho::CPathDebugger));
-    }
-    return moho::CPathDebugger::sType;
-  }
-
-  /**
-   * Address: 0x007B6210 (FUN_007B6210)
-   *
-   * What it does:
-   * Secondary cache accessor returning the reflection descriptor for
-   * `CPathDebugger`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedCPathDebuggerTypeSecondary()
-  {
-    if (!moho::CPathDebugger::sType) {
-      moho::CPathDebugger::sType = gpg::LookupRType(typeid(moho::CPathDebugger));
-    }
-    return moho::CPathDebugger::sType;
-  }
-
 } // namespace
 
 namespace moho

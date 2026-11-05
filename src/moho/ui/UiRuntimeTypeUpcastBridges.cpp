@@ -36,21 +36,6 @@ namespace
   }
 
   /**
-   * Address: 0x0078B440 (FUN_0078B440)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for `EMauiScrollAxis`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedEMauiScrollAxisType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::EMauiScrollAxis));
-    }
-    return cached;
-  }
-
-  /**
    * Address: 0x0078E620 (FUN_0078E620)
    *
    * What it does:
@@ -65,36 +50,6 @@ namespace
       if (cached == nullptr) {
         cached = gpg::REF_FindTypeNamed("Moho::CMauiLuaDragger");
       }
-    }
-    return cached;
-  }
-
-  /**
-   * Address: 0x0078EB20 (FUN_0078EB20)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for `EMauiKeyCode`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedEMauiKeyCodeType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::EMauiKeyCode));
-    }
-    return cached;
-  }
-
-  /**
-   * Address: 0x00795FA0 (FUN_00795FA0)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for `EMauiEventType`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedEMauiEventType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::EMauiEventType));
     }
     return cached;
   }

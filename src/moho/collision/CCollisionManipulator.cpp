@@ -84,39 +84,9 @@ namespace
     return sInstance;
   }
 
-  /**
-   * Address: 0x00637840 (FUN_00637840)
-   *
-   * What it does:
-   * Resolves and caches the reflected runtime type for
-   * `CCollisionManipulator`.
-   */
-  [[nodiscard]] gpg::RType* ResolveCCollisionManipulatorTypeCachePrimary()
-  {
-    if (!moho::CCollisionManipulator::sType) {
-      moho::CCollisionManipulator::sType = gpg::LookupRType(typeid(moho::CCollisionManipulator));
-    }
-    return moho::CCollisionManipulator::sType;
-  }
-
-  /**
-   * Address: 0x00638670 (FUN_00638670)
-   *
-   * What it does:
-   * Secondary duplicate lane that resolves/caches
-   * `CCollisionManipulator` reflection type.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveCCollisionManipulatorTypeCacheSecondary()
-  {
-    if (!moho::CCollisionManipulator::sType) {
-      moho::CCollisionManipulator::sType = gpg::LookupRType(typeid(moho::CCollisionManipulator));
-    }
-    return moho::CCollisionManipulator::sType;
-  }
-
   [[nodiscard]] gpg::RType* CachedCCollisionManipulatorType()
   {
-    return ResolveCCollisionManipulatorTypeCachePrimary();
+    return gpg::CachedLookup<moho::CCollisionManipulator>(moho::CCollisionManipulator::sType);
   }
 
   /**

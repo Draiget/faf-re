@@ -10,16 +10,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vec3f));
-    }
-
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
 } // namespace
 
 namespace moho
@@ -37,7 +27,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Read(CachedVector3fType(), &mGravity, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vec3f>(), &mGravity, nullOwner);
   }
 
   /**
@@ -51,7 +41,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Write(CachedVector3fType(), &mGravity, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vec3f>(), &mGravity, nullOwner);
   }
 } // namespace moho
 

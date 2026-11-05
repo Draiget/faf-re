@@ -54,14 +54,6 @@ namespace moho
 namespace
 {
 
-  [[nodiscard]] gpg::RType* ResolveTaskType()
-  {
-    if (!CTask::sType) {
-      CTask::sType = gpg::LookupRType(typeid(CTask));
-    }
-    return CTask::sType;
-  }
-
 
   [[nodiscard]] bool IsUnitState(const Unit* unit, const EUnitState state) noexcept
   {
@@ -987,7 +979,7 @@ void CAiSteeringImpl::MemberDeserialize(gpg::ReadArchive* const archive)
 
   const gpg::RRef ownerRef{};
 
-  gpg::RType* const taskType = ResolveTaskType();
+  gpg::RType* const taskType = gpg::CachedLookup<CTask>(CTask::sType);
   GPG_ASSERT(taskType != nullptr);
   if (!taskType) {
     return;
@@ -1068,7 +1060,7 @@ void CAiSteeringImpl::MemberSerialize(gpg::WriteArchive* const archive) const
 
   const gpg::RRef ownerRef{};
 
-  gpg::RType* const taskType = ResolveTaskType();
+  gpg::RType* const taskType = gpg::CachedLookup<CTask>(CTask::sType);
   GPG_ASSERT(taskType != nullptr);
   if (!taskType) {
     return;

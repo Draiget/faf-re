@@ -72,39 +72,6 @@ namespace
   // that used to be transcribed here (`CopyConstructDebugWorldTextCore`) was
   // removed 2026-09-14.
 
-  /**
-   * Address: 0x00652C70 (FUN_00652C70)
-   *
-   * What it does:
-   * Resolves and caches the reflected runtime type for `RDebugWeapons`.
-   */
-  [[nodiscard]] gpg::RType* ResolveRDebugWeaponsTypeCachePrimary()
-  {
-    gpg::RType* type = moho::RDebugWeapons::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::RDebugWeapons));
-      moho::RDebugWeapons::sType = type;
-    }
-    return type;
-  }
-
-  /**
-   * Address: 0x00653260 (FUN_00653260)
-   *
-   * What it does:
-   * Secondary duplicate lane that resolves/caches `RDebugWeapons`
-   * reflection type.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveRDebugWeaponsTypeCacheSecondary()
-  {
-    gpg::RType* type = moho::RDebugWeapons::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::RDebugWeapons));
-      moho::RDebugWeapons::sType = type;
-    }
-    return type;
-  }
-
 } // namespace
 
 namespace moho
@@ -125,7 +92,7 @@ namespace moho
    */
   gpg::RType* RDebugWeapons::GetClass() const
   {
-    return ResolveRDebugWeaponsTypeCachePrimary();
+    return gpg::CachedLookup<moho::RDebugWeapons>(moho::RDebugWeapons::sType);
   }
 
   /**

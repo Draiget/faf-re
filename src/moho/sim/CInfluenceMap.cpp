@@ -322,38 +322,6 @@ namespace
     sim->mContext.Update(word, 4u);
   }
 
-  /**
-   * Address: 0x0071A8E0 (FUN_0071A8E0)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `InfluenceGrid` lane.
-   */
-  [[nodiscard]] gpg::RType* CachedInfluenceGridType()
-  {
-    gpg::RType* type = moho::InfluenceGrid::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::InfluenceGrid));
-      moho::InfluenceGrid::sType = type;
-    }
-    return type;
-  }
-
-  /**
-   * Address: 0x0071A900 (FUN_0071A900)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `SThreat` lane.
-   */
-  [[nodiscard]] gpg::RType* CachedSThreatType()
-  {
-    gpg::RType* type = moho::SThreat::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SThreat));
-      moho::SThreat::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RType* CachedUIntType()
   {
     static gpg::RType* type = nullptr;
@@ -382,22 +350,6 @@ namespace
   }
 
   /**
-   * Address: 0x0071A8C0 (FUN_0071A8C0)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `InfluenceMapEntry` lane.
-   */
-  [[nodiscard]] gpg::RType* CachedInfluenceMapEntryType()
-  {
-    gpg::RType* type = moho::InfluenceMapEntry::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::InfluenceMapEntry));
-      moho::InfluenceMapEntry::sType = type;
-    }
-    return type;
-  }
-
-  /**
    * Address: 0x0071D220 (FUN_0071D220)
    *
    * What it does:
@@ -412,7 +364,7 @@ namespace
   {
     if (archive != nullptr) {
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = CachedInfluenceGridType()) {
+      if (gpg::RType* const type = gpg::CachedLookup<moho::InfluenceGrid>(moho::InfluenceGrid::sType)) {
         archive->Read(type, objectPtr, owner);
       }
     }
@@ -435,7 +387,7 @@ namespace
   {
     if (archive != nullptr) {
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = CachedInfluenceGridType()) {
+      if (gpg::RType* const type = gpg::CachedLookup<moho::InfluenceGrid>(moho::InfluenceGrid::sType)) {
         archive->Write(type, objectPtr, owner);
       }
     }
@@ -458,7 +410,7 @@ namespace
   {
     if (archive != nullptr) {
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = CachedInfluenceMapEntryType()) {
+      if (gpg::RType* const type = gpg::CachedLookup<moho::InfluenceMapEntry>(moho::InfluenceMapEntry::sType)) {
         archive->Read(type, objectPtr, owner);
       }
     }
@@ -481,7 +433,7 @@ namespace
   {
     if (archive != nullptr) {
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = CachedInfluenceMapEntryType()) {
+      if (gpg::RType* const type = gpg::CachedLookup<moho::InfluenceMapEntry>(moho::InfluenceMapEntry::sType)) {
         archive->Write(type, objectPtr, owner);
       }
     }
@@ -504,7 +456,7 @@ namespace
   {
     if (archive != nullptr) {
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = CachedSThreatType()) {
+      if (gpg::RType* const type = gpg::CachedLookup<moho::SThreat>(moho::SThreat::sType)) {
         archive->Read(type, objectPtr, owner);
       }
     }
@@ -527,7 +479,7 @@ namespace
   {
     if (archive != nullptr) {
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = CachedSThreatType()) {
+      if (gpg::RType* const type = gpg::CachedLookup<moho::SThreat>(moho::SThreat::sType)) {
         archive->Write(type, objectPtr, owner);
       }
     }
@@ -565,67 +517,6 @@ namespace
   )
   {
     (void)WriteInfluenceGridArchiveAndReturnArchive(archive, objectPtr, ownerRef);
-  }
-
-  /**
-   * Address: 0x0071EF60 (FUN_0071EF60)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `map<unsigned int, InfluenceMapEntry>`
-   * lane.
-   */
-  [[nodiscard]] gpg::RType* CachedInfluenceMapEntryMapType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(UIntInfluenceMapEntryMap));
-    }
-    return type;
-  }
-
-  /**
-   * Address: 0x0071EF80 (FUN_0071EF80)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `vector<SThreat>` lane.
-   */
-  [[nodiscard]] gpg::RType* CachedSThreatVectorType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(msvc8::vector<moho::SThreat>));
-    }
-    return type;
-  }
-
-  /**
-   * Address: 0x0071FEA0 (FUN_0071FEA0)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `map<unsigned int, int>` lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedUIntIntMapTypeLegacyLane()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(UIntIntMap));
-    }
-    return type;
-  }
-
-  /**
-   * Address: 0x0071FEC0 (FUN_0071FEC0)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `vector<InfluenceGrid>` lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedInfluenceGridVectorTypeLegacyLane()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(InfluenceGridVector));
-    }
-    return type;
   }
 
   /**
@@ -697,7 +588,7 @@ namespace
     archive->ReadUInt(&count);
 
     mapObject->clear();
-    gpg::RType* const valueType = CachedInfluenceMapEntryType();
+    gpg::RType* const valueType = gpg::CachedLookup<moho::InfluenceMapEntry>(moho::InfluenceMapEntry::sType);
     GPG_ASSERT(valueType != nullptr);
     if (!valueType) {
       return;
@@ -735,7 +626,7 @@ namespace
 
     archive->WriteUInt(static_cast<unsigned int>(mapObject->size()));
 
-    gpg::RType* const valueType = CachedInfluenceMapEntryType();
+    gpg::RType* const valueType = gpg::CachedLookup<moho::InfluenceMapEntry>(moho::InfluenceMapEntry::sType);
     GPG_ASSERT(valueType != nullptr);
     if (!valueType) {
       return;
@@ -807,7 +698,7 @@ namespace
 
       // The binary re-reads the lazily initialised `Moho::InfluenceGrid::sType`
       // global on every iteration (0x0071A3AB), so the lookup stays in-loop.
-      gpg::RType* const valueType = CachedInfluenceGridType();
+      gpg::RType* const valueType = gpg::CachedLookup<moho::InfluenceGrid>(moho::InfluenceGrid::sType);
       GPG_ASSERT(valueType != nullptr);
 
       // 0x0071A3B2/0x0071A3B6 zero a fresh `RRef` per element — the owner
@@ -847,7 +738,7 @@ namespace
       return;
     }
 
-    gpg::RType* const valueType = CachedInfluenceGridType();
+    gpg::RType* const valueType = gpg::CachedLookup<moho::InfluenceGrid>(moho::InfluenceGrid::sType);
     GPG_ASSERT(valueType != nullptr);
     if (!valueType) {
       return;
@@ -898,7 +789,7 @@ namespace
     SThreatVector loaded{};
     loaded.reserve(static_cast<std::size_t>(count));
 
-    gpg::RType* const valueType = CachedSThreatType();
+    gpg::RType* const valueType = gpg::CachedLookup<moho::SThreat>(moho::SThreat::sType);
     GPG_ASSERT(valueType != nullptr);
     if (!valueType) {
       return;
@@ -933,7 +824,7 @@ namespace
       return;
     }
 
-    gpg::RType* const valueType = CachedSThreatType();
+    gpg::RType* const valueType = gpg::CachedLookup<moho::SThreat>(moho::SThreat::sType);
     GPG_ASSERT(valueType != nullptr);
     if (!valueType) {
       return;
@@ -1052,7 +943,7 @@ void gpg::RMapType_uint_int::Init()
 const char* gpg::RMapType_uint_InfluenceMapEntry::GetName() const
 {
   static const msvc8::string sName =
-    gpg::STR_Printf("map<%s,%s>", CachedUIntType()->GetName(), CachedInfluenceMapEntryType()->GetName());
+    gpg::STR_Printf("map<%s,%s>", CachedUIntType()->GetName(), gpg::CachedLookup<moho::InfluenceMapEntry>(moho::InfluenceMapEntry::sType)->GetName());
   return sName.c_str();
 }
 
@@ -1156,7 +1047,7 @@ void gpg::RMapType_uint_InfluenceMapEntry::Init()
  */
 const char* gpg::RVectorType_InfluenceGrid::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedInfluenceGridType()->GetName());
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::CachedLookup<moho::InfluenceGrid>(moho::InfluenceGrid::sType)->GetName());
   return sName.c_str();
 }
 
@@ -1290,7 +1181,7 @@ void gpg::RVectorType_InfluenceGrid::SetCount(void* const obj, const int count) 
  */
 const char* gpg::RVectorType_SThreat::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedSThreatType()->GetName());
+  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::CachedLookup<moho::SThreat>(moho::SThreat::sType)->GetName());
   return sName.c_str();
 }
 
@@ -2722,21 +2613,21 @@ namespace moho
 
     const gpg::RRef owner{};
 
-    gpg::RType* const entryMapType = CachedInfluenceMapEntryMapType();
+    gpg::RType* const entryMapType = gpg::RTypeOf<UIntInfluenceMapEntryMap>();
     GPG_ASSERT(entryMapType != nullptr);
     if (!entryMapType) {
       return;
     }
     archive->Read(entryMapType, &entries, owner);
 
-    gpg::RType* const threatVectorType = CachedSThreatVectorType();
+    gpg::RType* const threatVectorType = gpg::RTypeOf<msvc8::vector<moho::SThreat>>();
     GPG_ASSERT(threatVectorType != nullptr);
     if (!threatVectorType) {
       return;
     }
     archive->Read(threatVectorType, &threats, owner);
 
-    gpg::RType* const threatType = CachedSThreatType();
+    gpg::RType* const threatType = gpg::CachedLookup<moho::SThreat>(moho::SThreat::sType);
     GPG_ASSERT(threatType != nullptr);
     if (!threatType) {
       return;
@@ -2760,21 +2651,21 @@ namespace moho
 
     const gpg::RRef owner{};
 
-    gpg::RType* const entryMapType = CachedInfluenceMapEntryMapType();
+    gpg::RType* const entryMapType = gpg::RTypeOf<UIntInfluenceMapEntryMap>();
     GPG_ASSERT(entryMapType != nullptr);
     if (!entryMapType) {
       return;
     }
     archive->Write(entryMapType, &entries, owner);
 
-    gpg::RType* const threatVectorType = CachedSThreatVectorType();
+    gpg::RType* const threatVectorType = gpg::RTypeOf<msvc8::vector<moho::SThreat>>();
     GPG_ASSERT(threatVectorType != nullptr);
     if (!threatVectorType) {
       return;
     }
     archive->Write(threatVectorType, &threats, owner);
 
-    gpg::RType* const threatType = CachedSThreatType();
+    gpg::RType* const threatType = gpg::CachedLookup<moho::SThreat>(moho::SThreat::sType);
     GPG_ASSERT(threatType != nullptr);
     if (!threatType) {
       return;

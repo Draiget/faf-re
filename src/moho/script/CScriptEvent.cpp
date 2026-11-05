@@ -85,14 +85,6 @@ namespace
     return cached;
   }
 
-  gpg::RType* CachedCAnimationManipulatorType()
-  {
-    if (!CAnimationManipulator::sType) {
-      CAnimationManipulator::sType = gpg::LookupRType(typeid(CAnimationManipulator));
-    }
-    return CAnimationManipulator::sType;
-  }
-
   gpg::RType* CachedCRotateManipulatorType()
   {
     static gpg::RType* cached = nullptr;
@@ -1098,7 +1090,7 @@ CAnimationManipulator* moho::SCR_FromLua_CAnimationManipulator(
   }
 
   const gpg::RRef sourceRef = SCR_MakeScriptObjectRef(scriptObject);
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, CachedCAnimationManipulatorType());
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, gpg::CachedLookup<CAnimationManipulator>(CAnimationManipulator::sType));
   if (!upcast.mObj) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kIncorrectGameObjectTypeError);
     return nullptr;

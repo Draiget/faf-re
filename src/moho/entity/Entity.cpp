@@ -918,16 +918,6 @@ namespace moho
 namespace
 {
 
-    [[nodiscard]] gpg::RType* CachedTaskType()
-    {
-      gpg::RType* type = CTask::sType;
-      if (!type) {
-        type = gpg::LookupRType(typeid(CTask));
-        CTask::sType = type;
-      }
-      return type;
-    }
-
 }
 
 
@@ -959,7 +949,7 @@ namespace
     BluePrint = constantData.mBlueprint;
     mTickCreated = constantData.mTickCreated;
     archive->Read(gpg::RTypeOf<CScriptObject>(), static_cast<CScriptObject*>(this), owner);
-    archive->Read(CachedTaskType(), static_cast<CTask*>(this), owner);
+    archive->Read(gpg::CachedLookup<CTask>(CTask::sType), static_cast<CTask*>(this), owner);
     archive->Read(gpg::RTypeOf<SSTIEntityVariableData>(), &mVarDat.mScmResource, owner);
 
     // Owning army (UNOWNED).
@@ -1062,7 +1052,7 @@ namespace
     archive->Write(gpg::RTypeOf<CScriptObject>(), static_cast<const CScriptObject*>(this), owner);
 
     // CTask base subobject (+0x34).
-    archive->Write(CachedTaskType(), static_cast<const CTask*>(this), owner);
+    archive->Write(gpg::CachedLookup<CTask>(CTask::sType), static_cast<const CTask*>(this), owner);
 
     // Variable-data sub-object (+0x78); modeled flat, first field is mMeshRef.
     archive->Write(gpg::RTypeOf<SSTIEntityVariableData>(), &mVarDat.mScmResource, owner);

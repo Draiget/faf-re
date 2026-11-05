@@ -201,21 +201,6 @@ namespace
     return sType;
   }
 
-  /**
-   * Address: 0x006EBFA0 (FUN_006EBFA0)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `Broadcaster<ECommandEvent>` lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyBroadcasterCommandEventType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Broadcaster<ECommandEvent>));
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RType* ResolveWeakPtrCUnitCommandVectorType()
   {
     static gpg::RType* sType = nullptr;

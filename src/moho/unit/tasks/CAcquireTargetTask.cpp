@@ -33,14 +33,6 @@ using namespace moho;
 namespace
 {
 
-  [[nodiscard]] gpg::RType* CachedCTaskType()
-  {
-    if (!CTask::sType) {
-      CTask::sType = gpg::LookupRType(typeid(CTask));
-    }
-    return CTask::sType;
-  }
-
   template <class T>
   [[nodiscard]] gpg::RRef MakeTrackedRef(T* object)
   {
@@ -775,7 +767,7 @@ namespace moho
     }
 
 
-    gpg::RType* const baseTaskType = CachedCTaskType();
+    gpg::RType* const baseTaskType = gpg::CachedLookup<CTask>(CTask::sType);
     archive->Read(baseTaskType, this, ownerRef);
 
     mWeapon = ReadTrackedPointer<UnitWeapon>(archive, ownerRef);
@@ -799,7 +791,7 @@ namespace moho
     }
 
 
-    gpg::RType* const baseTaskType = CachedCTaskType();
+    gpg::RType* const baseTaskType = gpg::CachedLookup<CTask>(CTask::sType);
     archive->Write(baseTaskType, this, ownerRef);
 
     WriteTrackedPointer(archive, mWeapon, gpg::TrackedPointerState::Unowned, ownerRef);

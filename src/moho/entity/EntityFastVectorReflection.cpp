@@ -45,15 +45,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedEntityType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Entity));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RType* CachedEntityPointerType()
   {
     static gpg::RType* cached = nullptr;
@@ -66,27 +57,27 @@ namespace
   [[nodiscard]] gpg::RRef MakeEntityObjectRef(moho::Entity* entity)
   {
     gpg::RRef out{};
-    out.mType = CachedEntityType();
+    out.mType = gpg::RTypeOf<moho::Entity>();
     out.mObj = entity;
     if (!entity) {
       return out;
     }
 
-    gpg::RType* dynamicType = CachedEntityType();
+    gpg::RType* dynamicType = gpg::RTypeOf<moho::Entity>();
     try {
       dynamicType = gpg::LookupRType(typeid(*entity));
     } catch (...) {
-      dynamicType = CachedEntityType();
+      dynamicType = gpg::RTypeOf<moho::Entity>();
     }
 
     int baseOffset = 0;
-    if (dynamicType && CachedEntityType() && dynamicType->IsDerivedFrom(CachedEntityType(), &baseOffset)) {
+    if (dynamicType && gpg::RTypeOf<moho::Entity>() && dynamicType->IsDerivedFrom(gpg::RTypeOf<moho::Entity>(), &baseOffset)) {
       out.mObj = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(entity) - static_cast<std::uintptr_t>(baseOffset));
       out.mType = dynamicType;
       return out;
     }
 
-    out.mType = dynamicType ? dynamicType : CachedEntityType();
+    out.mType = dynamicType ? dynamicType : gpg::RTypeOf<moho::Entity>();
     return out;
   }
 
@@ -113,12 +104,12 @@ namespace
     source.mObj = tracked.object;
     source.mType = tracked.type;
 
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedEntityType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::Entity>());
     if (upcast.mObj) {
       return static_cast<moho::Entity*>(upcast.mObj);
     }
 
-    const char* const expected = CachedEntityType() ? CachedEntityType()->GetName() : "Entity";
+    const char* const expected = gpg::RTypeOf<moho::Entity>() ? gpg::RTypeOf<moho::Entity>()->GetName() : "Entity";
     const char* const actual = source.GetTypeName();
     const msvc8::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
@@ -245,13 +236,13 @@ namespace
       source.mObj = tracked.object;
       source.mType = tracked.type;
 
-      const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedEntityType());
+      const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::Entity>());
       if (upcast.mObj) {
         vec[i] = static_cast<moho::Entity*>(upcast.mObj);
         continue;
       }
 
-      const char* const expected = CachedEntityType() ? CachedEntityType()->GetName() : "Entity";
+      const char* const expected = gpg::RTypeOf<moho::Entity>() ? gpg::RTypeOf<moho::Entity>()->GetName() : "Entity";
       const char* const actual = source.GetTypeName();
       const msvc8::string message = gpg::STR_Printf(
         "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
@@ -405,7 +396,7 @@ namespace moho
    */
   const char* RWeakPtrType<Entity>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedEntityType()->GetName());
+    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<moho::Entity>()->GetName());
     return sName.c_str();
   }
 

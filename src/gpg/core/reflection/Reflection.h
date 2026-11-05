@@ -1127,6 +1127,16 @@ namespace gpg
    * in gpg/core/reflection/Reflection.cpp, removed 2026-10-01.)
    * Address: 0x006D2EA0 (FUN_006D2EA0 -- `RTypeOf<moho::WeakEntitySetTemplate<moho::Unit>>`; formerly
    * `ResolveWeakUnitSetType` in moho/serialization/WeakUnitSetSerializer.cpp, removed 2026-10-01.)
+   * Address: 0x00508290 (FUN_00508290 -- `RTypeOf<moho::CIntelGrid>`; formerly `ResolveCIntelGridType` in moho/sim/SDelayedSubVizInfoReflection.cpp, removed 2026-11-05.)
+   * Address: 0x006EBFA0 (FUN_006EBFA0 -- `RTypeOf<Broadcaster<ECommandEvent>>`; formerly `ResolveLegacyBroadcasterCommandEventType` in moho/unit/CUnitCommand.cpp, removed 2026-11-05.)
+   * Address: 0x0071EF60 (FUN_0071EF60 -- `RTypeOf<UIntInfluenceMapEntryMap>`; formerly `CachedInfluenceMapEntryMapType` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
+   * Address: 0x0071EF80 (FUN_0071EF80 -- `RTypeOf<msvc8::vector<moho::SThreat>>`; formerly `CachedSThreatVectorType` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
+   * Address: 0x0071FEA0 (FUN_0071FEA0 -- `RTypeOf<UIntIntMap>`; formerly `CachedUIntIntMapTypeLegacyLane` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
+   * Address: 0x0071FEC0 (FUN_0071FEC0 -- `RTypeOf<InfluenceGridVector>`; formerly `CachedInfluenceGridVectorTypeLegacyLane` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
+   * Address: 0x0078B440 (FUN_0078B440 -- `RTypeOf<moho::EMauiScrollAxis>`; formerly `CachedEMauiScrollAxisType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-05.)
+   * Address: 0x0078EB20 (FUN_0078EB20 -- `RTypeOf<moho::EMauiKeyCode>`; formerly `CachedEMauiKeyCodeType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-05.)
+   * Address: 0x00795FA0 (FUN_00795FA0 -- `RTypeOf<moho::EMauiEventType>`; formerly `CachedEMauiEventType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-05.)
+   * Address: 0x008C6520 (FUN_008C6520 -- `RTypeOf<moho::UserEntity>`; formerly `ResolveUserEntityTypeCacheLane` in moho/entity/UserEntity.cpp, removed 2026-11-05.)
    *
    * A pointer type is the exception: its descriptor is the pointee's
    * `RPointerType` object, which `U::GetPointerType()` constructs before it
@@ -6164,6 +6174,31 @@ namespace gpg
    */
   /**
    * Engine addition: fills a caller's type slot from the first lookup and returns it.
+   * Address: 0x00508270 (FUN_00508270 -- `CachedLookup<moho::SDelayedSubVizInfo>(moho::SDelayedSubVizInfo::sType)`; formerly `ResolveSDelayedSubVizInfoType` in moho/sim/SDelayedSubVizInfoReflection.cpp, removed 2026-11-05.)
+   * Address: 0x0054D000 (FUN_0054D000 -- `CachedLookup<moho::CAniPoseBone>(moho::CAniPoseBone::sType)`; formerly `CachedCAniPoseBoneType` in moho/animation/CAniPose.cpp, removed 2026-11-05.)
+   * Address: 0x00579570 (FUN_00579570 -- `CachedLookup<moho::CAiBrain>(moho::CAiBrain::sType)`; formerly `ResolveCAiBrainTypeCachePrimary` in moho/ai/CAiBrain.cpp, removed 2026-11-05.)
+   * Address: 0x005D4220 (FUN_005D4220 -- `CachedLookup<CAiSteeringImpl>(CAiSteeringImpl::sType)`; formerly `CachedCAiSteeringImplType` in moho/ai/CAiSteeringImplTypeInfo.cpp, removed 2026-11-05.)
+   * Address: 0x006358F0 (FUN_006358F0 -- `CachedLookup<moho::CBuilderArmManipulator>(moho::CBuilderArmManipulator::sType)`; formerly `ResolveCBuilderArmManipulatorTypeCachePrimary` in moho/ai/CBuilderArmManipulatorTypeInfo.cpp, removed 2026-11-05.)
+   * Address: 0x00636F10 (FUN_00636F10 -- `CachedLookup<moho::CBuilderArmManipulator>(moho::CBuilderArmManipulator::sType)`; formerly `ResolveCBuilderArmManipulatorTypeCacheSecondary` in moho/ai/CBuilderArmManipulatorTypeInfo.cpp, removed 2026-11-05.)
+   * Address: 0x00637840 (FUN_00637840 -- `CachedLookup<moho::CCollisionManipulator>(moho::CCollisionManipulator::sType)`; formerly `ResolveCCollisionManipulatorTypeCachePrimary` in moho/collision/CCollisionManipulator.cpp, removed 2026-11-05.)
+   * Address: 0x00638670 (FUN_00638670 -- `CachedLookup<moho::CCollisionManipulator>(moho::CCollisionManipulator::sType)`; formerly `ResolveCCollisionManipulatorTypeCacheSecondary` in moho/collision/CCollisionManipulator.cpp, removed 2026-11-05.)
+   * Address: 0x0064D000 (FUN_0064D000 -- `CachedLookup<moho::RDebugGrid>(moho::RDebugGrid::sType)`; formerly `ResolveRDebugGridTypeCachePrimary` in moho/debug/RDebugGrid.cpp, removed 2026-11-05.)
+   * Address: 0x0064D860 (FUN_0064D860 -- `CachedLookup<moho::RDebugRadar>(moho::RDebugRadar::sType)`; formerly `ResolveRDebugRadarTypeCachePrimary` in moho/debug/RDebugRadar.cpp, removed 2026-11-05.)
+   * Address: 0x0064E250 (FUN_0064E250 -- `CachedLookup<moho::RDebugGrid>(moho::RDebugGrid::sType)`; formerly `ResolveRDebugGridTypeCachePrimary` in moho/debug/RDebugGrid.cpp, removed 2026-11-05.)
+   * Address: 0x0064E290 (FUN_0064E290 -- `CachedLookup<moho::RDebugRadar>(moho::RDebugRadar::sType)`; formerly `ResolveRDebugRadarTypeCachePrimary` in moho/debug/RDebugRadar.cpp, removed 2026-11-05.)
+   * Address: 0x00652C70 (FUN_00652C70 -- `CachedLookup<moho::RDebugWeapons>(moho::RDebugWeapons::sType)`; formerly `ResolveRDebugWeaponsTypeCachePrimary` in moho/unit/core/RDebugWeapons.cpp, removed 2026-11-05.)
+   * Address: 0x00653260 (FUN_00653260 -- `CachedLookup<moho::RDebugWeapons>(moho::RDebugWeapons::sType)`; formerly `ResolveRDebugWeaponsTypeCacheSecondary` in moho/unit/core/RDebugWeapons.cpp, removed 2026-11-05.)
+   * Address: 0x00658EC0 (FUN_00658EC0 -- `CachedLookup<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType)`; formerly `CachedSEntAttachInfoType` in moho/effects/rendering/CEfxBeam.cpp, removed 2026-11-05.)
+   * Address: 0x006831D0 (FUN_006831D0 -- `CachedLookup<moho::Motor>(moho::Motor::sType)`; formerly `ResolveLegacyMotorAliasType` in moho/entity/MotorReflection.cpp, removed 2026-11-05.)
+   * Address: 0x00689740 (FUN_00689740 -- `CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType)`; formerly `ResolveEntitySetBaseType` in moho/entity/EntitySetReflection.cpp, removed 2026-11-05.)
+   * Address: 0x006940F0 (FUN_006940F0 -- `CachedLookup<WeakEntitySet>(WeakEntitySet::sType)`; formerly `ResolveWeakEntitySetType` in moho/entity/EntitySetReflection.cpp, removed 2026-11-05.)
+   * Address: 0x006ADF70 (FUN_006ADF70 -- `CachedLookup<moho::CEconomyEvent>(moho::CEconomyEvent::sType)`; formerly `CachedCEconomyEventType` in moho/misc/CEconomyEvent.cpp, removed 2026-11-05.)
+   * Address: 0x0071A8C0 (FUN_0071A8C0 -- `CachedLookup<moho::InfluenceMapEntry>(moho::InfluenceMapEntry::sType)`; formerly `CachedInfluenceMapEntryType` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
+   * Address: 0x0071A8E0 (FUN_0071A8E0 -- `CachedLookup<moho::InfluenceGrid>(moho::InfluenceGrid::sType)`; formerly `CachedInfluenceGridType` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
+   * Address: 0x0071A900 (FUN_0071A900 -- `CachedLookup<moho::SThreat>(moho::SThreat::sType)`; formerly `CachedSThreatType` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
+   * Address: 0x00739B30 (FUN_00739B30 -- `CachedLookup<moho::CDamage>(moho::CDamage::sType)`; formerly `CachedCDamageTypeBridge` in moho/sim/CDamage.cpp, removed 2026-11-05.)
+   * Address: 0x007B5C30 (FUN_007B5C30 -- `CachedLookup<moho::CPathDebugger>(moho::CPathDebugger::sType)`; formerly `CachedCPathDebuggerTypePrimary` in moho/debug/CPathDebugger.cpp, removed 2026-11-05.)
+   * Address: 0x007B6210 (FUN_007B6210 -- `CachedLookup<moho::CPathDebugger>(moho::CPathDebugger::sType)`; formerly `CachedCPathDebuggerTypeSecondary` in moho/debug/CPathDebugger.cpp, removed 2026-11-05.)
    */
   template <class T>
   [[nodiscard]] RType* CachedLookup(RType*& slot)

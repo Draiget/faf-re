@@ -56,33 +56,11 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RType* CachedSPhysConstantsType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::SPhysConstants));
-    }
-
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeSPhysConstantsRef(moho::SPhysConstants* const object)
   {
     gpg::RRef ref{};
     ref.mObj = object;
-    ref.mType = CachedSPhysConstantsType();
+    ref.mType = gpg::RTypeOf<moho::SPhysConstants>();
     return ref;
   }
 
@@ -96,7 +74,7 @@ namespace
   [[maybe_unused]] void ReadVector3fArchiveObjectWithNullOwnerVariantA(gpg::ReadArchive* const archive, void* const object)
   {
     gpg::RRef ownerRef{};
-    archive->Read(CachedVector3fType(), object, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), object, ownerRef);
   }
 
   /**
@@ -109,7 +87,7 @@ namespace
   [[maybe_unused]] void WriteVector3fArchiveObjectWithNullOwnerVariantA(gpg::WriteArchive* const archive, void** const objectSlot)
   {
     const gpg::RRef ownerRef{};
-    archive->Write(CachedVector3fType(), objectSlot, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), objectSlot, ownerRef);
   }
 
   /**
@@ -122,7 +100,7 @@ namespace
   [[maybe_unused]] void ReadVector3fArchiveObjectWithNullOwnerVariantB(gpg::ReadArchive* const archive, void* const object)
   {
     gpg::RRef ownerRef{};
-    archive->Read(CachedVector3fType(), object, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), object, ownerRef);
   }
 
   /**
@@ -135,7 +113,7 @@ namespace
   [[maybe_unused]] void WriteVector3fArchiveObjectWithNullOwnerVariantB(gpg::WriteArchive* const archive, void** const objectSlot)
   {
     const gpg::RRef ownerRef{};
-    archive->Write(CachedVector3fType(), objectSlot, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), objectSlot, ownerRef);
   }
 
   /**
@@ -148,7 +126,7 @@ namespace
   [[maybe_unused]] void ReadVector3fArchiveObjectWithNullOwnerStdCall(void* const object, gpg::ReadArchive* const archive)
   {
     gpg::RRef ownerRef{};
-    archive->Read(CachedVector3fType(), object, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), object, ownerRef);
   }
 
   /**
@@ -161,7 +139,7 @@ namespace
   [[maybe_unused]] void WriteVector3fArchiveObjectWithNullOwnerStdCall(void** const objectSlot, gpg::WriteArchive* const archive)
   {
     const gpg::RRef ownerRef{};
-    archive->Write(CachedVector3fType(), objectSlot, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), objectSlot, ownerRef);
   }
 } // namespace
 

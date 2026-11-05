@@ -49,22 +49,6 @@ namespace
     return &sInstance;
   }
 
-  /**
-   * Address: 0x00739B30 (FUN_00739B30)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for `CDamage`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedCDamageTypeBridge()
-  {
-    gpg::RType* type = moho::CDamage::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CDamage));
-      moho::CDamage::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] LuaPlus::LuaObject CreateDamageLuaFactoryObject(moho::Sim* const sim)
   {
     LuaPlus::LuaObject scriptFactory{};

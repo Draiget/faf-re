@@ -51,21 +51,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x008C6520 (FUN_008C6520)
-   *
-   * What it does:
-   * Lazily resolves and caches one reflection type lane for `moho::UserEntity`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveUserEntityTypeCacheLane()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::UserEntity));
-    }
-    return cached;
-  }
-
   // 0x00416F60
   [[nodiscard]] bool ContainsCell(const moho::VisibilityRect& rect, const std::int32_t x, const std::int32_t z)
   {

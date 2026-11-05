@@ -24,20 +24,6 @@ namespace
   }
 
   /**
-   * Address: 0x005D4220 (FUN_005D4220)
-   *
-   * What it does:
-   * Resolves and caches the reflected runtime type for `CAiSteeringImpl`.
-   */
-  [[nodiscard]] gpg::RType* CachedCAiSteeringImplType()
-  {
-    if (!CAiSteeringImpl::sType) {
-      CAiSteeringImpl::sType = gpg::LookupRType(typeid(CAiSteeringImpl));
-    }
-    return CAiSteeringImpl::sType;
-  }
-
-  /**
    * Address: 0x005D4270 (FUN_005D4270, Moho::CAiSteeringImplTypeInfo::NewRef)
    *
    * What it does:
@@ -46,7 +32,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef CreateAiSteeringImplRefOwned()
   {
-    return gpg::MakeTypedRef(new CAiSteeringImpl(), CachedCAiSteeringImplType());
+    return gpg::MakeTypedRef(new CAiSteeringImpl(), gpg::CachedLookup<CAiSteeringImpl>(CAiSteeringImpl::sType));
   }
 
   void DeleteAiSteeringImplOwned(void* object)
@@ -157,7 +143,7 @@ void CAiSteeringImplTypeInfo::Init()
 gpg::RRef CAiSteeringImplTypeInfo::CtrRef(void* const objectStorage)
 {
   auto* const steering = gpg::ConstructInStorage<CAiSteeringImpl>(objectStorage);
-  return gpg::MakeTypedRef(steering, CachedCAiSteeringImplType());
+  return gpg::MakeTypedRef(steering, gpg::CachedLookup<CAiSteeringImpl>(CAiSteeringImpl::sType));
 }
 
 /**

@@ -20,29 +20,6 @@
 
 namespace
 {
-  /**
-   * Address: 0x0064D000 (FUN_0064D000)
-   * Address: 0x0064E250 (FUN_0064E250 -- the second emission of this same
-   * inline cache. Both bodies read `[0x010C73F4]`, and on a miss push
-   * `&typeid(RDebugGrid)` (`0x00F73CA4`) into `gpg::LookupRType` and store the
-   * result back; they differ only in the relative displacement of that one
-   * `call`, which is why `/OPT:ICF` could not fold them. Formerly transcribed
-   * a second time as `ResolveRDebugGridTypeCacheSecondary`, `[[maybe_unused]]`
-   * with zero callers.)
-   *
-   * What it does:
-   * Resolves and caches the reflected runtime type for `RDebugGrid`.
-   */
-  [[nodiscard]] gpg::RType* ResolveRDebugGridTypeCachePrimary()
-  {
-    gpg::RType* type = moho::RDebugGrid::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::RDebugGrid));
-      moho::RDebugGrid::sType = type;
-    }
-    return type;
-  }
-
 
   // Height-sample word scale (1/128) applied when converting stored 16-bit
   // terrain samples into world-space elevation. Matches ds:flt_E4F6DC.
@@ -459,7 +436,7 @@ namespace moho
    */
   gpg::RType* RDebugGrid::GetClass() const
   {
-    return ResolveRDebugGridTypeCachePrimary();
+    return gpg::CachedLookup<moho::RDebugGrid>(moho::RDebugGrid::sType);
   }
 
   /**

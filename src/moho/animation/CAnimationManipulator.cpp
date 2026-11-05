@@ -215,14 +215,6 @@ namespace
     return boneIndex;
   }
 
-  gpg::RType* CachedCAnimationManipulatorType()
-  {
-    if (!moho::CAnimationManipulator::sType) {
-      moho::CAnimationManipulator::sType = gpg::LookupRType(typeid(moho::CAnimationManipulator));
-    }
-    return moho::CAnimationManipulator::sType;
-  }
-
   /**
    * Address: 0x00642820 (FUN_00642820)
    *
@@ -235,7 +227,7 @@ namespace
       return nullptr;
     }
 
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCAnimationManipulatorType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, gpg::CachedLookup<moho::CAnimationManipulator>(moho::CAnimationManipulator::sType));
     return upcast.mObj;
   }
 
@@ -1161,7 +1153,7 @@ namespace moho
    */
   gpg::RType* CAnimationManipulator::GetClass() const
   {
-    return CachedCAnimationManipulatorType();
+    return gpg::CachedLookup<moho::CAnimationManipulator>(moho::CAnimationManipulator::sType);
   }
 
   /**
@@ -1169,7 +1161,7 @@ namespace moho
    */
   gpg::RRef CAnimationManipulator::GetDerivedObjectRef()
   {
-    return gpg::MakeTypedRef(this, CachedCAnimationManipulatorType());
+    return gpg::MakeTypedRef(this, gpg::CachedLookup<moho::CAnimationManipulator>(moho::CAnimationManipulator::sType));
   }
 
   /**

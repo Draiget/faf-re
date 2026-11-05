@@ -43,17 +43,6 @@ namespace
     return *reinterpret_cast<const BVIntSet*>(&slot);
   }
 
-  [[nodiscard]] gpg::RType* CachedBVIntSetType()
-  {
-    gpg::RType* type = BVIntSet::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(BVIntSet));
-      BVIntSet::sType = type;
-    }
-    GPG_ASSERT(type != nullptr);
-    return type;
-  }
-
   /**
    * Address: 0x00403720 (FUN_00403720, sub_403720)
    *
@@ -313,7 +302,7 @@ void IdPool::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->ReadUInt(&nextLowId);
   mNextLowId = static_cast<std::int32_t>(nextLowId);
 
-  archive->Read(CachedBVIntSetType(), &mReleasedLows, NullOwnerRef());
+  archive->Read(gpg::CachedLookup<BVIntSet>(BVIntSet::sType), &mReleasedLows, NullOwnerRef());
 
   // Engine addition (replay keyframes): the recycle ring as it was, see MemberSerialize.
   if (gSimExactArchive.load(std::memory_order_relaxed)) {
@@ -322,7 +311,7 @@ void IdPool::MemberDeserialize(gpg::ReadArchive* const archive)
     mSubRes2.Reset();
     for (std::uint32_t slot = 0; slot < slots; ++slot) {
       BVIntSet snapshot{};
-      archive->Read(CachedBVIntSetType(), &snapshot, NullOwnerRef());
+      archive->Read(gpg::CachedLookup<BVIntSet>(BVIntSet::sType), &snapshot, NullOwnerRef());
       mSubRes2.PushSnapshot(snapshot);
     }
   }
@@ -341,7 +330,7 @@ void IdPool::MemberSerialize(gpg::WriteArchive* const archive) const
   // saved. A keyframe keeps the cursor, the free set and the ring exactly.
   if (gSimExactArchive.load(std::memory_order_relaxed)) {
     archive->WriteInt(mNextLowId);
-    archive->Write(CachedBVIntSetType(), &mReleasedLows, NullOwnerRef());
+    archive->Write(gpg::CachedLookup<BVIntSet>(BVIntSet::sType), &mReleasedLows, NullOwnerRef());
 
     std::uint32_t slots = 0;
     for (int index = mSubRes2.mStart; index != mSubRes2.mEnd; index = (index + 1) % kHistoryCapacity) {
@@ -350,7 +339,7 @@ void IdPool::MemberSerialize(gpg::WriteArchive* const archive) const
     archive->WriteUInt(slots);
     for (int index = mSubRes2.mStart; index != mSubRes2.mEnd; index = (index + 1) % kHistoryCapacity) {
       BVIntSet snapshot = AsBitSet(mSubRes2.mData[index]);
-      archive->Write(CachedBVIntSetType(), &snapshot, NullOwnerRef());
+      archive->Write(gpg::CachedLookup<BVIntSet>(BVIntSet::sType), &snapshot, NullOwnerRef());
     }
     return;
   }
@@ -379,7 +368,7 @@ void IdPool::MemberSerialize(gpg::WriteArchive* const archive) const
   compactedReleased.ClearRange(lower, upper);
 
   archive->WriteInt(static_cast<int>(nextLowId));
-  archive->Write(CachedBVIntSetType(), &compactedReleased, NullOwnerRef());
+  archive->Write(gpg::CachedLookup<BVIntSet>(BVIntSet::sType), &compactedReleased, NullOwnerRef());
 }
 
 namespace moho
