@@ -572,7 +572,6 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     struct TextureViews
     {
       std::vector<std::vector<TextureDimension>> samplerDimensions;
-      std::map<std::pair<std::string, TextureDimension>, std::uint32_t> viewSlots;
     };
 
     /// Texture views and sampler registers.
@@ -593,7 +592,6 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           }
         }
       }
-      std::map<std::pair<std::string, TextureDimension>, std::uint32_t>& viewSlots = views.viewSlots;
       for (const Parameter& parameter : description.parameters) {
         if (parameter.parameterClass != ParameterClass::Texture) {
           continue;
@@ -605,7 +603,6 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
         for (const TextureDimension dimension : found->second) {
           const std::uint32_t slot = static_cast<std::uint32_t>(modern.textures.size());
           modern.textures.push_back(TextureSlot{parameter.name, dimension, slot});
-          viewSlots[{parameter.name, dimension}] = slot;
         }
       }
       if (modern.textures.size() > kMaxTextureSlots) {
@@ -705,7 +702,6 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
 
     TextureViews textureViews = BuildTextureViews(source, description, modern);
     std::vector<std::vector<TextureDimension>>& samplerDimensions = textureViews.samplerDimensions;
-    std::map<std::pair<std::string, TextureDimension>, std::uint32_t>& viewSlots = textureViews.viewSlots;
 
     // ---- parameters a function writes -------------------------------------------
     std::map<std::string, const Parameter*> numericParameters;
