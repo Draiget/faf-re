@@ -85,6 +85,9 @@ type RejoinStep struct {
 	UID    int          `yaml:"uid"`
 	Source int          `yaml:"source"`
 	Peers  []RejoinPeer `yaml:"peers"`
+	// Launcher starts the game with /gpgnet too, as a real launcher would: it reconnects to its
+	// seat's launcher connection.
+	Launcher bool `yaml:"launcher"`
 	// KeyOf starts the game with that player's rejoin key instead of UID's own.
 	KeyOf int `yaml:"keyOf"`
 	// Remote starts nothing: another machine takes the seat, from what this writes

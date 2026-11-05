@@ -11,6 +11,10 @@ do
                 .. ' from source ' .. tostring(GetCurrentCommandSource())
                 .. ' army ' .. tostring(army)
                 .. ' at tick ' .. tostring(GetGameTick()))
+            -- Changes what the checksums cover, so a command that runs twice, or at another beat, shows as a desync.
+            for _, brain in ArmyBrains do
+                brain:GiveResource('MASS', 0.5)
+            end
             return
         end
         return baseDoCallback(name, data, units)

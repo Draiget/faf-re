@@ -1,0 +1,49 @@
+name: 3p-rejoin-retail-restart
+description: >
+  A retail client is in the game, so rejoin is not on offer even with the switch on: same dialog, same ejection, nobody holds a seat, and the game goes on. A client that restarts anyway gets nothing. Needs init_mpemu_localvault.lua in the FAF bin folder. Do not click into the game windows.
+timeout: 20m
+
+mode: relay
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: sandbox
+  DisconnectionDelay02: '90'
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\rejoin_test.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+  saveReplays: true
+
+players:
+  - { uid: 1, name: Retail, faction: uef, exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe' }
+  - { uid: 2, name: Rejoins, faction: cybran, args: ['/title', 'rejoin-rejoins', '/con', 'net_PeerFeatures=1;net_RejoinAccept=1;net_CheckOrderStreams=0;net_LogShownBeatMs=500'] }
+  - { uid: 3, name: Behind, faction: aeon, args: ['/title', 'rejoin-behind', '/con', 'net_PeerFeatures=1;net_RejoinAccept=1;net_CheckOrderStreams=0;net_LogShownBeatMs=500'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 4m
+  - kill: 2
+  - wait: 15s
+  - note: player 2 restarts and takes its seat back
+  - rejoin: { uid: 2, source: 1, peers: [{ uid: 1, source: 0 }, { uid: 3, source: 2 }] }
+  - wait: 3m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  logsContain:
+    - { uids: [2], suffix: '-rejoin', pattern: 'REJOIN: refused' }
+  logsAbsent:
+    - { uids: [3], pattern: 'seat held' }
+    - { uids: [3], pattern: 'proved its seat' }
+    - { uids: [3], pattern: 'came back on a new link' }
+    - { uids: [3], pattern: 'REJOIN: sending client' }
+    - { uids: [3], pattern: 'mismatched' }

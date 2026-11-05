@@ -125,6 +125,8 @@ type ContractConfig struct {
 	JarBind string `yaml:"jarBind"`
 	// ForceRelay passes --force-relay.
 	ForceRelay bool `yaml:"forceRelay"`
+	// KeepSession: seconds the adapter keeps its links after a running game exits (issue #275).
+	KeepSession int `yaml:"keepSession"`
 	// NoTurn hands out no ICE servers.
 	NoTurn bool `yaml:"noTurn"`
 	// IceServers, when set, are handed out instead of mpemu's own TURN server
