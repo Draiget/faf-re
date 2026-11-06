@@ -61,12 +61,12 @@ void cases(const char*name,std::size_t cap,void(DrawLane::*candidate)()) {
   }) {
     reset(lane,n,p,t,d);
     (lane.*candidate)();
-    assert(records.size()==std::size_t(p)*n*4);
-    for(int pass=0;pass<p;++pass)for(std::size_t i=0;i<n*4;++i)assert((records[pass*n*4+i]==std::pair<int,int>(pass,int(i))));
+    ASSERT_TRUE(records.size()==std::size_t(p)*n*4);
+    for(int pass=0;pass<p;++pass)for(std::size_t i=0;i<n*4;++i)ASSERT_TRUE((records[pass*n*4+i]==std::pair<int,int>(pass,int(i))));
     const auto chunks=(n+cap-1)/cap;
     const auto uploads=n==0?0:n<=cap?1:std::size_t(p)*chunks;
-    assert(std::size_t(std::count(events.begin(),events.end(),"lock"))==uploads);
-    assert(std::size_t(std::count(events.begin(),events.end(),"draw"))==std::size_t(p)*chunks);
+    ASSERT_TRUE(std::size_t(std::count(events.begin(),events.end(),"lock"))==uploads);
+    ASSERT_TRUE(std::size_t(std::count(events.begin(),events.end(),"draw"))==std::size_t(p)*chunks);
     // Expected event order is independent of a comparison checkout.
     std::vector<std::string> expected;
     if(n) {
@@ -96,7 +96,7 @@ void cases(const char*name,std::size_t cap,void(DrawLane::*candidate)()) {
       }
       expected.push_back("end");
     }
-    assert(events==expected);
+    ASSERT_TRUE(events==expected);
 #ifdef HAS_BASELINE
     if(n<=cap) {
       auto e=events;
@@ -105,7 +105,7 @@ void cases(const char*name,std::size_t cap,void(DrawLane::*candidate)()) {
       if(std::string(name)=="High")lane.BaseHigh();
       else if(std::string(name)=="Medium")lane.BaseMedium();
       else lane.BaseLow();
-      assert(events==e&&records==r);
+      ASSERT_TRUE(events==e&&records==r);
     }
 #endif
     ++total;
@@ -117,7 +117,7 @@ void cases(const char*name,std::size_t cap,void(DrawLane::*candidate)()) {
   reset(lane,3,2,t,d);
   for(auto&v:lane.mSplatVertices)v.mPosition.x=97;
   (lane.*candidate)();
-  for(auto r:records)assert(r.second==97);
+  for(auto r:records)ASSERT_TRUE(r.second==97);
   // Fail each GAL stage in the helper path; no partial retry is allowed.
   reset(lane,cap+1,2,t,d);
   (lane.*candidate)();
@@ -132,7 +132,7 @@ void cases(const char*name,std::size_t cap,void(DrawLane::*candidate)()) {
     catch(Fatal&) {
       fatal=true;
     }
-    assert(fatal&&step==k+1);
+    ASSERT_TRUE(fatal&&step==k+1);
   }
   std::printf("%s: %d pass/count cases, independent full event order, %d overflow failure sites PASS\n",name,total,stages-2);
 }
@@ -161,7 +161,7 @@ void helperCases() {
     catch(Fatal&) {
       fatal=true;
     }
-    assert(fatal&&step==k+1);
+    ASSERT_TRUE(fatal&&step==k+1);
   }
   reset(lane,1,1,t,d);
   bool bad=false;
@@ -171,7 +171,7 @@ void helperCases() {
   catch(Fatal&) {
     bad=true;
   }
-  assert(bad&&events.empty());
+  ASSERT_TRUE(bad&&events.empty());
   bad=false;
   try {
     DrawSplatChunksPassMajor(&d,&lane.sheet,&lane.index,lane.mSplatVertices.data(),4,251);
@@ -179,7 +179,7 @@ void helperCases() {
   catch(Fatal&) {
     bad=true;
   }
-  assert(bad&&events.empty());
+  ASSERT_TRUE(bad&&events.empty());
   bad=false;
   nullLock=true;
   try {
@@ -188,14 +188,11 @@ void helperCases() {
   catch(Fatal&) {
     bad=true;
   }
-  assert(bad);
+  ASSERT_TRUE(bad);
   nullLock=false;
   puts("Helper invalid geometry, null lock, and every GAL failure site PASS");
 }
-int main() {
-  cases("High",2500,&DrawLane::NewHigh);
-  cases("Medium",2500,&DrawLane::NewMedium);
-  cases("Low",250,&DrawLane::NewLow);
-  helperCases();
-  puts("PASS: source-bound submission and geometry mocks, not native renderer/driver/FPS");
-}
+TEST(SplatDraw, High) { cases("High",2500,&DrawLane::NewHigh); }
+TEST(SplatDraw, Medium) { cases("Medium",2500,&DrawLane::NewMedium); }
+TEST(SplatDraw, Low) { cases("Low",250,&DrawLane::NewLow); }
+TEST(SplatDraw, HelperFailures) { helperCases(); }

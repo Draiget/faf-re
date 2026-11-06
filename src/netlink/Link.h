@@ -22,6 +22,7 @@
 // Engine addition, not recovered code.
 
 #include "netlink/LinkKeys.h"
+#include "netlink/PathChoice.h"
 #include "netlink/Signal.h"
 
 #include <atomic>
@@ -151,8 +152,14 @@ namespace faf::netlink
     std::uint64_t laneUnacked = 0;     // datagrams whose copies ran out before an ack
     std::uint64_t laneDuplicates = 0;  // copies received after the datagram itself
     std::uint64_t laneLost = 0;        // lane datagrams counted lost
+    // Issue #322: the selected pair's candidate types ("host", "srflx", "prflx",
+    // "relay") while connected, empty otherwise. Either "relay": through TURN.
+    std::string localType;
+    std::string remoteType;
     bool laneEncrypted = false;        // issue #289: the lane is on and sealed
     std::uint64_t laneUnauthenticated = 0; // lane datagrams dropped: not sealed with the agreed key
+    double laneRttMs = -1;             // issue #322: the lane's smoothed RTT, both ends; -1 before a sample
+    PathChoice choice;                 // issue #322: the path the player picked
   };
 
   class Link
@@ -179,6 +186,19 @@ namespace faf::netlink
     void Close();
     // No more restarts after a loss (GPGNet GameEnded).
     void SetGameEnded();
+    // Issue #321: drop the connection and connect again, as after a loss. The
+    // offerer offers again at once; the answerer waits for the peer's next
+    // offer, which comes when the peer's echo goes unanswered. Done in the
+    // next Tick, so the callbacks run on the ticking thread. Issue #322: with a
+    // choice, this and later attempts take that path. Any thread.
+    void Reconnect(const std::optional<PathChoice>& choice = std::nullopt)
+    {
+      std::lock_guard lock(mMutex);
+      if (choice) {
+        mPendingChoice = choice;
+      }
+      mReconnectAsked = true;
+    }
 
     LinkState GetState() const;
     bool IsConnected() const { return mConnected.load(); }
@@ -197,6 +217,7 @@ namespace faf::netlink
     void ConnectionLostLocked(Pending& out, const char* reason, Clock::time_point now);
     // The remote's marks from its ufrag, and the lane keys (#289) when both offer them.
     void NoteRemoteUfragLocked(Pending& out, const std::string& ufrag);
+    void NotePeerPathLocked(Pending& out, const std::string& path);
     void StartWebRtcLocked(Pending& out);
     void DropWebRtcLocked(Pending& out);
     void SetStateLocked(Pending& out, LinkState state);
@@ -234,6 +255,11 @@ namespace faf::netlink
     std::optional<Clock::time_point> mAwaitDeadline;
     std::optional<Clock::time_point> mCheckDeadline;
     std::optional<Clock::time_point> mRestartAt;
+    std::atomic<bool> mReconnectAsked{false}; // issue #321
+    std::optional<PathChoice> mPendingChoice;  // issue #322, under mMutex
+    PathChoice mChoice;                        // under mMutex
+    bool mChoicePicked = false;                // the player picked mChoice: tell our peer
+    PathChoice::Mode mPeerMode = PathChoice::Mode::Auto; // the peer's pick, this attempt
     Clock::time_point mNextEcho{};
     std::atomic<std::int64_t> mLastEchoReplyMs{0};
     LinkStats mStats;
@@ -266,6 +292,9 @@ namespace faf::netlink
     // next lane is sealed with, under mLaneMutex; set before the connection
     // comes up and cleared with the agent, so every lane gets the keys of its
     // own connection and no key outlives it. mLaneKeyed mirrors it under mMutex.
+    // Issue #322: the selected pair's candidate types, under mMutex.
+    std::string mLocalType;
+    std::string mRemoteType;
     LinkKeyPair mKeyPair;
     std::optional<remote::net::ChannelKeys> mLaneKeys;
     bool mLaneKeyed = false;

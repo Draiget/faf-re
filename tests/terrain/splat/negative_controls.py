@@ -4,7 +4,7 @@ import collection_source_test
 import draw_source_test
 
 
-def run(source, temp, cxx='g++', wildmagic=None):
+def run(source, temp, cxx='g++', wildmagic=None, gtest=None):
     mutations = []
     for lane in LANES:
         old = 'if (splatBudget++ >= splatOutputBudget.available\n' + ('          ' if lane == 'Low' else '            ') + '&& !TryGrowSplatOutput(mSplatVertices, splatOutputBudget)) {'
@@ -21,7 +21,7 @@ def run(source, temp, cxx='g++', wildmagic=None):
     ])
     for index, mutation in enumerate(mutations):
         print('NEGATIVE CONTROL:', mutation[3], flush=True)
-        collection_source_test.run(source, temp/str(index), cxx=cxx, wildmagic=wildmagic, mutation=mutation)
+        collection_source_test.run(source, temp/str(index), cxx=cxx, wildmagic=wildmagic, gtest=gtest, mutation=mutation)
     print('NEGATIVE CONTROL: omit multipass retransmission', flush=True)
-    draw_source_test.run(source, temp/'draw', cxx=cxx, wildmagic=wildmagic, negative=True)
+    draw_source_test.run(source, temp/'draw', cxx=cxx, wildmagic=wildmagic, gtest=gtest, negative=True)
     print('PASS 7 negative controls: every mutation compiled, every runtime rejected')

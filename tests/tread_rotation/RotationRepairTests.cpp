@@ -6,6 +6,8 @@
 #include <initializer_list>
 #include <limits>
 
+#include <gtest/gtest.h>
+
 #include "moho/entity/CTextureScroller.h"
 #include "moho/entity/Entity.h"
 
@@ -15,10 +17,7 @@ namespace
 
   void Check(const bool ok, const char* const why)
   {
-    if (!ok) {
-      std::fprintf(stderr, "FAIL %s\n", why);
-      std::exit(1);
-    }
+    EXPECT_TRUE(ok) << why;
   }
 
   struct Fixture
@@ -192,17 +191,31 @@ namespace
   }
 } // namespace
 
-int main()
+TEST(Existing_RotationRepair, YawInBothDirections)
 {
   CheckYawInBothDirections();
+}
+
+TEST(Existing_RotationRepair, NoMotionKeepsPriorPair)
+{
   CheckNoMotionKeepsPriorPair();
+}
+
+TEST(Existing_RotationRepair, TranslationUnchanged)
+{
   CheckTranslationUnchanged();
+}
+
+TEST(Existing_RotationRepair, ManualModeUntouched)
+{
   CheckManualModeUntouched();
+}
+
+TEST(Existing_RotationRepair, RepeatedAxis)
+{
   CheckRepeatedAxis(0, 1, 0, 1);       // yaw
   CheckRepeatedAxis(1, 0, 0, 1);       // pitch: zero projection
   CheckRepeatedAxis(0, 0, 1, 1);       // roll: zero projection
   CheckRepeatedAxis(1, 2, 3, 0.75f);   // tilted axis
   CheckRepeatedAxis(1, 2, 3, -0.75f);  // tilted axis, negative scale
-  std::puts("PASS CTextureScroller::Tick in-place rotation");
-  return 0;
 }

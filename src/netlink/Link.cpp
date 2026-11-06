@@ -95,6 +95,17 @@ namespace faf::netlink
       return {};
     }
 
+    // Issue #322: the word after " typ " in an SDP candidate line, empty when there is none.
+    std::string CandidateTypeOf(const std::string_view line)
+    {
+      const std::size_t at = line.find(" typ ");
+      if (at == std::string_view::npos) {
+        return {};
+      }
+      std::string_view rest = line.substr(at + 5);
+      return std::string(rest.substr(0, rest.find(' ')));
+    }
+
     std::string Lower(std::string s)
     {
       for (char& ch : s) {
@@ -436,7 +447,7 @@ namespace faf::netlink
     o.remoteId = mOptions.remoteId;
     o.offerer = mOptions.offerer;
     o.iceServers = mOptions.iceServers;
-    o.forceRelay = mOptions.forceRelay;
+    o.forceRelay = mOptions.forceRelay || mChoice.mode == PathChoice::Mode::RelayOnly;
     o.bindAddress = mOptions.bindAddress;
     auto onLog = [this](const std::string& text) {
       if (mCallbacks.onLog) {
@@ -508,8 +519,14 @@ namespace faf::netlink
       s.laneDuplicates = lane.redundantDuplicates;
       s.laneLost = lane.datagramsLost;
       s.laneUnauthenticated = lane.unauthenticatedDropped;
+      if (lane.rttSamples > 0) {
+        s.laneRttMs = static_cast<double>(lane.rttSmoothedUs) / 1000.0;
+      }
     }
     s.laneEncrypted = s.onLane && mLaneKeyed;
+    s.localType = mLocalType;
+    s.remoteType = mRemoteType;
+    s.choice = mChoice;
     s.dataReceived = mDataReceived.load();
     s.invalidReceived = mInvalidReceived.load();
     s.echoesAnswered = mEchoesAnswered.load();
@@ -534,6 +551,17 @@ namespace faf::netlink
   // CandidateUtil.isAllowedCandidate with PeerIceModule's flags.
   bool Link::AllowedLocked(const CandidateType type, const Clock::time_point now) const
   {
+    // Issue #322: the player's pick in the network panel holds over the policy.
+    // /nativenetrelay (forceRelay) still holds over "no relay".
+    // Our own pick first, else what our peer picked for this attempt.
+    const PathChoice::Mode mode = mChoice.mode != PathChoice::Mode::Auto ? mChoice.mode : mPeerMode;
+    if (mode == PathChoice::Mode::RelayOnly) {
+      return type == CandidateType::Relayed;
+    }
+    if (mode == PathChoice::Mode::NoRelay && !mOptions.forceRelay) {
+      return type == CandidateType::Host || type == CandidateType::ServerReflexive ||
+             type == CandidateType::PeerReflexive;
+    }
     const std::uint32_t previous = AttemptsInLastTwoMinutesLocked(now);
     const bool allowHost = previous < kForceSrflxCount && !mOptions.forceRelay;
     const bool allowReflexive = previous < kForceRelayCount && !mOptions.forceRelay;
@@ -573,6 +601,25 @@ namespace faf::netlink
     }
     mLaneKeyed = false;
     mKeyPair.Clear();
+    mLocalType.clear();
+    mRemoteType.clear();
+  }
+
+  // Issue #322: our peer's player picked a path; follow it on this attempt. "auto"
+  // starts the attempt policy afresh, as the pick did on the peer's side.
+  void Link::NotePeerPathLocked(Pending& out, const std::string& path)
+  {
+    if (path == "relay") {
+      mPeerMode = PathChoice::Mode::RelayOnly;
+    } else if (path == "norelay") {
+      mPeerMode = PathChoice::Mode::NoRelay;
+    } else if (path == "auto") {
+      mPeerMode = PathChoice::Mode::Auto;
+      mAttemptTimes.clear();
+    } else {
+      return;
+    }
+    Log(out, "the peer picked the path " + path + " for this attempt");
   }
 
   void Link::NoteRemoteUfragLocked(Pending& out, const std::string& ufrag)
@@ -612,6 +659,10 @@ namespace faf::netlink
       return;
     }
     DestroyAgentLocked();
+    mPeerMode = PathChoice::Mode::Auto;
+    if (remote != nullptr && !remote->fafPath.empty()) {
+      NotePeerPathLocked(out, remote->fafPath); // before any candidate is filtered
+    }
     {
       std::lock_guard cb(mIn->cbMutex);
       mIn->candidates.clear();
@@ -633,7 +684,18 @@ namespace faf::netlink
       }
     }
     std::vector<std::uint16_t> turnPorts;
+    // Issue #322: "relay via host:port" keeps that TURN server only, when it is in the list.
+    bool chosenTurnListed = false;
     for (const IceServer& s : mOptions.iceServers) {
+      chosenTurnListed = chosenTurnListed || (s.kind == IceServer::Kind::Turn && IceServerName(s) == mChoice.turnServer);
+    }
+    if (!mChoice.turnServer.empty() && !chosenTurnListed) {
+      Log(out, "TURN server " + mChoice.turnServer + " is no longer in the list, using every TURN server");
+    }
+    for (const IceServer& s : mOptions.iceServers) {
+      if (chosenTurnListed && IceServerName(s) != mChoice.turnServer) {
+        continue;
+      }
       if (s.kind == IceServer::Kind::Turn) {
         mIn->turnHosts.push_back(s.host);
         mIn->turnUsers.push_back(s.username);
@@ -768,6 +830,13 @@ namespace faf::netlink
     msg.destId = mOptions.remoteId;
     msg.ufrag = SdpAttribute(sdp, "ice-ufrag");
     msg.password = SdpAttribute(sdp, "ice-pwd");
+    if (mChoicePicked && mRemoteMarked) {
+      msg.fafPath = mChoice.mode == PathChoice::Mode::RelayOnly ? "relay" :
+                    mChoice.mode == PathChoice::Mode::NoRelay  ? "norelay" :
+                                                                 "auto";
+      // "auto" restarts the peer's policy once; later attempts escalate as usual.
+      mChoicePicked = mChoice.mode != PathChoice::Mode::Auto;
+    }
     for (Candidate& c : gathered) {
       if (!AllowedLocked(c.type, now)) {
         continue;
@@ -808,6 +877,9 @@ namespace faf::netlink
       return;
     }
     NoteRemoteUfragLocked(out, remote.ufrag);
+    if (!remote.fafPath.empty()) {
+      NotePeerPathLocked(out, remote.fafPath);
+    }
     const std::string sdp = RemoteDescriptionLocked(remote, now);
     if (juice_set_remote_description(mAgent, sdp.c_str()) < 0) {
       Log(out, "remote description rejected: " + sdp);
@@ -872,6 +944,26 @@ namespace faf::netlink
         ApplyRemoteLocked(p, m, now);
       }
 
+      if (mReconnectAsked) {
+        mReconnectAsked = false;
+        if (mGameEnded) {
+          Log(p, "reconnect not done: the game has ended");
+        } else {
+          if (mPendingChoice) {
+            // A path the player picked: the attempt policy starts afresh.
+            mChoice = *mPendingChoice;
+            mPendingChoice.reset();
+            mChoicePicked = true;
+            mAttemptTimes.clear();
+            Log(p, "path: " + PathChoiceText(mChoice));
+          }
+          ConnectionLostLocked(p, "reconnect asked", now);
+          if (mOptions.offerer) {
+            mRestartAt = now;
+          }
+        }
+      }
+
       bool gatheringDone = false;
       int juiceState = JUICE_STATE_DISCONNECTED;
       bool juiceStateChanged = false;
@@ -927,6 +1019,8 @@ namespace faf::netlink
           char remote[JUICE_MAX_CANDIDATE_SDP_STRING_LEN] = {};
           if (juice_get_selected_candidates(mAgent, local, sizeof(local), remote, sizeof(remote)) == 0) {
             Log(p, std::string("connected, selected pair: ") + local + " <-> " + remote);
+            mLocalType = CandidateTypeOf(local);
+            mRemoteType = CandidateTypeOf(remote);
           }
           if (mCallbacks.onConnected) {
             p.actions.push_back([this] { mCallbacks.onConnected(true); });

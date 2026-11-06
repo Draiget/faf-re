@@ -1,6 +1,6 @@
 # Terrain splat budget tests
 
-`faf_splat_budget_tests` includes the production SplatBudget, CWldSplat::SplatVertex and FastVectorN. It links `faf_engine`, inherits its headers, compiler configuration and existing forced `platform/LayoutAsserts.h`, and is excluded from the default build like the other small engine regression targets. It does not edit or bypass FastVector assertions. Checks use runtime failure reporting because normal engine builds disable layout static_asserts.
+`faf_splat_budget_tests` includes the production SplatBudget, CWldSplat::SplatVertex and FastVectorN. It links `faf_engine`, inherits its headers, compiler configuration and existing forced `platform/LayoutAsserts.h`, and is excluded from the default build like the other small engine regression targets. It does not edit or bypass FastVector assertions. Checks use GoogleTest assertions, including runtime layout checks because normal engine builds disable layout static_asserts. The target links gtest_main, uses the Tests/Terrain IDE folder and carries the Terrain CTest label.
 
 From an already configured Windows checkout:
 

@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <string>
+#include <gtest/gtest.h>
 
 #include "gpg/core/streams/MemBufferStream.h"
 #include "moho/misc/SessionStartup.h"
@@ -18,15 +19,7 @@
 
 namespace
 {
-  int gFailures = 0;
-
-#define CHECK(condition)                                                     \
-  do {                                                                       \
-    if (!(condition)) {                                                      \
-      ++gFailures;                                                           \
-      std::printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #condition);       \
-    }                                                                        \
-  } while (0)
+#define CHECK(condition) EXPECT_TRUE(condition)
 
   void WriteAdvance(gpg::Stream& stream, const std::int32_t beats)
   {
@@ -49,14 +42,14 @@ namespace
     return stream.VirtTell(gpg::Stream::ModeReceive);
   }
 
-  void TestEmptyStream()
+  TEST(Existing_ReplayScan, EmptyStream)
   {
     gpg::MemBufferStream stream(256);
     CHECK(moho::VCR_ScanReplayBeats(stream) == 0);
     CHECK(Position(stream) == 0u);
   }
 
-  void TestOnlyAdvanceMessagesCount()
+  TEST(Existing_ReplayScan, OnlyAdvanceMessagesCount)
   {
     gpg::MemBufferStream stream(1024);
     WriteOther(stream);
@@ -73,7 +66,7 @@ namespace
     CHECK(first.GetType().raw() == static_cast<std::uint8_t>(moho::ECmdStreamOp::CMDST_SetCommandSource));
   }
 
-  void TestComesBackToWhereItBegan()
+  TEST(Existing_ReplayScan, ComesBackToWhereItBegan)
   {
     gpg::MemBufferStream stream(1024);
     const std::string header = "the replay's header";
@@ -86,7 +79,7 @@ namespace
     CHECK(Position(stream) == header.size());
   }
 
-  void TestTruncatedLastMessage()
+  TEST(Existing_ReplayScan, TruncatedLastMessage)
   {
     gpg::MemBufferStream stream(256);
     WriteAdvance(stream, 50);
@@ -96,7 +89,7 @@ namespace
     CHECK(Position(stream) == 0u);
   }
 
-  void TestNegativeBeatsCountAsNone()
+  TEST(Existing_ReplayScan, NegativeBeatsCountAsNone)
   {
     gpg::MemBufferStream stream(256);
     WriteAdvance(stream, 20);
@@ -105,14 +98,3 @@ namespace
     CHECK(moho::VCR_ScanReplayBeats(stream) == 21);
   }
 } // namespace
-
-int main()
-{
-  TestEmptyStream();
-  TestOnlyAdvanceMessagesCount();
-  TestComesBackToWhereItBegan();
-  TestTruncatedLastMessage();
-  TestNegativeBeatsCountAsNone();
-  std::printf(gFailures == 0 ? "replay scan: pass\n" : "replay scan: %d failed\n", gFailures);
-  return gFailures == 0 ? 0 : 1;
-}

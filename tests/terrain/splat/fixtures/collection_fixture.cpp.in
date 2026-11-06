@@ -1,6 +1,6 @@
 // Host-only allocator/camera adapter. See README.
 #include "SplatBudget.h"
-#include <cassert>
+#include <gtest/gtest.h>
 #include <cstdio>
 #include <cstdlib>
 #include <new>
@@ -12,6 +12,13 @@
 #include <string>
 int moho::ren_SplatBudgetTier=0;
 static bool track=false,fail=false;
+// Evaluate production expressions first, then exclude GoogleTest diagnostics
+// from deterministic allocation injection. The previous state is restored.
+struct PauseTracking {
+  bool previous=track;
+  PauseTracking(){track=false;}
+  ~PauseTracking(){track=previous;}
+};
 static std::size_t attempts=0,live=0,peak=0,lastRequest=0,failAttempt=0;
 struct Allocation {
   void*p;
@@ -36,7 +43,12 @@ void*operator new(std::size_t n) {
       added=true;
       break;
     }
-    assert(added);
+    if(!added) {
+      track=false;
+      ADD_FAILURE() << "Host allocation tracking slots exhausted";
+      std::free(p);
+      throw std::bad_alloc();
+    }
     live+=n;
     peak=std::max(peak,live);
   }
@@ -54,6 +66,20 @@ void operator delete(void*p)noexcept {
 void operator delete(void*p,std::size_t)noexcept {
   ::operator delete(p);
 }
+// GoogleTest's stable-sort uses nothrow new. Keep every ordinary new/delete
+// overload on the same malloc/free path under ASan, without suppressing errors.
+void* operator new(std::size_t n,const std::nothrow_t&) noexcept {
+  try { return ::operator new(n); } catch(const std::bad_alloc&) { return nullptr; }
+}
+void operator delete(void* p,const std::nothrow_t&) noexcept { ::operator delete(p); }
+void* operator new[](std::size_t n) { return ::operator new(n); }
+void* operator new[](std::size_t n,const std::nothrow_t& tag) noexcept { return ::operator new(n,tag); }
+void operator delete[](void* p) noexcept { ::operator delete(p); }
+void operator delete[](void* p,std::size_t) noexcept { ::operator delete(p); }
+void operator delete[](void* p,const std::nothrow_t&) noexcept { ::operator delete(p); }
+struct DisarmInjection {
+  ~DisarmInjection(){track=false; fail=false; failAttempt=0;}
+};
 using namespace moho;
 struct Vector4f {
   float x=0,y=0,z=1,w=0;
@@ -103,7 +129,11 @@ template<std::size_t N>static bool has(Lane<N>&lane,std::size_t id) {
   return false;
 }
 static void reset() {
-  assert(live==0);
+  {
+    const bool passed=(live==0);
+    const PauseTracking pause;
+    ASSERT_TRUE(passed) << "live==0";
+  }
   track=false;
   fail=false;
   attempts=peak=failAttempt=0;
@@ -111,6 +141,7 @@ static void reset() {
   };
 }
 template<std::size_t N,class Method>void cases(const char*name,Method newM) {
+  const DisarmInjection disarm;
   const std::size_t cap=N/4;
   std::vector<CWldTerrainDecal*>v;
   v.reserve(objects.size());
@@ -127,13 +158,33 @@ template<std::size_t N,class Method>void cases(const char*name,Method newM) {
       fill(v,0,n);
       textureCalls=vertexCalls=0;
       (newLane.*newM)(v);
-      assert(textureCalls==std::min(n,limit));
-      assert(vertexCalls==(std::string(name)=="High"?std::min(n,limit):0));
-      assert(newLane.mSplatVertices.Size()==std::min(n,limit)*4);
-      assert(newLane.mSplatVertices.Capacity()<=std::max(cap,limit)*4);
+      {
+        const bool passed=(textureCalls==std::min(n,limit));
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "textureCalls==std::min(n,limit)";
+      }
+      {
+        const bool passed=(vertexCalls==(std::string(name)=="High"?std::min(n,limit):0));
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "vertexCalls==(std::string(name)==\"High\"?std::min(n,limit):0)";
+      }
+      {
+        const bool passed=(newLane.mSplatVertices.Size()==std::min(n,limit)*4);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "newLane.mSplatVertices.Size()==std::min(n,limit)*4";
+      }
+      {
+        const bool passed=(newLane.mSplatVertices.Capacity()<=std::max(cap,limit)*4);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "newLane.mSplatVertices.Capacity()<=std::max(cap,limit)*4";
+      }
       for(std::size_t i=0;i<newLane.mSplatVertices.Size();++i) {
         const auto&w=newLane.mSplatVertices[i];
-        assert(w.mPosition.x==float(i/4)&&w.mTexCoord.x==.2f&&w.mAlpha==2.f);
+        {
+          const bool passed=(w.mPosition.x==float(i/4)&&w.mTexCoord.x==.2f&&w.mAlpha==2.f);
+          const PauseTracking pause;
+          ASSERT_TRUE(passed) << "w.mPosition.x==float(i/4)&&w.mTexCoord.x==.2f&&w.mAlpha==2.f";
+        }
       }
       ++nCases;
     }
@@ -155,15 +206,35 @@ template<std::size_t N,class Method>void cases(const char*name,Method newM) {
       track=true;
       (lane.*newM)(v);
       track=false;
-      assert(attempts==0&&live==0&&lane.mSplatVertices.Size()==(cap-1)*4);
-      assert(state.failedBytes==123456&&state.skippedCalls==17);
-      assert(textureCalls==cap-1&&vertexCalls==(std::string(name)=="High"?cap-1:0));
+      {
+        const bool passed=(attempts==0&&live==0&&lane.mSplatVertices.Size()==(cap-1)*4);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "attempts==0&&live==0&&lane.mSplatVertices.Size()==(cap-1)*4";
+      }
+      {
+        const bool passed=(state.failedBytes==123456&&state.skippedCalls==17);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "state.failedBytes==123456&&state.skippedCalls==17";
+      }
+      {
+        const bool passed=(textureCalls==cap-1&&vertexCalls==(std::string(name)=="High"?cap-1:0));
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "textureCalls==cap-1&&vertexCalls==(std::string(name)==\"High\"?cap-1:0)";
+      }
       fill(v,0,100000,true);
       track=true;
       (lane.*newM)(v);
       track=false;
-      assert(attempts==0&&lane.mSplatVertices.Empty());
-      assert(state.failedBytes==123456&&state.skippedCalls==17);
+      {
+        const bool passed=(attempts==0&&lane.mSplatVertices.Empty());
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "attempts==0&&lane.mSplatVertices.Empty()";
+      }
+      {
+        const bool passed=(state.failedBytes==123456&&state.skippedCalls==17);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "state.failedBytes==123456&&state.skippedCalls==17";
+      }
     }
     reset();
   }
@@ -187,9 +258,21 @@ template<std::size_t N,class Method>void cases(const char*name,Method newM) {
       for(auto&w:objects[0].mSplatVertices)w.mPosition.z=distance[i];
       textureCalls=vertexCalls=0;
       (lane.*newM)(v);
-      assert(lane.mSplatVertices.Size()==(i==4?0:4));
-      for(auto&w:lane.mSplatVertices)assert(w.mAlpha==expected[i]);
-      assert(textureCalls==(i==4?0:1));
+      {
+        const bool passed=(lane.mSplatVertices.Size()==(i==4?0:4));
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "lane.mSplatVertices.Size()==(i==4?0:4)";
+      }
+      for(auto&w:lane.mSplatVertices){
+        const bool passed=(w.mAlpha==expected[i]);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "w.mAlpha==expected[i]";
+      }
+      {
+        const bool passed=(textureCalls==(i==4?0:1));
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "textureCalls==(i==4?0:1)";
+      }
     }
   }
   ren_SplatBudgetTier=1;
@@ -199,10 +282,18 @@ template<std::size_t N,class Method>void cases(const char*name,Method newM) {
     fill(v,0,cap*2);
     (newLane.*newM)(v);
     const auto target=cap+10;
-    assert(has(newLane,target));
+    {
+      const bool passed=(has(newLane,target));
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "has(newLane,target)";
+    }
     fill(v,cap,cap);
     (newLane.*newM)(v);
-    assert(has(newLane,target));
+    {
+      const bool passed=(has(newLane,target));
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "has(newLane,target)";
+    }
   }
   // Filtering BEFORE growth: enormous candidate set but <=inline eligible.
   reset();
@@ -211,16 +302,28 @@ template<std::size_t N,class Method>void cases(const char*name,Method newM) {
     Lane<N> lane;
     fill(v,0,100000,true);
     (lane.*newM)(v);
-    assert(lane.mSplatVertices.Empty()&&attempts==0);
+    {
+      const bool passed=(lane.mSplatVertices.Empty()&&attempts==0);
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "lane.mSplatVertices.Empty()&&attempts==0";
+    }
     fill(v,0,100000,true);
     for(std::size_t i=0;i<100;++i)for(auto&w:objects[i*2].mSplatVertices)w.mPosition.z=0;
     (lane.*newM)(v);
-    assert(lane.mSplatVertices.Size()==400&&attempts==0);
+    {
+      const bool passed=(lane.mSplatVertices.Size()==400&&attempts==0);
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "lane.mSplatVertices.Size()==400&&attempts==0";
+    }
     if(N==1000) {
       fill(v,0,100000);
       for(auto*p:v)static_cast<CWldSplat*>(p)->mFidelity=1;
       (lane.*newM)(v);
-      assert(lane.mSplatVertices.Empty()&&attempts==0);
+      {
+        const bool passed=(lane.mSplatVertices.Empty()&&attempts==0);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "lane.mSplatVertices.Empty()&&attempts==0";
+      }
     }
   }
   reset();
@@ -230,11 +333,23 @@ template<std::size_t N,class Method>void cases(const char*name,Method newM) {
     fill(v,0,cap+1);
     for(auto*p:v)static_cast<CWldSplat*>(p)->mCurrentAlpha=0;
     (lane.*newM)(v);
-    assert(lane.mSplatVertices.Size()==(cap+1)*4);
-    for(const auto&w:lane.mSplatVertices)assert(w.mAlpha==0);
+    {
+      const bool passed=(lane.mSplatVertices.Size()==(cap+1)*4);
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "lane.mSplatVertices.Size()==(cap+1)*4";
+    }
+    for(const auto&w:lane.mSplatVertices){
+      const bool passed=(w.mAlpha==0);
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "w.mAlpha==0";
+    }
     v.clear();
     (lane.*newM)(v);
-    assert(lane.mSplatVertices.Empty());
+    {
+      const bool passed=(lane.mSplatVertices.Empty());
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "lane.mSplatVertices.Empty()";
+    }
   }
   // Failed growth after full inline prefix: one attempt then 32 overflow skips.
   reset();
@@ -244,24 +359,48 @@ template<std::size_t N,class Method>void cases(const char*name,Method newM) {
     Lane<N> lane;
     fail=true;
     (lane.*newM)(v);
-    assert(lane.mSplatVertices.Size()==cap*4&&attempts==1&&live==0);
+    {
+      const bool passed=(lane.mSplatVertices.Size()==cap*4&&attempts==1&&live==0);
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "lane.mSplatVertices.Size()==cap*4&&attempts==1&&live==0";
+    }
     for(int i=0;i<32;++i) {
       (lane.*newM)(v);
-      assert(lane.mSplatVertices.Size()==cap*4&&attempts==1);
+      {
+        const bool passed=(lane.mSplatVertices.Size()==cap*4&&attempts==1);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "lane.mSplatVertices.Size()==cap*4&&attempts==1";
+      }
     }
     fail=false;
     (lane.*newM)(v);
-    assert(lane.mSplatVertices.Size()==(cap+1)*4&&attempts==2&&live==cap*2*112);
-    for(std::size_t i=0;i<lane.mSplatVertices.Size();++i)assert(lane.mSplatVertices[i].mPosition.x==float(i/4));
+    {
+      const bool passed=(lane.mSplatVertices.Size()==(cap+1)*4&&attempts==2&&live==cap*2*112);
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "lane.mSplatVertices.Size()==(cap+1)*4&&attempts==2&&live==cap*2*112";
+    }
+    for(std::size_t i=0;i<lane.mSplatVertices.Size();++i){
+      const bool passed=(lane.mSplatVertices[i].mPosition.x==float(i/4));
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "lane.mSplatVertices[i].mPosition.x==float(i/4)";
+    }
     auto*ptr=lane.mSplatVertices.data();
     const auto a=attempts;
     v.clear();
     (lane.*newM)(v);
-    assert(lane.mSplatVertices.data()==ptr&&attempts==a);
+    {
+      const bool passed=(lane.mSplatVertices.data()==ptr&&attempts==a);
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "lane.mSplatVertices.data()==ptr&&attempts==a";
+    }
     // Tier down releases oversized heap, invalid and original reset to inline.
     ren_SplatBudgetTier=0;
     (lane.*newM)(v);
-    assert(live==0&&lane.mSplatVertices.Capacity()==N);
+    {
+      const bool passed=(live==0&&lane.mSplatVertices.Capacity()==N);
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "live==0&&lane.mSplatVertices.Capacity()==N";
+    }
   }
   reset();
   // Peak bytes and allocations bounded per tier; settled frames allocate nothing.
@@ -275,18 +414,38 @@ template<std::size_t N,class Method>void cases(const char*name,Method newM) {
     {
       Lane<N> lane;
       (lane.*newM)(v);
-      assert(lane.mSplatVertices.Size()==limit*4&&live==limit*112&&peak<=limit*112*2);
+      {
+        const bool passed=(lane.mSplatVertices.Size()==limit*4&&live==limit*112&&peak<=limit*112*2);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "lane.mSplatVertices.Size()==limit*4&&live==limit*112&&peak<=limit*112*2";
+      }
       const auto a=attempts;
-      assert(a<=5);
+      {
+        const bool passed=(a<=5);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "a<=5";
+      }
       (lane.*newM)(v);
-      assert(attempts==a);
+      {
+        const bool passed=(attempts==a);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "attempts==a";
+      }
       std::printf("%s tier %d: limit=%zu heap=%zu peak_heap=%zu allocations=%zu\n",name,tier,limit,live,peak,attempts);
       ren_SplatBudgetTier=1;
       (lane.*newM)(v);
-      assert(lane.mSplatVertices.Size()==cap*4*4&&live==cap*4*112);
+      {
+        const bool passed=(lane.mSplatVertices.Size()==cap*4*4&&live==cap*4*112);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "lane.mSplatVertices.Size()==cap*4*4&&live==cap*4*112";
+      }
       ren_SplatBudgetTier=INT_MAX;
       (lane.*newM)(v);
-      assert(lane.mSplatVertices.Size()==(cap-1)*4&&live==0);
+      {
+        const bool passed=(lane.mSplatVertices.Size()==(cap-1)*4&&live==0);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "lane.mSplatVertices.Size()==(cap-1)*4&&live==0";
+      }
     }
     reset();
   }
@@ -297,12 +456,24 @@ template<std::size_t N,class Method>void cases(const char*name,Method newM) {
   {
     Lane<N> lane;
     (lane.*newM)(v);
-    assert(live==cap*2*112);
+    {
+      const bool passed=(live==cap*2*112);
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "live==cap*2*112";
+    }
     fill(v,0,cap*2+1);
     fail=true;
     (lane.*newM)(v);
-    assert(lane.mSplatVertices.Size()==cap*2*4&&live==cap*2*112);
-    for(std::size_t i=0;i<lane.mSplatVertices.Size();++i)assert(lane.mSplatVertices[i].mPosition.x==float(i/4));
+    {
+      const bool passed=(lane.mSplatVertices.Size()==cap*2*4&&live==cap*2*112);
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "lane.mSplatVertices.Size()==cap*2*4&&live==cap*2*112";
+    }
+    for(std::size_t i=0;i<lane.mSplatVertices.Size();++i){
+      const bool passed=(lane.mSplatVertices[i].mPosition.x==float(i/4));
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "lane.mSplatVertices[i].mPosition.x==float(i/4)";
+    }
   }
   reset();
   // Inject each of the five geometric-growth failures, not only first Reserve.
@@ -316,11 +487,27 @@ template<std::size_t N,class Method>void cases(const char*name,Method newM) {
       Lane<N> lane;
       (lane.*newM)(v);
       const auto kept=cap*(std::size_t(1)<<(failure-1));
-      assert(attempts==failure&&lane.mSplatVertices.Size()==kept*4);
-      for(std::size_t i=0;i<lane.mSplatVertices.Size();++i)assert(lane.mSplatVertices[i].mPosition.x==float(i/4));
-      assert(splat_detail::Backoff().skippedCalls==32);
+      {
+        const bool passed=(attempts==failure&&lane.mSplatVertices.Size()==kept*4);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "attempts==failure&&lane.mSplatVertices.Size()==kept*4";
+      }
+      for(std::size_t i=0;i<lane.mSplatVertices.Size();++i){
+        const bool passed=(lane.mSplatVertices[i].mPosition.x==float(i/4));
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "lane.mSplatVertices[i].mPosition.x==float(i/4)";
+      }
+      {
+        const bool passed=(splat_detail::Backoff().skippedCalls==32);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "splat_detail::Backoff().skippedCalls==32";
+      }
       (lane.*newM)(v);
-      assert(attempts==failure&&lane.mSplatVertices.Size()==kept*4);
+      {
+        const bool passed=(attempts==failure&&lane.mSplatVertices.Size()==kept*4);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "attempts==failure&&lane.mSplatVertices.Size()==kept*4";
+      }
     }
     reset();
   }
@@ -329,16 +516,44 @@ template<std::size_t N,class Method>void cases(const char*name,Method newM) {
 void backoffCases() {
   splat_detail::AllocationBackoff b;
   b.Failed(560000);
-  assert(b.Allow(56000));
+  {
+    const bool passed=(b.Allow(56000));
+    const PauseTracking pause;
+    ASSERT_TRUE(passed) << "b.Allow(56000)";
+  }
   b.Succeeded(56000);
-  assert(b.failedBytes==560000&&b.skippedCalls==32);
-  assert(!b.Allow(560000));
+  {
+    const bool passed=(b.failedBytes==560000&&b.skippedCalls==32);
+    const PauseTracking pause;
+    ASSERT_TRUE(passed) << "b.failedBytes==560000&&b.skippedCalls==32";
+  }
+  {
+    const bool passed=(!b.Allow(560000));
+    const PauseTracking pause;
+    ASSERT_TRUE(passed) << "!b.Allow(560000)";
+  }
   b.Failed(56000);
-  assert(!b.Allow(560000));
-  for(int i=0;i<31;++i)assert(!b.Allow(56000));
-  assert(b.Allow(56000));
+  {
+    const bool passed=(!b.Allow(560000));
+    const PauseTracking pause;
+    ASSERT_TRUE(passed) << "!b.Allow(560000)";
+  }
+  for(int i=0;i<31;++i){
+    const bool passed=(!b.Allow(56000));
+    const PauseTracking pause;
+    ASSERT_TRUE(passed) << "!b.Allow(56000)";
+  }
+  {
+    const bool passed=(b.Allow(56000));
+    const PauseTracking pause;
+    ASSERT_TRUE(passed) << "b.Allow(56000)";
+  }
   b.Succeeded(56000);
-  assert(b.failedBytes==0);
+  {
+    const bool passed=(b.failedBytes==0);
+    const PauseTracking pause;
+    ASSERT_TRUE(passed) << "b.failedBytes==0";
+  }
   // Consecutive smaller failures cannot alternate indefinitely: threshold falls.
   std::size_t previous=5600000;
   unsigned failures=0;
@@ -347,19 +562,35 @@ void backoffCases() {
   }) {
     if(b.Allow(bytes)) {
       b.Failed(bytes);
-      assert(bytes<=previous);
+      {
+        const bool passed=(bytes<=previous);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "bytes<=previous";
+      }
       previous=bytes;
       ++failures;
     }
   }
-  assert(failures==7);
+  {
+    const bool passed=(failures==7);
+    const PauseTracking pause;
+    ASSERT_TRUE(passed) << "failures==7";
+  }
   auto&shared=splat_detail::Backoff();
   shared.Failed(56000);
   std::thread worker([] {
-    assert(splat_detail::Backoff().failedBytes==0);splat_detail::Backoff().Failed(1);
+    {
+      const bool passed=(splat_detail::Backoff().failedBytes==0);
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "splat_detail::Backoff().failedBytes==0";
+    }splat_detail::Backoff().Failed(1);
   });
   worker.join();
-  assert(shared.failedBytes==56000);
+  {
+    const bool passed=(shared.failedBytes==56000);
+    const PauseTracking pause;
+    ASSERT_TRUE(passed) << "shared.failedBytes==56000";
+  }
   shared= {
   };
   puts("Backoff: smaller success preserves failure, decreasing bypass threshold, cross-thread isolation PASS");
@@ -368,10 +599,18 @@ void snapshotCase() {
   gpg::core::FastVectorN<CWldSplat::SplatVertex,1000>v;
   auto b=PrepareSplatOutput(v,1);
   ren_SplatBudgetTier=0;
-  assert(b.limit==1000&&TryGrowSplatOutput(v,b)&&b.available==500);
+  {
+    const bool passed=(b.limit==1000&&TryGrowSplatOutput(v,b)&&b.available==500);
+    const PauseTracking pause;
+    ASSERT_TRUE(passed) << "b.limit==1000&&TryGrowSplatOutput(v,b)&&b.available==500";
+  }
   // Existing snapshot unaffected.
   auto next=PrepareSplatOutput(v,ren_SplatBudgetTier);
-  assert(next.limit==249&&v.Capacity()==1000);
+  {
+    const bool passed=(next.limit==249&&v.Capacity()==1000);
+    const PauseTracking pause;
+    ASSERT_TRUE(passed) << "next.limit==249&&v.Capacity()==1000";
+  }
   puts("Per-view snapshot and next-view downshift PASS");
 }
 #ifdef HAS_BASELINE
@@ -392,27 +631,40 @@ void baselineCases(Method oldM,Method newM) {
     const auto tc=textureCalls,vc=vertexCalls;
     textureCalls=vertexCalls=0;
     (newLane.*newM)(v);
-    assert(tc==textureCalls&&vc==vertexCalls);
-    assert(oldLane.mSplatVertices.Size()==newLane.mSplatVertices.Size());
+    {
+      const bool passed=(tc==textureCalls&&vc==vertexCalls);
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "tc==textureCalls&&vc==vertexCalls";
+    }
+    {
+      const bool passed=(oldLane.mSplatVertices.Size()==newLane.mSplatVertices.Size());
+      const PauseTracking pause;
+      ASSERT_TRUE(passed) << "oldLane.mSplatVertices.Size()==newLane.mSplatVertices.Size()";
+    }
     for(std::size_t i=0;i<oldLane.mSplatVertices.Size();++i) {
       auto&a=oldLane.mSplatVertices[i];
       auto&b=newLane.mSplatVertices[i];
-      assert(a.mPosition.x==b.mPosition.x&&a.mTexCoord.x==b.mTexCoord.x&&a.mAlpha==b.mAlpha);
+      {
+        const bool passed=(a.mPosition.x==b.mPosition.x&&a.mTexCoord.x==b.mTexCoord.x&&a.mAlpha==b.mAlpha);
+        const PauseTracking pause;
+        ASSERT_TRUE(passed) << "a.mPosition.x==b.mPosition.x&&a.mTexCoord.x==b.mTexCoord.x&&a.mAlpha==b.mAlpha";
+      }
     }
   }
 }
 #endif
-int main() {
-  cases<10000>("High",&Lane<10000>::NewHigh);
-  cases<10000>("Medium",&Lane<10000>::NewMedium);
-  cases<1000>("Low",&Lane<1000>::NewLow);
-  backoffCases();
-  snapshotCase();
+class SplatCollection : public testing::Test {
+ protected:
+  void SetUp() override { track=false; reset(); }
+  void TearDown() override { track=false; fail=false; failAttempt=0; }
+};
+TEST_F(SplatCollection, High) { cases<10000>("High",&Lane<10000>::NewHigh); }
+TEST_F(SplatCollection, Medium) { cases<10000>("Medium",&Lane<10000>::NewMedium); }
+TEST_F(SplatCollection, Low) { cases<1000>("Low",&Lane<1000>::NewLow); }
+TEST_F(SplatCollection, Backoff) { backoffCases(); }
+TEST_F(SplatCollection, Snapshot) { snapshotCase(); }
 #ifdef HAS_BASELINE
-  baselineCases<10000>(&Lane<10000>::BaseHigh,&Lane<10000>::NewHigh);
-  baselineCases<10000>(&Lane<10000>::BaseMedium,&Lane<10000>::NewMedium);
-  baselineCases<1000>(&Lane<1000>::BaseLow,&Lane<1000>::NewLow);
-  puts("Optional baseline: default contents and texture/update calls identical");
+TEST_F(SplatCollection, BaselineHigh) { baselineCases<10000>(&Lane<10000>::BaseHigh,&Lane<10000>::NewHigh); }
+TEST_F(SplatCollection, BaselineMedium) { baselineCases<10000>(&Lane<10000>::BaseMedium,&Lane<10000>::NewMedium); }
+TEST_F(SplatCollection, BaselineLow) { baselineCases<1000>(&Lane<1000>::BaseLow,&Lane<1000>::NewLow); }
 #endif
-  puts("PASS: collection source-bound host checks; not native ABI/culling/GPU/FPS acceptance");
-}

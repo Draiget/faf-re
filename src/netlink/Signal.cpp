@@ -52,6 +52,9 @@ namespace faf::netlink
     o.Set("password", msg.password);
     o.Set("ufrag", msg.ufrag);
     o.Set("candidates", std::move(candidates));
+    if (!msg.fafPath.empty()) {
+      o.Set("fafPath", msg.fafPath);
+    }
     return WriteJson(o);
   }
 
@@ -76,6 +79,9 @@ namespace faf::netlink
     msg.destId = doc->Get("destId").AsInt();
     msg.password = doc->Get("password").AsString();
     msg.ufrag = doc->Get("ufrag").AsString();
+    if (const JsonValue* path = doc->Find("fafPath"); path != nullptr) {
+      msg.fafPath = path->AsString();
+    }
     for (const JsonValue& o : list.Items()) {
       Candidate c;
       c.foundation = o.Get("foundation").AsString();

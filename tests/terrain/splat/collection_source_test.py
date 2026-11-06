@@ -4,7 +4,7 @@ from source_extract import (LANES, TERRAIN, Sources, collection_method, compile_
                             prepare_fastvector, prepare_types, replace_exact, unique, write)
 
 
-def run(source, temp, cxx='g++', sanitize=False, wildmagic=None, baseline=None, mutation=None):
+def run(source, temp, cxx='g++', sanitize=False, wildmagic=None, baseline=None, gtest=None, mutation=None):
     sources = Sources()
     prepare_fastvector(source, temp, sources)
     prepare_types(source, temp, sources, wildmagic)
@@ -32,5 +32,5 @@ def run(source, temp, cxx='g++', sanitize=False, wildmagic=None, baseline=None, 
         sources.adapt('Intentional behavior mutation: ' + mutation[3], 1)
     sources.generated(temp)
     print('COLLECTION_SOURCE_MANIFEST ' + json.dumps(sources.manifest(), sort_keys=True), flush=True)
-    result = compile_run(temp, cxx, sanitize, negative=mutation is not None)
+    result = compile_run(temp, cxx, sanitize, negative=mutation is not None, gtest=gtest)
     return sources.manifest() | result

@@ -14,7 +14,7 @@ MOCK_HEADERS = (
 )
 
 
-def run(source, temp, cxx='g++', sanitize=False, wildmagic=None, baseline=None, negative=False):
+def run(source, temp, cxx='g++', sanitize=False, wildmagic=None, baseline=None, gtest=None, negative=False):
     sources = Sources()
     prepare_types(source, temp, sources, wildmagic)
     header = sources.read(source, TERRAIN + 'SplatChunkRenderer.h')
@@ -49,5 +49,5 @@ def run(source, temp, cxx='g++', sanitize=False, wildmagic=None, baseline=None, 
     write(temp, 'main.cpp', ('#define HAS_BASELINE 1\n' if baseline else '') + fixture)
     sources.generated(temp)
     print('DRAW_SOURCE_MANIFEST ' + json.dumps(sources.manifest(), sort_keys=True), flush=True)
-    result = compile_run(temp, cxx, sanitize, negative=negative)
+    result = compile_run(temp, cxx, sanitize, negative=negative, gtest=gtest)
     return sources.manifest() | result

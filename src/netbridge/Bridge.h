@@ -18,6 +18,7 @@
 
 #include "netbridge/GpgNet.h"
 #include "netbridge/Socket.h"
+#include "netlink/GameCounters.h"
 #include "netlink/Json.h"
 #include "netlink/Link.h"
 
@@ -67,30 +68,8 @@ namespace faf::netbridge
     int statsIntervalSec = 10;
   };
 
-  // Counts read from the game protocol's 15-byte header (SNetPacketHeader:
-  // type +0, serial +5, sequence +9). Every packet a connection sends, resends
-  // included, takes the next serial; a resent DATA packet keeps its sequence.
-  struct GameCounters
-  {
-    // From the game, toward the peer.
-    std::uint64_t sent = 0;
-    std::uint64_t dataResends = 0; // DATA with a sequence number sent before
-    // From the peer, toward the game.
-    std::uint64_t received = 0;
-    std::uint64_t lost = 0;    // serial numbers not seen (yet)
-    std::uint64_t repeats = 0; // serial numbers seen twice (duplicates)
-    std::uint64_t late = 0;    // older than the newest, first time seen
-
-    void OnSent(const unsigned char* d, std::size_t n);
-    void OnReceived(const unsigned char* d, std::size_t n);
-
-  private:
-    bool mHaveSeq = false;
-    std::uint16_t mTopSeq = 0;
-    bool mHaveSerial = false;
-    std::uint16_t mTopSerial = 0;
-    std::uint64_t mSeenMask = 0; // bit i: serial mTopSerial - i seen
-  };
+  // The game protocol's counts per peer (netlink/GameCounters.h, issue #241).
+  using netlink::GameCounters;
 
   // Parses the launcher's command line (IceOptions). Unknown options are
   // skipped, as picocli's unmatched-arguments mode does.

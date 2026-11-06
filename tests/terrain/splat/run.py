@@ -21,6 +21,7 @@ def main():
     parser.add_argument('--baseline', '--baseline-root', type=Path, help='optional old checkout for default/small-path equivalence')
     parser.add_argument('--wildmagic', '--wildmagic-root', type=Path, help='existing WildMagic source root with Foundation/Math')
     parser.add_argument('--cxx', default='g++', help='existing GCC/Clang-compatible C++20 compiler')
+    parser.add_argument('--gtest-root', type=Path, help='existing GoogleTest root containing include/ and src/')
     parser.add_argument('--sanitize', action='store_true', help='ASan+UBSan; leak checking explicitly disabled')
     parser.add_argument('--only', choices=('all', 'collection', 'draw', 'ui'), default='all')
     parser.add_argument('--negative', action='store_true', help='also compile and behavior-reject seven mutations')
@@ -33,10 +34,12 @@ def main():
     if args.only == 'ui' and not args.faf_root:
         parser.error('--only ui requires --faf-root and --lua')
     source = args.source.resolve()
+    if (args.only != 'ui' or args.negative) and not args.gtest_root:
+        parser.error('--gtest-root is required for C++ host gates (no downloads)')
     with tempfile.TemporaryDirectory(prefix='splat-source-host-') as directory:
         temp = Path(directory)
         common = dict(source=source, cxx=args.cxx, sanitize=args.sanitize,
-                      wildmagic=args.wildmagic, baseline=args.baseline)
+                      wildmagic=args.wildmagic, baseline=args.baseline, gtest=args.gtest_root)
         if args.only in ('all', 'collection'):
             collection_source_test.run(temp=temp/'collection', **common)
         if args.only in ('all', 'draw'):
@@ -48,7 +51,7 @@ def main():
             print('UI NOT RUN: supply both --faf-root and --lua to enable compatibility checks')
         if args.negative:
             from negative_controls import run
-            run(source, temp/'negative', args.cxx, args.wildmagic)
+            run(source, temp/'negative', args.cxx, args.wildmagic, args.gtest_root)
     print('PASS requested host gates; native renderer/ABI/GPU/performance acceptance remains separate')
 
 

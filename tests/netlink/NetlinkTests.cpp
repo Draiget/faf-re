@@ -31,18 +31,18 @@
 #include <thread>
 #include <vector>
 
+#include <gtest/gtest.h>
+
 using namespace faf::netlink;
 
 namespace
 {
-  int gFailures = 0;
+  std::string gBind;
+  int gDatagrams = 10000;
 
   void Check(const bool ok, const char* what)
   {
-    std::printf("%s %s\n", ok ? "ok  " : "FAIL", what);
-    if (!ok) {
-      ++gFailures;
-    }
+    EXPECT_TRUE(ok) << what;
   }
 
   // From docs/launcher-adapter-contract/trace-2p.jsonl: the shipped adapter's
@@ -684,6 +684,101 @@ namespace
     Check(n.atA.size() == 500 && n.atB.size() == 500 && n.corrupt == 0, "and game datagrams still flow");
   }
 
+  // Issue #321: Reconnect on either end drops a sealed connection and the offerer
+  // starts a new attempt; after GameEnded it does nothing. Whether the new attempt
+  // connects needs a STUN or TURN server: an attempt within 2 minutes of another
+  // offers no host candidates (kForceSrflxCount, as the Java adapter), and this
+  // test has none. A game with a TURN server checks that part.
+  void ReconnectTest(const std::string& bind, const bool onOfferer)
+  {
+    const char* const side = onOfferer ? "offerer" : "answerer";
+    std::unique_ptr<Link> a;
+    std::unique_ptr<Link> b;
+    std::atomic<bool> answererDropped{false};
+    auto callbacks = [&](std::unique_ptr<Link>& other, const char* name) {
+      LinkCallbacks cb;
+      cb.onSignal = [&other](const CandidatesMessage& m) { other->OnSignal(*CandidatesMessageFromJson(ToJson(m))); };
+      cb.onLog = [name](const std::string& text) { std::printf("    %s: %s\n", name, text.c_str()); };
+      cb.onConnected = [&answererDropped, name](const bool up) {
+        if (!up && std::strcmp(name, "answerer") == 0) {
+          answererDropped = true;
+        }
+      };
+      return cb;
+    };
+    LinkOptions o;
+    o.bindAddress = bind;
+    o.ufragPrefix = kOurUfragPrefix;
+    o.redundancy = 2;
+    LinkOptions oa = o;
+    oa.localId = 1;
+    oa.remoteId = 2;
+    oa.offerer = true;
+    LinkOptions ob = o;
+    ob.localId = 2;
+    ob.remoteId = 1;
+    a = std::make_unique<Link>(oa, callbacks(b, "offerer"));
+    b = std::make_unique<Link>(ob, callbacks(a, "answerer"));
+    std::atomic<bool> stop{false};
+    std::thread ticker([&] {
+      while (!stop) {
+        a->Tick();
+        b->Tick();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+    });
+    const auto waitFor = [](const int seconds, const std::function<bool()>& done) {
+      const auto t0 = std::chrono::steady_clock::now();
+      while (!done() && std::chrono::steady_clock::now() < t0 + std::chrono::seconds(seconds)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      }
+      return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    };
+    const auto sealedUp = [&] {
+      return a->IsConnected() && b->IsConnected() && a->GetStats().laneEncrypted && b->GetStats().laneEncrypted;
+    };
+    a->Start();
+    b->Start();
+    waitFor(20, sealedUp);
+    Check(sealedUp(), (std::string("reconnect on the ") + side + ": the pair connects, lane sealed").c_str());
+
+    Link& asked = onOfferer ? *a : *b;
+    if (onOfferer) {
+      // The answerer still answers new offers after its own GameEnded.
+      b->SetGameEnded();
+      b->Reconnect();
+      std::this_thread::sleep_for(std::chrono::milliseconds(300));
+      Check(sealedUp() && a->GetStats().attempts == 1, "after GameEnded, Reconnect does nothing");
+    }
+
+    const std::uint32_t before = a->GetStats().attempts;
+    asked.Reconnect();
+    const double seconds = waitFor(20, [&] { return answererDropped.load() && a->GetStats().attempts > before; });
+    std::printf("  reconnect on the %s: dropped and attempt %u started after %.1f s\n", side, a->GetStats().attempts,
+                seconds);
+    Check(answererDropped.load() && a->GetStats().attempts > before,
+          (std::string("reconnect on the ") + side + ": the connection drops and the offerer starts a new attempt").c_str());
+
+    if (onOfferer) {
+      // Issue #322: a picked path holds over the attempt policy, so "no relay" offers
+      // host candidates again and the pair comes back.
+      PathChoice direct;
+      direct.mode = PathChoice::Mode::NoRelay;
+      a->Reconnect(direct);
+      const double back = waitFor(20, sealedUp);
+      const LinkStats s = a->GetStats();
+      std::printf("  reconnect with 'no relay': connected %d after %.1f s, path %s/%s, picked %s\n", sealedUp(), back,
+                  s.localType.c_str(), s.remoteType.c_str(), PathChoiceText(s.choice).c_str());
+      Check(sealedUp() && s.choice == direct && s.localType == "host",
+            "reconnect with a picked path: 'no relay' connects over host candidates, lane sealed");
+    }
+
+    stop = true;
+    ticker.join();
+    a->Close();
+    b->Close();
+  }
+
   // Issue #289, for a packet capture: sends `count` datagrams that hold a
   // readable marker each way, on a lane that is sealed (sealed=true) or plain,
   // and prints the ufrags signalled. A capture of the sealed run must not hold
@@ -762,33 +857,38 @@ namespace
   }
 } // namespace
 
+TEST(Existing_Netlink, UnitTests) { UnitTests(); }
+TEST(Existing_Netlink, KeyUnitTests) { KeyUnitTests(); }
+TEST(Existing_Netlink, EncryptedLane) { EncryptedLaneTest(gBind); }
+TEST(Existing_Netlink, ReconnectOnOfferer) { ReconnectTest(gBind, true); }
+TEST(Existing_Netlink, ReconnectOnAnswerer) { ReconnectTest(gBind, false); }
+TEST(Existing_Netlink, Loopback) { LoopbackTest(gBind, gDatagrams); }
+TEST(Existing_Netlink, Lane) { LaneTest(gBind, 2000); }
+TEST(Existing_Netlink, OurPeer) { OurPeerTest(gBind); }
+TEST(Existing_Netlink, SilentIceServer) { SilentIceServerTest(gBind); }
+TEST(Existing_Netlink, Duplicate) { DuplicateTest(gBind); }
+TEST(Existing_Netlink, WebRtc) { WebRtcTest(gBind); }
+TEST(Existing_Netlink, LaneWebRtcSetup) { LaneWebRtcSetupTest(gBind); }
+
 int main(int argc, char** argv)
 {
-  std::string bind;
-  int count = 10000;
+  ::testing::InitGoogleTest(&argc, argv);
   std::string marker;
   for (int i = 1; i + 1 < argc; i += 2) {
     if (std::strcmp(argv[i], "--bind") == 0) {
-      bind = argv[i + 1];
+      gBind = argv[i + 1];
     } else if (std::strcmp(argv[i], "--datagrams") == 0) {
-      count = std::atoi(argv[i + 1]);
+      gDatagrams = std::atoi(argv[i + 1]);
     } else if (std::strcmp(argv[i], "--marker") == 0) {
-      marker = argv[i + 1]; // sealed | plain: only the capture run (#289)
+      marker = argv[i + 1]; // sealed | plain: only the capture run (#289); reconnect: only #321's tests
     }
   }
-  if (!marker.empty()) {
-    return MarkerRun(bind, marker == "sealed", 500);
+  if (marker == "reconnect") {
+    GTEST_FLAG_SET(filter, "Existing_Netlink.Reconnect*");
+    return RUN_ALL_TESTS();
   }
-  UnitTests();
-  KeyUnitTests();
-  EncryptedLaneTest(bind);
-  LoopbackTest(bind, count);
-  LaneTest(bind, 2000);
-  OurPeerTest(bind);
-  SilentIceServerTest(bind);
-  DuplicateTest(bind);
-  WebRtcTest(bind);
-  LaneWebRtcSetupTest(bind);
-  std::printf("%s (%d failures)\n", gFailures == 0 ? "PASS" : "FAIL", gFailures);
-  return gFailures == 0 ? 0 : 1;
+  if (!marker.empty()) {
+    return MarkerRun(gBind, marker == "sealed", 500);
+  }
+  return RUN_ALL_TESTS();
 }

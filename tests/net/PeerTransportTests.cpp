@@ -23,18 +23,18 @@
 #include <thread>
 #include <vector>
 
+#include <gtest/gtest.h>
+
 using namespace moho;
 
 namespace
 {
-  int gFailures = 0;
+  static u_long gSocketHost = 0x7F000001;
 
   void Check(const bool ok, const char* what)
   {
+    EXPECT_TRUE(ok) << what;
     std::printf("%s %s\n", ok ? "ok  " : "FAIL", what);
-    if (!ok) {
-      ++gFailures;
-    }
   }
 
   // Any type outside 200..209: those are connection events the receiving
@@ -131,57 +131,51 @@ namespace
   }
 } // namespace
 
+TEST(Existing_PeerTransport, DirectSockets)
+{
+  ASSERT_TRUE(NET_Init()) << "NET_Init failed";
+  auto* a = static_cast<CNetUDPConnector*>(NET_MakeUDPConnector(0, {}));
+  auto* b = static_cast<CNetUDPConnector*>(NET_MakeUDPConnector(0, {}));
+  Check(a != nullptr && b != nullptr, "two connectors bound");
+  Check(!NET_PeerTransportsActive(), "no transport registered");
+  Exchange(a, b, gSocketHost, b->GetLocalPort(), gSocketHost, a->GetLocalPort(), "socket path, both directions in order");
+  a->Destroy();
+  b->Destroy();
+}
+
+TEST(Existing_PeerTransport, VirtualTransports)
+{
+  ASSERT_TRUE(NET_Init()) << "NET_Init failed";
+  auto* a = static_cast<CNetUDPConnector*>(NET_MakeUDPConnector(0, {}));
+  auto* b = static_cast<CNetUDPConnector*>(NET_MakeUDPConnector(0, {}));
+  constexpr std::uint32_t kAddrA = 0x0AFF0001; // 10.255.0.1
+  constexpr std::uint32_t kAddrB = 0x0AFF0002; // 10.255.0.2
+  auto toB = std::make_shared<Pipe>();
+  toB->to = b;
+  toB->fromAddr = kAddrA;
+  toB->fromPort = 1;
+  auto toA = std::make_shared<Pipe>();
+  toA->to = a;
+  toA->fromAddr = kAddrB;
+  toA->fromPort = 2;
+  NET_SetPeerTransport(a, kAddrB, 2, toB);
+  NET_SetPeerTransport(b, kAddrA, 1, toA);
+  Check(NET_PeerTransportsActive(), "two transports registered");
+  Exchange(a, b, kAddrB, 2, kAddrA, 1, "transport path, both directions in order");
+  std::printf("  datagrams through the transports: %d to b, %d to a\n", toB->datagrams, toA->datagrams);
+  Check(toB->datagrams > 0 && toA->datagrams > 0, "every datagram went through a transport");
+  a->Destroy();
+  b->Destroy();
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+}
+
 int main(int argc, char** argv)
 {
-  if (!NET_Init()) {
-    std::printf("NET_Init failed\n");
-    return 1;
-  }
-  // --host <ip>: where the socket pair reaches each other (default 127.0.0.1),
-  // for machines that drop loopback UDP to sockets bound to 0.0.0.0.
-  u_long socketHost = 0x7F000001;
+  ::testing::InitGoogleTest(&argc, argv);
   for (int i = 1; i + 1 < argc; ++i) {
     if (std::strcmp(argv[i], "--host") == 0) {
-      socketHost = ::ntohl(::inet_addr(argv[i + 1]));
+      gSocketHost = ::ntohl(::inet_addr(argv[i + 1]));
     }
   }
-
-  // 1. Over the sockets: the table is empty and nothing changes.
-  {
-    auto* a = static_cast<CNetUDPConnector*>(NET_MakeUDPConnector(0, {}));
-    auto* b = static_cast<CNetUDPConnector*>(NET_MakeUDPConnector(0, {}));
-    Check(a != nullptr && b != nullptr, "two connectors bound");
-    Check(!NET_PeerTransportsActive(), "no transport registered");
-    Exchange(a, b, socketHost, b->GetLocalPort(), socketHost, a->GetLocalPort(), "socket path, both directions in order");
-    a->Destroy();
-    b->Destroy();
-  }
-
-  // 2. Through transports, to addresses no socket could reach.
-  {
-    auto* a = static_cast<CNetUDPConnector*>(NET_MakeUDPConnector(0, {}));
-    auto* b = static_cast<CNetUDPConnector*>(NET_MakeUDPConnector(0, {}));
-    constexpr std::uint32_t kAddrA = 0x0AFF0001; // 10.255.0.1
-    constexpr std::uint32_t kAddrB = 0x0AFF0002; // 10.255.0.2
-    auto toB = std::make_shared<Pipe>();
-    toB->to = b;
-    toB->fromAddr = kAddrA;
-    toB->fromPort = 1;
-    auto toA = std::make_shared<Pipe>();
-    toA->to = a;
-    toA->fromAddr = kAddrB;
-    toA->fromPort = 2;
-    NET_SetPeerTransport(a, kAddrB, 2, toB);
-    NET_SetPeerTransport(b, kAddrA, 1, toA);
-    Check(NET_PeerTransportsActive(), "two transports registered");
-    Exchange(a, b, kAddrB, 2, kAddrA, 1, "transport path, both directions in order");
-    std::printf("  datagrams through the transports: %d to b, %d to a\n", toB->datagrams, toA->datagrams);
-    Check(toB->datagrams > 0 && toA->datagrams > 0, "every datagram went through a transport");
-    a->Destroy();
-    b->Destroy();
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-  }
-
-  std::printf("%s (%d failures)\n", gFailures == 0 ? "PASS" : "FAIL", gFailures);
-  return gFailures == 0 ? 0 : 1;
+  return RUN_ALL_TESTS();
 }

@@ -3,20 +3,27 @@
 These are small host tests of the **live checkout**, not a standalone renderer,
 retail-layout build, full engine link, GPU test, or game-performance benchmark.
 No baseline checkout or historical test harness is required for normal acceptance.
-Python 3.9+ and a GCC/Clang-compatible C++20 compiler are required. There are no
-Python packages, downloads, generated checked-in files, or workflow changes.
+Python 3.9+, a GCC/Clang-compatible C++20 compiler, and an existing GoogleTest
+source checkout are required (validated with the upstream-pinned 1.15.2). There
+are no Python packages, automatic downloads, generated checked-in files, or
+workflow changes. The C++ fixtures use GoogleTest assertions, named test cases,
+and the upstream `gtest_main`; they do not supply a custom test entry point.
 
-From a complete faf-re checkout:
+From a complete faf-re checkout, set `GTEST_ROOT` to the existing GoogleTest
+subdirectory containing `include/gtest/gtest.h` and `src/gtest-all.cc`:
 
 ```sh
-python3 tests/terrain/splat/run.py --source .
-python3 tests/terrain/splat/run.py --source . --cxx g++ --sanitize
-python3 tests/terrain/splat/run.py --source . --negative
+python3 tests/terrain/splat/run.py --source . --gtest-root "$GTEST_ROOT"
+python3 tests/terrain/splat/run.py --source . --gtest-root "$GTEST_ROOT" --cxx g++ --sanitize
+python3 tests/terrain/splat/run.py --source . --gtest-root "$GTEST_ROOT" --negative
 ```
 
 `--sanitize` enables ASan and UBSan, with no UB recovery. Leak checking is
 explicitly disabled because this isolated test replaces global new/delete to
-inject deterministic allocation failures. Do not reuse that allocator in a
+inject deterministic allocation failures. Test expressions are evaluated with
+tracking unchanged; a scoped pause then keeps GoogleTest assertion reporting
+out of allocation counts and injected failures. Each collection test resets the
+injection state. Do not reuse that allocator in a
 full engine-linked test. Only the host compiler command is supported; these
 scripts are not an MSVC/native-build alternative.
 
@@ -24,17 +31,17 @@ Optional source and compatibility inputs:
 
 ```sh
 # Compile the existing WildMagic copy/assignment bodies instead of math mocks.
-python3 tests/terrain/splat/run.py --source . --wildmagic /path/to/WildMagic
+python3 tests/terrain/splat/run.py --source . --gtest-root "$GTEST_ROOT" --wildmagic /path/to/WildMagic
 
 # Additional original-default and small-draw equivalence, not the main oracle.
-python3 tests/terrain/splat/run.py --source . --baseline /path/to/original/faf-re
+python3 tests/terrain/splat/run.py --source . --gtest-root "$GTEST_ROOT" --baseline /path/to/original/faf-re
 
 # FAF dialect: production Lua bytes are unchanged.
-python3 tests/terrain/splat/run.py --source . \
+python3 tests/terrain/splat/run.py --source . --gtest-root "$GTEST_ROOT" \
   --faf-root /path/to/FAF --lua /path/to/faf-lua
 
 # Explicit stock-Lua compatibility adapter (tested with texlua/Lua 5.3).
-python3 tests/terrain/splat/run.py --source . --only ui \
+python3 tests/terrain/splat/run.py --source . --gtest-root "$GTEST_ROOT" --only ui \
   --faf-root /path/to/FAF --lua texlua --lua-dialect stock
 ```
 
@@ -79,7 +86,8 @@ stdout before compilation/execution; redirect stdout if a local record is wanted
 - Seven opt-in negative controls restore each lane's old cap, alter the default
   off-by-one, remove OOM backoff, erase a large failure after smaller success,
   and omit multipass reupload. **Each must compile successfully and then fail a
-  runtime assertion**. A parser/compile failure is not a detected mutation.
+  GoogleTest assertion** (exit code 1 with failure diagnostics). A parser/compile
+  failure, signal termination, or unrelated exception is not a detected mutation.
 
 ## Explicit host adaptations and limits
 
@@ -112,7 +120,8 @@ are extracted unchanged from `src/moho/render/d3d/CD3DDevice.cpp`. The effect,
 streams, device and text flush implementation remain mocks; text flush is an
 ordered event, not a simulated text render. These tests cannot establish backend
 resource transitions, buffer lifetimes across real drivers, culling or image
-correctness. Native CTest/build and actual game/renderer acceptance remain
+correctness. The optional Lua-only gate does not require `--gtest-root`. Native CTest/build
+and actual game/renderer acceptance remain
 separate gates.
 
 UI stock mode performs only documented exact-count replacements in the Python

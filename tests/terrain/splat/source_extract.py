@@ -194,10 +194,16 @@ def prepare_fastvector(source, out, sources):
     sources.adapt('FastVector retail-x86 sizeof assertions removed; all other assertions retained', 5)
 
 
-def compile_run(out, cxx, sanitize=False, negative=False):
+def compile_run(out, cxx, sanitize=False, negative=False, gtest=None):
     compiler = shutil.which(cxx) or str(Path(cxx).resolve())
     command = [compiler, '-std=c++20', '-O1', '-g', '-pthread', '-Wall', '-Wextra', '-Werror',
                '-Wno-error=mismatched-new-delete', '-I', str(out), str(out / 'main.cpp'), '-o', str(out / 'test')]
+    require(gtest is not None, 'GoogleTest source root is required')
+    gtest = Path(gtest).resolve()
+    for relative in ('include/gtest/gtest.h', 'src/gtest-all.cc', 'src/gtest_main.cc'):
+        require((gtest / relative).is_file(), f'Missing GoogleTest input: {gtest / relative}')
+    command.extend(['-I', str(gtest / 'include'), '-I', str(gtest),
+                    str(gtest / 'src/gtest-all.cc'), str(gtest / 'src/gtest_main.cc')])
     if sanitize:
         command[1:1] = ['-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']
     result = subprocess.run(command, capture_output=True, text=True, cwd=out, timeout=180)
@@ -209,12 +215,13 @@ def compile_run(out, cxx, sanitize=False, negative=False):
         env['ASAN_OPTIONS'] = 'detect_leaks=0'
     result = subprocess.run([str(out / 'test')], capture_output=True, text=True, env=env, cwd=out, timeout=120)
     if negative:
-        require(result.returncode != 0 and 'Assertion' in result.stderr,
-                'Negative control must compile and fail a runtime assertion:\n' + result.stdout + result.stderr)
-        print('PASS mutation: compiled successfully and runtime assertion rejected it')
-        print(result.stderr.strip().splitlines()[-1])
+        require(result.returncode == 1 and '[  FAILED  ]' in result.stdout and 'Failure' in result.stdout
+                and 'C++ exception' not in result.stdout and 'unknown file: Failure' not in result.stdout,
+                'Negative control must compile and fail a GoogleTest assertion:\n' + result.stdout + result.stderr)
+        print('PASS mutation: compiled successfully and GoogleTest assertion rejected it')
+        print(next(line for line in result.stdout.splitlines() if '[  FAILED  ]' in line))
     else:
         print(result.stdout, end='')
-        require(result.returncode == 0, 'Host test FAILED:\n' + result.stderr)
+        require(result.returncode == 0, 'Host test FAILED:\n' + result.stdout + result.stderr)
     return {'compiler': compiler, 'sanitize': sanitize, 'compiled': True,
             'runtime_assertion_rejection': negative, 'returncode': result.returncode}

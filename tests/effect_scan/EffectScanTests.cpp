@@ -2,6 +2,7 @@
 // find, on generated text made of the tokens those patterns care about.
 
 #include <cstdio>
+#include <gtest/gtest.h>
 #include <cstdint>
 #include <random>
 #include <regex>
@@ -55,7 +56,12 @@ namespace
 
   void Report(const char* const what, const std::string& text, const Rows& expected, const Rows& actual)
   {
-    if (expected == actual || ++gFailures > 10) {
+    if (expected == actual) {
+      return;
+    }
+    ++gFailures;
+    EXPECT_EQ(expected, actual) << what << " differs on: <<" << text << ">>";
+    if (gFailures > 10) {
       return;
     }
     std::printf("%s differs on: <<%s>>\n  regex %zu rows, scan %zu rows\n", what, text.c_str(), expected.size(), actual.size());
@@ -174,7 +180,7 @@ namespace
   }
 } // namespace
 
-int main()
+TEST(Existing_EffectScan, MatchesRegexTokens)
 {
   std::mt19937 random(0x5EED2007U);
   constexpr int kCases = 60000;
@@ -182,5 +188,5 @@ int main()
     CheckAll(Generate(random));
   }
   std::printf("effect scan: %d generated texts, %d differences\n", kCases, gFailures);
-  return gFailures == 0 ? 0 : 1;
+  EXPECT_EQ(gFailures, 0);
 }

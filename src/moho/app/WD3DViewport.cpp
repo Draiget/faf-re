@@ -1,4 +1,5 @@
 #include "moho/app/WxPrivate.h"
+#include "moho/app/NetworkPanel.h"
 
 
 // ---------------------------------------------------------------------------
@@ -194,6 +195,31 @@ long moho::WD3DViewport::MSWWindowProc(
       D3D_InitCursor();
       (void)device->ShowCursor(device->IsCursorShowing());
       return 1;
+    }
+  }
+
+  // Engine addition (issue #322): Ctrl+Shift+F11 flips the network panel, here so it works
+  // in the lobby, in a game and in fullscreen without the Lua key map. F11 alone is FAF's
+  // connectivity screen. Only the first press of a held key counts (lParam bit 30).
+  if (message == WM_KEYDOWN && wParam == VK_F11 && (lParam & 0x40000000) == 0 &&
+      (::GetKeyState(VK_CONTROL) & 0x8000) != 0 && (::GetKeyState(VK_SHIFT) & 0x8000) != 0) {
+    NETPANEL_Toggle();
+    return 0;
+  }
+
+  // Engine addition (issue #322): presses on the open network panel go to the panel, with
+  // the release that ends them; the game never sees them. Moves still reach the game.
+  if ((message >= WM_MOUSEMOVE && message <= WM_MBUTTONDBLCLK) || message == WM_MOUSEWHEEL) {
+    const HWND window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle()));
+    POINT at{static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
+    if (message == WM_MOUSEWHEEL) {
+      ::ScreenToClient(window, &at); // the wheel's position is on the screen
+    }
+    RECT client{};
+    ::GetClientRect(window, &client);
+    const int wheel = message == WM_MOUSEWHEEL ? static_cast<short>(HIWORD(wParam)) : 0;
+    if (NETPANEL_OnMouse(window, message, at.x, at.y, client.right, client.bottom, wheel)) {
+      return 0;
     }
   }
 

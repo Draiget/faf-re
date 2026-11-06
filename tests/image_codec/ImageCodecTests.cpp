@@ -4,6 +4,7 @@
 // whose D3DX11CreateTextureFromMemory isn't a stub.
 
 #include <algorithm>
+#include <gtest/gtest.h>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -21,12 +22,10 @@ using gpg::gal::imaging::ImageCodec;
 
 namespace
 {
-  int gFailures = 0;
-
   void Check(const bool condition, const char* const what, const char* const detail = "")
   {
+    EXPECT_TRUE(condition) << what << (detail[0] != '\0' ? " - " : "") << detail;
     std::printf("%s: %s%s%s\n", condition ? "PASS" : "FAIL", what, detail[0] != '\0' ? " - " : "", detail);
-    gFailures += condition ? 0 : 1;
   }
 
   struct NamedFormat
@@ -455,28 +454,73 @@ namespace
   }
 } // namespace
 
-int main()
+class Existing_ImageCodec : public ::testing::Test
 {
-  ImageCodec* const codec = ImageCodec::Instance();
-  if (codec == nullptr) {
-    std::printf("SKIP: no d3dx11_43.dll or no WARP device\n");
-    return 0;
+protected:
+  void SetUp() override
+  {
+    codec = ImageCodec::Instance();
+    if (codec == nullptr) {
+      GTEST_SKIP() << "no d3dx11_43.dll or no WARP device";
+    }
+    gpg::gal::imaging::gDdsDirectLoad = false;
+    gpg::gal::imaging::gTextureDecodeCache = false;
   }
-  gpg::gal::imaging::gDdsDirectLoad = false;
-  gpg::gal::imaging::gTextureDecodeCache = false;
 
+  ImageCodec* codec{nullptr};
+};
+
+TEST_F(Existing_ImageCodec, RefusesWhatItCannotWrite)
+{
   TestRefusesWhatItCannotWrite();
-  TestEveryFormatRoundTrips(*codec);
-  TestB5G6R5FileIsReadable(*codec);
-  TestSwizzleKeepsChannels(*codec);
-  TestResizeKeepsColour(*codec);
-  TestReloadInBlockFormat(*codec);
-  TestCube(*codec);
-  TestQualityKeepsCubeTopMip(*codec);
-  TestQualityKeepsVolumeTopMip(*codec);
-  TestQualitySkipFollowsD3dx9(*codec);
-  TestEncodeMatchesWriteDds(*codec);
+}
 
-  std::printf("%d failed\n", gFailures);
-  return gFailures == 0 ? 0 : 1;
+TEST_F(Existing_ImageCodec, EveryFormatRoundTrips)
+{
+  TestEveryFormatRoundTrips(*codec);
+}
+
+TEST_F(Existing_ImageCodec, B5G6R5FileIsReadable)
+{
+  TestB5G6R5FileIsReadable(*codec);
+}
+
+TEST_F(Existing_ImageCodec, SwizzleKeepsChannels)
+{
+  TestSwizzleKeepsChannels(*codec);
+}
+
+TEST_F(Existing_ImageCodec, ResizeKeepsColour)
+{
+  TestResizeKeepsColour(*codec);
+}
+
+TEST_F(Existing_ImageCodec, ReloadInBlockFormat)
+{
+  TestReloadInBlockFormat(*codec);
+}
+
+TEST_F(Existing_ImageCodec, Cube)
+{
+  TestCube(*codec);
+}
+
+TEST_F(Existing_ImageCodec, QualityKeepsCubeTopMip)
+{
+  TestQualityKeepsCubeTopMip(*codec);
+}
+
+TEST_F(Existing_ImageCodec, QualityKeepsVolumeTopMip)
+{
+  TestQualityKeepsVolumeTopMip(*codec);
+}
+
+TEST_F(Existing_ImageCodec, QualitySkipFollowsD3dx9)
+{
+  TestQualitySkipFollowsD3dx9(*codec);
+}
+
+TEST_F(Existing_ImageCodec, EncodeMatchesWriteDds)
+{
+  TestEncodeMatchesWriteDds(*codec);
 }

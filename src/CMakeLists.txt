@@ -210,9 +210,10 @@ endif()
 
 # The DirectX SDK libraries are searched before the Windows SDK's;
 # d3dcompiler.lib and dxguid.lib are taken from the Windows SDK by full path.
+target_include_directories(faf_engine PRIVATE "${_faf_ffmpeg}" "${CMAKE_BINARY_DIR}/dependencies/ffmpeg/include")
 target_link_directories(faf_engine INTERFACE "${_faf_dxsdk_lib}")
 target_link_libraries(faf_engine PUBLIC
-  FFmpeg::FFmpeg
+  $<LINK_ONLY:FFmpeg::FFmpeg>
   ws2_32 d3d9 d3dx9 d3d10 d3d11 "${_faf_sdk_um_lib}/d3dcompiler.lib" dxgi
   "${_faf_sdk_um_lib}/dxguid.lib" dsound
   legacy_stdio_definitions legacy_stdio_wide_specifiers

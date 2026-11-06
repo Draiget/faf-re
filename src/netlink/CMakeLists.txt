@@ -3,6 +3,7 @@
 # Engine addition, not recovered code.
 
 add_library(faf_netlink STATIC
+  GameCounters.cpp
   Json.cpp
   Signal.cpp
   Link.cpp

@@ -5,7 +5,7 @@
 #include <vector>
 #include <stdexcept>
 #include <string>
-#include <cassert>
+#include <gtest/gtest.h>
 #include <algorithm>
 #include "moho/terrain/splat/CWldSplat.h"
 namespace gpg {
@@ -48,8 +48,8 @@ namespace gpg {
     struct DrawIndexedContext {
       unsigned n,inds;
       DrawIndexedContext(DrawContext::TOPOLOGY t,unsigned min,unsigned nv,unsigned ni,unsigned start,int base):n(nv),inds(ni) {
-        assert(t==DrawContext::TOPOLOGY_TRIANGLELIST&&min==0&&start==0&&base==0);
-        assert(n%4==0&&inds==n/4*6);
+        EXPECT_TRUE(t==DrawContext::TOPOLOGY_TRIANGLELIST&&min==0&&start==0&&base==0);
+        EXPECT_TRUE(n%4==0&&inds==n/4*6);
       }
     };
     struct EffectTechnique {
@@ -84,7 +84,7 @@ namespace moho {
     std::vector<CWldSplat::SplatVertex> v;
     void* Lock(int i,int n,bool read,bool discard) {
       ev("lock");
-      assert(i==0&&!read&&discard);
+      EXPECT_TRUE(i==0&&!read&&discard);
       v.resize(n);
       return nullLock?nullptr:v.data();
     }
@@ -116,7 +116,7 @@ namespace moho {
     Holder mCurrentTechnique;
     void SetTechnique(const char*name) {
       ev("select");
-      assert(std::string(name)==expectedTechnique);
+      EXPECT_TRUE(std::string(name)==expectedTechnique);
     }
   };
   struct SD3DVertexRange;
@@ -138,11 +138,11 @@ inline gpg::gal::Device* gpg::gal::Device::GetInstance() {
 }
 inline void gpg::gal::Device::DrawIndexedPrimitive(const gpg::gal::DrawIndexedContext*c) {
   ev("draw");
-  assert(curSheet->stream.v.size()==c->n);
-  assert(c->n<=activeCap*4);
+  EXPECT_TRUE(curSheet->stream.v.size()==c->n);
+  EXPECT_TRUE(c->n<=activeCap*4);
   for(auto &v:curSheet->stream.v) {
-    assert(v.mPosition.y==1.25f&&v.mPosition.z==-2.f&&v.mTexCoord.x==.2f&&v.mTexCoord.y==.7f&&v.mAlpha==.33f);
-    for(auto byte:v.mPad18_1B)assert(byte==0x5a);
+    EXPECT_TRUE(v.mPosition.y==1.25f&&v.mPosition.z==-2.f&&v.mTexCoord.x==.2f&&v.mTexCoord.y==.7f&&v.mAlpha==.33f);
+    for(auto byte:v.mPad18_1B)EXPECT_TRUE(byte==0x5a);
     records.push_back( {
       passNow,int(v.mPosition.x)
     });

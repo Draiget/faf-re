@@ -6,6 +6,7 @@
 // for looking at the result outside the engine.
 
 #include <algorithm>
+#include <gtest/gtest.h>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -23,6 +24,7 @@ namespace
 
   void Check(const bool ok, const char* const what)
   {
+    EXPECT_TRUE(ok) << what;
     if (!ok) {
       std::printf("FAIL: %s\n", what);
       ++gFailures;
@@ -162,21 +164,14 @@ namespace
   }
 } // namespace
 
-int main(const int argc, char** const argv)
+static std::string gFontPath = "C:/Windows/Fonts/arial.ttf";
+static std::string gDumpFolder;
+
+TEST(Existing_MsdfFontCook, CookAndValidate)
 {
-  std::string fontPath = "C:/Windows/Fonts/arial.ttf";
-  std::string dumpFolder;
-  for (int i = 1; i < argc; ++i) {
-    if (std::strcmp(argv[i], "--dump") == 0 && i + 1 < argc) {
-      dumpFolder = argv[++i];
-    } else {
-      fontPath = argv[i];
-    }
-  }
-  const std::vector<char> font = ReadFile(fontPath);
+  const std::vector<char> font = ReadFile(gFontPath);
   if (font.empty()) {
-    std::printf("SKIP: can't read %s\n", fontPath.c_str());
-    return 0;
+    GTEST_SKIP() << "can't read " << gFontPath;
   }
 
   for (const std::string& name : moho::MSDF_ReadFontNames(font.data(), font.size())) {
@@ -199,7 +194,7 @@ int main(const int argc, char** const argv)
   const auto fourMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
 
   std::printf(
-    "%s: %zu glyphs, %u missing, atlas %dx%d, %lld ms on 1 thread, %lld ms on 4\n", fontPath.c_str(), oneThread.mGlyphs.size(),
+    "%s: %zu glyphs, %u missing, atlas %dx%d, %lld ms on 1 thread, %lld ms on 4\n", gFontPath.c_str(), oneThread.mGlyphs.size(),
     oneThread.mMissing, oneThread.mWidth, oneThread.mHeight, static_cast<long long>(oneMs), static_cast<long long>(fourMs)
   );
 
@@ -207,10 +202,22 @@ int main(const int argc, char** const argv)
   CheckGlyphShapes(oneThread);
   CheckCache(oneThread);
   CheckBadFiles(font);
-  if (!dumpFolder.empty()) {
-    Dump(oneThread, dumpFolder);
+  if (!gDumpFolder.empty()) {
+    Dump(oneThread, gDumpFolder);
   }
 
-  std::printf(gFailures == 0 ? "PASS\n" : "%d checks failed\n", gFailures);
-  return gFailures == 0 ? 0 : 1;
+  EXPECT_EQ(gFailures, 0);
+}
+
+int main(int argc, char** argv)
+{
+  ::testing::InitGoogleTest(&argc, argv);
+  for (int i = 1; i < argc; ++i) {
+    if (std::strcmp(argv[i], "--dump") == 0 && i + 1 < argc) {
+      gDumpFolder = argv[++i];
+    } else {
+      gFontPath = argv[i];
+    }
+  }
+  return RUN_ALL_TESTS();
 }
