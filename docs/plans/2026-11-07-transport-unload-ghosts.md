@@ -4,9 +4,9 @@
 
 **Goal:** Provide virtual 3D hologram "ghost" units at planned transport unload waypoints, allow players to select ghosts individually or en masse and queue tactical/engineering orders before landing, and automatically dispatch buffered orders to real units the moment they touch ground.
 
-**Architecture:** Entirely implemented in client-side FAF UI Lua to guarantee zero desync risk and full retail engine (`ForgedAlliance.exe`) compatibility. Composed of an isolated pure-Lua command buffer, a 3D `WorldMesh` visual manager, a `WorldView:Project` selection proxy interfacing with `orders.lua` and `construction.lua`, and an unload event dispatcher.
+**Architecture:** Entirely implemented in client-side FAF UI Lua to guarantee zero desync risk and full retail engine (`ForgedAlliance.exe`) compatibility. Grounded in the existing patterns of `I:\ProjectsFaf\fa` (`rallypoint.lua`, `construction.lua`, `worldview.lua`, `commandmode.lua`). Uses `GetAttachedUnitsList({ transport })` to query cargo, `WorldMesh` for 3D visualization, `WorldView:Project` for selection hit-testing, and `IssueUnitCommand` / `IssueBlueprintCommandToUnits` for execution.
 
-**Tech Stack:** FAF UI Lua, `WorldMesh` (`/lua/ui/controls/worldmesh.lua`), `WorldView:Project`, `IssueUnitCommand`.
+**Tech Stack:** FAF UI Lua, `GetAttachedUnitsList`, `WorldMesh` (`/lua/ui/controls/worldmesh.lua`), `WorldView:Project`, `IssueUnitCommandToUnit` (`/lua/userInit.lua`).
 
 **Spec:** [docs/specs/2026-11-07-transport-unload-ghosts-design.md](file:///i:/ProjectsFaf/faf-re/docs/specs/2026-11-07-transport-unload-ghosts-design.md)
 
@@ -20,11 +20,11 @@
 
 ## Review Focus
 
-1. **Transport shot down while in transit:** Ghosts and buffered orders must be instantly garbage-collected with no dangling `WorldMesh` or memory leaks.
-2. **Player cancels or re-routes unload waypoint:** Repositioning an unload waypoint shifts all ghost formation positions and path origins; clearing `Unload` wipes ghosts and queues.
-3. **Queueing orders without Shift vs with Shift:** Non-shift order clears existing pre-orders for that ghost; Shift-order appends to the queue.
-4. **Engineer construction commands:** Construction blueprints selected while an engineer ghost is active must record blueprint ID and build position correctly for dispatch.
-5. **Simultaneous group unload:** When multiple units disembark across consecutive ticks, each unit receives its specific queue without order mixing.
+1. **Cargo querying via `GetAttachedUnitsList`:** UI uses `GetAttachedUnitsList({ transport })` (as in `construction.lua:2444`), never non-existent UI methods.
+2. **Transport shot down while in transit:** Ghosts and buffered orders must be instantly garbage-collected with no dangling `WorldMesh` or memory leaks.
+3. **Player cancels or re-routes unload waypoint:** Repositioning an unload waypoint shifts all ghost formation positions and path origins; clearing `TransportUnloadUnits` wipes ghosts and queues.
+4. **Queueing orders without Shift vs with Shift:** Non-shift order clears existing pre-orders for that ghost; Shift-order appends to the queue.
+5. **Engineer construction commands:** When placing buildings for an engineer ghost, records blueprint ID and position, and dispatches via `IssueBlueprintCommandToUnits` / `IssueUnitCommand` upon disembarkation.
 
 ---
 
@@ -177,10 +177,11 @@ git commit -m "feat(ui): add pure Lua pending drop orders buffer with unit tests
 
 **Interfaces:**
 - Consumes:
-  - `/lua/ui/controls/worldmesh.lua`: `WorldMesh()` for 3D visual proxies.
-  - `data/fafengine/lua/ui/game/drop_ghosts_buffer.lua`: order storage.
+  - `GetAttachedUnitsList({ transport })` (`construction.lua:2444`) to enumerate cargo units.
+  - `/lua/ui/controls/worldmesh.lua`: `WorldMesh()` with shader `'FakeRings'` / `'RallyPoint'`.
+  - `transport:GetCommandQueue()` to find `TransportUnloadUnits` waypoint positions.
 - Produces:
-  - `DropGhostsManager.Update(focusArmy)`: ticks active player transports, scans for `Unload` waypoints, generates/updates/destroys `WorldMesh` holograms.
+  - `DropGhostsManager.Update(focusArmy)`: ticks active player transports, scans for `TransportUnloadUnits` waypoints, generates/updates/destroys `WorldMesh` holograms.
   - `DropGhostsManager.GetActiveGhosts()`: returns table of active `{ ghostId, realUnit, position, mesh }`.
   - `DropGhostsManager.DestroyGhost(ghostId)`: safely frees a single hologram mesh and its buffer.
   - `DropGhostsManager.ClearAll()`: cleanly deletes all meshes and resets state.
@@ -190,7 +191,7 @@ git commit -m "feat(ui): add pure Lua pending drop orders buffer with unit tests
 ```lua
 -- data/fafengine/lua/ui/game/drop_ghosts_manager.lua
 local WorldMesh = import('/lua/ui/controls/worldmesh.lua').WorldMesh
-local Buffer = import('/lua/ui/game/drop_ghosts_buffer.lua')
+local Buffer = import('/fafengine/lua/ui/game/drop_ghosts_buffer.lua') or import('/lua/ui/game/drop_ghosts_buffer.lua')
 
 local DropGhostsManager = {
     _buffer = Buffer.Create(),
@@ -198,7 +199,6 @@ local DropGhostsManager = {
     _lastWaypointPositions = {} -- [transportEntityId] = Vector(x, y, z)
 }
 
--- Calculate radial formation offset for N units around drop center
 local function GetFormationOffset(index, totalCount, radius)
     if totalCount <= 1 then
         return 0, 0
@@ -210,13 +210,61 @@ end
 function DropGhostsManager:Update(focusArmy)
     if not focusArmy or focusArmy < 1 then return end
 
-    -- Map current valid transports
-    local seenTransports = {}
-    local activeUnits = GetSelectedUnits() or {} -- or focusArmy unit scanner
+    -- Check selected units or registered transports
+    local selection = GetSelectedUnits() or {}
+    local transports = EntityCategoryFilterDown(categories.TRANSPORTATION, selection)
+    if not transports or table.empty(transports) then return end
 
-    -- Process registered transports...
-    -- Spawn WorldMesh with blueprint model and hologram/fake ring shader
-    -- Position with GetFormationOffset around unload waypoint
+    for _, transport in ipairs(transports) do
+        if transport:GetArmy() == focusArmy and not transport:IsDead() then
+            local attachedUnits = GetAttachedUnitsList({ transport })
+            local queue = transport:GetCommandQueue()
+            local unloadCmd = nil
+            for _, cmd in ipairs(queue) do
+                if cmd.type == 'TransportUnloadUnits' then
+                    unloadCmd = cmd
+                    break
+                end
+            end
+
+            if unloadCmd and attachedUnits and not table.empty(attachedUnits) then
+                local basePos = unloadCmd.position
+                local count = table.getn(attachedUnits)
+                for idx, unit in ipairs(attachedUnits) do
+                    local unitId = unit:GetEntityId()
+                    local ghostId = tostring(transport:GetEntityId()) .. '_' .. tostring(unitId)
+                    local ox, oz = GetFormationOffset(idx, count, 2.5)
+                    local ghostPos = { x = basePos[1] + ox, y = basePos[2], z = basePos[3] + oz }
+
+                    if not self._activeGhosts[ghostId] then
+                        local bp = unit:GetBlueprint()
+                        local mesh = WorldMesh()
+                        if bp.Display.MeshBlueprint then
+                            mesh:SetMesh({
+                                MeshName = bp.Display.MeshBlueprint,
+                                TextureName = '/meshes/game/Assist_albedo.dds',
+                                ShaderName = 'FakeRings',
+                                UniformScale = bp.Display.UniformScale or 0.1
+                            })
+                        end
+                        mesh:SetStance(ghostPos)
+                        mesh:SetHidden(false)
+
+                        self._activeGhosts[ghostId] = {
+                            id = ghostId,
+                            realUnit = unit,
+                            transport = transport,
+                            position = ghostPos,
+                            mesh = mesh
+                        }
+                    else
+                        self._activeGhosts[ghostId].mesh:SetStance(ghostPos)
+                        self._activeGhosts[ghostId].position = ghostPos
+                    end
+                end
+            end
+        end
+    end
 end
 
 function DropGhostsManager:GetActiveGhosts()
@@ -241,34 +289,39 @@ function DropGhostsManager:ClearAll()
     self._activeGhosts = {}
     self._lastWaypointPositions = {}
 end
+
+if not _G.import then
+    return DropGhostsManager
+end
 ```
 
 - [ ] **Step 2: Commit**
 
 ```bash
 git add data/fafengine/lua/ui/game/drop_ghosts_manager.lua
-git commit -m "feat(ui): add drop ghosts 3D visual manager"
+git commit -m "feat(ui): add drop ghosts 3D visual manager using GetAttachedUnitsList"
 ```
 
 ---
 
-### Task 3: Selection Proxy & Input Hook (`drop_ghosts_selection.lua`)
+### Task 3: Selection Proxy & Input Interception (`drop_ghosts_selection.lua`)
 
 **Files:**
 - Create: `data/fafengine/lua/ui/game/drop_ghosts_selection.lua`
-- Modify: `data/fafengine/lua/ui/game/gamemain.lua` (hook mouse input / selection events)
 
 **Interfaces:**
 - Consumes:
-  - `DropGhostsManager.GetActiveGhosts()`: list of world positions and units.
+  - `DropGhostsManager:GetActiveGhosts()`: list of world positions and units.
   - `WorldView:Project()`: screen coordinate conversions.
+  - `import("/lua/ui/game/orders.lua").SetAvailableOrders`: to populate abilities.
+  - `import("/lua/ui/game/construction.lua").OnSelection`: to show engineer palettes.
 - Produces:
-  - `DropGhostsSelection.HandleWorldClick(mouseEvent)`: detects click on ghosts and sets active ghost selection.
-  - `DropGhostsSelection.HandleWorldDrag(rect)`: detects drag-box containment for multi-selection.
+  - `DropGhostsSelection.HandleWorldClick(worldView, event)`: detects click on ghosts and sets active ghost selection.
+  - `DropGhostsSelection.HandleWorldDrag(worldView, minX, minY, maxX, maxY)`: detects drag-box containment for multi-selection.
   - `DropGhostsSelection.GetSelection()`: returns currently selected ghost records.
 
-- [ ] **Step 1: Implement screen hit-testing in `drop_ghosts_selection.lua`**
-- [ ] **Step 2: Connect selection to `orders.lua` and `construction.lua`**
+- [ ] **Step 1: Implement screen hit-testing with `WorldView:Project` in `drop_ghosts_selection.lua`**
+- [ ] **Step 2: Connect selection updates to `orders.SetAvailableOrders` and `construction.OnSelection`**
 - [ ] **Step 3: Commit**
 
 ```bash
@@ -285,14 +338,15 @@ git commit -m "feat(ui): add ghost selection proxy and UI input hooks"
 
 **Interfaces:**
 - Consumes:
-  - `DropGhostsBuffer.GetOrders(unitEntityId)`: retrieves planned queue.
-  - `IssueUnitCommand`: FAF engine Lua command dispatch.
+  - `DropGhostsBuffer:GetOrders(unitEntityId)`: retrieves planned queue.
+  - `IssueUnitCommandToUnit` (`/lua/userInit.lua`) / `IssueBlueprintCommandToUnits` for orders.
+  - `commandMeshResources` (`/lua/ui/game/commandmeshes.lua`) for waypoint icons.
 - Produces:
-  - `DropGhostsDispatcher.OnUnitUnloaded(realUnit)`: iterates buffered orders and dispatches via `IssueUnitCommand({realUnit}, cmd, data, clear)`.
+  - `DropGhostsDispatcher.OnBeat()`: polls `GetAttachedUnitsList({ transport })`; when a unit is no longer attached (unloaded), dispatches buffered orders to the `realUnit`.
   - `DropGhostsDispatcher.DrawWaypoints()`: renders colored path lines from drop position to destination waypoints.
 
 - [ ] **Step 1: Implement dispatch logic on disembark**
-- [ ] **Step 2: Implement line rendering for queued orders**
+- [ ] **Step 2: Implement line rendering for queued orders using standard waypoint meshes**
 - [ ] **Step 3: Commit**
 
 ```bash
@@ -302,13 +356,13 @@ git commit -m "feat(ui): add queued order waypoint renderer and disembark dispat
 
 ---
 
-### Task 5: Integration Hook & Scenario Smoke Test
+### Task 5: Integration Hook in `gamemain.lua` & Scenario Smoke Test
 
 **Files:**
 - Modify: `data/fafengine/lua/ui/game/gamemain.lua`
 - Create: `tools/scenarios/drop-ghosts-smoke.yaml`
 
-- [ ] **Step 1: Hook lifecycle in `gamemain.lua`**
+- [ ] **Step 1: Wire `AddBeatFunction` and input hook in `gamemain.lua`**
 - [ ] **Step 2: Author scenario smoke test in `tools/scenarios/drop-ghosts-smoke.yaml`**
 - [ ] **Step 3: Run scenario / test suite to verify full integration**
 - [ ] **Step 4: Commit**
