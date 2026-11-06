@@ -426,6 +426,8 @@ faf_dependency_patches(zlib-1.2.3 submodule
   zlib_1_2_3_faf_required.patch)
 faf_dependency_patches(boost_1_34_1 download
   boost_1_34_1_faf_required.patch)
+faf_dependency_patches(libjuice download
+  libjuice_1_7_4_faf_turn_release.patch)
 faf_dependency_patches(wxWindows-2.4.2 download
   wxwindows_2_4_2_faf_required.patch wxwindows_2_4_2_faf_x64.patch wxwindows_2_4_2_faf_x64_pointers.patch)
 if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})
