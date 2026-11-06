@@ -1,3 +1,6 @@
+#include <memory>
+#include <new>
+
 #include "CubeRenderTargetContext.hpp"
 #include "DepthStencilTarget.hpp"
 #include "DepthStencilTargetContext.hpp"
@@ -954,6 +957,34 @@ namespace gpg::gal
      * declaration order.
      */
     OutputContext::~OutputContext() = default;
+
+    OutputContext* NewOutputContexts(const std::uint32_t count)
+    {
+        if (count == 0U)
+        {
+            return nullptr;
+        }
+        std::allocator<OutputContext> allocator;
+        OutputContext* const contexts = allocator.allocate(count);
+        for (std::uint32_t index = 0U; index < count; ++index)
+        {
+            ::new (static_cast<void*>(contexts + index)) OutputContext();
+        }
+        return contexts;
+    }
+
+    void DeleteOutputContexts(OutputContext* const contexts, const std::uint32_t count) noexcept
+    {
+        if (contexts == nullptr)
+        {
+            return;
+        }
+        for (std::uint32_t index = count; index > 0U; --index)
+        {
+            contexts[index - 1U].~OutputContext();
+        }
+        std::allocator<OutputContext>().deallocate(contexts, count);
+    }
 
     /**
      * Address: 0x008E7A00 (FUN_008E7A00, ??1RenderTargetContext@gal@gpg@@QAE@@Z)

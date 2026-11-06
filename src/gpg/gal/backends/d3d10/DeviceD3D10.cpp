@@ -314,7 +314,7 @@ namespace
    */
   void DeviceD3D10::Shutdown()
   {
-    delete[] mHeadOutputContexts;
+    DeleteOutputContexts(mHeadOutputContexts, static_cast<std::uint32_t>(mDeviceContext.GetHeadCount()));
     mHeadOutputContexts = nullptr;
 
     for (IDXGISwapChain*& swapChain : mSwapChains) {
@@ -757,7 +757,7 @@ namespace
       ThrowGalError("DeviceD3D10.cpp", 1818, "internal D3D10 device initialization error");
     }
 
-    OutputContext* const outputContexts = (headCount > 0U) ? new OutputContext[headCount] : nullptr;
+    OutputContext* const outputContexts = NewOutputContexts(headCount);
     mHeadOutputContexts = outputContexts;
 
     auto* const device = mDevice;

@@ -910,7 +910,7 @@ namespace
      */
     void DeviceD3D9::Shutdown()
     {
-        delete[] mHeads;
+        DeleteOutputContexts(mHeads, GetDeviceHeadCount(this));
         mHeads = nullptr;
 
         mPipelineState.reset();
@@ -1147,7 +1147,7 @@ namespace
             ThrowGalError("DeviceD3D9.cpp", 1444, "internal D3D9 device initialization error");
         }
 
-        OutputContext* const heads = new OutputContext[headCount];
+        OutputContext* const heads = NewOutputContexts(headCount);
         mHeads = heads;
 
         for (unsigned int headIndex = 0; headIndex < headCount; ++headIndex)
@@ -1472,7 +1472,8 @@ namespace
         }
         mPipelineState.reset();
 
-        delete[] mHeads;
+        // Before BuildDeviceCapabilities below: the context still holds the head count the array was made with.
+        DeleteOutputContexts(mHeads, GetDeviceHeadCount(this));
         mHeads = nullptr;
 
         SafeRelease(mFrameEventQuery);
