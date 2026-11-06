@@ -17,6 +17,8 @@
 #include "gpg/core/utils/Logging.h"
 #include "IClientMgrUIInterface.h"
 #include "moho/misc/DiagnosticBudget.h"
+#include "moho/net/NetConVars.h"
+#include "moho/net/PeerFeatures.h"
 using namespace moho;
 
 namespace
@@ -400,8 +402,14 @@ void CClientBase::Process(CMessage& msg)
     // Engine addition: the hash this client reports for that stream, when it
     // sent one (the shipped engine does not). Our own acks describe our own
     // copy, so there is nothing to compare.
+    // Issue #285: with announcements on (net_PeerFeatures), a report counts only from a
+    // peer that announced OrderStreamCheck; reports before its announcement are skipped.
+    // Off, the message's size says it, as before. The bytes sent don't change either way.
     CommandStreamCheck* const streamCheck = mManager->mStreamCheck.get();
-    if (streamCheck != nullptr && this != mManager->mLocalClient &&
+    const bool reportAnnounced = net_PeerFeatures == 0 ||
+      (mManager->mPeerFeatures != nullptr &&
+       mManager->mPeerFeatures->PeerSupports(mIndex, EPeerFeature::OrderStreamCheck));
+    if (streamCheck != nullptr && this != mManager->mLocalClient && reportAnnounced &&
         static_cast<std::size_t>(msg.GetMessageSize()) >=
           sizeof(uint8_t) + sizeof(int32_t) + CommandStreamCheck::kAckDigestBytes) {
       CommandStreamCheck::AckDigest digest{};
