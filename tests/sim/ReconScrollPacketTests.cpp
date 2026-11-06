@@ -58,7 +58,7 @@ namespace
         deferredCount += deferred;
         if (!entry)
           entry = QueueEntityVariableUpdate(&packet, static_cast<EntId>(i + 1), source);
-        Check(entry != nullptr, "queue entry");
+        ASSERT_NE(entry, nullptr) << "queue entry"; // dereferenced below
 
         // Every second record is ordinary: catches marker reuse and neighbor corruption.
         if ((i % 2) == 0)
@@ -104,6 +104,7 @@ namespace
 
     const auto expectedDeferred = (workers > 0 && enabled) ? (count < 65536 ? count : 65536) : 0;
     Check(deferredCount == expectedDeferred, "serial/deferred/full-list path");
+    ASSERT_GE(packet.mEntityUpdates.size(), count) << "every queued record in the packet";
     for (std::size_t i = 0; i < count; ++i)
     {
       const auto& entry = packet.mEntityUpdates[i];
@@ -129,7 +130,7 @@ namespace
     }
 
     // Mutating one owned record must not mutate its neighbor or the source.
-    Check(count >= 2, "neighbor ownership fixture");
+    ASSERT_GE(count, 2u) << "neighbor ownership fixture";
     packet.mEntityUpdates[0].mVariableData.mAuxValueVector[2].mAttachedEntityId = 98765;
     Check(
       packet.mEntityUpdates[1].mVariableData.mAuxValueVector[2].mAttachedEntityId == 12345,

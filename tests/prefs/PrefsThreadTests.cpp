@@ -6,7 +6,8 @@
 // stack and links LuaObject temporaries into its object list. Without USER_PreferencesLock, the
 // threads here corrupt the state within seconds; with it, every value they wrote reads back.
 //
-// usage: faf_prefs_thread_tests [iterations per thread, default 20000]
+// FAF_PREFS_ITERATIONS=<n> sets the iterations per thread (default 20000); the command line
+// belongs to GoogleTest.
 //
 // FAF_PREFS_NOLOCK=1 gives each thread a lock of its own (USER_PreferencesLock), which brings the
 // race back: on 2026-11-01 four such runs ended in 0xC0000409 (a stack cookie overwritten) twice,
@@ -37,7 +38,8 @@ namespace
 
 TEST(Existing_PrefsThread, MultiThreadConcurrentAccess)
 {
-  const int iterations = 20000;
+  const char* const iterationsEnv = std::getenv("FAF_PREFS_ITERATIONS");
+  const int iterations = iterationsEnv != nullptr && std::atoi(iterationsEnv) > 0 ? std::atoi(iterationsEnv) : 20000;
   moho::IUserPrefs* const prefs = moho::USER_GetPreferences();
   ASSERT_NE(prefs, nullptr) << "no preferences object";
 
