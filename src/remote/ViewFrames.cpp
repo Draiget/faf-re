@@ -362,17 +362,21 @@ namespace faf::remote
     const CViewIdMap::OwnCommandTest isOwnCommand = OwnCommands(army);
 
     // In ascending sim id order, as a whole frame hands out new view ids.
-    const CViewFrameBuilder* const teamBuilder = TeamsOn() && mapSlot != army ? mBuilders[mapSlot].get() : nullptr;
+    // A player cut from their team holds nothing of its view any more.
+    const bool cut = CutFromTeam(army);
+    const CViewFrameBuilder* const teamBuilder = TeamsOn() && mapSlot != army && !cut ? mBuilders[mapSlot].get() : nullptr;
     const SHeldView* const teamHeld = teamBuilder != nullptr ? &mHeld[mapSlot] : nullptr;
     // A team's view names its players' real units, which each player's client may or may not hold, as a
     // lockstep client finds out by looking: they're allied, so it gives nothing away.
     std::uint32_t teamUnits = 0u;
-    if (TeamsOn()) {
+    if (TeamsOn() && !cut) {
       for (std::size_t team = 0; team < TeamCount(); ++team) {
         if (TeamSlot(team) == mapSlot) {
           teamUnits = TeamMask(team);
         }
       }
+    } else if (cut) {
+      teamUnits = std::uint32_t{1} << army;
     }
     const auto unheld = [&builder, &held, teamBuilder, teamHeld, teamUnits](const std::uint32_t id) {
       if (id == kNone) {
@@ -556,6 +560,31 @@ namespace faf::remote
     return wire::EncodeFrameChanges(changes, mCodec, writer);
   }
 
+  bool CViewFrames::EncodeWholeHeldFrame(const std::int32_t army, wire::BitWriter& writer) const
+  {
+    const auto slot = static_cast<std::size_t>(army);
+    const SHeldView& held = mHeld[slot];
+    const CViewFrameBuilder& builder = *mBuilders[slot];
+    std::vector<const wire::SEntityRecord*> records;
+    records.reserve(held.count);
+    for (std::uint32_t recordSlot = 0; recordSlot < held.sent.size(); ++recordSlot) {
+      if (held.sent[recordSlot] != 0u) {
+        records.push_back(held.ownSlot[recordSlot] != kNoOwn ? &held.own[held.ownSlot[recordSlot]] : &builder.RecordAt(recordSlot));
+      }
+    }
+    std::sort(records.begin(), records.end(), [](const wire::SEntityRecord* const a, const wire::SEntityRecord* const b) { return a->id < b->id; });
+    if (records.size() != held.count) {
+      return false;
+    }
+    wire::SFrameChanges changes{};
+    changes.frameId = held.frameId;
+    changes.baselineId = wire::kNoBaseline;
+    changes.beat = held.beat;
+    changes.entityCount = held.count;
+    changes.created = records;
+    return wire::EncodeFrameChanges(changes, mCodec, writer);
+  }
+
   bool CViewFrames::SlotHoldsEntity(const std::size_t slot, const std::uint32_t id) const
   {
     if (slot >= mHeld.size()) {
@@ -571,7 +600,7 @@ namespace faf::remote
 
   bool CViewFrames::ViewHoldsEntity(const std::size_t army, const std::uint32_t id) const
   {
-    return SlotHoldsEntity(army, id) || (TeamSlotOf(army) != army && SlotHoldsEntity(TeamSlotOf(army), id));
+    return SlotHoldsEntity(army, id) || (TeamSlotOf(army) != army && !CutFromTeam(army) && SlotHoldsEntity(TeamSlotOf(army), id));
   }
 
   CViewIdMap::OwnCommandTest CViewFrames::OwnCommands(const std::size_t slot) const
@@ -641,7 +670,7 @@ namespace faf::remote
         });
       };
       dump(army, false);
-      if (TeamSlotOf(army) != army) {
+      if (TeamSlotOf(army) != army && !CutFromTeam(army)) {
         dump(TeamSlotOf(army), true);
       }
       std::fprintf(mViewDump, "%u %zu props %llu %016llx\n", mViewBeat, army, static_cast<unsigned long long>(propCount), static_cast<unsigned long long>(propSum));

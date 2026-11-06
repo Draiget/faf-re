@@ -20,6 +20,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <exception>
 #include <filesystem>
@@ -83,7 +84,7 @@ namespace
 
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views]\n";
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
   // `net_Lag` is 500 ms in a lockstep game, time for every player's beats to arrive. Here it's only the
@@ -417,6 +418,7 @@ namespace
     if (ReadOption("--reconnect-seconds", text)) {
       netConfig.reconnectSeconds = std::atof(text.c_str());
     }
+    const double awayPauseSeconds = ReadOption("--away-pause-seconds", text) ? std::atof(text.c_str()) : 0.0;
 
     LuaPlus::LuaState* const state = faf::headless::ReplayLuaState();
     LuaPlus::LuaObject config;
@@ -427,10 +429,17 @@ namespace
     }
 
     moho::CLaunchRoster roster(kServerUid, kServerName, {});
-    moho::SLaunchBuild build = moho::BuildLaunchInfo(config, roster, seed, false, state);
+    // As a lockstep game's host launches it: each player may pause as often as the match's `Timeouts` says
+    // (`Sim::Pause` spends them), and an observer never. The server's own source pauses for the operator, unlimited.
+    moho::SLaunchBuild build = moho::BuildLaunchInfo(config, roster, seed, true, state);
     if (build.failure != nullptr) {
       Say("Can't host: the match can't launch: %s", build.failure);
       return kExitBadInput;
+    }
+    for (moho::SSTICommandSource& source : build.launchInfo->mCommandSources.mSrcs) {
+      if (source.mIndex == build.localSourceId) {
+        source.mTimeouts = -1;
+      }
     }
     end.title = ReadMatchTitle(config, state);
     end.map = build.mapName.c_str();
@@ -441,6 +450,11 @@ namespace
     if (speedGiven) {
       launchSpeed.speed = speedOption;
     }
+    // Team views only where teams can't change: with `TeamLock` "locked" FAF's sim Lua refuses a player's
+    // diplomacy (`SimUtils.BreakAlliance`, `OnAllianceResult`). A map's own script still can; then that army is cut.
+    const LuaPlus::LuaObject teamLock = gameOptions["TeamLock"];
+    const bool teamsLocked = teamLock.IsString() && std::strcmp(teamLock.GetString(), "locked") == 0;
+    const bool teamViews = !perPlayerViews && (teamsLocked || moho::CFG_GetArgOption("--team-views", 0, nullptr));
 
     Say("Hosting game \"%s\" on %s, %d players, speed %+d%s", end.title.c_str(), end.map.c_str(), static_cast<int>(end.players.size()), launchSpeed.speed,
         launchSpeed.adjustable ? " (adjustable)" : "");
@@ -537,8 +551,10 @@ namespace
         }
         net->QueueView(client.uid, faf::server::MakeGameInfo(mapSizeX, mapSizeZ, playerArmy, client.commandSource));
       }
-      views = std::make_unique<faf::server::CServerViews>(contentTables, *rules, mapSizeX, mapSizeZ, *net, std::move(viewPlayers), static_cast<unsigned int>(std::max(viewThreads, 1)), !perPlayerViews);
+      views = std::make_unique<faf::server::CServerViews>(contentTables, *rules, mapSizeX, mapSizeZ, *net, std::move(viewPlayers), static_cast<unsigned int>(std::max(viewThreads, 1)), teamViews);
       views->Install();
+      Say("Views: %s", teamViews ? (teamsLocked ? "one per team, and each player's own units" : "one per team (--team-views), with teams unlocked")
+                       : perPlayerViews ? "one per player (--per-player-views)" : "one per player, as teams aren't locked (TeamLock)");
     }
     sessionInfo->mLaunchInfo->mCommandSources.mOriginalSource = -1;
 
@@ -595,6 +611,18 @@ namespace
     int pausedBeats = 0;
     std::int32_t pausedBy = -1;
     int pauseRequestsDone = 0;
+    // `--away-pause-seconds`: the game waits for a player who lost the connection, from a budget each has for the game.
+    const auto serverSource = static_cast<std::int32_t>(sessionInfo->mSourceId);
+    std::map<std::int32_t, double> awayBudget; // by uid: seconds of pause left
+    std::map<std::int32_t, bool> away;         // by uid, while away
+    std::map<std::int32_t, std::string> seatNames;
+    for (const moho::SLaunchClient& client : roster.Remotes()) {
+      seatNames[client.uid] = client.name.c_str();
+    }
+    bool awayPending = false; // someone went away and the game hasn't waited for them yet
+    bool awayPausing = false; // the game is paused (or about to be) for whoever is away
+    bool awayPauseSeen = false;
+    double awayCharged = 0.0;
 
     const auto watchSpeed = [&](const double elapsed) {
       moho::CClientManagerImpl* const manager = driver->GetClientManager();
@@ -666,6 +694,52 @@ namespace
         if (pausedBy == -1) {
           driver->RequestPause();
         } else {
+          driver->Resume();
+        }
+      }
+      if (net && started) {
+        // Plan WP3.5, WP14.2. The reconnect window runs on meanwhile. A pause someone else ends or takes over isn't renewed.
+        for (const faf::server::CServerNet::SPresence& change : net->TakePresence()) {
+          if (awayPauseSeconds <= 0.0) {
+            continue;
+          }
+          if (change.away) {
+            away[change.uid] = true;
+            awayBudget.try_emplace(change.uid, awayPauseSeconds);
+            awayPending = true;
+          } else {
+            away.erase(change.uid);
+          }
+        }
+        if (awayPausing && pausedBy == serverSource) {
+          for (const auto& [uid, isAway] : away) {
+            awayBudget[uid] -= elapsed - awayCharged;
+          }
+        }
+        awayCharged = elapsed;
+        std::string waitingFor;
+        double budgetLeft = 0.0;
+        for (const auto& [uid, isAway] : away) {
+          if (awayBudget[uid] > 0.0) {
+            waitingFor = seatNames[uid];
+            budgetLeft = std::max(budgetLeft, awayBudget[uid]);
+          }
+        }
+        if (awayPausing && pausedBy == serverSource) {
+          awayPauseSeen = true;
+        } else if (awayPausing && awayPauseSeen) {
+          awayPausing = false; // resumed, or paused by someone else
+        }
+        if (!waitingFor.empty() && awayPending && !awayPausing && pausedBy == -1) {
+          awayPending = false;
+          awayPausing = true;
+          awayPauseSeen = false;
+          Say("Pausing the game while %s is away, for %.0f s at most", waitingFor.c_str(), budgetLeft);
+          driver->RequestPause();
+        } else if (waitingFor.empty() && awayPausing) {
+          awayPausing = false;
+          awayPending = false;
+          Say("%s", away.empty() ? "Resuming the game: nobody is away" : "Resuming the game: the time to wait for whoever is away has run out");
           driver->Resume();
         }
       }

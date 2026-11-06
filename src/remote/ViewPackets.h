@@ -37,6 +37,9 @@
 // A player's client holds the two together, less the blips of its own units, which their army byte tells.
 // Mutual allies share vision, so this shows a teammate nothing it couldn't see anyway; what can differ
 // from a lockstep client is that a blip's update reaches all of a team when it reaches one of them.
+// A team is fixed once made. An army that stops being a mutual ally of the rest is cut from it for good
+// (`CutFromTeam`): its player keeps only their own view, as the team's would show them what their former
+// allies see. Two teams that become allies keep their views apart, which hides from each what the other sees.
 //
 // The entity lanes are filled (creations, entity and unit updates, deletes and erases) and the
 // army lane (plan WP5.4: every army's public record, the focus-only fields for the view's own
@@ -86,12 +89,15 @@ namespace faf::remote
     [[nodiscard]] std::size_t TeamCount() const noexcept { return mTeams.size(); }
     /** A team's view slot. */
     [[nodiscard]] std::size_t TeamSlot(const std::size_t team) const noexcept { return static_cast<std::size_t>(mArmySlots) + team; }
-    /** The armies of a team, with or without views still. */
+    /** The armies that share a team's id map, with or without views still, and whether or not cut from it since. */
     [[nodiscard]] const std::vector<std::int32_t>& TeamMembers(const std::size_t team) const noexcept { return mTeams[team].members; }
-    /** The team's armies, one bit each. */
+    /** The team's armies that are still in it, one bit each. */
     [[nodiscard]] std::uint32_t TeamMask(const std::size_t team) const noexcept { return mTeams[team].mask; }
-    /** Whether alliances have changed since the teams were made: their views no longer match who may see what. */
-    [[nodiscard]] bool TeamsOutOfDate() const noexcept { return mTeamsOutOfDate; }
+    /**
+     * Whether an army has left its team: no longer a mutual ally of the rest. It keeps its own view and the
+     * team's id map, but gets nothing more of the team's view, and nothing of its own goes into it.
+     */
+    [[nodiscard]] bool CutFromTeam(const std::size_t army) const noexcept { return army < 32u && ((mCutArmies >> army) & 1u) != 0u; }
 
     /**
      * Builds the views on the sim's workers (plan WP5.7, under I3) from the next beat on. Off by
@@ -169,12 +175,15 @@ namespace faf::remote
     struct STeam
     {
       std::vector<std::int32_t> members;
-      std::uint32_t mask = 0; // `members`, one bit each
+      std::uint32_t mask = 0; // `members` not cut from it, one bit each
     };
 
     /** The teams from who's allied with whom now. */
     void BuildTeams(const moho::Sim& sim);
-    [[nodiscard]] bool TeamsStillMatch(const moho::Sim& sim) const;
+    /** Cuts from its team every army no longer a mutual ally of the rest; warns once when two teams become allies. */
+    void CheckTeams(const moho::Sim& sim);
+    /** The first army still in a team: whose sight shows the team what isn't any member's own. */
+    [[nodiscard]] std::int32_t TeamLead(const STeam& team) const noexcept;
     /** What a view does with an entity: the oracle's answer for an army's view, or as the section above says. */
     [[nodiscard]] SViewVisibility VisibilityFor(const moho::Sim& sim, std::int32_t view, const SEntityFacts& facts) const;
     /** The army whose recon record a view shows of a blip: its own, or the first of its team that has one. */
@@ -210,7 +219,8 @@ namespace faf::remote
     std::int32_t mArmySlots = 0;
     bool mWantTeams = false;
     bool mTeamsOn = false;
-    bool mTeamsOutOfDate = false;
+    bool mTeamsJoined = false; // two teams became allies, which their views don't follow
+    std::uint32_t mCutArmies = 0;
     std::vector<STeam> mTeams;
     std::vector<std::int32_t> mTeamOfArmy; // -1: none
     std::uint32_t mTeamBits = 0;           // the team views' slots, one bit each

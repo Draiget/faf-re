@@ -54,9 +54,21 @@ namespace faf::remote
       const wire::BitWriter& grids;
       const wire::BitWriter& lua;
       bool ok;
-      const wire::BitWriter* team = nullptr; // the player's team's frame, with teams
+      const wire::BitWriter* team = nullptr; // the player's team's frame, with teams and not cut from it
       std::size_t teamEntities = 0;
+      bool fresh = false; // `RequestFresh`: every lane but Lua's is whole, for a client that holds nothing
     };
+
+    /**
+     * Plan WP14.1, on the sim thread between beats: `army`'s client holds nothing any more (it reconnected),
+     * so its next beat's frames, army lane and grids go whole. Its Lua lane can't: that needs the client's resync (WP6.8).
+     */
+    void RequestFresh(std::size_t army)
+    {
+      if (army < mClients.size()) {
+        mClients[army].fresh = true;
+      }
+    }
 
     void OnViewFrames(moho::Sim& sim) override;
     void OnViewReady(std::size_t army) override { Send(army); }
@@ -93,6 +105,7 @@ namespace faf::remote
       std::vector<std::uint16_t> gridsNext;
       wire::BitWriter lua;              // this beat's Lua lane, which is ready before the others
       wire::BitWriter teamFrame;        // a team's view: this beat's frame, for its players' messages
+      bool fresh = false;               // `RequestFresh`
       std::uint32_t bytes = 0;          // this beat
       std::uint64_t failures = 0;       // since `TakeClientFailures`
     };

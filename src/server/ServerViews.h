@@ -22,6 +22,10 @@ namespace moho
 // the reliable stream. A lost datagram then costs a resend's wait, never a wrong picture. Sending frames
 // unreliably against the newest acknowledged one would cost no wait, and needs the held frames to encode
 // against an older frame, which they don't do.
+//
+// A player back from a lost connection holds none of that, so their next view is whole: its frames carry
+// every record they'd hold, against nothing, and its army and grid lanes are whole too (plan WP14.1). The
+// Lua lane can't be: what the UI built from earlier beats' `Sync` needs the client's resync (WP6.8).
 
 namespace faf::server
 {

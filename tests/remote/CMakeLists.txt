@@ -13,6 +13,14 @@ if(TARGET faf_netchannel)
   target_link_libraries(faf_netchannel_tests PRIVATE faf_netchannel faf_monocypher)
   target_compile_options(faf_netchannel_tests PRIVATE /EHsc)
   add_test(NAME remote_netchannel COMMAND faf_netchannel_tests)
+
+  # The server's player links over real UDP sockets on loopback (plan WP10.1); Linux builds it in cmake/FafLinux.cmake.
+  if(WIN32)
+    add_executable(faf_gamelink_tests EXCLUDE_FROM_ALL net/GameLinkTests.cpp)
+    target_link_libraries(faf_gamelink_tests PRIVATE faf_netchannel faf_monocypher)
+    target_compile_options(faf_gamelink_tests PRIVATE /EHsc)
+    add_test(NAME remote_gamelink COMMAND faf_gamelink_tests)
+  endif()
 endif()
 
 if(FAF_SERVER_MODE)

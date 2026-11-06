@@ -163,6 +163,7 @@ namespace
     double seconds = 30.0;
     double pauseAt = -1.0;
     double resumeAt = -1.0;
+    double pauseEvery = 0.0; // with `pauseAt`: asks to pause again this often, and to resume halfway between
     double forgeAt = -1.0;
     double vanishAt = -1.0;
     double vanishFor = 0.0; // 0: for good
@@ -174,6 +175,9 @@ namespace
     std::uint32_t hiddenId = 0u; // a unit of another army, as a cheat would guess it
     double fuzzAt = -1.0;
     double floodAt = -1.0;
+    double breakAllianceAt = -1.0;
+    std::int32_t breakWith = -1; // the army index to stop being allied with, as FAF's diplomacy screen asks
+
     double beatMs = 0.0; // the game's beat, to tell how late views come; 0: no telling
     bool noDecode = false; // the channel's limit alone, as decoding takes a while
     int fuzzCount = 2000;
@@ -216,6 +220,12 @@ namespace
         out.pauseAt = Argument(value);
       } else if (name == "--resume-at") {
         out.resumeAt = Argument(value);
+      } else if (name == "--pause-every") {
+        out.pauseEvery = Argument(value);
+      } else if (name == "--break-alliance-at") {
+        out.breakAllianceAt = Argument(value);
+      } else if (name == "--break-with") {
+        out.breakWith = std::atoi(value);
       } else if (name == "--forge-at") {
         out.forgeAt = Argument(value);
       } else if (name == "--vanish-at") {
@@ -289,6 +299,35 @@ namespace
    * An order, in the bytes `CMarshaller::IssueCommand` writes: a unit, its command id, and either a target
    * entity (`targetId`) or the ground at `x`, `z`.
    */
+  /**
+   * `SimCallback({Func = 'BreakAlliance', Args = {From = army, To = other}})` as `CMarshaller::LuaSimCallback` writes it:
+   * the name, the arguments in the Lua byte stream's tags (`LuaObject::ToByteStream`), no entities. Armies count from 1 there.
+   */
+  [[nodiscard]] std::vector<std::uint8_t> BreakAlliancePayload(const std::int32_t army, const std::int32_t other)
+  {
+    std::vector<std::uint8_t> out;
+    const auto putString = [&out](const char* const text) {
+      out.insert(out.end(), text, text + std::strlen(text) + 1u);
+    };
+    const auto putNumber = [&out](const float value) {
+      out.push_back(0u); // number
+      std::uint8_t bytes[sizeof(value)];
+      std::memcpy(bytes, &value, sizeof(value));
+      out.insert(out.end(), bytes, bytes + sizeof(value));
+    };
+    putString("BreakAlliance");
+    out.push_back(4u); // a table
+    out.push_back(1u); // string key
+    putString("From");
+    putNumber(static_cast<float>(army + 1));
+    out.push_back(1u);
+    putString("To");
+    putNumber(static_cast<float>(other + 1));
+    out.push_back(5u); // its end
+    PutU32(out, 0u);   // no entities
+    return out;
+  }
+
   [[nodiscard]] std::vector<std::uint8_t> OrderPayload(
     const std::uint32_t unit, const std::uint32_t commandId, const moho::EUnitCommandType type, const std::uint32_t targetId, const float x, const float z
   )
@@ -346,6 +385,8 @@ namespace
     std::uint64_t lastEntities = 0;
     std::uint64_t lastBeat = 0;
     std::uint64_t maxMessage = 0;
+    std::uint64_t whole = 0;       // views after the first whose frame came against nothing: after a reconnect
+    std::uint64_t gameInfos = 0;
     double firstAt = -1.0;
     double lastAt = 0.0;
   };
@@ -364,6 +405,7 @@ namespace
       out.mapX = sizes[0];
       out.mapZ = sizes[1];
       out.haveInfo = true;
+      ++out.gameInfos;
       return;
     }
     if (message[0] != static_cast<std::uint8_t>(ESeatMessage::View)) {
@@ -396,6 +438,11 @@ namespace
       ok = reader.Ok();
     }
     ok = ok && reader.AtEnd();
+    if (ok && out.views > 1u && faf::remote::wire::PeekFrameBaseline(std::span<const std::uint8_t>(frame, frameSize)) == faf::remote::wire::kNoBaseline) {
+      ++out.whole;
+      std::printf("probe: %.1f s: a whole view at beat %llu, %llu + %llu entities\n", elapsed, static_cast<unsigned long long>(beat),
+                  static_cast<unsigned long long>(entities), static_cast<unsigned long long>(teamEntities));
+    }
     if (ok) {
       faf::remote::wire::SViewFrame decoded;
       ok = out.window.Decode(std::span<const std::uint8_t>(frame, frameSize), out.codec, decoded) && decoded.entities.size() == entities;
@@ -487,9 +534,9 @@ int main(const int argc, char** const argv)
   SOptions options;
   if (!ReadOptions(argc, argv, options)) {
     std::printf(
-      "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s>] [--resume-at <s>] [--forge-at <s>] "
+      "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> [--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
       "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>]\n"
+      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>]\n"
     );
     return 3;
   }
@@ -635,10 +682,19 @@ int main(const int argc, char** const argv)
     if (Due(options.pauseAt, elapsed)) {
       SendCommand(link, kOpRequestPause);
       std::printf("probe %d: %.1f s: asked to pause, at beat %llu\n", options.uid, elapsed, static_cast<unsigned long long>(lastBeat));
+      if (options.pauseEvery > 0.0) {
+        options.resumeAt = elapsed + options.pauseEvery / 2.0;
+        options.pauseAt = elapsed + options.pauseEvery;
+      }
     }
     if (Due(options.resumeAt, elapsed)) {
       SendCommand(link, kOpResume);
       std::printf("probe %d: %.1f s: asked to resume, at beat %llu\n", options.uid, elapsed, static_cast<unsigned long long>(lastBeat));
+    }
+    if (views.haveInfo && Due(options.breakAllianceAt, elapsed)) {
+      SendCommand(link, static_cast<std::uint8_t>(moho::ECmdStreamOp::CMDST_LuaSimCallback), BreakAlliancePayload(views.army, options.breakWith));
+      std::printf("probe %d: %.1f s: broke the alliance of army %d with army %d, at beat %llu\n", options.uid, elapsed, views.army, options.breakWith,
+                  static_cast<unsigned long long>(lastBeat));
     }
     if (Due(options.forgeAt, elapsed)) {
       const std::vector<std::uint8_t> manyBeats = {0xA0, 0x86, 0x01, 0x00};
@@ -748,8 +804,9 @@ int main(const int argc, char** const argv)
   std::printf("probe %d: joined %llu times, %llu beat messages, last beat %llu\n", options.uid, static_cast<unsigned long long>(joins), static_cast<unsigned long long>(beatMessages), static_cast<unsigned long long>(lastBeat));
   const double viewSeconds = views.lastAt - views.firstAt;
   std::printf(
-    "probe %d: %llu views, %llu didn't decode, last at beat %llu with %llu entities, %.1f KB/s (frames %.1f), largest %llu bytes\n", options.uid,
-    static_cast<unsigned long long>(views.views), static_cast<unsigned long long>(views.failed), static_cast<unsigned long long>(views.lastBeat),
+    "probe %d: %llu views, %llu didn't decode, %llu whole after the first, %llu game infos, last at beat %llu with %llu entities, %.1f KB/s (frames %.1f), largest %llu bytes\n", options.uid,
+    static_cast<unsigned long long>(views.views), static_cast<unsigned long long>(views.failed), static_cast<unsigned long long>(views.whole),
+    static_cast<unsigned long long>(views.gameInfos), static_cast<unsigned long long>(views.lastBeat),
     static_cast<unsigned long long>(views.lastEntities), viewSeconds > 0.0 ? static_cast<double>(views.bytes) / 1024.0 / viewSeconds : 0.0,
     viewSeconds > 0.0 ? static_cast<double>(views.frameBytes) / 1024.0 / viewSeconds : 0.0, static_cast<unsigned long long>(views.maxMessage)
   );

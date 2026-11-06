@@ -97,6 +97,14 @@ namespace faf::server
         }
       }
     }
+    // Plan WP14.1: a returning player's client holds nothing, so this beat's view goes to them whole.
+    for (const std::int32_t uid : mNet.TakeReturned()) {
+      for (const auto& [army, player] : mPlayers) {
+        if (player == uid) {
+          RequestFresh(army);
+        }
+      }
+    }
 
     mNet.Intake().Drain(
       &mRules,
@@ -132,7 +140,7 @@ namespace faf::server
     WriteLane(writer, lanes.armies);
     WriteLane(writer, lanes.grids);
     WriteLane(writer, lanes.lua);
-    mNet.QueueView(player->second, std::move(message));
+    mNet.QueueView(player->second, std::move(message), lanes.fresh);
   }
 
   std::string CServerViews::LaneReport() const

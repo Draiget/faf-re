@@ -103,9 +103,8 @@ namespace faf::remote
       mWantTeams = false;
       BuildTeams(sim);
     }
-    if (mTeamsOn && !mTeamsOutOfDate && !TeamsStillMatch(sim)) {
-      mTeamsOutOfDate = true;
-      gpg::Warnf("views: alliances have changed since the teams were made; a team's view still shows its old members what the team sees");
+    if (mTeamsOn) {
+      CheckTeams(sim);
     }
     const std::size_t slots = armyCount + mTeams.size();
     while (mPackets.size() < slots) {
@@ -234,24 +233,60 @@ namespace faf::remote
     mTeamsOn = true;
   }
 
-  bool CViewPackets::TeamsStillMatch(const moho::Sim& sim) const
+  void CViewPackets::CheckTeams(const moho::Sim& sim)
   {
-    // Bits by army: a team's members must still all be mutual allies, and no two teams may have become so.
-    for (std::size_t a = 0; a < mTeamOfArmy.size(); ++a) {
-      if (mTeamOfArmy[a] < 0 || sim.mArmiesList[a] == nullptr) {
-        continue;
-      }
-      for (std::size_t b = a + 1u; b < mTeamOfArmy.size(); ++b) {
-        if (mTeamOfArmy[b] < 0 || sim.mArmiesList[b] == nullptr) {
-          continue;
+    const auto mutual = [&sim](const std::size_t a, const std::size_t b) {
+      return sim.mArmiesList[a] != nullptr && sim.mArmiesList[b] != nullptr && sim.mArmiesList[a]->mVarDat.mAllies.Contains(static_cast<unsigned int>(b))
+        && sim.mArmiesList[b]->mVarDat.mAllies.Contains(static_cast<unsigned int>(a));
+    };
+    for (STeam& team : mTeams) {
+      // While two of those still in the team aren't mutual allies, the one with fewer allies left in it goes.
+      for (;;) {
+        std::int32_t leaving = -1;
+        int leavingAllies = 0;
+        for (const std::int32_t a : team.members) {
+          if (((team.mask >> a) & 1u) == 0u) {
+            continue;
+          }
+          bool broken = false;
+          int allies = 0;
+          for (const std::int32_t b : team.members) {
+            if (b != a && ((team.mask >> b) & 1u) != 0u) {
+              const bool ally = mutual(static_cast<std::size_t>(a), static_cast<std::size_t>(b));
+              broken = broken || !ally;
+              allies += ally ? 1 : 0;
+            }
+          }
+          if (broken && (leaving < 0 || allies <= leavingAllies)) {
+            leaving = a;
+            leavingAllies = allies;
+          }
         }
-        const bool mutual = sim.mArmiesList[a]->mVarDat.mAllies.Contains(static_cast<unsigned int>(b)) && sim.mArmiesList[b]->mVarDat.mAllies.Contains(static_cast<unsigned int>(a));
-        if (mutual != (mTeamOfArmy[a] == mTeamOfArmy[b])) {
-          return false;
+        if (leaving < 0) {
+          break;
+        }
+        team.mask &= ~(std::uint32_t{1} << leaving);
+        mCutArmies |= std::uint32_t{1} << leaving;
+        gpg::Warnf("views: army index %d is no longer allied with the rest of its team; from now on its player gets only a view of their own units", leaving);
+      }
+    }
+    if (mTeamsJoined) {
+      return;
+    }
+    for (std::size_t a = 0; a < mTeamOfArmy.size(); ++a) {
+      for (std::size_t b = a + 1u; b < mTeamOfArmy.size(); ++b) {
+        if (mTeamOfArmy[a] >= 0 && mTeamOfArmy[b] >= 0 && mTeamOfArmy[a] != mTeamOfArmy[b] && !CutFromTeam(a) && !CutFromTeam(b) && mutual(a, b)) {
+          mTeamsJoined = true;
+          gpg::Warnf("views: army indices %zu and %zu became allies across teams; their teams' views stay apart, so neither sees what the other does", a, b);
+          return;
         }
       }
     }
-    return true;
+  }
+
+  std::int32_t CViewPackets::TeamLead(const STeam& team) const noexcept
+  {
+    return team.mask != 0u ? std::countr_zero(team.mask) : team.members.front();
   }
 
   std::int32_t CViewPackets::ReconArmyFor(const std::int32_t view, const SEntityFacts& facts) const noexcept
@@ -259,8 +294,9 @@ namespace faf::remote
     if (!mTeamsOn || view < mArmySlots) {
       return view;
     }
-    const std::uint32_t holders = mTeams[static_cast<std::size_t>(view - mArmySlots)].mask & static_cast<std::uint32_t>(facts.blipNeedsFlush);
-    return holders != 0u ? std::countr_zero(holders) : mTeams[static_cast<std::size_t>(view - mArmySlots)].members.front();
+    const STeam& team = mTeams[static_cast<std::size_t>(view - mArmySlots)];
+    const std::uint32_t holders = team.mask & static_cast<std::uint32_t>(facts.blipNeedsFlush);
+    return holders != 0u ? std::countr_zero(holders) : TeamLead(team);
   }
 
   SViewVisibility CViewPackets::VisibilityFor(const moho::Sim& sim, const std::int32_t view, const SEntityFacts& facts) const
@@ -281,7 +317,7 @@ namespace faf::remote
     }
     // An entity of the team's shows as to its owner, which all of the team may see.
     const bool owned = facts.armyIndex >= 0 && facts.armyIndex < 32 && ((team.mask >> facts.armyIndex) & 1u) != 0u;
-    return ResolveViewVisibility(sim, owned ? facts.armyIndex : team.members.front(), facts);
+    return ResolveViewVisibility(sim, owned ? facts.armyIndex : TeamLead(team), facts);
   }
 
   std::uint32_t CViewPackets::ViewsKeeping(const moho::Sim& sim, const SEntityFacts& facts) const
@@ -304,7 +340,7 @@ namespace faf::remote
         continue;
       }
       const bool owned = facts.armyIndex >= 0 && facts.armyIndex < 32 && ((team.mask >> facts.armyIndex) & 1u) != 0u;
-      views |= CanViewSee(sim, owned ? facts.armyIndex : team.members.front(), facts) ? slot : 0u;
+      views |= CanViewSee(sim, owned ? facts.armyIndex : TeamLead(team), facts) ? slot : 0u;
     }
     return views;
   }

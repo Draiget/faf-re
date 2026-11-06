@@ -35,11 +35,13 @@ namespace faf::remote::net
      * Server to player, reliable, one per beat: varints beat, entities in the player's own frame and in their team's,
      * then the own frame, team frame (empty without one), army, grid and Lua lanes, each a varint size and its bytes
      * (remote/ViewLanes.h). The player's client holds both frames; a blip of the player's own unit is theirs to leave out.
+     * An empty team frame means none: a player cut from their team drops what they held of it. After a reconnect the
+     * first view's frames are whole (no baseline), and so are its army and grid lanes.
      */
     View = 5,
     /**
-     * Server to player, reliable, once before any view: the map's size, x and z, as two 32-bit floats, then the
-     * player's army (-1: none) and command source, as two 32-bit integers.
+     * Server to player, reliable, before any view: the map's size, x and z, as two 32-bit floats, then the
+     * player's army (-1: none) and command source, as two 32-bit integers. Again after a reconnect.
      */
     GameInfo = 6,
     /**

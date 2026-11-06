@@ -107,6 +107,11 @@ namespace faf::remote
     /** `army`'s last frame against the one before, as `wire::EncodeFrame` writes it. */
     [[nodiscard]] bool EncodeHeldFrame(std::int32_t army, wire::BitWriter& writer) const;
     /**
+     * `army`'s last frame whole, against nothing, with the same frame id: for a client that lost what it held
+     * (plan WP14.1). The next frame is encoded against this one as for anyone else.
+     */
+    [[nodiscard]] bool EncodeWholeHeldFrame(std::int32_t army, wire::BitWriter& writer) const;
+    /**
      * With `EnableHeldFrames`, between a beat's views: whether `army`'s client holds a record with this
      * id, or held one within `CViewIdMap::kInboundGraceBeats` (its order may be on its way).
      */

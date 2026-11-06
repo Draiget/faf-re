@@ -147,10 +147,15 @@ namespace faf::remote
       return;
     }
     bool ok = true;
+    const bool fresh = std::exchange(client.fresh, false);
+    if (fresh) {
+      client.haveArmies = false;
+      client.grids.clear();
+    }
 
     // Entity lanes: the view's frame against the one its client holds.
     wire::BitWriter frameWriter;
-    if (EncodeHeldFrame(view, frameWriter)) {
+    if (fresh ? EncodeWholeHeldFrame(view, frameWriter) : EncodeHeldFrame(view, frameWriter)) {
       client.bytes += static_cast<std::uint32_t>(frameWriter.Bytes().size());
     } else {
       ++client.failures;
@@ -209,8 +214,18 @@ namespace faf::remote
     client.grids.swap(client.gridsNext);
 
     SLanes lanes{frameWriter, armyWriter, gridWriter, client.lua, ok};
-    if (const std::size_t teamSlot = TeamSlotOf(army); teamSlot != army) {
+    lanes.fresh = fresh;
+    // The team's frame goes once for all its players, except to one who holds none of it.
+    wire::BitWriter wholeTeamFrame;
+    if (const std::size_t teamSlot = TeamSlotOf(army); teamSlot != army && !CutFromTeam(army)) {
       lanes.team = &mClients[teamSlot].teamFrame;
+      if (fresh) {
+        if (!EncodeWholeHeldFrame(static_cast<std::int32_t>(teamSlot), wholeTeamFrame)) {
+          ++client.failures;
+          lanes.ok = false;
+        }
+        lanes.team = &wholeTeamFrame;
+      }
       lanes.teamEntities = HeldCount(static_cast<std::int32_t>(teamSlot));
       client.bytes += static_cast<std::uint32_t>(lanes.team->Bytes().size());
     }

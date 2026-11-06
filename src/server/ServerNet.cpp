@@ -71,10 +71,13 @@ namespace faf::server
     }
   }
 
-  void CServerNet::QueueView(const std::int32_t uid, std::vector<std::uint8_t> message)
+  void CServerNet::QueueView(const std::int32_t uid, std::vector<std::uint8_t> message, const bool fresh)
   {
     const std::scoped_lock lock(mViewLock);
-    mViewQueue[uid].push_back(std::move(message));
+    if (!message.empty() && message[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::GameInfo)) {
+      mGameInfo[uid] = message;
+    }
+    mViewQueue[uid].push_back(SQueuedMessage{std::move(message), fresh});
   }
 
   void CServerNet::SendViews()
@@ -90,18 +93,39 @@ namespace faf::server
         continue;
       }
       mViewSending.clear();
+      std::vector<std::uint8_t> gameInfo;
       {
         const std::scoped_lock lock(mViewLock);
         const auto queue = mViewQueue.find(uid);
         if (queue != mViewQueue.end()) {
           mViewSending.swap(queue->second);
         }
+        if (seat.viewBroken) {
+          if (const auto info = mGameInfo.find(uid); info != mGameInfo.end()) {
+            gameInfo = info->second;
+          }
+        }
       }
-      if (seat.gone || seat.lost || seat.viewBroken) {
+      if (seat.gone || seat.lost) {
         continue;
       }
-      for (const std::vector<std::uint8_t>& message : mViewSending) {
-        (void)mLinks.SendReliable(uid, message.data(), message.size());
+      std::size_t first = 0;
+      if (seat.viewBroken) {
+        // Back from a lost connection: what's encoded against frames it no longer holds goes nowhere, up to a fresh view.
+        while (first < mViewSending.size() && !mViewSending[first].fresh) {
+          ++first;
+        }
+        if (first == mViewSending.size()) {
+          continue;
+        }
+        seat.viewBroken = false;
+        if (!gameInfo.empty()) {
+          (void)mLinks.SendReliable(uid, gameInfo.data(), gameInfo.size());
+        }
+        Say(seat.name + " has their view again, from beat " + std::to_string(mBeat.load(std::memory_order_relaxed)));
+      }
+      for (std::size_t i = first; i < mViewSending.size(); ++i) {
+        (void)mLinks.SendReliable(uid, mViewSending[i].bytes.data(), mViewSending[i].bytes.size());
       }
       if (mLinks.ReliableUnacked(uid) > kMaxUnackedViewBytes) {
         Remove(uid, seat, "can't keep up with the game");
@@ -157,6 +181,7 @@ namespace faf::server
     {
       const std::scoped_lock lock(mNewsLock);
       mGone.push_back(uid);
+      mPresence.push_back(SPresence{uid, false});
     }
     Say(seat.name + " is out of the game: " + why);
   }
@@ -173,6 +198,18 @@ namespace faf::server
     return std::exchange(mGone, {});
   }
 
+  std::vector<std::int32_t> CServerNet::TakeReturned()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    return std::exchange(mReturned, {});
+  }
+
+  std::vector<CServerNet::SPresence> CServerNet::TakePresence()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    return std::exchange(mPresence, {});
+  }
+
   std::vector<std::string> CServerNet::TakeNews()
   {
     const std::scoped_lock lock(mNewsLock);
@@ -187,9 +224,16 @@ namespace faf::server
     }
     SSeat& seat = found->second;
     seat.joinedEver = true;
-    seat.lost = false;
-    seat.viewBroken = seat.viewBroken || returning;
-    Say(seat.name + (returning ? " is back, from " : " joined, from ") + from.Text() + (returning ? "; its view isn't resent yet" : ""));
+    const bool wasLost = std::exchange(seat.lost, false);
+    if (returning) {
+      seat.viewBroken = true;
+      const std::scoped_lock lock(mNewsLock);
+      mReturned.push_back(uid);
+      if (wasLost) {
+        mPresence.push_back(SPresence{uid, false});
+      }
+    }
+    Say(seat.name + (returning ? " is back, from " : " joined, from ") + from.Text() + (returning ? "; their view comes whole with the next beat" : ""));
   }
 
   void CServerNet::OnLost(const std::int32_t uid)
@@ -201,6 +245,10 @@ namespace faf::server
     SSeat& seat = found->second;
     seat.lost = true;
     seat.lostAtUs = mNowUs;
+    {
+      const std::scoped_lock lock(mNewsLock);
+      mPresence.push_back(SPresence{uid, true});
+    }
     Say(seat.name + " lost the connection: " + std::to_string(static_cast<int>(mConfig.reconnectSeconds)) + " s to come back");
   }
 

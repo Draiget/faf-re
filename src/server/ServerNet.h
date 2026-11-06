@@ -54,8 +54,11 @@ namespace faf::server
     /** Stops the thread; no seat is touched after this returns. */
     void Stop();
 
-    /** A reliable message for a player, in order, from any thread: it waits until they've joined. */
-    void QueueView(std::int32_t uid, std::vector<std::uint8_t> message);
+    /**
+     * A reliable message for a player, in order, from any thread: it waits until they've joined. `fresh`: a view
+     * whose lanes are whole (`CViewLanes::RequestFresh`), which a returning player starts from.
+     */
+    void QueueView(std::int32_t uid, std::vector<std::uint8_t> message, bool fresh = false);
     /** Bytes sent to all players so far. */
     [[nodiscard]] std::uint64_t BytesSent() const noexcept { return mBytesSent.load(std::memory_order_relaxed); }
 
@@ -67,6 +70,17 @@ namespace faf::server
 
     /** Players gone for good since the last call: nobody needs their views any more. */
     [[nodiscard]] std::vector<std::int32_t> TakeGone();
+    /** Players back since the last call, who hold no view now: their next one must be fresh (plan WP14.1). */
+    [[nodiscard]] std::vector<std::int32_t> TakeReturned();
+
+    /** A player who lost the connection (`away`), or came back or left the game since. */
+    struct SPresence
+    {
+      std::int32_t uid;
+      bool away;
+    };
+    /** Who went away or stopped being away since the last call, in order. */
+    [[nodiscard]] std::vector<SPresence> TakePresence();
 
     /** Lines for the console since the last call. */
     [[nodiscard]] std::vector<std::string> TakeNews();
@@ -84,7 +98,7 @@ namespace faf::server
       bool loaded = false;
       bool lost = false;
       bool gone = false;
-      // A returning player has lost the frames the next one is encoded against (WP14).
+      // A returning player has lost the frames the next one is encoded against, so it waits for a fresh one (WP14.1).
       bool viewBroken = false;
       std::uint64_t lostAtUs = 0;
       std::uint64_t bytesSeen = 0; // its channel's count; a new channel starts again
@@ -112,15 +126,23 @@ namespace faf::server
     std::uint64_t mStartUs = 0;
     std::uint64_t mNowUs = 0;
     bool mJoinWaitOver = false;
-    std::vector<std::int32_t> mGone; // under mNewsLock
+    std::vector<std::int32_t> mGone;          // under mNewsLock
+    std::vector<std::int32_t> mReturned;      // likewise
+    std::vector<SPresence> mPresence;         // likewise
     std::uint64_t mBadMessages = 0;
     // `OnMessage` runs inside the links' pass over their players, so they go once it's over.
     std::vector<std::int32_t> mToUnlink;
 
+    struct SQueuedMessage
+    {
+      std::vector<std::uint8_t> bytes;
+      bool fresh = false;
+    };
     std::atomic<std::uint64_t> mBytesSent{0};
     std::mutex mViewLock;
-    std::map<std::int32_t, std::vector<std::vector<std::uint8_t>>> mViewQueue;
-    std::vector<std::vector<std::uint8_t>> mViewSending;
+    std::map<std::int32_t, std::vector<SQueuedMessage>> mViewQueue;
+    std::map<std::int32_t, std::vector<std::uint8_t>> mGameInfo; // each player's, to send again on their return
+    std::vector<SQueuedMessage> mViewSending;
 
     std::mutex mNewsLock;
     std::vector<std::string> mNews;
