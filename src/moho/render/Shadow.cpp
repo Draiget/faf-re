@@ -28,18 +28,6 @@ namespace gpg::gal
 }
 #include "gpg/gal/backends/d3d9/RenderTargetD3D9.hpp"
 
-// Declared the way gpg/gal/Matrix.cpp declares its D3DX entry points, rather
-// than pulling in the D3DX headers - moho::VMatrix4 is layout-identical to
-// D3DXMATRIX and Wm3::Vector3f to D3DXVECTOR3.
-extern "C"
-{
-  moho::VMatrix4* WINAPI D3DXMatrixLookAtRH(
-    moho::VMatrix4* outMatrix,
-    const Wm3::Vector3f* eye,
-    const Wm3::Vector3f* target,
-    const Wm3::Vector3f* up
-  );
-}
 #include <algorithm>
 #include <cmath>
 #include "moho/render/d3d/CD3DVertexSheet.h"
@@ -103,9 +91,10 @@ namespace moho
    * Address: 0x009407D0 (FUN_009407D0, sub_9407D0)
    *
    * What it does:
-   * Builds a right-handed look-at matrix. A thin forward to D3DX that the
-   * binary keeps as its own symbol, so it is recovered under its own name
-   * rather than inlined at the call site.
+   * Builds a right-handed look-at matrix. The binary forwards to D3DXMatrixLookAtRH.
+   * Engine change (issue #317): computed here with D3DX's formula, so the client needs
+   * D3DX9 only for the Direct3D 9 renderer. Against d3dx9_43 over 10^6 random inputs it
+   * differs by at most 8.7e-6 of each term's scale (tmp/claude/half/lookat.cpp, 2026-11-06).
    */
   gpg::gal::Matrix* MatrixLookAtRH(
     gpg::gal::Matrix* const outMatrix,
@@ -114,7 +103,25 @@ namespace moho
     const Wm3::Vector3f* const up
   )
   {
-    return ::D3DXMatrixLookAtRH(outMatrix, eye, target, up);
+    Wm3::Vector3f zAxis{eye->x - target->x, eye->y - target->y, eye->z - target->z};
+    const float zScale = 1.0f / std::sqrt(zAxis.x * zAxis.x + zAxis.y * zAxis.y + zAxis.z * zAxis.z);
+    zAxis = {zAxis.x * zScale, zAxis.y * zScale, zAxis.z * zScale};
+
+    Wm3::Vector3f xAxis{up->y * zAxis.z - up->z * zAxis.y, up->z * zAxis.x - up->x * zAxis.z,
+                        up->x * zAxis.y - up->y * zAxis.x};
+    const float xScale = 1.0f / std::sqrt(xAxis.x * xAxis.x + xAxis.y * xAxis.y + xAxis.z * xAxis.z);
+    xAxis = {xAxis.x * xScale, xAxis.y * xScale, xAxis.z * xScale};
+
+    const Wm3::Vector3f yAxis{zAxis.y * xAxis.z - zAxis.z * xAxis.y, zAxis.z * xAxis.x - zAxis.x * xAxis.z,
+                              zAxis.x * xAxis.y - zAxis.y * xAxis.x};
+
+    outMatrix->r[0] = {xAxis.x, yAxis.x, zAxis.x, 0.0f};
+    outMatrix->r[1] = {xAxis.y, yAxis.y, zAxis.y, 0.0f};
+    outMatrix->r[2] = {xAxis.z, yAxis.z, zAxis.z, 0.0f};
+    outMatrix->r[3] = {-(xAxis.x * eye->x + xAxis.y * eye->y + xAxis.z * eye->z),
+                       -(yAxis.x * eye->x + yAxis.y * eye->y + yAxis.z * eye->z),
+                       -(zAxis.x * eye->x + zAxis.y * eye->y + zAxis.z * eye->z), 1.0f};
+    return outMatrix;
   }
 
   /**

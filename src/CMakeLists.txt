@@ -227,6 +227,12 @@ target_link_options(faf_engine INTERFACE
   /NODEFAULTLIB:ucrt.lib /NODEFAULTLIB:vcruntime.lib)
 # The manifest comes from MohoManifest.rc.
 target_link_options(faf_main PRIVATE /MANIFEST:NO)
+# Engine change (issue #317): d3dx9_43.dll, from the DirectX End-User Runtime of June 2010, is
+# loaded when the Direct3D 9 renderer first calls it, not when the exe starts; only that renderer
+# calls it. DeviceD3D9::Setup checks for it first, so a machine without it gets a clear error
+# there instead of a crash.
+target_link_options(faf_main PRIVATE /DELAYLOAD:d3dx9_43.dll)
+target_link_libraries(faf_main PRIVATE delayimp)
 
 # The static UCRT is the C runtime's math library, so its release decides
 # results the simulation depends on. UCRT 10.0.26100's x64 asin, acos, atan,
@@ -310,7 +316,7 @@ add_custom_command(TARGET faf_main POST_BUILD
 # faf_sim (plan WPR.11) is the simulation as programs without the client link it
 # (headless here, headless and the game server on Linux, cmake/FafLinux.cmake): the
 # objects of the translation units in sim_sources.cmake, gpg::gal::Math without D3DX
-# (gpg/gal/MatrixPortable.cpp instead of gpg/gal/Matrix.cpp), and what linking them takes,
+# (gpg/gal/MatrixPortable.cpp, which faf_main links too), and what linking them takes,
 # with no wx, Direct3D, D3DX, XACT, DirectSound or FFmpeg library.
 #
 # The objects are faf_engine's, compiled once for faf_main and faf_sim alike: each client
@@ -379,7 +385,7 @@ target_include_directories(faf_sim_settings INTERFACE
 target_compile_options(faf_sim_settings INTERFACE "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
 target_link_libraries(faf_sim_settings INTERFACE faf_codegen Wm3Headers)
 
-# MatrixPortable.cpp (faf_main has the D3DX version) is compiled by each program that links
+# MatrixPortable.cpp (faf_main has its own object of it) is compiled by each program that links
 # faf_sim, so its object (it has a static initialiser) links after the program's own, as
 # before faf_sim existed: an object library's objects would link first.
 add_library(faf_sim INTERFACE)

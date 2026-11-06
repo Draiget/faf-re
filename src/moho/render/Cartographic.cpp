@@ -1,5 +1,7 @@
 #include "moho/render/Cartographic.h"
 
+#include "gpg/gal/HalfFloat.h"
+
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -536,43 +538,6 @@ namespace
   [[nodiscard]] moho::STIMap& CartographicTerrainMap(const moho::IWldTerrainRes& terrain) noexcept
   {
     return *terrain.mMap;
-  }
-
-  /**
-   * Packs one IEEE-754 binary32 value into a binary16 word.
-   *
-   * The shipped elevation-texture fill loop converts each sampled height with
-   * `D3DXFloat32To16Array` (direct call at 0x007D2759). D3DX is an external
-   * runtime and this tree only reaches it through
-   * `gpg::gal::InvokeD3DXFloat32To16Array`, which lives in an anonymous
-   * namespace inside `D3D9Interfaces.cpp` and is therefore not linkable from
-   * another translation unit. This helper reproduces the same conversion
-   * (round-to-nearest, denormal-preserving, saturating to +/-Inf) that the
-   * D3D9 backend falls back to when the D3DX export is unavailable.
-   */
-  [[nodiscard]] std::uint16_t PackFloat32AsHalfFloat(const float value) noexcept
-  {
-    const std::uint32_t bits = std::bit_cast<std::uint32_t>(value);
-
-    const std::uint32_t sign = (bits >> 16U) & 0x8000U;
-    const std::int32_t exponent = static_cast<std::int32_t>((bits >> 23U) & 0xFFU) - 127 + 15;
-    std::uint32_t mantissa = bits & 0x007FFFFFU;
-
-    if (exponent <= 0) {
-      if (exponent < -10) {
-        return static_cast<std::uint16_t>(sign);
-      }
-      mantissa = (mantissa | 0x00800000U) >> static_cast<std::uint32_t>(1 - exponent);
-      return static_cast<std::uint16_t>(sign | ((mantissa + 0x00001000U) >> 13U));
-    }
-
-    if (exponent >= 31) {
-      return static_cast<std::uint16_t>(sign | 0x7C00U);
-    }
-
-    return static_cast<std::uint16_t>(
-      sign | (static_cast<std::uint32_t>(exponent) << 10U) | ((mantissa + 0x00001000U) >> 13U)
-    );
   }
 
   /**
@@ -1576,7 +1541,8 @@ namespace moho
           const float elevation = SampleCartographicHeightKernel(
             heightField, sampleX, sampleZ, mElevMinimum, inverseElevationSpan
           );
-          *texel = PackFloat32AsHalfFloat(elevation);
+          // The binary converts with D3DXFloat32To16Array (direct call at 0x007D2759).
+          *texel = gpg::gal::FloatToHalf(elevation);
           texel += kCartographicElevationTexelWordStride;
         }
         rowCursor += kCartographicElevationTexelWordStride * gridWidth;

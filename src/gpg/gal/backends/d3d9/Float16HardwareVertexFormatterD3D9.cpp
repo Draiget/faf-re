@@ -1,4 +1,5 @@
 #include "gpg/gal/backends/d3d9/D3D9Private.h"
+#include "gpg/gal/HalfFloat.h"
 
 namespace gpg::gal
 {
@@ -17,8 +18,8 @@ namespace
      */
     static void PackFloat2ToHalf2(std::uint16_t* const outHalf2, const float* const inFloat2)
     {
-        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&outHalf2[0]), &inFloat2[0], 1U);
-        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&outHalf2[1]), &inFloat2[1], 1U);
+        outHalf2[0] = FloatToHalf(inFloat2[0]);
+        outHalf2[1] = FloatToHalf(inFloat2[1]);
     }
 
     /**
@@ -29,9 +30,9 @@ namespace
      */
     static void PackFloat3ToHalf3(std::uint16_t* const outHalf3, const float* const inFloat3)
     {
-        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&outHalf3[0]), &inFloat3[0], 1U);
-        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&outHalf3[1]), &inFloat3[1], 1U);
-        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&outHalf3[2]), &inFloat3[2], 1U);
+        outHalf3[0] = FloatToHalf(inFloat3[0]);
+        outHalf3[1] = FloatToHalf(inFloat3[1]);
+        outHalf3[2] = FloatToHalf(inFloat3[2]);
     }
 
     /**
@@ -120,7 +121,7 @@ namespace
             destination.instanceIndex = source.instanceIndex;
             destination.meshColor = source.meshColor;
             destination.color = source.color;
-            D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.shaderTime), &source.shaderTime, 1U);
+            destination.shaderTime = FloatToHalf(source.shaderTime);
             CopyMatrix4x3Rows(
                 destination.transform[0], destination.transform[1], destination.transform[2], destination.transform[3],
                 source.transform
@@ -129,7 +130,7 @@ namespace
             destination.secondaryDataMask = (source.useSecondaryData != 0U) ? static_cast<std::uint8_t>(0xFFU) : 0U;
             PackFloat2ToHalf2(destination.scroll, source.scroll);
             destination.dissolve = source.dissolve;
-            D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.parameter), &source.parameter, 1U);
+            destination.parameter = FloatToHalf(source.parameter);
             return;
         }
 
@@ -144,10 +145,10 @@ namespace
         PackFloat3ToHalf3(destination.binormal, source.binormal);
         PackFloat3ToHalf3(destination.tangent, source.tangent);
 
-        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.texCoords[0]), &source.texCoord0[0], 1U);
-        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.texCoords[1]), &source.texCoord0[1], 1U);
-        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.texCoords[2]), &source.texCoord1[0], 1U);
-        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.texCoords[3]), &source.texCoord1[1], 1U);
+        destination.texCoords[0] = FloatToHalf(source.texCoord0[0]);
+        destination.texCoords[1] = FloatToHalf(source.texCoord0[1]);
+        destination.texCoords[2] = FloatToHalf(source.texCoord1[0]);
+        destination.texCoords[3] = FloatToHalf(source.texCoord1[1]);
     }
 }
 

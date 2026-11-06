@@ -938,6 +938,16 @@ namespace
         try
         {
             mCurThreadId = static_cast<int>(::GetCurrentThreadId());
+
+            // Engine change (issue #317): d3dx9_43.dll is delay-loaded (src/CMakeLists.txt), and this
+            // renderer is the only caller. Without it the renderer can't start: say so here rather
+            // than fail on the first D3DX call.
+            if (::LoadLibraryW(L"d3dx9_43.dll") == nullptr)
+            {
+                AppendD3D9SetupLogMessage("d3dx9_43.dll is missing (DirectX End-User Runtime)");
+                ThrowGalError("DeviceD3D9.cpp", 131, "d3dx9_43.dll is missing (DirectX End-User Runtime)");
+            }
+
             mDirect3D = Direct3DCreate9(0x20U);
             if (mDirect3D == nullptr)
             {

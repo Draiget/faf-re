@@ -1100,7 +1100,7 @@ set(FAF_ENGINE_SOURCES
   gpg/gal/GalBaseClasses.cpp
   gpg/gal/D3DErrorToString.cpp
   gpg/gal/D3DErrorToWideString.cpp
-  gpg/gal/Matrix.cpp
+  gpg/gal/MatrixPortable.cpp
   gpg/gal/MeshFormatter.cpp
   gpg/gal/MeshVertex.cpp
   gpg/gal/StateCache.cpp

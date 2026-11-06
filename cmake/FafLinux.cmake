@@ -172,7 +172,7 @@ faf_build_info(faf_sim x64-linux)
 # Windows build assembles X87Math64.asm, plan WPL.10).
 enable_language(ASM)
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math64.S")
-# gpg::gal::Math without D3DX (Windows' faf_main uses gpg/gal/Matrix.cpp, plan WPR.12).
+# gpg::gal::Math without D3DX (plan WPR.12; Windows' faf_main links it too, #317).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/gal/MatrixPortable.cpp")
 # The Win32 calls the shared code makes, on POSIX (plan WPL.5).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32Shim.cpp")

@@ -1,4 +1,5 @@
 #include "gpg/gal/backends/d3d10/D3D10Private.h"
+#include "gpg/gal/HalfFloat.h"
 
 namespace gpg::gal
 {
@@ -92,17 +93,17 @@ namespace
     auto& destination = *static_cast<Float16HardwareVertexInstance*>(destinationVertex);
     destination.instanceIndex = source.instanceIndex;
     destination.color = source.color;
-    D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.shaderTime), &source.shaderTime, 1U);
+    destination.shaderTime = FloatToHalf(source.shaderTime);
     static_cast<void>(CopyMatrix4x3Rows(
       destination.transform[0], destination.transform[1], destination.transform[2], destination.transform[3],
       source.transform
     ));
     destination.bonePaletteBase = source.bonePaletteBase;
     destination.secondaryDataMask = (source.useSecondaryData != 0U) ? static_cast<std::uint8_t>(0xFFU) : 0U;
-    D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.scroll[1]), &source.scroll[1], 1U);
-    D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.scroll[0]), &source.scroll[0], 1U);
+    destination.scroll[1] = FloatToHalf(source.scroll[1]);
+    destination.scroll[0] = FloatToHalf(source.scroll[0]);
     destination.dissolve = source.dissolve;
-    D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.parameter), &source.parameter, 1U);
+    destination.parameter = FloatToHalf(source.parameter);
     destination.meshColor = source.meshColor;
   }
 }
