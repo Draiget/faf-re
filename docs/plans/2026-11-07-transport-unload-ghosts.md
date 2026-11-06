@@ -248,9 +248,9 @@ git commit -m "feat(mod): create UI mod scaffold and pending drop orders buffer 
   - `DropGhostsDispatcher.OnBeat()`: polls `GetAttachedUnitsList({ transport })`; when a unit is no longer attached (unloaded), dispatches buffered orders to the `realUnit`.
   - `DropGhostsDispatcher.DrawWaypoints()`: renders colored path lines from drop position to destination waypoints.
 
-- [ ] **Step 1: Implement dispatch logic on disembark**
-- [ ] **Step 2: Implement line rendering for queued orders using standard waypoint meshes**
-- [ ] **Step 3: Commit**
+- [x] **Step 1: Implement dispatch logic on disembark**
+- [x] **Step 2: Implement line rendering for queued orders using standard waypoint meshes**
+- [x] **Step 3: Commit**
 
 ---
 
