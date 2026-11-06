@@ -852,9 +852,15 @@ namespace faf::remote::wire
 
   std::uint64_t HashBlipUpdate(const SEntityRecord& record, const SUnitDetail& detail) noexcept
   {
-    std::uint64_t hash = 0x9E3779B97F4A7C15ull;
-    const auto add = [&hash](const std::uint64_t value) {
-      hash = std::rotl(hash ^ (value * 0xC2B2AE3D27D4EB4Full), 31) * 0x9E3779B185EBCA87ull;
+    // Four lanes in turn, so each value's multiplies wait on the value four before, not the one
+    // before: a server hashes every blip update of every view group each beat (plan #118).
+    std::uint64_t lanes[4] = {0x9E3779B97F4A7C15ull, 0xC2B2AE3D27D4EB4Full, 0x165667B19E3779F9ull, 0x27D4EB2F165667C5ull};
+    const auto add = [&lanes](const std::uint64_t value) {
+      const std::uint64_t next = std::rotl(lanes[0] ^ (value * 0xC2B2AE3D27D4EB4Full), 31) * 0x9E3779B185EBCA87ull;
+      lanes[0] = lanes[1];
+      lanes[1] = lanes[2];
+      lanes[2] = lanes[3];
+      lanes[3] = next;
     };
     const auto addFloats = [&add](const float* const values, const std::size_t count) {
       for (std::size_t i = 0; i < count; ++i) {
@@ -1043,6 +1049,10 @@ namespace faf::remote::wire
         fields |= kFieldUnitWork;
       }
       if (b.unitStates != a.unitStates) {
+    std::uint64_t hash = lanes[0];
+    for (int lane = 1; lane < 4; ++lane) {
+      hash = std::rotl(hash ^ (lanes[lane] * 0xC2B2AE3D27D4EB4Full), 27) * 0x9E3779B185EBCA87ull;
+    }
         fields |= kFieldUnitStates;
       }
       if (b.scriptBits != a.scriptBits) {

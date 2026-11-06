@@ -134,6 +134,13 @@ namespace faf::remote
      * this is the last call of the beat that may read the sim, and the frames come later.
      */
     virtual void OnViewFrames(moho::Sim& sim) { (void)sim; }
+    /**
+     * Other work of the beat that reads the stopped sim and nothing of the frames: on the sim thread,
+     * before the frames, says how many jobs there are; `RunSideJob` then runs each on the workers in
+     * the frames' batch, so work that mostly waits on memory overlaps theirs (plan #118).
+     */
+    virtual std::size_t PrepareSideJobs(moho::Sim& sim) { (void)sim; return 0u; }
+    virtual void RunSideJob(const std::size_t index) { (void)index; }
     /** With a pipeline, on one of its threads: `army`'s frame is ready. Must not read the sim. */
     virtual void OnViewReady(const std::size_t army) { (void)army; }
     /** With a pipeline, on the sim thread: every view's `OnViewReady` of the last beat is over. */

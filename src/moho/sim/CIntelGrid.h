@@ -251,6 +251,27 @@ namespace moho
       gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
     );
 
+    /**
+     * Engine addition (dedicated server, plan #118): which parts of the grid a raster may have
+     * changed since the reader last cleared them, so a server encoding every army's grid each beat
+     * reads only those. One byte per `kChangeChunkCells` cells in row-major order, kept after the
+     * cells in the grid's own buffer, so the class keeps the binary's layout; the sim only sets them
+     * and never reads them, so they change nothing it computes. They start set.
+     */
+    static constexpr std::uint32_t kChangeChunkCells = 4096u;
+    [[nodiscard]] std::uint32_t ChangeChunkCount() const noexcept
+    {
+      return (mWidth * mHeight + kChangeChunkCells - 1u) / kChangeChunkCells;
+    }
+    [[nodiscard]] std::uint8_t* ChangedChunks() noexcept
+    {
+      return reinterpret_cast<std::uint8_t*>(mGrid.get() + static_cast<std::size_t>(mWidth) * mHeight);
+    }
+    [[nodiscard]] const std::uint8_t* ChangedChunks() const noexcept
+    {
+      return reinterpret_cast<const std::uint8_t*>(mGrid.get() + static_cast<std::size_t>(mWidth) * mHeight);
+    }
+
   private:
     /**
      * Address: 0x00507540 (FUN_00507540, ?Raster@CIntelGrid@Moho@@AAEXABV?$Vector3@M@Wm3@@I_N@Z)

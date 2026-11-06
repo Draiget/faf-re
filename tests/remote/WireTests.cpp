@@ -978,6 +978,15 @@ namespace
         const std::size_t at = rng() % 2u == 0u ? rng() % count : (rng() % (count / 64u + 1u)) * 64u % count;
         now[at] = static_cast<std::int8_t>(rng() % 3u == 0u ? 0u : 1 + rng() % 100u);
       }
+      if (round % 3 == 1) {
+        // A stretch that all comes into or goes out of sight (long flipped runs), counts of any sign.
+        const std::size_t from = rng() % count;
+        const std::size_t to = std::min(count, from + rng() % 300u);
+        const bool seen = rng() % 2u == 0u;
+        for (std::size_t at = from; at < to; ++at) {
+          now[at] = seen ? static_cast<std::int8_t>(rng() % 2u == 0u ? -1 - static_cast<int>(rng() % 120u) : 1 + static_cast<int>(rng() % 120u)) : std::int8_t{0};
+        }
+      }
       SGridBits current = before;
       before.cells.resize(count);
       current.cells.resize(count);
@@ -987,11 +996,48 @@ namespace
       }
       BitWriter expected;
       CHECK(EncodeGridDelta(current, &before, expected));
+      // The encoder keeps what the client holds as bits, 64 cells a word.
+      const auto bitsOf = [count](const std::vector<std::int8_t>& cells) {
+        std::vector<std::uint64_t> words(GridSeenWords(count), 0u);
+        for (std::size_t i = 0; i < count; ++i) {
+          words[i / 64u] |= std::uint64_t{cells[i] != 0 ? 1u : 0u} << (i % 64u);
+        }
+        return words;
+      };
+      std::vector<std::uint64_t> seen = bitsOf(held);
       BitWriter actual;
-      EncodeGridDeltaInPlace(before.width, before.height, now.data(), held.data(), actual);
+      EncodeGridDeltaInPlace(before.width, before.height, now.data(), seen.data(), actual);
       CHECK(actual.BitCount() == expected.BitCount());
       CHECK(std::equal(actual.Bytes().begin(), actual.Bytes().end(), expected.Bytes().begin(), expected.Bytes().end()));
-      CHECK(held == now);
+      CHECK(seen == bitsOf(now));
+
+      // Reading only the chunks flagged as changed (128 cells each here): every chunk with a changed
+      // cell flagged, some unchanged ones too; the same bits, and every flag cleared. Then a grid read
+      // whole with no flag set (a `seen` just reset).
+      constexpr std::uint32_t kChunk = 128u;
+      std::vector<std::uint8_t> flags((count + kChunk - 1u) / kChunk, 0u);
+      for (std::size_t i = 0; i < count; ++i) {
+        if ((held[i] != 0) != (now[i] != 0) || held[i] != now[i] || rng() % 50u == 0u) {
+          flags[i / kChunk] = 1u;
+        }
+      }
+      std::vector<std::uint64_t> chunkSeen = bitsOf(held);
+      BitWriter chunked;
+      EncodeGridDeltaInPlace(before.width, before.height, now.data(), chunkSeen.data(), chunked, flags.data(), kChunk, false);
+      CHECK(chunked.BitCount() == expected.BitCount());
+      CHECK(std::equal(chunked.Bytes().begin(), chunked.Bytes().end(), expected.Bytes().begin(), expected.Bytes().end()));
+      CHECK(chunkSeen == bitsOf(now));
+      CHECK(std::all_of(flags.begin(), flags.end(), [](const std::uint8_t flag) { return flag == 0u; }));
+      SGridBits empty = current;
+      std::fill(empty.cells.begin(), empty.cells.end(), std::uint8_t{0});
+      BitWriter wholeExpected;
+      CHECK(EncodeGridDelta(current, &empty, wholeExpected));
+      std::vector<std::uint64_t> fresh(GridSeenWords(count), 0u);
+      BitWriter whole;
+      EncodeGridDeltaInPlace(before.width, before.height, now.data(), fresh.data(), whole, flags.data(), kChunk, true);
+      CHECK(whole.BitCount() == wholeExpected.BitCount());
+      CHECK(std::equal(whole.Bytes().begin(), whole.Bytes().end(), wholeExpected.Bytes().begin(), wholeExpected.Bytes().end()));
+      CHECK(fresh == bitsOf(now));
     }
   }
 
