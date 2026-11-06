@@ -65,6 +65,7 @@
 #include "platform/X87Precision.h"
 #include "remote/net/UdpSocket.h"
 #include "remote/ContentTables.h"
+#include "server/LobbyHost.h"
 #include "server/ServerNet.h"
 #include "server/ServerViews.h"
 #include "server/SpeedWatch.h"
@@ -84,7 +85,7 @@ namespace
 
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>]\n";
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--lobby-seconds <n>]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
   // `net_Lag` is 500 ms in a lockstep game, time for every player's beats to arrive. Here it's only the
@@ -466,6 +467,9 @@ namespace
       netConfig.reconnectSeconds = std::atof(text.c_str());
     }
     const double awayPauseSeconds = ReadOption("--away-pause-seconds", text) ? std::atof(text.c_str()) : 0.0;
+    // Plan WP2.2: a lobby before the game, the server its network host. Until launch interception (WP2.14) it stays
+    // open this long and then the game starts as the match file says.
+    const double lobbySeconds = ReadOption("--lobby-seconds", text) ? std::atof(text.c_str()) : 0.0;
 
     LuaPlus::LuaState* const state = faf::headless::ReplayLuaState();
     LuaPlus::LuaObject config;
@@ -560,8 +564,9 @@ namespace
         Say("%d addresses from MatchAddresses get a full handshake budget; others share a small one, and a valid token lists them",
             static_cast<int>(allowedAddresses.size()));
       }
-      // The match file starts the game at once: no lobby phase, so nothing is relayed (plan WPR.51).
-      net->CloseLobby();
+      if (lobbySeconds <= 0.0) {
+        net->CloseLobby(); // the game starts at once: nothing to relay (plan WPR.51)
+      }
       std::string netError;
       if (!net->Start(netError)) {
         end.error = netError;
@@ -569,6 +574,41 @@ namespace
         return kExitBadInput;
       }
       Say("Listening on %s, %d seats, %.0f s to join", net->Local().Text().c_str(), static_cast<int>(roster.Remotes().size()), netConfig.joinSeconds);
+      if (lobbySeconds > 0.0) {
+        // Plan WP2.2, WP2.5: each participant's lobby joins the server's; their lobbies talk through the relay.
+        faf::server::CLobbyHost lobbyHost(kServerName, seed);
+        for (const moho::SLaunchClient& client : roster.Remotes()) {
+          lobbyHost.AddParticipant(client.uid, client.name.c_str());
+        }
+        Say("Lobby open for %.0f s", lobbySeconds);
+        const Clock::time_point lobbyEnd = Clock::now() + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(lobbySeconds));
+        std::vector<faf::server::CLobbyHost::SOutgoing> out;
+        std::size_t lastIn = 0;
+        while (Clock::now() < lobbyEnd && gStopSignal == 0) {
+          for (const faf::server::CServerNet::SLobbyMessage& message : net->TakeLobbyMessages()) {
+            lobbyHost.OnMessage(message.from, message.message, out);
+          }
+          for (const std::int32_t uid : net->TakeLobbyLeft()) {
+            lobbyHost.OnLeft(uid, out);
+          }
+          for (const faf::server::CLobbyHost::SOutgoing& message : out) {
+            net->QueueLobbyFromHost(message.to, message.message);
+          }
+          out.clear();
+          if (const std::size_t in = lobbyHost.Established().size(); in != lastIn) {
+            lastIn = in;
+            Say("Lobby: %d of %d participants in", static_cast<int>(in), static_cast<int>(roster.Remotes().size()));
+          }
+          for (const std::string& line : net->TakeNews()) {
+            Say("%s", line.c_str());
+          }
+          std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+        net->CloseLobby();
+        Say("Lobby closed: %d of %d participants in, %llu messages to the host ignored, %llu joins refused", static_cast<int>(lastIn),
+            static_cast<int>(roster.Remotes().size()), static_cast<unsigned long long>(lobbyHost.Ignored()),
+            static_cast<unsigned long long>(lobbyHost.Rejected()));
+      }
     } else if (!roster.Remotes().empty()) {
       Say("%d seats stay empty: this server isn't listening (--listen)", static_cast<int>(roster.Remotes().size()));
     }

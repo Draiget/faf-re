@@ -146,6 +146,12 @@ namespace faf::server
     return std::exchange(mLobbyIn, {});
   }
 
+  std::vector<std::int32_t> CServerNet::TakeLobbyLeft()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    return std::exchange(mLobbyLeft, {});
+  }
+
   void CServerNet::QueueLobbyFromHost(const std::int32_t uid, const std::vector<std::uint8_t>& message)
   {
     const std::scoped_lock lock(mViewLock);
@@ -227,6 +233,7 @@ namespace faf::server
     {
       const std::scoped_lock lock(mNewsLock);
       mGone.push_back(uid);
+      mLobbyLeft.push_back(uid);
       mPresence.push_back(SPresence{uid, false});
     }
     Say(seat.name + " is out of the game: " + why);

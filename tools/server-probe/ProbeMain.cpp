@@ -32,6 +32,7 @@
 #include "remote/ViewLanes.h"
 #include "remote/net/GameLinks.h"
 #include "remote/wire/EntityFrame.h"
+#include "server/LobbyHost.h"
 
 using namespace faf::remote::net;
 
@@ -185,6 +186,11 @@ namespace
     int fuzzCount = 2000;
     CImpairedPath::SConfig path;
     bool noLoad = false;
+    // Plan WP2.2, WP2.13: join the server's lobby by this name once connected, and send one direct script message
+    // through the relay to another participant at a time.
+    std::string lobbyName;
+    std::int32_t lobbySayTo = 0;
+    double lobbySayAt = -1.0;
   };
 
   [[nodiscard]] double Argument(const char* const text)
@@ -226,6 +232,12 @@ namespace
         out.pauseEvery = Argument(value);
       } else if (name == "--damage-at") {
         out.damageAt = Argument(value);
+      } else if (name == "--lobby-name") {
+        out.lobbyName = value;
+      } else if (name == "--lobby-say-to") {
+        out.lobbySayTo = std::atoi(value);
+      } else if (name == "--lobby-say-at") {
+        out.lobbySayAt = Argument(value);
       } else if (name == "--save-views") {
         out.saveViews = value;
       } else if (name == "--break-alliance-at") {
@@ -528,6 +540,102 @@ namespace
     return "?";
   }
 
+  /** Plan WP2.2, WP2.13: what the probe saw of the lobby. */
+  struct SLobbySeen
+  {
+    std::uint64_t messages = 0;
+    bool welcomed = false;
+    std::int32_t hostedTime = 0;
+    std::vector<std::int32_t> peers;        // from NewPeer, in order
+    std::vector<std::int32_t> established;  // the last EstablishedPeers
+    std::vector<std::int32_t> scriptFrom;   // senders of script data, as the relay wrote them
+    std::vector<std::int32_t> deleted;
+    bool rejected = false;
+  };
+
+  /** One `Lobby` frame from the server: varint sender (0: the host), then a CLobby message; printed and noted. */
+  void TakeLobby(const int uid, const double elapsed, const std::vector<std::uint8_t>& frame, SLobbySeen& seen)
+  {
+    ByteReader reader(frame.data() + 1, frame.size() - 1u);
+    const auto from = static_cast<std::int32_t>(reader.Varint());
+    std::size_t at = 1u + faf::remote::net::VarintSize(static_cast<std::uint64_t>(from));
+    if (!reader.Ok() || at + 3u > frame.size()) {
+      std::printf("probe %d: %.1f s: a malformed lobby frame\n", uid, elapsed);
+      return;
+    }
+    ++seen.messages;
+    const std::uint8_t type = frame[at];
+    const std::size_t end = frame.size();
+    at += 3u;
+    const auto string = [&] {
+      std::string text;
+      while (at < end && frame[at] != 0u) {
+        text.push_back(static_cast<char>(frame[at++]));
+      }
+      ++at;
+      return text;
+    };
+    const auto int32 = [&] {
+      std::uint32_t bits = 0;
+      for (std::size_t i = 0; i < 4u && at < end; ++i) {
+        bits |= static_cast<std::uint32_t>(frame[at++]) << (8u * i);
+      }
+      return static_cast<std::int32_t>(bits);
+    };
+    switch (type) {
+    case 102: { // Welcome
+      const std::string hostName = string();
+      const std::int32_t hostUid = int32();
+      const std::int32_t assigned = int32();
+      const std::string name = string();
+      seen.hostedTime = int32();
+      seen.welcomed = assigned == uid;
+      std::printf("probe %d: %.1f s: lobby: welcome from host \"%s\" (uid %d): uid %d, name \"%s\", seed %d\n", uid, elapsed, hostName.c_str(), hostUid, assigned,
+                  name.c_str(), seen.hostedTime);
+      break;
+    }
+    case 101:
+      seen.rejected = true;
+      std::printf("probe %d: %.1f s: lobby: rejected, %s\n", uid, elapsed, string().c_str());
+      break;
+    case 103: { // NewPeer
+      const std::string name = string();
+      const auto address = static_cast<std::uint32_t>(int32());
+      const std::uint16_t port = at + 2u <= end ? static_cast<std::uint16_t>(frame[at] | (frame[at + 1] << 8)) : 0u;
+      at += 2u;
+      const std::int32_t peer = int32();
+      seen.peers.push_back(peer);
+      std::printf("probe %d: %.1f s: lobby: new peer \"%s\" uid %d at %u.%u.%u.%u:%u\n", uid, elapsed, name.c_str(), peer, address >> 24, (address >> 16) & 0xFFu,
+                  (address >> 8) & 0xFFu, address & 0xFFu, port);
+      break;
+    }
+    case 104:
+      seen.deleted.push_back(int32());
+      std::printf("probe %d: %.1f s: lobby: peer %d left\n", uid, elapsed, seen.deleted.back());
+      break;
+    case 105: { // EstablishedPeers
+      seen.established.clear();
+      for (std::int32_t peer = int32(); peer != -1 && at <= end; peer = int32()) {
+        seen.established.push_back(peer);
+      }
+      std::string list;
+      for (const std::int32_t peer : seen.established) {
+        list += (list.empty() ? "" : " ") + std::to_string(peer);
+      }
+      std::printf("probe %d: %.1f s: lobby: established %s\n", uid, elapsed, list.c_str());
+      break;
+    }
+    case 106:
+    case 107:
+      seen.scriptFrom.push_back(from);
+      std::printf("probe %d: %.1f s: lobby: script data from uid %d, %zu bytes\n", uid, elapsed, from, end - at);
+      break;
+    default:
+      std::printf("probe %d: %.1f s: lobby: message %u from uid %d\n", uid, elapsed, type, from);
+      break;
+    }
+  }
+
   /** Each scheduled action once, when its time has come. */
   [[nodiscard]] bool Due(double& at, const double elapsed) noexcept
   {
@@ -546,7 +654,7 @@ int main(const int argc, char** const argv)
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> [--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
       "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>]\n"
+      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>]] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>]\n"
     );
     return 3;
   }
@@ -575,6 +683,7 @@ int main(const int argc, char** const argv)
   std::uint64_t beatMessages = 0;
   std::uint64_t lastBeat = 0;
   std::uint64_t joins = 0;
+  SLobbySeen lobby;
   std::vector<std::uint8_t> message;
   SViews views;
   views.beatMs = options.beatMs;
@@ -641,8 +750,37 @@ int main(const int argc, char** const argv)
         const auto kind = static_cast<std::uint8_t>(ESeatMessage::Loaded);
         (void)link.SendReliable(&kind, 1u);
       }
+      if (!options.lobbyName.empty()) {
+        // As `CLobby::OnConnectionMade` on the joining side: `Join` to the host, over the virtual connection to uid 0.
+        std::vector<std::uint8_t> frame;
+        faf::remote::net::ByteWriter writer(frame);
+        writer.Byte(static_cast<std::uint8_t>(ESeatMessage::Lobby));
+        writer.Varint(0u);
+        const std::vector<std::uint8_t> join = faf::server::CLobbyHost::Join(options.lobbyName, options.uid);
+        writer.Bytes(join.data(), join.size());
+        (void)link.SendReliable(frame.data(), frame.size());
+      }
+    }
+    if (Due(options.lobbySayAt, elapsed) && options.lobbySayTo != 0) {
+      // A direct script message (`LOBMSG_DirectScriptData`, 107) through the relay; its bytes needn't be a Lua value here.
+      const std::string text = "hello from " + std::to_string(options.uid);
+      std::vector<std::uint8_t> frame;
+      faf::remote::net::ByteWriter writer(frame);
+      writer.Byte(static_cast<std::uint8_t>(ESeatMessage::Lobby));
+      writer.Varint(static_cast<std::uint64_t>(options.lobbySayTo));
+      const std::size_t size = 3u + text.size();
+      writer.Byte(107u);
+      writer.Byte(static_cast<std::uint8_t>(size));
+      writer.Byte(static_cast<std::uint8_t>(size >> 8));
+      writer.Bytes(reinterpret_cast<const std::uint8_t*>(text.data()), text.size());
+      (void)link.SendReliable(frame.data(), frame.size());
+      std::printf("probe %d: %.1f s: lobby: script data to uid %d\n", options.uid, elapsed, options.lobbySayTo);
     }
     while (link.TakeReliable(message)) {
+      if (!message.empty() && message[0] == static_cast<std::uint8_t>(ESeatMessage::Lobby)) {
+        TakeLobby(options.uid, elapsed, message, lobby);
+        continue;
+      }
       if (!message.empty() && message[0] == static_cast<std::uint8_t>(ESeatMessage::CommandAnswer)) {
         ByteReader reader(message.data() + 1, message.size() - 1u);
         const std::uint64_t beat = reader.Varint();
@@ -877,6 +1015,18 @@ int main(const int argc, char** const argv)
     "probe %d: answers: %llu applied, %llu refused, %llu dropped%s\n", options.uid, static_cast<unsigned long long>(answers[0]), static_cast<unsigned long long>(answers[1]),
     static_cast<unsigned long long>(answers[2]), flooding ? (" (flooded)") : ""
   );
+  if (!options.lobbyName.empty()) {
+    const auto list = [](const std::vector<std::int32_t>& uids) {
+      std::string text;
+      for (const std::int32_t uid : uids) {
+        text += (text.empty() ? "" : " ") + std::to_string(uid);
+      }
+      return text.empty() ? std::string("none") : text;
+    };
+    std::printf("probe %d: lobby: %llu messages, %s, seed %d, peers %s, established %s, script data from %s, left %s\n", options.uid,
+                static_cast<unsigned long long>(lobby.messages), lobby.rejected ? "rejected" : (lobby.welcomed ? "welcomed" : "not welcomed"), lobby.hostedTime,
+                list(lobby.peers).c_str(), list(lobby.established).c_str(), list(lobby.scriptFrom).c_str(), list(lobby.deleted).c_str());
+  }
   if (!views.lateMs.empty()) {
     std::sort(views.lateMs.begin(), views.lateMs.end());
     const auto at = [&views](const double share) {

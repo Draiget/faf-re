@@ -27,6 +27,7 @@
 #include "remote/ViewIdMap.h"
 #include "remote/net/Datagram.h"
 #include "remote/net/GameLinks.h"
+#include "server/LobbyHost.h"
 #include "server/LobbyRelay.h"
 #include "server/SeatIntake.h"
 
@@ -584,4 +585,94 @@ TEST(LobbyRelay, ClosedAtLaunch)
   EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, {1u}), 1u).verdict, ELobbyRelayVerdict::Closed);
   EXPECT_EQ(Relay(relay, 1001, LobbyBody(0, {1u}), 1u).verdict, ELobbyRelayVerdict::Closed);
   EXPECT_EQ(relay.Count(ELobbyRelayVerdict::Closed), 2u);
+}
+
+// Plan WP2.2, WP2.5: the server as the lobby's host (server/LobbyHost.h).
+namespace
+{
+  using faf::server::CLobbyHost;
+
+  std::vector<CLobbyHost::SOutgoing> To(const std::vector<CLobbyHost::SOutgoing>& out, const std::int32_t uid)
+  {
+    std::vector<CLobbyHost::SOutgoing> mine;
+    for (const CLobbyHost::SOutgoing& message : out) {
+      if (message.to == uid) {
+        mine.push_back(message);
+      }
+    }
+    return mine;
+  }
+} // namespace
+
+TEST(LobbyHost, WireFormsAsCLobbyReadsThem)
+{
+  // Welcome: host name, host uid, assigned uid, name, hostedTime; whole size in bytes 1-2.
+  const std::vector<std::uint8_t> welcome = CLobbyHost::Welcome("srv", 0, 1001, "Ann", 7);
+  const std::vector<std::uint8_t> expected = {102u, 23u, 0u, 's', 'r', 'v', 0u, 0u, 0u, 0u, 0u, 0xE9u, 0x03u, 0u, 0u, 'A', 'n', 'n', 0u, 7u, 0u, 0u, 0u};
+  EXPECT_EQ(welcome.size(), 23u);
+  EXPECT_EQ(std::vector<std::uint8_t>(welcome.begin() + 3, welcome.end()), std::vector<std::uint8_t>(expected.begin() + 3, expected.end()));
+  EXPECT_EQ(welcome[0], 102u);
+  EXPECT_EQ(welcome[1] | (welcome[2] << 8), 23);
+  // NewPeer: name, a 4-byte address and a 2-byte port (netlink's engine address for the uid), uid.
+  const std::vector<std::uint8_t> newPeer = CLobbyHost::NewPeer("Bo", 0x01000005);
+  EXPECT_EQ(newPeer, (std::vector<std::uint8_t>{103u, 16u, 0u, 'B', 'o', 0u, 0x05u, 0x00u, 0x00u, 0xF0u, 0xE9u, 0x03u, 0x05u, 0x00u, 0x00u, 0x01u}));
+  EXPECT_EQ(CLobbyHost::EstablishedPeers({1001}), (std::vector<std::uint8_t>{105u, 11u, 0u, 0xE9u, 0x03u, 0u, 0u, 0xFFu, 0xFFu, 0xFFu, 0xFFu}));
+  EXPECT_EQ(CLobbyHost::DeletePeer(1001), (std::vector<std::uint8_t>{104u, 7u, 0u, 0xE9u, 0x03u, 0u, 0u}));
+  EXPECT_EQ(CLobbyHost::Join("Ann", 1001), (std::vector<std::uint8_t>{100u, 11u, 0u, 'A', 'n', 'n', 0u, 0xE9u, 0x03u, 0u, 0u}));
+}
+
+TEST(LobbyHost, JoinsWelcomeAndIntroduceEachOther)
+{
+  CLobbyHost host("server", 1234);
+  host.AddParticipant(1001, "Ann");
+  host.AddParticipant(1002, "Bo");
+  std::vector<CLobbyHost::SOutgoing> out;
+  host.OnMessage(1001, CLobbyHost::Join("ann (asked)", 1001), out);
+  ASSERT_EQ(out.size(), 2u);
+  EXPECT_EQ(out[0].to, 1001);
+  EXPECT_EQ(out[0].message, CLobbyHost::Welcome("server", 0, 1001, "Ann", 1234)); // FAF's name, the match seed
+  EXPECT_EQ(out[1].message, CLobbyHost::EstablishedPeers({1001}));
+
+  out.clear();
+  host.OnMessage(1002, CLobbyHost::Join("Bo", 1002), out);
+  const std::vector<CLobbyHost::SOutgoing> toBo = To(out, 1002);
+  const std::vector<CLobbyHost::SOutgoing> toAnn = To(out, 1001);
+  ASSERT_EQ(toBo.size(), 3u);
+  EXPECT_EQ(toBo[0].message, CLobbyHost::Welcome("server", 0, 1002, "Bo", 1234));
+  EXPECT_EQ(toBo[1].message, CLobbyHost::NewPeer("Ann", 1001));
+  EXPECT_EQ(toBo[2].message, CLobbyHost::EstablishedPeers({1001, 1002}));
+  ASSERT_EQ(toAnn.size(), 2u);
+  EXPECT_EQ(toAnn[0].message, CLobbyHost::NewPeer("Bo", 1002));
+  EXPECT_EQ(toAnn[1].message, CLobbyHost::EstablishedPeers({1001, 1002}));
+  EXPECT_EQ(host.Established(), (std::vector<std::int32_t>{1001, 1002}));
+
+  // Leaving: the others drop the peer.
+  out.clear();
+  host.OnLeft(1001, out);
+  ASSERT_EQ(out.size(), 2u);
+  EXPECT_EQ(out[0].to, 1002);
+  EXPECT_EQ(out[0].message, CLobbyHost::DeletePeer(1001));
+  EXPECT_EQ(out[1].message, CLobbyHost::EstablishedPeers({1002}));
+}
+
+TEST(LobbyHost, AdmitsOnlyTheUidTheTokenProved)
+{
+  CLobbyHost host("server", 1);
+  host.AddParticipant(1001, "Ann");
+  std::vector<CLobbyHost::SOutgoing> out;
+  host.OnMessage(1001, CLobbyHost::Join("Ann", 4242), out);
+  ASSERT_EQ(out.size(), 1u);
+  EXPECT_EQ(out[0].message, CLobbyHost::Rejected("WrongUid"));
+  EXPECT_EQ(host.Rejected(), 1u);
+  EXPECT_TRUE(host.Established().empty());
+
+  // Not a participant, a message the host has nothing to do with, a size that doesn't match: nothing.
+  out.clear();
+  host.OnMessage(999, CLobbyHost::Join("X", 999), out);
+  host.OnMessage(1001, CLobbyHost::EstablishedPeers({1001}), out);
+  std::vector<std::uint8_t> cut = CLobbyHost::Join("Ann", 1001);
+  cut.pop_back();
+  host.OnMessage(1001, cut, out);
+  EXPECT_TRUE(out.empty());
+  EXPECT_EQ(host.Ignored(), 3u);
 }
