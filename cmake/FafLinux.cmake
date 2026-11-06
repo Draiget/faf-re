@@ -319,7 +319,8 @@ target_link_libraries(faf_server_tests PRIVATE gtest_main)
 
 add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp" "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
-  "${PROJECT_SOURCE_DIR}/src/server/LobbyHost.cpp")
+  "${PROJECT_SOURCE_DIR}/src/server/LobbyHost.cpp"
+  "${PROJECT_SOURCE_DIR}/src/remote/client/ServerRelayConnector.cpp")
 target_link_libraries(faf_seat_tests PRIVATE faf_sim faf_netchannel faf_monocypher gtest_main)
 target_compile_definitions(faf_seat_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_seat_tests PRIVATE -Wl,--error-limit=0)

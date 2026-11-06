@@ -7,7 +7,10 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <algorithm>
 #include <cstring>
+#include <deque>
+#include <map>
 #include <memory>
 #include <span>
 #include <utility>
@@ -23,7 +26,9 @@
 #include "moho/net/EClientMsg.h"
 #include "moho/net/ECmdStreamOp.h"
 #include "moho/net/IMessageReceiver.h"
+#include "netlink/EngineLinks.h"
 #include "remote/ServerClient.h"
+#include "remote/client/ServerRelayConnector.h"
 #include "remote/ViewIdMap.h"
 #include "remote/net/Datagram.h"
 #include "remote/net/GameLinks.h"
@@ -675,4 +680,207 @@ TEST(LobbyHost, AdmitsOnlyTheUidTheTokenProved)
   host.OnMessage(1001, cut, out);
   EXPECT_TRUE(out.empty());
   EXPECT_EQ(host.Ignored(), 3u);
+}
+
+// Plan WP2.13, WP12.1: the client's relay connector (remote/client/ServerRelayConnector.h) against the server's relay
+// and lobby host in one process. `CLobby` isn't in this build, so the test makes its calls: Connect to the host, Join
+// on ConnMade, Accept what FindNextAddress offers, Connect to a peer it was told of, Welcome back.
+namespace
+{
+  using faf::remote::CServerRelayConnector;
+  using faf::remote::IRelayChannel;
+
+  /** One client's channel to the in-process server. */
+  struct SLoopChannel final : IRelayChannel
+  {
+    std::vector<std::vector<std::uint8_t>> out;
+    std::deque<std::vector<std::uint8_t>> in;
+    bool up = true;
+
+    void SendLobbyFrame(const std::span<const std::uint8_t> frame) override { out.emplace_back(frame.begin(), frame.end()); }
+    bool TakeLobbyFrame(std::vector<std::uint8_t>& frame) override
+    {
+      if (in.empty()) {
+        return false;
+      }
+      frame = std::move(in.front());
+      in.pop_front();
+      return true;
+    }
+    bool Up() const override { return up; }
+  };
+
+  /** What a lobby would receive: each message's type and bytes, and the connection it came on. */
+  struct SRecorder final : moho::IMessageReceiver
+  {
+    struct SReceived
+    {
+      std::uint8_t type;
+      std::vector<std::uint8_t> bytes;
+      moho::INetConnection* connection;
+    };
+    std::vector<SReceived> received;
+
+    void ReceiveMessage(moho::CMessage* const message, moho::CMessageDispatcher* const dispatcher) override
+    {
+      const auto* const start = reinterpret_cast<const std::uint8_t*>(message->mBuff.start_);
+      received.push_back(
+        SReceived{start[0], std::vector<std::uint8_t>(start, start + message->mBuff.Size()), static_cast<moho::INetConnection*>(dispatcher)}
+      );
+    }
+    [[nodiscard]] std::size_t Count(const std::uint8_t type, const moho::INetConnection* const on) const
+    {
+      return static_cast<std::size_t>(
+        std::count_if(received.begin(), received.end(), [&](const SReceived& r) { return r.type == type && r.connection == on; })
+      );
+    }
+  };
+
+  /** The server: every frame the clients sent through the relay, the host answering what's for it. */
+  struct SLoopServer
+  {
+    CLobbyRelay relay;
+    CLobbyHost host{"server", 777};
+    std::map<std::int32_t, SLoopChannel*> clients;
+
+    void Pump()
+    {
+      for (auto& [uid, channel] : clients) {
+        for (const std::vector<std::uint8_t>& frame : std::exchange(channel->out, {})) {
+          std::int32_t to = 0;
+          std::vector<std::uint8_t> forward;
+          std::span<const std::uint8_t> message;
+          const ELobbyRelayVerdict verdict = relay.Take(uid, std::span<const std::uint8_t>(frame).subspan(1), 1'000'000u, to, forward, message);
+          if (verdict == ELobbyRelayVerdict::Forward) {
+            clients.at(to)->in.push_back(forward);
+          } else if (verdict == ELobbyRelayVerdict::ToHost) {
+            std::vector<CLobbyHost::SOutgoing> answers;
+            host.OnMessage(uid, message, answers);
+            for (const CLobbyHost::SOutgoing& answer : answers) {
+              clients.at(answer.to)->in.push_back(CLobbyRelay::FrameFromHost(answer.message));
+            }
+          }
+        }
+      }
+    }
+  };
+
+  void WriteMessage(moho::INetConnection& connection, const std::vector<std::uint8_t>& message)
+  {
+    std::vector<std::uint8_t> copy = message;
+    moho::NetDataSpan span(copy.data(), copy.data() + copy.size());
+    connection.Write(&span);
+  }
+
+  constexpr std::uint8_t kJoin = 100;
+  constexpr std::uint8_t kWelcome = 102;
+  constexpr std::uint8_t kNewPeer = 103;
+  constexpr std::uint8_t kEstablished = 105;
+  constexpr std::uint8_t kDirectScript = 107;
+  constexpr std::uint8_t kConnMade = 201;
+  constexpr std::uint8_t kConnLostEof = 203;
+} // namespace
+
+TEST(RelayConnector, EngineAddressesMapBackToUids)
+{
+  for (const std::int32_t uid : {1, 1001, 0x00FFFFFF, 0x01000000, 0x7FFFFFFF}) {
+    const faf::netlink::EngineAddress address = faf::netlink::EngineAddressFor(uid);
+    EXPECT_EQ(CServerRelayConnector::UidForAddress(static_cast<u_long>(address.addrHost), address.portHost), uid) << uid;
+  }
+  EXPECT_EQ(CServerRelayConnector::UidForAddress(0x7F000001u, 27019u), 0); // the server's own address
+  EXPECT_EQ(CServerRelayConnector::UidForAddress(0xF0000001u, 80u), 0);     // in 240/4 but no engine port
+}
+
+TEST(RelayConnector, TwoLobbiesJoinTheServerAndEachOther)
+{
+  SRecorder lobbyA;
+  SRecorder lobbyB;
+  SLoopChannel channelA;
+  SLoopChannel channelB;
+  SLoopServer server;
+  server.relay.AddParticipant(1001);
+  server.relay.AddParticipant(1002);
+  server.host.AddParticipant(1001, "Ann");
+  server.host.AddParticipant(1002, "Bo");
+  server.clients = {{1001, &channelA}, {1002, &channelB}};
+  auto* const connectorA = new CServerRelayConnector(channelA);
+  auto* const connectorB = new CServerRelayConnector(channelB);
+  const auto listen = [](SRecorder& lobby, moho::INetConnection* const connection) {
+    connection->PushReceiver(100, 120, &lobby);
+    connection->PushReceiver(200, 210, &lobby);
+  };
+
+  // Each joins the host at the server's own address: ConnMade, then Join (CLobby::OnConnectionMade).
+  moho::INetConnection* const hostA = connectorA->Connect(0x7F000001u, 27019u);
+  listen(lobbyA, hostA);
+  connectorA->Pull();
+  ASSERT_EQ(lobbyA.Count(kConnMade, hostA), 1u);
+  WriteMessage(*hostA, CLobbyHost::Join("Ann", 1001));
+  server.Pump();
+  connectorA->Pull();
+  EXPECT_EQ(lobbyA.Count(kWelcome, hostA), 1u);
+  EXPECT_EQ(lobbyA.received.back().bytes, CLobbyHost::EstablishedPeers({1001}));
+
+  moho::INetConnection* const hostB = connectorB->Connect(0x7F000001u, 27019u);
+  listen(lobbyB, hostB);
+  connectorB->Pull();
+  WriteMessage(*hostB, CLobbyHost::Join("Bo", 1002));
+  server.Pump();
+  connectorA->Pull();
+  connectorB->Pull();
+  EXPECT_EQ(lobbyB.Count(kWelcome, hostB), 1u);
+  EXPECT_EQ(lobbyB.Count(kNewPeer, hostB), 1u); // told of Ann
+  EXPECT_EQ(lobbyA.Count(kNewPeer, hostA), 1u); // told of Bo
+  EXPECT_EQ(lobbyA.Count(kEstablished, hostA), 2u);
+
+  // The higher uid connects to the lower at the engine address NewPeer named; the lower is offered it and accepts.
+  const faf::netlink::EngineAddress annAddress = faf::netlink::EngineAddressFor(1001);
+  moho::INetConnection* const bToA = connectorB->Connect(static_cast<u_long>(annAddress.addrHost), annAddress.portHost);
+  listen(lobbyB, bToA);
+  connectorB->Pull();
+  ASSERT_EQ(lobbyB.Count(kConnMade, bToA), 1u);
+  WriteMessage(*bToA, CLobbyHost::Join("Bo", 1002));
+  server.Pump();
+  connectorA->Pull(); // kept: no connection to 1002 yet
+  u_long address = 0;
+  u_short port = 0;
+  ASSERT_TRUE(connectorA->FindNextAddress(address, port));
+  EXPECT_EQ(CServerRelayConnector::UidForAddress(address, port), 1002);
+  moho::INetConnection* const aToB = connectorA->Accept(address, port);
+  listen(lobbyA, aToB);
+  EXPECT_FALSE(connectorA->FindNextAddress(address, port));
+  connectorA->Pull();
+  ASSERT_EQ(lobbyA.Count(kConnMade, aToB), 1u);
+  ASSERT_EQ(lobbyA.Count(kJoin, aToB), 1u); // Bo's Join, on the connection from 1002
+  const std::vector<std::uint8_t> peerWelcome = {kWelcome, 3u, 0u}; // a non-host's Welcome carries nothing
+  WriteMessage(*aToB, peerWelcome);
+  server.Pump();
+  connectorB->Pull();
+  EXPECT_EQ(lobbyB.Count(kWelcome, bToA), 1u);
+
+  // Script data goes on the peer's connection, and arrives as from that peer.
+  const std::vector<std::uint8_t> script = {kDirectScript, 6u, 0u, 104u, 105u, 33u};
+  WriteMessage(*aToB, script);
+  server.Pump();
+  connectorB->Pull();
+  ASSERT_EQ(lobbyB.Count(kDirectScript, bToA), 1u);
+  EXPECT_EQ(lobbyB.received.back().bytes, script);
+
+  // A peer can't make up this side's connection events; a message with a wrong size is dropped.
+  WriteMessage(*aToB, {kConnLostEof, 3u, 0u});
+  WriteMessage(*aToB, {kDirectScript, 9u, 0u, 120u});
+  server.Pump();
+  connectorB->Pull();
+  EXPECT_EQ(lobbyB.Count(kConnLostEof, bToA), 0u);
+  EXPECT_EQ(connectorB->DroppedFrames(), 2u);
+
+  // The channel gone: every connection of that side is lost, once.
+  channelB.up = false;
+  connectorB->Pull();
+  connectorB->Pull();
+  EXPECT_EQ(lobbyB.Count(kConnLostEof, hostB), 1u);
+  EXPECT_EQ(lobbyB.Count(kConnLostEof, bToA), 1u);
+
+  connectorA->Destroy();
+  connectorB->Destroy();
 }
