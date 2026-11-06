@@ -1,7 +1,7 @@
 package main
 
-// Text helpers that print values the way desync_diff.py prints them, so a report.txt
-// written here reads the same as one the Python tool writes for the same dumps.
+// Text helpers that print values the way Python prints them: the report started as the Python
+// desync_diff.py, and these keep its text (str, repr, json.dumps, splitlines) unchanged.
 
 import (
 	"encoding/json"

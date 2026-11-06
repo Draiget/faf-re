@@ -1,14 +1,14 @@
 # desync-diff
 
-Compares the desync dumps that players' games wrote for one game and prints the first value that differs: which beat, which entity or army, which field. The dumps are the `desync_<game id>_beat<N>_army<A>.zip` files the engine's desync recorder writes next to the game log after a checksum mismatch (`/desyncrecorder`, [docs/SWITCHES.md](../../docs/SWITCHES.md#desync-recorder), issue #216). Python 3 with the standard library only.
+Compares the desync dumps that players' games wrote for one game and prints the first value that differs: which beat, which entity or army, which field. The dumps are the `desync_<game id>_beat<N>_army<A>.zip` files the engine's desync recorder writes next to the game log after a checksum mismatch (`/desyncrecorder`, [docs/SWITCHES.md](../../../docs/SWITCHES.md#desync-recorder), issue #216). Go with the standard library only: `tools\build.ps1` builds it into `tools\bin\desync-diff.exe` (`go build ./cmd/desync-diff` in `tools` works too). It started as the Python `desync_diff.py` and prints the same text.
 
 ```bat
-python tools\desync-diff\desync_diff.py desync_11204007_beat300_army0.zip desync_11204007_beat300_army1.zip
+tools\bin\desync-diff.exe desync_11204007_beat300_army0.zip desync_11204007_beat300_army1.zip
 ```
 
-With more than two dumps, the first is A and each other is compared with it. A dump can also be the `.tar.gz` copy the engine uploads to `telemetry_DumpEndpoint` ([docs/SWITCHES.md](../../docs/SWITCHES.md#desync-telemetry)); it holds the same files.
+With more than two dumps, the first is A and each other is compared with it. A dump can also be the `.tar.gz` copy the engine uploads to `telemetry_DumpEndpoint` ([docs/SWITCHES.md](../../../docs/SWITCHES.md#desync-telemetry)); it holds the same files.
 
-The receiver for those uploads is [`tools/cmd/desync-receiver`](../cmd/desync-receiver) (Go): `tools\bin\desync-receiver.exe --port 4319 --out dumps --token T --read-token R` stores each one as `dumps\<game id>\<name>.tar.gz` after checking it is a dump, answers 201, writes `report.txt` once the game has dumps from two armies (the same report as this tool's compare, ported to Go), and serves them back under `/dumps/` to holders of the read token. Options and routes: [docs/DESYNC_DIAGNOSTICS.md](../../docs/DESYNC_DIAGNOSTICS.md#dump-receiver); a deployable server around it: [tools/desync-server](../desync-server/README.md).
+`desync-diff serve` is the receiver for those uploads: `desync-diff serve --port 4319 --out dumps --token T --read-token R` stores each one as `dumps\<game id>\<name>.tar.gz` after checking it is a dump, answers 201, writes this report as `report.txt` once the game has dumps from two armies, and serves them back under `/dumps/` to holders of the read token. Options and routes: [docs/DESYNC_DIAGNOSTICS.md](../../../docs/DESYNC_DIAGNOSTICS.md#dump-receiver); a deployable server around it: [tools/desync-server](../../desync-server/README.md).
 
 ## What it prints
 
@@ -24,12 +24,12 @@ Exit code: 0 when the dumps don't differ, 1 when they do, 2 when the input is in
 Rebuild the other side: play the game's replay in headless on the other player's build and architecture, with the recorder on and `/desyncdumpbeat` set to the dump's beat, then compare.
 
 ```bat
-python tools\desync-diff\desync_diff.py rebuild desync_11204007_beat300_army0.zip ^
+tools\bin\desync-diff.exe rebuild desync_11204007_beat300_army0.zip ^
   --exe C:\ProgramData\FAForever\bin\headless.exe --replay 11204007.scfareplay ^
   --init C:\ProgramData\FAForever\bin\init_parity.lua -- /simworkers 8
 ```
 
-`rebuild` runs `<exe> --replay <file> /init <file> /nosound /log <out>\game.log /desyncrecorder /desyncdumpbeat <beat>` plus the arguments after `--` (the other player's switches), waits until the log says the dump is written, stops the run and compares the new dump with the given one. `--out` sets the folder (default `rebuilt\` next to the dump); `--no-compare` only writes the dump. The header step then also lists `sim_LeadOnSchedule`, which headless sets for every replay run; it only paces the sim, so it is marked "not counted" and a rebuild of the same build exits 0. A rebuild on the other architecture (an x86 headless against an x64 dump) shows `build.arch` and the x87 control word in the header and exits 1 even when every beat matches.
+`rebuild` runs `<exe> --replay <file> /init <file> /nosound /log <out>\game.log /desyncrecorder /desyncdumpbeat <beat>` plus the arguments after `--` (the other player's switches), waits until the log says the dump is written, stops the run and compares the new dump with the given one. `--out` sets the folder (default `rebuilt\` next to the dump), `--timeout` the seconds to wait for the dump (1800); `--no-compare` only writes the dump. The header step then also lists `sim_LeadOnSchedule`, which headless sets for every replay run; it only paces the sim, so it is marked "not counted" and a rebuild of the same build exits 0. A rebuild on the other architecture (an x86 headless against an x64 dump) shows `build.arch` and the x87 control word in the header and exits 1 even when every beat matches.
 
 In the forced-desync scenario (`tools/scenarios/2p-desync-recorder.yaml`), rebuilding player B from player A's dump and replay with `-- /desynctestbeat 300` gives the same first differing line as B's real dump: beat 300, the nudged unit's `health`.
 
@@ -44,3 +44,4 @@ This only finds differences that come from the build, the architecture or a swit
 - A header field that one dump's format doesn't have (a dump from an older recorder) is shown as "missing in one dump" and not counted. A damaged dump exits 2.
 - Every acceptance run so far had two players; the "one off, the rest agree" and "split" shapes of step 2 haven't met a real game with three or more.
 - The scenarios don't run the tool: mpemu has no step that runs a program. Its acceptance runs are scripts that play the scenario and then call the tool.
+- The report's text keeps Python's formatting (`repr` quoting, `json.dumps` escapes) from the Python version, so reports from before and after the port compare line for line.

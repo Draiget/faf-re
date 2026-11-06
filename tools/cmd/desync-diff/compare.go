@@ -1,9 +1,7 @@
 package main
 
-// The comparison the receiver writes to report.txt once a game has dumps from two armies: the
-// four steps of tools/desync-diff/desync_diff.py's compare, printed line for line the same.
-// A change to the report goes into both; run both on the same dumps (`desync-receiver compare A B`
-// and `python desync_diff.py A B`) and compare the output.
+// `desync-diff compare`, also what `serve` writes to report.txt: the four steps, printed line for
+// line as the Python desync_diff.py did (ported 2026-11-06, checked against it on 46 cases).
 
 import (
 	"archive/tar"
@@ -53,7 +51,7 @@ var (
 	stateArmy   = regexp.MustCompile(`^  (\d+) "`)
 )
 
-// badInput is desync_diff.py's BadInput: exit 2 with "error: <text>".
+// badInput is invalid input: exit 2 with "error: <text>".
 type badInput struct{ text string }
 
 func (e badInput) Error() string { return e.text }
@@ -915,7 +913,7 @@ func compact(beats []int) string {
 	return strings.Join(runs, ", ")
 }
 
-// compareDumps runs the four steps and returns the report text and desync_diff.py's exit code:
+// compareDumps runs the four steps and returns the report text and the exit code:
 // 0 nothing differs, 1 a difference was found, 2 invalid input (the error line ends the text).
 func compareDumps(paths []string, read func(string) ([]byte, error), context, states int, force bool) (string, int) {
 	r := &report{}

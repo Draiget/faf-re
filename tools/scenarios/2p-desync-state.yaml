@@ -5,7 +5,7 @@ description: >
   client 2 raises one unit's health by one float step at beat 300
   (/desynctestbeat), a real desync. Each client must keep the hashed state of
   recent beats in memory and write its dump next to its game log; the two
-  dumps compared with tools/desync-diff/desync_diff.py name the health value.
+  dumps compared with tools/cmd/desync-diff name the health value.
   Needs init_mpemu_localvault.lua. Run with -advertise 192.168.42.77 on the
   isolated account. Do not click into the game windows.
 timeout: 15m

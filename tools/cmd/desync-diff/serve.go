@@ -1,15 +1,10 @@
-// desync-receiver receives the desync dumps the engine uploads (telemetry_DumpEndpoint), keeps them
-// per game, compares them once two armies' dumps are in, and serves them back.
-//
-//	desync-receiver [--host 127.0.0.1] [--port 4319] [--prefix /dumps] [--out DIR] [--token T]
-//	                [--read-token R] [--max-mb 64]
-//	desync-receiver compare A.tar.gz B.tar.gz [C ...] [-C LINES] [--states N] [--force]
+// `desync-diff serve`: receives the desync dumps the engine uploads (telemetry_DumpEndpoint), keeps
+// them per game, compares them once two armies' dumps are in, and serves them back.
 //
 // Each upload is one POST whose body is a .tar.gz and whose X-FAF-Dump header names it
 // (desync_<game id>_<beat tag>_army<A>.tar.gz). It is checked as a dump (header.json in the
 // archive), stored as <out>/<game id>/<name>, and answered 201. Once a game has dumps from two
-// armies, they are compared (the same report as tools/desync-diff/desync_diff.py) and the report
-// goes to <out>/<game id>/report.txt.
+// armies, they are compared and the report goes to <out>/<game id>/report.txt.
 //
 // Reading: GET <prefix>/ lists the games, <prefix>/<game id>/ a game's files, and
 // <prefix>/<game id>/<file> downloads one (a dump or report.txt). With --read-token set, a read
@@ -17,8 +12,7 @@
 // ships with the game) never reads. GET /healthz answers "ok" without a token.
 //
 // --token and --read-token default to the FAF_UPLOAD_TOKEN and FAF_READ_TOKEN environment
-// variables. Plain HTTP: put TLS in front (tools/desync-server). Standard library only, so the
-// k8s manifest can build it from a ConfigMap.
+// variables. Plain HTTP: put TLS in front (tools/desync-server).
 package main
 
 import (
@@ -63,12 +57,9 @@ type server struct {
 	compareLock sync.Mutex
 }
 
-func main() {
-	if len(os.Args) > 1 && os.Args[1] == "compare" {
-		os.Exit(runCompare(os.Args[2:]))
-	}
+func runServe(args []string) int {
 	var o options
-	flags := flag.NewFlagSet("desync-receiver", flag.ExitOnError)
+	flags := flag.NewFlagSet("desync-diff serve", flag.ContinueOnError)
 	flags.StringVar(&o.host, "host", "127.0.0.1", "address to listen on")
 	flags.IntVar(&o.port, "port", 4319, "port")
 	flags.StringVar(&o.prefix, "prefix", "/dumps", "path the dumps are read under")
@@ -76,7 +67,12 @@ func main() {
 	flags.StringVar(&o.token, "token", os.Getenv("FAF_UPLOAD_TOKEN"), "upload token (default $FAF_UPLOAD_TOKEN)")
 	flags.StringVar(&o.readToken, "read-token", os.Getenv("FAF_READ_TOKEN"), "read token (default $FAF_READ_TOKEN)")
 	flags.IntVar(&o.maxMB, "max-mb", 64, "largest body accepted, in MB")
-	flags.Parse(os.Args[1:])
+	if err := flags.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
 	o.prefix = "/" + strings.Trim(o.prefix, "/")
 	log.SetFlags(0)
 	s := &server{options: o}
@@ -91,53 +87,8 @@ func main() {
 	}
 	out, _ := filepath.Abs(o.out)
 	log.Printf("receiving dumps on http://%s:%d%s, storing under %s", o.host, o.port, o.prefix, out)
-	log.Fatal(httpServer.ListenAndServe())
-}
-
-// runCompare is `desync-receiver compare`: the report on stdout, desync_diff.py's exit codes.
-func runCompare(args []string) int {
-	context, states, force := 10, 20, false
-	var paths []string
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		switch arg {
-		case "-C", "--context", "--states":
-			if i+1 >= len(args) {
-				fmt.Fprintf(os.Stderr, "error: %s needs a number\n", arg)
-				return 2
-			}
-			n, err := strconv.Atoi(args[i+1])
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %s needs a number\n", arg)
-				return 2
-			}
-			if arg == "--states" {
-				states = n
-			} else {
-				context = n
-			}
-			i++
-		case "--force":
-			force = true
-		case "-h", "--help":
-			fmt.Println("usage: desync-receiver compare A B [C ...] [-C LINES] [--states N] [--force]")
-			return 0
-		default:
-			paths = append(paths, arg)
-		}
-	}
-	text, code := compareDumps(paths, os.ReadFile, context, states, force)
-	if code == 2 {
-		// desync_diff.py prints errors to stderr, after whatever it printed to stdout.
-		if cut := strings.LastIndex(strings.TrimSuffix(text, "\n"), "\n"); cut >= 0 {
-			fmt.Print(text[:cut+1])
-			text = text[cut+1:]
-		}
-		fmt.Fprint(os.Stderr, text)
-	} else {
-		fmt.Print(text)
-	}
-	return code
+	log.Print(httpServer.ListenAndServe())
+	return 1
 }
 
 // checkDump reads header.json from an uploaded .tar.gz and checks it is a dump of a known

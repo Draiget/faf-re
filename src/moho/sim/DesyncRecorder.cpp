@@ -605,7 +605,7 @@ namespace moho
     }
 
     /// Recorder thread: one beat's `StateTap` records as sync-log-style text (the lines
-    /// tools/desync-diff compares), each float with its bits. `armies` maps an army index to its
+    /// tools/cmd/desync-diff compares), each float with its bits. `armies` maps an army index to its
     /// `"player" [army]` line.
     [[nodiscard]] std::string DescribeState(const SStateBeat& beat, const std::map<int, std::string>& armies)
     {

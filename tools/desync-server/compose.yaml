@@ -24,11 +24,11 @@ services:
     user: "0"
 
   dumps:
-    # tools/cmd/desync-receiver, Go with the standard library only: built from the mounted
+    # `desync-diff serve` (tools/cmd/desync-diff), Go with the standard library only: built from the mounted
     # sources at start (the build cache in data/gocache makes later starts quick), then run.
     image: golang:1.25.5-alpine
-    command: ["sh", "-c", "rm -rf /tmp/b && mkdir /tmp/b && cp /src/*.go /tmp/b/ && cd /tmp/b && go mod init desync-receiver
-              && go build -trimpath -o /tmp/desync-receiver . && exec /tmp/desync-receiver --host 0.0.0.0 --port 4319
+    command: ["sh", "-c", "rm -rf /tmp/b && mkdir /tmp/b && cp /src/*.go /tmp/b/ && cd /tmp/b && go mod init desync-diff
+              && go build -trimpath -o /tmp/desync-diff . && exec /tmp/desync-diff serve --host 0.0.0.0 --port 4319
               --prefix /dumps --out /data/dumps --max-mb 64"]
     environment:
       FAF_UPLOAD_TOKEN: ${FAF_UPLOAD_TOKEN:?set it in .env}
@@ -37,7 +37,7 @@ services:
       GOTOOLCHAIN: local
       GOCACHE: /gocache
     volumes:
-      - ../cmd/desync-receiver:/src:ro
+      - ../cmd/desync-diff:/src:ro
       - ./data/gocache:/gocache
       - ./data/dumps:/data/dumps
     ports:

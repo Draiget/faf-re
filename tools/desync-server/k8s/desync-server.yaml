@@ -1,7 +1,7 @@
 # faf-re desync test server on Kubernetes: the OpenTelemetry collector and the dump receiver behind
 # one Ingress host, /v1/logs to the collector and /dumps to the receiver. Before applying (README.md):
 #   - the faf-desync-tokens Secret (FAF_UPLOAD_TOKEN, FAF_READ_TOKEN),
-#   - the faf-desync-receiver ConfigMap (the Go sources of tools/cmd/desync-receiver, built at pod start),
+#   - the faf-desync-diff ConfigMap (the Go sources of tools/cmd/desync-diff, built at pod start),
 #   - the faf-desync-collector ConfigMap (tools/desync-server/collector.yaml),
 #   - HOST below replaced by the server's name (and the TLS lines filled in or removed).
 apiVersion: v1
@@ -80,8 +80,8 @@ spec:
       initContainers:
         - name: build
           image: golang:1.25.5-alpine
-          command: ["sh", "-c", "mkdir -p /tmp/src && cp /opt/src/*.go /tmp/src/ && cd /tmp/src && go mod init desync-receiver
-                    && go build -trimpath -ldflags=-s -o /opt/bin/desync-receiver ."]
+          command: ["sh", "-c", "mkdir -p /tmp/src && cp /opt/src/*.go /tmp/src/ && cd /tmp/src && go mod init desync-diff
+                    && go build -trimpath -ldflags=-s -o /opt/bin/desync-diff ."]
           env:
             - {name: CGO_ENABLED, value: "0"}
             - {name: GOTOOLCHAIN, value: local}
@@ -96,7 +96,7 @@ spec:
       containers:
         - name: dumps
           image: alpine:3.22.2
-          command: ["/opt/bin/desync-receiver", "--host", "0.0.0.0", "--port", "4319", "--prefix", "/dumps",
+          command: ["/opt/bin/desync-diff", "serve", "--host", "0.0.0.0", "--port", "4319", "--prefix", "/dumps",
                     "--out", "/data/dumps", "--max-mb", "64"]
           envFrom:
             - secretRef: {name: faf-desync-tokens}
@@ -112,7 +112,7 @@ spec:
             - {name: data, mountPath: /data/dumps, subPath: dumps}
       volumes:
         - name: src
-          configMap: {name: faf-desync-receiver}
+          configMap: {name: faf-desync-diff}
         - name: bin
           emptyDir: {}
         - name: data
