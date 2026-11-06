@@ -1,4 +1,6 @@
 #include "moho/terrain/HighFidelityTerrain.h"
+#include "moho/terrain/SplatChunkRenderer.h"
+#include "moho/terrain/SplatBudget.h"
 #include <cstdio>
 
 #include <algorithm>
@@ -66,7 +68,6 @@ namespace
   constexpr float kMinDecalAlpha = 0.0039215689f;
 
 
-  constexpr std::int32_t kMaxSplatsPerFrame = 2500;
   constexpr int kNoiseFillTextureFormat = 2;
 
   [[nodiscard]] std::int32_t FloorToInt(const float value) noexcept
@@ -814,7 +815,7 @@ namespace moho
         }
       }
 
-      mSplatVertices.ResetStorageToInline();
+      auto splatOutputBudget = PrepareSplatOutput(mSplatVertices, ren_SplatBudgetTier);
 
       if (!minimapPass && ren_Splats) {
         auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
@@ -824,7 +825,7 @@ namespace moho
 
         auto& splatVertices = mSplatVertices;
 
-        std::int32_t splatBudget = 0;
+        std::size_t splatBudget = 0;
         for (CWldTerrainDecal* const decalEntry : visibleSplats) {
           auto* const splat = static_cast<CWldSplat*>(decalEntry);
 
@@ -836,7 +837,8 @@ namespace moho
           if (worldDistance > splat->mCutoffLOD) {
             continue;
           }
-          if (++splatBudget >= kMaxSplatsPerFrame) {
+          if (splatBudget++ >= splatOutputBudget.available
+            && !TryGrowSplatOutput(mSplatVertices, splatOutputBudget)) {
             break;
           }
 
@@ -1187,6 +1189,17 @@ namespace moho
     const auto& splatVertices = mSplatVertices;
     const std::size_t splatVertexCount = splatVertices.size();
     if (splatVertexCount == 0) {
+      return;
+    }
+
+    // Keep the original single-draw path for ordinary views. Only overflow
+    // uses pass-major chunks, so every existing sheet/index stays in bounds.
+    if (splatVertexCount > 10000U) {
+      D3D_GetDevice()->SelectTechnique("TSplats");
+      GetTerrainShaderVars().decalAlbedoTexture.GetTexture(
+        boost::static_pointer_cast<CD3DDynamicTextureSheet>(sHighFidelityTextureBatcher->GetCompositeTexture()));
+      DrawSplatChunksPassMajor(
+        D3D_GetDevice(), mDynamicVertexSheet, mDynamicIndexSheet, mSplatVertices.data(), splatVertexCount, 2500);
       return;
     }
 

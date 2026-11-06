@@ -162,3 +162,10 @@ if(WIN32)
   target_link_libraries(faf_msdf_safety_tests PRIVATE faf_freetype faf_msdfgen faf_zstd)
   add_test(NAME msdf_font_safety COMMAND faf_msdf_safety_tests)
 endif()
+
+# Rendering-only bounded terrain splat output; no game data or renderer required.
+add_executable(faf_splat_budget_tests EXCLUDE_FROM_ALL terrain/splat_budget/SplatBudgetTests.cpp)
+target_link_libraries(faf_splat_budget_tests PRIVATE faf_engine)
+add_test(NAME splat_budget COMMAND faf_splat_budget_tests)
+set_tests_properties(splat_budget PROPERTIES TIMEOUT 120)
+
