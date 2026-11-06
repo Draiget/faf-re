@@ -9,14 +9,29 @@
 #include <string_view>
 #include <vector>
 
+#if defined(_WIN32)
 #include <windows.h>
 
 #include <zstd.h>
+#endif
 
 #include "gpg/core/utils/Logging.h"
 
 namespace gpg
 {
+#if !defined(_WIN32)
+  // Linux (the dedicated server and headless): an executable there carries no resources, so nothing
+  // is embedded and the loose files are used, as the header says for an exe without the resource.
+  std::wstring EmbeddedDxcDirectory()
+  {
+    return {};
+  }
+
+  std::wstring EmbeddedEngineLuaDirectory()
+  {
+    return {};
+  }
+#else
   namespace
   {
     /** A resource of type RCDATA in the executable, or an empty view. */
@@ -191,4 +206,5 @@ namespace gpg
     static const std::wstring directory = UnpackOnce(L"FAF_ENGINE_LUA", L"fafengine");
     return directory;
   }
+#endif
 } // namespace gpg
