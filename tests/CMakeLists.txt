@@ -58,6 +58,12 @@ add_executable(faf_image_codec_tests EXCLUDE_FROM_ALL image_codec/ImageCodecTest
 target_link_libraries(faf_image_codec_tests PRIVATE faf_engine)
 add_test(NAME image_codec COMMAND faf_image_codec_tests)
 
+# The DDS topology rule is shared with D3D11 and can be checked without D3DX/WARP.
+add_executable(faf_texture_quality_tests EXCLUDE_FROM_ALL image_codec/TextureQualityTests.cpp)
+target_include_directories(faf_texture_quality_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME texture_quality COMMAND faf_texture_quality_tests)
+
+
 # Engine addition (dedicated-server plan WPL.23): golden sim-math tests
 # (tests/sim_math). Built with every build, and run right after it: a change
 # that moves one result of the simulation's parity-sensitive arithmetic fails

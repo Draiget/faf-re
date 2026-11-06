@@ -1,6 +1,7 @@
 // FAF addition, not in the shipped binary: see ImageCodec.h.
 
 #include "ImageCodec.h"
+#include "TextureQuality.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -502,8 +503,12 @@ namespace gpg::gal::imaging
     return tLastDecodeRoute;
   }
 
-  HRESULT ImageCodec::Decode(const void* const data, const std::size_t bytes, const DecodeOptions& options, Image& outImage)
+  HRESULT ImageCodec::Decode(
+    const void* const data, const std::size_t bytes, const DecodeOptions& requestedOptions, Image& outImage
+  )
   {
+    DecodeOptions options = requestedOptions;
+    options.skipMipLevels = TextureQualityMipLevels(data, bytes, options.skipMipLevels);
     tLastDecodeRoute = "direct";
     if (gDdsDirectLoad && TryReadBlockCompressedDds(static_cast<const std::uint8_t*>(data), bytes, options, outImage)) {
       if (VerifyRequested()) {
@@ -561,9 +566,12 @@ namespace gpg::gal::imaging
     if (!gTextureDecodeCache) {
       return DecodeWithD3dx(data, bytes, options, outImage);
     }
-    const std::uint64_t key = DecodeCacheKey(data, bytes, options);
-    const std::string path = DecodeCachePath(key);
-    if (!path.empty() && ReadDecodeCache(path, key, outImage)) {
+    std::uint64_t key = DecodeCacheKey(data, bytes, options);
+    std::string path = DecodeCachePath(key);
+    // Reject pre-fix nonzero-skip cube/volume entries even if a permissive
+    // D3DX decoder recognizes a resource kind the header probe did not.
+    if (!path.empty() && ReadDecodeCache(path, key, outImage) &&
+        !(options.skipMipLevels != 0U && (outImage.cube || outImage.volume))) {
       tLastDecodeRoute = "cache";
       return S_OK;
     }
@@ -573,6 +581,13 @@ namespace gpg::gal::imaging
     ::QueryPerformanceCounter(&end);
     ::QueryPerformanceFrequency(&frequency);
     const auto microseconds = static_cast<std::uint64_t>(1000000.0 * static_cast<double>(end.QuadPart - start.QuadPart) / static_cast<double>(frequency.QuadPart));
+    if (SUCCEEDED(result) && options.skipMipLevels != 0U && (outImage.cube || outImage.volume)) {
+      // Metadata is authoritative for unusual inputs. Never write a full
+      // cube/volume under the old quality-dependent identity.
+      options.skipMipLevels = 0U;
+      key = DecodeCacheKey(data, bytes, options);
+      path = DecodeCachePath(key);
+    }
     if (SUCCEEDED(result) && !path.empty() && microseconds >= kDecodeCacheMinMicroseconds) {
       tLastDecodeRoute = "d3dx, cached for later sessions";
       // Written on a background thread from a copy, so the frame does not wait for the disk.
@@ -634,7 +649,9 @@ namespace gpg::gal::imaging
 
     ComPtr<ID3D11Resource> resource;
     result = E_FAIL;
-    if (options.skipMipLevels != 0U) {
+    const bool preserveTopMip = (info.MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE) != 0U ||
+      info.ResourceDimension == D3D11_RESOURCE_DIMENSION_TEXTURE3D;
+    if (!preserveTopMip && options.skipMipLevels != 0U) {
       result = load(options.skipMipLevels, resource);
     }
     if (FAILED(result)) {
