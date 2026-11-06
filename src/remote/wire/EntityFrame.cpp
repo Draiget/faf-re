@@ -74,11 +74,11 @@ namespace faf::remote::wire
       }
     }
 
-    [[nodiscard]] std::uint32_t ReadExpGolomb(BitReader& reader, const int order) noexcept
+    [[nodiscard]] std::uint32_t ReadExpGolomb(BitReader& reader, const int order, const int maxZeros = kMaxGolombZeros) noexcept
     {
       int zeros = 0;
       while (reader.ReadBits(1) == 0u) {
-        if (!reader.Ok() || ++zeros > kMaxGolombZeros) {
+        if (!reader.Ok() || ++zeros > maxZeros) {
           reader.Fail();
           return 0u;
         }
@@ -773,6 +773,93 @@ namespace faf::remote::wire
       previous = id;
     }
 
+    constexpr int kMaxGapZeros = 32; // an order-0 code of any 32-bit gap
+  } // namespace
+
+  std::uint32_t CChangeHeaders::Find(const std::uint32_t fields) const noexcept
+  {
+    std::uint32_t place = 0;
+    while (place < mRecentCount && mRecentMasks[place] != fields) {
+      ++place;
+    }
+    return place < mRecentCount ? place : kRecent;
+  }
+
+  void CChangeHeaders::Use(const std::uint32_t place, const std::uint32_t fields) noexcept
+  {
+    // Moved (or, when new, put) to the front; a new mask drops the oldest once all 15 are taken.
+    std::uint32_t from = place;
+    if (place == kRecent) {
+      from = mRecentCount < kRecent ? mRecentCount++ : kRecent - 1u;
+    }
+    for (std::uint32_t i = from; i > 0u; --i) {
+      mRecentMasks[i] = mRecentMasks[i - 1u];
+    }
+    mRecentMasks[0] = fields;
+  }
+
+  void CChangeHeaders::Write(BitWriter& writer, const std::uint32_t id, const std::uint32_t fields)
+  {
+    if (mFirst) {
+      writer.WriteVarUint(id);
+    } else {
+      WriteExpGolomb(writer, id - mPrevious - 1u, 0);
+    }
+    mFirst = false;
+    mPrevious = id;
+    const std::uint32_t place = Find(fields);
+    WriteExpGolomb(writer, place, 0);
+    if (place == kRecent) {
+      writer.WriteVarUint(fields);
+    }
+    Use(place, fields);
+  }
+
+  bool CChangeHeaders::Read(BitReader& reader, std::uint32_t& id, std::uint32_t& fields) noexcept
+  {
+    const std::uint64_t gap = mFirst ? reader.ReadVarUint() : ReadExpGolomb(reader, 0, kMaxGapZeros);
+    const std::uint64_t next = mFirst ? gap : static_cast<std::uint64_t>(mPrevious) + 1u + gap;
+    if (!reader.Ok() || next > 0xFFFFFFFFull) {
+      reader.Fail();
+      return false;
+    }
+    mFirst = false;
+    mPrevious = static_cast<std::uint32_t>(next);
+    id = mPrevious;
+    const std::uint32_t place = ReadExpGolomb(reader, 0, 4);
+    if (!reader.Ok() || place > kRecent || (place != kRecent && place >= mRecentCount)) {
+      reader.Fail();
+      return false;
+    }
+    fields = place == kRecent ? reader.ReadVarUint() : mRecentMasks[place];
+    if (!reader.Ok()) {
+      return false;
+    }
+    Use(place, fields);
+    return true;
+  }
+
+  int CChangeHeaders::Bits(const std::uint32_t id, const std::uint32_t fields) noexcept
+  {
+    const auto varintBits = [](std::uint32_t value) {
+      int bits = 8;
+      while (value >= 0x80u) {
+        value >>= 7;
+        bits += 8;
+      }
+      return bits;
+    };
+    int bits = mFirst ? varintBits(id) : ExpGolombBits(id - mPrevious - 1u, 0);
+    mFirst = false;
+    mPrevious = id;
+    const std::uint32_t place = Find(fields);
+    bits += ExpGolombBits(place, 0) + (place == kRecent ? varintBits(fields) : 0);
+    Use(place, fields);
+    return bits;
+  }
+
+  namespace
+  {
     /** A section count the remaining bits could carry and the codec allows. */
     [[nodiscard]] bool ReadCount(BitReader& reader, const SFrameCodec& codec, std::uint32_t& count) noexcept
     {
@@ -962,6 +1049,10 @@ namespace faf::remote::wire
     }
     add(attributes.reserved6C);
 
+    std::uint64_t hash = lanes[0];
+    for (int lane = 1; lane < 4; ++lane) {
+      hash = std::rotl(hash ^ (lanes[lane] * 0xC2B2AE3D27D4EB4Full), 27) * 0x9E3779B185EBCA87ull;
+    }
     hash ^= hash >> 32u;
     return hash != 0u ? hash : 1u;
   }
@@ -1049,10 +1140,6 @@ namespace faf::remote::wire
         fields |= kFieldUnitWork;
       }
       if (b.unitStates != a.unitStates) {
-    std::uint64_t hash = lanes[0];
-    for (int lane = 1; lane < 4; ++lane) {
-      hash = std::rotl(hash ^ (lanes[lane] * 0xC2B2AE3D27D4EB4Full), 27) * 0x9E3779B185EBCA87ull;
-    }
         fields |= kFieldUnitStates;
       }
       if (b.scriptBits != a.scriptBits) {
@@ -1376,11 +1463,10 @@ namespace faf::remote::wire
         WriteFields(writer, *record, fields, codec, beat, nullptr);
       }
 
-      first = true;
       writer.WriteVarUint(static_cast<std::uint32_t>(changed.size()));
+      CChangeHeaders headers;
       for (const SFrameChange& change : changed) {
-        WriteGap(writer, first, previous, change.after->id);
-        writer.WriteVarUint(change.fields);
+        headers.Write(writer, change.after->id, change.fields);
         WriteFields(writer, *change.after, change.fields, codec, beat, change.before);
       }
     }
@@ -1582,16 +1668,16 @@ namespace faf::remote::wire
       return false;
     }
     {
-      CIdCursor cursor;
+      CChangeHeaders headers;
       std::size_t m = 0;
       std::size_t c = 0;
       for (std::uint32_t i = 0; i < changedCount; ++i) {
         std::uint32_t id = 0;
-        if (!cursor.Next(reader, id)) {
+        std::uint32_t fields = 0;
+        if (!headers.Read(reader, id, fields)) {
           return false;
         }
-        const std::uint32_t fields = reader.ReadVarUint();
-        if (!reader.Ok() || fields == 0u || (fields & ~kAllFields) != 0u) {
+        if (fields == 0u || (fields & ~kAllFields) != 0u) {
           return false;
         }
         while (m < merged.size() && merged[m].id < id) {

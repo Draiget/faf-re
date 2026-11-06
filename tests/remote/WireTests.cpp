@@ -1304,6 +1304,89 @@ namespace
     CHECK(Decode(Encode(wrapped, &nearZero), &nearZero, decoded) && decoded == wrapped);
     CHECK(PositionFieldBits(stepped.entities[0], &placed.entities[0], kCodec) < PositionFieldBits(stepped.entities[0], nullptr, kCodec));
 
+    // Entities 12: a change's id gap and mask (CChangeHeaders). Alone: ids close and far apart (to
+    // the top of the range), masks from a pool of 40 (more than the 15 kept), repeats; what `Bits`
+    // counts is what `Write` writes, and every id and mask reads back.
+    {
+      std::mt19937 rng(0x12u);
+      for (int round = 0; round < 50; ++round) {
+        std::vector<std::pair<std::uint32_t, std::uint32_t>> headers;
+        std::uint64_t id = rng() % 3u == 0u ? 0u : rng();
+        std::uint32_t pool[40];
+        for (std::uint32_t& mask : pool) {
+          mask = (rng() | 1u) & kAllFields;
+        }
+        while (id <= 0xFFFFFFFFull && headers.size() < 400u) {
+          const std::uint32_t fields = rng() % 2u == 0u && !headers.empty() ? headers.back().second : pool[rng() % 40u];
+          headers.emplace_back(static_cast<std::uint32_t>(id), fields);
+          const std::uint32_t kind = rng() % 10u;
+          id += 1u + (kind < 7u ? rng() % 4u : kind < 9u ? rng() % 5000u : rng());
+        }
+        if (round == 0 && (headers.empty() || headers.back().first != 0xFFFFFFFFu)) {
+          headers.emplace_back(0xFFFFFFFFu, kAllFields); // the largest id, after any gap
+        }
+        BitWriter writer;
+        CChangeHeaders write;
+        CChangeHeaders count;
+        std::size_t counted = 0;
+        for (const auto& [headerId, fields] : headers) {
+          write.Write(writer, headerId, fields);
+          counted += static_cast<std::size_t>(count.Bits(headerId, fields));
+        }
+        CHECK(counted == writer.BitCount());
+        const std::vector<std::uint8_t> bytes = Bytes(writer);
+        BitReader reader(bytes);
+        CChangeHeaders read;
+        bool same = true;
+        for (const auto& [headerId, fields] : headers) {
+          std::uint32_t readId = 0;
+          std::uint32_t readFields = 0;
+          same = same && read.Read(reader, readId, readFields) && readId == headerId && readFields == fields;
+        }
+        CHECK(same);
+      }
+      // A place no mask has taken yet is refused, as is a gap past the top of the range.
+      BitWriter badPlace;
+      badPlace.WriteVarUint(5u);
+      badPlace.WriteBits(0b00100u, 5); // place 3 (order-0 code 00100) with no masks yet
+      const std::vector<std::uint8_t> badPlaceBytes = Bytes(badPlace);
+      BitReader badPlaceReader(badPlaceBytes);
+      CChangeHeaders badPlaceHeaders;
+      std::uint32_t unusedId = 0;
+      std::uint32_t unusedFields = 0;
+      CHECK(!badPlaceHeaders.Read(badPlaceReader, unusedId, unusedFields));
+    }
+    // In frames: 40 entities, each frame changing them in 63 different field combinations, so a frame
+    // holds more masks than are kept; each frame reads back exactly against the one before.
+    {
+      SViewFrame previous = placed;
+      previous.frameId = 30;
+      previous.entities.clear();
+      std::uint32_t nextId = 3;
+      for (int i = 0; i < 40; ++i) {
+        SEntityRecord record = placed.entities[0];
+        record.id = nextId;
+        nextId += i % 5 == 4 ? 70000u : 1u + static_cast<std::uint32_t>(i % 3);
+        previous.entities.push_back(record);
+      }
+      for (std::uint32_t round = 1; round <= 6; ++round) {
+        SViewFrame next = previous;
+        next.frameId = previous.frameId + 1u;
+        for (std::size_t i = 0; i < next.entities.size(); ++i) {
+          const std::uint32_t combination = (static_cast<std::uint32_t>(i) * 5u + round * 11u) % 63u + 1u;
+          SEntityRecord& record = next.entities[i];
+          if ((combination & 1u) != 0u) record.position[0] += 3u;
+          if ((combination & 2u) != 0u) record.orientation += 7u;
+          if ((combination & 4u) != 0u) record.health += 1.0f;
+          if ((combination & 8u) != 0u) record.maxHealth += 2.0f;
+          if ((combination & 16u) != 0u) record.fractionComplete = record.fractionComplete > 0.5f ? 0.25f : 0.75f;
+          if ((combination & 32u) != 0u) record.flags ^= 1u;
+        }
+        CHECK(Decode(Encode(next, &previous), &previous, decoded) && decoded == next);
+        previous = next;
+      }
+    }
+
     // A creation mask without the basic fields, or with unit fields for a non-unit, is refused.
     for (const std::uint32_t mask : {std::uint32_t{kFieldKind}, kEntityFields | kFieldKind | kFieldUnitFuel, kAllFields + 1u}) {
       BitWriter writer;

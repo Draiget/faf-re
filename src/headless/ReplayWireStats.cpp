@@ -348,9 +348,9 @@ namespace faf::headless
         mCreationAppearanceBits[i] += created.appearance[i];
       }
     }
-    first = true;
+    wire::CChangeHeaders headers; // the encoder's own rule for a change's id and mask
     for (const wire::SFrameDelta::SChange& change : delta.changed) {
-      mFieldBits.overhead += gap(first, previous, change.record.id) + varintBits(change.fields);
+      mFieldBits.overhead += static_cast<std::uint64_t>(headers.Bits(change.record.id, change.fields));
       fieldBits(change.record, change.fields, mFieldBits);
     }
   }
