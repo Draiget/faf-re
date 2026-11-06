@@ -1808,8 +1808,10 @@ fa::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(fa::string* const failureRe
       setup.receivedBytes = received;
       setup.deadline = now + kWait;
     }
-    // Any peer that lets clients back answers within a round trip, whatever else it is doing.
-    constexpr std::chrono::seconds kSilentPeerWait{30};
+    // Any peer that lets clients back answers within a round trip once its link is up. A link
+    // whose first attempt fails takes up to 15 s of checks and 5 s before the next offer, and
+    // a relay one longer (issue #275, two-machine runs fx1 and fx7): room for a second attempt.
+    constexpr std::chrono::seconds kSilentPeerWait{60};
     const bool silentPeer = now - sRejoinStart >= kSilentPeerWait && std::any_of(list.begin(), list.end(), [](const auto& peer) {
       return !peer->receiver.Heard();
     });
