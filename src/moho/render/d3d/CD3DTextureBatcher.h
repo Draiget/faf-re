@@ -63,6 +63,12 @@ namespace moho
     CD3DTextureBatcher();
 
     /**
+     * Engine addition: the same atlas at another size (a multiple of 4 in both directions). The
+     * terrain splat atlas uses 2048x2048 (`ren_SplatAtlasFix`, CWldSplat.h).
+     */
+    CD3DTextureBatcher(std::int32_t width, std::int32_t height);
+
+    /**
      * Address: 0x00448B60 (FUN_00448B60)
      *
      * What it does:

@@ -11,6 +11,7 @@
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 #include "legacy/algorithms/Sort.h"
+#include "moho/console/CConCommand.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/CDecalGroup.h"
@@ -21,9 +22,24 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 
+namespace moho
+{
+  bool ren_SplatAtlasFix = true;
+}
+
 namespace
 {
+  moho::TConVar<bool> gTConVar_ren_SplatAtlasFix(
+    "ren_SplatAtlasFix",
+    "Terrain splats (tread and scorch marks) use a 2048x2048 texture atlas that is cleared and refilled when a frame's "
+    "splats do not fit, and a splat without a place is not drawn (1, the default); or retail's 1024x1024 atlas that is "
+    "never cleared, where splats of a texture that found no room show other textures (0). The size is read when a map's "
+    "terrain is created, the rest each frame.",
+    &moho::ren_SplatAtlasFix
+  );
 
+  constexpr std::int32_t kSplatAtlasSize = 2048;
+  constexpr std::int32_t kRetailSplatAtlasSize = 1024;
 
   /// True when a decal texture reference already names an absolute location -
   /// a UNC share, a drive-qualified path, or a rooted one - and so must be used
@@ -808,8 +824,11 @@ namespace moho
    */
   CWldSplat::CWldSplat(SpatialDB<CWldTerrainDecal>* const spatialDbOwner, IWldTerrainRes* const terrainRes)
     : CWldTerrainDecal(spatialDbOwner, terrainRes)
+    , mSplatVertices{}
     , mTex()
   {
+    // Engine fix: retail (0x0089DF70) leaves the four vertices unset, so a splat whose texture never
+    // got an atlas place drew with whatever texture coordinates its memory held.
     // 0x0089DFE2..0x0089DFF8: after the base registered this entry as a decal
     // (0x800), the splat re-runs the spatial entry constructor with 0x200.
     // That is what keeps splats out of the albedo decal pass (which collects
@@ -893,21 +912,44 @@ namespace moho
    * Adds the retained batch texture to the atlas and writes the returned UV
    * rectangle into the splat quad.
    */
-  void CWldSplat::UpdateBatchTexture(CD3DTextureBatcher* const batcher)
+  bool CWldSplat::UpdateBatchTexture(CD3DTextureBatcher* const batcher)
   {
-    if (mTex) {
-      const gpg::Rect2f* const uvRect = batcher->AddTexture(mTex);
-      if (uvRect != nullptr) {
-        mSplatVertices[0].mTexCoord.x = uvRect->x0;
-        mSplatVertices[0].mTexCoord.y = uvRect->z0;
-        mSplatVertices[1].mTexCoord.x = uvRect->x1;
-        mSplatVertices[1].mTexCoord.y = uvRect->z0;
-        mSplatVertices[2].mTexCoord.x = uvRect->x1;
-        mSplatVertices[2].mTexCoord.y = uvRect->z1;
-        mSplatVertices[3].mTexCoord.x = uvRect->x0;
-        mSplatVertices[3].mTexCoord.y = uvRect->z1;
-      }
+    if (!mTex) {
+      return false;
     }
+    const gpg::Rect2f* const uvRect = batcher->AddTexture(mTex);
+    if (uvRect == nullptr) {
+      return false;
+    }
+    mSplatVertices[0].mTexCoord.x = uvRect->x0;
+    mSplatVertices[0].mTexCoord.y = uvRect->z0;
+    mSplatVertices[1].mTexCoord.x = uvRect->x1;
+    mSplatVertices[1].mTexCoord.y = uvRect->z0;
+    mSplatVertices[2].mTexCoord.x = uvRect->x1;
+    mSplatVertices[2].mTexCoord.y = uvRect->z1;
+    mSplatVertices[3].mTexCoord.x = uvRect->x0;
+    mSplatVertices[3].mTexCoord.y = uvRect->z1;
+    return true;
+  }
+
+  CWldSplat::AtlasMiss CWldSplat::OnAtlasResult(const bool placed, const bool mayRestart) const noexcept
+  {
+    if (placed || !ren_SplatAtlasFix) {
+      return AtlasMiss::Draw;
+    }
+    // Without a texture there is nothing to make room for.
+    return (mayRestart && mTex) ? AtlasMiss::Restart : AtlasMiss::Skip;
+  }
+
+  CD3DTextureBatcher* REN_NewSplatTextureBatcher()
+  {
+    const std::int32_t size = ren_SplatAtlasFix ? kSplatAtlasSize : kRetailSplatAtlasSize;
+    return new CD3DTextureBatcher(size, size);
+  }
+
+  void REN_ResetSplatTextureBatcher(CD3DTextureBatcher* const batcher)
+  {
+    batcher->Reset();
   }
 
   /**
