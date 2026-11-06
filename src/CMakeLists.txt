@@ -93,7 +93,7 @@ target_link_libraries(faf_engine PUBLIC faf_netlink)
 # The rejoin key's signatures (moho/net/RejoinKey.cpp) and the rejoin save's packing (issue #275).
 target_link_libraries(faf_engine PUBLIC faf_monocypher faf_zstd)
 # MSDF text (moho/render/font, issue #306): both static, client only.
-target_link_libraries(faf_engine PUBLIC faf_freetype faf_msdfgen)
+target_link_libraries(faf_engine PUBLIC faf_freetype faf_msdfgen faf_directxtex)
 
 set(_faf_main_options
   # C++ exceptions with extern "C" functions allowed to throw (/EHs, not

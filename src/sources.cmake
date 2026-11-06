@@ -87,6 +87,7 @@ set(FAF_ENGINE_SOURCES
   gpg/gal/effects/EffectParameters.cpp
   gpg/gal/effects/EffectRuntime.cpp
   gpg/gal/backends/common/ImageCodec.cpp
+  gpg/gal/backends/common/ImageCodecDirectXTex.cpp
   gpg/gal/backends/common/LockShadow.cpp
   gpg/gal/backends/common/RuntimeInfo.cpp
   gpg/gal/backends/common/WindowsCursor.cpp
