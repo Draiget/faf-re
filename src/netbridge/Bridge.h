@@ -58,6 +58,9 @@ namespace faf::netbridge
     // Issue #240: the redundant lane with our peers, each game datagram
     // repeated up to this many times until acked (--redundancy N); 0 is off.
     int redundancy = 0;
+    // Issue #289: encrypt that lane with peers that offer it too; off with
+    // --no-encrypt or FAF_NETBRIDGE_ENCRYPT=0.
+    bool encrypt = true;
     // Tests only: drop this share of game datagrams before sending (0-100).
     int testDropPercent = 0;
     // Seconds between per-peer statistics lines (issue #241); 0 only at close.

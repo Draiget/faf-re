@@ -82,6 +82,10 @@ namespace moho
   // on a redundant lane that repeats each up to this many times until acked;
   // 0 sends them plainly. Read when a link starts.
   int32_t net_NativeNetRedundancy = 2;
+  // Issue #289: in native mode, 1 encrypts that lane with peers that offer it
+  // too, with keys agreed per connection; 0 leaves it plain. Read when a link
+  // starts.
+  int32_t net_NativeNetEncrypt = 1;
   // Issue #236, diagnostics: log every beat that became available this many ms
   // or more after the one before it (waiting on a peer's data); 0 logs nothing.
   // Live.
@@ -176,6 +180,12 @@ namespace moho
       "net_NativeNetRedundancy",
       "In native mode, repeat each game datagram to peers running our build up to this many times until acked (default 2); 0 sends them plainly.",
       &net_NativeNetRedundancy
+    );
+
+    TConVar<int32_t> gTConVar_net_NativeNetEncrypt(
+      "net_NativeNetEncrypt",
+      "In native mode, 1 (default): encrypt the redundant lane with peers running our build that offer it too; 0 leaves it plain.",
+      &net_NativeNetEncrypt
     );
 
     TConVar<int32_t> gTConVar_net_InEngineLinks(

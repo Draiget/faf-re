@@ -1,6 +1,10 @@
 // netlink tests (issue #229).
 //
 //   faf_netlink_tests [--bind <local address>] [--datagrams N]
+//   faf_netlink_tests [--bind <local address>] --marker sealed|plain
+//
+// The second form only sends a readable marker over a sealed or a plain lane,
+// for a packet capture (issue #289).
 //
 // Unit checks of the JSON, signalling and SDP code against what the shipped
 // Java adapter writes, then two links in this process (offerer and answerer,
@@ -605,20 +609,179 @@ namespace
     Check(r.a.webRtcSent == 1000 && r.b.webRtcSent == 1000, "every game datagram goes on the data channel");
     Check(r.atA.size() == 1000 && r.atB.size() == 1000 && r.corrupt == 0, "and arrives unaltered");
   }
+
+  // Issue #289: the key mark in the ufrag and the keys made from it.
+  void KeyUnitTests()
+  {
+    LinkKeyPair a;
+    LinkKeyPair b;
+    Check(a.Generate() && b.Generate(), "keys: two key pairs from the system's random source");
+    Check(a.Public() != b.Public(), "keys: two pairs differ");
+
+    const std::string mark = KeyMarkFor(a.Public());
+    Check(mark.size() == 2 + 64 && mark.rfind("k+", 0) == 0 && mark.find('+', 2) == std::string::npos,
+          "keys: the mark is k+ and 64 hex digits, no further '+'");
+    const std::string prefix = kOurUfragPrefix;
+    for (const std::string marks : {std::string(""), std::string("c+"), std::string("w+c+")}) {
+      const std::optional<LinkPublicKey> back = KeyFromUfrag(prefix + marks + mark, prefix);
+      Check(back && *back == a.Public(), ("keys: read back after \"" + prefix + marks + "\"").c_str());
+    }
+    Check(!KeyFromUfrag("eb31i1k68fj1m5", prefix), "keys: a Java adapter's ufrag offers none");
+    Check(!KeyFromUfrag(prefix + "c+a1b2c3d4", prefix), "keys: an older build's ufrag offers none");
+    Check(!KeyFromUfrag(prefix + "c+" + mark + "0", prefix), "keys: 65 hex digits are refused");
+    Check(!KeyFromUfrag(prefix + "c+" + mark.substr(0, mark.size() - 1), prefix), "keys: 63 hex digits are refused");
+    std::string upper = prefix + "c+" + mark;
+    for (char& c : upper) {
+      c = (c >= 'a' && c <= 'f') ? static_cast<char>(c - 'a' + 'A') : c;
+    }
+    Check(!KeyFromUfrag(upper, prefix), "keys: upper-case hex is refused");
+    Check(!KeyFromUfrag(prefix + "c+" + mark, ""), "keys: an unmarked link reads none");
+
+    const auto ka = a.Derive(b.Public(), true);
+    const auto kb = b.Derive(a.Public(), false);
+    Check(ka && kb && ka->send == kb->receive && ka->receive == kb->send, "keys: offerer and answerer agree");
+    Check(ka && ka->send != ka->receive, "keys: one key per direction");
+    const auto swapped = b.Derive(a.Public(), true);
+    Check(swapped && kb && swapped->send != kb->send, "keys: the role is part of the keys");
+    LinkKeyPair c;
+    Check(c.Generate(), "keys: a third pair");
+    const auto kc = c.Derive(a.Public(), false);
+    Check(kc && ka && kc->receive != ka->send, "keys: another peer's keys differ");
+    const LinkPublicKey zero{};
+    Check(!a.Derive(zero, true), "keys: a low-order public key (all zeros) gives none");
+    LinkKeyPair unset;
+    Check(!unset.Derive(a.Public(), true), "keys: a pair never generated gives none");
+  }
+
+  // Issue #289: two links with the lane seal it with keys from each other's
+  // ufrag; one that doesn't offer keys still gets the lane, plain.
+  void EncryptedLaneTest(const std::string& bind)
+  {
+    LinkOptions o;
+    o.bindAddress = bind;
+    o.ufragPrefix = kOurUfragPrefix;
+    o.redundancy = 2;
+    const PairResult r = RunPair(o, o, 1000, [](Link& a, Link& b) {
+      return a.GetStats().laneEncrypted && b.GetStats().laneEncrypted;
+    });
+    std::printf("  encrypted lane: offerer got %zu, answerer %zu; unauthenticated dropped %llu / %llu\n",
+                r.atA.size(), r.atB.size(), static_cast<unsigned long long>(r.a.laneUnauthenticated),
+                static_cast<unsigned long long>(r.b.laneUnauthenticated));
+    Check(r.ready && r.a.laneEncrypted && r.b.laneEncrypted, "both links seal the lane");
+    Check(Distinct(r.atA) == 1000 && Distinct(r.atB) == 1000 && r.corrupt == 0, "every game datagram arrives unaltered");
+    Check(r.a.laneUnauthenticated == 0 && r.b.laneUnauthenticated == 0, "no lane datagram refused");
+
+    LinkOptions plain = o;
+    plain.encrypt = false; // the ufrag an older build sends: fnl+c+<token>
+    const PairResult m = RunPair(o, plain, 1000, [](Link& a, Link& b) { return a.GetStats().onLane && b.GetStats().onLane; });
+    Check(m.ready && !m.a.laneEncrypted && !m.b.laneEncrypted, "with a peer offering no key: lane on, not sealed");
+    Check(Distinct(m.atA) == 1000 && Distinct(m.atB) == 1000 && m.corrupt == 0, "and game datagrams still flow");
+
+    LinkOptions noLane = o;
+    noLane.redundancy = 0;
+    const PairResult n = RunPair(o, noLane, 500, [](Link&, Link&) { return true; });
+    Check(n.connected && !n.a.onLane && !n.b.onLane, "with a peer without the lane: plain 'd' frames");
+    Check(n.atA.size() == 500 && n.atB.size() == 500 && n.corrupt == 0, "and game datagrams still flow");
+  }
+
+  // Issue #289, for a packet capture: sends `count` datagrams that hold a
+  // readable marker each way, on a lane that is sealed (sealed=true) or plain,
+  // and prints the ufrags signalled. A capture of the sealed run must not hold
+  // the marker; the plain run is the control that shows the capture sees it.
+  int MarkerRun(const std::string& bind, const bool sealed, const int count)
+  {
+    static constexpr char kMarker[] = "FAF-PLAINTEXT-MARKER-289";
+    struct End
+    {
+      std::unique_ptr<Link> link;
+      std::atomic<int> got{0};
+    };
+    End a;
+    End b;
+    auto callbacks = [](End& self, End& other, const char* name) {
+      LinkCallbacks cb;
+      cb.onSignal = [&other, name](const CandidatesMessage& m) {
+        const std::string json = ToJson(m);
+        std::printf("  %s signals: %s\n", name, json.c_str());
+        other.link->OnSignal(*CandidatesMessageFromJson(json));
+      };
+      cb.onData = [&self](const std::uint8_t* data, const std::size_t size) {
+        if (size >= sizeof(kMarker) - 1 && std::memcmp(data, kMarker, sizeof(kMarker) - 1) == 0) {
+          ++self.got;
+        }
+      };
+      return cb;
+    };
+    LinkOptions o;
+    o.bindAddress = bind;
+    o.ufragPrefix = kOurUfragPrefix;
+    o.redundancy = 2;
+    o.encrypt = sealed;
+    LinkOptions oa = o;
+    oa.localId = 1;
+    oa.remoteId = 2;
+    oa.offerer = true;
+    LinkOptions ob = o;
+    ob.localId = 2;
+    ob.remoteId = 1;
+    a.link = std::make_unique<Link>(oa, callbacks(a, b, "offerer"));
+    b.link = std::make_unique<Link>(ob, callbacks(b, a, "answerer"));
+    std::atomic<bool> stop{false};
+    std::thread ticker([&] {
+      while (!stop) {
+        a.link->Tick();
+        b.link->Tick();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+    });
+    a.link->Start();
+    b.link->Start();
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+    while (!(a.link->GetStats().onLane && b.link->GetStats().onLane) && std::chrono::steady_clock::now() < deadline) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    char buf[200] = {};
+    std::snprintf(buf, sizeof(buf), "%s game datagram text that must not be readable on the wire", kMarker);
+    for (int i = 0; i < count; ++i) {
+      a.link->Send(buf, sizeof(buf));
+      b.link->Send(buf, sizeof(buf));
+      std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    stop = true;
+    ticker.join();
+    const LinkStats sa = a.link->GetStats();
+    const LinkStats sb = b.link->GetStats();
+    std::printf("marker run %s: lane %d/%d, sealed %d/%d, received %d / %d of %d\n", sealed ? "sealed" : "plain",
+                sa.onLane, sb.onLane, sa.laneEncrypted, sb.laneEncrypted, a.got.load(), b.got.load(), count);
+    a.link->Close();
+    b.link->Close();
+    const bool ok = sa.onLane && sb.onLane && sa.laneEncrypted == sealed && sb.laneEncrypted == sealed &&
+                    a.got.load() == count && b.got.load() == count;
+    return ok ? 0 : 1;
+  }
 } // namespace
 
 int main(int argc, char** argv)
 {
   std::string bind;
   int count = 10000;
+  std::string marker;
   for (int i = 1; i + 1 < argc; i += 2) {
     if (std::strcmp(argv[i], "--bind") == 0) {
       bind = argv[i + 1];
     } else if (std::strcmp(argv[i], "--datagrams") == 0) {
       count = std::atoi(argv[i + 1]);
+    } else if (std::strcmp(argv[i], "--marker") == 0) {
+      marker = argv[i + 1]; // sealed | plain: only the capture run (#289)
     }
   }
+  if (!marker.empty()) {
+    return MarkerRun(bind, marker == "sealed", 500);
+  }
   UnitTests();
+  KeyUnitTests();
+  EncryptedLaneTest(bind);
   LoopbackTest(bind, count);
   LaneTest(bind, 2000);
   OurPeerTest(bind);

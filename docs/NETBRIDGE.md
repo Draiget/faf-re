@@ -21,6 +21,7 @@ The launcher's arguments, plus a few of ours:
 | `--duplicate-ms <n>` | send every game datagram a second time, `n` ms after the first (0: right after it); off by default (#235). The game drops a repeated DATA packet by its sequence number, so the copy only counts when the first is lost |
 | `--webrtc` | offer WebRTC data channels to our own peers (#239, below); also `FAF_NETBRIDGE_WEBRTC=1` |
 | `--redundancy <n>` | with our own peers, carry game datagrams on the redundant lane, each repeated up to `n` times until acked (#240, below); 0 (default) is off. Also `FAF_NETBRIDGE_REDUNDANCY=<n>`, and passed to a game that runs its own links (`redundancy` in `NetlinkConfig`) |
+| `--no-encrypt` | don't offer to encrypt the redundant lane (#289, below); it is offered by default. Also `FAF_NETBRIDGE_ENCRYPT=0`, and passed to a game that runs its own links (`encrypt` in `NetlinkConfig`) |
 | `--test-drop-percent <n>` | tests only: drop n % of the game's datagrams before sending, on either path; on the redundant lane, of the lane's datagrams |
 | `--stats-interval <s>` | seconds between statistics lines, default 10; 0 logs them only when a link closes (#241) |
 | `--bind-address <ip>` | local address for ICE host candidates (default all interfaces) |
@@ -44,6 +45,12 @@ With `--redundancy <n>` (or `redundancy` in `NetlinkConfig`, or `net_NativeNetRe
 When the game is quiet, the link's 50 ms timer sends the remaining repeats. On ICE the channel's datagrams go behind a `c` byte; on the WebRTC data channel they go bare (their first byte, `0xFC`, starts no game packet). A new connection starts a new lane on both sides. A peer without the mark, the Java adapter included, never sees any of this.
 
 The log shows `starting WebRTC as offerer`, then `webrtc: data channel open, game datagrams move onto it`.
+
+### Lane encryption (#289)
+
+With the lane on, a link also offers to encrypt it, unless `--no-encrypt` (or `FAF_NETBRIDGE_ENCRYPT=0`, or `net_NativeNetEncrypt 0` in native mode) turns that off. Each connection attempt makes a new X25519 key pair, and its public key ends the ufrag: `fnl+` [`w+`] `c+k+` and 64 lowercase hex digits, in place of the random token (`src/netlink/LinkKeys.h`). The ufrag already travels in the CandidatesMessage, so nothing new is sent and nothing secret is: `iceMsg` carries public keys only. When both ufrags carry a key, each end makes the same two keys, one per direction, with BLAKE2b over the X25519 result and both public keys, and the lane seals every datagram with XChaCha20-Poly1305 from the first one ([NET_CHANNEL.md](NET_CHANNEL.md), Encryption). A reconnect is a new attempt, so it gets new keys and a new lane. A peer whose ufrag has no key (an older build, or a key it can't read) gets the lane as before, unencrypted, and so does a peer with encryption turned off. Without the lane, game datagrams stay plain `'d'` frames.
+
+The log line that moves a link onto the lane ends in `, encrypted` or `, not encrypted`. This keeps game data from anyone on the network path. It doesn't protect against whoever relays `iceMsg`, the lobby server, which could replace or remove the keys.
 
 ### faf-pioneer
 

@@ -21,6 +21,7 @@
 // at least every 100 ms. Callbacks run without the link's lock held.
 // Engine addition, not recovered code.
 
+#include "netlink/LinkKeys.h"
 #include "netlink/Signal.h"
 
 #include <atomic>
@@ -99,6 +100,11 @@ namespace faf::netlink
     // lost datagram costs no resend wait. The ufrag then carries "c+" after
     // the prefix (and "w+"). 0 (default) is off: plain 'd' frames.
     int redundancy = 0;
+    // Issue #289: with the lane on, offer to encrypt it. The ufrag then ends
+    // in "k+" and a new X25519 public key per attempt (netlink/LinkKeys.h);
+    // with a peer that offers one too, the lane's datagrams are sealed with
+    // XChaCha20-Poly1305 both ways. Without the lane nothing is encrypted.
+    bool encrypt = true;
   };
 
   // The prefix faf-netbridge and the engine use.
@@ -145,6 +151,8 @@ namespace faf::netlink
     std::uint64_t laneUnacked = 0;     // datagrams whose copies ran out before an ack
     std::uint64_t laneDuplicates = 0;  // copies received after the datagram itself
     std::uint64_t laneLost = 0;        // lane datagrams counted lost
+    bool laneEncrypted = false;        // issue #289: the lane is on and sealed
+    std::uint64_t laneUnauthenticated = 0; // lane datagrams dropped: not sealed with the agreed key
   };
 
   class Link
@@ -187,6 +195,8 @@ namespace faf::netlink
     void SendCandidatesLocked(Pending& out, Clock::time_point now);
     void ApplyRemoteLocked(Pending& out, const CandidatesMessage& remote, Clock::time_point now);
     void ConnectionLostLocked(Pending& out, const char* reason, Clock::time_point now);
+    // The remote's marks from its ufrag, and the lane keys (#289) when both offer them.
+    void NoteRemoteUfragLocked(Pending& out, const std::string& ufrag);
     void StartWebRtcLocked(Pending& out);
     void DropWebRtcLocked(Pending& out);
     void SetStateLocked(Pending& out, LinkState state);
@@ -252,5 +262,12 @@ namespace faf::netlink
     std::atomic<bool> mLaneReset{false}; // a new connection: the next use starts a new lane
     mutable std::mutex mLaneMutex;
     std::unique_ptr<remote::net::NetChannel> mLane;
+    // Issue #289. mKeyPair: this attempt's, under mMutex. mLaneKeys: what the
+    // next lane is sealed with, under mLaneMutex; set before the connection
+    // comes up and cleared with the agent, so every lane gets the keys of its
+    // own connection and no key outlives it. mLaneKeyed mirrors it under mMutex.
+    LinkKeyPair mKeyPair;
+    std::optional<remote::net::ChannelKeys> mLaneKeys;
+    bool mLaneKeyed = false;
   };
 } // namespace faf::netlink

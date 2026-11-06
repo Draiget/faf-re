@@ -76,6 +76,9 @@ namespace moho
         mDuplicateGapMs = static_cast<int>(config->Get("duplicateMs").AsInt(-1));
         mWebRtc = config->Get("webrtc").AsBool();
         mRedundancy = static_cast<int>(config->Get("redundancy").AsInt(0));
+        // Issue #289: an older bridge sends no "encrypt"; its links offered none.
+        const nl::JsonValue* encrypt = config->Find("encrypt");
+        mEncrypt = encrypt != nullptr && encrypt->AsBool();
         mTestDropPercent = static_cast<int>(config->Get("testDropPercent").AsInt(0));
         gpg::Logf(
           "NETLINK: configured, local id %lld, %d ICE server addresses%s", static_cast<long long>(mLocalId),
@@ -91,7 +94,8 @@ namespace moho
         const std::string& bindAddress,
         const bool forceRelay,
         const bool webrtc,
-        const int redundancy
+        const int redundancy,
+        const bool encrypt
       )
       {
         std::lock_guard lock(mMutex);
@@ -101,6 +105,7 @@ namespace moho
         mForceRelay = forceRelay;
         mWebRtc = webrtc;
         mRedundancy = redundancy;
+        mEncrypt = encrypt;
         StartTickerLocked();
       }
 
@@ -170,6 +175,7 @@ namespace moho
           options.duplicateGapMs = mDuplicateGapMs;
           options.webrtc = mWebRtc;
           options.redundancy = mRedundancy;
+          options.encrypt = mEncrypt;
           options.testDropPercent = mTestDropPercent;
         }
         options.remoteId = id;
@@ -387,6 +393,7 @@ namespace moho
       int mDuplicateGapMs = -1;
       bool mWebRtc = false;
       int mRedundancy = 0;
+      bool mEncrypt = false;
       int mTestDropPercent = 0;
       bool mGameEnded = false;
       bool mNative = false;
@@ -503,10 +510,12 @@ namespace moho
     const bool forceRelay = CFG_GetArgOption("/nativenetrelay", 0u, nullptr);
     boost::weak_ptr<CGpgNetInterface> weak;
     boost::AssignWeakFromShared(weak, GPGNET_GetPtr());
-    Links().StartNative(weak, bindAddress, forceRelay, net_NativeNetWebRtc != 0, net_NativeNetRedundancy);
+    const bool encrypt = net_NativeNetEncrypt != 0;
+    Links().StartNative(weak, bindAddress, forceRelay, net_NativeNetWebRtc != 0, net_NativeNetRedundancy, encrypt);
     gpg::Logf(
-      "NETLINK: native mode, the game links every peer itself%s%s%s, redundancy %d", forceRelay ? ", relay only" : "",
-      bindAddress.empty() ? "" : ", bound to ", bindAddress.c_str(), static_cast<int>(net_NativeNetRedundancy)
+      "NETLINK: native mode, the game links every peer itself%s%s%s, redundancy %d%s", forceRelay ? ", relay only" : "",
+      bindAddress.empty() ? "" : ", bound to ", bindAddress.c_str(), static_cast<int>(net_NativeNetRedundancy),
+      encrypt && net_NativeNetRedundancy > 0 ? ", lane encrypted with peers that offer it" : ""
     );
   }
 

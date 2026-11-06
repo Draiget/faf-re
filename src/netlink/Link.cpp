@@ -507,7 +507,9 @@ namespace faf::netlink
       s.laneUnacked = lane.redundantUnacked;
       s.laneDuplicates = lane.redundantDuplicates;
       s.laneLost = lane.datagramsLost;
+      s.laneUnauthenticated = lane.unauthenticatedDropped;
     }
+    s.laneEncrypted = s.onLane && mLaneKeyed;
     s.dataReceived = mDataReceived.load();
     s.invalidReceived = mInvalidReceived.load();
     s.echoesAnswered = mEchoesAnswered.load();
@@ -546,9 +548,7 @@ namespace faf::netlink
 
   void Link::DestroyAgentLocked()
   {
-    // Issue #240: a new connection starts a new lane (lazily, under mLaneMutex).
     mLaneActive = false;
-    mLaneReset = true;
     juice_agent* agent = nullptr;
     {
       std::unique_lock agentLock(mIn->agentMutex);
@@ -559,6 +559,50 @@ namespace faf::netlink
     if (agent != nullptr) {
       juice_destroy(agent); // joins libjuice's thread; never called from it
     }
+    // Issue #240: a new connection starts a new lane (lazily, under mLaneMutex).
+    // After the agent is gone, so no late datagram of this connection makes the
+    // next connection's lane before its keys are known (#289).
+    {
+      std::lock_guard laneLock(mLaneMutex);
+      mLaneReset = true;
+      if (mLaneKeys) {
+        remote::net::WipeKey(mLaneKeys->send);
+        remote::net::WipeKey(mLaneKeys->receive);
+        mLaneKeys.reset();
+      }
+    }
+    mLaneKeyed = false;
+    mKeyPair.Clear();
+  }
+
+  void Link::NoteRemoteUfragLocked(Pending& out, const std::string& ufrag)
+  {
+    mRemoteUfrag = ufrag;
+    mRemoteMarked = !mOptions.ufragPrefix.empty() && mRemoteUfrag.rfind(mOptions.ufragPrefix, 0) == 0;
+    mRemoteWebRtc = mRemoteMarked && mRemoteUfrag.rfind(mOptions.ufragPrefix + "w+", 0) == 0;
+    mRemoteLane = mRemoteMarked && OffersAfterPrefix(mRemoteUfrag, mOptions.ufragPrefix, "c+");
+    // Issue #289: both sides decide the same way, each from the other's ufrag
+    // and its own, so the lane is sealed on both or on neither.
+    if (!mKeyPair.IsSet() || !mRemoteLane) {
+      return;
+    }
+    const std::optional<LinkPublicKey> peerKey = KeyFromUfrag(mRemoteUfrag, mOptions.ufragPrefix);
+    if (!peerKey) {
+      Log(out, "the peer offers no lane key; the lane stays unencrypted");
+      return;
+    }
+    std::optional<remote::net::ChannelKeys> keys = mKeyPair.Derive(*peerKey, mOptions.offerer);
+    if (!keys) {
+      Log(out, "the peer's lane key is unusable; the lane stays unencrypted");
+      return;
+    }
+    {
+      std::lock_guard laneLock(mLaneMutex);
+      mLaneKeys = *keys;
+    }
+    remote::net::WipeKey(keys->send);
+    remote::net::WipeKey(keys->receive);
+    mLaneKeyed = true;
   }
 
   void Link::InitiateLocked(Pending& out, const CandidatesMessage* remote)
@@ -643,8 +687,21 @@ namespace faf::netlink
       const std::string mark =
         mOptions.ufragPrefix + (mOptions.webrtc ? "w+" : "") + (mOptions.redundancy > 0 ? "c+" : "");
       const std::size_t prefix = mark.size();
-      const std::string ufrag = mark + RandomToken(prefix + 4 < 14 ? 14 - prefix : 4);
-      juice_set_local_ice_attributes(agent, ufrag.c_str(), RandomToken(26).c_str());
+      std::string ufrag = mark + RandomToken(prefix + 4 < 14 ? 14 - prefix : 4);
+      // Issue #289: a new key pair per attempt; its public key ends the ufrag
+      // in place of the random token. Hex digits hold no '+', so the marks
+      // before it read as they always have.
+      if (mOptions.encrypt && mOptions.redundancy > 0) {
+        if (mKeyPair.Generate()) {
+          ufrag = mark + KeyMarkFor(mKeyPair.Public());
+        } else {
+          Log(out, "no random source for a lane key; the lane stays unencrypted");
+        }
+      }
+      if (juice_set_local_ice_attributes(agent, ufrag.c_str(), RandomToken(26).c_str()) != JUICE_ERR_SUCCESS) {
+        Log(out, "ufrag refused by libjuice: " + ufrag);
+        mKeyPair.Clear();
+      }
     }
     {
       std::unique_lock agentLock(mIn->agentMutex);
@@ -657,10 +714,7 @@ namespace faf::netlink
     mOurPeerReported = false;
     mProbesSent = 0;
     if (remote != nullptr) {
-      mRemoteUfrag = remote->ufrag;
-      mRemoteMarked = !mOptions.ufragPrefix.empty() && mRemoteUfrag.rfind(mOptions.ufragPrefix, 0) == 0;
-      mRemoteWebRtc = mRemoteMarked && mRemoteUfrag.rfind(mOptions.ufragPrefix + "w+", 0) == 0;
-      mRemoteLane = mRemoteMarked && OffersAfterPrefix(mRemoteUfrag, mOptions.ufragPrefix, "c+");
+      NoteRemoteUfragLocked(out, remote->ufrag);
       // Answerer: the remote description goes in before gathering, so
       // libjuice takes the controlled role (the offerer controls, as
       // agent.setControlling(peer.isLocalOffer())).
@@ -753,10 +807,7 @@ namespace faf::netlink
       Log(out, std::string("received candidates unexpectedly, state ") + LinkStateName(mState));
       return;
     }
-    mRemoteUfrag = remote.ufrag;
-    mRemoteMarked = !mOptions.ufragPrefix.empty() && mRemoteUfrag.rfind(mOptions.ufragPrefix, 0) == 0;
-    mRemoteWebRtc = mRemoteMarked && mRemoteUfrag.rfind(mOptions.ufragPrefix + "w+", 0) == 0;
-    mRemoteLane = mRemoteMarked && OffersAfterPrefix(mRemoteUfrag, mOptions.ufragPrefix, "c+");
+    NoteRemoteUfragLocked(out, remote.ufrag);
     const std::string sdp = RemoteDescriptionLocked(remote, now);
     if (juice_set_remote_description(mAgent, sdp.c_str()) < 0) {
       Log(out, "remote description rejected: " + sdp);
@@ -948,7 +999,8 @@ namespace faf::netlink
           !mLaneActive.load()) {
         mLaneActive = true;
         Log(p, "game datagrams move onto the redundant lane, each repeated up to " +
-                 std::to_string(mOptions.redundancy) + " times until acked");
+                 std::to_string(mOptions.redundancy) + " times until acked" +
+                 (mLaneKeyed ? ", encrypted" : ", not encrypted"));
       }
 
       if (mState == LinkState::Disconnected && mRestartAt && now >= *mRestartAt) {
@@ -1043,6 +1095,10 @@ namespace faf::netlink
       config.timeoutUs = 24ull * 3600 * 1000 * 1000;
       config.keepaliveIntervalUs = 1'000'000;
       mLane = std::make_unique<remote::net::NetChannel>(config);
+      // Issue #289: sealed from its first datagram, with this connection's keys.
+      if (mLaneKeys) {
+        (void)mLane->SetKeys(*mLaneKeys);
+      }
     }
     return *mLane;
   }

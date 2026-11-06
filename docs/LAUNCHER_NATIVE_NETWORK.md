@@ -2,7 +2,7 @@
 
 Issue #274. With the switch `/nativenet` the game runs every peer link itself: ICE over libjuice, a link that FAF's Java ICE adapter accepts as one of its own, and WebRTC between two of our builds. The launcher starts no adapter. It talks to the game over GPGNet directly, as FAF clients did before ICE adapters existed. Without the switch nothing changes: the game talks to an adapter as described in [LAUNCHER_ADAPTER_CONTRACT.md](LAUNCHER_ADAPTER_CONTRACT.md).
 
-This page is what a launcher needs to support the mode: downlords-faf-client and FAForeverRustClient, through later PRs, and `tools/seat` (mpemu) today. The lobby server needs no change.
+This page is what a launcher needs to support the mode: downlords-faf-client (open PR [FAForever/downlords-faf-client#3590](https://github.com/FAForever/downlords-faf-client/pull/3590), behind a preference and the `fafdevelop` mod), FAForeverRustClient (not started), and `tools/seat` (mpemu) today. The lobby server needs no change.
 
 ## What the launcher does
 
@@ -58,7 +58,7 @@ A launcher checks `ProductName` only, under the string table `040904b0`. On Wind
 | `/nativenetrelay` | only TURN-relayed candidates: the client's "force relay" setting, or the API session's `forceRelay` |
 | `/nativenetbind <address>` | ICE host candidates use this local address. Optional; for machines that drop loopback UDP to sockets bound to every interface |
 
-`net_NativeNetWebRtc` (default 0; 1 enables it) offers a WebRTC data channel to peers that are our builds too (#239). A channel opens only when both sides offer it. It stays off because raw ICE with the lane came out ahead in the comparison posted on PR #277. `net_NativeNetRedundancy` (default 2) carries game datagrams to those peers on the redundant lane, each repeated up to that many times until acked (#240). A Java adapter peer, or an older build, keeps the plain ICE link.
+`net_NativeNetWebRtc` (default 0; 1 enables it) offers a WebRTC data channel to peers that are our builds too (#239). A channel opens only when both sides offer it. It stays off because raw ICE with the lane came out ahead in the comparison posted on PR #277. `net_NativeNetRedundancy` (default 2) carries game datagrams to those peers on the redundant lane, each repeated up to that many times until acked (#240). `net_NativeNetEncrypt` (default 1; 0 turns it off) encrypts that lane with peers that offer it too, with keys agreed per connection from public keys in the ICE ufrag (#289, [NETBRIDGE.md](NETBRIDGE.md#lane-encryption-289)). A Java adapter peer keeps the plain ICE link; an older build of ours gets the lane unencrypted.
 
 ## Inside the game
 
