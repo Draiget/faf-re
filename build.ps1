@@ -139,7 +139,13 @@ function Copy-Build([hashtable]$t, [string]$destDir, [string]$exeName) {
   if (Test-Path $pdb) { Copy-Item $pdb (Join-Path $destDir "$exeName.pdb") -Force }
 
   $hooks = Join-Path $src 'fafengine'
-  if (Test-Path $hooks) { Copy-Item $hooks $destDir -Recurse -Force }
+  if (Test-Path $hooks) {
+    # Replaced, not copied over: a hook file left from an older build would still be appended
+    # to the FAF file of its path.
+    $destHooks = Join-Path $destDir 'fafengine'
+    if (Test-Path $destHooks) { Remove-Item $destHooks -Recurse -Force }
+    Copy-Item $hooks $destDir -Recurse -Force
+  }
 
   # headless (the console replay player, docs/SWITCHES.md) beside it: <name>_headless with
   # -Name, headless_x64 / headless otherwise (_profile for a Profile build).

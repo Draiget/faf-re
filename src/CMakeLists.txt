@@ -327,7 +327,10 @@ endif()
 # docs/RENDERER_BACKENDS.md). And the DXC runtime (dxcompiler.dll, dxil.dll),
 # which Direct3D 12 and Vulkan load to compile their shaders.
 set(_faf_dxc_bin "${FAF_DEPENDENCIES_DIR}/dxc/bin/${_faf_sdk_arch}")
+# The folder is replaced, not copied over: a file moved or removed in data/fafengine must not
+# stay behind, where the engine would still take it as a hook of the FAF file of that path.
 add_custom_command(TARGET faf_main POST_BUILD
+  COMMAND "${CMAKE_COMMAND}" -E rm -rf "$<TARGET_FILE_DIR:faf_main>/fafengine"
   COMMAND "${CMAKE_COMMAND}" -E copy_directory "${PROJECT_SOURCE_DIR}/data/fafengine"
           "$<TARGET_FILE_DIR:faf_main>/fafengine"
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_faf_dxc_bin}/dxcompiler.dll"
