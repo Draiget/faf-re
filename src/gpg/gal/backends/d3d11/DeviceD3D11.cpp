@@ -871,20 +871,7 @@ namespace gpg::gal
       const char* const data = context->dataBuffer_.mBegin;
       const SIZE_T bytes = context->DataSizeBytes();
 
-      // Original D3D9 applies the quality skip only to 2D DDS textures;
-      // environment cubes and volumes retain their top mip. A 2D file with
-      // too few levels for the requested skip still falls back to loading whole.
-      const UINT skipLevels = imaging::TextureQualityMipLevels(data, bytes, context->reserved0x44_ & 0x1FU);
-      HRESULT result = E_FAIL;
-      if (skipLevels != 0U) {
-        D3DX11_IMAGE_LOAD_INFO loadInfo;
-        loadInfo.FirstMipLevel = skipLevels;
-        result = mD3DX11->createTextureFromMemory(mDevice.Get(), data, bytes, &loadInfo, nullptr, &resource, nullptr);
-      }
-      if (FAILED(result)) {
-        resource.Reset();
-        result = mD3DX11->createTextureFromMemory(mDevice.Get(), data, bytes, nullptr, nullptr, &resource, nullptr);
-      }
+      const HRESULT result = mD3DX11->createTextureFromMemory(mDevice.Get(), data, bytes, nullptr, nullptr, &resource, nullptr);
       if (FAILED(result)) {
         char message[640]{};
         std::snprintf(
@@ -892,6 +879,40 @@ namespace gpg::gal
           static_cast<unsigned long>(result)
         );
         ThrowError("DeviceD3D11.cpp", __LINE__, message);
+      }
+      // Texture quality drops the top levels of a 2D DDS with a mip chain, as the original's
+      // D3DX9 load does; cubes and volumes keep theirs. D3DX11's FirstMipLevel is not that: it
+      // scales the skipped-to level back up to the file's size. So the file loads whole and the
+      // levels below the skip are copied into a smaller texture.
+      ComPtr<ID3D11Texture2D> whole;
+      UINT skip = imaging::TextureQualityMipLevels(data, bytes, context->reserved0x44_ & 0x1FU);
+      if (skip != 0U && SUCCEEDED(resource.As(&whole))) {
+        D3D11_TEXTURE2D_DESC desc{};
+        whole->GetDesc(&desc);
+        skip = (desc.MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE) != 0U ? 0U : std::min(skip, desc.MipLevels - 1U);
+        // A block-compressed top level stays a whole number of blocks.
+        while (skip != 0U && d3d11::IsBlockCompressed(desc.Format) &&
+               (((desc.Width >> skip) % 4U) != 0U || ((desc.Height >> skip) % 4U) != 0U)) {
+          --skip;
+        }
+        if (skip != 0U) {
+          const UINT wholeLevels = desc.MipLevels;
+          desc.Width >>= skip;
+          desc.Height >>= skip;
+          desc.MipLevels -= skip;
+          ComPtr<ID3D11Texture2D> smaller;
+          if (SUCCEEDED(mDevice->CreateTexture2D(&desc, nullptr, &smaller))) {
+            for (UINT slice = 0U; slice < desc.ArraySize; ++slice) {
+              for (UINT level = 0U; level < desc.MipLevels; ++level) {
+                mImmediate->CopySubresourceRegion(
+                  smaller.Get(), D3D11CalcSubresource(level, slice, desc.MipLevels), 0U, 0U, 0U, whole.Get(),
+                  D3D11CalcSubresource(level + skip, slice, wholeLevels), nullptr
+                );
+              }
+            }
+            resource = smaller;
+          }
+        }
       }
     } else {
       ThrowError("DeviceD3D11.cpp", __LINE__, "invalid source specified for texture data");

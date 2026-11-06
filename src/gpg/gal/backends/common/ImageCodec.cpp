@@ -200,7 +200,7 @@ namespace gpg::gal::imaging
       }
       const std::uint32_t faces = cube ? 6U : 1U;
 
-      // D3DX's FirstMipLevel; the caller retries from level 0 when D3DX refuses the skip.
+      // Texture quality's top levels to drop, already limited to the file's chain by Decode.
       std::uint32_t skip = options.skipMipLevels;
       if (skip >= mipCount) {
         skip = 0U;
@@ -316,7 +316,8 @@ namespace gpg::gal::imaging
     [[nodiscard]] std::uint64_t DecodeCacheKey(const void* const data, const std::size_t bytes, const DecodeOptions& options)
     {
       effects::Fnv1a64 hash;
-      hash.Add("faf image decode cache 2");
+      // 3: a 2D quality skip drops whole levels; entries from D3DX11's FirstMipLevel were scaled up.
+      hash.Add("faf image decode cache 3");
       // The file stores Image::Subresource as is, whose offset is pointer-sized: x86 and x64
       // builds share the directory and keep separate entries.
       const std::uint32_t pointerBytes = sizeof(void*);
@@ -620,7 +621,7 @@ namespace gpg::gal::imaging
       return result;
     }
 
-    const auto load = [&](const std::uint32_t firstMip, ComPtr<ID3D11Resource>& resource) {
+    const auto load = [&](ComPtr<ID3D11Resource>& resource) {
       D3DX11_IMAGE_LOAD_INFO loadInfo; // every field D3DX11_DEFAULT / FROM_FILE
       if (options.width != 0U) {
         loadInfo.Width = options.width;
@@ -637,9 +638,6 @@ namespace gpg::gal::imaging
       if (options.filter == ResizeFilter::None) {
         loadInfo.Filter = D3DX11_FILTER_NONE;
       }
-      if (firstMip != 0U) {
-        loadInfo.FirstMipLevel = firstMip;
-      }
       loadInfo.Usage = D3D11_USAGE_STAGING;
       loadInfo.BindFlags = 0U;
       loadInfo.CpuAccessFlags = D3D11_CPU_ACCESS_READ;
@@ -647,33 +645,35 @@ namespace gpg::gal::imaging
       return state.createTexture(state.device.Get(), data, bytes, &loadInfo, nullptr, &resource, nullptr);
     };
 
+    // The quality skip is not D3DX11's FirstMipLevel: that scales the skipped-to level back up to
+    // the file's size. The file loads whole and the top levels are dropped below, as D3DX9 does.
     ComPtr<ID3D11Resource> resource;
-    result = E_FAIL;
-    const bool preserveTopMip = (info.MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE) != 0U ||
-      info.ResourceDimension == D3D11_RESOURCE_DIMENSION_TEXTURE3D;
-    if (!preserveTopMip && options.skipMipLevels != 0U) {
-      result = load(options.skipMipLevels, resource);
-    }
-    if (FAILED(result)) {
-      resource.Reset();
-      result = load(0U, resource);
-    }
+    result = load(resource);
     if (FAILED(result)) {
       return result;
     }
+    const bool preserveTopMip = (info.MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE) != 0U ||
+      info.ResourceDimension == D3D11_RESOURCE_DIMENSION_TEXTURE3D;
 
     ComPtr<ID3D11Texture2D> texture2D;
     ComPtr<ID3D11Texture3D> texture3D;
     if (SUCCEEDED(resource.As(&texture2D))) {
       D3D11_TEXTURE2D_DESC desc{};
       texture2D->GetDesc(&desc);
-      outImage.Allocate(desc.Format, desc.Width, desc.Height, desc.MipLevels, desc.ArraySize);
+      std::uint32_t skip = preserveTopMip ? 0U : std::min(options.skipMipLevels, desc.MipLevels - 1U);
+      // A block-compressed top level stays a whole number of blocks.
+      while (skip != 0U && dxgi::IsBlockCompressed(desc.Format) &&
+             (((desc.Width >> skip) % 4U) != 0U || ((desc.Height >> skip) % 4U) != 0U)) {
+        --skip;
+      }
+      outImage.Allocate(desc.Format, desc.Width >> skip, desc.Height >> skip, desc.MipLevels - skip, desc.ArraySize);
       outImage.cube = (info.MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE) != 0U && desc.ArraySize == 6U;
       outImage.volume = false;
       for (std::uint32_t index = 0U; index < outImage.subresources.size(); ++index) {
         const Image::Subresource& subresource = outImage.subresources[index];
+        const UINT source = (index / outImage.mipLevels) * desc.MipLevels + index % outImage.mipLevels + skip;
         D3D11_MAPPED_SUBRESOURCE mapped{};
-        result = state.context->Map(texture2D.Get(), index, D3D11_MAP_READ, 0U, &mapped);
+        result = state.context->Map(texture2D.Get(), source, D3D11_MAP_READ, 0U, &mapped);
         if (FAILED(result)) {
           return result;
         }
@@ -682,7 +682,7 @@ namespace gpg::gal::imaging
                       static_cast<const std::uint8_t*>(mapped.pData) + static_cast<std::size_t>(row) * mapped.RowPitch,
                       subresource.rowPitch);
         }
-        state.context->Unmap(texture2D.Get(), index);
+        state.context->Unmap(texture2D.Get(), source);
       }
       return S_OK;
     }

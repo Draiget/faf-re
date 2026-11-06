@@ -365,6 +365,60 @@ namespace
     }
   }
 
+  // The original's D3DX9 load, measured on d3dx9_35: a 2D DDS with more than one level drops
+  // min(skip, levels - 1) top levels and keeps the rest byte for byte; a one-level DDS and a PNG
+  // load whole. The levels D3DX builds past a short chain are kept the same way.
+  void TestQualitySkipFollowsD3dx9(ImageCodec& codec)
+  {
+    const bool oldDirect = gpg::gal::imaging::gDdsDirectLoad;
+    for (const bool direct : {false, true}) {
+      gpg::gal::imaging::gDdsDirectLoad = direct;
+      for (const DXGI_FORMAT format : {DXGI_FORMAT_BC3_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM}) {
+        for (const std::uint32_t levels : {1U, 2U, 3U, 7U}) {
+          std::vector<std::uint8_t> file;
+          const HRESULT written = ImageCodec::WriteDds(MakeImage(format, 64U, 64U, levels), file);
+          Image baseline;
+          const HRESULT baselineRead = SUCCEEDED(written) ? codec.Decode(file.data(), file.size(), DecodeOptions{}, baseline) : written;
+          if (!SUCCEEDED(baselineRead)) {
+            Check(false, "quality baseline loads");
+            continue;
+          }
+          for (const std::uint32_t skip : {1U, 2U}) {
+            const std::uint32_t dropped = levels > 1U ? std::min(skip, levels - 1U) : 0U;
+            Image expected;
+            expected.Allocate(baseline.format, 64U >> dropped, 64U >> dropped, baseline.mipLevels - dropped, 1U);
+            for (std::uint32_t mip = 0U; mip < expected.mipLevels; ++mip) {
+              const Image::Subresource& from = baseline.subresources[mip + dropped];
+              std::memcpy(expected.bytes.data() + expected.subresources[mip].offset, baseline.bytes.data() + from.offset, from.slicePitch);
+            }
+            DecodeOptions options;
+            options.skipMipLevels = skip;
+            Image reloaded;
+            const HRESULT read = codec.Decode(file.data(), file.size(), options, reloaded);
+            char detail[96]{};
+            std::snprintf(detail, sizeof(detail), "format %d, %u levels, direct %u, skip %u", static_cast<int>(format), levels, direct ? 1U : 0U, skip);
+            Check(SUCCEEDED(read) && SameLevels(expected, reloaded), "texture quality drops levels as D3DX9 does", detail);
+          }
+        }
+      }
+    }
+    gpg::gal::imaging::gDdsDirectLoad = oldDirect;
+
+    std::vector<std::uint8_t> png;
+    const Image source = MakeImage(DXGI_FORMAT_R8G8B8A8_UNORM, 64U, 64U, 1U);
+    if (SUCCEEDED(codec.Encode(source, FileFormat::Png, png))) {
+      Image whole;
+      Image reloaded;
+      DecodeOptions options;
+      options.skipMipLevels = 1U;
+      const bool loaded = SUCCEEDED(codec.Decode(png.data(), png.size(), DecodeOptions{}, whole)) &&
+        SUCCEEDED(codec.Decode(png.data(), png.size(), options, reloaded));
+      Check(loaded && SameLevels(whole, reloaded), "texture quality leaves a PNG whole");
+    } else {
+      Check(false, "PNG encodes");
+    }
+  }
+
   /** Encode, which is D3DX11's writer where it has one: the same texels come back either way. */
   void TestEncodeMatchesWriteDds(ImageCodec& codec)
   {
@@ -420,6 +474,7 @@ int main()
   TestCube(*codec);
   TestQualityKeepsCubeTopMip(*codec);
   TestQualityKeepsVolumeTopMip(*codec);
+  TestQualitySkipFollowsD3dx9(*codec);
   TestEncodeMatchesWriteDds(*codec);
 
   std::printf("%d failed\n", gFailures);
