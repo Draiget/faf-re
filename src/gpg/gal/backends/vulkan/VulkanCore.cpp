@@ -311,12 +311,22 @@ namespace gpg::gal::vulkan
           continue;
         }
         const VkDeviceSize rangeStart = range->first;
-        block->free.erase(range);
+        const VkDeviceSize allocationEnd = start + requirements.size;
         if (start > rangeStart) {
-          block->free[rangeStart] = start - rangeStart;
-        }
-        if (start + requirements.size < end) {
-          block->free[start + requirements.size] = end - (start + requirements.size);
+          // Prepare the only extra node before changing the existing free range.
+          // If allocation fails, the full range remains available for a later try.
+          if (allocationEnd < end) {
+            block->free.emplace(allocationEnd, end - allocationEnd);
+          }
+          range->second = start - rangeStart;
+        } else if (allocationEnd < end) {
+          // Reuse the existing node for the suffix; no heap allocation is needed.
+          auto suffix = block->free.extract(range);
+          suffix.key() = allocationEnd;
+          suffix.mapped() = end - allocationEnd;
+          block->free.insert(std::move(suffix));
+        } else {
+          block->free.erase(range);
         }
         Allocation allocation;
         allocation.memory = block->memory;
@@ -339,6 +349,23 @@ namespace gpg::gal::vulkan
     info.allocationSize = block->size;
     info.memoryTypeIndex = type;
     CheckVk("VulkanCore.cpp", __LINE__, Vk().vkAllocateMemory(mDevice, &info, nullptr, &block->memory));
+    // Until the block is published, its unique_ptr only owns the bookkeeping.
+    // A failed map or container allocation must also release the native memory.
+    struct UnpublishedBlock
+    {
+      VkDevice device;
+      Block* block;
+
+      ~UnpublishedBlock() noexcept
+      {
+        if (block != nullptr) {
+          if (block->mapped != nullptr) {
+            Vk().vkUnmapMemory(device, block->memory);
+          }
+          Vk().vkFreeMemory(device, block->memory, nullptr);
+        }
+      }
+    } unpublished{mDevice, block.get()};
     if (hostVisible) {
       void* mapped = nullptr;
       CheckVk("VulkanCore.cpp", __LINE__, Vk().vkMapMemory(mDevice, block->memory, 0U, VK_WHOLE_SIZE, 0U, &mapped));
@@ -359,11 +386,13 @@ namespace gpg::gal::vulkan
       if (mBlocks[index] == nullptr) {
         allocation.block = static_cast<std::int32_t>(index);
         mBlocks[index] = std::move(block);
+        unpublished.block = nullptr;
         return allocation;
       }
     }
     allocation.block = static_cast<std::int32_t>(mBlocks.size());
     mBlocks.push_back(std::move(block));
+    unpublished.block = nullptr;
     return allocation;
   }
 
