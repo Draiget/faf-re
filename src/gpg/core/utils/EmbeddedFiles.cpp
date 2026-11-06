@@ -26,11 +26,6 @@ namespace gpg
   {
     return {};
   }
-
-  std::wstring EmbeddedEngineLuaDirectory()
-  {
-    return {};
-  }
 #else
   namespace
   {
@@ -198,12 +193,6 @@ namespace gpg
   std::wstring EmbeddedDxcDirectory()
   {
     static const std::wstring directory = UnpackOnce(L"FAF_DXC", L"dxc");
-    return directory;
-  }
-
-  std::wstring EmbeddedEngineLuaDirectory()
-  {
-    static const std::wstring directory = UnpackOnce(L"FAF_ENGINE_LUA", L"fafengine");
     return directory;
   }
 #endif
