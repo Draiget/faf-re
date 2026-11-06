@@ -1,4 +1,5 @@
 #include "moho/misc/StartupHelpers.h"
+#include "gpg/core/utils/EmbeddedFiles.h"
 #include "moho/lua/CScrLuaInitForm.h"
 
 #include "legacy/containers/AutoPtr.h"
@@ -677,7 +678,8 @@ namespace
    * in it is appended to the gamedata script of the same path - today
    * lua/options/options.lua, which adds the Graphics API option. The engine
    * does this itself rather than through the init file because the init
-   * files belong to the FAF client. Nothing happens when the folder is absent.
+   * files belong to the FAF client. Without the folder, the copy the executable
+   * carries is mounted instead (issue #315, gpg/core/utils/EmbeddedFiles.h).
    */
   void AppendEngineHookFolder(fa::vector<moho::SVFSMountPoint>& mountPoints)
   {
@@ -686,10 +688,14 @@ namespace
     if (length == 0U || length >= modulePath.size()) {
       return;
     }
-    const std::filesystem::path folder = std::filesystem::path(modulePath.data()).parent_path() / L"fafengine";
+    std::filesystem::path folder = std::filesystem::path(modulePath.data()).parent_path() / L"fafengine";
     std::error_code error;
     if (!std::filesystem::is_directory(folder, error)) {
-      return;
+      const std::wstring embedded = gpg::EmbeddedEngineLuaDirectory();
+      if (embedded.empty()) {
+        return;
+      }
+      folder = std::filesystem::path(embedded).parent_path(); // without the trailing backslash
     }
     const fa::string folderUtf8 = gpg::STR_WideToUtf8(folder.wstring().c_str());
     mountPoints.push_back(moho::SVFSMountPoint(folderUtf8.c_str(), "/fafengine"));

@@ -1,6 +1,7 @@
 // FAF addition, not in the shipped binary: see ShaderCompiler.h.
 
 #include "ShaderCompiler.h"
+#include "gpg/core/utils/EmbeddedFiles.h"
 
 #include <windows.h>
 
@@ -94,6 +95,10 @@ namespace gpg::gal::effects
       }
       directories.push_back(directory);
     }
+    // Last, the copy the executable carries (issue #315): loose DLLs win.
+    if (std::wstring embedded = gpg::EmbeddedDxcDirectory(); !embedded.empty()) {
+      directories.push_back(std::move(embedded));
+    }
 
     auto library = new Library();
     for (const std::wstring& directory : directories) {
@@ -110,7 +115,7 @@ namespace gpg::gal::effects
       }
     }
     if (library->compiler == nullptr) {
-      mLoadError = "dxcompiler.dll not found next to the executable or in FAF_DXC_DIR";
+      mLoadError = "dxcompiler.dll not found next to the executable, in FAF_DXC_DIR or in the executable";
       delete library;
       return;
     }
