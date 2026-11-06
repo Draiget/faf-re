@@ -55,7 +55,9 @@ namespace moho
 
   struct SMsdfCookOptions
   {
-    std::int32_t mAtlasWidth = 1024;
+    // Two atlases and the 3 texels between them fit across CD3DFont's 2048-texel page; at 1024 each font took a
+    // row of its own, and the page ran out after a few fonts.
+    std::int32_t mAtlasWidth = 1022;
     std::int32_t mHeightStep = 256;     // the atlas grows in these steps until the glyphs fit
     std::int32_t mMaxAtlasHeight = 4096;
     double mEmPixels = 48.0;

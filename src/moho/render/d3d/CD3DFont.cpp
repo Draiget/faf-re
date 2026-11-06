@@ -57,12 +57,13 @@ namespace moho
 
     TConVar<bool> gTConVar_ren_MsdfText(
       "ren_MsdfText",
-      "Draw screen-space text from MSDF atlases where one is ready (1, the default), or always through GDI glyphs (0).",
+      "Draw screen-space text from MSDF atlases where one is ready (1, the default), or always through GDI glyphs (0). "
+      "A mod's font has no GDI version and keeps its atlas either way.",
       &ren_MsdfText
     );
     TConVar<int> gTConVar_ren_MsdfTextMinSize(
       "ren_MsdfTextMinSize",
-      "The smallest text in pixels ren_MsdfText draws from an atlas; smaller text stays on GDI glyphs.",
+      "The smallest text in pixels ren_MsdfText draws from an atlas; smaller text stays on GDI glyphs. Not for a mod's font.",
       &ren_MsdfTextMinSize
     );
 
@@ -82,6 +83,9 @@ namespace moho
       bool mIsMod = false;
       const SMsdfStrike* mStrike = nullptr; // into mAtlas: this size as a bitmap, when it has one
       std::shared_ptr<const SMsdfFontAtlas> mFallbackAtlas;
+      // The atlas page had no room for this mod font's atlas: it draws in the default font, with that font's
+      // advances too, rather than GDI's glyphs at the mod font's spacing. Its bitmaps of small sizes still apply.
+      bool mNoPage = false;
     };
 
     /**
@@ -149,10 +153,11 @@ namespace moho
 
     /**
      * Where an atlas sits on the page, placing it on first use and rewriting the page after a device reset.
-     * False when the page is full or can't be made; that font stays on GDI glyphs.
+     * False when the page is full or can't be made; that font stays on GDI glyphs. `outFull` says it was full.
      */
-    [[nodiscard]] bool AcquireMsdfPlacement(const SMsdfFontAtlas& atlas, std::int32_t& outX, std::int32_t& outY)
+    [[nodiscard]] bool AcquireMsdfPlacement(const SMsdfFontAtlas& atlas, std::int32_t& outX, std::int32_t& outY, bool& outFull)
     {
+      outFull = false;
       MsdfAtlasPage& page = sMsdfPage;
       if (!page.mSheet) {
         CD3DDevice* const device = D3D_GetDevice();
@@ -191,6 +196,7 @@ namespace moho
         page.mShelfHeight = 0;
       }
       if (atlas.mWidth > kMsdfPageWidth || page.mShelfY + atlas.mHeight > kMsdfPageHeight) {
+        outFull = true;
         return false;
       }
       const MsdfAtlasPage::PlacedFont placed{&atlas, page.mShelfX, page.mShelfY};
@@ -225,6 +231,8 @@ namespace moho
     }
 
     void PollModFontBinding(CD3DFont& font, MsdfBinding& binding);
+    void InitializeGlyphPageCache(CD3DFont::SCharInfoPages& pages);
+    void DestroyGlyphPageCache(CD3DFont::SCharInfoPages& pages);
 
     /**
      * Draws a string from its font's MSDF atlas, at any uniform scale of the screen plane (the axes' length), so
@@ -238,7 +246,8 @@ namespace moho
     )
     {
       const auto bound = sMsdfBindings.find(&font);
-      if (bound == sMsdfBindings.end() || bound->second.mPointSize < ren_MsdfTextMinSize) {
+      // A mod's font has no GDI version, so the switches for the game's fonts don't send it there.
+      if (bound == sMsdfBindings.end() || (bound->second.mPointSize < ren_MsdfTextMinSize && !bound->second.mIsMod)) {
         return false;
       }
       const float textScale = xAxis.x;
@@ -285,12 +294,19 @@ namespace moho
       }
       std::int32_t pageX = 0;
       std::int32_t pageY = 0;
-      if (!AcquireMsdfPlacement(atlas, pageX, pageY)) {
+      bool pageFull = false;
+      if (!AcquireMsdfPlacement(atlas, pageX, pageY, pageFull)) {
+        if (pageFull && binding.mIsMod && !binding.mNoPage) {
+          gpg::Warnf("MSDF: the atlas page is full; %s at %d px draws in the default font", binding.mFace.c_str(), binding.mPointSize);
+          binding.mNoPage = true;
+          DestroyGlyphPageCache(font.mCharInfo); // they hold the mod font's advances
+          InitializeGlyphPageCache(font.mCharInfo);
+        }
         return false;
       }
       std::int32_t fallbackPageX = 0;
       std::int32_t fallbackPageY = 0;
-      if (usesFallback && !AcquireMsdfPlacement(*fallback, fallbackPageX, fallbackPageY)) {
+      if (usesFallback && !AcquireMsdfPlacement(*fallback, fallbackPageX, fallbackPageY, pageFull)) {
         return false;
       }
       const boost::shared_ptr<CD3DDynamicTextureSheet>& sheet = sMsdfPage.mSheet;
@@ -985,6 +1001,10 @@ namespace moho
       const SMsdfFontAtlas& atlas = *binding.mAtlas;
       const float size = static_cast<float>(binding.mPointSize);
       binding.mStrike = FindMsdfStrike(atlas, binding.mPointSize);
+      gpg::Logf(
+        "MSDF: %s at %d px drawn from %s", binding.mFace.c_str(), binding.mPointSize,
+        binding.mStrike != nullptr ? "its bitmaps" : "its distance field"
+      );
       font.mAscent = std::ceil(atlas.mAscent * size);
       font.mDescent = std::ceil(atlas.mDescent * size);
       font.mHeight = font.mAscent + font.mDescent;
@@ -1226,7 +1246,7 @@ namespace moho
       const auto bound = sMsdfBindings.find(this);
       if (bound != sMsdfBindings.end() && bound->second.mIsMod && bound->second.mAtlas) {
         const MsdfBinding& binding = bound->second;
-        const SMsdfGlyph* const glyph = FindMsdfGlyph(*binding.mAtlas, static_cast<std::uint32_t>(chText));
+        const SMsdfGlyph* const glyph = binding.mNoPage ? nullptr : FindMsdfGlyph(*binding.mAtlas, static_cast<std::uint32_t>(chText));
         if (glyph != nullptr) {
           advance = glyph->mAdvance * static_cast<float>(binding.mPointSize);
         }
@@ -1477,7 +1497,7 @@ namespace moho
   {
     PollModFont();
     Vector3f cursor = origin;
-    if (ren_MsdfText && RenderMsdfText(*this, text, *primBatcher, origin, xAxis, yAxis, color, maxAdvance, cursor)) {
+    if ((ren_MsdfText || IsModFont()) && RenderMsdfText(*this, text, *primBatcher, origin, xAxis, yAxis, color, maxAdvance, cursor)) {
       return cursor;
     }
 
