@@ -34,6 +34,18 @@
 #include <string>
 #include <vector>
 
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#elif defined(__linux__)
+#include <unistd.h>
+#endif
+
 #include <gtest/gtest.h>
 
 #include "legacy/math/X87Math.h"
@@ -649,19 +661,101 @@ namespace
     EXPECT_EQ(skipped, 0);
 #endif
   }
+  std::filesystem::path GetExecutableDir()
+  {
+    std::error_code ec;
+#if defined(_WIN32)
+    char buffer[MAX_PATH];
+    const DWORD len = GetModuleFileNameA(nullptr, buffer, static_cast<DWORD>(sizeof(buffer)));
+    if (len > 0 && len < sizeof(buffer)) {
+      return std::filesystem::path(buffer).parent_path();
+    }
+#elif defined(__linux__)
+    char buffer[1024];
+    const ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
+    if (len > 0) {
+      buffer[len] = '\0';
+      return std::filesystem::path(buffer).parent_path();
+    }
+#endif
+    return std::filesystem::current_path(ec);
+  }
+
+  std::filesystem::path FindInAncestors(const std::filesystem::path& startDir, const std::filesystem::path& relativeTarget)
+  {
+    std::error_code ec;
+    std::filesystem::path cur = std::filesystem::absolute(startDir, ec);
+    while (!cur.empty()) {
+      const std::filesystem::path candidate = cur / relativeTarget;
+      if (std::filesystem::exists(candidate, ec)) {
+        return candidate;
+      }
+      const std::filesystem::path parent = cur.parent_path();
+      if (parent == cur) {
+        break;
+      }
+      cur = parent;
+    }
+    return {};
+  }
+
+  std::string ResolveGoldenPath()
+  {
+    if (!gGoldenPath.empty()) {
+      return gGoldenPath;
+    }
+    std::error_code ec;
+#if defined(FAF_SIM_MATH_GOLDEN)
+    const std::filesystem::path compiledGolden(FAF_SIM_MATH_GOLDEN);
+    if (std::filesystem::exists(compiledGolden, ec)) {
+      return compiledGolden.string();
+    }
+#endif
+    const std::filesystem::path cur = std::filesystem::current_path(ec);
+    for (const auto& rel : {"sim_math/golden.txt", "tests/sim_math/golden.txt"}) {
+      const std::filesystem::path found = FindInAncestors(cur, rel);
+      if (!found.empty()) {
+        return found.string();
+      }
+    }
+    const std::filesystem::path exeDir = GetExecutableDir();
+    for (const auto& rel : {"sim_math/golden.txt", "tests/sim_math/golden.txt"}) {
+      const std::filesystem::path found = FindInAncestors(exeDir, rel);
+      if (!found.empty()) {
+        return found.string();
+      }
+    }
+    return {};
+  }
+
+  std::string ResolveKnownPath(const std::string& resolvedGolden)
+  {
+    if (!gKnownPath.empty()) {
+      return gKnownPath;
+    }
+    std::error_code ec;
+#if defined(FAF_SIM_MATH_KNOWN)
+    const std::filesystem::path compiledKnown(FAF_SIM_MATH_KNOWN);
+    if (std::filesystem::exists(compiledKnown, ec)) {
+      return compiledKnown.string();
+    }
+#endif
+    if (!resolvedGolden.empty()) {
+      const std::filesystem::path goldenDir = std::filesystem::path(resolvedGolden).parent_path();
+      const std::filesystem::path candidate = goldenDir / ("known_" + std::string(PlatformName()) + ".txt");
+      if (std::filesystem::exists(candidate, ec)) {
+        return candidate.string();
+      }
+    }
+    return {};
+  }
 } // namespace
 
 TEST(Existing_SimMath, GoldenParity)
 {
-  std::string path = gGoldenPath;
-  if (path.empty()) {
-    if (std::filesystem::exists("sim_math/golden.txt")) {
-      path = "sim_math/golden.txt";
-    } else if (std::filesystem::exists("tests/sim_math/golden.txt")) {
-      path = "tests/sim_math/golden.txt";
-    }
-  }
-  RunParityCheck(path.empty() ? nullptr : path.c_str(), gKnownPath.empty() ? nullptr : gKnownPath.c_str());
+  const std::string golden = ResolveGoldenPath();
+  const std::string known = ResolveKnownPath(golden);
+  RunParityCheck(golden.empty() ? nullptr : golden.c_str(), known.empty() ? nullptr : known.c_str());
 }
 
 int main(int argc, char** argv)

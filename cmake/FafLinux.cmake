@@ -240,6 +240,14 @@ faf_precompile(faf_sim)
 # them on faf_engine: every golden case, the pathfinder's and the random stream's too.
 add_executable(faf_sim_math_tests "${PROJECT_SOURCE_DIR}/tests/sim_math/SimMathTests.cpp")
 target_link_libraries(faf_sim_math_tests PRIVATE faf_sim gtest)
+target_compile_definitions(faf_sim_math_tests PRIVATE
+  FAF_SIM_MATH_GOLDEN="${PROJECT_SOURCE_DIR}/tests/sim_math/golden.txt"
+)
+if(EXISTS "${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-x64.txt")
+  target_compile_definitions(faf_sim_math_tests PRIVATE
+    FAF_SIM_MATH_KNOWN="${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-x64.txt"
+  )
+endif()
 set(_faf_sim_math_args "${PROJECT_SOURCE_DIR}/tests/sim_math/golden.txt")
 if(EXISTS "${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-x64.txt")
   list(APPEND _faf_sim_math_args --known "${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-x64.txt")

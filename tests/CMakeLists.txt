@@ -92,6 +92,14 @@ set(_faf_sim_math_golden "${CMAKE_CURRENT_SOURCE_DIR}/sim_math/golden.txt")
 # The x86 build's recorded differences from the x64 golden (the file's header
 # gives the reason).
 set(_faf_sim_math_known "${CMAKE_CURRENT_SOURCE_DIR}/sim_math/known_windows-${FAF_TARGET_ARCH}.txt")
+target_compile_definitions(faf_sim_math_tests PRIVATE
+  FAF_SIM_MATH_GOLDEN="${_faf_sim_math_golden}"
+)
+if(EXISTS "${_faf_sim_math_known}")
+  target_compile_definitions(faf_sim_math_tests PRIVATE
+    FAF_SIM_MATH_KNOWN="${_faf_sim_math_known}"
+  )
+endif()
 set(_faf_sim_math_args "${_faf_sim_math_golden}")
 if(EXISTS "${_faf_sim_math_known}")
   list(APPEND _faf_sim_math_args --known "${_faf_sim_math_known}")
