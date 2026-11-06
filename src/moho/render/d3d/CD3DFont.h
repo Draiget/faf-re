@@ -148,6 +148,10 @@ namespace moho
      */
     [[nodiscard]] std::int32_t GetNearestCharacterIndex(gpg::StrArg text, float targetAdvance);
 
+    /** Engine addition (issue #304): a family from `LoadFont`, whose metrics change when its atlas arrives. */
+    [[nodiscard]] bool IsModFont() const;
+    void PollModFont();
+
   public:
     HFONT mFont;              // +0x08
     bool mIsTruetype;         // +0x0C

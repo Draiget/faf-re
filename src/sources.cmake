@@ -198,6 +198,8 @@ set(FAF_ENGINE_SOURCES
   moho/animation/CAnimTexture.cpp
   moho/render/d3d/CD3DFont.cpp
   moho/render/font/MsdfFontCook.cpp
+  moho/render/font/MsdfFontCheck.cpp
+  moho/render/font/MsdfFontGpuCook.cpp
   moho/render/font/MsdfFontRegistry.cpp
   moho/render/font/MsdfTextGpuRenderer.cpp
   moho/render/d3d/CD3DEffectTechnique.cpp

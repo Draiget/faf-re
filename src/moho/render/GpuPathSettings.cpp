@@ -122,6 +122,7 @@ namespace moho
   extern int ren_GpuShapes;
   extern int ren_GpuRanges;
   extern int ren_GpuText;
+  extern int ren_GpuFontCook;
 
   namespace
   {
@@ -145,6 +146,8 @@ namespace moho
       {"ren_GpuShapes", &ren_GpuShapes, gpg::gal::kGpuPathWorldShapes, gpg::gal::kGpuFeatureVertexPulling},
       {"ren_GpuRanges", &ren_GpuRanges, gpg::gal::kGpuPathRanges, gpg::gal::kGpuFeatureVertexPulling},
       {"ren_GpuText", &ren_GpuText, gpg::gal::kGpuPathMsdfText, gpg::gal::kGpuFeatureVertexPulling},
+      {"ren_GpuFontCook", &ren_GpuFontCook, gpg::gal::kGpuPathMsdfCook,
+       gpg::gal::kGpuFeatureVertexPulling | gpg::gal::kGpuFeatureCompute},
     };
   } // namespace
 

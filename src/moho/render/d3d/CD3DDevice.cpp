@@ -33,6 +33,7 @@
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/render/font/MsdfFontGpuCook.h"
 #include "moho/render/font/MsdfFontRegistry.h"
 #include "moho/render/font/MsdfTextGpuRenderer.h"
 #include "moho/misc/StatItem.h"
@@ -661,6 +662,7 @@ namespace moho
   bool CD3DDevice::Refresh()
   {
     MSDF_FlushPendingText();
+    MSDF_TickGpuCook();
     if (WRenViewport* const viewport = GetViewport(); viewport != nullptr) {
       // A hidden window gets no WM_PAINT, so it draws nothing here either.
       const HWND window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(viewport->GetHandle()));

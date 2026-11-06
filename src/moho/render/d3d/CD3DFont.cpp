@@ -67,6 +67,7 @@ namespace moho
     );
 
     constexpr const char* kMsdfTechnique = "TMsdfText";
+    constexpr const char* kModFontFallbackFace = "Arial";
     constexpr const char* kScreenTextTechnique = "TAlphaBlendLinearSampleNoDepth";
     constexpr std::uint32_t kAtlasTextureFormat = 2u; // 32-bit; byte order doesn't matter to the median
 
@@ -76,6 +77,11 @@ namespace moho
       std::string mFace;
       std::int32_t mPointSize = 0;
       std::shared_ptr<const SMsdfFontAtlas> mAtlas;
+      // A family from `LoadFont` (`mod:<hash>`): GDI never hears of it and draws the default font until the
+      // atlas arrives, and from then on the atlas's metrics and advances replace GDI's.
+      bool mIsMod = false;
+      const SMsdfStrike* mStrike = nullptr; // into mAtlas: this size as a bitmap, when it has one
+      std::shared_ptr<const SMsdfFontAtlas> mFallbackAtlas;
     };
 
     /**
@@ -104,6 +110,7 @@ namespace moho
     constexpr std::int32_t kMsdfPageSpacing = 3; // empty texels between fonts, as between glyph boxes
 
     std::map<const CD3DFont*, MsdfBinding> sMsdfBindings;
+    bool sHasModFonts = false; // so a game with none pays one load
     MsdfAtlasPage sMsdfPage;
 
     [[nodiscard]] const SMsdfGlyph* FindMsdfGlyph(const SMsdfFontAtlas& atlas, const std::uint32_t codepoint)
@@ -198,9 +205,31 @@ namespace moho
       return true;
     }
 
+    [[nodiscard]] const SMsdfStrike* FindMsdfStrike(const SMsdfFontAtlas& atlas, const std::int32_t pixelSize)
+    {
+      for (const SMsdfStrike& strike : atlas.mStrikes) {
+        if (strike.mPixelSize == pixelSize) {
+          return &strike;
+        }
+      }
+      return nullptr;
+    }
+
+    [[nodiscard]] const SMsdfStrikeGlyph* FindMsdfStrikeGlyph(const SMsdfStrike& strike, const std::uint32_t codepoint)
+    {
+      const auto found = std::lower_bound(
+        strike.mGlyphs.begin(), strike.mGlyphs.end(), codepoint,
+        [](const SMsdfStrikeGlyph& glyph, const std::uint32_t value) { return glyph.mCodepoint < value; }
+      );
+      return found != strike.mGlyphs.end() && found->mCodepoint == codepoint ? &*found : nullptr;
+    }
+
+    void PollModFontBinding(CD3DFont& font, MsdfBinding& binding);
+
     /**
-     * Draws a string from its font's MSDF atlas. Returns false, having drawn nothing, when the old path
-     * has to: no atlas yet, small text, text not on the screen plane, a character the atlas lacks, or a
+     * Draws a string from its font's MSDF atlas, at any uniform scale of the screen plane (the axes' length), so
+     * text that grows or shrinks stays sharp and costs no new font. Returns false, having drawn nothing, when the
+     * old path has to: no atlas yet, small text, text not on the screen plane, a character no atlas has, or a
      * caller drawing with a technique other than the UI's.
      */
     [[nodiscard]] bool RenderMsdfText(
@@ -212,23 +241,39 @@ namespace moho
       if (bound == sMsdfBindings.end() || bound->second.mPointSize < ren_MsdfTextMinSize) {
         return false;
       }
-      if (xAxis.x != 1.0f || xAxis.y != 0.0f || xAxis.z != 0.0f || yAxis.x != 0.0f || yAxis.y != -1.0f || yAxis.z != 0.0f) {
+      const float textScale = xAxis.x;
+      if (!(textScale > 0.0f) || xAxis.y != 0.0f || xAxis.z != 0.0f || yAxis.x != 0.0f || yAxis.y != -textScale || yAxis.z != 0.0f) {
         return false;
       }
       MsdfBinding& binding = bound->second;
-      if (!binding.mAtlas) {
-        binding.mAtlas = MSDF_FindAtlas(binding.mFace.c_str());
-        if (!binding.mAtlas) {
+      if (binding.mIsMod) {
+        PollModFontBinding(font, binding);
+        // Its small sizes have bitmaps, which GetCharInfo draws; scaled, they'd blur, and the atlas doesn't.
+        if (binding.mStrike != nullptr && textScale == 1.0f) {
           return false;
         }
+      } else if (!binding.mAtlas) {
+        binding.mAtlas = MSDF_FindAtlas(binding.mFace.c_str());
+      }
+      if (!binding.mAtlas) {
+        return false;
       }
       const SMsdfFontAtlas& atlas = *binding.mAtlas;
+      if (binding.mIsMod && !binding.mFallbackAtlas) {
+        binding.mFallbackAtlas = MSDF_FindAtlas(kModFontFallbackFace);
+      }
+      const SMsdfFontAtlas* const fallback = binding.mIsMod ? binding.mFallbackAtlas.get() : nullptr;
 
+      // A character a mod's font lacks comes from the default font's atlas, on the same page and in the same draw.
+      bool usesFallback = false;
       wchar_t codepoint = 0;
       for (const char* encoded = gpg::STR_DecodeUtf8Char(text, codepoint); codepoint != 0;
            encoded = gpg::STR_DecodeUtf8Char(encoded, codepoint)) {
         if (FindMsdfGlyph(atlas, static_cast<std::uint32_t>(codepoint)) == nullptr) {
-          return false;
+          if (fallback == nullptr || FindMsdfGlyph(*fallback, static_cast<std::uint32_t>(codepoint)) == nullptr) {
+            return false;
+          }
+          usesFallback = true;
         }
       }
 
@@ -243,9 +288,14 @@ namespace moho
       if (!AcquireMsdfPlacement(atlas, pageX, pageY)) {
         return false;
       }
+      std::int32_t fallbackPageX = 0;
+      std::int32_t fallbackPageY = 0;
+      if (usesFallback && !AcquireMsdfPlacement(*fallback, fallbackPageX, fallbackPageY)) {
+        return false;
+      }
       const boost::shared_ptr<CD3DDynamicTextureSheet>& sheet = sMsdfPage.mSheet;
 
-      const float size = static_cast<float>(binding.mPointSize);
+      const float size = static_cast<float>(binding.mPointSize) * textScale;
       const float pixelRange = atlas.mDistanceRange * size / atlas.mEmPixels;
 
       // One instanced draw from a GPU buffer where the backend has it; through the batcher otherwise.
@@ -274,19 +324,28 @@ namespace moho
       float totalAdvance = 0.0f;
       for (const char* encoded = gpg::STR_DecodeUtf8Char(text, codepoint); codepoint != 0;
            encoded = gpg::STR_DecodeUtf8Char(encoded, codepoint)) {
+        // The clip width is the control's, so it counts unscaled advances: a pop doesn't change what fits.
         const float advance = font.GetCharInfo(codepoint).mAdvance;
         totalAdvance += advance;
         if (std::isfinite(maxAdvance) && totalAdvance > maxAdvance) {
           break;
         }
-        const SMsdfGlyph& glyph = *FindMsdfGlyph(atlas, static_cast<std::uint32_t>(codepoint));
+        const SMsdfGlyph* found = FindMsdfGlyph(atlas, static_cast<std::uint32_t>(codepoint));
+        float glyphPageX = static_cast<float>(pageX);
+        float glyphPageY = static_cast<float>(pageY);
+        if (found == nullptr) {
+          found = FindMsdfGlyph(*fallback, static_cast<std::uint32_t>(codepoint));
+          glyphPageX = static_cast<float>(fallbackPageX);
+          glyphPageY = static_cast<float>(fallbackPageY);
+        }
+        const SMsdfGlyph& glyph = *found;
         if (glyph.mAtlasRight > glyph.mAtlasLeft) {
           const Vector3f topLeft = corner(cursor, glyph.mPlaneLeft, glyph.mPlaneTop);
           const Vector3f bottomRight = corner(cursor, glyph.mPlaneRight, glyph.mPlaneBottom);
-          const float u0 = (glyph.mAtlasLeft + static_cast<float>(pageX)) * inverseWidth;
-          const float u1 = (glyph.mAtlasRight + static_cast<float>(pageX)) * inverseWidth;
-          const float v0 = (glyph.mAtlasTop + static_cast<float>(pageY)) * inverseHeight;
-          const float v1 = (glyph.mAtlasBottom + static_cast<float>(pageY)) * inverseHeight;
+          const float u0 = (glyph.mAtlasLeft + glyphPageX) * inverseWidth;
+          const float u1 = (glyph.mAtlasRight + glyphPageX) * inverseWidth;
+          const float v0 = (glyph.mAtlasTop + glyphPageY) * inverseHeight;
+          const float v1 = (glyph.mAtlasBottom + glyphPageY) * inverseHeight;
           if (instanced) {
             MsdfUiQuad quad;
             const float xs[4] = {topLeft.x, bottomRight.x, bottomRight.x, topLeft.x};
@@ -312,7 +371,7 @@ namespace moho
             );
           }
         }
-        cursor.x += advance;
+        cursor.x += advance * textScale;
       }
 
       if (!instanced) {
@@ -909,7 +968,53 @@ namespace moho
     {
       SortKerningPairsByPackedKey(pairs);
     }
+
+    /**
+     * Takes a mod's atlas once it has been cooked: from then on the font has that file's metrics and advances, so
+     * what GDI's default font measured is dropped along with its glyphs.
+     */
+    void PollModFontBinding(CD3DFont& font, MsdfBinding& binding)
+    {
+      if (!binding.mIsMod || binding.mAtlas) {
+        return;
+      }
+      binding.mAtlas = MSDF_FindAtlas(binding.mFace.c_str());
+      if (!binding.mAtlas) {
+        return;
+      }
+      const SMsdfFontAtlas& atlas = *binding.mAtlas;
+      const float size = static_cast<float>(binding.mPointSize);
+      binding.mStrike = FindMsdfStrike(atlas, binding.mPointSize);
+      font.mAscent = std::ceil(atlas.mAscent * size);
+      font.mDescent = std::ceil(atlas.mDescent * size);
+      font.mHeight = font.mAscent + font.mDescent;
+      font.mInternalLeading = (std::max)(0.0f, font.mHeight - size);
+      font.mExternalLeading = (std::max)(0.0f, std::round(atlas.mLineGap * size));
+      MSDF_FlushPendingText();
+      DestroyGlyphPageCache(font.mCharInfo);
+      InitializeGlyphPageCache(font.mCharInfo);
+    }
   } // namespace
+
+  bool CD3DFont::IsModFont() const
+  {
+    if (!sHasModFonts) {
+      return false;
+    }
+    const auto bound = sMsdfBindings.find(this);
+    return bound != sMsdfBindings.end() && bound->second.mIsMod;
+  }
+
+  void CD3DFont::PollModFont()
+  {
+    if (!sHasModFonts) {
+      return;
+    }
+    const auto bound = sMsdfBindings.find(this);
+    if (bound != sMsdfBindings.end()) {
+      PollModFontBinding(*this, bound->second);
+    }
+  }
 
   /**
    * Address: 0x00425290 (FUN_00425290, ?Create@CD3DFont@Moho@@SA?AV?$CountedPtr@VCD3DFont@Moho@@@2@HVStrArg@gpg@@@Z)
@@ -931,7 +1036,10 @@ namespace moho
       return MakeFontHandle(existingFont);
     }
 
-    const HFONT createdWin32Font = CreateFontA(-pointSize, 0, 0, 0, 0, 0, 0, 0, 1u, 0, 0, 4u, 0, lookup.mFace.c_str());
+    // A mod's family never reaches GDI; its name means nothing there anyway, and its file was never loaded there.
+    const bool isModFace = lookup.mFace.compare(0u, 4u, "mod:") == 0;
+    const HFONT createdWin32Font =
+      CreateFontA(-pointSize, 0, 0, 0, 0, 0, 0, 0, 1u, 0, 0, 4u, 0, isModFace ? kModFontFallbackFace : lookup.mFace.c_str());
     if (createdWin32Font == nullptr) {
       return {};
     }
@@ -942,7 +1050,12 @@ namespace moho
       return {};
     }
 
-    sMsdfBindings[createdFont] = MsdfBinding{lookup.mFace, pointSize, nullptr};
+    MsdfBinding binding{};
+    binding.mFace = lookup.mFace;
+    binding.mPointSize = pointSize;
+    binding.mIsMod = isModFace;
+    sHasModFonts = sHasModFonts || isModFace;
+    sMsdfBindings[createdFont] = std::move(binding);
 
     ++createdFont->mRefCount; // cache-owned reference
     const auto [insertedIt, inserted] = InsertFontCacheEntry(lookup, createdFont);
@@ -1104,7 +1217,26 @@ namespace moho
 
     RECT textRect{};
     (void)DrawTextW(mDeviceContext, &chText, 1, &textRect, 0xC20u);
-    const float advance = static_cast<float>(textRect.right - textRect.left);
+    float advance = static_cast<float>(textRect.right - textRect.left);
+
+    // Engine addition (issue #304): a mod's font, once its atlas is here, has its own advances and small bitmaps.
+    const SMsdfStrike* modStrike = nullptr;
+    const SMsdfStrikeGlyph* modStrikeGlyph = nullptr;
+    if (sHasModFonts) {
+      const auto bound = sMsdfBindings.find(this);
+      if (bound != sMsdfBindings.end() && bound->second.mIsMod && bound->second.mAtlas) {
+        const MsdfBinding& binding = bound->second;
+        const SMsdfGlyph* const glyph = FindMsdfGlyph(*binding.mAtlas, static_cast<std::uint32_t>(chText));
+        if (glyph != nullptr) {
+          advance = glyph->mAdvance * static_cast<float>(binding.mPointSize);
+        }
+        modStrike = binding.mStrike;
+        modStrikeGlyph = modStrike != nullptr ? FindMsdfStrikeGlyph(*modStrike, static_cast<std::uint32_t>(chText)) : nullptr;
+        if (modStrikeGlyph != nullptr) {
+          advance = modStrikeGlyph->mAdvance;
+        }
+      }
+    }
 
     int glyphWidth = (static_cast<int>((mAveCharWidth * 2.0f) + advance) + 3) & ~3;
     int glyphHeight = (baselineAscent + baselineDescent + 4) & ~3;
@@ -1161,6 +1293,23 @@ namespace moho
       }
     } else {
       readWithGetPixel(pixels);
+    }
+
+    if (modStrikeGlyph != nullptr) {
+      // The rest of this function only sees pixels, so a mod's bitmap takes GDI's place here and every
+      // renderer draws it the way it draws any glyph.
+      pixels.fill(0u);
+      const std::uint8_t* const coverage = modStrike->mCoverage.data() + modStrikeGlyph->mOffset;
+      for (int row = 0; row < modStrikeGlyph->mHeight; ++row) {
+        const int y = baselineAscent - modStrikeGlyph->mTop + row;
+        for (int column = 0; column < modStrikeGlyph->mWidth; ++column) {
+          const int x = baselineX + modStrikeGlyph->mLeft + column;
+          if (x >= 0 && x < sampleWidth && y >= 0 && y < sampleHeight) {
+            const std::uint8_t value = coverage[static_cast<std::size_t>(row) * static_cast<std::size_t>(modStrikeGlyph->mWidth) + static_cast<std::size_t>(column)];
+            pixels[static_cast<std::size_t>(y * kGlyphScratchWidth + x)] = RGB(value, value, value);
+          }
+        }
+      }
     }
 
     auto isColumnBlack = [&pixels](const int x, const int yMin, const int yMaxExclusive) noexcept {
@@ -1326,6 +1475,7 @@ namespace moho
     const float maxAdvance
   )
   {
+    PollModFont();
     Vector3f cursor = origin;
     if (ren_MsdfText && RenderMsdfText(*this, text, *primBatcher, origin, xAxis, yAxis, color, maxAdvance, cursor)) {
       return cursor;
@@ -1394,6 +1544,7 @@ namespace moho
    */
   float CD3DFont::GetAdvance(const gpg::StrArg text, const std::int32_t /*flags*/)
   {
+    PollModFont();
     float advance = 0.0f;
     wchar_t codepoint = 0;
     const char* encoded = gpg::STR_DecodeUtf8Char(text, codepoint);

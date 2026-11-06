@@ -13,9 +13,20 @@ endif()
 if(NOT EXISTS "${FAF_FREETYPE_DIR}/include/ft2build.h")
   message(FATAL_ERROR "Dependencies: FreeType not found in ${FAF_FREETYPE_DIR}")
 endif()
+# A tree from FAF_FREETYPE_DIR isn't patched by cmake/FafDependencies.cmake, and without this patch a
+# mod's font that runs FreeType out of its capped memory crashes the game (dependencies/patches/freetype_2_15_0_faf_oom.md).
+file(READ "${FAF_FREETYPE_DIR}/src/base/fthash.c" _faf_fthash)
+string(FIND "${_faf_fthash}" "The free function walks `size` buckets" _faf_fthash_patched)
+if(_faf_fthash_patched EQUAL -1)
+  message(FATAL_ERROR "Dependencies: ${FAF_FREETYPE_DIR} lacks dependencies/patches/freetype_2_15_0_faf_oom.patch; "
+                      "apply it there with git -c core.autocrlf=false apply")
+endif()
+unset(_faf_fthash)
 
 add_library(faf_freetype STATIC
+  "${FAF_FREETYPE_DIR}/src/autofit/autofit.c"
   "${FAF_FREETYPE_DIR}/src/base/ftbase.c"
+  "${FAF_FREETYPE_DIR}/src/base/ftbitmap.c"
   "${FAF_FREETYPE_DIR}/src/base/ftdebug.c"
   "${FAF_FREETYPE_DIR}/src/base/ftinit.c"
   "${FAF_FREETYPE_DIR}/src/base/ftsystem.c"
@@ -24,6 +35,7 @@ add_library(faf_freetype STATIC
   "${FAF_FREETYPE_DIR}/src/pshinter/pshinter.c"
   "${FAF_FREETYPE_DIR}/src/psnames/psnames.c"
   "${FAF_FREETYPE_DIR}/src/sfnt/sfnt.c"
+  "${FAF_FREETYPE_DIR}/src/smooth/smooth.c"
   "${FAF_FREETYPE_DIR}/src/truetype/truetype.c")
 target_include_directories(faf_freetype SYSTEM PUBLIC
   "${CMAKE_CURRENT_SOURCE_DIR}/config"

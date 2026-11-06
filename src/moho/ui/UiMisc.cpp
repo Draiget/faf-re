@@ -2973,6 +2973,9 @@ namespace
       (void)::moho::func_CMauiTextSetCenteredVertically_LuaFuncDef();
       (void)::moho::func_CMauiTextGetStringAdvance_LuaFuncDef();
       (void)::moho::func_CMauiTextSetNewClipToWidth_LuaFuncDef();
+      (void)::moho::func_CMauiTextSetTextScale_LuaFuncDef();
+      (void)::moho::func_CMauiTextGetTextScale_LuaFuncDef();
+      (void)::moho::func_LoadFont_LuaFuncDef();
       (void)::moho::func_SetFrontEndData_LuaFuncDef();
       (void)::moho::func_GetFrontEndData_LuaFuncDef();
       (void)::moho::func_GetCursor_LuaFuncDef();

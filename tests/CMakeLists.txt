@@ -137,3 +137,28 @@ add_executable(faf_msdf_cook_tests EXCLUDE_FROM_ALL font/MsdfFontCookTests.cpp $
 target_include_directories(faf_msdf_cook_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(faf_msdf_cook_tests PRIVATE faf_freetype faf_msdfgen faf_zstd)
 add_test(NAME msdf_font_cook COMMAND faf_msdf_cook_tests)
+
+# Engine addition: fuzzes what a mod's font goes through (issue #305). FAF_FONTFUZZ_SANITIZE adds
+# AddressSanitizer to it and to the two font libraries, so build it in a folder of its own.
+option(FAF_FONTFUZZ_SANITIZE "Build faf_fontfuzz and the font libraries with AddressSanitizer" OFF)
+add_executable(faf_fontfuzz EXCLUDE_FROM_ALL ${CMAKE_SOURCE_DIR}/tools/fontfuzz/FontFuzz.cpp
+  ${CMAKE_SOURCE_DIR}/src/moho/render/font/MsdfFontCheck.cpp
+  ${CMAKE_SOURCE_DIR}/src/moho/render/font/MsdfFontCook.cpp)
+target_include_directories(faf_fontfuzz PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_fontfuzz PRIVATE faf_freetype faf_msdfgen faf_zstd)
+if(FAF_FONTFUZZ_SANITIZE)
+  foreach(_target faf_fontfuzz faf_freetype faf_msdfgen)
+    target_compile_options(${_target} PRIVATE -fsanitize=address -fno-omit-frame-pointer -g)
+  endforeach()
+  target_link_options(faf_fontfuzz PRIVATE -fsanitize=address)
+endif()
+
+# Engine addition: the checks and limits on a mod's font (issue #305). Without a folder it reads Windows' Arial.
+if(WIN32)
+  add_executable(faf_msdf_safety_tests EXCLUDE_FROM_ALL font/MsdfFontSafetyTests.cpp
+    ${CMAKE_SOURCE_DIR}/src/moho/render/font/MsdfFontCheck.cpp
+    ${CMAKE_SOURCE_DIR}/src/moho/render/font/MsdfFontCook.cpp)
+  target_include_directories(faf_msdf_safety_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+  target_link_libraries(faf_msdf_safety_tests PRIVATE faf_freetype faf_msdfgen faf_zstd)
+  add_test(NAME msdf_font_safety COMMAND faf_msdf_safety_tests)
+endif()

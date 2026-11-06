@@ -6,3 +6,7 @@ FT_USE_MODULE( FT_Module_Class, psaux_module_class )
 FT_USE_MODULE( FT_Module_Class, psnames_module_class )
 FT_USE_MODULE( FT_Module_Class, pshinter_module_class )
 FT_USE_MODULE( FT_Module_Class, sfnt_module_class )
+/* A mod's small text (issue #308): the light autohinter and the anti-aliased rasterizer. Both only run on a mod's
+ * font inside the helper process; no font's hinting programs run, as the bytecode interpreter stays out. */
+FT_USE_MODULE( FT_Module_Class, autofit_module_class )
+FT_USE_MODULE( FT_Renderer_Class, ft_smooth_renderer_class )

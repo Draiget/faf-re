@@ -8108,6 +8108,17 @@ namespace moho
    */
   CScrLuaInitForm* func_CMauiTextSetDropShadow_LuaFuncDef();
 
+  // Engine additions: draw scale of a text control, and fonts from mods (issue #304).
+  int cfunc_CMauiTextSetTextScale(lua_State* luaContext);
+  int cfunc_CMauiTextSetTextScaleL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_CMauiTextSetTextScale_LuaFuncDef();
+  int cfunc_CMauiTextGetTextScale(lua_State* luaContext);
+  int cfunc_CMauiTextGetTextScaleL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_CMauiTextGetTextScale_LuaFuncDef();
+  int cfunc_LoadFont(lua_State* luaContext);
+  int cfunc_LoadFontL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_LoadFont_LuaFuncDef();
+
   /**
    * Address: 0x007A3BE0 (FUN_007A3BE0, cfunc_CMauiTextSetDropShadowL)
    *

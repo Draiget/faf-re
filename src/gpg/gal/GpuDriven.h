@@ -68,6 +68,7 @@ namespace gpg::gal
     kGpuPathWorldShapes = 1U << 6U,     ///< `ren_GpuShapes`
     kGpuPathRanges = 1U << 7U,          ///< `ren_GpuRanges`
     kGpuPathMsdfText = 1U << 8U,        ///< `ren_GpuText`
+    kGpuPathMsdfCook = 1U << 9U,        ///< `ren_GpuFontCook`
   };
 
   enum class GpuBufferKind : std::uint8_t
