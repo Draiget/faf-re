@@ -50,6 +50,9 @@
 #include "moho/sim/SSTICommandSource.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/ui/UiRuntimeTypes.h"
+#if FAF_SERVER_MODE
+#include "remote/client/ServerConnect.h"
+#endif
 using namespace moho;
 
 namespace moho
@@ -1563,10 +1566,22 @@ int moho::cfunc_InternalCreateLobbyL(LuaPlus::LuaState* const state)
   if (!natTraversalProvider.expired()) {
     liveNatTraversalProvider = natTraversalProvider;
   }
-  const bool noNatTraversalProvider = (liveNatTraversalProvider.use_count() == 0);
+  bool noNatTraversalProvider = (liveNatTraversalProvider.use_count() == 0);
 
   INetConnector* connector = nullptr;
-  if (protocol == ENetProtocolType::kTcp) {
+#if FAF_SERVER_MODE
+  // Engine addition, server mode (plan WP2.13, WP12.1): in a server session the lobby's connections are virtual,
+  // one per participant over the channel to the server (remote/client/ServerRelayConnector.h), whatever protocol
+  // the lobby Lua names. The server, as the lobby's host, introduces the peers (`NewPeer`), which a lobby with no
+  // NAT-traversal provider accepts.
+  if (INetConnector* const relay = faf::remote::TakeServerLobbyConnector(); relay != nullptr) {
+    connector = relay;
+    noNatTraversalProvider = true;
+  }
+#endif
+  if (connector != nullptr) {
+    // the server session's
+  } else if (protocol == ENetProtocolType::kTcp) {
     connector = NET_MakeTCPConnector(static_cast<u_short>(localPort));
   } else if (protocol == ENetProtocolType::kUdp) {
     connector = NET_MakeUDPConnector(static_cast<u_short>(localPort), liveNatTraversalProvider);

@@ -477,7 +477,9 @@ namespace
 
     // Engine addition, server mode: `/connectserver` takes over startup. Without it, every
     // path below runs as before.
-    switch (faf::remote::StartServerSessionFromCommandLine()) {
+    // The lobby as a direct join starts it (lobby Lua unchanged); the server, its host, names the player.
+    const auto startServerLobby = [](const char* const endpoint) { return moho::UI_StartJoinLobbyUI("UDP", endpoint, "Player"); };
+    switch (faf::remote::StartServerSessionFromCommandLine(startServerLobby)) {
     case faf::remote::EServerSessionStart::NotRequested:
       break;
     case faf::remote::EServerSessionStart::Started:

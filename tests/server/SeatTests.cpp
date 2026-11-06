@@ -671,6 +671,13 @@ TEST(LobbyHost, AdmitsOnlyTheUidTheTokenProved)
   EXPECT_EQ(host.Rejected(), 1u);
   EXPECT_TRUE(host.Established().empty());
 
+  // No uid asked for (-1): welcomed with the token's, which CLobby adopts.
+  out.clear();
+  host.OnMessage(1001, CLobbyHost::Join("Ann", -1), out);
+  ASSERT_FALSE(out.empty());
+  EXPECT_EQ(out[0].message, CLobbyHost::Welcome("server", 0, 1001, "Ann", 1));
+  EXPECT_EQ(host.Established(), (std::vector<std::int32_t>{1001}));
+
   // Not a participant, a message the host has nothing to do with, a size that doesn't match: nothing.
   out.clear();
   host.OnMessage(999, CLobbyHost::Join("X", 999), out);

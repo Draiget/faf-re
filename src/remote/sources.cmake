@@ -46,6 +46,7 @@ set(FAF_REMOTE_CLIENT_SOURCES
   remote/client/RemoteClientManager.cpp
   remote/client/RemoteSimDriver.cpp
   remote/client/ServerConnect.cpp
+  remote/client/ServerRelayConnector.cpp
   remote/client/SessionSummary.cpp
   remote/client/SyncRebuilder.cpp
 )

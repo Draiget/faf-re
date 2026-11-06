@@ -143,9 +143,10 @@ namespace faf::server
       ++mIgnored;
       return;
     }
-    // Plan WP2.5: the uid its token proved, and no other; a client with another one would adopt it in `OnWelcome`
-    // and its lobby would name the wrong player.
-    if (requested != from) {
+    // Plan WP2.5: the uid its token proved, or none (-1: `CLobby::OnWelcome` then adopts the one `Welcome` assigns, so
+    // a server launch needs no uid on its command line); a client asking for another uid would keep it and its
+    // lobby would name the wrong player.
+    if (requested != from && requested != -1) {
       ++mRejected;
       out.push_back(SOutgoing{from, Rejected("WrongUid")});
       return;

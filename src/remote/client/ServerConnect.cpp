@@ -2,17 +2,28 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
+#include <cstdlib>
+#include <memory>
+#include <span>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 #include "gpg/core/containers/String.h"
 #include "moho/app/WinApp.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/net/Common.h"
+#include "remote/client/ServerRelayConnector.h"
+#include "remote/net/GameLinks.h"
+#include "remote/net/Handshake.h"
+#include "remote/net/UdpSocket.h"
 
 namespace gpg
 {
   void Logf(const char* fmt, ...);
 } // namespace gpg
+
 
 namespace faf::remote
 {
@@ -75,10 +86,89 @@ namespace faf::remote
       return EServerConnectArgs::Invalid;
     }
 
+    std::string uid;
+    if (!ReadOneArg("/serveruid", uid) || std::atoi(uid.c_str()) <= 0) {
+      error = "/connectserver needs /serveruid with the player's id, which the token was made for.";
+      return EServerConnectArgs::Invalid;
+    }
+    request.uid = std::atoi(uid.c_str());
+
     return EServerConnectArgs::Valid;
   }
 
-  EServerSessionStart StartServerSessionFromCommandLine()
+  namespace
+  {
+    [[nodiscard]] std::uint64_t NowUs() noexcept
+    {
+      return static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()
+      );
+    }
+
+    /** The client's channel to the server as the lobby's connector uses it; the rest it receives waits for the game. */
+    class CLinkRelayChannel final : public IRelayChannel
+    {
+    public:
+      explicit CLinkRelayChannel(net::CClientLink& link)
+        : mLink(link)
+      {}
+
+      void SendLobbyFrame(const std::span<const std::uint8_t> frame) override { (void)mLink.SendReliable(frame.data(), frame.size()); }
+
+      bool TakeLobbyFrame(std::vector<std::uint8_t>& frame) override
+      {
+        // `CLobby` pulls its connector every frame: the link moves here.
+        mLink.Pump(NowUs());
+        while (mLink.TakeReliable(mMessage)) {
+          if (!mMessage.empty() && mMessage[0] == static_cast<std::uint8_t>(net::ESeatMessage::Lobby)) {
+            frame = std::move(mMessage);
+            return true;
+          }
+          mForGame.push_back(std::move(mMessage)); // the game's session takes these (plan WP11)
+        }
+        return false;
+      }
+
+      bool Up() const override
+      {
+        const net::CClientLink::EState state = mLink.State();
+        return state == net::CClientLink::EState::Connected || state == net::CClientLink::EState::Connecting;
+      }
+
+    private:
+      net::CClientLink& mLink;
+      std::vector<std::uint8_t> mMessage;
+      std::vector<std::vector<std::uint8_t>> mForGame;
+    };
+
+    /** One server session: the link, the channel the lobby uses over it, the lobby's connector once. */
+    struct SServerSession
+    {
+      SServerSession(const std::int32_t uid, const net::Token& token, const net::SEndpoint& server)
+        : link(uid, token, server)
+        , channel(link)
+      {}
+
+      net::CClientLink link;
+      CLinkRelayChannel channel;
+      bool connectorTaken = false;
+    };
+
+    std::unique_ptr<SServerSession> sSession;
+
+    // How long startup waits for the server's answer before telling the player.
+    constexpr double kConnectSeconds = 15.0;
+  } // namespace
+
+  moho::INetConnector* TakeServerLobbyConnector()
+  {
+    if (sSession == nullptr || std::exchange(sSession->connectorTaken, true)) {
+      return nullptr;
+    }
+    return new CServerRelayConnector(sSession->channel); // `CLobby` destroys it
+  }
+
+  EServerSessionStart StartServerSessionFromCommandLine(bool (*const startLobby)(const char* endpoint))
   {
     SServerConnectRequest request;
     std::string error;
@@ -92,11 +182,47 @@ namespace faf::remote
       break;
     }
 
-    gpg::Logf("Server session requested: %s", request.endpoint.c_str());
+    gpg::Logf("Server session requested: %s as player %d", request.endpoint.c_str(), request.uid);
 
-    // The connection to the server is not written yet. Until it is, a server launch line
-    // ends here rather than in a lockstep session the player did not ask for.
-    moho::WIN_OkBox("Ack!", "This build cannot join server games yet.");
-    return EServerSessionStart::Failed;
+    // Plan WP12.1: the channel first (one handshake, the token), then the lobby over it.
+    net::SEndpoint server;
+    if (!net::ParseEndpoint(request.endpoint, server)) {
+      moho::WIN_OkBox("Ack!", ("The game server's address must be an IPv4 address and port: \"" + request.endpoint + "\".").c_str());
+      return EServerSessionStart::Failed;
+    }
+    sSession = std::make_unique<SServerSession>(request.uid, net::MakeToken(request.token), server);
+    if (std::string openError; !sSession->link.Open(openError)) {
+      moho::WIN_OkBox("Ack!", ("Can't reach the game server: " + openError).c_str());
+      sSession.reset();
+      return EServerSessionStart::Failed;
+    }
+    const auto start = std::chrono::steady_clock::now();
+    while (sSession->link.State() == net::CClientLink::EState::Connecting) {
+      if (std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() > kConnectSeconds) {
+        moho::WIN_OkBox("Ack!", ("The game server at " + request.endpoint + " doesn't answer.").c_str());
+        sSession.reset();
+        return EServerSessionStart::Failed;
+      }
+      sSession->link.Pump(NowUs());
+      sSession->link.Wait(20);
+    }
+    if (sSession->link.State() != net::CClientLink::EState::Connected) {
+      const auto refusal = sSession->link.Refusal();
+      moho::WIN_OkBox(
+        "Ack!", ("The game server refused this player" + (refusal ? " (reason " + std::to_string(static_cast<int>(*refusal)) + ")" : std::string()) + ".").c_str()
+      );
+      sSession.reset();
+      return EServerSessionStart::Failed;
+    }
+    gpg::Logf("Server session: connected to %s", request.endpoint.c_str());
+
+    // The lobby as a direct join makes it (`UI_StartJoinLobbyUI`, lobby Lua unchanged); `InternalCreateLobby` takes
+    // `TakeServerLobbyConnector`, and the server, the lobby's host, names the player and assigns its uid in Welcome.
+    if (startLobby == nullptr || !startLobby(request.endpoint.c_str())) {
+      moho::WIN_OkBox("Ack!", "Unable to start the lobby.");
+      sSession.reset();
+      return EServerSessionStart::Failed;
+    }
+    return EServerSessionStart::Started;
   }
 } // namespace faf::remote

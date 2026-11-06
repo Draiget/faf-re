@@ -358,6 +358,9 @@ list(REMOVE_ITEM _faf_client_sources ${FAF_SIM_SOURCES})
 if(FAF_SERVER_MODE)
   # The oracle's golden test reads the client world (CWldSession): faf_main's alone.
   list(APPEND _faf_client_sources remote/client/OracleGolden.cpp)
+  # The client's channel to the server and its lobby connector (/connectserver): headless has no use for them, and
+  # their socket and crypto imports aren't allowed there (cmake/HeadlessImports.cmake).
+  list(APPEND _faf_client_sources remote/client/ServerConnect.cpp remote/client/ServerRelayConnector.cpp)
 endif()
 set(_faf_sim_objects "$<TARGET_OBJECTS:faf_engine>")
 set(_faf_client_regex "")
@@ -457,6 +460,10 @@ endif()
 target_link_libraries(headless PRIVATE faf_sim)
 if(FAF_SERVER_MODE)
   target_compile_definitions(headless PRIVATE FAF_SERVER_MODE=1)
+  # The channel to the server (CClientLink) for /connectserver, in the client's objects.
+  target_link_libraries(faf_main PRIVATE faf_netchannel faf_monocypher)
+  # The client's own sources (the replay player's checks among them) read the server-mode declarations too.
+  target_compile_definitions(faf_main PRIVATE FAF_SERVER_MODE=1)
 endif()
 # No UI, graphics or audio import (cmake/HeadlessImports.cmake): the link fails otherwise.
 add_custom_command(TARGET headless POST_BUILD
