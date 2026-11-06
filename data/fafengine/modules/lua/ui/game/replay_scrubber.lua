@@ -7,7 +7,7 @@ local Dragger = import('/lua/maui/dragger.lua').Dragger
 local Group = import('/lua/maui/group.lua').Group
 local LayoutHelpers = import('/lua/maui/layouthelpers.lua')
 local UIUtil = import('/lua/ui/uiutil.lua')
-local FlatPanel = import('/fafengine/lua/ui/controls/flat_panel.lua')
+local FlatPanel = import('/fafengine/modules/lua/ui/controls/flat_panel.lua')
 
 local kGroove = 'ff26323a'
 local kPending = '7036505c'

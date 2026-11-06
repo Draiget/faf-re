@@ -1582,7 +1582,13 @@ namespace
    */
   void CWldSession::ResetForNewReplaySim()
   {
-    (void)SCR_LuaDoString("import('/fafengine/lua/ui/game/replay_timeline.lua').OnSimReplaced()", mState);
+    // The timeline that made the bar: FAF's Lua's own copy when it carries one (issue #327), else the engine's.
+    (void)SCR_LuaDoString(
+      "local path = '/lua/ui/game/replay_timeline.lua' "
+      "if not DiskGetFileInfo(path) then path = '/fafengine/modules/lua/ui/game/replay_timeline.lua' end "
+      "import(path).OnSimReplaced()",
+      mState
+    );
     SetSelection(WeakSet<UserEntity>());
     USER_GetSound()->StopAllSounds();
     USER_GetSound()->SetListenerArmy(nullptr);

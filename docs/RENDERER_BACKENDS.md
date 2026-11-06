@@ -47,6 +47,8 @@ The options entry comes from the engine's own Lua, never from edits to FAF's gam
 - **Source:** `data/fafengine/` holds engine-owned scripts that extend gamedata scripts. The build copies it next to the executable (`src/CMakeLists.txt`), and `build.ps1` copies it into the run folder.
 - **Mount:** at startup the engine mounts `<exe folder>/fafengine` at `/fafengine` and registers it as a hook directory, after the init file's own `path` and `hook` entries (`AppendEngineHookFolder` in `src/moho/misc/StartupHelpers.cpp`). The engine does this itself because the init files (`init_faf.lua` and the rest) belong to the FAF client.
 - **Hook:** a hook file is appended to the gamedata file of the same path, so `fafengine/lua/options/options.lua` runs at the end of `/lua/options/options.lua` and inserts the entry after Vertical Sync. The log says `engine hooks: ... mounted at /fafengine` and `Hooked /lua/options/options.lua with /fafengine/lua/options/options.lua`.
+- **Modules:** files that only the hooks import (the replay timeline and its controls) lie under `data/fafengine/modules/`, a path no gamedata file has. Under `lua/` they would be taken as hooks of a FAF file of the same name and appended to it.
+- **In FAF's Lua:** the same options and screens are to come with FAF's own Lua behind `GetEngineInfo`, which only this engine has (issue #327). When FAF's files carry them, the hooks here leave them out: an option whose key is already in the tab, the timeline when `/lua/ui/game/replay_timeline.lua` exists, the rejoin screen when `uimain.lua` defines `UpdateRejoinScreen`, the Connectivity rows when `disconnect.lua` defines its own `GetSessionClients`.
 
 ## Effects: one source, translated at load time
 
