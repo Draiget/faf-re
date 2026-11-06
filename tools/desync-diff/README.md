@@ -8,7 +8,7 @@ python tools\desync-diff\desync_diff.py desync_11204007_beat300_army0.zip desync
 
 With more than two dumps, the first is A and each other is compared with it. A dump can also be the `.tar.gz` copy the engine uploads to `telemetry_DumpEndpoint` ([docs/SWITCHES.md](../../docs/SWITCHES.md#desync-telemetry)); it holds the same files.
 
-`receive.py` is a reference receiver for those uploads: `python tools\desync-diffeceive.py --port 4319 --out dumps --token T --read-token R` stores each one as `dumps\<game id>\<name>.tar.gz` after checking it is a dump, answers 201, writes `report.txt` from this tool once the game has dumps from two armies, and serves them back under `/dumps/` to holders of the read token. Options and routes: [docs/DESYNC_DIAGNOSTICS.md](../../docs/DESYNC_DIAGNOSTICS.md#dump-receiver); a deployable server around it: [tools/desync-server](../desync-server/README.md).
+The receiver for those uploads is [`tools/cmd/desync-receiver`](../cmd/desync-receiver) (Go): `tools\bin\desync-receiver.exe --port 4319 --out dumps --token T --read-token R` stores each one as `dumps\<game id>\<name>.tar.gz` after checking it is a dump, answers 201, writes `report.txt` once the game has dumps from two armies (the same report as this tool's compare, ported to Go), and serves them back under `/dumps/` to holders of the read token. Options and routes: [docs/DESYNC_DIAGNOSTICS.md](../../docs/DESYNC_DIAGNOSTICS.md#dump-receiver); a deployable server around it: [tools/desync-server](../desync-server/README.md).
 
 ## What it prints
 

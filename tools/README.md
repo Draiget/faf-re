@@ -10,6 +10,7 @@ Development tools for the engine. The main one is **mpemu**, a Go multiplayer te
 | `cmd/mpemu-server` | The hub: icebreaker signalling API, STUN/TURN, the director–agent control channel and a latching game relay. Deployment: [deploy/README.md](deploy/README.md) |
 | `cmd/fakegame` | Stand-in for the game process: speaks GPGNet, pings every peer over UDP and reports what it measured (`/loadtime` delays `Idle` as the game's loading does) |
 | `cmd/fafclient` | Emulates the mainline FAF client's side of the ICE adapter contract and the lobby server's pairing, so any adapter (FAF's `faf-ice-adapter.jar`, ours) runs unchanged; see [docs/LAUNCHER_ADAPTER_CONTRACT.md](../docs/LAUNCHER_ADAPTER_CONTRACT.md) |
+| `cmd/desync-receiver` | The desync server's dump receiver: stores the dumps games upload per game, writes the comparison report once two armies' dumps are in, serves them to holders of the read token; `compare` prints the same report for dumps on disk. See [docs/DESYNC_DIAGNOSTICS.md](../docs/DESYNC_DIAGNOSTICS.md#dump-receiver) |
 | `cmd/turnsrv` | `turnsrv` on its own (prints its URLs and one set of credentials), for testing ICE agents such as `faf_juice_gather` |
 | `scenarios/` | YAML scenarios for mpemu |
 | `desync-diff/` | Compares players' desync dumps from one game and prints the first value that differs; rebuilds a missing side from the replay. See [desync-diff/README.md](desync-diff/README.md) |

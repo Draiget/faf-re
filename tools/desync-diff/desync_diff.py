@@ -21,6 +21,9 @@ architecture or a switch (each build replays its own way every time), not memory
 hardware faults.
 
 Exit code: 0 nothing differs, 1 a difference was found, 2 invalid input. Standard library only.
+
+The desync server writes the same report with tools/cmd/desync-receiver (compare.go, a Go port of
+compare): a change to the report goes into both.
 """
 import argparse
 import csv

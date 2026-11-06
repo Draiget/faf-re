@@ -37,7 +37,7 @@ A `faf.desync` record from a test game (`tools/scenarios/2p-desync-dump-upload.y
 }
 ```
 
-`faf.dump.url` is the dump endpoint plus `/<game id>/<file>`, where `receive.py` serves the stored file (with the read token).
+`faf.dump.url` is the dump endpoint plus `/<game id>/<file>`, where `desync-receiver` serves the stored file (with the read token).
 
 Every request also carries the process as the OTLP resource: `service.name` `faf-engine`, `service.version` (the commit), `faf.engine.version`, `faf.engine.dirty`, `host.arch`, `faf.arch`, `os.type`, `os.description`, `faf.cpu.logical_count`. A `faf.game.end` record follows at the end of every game, desync or not, with `faf.game.beats`, `faf.desync` and `faf.desync.later_records`. Records of one game pair up by `faf.game.id`; a record pairs with its uploaded dump by `faf.dump.upload`.
 
@@ -95,10 +95,10 @@ HTTPS: the Windows build posts `https://` URLs through WinHTTP; the Linux build 
 
 ## Dump receiver
 
-`tools/desync-diff/receive.py` is a reference receiver, Python 3 with the standard library only:
+`tools/cmd/desync-receiver` is the receiver, Go with the standard library only (`tools/build.ps1` builds it into `tools/bin`):
 
 ```sh
-python tools/desync-diff/receive.py --host 0.0.0.0 --port 4319 --prefix /dumps --out /srv/faf-dumps \
+desync-receiver --host 0.0.0.0 --port 4319 --prefix /dumps --out /srv/faf-dumps \
   --token <upload token> --read-token <read token> --max-mb 64
 ```
 
@@ -112,7 +112,7 @@ python tools/desync-diff/receive.py --host 0.0.0.0 --port 4319 --prefix /dumps -
 | `--read-token` | `FAF_READ_TOKEN` | Required token for reads (`Authorization: Bearer` or `?token=`); empty lets anyone read |
 | `--max-mb` | 64 | Largest body accepted |
 
-Uploads: 201 to a stored dump (with its path), 401 to a wrong token, 400 to a name that isn't a dump name or a body that isn't a dump (`header.json` missing from the archive), 413 to an empty or oversized body. Once a game has dumps from two armies, it runs `desync_diff.py` on them and writes `<out>/<game id>/report.txt`. Reads: `GET <prefix>/` lists the games, `<prefix>/<game id>/` a game's dumps and report, `<prefix>/<game id>/<file>` downloads one; the upload token never reads, since it ships with the game. `GET /healthz` answers `ok` without a token. It serves each request on its own thread and has no TLS: for a public server, run it behind a reverse proxy that terminates TLS ([tools/desync-server](../tools/desync-server/README.md)). The engine posts to the URL as given; with `--prefix` equal to that URL's path, `faf.dump.url` points at the stored file.
+Uploads: 201 to a stored dump (with its path), 401 to a wrong token, 400 to a name that isn't a dump name or a body that isn't a dump (`header.json` missing from the archive), 413 to an empty or oversized body. Once a game has dumps from two armies, it compares them and writes `<out>/<game id>/report.txt`: the report `desync_diff.py` prints, ported to Go (`desync-receiver compare A B` prints it for dumps on disk). Reads: `GET <prefix>/` lists the games, `<prefix>/<game id>/` a game's dumps and report, `<prefix>/<game id>/<file>` downloads one; the upload token never reads, since it ships with the game. `GET /healthz` answers `ok` without a token. It has no TLS: for a public server, run it behind a reverse proxy that terminates TLS ([tools/desync-server](../tools/desync-server/README.md)). The engine posts to the URL as given; with `--prefix` equal to that URL's path, `faf.dump.url` points at the stored file.
 
 The client deletes its `.tar.gz` once the receiver answers 2xx, after six failed attempts (when queued, with the game-end record, then at up to four later starts), or at once on a 4xx other than 408 and 429. The zip stays on the player's disk either way.
 
@@ -142,7 +142,7 @@ What isn't sent yet waits in `faf_telemetry_outbox_<pid>.txt` next to the game l
 
 ## Checking a setup locally
 
-Two scenarios run a real two-player desync against local servers (`tools/mpemu`, see [tools/README.md](../tools/README.md)): start the collector on `127.0.0.1:4318` and, for the second, `receive.py --port 4319 --token test-token`, then
+Two scenarios run a real two-player desync against local servers (`tools/mpemu`, see [tools/README.md](../tools/README.md)): start the collector on `127.0.0.1:4318` and, for the second, `desync-receiver --port 4319 --token test-token`, then
 
 ```bat
 tools\bin\mpemu.exe run tools\scenarios\2p-desync-telemetry.yaml
