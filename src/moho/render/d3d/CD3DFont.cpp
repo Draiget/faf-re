@@ -89,7 +89,7 @@ namespace moho
     };
 
     /**
-     * Every font's atlas on one GPU texture, so a change of font doesn't split a draw. A device reset
+     * Many fonts' atlases on one GPU texture, so a change of font doesn't split a draw. A device reset
      * replaces the sheet's texture and loses its pixels, so they're written again.
      */
     struct MsdfAtlasPage
@@ -115,7 +115,10 @@ namespace moho
 
     std::map<const CD3DFont*, MsdfBinding> sMsdfBindings;
     bool sHasModFonts = false; // so a game with none pays one load
-    MsdfAtlasPage sMsdfPage;
+    // The game's fonts on one page, mods' fonts on another (with their own copy of the default font for the
+    // characters they lack), so fonts from mods can't take the room the game's text needs.
+    MsdfAtlasPage sMsdfGamePage;
+    MsdfAtlasPage sMsdfModPage;
 
     [[nodiscard]] const SMsdfGlyph* FindMsdfGlyph(const SMsdfFontAtlas& atlas, const std::uint32_t codepoint)
     {
@@ -127,7 +130,7 @@ namespace moho
     }
 
     /** Writes one font's pixels and the empty texels to its right and below it, which keep the next font apart. */
-    [[nodiscard]] bool WriteFontToPage(const MsdfAtlasPage::PlacedFont& placed)
+    [[nodiscard]] bool WriteFontToPage(MsdfAtlasPage& page, const MsdfAtlasPage::PlacedFont& placed)
     {
       const SMsdfFontAtlas& atlas = *placed.mAtlas;
       const std::int32_t right = (std::min)(placed.mX + atlas.mWidth + kMsdfPageSpacing, kMsdfPageWidth);
@@ -135,7 +138,7 @@ namespace moho
       const RECT rect{placed.mX, placed.mY, right, bottom};
       std::uint32_t pitch = 0u;
       void* bits = nullptr;
-      if (!sMsdfPage.mSheet->LockRect(&rect, &pitch, &bits) || bits == nullptr) {
+      if (!page.mSheet->LockRect(&rect, &pitch, &bits) || bits == nullptr) {
         return false;
       }
       const std::size_t lockedRowBytes = static_cast<std::size_t>(right - placed.mX) * 4u;
@@ -147,7 +150,7 @@ namespace moho
           std::memcpy(out, atlas.mPixels.data() + atlasRowBytes * static_cast<std::size_t>(row), atlasRowBytes);
         }
       }
-      (void)sMsdfPage.mSheet->Unlock();
+      (void)page.mSheet->Unlock();
       return true;
     }
 
@@ -155,10 +158,11 @@ namespace moho
      * Where an atlas sits on the page, placing it on first use and rewriting the page after a device reset.
      * False when the page is full or can't be made; that font stays on GDI glyphs. `outFull` says it was full.
      */
-    [[nodiscard]] bool AcquireMsdfPlacement(const SMsdfFontAtlas& atlas, std::int32_t& outX, std::int32_t& outY, bool& outFull)
+    [[nodiscard]] bool AcquireMsdfPlacement(
+      MsdfAtlasPage& page, const SMsdfFontAtlas& atlas, std::int32_t& outX, std::int32_t& outY, bool& outFull
+    )
     {
       outFull = false;
-      MsdfAtlasPage& page = sMsdfPage;
       if (!page.mSheet) {
         CD3DDevice* const device = D3D_GetDevice();
         ID3DDeviceResources* const resources = device != nullptr ? device->GetResources() : nullptr;
@@ -175,7 +179,7 @@ namespace moho
       page.mSheet->GetTexture(texture);
       if (texture.get() != page.mUploadedTexture) {
         for (const MsdfAtlasPage::PlacedFont& placed : page.mFonts) {
-          if (!WriteFontToPage(placed)) {
+          if (!WriteFontToPage(page, placed)) {
             return false;
           }
         }
@@ -200,7 +204,7 @@ namespace moho
         return false;
       }
       const MsdfAtlasPage::PlacedFont placed{&atlas, page.mShelfX, page.mShelfY};
-      if (!WriteFontToPage(placed)) {
+      if (!WriteFontToPage(page, placed)) {
         return false;
       }
       page.mFonts.push_back(placed);
@@ -295,7 +299,8 @@ namespace moho
       std::int32_t pageX = 0;
       std::int32_t pageY = 0;
       bool pageFull = false;
-      if (!AcquireMsdfPlacement(atlas, pageX, pageY, pageFull)) {
+      MsdfAtlasPage& page = binding.mIsMod ? sMsdfModPage : sMsdfGamePage;
+      if (!AcquireMsdfPlacement(page, atlas, pageX, pageY, pageFull)) {
         if (pageFull && binding.mIsMod && !binding.mNoPage) {
           gpg::Warnf("MSDF: the atlas page is full; %s at %d px draws in the default font", binding.mFace.c_str(), binding.mPointSize);
           binding.mNoPage = true;
@@ -306,10 +311,10 @@ namespace moho
       }
       std::int32_t fallbackPageX = 0;
       std::int32_t fallbackPageY = 0;
-      if (usesFallback && !AcquireMsdfPlacement(*fallback, fallbackPageX, fallbackPageY, pageFull)) {
+      if (usesFallback && !AcquireMsdfPlacement(page, *fallback, fallbackPageX, fallbackPageY, pageFull)) {
         return false;
       }
-      const boost::shared_ptr<CD3DDynamicTextureSheet>& sheet = sMsdfPage.mSheet;
+      const boost::shared_ptr<CD3DDynamicTextureSheet>& sheet = page.mSheet;
 
       const float size = static_cast<float>(binding.mPointSize) * textScale;
       const float pixelRange = atlas.mDistanceRange * size / atlas.mEmPixels;
