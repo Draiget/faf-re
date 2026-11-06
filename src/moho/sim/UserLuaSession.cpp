@@ -1,5 +1,6 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/sim/UserLuaPrivate.h"
+#include "gpg/core/diagnostics/BuildInfo.h"
 
 namespace
 {
@@ -2157,8 +2158,31 @@ namespace
     return 1;
   }
 
+  /**
+   * Engine addition (issue #327): `GetEngineInfo()` - which engine runs the UI. FAF's own Lua carries
+   * faf-re's options and screens behind `if rawget(_G, 'GetEngineInfo') then`, so on the original
+   * executable, which has no such function, nothing changes. Name is always "faf-re"; Version is the
+   * release or nightly tag (or the short commit of any other build), Commit the short commit.
+   */
+  int GetEngineInfoBody(lua_State* const rawState)
+  {
+    lua_newtable(rawState);
+    lua_pushstring(rawState, "Name");
+    lua_pushstring(rawState, "faf-re");
+    lua_rawset(rawState, -3);
+    lua_pushstring(rawState, "Version");
+    lua_pushstring(rawState, gpg::diag::BuildVersion());
+    lua_rawset(rawState, -3);
+    lua_pushstring(rawState, "Commit");
+    lua_pushstring(rawState, gpg::diag::BuildCommitShort());
+    lua_rawset(rawState, -3);
+    return 1;
+  }
+
   void RegisterReplayTimelineBindings()
   {
+    static CScrLuaBinder engineInfo(moho::SCR_UserLuaInitSet(), "GetEngineInfo", &ReplayTimelineBinding<&GetEngineInfoBody>, nullptr, "<global>",
+      "table GetEngineInfo() - the engine running the UI: Name 'faf-re', Version (release or nightly tag), Commit. Absent on the original executable.");
     static CScrLuaBinder total(moho::SCR_UserLuaInitSet(), "GetReplayTotalTicks", &ReplayTimelineBinding<&ReplayTotalTicksBody>, nullptr, "<global>",
       "int GetReplayTotalTicks() - the replay's length in ticks; 0 when not known.");
     static CScrLuaBinder keyframes(moho::SCR_UserLuaInitSet(), "GetReplayKeyframeTicks", &ReplayTimelineBinding<&ReplayKeyframeTicksBody>, nullptr, "<global>",
