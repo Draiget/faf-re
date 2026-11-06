@@ -2134,7 +2134,12 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     // The draw covers the viewport, which is the destination rect, and its
     // texture coordinates cover the source rect. Scaling the viewport instead
     // would leave the viewport bounds (-32768..32767) for small rects.
-    // Allocated first: an upload can hand the recorded commands to the GPU.
+    // The table first: a full view heap hands the recorded commands to the GPU,
+    // waits, and frees the upload pages, constants uploaded before it included.
+    // The upload next, before any barrier: it may submit too, but leaves the
+    // view heap alone.
+    D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
+    const D3D12_GPU_DESCRIPTOR_HANDLE table = AllocateTable(effects::kMaxTextureSlots, cpu);
     const float sourceUv[4] = {
       static_cast<float>(sourceRect.left) / static_cast<float>(sourceWidth),
       static_cast<float>(sourceRect.top) / static_cast<float>(sourceHeight),
@@ -2145,8 +2150,6 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       AllocateUpload(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
     std::memcpy(constants.cpu, sourceUv, sizeof(sourceUv));
 
-    D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
-    const D3D12_GPU_DESCRIPTOR_HANDLE table = AllocateTable(effects::kMaxTextureSlots, cpu);
     mDevice->CopyDescriptorsSimple(1U, cpu, source, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     D3D12_CPU_DESCRIPTOR_HANDLE rest = cpu;
     rest.ptr += mFrames[mFrameIndex].views.Increment();
