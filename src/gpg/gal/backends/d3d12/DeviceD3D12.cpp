@@ -2848,24 +2848,6 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       }
     }
 
-    // $Globals, snapshotted as D3D9's BeginPass and Effects 11's Apply do.
-    const std::span<const std::uint8_t> constants = parameters.Constants();
-    if (!constants.empty()) {
-      if (state.constants == 0U || state.constantsVersion != parameters.Version() || state.constantsSerial != RecordingSerial()) {
-        const std::uint64_t bytes = (constants.size() + 255U) & ~static_cast<std::uint64_t>(255U);
-        const d3d12::UploadAllocation upload = AllocateUpload(bytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-        std::memcpy(upload.cpu, constants.data(), constants.size());
-        state.constants = upload.gpu;
-        state.constantsCpu = upload.cpu;
-        state.constantsVersion = parameters.Version();
-        state.constantsSerial = RecordingSerial();
-      }
-      bound.constants = state.constants;
-      bound.constantsCpu = state.constantsCpu;
-      bound.constantsBytes = static_cast<std::uint32_t>(constants.size());
-      bound.constantsSerial = state.constantsSerial;
-    }
-
     // The texture table: rebuilt when a binding changed or the frame moved on.
     if (state.tableFrame != mFrameCount || state.tableEpoch != mArenaEpoch || state.textureVersion != parameters.TextureVersion() ||
         state.tableSurface != outputContext_.surface.get()) {
@@ -2926,6 +2908,27 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       state.textureVersion = parameters.TextureVersion();
       state.tableSurface = outputContext_.surface.get();
     }
+    // AllocateTable can submit and recycle upload pages on descriptor exhaustion.
+    // Snapshot this new pass only after that boundary; Submit carries mPass,
+    // not the local bound record being built here.
+    // $Globals, snapshotted as D3D9's BeginPass and Effects 11's Apply do.
+    const std::span<const std::uint8_t> constants = parameters.Constants();
+    if (!constants.empty()) {
+      if (state.constants == 0U || state.constantsVersion != parameters.Version() || state.constantsSerial != RecordingSerial()) {
+        const std::uint64_t bytes = (constants.size() + 255U) & ~static_cast<std::uint64_t>(255U);
+        const d3d12::UploadAllocation upload = AllocateUpload(bytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+        std::memcpy(upload.cpu, constants.data(), constants.size());
+        state.constants = upload.gpu;
+        state.constantsCpu = upload.cpu;
+        state.constantsVersion = parameters.Version();
+        state.constantsSerial = RecordingSerial();
+      }
+      bound.constants = state.constants;
+      bound.constantsCpu = state.constantsCpu;
+      bound.constantsBytes = static_cast<std::uint32_t>(constants.size());
+      bound.constantsSerial = state.constantsSerial;
+    }
+
     bound.textures = state.table;
     bound.tableFrame = state.tableFrame;
     bound.tableEpoch = state.tableEpoch;

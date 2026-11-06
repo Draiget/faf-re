@@ -44,15 +44,6 @@ namespace moho
       return value.IsNumber() ? std::clamp(static_cast<float>(value.GetNumber()), 0.5f, 4.0f) : 1.0f;
     }
 
-    [[nodiscard]] std::string PathText(const SNetlinkPeerInfo& p)
-    {
-      if (!p.connected || p.localType.empty()) {
-        return "-";
-      }
-      const bool relayed = p.localType == "relay" || p.remoteType == "relay";
-      return std::string(relayed ? "relayed" : "direct") + " (" + p.localType + "/" + p.remoteType + ")";
-    }
-
     [[nodiscard]] std::string Format(const char* format, const double value)
     {
       char buf[64];
@@ -74,7 +65,7 @@ namespace moho
           rows.push_back({
             p.login + " (" + std::to_string(p.id) + ")",
             p.state + (p.attempts > 1 ? " #" + std::to_string(p.attempts) : ""),
-            PathText(p),
+            NETPANEL_PathText(p),
             p.rttMs >= 0 ? Format("%.1f ms", p.rttMs) : "-",
             p.received > 0 ? Format("%.2f %%", p.lossPercent) : "-",
             std::to_string(p.resends),
@@ -91,6 +82,15 @@ namespace moho
       return rows;
     }
   } // namespace
+
+  std::string NETPANEL_PathText(const SNetlinkPeerInfo& p)
+  {
+    if (!p.connected || p.localType.empty()) {
+      return "-";
+    }
+    const bool relayed = p.localType == "relay" || p.remoteType == "relay";
+    return std::string(relayed ? "relayed" : "direct") + " (" + p.localType + "/" + p.remoteType + ")";
+  }
 
   void NETPANEL_Toggle()
   {

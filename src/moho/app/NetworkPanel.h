@@ -7,9 +7,16 @@
 // (console), or Ctrl+Shift+F11. The ICE adapter's debug window used to show this;
 // with no adapter the game does.
 
+#include <string>
+
 namespace moho
 {
   class CD3DPrimBatcher;
+  struct SNetlinkPeerInfo;
+
+  // "relayed (relay/host)", "direct (host/srflx)", or "-" while not connected: the
+  // panel's path column, also used by the tray icon (#321).
+  [[nodiscard]] std::string NETPANEL_PathText(const SNetlinkPeerInfo& peer);
 
   extern bool net_ShowPanel;
 

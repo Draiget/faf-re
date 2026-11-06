@@ -86,6 +86,18 @@ With no adapter there is no adapter window, so the game shows its links itself (
 
 Under the table come the latest `NETLINK:` and `NET:` log lines. With in-engine links behind faf-netbridge (#233) the panel shows the same; with the launcher's adapter running the links it says so, since the game has no links of its own then.
 
+## Tray icon
+
+With no adapter there is no adapter tray icon either, so the game shows one while it runs its own links (#321, `src/moho/app/NetworkTray.cpp`, switch `net_TrayIcon`). It comes with the first link setup (native mode or in-engine links) and goes when GPGNet shuts down or the game exits. Its tooltip counts links up, relayed and lost. A click opens its menu:
+
+- one line per peer: state, path and round trip, as on the panel;
+- **Network panel**: shows or hides the panel, as Ctrl+Shift+F11 does;
+- **Reconnect**: drops the link to one peer and connects again. The offerer offers again at once; when the answerer asks, the offerer notices within 10 s, when its echo goes unanswered. A new attempt within 2 minutes of another offers no host candidates, as the Java adapter does;
+- **Open log folder**: Explorer with the game's `/log` file selected;
+- **Copy diagnostics**: the build, every link with its counts, the log file's path and the latest network log lines, for a bug report.
+
+The icon has its own thread and window, so the menu works while the game window is minimised after alt-tab.
+
 ## Change points in the launchers
 
 From reading both clients (Java: downlords-faf-client `develop` 66e624f119; Rust: FAForeverRustClient `develop` 70c88a5f9b, both 2026-10-31):

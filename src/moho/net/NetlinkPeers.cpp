@@ -16,6 +16,7 @@
 #include "boost/weak_ptr.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/app/NetworkTray.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/net/CGpgNetInterface.h"
 #include "moho/net/NetConVars.h"
@@ -139,6 +140,7 @@ namespace moho
           static_cast<int>(mIceServers.size()), mForceRelay ? ", relay only" : ""
         );
         StartTickerLocked();
+        NETTRAY_Start(); // issue #321
       }
 
       // Issue #274: native mode, the launcher talks to the game directly. Link
@@ -161,6 +163,7 @@ namespace moho
         mRedundancy = redundancy;
         mEncrypt = encrypt;
         StartTickerLocked();
+        NETTRAY_Start(); // issue #321
       }
 
       [[nodiscard]] bool IsNative()
@@ -215,6 +218,17 @@ namespace moho
           out.peers.push_back(std::move(info));
         }
         return out;
+      }
+
+      bool Reconnect(const std::int64_t id)
+      {
+        const std::shared_ptr<nl::Link> link = Find(id);
+        if (!link) {
+          return false;
+        }
+        gpg::Logf("NETLINK: peer %lld reconnect asked", static_cast<long long>(id));
+        link->Reconnect();
+        return true;
       }
 
       void SetLocalId(const std::int64_t id)
@@ -595,7 +609,13 @@ namespace moho
 
   void NETLINK_Shutdown()
   {
+    NETTRAY_Stop(); // issue #321: the icon goes with the game's links
     Links().Shutdown();
+  }
+
+  bool NETLINK_ReconnectPeer(const std::int64_t id)
+  {
+    return Links().Reconnect(id);
   }
 
   SNetlinkSnapshot NETLINK_GetSnapshot()

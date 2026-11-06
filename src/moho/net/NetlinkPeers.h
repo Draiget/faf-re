@@ -56,6 +56,10 @@ namespace moho
   // modes that run links and by the panel; idempotent. Any thread.
   void NETLINK_KeepLogLines();
 
+  // Issue #321: drops the link to that peer and connects again (Link::Reconnect).
+  // False when no link to it exists. Any thread.
+  bool NETLINK_ReconnectPeer(std::int64_t id);
+
   class CGpgNetInterface;
   struct SNetCommandArg;
 

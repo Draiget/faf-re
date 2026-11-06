@@ -184,6 +184,11 @@ namespace faf::netlink
     void Close();
     // No more restarts after a loss (GPGNet GameEnded).
     void SetGameEnded();
+    // Issue #321: drop the connection and connect again, as after a loss. The
+    // offerer offers again at once; the answerer waits for the peer's next
+    // offer, which comes when the peer's echo goes unanswered. Done in the
+    // next Tick, so the callbacks run on the ticking thread. Any thread.
+    void Reconnect() { mReconnectAsked = true; }
 
     LinkState GetState() const;
     bool IsConnected() const { return mConnected.load(); }
@@ -239,6 +244,7 @@ namespace faf::netlink
     std::optional<Clock::time_point> mAwaitDeadline;
     std::optional<Clock::time_point> mCheckDeadline;
     std::optional<Clock::time_point> mRestartAt;
+    std::atomic<bool> mReconnectAsked{false}; // issue #321
     Clock::time_point mNextEcho{};
     std::atomic<std::int64_t> mLastEchoReplyMs{0};
     LinkStats mStats;
