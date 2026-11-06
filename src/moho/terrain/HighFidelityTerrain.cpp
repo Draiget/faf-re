@@ -844,8 +844,8 @@ namespace moho
           if (splat->mNearCutoff <= 0.0f) {
             const float farFadeStart = splat->mCutoffLOD * ren_DecalFadeFraction;
             const float clampedDistance = std::min(worldDistance, splat->mCutoffLOD);
-            const float fadeFloor = std::max(farFadeStart, std::min(clampedDistance, farFadeStart));
-            fadeAlpha = 1.0f - ((clampedDistance - fadeFloor) / (splat->mCutoffLOD - fadeFloor));
+            const float fadeDistance = std::max(clampedDistance, farFadeStart);
+            fadeAlpha = 1.0f - ((fadeDistance - farFadeStart) / (splat->mCutoffLOD - farFadeStart));
           } else {
             const float nearFadeStart = splat->mNearCutoff * ren_DecalFadeFraction;
             const float clampedDistance = std::min(worldDistance, splat->mNearCutoff);
