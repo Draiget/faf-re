@@ -6,9 +6,21 @@ The [Nightly release workflow](../../.github/workflows/nightly-release.yml) publ
 |---|---|
 | `plan` | The tag: the UTC year and month, the month's next number and `-nightly`, for example `2026.11.001-nightly`, a real release being the same without `-nightly`. Releases and nightlies share the numbers, which go back to 001 each month and always have at least three digits, so a number can't be read as a day. The newest release or nightly the commit descends from, for the change list. It builds nothing when that tag's release already exists, as master did not move |
 | `build` | Builds `main_x64.exe` and `main.exe` with clang-cl and zips them as a release is zipped: exe, pdb, the DXC DLLs, `fafengine\` and `INSTALL.txt` ([x64](INSTALL_x64.txt), [x86](INSTALL_x86.txt)). The exe reports the nightly tag as its version |
-| `release` | Writes the notes ([nightly_notes.py](nightly_notes.py)): the parity counts, every commit since the previous release or nightly, and the checksums. Publishes them with the zips and the two exes on their own as a full release marked as the latest, so the repository's release link and `/releases/latest` point at it |
+| `release` | Writes the notes ([nightly_notes.py](nightly_notes.py)): the parity counts, every commit since the previous release or nightly, and the checksums; and `player-notes.md`, the notes for players (below). Publishes them with the zips and the two exes on their own as a full release marked as the latest, so the repository's release link and `/releases/latest` point at it |
 
 A parity run that failed or lists new failures publishes nothing, and neither does a parity run started by hand, which may have played any commit or set.
+
+## Notes for players
+
+Every release and nightly carries `player-notes.md`: one line for each `Player-Note:` trailer of the commits since the previous one, or a line saying there are none. FAF Develop's changelog in the game's lobby shows it (issue #323), so a note says in a player's words what changed for them, and most commits have none. The trailer goes in the commit message's last paragraph, one per line:
+
+```
+feat(render): Direct3D 12 and Vulkan decode textures with DirectXTex when d3dx11_43.dll is missing (#318)
+
+Players without the DirectX End-User Runtime of June 2010 ...
+
+Player-Note: Direct3D 12 and Vulkan work without installing the DirectX runtime.
+```
 
 ## Retries
 
