@@ -442,6 +442,14 @@ namespace faf::remote::wire
    */
   [[nodiscard]] bool EncodeFrameChanges(const SFrameChanges& changes, const SFrameCodec& codec, BitWriter& writer);
 
+  /**
+   * The bits the encoder writes for a record's position (its far bit included, dead reckoning's fields not) and
+   * for its orientation (the yaw bit included, orientation reckoning's not). `before`: the baseline's record,
+   * null for a creation. For `--wire-stats`, so its classes add up to what is sent.
+   */
+  [[nodiscard]] int PositionFieldBits(const SEntityRecord& record, const SEntityRecord* before, const SFrameCodec& codec) noexcept;
+  [[nodiscard]] int OrientationFieldBits(const SEntityRecord& record, const SEntityRecord* before) noexcept;
+
   /** The baseline a frame on the wire was encoded against (`kNoBaseline` for a full frame). */
   [[nodiscard]] std::uint32_t PeekFrameBaseline(std::span<const std::uint8_t> bytes) noexcept;
 

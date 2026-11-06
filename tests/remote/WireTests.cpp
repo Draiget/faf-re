@@ -1257,6 +1257,37 @@ namespace
     CHECK(Decode(shiftedBytes, &moved, decoded) && decoded == shifted);
     CHECK(Decode(jumpedBytes, &moved, decoded) && decoded == jumped);
 
+    // Entities 11: a changed position, and a changed yaw, go as their step from the baseline's record when that
+    // is shorter; a jump goes whole. Both read back exactly, a turn across 0 too.
+    SViewFrame placed = shifted;
+    placed.frameId = 4;
+    placed.entities[0].position = {40000u, 3000u, 50000u};
+    placed.entities[0].yawOnly = true;
+    placed.entities[0].orientation = 1000u;
+    CHECK(Decode(Encode(placed, &shifted), &shifted, decoded) && decoded == placed);
+    SViewFrame stepped = placed;
+    stepped.frameId = 5;
+    stepped.entities[0].position = {40019u, 2998u, 49990u};
+    stepped.entities[0].orientation = 990u;
+    SViewFrame leapt = placed;
+    leapt.frameId = 5;
+    leapt.entities[0].position = {1000u, 60000u, 90000u};
+    leapt.entities[0].orientation = 41000u;
+    const std::vector<std::uint8_t> steppedBytes = Encode(stepped, &placed);
+    const std::vector<std::uint8_t> leaptBytes = Encode(leapt, &placed);
+    CHECK(steppedBytes.size() + 4u <= leaptBytes.size());
+    CHECK(Decode(steppedBytes, &placed, decoded) && decoded == stepped);
+    CHECK(Decode(leaptBytes, &placed, decoded) && decoded == leapt);
+    SViewFrame wrapped = stepped;
+    wrapped.frameId = 6;
+    wrapped.entities[0].orientation = 65530u;
+    SViewFrame nearZero = stepped;
+    nearZero.frameId = 6;
+    nearZero.entities[0].orientation = 3u;
+    CHECK(Decode(Encode(nearZero, &stepped), &stepped, decoded) && decoded == nearZero);
+    CHECK(Decode(Encode(wrapped, &nearZero), &nearZero, decoded) && decoded == wrapped);
+    CHECK(PositionFieldBits(stepped.entities[0], &placed.entities[0], kCodec) < PositionFieldBits(stepped.entities[0], nullptr, kCodec));
+
     // A creation mask without the basic fields, or with unit fields for a non-unit, is refused.
     for (const std::uint32_t mask : {std::uint32_t{kFieldKind}, kEntityFields | kFieldKind | kFieldUnitFuel, kAllFields + 1u}) {
       BitWriter writer;

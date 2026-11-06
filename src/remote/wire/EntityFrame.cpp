@@ -47,6 +47,84 @@ namespace faf::remote::wire
       return static_cast<std::int32_t>(value >> 1) ^ -static_cast<std::int32_t>(value & 1u);
     }
 
+    // Entities 11: a changed position or yaw goes as the step from the client's record when that is shorter,
+    // in exponential-Golomb codes of order k (k low bits always, small values in few bits). Horizontal moves of
+    // a unit run a few to a few dozen 1/64 steps a beat, height changes far fewer, turns a few hundredths of 2^16.
+    constexpr int kStepOrderXZ = 3;
+    constexpr int kStepOrderY = 1;
+    constexpr int kStepOrderYaw = 3;
+    constexpr int kMaxGolombZeros = 26; // more than any step a field this wide can take
+
+    [[nodiscard]] int ExpGolombBits(const std::uint32_t value, const int order) noexcept
+    {
+      const std::uint64_t shifted = std::uint64_t{value} + (std::uint64_t{1} << order);
+      return 2 * static_cast<int>(std::bit_width(shifted)) - 1 - order;
+    }
+
+    void WriteExpGolomb(BitWriter& writer, const std::uint32_t value, const int order)
+    {
+      const std::uint64_t shifted = std::uint64_t{value} + (std::uint64_t{1} << order);
+      const int width = static_cast<int>(std::bit_width(shifted));
+      if (width - 1 - order > 0) {
+        writer.WriteBits(0u, width - 1 - order);
+      }
+      writer.WriteBits(1u, 1);
+      if (width > 1) {
+        writer.WriteBits(static_cast<std::uint32_t>(shifted), width - 1);
+      }
+    }
+
+    [[nodiscard]] std::uint32_t ReadExpGolomb(BitReader& reader, const int order) noexcept
+    {
+      int zeros = 0;
+      while (reader.ReadBits(1) == 0u) {
+        if (!reader.Ok() || ++zeros > kMaxGolombZeros) {
+          reader.Fail();
+          return 0u;
+        }
+      }
+      const int rest = zeros + order;
+      const std::uint64_t shifted = (std::uint64_t{1} << rest) | (rest > 0 ? reader.ReadBits(rest) : 0u);
+      return static_cast<std::uint32_t>(shifted - (std::uint64_t{1} << order));
+    }
+
+    /** A position's step from `before`, per axis, zigzagged. */
+    [[nodiscard]] std::array<std::uint32_t, 3> PositionSteps(const SEntityRecord& record, const SEntityRecord& before) noexcept
+    {
+      std::array<std::uint32_t, 3> steps{};
+      for (std::size_t axis = 0; axis < 3; ++axis) {
+        steps[axis] = ZigZag(static_cast<std::int32_t>(static_cast<std::int64_t>(record.position[axis]) - before.position[axis]));
+      }
+      return steps;
+    }
+
+    /** Whether a changed position may go as its step: both ends in the quantiser's range. */
+    [[nodiscard]] bool PositionMayStep(const SEntityRecord& record, const SEntityRecord* const before) noexcept
+    {
+      return before != nullptr && !before->farPosition && !record.farPosition;
+    }
+
+    [[nodiscard]] int PositionStepBits(const std::array<std::uint32_t, 3>& steps) noexcept
+    {
+      return ExpGolombBits(steps[0], kStepOrderXZ) + ExpGolombBits(steps[1], kStepOrderY) + ExpGolombBits(steps[2], kStepOrderXZ);
+    }
+
+    [[nodiscard]] int PositionWholeBits(const SFrameCodec& codec) noexcept
+    {
+      return codec.position.x.bits + codec.position.y.bits + codec.position.z.bits;
+    }
+
+    /** Whether a changed yaw may go as its turn: yaw-only at both ends. */
+    [[nodiscard]] bool YawMayStep(const SEntityRecord& record, const SEntityRecord* const before) noexcept
+    {
+      return before != nullptr && before->yawOnly && record.yawOnly;
+    }
+
+    [[nodiscard]] std::uint32_t YawStep(const SEntityRecord& record, const SEntityRecord& before) noexcept
+    {
+      return ZigZag(static_cast<std::int16_t>(static_cast<std::uint16_t>(record.orientation - before.orientation)));
+    }
+
     /** `beat` is the frame's: a dead-reckoned anchor cannot lie in its future. */
     [[nodiscard]] bool FitsCodec(const SEntityRecord& record, const SFrameCodec& codec, const std::uint32_t beat) noexcept
     {
@@ -164,9 +242,22 @@ namespace faf::remote::wire
           writer.WriteFloatExact(value);
         }
       } else if ((fields & kFieldPosition) != 0u) {
-        writer.WriteBits(record.position[0], codec.position.x.bits);
-        writer.WriteBits(record.position[1], codec.position.y.bits);
-        writer.WriteBits(record.position[2], codec.position.z.bits);
+        bool stepped = false;
+        if (PositionMayStep(record, before)) {
+          const std::array<std::uint32_t, 3> steps = PositionSteps(record, *before);
+          stepped = PositionStepBits(steps) < PositionWholeBits(codec);
+          writer.WriteBool(stepped);
+          if (stepped) {
+            WriteExpGolomb(writer, steps[0], kStepOrderXZ);
+            WriteExpGolomb(writer, steps[1], kStepOrderY);
+            WriteExpGolomb(writer, steps[2], kStepOrderXZ);
+          }
+        }
+        if (!stepped) {
+          writer.WriteBits(record.position[0], codec.position.x.bits);
+          writer.WriteBits(record.position[1], codec.position.y.bits);
+          writer.WriteBits(record.position[2], codec.position.z.bits);
+        }
         if (codec.deadReckoning) {
           writer.WriteVarUint(beat - record.anchorBeat);
           for (const std::int32_t component : record.velocity) {
@@ -180,7 +271,18 @@ namespace faf::remote::wire
       }
       if ((fields & kFieldOrientation) != 0u) {
         writer.WriteBool(record.yawOnly);
-        writer.WriteBits(record.orientation, record.yawOnly ? kYawBits : 32);
+        bool turned = false;
+        if (YawMayStep(record, before)) {
+          const std::uint32_t turn = YawStep(record, *before);
+          turned = ExpGolombBits(turn, kStepOrderYaw) < kYawBits;
+          writer.WriteBool(turned);
+          if (turned) {
+            WriteExpGolomb(writer, turn, kStepOrderYaw);
+          }
+        }
+        if (!turned) {
+          writer.WriteBits(record.orientation, record.yawOnly ? kYawBits : 32);
+        }
         if (codec.orientationReckoning && record.yawOnly) {
           writer.WriteVarUint(beat - record.orientationBeat);
           writer.WriteVarUint(ZigZag(record.yawRate));
@@ -349,12 +451,19 @@ namespace faf::remote::wire
       }
     }
 
-    /** Reads `fields` into `record`. Unit fields for a record that is not a unit are refused. */
+    /**
+     * Reads `fields` into `record`. Unit fields for a record that is not a unit are refused. `change`: `record`
+     * holds the baseline's record, which a stepped position or yaw goes from (none for a creation).
+     */
     [[nodiscard]] bool ReadFields(
       BitReader& reader, SEntityRecord& record, const std::uint32_t fields, const SFrameCodec& codec,
-      const std::uint32_t beat
+      const std::uint32_t beat, const bool change
     )
     {
+      const bool positionFromBaseline = change && !record.farPosition;
+      const QuantizedPosition baselinePosition = record.position;
+      const bool yawFromBaseline = change && record.yawOnly;
+      const std::uint32_t baselineOrientation = record.orientation;
       if ((fields & kFieldKind) != 0u) {
         record.isUnit = reader.ReadBool();
       }
@@ -376,9 +485,22 @@ namespace faf::remote::wire
         record.followsGround = false;
       } else if ((fields & kFieldPosition) != 0u) {
         record.farValue = {};
-        record.position[0] = reader.ReadBits(codec.position.x.bits);
-        record.position[1] = reader.ReadBits(codec.position.y.bits);
-        record.position[2] = reader.ReadBits(codec.position.z.bits);
+        if (positionFromBaseline && reader.ReadBool()) {
+          const std::uint32_t limits[3] = {codec.position.x.MaxQuantized(), codec.position.y.MaxQuantized(), codec.position.z.MaxQuantized()};
+          const int orders[3] = {kStepOrderXZ, kStepOrderY, kStepOrderXZ};
+          for (std::size_t axis = 0; axis < 3; ++axis) {
+            const std::int64_t value = static_cast<std::int64_t>(baselinePosition[axis]) + UnZigZag(ReadExpGolomb(reader, orders[axis]));
+            if (!reader.Ok() || value < 0 || value > limits[axis]) {
+              reader.Fail();
+              return false;
+            }
+            record.position[axis] = static_cast<std::uint32_t>(value);
+          }
+        } else {
+          record.position[0] = reader.ReadBits(codec.position.x.bits);
+          record.position[1] = reader.ReadBits(codec.position.y.bits);
+          record.position[2] = reader.ReadBits(codec.position.z.bits);
+        }
         if (codec.deadReckoning) {
           const std::uint32_t age = reader.ReadVarUint();
           if (!reader.Ok() || age > beat) {
@@ -395,7 +517,16 @@ namespace faf::remote::wire
       }
       if ((fields & kFieldOrientation) != 0u) {
         record.yawOnly = reader.ReadBool();
-        record.orientation = reader.ReadBits(record.yawOnly ? kYawBits : 32);
+        if (yawFromBaseline && record.yawOnly && reader.ReadBool()) {
+          const std::uint32_t turn = ReadExpGolomb(reader, kStepOrderYaw);
+          if (!reader.Ok() || turn > 0xFFFFu) {
+            reader.Fail();
+            return false;
+          }
+          record.orientation = static_cast<std::uint16_t>(baselineOrientation + static_cast<std::uint32_t>(UnZigZag(turn)));
+        } else {
+          record.orientation = reader.ReadBits(record.yawOnly ? kYawBits : 32);
+        }
         record.yawRate = 0;
         record.orientationBeat = 0;
         if (codec.orientationReckoning && record.yawOnly) {
@@ -1289,6 +1420,28 @@ namespace faf::remote::wire
     return true;
   }
 
+  int PositionFieldBits(const SEntityRecord& record, const SEntityRecord* const before, const SFrameCodec& codec) noexcept
+  {
+    if (record.farPosition) {
+      return 1 + 96;
+    }
+    if (!PositionMayStep(record, before)) {
+      return 1 + PositionWholeBits(codec);
+    }
+    return 2 + std::min(PositionStepBits(PositionSteps(record, *before)), PositionWholeBits(codec));
+  }
+
+  int OrientationFieldBits(const SEntityRecord& record, const SEntityRecord* const before) noexcept
+  {
+    if (!record.yawOnly) {
+      return 1 + 32;
+    }
+    if (!YawMayStep(record, before)) {
+      return 1 + kYawBits;
+    }
+    return 2 + std::min(ExpGolombBits(YawStep(record, *before), kStepOrderYaw), kYawBits);
+  }
+
   std::uint32_t PeekFrameBaseline(const std::span<const std::uint8_t> bytes) noexcept
   {
     BitReader reader(bytes);
@@ -1365,7 +1518,7 @@ namespace faf::remote::wire
           return false;
         }
         record.tickCreated = reader.ReadVarUint();
-        if (!ReadFields(reader, record, fields, codec, beat)) {
+        if (!ReadFields(reader, record, fields, codec, beat, false)) {
           return false;
         }
         created.push_back(record);
@@ -1416,7 +1569,7 @@ namespace faf::remote::wire
         if (m == merged.size() || merged[m].id != id || (c < created.size() && created[c].id == id)) {
           return false;
         }
-        if (!ReadFields(reader, merged[m], fields, codec, beat)) {
+        if (!ReadFields(reader, merged[m], fields, codec, beat, true)) {
           return false;
         }
       }
