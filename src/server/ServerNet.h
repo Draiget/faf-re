@@ -49,6 +49,9 @@ namespace faf::server
 
     void AddSeat(std::int32_t uid, const char* name, const std::string& token, remote::CServerClient& seat);
 
+    /** Before `Start`: an address the match knows a player by (`CServerLinks::AllowAddress`). */
+    void AllowAddress(std::uint32_t ip) { mLinks.AllowAddress(ip); }
+
     /** Binds the socket and starts the thread. */
     [[nodiscard]] bool Start(std::string& error);
     /** Stops the thread; no seat is touched after this returns. */
@@ -82,6 +85,9 @@ namespace faf::server
     /** Who went away or stopped being away since the last call, in order. */
     [[nodiscard]] std::vector<SPresence> TakePresence();
 
+    /** What arrived that wasn't a player's, for the console; after `Stop`. */
+    [[nodiscard]] std::string LinkReport() const;
+
     /** Lines for the console since the last call. */
     [[nodiscard]] std::vector<std::string> TakeNews();
     /** The wait is over and nobody ever joined. */
@@ -101,6 +107,7 @@ namespace faf::server
       // A returning player has lost the frames the next one is encoded against, so it waits for a fresh one (WP14.1).
       bool viewBroken = false;
       std::uint64_t lostAtUs = 0;
+      std::uint64_t lastResyncUs = 0; // its last view sent whole on a `ViewMismatch`
       std::uint64_t bytesSeen = 0; // its channel's count; a new channel starts again
     };
 
@@ -130,6 +137,8 @@ namespace faf::server
     std::vector<std::int32_t> mReturned;      // likewise
     std::vector<SPresence> mPresence;         // likewise
     std::uint64_t mBadMessages = 0;
+    std::uint64_t mViewMismatches = 0;
+    static constexpr double kResyncSeconds = 10.0;
     // `OnMessage` runs inside the links' pass over their players, so they go once it's over.
     std::vector<std::int32_t> mToUnlink;
 

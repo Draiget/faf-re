@@ -222,6 +222,12 @@ namespace faf::remote::wire
   [[nodiscard]] std::uint64_t HashBlipUpdate(const SEntityRecord& record, const SUnitDetail& detail) noexcept;
 
   /**
+   * Plan WPR.30: a fingerprint of a whole record, the id and creation constants and motion included, so a server and
+   * its client can tell whether they hold the same frame. A frame's is the sum of its records', in any order.
+   */
+  [[nodiscard]] std::uint64_t HashRecord(const SEntityRecord& record) noexcept;
+
+  /**
    * Change-mask bits, one per field after the id. On the wire the mask is a varint, so the
    * fields that change every tick come first and a typical change costs one mask byte.
    * `kFieldKind` carries `isUnit`; the unit bits are only valid for a unit.

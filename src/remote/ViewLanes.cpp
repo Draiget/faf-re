@@ -138,12 +138,14 @@ namespace faf::remote
       client.grids.clear();
       return; // no client
     }
+    const bool check = ViewBeat() % kCheckEveryBeats == 0u;
     if (army >= static_cast<std::size_t>(ArmyCount())) {
       // A team's view: its frame, once, for its players' messages.
       client.teamFrame.Clear();
       if (!EncodeHeldFrame(view, client.teamFrame)) {
         ++client.failures;
       }
+      client.teamHash = check ? HeldFrameHash(view) : 0u;
       return;
     }
     bool ok = true;
@@ -215,6 +217,9 @@ namespace faf::remote
 
     SLanes lanes{frameWriter, armyWriter, gridWriter, client.lua, ok};
     lanes.fresh = fresh;
+    // A whole view carries its check, so a client that asked for one knows at once that it holds the right frames.
+    lanes.check = check || fresh;
+    lanes.frameHash = lanes.check ? HeldFrameHash(view) : 0u;
     // The team's frame goes once for all its players, except to one who holds none of it.
     wire::BitWriter wholeTeamFrame;
     if (const std::size_t teamSlot = TeamSlotOf(army); teamSlot != army && !CutFromTeam(army)) {
@@ -227,6 +232,8 @@ namespace faf::remote
         lanes.team = &wholeTeamFrame;
       }
       lanes.teamEntities = HeldCount(static_cast<std::int32_t>(teamSlot));
+      // The team's view hashed itself only on a check's beat; between them a whole view hashes it here.
+      lanes.teamHash = check ? mClients[teamSlot].teamHash : (fresh ? HeldFrameHash(static_cast<std::int32_t>(teamSlot)) : 0u);
       client.bytes += static_cast<std::uint32_t>(lanes.team->Bytes().size());
     }
     OnLanesEncoded(army, lanes);

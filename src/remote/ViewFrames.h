@@ -111,6 +111,8 @@ namespace faf::remote
      * (plan WP14.1). The next frame is encoded against this one as for anyone else.
      */
     [[nodiscard]] bool EncodeWholeHeldFrame(std::int32_t army, wire::BitWriter& writer) const;
+    /** Plan WPR.30: `wire::HashRecord` summed over what `army`'s client holds after its last frame. */
+    [[nodiscard]] std::uint64_t HeldFrameHash(std::int32_t army) const;
     /**
      * With `EnableHeldFrames`, between a beat's views: whether `army`'s client holds a record with this
      * id, or held one within `CViewIdMap::kInboundGraceBeats` (its order may be on its way).

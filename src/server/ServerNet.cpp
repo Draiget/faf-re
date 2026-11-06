@@ -198,6 +198,16 @@ namespace faf::server
     return std::exchange(mGone, {});
   }
 
+  std::string CServerNet::LinkReport() const
+  {
+    const remote::net::SGameLinkStats& stats = mLinks.Stats();
+    return "network: " + std::to_string(stats.datagramsIn) + " datagrams in; dropped: " + std::to_string(stats.strangersDropped) + " not a player's, " +
+           std::to_string(stats.unlistedDropped) + " from unlisted addresses past their budget, " + std::to_string(stats.addressLimited) +
+           " handshakes past their address's limit, " + std::to_string(stats.handshakesLimited) + " past the server's, " + std::to_string(stats.badCookies) +
+           " with a bad cookie; " + std::to_string(stats.refused) + " refused; " + std::to_string(mViewMismatches) +
+           " views reported damaged";
+  }
+
   std::vector<std::int32_t> CServerNet::TakeReturned()
   {
     const std::scoped_lock lock(mNewsLock);
@@ -289,10 +299,25 @@ namespace faf::server
     case remote::net::ESeatMessage::Leaving:
       Remove(uid, seat, "left");
       return;
+    case remote::net::ESeatMessage::ViewMismatch:
+      // Plan WPR.30: the next view goes whole. At most one in `kResyncSeconds`, as each costs a whole frame.
+      ++mViewMismatches;
+      if (seat.viewBroken || (seat.lastResyncUs != 0u && mNowUs - seat.lastResyncUs < static_cast<std::uint64_t>(kResyncSeconds * 1e6))) {
+        return;
+      }
+      seat.lastResyncUs = mNowUs;
+      seat.viewBroken = true;
+      {
+        const std::scoped_lock lock(mNewsLock);
+        mReturned.push_back(uid);
+      }
+      Say(seat.name + "'s view didn't match the server's check; it gets it whole with the next beat");
+      return;
     case remote::net::ESeatMessage::Beat:
     case remote::net::ESeatMessage::View:
     case remote::net::ESeatMessage::GameInfo:
     case remote::net::ESeatMessage::CommandAnswer:
+    case remote::net::ESeatMessage::ViewCheck:
       break; // the server's own to send
     }
     ++mBadMessages;

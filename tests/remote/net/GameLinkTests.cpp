@@ -331,14 +331,83 @@ namespace
     }
     server.Wait(20);
     server.Pump(nowUs, events);
-    Check(server.Stats().handshakesLimited > 0u, "a flood of Hellos hits the limit");
+    Check(server.Stats().addressLimited > 0u, "a flood of Hellos from one address hits its own limit");
+    Check(server.Stats().handshakesLimited == 0u, "before the server's");
     int answers = 0;
     std::array<std::uint8_t, 256> buffer{};
     SEndpoint from;
     while (flood.ReceiveFrom(buffer.data(), buffer.size(), from) >= 0) {
       ++answers;
     }
-    Check(answers <= static_cast<int>(CServerLinks::kHandshakesPerSecond), "and most get no answer");
+    Check(answers <= static_cast<int>(CServerLinks::kHandshakeBurstPerAddress), "and most get no answer");
+  }
+
+  /** A raw Hello from `socket`; whether a Challenge comes back. */
+  [[nodiscard]] bool GetsChallenge(CServerLinks& server, CEvents& events, CUdpSocket& socket, const std::uint64_t nowUs)
+  {
+    const auto hello = WriteHello();
+    (void)socket.SendTo(hello.data(), hello.size(), server.Local());
+    std::array<std::uint8_t, 256> buffer{};
+    SEndpoint from;
+    for (int i = 0; i < 100; ++i) {
+      server.Pump(nowUs, events);
+      socket.Wait(1);
+      if (socket.ReceiveFrom(buffer.data(), buffer.size(), from) == static_cast<int>(kChallengeSize)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Plan WPR.28, WPR.45, WPR.48: several loopback addresses stand for several machines.
+  void AllowlistAndAddressLimits()
+  {
+    CServerLinks server;
+    std::string error;
+    Check(server.Open(kLoopbackAnyPort, error), "the server binds");
+    server.AddPlayer(1, MakeToken("one"));
+    server.AllowAddress(0x7F000002u); // 127.0.0.2: the match's player address
+    CEvents events;
+    std::uint64_t nowUs = 1000u;
+
+    CUdpSocket listed;
+    CUdpSocket flood;
+    CUdpSocket other;
+    Check(listed.Open(SEndpoint{0x7F000002u, 0u}, error), "a socket on the listed address opens");
+    Check(flood.Open(SEndpoint{0x7F000003u, 0u}, error), "a flood socket on an unlisted address opens");
+    Check(other.Open(SEndpoint{0x7F000004u, 0u}, error), "another unlisted socket opens");
+
+    // Unlisted Hellos share a small budget: past it they get nothing, and nothing is kept for them.
+    const auto hello = WriteHello();
+    for (int i = 0; i < 1000; ++i) {
+      (void)flood.SendTo(hello.data(), hello.size(), server.Local());
+    }
+    server.Wait(20);
+    server.Pump(nowUs, events);
+    int answers = 0;
+    std::array<std::uint8_t, 256> buffer{};
+    SEndpoint from;
+    while (flood.ReceiveFrom(buffer.data(), buffer.size(), from) >= 0) {
+      ++answers;
+    }
+    Check(answers <= static_cast<int>(CServerLinks::kUnlistedHandshakesPerSecond), "an unlisted flood gets at most the unlisted budget");
+    Check(server.Stats().unlistedDropped > 0u, "and the rest is dropped");
+    Check(server.Stats().handshakesLimited == 0u, "without touching the server's budget");
+    Check(GetsChallenge(server, events, listed, nowUs), "the listed address still gets its challenge at once");
+
+    // A player whose address the match didn't know (a VPN) gets in with the token, once the shared budget refills.
+    nowUs += 2'000'000u;
+    CClientLink vpn(1, MakeToken("one"), server.Local());
+    Check(vpn.Open(error), "a client on 127.0.0.1, which isn't listed, opens");
+    Check(RunUntil(server, events, {&vpn}, nowUs, 2'000'000u, [&] { return vpn.State() == CClientLink::EState::Connected; }), "it gets in with its token");
+    // Its address is now listed: a flood from elsewhere doesn't keep it out when it comes back.
+    for (int i = 0; i < 1000; ++i) {
+      (void)other.SendTo(hello.data(), hello.size(), server.Local());
+    }
+    server.Wait(20);
+    server.Pump(nowUs, events);
+    vpn.Reconnect();
+    Check(RunUntil(server, events, {&vpn}, nowUs, 2'000'000u, [&] { return vpn.State() == CClientLink::EState::Connected; }), "and comes back through an unlisted flood");
   }
 } // namespace
 
@@ -350,6 +419,7 @@ int main()
   Endpoints();
   OverRealSockets();
   TimeoutAndRateLimit();
+  AllowlistAndAddressLimits();
   std::printf("%d checks, %d failures\n", gChecks, gFailures);
   return gFailures;
 }

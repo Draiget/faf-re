@@ -57,7 +57,14 @@ namespace faf::remote
       const wire::BitWriter* team = nullptr; // the player's team's frame, with teams and not cut from it
       std::size_t teamEntities = 0;
       bool fresh = false; // `RequestFresh`: every lane but Lua's is whole, for a client that holds nothing
+      // Plan WPR.30, every `kCheckEveryBeats`: what the client should hold after this beat, by `CViewFrames::HeldFrameHash`.
+      bool check = false;
+      std::uint64_t frameHash = 0;
+      std::uint64_t teamHash = 0; // with `team`
     };
+
+    /** How often a client's frames are checked: the most a damaged one goes unnoticed (WPR.31: under a second). */
+    static constexpr std::uint32_t kCheckEveryBeats = 8;
 
     /**
      * Plan WP14.1, on the sim thread between beats: `army`'s client holds nothing any more (it reconnected),
@@ -105,6 +112,7 @@ namespace faf::remote
       std::vector<std::uint16_t> gridsNext;
       wire::BitWriter lua;              // this beat's Lua lane, which is ready before the others
       wire::BitWriter teamFrame;        // a team's view: this beat's frame, for its players' messages
+      std::uint64_t teamHash = 0;       // and on a check's beat its hash
       bool fresh = false;               // `RequestFresh`
       std::uint32_t bytes = 0;          // this beat
       std::uint64_t failures = 0;       // since `TakeClientFailures`

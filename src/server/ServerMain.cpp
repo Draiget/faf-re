@@ -271,6 +271,53 @@ namespace
     return tokens;
   }
 
+  /**
+   * Plan WPR.45: `MatchAddresses`, by `OwnerID`, each an IPv4 address or a list of them, outside `MatchConfig` as the
+   * tokens are. The addresses FAF knows its players by. False with `error` for one that doesn't parse.
+   */
+  [[nodiscard]] bool ReadAddresses(LuaPlus::LuaState* const state, std::vector<std::uint32_t>& addresses, std::string& error)
+  {
+    LuaPlus::LuaObject table = state->GetGlobal("MatchAddresses");
+    if (!table.IsTable()) {
+      return true;
+    }
+    const auto add = [&](const LuaPlus::LuaObject& value) {
+      faf::remote::net::SEndpoint endpoint;
+      if (!value.IsString() || !faf::remote::net::ParseEndpoint(std::string(value.GetString()) + ":1", endpoint)) {
+        error = std::string("MatchAddresses holds ") + (value.IsString() ? value.GetString() : "a value that isn't a string") + ", not an IPv4 address";
+        return false;
+      }
+      addresses.push_back(endpoint.ip);
+      return true;
+    };
+    for (LuaPlus::LuaTableIterator it(&table, 1); !it.m_isDone; it.Next()) {
+      LuaPlus::LuaObject value = it.GetValue();
+      if (value.IsTable()) {
+        for (LuaPlus::LuaTableIterator one(&value, 1); !one.m_isDone; one.Next()) {
+          if (!add(one.GetValue())) {
+            return false;
+          }
+        }
+      } else if (!add(value)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** Plan WPR.42: the sim mods a match names. FAF's lobby puts only sim mods in `GameMods` (`Mods.GetGameMods`). */
+  [[nodiscard]] int CountSimMods(const LuaPlus::LuaObject& config)
+  {
+    LuaPlus::LuaObject mods = config["GameMods"];
+    int count = 0;
+    if (mods.IsTable()) {
+      for (LuaPlus::LuaTableIterator it(&mods, 1); !it.m_isDone; it.Next()) {
+        ++count;
+      }
+    }
+    return count;
+  }
+
   [[nodiscard]] std::vector<SMatchPlayer> ReadPlayers(const LuaPlus::LuaObject& config)
   {
     std::vector<SMatchPlayer> players;
@@ -427,6 +474,17 @@ namespace
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
     }
+    // A sim mod's Lua would run unchecked inside the server's sim; UI mods stay on the players' machines.
+    if (const int simMods = CountSimMods(config); simMods > 0) {
+      end.error = "the match names " + std::to_string(simMods) + " sim mods, and a dedicated server runs none";
+      Say("Can't host: %s", end.error.c_str());
+      return kExitBadInput;
+    }
+    std::vector<std::uint32_t> allowedAddresses;
+    if (!ReadAddresses(state, allowedAddresses, end.error)) {
+      Say("Can't host: %s", end.error.c_str());
+      return kExitBadInput;
+    }
 
     moho::CLaunchRoster roster(kServerUid, kServerName, {});
     // As a lockstep game's host launches it: each player may pause as often as the match's `Timeouts` says
@@ -495,6 +553,13 @@ namespace
       net->AddSeat(client.uid, client.name.c_str(), token->second, seat);
     }
     if (net) {
+      for (const std::uint32_t ip : allowedAddresses) {
+        net->AllowAddress(ip);
+      }
+      if (!allowedAddresses.empty()) {
+        Say("%d addresses from MatchAddresses get a full handshake budget; others share a small one, and a valid token lists them",
+            static_cast<int>(allowedAddresses.size()));
+      }
       std::string netError;
       if (!net->Start(netError)) {
         end.error = netError;
@@ -845,6 +910,10 @@ namespace
       views->Uninstall();
       Say("%s", net->Intake().Report().c_str());
       Say("%s", views->LaneReport().c_str());
+    }
+    if (net) {
+      net->Stop(); // its counters are the network thread's
+      Say("%s", net->LinkReport().c_str());
     }
     while (driver->HasSyncData()) {
       moho::SSyncData* rawPacket = nullptr;

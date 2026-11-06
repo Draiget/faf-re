@@ -585,6 +585,20 @@ namespace faf::remote
     return wire::EncodeFrameChanges(changes, mCodec, writer);
   }
 
+  std::uint64_t CViewFrames::HeldFrameHash(const std::int32_t army) const
+  {
+    const auto slot = static_cast<std::size_t>(army);
+    const SHeldView& held = mHeld[slot];
+    const CViewFrameBuilder& builder = *mBuilders[slot];
+    std::uint64_t hash = 0;
+    for (std::uint32_t recordSlot = 0; recordSlot < held.sent.size(); ++recordSlot) {
+      if (held.sent[recordSlot] != 0u) {
+        hash += wire::HashRecord(held.ownSlot[recordSlot] != kNoOwn ? held.own[held.ownSlot[recordSlot]] : builder.RecordAt(recordSlot));
+      }
+    }
+    return hash;
+  }
+
   bool CViewFrames::SlotHoldsEntity(const std::size_t slot, const std::uint32_t id) const
   {
     if (slot >= mHeld.size()) {

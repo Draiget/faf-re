@@ -960,6 +960,30 @@ namespace faf::remote::wire
     return hash != 0u ? hash : 1u;
   }
 
+  std::uint64_t HashRecord(const SEntityRecord& record) noexcept
+  {
+    // A record that isn't a unit keeps an empty unit block, as `operator==` ignores it.
+    static const SUnitDetail kNoDetail{};
+    std::uint64_t hash = HashBlipUpdate(record, record.isUnit ? *record.unit.detail : kNoDetail);
+    const auto add = [&hash](const std::uint64_t value) {
+      hash = std::rotl(hash ^ (value * 0xC2B2AE3D27D4EB4Full), 29) * 0x9E3779B185EBCA87ull;
+    };
+    add(record.id);
+    add(record.tickCreated);
+    add(record.blueprint);
+    add(record.army);
+    add(record.isUnit ? 1u : 0u);
+    for (const std::int32_t component : record.velocity) {
+      add(static_cast<std::uint32_t>(component));
+    }
+    add(static_cast<std::uint32_t>(record.verticalAcceleration));
+    add(record.anchorBeat);
+    add(record.followsGround ? 1u : 0u);
+    add(static_cast<std::uint32_t>(record.yawRate));
+    add(record.orientationBeat);
+    return hash ^ (hash >> 29u);
+  }
+
   std::uint32_t CreationFields(const SEntityRecord& record) noexcept
   {
     return kEntityFields | kFieldKind | (record.isUnit ? kUnitFields : 0u)

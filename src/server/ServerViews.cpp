@@ -141,6 +141,17 @@ namespace faf::server
     WriteLane(writer, lanes.grids);
     WriteLane(writer, lanes.lua);
     mNet.QueueView(player->second, std::move(message), lanes.fresh);
+    if (lanes.check) {
+      std::vector<std::uint8_t> check;
+      remote::net::ByteWriter checkWriter(check);
+      checkWriter.Byte(static_cast<std::uint8_t>(remote::net::ESeatMessage::ViewCheck));
+      checkWriter.Varint(ViewBeat());
+      std::uint8_t hashes[2 * sizeof(std::uint64_t)];
+      std::memcpy(hashes, &lanes.frameHash, sizeof(std::uint64_t));
+      std::memcpy(hashes + sizeof(std::uint64_t), &lanes.teamHash, sizeof(std::uint64_t));
+      checkWriter.Bytes(hashes, sizeof(hashes));
+      mNet.QueueView(player->second, std::move(check));
+    }
   }
 
   std::string CServerViews::LaneReport() const

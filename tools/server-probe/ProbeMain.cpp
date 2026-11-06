@@ -176,10 +176,12 @@ namespace
     double fuzzAt = -1.0;
     double floodAt = -1.0;
     double breakAllianceAt = -1.0;
+    double damageAt = -1.0; // changes a kept record on purpose (WPR.31), which the server's next check should catch
     std::int32_t breakWith = -1; // the army index to stop being allied with, as FAF's diplomacy screen asks
 
     double beatMs = 0.0; // the game's beat, to tell how late views come; 0: no telling
     bool noDecode = false; // the channel's limit alone, as decoding takes a while
+    std::string saveViews; // every message from the server's views, each as a 32-bit size and its bytes, to measure compression
     int fuzzCount = 2000;
     CImpairedPath::SConfig path;
     bool noLoad = false;
@@ -222,6 +224,10 @@ namespace
         out.resumeAt = Argument(value);
       } else if (name == "--pause-every") {
         out.pauseEvery = Argument(value);
+      } else if (name == "--damage-at") {
+        out.damageAt = Argument(value);
+      } else if (name == "--save-views") {
+        out.saveViews = value;
       } else if (name == "--break-alliance-at") {
         out.breakAllianceAt = Argument(value);
       } else if (name == "--break-with") {
@@ -387,6 +393,10 @@ namespace
     std::uint64_t maxMessage = 0;
     std::uint64_t whole = 0;       // views after the first whose frame came against nothing: after a reconnect
     std::uint64_t gameInfos = 0;
+    std::uint64_t checks = 0;      // `ViewCheck`s compared
+    std::uint64_t mismatches = 0;  // and of them that didn't match
+    bool askedWhole = false;       // a `ViewMismatch` went, and no check has matched since
+    double damagedAt = -1.0;       // `--damage-at`'s time, once done
     double firstAt = -1.0;
     double lastAt = 0.0;
   };
@@ -536,7 +546,7 @@ int main(const int argc, char** const argv)
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> [--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
       "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>]\n"
+      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>]\n"
     );
     return 3;
   }
@@ -569,6 +579,8 @@ int main(const int argc, char** const argv)
   SViews views;
   views.beatMs = options.beatMs;
   views.noDecode = options.noDecode;
+  // Left to the process's end to close.
+  std::FILE* const saved = options.saveViews.empty() ? nullptr : std::fopen(options.saveViews.c_str(), "wb");
   std::deque<const char*> asked; // what each answer will be about, in order
   std::uint64_t answers[3] = {};
   std::uint32_t nextCommand = 1u;
@@ -651,6 +663,45 @@ int main(const int argc, char** const argv)
         }
         continue;
       }
+      if (message[0] == static_cast<std::uint8_t>(ESeatMessage::ViewCheck)) {
+        // Plan WPR.30: what the server says this client holds, against what it decoded.
+        ByteReader reader(message.data() + 1, message.size() - 1u);
+        const std::uint64_t beat = reader.Varint();
+        const std::uint8_t* const hashes = reader.Bytes(2u * sizeof(std::uint64_t));
+        if (reader.Ok() && !views.noDecode && views.haveFrame) {
+          std::uint64_t expected[2] = {};
+          std::memcpy(expected, hashes, sizeof(expected));
+          std::uint64_t held[2] = {};
+          for (const auto& record : views.frame.entities) {
+            held[0] += faf::remote::wire::HashRecord(record);
+          }
+          for (const auto& record : views.teamFrame.entities) {
+            held[1] += faf::remote::wire::HashRecord(record);
+          }
+          ++views.checks;
+          if (held[0] != expected[0] || held[1] != expected[1]) {
+            ++views.mismatches;
+            if (!views.askedWhole) {
+              views.askedWhole = true;
+              const auto kind = static_cast<std::uint8_t>(ESeatMessage::ViewMismatch);
+              (void)link.SendReliable(&kind, 1u);
+              std::printf("probe %d: %.1f s: its frames don't match the server's check at beat %llu; asked for them whole\n", options.uid, elapsed,
+                          static_cast<unsigned long long>(beat));
+            }
+          } else if (views.askedWhole) {
+            views.askedWhole = false;
+            std::printf("probe %d: %.1f s: its frames match the server's check again at beat %llu, %.2f s after the damage\n", options.uid, elapsed,
+                        static_cast<unsigned long long>(beat), views.damagedAt >= 0.0 ? elapsed - views.damagedAt : 0.0);
+          }
+        }
+        continue;
+      }
+      if (saved != nullptr) {
+        const auto size = static_cast<std::uint32_t>(message.size());
+        std::fwrite(&size, sizeof(size), 1, saved);
+        std::fwrite(message.data(), 1, message.size(), saved);
+        std::fflush(saved); // a probe is often stopped by a signal
+      }
       TakeView(views, message, elapsed);
       // A view takes a while to decode, and the link mustn't go quiet meanwhile.
       link.Pump(static_cast<std::uint64_t>(std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() * 1e6));
@@ -690,6 +741,17 @@ int main(const int argc, char** const argv)
     if (Due(options.resumeAt, elapsed)) {
       SendCommand(link, kOpResume);
       std::printf("probe %d: %.1f s: asked to resume, at beat %llu\n", options.uid, elapsed, static_cast<unsigned long long>(lastBeat));
+    }
+    if (views.haveFrame && Due(options.damageAt, elapsed)) {
+      // Plan WPR.31: a field that never changes, in the frame the next one decodes against, so the damage stays.
+      if (faf::remote::wire::SViewFrame* const kept = views.window.NewestFrame(); kept != nullptr && !kept->entities.empty()) {
+        ++kept->entities[0].tickCreated;
+        if (!views.frame.entities.empty()) {
+          ++views.frame.entities[0].tickCreated;
+        }
+        views.damagedAt = elapsed;
+        std::printf("probe %d: %.1f s: damaged entity 0x%08x of its own frame\n", options.uid, elapsed, kept->entities[0].id);
+      }
     }
     if (views.haveInfo && Due(options.breakAllianceAt, elapsed)) {
       SendCommand(link, static_cast<std::uint8_t>(moho::ECmdStreamOp::CMDST_LuaSimCallback), BreakAlliancePayload(views.army, options.breakWith));
@@ -804,9 +866,10 @@ int main(const int argc, char** const argv)
   std::printf("probe %d: joined %llu times, %llu beat messages, last beat %llu\n", options.uid, static_cast<unsigned long long>(joins), static_cast<unsigned long long>(beatMessages), static_cast<unsigned long long>(lastBeat));
   const double viewSeconds = views.lastAt - views.firstAt;
   std::printf(
-    "probe %d: %llu views, %llu didn't decode, %llu whole after the first, %llu game infos, last at beat %llu with %llu entities, %.1f KB/s (frames %.1f), largest %llu bytes\n", options.uid,
+    "probe %d: %llu views, %llu didn't decode, %llu whole after the first, %llu game infos, %llu checks (%llu didn't match), last at beat %llu with %llu entities, %.1f KB/s (frames %.1f), largest %llu bytes\n", options.uid,
     static_cast<unsigned long long>(views.views), static_cast<unsigned long long>(views.failed), static_cast<unsigned long long>(views.whole),
-    static_cast<unsigned long long>(views.gameInfos), static_cast<unsigned long long>(views.lastBeat),
+    static_cast<unsigned long long>(views.gameInfos), static_cast<unsigned long long>(views.checks), static_cast<unsigned long long>(views.mismatches),
+    static_cast<unsigned long long>(views.lastBeat),
     static_cast<unsigned long long>(views.lastEntities), viewSeconds > 0.0 ? static_cast<double>(views.bytes) / 1024.0 / viewSeconds : 0.0,
     viewSeconds > 0.0 ? static_cast<double>(views.frameBytes) / 1024.0 / viewSeconds : 0.0, static_cast<unsigned long long>(views.maxMessage)
   );

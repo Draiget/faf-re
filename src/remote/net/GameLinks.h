@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -8,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "remote/net/Handshake.h"
@@ -49,6 +51,14 @@ namespace faf::remote::net
      * didn't), then an `ECommandAnswer` byte.
      */
     CommandAnswer = 7,
+    /**
+     * Server to player, reliable, after a beat's view every few beats (plan WPR.30): varint beat, then what the player's
+     * client should hold after it, `wire::HashRecord` summed over its own frame and over its team's frame, as two 64-bit
+     * integers (the second 0 without a team frame).
+     */
+    ViewCheck = 8,
+    /** Player to server, reliable: its frames didn't match a `ViewCheck`; it wants its next view whole. */
+    ViewMismatch = 9,
   };
 
   /** What became of a player's command. */
@@ -68,6 +78,10 @@ namespace faf::remote::net
     std::uint64_t strangersDropped = 0;
     /** Handshakes past the rate limit. */
     std::uint64_t handshakesLimited = 0;
+    /** Handshakes past their address's own limit. */
+    std::uint64_t addressLimited = 0;
+    /** With an allowlist: datagrams from an address not on it, past the budget such addresses share. */
+    std::uint64_t unlistedDropped = 0;
     std::uint64_t badCookies = 0;
     std::uint64_t refused = 0;
   };
@@ -89,11 +103,28 @@ namespace faf::remote::net
 
     /** Handshakes a second at most, so a flood can't take the whole CPU in key exchanges. */
     static constexpr double kHandshakesPerSecond = 200.0;
+    /**
+     * Plan WPR.28: handshakes a second from one address, after a burst, so one address can't spend everyone's
+     * budget. Players behind one router share an address, so it allows a whole game rejoining at once. Kept in a
+     * fixed table by a salted hash of the address: no state grows with the addresses a flood comes from.
+     */
+    static constexpr double kHandshakesPerAddressPerSecond = 16.0;
+    static constexpr double kHandshakeBurstPerAddress = 64.0;
+    /** Plan WPR.48: with an allowlist, handshakes a second from every address not on it together. */
+    static constexpr double kUnlistedHandshakesPerSecond = 20.0;
 
     explicit CServerLinks(const ChannelConfig& channel = {});
 
     [[nodiscard]] bool Open(const SEndpoint& local, std::string& error);
     [[nodiscard]] SEndpoint Local() const noexcept { return mSocket.Local(); }
+
+    /**
+     * Plan WPR.45, WPR.48: from the first call on, only datagrams from these addresses (any port) reach the handshake
+     * at the normal budget. The rest share `kUnlistedHandshakesPerSecond`, so a player behind a VPN, whose address
+     * the match didn't know, still gets in with a valid token, and their address is then listed. Without any call,
+     * every address is treated as listed.
+     */
+    void AllowAddress(std::uint32_t ip);
 
     void AddPlayer(std::int32_t uid, const Token& token);
     /** No more handshakes for this uid, and its channel is gone. */
@@ -127,6 +158,16 @@ namespace faf::remote::net
     void HandleDatagram(const std::uint8_t* data, std::size_t size, const SEndpoint& from, std::uint64_t nowUs, IEvents& events);
     void HandleConnect(const std::uint8_t* data, std::size_t size, const SEndpoint& from, std::uint64_t nowUs, IEvents& events);
     [[nodiscard]] bool TakeHandshakeBudget(std::uint64_t nowUs) noexcept;
+    /** One address's own budget (`kHandshakesPerAddressPerSecond`). */
+    [[nodiscard]] bool TakeAddressBudget(std::uint32_t ip, std::uint64_t nowUs) noexcept;
+    [[nodiscard]] bool TakeUnlistedBudget(std::uint64_t nowUs) noexcept;
+
+    struct SAddressBucket
+    {
+      double tokens = kHandshakeBurstPerAddress;
+      std::uint64_t lastUs = 0;
+    };
+    static constexpr std::size_t kAddressBuckets = 4096;
 
     ChannelConfig mChannelConfig;
     CUdpSocket mSocket;
@@ -136,6 +177,12 @@ namespace faf::remote::net
     SGameLinkStats mStats;
     double mHandshakeBudget = kHandshakesPerSecond;
     std::uint64_t mHandshakeBudgetUs = 0;
+    std::array<SAddressBucket, kAddressBuckets> mAddressBuckets{};
+    std::uint64_t mAddressSalt = 0;
+    bool mAllowlistOn = false;
+    std::unordered_set<std::uint32_t> mAllowed;
+    double mUnlistedBudget = kUnlistedHandshakesPerSecond;
+    std::uint64_t mUnlistedBudgetUs = 0;
     std::vector<std::vector<std::uint8_t>> mOut;
     std::vector<std::uint8_t> mMessage;
   };
