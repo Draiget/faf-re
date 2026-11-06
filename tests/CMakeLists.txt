@@ -232,3 +232,11 @@ if(TARGET faf_msdf_safety_tests)
 endif()
 add_custom_target(existing_tests DEPENDS ${_faf_existing_test_targets})
 set_target_properties(existing_tests PROPERTIES FOLDER "Tests/Existing")
+
+# Header-only particle pool reclamation policy; no graphics device required.
+add_executable(faf_particle_pool_reclaim_tests EXCLUDE_FROM_ALL particles/ParticlePoolReclaimTests.cpp)
+target_include_directories(faf_particle_pool_reclaim_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_particle_pool_reclaim_tests PRIVATE gtest_main)
+set_target_properties(faf_particle_pool_reclaim_tests PROPERTIES FOLDER "Tests/Particles")
+add_test(NAME particle_pool_reclaim COMMAND faf_particle_pool_reclaim_tests)
+set_tests_properties(particle_pool_reclaim PROPERTIES LABELS "Particles")
