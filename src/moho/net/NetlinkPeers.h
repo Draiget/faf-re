@@ -11,6 +11,7 @@
 
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
+#include "netlink/PathChoice.h"
 
 #include <cstdint>
 #include <string>
@@ -31,6 +32,7 @@ namespace moho
     bool onLane = false;    // the redundant lane (#240)
     bool laneEncrypted = false; // #289
     std::uint32_t attempts = 0;
+    faf::netlink::PathChoice choice; // the path picked in the panel (#322)
     // The game protocol's own counts on this link (netlink/GameCounters.h).
     std::uint64_t sent = 0;
     std::uint64_t resends = 0;
@@ -47,6 +49,10 @@ namespace moho
     std::vector<SNetlinkPeerInfo> peers;
     // The latest network log lines (NETLINK: and NET:), oldest first.
     std::vector<std::string> log;
+    // The ICE servers new links use, "host:port" (IceServerName).
+    std::vector<std::string> turnServers;
+    std::vector<std::string> stunServers;
+    bool forceRelay = false; // /nativenetrelay: relayed candidates only, whatever the choice
   };
 
   // A copy of the game's peer links and recent network log lines. Any thread.
@@ -56,9 +62,10 @@ namespace moho
   // modes that run links and by the panel; idempotent. Any thread.
   void NETLINK_KeepLogLines();
 
-  // Issue #321: drops the link to that peer and connects again (Link::Reconnect).
-  // False when no link to it exists. Any thread.
-  bool NETLINK_ReconnectPeer(std::int64_t id);
+  // Issue #321: drops the link to that peer and connects again (Link::Reconnect);
+  // issue #322: with a choice, on that path from now on. False when no link to it
+  // exists. Any thread.
+  bool NETLINK_ReconnectPeer(std::int64_t id, const faf::netlink::PathChoice* choice = nullptr);
 
   class CGpgNetInterface;
   struct SNetCommandArg;

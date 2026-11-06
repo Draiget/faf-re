@@ -25,6 +25,7 @@ namespace moho
 #include <windows.h>
 #include <objbase.h>
 #include <shellapi.h>
+#include <shlobj.h>
 
 #include <cstdint>
 #include <cstdio>
@@ -147,22 +148,6 @@ namespace moho
       return out;
     }
 
-    // Explorer with the log file selected.
-    void OpenLogFolder()
-    {
-      const std::wstring log = LogFilePath();
-      const bool haveLog = !log.empty() && ::GetFileAttributesW(log.c_str()) != INVALID_FILE_ATTRIBUTES;
-      // Without a log file (no /log): the game's own folder.
-      const std::wstring target = haveLog ? log : ExeFolder();
-      const HINSTANCE result =
-        haveLog ? ::ShellExecuteW(nullptr, L"open", L"explorer.exe", (L"/select,\"" + log + L"\"").c_str(), nullptr,
-                                  SW_SHOWNORMAL)
-                : ::ShellExecuteW(nullptr, L"open", target.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
-      const auto code = reinterpret_cast<INT_PTR>(result); // above 32: started
-      gpg::Logf("NETLINK: tray: log folder %s %s (ShellExecute %d)", code > 32 ? "opened at" : "not opened at",
-                Narrow(target).c_str(), static_cast<int>(code));
-    }
-
     // What a bug report needs: the build, every link with its counts, the log file
     // and the latest network log lines.
     [[nodiscard]] std::string DiagnosticsText(const SNetlinkSnapshot& view)
@@ -189,7 +174,8 @@ namespace moho
           static_cast<unsigned long long>(p.lost), p.lossPercent, static_cast<unsigned long long>(p.resends)
         );
         out += "peer " + PeerName(p) + ": " + p.state + ", attempts " + std::to_string(p.attempts) + ", " +
-               NETPANEL_PathText(p) + ", round trip " + RttText(p) + ", lane " +
+               NETPANEL_PathText(p) + " (picked: " + faf::netlink::PathChoiceText(p.choice) + "), round trip " +
+               RttText(p) + ", lane " +
                (p.onLane ? (p.laneEncrypted ? "encrypted" : "plain") : "off") + ", " + counts + "\r\n";
       }
       if (!view.log.empty()) {
@@ -222,6 +208,40 @@ namespace moho
       }
       ::CloseClipboard();
       return ok;
+    }
+
+    // Explorer with the log file selected (without /log, the game's own folder). The
+    // shell can refuse: a game run as another user than the desktop's gets "access
+    // denied". Then the path goes on the clipboard instead. Returns what happened,
+    // for the panel and the log.
+    std::string OpenLogFolder(const HWND owner)
+    {
+      const std::wstring log = LogFilePath();
+      const bool haveLog = !log.empty() && ::GetFileAttributesW(log.c_str()) != INVALID_FILE_ATTRIBUTES;
+      const std::wstring target = haveLog ? log : ExeFolder();
+      const HRESULT com = ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+      PIDLIST_ABSOLUTE item = nullptr;
+      HRESULT hr = ::SHParseDisplayName(target.c_str(), nullptr, &item, 0, nullptr);
+      if (SUCCEEDED(hr)) {
+        // One item: its folder opens with it selected; a folder opens itself.
+        hr = ::SHOpenFolderAndSelectItems(item, 0, nullptr, 0);
+        ::CoTaskMemFree(item);
+      }
+      if (SUCCEEDED(com)) {
+        ::CoUninitialize();
+      }
+      std::string result;
+      if (SUCCEEDED(hr)) {
+        result = "Log folder opened";
+      } else {
+        const bool copied = CopyToClipboard(owner, Narrow(target));
+        char code[16];
+        std::snprintf(code, sizeof(code), "0x%08lX", static_cast<unsigned long>(hr));
+        result = std::string("Explorer refused (") + code + ")" +
+                 (copied ? "; the log file's path is on the clipboard" : "; the log file is " + Narrow(target));
+      }
+      gpg::Logf("NETLINK: log folder: %s (%s)", result.c_str(), Narrow(target).c_str());
+      return result;
     }
 
     class Tray
@@ -386,6 +406,23 @@ namespace moho
         mTip = tip;
       }
 
+      // A notification from the icon (a balloon, or a toast on Windows 10 and later).
+      void Notify(const HWND hwnd, const std::string& title, const std::string& text)
+      {
+        if (!mShown) {
+          return;
+        }
+        NOTIFYICONDATAW nid{};
+        nid.cbSize = sizeof(nid);
+        nid.hWnd = hwnd;
+        nid.uID = kIconId;
+        nid.uFlags = NIF_INFO;
+        nid.dwInfoFlags = NIIF_INFO;
+        wcsncpy_s(nid.szInfoTitle, Wide(title).c_str(), _TRUNCATE);
+        wcsncpy_s(nid.szInfo, Wide(text).c_str(), _TRUNCATE);
+        ::Shell_NotifyIconW(NIM_MODIFY, &nid);
+      }
+
       void RemoveIcon(const HWND hwnd)
       {
         if (!mShown) {
@@ -446,7 +483,10 @@ namespace moho
           NETPANEL_Toggle();
           gpg::Logf("NETLINK: tray: network panel %s", net_ShowPanel ? "shown" : "hidden");
         } else if (cmd == kCmdLogFolder) {
-          OpenLogFolder();
+          const std::string result = OpenLogFolder(hwnd);
+          if (result.rfind("Log folder opened", 0) != 0) {
+            Notify(hwnd, "Log folder", result); // the tray has no panel to say it in
+          }
         } else if (cmd == kCmdDiagnostics) {
           const std::string text = DiagnosticsText(NETLINK_GetSnapshot());
           const bool ok = CopyToClipboard(hwnd, text);
@@ -480,6 +520,26 @@ namespace moho
     }
   } // namespace
 
+  std::string NETDIAG_OpenLogFolder(void* const owner)
+  {
+    return OpenLogFolder(static_cast<HWND>(owner));
+  }
+
+  std::string NETDIAG_LogFilePath()
+  {
+    return Narrow(LogFilePath());
+  }
+
+  std::string NETDIAG_Text()
+  {
+    return DiagnosticsText(NETLINK_GetSnapshot());
+  }
+
+  bool NETDIAG_CopyText(void* const owner, const std::string& text)
+  {
+    return CopyToClipboard(static_cast<HWND>(owner), text);
+  }
+
   void NETTRAY_Start()
   {
     TheTray().Start();
@@ -497,6 +557,22 @@ namespace moho
 {
   void NETTRAY_Start() {}
   void NETTRAY_Stop() {}
+  std::string NETDIAG_OpenLogFolder(void*)
+  {
+    return {};
+  }
+  std::string NETDIAG_LogFilePath()
+  {
+    return {};
+  }
+  std::string NETDIAG_Text()
+  {
+    return {};
+  }
+  bool NETDIAG_CopyText(void*, const std::string&)
+  {
+    return false;
+  }
 } // namespace moho
 
 #endif

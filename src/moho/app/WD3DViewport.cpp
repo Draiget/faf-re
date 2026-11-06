@@ -207,6 +207,22 @@ long moho::WD3DViewport::MSWWindowProc(
     return 0;
   }
 
+  // Engine addition (issue #322): presses on the open network panel go to the panel, with
+  // the release that ends them; the game never sees them. Moves still reach the game.
+  if ((message >= WM_MOUSEMOVE && message <= WM_MBUTTONDBLCLK) || message == WM_MOUSEWHEEL) {
+    const HWND window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle()));
+    POINT at{static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
+    if (message == WM_MOUSEWHEEL) {
+      ::ScreenToClient(window, &at); // the wheel's position is on the screen
+    }
+    RECT client{};
+    ::GetClientRect(window, &client);
+    const int wheel = message == WM_MOUSEWHEEL ? static_cast<short>(HIWORD(wParam)) : 0;
+    if (NETPANEL_OnMouse(window, message, at.x, at.y, client.right, client.bottom, wheel)) {
+      return 0;
+    }
+  }
+
   // FAF hot-patch (FA-Binary-Patches OnWindowMessage): 0x00430C0E calls 0x01291029 instead of
   // wxWindow::MSWWindowProc, which hands the side mouse buttons to wx as key presses of
   // VK_XBUTTON1/VK_XBUTTON2, so they can be bound like keys. lParam: repeat count 1, scan

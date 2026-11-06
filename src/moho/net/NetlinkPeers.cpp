@@ -70,7 +70,7 @@ namespace moho
     class NetLogLines final : public gpg::LogTarget
     {
     public:
-      static constexpr std::size_t kKeep = 12;
+      static constexpr std::size_t kKeep = 200; // the panel's log tab scrolls through them
 
       NetLogLines() : gpg::LogTarget(true) {}
 
@@ -188,6 +188,10 @@ namespace moho
         {
           std::lock_guard lock(mMutex);
           out.mode = mNative ? "native" : mConfigured ? "in-engine" : "";
+          out.forceRelay = mForceRelay;
+          for (const nl::IceServer& s : mIceServers) {
+            (s.kind == nl::IceServer::Kind::Turn ? out.turnServers : out.stunServers).push_back(nl::IceServerName(s));
+          }
           for (const auto& [id, peer] : mPeers) {
             entries.push_back({id, peer->login, peer->link, peer->counters});
           }
@@ -206,6 +210,7 @@ namespace moho
           info.onLane = stats.onLane;
           info.laneEncrypted = stats.laneEncrypted;
           info.attempts = stats.attempts;
+          info.choice = stats.choice;
           {
             std::lock_guard lock(e.counters->mutex);
             const nl::GameCounters& c = e.counters->counts;
@@ -220,14 +225,15 @@ namespace moho
         return out;
       }
 
-      bool Reconnect(const std::int64_t id)
+      bool Reconnect(const std::int64_t id, const nl::PathChoice* choice)
       {
         const std::shared_ptr<nl::Link> link = Find(id);
         if (!link) {
           return false;
         }
-        gpg::Logf("NETLINK: peer %lld reconnect asked", static_cast<long long>(id));
-        link->Reconnect();
+        gpg::Logf("NETLINK: peer %lld reconnect asked%s%s", static_cast<long long>(id), choice ? ", path " : "",
+                  choice ? nl::PathChoiceText(*choice).c_str() : "");
+        link->Reconnect(choice ? std::optional<nl::PathChoice>(*choice) : std::nullopt);
         return true;
       }
 
@@ -613,9 +619,9 @@ namespace moho
     Links().Shutdown();
   }
 
-  bool NETLINK_ReconnectPeer(const std::int64_t id)
+  bool NETLINK_ReconnectPeer(const std::int64_t id, const faf::netlink::PathChoice* const choice)
   {
-    return Links().Reconnect(id);
+    return Links().Reconnect(id, choice);
   }
 
   SNetlinkSnapshot NETLINK_GetSnapshot()

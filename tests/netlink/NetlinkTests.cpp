@@ -759,6 +759,20 @@ namespace
     Check(answererDropped.load() && a->GetStats().attempts > before,
           (std::string("reconnect on the ") + side + ": the connection drops and the offerer starts a new attempt").c_str());
 
+    if (onOfferer) {
+      // Issue #322: a picked path holds over the attempt policy, so "no relay" offers
+      // host candidates again and the pair comes back.
+      PathChoice direct;
+      direct.mode = PathChoice::Mode::NoRelay;
+      a->Reconnect(direct);
+      const double back = waitFor(20, sealedUp);
+      const LinkStats s = a->GetStats();
+      std::printf("  reconnect with 'no relay': connected %d after %.1f s, path %s/%s, picked %s\n", sealedUp(), back,
+                  s.localType.c_str(), s.remoteType.c_str(), PathChoiceText(s.choice).c_str());
+      Check(sealedUp() && s.choice == direct && s.localType == "host",
+            "reconnect with a picked path: 'no relay' connects over host candidates, lane sealed");
+    }
+
     stop = true;
     ticker.join();
     a->Close();

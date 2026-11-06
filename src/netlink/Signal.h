@@ -50,6 +50,10 @@ namespace faf::netlink
     std::string password;
     std::string ufrag;
     std::vector<Candidate> candidates;
+    // Issue #322, ours only: the path the sender's player picked ("auto", "relay",
+    // "norelay"), for the receiver to follow on this attempt. Sent only to a peer
+    // whose ufrag shows it runs our engine: the Java adapter rejects unknown fields.
+    std::string fafPath;
   };
 
   // Jackson's output for the records: fields in declaration order, nothing
@@ -77,6 +81,12 @@ namespace faf::netlink
     std::string username;
     std::string credential;
   };
+
+  // "host:port", as the network panel names a server (#322).
+  [[nodiscard]] inline std::string IceServerName(const IceServer& s)
+  {
+    return s.host + ":" + std::to_string(s.port);
+  }
 
   // setIceServers' list of {urls|url, username, credential}. Each URL may be
   // "turn:h:p?transport=udp" or "turn://h:p?transport=udp" (the Java adapter

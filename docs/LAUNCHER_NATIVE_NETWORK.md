@@ -74,17 +74,30 @@ A launcher checks `ProductName` only, under the string table `040904b0`. On Wind
 
 ## Network panel
 
-With no adapter there is no adapter window, so the game shows its links itself (#322): `net_ShowPanel 1`, or Ctrl+Shift+F11 in the game window (F11 alone stays FAF's connectivity screen). The renderer draws it in the same pass as the debug overlays (`src/moho/app/NetworkPanel.cpp`), so it shows in the lobby, on the loading screen and in a game, over Direct3D 11, 12 and Vulkan. One row per peer:
+With no adapter there is no adapter window, so the game shows its links itself and lets the player act on them (#322): `net_ShowPanel 1`, or Ctrl+Shift+F11 in the game window (F11 alone stays FAF's connectivity screen). The renderer draws it in the same pass as the debug overlays (`src/moho/app/NetworkPanel.cpp`), so it shows in the lobby, on the loading screen and in a game, over Direct3D 11, 12 and Vulkan. Mouse presses on the panel go to the panel, with the release that ends them; the game never sees them, and moves still reach it. Its text is Consolas from Windows' fonts folder, drawn from an MSDF atlas like the interface's text; without that file it is Courier New through GDI.
 
-| Column | From |
-|---|---|
-| state | the link's state (`LinkStateName`); `#n` after the n-th connection attempt |
-| path | `direct` or `relayed`, then the selected pair's candidate types, local/remote (`host`, `srflx`, `prflx`, `relay`) |
-| round trip | the offerer's echo; on the answerer, which sends no echo, the lane's smoothed RTT |
-| loss, resends | the game protocol's own counts on this link (`src/netlink/GameCounters.h`, as faf-netbridge's statistics lines): serial numbers that never arrived, and DATA packets the game sent again |
-| lane | `encrypted`, `plain` or `off` (#240, #289) |
+Along the top: **Copy diagnostics** (the build, every link with its counts, the log file's path and the network log lines), **Log folder**, and **X** to close. Three tabs:
 
-Under the table come the latest `NETLINK:` and `NET:` log lines. With in-engine links behind faf-netbridge (#233) the panel shows the same; with the launcher's adapter running the links it says so, since the game has no links of its own then.
+- **Peers**: one row per peer.
+
+  | Column | From |
+  |---|---|
+  | state | the link's state (`LinkStateName`); `#n` after the n-th connection attempt |
+  | path | `direct` or `relayed`, then the selected pair's candidate types, local/remote (`host`, `srflx`, `prflx`, `relay`) |
+  | round trip | the offerer's echo; on the answerer, which sends no echo, the lane's smoothed RTT |
+  | loss, resends | the game protocol's own counts on this link (`src/netlink/GameCounters.h`, as faf-netbridge's statistics lines): serial numbers that never arrived, and DATA packets the game sent again |
+  | lane | `encrypted`, `plain` or `off` (#240, #289) |
+  | picked | the path picked for this link: `auto`, `relay only`, `relay via host:port` or `no relay` |
+
+  A click on a row selects the peer. Under the table: **Reconnect** (as the link is), **Auto**, **Relay only**, **No relay**, and **Relay via** one button per TURN server. Each reconnects the link on that path and keeps it for the link's later attempts. Auto is FAF's adapter policy: every candidate type on the first attempt, no host candidates after one attempt within 2 minutes, relayed only after two. A picked path holds over that policy and starts it afresh. With `/nativenetrelay` the game takes relayed candidates only, and No relay is greyed out.
+- **Log**: the game log file's path and the last 200 `NETLINK:` and `NET:` lines, 18 at a time; the mouse wheel and **Older** / **Newer** scroll, **Copy log** copies them.
+- **ICE servers**: the TURN and STUN servers new links use (from `IceServers`), with **Every peer through this relay** per TURN server, and Auto, Relay only or No relay for every peer at once.
+
+**Log folder** opens Explorer with the log file selected (`SHOpenFolderAndSelectItems`). When the shell refuses, for example for a game run as another Windows user than the desktop's, the log file's path goes on the clipboard and the panel says so.
+
+Each end of a link filters candidates by its own attempt history, the peer's included, so a path picked on one end alone could lose to the other's policy. The pick therefore travels with the candidates: a `fafPath` field (`auto`, `relay` or `norelay`) in the `IceMsg` JSON, sent only to a peer whose ufrag carries our prefix, since the Java adapter rejects unknown fields. Our peer follows it for that attempt; `auto` restarts its policy once. Older builds of ours ignore the field.
+
+With in-engine links behind faf-netbridge (#233) the panel shows the same; with the launcher's adapter running the links it says so, since the game has no links of its own then.
 
 ## Tray icon
 
@@ -93,7 +106,7 @@ With no adapter there is no adapter tray icon either, so the game shows one whil
 - one line per peer: state, path and round trip, as on the panel;
 - **Network panel**: shows or hides the panel, as Ctrl+Shift+F11 does;
 - **Reconnect**: drops the link to one peer and connects again. The offerer offers again at once; when the answerer asks, the offerer notices within 10 s, when its echo goes unanswered. A new attempt within 2 minutes of another offers no host candidates, as the Java adapter does;
-- **Open log folder**: Explorer with the game's `/log` file selected;
+- **Open log folder**: Explorer with the game's `/log` file selected; when the shell refuses, the path goes on the clipboard and a notification says so;
 - **Copy diagnostics**: the build, every link with its counts, the log file's path and the latest network log lines, for a bug report.
 
 The icon has its own thread and window, so the menu works while the game window is minimised after alt-tab.
