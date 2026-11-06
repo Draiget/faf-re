@@ -38,6 +38,18 @@ With `/rejoinoffer` the game can come back to its match (issue #275). There's no
 
 The lobby server needs no change: it routes `IceMsg` by player, and the player's connection never closed.
 
+## Telling our exe from the original
+
+In FAF both files are `ForgedAlliance.exe`, and the x86 build is 32-bit like the original, so a launcher reads the exe's version resource (issue #314, `src/moho/app/MohoVersion.rc`):
+
+| Field | Our exe | The original |
+|---|---|---|
+| `ProductName` | `faf-re` | `Supreme Commander Forged Alliance` |
+| `ProductVersion`, `FileVersion` | the release tag, for example `2026.11.001` or `2026.11.001-nightly`; any other build has its commit, for example `7104a74` | `1, 5, 0, 1` |
+| numeric file version | `2026.11.1.0` for that tag; `0.0.0.0` for other builds | `1.5.0.1` |
+
+A launcher checks `ProductName` only, under the string table `040904b0`. On Windows it is `VerQueryValue` with `\StringFileInfo\040904b0\ProductName` (JNA's `Version` in Java). A launcher that also runs on Linux, where the game runs under Wine, reads it from the file's resource section instead.
+
 ## Game command line
 
 | Option | Meaning |
