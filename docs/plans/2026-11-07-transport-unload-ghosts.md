@@ -228,9 +228,9 @@ git commit -m "feat(mod): create UI mod scaffold and pending drop orders buffer 
   - `DropGhostsSelection.HandleWorldDrag(worldView, minX, minY, maxX, maxY)`: detects drag-box containment for multi-selection.
   - `DropGhostsSelection.GetSelection()`: returns currently selected ghost records.
 
-- [ ] **Step 1: Implement screen hit-testing with `WorldView:Project` in `drop_ghosts_selection.lua`**
-- [ ] **Step 2: Connect selection updates to `orders.SetAvailableOrders` and `construction.OnSelection`**
-- [ ] **Step 3: Commit**
+- [x] **Step 1: Implement screen hit-testing with `WorldView:Project` in `drop_ghosts_selection.lua`**
+- [x] **Step 2: Connect selection updates to `orders.SetAvailableOrders` and `construction.OnSelection`**
+- [x] **Step 3: Commit**
 
 ---
 
