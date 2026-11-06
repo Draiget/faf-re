@@ -17,6 +17,8 @@
 #include <string>
 #include <vector>
 
+#include <gtest/gtest.h>
+
 #include "monocypher.h"
 #include "remote/net/Datagram.h"
 #include "remote/net/DatagramCipher.h"
@@ -30,38 +32,7 @@ namespace
 {
   // --- Harness (as tests/remote/WireTests.cpp) -------------------------------------------
 
-  int gFailures = 0;
-  int gChecks = 0;
-
-#define CHECK(cond)                                                                \
-  do {                                                                             \
-    ++gChecks;                                                                     \
-    if (!(cond)) {                                                                 \
-      ++gFailures;                                                                 \
-      std::printf("  FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond);                \
-    }                                                                              \
-  } while (0)
-
-  struct TestCase
-  {
-    const char* name;
-    void (*body)();
-  };
-
-  void RunTest(const TestCase& test)
-  {
-    const int failuresBefore = gFailures;
-    try {
-      test.body();
-    } catch (const std::exception& e) {
-      ++gFailures;
-      std::printf("  FAIL %s: exception escaped: %s\n", test.name, e.what());
-    } catch (...) {
-      ++gFailures;
-      std::printf("  FAIL %s: exception escaped\n", test.name);
-    }
-    std::printf("%s %s\n", gFailures == failuresBefore ? "PASS" : "FAIL", test.name);
-  }
+#define CHECK(cond) EXPECT_TRUE(cond)
 
   using Bytes = std::vector<std::uint8_t>;
 
@@ -1116,36 +1087,26 @@ namespace
     CHECK(!CheckStyle(key.publicKey, 100, 200, challenge, color, tampered));
   }
 
-  const TestCase kTests[] = {
-    {"style proof", TestStyleProof},
-    {"header round trip and refusals (WP10.2)", TestHeaderRoundTrip},
-    {"varints", TestVarints},
-    {"receive window against a model: verdicts and ack bits (WP10.2)", TestReceiveWindowModel},
-    {"range set against a model (WP10.3)", TestRangeSetModel},
-    {"receiver reassembly from shuffled overlapping fragments (WP10.3)", TestReceiverReassembly},
-    {"reliable messages over lossy links, both ways (WP10.3)", TestReliableMatrix},
-    {"in-flight limit (WP10.3)", TestInFlightLimit},
-    {"message size limits", TestMessageLimits},
-    {"unreliable messages: at most once, intact", TestUnreliable},
-    {"redundant lane: losses covered by repeats, each message once (#240)", TestRedundantLane},
-    {"seal and open (WP10.6)", TestSealOpen},
-    {"cipher known answers: XChaCha20-Poly1305 vector, the channel's layout (WP10.6)", TestCipherKnownAnswers},
-    {"encrypted channel: delivery, tampering, replay, plaintext, one-sided keys (WP10.6)", TestEncryptedChannel},
-    {"keys set mid-session at different moments on each end (WP10.6)", TestKeysMidSession},
-    {"the sequence ends in failure, never a wrap (WP10.2, WP10.6)", TestSequenceEnd},
-    {"keepalive and RTT on an idle link (WP10.8)", TestKeepaliveAndRtt},
-    {"loss statistics at 10% loss (WP10.8)", TestLossStatistics},
-    {"timeout after a long partition, none after a short one (WP10.8)", TestTimeoutAndPartition},
-    {"retransmission backoff during a partition", TestBackoff},
-    {"fuzzed datagrams", TestFuzz},
-  };
 } // namespace
 
-int main()
-{
-  for (const TestCase& test : kTests) {
-    RunTest(test);
-  }
-  std::printf("%d checks, %d failures\n", gChecks, gFailures);
-  return gFailures;
-}
+TEST(Existing_NetChannel, StyleProof) { TestStyleProof(); }
+TEST(Existing_NetChannel, HeaderRoundTrip) { TestHeaderRoundTrip(); }
+TEST(Existing_NetChannel, Varints) { TestVarints(); }
+TEST(Existing_NetChannel, ReceiveWindowModel) { TestReceiveWindowModel(); }
+TEST(Existing_NetChannel, RangeSetModel) { TestRangeSetModel(); }
+TEST(Existing_NetChannel, ReceiverReassembly) { TestReceiverReassembly(); }
+TEST(Existing_NetChannel, ReliableMatrix) { TestReliableMatrix(); }
+TEST(Existing_NetChannel, InFlightLimit) { TestInFlightLimit(); }
+TEST(Existing_NetChannel, MessageLimits) { TestMessageLimits(); }
+TEST(Existing_NetChannel, Unreliable) { TestUnreliable(); }
+TEST(Existing_NetChannel, RedundantLane) { TestRedundantLane(); }
+TEST(Existing_NetChannel, SealOpen) { TestSealOpen(); }
+TEST(Existing_NetChannel, CipherKnownAnswers) { TestCipherKnownAnswers(); }
+TEST(Existing_NetChannel, EncryptedChannel) { TestEncryptedChannel(); }
+TEST(Existing_NetChannel, KeysMidSession) { TestKeysMidSession(); }
+TEST(Existing_NetChannel, SequenceEnd) { TestSequenceEnd(); }
+TEST(Existing_NetChannel, KeepaliveAndRtt) { TestKeepaliveAndRtt(); }
+TEST(Existing_NetChannel, LossStatistics) { TestLossStatistics(); }
+TEST(Existing_NetChannel, TimeoutAndPartition) { TestTimeoutAndPartition(); }
+TEST(Existing_NetChannel, Backoff) { TestBackoff(); }
+TEST(Existing_NetChannel, Fuzz) { TestFuzz(); }

@@ -1,8 +1,8 @@
 #include "gpg/core/profiling/Profiler.h"
-#include <cassert>
+#include <gtest/gtest.h>
 #include <string>
 
-int main()
+TEST(Existing_ProfilerFacade, FacadeMacros)
 {
   FAF_PROFILE_FRAME("TestFrame");
   FAF_PROFILE_FRAME_DEFAULT();
@@ -20,5 +20,5 @@ int main()
   else
     FAF_PROFILE_ZONE_NAMED("FalseBranch");
 
-  return 0;
+  SUCCEED();
 }

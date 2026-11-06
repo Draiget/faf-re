@@ -106,6 +106,7 @@ if(FAF_FETCH_DEPENDENCIES)
 endif()
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/monocypher" "${CMAKE_BINARY_DIR}/deps/monocypher")
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/zstd" "${CMAKE_BINARY_DIR}/deps/zstd")
+add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/googletest" "${CMAKE_BINARY_DIR}/deps/googletest")
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/remote/net" "${CMAKE_BINARY_DIR}/remote/net")
 if(TARGET faf_netchannel)
   add_executable(faf_netchannel_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/NetChannelTests.cpp")
@@ -238,7 +239,7 @@ faf_precompile(faf_sim)
 # The golden sim-math tests (tests/sim_math) on every faf_sim object, as Windows runs
 # them on faf_engine: every golden case, the pathfinder's and the random stream's too.
 add_executable(faf_sim_math_tests "${PROJECT_SOURCE_DIR}/tests/sim_math/SimMathTests.cpp")
-target_link_libraries(faf_sim_math_tests PRIVATE faf_sim)
+target_link_libraries(faf_sim_math_tests PRIVATE faf_sim gtest)
 set(_faf_sim_math_args "${PROJECT_SOURCE_DIR}/tests/sim_math/golden.txt")
 if(EXISTS "${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-x64.txt")
   list(APPEND _faf_sim_math_args --known "${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-x64.txt")
@@ -302,9 +303,10 @@ target_link_options(server PRIVATE -Wl,--error-limit=0)
 
 add_executable(faf_server_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SpeedWatchTests.cpp")
 target_include_directories(faf_server_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(faf_server_tests PRIVATE gtest_main)
 
 add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp" "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp")
-target_link_libraries(faf_seat_tests PRIVATE faf_sim faf_netchannel faf_monocypher)
+target_link_libraries(faf_seat_tests PRIVATE faf_sim faf_netchannel faf_monocypher gtest_main)
 target_compile_definitions(faf_seat_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_seat_tests PRIVATE -Wl,--error-limit=0)
 
@@ -317,7 +319,7 @@ target_link_options(faf_server_probe PRIVATE -Wl,--error-limit=0)
 # The wire format's tests (tests/remote/WireTests.cpp) on the Linux objects, as Windows'
 # server-mode build runs them on faf_engine.
 add_executable(faf_remote_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/WireTests.cpp")
-target_link_libraries(faf_remote_tests PRIVATE faf_sim)
+target_link_libraries(faf_remote_tests PRIVATE faf_sim gtest_main)
 target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_remote_tests PRIVATE -Wl,--error-limit=0)
 

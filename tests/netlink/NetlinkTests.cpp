@@ -31,18 +31,18 @@
 #include <thread>
 #include <vector>
 
+#include <gtest/gtest.h>
+
 using namespace faf::netlink;
 
 namespace
 {
-  int gFailures = 0;
+  std::string gBind;
+  int gDatagrams = 10000;
 
   void Check(const bool ok, const char* what)
   {
-    std::printf("%s %s\n", ok ? "ok  " : "FAIL", what);
-    if (!ok) {
-      ++gFailures;
-    }
+    EXPECT_TRUE(ok) << what;
   }
 
   // From docs/launcher-adapter-contract/trace-2p.jsonl: the shipped adapter's
@@ -762,33 +762,32 @@ namespace
   }
 } // namespace
 
+TEST(Existing_Netlink, UnitTests) { UnitTests(); }
+TEST(Existing_Netlink, KeyUnitTests) { KeyUnitTests(); }
+TEST(Existing_Netlink, EncryptedLane) { EncryptedLaneTest(gBind); }
+TEST(Existing_Netlink, Loopback) { LoopbackTest(gBind, gDatagrams); }
+TEST(Existing_Netlink, Lane) { LaneTest(gBind, 2000); }
+TEST(Existing_Netlink, OurPeer) { OurPeerTest(gBind); }
+TEST(Existing_Netlink, SilentIceServer) { SilentIceServerTest(gBind); }
+TEST(Existing_Netlink, Duplicate) { DuplicateTest(gBind); }
+TEST(Existing_Netlink, WebRtc) { WebRtcTest(gBind); }
+TEST(Existing_Netlink, LaneWebRtcSetup) { LaneWebRtcSetupTest(gBind); }
+
 int main(int argc, char** argv)
 {
-  std::string bind;
-  int count = 10000;
+  ::testing::InitGoogleTest(&argc, argv);
   std::string marker;
   for (int i = 1; i + 1 < argc; i += 2) {
     if (std::strcmp(argv[i], "--bind") == 0) {
-      bind = argv[i + 1];
+      gBind = argv[i + 1];
     } else if (std::strcmp(argv[i], "--datagrams") == 0) {
-      count = std::atoi(argv[i + 1]);
+      gDatagrams = std::atoi(argv[i + 1]);
     } else if (std::strcmp(argv[i], "--marker") == 0) {
       marker = argv[i + 1]; // sealed | plain: only the capture run (#289)
     }
   }
   if (!marker.empty()) {
-    return MarkerRun(bind, marker == "sealed", 500);
+    return MarkerRun(gBind, marker == "sealed", 500);
   }
-  UnitTests();
-  KeyUnitTests();
-  EncryptedLaneTest(bind);
-  LoopbackTest(bind, count);
-  LaneTest(bind, 2000);
-  OurPeerTest(bind);
-  SilentIceServerTest(bind);
-  DuplicateTest(bind);
-  WebRtcTest(bind);
-  LaneWebRtcSetupTest(bind);
-  std::printf("%s (%d failures)\n", gFailures == 0 ? "PASS" : "FAIL", gFailures);
-  return gFailures == 0 ? 0 : 1;
+  return RUN_ALL_TESTS();
 }

@@ -3,6 +3,7 @@
 // needs no graphics device.
 
 #include <algorithm>
+#include <gtest/gtest.h>
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -16,6 +17,7 @@ namespace
 
   void Check(const bool condition, const char* const what)
   {
+    EXPECT_TRUE(condition) << what;
     if (!condition) {
       std::printf("FAIL: %s\n", what);
       ++gFailures;
@@ -92,11 +94,11 @@ namespace
   }
 } // namespace
 
-int main()
+TEST(Existing_TextureQuality, MipLevelsTopology)
 {
   for (std::uint32_t skip = 0U; skip < 32U; ++skip) {
     TestTopology(skip);
   }
   std::printf("%d failed\n", gFailures);
-  return gFailures == 0 ? 0 : 1;
+  EXPECT_EQ(gFailures, 0);
 }

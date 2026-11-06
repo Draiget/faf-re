@@ -18,6 +18,7 @@
 #include <mutex>
 #include <thread>
 #include <vector>
+#include <gtest/gtest.h>
 
 #include "gpg/core/containers/String.h"
 #include "lua/LuaObject.h"
@@ -34,14 +35,11 @@ namespace
   }
 } // namespace
 
-int main(int argc, char** argv)
+TEST(Existing_PrefsThread, MultiThreadConcurrentAccess)
 {
-  const int iterations = argc > 1 ? std::atoi(argv[1]) : 20000;
+  const int iterations = 20000;
   moho::IUserPrefs* const prefs = moho::USER_GetPreferences();
-  if (prefs == nullptr) {
-    std::printf("FAIL: no preferences object\n");
-    return 1;
-  }
+  ASSERT_NE(prefs, nullptr) << "no preferences object";
 
   std::atomic<int> ready{0};
   std::vector<std::thread> threads;
@@ -86,11 +84,5 @@ int main(int argc, char** argv)
       }
     }
   }
-  if (wrong != 0) {
-    std::printf("FAIL: %d of %d values wrong after %d threads x %d iterations\n", wrong, kThreads * kKeysPerThread, kThreads,
-      iterations);
-    return 1;
-  }
-  std::printf("ok: %d threads x %d iterations, all %d values read back\n", kThreads, iterations, kThreads * kKeysPerThread);
-  return 0;
+  EXPECT_EQ(wrong, 0) << wrong << " of " << (kThreads * kKeysPerThread) << " values wrong after " << kThreads << " threads x " << iterations << " iterations";
 }

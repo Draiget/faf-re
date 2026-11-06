@@ -20,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include <gtest/gtest.h>
+
 #include "gpg/core/containers/FlatGenerationMap.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/command/SSTITarget.h"
@@ -49,39 +51,7 @@ namespace
 {
   // --- Harness (as tests/net) ------------------------------------------------------------
 
-  int gFailures = 0;
-  int gChecks = 0;
-
-#define CHECK(cond)                                                                \
-  do {                                                                             \
-    ++gChecks;                                                                     \
-    if (!(cond)) {                                                                 \
-      ++gFailures;                                                                 \
-      std::printf("  FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond);                \
-    }                                                                              \
-  } while (0)
-
-  struct TestCase
-  {
-    const char* name;
-    void (*body)();
-  };
-
-  void RunTest(const TestCase& test)
-  {
-    const int failuresBefore = gFailures;
-    try {
-      test.body();
-    } catch (const std::exception& e) {
-      ++gFailures;
-      std::printf("  FAIL %s: exception escaped: %s\n", test.name, e.what());
-    } catch (...) {
-      ++gFailures;
-      std::printf("  FAIL %s: non-std exception escaped\n", test.name);
-    }
-    std::printf("%s %s\n", gFailures == failuresBefore ? "ok  " : "FAIL", test.name);
-    std::fflush(stdout);
-  }
+#define CHECK(cond) EXPECT_TRUE(cond)
 
   [[nodiscard]] std::vector<std::uint8_t> Bytes(const BitWriter& writer)
   {
@@ -2429,50 +2399,40 @@ namespace
     CHECK(DecodeGridLane(gridReader2, clientHeld) && clientHeld == beat2);
   }
 
-  const TestCase kTests[] = {
-    {"armies and grids: lanes round trip", &TestArmyAndGridLanes},
-    {"frames: window of acknowledged baselines", &TestFrameWindow},
-    {"view ids: renumbering, inbound and retirement", &TestViewIdMap},
-    {"view ids: inbound translation of commands", &TestInboundIds},
-    {"grids: delta round trip", &TestGridDeltaRoundTrip},
-    {"grids: unchanged is small", &TestGridDeltaUnchangedIsSmall},
-    {"flat map: erase against a reference map", &TestFlatMapEraseMatchesMap},
-    {"grids: same bytes as cell at a time", &TestGridDeltaMatchesCellAtATime},
-    {"grids: hostile input", &TestGridDeltaHostile},
-    {"sounds: session table", &TestSoundTable},
-    {"roster: round trip and refusals", &TestRoster},
-    {"session tables: sounds and names", &TestSessionTables},
-    {"bits: round trip", &TestBitStreamRoundTrip},
-    {"bits: overrun", &TestBitStreamOverrun},
-    {"bits: same bytes as bit at a time", &TestBitStreamMatchesBitAtATime},
-    {"bits: malformed varuint", &TestBitStreamMalformedVarUint},
-    {"quantize: axis", &TestAxisQuantizer},
-    {"quantize: map position bits", &TestPositionQuantizerForMap},
-    {"quantize: quaternion", &TestQuaternionPacking},
-    {"ordinals: table and hash", &TestOrdinalTable},
-    {"hello: versions", &TestHello},
-    {"frame: decode(encode(f, b), b) == f", &TestFrameRoundTripProperty},
-    {"frame: dead reckoning round trip", &TestFrameRoundTripDeadReckoning},
-    {"frame: dead reckoning rules", &TestDeadReckoningRules},
-    {"frame: unchanged costs the header", &TestFrameUnchangedIsSmall},
-    {"frame: baseline checks", &TestFrameBaselineChecks},
-    {"frame: encoder refuses bad frames", &TestEncodeRejects},
-    {"frame: truncation", &TestDecoderTruncation},
-    {"frame: corruption and garbage", &TestDecoderCorruptionAndGarbage},
-    {"frame: hostile counts and ids", &TestDecoderHostileCounts},
-    {"frame: appearance block", &TestFrameAppearance},
-    {"frame: blip update hash", &TestBlipUpdateHash},
-    {"grid lane: slots encoded apart", &TestBitWriterAppend},
-    {"lua lane: round trip and limits", &TestLuaSyncLane},
-    {"grid lane: delta in place", &TestGridDeltaInPlace},
-  };
 } // namespace
 
-int main()
-{
-  for (const TestCase& test : kTests) {
-    RunTest(test);
-  }
-  std::printf("%d checks, %d failures\n", gChecks, gFailures);
-  return gFailures;
-}
+TEST(Existing_Wire, ArmyAndGridLanes) { TestArmyAndGridLanes(); }
+TEST(Existing_Wire, FrameWindow) { TestFrameWindow(); }
+TEST(Existing_Wire, ViewIdMap) { TestViewIdMap(); }
+TEST(Existing_Wire, InboundIds) { TestInboundIds(); }
+TEST(Existing_Wire, GridDeltaRoundTrip) { TestGridDeltaRoundTrip(); }
+TEST(Existing_Wire, GridDeltaUnchangedIsSmall) { TestGridDeltaUnchangedIsSmall(); }
+TEST(Existing_Wire, FlatMapEraseMatchesMap) { TestFlatMapEraseMatchesMap(); }
+TEST(Existing_Wire, GridDeltaMatchesCellAtATime) { TestGridDeltaMatchesCellAtATime(); }
+TEST(Existing_Wire, GridDeltaHostile) { TestGridDeltaHostile(); }
+TEST(Existing_Wire, SoundTable) { TestSoundTable(); }
+TEST(Existing_Wire, Roster) { TestRoster(); }
+TEST(Existing_Wire, SessionTables) { TestSessionTables(); }
+TEST(Existing_Wire, BitStreamRoundTrip) { TestBitStreamRoundTrip(); }
+TEST(Existing_Wire, BitStreamOverrun) { TestBitStreamOverrun(); }
+TEST(Existing_Wire, BitStreamMatchesBitAtATime) { TestBitStreamMatchesBitAtATime(); }
+TEST(Existing_Wire, BitStreamMalformedVarUint) { TestBitStreamMalformedVarUint(); }
+TEST(Existing_Wire, AxisQuantizer) { TestAxisQuantizer(); }
+TEST(Existing_Wire, PositionQuantizerForMap) { TestPositionQuantizerForMap(); }
+TEST(Existing_Wire, QuaternionPacking) { TestQuaternionPacking(); }
+TEST(Existing_Wire, OrdinalTable) { TestOrdinalTable(); }
+TEST(Existing_Wire, Hello) { TestHello(); }
+TEST(Existing_Wire, FrameRoundTripProperty) { TestFrameRoundTripProperty(); }
+TEST(Existing_Wire, FrameRoundTripDeadReckoning) { TestFrameRoundTripDeadReckoning(); }
+TEST(Existing_Wire, DeadReckoningRules) { TestDeadReckoningRules(); }
+TEST(Existing_Wire, FrameUnchangedIsSmall) { TestFrameUnchangedIsSmall(); }
+TEST(Existing_Wire, FrameBaselineChecks) { TestFrameBaselineChecks(); }
+TEST(Existing_Wire, EncodeRejects) { TestEncodeRejects(); }
+TEST(Existing_Wire, DecoderTruncation) { TestDecoderTruncation(); }
+TEST(Existing_Wire, DecoderCorruptionAndGarbage) { TestDecoderCorruptionAndGarbage(); }
+TEST(Existing_Wire, DecoderHostileCounts) { TestDecoderHostileCounts(); }
+TEST(Existing_Wire, FrameAppearance) { TestFrameAppearance(); }
+TEST(Existing_Wire, BlipUpdateHash) { TestBlipUpdateHash(); }
+TEST(Existing_Wire, BitWriterAppend) { TestBitWriterAppend(); }
+TEST(Existing_Wire, LuaSyncLane) { TestLuaSyncLane(); }
+TEST(Existing_Wire, GridDeltaInPlace) { TestGridDeltaInPlace(); }

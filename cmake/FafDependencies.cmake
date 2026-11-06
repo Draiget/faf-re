@@ -237,6 +237,12 @@ set(_faf_download_freetype
     "freetype-2.15.0")
 # msdfgen 1.13 (MIT): generates MSDF glyphs from those outlines (issue #306). The tag's source
 # archive; cmake/deps/msdfgen builds the static library.
+# GoogleTest 1.15.2 (BSD-3-Clause): unit testing framework.
+set(_faf_download_googletest
+    "https://github.com/google/googletest/archive/refs/tags/v1.15.2.tar.gz"
+    "7b42b4d6ed48810c5362c265a17faebe90dc2373c885e5216439d37927f02926"
+    "googletest-1.15.2"
+    "googletest-1.15.2.tar.gz")
 set(_faf_download_msdfgen
     "https://github.com/Chlumsky/msdfgen/archive/refs/tags/v1.13.tar.gz"
     "93cd1ad8918c1a78c5c96e82d4f4c77f0eb86c2e7e8579a0967e54196c4b7167"
@@ -418,6 +424,7 @@ if(NOT FAF_MSDFGEN_DIR AND NOT DEFINED ENV{FAF_MSDFGEN_DIR})
 endif()
 if(NOT FAF_ZSTD_DIR)
   faf_dependency_download(zstd)
+  faf_dependency_download(googletest)
 endif()
 
 faf_dependency_patches(WildMagic3p8 submodule

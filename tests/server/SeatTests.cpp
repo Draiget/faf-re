@@ -12,6 +12,8 @@
 #include <utility>
 #include <vector>
 
+#include <gtest/gtest.h>
+
 #include "gpg/core/streams/BinaryReader.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/net/CClientManagerImpl.h"
@@ -31,16 +33,9 @@ namespace
   using faf::remote::CServerClient;
   using moho::ECmdStreamOp;
 
-  int gChecks = 0;
-  int gFailures = 0;
-
   void Check(const bool ok, const char* const what)
   {
-    ++gChecks;
-    if (!ok) {
-      ++gFailures;
-      std::printf("FAILED: %s\n", what);
-    }
+    EXPECT_TRUE(ok) << what;
   }
 
   constexpr std::uint32_t kServerSource = 0u;
@@ -439,16 +434,11 @@ namespace
   }
 } // namespace
 
-int main()
-{
-  Policy();
-  SilentSeatsNeverHoldTheGame();
-  CommandsGoInTheNextBeatUnderTheSeatsSource();
-  ForgedOpsNeverReachTheSim();
-  EjectionEndsTheSourceAndFreesTheGame();
-  TheHookRunsAheadOfEachBeat();
-  TheIntakeHandsOnWhatItCanTranslate();
-  LoadedCountsForTheStart();
-  std::printf("%d checks, %d failures\n", gChecks, gFailures);
-  return gFailures;
-}
+TEST(Existing_Seat, Policy) { Policy(); }
+TEST(Existing_Seat, SilentSeatsNeverHoldTheGame) { SilentSeatsNeverHoldTheGame(); }
+TEST(Existing_Seat, CommandsGoInTheNextBeatUnderTheSeatsSource) { CommandsGoInTheNextBeatUnderTheSeatsSource(); }
+TEST(Existing_Seat, ForgedOpsNeverReachTheSim) { ForgedOpsNeverReachTheSim(); }
+TEST(Existing_Seat, EjectionEndsTheSourceAndFreesTheGame) { EjectionEndsTheSourceAndFreesTheGame(); }
+TEST(Existing_Seat, TheHookRunsAheadOfEachBeat) { TheHookRunsAheadOfEachBeat(); }
+TEST(Existing_Seat, TheIntakeHandsOnWhatItCanTranslate) { TheIntakeHandsOnWhatItCanTranslate(); }
+TEST(Existing_Seat, LoadedCountsForTheStart) { LoadedCountsForTheStart(); }

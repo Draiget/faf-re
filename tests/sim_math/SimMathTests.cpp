@@ -27,11 +27,14 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <functional>
 #include <limits>
 #include <map>
 #include <string>
 #include <vector>
+
+#include <gtest/gtest.h>
 
 #include "legacy/math/X87Math.h"
 #include "moho/ai/NavigatorCellMath.h"
@@ -579,7 +582,87 @@ namespace
     }
     return 0;
   }
+
+  std::string gGoldenPath;
+  std::string gKnownPath;
+
+  void RunParityCheck(const char* path, const char* knownPath)
+  {
+    ASSERT_NE(path, nullptr) << "Golden file path must be provided";
+    std::map<std::string, std::string> golden;
+    ASSERT_TRUE(ReadCaseFile(path, golden)) << "cannot read " << path;
+
+    // The simulation thread's floating-point environment.
+#if defined(_PC_24)
+    platform::SetX87PrecisionControl(_PC_24);
+#endif
+    (void)SetSse2Mode(0);
+
+    Results results;
+    RunAll(results);
+
+    int known = 0;
+    if (knownPath != nullptr) {
+      std::map<std::string, std::string> overlay;
+      ASSERT_TRUE(ReadCaseFile(knownPath, overlay)) << "cannot read " << knownPath;
+      for (const auto& [key, value] : overlay) {
+        golden[key] = value;
+        ++known;
+      }
+    }
+
+    std::map<std::string, int> mismatchesByName;
+    std::map<std::string, std::string> firstMismatch;
+    int missing = 0;
+    for (const std::string& key : results.order) {
+      const auto it = golden.find(key);
+      const std::string& actual = results.lines[key];
+      const std::string name = key.substr(0, key.find(' '));
+      if (it == golden.end()) {
+        ++missing;
+        continue;
+      }
+      if (it->second != actual) {
+        if (mismatchesByName[name]++ == 0) {
+          firstMismatch[name] = key + ": expected " + it->second + ", got " + actual.substr(actual.find("->") + 3);
+        }
+      }
+    }
+
+    int total = 0;
+    for (const auto& [name, count] : mismatchesByName) {
+      std::printf("FAIL %s: %d case(s) differ; first: %s\n", name.c_str(), count, firstMismatch[name].c_str());
+      total += count;
+    }
+    std::printf(
+      "faf_sim_math_tests (%s): %zu cases, %d differ, %d missing from %s (%d known platform difference(s) applied)\n",
+      PlatformName(), results.order.size(), total, missing, path, known
+    );
+    const std::size_t skipped = golden.size() - (results.order.size() - static_cast<std::size_t>(missing));
+#if defined(FAF_SIM_MATH_SUBSET)
+    std::printf("subset build: %zu golden case(s) not run here (pathfinder, random stream)\n", skipped);
+    EXPECT_EQ(total, 0);
+    EXPECT_EQ(missing, 0);
+#else
+    EXPECT_EQ(total, 0);
+    EXPECT_EQ(missing, 0);
+    EXPECT_EQ(skipped, 0);
+#endif
+  }
 } // namespace
+
+TEST(Existing_SimMath, GoldenParity)
+{
+  std::string path = gGoldenPath;
+  if (path.empty()) {
+    if (std::filesystem::exists("sim_math/golden.txt")) {
+      path = "sim_math/golden.txt";
+    } else if (std::filesystem::exists("tests/sim_math/golden.txt")) {
+      path = "tests/sim_math/golden.txt";
+    }
+  }
+  RunParityCheck(path.empty() ? nullptr : path.c_str(), gKnownPath.empty() ? nullptr : gKnownPath.c_str());
+}
 
 int main(int argc, char** argv)
 {
@@ -591,32 +674,17 @@ int main(int argc, char** argv)
     return RunSweep(argv[2]);
   }
 
-  // faf_sim_math_tests <golden.txt> [--known <overlay.txt>]
-  // faf_sim_math_tests --generate <golden.txt>
-  // faf_sim_math_tests --generate-known <golden.txt> <overlay.txt> <reason>
-  //
-  // An overlay holds the cases where one platform's result differs from the
-  // Windows x64 golden for a recorded reason (its header says which); the
-  // check applies it on top of the golden and stays bit-exact.
   const bool generate = argc > 2 && std::strcmp(argv[1], "--generate") == 0;
   const bool generateKnown = argc > 4 && std::strcmp(argv[1], "--generate-known") == 0;
-  const char* const path = (generate || generateKnown) ? argv[2] : (argc > 1 ? argv[1] : nullptr);
-  const char* const knownPath = (argc > 3 && std::strcmp(argv[2], "--known") == 0) ? argv[3] : nullptr;
-  if (path == nullptr) {
-    std::fprintf(stderr, "usage: see the comment at main in tests/sim_math/SimMathTests.cpp\n");
-    return 2;
-  }
-
-  // The simulation thread's floating-point environment.
-#if defined(_PC_24)
-  platform::SetX87PrecisionControl(_PC_24);
-#endif
-  (void)SetSse2Mode(0);
-
-  Results results;
-  RunAll(results);
 
   if (generate) {
+#if defined(_PC_24)
+    platform::SetX87PrecisionControl(_PC_24);
+#endif
+    (void)SetSse2Mode(0);
+    Results results;
+    RunAll(results);
+    const char* const path = argv[2];
     std::FILE* const out = std::fopen(path, "wb");
     if (out == nullptr) {
       std::fprintf(stderr, "cannot write %s\n", path);
@@ -632,13 +700,19 @@ int main(int argc, char** argv)
     return 0;
   }
 
-  std::map<std::string, std::string> golden;
-  if (!ReadCaseFile(path, golden)) {
-    std::fprintf(stderr, "cannot read %s\n", path);
-    return 2;
-  }
-
   if (generateKnown) {
+#if defined(_PC_24)
+    platform::SetX87PrecisionControl(_PC_24);
+#endif
+    (void)SetSse2Mode(0);
+    Results results;
+    RunAll(results);
+    const char* const path = argv[2];
+    std::map<std::string, std::string> golden;
+    if (!ReadCaseFile(path, golden)) {
+      std::fprintf(stderr, "cannot read %s\n", path);
+      return 2;
+    }
     std::FILE* const out = std::fopen(argv[3], "wb");
     if (out == nullptr) {
       std::fprintf(stderr, "cannot write %s\n", argv[3]);
@@ -659,51 +733,15 @@ int main(int argc, char** argv)
     return 0;
   }
 
-  int known = 0;
-  if (knownPath != nullptr) {
-    std::map<std::string, std::string> overlay;
-    if (!ReadCaseFile(knownPath, overlay)) {
-      std::fprintf(stderr, "cannot read %s\n", knownPath);
-      return 2;
-    }
-    for (const auto& [key, value] : overlay) {
-      golden[key] = value;
-      ++known;
+  ::testing::InitGoogleTest(&argc, argv);
+
+  for (int i = 1; i < argc; ++i) {
+    if (std::strcmp(argv[i], "--known") == 0 && i + 1 < argc) {
+      gKnownPath = argv[++i];
+    } else if (argv[i][0] != '-') {
+      gGoldenPath = argv[i];
     }
   }
 
-  std::map<std::string, int> mismatchesByName;
-  std::map<std::string, std::string> firstMismatch;
-  int missing = 0;
-  for (const std::string& key : results.order) {
-    const auto it = golden.find(key);
-    const std::string& actual = results.lines[key];
-    const std::string name = key.substr(0, key.find(' '));
-    if (it == golden.end()) {
-      ++missing;
-      continue;
-    }
-    if (it->second != actual) {
-      if (mismatchesByName[name]++ == 0) {
-        firstMismatch[name] = key + ": expected " + it->second + ", got " + actual.substr(actual.find("->") + 3);
-      }
-    }
-  }
-
-  int total = 0;
-  for (const auto& [name, count] : mismatchesByName) {
-    std::printf("FAIL %s: %d case(s) differ; first: %s\n", name.c_str(), count, firstMismatch[name].c_str());
-    total += count;
-  }
-  std::printf(
-    "faf_sim_math_tests (%s): %zu cases, %d differ, %d missing from %s (%d known platform difference(s) applied)\n",
-    PlatformName(), results.order.size(), total, missing, path, known
-  );
-  const std::size_t skipped = golden.size() - (results.order.size() - static_cast<std::size_t>(missing));
-#if defined(FAF_SIM_MATH_SUBSET)
-  std::printf("subset build: %zu golden case(s) not run here (pathfinder, random stream)\n", skipped);
-  return (total == 0 && missing == 0) ? 0 : 1;
-#else
-  return (total == 0 && missing == 0 && skipped == 0) ? 0 : 1;
-#endif
+  return RUN_ALL_TESTS();
 }

@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include <gtest/gtest.h>
+
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/SimDriver.h"
@@ -16,11 +18,7 @@ namespace
 
   void Check(bool value, const char* what)
   {
-    if (!value)
-    {
-      std::fprintf(stderr, "FAIL: %s\n", what);
-      std::exit(1);
-    }
+    EXPECT_TRUE(value) << what;
   }
 
   std::uint32_t Bits(float f)
@@ -28,7 +26,7 @@ namespace
     return std::bit_cast<std::uint32_t>(f);
   }
 
-  void Run(int workers, bool enabled, bool finish, std::size_t count)
+  void RunReconTest(int workers, bool enabled, bool finish, std::size_t count)
   {
     sim_Workers = workers;
     sim_ParallelSync = true;
@@ -145,14 +143,12 @@ namespace
   }
 }
 
-int main()
+TEST(Existing_ReconScrollPacket, SnapshotOwnershipAndEndpoints)
 {
-  Run(0, true, true, 257);
-  Run(2, false, true, 257);
-  Run(2, true, true, 257);
-  Run(2, true, false, 257);
-  Run(2, true, true, 65537);
-  Run(2, true, true, 257);
-  std::puts("PASS native recon packet: serial, disabled, workers, destructor, overflow, reuse, aux ownership and endpoint bits");
-  return 0;
+  RunReconTest(0, true, true, 257);
+  RunReconTest(2, false, true, 257);
+  RunReconTest(2, true, true, 257);
+  RunReconTest(2, true, false, 257);
+  RunReconTest(2, true, true, 65537);
+  RunReconTest(2, true, true, 257);
 }
