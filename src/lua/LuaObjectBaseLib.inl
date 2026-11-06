@@ -1489,11 +1489,26 @@ namespace moho
 	 * to source; each compiled chunk loaded is named in the log (`f_parser`).
 	 */
 	bool lua_AllowPrecompiledChunks = true;
+	thread_local bool lua_LoadingCachedChunk = false;
 
 	TConVar<bool> gTConVar_lua_AllowPrecompiledChunks(
 		"lua_AllowPrecompiledChunks",
 		"Load compiled Lua chunks as well as source (off: a map or mod could run native code through one).",
 		&lua_AllowPrecompiledChunks
+	);
+
+	/**
+	 * Engine addition: `lua_ThreadedDispatch`. On, the interpreter reaches each instruction's handler
+	 * through a table of label addresses and takes its fast paths (LuaExecute); off, the binary's switch.
+	 */
+	bool lua_ThreadedDispatch = true;
+
+	TConVar<bool> gTConVar_lua_ThreadedDispatch(
+		"lua_ThreadedDispatch",
+		"Reach each Lua instruction's handler through a table of label addresses, with fast paths for table "
+		"slots, comparisons and next() loops (1, the default), or through the binary's switch (0). The same "
+		"results either way; Lua runs faster with 1.",
+		&lua_ThreadedDispatch
 	);
 
 	/**

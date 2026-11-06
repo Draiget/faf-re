@@ -5,6 +5,11 @@
 
 namespace gpg
 {
+  /// Engine addition: STR_ToLower and STR_CanonizeFilename copy the text once and edit it in place
+  /// (true) or build it a character at a time as the binary does. Same text either way; the
+  /// `res_LowerInPlace` console variable (registered in moho/misc/FileWaitHandleSet.cpp).
+  extern bool str_LowerInPlace;
+
   using StrArg = const char*;
   using WStrArg = const wchar_t*;
 
