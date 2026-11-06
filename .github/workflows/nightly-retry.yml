@@ -1,0 +1,36 @@
+name: Nightly retry
+
+# Re-runs the failed jobs of a nightly Replay parity or Nightly release run, started by that run's
+# own retry job when a job failed. It waits for the run to end, as GitHub re-runs only an ended run.
+# The callers stop after their third attempt. tools/release/README.md.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: The run whose failed jobs to re-run
+        required: true
+
+permissions:
+  actions: write  # the re-run
+
+jobs:
+  retry:
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ inputs.run_id }}
+        run: |
+          for i in $(seq 1 60); do
+            [ "$(gh run view "$RUN" -R "$GITHUB_REPOSITORY" --json status --jq .status)" = completed ] && break
+            sleep 30
+          done
+          gh run view "$RUN" -R "$GITHUB_REPOSITORY" --json workflowName,attempt,conclusion,url \
+            --jq '"\(.workflowName) attempt \(.attempt): \(.conclusion), \(.url)"' | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$(gh run view "$RUN" -R "$GITHUB_REPOSITORY" --json attempt --jq .attempt)" -ge 3 ]; then
+            echo "Three attempts already: not re-run." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh run view "$RUN" -R "$GITHUB_REPOSITORY" --json jobs \
+            --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out") | "failed: \(.name)"' | tee -a "$GITHUB_STEP_SUMMARY"
+          gh run rerun "$RUN" -R "$GITHUB_REPOSITORY" --failed

@@ -1,14 +1,20 @@
 # Nightly releases
 
-The [Nightly release workflow](../../.github/workflows/nightly-release.yml) publishes a pre-release of master's head when that night's [Replay parity](../parity-data/README.md) run lists no new failure in its report. Replay parity starts at 20:00 UTC (00:00 UTC+4), and takes about 5 h 30 min.
+The [Nightly release workflow](../../.github/workflows/nightly-release.yml) publishes master's head as the latest release when that night's [Replay parity](../parity-data/README.md) run lists no new failure in its report. Replay parity starts at 20:00 UTC (00:00 UTC+4), and takes about 5 h 30 min.
 
 | Job | What it does |
 |---|---|
 | `plan` | The tag: the UTC year and month, the month's next number and `-nightly`, for example `2026.11.001-nightly`, a real release being the same without `-nightly`. Releases and nightlies share the numbers, which go back to 001 each month and always have at least three digits, so a number can't be read as a day. The newest release or nightly the commit descends from, for the change list. It builds nothing when that tag's release already exists, as master did not move |
 | `build` | Builds `main_x64.exe` and `main.exe` with clang-cl and zips them as a release is zipped: exe, pdb, the DXC DLLs, `fafengine\` and `INSTALL.txt` ([x64](INSTALL_x64.txt), [x86](INSTALL_x86.txt)). The exe reports the nightly tag as its version |
-| `release` | Writes the notes ([nightly_notes.py](nightly_notes.py)): the parity counts, every commit since the previous release or nightly, and the checksums. Publishes them with the zips and the two exes on their own as a pre-release, never marked as the latest release |
+| `release` | Writes the notes ([nightly_notes.py](nightly_notes.py)): the parity counts, every commit since the previous release or nightly, and the checksums. Publishes them with the zips and the two exes on their own as a full release marked as the latest, so the repository's release link and `/releases/latest` point at it |
 
 A parity run that failed or lists new failures publishes nothing, and neither does a parity run started by hand, which may have played any commit or set.
+
+## Retries
+
+A desync never fails a parity run: the report lists it. So a failed job in the nightly is CI's own, such as a lost runner, a timeout or a download error. The run's `retry` job then starts the [Nightly retry workflow](../../.github/workflows/nightly-retry.yml), which waits for the run to end and re-runs its failed jobs. Nightly release does the same when one of its jobs fails. A run gets three attempts at most.
+
+GitHub starts no workflow from what the workflow token does, so a parity run that Nightly retry re-ran doesn't start Nightly release when it ends. Its `release` job starts it instead, with `publish` and `parity_run`, and only when the report lists no new failures. A re-run started by a person starts Nightly release as a first attempt does.
 
 Started by hand, the workflow builds the commit and writes the notes as artifacts. It publishes only with `publish` ticked, and such a build has passed no parity run, as its notes say. Give `parity_run` to report a run in the notes, with any new failures named, and `note` for a line of your own, such as what was fixed after that run.
 

@@ -1,4 +1,4 @@
-"""Writes a nightly pre-release's notes: the parity run it passed, every commit since the previous
+"""Writes a nightly release's notes: the parity run it passed, every commit since the previous
 nightly (or release), how to install it, and the zips' checksums.
 
 usage: TAG=... SHA=... PREVIOUS=... [PARITY_RUN=... PARITY_URL=... NOTE=...] nightly_notes.py --out notes.md
@@ -58,8 +58,8 @@ def main():
     with open("zips/SHA256SUMS.txt", encoding="utf-8") as f:
         sums = f.read().strip()
 
-    lines = ["A nightly build of master at [`%s`](%s/commit/%s). It has had no testing beyond the checks below: "
-             "use a [release](%s/releases/latest) unless you want the newest changes." % (sha[:7], REPO, sha, REPO), "",
+    lines = ["A nightly build of master at [`%s`](%s/commit/%s). It has had no testing beyond the checks below."
+             % (sha[:7], REPO, sha), "",
              parity_line(), ""] + ([os.environ["NOTE"], ""] if os.environ.get("NOTE") else []) + [
              "## Changes since %s (%d)" % (previous, len(commits)), ""]
     lines += shown or ["No commits."]

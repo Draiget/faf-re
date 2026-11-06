@@ -285,3 +285,42 @@ jobs:
           name: report
           path: report
           retention-days: 90
+
+  # A desync never fails the run (report --no-fail), so a failed job in the nightly is CI's: a lost
+  # runner, a timeout, a cache or network error. Nightly retry re-runs the failed jobs once this run
+  # has ended, twice at most. tools/release/README.md.
+  retry:
+    needs: [build, plan, run, report]
+    if: failure() && github.event_name == 'schedule' && github.run_attempt < 3
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write  # starts Nightly retry
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run nightly-retry.yml -R "$GITHUB_REPOSITORY" --ref master -f run_id=${{ github.run_id }}
+
+  # A re-run started by Nightly retry ends without starting Nightly release (GitHub starts no
+  # workflow from what the workflow token did), so this run starts it, when the report is clean.
+  release:
+    needs: [run, report]
+    if: github.event_name == 'schedule' && github.run_attempt > 1 && github.triggering_actor == 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write  # starts Nightly release
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: report
+          path: report
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          new=$(jq -r '.regressions | length' report/report.json)
+          if [ "$new" != "0" ]; then
+            echo "$new new failures: no nightly release." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh workflow run nightly-release.yml -R "$GITHUB_REPOSITORY" --ref master -f ref=${{ github.sha }} \
+            -f publish=true -f parity_run=${{ github.run_id }} \
+            -f note="Replay parity passed on attempt ${{ github.run_attempt }}, after Nightly retry re-ran its failed jobs."

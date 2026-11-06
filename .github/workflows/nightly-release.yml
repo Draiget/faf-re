@@ -1,6 +1,6 @@
 name: Nightly release
 
-# Publishes a pre-release of master's head once that night's Replay parity lists no new failure: the x64 and
+# Publishes master's head as the latest release once that night's Replay parity lists no new failure: the x64 and
 # x86 engine, the commits since the previous nightly, and the parity run it passed. Started by hand
 # it only builds and writes the notes, unless `publish` is ticked. tools/release/README.md.
 on:
@@ -15,7 +15,7 @@ on:
         required: true
         default: master
       publish:
-        description: Also publish the pre-release (otherwise the zips and notes stay this run's artifacts)
+        description: Also publish the release as the latest (otherwise the zips and notes stay this run's artifacts)
         type: boolean
         default: false
       parity_run:
@@ -217,6 +217,18 @@ jobs:
           SHA: ${{ needs.plan.outputs.sha }}
           TAG: ${{ needs.plan.outputs.tag }}
         run: |
-          gh release create "$TAG" zips/faf-engine-*.zip zips/main*.exe zips/SHA256SUMS.txt --target "$SHA" --prerelease --latest=false \
+          gh release create "$TAG" zips/faf-engine-*.zip zips/main*.exe zips/SHA256SUMS.txt --target "$SHA" --latest \
             --title "$TAG x64\\x86" --notes-file notes.md
           gh release view "$TAG" --json tagName,isPrerelease,url | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # A failed build or publish of a nightly is CI's: Nightly retry re-runs the failed jobs, twice at most.
+  retry:
+    needs: [plan, build, release]
+    if: failure() && github.run_attempt < 3 && (github.event_name == 'workflow_run' || inputs.publish)
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write  # starts Nightly retry
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run nightly-retry.yml -R "$GITHUB_REPOSITORY" --ref master -f run_id=${{ github.run_id }}
