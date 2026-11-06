@@ -171,8 +171,8 @@ namespace faf::remote
     std::size_t gone = 0;
     while (last < mLastEntityIndex.size() || next < changed.size()) {
       const std::uint32_t lastId = last < mLastEntityIndex.size() ? mLastEntityIndex[last].id : 0xFFFFFFFFu;
-      if (next < changed.size() && static_cast<std::uint32_t>(changed[next].entity->id_) <= lastId) {
-        const auto id = static_cast<std::uint32_t>(changed[next].entity->id_);
+      if (next < changed.size() && changed[next].id <= lastId) {
+        const auto id = changed[next].id;
         mEntityReads.push_back({static_cast<std::uint32_t>(mEntityIndex.size()), static_cast<std::uint32_t>(next)});
         mEntityIndex.push_back({id, 0u, false, false});
         mEntityPointers.push_back(changed[next].entity);
@@ -216,7 +216,7 @@ namespace faf::remote
       while (last < mLastEntityIndex.size() && mLastEntityIndex[last].id < key) {
         ++last;
       }
-      while (next < changed.size() && static_cast<std::uint32_t>(changed[next].entity->id_) < key) {
+      while (next < changed.size() && changed[next].id < key) {
         ++next;
       }
       const bool synced = next < changed.size() && changed[next].entity == entity;

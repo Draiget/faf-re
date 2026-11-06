@@ -20,6 +20,8 @@ namespace faf::remote
   struct SChangedEntity
   {
     moho::Entity* entity = nullptr;
+    /** Its id, read while the walk has the entity at hand: sorting by it then reads no entity. */
+    std::uint32_t id = 0;
     /** `mRequestRefreshUI` as the walk found it: `Entity::Sync` clears it after the packet copy. */
     bool requestRefreshUI = false;
   };
