@@ -60,18 +60,53 @@ namespace
   [[maybe_unused]] const bool gSoundEnabledSet = (moho::sSoundEnabled = &IsSoundEnabled, true);
 } // namespace
 
-extern "C" __declspec(dllimport) void __cdecl X3DAudioCalculate(
-  const void* instance,
-  const moho::Audio3DListener* listener,
-  const moho::Audio3DEmitter* emitter,
-  std::uint32_t flags,
-  moho::Audio3DDspSettings* dspSettings
-);
-extern "C" __declspec(dllimport) void __cdecl X3DAudioInitialize(
-  std::uint32_t speakerChannelMask,
-  float speedOfSound,
-  void* instance
-);
+namespace
+{
+  /**
+   * Engine addition (issue #316): X3DAudio is loaded at run time instead of being imported from
+   * X3DAudio1_7.dll, which only the DirectX End-User Runtime of June 2010 installs. Windows 10's
+   * xaudio2_9.dll exports the same two functions with the same structures (X3DAUDIO_HANDLE_BYTESIZE 20,
+   * pack 1, __cdecl; its X3DAudioInitialize returns an HRESULT the engine never read). X3DAudio1_7.dll
+   * stays the fallback for Windows before 10. Both come from System32 only. Without either, 3D audio
+   * fails to initialize and the game runs without sound, as for any other sound start-up error.
+   */
+  struct X3DAudioFunctions
+  {
+    void(__cdecl* mInitialize)(std::uint32_t speakerChannelMask, float speedOfSound, void* instance) = nullptr;
+    void(__cdecl* mCalculate)(
+      const void* instance,
+      const moho::Audio3DListener* listener,
+      const moho::Audio3DEmitter* emitter,
+      std::uint32_t flags,
+      moho::Audio3DDspSettings* dspSettings
+    ) = nullptr;
+  };
+
+  const X3DAudioFunctions& X3DAudio()
+  {
+    static const X3DAudioFunctions functions = [] {
+      for (const wchar_t* const library : {L"xaudio2_9.dll", L"X3DAudio1_7.dll"}) {
+        const HMODULE module = ::LoadLibraryExW(library, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        if (module == nullptr) {
+          continue;
+        }
+        X3DAudioFunctions loaded;
+        loaded.mInitialize =
+          reinterpret_cast<decltype(loaded.mInitialize)>(::GetProcAddress(module, "X3DAudioInitialize"));
+        loaded.mCalculate =
+          reinterpret_cast<decltype(loaded.mCalculate)>(::GetProcAddress(module, "X3DAudioCalculate"));
+        if (loaded.mInitialize != nullptr && loaded.mCalculate != nullptr) {
+          gpg::Logf("SND: 3D audio from %ls", library);
+          return loaded;
+        }
+        ::FreeLibrary(module);
+      }
+      gpg::Warnf("SND: neither xaudio2_9.dll nor X3DAudio1_7.dll provides X3DAudio");
+      return X3DAudioFunctions{};
+    }();
+    return functions;
+  }
+} // namespace
 
 namespace moho
 {
@@ -1379,7 +1414,10 @@ namespace moho
       return result;
     }
 
-    X3DAudioInitialize(finalMixFormat.dwChannelMask, speedOfSound, audioHandle);
+    if (X3DAudio().mInitialize == nullptr) {
+      return kHresultFail;
+    }
+    X3DAudio().mInitialize(finalMixFormat.dwChannelMask, speedOfSound, audioHandle);
     return result;
   }
 
@@ -1711,7 +1749,10 @@ namespace moho
       emitter->mLfeCurve = const_cast<AudioDistanceCurve*>(&kDefaultDistanceCurve);
     }
 
-    X3DAudioCalculate(audioHandle, listener, emitter, kX3dCalculateFlags, settings);
+    if (X3DAudio().mCalculate == nullptr) {
+      return kHresultFail;
+    }
+    X3DAudio().mCalculate(audioHandle, listener, emitter, kX3dCalculateFlags, settings);
     return 0;
   }
 

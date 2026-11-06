@@ -214,7 +214,7 @@ target_link_directories(faf_engine INTERFACE "${_faf_dxsdk_lib}")
 target_link_libraries(faf_engine PUBLIC
   FFmpeg::FFmpeg
   ws2_32 d3d9 d3dx9 d3d10 d3d11 "${_faf_sdk_um_lib}/d3dcompiler.lib" dxgi
-  "${_faf_sdk_um_lib}/dxguid.lib" dsound x3daudio
+  "${_faf_sdk_um_lib}/dxguid.lib" dsound
   legacy_stdio_definitions legacy_stdio_wide_specifiers
   dbghelp winmm version comctl32 shlwapi faultrep
   ${_faf_zlib}
