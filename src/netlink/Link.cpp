@@ -959,10 +959,12 @@ namespace faf::netlink
         }
       }
 
-      // Issue #234: probe a marked peer, at most 5 times a second apart.
-      if (mState == LinkState::Connected && mRemoteMarked && !mOurPeer.load() && mProbesSent < 5 &&
-          now >= mNextProbe) {
-        mNextProbe = now + std::chrono::seconds(1);
+      // Issue #234: probe a marked peer, 5 times a second apart, then every 5 s
+      // until it answers. A reconnect can come up while the path still drops
+      // what the link sends (ICE checks got through), and without an answer the
+      // lane and its encryption (#289) would stay off for the whole connection.
+      if (mState == LinkState::Connected && mRemoteMarked && !mOurPeer.load() && now >= mNextProbe) {
+        mNextProbe = now + std::chrono::seconds(mProbesSent < 5 ? 1 : 5);
         ++mProbesSent;
         static constexpr char kProbe[] = "fnetlink-probe 1";
         SendFramed(kProbe, sizeof(kProbe) - 1);
