@@ -8,6 +8,18 @@
 -- Direct3D 11, Direct3D 9). A command-line switch (/d3d9, /d3d11, /d3d12,
 -- /vulkan, /D3D10) overrides the option, and a chosen renderer that cannot
 -- start falls back to Direct3D 9.
+--
+-- FAF's own options.lua may carry these entries (issue #327); an entry whose key
+-- is already in the tab is left out here, so it shows once, with FAF's text.
+
+local function HasOptionKey(items, key)
+    for _, item in items do
+        if item.key == key then
+            return true
+        end
+    end
+    return false
+end
 
 do
     local graphicsApi = {
@@ -30,7 +42,7 @@ do
     }
 
     local video = options and options.video
-    if video and video.items then
+    if video and video.items and not HasOptionKey(video.items, graphicsApi.key) then
         -- After Vertical Sync, with the other display settings; at the end of
         -- the tab when that entry is missing.
         local position = table.getn(video.items) + 1
@@ -48,7 +60,12 @@ end
 do
     local gameplay = options and options.gameplay
     if gameplay and gameplay.items then
-        table.insert(gameplay.items, {
+        local function Add(item)
+            if not HasOptionKey(gameplay.items, item.key) then
+                table.insert(gameplay.items, item)
+            end
+        end
+        Add({
             title = "Replay keyframe cache (MB)",
             key = 'replay_keyframe_budget',
             type = 'slider',
@@ -64,7 +81,7 @@ do
                 inc = 256,
             },
         })
-        table.insert(gameplay.items, {
+        Add({
             title = "Replay keyframe spacing (seconds)",
             key = 'replay_keyframe_spacing',
             type = 'slider',
@@ -80,7 +97,7 @@ do
                 inc = 10,
             },
         })
-        table.insert(gameplay.items, {
+        Add({
             title = "Replay background preparation",
             key = 'replay_keyframe_prepare',
             type = 'toggle',
