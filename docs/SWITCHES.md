@@ -180,6 +180,7 @@ The switches below are read when a session begins. In a multiplayer game every c
 | `sim_FixProjectileImpactBelowZero` | −1 | `/con` | next game | #154 (from 3840): a projectile below height 0 impacts |
 | `sim_FixRefuelUndockAboveMaxHealth` | −1 | `/con` | next game | #169 (from 3840): refuelled aircraft undock once health is at least max health |
 | `sim_FixShieldRepair` | −1 | `/con` | next game | #175 (from 3840): shield repair scales with the builder's resources, and a switched-off shield is not repaired |
+| `sim_FixProjectileMapEdgeCollision` | −1 | `/con` | next game | #180 (in no FAF release yet, so −1 means off): a surface-colliding projectile outside the map hits the terrain at the height of the nearest map edge, and #154's impact below height 0 is off. Projectiles with `CollideSurface = false`, such as the UEF build effect projectile, are no longer destroyed below 0 |
 
 ## Protection against other players
 
