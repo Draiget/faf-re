@@ -226,4 +226,32 @@ for _ in pairs(mgr:GetActiveGhosts()) do count = count + 1 end
 assert_eq(count, 0, "ClearAll emptied active ghosts")
 assert_true(m4.isDestroyed, "ClearAll destroyed mesh")
 
+-- Test 10: Static dot-syntax calls (Manager.Update, Manager.GetActiveGhosts, Manager.DestroyGhost, Manager.ClearAll)
+local u5 = CreateMockUnit('u105', 1)
+local u6 = CreateMockUnit('u106', 1)
+local transport3 = CreateMockTransport('t3', 1, { u5, u6 }, {
+    { type = 'TransportUnloadUnits', position = { x = 300, y = 20, z = 400 } }
+})
+
+-- Test Manager.Update with dot syntax
+Manager.Update(1, { transport3 })
+local staticGhosts = Manager.GetActiveGhosts()
+assert_true(staticGhosts['u105'] ~= nil, "Ghost u105 spawned via static Update")
+assert_true(staticGhosts['u106'] ~= nil, "Ghost u106 spawned via static Update")
+local m5 = staticGhosts['u105'].mesh
+
+-- Test Manager.DestroyGhost with dot syntax
+Manager.DestroyGhost('u105')
+staticGhosts = Manager.GetActiveGhosts()
+assert_true(staticGhosts['u105'] == nil, "Ghost u105 destroyed via static DestroyGhost")
+assert_true(staticGhosts['u106'] ~= nil, "Ghost u106 still present after u105 destroyed")
+assert_true(m5.isDestroyed, "Mesh for u105 was destroyed")
+
+-- Test Manager.ClearAll with dot syntax
+Manager.ClearAll()
+staticGhosts = Manager.GetActiveGhosts()
+count = 0
+for _ in pairs(staticGhosts) do count = count + 1 end
+assert_eq(count, 0, "All ghosts cleared via static ClearAll")
+
 print("test_drop_ghosts_manager: ALL PASSED")
