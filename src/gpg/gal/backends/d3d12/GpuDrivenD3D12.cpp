@@ -327,7 +327,15 @@ namespace gpg::gal
     // UI_DrawLine stroke against the path off, pixel-identical outside two animated unit glows.
     return kGpuPathStrategicIcons | kGpuPathIconClassify | kGpuPathFogOfWar | kGpuPathSelectBrackets | kGpuPathProjectileIcons |
       // MSDF text and the interface's quads: 0 pixels differ in a same-process A/B of a panel of text.
-      kGpuPathWorldShapes | kGpuPathMsdfText;
+      kGpuPathWorldShapes | kGpuPathMsdfText | MsdfCookVerified();
+  }
+
+  std::uint32_t DeviceD3D12::MsdfCookVerified() const
+  {
+    // The GPU font cook (ren_GpuFontCook): GPU and CPU atlases compared per font, and a device reset during
+    // a cook, on NVIDIA only; other vendors keep the CPU cook until it has run there (issue #309).
+    const bool nvidia = mAdapterIndex < mFactory.Adapters().size() && mFactory.Adapters()[mAdapterIndex].desc.VendorId == kPciVendorNvidia;
+    return nvidia ? kGpuPathMsdfCook : 0U;
   }
 
   boost::shared_ptr<GpuBuffer> DeviceD3D12::CreateGpuBuffer(const GpuBufferDesc& desc)

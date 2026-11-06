@@ -130,6 +130,8 @@ namespace gpg::gal
     // GPU-driven additions (gpg/gal/GpuDriven.h), implemented by GpuDrivenD3D11.
     [[nodiscard]] std::uint32_t GetGpuDrivenFeatures() const override;
     [[nodiscard]] std::uint32_t GetGpuDrivenVerified() const override;
+    /** `kGpuPathMsdfCook` for an NVIDIA adapter, else 0 (issue #309). */
+    [[nodiscard]] std::uint32_t MsdfCookVerified() const;
     boost::shared_ptr<GpuBuffer> CreateGpuBuffer(const GpuBufferDesc& desc) override;
     void UpdateGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, const void* data) override;
     boost::shared_ptr<GpuProgram> CreateGpuProgram(const GpuProgramDesc& desc) override;
