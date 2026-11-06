@@ -328,6 +328,39 @@ namespace moho
     }
 
     /**
+     * Adds a quadratic, split at its highest or lowest point when that lies inside it, so each piece only rises or
+     * only falls. The shader's inside test then counts a crossing from the endpoints alone, as for a line; a ray
+     * touching a curve's top was counted twice before, which drew a line beside the glyph. A split traces the same
+     * curve, so no distance changes.
+     */
+    void PushGpuQuadratic(std::vector<SMsdfGpuEdge>& edges, const float* const p0, const float* const p1, const float* const p2, const std::uint32_t color)
+    {
+      const auto push = [&edges, color](const float* const a, const float* const b, const float* const c) {
+        SMsdfGpuEdge edge;
+        edge.mP0[0] = a[0];
+        edge.mP0[1] = a[1];
+        edge.mP1[0] = b[0];
+        edge.mP1[1] = b[1];
+        edge.mP2[0] = c[0];
+        edge.mP2[1] = c[1];
+        edge.mColor = color;
+        edge.mKind = 2u;
+        edges.push_back(edge);
+      };
+      const float denominator = p0[1] - 2.0f * p1[1] + p2[1];
+      const float t = denominator != 0.0f ? (p0[1] - p1[1]) / denominator : -1.0f;
+      if (!(t > 0.0f && t < 1.0f)) {
+        push(p0, p1, p2);
+        return;
+      }
+      const float q0[2] = {p0[0] + (p1[0] - p0[0]) * t, p0[1] + (p1[1] - p0[1]) * t};
+      const float q1[2] = {p1[0] + (p2[0] - p1[0]) * t, p1[1] + (p2[1] - p1[1]) * t};
+      const float middle[2] = {q0[0] + (q1[0] - q0[0]) * t, q0[1] + (q1[1] - q0[1]) * t};
+      push(p0, q0, middle);
+      push(middle, q1, p2);
+    }
+
+    /**
      * Fills the directions and corner bisectors of one contour's GPU edges, `[first, edges.size())`, each corner
      * between an edge and the one before it, wrapping around: the shader needs them to tell which side of a corner
      * a texel is on, as msdfgen's MultiDistanceSelector::addEdge does with the edges on either side.
@@ -771,13 +804,13 @@ namespace moho
             edge.mKind = 1u;
             plan.mGpuEdges.push_back(edge);
           } else if (segment->type() == static_cast<int>(msdfgen::QuadraticSegment::EDGE_TYPE)) {
-            SMsdfGpuEdge edge;
-            project(points[0], edge.mP0);
-            project(points[1], edge.mP1);
-            project(points[2], edge.mP2);
-            edge.mColor = color;
-            edge.mKind = 2u;
-            plan.mGpuEdges.push_back(edge);
+            float p0[2];
+            float p1[2];
+            float p2[2];
+            project(points[0], p0);
+            project(points[1], p1);
+            project(points[2], p2);
+            PushGpuQuadratic(plan.mGpuEdges, p0, p1, p2, color);
           } else {
             // A cubic as four quadratics, each with the control point that best fits its piece.
             constexpr int kPieces = 4;
@@ -789,13 +822,13 @@ namespace moho
               const msdfgen::Vector2 startDirection = segment->direction(t0);
               const double scaleToPiece = 3.0 * (t1 - t0) / 2.0; // direction() is the derivative over 3
               const msdfgen::Point2 control = start + startDirection * scaleToPiece;
-              SMsdfGpuEdge edge;
-              project(start, edge.mP0);
-              project(control, edge.mP1);
-              project(end, edge.mP2);
-              edge.mColor = color;
-              edge.mKind = 2u;
-              plan.mGpuEdges.push_back(edge);
+              float p0[2];
+              float p1[2];
+              float p2[2];
+              project(start, p0);
+              project(control, p1);
+              project(end, p2);
+              PushGpuQuadratic(plan.mGpuEdges, p0, p1, p2, color);
             }
           }
         }

@@ -250,49 +250,38 @@ float PerpendicularDistance(Edge e, float2 q, Distance found)
   return found.d;
 }
 
-// How much this edge winds around q, counted along a ray towards +x; together, the exact non-zero fill.
+// How much this edge winds around q, counted along a ray towards +x; together, the exact non-zero fill. The CPU
+// splits quadratics where they turn up or down (PushGpuQuadratic), so each edge here only rises or only falls, and
+// its endpoints decide whether the ray crosses it, half-open as for a line: a ray touching a curve's top or bottom
+// counts once or not at all, never twice.
 int Winding(Edge e, float2 q)
 {
-  if (e.kind == 1u) {
-    if ((e.p0.y <= q.y) == (e.p1.y <= q.y)) {
-      return 0;
-    }
-    float t = (q.y - e.p0.y) / (e.p1.y - e.p0.y);
-    return lerp(e.p0.x, e.p1.x, t) > q.x ? (e.p1.y > e.p0.y ? 1 : -1) : 0;
+  float2 end = EndPoint(e);
+  if ((e.p0.y <= q.y) == (end.y <= q.y)) {
+    return 0;
   }
+  int direction = end.y > e.p0.y ? 1 : -1;
+  if (e.kind == 1u) {
+    float t = (q.y - e.p0.y) / (end.y - e.p0.y);
+    return lerp(e.p0.x, end.x, t) > q.x ? direction : 0;
+  }
+  // The one t where this monotonic curve reaches q.y.
   float a = e.p0.y - 2.0 * e.p1.y + e.p2.y;
   float b = 2.0 * (e.p1.y - e.p0.y);
   float c = e.p0.y - q.y;
-  float t0 = -1.0;
-  float t1 = -1.0;
+  float t;
   if (abs(a) < 1.0e-6) {
-    if (b != 0.0) {
-      t0 = -c / b;
-    }
+    t = -c / b;
   } else {
-    float disc = b * b - 4.0 * a * c;
-    if (disc >= 0.0) {
-      float s = sqrt(disc);
-      t0 = (-b - s) / (2.0 * a);
-      t1 = (-b + s) / (2.0 * a);
-    }
+    float s = sqrt(max(b * b - 4.0 * a * c, 0.0));
+    float t0 = (-b - s) / (2.0 * a);
+    float t1 = (-b + s) / (2.0 * a);
+    t = (t0 >= 0.0 && t0 <= 1.0) ? t0 : t1;
   }
-  int wind = 0;
-  if (t0 >= 0.0 && t0 < 1.0) {
-    float mt = 1.0 - t0;
-    float x = mt * mt * e.p0.x + 2.0 * mt * t0 * e.p1.x + t0 * t0 * e.p2.x;
-    if (x > q.x) {
-      wind += (2.0 * a * t0 + b) > 0.0 ? 1 : -1;
-    }
-  }
-  if (t1 >= 0.0 && t1 < 1.0) {
-    float mt = 1.0 - t1;
-    float x = mt * mt * e.p0.x + 2.0 * mt * t1 * e.p1.x + t1 * t1 * e.p2.x;
-    if (x > q.x) {
-      wind += (2.0 * a * t1 + b) > 0.0 ? 1 : -1;
-    }
-  }
-  return wind;
+  t = clamp(t, 0.0, 1.0);
+  float mt = 1.0 - t;
+  float x = mt * mt * e.p0.x + 2.0 * mt * t * e.p1.x + t * t * e.p2.x;
+  return x > q.x ? direction : 0;
 }
 
 [numthreads(8, 8, 1)]
