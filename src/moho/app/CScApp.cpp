@@ -60,6 +60,7 @@
 #if FAF_SERVER_MODE
 #include "remote/client/OracleGolden.h"
 #include "remote/client/ServerConnect.h"
+#include "moho/app/ServerLobbyUi.h"
 #endif
 
 namespace gpg
@@ -477,9 +478,8 @@ namespace
 
     // Engine addition, server mode: `/connectserver` takes over startup. Without it, every
     // path below runs as before.
-    // The lobby as a direct join starts it (lobby Lua unchanged); the server, its host, names the player.
-    const auto startServerLobby = [](const char* const endpoint) { return moho::UI_StartJoinLobbyUI("UDP", endpoint, "Player"); };
-    switch (faf::remote::StartServerSessionFromCommandLine(startServerLobby)) {
+    // The server's lobby signals make the lobby, as GPGNet's commands would (lobby Lua unchanged).
+    switch (faf::remote::StartServerSessionFromCommandLine(&moho::SERVERLOBBY_Start)) {
     case faf::remote::EServerSessionStart::NotRequested:
       break;
     case faf::remote::EServerSessionStart::Started:

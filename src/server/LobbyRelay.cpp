@@ -96,7 +96,7 @@ namespace faf::server
 
     if (target == 0u) {
       to = 0;
-      return verdict(ELobbyRelayVerdict::ToHost);
+      return verdict(ELobbyRelayVerdict::ToServer);
     }
     const auto targetUid = static_cast<std::int32_t>(target);
     if (targetUid == from || !mSenders.contains(targetUid)) {
@@ -111,7 +111,7 @@ namespace faf::server
     return verdict(ELobbyRelayVerdict::Forward);
   }
 
-  std::vector<std::uint8_t> CLobbyRelay::FrameFromHost(const std::span<const std::uint8_t> message)
+  std::vector<std::uint8_t> CLobbyRelay::FrameFromServer(const std::span<const std::uint8_t> message)
   {
     std::vector<std::uint8_t> out;
     remote::net::ByteWriter writer(out);

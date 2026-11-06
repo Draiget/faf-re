@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string>
 
+#include "remote/net/LobbySignals.h"
+
 namespace moho
 {
   class INetConnector;
@@ -49,10 +51,22 @@ namespace faf::remote
   /**
    * Called first by the startup session selection (`InitializeSessionFromCommandLine`). Once
    * `/connectserver` is given, startup never falls back to a lockstep path. With the channel up it calls
-   * `startLobby` with the server's address (the client starts its join-lobby UI; this file stays out of the UI,
-   * which headless lacks).
+   * `startLobbyUi`: the client shows its waiting front end and starts the task that takes the server's lobby signals
+   * (this file stays out of the UI, which headless lacks).
    */
-  [[nodiscard]] EServerSessionStart StartServerSessionFromCommandLine(bool (*startLobby)(const char* endpoint));
+  [[nodiscard]] EServerSessionStart StartServerSessionFromCommandLine(bool (*startLobbyUi)());
+
+  /**
+   * Plan WP2.12: the server's next lobby signal (remote/net/LobbySignals.h), if it is next in line: the lobby's own
+   * frames after it wait until it has been taken. False outside a server session.
+   */
+  [[nodiscard]] bool TakeServerLobbySignal(net::SLobbySignal& signal);
+  /** The lobby's connection to `uid` ends (`ConnLostEof`): the server said that participant left. */
+  void EndServerLobbyPeer(std::int32_t uid);
+  /** This player's uid in the server session, or 0 outside one. */
+  [[nodiscard]] std::int32_t ServerSessionUid();
+  /** The channel to the server is connected or reconnecting. */
+  [[nodiscard]] bool ServerSessionUp();
 
   /**
    * Plan WP2.13, WP12.1: once a server session has its channel, the connector the lobby is made with

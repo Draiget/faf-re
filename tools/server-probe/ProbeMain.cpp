@@ -32,7 +32,7 @@
 #include "remote/ViewLanes.h"
 #include "remote/net/GameLinks.h"
 #include "remote/wire/EntityFrame.h"
-#include "server/LobbyHost.h"
+#include "remote/net/LobbySignals.h"
 
 using namespace faf::remote::net;
 
@@ -186,7 +186,7 @@ namespace
     int fuzzCount = 2000;
     CImpairedPath::SConfig path;
     bool noLoad = false;
-    // Plan WP2.2, WP2.13: join the server's lobby by this name once connected, and send one direct script message
+    // Plan WP2.2, WP2.13: print the lobby signals the server sends (Host, Join, ConnectToPeer, DisconnectFromPeer), and send one direct script message
     // through the relay to another participant at a time.
     std::string lobbyName;
     std::int32_t lobbySayTo = 0;
@@ -544,21 +544,52 @@ namespace
   struct SLobbySeen
   {
     std::uint64_t messages = 0;
+    std::string role = "none";              // from the server's Host or Join signal
+    std::int32_t hostUid = 0;
     bool welcomed = false;
     std::int32_t hostedTime = 0;
-    std::vector<std::int32_t> peers;        // from NewPeer, in order
+    std::vector<std::int32_t> peers;        // from ConnectToPeer signals, in order
     std::vector<std::int32_t> established;  // the last EstablishedPeers
     std::vector<std::int32_t> scriptFrom;   // senders of script data, as the relay wrote them
-    std::vector<std::int32_t> deleted;
+    std::vector<std::int32_t> deleted;      // from DisconnectFromPeer signals
     bool rejected = false;
   };
 
-  /** One `Lobby` frame from the server: varint sender (0: the host), then a CLobby message; printed and noted. */
+  /** One `Lobby` frame from the server: varint sender (0: the server's signal), then the message; printed and noted. */
   void TakeLobby(const int uid, const double elapsed, const std::vector<std::uint8_t>& frame, SLobbySeen& seen)
   {
     ByteReader reader(frame.data() + 1, frame.size() - 1u);
     const auto from = static_cast<std::int32_t>(reader.Varint());
     std::size_t at = 1u + faf::remote::net::VarintSize(static_cast<std::uint64_t>(from));
+    if (from == 0 && reader.Ok() && at < frame.size()) {
+      ++seen.messages;
+      faf::remote::net::SLobbySignal signal;
+      if (!faf::remote::net::DecodeLobbySignal(std::span<const std::uint8_t>(frame).subspan(at), signal)) {
+        std::printf("probe %d: %.1f s: a malformed lobby signal\n", uid, elapsed);
+        return;
+      }
+      using faf::remote::net::ELobbySignal;
+      switch (signal.kind) {
+      case ELobbySignal::Host:
+        seen.role = "host";
+        std::printf("probe %d: %.1f s: lobby: host it as \"%s\", map %s\n", uid, elapsed, signal.name.c_str(), signal.text.c_str());
+        break;
+      case ELobbySignal::Join:
+        seen.role = "join";
+        seen.hostUid = signal.uid;
+        std::printf("probe %d: %.1f s: lobby: join host \"%s\" (uid %d) as \"%s\"\n", uid, elapsed, signal.text.c_str(), signal.uid, signal.name.c_str());
+        break;
+      case ELobbySignal::ConnectToPeer:
+        seen.peers.push_back(signal.uid);
+        std::printf("probe %d: %.1f s: lobby: connect to peer \"%s\" (uid %d)\n", uid, elapsed, signal.name.c_str(), signal.uid);
+        break;
+      case ELobbySignal::DisconnectFromPeer:
+        seen.deleted.push_back(signal.uid);
+        std::printf("probe %d: %.1f s: lobby: peer %d left\n", uid, elapsed, signal.uid);
+        break;
+      }
+      return;
+    }
     if (!reader.Ok() || at + 3u > frame.size()) {
       std::printf("probe %d: %.1f s: a malformed lobby frame\n", uid, elapsed);
       return;
@@ -749,16 +780,6 @@ int main(const int argc, char** const argv)
       if (!options.noLoad && joins == 1u) {
         const auto kind = static_cast<std::uint8_t>(ESeatMessage::Loaded);
         (void)link.SendReliable(&kind, 1u);
-      }
-      if (!options.lobbyName.empty()) {
-        // As `CLobby::OnConnectionMade` on the joining side: `Join` to the host, over the virtual connection to uid 0.
-        std::vector<std::uint8_t> frame;
-        faf::remote::net::ByteWriter writer(frame);
-        writer.Byte(static_cast<std::uint8_t>(ESeatMessage::Lobby));
-        writer.Varint(0u);
-        const std::vector<std::uint8_t> join = faf::server::CLobbyHost::Join(options.lobbyName, options.uid);
-        writer.Bytes(join.data(), join.size());
-        (void)link.SendReliable(frame.data(), frame.size());
       }
     }
     if (Due(options.lobbySayAt, elapsed) && options.lobbySayTo != 0) {
@@ -1023,9 +1044,9 @@ int main(const int argc, char** const argv)
       }
       return text.empty() ? std::string("none") : text;
     };
-    std::printf("probe %d: lobby: %llu messages, %s, seed %d, peers %s, established %s, script data from %s, left %s\n", options.uid,
-                static_cast<unsigned long long>(lobby.messages), lobby.rejected ? "rejected" : (lobby.welcomed ? "welcomed" : "not welcomed"), lobby.hostedTime,
-                list(lobby.peers).c_str(), list(lobby.established).c_str(), list(lobby.scriptFrom).c_str(), list(lobby.deleted).c_str());
+    std::printf("probe %d: lobby: %llu messages, role %s, host %d, peers %s, script data from %s, left %s\n", options.uid,
+                static_cast<unsigned long long>(lobby.messages), lobby.role.c_str(), lobby.hostUid, list(lobby.peers).c_str(), list(lobby.scriptFrom).c_str(),
+                list(lobby.deleted).c_str());
   }
   if (!views.lateMs.empty()) {
     std::sort(views.lateMs.begin(), views.lateMs.end());

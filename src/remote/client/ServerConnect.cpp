@@ -105,7 +105,10 @@ namespace faf::remote
       );
     }
 
-    /** The client's channel to the server as the lobby's connector uses it; the rest it receives waits for the game. */
+    /**
+     * The client's channel to the server as the lobby uses it: lobby frames in arrival order (`CLobbyInbox`: a server
+     * signal holds back the frames after it), the rest kept for the game's session.
+     */
     class CLinkRelayChannel final : public IRelayChannel
     {
     public:
@@ -117,16 +120,8 @@ namespace faf::remote
 
       bool TakeLobbyFrame(std::vector<std::uint8_t>& frame) override
       {
-        // `CLobby` pulls its connector every frame: the link moves here.
-        mLink.Pump(NowUs());
-        while (mLink.TakeReliable(mMessage)) {
-          if (!mMessage.empty() && mMessage[0] == static_cast<std::uint8_t>(net::ESeatMessage::Lobby)) {
-            frame = std::move(mMessage);
-            return true;
-          }
-          mForGame.push_back(std::move(mMessage)); // the game's session takes these (plan WP11)
-        }
-        return false;
+        Pump();
+        return mInbox.TakeLobbyFrame(frame);
       }
 
       bool Up() const override
@@ -135,9 +130,39 @@ namespace faf::remote
         return state == net::CClientLink::EState::Connected || state == net::CClientLink::EState::Connecting;
       }
 
+      void TakeGone(std::vector<std::int32_t>& uids) override
+      {
+        uids.insert(uids.end(), mGone.begin(), mGone.end());
+        mGone.clear();
+      }
+
+      [[nodiscard]] bool TakeSignal(net::SLobbySignal& signal)
+      {
+        Pump();
+        return mInbox.TakeSignal(signal);
+      }
+
+      void MarkGone(const std::int32_t uid) { mGone.push_back(uid); }
+
     private:
+      // The lobby pulls every frame, and the session's task too: the link moves here.
+      void Pump()
+      {
+        mLink.Pump(NowUs());
+        while (mLink.TakeReliable(mMessage)) {
+          if (!mMessage.empty() && mMessage[0] == static_cast<std::uint8_t>(net::ESeatMessage::Lobby)) {
+            mInbox.Push(std::move(mMessage));
+          } else {
+            mForGame.push_back(std::move(mMessage)); // the game's session takes these (plan WP11)
+          }
+          mMessage.clear();
+        }
+      }
+
       net::CClientLink& mLink;
+      CLobbyInbox mInbox;
       std::vector<std::uint8_t> mMessage;
+      std::vector<std::int32_t> mGone;
       std::vector<std::vector<std::uint8_t>> mForGame;
     };
 
@@ -145,10 +170,12 @@ namespace faf::remote
     struct SServerSession
     {
       SServerSession(const std::int32_t uid, const net::Token& token, const net::SEndpoint& server)
-        : link(uid, token, server)
+        : uid(uid)
+        , link(uid, token, server)
         , channel(link)
       {}
 
+      std::int32_t uid;
       net::CClientLink link;
       CLinkRelayChannel channel;
       bool connectorTaken = false;
@@ -168,7 +195,29 @@ namespace faf::remote
     return new CServerRelayConnector(sSession->channel); // `CLobby` destroys it
   }
 
-  EServerSessionStart StartServerSessionFromCommandLine(bool (*const startLobby)(const char* endpoint))
+  bool TakeServerLobbySignal(net::SLobbySignal& signal)
+  {
+    return sSession != nullptr && sSession->channel.TakeSignal(signal);
+  }
+
+  void EndServerLobbyPeer(const std::int32_t uid)
+  {
+    if (sSession != nullptr) {
+      sSession->channel.MarkGone(uid);
+    }
+  }
+
+  std::int32_t ServerSessionUid()
+  {
+    return sSession != nullptr ? sSession->uid : 0;
+  }
+
+  bool ServerSessionUp()
+  {
+    return sSession != nullptr && sSession->channel.Up();
+  }
+
+  EServerSessionStart StartServerSessionFromCommandLine(bool (*const startLobbyUi)())
   {
     SServerConnectRequest request;
     std::string error;
@@ -216,9 +265,10 @@ namespace faf::remote
     }
     gpg::Logf("Server session: connected to %s", request.endpoint.c_str());
 
-    // The lobby as a direct join makes it (`UI_StartJoinLobbyUI`, lobby Lua unchanged); `InternalCreateLobby` takes
-    // `TakeServerLobbyConnector`, and the server, the lobby's host, names the player and assigns its uid in Welcome.
-    if (startLobby == nullptr || !startLobby(request.endpoint.c_str())) {
+    // The front end waits for the server's lobby signals (plan WP2.12): a task the UI side runs takes them and makes
+    // the lobby as GPGNet's commands would (moho/app/ServerLobbyUi.h); `InternalCreateLobby` takes
+    // `TakeServerLobbyConnector`.
+    if (startLobbyUi == nullptr || !startLobbyUi()) {
       moho::WIN_OkBox("Ack!", "Unable to start the lobby.");
       sSession.reset();
       return EServerSessionStart::Failed;

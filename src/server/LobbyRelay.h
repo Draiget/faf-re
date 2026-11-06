@@ -27,7 +27,7 @@ namespace faf::server
   enum class ELobbyRelayVerdict : std::uint8_t
   {
     Forward,       // `out` goes to `to`
-    ToHost,        // the message is for the server, as the lobby's host
+    ToServer,      // the message is for the server itself (uid 0)
     Closed,        // the game has launched
     UnknownSender, // not a participant of the match
     UnknownTarget, // the uid it is for isn't one, or is the sender
@@ -60,7 +60,7 @@ namespace faf::server
     );
 
     /** The frame for `to` carrying a message from the server itself (uid 0). */
-    [[nodiscard]] static std::vector<std::uint8_t> FrameFromHost(std::span<const std::uint8_t> message);
+    [[nodiscard]] static std::vector<std::uint8_t> FrameFromServer(std::span<const std::uint8_t> message);
 
     [[nodiscard]] std::uint64_t Count(ELobbyRelayVerdict verdict) const noexcept { return mCounts[static_cast<std::size_t>(verdict)]; }
 

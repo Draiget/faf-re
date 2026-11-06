@@ -152,10 +152,16 @@ namespace faf::server
     return std::exchange(mLobbyLeft, {});
   }
 
-  void CServerNet::QueueLobbyFromHost(const std::int32_t uid, const std::vector<std::uint8_t>& message)
+  std::vector<std::int32_t> CServerNet::TakeLobbyJoined()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    return std::exchange(mLobbyJoined, {});
+  }
+
+  void CServerNet::QueueLobbyFromServer(const std::int32_t uid, const std::vector<std::uint8_t>& message)
   {
     const std::scoped_lock lock(mViewLock);
-    mLobbyOut.push_back(SLobbyMessage{uid, CLobbyRelay::FrameFromHost(message)});
+    mLobbyOut.push_back(SLobbyMessage{uid, CLobbyRelay::FrameFromServer(message)});
   }
 
   void CServerNet::SendLobby()
@@ -259,8 +265,8 @@ namespace faf::server
            " handshakes past their address's limit, " + std::to_string(stats.handshakesLimited) + " past the server's, " + std::to_string(stats.badCookies) +
            " with a bad cookie; " + std::to_string(stats.refused) + " refused; " + std::to_string(mViewMismatches) +
            " views reported damaged; lobby: " + std::to_string(mLobby.Count(ELobbyRelayVerdict::Forward)) + " relayed (" +
-           std::to_string(mLobbyUndelivered) + " to no channel), " + std::to_string(mLobby.Count(ELobbyRelayVerdict::ToHost)) +
-           " for the host, dropped " + std::to_string(mLobby.Count(ELobbyRelayVerdict::TooFast)) + " too fast, " +
+           std::to_string(mLobbyUndelivered) + " to no channel), " + std::to_string(mLobby.Count(ELobbyRelayVerdict::ToServer)) +
+           " for the server, dropped " + std::to_string(mLobby.Count(ELobbyRelayVerdict::TooFast)) + " too fast, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::TooLarge)) + " too large, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::Closed)) + " after launch, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::UnknownSender) + mLobby.Count(ELobbyRelayVerdict::UnknownTarget) +
@@ -293,7 +299,10 @@ namespace faf::server
       return;
     }
     SSeat& seat = found->second;
-    seat.joinedEver = true;
+    if (!std::exchange(seat.joinedEver, true) && mLobby.Open()) {
+      const std::scoped_lock lock(mNewsLock);
+      mLobbyJoined.push_back(uid);
+    }
     const bool wasLost = std::exchange(seat.lost, false);
     if (returning) {
       seat.viewBroken = true;
@@ -374,7 +383,7 @@ namespace faf::server
       Say(seat.name + "'s view didn't match the server's check; it gets it whole with the next beat");
       return;
     case remote::net::ESeatMessage::Lobby: {
-      // Plan WP2.13: to another participant with the sender written here, or to the server as the lobby's host.
+      // Plan WP2.13: to another participant with the sender written here, or to the server itself (uid 0).
       std::int32_t to = 0;
       std::span<const std::uint8_t> lobbyMessage;
       const ELobbyRelayVerdict verdict =
@@ -383,7 +392,7 @@ namespace faf::server
         if (!mLinks.SendReliable(to, mLobbyFrame.data(), mLobbyFrame.size())) {
           ++mLobbyUndelivered;
         }
-      } else if (verdict == ELobbyRelayVerdict::ToHost) {
+      } else if (verdict == ELobbyRelayVerdict::ToServer) {
         const std::scoped_lock lock(mNewsLock);
         mLobbyIn.push_back(SLobbyMessage{uid, std::vector<std::uint8_t>(lobbyMessage.begin(), lobbyMessage.end())});
       }

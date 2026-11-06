@@ -61,9 +61,10 @@ namespace faf::remote::net
     ViewMismatch = 9,
     /**
      * Both ways, reliable, before the game launches (plan WP2.13): one lobby (`CLobby`) message on the virtual
-     * connection between two participants. Player to server: varint the uid it is for (0: the server, the lobby's
-     * host), then the message. Server to player: varint the uid it is from (0: the server), then the message; the
-     * server writes the sender itself, so no player chooses whom a message seems to come from.
+     * connection between two participants. Player to server: varint the uid it is for, then the message. Server to
+     * player: varint the uid it is from, then the message; the server writes the sender itself, so no player chooses
+     * whom a message seems to come from. Uid 0 is the server itself, whose messages are lobby signals
+     * (LobbySignals.h), as FAF's lobby server sends a game over GPGNet.
      */
     Lobby = 10,
   };

@@ -88,7 +88,7 @@ namespace faf::server
 
     /**
      * Plan WP2.13: lobby messages between participants are relayed on the network thread (`CLobbyRelay`); one for
-     * the server, the lobby's host, waits here. From any thread.
+     * the server itself (uid 0) waits here. From any thread.
      */
     struct SLobbyMessage
     {
@@ -96,9 +96,11 @@ namespace faf::server
       std::vector<std::uint8_t> message;
     };
     [[nodiscard]] std::vector<SLobbyMessage> TakeLobbyMessages();
-    /** A lobby message from the server to a participant, in order, once they've joined. From any thread. */
-    void QueueLobbyFromHost(std::int32_t uid, const std::vector<std::uint8_t>& message);
-    /** Participants out of the game since the last call, for the lobby's host (the game's views read `TakeGone`). */
+    /** A lobby signal from the server to a participant, in order, once they've joined. From any thread. */
+    void QueueLobbyFromServer(std::int32_t uid, const std::vector<std::uint8_t>& message);
+    /** Participants whose channel came up for the first time since the last call, for the lobby's signals. */
+    [[nodiscard]] std::vector<std::int32_t> TakeLobbyJoined();
+    /** Participants out of the game since the last call, for the lobby's signals (the game's views read `TakeGone`). */
     [[nodiscard]] std::vector<std::int32_t> TakeLobbyLeft();
     /** At launch (plan WPR.51): the relay takes nothing more. From any thread. */
     void CloseLobby() noexcept { mCloseLobby.store(true, std::memory_order_relaxed); }
@@ -181,6 +183,7 @@ namespace faf::server
     std::uint64_t mLobbyUndelivered = 0;       // relayed to a participant with no channel
     std::vector<SLobbyMessage> mLobbyIn;       // for the host; under mNewsLock
     std::vector<std::int32_t> mLobbyLeft;      // likewise
+    std::vector<std::int32_t> mLobbyJoined;    // likewise
     std::vector<SLobbyMessage> mLobbyOut;      // from the host, `from` being the participant it's for; under mViewLock
   };
 } // namespace faf::server

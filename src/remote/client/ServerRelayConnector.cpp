@@ -85,7 +85,7 @@ namespace faf::remote
         }
         (void)Dispatch(&message);
       }
-      if (mConnector.mLost && !mLostSent && !mDestroy) {
+      if ((mConnector.mLost || mGone) && !mLostSent && !mDestroy) {
         mLostSent = true;
         moho::CMessage lost(moho::ELobbyMsg::LOBMSG_ConnLostEof);
         (void)Dispatch(&lost);
@@ -93,6 +93,8 @@ namespace faf::remote
     }
 
     void Queue(std::vector<std::uint8_t> message) { mInbox.push_back(std::move(message)); }
+    /** Its participant left: what it sent still arrives, then `ConnLostEof`. */
+    void Gone() noexcept { mGone = true; }
     [[nodiscard]] bool Destroyed() const noexcept { return mDestroy; }
 
   private:
@@ -105,6 +107,7 @@ namespace faf::remote
     bool mDestroy = false;
     bool mMadeSent = false;
     bool mLostSent = false;
+    bool mGone = false;
   };
 
   CServerRelayConnector::CServerRelayConnector(IRelayChannel& channel)
@@ -120,8 +123,8 @@ namespace faf::remote
 
   moho::ENetProtocolType CServerRelayConnector::GetProtocol()
   {
-    // A multiplayer lobby (`CLobby::LaunchGame` tells multiplayer by a protocol); clients only join, so the LAN
-    // discovery `HostGame` opens with one never starts.
+    // A multiplayer lobby (`CLobby::LaunchGame` tells multiplayer by a protocol). The LAN discovery `HostGame` opens
+    // with one needs a lobby with no NAT-traversal provider; a server session's lobby counts as having one.
     return moho::ENetProtocolType::kUdp;
   }
 
@@ -212,6 +215,17 @@ namespace faf::remote
       }
     }
     mLost = mLost || !mChannel.Up();
+    mGone.clear();
+    mChannel.TakeGone(mGone);
+    for (const std::int32_t uid : mGone) {
+      if (const auto found = mConnections.find(uid); found != mConnections.end()) {
+        found->second->Gone();
+      }
+      if (const auto pending = mPending.find(uid); pending != mPending.end()) {
+        mDropped += pending->second.size();
+        mPending.erase(pending);
+      }
+    }
 
     // A connection may close itself while it delivers (`CLobby` drops a rejected peer's): it goes after the pass.
     for (auto& [uid, connection] : mConnections) {
@@ -221,6 +235,39 @@ namespace faf::remote
   }
 
   void CServerRelayConnector::Push() {}
+
+  bool CLobbyInbox::IsSignal(const std::vector<std::uint8_t>& frame) noexcept
+  {
+    return frame.size() >= 2u && frame[1] == 0u; // varint uid 0: one byte
+  }
+
+  void CLobbyInbox::Push(std::vector<std::uint8_t> frame)
+  {
+    mFrames.push_back(std::move(frame));
+  }
+
+  bool CLobbyInbox::TakeLobbyFrame(std::vector<std::uint8_t>& frame)
+  {
+    if (mFrames.empty() || IsSignal(mFrames.front())) {
+      return false;
+    }
+    frame = std::move(mFrames.front());
+    mFrames.pop_front();
+    return true;
+  }
+
+  bool CLobbyInbox::TakeSignal(net::SLobbySignal& signal)
+  {
+    while (!mFrames.empty() && IsSignal(mFrames.front())) {
+      const std::vector<std::uint8_t> frame = std::move(mFrames.front());
+      mFrames.pop_front();
+      if (net::DecodeLobbySignal(std::span<const std::uint8_t>(frame).subspan(2), signal)) {
+        return true;
+      }
+      ++mDropped;
+    }
+    return false;
+  }
 
   void CServerRelayConnector::SelectEvent(HANDLE ev)
   {

@@ -1570,13 +1570,14 @@ int moho::cfunc_InternalCreateLobbyL(LuaPlus::LuaState* const state)
 
   INetConnector* connector = nullptr;
 #if FAF_SERVER_MODE
-  // Engine addition, server mode (plan WP2.13, WP12.1): in a server session the lobby's connections are virtual,
-  // one per participant over the channel to the server (remote/client/ServerRelayConnector.h), whatever protocol
-  // the lobby Lua names. The server, as the lobby's host, introduces the peers (`NewPeer`), which a lobby with no
-  // NAT-traversal provider accepts.
+  // Engine addition, server mode (plan WP2.12, WP2.13, WP12.1): in a server session the lobby's connections are
+  // virtual, one per participant over the channel to the server (remote/client/ServerRelayConnector.h), whatever
+  // protocol the lobby Lua names. The server names the participants as FAF's lobby server does through GPGNet
+  // (`ConnectToPeer`), so the lobby works as one with a NAT-traversal provider: no `NewPeer` from its host, no
+  // connection accepted that wasn't announced, no LAN discovery.
   if (INetConnector* const relay = faf::remote::TakeServerLobbyConnector(); relay != nullptr) {
     connector = relay;
-    noNatTraversalProvider = true;
+    noNatTraversalProvider = false;
   }
 #endif
   if (connector != nullptr) {

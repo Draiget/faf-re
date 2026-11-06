@@ -287,7 +287,7 @@ add_executable(headless ${_faf_headless_files}
   "${PROJECT_SOURCE_DIR}/src/headless/ReplayTargetAudit.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
-  "${PROJECT_SOURCE_DIR}/src/server/LobbyHost.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbySignaller.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
 )
@@ -303,7 +303,7 @@ add_executable(server
   "${PROJECT_SOURCE_DIR}/src/server/ServerMain.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
-  "${PROJECT_SOURCE_DIR}/src/server/LobbyHost.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbySignaller.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
   "${PROJECT_SOURCE_DIR}/src/headless/SessionLoad.cpp"
@@ -319,12 +319,12 @@ target_link_libraries(faf_server_tests PRIVATE gtest_main)
 
 add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp" "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
-  "${PROJECT_SOURCE_DIR}/src/server/LobbyHost.cpp")
+  "${PROJECT_SOURCE_DIR}/src/server/LobbySignaller.cpp")
 target_link_libraries(faf_seat_tests PRIVATE faf_sim faf_netchannel faf_monocypher gtest_main)
 target_compile_definitions(faf_seat_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_seat_tests PRIVATE -Wl,--error-limit=0)
 
-add_executable(faf_server_probe EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeMain.cpp" "${PROJECT_SOURCE_DIR}/src/server/LobbyHost.cpp")
+add_executable(faf_server_probe EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeMain.cpp")
 target_link_libraries(faf_server_probe PRIVATE faf_sim faf_netchannel faf_monocypher)
 target_compile_definitions(faf_server_probe PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_server_probe PRIVATE -Wl,--error-limit=0)

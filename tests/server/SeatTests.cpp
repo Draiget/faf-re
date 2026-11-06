@@ -13,6 +13,7 @@
 #include <map>
 #include <memory>
 #include <span>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -32,7 +33,8 @@
 #include "remote/ViewIdMap.h"
 #include "remote/net/Datagram.h"
 #include "remote/net/GameLinks.h"
-#include "server/LobbyHost.h"
+#include "remote/net/LobbySignals.h"
+#include "server/LobbySignaller.h"
 #include "server/LobbyRelay.h"
 #include "server/SeatIntake.h"
 
@@ -503,11 +505,11 @@ TEST(LobbyRelay, ForwardsWithTheSenderTheServerWrites)
   EXPECT_EQ(relayed.frame, expected);
 
   // Uid 0 is the server, the lobby's host.
-  const SRelayed toHost = Relay(relay, 1002, LobbyBody(0, hello), 1'000'000u);
-  EXPECT_EQ(toHost.verdict, ELobbyRelayVerdict::ToHost);
-  EXPECT_EQ(toHost.message, hello);
-  const std::vector<std::uint8_t> fromHost = CLobbyRelay::FrameFromHost(hello);
-  EXPECT_EQ(fromHost, (std::vector<std::uint8_t>{static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::Lobby), 0u, 7u, 1u, 2u, 3u}));
+  const SRelayed toServer = Relay(relay, 1002, LobbyBody(0, hello), 1'000'000u);
+  EXPECT_EQ(toServer.verdict, ELobbyRelayVerdict::ToServer);
+  EXPECT_EQ(toServer.message, hello);
+  const std::vector<std::uint8_t> fromServer = CLobbyRelay::FrameFromServer(hello);
+  EXPECT_EQ(fromServer, (std::vector<std::uint8_t>{static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::Lobby), 0u, 7u, 1u, 2u, 3u}));
 }
 
 TEST(LobbyRelay, OnlyBetweenParticipants)
@@ -592,129 +594,147 @@ TEST(LobbyRelay, ClosedAtLaunch)
   EXPECT_EQ(relay.Count(ELobbyRelayVerdict::Closed), 2u);
 }
 
-// Plan WP2.2, WP2.5: the server as the lobby's host (server/LobbyHost.h).
+// Plan WP2.2, WP2.12: the server's lobby signals (remote/net/LobbySignals.h, server/LobbySignaller.h).
 namespace
 {
-  using faf::server::CLobbyHost;
+  using faf::remote::net::ELobbySignal;
+  using faf::remote::net::SLobbySignal;
+  using faf::server::CLobbySignaller;
 
-  std::vector<CLobbyHost::SOutgoing> To(const std::vector<CLobbyHost::SOutgoing>& out, const std::int32_t uid)
+  SLobbySignal Decoded(const std::vector<std::uint8_t>& message)
   {
-    std::vector<CLobbyHost::SOutgoing> mine;
-    for (const CLobbyHost::SOutgoing& message : out) {
+    SLobbySignal signal;
+    EXPECT_TRUE(faf::remote::net::DecodeLobbySignal(message, signal));
+    return signal;
+  }
+
+  /** The signals for `uid`, in order, as "kind uid name text". */
+  std::vector<std::string> SignalsTo(const std::vector<CLobbySignaller::SOutgoing>& out, const std::int32_t uid)
+  {
+    std::vector<std::string> mine;
+    for (const CLobbySignaller::SOutgoing& message : out) {
       if (message.to == uid) {
-        mine.push_back(message);
+        const SLobbySignal signal = Decoded(message.message);
+        mine.push_back(std::to_string(static_cast<int>(signal.kind)) + " " + std::to_string(signal.uid) + " " + signal.name + " " + signal.text);
       }
     }
     return mine;
   }
 } // namespace
 
-TEST(LobbyHost, WireFormsAsCLobbyReadsThem)
+TEST(LobbySignals, RoundTripAndRefuseWhatIsNotOne)
 {
-  // Welcome: host name, host uid, assigned uid, name, hostedTime; whole size in bytes 1-2.
-  const std::vector<std::uint8_t> welcome = CLobbyHost::Welcome("srv", 0, 1001, "Ann", 7);
-  const std::vector<std::uint8_t> expected = {102u, 23u, 0u, 's', 'r', 'v', 0u, 0u, 0u, 0u, 0u, 0xE9u, 0x03u, 0u, 0u, 'A', 'n', 'n', 0u, 7u, 0u, 0u, 0u};
-  EXPECT_EQ(welcome.size(), 23u);
-  EXPECT_EQ(std::vector<std::uint8_t>(welcome.begin() + 3, welcome.end()), std::vector<std::uint8_t>(expected.begin() + 3, expected.end()));
-  EXPECT_EQ(welcome[0], 102u);
-  EXPECT_EQ(welcome[1] | (welcome[2] << 8), 23);
-  // NewPeer: name, a 4-byte address and a 2-byte port (netlink's engine address for the uid), uid.
-  const std::vector<std::uint8_t> newPeer = CLobbyHost::NewPeer("Bo", 0x01000005);
-  EXPECT_EQ(newPeer, (std::vector<std::uint8_t>{103u, 16u, 0u, 'B', 'o', 0u, 0x05u, 0x00u, 0x00u, 0xF0u, 0xE9u, 0x03u, 0x05u, 0x00u, 0x00u, 0x01u}));
-  EXPECT_EQ(CLobbyHost::EstablishedPeers({1001}), (std::vector<std::uint8_t>{105u, 11u, 0u, 0xE9u, 0x03u, 0u, 0u, 0xFFu, 0xFFu, 0xFFu, 0xFFu}));
-  EXPECT_EQ(CLobbyHost::DeletePeer(1001), (std::vector<std::uint8_t>{104u, 7u, 0u, 0xE9u, 0x03u, 0u, 0u}));
-  EXPECT_EQ(CLobbyHost::Join("Ann", 1001), (std::vector<std::uint8_t>{100u, 11u, 0u, 'A', 'n', 'n', 0u, 0xE9u, 0x03u, 0u, 0u}));
+  for (const SLobbySignal& signal :
+       {SLobbySignal{ELobbySignal::Host, faf::remote::net::kLobbySignalAutoLobby, 0, "Ann", "/maps/x/x_scenario.lua"},
+        SLobbySignal{ELobbySignal::Join, 0, 1001, "Bo", "Ann"}, SLobbySignal{ELobbySignal::ConnectToPeer, 0, 0x7FFFFFFF, "Cy", ""},
+        SLobbySignal{ELobbySignal::DisconnectFromPeer, 0, 1003, "", ""}}) {
+    const SLobbySignal back = Decoded(faf::remote::net::EncodeLobbySignal(signal));
+    EXPECT_EQ(back.kind, signal.kind);
+    EXPECT_EQ(back.flags, signal.flags);
+    EXPECT_EQ(back.uid, signal.uid);
+    EXPECT_EQ(back.name, signal.name);
+    EXPECT_EQ(back.text, signal.text);
+  }
+  SLobbySignal out;
+  std::vector<std::uint8_t> bytes = faf::remote::net::EncodeLobbySignal(SLobbySignal{ELobbySignal::Join, 0, 1001, "Bo", "Ann"});
+  bytes.push_back(0u);
+  EXPECT_FALSE(faf::remote::net::DecodeLobbySignal(bytes, out)); // bytes left over
+  bytes.pop_back();
+  bytes.pop_back();
+  EXPECT_FALSE(faf::remote::net::DecodeLobbySignal(bytes, out)); // cut short
+  bytes = faf::remote::net::EncodeLobbySignal(SLobbySignal{ELobbySignal::Join, 0, 1001, "Bo", "Ann"});
+  bytes[0] = 9u;
+  EXPECT_FALSE(faf::remote::net::DecodeLobbySignal(bytes, out)); // no such kind
+  const std::vector<std::uint8_t> longName = {2u, 0u, 1u, 0x81u, 0x02u}; // a 257-byte name
+  EXPECT_FALSE(faf::remote::net::DecodeLobbySignal(longName, out));
 }
 
-TEST(LobbyHost, JoinsWelcomeAndIntroduceEachOther)
+TEST(LobbySignaller, RolesWaitForTheHostThenEveryPairIsIntroduced)
 {
-  CLobbyHost host("server", 1234);
-  host.AddParticipant(1001, "Ann");
-  host.AddParticipant(1002, "Bo");
-  std::vector<CLobbyHost::SOutgoing> out;
-  host.OnMessage(1001, CLobbyHost::Join("ann (asked)", 1001), out);
-  ASSERT_EQ(out.size(), 2u);
-  EXPECT_EQ(out[0].to, 1001);
-  EXPECT_EQ(out[0].message, CLobbyHost::Welcome("server", 0, 1001, "Ann", 1234)); // FAF's name, the match seed
-  EXPECT_EQ(out[1].message, CLobbyHost::EstablishedPeers({1001}));
+  CLobbySignaller signaller("/maps/m/m_scenario.lua");
+  signaller.AddParticipant(1001, "Ann"); // first in the match: the logical host
+  signaller.AddParticipant(1002, "Bo");
+  signaller.AddParticipant(1003, "Cy");
+  EXPECT_EQ(signaller.Host(), 1001);
+  std::vector<CLobbySignaller::SOutgoing> out;
 
-  out.clear();
-  host.OnMessage(1002, CLobbyHost::Join("Bo", 1002), out);
-  const std::vector<CLobbyHost::SOutgoing> toBo = To(out, 1002);
-  const std::vector<CLobbyHost::SOutgoing> toAnn = To(out, 1001);
-  ASSERT_EQ(toBo.size(), 3u);
-  EXPECT_EQ(toBo[0].message, CLobbyHost::Welcome("server", 0, 1002, "Bo", 1234));
-  EXPECT_EQ(toBo[1].message, CLobbyHost::NewPeer("Ann", 1001));
-  EXPECT_EQ(toBo[2].message, CLobbyHost::EstablishedPeers({1001, 1002}));
-  ASSERT_EQ(toAnn.size(), 2u);
-  EXPECT_EQ(toAnn[0].message, CLobbyHost::NewPeer("Bo", 1002));
-  EXPECT_EQ(toAnn[1].message, CLobbyHost::EstablishedPeers({1001, 1002}));
-  EXPECT_EQ(host.Established(), (std::vector<std::int32_t>{1001, 1002}));
-
-  // Leaving: the others drop the peer.
-  out.clear();
-  host.OnLeft(1001, out);
-  ASSERT_EQ(out.size(), 2u);
-  EXPECT_EQ(out[0].to, 1002);
-  EXPECT_EQ(out[0].message, CLobbyHost::DeletePeer(1001));
-  EXPECT_EQ(out[1].message, CLobbyHost::EstablishedPeers({1002}));
-}
-
-TEST(LobbyHost, AdmitsOnlyTheUidTheTokenProved)
-{
-  CLobbyHost host("server", 1);
-  host.AddParticipant(1001, "Ann");
-  std::vector<CLobbyHost::SOutgoing> out;
-  host.OnMessage(1001, CLobbyHost::Join("Ann", 4242), out);
-  ASSERT_EQ(out.size(), 1u);
-  EXPECT_EQ(out[0].message, CLobbyHost::Rejected("WrongUid"));
-  EXPECT_EQ(host.Rejected(), 1u);
-  EXPECT_TRUE(host.Established().empty());
-
-  // No uid asked for (-1): welcomed with the token's, which CLobby adopts.
-  out.clear();
-  host.OnMessage(1001, CLobbyHost::Join("Ann", -1), out);
-  ASSERT_FALSE(out.empty());
-  EXPECT_EQ(out[0].message, CLobbyHost::Welcome("server", 0, 1001, "Ann", 1));
-  EXPECT_EQ(host.Established(), (std::vector<std::int32_t>{1001}));
-
-  // Not a participant, a message the host has nothing to do with, a size that doesn't match: nothing.
-  out.clear();
-  host.OnMessage(999, CLobbyHost::Join("X", 999), out);
-  host.OnMessage(1001, CLobbyHost::EstablishedPeers({1001}), out);
-  std::vector<std::uint8_t> cut = CLobbyHost::Join("Ann", 1001);
-  cut.pop_back();
-  host.OnMessage(1001, cut, out);
+  // Bo is in before the host: nothing yet.
+  signaller.OnJoined(1002, out);
   EXPECT_TRUE(out.empty());
-  EXPECT_EQ(host.Ignored(), 3u);
+  EXPECT_EQ(signaller.InLobby(), 0u);
+
+  // The host comes: it hosts, learns of Bo before Bo learns whom to join.
+  signaller.OnJoined(1001, out);
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_EQ(out[0].to, 1001);
+  EXPECT_EQ(SignalsTo(out, 1001), (std::vector<std::string>{"1 0 Ann /maps/m/m_scenario.lua", "3 1002 Bo "}));
+  EXPECT_EQ(out[2].to, 1002);
+  EXPECT_EQ(SignalsTo(out, 1002), (std::vector<std::string>{"2 1001 Bo Ann"}));
+  EXPECT_EQ(signaller.InLobby(), 2u);
+
+  // Cy: the host first, then Cy joins, then Bo and Cy both ways.
+  out.clear();
+  signaller.OnJoined(1003, out);
+  EXPECT_EQ(SignalsTo(out, 1001), (std::vector<std::string>{"3 1003 Cy "}));
+  EXPECT_EQ(SignalsTo(out, 1003), (std::vector<std::string>{"2 1001 Cy Ann", "3 1002 Bo "}));
+  EXPECT_EQ(SignalsTo(out, 1002), (std::vector<std::string>{"3 1003 Cy "}));
+  EXPECT_EQ(out.front().to, 1001);
+
+  // Twice in, someone not in the match: nothing.
+  out.clear();
+  signaller.OnJoined(1003, out);
+  signaller.OnJoined(999, out);
+  EXPECT_TRUE(out.empty());
+
+  // Bo leaves: the rest are told; the host leaves: the lobby can't go on.
+  signaller.OnLeft(1002, out);
+  EXPECT_EQ(SignalsTo(out, 1001), (std::vector<std::string>{"4 1002 Bo "}));
+  EXPECT_EQ(SignalsTo(out, 1003), (std::vector<std::string>{"4 1002 Bo "}));
+  out.clear();
+  signaller.OnLeft(1001, out);
+  EXPECT_TRUE(signaller.HostLeft());
+  EXPECT_EQ(SignalsTo(out, 1003), (std::vector<std::string>{"4 1001 Ann "}));
+  EXPECT_EQ(signaller.InLobby(), 1u);
+}
+
+TEST(LobbySignaller, AJoinerWhoLeftBeforeItsRoleIsNotAnnounced)
+{
+  CLobbySignaller signaller("");
+  signaller.AddParticipant(1001, "Ann");
+  signaller.AddParticipant(1002, "Bo");
+  std::vector<CLobbySignaller::SOutgoing> out;
+  signaller.OnJoined(1002, out);
+  signaller.OnLeft(1002, out);
+  signaller.OnJoined(1001, out);
+  EXPECT_EQ(SignalsTo(out, 1001), (std::vector<std::string>{"1 0 Ann "}));
+  EXPECT_TRUE(SignalsTo(out, 1002).empty());
 }
 
 // Plan WP2.13, WP12.1: the client's relay connector (remote/client/ServerRelayConnector.h) against the server's relay
-// and lobby host in one process. `CLobby` isn't in this build, so the test makes its calls: Connect to the host, Join
-// on ConnMade, Accept what FindNextAddress offers, Connect to a peer it was told of, Welcome back.
+// and signals in one process. `CLobby` isn't in this build, so the test makes its calls as the signals ask: the host
+// accepts each participant it is told of (`ConnectToPeer`), a joiner connects to the host and sends Join on ConnMade.
 namespace
 {
+  using faf::remote::CLobbyInbox;
   using faf::remote::CServerRelayConnector;
   using faf::remote::IRelayChannel;
 
-  /** One client's channel to the in-process server. */
+  /** One client's channel to the in-process server, its frames in a `CLobbyInbox` as the client's are. */
   struct SLoopChannel final : IRelayChannel
   {
     std::vector<std::vector<std::uint8_t>> out;
-    std::deque<std::vector<std::uint8_t>> in;
+    CLobbyInbox inbox;
+    std::vector<std::int32_t> gone;
     bool up = true;
 
     void SendLobbyFrame(const std::span<const std::uint8_t> frame) override { out.emplace_back(frame.begin(), frame.end()); }
-    bool TakeLobbyFrame(std::vector<std::uint8_t>& frame) override
-    {
-      if (in.empty()) {
-        return false;
-      }
-      frame = std::move(in.front());
-      in.pop_front();
-      return true;
-    }
+    bool TakeLobbyFrame(std::vector<std::uint8_t>& frame) override { return inbox.TakeLobbyFrame(frame); }
     bool Up() const override { return up; }
+    void TakeGone(std::vector<std::int32_t>& uids) override
+    {
+      uids.insert(uids.end(), gone.begin(), gone.end());
+      gone.clear();
+    }
   };
 
   /** What a lobby would receive: each message's type and bytes, and the connection it came on. */
@@ -743,13 +763,31 @@ namespace
     }
   };
 
-  /** The server: every frame the clients sent through the relay, the host answering what's for it. */
+  /** The server: the relay between clients, and the signals it sends as participants come and go. */
   struct SLoopServer
   {
     CLobbyRelay relay;
-    CLobbyHost host{"server", 777};
+    CLobbySignaller signaller{"/maps/m/m_scenario.lua"};
     std::map<std::int32_t, SLoopChannel*> clients;
 
+    void Signal(const std::vector<CLobbySignaller::SOutgoing>& out)
+    {
+      for (const CLobbySignaller::SOutgoing& message : out) {
+        clients.at(message.to)->inbox.Push(CLobbyRelay::FrameFromServer(message.message));
+      }
+    }
+    void Joined(const std::int32_t uid)
+    {
+      std::vector<CLobbySignaller::SOutgoing> out;
+      signaller.OnJoined(uid, out);
+      Signal(out);
+    }
+    void Left(const std::int32_t uid)
+    {
+      std::vector<CLobbySignaller::SOutgoing> out;
+      signaller.OnLeft(uid, out);
+      Signal(out);
+    }
     void Pump()
     {
       for (auto& [uid, channel] : clients) {
@@ -757,15 +795,8 @@ namespace
           std::int32_t to = 0;
           std::vector<std::uint8_t> forward;
           std::span<const std::uint8_t> message;
-          const ELobbyRelayVerdict verdict = relay.Take(uid, std::span<const std::uint8_t>(frame).subspan(1), 1'000'000u, to, forward, message);
-          if (verdict == ELobbyRelayVerdict::Forward) {
-            clients.at(to)->in.push_back(forward);
-          } else if (verdict == ELobbyRelayVerdict::ToHost) {
-            std::vector<CLobbyHost::SOutgoing> answers;
-            host.OnMessage(uid, message, answers);
-            for (const CLobbyHost::SOutgoing& answer : answers) {
-              clients.at(answer.to)->in.push_back(CLobbyRelay::FrameFromHost(answer.message));
-            }
+          if (relay.Take(uid, std::span<const std::uint8_t>(frame).subspan(1), 1'000'000u, to, forward, message) == ELobbyRelayVerdict::Forward) {
+            clients.at(to)->inbox.Push(forward);
           }
         }
       }
@@ -779,10 +810,18 @@ namespace
     connection.Write(&span);
   }
 
+  [[nodiscard]] u_long AddressOf(const std::int32_t uid)
+  {
+    return static_cast<u_long>(faf::netlink::EngineAddressFor(uid).addrHost);
+  }
+
+  [[nodiscard]] u_short PortOf(const std::int32_t uid)
+  {
+    return faf::netlink::EngineAddressFor(uid).portHost;
+  }
+
   constexpr std::uint8_t kJoin = 100;
   constexpr std::uint8_t kWelcome = 102;
-  constexpr std::uint8_t kNewPeer = 103;
-  constexpr std::uint8_t kEstablished = 105;
   constexpr std::uint8_t kDirectScript = 107;
   constexpr std::uint8_t kConnMade = 201;
   constexpr std::uint8_t kConnLostEof = 203;
@@ -791,14 +830,39 @@ namespace
 TEST(RelayConnector, EngineAddressesMapBackToUids)
 {
   for (const std::int32_t uid : {1, 1001, 0x00FFFFFF, 0x01000000, 0x7FFFFFFF}) {
-    const faf::netlink::EngineAddress address = faf::netlink::EngineAddressFor(uid);
-    EXPECT_EQ(CServerRelayConnector::UidForAddress(static_cast<u_long>(address.addrHost), address.portHost), uid) << uid;
+    EXPECT_EQ(CServerRelayConnector::UidForAddress(AddressOf(uid), PortOf(uid)), uid) << uid;
   }
-  EXPECT_EQ(CServerRelayConnector::UidForAddress(0x7F000001u, 27019u), 0); // the server's own address
+  EXPECT_EQ(CServerRelayConnector::UidForAddress(0x7F000001u, 27019u), 0); // a real address: nobody's
   EXPECT_EQ(CServerRelayConnector::UidForAddress(0xF0000001u, 80u), 0);     // in 240/4 but no engine port
 }
 
-TEST(RelayConnector, TwoLobbiesJoinTheServerAndEachOther)
+TEST(RelayConnector, ASignalHoldsBackWhatCameAfterIt)
+{
+  CLobbyInbox inbox;
+  const std::vector<std::uint8_t> signal = CLobbyRelay::FrameFromServer(
+    faf::remote::net::EncodeLobbySignal(SLobbySignal{ELobbySignal::ConnectToPeer, 0, 1002, "Bo", ""})
+  );
+  const std::vector<std::uint8_t> fromBo = {static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::Lobby), 0xEAu, 0x07u, kJoin, 3u, 0u};
+  inbox.Push(signal);
+  inbox.Push(fromBo);
+  std::vector<std::uint8_t> frame;
+  EXPECT_FALSE(inbox.TakeLobbyFrame(frame)); // Bo's Join waits for the signal that announces Bo
+  SLobbySignal taken;
+  ASSERT_TRUE(inbox.TakeSignal(taken));
+  EXPECT_EQ(taken.uid, 1002);
+  EXPECT_FALSE(inbox.TakeSignal(taken));
+  ASSERT_TRUE(inbox.TakeLobbyFrame(frame));
+  EXPECT_EQ(frame, fromBo);
+
+  // A malformed signal is dropped, and what came after it flows.
+  inbox.Push(CLobbyRelay::FrameFromServer(std::vector<std::uint8_t>{9u, 0u}));
+  inbox.Push(fromBo);
+  EXPECT_FALSE(inbox.TakeSignal(taken));
+  EXPECT_EQ(inbox.DroppedSignals(), 1u);
+  EXPECT_TRUE(inbox.TakeLobbyFrame(frame));
+}
+
+TEST(RelayConnector, TheHostAcceptsWhomTheServerNamesAndTheJoinerConnects)
 {
   SRecorder lobbyA;
   SRecorder lobbyB;
@@ -807,8 +871,8 @@ TEST(RelayConnector, TwoLobbiesJoinTheServerAndEachOther)
   SLoopServer server;
   server.relay.AddParticipant(1001);
   server.relay.AddParticipant(1002);
-  server.host.AddParticipant(1001, "Ann");
-  server.host.AddParticipant(1002, "Bo");
+  server.signaller.AddParticipant(1001, "Ann");
+  server.signaller.AddParticipant(1002, "Bo");
   server.clients = {{1001, &channelA}, {1002, &channelB}};
   auto* const connectorA = new CServerRelayConnector(channelA);
   auto* const connectorB = new CServerRelayConnector(channelB);
@@ -817,61 +881,44 @@ TEST(RelayConnector, TwoLobbiesJoinTheServerAndEachOther)
     connection->PushReceiver(200, 210, &lobby);
   };
 
-  // Each joins the host at the server's own address: ConnMade, then Join (CLobby::OnConnectionMade).
-  moho::INetConnection* const hostA = connectorA->Connect(0x7F000001u, 27019u);
-  listen(lobbyA, hostA);
-  connectorA->Pull();
-  ASSERT_EQ(lobbyA.Count(kConnMade, hostA), 1u);
-  WriteMessage(*hostA, CLobbyHost::Join("Ann", 1001));
-  server.Pump();
-  connectorA->Pull();
-  EXPECT_EQ(lobbyA.Count(kWelcome, hostA), 1u);
-  EXPECT_EQ(lobbyA.received.back().bytes, CLobbyHost::EstablishedPeers({1001}));
-
-  moho::INetConnection* const hostB = connectorB->Connect(0x7F000001u, 27019u);
-  listen(lobbyB, hostB);
-  connectorB->Pull();
-  WriteMessage(*hostB, CLobbyHost::Join("Bo", 1002));
-  server.Pump();
-  connectorA->Pull();
-  connectorB->Pull();
-  EXPECT_EQ(lobbyB.Count(kWelcome, hostB), 1u);
-  EXPECT_EQ(lobbyB.Count(kNewPeer, hostB), 1u); // told of Ann
-  EXPECT_EQ(lobbyA.Count(kNewPeer, hostA), 1u); // told of Bo
-  EXPECT_EQ(lobbyA.Count(kEstablished, hostA), 2u);
-
-  // The higher uid connects to the lower at the engine address NewPeer named; the lower is offered it and accepts.
-  const faf::netlink::EngineAddress annAddress = faf::netlink::EngineAddressFor(1001);
-  moho::INetConnection* const bToA = connectorB->Connect(static_cast<u_long>(annAddress.addrHost), annAddress.portHost);
+  server.Joined(1002);
+  server.Joined(1001);
+  SLobbySignal signal;
+  // Ann hosts; as `ConnectToPeer` on a host (`CLobby::ConnectToPeer`), she accepts Bo's engine address.
+  ASSERT_TRUE(channelA.inbox.TakeSignal(signal));
+  EXPECT_EQ(signal.kind, ELobbySignal::Host);
+  ASSERT_TRUE(channelA.inbox.TakeSignal(signal));
+  ASSERT_EQ(signal.kind, ELobbySignal::ConnectToPeer);
+  moho::INetConnection* const aToB = connectorA->Accept(AddressOf(signal.uid), PortOf(signal.uid));
+  listen(lobbyA, aToB);
+  // Bo joins Ann at her engine address: ConnMade, then Join.
+  ASSERT_TRUE(channelB.inbox.TakeSignal(signal));
+  ASSERT_EQ(signal.kind, ELobbySignal::Join);
+  EXPECT_EQ(signal.uid, 1001);
+  moho::INetConnection* const bToA = connectorB->Connect(AddressOf(signal.uid), PortOf(signal.uid));
   listen(lobbyB, bToA);
   connectorB->Pull();
   ASSERT_EQ(lobbyB.Count(kConnMade, bToA), 1u);
-  WriteMessage(*bToA, CLobbyHost::Join("Bo", 1002));
+  WriteMessage(*bToA, {kJoin, 3u, 0u});
   server.Pump();
-  connectorA->Pull(); // kept: no connection to 1002 yet
+  connectorA->Pull();
+  EXPECT_EQ(lobbyA.Count(kConnMade, aToB), 1u);
+  EXPECT_EQ(lobbyA.Count(kJoin, aToB), 1u); // on the connection the host made for 1002
   u_long address = 0;
   u_short port = 0;
-  ASSERT_TRUE(connectorA->FindNextAddress(address, port));
-  EXPECT_EQ(CServerRelayConnector::UidForAddress(address, port), 1002);
-  moho::INetConnection* const aToB = connectorA->Accept(address, port);
-  listen(lobbyA, aToB);
   EXPECT_FALSE(connectorA->FindNextAddress(address, port));
-  connectorA->Pull();
-  ASSERT_EQ(lobbyA.Count(kConnMade, aToB), 1u);
-  ASSERT_EQ(lobbyA.Count(kJoin, aToB), 1u); // Bo's Join, on the connection from 1002
-  const std::vector<std::uint8_t> peerWelcome = {kWelcome, 3u, 0u}; // a non-host's Welcome carries nothing
-  WriteMessage(*aToB, peerWelcome);
+  WriteMessage(*aToB, {kWelcome, 3u, 0u});
   server.Pump();
   connectorB->Pull();
   EXPECT_EQ(lobbyB.Count(kWelcome, bToA), 1u);
 
-  // Script data goes on the peer's connection, and arrives as from that peer.
+  // Script data arrives as from the participant that sent it.
   const std::vector<std::uint8_t> script = {kDirectScript, 6u, 0u, 104u, 105u, 33u};
-  WriteMessage(*aToB, script);
+  WriteMessage(*bToA, script);
   server.Pump();
-  connectorB->Pull();
-  ASSERT_EQ(lobbyB.Count(kDirectScript, bToA), 1u);
-  EXPECT_EQ(lobbyB.received.back().bytes, script);
+  connectorA->Pull();
+  ASSERT_EQ(lobbyA.Count(kDirectScript, aToB), 1u);
+  EXPECT_EQ(lobbyA.received.back().bytes, script);
 
   // A peer can't make up this side's connection events; a message with a wrong size is dropped.
   WriteMessage(*aToB, {kConnLostEof, 3u, 0u});
@@ -881,12 +928,20 @@ TEST(RelayConnector, TwoLobbiesJoinTheServerAndEachOther)
   EXPECT_EQ(lobbyB.Count(kConnLostEof, bToA), 0u);
   EXPECT_EQ(connectorB->DroppedFrames(), 2u);
 
-  // The channel gone: every connection of that side is lost, once.
-  channelB.up = false;
+  // The host leaves: Bo is told, and his connection to her ends once (CLobby: "HostLeft").
+  server.Left(1001);
+  ASSERT_TRUE(channelB.inbox.TakeSignal(signal));
+  EXPECT_EQ(signal.kind, ELobbySignal::DisconnectFromPeer);
+  channelB.gone.push_back(signal.uid);
   connectorB->Pull();
   connectorB->Pull();
-  EXPECT_EQ(lobbyB.Count(kConnLostEof, hostB), 1u);
   EXPECT_EQ(lobbyB.Count(kConnLostEof, bToA), 1u);
+
+  // The channel gone: every connection of that side is lost, once.
+  channelA.up = false;
+  connectorA->Pull();
+  connectorA->Pull();
+  EXPECT_EQ(lobbyA.Count(kConnLostEof, aToB), 1u);
 
   connectorA->Destroy();
   connectorB->Destroy();
