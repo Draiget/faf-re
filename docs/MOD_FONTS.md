@@ -1,11 +1,12 @@
 # Fonts and text scale for mods
 
-Two calls for mods, in the user interface's Lua only. Neither exists on the shipped game, so check for them first, and a mod keeps working there.
+Two calls for mods, in the user interface's Lua only. Neither exists on the shipped game, so check for them first, and a mod keeps working there. FAF's Lua stops a script that reads a global it doesn't have, so `LoadFont and ...` is an error there: read it with `rawget(_G, 'LoadFont')`.
 
 ## Load a font
 
 ```lua
 -- nil when the engine lacks the call or the file is refused
+local LoadFont = rawget(_G, 'LoadFont')
 local family = LoadFont and LoadFont('/mods/MyMod/fonts/MyFont.ttf')
 if family then
     text:SetFont(family, 14)
