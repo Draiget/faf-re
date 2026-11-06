@@ -726,15 +726,19 @@ namespace gpg::gal
     Vk().vkGetPhysicalDeviceSurfacePresentModesKHR(mPhysical, swapChain.surface, &count, nullptr);
     std::vector<VkPresentModeKHR> modes(count);
     Vk().vkGetPhysicalDeviceSurfacePresentModesKHR(mPhysical, swapChain.surface, &count, modes.data());
-    VkPresentModeKHR mode = VK_PRESENT_MODE_FIFO_KHR;
+    // Without vsync, the modes that don't wait, in order; FIFO, which every driver has, comes last in any case.
+    std::vector<VkPresentModeKHR> tryModes;
     if (!mDeviceContext.mVSync) {
       for (const VkPresentModeKHR candidate : {VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR}) {
         if (std::find(modes.begin(), modes.end(), candidate) != modes.end()) {
-          mode = candidate;
-          break;
+          tryModes.push_back(candidate);
         }
       }
     }
+    tryModes.push_back(VK_PRESENT_MODE_FIFO_KHR);
+    const auto modeName = [](const VkPresentModeKHR presentMode) {
+      return (presentMode == VK_PRESENT_MODE_FIFO_KHR) ? "FIFO (vsync)" : (presentMode == VK_PRESENT_MODE_MAILBOX_KHR) ? "mailbox" : "immediate";
+    };
 
     VkExtent2D extent{width, height};
     if (capabilities.currentExtent.width != 0xFFFFFFFFU) {
@@ -759,11 +763,26 @@ namespace gpg::gal
     info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     info.preTransform = capabilities.currentTransform;
     info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    info.presentMode = mode;
     info.clipped = VK_TRUE;
     info.oldSwapchain = swapChain.swapchain;
     VkSwapchainKHR created = VK_NULL_HANDLE;
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateSwapchainKHR(mDevice, &info, nullptr, &created));
+    VkPresentModeKHR mode = tryModes.back();
+    VkResult result = VK_ERROR_INITIALIZATION_FAILED;
+    // Engine addition: a driver can refuse a mode it lists. An NVIDIA TITAN RTX (driver 0x8F118000) refused the
+    // vsync-off one with VK_ERROR_OUT_OF_DEVICE_MEMORY for a 1600x1000 window while FIFO worked, and the whole
+    // renderer fell back to Direct3D 9. A refused mode now falls back to the next, ending with FIFO.
+    for (const VkPresentModeKHR candidate : tryModes) {
+      info.presentMode = candidate;
+      result = Vk().vkCreateSwapchainKHR(mDevice, &info, nullptr, &created);
+      if (result == VK_SUCCESS) {
+        mode = candidate;
+        break;
+      }
+      gpg::Warnf("Vulkan: the driver refused a %s swap chain (%d)", modeName(candidate), static_cast<int>(result));
+      // A failed create has already retired the old swap chain, and a retired one can't be passed again.
+      info.oldSwapchain = VK_NULL_HANDLE;
+    }
+    CheckVk("DeviceVulkan.cpp", __LINE__, result);
     if (swapChain.swapchain != VK_NULL_HANDLE) {
       Vk().vkDestroySwapchainKHR(mDevice, swapChain.swapchain, nullptr);
     }
@@ -784,10 +803,7 @@ namespace gpg::gal
       CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateSemaphore(mDevice, &semaphore, nullptr, &finished));
     }
     swapChain.hasImage = false;
-    gpg::Logf(
-      "Vulkan: swap chain %ux%u, %u images, %s", extent.width, extent.height, count,
-      (mode == VK_PRESENT_MODE_FIFO_KHR) ? "FIFO (vsync)" : (mode == VK_PRESENT_MODE_MAILBOX_KHR) ? "mailbox" : "immediate"
-    );
+    gpg::Logf("Vulkan: swap chain %ux%u, %u images, %s", extent.width, extent.height, count, modeName(mode));
   }
 
   void DeviceVulkan::DestroySwapChain(SwapChain& swapChain, const bool keepSurface) noexcept
