@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "remote/net/GameLinks.h"
+#include "server/LobbyRelay.h"
 #include "server/SeatIntake.h"
 
 // Engine addition, dedicated server (plan WP1.1, WP3.5, WP10.1, WP10.5): the players' network. Its own
@@ -85,6 +86,21 @@ namespace faf::server
     /** Who went away or stopped being away since the last call, in order. */
     [[nodiscard]] std::vector<SPresence> TakePresence();
 
+    /**
+     * Plan WP2.13: lobby messages between participants are relayed on the network thread (`CLobbyRelay`); one for
+     * the server, the lobby's host, waits here. From any thread.
+     */
+    struct SLobbyMessage
+    {
+      std::int32_t from = 0;
+      std::vector<std::uint8_t> message;
+    };
+    [[nodiscard]] std::vector<SLobbyMessage> TakeLobbyMessages();
+    /** A lobby message from the server to a participant, in order, once they've joined. From any thread. */
+    void QueueLobbyFromHost(std::int32_t uid, const std::vector<std::uint8_t>& message);
+    /** At launch (plan WPR.51): the relay takes nothing more. From any thread. */
+    void CloseLobby() noexcept { mCloseLobby.store(true, std::memory_order_relaxed); }
+
     /** What arrived that wasn't a player's, for the console; after `Stop`. */
     [[nodiscard]] std::string LinkReport() const;
 
@@ -116,6 +132,7 @@ namespace faf::server
     void Remove(std::int32_t uid, SSeat& seat, const std::string& why);
     void Say(std::string line);
     void SendViews();
+    void SendLobby();
 
     void OnJoined(std::int32_t uid, const remote::net::SEndpoint& from, bool returning) override;
     void OnMessage(std::int32_t uid, const std::vector<std::uint8_t>& message) override;
@@ -155,5 +172,12 @@ namespace faf::server
 
     std::mutex mNewsLock;
     std::vector<std::string> mNews;
+
+    CLobbyRelay mLobby;                        // on the network thread
+    std::vector<std::uint8_t> mLobbyFrame;     // the frame being relayed
+    std::atomic<bool> mCloseLobby{false};
+    std::uint64_t mLobbyUndelivered = 0;       // relayed to a participant with no channel
+    std::vector<SLobbyMessage> mLobbyIn;       // for the host; under mNewsLock
+    std::vector<SLobbyMessage> mLobbyOut;      // from the host, `from` being the participant it's for; under mViewLock
   };
 } // namespace faf::server

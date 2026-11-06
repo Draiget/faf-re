@@ -560,6 +560,8 @@ namespace
         Say("%d addresses from MatchAddresses get a full handshake budget; others share a small one, and a valid token lists them",
             static_cast<int>(allowedAddresses.size()));
       }
+      // The match file starts the game at once: no lobby phase, so nothing is relayed (plan WPR.51).
+      net->CloseLobby();
       std::string netError;
       if (!net->Start(netError)) {
         end.error = netError;

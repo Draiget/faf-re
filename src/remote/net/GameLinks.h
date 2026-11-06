@@ -59,6 +59,13 @@ namespace faf::remote::net
     ViewCheck = 8,
     /** Player to server, reliable: its frames didn't match a `ViewCheck`; it wants its next view whole. */
     ViewMismatch = 9,
+    /**
+     * Both ways, reliable, before the game launches (plan WP2.13): one lobby (`CLobby`) message on the virtual
+     * connection between two participants. Player to server: varint the uid it is for (0: the server, the lobby's
+     * host), then the message. Server to player: varint the uid it is from (0: the server), then the message; the
+     * server writes the sender itself, so no player chooses whom a message seems to come from.
+     */
+    Lobby = 10,
   };
 
   /** What became of a player's command. */

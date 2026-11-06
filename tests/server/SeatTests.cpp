@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -26,6 +27,7 @@
 #include "remote/ViewIdMap.h"
 #include "remote/net/Datagram.h"
 #include "remote/net/GameLinks.h"
+#include "server/LobbyRelay.h"
 #include "server/SeatIntake.h"
 
 namespace
@@ -442,3 +444,144 @@ TEST(Existing_Seat, EjectionEndsTheSourceAndFreesTheGame) { EjectionEndsTheSourc
 TEST(Existing_Seat, TheHookRunsAheadOfEachBeat) { TheHookRunsAheadOfEachBeat(); }
 TEST(Existing_Seat, TheIntakeHandsOnWhatItCanTranslate) { TheIntakeHandsOnWhatItCanTranslate(); }
 TEST(Existing_Seat, LoadedCountsForTheStart) { LoadedCountsForTheStart(); }
+
+// Plan WP2.13, WPR.51: the lobby relay (server/LobbyRelay.h).
+namespace
+{
+  using faf::server::CLobbyRelay;
+  using faf::server::ELobbyRelayVerdict;
+  using faf::server::SLobbyRelayLimits;
+
+  /** A Lobby frame's body: varint `to`, then `message`. */
+  std::vector<std::uint8_t> LobbyBody(const std::uint32_t to, const std::vector<std::uint8_t>& message)
+  {
+    std::vector<std::uint8_t> body;
+    faf::remote::net::ByteWriter writer(body);
+    writer.Varint(to);
+    writer.Bytes(message.data(), message.size());
+    return body;
+  }
+
+  struct SRelayed
+  {
+    ELobbyRelayVerdict verdict;
+    std::int32_t to = -1;
+    std::vector<std::uint8_t> frame;
+    std::vector<std::uint8_t> message;
+  };
+
+  SRelayed Relay(CLobbyRelay& relay, const std::int32_t from, const std::vector<std::uint8_t>& body, const std::uint64_t nowUs)
+  {
+    SRelayed result{};
+    std::span<const std::uint8_t> message;
+    result.verdict = relay.Take(from, body, nowUs, result.to, result.frame, message);
+    result.message.assign(message.begin(), message.end());
+    return result;
+  }
+} // namespace
+
+TEST(LobbyRelay, ForwardsWithTheSenderTheServerWrites)
+{
+  CLobbyRelay relay;
+  relay.AddParticipant(1001);
+  relay.AddParticipant(1002);
+  const std::vector<std::uint8_t> hello = {7u, 1u, 2u, 3u};
+  const SRelayed relayed = Relay(relay, 1001, LobbyBody(1002, hello), 1'000'000u);
+  ASSERT_EQ(relayed.verdict, ELobbyRelayVerdict::Forward);
+  EXPECT_EQ(relayed.to, 1002);
+  std::vector<std::uint8_t> expected;
+  faf::remote::net::ByteWriter writer(expected);
+  writer.Byte(static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::Lobby));
+  writer.Varint(1001u);
+  writer.Bytes(hello.data(), hello.size());
+  EXPECT_EQ(relayed.frame, expected);
+
+  // Uid 0 is the server, the lobby's host.
+  const SRelayed toHost = Relay(relay, 1002, LobbyBody(0, hello), 1'000'000u);
+  EXPECT_EQ(toHost.verdict, ELobbyRelayVerdict::ToHost);
+  EXPECT_EQ(toHost.message, hello);
+  const std::vector<std::uint8_t> fromHost = CLobbyRelay::FrameFromHost(hello);
+  EXPECT_EQ(fromHost, (std::vector<std::uint8_t>{static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::Lobby), 0u, 7u, 1u, 2u, 3u}));
+}
+
+TEST(LobbyRelay, OnlyBetweenParticipants)
+{
+  CLobbyRelay relay;
+  relay.AddParticipant(1001);
+  relay.AddParticipant(1002);
+  const std::vector<std::uint8_t> hello = {1u};
+  EXPECT_EQ(Relay(relay, 999, LobbyBody(1001, hello), 1u).verdict, ELobbyRelayVerdict::UnknownSender);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1003, hello), 1u).verdict, ELobbyRelayVerdict::UnknownTarget);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1001, hello), 1u).verdict, ELobbyRelayVerdict::UnknownTarget);
+  relay.RemoveParticipant(1002);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, hello), 1u).verdict, ELobbyRelayVerdict::UnknownTarget);
+  EXPECT_EQ(Relay(relay, 1002, LobbyBody(1001, hello), 1u).verdict, ELobbyRelayVerdict::UnknownSender);
+}
+
+TEST(LobbyRelay, MalformedFramesAreDropped)
+{
+  CLobbyRelay relay;
+  relay.AddParticipant(1001);
+  relay.AddParticipant(1002);
+  EXPECT_EQ(Relay(relay, 1001, {}, 1u).verdict, ELobbyRelayVerdict::Malformed);                       // nothing
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, {}), 1u).verdict, ELobbyRelayVerdict::Malformed);      // no message
+  EXPECT_EQ(Relay(relay, 1001, {0xEAu, 0x87u}, 1u).verdict, ELobbyRelayVerdict::Malformed);           // a uid cut short
+  EXPECT_EQ(Relay(relay, 1001, {0xEAu, 0x87u, 0x80u, 0x00u, 5u}, 1u).verdict, ELobbyRelayVerdict::Malformed); // a long form
+  EXPECT_EQ(Relay(relay, 1001, {0xFFu, 0xFFu, 0xFFu, 0xFFu, 0x0Fu, 5u}, 1u).verdict, ELobbyRelayVerdict::Malformed); // past 31 bits
+}
+
+TEST(LobbyRelay, CapsEachSendersSizeAndRate)
+{
+  SLobbyRelayLimits limits;
+  limits.maxMessageBytes = 100;
+  limits.bytesPerSecond = 1000.0;
+  limits.burstBytes = 2000.0;
+  limits.messagesPerSecond = 10.0;
+  limits.burstMessages = 5.0;
+  CLobbyRelay relay(limits);
+  relay.AddParticipant(1001);
+  relay.AddParticipant(1002);
+  relay.AddParticipant(1003);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, std::vector<std::uint8_t>(101u, 1u)), 1'000'000u).verdict, ELobbyRelayVerdict::TooLarge);
+
+  // Five messages at once, then the sixth waits for the bucket to fill (10 a second: 0.1 s each).
+  const std::vector<std::uint8_t> small(10u, 1u);
+  for (int i = 0; i < 5; ++i) {
+    EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, small), 1'000'000u).verdict, ELobbyRelayVerdict::Forward) << i;
+  }
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, small), 1'000'000u).verdict, ELobbyRelayVerdict::TooFast);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, small), 1'050'000u).verdict, ELobbyRelayVerdict::TooFast);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, small), 1'110'000u).verdict, ELobbyRelayVerdict::Forward);
+  // Another sender has a bucket of its own.
+  EXPECT_EQ(Relay(relay, 1003, LobbyBody(1002, small), 1'110'000u).verdict, ELobbyRelayVerdict::Forward);
+
+  // Bytes: 2000 at once, then 1000 a second; messages plentiful, so only bytes run out.
+  SLobbyRelayLimits byteLimits = limits;
+  byteLimits.messagesPerSecond = 1000.0;
+  byteLimits.burstMessages = 1000.0;
+  CLobbyRelay bytes(byteLimits);
+  bytes.AddParticipant(1001);
+  bytes.AddParticipant(1002);
+  const std::vector<std::uint8_t> big(100u, 1u);
+  int sent = 0;
+  std::uint64_t now = 10'000'000u;
+  for (int i = 0; i < 80; ++i, now += 50'000u) { // 2000 bytes a second asked for, over 3.95 s
+    sent += Relay(bytes, 1001, LobbyBody(1002, big), now).verdict == ELobbyRelayVerdict::Forward ? 1 : 0;
+  }
+  // The 2000-byte burst plus 3.95 s at 1000 a second: about 5950 bytes, 59 of the 80 messages.
+  EXPECT_GE(sent, 57);
+  EXPECT_LE(sent, 61);
+  EXPECT_EQ(bytes.Count(ELobbyRelayVerdict::TooFast), static_cast<std::uint64_t>(80 - sent));
+}
+
+TEST(LobbyRelay, ClosedAtLaunch)
+{
+  CLobbyRelay relay;
+  relay.AddParticipant(1001);
+  relay.AddParticipant(1002);
+  relay.Close();
+  EXPECT_FALSE(relay.Open());
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, {1u}), 1u).verdict, ELobbyRelayVerdict::Closed);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(0, {1u}), 1u).verdict, ELobbyRelayVerdict::Closed);
+  EXPECT_EQ(relay.Count(ELobbyRelayVerdict::Closed), 2u);
+}
