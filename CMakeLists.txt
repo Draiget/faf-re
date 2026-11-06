@@ -138,6 +138,7 @@ add_subdirectory(cmake/deps/monocypher)
 add_subdirectory(cmake/deps/zstd)
 add_subdirectory(cmake/deps/freetype)
 add_subdirectory(cmake/deps/msdfgen)
+add_subdirectory(cmake/deps/googletest)
 
 # --- Profiler (optional Tracy integration) --------------------------------------------
 option(FAF_ENABLE_TRACY "Enable Tracy profiler instrumentation" OFF)

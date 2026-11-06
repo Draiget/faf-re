@@ -6,20 +6,15 @@
 #include <cmath>
 #include <cstdio>
 
+#include <gtest/gtest.h>
+
 #include "server/SpeedWatch.h"
 
 namespace
 {
-  int gChecks = 0;
-  int gFailures = 0;
-
   void Check(const bool ok, const char* const what)
   {
-    ++gChecks;
-    if (!ok) {
-      ++gFailures;
-      std::printf("FAILED: %s\n", what);
-    }
+    EXPECT_TRUE(ok) << what;
   }
 
   using faf::server::CSpeedWatch;
@@ -126,14 +121,9 @@ namespace
   }
 } // namespace
 
-int main()
-{
-  QuietWhileSteady();
-  SpeedChangeMustHold();
-  RequestReportedAtOnce();
-  SlowWarnsOnce();
-  NoMeasureNoWarning();
-  SpeedScale();
-  std::printf("%d checks, %d failures\n", gChecks, gFailures);
-  return gFailures;
-}
+TEST(Existing_SpeedWatch, QuietWhileSteady) { QuietWhileSteady(); }
+TEST(Existing_SpeedWatch, SpeedChangeMustHold) { SpeedChangeMustHold(); }
+TEST(Existing_SpeedWatch, RequestReportedAtOnce) { RequestReportedAtOnce(); }
+TEST(Existing_SpeedWatch, SlowWarnsOnce) { SlowWarnsOnce(); }
+TEST(Existing_SpeedWatch, NoMeasureNoWarning) { NoMeasureNoWarning(); }
+TEST(Existing_SpeedWatch, SpeedScale) { SpeedScale(); }

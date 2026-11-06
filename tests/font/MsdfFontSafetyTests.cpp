@@ -5,6 +5,7 @@
 // Without a folder it uses Windows' Arial alone.
 
 #include <algorithm>
+#include <gtest/gtest.h>
 #include <atomic>
 #include <cctype>
 #include <chrono>
@@ -25,6 +26,7 @@ namespace
 
   void Check(const bool ok, const std::string& what)
   {
+    EXPECT_TRUE(ok) << what;
     if (!ok) {
       std::printf("FAIL: %s\n", what.c_str());
       ++gFailures;
@@ -446,29 +448,61 @@ namespace
   }
 } // namespace
 
-int main(const int argc, char** const argv)
+static std::string gFolder;
+static std::vector<std::string> gExtraFonts;
+
+TEST(Existing_MsdfFontSafety, Structure)
 {
-  std::setvbuf(stdout, nullptr, _IONBF, 0); // what ran before a crash still shows
+  std::setvbuf(stdout, nullptr, _IONBF, 0);
   const Bytes font = ReadFile("C:/Windows/Fonts/arial.ttf");
-  Check(!font.empty(), "can't read Windows' Arial");
-  if (font.empty()) {
-    return 1;
-  }
+  ASSERT_FALSE(font.empty()) << "can't read Windows' Arial";
   TestStructure(font);
-  if (argc > 1) {
-    TestFolder(argv[1]);
+  if (!gFolder.empty()) {
+    TestFolder(gFolder);
   }
+}
+
+TEST(Existing_MsdfFontSafety, PathsAndStrikes)
+{
+  const Bytes font = ReadFile("C:/Windows/Fonts/arial.ttf");
+  ASSERT_FALSE(font.empty()) << "can't read Windows' Arial";
   TestPaths();
   TestStrikes(font);
+}
+
+TEST(Existing_MsdfFontSafety, CookLimitsAndAtlasCheck)
+{
+  const Bytes font = ReadFile("C:/Windows/Fonts/arial.ttf");
+  ASSERT_FALSE(font.empty()) << "can't read Windows' Arial";
   TestCookLimits(font);
   TestCookedAtlasCheck(font);
-  TestOutOfMemory(font);
-  for (int i = 2; i < argc; ++i) {
-    std::printf("out of memory sweep on %s\n", argv[i]); // a CFF font takes other paths through FreeType
-    TestOutOfMemory(ReadFile(argv[i]));
-  }
-  TestModLimits(font);
+}
 
-  std::printf(gFailures == 0 ? "All passed\n" : "%d failed\n", gFailures);
-  return gFailures == 0 ? 0 : 1;
+TEST(Existing_MsdfFontSafety, OutOfMemorySweep)
+{
+  const Bytes font = ReadFile("C:/Windows/Fonts/arial.ttf");
+  ASSERT_FALSE(font.empty()) << "can't read Windows' Arial";
+  TestOutOfMemory(font);
+  for (const auto& path : gExtraFonts) {
+    TestOutOfMemory(ReadFile(path));
+  }
+}
+
+TEST(Existing_MsdfFontSafety, ModLimits)
+{
+  const Bytes font = ReadFile("C:/Windows/Fonts/arial.ttf");
+  ASSERT_FALSE(font.empty()) << "can't read Windows' Arial";
+  TestModLimits(font);
+}
+
+int main(int argc, char** argv)
+{
+  ::testing::InitGoogleTest(&argc, argv);
+  if (argc > 1) {
+    gFolder = argv[1];
+  }
+  for (int i = 2; i < argc; ++i) {
+    gExtraFonts.push_back(argv[i]);
+  }
+  return RUN_ALL_TESTS();
 }

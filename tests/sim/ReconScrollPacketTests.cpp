@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include <gtest/gtest.h>
+
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/SimDriver.h"
@@ -16,11 +18,7 @@ namespace
 
   void Check(bool value, const char* what)
   {
-    if (!value)
-    {
-      std::fprintf(stderr, "FAIL: %s\n", what);
-      std::exit(1);
-    }
+    EXPECT_TRUE(value) << what;
   }
 
   std::uint32_t Bits(float f)
@@ -28,7 +26,7 @@ namespace
     return std::bit_cast<std::uint32_t>(f);
   }
 
-  void Run(int workers, bool enabled, bool finish, std::size_t count)
+  void RunReconTest(int workers, bool enabled, bool finish, std::size_t count)
   {
     sim_Workers = workers;
     sim_ParallelSync = true;
@@ -60,7 +58,7 @@ namespace
         deferredCount += deferred;
         if (!entry)
           entry = QueueEntityVariableUpdate(&packet, static_cast<EntId>(i + 1), source);
-        Check(entry != nullptr, "queue entry");
+        ASSERT_NE(entry, nullptr) << "queue entry"; // dereferenced below
 
         // Every second record is ordinary: catches marker reuse and neighbor corruption.
         if ((i % 2) == 0)
@@ -106,6 +104,7 @@ namespace
 
     const auto expectedDeferred = (workers > 0 && enabled) ? (count < 65536 ? count : 65536) : 0;
     Check(deferredCount == expectedDeferred, "serial/deferred/full-list path");
+    ASSERT_GE(packet.mEntityUpdates.size(), count) << "every queued record in the packet";
     for (std::size_t i = 0; i < count; ++i)
     {
       const auto& entry = packet.mEntityUpdates[i];
@@ -131,7 +130,7 @@ namespace
     }
 
     // Mutating one owned record must not mutate its neighbor or the source.
-    Check(count >= 2, "neighbor ownership fixture");
+    ASSERT_GE(count, 2u) << "neighbor ownership fixture";
     packet.mEntityUpdates[0].mVariableData.mAuxValueVector[2].mAttachedEntityId = 98765;
     Check(
       packet.mEntityUpdates[1].mVariableData.mAuxValueVector[2].mAttachedEntityId == 12345,
@@ -145,14 +144,12 @@ namespace
   }
 }
 
-int main()
+TEST(Existing_ReconScrollPacket, SnapshotOwnershipAndEndpoints)
 {
-  Run(0, true, true, 257);
-  Run(2, false, true, 257);
-  Run(2, true, true, 257);
-  Run(2, true, false, 257);
-  Run(2, true, true, 65537);
-  Run(2, true, true, 257);
-  std::puts("PASS native recon packet: serial, disabled, workers, destructor, overflow, reuse, aux ownership and endpoint bits");
-  return 0;
+  RunReconTest(0, true, true, 257);
+  RunReconTest(2, false, true, 257);
+  RunReconTest(2, true, true, 257);
+  RunReconTest(2, true, false, 257);
+  RunReconTest(2, true, true, 65537);
+  RunReconTest(2, true, true, 257);
 }

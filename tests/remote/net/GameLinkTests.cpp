@@ -15,6 +15,8 @@
 #include <string>
 #include <vector>
 
+#include <gtest/gtest.h>
+
 #include "remote/net/Datagram.h"
 #include "remote/net/GameLinks.h"
 #include "remote/net/Handshake.h"
@@ -25,16 +27,9 @@ using namespace faf::remote::net;
 
 namespace
 {
-  int gChecks = 0;
-  int gFailures = 0;
-
   void Check(const bool ok, const char* const what)
   {
-    ++gChecks;
-    if (!ok) {
-      ++gFailures;
-      std::printf("FAILED: %s\n", what);
-    }
+    EXPECT_TRUE(ok) << what;
   }
 
   constexpr std::uint64_t kAddress = 0x7F00000104D2ull;
@@ -411,15 +406,10 @@ namespace
   }
 } // namespace
 
-int main()
-{
-  HandshakeAgreesOnKeys();
-  HandshakeRefusals();
-  CookiesAndHello();
-  Endpoints();
-  OverRealSockets();
-  TimeoutAndRateLimit();
-  AllowlistAndAddressLimits();
-  std::printf("%d checks, %d failures\n", gChecks, gFailures);
-  return gFailures;
-}
+TEST(Existing_GameLink, HandshakeAgreesOnKeys) { HandshakeAgreesOnKeys(); }
+TEST(Existing_GameLink, HandshakeRefusals) { HandshakeRefusals(); }
+TEST(Existing_GameLink, CookiesAndHello) { CookiesAndHello(); }
+TEST(Existing_GameLink, Endpoints) { Endpoints(); }
+TEST(Existing_GameLink, OverRealSockets) { OverRealSockets(); }
+TEST(Existing_GameLink, TimeoutAndRateLimit) { TimeoutAndRateLimit(); }
+TEST(Existing_GameLink, AllowlistAndAddressLimits) { AllowlistAndAddressLimits(); }
