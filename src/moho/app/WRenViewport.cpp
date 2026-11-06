@@ -1,4 +1,5 @@
 #include "moho/app/WxPrivate.h"
+#include "moho/app/NetworkPanel.h"
 
 namespace
 {
@@ -786,8 +787,9 @@ namespace
 void moho::REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, const int head)
 {
   // 0x007FA756..0x007FA778: bail (releasing the batcher) when nothing is armed.
+  // Engine addition (issue #322): the network panel is one more overlay.
   if (!moho::ren_ShowFrameTimes && !moho::ren_ShowNetworkStats
-      && !moho::ren_ShowBandwidthUsage && !moho::UI_ShowControlUnderMouse) {
+      && !moho::ren_ShowBandwidthUsage && !moho::UI_ShowControlUnderMouse && !moho::net_ShowPanel) {
     return; // batcher shared_ptr destructs here (asm 0x007FA77A..0x007FA786)
   }
 
@@ -861,6 +863,9 @@ void moho::REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, const int 
       uiManager->DebugMouseOverControl(primBatcher);
     }
   }
+
+  // Engine addition (issue #322): the network panel, last so it is on top.
+  moho::NETPANEL_Draw(primBatcher, widthF, heightF);
 
   // 0x007FA9ED..0x007FA9F3: flush the accumulated debug geometry.
   primBatcher->Flush();

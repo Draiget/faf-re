@@ -1,4 +1,5 @@
 #include "moho/app/WxPrivate.h"
+#include "moho/app/NetworkPanel.h"
 
 
 // ---------------------------------------------------------------------------
@@ -195,6 +196,15 @@ long moho::WD3DViewport::MSWWindowProc(
       (void)device->ShowCursor(device->IsCursorShowing());
       return 1;
     }
+  }
+
+  // Engine addition (issue #322): Ctrl+Shift+F11 flips the network panel, here so it works
+  // in the lobby, in a game and in fullscreen without the Lua key map. F11 alone is FAF's
+  // connectivity screen. Only the first press of a held key counts (lParam bit 30).
+  if (message == WM_KEYDOWN && wParam == VK_F11 && (lParam & 0x40000000) == 0 &&
+      (::GetKeyState(VK_CONTROL) & 0x8000) != 0 && (::GetKeyState(VK_SHIFT) & 0x8000) != 0) {
+    NETPANEL_Toggle();
+    return 0;
   }
 
   // FAF hot-patch (FA-Binary-Patches OnWindowMessage): 0x00430C0E calls 0x01291029 instead of

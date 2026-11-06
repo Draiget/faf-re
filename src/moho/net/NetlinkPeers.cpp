@@ -4,6 +4,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <deque>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -20,6 +21,7 @@
 #include "moho/net/NetConVars.h"
 #include "moho/net/NetPeerTransport.h"
 #include "netlink/EngineLinks.h"
+#include "netlink/GameCounters.h"
 #include "netlink/Json.h"
 #include "netlink/Link.h"
 #include "netlink/WebRtc.h"
@@ -30,13 +32,26 @@ namespace moho
   {
     namespace nl = faf::netlink;
 
+    // Issue #322: the game protocol's counts on one link, for the network panel.
+    // Sends count on the game's thread, arrivals on libjuice's.
+    struct PeerCounters
+    {
+      std::mutex mutex;
+      nl::GameCounters counts;
+    };
+
     // The game's datagrams to one peer go into its link.
     struct LinkTransport final : INetPeerTransport
     {
       std::shared_ptr<nl::Link> link;
+      std::shared_ptr<PeerCounters> counters;
 
       void SendDatagram(const void* data, const std::size_t size) override
       {
+        {
+          std::lock_guard lock(counters->mutex);
+          counters->counts.OnSent(static_cast<const unsigned char*>(data), size);
+        }
         link->Send(data, size);
       }
     };
@@ -47,7 +62,45 @@ namespace moho
       std::string login;
       nl::EngineAddress address;
       std::shared_ptr<nl::Link> link;
+      std::shared_ptr<PeerCounters> counters;
     };
+
+    // Issue #322: the latest network log lines, for the network panel.
+    class NetLogLines final : public gpg::LogTarget
+    {
+    public:
+      static constexpr std::size_t kKeep = 12;
+
+      NetLogLines() : gpg::LogTarget(true) {}
+
+      void OnMessage(
+        gpg::LogSeverity, const fa::string& message, const fa::vector<fa::string>&, int
+      ) override
+      {
+        const std::string_view text(message.c_str(), message.size());
+        if (text.rfind("NETLINK:", 0) != 0 && text.rfind("NET:", 0) != 0) {
+          return;
+        }
+        std::lock_guard lock(mMutex);
+        mLines.emplace_back(text);
+        if (mLines.size() > kKeep) {
+          mLines.pop_front();
+        }
+      }
+
+      [[nodiscard]] std::vector<std::string> Lines()
+      {
+        std::lock_guard lock(mMutex);
+        return {mLines.begin(), mLines.end()};
+      }
+
+    private:
+      std::mutex mMutex;
+      std::deque<std::string> mLines;
+    };
+
+    std::mutex gLogLinesMutex;
+    NetLogLines* gLogLines = nullptr; // lives to the end of the process, as the log does
 
     class EngineLinks
     {
@@ -80,6 +133,7 @@ namespace moho
         const nl::JsonValue* encrypt = config->Find("encrypt");
         mEncrypt = encrypt != nullptr && encrypt->AsBool();
         mTestDropPercent = static_cast<int>(config->Get("testDropPercent").AsInt(0));
+        mConfigured = true;
         gpg::Logf(
           "NETLINK: configured, local id %lld, %d ICE server addresses%s", static_cast<long long>(mLocalId),
           static_cast<int>(mIceServers.size()), mForceRelay ? ", relay only" : ""
@@ -113,6 +167,54 @@ namespace moho
       {
         std::lock_guard lock(mMutex);
         return mNative;
+      }
+
+      // Issue #322: what the network panel shows. Statistics are read with the
+      // links' own locks, outside mMutex.
+      [[nodiscard]] SNetlinkSnapshot Snapshot()
+      {
+        SNetlinkSnapshot out;
+        struct Entry
+        {
+          std::int64_t id;
+          std::string login;
+          std::shared_ptr<nl::Link> link;
+          std::shared_ptr<PeerCounters> counters;
+        };
+        std::vector<Entry> entries;
+        {
+          std::lock_guard lock(mMutex);
+          out.mode = mNative ? "native" : mConfigured ? "in-engine" : "";
+          for (const auto& [id, peer] : mPeers) {
+            entries.push_back({id, peer->login, peer->link, peer->counters});
+          }
+        }
+        for (const Entry& e : entries) {
+          const nl::LinkStats stats = e.link->GetStats();
+          SNetlinkPeerInfo info;
+          info.id = e.id;
+          info.login = e.login;
+          info.state = nl::LinkStateName(e.link->GetState());
+          info.connected = e.link->IsConnected();
+          info.localType = stats.localType;
+          info.remoteType = stats.remoteType;
+          // The offerer's echo, else the lane's own RTT (the answerer sends no echo).
+          info.rttMs = stats.lastRttMs >= 0 ? stats.lastRttMs : stats.onLane ? stats.laneRttMs : -1;
+          info.onLane = stats.onLane;
+          info.laneEncrypted = stats.laneEncrypted;
+          info.attempts = stats.attempts;
+          {
+            std::lock_guard lock(e.counters->mutex);
+            const nl::GameCounters& c = e.counters->counts;
+            info.sent = c.sent;
+            info.resends = c.dataResends;
+            info.received = c.received;
+            info.lost = c.lost;
+            info.lossPercent = c.LossPercent();
+          }
+          out.peers.push_back(std::move(info));
+        }
+        return out;
       }
 
       void SetLocalId(const std::int64_t id)
@@ -196,8 +298,13 @@ namespace moho
         };
         cb.onState = [this, id](const nl::LinkState) { ReportState(id); };
         cb.onConnected = [this, id](const bool) { ReportState(id); };
+        auto counters = std::make_shared<PeerCounters>();
         // libjuice's thread: to the connector that talks to this address.
-        cb.onData = [address](const std::uint8_t* data, const std::size_t size) {
+        cb.onData = [address, counters](const std::uint8_t* data, const std::size_t size) {
+          {
+            std::lock_guard lock(counters->mutex);
+            counters->counts.OnReceived(data, size);
+          }
           NET_DeliverFromPeerTransport(nullptr, address.addrHost, address.portHost, data, size);
         };
         const std::string prefix = "NETLINK: peer " + login + "(" + std::to_string(id) + "): ";
@@ -208,8 +315,10 @@ namespace moho
         peer->login = login;
         peer->address = address;
         peer->link = std::make_shared<nl::Link>(options, std::move(cb));
+        peer->counters = counters;
         auto transport = std::make_shared<LinkTransport>();
         transport->link = peer->link;
+        transport->counters = counters;
         NET_SetPeerTransport(nullptr, address.addrHost, address.portHost, std::move(transport));
         gpg::Logf(
           "NETLINK: peer %s(%lld) %s at %s", login.c_str(), static_cast<long long>(id),
@@ -295,6 +404,7 @@ namespace moho
         mStop = false;
         mGameEnded = false;
         mNative = false;
+        mConfigured = false;
       }
 
     private:
@@ -397,6 +507,7 @@ namespace moho
       int mTestDropPercent = 0;
       bool mGameEnded = false;
       bool mNative = false;
+      bool mConfigured = false; // the bridge sent NetlinkConfig (in-engine links)
       std::map<std::int64_t, std::unique_ptr<EnginePeer>> mPeers;
     };
 
@@ -466,6 +577,7 @@ namespace moho
       return true;
     }
     if (command == nl::kCmdConfig && args.size() == 1) {
+      NETLINK_KeepLogLines(); // issue #322
       Links().Configure(StrArg(args[0]));
     } else if (command == nl::kCmdPeer && args.size() == 3) {
       Links().AddPeer(IntArg(args[0]), StrArg(args[1]), IntArg(args[2]) != 0);
@@ -484,6 +596,24 @@ namespace moho
   void NETLINK_Shutdown()
   {
     Links().Shutdown();
+  }
+
+  SNetlinkSnapshot NETLINK_GetSnapshot()
+  {
+    SNetlinkSnapshot out = Links().Snapshot();
+    std::lock_guard lock(gLogLinesMutex);
+    if (gLogLines != nullptr) {
+      out.log = gLogLines->Lines();
+    }
+    return out;
+  }
+
+  void NETLINK_KeepLogLines()
+  {
+    std::lock_guard lock(gLogLinesMutex);
+    if (gLogLines == nullptr) {
+      gLogLines = new NetLogLines(); // never deleted: the log may write to it until exit
+    }
   }
 
   bool NATIVENET_Enabled()
@@ -510,6 +640,7 @@ namespace moho
     const bool forceRelay = CFG_GetArgOption("/nativenetrelay", 0u, nullptr);
     boost::weak_ptr<CGpgNetInterface> weak;
     boost::AssignWeakFromShared(weak, GPGNET_GetPtr());
+    NETLINK_KeepLogLines(); // issue #322: the panel's log lines
     const bool encrypt = net_NativeNetEncrypt != 0;
     Links().StartNative(weak, bindAddress, forceRelay, net_NativeNetWebRtc != 0, net_NativeNetRedundancy, encrypt);
     gpg::Logf(

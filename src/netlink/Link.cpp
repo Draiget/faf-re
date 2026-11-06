@@ -95,6 +95,17 @@ namespace faf::netlink
       return {};
     }
 
+    // Issue #322: the word after " typ " in an SDP candidate line, empty when there is none.
+    std::string CandidateTypeOf(const std::string_view line)
+    {
+      const std::size_t at = line.find(" typ ");
+      if (at == std::string_view::npos) {
+        return {};
+      }
+      std::string_view rest = line.substr(at + 5);
+      return std::string(rest.substr(0, rest.find(' ')));
+    }
+
     std::string Lower(std::string s)
     {
       for (char& ch : s) {
@@ -508,8 +519,13 @@ namespace faf::netlink
       s.laneDuplicates = lane.redundantDuplicates;
       s.laneLost = lane.datagramsLost;
       s.laneUnauthenticated = lane.unauthenticatedDropped;
+      if (lane.rttSamples > 0) {
+        s.laneRttMs = static_cast<double>(lane.rttSmoothedUs) / 1000.0;
+      }
     }
     s.laneEncrypted = s.onLane && mLaneKeyed;
+    s.localType = mLocalType;
+    s.remoteType = mRemoteType;
     s.dataReceived = mDataReceived.load();
     s.invalidReceived = mInvalidReceived.load();
     s.echoesAnswered = mEchoesAnswered.load();
@@ -573,6 +589,8 @@ namespace faf::netlink
     }
     mLaneKeyed = false;
     mKeyPair.Clear();
+    mLocalType.clear();
+    mRemoteType.clear();
   }
 
   void Link::NoteRemoteUfragLocked(Pending& out, const std::string& ufrag)
@@ -927,6 +945,8 @@ namespace faf::netlink
           char remote[JUICE_MAX_CANDIDATE_SDP_STRING_LEN] = {};
           if (juice_get_selected_candidates(mAgent, local, sizeof(local), remote, sizeof(remote)) == 0) {
             Log(p, std::string("connected, selected pair: ") + local + " <-> " + remote);
+            mLocalType = CandidateTypeOf(local);
+            mRemoteType = CandidateTypeOf(remote);
           }
           if (mCallbacks.onConnected) {
             p.actions.push_back([this] { mCallbacks.onConnected(true); });

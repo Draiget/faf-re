@@ -147,6 +147,7 @@ set(FAF_ENGINE_SOURCES
   moho/app/WSupComFrame.cpp
   moho/app/CBloomRenderer.cpp
   moho/app/WRenViewport.cpp
+  moho/app/NetworkPanel.cpp
   moho/app/WxUrl.cpp
   moho/containers/BVIntSetSerializer.cpp
   moho/containers/BVIntSetTypeInfo.cpp

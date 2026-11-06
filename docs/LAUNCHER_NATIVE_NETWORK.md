@@ -72,6 +72,20 @@ A launcher checks `ProductName` only, under the string table `040904b0`. On Wind
 - Signalling from a link goes out as `IceMsg [receiver id, text]`.
 - When the game sends `GameEnded`, links stop restarting.
 
+## Network panel
+
+With no adapter there is no adapter window, so the game shows its links itself (#322): `net_ShowPanel 1`, or Ctrl+Shift+F11 in the game window (F11 alone stays FAF's connectivity screen). The renderer draws it in the same pass as the debug overlays (`src/moho/app/NetworkPanel.cpp`), so it shows in the lobby, on the loading screen and in a game, over Direct3D 11, 12 and Vulkan. One row per peer:
+
+| Column | From |
+|---|---|
+| state | the link's state (`LinkStateName`); `#n` after the n-th connection attempt |
+| path | `direct` or `relayed`, then the selected pair's candidate types, local/remote (`host`, `srflx`, `prflx`, `relay`) |
+| round trip | the offerer's echo; on the answerer, which sends no echo, the lane's smoothed RTT |
+| loss, resends | the game protocol's own counts on this link (`src/netlink/GameCounters.h`, as faf-netbridge's statistics lines): serial numbers that never arrived, and DATA packets the game sent again |
+| lane | `encrypted`, `plain` or `off` (#240, #289) |
+
+Under the table come the latest `NETLINK:` and `NET:` log lines. With in-engine links behind faf-netbridge (#233) the panel shows the same; with the launcher's adapter running the links it says so, since the game has no links of its own then.
+
 ## Change points in the launchers
 
 From reading both clients (Java: downlords-faf-client `develop` 66e624f119; Rust: FAForeverRustClient `develop` 70c88a5f9b, both 2026-10-31):

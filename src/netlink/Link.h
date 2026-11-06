@@ -151,8 +151,13 @@ namespace faf::netlink
     std::uint64_t laneUnacked = 0;     // datagrams whose copies ran out before an ack
     std::uint64_t laneDuplicates = 0;  // copies received after the datagram itself
     std::uint64_t laneLost = 0;        // lane datagrams counted lost
+    // Issue #322: the selected pair's candidate types ("host", "srflx", "prflx",
+    // "relay") while connected, empty otherwise. Either "relay": through TURN.
+    std::string localType;
+    std::string remoteType;
     bool laneEncrypted = false;        // issue #289: the lane is on and sealed
     std::uint64_t laneUnauthenticated = 0; // lane datagrams dropped: not sealed with the agreed key
+    double laneRttMs = -1;             // issue #322: the lane's smoothed RTT, both ends; -1 before a sample
   };
 
   class Link
@@ -266,6 +271,9 @@ namespace faf::netlink
     // next lane is sealed with, under mLaneMutex; set before the connection
     // comes up and cleared with the agent, so every lane gets the keys of its
     // own connection and no key outlives it. mLaneKeyed mirrors it under mMutex.
+    // Issue #322: the selected pair's candidate types, under mMutex.
+    std::string mLocalType;
+    std::string mRemoteType;
     LinkKeyPair mKeyPair;
     std::optional<remote::net::ChannelKeys> mLaneKeys;
     bool mLaneKeyed = false;
