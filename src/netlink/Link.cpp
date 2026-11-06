@@ -890,6 +890,17 @@ namespace faf::netlink
         ApplyRemoteLocked(p, m, now);
       }
 
+      if (mReconnectAsked.exchange(false)) {
+        if (mGameEnded) {
+          Log(p, "reconnect not done: the game has ended");
+        } else {
+          ConnectionLostLocked(p, "reconnect asked", now);
+          if (mOptions.offerer) {
+            mRestartAt = now;
+          }
+        }
+      }
+
       bool gatheringDone = false;
       int juiceState = JUICE_STATE_DISCONNECTED;
       bool juiceStateChanged = false;
