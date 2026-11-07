@@ -1528,7 +1528,10 @@ namespace moho
 	 */
 	bool lua_ParallelMark = true;
 
-	bool lua_IncrementalGC = true;
+	// Off until the game's startup copies the convar in (CaptureIncrementalGcStartupSetting, from
+	// CScApp::Init). Headless, the server and the tools never do, so their session states keep the
+	// shipped collector and their sim paths skip the incremental checks.
+	bool lua_IncrementalGC = false;
 	bool lua_IncrementalGCSetting = true;
 
 	TConVar<bool> gTConVar_lua_IncrementalGC(

@@ -5,7 +5,9 @@
 namespace moho
 {
 	/// The live runtime flag: the collector role of a VM is decided from this
-	/// value when the VM is created.
+	/// value when the VM is created. False until `CaptureIncrementalGcStartupSetting`
+	/// runs, which only the game does, so headless and the server keep the
+	/// shipped collector.
 	extern bool lua_IncrementalGC;
 
 	/// The configured value of the `lua_IncrementalGC` convar. The convar is
