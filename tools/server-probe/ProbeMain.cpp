@@ -27,6 +27,7 @@
 #include <thread>
 #include <vector>
 
+#include "ProbeRebuild.h"
 #include "lua/LuaObject.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -189,6 +190,8 @@ namespace
 
     double beatMs = 0.0; // the game's beat, to tell how late views come; 0: no telling
     bool noDecode = false; // the channel's limit alone, as decoding takes a while
+    // Plan WP11 step 1: rebuild each beat's game data from the views alone, with this match file's rules.
+    std::string rebuild;
     std::string saveViews; // every message from the server's views, each as a 32-bit size and its bytes, to measure compression
     int fuzzCount = 2000;
     CImpairedPath::SConfig path;
@@ -219,6 +222,13 @@ namespace
       }
       if (name == "--no-decode") {
         out.noDecode = true;
+        continue;
+      }
+      if (!name.empty() && name[0] == '/') {
+        // The engine's own switches (`/init <file>`, `/nosound`), which `--rebuild`'s engine reads itself.
+        if (i + 1 < argc && argv[i + 1][0] != '-' && argv[i + 1][0] != '/') {
+          ++i;
+        }
         continue;
       }
       if (i + 1 >= argc) {
@@ -295,6 +305,8 @@ namespace
         out.path.partitionAt = Argument(value);
       } else if (name == "--partition-for") {
         out.path.partitionFor = Argument(value);
+      } else if (name == "--rebuild") {
+        out.rebuild = value;
       } else {
         return false;
       }
@@ -407,6 +419,7 @@ namespace
     std::int32_t army = -1;
     std::uint32_t source = 0;
     bool noDecode = false;
+    faf::probe::CProbeRebuild* rebuild = nullptr; // `--rebuild`
     double beatMs = 0.0;
     double lateBase = 0.0;      // the seconds at which beat 0 would have come
     bool haveLateBase = false;
@@ -442,6 +455,9 @@ namespace
       out.mapX = sizes[0];
       out.mapZ = sizes[1];
       out.haveInfo = true;
+      if (out.rebuild != nullptr) {
+        out.rebuild->OnGameInfo(sizes[0], sizes[1]);
+      }
       ++out.gameInfos;
       return;
     }
@@ -481,6 +497,9 @@ namespace
                   static_cast<unsigned long long>(entities), static_cast<unsigned long long>(teamEntities));
     }
     if (ok) {
+      if (out.rebuild != nullptr) {
+        out.rebuild->OnFrame(std::span<const std::uint8_t>(frame, frameSize));
+      }
       faf::remote::wire::SViewFrame decoded;
       ok = out.window.Decode(std::span<const std::uint8_t>(frame, frameSize), out.codec, decoded) && decoded.entities.size() == entities;
       faf::remote::wire::SViewFrame teamDecoded;
@@ -706,12 +725,20 @@ int main(const int argc, char** const argv)
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> [--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
       "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>]] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>]\n"
+      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>]] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--rebuild <match.lua> /init <init.lua>]\n"
     );
     return 3;
   }
 
   std::string error;
+  faf::probe::CProbeRebuild rebuild;
+  if (!options.rebuild.empty()) {
+    if (!rebuild.Load(options.rebuild, options.uid, error)) {
+      std::printf("probe %d: rebuild: %s\n", options.uid, error.c_str());
+      return 3;
+    }
+    std::printf("probe %d: rebuild: rules of %s loaded\n", options.uid, options.rebuild.c_str());
+  }
   CImpairedPath path;
   SEndpoint server = options.server;
   if (options.path.Any()) {
@@ -740,6 +767,7 @@ int main(const int argc, char** const argv)
   SViews views;
   views.beatMs = options.beatMs;
   views.noDecode = options.noDecode;
+  views.rebuild = options.rebuild.empty() ? nullptr : &rebuild;
   // Left to the process's end to close.
   std::FILE* const saved = options.saveViews.empty() ? nullptr : std::fopen(options.saveViews.c_str(), "wb");
   std::deque<const char*> asked; // what each answer will be about, in order
@@ -1087,6 +1115,9 @@ int main(const int argc, char** const argv)
     "probe %d: answers: %llu applied, %llu refused, %llu dropped%s\n", options.uid, static_cast<unsigned long long>(answers[0]), static_cast<unsigned long long>(answers[1]),
     static_cast<unsigned long long>(answers[2]), flooding ? (" (flooded)") : ""
   );
+  if (!options.rebuild.empty()) {
+    rebuild.Report(options.uid);
+  }
   if (!options.lobbyName.empty()) {
     const auto list = [](const std::vector<std::int32_t>& uids) {
       std::string text;

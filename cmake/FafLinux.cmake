@@ -329,7 +329,10 @@ target_link_libraries(faf_seat_tests PRIVATE faf_sim faf_netchannel faf_monocyph
 target_compile_definitions(faf_seat_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_seat_tests PRIVATE -Wl,--error-limit=0)
 
-add_executable(faf_server_probe EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeMain.cpp")
+add_executable(faf_server_probe EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeMain.cpp"
+  "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeRebuild.cpp"
+  "${PROJECT_SOURCE_DIR}/src/headless/SessionLoad.cpp"
+  "${PROJECT_SOURCE_DIR}/src/headless/ReplayLuaState.cpp")
 target_link_libraries(faf_server_probe PRIVATE faf_sim faf_netchannel faf_monocypher)
 target_compile_definitions(faf_server_probe PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_server_probe PRIVATE -Wl,--error-limit=0)
