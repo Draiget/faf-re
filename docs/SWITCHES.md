@@ -115,6 +115,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `ren_AoFadeStart` / `ren_AoFadeEnd` | 120 / 260 | `/con` | live | Camera distance where ambient occlusion starts to fade out, and where it is gone |
 | `ren_AoContact` | 0.35 | `/con` | live | Contact shadows, part of `ren_Ao`: a short ray from each sunlit surface towards the sun darkens it by this much where nearby depth blocks the ray, which keeps units and props attached to the ground where the shadow map is too coarse. 0 turns them off |
 | `ren_AoContactLength` | 1.5 | `/con` | live | Contact shadow ray length, world units |
+| `ren_Fxaa` | -1 (auto) | `/con`, and Options > Video > Anti-aliasing (FXAA) | live | FXAA over the world views on Direct3D 12 and Vulkan, which have no multisampled back buffer: the head is copied into the refraction target and drawn back through FXAA, colour only, before the cartographic views and the interface. -1 runs it when the Anti-Aliasing option holds a level (saved under Direct3D 9), 1 on, 0 off; Direct3D 9 and 11 keep their own anti-aliasing |
 | `ren_GpuIcons` | −1 (auto) | `/con` | live | Strategic icons drawn by the GPU (1 on, 0 off, −1 when the device verified the path) |
 | `ren_GpuIconClassify` | −1 (auto) | `/con` | live | Icon classification in a compute pass |
 | `ren_GpuFog` | −1 (auto) | `/con` | live | Fog of war drawn by the GPU |

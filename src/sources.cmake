@@ -916,6 +916,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/CDecalHandleTypeInfo.cpp
   moho/render/AmbientOcclusionRenderer.cpp
   moho/render/BoundaryRenderer.cpp
+  moho/render/FxaaRenderer.cpp
   moho/render/BoxRenderer.cpp
   moho/render/CRenFrame.cpp
   moho/render/CDecalTypes.cpp

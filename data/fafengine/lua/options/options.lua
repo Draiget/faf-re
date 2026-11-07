@@ -240,3 +240,54 @@ do
         })
     end
 end
+
+-- FXAA (ren_Fxaa) on Direct3D 12 and Vulkan, which list no multisampled anti-aliasing. Shown only by an
+-- engine that has the command.
+do
+    local command = 'ren_Fxaa'
+    local function Supported()
+        if type(ConTextMatches) ~= 'function' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local video = options and options.video
+    if video and video.items and Supported() then
+        local position = table.getn(video.items) + 1
+        for index, item in ipairs(video.items) do
+            if item.key == 'antialiasing' then
+                position = index + 1
+            end
+        end
+        table.insert(video.items, position, {
+            title = 'Anti-aliasing (FXAA)',
+            key = 'fxaa',
+            type = 'toggle',
+            default = -1,
+            tip = 'Smooths jagged edges on Direct3D 12 and Vulkan. Automatic follows the Anti-Aliasing setting. Other renderers ignore it.',
+            set = function(key, value, startup)
+                if value ~= 0 and value ~= 1 and value ~= -1 then
+                    value = -1
+                end
+                ConExecute(command .. ' ' .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    { text = 'Automatic', key = -1 },
+                    { text = '<LOC _On>', key = 1 },
+                    { text = '<LOC _Off>', key = 0 },
+                },
+            },
+        })
+    end
+end

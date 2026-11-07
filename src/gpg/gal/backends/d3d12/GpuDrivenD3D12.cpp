@@ -567,6 +567,13 @@ namespace gpg::gal
         if (auto* const texture = static_cast<TextureD3D12*>(bindings.textures[slot - kGpuMaxReadBuffers])) {
           view = texture->View();
           Transition(texture->Resource(), kTextureRead);
+        } else if (auto* const target = static_cast<RenderTargetD3D12*>(bindings.targets[slot - kGpuMaxReadBuffers])) {
+          // The next bind of it as a target moves it back to RENDER_TARGET (BindTargets).
+          RenderTargetD3D12::Buffer& buffer = target->Current();
+          if (buffer.shaderResourceView.ptr != 0U) {
+            view = buffer.shaderResourceView;
+            Transition(buffer.resource, kTextureRead);
+          }
         }
       } else if (bindings.readBoundDepth && outputContext_.depthStencil != nullptr) {
         // The next target bind moves it back to DEPTH_WRITE (BindTargets).

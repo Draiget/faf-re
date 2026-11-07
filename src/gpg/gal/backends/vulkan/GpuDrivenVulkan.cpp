@@ -638,6 +638,11 @@ namespace gpg::gal
       if (auto* const texture = static_cast<TextureVulkan*>(bindings.textures[slot])) {
         Transition(texture->Image(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         info.imageView = texture->View();
+      } else if (auto* const target = static_cast<RenderTargetVulkan*>(bindings.targets[slot])) {
+        // BeginRendering moves it back to COLOR_ATTACHMENT_OPTIMAL when it is drawn into again.
+        RenderTargetVulkan::Buffer& buffer = target->Current();
+        Transition(buffer.image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        info.imageView = buffer.view;
       } else {
         info.imageView = mNullViews[0];
       }

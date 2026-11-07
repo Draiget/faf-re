@@ -1,6 +1,7 @@
 #include "moho/app/WxPrivate.h"
 #include "moho/app/NetworkPanel.h"
 #include "moho/render/AmbientOcclusionRenderer.h"
+#include "moho/render/FxaaRenderer.h"
 
 namespace
 {
@@ -2273,6 +2274,35 @@ void moho::WRenViewport::Render(const int head, fa::vector<SWorldViewInfo>& worl
   // and every view re-tessellates the terrain each frame.
   if (moho::IWldTerrainRes* const decalTerrainRes = moho::REN_GetTerrainRes(); decalTerrainRes != nullptr) {
     static_cast<moho::CDecalManager*>(decalTerrainRes->GetDecalManager())->ClearPendingChanges();
+  }
+
+  // Engine addition (ren_Fxaa): anti-aliasing for the world views on Direct3D 12 and Vulkan, which
+  // have no multisampled back buffer. The head is copied into the refraction target (free again
+  // once the views are drawn) and drawn back through FXAA over the whole head, colour only, before
+  // the cartographic views and the interface.
+  if (begin != end && mPrimaryTargetLocks[mHead] && !RenderAdditionsDisabled()) {
+    if (moho::FxaaRenderer& fxaa = moho::FxaaRenderer::Get(); fxaa.IsActive()) {
+      const gpg::gal::RenderProfileScope profileFxaa("Fxaa");
+      boost::shared_ptr<moho::ID3DRenderTarget> headTarget{};
+      device->GetWriterLock1(headTarget, mHead);
+      device->SetViewRect(headTarget.get(), mPrimaryTargetLocks[mHead].get(), nullptr, nullptr);
+      moho::ID3DRenderTarget::SurfaceHandle copy{};
+      (void)mPrimaryTargetLocks[mHead]->GetSurface(copy);
+      if (copy) {
+        Wm3::Vector2i savedPos{};
+        Wm3::Vector2i savedSize{};
+        float savedMinZ = 0.0f;
+        float savedMaxZ = 1.0f;
+        device->GetView(&savedPos, &savedSize, &savedMinZ, &savedMaxZ);
+        const int width = device->GetHeadWidth(static_cast<unsigned int>(mHead));
+        const int height = device->GetHeadHeight(static_cast<unsigned int>(mHead));
+        Wm3::Vector2i headPos{0, 0};
+        Wm3::Vector2i headSize{width, height};
+        device->SetViewport(&headPos, &headSize, savedMinZ, savedMaxZ);
+        fxaa.Render(*copy, width, height);
+        device->SetViewport(&savedPos, &savedSize, savedMinZ, savedMaxZ);
+      }
+    }
   }
 
   // Shared tail, reached from the per-view loop, from the empty-list jump
