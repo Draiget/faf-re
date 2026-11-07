@@ -60,18 +60,53 @@ namespace
   [[maybe_unused]] const bool gSoundEnabledSet = (moho::sSoundEnabled = &IsSoundEnabled, true);
 } // namespace
 
-extern "C" __declspec(dllimport) void __cdecl X3DAudioCalculate(
-  const void* instance,
-  const moho::Audio3DListener* listener,
-  const moho::Audio3DEmitter* emitter,
-  std::uint32_t flags,
-  moho::Audio3DDspSettings* dspSettings
-);
-extern "C" __declspec(dllimport) void __cdecl X3DAudioInitialize(
-  std::uint32_t speakerChannelMask,
-  float speedOfSound,
-  void* instance
-);
+namespace
+{
+  /**
+   * Engine addition (issue #316): X3DAudio is loaded at run time instead of being imported from
+   * X3DAudio1_7.dll, which only the DirectX End-User Runtime of June 2010 installs. Windows 10's
+   * xaudio2_9.dll exports the same two functions with the same structures (X3DAUDIO_HANDLE_BYTESIZE 20,
+   * pack 1, __cdecl; its X3DAudioInitialize returns an HRESULT the engine never read). X3DAudio1_7.dll
+   * stays the fallback for Windows before 10. Both come from System32 only. Without either, 3D audio
+   * fails to initialize and the game runs without sound, as for any other sound start-up error.
+   */
+  struct X3DAudioFunctions
+  {
+    void(__cdecl* mInitialize)(std::uint32_t speakerChannelMask, float speedOfSound, void* instance) = nullptr;
+    void(__cdecl* mCalculate)(
+      const void* instance,
+      const moho::Audio3DListener* listener,
+      const moho::Audio3DEmitter* emitter,
+      std::uint32_t flags,
+      moho::Audio3DDspSettings* dspSettings
+    ) = nullptr;
+  };
+
+  const X3DAudioFunctions& X3DAudio()
+  {
+    static const X3DAudioFunctions functions = [] {
+      for (const wchar_t* const library : {L"xaudio2_9.dll", L"X3DAudio1_7.dll"}) {
+        const HMODULE module = ::LoadLibraryExW(library, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        if (module == nullptr) {
+          continue;
+        }
+        X3DAudioFunctions loaded;
+        loaded.mInitialize =
+          reinterpret_cast<decltype(loaded.mInitialize)>(::GetProcAddress(module, "X3DAudioInitialize"));
+        loaded.mCalculate =
+          reinterpret_cast<decltype(loaded.mCalculate)>(::GetProcAddress(module, "X3DAudioCalculate"));
+        if (loaded.mInitialize != nullptr && loaded.mCalculate != nullptr) {
+          gpg::Logf("SND: 3D audio from %ls", library);
+          return loaded;
+        }
+        ::FreeLibrary(module);
+      }
+      gpg::Warnf("SND: neither xaudio2_9.dll nor X3DAudio1_7.dll provides X3DAudio");
+      return X3DAudioFunctions{};
+    }();
+    return functions;
+  }
+} // namespace
 
 namespace moho
 {
@@ -162,7 +197,7 @@ namespace
  * Releases one `sp_counted_impl_p<AudioEngine>` owned slot by destroying the
  * pointed `AudioEngineImpl` and deleting the slot storage.
  */
-void DestroyAudioEngineImplOwnedByCountedBlock(
+[[maybe_unused]] void DestroyAudioEngineImplOwnedByCountedBlock(
   SpCountedImplAudioEngineBlock* const countedBlock
 ) noexcept
 {
@@ -261,7 +296,7 @@ namespace
   {
     gpg::MemBuffer<char> mBuffer; // +0x00
     moho::IXACTSoundBank* mBank;  // +0x10
-    msvc8::string mName;          // +0x14
+    fa::string mName;          // +0x14
     moho::AudioEngineImpl* mEngine; // +0x30
 
     /**
@@ -299,7 +334,7 @@ namespace
     [[nodiscard]] virtual bool Load(gpg::StrArg waveBankPath) = 0;
 
     moho::IXACTWaveBank* mWaveBank; // +0x04
-    msvc8::string mName;            // +0x08
+    fa::string mName;            // +0x08
     moho::AudioEngineImpl* mEngine; // +0x24
   };
 
@@ -311,7 +346,7 @@ namespace
   // `RWaveBankResInMemory::Load` reads the engine at `[edi+0x24]` (0x004DAC5A)
   // and the mapped buffer at `[edi+0x28]` (0x004DABEF), and
   // `RWaveBankResStreaming::LoadBank` reads the same engine lane at
-  // `[esi+0x24]` (0x004DAE96) - which is where a 0x1C-byte `msvc8::string`
+  // `[esi+0x24]` (0x004DAE96) - which is where a 0x1C-byte `fa::string`
   // starting at +0x08 ends.
   static_assert(offsetof(AudioWaveBankLoaderBase, mWaveBank) == 0x04, "AudioWaveBankLoaderBase::mWaveBank offset must be 0x04");
   static_assert(offsetof(AudioWaveBankLoaderBase, mName) == 0x08, "AudioWaveBankLoaderBase::mName offset must be 0x08");
@@ -399,10 +434,10 @@ namespace
    * (`1.0f`) and returns its volume lane.
    *
    * Own `lower_bound`-style descent (tracking the best `>=` candidate, the
-   * same shape `msvc8::map<K,T>::operator[]` uses elsewhere in this file's
+   * same shape `fa::map<K,T>::operator[]` uses elsewhere in this file's
    * sibling instantiations) followed by a hinted insert against that
    * descent's own result when the exact key is absent -- register-traced
-   * against the real `.asm` field for field: matches `msvc8::map<
+   * against the real `.asm` field for field: matches `fa::map<
    * std::uint16_t, float>::insert(const_iterator, const value_type&)`
    * (`insert_hint` in `RbTree.h`, cited there as `FUN_004DC080` for this
    * instantiation), including the leftmost/rightmost/predecessor-successor
@@ -429,7 +464,7 @@ namespace
    * all (its own descent didn't even take a hint parameter), not that the
    * real binary skips rebalancing on this instantiation.
    */
-  [[nodiscard]] float* FindOrInsertCategoryVolume(msvc8::map<std::uint16_t, float>& map, const std::uint16_t category)
+  [[nodiscard]] float* FindOrInsertCategoryVolume(fa::map<std::uint16_t, float>& map, const std::uint16_t category)
   {
     auto it = map.lower_bound(category);
     if (it != map.end() && it->first == category) {
@@ -489,8 +524,8 @@ namespace
   bool AudioSoundBankLoader::Load(const gpg::StrArg soundBankPath)
   {
     moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
-    msvc8::string mountedPath{};
-    const msvc8::string* const resolvedPath = waitHandleSet->mHandle->FindFile(&mountedPath, soundBankPath, nullptr);
+    fa::string mountedPath{};
+    const fa::string* const resolvedPath = waitHandleSet->mHandle->FindFile(&mountedPath, soundBankPath, nullptr);
 
     mBuffer = moho::DISK_ReadFile(resolvedPath->c_str());
     if (mBuffer.mBegin == nullptr) {
@@ -533,8 +568,8 @@ namespace
       return false;
     }
 
-    msvc8::string mountedPath{};
-    const msvc8::string* const resolvedPath = waitHandleSet->mHandle->FindFile(&mountedPath, waveBankPath, nullptr);
+    fa::string mountedPath{};
+    const fa::string* const resolvedPath = waitHandleSet->mHandle->FindFile(&mountedPath, waveBankPath, nullptr);
     mFileHandle = ::CreateFileA(
       resolvedPath->c_str(),
       GENERIC_READ,
@@ -593,8 +628,8 @@ namespace
       return false;
     }
 
-    msvc8::string mountedPath{};
-    const msvc8::string* const resolvedPath = waitHandleSet->mHandle->FindFile(&mountedPath, waveBankPath, nullptr);
+    fa::string mountedPath{};
+    const fa::string* const resolvedPath = waitHandleSet->mHandle->FindFile(&mountedPath, waveBankPath, nullptr);
     mMappedBuffer = moho::DISK_MemoryMapFile(resolvedPath->c_str());
     if (mMappedBuffer.mBegin == nullptr) {
       return false;
@@ -635,10 +670,10 @@ namespace
       return false;
     }
 
-    msvc8::string mountedPath{};
-    const msvc8::string* const resolvedPath = waitHandleSet->mHandle->FindFile(&mountedPath, waveBankPath, nullptr);
+    fa::string mountedPath{};
+    const fa::string* const resolvedPath = waitHandleSet->mHandle->FindFile(&mountedPath, waveBankPath, nullptr);
 
-    msvc8::auto_ptr<gpg::Stream> openedStream = moho::DISK_OpenFileRead(resolvedPath->c_str());
+    fa::auto_ptr<gpg::Stream> openedStream = moho::DISK_OpenFileRead(resolvedPath->c_str());
     gpg::Stream* const stream = openedStream.get();
     if (stream == nullptr) {
       return false;
@@ -685,7 +720,7 @@ namespace
    * What it does:
    * Stores one `AudioEngineRef*` advanced by one element index.
    */
-  [[nodiscard]] moho::AudioEngineRef** ComputeAudioEngineRefOffset(
+  [[maybe_unused]] [[nodiscard]] moho::AudioEngineRef** ComputeAudioEngineRefOffset(
     moho::AudioEngineRef** const outSlot,
     moho::AudioEngineRef* const* const base,
     const int index
@@ -1325,7 +1360,7 @@ namespace moho
 
   void func_RetreiveXACTCOMInterface(AudioEngineImpl* impl);
   void func_LoadSoundPath(AudioEngineImpl* impl, gpg::StrArg voicePath);
-  msvc8::string SND_GetVariableName(int variableId);
+  fa::string SND_GetVariableName(int variableId);
 
   /**
    * Address: 0x004D8A50 (FUN_004D8A50, func_SoundErrorCodeToMsg)
@@ -1379,7 +1414,10 @@ namespace moho
       return result;
     }
 
-    X3DAudioInitialize(finalMixFormat.dwChannelMask, speedOfSound, audioHandle);
+    if (X3DAudio().mInitialize == nullptr) {
+      return kHresultFail;
+    }
+    X3DAudio().mInitialize(finalMixFormat.dwChannelMask, speedOfSound, audioHandle);
     return result;
   }
 
@@ -1420,7 +1458,7 @@ namespace moho
     const int errorCode = func_CreateXACTinstance(mode, reinterpret_cast<void**>(&impl->mInstance));
     if (errorCode < 0) {
       const char* const errorMessage = func_SoundErrorCodeToMsg(errorCode);
-      const msvc8::string fullMessage =
+      const fa::string fullMessage =
         gpg::STR_Printf("SND: Error retrieving XACT COM interface. %s", errorMessage ? errorMessage : "Unknown XACT Error");
       throw XAudioError(fullMessage.c_str());
     }
@@ -1455,11 +1493,11 @@ namespace moho
 
     std::vector<std::string> diskPaths{};
     for (const char* const pattern : {"*.xwb", "*.xsb"}) {
-      msvc8::vector<msvc8::string> mountedPaths{};
+      fa::vector<fa::string> mountedPaths{};
       fileSystem.EnumerateFiles(voicePath, pattern, false, &mountedPaths);
-      for (const msvc8::string& mountedPath : mountedPaths) {
-        msvc8::string resolved{};
-        if (const msvc8::string* const found = fileSystem.FindFile(&resolved, mountedPath.c_str(), nullptr)) {
+      for (const fa::string& mountedPath : mountedPaths) {
+        fa::string resolved{};
+        if (const fa::string* const found = fileSystem.FindFile(&resolved, mountedPath.c_str(), nullptr)) {
           diskPaths.emplace_back(found->c_str());
         }
       }
@@ -1519,11 +1557,11 @@ namespace moho
 
     ReadSoundBanksAhead(*waitHandleSet->mHandle, voicePath);
 
-    msvc8::vector<msvc8::string> waveBankPaths{};
+    fa::vector<fa::string> waveBankPaths{};
     waitHandleSet->mHandle->EnumerateFiles(voicePath, "*.xwb", false, &waveBankPaths);
 
 
-    for (const msvc8::string& waveBankPath : waveBankPaths) {
+    for (const fa::string& waveBankPath : waveBankPaths) {
       const bool streamingWaveBank = IsStreamingWaveBank(waveBankPath.c_str());
       gpg::Logf(
         "IsStreamingWaveBank(\"%s\") => %s",
@@ -1551,11 +1589,11 @@ namespace moho
       return;
     }
 
-    msvc8::vector<msvc8::string> soundBankPaths{};
+    fa::vector<fa::string> soundBankPaths{};
     waitHandleSet->mHandle->EnumerateFiles(voicePath, "*.xsb", false, &soundBankPaths);
 
 
-    for (const msvc8::string& soundBankPath : soundBankPaths) {
+    for (const fa::string& soundBankPath : soundBankPaths) {
       auto* soundBankLoader = new (std::nothrow) AudioSoundBankLoader{};
       if (soundBankLoader != nullptr) {
         soundBankLoader->mEngine = impl;
@@ -1711,7 +1749,10 @@ namespace moho
       emitter->mLfeCurve = const_cast<AudioDistanceCurve*>(&kDefaultDistanceCurve);
     }
 
-    X3DAudioCalculate(audioHandle, listener, emitter, kX3dCalculateFlags, settings);
+    if (X3DAudio().mCalculate == nullptr) {
+      return kHresultFail;
+    }
+    X3DAudio().mCalculate(audioHandle, listener, emitter, kX3dCalculateFlags, settings);
     return 0;
   }
 
@@ -1857,7 +1898,7 @@ namespace moho
       break;
 
     case 0x09: {
-      const msvc8::string variableName = SND_GetVariableName(static_cast<int>(eventData.variable.variableIndex));
+      const fa::string variableName = SND_GetVariableName(static_cast<int>(eventData.variable.variableIndex));
       gpg::Logf("SND: Global var changed [%s] = %f", variableName.c_str(), eventData.variable.variableValue);
       break;
     }
@@ -1918,8 +1959,8 @@ namespace moho
       sSoundConfiguration->mRuntimeParams.globalSettingsFlags = 0u;
 
       moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
-      msvc8::string mountedPath{};
-      const msvc8::string* const resolvedPath =
+      fa::string mountedPath{};
+      const fa::string* const resolvedPath =
         waitHandleSet->mHandle->FindFile(&mountedPath, "/sounds/SupCom.xgs", nullptr);
 
       gpg::MemBuffer<char> loadedBuffer = moho::DISK_ReadFile(resolvedPath->c_str());
@@ -2222,7 +2263,7 @@ namespace moho
     gpg::MD5Context md5Context{};
     md5Context.Reset();
     md5Context.Update(configuration->mRuntimeParams.pGlobalSettingsBuffer, configuration->mRuntimeParams.globalSettingsBufferSize);
-    const msvc8::string globalSettingsDigest = md5Context.Digest().ToString();
+    const fa::string globalSettingsDigest = md5Context.Digest().ToString();
     gpg::Logf("MD5 of global settings: %s", globalSettingsDigest.c_str());
 
     // FUN_004D9410 passes SoundConfiguration +0x34, the embedded XACT 2.5
@@ -2397,8 +2438,8 @@ namespace moho
   {
 
 
-    // mPausedCategoryNames (msvc8::set<msvc8::string>) and mCategoryVolumes
-    // (msvc8::map<std::uint16_t, float>) both construct themselves via their
+    // mPausedCategoryNames (fa::set<fa::string>) and mCategoryVolumes
+    // (fa::map<std::uint16_t, float>) both construct themselves via their
     // own member initializers above -- see RbTree.h's `rb_tree()` ctor
     // citations for both instantiations.
     mGlobalCategoryVolume = 0.0f;
@@ -2463,8 +2504,8 @@ namespace moho
     // member destructors, which is where 0x004DA475 and 0x004DA4CC free it --
     // by then both ranges are empty, so those emissions only free the buffer.
     //
-    // mCategoryVolumes (msvc8::map<std::uint16_t, float>) and
-    // mPausedCategoryNames (msvc8::set<msvc8::string>) both tear themselves
+    // mCategoryVolumes (fa::map<std::uint16_t, float>) and
+    // mPausedCategoryNames (fa::set<fa::string>) both tear themselves
     // down via their own implicit member destructors, which run AFTER this
     // point in reverse declaration order: mCategoryVolumes (declared later in
     // AudioEngineImpl) destructs before mPausedCategoryNames (declared

@@ -1,5 +1,13 @@
 #include "moho/ui/UiPrivate.h"
 
+#include <cmath>
+#include <map>
+#include <string>
+
+#include "moho/misc/FileWaitHandleSet.h"
+#include "moho/render/font/MsdfFontCheck.h"
+#include "moho/render/font/MsdfFontRegistry.h"
+
 namespace
 {
   constexpr const char* kInternalCreateTextHelpText = "InternalCreateText(luaobj,parent)";
@@ -14,6 +22,27 @@ namespace
   constexpr const char* kCMauiTextSetTextHelpText = "CMauiText:SetText(text)";
   constexpr const char* kCMauiTextGetStringAdvanceHelpText =
     "number Text:GetAdvance(string) - get the advance of a string using the same font as the text control";
+  constexpr const char* kCMauiTextSetTextScaleHelpText =
+    "Text:SetTextScale(scale[, pivotX, pivotY]) - draw the text larger or smaller without moving the layout. The "
+    "pivots say which point of the control stays put, 0 to 1 across it; the middle by default";
+  constexpr const char* kCMauiTextGetTextScaleHelpText = "number Text:GetTextScale()";
+  constexpr const char* kLoadFontHelpText =
+    "string LoadFont(path) - load a .ttf or .otf under /mods/<mod>/fonts/ and return the family to pass to SetFont, "
+    "or nil when it is refused";
+
+  /**
+   * Engine addition: a text control's draw scale, beside it because the class's layout is the binary's. Only
+   * controls with a scale are here, so the rest pay one load per draw.
+   */
+  struct STextScale
+  {
+    float mScale = 1.0f;
+    float mPivotX = 0.5f;
+    float mPivotY = 0.5f;
+  };
+  std::map<const moho::CMauiText*, STextScale> sTextScales;
+
+  constexpr float kMaxTextScale = 64.0f;
 
   /**
    * Address: 0x0078EBF0 (FUN_0078EBF0)
@@ -138,6 +167,7 @@ moho::CMauiText::~CMauiText()
   // is where a smart-pointer member at +0x11C would put it. `mFont` is a raw
   // pointer here, so the release runs from the body, ahead of them.
   ReleaseIntrusiveFont(mFont);
+  sTextScales.erase(this);
 }
 
 /**
@@ -232,6 +262,15 @@ void moho::CMauiText::DoRender(
 
   const char* const text = mText.c_str();
 
+  // Engine addition (issue #304): a mod's font gets its own metrics when its atlas arrives, after Lua laid out
+  // this control with the default font's, so the values Lua reads catch up here.
+  if (font->IsModFont()) {
+    const float advance = font->GetAdvance(text, 0);
+    if (advance != CScriptLazyVar_float::GetValue(&mTextAdvanceLV) || font->mAscent != CScriptLazyVar_float::GetValue(&mFontAscentLV)) {
+      SetNewFont(font);
+    }
+  }
+
   // Horizontal origin.
   float originX;
   if (mCenteredHorizontally) {
@@ -253,15 +292,33 @@ void moho::CMauiText::DoRender(
     baselineY = font->mAscent + top;
   }
 
-  const Wm3::Vector3f xAxis{1.0f, 0.0f, 0.0f};
-  const Wm3::Vector3f yAxis{0.0f, -1.0f, 0.0f};
+  // Engine addition: `SetTextScale`. The text grows around its pivot in the control, without touching the layout.
+  float textScale = 1.0f;
+  float pivotX = 0.0f;
+  float pivotY = 0.0f;
+  if (!sTextScales.empty()) {
+    const auto scaled = sTextScales.find(this);
+    if (scaled != sTextScales.end()) {
+      textScale = scaled->second.mScale;
+      if (textScale <= 0.0f) {
+        return;
+      }
+      pivotX = CScriptLazyVar_float::GetValue(&mLeftLV) + CScriptLazyVar_float::GetValue(&mWidthLV) * scaled->second.mPivotX;
+      pivotY = CScriptLazyVar_float::GetValue(&mTopLV) + CScriptLazyVar_float::GetValue(&mHeightLV) * scaled->second.mPivotY;
+      originX = pivotX + (originX - pivotX) * textScale;
+      baselineY = pivotY + (baselineY - pivotY) * textScale;
+    }
+  }
+
+  const Wm3::Vector3f xAxis{textScale, 0.0f, 0.0f};
+  const Wm3::Vector3f yAxis{0.0f, -textScale, 0.0f};
 
   // Optional drop shadow, offset by (+1, +1).
   if (mDropShadow) {
     const std::uint32_t shadowColor = this->AdjustARGBAlpha(mColor & 0xFF000000u);
     const float shadowMaxAdvance = mClipToWidth ? CScriptLazyVar_float::GetValue(&mWidthLV)
                                                           : gpg::NaN;
-    const Wm3::Vector3f shadowOrigin{originX + 1.0f, baselineY + 1.0f, 0.0f};
+    const Wm3::Vector3f shadowOrigin{originX + textScale, baselineY + textScale, 0.0f};
     (void)font->Render(text, primBatcher, shadowOrigin, xAxis, yAxis, shadowColor, 1.0f, shadowMaxAdvance);
   }
 
@@ -795,6 +852,172 @@ int moho::cfunc_CMauiTextSetNewClipToWidthL(
   return 1;
 }
 
+int moho::cfunc_CMauiTextSetTextScale(
+  lua_State* const luaContext
+)
+{
+  return cfunc_CMauiTextSetTextScaleL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Engine addition: `Text:SetTextScale(scale[, pivotX, pivotY])`. A mod on the shipped game checks that the method
+ * exists. Costs no new font, unlike calling SetFont with each size, so it can change every frame.
+ */
+moho::CScrLuaInitForm* moho::func_CMauiTextSetTextScale_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "SetTextScale",
+    &moho::cfunc_CMauiTextSetTextScale,
+    &moho::CScrLuaMetatableFactory<moho::CMauiText>::Instance(),
+    "CMauiText",
+    kCMauiTextSetTextScaleHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_CMauiTextSetTextScaleL(
+  LuaPlus::LuaState* const state
+)
+{
+  const int argumentCount = lua_gettop(state->m_state);
+  moho::SCR_ExpectExactArgs(state, argumentCount == 2 ? 2 : 4, kCMauiTextSetTextScaleHelpText);
+
+  LuaPlus::LuaObject textObject(LuaPlus::LuaStackObject(state, 1));
+  const CMauiText* const textControl = SCR_FromLua_CMauiText(textObject, state);
+
+  STextScale scale{};
+  const auto readNumber = [state](const int index) {
+    LuaPlus::LuaStackObject argument(state, index);
+    if (lua_type(state->m_state, index) != LUA_TNUMBER) {
+      LuaPlus::LuaStackObject::TypeError(&argument, "number");
+    }
+    return static_cast<float>(lua_tonumber(state->m_state, index));
+  };
+  scale.mScale = readNumber(2);
+  if (argumentCount == 4) {
+    scale.mPivotX = readNumber(3);
+    scale.mPivotY = readNumber(4);
+  }
+  if (!std::isfinite(scale.mScale) || !std::isfinite(scale.mPivotX) || !std::isfinite(scale.mPivotY)) {
+    scale = STextScale{};
+  }
+  scale.mScale = (std::min)((std::max)(scale.mScale, 0.0f), kMaxTextScale);
+
+  if (scale.mScale == 1.0f) {
+    sTextScales.erase(textControl);
+  } else {
+    sTextScales[textControl] = scale;
+  }
+  lua_settop(state->m_state, 1);
+  return 1;
+}
+
+int moho::cfunc_CMauiTextGetTextScale(
+  lua_State* const luaContext
+)
+{
+  return cfunc_CMauiTextGetTextScaleL(ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_CMauiTextGetTextScale_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "GetTextScale",
+    &moho::cfunc_CMauiTextGetTextScale,
+    &moho::CScrLuaMetatableFactory<moho::CMauiText>::Instance(),
+    "CMauiText",
+    kCMauiTextGetTextScaleHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_CMauiTextGetTextScaleL(
+  LuaPlus::LuaState* const state
+)
+{
+  moho::SCR_ExpectExactArgs(state, 1, kCMauiTextGetTextScaleHelpText);
+  LuaPlus::LuaObject textObject(LuaPlus::LuaStackObject(state, 1));
+  const CMauiText* const textControl = SCR_FromLua_CMauiText(textObject, state);
+  const auto scaled = sTextScales.find(textControl);
+  lua_pushnumber(state->m_state, scaled != sTextScales.end() ? scaled->second.mScale : 1.0f);
+  (void)lua_gettop(state->m_state);
+  return 1;
+}
+
+int moho::cfunc_LoadFont(
+  lua_State* const luaContext
+)
+{
+  return cfunc_LoadFontL(ResolveBindingState(luaContext));
+}
+
+/**
+ * Engine addition (issue #304): `LoadFont(path)`. In the user Lua state only, never the sim's. Docs for mod authors
+ * are in docs/MOD_FONTS.md.
+ */
+moho::CScrLuaInitForm* moho::func_LoadFont_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "LoadFont",
+    &moho::cfunc_LoadFont,
+    nullptr,
+    "<global>",
+    kLoadFontHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_LoadFontL(
+  LuaPlus::LuaState* const state
+)
+{
+  moho::SCR_ExpectExactArgs(state, 1, kLoadFontHelpText);
+  LuaPlus::LuaStackObject pathArg(state, 1);
+  const char* const path = lua_tostring(state->m_state, 1);
+  if (path == nullptr) {
+    LuaPlus::LuaStackObject::TypeError(&pathArg, "string");
+    return 0;
+  }
+
+  std::string reason;
+  std::string family;
+  if (!ren_ModFonts) {
+    gpg::Warnf("MSDF: mod font %s refused: ren_ModFonts is off", path);
+  } else if (!MSDF_IsAllowedModFontPath(path, reason)) {
+    gpg::Warnf("MSDF: mod font %s refused: %s", path, reason.c_str());
+  } else {
+    FILE_EnsureWaitHandleSet();
+    FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
+    fa::string mountedPath{};
+    SDiskFileInfo info{};
+    if (waitHandleSet != nullptr && waitHandleSet->mHandle != nullptr) {
+      (void)waitHandleSet->mHandle->FindFile(&mountedPath, path, &info);
+    }
+    if (mountedPath.empty()) {
+      gpg::Warnf("MSDF: mod font %s refused: no such file", path);
+    } else if (info.mFileSize > kMsdfMaxFontBytes) {
+      gpg::Warnf("MSDF: mod font %s refused: the file is over the size limit", path);
+    } else {
+      gpg::MemBuffer<char> fontBytes = DISK_ReadFile(mountedPath.c_str());
+      if (fontBytes.mBegin == nullptr) {
+        gpg::Warnf("MSDF: mod font %s refused: it can't be read", path);
+      } else {
+        family = MSDF_RegisterModFont(path, fontBytes.mBegin, static_cast<std::size_t>(fontBytes.mEnd - fontBytes.mBegin));
+      }
+    }
+  }
+
+  if (family.empty()) {
+    lua_pushnil(state->m_state);
+  } else {
+    lua_pushstring(state->m_state, family.c_str());
+  }
+  return 1;
+}
+
 /**
  * Address: 0x007A29D0 (FUN_007A29D0, Moho::CMauiText::GetClass)
  *
@@ -818,8 +1041,5 @@ gpg::RType* moho::CMauiText::GetClass() const
  */
 gpg::RRef moho::CMauiText::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }

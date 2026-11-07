@@ -60,7 +60,7 @@ namespace
     // degree apart) whose products are float denormals; rounding each one
     // through SSE separated an engineer from a swept path retail found it in
     // (replay 26935800 beat 14763).
-    const float radius = msvc8::BoxRadiusOnAxisX87(&box.Center.x, &axis.x);
+    const float radius = fa::BoxRadiusOnAxisX87(&box.Center.x, &axis.x);
 
     *outMin = centerProjection - radius;
     *outMax = centerProjection + radius;
@@ -175,7 +175,7 @@ namespace
         bestDepth = normalizedOverlap;
         // 0x00474ED2..0x00474EF6: each axis lane is scaled by the reciprocal
         // on the x87 stack (`fld st0; fmul [axis]; fstp`), not by mulss.
-        msvc8::ScaleVectorX87(&bestAxis.x, &axis.x, invAxisLength);
+        fa::ScaleVectorX87(&bestAxis.x, &axis.x, invAxisLength);
         bestAxisIndex = axisIndex;
         hasBestAxis = true;
       }

@@ -61,7 +61,7 @@ namespace gpg::gal
             gpg::StrArg sourcePath,
             gpg::StrArg cachePath,
             const gpg::MemBuffer<char>& sourceBuffer,
-            const msvc8::vector<EffectMacro>& macros
+            const fa::vector<EffectMacro>& macros
         );
 
         /**
@@ -92,17 +92,17 @@ namespace gpg::gal
         // declared state starts at +0x04. The three constructors in
         // ContextInterfaces.cpp fix the rest: `mSourceType` is 0 for the default
         // context and 2 for the payload one (0x0093FD90), `mUseCache` is the
-        // byte at +0x08, the two 0x1C `msvc8::string` lanes follow at +0x0C and
+        // byte at +0x08, the two 0x1C `fa::string` lanes follow at +0x0C and
         // +0x28, and the four words at +0x44 are one `MemBuffer<char>` -
         // `mData.px`, `mData.pi` (the lane that takes `add_ref_copy()` and
         // `release()`), `mBegin`, `mEnd`. The 0x10 macro vector closes the
         // object at +0x54.
         std::uint32_t mSourceType{};             // +0x04
         bool mUseCache{};                        // +0x08
-        msvc8::string mSourcePath;               // +0x0C
-        msvc8::string mCachePath;                // +0x28
+        fa::string mSourcePath;               // +0x0C
+        fa::string mCachePath;                // +0x28
         gpg::MemBuffer<char> mSourceBuffer;      // +0x44
-        msvc8::vector<EffectMacro> mMacros;      // +0x54
+        fa::vector<EffectMacro> mMacros;      // +0x54
     };
 
     static_assert(offsetof(EffectContext, mSourceType) == 0x04, "EffectContext::mSourceType offset must be 0x04");

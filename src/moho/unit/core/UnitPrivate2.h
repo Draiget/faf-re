@@ -34,7 +34,7 @@ namespace
     return collisionRect;
   }
 
-  [[nodiscard]] bool IsCollisionRectEquivalentToZero(const gpg::Rect2i& ogridRect) noexcept
+  [[maybe_unused]] [[nodiscard]] bool IsCollisionRectEquivalentToZero(const gpg::Rect2i& ogridRect) noexcept
   {
     const gpg::Rect2i zeroRect{};
     const CollisionDBRect currentCollisionRect = COORDS_OgridRectToCollisionRect(ogridRect);
@@ -48,7 +48,7 @@ namespace
    * What it does:
    * Copies this unit's reserved O-grid rectangle bounds into one `Rect2i`.
    */
-  [[nodiscard]] gpg::Rect2i GetReservedOgridRect(const Unit& unit) noexcept
+  [[maybe_unused]] [[nodiscard]] gpg::Rect2i GetReservedOgridRect(const Unit& unit) noexcept
   {
     return {
       unit.ReservedOgridRectMinX,
@@ -64,12 +64,12 @@ namespace
    * What it does:
    * Returns the larger of the footprint X/Z side lengths.
    */
-  [[nodiscard]] std::uint8_t FootprintMaxSide(const SFootprint& footprint) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint8_t FootprintMaxSide(const SFootprint& footprint) noexcept
   {
     return (footprint.mSizeX > footprint.mSizeZ) ? footprint.mSizeX : footprint.mSizeZ;
   }
 
-  [[nodiscard]] bool IsMeleeCandidateCellNavigable(
+  [[maybe_unused]] [[nodiscard]] bool IsMeleeCandidateCellNavigable(
     Unit& moveUnit,
     Unit* const ignoreUnit,
     const SFootprint& moverFootprint,

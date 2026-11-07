@@ -141,7 +141,7 @@ gpg::RFastVectorType<moho::IFormationInstance*>::~RFastVectorType() = default;
  */
 const char* gpg::RFastVectorType<moho::IFormationInstance*>::GetName() const
 {
-  static const msvc8::string sName =
+  static const fa::string sName =
     gpg::STR_Printf("fastvector<%s>", moho::IFormationInstance::GetPointerType()->GetName());
   return sName.c_str();
 }
@@ -149,9 +149,9 @@ const char* gpg::RFastVectorType<moho::IFormationInstance*>::GetName() const
 /**
  * Address: 0x0059CA40 (FUN_0059CA40, gpg::RFastVectorType_IFormationInstance_P::GetLexical)
  */
-msvc8::string gpg::RFastVectorType<moho::IFormationInstance*>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RFastVectorType<moho::IFormationInstance*>::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 

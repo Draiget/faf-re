@@ -226,7 +226,7 @@ namespace moho
     mParams.resize(EFFECT_LASTPARAM, 0.0f);   // 26 param floats
     mParticleTextures.resize(2, nullptr);
     {
-      const msvc8::string emptyString;
+      const fa::string emptyString;
       mStrings.resize(2, emptyString);
     }
 
@@ -575,7 +575,7 @@ namespace moho
   {
     if (mParams.start_[EFFECT_EMITIFVISIBLE] > 0.0f) {
       Sim* const sim = mManager->GetSim();
-      msvc8::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
+      fa::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
       GeomCamera3* const camerasEnd = cameras.end();
       GeomCamera3* camera = cameras.begin();
 
@@ -634,7 +634,7 @@ namespace moho
     }
 
     if (mParams.start_[EFFECT_CREATEIFVISIBLE] > 0.0f) {
-      msvc8::vector<GeomCamera3>& cameras = effectManager->GetSim()->mSyncFilter.geoCams;
+      fa::vector<GeomCamera3>& cameras = effectManager->GetSim()->mSyncFilter.geoCams;
       for (GeomCamera3* camera = cameras.begin(); camera != cameras.end(); ++camera) {
         if (!CanSeeCam(camera)) {
           continue;
@@ -866,7 +866,7 @@ namespace moho
     const float tickFloat = static_cast<float>(tick);
 
     // 0x0065CE51 and 0x0065CF9D below call the MSVC8 CRT `_CIfmod`.
-    float ratePhase = static_cast<float>(msvc8::fmod(paramsBase[EFFECT_TICKCOUNT] - tickFloat, repeatTime));
+    float ratePhase = static_cast<float>(fa::fmod(paramsBase[EFFECT_TICKCOUNT] - tickFloat, repeatTime));
     if ((ratePhase < 0.0f) != (repeatTime < 0.0f)) {
       ratePhase += repeatTime;
     }
@@ -897,7 +897,7 @@ namespace moho
     for (int emitted = 0; ; ++emitted) {
       const float* const params = mParams.start_;
       const float repeat = params[EFFECT_REPEATTIME];
-      float phase = static_cast<float>(msvc8::fmod(params[EFFECT_TICKCOUNT] - tickFloat + emissionCursor, repeat));
+      float phase = static_cast<float>(fa::fmod(params[EFFECT_TICKCOUNT] - tickFloat + emissionCursor, repeat));
       if ((phase < 0.0f) != (repeat < 0.0f)) {
         phase += repeat;
       }

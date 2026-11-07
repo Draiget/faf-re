@@ -42,7 +42,7 @@ namespace moho
    * One mip level of the height field. Both grids are owned, so the tier has
    * the copy/assign/destroy trio a 2007 engine would have written by hand --
    * and that trio is what made `mGrids.resize(n, CHeightFieldTier{})` emit the
-   * whole `msvc8::vector<CHeightFieldTier>` family the recovery used to carry
+   * whole `fa::vector<CHeightFieldTier>` family the recovery used to carry
    * as free functions (all cited on the template members now).
    * Address: 0x004785D0 (FUN_004785D0 -- `CHeightFieldTier::CHeightFieldTier()` -- both owned grids null, both extents zero; zero callers, unreachable; formerly `ZeroHeightFieldTier` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
    * Address: 0x00479580 (FUN_00479580 -- `CHeightFieldTier::~CHeightFieldTier()` -- `delete[]` both owned grids; callers 0x00479380, 0x004796D0; formerly `DestroyHeightFieldTierEntry` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
@@ -531,7 +531,7 @@ namespace moho
     std::uint16_t* data;                    // +0x00
     std::int32_t width;                     // +0x04
     std::int32_t height;                    // +0x08
-    msvc8::vector<CHeightFieldTier> mGrids; // +0x0C
+    fa::vector<CHeightFieldTier> mGrids; // +0x0C
   };
 
   static_assert(sizeof(CHeightField) == 0x1C, "CHeightField size must be 0x1C");

@@ -122,7 +122,7 @@ namespace
     constexpr const char* kIncorrectGameObjectTypeError =
       "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
 
-    moho::CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+    moho::CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
     if (!scriptObjectSlot) {
       luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
       return nullptr;
@@ -206,10 +206,7 @@ gpg::RType* moho::CMauiCursor::GetClass() const
  */
 gpg::RRef moho::CMauiCursor::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**
@@ -650,7 +647,7 @@ void moho::UIWorldViewUpdateCursorEngineStats(
   moho::CameraImpl* const camera = worldView->mCamera.get();
 
   if (_stricmp(camera->CameraGetName(), "WorldCamera") == 0) {
-    const msvc8::string positionText =
+    const fa::string positionText =
       gpg::STR_Printf("x=%.2f,y=%.2f,z=%.2f", cursorWorldPosition.x, cursorWorldPosition.y, cursorWorldPosition.z);
     EnsureEngineStringStat(gCameraCursorPositionStat, "Camera_Cursor_Position")->SetValue(positionText);
 
@@ -662,7 +659,7 @@ void moho::UIWorldViewUpdateCursorEngineStats(
 
     const auto cellX = static_cast<std::int16_t>(static_cast<int>(cursorWorldPosition.x - 0.5f));
     const auto cellZ = static_cast<std::int16_t>(static_cast<int>(cursorWorldPosition.z - 0.5f));
-    const msvc8::string cellText = gpg::STR_Printf("x=%i,z=%i", cellX, cellZ);
+    const fa::string cellText = gpg::STR_Printf("x=%i,z=%i", cellX, cellZ);
     EnsureEngineStringStat(gCameraCursorOCellStat, "Camera_Cursor_OCell")->SetValue(cellText);
 
     StoreCursorLodAndFocusStats(

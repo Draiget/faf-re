@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -109,6 +111,12 @@ namespace faf::remote::client
      */
     bool Apply(std::span<const std::uint8_t> frameBytes, moho::SSyncData& packet);
 
+    /**
+     * Plan WP11: rewrites `packet`'s entity lanes from a frame already decoded (a server's view: the player's own
+     * frame and its team's, merged by `CViewFrameMerger`). `wireBytes` is what it took on the wire, for the counts.
+     */
+    bool ApplyFrame(wire::SViewFrame frame, std::size_t wireBytes, moho::SSyncData& packet);
+
     ~CSyncRebuilder();
 
     [[nodiscard]] const SRebuildStats& Stats() const noexcept { return mStats; }
@@ -128,6 +136,8 @@ namespace faf::remote::client
     [[nodiscard]] const wire::SViewFrame* Baseline() const noexcept { return mHasShown ? &mShown : nullptr; }
 
   private:
+    bool ApplyFrame(wire::SViewFrame frame, std::size_t wireBytes, moho::SSyncData& packet, std::chrono::steady_clock::time_point start);
+
     struct SHeldEntity
     {
       bool live = false; // in the session's id map (not orphaned)
@@ -154,6 +164,12 @@ namespace faf::remote::client
     /** The session tables the frames' sound and name ids refer to (WP7.2). */
   public:
     void SetSessionTables(wire::CSessionTableReaders* session) noexcept { mSession = session; }
+    /**
+     * A client with no sim behind it (a server's player, the probe): its packets carry neither the sim's deposits nor
+     * its height field, so the session tables' deposits are the packet's from the first beat, and its terrain edits
+     * go on the heights `SeedTerrain` gave (without a seed they are only counted).
+     */
+    void SetNoSim() noexcept { mNoSim = true; }
     /** The client's rules (the category universe of unit category sets). */
     void SetRules(moho::RRuleGameRules* rules) noexcept { mRules = rules; }
 
@@ -181,6 +197,7 @@ namespace faf::remote::client
     std::vector<moho::RMeshBlueprint*> mMeshes;
     std::vector<SMeshResource> mMeshResources;
     wire::CSessionTableReaders* mSession = nullptr; // takes the terrain edits
+    bool mNoSim = false;                            // `SetNoSim`
     moho::RRuleGameRules* mRules = nullptr;
     std::vector<moho::CSndParams*> mSounds;   // by sound id, resolved on first use
     std::vector<SUnderlay> mUnderlays;        // by name id

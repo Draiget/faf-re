@@ -12,7 +12,7 @@
  *
  * The search keeps two structures:
  *
- *   - a node table keyed by cell (`msvc8::hash_map`), holding the per-cell
+ *   - a node table keyed by cell (`fa::hash_map`), holding the per-cell
  *     search record; and
  *   - an *indexed* binary heap of open nodes. "Indexed" because callers hold a
  *     stable handle rather than a heap position: `mIndexByHandle` maps a handle
@@ -86,8 +86,8 @@ namespace gpg
      * caller-visible handles.
      *
      * Layout (relative to the heap, which lives at `AStarSearch` +0x28):
-     *   +0x00 : mEntries        (msvc8::vector, 4 words)
-     *   +0x10 : mIndexByHandle  (msvc8::vector, 4 words)
+     *   +0x00 : mEntries        (fa::vector, 4 words)
+     *   +0x10 : mIndexByHandle  (fa::vector, 4 words)
      *   +0x20 : mFreeHandle
      *   sizeof == 0x24
      */
@@ -109,8 +109,8 @@ namespace gpg
         };
 
     private:
-        msvc8::vector<Entry> mEntries;              // +0x00
-        msvc8::vector<std::int32_t> mIndexByHandle; // +0x10
+        fa::vector<Entry> mEntries;              // +0x00
+        fa::vector<std::int32_t> mIndexByHandle; // +0x10
         std::int32_t mFreeHandle;                   // +0x20
 
     public:
@@ -126,8 +126,8 @@ namespace gpg
         [[nodiscard]] node_type* top() const noexcept { return mEntries[0].mNode; }
 
         // Engine addition (replay keyframes): the heap as it is, entry order and handles included.
-        [[nodiscard]] const msvc8::vector<Entry>& Entries() const noexcept { return mEntries; }
-        [[nodiscard]] const msvc8::vector<std::int32_t>& IndexByHandle() const noexcept { return mIndexByHandle; }
+        [[nodiscard]] const fa::vector<Entry>& Entries() const noexcept { return mEntries; }
+        [[nodiscard]] const fa::vector<std::int32_t>& IndexByHandle() const noexcept { return mIndexByHandle; }
         [[nodiscard]] std::int32_t FreeHandle() const noexcept { return mFreeHandle; }
 
         void AppendRestored(const Entry& entry) { mEntries.push_back(entry); }
@@ -354,7 +354,7 @@ namespace gpg
      *   Step  ExpandNode(const TCell&, neighbour_list&);  // Step{} = keep going
      *
      * Layout:
-     *   +0x00 : mNodes  (msvc8::hash_map, 0x28; AStarNodeTable keeps the size)
+     *   +0x00 : mNodes  (fa::hash_map, 0x28; AStarNodeTable keeps the size)
      *   +0x28 : mOpen   (AStarOpenHeap, 0x24)
      *   sizeof == 0x4C
      */
@@ -428,7 +428,7 @@ namespace gpg
     };
 
     /**
-     * The search's node table: the binary's `msvc8::hash_map` in place, or, for
+     * The search's node table: the binary's `fa::hash_map` in place, or, for
      * a search that allows it and with AStarFlatNodeTableEnabled(), a pointer
      * to the flat table in the same bytes, which keeps `AStarSearch`'s layout.
      * The choice is made once per process, so every table is read the way it
@@ -437,7 +437,7 @@ namespace gpg
     template <class TCell, class TNode, class TCellTraits, bool kAllowFlat>
     class AStarNodeTable
     {
-        using legacy_type = msvc8::hash_map<TCell, TNode, TCellTraits>;
+        using legacy_type = fa::hash_map<TCell, TNode, TCellTraits>;
         using flat_type = AStarFlatNodeTable<TCell, TNode>;
 
         [[nodiscard]] static bool UseFlat() noexcept
@@ -542,7 +542,7 @@ namespace gpg
         alignas(legacy_type) unsigned char mStorage[sizeof(legacy_type)];
     };
 
-    template <class TCell, class TTraits, class TCellTraits = msvc8::hash_compare<TCell>, bool kAllowFlatTable = false>
+    template <class TCell, class TTraits, class TCellTraits = fa::hash_compare<TCell>, bool kAllowFlatTable = false>
     class AStarSearch
     {
     public:
@@ -658,7 +658,7 @@ namespace gpg
          * written back-to-front in a single pass - the binary does the same, and
          * it avoids reversing afterwards.
          */
-        [[nodiscard]] bool BuildPath(const TCell& cell, msvc8::vector<TCell>& outCells)
+        [[nodiscard]] bool BuildPath(const TCell& cell, fa::vector<TCell>& outCells)
         {
             node_type* const goal = mNodes.Find(cell);
             if (goal == nullptr) {

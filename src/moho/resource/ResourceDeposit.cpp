@@ -18,11 +18,6 @@ namespace
 {
   constexpr float kTerrainHeightWordScale = 1.0f / 128.0f;
 
-  constexpr const char* kSerializationSourcePath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-  constexpr int kSerializationLoadLine = 84;
-  constexpr int kSerializationSaveLine = 87;
-
   [[nodiscard]] int ClampTerrainSampleIndex(const int value, const int maxInclusive) noexcept
   {
     // Preserve binary clamp order: upper clamp first, then clamp to zero.
@@ -63,12 +58,7 @@ namespace
    */
   [[maybe_unused]] void cleanup_ResourceDepositTypeInfoRTypeBase(moho::ResourceDepositTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   [[nodiscard]] moho::ResourceDepositTypeInfo& AcquireResourceDepositTypeInfo()

@@ -102,12 +102,7 @@ namespace moho
    */
   LuaPlus::LuaObject* func_GetPropFactory(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
   {
-    if (object == nullptr) {
-      return nullptr;
-    }
-
-    *object = CScrLuaMetatableFactory<Prop>::Instance().Get(state);
-    return object;
+    return SCR_WriteMetatable<Prop>(object, state);
   }
 
   /**
@@ -175,7 +170,7 @@ namespace moho
     }
 
     const float priorityValue = static_cast<float>(lua_tonumber(rawState, 2));
-    prop->mPriorityInfo.mPriority = msvc8::CeilToIntX87(priorityValue); // 0x006FD093..0x006FD0A6
+    prop->mPriorityInfo.mPriority = fa::CeilToIntX87(priorityValue); // 0x006FD093..0x006FD0A6
 
     Sim* const sim = prop->SimulationRef;
     prop->mPriorityInfo.mBoundedTick = static_cast<std::int32_t>(sim->mCurTick);
@@ -236,7 +231,7 @@ namespace moho
       blueprintArg.TypeError("string");
     }
 
-    msvc8::string blueprintFilename;
+    fa::string blueprintFilename;
     (void)gpg::STR_InitFilename(&blueprintFilename, blueprintName);
     const RPropBlueprint* const childBlueprint = prop->SimulationRef->mRules->GetPropBlueprint(blueprintFilename);
 
@@ -308,7 +303,7 @@ namespace moho
     if (blueprintName == nullptr) {
       blueprintArg.TypeError("string");
     }
-    const msvc8::string blueprintId(blueprintName, std::strlen(blueprintName));
+    const fa::string blueprintId(blueprintName, std::strlen(blueprintName));
 
     // Position (args 2,3,4) and Euler angles (args 5,6,7); validated in the
     // binary's order (4, 3, 2, then 5, 6, 7).
@@ -535,7 +530,7 @@ namespace moho
       return nullptr;
     }
 
-    msvc8::string normalizedBlueprintId;
+    fa::string normalizedBlueprintId;
     normalizedBlueprintId.assign_owned(blueprintId);
     gpg::STR_NormalizeFilenameLowerSlash(normalizedBlueprintId);
 
@@ -690,10 +685,7 @@ namespace moho
    */
   gpg::RRef Prop::GetDerivedObjectRef()
   {
-    gpg::RRef ref{};
-    ref.mObj = this;
-    ref.mType = GetClass();
-    return ref;
+    return gpg::MakeSelfRef(this);
   }
 
   /**

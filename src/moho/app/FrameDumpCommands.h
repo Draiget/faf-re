@@ -22,10 +22,10 @@ namespace moho
   extern int dump_outputFrameNumber;
 
   /// 0x00F5A8A4. Timestamp token embedded in dumped frame filenames.
-  extern msvc8::string dump_Timestamp;
+  extern fa::string dump_Timestamp;
 
   /// 0x00F5A8C0. Base directory / name prefix for dumped frame files.
-  extern msvc8::string dump_frameDumpName;
+  extern fa::string dump_frameDumpName;
 
   /**
    * Address: 0x007F5450 (FUN_007F5450, Moho::DUMP_UpdateTimestamp)
@@ -63,7 +63,7 @@ namespace moho
    * means stop and report the frame reached, stopped means prompt for a
    * directory and arm an unbounded dump.
    */
-  void DUMP_Frames(const msvc8::vector<msvc8::string>& args);
+  void DUMP_Frames(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x007F5840 (FUN_007F5840, Moho::DUMP_Frame)
@@ -76,7 +76,7 @@ namespace moho
    * directory from the one optional argument, from the previous directory when
    * that argument is `.`, or from the user's screenshot directory otherwise.
    */
-  void DUMP_Frame(const msvc8::vector<msvc8::string>& args);
+  void DUMP_Frame(const fa::vector<fa::string>& args);
 
 
 } // namespace moho

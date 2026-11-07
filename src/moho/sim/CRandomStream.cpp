@@ -24,7 +24,6 @@ namespace moho
     constexpr std::uint32_t kTemperMaskB = 0xFF3A58ADu;
     constexpr std::uint32_t kTemperMaskC = 0xFFFFDF8Cu;
     constexpr std::uint32_t kTwistMagTable[2] = {0u, 0x9908B0DFu};
-    constexpr double kInvTwoTo31 = 4.656612873077392578125e-10;  // 1 / 2^31
     constexpr double kInvTwoTo32 = 2.3283064365386962890625e-10; // 1 / 2^32
 
     // 0x0040EF3A: the shipped code runs on x87 with 24-bit precision control,
@@ -213,7 +212,7 @@ namespace moho
     // x87 under 24-bit precision: range rounded, range * word rounded once,
     // the 2^-32 scale exact, the sum rounded, all with the extended exponent.
     const std::uint32_t word = twister.NextUInt32();
-    return msvc8::TwisterWordInRange(lower, upper, word);
+    return fa::TwisterWordInRange(lower, upper, word);
   }
 
   /**
@@ -277,7 +276,7 @@ namespace moho
     // exact). The CRT's double `log` rounded to float picks the neighbouring
     // float whenever the two approximations straddle a float midpoint, so the
     // log goes through the same `fyl2x` the engine runs.
-    const float scale = std::sqrt((-2.0f * msvc8::IntrinsicLn(radiusSquared)) / radiusSquared);
+    const float scale = std::sqrt((-2.0f * fa::IntrinsicLn(radiusSquared)) / radiusSquared);
     hasMarsagliaPair = 1;
     marsagliaPair = y * scale;
     return x * scale;

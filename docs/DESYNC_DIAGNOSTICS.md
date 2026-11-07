@@ -1,12 +1,12 @@
 # Desync diagnostics
 
-A desync is a multiplayer game whose players' sims stop agreeing: every 50 beats by default (one beat is one 100 ms sim tick) each client hashes its game state and sends the hash to the others, and a hash that differs from a client's own is a desync. The engine has three aids for finding out why. The recorder and telemetry are on by default in live multiplayer games:
+A desync is a multiplayer game whose players' sims stop agreeing: every 50 beats by default (one beat is one 100 ms sim tick) each client hashes its game state and sends the hash to the others, and a hash that differs from a client's own is a desync. The engine has three aids for finding out why. The recorder is on by default in live multiplayer games; telemetry only with the player's consent (`/telemetry`, #337):
 
 | Aid | What it does | Issue | Switches |
 |---|---|---|---|
 | Desync recorder | On by default in live multiplayer: keeps the state each beat hashes for the recent beats in memory, copied as bytes (`/nodesyncdump` turns it off). After a mismatch it writes `desync_<game id>_beat<N>_army<A>.zip` into the folder of the game's log file (`/log`; the working folder without it); the log names the folder at game start. `/desyncrecorder` records the full sync log instead, call trace included, at a sim-time cost | #216 | [Desync recorder](SWITCHES.md#desync-recorder) |
-| `tools/desync-diff/desync_diff.py` | Compares two players' dumps and prints the first value that differs: beat, entity, field | #217 | [README](../tools/desync-diff/README.md) |
-| Desync telemetry | On by default in live multiplayer (`/notelemetry` turns it off): sends one small record per desync and one per game end to the faf-re desync server's OpenTelemetry collector, and uploads the dump as `.tar.gz` to its dump receiver; the switches point both at a server of your own | #218 | [Desync telemetry](SWITCHES.md#desync-telemetry) |
+| `tools/cmd/desync-diff` | Compares two players' dumps and prints the first value that differs: beat, entity, field; also the desync server's dump receiver | #217 | [README](../tools/cmd/desync-diff/README.md) |
+| Desync telemetry | Off unless the player agreed: `/telemetry` on the command line, which the FAF client passes (#337); `/notelemetry` turns it off and wins. With it, a live multiplayer game sends one small record per desync and one per game end to the faf-re desync server's OpenTelemetry collector, and uploads the dump as `.tar.gz` to its dump receiver; the switches point both at a server of your own | #218 | [Desync telemetry](SWITCHES.md#desync-telemetry) |
 
 This page is the setup side: what reaches the servers, how to run them, and how to check it works. Every field and switch is listed in [SWITCHES.md](SWITCHES.md#desync-telemetry). A ready server with both parts, for Docker Compose or Kubernetes, is [tools/desync-server](../tools/desync-server/README.md).
 
@@ -37,7 +37,7 @@ A `faf.desync` record from a test game (`tools/scenarios/2p-desync-dump-upload.y
 }
 ```
 
-`faf.dump.url` is the dump endpoint plus `/<game id>/<file>`, where `receive.py` serves the stored file (with the read token).
+`faf.dump.url` is the dump endpoint plus `/<game id>/<file>`, where `desync-diff serve` serves the stored file (with the read token).
 
 Every request also carries the process as the OTLP resource: `service.name` `faf-engine`, `service.version` (the commit), `faf.engine.version`, `faf.engine.dirty`, `host.arch`, `faf.arch`, `os.type`, `os.description`, `faf.cpu.logical_count`. A `faf.game.end` record follows at the end of every game, desync or not, with `faf.game.beats`, `faf.desync` and `faf.desync.later_records`. Records of one game pair up by `faf.game.id`; a record pairs with its uploaded dump by `faf.dump.upload`.
 
@@ -95,10 +95,10 @@ HTTPS: the Windows build posts `https://` URLs through WinHTTP; the Linux build 
 
 ## Dump receiver
 
-`tools/desync-diff/receive.py` is a reference receiver, Python 3 with the standard library only:
+`desync-diff serve` ([tools/cmd/desync-diff](../tools/cmd/desync-diff/README.md), Go with the standard library only; `tools/build.ps1` builds it into `tools/bin`) is the receiver:
 
 ```sh
-python tools/desync-diff/receive.py --host 0.0.0.0 --port 4319 --prefix /dumps --out /srv/faf-dumps \
+desync-diff serve --host 0.0.0.0 --port 4319 --prefix /dumps --out /srv/faf-dumps \
   --token <upload token> --read-token <read token> --max-mb 64
 ```
 
@@ -112,18 +112,20 @@ python tools/desync-diff/receive.py --host 0.0.0.0 --port 4319 --prefix /dumps -
 | `--read-token` | `FAF_READ_TOKEN` | Required token for reads (`Authorization: Bearer` or `?token=`); empty lets anyone read |
 | `--max-mb` | 64 | Largest body accepted |
 
-Uploads: 201 to a stored dump (with its path), 401 to a wrong token, 400 to a name that isn't a dump name or a body that isn't a dump (`header.json` missing from the archive), 413 to an empty or oversized body. Once a game has dumps from two armies, it runs `desync_diff.py` on them and writes `<out>/<game id>/report.txt`. Reads: `GET <prefix>/` lists the games, `<prefix>/<game id>/` a game's dumps and report, `<prefix>/<game id>/<file>` downloads one; the upload token never reads, since it ships with the game. `GET /healthz` answers `ok` without a token. It serves each request on its own thread and has no TLS: for a public server, run it behind a reverse proxy that terminates TLS ([tools/desync-server](../tools/desync-server/README.md)). The engine posts to the URL as given; with `--prefix` equal to that URL's path, `faf.dump.url` points at the stored file.
+Uploads: 201 to a stored dump (with its path), 401 to a wrong token, 400 to a name that isn't a dump name or a body that isn't a dump (`header.json` missing from the archive), 413 to an empty or oversized body. Once a game has dumps from two armies, it compares them and writes `<out>/<game id>/report.txt`: the report `desync-diff compare A B` prints for dumps on disk. Reads: `GET <prefix>/` lists the games, `<prefix>/<game id>/` a game's dumps and report, `<prefix>/<game id>/<file>` downloads one; the upload token never reads, since it ships with the game. `GET /healthz` answers `ok` without a token. It has no TLS: for a public server, run it behind a reverse proxy that terminates TLS ([tools/desync-server](../tools/desync-server/README.md)). The engine posts to the URL as given; with `--prefix` equal to that URL's path, `faf.dump.url` points at the stored file.
 
 The client deletes its `.tar.gz` once the receiver answers 2xx, after six failed attempts (when queued, with the game-end record, then at up to four later starts), or at once on a 4xx other than 408 and 429. The zip stays on the player's disk either way.
 
 ## Game side
 
-By default a live multiplayer game sends its records to `https://fafre-metrics.draiget.dev/v1/logs` and its dump to `https://fafre-metrics.draiget.dev/dumps` (the Linux build posts plain `http://`: it has no TLS library), the faf-re desync server behind Cloudflare. `/notelemetry` sends nothing. To use a server of your own, add to the game's command line (or set the switches in the console):
+Without `/telemetry` on its command line a game sends nothing: no records, no dump (#337). With it, a live multiplayer game sends its records to `https://fafre-metrics.draiget.dev/v1/logs` and its dump to `https://fafre-metrics.draiget.dev/dumps` (the Linux build posts plain `http://`: it has no TLS library), the faf-re desync server behind Cloudflare. `/notelemetry` sends nothing, even with `/telemetry`. To use a server of your own, add to the game's command line (or set the switches in the console):
 
 ```
 /telemetryendpoint https://collector.example.org /telemetrytoken <token>
 /telemetrydumpendpoint https://dumps.example.org/dumps
 ```
+
+The token is this client's alone (#336): the launcher passes it, and no other player may see it. It never reaches the game log, the replay or the dump (whose copy of the command line shows `/telemetrytoken <token>`), and Lua never gets it: `GetCommandLineArg('/telemetrytoken', n)` answers `false`, and the values of an option given before it end before it.
 
 The first line moves the records. The second moves the dump the recorder writes (an empty URL uploads none); the recorder is on by default in live multiplayer, and with `/nodesyncdump` there is no dump to upload. `/v1/logs` is appended to the collector URL unless it already ends with it. Records and dumps are only sent from live multiplayer games, never from replays.
 
@@ -142,7 +144,7 @@ What isn't sent yet waits in `faf_telemetry_outbox_<pid>.txt` next to the game l
 
 ## Checking a setup locally
 
-Two scenarios run a real two-player desync against local servers (`tools/mpemu`, see [tools/README.md](../tools/README.md)): start the collector on `127.0.0.1:4318` and, for the second, `receive.py --port 4319 --token test-token`, then
+Two scenarios run a real two-player desync against local servers (`tools/mpemu`, see [tools/README.md](../tools/README.md)): start the collector on `127.0.0.1:4318` and, for the second, `desync-diff serve --port 4319 --token test-token`, then
 
 ```bat
 tools\bin\mpemu.exe run tools\scenarios\2p-desync-telemetry.yaml

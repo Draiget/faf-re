@@ -86,7 +86,7 @@ namespace
   // /peerstylekey <file>, otherwise peer_style.key beside the exe.
   [[nodiscard]] std::filesystem::path KeyFilePath()
   {
-    msvc8::vector<msvc8::string> args;
+    fa::vector<fa::string> args;
     if (CFG_GetArgOption("/peerstylekey", 1u, &args) && !args.empty()) {
       return std::filesystem::path(args[0].c_str());
     }

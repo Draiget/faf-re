@@ -148,7 +148,7 @@ namespace moho
 
   struct UICommandModeData
   {
-    msvc8::string mMode;          // +0x00
+    fa::string mMode;          // +0x00
     LuaPlus::LuaObject mPayload{}; // +0x1C
 
     /**
@@ -291,6 +291,12 @@ namespace moho
    */
   [[nodiscard]] bool UI_UpdateDisconnectDialogCallback();
 
+  /// Engine addition (issue #275): the screen of a client started with /rejoin, before it has a session.
+  [[nodiscard]] bool UI_StartRejoinScreen();
+
+  /// Engine addition (issue #275): `/lua/ui/uimain.lua:UpdateRejoinScreen(stage, progress)`.
+  void UI_UpdateRejoinScreen(const char* stage, float progress);
+
   /**
    * Address: 0x0083DDA0 (FUN_0083DDA0, ?UI_GetCommandMode@Moho@@YA?AUUICommandModeData@1@XZ)
    *
@@ -341,5 +347,5 @@ namespace moho
    * Builds one Lua table from desync payload strings and invokes
    * `/lua/ui/uimain.lua:ShowDesyncDialog(sessionTick, payloadTable)`.
    */
-  void UI_ShowDesyncDialog(int sessionTick, const msvc8::vector<msvc8::string>& payloadLines);
+  void UI_ShowDesyncDialog(int sessionTick, const fa::vector<fa::string>& payloadLines);
 } // namespace moho

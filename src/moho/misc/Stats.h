@@ -4,6 +4,7 @@
 #include <cstdint>
 #if FAF_SERVER_MODE
 #include <functional>
+#include <vector>
 #endif
 
 #include "boost/mutex.h"
@@ -107,7 +108,12 @@ namespace moho
    * with its path as `GetItem` takes it ("Parent_Child"), holding the tree's lock throughout
    * (the sim adds items under it). A game server reads a unit's stats this way to send them.
    */
-  void STAT_VisitItems(Stats<StatItem>& stats, const std::function<void(const msvc8::string& path, StatItem& item)>& visit);
+  void STAT_VisitItems(Stats<StatItem>& stats, const std::function<void(const fa::string& path, StatItem& item)>& visit);
+  /**
+   * Engine addition, server mode: the items `STAT_VisitItems` visits, in its order, without their paths: a server
+   * that read a tree once checks each beat whether its items are still the same ones before reading only values.
+   */
+  void STAT_CollectItems(Stats<StatItem>& stats, std::vector<StatItem*>& out);
 #endif
 
   /**
@@ -163,8 +169,8 @@ namespace moho
     [[nodiscard]] float EndLogging();
 
   public:
-    msvc8::string mLogFileName;   // +0x10
-    msvc8::string mResolvedLogFilePath; // +0x2C
+    fa::string mLogFileName;   // +0x10
+    fa::string mResolvedLogFilePath; // +0x2C
     std::int32_t mLogFrameCount;  // +0x48
     std::uint8_t mIsLogging;      // +0x4C
     std::uint8_t mPad4D[3];       // +0x4D
@@ -816,7 +822,7 @@ namespace moho
    * What it does:
    * Builds a local-time filename prefix as `YYYY-MM-DD.HH-MM`.
    */
-  [[nodiscard]] msvc8::string LOG_GenerateFilenamePrefix();
+  [[nodiscard]] fa::string LOG_GenerateFilenamePrefix();
 
   /**
    * Address: 0x00415E60 (FUN_00415E60, Moho::STAT_Frame)
@@ -843,7 +849,7 @@ namespace moho
    * Clears a stats subtree selected from the console argument vector and
    * forwards to the engine stats delete path.
    */
-  void CON_ClearStats(const msvc8::vector<msvc8::string>& args);
+  void CON_ClearStats(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x004163A0 (FUN_004163A0, Moho::CON_BeginLoggingStats)
@@ -852,7 +858,7 @@ namespace moho
    * Selects a logging file name from console args, resets the logging frame
    * counter, and enables stats logging.
    */
-  void CON_BeginLoggingStats(const msvc8::vector<msvc8::string>& args);
+  void CON_BeginLoggingStats(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00415EC0 (FUN_00415EC0, Moho::CON_PrintStats)
@@ -860,7 +866,7 @@ namespace moho
    * What it does:
    * Exercises and prints a debug stats subtree from the console command lane.
    */
-  void CON_PrintStats(const msvc8::vector<msvc8::string>& args);
+  void CON_PrintStats(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00834F90 (FUN_00834F90, Moho::ShowStats)
@@ -869,7 +875,7 @@ namespace moho
    * Imports `/lua/debug/EngineStats.lua` and calls its `Toggle` entry with
    * the requested stats mode token (default `"all"`).
    */
-  void ShowStats(const msvc8::vector<msvc8::string>& args);
+  void ShowStats(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00835160 (FUN_00835160, Moho::ShowArmyStats)
@@ -878,7 +884,7 @@ namespace moho
    * Imports `/lua/debug/ArmyStats.lua` and calls its `Show` entry with army
    * index + display mode from console args (defaults: focused army + `"all"`).
    */
-  void ShowArmyStats(const msvc8::vector<msvc8::string>& args);
+  void ShowArmyStats(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00416480 (FUN_00416480, Moho::CON_EndLoggingStats)
@@ -886,7 +892,7 @@ namespace moho
    * What it does:
    * Console end-logging entry that finalizes the active stats log.
    */
-  void CON_EndLoggingStats(const msvc8::vector<msvc8::string>& args);
+  void CON_EndLoggingStats(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00416490 (FUN_00416490, cfunc_BeginLoggingStats)
@@ -1012,7 +1018,7 @@ namespace moho
      * Address: 0x005953A0 (FUN_005953A0, token walk)
      */
     [[nodiscard]] static CArmyStatItem*
-    WalkTokenPath(CArmyStatItem* root, const msvc8::vector<msvc8::string>& tokens, bool allowCreate, bool* didCreate);
+    WalkTokenPath(CArmyStatItem* root, const fa::vector<fa::string>& tokens, bool allowCreate, bool* didCreate);
 
 
   public:

@@ -52,8 +52,8 @@ namespace moho
 
 namespace
 {
-  using UnitOffsetMap = msvc8::map<moho::EntId, moho::SUnitOffsetInfo>;
-  using CoordMap = msvc8::map<moho::EntId, moho::SCoordsVec2>;
+  using UnitOffsetMap = fa::map<moho::EntId, moho::SUnitOffsetInfo>;
+  using CoordMap = fa::map<moho::EntId, moho::SCoordsVec2>;
 
   [[nodiscard]] gpg::RType* CachedEntIdType();
   [[nodiscard]] gpg::RType* CachedSUnitOffsetInfoType();
@@ -648,7 +648,7 @@ namespace
      * Appends `", size=<n>"` to the base `RType::GetLexical` text, taking the
      * element count straight off the reflected map's node-count word.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x0056DC00 (FUN_0056DC00, gpg::RMapType_EntId_SUnitOffsetInfo::SerSave)
@@ -812,7 +812,7 @@ namespace
      * Appends `", size=<n>"` to the base `RType::GetLexical` text, taking the
      * element count straight off the reflected map's node-count word.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x0056E220 (FUN_0056E220, gpg::RMapType_EntId_SCoordsVec2::SerSave)
@@ -915,7 +915,7 @@ namespace
    */
   const char* RMapType_EntId_SUnitOffsetInfo::GetName() const
   {
-    static const msvc8::string sName =
+    static const fa::string sName =
       gpg::STR_Printf("map<%s,%s>", CachedEntIdType()->GetName(), CachedSUnitOffsetInfoType()->GetName());
     return sName.c_str();
   }
@@ -929,9 +929,9 @@ namespace
    * rather than dispatching a virtual, because this descriptor has no
    * `RIndexed` sub-object; the typed `size()` accessor is that same word.
    */
-  msvc8::string RMapType_EntId_SUnitOffsetInfo::GetLexical(const gpg::RRef& ref) const
+  fa::string RMapType_EntId_SUnitOffsetInfo::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     const auto* const mapObject = static_cast<const UnitOffsetMap*>(ref.mObj);
     const int count = mapObject ? static_cast<int>(mapObject->size()) : 0;
     return gpg::STR_Printf("%s, size=%d", base.c_str(), count);
@@ -947,7 +947,7 @@ namespace
    */
   const char* RBroadcasterRType_EFormationdStatus::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("Broadcaster<%s>", gpg::RTypeOf<moho::EFormationdStatus>()->GetName());
+    static const fa::string sName = gpg::STR_Printf("Broadcaster<%s>", gpg::RTypeOf<moho::EFormationdStatus>()->GetName());
     return sName.c_str();
   }
 
@@ -961,7 +961,7 @@ namespace
    */
   const char* RListenerRType_EFormationdStatus::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("Listener<%s>", gpg::RTypeOf<moho::EFormationdStatus>()->GetName());
+    static const fa::string sName = gpg::STR_Printf("Listener<%s>", gpg::RTypeOf<moho::EFormationdStatus>()->GetName());
     return sName.c_str();
   }
 
@@ -975,7 +975,7 @@ namespace
    */
   const char* RMapType_EntId_SCoordsVec2::GetName() const
   {
-    static const msvc8::string sName =
+    static const fa::string sName =
       gpg::STR_Printf("map<%s,%s>", CachedEntIdType()->GetName(), gpg::RTypeOf<moho::SCoordsVec2>()->GetName());
     return sName.c_str();
   }
@@ -989,9 +989,9 @@ namespace
    * rather than dispatching a virtual, because this descriptor has no
    * `RIndexed` sub-object; the typed `size()` accessor is that same word.
    */
-  msvc8::string RMapType_EntId_SCoordsVec2::GetLexical(const gpg::RRef& ref) const
+  fa::string RMapType_EntId_SCoordsVec2::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     const auto* const mapObject = static_cast<const CoordMap*>(ref.mObj);
     const int count = mapObject ? static_cast<int>(mapObject->size()) : 0;
     return gpg::STR_Printf("%s, size=%d", base.c_str(), count);
@@ -1123,7 +1123,7 @@ namespace
 
     const char* const expected = expectedType->GetName();
     const char* const actual = source.GetTypeName();
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "Sim",
@@ -1176,7 +1176,7 @@ namespace
   /// 0x0059B5C7..0x0059B5E8).
   [[nodiscard]] float HeadingDifference(const Wm3::Quatf& q, const float dirX, const float dirZ) noexcept
   {
-    return msvc8::Atan2Difference(
+    return fa::Atan2Difference(
       (q.z * q.x + q.y * q.w) * 2.0f, 1.0f - (q.y * q.y + q.x * q.x) * 2.0f, dirX, dirZ
     );
   }
@@ -1187,8 +1187,8 @@ namespace
   [[nodiscard]] Wm3::Quatf YawQuaternion(const float angle) noexcept
   {
     const float halfAngle = angle * 0.5f;
-    const float sinHalf = msvc8::sin(halfAngle);
-    return Wm3::Quatf{msvc8::cos(halfAngle), sinHalf * 0.0f, sinHalf, sinHalf * 0.0f};
+    const float sinHalf = fa::sin(halfAngle);
+    return Wm3::Quatf{fa::cos(halfAngle), sinHalf * 0.0f, sinHalf, sinHalf * 0.0f};
   }
 
   /// Flat (XZ) distance between two positions, `sqrtf(dz*dz + dx*dx)`.
@@ -1414,7 +1414,7 @@ namespace
   static_assert(sizeof(SFormationRunScriptCandidate) == 0x48, "SFormationRunScriptCandidate size must be 0x48");
 
   /**
-   * Comparator for the `msvc8::sort(candidates.begin(), candidates.end(), ...)`
+   * Comparator for the `fa::sort(candidates.begin(), candidates.end(), ...)`
    * call in `RunScript` phase 6 below: candidates are ordered by *decreasing*
    * squared distance, the far slots first.
    *
@@ -2902,7 +2902,7 @@ namespace moho
       candidate.category = slot.mCategory;
       candidates.push_back(candidate);
     }
-    msvc8::sort(candidates.begin(), candidates.end(), CompareRunScriptCandidateByDistanceSq);
+    fa::sort(candidates.begin(), candidates.end(), CompareRunScriptCandidateByDistanceSq);
 
     // Phase 7 (0x00567D97-0x00568280): greedy nearest-unit assignment. The
     // per-assignment `SUnitOffsetInfo` is the stack value filled at

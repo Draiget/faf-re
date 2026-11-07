@@ -80,7 +80,7 @@ namespace gpg
          * What it does:
          * Reads one NUL-terminated string from stream bytes.
          */
-        void ReadString(msvc8::string* out) const;
+        void ReadString(fa::string* out) const;
 
         /**
          * Address: <synthetic host-build helper>
@@ -88,7 +88,7 @@ namespace gpg
          * What it does:
          * Reads one 32-bit length-prefixed byte string into legacy string storage.
          */
-        void ReadLengthPrefixedString(msvc8::string* out) const;
+        void ReadLengthPrefixedString(fa::string* out) const;
 
         /**
          * Read exactly sizeof(T) bytes into T's object storage.
@@ -148,9 +148,9 @@ namespace gpg
 
     private:
         Stream* mStream = nullptr; // +0
-        uint32_t mPort = 0;        // +4
-        uint32_t mReserved0 = 0;   // +8
-        uint32_t mReserved1 = 0;   // +12
+        [[maybe_unused]] uint32_t mPort = 0;        // +4
+        [[maybe_unused]] uint32_t mReserved0 = 0;   // +8
+        [[maybe_unused]] uint32_t mReserved1 = 0;   // +12
 	};
 
     static_assert(sizeof(BinaryReader) == 16, "BinaryReader size must be 16");

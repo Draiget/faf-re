@@ -64,7 +64,7 @@ namespace moho
     // Address: 0x006FDC20 (FUN_006FDC20)
     virtual const char* GetArmyType() = 0;
     // Address: 0x006FDC40 (FUN_006FDC40)
-    virtual void SetArmyPlans(const msvc8::string& armyPlans) = 0;
+    virtual void SetArmyPlans(const fa::string& armyPlans) = 0;
     // Address: 0x006FDC60 (FUN_006FDC60)
     virtual const char* GetArmyPlans() = 0;
     // Address: 0x006FDC80 (FUN_006FDC80)
@@ -144,7 +144,7 @@ namespace moho
     // Address: 0x00700EB0 (FUN_00700EB0)
     virtual void* GetUnits(void* outUnits, void* filterBuckets) = 0;
     // Address: 0x006FE090 (FUN_006FE090)
-    virtual msvc8::vector<CArmyImpl*>* GetAlliedArmies(msvc8::vector<CArmyImpl*>* outArmyList) = 0;
+    virtual fa::vector<CArmyImpl*>* GetAlliedArmies(fa::vector<CArmyImpl*>* outArmyList) = 0;
     // Address: 0x006FDD00 (FUN_006FDD00)
     virtual float GetUnitCap() = 0;
     // Address: 0x006FDD10 (FUN_006FDD10)

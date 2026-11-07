@@ -235,7 +235,7 @@ int moho::cfunc_UnitAlterArmorL(LuaPlus::LuaState* const state)
     damageTypeArg.TypeError("string");
     damageTypeName = "";
   }
-  const msvc8::string armorTypeName(damageTypeName);
+  const fa::string armorTypeName(damageTypeName);
 
   const LuaPlus::LuaStackObject armorMultiplierArg(state, 3);
   if (lua_type(rawState, 3) != LUA_TNUMBER) {
@@ -611,7 +611,7 @@ int moho::cfunc_UnitPrintCommandQueueL(LuaPlus::LuaState* const state)
     return 0;
   }
 
-  const msvc8::vector<WeakPtr<CUnitCommand>> commandSnapshot = commandQueue->mCommandVec;
+  const fa::vector<WeakPtr<CUnitCommand>> commandSnapshot = commandQueue->mCommandVec;
 
   const RUnitBlueprint* const unitBlueprint = unit->GetBlueprint();
   const char* const unitName = (unitBlueprint != nullptr) ? unitBlueprint->mBlueprintId.c_str() : "";
@@ -1524,7 +1524,7 @@ namespace moho
  * guarded/guard links from the source unit to the destination unit during an
  * upgrade, and queues an allied-upgrade sync notification.
  */
-int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
+int cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kNotifyUpgradeHelpText);
@@ -1550,7 +1550,7 @@ int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
   //    skipping the upgrade command that produced `dest`. The copied weak-ptr
   //    vector unlinks + frees on scope exit (matches the binary's manual cleanup).
   if (CUnitCommandQueue* const sourceQueue = source->CommandQueue) {
-    const msvc8::vector<WeakPtr<CUnitCommand>> commandsSnapshot = sourceQueue->mCommandVec;
+    const fa::vector<WeakPtr<CUnitCommand>> commandsSnapshot = sourceQueue->mCommandVec;
     const RUnitBlueprint* const destBlueprint = dest->GetBlueprint();
     for (const WeakPtr<CUnitCommand>& weakCommand : commandsSnapshot) {
       CUnitCommand* const command = weakCommand.GetObjectPtr();
@@ -1567,7 +1567,7 @@ int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
   // 2) Builder factory-command transfer.
   if (source->AiBuilder != nullptr && dest->AiBuilder != nullptr) {
     dest->AiBuilder->BuilderClearFactoryCommandQueue();
-    const msvc8::vector<WeakPtr<CUnitCommand>>& builderCommands = source->AiBuilder->BuilderGetFactoryCommandQueue();
+    const fa::vector<WeakPtr<CUnitCommand>>& builderCommands = source->AiBuilder->BuilderGetFactoryCommandQueue();
     for (std::size_t i = 0; i < builderCommands.size(); ++i) {
       CUnitCommand* const builderCommand = source->AiBuilder->BuilderGetFactoryCommand(static_cast<int>(i));
       if (builderCommand != nullptr) {
@@ -1613,7 +1613,7 @@ int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
   dest->GuardedPos = source->GuardedPos;
 
   // Snapshot the guard slots first: SetGuardedUnit mutates source->GuardedByList.
-  msvc8::vector<Unit*> guards;
+  fa::vector<Unit*> guards;
   for (Entity* const entry : source->GuardedByList.mVec) {
     guards.push_back(static_cast<Unit*>(entry));
   }
@@ -1630,7 +1630,7 @@ int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
       static_cast<std::int32_t>(source->GetEntityId()),
       static_cast<std::int32_t>(dest->GetEntityId())
     };
-    // push_back's capacity-full path is `msvc8::vector<SUpgradeNotifyPair>::insert`
+    // push_back's capacity-full path is `fa::vector<SUpgradeNotifyPair>::insert`
     // (FUN_006D1A90), reached through the binary's push_back (FUN_006D1960).
     globalUserdata->mAllyUpgradeNotifications.push_back(pair);
   }
@@ -1644,7 +1644,7 @@ int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps the Lua callback binding state and forwards to `cfunc_NotifyUpgradeL`.
  */
-int moho::cfunc_NotifyUpgrade(lua_State* const luaContext)
+int cfunc_NotifyUpgrade(lua_State* const luaContext)
 {
   return cfunc_NotifyUpgradeL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1656,7 +1656,7 @@ int moho::cfunc_NotifyUpgrade(lua_State* const luaContext)
  * Publishes the global `NotifyUpgrade(from,to)` Lua binder and links it into the
  * sim script init form set.
  */
-void moho::func_NotifyUpgrade_LuaFuncDef()
+void func_NotifyUpgrade_LuaFuncDef()
 {
   static CScrLuaBinder binder(
     moho::SCR_SimLuaInitSet(),
@@ -1682,7 +1682,7 @@ void moho::func_NotifyUpgrade_LuaFuncDef()
  * (x, 0, z) with a yaw quaternion built from the heading (degrees), spawns the unit
  * through the sim, and pushes the created unit's script object back to Lua.
  */
-int moho::cfunc_CreateUnit2L(LuaPlus::LuaState* const state)
+int cfunc_CreateUnit2L(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 6, kCreateUnit2HelpText);
@@ -1745,8 +1745,8 @@ int moho::cfunc_CreateUnit2L(LuaPlus::LuaState* const state)
   // 0x006D0349-0x006D0358: `fmul 0.017453292f` then `fmul 0.5f` on the float
   // lua_Number, single-precision under the sim's `_PC_24` word.
   const float halfAngle = (static_cast<float>(lua_tonumber(rawState, 6)) * 0.017453292f) * 0.5f;
-  const float sinHalfAngle = msvc8::sin(halfAngle);
-  const float cosHalfAngle = msvc8::cos(halfAngle);
+  const float sinHalfAngle = fa::sin(halfAngle);
+  const float cosHalfAngle = fa::cos(halfAngle);
 
   // 0x006D0381-0x006D03A1: the x and z lanes are `sinH * 0.0f`, not literal
   // zeros, so a negative heading leaves them -0.0f.
@@ -1772,7 +1772,7 @@ int moho::cfunc_CreateUnit2L(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps the Lua callback binding state and forwards to `cfunc_CreateUnit2L`.
  */
-int moho::cfunc_CreateUnit2(lua_State* const luaContext)
+int cfunc_CreateUnit2(lua_State* const luaContext)
 {
   return cfunc_CreateUnit2L(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1784,7 +1784,7 @@ int moho::cfunc_CreateUnit2(lua_State* const luaContext)
  * Publishes the global `CreateUnit2(blueprint, army, layer, x, z, heading)` Lua
  * binder and links it into the sim script init form set.
  */
-CScrLuaInitForm* moho::func_CreateUnit2_LuaFuncDef()
+CScrLuaInitForm* func_CreateUnit2_LuaFuncDef()
 {
   static CScrLuaBinder binder(
     moho::SCR_SimLuaInitSet(),
@@ -1813,7 +1813,7 @@ CScrLuaInitForm* moho::func_CreateUnit2_LuaFuncDef()
  * Numeric arguments are read right-to-left, while the constructed position
  * retains the Lua API's x, y, z order.
  */
-int moho::cfunc_CreateUnitL(LuaPlus::LuaState* const state)
+int cfunc_CreateUnitL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);
@@ -1932,7 +1932,7 @@ int moho::cfunc_CreateUnitL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps the Lua callback binding state and forwards to `cfunc_CreateUnitL`.
  */
-int moho::cfunc_CreateUnit(lua_State* const luaContext)
+int cfunc_CreateUnit(lua_State* const luaContext)
 {
   return cfunc_CreateUnitL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1944,7 +1944,7 @@ int moho::cfunc_CreateUnit(lua_State* const luaContext)
  * Publishes the global `CreateUnit(...)` Lua binder and links it into the sim
  * script init form set.
  */
-CScrLuaInitForm* moho::func_CreateUnit_LuaFuncDef()
+CScrLuaInitForm* func_CreateUnit_LuaFuncDef()
 {
   static CScrLuaBinder binder(
     moho::SCR_SimLuaInitSet(),
@@ -1971,21 +1971,21 @@ CScrLuaInitForm* moho::func_CreateUnit_LuaFuncDef()
  * and converts it to an orientation quaternion, spawns the unit through the sim,
  * and pushes its script object.
  */
-int moho::cfunc_CreateUnitHPRL(LuaPlus::LuaState* const state)
+int cfunc_CreateUnitHPRL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 8, kCreateUnitHPRHelpText);
 
   Sim* const sim = lua_getglobaluserdata_typed(rawState);
 
-  // arg1: blueprint id (string) -> kept as an msvc8::string for the lookup + errors.
+  // arg1: blueprint id (string) -> kept as an fa::string for the lookup + errors.
   const LuaPlus::LuaStackObject blueprintArg(state, 1);
   const char* blueprintText = lua_tostring(rawState, 1);
   if (!blueprintText) {
     blueprintArg.TypeError("string");
     blueprintText = "";
   }
-  const msvc8::string blueprintName(blueprintText, std::strlen(blueprintText));
+  const fa::string blueprintName(blueprintText, std::strlen(blueprintText));
 
   // arg2: owning army as a Lua object (not a 1-based index).
   const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 2));
@@ -2057,7 +2057,7 @@ int moho::cfunc_CreateUnitHPRL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps the Lua callback binding state and forwards to `cfunc_CreateUnitHPRL`.
  */
-int moho::cfunc_CreateUnitHPR(lua_State* const luaContext)
+int cfunc_CreateUnitHPR(lua_State* const luaContext)
 {
   return cfunc_CreateUnitHPRL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2069,7 +2069,7 @@ int moho::cfunc_CreateUnitHPR(lua_State* const luaContext)
  * Publishes the global `CreateUnitHPR(...)` Lua binder and links it into the sim
  * script init form set.
  */
-CScrLuaInitForm* moho::func_CreateUnitHPR_LuaFuncDef()
+CScrLuaInitForm* func_CreateUnitHPR_LuaFuncDef()
 {
   static CScrLuaBinder binder(
     moho::SCR_SimLuaInitSet(),

@@ -41,13 +41,7 @@ namespace
       return;
     }
 
-    gpg::RField field{};
-    field.mName = baseType->GetName();
-    field.mType = baseType;
-    field.mOffset = baseOffset;
-    field.mFlags = 0;
-    field.mDesc = nullptr;
-    typeInfo->AddBase(field);
+    gpg::AddReflectedBaseType(typeInfo, baseType, baseOffset);
   }
 
   /**
@@ -91,7 +85,7 @@ namespace
    *
    * What it does:
    * Constructs the `gpg::RListType<gpg::Rect2i>` static, which preregisters
-   * it for `typeid(msvc8::list<gpg::Rect2i>)`, and returns it.
+   * it for `typeid(fa::list<gpg::Rect2i>)`, and returns it.
    *
    * `RListType<Rect2<int>>`, vtable 0x00E1C36C:
    *
@@ -152,7 +146,7 @@ gpg::RRef CAiPathFinderTypeInfo::NewRef()
  */
 void CAiPathFinderTypeInfo::Delete(void* const objectStorage)
 {
-  delete static_cast<CAiPathFinder*>(objectStorage);
+  GPG_NONVIRTUAL_DESTROY(delete static_cast<CAiPathFinder*>(objectStorage));
 }
 
 /**
@@ -164,10 +158,7 @@ void CAiPathFinderTypeInfo::Delete(void* const objectStorage)
  */
 gpg::RRef CAiPathFinderTypeInfo::CtrRef(void* const objectStorage)
 {
-  auto* const pathFinder = static_cast<CAiPathFinder*>(objectStorage);
-  if (pathFinder != nullptr) {
-    new (pathFinder) CAiPathFinder();
-  }
+  auto* const pathFinder = gpg::ConstructInStorage<CAiPathFinder>(objectStorage);
 
   gpg::RRef out{};
   out = gpg::MakeRRef<moho::CAiPathFinder>(pathFinder);
@@ -183,10 +174,7 @@ gpg::RRef CAiPathFinderTypeInfo::CtrRef(void* const objectStorage)
  */
 void CAiPathFinderTypeInfo::Destruct(void* const objectStorage)
 {
-  auto* const pathFinder = static_cast<CAiPathFinder*>(objectStorage);
-  if (pathFinder != nullptr) {
-    pathFinder->~CAiPathFinder();
-  }
+  gpg::DestructInStorage<CAiPathFinder>(objectStorage);
 }
 
 /**

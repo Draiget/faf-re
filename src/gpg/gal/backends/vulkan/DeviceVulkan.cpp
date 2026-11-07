@@ -232,6 +232,23 @@ namespace gpg::gal
     }
   } // namespace
 
+  namespace
+  {
+    const effects::TextureBinding kNoTextureBinding{};
+
+    // A slot's handles are copied only when they changed: each copy is an atomic increment, and a
+    // decal draw keeps all but a few of its effect's textures.
+    void KeepBinding(effects::TextureBinding& slot, const effects::TextureBinding& binding)
+    {
+      if (slot.texture.get() != binding.texture.get()) {
+        slot.texture = binding.texture;
+      }
+      if (slot.renderTarget.get() != binding.renderTarget.get()) {
+        slot.renderTarget = binding.renderTarget;
+      }
+    }
+  } // namespace
+
   struct DeviceVulkan::ProgramState
   {
     std::vector<VkSampler> samplers;
@@ -248,7 +265,7 @@ namespace gpg::gal
     std::uint64_t textureVersion = 0;
     const RenderTarget* tableSurface = nullptr;
     VkDescriptorSet table = VK_NULL_HANDLE;
-    std::shared_ptr<const std::vector<effects::TextureBinding>> tableBindings;
+    std::vector<effects::TextureBinding> tableBindings;
   };
 
   // ---------------------------------------------------------------------------
@@ -284,6 +301,7 @@ namespace gpg::gal
         garbage.serial = 0U;
       }
       CollectCompleted();
+      mPipelineMemo.Clear();
       for (auto& [key, pipeline] : mPipelines) {
         if (pipeline != VK_NULL_HANDLE) {
           Vk().vkDestroyPipeline(mDevice, pipeline, nullptr);
@@ -708,15 +726,19 @@ namespace gpg::gal
     Vk().vkGetPhysicalDeviceSurfacePresentModesKHR(mPhysical, swapChain.surface, &count, nullptr);
     std::vector<VkPresentModeKHR> modes(count);
     Vk().vkGetPhysicalDeviceSurfacePresentModesKHR(mPhysical, swapChain.surface, &count, modes.data());
-    VkPresentModeKHR mode = VK_PRESENT_MODE_FIFO_KHR;
+    // Without vsync, the modes that don't wait, in order; FIFO, which every driver has, comes last in any case.
+    std::vector<VkPresentModeKHR> tryModes;
     if (!mDeviceContext.mVSync) {
       for (const VkPresentModeKHR candidate : {VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR}) {
         if (std::find(modes.begin(), modes.end(), candidate) != modes.end()) {
-          mode = candidate;
-          break;
+          tryModes.push_back(candidate);
         }
       }
     }
+    tryModes.push_back(VK_PRESENT_MODE_FIFO_KHR);
+    const auto modeName = [](const VkPresentModeKHR presentMode) {
+      return (presentMode == VK_PRESENT_MODE_FIFO_KHR) ? "FIFO (vsync)" : (presentMode == VK_PRESENT_MODE_MAILBOX_KHR) ? "mailbox" : "immediate";
+    };
 
     VkExtent2D extent{width, height};
     if (capabilities.currentExtent.width != 0xFFFFFFFFU) {
@@ -741,11 +763,26 @@ namespace gpg::gal
     info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     info.preTransform = capabilities.currentTransform;
     info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    info.presentMode = mode;
     info.clipped = VK_TRUE;
     info.oldSwapchain = swapChain.swapchain;
     VkSwapchainKHR created = VK_NULL_HANDLE;
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateSwapchainKHR(mDevice, &info, nullptr, &created));
+    VkPresentModeKHR mode = tryModes.back();
+    VkResult result = VK_ERROR_INITIALIZATION_FAILED;
+    // Engine addition: a driver can refuse a mode it lists. An NVIDIA TITAN RTX (driver 0x8F118000) refused the
+    // vsync-off one with VK_ERROR_OUT_OF_DEVICE_MEMORY for a 1600x1000 window while FIFO worked, and the whole
+    // renderer fell back to Direct3D 9. A refused mode now falls back to the next, ending with FIFO.
+    for (const VkPresentModeKHR candidate : tryModes) {
+      info.presentMode = candidate;
+      result = Vk().vkCreateSwapchainKHR(mDevice, &info, nullptr, &created);
+      if (result == VK_SUCCESS) {
+        mode = candidate;
+        break;
+      }
+      gpg::Warnf("Vulkan: the driver refused a %s swap chain (%d)", modeName(candidate), static_cast<int>(result));
+      // A failed create has already retired the old swap chain, and a retired one can't be passed again.
+      info.oldSwapchain = VK_NULL_HANDLE;
+    }
+    CheckVk("DeviceVulkan.cpp", __LINE__, result);
     if (swapChain.swapchain != VK_NULL_HANDLE) {
       Vk().vkDestroySwapchainKHR(mDevice, swapChain.swapchain, nullptr);
     }
@@ -766,10 +803,7 @@ namespace gpg::gal
       CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateSemaphore(mDevice, &semaphore, nullptr, &finished));
     }
     swapChain.hasImage = false;
-    gpg::Logf(
-      "Vulkan: swap chain %ux%u, %u images, %s", extent.width, extent.height, count,
-      (mode == VK_PRESENT_MODE_FIFO_KHR) ? "FIFO (vsync)" : (mode == VK_PRESENT_MODE_MAILBOX_KHR) ? "mailbox" : "immediate"
-    );
+    gpg::Logf("Vulkan: swap chain %ux%u, %u images, %s", extent.width, extent.height, count, modeName(mode));
   }
 
   void DeviceVulkan::DestroySwapChain(SwapChain& swapChain, const bool keepSurface) noexcept
@@ -1244,6 +1278,16 @@ namespace gpg::gal
     static_cast<IndexBufferVulkan&>(buffer).Storage().ReleaseCopy();
   }
 
+  void DeviceVulkan::CopyLockedRangeOnly(VertexBuffer& buffer)
+  {
+    static_cast<VertexBufferVulkan&>(buffer).Storage().CopyLockedRangeOnly();
+  }
+
+  void DeviceVulkan::CopyLockedRangeOnly(IndexBuffer& buffer)
+  {
+    static_cast<IndexBufferVulkan&>(buffer).Storage().CopyLockedRangeOnly();
+  }
+
   bool DeviceVulkan::CopyVertexBufferRegion(
     VertexBuffer& destination, const std::uint32_t destinationOffset, VertexBuffer& source, const std::uint32_t sourceOffset,
     const std::uint32_t byteCount
@@ -1517,7 +1561,7 @@ namespace gpg::gal
 
   void DeviceVulkan::Func1() const {}
 
-  void DeviceVulkan::GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, const int adapterIndex)
+  void DeviceVulkan::GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, const int adapterIndex)
   {
     static_cast<void>(adapterIndex);
     outModes.clear(); // windowed and borderless only: no exclusive modes on this backend
@@ -1948,13 +1992,13 @@ namespace gpg::gal
     to->DiscardCpuCopy();
   }
 
-  void DeviceVulkan::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const msvc8::string& filePath)
+  void DeviceVulkan::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath)
   {
     static_cast<void>(cubeTarget);
     static_cast<void>(filePath);
   }
 
-  void DeviceVulkan::SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const msvc8::string& filePath, const int fileFormat)
+  void DeviceVulkan::SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, const int fileFormat)
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     auto* const target = static_cast<RenderTargetVulkan*>(renderTarget.get());
@@ -1967,7 +2011,7 @@ namespace gpg::gal
   }
 
   void DeviceVulkan::SaveTexture(
-    const boost::shared_ptr<Texture>& texture, const msvc8::string& filePath, const int fileFormat, gpg::MemBuffer<char>* const outBuffer
+    const boost::shared_ptr<Texture>& texture, const fa::string& filePath, const int fileFormat, gpg::MemBuffer<char>* const outBuffer
   )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -2584,16 +2628,19 @@ namespace gpg::gal
         state.tableSurface != outputContext_.surface.get()) {
       const auto& slots = program.Modern().textures;
       const auto& slotParameters = program.TextureSlotParameters();
-      auto bindings = std::make_shared<std::vector<effects::TextureBinding>>();
+      std::vector<effects::TextureBinding>& bindings = state.tableBindings;
+      bindings.resize(std::min<std::size_t>(slots.size(), kTextureBindings));
       const VkDescriptorSet set = AllocateSet(mTextureLayout);
-      std::vector<VkDescriptorImageInfo> images(slots.size());
-      std::vector<VkDescriptorImageInfo> samplers(state.samplers.size());
-      std::vector<VkWriteDescriptorSet> writes;
+      VkDescriptorImageInfo images[kTextureBindings];
+      VkDescriptorImageInfo samplers[kSamplerBindings];
+      VkWriteDescriptorSet writes[kTextureBindings + kSamplerBindings];
+      std::uint32_t writeCount = 0U;
       for (std::size_t index = 0U; index < slots.size() && index < kTextureBindings; ++index) {
         const effects::TextureSlot& slot = slots[index];
         const std::int32_t parameter = slotParameters[index];
-        effects::TextureBinding binding =
-          (parameter >= 0) ? parameters.Binding(static_cast<std::uint32_t>(parameter)) : effects::TextureBinding{};
+        const effects::TextureBinding& binding =
+          (parameter >= 0) ? parameters.Binding(static_cast<std::uint32_t>(parameter)) : kNoTextureBinding;
+        const effects::TextureBinding* kept = &binding;
         VkImageView view = mNullViews[static_cast<int>(slot.dimension)];
         if (binding.texture != nullptr) {
           auto* const texture = static_cast<TextureVulkan*>(binding.texture.get());
@@ -2603,16 +2650,16 @@ namespace gpg::gal
           if (matches) {
             view = texture->View();
           } else {
-            binding = effects::TextureBinding{};
+            kept = &kNoTextureBinding;
           }
         } else if (binding.renderTarget != nullptr && slot.dimension == effects::TextureDimension::Texture2D) {
           if (binding.renderTarget.get() == outputContext_.surface.get()) {
-            binding = effects::TextureBinding{}; // a pass sampling its own target reads zero (D3D10/11)
+            kept = &kNoTextureBinding; // a pass sampling its own target reads zero (D3D10/11)
           } else {
             view = static_cast<RenderTargetVulkan*>(binding.renderTarget.get())->Current().view;
           }
         } else {
-          binding = effects::TextureBinding{};
+          kept = &kNoTextureBinding;
         }
         images[index] = VkDescriptorImageInfo{VK_NULL_HANDLE, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
         VkWriteDescriptorSet write{};
@@ -2622,8 +2669,8 @@ namespace gpg::gal
         write.descriptorCount = 1U;
         write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
         write.pImageInfo = &images[index];
-        writes.push_back(write);
-        bindings->push_back(binding);
+        writes[writeCount++] = write;
+        KeepBinding(bindings[index], *kept);
       }
       for (std::size_t index = 0U; index < state.samplers.size() && index < kSamplerBindings; ++index) {
         samplers[index] = VkDescriptorImageInfo{state.samplers[index], VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED};
@@ -2634,19 +2681,18 @@ namespace gpg::gal
         write.descriptorCount = 1U;
         write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
         write.pImageInfo = &samplers[index];
-        writes.push_back(write);
+        writes[writeCount++] = write;
       }
-      if (!writes.empty()) {
-        Vk().vkUpdateDescriptorSets(mDevice, static_cast<std::uint32_t>(writes.size()), writes.data(), 0U, nullptr);
+      if (writeCount != 0U) {
+        Vk().vkUpdateDescriptorSets(mDevice, writeCount, writes, 0U, nullptr);
       }
       state.table = set;
-      state.tableBindings = std::move(bindings);
       state.tableFrame = mFrameCount;
       state.textureVersion = parameters.TextureVersion();
       state.tableSurface = outputContext_.surface.get();
     }
     bound.textures = state.table;
-    bound.sampled = state.tableBindings;
+    bound.sampled = &state.tableBindings;
     if (mTracing) {
       Trace("BindPass %s technique %s pass %u valid %d", program.Name().c_str(),
             program.Description().techniques[technique].name.c_str(), pass, bound.valid ? 1 : 0);
@@ -2740,6 +2786,29 @@ namespace gpg::gal
       depthFormat = static_cast<DepthStencilTargetVulkan*>(outputContext_.depthStencil.get())->Image().format;
     }
 
+    // Engine change (ren_PipelineMemo): recent pipelines are found without building the string key below.
+    PipelineInputs inputs;
+    std::memset(static_cast<void*>(&inputs), 0, sizeof(inputs));
+    inputs.vertexKey = pass.vertexShader->key;
+    inputs.pixelKey = (pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL;
+    inputs.format = mBoundFormat;
+    inputs.sampleMask = pass.state.sampleMask;
+    for (std::uint32_t slot = 0U; slot < 16U; ++slot) {
+      inputs.strides[slot] = mStreams[slot].stride;
+    }
+    inputs.blend = pass.state.blend;
+    inputs.depth = pass.state.depthStencil;
+    inputs.rasterizer = pass.state.rasterizer;
+    inputs.colorFormat = colorFormat;
+    inputs.depthFormat = depthFormat;
+    inputs.topology = topology;
+    if (gPipelineMemo) {
+      const VkPipeline known = mPipelineMemo.Find(inputs);
+      if (known != VK_NULL_HANDLE) {
+        return known;
+      }
+    }
+
     KeyWriter key;
     key.Add(pass.vertexShader->key);
     key.Add((pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL);
@@ -2779,6 +2848,7 @@ namespace gpg::gal
     key.Add(topology);
     auto found = mPipelines.find(key.Key());
     if (found != mPipelines.end()) {
+      mPipelineMemo.Store(inputs, found->second);
       return found->second;
     }
 

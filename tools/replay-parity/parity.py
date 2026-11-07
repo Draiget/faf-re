@@ -61,7 +61,7 @@ import urllib.request
 import zipfile
 
 from replayfile import (HL_ENDED_RE, HL_LOADED_RE, HL_PROGRESS_RE, HL_SUMMARY_RE, HL_TROUBLE_RE,
-                        HL_VERDICT_RE, MISMATCH_RE, decode_fafreplay, header_summary,
+                        HL_VERDICT_RE, MISMATCH_RE, decode_fafreplay, extract_map, has_scenario, header_summary,
                         live_client_desync, replay_beats, replay_body_info, replay_checksums)
 
 
@@ -330,10 +330,11 @@ def map_dirs(cfg):
 
 
 def known_maps(cfg):
+    """A folder without a scenario file doesn't count, as the engine skips it: it is fetched again."""
     names = set()
     for d in map_dirs(cfg):
         try:
-            names.update(n.lower() for n in os.listdir(d))
+            names.update(n.lower() for n in os.listdir(d) if has_scenario(os.path.join(d, n)))
         except OSError:
             pass
     return names
@@ -354,11 +355,11 @@ def ensure_map(folder, cfg, maps):
         return False, "map %s: HTTP %d" % (folder, exc.code)
     except Exception as exc:
         return False, "map %s: %s" % (folder, exc)
-    with zipfile.ZipFile(zpath) as z:
-        tops = {n.split("/")[0] for n in z.namelist() if n.strip("/")}
-        z.extractall(vault_maps)
-    if folder not in {t.lower() for t in tops} and len(tops) == 1:
-        os.rename(os.path.join(vault_maps, tops.pop()), os.path.join(vault_maps, folder))
+    try:
+        extract_map(zpath, vault_maps, folder)
+    except (zipfile.BadZipFile, ValueError) as exc:
+        os.remove(zpath)  # so the next try downloads it again
+        return False, "map %s: %s" % (folder, exc)
     maps.add(folder)
     return True, None
 

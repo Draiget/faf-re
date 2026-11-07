@@ -18,7 +18,10 @@
 #include <map>
 #include <random>
 #include <string>
+#include <thread>
 #include <vector>
+
+#include <gtest/gtest.h>
 
 #include "gpg/core/containers/FlatGenerationMap.h"
 #include "moho/command/SSTICommandIssueData.h"
@@ -49,39 +52,7 @@ namespace
 {
   // --- Harness (as tests/net) ------------------------------------------------------------
 
-  int gFailures = 0;
-  int gChecks = 0;
-
-#define CHECK(cond)                                                                \
-  do {                                                                             \
-    ++gChecks;                                                                     \
-    if (!(cond)) {                                                                 \
-      ++gFailures;                                                                 \
-      std::printf("  FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond);                \
-    }                                                                              \
-  } while (0)
-
-  struct TestCase
-  {
-    const char* name;
-    void (*body)();
-  };
-
-  void RunTest(const TestCase& test)
-  {
-    const int failuresBefore = gFailures;
-    try {
-      test.body();
-    } catch (const std::exception& e) {
-      ++gFailures;
-      std::printf("  FAIL %s: exception escaped: %s\n", test.name, e.what());
-    } catch (...) {
-      ++gFailures;
-      std::printf("  FAIL %s: non-std exception escaped\n", test.name);
-    }
-    std::printf("%s %s\n", gFailures == failuresBefore ? "ok  " : "FAIL", test.name);
-    std::fflush(stdout);
-  }
+#define CHECK(cond) EXPECT_TRUE(cond)
 
   [[nodiscard]] std::vector<std::uint8_t> Bytes(const BitWriter& writer)
   {
@@ -1008,6 +979,15 @@ namespace
         const std::size_t at = rng() % 2u == 0u ? rng() % count : (rng() % (count / 64u + 1u)) * 64u % count;
         now[at] = static_cast<std::int8_t>(rng() % 3u == 0u ? 0u : 1 + rng() % 100u);
       }
+      if (round % 3 == 1) {
+        // A stretch that all comes into or goes out of sight (long flipped runs), counts of any sign.
+        const std::size_t from = rng() % count;
+        const std::size_t to = std::min(count, from + rng() % 300u);
+        const bool seen = rng() % 2u == 0u;
+        for (std::size_t at = from; at < to; ++at) {
+          now[at] = seen ? static_cast<std::int8_t>(rng() % 2u == 0u ? -1 - static_cast<int>(rng() % 120u) : 1 + static_cast<int>(rng() % 120u)) : std::int8_t{0};
+        }
+      }
       SGridBits current = before;
       before.cells.resize(count);
       current.cells.resize(count);
@@ -1017,11 +997,48 @@ namespace
       }
       BitWriter expected;
       CHECK(EncodeGridDelta(current, &before, expected));
+      // The encoder keeps what the client holds as bits, 64 cells a word.
+      const auto bitsOf = [count](const std::vector<std::int8_t>& cells) {
+        std::vector<std::uint64_t> words(GridSeenWords(count), 0u);
+        for (std::size_t i = 0; i < count; ++i) {
+          words[i / 64u] |= std::uint64_t{cells[i] != 0 ? 1u : 0u} << (i % 64u);
+        }
+        return words;
+      };
+      std::vector<std::uint64_t> seen = bitsOf(held);
       BitWriter actual;
-      EncodeGridDeltaInPlace(before.width, before.height, now.data(), held.data(), actual);
+      EncodeGridDeltaInPlace(before.width, before.height, now.data(), seen.data(), actual);
       CHECK(actual.BitCount() == expected.BitCount());
       CHECK(std::equal(actual.Bytes().begin(), actual.Bytes().end(), expected.Bytes().begin(), expected.Bytes().end()));
-      CHECK(held == now);
+      CHECK(seen == bitsOf(now));
+
+      // Reading only the chunks flagged as changed (128 cells each here): every chunk with a changed
+      // cell flagged, some unchanged ones too; the same bits, and every flag cleared. Then a grid read
+      // whole with no flag set (a `seen` just reset).
+      constexpr std::uint32_t kChunk = 128u;
+      std::vector<std::uint8_t> flags((count + kChunk - 1u) / kChunk, 0u);
+      for (std::size_t i = 0; i < count; ++i) {
+        if ((held[i] != 0) != (now[i] != 0) || held[i] != now[i] || rng() % 50u == 0u) {
+          flags[i / kChunk] = 1u;
+        }
+      }
+      std::vector<std::uint64_t> chunkSeen = bitsOf(held);
+      BitWriter chunked;
+      EncodeGridDeltaInPlace(before.width, before.height, now.data(), chunkSeen.data(), chunked, flags.data(), kChunk, false);
+      CHECK(chunked.BitCount() == expected.BitCount());
+      CHECK(std::equal(chunked.Bytes().begin(), chunked.Bytes().end(), expected.Bytes().begin(), expected.Bytes().end()));
+      CHECK(chunkSeen == bitsOf(now));
+      CHECK(std::all_of(flags.begin(), flags.end(), [](const std::uint8_t flag) { return flag == 0u; }));
+      SGridBits empty = current;
+      std::fill(empty.cells.begin(), empty.cells.end(), std::uint8_t{0});
+      BitWriter wholeExpected;
+      CHECK(EncodeGridDelta(current, &empty, wholeExpected));
+      std::vector<std::uint64_t> fresh(GridSeenWords(count), 0u);
+      BitWriter whole;
+      EncodeGridDeltaInPlace(before.width, before.height, now.data(), fresh.data(), whole, flags.data(), kChunk, true);
+      CHECK(whole.BitCount() == wholeExpected.BitCount());
+      CHECK(std::equal(whole.Bytes().begin(), whole.Bytes().end(), wholeExpected.Bytes().begin(), wholeExpected.Bytes().end()));
+      CHECK(fresh == bitsOf(now));
     }
   }
 
@@ -1256,6 +1273,120 @@ namespace
     CHECK(shiftedBytes.size() + 8u == jumpedBytes.size());
     CHECK(Decode(shiftedBytes, &moved, decoded) && decoded == shifted);
     CHECK(Decode(jumpedBytes, &moved, decoded) && decoded == jumped);
+
+    // Entities 11: a changed position, and a changed yaw, go as their step from the baseline's record when that
+    // is shorter; a jump goes whole. Both read back exactly, a turn across 0 too.
+    SViewFrame placed = shifted;
+    placed.frameId = 4;
+    placed.entities[0].position = {40000u, 3000u, 50000u};
+    placed.entities[0].yawOnly = true;
+    placed.entities[0].orientation = 1000u;
+    CHECK(Decode(Encode(placed, &shifted), &shifted, decoded) && decoded == placed);
+    SViewFrame stepped = placed;
+    stepped.frameId = 5;
+    stepped.entities[0].position = {40019u, 2998u, 49990u};
+    stepped.entities[0].orientation = 990u;
+    SViewFrame leapt = placed;
+    leapt.frameId = 5;
+    leapt.entities[0].position = {1000u, 60000u, 90000u};
+    leapt.entities[0].orientation = 41000u;
+    const std::vector<std::uint8_t> steppedBytes = Encode(stepped, &placed);
+    const std::vector<std::uint8_t> leaptBytes = Encode(leapt, &placed);
+    CHECK(steppedBytes.size() + 4u <= leaptBytes.size());
+    CHECK(Decode(steppedBytes, &placed, decoded) && decoded == stepped);
+    CHECK(Decode(leaptBytes, &placed, decoded) && decoded == leapt);
+    SViewFrame wrapped = stepped;
+    wrapped.frameId = 6;
+    wrapped.entities[0].orientation = 65530u;
+    SViewFrame nearZero = stepped;
+    nearZero.frameId = 6;
+    nearZero.entities[0].orientation = 3u;
+    CHECK(Decode(Encode(nearZero, &stepped), &stepped, decoded) && decoded == nearZero);
+    CHECK(Decode(Encode(wrapped, &nearZero), &nearZero, decoded) && decoded == wrapped);
+    CHECK(PositionFieldBits(stepped.entities[0], &placed.entities[0], kCodec) < PositionFieldBits(stepped.entities[0], nullptr, kCodec));
+
+    // Entities 12: a change's id gap and mask (CChangeHeaders). Alone: ids close and far apart (to
+    // the top of the range), masks from a pool of 40 (more than the 15 kept), repeats; what `Bits`
+    // counts is what `Write` writes, and every id and mask reads back.
+    {
+      std::mt19937 rng(0x12u);
+      for (int round = 0; round < 50; ++round) {
+        std::vector<std::pair<std::uint32_t, std::uint32_t>> headers;
+        std::uint64_t id = rng() % 3u == 0u ? 0u : rng();
+        std::uint32_t pool[40];
+        for (std::uint32_t& mask : pool) {
+          mask = (rng() | 1u) & kAllFields;
+        }
+        while (id <= 0xFFFFFFFFull && headers.size() < 400u) {
+          const std::uint32_t fields = rng() % 2u == 0u && !headers.empty() ? headers.back().second : pool[rng() % 40u];
+          headers.emplace_back(static_cast<std::uint32_t>(id), fields);
+          const std::uint32_t kind = rng() % 10u;
+          id += 1u + (kind < 7u ? rng() % 4u : kind < 9u ? rng() % 5000u : rng());
+        }
+        if (round == 0 && (headers.empty() || headers.back().first != 0xFFFFFFFFu)) {
+          headers.emplace_back(0xFFFFFFFFu, kAllFields); // the largest id, after any gap
+        }
+        BitWriter writer;
+        CChangeHeaders write;
+        CChangeHeaders count;
+        std::size_t counted = 0;
+        for (const auto& [headerId, fields] : headers) {
+          write.Write(writer, headerId, fields);
+          counted += static_cast<std::size_t>(count.Bits(headerId, fields));
+        }
+        CHECK(counted == writer.BitCount());
+        const std::vector<std::uint8_t> bytes = Bytes(writer);
+        BitReader reader(bytes);
+        CChangeHeaders read;
+        bool same = true;
+        for (const auto& [headerId, fields] : headers) {
+          std::uint32_t readId = 0;
+          std::uint32_t readFields = 0;
+          same = same && read.Read(reader, readId, readFields) && readId == headerId && readFields == fields;
+        }
+        CHECK(same);
+      }
+      // A place no mask has taken yet is refused, as is a gap past the top of the range.
+      BitWriter badPlace;
+      badPlace.WriteVarUint(5u);
+      badPlace.WriteBits(0b00100u, 5); // place 3 (order-0 code 00100) with no masks yet
+      const std::vector<std::uint8_t> badPlaceBytes = Bytes(badPlace);
+      BitReader badPlaceReader(badPlaceBytes);
+      CChangeHeaders badPlaceHeaders;
+      std::uint32_t unusedId = 0;
+      std::uint32_t unusedFields = 0;
+      CHECK(!badPlaceHeaders.Read(badPlaceReader, unusedId, unusedFields));
+    }
+    // In frames: 40 entities, each frame changing them in 63 different field combinations, so a frame
+    // holds more masks than are kept; each frame reads back exactly against the one before.
+    {
+      SViewFrame previous = placed;
+      previous.frameId = 30;
+      previous.entities.clear();
+      std::uint32_t nextId = 3;
+      for (int i = 0; i < 40; ++i) {
+        SEntityRecord record = placed.entities[0];
+        record.id = nextId;
+        nextId += i % 5 == 4 ? 70000u : 1u + static_cast<std::uint32_t>(i % 3);
+        previous.entities.push_back(record);
+      }
+      for (std::uint32_t round = 1; round <= 6; ++round) {
+        SViewFrame next = previous;
+        next.frameId = previous.frameId + 1u;
+        for (std::size_t i = 0; i < next.entities.size(); ++i) {
+          const std::uint32_t combination = (static_cast<std::uint32_t>(i) * 5u + round * 11u) % 63u + 1u;
+          SEntityRecord& record = next.entities[i];
+          if ((combination & 1u) != 0u) record.position[0] += 3u;
+          if ((combination & 2u) != 0u) record.orientation += 7u;
+          if ((combination & 4u) != 0u) record.health += 1.0f;
+          if ((combination & 8u) != 0u) record.maxHealth += 2.0f;
+          if ((combination & 16u) != 0u) record.fractionComplete = record.fractionComplete > 0.5f ? 0.25f : 0.75f;
+          if ((combination & 32u) != 0u) record.flags ^= 1u;
+        }
+        CHECK(Decode(Encode(next, &previous), &previous, decoded) && decoded == next);
+        previous = next;
+      }
+    }
 
     // A creation mask without the basic fields, or with unit fields for a non-unit, is refused.
     for (const std::uint32_t mask : {std::uint32_t{kFieldKind}, kEntityFields | kFieldKind | kFieldUnitFuel, kAllFields + 1u}) {
@@ -2398,50 +2529,95 @@ namespace
     CHECK(DecodeGridLane(gridReader2, clientHeld) && clientHeld == beat2);
   }
 
-  const TestCase kTests[] = {
-    {"armies and grids: lanes round trip", &TestArmyAndGridLanes},
-    {"frames: window of acknowledged baselines", &TestFrameWindow},
-    {"view ids: renumbering, inbound and retirement", &TestViewIdMap},
-    {"view ids: inbound translation of commands", &TestInboundIds},
-    {"grids: delta round trip", &TestGridDeltaRoundTrip},
-    {"grids: unchanged is small", &TestGridDeltaUnchangedIsSmall},
-    {"flat map: erase against a reference map", &TestFlatMapEraseMatchesMap},
-    {"grids: same bytes as cell at a time", &TestGridDeltaMatchesCellAtATime},
-    {"grids: hostile input", &TestGridDeltaHostile},
-    {"sounds: session table", &TestSoundTable},
-    {"roster: round trip and refusals", &TestRoster},
-    {"session tables: sounds and names", &TestSessionTables},
-    {"bits: round trip", &TestBitStreamRoundTrip},
-    {"bits: overrun", &TestBitStreamOverrun},
-    {"bits: same bytes as bit at a time", &TestBitStreamMatchesBitAtATime},
-    {"bits: malformed varuint", &TestBitStreamMalformedVarUint},
-    {"quantize: axis", &TestAxisQuantizer},
-    {"quantize: map position bits", &TestPositionQuantizerForMap},
-    {"quantize: quaternion", &TestQuaternionPacking},
-    {"ordinals: table and hash", &TestOrdinalTable},
-    {"hello: versions", &TestHello},
-    {"frame: decode(encode(f, b), b) == f", &TestFrameRoundTripProperty},
-    {"frame: dead reckoning round trip", &TestFrameRoundTripDeadReckoning},
-    {"frame: dead reckoning rules", &TestDeadReckoningRules},
-    {"frame: unchanged costs the header", &TestFrameUnchangedIsSmall},
-    {"frame: baseline checks", &TestFrameBaselineChecks},
-    {"frame: encoder refuses bad frames", &TestEncodeRejects},
-    {"frame: truncation", &TestDecoderTruncation},
-    {"frame: corruption and garbage", &TestDecoderCorruptionAndGarbage},
-    {"frame: hostile counts and ids", &TestDecoderHostileCounts},
-    {"frame: appearance block", &TestFrameAppearance},
-    {"frame: blip update hash", &TestBlipUpdateHash},
-    {"grid lane: slots encoded apart", &TestBitWriterAppend},
-    {"lua lane: round trip and limits", &TestLuaSyncLane},
-    {"grid lane: delta in place", &TestGridDeltaInPlace},
-  };
+  void TestSharedValueShare()
+  {
+    // `Share`: the same pointer compares nothing; an equal value is no change but its pointer is taken; a different
+    // value is a change.
+    const TSharedValue<std::vector<SUnitStat>> a(std::vector<SUnitStat>{SUnitStat{3u, 0u, false, 7u, 0u}});
+    const TSharedValue<std::vector<SUnitStat>> equal(std::vector<SUnitStat>{SUnitStat{3u, 0u, false, 7u, 0u}});
+    const TSharedValue<std::vector<SUnitStat>> other(std::vector<SUnitStat>{SUnitStat{3u, 0u, false, 8u, 0u}});
+    TSharedValue<std::vector<SUnitStat>> held;
+    CHECK(held.Share(a));
+    CHECK(!held.Share(a) && &*held == &*a);
+    CHECK(!held.Share(equal) && &*held == &*equal);
+    CHECK(held.Share(other) && *held == *other);
+    CHECK(held.Share(TSharedValue<std::vector<SUnitStat>>()) && held->empty());
+  }
+
+  void TestSessionTablesFromThreads()
+  {
+    // Plan WP11 step 4: a server's views intern on several threads at once into one session; each name gets one id,
+    // and the record read back holds every name under it.
+    CSessionTableWriters server;
+    constexpr int kThreads = 8;
+    constexpr int kNames = 200;
+    std::vector<std::vector<std::uint32_t>> ids(kThreads, std::vector<std::uint32_t>(kNames));
+    std::vector<std::thread> threads;
+    for (int t = 0; t < kThreads; ++t) {
+      threads.emplace_back([&server, &ids, t] {
+        for (int i = 0; i < kNames; ++i) {
+          const int name = (i * 7 + t * 13) % kNames;
+          ids[static_cast<std::size_t>(t)][static_cast<std::size_t>(name)] = server.Name("/stat/" + std::to_string(name));
+          if (i % 10 == 0) {
+            (void)server.Sound(SSoundEntry{"Bank", "Cue" + std::to_string(name % 5), "", ""});
+          }
+        }
+      });
+    }
+    for (std::thread& thread : threads) {
+      thread.join();
+    }
+    for (int t = 1; t < kThreads; ++t) {
+      CHECK(ids[static_cast<std::size_t>(t)] == ids[0]);
+    }
+    BitWriter record;
+    server.WritePending(record);
+    const std::vector<std::uint8_t> bytes = Bytes(record);
+    BitReader in(bytes);
+    CSessionTableReaders client;
+    CHECK(client.Read(in) && client.Names().Size() == static_cast<std::uint32_t>(kNames) && client.Sounds().Size() <= 5u);
+    for (int name = 0; name < kNames; ++name) {
+      const std::string* const text = client.Names().Find(ids[0][static_cast<std::size_t>(name)]);
+      CHECK(text != nullptr && *text == "/stat/" + std::to_string(name));
+    }
+  }
+
 } // namespace
 
-int main()
-{
-  for (const TestCase& test : kTests) {
-    RunTest(test);
-  }
-  std::printf("%d checks, %d failures\n", gChecks, gFailures);
-  return gFailures;
-}
+TEST(Existing_Wire, ArmyAndGridLanes) { TestArmyAndGridLanes(); }
+TEST(Existing_Wire, FrameWindow) { TestFrameWindow(); }
+TEST(Existing_Wire, ViewIdMap) { TestViewIdMap(); }
+TEST(Existing_Wire, InboundIds) { TestInboundIds(); }
+TEST(Existing_Wire, GridDeltaRoundTrip) { TestGridDeltaRoundTrip(); }
+TEST(Existing_Wire, GridDeltaUnchangedIsSmall) { TestGridDeltaUnchangedIsSmall(); }
+TEST(Existing_Wire, FlatMapEraseMatchesMap) { TestFlatMapEraseMatchesMap(); }
+TEST(Existing_Wire, GridDeltaMatchesCellAtATime) { TestGridDeltaMatchesCellAtATime(); }
+TEST(Existing_Wire, GridDeltaHostile) { TestGridDeltaHostile(); }
+TEST(Existing_Wire, SoundTable) { TestSoundTable(); }
+TEST(Existing_Wire, Roster) { TestRoster(); }
+TEST(Existing_Wire, SessionTables) { TestSessionTables(); }
+TEST(Existing_Wire, SessionTablesFromThreads) { TestSessionTablesFromThreads(); }
+TEST(Existing_Wire, SharedValueShare) { TestSharedValueShare(); }
+TEST(Existing_Wire, BitStreamRoundTrip) { TestBitStreamRoundTrip(); }
+TEST(Existing_Wire, BitStreamOverrun) { TestBitStreamOverrun(); }
+TEST(Existing_Wire, BitStreamMatchesBitAtATime) { TestBitStreamMatchesBitAtATime(); }
+TEST(Existing_Wire, BitStreamMalformedVarUint) { TestBitStreamMalformedVarUint(); }
+TEST(Existing_Wire, AxisQuantizer) { TestAxisQuantizer(); }
+TEST(Existing_Wire, PositionQuantizerForMap) { TestPositionQuantizerForMap(); }
+TEST(Existing_Wire, QuaternionPacking) { TestQuaternionPacking(); }
+TEST(Existing_Wire, OrdinalTable) { TestOrdinalTable(); }
+TEST(Existing_Wire, Hello) { TestHello(); }
+TEST(Existing_Wire, FrameRoundTripProperty) { TestFrameRoundTripProperty(); }
+TEST(Existing_Wire, FrameRoundTripDeadReckoning) { TestFrameRoundTripDeadReckoning(); }
+TEST(Existing_Wire, DeadReckoningRules) { TestDeadReckoningRules(); }
+TEST(Existing_Wire, FrameUnchangedIsSmall) { TestFrameUnchangedIsSmall(); }
+TEST(Existing_Wire, FrameBaselineChecks) { TestFrameBaselineChecks(); }
+TEST(Existing_Wire, EncodeRejects) { TestEncodeRejects(); }
+TEST(Existing_Wire, DecoderTruncation) { TestDecoderTruncation(); }
+TEST(Existing_Wire, DecoderCorruptionAndGarbage) { TestDecoderCorruptionAndGarbage(); }
+TEST(Existing_Wire, DecoderHostileCounts) { TestDecoderHostileCounts(); }
+TEST(Existing_Wire, FrameAppearance) { TestFrameAppearance(); }
+TEST(Existing_Wire, BlipUpdateHash) { TestBlipUpdateHash(); }
+TEST(Existing_Wire, BitWriterAppend) { TestBitWriterAppend(); }
+TEST(Existing_Wire, LuaSyncLane) { TestLuaSyncLane(); }
+TEST(Existing_Wire, GridDeltaInPlace) { TestGridDeltaInPlace(); }

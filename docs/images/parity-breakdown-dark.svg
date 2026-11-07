@@ -4,9 +4,9 @@
 <text x="0.0" y="20.0" font-size="18" fill="#e6edf3" font-weight="600">Replays that did not pass, by player count and game length</text>
 <text x="0.0" y="42.0" font-size="13" fill="#9198a1">CI run 41025691648, commit 7986851b6, before the fixes. Share of each row's replays.</text>
 <rect x="0.00" y="56.00" width="11.00" height="11.00" rx="2.00" fill="#9085e9"/>
-<text x="18.0" y="66.0" font-size="13" fill="#9198a1">Desync</text>
-<rect x="84.00" y="56.00" width="11.00" height="11.00" rx="2.00" fill="#6e7681"/>
-<text x="102.0" y="66.0" font-size="13" fill="#9198a1">CI runner failure</text>
+<text x="18.0" y="66.0" font-size="13" fill="#9198a1">Checksum mismatch</text>
+<rect x="150.00" y="56.00" width="11.00" height="11.00" rx="2.00" fill="#6e7681"/>
+<text x="168.0" y="66.0" font-size="13" fill="#9198a1">CI runner failure</text>
 <text x="0.0" y="96.0" font-size="14" fill="#e6edf3" font-weight="600">By player count</text>
 <text x="420.0" y="96.0" font-size="12" fill="#9198a1" text-anchor="end">Replays</text>
 <line x1="104.0" y1="114.0" x2="104.0" y2="289.0" stroke="#3d444d"/>

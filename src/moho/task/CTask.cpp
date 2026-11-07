@@ -41,14 +41,6 @@ namespace
     return &sInstance;
   }
 
-  gpg::RType* CachedCTaskType()
-  {
-    if (!CTask::sType) {
-      CTask::sType = gpg::LookupRType(typeid(CTask));
-    }
-    return CTask::sType;
-  }
-
   /**
    * Address: 0x007BB640 (FUN_007BB640)
    *
@@ -56,7 +48,7 @@ namespace
    * Runs the shared `CTask` teardown lane for the `CPullTask<CGpgNetInterface>`
    * deleting-destructor vtable slot and frees storage when requested.
    */
-  [[nodiscard]] CTask* DestroyPullTaskGpgNetInterfaceDeleting(
+  [[maybe_unused]] [[nodiscard]] CTask* DestroyPullTaskGpgNetInterfaceDeleting(
     CTask* const task,
     const unsigned char deleteFlag
   )
@@ -75,7 +67,7 @@ namespace
    * Runs the shared `CTask` teardown lane for the `CPullTask<CDiscoveryService>`
    * deleting-destructor vtable slot and frees storage when requested.
    */
-  [[nodiscard]] CTask* DestroyPullTaskDiscoveryServiceDeleting(
+  [[maybe_unused]] [[nodiscard]] CTask* DestroyPullTaskDiscoveryServiceDeleting(
     CTask* const task,
     const unsigned char deleteFlag
   )
@@ -94,7 +86,7 @@ namespace
    * Runs the shared `CTask` teardown lane for the `CPushTask<CDiscoveryService>`
    * deleting-destructor vtable slot and frees storage when requested.
    */
-  [[nodiscard]] CTask* DestroyPushTaskDiscoveryServiceDeleting(
+  [[maybe_unused]] [[nodiscard]] CTask* DestroyPushTaskDiscoveryServiceDeleting(
     CTask* const task,
     const unsigned char deleteFlag
   )
@@ -117,20 +109,20 @@ namespace
   {
     gpg::RRef out{};
     out.mObj = nullptr;
-    out.mType = CachedCTaskType();
+    out.mType = gpg::CachedLookup<CTask>(CTask::sType);
     if (!task) {
       return out;
     }
 
-    gpg::RType* dynamicType = CachedCTaskType();
+    gpg::RType* dynamicType = gpg::CachedLookup<CTask>(CTask::sType);
     try {
       dynamicType = gpg::LookupRType(typeid(*task));
     } catch (...) {
-      dynamicType = CachedCTaskType();
+      dynamicType = gpg::CachedLookup<CTask>(CTask::sType);
     }
 
     std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(CachedCTaskType(), &baseOffset);
+    const bool derived = dynamicType->IsDerivedFrom(gpg::CachedLookup<CTask>(CTask::sType), &baseOffset);
     GPG_ASSERT(derived);
     if (!derived) {
       out.mObj = task;
@@ -153,7 +145,7 @@ namespace
    */
   [[nodiscard]] CTask* UpcastCTaskRef(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCTaskType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::CachedLookup<CTask>(CTask::sType));
     return static_cast<CTask*>(upcast.mObj);
   }
 
@@ -172,9 +164,9 @@ namespace
       return task;
     }
 
-    const char* const expected = CachedCTaskType()->GetName();
+    const char* const expected = gpg::CachedLookup<CTask>(CTask::sType)->GetName();
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "CTask",
@@ -213,7 +205,7 @@ gpg::RType* CTask::sType = nullptr;
 
 gpg::RType* CTask::StaticGetClass()
 {
-  return CachedCTaskType();
+  return gpg::CachedLookup<CTask>(CTask::sType);
 }
 
 /**

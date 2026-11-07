@@ -188,7 +188,7 @@ namespace
       return false;
     }
 
-    const msvc8::vector<moho::WeakPtr<moho::CUnitCommand>>& commands = unit->CommandQueue->mCommandVec;
+    const fa::vector<moho::WeakPtr<moho::CUnitCommand>>& commands = unit->CommandQueue->mCommandVec;
     if (commands.empty()) {
       return false;
     }
@@ -1060,7 +1060,7 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
 
   RUnitBlueprint* structureBp = nullptr;
   {
-    msvc8::string structureFilename;
+    fa::string structureFilename;
     gpg::STR_InitFilename(&structureFilename, structureName);
     structureBp = sim->mRules->GetUnitBlueprint(RResId(structureFilename));
   }
@@ -1093,7 +1093,7 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
       float centerZ;
       float distanceSq;
     };
-    msvc8::vector<SDepositCandidate> candidates;
+    fa::vector<SDepositCandidate> candidates;
     for (const ResourceDeposit& deposit : resources->GetDeposits()) {
       if (deposit.depositType != wantedDeposit) {
         continue;
@@ -1105,7 +1105,7 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
       candidates.push_back(SDepositCandidate{centerX, centerZ, (dx * dx) + (dz * dz)});
     }
 
-    msvc8::sort(candidates.data(), candidates.data() + candidates.size(), [](const SDepositCandidate& a, const SDepositCandidate& b) {
+    fa::sort(candidates.data(), candidates.data() + candidates.size(), [](const SDepositCandidate& a, const SDepositCandidate& b) {
       return a.distanceSq < b.distanceSq;
     });
 
@@ -2392,7 +2392,7 @@ CScrLuaInitForm* moho::func_CAiBrainGetThreatsAroundPosition_LuaFuncDef()
  * What it does:
  * Reads `(brain, position, ring, restriction[, threatTypeName, armyIndex])`
  * from the Lua stack, gathers every positive-threat cell around `position`
- * into a `msvc8::vector<SPositionThreat>` via
+ * into a `fa::vector<SPositionThreat>` via
  * `CInfluenceMap::GetThreatsAroundPosition`, then builds and pushes a Lua array
  * whose rows are `{ [1]=x, [2]=z, [3]=threat }`.
  *
@@ -2457,7 +2457,7 @@ int moho::cfunc_CAiBrainGetThreatsAroundPositionL(LuaPlus::LuaState* const state
     }
   }
 
-  msvc8::vector<SPositionThreat> threats;
+  fa::vector<SPositionThreat> threats;
   CInfluenceMap* const influenceGrid = brain->mArmy->GetIGrid();
   influenceGrid->GetThreatsAroundPosition(threats, position, ring, restrictToPlayable, threatType, armyIndex);
 
@@ -3201,7 +3201,7 @@ int moho::cfunc_CAiBrainFindClosestArmyWithBaseL(LuaPlus::LuaState* const state)
 
   const EntityCategorySet* const structureCategory = brain->mSim->mRules->GetEntityCategory("STRUCTURE");
 
-  const msvc8::vector<ReconBlip*>& blips = reconDB->ReconGetBlips();
+  const fa::vector<ReconBlip*>& blips = reconDB->ReconGetBlips();
   for (ReconBlip* const blip : blips) {
     if (blip == nullptr) {
       continue;
@@ -3505,7 +3505,7 @@ int moho::cfunc_CAiBrainCanBuildPlatoonL(LuaPlus::LuaState* const state)
     return 1;
   }
 
-  msvc8::vector<Unit*> candidateFactories;
+  fa::vector<Unit*> candidateFactories;
 
   if (argumentCount > 2) {
     const LuaPlus::LuaObject suggestedObject(LuaPlus::LuaStackObject(state, 3));

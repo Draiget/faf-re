@@ -256,7 +256,7 @@ namespace moho
      * if there is one. The out-of-line copy has no caller; the
      * `SetPrioritizedTargetList` binding (0x0072E940) inlines it.
      */
-    void SetPrioritizedTargetList(ESquadClass squadClass, const msvc8::vector<EntityCategorySet>& categories);
+    void SetPrioritizedTargetList(ESquadClass squadClass, const fa::vector<EntityCategorySet>& categories);
 
     /**
      * Address: 0x00725660 (FUN_00725660, Moho::CPlatoon::CountUnassignedUnitsWithBP)
@@ -331,7 +331,7 @@ namespace moho
      * `UNITCOMMAND_TransportLoadUnits` per transport, and returns issued
      * command weak-links.
      */
-    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> LoadUnits(const EntityCategorySet* categorySet);
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> LoadUnits(const EntityCategorySet* categorySet);
 
     /**
      * Address: 0x00729D20 (FUN_00729D20, Moho::CPlatoon::UseTeleporter)
@@ -341,7 +341,7 @@ namespace moho
      * unit, issues one `UNITCOMMAND_TransportLoadUnits` targeting the teleporter,
      * and returns the issued command weak-links.
      */
-    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> UseTeleporter(Unit* teleporter, ESquadClass squadClass);
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> UseTeleporter(Unit* teleporter, ESquadClass squadClass);
 
     /**
      * Address: 0x00728700 (FUN_00728700, Moho::CPlatoon::FerryToLocation)
@@ -351,7 +351,7 @@ namespace moho
      * units across all squads, issues one `UNITCOMMAND_Ferry` to that ground
      * point, and returns the issued command weak-links.
      */
-    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> FerryToLocation(Wm3::Vector3f& targetPos);
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> FerryToLocation(Wm3::Vector3f& targetPos);
 
     /**
      * Address: 0x00726420 (FUN_00726420, Moho::CPlatoon::Patrol)
@@ -373,7 +373,7 @@ namespace moho
      * classes independently. Uses FormAttack (with the resolved formation script)
      * when applicable, else Attack. Returns the issued command weak-links.
      */
-    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> AttackTarget(Entity* target, ESquadClass squadClass);
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> AttackTarget(Entity* target, ESquadClass squadClass);
 
     /**
      * Address: 0x00728420 (FUN_00728420, func_IssueGuardTargetToPlatoon)
@@ -383,7 +383,7 @@ namespace moho
      * whole platoon when it has a named formation, otherwise one per requested
      * Attack/Artillery squad. Returns the issued command weak-links.
      */
-    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> GuardTarget(Unit* target, ESquadClass squadClass);
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> GuardTarget(Unit* target, ESquadClass squadClass);
 
     /**
      * Address: 0x00727740 (FUN_00727740, Moho::CPlatoon::MoveToTarget)
@@ -395,7 +395,7 @@ namespace moho
      * independently. Uses FormMove/Move by the usual threshold. Returns the
      * issued command weak-links.
      */
-    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> MoveToTarget(Entity* target, bool useTransports, ESquadClass squadClass);
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> MoveToTarget(Entity* target, bool useTransports, ESquadClass squadClass);
 
     /**
      * Address: 0x00726DE0 (FUN_00726DE0, Moho::CPlatoon::MoveToLocation)
@@ -406,7 +406,7 @@ namespace moho
      * alive transports as one set; otherwise the whole platoon (formation) or each
      * requested squad class independently. Returns the issued command weak-links.
      */
-    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> MoveToLocation(Wm3::Vector3f& pos, bool useTransports, ESquadClass squadClass);
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> MoveToLocation(Wm3::Vector3f& pos, bool useTransports, ESquadClass squadClass);
 
     /**
      * Address: 0x00729A70 (FUN_00729A70, Moho::CPlatoon::UseFerryBeacon)
@@ -416,7 +416,7 @@ namespace moho
      * ordinal is a member of `category` (across all squad classes) and issues one
      * UNITCOMMAND_TransportLoadUnits targeted at the `beacon` ferry entity.
      */
-    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> UseFerryBeacon(const EntityCategorySet* category, Unit* beacon);
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> UseFerryBeacon(const EntityCategorySet* category, Unit* beacon);
 
     /**
      * Address: 0x00725870 (FUN_00725870, Moho::CPlatoon::GetFerryBeacons)
@@ -436,7 +436,7 @@ namespace moho
      * AggressiveMove) either to the whole platoon (named formation) or to each
      * requested squad class (1..5) independently.
      */
-    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> AggressiveMoveToLocation(Wm3::Vector3f& pos, ESquadClass squadClass);
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> AggressiveMoveToLocation(Wm3::Vector3f& pos, ESquadClass squadClass);
 
     /**
      * Address: 0x007291C0 (FUN_007291C0, Moho::CPlatoon::UnloadUnitsAtLocation)
@@ -447,7 +447,7 @@ namespace moho
      * member of `category` (plus the carrier itself) via one
      * UNITCOMMAND_TransportUnloadSpecificUnits at that point.
      */
-    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> UnloadUnitsAtLocation(const EntityCategorySet* category, Wm3::Vector3f& pos);
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> UnloadUnitsAtLocation(const EntityCategorySet* category, Wm3::Vector3f& pos);
 
     /**
      * Address: 0x00729690 (FUN_00729690, Moho::CPlatoon::UnloadAllAtLocation)
@@ -457,7 +457,7 @@ namespace moho
      * `UNITCOMMAND_TransportUnloadUnits` to `targetPos`, returning the issued
      * command weak-links.
      */
-    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> UnloadAllAtLocation(const Wm3::Vector3f& targetPos);
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> UnloadAllAtLocation(const Wm3::Vector3f& targetPos);
 
     /**
      * Address: 0x00729FE0 (FUN_00729FE0, Moho::CPlatoon::SquadsHaveOrders)
@@ -541,7 +541,7 @@ namespace moho
      * What it does:
      * Replaces the formation name; an empty string clears it.
      */
-    void SetPlatoonFormationOverride(const msvc8::string& formationName);
+    void SetPlatoonFormationOverride(const fa::string& formationName);
 
     /**
      * Address: 0x00725410 (FUN_00725410, Moho::CPlatoon::PullUnassignedUnitsFrom)
@@ -586,10 +586,10 @@ namespace moho
     SimArmy* mArmy;                             // +0x38
     std::uint32_t mUnknown_0x03C;               // +0x3C
     gpg::fastvector_n<CSquad*, 8> mSquadList;   // +0x40
-    msvc8::string mName;                        // +0x70
-    msvc8::string mPlan;                        // +0x8C
-    msvc8::string mUniqueName;                  // +0xA8
-    msvc8::string mFormation;                   // +0xC4
+    fa::string mName;                        // +0x70
+    fa::string mPlan;                        // +0x8C
+    fa::string mUniqueName;                  // +0xA8
+    fa::string mFormation;                   // +0xC4
     bool mDisbandOnIdle;                        // +0xE0
     std::uint8_t mPad_0x0E1[3];                 // +0xE1
     std::int32_t mKills;                        // +0xE4 enemy units killed (Unit.cpp death path)

@@ -27,10 +27,11 @@ Feature traffic for the lobby goes in this message with a first byte other than 
 
 | Feature | Bit | Announced when | What it means |
 |---|---|---|---|
-| `OrderStreamCheck` | 0 | `net_CheckOrderStreams` was on as the game began | This client's acks carry `CommandStreamCheck`'s hash after their fields |
+| `OrderStreamCheck` | 0 | `net_CheckOrderStreams` was on as the game began | This client's acks carry `CommandStreamCheck`'s hash after their fields. With `net_PeerFeatures` on, a peer's hash is compared only once it announced this; off, the ack's size says it, as before |
 | `SkewCorrection` | 1 | `wld_SkewCorrection` was on as the game began | This client's display clock keeps to real time; the correction only runs when every player announces this |
 | `FastAck` | 2 | `net_FastRetransmit` was on as the game began | This client acknowledges within `net_FastAckDelay`, which the shared start takes off that peer's ping |
 | `SignedStyle` | 3 | In the lobby, when this client has a valid style key | This client answers a style challenge |
+| `Rejoin` | 4 | `net_RejoinAccept` is on | A client that restarts can take its seat back (#275). With any client that didn't announce it, a lost link behaves as in the original game |
 
 `SignedStyle` is announced only in the lobby. A player who announces it can prove a style with a key: the other player sends a random challenge (kind 1), and the answer (kind 2) is the colour with a signature over both players' ids, the challenge and the colour (`src/remote/net/StyleProof.h`). The engine keeps only the public key. The key file is `peer_style.key` beside the exe, or `/peerstylekey <file>`: the seed in hex, then the colour as `rrggbb`. A proven colour shows on the player's name in the lobby: the engine wraps the lobby script's `SetSlotInfo` (`CLobbyPeerFeatures::InstallSlotStyles`), with no script file of its own.
 
@@ -50,7 +51,7 @@ All integers are little-endian.
 
 | Bytes | Field | Meaning |
 |---|---|---|
-| 1 | kind | 0: announcement. Other values are feature traffic, and a client that doesn't know one ignores it |
+| 1 | kind | 0: announcement. Other values are feature traffic (1 to 8: rejoin), and a client that doesn't know one ignores it |
 | 1 | format | 1 |
 | 8 | mask | One bit per `EPeerFeature`. A bit this build doesn't know is ignored |
 | rest | build | Short commit hash, NUL-terminated. A later format adds its fields after this |

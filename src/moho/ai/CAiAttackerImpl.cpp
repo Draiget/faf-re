@@ -155,7 +155,6 @@ namespace
   constexpr const char* kAiAttackerImplForceEngageHelpText = "Force to engage enemy target";
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
 
-  constexpr std::int32_t kExtraDataMissingValue = static_cast<std::int32_t>(0xF0000000u);
   constexpr EAiAttackerEvent kAiAttackerEventCanTarget = static_cast<EAiAttackerEvent>(0x9);
   constexpr const char* kEngineerCategoryName = "ENGINEER";
   constexpr std::array<float, 4> kBallisticArcHeightFactors{
@@ -166,7 +165,7 @@ namespace
   };
   std::int32_t gRecoveredCScrLuaMetatableFactoryCAiAttackerImplIndex = 0;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A00 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F599F0 = nullptr;
+  [[maybe_unused]] moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F599F0 = nullptr;
 
   [[nodiscard]] CAiTarget BuildClearedTarget()
   {
@@ -247,7 +246,7 @@ namespace
       } else {
         const float checkInterval =
           (task->mWeapon->mWeaponBlueprint != nullptr) ? task->mWeapon->mWeaponBlueprint->TargetCheckInterval : 0.0f;
-        const int roundedFrames = msvc8::CeilToIntX87(checkInterval * 10.0f); // 0x005D956D..0x005D9580
+        const int roundedFrames = fa::CeilToIntX87(checkInterval * 10.0f); // 0x005D956D..0x005D9580
         pendingFrames = (roundedFrames > 1) ? roundedFrames : 1;
       }
     }
@@ -264,7 +263,7 @@ namespace
   }
 
   [[nodiscard]] CAcquireTargetTask*
-  FindAcquireTaskForWeapon(msvc8::vector<CAcquireTargetTask*>& tasks, UnitWeapon* const weapon) noexcept
+  FindAcquireTaskForWeapon(fa::vector<CAcquireTargetTask*>& tasks, UnitWeapon* const weapon) noexcept
   {
     for (CAcquireTargetTask* const task : tasks) {
       if (task != nullptr && task->mWeapon == weapon) {
@@ -1255,7 +1254,7 @@ namespace
 {
   /// Whether a reclaim or capture command in `commands` targets `target` (or, through a blip, its source).
   [[nodiscard]] bool QueuedCommandExemptsTarget(
-    const msvc8::vector<WeakPtr<CUnitCommand>>& commands, const Entity* const target
+    const fa::vector<WeakPtr<CUnitCommand>>& commands, const Entity* const target
   )
   {
     for (const WeakPtr<CUnitCommand>& weakCommand : commands) {
@@ -1302,10 +1301,10 @@ bool CAiAttackerImpl::IsTargetExempt(Entity* const target)
     // decodes, the command type, and CAiTarget::GetEntity (0x005E2CE0), which decodes the target
     // and a blip's source unit -- so the queue cannot change under it, and the copy's nodes were
     // linked at their commands' chain heads and unlinked again, leaving every chain as it was.
-    const msvc8::vector<WeakPtr<CUnitCommand>>& commandQueue = ownerUnit->CommandQueue->mCommandVec;
+    const fa::vector<WeakPtr<CUnitCommand>>& commandQueue = ownerUnit->CommandQueue->mCommandVec;
     const bool exempted = sim_ExemptCheckInPlace
       ? QueuedCommandExemptsTarget(commandQueue, target)
-      : QueuedCommandExemptsTarget(msvc8::vector<WeakPtr<CUnitCommand>>(commandQueue), target);
+      : QueuedCommandExemptsTarget(fa::vector<WeakPtr<CUnitCommand>>(commandQueue), target);
     if (exempted) {
       return true;
     }
@@ -1480,10 +1479,7 @@ gpg::RType* CAiAttackerImpl::GetClass() const
  */
 gpg::RRef CAiAttackerImpl::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**
@@ -1507,7 +1503,7 @@ void CAiAttackerImpl::PushStack(LuaPlus::LuaState* const luaState)
 void CAiAttackerImpl::Stop()
 {
   CAiTarget stopTarget{};
-  std::memset(&stopTarget, 0, 0x0C);
+  std::memset(static_cast<void*>(&stopTarget), 0, 0x0C);
   stopTarget.targetPoint = -1;
   stopTarget.targetIsMobile = false;
   SetDesiredTarget(&stopTarget);

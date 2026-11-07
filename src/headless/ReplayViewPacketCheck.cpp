@@ -124,7 +124,7 @@ namespace faf::headless
      * The army lane: every army's public fields and `mIsAlly`, plus the fields only the focus
      * army's own client reads (remote/ViewPackets.cpp, `ArmyRecordForView`) for `viewArmy` alone.
      */
-    [[nodiscard]] std::uint64_t ArmiesDigest(const msvc8::vector<moho::SSTIArmyVariableData>& armies, const std::int32_t viewArmy)
+    [[nodiscard]] std::uint64_t ArmiesDigest(const fa::vector<moho::SSTIArmyVariableData>& armies, const std::int32_t viewArmy)
     {
       CDigest digest;
       const auto count = static_cast<std::uint32_t>(armies.size());
@@ -166,7 +166,7 @@ namespace faf::headless
     }
 
     template <class TRecord>
-    [[nodiscard]] std::vector<const TRecord*> ById(const msvc8::vector<TRecord>& records)
+    [[nodiscard]] std::vector<const TRecord*> ById(const fa::vector<TRecord>& records)
     {
       std::vector<const TRecord*> sorted;
       sorted.reserve(records.size());
@@ -179,7 +179,7 @@ namespace faf::headless
       return sorted;
     }
 
-    [[nodiscard]] std::uint64_t IdsDigest(const msvc8::vector<moho::EntId>& ids)
+    [[nodiscard]] std::uint64_t IdsDigest(const fa::vector<moho::EntId>& ids)
     {
       std::vector<std::uint32_t> sorted;
       for (const moho::EntId id : ids) {
@@ -311,7 +311,7 @@ namespace faf::headless
       entry('n', update->mEntityId, add);
     }
     // In id order, as their lane digests take them (`IdsDigest`).
-    const auto idEntries = [&](const char lane, const msvc8::vector<moho::EntId>& ids) {
+    const auto idEntries = [&](const char lane, const fa::vector<moho::EntId>& ids) {
       std::vector<std::uint32_t> sorted;
       for (const moho::EntId id : ids) {
         sorted.push_back(static_cast<std::uint32_t>(id));

@@ -6,34 +6,6 @@ namespace
 {
 
 // Engine addition: helpers shared with the file these functions came from.
-  [[nodiscard]] gpg::RType* CachedCScriptObjectPointerType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = CScriptObject::GetPointerType();
-    }
-    return sType;
-  }
-
-  [[nodiscard]] CScriptObject** ExtractScriptObjectSlotFromLuaObject(const LuaPlus::LuaObject& object)
-  {
-    LuaPlus::LuaObject payload(object);
-    if (payload.IsTable()) {
-      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
-    }
-
-    if (!payload.IsUserData()) {
-      return nullptr;
-    }
-
-    const gpg::RRef userDataRef = moho::SCR_UserDataRef(payload);
-    if (!userDataRef.mObj) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, CachedCScriptObjectPointerType());
-    return static_cast<CScriptObject**>(upcast.mObj);
-  }
   /**
    * Address: 0x008B5BB0 (FUN_008B5BB0, sub_8B5BB0)
    *
@@ -46,7 +18,7 @@ namespace
    * `commandManager->mCommands.find(cmdId)`; this used to reach in through a
    * bespoke `CommandDbMapStorageView`/`CommandDbMapNodeView` pair
    * (`CommandIssueMapOf` + `FindCommandNode`) that hand-walked the same real
-   * `msvc8::map<CmdId, UserCommandIssueHelper*> CommandManager::mCommands`
+   * `fa::map<CmdId, UserCommandIssueHelper*> CommandManager::mCommands`
    * (`CommandManager.h`) member instead of calling it.
    */
   [[nodiscard]] UserCommandIssueHelper* FindCommandIssueHelperInManager(
@@ -73,7 +45,7 @@ namespace
     return unit ? static_cast<IUnit*>(unit) : nullptr;
   }
 
-  void AppendSelectionUnitUnique(msvc8::vector<UserUnit*>& selectionUnits, UserUnit* const unit)
+  void AppendSelectionUnitUnique(fa::vector<UserUnit*>& selectionUnits, UserUnit* const unit)
   {
     if (unit == nullptr) {
       return;
@@ -238,12 +210,12 @@ namespace
       return nullptr;
     }
 
-    static const msvc8::string kTransportationCategory("TRANSPORTATION");
+    static const fa::string kTransportationCategory("TRANSPORTATION");
     return attachmentParentEntity->IsInCategory(kTransportationCategory) ? attachmentParentUnit : nullptr;
   }
   [[nodiscard]] UserUnit* ResolveUserUnitOptional(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
   {
-    CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+    CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
     if (scriptObjectSlot == nullptr) {
       luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
       return nullptr;
@@ -487,7 +459,7 @@ int moho::cfunc_GetUnitCommandFromCommandCapL(LuaPlus::LuaState* const state)
   EUnitCommandType commandType = moho::UnitCommandCapToCommandType(commandCap);
 
   gpg::RRef commandTypeRef(&commandType, gpg::RTypeOf<moho::EUnitCommandType>());
-  const msvc8::string commandTypeLexical = commandTypeRef.GetLexical();
+  const fa::string commandTypeLexical = commandTypeRef.GetLexical();
   lua_pushstring(rawState, commandTypeLexical.c_str());
   (void)lua_gettop(rawState);
   return 1;
@@ -816,7 +788,7 @@ int moho::cfunc_SimCallbackL(LuaPlus::LuaState* const state)
     LuaPlus::LuaStackObject::TypeError(&callbackNameArg, "string");
     callbackNameText = "";
   }
-  const msvc8::string callbackName(callbackNameText);
+  const fa::string callbackName(callbackNameText);
 
   lua_pushstring(rawState, "Args");
   lua_gettable(rawState, 1);
@@ -827,7 +799,7 @@ int moho::cfunc_SimCallbackL(LuaPlus::LuaState* const state)
 
   if (LuaPlus::LuaStackObject::GetBoolean(&includeSelectionArg)) {
     if (CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
-      msvc8::vector<UserUnit*> selectedUnits{};
+      fa::vector<UserUnit*> selectedUnits{};
       session->GetSelectionUnits(selectedUnits);
       for (UserUnit* const selectedUnit : selectedUnits) {
         IUnit* const iunitBridge = ResolveIUnitBridge(selectedUnit);
@@ -1642,7 +1614,7 @@ int moho::cfunc_GetSelectedUnitsL(LuaPlus::LuaState* const state)
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 0, kGetSelectedUnitsHelpText);
 
-  msvc8::vector<UserUnit*> selectedUnits{};
+  fa::vector<UserUnit*> selectedUnits{};
   session->GetSelectionUnits(selectedUnits);
   if (selectedUnits.empty()) {
     lua_pushnil(rawState);
@@ -1720,7 +1692,7 @@ int moho::cfunc_GetValidAttackingUnitsL(LuaPlus::LuaState* const state)
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 0, kGetValidAttackingUnitsHelpText);
 
-  msvc8::vector<UserUnit*> validUnits{};
+  fa::vector<UserUnit*> validUnits{};
   session->GetValidAttackingUnits(validUnits);
   if (validUnits.empty()) {
     lua_pushnil(rawState);
@@ -1831,7 +1803,7 @@ int moho::cfunc_SelectUnitsL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject sourceUnitsObject(LuaPlus::LuaStackObject(state, 1));
 
-  msvc8::vector<UserUnit*> selectionUnits{};
+  fa::vector<UserUnit*> selectionUnits{};
   if (sourceUnitsObject.IsTable()) {
     const int unitCount = sourceUnitsObject.GetCount();
     for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
@@ -1907,7 +1879,7 @@ int moho::cfunc_AddSelectUnitsL(LuaPlus::LuaState* const state)
   moho::SCR_ExpectExactArgs(state, 1, kAddSelectUnitsHelpText);
 
   const LuaPlus::LuaObject sourceUnitsObject(LuaPlus::LuaStackObject(state, 1));
-  msvc8::vector<UserUnit*> mergedSelection{};
+  fa::vector<UserUnit*> mergedSelection{};
   session->GetSelectionUnits(mergedSelection);
 
   if (sourceUnitsObject.IsTable()) {

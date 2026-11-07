@@ -74,16 +74,6 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RType* CachedRect2fType()
-  {
-    gpg::RType* type = gpg::Rect2f::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(gpg::Rect2<float>));
-      gpg::Rect2f::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] moho::CUnitCommand* ResolveQueueHeadCommand(moho::Unit* const unit)
   {
     if (unit == nullptr || unit->CommandQueue == nullptr || unit->CommandQueue->mCommandVec.empty()) {
@@ -351,7 +341,7 @@ namespace moho
       return nearest;
     }
 
-    for (const msvc8::string& rebuildId : mBlueprint->Economy.RebuildBonusIds) {
+    for (const fa::string& rebuildId : mBlueprint->Economy.RebuildBonusIds) {
       if (_stricmp(associatedBp.GetString(), rebuildId.c_str()) != 0) {
         continue;
       }
@@ -891,7 +881,7 @@ namespace moho
 
     // 11-12. build area / skirt rects (offsets 0xC8 / 0xD8).
     archive->Read(CachedRect2iType(), &mBuildRect, ownerRef);
-    archive->Read(CachedRect2fType(), &mBuildSkirt, ownerRef);
+    archive->Read(gpg::CachedLookup<gpg::Rect2<float>>(gpg::Rect2f::sType), &mBuildSkirt, ownerRef);
   }
 
   /**
@@ -944,7 +934,7 @@ namespace moho
 
     // 11-12. build area / skirt rects (offsets 0xC8 / 0xD8).
     archive->Write(CachedRect2iType(), &mBuildRect, ownerRef);
-    archive->Write(CachedRect2fType(), &mBuildSkirt, ownerRef);
+    archive->Write(gpg::CachedLookup<gpg::Rect2<float>>(gpg::Rect2f::sType), &mBuildSkirt, ownerRef);
   }
 } // namespace moho
 

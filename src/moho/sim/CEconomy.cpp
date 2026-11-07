@@ -64,14 +64,14 @@ namespace
   // Exact source location cited by every `HandleAssertFailure` call this
   // file's real double-registration guards raise (confirmed per-assert from
   // raw disassembly: gpgcore/reflection/serialization.h, lines 84/87/231).
-  constexpr const char* kSerializationSourcePath =
+  [[maybe_unused]] constexpr const char* kSerializationSourcePath =
     "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-  constexpr const char* kLoadAssertText = "!type->mSerLoadFunc";
-  constexpr const char* kSaveAssertText = "!type->mSerSaveFunc";
-  constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
-  constexpr int kSerializationLoadLine = 84;
-  constexpr int kSerializationSaveLine = 87;
-  constexpr int kSerializationConstructLine = 231;
+  [[maybe_unused]] constexpr const char* kLoadAssertText = "!type->mSerLoadFunc";
+  [[maybe_unused]] constexpr const char* kSaveAssertText = "!type->mSerSaveFunc";
+  [[maybe_unused]] constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
+  [[maybe_unused]] constexpr int kSerializationLoadLine = 84;
+  [[maybe_unused]] constexpr int kSerializationSaveLine = 87;
+  [[maybe_unused]] constexpr int kSerializationConstructLine = 231;
 
   template <class TObject>
   [[nodiscard]] gpg::RRef MakeStaticRef(TObject* const object, gpg::RType* const staticType) noexcept
@@ -100,21 +100,6 @@ namespace
       cached = gpg::LookupRType(typeid(moho::SEconTotals));
       if (!cached) {
         cached = moho::preregister_SEconTotalsTypeInfo();
-      }
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCEconStorageType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      constexpr const char* kTypeNames[] = {"Moho::CEconStorage", "CEconStorage", "class Moho::CEconStorage"};
-      for (const char* const typeName : kTypeNames) {
-        cached = gpg::REF_FindTypeNamed(typeName);
-        if (cached != nullptr) {
-          break;
-        }
       }
     }
     return cached;
@@ -554,7 +539,7 @@ namespace moho
     // Both locals are built whether or not sharing is on, and live to the end
     // of the function (0x00772058 fetches the allies, 0x0077205A-0x0077208A
     // arms the two-slot inline buffer).
-    msvc8::vector<CArmyImpl*> allies;
+    fa::vector<CArmyImpl*> allies;
     army->GetAlliedArmies(&allies);
     gpg::fastvector_n<CEconomy*, 2> recipients;
 

@@ -14,13 +14,13 @@ namespace moho
     /**
      * Address: 0x004B01D0 (FUN_004B01D0, Moho::ScrBreakpoint::ScrBreakpoint)
      *
-     * msvc8::string const &,int
+     * fa::string const &,int
      *
      * What it does:
      * Initializes one breakpoint with enabled-state lane set true, copies the
      * name string, and stores the line lane.
      */
-    ScrBreakpoint(const msvc8::string& breakpointName, int lineNumber);
+    ScrBreakpoint(const fa::string& breakpointName, int lineNumber);
 
     /**
      * Address: 0x004B0210 (FUN_004B0210, Moho::ScrBreakpoint::~ScrBreakpoint)
@@ -36,22 +36,22 @@ namespace moho
      * What it does:
      * Serializes breakpoint state into `enabled|disabled:line:name`.
      */
-    [[nodiscard]] msvc8::string AsString() const;
+    [[nodiscard]] fa::string AsString() const;
 
     /**
      * Address: 0x004B0240 (FUN_004B0240, Moho::ScrBreakpoint::FromString)
      *
-     * msvc8::string const &
+     * fa::string const &
      *
      * What it does:
      * Parses one serialized `enabled:line:name` string and applies parsed
      * state when all three lanes are present.
      */
-    void FromString(const msvc8::string& serializedBreakpoint);
+    void FromString(const fa::string& serializedBreakpoint);
 
   public:
     bool enabled;      // +0x04
-    msvc8::string name;// +0x08
+    fa::string name;// +0x08
     int line;          // +0x24
   };
 

@@ -7,7 +7,7 @@
 // UICommandGraph's own hash-table growth guard (CheckedIncrementListSize) can
 // reuse the identical message/exception construction instead of re-emitting it
 // inline a second time. The bucket vector's own overflow lane (FUN_00830620)
-// is msvc8::vector<void*>::throw_too_long and is cited there.
+// is fa::vector<void*>::throw_too_long and is cited there.
 [[noreturn]] void EngineThrowContainerTooLong(const char* message);
 
 // Forward declaration: this symbol is referenced by the linker at global
@@ -354,7 +354,7 @@ namespace moho
     const auto combined = static_cast<std::uint32_t>(
       3863u * fromAddress + 7919u * toAddress + 53849u * (fromAddress ^ toAddress)
     );
-    return msvc8::hash_value(static_cast<long>(combined));
+    return fa::hash_value(static_cast<long>(combined));
   }
 
   bool UICommandGraph::EdgeKeyHashCompare::operator()(const DrawNodePair& lhs, const DrawNodePair& rhs) const noexcept
@@ -369,7 +369,7 @@ namespace moho
   UICommandGraph::CommandGraphTreeNode* UICommandGraph::AllocateTreeSentinelNode()
   {
     auto* const node = static_cast<CommandGraphTreeNode*>(::operator new(sizeof(CommandGraphTreeNode)));
-    std::memset(node, 0, sizeof(CommandGraphTreeNode));
+    std::memset(static_cast<void*>(node), 0, sizeof(CommandGraphTreeNode));
     node->mColorOrAllocated = 1u;
     node->mIsSentinel = 0u;
     return node;
@@ -675,7 +675,7 @@ namespace
    * Address: 0x0082B8B0 (FUN_0082B8B0, sub_82B8B0) - see the declaration's
    * doc comment.
    */
-  msvc8::vector<UICommandGraph::CommandGraphEdge*>& UICommandGraph::FindOrInsertCommandGraphBucket(
+  fa::vector<UICommandGraph::CommandGraphEdge*>& UICommandGraph::FindOrInsertCommandGraphBucket(
     CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
   )
   {
@@ -752,8 +752,8 @@ namespace
       // the binary reads `mPrefix` straight off it at 0x00824F3E rather than
       // going through the IsEnumType() virtual.
       const auto* const enumType = static_cast<const gpg::REnumType*>(commandTypeRef.mType);
-      const msvc8::string lexicalName = commandTypeRef.GetLexical();
-      const msvc8::string key = gpg::STR_Printf("%s%s", enumType->mPrefix, lexicalName.c_str());
+      const fa::string lexicalName = commandTypeRef.GetLexical();
+      const fa::string key = gpg::STR_Printf("%s%s", enumType->mPrefix, lexicalName.c_str());
 
       mNodes[index].LoadTextures(params, key.c_str(), state);
     }
@@ -875,9 +875,9 @@ namespace
     // is why the six-string Create overload is called directly instead of the
     // `Create(const RMeshBlueprintLOD&, ...)` one, which would carry
     // `lod->mShaderName` through.
-    const msvc8::string shaderName("UnitPlace");
-    const msvc8::string emptyLookupName;
-    const msvc8::string emptySecondaryName;
+    const fa::string shaderName("UnitPlace");
+    const fa::string emptyLookupName;
+    const fa::string emptySecondaryName;
     const boost::shared_ptr<MeshMaterial> material = MeshMaterial::Create(
       shaderName,
       lod->mAlbedoName,
@@ -1023,7 +1023,7 @@ namespace
 
       // Wall segments, walls and other decorative units never contribute an
       // order line even when they carry a queue.
-      if (entity->IsInCategory(msvc8::string{"INSIGNIFICANTUNIT", 17u})) {
+      if (entity->IsInCategory(fa::string{"INSIGNIFICANTUNIT", 17u})) {
         continue;
       }
 
@@ -1032,8 +1032,8 @@ namespace
       // A stationary factory's build queue is a second, separate order chain -
       // mobile factories (engineers, hives) carry theirs on the normal queue
       // above and must not be folded in twice.
-      const bool isFactory = entity->IsInCategory(msvc8::string{"FACTORY", 7u});
-      const bool isMobileFactory = isFactory && entity->IsInCategory(msvc8::string{"MOBILE", 6u});
+      const bool isFactory = entity->IsInCategory(fa::string{"FACTORY", 7u});
+      const bool isMobileFactory = isFactory && entity->IsInCategory(fa::string{"MOBILE", 6u});
       if (isFactory && !isMobileFactory) {
         AddCommandQueueToCommandGraph(*entity, *this, entity->GetFactoryCommandQueue());
       }
@@ -1706,7 +1706,7 @@ namespace
 
     const float seconds = static_cast<float>(beatsUntilDue) * 0.1f;
     const auto truncSeconds = static_cast<std::int32_t>(std::trunc(seconds));
-    const msvc8::string label = gpg::STR_Printf("ETA: %d.%02d", truncSeconds / 60, truncSeconds % 60);
+    const fa::string label = gpg::STR_Printf("ETA: %d.%02d", truncSeconds / 60, truncSeconds % 60);
 
     const Wm3::Vector3f textAnchor{avg.x + glyphScale, avg.y, avg.z - glyphScale};
     const Wm3::Vector2f projected = camera.Project(textAnchor);
@@ -1834,7 +1834,7 @@ namespace
       color &= static_cast<std::uint32_t>(static_cast<std::uint8_t>(glow * 255.0f)) << 24;
     }
 
-    const float uStart = 1.0f - msvc8::fmod((static_cast<double>(tick) + tickFraction) * node.mOrderlineAnimRate, 1.0);
+    const float uStart = 1.0f - fa::fmod((static_cast<double>(tick) + tickFraction) * node.mOrderlineAnimRate, 1.0);
 
     EmitHermiteRibbonSegments(
       batcher, fromPos, toPos, Wm3::Vector3f{fromTangent.x * smoothRadius, fromTangent.y * smoothRadius, fromTangent.z * smoothRadius},
@@ -1867,7 +1867,7 @@ namespace
    * own primbatcher technique:
    *   A) "TCommand"        - opaque orderlines, walking `mCommandGraphTree`
    *      (a texture-bucketed red-black tree; each node's payload is a
-   *      `{texture, msvc8::vector<CommandGraphEdge*>}` pair) and drawing
+   *      `{texture, fa::vector<CommandGraphEdge*>}` pair) and drawing
    *      every edge in every bucket with `isGlow=false`.
    *   B) "TCommandGlow"    - the same tree walk again with `isGlow=true`.
    *   C) "TAlphaBlendLinearSampleNoDepth" - waypoint marker billboards,
@@ -2031,7 +2031,7 @@ namespace
     // fresh/never-populated army leaves it null.
     const auto* const footprintDescriptor = reinterpret_cast<const std::uint8_t*>(scratch.mMetaWord);
 
-    msvc8::list<Wm3::Vector3f> simplifiedPath{};
+    fa::list<Wm3::Vector3f> simplifiedPath{};
     float capWidthSeed = 0.0f;
 
     if (ui_PathPreview) {
@@ -2051,7 +2051,7 @@ namespace
       // `vector(count, value)` (FUN_007E3730 -> FUN_007E4370 -> FUN_007E6460,
       // Vector.h). Every slot is overwritten by the loop immediately below,
       // so the broadcast fill value never survives to be observed.
-      msvc8::vector<Wm3::Vector3f> worldPts(cellCount);
+      fa::vector<Wm3::Vector3f> worldPts(cellCount);
       for (std::size_t i = 0; i < cellCount; ++i) {
         worldPts[i] = COORDS_ToWorldPos(
           stiMap, cellPositions[i], static_cast<ELayer>(footprintDescriptor[2]), footprintDescriptor[0],
@@ -2152,7 +2152,7 @@ namespace
     }
 
     const bool hasArrowhead = node.mArrowheadTexture.px != nullptr;
-    const float uStart = 1.0f - msvc8::fmod((static_cast<double>(tick) + tickFraction) * node.mOrderlineAnimRate, 1.0);
+    const float uStart = 1.0f - fa::fmod((static_cast<double>(tick) + tickFraction) * node.mOrderlineAnimRate, 1.0);
 
     for (auto it = simplifiedPath.begin(); it != simplifiedPath.end(); ++it) {
       auto next = it;
@@ -2379,7 +2379,7 @@ namespace
    * `[esi+4]` reads that node's helper head.
    *
    * The successor step inside the walk is the `map<EntId, WeakPtr<UserEntity>>`
-   * `_Inc` emission at 0x007B4D90 (carried on `msvc8::detail::rb_increment`).
+   * `_Inc` emission at 0x007B4D90 (carried on `fa::detail::rb_increment`).
    * It is spelled with this file's `WeakSet<UserEntity>::Iterator_inc`
    * shape, which is the same body over the same node type and matches the
    * binary's `_Node**` out-parameter call at 0x00826DE8.
@@ -2726,7 +2726,7 @@ namespace
         reinterpret_cast<const boost::SharedPtrRaw<ID3DTextureSheet>&>(style.mOrderlineTexture)
       );
       if (texture) {
-        msvc8::vector<UICommandGraph::CommandGraphEdge*>& bucket = UICommandGraph::FindOrInsertCommandGraphBucket(
+        fa::vector<UICommandGraph::CommandGraphEdge*>& bucket = UICommandGraph::FindOrInsertCommandGraphBucket(
           graph.mCommandGraphTree, boost::SharedPtrRawFromSharedBorrow(texture)
         );
         bucket.push_back(edge);

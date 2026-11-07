@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstddef>
+#include <atomic>
 #include <cstdint>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -62,14 +64,24 @@ namespace faf::remote::wire
   class CSessionTableWriters
   {
   public:
+    CSessionTableWriters();
+    CSessionTableWriters(const CSessionTableWriters&) = delete;
+    CSessionTableWriters& operator=(const CSessionTableWriters&) = delete;
+
     static constexpr std::uint32_t kMaxDeposits = 1u << 16;
     static constexpr std::uint32_t kMaxTerrainEdits = 1u << 12; // in one record
     static constexpr std::uint32_t kMaxEditCells = 1u << 21;    // in one edit: a 1025-cell square fits
 
-    /** The sound table id of `entry`, interning it (and queueing it for the next record). */
+    /**
+     * The sound table id of `entry`, interning it (and queueing it for the next record). `Sound` and `Name`
+     * may be called from several threads at once: a server's views are built on the sim's workers and share
+     * one session (plan WP11 step 4); the rest is for one thread, between them.
+     */
     [[nodiscard]] std::uint32_t Sound(const SSoundEntry& entry);
     /** The name table id of `name`, as `Sound`. */
     [[nodiscard]] std::uint32_t Name(std::string_view name);
+    /** Tells this session from any other (for a thread's own caches of its ids). */
+    [[nodiscard]] std::uint64_t Serial() const noexcept { return mSerial; }
     /** Queues a deposit the sim added (false past `kMaxDeposits`, which the client would refuse). */
     bool Deposit(const SDeposit& deposit);
     /** Deposits queued or written so far: the sim's deposits from this index on are new. */
@@ -87,6 +99,10 @@ namespace faf::remote::wire
     void WritePending(BitWriter& writer);
 
   private:
+    std::mutex mInternLock; // `Sound` and `Name`
+    std::uint64_t mSerial;  // tells this session's names from another's in a thread's cache (SessionTables.cpp)
+    static constexpr std::uint32_t kNoEmptyName = 0xFFFFFFFFu;
+    std::atomic<std::uint32_t> mEmptyName{kNoEmptyName}; // the empty name's id, once interned
     CSoundTableWriter mSounds;
     CNameTableWriter mNames;
     std::vector<std::uint32_t> mNewSounds;

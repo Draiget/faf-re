@@ -78,6 +78,29 @@ func (u UIDs) Resolve(all []int, host int) []int {
 	return u.List
 }
 
+// RejoinStep restarts player UID's game, which links to every peer from UID's old
+// lobby port and gets the game's recording from the first. A source is a player's
+// command source: its position among the human players, from 0.
+type RejoinStep struct {
+	UID    int          `yaml:"uid"`
+	Source int          `yaml:"source"`
+	Peers  []RejoinPeer `yaml:"peers"`
+	// Launcher starts the game with /gpgnet too, as a real launcher would: it reconnects to its
+	// seat's launcher connection.
+	Launcher bool `yaml:"launcher"`
+	// KeyOf starts the game with that player's rejoin key instead of UID's own.
+	KeyOf int `yaml:"keyOf"`
+	// Remote starts nothing: another machine takes the seat, from what this writes
+	// to rejoin-<uid>.txt in the run folder. Use with relayFollow.
+	Remote bool `yaml:"remote"`
+}
+
+// RejoinPeer is a player still in the game.
+type RejoinPeer struct {
+	UID    int `yaml:"uid"`
+	Source int `yaml:"source"`
+}
+
 // Step is one action; exactly one field is set.
 type Step struct {
 	// Start brings players up (endpoint, adapter, game).
@@ -99,6 +122,8 @@ type Step struct {
 	Restore int `yaml:"restore"`
 	// Kill terminates games (and adapters), as a crash would.
 	Kill *UIDs `yaml:"kill"`
+	// Rejoin restarts a killed player's game to take its seat back from a peer.
+	Rejoin *RejoinStep `yaml:"rejoin"`
 	// Send delivers a raw GPGNet message to a game.
 	Send *SendStep `yaml:"send"`
 	// Check evaluates expectations now, failing the run if they do not hold.
@@ -175,6 +200,9 @@ type Expect struct {
 type LogsAgree struct {
 	UIDs    UIDs   `yaml:"uids"`
 	Pattern string `yaml:"pattern"`
+	// Suffix reads <run>/game-<uid><suffix>.log, such as "-rejoin" for a game a
+	// rejoin step started; a missing file is a failure.
+	Suffix string `yaml:"suffix"`
 }
 
 // PeerStatsExpect bounds the fakegame's per-peer measurements (its last
@@ -245,6 +273,8 @@ func (s Step) String() string {
 		return fmt.Sprintf("restore %d", s.Restore)
 	case s.Kill != nil:
 		return "kill " + s.Kill.String()
+	case s.Rejoin != nil:
+		return fmt.Sprintf("rejoin %d from %v", s.Rejoin.UID, s.Rejoin.Peers)
 	case s.Send != nil:
 		return fmt.Sprintf("send %d %s %v", s.Send.UID, s.Send.Cmd, s.Send.Args)
 	case s.Check != nil:

@@ -97,7 +97,7 @@ namespace moho
      * What it does:
      * Returns a by-value snapshot of this command's coordinating-order weak links.
      */
-    [[nodiscard]] msvc8::vector<WeakPtr<CUnitCommand>> GetCoordinatingOrdersSnapshot() const;
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> GetCoordinatingOrdersSnapshot() const;
 
     /**
      * Address: 0x006E91C0 (FUN_006E91C0, Moho::CUnitCommand::MemberConstruct)
@@ -136,7 +136,7 @@ namespace moho
      * Adds `unit` into the command's unit-set and inserts this command weak-ref
      * into `queue` at `index` (negative index means append-relative insertion).
      */
-    void AddUnit(Unit* unit, msvc8::vector<WeakPtr<CUnitCommand>>& queue, int index);
+    void AddUnit(Unit* unit, fa::vector<WeakPtr<CUnitCommand>>& queue, int index);
 
     /**
      * Address: 0x006E8CC0 (FUN_006E8CC0)
@@ -154,7 +154,7 @@ namespace moho
      * Removes `unit` from the command's unit-set and erases this command
      * from the provided command queue.
      */
-    void RemoveUnit(Unit* unit, msvc8::vector<WeakPtr<CUnitCommand>>& queue);
+    void RemoveUnit(Unit* unit, fa::vector<WeakPtr<CUnitCommand>>& queue);
 
     /**
      * Address: 0x006E8D10 (FUN_006E8D10)
@@ -345,7 +345,7 @@ namespace moho
     bool mNeedsUpdate;
     bool mUnknownFlag142;
     bool mUnknownFlag143;
-    msvc8::vector<WeakPtr<CUnitCommand>> mCoordinatingOrders;
+    fa::vector<WeakPtr<CUnitCommand>> mCoordinatingOrders;
     bool mUnknownFlag154;
     /**
      * The ferry beacon this command spawned, held by the engine's intrusive

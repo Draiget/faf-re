@@ -3,18 +3,25 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 
 #include <Windows.h>
+#include <objbase.h>
 
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
+#include <mutex>
+#include <thread>
 #include <utility>
+#include <vector>
 
 #include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
 #include "moho/audio/AudioEngine.h"
+#include "moho/console/CConCommand.h"
 #include "moho/entity/Entity.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/misc/StartupHelpers.h"
@@ -370,7 +377,7 @@ namespace
   }
 
   void WarnCuePlayFailure(
-    const int xactResult, const std::uint16_t cueId, const std::uint16_t bankId, const msvc8::string& bankName
+    const int xactResult, const std::uint16_t cueId, const std::uint16_t bankId, const fa::string& bankName
   )
   {
     if (xactResult >= 0 || xactResult == kXactErrCuePreparedOnly) {
@@ -479,7 +486,7 @@ namespace
 
   /**
    * Layout of the 12-byte intrusive tree-node the original MSVC8-era
-   * `msvc8::set<IXACTCue*>` allocates for each insertion. Only the three
+   * `fa::set<IXACTCue*>` allocates for each insertion. Only the three
    * leading link pointers are observable in the binary's initialization
    * routine (`FUN_008AF8D0`); the comparison key is stored through the
    * `leftOrValue` lane because the set is used as a FIFO destroy queue and
@@ -532,19 +539,19 @@ namespace
   /**
    * Inserts one cue pointer into the pending-destroy set using the same
    * node-layout contract the release binary records via
-   * `StorePendingDestroyCueNodeLinks`. The msvc8::set rewrite owns the
+   * `StorePendingDestroyCueNodeLinks`. The fa::set rewrite owns the
    * allocation; we bind the initialized node-links layout alongside it so
    * the insertion retains an explicit invocation of the recovered helper
    * name rather than dropping it through opaque STL internals.
    */
   void EnqueuePendingDestroyCue(
-    msvc8::set<moho::IXACTCue*>& pendingCues, moho::IXACTCue* const cue
+    fa::set<moho::IXACTCue*>& pendingCues, moho::IXACTCue* const cue
   )
   {
     // Build the node-link triplet FUN_008AF8D0 would have written: the
     // left/parent lanes both reference the cue key (the set keys by the
     // pointer value itself), and the `right` lane starts empty just like
-    // the binary stages before `msvc8::set::insert` links the node.
+    // the binary stages before `fa::set::insert` links the node.
     PendingDestroyCueNodeLinks stagedLinks{};
     (void)StorePendingDestroyCueNodeLinks(&stagedLinks, cue, cue, nullptr);
 
@@ -552,7 +559,7 @@ namespace
   }
 
   [[nodiscard]] int DrainFinishedPendingCues(
-    msvc8::set<moho::IXACTCue*>& pendingCues, moho::AudioEngine* const voiceEngine
+    fa::set<moho::IXACTCue*>& pendingCues, moho::AudioEngine* const voiceEngine
   )
   {
     const bool canQueryCueState =
@@ -662,6 +669,114 @@ namespace moho
    */
   CUserSoundManager::~CUserSoundManager() = default;
 
+  bool snd_CreateEarly = true;
+
+  TConVar<bool> gTConVar_snd_CreateEarly(
+    "snd_CreateEarly",
+    "Build the audio engine on a helper thread while the window and graphics device are created (1, the default), or "
+    "on the main thread when the user scripts first need it (0). Read at startup, before /con: /nosndearly sets 0.",
+    &snd_CreateEarly
+  );
+
+  namespace
+  {
+    // Engine addition (snd_CreateEarly): the build USER_StartSoundEarly started, and the work queued
+    // for it. Never destroyed: a builder still joinable at exit would terminate the process.
+    struct SEarlySound
+    {
+      std::mutex lock;
+      std::mutex joinLock; // one thread joins the builder; the builder never takes it
+      std::thread builder;
+      bool accepting = false; // USER_WithSound queues work for the builder
+      std::vector<std::function<void(IUserSoundManager*)>> queued;
+    };
+
+    SEarlySound& EarlySound()
+    {
+      static auto* const early = new SEarlySound();
+      return *early;
+    }
+
+    std::atomic<bool> gEarlySoundPending{false}; // the builder has not been joined
+    thread_local bool tBuildingSound = false;
+  } // namespace
+
+  void USER_StartSoundEarly()
+  {
+    SEarlySound& early = EarlySound();
+    const std::lock_guard<std::mutex> guard(early.lock);
+    if (CFG_GetArgOption("/nosndearly", 0, nullptr)) {
+      snd_CreateEarly = false;
+    }
+    if (!snd_CreateEarly || gUserSoundManager != nullptr || gEarlySoundPending.load()) {
+      return;
+    }
+    early.accepting = true;
+    gEarlySoundPending = true;
+    early.builder = std::thread([&early] {
+      gpg::SetThreadName(0xFFFFFFFFu, "Sound init");
+      // The XACT engine is a free-threaded ("Both") COM object, made here in the process's
+      // multithreaded apartment. The thread ends without CoUninitialize, so its hold keeps the
+      // apartment up after it, for as long as the engines are used.
+      (void)::CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+      tBuildingSound = true;
+      IUserSoundManager* manager = nullptr;
+      try {
+        manager = USER_GetSound();
+      } catch (const std::exception& error) {
+        gpg::Warnf("SND: building the sound manager failed: %s", error.what());
+      } catch (...) {
+        gpg::Warnf("SND: building the sound manager failed");
+      }
+      for (;;) {
+        std::vector<std::function<void(IUserSoundManager*)>> work;
+        {
+          const std::lock_guard<std::mutex> workGuard(early.lock);
+          if (early.queued.empty()) {
+            early.accepting = false;
+            break;
+          }
+          work.swap(early.queued);
+        }
+        for (const auto& item : work) {
+          try {
+            item(manager);
+          } catch (const std::exception& error) {
+            gpg::Warnf("SND: %s", error.what());
+          } catch (...) {
+            gpg::Warnf("SND: queued sound work failed");
+          }
+        }
+      }
+    });
+  }
+
+  void USER_FinishSoundEarly()
+  {
+    if (!gEarlySoundPending.load() || tBuildingSound) {
+      return;
+    }
+    SEarlySound& early = EarlySound();
+    const std::lock_guard<std::mutex> guard(early.joinLock);
+    if (early.builder.joinable()) {
+      early.builder.join();
+    }
+    gEarlySoundPending = false;
+  }
+
+  void USER_WithSound(std::function<void(IUserSoundManager*)> work)
+  {
+    {
+      SEarlySound& early = EarlySound();
+      const std::lock_guard<std::mutex> guard(early.lock);
+      if (early.accepting && !tBuildingSound) {
+        early.queued.push_back(std::move(work));
+        return;
+      }
+    }
+    work(USER_GetSound());
+  }
+
   /**
    * Address: 0x008AB220 (FUN_008AB220, ?USER_GetSound@Moho@@YAPAVIUserSoundManager@1@XZ)
    *
@@ -670,6 +785,9 @@ namespace moho
    */
   IUserSoundManager* USER_GetSound()
   {
+    if (gEarlySoundPending.load(std::memory_order_acquire) && !tBuildingSound) {
+      USER_FinishSoundEarly();
+    }
     if (gUserSoundManager == nullptr) {
       CUserSoundManager* const created = new CUserSoundManager();
       if (created != gUserSoundManager) {
@@ -1289,7 +1407,7 @@ namespace moho
         continue;
       }
 
-      const msvc8::string baseLine = gpg::STR_Printf(
+      const fa::string baseLine = gpg::STR_Printf(
         "%4i: %s.%s",
         static_cast<int>(handleIndex),
         record.mParams->mBank.c_str(),
@@ -1297,7 +1415,7 @@ namespace moho
       );
 
       if (record.mPlayingSeconds > 0.0f) {
-        const msvc8::string stoppingLine = gpg::STR_Printf("%s (stopping %2.2f)", baseLine.c_str(), record.mPlayingSeconds);
+        const fa::string stoppingLine = gpg::STR_Printf("%s (stopping %2.2f)", baseLine.c_str(), record.mPlayingSeconds);
         gpg::Logf("%s", stoppingLine.c_str());
         continue;
       }
@@ -1380,17 +1498,17 @@ namespace moho
   /**
    * Address: 0x008AAC50 (FUN_008AAC50)
    *
-   * msvc8::string const&, msvc8::string const&
+   * fa::string const&, fa::string const&
    *
    * IDA signature:
-   * void __thiscall Moho::CUserSoundManager::Play(Moho::CUserSoundManager *this, msvc8::string const& bankName,
-   * msvc8::string const& cueName);
+   * void __thiscall Moho::CUserSoundManager::Play(Moho::CUserSoundManager *this, fa::string const& bankName,
+   * fa::string const& cueName);
    *
    * What it does:
    * Builds transient cue params from bank+cue names and plays a one-shot on
    * the voice engine.
    */
-  void CUserSoundManager::Play(const msvc8::string& bankName, const msvc8::string& cueName)
+  void CUserSoundManager::Play(const fa::string& bankName, const fa::string& cueName)
   {
     CSndParams params(bankName, cueName, nullptr, nullptr, mVoiceEngine);
     if (!ParamsHasResolvedEngine(params)) {
@@ -1905,7 +2023,7 @@ namespace moho
     if (!categoryPtr) {
       LuaPlus::LuaStackObject::TypeError(&categoryArg, "string");
     }
-    const msvc8::string category(categoryPtr);
+    const fa::string category(categoryPtr);
 
     LuaPlus::LuaStackObject pausedArg(state, 2);
     const bool paused = LuaPlus::LuaStackObject::GetBoolean(&pausedArg);
@@ -1966,7 +2084,7 @@ namespace moho
     if (!categoryPtr) {
       LuaPlus::LuaStackObject::TypeError(&categoryArg, "string");
     }
-    const msvc8::string category(categoryPtr);
+    const fa::string category(categoryPtr);
 
     LuaPlus::LuaStackObject pausedArg(state, 2);
     const bool paused = LuaPlus::LuaStackObject::GetBoolean(&pausedArg);

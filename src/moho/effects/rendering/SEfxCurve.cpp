@@ -32,7 +32,7 @@ namespace gpg
     /**
      * Address: 0x0065EF80 (FUN_0065EF80, gpg::RFastVectorType_SEfxCurve::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x0065F010 (FUN_0065F010, gpg::RFastVectorType_SEfxCurve::IsIndexed)
@@ -154,7 +154,7 @@ namespace gpg
    */
   const char* RFastVectorType<moho::SEfxCurve>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSEfxCurveType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("fastvector<%s>", CachedSEfxCurveType()->GetName());
     return sName.c_str();
   }
 
@@ -164,9 +164,9 @@ namespace gpg
    * What it does:
    * Appends `size=<count>` to the base reflection lexical dump string.
    */
-  msvc8::string RFastVectorType<moho::SEfxCurve>::GetLexical(const gpg::RRef& ref) const
+  fa::string RFastVectorType<moho::SEfxCurve>::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 

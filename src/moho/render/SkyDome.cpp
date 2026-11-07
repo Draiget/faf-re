@@ -42,7 +42,7 @@ namespace
 
   static_assert(sizeof(SkyDomeVertex) == 0x14, "SkyDomeVertex size must be 0x14");
 
-  constexpr float kHalfPi = 1.5707964f;
+  [[maybe_unused]] constexpr float kHalfPi = 1.5707964f;
   constexpr float kTwoPi = 6.2831855f;
 
   constexpr std::array<float, 8> kDecalBillboardQuadVertices = {
@@ -104,7 +104,7 @@ namespace moho
   void SkyDome::SetCirrusContext(
     const float speed,
     const Wm3::Vector3f& direction,
-    const msvc8::string& texturePath
+    const fa::string& texturePath
   )
   {
     (void)speed;
@@ -157,7 +157,7 @@ namespace moho
     const Wm3::Vector3f& skyColor,
     const float horizonSize,
     const Wm3::Vector3f& horizonColor,
-    const msvc8::string& horizonLookupPath
+    const fa::string& horizonLookupPath
   ) noexcept
   {
     (void)horizonLookupPath;
@@ -197,7 +197,7 @@ namespace moho
     // side effect preserved) and released after the horizon lane is written; it
     // is not consumed by the horizon setup itself.
     {
-      const msvc8::string horizonLookupPath("/textures/environment/horizonLookup.dds");
+      const fa::string horizonLookupPath("/textures/environment/horizonLookup.dds");
       ResetHorizonContext(
         Wm3::Vector3f{0.25999999f, 0.46000001f, 0.58999997f},   // sky colour
         domeRadius * 0.15360001f,                               // horizon size
@@ -207,7 +207,7 @@ namespace moho
 
     // Cirrus context: fixed colour vector + cirrus texture path.
     {
-      const msvc8::string cirrusTexturePath("/textures/environment/cirrus001_512.dds");
+      const fa::string cirrusTexturePath("/textures/environment/cirrus001_512.dds");
       SetCirrusContext(
         0.0f,                                                   // speed lane (ignored)
         Wm3::Vector3f{1.39000000f, 0.75999999f, 0.49000001f},   // cirrus colour
@@ -322,7 +322,7 @@ namespace moho
     reader.ReadExact(mSkyColor);
     reader.ReadExact(mHorizonBlend);
 
-    msvc8::string scratch;
+    fa::string scratch;
     reader.ReadString(&scratch);
     mAtmosphereTexPath.assign(scratch, 0u, 0xFFFFFFFFu);
     reader.ReadString(&scratch);
@@ -504,7 +504,7 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
     // its base GAL texture into the destination lane. Path -> lane mapping is
     // taken verbatim from the store offsets in FUN_00817850.
     const auto loadTexture =
-      [&](const msvc8::string& path, boost::shared_ptr<gpg::gal::Texture>& lane) {
+      [&](const fa::string& path, boost::shared_ptr<gpg::gal::Texture>& lane) {
         ID3DDeviceResources::TextureResourceHandle textureResource;
         resources->GetTexture(textureResource, path.c_str(), watcher, true);
         textureResource->GetTexture(lane);
@@ -904,7 +904,7 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
     const int head,
     const float deltaFrame,
     const GeomCamera3& cam,
-    const msvc8::vector<CumulusVertex>& cumulusVertices
+    const fa::vector<CumulusVertex>& cumulusVertices
   )
   {
     (void)head;

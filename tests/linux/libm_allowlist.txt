@@ -6,11 +6,11 @@
 # (X87Math64.S); the host CRT is reached only with the CRT's SSE2 mode on (never in the sim) or
 # for pow's zero, infinite and NaN operands (IEEE-defined results). asinf, expf and logf use the
 # engine's legacy/math/Libm.cpp (plan WPL.11) and are not listed: a host call there fails.
-acos msvc8::acos(double)
-asin msvc8::asin(double)
-pow msvc8::pow(double, double)
+acos fa::acos(double)
+asin fa::asin(double)
+pow fa::pow(double, double)
 # powf: the sim driver's wall-clock pacing only (SimDriver.cpp, the beat rate from the sim rate).
-pow msvc8::powf(float, float)
+pow fa::powf(float, float)
 # powf: the skew clock's tick length and display factor (SimDriver.cpp), wall-clock pacing and a log
 # line; nothing it computes reaches the sim.
 powf (anonymous namespace)::ApplySharedStart((anonymous namespace)::SkewClock&, int, int, moho::CClientManagerImpl&)
@@ -23,7 +23,7 @@ tanf moho::VEC_D3DProjectionMatrixFOV(float, float, float, float, float)
 
 # Effects and decals: visual state, not in the sim checksum.
 atan2f moho::CEfxEmitter::Tick(int)
-atan2f (anonymous namespace)::CreateDecalFromTransform(moho::VTransform const&, Wm3::Vector3<float> const&, moho::Sim*, float, msvc8::string const&, msvc8::string const&, float, bool, msvc8::string const&, unsigned int, unsigned int)
+atan2f (anonymous namespace)::CreateDecalFromTransform(moho::VTransform const&, Wm3::Vector3<float> const&, moho::Sim*, float, fa::string const&, fa::string const&, float, bool, fa::string const&, unsigned int, unsigned int)
 
 # remote/wire: the server-authoritative wire format (the server quantises, clients decode); not
 # sim state.
@@ -32,6 +32,6 @@ sin faf::remote::wire::YawToQuaternion(unsigned int)
 cos faf::remote::wire::YawToQuaternion(unsigned int)
 cos faf::remote::wire::ApplyOrientationReckoning(faf::remote::wire::SEntityRecord&, faf::remote::wire::SEntityRecord const&, std::__1::span<unsigned int const, 18446744073709551615ul>, unsigned int, faf::remote::wire::SReckoningScheme const&, faf::remote::wire::SFrameCodec const&)
 # remote/client: the client rebuilding sync packets from the wire (runs on the client, not the sim).
-acos faf::remote::client::CSyncRebuilder::Apply(std::__1::span<unsigned char const, 18446744073709551615ul>, moho::SSyncData&)
+acos faf::remote::client::CSyncRebuilder::ApplyFrame(faf::remote::wire::SViewFrame, unsigned long, moho::SSyncData&, std::__1::chrono::time_point<std::__1::chrono::steady_clock, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> > >)
 # The client's beat clock: the beat rate the server's sim rate implies, for pacing and skew stats.
 pow faf::remote::client::CBeatClock::ExpectedBeatsPerSecond() const

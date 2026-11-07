@@ -34,7 +34,7 @@ namespace moho
    *
    * What it does:
    * Constructs the `gpg::RListType<moho::Shield*>` static (`Sim::mShields`),
-   * which preregisters it for `typeid(msvc8::list<moho::Shield*>)`, and
+   * which preregisters it for `typeid(fa::list<moho::Shield*>)`, and
    * returns it.
    *
    * `RListType<Shield*>`, vtable 0x00E347BC:

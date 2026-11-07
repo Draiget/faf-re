@@ -21,7 +21,7 @@ namespace gpg
    *   in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.
    *
    * What it is:
-   * Reflection/indexing adapter for `msvc8::vector<moho::SDelayedSubVizInfo>`.
+   * Reflection/indexing adapter for `fa::vector<moho::SDelayedSubVizInfo>`.
    */
   template <>
   class RVectorType<moho::SDelayedSubVizInfo> final : public gpg::RType, public gpg::RIndexed
@@ -35,7 +35,7 @@ namespace gpg
     /**
      * Address: 0x00507B60 (FUN_00507B60, gpg::RVectorType_SDelayedSubVizInfo::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x00507BF0 (FUN_00507BF0, gpg::RVectorType_SDelayedSubVizInfo::IsIndexed)
@@ -65,8 +65,8 @@ namespace gpg
 
   static_assert(sizeof(RVectorType<moho::SDelayedSubVizInfo>) == 0x68, "RVectorType<SDelayedSubVizInfo> size must be 0x68");
   static_assert(
-    sizeof(msvc8::vector<moho::SDelayedSubVizInfo>) == 0x10,
-    "msvc8::vector<SDelayedSubVizInfo> size must be 0x10"
+    sizeof(fa::vector<moho::SDelayedSubVizInfo>) == 0x10,
+    "fa::vector<SDelayedSubVizInfo> size must be 0x10"
   );
 
   /**

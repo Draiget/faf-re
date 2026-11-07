@@ -128,9 +128,9 @@ namespace
    * Clears and reassigns one destination string from projectile
    * `mDamageTypeName`.
    */
-  [[maybe_unused]] msvc8::string* CopyProjectileDamageTypeName(
+  [[maybe_unused]] fa::string* CopyProjectileDamageTypeName(
     const moho::Projectile* const projectile,
-    msvc8::string* const outName
+    fa::string* const outName
   )
   {
     if (outName == nullptr) {
@@ -326,7 +326,7 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName =
+      static const fa::string sName =
         gpg::STR_Printf("ManyToOneBroadcaster<%s>", gpg::RTypeOf<moho::EProjectileImpactEvent>()->GetName());
       return sName.c_str();
     }
@@ -344,10 +344,10 @@ namespace
       size_ = sizeof(moho::ManyToOneBroadcaster_EProjectileImpactEvent);
       version_ = 1;
       serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(
-        &gpg::LoadAndBroadcastManyToOneListenerEProjectileImpactEvent
+        reinterpret_cast<void (*)()>(&gpg::LoadAndBroadcastManyToOneListenerEProjectileImpactEvent)
       );
       serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(
-        &gpg::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1
+        reinterpret_cast<void (*)()>(&gpg::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1)
       );
     }
   };
@@ -386,7 +386,7 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName =
+      static const fa::string sName =
         gpg::STR_Printf("ManyToOneListener<%s>", gpg::RTypeOf<moho::EProjectileImpactEvent>()->GetName());
       return sName.c_str();
     }
@@ -544,12 +544,7 @@ namespace moho
   LuaPlus::LuaObject*
   func_GetProjectileFactory(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
   {
-    if (object == nullptr) {
-      return nullptr;
-    }
-
-    *object = CScrLuaMetatableFactory<Projectile>::Instance().Get(state);
-    return object;
+    return SCR_WriteMetatable<Projectile>(object, state);
   }
 
   /**
@@ -580,7 +575,7 @@ namespace moho
     const VTransform& launchTransform,
     const float damage,
     const float damageRadius,
-    const msvc8::string& damageTypeName,
+    const fa::string& damageTypeName,
     const CAiTarget& target,
     const bool isChildProjectile
   )
@@ -1360,7 +1355,7 @@ namespace moho
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);
     if (argumentCount != 1 && argumentCount != 2 && argumentCount != 4) {
-      const msvc8::string message = gpg::STR_Printf(kSetBallisticAccelerationArgCountError, argumentCount);
+      const fa::string message = gpg::STR_Printf(kSetBallisticAccelerationArgCountError, argumentCount);
       lua_pushstring(rawState, message.c_str());
       (void)lua_gettop(rawState);
       lua_error(rawState);
@@ -1575,7 +1570,7 @@ namespace moho
     // 0x006A2846..0x006A2861: the squares, their (z^2 + y^2) + x^2 sum and the
     // `fsqrt` stay on the x87 stack and are stored once, so lanes too small
     // (or too large) to square in float still give retail's speed.
-    const float speed = msvc8::VectorLengthZYXX87(&velocity.x);
+    const float speed = fa::VectorLengthZYXX87(&velocity.x);
     lua_pushnumber(rawState, speed);
     (void)lua_gettop(rawState);
     return 1;
@@ -2341,7 +2336,7 @@ namespace moho
       return 1;
     }
 
-    msvc8::string copiedDamageTypeName{};
+    fa::string copiedDamageTypeName{};
     (void)CopyProjectileDamageTypeName(sourceProjectile, &copiedDamageTypeName);
 
     Projectile* const childProjectile = PROJ_Create(
@@ -2433,9 +2428,9 @@ namespace moho
     constexpr float kUpScale = 2.2118911e-10f; // 0x2F733333
     constexpr float kUpBias = 0.05f;           // 0x3D4CCCCD
     Wm3::Vector3f randomDirection{};
-    randomDirection.x = msvc8::MulTwisterWord(kInvTwoTo32, random->twister.NextUInt32());
-    randomDirection.y = msvc8::MulTwisterWord(kUpScale, random->twister.NextUInt32()) + kUpBias;
-    randomDirection.z = msvc8::MulTwisterWord(kInvTwoTo32, random->twister.NextUInt32());
+    randomDirection.x = fa::MulTwisterWord(kInvTwoTo32, random->twister.NextUInt32());
+    randomDirection.y = fa::MulTwisterWord(kUpScale, random->twister.NextUInt32()) + kUpBias;
+    randomDirection.z = fa::MulTwisterWord(kInvTwoTo32, random->twister.NextUInt32());
 
     LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
     Projectile* const projectile = SCR_FromLua_Projectile(projectileObject, state);
@@ -2784,12 +2779,7 @@ namespace moho
    */
   [[maybe_unused]] void DestroyCProjectileAttributesTypeInfoBody(CProjectileAttributesTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**

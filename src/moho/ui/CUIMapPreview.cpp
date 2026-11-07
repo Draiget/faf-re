@@ -103,7 +103,7 @@ bool moho::CUIMapPreview::SetTextureFromMap(
     return false;
   }
 
-  msvc8::auto_ptr<CWldMap> loadedMap = WLD_LoadMapPreview(mapPath);
+  fa::auto_ptr<CWldMap> loadedMap = WLD_LoadMapPreview(mapPath);
   if (loadedMap.get() != nullptr && loadedMap->mMapPreviewChunk != nullptr) {
     mTexture = loadedMap->mMapPreviewChunk->mPreviewTexture;
   }
@@ -374,8 +374,5 @@ gpg::RType* moho::CUIMapPreview::GetClass() const
  */
 gpg::RRef moho::CUIMapPreview::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }

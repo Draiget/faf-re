@@ -28,7 +28,7 @@ namespace
   constexpr std::uint64_t kUnitStateMaskCallTransportPending = 0x0000000000000100ull;
   constexpr std::uint64_t kUnitStateMaskWaitingForTransport = 0x0000000000000080ull;
   constexpr std::uint64_t kUnitStateMaskTeleporting = 0x0000000000080000ull;
-  constexpr float kPi = 3.1415927f;
+  [[maybe_unused]] constexpr float kPi = 3.1415927f;
   constexpr std::int16_t kInvalidCellPosComponent = static_cast<std::int16_t>(0x8000);
 
   [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
@@ -208,7 +208,7 @@ namespace moho
           return -1;
         }
 
-        const float blend = (msvc8::cos(mBeamupTime * kPi * 0.1f) * 0.5f) + 0.5f;
+        const float blend = (fa::cos(mBeamupTime * kPi * 0.1f) * 0.5f) + 0.5f;
         mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
 
         if (const RUnitBlueprint* const blueprint = mUnit->GetBlueprint(); blueprint != nullptr) {
@@ -375,12 +375,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitCallTransport(gpg::RRef* const outRef, moho::CUnitCallTransport* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitCallTransport>());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

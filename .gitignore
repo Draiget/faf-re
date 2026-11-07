@@ -33,6 +33,11 @@ dependencies/usrsctp/
 dependencies/plog/
 dependencies/mbedtls/
 dependencies/slang/
+dependencies/zstd/
+dependencies/freetype/
+dependencies/msdfgen/
+dependencies/googletest/
+dependencies/DirectXTex/
 dependencies/*.7z
 *.7z
 *.pdb

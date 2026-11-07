@@ -107,15 +107,11 @@ namespace
          * What it does:
          * Maps one cube-face index (`0..5`) to the backend D3D9 face token.
          */
-        [[nodiscard]] int ResolveD3D9CubeFaceToken(const int faceIndex) noexcept
+        [[maybe_unused]] [[nodiscard]] int ResolveD3D9CubeFaceToken(const int faceIndex) noexcept
         {
             return static_cast<int>(kCubeFaceByIndex[faceIndex]);
         }
 
-        const char* GetStringDataRaw(const msvc8::string& text) noexcept
-        {
-            return (text.myRes < 16U) ? text.bx.buf : text.bx.ptr;
-        }
 }
 
 

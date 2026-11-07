@@ -15,7 +15,7 @@ namespace lua
    * Wraps the Lua error message and stores the originating `lua_State*` and
    * numeric error code.
    */
-  class lua_Error : public msvc8::runtime_error
+  class lua_Error : public fa::runtime_error
   {
   public:
     /**
@@ -27,8 +27,8 @@ namespace lua
      * What it does:
      * Constructs a `lua_Error` from an error message string, stores the
      * originating `lua_State` and numeric error code. Inherits message
-     * storage from `msvc8::runtime_error`; the `const char*` becomes the
-     * temporary `msvc8::string` the binary builds on the stack before the
+     * storage from `fa::runtime_error`; the `const char*` becomes the
+     * temporary `fa::string` the binary builds on the stack before the
      * base call.
      */
     lua_Error(lua_State* lua_state, int errcode, const char* err);
@@ -59,7 +59,7 @@ namespace lua
     /**
      * What it does:
      * Destroys one base Lua error payload by delegating to the inherited
-     * `msvc8::runtime_error` destruction lane.
+     * `fa::runtime_error` destruction lane.
      */
     ~lua_Error() override;
 
@@ -67,7 +67,7 @@ namespace lua
     int code;       // numeric lua error code (e.g. LUA_ERRMEM, LUA_ERRRUN)
   };
 
-  // 0x30 in the shipped binary, and now here: msvc8::runtime_error is the
+  // 0x30 in the shipped binary, and now here: fa::runtime_error is the
   // 0x28 base MSVC8 had (0x0C of std::exception plus an embedded 0x1C
   // string), so L lands at +0x28 and code at +0x2C. The constructor at
   // 0x009140D0 confirms both - `mov [esi+0x2Ch], eax` for code and

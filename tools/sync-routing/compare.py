@@ -13,6 +13,10 @@ Exit code 1 if any key differs in any way.
 
 A lockstep client gets every unit's death in `UnitData` and `ReleaseIds`, and the server keeps those
 with the unit's owner. `--army` (0-based, the view's army) leaves other armies' out of the reference.
+
+A lockstep client also gets every reclaim label, and the server sends a later one only once the player
+sees the spot. So `Reclaim` is checked apart: each label the player gets must be one the lockstep client
+got by then; the map's first ones must arrive on their beat; the rest is printed as held back.
 """
 import argparse
 import collections
@@ -91,11 +95,28 @@ def main():
     beats = sorted(beat for beat in set(reference) & set(routed) if beat >= args.from_beat)
     counts = collections.defaultdict(collections.Counter)
     examples = collections.defaultdict(list)
+    labels = {}
+    reclaim = collections.Counter()
+    reclaim_bad = []
+    for beat in sorted(b for b in reference if b < args.from_beat and reference[b]):
+        for entity, value in (decode(reference[beat])[0].get("Reclaim") or {}).items():
+            labels.setdefault(entity, set()).add(repr(normal(value)))
     for beat in beats:
         want = decode(reference[beat])[0] if reference[beat] else {}
         got = decode(routed[beat])[0] if routed[beat] else {}
         if args.army is not None:
             drop_foreign_deaths(want, args.army)
+        for entity, value in (want.get("Reclaim") or {}).items():
+            labels.setdefault(entity, set()).add(repr(normal(value)))
+            reclaim["told"] += 1
+        for entity, value in (got.get("Reclaim") or {}).items():
+            reclaim["got"] += 1
+            if repr(normal(value)) not in labels.get(entity, ()):
+                reclaim_bad.append((beat, entity, value))
+        if beat <= 1 and normal(want.get("Reclaim")) != normal(got.get("Reclaim")):
+            reclaim_bad.append((beat, "first labels", None))
+        want.pop("Reclaim", None)
+        got.pop("Reclaim", None)
         for key in sorted(set(want) | set(got), key=str):
             a = want.get(key)
             b = got.get(key)
@@ -110,7 +131,10 @@ def main():
                 examples[(key, kind)].append((beat, a, b))
 
     print("beats compared %d (reference %d, routed %d)" % (len(beats), len(reference), len(routed)))
-    bad = False
+    bad = bool(reclaim_bad)
+    print("Reclaim: lockstep told %d, player got %d, not as lockstep %d" % (reclaim["told"], reclaim["got"], len(reclaim_bad)))
+    for example in reclaim_bad[:args.examples]:
+        print("    %s" % repr(example)[:150])
     for key in sorted(counts, key=str):
         c = counts[key]
         if c["missing"] or c["extra"] or c["differs"]:

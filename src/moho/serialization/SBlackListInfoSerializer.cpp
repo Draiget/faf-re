@@ -12,17 +12,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* ResolveWeakPtrEntityType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::Entity>));
-    }
-
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
 } // namespace
 
 namespace moho
@@ -49,7 +38,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Read(ResolveWeakPtrEntityType(), &mEntity, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mEntity, nullOwner);
     archive->ReadInt(&mValue);
   }
 
@@ -67,7 +56,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Write(ResolveWeakPtrEntityType(), &mEntity, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mEntity, nullOwner);
     archive->WriteInt(mValue);
   }
 } // namespace moho

@@ -91,7 +91,7 @@ namespace moho
      * (mIAiAttackerListenersHead at +0x04/+0x08), invokes the
      * CScriptObject base ctor on the subobject at +0x0C, in-place
      * constructs the embedded `CTaskStage mStage` at +0x44, and
-     * zero-clears the embedded msvc8::vector triplets (`mWeapons`,
+     * zero-clears the embedded fa::vector triplets (`mWeapons`,
      * `mTasks`), the `WeakPtr<CTaskThread> mThread`, the
      * `CAiTarget mDesiredTarget`, and the trailing `mReportingState`
      * lane. The `mReportingState` (`+0xA0`) is left at zero; the
@@ -434,9 +434,9 @@ namespace moho
 
     Unit* mUnit = nullptr;                             // +0x40
     CTaskStage mStage;                                 // +0x44
-    msvc8::vector<UnitWeapon*> mWeapons;               // +0x58
+    fa::vector<UnitWeapon*> mWeapons;               // +0x58
     WeakPtr<CTaskThread> mThread;                      // +0x68
-    msvc8::vector<CAcquireTargetTask*> mTasks;         // +0x70
+    fa::vector<CAcquireTargetTask*> mTasks;         // +0x70
     CAiTarget mDesiredTarget;                          // +0x80
     EAiAttackerEvent mReportingState{};                // +0xA0
   };

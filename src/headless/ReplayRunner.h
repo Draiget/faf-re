@@ -17,6 +17,10 @@ namespace faf::headless
     std::string replayPath;     // `.scfareplay`
     std::string label;          // prefix of every line headless prints
     int focusArmy = -1;         // the army whose view `Sim::Sync` builds; -1 = observer
+    std::string rejoinPeers;    // when set, no replay: take seat `rejoinSource` back from these peers (address:port=source,...)
+    int rejoinPort = 0;         // with `rejoinPeers`: this client's game port
+    int rejoinSource = -1;      // when set: play as this source of a live game (CRejoinFeed.h)
+    int rejoinBeat = 0;         // with `rejoinSource`: the beat the driver takes over
     std::string digestPath;     // when set: one "beat digest" line per checksummed beat
     std::string syncKeysPath;   // when set: every top-level Lua `Sync` key seen, with beat counts
     std::string wireStatsPath;  // when set: the entities lane of the wire format, per beat (CSV)
@@ -25,6 +29,9 @@ namespace faf::headless
     int loopbackDeadReckoning = 0; // with `loopback`: dead-reckoning tolerance in 1/64-unit steps
     int loopbackTurnTolerance = 0; // with dead reckoning: orientation tolerance in 1/65536 turns (0: off)
     bool commandCheck = false;  // every command decoded and marshalled again, compared (ReplayCommandCheck.h)
+    bool seats = false;         // the commands through the game server's seats (ReplaySeats.h)
+    std::string seatsListen;    // with `seats`, Linux: the whole server's load: views and players over UDP at this address
+    bool targetAudit = false;   // with `seatsListen`: how many recorded targets a server's view wouldn't have held
     bool oracleCheck = false;   // the visibility oracle against the sim's own publication (ReplayOracleCheck.h)
     std::string oracleDigestsPath; // with `oracleCheck`: per beat and army, the oracle's answers as a digest
     bool changeSetCheck = false; // the sync walk's change set against its packet (ReplayChangeSetCheck.h)
@@ -48,6 +55,10 @@ namespace faf::headless
     int focusSwitchArmy = 0;
     std::string syncDumpPath;    // when set: each beat's Lua `Sync` bytes go here
     int viewPipelineThreads = 0; // with `viewBenchPath`: threads that finish the views while the sim goes on
+    bool viewTables = false;     // `--view-tables`: the session tables as a server keeps them (plan WP11 step 4)
+    int statsEvery = 0;          // `--stats-every <beats>` with `viewTables` (0: the server's default)
+    bool viewTeams = false;      // with `viewPipelineThreads`: one view per team and each player's own units
+    std::string viewDumpPath;    // with `viewBenchPath`: what each client holds, every 2000 beats, to compare two runs
     bool parallelViews = false;  // with `viewFramesPath`, `viewBenchPath` or `viewPacketsPath`: views built on the sim's workers
     bool keepClientData = false; // keep what only a client reads (`--keep-client-data`)
     bool viewBenchCheck = false; // with `viewBenchPath`: each held frame is compared with the whole one
@@ -60,7 +71,9 @@ namespace faf::headless
     std::string blueprintOrderPath; // when set: every blueprint by ordinal, in load order (plan WPL.16)
     std::string luaPairsPath;   // when set: the sim Lua state's pairs() order before BeginSession (plan WPL.18)
     int keyframeEvery = 0;      // when > 0: save the sim every this many beats (ReplayKeyframes.h)
+    int keyframeFirst = 0;      // with `keyframeEvery`, when > 0: the beat of the first save
     std::string keyframeDir;    // with `keyframeEvery`: where the keyframe files go
+    bool keyframePrepare = false;
     bool keyframeKeep = false;  // with `keyframeEvery`: keep the files after measuring them
     std::string resumeFrom;     // when set: a keyframe of this replay; the run continues from it
     std::function<bool(int)> stopAfter; // when set: asked after each packet's beat; true ends the run there

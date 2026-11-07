@@ -28,22 +28,6 @@ namespace
     &sim_FastBoneUpdates
   );
 
-  /**
-   * Address: 0x0054D000 (FUN_0054D000)
-   *
-   * What it does:
-   * Resolves and caches the reflected runtime type for `CAniPoseBone`.
-   */
-  [[nodiscard]] gpg::RType* CachedCAniPoseBoneType()
-  {
-    gpg::RType* type = moho::CAniPoseBone::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CAniPoseBone));
-      moho::CAniPoseBone::sType = type;
-    }
-    return type;
-  }
-
   // Address: 0x00BC9960 (FUN_00BC9960, register_CAniPoseSerializer) -- MSVC's
   // own compiler-generated dynamic initializer for this global runs the real
   // `gpg::SerSaveLoadHelper<CAniPose>` ctor (self-links into `sNewHelpers`,
@@ -112,7 +96,7 @@ namespace
     }
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Read(CachedCAniPoseBoneType(), objectStorage, owner);
+    archive->Read(gpg::CachedLookup<moho::CAniPoseBone>(moho::CAniPoseBone::sType), objectStorage, owner);
     return archive;
   }
 
@@ -133,7 +117,7 @@ namespace
     }
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Write(CachedCAniPoseBoneType(), objectSlot, owner);
+    archive->Write(gpg::CachedLookup<moho::CAniPoseBone>(moho::CAniPoseBone::sType), objectSlot, owner);
     return archive;
   }
 
@@ -247,31 +231,6 @@ namespace
     laneView->lane38 = 0.0f;
     laneView->lane3C = 0.0f;
     return laneView;
-  }
-
-  [[nodiscard]] constexpr std::intptr_t PoseBoneStrideBytes() noexcept
-  {
-    return static_cast<std::intptr_t>(sizeof(moho::CAniPoseBone));
-  }
-
-  [[nodiscard]] moho::CAniPoseBone* PoseBoneByteOffset(
-    moho::CAniPoseBone* const begin,
-    const std::int32_t elementOffset
-  ) noexcept
-  {
-    const std::intptr_t beginBytes = reinterpret_cast<std::intptr_t>(begin);
-    const std::intptr_t offsetBytes = static_cast<std::intptr_t>(elementOffset) * PoseBoneStrideBytes();
-    return reinterpret_cast<moho::CAniPoseBone*>(beginBytes + offsetBytes);
-  }
-
-  [[nodiscard]] const moho::CAniPoseBone* PoseBoneByteOffset(
-    const moho::CAniPoseBone* const begin,
-    const std::int32_t elementOffset
-  ) noexcept
-  {
-    const std::intptr_t beginBytes = reinterpret_cast<std::intptr_t>(begin);
-    const std::intptr_t offsetBytes = static_cast<std::intptr_t>(elementOffset) * PoseBoneStrideBytes();
-    return reinterpret_cast<const moho::CAniPoseBone*>(beginBytes + offsetBytes);
   }
 
   /**

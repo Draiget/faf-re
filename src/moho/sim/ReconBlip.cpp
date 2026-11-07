@@ -142,7 +142,7 @@ namespace
    * Copies one source entity mesh shared-pair `(px,pi)` and retains one shared
    * control-block owner when the control lane is non-null.
    */
-  [[nodiscard]] boost::SharedPtrRaw<RScmResource> CopyEntityMeshSharedRetained(const Entity* const source) noexcept
+  [[maybe_unused]] [[nodiscard]] boost::SharedPtrRaw<RScmResource> CopyEntityMeshSharedRetained(const Entity* const source) noexcept
   {
     boost::SharedPtrRaw<RScmResource> out{};
     if (source == nullptr) {
@@ -192,13 +192,6 @@ namespace
     return {direction.x * randomScale, direction.y * randomScale, direction.z * randomScale};
   }
 
-  [[nodiscard]] gpg::RRef MakeReconBlipRef(ReconBlip* const object) noexcept
-  {
-    gpg::RRef ref{};
-    ref.mObj = object;
-    ref.mType = object ? ReconBlip::StaticGetClass() : nullptr;
-    return ref;
-  }
 } // namespace
 
 gpg::RType* SPerArmyReconInfo::sType = nullptr;
@@ -821,7 +814,7 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
 ReconBlip::~ReconBlip()
 {
   // `mReconDat` is the last-declared member, so MSVC emits its
-  // `msvc8::vector<SPerArmyReconInfo>::~vector()` (FUN_005C5580, called at
+  // `fa::vector<SPerArmyReconInfo>::~vector()` (FUN_005C5580, called at
   // 0x005BECBB) as the first teardown step of this epilogue. Nothing to write.
   // FUN_005BEC90 destroys the payload in place and re-inits it before the
   // rest of the epilogue runs; `mUnitVarDat`'s own destructor then sees an
@@ -859,10 +852,7 @@ void ReconBlip::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg:
  */
 gpg::RRef ReconBlip::GetDerivedObjectRef()
 {
-  gpg::RRef objectRef{};
-  objectRef.mObj = this;
-  objectRef.mType = GetClass();
-  return objectRef;
+  return gpg::MakeSelfRef(this);
 }
 
 /**
@@ -1225,34 +1215,6 @@ bool ReconBlip::IsMaybeDead(CArmyImpl* const army) const
 bool ReconBlip::IsFake() const noexcept
 {
   return mUnitConstDat.mFake != 0u;
-}
-
-SPerArmyReconInfo* ReconBlip::GetPerArmyReconInfo(const std::int32_t armyIndex) noexcept
-{
-  if (armyIndex < 0 || mReconDat.begin() == nullptr || mReconDat.end() == nullptr) {
-    return nullptr;
-  }
-
-  const std::ptrdiff_t count = mReconDat.end() - mReconDat.begin();
-  if (armyIndex >= count) {
-    return nullptr;
-  }
-
-  return mReconDat.begin() + armyIndex;
-}
-
-const SPerArmyReconInfo* ReconBlip::GetPerArmyReconInfo(const std::int32_t armyIndex) const noexcept
-{
-  if (armyIndex < 0 || mReconDat.begin() == nullptr || mReconDat.end() == nullptr) {
-    return nullptr;
-  }
-
-  const std::ptrdiff_t count = mReconDat.end() - mReconDat.begin();
-  if (armyIndex >= count) {
-    return nullptr;
-  }
-
-  return mReconDat.begin() + armyIndex;
 }
 
 /**

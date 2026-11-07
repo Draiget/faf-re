@@ -21,11 +21,11 @@ namespace moho
     // +0x00
     std::uintptr_t addr;
     // +0x04
-    msvc8::string symbol;
+    fa::string symbol;
     // +0x20
     std::uintptr_t symDis;
     // +0x24
-    msvc8::string filename;
+    fa::string filename;
     // +0x40
     std::uint32_t lineNum;
     // +0x44
@@ -36,7 +36,7 @@ namespace moho
      * Formats one resolved symbol line as:
      * `symbol + symDis bytes (file(lineNum) + lineDis bytes)`.
      */
-    [[nodiscard]] msvc8::string FormatResolvedLine() const;
+    [[nodiscard]] fa::string FormatResolvedLine() const;
   };
 
 #if defined(_WIN64)
@@ -208,7 +208,7 @@ namespace moho
    * Returns UTF-8 text containing recent log-history lines for crash/report
    * output flows.
    */
-  msvc8::string LOG_GetRecentLines(std::uint32_t maxLines);
+  fa::string LOG_GetRecentLines(std::uint32_t maxLines);
 
   /**
    * Address: 0x004A22B0 (FUN_004A22B0)
@@ -237,7 +237,7 @@ namespace moho
    * What it does:
    * Formats callstack entries from `[firstFrame, endFrame)` into text lines.
    */
-  msvc8::string PLAT_FormatCallstack(std::int32_t firstFrame, std::int32_t endFrame, const std::uintptr_t* frames);
+  fa::string PLAT_FormatCallstack(std::int32_t firstFrame, std::int32_t endFrame, const std::uintptr_t* frames);
 
   /**
    * Address: 0x004A25D0 (FUN_004A25D0)
@@ -248,7 +248,7 @@ namespace moho
    * Converts one decorated symbol into undecorated text under the shared
    * symbol-handler mutex, with optional underscore-stripping mode.
    */
-  msvc8::string PLAT_UnDecorateSymbolName(const char* name, bool stripLeadingUnderscore);
+  fa::string PLAT_UnDecorateSymbolName(const char* name, bool stripLeadingUnderscore);
 
   /**
    * Address: 0x004A1F10 (FUN_004A1F10)
@@ -296,7 +296,7 @@ namespace moho
    * Reads UTF-16 clipboard text from `CF_UNICODETEXT`, converts it to UTF-8,
    * and returns empty text when clipboard ownership/data is unavailable.
    */
-  msvc8::string WIN_GetClipboardText();
+  fa::string WIN_GetClipboardText();
 
   /**
    * Address: 0x004F2800 (FUN_004F2800, ?WIN_OkBox@Moho@@YAXVStrArg@gpg@@0@Z)
@@ -366,7 +366,7 @@ namespace moho
    * What it does:
    * Converts current `GetLastError()` value into readable UTF-8 text.
    */
-  msvc8::string WIN_GetLastError();
+  fa::string WIN_GetLastError();
 
   /**
    * Address: 0x004F1190 (FUN_004F1190)

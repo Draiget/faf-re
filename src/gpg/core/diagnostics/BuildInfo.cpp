@@ -19,17 +19,17 @@ namespace gpg::diag
       "-dirty"
 #endif
       " " FAF_BUILD_ARCH " " FAF_BUILD_CONFIG " (" FAF_BUILD_BRANCH ", " FAF_BUILD_DESCRIBE ")";
-    constexpr char kLabel[] =
-      "FAF-RE by Draiget, build " FAF_BUILD_COMMIT_SHORT
-#if FAF_BUILD_DIRTY
-      "-dirty"
-#endif
-      " " FAF_BUILD_ARCH;
+    constexpr char kLabel[] = "FAF-RE, Draiget & contributors, build " FAF_BUILD_SHOWN " " FAF_BUILD_ARCH;
   } // namespace
 
   const char* BuildLabel() noexcept
   {
     return kLabel;
+  }
+
+  const char* BuildVersion() noexcept
+  {
+    return FAF_BUILD_SHOWN;
   }
 
   const char* BuildCommit() noexcept

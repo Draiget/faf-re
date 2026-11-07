@@ -110,14 +110,6 @@ namespace
   constexpr const char* kNavigatorCanPathToGoalMethodName = "CanPathToGoal";
   constexpr const char* kNavigatorEmptyHelpText = "";
 
-  [[nodiscard]] gpg::RType* CachedCTaskType()
-  {
-    if (!CTask::sType) {
-      CTask::sType = gpg::LookupRType(typeid(CTask));
-    }
-    return CTask::sType;
-  }
-
   template <typename TObject>
   [[nodiscard]] TObject* ReadPointerWithType(
     gpg::ReadArchive* const archive,
@@ -1216,7 +1208,7 @@ void CAiNavigatorImpl::MemberDeserialize(gpg::ReadArchive* const archive, const 
   const gpg::RRef ownerRef{};
   archive->Read(gpg::RTypeOf<IAiNavigator>(), this, ownerRef);
   archive->Read(gpg::RTypeOf<CScriptObject>(), static_cast<CScriptObject*>(this), ownerRef);
-  archive->Read(CachedCTaskType(), static_cast<CTask*>(this), ownerRef);
+  archive->Read(gpg::CachedLookup<CTask>(CTask::sType), static_cast<CTask*>(this), ownerRef);
 
   Unit* const loadedUnit = ReadPointerWithType<Unit>(archive, ownerRef, gpg::RTypeOf<Unit>());
 
@@ -1252,7 +1244,7 @@ void CAiNavigatorImpl::MemberSerialize(gpg::WriteArchive* const archive, const i
   const gpg::RRef ownerRef{};
   archive->Write(gpg::RTypeOf<IAiNavigator>(), this, ownerRef);
   archive->Write(gpg::RTypeOf<CScriptObject>(), static_cast<const CScriptObject*>(this), ownerRef);
-  archive->Write(CachedCTaskType(), static_cast<const CTask*>(this), ownerRef);
+  archive->Write(gpg::CachedLookup<CTask>(CTask::sType), static_cast<const CTask*>(this), ownerRef);
 
   WritePointerWithType(archive, mUnit, gpg::RTypeOf<Unit>(), gpg::TrackedPointerState::Unowned, ownerRef);
 
@@ -1278,10 +1270,7 @@ gpg::RType* CAiNavigatorImpl::GetClass() const
  */
 gpg::RRef CAiNavigatorImpl::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**

@@ -19,9 +19,6 @@
 
 namespace
 {
-  constexpr const char* kSerializationHeaderPath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.h";
-
   // Forward declaration: defined further down in this namespace; used by
   // SScrollerSerializer::Init() below.
 
@@ -330,8 +327,8 @@ namespace
   ) noexcept
   {
     // 0x00778698 `fsincos`: the x87 results, not the CRT's software sin/cos.
-    *outCos = msvc8::cosf(angle);
-    *outSin = msvc8::sinf(angle);
+    *outCos = fa::cosf(angle);
+    *outSin = fa::sinf(angle);
     return outSin;
   }
 } // namespace
@@ -496,7 +493,7 @@ namespace moho
           phaseDuration = wasForward ? mScroller.mFloat10 : mScroller.mFloat0C;
         }
 
-        mSpeed[axis] = msvc8::FloorToIntX87(phaseDuration * 10.0f); // 0x00777791, 0x007777C0
+        mSpeed[axis] = fa::FloorToIntX87(phaseDuration * 10.0f); // 0x00777791, 0x007777C0
       }
 
       if (!changed) {
@@ -673,7 +670,7 @@ namespace
   void DeserializeCTextureScrollerSerializerCallback(gpg::ReadArchive* archive, std::intptr_t objectPtr, int unusedTag, gpg::RRef* ownerRef);
   void SerializeCTextureScrollerSerializerCallback(gpg::WriteArchive* archive, std::intptr_t objectPtr, int unusedTag, gpg::RRef* ownerRef);
 
-  void DeserializeCTextureScrollerSerializerCallback(
+  [[maybe_unused]] void DeserializeCTextureScrollerSerializerCallback(
     gpg::ReadArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -683,7 +680,7 @@ namespace
     reinterpret_cast<moho::CTextureScroller*>(objectPtr)->MemberDeserialize(archive);
   }
 
-  void SerializeCTextureScrollerSerializerCallback(
+  [[maybe_unused]] void SerializeCTextureScrollerSerializerCallback(
     gpg::WriteArchive* const archive,
     const std::intptr_t objectPtr,
     const int,

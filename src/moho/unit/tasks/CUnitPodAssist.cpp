@@ -416,7 +416,7 @@ namespace moho
    */
   bool CUnitPodAssist::HasNextCommand() const
   {
-    const msvc8::vector<WeakPtr<CUnitCommand>>& commands = mUnit->CommandQueue->mCommandVec;
+    const fa::vector<WeakPtr<CUnitCommand>>& commands = mUnit->CommandQueue->mCommandVec;
     if (commands.size() < 2u) {
       return false;
     }
@@ -603,12 +603,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitPodAssist(gpg::RRef* const outRef, moho::CUnitPodAssist* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitPodAssist>());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 } // namespace gpg
 

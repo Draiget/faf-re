@@ -336,7 +336,7 @@ namespace gpg::HaStar
      * already name as the managed type of that shared_ptr.
      *
      * Full definition lives in `Cluster.cpp` (it embeds `ClusterInternalCache<T>`,
-     * whose own storage is a TU-local `msvc8::hash_map` instantiation) -
+     * whose own storage is a TU-local `fa::hash_map` instantiation) -
      * only a pointer to it escapes this header.
      */
     class ClusterCacheImpl;

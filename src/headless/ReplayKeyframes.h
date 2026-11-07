@@ -42,12 +42,25 @@ namespace faf::headless
     [[nodiscard]] int Failures() const noexcept { return mFailures; }
     [[nodiscard]] bool Pending() const noexcept { return mPending; }
 
+    /** For the replay viewer's hidden process: each file gets its name only once complete, and nothing is measured. */
+    void SetPreparing(const bool preparing) noexcept { mPreparing = preparing; }
+    /** Before any keyframe: the first comes at this beat. A later session of a `--seek` run goes on from what it has. */
+    void SetFirstBeat(const int beat) noexcept
+    {
+      if (mIndex == nullptr || mIndex->empty()) {
+        mNextBeat = beat;
+      }
+    }
+    [[nodiscard]] bool IsPreparing() const noexcept { return mPreparing; }
+
     // Called by the request.
+    void OnPrepared(std::uint32_t beat, double saveSeconds);
     void OnSaved(
       std::uint32_t beat, const std::string& path, double saveSeconds, bool succeeded, const std::string& error
     );
 
   private:
+    bool mPreparing = false;
     std::string mDirectory;
     std::string mLabel;
     int mEveryBeats;

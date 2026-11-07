@@ -26,6 +26,8 @@ namespace moho
   class ScrWatchCtrl : public wxTreeListCtrl
   {
   public:
+    using wxTreeListCtrl::Update; // wxWindow's own, which the row update below would hide.
+
     /**
      * Address: 0x004D6FF0 (FUN_004D6FF0, ??0ScrWatchCtrl@Moho@@QAE@PAVwxWindow@@ABHHHHABVwxPoint@@ABVwxSize@@@Z)
      *
@@ -59,7 +61,7 @@ namespace moho
      * What it does:
      * Replaces the rows with `watches`, sorted by name.
      */
-    void Update(const msvc8::vector<ScrWatch>& watches);
+    void Update(const fa::vector<ScrWatch>& watches);
 
     /**
      * Address: 0x004D7380 (FUN_004D7380, ?OnItemActivate@ScrWatchCtrl@Moho@@QAEXAAVwxTreeEvent@@@Z)

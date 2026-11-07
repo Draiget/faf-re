@@ -46,7 +46,7 @@ namespace gpg::gal
    * What it does:
    * Returns the variable-name string lane.
    */
-  msvc8::string* EffectVariableD3D10::GetName()
+  fa::string* EffectVariableD3D10::GetName()
   {
     return &name_;
   }
@@ -248,7 +248,7 @@ namespace gpg::gal
    * What it does:
    * Reads a boolean annotation by name from this variable handle.
    */
-  bool EffectVariableD3D10::GetAnnotationBool(bool* const outValue, const msvc8::string& annotationName)
+  bool EffectVariableD3D10::GetAnnotationBool(bool* const outValue, const fa::string& annotationName)
   {
     if (variableHandle_ == nullptr) {
       ThrowGalError("EffectVariableD3D10.cpp", 154, "invalid effect variable");
@@ -275,7 +275,7 @@ namespace gpg::gal
    * What it does:
    * Reads an integer annotation by name from this variable handle.
    */
-  bool EffectVariableD3D10::GetAnnotationInt(int* const outValue, const msvc8::string& annotationName)
+  bool EffectVariableD3D10::GetAnnotationInt(int* const outValue, const fa::string& annotationName)
   {
     if (variableHandle_ == nullptr) {
       ThrowGalError("EffectVariableD3D10.cpp", 173, "invalid effect variable");
@@ -300,7 +300,7 @@ namespace gpg::gal
    * What it does:
    * Reads a float annotation by name from this variable handle.
    */
-  bool EffectVariableD3D10::GetAnnotationFloat(float* const outValue, const msvc8::string& annotationName)
+  bool EffectVariableD3D10::GetAnnotationFloat(float* const outValue, const fa::string& annotationName)
   {
     if (variableHandle_ == nullptr) {
       ThrowGalError("EffectVariableD3D10.cpp", 189, "invalid effect variable");
@@ -325,7 +325,7 @@ namespace gpg::gal
    * What it does:
    * Reads a string annotation by name from this variable handle.
    */
-  bool EffectVariableD3D10::GetAnnotationString(msvc8::string* const outValue, const msvc8::string& annotationName)
+  bool EffectVariableD3D10::GetAnnotationString(fa::string* const outValue, const fa::string& annotationName)
   {
     if (variableHandle_ == nullptr) {
       ThrowGalError("EffectVariableD3D10.cpp", 205, "invalid effect variable");

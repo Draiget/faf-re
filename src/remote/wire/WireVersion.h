@@ -44,9 +44,12 @@ namespace faf::remote::wire
    * the resource deposits the sim adds and the terrain edits; a creation carries the sim's
    * creation tick. Entities 9: with ground following, a dead-reckoned position carries a bit
    * saying its height is the terrain's. Entities 10: the frame header carries the server's sim
-   * rate and clock.
+   * rate and clock. Entities 11: a changed position, and a changed yaw-only orientation, carry a
+   * bit saying they go as the step from the baseline's record in exponential-Golomb codes.
+   * Entities 12: a change's id gap in an order-0 exponential-Golomb code and its field mask as
+   * its place among the frame's last 15 masks (`CChangeHeaders`).
    */
-  inline constexpr std::array<std::uint16_t, kLaneCount> kLaneVersions{10, 1, 1, 1, 1, 1};
+  inline constexpr std::array<std::uint16_t, kLaneCount> kLaneVersions{12, 1, 1, 1, 1, 1};
 
   [[nodiscard]] const char* LaneName(ELane lane) noexcept;
 

@@ -1,4 +1,5 @@
 #include "WinApp.h"
+#include "moho/misc/WideStringRange.h"
 #include "platform/X87Precision.h"
 
 #include "platform/Platform.h"
@@ -42,6 +43,7 @@
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/TimeBar.h"
+#include "moho/render/d3d/CD3DDevice.h"
 #include "moho/resource/ResourceManager.h"
 #include "moho/core/Thread.h"
 
@@ -88,7 +90,7 @@ namespace
   HHOOK sWindowHook = nullptr;
   gpg::time::Timer wakeupTimer;
   float wakeupTimerDur = kInfiniteWakeupMs;
-  constexpr DWORD kPlatformSymbolHandlerOptions =
+  [[maybe_unused]] constexpr DWORD kPlatformSymbolHandlerOptions =
     SYMOPT_FAIL_CRITICAL_ERRORS | // suppress critical-error UI while probing symbols.
     SYMOPT_LOAD_LINES | // include source line records for resolved addresses.
     SYMOPT_DEFERRED_LOADS | // lazily load module symbols as needed.
@@ -97,8 +99,6 @@ namespace
     kPlatformSymbolHandlerOptions == 0x216u,
     "PLAT_Init symbol options must match recovered SymSetOptions(0x216)"
   );
-
-  moho::CWinLogTarget& sLogWindowTarget = moho::sLogWindowTarget;
 
   /**
    * The splash screen WINX_InitSplash shows (0x010A9BE4), a VC8
@@ -384,7 +384,6 @@ namespace
   // the boost::function1 manage / clear / manage::do_alloc lanes.
   LegacyUnaryDispatchAdapter gLegacyTssAdapterUnaryDispatchAdapter = nullptr;
   LegacyTypeInfoDispatchAdapter gLegacyTssAdapterTypeInfoDispatchAdapter = nullptr;
-  bool gLegacyTssAdapterDispatchPairPublished = false;
 
   // Synthetic engine-T binding for the `boost::detail::tss_adapter<T>` RTTI
   // Type Descriptor referenced at 0x00F61928 in the binary.
@@ -909,7 +908,7 @@ namespace
     if (sourceCallback != nullptr) {
       sourceLifecycle = sourceCallback->lifecycleAdapter;
     }
-    return reinterpret_cast<LegacyUnaryDispatchAdapter>(sourceLifecycle);
+    return reinterpret_cast<LegacyUnaryDispatchAdapter>(reinterpret_cast<void (*)()>(sourceLifecycle));
   }
 
   /**
@@ -1031,65 +1030,6 @@ namespace
 
 
   /**
-   * Address: 0x004A1AE0 (FUN_004A1AE0)
-   * Mangled: ?append@wstring@std@@QAEAAV12@ABV12@II@Z
-   *
-   * What it does:
-   * Appends a clamped substring range from `source` into `destination`.
-   */
-  [[maybe_unused]] std::wstring* AppendWideSubstringRangeClamped(
-    std::wstring* const destination,
-    const std::wstring& source,
-    std::size_t count,
-    const std::size_t sourceOffset
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-    if (sourceOffset > source.size()) {
-      throw std::out_of_range("wstring::append sourceOffset");
-    }
-
-    const std::size_t available = source.size() - sourceOffset;
-    if (count > available) {
-      count = available;
-    }
-
-    destination->append(source, sourceOffset, count);
-    return destination;
-  }
-
-  /**
-   * Address: 0x004A19E0 (FUN_004A19E0)
-   * Mangled: ??Ywstring@std@@VQAEAAV01@PB_W@Z
-   *
-   * What it does:
-   * Appends one wide source range into destination while preserving overlapping
-   * source semantics.
-   */
-  [[maybe_unused]] std::wstring* AppendWideRangePreservingOverlap(
-    std::wstring* const destination,
-    const wchar_t* const source,
-    const std::size_t sourceLength
-  )
-  {
-    if (destination == nullptr || source == nullptr) {
-      return destination;
-    }
-
-    const wchar_t* const destinationData = destination->data();
-    const wchar_t* const destinationEnd = destinationData + destination->size();
-    if (source >= destinationData && source < destinationEnd) {
-      const std::size_t sourceOffset = static_cast<std::size_t>(source - destinationData);
-      return AppendWideSubstringRangeClamped(destination, *destination, sourceLength, sourceOffset);
-    }
-
-    destination->append(source, sourceLength);
-    return destination;
-  }
-
-  /**
    * Address: 0x004A1820 (FUN_004A1820, sub_4A1820)
    *
    * What it does:
@@ -1101,7 +1041,7 @@ namespace
   )
   {
     const wchar_t* const safeSource = (source != nullptr) ? source : L"";
-    return AppendWideRangePreservingOverlap(destination, safeSource, std::wcslen(safeSource));
+    return moho::AppendWideRangePreservingOverlap(destination, safeSource, std::wcslen(safeSource));
   }
 
   /**
@@ -1118,69 +1058,6 @@ namespace
     return AppendWideStringFromNullTerminatedInputA(destination, source);
   }
 
-
-  /**
-   * Address: 0x004A1950 (FUN_004A1950)
-   * Mangled: ?compare@?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@QBEHPB_W@Z
-   *
-   * What it does:
-   * Lexicographically compares up to `lhsRequestedLength` characters from one
-   * wide string against one raw wide range and returns `-1/0/1`.
-   */
-  [[maybe_unused]] int CompareWideStringPrefixRange(
-    std::size_t lhsRequestedLength,
-    const std::wstring* const lhs,
-    const std::size_t rhsLength,
-    const wchar_t* const rhs
-  ) noexcept
-  {
-    if (lhs == nullptr || rhs == nullptr) {
-      return (lhs == nullptr) ? ((rhs == nullptr) ? 0 : -1) : 1;
-    }
-
-    std::size_t lhsLength = lhsRequestedLength;
-    if (lhs->size() < lhsLength) {
-      lhsLength = lhs->size();
-    }
-
-    std::size_t compareCount = lhsLength;
-    if (compareCount > rhsLength) {
-      compareCount = rhsLength;
-    }
-
-    for (std::size_t i = 0; i < compareCount; ++i) {
-      const wchar_t left = (*lhs)[i];
-      const wchar_t right = rhs[i];
-      if (left != right) {
-        return (left < right) ? -1 : 1;
-      }
-    }
-
-    if (lhsLength >= rhsLength) {
-      return (lhsLength != rhsLength) ? 1 : 0;
-    }
-    return -1;
-  }
-
-  /**
-   * Address: 0x004A1880 (FUN_004A1880, sub_4A1880)
-   *
-   * What it does:
-   * Compares one wide string against one zero-terminated wide source.
-   */
-  [[maybe_unused]] int CompareWideStringWithNullTerminatedInput(
-    const std::wstring* const lhs,
-    const wchar_t* const rhs
-  ) noexcept
-  {
-    const wchar_t* const safeRhs = (rhs != nullptr) ? rhs : L"";
-    return CompareWideStringPrefixRange(
-      (lhs != nullptr) ? lhs->size() : 0U,
-      lhs,
-      std::wcslen(safeRhs),
-      safeRhs
-    );
-  }
 
   /**
    * Address: 0x004A1850 (FUN_004A1850, sub_4A1850)
@@ -1540,7 +1417,7 @@ namespace
       (void)::CloseHandle(processInformation.hThread);
     }
 
-    const msvc8::string outputPathUtf8 = gpg::STR_WideToUtf8(outputPath.c_str());
+    const fa::string outputPathUtf8 = gpg::STR_WideToUtf8(outputPath.c_str());
     if (moho::FILE_GetFileInfo(outputPathUtf8.c_str(), nullptr, false)) {
       moho::PLAT_RegisterFileForErrorReport(outputPath.c_str());
     }
@@ -1601,17 +1478,18 @@ namespace
    * turns a typed WM_CHAR into its code-page byte, which the W dispatch then reads as a UTF-16
    * code unit: Cyrillic "П" (0xCF in 1251) reached the edit box as "Ï" (U+00CF).
    */
-  void DispatchPendingMessage()
+  bool DispatchPendingMessage()
   {
     MSG message{};
     if (::PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE) == FALSE) {
-      return;
+      return false;
     }
     if (message.message == WM_QUIT) {
       wxTheApp->ExitMainLoop(); // what wxApp::DoMessage does on WM_QUIT
-      return;
+      return true;
     }
     wxTheApp->DoMessage(reinterpret_cast<WXMSG*>(&message));
+    return true;
   }
 
   DWORD ComputeWaitTimeoutMs()
@@ -1687,7 +1565,7 @@ namespace
    * Converts lone `\n` bytes in one UTF-8 crash/body payload into CRLF
    * sequences while preserving existing `\r\n` pairs.
    */
-  [[nodiscard]] msvc8::string NormalizeDialogNewlines(const gpg::StrArg text)
+  [[nodiscard]] fa::string NormalizeDialogNewlines(const gpg::StrArg text)
   {
     const char* const source = text != nullptr ? text : "";
     std::string normalized;
@@ -1702,7 +1580,7 @@ namespace
       previous = current;
     }
 
-    msvc8::string result;
+    fa::string result;
     result.assign_owned(normalized);
     return result;
   }
@@ -1723,7 +1601,7 @@ namespace
       const std::wstring caption = gpg::STR_Utf8ToWide(initData != nullptr ? initData->caption : "");
       (void)::SetWindowTextW(hWnd, caption.c_str());
 
-      const msvc8::string normalizedBody = NormalizeDialogNewlines(initData != nullptr ? initData->body : "");
+      const fa::string normalizedBody = NormalizeDialogNewlines(initData != nullptr ? initData->body : "");
       const std::wstring bodyText = gpg::STR_Utf8ToWide(normalizedBody.c_str());
       (void)::SetDlgItemTextW(hWnd, kCrashTextControlId, bodyText.c_str());
 
@@ -1987,7 +1865,7 @@ namespace
       return;
     }
 
-    const msvc8::string callstackText =
+    const fa::string callstackText =
       moho::PLAT_FormatCallstack(0, static_cast<std::int32_t>(frameCount), stackFrames);
 
     // One Logf per frame. gpg::Logf formats through a bounded buffer, so a
@@ -2327,15 +2205,25 @@ void moho::WIN_AppExecute(IWinApp* const app)
       acceptNewEvent = false;
     }
 
-    if (wxTheApp->Pending()) {
-      DispatchPendingMessage(); // engine change: wxTheApp->Dispatch() could block, see there
+    // Engine change: taking the message is the check, as a second PeekMessage per pass was 7 % of
+    // an uncapped frame. wxTheApp->Dispatch() could also block, see there.
+    if (DispatchPendingMessage()) {
       success = true;
       continue;
     }
 
+    // Engine addition: where the frame's WM_PAINT would come, after the messages and before idle.
+    if (moho::D3D_RunDirectPaint()) {
+      success = true;
+    }
+
+    // Engine change: with idle work done this goes on to the next frame without asking for messages
+    // a second or third time; one that arrives now waits for the top of the next frame.
     if (success) {
       success = wxTheApp->ProcessIdle();
-      continue;
+      if (success) {
+        continue;
+      }
     }
 
     if (!wxGetApp().KeepGoing()) {
@@ -2350,7 +2238,8 @@ void moho::WIN_AppExecute(IWinApp* const app)
 
     const DWORD timeoutMs = ComputeWaitTimeoutMs();
     wakeupTimerDur = kInfiniteWakeupMs;
-    WIN_GetWaitHandleSet()->MsgWaitEx(timeoutMs);
+    // Engine addition: no paint message wakes this wait for a frame that draws without one.
+    WIN_GetWaitHandleSet()->MsgWaitEx(moho::D3D_IsDirectPaintPending() ? 0u : timeoutMs);
   }
 
   app->Destroy();
@@ -2406,7 +2295,7 @@ void moho::PLAT_CatchStructuredExceptions()
  * Produces one UTF-8 log-history text blob consumed by crash/report export
  * paths. The current recovered logging backend already applies bounded history.
  */
-msvc8::string moho::LOG_GetRecentLines(const std::uint32_t maxLines)
+fa::string moho::LOG_GetRecentLines(const std::uint32_t maxLines)
 {
   (void)maxLines;
   return gpg::GetRecentLogLines();
@@ -2422,7 +2311,7 @@ msvc8::string moho::LOG_GetRecentLines(const std::uint32_t maxLines)
  */
 void moho::PLAT_CreateGameLogForReport()
 {
-  const msvc8::string recentLogLines = LOG_GetRecentLines(0);
+  const fa::string recentLogLines = LOG_GetRecentLines(0);
   const char* const appShortName = (sSupComApp != nullptr && !sSupComApp->shortName.empty())
                                      ? sSupComApp->shortName.c_str()
                                      : "SupCom";
@@ -2433,8 +2322,8 @@ void moho::PLAT_CreateGameLogForReport()
   HANDLE logFileHandle =
     ::CreateFileW(logFilePath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (logFileHandle == INVALID_HANDLE_VALUE) {
-    const msvc8::string errorText = WIN_GetLastError();
-    const msvc8::string utf8Path = gpg::STR_WideToUtf8(logFilePath.c_str());
+    const fa::string errorText = WIN_GetLastError();
+    const fa::string utf8Path = gpg::STR_WideToUtf8(logFilePath.c_str());
     gpg::Warnf(
       "PLAT_CreateGameLogForReport(\"%s\") log file creation failed: %s",
       utf8Path.c_str(),
@@ -2451,8 +2340,8 @@ void moho::PLAT_CreateGameLogForReport()
         &bytesWritten,
         nullptr
       ) == FALSE) {
-    const msvc8::string errorText = WIN_GetLastError();
-    const msvc8::string utf8Path = gpg::STR_WideToUtf8(logFilePath.c_str());
+    const fa::string errorText = WIN_GetLastError();
+    const fa::string utf8Path = gpg::STR_WideToUtf8(logFilePath.c_str());
     gpg::Warnf(
       "PLAT_CreateGameLogForReport(\"%s\") log file writing failed: %s",
       utf8Path.c_str(),
@@ -2489,7 +2378,7 @@ bool moho::PLAT_SetRegistryValue(
   // `ParseRegistryPathInPlace` can split it; the vector frees itself on every
   // return path, which is what the explicit teardown calls at each `return`
   // used to model.
-  msvc8::vector<std::uint8_t, false> keyBuffer{};
+  fa::vector<std::uint8_t, false> keyBuffer{};
   keyBuffer.resize(std::strlen(keyPath) + 1U);
 
   char* const mutableKeyPath = reinterpret_cast<char*>(keyBuffer.begin());
@@ -2583,7 +2472,7 @@ std::uint32_t moho::PLAT_GetRegistryValue(
   // `ParseRegistryPathInPlace` can split it; the vector frees itself on every
   // return path, which is what the explicit teardown calls at each `return`
   // used to model.
-  msvc8::vector<std::uint8_t, false> keyBuffer{};
+  fa::vector<std::uint8_t, false> keyBuffer{};
   keyBuffer.resize(std::strlen(keyPath) + 1U);
 
   char* const mutableKeyPath = reinterpret_cast<char*>(keyBuffer.begin());
@@ -2624,7 +2513,7 @@ std::uint32_t moho::PLAT_GetRegistryValue(
  * present), converts UTF-16 content to UTF-8, and returns empty text when
  * unavailable.
  */
-msvc8::string moho::WIN_GetClipboardText()
+fa::string moho::WIN_GetClipboardText()
 {
   const HWND ownerWindow = sMainWindow != nullptr
     ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(sMainWindow->GetHandle()))
@@ -2634,7 +2523,7 @@ msvc8::string moho::WIN_GetClipboardText()
     return {};
   }
 
-  msvc8::string clipboardText{};
+  fa::string clipboardText{};
   const HANDLE clipboardData = ::GetClipboardData(CF_UNICODETEXT);
   if (clipboardData != nullptr) {
     const wchar_t* const lockedText = static_cast<const wchar_t*>(::GlobalLock(clipboardData));
@@ -2673,13 +2562,13 @@ void moho::WIN_ShowCrashDialog(
         programFileName,
         static_cast<DWORD>(sizeof(programFileName) / sizeof(programFileName[0]))
       ) != 0) {
-    const msvc8::string programPath = gpg::STR_WideToUtf8(programFileName);
+    const fa::string programPath = gpg::STR_WideToUtf8(programFileName);
     details << "Program : " << programPath.c_str() << "\n";
   } else {
     details << "Program : <unknown>\n";
   }
 
-  const msvc8::string args = CFG_GetArgs();
+  const fa::string args = CFG_GetArgs();
   details << "Cmd line arguments : " << args.c_str() << "\n\n";
   details << "Callstack:\n";
 
@@ -2703,7 +2592,7 @@ void moho::WIN_ShowCrashDialog(
     details << "    unavailable.\n";
     gpg::Logf("CRASH callstack: unavailable.");
   } else {
-    const msvc8::string callstackText =
+    const fa::string callstackText =
       PLAT_FormatCallstack(static_cast<std::int32_t>(firstFrame), static_cast<std::int32_t>(frameCount), stackFrames);
     details << callstackText.c_str();
     gpg::Logf("CRASH callstack:\n%s", callstackText.c_str());
@@ -2711,7 +2600,7 @@ void moho::WIN_ShowCrashDialog(
 
   details << "\n";
   details << "Last 100 lines of log...\n\n";
-  const msvc8::string recentLogLines = LOG_GetRecentLines(100u);
+  const fa::string recentLogLines = LOG_GetRecentLines(100u);
   details << recentLogLines.c_str();
 
   const std::string bodyText = details.str();
@@ -2734,7 +2623,7 @@ void moho::WIN_ShowCrashDialog(
                             &CrashDialogProc,
                             reinterpret_cast<LPARAM>(&dialogInit)
                           ) == -1) {
-    const msvc8::string dialogError = WIN_GetLastError();
+    const fa::string dialogError = WIN_GetLastError();
     gpg::Logf("DialogBoxParam failed: %s", dialogError.c_str());
     WIN_OkBox(dialogInit.caption, dialogInit.body);
   }
@@ -2863,7 +2752,7 @@ wxString moho::WINX_Printf(const char* const format, ...)
   va_list args;
   va_start(args, format);
   const char* formatCursor = format;
-  const msvc8::string formatted = gpg::STR_Va(formatCursor, args);
+  const fa::string formatted = gpg::STR_Va(formatCursor, args);
   va_end(args);
 
   return wxString(gpg::STR_Utf8ToWide(formatted.c_str()).c_str());

@@ -99,7 +99,7 @@ namespace moho
      * VFTable SLOT: 8
      */
     [[nodiscard]]
-    virtual msvc8::vector<WeakPtr<CUnitCommand>>& BuilderGetFactoryCommandQueue() = 0;
+    virtual fa::vector<WeakPtr<CUnitCommand>>& BuilderGetFactoryCommandQueue() = 0;
 
     /**
      * Address: 0x0059F480 (FUN_0059F480, ?BuilderIsBusy@CAiBuilderImpl@Moho@@UBE_NXZ)

@@ -294,7 +294,7 @@ int moho::cfunc_SpecFootprintsL(LuaPlus::LuaState* const state)
 
   gpg::ScopedLogContext footprintScope("Initializing footprint groups");
 
-  msvc8::list<SNamedFootprint>& footprints = rules->mFootprints.mFootprints;
+  fa::list<SNamedFootprint>& footprints = rules->mFootprints.mFootprints;
   lua_State* const rawState = state->m_state;
   const LuaPlus::LuaObject footprintSpecsObject(LuaPlus::LuaStackObject(state, 1));
   const int footprintSpecCount = footprintSpecsObject.GetCount();
@@ -396,7 +396,7 @@ namespace
    *
    * FUN_00556320's role (previously unresolved): it is the compiler-emitted
    * 2-argument converting constructor of `CategoryLookupMap::value_type`
-   * (`pair<const msvc8::string, CategoryLookupValue>`), materialising the
+   * (`pair<const fa::string, CategoryLookupValue>`), materialising the
    * temporary this function passes to `insert()`. The binary builds that
    * temporary's second half inline as "an empty `BVIntSet` seeded with
    * `lookup->mRules`" (0x00555601-0x00555625 hand-assembles a
@@ -426,7 +426,7 @@ namespace
    */
   void AddCategoryMemberBit(
     EntityCategoryLookupTable& lookup,
-    const msvc8::string& categoryName,
+    const fa::string& categoryName,
     const unsigned int categoryBitIndex
   )
   {
@@ -526,12 +526,12 @@ namespace
     }
 
     const unsigned int categoryBitIndex = blueprint->mCategoryBitIndex;
-    for (const msvc8::string& category : blueprint->mCategories) {
+    for (const fa::string& category : blueprint->mCategories) {
       AddCategoryMemberBit(*lookup, category, categoryBitIndex);
     }
 
     if (extraCategory != nullptr && *extraCategory != '\0') {
-      AddCategoryMemberBit(*lookup, msvc8::string(extraCategory), categoryBitIndex);
+      AddCategoryMemberBit(*lookup, fa::string(extraCategory), categoryBitIndex);
     }
 
     AddCategoryMemberBit(*lookup, blueprint->mBlueprintId, categoryBitIndex);
@@ -1046,7 +1046,7 @@ int moho::cfunc_RandomSimL(LuaPlus::LuaState* const state)
     // 0x00759150..0x00759165: `fild` word (+2^32), `fmul` 2^-32 (0x00E4F7B0)
     // under 24-bit x87 precision, stored as a float lua_Number.
     constexpr float kInvTwoTo32 = 2.3283064365386963e-10f;
-    const float value = msvc8::MulTwisterWord(kInvTwoTo32, sim->mRngState->twister.NextUInt32());
+    const float value = fa::MulTwisterWord(kInvTwoTo32, sim->mRngState->twister.NextUInt32());
     lua_pushnumber(rawState, value);
     return 1;
   }
@@ -1833,7 +1833,7 @@ int moho::cfunc_ChangeUnitArmyL(LuaPlus::LuaState* const state)
     unit->IsBeingBuilt() || unit->IsDead() || unit->DestroyQueued() || unit->IsInCategory("COMMAND");
 
   // Refuse the transfer if any attached entity is a COMMAND unit.
-  const msvc8::vector<Entity*>& attached = unit->GetAttachedEntities();
+  const fa::vector<Entity*>& attached = unit->GetAttachedEntities();
   for (Entity* const attachedEntity : attached) {
     Unit* const attachedUnit = attachedEntity->IsUnit();
     if (attachedUnit && attachedUnit->IsInCategory("COMMAND")) {
@@ -3675,7 +3675,7 @@ int moho::cfunc_CreateResourceDepositL(LuaPlus::LuaState* const state)
     LuaPlus::LuaStackObject::TypeError(&depositTypeArg, "string");
   }
 
-  const msvc8::string depositTypeName{depositTypeText != nullptr ? depositTypeText : ""};
+  const fa::string depositTypeName{depositTypeText != nullptr ? depositTypeText : ""};
 
   LuaPlus::LuaStackObject zArg{};
   zArg.m_state = state;
@@ -3724,13 +3724,13 @@ int moho::cfunc_CreateResourceDepositL(LuaPlus::LuaState* const state)
   size.x = static_cast<int>(lua_tonumber(state->m_state, 5));
   size.y = sizeY;
 
-  static msvc8::string resourceDepositTypeNames[3] = {
-    msvc8::string(""),
-    msvc8::string("Mass"),
-    msvc8::string("Hydrocarbon"),
+  static fa::string resourceDepositTypeNames[3] = {
+    fa::string(""),
+    fa::string("Mass"),
+    fa::string("Hydrocarbon"),
   };
 
-  msvc8::string* const match =
+  fa::string* const match =
     moho::SearchStringArrayFor(resourceDepositTypeNames, resourceDepositTypeNames + 3, &depositTypeName);
   const int depositTypeIndex =
     match != resourceDepositTypeNames + 3 ? static_cast<int>(match - resourceDepositTypeNames) : 0;

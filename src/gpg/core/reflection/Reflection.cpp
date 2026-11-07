@@ -614,22 +614,13 @@ namespace
   return upcast.mObj;
 }
 
-msvc8::string BuildPointerName(RType* const pointeeType)
-{
-    const char* pointeeName = pointeeType ? pointeeType->GetName() : "null";
-    if (!pointeeName) {
-        pointeeName = "null";
-    }
-    return STR_Printf("%s*", pointeeName);
-}
-
 /**
  * Address: 0x004C8AA0 (FUN_004C8AA0, sub_4C8AA0)
  *
  * What it does:
  * Binds new/construct callback lanes for `CScriptObject*` pointer reflection.
  */
-gpg::RPointerTypeBase* BindCScriptObjectPointerNewAndConstruct(gpg::RPointerTypeBase* const typeInfo)
+[[maybe_unused]] gpg::RPointerTypeBase* BindCScriptObjectPointerNewAndConstruct(gpg::RPointerTypeBase* const typeInfo)
 {
     typeInfo->newRefFunc_ = &NewCScriptObjectPointerSlotRef;
     typeInfo->ctorRefFunc_ = &ConstructCScriptObjectPointerSlotRef;
@@ -642,7 +633,7 @@ gpg::RPointerTypeBase* BindCScriptObjectPointerNewAndConstruct(gpg::RPointerType
  * What it does:
  * Binds copy/move callback lanes for `CScriptObject*` pointer reflection.
  */
-gpg::RPointerTypeBase* BindCScriptObjectPointerCopyAndMove(gpg::RPointerTypeBase* const typeInfo)
+[[maybe_unused]] gpg::RPointerTypeBase* BindCScriptObjectPointerCopyAndMove(gpg::RPointerTypeBase* const typeInfo)
 {
     typeInfo->cpyRefFunc_ = &CopyCScriptObjectPointerSlotRef;
     typeInfo->movRefFunc_ = &MoveCScriptObjectPointerSlotRef;
@@ -801,7 +792,7 @@ namespace gpg
  */
 gpg::RType* preregister_SimArmyVectorTypeStartup()
 {
-  gpg::PreRegisterRType(typeid(msvc8::vector<moho::SimArmy*>), &gSimArmyVectorType);
+  gpg::PreRegisterRType(typeid(fa::vector<moho::SimArmy*>), &gSimArmyVectorType);
   return &gSimArmyVectorType;
 }
 
@@ -839,7 +830,7 @@ RType* LookupRType(const std::type_info& typeInfo)
   TypeInfoMap& preregistered = GetRTypePreregisteredMap();
   const TypeInfoMap::iterator it = FindRTypePreregisteredNode(preregistered, &typeInfo);
   if (it == preregistered.end()) {
-    const msvc8::string msg =
+    const fa::string msg =
       STR_Printf("Attempting to lookup the RType for %s before it is registered.", typeInfo.name());
     throw std::runtime_error(msg.c_str());
   }
@@ -897,8 +888,8 @@ static std::pair<TypeInfoMap::iterator, bool> InsertRTypePreregisteredNode(
  *
  * Both are generic Dinkumware `std::_Tree` internals for this map's real
  * `std::map` instantiation (this map deliberately uses `std::map`, not
- * `msvc8::map` -- there is no project-owned ABI-compat template to cite
- * these against; `RbTree.h`'s `msvc8::rb_tree<V>` models the 2007 MSVC8
+ * `fa::map` -- there is no project-owned ABI-compat template to cite
+ * these against; `RbTree.h`'s `fa::rb_tree<V>` models the 2007 MSVC8
  * binary layout specifically, which this map does not use). Recovering
  * `_Insert`/`_Buynode` as hand-rolled free functions would be a pure
  * STL-internal reimplementation with zero behavioral difference from the
@@ -930,7 +921,7 @@ static std::pair<TypeInfoMap::iterator, bool> InsertRTypePreregisteredNode(
  * reading both `.c` files: 0x008DD520's `LABEL_22` path calls
  * `sub_8DCE80(this, ..., v7)` directly, and 0x008DCE80's body performs
  * the described descent then calls `Tree::_Insert`. Same generic
- * Dinkumware `std::_Tree` internals, same real (not `msvc8::`) `std::map`
+ * Dinkumware `std::_Tree` internals, same real (not `fa::`) `std::map`
  * instantiation, same reasoning as `_Insert`/`_Buynode` above --
  * `external_dependency`, no project-owned template to cite them against.
  */
@@ -1176,13 +1167,7 @@ void AddBaseIfPresent(RType* const typeInfo, RType* const baseType, const std::i
     return;
   }
 
-  RField baseField{};
-  baseField.mName = baseType->GetName();
-  baseField.mType = baseType;
-  baseField.mOffset = offset;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBaseType(typeInfo, baseType, offset);
 }
 
 /**
@@ -1366,7 +1351,7 @@ const RIndexed* gpg::RVectorTypeBase::AsIndexedSelf() const noexcept
  */
 const char* gpg::RVectorType<moho::SimArmy*>::GetName() const
 {
-    static const msvc8::string sName = STR_Printf("vector<%s>", GetPointeeType()->GetName());
+    static const fa::string sName = STR_Printf("vector<%s>", GetPointeeType()->GetName());
     return sName.c_str();
 }
 
@@ -1378,9 +1363,9 @@ const char* gpg::RVectorType<moho::SimArmy*>::GetName() const
  * where the base lexical comes from `RType::GetLexical` and the count comes
  * from the RIndexed subobject's `GetCount(ref.mObj)`.
  */
-msvc8::string gpg::RVectorType<moho::SimArmy*>::GetLexical(const RRef& ref) const
+fa::string gpg::RVectorType<moho::SimArmy*>::GetLexical(const RRef& ref) const
 {
-    const msvc8::string base = RType::GetLexical(ref);
+    const fa::string base = RType::GetLexical(ref);
     const size_t count = GetCount(ref.mObj);
     return STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(count));
 }
@@ -1407,7 +1392,7 @@ const RIndexed* gpg::RVectorType<moho::SimArmy*>::IsIndexed() const
  */
 RRef gpg::RVectorType<moho::SimArmy*>::SubscriptIndex(void* const obj, const int ind) const
 {
-    auto* const vec = static_cast<msvc8::vector<moho::SimArmy*>*>(obj);
+    auto* const vec = static_cast<fa::vector<moho::SimArmy*>*>(obj);
     RRef out{};
     out = gpg::MakeRRef<moho::SimArmy*>(vec->ptr_at(static_cast<std::size_t>(ind)));
     return out;
@@ -1422,7 +1407,7 @@ RRef gpg::RVectorType<moho::SimArmy*>::SubscriptIndex(void* const obj, const int
  */
 size_t gpg::RVectorType<moho::SimArmy*>::GetCount(void* const obj) const
 {
-    auto* const vec = static_cast<const msvc8::vector<moho::SimArmy*>*>(obj);
+    auto* const vec = static_cast<const fa::vector<moho::SimArmy*>*>(obj);
     return vec->size();
 }
 
@@ -1431,11 +1416,11 @@ size_t gpg::RVectorType<moho::SimArmy*>::GetCount(void* const obj) const
  *
  * What it does:
  * Resizes the underlying `std::vector<SimArmy*>` storage to `count` (forwards to
- * `msvc8::vector<SimArmy*>::resize` at 0x0074DC40).
+ * `fa::vector<SimArmy*>::resize` at 0x0074DC40).
  */
 void gpg::RVectorType<moho::SimArmy*>::SetCount(void* const obj, const int count) const
 {
-    auto* const vec = static_cast<msvc8::vector<moho::SimArmy*>*>(obj);
+    auto* const vec = static_cast<fa::vector<moho::SimArmy*>*>(obj);
     vec->resize(static_cast<std::size_t>(count));
 }
 
@@ -1448,7 +1433,7 @@ void gpg::RVectorType<moho::SimArmy*>::SetCount(void* const obj, const int count
  */
 void gpg::RVectorType<moho::SimArmy*>::Init()
 {
-    size_ = sizeof(msvc8::vector<moho::SimArmy*>);
+    size_ = sizeof(fa::vector<moho::SimArmy*>);
     version_ = 1;
     serLoadFunc_ = &gpg::DeserializeSimArmyPtrVector;
     serSaveFunc_ = &gpg::SerializeSimArmyPtrVector;
@@ -1470,14 +1455,14 @@ RType* gpg::RVectorType<moho::SimArmy*>::GetPointeeType() const
  * storage. Bound as `RType::serLoadFunc_`; `version`/`ownerRef` are unused by
  * this body (the binary loads a fresh vector, not an owner-anchored slot).
  */
-void gpg::DeserializeSimArmyPtrVector(ReadArchive* const archive, const std::intptr_t vectorPtr, int /*version*/, RRef* /*ownerRef*/)
+void DeserializeSimArmyPtrVector(ReadArchive* const archive, const std::intptr_t vectorPtr, int /*version*/, RRef* /*ownerRef*/)
 {
-    auto* const outVector = reinterpret_cast<msvc8::vector<moho::SimArmy*>*>(vectorPtr);
+    auto* const outVector = reinterpret_cast<fa::vector<moho::SimArmy*>*>(vectorPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    msvc8::vector<moho::SimArmy*> loaded;
+    fa::vector<moho::SimArmy*> loaded;
     loaded.reserve(count);
 
     const gpg::RRef emptyOwner{};
@@ -1498,9 +1483,9 @@ void gpg::DeserializeSimArmyPtrVector(ReadArchive* const archive, const std::int
  * unowned tracked raw pointer (`RRef_SimArmy` + `WriteRawPointer`). Bound as
  * `RType::serSaveFunc_`; `version`/`ownerRef` are unused by this body.
  */
-void gpg::SerializeSimArmyPtrVector(WriteArchive* const archive, const std::intptr_t vectorPtr, int /*version*/, RRef* /*ownerRef*/)
+void SerializeSimArmyPtrVector(WriteArchive* const archive, const std::intptr_t vectorPtr, int /*version*/, RRef* /*ownerRef*/)
 {
-    const auto* const vector = reinterpret_cast<const msvc8::vector<moho::SimArmy*>*>(vectorPtr);
+    const auto* const vector = reinterpret_cast<const fa::vector<moho::SimArmy*>*>(vectorPtr);
 
     const std::size_t count = vector->size();
     archive->WriteUInt(static_cast<unsigned int>(count));
@@ -1631,11 +1616,11 @@ void gpg::Rect2fTypeInfo::Init()
  * Address: 0x008DF290 (FUN_008DF290)
  *
  * What it does:
- * Appends one enum option lane into the backing `msvc8::vector` and returns
+ * Appends one enum option lane into the backing `fa::vector` and returns
  * the inserted slot.
  */
 [[nodiscard]] REnumType::ROptionValue* AppendEnumOptionValue(
-  msvc8::vector<REnumType::ROptionValue>& options,
+  fa::vector<REnumType::ROptionValue>& options,
   const REnumType::ROptionValue& value
 )
 {
@@ -1744,7 +1729,7 @@ gpg::RPointerType<moho::SimArmy>::~RPointerType() = default;
  * Address: 0x00752420 (FUN_00752420, gpg::RVectorType_SimArmy_P::dtr)
  *
  * What it does:
- * Scalar-deleting dtor. The binary frees the two `msvc8::vector<RField>`
+ * Scalar-deleting dtor. The binary frees the two `fa::vector<RField>`
  * storage lanes owned by the RType base (`bases_._Myfirst` @ +0x2C,
  * `fields_._Myfirst` @ +0x3C), restores the RObject vftable, and conditionally
  * deletes `this`. The compiler-generated `~RType()` reproduces this exactly, so
@@ -1920,7 +1905,7 @@ gpg::RPointerType<moho::CArmyStatItem>::~RPointerType() = default;
  * Demangled: gpg::RType::dtr
  *
  * What it does:
- * Frees the RType base's two `msvc8::vector<RField>` storage lanes
+ * Frees the RType base's two `fa::vector<RField>` storage lanes
  * (`bases_._Myfirst` @ +0x2C, `fields_._Myfirst` @ +0x3C) and restores the
  * `gpg::RObject` vftable. The listed clone addresses are COMDAT clones of
  * this exact body: each one is the vtable-slot-2 scalar deleting destructor

@@ -269,13 +269,7 @@ const char* moho::CLuaConOutputHandlerTypeInfo::GetName() const
 void moho::CLuaConOutputHandlerTypeInfo::AddBaseRObject(gpg::RType* const typeInfo)
 {
   gpg::RType* const rObjectType = gpg::RTypeOf<gpg::RObject>();
-  gpg::RField baseField{};
-  baseField.mName = rObjectType->GetName();
-  baseField.mType = rObjectType;
-  baseField.mOffset = gpg::BaseSubobjectOffset<CLuaConOutputHandler, gpg::RObject>();
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBaseType(typeInfo, rObjectType, gpg::BaseSubobjectOffset<CLuaConOutputHandler, gpg::RObject>());
 }
 
 /**

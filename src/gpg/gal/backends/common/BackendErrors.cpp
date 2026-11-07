@@ -14,7 +14,7 @@ namespace gpg::gal::backend
 {
   void ThrowError(const char* const file, const int line, const char* const message)
   {
-    throw Error(msvc8::string(file != nullptr ? file : ""), line, msvc8::string(message != nullptr ? message : ""));
+    throw Error(fa::string(file != nullptr ? file : ""), line, fa::string(message != nullptr ? message : ""));
   }
 
   void ThrowHresult(const char* const file, const int line, const HRESULT result)

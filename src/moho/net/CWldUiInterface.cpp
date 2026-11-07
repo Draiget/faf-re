@@ -42,16 +42,16 @@ namespace
    * function's pointer type as `void (__cdecl *)(gpg::StrArg)`. As with
    * `func_ReceiveChat` (see `UiRuntimeTypes.h`), this SDK's `gpg::StrArg` is
    * currently the simplified `= const char*` alias with no implicit
-   * conversion from `msvc8::string`, so the parameter is kept as
-   * `const msvc8::string&` -- a known, evidenced gap, not a guess (see
+   * conversion from `fa::string`, so the parameter is kept as
+   * `const fa::string&` -- a known, evidenced gap, not a guess (see
    * `gpg/core/utils/Logging.h`'s `LogScopeEntry` note and
    * `CGpgNetInterface.cpp`'s `MakeConnectThreadLaunchCallback`).
    */
   void ConPrintClientDisconnected(
-    const msvc8::string& nickname
+    const fa::string& nickname
   )
   {
-    const msvc8::string message = moho::Loc(moho::USER_GetLuaState(), "<LOC Engine0002>%s disconnected.");
+    const fa::string message = moho::Loc(moho::USER_GetLuaState(), "<LOC Engine0002>%s disconnected.");
     moho::CON_Printf(message.c_str(), nickname.c_str());
   }
 
@@ -62,7 +62,7 @@ namespace
    * the chat. The text is passed as a value, never spliced into Lua source:
    * it holds player names.
    */
-  void ShowOrdersDifferNotice(const msvc8::string& text)
+  void ShowOrdersDifferNotice(const fa::string& text)
   {
     moho::CON_Printf("%s", text.c_str());
 
@@ -163,7 +163,7 @@ namespace moho
    */
   void CWldUiInterface::NoteDisconnect(const CClientBase* const client)
   {
-    const msvc8::string nickname = client->GetNickname();
+    const fa::string nickname = client->GetNickname();
     boost::function<void(), std::allocator<void>> callback = boost::bind(&ConPrintClientDisconnected, nickname);
     THREAD_InvokeAsync(callback, 0u);
   }
@@ -299,7 +299,7 @@ namespace moho
    */
   void CWldUiInterface::ReceiveChat(const CClientBase* const sender, const gpg::MemBuffer<const char>& data)
   {
-    const msvc8::string nickname = sender->GetNickname();
+    const fa::string nickname = sender->GetNickname();
     boost::function<void(), std::allocator<void>> callback = boost::bind(&func_ReceiveChat, nickname, data);
     THREAD_InvokeAsync(callback, 0u);
   }
@@ -361,14 +361,22 @@ namespace moho
   }
 
   /**
+   * Engine addition (issue #275), not in the binary.
+   */
+  void CWldUiInterface::NoteRejoinOffer(const fa::string& localSource, const fa::string& seats)
+  {
+    GPGNET_ReportRejoinOffer(localSource, seats);
+  }
+
+  /**
    * Engine addition, not in the binary: posts the notice to the main thread,
    * as NoteDisconnect does.
    */
   void CWldUiInterface::NoteOrdersDiffer(
-    const msvc8::string& sender, const msvc8::string& reporter, const bool selfReport, const bool stopped
+    const fa::string& sender, const fa::string& reporter, const bool selfReport, const bool stopped
   )
   {
-    msvc8::string text = selfReport
+    fa::string text = selfReport
       ? gpg::STR_Printf(
           "%s's orders reached you differently from what %s says it sent. Its desync reports are only logged.",
           sender.c_str(),

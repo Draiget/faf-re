@@ -16,13 +16,7 @@ namespace
 
   void AddBaseField(gpg::RType* const typeInfo, gpg::RType* const baseType, const int offset)
   {
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = offset;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType, offset);
   }
 
   void Delete_CUnitMoveTask(void* const objectStorage)
@@ -191,10 +185,7 @@ namespace moho
    */
   gpg::RRef CUnitMoveTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitMoveTask*>(objectStorage);
-    if (task) {
-      new (task) CUnitMoveTask();
-    }
+    auto* const task = gpg::ConstructInStorage<CUnitMoveTask>(objectStorage);
 
     return gpg::RRef{task, gpg::RTypeOf<moho::CUnitMoveTask>()};
   }

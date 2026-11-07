@@ -1354,11 +1354,6 @@ namespace gpg
     moho::CUnitAttackTargetTask* const value
   )
   {
-    if (outRef == nullptr) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, CachedCUnitAttackTargetTaskType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value, &CachedCUnitAttackTargetTaskType);
   }
 } // namespace gpg

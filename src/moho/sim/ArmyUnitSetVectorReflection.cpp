@@ -14,7 +14,7 @@
 
 namespace
 {
-  using EntitySetVector = msvc8::vector<moho::EntitySetTemplate<moho::Unit>>;
+  using EntitySetVector = fa::vector<moho::EntitySetTemplate<moho::Unit>>;
   using EntitySetVectorType = gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>;
 
   /**
@@ -112,7 +112,7 @@ gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::~RVectorType() = default;
  */
 const char* gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>()->GetName());
+  static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>()->GetName());
   return sName.c_str();
 }
 
@@ -123,9 +123,9 @@ const char* gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::GetName() con
  * Appends the element count to the base `RType::GetLexical` text, matching
  * the binary's `"%s, size=%d"` formatting of the inherited lexical form.
  */
-msvc8::string gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 
@@ -216,7 +216,7 @@ void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SetCount(void* const
 gpg::RType* moho::register_EntitySetTemplateUnitVectorType()
 {
   EntitySetVectorType* const type = AcquireEntitySetVectorType();
-  gpg::PreRegisterRType(typeid(msvc8::vector<moho::EntitySetTemplate<moho::Unit>>), type);
+  gpg::PreRegisterRType(typeid(fa::vector<moho::EntitySetTemplate<moho::Unit>>), type);
   return type;
 }
 

@@ -24,7 +24,6 @@ namespace
   gpg::RType* gQueueBaseType = nullptr;
   gpg::RType* gQueueWeakCommandVectorType = nullptr;
   gpg::RType* gQueueCommandTypeEnumType = nullptr;
-  gpg::RType* gQueueUnitType = nullptr;
 
   template <class TObject>
   [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cache)
@@ -49,14 +48,6 @@ namespace
     source.mType = tracked.type;
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveCachedType<TObject>(cache));
     return static_cast<TObject*>(upcast.mObj);
-  }
-
-  [[nodiscard]] gpg::RRef MakeQueueRef(CUnitCommandQueue* const queue)
-  {
-    gpg::RRef out{};
-    out.mObj = queue;
-    out.mType = CUnitCommandQueue::StaticGetClass();
-    return out;
   }
 
   [[nodiscard]] bool ShouldMarkOwnerSyncStateForQueueHead(const CUnitCommandQueue& queue)
@@ -168,7 +159,7 @@ void CUnitCommandQueue::MemberDeserialize(gpg::ReadArchive* const archive)
 {
   gpg::RRef ownerRef{};
   archive->Read(ResolveCachedType<Broadcaster<EUnitCommandQueueStatus>>(gQueueBaseType), static_cast<Broadcaster<EUnitCommandQueueStatus>*>(this), ownerRef);
-  archive->Read(ResolveCachedType<msvc8::vector<WeakPtr<CUnitCommand>>>(gQueueWeakCommandVectorType), &mCommandVec, ownerRef);
+  archive->Read(ResolveCachedType<fa::vector<WeakPtr<CUnitCommand>>>(gQueueWeakCommandVectorType), &mCommandVec, ownerRef);
   archive->Read(ResolveCachedType<EUnitCommandType>(gQueueCommandTypeEnumType), &mCommandType, ownerRef);
 
   unsigned int decodedCounter = 0u;
@@ -187,7 +178,7 @@ void CUnitCommandQueue::MemberSerialize(gpg::WriteArchive* const archive) const
 {
   gpg::RRef ownerRef{};
   archive->Write(ResolveCachedType<Broadcaster<EUnitCommandQueueStatus>>(gQueueBaseType), static_cast<const Broadcaster<EUnitCommandQueueStatus>*>(this), ownerRef);
-  archive->Write(ResolveCachedType<msvc8::vector<WeakPtr<CUnitCommand>>>(gQueueWeakCommandVectorType), &mCommandVec, ownerRef);
+  archive->Write(ResolveCachedType<fa::vector<WeakPtr<CUnitCommand>>>(gQueueWeakCommandVectorType), &mCommandVec, ownerRef);
   archive->Write(ResolveCachedType<EUnitCommandType>(gQueueCommandTypeEnumType), &mCommandType, ownerRef);
   archive->WriteUInt(static_cast<unsigned int>(unk0));
 }

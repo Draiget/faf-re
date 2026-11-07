@@ -49,6 +49,12 @@ namespace moho
   // to an incomplete type is a legal declaration.
   class RRuleGameRules;
   class RRuleGameRulesImpl;
+
+  /**
+   * Engine addition (replay timeline): the viewer starts more sims from one set of rules, and each
+   * copies the rules' Lua blueprints, so `rule_ReleaseScriptBlueprints` has to leave them in place.
+   */
+  extern bool gRuleKeepScriptBlueprints;
   struct LuaReloadRequestNode;
 
   /**
@@ -74,10 +80,10 @@ namespace moho
    *     `erase_node`) reads colour at `[node+0x58]` and `isNil` at
    *     `[node+0x59]` throughout its transplant-and-rebalance body.
    *   - `destroy_subtree`'s emission (`FUN_005369D0`) tears each node down as
-   *     `_Myval.helper.first` (the `msvc8::string` key) and
+   *     `_Myval.helper.first` (the `fa::string` key) and
    *     `_Myval.helper.second.mSet.mUsed` (the value's inline bit-vector) --
    *     IDA's `helper` naming is this instantiation's
-   *     `pair<const msvc8::string, EntityCategorySet>` value_type.
+   *     `pair<const fa::string, EntityCategorySet>` value_type.
    *
    * The alignment now lives on `moho::BVSet` itself (BVSet.h), which is what
    * `EntityCategorySet` is. It is not on the `BVIntSet` that record
@@ -101,7 +107,7 @@ namespace moho
    * `RRuleGameRulesImpl::mEntityCategoryLookup` (+0xC4, see
    * `EntityCategoryLookupResolver::GetEntityCategory`). Address evidence for
    * the tree operations this instantiation reaches is cited on
-   * `msvc8::detail::rb_tree`'s `insert_unique`/`insert_at`/`buy_node`/
+   * `fa::detail::rb_tree`'s `insert_unique`/`insert_at`/`buy_node`/
    * `rb_decrement`/`find_node` members (insert/lookup side, reached from
    * `Sim.cpp`'s `AddCategoryMemberBit`) and its `buy_head`/`rb_min`/
    * `rb_max`/`rb_increment`/`rotate_left`/`rotate_right`/`erase_node`/
@@ -117,7 +123,7 @@ namespace moho
    * colour@+0x58, isNil@+0x59) -- corroborating evidence from three
    * independently recovered call sites for the same binary object.
    */
-  using CategoryLookupMap = msvc8::map<msvc8::string, CategoryLookupValue>;
+  using CategoryLookupMap = fa::map<fa::string, CategoryLookupValue>;
   static_assert(sizeof(CategoryLookupMap) == 0x0C, "CategoryLookupMap size must be 0x0C");
 
   /**
@@ -147,7 +153,7 @@ namespace moho
      * The word range recorded for `categoryName`, or null when the name is
      * not in the table.
      */
-    [[nodiscard]] const EntityCategorySet* TryFind(const msvc8::string& categoryName) const;
+    [[nodiscard]] const EntityCategorySet* TryFind(const fa::string& categoryName) const;
 
     /**
      * Address: 0x005552C0 (FUN_005552C0, sub_5552C0)
@@ -157,7 +163,7 @@ namespace moho
      * range when the name is not in the table. This is the whole body of
      * `RRuleGameRulesImpl::GetEntityCategory`.
      */
-    [[nodiscard]] const EntityCategorySet* FindOrFallback(const msvc8::string& categoryName) const;
+    [[nodiscard]] const EntityCategorySet* FindOrFallback(const fa::string& categoryName) const;
 
     /**
      * Address: 0x005551F0 (FUN_005551F0, Moho::EntityCategorySet::EntityCategorySet)
@@ -194,7 +200,7 @@ namespace moho
     explicit EntityCategoryLookupTable(const RRuleGameRulesImpl* owner) noexcept;
 
     /**
-     * No explicit destructor: `mCategoryMap` (`msvc8::map<msvc8::string,
+     * No explicit destructor: `mCategoryMap` (`fa::map<fa::string,
      * CategoryLookupValue>`) and `mCategoryFallback` (`EntityCategorySet`)
      * are both real typed members now, so implicit member destruction runs
      * their own real destructors automatically - exactly matching
@@ -231,9 +237,9 @@ namespace moho
     "EntityCategoryLookupTable size must be 0x40"
   );
 
-  struct RRuleGameRulesBlueprintNode : msvc8::Tree<RRuleGameRulesBlueprintNode>
+  struct RRuleGameRulesBlueprintNode : fa::Tree<RRuleGameRulesBlueprintNode>
   {
-    msvc8::string mBlueprintId; // +0x0C
+    fa::string mBlueprintId; // +0x0C
     void* mBlueprint;           // +0x28
     std::uint8_t mColor;        // +0x2C
     std::uint8_t mIsSentinel;   // +0x2D
@@ -260,13 +266,13 @@ namespace moho
    * seven tables -- so a `void*` mapped type is the faithful model.
    *
    * Node arithmetic closes: links 0x0C plus a
-   * `pair<const msvc8::string, void*>` of 0x20 puts colour/nil at
+   * `pair<const fa::string, void*>` of 0x20 puts colour/nil at
    * +0x2C/+0x2D and the node at 0x30. The key order is the default
    * `std::less` -- the binary compares through `CompareLex`, which is
    * `char_traits::compare` over the common prefix then length, and
-   * `msvc8::string::operator<` is `compare(rhs.view()) < 0`.
+   * `fa::string::operator<` is `compare(rhs.view()) < 0`.
    */
-  using RRuleGameRulesBlueprintMap = msvc8::map<msvc8::string, void*>;
+  using RRuleGameRulesBlueprintMap = fa::map<fa::string, void*>;
 
   static_assert(sizeof(RRuleGameRulesBlueprintMap) == 0x0C, "RRuleGameRulesBlueprintMap size must be 0x0C");
 
@@ -280,25 +286,25 @@ namespace moho
    *     binding: `mRootState` = the target root state, then `sub_52F370`
    *     buys a red-black-tree header node and self-links its three
    *     pointers with `_Isnil=1` at `[node+0x11]` -- byte-for-byte
-   *     `msvc8::detail::rb_tree<...>::buy_head()` (RbTree.h).
+   *     `fa::detail::rb_tree<...>::buy_head()` (RbTree.h).
    *   - `func_Add__blueprints` (0x00529B30) walks every existing binding
    *     ([`mMaps.begin()`, `mMaps.end()`)) and calls `func_MapInsert` /
    *     `FUN_0052BC60` on `binding + 4` for each newly registered
    *     blueprint's ordinal -- `FUN_0052BC60` is
-   *     `msvc8::detail::rb_tree<uint32_t...>::insert_unique` byte-for-byte
+   *     `fa::detail::rb_tree<uint32_t...>::insert_unique` byte-for-byte
    *     (lower-bound descent, `where == leftmost()` fast path, else
    *     `rb_decrement` probe -- see the citation on `insert_unique` in
    *     RbTree.h). `FUN_0052DB50`'s node-buy stores only 4 bytes at
    *     `node+0x0C` (the ordinal itself, no paired pointer), so the
-   *     embedded container is `msvc8::set<uint32_t>`, not
-   *     `msvc8::map<uint32_t, RBlueprint*>`.
+   *     embedded container is `fa::set<uint32_t>`, not
+   *     `fa::map<uint32_t, RBlueprint*>`.
    *   - `FUN_0052A390` destroys one binding's set by erasing the full
-   *     range and deleting the header node -- exactly `msvc8::set<uint32_t>
+   *     range and deleting the header node -- exactly `fa::set<uint32_t>
    *     >`'s own destructor (`rb_tree::~rb_tree`).
    *
    * The embedded node is 0x14 bytes with `_Isnil` at +0x11
    * (0x0D + sizeof(uint32_t)), the same shape already precedented by
-   * `Moho::SPeer::establishedUids` (`msvc8::set<int32_t>`, RbTree.h
+   * `Moho::SPeer::establishedUids` (`fa::set<int32_t>`, RbTree.h
    * `buy_head` citation block).
    *
    * A previous pass modeled this same memory as an intrusive doubly-linked
@@ -318,18 +324,18 @@ namespace moho
    * emissions rather than assumptions:
    *   - Implicit destructor = `FUN_0052A390` (`_callgraph_index.sqlite`
    *     confirms its only two real callers are `FUN_00529F70`
-   *     (`ExportToLuaState`) and `FUN_0052DBE0` (`msvc8::vector<
+   *     (`ExportToLuaState`) and `FUN_0052DBE0` (`fa::vector<
    *     RRuleGameRulesLuaExportBinding>::insert`) -- both are the EH-unwind
    *     cleanup for a local `RRuleGameRulesLuaExportBinding` temporary
    *     (`ExportToLuaState`'s freshly-built binding value, `insert`'s own
    *     `const T localValue(value)`) being torn down on a mid-construction
-   *     throw. `msvc8::detail::rb_tree<uint32_t>::~rb_tree()` (RbTree.h)
+   *     throw. `fa::detail::rb_tree<uint32_t>::~rb_tree()` (RbTree.h)
    *     supplies `mPendingBlueprintOrdinals`'s half; `mRootState` is
    *     trivially destructible.
    *   - Implicit copy-assignment operator = `FUN_00536DA0` and
    *     `FUN_00537420` -- two non-ICF-folded emissions of the identical
    *     compiled body (different register allocation from being inlined at
-   *     two different call sites: `msvc8::vector<...>::erase(iterator)`'s
+   *     two different call sites: `fa::vector<...>::erase(iterator)`'s
    *     tail-shift loop and `insert(pos,count,value)`'s in-place tail-shift
    *     branch, respectively), both cited in full on `legacy/containers/
    *     Vector.h`'s `erase(iterator)` and `insert(pos,count,value)`
@@ -339,14 +345,14 @@ namespace moho
    *     tree via `copy_from`), guarded by the compiler-inserted `this !=
    *     &other` self-assignment check.
    * Both are reached automatically once real code invokes
-   * `msvc8::vector<RRuleGameRulesLuaExportBinding>`'s own erase/insert/
+   * `fa::vector<RRuleGameRulesLuaExportBinding>`'s own erase/insert/
    * destructor -- no bespoke per-element free function is needed or
    * written for either.
    */
   struct RRuleGameRulesLuaExportBinding
   {
     LuaPlus::LuaState* mRootState;                       // +0x00
-    msvc8::set<std::uint32_t> mPendingBlueprintOrdinals; // +0x04 (proxy_@+04, head_@+08, size_@+0C)
+    fa::set<std::uint32_t> mPendingBlueprintOrdinals; // +0x04 (proxy_@+04, head_@+08, size_@+0C)
   };
 
   static_assert(sizeof(RRuleGameRulesLuaExportBinding) == 0x10, "RRuleGameRulesLuaExportBinding size must be 0x10");
@@ -355,14 +361,14 @@ namespace moho
     "RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals offset must be 0x04"
   );
 
-  // `RRuleGameRulesLuaExportBindingArray` used to duplicate `msvc8::vector<T>`'s
+  // `RRuleGameRulesLuaExportBindingArray` used to duplicate `fa::vector<T>`'s
   // own private layout here ({proxy, begin, end, capacityEnd}, byte-for-byte
   // identical to Vector.h's `myProxy_@0/first_@4/last_@8/end_@0xC`) as a
   // hand-rolled struct with hand-rolled pointer-triplet accessors in
   // RRuleGameRules.cpp -- exactly the CLAUDE.md "Duplicate layout contract"
   // violation ("Do not keep duplicated class/struct layouts that model the
   // same binary object in multiple headers"). `RRuleGameRulesImpl::mMaps`
-  // below is now a real `msvc8::vector<RRuleGameRulesLuaExportBinding>`; see
+  // below is now a real `fa::vector<RRuleGameRulesLuaExportBinding>`; see
   // that field's own doc comment for the growth/allocation divergence this
   // migration fixed (the hand-rolled model over-constructed its spare
   // capacity and paired it with `delete[]`, which the real binary's
@@ -404,7 +410,7 @@ namespace moho
      * constructor with active-mod payload plus the background-task control that
      * blueprint loading reports progress to (null when nothing is watching).
      */
-    [[nodiscard]] static RRuleGameRules* Create(const msvc8::string& activeMods, CBackgroundTaskControl* initHandler);
+    [[nodiscard]] static RRuleGameRules* Create(const fa::string& activeMods, CBackgroundTaskControl* initHandler);
 
     /**
      * Address: 0x00529F70 (FUN_00529F70)
@@ -556,7 +562,7 @@ namespace moho
      * What it does:
      * Adapter overload for callsites that still pass a normalized string id.
      */
-    RPropBlueprint* GetPropBlueprint(const msvc8::string& blueprintId);
+    RPropBlueprint* GetPropBlueprint(const fa::string& blueprintId);
   };
 
   /**
@@ -578,7 +584,7 @@ namespace moho
      * Initializes rule Lua/runtime storage, runs core Lua init forms, loads
      * `/lua/RuleInit.lua`, and rebuilds category caches.
      */
-    RRuleGameRulesImpl(const msvc8::string& activeMods, CBackgroundTaskControl* initHandler);
+    RRuleGameRulesImpl(const fa::string& activeMods, CBackgroundTaskControl* initHandler);
 
     /**
      * Address: 0x00529700 (FUN_00529700)
@@ -753,7 +759,7 @@ namespace moho
      * per-element layout evidence. Previously modeled under the name
      * `mLuaExports`; renamed here to match the binary-recovered name.
      *
-     * Real `msvc8::vector<RRuleGameRulesLuaExportBinding>`, not a
+     * Real `fa::vector<RRuleGameRulesLuaExportBinding>`, not a
      * hand-rolled pointer-triplet struct (see the removed
      * `RRuleGameRulesLuaExportBindingArray` note above). Migrating this
      * field surfaced a genuine behavioral divergence in the growth path
@@ -780,12 +786,12 @@ namespace moho
      *     constructed elements. The hand-rolled growth policy
      *     (`capacity>0 ? capacity*2 : 4`, in the removed
      *     `AddOrGetExportBinding`) was also wrong on its own terms --
-     *     `msvc8::vector<T>::recommended_capacity()` grows 1.5x
+     *     `fa::vector<T>::recommended_capacity()` grows 1.5x
      *     (`cur + cur/2`), not 2x. Both divergences are fixed by routing
      *     growth through the real `reserve()`/`insert()` API instead of
      *     hand-rolling it.
      */
-    msvc8::vector<RRuleGameRulesLuaExportBinding> mMaps; // +0x44
+    fa::vector<RRuleGameRulesLuaExportBinding> mMaps; // +0x44
     SRuleFootprintsBlueprint mFootprints;             // +0x54
     RRuleGameRulesBlueprintMap mUnitBlueprints;       // +0x60
     RRuleGameRulesBlueprintMap mProjectileBlueprints; // +0x6C
@@ -797,12 +803,12 @@ namespace moho
     /**
      * Blueprint registry indexed by ordinal (the order `RegisterUnitBlueprint`
      * and friends first saw each blueprint). The binary hands `rules + 0xB4`
-     * straight to `msvc8::vector<RBlueprint*>::push_back` — see the
+     * straight to `fa::vector<RBlueprint*>::push_back` — see the
      * `add ecx, 0B4h` at 0x00531FE9 in `func_CreateRUnitBlueprint` — so the
      * `{proxy, first, last, end}` quad at +0xB4..+0xC0 is one whole legacy
      * vector object, not four independent lanes.
      */
-    msvc8::vector<RBlueprint*> mBlueprintsByOrdinal;  // +0xB4
+    fa::vector<RBlueprint*> mBlueprintsByOrdinal;  // +0xB4
     /**
      * Real ground-truth object is `Moho::EntityCategorySet`/`EntityCategory`
      * (the mangled ctor/dtor names differ - see the address block on
@@ -825,8 +831,8 @@ namespace moho
     offsetof(RRuleGameRulesImpl, mMaps) == 0x44, "RRuleGameRulesImpl::mMaps offset must be 0x44"
   );
   static_assert(
-    sizeof(msvc8::vector<RRuleGameRulesLuaExportBinding>) == 0x10,
-    "msvc8::vector<RRuleGameRulesLuaExportBinding> size must be 0x10"
+    sizeof(fa::vector<RRuleGameRulesLuaExportBinding>) == 0x10,
+    "fa::vector<RRuleGameRulesLuaExportBinding> size must be 0x10"
   );
   static_assert(
     offsetof(RRuleGameRulesImpl, mFootprints) == 0x54, "RRuleGameRulesImpl::mFootprints offset must be 0x54"
@@ -859,7 +865,7 @@ namespace moho
     "RRuleGameRulesImpl::mBlueprintsByOrdinal offset must be 0xB4"
   );
   static_assert(
-    sizeof(msvc8::vector<RBlueprint*>) == 0x10, "msvc8::vector<RBlueprint*> size must be 0x10"
+    sizeof(fa::vector<RBlueprint*>) == 0x10, "fa::vector<RBlueprint*> size must be 0x10"
   );
   static_assert(
     offsetof(RRuleGameRulesImpl, mEntityCategoryLookup) == 0xC4,
@@ -888,4 +894,13 @@ namespace moho
   [[nodiscard]] REmitterBlueprint* RULE_FindEmitterBlueprintByName(RRuleGameRules* rules, const char* name);
   [[nodiscard]] RTrailBlueprint* RULE_FindTrailBlueprintByName(RRuleGameRules* rules, const char* name);
   [[nodiscard]] RProjectileBlueprint* RULE_FindProjectileBlueprintByName(RRuleGameRules* rules, const char* name);
+
+  /**
+   * Engine addition (`wld_StartSimEarly`): the session loader frees the rules' Lua copy of the
+   * blueprints itself (`RULE_ReleaseDeferredScriptBlueprints`), after the session's export, which
+   * comes after the sim's there; the sim, which may start before that export, then leaves it be in
+   * `OnSimHasBlueprints`. For the rules of one load at a time.
+   */
+  void RULE_DeferScriptBlueprintRelease(RRuleGameRules* rules) noexcept;
+  void RULE_ReleaseDeferredScriptBlueprints(RRuleGameRules* rules);
 } // namespace moho

@@ -41,7 +41,7 @@ namespace
 
     const char* const expected = gpg::RTypeOf<moho::RUnitBlueprintWeapon>() ? gpg::RTypeOf<moho::RUnitBlueprintWeapon>()->GetName() : "RUnitBlueprintWeapon";
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
       expected ? expected : "RUnitBlueprintWeapon",
       actual ? actual : "null"
@@ -78,7 +78,7 @@ namespace moho
    */
   void CWeaponAttributes::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    if (archive == nullptr || this == nullptr) {
+    if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
     }
 
@@ -119,7 +119,7 @@ namespace moho
     archive->WriteFloat(mMaxRadius);
     archive->WriteFloat(mMinRadiusSq);
     archive->WriteFloat(mMaxRadiusSq);
-    archive->WriteString(const_cast<msvc8::string*>(&mType));
+    archive->WriteString(const_cast<fa::string*>(&mType));
     archive->WriteFloat(mDamageRadius);
     archive->WriteFloat(mDamage);
     archive->WriteFloat(mUnknown_0044);
@@ -178,7 +178,7 @@ namespace
   {
     gpg::RType* type = gLegacyEntityCategorySetVectorType;
     if (!type) {
-      type = gpg::LookupRType(typeid(msvc8::vector<moho::EntityCategorySet>));
+      type = gpg::LookupRType(typeid(fa::vector<moho::EntityCategorySet>));
       gLegacyEntityCategorySetVectorType = type;
     }
     return type;
@@ -194,7 +194,7 @@ namespace
   {
     gpg::RType* type = gLegacySBlackListInfoVectorType;
     if (!type) {
-      type = gpg::LookupRType(typeid(msvc8::vector<moho::SBlackListInfo>));
+      type = gpg::LookupRType(typeid(fa::vector<moho::SBlackListInfo>));
       gLegacySBlackListInfoVectorType = type;
     }
     return type;
@@ -237,13 +237,13 @@ namespace
    * Loads one reflected `vector<SBlackListInfo>` payload using the cached RTTI
    * descriptor and returns the archive pointer for chaining.
    */
-  gpg::ReadArchive* ReadCachedSBlackListInfoVectorAndReturnArchive(
+  [[maybe_unused]] gpg::ReadArchive* ReadCachedSBlackListInfoVectorAndReturnArchive(
     gpg::ReadArchive* const archive,
     void* const objectPtr,
     gpg::RRef* const ownerRef
   )
   {
-    ReadObjectByCachedType<msvc8::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
+    ReadObjectByCachedType<fa::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
     return archive;
   }
 
@@ -254,7 +254,7 @@ namespace
    * Saves one reflected `CWeaponAttributes` payload using the cached RTTI
    * descriptor and returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteCachedCWeaponAttributesAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteCachedCWeaponAttributesAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
@@ -271,13 +271,13 @@ namespace
    * Saves one reflected `vector<EntityCategorySet>` payload using cached RTTI
    * lookup and returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteCachedEntityCategorySetVectorAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteCachedEntityCategorySetVectorAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
   )
   {
-    WriteObjectByCachedType<msvc8::vector<moho::EntityCategorySet>>(archive, objectPtr, ownerRef);
+    WriteObjectByCachedType<fa::vector<moho::EntityCategorySet>>(archive, objectPtr, ownerRef);
     return archive;
   }
 
@@ -288,13 +288,13 @@ namespace
    * Saves one reflected `vector<SBlackListInfo>` payload using cached RTTI
    * lookup and returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteCachedSBlackListInfoVectorAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteCachedSBlackListInfoVectorAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
   )
   {
-    WriteObjectByCachedType<msvc8::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
+    WriteObjectByCachedType<fa::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
     return archive;
   }
 
@@ -305,7 +305,7 @@ namespace
    * Read-callback bridge that loads one reflected `CWeaponAttributes` payload
    * through cached RTTI lookup.
    */
-  void ReadCachedCWeaponAttributesCallback(gpg::ReadArchive* archive, void* objectPtr, gpg::RRef* ownerRef)
+  [[maybe_unused]] void ReadCachedCWeaponAttributesCallback(gpg::ReadArchive* archive, void* objectPtr, gpg::RRef* ownerRef)
   {
     ReadObjectByCachedType<moho::CWeaponAttributes>(archive, objectPtr, ownerRef);
   }
@@ -317,7 +317,7 @@ namespace
    * Write-callback bridge that saves one reflected `CWeaponAttributes` payload
    * through cached RTTI lookup.
    */
-  void WriteCachedCWeaponAttributesCallback(
+  [[maybe_unused]] void WriteCachedCWeaponAttributesCallback(
     gpg::WriteArchive* archive,
     void* objectPtr,
     const gpg::RRef* ownerRef
@@ -333,13 +333,13 @@ namespace
    * Read-callback bridge that loads one reflected
    * `vector<EntityCategorySet>` payload through cached RTTI lookup.
    */
-  void ReadCachedEntityCategorySetVectorCallback(
+  [[maybe_unused]] void ReadCachedEntityCategorySetVectorCallback(
     gpg::ReadArchive* archive,
     void* objectPtr,
     gpg::RRef* ownerRef
   )
   {
-    ReadObjectByCachedType<msvc8::vector<moho::EntityCategorySet>>(archive, objectPtr, ownerRef);
+    ReadObjectByCachedType<fa::vector<moho::EntityCategorySet>>(archive, objectPtr, ownerRef);
   }
 
   /**
@@ -349,13 +349,13 @@ namespace
    * Write-callback bridge that saves one reflected
    * `vector<EntityCategorySet>` payload through cached RTTI lookup.
    */
-  void WriteCachedEntityCategorySetVectorCallback(
+  [[maybe_unused]] void WriteCachedEntityCategorySetVectorCallback(
     gpg::WriteArchive* archive,
     void* objectPtr,
     const gpg::RRef* ownerRef
   )
   {
-    WriteObjectByCachedType<msvc8::vector<moho::EntityCategorySet>>(archive, objectPtr, ownerRef);
+    WriteObjectByCachedType<fa::vector<moho::EntityCategorySet>>(archive, objectPtr, ownerRef);
   }
 
   /**
@@ -365,13 +365,13 @@ namespace
    * Read-callback bridge that loads one reflected `vector<SBlackListInfo>`
    * payload through cached RTTI lookup.
    */
-  void ReadCachedSBlackListInfoVectorCallback(
+  [[maybe_unused]] void ReadCachedSBlackListInfoVectorCallback(
     gpg::ReadArchive* archive,
     void* objectPtr,
     gpg::RRef* ownerRef
   )
   {
-    ReadObjectByCachedType<msvc8::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
+    ReadObjectByCachedType<fa::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
   }
 
   /**
@@ -381,12 +381,12 @@ namespace
    * Write-callback bridge that saves one reflected `vector<SBlackListInfo>`
    * payload through cached RTTI lookup.
    */
-  void WriteCachedSBlackListInfoVectorCallback(
+  [[maybe_unused]] void WriteCachedSBlackListInfoVectorCallback(
     gpg::WriteArchive* archive,
     void* objectPtr,
     const gpg::RRef* ownerRef
   )
   {
-    WriteObjectByCachedType<msvc8::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
+    WriteObjectByCachedType<fa::vector<moho::SBlackListInfo>>(archive, objectPtr, ownerRef);
   }
 } // namespace

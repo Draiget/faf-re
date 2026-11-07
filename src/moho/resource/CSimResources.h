@@ -75,12 +75,12 @@ namespace moho
     /**
      * Address: 0x00545FC0 (FUN_00545FC0, Moho::CSimResources::GetDeposits1)
      */
-    const msvc8::vector<ResourceDeposit>& GetDeposits() const override;
+    const fa::vector<ResourceDeposit>& GetDeposits() const override;
 
     /**
      * Address: 0x00545FB0 (FUN_00545FB0, Moho::CSimResources::GetDeposits2)
      */
-    msvc8::vector<ResourceDeposit>& GetDeposits() override;
+    fa::vector<ResourceDeposit>& GetDeposits() override;
 
     /**
      * Address: 0x00546060 (FUN_00546060, Moho::CSimResources::IsDepositAt)
@@ -133,7 +133,7 @@ namespace moho
 
   public:
     boost::mutex lock_;                       // +0x04
-    msvc8::vector<ResourceDeposit> deposits_; // +0x0C
+    fa::vector<ResourceDeposit> deposits_; // +0x0C
   };
 
   static_assert(std::is_polymorphic<ISimResources>::value, "ISimResources must remain polymorphic");

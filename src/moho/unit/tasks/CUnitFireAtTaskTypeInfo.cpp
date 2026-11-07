@@ -98,10 +98,7 @@ namespace moho
    */
   gpg::RRef CUnitFireAtTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<moho::CUnitFireAtTask*>(objectStorage);
-    if (object) {
-      new (object) moho::CUnitFireAtTask();
-    }
+    auto* const object = gpg::ConstructInStorage<moho::CUnitFireAtTask>(objectStorage);
     return MakeCUnitFireAtTaskRef(object);
   }
 

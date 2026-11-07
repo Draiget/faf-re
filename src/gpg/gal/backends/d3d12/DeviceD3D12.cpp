@@ -2,6 +2,7 @@
 
 #include "DeviceD3D12.h"
 
+#include <thread>
 #include <algorithm>
 #include <cctype>
 #include <cstdarg>
@@ -132,6 +133,38 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       lower(commandLine);
       lower(needle);
       return commandLine.find(needle) != std::string::npos;
+    }
+
+    /// Engine addition (ren_PrepareDeviceEarly): the device D3D12_PrepareDeviceEarly is creating.
+    struct SEarlyDevice
+    {
+      std::mutex lock;
+      std::thread builder;
+      Microsoft::WRL::ComPtr<ID3D12Device> device; // written by `builder`, read after joining it
+      LUID adapter{};
+    };
+
+    // Never destroyed: a builder still joinable at exit would terminate the process.
+    SEarlyDevice& EarlyDevice()
+    {
+      static auto* const early = new SEarlyDevice();
+      return *early;
+    }
+
+    /// The device made early for `adapter`, once its builder is done, or null; one for another adapter is released.
+    [[nodiscard]] Microsoft::WRL::ComPtr<ID3D12Device> TakeEarlyDevice(const LUID& adapter)
+    {
+      SEarlyDevice& early = EarlyDevice();
+      const std::lock_guard<std::mutex> guard(early.lock);
+      if (early.builder.joinable()) {
+        early.builder.join();
+      }
+      Microsoft::WRL::ComPtr<ID3D12Device> device = std::move(early.device);
+      early.device.Reset();
+      if (device != nullptr && (early.adapter.LowPart != adapter.LowPart || early.adapter.HighPart != adapter.HighPart)) {
+        device.Reset();
+      }
+      return device;
     }
 
     /** The command a DRED breadcrumb records, for the device-removed report. */
@@ -344,8 +377,25 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     std::uint64_t textureVersion = 0;
     const RenderTarget* tableSurface = nullptr; // the colour target bound when the table was built
     D3D12_GPU_DESCRIPTOR_HANDLE table{};
-    std::shared_ptr<const std::vector<effects::TextureBinding>> tableBindings;
+    std::vector<effects::TextureBinding> tableBindings;
   };
+
+  namespace
+  {
+    const effects::TextureBinding kNoTextureBinding{};
+
+    // A slot's handles are copied only when they changed: each copy is an atomic increment, and a
+    // decal draw keeps all but a few of its effect's textures.
+    void KeepBinding(effects::TextureBinding& slot, const effects::TextureBinding& binding)
+    {
+      if (slot.texture.get() != binding.texture.get()) {
+        slot.texture = binding.texture;
+      }
+      if (slot.renderTarget.get() != binding.renderTarget.get()) {
+        slot.renderTarget = binding.renderTarget;
+      }
+    }
+  } // namespace
 
   // ---------------------------------------------------------------------------
   // Construction and setup
@@ -381,6 +431,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mSwapChains.clear();
     mGarbage.clear();
     mPipelineCache.Close();
+    mPipelineMemo.Clear();
     mPipelines.clear();
     mBlitPipelines.clear();
     mPipelineState.reset();
@@ -459,9 +510,14 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         gpg::Logf("D3D12: device removed extended data on");
       }
     }
-    CheckHresult(
-      "DeviceD3D12.cpp", __LINE__, mLibrary.createDevice(adapter.adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&mDevice))
-    );
+    // Engine addition (ren_PrepareDeviceEarly): the device made early for this adapter, never with
+    // the debug layer or DRED on.
+    mDevice = (debugLayer || mDredEnabled) ? nullptr : TakeEarlyDevice(adapter.desc.AdapterLuid);
+    if (mDevice == nullptr) {
+      CheckHresult(
+        "DeviceD3D12.cpp", __LINE__, mLibrary.createDevice(adapter.adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&mDevice))
+      );
+    }
     if (debugLayer) {
       static_cast<void>(mDevice.As(&mInfoQueue));
     }
@@ -745,6 +801,36 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mBlitSamplers = SamplerTable({linearClamp});
   }
 
+  void D3D12_PrepareDeviceEarly()
+  {
+    if (CommandLineHas("/d3d12gbv") || CommandLineHas("/d3d12debug") || CommandLineHas("/d3d12dred") ||
+        backend::SetupFailureRequested("d3d12")) {
+      return;
+    }
+    SEarlyDevice& early = EarlyDevice();
+    const std::lock_guard<std::mutex> guard(early.lock);
+    if (early.builder.joinable() || early.device != nullptr) {
+      return;
+    }
+    early.builder = std::thread([&early] {
+      d3d12::Library library; // d3d12.dll stays loaded, as Setup's own load keeps it
+      dxgi::Factory factory;
+      if (!library.Load() || FAILED(factory.Create())) {
+        return;
+      }
+      factory.EnumerateAdapters(DXGI_FORMAT_B8G8R8A8_UNORM);
+      if (factory.Adapters().empty()) {
+        return;
+      }
+      const dxgi::AdapterInfo& adapter = factory.Adapters().front();
+      Microsoft::WRL::ComPtr<ID3D12Device> device;
+      if (SUCCEEDED(library.createDevice(adapter.adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device)))) {
+        early.device = std::move(device);
+        early.adapter = adapter.desc.AdapterLuid;
+      }
+    });
+  }
+
   void DeviceD3D12::Setup(DeviceContext* const context)
   {
     mCurThreadId = static_cast<int>(::GetCurrentThreadId());
@@ -754,6 +840,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       ThrowError("DeviceD3D12.cpp", __LINE__, "device creation failed on request (FAF_GAL_FAIL_SETUP)");
     }
     if (!mLibrary.Load()) {
+      (void)TakeEarlyDevice(LUID{}); // engine addition (ren_PrepareDeviceEarly): nothing will take it
       ThrowError("DeviceD3D12.cpp", __LINE__, "Direct3D 12 is not available (d3d12.dll)");
     }
     effects::ShaderCompiler& compiler = effects::ShaderCompiler::Instance();
@@ -1294,6 +1381,16 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     static_cast<IndexBufferD3D12&>(buffer).Storage().ReleaseCopy();
   }
 
+  void DeviceD3D12::CopyLockedRangeOnly(VertexBuffer& buffer)
+  {
+    static_cast<VertexBufferD3D12&>(buffer).Storage().CopyLockedRangeOnly();
+  }
+
+  void DeviceD3D12::CopyLockedRangeOnly(IndexBuffer& buffer)
+  {
+    static_cast<IndexBufferD3D12&>(buffer).Storage().CopyLockedRangeOnly();
+  }
+
   bool DeviceD3D12::CopyVertexBufferRegion(
     VertexBuffer& destination, const std::uint32_t destinationOffset, VertexBuffer& source, const std::uint32_t sourceOffset,
     const std::uint32_t byteCount
@@ -1608,7 +1705,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
 
   void DeviceD3D12::Func1() const {}
 
-  void DeviceD3D12::GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, const int adapterIndex)
+  void DeviceD3D12::GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, const int adapterIndex)
   {
     outModes.clear();
     const auto& adapters = mFactory.Adapters();
@@ -2106,7 +2203,12 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     // The draw covers the viewport, which is the destination rect, and its
     // texture coordinates cover the source rect. Scaling the viewport instead
     // would leave the viewport bounds (-32768..32767) for small rects.
-    // Allocated first: an upload can hand the recorded commands to the GPU.
+    // The table first: a full view heap hands the recorded commands to the GPU,
+    // waits, and frees the upload pages, constants uploaded before it included.
+    // The upload next, before any barrier: it may submit too, but leaves the
+    // view heap alone.
+    D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
+    const D3D12_GPU_DESCRIPTOR_HANDLE table = AllocateTable(effects::kMaxTextureSlots, cpu);
     const float sourceUv[4] = {
       static_cast<float>(sourceRect.left) / static_cast<float>(sourceWidth),
       static_cast<float>(sourceRect.top) / static_cast<float>(sourceHeight),
@@ -2117,8 +2219,6 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       AllocateUpload(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
     std::memcpy(constants.cpu, sourceUv, sizeof(sourceUv));
 
-    D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
-    const D3D12_GPU_DESCRIPTOR_HANDLE table = AllocateTable(effects::kMaxTextureSlots, cpu);
     mDevice->CopyDescriptorsSimple(1U, cpu, source, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     D3D12_CPU_DESCRIPTOR_HANDLE rest = cpu;
     rest.ptr += mFrames[mFrameIndex].views.Increment();
@@ -2221,13 +2321,13 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     destinationTexture->DiscardCpuCopy();
   }
 
-  void DeviceD3D12::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const msvc8::string& filePath)
+  void DeviceD3D12::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath)
   {
     static_cast<void>(cubeTarget);
     static_cast<void>(filePath);
   }
 
-  void DeviceD3D12::SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const msvc8::string& filePath, const int fileFormat)
+  void DeviceD3D12::SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, const int fileFormat)
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     imaging::Image image;
@@ -2239,7 +2339,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   }
 
   void DeviceD3D12::SaveTexture(
-    const boost::shared_ptr<Texture>& texture, const msvc8::string& filePath, const int fileFormat, gpg::MemBuffer<char>* const outBuffer
+    const boost::shared_ptr<Texture>& texture, const fa::string& filePath, const int fileFormat, gpg::MemBuffer<char>* const outBuffer
   )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -2817,31 +2917,13 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       }
     }
 
-    // $Globals, snapshotted as D3D9's BeginPass and Effects 11's Apply do.
-    const std::span<const std::uint8_t> constants = parameters.Constants();
-    if (!constants.empty()) {
-      if (state.constants == 0U || state.constantsVersion != parameters.Version() || state.constantsSerial != RecordingSerial()) {
-        const std::uint64_t bytes = (constants.size() + 255U) & ~static_cast<std::uint64_t>(255U);
-        const d3d12::UploadAllocation upload = AllocateUpload(bytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-        std::memcpy(upload.cpu, constants.data(), constants.size());
-        state.constants = upload.gpu;
-        state.constantsCpu = upload.cpu;
-        state.constantsVersion = parameters.Version();
-        state.constantsSerial = RecordingSerial();
-      }
-      bound.constants = state.constants;
-      bound.constantsCpu = state.constantsCpu;
-      bound.constantsBytes = static_cast<std::uint32_t>(constants.size());
-      bound.constantsSerial = state.constantsSerial;
-    }
-
     // The texture table: rebuilt when a binding changed or the frame moved on.
     if (state.tableFrame != mFrameCount || state.tableEpoch != mArenaEpoch || state.textureVersion != parameters.TextureVersion() ||
         state.tableSurface != outputContext_.surface.get()) {
       const auto& slots = program.Modern().textures;
       const auto& slotParameters = program.TextureSlotParameters();
-      auto bindings = std::make_shared<std::vector<effects::TextureBinding>>();
-      bindings->reserve(slots.size());
+      std::vector<effects::TextureBinding>& bindings = state.tableBindings;
+      bindings.resize(std::min<std::size_t>(slots.size(), effects::kMaxTextureSlots));
       D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
       const D3D12_GPU_DESCRIPTOR_HANDLE table = AllocateTable(effects::kMaxTextureSlots, cpu);
       const UINT increment = mFrames[mFrameIndex].views.Increment();
@@ -2849,8 +2931,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       for (std::size_t index = 0U; index < slots.size() && index < effects::kMaxTextureSlots; ++index) {
         const effects::TextureSlot& slot = slots[index];
         const std::int32_t parameter = slotParameters[index];
-        const effects::TextureBinding binding =
-          (parameter >= 0) ? parameters.Binding(static_cast<std::uint32_t>(parameter)) : effects::TextureBinding{};
+        const effects::TextureBinding& binding =
+          (parameter >= 0) ? parameters.Binding(static_cast<std::uint32_t>(parameter)) : kNoTextureBinding;
         D3D12_CPU_DESCRIPTOR_HANDLE view = mNullViews[static_cast<int>(slot.dimension)];
         if (binding.texture != nullptr) {
           auto* const texture = static_cast<TextureD3D12*>(binding.texture.get());
@@ -2869,7 +2951,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
             if (logged.size() < 32U && logged.insert(techniqueName).second) {
               gpg::Logf("D3D12: %s samples its own colour target; bound as a null view", techniqueName.c_str());
             }
-            bindings->push_back(effects::TextureBinding{});
+            KeepBinding(bindings[index], kNoTextureBinding);
             written = static_cast<std::uint32_t>(index + 1U);
             D3D12_CPU_DESCRIPTOR_HANDLE destination = cpu;
             destination.ptr += static_cast<SIZE_T>(index) * increment;
@@ -2881,7 +2963,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         D3D12_CPU_DESCRIPTOR_HANDLE destination = cpu;
         destination.ptr += static_cast<SIZE_T>(index) * increment;
         mDevice->CopyDescriptorsSimple(1U, destination, view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        bindings->push_back(binding);
+        KeepBinding(bindings[index], binding);
         written = static_cast<std::uint32_t>(index + 1U);
       }
       if (written < effects::kMaxTextureSlots) {
@@ -2890,16 +2972,36 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         mDevice->CopyDescriptorsSimple(effects::kMaxTextureSlots - written, rest, mNullViewRun, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
       }
       state.table = table;
-      state.tableBindings = std::move(bindings);
       state.tableFrame = mFrameCount;
       state.tableEpoch = mArenaEpoch;
       state.textureVersion = parameters.TextureVersion();
       state.tableSurface = outputContext_.surface.get();
     }
+    // AllocateTable can submit and recycle upload pages on descriptor exhaustion.
+    // Snapshot this new pass only after that boundary; Submit carries mPass,
+    // not the local bound record being built here.
+    // $Globals, snapshotted as D3D9's BeginPass and Effects 11's Apply do.
+    const std::span<const std::uint8_t> constants = parameters.Constants();
+    if (!constants.empty()) {
+      if (state.constants == 0U || state.constantsVersion != parameters.Version() || state.constantsSerial != RecordingSerial()) {
+        const std::uint64_t bytes = (constants.size() + 255U) & ~static_cast<std::uint64_t>(255U);
+        const d3d12::UploadAllocation upload = AllocateUpload(bytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+        std::memcpy(upload.cpu, constants.data(), constants.size());
+        state.constants = upload.gpu;
+        state.constantsCpu = upload.cpu;
+        state.constantsVersion = parameters.Version();
+        state.constantsSerial = RecordingSerial();
+      }
+      bound.constants = state.constants;
+      bound.constantsCpu = state.constantsCpu;
+      bound.constantsBytes = static_cast<std::uint32_t>(constants.size());
+      bound.constantsSerial = state.constantsSerial;
+    }
+
     bound.textures = state.table;
     bound.tableFrame = state.tableFrame;
     bound.tableEpoch = state.tableEpoch;
-    bound.sampled = state.tableBindings;
+    bound.sampled = &state.tableBindings;
     bound.samplers = state.samplers;
     bound.techniqueIndex = technique;
     bound.passIndex = pass;
@@ -2946,6 +3048,25 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       depthFormat = static_cast<DepthStencilTargetD3D12*>(outputContext_.depthStencil.get())->DepthFormat();
     }
 
+    // Engine change (ren_PipelineMemo): recent pipelines are found without building the string key below.
+    PipelineInputs inputs;
+    std::memset(static_cast<void*>(&inputs), 0, sizeof(inputs));
+    inputs.vertexKey = pass.vertexShader->key;
+    inputs.pixelKey = (pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL;
+    inputs.format = mBoundFormat;
+    inputs.sampleMask = pass.state.sampleMask;
+    inputs.blend = pass.state.blend;
+    inputs.depth = pass.state.depthStencil;
+    inputs.rasterizer = pass.state.rasterizer;
+    inputs.renderFormat = renderFormat;
+    inputs.depthFormat = depthFormat;
+    inputs.topologyType = topologyType;
+    if (gPipelineMemo) {
+      if (ID3D12PipelineState* const known = mPipelineMemo.Find(inputs)) {
+        return known;
+      }
+    }
+
     KeyWriter key;
     key.Add(pass.vertexShader->key);
     key.Add((pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL);
@@ -2959,6 +3080,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     key.Add(topologyType);
     auto found = mPipelines.find(key.Key());
     if (found != mPipelines.end()) {
+      mPipelineMemo.Store(inputs, found->second.Get());
       return found->second.Get();
     }
 

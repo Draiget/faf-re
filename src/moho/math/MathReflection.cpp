@@ -158,12 +158,12 @@ namespace moho
     const float halfPitch = orientation.p * 0.5f;
     const float halfYaw = orientation.y * 0.5f;
 
-    const float rollCos = msvc8::cos(halfRoll);
-    const float rollSin = msvc8::sin(halfRoll);
-    const float pitchCos = msvc8::cos(halfPitch);
-    const float pitchSin = msvc8::sin(halfPitch);
-    const float yawCos = msvc8::cos(halfYaw);
-    const float yawSin = msvc8::sin(halfYaw);
+    const float rollCos = fa::cos(halfRoll);
+    const float rollSin = fa::sin(halfRoll);
+    const float pitchCos = fa::cos(halfPitch);
+    const float pitchSin = fa::sin(halfPitch);
+    const float yawCos = fa::cos(halfYaw);
+    const float yawSin = fa::sin(halfYaw);
 
     // 0x004EB5EF..0x004EB711 composes yaw about Y, pitch about X,
     // then roll about Z. Preserve the two quaternion products instead of
@@ -292,7 +292,7 @@ namespace moho
     return PointsAreSimilarWithinEpsilon(vX, reconstructedVX);
   }
 
-  msvc8::string ToString(const Wm3::Vector3f& value);
+  fa::string ToString(const Wm3::Vector3f& value);
 
   /**
    * Address: 0x004ED000 (FUN_004ED000, ?ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVVAxes3@1@@Z)
@@ -302,11 +302,11 @@ namespace moho
    * Formats one basis as `X=(...) Y=(...) Z=(...)` using the existing vector
    * lane formatter.
    */
-  msvc8::string ToString(const VAxes3& value)
+  fa::string ToString(const VAxes3& value)
   {
-    const msvc8::string zText = ToString(value.vZ);
-    const msvc8::string yText = ToString(value.vY);
-    const msvc8::string xText = ToString(value.vX);
+    const fa::string zText = ToString(value.vZ);
+    const fa::string yText = ToString(value.vY);
+    const fa::string xText = ToString(value.vX);
     return gpg::STR_Printf("X=(%s) Y=(%s) Z=(%s)", xText.c_str(), yText.c_str(), zText.c_str());
   }
 
@@ -1351,7 +1351,7 @@ namespace moho
   void VAxes3::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     GPG_ASSERT(archive != nullptr);
-    if (archive == nullptr || this == nullptr) {
+    if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
     }
 
@@ -1367,7 +1367,7 @@ namespace moho
   void VAxes3::MemberSerialize(gpg::WriteArchive* const archive)
   {
     GPG_ASSERT(archive != nullptr);
-    if (archive == nullptr || this == nullptr) {
+    if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
     }
 

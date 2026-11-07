@@ -499,12 +499,19 @@ namespace gpg::gal::d3d12
         if (offset + size > start + length) {
           continue;
         }
-        heap->free.erase(range);
+        // Keep the original range until the only possibly allocating step succeeds.
         if (offset > start) {
-          heap->free.emplace(start, offset - start);
-        }
-        if (offset + size < start + length) {
-          heap->free.emplace(offset + size, start + length - offset - size);
+          if (offset + size < start + length) {
+            heap->free.emplace(offset + size, start + length - offset - size);
+          }
+          range->second = offset - start;
+        } else if (offset + size < start + length) {
+          auto remainder = heap->free.extract(range);
+          remainder.key() = offset + size;
+          remainder.mapped() = start + length - offset - size;
+          heap->free.insert(std::move(remainder));
+        } else {
+          heap->free.erase(range);
         }
         heap->used += size;
         outOffset = offset;
@@ -531,9 +538,9 @@ namespace gpg::gal::d3d12
     static_cast<void>(heap->heap->SetName(name.c_str()));
     heap->free.emplace(size, kPlacedHeapSize - size);
     heap->used = size;
+    heaps.push_back(std::move(heap));
     heapBytes += kPlacedHeapSize;
     outOffset = 0U;
-    heaps.push_back(std::move(heap));
     return heaps.back().get();
   }
 

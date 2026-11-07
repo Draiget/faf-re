@@ -117,7 +117,7 @@ namespace moho
      * What it does:
      * Returns "host:port" textual identity for logs/debug.
      */
-    msvc8::string ToString() override;
+    fa::string ToString() override;
 
     /**
      * Address: 0x004835E0 (FUN_004835E0)

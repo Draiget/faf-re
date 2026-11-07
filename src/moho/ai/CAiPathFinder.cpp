@@ -86,7 +86,7 @@ namespace
 {
   constexpr const char* kConVarPathMaxInstantWorkUnits = "path_MaxInstantWorkUnits";
 
-  using PathCellVector = msvc8::vector<moho::HPathCell>;
+  using PathCellVector = fa::vector<moho::HPathCell>;
 
   /**
    * Address: 0x005A9890 (FUN_005A9890)
@@ -296,7 +296,7 @@ namespace
   [[nodiscard]] gpg::RType* CachedRect2iListType()
   {
     if (!gRect2iListType) {
-      gRect2iListType = gpg::RTypeOf<msvc8::list<gpg::Rect2i>>();
+      gRect2iListType = gpg::RTypeOf<fa::list<gpg::Rect2i>>();
     }
     return gRect2iListType;
   }
@@ -455,7 +455,7 @@ namespace
  */
 const char* moho::RBroadcasterRType_NavPath::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("Broadcaster<%s>", gpg::RTypeOf<moho::SNavPath>()->GetName());
+  static const fa::string sName = gpg::STR_Printf("Broadcaster<%s>", gpg::RTypeOf<moho::SNavPath>()->GetName());
   return sName.c_str();
 }
 
@@ -475,8 +475,8 @@ void moho::RBroadcasterRType_NavPath::Init()
   static_assert(sizeof(moho::Broadcaster<const moho::SNavPath&>) == 8, "moho::Broadcaster<const moho::SNavPath&> is 8 bytes on x86");
   size_ = sizeof(moho::Broadcaster<const moho::SNavPath&>);
   version_ = 1;
-  serLoadFunc_ = reinterpret_cast<load_func_t>(&gpg::ReadAndLinkNavPathListeners);
-  serSaveFunc_ = reinterpret_cast<save_func_t>(&WriteNavPathListeners);
+  serLoadFunc_ = reinterpret_cast<load_func_t>(reinterpret_cast<void (*)()>(&gpg::ReadAndLinkNavPathListeners));
+  serSaveFunc_ = reinterpret_cast<save_func_t>(reinterpret_cast<void (*)()>(&WriteNavPathListeners));
 }
 
 /**
@@ -552,7 +552,7 @@ moho::RBroadcasterRType_NavPath::~RBroadcasterRType_NavPath() = default;
  */
 const char* moho::RListenerRType_NavPath::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("Listener<%s>", gpg::RTypeOf<moho::SNavPath>()->GetName());
+  static const fa::string sName = gpg::STR_Printf("Listener<%s>", gpg::RTypeOf<moho::SNavPath>()->GetName());
   return sName.c_str();
 }
 

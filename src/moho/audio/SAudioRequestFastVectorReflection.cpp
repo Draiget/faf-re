@@ -65,7 +65,7 @@ namespace gpg
     /**
      * Address: 0x00761A90 (FUN_00761A90, gpg::RFastVectorType_SAudioRequest::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x00761B20 (FUN_00761B20, gpg::RFastVectorType_SAudioRequest::IsIndexed)
@@ -199,7 +199,7 @@ namespace gpg
    */
   const char* RFastVectorType<moho::SAudioRequest>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::SAudioRequest>()->GetName());
+    static const fa::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::SAudioRequest>()->GetName());
     return sName.c_str();
   }
 
@@ -209,9 +209,9 @@ namespace gpg
    * What it does:
    * Renders `"<base RType lexical>, size=<count>"`.
    */
-  msvc8::string RFastVectorType<moho::SAudioRequest>::GetLexical(const gpg::RRef& ref) const
+  fa::string RFastVectorType<moho::SAudioRequest>::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 

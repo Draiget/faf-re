@@ -38,9 +38,9 @@ namespace moho
      * What it does:
      * Executes the alias text and appends escaped runtime command arguments.
      */
-    void Handle(const msvc8::vector<msvc8::string>& args) override;
+    void Handle(const fa::vector<fa::string>& args) override;
 
-    msvc8::string mAliasText; // 0x0C
+    fa::string mAliasText; // 0x0C
   };
 
   static_assert(sizeof(CConAlias) == 0x28, "CConAlias size must be 0x28");

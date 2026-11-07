@@ -353,8 +353,8 @@ bool Unit::PrepareMove(
   // (round to nearest), not truncation. A destination at a whole world unit
   // with an odd footprint lands on .5 here, and truncating it started the ring
   // search one cell to the side (replay 26935800 beat 532: goal cell 95 vs 96).
-  const int rawStartX = msvc8::RoundToInt(inOutPos->x - halfSizeX);
-  const int rawStartZ = msvc8::RoundToInt(inOutPos->z - halfSizeZ);
+  const int rawStartX = fa::RoundToInt(inOutPos->x - halfSizeX);
+  const int rawStartZ = fa::RoundToInt(inOutPos->z - halfSizeZ);
   SOCellPos startCell{
     static_cast<std::int16_t>(rawStartX),
     static_cast<std::int16_t>(rawStartZ),

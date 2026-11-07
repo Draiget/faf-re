@@ -273,28 +273,6 @@ namespace
     DrawReconGrid(&moho::IAiReconDB::ReconGetVCIGrid, reconDB, kVciGridColor, hf, canvas);
   }
 
-  /**
-   * Address: 0x0064D860 (FUN_0064D860)
-   * Address: 0x0064E290 (FUN_0064E290 -- the second emission of this same
-   * inline cache, differing only in the relative displacement of its one
-   * `call gpg::LookupRType`, which is why `/OPT:ICF` could not fold the two.
-   * Formerly transcribed a second time as
-   * `ResolveRDebugRadarTypeCacheSecondary`, `[[maybe_unused]]` with zero
-   * callers.)
-   *
-   * What it does:
-   * Resolves and caches the reflected runtime type for `RDebugRadar`.
-   */
-  [[nodiscard]] gpg::RType* ResolveRDebugRadarTypeCachePrimary()
-  {
-    gpg::RType* type = moho::RDebugRadar::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::RDebugRadar));
-      moho::RDebugRadar::sType = type;
-    }
-    return type;
-  }
-
 } // namespace
 
 namespace moho
@@ -315,7 +293,7 @@ namespace moho
    */
   gpg::RType* RDebugRadar::GetClass() const
   {
-    return ResolveRDebugRadarTypeCachePrimary();
+    return gpg::CachedLookup<moho::RDebugRadar>(moho::RDebugRadar::sType);
   }
 
   /**

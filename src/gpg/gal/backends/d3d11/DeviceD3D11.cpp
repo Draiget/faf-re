@@ -43,6 +43,7 @@
 #include "gpg/gal/RenderTargetContext.hpp"
 #include "gpg/gal/TextureContext.h"
 #include "gpg/gal/VertexBufferContext.hpp"
+#include "gpg/gal/backends/common/TextureQuality.h"
 
 namespace gpg::gal
 {
@@ -765,7 +766,7 @@ namespace gpg::gal
 
   void DeviceD3D11::Func1() const {}
 
-  void DeviceD3D11::GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, const int adapterIndex)
+  void DeviceD3D11::GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, const int adapterIndex)
   {
     outModes.clear();
     const auto& adapters = mFactory.Adapters();
@@ -870,20 +871,7 @@ namespace gpg::gal
       const char* const data = context->dataBuffer_.mBegin;
       const SIZE_T bytes = context->DataSizeBytes();
 
-      // The texture-quality option skips top mip levels (D3D9 passes it as
-      // D3DX_SKIP_DDS_MIP_LEVELS, `reserved0x44_`); a file with too few
-      // levels for that loads whole.
-      const UINT skipLevels = context->reserved0x44_ & 0x1FU;
-      HRESULT result = E_FAIL;
-      if (skipLevels != 0U) {
-        D3DX11_IMAGE_LOAD_INFO loadInfo;
-        loadInfo.FirstMipLevel = skipLevels;
-        result = mD3DX11->createTextureFromMemory(mDevice.Get(), data, bytes, &loadInfo, nullptr, &resource, nullptr);
-      }
-      if (FAILED(result)) {
-        resource.Reset();
-        result = mD3DX11->createTextureFromMemory(mDevice.Get(), data, bytes, nullptr, nullptr, &resource, nullptr);
-      }
+      const HRESULT result = mD3DX11->createTextureFromMemory(mDevice.Get(), data, bytes, nullptr, nullptr, &resource, nullptr);
       if (FAILED(result)) {
         char message[640]{};
         std::snprintf(
@@ -891,6 +879,40 @@ namespace gpg::gal
           static_cast<unsigned long>(result)
         );
         ThrowError("DeviceD3D11.cpp", __LINE__, message);
+      }
+      // Texture quality drops the top levels of a 2D DDS with a mip chain, as the original's
+      // D3DX9 load does; cubes and volumes keep theirs. D3DX11's FirstMipLevel is not that: it
+      // scales the skipped-to level back up to the file's size. So the file loads whole and the
+      // levels below the skip are copied into a smaller texture.
+      ComPtr<ID3D11Texture2D> whole;
+      UINT skip = imaging::TextureQualityMipLevels(data, bytes, context->reserved0x44_ & 0x1FU);
+      if (skip != 0U && SUCCEEDED(resource.As(&whole))) {
+        D3D11_TEXTURE2D_DESC desc{};
+        whole->GetDesc(&desc);
+        skip = (desc.MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE) != 0U ? 0U : std::min(skip, desc.MipLevels - 1U);
+        // A block-compressed top level stays a whole number of blocks.
+        while (skip != 0U && d3d11::IsBlockCompressed(desc.Format) &&
+               (((desc.Width >> skip) % 4U) != 0U || ((desc.Height >> skip) % 4U) != 0U)) {
+          --skip;
+        }
+        if (skip != 0U) {
+          const UINT wholeLevels = desc.MipLevels;
+          desc.Width >>= skip;
+          desc.Height >>= skip;
+          desc.MipLevels -= skip;
+          ComPtr<ID3D11Texture2D> smaller;
+          if (SUCCEEDED(mDevice->CreateTexture2D(&desc, nullptr, &smaller))) {
+            for (UINT slice = 0U; slice < desc.ArraySize; ++slice) {
+              for (UINT level = 0U; level < desc.MipLevels; ++level) {
+                mImmediate->CopySubresourceRegion(
+                  smaller.Get(), D3D11CalcSubresource(level, slice, desc.MipLevels), 0U, 0U, 0U, whole.Get(),
+                  D3D11CalcSubresource(level + skip, slice, wholeLevels), nullptr
+                );
+              }
+            }
+            resource = smaller;
+          }
+        }
       }
     } else {
       ThrowError("DeviceD3D11.cpp", __LINE__, "invalid source specified for texture data");
@@ -1371,14 +1393,14 @@ namespace gpg::gal
     destinationTexture->DiscardCpuCopy();
   }
 
-  void DeviceD3D11::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const msvc8::string& filePath)
+  void DeviceD3D11::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath)
   {
     static_cast<void>(cubeTarget);
     static_cast<void>(filePath);
   }
 
   void DeviceD3D11::SaveRenderTarget(
-    const boost::shared_ptr<RenderTarget>& renderTarget, const msvc8::string& filePath, const int fileFormat
+    const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, const int fileFormat
   )
   {
     auto* const target = static_cast<RenderTargetD3D11*>(renderTarget.get());
@@ -1390,17 +1412,20 @@ namespace gpg::gal
 
   void DeviceD3D11::SaveTexture(
     const boost::shared_ptr<Texture>& texture,
-    const msvc8::string& filePath,
+    const fa::string& filePath,
     const int fileFormat,
     gpg::MemBuffer<char>* const outBuffer
   )
   {
     auto* const sourceTexture = static_cast<TextureD3D11*>(texture.get());
     if (outBuffer == nullptr) {
-      CheckHresult(
-        "DeviceD3D11.cpp", __LINE__,
-        mD3DX11->saveTextureToFile(mImmediate.Get(), sourceTexture->GetResource(), ImageFileFormat(fileFormat), filePath.c_str())
-      );
+      const HRESULT saved = mD3DX11->saveTextureToFile(mImmediate.Get(), sourceTexture->GetResource(), ImageFileFormat(fileFormat), filePath.c_str());
+      if (FAILED(saved) && fileFormat == 0) {
+        // D3DX11 answers E_FAIL for a frame as a BMP, which is what dump_Frame asks for.
+        DumpTexture(sourceTexture->GetTexture2D(), filePath.c_str());
+        return;
+      }
+      CheckHresult("DeviceD3D11.cpp", __LINE__, saved);
       return;
     }
 
@@ -2280,7 +2305,16 @@ namespace gpg::gal
     // World shapes (ren_GpuShapes): a paused same-process A/B of FAF's shapes plus a 2,000-segment
     // UI_DrawLine stroke against the path off, pixel-identical outside two animated unit glows.
     return kGpuPathStrategicIcons | kGpuPathIconClassify | kGpuPathFogOfWar | kGpuPathSelectBrackets |
-      kGpuPathProjectileIcons | kGpuPathWorldShapes;
+      // MSDF text and the interface's quads: 0 pixels differ in a same-process A/B of a panel of text.
+      kGpuPathProjectileIcons | kGpuPathWorldShapes | kGpuPathMsdfText | MsdfCookVerified();
+  }
+
+  std::uint32_t DeviceD3D11::MsdfCookVerified() const
+  {
+    // The GPU font cook (ren_GpuFontCook): GPU and CPU atlases compared per font, and a device reset during
+    // a cook, on NVIDIA only; other vendors keep the CPU cook until it has run there (issue #309).
+    const bool nvidia = mAdapterIndex < mFactory.Adapters().size() && mFactory.Adapters()[mAdapterIndex].desc.VendorId == kPciVendorNvidia;
+    return nvidia ? kGpuPathMsdfCook : 0U;
   }
 
   boost::shared_ptr<GpuBuffer> DeviceD3D11::CreateGpuBuffer(const GpuBufferDesc& desc)

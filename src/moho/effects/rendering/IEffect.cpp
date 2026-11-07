@@ -100,10 +100,7 @@ namespace moho
    */
   gpg::RRef IEffect::GetDerivedObjectRef()
   {
-    gpg::RRef out{};
-    out.mObj = this;
-    out.mType = GetClass();
-    return out;
+    return gpg::MakeSelfRef(this);
   }
 
   /**
@@ -129,7 +126,7 @@ namespace moho
   /**
    * Address: 0x00654280 (FUN_00654280, Moho::IEffect::GetStringParam)
    */
-  msvc8::string* IEffect::GetStringParam(const std::int32_t)
+  fa::string* IEffect::GetStringParam(const std::int32_t)
   {
     return nullptr;
   }

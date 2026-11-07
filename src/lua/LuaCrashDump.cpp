@@ -69,7 +69,7 @@ namespace
   bool IsPlausiblePointer(const void* const p)
   {
     const auto address = reinterpret_cast<std::uintptr_t>(p);
-    return address > 0x10000 && address < 0x7FFFFFFFFFFFULL;
+    return address > 0x10000 && static_cast<std::uint64_t>(address) < 0x7FFFFFFFFFFFULL;
   }
 
   const char* LuaTypeName(const int tt)

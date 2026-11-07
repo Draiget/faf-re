@@ -9,8 +9,8 @@
  * 0x00BF18C0, and the vector destructor bodies 0x004F8180 / 0x004F82D0,
  * whose WeakPtr destructors unlink each slot from its window.
  */
-msvc8::vector<moho::WeakPtr<moho::WWinManagedDialog>> moho::managedWindows;
-msvc8::vector<moho::WeakPtr<moho::WWinManagedFrame>> moho::managedFrames;
+fa::vector<moho::WeakPtr<moho::WWinManagedDialog>> moho::managedWindows;
+fa::vector<moho::WeakPtr<moho::WWinManagedFrame>> moho::managedFrames;
 wxWindow* moho::sMainWindow = nullptr;
 moho::WRenViewport* moho::ren_Viewport = nullptr;
 
@@ -284,7 +284,7 @@ moho::WWxInputBox::WWxInputBox(
   const char* const dialogTitle,
   const char* const defaultValue,
   const char* const labelText,
-  msvc8::string* const resultString
+  fa::string* const resultString
 )
   : wxDialog(
       nullptr,
@@ -346,7 +346,7 @@ bool moho::WxInputBox(
   const char* const dialogTitle,
   const char* const defaultValue,
   const char* const labelText,
-  msvc8::string* const resultString
+  fa::string* const resultString
 )
 {
   WWxInputBox* const dialog = new WWxInputBox(dialogTitle, defaultValue, labelText, resultString);
@@ -364,11 +364,11 @@ bool moho::WxInputBox(
  * "Type your answer below.", then prints the entered text (or "Canceled"
  * when dismissed) through `Moho::CON_Printf`.
  */
-void moho::CON_WxInputBox(const msvc8::vector<msvc8::string>& args)
+void moho::CON_WxInputBox(const fa::vector<fa::string>& args)
 {
   (void)args;
 
-  msvc8::string enteredText;
+  fa::string enteredText;
   if (WxInputBox("What?", "default", "Type your answer below.", &enteredText)) {
     CON_Printf("You entered \"%s\"", enteredText.c_str());
   } else {

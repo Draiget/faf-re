@@ -43,7 +43,7 @@ namespace moho
    * Address: 0x008B56F0 (FUN_008B56F0 -- the implicit copy constructor:
    * member-wise, the unit set through its range constructor 0x00831310,
    * `mTarget` through 0x008B40F0, `mCells` through 0x00552C90; `+0x34` is
-   * padding and is not copied. Reached from `msvc8::deque::push_back`
+   * padding and is not copied. Reached from `fa::deque::push_back`
    * 0x008B4E80.)
    * Address: 0x008B4800 (FUN_008B4800 -- the implicit destructor, members in
    * reverse: `mCells` back to inline storage, `mTarget`'s weak link unlinked,
@@ -104,7 +104,7 @@ namespace moho
     std::int32_t mDueSeqNo;                   // +0x0B4
     /// Local edits not yet confirmed by the sim, oldest first. Block size 1
     /// (0x50-byte element), so each map slot owns one event.
-    msvc8::deque<UserCommandIssueLocalEvent> mLocalQueue; // +0x0B8
+    fa::deque<UserCommandIssueLocalEvent> mLocalQueue; // +0x0B8
     /// Units the command applies to, rebuilt from `mVariableData.mEntIds`
     /// plus the queued select/deselect edits (`GetEntitiesUnderCursor`, 0x008B43F0,
     /// which runs the `WeakSet<UserUnit>` bodies: `Add` 0x00822270, `Remove`

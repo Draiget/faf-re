@@ -314,7 +314,7 @@ namespace
    */
   void DeviceD3D10::Shutdown()
   {
-    delete[] mHeadOutputContexts;
+    DeleteOutputContexts(mHeadOutputContexts, static_cast<std::uint32_t>(mDeviceContext.GetHeadCount()));
     mHeadOutputContexts = nullptr;
 
     for (IDXGISwapChain*& swapChain : mSwapChains) {
@@ -437,7 +437,7 @@ namespace
    * them all would repeat each resolution. An index past the adapter list
    * leaves the list empty, as on D3D9.
    */
-  void DeviceD3D10::GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, const int adapterIndex)
+  void DeviceD3D10::GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, const int adapterIndex)
   {
     outModes.clear();
     if (adapterIndex < 0 || adapterIndex >= static_cast<int>(mAdapters.size())) {
@@ -757,7 +757,7 @@ namespace
       ThrowGalError("DeviceD3D10.cpp", 1818, "internal D3D10 device initialization error");
     }
 
-    OutputContext* const outputContexts = (headCount > 0U) ? new OutputContext[headCount] : nullptr;
+    OutputContext* const outputContexts = NewOutputContexts(headCount);
     mHeadOutputContexts = outputContexts;
 
     auto* const device = mDevice;
@@ -991,7 +991,7 @@ namespace
         &errorBlob
       );
 
-      msvc8::string reason("unknown error");
+      fa::string reason("unknown error");
       if ((result < 0) && (errorBlob != nullptr)) {
         reason.assign_owned(static_cast<const char*>(errorBlob->GetBufferPointer()));
       }
@@ -999,7 +999,7 @@ namespace
       SafeRelease(errorBlob);
 
       if (result < 0) {
-        msvc8::string message("unable to create effect: ");
+        fa::string message("unable to create effect: ");
         message = message + context.mSourcePath;
         message = message + " reason: ";
         message = message + reason;
@@ -1607,7 +1607,7 @@ namespace
    * through the image-format table at `DAT_00D430A0`.
    */
   void DeviceD3D10::SaveRenderTarget(
-    const boost::shared_ptr<RenderTarget>& renderTarget, const msvc8::string& filePath, const int fileFormat
+    const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, const int fileFormat
   )
   {
     const int imageFileFormat = ResolveImageFileFormatToken(fileFormat);
@@ -1630,7 +1630,7 @@ namespace
    */
   void DeviceD3D10::SaveTexture(
     const boost::shared_ptr<Texture>& texture,
-    const msvc8::string& filePath,
+    const fa::string& filePath,
     const int fileFormat,
     gpg::MemBuffer<char>* const outBuffer
   )
@@ -1806,7 +1806,7 @@ namespace
    * D3D10 cannot save a cube target: the body is a bare `ret 8`.
    */
   void DeviceD3D10::SaveCubeRenderTarget(
-    const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const msvc8::string& filePath
+    const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath
   )
   {
     static_cast<void>(cubeTarget);

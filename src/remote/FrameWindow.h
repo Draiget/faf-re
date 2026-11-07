@@ -53,6 +53,8 @@ namespace faf::remote
 
     /** The newest frame decoded (what the client acknowledges), or `kNoBaseline`. */
     [[nodiscard]] std::uint32_t Newest() const noexcept { return mFrames.empty() ? wire::kNoBaseline : mFrames.back().frameId; }
+    /** The newest frame kept, which the next frame is decoded against; null before one. For damage on purpose (WPR.31). */
+    [[nodiscard]] wire::SViewFrame* NewestFrame() noexcept { return mFrames.empty() ? nullptr : &mFrames.back(); }
 
   private:
     std::deque<wire::SViewFrame> mFrames; // decoded, oldest first

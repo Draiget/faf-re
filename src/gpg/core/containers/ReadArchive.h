@@ -12,7 +12,7 @@
 #include "legacy/containers/Vector.h"
 #include "moho/path/PathTables.h"  // PathQueue::Impl is nested, so the enclosing class must be complete
 
-namespace msvc8
+namespace fa
 {
   struct string;
 }
@@ -175,7 +175,7 @@ namespace gpg
      * Slot: 2
      * Demangled: _purecall
      */
-    virtual void ReadString(msvc8::string*) = 0;
+    virtual void ReadString(fa::string*) = 0;
 
     /**
      * Address: 0x00A82547
@@ -366,8 +366,8 @@ namespace gpg
     TypeHandle ReadTypeHandle();
 
   protected:
-    msvc8::vector<TypeHandle> mTypeHandles;
-    msvc8::vector<TrackedPointerInfo> mTrackedPtrs;
+    fa::vector<TypeHandle> mTypeHandles;
+    fa::vector<TrackedPointerInfo> mTrackedPtrs;
     TrackedPointerInfo mNullTrackedPointer;
 
     friend TrackedPointerInfo& ReadRawPointer(ReadArchive* archive, const RRef& ownerRef);

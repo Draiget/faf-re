@@ -10,7 +10,7 @@ namespace
   [[nodiscard]] int ComputeGridCellCoordinate(const float worldCoordinate, const int gridSize) noexcept
   {
     const float reciprocal = 1.0f / static_cast<float>(gridSize);
-    return msvc8::FloorToIntX87(worldCoordinate * reciprocal);
+    return fa::FloorToIntX87(worldCoordinate * reciprocal);
   }
 
 } // namespace
@@ -34,6 +34,6 @@ namespace moho
 
   int FloorSecondsToTicks(const float seconds) noexcept
   {
-    return msvc8::FloorToIntX87(seconds * 10.0f);
+    return fa::FloorToIntX87(seconds * 10.0f);
   }
 } // namespace moho

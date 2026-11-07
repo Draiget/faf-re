@@ -195,7 +195,7 @@ std::int64_t CClientManagerImpl::EstimateSharedStartUs(const bool logDetails)
   };
 
   std::scoped_lock lock(mLock);
-  msvc8::vector<SReadyTiming> timings;
+  fa::vector<SReadyTiming> timings;
   std::int64_t start = 0;
   for (std::size_t index = 0; index < mClients.size(); ++index) {
     CClientBase* const client = mClients[index];
@@ -252,15 +252,15 @@ std::int64_t CClientManagerImpl::EstimateSharedStartUs(const bool logDetails)
  */
 void CClientManagerImpl::NoteDivergentOrders()
 {
-  const auto nickname = [this](const int index) -> msvc8::string {
+  const auto nickname = [this](const int index) -> fa::string {
     const bool known = index >= 0 && static_cast<std::size_t>(index) < mClients.size() && mClients[index] != nullptr;
-    return known ? mClients[static_cast<std::size_t>(index)]->GetNickname() : msvc8::string("?");
+    return known ? mClients[static_cast<std::size_t>(index)]->GetNickname() : fa::string("?");
   };
   const bool stopped = mStreamCheck->StopsOnDivergence();
 
   for (const CommandStreamCheck::Divergence& divergence : mStreamCheck->TakeFindings()) {
-    const msvc8::string sender = nickname(divergence.sender);
-    const msvc8::string reporter = nickname(divergence.reporter);
+    const fa::string sender = nickname(divergence.sender);
+    const fa::string reporter = nickname(divergence.reporter);
     const bool selfReport = divergence.sender == divergence.reporter;
 
     if (selfReport) {
@@ -751,6 +751,9 @@ void CMarshaller::WriteCells(CMessageStream& stream, const gpg::core::FastVector
  */
 CClientManagerImpl::~CClientManagerImpl()
 {
+  // It holds client pointers, and deleting a client can still route a message.
+  mRejoinFeed.reset();
+
   for (CClientBase*& client : mClients) {
     delete client;
     client = nullptr;
@@ -1005,6 +1008,12 @@ void CClientManagerImpl::BroadcastIntParam(const int value)
 void CClientManagerImpl::ProcessClients(CMessage& msg)
 {
   std::scoped_lock lock(mLock);
+
+  // Engine addition (issue #275): null outside a rejoin.
+  if (mRejoinFeed != nullptr && mRejoinFeed->Route(msg)) {
+    return;
+  }
+
   for (CClientBase* const client : mClients) {
     if (client != nullptr) {
       client->Process(msg);
@@ -1130,7 +1139,7 @@ namespace
 
   // net_TestBurstBeat / net_TestBurstBytes: filler on the ordered stream to every
   // peer, incompressible so the deflated size on the wire is the given size.
-  void MaybeSendTestBurst(const msvc8::vector<CClientBase*>& clients, const int availableBeat)
+  void MaybeSendTestBurst(const fa::vector<CClientBase*>& clients, const int availableBeat)
   {
     if (sTestBurstSent || net_TestBurstBeat < 0 || net_TestBurstBytes <= 0 || availableBeat < net_TestBurstBeat) {
       return;
@@ -1171,6 +1180,15 @@ void CClientManagerImpl::DoBeat()
 
   if (mConnector != nullptr) {
     mConnector->Pull();
+  }
+
+  // Engine addition (issue #275): null outside a rejoin.
+  if (mRejoinFeed != nullptr) {
+    mRejoinFeed->Pump();
+  }
+  if (mConnector != nullptr && (mRejoinFeed == nullptr || !mRejoinFeed->CatchingUp()) &&
+      mPeerFeatures->EveryoneSupports(*this, EPeerFeature::Rejoin)) {
+    REJOIN_ServeRestartedPeers(*this);
   }
 
   if (mWeAreReady && !mEveryoneIsReady) {
@@ -1246,6 +1264,42 @@ void CClientManagerImpl::DoBeat()
   }
 
   mInDoBeat = false;
+}
+
+/**
+ * Engine addition, not in the binary: see the declaration.
+ */
+bool CClientManagerImpl::RejoinHoldsIssue(int& nextIssueBeat)
+{
+  if (mRejoinFeed == nullptr) {
+    return false;
+  }
+  std::scoped_lock lock(mLock);
+  return mRejoinFeed->HoldIssue(nextIssueBeat);
+}
+
+/**
+ * Engine addition, not in the binary: see the declaration.
+ */
+bool CClientManagerImpl::RejoinCatchingUp()
+{
+  if (mRejoinFeed == nullptr) {
+    return false;
+  }
+  std::scoped_lock lock(mLock);
+  return mRejoinFeed->CatchingUp();
+}
+
+/**
+ * Engine addition, not in the binary: see the declaration.
+ */
+int CClientManagerImpl::RejoinSkippedBeats()
+{
+  if (mRejoinFeed == nullptr) {
+    return 0;
+  }
+  std::scoped_lock lock(mLock);
+  return mRejoinFeed->SkippedBeats();
 }
 
 /**

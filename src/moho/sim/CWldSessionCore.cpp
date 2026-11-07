@@ -1,3 +1,6 @@
+#include "moho/net/CClientManagerImpl.h"
+#include "moho/sim/SimDriver.h"
+#include "moho/sim/SimKeyframe.h"
 #include "moho/sim/CWldSessionPrivate.h"
 
 namespace moho
@@ -40,7 +43,7 @@ namespace
     // `DestroyBuildTemplateInfo` (0x00823E10, per-element blueprint-id string
     // release) and `DestroyBuildTemplateRange` (0x00823DD0, the loop over it)
     // are the compiler's per-element/range release for `SBuildTemplateInfo`'s
-    // `msvc8::string mBlueprintId` member -- the same release
+    // `fa::string mBlueprintId` member -- the same release
     // `SBuildTemplateInfo`'s implicit destructor already performs. Now that
     // `gpg::fastvector_n<SBuildTemplateInfo, 16>` is `gpg::fastvector_n<SBuildTemplateInfo, 16>`
     // (CWldSession.h), that release happens through the container's own
@@ -58,12 +61,12 @@ namespace
 
       // The binary's whole sort instantiation for this element hangs off this
       // one line -- twelve emitted bodies, catalogued on the members of
-      // legacy/algorithms/Sort.h. `msvc8::sort` rather than `std::sort`
+      // legacy/algorithms/Sort.h. `fa::sort` rather than `std::sort`
       // because only the former models VC8's introsort exactly: the same
       // 32-element insertion-sort cutoff, the same 40-element ninther
       // threshold in the median pick, and the same three-quarters recursion
       // budget before it falls back to heapsort.
-      msvc8::sort(
+      fa::sort(
         begin,
         end,
         [](const SBuildTemplateInfo& lhs, const SBuildTemplateInfo& rhs) noexcept { return lhs.mBuildOrder < rhs.mBuildOrder; }
@@ -127,9 +130,9 @@ namespace
    * ??0CWldSession@Moho@@QAE@AAV?$auto_ptr@VLuaState@LuaPlus@@@std@@AAV?$auto_ptr@VRRuleGameRules@Moho@@@3@AAV?$auto_ptr@VCWldMap@Moho@@@3@AAUSWldSessionInfo@1@@Z)
    */
   CWldSession::CWldSession(
-    msvc8::auto_ptr<LuaPlus::LuaState>& state,
-    msvc8::auto_ptr<RRuleGameRules>& rulesOwner,
-    msvc8::auto_ptr<CWldMap>& wldMap,
+    fa::auto_ptr<LuaPlus::LuaState>& state,
+    fa::auto_ptr<RRuleGameRules>& rulesOwner,
+    fa::auto_ptr<CWldMap>& wldMap,
     SWldSessionInfo& sessionInfo
   )
   {
@@ -211,7 +214,7 @@ namespace
       // dereferences `userArmies[FocusArmy]` the moment the in-game UI asks
       // whether the local player is an observer.
       // FUN_00899880 / FUN_00898EC0 are the two halves of
-      // msvc8::vector<UserArmy*>::assign(count, nullptr) -- see the address
+      // fa::vector<UserArmy*>::assign(count, nullptr) -- see the address
       // block on that member in legacy/containers/Vector.h.
       userArmies.assign(launchInfo->mArmyLaunchInfo.size(), nullptr);
 
@@ -583,7 +586,7 @@ namespace
     WeakPtr<UserEntity> sTestHoveredEntity;
     bool sTestHoverActive = false;
 
-    void UiTestHover(const msvc8::vector<msvc8::string>& args)
+    void UiTestHover(const fa::vector<fa::string>& args)
     {
       const std::string mode = args.size() >= 2U ? std::string(args[1].c_str()) : std::string();
       if (mode == "off") {
@@ -787,7 +790,7 @@ namespace
   void CWldSession::AddToExtraSelectList(UserEntity* const entity)
   {
     UICommandModeData commandModeData{};
-    commandModeData.mMode = msvc8::string("order", 5u);
+    commandModeData.mMode = fa::string("order", 5u);
     commandModeData.mPayload.AssignNewTable(mState, 0, 0);
     commandModeData.mPayload.SetString("name", "RULEUCC_Transport");
     UI_StartCommandMode(commandModeData);
@@ -1332,7 +1335,7 @@ namespace
      * Resolves one army slot for the sound listener, treating a negative focus
      * army (observer, or not yet assigned) as "no listener".
      */
-    [[nodiscard]] UserArmy* ArmyAtIndexOrNull(const msvc8::vector<UserArmy*>& armies, const std::int32_t index)
+    [[nodiscard]] UserArmy* ArmyAtIndexOrNull(const fa::vector<UserArmy*>& armies, const std::int32_t index)
     {
       if (index < 0 || static_cast<std::size_t>(index) >= armies.size()) {
         return nullptr;
@@ -1382,7 +1385,7 @@ namespace
      */
     template <class Entry>
     [[nodiscard]] bool ResolveSyncTargets(
-      CWldSession& session, const msvc8::vector<Entry>& entries, std::vector<UserEntity*>& targets
+      CWldSession& session, const fa::vector<Entry>& entries, std::vector<UserEntity*>& targets
     )
     {
       targets.resize(entries.size());
@@ -1463,7 +1466,7 @@ namespace
     }
 
     /// Engine addition (`wld_ParallelSync`): `DoBeat`'s unit-update loop. False: run the serial loop.
-    [[nodiscard]] bool ApplyUnitUpdatesParallel(CWldSession& session, const msvc8::vector<SUnitVariableUpdateEntry>& updates)
+    [[nodiscard]] bool ApplyUnitUpdatesParallel(CWldSession& session, const fa::vector<SUnitVariableUpdateEntry>& updates)
     {
       if (!UseParallelSync(updates.size())) {
         return false;
@@ -1491,7 +1494,7 @@ namespace
 
     /// Engine addition (`wld_ParallelSync`): `DoBeat`'s entity-update loop. False: run the serial loop.
     [[nodiscard]] bool ApplyEntityUpdatesParallel(
-      CWldSession& session, const msvc8::vector<SEntityVariableUpdateEntry>& updates
+      CWldSession& session, const fa::vector<SEntityVariableUpdateEntry>& updates
     )
     {
       if (!UseParallelSync(updates.size())) {
@@ -1577,7 +1580,52 @@ namespace
    * This is the sole consumer of the driver's sync queue - without it the queue
    * fills, the issue thread stops issuing, and the game clock never advances.
    */
-  void CWldSession::DoBeat(msvc8::auto_ptr<SSyncData> syncData)
+  void CWldSession::ResetForNewReplaySim()
+  {
+    // The timeline that made the bar: FAF's Lua's own copy when it carries one (issue #327), else the engine's.
+    (void)SCR_LuaDoString(
+      "local path = '/lua/ui/game/replay_timeline.lua' "
+      "if not DiskGetFileInfo(path) then path = '/fafengine/modules/lua/ui/game/replay_timeline.lua' end "
+      "import(path).OnSimReplaced()",
+      mState
+    );
+    SetSelection(WeakSet<UserEntity>());
+    USER_GetSound()->StopAllSounds();
+    USER_GetSound()->SetListenerArmy(nullptr);
+    sWorldParticles.ClearRenderBuckets();
+    gFormationPreviews.clear();
+
+    while (!mEntities.empty()) {
+      UserEntity* const entity = mEntities.begin()->second;
+      RemoveEntity(entity);
+      delete entity;
+    }
+    for (auto orphan = mOrphans.begin(); orphan != mOrphans.end();) {
+      UserEntity* const entity = *orphan;
+      ++orphan;
+      delete entity;
+    }
+    while (!mCommandManager->mCommands.empty()) {
+      delete mCommandManager->mCommands.begin()->second;
+    }
+    for (std::size_t armyIndex = 0; armyIndex < userArmies.size(); ++armyIndex) {
+      delete userArmies[armyIndex];
+      userArmies[armyIndex] = nullptr;
+    }
+    mDebugCanvas.release();
+    mBeatDebugCanvas.release();
+    IsGameOver = 0u;
+    mLastBeatWasTick = 0;
+    mTimeSinceLastTick = 0.0f;
+
+    // The terrain flattened since the keyframe has to go back, and the sim's heights are the truth.
+    IWldTerrainRes* const terrainRes = mWldMap->mTerrainRes;
+    static_cast<CDecalManager*>(terrainRes->GetDecalManager())->RemoveAllDecals();
+    const CHeightField* const field = mWldMap->mTerrainRes->mMap->mHeightField.get();
+    terrainRes->NotifyMapChange(gpg::Rect2i{0, 0, field->width - 1, field->height - 1});
+  }
+
+  void CWldSession::DoBeat(fa::auto_ptr<SSyncData> syncData)
   {
     const CTimeBarSection beatSection("Sync");
 
@@ -1616,7 +1664,7 @@ namespace
 
     // Camera shakes reach every live camera, not just the world one.
     {
-      const msvc8::vector<CameraImpl*> allCameras = CAM_GetAllRCamCameras();
+      const fa::vector<CameraImpl*> allCameras = CAM_GetAllRCamCameras();
       for (const SCamShakeParams& shake : beat.mCamShakeParams) {
         for (CameraImpl* const camera : allCameras) {
           if (camera != nullptr) {
@@ -1663,6 +1711,19 @@ namespace
 
     for (const SSTICommandConstantData& commandConstantData : beat.mPublishedCommandDescriptors) {
       (void)FindOrCreateCommandIssueHelper(*mCommandManager, commandConstantData, 0u, 0);
+    }
+
+    // Engine addition (issue #275): orders this client gave before it restarted
+    // keep their ids, and `Sim::ValidateNewCommandId` refuses an id in use.
+    if (CClientManagerImpl* const clients = sSimDriver != nullptr ? sSimDriver->GetClientManager() : nullptr;
+        clients != nullptr && clients->mRejoinFeed != nullptr) {
+      for (const SSTICommandConstantData& commandConstantData : beat.mPublishedCommandDescriptors) {
+        const auto commandId = static_cast<std::uint32_t>(commandConstantData.cmd);
+        const std::int32_t lowId = static_cast<std::int32_t>(commandId & 0x00FFFFFFu);
+        if ((commandId >> 24u) == mCommandManager->mSourceId && lowId >= mCommandManager->mIdPool.mNextLowId) {
+          mCommandManager->mIdPool.mNextLowId = lowId + 1;
+        }
+      }
     }
 
     if (!ApplyUnitUpdatesParallel(*this, beat.mUnitUpdates)) {
@@ -1743,6 +1804,7 @@ namespace
       // (see SCR_FromLocalByteStream); the binary calls SCR_FromByteStream.
       currentSync.SCR_FromLocalByteStream(currentSync, mState, &syncReader);
       mState->GetGlobals().SetObject("Sync", currentSync);
+      SIM_AddRestoredUiData(currentSync, mState); // engine addition (replay keyframes)
     }
     (void)SCR_LuaDoString("OnSync()", mState);
 
@@ -1753,7 +1815,7 @@ namespace
     terrainRes->SyncTerrain(beat.mTerrainUpdate.px);
     mSimResources.reset_from(beat.mSimResources);
 
-    // `msvc8::vector<SExtraUnitData>::operator=` (0x00895214, FUN_007530C0,
+    // `fa::vector<SExtraUnitData>::operator=` (0x00895214, FUN_007530C0,
     // `legacy/containers/Vector.h`). Previously mis-wired through
     // `AssignSyncInlineVectors` (a per-element `SyncInlineVector` scratch-run
     // copy) at this exact call site -- `FUN_007530C0`'s callee chain
@@ -1763,12 +1825,12 @@ namespace
     // element; removed the wrong helper and call directly.
     mSyncExtraUnitData = beat.mSyncExtraUnitData;
 
-    for (const msvc8::string& printLine : beat.mPrintField) {
+    for (const fa::string& printLine : beat.mPrintField) {
       CON_Printf("%s", printLine.c_str());
     }
 
     if (!beat.mDesyncs.empty()) {
-      msvc8::vector<msvc8::string> desyncArmyNames;
+      fa::vector<fa::string> desyncArmyNames;
       desyncArmyNames.reserve(beat.mDesyncs.size());
 
       // Engine addition: a checksum from a player whose orders reached this
@@ -1778,7 +1840,7 @@ namespace
       CClientManagerImpl* const clientManager = driver != nullptr ? driver->GetClientManager() : nullptr;
 
       for (const SDesyncInfo& desync : beat.mDesyncs) {
-        const msvc8::string& armyName = cmdSources[static_cast<std::size_t>(desync.army)].mName;
+        const fa::string& armyName = cmdSources[static_cast<std::size_t>(desync.army)].mName;
         if (clientManager != nullptr && clientManager->OrdersAlteredFrom(static_cast<CommandSourceId>(desync.army))) {
           gpg::Warnf(
             "Desync with %s at beat %d not reported to FAF: %s's orders reached this client differently from "
@@ -1801,7 +1863,7 @@ namespace
       if (!desyncArmyNames.empty()) {
         // Engine addition (issue #216): the dialog's diagnostic lines name the recorder's dump.
         if (const std::string dumpPath = CDesyncRecorder::DumpPath(); !dumpPath.empty()) {
-          desyncArmyNames.push_back(msvc8::string(("Desync dump: " + dumpPath).c_str()));
+          desyncArmyNames.push_back(fa::string(("Desync dump: " + dumpPath).c_str()));
         }
         UI_ShowDesyncDialog(mGameTick, desyncArmyNames);
       }
@@ -1826,7 +1888,7 @@ namespace
     {
       static int sExitAtTick = -2;
       if (sExitAtTick == -2) {
-        msvc8::vector<msvc8::string> args;
+        fa::vector<fa::string> args;
         sExitAtTick = CFG_GetArgOption("/exitattick", 1u, &args) && !args.empty() ? std::atoi(args[0].c_str()) : -1;
       }
       if (sExitAtTick >= 0 && static_cast<int>(mGameTick) >= sExitAtTick) {
@@ -1916,7 +1978,7 @@ namespace
     }
 
     if (dbg_Metronome && USER_GetSound() != nullptr) {
-      USER_GetSound()->Play(msvc8::string("Tick", 4u), msvc8::string("TestBank", 8u));
+      USER_GetSound()->Play(fa::string("Tick", 4u), fa::string("TestBank", 8u));
     }
   }
 
@@ -1932,7 +1994,8 @@ namespace
     // Interpolation between ticks. Running with the wind means "do not
     // interpolate, just consume beats", so the fraction is pinned at a whole
     // tick and the drain below never waits for the clock.
-    if (mLastBeatWasTick == 0 || wld_RunWithTheWind) {
+    const std::int32_t fastForwardTarget = REPLAY_FastForwardTarget(); // engine addition (replay timeline)
+    if (mLastBeatWasTick == 0 || wld_RunWithTheWind || fastForwardTarget >= 0) {
       mTimeSinceLastTick = 1.0f;
     } else {
       mTimeSinceLastTick += WLD_GetSimRate() * deltaSeconds * 10.0f;
@@ -1941,18 +2004,39 @@ namespace
     CFormation::UpdateOrientation(CursorInfo().mMouseWorldPos, mCurFormation);
 
     const std::int32_t tickAtFrameStart = mGameTick;
-    const std::int32_t targetTick = mGameTick + msvc8::FloorToIntX87(mTimeSinceLastTick); // 0x00895BEA..0x00895BFD
+    const std::int32_t targetTick = mGameTick + fa::FloorToIntX87(mTimeSinceLastTick); // 0x00895BEA..0x00895BFD
+
+    // Engine addition (issue #275): a client catching up shows nothing worth
+    // waiting for, and its driver needs the queue to have room at the handover.
+    CClientManagerImpl* const frameClients = simDriver->GetClientManager();
+    const bool rejoinCatchingUp = frameClients != nullptr && frameClients->RejoinCatchingUp();
 
     // Drain the driver's sync queue. Bounded at 100 beats so a burst after a
     // stall cannot make one frame arbitrarily long.
     std::int32_t beatsApplied = 0;
-    for (; beatsApplied < 100; ++beatsApplied) {
+    // Engine addition (replay timeline): a fast-forward takes what the sim has ready for most of a frame, so the
+    // UI stays responsive, and a paused replay moves too.
+    if (fastForwardTarget >= 0) {
+      constexpr std::chrono::milliseconds kFastForwardFrameBudget{15};
+      const auto frameStart = std::chrono::steady_clock::now();
+      while (mGameTick < fastForwardTarget && IsGameOver == 0 && simDriver->HasSyncData()) {
+        SSyncData* packet = nullptr;
+        simDriver->GetSyncData(packet);
+        DoBeat(fa::auto_ptr<SSyncData>(packet));
+        ++beatsApplied;
+        if (std::chrono::steady_clock::now() - frameStart >= kFastForwardFrameBudget) {
+          break;
+        }
+      }
+      REPLAY_AfterFastForwardFrame(*this, beatsApplied);
+    } else
+    for (; beatsApplied < 100 && !WLD_IsReplaySimSwapping(); ++beatsApplied) {
       if (mReplayIsPaused) {
         // A paused replay still applies beats until it lands on a tick.
         if (mLastBeatWasTick != 0) {
           break;
         }
-      } else if (mGameTick >= targetTick && !wld_RunWithTheWind) {
+      } else if (mGameTick >= targetTick && !wld_RunWithTheWind && !rejoinCatchingUp) {
         break;
       }
 
@@ -1962,7 +2046,7 @@ namespace
 
       SSyncData* packet = nullptr;
       simDriver->GetSyncData(packet);
-      DoBeat(msvc8::auto_ptr<SSyncData>(packet));
+      DoBeat(fa::auto_ptr<SSyncData>(packet));
     }
 
     if (sEngineStat_Sync_Count == nullptr) {
@@ -1981,7 +2065,9 @@ namespace
 
     // Whatever the drain consumed comes back off the interpolation fraction, so
     // the render clock does not run ahead of the sim clock.
-    if (!wld_RunWithTheWind) {
+    if (fastForwardTarget >= 0) {
+      mTimeSinceLastTick = 0.0f;
+    } else if (!wld_RunWithTheWind) {
       const float remainder = mTimeSinceLastTick - static_cast<float>(mGameTick - tickAtFrameStart);
       mTimeSinceLastTick = std::max(0.0f, std::min(remainder, 1.0f));
     }
@@ -1998,7 +2084,7 @@ namespace
   /**
    * Address: 0x00896000 (FUN_00896000, ?GetSelectionUnits@CWldSession@Moho@@QBEXAAV?$WeakSet@VUserUnit@Moho@@@2@@Z)
    */
-  void CWldSession::GetSelectionUnits(msvc8::vector<UserUnit*>& outUnits) const
+  void CWldSession::GetSelectionUnits(fa::vector<UserUnit*>& outUnits) const
   {
     outUnits.clear();
 
@@ -2035,7 +2121,7 @@ namespace
    * Walks selected units and keeps only those that can attack the currently
    * hovered entity.
    */
-  void CWldSession::GetValidAttackingUnits(msvc8::vector<UserUnit*>& outUnits) const
+  void CWldSession::GetValidAttackingUnits(fa::vector<UserUnit*>& outUnits) const
   {
     outUnits.clear();
 
@@ -2116,7 +2202,7 @@ namespace
     }
   }
 
-  void CWldSession::SetSelectionUnits(const msvc8::vector<UserUnit*>& units)
+  void CWldSession::SetSelectionUnits(const fa::vector<UserUnit*>& units)
   {
     WeakSet<UserEntity> nextSelection;
     for (UserUnit* const unit : units) {
@@ -2135,7 +2221,7 @@ namespace
   {
     const UserEntity* const entity = reinterpret_cast<const UserEntity*>(unit);
     const bool selectableByArmy = entity != nullptr && entity->IsSelectable() && entity->mArmy == GetFocusUserArmy();
-    return selectableByArmy || (UI_SelectAnything && this != nullptr && IsCheatsEnabled);
+    return selectableByArmy || (UI_SelectAnything && static_cast<const void*>(this) != nullptr && IsCheatsEnabled);
   }
 
   /**
@@ -2215,7 +2301,7 @@ namespace
         continue;
       }
 
-      for (const msvc8::string& selectionSet : unit->mSelectionSets) {
+      for (const fa::string& selectionSet : unit->mSelectionSets) {
         saveData->mNodeMap.insert(std::make_pair(entityId, selectionSet));
       }
     }

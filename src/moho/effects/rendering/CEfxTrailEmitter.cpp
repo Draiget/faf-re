@@ -171,7 +171,7 @@ namespace moho
     mParams.resize(TRAIL_LASTPARAM, 0.0f);
     mParticleTextures.resize(2, nullptr);
     {
-      const msvc8::string emptyString;
+      const fa::string emptyString;
       mStrings.resize(2, emptyString);
     }
 
@@ -375,7 +375,7 @@ namespace moho
     }
 
     Sim* const sim = mManager->GetSim();
-    const msvc8::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
+    const fa::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
 
     for (const GeomCamera3& camera : cameras) {
       if (CanSeeCam(&camera)

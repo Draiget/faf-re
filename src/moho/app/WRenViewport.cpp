@@ -1,4 +1,5 @@
 #include "moho/app/WxPrivate.h"
+#include "moho/app/NetworkPanel.h"
 
 namespace
 {
@@ -252,7 +253,7 @@ void moho::WRenViewport::AddWorldView(
   WRenViewport* const viewport = moho::ren_Viewport;
   viewport->RemoveWorldView(view);
 
-  msvc8::vector<SWorldViewInfo>& worldViews = viewport->mWorldViews;
+  fa::vector<SWorldViewInfo>& worldViews = viewport->mWorldViews;
   SWorldViewInfo* insertPos = worldViews.begin();
   while (insertPos != worldViews.end() && depth >= insertPos->mDepth) {
     ++insertPos;
@@ -318,8 +319,8 @@ namespace
   // modeled here at their proven types and byte-verified defaults:
   //   dump_frameRate         @ 0x010A6334 (?dump_frameRate@Moho@@3HA)          int, 0
   //   dump_outputFrameNumber @ 0x010A6418 (?dump_outputFrameNumber@Moho@@3HA)  int, 0
-  //   dump_Timestamp         @ 0x00F5A8A4 (msvc8::string)                      empty
-  //   dump_frameDumpName     @ 0x00F5A8C0 (msvc8::string)                      empty
+  //   dump_Timestamp         @ 0x00F5A8A4 (fa::string)                      empty
+  //   dump_frameDumpName     @ 0x00F5A8C0 (fa::string)                      empty
   // The timestamp / base-name strings are populated by the frame-dump console
   // command elsewhere; here they are only consumed to build the output path.
 }
@@ -347,14 +348,14 @@ namespace moho
    *
    * Timestamp token embedded in dumped frame filenames. Default empty.
    */
-  msvc8::string dump_Timestamp{};
+  fa::string dump_Timestamp{};
 
   /**
    * Address: 0x00F5A8C0 (?dump_frameDumpName@Moho@@3V?$basic_string@...@std@@A)
    *
    * Base directory / name prefix for dumped frame files. Default empty.
    */
-  msvc8::string dump_frameDumpName{};
+  fa::string dump_frameDumpName{};
 
   void REN_MaybeDumpFrame(ID3DRenderTarget* renderTarget);
 }
@@ -408,7 +409,7 @@ void moho::REN_MaybeDumpFrame(moho::ID3DRenderTarget* const renderTarget)
 
   // Build the numbered output path: "<name>\SCFrame_<timestamp>_<NNNNN>.bmp".
   const int frameNumber = moho::dump_outputFrameNumber++;
-  const msvc8::string dest = gpg::STR_Printf(
+  const fa::string dest = gpg::STR_Printf(
     "%s\\SCFrame_%s_%05d.bmp",
     moho::dump_frameDumpName.c_str(),
     moho::dump_Timestamp.c_str(),
@@ -663,7 +664,7 @@ namespace
       int labelValue = 0;            // ebp (v50), steps by axisStep
       unsigned int rowYAccum = 0;    // esi (v49), steps by the row-height slot y_low
       for (int row = 0; row < 5; ++row) { // var_138 == 5
-        const msvc8::string text = gpg::STR_Printf("%5d", labelValue); // 0x007F46B0
+        const fa::string text = gpg::STR_Printf("%5d", labelValue); // 0x007F46B0
         // Baseline Y = (peakScale-derived base) - (rowYAccum >> 2), fild + the
         // MSVC unsigned->float fixup (0x007F46BC..0x007F46E1).
         const int rawY = static_cast<int>(gRenBandwidthPeakScale) - static_cast<int>(rowYAccum >> 2);
@@ -786,8 +787,9 @@ namespace
 void moho::REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, const int head)
 {
   // 0x007FA756..0x007FA778: bail (releasing the batcher) when nothing is armed.
+  // Engine addition (issue #322): the network panel is one more overlay.
   if (!moho::ren_ShowFrameTimes && !moho::ren_ShowNetworkStats
-      && !moho::ren_ShowBandwidthUsage && !moho::UI_ShowControlUnderMouse) {
+      && !moho::ren_ShowBandwidthUsage && !moho::UI_ShowControlUnderMouse && !moho::net_ShowPanel) {
     return; // batcher shared_ptr destructs here (asm 0x007FA77A..0x007FA786)
   }
 
@@ -831,7 +833,8 @@ void moho::REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, const int 
 
   // 0x007FA941..0x007FA982: network-stats HUD, right-anchored.
   if (moho::ren_ShowNetworkStats) {
-    if (CSimDriver* const simDriver = static_cast<CSimDriver*>(moho::WLD_GetDriver())) {
+    // Engine addition: only the lockstep driver has these stats (the remote and server drivers draw none).
+    if (CSimDriver* const simDriver = dynamic_cast<CSimDriver*>(moho::WLD_GetDriver())) {
       simDriver->DrawNetworkStats(primBatcher, static_cast<float>(headWidth - 25), 25.0f, 1.0f, 0.0f);
     }
   }
@@ -862,6 +865,9 @@ void moho::REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, const int 
     }
   }
 
+  // Engine addition (issue #322): the network panel, last so it is on top.
+  moho::NETPANEL_Draw(primBatcher, widthF, heightF);
+
   // 0x007FA9ED..0x007FA9F3: flush the accumulated debug geometry.
   primBatcher->Flush();
   // batcher shared_ptr destructs here (asm 0x007FA9FB..0x007FAA2D).
@@ -885,8 +891,8 @@ namespace
   }
 
   /**
-   * Engine addition (issue #215): gpg::diag::BuildLabel ("FAF-RE by Draiget, build
-   * <commit> <arch>") in small gray text, centred at the bottom of the first head, while
+   * Engine addition (issue #215): gpg::diag::BuildLabel ("FAF-RE, Draiget & contributors,
+   * build <version or commit> <arch>") in small gray text, centred at the bottom of the first head, while
    * the lobby screen is up (a CLobby exists and no game session runs). In a game the
    * same line heads the network-stats panel (F11) instead. The engine draws it after the UI, from
    * the commit compiled into the exe, so no Lua code can change or hide it; there is
@@ -950,7 +956,7 @@ namespace
  * ren_Ui is set, then the debug overlays (REN_DebugStuff) and the editor
  * render hook.
  */
-void moho::WRenViewport::RenderUI(const msvc8::vector<SWorldViewInfo>& worldViews)
+void moho::WRenViewport::RenderUI(const fa::vector<SWorldViewInfo>& worldViews)
 {
   // 0x007F88CA..0x007F88FD: bind the head render target, disable secondary
   // color write.
@@ -1108,7 +1114,7 @@ void moho::WRenViewport::RenderCameraOutline(
  * `head` and the vector (the one call site, WRenViewport::Render
  * 0x007F97AF..0x007F97B2, pushes the three) and passes a dead DeviceD3D9* in
  * edi. The vector is read at +4/+8 only - its first and last element
- * pointers, past msvc8::vector's leading proxy word.
+ * pointers, past fa::vector's leading proxy word.
  *
  * What it does:
  * Renders the cartographic ("strategic"/top-down) view for every world-view
@@ -1161,7 +1167,7 @@ void moho::WRenViewport::RenderCameraOutline(
  */
 unsigned int moho::WRenViewport::RenderCartographic(
   const int head,
-  msvc8::vector<SWorldViewInfo>& worldViews
+  fa::vector<SWorldViewInfo>& worldViews
 )
 {
   IWldTerrainRes* const terrain = moho::REN_GetTerrainRes();
@@ -1524,7 +1530,7 @@ void moho::WRenViewport::D3DWindowOnDeviceRender()
       // Debug mode: render only the first registered world view. The binary
       // copy-constructs a fresh one-element vector from the first entry for
       // the duration of the call rather than passing the live vector.
-      msvc8::vector<SWorldViewInfo> firstViewOnly{};
+      fa::vector<SWorldViewInfo> firstViewOnly{};
       firstViewOnly.push_back(mWorldViews.front());
       Render(head, firstViewOnly);
     } else {
@@ -1651,7 +1657,7 @@ void moho::WRenViewport::RenderPreviewImage([[maybe_unused]] const bool forceReg
     (void)worldViewEntry.mTerrain->Create(terrainRes);
   }
 
-  msvc8::vector<SWorldViewInfo> previewWorldViews{};
+  fa::vector<SWorldViewInfo> previewWorldViews{};
   previewWorldViews.push_back(worldViewEntry);
   Render(0, previewWorldViews);
 
@@ -1747,6 +1753,364 @@ namespace
 
 
 /**
+ * Engine addition: one world view of `Render`'s per-view loop (0x007F9253..0x007F9779), in the
+ * binary's order. A view it skips returns, where the binary jumps to the next entry.
+ */
+void moho::WRenViewport::RenderWorldView(
+  const SWorldViewInfo* const worldView, const int head, const SWorldViewInfo* const begin, const bool regenerateShoreline
+)
+{
+  if (worldView->mView == nullptr) {
+    return;
+  }
+
+  // 0x007F92A0..0x007F92FB: a view is skipped when its slot-9 query answers
+  // true, when slot 12 does (CUIWorldView::CanShake 0x0086DC60 returns the
+  // orthographic flag, so every minimap is left to the cartographic pass and
+  // never gets the 3D world/fog pass), when it belongs to another head, and,
+  // under `ren_HideSecondary` (0x010A6421), when it is not the first view.
+  if (worldView->mView->Func2() || worldView->mView->CanShake() || worldView->mHead != head
+      || (moho::ren_HideSecondary && worldView != begin)) {
+    return;
+  }
+
+  // `IRenderWorldView::GetCamera()` returns a `CameraImpl*` (see
+  // IRenderWorldView.h slot 3) - a whole camera-control object, not the
+  // embedded GeomCamera3 transform/projection state itself. The prior
+  // reinterpret_cast straight to `GeomCamera3*` treated CameraImpl's own
+  // layout (RCamCamera broadcaster fields, the CScriptEvent sub-object,
+  // mName, mTerrainMap, ...) as if it were GeomCamera3, so every read
+  // through `mCam` below (view/projection matrices, transform) pulled
+  // unrelated CameraImpl bytes instead - confirmed live via dbgrun: the
+  // resulting "position" was nonsense (~31219 on two axes) even though
+  // CameraImpl's own CameraGetView()/UpdateCoords() computed a perfectly
+  // sane transform. CameraGetView() is the real, correctly-offset
+  // accessor for the embedded GeomCamera3 (CameraImpl.cpp:2007-2010:
+  // `return As(this)->mCam;`).
+  moho::CameraImpl* const cameraImpl = worldView->mView->GetCamera();
+  mCam = cameraImpl != nullptr
+    ? const_cast<moho::GeomCamera3*>(&cameraImpl->CameraGetView())
+    : nullptr;
+  if (mCam == nullptr) {
+    return;
+  }
+
+  // Ground clutter, refreshed once per frame off the primary world view.
+  // Binary 0x007F9301..0x007F9330: gated on `ren_Clutter` and on this entry
+  // being the first in the world-view list (the same `== begin` comparison
+  // `ren_HideSecondary` uses two instructions earlier -- IDA types the list's
+  // begin/end pair as `mVertexSheets[0]`/`[1]`, which is what makes that test
+  // read like a sheet comparison). `UpdateCurrent` retires regions the camera
+  // has left, `GenerateNew` fills in the ones it has entered; both take the
+  // view camera and both live at `viewport + 0x808`.
+  // TEMPORARY: FAF_NO_CLUTTER=1 skips only this block (black-sliver triage).
+  static const bool sClutterDisabled = [] {
+    std::size_t length = 0u;
+    char value[8] = {};
+    return ::getenv_s(&length, value, sizeof(value), "FAF_NO_CLUTTER") == 0 && length != 0u && value[0] == '1';
+  }();
+  if (moho::ren_Clutter && worldView == begin && !RenderAdditionsDisabled() && !sClutterDisabled) {
+    mClutter.UpdateCurrent(mCam);
+    mClutter.GenerateNew(mCam);
+  }
+
+  // Refresh mScreenPos/mScreenSize/mFullScreen from THIS view's camera
+  // before drawing it. The binary calls UpdateRenderViewportCoordinates
+  // twice (confirmed via its two code xrefs): once per-iteration right
+  // here (0x007F9385, with mCam freshly bound to the current view), and
+  // once more after the loop as a shared tail (0x007F97A4, by which point
+  // the loop has reset mCam to null - see `mCam = nullptr;`
+  // below). This per-iteration call was missing from the recovery, so
+  // mScreenPos/mScreenSize never advanced past whatever the PREVIOUS
+  // frame's post-loop null-camera fallback wrote (the full head rect at
+  // origin) - every view, main and minimap alike, rendered its
+  // terrain/mesh/water passes through that full-screen rect instead of
+  // this view's own CameraSetViewport-pushed one.
+  UpdateRenderViewportCoordinates();
+
+
+  // Render the atmosphere/cloud sky dome for this world view before the
+  // terrain composite pass (binary order: WRenViewport::Render @0x007F90D0
+  // dispatches the sky dome pass right after the per-view camera bind,
+  // guarded by the ren_SkyDome tuning flag).
+  if (moho::ren_SkyDome) {
+    const gpg::gal::RenderProfileScope profileSky("SkyDome");
+    RenderSkyDome();
+  }
+
+  moho::TerrainCommon* const terrain = worldView->mTerrain.get();
+
+
+  if (moho::ren_Terrain && terrain != nullptr) {
+    // Per-frame render-context update (TerrainCommon slot 5), dispatched
+    // immediately before RenderTerrainNormals in the binary
+    // (0x007F93A6-0x007F93C7). The viewport block is the 3 contiguous
+    // Vector2i fields at +0x308 (mScreenPos/mScreenSize/mFullScreen). minimapPass is always false from this call site;
+    // forceRegenerate is the `ren_RegenShore` latch taken on entry (the
+    // push at 0x007F939A reads that stack byte). Passing 1 here rebuilt the
+    // whole shoreline every frame.
+    {
+      const gpg::gal::RenderProfileScope profileTerrainContext("TerrainContext");
+      terrain->UpdateRenderContext(
+        moho::REN_GetGameTick(),
+        moho::REN_GetSimDeltaSeconds(),
+        mCam,
+        reinterpret_cast<const std::int32_t*>(&mScreenPos),
+        false,
+        regenerateShoreline ? 1 : 0
+      );
+    }
+
+    {
+      const gpg::gal::RenderProfileScope profileTerrainNormals("TerrainNormals");
+      RenderTerrainNormals(terrain);
+      TransformTerrainNormals();
+    }
+
+    // The shadow pass, between the normal transform and the composite
+    // (0x007F93DF slot 6 CameraGetTargetZoom, then 0x007F93F1).
+    {
+      const gpg::gal::RenderProfileScope profileShadows("Shadows");
+      mShadowRenderer.RenderFrameShadows(
+        terrain, *mCam, worldView->mView->CameraGetTargetZoom());
+    }
+
+    FogOn(worldView->mView->CameraGetZoom());
+    {
+      const gpg::gal::RenderProfileScope profileTerrain("Terrain");
+      RenderCompositeTerrain(terrain);
+    }
+  }
+
+  // Range-ring pass for the normal (non-cartographic) world view, between the
+  // terrain composite and the mesh batch. Binary 0x007F940E..0x007F944D:
+  //
+  //   0x007F940E  call [worldView + 0Ch]      ; IRenderWorldView slot 3, GetCamera
+  //   0x007F9417  mov  ecx, [esp+1Ch]         ; the cached sWldSession local
+  //   0x007F941D  test ecx, ecx / jz          ; no session -> skip
+  //   0x007F9421  test eax, eax / jz          ; no camera  -> skip
+  //   0x007F9423  cmp  ren_Ranges, 0 / jz     ; 0x00F57E4F
+  //   0x007F942C  cmp  ren_Ui, 0 / jz         ; 0x00F57DE7
+  //   0x007F9435  fld  sDeltaFrame            ; 0x010A6338
+  //   0x007F9444  lea  edx, [ebp+37Ch]        ; &WRenViewport::mRangeRenderer
+  //   0x007F944D  call RangeRenderer::Render
+  //
+  // Without this the range renderer only ever ran from `Cartographic::Render`,
+  // so every range overlay - build range, weapon ranges, intel - was visible
+  // in the minimap and in cartographic mode but never in the ordinary 3D view.
+  // The call target is FAF's `.exxt` replacement of `RangeRenderer::Render`
+  // (0x012910B7), which re-implements the build-ring and visible-profile
+  // passes and then jumps back into the shipped body at 0x007EEB55 for the
+  // selected/highlighted passes; the recovered `RangeRenderer::Render` already
+  // covers all of that, so it is called directly here.
+  if (moho::CWldSession* const rangeSession = moho::WLD_GetActiveSession(); rangeSession != nullptr) {
+    moho::CameraImpl* const rangeCamera = worldView->mView->GetCamera();
+    if (rangeCamera != nullptr && moho::ren_Ranges && moho::ren_Ui) {
+      const gpg::gal::RenderProfileScope profileRanges("Ranges");
+      mRangeRenderer.Render(
+        rangeSession, rangeCamera, static_cast<unsigned int>(head), moho::REN_GetSimDeltaSeconds()
+      );
+    }
+  }
+
+  // Rebuild the global mesh-renderer batch map for this frame/view before the
+  // mesh draw passes below. Binary (WRenViewport::Render @0x007F90D0, the
+  // GetInstance+Batch pair at 0x007F9452..0x007F9478) invokes it as
+  //   MeshRenderer::Batch(instance, sCurGameTick, sDeltaFrame,
+  //                       *viewport->mCam, viewport->mCam->viewport.r[1]);
+  // The Vector4f fade-plane arg is the second row of the camera viewport
+  // matrix (mCam + 0x294 = viewport @0x284 + 0x10 = r[1]).
+  moho::MeshRenderer* const meshRenderer = moho::MeshRenderer::GetInstance();
+  {
+    const gpg::gal::RenderProfileScope profileMeshBatch("MeshBatch");
+    meshRenderer->Batch(
+      moho::REN_GetGameTick(),
+      moho::REN_GetSimDeltaSeconds(),
+      *mCam,
+      mCam->viewport.r[1]
+    );
+  }
+
+  {
+    const gpg::gal::RenderProfileScope profileReflections("Reflections");
+    RenderReflections();
+  }
+  {
+    const gpg::gal::RenderProfileScope profileMeshes("Meshes");
+    RenderMeshes(0x14, false);
+  }
+  {
+    const gpg::gal::RenderProfileScope profileEffects("Effects");
+    RenderEffects(true);
+  }
+  {
+    const gpg::gal::RenderProfileScope profileMeshes("Meshes");
+    RenderMeshes(0x18, false);
+  }
+  FogOff();
+
+  if (terrain != nullptr) {
+    const gpg::gal::RenderProfileScope profileWater("Water");
+    RenderWaterMask(terrain);
+    RenderCopyForRefraction(false);
+    // Fog density tracks the camera zoom - the binary dispatches
+    // IRenderWorldView slot 8 (CameraGetZoom) straight into FogOn at
+    // 0x007F94B8..0x007F94C8, it is not a constant.
+    FogOn(worldView->mView->CameraGetZoom());
+    RenderWater(terrain);
+  }
+
+  // The playable-boundary pass and the UI selection pass, in that order,
+  // between RenderWater and the 0x24 mesh bucket.
+  //
+  //   0x007F94D2  cmp  ren_PlayableBoundary, 0   ; jz 0x007F9500
+  //   0x007F94DF  test ebx, ebx                  ; jz 0x007F9500  (mSession)
+  //   0x007F94E3  cmp  [worldView->mView], 0      ; jz 0x007F9500
+  //   0x007F94FB  call func_RenBoundary          ; 0x007D01C0, __thiscall
+  //               ecx = head; args (&mBoundaryRenderer, mSession, <local>)
+  //   0x007F9500  cmp  ren_Ui, 0                 ; jz 0x007F9536
+  //   0x007F952E  call func_RenUI                ; 0x007FD490, __cdecl/0x14
+  //               (mSession, mCam, mPrimBatcher.px, sDeltaFrame,
+  //                sWeightedFrameRate)  <- IDA's 4-arg signature is wrong,
+  //               it drops the 5th float; the push sequence at
+  //               0x007F9509..0x007F952D has five dwords and the callee
+  //               cleanup is `add esp, 14h` at 0x007F9533. `moho::RenUI`
+  //               takes all five; do not trim it back to four.
+  //
+  // The fifth argument is the smoothed frame time (`fld sWeightedFrameRate`
+  // at 0x007F9509), not the sim delta - the blinky-box cycle advances on
+  // wall-clock frame time while the bracket geometry interpolates on
+  // `sDeltaFrame`.
+  // The `ebx` these three gates test is NOT the `+0x2140` lane this file
+  // models as `mSession`. `+0x2140` is written once per loop iteration at
+  // 0x007F9379, alongside `mCam` at `+0x219C`, and both are cleared together
+  // at 0x007F9709 - it is the per-iteration current world view, and slot 0 is
+  // dispatched off it at 0x007F95EA. Nothing ever writes it as a session, so
+  // reading it here handed all three passes a permanent nullptr and the
+  // playable boundary, the UI selection pass and the fog of war never ran.
+  // The session the binary tests is the plain `sWldSession` global, cached
+  // into a stack local ahead of the loop (`v79 = Moho::sWldSession`).
+  moho::CWldSession* const renderSession = moho::WLD_GetActiveSession();
+  if (moho::ren_PlayableBoundary && renderSession != nullptr && worldView->mView != nullptr) {
+    moho::RenderPlayableBoundary(
+      static_cast<unsigned int>(head), mBoundaryRenderer, *renderSession,
+      *mCam
+    );
+  }
+
+  if (moho::ren_Ui) {
+    const gpg::gal::RenderProfileScope profileRenUi("WorldUi");
+    moho::RenUI(
+      renderSession,
+      mCam,
+      mPrimBatcher.get(),
+      moho::REN_GetSimDeltaSeconds(),
+      moho::REN_GetWeightedFrameSeconds()
+    );
+  }
+
+  {
+    const gpg::gal::RenderProfileScope profileMeshes("Meshes");
+    RenderMeshes(0x24, false);
+  }
+  {
+    const gpg::gal::RenderProfileScope profileEffects("Effects");
+    RenderEffects(false);
+  }
+  {
+    const gpg::gal::RenderProfileScope profileMeshes("Meshes");
+    RenderMeshes(0x28, false);
+  }
+
+  // Fog is dropped *before* the refracting-effects pass, not after it. The
+  // binary runs FogOff at 0x007F9551, then the fog-of-war block, and only
+  // reaches RenderRefractingEffects at 0x007F95AE - so the refraction pass
+  // draws unfogged. Emitting RenderRefractingEffects first (as this did)
+  // rendered it with the terrain fog state still bound.
+  FogOff();
+
+  // Not yet wired: the fog-of-war overlay, between FogOff and the
+  // refracting-effects pass.
+  //
+  //   0x007F9556  cmp  ren_FogOfWar, 0           ; jz 0x007F95AC
+  //   0x007F955F  test ebx, ebx                  ; jz 0x007F95AC  (mSession)
+  //   0x007F9563  cmp  [mSession + 0x488], -1    ; jz 0x007F95AC
+  //               (focus army unset -> no fog of war to draw)
+  //   0x007F9589  call func_ren_FogOfWar         ; 0x0081C660, __thiscall
+  //               ecx = mSession; args (&mVisionRenderer, head, <local>,
+  //               sDeltaFrame)
+  //   0x007F958E  Clear(false, false, true, 0xFFFFFFFF, 1.0f, 0) through
+  //               device slot +0x98: wipe the vision stencil again so it
+  //               does not mask anything drawn after the fog pass.
+  if (moho::ren_FogOfWar && renderSession != nullptr &&
+      renderSession->FocusArmy != -1) {
+    const gpg::gal::RenderProfileScope profileFog("FogOfWar");
+    moho::RenderFogOfWar(
+      *renderSession, mVisionRenderer, static_cast<unsigned int>(head),
+      *mCam, moho::REN_GetSimDeltaSeconds()
+    );
+    gpg::gal::Device::GetInstance()->Clear(false, false, true, 0xFFFFFFFFu, 1.0f, 0);
+  }
+
+  {
+    const gpg::gal::RenderProfileScope profileRefraction("Refraction");
+    RenderRefractingEffects();
+  }
+
+  // 0x007F95B3..0x007F95EA: the world view's own overlay pass, dispatched
+  // through `IRenderWorldView` slot 0 on the `+0x2140` lane this loop seeded
+  // at 0x007F9379. The four arguments are laid down at 0x007F95BC..0x007F95E7:
+  // the raw `CD3DPrimBatcher*` from `mPrimBatcher` at `+0x215C`,
+  // `sCurGameTick`, then `sDeltaFrame` (the sub-tick interpolation fraction)
+  // and `sWeightedFrameRate`, both through the x87 stack. This is the
+  // dispatch that draws the overlays for an ordinary perspective view; the
+  // one in `Cartographic::Render` only ever runs for a view whose
+  // orthographic flag is set, which is the minimap and whichever view the
+  // player has toggled into cartographic mode.
+  if (moho::ren_Ui && worldView->mView != nullptr) {
+    const gpg::gal::RenderProfileScope profileViewOverlay("ViewOverlay");
+    worldView->mView->Render(
+      mPrimBatcher.get(),
+      static_cast<int>(moho::REN_GetGameTick()),
+      moho::REN_GetSimDeltaSeconds(),
+      moho::REN_GetWeightedFrameSeconds()
+    );
+  }
+
+  // Per-view debug-canvas overlay pass. Binary (WRenViewport::Render
+  // @0x007F90D0, 0x007F9639..0x007F96D3): resets the 2D draw origin to
+  // local screen space unconditionally, then - only while a world session
+  // is active - renders and releases the session's tick and beat debug
+  // canvases in turn.
+  //
+  // Not yet modelled: the unconditional tail at 0x007F96D8 that follows
+  // this (reached whether or not a session was active) additionally
+  // renders and clears the viewport's OWN debug canvas
+  // (`mDebugCanvas`, +0x2C8) and runs cleanup this pass does not
+  // cover (`[ebp+2140h]` zero, `sub_7F7AC0`). Left out rather than guessed.
+  SetViewportToLocalScreen();
+  if (moho::CWldSession* const activeSession = moho::WLD_GetActiveSession(); activeSession != nullptr) {
+    if (boost::SharedPtrRaw<moho::CDebugCanvas> tickCanvas = activeSession->GetTickDebugCanvas();
+        tickCanvas.px != nullptr) {
+      tickCanvas.px->Render(
+        mPrimBatcher.get(), *mCam, mScreenSize.x, mScreenSize.y
+      );
+      tickCanvas.release();
+    }
+
+    if (boost::SharedPtrRaw<moho::CDebugCanvas> beatCanvas = activeSession->GetBeatDebugCanvas();
+        beatCanvas.px != nullptr) {
+      beatCanvas.px->Render(
+        mPrimBatcher.get(), *mCam, mScreenSize.x, mScreenSize.y
+      );
+      beatCanvas.release();
+    }
+  }
+
+  mCam = nullptr;
+}
+
+/**
  * Address: 0x007F90D0 (FUN_007F90D0)
  * Mangled: ?Render@WRenViewport@Moho@@AAEXHAAV?$vector@USWorldViewInfo@Moho@@V?$allocator@USWorldViewInfo@Moho@@@std@@@std@@@Z
  *
@@ -1760,7 +2124,7 @@ namespace
  * ren_OnlyFirstView a copy of the first view. An earlier revision walked
  * mWorldViews here, so both drew every registered view.
  */
-void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& worldViews)
+void moho::WRenViewport::Render(const int head, fa::vector<SWorldViewInfo>& worldViews)
 {
   moho::CD3DDevice* const device = moho::D3D_GetDevice();
   if (device == nullptr) {
@@ -1891,354 +2255,7 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
   const SWorldViewInfo* const end = worldViews.end();
 
   for (const SWorldViewInfo* worldView = begin; worldView != end; ++worldView) {
-    if (worldView->mView == nullptr) {
-      continue;
-    }
-
-    // 0x007F92A0..0x007F92FB: a view is skipped when its slot-9 query answers
-    // true, when slot 12 does (CUIWorldView::CanShake 0x0086DC60 returns the
-    // orthographic flag, so every minimap is left to the cartographic pass and
-    // never gets the 3D world/fog pass), when it belongs to another head, and,
-    // under `ren_HideSecondary` (0x010A6421), when it is not the first view.
-    if (worldView->mView->Func2() || worldView->mView->CanShake() || worldView->mHead != head
-        || (moho::ren_HideSecondary && worldView != begin)) {
-      continue;
-    }
-
-    // `IRenderWorldView::GetCamera()` returns a `CameraImpl*` (see
-    // IRenderWorldView.h slot 3) - a whole camera-control object, not the
-    // embedded GeomCamera3 transform/projection state itself. The prior
-    // reinterpret_cast straight to `GeomCamera3*` treated CameraImpl's own
-    // layout (RCamCamera broadcaster fields, the CScriptEvent sub-object,
-    // mName, mTerrainMap, ...) as if it were GeomCamera3, so every read
-    // through `mCam` below (view/projection matrices, transform) pulled
-    // unrelated CameraImpl bytes instead - confirmed live via dbgrun: the
-    // resulting "position" was nonsense (~31219 on two axes) even though
-    // CameraImpl's own CameraGetView()/UpdateCoords() computed a perfectly
-    // sane transform. CameraGetView() is the real, correctly-offset
-    // accessor for the embedded GeomCamera3 (CameraImpl.cpp:2007-2010:
-    // `return As(this)->mCam;`).
-    moho::CameraImpl* const cameraImpl = worldView->mView->GetCamera();
-    mCam = cameraImpl != nullptr
-      ? const_cast<moho::GeomCamera3*>(&cameraImpl->CameraGetView())
-      : nullptr;
-    if (mCam == nullptr) {
-      continue;
-    }
-
-    // Ground clutter, refreshed once per frame off the primary world view.
-    // Binary 0x007F9301..0x007F9330: gated on `ren_Clutter` and on this entry
-    // being the first in the world-view list (the same `== begin` comparison
-    // `ren_HideSecondary` uses two instructions earlier -- IDA types the list's
-    // begin/end pair as `mVertexSheets[0]`/`[1]`, which is what makes that test
-    // read like a sheet comparison). `UpdateCurrent` retires regions the camera
-    // has left, `GenerateNew` fills in the ones it has entered; both take the
-    // view camera and both live at `viewport + 0x808`.
-    // TEMPORARY: FAF_NO_CLUTTER=1 skips only this block (black-sliver triage).
-    static const bool sClutterDisabled = [] {
-      std::size_t length = 0u;
-      char value[8] = {};
-      return ::getenv_s(&length, value, sizeof(value), "FAF_NO_CLUTTER") == 0 && length != 0u && value[0] == '1';
-    }();
-    if (moho::ren_Clutter && worldView == begin && !RenderAdditionsDisabled() && !sClutterDisabled) {
-      mClutter.UpdateCurrent(mCam);
-      mClutter.GenerateNew(mCam);
-    }
-
-    // Refresh mScreenPos/mScreenSize/mFullScreen from THIS view's camera
-    // before drawing it. The binary calls UpdateRenderViewportCoordinates
-    // twice (confirmed via its two code xrefs): once per-iteration right
-    // here (0x007F9385, with mCam freshly bound to the current view), and
-    // once more after the loop as a shared tail (0x007F97A4, by which point
-    // the loop has reset mCam to null - see `mCam = nullptr;`
-    // below). This per-iteration call was missing from the recovery, so
-    // mScreenPos/mScreenSize never advanced past whatever the PREVIOUS
-    // frame's post-loop null-camera fallback wrote (the full head rect at
-    // origin) - every view, main and minimap alike, rendered its
-    // terrain/mesh/water passes through that full-screen rect instead of
-    // this view's own CameraSetViewport-pushed one.
-    UpdateRenderViewportCoordinates();
-
-
-    // Render the atmosphere/cloud sky dome for this world view before the
-    // terrain composite pass (binary order: WRenViewport::Render @0x007F90D0
-    // dispatches the sky dome pass right after the per-view camera bind,
-    // guarded by the ren_SkyDome tuning flag).
-    if (moho::ren_SkyDome) {
-      const gpg::gal::RenderProfileScope profileSky("SkyDome");
-      RenderSkyDome();
-    }
-
-    moho::TerrainCommon* const terrain = worldView->mTerrain.get();
-
-
-    if (moho::ren_Terrain && terrain != nullptr) {
-      // Per-frame render-context update (TerrainCommon slot 5), dispatched
-      // immediately before RenderTerrainNormals in the binary
-      // (0x007F93A6-0x007F93C7). The viewport block is the 3 contiguous
-      // Vector2i fields at +0x308 (mScreenPos/mScreenSize/mFullScreen). minimapPass is always false from this call site;
-      // forceRegenerate is the `ren_RegenShore` latch taken on entry (the
-      // push at 0x007F939A reads that stack byte). Passing 1 here rebuilt the
-      // whole shoreline every frame.
-      {
-        const gpg::gal::RenderProfileScope profileTerrainContext("TerrainContext");
-        terrain->UpdateRenderContext(
-          moho::REN_GetGameTick(),
-          moho::REN_GetSimDeltaSeconds(),
-          mCam,
-          reinterpret_cast<const std::int32_t*>(&mScreenPos),
-          false,
-          regenerateShoreline ? 1 : 0
-        );
-      }
-
-      {
-        const gpg::gal::RenderProfileScope profileTerrainNormals("TerrainNormals");
-        RenderTerrainNormals(terrain);
-        TransformTerrainNormals();
-      }
-
-      // The shadow pass, between the normal transform and the composite
-      // (0x007F93DF slot 6 CameraGetTargetZoom, then 0x007F93F1).
-      {
-        const gpg::gal::RenderProfileScope profileShadows("Shadows");
-        mShadowRenderer.RenderFrameShadows(
-          terrain, *mCam, worldView->mView->CameraGetTargetZoom());
-      }
-
-      FogOn(worldView->mView->CameraGetZoom());
-      {
-        const gpg::gal::RenderProfileScope profileTerrain("Terrain");
-        RenderCompositeTerrain(terrain);
-      }
-    }
-
-    // Range-ring pass for the normal (non-cartographic) world view, between the
-    // terrain composite and the mesh batch. Binary 0x007F940E..0x007F944D:
-    //
-    //   0x007F940E  call [worldView + 0Ch]      ; IRenderWorldView slot 3, GetCamera
-    //   0x007F9417  mov  ecx, [esp+1Ch]         ; the cached sWldSession local
-    //   0x007F941D  test ecx, ecx / jz          ; no session -> skip
-    //   0x007F9421  test eax, eax / jz          ; no camera  -> skip
-    //   0x007F9423  cmp  ren_Ranges, 0 / jz     ; 0x00F57E4F
-    //   0x007F942C  cmp  ren_Ui, 0 / jz         ; 0x00F57DE7
-    //   0x007F9435  fld  sDeltaFrame            ; 0x010A6338
-    //   0x007F9444  lea  edx, [ebp+37Ch]        ; &WRenViewport::mRangeRenderer
-    //   0x007F944D  call RangeRenderer::Render
-    //
-    // Without this the range renderer only ever ran from `Cartographic::Render`,
-    // so every range overlay - build range, weapon ranges, intel - was visible
-    // in the minimap and in cartographic mode but never in the ordinary 3D view.
-    // The call target is FAF's `.exxt` replacement of `RangeRenderer::Render`
-    // (0x012910B7), which re-implements the build-ring and visible-profile
-    // passes and then jumps back into the shipped body at 0x007EEB55 for the
-    // selected/highlighted passes; the recovered `RangeRenderer::Render` already
-    // covers all of that, so it is called directly here.
-    if (moho::CWldSession* const rangeSession = moho::WLD_GetActiveSession(); rangeSession != nullptr) {
-      moho::CameraImpl* const rangeCamera = worldView->mView->GetCamera();
-      if (rangeCamera != nullptr && moho::ren_Ranges && moho::ren_Ui) {
-        const gpg::gal::RenderProfileScope profileRanges("Ranges");
-        mRangeRenderer.Render(
-          rangeSession, rangeCamera, static_cast<unsigned int>(head), moho::REN_GetSimDeltaSeconds()
-        );
-      }
-    }
-
-    // Rebuild the global mesh-renderer batch map for this frame/view before the
-    // mesh draw passes below. Binary (WRenViewport::Render @0x007F90D0, the
-    // GetInstance+Batch pair at 0x007F9452..0x007F9478) invokes it as
-    //   MeshRenderer::Batch(instance, sCurGameTick, sDeltaFrame,
-    //                       *viewport->mCam, viewport->mCam->viewport.r[1]);
-    // The Vector4f fade-plane arg is the second row of the camera viewport
-    // matrix (mCam + 0x294 = viewport @0x284 + 0x10 = r[1]).
-    moho::MeshRenderer* const meshRenderer = moho::MeshRenderer::GetInstance();
-    {
-      const gpg::gal::RenderProfileScope profileMeshBatch("MeshBatch");
-      meshRenderer->Batch(
-        moho::REN_GetGameTick(),
-        moho::REN_GetSimDeltaSeconds(),
-        *mCam,
-        mCam->viewport.r[1]
-      );
-    }
-
-    {
-      const gpg::gal::RenderProfileScope profileReflections("Reflections");
-      RenderReflections();
-    }
-    {
-      const gpg::gal::RenderProfileScope profileMeshes("Meshes");
-      RenderMeshes(0x14, false);
-    }
-    {
-      const gpg::gal::RenderProfileScope profileEffects("Effects");
-      RenderEffects(true);
-    }
-    {
-      const gpg::gal::RenderProfileScope profileMeshes("Meshes");
-      RenderMeshes(0x18, false);
-    }
-    FogOff();
-
-    if (terrain != nullptr) {
-      const gpg::gal::RenderProfileScope profileWater("Water");
-      RenderWaterMask(terrain);
-      RenderCopyForRefraction(false);
-      // Fog density tracks the camera zoom - the binary dispatches
-      // IRenderWorldView slot 8 (CameraGetZoom) straight into FogOn at
-      // 0x007F94B8..0x007F94C8, it is not a constant.
-      FogOn(worldView->mView->CameraGetZoom());
-      RenderWater(terrain);
-    }
-
-    // The playable-boundary pass and the UI selection pass, in that order,
-    // between RenderWater and the 0x24 mesh bucket.
-    //
-    //   0x007F94D2  cmp  ren_PlayableBoundary, 0   ; jz 0x007F9500
-    //   0x007F94DF  test ebx, ebx                  ; jz 0x007F9500  (mSession)
-    //   0x007F94E3  cmp  [worldView->mView], 0      ; jz 0x007F9500
-    //   0x007F94FB  call func_RenBoundary          ; 0x007D01C0, __thiscall
-    //               ecx = head; args (&mBoundaryRenderer, mSession, <local>)
-    //   0x007F9500  cmp  ren_Ui, 0                 ; jz 0x007F9536
-    //   0x007F952E  call func_RenUI                ; 0x007FD490, __cdecl/0x14
-    //               (mSession, mCam, mPrimBatcher.px, sDeltaFrame,
-    //                sWeightedFrameRate)  <- IDA's 4-arg signature is wrong,
-    //               it drops the 5th float; the push sequence at
-    //               0x007F9509..0x007F952D has five dwords and the callee
-    //               cleanup is `add esp, 14h` at 0x007F9533. `moho::RenUI`
-    //               takes all five; do not trim it back to four.
-    //
-    // The fifth argument is the smoothed frame time (`fld sWeightedFrameRate`
-    // at 0x007F9509), not the sim delta - the blinky-box cycle advances on
-    // wall-clock frame time while the bracket geometry interpolates on
-    // `sDeltaFrame`.
-    // The `ebx` these three gates test is NOT the `+0x2140` lane this file
-    // models as `mSession`. `+0x2140` is written once per loop iteration at
-    // 0x007F9379, alongside `mCam` at `+0x219C`, and both are cleared together
-    // at 0x007F9709 - it is the per-iteration current world view, and slot 0 is
-    // dispatched off it at 0x007F95EA. Nothing ever writes it as a session, so
-    // reading it here handed all three passes a permanent nullptr and the
-    // playable boundary, the UI selection pass and the fog of war never ran.
-    // The session the binary tests is the plain `sWldSession` global, cached
-    // into a stack local ahead of the loop (`v79 = Moho::sWldSession`).
-    moho::CWldSession* const renderSession = moho::WLD_GetActiveSession();
-    if (moho::ren_PlayableBoundary && renderSession != nullptr && worldView->mView != nullptr) {
-      moho::RenderPlayableBoundary(
-        static_cast<unsigned int>(head), mBoundaryRenderer, *renderSession,
-        *mCam
-      );
-    }
-
-    if (moho::ren_Ui) {
-      const gpg::gal::RenderProfileScope profileRenUi("WorldUi");
-      moho::RenUI(
-        renderSession,
-        mCam,
-        mPrimBatcher.get(),
-        moho::REN_GetSimDeltaSeconds(),
-        moho::REN_GetWeightedFrameSeconds()
-      );
-    }
-
-    {
-      const gpg::gal::RenderProfileScope profileMeshes("Meshes");
-      RenderMeshes(0x24, false);
-    }
-    {
-      const gpg::gal::RenderProfileScope profileEffects("Effects");
-      RenderEffects(false);
-    }
-    {
-      const gpg::gal::RenderProfileScope profileMeshes("Meshes");
-      RenderMeshes(0x28, false);
-    }
-
-    // Fog is dropped *before* the refracting-effects pass, not after it. The
-    // binary runs FogOff at 0x007F9551, then the fog-of-war block, and only
-    // reaches RenderRefractingEffects at 0x007F95AE - so the refraction pass
-    // draws unfogged. Emitting RenderRefractingEffects first (as this did)
-    // rendered it with the terrain fog state still bound.
-    FogOff();
-
-    // Not yet wired: the fog-of-war overlay, between FogOff and the
-    // refracting-effects pass.
-    //
-    //   0x007F9556  cmp  ren_FogOfWar, 0           ; jz 0x007F95AC
-    //   0x007F955F  test ebx, ebx                  ; jz 0x007F95AC  (mSession)
-    //   0x007F9563  cmp  [mSession + 0x488], -1    ; jz 0x007F95AC
-    //               (focus army unset -> no fog of war to draw)
-    //   0x007F9589  call func_ren_FogOfWar         ; 0x0081C660, __thiscall
-    //               ecx = mSession; args (&mVisionRenderer, head, <local>,
-    //               sDeltaFrame)
-    //   0x007F958E  Clear(false, false, true, 0xFFFFFFFF, 1.0f, 0) through
-    //               device slot +0x98: wipe the vision stencil again so it
-    //               does not mask anything drawn after the fog pass.
-    if (moho::ren_FogOfWar && renderSession != nullptr &&
-        renderSession->FocusArmy != -1) {
-      const gpg::gal::RenderProfileScope profileFog("FogOfWar");
-      moho::RenderFogOfWar(
-        *renderSession, mVisionRenderer, static_cast<unsigned int>(head),
-        *mCam, moho::REN_GetSimDeltaSeconds()
-      );
-      gpg::gal::Device::GetInstance()->Clear(false, false, true, 0xFFFFFFFFu, 1.0f, 0);
-    }
-
-    {
-      const gpg::gal::RenderProfileScope profileRefraction("Refraction");
-      RenderRefractingEffects();
-    }
-
-    // 0x007F95B3..0x007F95EA: the world view's own overlay pass, dispatched
-    // through `IRenderWorldView` slot 0 on the `+0x2140` lane this loop seeded
-    // at 0x007F9379. The four arguments are laid down at 0x007F95BC..0x007F95E7:
-    // the raw `CD3DPrimBatcher*` from `mPrimBatcher` at `+0x215C`,
-    // `sCurGameTick`, then `sDeltaFrame` (the sub-tick interpolation fraction)
-    // and `sWeightedFrameRate`, both through the x87 stack. This is the
-    // dispatch that draws the overlays for an ordinary perspective view; the
-    // one in `Cartographic::Render` only ever runs for a view whose
-    // orthographic flag is set, which is the minimap and whichever view the
-    // player has toggled into cartographic mode.
-    if (moho::ren_Ui && worldView->mView != nullptr) {
-      const gpg::gal::RenderProfileScope profileViewOverlay("ViewOverlay");
-      worldView->mView->Render(
-        mPrimBatcher.get(),
-        static_cast<int>(moho::REN_GetGameTick()),
-        moho::REN_GetSimDeltaSeconds(),
-        moho::REN_GetWeightedFrameSeconds()
-      );
-    }
-
-    // Per-view debug-canvas overlay pass. Binary (WRenViewport::Render
-    // @0x007F90D0, 0x007F9639..0x007F96D3): resets the 2D draw origin to
-    // local screen space unconditionally, then - only while a world session
-    // is active - renders and releases the session's tick and beat debug
-    // canvases in turn.
-    //
-    // Not yet modelled: the unconditional tail at 0x007F96D8 that follows
-    // this (reached whether or not a session was active) additionally
-    // renders and clears the viewport's OWN debug canvas
-    // (`mDebugCanvas`, +0x2C8) and runs cleanup this pass does not
-    // cover (`[ebp+2140h]` zero, `sub_7F7AC0`). Left out rather than guessed.
-    SetViewportToLocalScreen();
-    if (moho::CWldSession* const activeSession = moho::WLD_GetActiveSession(); activeSession != nullptr) {
-      if (boost::SharedPtrRaw<moho::CDebugCanvas> tickCanvas = activeSession->GetTickDebugCanvas();
-          tickCanvas.px != nullptr) {
-        tickCanvas.px->Render(
-          mPrimBatcher.get(), *mCam, mScreenSize.x, mScreenSize.y
-        );
-        tickCanvas.release();
-      }
-
-      if (boost::SharedPtrRaw<moho::CDebugCanvas> beatCanvas = activeSession->GetBeatDebugCanvas();
-          beatCanvas.px != nullptr) {
-        beatCanvas.px->Render(
-          mPrimBatcher.get(), *mCam, mScreenSize.x, mScreenSize.y
-        );
-        beatCanvas.release();
-      }
-    }
-
-    mCam = nullptr;
+    RenderWorldView(worldView, head, begin, regenerateShoreline);
   }
 
   // Every world view has consumed this frame's decal set, so drop the decal
@@ -2347,27 +2364,6 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
   // (line 375): Moho::REN_MaybeDumpFrame((ID3DRenderTarget *)viewport->mLocks1[0]),
   // where mLocks1[0] is the primary render-target writer-lock slot at +0x2164.
   // It is a no-op unless frame dumping has been armed via `dump_frameRate`.
-
-  // few frames so we get a BMP of exactly what the renderer produced. The whole
-  // terrain path measures healthy (rectCacheCount=122..128, DrawNormals=1,
-  // colour writes 0x07, camera over the map, cartographic drew=0) yet the
-  // window shows a flat fill -- this distinguishes "terrain is in the target
-  // but never reaches the screen" from "the draw genuinely produces nothing".
-  {
-    // Arm LATE: the first dumps came out as the Cybran loading screen because
-    // they fired on the very first Render call, during loading. Wait several
-    // thousand frames so the capture is unambiguously in-session.
-    static int sRenderCalls = 0;
-    static bool sArmedDump = false;
-    ++sRenderCalls;
-    if (!sArmedDump && sRenderCalls > 4000 && getenv("FAF_DUMP_FRAMES") != nullptr) {
-      sArmedDump = true;
-      moho::dump_frameDumpName.assign("C:\\ProgramData\\FAForever\\bin\\framedump");
-      moho::dump_frameRate = 3;
-      gpg::Warnf("[DUMPDIAG] armed frame dump -> %s", moho::dump_frameDumpName.c_str());
-    }
-  }
-
   moho::REN_MaybeDumpFrame(mPrimaryTargetLocks[0].get());
 }
 
@@ -2402,7 +2398,7 @@ void moho::WRenViewport::RenderSkyDome()
 
   // The dispatcher hands the cumulus pass an empty per-cloud instance stream;
   // the producer that fills it is a separate (unrecovered) upload path.
-  const msvc8::vector<moho::SkyDome::CumulusVertex> cumulusVertices{};
+  const fa::vector<moho::SkyDome::CumulusVertex> cumulusVertices{};
 
   const moho::GeomCamera3& cam = *mCam;
   const float simDeltaSeconds = moho::REN_GetSimDeltaSeconds();

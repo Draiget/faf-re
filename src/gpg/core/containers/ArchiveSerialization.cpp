@@ -296,7 +296,7 @@ namespace
    * investigation. It is now fully recovered: raw asm for `Deserialize`
    * (0x00763190) and `Serialize` (0x007631D0) shows both operate through
    * the `std::vector<Moho::HPathCell>` RType (`gpg::LookupRType(typeid(
-   * msvc8::vector<moho::HPathCell>))`, cached), calling `archive->Read/
+   * fa::vector<moho::HPathCell>))`, cached), calling `archive->Read/
    * Write(type, objectPtr, RRef{})` directly on the raw object pointer with
    * NO field-offset adjustment and a *fresh empty* owner ref (the real
    * caller's owner ref is not forwarded) -- so this recovery does not need
@@ -388,7 +388,7 @@ namespace
     gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const
   )
   {
-    gpg::RType* const type = CachedCompatRType<msvc8::vector<moho::HPathCell>>();
+    gpg::RType* const type = CachedCompatRType<fa::vector<moho::HPathCell>>();
     const gpg::RRef emptyOwner{};
     archive->Read(type, reinterpret_cast<void*>(objectPtr), emptyOwner);
   }
@@ -397,7 +397,7 @@ namespace
     gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const
   )
   {
-    gpg::RType* const type = CachedCompatRType<msvc8::vector<moho::HPathCell>>();
+    gpg::RType* const type = CachedCompatRType<fa::vector<moho::HPathCell>>();
     const gpg::RRef emptyOwner{};
     archive->Write(type, reinterpret_cast<void*>(objectPtr), emptyOwner);
   }
@@ -422,23 +422,6 @@ namespace
    */
   moho::SPathNeighborSerializer gSPathNeighborSerializerHelper;
 
-  [[nodiscard]] gpg::RType* CachedSOffsetInfoType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::REF_FindTypeNamed("Moho::SOffsetInfo");
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSAssignedLocInfoType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::REF_FindTypeNamed("Moho::SAssignedLocInfo");
-    }
-    return sType;
-  }
 } // namespace
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
@@ -595,7 +578,7 @@ namespace gpg
     }
 
     const auto* const storage =
-      reinterpret_cast<const msvc8::vector<moho::SPerArmyReconInfo>*>(objectPtr);
+      reinterpret_cast<const fa::vector<moho::SPerArmyReconInfo>*>(objectPtr);
     SaveContiguousArchiveVectorPayload(
       archive, storage->data(), static_cast<unsigned int>(storage->size()),
       CachedCompatRType<moho::SPerArmyReconInfo>(), ownerRef ? *ownerRef : gpg::RRef{}
@@ -632,12 +615,12 @@ namespace gpg
   )
   {
     auto* const outVector =
-      reinterpret_cast<msvc8::vector<moho::SPerArmyReconInfo>*>(objectPtr);
+      reinterpret_cast<fa::vector<moho::SPerArmyReconInfo>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    msvc8::vector<moho::SPerArmyReconInfo> loaded;
+    fa::vector<moho::SPerArmyReconInfo> loaded;
     loaded.reserve(count);
 
     if (!moho::SPerArmyReconInfo::sType) {
@@ -665,7 +648,7 @@ namespace
     throw SerializationError(message ? message : "");
   }
 
-  [[noreturn]] void ThrowSerializationError(const msvc8::string& message)
+  [[noreturn]] void ThrowSerializationError(const fa::string& message)
   {
     throw SerializationError(message.c_str());
   }
@@ -1291,7 +1274,7 @@ namespace
    * Upcasts one reflected reference to `CThrustManipulator` and returns the
    * typed object pointer when the source is compatible.
    */
-  [[nodiscard]] moho::CThrustManipulator* func_CastCThrustManipulator(const gpg::RRef& source)
+  [[maybe_unused]] [[nodiscard]] moho::CThrustManipulator* func_CastCThrustManipulator(const gpg::RRef& source)
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveCThrustManipulatorArchiveAdapterType());
     return static_cast<moho::CThrustManipulator*>(upcast.mObj);
@@ -1304,7 +1287,7 @@ namespace
    * Upcasts one reflected reference to `RDebugOverlay` and returns the typed
    * object pointer when the source is compatible.
    */
-  [[nodiscard]] moho::RDebugOverlay* func_CastRDebugOverlay(const gpg::RRef& source)
+  [[maybe_unused]] [[nodiscard]] moho::RDebugOverlay* func_CastRDebugOverlay(const gpg::RRef& source)
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::RDebugOverlay>());
     return static_cast<moho::RDebugOverlay*>(upcast.mObj);
@@ -1317,7 +1300,7 @@ namespace
    * Upcasts one reflected reference to `REmitterBlueprint` and returns the
    * typed object pointer when the source is compatible.
    */
-  [[nodiscard]] moho::REmitterBlueprint* func_CastREmitterBlueprint(const gpg::RRef& source)
+  [[maybe_unused]] [[nodiscard]] moho::REmitterBlueprint* func_CastREmitterBlueprint(const gpg::RRef& source)
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::REmitterBlueprint>());
     return static_cast<moho::REmitterBlueprint*>(upcast.mObj);
@@ -1330,7 +1313,7 @@ namespace
    * Upcasts one reflected reference to `RTrailBlueprint` and returns the typed
    * object pointer when the source is compatible.
    */
-  [[nodiscard]] moho::RTrailBlueprint* func_CastRTrailBlueprint(const gpg::RRef& source)
+  [[maybe_unused]] [[nodiscard]] moho::RTrailBlueprint* func_CastRTrailBlueprint(const gpg::RRef& source)
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::RTrailBlueprint>());
     return static_cast<moho::RTrailBlueprint*>(upcast.mObj);
@@ -1343,7 +1326,7 @@ namespace
    * Upcasts one reflected reference to `CollisionBeamEntity` and returns the
    * typed object pointer when the source is compatible.
    */
-  [[nodiscard]] moho::CollisionBeamEntity* func_CastCollisionBeamEntity(const gpg::RRef& source)
+  [[maybe_unused]] [[nodiscard]] moho::CollisionBeamEntity* func_CastCollisionBeamEntity(const gpg::RRef& source)
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::CollisionBeamEntity>());
     return static_cast<moho::CollisionBeamEntity*>(upcast.mObj);
@@ -1356,7 +1339,7 @@ namespace
    * Upcasts one reflected reference to `ManyToOneListener_ECollisionBeamEvent`
    * and returns the typed object pointer when the source is compatible.
    */
-  [[nodiscard]] moho::ManyToOneListener_ECollisionBeamEvent*
+  [[maybe_unused]] [[nodiscard]] moho::ManyToOneListener_ECollisionBeamEvent*
   func_CastManyToOneListener_ECollisionBeamEvent(const gpg::RRef& source)
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::ManyToOneListener_ECollisionBeamEvent>());
@@ -1370,7 +1353,7 @@ namespace
    * Upcasts one reflected reference to `RProjectileBlueprint` and returns the
    * typed object pointer when the source is compatible.
    */
-  [[nodiscard]] moho::RProjectileBlueprint* func_CastRProjectileBlueprint(const gpg::RRef& source)
+  [[maybe_unused]] [[nodiscard]] moho::RProjectileBlueprint* func_CastRProjectileBlueprint(const gpg::RRef& source)
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::RProjectileBlueprint>());
     return static_cast<moho::RProjectileBlueprint*>(upcast.mObj);
@@ -1383,7 +1366,7 @@ namespace
    * Upcasts one reflected reference to `EntitySetBase` and returns the typed
    * object pointer when the source is compatible.
    */
-  [[nodiscard]] moho::EntitySetBase* func_CastEntitySetBase(const gpg::RRef& source)
+  [[maybe_unused]] [[nodiscard]] moho::EntitySetBase* func_CastEntitySetBase(const gpg::RRef& source)
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::EntitySetBase>());
     return static_cast<moho::EntitySetBase*>(upcast.mObj);
@@ -1500,7 +1483,7 @@ namespace
    * What it does:
    * Upcasts one reflected reference to `CDamage` and returns the typed object pointer when the source is compatible.
    */
-  [[nodiscard]] moho::CDamage* func_CastCDamage(const gpg::RRef& source)
+  [[maybe_unused]] [[nodiscard]] moho::CDamage* func_CastCDamage(const gpg::RRef& source)
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::CDamage>());
     return static_cast<moho::CDamage*>(upcast.mObj);
@@ -1512,7 +1495,7 @@ namespace
    * What it does:
    * Upcasts one reflected reference to `Shield` and returns the typed object pointer when the source is compatible.
    */
-  [[nodiscard]] moho::Shield* func_CastShield(const gpg::RRef& source)
+  [[maybe_unused]] [[nodiscard]] moho::Shield* func_CastShield(const gpg::RRef& source)
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveShieldArchiveAdapterType());
     return static_cast<moho::Shield*>(upcast.mObj);
@@ -1525,7 +1508,7 @@ namespace
    * Upcasts one reflected reference to `Listener<NavPath const&>` and returns the typed object pointer when the source is
    * compatible.
    */
-  [[nodiscard]] moho::Listener<const moho::SNavPath&>* func_CastListener_NavPath(const gpg::RRef& source)
+  [[maybe_unused]] [[nodiscard]] moho::Listener<const moho::SNavPath&>* func_CastListener_NavPath(const gpg::RRef& source)
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveListenerNavPathArchiveAdapterType());
     return static_cast<moho::Listener<const moho::SNavPath&>*>(upcast.mObj);
@@ -1537,7 +1520,7 @@ namespace
    * What it does:
    * Upcasts one reflected reference to `IPathTraveler` and returns the typed object pointer when the source is compatible.
    */
-  [[nodiscard]] moho::IPathTraveler* func_CastIPathTraveler(const gpg::RRef& source)
+  [[maybe_unused]] [[nodiscard]] moho::IPathTraveler* func_CastIPathTraveler(const gpg::RRef& source)
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveIPathTravelerArchiveAdapterType());
     return static_cast<moho::IPathTraveler*>(upcast.mObj);

@@ -147,7 +147,7 @@ namespace moho
    * What it does:
    * Map key for the beam render buckets: the two texture sheets a beam draws
    * with, plus its blend mode.
-   * Address: 0x004921D0 (FUN_004921D0 -- the key's implicit default constructor -- both `TextureSheetHandle` members start empty for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `InitializeBeamTextureBucketKeyHandles` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004921D0 (FUN_004921D0 -- the key's implicit default constructor -- both `TextureSheetHandle` members start empty for `fa::map<SBeamBucketKey, fa::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `InitializeBeamTextureBucketKeyHandles` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
    */
   struct SBeamBucketKey
   {
@@ -183,7 +183,7 @@ namespace moho
   // only measures under `_ITERATOR_DEBUG_LEVEL=2`. Using the legacy tree keeps
   // `CWorldParticles` at 0xDC in every build configuration.
   using BeamBucketMap =
-    msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>, BeamBucketKeyLess>;
+    fa::map<SBeamBucketKey, fa::vector<SWorldBeam>, BeamBucketKeyLess>;
 
   /**
    * What it does:
@@ -192,12 +192,12 @@ namespace moho
   /**
    * Address: 0x0049C0E0 (FUN_0049C0E0 -- the compiler-generated copy of this
    * 0x38-byte vertex record, emitted out of line for
-   * `msvc8::vector<SBeamVertex>`'s copy steps. Formerly transcribed
+   * `fa::vector<SBeamVertex>`'s copy steps. Formerly transcribed
    * as `CopyBeamRenderVertexLanePacked` in BeamRenderHelpers.cpp, removed
    * 2026-09-10.)
-   * Address: 0x0049FEF0 (FUN_0049FEF0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SBeamVertex` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x004A0040 (FUN_004A0040 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SBeamVertex` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x004A06B0 (FUN_004A06B0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SBeamVertex` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0049FEF0 (FUN_0049FEF0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SBeamVertex` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004A0040 (FUN_004A0040 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SBeamVertex` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004A06B0 (FUN_004A06B0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SBeamVertex` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
    */
   struct SBeamVertex
   {
@@ -229,7 +229,7 @@ namespace moho
   static_assert(offsetof(SBeamVertex, vShift) == 0x38, "SBeamVertex::vShift offset must be 0x38");
   static_assert(sizeof(SBeamVertex) == 0x3C, "SBeamVertex size must be 0x3C");
 
-  using BeamVertexArray = msvc8::vector<SBeamVertex>;
+  using BeamVertexArray = fa::vector<SBeamVertex>;
 
   /**
    * What it does:
@@ -242,7 +242,7 @@ namespace moho
   {
     /**
      * Address: 0x004990B0 (FUN_004990B0 -- the implicit copy constructor, as
-     * emitted for this key's `msvc8::map` instantiation: the scalar lanes, then
+     * emitted for this key's `fa::map` instantiation: the scalar lanes, then
      * both texture handles through the weak-pair retain, then the tag. Formerly
      * transcribed as `CopyConstructParticleBucketKey` in
      * moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-22.)
@@ -252,7 +252,7 @@ namespace moho
     std::uint8_t statePadding[0x03]{};    // +0x05
     TextureSheetHandle texture0;          // +0x08
     TextureSheetHandle texture1;          // +0x10
-    msvc8::string tag;                    // +0x18
+    fa::string tag;                    // +0x18
     std::int32_t blendMode = 0;           // +0x34
     std::int32_t zMode = 0;               // +0x38
   };
@@ -287,14 +287,14 @@ namespace moho
   {
     /**
      * Address: 0x00499180 (FUN_00499180 -- the implicit copy constructor, as
-     * emitted for this key's `msvc8::map` instantiation. Formerly
+     * emitted for this key's `fa::map` instantiation. Formerly
      * `CopyConstructTrailBucketKey` in moho/particles/CWorldParticles.cpp
      * (RULE ONE), removed 2026-09-22.)
      */
     float sortScalar = 0.0f;              // +0x00
     TextureSheetHandle texture0;          // +0x04
     TextureSheetHandle texture1;          // +0x0C
-    msvc8::string tag;                    // +0x14
+    fa::string tag;                    // +0x14
     /**
      * Blueprint `BlendMode`, copied straight out of `SWorldTrail::mBlendMode`.
      * A `std::int32_t`, not a float: `IsTrailBucketKeyRhsLessThanLhs`
@@ -319,7 +319,7 @@ namespace moho
   // `mov ecx, edi; call 0x494740` at 0x0049488F with `edi` the same pointer it
   // reads `activeWorkItems` from at `[edi+0x48]`. Both selectors are now
   // `SelectTechnique()` members on the buckets (ParticleRenderBuckets.h), which
-  // also retires a per-bucket, per-frame copy of an `msvc8::string` and two
+  // also retires a per-bucket, per-frame copy of an `fa::string` and two
   // texture handle retains.
 
   /**

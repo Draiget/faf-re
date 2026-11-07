@@ -336,7 +336,11 @@ namespace gpg::gal
     // The whole buffer, DISCARD too: bytes outside the locked range keep their
     // last values, as a D3D9 driver's renamed buffer does (see BufferStorageD3D12).
     const vulkan::UploadAllocation chunk = device.AllocateUpload(mByteWidth, 256U);
-    std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
+    if (mLockedRangeOnly && gLockedRangeOnly) {
+      std::memcpy(chunk.cpu + mLockOffset, mShadow.data() + mLockOffset, mLockSize);
+    } else {
+      std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
+    }
     mChunkBuffer = chunk.buffer;
     mChunkOffset = chunk.offset;
     mChunkCpu = chunk.cpu;

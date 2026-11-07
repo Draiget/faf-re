@@ -139,10 +139,7 @@ gpg::RRef CAiPathNavigatorTypeInfo::NewRef()
  */
 gpg::RRef CAiPathNavigatorTypeInfo::CtrRef(void* const objectStorage)
 {
-  auto* const navigator = static_cast<CAiPathNavigator*>(objectStorage);
-  if (navigator) {
-    new (navigator) CAiPathNavigator();
-  }
+  auto* const navigator = gpg::ConstructInStorage<CAiPathNavigator>(objectStorage);
 
   gpg::RRef out{};
   PopulateCAiPathNavigatorRef(&out, navigator);
@@ -154,7 +151,7 @@ gpg::RRef CAiPathNavigatorTypeInfo::CtrRef(void* const objectStorage)
  */
 void CAiPathNavigatorTypeInfo::Delete(void* const objectStorage)
 {
-  delete static_cast<CAiPathNavigator*>(objectStorage);
+  GPG_NONVIRTUAL_DESTROY(delete static_cast<CAiPathNavigator*>(objectStorage));
 }
 
 /**
@@ -162,7 +159,7 @@ void CAiPathNavigatorTypeInfo::Delete(void* const objectStorage)
  */
 void CAiPathNavigatorTypeInfo::Destruct(void* const objectStorage)
 {
-  static_cast<CAiPathNavigator*>(objectStorage)->~CAiPathNavigator();
+  static_cast<CAiPathNavigator*>(objectStorage)->CAiPathNavigator::~CAiPathNavigator();
 }
 
 /**

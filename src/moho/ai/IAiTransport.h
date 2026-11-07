@@ -430,7 +430,7 @@ namespace moho
    * Address: 0x00BCEFE0 (FUN_00BCEFE0, register_RVectorType_int)
    *
    * What it does:
-   * Registers `msvc8::vector<int>` reflection metadata and installs cleanup.
+   * Registers `fa::vector<int>` reflection metadata and installs cleanup.
    */
   void register_RVectorType_int();
 
@@ -438,7 +438,7 @@ namespace moho
    * Address: 0x00BCF000 (FUN_00BCF000, register_RVectorType_SAiReservedTransportBone)
    *
    * What it does:
-   * Registers `msvc8::vector<SAiReservedTransportBone>` reflection metadata and
+   * Registers `fa::vector<SAiReservedTransportBone>` reflection metadata and
    * installs cleanup.
    */
   void register_RVectorType_SAiReservedTransportBone();
@@ -447,7 +447,7 @@ namespace moho
    * Address: 0x00BCF020 (FUN_00BCF020, register_RVectorType_SAttachPoint)
    *
    * What it does:
-   * Registers `msvc8::vector<SAttachPoint>` reflection metadata and installs
+   * Registers `fa::vector<SAttachPoint>` reflection metadata and installs
    * cleanup.
    */
   void register_RVectorType_SAttachPoint();

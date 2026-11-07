@@ -254,7 +254,7 @@ int moho::cfunc_GetArmyAvatarsL(LuaPlus::LuaState* const state)
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 0, kGetArmyAvatarsHelpText);
 
-  const msvc8::vector<WeakPtr<UserUnit>> avatars = session->GetFocusArmy()->GetAvatars();
+  const fa::vector<WeakPtr<UserUnit>> avatars = session->GetFocusArmy()->GetAvatars();
   if (avatars.empty()) {
     lua_pushnil(rawState);
     (void)lua_gettop(rawState);
@@ -676,9 +676,9 @@ moho::CScrLuaInitForm* moho::func_GetArmiesTable_LuaFuncDef()
  * Copies one `UserArmy*` vector lane into caller scratch storage for stable
  * iteration during Lua table materialization.
  */
-static msvc8::vector<moho::UserArmy*>* SnapshotUserArmyVector(
-  const msvc8::vector<moho::UserArmy*>& source,
-  msvc8::vector<moho::UserArmy*>* const outSnapshot
+static fa::vector<moho::UserArmy*>* SnapshotUserArmyVector(
+  const fa::vector<moho::UserArmy*>& source,
+  fa::vector<moho::UserArmy*>* const outSnapshot
 )
 {
   if (outSnapshot == nullptr) {
@@ -709,9 +709,9 @@ int moho::cfunc_GetArmiesTableL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kNoSessionStartedText);
   }
 
-  msvc8::vector<UserArmy*> armiesSnapshot{};
+  fa::vector<UserArmy*> armiesSnapshot{};
   SnapshotUserArmyVector(session->userArmies, &armiesSnapshot);
-  const msvc8::vector<UserArmy*>& armies = armiesSnapshot;
+  const fa::vector<UserArmy*>& armies = armiesSnapshot;
   const std::size_t armyCount = armies.size();
 
   LuaPlus::LuaObject result(state);

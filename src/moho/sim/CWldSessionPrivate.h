@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <chrono>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -102,7 +103,9 @@
 #include "moho/sim/CWldSessionLoaderImpl.h"
 #include "moho/client/Localization.h"
 #include "moho/misc/SessionStartup.h"
+#include "moho/sim/ReplayTimeline.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/SimKeyframe.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/PauseListener.h"
 #include "moho/sim/SOCellPos.h"
@@ -132,6 +135,7 @@
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "moho/sim/Sim.h"
 #if FAF_SERVER_MODE
+#include "remote/client/NetworkSimDriver.h"
 #include "remote/client/RemoteSimDriver.h"
 #include "remote/client/SessionSummary.h"
 #endif
@@ -150,9 +154,12 @@
     boost::shared_ptr<moho::MeshMaterial> mMaterial; // +0x08
   };
   static_assert(sizeof(SFormationPreviewGhost) == 0x10, "SFormationPreviewGhost size must be 0x10");
-  extern msvc8::vector<SFormationPreviewGhost> gFormationPreviews;
+  extern fa::vector<SFormationPreviewGhost> gFormationPreviews;
 namespace moho
 {
+  /** Engine addition (replay timeline): a new sim is on its way behind the session, which takes no beats until then. */
+  [[nodiscard]] bool WLD_IsReplaySimSwapping();
+
   extern std::uint64_t gUserSyncBeats;
 
   struct UICommandGraphNode
@@ -373,7 +380,7 @@ namespace moho
       /// and 0x00829396, and only the flat-white node pass at 0x0082952C takes
       /// the `CD3DBatchTexture` overload.
       boost::SharedPtrRaw<ID3DTextureSheet> mTexture;   // +0x00
-      msvc8::vector<CommandGraphEdge*> mEdges;          // +0x08
+      fa::vector<CommandGraphEdge*> mEdges;          // +0x08
     };
     static_assert(sizeof(CommandGraphTreeBucket) == 0x18, "CommandGraphTreeBucket size must be 0x18");
 
@@ -410,7 +417,7 @@ namespace moho
      * One drawn segment of a queued-order "orderline" - the ribbon connecting
      * two command-graph draw nodes. `mCommandGraphTree` buckets these by
      * texture: each tree node's `mBucket` holds a
-     * `{boost::SharedPtrRaw<ID3DTextureSheet>, msvc8::vector<CommandGraphEdge*>}`
+     * `{boost::SharedPtrRaw<ID3DTextureSheet>, fa::vector<CommandGraphEdge*>}`
      * pair, and the render pass walks the bucket's vector once per texture.
      *
      * In the original EdgeMap list node, the two pointer keys occupy +8/+12
@@ -458,7 +465,7 @@ namespace moho
     static_assert(offsetof(CommandGraphEdge, mLaneADistribution) == 0x14, "CommandGraphEdge::mLaneADistribution offset must be 0x14");
     static_assert(offsetof(CommandGraphEdge, mForceHighlightStyle) == 0x18, "CommandGraphEdge::mForceHighlightStyle offset must be 0x18");
 
-    using DrawNodeMap = msvc8::hash_map<UserCommandIssueHelper*, UICommandGraphDrawNode>;
+    using DrawNodeMap = fa::hash_map<UserCommandIssueHelper*, UICommandGraphDrawNode>;
     using DrawNodePair = std::pair<UICommandGraphDrawNode*, UICommandGraphDrawNode*>;
 
     // The original pair hash combines both pointer words before the VC8
@@ -471,8 +478,8 @@ namespace moho
       bool operator()(const DrawNodePair& lhs, const DrawNodePair& rhs) const noexcept;
     };
 
-    using EdgeMap = msvc8::hash_map<DrawNodePair, CommandGraphEdge, EdgeKeyHashCompare>;
-    using WidthMap = msvc8::hash_map<std::uint32_t, float>;
+    using EdgeMap = fa::hash_map<DrawNodePair, CommandGraphEdge, EdgeKeyHashCompare>;
+    using WidthMap = fa::hash_map<std::uint32_t, float>;
 
     static_assert(sizeof(CountedPtr<CD3DFont>) == 0x04, "Debug font handle size must be 0x04");
     static_assert(sizeof(DrawNodeMap) == 0x28, "DrawNodeMap size must be 0x28");
@@ -713,7 +720,7 @@ namespace moho
      * (0x00826960) pushes the new edge straight into it via
      * `CommandGraphTreeBucket::mEdges.push_back` (0x0082BCB0).
      */
-    static msvc8::vector<CommandGraphEdge*>&
+    static fa::vector<CommandGraphEdge*>&
       FindOrInsertCommandGraphBucket(CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture);
 
     /**
@@ -1060,12 +1067,12 @@ namespace
     // ResolveIUnitBridge was a duplicate of UserUnit.h's GetIUnitBridge -
     // callers below now use that instead.
 
-    [[nodiscard]] bool ContainsUnitPtr(const msvc8::vector<UserUnit*>& units, const UserUnit* const unit)
+    [[nodiscard]] bool ContainsUnitPtr(const fa::vector<UserUnit*>& units, const UserUnit* const unit)
     {
       return std::find(units.begin(), units.end(), unit) != units.end();
     }
 
-    void AppendUnitUnique(msvc8::vector<UserUnit*>& units, UserUnit* const unit)
+    void AppendUnitUnique(fa::vector<UserUnit*>& units, UserUnit* const unit)
     {
       if (unit == nullptr || ContainsUnitPtr(units, unit)) {
         return;
@@ -1152,7 +1159,7 @@ namespace
      * released before returning. Callers: `func_ProcessCommandDrag`
      * (0x00829B40) and `EstimateDrawNodeWorkTicks` (0x00826F10).
      */
-    [[nodiscard]] UserEntity* ResolveCommandTargetEntity(const UserCommandIssueHelper& helper)
+    [[maybe_unused]] [[nodiscard]] UserEntity* ResolveCommandTargetEntity(const UserCommandIssueHelper& helper)
     {
       const UserTarget target = ResolveCommandIssueTarget(helper);
       return target.targetType == UserTargetType::Entity ? target.targetEntity.GetObjectPtr() : nullptr;
@@ -1166,7 +1173,7 @@ namespace
      * 0x008BED50): the named entity's position, the ground position, or the
      * invalid vector. The transient target is released on the way out.
      */
-    [[nodiscard]] Wm3::Vector3f* ResolveCommandIssueTargetPosition(
+    [[maybe_unused]] [[nodiscard]] Wm3::Vector3f* ResolveCommandIssueTargetPosition(
       Wm3::Vector3f* const outPosition, const UserCommandIssueHelper& helper
     )
     {
@@ -1178,7 +1185,7 @@ namespace
       return outPosition;
     }
 
-    void CollectSessionUserUnits(CWldSession* const session, msvc8::vector<UserUnit*>& outUnits)
+    [[maybe_unused]] void CollectSessionUserUnits(CWldSession* const session, fa::vector<UserUnit*>& outUnits)
     {
       outUnits.clear();
       if (session == nullptr) {
@@ -1206,7 +1213,7 @@ namespace
      * Looks one live command-issue helper up by id, returning null when the
      * manager's map has no entry (the walk lands on the sentinel head).
      */
-    [[nodiscard]] UserCommandIssueHelper* FindCommandIssueHelper(CommandManager& manager, const CmdId commandId)
+    [[maybe_unused]] [[nodiscard]] UserCommandIssueHelper* FindCommandIssueHelper(CommandManager& manager, const CmdId commandId)
     {
       const auto found = manager.mCommands.find(commandId);
       return found == manager.mCommands.end() ? nullptr : found->second;

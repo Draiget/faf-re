@@ -40,9 +40,13 @@
 // Every player's payload is put together from encoded pieces of those tables, so routing creates
 // no Lua tables on the way out, and the sim's own heap sees only the writes the game makes.
 //
-// What this can't reach from the engine, for the user's decision (WP6.6): `lua/sim/Recall.lua`'s
-// voting and status threads, which mix what they do to the sim with what each player's client is
-// told, and `DiplomacyHandler`'s announcement to third parties.
+// 8. Recall votes (`lua/sim/Recall.lua`): the game asks "is this client on the voting team?" once,
+//    in a callback or thread that also changes the sim. Those run once, under the voter's or the
+//    requester's focus, so the answer is yes; the functions that then write `Sync` run once per view
+//    on that team. Its status thread, one per client on a lockstep client's sim, becomes a due tick
+//    per view here. A lockstep game never sees any of this: nothing is wrapped without a router.
+// 9. Reclaim labels (`Sync.Reclaim`): a lockstep client is told of every wreck, seen or not. A view
+//    gets the map's first labels; any later one, or change to one, waits until it sees the spot.
 
 namespace faf::remote
 {
@@ -50,6 +54,7 @@ namespace faf::remote
   enum class ESyncRoute : std::uint8_t
   {
     Everyone,     // written the same under every focus
+    Reclaim,      // a table by prop id: the map's first ones to all, then for views that see the spot
     EntityOwner,  // a table by entity id: the unit's owner (`Unit:UpdateUnitData`, `lua/sim/Unit.lua:77`)
     EntityAllies, // a table by entity id: the unit's owner and allies (`SyncUnitEnhancements`)
     ReleasedIds,  // a table by entity id: whoever got that id's unit data
@@ -77,7 +82,7 @@ namespace faf::remote
   {
     Owner,  // the unit's owner
     Allies, // the unit's owner and allies
-    Anyone, // props, which keep their sim ids and are the same for everyone
+    Seen,   // a prop whose label the view may hold: from the map's start, or at a spot it sees
   };
 
   /**
@@ -111,7 +116,7 @@ namespace faf::remote
     [[nodiscard]] std::int32_t FocusForLua() const noexcept override;
     void EnterCommand(moho::Sim& sim) override;
     void LeaveCommand(moho::Sim& sim) override;
-    bool Print(const msvc8::string& line) override;
+    bool Print(const fa::string& line) override;
     void SetFocusFromLua(std::int32_t army) override;
     void OnThreadForked(lua_State* parent, lua_State* thread) override;
     bool EnterThread(lua_State* thread) override;
@@ -141,6 +146,17 @@ namespace faf::remote
     void MoveView(std::size_t view, std::int32_t army);
     /** At the next beat's sync, `view` is sent what a client needs after reconnecting. */
     void RequestResync(std::size_t view);
+    /** The view whose focus is set now, or -1. */
+    [[nodiscard]] std::int32_t CurrentView() const noexcept { return mFrames.empty() ? -1 : mFrames.back().view; }
+    /** `view`'s recall status is sent at this beat's sync. */
+    void MarkRecallStatus(const std::size_t view) noexcept { mPlayers[view].recallStatusTick = 0; }
+    /** While above 0, `SyncRecallStatus` is for the view whose focus is set, not its whole team. */
+    [[nodiscard]] int SingleViewRecallStatus() const noexcept { return mSingleViewRecallStatus; }
+    void AddSingleViewRecallStatus(const int delta) noexcept { mSingleViewRecallStatus += delta; }
+    /** `ResyncRecallVoting`, for an army's defeat. */
+    [[nodiscard]] const LuaPlus::LuaObject& RecallResync() const noexcept { return mRecallResync; }
+    /** While set, a thread forked with an army number is that army's recall vote. */
+    void SetForkingRecallVote(const bool forking) noexcept { mForkingRecallVote = forking; }
 
     /** From here to `LeaveView`, `Sync` and `GetFocusArmy()` are those of view `view` (-1: the sim's own). */
     void EnterView(moho::Sim& sim, std::int32_t view);
@@ -160,6 +176,7 @@ namespace faf::remote
       std::int32_t army = -1;         // what `GetFocusArmy()` returns under this view
       std::int32_t source = -1;       // its client's command source, once known
       bool sourceOnFocus = false;     // the focused army held that source when last looked at
+      std::int64_t recallStatusTick = -1; // the tick its recall status is next sent; -1: none due
       LuaPlus::LuaObject context;     // the table writes under this player's focus go to
       bool contextUsed = false;       // since the last beat
       std::vector<std::uint8_t> body; // the entries of the beat's table so far
@@ -176,6 +193,8 @@ namespace faf::remote
 
     void InstallWrappers(moho::Sim& sim);
     void FollowCommandSources(const moho::Sim& sim);
+    void RunRecallStatus(moho::Sim& sim);
+    void RouteReclaim(moho::Sim& sim, LuaPlus::LuaObject& key, LuaPlus::LuaObject& value);
     void ApplyMovesAndResyncs(moho::Sim& sim);
     void RouteKey(moho::Sim& sim, LuaPlus::LuaObject& key, std::string_view name, LuaPlus::LuaObject& value);
     void RouteById(moho::Sim& sim, LuaPlus::LuaObject& key, std::string_view name, LuaPlus::LuaObject& value, ESyncRoute route);
@@ -190,6 +209,29 @@ namespace faf::remote
     std::vector<const void*> mOwnedThreadFunctions;            // what such a thread starts with
     std::vector<std::pair<std::size_t, std::int32_t>> mMoves; // view, army: at the next sync
     std::vector<std::size_t> mResyncs;
+    LuaPlus::LuaObject mRecallCooldown;   // `ArmyRecallRequestCooldown`, unwrapped
+    LuaPlus::LuaObject mRecallCannot;     // `SyncCannotRequestRecall`, unwrapped
+    LuaPlus::LuaObject mRecallResync;     // `ResyncRecallVoting`, wrapped
+
+    /** A prop's label not yet where it should be, by prop id. */
+    struct SReclaimLabel
+    {
+      float x = 0.0f;
+      float y = 0.0f;
+      float z = 0.0f;
+      std::vector<std::uint8_t> entry; // its latest key and value, encoded
+      std::uint32_t pending = 0;       // views that don't have that yet, by bit
+      std::uint32_t delivered = 0;     // views that hold a label for it, by bit
+      bool gone = false;
+      bool listed = false;             // in `mReclaimPending`
+      bool fresh = false;              // written this beat
+    };
+    std::unordered_map<std::uint32_t, SReclaimLabel> mReclaim;
+    std::vector<std::uint32_t> mReclaimPending;
+    std::vector<std::uint32_t> mReclaimFirst; // ids of the map's first labels
+    bool mReclaimFirstSorted = false;
+    int mSingleViewRecallStatus = 0;
+    bool mForkingRecallVote = false;
     std::function<void(moho::Sim&)> mPayloadObserver;
     IdTranslator mTranslate;
     moho::Sim* mSim = nullptr;

@@ -130,6 +130,16 @@ namespace gpg::gal::effects
     case ParameterClass::Vector: {
       // `columns` floats per element, as D3D9's SetFloatArray.
       const std::uint32_t columns = std::max<std::uint32_t>(description.columns, 1U);
+      // Engine change: float4 arrays are already this image's layout. The mesh effect's two bone
+      // palettes come through here for each batch, and word by word they were 6 % of a frame.
+      if (description.scalarType == ScalarType::Float && columns == 4U) {
+        const std::size_t offset = target.slot->offset;
+        if (offset < mImage.size()) {
+          const std::size_t bytes = std::min<std::size_t>(std::min<std::size_t>(count, std::size_t{elements} * 4U) * 4U, mImage.size() - offset);
+          std::memcpy(mImage.data() + offset, values, bytes);
+        }
+        break;
+      }
       for (std::uint32_t index = 0U; index < count && index / columns < elements; ++index) {
         WriteComponent(
           target.slot->offset + (index / columns) * 16U + (index % columns) * 4U, description.scalarType, FloatBits(values[index]), true

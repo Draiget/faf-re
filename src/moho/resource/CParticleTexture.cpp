@@ -36,7 +36,7 @@ namespace moho
 {
   void CParticleTexture::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
   {
-    msvc8::string path;
+    fa::string path;
     archive.ReadString(&path);
     result.SetUnowned(gpg::MakeRRef(new CParticleTexture(path.c_str())), 1u);
   }

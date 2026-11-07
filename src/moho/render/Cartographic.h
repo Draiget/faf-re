@@ -210,8 +210,8 @@ namespace moho
     void UploadDecalVerticesIfDirty();
 
   public:
-    msvc8::string mTechniqueName;                                         // +0x04
-    msvc8::string mTexturePath;                                           // +0x20
+    fa::string mTechniqueName;                                         // +0x04
+    fa::string mTexturePath;                                           // +0x20
     boost::shared_ptr<gpg::gal::Texture> mDecalTexture;               // +0x3C
     boost::shared_ptr<gpg::gal::VertexFormat> mVertexFormat;          // +0x44
     boost::shared_ptr<gpg::gal::VertexBuffer> mQuadVertexBuffer;      // +0x4C

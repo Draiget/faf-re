@@ -42,7 +42,7 @@ namespace faf::remote::client
     float GetStatusMetricA() override;
     float GetStatusMetricB() override;
     bool NoEjectionPending() override;
-    void CollectEjecters(msvc8::vector<const moho::CClientBase*>& out) override;
+    void CollectEjecters(fa::vector<const moho::CClientBase*>& out) override;
     int32_t GetSimRate() override;
     /** A remote client exchanges no peer messages: everything comes through the server. */
     void Process(moho::CMessage& msg) override;
@@ -60,8 +60,15 @@ namespace faf::remote::client
     /** Takes each command message, as `CMarshaller` built it, in order. */
     using CommandHandler = std::function<void(moho::CMessage& message)>;
 
-    /** `standIn`: the client manager whose answers this one gives (loopback); null for none. */
+    /**
+     * `standIn`: the client manager whose answers this one gives (loopback). Null: a server session (plan WP11.4): the
+     * clients the session creates become the roster, the start barrier is the server's (`Cleanup` calls the loaded
+     * handler once and the session counts as ready), and there are no peers to beat, wait for or vote with.
+     */
     CRemoteClientManager(CommandHandler onCommand, moho::IClientManager* standIn);
+
+    /** A server session: told once, when the session has loaded and is ready (`Cleanup`), to tell the server. */
+    void SetLoadedHandler(std::function<void()> onLoaded) { mOnLoaded = std::move(onLoaded); }
     ~CRemoteClientManager() override;
 
     /** A command message for the server (the lockstep form sends it to every client). */
@@ -113,8 +120,13 @@ namespace faf::remote::client
     void Disconnect() override;
 
   private:
+    /** A server session's client: an entry of the roster this side keeps until the server sends one. */
+    moho::IClient* AddRosterEntry(const char* name, int idx, int32_t ownerId, unsigned int sourceId, bool local);
+
     CommandHandler mOnCommand;
     moho::IClientManager* mStandIn;
+    std::function<void()> mOnLoaded;
+    bool mReady = false;
     bool mHaveRoster = false;
     bool mHaveServerSimRate = false;
     int mServerSimRate = 0;

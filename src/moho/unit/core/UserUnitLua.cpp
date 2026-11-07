@@ -700,7 +700,7 @@ int moho::cfunc_UserUnitGetEntityIdL(LuaPlus::LuaState* const state)
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
   const UserEntity* const entityView = userUnit;
   const std::int32_t entityId = entityView != nullptr ? static_cast<std::int32_t>(entityView->mParams.mEntityId) : 0;
-  const msvc8::string entityIdText = gpg::STR_Printf("%d", entityId);
+  const fa::string entityIdText = gpg::STR_Printf("%d", entityId);
 
   const char* const entityIdChars = entityIdText.c_str();
   lua_pushstring(rawState, entityIdChars ? entityIdChars : "");
@@ -1077,7 +1077,7 @@ int moho::cfunc_UserUnitGetSelectionSetsL(LuaPlus::LuaState* const state)
   resultTable.AssignNewTable(state, static_cast<int>(userUnit->mSelectionSets.size()), 0);
 
   int luaIndex = 1;
-  for (const msvc8::string& selectionSetName : userUnit->mSelectionSets) {
+  for (const fa::string& selectionSetName : userUnit->mSelectionSets) {
     resultTable.SetString(luaIndex++, selectionSetName.c_str());
   }
 
@@ -1138,7 +1138,7 @@ int moho::cfunc_UserUnitIsInCategoryL(LuaPlus::LuaState* const state)
     categoryText = "";
   }
 
-  const msvc8::string category(categoryText);
+  const fa::string category(categoryText);
   const UserEntity* const entityView = userUnit;
   const bool inCategory = entityView != nullptr && entityView->IsInCategory(category);
   lua_pushboolean(rawState, inCategory ? 1 : 0);
@@ -1811,7 +1811,7 @@ int moho::cfunc_UserUnitGetCustomNameL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
   if (userUnit != nullptr) {
-    const msvc8::string& customName = userUnit->mUnitVarDat.mCustomName;
+    const fa::string& customName = userUnit->mUnitVarDat.mCustomName;
     if (!customName.empty()) {
       lua_pushstring(rawState, customName.c_str());
       (void)lua_gettop(rawState);
@@ -2366,7 +2366,7 @@ int moho::cfunc_UserUnitGetCommandQueueL(LuaPlus::LuaState* const state)
     EUnitCommandType commandTypeValue = ResolveHelperCommandType(*helper);
     gpg::RRef commandTypeRef{};
     commandTypeRef = gpg::MakeRRef<moho::EUnitCommandType>(&commandTypeValue);
-    const msvc8::string commandTypeLexical = commandTypeRef.GetLexical();
+    const fa::string commandTypeLexical = commandTypeRef.GetLexical();
     row.SetString(kCommandQueueTypeKey, commandTypeLexical.c_str());
 
     const Wm3::Vector3<float> commandPosition = ResolveHelperTargetPosition(*helper, session);

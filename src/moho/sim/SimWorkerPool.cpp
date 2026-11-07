@@ -23,6 +23,8 @@
 
 namespace moho
 {
+  int gSimDefaultWorkers = 0;
+
   namespace
   {
     // MXCSR bits 0-5 are sticky exception *flags* (status, not control); a job inherits only the
@@ -46,14 +48,15 @@ namespace moho
       return std::max(1u, std::thread::hardware_concurrency());
     }
 
-    /// `/simworkers N` on the command line, otherwise 0: serial until a parallel phase is asked for.
+    /// `/simworkers N` on the command line, otherwise the exe's default, leaving two CPUs for the main and sim threads.
     [[nodiscard]] int CommandLineWorkerCount()
     {
-      msvc8::vector<msvc8::string> args;
+      fa::vector<fa::string> args;
       if (CFG_GetArgOption("/simworkers", 1u, &args) && !args.empty()) {
         return static_cast<int>(std::max(0L, std::strtol(args[0].c_str(), nullptr, 10)));
       }
-      return 0;
+      const unsigned int cpus = UsableCpuCount();
+      return cpus > 2u ? std::min(gSimDefaultWorkers, static_cast<int>(cpus - 2u)) : 0;
     }
 
     /// Clamps a requested worker count to [0, min(usable CPUs, kMaxWorkers)].

@@ -109,10 +109,7 @@ namespace moho
    */
   gpg::RRef CUnitAssistMoveTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitAssistMoveTask*>(objectStorage);
-    if (task) {
-      new (task) CUnitAssistMoveTask();
-    }
+    auto* const task = gpg::ConstructInStorage<CUnitAssistMoveTask>(objectStorage);
     return MakeAssistMoveTaskRef(reinterpret_cast<CUnitAssistMoveTask*>(task));
   }
 
@@ -136,11 +133,7 @@ namespace moho
    */
   void CUnitAssistMoveTaskTypeInfo::Destruct(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitAssistMoveTask*>(objectStorage);
-    if (!task) {
-      return;
-    }
-    task->~CUnitAssistMoveTask();
+    gpg::DestructInStorage<CUnitAssistMoveTask>(objectStorage);
   }
 
   /**

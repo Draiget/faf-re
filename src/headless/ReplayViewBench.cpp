@@ -3,12 +3,7 @@
 #include <algorithm>
 
 #include "headless/ReplaySyncSpy.h"
-#include "moho/sim/CArmyImpl.h"
-#include "moho/sim/CIntelGrid.h"
 #include "moho/sim/Sim.h"
-#include "moho/sim/SimWorkerPool.h"
-#include "remote/ArmyRecords.h"
-#include "remote/wire/BitStream.h"
 
 // Engine addition, server mode: see ReplayViewBench.h.
 
@@ -16,15 +11,6 @@ namespace faf::headless
 {
   namespace
   {
-    /** The codec `--view-frames` uses: positions over the map, no dead reckoning. */
-    [[nodiscard]] remote::wire::SFrameCodec MakeCodec(const float mapSizeX, const float mapSizeZ)
-    {
-      remote::wire::SFrameCodec codec{};
-      codec.position = remote::wire::SPositionQuantizer::ForMap(mapSizeX, mapSizeZ);
-      codec.maxEntities = 1u << 20;
-      return codec;
-    }
-
     [[nodiscard]] double MillisecondsBetween(
       const std::chrono::steady_clock::time_point from, const std::chrono::steady_clock::time_point to
     )
@@ -59,12 +45,12 @@ namespace faf::headless
     const std::string& path, const remote::wire::SContentTables& tables, const float mapSizeX, const float mapSizeZ,
     const bool check
   )
-    : remote::CViewFrames(tables, MakeCodec(mapSizeX, mapSizeZ))
-    , mCodec(MakeCodec(mapSizeX, mapSizeZ))
+    : remote::CViewLanes(tables, mapSizeX, mapSizeZ)
   {
     EnableIdMaps();       // the server's frames carry each view's own ids
     SkipCivilianViews(); // and no client receives a civilian army's view
     EnableHeldFrames(check);
+    EnablePhaseTimes();
     if (fopen_s(&mFile, path.c_str(), "w") != 0) {
       mFile = nullptr;
       return;
@@ -88,129 +74,21 @@ namespace faf::headless
   void CReplayViewBench::Uninstall()
   {
     (void)FinishViews();
-    moho::Sim::SetSyncRouting(nullptr);
+    UninstallRouting();
     moho::Sim::SetSyncObserver(nullptr);
   }
 
   void CReplayViewBench::OnViewFrames(moho::Sim& sim)
   {
     const auto sendStart = std::chrono::steady_clock::now();
-    const auto armyCount = static_cast<std::size_t>(ArmyCount());
-    if (mClients.size() < armyCount) {
-      mClients.resize(armyCount);
+    if (mSessionTables.HasPending()) {
+      // As a server's `CServerViews::OnViewFrames`: the beat's record, before the views.
+      remote::wire::BitWriter record;
+      mSessionTables.WritePending(record);
+      mTableBytes += record.Bytes().size();
+      ++mTableRecords;
     }
-    if (mLuaRouting && mRouter == nullptr) {
-      mRouter = std::make_unique<remote::CSyncRouter>(armyCount);
-      mRouter->SetIdTranslator([this](const std::size_t view, const std::uint32_t simId) {
-        return ViewEntityId(view, simId);
-      });
-      mRouter->SetDumpPrefix(mLuaRoutingDump);
-      if (mLuaSpyOn) {
-        mSyncSpy = std::make_unique<CReplaySyncSpy>(*mRouter);
-        mRouter->SetPayloadObserver([this](moho::Sim& observed) { mSyncSpy->Check(observed); });
-      }
-      moho::Sim::SetSyncRouting(mRouter.get());
-    }
-    if (mRouter != nullptr) {
-      const auto beat = static_cast<std::int32_t>(sim.mCurBeat);
-      for (const SLuaTestStep& step : mLuaMoves) {
-        if (step.beat == beat && step.view < mRouter->ViewCount()) {
-          mRouter->MoveView(step.view, step.army);
-        }
-      }
-      for (const SLuaTestStep& step : mLuaResyncs) {
-        if (step.beat == beat && step.view < mRouter->ViewCount()) {
-          mRouter->RequestResync(step.view);
-        }
-      }
-    }
-
-    // Every army's grids, encoded once for all the views that receive them, on the workers.
-    std::size_t slots = 0;
-    for (std::size_t index = 0; index < sim.mArmiesList.size(); ++index) {
-      const moho::CArmyImpl* const army = sim.mArmiesList[index];
-      if (army == nullptr) {
-        continue;
-      }
-      const moho::CIntelGrid* const kinds[2] = {army->mConstDat.mVisionReconGrid.get(), army->mConstDat.mWaterReconGrid.get()};
-      for (std::uint8_t kind = 0; kind < 2u; ++kind) {
-        const moho::CIntelGrid* const grid = kinds[kind];
-        if (grid == nullptr) {
-          continue;
-        }
-        if (mBeatGrids.size() <= slots) {
-          mBeatGrids.emplace_back();
-        }
-        SBeatGrid& beatGrid = mBeatGrids[slots++];
-        remote::wire::SGridSlot& slot = beatGrid.slot;
-        slot.army = static_cast<std::uint8_t>(index);
-        slot.kind = kind;
-        slot.gridSize = grid->mGridSize;
-        slot.bits.width = grid->mWidth;
-        slot.bits.height = grid->mHeight;
-        beatGrid.fresh = beatGrid.source != grid || beatGrid.cells.size() != static_cast<std::size_t>(grid->mWidth) * grid->mHeight;
-        if (beatGrid.fresh) {
-          beatGrid.cells.assign(static_cast<std::size_t>(grid->mWidth) * grid->mHeight, 0);
-        }
-        beatGrid.source = grid;
-        beatGrid.key = static_cast<std::uint16_t>(index * 2u + kind);
-        // The view army's grids and those of every army that counts it as an ally
-        // (`UserArmy::CanSeeCell`, 0x008B17F0).
-        beatGrid.receivers = 0u;
-        for (std::size_t view = 0; view < armyCount && view < 32u; ++view) {
-          if (view == index || army->mVarDat.mAllies.Contains(static_cast<unsigned int>(view))) {
-            beatGrid.receivers |= std::uint32_t{1} << view;
-          }
-        }
-      }
-    }
-    mBeatGrids.resize(slots);
-    const auto copyGrids = [this](const std::size_t begin, const std::size_t end) {
-      for (std::size_t i = begin; i < end; ++i) {
-        SBeatGrid& beatGrid = mBeatGrids[i];
-        const moho::CIntelGrid* const grid = beatGrid.source;
-        beatGrid.delta.Clear();
-        remote::wire::WriteGridSlotHeader(beatGrid.slot, beatGrid.delta);
-        remote::wire::EncodeGridDeltaInPlace(grid->mWidth, grid->mHeight, grid->mGrid.get(), beatGrid.cells.data(), beatGrid.delta);
-      }
-    };
-    if (Parallel() && slots > 1u) {
-      moho::CSimWorkerPool::Get().ParallelFor(slots, 1u, copyGrids);
-    } else {
-      copyGrids(0u, slots);
-    }
-
-    // Lua lane. `Sim::Sync` writes the `Sync` table after its entity walk, so these are the last
-    // beat's, and it writes them again once this returns: a real server sends them when the beat's
-    // sync is over.
-    if (mRouter != nullptr) {
-      for (std::size_t army = 0; army < armyCount && army < mRouter->ViewCount(); ++army) {
-        SClient& client = mClients[army];
-        client.luaBytes = 0u;
-        if (HasView(static_cast<std::int32_t>(army))) {
-          remote::wire::BitWriter luaWriter;
-          if (remote::wire::EncodeLuaSyncLane(mRouter->Payload(army), mRouter->Prints(army), luaWriter)) {
-            client.luaBytes = static_cast<std::uint32_t>(luaWriter.Bytes().size());
-          } else {
-            ++client.failures;
-          }
-        }
-      }
-    }
-
-    if (!PipelineOn()) {
-      if (Parallel() && armyCount > 1u) {
-        moho::CSimWorkerPool::Get().ParallelFor(armyCount, 1u, [this](const std::size_t begin, const std::size_t end) {
-          for (std::size_t army = begin; army < end; ++army) {
-            Send(army);
-          }
-        });
-      } else {
-        for (std::size_t army = 0; army < armyCount; ++army) {
-          Send(army);
-        }
-      }
-    }
+    remote::CViewLanes::OnViewFrames(sim);
 
     const auto sendEnd = std::chrono::steady_clock::now();
     mBeat = SBeat{};
@@ -224,9 +102,34 @@ namespace faf::headless
     }
   }
 
+  void CReplayViewBench::OnLuaRouterMade(remote::CSyncRouter& router)
+  {
+    if (mLuaSpyOn) {
+      mSyncSpy = std::make_unique<CReplaySyncSpy>(router);
+      router.SetPayloadObserver([this](moho::Sim& observed) { mSyncSpy->Check(observed); });
+    }
+  }
+
+  void CReplayViewBench::OnLuaRouterBeat(moho::Sim& sim, remote::CSyncRouter& router)
+  {
+    const auto beat = static_cast<std::int32_t>(sim.mCurBeat);
+    for (const SLuaTestStep& step : mLuaMoves) {
+      if (step.beat == beat && step.view < router.ViewCount()) {
+        router.MoveView(step.view, step.army);
+      }
+    }
+    for (const SLuaTestStep& step : mLuaResyncs) {
+      if (step.beat == beat && step.view < router.ViewCount()) {
+        router.RequestResync(step.view);
+      }
+    }
+  }
+
   void CReplayViewBench::OnViewsFinished()
   {
     mBeat.sendMs += ViewWaitSeconds() * 1000.0; // what the views still cost the sim thread
+    mWaitSeconds += ViewWaitSeconds();
+    ++mPhaseBeats;
     const auto armyCount = static_cast<std::size_t>(ArmyCount());
     std::uint64_t entities = 0;
     std::uint64_t bytes = 0;
@@ -236,12 +139,10 @@ namespace faf::headless
         continue;
       }
       ++mViews;
-      SClient& client = mClients[army];
       entities += HeldCount(static_cast<std::int32_t>(army));
-      bytes += client.bytes;
-      mClientBeatBytes.push_back(client.bytes);
-      mEncodeFailures += client.failures;
-      client.failures = 0;
+      bytes += ClientBytes(army);
+      mClientBeatBytes.push_back(ClientBytes(army));
+      mEncodeFailures += TakeClientFailures(army);
     }
     mEntities += entities;
     if (mHaveLastFrames) {
@@ -254,74 +155,6 @@ namespace faf::headless
         static_cast<unsigned long long>(entities), static_cast<unsigned long long>(bytes)
       );
     }
-  }
-
-  void CReplayViewBench::Send(const std::size_t army)
-  {
-    SClient& client = mClients[army];
-    client.bytes = client.luaBytes;
-    const auto view = static_cast<std::int32_t>(army);
-    if (!HasView(view)) {
-      client.grids.clear();
-      return; // a civilian army: no client
-    }
-
-    // Entity lanes: the view's frame against the one its client holds.
-    remote::wire::BitWriter frameWriter;
-    if (EncodeHeldFrame(view, frameWriter)) {
-      client.bytes += static_cast<std::uint32_t>(frameWriter.Bytes().size());
-    } else {
-      ++client.failures;
-    }
-
-    // Army lane: every army's record as the view gets it.
-    const moho::SSyncData& packet = Packet(view);
-    std::vector<remote::wire::SArmyRecord> records;
-    records.reserve(packet.mArmyUpdates.size());
-    for (std::size_t index = 0; index < packet.mArmyUpdates.size(); ++index) {
-      records.push_back(remote::ArmyToWire(remote::ArmyRecordForView(packet.mArmyUpdates[index], index, view, packet.mCurBeat == 0)));
-    }
-    remote::wire::BitWriter armyWriter;
-    if (remote::wire::EncodeArmyLane(records, client.haveArmies ? &client.armies : nullptr, armyWriter)) {
-      client.bytes += static_cast<std::uint32_t>(armyWriter.Bytes().size());
-    } else {
-      ++client.failures;
-    }
-    client.armies = std::move(records);
-    client.haveArmies = true;
-
-    // Grid lane.
-    client.gridsNext.clear();
-    for (const SBeatGrid& beatGrid : mBeatGrids) {
-      if ((beatGrid.receivers & (std::uint32_t{1} << army)) != 0u && client.gridsNext.size() < remote::wire::kMaxGridSlots) {
-        client.gridsNext.push_back(beatGrid.key);
-      }
-    }
-    remote::wire::BitWriter gridWriter;
-    gridWriter.WriteVarUint(static_cast<std::uint32_t>(client.gridsNext.size()));
-    bool gridsOk = true;
-    for (const std::uint16_t key : client.gridsNext) {
-      const SBeatGrid& beatGrid = *std::find_if(mBeatGrids.begin(), mBeatGrids.end(), [key](const SBeatGrid& other) {
-        return other.key == key;
-      });
-      if (!beatGrid.fresh && std::find(client.grids.begin(), client.grids.end(), key) != client.grids.end()) {
-        gridWriter.Append(beatGrid.delta);
-      } else {
-        // A client new to this grid gets it whole, which is rare enough to make its cells here.
-        remote::wire::SGridSlot whole = beatGrid.slot;
-        whole.bits.cells.resize(beatGrid.cells.size());
-        std::transform(beatGrid.cells.begin(), beatGrid.cells.end(), whole.bits.cells.begin(), [](const std::int8_t cell) {
-          return static_cast<std::uint8_t>(cell != 0 ? 1u : 0u);
-        });
-        gridsOk = remote::wire::EncodeGridSlot(whole, nullptr, gridWriter) && gridsOk;
-      }
-    }
-    if (gridsOk) {
-      client.bytes += static_cast<std::uint32_t>(gridWriter.Bytes().size());
-    } else {
-      ++client.failures;
-    }
-    client.grids.swap(client.gridsNext);
   }
 
   std::uint64_t CReplayViewBench::Failures() const noexcept
@@ -360,6 +193,31 @@ namespace faf::headless
     summary += "; build+send " + Distribution(total, "ms");
     summary += "; beat interval " + Distribution(interval, "ms");
     summary += "; per client " + Distribution(perSecond, "B/s");
+    if (SessionTables() != nullptr) {
+      summary += "; session tables " + std::to_string(mTableRecords) + " records, " + std::to_string(mTableBytes / 1024u) + " KB";
+    }
+    if (PhaseTimesOn() && mPhaseBeats != 0u) {
+      // Per beat, ms: each step's wall time on the sim thread; for a step done a view at a time, the
+      // sum over views, the slowest view and the team views' part of the sum.
+      static constexpr const char* kNames[] = {"read", "read blocks", "read blips", "build", "write", "shared", "index", "facts", "keep", "tables", "frames", "release", "grid setup", "grids", "lua"};
+      static_assert(std::size(kNames) == static_cast<std::size_t>(EViewPhase::Count));
+      const double perBeat = 1000.0 / static_cast<double>(mPhaseBeats);
+      double wall = 0.0;
+      summary += "\n  view steps, ms a beat:";
+      for (std::size_t phase = 0; phase < std::size(kNames); ++phase) {
+        const SPhaseTime& time = PhaseTime(static_cast<EViewPhase>(phase));
+        wall += time.wall;
+        std::snprintf(text, sizeof(text), " %s %.2f", kNames[phase], time.wall * perBeat);
+        summary += text;
+        if (time.viewSum > 0.0) {
+          std::snprintf(text, sizeof(text), " (views %.2f, slowest %.2f, teams %.2f)", time.viewSum * perBeat, time.viewMax * perBeat, time.teamViews * perBeat);
+          summary += text;
+        }
+        summary += ";";
+      }
+      std::snprintf(text, sizeof(text), " all %.2f; waiting for the last beat's views %.2f", wall * perBeat, mWaitSeconds * perBeat);
+      summary += text;
+    }
     if (mSyncSpy != nullptr) {
       summary += "\n  ";
       summary += mSyncSpy->Summary();

@@ -28,7 +28,7 @@ namespace
             D3DPT_TRIANGLESTRIP,
         };
 
-        msvc8::vector<msvc8::string> gD3D9LogStorage{};
+        fa::vector<fa::string> gD3D9LogStorage{};
 
         std::uint32_t GetDeviceContextHeadCount(const DeviceContext* const context) noexcept
         {
@@ -178,12 +178,12 @@ namespace
                     ThrowGalError("DeviceD3D9.cpp", 1199, "unable to enumerate adapters");
                 }
 
-                const msvc8::string description(
+                const fa::string description(
                     adapterIdentifier.Description,
                     std::strlen(adapterIdentifier.Description)
                 );
-                const msvc8::string deviceName(adapterIdentifier.DeviceName, std::strlen(adapterIdentifier.DeviceName));
-                const msvc8::string driver(adapterIdentifier.Driver, std::strlen(adapterIdentifier.Driver));
+                const fa::string deviceName(adapterIdentifier.DeviceName, std::strlen(adapterIdentifier.DeviceName));
+                const fa::string driver(adapterIdentifier.Driver, std::strlen(adapterIdentifier.Driver));
 
                 AdapterD3D9 adapter(
                     adapterIdentifier.VendorId,
@@ -460,24 +460,24 @@ namespace
             return 0U;
         }
 
-        [[nodiscard]] msvc8::string ReadD3DXErrorText(ID3DXBuffer* const errors)
+        [[nodiscard]] fa::string ReadD3DXErrorText(ID3DXBuffer* const errors)
         {
             const char* const errorText =
                 (errors != nullptr) ? static_cast<const char*>(errors->GetBufferPointer()) : "unknown error";
 
-            msvc8::string reason{};
+            fa::string reason{};
             reason.assign_owned(errorText);
             return reason;
         }
 
         [[nodiscard]]
-        msvc8::string BuildEffectCreationMessage(
+        fa::string BuildEffectCreationMessage(
             const char* const prefix,
             const EffectContext& context,
-            const msvc8::string& reason
+            const fa::string& reason
         )
         {
-            msvc8::string message(prefix != nullptr ? prefix : "");
+            fa::string message(prefix != nullptr ? prefix : "");
             message = message + context.mSourcePath;
             message = message + " reason: ";
             message = message + reason;
@@ -490,7 +490,7 @@ namespace
          * (0x008F0A81) allocates it with `new[]` and never frees it; the
          * array points into the context's strings.
          */
-        [[nodiscard]] D3DXMACRO* BuildD3DXMacroDefines(const msvc8::vector<EffectMacro>& macros)
+        [[nodiscard]] D3DXMACRO* BuildD3DXMacroDefines(const fa::vector<EffectMacro>& macros)
         {
             const std::size_t macroCount = macros.size();
             if (macroCount == 0U)
@@ -516,7 +516,7 @@ namespace
          * FAF addition, not in the shipped binary: whether `macros` defines
          * `name`.
          */
-        [[nodiscard]] bool DefinesMacro(const msvc8::vector<EffectMacro>& macros, const char* const name)
+        [[nodiscard]] bool DefinesMacro(const fa::vector<EffectMacro>& macros, const char* const name)
         {
             for (const EffectMacro& macro : macros)
             {
@@ -670,7 +670,7 @@ namespace
      * leaves it empty. The recovered body pushed 16-byte `AdapterModeD3D9`s into
      * a vector the caller walks at a 12-byte stride.
      */
-    void DeviceD3D9::GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, const int adapterIndex)
+    void DeviceD3D9::GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, const int adapterIndex)
     {
         outModes.clear();
         if (adapterIndex >= static_cast<int>(mAdapters.size()))
@@ -740,7 +740,7 @@ namespace
             );
             if (FAILED(result))
             {
-                const msvc8::string message =
+                const fa::string message =
                     BuildEffectCreationMessage("unable to compile effect: ", context, ReadD3DXErrorText(errors));
                 ThrowGalError("DeviceD3D9.cpp", 1549, message.c_str());
             }
@@ -749,7 +749,7 @@ namespace
             result = effectCompiler->CompileEffect(D3DXSHADER_DEBUG | flowControlFlags, &compiledEffect, &errors);
             if (FAILED(result))
             {
-                const msvc8::string message =
+                const fa::string message =
                     BuildEffectCreationMessage("unable to compile effect: ", context, ReadD3DXErrorText(errors));
                 ThrowGalError("DeviceD3D9.cpp", 1557, message.c_str());
             }
@@ -762,7 +762,7 @@ namespace
             );
             if (FAILED(result))
             {
-                const msvc8::string message =
+                const fa::string message =
                     BuildEffectCreationMessage("unable to create effect: ", context, ReadD3DXErrorText(errors));
                 ThrowGalError("DeviceD3D9.cpp", 1575, message.c_str());
             }
@@ -841,7 +841,7 @@ namespace
             );
             if (FAILED(result))
             {
-                const msvc8::string message =
+                const fa::string message =
                     BuildEffectCreationMessage("unable to create effect: ", context, ReadD3DXErrorText(errors));
                 ThrowGalError("DeviceD3D9.cpp", 1640, message.c_str());
             }
@@ -910,7 +910,7 @@ namespace
      */
     void DeviceD3D9::Shutdown()
     {
-        delete[] mHeads;
+        DeleteOutputContexts(mHeads, GetDeviceHeadCount(this));
         mHeads = nullptr;
 
         mPipelineState.reset();
@@ -938,6 +938,16 @@ namespace
         try
         {
             mCurThreadId = static_cast<int>(::GetCurrentThreadId());
+
+            // Engine change (issue #317): d3dx9_43.dll is delay-loaded (src/CMakeLists.txt), and this
+            // renderer is the only caller. Without it the renderer can't start: say so here rather
+            // than fail on the first D3DX call.
+            if (::LoadLibraryW(L"d3dx9_43.dll") == nullptr)
+            {
+                AppendD3D9SetupLogMessage("d3dx9_43.dll is missing (DirectX End-User Runtime)");
+                ThrowGalError("DeviceD3D9.cpp", 131, "d3dx9_43.dll is missing (DirectX End-User Runtime)");
+            }
+
             mDirect3D = Direct3DCreate9(0x20U);
             if (mDirect3D == nullptr)
             {
@@ -957,7 +967,7 @@ namespace
             const std::size_t adapterCount = mAdapters.size();
             for (std::size_t adapterIndex = 0; adapterIndex < adapterCount; ++adapterIndex)
             {
-                if (mAdapters[adapterIndex].description.find("NVPerfHUD", 0U, 9U) != msvc8::string::npos)
+                if (mAdapters[adapterIndex].description.find("NVPerfHUD", 0U, 9U) != fa::string::npos)
                 {
                     deviceType = D3DDEVTYPE_REF;
                     selectedAdapter = static_cast<unsigned int>(adapterIndex);
@@ -1147,7 +1157,7 @@ namespace
             ThrowGalError("DeviceD3D9.cpp", 1444, "internal D3D9 device initialization error");
         }
 
-        OutputContext* const heads = new OutputContext[headCount];
+        OutputContext* const heads = NewOutputContexts(headCount);
         mHeads = heads;
 
         for (unsigned int headIndex = 0; headIndex < headCount; ++headIndex)
@@ -1472,7 +1482,8 @@ namespace
         }
         mPipelineState.reset();
 
-        delete[] mHeads;
+        // Before BuildDeviceCapabilities below: the context still holds the head count the array was made with.
+        DeleteOutputContexts(mHeads, GetDeviceHeadCount(this));
         mHeads = nullptr;
 
         SafeRelease(mFrameEventQuery);
@@ -1989,12 +2000,12 @@ namespace
      */
     void DeviceD3D9::SaveCubeRenderTarget(
         const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
-        const msvc8::string& filePath
+        const fa::string& filePath
     )
     {
         Func1();
 
-        // `!*(_DWORD *)(a3 + 20)` - string+0x14 is mySize, not myRes: msvc8::string
+        // `!*(_DWORD *)(a3 + 20)` - string+0x14 is mySize, not myRes: fa::string
         // keeps its allocator cookie at +0x00, bx at +0x04, mySize at +0x14 and
         // myRes at +0x18. The guard rejects an empty path.
         if (filePath.mySize == 0U)
@@ -2024,7 +2035,7 @@ namespace
      */
     void DeviceD3D9::SaveRenderTarget(
         const boost::shared_ptr<RenderTarget>& renderTarget,
-        const msvc8::string& filePath,
+        const fa::string& filePath,
         const int fileFormat
     )
     {
@@ -2063,7 +2074,7 @@ namespace
      */
     void DeviceD3D9::SaveTexture(
         const boost::shared_ptr<Texture>& texture,
-        const msvc8::string& filePath,
+        const fa::string& filePath,
         const int fileFormat,
         gpg::MemBuffer<char>* const outBuffer
     )

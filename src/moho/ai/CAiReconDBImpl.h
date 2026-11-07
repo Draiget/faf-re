@@ -55,7 +55,7 @@ namespace moho
   // 0x0FFFFFFE is `0xFFFFFFFF / 0x10 - 1`, that value type's `max_size`. The
   // insert (0x005C5AF0) links at the leaf without an equivalence probe, so
   // this is a multimap, not a map.
-  using ReconBlipMap = msvc8::multimap<SReconKey, ReconBlip*, SReconKeyLess>;
+  using ReconBlipMap = fa::multimap<SReconKey, ReconBlip*, SReconKeyLess>;
 
   static_assert(sizeof(ReconBlipMap) == 0x0C, "ReconBlipMap size must be 0x0C");
 
@@ -291,7 +291,7 @@ namespace moho
      * VFTable SLOT: 7
      */
     [[nodiscard]]
-    const msvc8::vector<ReconBlip*>& ReconGetBlips() const override;
+    const fa::vector<ReconBlip*>& ReconGetBlips() const override;
 
     /**
      * Address: 0x005C1A10 (FUN_005C1A10)
@@ -445,13 +445,13 @@ namespace moho
     /**
      * Address: 0x005C0A70 (FUN_005C0A70, Moho::CAiReconDBImpl::GenerateNewBlips)
      *
-     * msvc8::vector<SNewBlip> const &
+     * fa::vector<SNewBlip> const &
      *
      * What it does:
      * Materializes pending blip requests, updates per-army state, and inserts
      * resulting blips into the typed blip map.
      */
-    void GenerateNewBlips(const msvc8::vector<SNewBlip>& pending);
+    void GenerateNewBlips(const fa::vector<SNewBlip>& pending);
 
     /**
      * Address: 0x005C1810 (FUN_005C1810, Moho::CAiReconDBImpl::IntelConfirmDead)
@@ -502,7 +502,7 @@ namespace moho
     /**
      * Address: 0x005C1F80 (FUN_005C1F80)
      *
-     * range-pair, Unit *, EReconFlags, msvc8::vector<SNewBlip> &
+     * range-pair, Unit *, EReconFlags, fa::vector<SNewBlip> &
      *
      * What it does:
      * Updates the map-owned blips in `[first, last)` (one source unit's
@@ -511,7 +511,7 @@ namespace moho
      */
     void UpdateBlips(
       ReconBlipMap::iterator first, ReconBlipMap::iterator last, Unit* sourceUnit, EReconFlags detectedFlags,
-      msvc8::vector<SNewBlip>& pending
+      fa::vector<SNewBlip>& pending
     );
 
     /**
@@ -628,8 +628,8 @@ namespace moho
     static constexpr std::uint32_t kIntelGridCellSize = 4u;
 
     ReconBlipMap mBlipMap;      // +0x04
-    msvc8::vector<ReconBlip*> mBblips;  // +0x10
-    msvc8::vector<ReconBlip*> mTempBlips; // +0x20
+    fa::vector<ReconBlip*> mBblips;  // +0x10
+    fa::vector<ReconBlip*> mTempBlips; // +0x20
     SimArmy* mArmy;                     // +0x30
     STIMap* mMapData;                   // +0x34
     Sim* mSim;                          // +0x38

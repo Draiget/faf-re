@@ -566,47 +566,142 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     return layout;
   }
 
+  namespace
+  {
+    /// What GenerateModernHlsl's body needs from the texture views.
+    struct TextureViews
+    {
+      std::vector<std::vector<TextureDimension>> samplerDimensions;
+    };
+
+    /// Texture views and sampler registers.
+    TextureViews BuildTextureViews(const std::string_view source, EffectDescription& description, ModernEffect& modern)
+    {
+      TextureViews views;
+      std::map<std::string, std::vector<TextureDimension>> textureDimensions;
+      std::vector<std::vector<TextureDimension>>& samplerDimensions = views.samplerDimensions;
+      for (const SamplerDesc& sampler : description.samplers) {
+        samplerDimensions.push_back(SamplerDimensions(sampler, source));
+        if (sampler.texture.empty()) {
+          continue;
+        }
+        std::vector<TextureDimension>& dimensions = textureDimensions[sampler.texture];
+        for (const TextureDimension dimension : samplerDimensions.back()) {
+          if (std::find(dimensions.begin(), dimensions.end(), dimension) == dimensions.end()) {
+            dimensions.push_back(dimension);
+          }
+        }
+      }
+      for (const Parameter& parameter : description.parameters) {
+        if (parameter.parameterClass != ParameterClass::Texture) {
+          continue;
+        }
+        const auto found = textureDimensions.find(parameter.name);
+        if (found == textureDimensions.end()) {
+          continue; // never sampled
+        }
+        for (const TextureDimension dimension : found->second) {
+          const std::uint32_t slot = static_cast<std::uint32_t>(modern.textures.size());
+          modern.textures.push_back(TextureSlot{parameter.name, dimension, slot});
+        }
+      }
+      if (modern.textures.size() > kMaxTextureSlots) {
+        modern.notes.push_back("more texture views than the register budget");
+      }
+      if (description.samplers.size() > kMaxSamplerSlots) {
+        modern.notes.push_back("more samplers than the register budget");
+      }
+      return views;
+    }
+
+    /// The functions in the source, by name; the first definition of a name wins.
+    std::map<std::string, Function> CollectFunctions(const std::vector<Item>& items)
+    {
+      std::map<std::string, Function> functions;
+      for (const Item& item : items) {
+        Function function;
+        if (item.braced && item.head.find('(') != std::string::npos && !HasTopLevelAssignment(item.head) &&
+            ParseFunctionHead(item.head, function) && functions.find(function.name) == functions.end()) {
+          functions[function.name] = function;
+        }
+      }
+      return functions;
+    }
+
+    /// The role each struct plays in a stage's signature.
+    std::map<std::string, SemanticRole> AssignStructRoles(
+      EffectDescription& description, const std::map<std::string, Function>& functions, ModernEffect& modern
+    )
+    {
+      std::map<std::string, SemanticRole> structRoles;
+      std::set<std::string> vertexInputStructs;
+      const auto isStruct = [&](const std::string& name) { return description.FindStruct(name) != nullptr; };
+      // Roles belong to the struct definition, typedef'd names included.
+      const auto baseStruct = [&](const std::string& name) {
+        const StructType* const found = description.FindStruct(name);
+        return (found != nullptr && !found->aliasOf.empty()) ? found->aliasOf : name;
+      };
+      for (const Technique& technique : description.techniques) {
+        for (const Pass& pass : technique.passes) {
+          for (const auto& [reference, stage] :
+               {std::pair{&pass.vertexShader, ShaderStage::Vertex}, std::pair{&pass.pixelShader, ShaderStage::Pixel}}) {
+            const auto found = functions.find(reference->function);
+            if (found == functions.end()) {
+              continue;
+            }
+            const Function& function = found->second;
+            if (stage == ShaderStage::Vertex) {
+              if (isStruct(function.returnType)) {
+                structRoles.emplace(baseStruct(function.returnType), SemanticRole::VertexOutput);
+              }
+              for (const std::string& parameter : function.parameters) {
+                const ParameterParts parts = SplitParameter(parameter);
+                if (!isStruct(parts.type)) {
+                  continue;
+                }
+                if (parts.isOut) {
+                  structRoles.emplace(baseStruct(parts.type), SemanticRole::VertexOutput);
+                } else if (!parts.isUniform) {
+                  vertexInputStructs.insert(baseStruct(parts.type));
+                }
+              }
+            } else {
+              if (isStruct(function.returnType)) {
+                structRoles[baseStruct(function.returnType)] = SemanticRole::PixelOutput;
+              }
+              for (const std::string& parameter : function.parameters) {
+                const ParameterParts parts = SplitParameter(parameter);
+                if (!isStruct(parts.type)) {
+                  continue;
+                }
+                if (parts.isOut) {
+                  structRoles[baseStruct(parts.type)] = SemanticRole::PixelOutput;
+                } else if (!parts.isUniform) {
+                  structRoles.emplace(baseStruct(parts.type), SemanticRole::PixelInput);
+                }
+              }
+            }
+          }
+        }
+      }
+      for (const std::string& name : vertexInputStructs) {
+        const auto found = structRoles.find(name);
+        if (found != structRoles.end() && found->second != SemanticRole::PixelOutput) {
+          modern.notes.push_back("struct " + name + " is both a vertex input and a stage output; semantics left as written");
+          structRoles.erase(found);
+        }
+      }
+      return structRoles;
+    }
+  } // namespace
+
   ModernEffect GenerateModernHlsl(const std::string_view source, EffectDescription& description)
   {
     ModernEffect modern;
     const std::vector<Item> items = SplitItems(source);
 
-    // ---- texture views and sampler registers ----------------------------------
-    std::map<std::string, std::vector<TextureDimension>> textureDimensions;
-    std::vector<std::vector<TextureDimension>> samplerDimensions;
-    for (const SamplerDesc& sampler : description.samplers) {
-      samplerDimensions.push_back(SamplerDimensions(sampler, source));
-      if (sampler.texture.empty()) {
-        continue;
-      }
-      std::vector<TextureDimension>& dimensions = textureDimensions[sampler.texture];
-      for (const TextureDimension dimension : samplerDimensions.back()) {
-        if (std::find(dimensions.begin(), dimensions.end(), dimension) == dimensions.end()) {
-          dimensions.push_back(dimension);
-        }
-      }
-    }
-    std::map<std::pair<std::string, TextureDimension>, std::uint32_t> viewSlots;
-    for (const Parameter& parameter : description.parameters) {
-      if (parameter.parameterClass != ParameterClass::Texture) {
-        continue;
-      }
-      const auto found = textureDimensions.find(parameter.name);
-      if (found == textureDimensions.end()) {
-        continue; // never sampled
-      }
-      for (const TextureDimension dimension : found->second) {
-        const std::uint32_t slot = static_cast<std::uint32_t>(modern.textures.size());
-        modern.textures.push_back(TextureSlot{parameter.name, dimension, slot});
-        viewSlots[{parameter.name, dimension}] = slot;
-      }
-    }
-    if (modern.textures.size() > kMaxTextureSlots) {
-      modern.notes.push_back("more texture views than the register budget");
-    }
-    if (description.samplers.size() > kMaxSamplerSlots) {
-      modern.notes.push_back("more samplers than the register budget");
-    }
+    TextureViews textureViews = BuildTextureViews(source, description, modern);
+    std::vector<std::vector<TextureDimension>>& samplerDimensions = textureViews.samplerDimensions;
 
     // ---- parameters a function writes -------------------------------------------
     std::map<std::string, const Parameter*> numericParameters;
@@ -617,74 +712,8 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       }
     }
 
-    // ---- functions and the roles of their structs --------------------------------
-    std::map<std::string, Function> functions;
-    for (const Item& item : items) {
-      Function function;
-      if (item.braced && item.head.find('(') != std::string::npos && !HasTopLevelAssignment(item.head) &&
-          ParseFunctionHead(item.head, function) && functions.find(function.name) == functions.end()) {
-        functions[function.name] = function;
-      }
-    }
-
-    std::map<std::string, SemanticRole> structRoles;
-    std::set<std::string> vertexInputStructs;
-    const auto isStruct = [&](const std::string& name) { return description.FindStruct(name) != nullptr; };
-    // Roles belong to the struct definition, typedef'd names included.
-    const auto baseStruct = [&](const std::string& name) {
-      const StructType* const found = description.FindStruct(name);
-      return (found != nullptr && !found->aliasOf.empty()) ? found->aliasOf : name;
-    };
-    for (const Technique& technique : description.techniques) {
-      for (const Pass& pass : technique.passes) {
-        for (const auto& [reference, stage] :
-             {std::pair{&pass.vertexShader, ShaderStage::Vertex}, std::pair{&pass.pixelShader, ShaderStage::Pixel}}) {
-          const auto found = functions.find(reference->function);
-          if (found == functions.end()) {
-            continue;
-          }
-          const Function& function = found->second;
-          if (stage == ShaderStage::Vertex) {
-            if (isStruct(function.returnType)) {
-              structRoles.emplace(baseStruct(function.returnType), SemanticRole::VertexOutput);
-            }
-            for (const std::string& parameter : function.parameters) {
-              const ParameterParts parts = SplitParameter(parameter);
-              if (!isStruct(parts.type)) {
-                continue;
-              }
-              if (parts.isOut) {
-                structRoles.emplace(baseStruct(parts.type), SemanticRole::VertexOutput);
-              } else if (!parts.isUniform) {
-                vertexInputStructs.insert(baseStruct(parts.type));
-              }
-            }
-          } else {
-            if (isStruct(function.returnType)) {
-              structRoles[baseStruct(function.returnType)] = SemanticRole::PixelOutput;
-            }
-            for (const std::string& parameter : function.parameters) {
-              const ParameterParts parts = SplitParameter(parameter);
-              if (!isStruct(parts.type)) {
-                continue;
-              }
-              if (parts.isOut) {
-                structRoles[baseStruct(parts.type)] = SemanticRole::PixelOutput;
-              } else if (!parts.isUniform) {
-                structRoles.emplace(baseStruct(parts.type), SemanticRole::PixelInput);
-              }
-            }
-          }
-        }
-      }
-    }
-    for (const std::string& name : vertexInputStructs) {
-      const auto found = structRoles.find(name);
-      if (found != structRoles.end() && found->second != SemanticRole::PixelOutput) {
-        modern.notes.push_back("struct " + name + " is both a vertex input and a stage output; semantics left as written");
-        structRoles.erase(found);
-      }
-    }
+    const std::map<std::string, Function> functions = CollectFunctions(items);
+    std::map<std::string, SemanticRole> structRoles = AssignStructRoles(description, functions, modern);
 
     // ---- the body ---------------------------------------------------------------
     std::string body;

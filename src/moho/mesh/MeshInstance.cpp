@@ -1,5 +1,10 @@
 #include "moho/mesh/MeshPrivate.h"
 
+#include <algorithm>
+#include <cstring>
+
+#include "moho/console/CConCommand.h"
+
 namespace moho
 {
 
@@ -262,7 +267,7 @@ namespace moho
     , hasStanceUpdatePending(1)
     , isStaticPose(static_cast<std::uint8_t>(isStaticPoseArg ? 1 : 0))
     , isLocked(0)
-    , pad_A7(0)
+    , poseStill(0)
     , startPose()
     , endPose()
     , curPose()
@@ -523,6 +528,7 @@ namespace moho
 
     frameCounter = sFrameCounter;
     currInterpolant = -1.0f;
+    poseStill = 0;
   }
 
   /**
@@ -570,6 +576,7 @@ namespace moho
     frameCounter = sFrameCounter;
     currInterpolant = -1.0f;
     hasStanceUpdatePending = 1;
+    poseStill = 0;
 
     const bool changed = !Vec3EqualExact(endTransform.pos_, endTransformArg.pos_) ||
       !QuatEqualExact(endTransform.orient_, endTransformArg.orient_) ||
@@ -584,6 +591,42 @@ namespace moho
     boundsValid = 1;
     return true;
   }
+
+  bool ren_MeshPoseStill = true;
+  namespace
+  {
+    TConVar<bool> gTConVar_ren_MeshPoseStill(
+      "ren_MeshPoseStill",
+      "A unit's pose is blended once while its start and end poses match (1, the default), or each frame (0). Read when a "
+      "pose is blended.",
+      &ren_MeshPoseStill
+    );
+
+    /// Whether blending the two poses gives the same result at any interpolant.
+    [[nodiscard]] bool PosesMatch(const CAniPose& first, const CAniPose& second, const std::int32_t bones)
+    {
+      if (&first == &second) {
+        return true;
+      }
+      if (first.mMaxOffset != second.mMaxOffset || std::memcmp(&first.mLocalTransform, &second.mLocalTransform, sizeof(VTransform)) != 0) {
+        return false;
+      }
+      const std::int32_t count = std::min({
+        static_cast<std::int32_t>(first.mBones.end() - first.mBones.begin()),
+        static_cast<std::int32_t>(second.mBones.end() - second.mBones.begin()),
+        bones,
+      });
+      for (std::int32_t index = 0; index < count; ++index) {
+        const CAniPoseBone& a = first.mBones.begin()[index];
+        const CAniPoseBone& b = second.mBones.begin()[index];
+        if (a.mCompositeIsLocal != b.mCompositeIsLocal || a.mVisible != b.mVisible ||
+            std::memcmp(&a.mLocalTransform, &b.mLocalTransform, sizeof(VTransform)) != 0) {
+          return false;
+        }
+      }
+      return true;
+    }
+  } // namespace
 
   /**
    * Address: 0x007DEC80 (FUN_007DEC80, ?UpdateInterpolatedFields@MeshInstance@Moho@@ABEXXZ)
@@ -644,10 +687,16 @@ namespace moho
     // instance's live animation state. Only static-pose (real unit)
     // instances that are not locked carry start/end pose handles (see
     // MeshInstance::SetStance's pose-carrying overload).
-    if (isStaticPose != 0u && isLocked == 0u) {
-      curPose->InterpolatePose(
-        interpolation, startPose.get(), endPose.get(), static_cast<std::int32_t>(resource->mFile->mSkinBoneCount)
-      );
+    //
+    // Engine change (ren_MeshPoseStill): a unit that stands still gets two matching poses from the sim, and
+    // blending those gives the same pose every frame. One blend per stance is enough, which also keeps the
+    // bones' composite transforms from being rebuilt. The sim never writes a pose it has published.
+    // Engine addition, server mode: a server session's client gets no poses until the pose lane (plan WP8.3), so a
+    // unit's start and end pose can be null; it keeps the pose it has.
+    if (isStaticPose != 0u && isLocked == 0u && (poseStill == 0u || !ren_MeshPoseStill) && startPose && endPose && curPose) {
+      const std::int32_t skinBoneCount = static_cast<std::int32_t>(resource->mFile->mSkinBoneCount);
+      curPose->InterpolatePose(interpolation, startPose.get(), endPose.get(), skinBoneCount);
+      poseStill = (ren_MeshPoseStill && PosesMatch(*startPose, *endPose, skinBoneCount)) ? 1u : 0u;
     }
 
     float maxScale = scale.x;

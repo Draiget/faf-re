@@ -36,6 +36,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/OutputContext.hpp"
+#include "gpg/gal/backends/common/PipelineMemo.h"
 #include "gpg/gal/backends/common/WindowsCursor.h"
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "gpg/gal/effects/SpirvReflect.h"
@@ -62,7 +63,7 @@ namespace gpg::gal
     DeviceContext* GetDeviceContext() override;
     int GetCurThreadId() override;
     void Func1() const override;
-    void GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
+    void GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
     OutputContext* GetHeadOutputContext(unsigned int headIndex) override;
     const OutputContext* GetHeadOutputContext(unsigned int headIndex) const override;
     boost::shared_ptr<PipelineState> GetPipelineState() override;
@@ -87,10 +88,10 @@ namespace gpg::gal
       const RECT* sourceRect,
       const RECT* destinationRect
     ) override;
-    void SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const msvc8::string& filePath) override;
-    void SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const msvc8::string& filePath, int fileFormat) override;
+    void SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
+    void SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, int fileFormat) override;
     void SaveTexture(
-      const boost::shared_ptr<Texture>& texture, const msvc8::string& filePath, int fileFormat, gpg::MemBuffer<char>* outBuffer
+      const boost::shared_ptr<Texture>& texture, const fa::string& filePath, int fileFormat, gpg::MemBuffer<char>* outBuffer
     ) override;
     void GetTexture2D(
       const void* sourceData, std::uint32_t sourceBytes, gpg::MemBuffer<char>* outTextureData, std::uint32_t* outWidth, int* outHeight
@@ -137,6 +138,8 @@ namespace gpg::gal
     bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out) override;
     void ReleaseBufferCopy(VertexBuffer& buffer) override;
     void ReleaseBufferCopy(IndexBuffer& buffer) override;
+    void CopyLockedRangeOnly(VertexBuffer& buffer) override;
+    void CopyLockedRangeOnly(IndexBuffer& buffer) override;
     bool CopyVertexBufferRegion(
       VertexBuffer& destination, std::uint32_t destinationOffset, VertexBuffer& source, std::uint32_t sourceOffset, std::uint32_t byteCount
     ) override;
@@ -190,7 +193,7 @@ namespace gpg::gal
       const std::uint8_t* constantsCpu = nullptr; // the same snapshot, CPU side (upload memory)
       std::uint32_t constantsBytes = 0;
       std::uint64_t constantsSerial = 0;          // the submission whose upload memory holds it
-      std::shared_ptr<const std::vector<effects::TextureBinding>> sampled;
+      const std::vector<effects::TextureBinding>* sampled = nullptr; // in the effect's state
     };
 
     struct ProgramState;
@@ -297,7 +300,7 @@ namespace gpg::gal
 
     // ---- core objects --------------------------------------------------------
     int mCurThreadId = 0;
-    msvc8::vector<msvc8::string> mLog{};
+    fa::vector<fa::string> mLog{};
     DeviceContext mDeviceContext{DeviceApi::Unset};
     std::recursive_mutex mMutex;
     VkInstance mInstance = VK_NULL_HANDLE;
@@ -337,6 +340,22 @@ namespace gpg::gal
     std::map<std::pair<std::uint64_t, std::uint64_t>, VkShaderModule> mLinkedModules;
     std::unordered_map<std::uint64_t, effects::SpirvInterface> mInterfaces;
     std::unordered_map<std::string, VkPipeline> mPipelines;
+    /** Everything mPipelines' string key is built from; see PipelineMemo. */
+    struct PipelineInputs
+    {
+      std::uint64_t vertexKey;
+      std::uint64_t pixelKey;
+      std::uint32_t format;
+      std::uint32_t sampleMask;
+      std::uint32_t strides[16];
+      effects::BlendDesc blend;
+      effects::DepthStencilDesc depth;
+      effects::RasterizerDesc rasterizer;
+      VkFormat colorFormat;
+      VkFormat depthFormat;
+      VkPrimitiveTopology topology;
+    };
+    PipelineMemo<PipelineInputs, VkPipeline> mPipelineMemo;
 
     // ---- heads ---------------------------------------------------------------
     std::vector<SwapChain> mSwapChains;

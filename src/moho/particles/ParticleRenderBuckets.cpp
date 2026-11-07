@@ -87,7 +87,7 @@ namespace
    * Recreates one vertex-sheet slot from device resources with fixed stream
    * usage token `1`, releasing the replaced sheet when the pointer changes.
    */
-  moho::ID3DVertexSheet* RecreateVertexSheetWithUsageTokenOne(
+  [[maybe_unused]] moho::ID3DVertexSheet* RecreateVertexSheetWithUsageTokenOne(
     moho::ID3DVertexSheet*& vertexSheet,
     moho::CD3DVertexFormat* const vertexFormat,
     const std::int32_t streamFrequencyToken
@@ -182,15 +182,12 @@ namespace
     (void)device->DrawTriangleList(&vertexSheetView, &indexSheetView, &primitiveType);
   }
 
-  constexpr std::uint8_t kTrailSegmentPoolColorRed = 0U;
-  constexpr std::uint8_t kTrailSegmentPoolColorBlack = 1U;
-
 
   [[nodiscard]] bool AppendInterval(
     moho::SParticleRenderWorkItem& workItem, const float beginFrame, const float lifeFrames
   )
   {
-    // `msvc8::vector<SParticleRenderInterval>::push_back` (0x00496950, cited on Vector.h).
+    // `fa::vector<SParticleRenderInterval>::push_back` (0x00496950, cited on Vector.h).
     const moho::SParticleRenderInterval intervalValue{beginFrame, lifeFrames};
     workItem.mIntervals.push_back(intervalValue);
     return true;
@@ -276,7 +273,7 @@ namespace
    * What it does:
    * Writes one pointer-sized value to caller output storage.
    */
-  const void** WritePointerToOutputSlot(
+  [[maybe_unused]] const void** WritePointerToOutputSlot(
     const void** const outPointer,
     const void* const value
   ) noexcept
@@ -304,7 +301,7 @@ namespace moho
   {
     bucket.texture0.reset();
     bucket.texture1.reset();
-    bucket.tag = msvc8::string{};
+    bucket.tag = fa::string{};
     bucket.blendMode = 0;
     bucket.zMode = 0;
     bucket.pendingParticles.clear();
@@ -325,7 +322,7 @@ namespace moho
     }
     bucket.texture1 = texture1;
 
-    bucket.tag.assign(particle.mTypeTag, 0U, msvc8::string::npos);
+    bucket.tag.assign(particle.mTypeTag, 0U, fa::string::npos);
     bucket.blendMode = static_cast<std::int32_t>(particle.mBlendMode);
     bucket.zMode = static_cast<std::int32_t>(particle.mZMode);
     return &bucket;
@@ -346,7 +343,7 @@ namespace moho
   {
     bucket.texture0.reset();
     bucket.texture1.reset();
-    bucket.tag = msvc8::string{};
+    bucket.tag = fa::string{};
     bucket.blendMode = 0;
     bucket.renderStartIndex = 0U;
     bucket.pendingTrails.clear();
@@ -385,7 +382,7 @@ namespace moho
   void UploadPendingParticlesIntoWorkItem(
     SParticleRenderWorkItem& workItem,
     const float frameDelta,
-    msvc8::vector<SWorldParticle>& pendingParticles
+    fa::vector<SWorldParticle>& pendingParticles
   )
   {
     const std::size_t pendingCount = pendingParticles.size();
@@ -461,7 +458,10 @@ namespace moho
       instance->rampSelection = particle.mRampSelection;
       instance->value3 = particle.mValue3;
       instance->resistance = particle.mResistance;
-      instance->inverseResistance = 1.0f / particle.mResistance;
+      // Engine change: retail divides with no guard (0x004933FE). A drag emitter with resistance 0
+      // (seraphim_airmoveexhaust_01_emit) then hands the shader an infinity, and Direct3D 12 and Vulkan
+      // turn its particles' positions into NaN and draw nothing; with 0 they stay where they were born.
+      instance->inverseResistance = particle.mResistance != 0.0f ? 1.0f / particle.mResistance : 0.0f;
       instance->inverseResistanceSq = instance->inverseResistance * instance->inverseResistance;
     }
 
@@ -995,7 +995,7 @@ namespace moho
   bool UploadPendingTrailsIntoWorkItem(
     SParticleRenderWorkItem& workItem,
     const float frameDelta,
-    msvc8::vector<SWorldTrail>& pendingTrails
+    fa::vector<SWorldTrail>& pendingTrails
   )
   {
     const std::size_t pendingCount = pendingTrails.size();

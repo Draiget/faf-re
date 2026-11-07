@@ -38,7 +38,7 @@ namespace moho
    * chaining to `IAniManipulator::IAniManipulator` writes both vftables, then
    * `mov [esi+0x80], 0` / `mov [esi+0x84], 0` (the weak-pointer node),
    * `mov byte [esi+0x8c], 0` / `mov [esi+0x9c], 0` / `mov [esi+0xa0], 0xf`
-   * (`msvc8::string`'s `_Bx._Buf[0]` / `_Mysize` / `_Myres`, which is what
+   * (`fa::string`'s `_Bx._Buf[0]` / `_Mysize` / `_Myres`, which is what
    * pins `mLabel` to +0x88), `mov byte [esi+0xa8], 0`, the two cap vectors,
    * and the two turn scalars. `sizeof` is pinned twice over: by
    * `CThrustManipulatorTypeInfo::Init` (0x0064A230), whose first store is
@@ -180,7 +180,7 @@ namespace moho
     WeakPtr<Unit> mUnit;           // +0x80
     /// Name this manipulator was created under. Written by both constructors
     /// and carried through save/load; no code in the binary reads it back.
-    msvc8::string mLabel;          // +0x88
+    fa::string mLabel;          // +0x88
     /// Bone this manipulator swivels, and the bone whose world transform the
     /// roll correction is measured at.
     std::int32_t mThrustBoneIndex; // +0xA4

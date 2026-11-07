@@ -26,13 +26,7 @@ namespace
 
   void AddBaseField(gpg::RType* const typeInfo, gpg::RType* const baseType, const std::int32_t offset)
   {
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = offset;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType, offset);
   }
 
   [[nodiscard]] gpg::RRef MakeFormAndMoveTaskRef(moho::CUnitFormAndMoveTask* const task)
@@ -198,10 +192,7 @@ namespace moho
    */
   gpg::RRef CUnitFormAndMoveTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitFormAndMoveTask*>(objectStorage);
-    if (task) {
-      new (task) CUnitFormAndMoveTask();
-    }
+    auto* const task = gpg::ConstructInStorage<CUnitFormAndMoveTask>(objectStorage);
     return MakeFormAndMoveTaskRef(task);
   }
 

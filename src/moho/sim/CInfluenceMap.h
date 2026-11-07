@@ -53,7 +53,7 @@ namespace moho
    * the `cfunc_CAiBrainGetThreatsAroundPositionL` Lua worker (FUN_00590C80).
    *
    * The binary builds each record on the stack as `{worldX, 0.0f, worldZ,
-   * threat}` and pushes it onto a `msvc8::vector<SPositionThreat>` (16-byte
+   * threat}` and pushes it onto a `fa::vector<SPositionThreat>` (16-byte
    * stride, `push_back` = FUN_00718A40). The `y` lane is written as `0.0f` and
    * is unused by the worker, which reads only `x` (+0x00), `z` (+0x08), and
    * `threat` (+0x0C).
@@ -240,8 +240,8 @@ namespace moho
     [[nodiscard]] bool RemoveEntry(std::uint32_t entityId);
 
   public:
-    msvc8::map<std::uint32_t, InfluenceMapEntry> entries; // +0x00
-    msvc8::vector<SThreat> threats;                               // +0x0C
+    fa::map<std::uint32_t, InfluenceMapEntry> entries; // +0x00
+    fa::vector<SThreat> threats;                               // +0x0C
     SThreat threat;                                               // +0x1C
     SThreat decay;                                                // +0x54
   };
@@ -349,14 +349,14 @@ namespace moho
      * whose per-type threat is strictly positive, then returns `&out`.
      *
      * NOTE: signature corrected from the mis-recovered `LuaObject*` form. The
-     * binary fills a `msvc8::vector<SPositionThreat>` (element built as
+     * binary fills a `fa::vector<SPositionThreat>` (element built as
      * `{worldX, 0.0f, worldZ, threat}`, pushed via FUN_00718A40); it does NOT
      * build a Lua table. The only caller,
      * `cfunc_CAiBrainGetThreatsAroundPositionL` (FUN_00590C80), builds the Lua
      * table from that vector.
      */
-    msvc8::vector<SPositionThreat>* GetThreatsAroundPosition(
-      msvc8::vector<SPositionThreat>& out,
+    fa::vector<SPositionThreat>* GetThreatsAroundPosition(
+      fa::vector<SPositionThreat>& out,
       const Wm3::Vec3f& pos,
       int ring,
       bool restrictToPlayable,
@@ -410,7 +410,7 @@ namespace moho
     );
 
   private:
-    using BlipCellMap = msvc8::map<std::uint32_t, std::int32_t>;
+    using BlipCellMap = fa::map<std::uint32_t, std::int32_t>;
 
     [[nodiscard]] CArmyImpl* ResolveSourceArmy(std::uint32_t blipId) const;
     [[nodiscard]] const std::int32_t* FindBlipCell(std::uint32_t blipId) const;
@@ -457,7 +457,7 @@ namespace moho
     std::int32_t mHeight;                 // +0x0C
     std::int32_t mGridSize;               // +0x10
     BlipCellMap mBlipCells;               // +0x14
-    msvc8::vector<InfluenceGrid> mMapEntries; // +0x20
+    fa::vector<InfluenceGrid> mMapEntries; // +0x20
   };
 
   static_assert(sizeof(SThreat) == 0x38, "SThreat size must be 0x38");

@@ -32,7 +32,7 @@ namespace moho
 
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
-    msvc8::string name;
+    fa::string name;
   };
 
   /**
@@ -42,7 +42,7 @@ namespace moho
    * Completes a resource path using the source-file directory and collapses
    * separator / `.` / `..` path segments into canonical form.
    */
-  [[nodiscard]] msvc8::string RES_CompletePath(gpg::StrArg resourceName, gpg::StrArg sourceName);
+  [[nodiscard]] fa::string RES_CompletePath(gpg::StrArg resourceName, gpg::StrArg sourceName);
 
   /**
    * VFTABLE: 0x00E07368
@@ -72,7 +72,7 @@ namespace moho
     /**
      * Address: 0x004A9450 (FUN_004A9450, Moho::RResIdType::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x004A9430 (FUN_004A9430, Moho::RResIdType::SetLexical)

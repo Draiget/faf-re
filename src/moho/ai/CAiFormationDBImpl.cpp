@@ -73,7 +73,7 @@ namespace
 
     const char* const expected = expectedType->GetName();
     const char* const actual = source.GetTypeName();
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "Sim",
@@ -204,7 +204,7 @@ namespace
  */
 unsigned int moho::FORMATION_GetNumScripts(LuaPlus::LuaState* const state, const EFormationType formationType)
 {
-  msvc8::string bucketName{kFormationBuckets[ToFormationBucketIndex(formationType)]};
+  fa::string bucketName{kFormationBuckets[ToFormationBucketIndex(formationType)]};
 
   LuaPlus::LuaObject module = SCR_ImportLuaModule(state, kFormationModulePath);
   if (module.IsNil()) {
@@ -238,7 +238,7 @@ const char* moho::FORMATION_GetScriptName(
     return nullptr;
   }
 
-  msvc8::string bucketName{kFormationBuckets[ToFormationBucketIndex(formationType)]};
+  fa::string bucketName{kFormationBuckets[ToFormationBucketIndex(formationType)]};
 
   LuaPlus::LuaObject module = SCR_ImportLuaModule(state, kFormationModulePath);
   if (module.IsNil()) {
@@ -272,7 +272,7 @@ int moho::FORMATION_GetScriptIndex(
   const EFormationType formationType
 )
 {
-  msvc8::string bucketName{kFormationBuckets[ToFormationBucketIndex(formationType)]};
+  fa::string bucketName{kFormationBuckets[ToFormationBucketIndex(formationType)]};
 
   LuaPlus::LuaObject module = SCR_ImportLuaModule(state, kFormationModulePath);
   if (module.IsNil()) {

@@ -125,7 +125,7 @@ namespace moho
      * VFTable SLOT: 7
      */
     [[nodiscard]]
-    virtual const msvc8::vector<ReconBlip*>& ReconGetBlips() const = 0;
+    virtual const fa::vector<ReconBlip*>& ReconGetBlips() const = 0;
 
     /**
      * Address: 0x005C1A10 (FUN_005C1A10)

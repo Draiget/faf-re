@@ -609,7 +609,7 @@ void CScriptObject::MemberSerialize(gpg::WriteArchive* const archive)
  * Default `where` text for script-error warnings: `CScriptObject at %08x`
  * (format at 0x00E091C4) of `this` -- lower-case, zero-padded hex, not `%p`.
  */
-msvc8::string CScriptObject::GetErrorDescription()
+fa::string CScriptObject::GetErrorDescription()
 {
   return gpg::STR_Printf("CScriptObject at %08x", reinterpret_cast<std::uintptr_t>(this));
 }
@@ -713,7 +713,7 @@ void CScriptObject::SetLuaObject(const LuaPlus::LuaObject& obj)
 void CScriptObject::LogScriptWarning(CScriptObject* obj, const char* which, const char* message)
 {
   const char* where = "<deleted object>";
-  msvc8::string description;
+  fa::string description;
   if (obj) {
     description = obj->GetErrorDescription();
     where = description.c_str();

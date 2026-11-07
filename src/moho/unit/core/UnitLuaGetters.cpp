@@ -371,7 +371,7 @@ int moho::cfunc_UnitGetArmorMultL(LuaPlus::LuaState* const state)
     damageTypeName = "";
   }
 
-  const float armorMultiplier = unit->GetArmorMult(msvc8::string(damageTypeName));
+  const float armorMultiplier = unit->GetArmorMult(fa::string(damageTypeName));
   lua_pushnumber(rawState, armorMultiplier);
   (void)lua_gettop(rawState);
   return 1;
@@ -1384,7 +1384,7 @@ int moho::cfunc_UnitGetCommandQueueL(LuaPlus::LuaState* const state)
     return 0;
   }
 
-  const msvc8::vector<WeakPtr<CUnitCommand>> commandSnapshot = commandQueue->mCommandVec;
+  const fa::vector<WeakPtr<CUnitCommand>> commandSnapshot = commandQueue->mCommandVec;
 
   LuaPlus::LuaObject queueArray{};
   const int commandCount = static_cast<int>(commandSnapshot.size());
@@ -2384,7 +2384,7 @@ int moho::cfunc_UnitGetNumBuildOrdersL(LuaPlus::LuaState* const state)
   int buildOrderCount = 0;
   if (unit->AiBuilder != nullptr) {
     if (CUnitCommandQueue* const commandQueue = unit->CommandQueue; commandQueue != nullptr) {
-      const msvc8::vector<WeakPtr<CUnitCommand>> commands(commandQueue->mCommandVec);
+      const fa::vector<WeakPtr<CUnitCommand>> commands(commandQueue->mCommandVec);
       for (const WeakPtr<CUnitCommand>& commandWeakRef : commands) {
         const CUnitCommand* const command = commandWeakRef.GetObjectPtr();
         if (!command) {
@@ -3239,10 +3239,10 @@ int moho::cfunc_UnitCanPathToRectL(LuaPlus::LuaState* const state)
 
   SAiNavigatorGoal goal{};
   // 0x006CBEA4..0x006CBF25: the binary's inlined ceil and floor.
-  goal.minX = msvc8::FloorToIntX87(minCorner.x);
-  goal.minZ = msvc8::FloorToIntX87(minCorner.z);
-  goal.maxX = msvc8::CeilToIntX87(maxCorner.x);
-  goal.maxZ = msvc8::CeilToIntX87(maxCorner.z);
+  goal.minX = fa::FloorToIntX87(minCorner.x);
+  goal.minZ = fa::FloorToIntX87(minCorner.z);
+  goal.maxX = fa::CeilToIntX87(maxCorner.x);
+  goal.maxZ = fa::CeilToIntX87(maxCorner.z);
 
   Wm3::Vector3f targetPos = InvalidNavigatorTargetLane();
   const bool canPath = unit->AiNavigator->CanPathTo(&targetPos, goal);

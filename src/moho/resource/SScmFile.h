@@ -124,6 +124,6 @@ namespace moho
      * `MeshBatch::Initialize`'s bone-remap branch, which is why it lives here
      * next to the file layout it walks rather than in either caller.
      */
-    void FillBoneNamePointers(const SScmFile& file, msvc8::vector<const char*>& outNamePointers);
+    void FillBoneNamePointers(const SScmFile& file, fa::vector<const char*>& outNamePointers);
   } // namespace scm_file
 } // namespace moho

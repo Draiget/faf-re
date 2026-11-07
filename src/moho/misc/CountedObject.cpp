@@ -32,7 +32,7 @@ namespace moho
 
   void CountedObject::AddReferenceAtomic() noexcept
   {
-    (void)_InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&mRefCount), 1);
+    (void)platform::AtomicAdd(&mRefCount, 1);
   }
 
   [[nodiscard]] bool CountedObject::ReleaseReference() noexcept
@@ -48,7 +48,7 @@ namespace moho
 
   [[nodiscard]] bool CountedObject::ReleaseReferenceAtomic() noexcept
   {
-    const long previous = _InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(&mRefCount), -1);
+    const std::int32_t previous = platform::AtomicAdd(&mRefCount, -1);
     if (previous != 1) {
       return false;
     }

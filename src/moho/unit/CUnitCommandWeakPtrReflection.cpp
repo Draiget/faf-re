@@ -18,7 +18,7 @@
 namespace
 {
   using WeakPtrType = moho::RWeakPtrType<moho::CUnitCommand>;
-  using WeakPtrVector = msvc8::vector<moho::WeakPtr<moho::CUnitCommand>>;
+  using WeakPtrVector = fa::vector<moho::WeakPtr<moho::CUnitCommand>>;
   using WeakPtrVectorType = gpg::RVectorType<moho::WeakPtr<moho::CUnitCommand>>;
 
   /**
@@ -56,18 +56,6 @@ namespace
       cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::CUnitCommand>));
       if (!cached) {
         cached = moho::register_WeakPtr_CUnitCommand_Type_00();
-      }
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrVectorCUnitCommandType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(msvc8::vector<moho::WeakPtr<moho::CUnitCommand>>));
-      if (!cached) {
-        cached = moho::register_WeakPtr_CUnitCommand_VectorType_00();
       }
     }
     return cached;
@@ -129,7 +117,7 @@ namespace
 
     const char* const expected = CachedCUnitCommandType() ? CachedCUnitCommandType()->GetName() : "CUnitCommand";
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
       expected ? expected : "CUnitCommand",
       actual ? actual : "null"
@@ -155,7 +143,7 @@ namespace
     storage->clear();
 
     // The binary grows the destination with reserve(count) (FUN_006EB1D0,
-    // msvc8::vector<WeakPtr<CUnitCommand>>::reserve) and then fills the
+    // fa::vector<WeakPtr<CUnitCommand>>::reserve) and then fills the
     // reserved run in place with empty weak links: with the capacity already
     // there, `insert(end(), count, T())` takes the in-place `_Ufill` arm
     // (0x006EC5B0) rather than reallocating.
@@ -201,7 +189,7 @@ namespace moho
    */
   const char* RWeakPtrType<CUnitCommand>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedCUnitCommandType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedCUnitCommandType()->GetName());
     return sName.c_str();
   }
 
@@ -219,19 +207,19 @@ namespace moho
   /**
    * Address: 0x006E9950 (FUN_006E9950, Moho::RWeakPtrType_CUnitCommand::GetLexical)
    */
-  msvc8::string RWeakPtrType<CUnitCommand>::GetLexical(const gpg::RRef& ref) const
+  fa::string RWeakPtrType<CUnitCommand>::GetLexical(const gpg::RRef& ref) const
   {
     auto* const weak = static_cast<const WeakPtr<CUnitCommand>*>(ref.mObj);
     if (!weak || !weak->HasValue()) {
-      return msvc8::string("NULL");
+      return fa::string("NULL");
     }
 
     const gpg::RRef pointeeRef = MakeCUnitCommandRef(weak->GetObjectPtr());
     if (!pointeeRef.mObj) {
-      return msvc8::string("NULL");
+      return fa::string("NULL");
     }
 
-    const msvc8::string inner = pointeeRef.GetLexical();
+    const fa::string inner = pointeeRef.GetLexical();
     return gpg::STR_Printf("[%s]", inner.c_str());
   }
 
@@ -324,7 +312,7 @@ namespace moho
   gpg::RType* register_WeakPtr_CUnitCommand_VectorType_00()
   {
     WeakPtrVectorType* const type = AcquireWeakPtrVectorType();
-    gpg::PreRegisterRType(typeid(msvc8::vector<WeakPtr<CUnitCommand>>), type);
+    gpg::PreRegisterRType(typeid(fa::vector<WeakPtr<CUnitCommand>>), type);
     return type;
   }
 
@@ -347,7 +335,7 @@ namespace gpg
    */
   const char* RVectorType<moho::WeakPtr<moho::CUnitCommand>>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedWeakPtrCUnitCommandType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("vector<%s>", CachedWeakPtrCUnitCommandType()->GetName());
     return sName.c_str();
   }
 
@@ -365,9 +353,9 @@ namespace gpg
   /**
    * Address: 0x006E9C50 (FUN_006E9C50, gpg::RVectorType_WeakPtr_CUnitCommand::GetLexical)
    */
-  msvc8::string RVectorType<moho::WeakPtr<moho::CUnitCommand>>::GetLexical(const gpg::RRef& ref) const
+  fa::string RVectorType<moho::WeakPtr<moho::CUnitCommand>>::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 

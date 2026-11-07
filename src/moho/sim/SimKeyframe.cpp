@@ -1,13 +1,18 @@
 #include "moho/sim/SimKeyframe.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <memory>
 #include <new>
 #include <unordered_map>
 #include <utility>
 
+#include "gpg/core/streams/BinaryReader.h"
+#include "gpg/core/streams/MemBufferStream.h"
+#include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimArchiveMode.h"
 #include "moho/sim/SimBlockLane.h"
@@ -17,12 +22,15 @@ namespace moho
   namespace
   {
     constexpr std::uint32_t kHeaderMagic = 0x4B465246u; // "FRFK"
-    constexpr std::uint32_t kHeaderVersion = 4u;
+    constexpr std::uint32_t kHeaderVersion = 5u;
 
     // A keyframe's header is read from a file; a length past this is not one.
     constexpr std::uint32_t kMaxListLength = 64u * 1024u * 1024u;
 
     std::vector<SSimFlatten> sFlattenLog;
+#if defined(_M_X64) || defined(__x86_64__)
+    std::vector<SimBlockLane::HeldBlock> sRestoredHeld;
+#endif
     std::unique_ptr<SSimKeyframeHeader> sRestore;
 
     struct SFormationPointer
@@ -33,6 +41,39 @@ namespace moho
 
     std::unordered_map<std::uint64_t, void*> sRestoredBlocks;
     std::vector<SFormationPointer> sRestoredFormationPointers;
+
+    struct SRestoredUiData
+    {
+      std::int32_t x0 = 0;
+      std::int32_t z0 = 0;
+      std::int32_t x1 = 0;
+      std::int32_t z1 = 0;
+      gpg::MemBufferStream unitData{256u};
+      gpg::MemBufferStream enhancements{256u};
+      bool hasTables = false;
+    };
+
+    std::atomic<SRestoredUiData*> sRestoredUiData{nullptr};
+
+    void CaptureRestoredUiData(Sim& sim)
+    {
+      auto data = std::make_unique<SRestoredUiData>();
+      const gpg::Rect2i& playable = sim.mMapData->mPlayableRect;
+      data->x0 = playable.x0;
+      data->z0 = playable.z0;
+      data->x1 = playable.x1;
+      data->z1 = playable.z1;
+
+      // lua/simInit.lua loads lua/SimSync.lua with `doscript`, so these are globals of the sim's state.
+      LuaPlus::LuaObject unitData = sim.mLuaState->GetGlobal("UnitData");
+      LuaPlus::LuaObject enhancements = sim.mLuaState->GetGlobal("SimUnitEnhancements");
+      if (unitData.IsTable() && enhancements.IsTable()) {
+        (void)unitData.ToByteStream(data->unitData);
+        (void)enhancements.ToByteStream(data->enhancements);
+        data->hasTables = true;
+      }
+      delete sRestoredUiData.exchange(data.release());
+    }
 
     constexpr std::size_t kUnheldBlockBytes = 2048u;
 
@@ -129,17 +170,32 @@ namespace moho
 
     header.laneBlocks.clear();
     header.laneBytes.clear();
+    header.heldBlocks.clear();
+    header.heldSizes.clear();
+    header.heldBytes.clear();
 #if defined(_M_X64) || defined(__x86_64__)
-    const std::vector<void*>& freeBlocks = SimBlockLane::FreeBlocks();
-    header.laneBytes.resize(freeBlocks.size() * SimBlockLane::kBlockBytes);
-    std::uint8_t* out = header.laneBytes.data();
-    for (void* const block : freeBlocks) {
-      header.laneBlocks.push_back(reinterpret_cast<std::uintptr_t>(block));
+    const auto packBlock = [](void* const block, std::uint8_t* const out) {
       std::memcpy(out, block, SimBlockLane::kBlockBytes);
       std::uint64_t firstWord = 0;
       std::memcpy(&firstWord, out, sizeof(firstWord));
       firstWord = PackFirstWord(firstWord);
       std::memcpy(out, &firstWord, sizeof(firstWord));
+    };
+    const std::vector<void*>& freeBlocks = SimBlockLane::FreeBlocks();
+    header.laneBytes.resize(freeBlocks.size() * SimBlockLane::kBlockBytes);
+    std::uint8_t* out = header.laneBytes.data();
+    for (void* const block : freeBlocks) {
+      header.laneBlocks.push_back(reinterpret_cast<std::uintptr_t>(block));
+      packBlock(block, out);
+      out += SimBlockLane::kBlockBytes;
+    }
+    const std::vector<SimBlockLane::HeldBlock>& heldBlocks = SimBlockLane::HeldBlocks();
+    header.heldBytes.resize(heldBlocks.size() * SimBlockLane::kBlockBytes);
+    out = header.heldBytes.data();
+    for (const SimBlockLane::HeldBlock& held : heldBlocks) {
+      header.heldBlocks.push_back(reinterpret_cast<std::uintptr_t>(held.block));
+      header.heldSizes.push_back(held.bytes);
+      packBlock(held.block, out);
       out += SimBlockLane::kBlockBytes;
     }
 #endif
@@ -157,7 +213,8 @@ namespace moho
       && WriteValue(file, flags) && WriteValue(file, header.context) && WriteValue(file, header.hashes)
       && WriteList(file, header.timeouts) && WriteList(file, header.flattens) && WriteValue(file, header.luaBlocks)
       && WriteValue(file, header.luaThreshold) && WriteList(file, header.laneBlocks)
-      && WriteList(file, header.laneBytes);
+      && WriteList(file, header.laneBytes) && WriteList(file, header.heldBlocks) && WriteList(file, header.heldSizes)
+      && WriteList(file, header.heldBytes);
   }
 
   bool SIM_ReadKeyframeHeader(std::FILE* const file, SSimKeyframeHeader& header)
@@ -170,7 +227,8 @@ namespace moho
         || !ReadValue(file, header.commandSource) || !ReadValue(file, flags) || !ReadValue(file, header.context)
         || !ReadValue(file, header.hashes) || !ReadList(file, header.timeouts) || !ReadList(file, header.flattens)
         || !ReadValue(file, header.luaBlocks) || !ReadValue(file, header.luaThreshold)
-        || !ReadList(file, header.laneBlocks) || !ReadList(file, header.laneBytes)) {
+        || !ReadList(file, header.laneBlocks) || !ReadList(file, header.laneBytes) || !ReadList(file, header.heldBlocks)
+        || !ReadList(file, header.heldSizes) || !ReadList(file, header.heldBytes)) {
       return false;
     }
     header.singleStep = flags[0] != 0u;
@@ -186,26 +244,43 @@ namespace moho
     sRestoredBlocks.clear();
     sRestoredFormationPointers.clear();
 #if defined(_M_X64) || defined(__x86_64__)
+    const auto unpackBlock = [](const std::uint64_t saved, const std::uint8_t* const in) {
+      void* const block = ::operator new(SimBlockLane::kBlockBytes);
+      std::memcpy(block, in, SimBlockLane::kBlockBytes);
+      std::uint64_t firstWord = 0;
+      std::memcpy(&firstWord, in, sizeof(firstWord));
+      firstWord = UnpackFirstWord(firstWord);
+      std::memcpy(block, &firstWord, sizeof(firstWord));
+      sRestoredBlocks[saved] = block;
+      return block;
+    };
     std::vector<void*> freeBlocks;
     freeBlocks.reserve(header.laneBlocks.size());
     const std::uint8_t* in = header.laneBytes.data();
     if (header.laneBytes.size() == header.laneBlocks.size() * SimBlockLane::kBlockBytes) {
       for (const std::uint64_t saved : header.laneBlocks) {
-        void* const block = ::operator new(SimBlockLane::kBlockBytes);
-        std::memcpy(block, in, SimBlockLane::kBlockBytes);
-        std::uint64_t firstWord = 0;
-        std::memcpy(&firstWord, in, sizeof(firstWord));
-        firstWord = UnpackFirstWord(firstWord);
-        std::memcpy(block, &firstWord, sizeof(firstWord));
+        freeBlocks.push_back(unpackBlock(saved, in));
         in += SimBlockLane::kBlockBytes;
-        sRestoredBlocks[saved] = block;
-        freeBlocks.push_back(block);
       }
     }
     SimBlockLane::SetFreeBlocks(std::move(freeBlocks));
+    sRestoredHeld.clear();
+    in = header.heldBytes.data();
+    if (header.heldBytes.size() == header.heldBlocks.size() * SimBlockLane::kBlockBytes
+        && header.heldSizes.size() == header.heldBlocks.size()) {
+      for (std::size_t i = 0; i < header.heldBlocks.size(); ++i) {
+        sRestoredHeld.push_back(
+          SimBlockLane::HeldBlock{nullptr, static_cast<std::size_t>(header.heldSizes[i]), unpackBlock(header.heldBlocks[i], in)}
+        );
+        in += SimBlockLane::kBlockBytes;
+      }
+    }
 #endif
     header.laneBlocks.clear();
     header.laneBytes.clear();
+    header.heldBlocks.clear();
+    header.heldSizes.clear();
+    header.heldBytes.clear();
 
     sRestore = std::make_unique<SSimKeyframeHeader>(std::move(header));
     gSimExactArchive.store(true);
@@ -240,6 +315,10 @@ namespace moho
     }
     sRestoredFormationPointers.clear();
     sRestoredBlocks.clear();
+#if defined(_M_X64) || defined(__x86_64__)
+    SimBlockLane::AdoptHeldBlocks(std::move(sRestoredHeld));
+    sRestoredHeld.clear();
+#endif
   }
 
   const SSimKeyframeHeader* SIM_KeyframeRestore() noexcept
@@ -251,6 +330,8 @@ namespace moho
   {
     gSimExactArchive.store(false);
     gSimKeyframeRestoring.store(false);
+
+    CaptureRestoredUiData(sim);
 
     const SSimKeyframeHeader& header = *sRestore;
     sim.mCurBeat = header.beat;
@@ -273,5 +354,45 @@ namespace moho
 
     sFlattenLog = header.flattens;
     sRestore.reset();
+  }
+
+  void SIM_AddRestoredUiData(LuaPlus::LuaObject& sync, LuaPlus::LuaState* const state)
+  {
+    std::unique_ptr<SRestoredUiData> data(sRestoredUiData.exchange(nullptr));
+    if (!data) {
+      return;
+    }
+
+    LuaPlus::LuaObject area;
+    area.AssignNewTable(state, 4, 0);
+    area.SetInteger(1, data->x0);
+    area.SetInteger(2, data->z0);
+    area.SetInteger(3, data->x1);
+    area.SetInteger(4, data->z1);
+    sync.SetObject("NewPlayableArea", area);
+
+    if (!data->hasTables) {
+      gpg::Warnf("Keyframe restore: the sim's UnitData and SimUnitEnhancements tables were not found for the UI");
+      return;
+    }
+
+    gpg::BinaryReader enhancementsReader(&data->enhancements);
+    LuaPlus::LuaObject enhancements;
+    enhancements.SCR_FromLocalByteStream(enhancements, state, &enhancementsReader);
+    sync.SetObject("UserUnitEnhancements", enhancements);
+
+    gpg::BinaryReader unitDataReader(&data->unitData);
+    LuaPlus::LuaObject unitData;
+    unitData.SCR_FromLocalByteStream(unitData, state, &unitDataReader);
+    state->GetGlobals().SetObject("__RestoredUnitData", unitData);
+    (void)SCR_LuaDoString(
+      "local focus = GetFocusArmy() "
+      "Sync.UnitData = Sync.UnitData or {} "
+      "for id, entry in __RestoredUnitData do "
+      "if entry.OwnerArmy == focus or focus == -1 then Sync.UnitData[id] = entry.Data end "
+      "end "
+      "__RestoredUnitData = nil",
+      state
+    );
   }
 } // namespace moho

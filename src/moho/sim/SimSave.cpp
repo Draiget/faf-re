@@ -445,16 +445,16 @@ void Sim::SerVars(gpg::WriteArchive* archive)
       continue;
     }
 
-    msvc8::string varName(simVar->mName ? simVar->mName : "");
+    fa::string varName(simVar->mName ? simVar->mName : "");
     archive->WriteString(&varName);
 
     gpg::RRef valueRef{};
     simVar->GetValueRef(&valueRef);
-    msvc8::string lexical = valueRef.GetLexical();
+    fa::string lexical = valueRef.GetLexical();
     archive->WriteString(&lexical);
   }
 
-  msvc8::string endOfVars;
+  fa::string endOfVars;
   archive->WriteString(&endOfVars);
 }
 
@@ -480,10 +480,10 @@ void Sim::SerVars(gpg::ReadArchive* const archive)
     return;
   }
 
-  msvc8::string varName;
+  fa::string varName;
   archive->ReadString(&varName);
   while (!varName.empty()) {
-    msvc8::string varValue;
+    fa::string varValue;
     archive->ReadString(&varValue);
 
     // `simcons` map value is a CSimConVarBase (only convar entries are saved by
@@ -671,7 +671,7 @@ void Sim::Load(LaunchInfoLoad* const loadInfo)
       const gpg::Rect2i playableRect = mMapData->mPlayableRect;
       const LuaPlus::LuaObject rectObject = SCR_ToLua<gpg::Rect2<int>>(mLuaState, playableRect);
       syncPlayableRect.Call_Object(rectObject);
-    } catch (const msvc8::runtime_error& error) {
+    } catch (const fa::runtime_error& error) {
       gpg::Warnf("Error running SyncPlayableRect in /lua/SimSync.lua: %s", error.what());
     }
   }

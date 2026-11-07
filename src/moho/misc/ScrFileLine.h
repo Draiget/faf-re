@@ -12,13 +12,13 @@ namespace moho
     /**
      * Address: 0x004C1C60 (FUN_004C1C60, Moho::ScrFileLine::ScrFileLine)
      *
-     * int,msvc8::string const &
+     * int,fa::string const &
      *
      * What it does:
      * Initializes one script-source line row with cleared marker state,
      * one formatted line-number text lane, and tab-expanded source text.
      */
-    ScrFileLine(int lineNumberOneBased, const msvc8::string& sourceLineText);
+    ScrFileLine(int lineNumberOneBased, const fa::string& sourceLineText);
 
     /**
      * Address: 0x004C6150 (FUN_004C6150, Moho::ScrFileLine::ScrFileLine)
@@ -43,8 +43,8 @@ namespace moho
 
   public:
     int mMarkerState;                 // +0x04
-    msvc8::string mLineNumberText;    // +0x08
-    msvc8::string mSourceText;        // +0x24
+    fa::string mLineNumberText;    // +0x08
+    fa::string mSourceText;        // +0x24
   };
 
   static_assert(offsetof(ScrFileLine, mMarkerState) == 0x04, "ScrFileLine::mMarkerState offset must be 0x04");

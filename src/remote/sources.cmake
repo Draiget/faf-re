@@ -15,10 +15,12 @@ set(FAF_REMOTE_SOURCES
   remote/BeatChangeSet.cpp
   remote/ViewPackets.cpp
   remote/ViewFrames.cpp
+  remote/ViewLanes.cpp
   remote/SyncRouting.cpp
   remote/ViewIdMap.cpp
   remote/ViewJobs.cpp
   remote/InboundIds.cpp
+  remote/ServerClient.cpp
   remote/FrameWindow.cpp
   remote/ArmyRecords.cpp
   remote/wire/ArmyLane.cpp
@@ -44,6 +46,10 @@ set(FAF_REMOTE_CLIENT_SOURCES
   remote/client/RemoteClientManager.cpp
   remote/client/RemoteSimDriver.cpp
   remote/client/ServerConnect.cpp
+  remote/client/ServerRelayConnector.cpp
   remote/client/SessionSummary.cpp
   remote/client/SyncRebuilder.cpp
+  remote/client/ViewMerge.cpp
+  remote/client/ServerViewClient.cpp
+  remote/client/NetworkSimDriver.cpp
 )

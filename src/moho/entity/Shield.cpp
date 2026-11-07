@@ -58,14 +58,7 @@ namespace
    */
   void AddEntityBaseToShieldTypeInfo(gpg::RType* const typeInfo)
   {
-    gpg::RType* const entityType = gpg::RTypeOf<moho::Entity>();
-    gpg::RField baseField{};
-    baseField.mName = entityType->GetName();
-    baseField.mType = entityType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::Entity>(typeInfo);
   }
 
   void UnlinkShieldFromSimList(moho::Shield* const shield)
@@ -74,8 +67,8 @@ namespace
       return;
     }
 
-    msvc8::list<moho::Shield*>& shieldList = shield->SimulationRef->mShields;
-    for (msvc8::list<moho::Shield*>::iterator it = shieldList.begin(); it != shieldList.end();) {
+    fa::list<moho::Shield*>& shieldList = shield->SimulationRef->mShields;
+    for (fa::list<moho::Shield*>::iterator it = shieldList.begin(); it != shieldList.end();) {
       it = (*it == shield) ? shieldList.erase(it) : std::next(it);
     }
   }
@@ -193,10 +186,7 @@ namespace moho
    */
   gpg::RRef Shield::GetDerivedObjectRef()
   {
-    gpg::RRef ref{};
-    ref.mObj = this;
-    ref.mType = GetClass();
-    return ref;
+    return gpg::MakeSelfRef(this);
   }
 
   /**

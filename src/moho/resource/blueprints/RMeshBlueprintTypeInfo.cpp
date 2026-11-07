@@ -73,7 +73,7 @@ namespace moho
    */
   void RMeshBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    gpg::RField* const lodsField = typeInfo->AddField<msvc8::vector<moho::RMeshBlueprintLOD>>("LODs", offsetof(RMeshBlueprint, mLods));
+    gpg::RField* const lodsField = typeInfo->AddField<fa::vector<moho::RMeshBlueprintLOD>>("LODs", offsetof(RMeshBlueprint, mLods));
     lodsField->mFlags = 3;
     lodsField->mDesc = "List of LOD info";
     typeInfo->AddField<float>("IconFadeInZoom", offsetof(RMeshBlueprint, mIconFadeInZoom), 3, "Zoom level at which to start fading in the strategic icon");

@@ -159,7 +159,7 @@ namespace moho
    *
    * What it does:
    * Constructs/preregisters RTTI metadata for
-   * `msvc8::vector<moho::UnitWeapon*>`.
+   * `fa::vector<moho::UnitWeapon*>`.
    */
   [[nodiscard]] gpg::RType* preregister_RVectorType_UnitWeaponPtr();
 
@@ -168,7 +168,7 @@ namespace moho
    *
    * What it does:
    * Constructs/preregisters RTTI metadata for
-   * `msvc8::vector<moho::CAcquireTargetTask*>`.
+   * `fa::vector<moho::CAcquireTargetTask*>`.
    */
   [[nodiscard]] gpg::RType* preregister_RVectorType_CAcquireTargetTaskPtr();
 
@@ -176,7 +176,7 @@ namespace moho
    * Address: 0x00BCEAE0 (FUN_00BCEAE0, sub_BCEAE0)
    *
    * What it does:
-   * Registers `msvc8::vector<UnitWeapon*>` reflection metadata and installs
+   * Registers `fa::vector<UnitWeapon*>` reflection metadata and installs
    * process-exit cleanup.
    */
   void register_RVectorType_UnitWeaponPtr();
@@ -185,7 +185,7 @@ namespace moho
    * Address: 0x00BCEB00 (FUN_00BCEB00, sub_BCEB00)
    *
    * What it does:
-   * Registers `msvc8::vector<CAcquireTargetTask*>` reflection metadata and
+   * Registers `fa::vector<CAcquireTargetTask*>` reflection metadata and
    * installs process-exit cleanup.
    */
   void register_RVectorType_CAcquireTargetTaskPtr();

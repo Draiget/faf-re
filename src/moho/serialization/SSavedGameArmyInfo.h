@@ -33,7 +33,7 @@ namespace moho
 
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
-    msvc8::string mPlayerName; // +0x00
+    fa::string mPlayerName; // +0x00
   };
 
   static_assert(offsetof(SSavedGameArmyInfo, mPlayerName) == 0x00, "SSavedGameArmyInfo::mPlayerName offset must be 0x00");

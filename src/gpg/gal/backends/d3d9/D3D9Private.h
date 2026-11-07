@@ -62,15 +62,15 @@ namespace
 {
         constexpr int kCubeFaceCount = 6;
 
-        msvc8::string MakeShortString(const char* const text)
+        fa::string MakeShortString(const char* const text)
         {
             if (text == nullptr)
             {
-                return msvc8::string();
+                return fa::string();
             }
 
             const std::size_t length = std::strlen(text);
-            return msvc8::string(text, length);
+            return fa::string(text, length);
         }
 
         [[noreturn]] void ThrowGalError(const char* const file, const int line, const char* const message)
@@ -78,7 +78,7 @@ namespace
             throw Error(MakeShortString(file), line, MakeShortString(message));
         }
 
-        [[noreturn]] void ThrowGalErrorFromHresult(const char* const file, const int line, const HRESULT code)
+        [[maybe_unused]] [[noreturn]] void ThrowGalErrorFromHresult(const char* const file, const int line, const HRESULT code)
         {
             throw Error(MakeShortString(file), line, MakeShortString(::gpg::D3DErrorToString(static_cast<long>(code))));
         }
@@ -108,7 +108,7 @@ namespace
      * Copies rows `(0,1,2)`, `(4,5,6)`, `(8,9,10)`, `(12,13,14)` from a
      * source 4x4 matrix into four contiguous 3-float destination rows.
      */
-    static void CopyMatrix4x3Rows(
+    [[maybe_unused]] static void CopyMatrix4x3Rows(
         float* const outRow0,
         float* const outRow1,
         float* const outRow2,
@@ -353,7 +353,7 @@ namespace
          * Validates one vertex-format code and returns the recovered D3D vertex
          * element declaration table pointer for that format.
          */
-        const D3DVERTEXELEMENT9* GetVertexFormatElementsOrThrow(const std::uint32_t formatCode)
+        [[maybe_unused]] const D3DVERTEXELEMENT9* GetVertexFormatElementsOrThrow(const std::uint32_t formatCode)
         {
             if (formatCode >= kVertexFormatCount)
             {

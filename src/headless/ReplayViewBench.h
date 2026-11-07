@@ -7,10 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "remote/SyncRouting.h"
-#include "remote/ViewFrames.h"
-#include "remote/wire/ArmyLane.h"
-#include "remote/wire/LuaSyncLane.h"
+#include "remote/ViewLanes.h"
 
 // Engine addition, server mode (plan WP16.5, WPR.35): headless's `--view-bench <file>`. Run
 // unfocused, every beat it does the work a dedicated server does for its players and nothing a
@@ -27,16 +24,11 @@
 // bytes of all lanes. The summary gives the mean, p50, p95, p99 and maximum of each time and the
 // bytes per client per second.
 
-namespace moho
-{
-  class CIntelGrid;
-}
-
 namespace faf::headless
 {
   class CReplaySyncSpy;
 
-  class CReplayViewBench final : public remote::CViewFrames
+  class CReplayViewBench final : public remote::CViewLanes
   {
   public:
     /** `check`: `--view-bench-check`, each held frame is compared with the whole one (slow). */
@@ -46,14 +38,10 @@ namespace faf::headless
     [[nodiscard]] bool IsOpen() const noexcept { return mFile != nullptr; }
     void Install();
     void Uninstall();
-    /** `--lua-routing`: the Lua lane too, each player's `Sync` as `remote/SyncRouting.h` routes it. */
-    void EnableLuaRouting(std::string dumpPrefix)
-    {
-      mLuaRouting = true;
-      mLuaRoutingDump = std::move(dumpPrefix);
-    }
     /** `--spy` with `--lua-routing`: every Lua key each view receives is checked (ReplaySyncSpy.h). */
     void EnableLuaSpy() noexcept { mLuaSpyOn = true; }
+    /** `--view-tables`: the session tables as a server keeps them, each beat's record written (and counted). */
+    void EnableBenchTables() noexcept { EnableSessionTables(mSessionTables); }
     /** `--lua-move-view` and `--lua-resync`: moves and resyncs at a beat, to test them on replays. */
     void AddLuaMove(const std::int32_t beat, const std::size_t view, const std::int32_t army) { mLuaMoves.push_back({beat, view, army}); }
     void AddLuaResync(const std::int32_t beat, const std::size_t view) { mLuaResyncs.push_back({beat, view, 0}); }
@@ -63,34 +51,11 @@ namespace faf::headless
 
   protected:
     void OnViewFrames(moho::Sim& sim) override;
-    void OnViewReady(std::size_t army) override { Send(army); }
     void OnViewsFinished() override;
+    void OnLuaRouterMade(remote::CSyncRouter& router) override;
+    void OnLuaRouterBeat(moho::Sim& sim, remote::CSyncRouter& router) override;
 
   private:
-    /** What one view's client received last (its frame is held by CViewFrames). */
-    struct SClient
-    {
-      std::vector<remote::wire::SArmyRecord> armies;
-      bool haveArmies = false;
-      std::vector<std::uint16_t> grids; // the slots it received last beat (`SBeatGrid::key`)
-      std::vector<std::uint16_t> gridsNext;
-      std::uint32_t bytes = 0;      // this beat
-      std::uint32_t luaBytes = 0;   // this beat's Lua lane, which is ready before the others
-      std::uint64_t failures = 0;   // this beat
-    };
-
-    /** One grid: every client that holds last beat's gets the same delta, encoded once. */
-    struct SBeatGrid
-    {
-      remote::wire::SGridSlot slot;                // who and which; no cells
-      std::uint32_t receivers = 0;                 // the views that get it, by bit
-      const moho::CIntelGrid* source = nullptr;    // the sim's grid
-      std::vector<std::int8_t> cells;              // as of this beat, once `delta` is written
-      remote::wire::BitWriter delta;               // the slot against last beat's cells
-      std::uint16_t key = 0;                       // army and kind
-      bool fresh = true;                           // no cells to go from: every client gets it whole
-    };
-
     /** One beat's measurements. */
     struct SBeat
     {
@@ -99,24 +64,21 @@ namespace faf::headless
       double intervalMs = 0.0;
     };
 
-    void Send(std::size_t army);
-
     std::FILE* mFile = nullptr;
-    remote::wire::SFrameCodec mCodec;
-    std::vector<SClient> mClients;
+    remote::wire::CSessionTableWriters mSessionTables; // `EnableBenchTables`
+    std::uint64_t mTableBytes = 0;
+    std::uint64_t mTableRecords = 0;
     std::size_t mViews = 0; // views built on the last beat (civilian armies have none)
-    std::vector<SBeatGrid> mBeatGrids; // every army's grids, in army order; they keep their cells from beat to beat
     std::vector<SBeat> mBeats;
     SBeat mBeat{}; // this beat's, until `OnViewsFinished` adds it to them
     std::vector<std::uint32_t> mClientBeatBytes; // one entry per client and beat
     std::uint64_t mEntities = 0;                 // in all frames, all beats
     double mLastBuildSeconds = 0.0;
     bool mHaveLastFrames = false;
+    double mWaitSeconds = 0.0;    // the sim thread's wait for the last beat's views to finish
+    std::uint64_t mPhaseBeats = 0; // beats the phase times cover
     std::chrono::steady_clock::time_point mLastFrames{};
     std::uint64_t mEncodeFailures = 0;
-    bool mLuaRouting = false;
-    std::string mLuaRoutingDump;
-    std::unique_ptr<remote::CSyncRouter> mRouter; // made once the army count is known
     struct SLuaTestStep
     {
       std::int32_t beat;

@@ -245,7 +245,7 @@ namespace faf::remote
   {
     // `ViewCanSeePoint`: a view with no army or no vision grid sees every point, so the grid
     // cannot narrow anything: brute force.
-    const msvc8::vector<moho::CArmyImpl*>& armies = sim.mArmiesList;
+    const fa::vector<moho::CArmyImpl*>& armies = sim.mArmiesList;
     const moho::CArmyImpl* view = nullptr;
     if (viewArmy >= 0 && static_cast<std::size_t>(viewArmy) < armies.size()) {
       view = armies[static_cast<std::size_t>(viewArmy)];

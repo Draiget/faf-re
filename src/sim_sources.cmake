@@ -33,7 +33,7 @@ set(_faf_client_only_patterns
   # D3D device resources.
   "^moho/misc/ID3DDeviceResources\\.cpp$"
   # The user world: session, user-side armies, entities and units.
-  "^moho/sim/(CWldSession|CWldSessionCommands|CWldSessionCore|CWldSessionRender|CWldSessionTypes|UICommandGraph|WldSessionControl|UserArmy|UserLuaArmies|UserLuaFiles|UserLuaSession|UserLuaUi|UserLuaUnits|UserCommandIssue|UserCommandLuaFunctions|UserStartupRegistrations)\\.cpp$"
+  "^moho/sim/(CWldSession|ReplayTimeline|CWldSessionCommands|CWldSessionCore|CWldSessionRender|CWldSessionTypes|UICommandGraph|WldSessionControl|UserArmy|UserLuaArmies|UserLuaFiles|UserLuaSession|UserLuaUi|UserLuaUnits|UserCommandIssue|UserCommandLuaFunctions|UserStartupRegistrations)\\.cpp$"
   # The user Lua state's decals (CreateDecal, moho.userDecal_methods).
   "^moho/script/(ScriptedDecal|ScriptedDecalTypeInfo)\\.cpp$"
   # Particle textures' render-device half (GetTexture).

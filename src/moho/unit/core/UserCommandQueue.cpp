@@ -10,7 +10,7 @@ namespace
    * Removes this command's issue-helper entry from the active session's
    * command-issue map, if present.
    *
-   * Real `msvc8::map<CmdId, UserCommandIssueHelper*>::erase(const
+   * Real `fa::map<CmdId, UserCommandIssueHelper*>::erase(const
    * key_type&)` call on `CommandManager::mCommands` -- "covered by typed
    * source construct... no standalone SDK address owner emitted" per this
    * token's own progress-DB note, matching the `Sim.cpp` precedent (see
@@ -72,7 +72,7 @@ namespace
         (void)helper.mCursorEntitySet.Add(static_cast<UserUnit*>(entity));
       }
 
-      msvc8::deque<UserCommandIssueLocalEvent>& events = helper.mLocalQueue;
+      fa::deque<UserCommandIssueLocalEvent>& events = helper.mLocalQueue;
       for (std::size_t index = 0; index != events.size(); ++index) {
         UserCommandIssueLocalEvent& event = events[index];
         if (event.mType == ECommandIssueEvent::DeselectUnit) {

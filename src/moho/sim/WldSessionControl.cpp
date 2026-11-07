@@ -1,4 +1,16 @@
+#include <mutex>
+
+#include "moho/net/CClientManagerImpl.h"
+#include "moho/net/CRejoinFeed.h"
 #include "moho/sim/CWldSessionPrivate.h"
+
+#include <chrono>
+
+#include "moho/render/GpuPathSettings.h"
+#include "moho/render/SkyDome.h"
+#include "moho/sim/CWldSessionLoaderImpl.h"
+#include "moho/sim/CWldMap.h"
+#include "moho/sim/STIMap.h"
 
 namespace moho
 {
@@ -34,6 +46,21 @@ namespace
 namespace
 {
 
+    // Engine addition (replay timeline): a new sim on its way behind the running session.
+    enum class EReplaySimSwap
+    {
+      None,
+      WaitingForSync,
+      WaitingForReady,
+      Holding,
+    };
+    EReplaySimSwap sReplaySimSwap = EReplaySimSwap::None;
+    // The new sim's beats until the move's target: the session and what it draws stay as they are.
+    std::vector<SSyncData*> sReplayHeldBeats;
+    int sReplaySwapRate = 0;
+    std::int32_t sReplaySwapFocus = -1;
+    std::chrono::steady_clock::time_point sReplaySwapStart{};
+
     // ---- Crash-report "Sim" section (new diagnostics functionality) ----
     //
     // Everything a crash report reader asks first: what map, live or replay,
@@ -60,11 +87,12 @@ namespace
         line("session   : none (menu/lobby/teardown)");
       }
 
-      if (ISTIDriver* const driver = sSimDriver.get()) {
-        const auto* const simDriver = static_cast<const CSimDriver*>(driver);
+      if (const auto* const simDriver = dynamic_cast<const CSimDriver*>(sSimDriver.get())) {
         line("driver    : state=%d dispatchBeat=%d nextIssueBeat=%d",
              static_cast<int>(simDriver->DiagDriverState()), simDriver->DiagDispatchBeat(),
              simDriver->DiagNextIssueBeat());
+      } else if (sSimDriver.get() != nullptr) {
+        line("driver    : not the lockstep driver (loopback or a server session's)");
       } else {
         line("driver    : none");
       }
@@ -88,7 +116,7 @@ namespace
      *   on this global: release the source, delete the old value when it
      *   differs, return the global) - WLD_BeginSession's assignment.
      */
-    msvc8::auto_ptr<SWldSessionInfo> gPendingWldSessionInfo;
+    fa::auto_ptr<SWldSessionInfo> gPendingWldSessionInfo;
 
     [[nodiscard]] std::intptr_t DispatchSessionListenerAttachAndReturnLastResult(
       WldTeardownCallbackVector* const callbacks
@@ -202,6 +230,7 @@ namespace
       }
 
       gWldFrameAction = EWldFrameAction::Loading;
+      WLD_HoldSessionScripts(false); // engine addition (wld_EarlyCommandLineSession): the UI frames exist now
 
       // ` DoPreload 2` bracket marker (paired with the opening marker
       // above): same profiler/log-string discard pattern.
@@ -217,16 +246,159 @@ namespace
      * (a single-player skirmish or campaign) gets the local lead; anything with a connector or more
      * clients (players or observers of a live game) keeps the original pacing.
      */
-    [[nodiscard]] ESimSessionPacing SelectSessionPacing(const CWldSession& session, IClientManager* const clientManager)
+    [[nodiscard]] ESimSessionPacing SelectSessionPacing(
+      const bool isReplay, const bool isMultiplayer, IClientManager* const clientManager
+    )
     {
-      if (session.IsReplay) {
+      if (isReplay) {
         return ESimSessionPacing::Replay;
       }
-      if (session.IsMultiplayer || clientManager == nullptr || clientManager->GetConnector() != nullptr ||
+      if (isMultiplayer || clientManager == nullptr || clientManager->GetConnector() != nullptr ||
           clientManager->NumberOfClients() != 1u || clientManager->GetLocalClient() == nullptr) {
         return ESimSessionPacing::Network;
       }
       return ESimSessionPacing::Local;
+    }
+
+    [[nodiscard]] ESimSessionPacing SelectSessionPacing(const CWldSession& session, IClientManager* const clientManager)
+    {
+      return SelectSessionPacing(session.IsReplay != 0, session.IsMultiplayer != 0, clientManager);
+    }
+
+    /**
+     * Engine addition (`wld_StartSimEarly`): a single-player game's or a replay's sim driver, created
+     * as soon as the load has the rules and the map (`WLD_GetEarlySimInputs`) rather than once the
+     * whole load is done, for `WLD_DoLoading` to hand to the session it builds then. The driver gets
+     * what it gets there, in the same order: the game version, the replay sink, the launch info's
+     * rules, map and language, the single-player clone of the launch info (made before the sim takes
+     * the map out of it), and the props.
+     */
+    struct SEarlySimStart
+    {
+      ISTIDriver* driver = nullptr;
+      boost::shared_ptr<LaunchInfoBase> launchClone;
+      std::string language; // the launch info's, checked against the session's once that exists
+    };
+    SEarlySimStart sEarlySim;
+
+    /** Shuts down and deletes a driver started early that no session took (a load given up). */
+    void DropEarlySim()
+    {
+      if (ISTIDriver* const driver = sEarlySim.driver; driver != nullptr) {
+        driver->ShutDown();
+        while (driver->HasSyncData()) {
+          SSyncData* syncData = nullptr;
+          driver->GetSyncData(syncData);
+          (void)fa::auto_ptr<SSyncData>(syncData);
+        }
+        delete driver;
+      }
+      sEarlySim = SEarlySimStart{};
+    }
+
+    /**
+     * Starts the sim of the session `WLD_DoLoading` waits for once its load has the rules and the
+     * map, when the session has no network: a single-player game or a replay. Otherwise, or when the
+     * user interface has no language to give it, the sim starts when the load is done, as before.
+     * The language is the user interface's `__language`: the session's comes from the same
+     * userInit.lua and preferences in its SessionInit.lua, which is still running.
+     */
+    void StartSimEarly(SWldSessionInfo* const sessionInfo, CWldSessionLoaderImpl* const loader)
+    {
+      RRuleGameRules* rules = nullptr;
+      CWldMap* map = nullptr;
+      if (sEarlySim.driver != nullptr || sessionInfo == nullptr || sessionInfo->mLaunchInfo.get() == nullptr ||
+          !WLD_GetEarlySimInputs(loader->mGameData, &rules, &map) || map->mTerrainRes == nullptr ||
+          SelectSessionPacing(sessionInfo->mIsReplay, sessionInfo->mIsMultiplayer, sessionInfo->mClientManager) ==
+            ESimSessionPacing::Network) {
+        return;
+      }
+      const LuaPlus::LuaObject userLanguage = USER_GetLuaState()->GetGlobal("__language");
+      const char* const language = userLanguage.ToString();
+      if (language == nullptr) {
+        return;
+      }
+      sEarlySim.language = language;
+
+      FAF_BeginSession(sessionInfo->mIsReplay);
+      fa::auto_ptr<gpg::Stream> replayStream(nullptr);
+      if (sessionInfo->mIsBeingRecorded) {
+        const fa::string defaultReplayName = Loc(USER_GetLuaState(), "<LOC Engine0030>LastGame");
+        replayStream = VCR_CreateReplay(sessionInfo, defaultReplayName.c_str());
+        if (replayStream.get() == nullptr) {
+          sessionInfo->mIsBeingRecorded = false;
+        }
+      }
+
+      STIMap* const launchMap = new STIMap(map->mTerrainRes->mMap);
+      LaunchInfoBase* const launchInfo = sessionInfo->mLaunchInfo.get();
+      launchInfo->mGameRules = rules;
+      if (launchMap != launchInfo->mMap && launchInfo->mMap != nullptr) {
+        delete launchInfo->mMap;
+      }
+      launchInfo->mMap = launchMap;
+      launchInfo->mLanguage.assign_owned(language);
+
+      if (!sessionInfo->mIsMultiplayer && !sessionInfo->mIsReplay) {
+        boost::SharedPtrRaw<void> createdLaunchInfo{};
+        launchInfo->Create(createdLaunchInfo);
+        boost::SharedPtrRaw<LaunchInfoBase> createdTyped{};
+        createdTyped.px = static_cast<LaunchInfoBase*>(createdLaunchInfo.px);
+        createdTyped.pi = createdLaunchInfo.pi;
+        sEarlySim.launchClone = boost::SharedPtrFromRawRetained(createdTyped);
+        createdLaunchInfo.release();
+      }
+
+      if (LaunchInfoNew* const newLaunchInfo = launchInfo->GetNew(); newLaunchInfo != nullptr) {
+        newLaunchInfo->mProps = map->mProps;
+      }
+
+      IClientManager* const clientManager = sessionInfo->mClientManager;
+      sessionInfo->mClientManager = nullptr;
+      // Engine addition (issue #275), as WLD_DoLoading: does nothing unless a save came with this
+      // client's seat (a rejoin is a network session, which never starts early).
+      REJOIN_PrepareRestore(*sessionInfo);
+      REPLAY_PrepareSession(*sessionInfo); // engine addition (replay timeline)
+      SIM_SetSessionPacing(SelectSessionPacing(sessionInfo->mIsReplay, sessionInfo->mIsMultiplayer, clientManager));
+      ISTIDriver* driver = SIM_CreateDriver(
+        static_cast<CClientManagerImpl*>(clientManager),
+        replayStream.release(),
+        sessionInfo->mLaunchInfo,
+        sessionInfo->mSourceId
+      );
+#if FAF_SERVER_MODE
+      driver = faf::remote::client::WrapForLoopback(
+        driver, *rules, launchMap->GetBounds3D(), sessionInfo->mIsMultiplayer
+      );
+#endif
+      sEarlySim.driver = driver;
+    }
+
+    /**
+     * Engine addition (issue #275): what the screen of a client taking its seat back
+     * says this frame. Outside a rejoin there is no feed and it does nothing. Past the
+     * loading screen, the "loading" stage is only the first beat waiting for the sim,
+     * and it needs the cover as much as catching up does.
+     */
+    void UpdateRejoinScreen(IClientManager* const clientManager, const bool loadingScreenUp)
+    {
+      auto* const manager = static_cast<CClientManagerImpl*>(clientManager);
+      if (manager == nullptr || manager->mRejoinFeed == nullptr) {
+        return;
+      }
+
+      SRejoinStatus status{};
+      {
+        std::scoped_lock lock(manager->mLock);
+        status = manager->mRejoinFeed->Status();
+      }
+      if (status.stage == ERejoinStage::Loading) {
+        UI_UpdateRejoinScreen(loadingScreenUp ? "loading" : "catchingUp", loadingScreenUp ? -1.0f : 0.0f);
+      } else if (status.stage == ERejoinStage::CatchingUp) {
+        UI_UpdateRejoinScreen("catchingUp", status.progress);
+      } else {
+        UI_UpdateRejoinScreen("", -1.0f);
+      }
     }
 
     /**
@@ -264,10 +436,15 @@ namespace
       SWldSessionInfo* const sessionInfo = gPendingWldSessionInfo.get();
       if (sessionInfo != nullptr && sessionInfo->mClientManager != nullptr) {
         sessionInfo->mClientManager->DoBeat();
+        UpdateRejoinScreen(sessionInfo->mClientManager, true);
       }
 
       CWldSessionLoaderImpl* const loader = GetWldSessionLoader();
-      if (loader == nullptr || !loader->IsLoaded()) {
+      if (loader == nullptr) {
+        return;
+      }
+      if (!loader->IsLoaded()) {
+        StartSimEarly(sessionInfo, loader); // engine addition (wld_StartSimEarly)
         return;
       }
 
@@ -280,6 +457,7 @@ namespace
       (void)loader->LoadGameData(&gameData);
 
       if (gameData.mGameRules == nullptr) {
+        DropEarlySim();
         gpg::Warnf("map %s failed.  aborting session.", sessionInfo->mMapName.c_str());
         if (gWldFrameAction != EWldFrameAction::Inactive) {
           gWldFrameAction = EWldFrameAction::Exit;
@@ -291,16 +469,22 @@ namespace
         return;
       }
 
+      // Engine addition (wld_StartSimEarly): a sim started early (StartSimEarly) has had everything
+      // up to its driver below; the session is built as before and takes that driver.
+      const bool simStartedEarly = sEarlySim.driver != nullptr;
+
       // Engine addition: fix the FAF game version - and with it the engine
       // patches the sim applies - before the replay sink records it and before
       // the driver creates the sim.
-      FAF_BeginSession(sessionInfo->mIsReplay);
+      if (!simStartedEarly) {
+        FAF_BeginSession(sessionInfo->mIsReplay);
+      }
 
       // The replay sink, when this session records one. A sink that cannot be
       // opened is not fatal - the session simply stops being a recorded one.
-      msvc8::auto_ptr<gpg::Stream> replayStream(nullptr);
-      if (sessionInfo->mIsBeingRecorded) {
-        const msvc8::string defaultReplayName = Loc(USER_GetLuaState(), "<LOC Engine0030>LastGame");
+      fa::auto_ptr<gpg::Stream> replayStream(nullptr);
+      if (sessionInfo->mIsBeingRecorded && !simStartedEarly) {
+        const fa::string defaultReplayName = Loc(USER_GetLuaState(), "<LOC Engine0030>LastGame");
         replayStream = VCR_CreateReplay(sessionInfo, defaultReplayName.c_str());
         if (replayStream.get() == nullptr) {
           sessionInfo->mIsBeingRecorded = false;
@@ -312,77 +496,112 @@ namespace
         (void)marker;
       }
 
-      msvc8::auto_ptr<LuaPlus::LuaState> stateOwner(gameData.mState);
-      msvc8::auto_ptr<RRuleGameRules> rulesOwner(gameData.mGameRules);
-      msvc8::auto_ptr<CWldMap> mapOwner(gameData.mWldMap);
+      fa::auto_ptr<LuaPlus::LuaState> stateOwner(gameData.mState);
+      fa::auto_ptr<RRuleGameRules> rulesOwner(gameData.mGameRules);
+      fa::auto_ptr<CWldMap> mapOwner(gameData.mWldMap);
       gameData = SWldGameData{};
       CWldSession* const wldSession = WLD_CreateSession(stateOwner, rulesOwner, mapOwner, *sessionInfo);
+      ISTIDriver* driver = nullptr;
+      if (simStartedEarly) {
+        const char* const sessionLanguage = wldSession->mState->GetGlobal("__language").ToString();
+        if (sessionLanguage == nullptr || sEarlySim.language != sessionLanguage) {
+          gpg::Warnf("wld_StartSimEarly: the sim started with language '%s', the session's is '%s'",
+                     sEarlySim.language.c_str(), sessionLanguage != nullptr ? sessionLanguage : "");
+        }
+        if (sEarlySim.launchClone) {
+          wldSession->mLaunchInfo = sEarlySim.launchClone;
+        }
+        driver = sEarlySim.driver;
+        sEarlySim = SEarlySimStart{};
+      } else {
+        // The launch info keeps its own copy of the playable map so a restart can
+        // rebuild the session without the terrain resource still being alive.
+        auto* const playableMap =
+          wldSession->mWldMap->mTerrainRes->mMap;
+        STIMap* const launchMap = new STIMap(playableMap);
 
-      // The launch info keeps its own copy of the playable map so a restart can
-      // rebuild the session without the terrain resource still being alive.
-      auto* const playableMap =
-        wldSession->mWldMap->mTerrainRes->mMap;
-      STIMap* const launchMap = new STIMap(playableMap);
+        LaunchInfoBase* const launchInfo = sessionInfo->mLaunchInfo.get();
+        launchInfo->mGameRules = wldSession->mRules;
+        if (launchMap != launchInfo->mMap && launchInfo->mMap != nullptr) {
+          delete launchInfo->mMap;
+        }
+        launchInfo->mMap = launchMap;
 
-      LaunchInfoBase* const launchInfo = sessionInfo->mLaunchInfo.get();
-      launchInfo->mGameRules = wldSession->mRules;
-      if (launchMap != launchInfo->mMap && launchInfo->mMap != nullptr) {
-        delete launchInfo->mMap;
-      }
-      launchInfo->mMap = launchMap;
+        launchInfo->mLanguage.assign_owned(wldSession->mState->GetGlobal("__language").ToString());
 
-      launchInfo->mLanguage.assign_owned(wldSession->mState->GetGlobal("__language").ToString());
+        if (!wldSession->IsMultiplayer && !wldSession->IsReplay) {
+          // Single player: the session takes a shared owner on a fresh clone of
+          // the launch info, which is what a mid-game save serializes.
+          boost::SharedPtrRaw<void> createdLaunchInfo{};
+          launchInfo->Create(createdLaunchInfo);
 
-      if (!wldSession->IsMultiplayer && !wldSession->IsReplay) {
-        // Single player: the session takes a shared owner on a fresh clone of
-        // the launch info, which is what a mid-game save serializes.
-        boost::SharedPtrRaw<void> createdLaunchInfo{};
-        launchInfo->Create(createdLaunchInfo);
+          boost::SharedPtrRaw<LaunchInfoBase> createdTyped{};
+          createdTyped.px = static_cast<LaunchInfoBase*>(createdLaunchInfo.px);
+          createdTyped.pi = createdLaunchInfo.pi;
+          wldSession->mLaunchInfo = boost::SharedPtrFromRawRetained(createdTyped);
+          createdLaunchInfo.release();
+        }
 
-        boost::SharedPtrRaw<LaunchInfoBase> createdTyped{};
-        createdTyped.px = static_cast<LaunchInfoBase*>(createdLaunchInfo.px);
-        createdTyped.pi = createdLaunchInfo.pi;
-        wldSession->mLaunchInfo = boost::SharedPtrFromRawRetained(createdTyped);
-        createdLaunchInfo.release();
-      }
+        {
+          const std::string marker(" DoLoading 4");
+          (void)marker;
+        }
 
-      {
-        const std::string marker(" DoLoading 4");
-        (void)marker;
-      }
+        if (LaunchInfoNew* const newLaunchInfo = launchInfo->GetNew(); newLaunchInfo != nullptr) {
+          newLaunchInfo->mProps = wldSession->mWldMap->mProps;
+        }
 
-      if (LaunchInfoNew* const newLaunchInfo = launchInfo->GetNew(); newLaunchInfo != nullptr) {
-        newLaunchInfo->mProps = wldSession->mWldMap->mProps;
-      }
+        {
+          const std::string marker(" DoLoading 5");
+          (void)marker;
+        }
 
-      {
-        const std::string marker(" DoLoading 5");
-        (void)marker;
-      }
-
-      // Ownership of both the client manager and the replay sink moves into the
-      // driver; the session info gives its client manager up here.
-      IClientManager* const clientManager = sessionInfo->mClientManager;
-      sessionInfo->mClientManager = nullptr;
-      // Engine addition: replays and single-player sessions get a beat lead (`sim_ReplayLead`,
-      // `sim_LocalLead`); a session with any network connector keeps the original pacing.
-      SIM_SetSessionPacing(SelectSessionPacing(*wldSession, clientManager));
-      // 0x0088C364..0x0088C37C: the inlined `scoped_ptr::reset` - the new
-      // driver is stored first, then the previous one is deleted.
-      ISTIDriver* driver = SIM_CreateDriver(
-        static_cast<CClientManagerImpl*>(clientManager),
-        replayStream.release(),
-        sessionInfo->mLaunchInfo,
-        sessionInfo->mSourceId
-      );
 #if FAF_SERVER_MODE
-      // Engine addition, server mode: `/loopback` runs the session through the remote
-      // driver, the lockstep driver standing in for its server (replays and single-player
-      // sessions only). Without it, unchanged.
-      driver = faf::remote::client::WrapForLoopback(
-        driver, *wldSession->mRules, launchMap->GetBounds3D(), wldSession->IsMultiplayer != 0
-      );
+        // Engine addition, server mode (plan WP2.8): a server session's client has no sim. Its driver makes every
+        // beat from the server's views (remote/client/NetworkSimDriver.h); no rejoin restore, replay timeline,
+        // recording (the server keeps the replay) or sim pacing.
+        const bool serverSession = faf::remote::client::HasServerLaunch();
+#else
+        constexpr bool serverSession = false;
 #endif
+        // Ownership of both the client manager and the replay sink moves into the
+        // driver; the session info gives its client manager up here.
+        IClientManager* const clientManager = sessionInfo->mClientManager;
+        sessionInfo->mClientManager = nullptr;
+        if (serverSession) {
+#if FAF_SERVER_MODE
+          // The client's own map heights, as loaded: the server's terrain edits go on a copy of them.
+          const CHeightField* heights = nullptr;
+          if (wldSession->mWldMap != nullptr && wldSession->mWldMap->mTerrainRes != nullptr && wldSession->mWldMap->mTerrainRes->mMap != nullptr) {
+            heights = wldSession->mWldMap->mTerrainRes->mMap->mHeightField.get();
+          }
+          driver = faf::remote::client::CreateServerSessionDriver(*wldSession->mRules, *sessionInfo->mLaunchInfo, heights);
+#endif
+        } else {
+        // Engine addition (issue #275): does nothing unless a save came with this client's seat.
+        REJOIN_PrepareRestore(*sessionInfo);
+        REPLAY_PrepareSession(*sessionInfo); // engine addition (replay timeline)
+        // Engine addition: replays and single-player sessions get a beat lead (`sim_ReplayLead`,
+        // `sim_LocalLead`); a session with any network connector keeps the original pacing.
+        SIM_SetSessionPacing(SelectSessionPacing(*wldSession, clientManager));
+        // 0x0088C364..0x0088C37C: the inlined `scoped_ptr::reset` - the new
+        // driver is stored first, then the previous one is deleted.
+        driver = SIM_CreateDriver(
+          static_cast<CClientManagerImpl*>(clientManager),
+          replayStream.release(),
+          sessionInfo->mLaunchInfo,
+          sessionInfo->mSourceId
+        );
+#if FAF_SERVER_MODE
+        // Engine addition, server mode: `/loopback` runs the session through the remote
+        // driver, the lockstep driver standing in for its server (replays and single-player
+        // sessions only). Without it, unchanged.
+        driver = faf::remote::client::WrapForLoopback(
+          driver, *wldSession->mRules, launchMap->GetBounds3D(), wldSession->IsMultiplayer != 0
+        );
+#endif
+        }
+      }
       sSimDriver.reset(driver);
 
       gWldFrameAction = EWldFrameAction::Initialize;
@@ -396,6 +615,152 @@ namespace
       }
 
       ReleaseWldGameDataHandles(&gameData);
+    }
+
+    /**
+     * Engine addition (replay timeline): replaces the sim behind the running session with one at
+     * the replay's keyframe or start. It is `WLD_DoLoading`'s part from the session info on; the
+     * session's map, rules, UI and camera stay. What the old sim published stays until the new one
+     * reaches the target, so that is what the screen shows until then.
+     */
+    [[nodiscard]] bool StartReplaySim(CWldSession& session)
+    {
+      sReplaySwapRate = sSimDriver->GetClientManager()->GetSimRateRequested();
+      sReplaySwapFocus = session.FocusArmy;
+      sReplaySwapStart = std::chrono::steady_clock::now();
+
+      // Its last syncs only say that everything is gone, and they go with the driver.
+      sSimDriver->ShutDown();
+      sSimDriver.reset();
+
+      fa::auto_ptr<SWldSessionInfo> sessionInfo = REPLAY_CreateRestartSession();
+      if (sessionInfo.get() == nullptr) {
+        return false;
+      }
+
+      STIMap* const launchMap = REPLAY_CloneStartMap();
+      LaunchInfoBase* const launchInfo = sessionInfo->mLaunchInfo.get();
+      launchInfo->mGameRules = session.mRules;
+      launchInfo->mMap = launchMap;
+      launchInfo->mLanguage.assign_owned(session.mState->GetGlobal("__language").ToString());
+      if (LaunchInfoNew* const newLaunchInfo = launchInfo->GetNew(); newLaunchInfo != nullptr) {
+        newLaunchInfo->mProps = session.mWldMap->mProps;
+      }
+
+      IClientManager* const clientManager = sessionInfo->mClientManager;
+      sessionInfo->mClientManager = nullptr;
+      clientManager->SetUIInterface(&sCWldUiInterface);
+      REPLAY_PrepareSession(*sessionInfo);
+      SIM_SetSessionPacing(SelectSessionPacing(session, clientManager));
+      ISTIDriver* driver = SIM_CreateDriver(
+        static_cast<CClientManagerImpl*>(clientManager),
+        nullptr,
+        sessionInfo->mLaunchInfo,
+        sessionInfo->mSourceId
+      );
+#if FAF_SERVER_MODE
+      driver = faf::remote::client::WrapForLoopback(
+        driver, *session.mRules, launchMap->GetBounds3D(), session.IsMultiplayer != 0
+      );
+#endif
+      sSimDriver.reset(driver);
+      gpg::Logf(
+        "Replay timeline: the old sim went in %.2f s",
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - sReplaySwapStart).count()
+      );
+      return true;
+    }
+
+    /**
+     * Engine addition (replay timeline): one frame of a sim swap: the steps of `WLD_DoInitializing`
+     * and `WLD_DoPostInitializing` without their UI, then the new sim's beats are held until the
+     * target, and applied in one frame. True while the session has no beats to take.
+     */
+    [[nodiscard]] bool StepReplaySimSwap(CWldSession& session)
+    {
+      constexpr double kNewSimLimitSeconds = 300.0;
+
+      if (sReplaySimSwap == EReplaySimSwap::None) {
+        if (!REPLAY_RestartWanted()) {
+          return false;
+        }
+        sReplaySimSwap = EReplaySimSwap::WaitingForSync;
+        if (!StartReplaySim(session)) {
+          gWldFrameAction = EWldFrameAction::Exit;
+          return true;
+        }
+      }
+
+      ISTIDriver* const simDriver = sSimDriver.get();
+      if (simDriver == nullptr) {
+        return true;
+      }
+      simDriver->Dispatch();
+
+      if (sReplaySimSwap == EReplaySimSwap::WaitingForSync) {
+        if (!simDriver->HasSyncData()) {
+          const std::chrono::duration<double> waited = std::chrono::steady_clock::now() - sReplaySwapStart;
+          if (waited.count() > kNewSimLimitSeconds) {
+            gpg::Warnf("Replay timeline: the new sim gave nothing in %.0f s, leaving the replay", waited.count());
+            gWldFrameAction = EWldFrameAction::Exit;
+          }
+          return true;
+        }
+
+        SSyncData* syncData = nullptr;
+        simDriver->GetSyncData(syncData);
+        // The new sim doesn't know whose view this is yet; the UI must not see a change for one beat.
+        syncData->mFocusArmy = sReplaySwapFocus;
+        sReplayHeldBeats.push_back(syncData);
+        REPLAY_NoteHeldTick(syncData->mCurTick);
+        gpg::Logf(
+          "Replay timeline: the new sim's first sync after %.2f s",
+          std::chrono::duration<double>(std::chrono::steady_clock::now() - sReplaySwapStart).count()
+        );
+
+        if (CClientManagerImpl* const clientManager = simDriver->GetClientManager(); clientManager != nullptr) {
+          clientManager->Cleanup();
+          clientManager->SetSimRate(sReplaySwapRate);
+        }
+        simDriver->SetArmyIndex(sReplaySwapFocus);
+        sReplaySimSwap = EReplaySimSwap::WaitingForReady;
+      }
+
+      if (sReplaySimSwap == EReplaySimSwap::WaitingForReady) {
+        CClientManagerImpl* const clientManager = simDriver->GetClientManager();
+        if (clientManager != nullptr && !clientManager->IsEveryoneReady()) {
+          return true;
+        }
+        simDriver->DecrementOutstandingRequestsAndSignal();
+        sReplaySimSwap = EReplaySimSwap::Holding;
+      }
+
+      simDriver->SetGeomCams(CAM_GetAllCameras());
+      bool gameOver = false;
+      while (!gameOver && !REPLAY_HoldIsDone(sReplayHeldBeats.size()) && simDriver->HasSyncData()) {
+        SSyncData* syncData = nullptr;
+        simDriver->GetSyncData(syncData);
+        sReplayHeldBeats.push_back(syncData);
+        REPLAY_NoteHeldTick(syncData->mCurTick);
+        gameOver = syncData->mGameOver;
+      }
+      if (!gameOver && !REPLAY_HoldIsDone(sReplayHeldBeats.size())) {
+        return true;
+      }
+
+      const auto applyStart = std::chrono::steady_clock::now();
+      session.ResetForNewReplaySim();
+      for (SSyncData* const held : sReplayHeldBeats) {
+        session.DoBeat(fa::auto_ptr<SSyncData>(held));
+      }
+      gpg::Logf(
+        "Replay timeline: %d held beats applied in %.2f s", static_cast<int>(sReplayHeldBeats.size()),
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - applyStart).count()
+      );
+      sReplayHeldBeats.clear();
+      sReplaySimSwap = EReplaySimSwap::None;
+      REPLAY_SimRestarted(session);
+      return false;
     }
 
     /**
@@ -419,6 +784,21 @@ namespace
         return;
       }
 
+      // Engine addition: once per session, while the loading screen waits for the sim's first
+      // sync, build the GPU-driven render paths the first frame of play would otherwise build
+      // (REN_PrepareGpuPaths); the main thread is idle here for the seconds the sim takes to start.
+      if (static const CWldSession* sPreparedFor = nullptr; ren_PrepareDuringLoading && sPreparedFor != gActiveWldSession) {
+        sPreparedFor = gActiveWldSession;
+        const auto prepareStart = std::chrono::steady_clock::now();
+        const int paths = REN_PrepareGpuPaths();
+        // The map's sky dome textures and buffers, which its first draw otherwise creates.
+        if (IWldTerrainRes* const terrainRes = REN_GetTerrainRes(); terrainRes != nullptr) {
+          terrainRes->GetSkyDome().CreateRenderAbility();
+        }
+        gpg::Logf("Render: %d GPU-driven paths and the sky dome prepared during loading in %.1f ms", paths,
+          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - prepareStart).count());
+      }
+
       simDriver->Dispatch();
       if (!simDriver->HasSyncData()) {
         return;
@@ -435,7 +815,7 @@ namespace
       if (session != nullptr) {
         SSyncData* syncData = nullptr;
         simDriver->GetSyncData(syncData);
-        session->DoBeat(msvc8::auto_ptr<SSyncData>(syncData));
+        session->DoBeat(fa::auto_ptr<SSyncData>(syncData));
       }
 
       IWldUIProvider* const wldUIProvider = ResolveWldUIProvider();
@@ -491,7 +871,7 @@ namespace
      * dispatch to `Playing`, and notifies the active world-UI provider through
      * `OnStart` when present.
      */
-    int WLD_EnterPlayingAndNotifyUIProvider()
+    [[maybe_unused]] int WLD_EnterPlayingAndNotifyUIProvider()
     {
       int dispatchResult = 0;
       if (ISTIDriver* const simDriver = sSimDriver.get(); simDriver != nullptr) {
@@ -578,6 +958,7 @@ namespace
         return;
       }
 
+      REJOIN_MainFrame(*simDriver);
       simDriver->Dispatch();
       CClientManagerImpl* const clientManager = simDriver->GetClientManager();
       if (clientManager != nullptr && clientManager->IsEveryoneReady()) {
@@ -596,6 +977,7 @@ namespace
           *outContinue = true;
         }
       } else {
+        UpdateRejoinScreen(clientManager, false);
         (void)UI_UpdateDisconnectDialogCallback();
       }
     }
@@ -610,12 +992,21 @@ namespace
      */
     void WLD_DoPlayingAction(const float deltaSeconds)
     {
-      if (ISTIDriver* const simDriver = sSimDriver.get(); simDriver != nullptr) {
+      // Engine addition (replay timeline): a new sim behind this session, and keyframes.
+      CWldSession* const replaySession = WLD_GetActiveSession();
+      const bool simSwapping = replaySession != nullptr && StepReplaySimSwap(*replaySession);
+
+      if (ISTIDriver* const simDriver = sSimDriver.get(); simDriver != nullptr && !simSwapping) {
+        REJOIN_MainFrame(*simDriver);
         simDriver->Dispatch();
+
+        if (replaySession != nullptr) {
+          REPLAY_MainFrame(*simDriver, *replaySession);
+        }
 
         // Snapshot every active GeomCamera and forward to the sim driver so
         // visibility/projection state matches the upcoming session frame.
-        const msvc8::vector<GeomCamera3> cameras = CAM_GetAllCameras();
+        const fa::vector<GeomCamera3> cameras = CAM_GetAllCameras();
         simDriver->SetGeomCams(cameras);
       }
 
@@ -627,6 +1018,7 @@ namespace
         // Trailing sim-driver post-frame slot (Func1 in IDA): currently
         // a NoOp until full ISTIDriver vtable slot ownership is recovered.
         simDriver->NoOp();
+        UpdateRejoinScreen(simDriver->GetClientManager(), false);
       }
 
       (void)UI_UpdateDisconnectDialogCallback();
@@ -657,7 +1049,7 @@ namespace
         return;
       }
 
-      msvc8::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
+      fa::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
       sessionInfo->mMapName = session->mMapName;
       sessionInfo->mLaunchInfo = session->mLaunchInfo;
       sessionInfo->mIsBeingRecorded = session->IsBeingRecorded;
@@ -737,7 +1129,7 @@ namespace
    * initializer 0x00BE7510 (instruction 0x00BE7530 stores the callback
    * address in the command object's slot at 0x00F5B770).
    */
-  void CON_WLD_ClientDebugDump(const msvc8::vector<msvc8::string>& args)
+  void CON_WLD_ClientDebugDump(const fa::vector<fa::string>& args)
   {
     (void)args;
 
@@ -753,7 +1145,7 @@ namespace
    * Console-command callback that requests world-session exit when frame
    * dispatch is currently active.
    */
-  void CON_WLD_RequestEndSession(const msvc8::vector<msvc8::string>& args)
+  void CON_WLD_RequestEndSession(const fa::vector<fa::string>& args)
   {
     (void)args;
 
@@ -925,15 +1317,27 @@ namespace
    * carry entity deletions and command releases the session would otherwise
    * never apply before it is destroyed.
    */
+  bool WLD_IsReplaySimSwapping()
+  {
+    return sReplaySimSwap != EReplaySimSwap::None;
+  }
+
   void WLD_Teardown()
   {
+    DropEarlySim(); // engine addition (wld_StartSimEarly): a load given up before its session
+    REPLAY_OnTeardown(); // engine addition (replay timeline)
+    sReplaySimSwap = EReplaySimSwap::None;
+    for (SSyncData* const held : sReplayHeldBeats) {
+      delete held;
+    }
+    sReplayHeldBeats.clear();
     if (sSimDriver) {
       sSimDriver->ShutDown();
       CWldSession* const session = gActiveWldSession;
       while (sSimDriver->HasSyncData()) {
         SSyncData* syncData = nullptr;
         sSimDriver->GetSyncData(syncData);
-        session->DoBeat(msvc8::auto_ptr<SSyncData>(syncData));
+        session->DoBeat(fa::auto_ptr<SSyncData>(syncData));
       }
     }
 
@@ -964,9 +1368,9 @@ namespace
    * auto_ptr lanes, and updates the global active-session pointer.
    */
   CWldSession* WLD_CreateSession(
-    msvc8::auto_ptr<LuaPlus::LuaState>& state,
-    msvc8::auto_ptr<RRuleGameRules>& gameRules,
-    msvc8::auto_ptr<CWldMap>& wldMap,
+    fa::auto_ptr<LuaPlus::LuaState>& state,
+    fa::auto_ptr<RRuleGameRules>& gameRules,
+    fa::auto_ptr<CWldMap>& wldMap,
     SWldSessionInfo& sessionInfo
   )
   {
@@ -1027,10 +1431,25 @@ namespace
    * What it does:
    * Replaces pending world-session bootstrap info and schedules preload.
    */
-  void WLD_BeginSession(msvc8::auto_ptr<SWldSessionInfo> sessionInfo)
+  void WLD_BeginSession(fa::auto_ptr<SWldSessionInfo> sessionInfo)
   {
     gPendingWldSessionInfo = sessionInfo;
     gWldFrameAction = EWldFrameAction::Preload;
+  }
+
+  void WLD_StartPendingSessionLoad()
+  {
+    CWldSessionLoaderImpl* const loader = GetWldSessionLoader();
+    SWldSessionInfo* const pendingSession = gPendingWldSessionInfo.get();
+    if (loader == nullptr || pendingSession == nullptr || pendingSession->mLaunchInfo.get() == nullptr) {
+      return;
+    }
+    (void)loader->CreateScenarioInfo(
+      pendingSession->mMapName.raw_data_unsafe(), &pendingSession->mLaunchInfo.get()->mGameMods
+    );
+    WLD_HoldSessionScripts(true);
+    WLD_HoldDeviceUse(true); // CScApp::Init lets it go once CreateDevice returns
+    loader->Update();
   }
 
   /**

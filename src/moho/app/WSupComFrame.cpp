@@ -232,8 +232,8 @@ void WSupComFrame::OnMove(
   // x goes to Windows.Main.x and y to Windows.Main.y. An earlier revision
   // swapped them; CScApp::CreateDevice reads the keys straight back, so every
   // launch re-applied the swap until the window opened off every monitor.
-  preferences->SetInteger(msvc8::string(kSupComFrameXPreferenceKey), GetPosition().x);
-  preferences->SetInteger(msvc8::string(kSupComFrameYPreferenceKey), GetPosition().y);
+  preferences->SetInteger(fa::string(kSupComFrameXPreferenceKey), GetPosition().x);
+  preferences->SetInteger(fa::string(kSupComFrameYPreferenceKey), GetPosition().y);
 }
 
 /**
@@ -271,8 +271,8 @@ long WSupComFrame::MSWWindowProc(
 
       if (preferences != nullptr) {
         const wxSize clientSize = GetClientSize();
-        preferences->SetInteger(msvc8::string(kSupComFrameWidthPreferenceKey), clientSize.x);
-        preferences->SetInteger(msvc8::string(kSupComFrameHeightPreferenceKey), clientSize.y);
+        preferences->SetInteger(fa::string(kSupComFrameWidthPreferenceKey), clientSize.x);
+        preferences->SetInteger(fa::string(kSupComFrameHeightPreferenceKey), clientSize.y);
       }
 
       if (moho::CD3DDevice* const d3dDevice = moho::D3D_GetDevice(); d3dDevice != nullptr) {
@@ -283,7 +283,7 @@ long WSupComFrame::MSWWindowProc(
     } else if (message == kSupComFrameMessageSize && wParam == SIZE_MAXIMIZED) {
       SyncSupComFrameClientSizeAndViewport(*this);
       if (preferences != nullptr) {
-        preferences->SetBoolean(msvc8::string(kSupComFrameMaximizedPreferenceKey), true);
+        preferences->SetBoolean(fa::string(kSupComFrameMaximizedPreferenceKey), true);
       }
       mPersistedMaximizeSync = 1;
     }
@@ -293,9 +293,9 @@ long WSupComFrame::MSWWindowProc(
         SyncSupComFrameClientSizeAndViewport(*this);
         if (preferences != nullptr) {
           const wxSize clientSize = GetClientSize();
-          preferences->SetInteger(msvc8::string(kSupComFrameWidthPreferenceKey), clientSize.x);
-          preferences->SetInteger(msvc8::string(kSupComFrameHeightPreferenceKey), clientSize.y);
-          preferences->SetBoolean(msvc8::string(kSupComFrameMaximizedPreferenceKey), false);
+          preferences->SetInteger(fa::string(kSupComFrameWidthPreferenceKey), clientSize.x);
+          preferences->SetInteger(fa::string(kSupComFrameHeightPreferenceKey), clientSize.y);
+          preferences->SetBoolean(fa::string(kSupComFrameMaximizedPreferenceKey), false);
         }
         mPersistedMaximizeSync = 0;
       }

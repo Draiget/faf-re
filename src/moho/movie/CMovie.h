@@ -74,7 +74,7 @@ namespace moho
     [[nodiscard]] virtual float GetFrameRate() = 0;
 
     /// Slot 13.
-    [[nodiscard]] virtual const msvc8::string* GetSubtitleText() = 0;
+    [[nodiscard]] virtual const fa::string* GetSubtitleText() = 0;
 
     /// Slot 14.
     virtual boost::shared_ptr<ID3DTextureSheet>* GetTextureSheetHandle(
@@ -308,7 +308,7 @@ namespace moho
      * Hands out the subtitle string lane itself, which `UpdatePlaybackFrame`
      * refreshes each tick. The caller does not own it.
      */
-    [[nodiscard]] const msvc8::string* GetSubtitleText() override;
+    [[nodiscard]] const fa::string* GetSubtitleText() override;
 
     /**
      * Address: 0x00874750 (FUN_00874750, Moho::CMovie::Func10) - vtable slot 14
@@ -337,8 +337,8 @@ namespace moho
     std::int32_t mHeight = 0;            // +0x38
     std::int32_t mFrameCount = 0;        // +0x3C
     float mFrameRate = 0.0f;             // +0x40
-    msvc8::string mMovieName{};          // +0x44
-    msvc8::string mSubtitleText{};       // +0x60
+    fa::string mMovieName{};          // +0x44
+    fa::string mSubtitleText{};       // +0x60
     std::uint8_t mFrameAdvanceBlocked = 0; // +0x7C
     std::uint8_t mReserved7D_7F[0x03]{}; // +0x7D
     MwsfdPlaybackStateSubobj* mPly = nullptr; // +0x80

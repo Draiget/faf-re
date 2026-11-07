@@ -58,7 +58,7 @@ namespace
     }
   };
 
-  using PathQueueCellTraits = msvc8::hash_compare<moho::SOCellPos, PathQueueCellLess>;
+  using PathQueueCellTraits = fa::hash_compare<moho::SOCellPos, PathQueueCellLess>;
 
   /**
    * Address: 0x00E35E84 / 0x00E35E8C / 0x00E35E94 / 0x00E35E9C
@@ -224,7 +224,7 @@ namespace moho
     float mClosestDistance;                 // +0x58
     gpg::HaStar::ClusterMap* mClusterMap;   // +0x5C
     std::int32_t mBudget;                   // +0x60
-    msvc8::vector<SOCellPos> mResultCells;  // +0x64
+    fa::vector<SOCellPos> mResultCells;  // +0x64
     std::int32_t mExpandCount;              // +0x74
     std::int32_t mPathCap;                  // +0x78
 
@@ -1368,6 +1368,7 @@ namespace moho
      * Copy-constructs one path occupation-source binding owner pair.
      */
     OccupySourceBinding(const OccupySourceBinding& other);
+    OccupySourceBinding& operator=(const OccupySourceBinding&) = default;
 
     /**
      * Address: 0x0076B770 (FUN_0076B770, Moho::OccupySourceBinding::GetOccupyData)
@@ -1409,8 +1410,8 @@ namespace moho
 
     std::int32_t mWidth;                          // +0x00
     std::int32_t mHeight;                         // +0x04
-    msvc8::vector<OccupySourceBinding> mSources;  // +0x08
-    msvc8::vector<ClusterMap*> mMaps;             // +0x18
+    fa::vector<OccupySourceBinding> mSources;  // +0x08
+    fa::vector<ClusterMap*> mMaps;             // +0x18
     gpg::HaStar::ClusterCache mClusterCache;      // +0x28
   };
 

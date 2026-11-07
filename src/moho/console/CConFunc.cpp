@@ -20,7 +20,7 @@ moho::CConFunc::CConFunc(const char* const name, const char* const description, 
  * What it does:
  * Invokes the stored handler with the command args.
  */
-void moho::CConFunc::Handle(const msvc8::vector<msvc8::string>& args)
+void moho::CConFunc::Handle(const fa::vector<fa::string>& args)
 {
   mFunc(args);
 }

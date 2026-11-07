@@ -186,15 +186,26 @@ namespace faf::headless
       }
       return 8u * groups;
     };
-    const std::uint64_t positionBits = static_cast<std::uint64_t>(mCodec.position.x.bits) + mCodec.position.y.bits
-                                     + mCodec.position.z.bits;
+    // A change's record in the baseline (creations are counted into their own `SFieldBits`).
+    const auto baselineOf = [&](const wire::SEntityRecord& record, const SFieldBits& into) -> const wire::SEntityRecord* {
+      if (&into != &mFieldBits || !mHavePrevious) {
+        return nullptr;
+      }
+      const auto it = std::lower_bound(
+        mPrevious.entities.begin(), mPrevious.entities.end(), record.id,
+        [](const wire::SEntityRecord& r, const std::uint32_t id) { return r.id < id; }
+      );
+      return it != mPrevious.entities.end() && it->id == record.id ? &*it : nullptr;
+    };
     const auto fieldBits = [&](const wire::SEntityRecord& record, const std::uint32_t fields, SFieldBits& into) {
+      const wire::SEntityRecord* const baseline = baselineOf(record, into);
       if ((fields & wire::kFieldPosition) != 0u) {
-        into.transform += 1u + (record.farPosition ? 96u : positionBits);
+        into.transform += static_cast<std::uint64_t>(wire::PositionFieldBits(record, baseline, mCodec));
       }
       if ((fields & wire::kFieldOrientation) != 0u) {
-        into.transform += 1u + (record.yawOnly ? 16u : 32u);
-        into.orientation += 1u + (record.yawOnly ? 16u : 32u);
+        const auto bits = static_cast<std::uint64_t>(wire::OrientationFieldBits(record, baseline));
+        into.transform += bits;
+        into.orientation += bits;
       }
       if ((fields & wire::kFieldHealth) != 0u) into.scalars += 32;
       if ((fields & wire::kFieldMaxHealth) != 0u) into.scalars += 32;
@@ -337,9 +348,9 @@ namespace faf::headless
         mCreationAppearanceBits[i] += created.appearance[i];
       }
     }
-    first = true;
+    wire::CChangeHeaders headers; // the encoder's own rule for a change's id and mask
     for (const wire::SFrameDelta::SChange& change : delta.changed) {
-      mFieldBits.overhead += gap(first, previous, change.record.id) + varintBits(change.fields);
+      mFieldBits.overhead += static_cast<std::uint64_t>(headers.Bits(change.record.id, change.fields));
       fieldBits(change.record, change.fields, mFieldBits);
     }
   }

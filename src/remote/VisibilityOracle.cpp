@@ -23,7 +23,7 @@ namespace faf::remote
   {
     [[nodiscard]] const moho::CArmyImpl* ArmyAt(const moho::Sim& sim, const std::int32_t armyIndex) noexcept
     {
-      const msvc8::vector<moho::CArmyImpl*>& armies = sim.mArmiesList;
+      const fa::vector<moho::CArmyImpl*>& armies = sim.mArmiesList;
       if (armyIndex < 0 || static_cast<std::uint32_t>(armyIndex) >= armies.size()) {
         return nullptr;
       }

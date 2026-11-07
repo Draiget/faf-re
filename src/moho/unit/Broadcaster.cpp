@@ -71,7 +71,7 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName =
+      static const fa::string sName =
         gpg::STR_Printf("Broadcaster<%s>", ResolveECommandEventTypeCachePrimary()->GetName());
       return sName.c_str();
     }
@@ -118,7 +118,7 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName =
+      static const fa::string sName =
         gpg::STR_Printf("Broadcaster<%s>", gpg::RTypeOf<moho::EUnitCommandQueueStatus>()->GetName());
       return sName.c_str();
     }
@@ -136,7 +136,7 @@ namespace
       version_ = 1;
       serLoadFunc_ = &RBroadcasterRType_EUnitCommandQueueStatus::SerLoad;
       serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(
-        &gpg::SaveBroadcasterListenerChainEUnitCommandQueueStatus
+        reinterpret_cast<void (*)()>(&gpg::SaveBroadcasterListenerChainEUnitCommandQueueStatus)
       );
     }
   };
@@ -183,7 +183,7 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName =
+      static const fa::string sName =
         gpg::STR_Printf("Listener<%s>", gpg::RTypeOf<moho::EUnitCommandQueueStatus>()->GetName());
       return sName.c_str();
     }
@@ -207,12 +207,7 @@ namespace
     RBroadcasterRType_ECommandEvent* const typeInfo
   ) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   RBroadcasterRType_ECommandEvent::~RBroadcasterRType_ECommandEvent()
@@ -379,7 +374,7 @@ namespace
    */
   const char* RListenerRType_ECommandEvent::GetName() const
   {
-    static const msvc8::string sName =
+    static const fa::string sName =
       gpg::STR_Printf("Listener<%s>", ResolveECommandEventTypeCachePrimary()->GetName());
     return sName.c_str();
   }

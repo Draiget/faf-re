@@ -15,7 +15,7 @@ namespace faf::remote
 
   void CBeatChangeSet::OnEntitySynced(moho::Entity& entity)
   {
-    mPending.push_back(SChangedEntity{&entity, mPendingRefreshUI});
+    mPending.push_back(SChangedEntity{&entity, static_cast<std::uint32_t>(entity.id_), mPendingRefreshUI});
   }
 
   void CBeatChangeSet::OnSyncWalkDone(moho::Sim& sim, const moho::SSyncData& packet)
@@ -23,9 +23,7 @@ namespace faf::remote
     mSealed.swap(mPending);
     mPending.clear();
     // The dirty run is in link order; by id the change set merges with the views' id-ordered frames.
-    std::sort(mSealed.begin(), mSealed.end(), [](const SChangedEntity& lhs, const SChangedEntity& rhs) {
-      return static_cast<std::uint32_t>(lhs.entity->id_) < static_cast<std::uint32_t>(rhs.entity->id_);
-    });
+    std::sort(mSealed.begin(), mSealed.end(), [](const SChangedEntity& lhs, const SChangedEntity& rhs) { return lhs.id < rhs.id; });
     mBeat = sim.mCurBeat;
     OnBeatChanges(sim, packet);
   }

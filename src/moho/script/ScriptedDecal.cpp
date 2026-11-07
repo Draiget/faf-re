@@ -25,6 +25,7 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/script/CScriptEvent.h"
+#include "moho/script/ScriptedDecalPlacement.h"
 #include "moho/terrain/splat/CWldSplat.h"
 #include "Wm3Vector2.h"
 
@@ -33,34 +34,6 @@ using namespace moho;
 // Engine addition: helpers shared with the file these functions came from.
 namespace
 {
-  gpg::RType* CachedCScriptObjectPointerType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CScriptObject*));
-    }
-    return cached;
-  }
-
-  CScriptObject** ExtractScriptObjectSlotFromLuaObject(const LuaPlus::LuaObject& object)
-  {
-    LuaPlus::LuaObject payload(object);
-    if (payload.IsTable()) {
-      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
-    }
-
-    if (!payload.IsUserData()) {
-      return nullptr;
-    }
-
-    const gpg::RRef userDataRef = moho::SCR_UserDataRef(payload);
-    if (!userDataRef.mObj) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, CachedCScriptObjectPointerType());
-    return static_cast<CScriptObject**>(upcast.mObj);
-  }
   constexpr const char* kDestroyedGameObjectError = "Game object has been destroyed";
   constexpr const char* kExpectedGameObjectError = "Expected a game object. (Did you call with '.' instead of ':'?)";
   constexpr const char* kIncorrectGameObjectTypeError =
@@ -100,6 +73,9 @@ namespace
   constexpr const char* kScriptedDecalSetPositionByScreenHelpText = "Set the position based on screen space mouse coords";
   constexpr const char* kScriptedDecalSetPositionName = "SetPosition";
   constexpr const char* kScriptedDecalSetPositionHelpText = "Set the position based on wolrd coords";
+  constexpr const char* kScriptedDecalSetOrientationName = "SetOrientation";
+  constexpr const char* kScriptedDecalSetOrientationHelpText =
+    "Set the heading in radians about +y; the decal stays centred on its position";
   constexpr const char* kScriptedDecalDestroyName = "Destroy";
   constexpr const char* kScriptedDecalDestroyHelpText = "Kill it";
   constexpr const char* kScriptedDecalCreateDecalName = "_c_CreateDecal";
@@ -171,6 +147,7 @@ ScriptedDecal::ScriptedDecal(CWldSession* const session, LuaPlus::LuaObject luaO
   // keeps that first frame's decal at the map origin instead of at whatever
   // the allocator left behind.
   , mWorldPosition{}
+  , mHeading(0.0f)
 {
   SetLuaObject(luaObject);
 }
@@ -268,9 +245,14 @@ int moho::cfunc__c_CreateDecalL(LuaPlus::LuaState* const state)
  * Address: 0x0087ECE0 (FUN_0087ECE0, Moho::ScriptedDecal::SetPosition)
  *
  * What it does:
- * Stores one world-space position, shifts the decal quad half its own extent
- * so it is centred on that point, and republishes the terrain decal's
- * transform. A NaN position is dropped without touching any lane.
+ * Stores one world-space position, places the decal quad's corner so it is
+ * centred on that point at the current heading, and republishes the terrain
+ * decal's transform. A NaN position is dropped without touching any lane.
+ *
+ * The binary stores the corner (`position - scale / 2`) in `mWorldPosition`;
+ * the engine stores the centre and computes the corner from it, so the
+ * heading turns the quad about its middle and `SetScale` no longer moves it
+ * (see `mWorldPosition`). At heading 0 the corner is the binary's.
  */
 void ScriptedDecal::SetPosition(const Wm3::Vector3f& worldPosition)
 {
@@ -283,14 +265,14 @@ void ScriptedDecal::SetPosition(const Wm3::Vector3f& worldPosition)
   }
 
   mWorldPosition = worldPosition;
-  mWorldPosition.x -= mScale.x * 0.5f;
-  mWorldPosition.z -= mScale.z * 0.5f;
+  const ScriptedDecalCorner corner =
+    ScriptedDecalCornerForCentre(worldPosition.x, worldPosition.z, mScale.x, mScale.z, mHeading);
 
   // 0x0087ED43 dereferences the weak lane without a null test, so the binary
   // faults here when no `SetTexture` call has built a decal yet. Skipping is
   // the only divergence, and it only covers the case the original crashed in.
   if (CWldTerrainDecal* const decal = mDecal.GetObjectPtr(); decal != nullptr) {
-    decal->mPosition = mWorldPosition;
+    decal->mPosition = Wm3::Vector3f{corner.x, worldPosition.y, corner.z};
     decal->Update();
   }
 }
@@ -312,7 +294,9 @@ void ScriptedDecal::SetPositionByScreen(const Wm3::Vector2f& screenPoint)
  *
  * What it does:
  * Resizes this decal and the terrain decal it owns, then reapplies the current
- * position so the quad stays centred on it.
+ * position so the quad stays centred on it. In the binary that position is
+ * already the shifted corner, so the quad moved by half its size on every
+ * call; `mWorldPosition` now holds the centre.
  */
 void ScriptedDecal::SetScale(const Wm3::Vector3f& scale)
 {
@@ -362,7 +346,31 @@ void ScriptedDecal::SetTexture(const char* const texturePath)
   decal->mCutoffLOD = std::numeric_limits<float>::max();
   decal->mEntry.UpdateDissolveCutoff(std::numeric_limits<float>::max());
   decal->EnableFlatOptimization(false);
+  // Engine addition: the replacement decal keeps the heading `SetOrientation`
+  // gave the previous one (0 when it was never called, as in the binary).
+  decal->mOrientation = Wm3::Vector3f{0.0f, mHeading, 0.0f};
   mDecalManager->AddSplat(decal);
+}
+
+/**
+ * FAF addition, not in the shipped binary.
+ *
+ * What it does:
+ * Stores the heading, hands it to the terrain decal as its yaw and places the
+ * quad again so it turns about the current centre.
+ */
+void ScriptedDecal::SetOrientation(const float heading)
+{
+  if (!std::isfinite(heading)) {
+    return;
+  }
+
+  mHeading = heading;
+  if (CWldTerrainDecal* const decal = mDecal.GetObjectPtr(); decal != nullptr) {
+    decal->mOrientation = Wm3::Vector3f{0.0f, heading, 0.0f};
+  }
+
+  SetPosition(mWorldPosition);
 }
 
 /**
@@ -573,6 +581,60 @@ int moho::cfunc_ScriptedDecalSetPositionL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * FAF addition, not in the shipped binary.
+ *
+ * What it does:
+ * Unwraps Lua callback context and forwards to `cfunc_ScriptedDecalSetOrientationL`.
+ */
+int moho::cfunc_ScriptedDecalSetOrientation(lua_State* const luaContext)
+{
+  return cfunc_ScriptedDecalSetOrientationL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * FAF addition, not in the shipped binary.
+ *
+ * What it does:
+ * Publishes the `ScriptedDecal:SetOrientation(heading)` Lua binder.
+ */
+CScrLuaInitForm* moho::func_ScriptedDecalSetOrientation_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    kScriptedDecalSetOrientationName,
+    &moho::cfunc_ScriptedDecalSetOrientation,
+    &CScrLuaMetatableFactory<ScriptedDecal>::Instance(),
+    kScriptedDecalLuaClassName,
+    kScriptedDecalSetOrientationHelpText
+  );
+  return &binder;
+}
+
+/**
+ * FAF addition, not in the shipped binary.
+ *
+ * What it does:
+ * Reads one heading in radians and applies it via `ScriptedDecal::SetOrientation`.
+ */
+int moho::cfunc_ScriptedDecalSetOrientationL(LuaPlus::LuaState* const state)
+{
+  moho::SCR_ExpectExactArgs(state, 2, kScriptedDecalSetOrientationHelpText);
+
+  const LuaPlus::LuaObject decalObject(LuaPlus::LuaStackObject(state, 1));
+  ScriptedDecal* const decal = SCR_FromLua_ScriptedDecal(decalObject, state);
+
+  lua_State* const rawState = state->m_state;
+  if (lua_type(rawState, 2) != LUA_TNUMBER) {
+    LuaPlus::LuaStackObject headingArg(state, 2);
+    LuaPlus::LuaStackObject::TypeError(&headingArg, "number");
+    return 0;
+  }
+
+  decal->SetOrientation(static_cast<float>(lua_tonumber(rawState, 2)));
+  return 0;
+}
+
+/**
  * Address: 0x0087F950 (FUN_0087F950, cfunc_ScriptedDecalDestroy)
  *
  * What it does:
@@ -677,6 +739,8 @@ namespace
       (void)::moho::func_ScriptedDecalSetScale_LuaFuncDef();
       (void)::moho::func_ScriptedDecalSetPositionByScreen_LuaFuncDef();
       (void)::moho::func_ScriptedDecalSetPosition_LuaFuncDef();
+      // FAF addition, not in the shipped binary.
+      (void)::moho::func_ScriptedDecalSetOrientation_LuaFuncDef();
       (void)::moho::func_ScriptedDecalDestroy_LuaFuncDef();
     }
   };
@@ -693,7 +757,7 @@ namespace
  */
 ScriptedDecal* moho::SCR_FromLua_ScriptedDecal(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
 {
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(object);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
     return nullptr;

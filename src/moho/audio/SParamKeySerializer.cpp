@@ -8,13 +8,6 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/reflection/Reflection.h"
 
-namespace
-{
-  constexpr const char* kSerializationSourcePath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-
-} // namespace
-
 namespace moho
 {
   /**

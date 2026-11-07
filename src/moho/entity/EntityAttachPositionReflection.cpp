@@ -293,7 +293,7 @@ namespace
    * list, or an index past its end.
    *
    * The owner (`esi`) is the Sim: the body reads a 4-byte-element vector whose
-   * `_Myfirst`/`_Mylast` sit at +0x910/+0x914, i.e. `msvc8::vector<CArmyImpl*>
+   * `_Myfirst`/`_Mylast` sit at +0x910/+0x914, i.e. `fa::vector<CArmyImpl*>
    * mArmiesList` at +0x90C behind its proxy word, and it decodes the index the
    * same way as `CInfluenceMap::ResolveSourceArmy`
    * (`sim->mArmiesList[(id >> 20) & 0xFF]`).
@@ -314,7 +314,7 @@ namespace
       return nullptr;
     }
 
-    const msvc8::vector<moho::CArmyImpl*>& armies = sim->mArmiesList;
+    const fa::vector<moho::CArmyImpl*>& armies = sim->mArmiesList;
     if (armies.begin() == nullptr) {
       return nullptr;
     }
@@ -638,12 +638,7 @@ namespace moho
    */
   void DestroyPositionHistoryTypeInfoBody(PositionHistoryTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**

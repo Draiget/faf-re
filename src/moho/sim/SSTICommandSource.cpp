@@ -69,7 +69,7 @@ SSTICommandSource& SSTICommandSource::operator=(const SSTICommandSource& other)
  * Appends one source entry into the command-source vector lane.
  */
 void AppendSSTICommandSource(
-  msvc8::vector<SSTICommandSource>& commandSources,
+  fa::vector<SSTICommandSource>& commandSources,
   const SSTICommandSource& entry
 )
 {
@@ -132,9 +132,9 @@ SSTICommandSource* CopyAssignCommandSourceRangeForVectorFill(
  * sequence exactly (the `Sim` constructor uses this to seed `mCommandSources`
  * from `LaunchInfoBase::mCommandSources.mSrcs`).
  */
-msvc8::vector<SSTICommandSource>* CopyConstructCommandSourceVector(
-  const msvc8::vector<SSTICommandSource>& src,
-  msvc8::vector<SSTICommandSource>* const out
+fa::vector<SSTICommandSource>* CopyConstructCommandSourceVector(
+  const fa::vector<SSTICommandSource>& src,
+  fa::vector<SSTICommandSource>* const out
 )
 {
   out->release_storage_without_free();

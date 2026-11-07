@@ -323,7 +323,7 @@ namespace
    * body); `version` and the owner-ref lane are unused by the member
    * (mirrors the binary tail-jump).
    */
-  void DeserializeCUnitWaitForFerryTaskSerializerCallback(
+  [[maybe_unused]] void DeserializeCUnitWaitForFerryTaskSerializerCallback(
     gpg::ReadArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -349,7 +349,7 @@ namespace
    * body); `version` and the owner-ref lane are unused by the member
    * (mirrors the binary tail-jump).
    */
-  void SerializeCUnitWaitForFerryTaskSerializerCallback(
+  [[maybe_unused]] void SerializeCUnitWaitForFerryTaskSerializerCallback(
     gpg::WriteArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -376,12 +376,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitWaitForFerryTask(gpg::RRef* const outRef, moho::CUnitWaitForFerryTask* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitWaitForFerryTask>());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

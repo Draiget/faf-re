@@ -231,7 +231,7 @@ namespace moho
      * detaches first -- the destination storage is fresh, so it holds no
      * prior chain membership. This is the construct-into-fresh-storage
      * counterpart to `operator=` below. Every relinking copy an
-     * `msvc8::vector` of weak pointers (or of a struct holding one) emits --
+     * `fa::vector` of weak pointers (or of a struct holding one) emits --
      * `uninit_fill_n`, `uninit_copy_n` -- is this constructor in a loop.
      *
      * Address: 0x00686D50 (FUN_00686D50 -- this constructor emitted out of line,

@@ -34,7 +34,7 @@ namespace gpg
      * Returns base lexical text plus reflected vector size for one
      * `fastvector<CountedPtr<CParticleTexture>>` instance.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
     /**
      * Address: 0x00659FB0 (FUN_00659FB0, gpg::RFastVectorType_CountedPtr_CParticleTexture::IsIndexed)
      *
@@ -309,7 +309,7 @@ namespace moho
    */
   const char* RCountedPtrType<moho::CParticleTexture>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("CountedPtr<%s>", CachedCParticleTextureType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("CountedPtr<%s>", CachedCParticleTextureType()->GetName());
     return sName.c_str();
   }
 
@@ -320,15 +320,15 @@ namespace moho
    * Returns `"NULL"` for empty counted pointers; otherwise returns bracketed
    * pointee lexical text for the texture object.
    */
-  msvc8::string RCountedPtrType<moho::CParticleTexture>::GetLexical(const gpg::RRef& ref) const
+  fa::string RCountedPtrType<moho::CParticleTexture>::GetLexical(const gpg::RRef& ref) const
   {
     auto* const counted = reinterpret_cast<const moho::CountedPtr_CParticleTexture*>(ref.mObj);
     if (!counted || !counted->tex) {
-      return msvc8::string("NULL");
+      return fa::string("NULL");
     }
 
     const gpg::RRef textureRef = MakeCParticleTextureRef(counted->tex);
-    const msvc8::string inner = textureRef.GetLexical();
+    const fa::string inner = textureRef.GetLexical();
     return gpg::STR_Printf("[%s]", inner.c_str());
   }
 
@@ -486,7 +486,7 @@ namespace gpg
    */
   const char* RFastVectorType<moho::CountedPtr_CParticleTexture>::GetName() const
   {
-    static const msvc8::string sName =
+    static const fa::string sName =
       gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::CountedPtr_CParticleTexture>()->GetName());
     return sName.c_str();
   }
@@ -498,9 +498,9 @@ namespace gpg
    * Returns base lexical text plus reflected vector size for one
    * `fastvector<CountedPtr<CParticleTexture>>` instance.
    */
-  msvc8::string RFastVectorType<moho::CountedPtr_CParticleTexture>::GetLexical(const gpg::RRef& ref) const
+  fa::string RFastVectorType<moho::CountedPtr_CParticleTexture>::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 

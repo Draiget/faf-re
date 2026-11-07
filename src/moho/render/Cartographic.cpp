@@ -1,5 +1,7 @@
 #include "moho/render/Cartographic.h"
 
+#include "gpg/gal/HalfFloat.h"
+
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -203,7 +205,7 @@ namespace
   [[nodiscard]] moho::CartographicDecalNode* CreateCartographicDecalSentinelNode()
   {
     auto* const sentinel =
-      msvc8::detail::allocate_checked<moho::CartographicDecalNode>(1u);
+      fa::detail::allocate_checked<moho::CartographicDecalNode>(1u);
     sentinel->mNext = sentinel;
     sentinel->mPrev = sentinel;
     return sentinel;
@@ -539,43 +541,6 @@ namespace
   }
 
   /**
-   * Packs one IEEE-754 binary32 value into a binary16 word.
-   *
-   * The shipped elevation-texture fill loop converts each sampled height with
-   * `D3DXFloat32To16Array` (direct call at 0x007D2759). D3DX is an external
-   * runtime and this tree only reaches it through
-   * `gpg::gal::InvokeD3DXFloat32To16Array`, which lives in an anonymous
-   * namespace inside `D3D9Interfaces.cpp` and is therefore not linkable from
-   * another translation unit. This helper reproduces the same conversion
-   * (round-to-nearest, denormal-preserving, saturating to +/-Inf) that the
-   * D3D9 backend falls back to when the D3DX export is unavailable.
-   */
-  [[nodiscard]] std::uint16_t PackFloat32AsHalfFloat(const float value) noexcept
-  {
-    const std::uint32_t bits = std::bit_cast<std::uint32_t>(value);
-
-    const std::uint32_t sign = (bits >> 16U) & 0x8000U;
-    const std::int32_t exponent = static_cast<std::int32_t>((bits >> 23U) & 0xFFU) - 127 + 15;
-    std::uint32_t mantissa = bits & 0x007FFFFFU;
-
-    if (exponent <= 0) {
-      if (exponent < -10) {
-        return static_cast<std::uint16_t>(sign);
-      }
-      mantissa = (mantissa | 0x00800000U) >> static_cast<std::uint32_t>(1 - exponent);
-      return static_cast<std::uint16_t>(sign | ((mantissa + 0x00001000U) >> 13U));
-    }
-
-    if (exponent >= 31) {
-      return static_cast<std::uint16_t>(sign | 0x7C00U);
-    }
-
-    return static_cast<std::uint16_t>(
-      sign | (static_cast<std::uint32_t>(exponent) << 10U) | ((mantissa + 0x00001000U) >> 13U)
-    );
-  }
-
-  /**
    * Address: 0x007D0E60 (FUN_007D0E60, sub_7D0E60)
    *
    * IDA signature:
@@ -868,7 +833,7 @@ namespace moho
    * Address: 0x007D4B50 (FUN_007D4B50) is the compiler's out-of-line
    * emission of this constructor's member-initializer-list prologue
    * (`: mTechniqueName(), mTexturePath(), mDecalTexture(), ...,
-   * mDecals{}` below) -- sets the vtable, resets both `msvc8::string`
+   * mDecals{}` below) -- sets the vtable, resets both `fa::string`
    * lanes to empty SSO state, nulls the five `shared_ptr` resource
    * handles, sets `mNeedsVertexUpload = true`, and self-links the decal
    * list sentinel via `sub_7D4300` (already-recovered list-init helper),
@@ -890,7 +855,7 @@ namespace moho
       mPadding65_67{},
       mDecals{}
   {
-    // The member-init list above already places both msvc8::string
+    // The member-init list above already places both fa::string
     // lanes in empty-SSO state (mySize=0, myRes=15, bx.buf[0]='\0'),
     // matching the binary's explicit field writes. Initialize the
     // intrusive decal-list sentinel before forwarding into Read; the
@@ -1199,9 +1164,9 @@ namespace moho
    * Deserializes one batch payload from `reader` at the given map
    * version. The wire format is:
    *
-   *   - msvc8::string mTechniqueName  (NUL-terminated; absent in
+   *   - fa::string mTechniqueName  (NUL-terminated; absent in
    *     legacy versions below 0x3C where the field defaults to "Decal")
-   *   - msvc8::string mTexturePath    (NUL-terminated)
+   *   - fa::string mTexturePath    (NUL-terminated)
    *   - int32         decalCount
    *   - for each decal:
    *       - 8 bytes: mVertexData[0..1]
@@ -1233,7 +1198,7 @@ namespace moho
     Shutdown();
 
     // 1. Technique name (defaulted to "Decal" for legacy maps).
-    msvc8::string techniqueName{};
+    fa::string techniqueName{};
     if (version < 0x3Cu) {
       techniqueName.assign("Decal", 5u);
     } else {
@@ -1242,7 +1207,7 @@ namespace moho
     mTechniqueName.assign(techniqueName, 0u, ~0u);
 
     // 2. Texture resource path.
-    msvc8::string texturePath{};
+    fa::string texturePath{};
     reader.ReadString(&texturePath);
     mTexturePath.assign(texturePath, 0u, ~0u);
 
@@ -1576,7 +1541,8 @@ namespace moho
           const float elevation = SampleCartographicHeightKernel(
             heightField, sampleX, sampleZ, mElevMinimum, inverseElevationSpan
           );
-          *texel = PackFloat32AsHalfFloat(elevation);
+          // The binary converts with D3DXFloat32To16Array (direct call at 0x007D2759).
+          *texel = gpg::gal::FloatToHalf(elevation);
           texel += kCartographicElevationTexelWordStride;
         }
         rowCursor += kCartographicElevationTexelWordStride * gridWidth;

@@ -123,7 +123,7 @@ namespace
   struct SAttackVectorGridRow
   {
     std::int32_t mNextColumn = 0;         // +0x00 next cell to record
-    msvc8::vector<int> mOccupancyWords{}; // +0x04 one bit per column
+    fa::vector<int> mOccupancyWords{}; // +0x04 one bit per column
   };
   static_assert(sizeof(SAttackVectorGridRow) == 0x14, "SAttackVectorGridRow size must be 0x14");
 
@@ -202,7 +202,7 @@ namespace
      * Demangled: gpg::RMapType_IVector2i_SBuildReserveInfo::dtr (scalar-deleting)
      *
      * What it does:
-     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes
+     * Frees the `RType` base's two `fa::vector<RField>` storage lanes
      * (`bases_._Myfirst` @ +0x2C, `fields_._Myfirst` @ +0x3C), restores the
      * `gpg::RObject` vftable, and conditionally deletes `this`. Defaulted in
      * source: the compiler-generated `~RType()` reproduces this behavior,
@@ -234,7 +234,7 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName = gpg::STR_Printf(
+      static const fa::string sName = gpg::STR_Printf(
         "map<%s,%s>", ResolveBuildReserveKeyType()->GetName(), ResolveBuildReserveValueType()->GetName()
       );
       return sName.c_str();
@@ -253,9 +253,9 @@ namespace
      * rather than dispatching a virtual, because this descriptor has no
      * `RIndexed` sub-object; the typed `size()` accessor is that same word.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override
     {
-      const msvc8::string base = gpg::RType::GetLexical(ref);
+      const fa::string base = gpg::RType::GetLexical(ref);
       const auto* const mapObject = static_cast<const BuildReserveMapStorage*>(ref.mObj);
       const int count = mapObject ? static_cast<int>(mapObject->size()) : 0;
       return gpg::STR_Printf("%s, size=%d", base.c_str(), count);
@@ -381,7 +381,7 @@ namespace
    * Constructs/preregisters reflection metadata for
    * `std::map<Wm3::IVector2<int>,Moho::SBuildReserveInfo>`.
    */
-  [[nodiscard]] gpg::RType* preregister_BuildReserveMapTypeInfo()
+  [[maybe_unused]] [[nodiscard]] gpg::RType* preregister_BuildReserveMapTypeInfo()
   {
     BuildReserveMapTypeInfo& typeInfo = AcquireBuildReserveMapTypeInfo();
     gpg::PreRegisterRType(typeid(BuildReserveMapStorage), &typeInfo);

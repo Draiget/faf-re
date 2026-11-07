@@ -117,7 +117,7 @@ namespace gal {
        * Empty in the shipped binary (`ret 8`); FAF fills it from the enumerated
        * R8G8B8A8_UNORM modes, as the D3D9 backend does.
        */
-      void GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
+      void GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
       /**
        * Address: 0x008FAB80
        * Slot: 7
@@ -262,7 +262,7 @@ namespace gal {
        */
       void SaveCubeRenderTarget(
           const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
-          const msvc8::string& filePath
+          const fa::string& filePath
       ) override;
       /**
        * Address: 0x008FC9B0
@@ -274,7 +274,7 @@ namespace gal {
        */
       void SaveRenderTarget(
           const boost::shared_ptr<RenderTarget>& renderTarget,
-          const msvc8::string& filePath,
+          const fa::string& filePath,
           int fileFormat
       ) override;
       /**
@@ -287,7 +287,7 @@ namespace gal {
        */
       void SaveTexture(
           const boost::shared_ptr<Texture>& texture,
-          const msvc8::string& filePath,
+          const fa::string& filePath,
           int fileFormat,
           gpg::MemBuffer<char>* outBuffer
       ) override;
@@ -718,10 +718,10 @@ namespace gal {
       D3DX10SaveTextureToMemoryFn mD3DX10SaveTextureToMemory = nullptr; // +0x44
       CreateDXGIFactoryFn mCreateDXGIFactory = nullptr;               // +0x48
       int mCurThreadId = 0;                                           // +0x4C
-      msvc8::vector<msvc8::string> mLog{};                            // +0x50
+      fa::vector<fa::string> mLog{};                            // +0x50
       DeviceContext mDeviceContext{DeviceApi::Unset};                 // +0x60
-      msvc8::vector<AdapterD3D10> mAdapters{};                        // +0x94
-      msvc8::vector<IDXGISwapChain*> mSwapChains{};                   // +0xA4
+      fa::vector<AdapterD3D10> mAdapters{};                        // +0x94
+      fa::vector<IDXGISwapChain*> mSwapChains{};                   // +0xA4
       boost::shared_ptr<PipelineStateD3D10> mPipelineState{};         // +0xB4
       IDXGIFactory* mDXGIFactory = nullptr;                           // +0xBC
       ID3D10Device* mDevice = nullptr;                                // +0xC0

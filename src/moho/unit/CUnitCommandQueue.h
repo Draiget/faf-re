@@ -278,7 +278,7 @@ namespace moho
     static gpg::RType* sType;
 
     Unit* mUnit;
-    msvc8::vector<WeakPtr<CUnitCommand>> mCommandVec;
+    fa::vector<WeakPtr<CUnitCommand>> mCommandVec;
     EUnitCommandType mCommandType; // mirrors queue head command family
     int32_t unk0;
     bool mNeedsRefresh;

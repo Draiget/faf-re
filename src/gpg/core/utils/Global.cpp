@@ -44,7 +44,7 @@ namespace
     constexpr std::uint32_t kPrimaryHeapReserveBytes = 0x20000000u;
     constexpr std::uint32_t kThreadCacheSizeBytes = 0x214u;
     constexpr std::uint32_t kHeapRecordSizeBytes = 0x28u;
-    constexpr std::uint32_t kThreadCacheTrimBytes = 0x200000u;
+    [[maybe_unused]] constexpr std::uint32_t kThreadCacheTrimBytes = 0x200000u;
 
     constexpr std::uintptr_t kRecordTagFree = 0u;
     constexpr std::uintptr_t kRecordTagSmallBlocks = 1u;
@@ -803,14 +803,14 @@ namespace
      * What it does:
      * Pushes one node to the lane head and increments lane count.
      */
-    void PushLaneNode(ThreadSmallBlockLane& lane, SmallBlockNode* const node)
+    [[maybe_unused]] void PushLaneNode(ThreadSmallBlockLane& lane, SmallBlockNode* const node)
     {
         node->next = lane.head;
         lane.head = node;
         ++lane.count;
     }
 
-    [[nodiscard]] ThreadSmallBlockLane& GetLane(ThreadHeapCache* const cache, const std::uint32_t kind)
+    [[maybe_unused]] [[nodiscard]] ThreadSmallBlockLane& GetLane(ThreadHeapCache* const cache, const std::uint32_t kind)
     {
         return cache->lanes[kind];
     }
@@ -1077,7 +1077,7 @@ namespace
      * What it does:
      * Optionally enters allocator critical section and marks lock state.
      */
-    [[nodiscard]] AllocatorLockToken* EnterAllocatorLock(AllocatorLockToken* const token, const bool shouldLock)
+    [[maybe_unused]] [[nodiscard]] AllocatorLockToken* EnterAllocatorLock(AllocatorLockToken* const token, const bool shouldLock)
     {
         token->hasLock = 0;
         if (shouldLock) {
@@ -1093,7 +1093,7 @@ namespace
      * What it does:
      * Leaves allocator critical section if lock token still owns it.
      */
-    void LeaveAllocatorLock(AllocatorLockToken* const token)
+    [[maybe_unused]] void LeaveAllocatorLock(AllocatorLockToken* const token)
     {
         if (ReadAllocatorLockStateLane(token) != 0) {
             ::LeaveCriticalSection(&gAllocatorSentinel);
@@ -1555,7 +1555,7 @@ namespace
      * What it does:
      * Allocates a free-region record and splits any leftover pages.
      */
-    [[nodiscard]] HeapRecord* AllocateAndSplitFreeRegion(const std::uint32_t pages)
+    [[maybe_unused]] [[nodiscard]] HeapRecord* AllocateAndSplitFreeRegion(const std::uint32_t pages)
     {
         HeapRecord* const block = AllocateFreeRegion(pages, true);
         if (block != nullptr) {
@@ -1570,7 +1570,7 @@ namespace
      * What it does:
      * Allocates a large block (>= 4 KiB) and tracks it in the large-allocation list.
      */
-    [[nodiscard]] void* AllocateLargeRegion(const std::uint32_t bytes)
+    [[maybe_unused]] [[nodiscard]] void* AllocateLargeRegion(const std::uint32_t bytes)
     {
         const std::uint32_t pages = BytesToPages(bytes);
         HeapRecord* const block = AllocateFreeRegion(pages, true);
@@ -1695,7 +1695,7 @@ namespace
      * What it does:
      * Returns current thread heap-cache object, allocating it on first use.
      */
-    [[nodiscard]] ThreadHeapCache* GetOrCreateThreadHeapCache()
+    [[maybe_unused]] [[nodiscard]] ThreadHeapCache* GetOrCreateThreadHeapCache()
     {
         if (gThreadHeapCache != nullptr) {
             return gThreadHeapCache;
@@ -1843,7 +1843,7 @@ void gpg::Die(const char* args, ...)
 {
     va_list va;
     va_start(va, args);
-    const msvc8::string msg = STR_Va(args, va);
+    const fa::string msg = STR_Va(args, va);
     va_end(va);
     InvokeDieHandler(msg.c_str());
     __debugbreak();
@@ -2033,7 +2033,7 @@ extern "C" void __cdecl free_0(void* ptr)
         ThreadHeapCache* const threadCache = GetOrCreateThreadHeapCache();
         if (threadCache == kThreadCacheDisabled || threadCache == nullptr) {
             ::EnterCriticalSection(&gAllocatorSentinel);
-            PushHeapBlock(static_cast<SmallBlockNode*>(ptr), static_cast<std::int32_t>(kind));
+            (void)PushHeapBlock(static_cast<SmallBlockNode*>(ptr), static_cast<std::int32_t>(kind));
             ::LeaveCriticalSection(&gAllocatorSentinel);
         } else {
             ThreadSmallBlockLane& lane = GetLane(threadCache, kind);
@@ -2042,7 +2042,7 @@ extern "C" void __cdecl free_0(void* ptr)
 
             if (threadCache->cachedBytes >= static_cast<std::int32_t>(kThreadCacheTrimBytes)) {
                 AllocatorLockToken token{};
-                EnterAllocatorLock(&token, true);
+                (void)EnterAllocatorLock(&token, true);
                 TrimThreadCache(threadCache, false);
                 LeaveAllocatorLock(&token);
             }
@@ -2059,7 +2059,7 @@ extern "C" void __cdecl free_0(void* ptr)
 
         ::EnterCriticalSection(&gAllocatorSentinel);
         UnlinkRecord(record);
-        ReleaseHeapRecord(record);
+        (void)ReleaseHeapRecord(record);
         gHeapCommitted -= byteSize;
         gHeapInUse -= byteSize;
         ::LeaveCriticalSection(&gAllocatorSentinel);

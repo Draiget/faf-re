@@ -525,7 +525,7 @@ gpg::RRef* PackRRef_bool(RRef* const out, bool* const value)
  * resulting `(mObj, mType)` pair into caller-provided storage.
  */
 [[maybe_unused]] gpg::RRef* BuildStringRefAdapterLane(
-  msvc8::string* const value,
+  fa::string* const value,
   gpg::RRef* const out
 )
 {
@@ -534,7 +534,7 @@ gpg::RRef* PackRRef_bool(RRef* const out, bool* const value)
   }
 
   gpg::RRef temp{};
-  temp = gpg::MakeRRef<msvc8::string>(value);
+  temp = gpg::MakeRRef<fa::string>(value);
   out->mObj = temp.mObj;
   out->mType = temp.mType;
   return out;

@@ -75,10 +75,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef ConstructAiPathSplineRefInPlace(void* objectStorage)
   {
-    auto* const spline = static_cast<CAiPathSpline*>(objectStorage);
-    if (spline) {
-      new (spline) CAiPathSpline();
-    }
+    auto* const spline = gpg::ConstructInStorage<CAiPathSpline>(objectStorage);
     return gpg::MakeTypedRef(spline, gpg::RTypeOf<CAiPathSpline>());
   }
 

@@ -20,12 +20,6 @@
 
 namespace
 {
-  constexpr const char* kSerializationSourcePath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-  constexpr int kSerializationLoadLine = 84;
-  constexpr int kSerializationSaveLine = 87;
-
-
   /**
    * Address: 0x00BF1770 (FUN_00BF1770, atexit destructor of the VTransformTypeInfo object)
    */
@@ -322,7 +316,7 @@ namespace moho
    * What it does:
    * Formats one 3D vector lane as `x=...,y=...,z=...`.
    */
-  msvc8::string ToString(const Wm3::Vec3f& value)
+  fa::string ToString(const Wm3::Vec3f& value)
   {
     return gpg::STR_Printf("x=%f,y=%f,z=%f", value.x, value.y, value.z);
   }
@@ -333,10 +327,10 @@ namespace moho
    * What it does:
    * Formats one quaternion in scalar/vector form (`v=(x,y,z),s=w`).
    */
-  msvc8::string ToString(const Wm3::Quatf& value)
+  fa::string ToString(const Wm3::Quatf& value)
   {
     const Wm3::Vec3f vectorLane{value.x, value.y, value.z};
-    const msvc8::string vectorText = ToString(vectorLane);
+    const fa::string vectorText = ToString(vectorLane);
     return gpg::STR_Printf("v=(%s),s=%f", vectorText.c_str(), value.w);
   }
 
@@ -346,10 +340,10 @@ namespace moho
    * What it does:
    * Formats one transform as translation plus quaternion rotation text.
    */
-  msvc8::string ToString(const VTransform& value)
+  fa::string ToString(const VTransform& value)
   {
-    const msvc8::string rotationText = ToString(value.orient_);
-    const msvc8::string translationText = ToString(value.pos_);
+    const fa::string rotationText = ToString(value.orient_);
+    const fa::string translationText = ToString(value.pos_);
     return gpg::STR_Printf("t=%s, r={%s}", translationText.c_str(), rotationText.c_str());
   }
 

@@ -42,7 +42,7 @@ namespace moho
     /**
      * Address: 0x0057C9F0 (FUN_0057C9F0 -- the compiler-generated copy
      * assignment of this 24-byte aggregate (two `Vector3<float>` field
-     * copies), emitted out of line for `msvc8::vector<SPointVector>`'s
+     * copies), emitted out of line for `fa::vector<SPointVector>`'s
      * element-wise copy steps and called from 0x0057C290 (CAiBrain.cpp).
      * No source line: it is the implicit `operator=`. Formerly transcribed
      * as `CopySPointVectorAndReturnDestination` in CAiBrain.cpp, removed
@@ -110,7 +110,7 @@ namespace moho
    * Address: 0x005825A0 (FUN_005825A0, register_SPointVectorVectorType)
    *
    * What it does:
-   * Constructs/preregisters RTTI for `msvc8::vector<moho::SPointVector>`.
+   * Constructs/preregisters RTTI for `fa::vector<moho::SPointVector>`.
    */
   [[nodiscard]] gpg::RType* register_SPointVectorVectorType();
 
@@ -126,7 +126,7 @@ namespace moho
 namespace gpg
 {
   /**
-   * Reflection/indexing adapter for `msvc8::vector<moho::SPointVector>`.
+   * Reflection/indexing adapter for `fa::vector<moho::SPointVector>`.
    */
   template <>
   class RVectorType<moho::SPointVector> final : public gpg::RType, public gpg::RIndexed
@@ -137,7 +137,7 @@ namespace gpg
      * Demangled: gpg::RVectorType_SPointVector::dtr (scalar-deleting)
      *
      * What it does:
-     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes
+     * Frees the `RType` base's two `fa::vector<RField>` storage lanes
      * (`bases_._Myfirst` @ +0x2C, `fields_._Myfirst` @ +0x3C), restores the
      * `gpg::RObject` vftable, and conditionally deletes `this`. Defaulted in
      * source: the compiler-generated `~RType()` reproduces this behavior,
@@ -168,7 +168,7 @@ namespace gpg
      * Returns the base lexical text plus `size=<count>` for one reflected
      * `vector<SPointVector>` payload.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x0057E0B0 (FUN_0057E0B0, gpg::RVectorType_SPointVector::IsIndexed)

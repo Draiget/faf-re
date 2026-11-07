@@ -10,11 +10,6 @@
 
 namespace
 {
-  [[nodiscard]] float VectorLengthSq(const Wm3::Vec3f& v) noexcept
-  {
-    return v.x * v.x + v.y * v.y + v.z * v.z;
-  }
-
   [[nodiscard]] bool Finite(const float value) noexcept
   {
     return std::isfinite(value);

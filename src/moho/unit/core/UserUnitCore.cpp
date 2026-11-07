@@ -77,7 +77,7 @@ namespace
    * What it does:
    * Returns the fixed transport-load factor used by the UserUnit IUnit bridge.
    */
-  [[nodiscard]] float IUnitBridgeCalcTransportLoadFactor(const IUnit* const bridge) noexcept
+  [[maybe_unused]] [[nodiscard]] float IUnitBridgeCalcTransportLoadFactor(const IUnit* const bridge) noexcept
   {
     (void)bridge;
     return 1.0f;
@@ -89,7 +89,7 @@ namespace
    * What it does:
    * Returns false for the UserUnit IUnit bridge destroy-queued lane.
    */
-  [[nodiscard]] bool IUnitBridgeDestroyQueued(const IUnit* const bridge) noexcept
+  [[maybe_unused]] [[nodiscard]] bool IUnitBridgeDestroyQueued(const IUnit* const bridge) noexcept
   {
     (void)bridge;
     return false;
@@ -101,7 +101,7 @@ namespace
    * What it does:
    * Returns false for the UserUnit IUnit bridge navigator-idle lane.
    */
-  [[nodiscard]] bool IUnitBridgeIsNavigatorIdle(const IUnit* const bridge) noexcept
+  [[maybe_unused]] [[nodiscard]] bool IUnitBridgeIsNavigatorIdle(const IUnit* const bridge) noexcept
   {
     (void)bridge;
     return false;
@@ -139,7 +139,7 @@ namespace
     return self->mVisionHandle;
   }
 
-  [[nodiscard]] const VisionDB::Handle* GetUserUnitVisionHandle(const UserUnit* const self) noexcept
+  [[maybe_unused]] [[nodiscard]] const VisionDB::Handle* GetUserUnitVisionHandle(const UserUnit* const self) noexcept
   {
     return self->mVisionHandle;
   }
@@ -196,7 +196,7 @@ namespace
     }
 
     const IUnit* const unitBridge = unit;
-    msvc8::vector<WeakPtr<UserUnit>>& avatars = army->mAvatars;
+    fa::vector<WeakPtr<UserUnit>>& avatars = army->mAvatars;
     for (WeakPtr<UserUnit>* it = avatars.begin(); it != avatars.end(); ++it) {
       const UserUnit* const avatar = it->GetObjectPtr();
       if (avatar == nullptr) {
@@ -247,7 +247,7 @@ namespace
   /**
    * Address: 0x008B2470 (FUN_008B2470, UserArmy::UnregisterPrioritySelectionSlot)
    * Address: 0x008B3870 (FUN_008B3870, `std::copy` over `WeakPtr<UserUnit>` --
-   *   the tail shift of `msvc8::vector<WeakPtr<UserUnit>>::erase` below,
+   *   the tail shift of `fa::vector<WeakPtr<UserUnit>>::erase` below,
    *   formerly transcribed here as `PatchUserArmyPriorityRegistryRecordTail`)
    *
    * IDA signature:
@@ -278,7 +278,7 @@ namespace
       return;
     }
 
-    msvc8::vector<WeakPtr<UserUnit>>& avatars = army->mAvatars;
+    fa::vector<WeakPtr<UserUnit>>& avatars = army->mAvatars;
     for (auto it = avatars.begin(); it != avatars.end(); ++it) {
       if (it->GetObjectPtr() == unit) {
         (void)avatars.erase(it);
@@ -474,7 +474,7 @@ namespace
 
   [[nodiscard]] bool IsUnitInOverlayCategory(const UserUnit* const unit, const char* const categoryName)
   {
-    msvc8::string category{};
+    fa::string category{};
     category.assign_owned(categoryName != nullptr ? categoryName : "");
     const UserEntity* const entityView = unit;
     return entityView != nullptr && entityView->IsInCategory(category);
@@ -587,12 +587,12 @@ namespace moho
    * reference, upcast to `RUnitBlueprint`, and appended to the output list.
    *
    * `out` is a real `std::list<T>` in the binary (node-buy at 0x008C5EF0 +
-   * `_Incsize` at 0x008C5F30, both cited on `msvc8::list<T>::insert` in
+   * `_Incsize` at 0x008C5F30, both cited on `fa::list<T>::insert` in
    * `legacy/containers/Vector.h`), not a set: it preserves queue order and
    * allows duplicate blueprint pointers when multiple pending commands
    * target the same blueprint. The IDA-signature comment previously (and
    * wrongly) said `std::set<RUnitBlueprint const*>`, and the recovered
-   * body used `msvc8::set` to match -- the caller's own comment
+   * body used `fa::set` to match -- the caller's own comment
    * (`CCommandLuaFunctionRegistrations.cpp`) already documents that its
    * loop's final state depends on which target is iterated *last*, which
    * only matches the binary's real command-queue order under a real
@@ -600,7 +600,7 @@ namespace moho
    * "last" target by heap-address order instead, an observable behavior
    * bug independent of the citation.
    */
-  void CollectUpgradeCommandTargetBlueprints(UserUnit* const unit, msvc8::list<const RUnitBlueprint*>& out)
+  void CollectUpgradeCommandTargetBlueprints(UserUnit* const unit, fa::list<const RUnitBlueprint*>& out)
   {
     gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queue = RebuildAndGetUserUnitManagerQueue(unit->mManager);
     if (queue == nullptr) {
@@ -687,12 +687,7 @@ namespace moho
     LuaPlus::LuaState* const state
   )
   {
-    if (object == nullptr) {
-      return nullptr;
-    }
-
-    *object = CScrLuaMetatableFactory<UserUnit>::Instance().Get(state);
-    return object;
+    return SCR_WriteMetatable<UserUnit>(object, state);
   }
 }
 
@@ -746,12 +741,12 @@ UserUnit::UserUnit(CWldSession* const session, const SCreateUnitParams& params)
   mManager = new UserCommandQueue(this);
 
   // 0x008BF66F: factories carry a second queue for what they are building.
-  if (IsInCategory(msvc8::string("FACTORY", 7u))) {
+  if (IsInCategory(fa::string("FACTORY", 7u))) {
     mFactoryManager = new UserCommandQueue(this);
 
     // 0x008BF745: only a factory that is also a structure counts as one for
     // the idle-factory registry; mobile factories are handled as engineers.
-    if (IsInCategory(msvc8::string("STRUCTURE", 9u))) {
+    if (IsInCategory(fa::string("STRUCTURE", 9u))) {
       mIsFactory = true;
     }
   }
@@ -765,10 +760,10 @@ UserUnit::UserUnit(CWldSession* const session, const SCreateUnitParams& params)
     return;
   }
 
-  mIsEngineer = IsInCategory(msvc8::string("ENGINEER", 8u))
-    && !IsInCategory(msvc8::string("COMMAND", 7u))
-    && !IsInCategory(msvc8::string("SCOUT", 5u))
-    && !IsInCategory(msvc8::string("UNTARGETABLE", 12u));
+  mIsEngineer = IsInCategory(fa::string("ENGINEER", 8u))
+    && !IsInCategory(fa::string("COMMAND", 7u))
+    && !IsInCategory(fa::string("SCOUT", 5u))
+    && !IsInCategory(fa::string("UNTARGETABLE", 12u));
 }
 
 /**
@@ -810,7 +805,7 @@ UserUnit::~UserUnit()
   // over on the way out. The successor only joins the selection if this unit
   // was itself selected, so an off-screen death never steals the player's
   // current selection.
-  if (mUnitVarDat.mSelectionInheritorId != ToRaw(EEntityIdSentinel::Invalid)) {
+  if (static_cast<std::uint32_t>(mUnitVarDat.mSelectionInheritorId) != ToRaw(EEntityIdSentinel::Invalid)) {
     WeakSet<UserEntity> selectionSnapshot(entityView->mSession->mSelection);
     if (selectionSnapshot.Find(entityView) != selectionSnapshot.end()) {
       UserEntity* const inheritor =
@@ -958,11 +953,11 @@ bool UserUnit::UnitDataUpdateRunsLua(const SSTIUnitVariableData& payload) const
     return false;
   }
   const UserEntity* const heldCreator = mCreator.GetObjectPtr();
-  if (heldCreator != nullptr && heldCreator->mParams.mEntityId == replicatedCreator) {
+  if (heldCreator != nullptr && heldCreator->mParams.mEntityId == static_cast<std::uint32_t>(replicatedCreator)) {
     return false;
   }
   const UserEntity* const creator = WLD_GetActiveSession()->LookupEntityId(static_cast<EntId>(replicatedCreator));
-  return creator != nullptr && creator->IsInCategory(msvc8::string("FACTORY", 7u));
+  return creator != nullptr && creator->IsInCategory(fa::string("FACTORY", 7u));
 }
 
 void UserUnit::FinishUnitDataLinks()
@@ -973,11 +968,11 @@ void UserUnit::FinishUnitDataLinks()
     mCreator.UnlinkFromOwnerChain();
   } else {
     const UserEntity* const heldCreator = mCreator.GetObjectPtr();
-    if (heldCreator == nullptr || heldCreator->mParams.mEntityId != replicatedCreator) {
+    if (heldCreator == nullptr || heldCreator->mParams.mEntityId != static_cast<std::uint32_t>(replicatedCreator)) {
       mCreator.ResetFromObject(WLD_GetActiveSession()->LookupEntityId(static_cast<EntId>(replicatedCreator)));
 
       UserEntity* const creator = mCreator.GetObjectPtr();
-      if (creator != nullptr && creator->IsInCategory(msvc8::string("FACTORY", 7u))) {
+      if (creator != nullptr && creator->IsInCategory(fa::string("FACTORY", 7u))) {
         // 0x008C0949: a unit rolling off a factory inherits that factory's
         // selection-set membership. The binary decodes the weak lane straight
         // to a `UserUnit` here; the category test is what makes that safe.
@@ -1214,10 +1209,7 @@ gpg::RType* UserUnit::GetClass() const
  */
 gpg::RRef UserUnit::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**
@@ -1481,7 +1473,7 @@ bool UserUnit::IsSelectable() const
   const UserEntity* const entityView = this;  // base conversion, not a reinterpretation
 
 
-  const msvc8::string podCategory("POD", 3u);
+  const fa::string podCategory("POD", 3u);
   if (mUnitVarDat.mIsBusy && iunitBridge->IsMobile() && !entityView->IsInCategory(podCategory)) {
     return false;
   }
@@ -1501,14 +1493,14 @@ bool UserUnit::IsSelectable() const
   // half of the 0x006EFAC9 patch in `ProcessIssuedUnitCommand` (Sim.cpp):
   // a CQUEMOV unit can be selected, and so given orders, while being built.
   if (IsBeingBuilt()) {
-    const msvc8::string queueMoveCategory("CQUEMOV", 7u);
-    const msvc8::string factoryCategory("FACTORY", 7u);
+    const fa::string queueMoveCategory("CQUEMOV", 7u);
+    const fa::string factoryCategory("FACTORY", 7u);
     if (!entityView->IsInCategory(queueMoveCategory) && !entityView->IsInCategory(factoryCategory)) {
       return false;
     }
   }
 
-  const msvc8::string selectableCategory("SELECTABLE", 10u);
+  const fa::string selectableCategory("SELECTABLE", 10u);
   return entityView->IsInCategory(selectableCategory);
 }
 
@@ -1869,7 +1861,7 @@ float UserUnit::GetShield() const
  */
 void UserUnit::AddSelectionSet(const char* const selectionSetName)
 {
-  msvc8::string selectionSet{};
+  fa::string selectionSet{};
   selectionSet.assign_owned(selectionSetName != nullptr ? selectionSetName : "");
   (void)mSelectionSets.insert(selectionSet);
 }
@@ -1895,7 +1887,7 @@ void UserUnit::AddToSelectionSet(UserUnit* const target, UserUnit* const source)
 
   // 0x008BFF41: the source's names are snapshotted before anything is added to
   // the target, so the walk is stable even when `target == source`.
-  const msvc8::set<msvc8::string> inheritedNames = source->mSelectionSets;
+  const fa::set<fa::string> inheritedNames = source->mSelectionSets;
 
   LuaPlus::LuaObject selectionModule =
     SCR_Import(WLD_GetActiveSession()->mState, "/lua/ui/game/selection.lua");
@@ -1905,7 +1897,7 @@ void UserUnit::AddToSelectionSet(UserUnit* const target, UserUnit* const source)
   // 0x008BFF9E: the bridge is resolved once, but `GetLuaObject` is dispatched
   // per name because the call below consumes the object.
   IUnit* const targetBridge = GetIUnitBridge(target);
-  for (const msvc8::string& selectionSetName : inheritedNames) {
+  for (const fa::string& selectionSetName : inheritedNames) {
     target->AddSelectionSet(selectionSetName.c_str());
     const LuaPlus::LuaObject targetObject = targetBridge->GetLuaObject();
     callback.Call_StringObject(std::string(selectionSetName.c_str(), selectionSetName.size()), targetObject);
@@ -1921,17 +1913,17 @@ void UserUnit::AddToSelectionSet(UserUnit* const target, UserUnit* const source)
  */
 void UserUnit::RemoveSelectionSet(const char* const selectionSetName)
 {
-  msvc8::string selectionSet{};
+  fa::string selectionSet{};
   selectionSet.assign_owned(selectionSetName != nullptr ? selectionSetName : "");
   (void)mSelectionSets.erase(selectionSet);
 }
 
 /**
- * Address: 0x008C5B90 (FUN_008C5B90, msvc8::set<msvc8::string>::find)
+ * Address: 0x008C5B90 (FUN_008C5B90, fa::set<fa::string>::find)
  *
  * What it does:
  * Per-T canonical-template-helper binding for the engine-instantiated
- * `msvc8::set<msvc8::string>::find(const key&)` _Tree::_Lbound walk +
+ * `fa::set<fa::string>::find(const key&)` _Tree::_Lbound walk +
  * key-equal check body. Returns the iterator to the matching node or
  * `end()` if the key is not present.
  *
@@ -1940,9 +1932,9 @@ void UserUnit::RemoveSelectionSet(const char* const selectionSetName)
  * `_Tree::find` template emission symbol shape even when the modern
  * compiler would inline the natural `mSelectionSets.find(...)` call.
  */
-msvc8::set<msvc8::string>::iterator FindStringSetEntry(
-  const msvc8::set<msvc8::string>& storage,
-  const msvc8::string& key)
+fa::set<fa::string>::iterator FindStringSetEntry(
+  const fa::set<fa::string>& storage,
+  const fa::string& key)
 {
   return storage.find(key);
 }
@@ -1952,12 +1944,12 @@ msvc8::set<msvc8::string>::iterator FindStringSetEntry(
  *
  * What it does:
  * Returns whether this unit currently stores one named selection-set key.
- * Routes the per-T `msvc8::set<msvc8::string>::find` through the named
+ * Routes the per-T `fa::set<fa::string>::find` through the named
  * helper (FUN_008C5B90) to preserve the MSVC8 template emission symbol.
  */
 bool UserUnit::HasSelectionSet(const char* const selectionSetName) const
 {
-  msvc8::string selectionSet{};
+  fa::string selectionSet{};
   selectionSet.assign_owned(selectionSetName != nullptr ? selectionSetName : "");
   return FindStringSetEntry(mSelectionSets, selectionSet) != mSelectionSets.end();
 }
@@ -2292,7 +2284,7 @@ bool moho::USERUNIT_WithinBuildDistance(
   CWldSession& session, const RUnitBlueprint* const buildBlueprint, const SCoordsVec2& buildPosition
 )
 {
-  msvc8::vector<UserUnit*> selectedUnits{};
+  fa::vector<UserUnit*> selectedUnits{};
   session.GetSelectionUnits(selectedUnits);
   if (selectedUnits.empty()) {
     return false;

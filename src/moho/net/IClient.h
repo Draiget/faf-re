@@ -56,7 +56,7 @@ namespace moho
      * Address: 0x00A82547 (_purecall)
      * Slot: 4
      */
-    virtual const msvc8::vector<int32_t>* GetLatestAcksVector() = 0;
+    virtual const fa::vector<int32_t>* GetLatestAcksVector() = 0;
 
     /**
      * Address: 0x00A82547 (_purecall)
@@ -102,7 +102,7 @@ namespace moho
      * Collects the clients that have authored a pending eject request against
      * this client (the "ejectedBy" set surfaced to Lua).
      */
-    virtual void CollectEjecters(msvc8::vector<const CClientBase*>& out) = 0;
+    virtual void CollectEjecters(fa::vector<const CClientBase*>& out) = 0;
 
     /**
      * Address: 0x00A82547 (_purecall)
@@ -140,13 +140,13 @@ namespace moho
      * Exposes the client nickname string tracked by this client record.
      */
     [[nodiscard]]
-    const msvc8::string& GetNickname() const
+    const fa::string& GetNickname() const
     {
       return mNickname;
     }
 
   protected:
-    msvc8::string mNickname;
+    fa::string mNickname;
     int mIndex{0};
     int32_t mOwnerId{0};
   };

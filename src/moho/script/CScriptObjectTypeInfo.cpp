@@ -26,13 +26,7 @@ namespace
       rObjectType = gpg::LookupRType(typeid(gpg::RObject));
     }
 
-    gpg::RField baseField{};
-    baseField.mName = rObjectType->GetName();
-    baseField.mType = rObjectType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, rObjectType);
   }
 
   struct CScriptObjectTypeInfoBootstrap

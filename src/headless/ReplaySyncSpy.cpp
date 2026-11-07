@@ -10,6 +10,7 @@
 #include "moho/entity/EntityId.h"
 #include "moho/sim/Sim.h"
 #include "remote/ViewIdMap.h"
+#include "remote/VisibilityOracle.h"
 #include "remote/wire/BitStream.h"
 #include "remote/wire/LuaSyncLane.h"
 
@@ -51,6 +52,7 @@ namespace faf::headless
     const std::vector<std::uint8_t>& table;
     std::size_t pos = 0;
     std::string_view topKey;
+    bool endsLabel = false; // the id's value is a boolean: a reclaim label's end, not a new one
 
     [[nodiscard]] bool Left(const std::size_t count) const noexcept { return pos + count <= table.size(); }
     [[nodiscard]] bool ReadString(std::string_view& text) noexcept
@@ -109,7 +111,16 @@ namespace faf::headless
       ++mMarkedIds;
       // Lua decides for itself under a focus: `NoteFocusArmyChanged` releases the old army's units.
       const std::string key(walk.topKey);
-      const bool allowed = mark->audience == remote::ESyncIdAudience::Anyone
+      const auto seen = [&] {
+        // The map's first labels. A label's end only goes to who holds it, and the sim may have given
+        // its id to another prop by then, somewhere else.
+        if (walk.sim.mCurBeat <= 1u || entity == nullptr || walk.endsLabel) {
+          return true;
+        }
+        const Wm3::Vec3f position = entity->GetPositionWm3();
+        return remote::ViewCanSeePoint(walk.sim, walk.army, position, false) || remote::ViewCanSeePoint(walk.sim, walk.army, position, true);
+      };
+      const bool allowed = (mark->audience == remote::ESyncIdAudience::Seen && seen())
                            || (mark->audience == remote::ESyncIdAudience::Owner
                                && (owner == walk.army || mRouter.WroteUnderFocus(walk.view, key.c_str())))
                            || (mark->audience == remote::ESyncIdAudience::Allies && mRouter.Allied(walk.sim, walk.view, owner));
@@ -121,7 +132,7 @@ namespace faf::headless
     }
     // A score's totals and a chat line's text only look like ids now and then: an energy total of
     // 2097210, a message saying "1".
-    if (entity != nullptr && owner != walk.army && walk.topKey != "Score" && field != "text") {
+    if (entity != nullptr && owner != walk.army && walk.topKey != "Score" && walk.topKey != "ScoreAccum" && field != "text") {
       ++mUnmarked;
       Example(walk, "unmarked", id, field);
     }
@@ -174,6 +185,7 @@ namespace faf::headless
           return false;
         }
         if (ParseDigits(text, id)) {
+          walk.endsLabel = walk.Left(1u) && walk.table[walk.pos] == kTagBool;
           CheckId(walk, id, field, true, depth);
         } else {
           entryField = text;

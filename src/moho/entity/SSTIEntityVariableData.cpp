@@ -304,60 +304,6 @@ namespace
    */
   EntityAttributesSerializerHelper::~EntityAttributesSerializerHelper() = default;
 
-  void DeserializeSSTIEntityVariableDataSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    auto* const object = reinterpret_cast<moho::SSTIEntityVariableData*>(objectPtr);
-    if (archive == nullptr || object == nullptr) {
-      return;
-    }
-
-    object->MemberDeserialize(archive, 2);
-  }
-
-  void SerializeSSTIEntityVariableDataSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    auto* const object = reinterpret_cast<moho::SSTIEntityVariableData*>(objectPtr);
-    if (archive == nullptr || object == nullptr) {
-      return;
-    }
-
-    object->MemberSerialize(archive, 2);
-  }
-
-
-  [[nodiscard]] gpg::RType* ResolveRScmResourceType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::REF_FindFirstTypeNamed({"RScmResource", "Moho::RScmResource"});
-      if (!sType) {
-        sType = gpg::LookupRType(typeid(moho::RScmResource));
-      }
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveRMeshBlueprintType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::REF_FindFirstTypeNamed({"RMeshBlueprint", "Moho::RMeshBlueprint"});
-      if (!sType) {
-        sType = gpg::LookupRType(typeid(moho::RMeshBlueprint));
-      }
-    }
-    return sType;
-  }
 
   [[nodiscard]] gpg::RType* ResolveEntIdType()
   {
@@ -373,18 +319,6 @@ namespace
   [[nodiscard]] gpg::RType* ResolveAttachInfoVectorType()
   {
     return gpg::RTypeOf<gpg::fastvector<moho::SSTIEntityAttachInfo>>();
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCSndParamsType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::REF_FindFirstTypeNamed({"CSndParams", "Moho::CSndParams"});
-      if (!sType) {
-        sType = gpg::LookupRType(typeid(moho::CSndParams));
-      }
-    }
-    return sType;
   }
 
   [[nodiscard]] gpg::RType* ResolveVisibilityModeType()

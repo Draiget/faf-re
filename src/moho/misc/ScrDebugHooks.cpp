@@ -44,10 +44,10 @@ namespace
     std::recursive_mutex breakpointMutex;
     std::recursive_mutex pausedQueueMutex;
 
-    msvc8::list<LuaHookBinding> hookBindings;
-    msvc8::list<LuaPlus::LuaState*> singleStepRootStates;
-    msvc8::list<moho::ScrBreakpoint> breakpoints;
-    msvc8::list<moho::PausedThread*> pausedThreads;
+    fa::list<LuaHookBinding> hookBindings;
+    fa::list<LuaPlus::LuaState*> singleStepRootStates;
+    fa::list<moho::ScrBreakpoint> breakpoints;
+    fa::list<moho::PausedThread*> pausedThreads;
 
     bool hasPendingSingleStepRoots = false;
     bool hasEnabledBreakpoints = false;
@@ -87,7 +87,7 @@ namespace
     return 0;
   }
 
-  [[nodiscard]] msvc8::list<moho::ScrBreakpoint>::iterator FindBreakpointExact(
+  [[nodiscard]] fa::list<moho::ScrBreakpoint>::iterator FindBreakpointExact(
     ScrDebugState& runtime,
     const moho::ScrBreakpoint& key
   )
@@ -146,17 +146,17 @@ namespace
       return;
     }
 
-    msvc8::list<msvc8::string> serializedBreakpoints;
+    fa::list<fa::string> serializedBreakpoints;
     for (const moho::ScrBreakpoint& breakpoint : runtime.breakpoints) {
       serializedBreakpoints.push_back(breakpoint.AsString());
     }
 
-    preferences->SetStringArr(msvc8::string(kBreakpointPreferenceKey), serializedBreakpoints);
+    preferences->SetStringArr(fa::string(kBreakpointPreferenceKey), serializedBreakpoints);
   }
 
-  [[nodiscard]] msvc8::string ToMountedSourcePath(const char* sourcePath)
+  [[nodiscard]] fa::string ToMountedSourcePath(const char* sourcePath)
   {
-    msvc8::string mountedPath;
+    fa::string mountedPath;
     if (sourcePath == nullptr) {
       return mountedPath;
     }
@@ -281,7 +281,7 @@ namespace
   /**
    * Address: 0x004B5B10 (FUN_004B5B10)
    *
-   * LuaPlus::LuaState *,msvc8::string const &,int,lua_Debug *
+   * LuaPlus::LuaState *,fa::string const &,int,lua_Debug *
    *
    * What it does:
    * Posts one pause event to the debug window, enqueues one paused-thread
@@ -289,7 +289,7 @@ namespace
    */
   void PauseLuaThreadAtSource(
     LuaPlus::LuaState* const luaState,
-    const msvc8::string& mountedSource,
+    const fa::string& mountedSource,
     const int sourceLine,
     lua_Debug* const debugFrame
   )
@@ -492,8 +492,8 @@ void moho::SCR_RemoveAllBreakpoints()
  * Enumerates breakpoints matching one mounted source path into output storage.
  */
 void moho::SCR_EnumerateBreakpoints(
-  const msvc8::string& sourcePath,
-  msvc8::vector<ScrBreakpoint>& outBreakpoints
+  const fa::string& sourcePath,
+  fa::vector<ScrBreakpoint>& outBreakpoints
 )
 {
   outBreakpoints.clear();
@@ -520,7 +520,7 @@ void moho::SCR_EnumerateBreakpoints(
  * What it does:
  * Enumerates call-stack activation frames for the currently paused script state.
  */
-void moho::SCR_EnumerateCallStack(msvc8::vector<ScrActivation>& outActivations)
+void moho::SCR_EnumerateCallStack(fa::vector<ScrActivation>& outActivations)
 {
   outActivations.clear();
 
@@ -541,8 +541,8 @@ void moho::SCR_EnumerateCallStack(msvc8::vector<ScrActivation>& outActivations)
       ++source;
     }
 
-    const msvc8::string mountedSource = ToMountedSourcePath(source);
-    const msvc8::string activationName(debugFrame.name != nullptr ? debugFrame.name : "");
+    const fa::string mountedSource = ToMountedSourcePath(source);
+    const fa::string activationName(debugFrame.name != nullptr ? debugFrame.name : "");
     outActivations.push_back(ScrActivation(mountedSource, activationName, debugFrame.currentline));
   }
 }
@@ -555,7 +555,7 @@ void moho::SCR_EnumerateCallStack(msvc8::vector<ScrActivation>& outActivations)
  * What it does:
  * Enumerates locals and closure upvalues from one Lua stack level.
  */
-void moho::SCR_EnumerateLocals(const int level, msvc8::vector<ScrWatch>& outWatches)
+void moho::SCR_EnumerateLocals(const int level, fa::vector<ScrWatch>& outWatches)
 {
   outWatches.clear();
 
@@ -578,7 +578,7 @@ void moho::SCR_EnumerateLocals(const int level, msvc8::vector<ScrWatch>& outWatc
        localName = lua_getlocal(pausedLuaState->m_state, &debugFrame, index)) {
     ++index;
 
-    const msvc8::string watchName(localName);
+    const fa::string watchName(localName);
     const LuaPlus::LuaObject watchValue(pausedLuaState, -1);
     outWatches.push_back(ScrWatch(watchName, watchValue));
   }
@@ -591,7 +591,7 @@ void moho::SCR_EnumerateLocals(const int level, msvc8::vector<ScrWatch>& outWatc
        upvalueName = lua_getupvalue(pausedLuaState->m_state, -1, index)) {
     ++index;
 
-    const msvc8::string watchName(upvalueName);
+    const fa::string watchName(upvalueName);
     const LuaPlus::LuaObject watchValue(pausedLuaState, -1);
     outWatches.push_back(ScrWatch(watchName, watchValue));
 
@@ -609,7 +609,7 @@ void moho::SCR_EnumerateLocals(const int level, msvc8::vector<ScrWatch>& outWatc
  * What it does:
  * Enumerates global Lua table entries for the currently paused script state.
  */
-void moho::SCR_EnumerateGlobals(msvc8::vector<ScrWatch>& outWatches)
+void moho::SCR_EnumerateGlobals(fa::vector<ScrWatch>& outWatches)
 {
   outWatches.clear();
 
@@ -629,7 +629,7 @@ void moho::SCR_EnumerateGlobals(msvc8::vector<ScrWatch>& outWatches)
   LuaPlus::LuaTableIterator iterator(globals, true);
   while (!iterator.m_isDone) {
     const char* const keyName = iterator.m_keyObj.GetString();
-    const msvc8::string watchName(keyName != nullptr ? keyName : "");
+    const fa::string watchName(keyName != nullptr ? keyName : "");
     outWatches.push_back(ScrWatch(watchName, iterator.m_valueObj));
     iterator.Next();
   }
@@ -699,12 +699,12 @@ void moho::SCR_LoadBreakpoints()
     return;
   }
 
-  const msvc8::list<msvc8::string> fallback;
-  const msvc8::list<msvc8::string> serializedBreakpoints =
-    preferences->GetStringArr(msvc8::string(kBreakpointPreferenceKey), fallback);
+  const fa::list<fa::string> fallback;
+  const fa::list<fa::string> serializedBreakpoints =
+    preferences->GetStringArr(fa::string(kBreakpointPreferenceKey), fallback);
 
-  const msvc8::string emptyName("");
-  for (const msvc8::string& serializedBreakpoint : serializedBreakpoints) {
+  const fa::string emptyName("");
+  for (const fa::string& serializedBreakpoint : serializedBreakpoints) {
     ScrBreakpoint breakpoint(emptyName, -1);
     breakpoint.enabled = false;
     breakpoint.FromString(serializedBreakpoint);
@@ -771,13 +771,13 @@ void moho::DebugLuaHook(lua_State* const state, lua_Debug* const debugFrame)
   const int currentLine = debugFrame->currentline;
 
   if (ConsumeSingleStepRootState(runtime, luaState->m_rootState)) {
-    const msvc8::string mountedSource = ToMountedSourcePath(source);
+    const fa::string mountedSource = ToMountedSourcePath(source);
     PauseLuaThreadAtSource(luaState, mountedSource, currentLine, debugFrame);
     return;
   }
 
   bool shouldPauseForBreakpoint = false;
-  msvc8::string mountedSource;
+  fa::string mountedSource;
   {
     std::lock_guard<std::recursive_mutex> lock(runtime.breakpointMutex);
     if (runtime.hasEnabledBreakpoints) {

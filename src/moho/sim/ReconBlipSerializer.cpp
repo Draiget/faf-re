@@ -42,14 +42,6 @@ namespace
     return gWeakPtrUnitType;
   }
 
-  [[nodiscard]] gpg::RType* ResolvePerArmyReconInfoType()
-  {
-    if (!moho::SPerArmyReconInfo::sType) {
-      moho::SPerArmyReconInfo::sType = gpg::LookupRType(typeid(moho::SPerArmyReconInfo));
-    }
-    return moho::SPerArmyReconInfo::sType;
-  }
-
   // Addresses 0x005C90D0/0x005CAF90 (deserialize "ThunkA"/"ThunkB" pair) and
   // 0x005C90E0/0x005CAFA0 (serialize "ThunkA"/"ThunkB" pair) formerly modeled
   // here are dead: zero data_refs and zero call_edges in the callgraph index
@@ -85,7 +77,7 @@ namespace moho
     archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mJamOffset, ownerRef);
     archive->Read(gpg::RTypeOf<moho::SSTIUnitConstantData>(), &mUnitConstDat, ownerRef);
     archive->Read(gpg::RTypeOf<moho::SSTIUnitVariableData>(), &mUnitVarDat, ownerRef);
-    archive->Read(gpg::RTypeOf<msvc8::vector<moho::SPerArmyReconInfo>>(), &mReconDat, ownerRef);
+    archive->Read(gpg::RTypeOf<fa::vector<moho::SPerArmyReconInfo>>(), &mReconDat, ownerRef);
   }
 
   /**
@@ -104,7 +96,7 @@ namespace moho
     archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mJamOffset, ownerRef);
     archive->Write(gpg::RTypeOf<moho::SSTIUnitConstantData>(), &mUnitConstDat, ownerRef);
     archive->Write(gpg::RTypeOf<moho::SSTIUnitVariableData>(), &mUnitVarDat, ownerRef);
-    archive->Write(gpg::RTypeOf<msvc8::vector<moho::SPerArmyReconInfo>>(), &mReconDat, ownerRef);
+    archive->Write(gpg::RTypeOf<fa::vector<moho::SPerArmyReconInfo>>(), &mReconDat, ownerRef);
   }
 } // namespace moho
 

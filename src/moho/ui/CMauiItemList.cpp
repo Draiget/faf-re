@@ -463,8 +463,8 @@ int moho::cfunc_CMauiItemListGetItemL(
   }
   const int index = static_cast<std::int32_t>(lua_tonumber(state->m_state, 2));
 
-  msvc8::string* const itemBase = itemList->mItems.data();
-  const msvc8::string& itemName = itemBase[index];
+  fa::string* const itemBase = itemList->mItems.data();
+  const fa::string& itemName = itemBase[index];
   lua_pushstring(state->m_state, itemName.c_str());
   (void)lua_gettop(state->m_state);
   return 1;
@@ -912,7 +912,7 @@ int moho::cfunc_CMauiItemListNeedsScrollBarL(
  */
 moho::CMauiItemList::~CMauiItemList()
 {
-  mItems = msvc8::vector<msvc8::string>{};
+  mItems = fa::vector<fa::string>{};
   ReleaseIntrusiveFont(mFont);
 }
 
@@ -1032,7 +1032,7 @@ void moho::CMauiItemList::DoRender(
   }
 
   for (std::int32_t visibleRow = 0; visibleRow < visibleLineCount; ++visibleRow) {
-    const msvc8::string* const itemStorage = mItems.data();
+    const fa::string* const itemStorage = mItems.data();
     const std::int32_t itemIndex = visibleRow + mScrollPosition;
     if (itemStorage == nullptr || static_cast<std::uint32_t>(itemIndex) >= mItems.size()) {
       break;
@@ -1049,7 +1049,7 @@ void moho::CMauiItemList::DoRender(
     const float baselineY =
       rowHeight * static_cast<float>(static_cast<std::uint32_t>(visibleRow)) + font->mAscent + top;
 
-    const msvc8::string& itemText = itemStorage[itemIndex];
+    const fa::string& itemText = itemStorage[itemIndex];
     const Wm3::Vector3f origin{left, baselineY, 0.0f};
     const Wm3::Vector3f xAxis{1.0f, 0.0f, 0.0f};
     const Wm3::Vector3f yAxis{0.0f, -1.0f, 0.0f};
@@ -1066,10 +1066,10 @@ void moho::CMauiItemList::DoRender(
  */
 void moho::CMauiItemList::ModifyItem(
   const std::uint32_t index,
-  msvc8::string text
+  fa::string text
 )
 {
-  msvc8::string* const itemBase = mItems.data();
+  fa::string* const itemBase = mItems.data();
   const std::uint32_t itemCount = itemBase != nullptr ? static_cast<std::uint32_t>(mItems.size()) : 0u;
 
   if (itemBase == nullptr || index >= itemCount) {
@@ -1096,7 +1096,7 @@ void moho::CMauiItemList::DeleteItem(
     return;
   }
 
-  msvc8::string* const itemBase = mItems.data();
+  fa::string* const itemBase = mItems.data();
   if (itemBase == nullptr || static_cast<std::size_t>(index) >= mItems.size()) {
     return;
   }
@@ -1111,7 +1111,7 @@ void moho::CMauiItemList::DeleteItem(
  * Appends one item string lane to the item-list storage vector.
  */
 void moho::CMauiItemList::AddItem(
-  msvc8::string text
+  fa::string text
 )
 {
   mItems.push_back(text);
@@ -1137,7 +1137,7 @@ std::int32_t moho::CMauiItemList::GetItem(
   const std::int32_t rowIndex = mScrollPosition + static_cast<std::int32_t>(localY / rowHeight);
   if (
     itemBase != nullptr && rowIndex >= 0 && static_cast<std::size_t>(rowIndex) < mItems.size() &&
-    font->mHeight > static_cast<float>(msvc8::fmod(localY, rowHeight)) // 0x0079A126: _CIfmod
+    font->mHeight > static_cast<float>(fa::fmod(localY, rowHeight)) // 0x0079A126: _CIfmod
   ) {
     return rowIndex;
   }
@@ -1172,8 +1172,8 @@ void moho::CMauiItemList::Dump()
     return;
   }
 
-  const msvc8::string* const itemStorage = mItems.data();
-  const msvc8::string& selectedItem = itemStorage[curSelection];
+  const fa::string* const itemStorage = mItems.data();
+  const fa::string& selectedItem = itemStorage[curSelection];
   gpg::Logf("Current Selection = %d Text = %s", curSelection, selectedItem.c_str());
 }
 
@@ -1580,7 +1580,7 @@ int moho::cfunc_CMauiItemListAddItemL(
     itemText = "";
   }
 
-  itemList->AddItem(msvc8::string(itemText));
+  itemList->AddItem(fa::string(itemText));
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -1746,7 +1746,7 @@ int moho::cfunc_CMauiItemListModifyItemL(
       itemText = "";
     }
 
-    itemList->ModifyItem(static_cast<std::uint32_t>(index), msvc8::string(itemText));
+    itemList->ModifyItem(static_cast<std::uint32_t>(index), fa::string(itemText));
   }
 
   lua_settop(state->m_state, 1);
@@ -1909,8 +1909,5 @@ gpg::RType* moho::CMauiItemList::GetClass() const
  */
 gpg::RRef moho::CMauiItemList::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }

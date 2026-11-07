@@ -37,12 +37,12 @@ namespace
   UiKeyRepeatMap gUiKeyRepeatMap{};
 
   void AppendLegacyStringOrThrow(
-    msvc8::string& destination,
+    fa::string& destination,
     const char* const text,
     const std::size_t length
   )
   {
-    if (length > msvc8::string::maxCapGuard - destination.size()) {
+    if (length > fa::string::maxCapGuard - destination.size()) {
       throw std::length_error("legacy string too long");
     }
     if (!destination.append(text, length)) {
@@ -51,12 +51,12 @@ namespace
   }
 
   void AppendLegacyStringOrThrow(
-    msvc8::string& destination,
+    fa::string& destination,
     const std::size_t count,
     const char value
   )
   {
-    if (count > msvc8::string::maxCapGuard - destination.size()) {
+    if (count > fa::string::maxCapGuard - destination.size()) {
       throw std::length_error("legacy string too long");
     }
     if (!destination.append(count, value)) {
@@ -82,7 +82,7 @@ namespace
 
     for (LuaPlus::LuaTableIterator iter(keyMapTable, 1); !iter.m_isDone; iter.Next()) {
       const char* const keyBindingSpecText = iter.m_keyObj.GetString();
-      msvc8::scoped_string keyBindingSpec{keyBindingSpecText != nullptr ? keyBindingSpecText : ""};
+      fa::scoped_string keyBindingSpec{keyBindingSpecText != nullptr ? keyBindingSpecText : ""};
       const UiKeyMask keyMask = static_cast<UiKeyMask>(moho::IN_ParseKeyModifiers(keyBindingSpec));
 
       const LuaPlus::LuaObject actionObject = iter.m_valueObj["action"];
@@ -114,7 +114,7 @@ namespace
 
     for (LuaPlus::LuaTableIterator iter(keyMapTable, 1); !iter.m_isDone; iter.Next()) {
       const char* const keyBindingSpecText = iter.m_keyObj.GetString();
-      msvc8::scoped_string keyBindingSpec{keyBindingSpecText != nullptr ? keyBindingSpecText : ""};
+      fa::scoped_string keyBindingSpec{keyBindingSpecText != nullptr ? keyBindingSpecText : ""};
       const UiKeyMask keyMask = static_cast<UiKeyMask>(moho::IN_ParseKeyModifiers(keyBindingSpec));
       gUiKeyActionMap.erase(keyMask);
       gUiKeyRepeatMap.erase(keyMask);
@@ -442,14 +442,14 @@ moho::CScrLuaInitForm* moho::func_IN_ClearKeyMap_LuaFuncDef()
  * equality test which returns 0 on match.
  */
 int moho::IN_FindKeyNameIndex(
-  const msvc8::string& needle
+  const fa::string& needle
 )
 {
   const char* const needlePtr = needle.c_str();
   const std::size_t needleSize = needle.size();
 
   for (int index = 0; index < 256; ++index) {
-    const msvc8::string& slot = in_keyNames[index];
+    const fa::string& slot = in_keyNames[index];
     if (slot.compare(0u, slot.size(), needlePtr, needleSize) == 0) {
       return index;
     }
@@ -466,7 +466,7 @@ int moho::IN_FindKeyNameIndex(
  * `stricmp` on the SSO-resolved character pointers of slot and needle.
  */
 int moho::IN_FindKeyNameIndexCi(
-  const msvc8::string& needle
+  const fa::string& needle
 )
 {
   const char* const needlePtr = needle.c_str();
@@ -498,18 +498,18 @@ namespace
  * What it does:
  * Yields `in_keyNames[keyCode]`, or an empty string when the code falls
  * outside the 256-slot table. The binary indexes it as `28 * keyCode +
- * 0x010C1B48` -- stride `sizeof(msvc8::string) == 0x1C` over `in_keyNames`,
+ * 0x010C1B48` -- stride `sizeof(fa::string) == 0x1C` over `in_keyNames`,
  * which is what fixes that global's element type -- and materialises a
  * temporary empty string for the out-of-range arm so both arms can share one
  * `assign` tail.
  */
-msvc8::scoped_string moho::IN_GetKeyName(
+fa::scoped_string moho::IN_GetKeyName(
   const unsigned int keyCode
 )
 {
-  msvc8::scoped_string keyName{};
+  fa::scoped_string keyName{};
   if (keyCode < 256u) {
-    const msvc8::string& slot = in_keyNames[keyCode];
+    const fa::string& slot = in_keyNames[keyCode];
     keyName.assign_owned(std::string_view{slot.c_str(), slot.size()});
   }
   return keyName;
@@ -530,11 +530,11 @@ msvc8::scoped_string moho::IN_GetKeyName(
  * against the original mask is equivalent, because clearing one modifier
  * never disturbs another.
  */
-msvc8::scoped_string moho::IN_DescribeKeyBinding(
+fa::scoped_string moho::IN_DescribeKeyBinding(
   const UiKeyMask keyMask
 )
 {
-  msvc8::scoped_string description{};
+  fa::scoped_string description{};
 
   if ((keyMask & kUiKeyMaskCtrl) != 0u) {
     AppendLegacyStringOrThrow(description, "Ctrl-", 5u);
@@ -547,7 +547,7 @@ msvc8::scoped_string moho::IN_DescribeKeyBinding(
   }
 
   const UiKeyMask keyCode = keyMask & ~(kUiKeyMaskCtrl | kUiKeyMaskAlt | kUiKeyMaskShift);
-  const msvc8::scoped_string keyName = IN_GetKeyName(keyCode);
+  const fa::scoped_string keyName = IN_GetKeyName(keyCode);
   AppendLegacyStringOrThrow(description, keyName.c_str(), keyName.size());
 
   return description;
@@ -566,14 +566,14 @@ msvc8::scoped_string moho::IN_DescribeKeyBinding(
  * `_Tree::_Inc` (0x0083C0B0) from `gUiKeyActionMap`'s leftmost node to its
  * head, and the repeat test is `_Tree::find` spelled as a lower-bound descent
  * (`_Left@0x00`, `_Right@0x08`, `_Myval@0x0C`, `_Isnil@0x15`) followed by the
- * `end()`-or-greater equivalence check. Both are `msvc8::map`'s already.
+ * `end()`-or-greater equivalence check. Both are `fa::map`'s already.
  */
 void moho::IN_DumpKeyBindings(
-  const msvc8::vector<msvc8::string>& /*args*/
+  const fa::vector<fa::string>& /*args*/
 )
 {
   for (const auto& binding : gUiKeyActionMap) {
-    const msvc8::scoped_string chord = IN_DescribeKeyBinding(binding.first);
+    const fa::scoped_string chord = IN_DescribeKeyBinding(binding.first);
     const bool repeats = gUiKeyRepeatMap.find(binding.first) != gUiKeyRepeatMap.end();
     CON_Printf("%s :: %s :: repeat = %s", chord.c_str(), binding.second.c_str(), repeats ? "true" : "false");
   }
@@ -586,11 +586,11 @@ void moho::IN_DumpKeyBindings(
  * The `IN_DumpKeyNames` console command: prints every slot of
  * `in_keyNames[0..255]` as `"%04d = %s"`. The binary's raw SSO-vs-heap
  * pointer check on each slot's `_Bx`/`_Mysize`/`_Myres` triple is exactly
- * what `msvc8::string::c_str()` already resolves, so it is not reproduced
+ * what `fa::string::c_str()` already resolves, so it is not reproduced
  * here.
  */
 void moho::IN_DumpKeyNames(
-  const msvc8::vector<msvc8::string>& /*args*/
+  const fa::vector<fa::string>& /*args*/
 )
 {
   for (int index = 0; index < 256; ++index) {
@@ -689,8 +689,8 @@ void moho::CUIKeyHandlerLoadKeyMappings()
 bool moho::IN_InitKeyHandler()
 {
   for (int code = 0; code < 256; ++code) {
-    const msvc8::string placeholder = gpg::STR_Printf("Unknown%02X", code);
-    in_keyNames[code].assign(placeholder, 0u, msvc8::string::npos);
+    const fa::string placeholder = gpg::STR_Printf("Unknown%02X", code);
+    in_keyNames[code].assign(placeholder, 0u, fa::string::npos);
   }
 
   CUIKeyHandlerLoadKeyMappings();
@@ -708,7 +708,7 @@ bool moho::IN_InitKeyHandler()
  * Parses one key-binding token string (`key[-modifier[-modifier...]]`) into a
  * single packed keycode/modifier mask. Tokens are split on '-' by
  * gpg::STR_GetToken and each is inserted at the FRONT of a small-buffer scratch
- * vector (gpg::fastvector_n<msvc8::string,4>), so after tokenizing, slot 0 holds
+ * vector (gpg::fastvector_n<fa::string,4>), so after tokenizing, slot 0 holds
  * the LAST token (the key name) and slots 1..n hold the modifiers in reverse
  * order. Slot 0 is resolved through IN_FindKeyNameIndexCi against the
  * runtime-loaded in_keyNames table (unknown key names yield -1, preserving the
@@ -718,12 +718,12 @@ bool moho::IN_InitKeyHandler()
  * empty.
  *
  * The three modifier reference strings live in the binary as runtime-initialized
- * msvc8::string globals at 0x10C1D08 / 0x10C1D24 / 0x10C1D40; their initializer
+ * fa::string globals at 0x10C1D08 / 0x10C1D24 / 0x10C1D40; their initializer
  * is not in the recovered evidence set, so the literal spellings are modeled
  * here. See the reconstruction note for the CTRL-vs-CONTROL open item.
  */
 int moho::IN_ParseKeyModifiers(
-  const msvc8::string& keyBindingSpec
+  const fa::string& keyBindingSpec
 )
 {
   // Binary reference strings @ 0x10C1D08 / 0x10C1D24 / 0x10C1D40, compared in
@@ -761,14 +761,14 @@ int moho::IN_ParseKeyModifiers(
   // collided with each other -- `Shift-R` landed on `Alt-R`'s real mask -- so
   // 12 of the 196 shipped bindings were silently overwriting one another; the
   // map held 184 entries before this and holds 196 after.
-  const msvc8::scoped_string shiftModifier{"SHIFT"};
-  const msvc8::scoped_string controlModifier{"CTRL"};
-  const msvc8::scoped_string altModifier{"ALT"};
+  const fa::scoped_string shiftModifier{"SHIFT"};
+  const fa::scoped_string controlModifier{"CTRL"};
+  const fa::scoped_string altModifier{"ALT"};
 
-  // SBO scratch: 4 inline msvc8::string slots, teardown frees heap only when the
+  // SBO scratch: 4 inline fa::string slots, teardown frees heap only when the
   // token count spilled past the inline window (start != inline origin).
-  gpg::fastvector_n<msvc8::scoped_string, 4> tokens{};
-  msvc8::scoped_string token{};
+  gpg::fastvector_n<fa::scoped_string, 4> tokens{};
+  fa::scoped_string token{};
 
   // Tokenize the spec, inserting each token at begin() so the final slot 0 is
   // the last (key) token and the modifiers follow in reverse token order.
@@ -787,7 +787,7 @@ int moho::IN_ParseKeyModifiers(
 
   const std::size_t tokenCount = tokens.Size();
   for (std::size_t tokenIndex = 1u; tokenIndex < tokenCount; ++tokenIndex) {
-    const msvc8::scoped_string& modifier = tokens.Data()[tokenIndex];
+    const fa::scoped_string& modifier = tokens.Data()[tokenIndex];
     if (_stricmp(modifier.c_str(), shiftModifier.c_str()) == 0) {
       keyMask |= static_cast<int>(0x80000000u);
     } else if (_stricmp(modifier.c_str(), controlModifier.c_str()) == 0) {
@@ -815,7 +815,7 @@ int moho::IN_ParseKeyModifiers(
  * result reports the original key token and leaves the map unchanged.
  */
 void moho::IN_BindKey(
-  const msvc8::vector<msvc8::string>& args
+  const fa::vector<fa::string>& args
 )
 {
   if (args.size() < 3u) {
@@ -823,16 +823,16 @@ void moho::IN_BindKey(
     return;
   }
 
-  const msvc8::string* const keyBindingSpec = ConCommandArg(args, 1u);
+  const fa::string* const keyBindingSpec = ConCommandArg(args, 1u);
   const int parsedKeyMask = IN_ParseKeyModifiers(*keyBindingSpec);
   if (parsedKeyMask == 0) {
     CON_Printf("Unrecognized key sequence: %s", keyBindingSpec->c_str());
     return;
   }
 
-  msvc8::scoped_string actionText{};
+  fa::scoped_string actionText{};
   for (std::size_t argumentIndex = 2u; argumentIndex < args.size(); ++argumentIndex) {
-    const msvc8::string* const argument = ConCommandArg(args, argumentIndex);
+    const fa::string* const argument = ConCommandArg(args, argumentIndex);
     AppendLegacyStringOrThrow(actionText, argument->c_str(), argument->size());
     AppendLegacyStringOrThrow(actionText, 1u, ' ');
   }
@@ -853,7 +853,7 @@ void moho::IN_BindKey(
  * case-insensitively via `IN_FindKeyNameIndexCi`) or reports the collision.
  */
 void moho::IN_SetKeyName(
-  const msvc8::vector<msvc8::string>& args
+  const fa::vector<fa::string>& args
 )
 {
   if (args.size() < 3u) {
@@ -861,14 +861,14 @@ void moho::IN_SetKeyName(
     return;
   }
 
-  const msvc8::string* const keyCodeArg = ConCommandArg(args, 1u);
+  const fa::string* const keyCodeArg = ConCommandArg(args, 1u);
   const unsigned int keyCode = gpg::STR_Xtoi(keyCodeArg->c_str());
   if (keyCode > 0xFFu) {
     CON_Printf("Invalid key code %02X, must be between 0x00 and 0xFF", keyCode);
     return;
   }
 
-  const msvc8::string* const nameArg = ConCommandArg(args, 2u);
+  const fa::string* const nameArg = ConCommandArg(args, 2u);
   if (IN_FindKeyNameIndexCi(*nameArg) == -1) {
     in_keyNames[keyCode].assign_owned(std::string_view{nameArg->c_str(), nameArg->size()});
     CON_Printf("Key code %02X name is %s", keyCode, in_keyNames[keyCode].c_str());

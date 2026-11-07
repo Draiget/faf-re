@@ -15,6 +15,41 @@ namespace moho
    */
   void WLD_SetSessionKeepsBlueprints(bool keep) noexcept;
 
+  /**
+   * Engine addition (`wld_EarlyCommandLineSession`): while held, a session's load waits before
+   * SessionInit.lua, which needs the UI frames. `WLD_StartPendingSessionLoad` holds it, as that load
+   * starts before the app has the frames, and `WLD_DoPreload` lets it go once they exist. Stopping
+   * the load also ends the wait.
+   */
+  void WLD_HoldSessionScripts(bool hold) noexcept;
+
+  /**
+   * Engine addition (`wld_EarlyCommandLineSession`): while held, code on a load's threads that needs the
+   * graphics device (a unit blueprint's strategic icons, `REntityBlueprint::OnInitBlueprint`) waits in
+   * `WLD_WaitForDeviceUse`. `WLD_StartPendingSessionLoad` holds it, as that load starts before the app
+   * has created its device, and `CScApp::Init` lets it go once `CreateDevice` returns, either way.
+   * Otherwise a unit registered while the device is still being created gets no icons, or on
+   * Direct3D 9 its texture call fails ("Invalid call") and the rules with it.
+   */
+  void WLD_HoldDeviceUse(bool hold) noexcept;
+
+  /** Engine addition: returns once `WLD_HoldDeviceUse` holds nothing (at once on the holding thread). */
+  void WLD_WaitForDeviceUse() noexcept;
+
+  class CWldMap;
+  class RRuleGameRules;
+
+  /**
+   * Engine addition (`wld_StartSimEarly`): the rules and the map of `scenario` once its load has both
+   * and has started building the sim's Lua state, so a session can start its sim while the rest of
+   * the load (the session's copy of the rules and SessionInit.lua) is still running. False until
+   * then, and always for a load with the switch off or without an early map (`wld_LoadMapEarly`).
+   * Both stay the scenario's; nothing else in the load changes them.
+   */
+  [[nodiscard]] bool WLD_GetEarlySimInputs(
+    const SWldScenarioInfo* scenario, RRuleGameRules** outRules, CWldMap** outMap
+  ) noexcept;
+
   // Every virtual below except the destructor is pure. IWldSessionLoader's
   // vftable (0x00E49FA4) has all 7 of its slots pointing at _purecall
   // (0x00A82547), so this interface contributes no bodies; the stubs that used
@@ -64,12 +99,12 @@ namespace moho
      * What it does:
      * Reorders requested scenario into MRU position and optionally marks it as active game-data source.
      */
-    virtual SWldScenarioInfo* GetScenarioInfo(const char* mapName, msvc8::string* gameMods, bool setGameData) = 0;
+    virtual SWldScenarioInfo* GetScenarioInfo(const char* mapName, fa::string* gameMods, bool setGameData) = 0;
 
     /**
      * Address: 0x00885920 (FUN_00885920, ?CreateScenarioInfo@CWldSessionLoaderImpl@Moho@@...)
      */
-    virtual SWldScenarioInfo* CreateScenarioInfo(const char* mapName, msvc8::string* gameMods) = 0;
+    virtual SWldScenarioInfo* CreateScenarioInfo(const char* mapName, fa::string* gameMods) = 0;
 
     /**
      * Address: 0x00885970 (FUN_00885970, ?IsLoaded@CWldSessionLoaderImpl@Moho@@...)
@@ -119,12 +154,12 @@ namespace moho
     /**
      * Address: 0x008858A0 (FUN_008858A0)
      */
-    SWldScenarioInfo* GetScenarioInfo(const char* mapName, msvc8::string* gameMods, bool setGameData) override;
+    SWldScenarioInfo* GetScenarioInfo(const char* mapName, fa::string* gameMods, bool setGameData) override;
 
     /**
      * Address: 0x00885920 (FUN_00885920)
      */
-    SWldScenarioInfo* CreateScenarioInfo(const char* mapName, msvc8::string* gameMods) override;
+    SWldScenarioInfo* CreateScenarioInfo(const char* mapName, fa::string* gameMods) override;
 
     /**
      * Address: 0x00885970 (FUN_00885970)
@@ -150,7 +185,7 @@ namespace moho
     /**
      * Address: 0x00886200 (FUN_00886200, func_GetScenarioInfo)
      */
-    SWldScenarioInfo* FindOrCreateScenarioInfo(const char* mapName, const msvc8::string& gameMods);
+    SWldScenarioInfo* FindOrCreateScenarioInfo(const char* mapName, const fa::string& gameMods);
 
     /**
      * Address: 0x00886170 (FUN_00886170, func_MoveGameData)

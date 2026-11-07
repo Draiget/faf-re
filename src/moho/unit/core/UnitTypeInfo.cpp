@@ -16,8 +16,8 @@ namespace
 
   void ResetTypeInfoVectors(TypeInfo& typeInfo) noexcept
   {
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    typeInfo.fields_ = fa::vector<gpg::RField>{};
+    typeInfo.bases_ = fa::vector<gpg::RField>{};
   }
 
   /**
@@ -108,13 +108,7 @@ namespace moho
       gEntityType = baseType;
     }
 
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = gpg::BaseSubobjectOffset<Unit, Entity>();
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::BaseSubobjectOffset<Unit, Entity>());
   }
 
   /**
@@ -131,13 +125,7 @@ namespace moho
       gIUnitType = baseType;
     }
 
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType);
   }
 
   /**

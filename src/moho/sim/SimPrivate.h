@@ -251,7 +251,7 @@ namespace
    * Thin wrapper around `func_FindArmyWithName` used by army-Lua argument
    * decoding helpers.
    */
-  [[nodiscard]] ArmyListCursor
+  [[maybe_unused]] [[nodiscard]] ArmyListCursor
   func_GetArmyWithName(ArmyListCursor begin, const ArmyListCursor end, const std::string_view armyName)
   {
     return func_FindArmyWithName(begin, end, armyName);
@@ -311,7 +311,7 @@ namespace
    * still the unresolved `0xFF......` sentinel, and one Sim.cpp path
    * deliberately passes a possibly-null `mCommandDB`.
    */
-  void ReleaseCommandIdIfUnconsumed(CCommandDB* commandDb, const CmdId cmdId)
+  [[maybe_unused]] void ReleaseCommandIdIfUnconsumed(CCommandDB* commandDb, const CmdId cmdId)
   {
     if (!commandDb) {
       return;
@@ -458,7 +458,7 @@ namespace
    * Applies per-unit command-family validation and rejection side-effects
    * before queue insertion in `UNIT_IssueCommand`.
    */
-  [[nodiscard]] bool ProcessIssuedUnitCommand(
+  [[maybe_unused]] [[nodiscard]] bool ProcessIssuedUnitCommand(
     Sim* const sim,
     const SSTICommandIssueData& commandIssueData,
     Unit* const unit,
@@ -853,7 +853,7 @@ namespace
    * `REntityBlueprint::mBlueprintId` (+0x08) of the entity's blueprint:
    * `[bp+0x20]` capacity test, `[bp+0x0C]` buffer (0x0074A9FE, 0x0068BF9A).
    */
-  const char* ResolveBlueprintIdCString(const Entity* entity)
+  [[maybe_unused]] const char* ResolveBlueprintIdCString(const Entity* entity)
   {
     if (!entity || !entity->BluePrint) {
       return "";
@@ -870,7 +870,7 @@ namespace
    * Writes all key/value lanes from one Lua table iterator into archive object
    * stream as `LuaObject` entries, then writes one trailing nil marker object.
    */
-  LuaPlus::LuaObject* func_ArchiveWriteLuaObj(gpg::WriteArchive* const archive, LuaPlus::LuaObject* const tableObject)
+  [[maybe_unused]] LuaPlus::LuaObject* func_ArchiveWriteLuaObj(gpg::WriteArchive* const archive, LuaPlus::LuaObject* const tableObject)
   {
     if (!archive || !tableObject) {
       return tableObject;
@@ -905,7 +905,7 @@ namespace
   );
   static_assert(offsetof(CUnitCommand, mTarget) == 0x11C, "CUnitCommand::mTarget offset must be 0x11C (0x00764CCE)");
 
-  void AdvanceCoords(Entity* entity)
+  [[maybe_unused]] void AdvanceCoords(Entity* entity)
   {
     if (!entity) {
       return;
@@ -975,7 +975,7 @@ namespace
   // addresses, just one definition instead of two.
 
   /**
-   * Address: 0x005347A0 (FUN_005347A0, msvc8::vector<Moho::RBlueprint*>::push_back)
+   * Address: 0x005347A0 (FUN_005347A0, fa::vector<Moho::RBlueprint*>::push_back)
    *
    * IDA signature:
    * unsigned int __usercall sub_5347A0@<eax>(RBlueprint **value@<eax>,
@@ -1000,7 +1000,7 @@ namespace
       return;
     }
 
-    // push_back's capacity-full path is `msvc8::vector<RBlueprint*>::insert`
+    // push_back's capacity-full path is `fa::vector<RBlueprint*>::insert`
     // (FUN_00535D60), reached through the binary's push_back at FUN_005347A0.
     rules.mBlueprintsByOrdinal.push_back(static_cast<RBlueprint*>(blueprintObject));
   }
@@ -1018,14 +1018,14 @@ namespace
    * (RRuleGameRules.cpp), matching a pending/dirty-set role.
    *
    * The binary performs this as the loop at 0x00529BE3-0x00529C0B, calling
-   * `func_MapInsert` / `FUN_0052BC60` (`msvc8::detail::rb_tree<...>::
-   * insert_unique` for the `msvc8::set<uint32_t>` embedded at
+   * `func_MapInsert` / `FUN_0052BC60` (`fa::detail::rb_tree<...>::
+   * insert_unique` for the `fa::set<uint32_t>` embedded at
    * `RRuleGameRulesLuaExportBinding::mPendingBlueprintOrdinals` -- see the
    * citation block on `insert_unique` in RbTree.h) on `binding + 4` for
    * every existing `[mMaps.begin(), mMaps.end())` binding, using the
    * blueprint's `mBlueprintOrdinal` (+0x5C) as the key.
    *
-   * `mMaps` is a real `msvc8::vector<RRuleGameRulesLuaExportBinding>`
+   * `mMaps` is a real `fa::vector<RRuleGameRulesLuaExportBinding>`
    * (RRuleGameRules.h); this walk uses its own `begin()`/`end()` instead of
    * the hand-rolled `mBegin`/`mEnd` pointer fields the now-removed
    * `RRuleGameRulesLuaExportBindingArray` used to expose.
@@ -1112,7 +1112,7 @@ namespace
     allBlueprints.SetObject(blueprint->mBlueprintId.c_str(), luaBlueprint);
   }
 
-  [[nodiscard]] msvc8::string ResolveNormalizedBlueprintId(const LuaPlus::LuaObject& blueprintSpec)
+  [[nodiscard]] fa::string ResolveNormalizedBlueprintId(const LuaPlus::LuaObject& blueprintSpec)
   {
     LuaPlus::LuaObject idObject = blueprintSpec.GetByName("BlueprintId");
     const char* const rawId = idObject.GetString();
@@ -1154,9 +1154,9 @@ namespace
     }
 
     LuaPlus::LuaObject blueprintSpec(LuaPlus::LuaStackObject(state, 1));
-    const msvc8::string normalizedId = ResolveNormalizedBlueprintId(blueprintSpec);
+    const fa::string normalizedId = ResolveNormalizedBlueprintId(blueprintSpec);
 
-    const msvc8::string logContextText =
+    const fa::string logContextText =
       gpg::STR_Printf("Initializing %s blueprint for %s", blueprintTypeName, normalizedId.c_str());
     gpg::ScopedLogContext logScope(logContextText);
     if (CFG_GetArgOption("/spewbp", 0u, nullptr)) {
@@ -1206,9 +1206,9 @@ namespace
     }
 
     LuaPlus::LuaObject blueprintSpec(LuaPlus::LuaStackObject(state, 1));
-    const msvc8::string normalizedId = ResolveNormalizedBlueprintId(blueprintSpec);
+    const fa::string normalizedId = ResolveNormalizedBlueprintId(blueprintSpec);
 
-    const msvc8::string logContextText =
+    const fa::string logContextText =
       gpg::STR_Printf("Initializing %s blueprint for %s", blueprintTypeName, normalizedId.c_str());
     gpg::ScopedLogContext logScope(logContextText);
 
@@ -1264,7 +1264,7 @@ namespace
     );
   }
 
-  int RegisterMeshBlueprintFromState(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterMeshBlueprintFromState(LuaPlus::LuaState* const state)
   {
     RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
     if (!rules) {
@@ -1284,7 +1284,7 @@ namespace
    * then applies reflected field values from the Lua object into that
    * blueprint instance.
    */
-  int RegisterTrailEmitterBlueprintFromState(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterTrailEmitterBlueprintFromState(LuaPlus::LuaState* const state)
   {
     RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
     if (!rules) {
@@ -1312,7 +1312,7 @@ namespace
    * then applies reflected field values from the Lua object into that
    * blueprint instance.
    */
-  int RegisterEmitterBlueprintFromState(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterEmitterBlueprintFromState(LuaPlus::LuaState* const state)
   {
     RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
     if (!rules) {
@@ -1339,7 +1339,7 @@ namespace
    * Creates or resolves one beam blueprint from Lua stack lane 1, then applies
    * reflected field values from the Lua object into that blueprint instance.
    */
-  int RegisterBeamBlueprintFromState(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterBeamBlueprintFromState(LuaPlus::LuaState* const state)
   {
     RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
     if (!rules) {
@@ -1358,7 +1358,7 @@ namespace
     );
     return 0;
   }
-  void TickBlueprintLoaderProgressFromLoaderContext()
+  [[maybe_unused]] void TickBlueprintLoaderProgressFromLoaderContext()
   {
     moho::CBackgroundTaskControl* const initHandler = moho::BlueprintLoaderContext().mInitHandler;
     if (initHandler != nullptr && initHandler->mHandle != nullptr) {

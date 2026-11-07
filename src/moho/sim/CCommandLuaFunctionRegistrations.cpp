@@ -2265,7 +2265,7 @@ namespace moho
     moho::SCR_ExpectExactArgs(state, 1, kCoordinateAttacksHelpText);
 
     const LuaPlus::LuaObject commandListObject(LuaPlus::LuaStackObject(state, 1));
-    msvc8::vector<CUnitCommand*> commands{};
+    fa::vector<CUnitCommand*> commands{};
     if (commandListObject.IsTable()) {
       const int commandCount = commandListObject.GetCount();
       for (int commandIndex = 1; commandIndex <= commandCount; ++commandIndex) {
@@ -3186,9 +3186,9 @@ namespace moho
    * (x = element[1], z = element[2]). Raises the binary's Lua errors when the
    * argument is not a table, or any element is not a two-element table.
    */
-  [[nodiscard]] msvc8::vector<SOCellPos> func_GetCells(LuaPlus::LuaState* const state, LuaPlus::LuaStackObject cellListArg)
+  [[nodiscard]] fa::vector<SOCellPos> func_GetCells(LuaPlus::LuaState* const state, LuaPlus::LuaStackObject cellListArg)
   {
-    msvc8::vector<SOCellPos> cells{};
+    fa::vector<SOCellPos> cells{};
 
     lua_State* const rawState = cellListArg.m_state->m_state;
     if (lua_type(rawState, cellListArg.m_stackIndex) != LUA_TTABLE) {
@@ -3203,7 +3203,7 @@ namespace moho
 
       if (!cellObject.IsTable() || cellObject.GetCount() != 2) {
         if (cellObject.IsTable()) {
-          const msvc8::string describe = gpg::STR_Printf("%d element table", cellObject.GetCount());
+          const fa::string describe = gpg::STR_Printf("%d element table", cellObject.GetCount());
           LuaPlus::LuaState::Error(state, kInvalidCellError, kIssueBuildMobileName, describe.c_str());
         } else {
           const LuaPlus::LuaObject listObject(cellListArg);
@@ -3262,7 +3262,7 @@ namespace moho
       ResolveUnitBlueprintFromLuaArgument(state, LuaPlus::LuaStackObject(state, 3), kIssueBuildMobileName);
 
     // arg4: cell list.
-    const msvc8::vector<SOCellPos> cells = func_GetCells(state, LuaPlus::LuaStackObject(state, 4));
+    const fa::vector<SOCellPos> cells = func_GetCells(state, LuaPlus::LuaStackObject(state, 4));
 
     if (blueprint == nullptr) {
       return 0;

@@ -41,10 +41,10 @@ namespace moho
     [[nodiscard]] gpg::Rect2i SkirtRectToCellRect(const gpg::Rect2f& skirt) noexcept
     {
       gpg::Rect2i out{};
-      out.x0 = msvc8::FloorToIntX87(skirt.x0 - 1.0f);
-      out.x1 = msvc8::CeilToIntX87(skirt.x1 + 1.0f);
-      out.z0 = msvc8::FloorToIntX87(skirt.z0 - 1.0f);
-      out.z1 = msvc8::CeilToIntX87(skirt.z1 + 1.0f);
+      out.x0 = fa::FloorToIntX87(skirt.x0 - 1.0f);
+      out.x1 = fa::CeilToIntX87(skirt.x1 + 1.0f);
+      out.z0 = fa::FloorToIntX87(skirt.z0 - 1.0f);
+      out.z1 = fa::CeilToIntX87(skirt.z1 + 1.0f);
       return out;
     }
 
@@ -740,12 +740,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitCallTeleport(gpg::RRef* const outRef, moho::CUnitCallTeleport* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitCallTeleport>());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

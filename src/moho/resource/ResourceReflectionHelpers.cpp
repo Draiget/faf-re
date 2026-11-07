@@ -61,13 +61,7 @@ namespace moho::resource_reflection
       return;
     }
 
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    ownerType->AddBase(baseField);
+    gpg::AddReflectedBaseType(ownerType, baseType);
   }
 
   void RegisterSerializeCallbacks(

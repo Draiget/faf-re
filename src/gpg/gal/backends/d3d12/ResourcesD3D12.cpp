@@ -462,7 +462,11 @@ namespace gpg::gal
     // circle count from every ring batch - and fresh upload memory there
     // drew garbage vision volumes into the minimap fog.
     const d3d12::UploadAllocation chunk = device.AllocateUpload(mByteWidth, 256U);
-    std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
+    if (mLockedRangeOnly && gLockedRangeOnly) {
+      std::memcpy(chunk.cpu + mLockOffset, mShadow.data() + mLockOffset, mLockSize);
+    } else {
+      std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
+    }
     TakeChunk(device, chunk);
   }
 

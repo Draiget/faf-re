@@ -1092,13 +1092,7 @@ void moho::CSlideManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const 
     return;
   }
 
-  gpg::RField baseField{};
-  baseField.mName = baseType->GetName();
-  baseField.mType = baseType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBaseType(typeInfo, baseType);
 }
 
 /**
@@ -1181,12 +1175,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CSlideManipulator(gpg::RRef* const outRef, moho::CSlideManipulator* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, CachedCSlideManipulatorType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value, &CachedCSlideManipulatorType);
   }
 } // namespace gpg
 

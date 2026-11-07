@@ -369,12 +369,7 @@ namespace gpg
     moho::CUnitCallAirStagingPlatform* const value
   )
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitCallAirStagingPlatform>());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

@@ -1,5 +1,6 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/sim/UserLuaPrivate.h"
+#include "gpg/core/diagnostics/BuildInfo.h"
 
 namespace
 {
@@ -766,7 +767,7 @@ int moho::cfunc_RandomUserL(LuaPlus::LuaState* const state)
     // 0x008BEB38..0x008BEB4D: `fild; jge; fadd 2^32; fmul [0x00E4F7B0]`, the
     // float 2^-32 (0x2F800000), stored to float once.
     constexpr float kInvTwoTo32 = 0x1p-32f;
-    const float value = msvc8::MulTwisterWord(kInvTwoTo32, math_GlobalRandomStream.twister.NextUInt32());
+    const float value = fa::MulTwisterWord(kInvTwoTo32, math_GlobalRandomStream.twister.NextUInt32());
     lua_pushnumber(rawState, value);
     return 1;
   }
@@ -2065,6 +2066,138 @@ int moho::cfunc_GetSimRateL(LuaPlus::LuaState* const state)
   lua_pushnumber(rawState, static_cast<float>(clientManager->GetSimRate()));
   return 1;
 }
+/**
+ * Engine addition (replay timeline): the viewer's bar, `/lua/ui/game/replay_timeline.lua`.
+ */
+namespace
+{
+  template <int (*Body)(lua_State*)>
+  int ReplayTimelineBinding(lua_State* const luaContext)
+  {
+    LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
+    return state != nullptr && state->m_state != nullptr ? Body(state->m_state) : 0;
+  }
+
+  int ReplayTotalTicksBody(lua_State* const rawState)
+  {
+    lua_pushnumber(rawState, static_cast<lua_Number>(moho::REPLAY_TotalTicks()));
+    return 1;
+  }
+
+  int ReplayKeyframeTicksBody(lua_State* const rawState)
+  {
+    const std::vector<std::int32_t> ticks = moho::REPLAY_KeyframeTicks();
+    lua_newtable(rawState);
+    int index = 1;
+    for (const std::int32_t tick : ticks) {
+      lua_pushnumber(rawState, static_cast<lua_Number>(index));
+      lua_pushnumber(rawState, static_cast<lua_Number>(tick));
+      lua_rawset(rawState, -3);
+      ++index;
+    }
+    return 1;
+  }
+
+  int ReplaySeekBody(lua_State* const rawState)
+  {
+    moho::CWldSession* const session = moho::WLD_GetActiveSession();
+    if (session != nullptr && lua_isnumber(rawState, 1)) {
+      moho::REPLAY_SeekTo(*session, static_cast<std::int32_t>(lua_tonumber(rawState, 1)));
+    }
+    return 0;
+  }
+
+  int ReplaySeekKindBody(lua_State* const rawState)
+  {
+    moho::CWldSession* const session = moho::WLD_GetActiveSession();
+    if (session == nullptr || !lua_isnumber(rawState, 1)) {
+      lua_pushnil(rawState);
+      return 1;
+    }
+    switch (moho::REPLAY_SeekKind(*session, static_cast<std::int32_t>(lua_tonumber(rawState, 1)))) {
+    case moho::EReplaySeekKind::LoadKeyframe:
+      lua_pushstring(rawState, "load");
+      break;
+    case moho::EReplaySeekKind::PlayForward:
+      lua_pushstring(rawState, "play");
+      break;
+    default:
+      lua_pushnil(rawState);
+      break;
+    }
+    return 1;
+  }
+
+  int ReplayCancelSeekBody(lua_State* const)
+  {
+    moho::REPLAY_CancelSeek();
+    return 0;
+  }
+
+  int ReplaySeekProgressBody(lua_State* const rawState)
+  {
+    moho::CWldSession* const session = moho::WLD_GetActiveSession();
+    if (session == nullptr || !moho::REPLAY_IsSeeking()) {
+      lua_pushnil(rawState);
+      return 1;
+    }
+    const moho::SReplaySeekProgress progress = moho::REPLAY_SeekProgress(*session);
+    lua_newtable(rawState);
+    lua_pushstring(rawState, "targetTick");
+    lua_pushnumber(rawState, static_cast<lua_Number>(progress.targetTick));
+    lua_rawset(rawState, -3);
+    lua_pushstring(rawState, "currentTick");
+    lua_pushnumber(rawState, static_cast<lua_Number>(progress.currentTick));
+    lua_rawset(rawState, -3);
+    lua_pushstring(rawState, "progress");
+    lua_pushnumber(rawState, static_cast<lua_Number>(progress.progress));
+    lua_rawset(rawState, -3);
+    lua_pushstring(rawState, "restarting");
+    lua_pushboolean(rawState, progress.restarting ? 1 : 0);
+    lua_rawset(rawState, -3);
+    return 1;
+  }
+
+  /**
+   * Engine addition (issue #327): `GetEngineInfo()` - which engine runs the UI. FAF's own Lua carries
+   * faf-re's options and screens behind `if rawget(_G, 'GetEngineInfo') then`, so on the original
+   * executable, which has no such function, nothing changes. Name is always "faf-re"; Version is the
+   * release or nightly tag (or the short commit of any other build), Commit the short commit.
+   */
+  int GetEngineInfoBody(lua_State* const rawState)
+  {
+    lua_newtable(rawState);
+    lua_pushstring(rawState, "Name");
+    lua_pushstring(rawState, "faf-re");
+    lua_rawset(rawState, -3);
+    lua_pushstring(rawState, "Version");
+    lua_pushstring(rawState, gpg::diag::BuildVersion());
+    lua_rawset(rawState, -3);
+    lua_pushstring(rawState, "Commit");
+    lua_pushstring(rawState, gpg::diag::BuildCommitShort());
+    lua_rawset(rawState, -3);
+    return 1;
+  }
+
+  void RegisterReplayTimelineBindings()
+  {
+    static CScrLuaBinder engineInfo(moho::SCR_UserLuaInitSet(), "GetEngineInfo", &ReplayTimelineBinding<&GetEngineInfoBody>, nullptr, "<global>",
+      "table GetEngineInfo() - the engine running the UI: Name 'faf-re', Version (release or nightly tag), Commit. Absent on the original executable.");
+    static CScrLuaBinder total(moho::SCR_UserLuaInitSet(), "GetReplayTotalTicks", &ReplayTimelineBinding<&ReplayTotalTicksBody>, nullptr, "<global>",
+      "int GetReplayTotalTicks() - the replay's length in ticks; 0 when not known.");
+    static CScrLuaBinder keyframes(moho::SCR_UserLuaInitSet(), "GetReplayKeyframeTicks", &ReplayTimelineBinding<&ReplayKeyframeTicksBody>, nullptr, "<global>",
+      "table GetReplayKeyframeTicks() - the ticks with a keyframe to move back to, in order.");
+    static CScrLuaBinder seek(moho::SCR_UserLuaInitSet(), "ReplaySeek", &ReplayTimelineBinding<&ReplaySeekBody>, nullptr, "<global>",
+      "ReplaySeek(tick) - moves the replay to a tick, either way, keeping the view.");
+    static CScrLuaBinder seekKind(moho::SCR_UserLuaInitSet(), "ReplaySeekKind", &ReplayTimelineBinding<&ReplaySeekKindBody>, nullptr, "<global>",
+      "string ReplaySeekKind(tick) - what ReplaySeek(tick) would do now: 'load' a keyframe or 'play' forward; nil when nothing or not known yet.");
+    static CScrLuaBinder cancel(moho::SCR_UserLuaInitSet(), "ReplayCancelSeek", &ReplayTimelineBinding<&ReplayCancelSeekBody>, nullptr, "<global>",
+      "ReplayCancelSeek() - stops a seek where it is.");
+    static CScrLuaBinder progress(moho::SCR_UserLuaInitSet(), "ReplaySeekProgress", &ReplayTimelineBinding<&ReplaySeekProgressBody>, nullptr, "<global>",
+      "table ReplaySeekProgress() - targetTick, currentTick, progress, restarting; nil when not seeking.");
+  }
+} // namespace
+
 namespace
 {
   /**
@@ -2076,6 +2209,7 @@ namespace
   {
     UserLuaFuncDefBootstrap()
     {
+      RegisterReplayTimelineBindings();
       (void)::moho::func_ParseEntityCategoryUser_LuaFuncDef();
       (void)::moho::func_GetUnitCommandFromCommandCap_LuaFuncDef();
       (void)::moho::func_EjectSessionClient_LuaFuncDef();

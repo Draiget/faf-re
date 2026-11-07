@@ -111,7 +111,7 @@ namespace
 
     const char* const expected = gpg::RTypeOf<STaskEventLinkage>()->GetName();
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "STaskEventLinkage",
@@ -148,7 +148,7 @@ namespace
 
     const char* const expected = gpg::RTypeOf<STaskEventLinkage>()->GetName();
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "STaskEventLinkage",
@@ -331,26 +331,26 @@ RWeakPtrType<STaskEventLinkage>::~RWeakPtrType() = default;
  */
 const char* RWeakPtrType<STaskEventLinkage>::GetName() const
 {
-    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<STaskEventLinkage>()->GetName());
+    static const fa::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<STaskEventLinkage>()->GetName());
     return sName.c_str();
 }
 
 /**
  * Address: 0x00407370 (FUN_00407370, Moho::RWeakPtrType_STaskEventLinkage::GetLexical)
  */
-msvc8::string RWeakPtrType<STaskEventLinkage>::GetLexical(const gpg::RRef& ref) const
+fa::string RWeakPtrType<STaskEventLinkage>::GetLexical(const gpg::RRef& ref) const
 {
   auto* const weak = static_cast<const WeakPtr<STaskEventLinkage>*>(ref.mObj);
   if (!weak || !weak->HasValue()) {
-    return msvc8::string("NULL");
+    return fa::string("NULL");
   }
 
   const gpg::RRef linkageRef = MakeSTaskEventLinkageRef(weak->GetObjectPtr());
   if (!linkageRef.mObj) {
-    return msvc8::string("NULL");
+    return fa::string("NULL");
   }
 
-  const msvc8::string inner = linkageRef.GetLexical();
+  const fa::string inner = linkageRef.GetLexical();
   return gpg::STR_Printf("[%s]", inner.c_str());
 }
 

@@ -51,17 +51,17 @@ namespace gpg::gal
    */
   struct DeviceRuntimeInfo
   {
-    msvc8::string api;            // "D3D9", "D3D11", "D3D12", "Vulkan"
-    msvc8::string adapter;        // adapter description
-    msvc8::string driverVersion;  // when the API exposes it
-    msvc8::string featureLevel;   // "11_1", "SM3", Vulkan API version ...
+    fa::string api;            // "D3D9", "D3D11", "D3D12", "Vulkan"
+    fa::string adapter;        // adapter description
+    fa::string driverVersion;  // when the API exposes it
+    fa::string featureLevel;   // "11_1", "SM3", Vulkan API version ...
     std::uint32_t vendorId = 0, deviceId = 0;
     std::uint64_t dedicatedVideoMemory = 0;   // bytes
     std::uint64_t sharedSystemMemory = 0;
     std::uint64_t localBudget = 0, localUsage = 0;        // DXGI QueryVideoMemoryInfo / VK_EXT_memory_budget
     std::uint64_t nonLocalBudget = 0, nonLocalUsage = 0;
     std::uint64_t availableTextureMemory = 0; // D3D9 GetAvailableTextureMem
-    msvc8::string swapChain;      // e.g. "1280x720 flip-discard 3 buffers, tearing"
+    fa::string swapChain;      // e.g. "1280x720 flip-discard 3 buffers, tearing"
     bool vsync = false;
     std::uint32_t gpuDrivenFeatures = 0;
   };
@@ -181,7 +181,7 @@ namespace gpg::gal
      * code that calls it walks the result at a 12-byte stride (0x008D2305). The
      * shipped D3D10 body is empty (0x008F86F0, `ret 8`); FAF fills it.
      */
-    virtual void GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, int adapterIndex) = 0;
+    virtual void GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, int adapterIndex) = 0;
     /**
      * Slot: 7 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
@@ -325,7 +325,7 @@ namespace gpg::gal
      */
     virtual void SaveCubeRenderTarget(
       const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
-      const msvc8::string& filePath
+      const fa::string& filePath
     ) = 0;
     /**
      * Slot: 21 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
@@ -336,7 +336,7 @@ namespace gpg::gal
      */
     virtual void SaveRenderTarget(
       const boost::shared_ptr<RenderTarget>& renderTarget,
-      const msvc8::string& filePath,
+      const fa::string& filePath,
       int fileFormat
     ) = 0;
     /**
@@ -348,7 +348,7 @@ namespace gpg::gal
      */
     virtual void SaveTexture(
       const boost::shared_ptr<Texture>& texture,
-      const msvc8::string& filePath,
+      const fa::string& filePath,
       int fileFormat,
       gpg::MemBuffer<char>* outBuffer
     ) = 0;
@@ -667,6 +667,13 @@ namespace gpg::gal
      */
     virtual void ReleaseBufferCopy(VertexBuffer& buffer);
     virtual void ReleaseBufferCopy(IndexBuffer& buffer);
+
+    /**
+     * Engine addition: draws of this dynamic buffer only read what its latest locks wrote, so a
+     * backend renaming it needs to copy only those bytes. Nothing here.
+     */
+    virtual void CopyLockedRangeOnly(VertexBuffer& buffer);
+    virtual void CopyLockedRangeOnly(IndexBuffer& buffer);
 
   protected:
     OutputContext outputContext_{}; // +0x04 the bound targets (`ClearTarget` / `GetContext`)

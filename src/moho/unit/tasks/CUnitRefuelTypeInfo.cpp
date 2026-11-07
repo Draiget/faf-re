@@ -93,10 +93,7 @@ namespace moho
    */
   gpg::RRef CUnitRefuelTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitRefuel*>(objectStorage);
-    if (object) {
-      new (object) CUnitRefuel();
-    }
+    auto* const object = gpg::ConstructInStorage<CUnitRefuel>(objectStorage);
 
     return MakeCUnitRefuelRef(object);
   }

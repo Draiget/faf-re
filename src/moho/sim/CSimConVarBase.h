@@ -97,11 +97,11 @@ namespace moho
      * Moho@@6B@+0x8` (`E` is IDA's demangled shorthand for `unsigned char`
      * here, not a real enum).)
      *
-     * `T = msvc8::string` does NOT use this generic body -- traced its raw
+     * `T = fa::string` does NOT use this generic body -- traced its raw
      * `.asm` and found the compiler splits it into two out-of-line symbols
      * instead of the single generic shape above: 0x007354E0
-     * (`TSimConVar<msvc8::string>::CreateInstance` itself -- allocates
-     * `sizeof(TSimConVarInstance<msvc8::string>)` and builds a stack copy of
+     * (`TSimConVar<fa::string>::CreateInstance` itself -- allocates
+     * `sizeof(TSimConVarInstance<fa::string>)` and builds a stack copy of
      * `mDefaultValue`) and 0x00735A30 (the placement-construct step, taking
      * the raw memory, `mName`, and that copy by value -- see
      * `ConstructTSimConVarInstanceString`, CSimConVarInstanceBase.h/.cpp).
@@ -164,7 +164,7 @@ namespace moho
    * specialization rather than sharing the generic template body.
    */
   template <>
-  CSimConVarInstanceBase* TSimConVar<msvc8::string>::CreateInstance();
+  CSimConVarInstanceBase* TSimConVar<fa::string>::CreateInstance();
 
   static_assert(
     offsetof(TSimConVar<bool>, mDefaultValue) == 0x10, "TSimConVar<bool>::mDefaultValue offset must be 0x10"
@@ -177,6 +177,6 @@ namespace moho
     offsetof(TSimConVar<std::uint8_t>, mDefaultValue) == 0x10, "TSimConVar<uint8_t>::mDefaultValue offset must be 0x10"
   );
   static_assert(
-    offsetof(TSimConVar<msvc8::string>, mDefaultValue) == 0x10, "TSimConVar<string>::mDefaultValue offset must be 0x10"
+    offsetof(TSimConVar<fa::string>, mDefaultValue) == 0x10, "TSimConVar<string>::mDefaultValue offset must be 0x10"
   );
 } // namespace moho

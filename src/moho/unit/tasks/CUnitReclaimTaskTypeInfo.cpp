@@ -26,7 +26,7 @@ namespace
    * Constructs and preregisters static RTTI descriptor storage for
    * `moho::CUnitReclaimTask`.
    */
-  [[nodiscard]] gpg::RType* construct_CUnitReclaimTaskTypeInfo()
+  [[maybe_unused]] [[nodiscard]] gpg::RType* construct_CUnitReclaimTaskTypeInfo()
   {
     return AcquireCUnitReclaimTaskTypeInfo();
   }
@@ -137,10 +137,7 @@ namespace moho
    */
   gpg::RRef CUnitReclaimTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<moho::CUnitReclaimTask*>(objectStorage);
-    if (object) {
-      new (object) moho::CUnitReclaimTask();
-    }
+    auto* const object = gpg::ConstructInStorage<moho::CUnitReclaimTask>(objectStorage);
 
     return MakeCUnitReclaimTaskRef(reinterpret_cast<CUnitReclaimTask*>(object));
   }

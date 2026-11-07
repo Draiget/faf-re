@@ -18,14 +18,14 @@ namespace moho
   class SPeer : public TDatListItem<SPeer, void>
   {
   public:
-    msvc8::string playerName;
+    fa::string playerName;
     int32_t uid{0};
     u_long address{0};
     u_short port{0};
     ENetworkPlayerState state{ENetworkPlayerState::kUnknown};
     float v2{0.0f}; // Constructor-initialized at +0x34; semantics unresolved in current evidence.
     INetConnection* peerConnection{nullptr};
-    msvc8::set<int32_t> establishedUids;
+    fa::set<int32_t> establishedUids;
     uint32_t mCmdSource{0xFFu};
     int32_t mClientInd{-1};
 
@@ -36,7 +36,7 @@ namespace moho
      * Initializes a peer record and sets default command-source/client index sentinels.
      */
     SPeer(
-      const msvc8::string& playerName,
+      const fa::string& playerName,
       int32_t uid,
       u_long address,
       u_short port,
@@ -59,7 +59,7 @@ namespace moho
      * Formats a human-readable peer endpoint string.
      */
     [[nodiscard]]
-    msvc8::string ToString() const;
+    fa::string ToString() const;
 
     /**
      * Address: 0x007C2950 (FUN_007C2950)

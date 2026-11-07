@@ -52,6 +52,9 @@ func (s *Seat) startJarBridge(ctx context.Context, bind string, jarPort int) (in
 	}
 	b := &jarBridge{s: s, bind: bind, jarPort: jarPort, ln: ln, peers: map[int]*net.UDPConn{},
 		shaper: newLinkShaper(os.Getenv("FAF_NETLINK_TEST_SHAPING"))}
+	s.mu.Lock()
+	s.bridge = b
+	s.mu.Unlock()
 	go b.serve(ctx)
 	return ln.Addr().(*net.TCPAddr).Port, nil
 }
@@ -73,10 +76,17 @@ func (b *jarBridge) serve(ctx context.Context) {
 			c.Close()
 		}
 	}()
-	game, err := b.ln.Accept()
-	if err != nil {
-		return
+	// More than one game, if one crashes and is started again.
+	for {
+		game, err := b.ln.Accept()
+		if err != nil {
+			return
+		}
+		b.serveGame(game)
 	}
+}
+
+func (b *jarBridge) serveGame(game net.Conn) {
 	defer game.Close()
 	jar, err := net.Dial("tcp", "127.0.0.1:"+strconv.Itoa(b.jarPort))
 	if err != nil {

@@ -202,10 +202,7 @@ void EntityCategoryTypeInfo::Delete(void* const objectStorage)
  */
 gpg::RRef EntityCategoryTypeInfo::CtrRef(void* const objectStorage)
 {
-  auto* const categorySet = static_cast<EntityCategorySet*>(objectStorage);
-  if (categorySet) {
-    new (categorySet) EntityCategorySet();
-  }
+  auto* const categorySet = gpg::ConstructInStorage<EntityCategorySet>(objectStorage);
   return MakeEntityCategoryRef(categorySet);
 }
 

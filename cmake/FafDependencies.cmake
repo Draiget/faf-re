@@ -7,7 +7,7 @@
 #     missing and moved when their pin changes, always with core.autocrlf=false.
 #     Git for Windows turns autocrlf on system-wide, and converted line endings
 #     break the CR-exact patches.
-#   * Downloads (boost 1.34.1, wxWindows 2.4.2, DXC, libjuice, libdatachannel and its deps): pinned by SHA256, cached in
+#   * Downloads (boost 1.34.1, wxWindows 2.4.2, DXC, DirectXTex, libjuice, libdatachannel and its deps): pinned by SHA256, cached in
 #     dependencies/.downloads and extracted into dependencies/<name>.
 #   * Patches (dependencies/patches): applied in order onto a fresh baseline. A
 #     stamp file in each tree records the patches (and their hashes) it carries,
@@ -221,6 +221,43 @@ set(_faf_download_monocypher
     "https://github.com/LoupVaillant/Monocypher/archive/refs/tags/4.0.2.tar.gz"
     "bc1ca30b1b2654e4e7daf2492c0d204200e55137f23fda6b7142fd7d523bd6b4"
     "Monocypher-4.0.2")
+# Zstandard 1.5.7 (BSD-3-Clause): packs a returning player's save (issue #275). The release
+# archive; cmake/deps/zstd builds it.
+set(_faf_download_zstd
+    "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz"
+    "eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3"
+    "zstd-1.5.7")
+
+# FreeType 2.15.0 (FTL): reads font outlines for MSDF text (moho/render/font, issue #306). The
+# release archive, checksum from the release announcement; cmake/deps/freetype builds it as a
+# static library with only what that needs.
+set(_faf_download_freetype
+    "https://download.savannah.gnu.org/releases/freetype/freetype-2.15.0.tar.gz"
+    "9186627467a616d9a9e3e574748ac0c45fa77398e6364edef3041a8ba8d92f64"
+    "freetype-2.15.0")
+# msdfgen 1.13 (MIT): generates MSDF glyphs from those outlines (issue #306). The tag's source
+# archive; cmake/deps/msdfgen builds the static library.
+set(_faf_download_msdfgen
+    "https://github.com/Chlumsky/msdfgen/archive/refs/tags/v1.13.tar.gz"
+    "93cd1ad8918c1a78c5c96e82d4f4c77f0eb86c2e7e8579a0967e54196c4b7167"
+    "msdfgen-1.13"
+    "msdfgen-1.13.tar.gz")
+# GoogleTest 1.15.2 (BSD-3-Clause): the tests' framework (tests/README.md). The tag's source
+# archive; cmake/deps/googletest builds gtest and gtest_main without gmock.
+set(_faf_download_googletest
+    "https://github.com/google/googletest/archive/refs/tags/v1.15.2.tar.gz"
+    "7b42b4d6ed48810c5362c265a17faebe90dc2373c885e5216439d37927f02926"
+    "googletest-1.15.2"
+    "googletest-1.15.2.tar.gz")
+
+# DirectXTex may2026 (MIT): decodes textures when d3dx11_43.dll is missing
+# (gpg/gal/backends/common/ImageCodecDirectXTex.cpp, issue #318). The tag's source archive;
+# cmake/deps/directxtex builds its CPU code.
+set(_faf_download_DirectXTex
+    "https://github.com/microsoft/DirectXTex/archive/refs/tags/may2026.tar.gz"
+    "204ae68a66fb15d87867d836efbac9ae5aa799ca2a1867024d96a8168fa3651f"
+    "DirectXTex-may2026"
+    "DirectXTex-may2026.tar.gz")
 
 function(_faf_download_tree name)
   list(GET _faf_download_${name} 0 _url)
@@ -389,6 +426,19 @@ faf_dependency_download(usrsctp)
 faf_dependency_download(plog)
 faf_dependency_download(mbedtls)
 faf_dependency_download(monocypher)
+faf_dependency_download(DirectXTex)
+if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})
+  faf_dependency_download(freetype)
+endif()
+if(NOT FAF_MSDFGEN_DIR AND NOT DEFINED ENV{FAF_MSDFGEN_DIR})
+  faf_dependency_download(msdfgen)
+endif()
+if(NOT FAF_ZSTD_DIR)
+  faf_dependency_download(zstd)
+endif()
+if(NOT DEFINED ENV{FAF_GTEST_DIR} AND NOT (FAF_GTEST_DIR AND EXISTS "${FAF_GTEST_DIR}/CMakeLists.txt"))
+  faf_dependency_download(googletest)
+endif()
 
 faf_dependency_patches(WildMagic3p8 submodule
   wildmagic3p8_faf_required.patch)
@@ -396,6 +446,12 @@ faf_dependency_patches(zlib-1.2.3 submodule
   zlib_1_2_3_faf_required.patch)
 faf_dependency_patches(boost_1_34_1 download
   boost_1_34_1_faf_required.patch)
+faf_dependency_patches(libjuice download
+  libjuice_1_7_4_faf_turn_release.patch)
 faf_dependency_patches(wxWindows-2.4.2 download
   wxwindows_2_4_2_faf_required.patch wxwindows_2_4_2_faf_x64.patch wxwindows_2_4_2_faf_x64_pointers.patch)
+if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})
+  faf_dependency_patches(freetype download
+    freetype_2_15_0_faf_oom.patch)
+endif()
 _faf_wx_generated()

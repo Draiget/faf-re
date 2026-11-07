@@ -109,10 +109,7 @@ namespace moho
    */
   gpg::RRef CUnitCarrierLandTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<moho::CUnitCarrierLand*>(objectStorage);
-    if (object) {
-      new (object) moho::CUnitCarrierLand();
-    }
+    auto* const object = gpg::ConstructInStorage<moho::CUnitCarrierLand>(objectStorage);
     return MakeCUnitCarrierLandRef(object);
   }
 
@@ -266,7 +263,7 @@ namespace
    * `version` and the owner-ref lane are unused by the member (mirrors the
    * binary tail call).
    */
-  void DeserializeCUnitCarrierLandSerializerCallback(
+  [[maybe_unused]] void DeserializeCUnitCarrierLandSerializerCallback(
     gpg::ReadArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -289,7 +286,7 @@ namespace
    * `version` and the owner-ref lane are unused by the member (mirrors the
    * binary tail call).
    */
-  void SerializeCUnitCarrierLandSerializerCallback(
+  [[maybe_unused]] void SerializeCUnitCarrierLandSerializerCallback(
     gpg::WriteArchive* const archive,
     const std::intptr_t objectPtr,
     const int,

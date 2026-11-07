@@ -30,7 +30,7 @@ namespace
     ~CAiBuilderRebuildMapTypeInfo() override = default;
 
     [[nodiscard]] const char* GetName() const override;
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
     void Init() override;
   };
 
@@ -117,7 +117,7 @@ namespace
 
     const char* const expected = expectedType->GetName();
     const char* const actual = source.GetTypeName();
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "RUnitBlueprint",
@@ -244,7 +244,7 @@ void CAiBuilderImplTypeInfo::Init()
  */
 const char* CAiBuilderRebuildMapTypeInfo::GetName() const
 {
-  static const msvc8::string sName =
+  static const fa::string sName =
     gpg::STR_Printf("map<%s,%s>", gpg::RTypeOf<unsigned int>()->GetName(), RUnitBlueprint::GetPointerType()->GetName());
   return sName.c_str();
 }
@@ -252,9 +252,9 @@ const char* CAiBuilderRebuildMapTypeInfo::GetName() const
 /**
  * Address: 0x005A0590 (FUN_005A0590, gpg::RMapType_uint_RUnitBlueprintP::GetLexical)
  */
-msvc8::string CAiBuilderRebuildMapTypeInfo::GetLexical(const gpg::RRef& ref) const
+fa::string CAiBuilderRebuildMapTypeInfo::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string lexical = gpg::RType::GetLexical(ref);
+  const fa::string lexical = gpg::RType::GetLexical(ref);
   const auto* const map = static_cast<const SBuilderRebuildMap*>(ref.mObj);
   const unsigned int count = map ? static_cast<unsigned int>(map->size()) : 0u;
   return gpg::STR_Printf("%s, size=%d", lexical.c_str(), static_cast<int>(count));

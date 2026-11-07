@@ -9,24 +9,6 @@
 namespace
 {
 
-  [[nodiscard]] gpg::RType* ResolveVTransformType()
-  {
-    static gpg::RType* cached = nullptr;
-    return gpg::CachedLookup<moho::VTransform>(cached);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    return gpg::CachedLookup<Wm3::Vector3<float>>(cached);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVector4fType()
-  {
-    static gpg::RType* cached = nullptr;
-    return gpg::CachedLookup<moho::Vector4f>(cached);
-  }
-
   [[nodiscard]] gpg::RType* ResolveSWorldBeamBlendModeType()
   {
     return gpg::CachedLookup<moho::SWorldBeam::BlendMode>(moho::SWorldBeam::sBlendModeType);
@@ -70,17 +52,17 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Read(ResolveVTransformType(), &mCurStart, nullOwner);
-    archive->Read(ResolveVTransformType(), &mLastStart, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::VTransform>(), &mCurStart, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::VTransform>(), &mLastStart, nullOwner);
     archive->ReadBool(&mFromStart);
-    archive->Read(ResolveVTransformType(), &mCurEnd, nullOwner);
-    archive->Read(ResolveVTransformType(), &mLastEnd, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::VTransform>(), &mCurEnd, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::VTransform>(), &mLastEnd, nullOwner);
     archive->ReadFloat(&mLastInterpolation);
-    archive->Read(ResolveVector3fType(), &mStart, nullOwner);
-    archive->Read(ResolveVector3fType(), &mEnd, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3<float>>(), &mStart, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3<float>>(), &mEnd, nullOwner);
     archive->ReadFloat(&mWidth);
-    archive->Read(ResolveVector4fType(), &mStartColor, nullOwner);
-    archive->Read(ResolveVector4fType(), &mEndColor, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::Vector4f>(), &mStartColor, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::Vector4f>(), &mEndColor, nullOwner);
     archive->Read(gpg::RTypeOf<moho::CountedPtr_CParticleTexture>(), &mTexture1, nullOwner);
     archive->Read(gpg::RTypeOf<moho::CountedPtr_CParticleTexture>(), &mTexture2, nullOwner);
     archive->ReadFloat(&mUShift);
@@ -98,17 +80,17 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Write(ResolveVTransformType(), &mCurStart, nullOwner);
-    archive->Write(ResolveVTransformType(), &mLastStart, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::VTransform>(), &mCurStart, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::VTransform>(), &mLastStart, nullOwner);
     archive->WriteBool(mFromStart);
-    archive->Write(ResolveVTransformType(), &mCurEnd, nullOwner);
-    archive->Write(ResolveVTransformType(), &mLastEnd, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::VTransform>(), &mCurEnd, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::VTransform>(), &mLastEnd, nullOwner);
     archive->WriteFloat(mLastInterpolation);
-    archive->Write(ResolveVector3fType(), &mStart, nullOwner);
-    archive->Write(ResolveVector3fType(), &mEnd, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3<float>>(), &mStart, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3<float>>(), &mEnd, nullOwner);
     archive->WriteFloat(mWidth);
-    archive->Write(ResolveVector4fType(), &mStartColor, nullOwner);
-    archive->Write(ResolveVector4fType(), &mEndColor, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::Vector4f>(), &mStartColor, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::Vector4f>(), &mEndColor, nullOwner);
     archive->Write(gpg::RTypeOf<moho::CountedPtr_CParticleTexture>(), &mTexture1, nullOwner);
     archive->Write(gpg::RTypeOf<moho::CountedPtr_CParticleTexture>(), &mTexture2, nullOwner);
     archive->WriteFloat(mUShift);

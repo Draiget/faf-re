@@ -46,7 +46,7 @@ namespace
 
     const char* const expected = expectedType ? expectedType->GetName() : "<unknown>";
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "<unknown>",
@@ -161,7 +161,7 @@ namespace
 
     const char* const expected = gpg::RTypeOf<CTaskStage>() ? gpg::RTypeOf<CTaskStage>()->GetName() : "<unknown>";
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "<unknown>",
@@ -208,7 +208,7 @@ namespace
     if (!thread) {
       const char* const expected = gpg::RTypeOf<CTaskThread>()->GetName();
       const char* const actual = source.GetTypeName();
-      const msvc8::string msg = gpg::STR_Printf(
+      const fa::string msg = gpg::STR_Printf(
         "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
         "instead",
         expected ? expected : "CTaskThread",

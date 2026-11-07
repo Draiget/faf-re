@@ -15,6 +15,13 @@ namespace moho
   class ID3DTextureSheet;
 
   /**
+   * Engine addition: `ren_TextureAtlasCache`. CD3DTextureBatcher::AddTexture runs for each glyph and
+   * strategic icon, and its tree search with a shared handle copy was 2 % of an uncapped frame. With
+   * this on it first looks at a small table of the last entries found, by texture address.
+   */
+  extern bool ren_TextureAtlasCache;
+
+  /**
    * VFTABLE: none (plain helper owner)
    *
    * What it does:
@@ -41,10 +48,10 @@ namespace moho
       [[nodiscard]] bool operator()(const TextureAtlasEntry& lhs, const TextureAtlasEntry& rhs) const noexcept;
     };
 
-    using AvailableRectVector = msvc8::vector<gpg::Rect2i>;
+    using AvailableRectVector = fa::vector<gpg::Rect2i>;
     using DynamicTextureSheetHandle = boost::shared_ptr<CD3DDynamicTextureSheet>;
-    using TextureAtlasSet = msvc8::set<TextureAtlasEntry, TextureAtlasEntryLess>;
-    using PixelByteVector = msvc8::vector<std::uint8_t>;
+    using TextureAtlasSet = fa::set<TextureAtlasEntry, TextureAtlasEntryLess>;
+    using PixelByteVector = fa::vector<std::uint8_t>;
 
     /**
      * Address: 0x00448A60 (FUN_00448A60)
@@ -54,6 +61,12 @@ namespace moho
      * backing store, and creates one dynamic texture sheet.
      */
     CD3DTextureBatcher();
+
+    /**
+     * Engine addition: the same atlas at another size (a multiple of 4 in both directions). The
+     * terrain splat atlas uses 2048x2048 (`ren_SplatAtlasFix`, CWldSplat.h).
+     */
+    CD3DTextureBatcher(std::int32_t width, std::int32_t height);
 
     /**
      * Address: 0x00448B60 (FUN_00448B60)

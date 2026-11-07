@@ -1,5 +1,7 @@
 #include "CD3DPrimBatcher.h"
 
+#include "moho/render/font/MsdfTextGpuRenderer.h"
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -14,6 +16,7 @@
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/ID3DIndexSheet.h"
 #include "moho/render/ID3DTextureSheet.h"
+#include "gpg/gal/Device.hpp"
 #include "moho/render/ID3DVertexStream.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DIndexSheet.h"
@@ -133,7 +136,7 @@ namespace
    * Disposes one `sp_counted_impl_p<CD3DPrimBatcher>` payload by running
    * non-deleting `CD3DPrimBatcher` teardown and releasing owned storage.
    */
-  void DisposeCountedPrimBatcherStorage(
+  [[maybe_unused]] void DisposeCountedPrimBatcherStorage(
     boost::SpCountedImplStorage<moho::CD3DPrimBatcher>* const countedStorage
   )
   {
@@ -261,6 +264,7 @@ namespace moho
    */
   CD3DPrimBatcher* CD3DPrimBatcher::Setup(const char* const techniqueName)
   {
+    MSDF_FlushPendingText();
     CD3DDevice* const device = D3D_GetDevice();
     device->SelectFxFile("primbatcher");
     device->SelectTechnique(techniqueName);
@@ -278,6 +282,7 @@ namespace moho
    */
   void CD3DPrimBatcher::SetViewMatrix(const VMatrix4& matrix)
   {
+    MSDF_FlushPendingText();
     auto* const runtime = this;
     if (!runtime->mVertices.empty()) {
       Flush();
@@ -296,6 +301,7 @@ namespace moho
    */
   void CD3DPrimBatcher::SetProjectionMatrix(const VMatrix4& matrix)
   {
+    MSDF_FlushPendingText();
     auto* const runtime = this;
     if (!runtime->mVertices.empty()) {
       Flush();
@@ -314,6 +320,7 @@ namespace moho
    */
   void CD3DPrimBatcher::SetViewProjMatrix(const GeomCamera3& camera)
   {
+    MSDF_FlushPendingText();
     auto* const runtime = this;
     if (!runtime->mVertices.empty()) {
       Flush();
@@ -417,6 +424,8 @@ namespace moho
 
     const gpg::Rect2f* uvRect = runtime->mTextureBatcher->AddTexture(texture);
     if (uvRect == nullptr) {
+      // Engine addition: pending instanced quads use this atlas too, and it's about to start over.
+      MSDF_FlushPendingText();
       if (!runtime->mVertices.empty()) {
         Flush();
       }
@@ -475,6 +484,21 @@ namespace moho
     runtime->mP1y = 1.0f;
   }
 
+  CD3DPrimBatcher::TextureBinding CD3DPrimBatcher::GetTextureBinding() const
+  {
+    return {mDynamicTexSheet, mTexture, mP1x, mP1y, mP2x, mP2y};
+  }
+
+  void CD3DPrimBatcher::SetTextureBinding(const TextureBinding& binding)
+  {
+    mDynamicTexSheet = binding.mSheet;
+    mTexture = binding.mTexture;
+    mP1x = binding.mP1x;
+    mP1y = binding.mP1y;
+    mP2x = binding.mP2x;
+    mP2y = binding.mP2y;
+  }
+
   /**
    * Address: 0x004389A0 (?DrawQuad@CD3DPrimBatcher@Moho@@QAEXABUVertex@12@000@Z)
    *
@@ -490,6 +514,13 @@ namespace moho
   )
   {
     auto* const runtime = this;
+
+    // Engine addition: with nothing queued here and the atlas bound, an interface quad joins the
+    // instanced list, which keeps submission order and is one draw (MsdfTextGpuRenderer.h).
+    if (runtime->mVertices.empty() && !runtime->mDynamicTexSheet &&
+        MsdfTextGpuRenderer::Get().QueueImageQuad(*runtime, topLeft, topRight, bottomRight, bottomLeft)) {
+      return;
+    }
 
     if (!runtime->mVertices.empty()) {
       const std::uint32_t vertexCount = static_cast<std::uint32_t>(runtime->mVertices.size());
@@ -1058,6 +1089,9 @@ namespace moho
    */
   void CD3DPrimBatcher::Flush()
   {
+    // Engine addition: glyphs waiting for an instanced draw were submitted before this batch.
+    MSDF_FlushPendingText();
+
     auto* const runtime = this;
     if (runtime->mVertices.empty()) {
       return;
@@ -1090,6 +1124,18 @@ namespace moho
 
     ID3DVertexStream* const vertexStream = runtime->mVertexSheets[runtime->mCurVertexSheet]->GetVertStream(0);
     const std::uint32_t vertexCount = static_cast<std::uint32_t>(runtime->mVertices.size());
+    // Engine addition: the draw below reads only these vertices and indices.
+    {
+      ID3DVertexStream::BufferHandle vertexBuffer;
+      gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
+      if (vertexStream->GetBuffer(vertexBuffer)) {
+        galDevice->CopyLockedRangeOnly(*vertexBuffer);
+      }
+      CD3DIndexSheet::BufferHandle indexBuffer;
+      if (runtime->mIndexSheet->GetBuffer(indexBuffer)) {
+        galDevice->CopyLockedRangeOnly(*indexBuffer);
+      }
+    }
     void* const lockedVertices = vertexStream->Lock(0, static_cast<int>(vertexCount), false, true);
     // Raw GPU upload: vertex blob into the locked D3D stream.
     std::copy_n(runtime->mVertices.data(), vertexCount, static_cast<Vertex*>(lockedVertices));
@@ -1733,6 +1779,7 @@ namespace moho
    */
   void CD3DPrimBatcher::SetToViewport(const int head, const CUIManager& manager)
   {
+    MSDF_FlushPendingText();
     if (head < 0) {
       return;
     }

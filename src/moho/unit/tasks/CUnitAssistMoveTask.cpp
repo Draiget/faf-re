@@ -474,7 +474,7 @@ namespace moho
    */
   void CUnitAssistMoveTask::MemberDeserialize(gpg::ReadArchive* const archive, int, const gpg::RRef&)
   {
-    if (archive == nullptr || this == nullptr) {
+    if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
     }
 
@@ -498,7 +498,7 @@ namespace moho
    */
   void CUnitAssistMoveTask::MemberSerialize(gpg::WriteArchive* const archive, int, const gpg::RRef&) const
   {
-    if (archive == nullptr || this == nullptr) {
+    if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
     }
 
@@ -535,12 +535,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitAssistMoveTask(gpg::RRef* const outRef, moho::CUnitAssistMoveTask* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitAssistMoveTask>());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

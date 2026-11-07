@@ -447,12 +447,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitFireAtTask(gpg::RRef* const outRef, moho::CUnitFireAtTask* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeDerivedRef(value, gpg::RTypeOf<moho::CUnitFireAtTask>());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

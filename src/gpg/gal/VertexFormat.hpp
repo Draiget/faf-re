@@ -55,7 +55,7 @@ namespace gpg::gal
         static boost::shared_ptr<VertexFormat> Create(std::uint32_t formatCode);
 
         std::uint32_t formatCode_;                   // +0x04
-        msvc8::vector<std::uint32_t> streamStrides_; // +0x08 byte stride per vertex stream
+        fa::vector<std::uint32_t> streamStrides_; // +0x08 byte stride per vertex stream
     };
 
     static_assert(offsetof(VertexFormat, formatCode_) == 0x04, "VertexFormat::formatCode_ offset must be 0x04");

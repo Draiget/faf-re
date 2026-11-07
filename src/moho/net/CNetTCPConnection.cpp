@@ -8,6 +8,7 @@
 #include "ELobbyMsg.h"
 #include "NetMessageRanges.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/misc/WeakPtr.h"
 
@@ -51,7 +52,7 @@ namespace
     }
 
     if (connection.mScheduleDestroy) {
-      delete &connection;
+      GPG_NONVIRTUAL_DESTROY(delete &connection);
       return true;
     }
     return false;
@@ -167,7 +168,7 @@ void CNetTCPConnection::Close()
  * What it does:
  * Returns "host:port" textual identity for logs/debug.
  */
-msvc8::string CNetTCPConnection::ToString()
+fa::string CNetTCPConnection::ToString()
 {
   const auto host = NET_GetHostName(mAddr);
   return gpg::STR_Printf("%s:%d", host.c_str(), mPort);
@@ -259,7 +260,7 @@ void CNetTCPConnection::Pull()
   const WeakPtr<CNetTCPConnector> connector{mConnector};
 
   if (mScheduleDestroy) {
-    delete this;
+    GPG_NONVIRTUAL_DESTROY(delete this);
     return;
   }
 
@@ -410,7 +411,7 @@ void CNetTCPConnection::Pull()
 void CNetTCPConnection::Push()
 {
   if (mScheduleDestroy) {
-    delete this;
+    GPG_NONVIRTUAL_DESTROY(delete this);
     return;
   }
 

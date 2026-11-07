@@ -79,7 +79,7 @@ namespace moho
     float Thickness{1.0f};                       // +0x30
     float UShift{0.0f};                          // +0x34
     float VShift{0.0f};                          // +0x38
-    msvc8::string TextureName;                   // +0x3C
+    fa::string TextureName;                   // +0x3C
     Vector4f StartColor{1.0f, 1.0f, 1.0f, 0.0f}; // +0x58
     Vector4f EndColor{1.0f, 1.0f, 1.0f, 0.0f};   // +0x68
     float LODCutoff{200.0f};                     // +0x78

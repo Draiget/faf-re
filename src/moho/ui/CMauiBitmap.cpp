@@ -31,7 +31,7 @@ namespace
    * Appends one texture batch entry to the bitmap's legacy vector lane.
    */
   void AppendBitmapTextureBatch(
-    msvc8::vector<boost::shared_ptr<moho::CD3DBatchTexture>>& textureBatches,
+    fa::vector<boost::shared_ptr<moho::CD3DBatchTexture>>& textureBatches,
     const boost::shared_ptr<moho::CD3DBatchTexture>& texture
   )
   {
@@ -139,8 +139,8 @@ int moho::cfunc_CMauiBitmapSetNewTextureL(
         bitmap->SetTexture(CD3DBatchTexture::FromSolidColor(0xFFAAAA00u));
       }
 
-      const msvc8::string frameText = gpg::STR_Printf("Frame %d = %s\n", frameIndex, pathText);
-      msvc8::string debugName = bitmap->GetDebugName();
+      const fa::string frameText = gpg::STR_Printf("Frame %d = %s\n", frameIndex, pathText);
+      fa::string debugName = bitmap->GetDebugName();
       debugName += frameText;
       bitmap->SetDebugName(debugName);
     }
@@ -216,7 +216,7 @@ int moho::cfunc_CMauiBitmapInternalSetSolidColorL(
     colorText = "";
   }
 
-  msvc8::string debugName("Bitmap is solid color ");
+  fa::string debugName("Bitmap is solid color ");
   debugName += colorText;
   bitmap->SetDebugName(debugName);
 
@@ -1060,7 +1060,7 @@ int moho::cfunc_CMauiBitmapSetFramePatternL(
     LuaPlus::LuaObject frameTableObject(LuaPlus::LuaStackObject(state, 2));
     const int frameCount = frameTableObject.GetCount();
 
-    msvc8::vector<std::int32_t> framePattern{};
+    fa::vector<std::int32_t> framePattern{};
     if (frameCount > 0) {
       framePattern.reserve(static_cast<std::size_t>(frameCount));
     }
@@ -1553,7 +1553,7 @@ void moho::CMauiBitmap::SetTexture(
  * negative or out-of-range values.
  */
 void moho::CMauiBitmap::SetFramePattern(
-  const msvc8::vector<std::int32_t>& framePattern
+  const fa::vector<std::int32_t>& framePattern
 )
 {
   mFrames.clear();
@@ -1863,8 +1863,5 @@ gpg::RType* moho::CMauiBitmap::GetClass() const
  */
 gpg::RRef moho::CMauiBitmap::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }

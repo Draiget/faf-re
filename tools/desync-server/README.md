@@ -1,6 +1,6 @@
 # Desync test server
 
-Collects the desync reports faf-re clients send ([docs/DESYNC_DIAGNOSTICS.md](../../docs/DESYNC_DIAGNOSTICS.md)): an OpenTelemetry Collector for the small records (`faf.desync`, `faf.game.end`) and the dump receiver ([`tools/desync-diff/receive.py`](../desync-diff/receive.py)) for the dump files, which it stores per game, compares once two players' dumps are in, and serves back for download. Nothing here names a host: the server's name is set when it is deployed.
+Collects the desync reports faf-re clients send ([docs/DESYNC_DIAGNOSTICS.md](../../docs/DESYNC_DIAGNOSTICS.md)): an OpenTelemetry Collector for the small records (`faf.desync`, `faf.game.end`) and the dump receiver (`desync-diff serve`, [`tools/cmd/desync-diff`](../cmd/desync-diff/README.md), Go with the standard library only) for the dump files, which it stores per game, compares once two players' dumps are in, and serves back for download. Nothing here names a host: the server's name is set when it is deployed.
 
 | Path | Service | What |
 |---|---|---|
@@ -31,26 +31,25 @@ docker compose up -d
 docker compose logs -f
 ```
 
-`compose.yaml` mounts `../desync-diff/receive.py` and `desync_diff.py` into a stock `python:3.12-slim` image and runs the contrib collector image (`otel/opentelemetry-collector-contrib:0.164.0`, for its `bearertokenauth` extension). Data stays in `data/otel` and `data/dumps`. Each container is capped at 1 CPU and 512 MB. The ports are plain HTTP: for players on the internet, put a TLS proxy in front (Caddy, nginx, a cloud load balancer) that forwards `/v1/logs` to 4318 and `/dumps` to 4319 and allows request bodies of 64 MB.
+`compose.yaml` mounts `../cmd/desync-diff` into a stock `golang:1.25.5-alpine` image, which builds the receiver at start (the build cache stays in `data/gocache`), and runs the contrib collector image (`otel/opentelemetry-collector-contrib:0.164.0`, for its `bearertokenauth` extension). Data stays in `data/otel` and `data/dumps`. Each container is capped at 1 CPU and 512 MB. The ports are plain HTTP: for players on the internet, put a TLS proxy in front (Caddy, nginx, a cloud load balancer) that forwards `/v1/logs` to 4318 and `/dumps` to 4319 and allows request bodies of 64 MB.
 
 `docker compose down` stops it; `data/` keeps what arrived.
 
 ## Kubernetes
 
-`k8s/desync-server.yaml` has a namespace `faf-desync`, one 10 Gi volume (both services, by subPath), the two Deployments with their Services, and one Ingress for both paths. Before applying it:
+`k8s/desync-server.yaml` has a namespace `faf-desync`, one 10 Gi volume (both services, by subPath), the two Deployments with their Services, and one Ingress for both paths. The receiver's pod builds it from its Go sources in a ConfigMap (an init container with `golang:1.25.5-alpine`) and runs it in `alpine:3.22.2`, so no image has to be built or pushed. Before applying it:
 
 ```sh
 kubectl apply -f k8s/desync-server.yaml --dry-run=client   # check it parses
 kubectl create namespace faf-desync
 kubectl -n faf-desync create secret generic faf-desync-tokens \
   --from-literal=FAF_UPLOAD_TOKEN=<upload token> --from-literal=FAF_READ_TOKEN=<read token>
-kubectl -n faf-desync create configmap faf-desync-tools \
-  --from-file=../desync-diff/receive.py --from-file=../desync-diff/desync_diff.py
+kubectl -n faf-desync create configmap faf-desync-diff --from-file=../cmd/desync-diff/
 kubectl -n faf-desync create configmap faf-desync-collector --from-file=collector.yaml
 sed 's/HOST/<host>/g' k8s/desync-server.yaml | kubectl apply -f -
 ```
 
-In the Ingress, set `ingressClassName`, a cert-manager issuer (or a TLS secret) and, with external-dns, its annotations. The PersistentVolumeClaim uses the cluster's default storage class unless `storageClassName` is set. To update the receiver after a change to `receive.py`, recreate the `faf-desync-tools` ConfigMap (`--dry-run=client -o yaml | kubectl apply -f -`) and `kubectl -n faf-desync rollout restart deployment/dumps`.
+In the Ingress, set `ingressClassName`, a cert-manager issuer (or a TLS secret) and, with external-dns, its annotations. The PersistentVolumeClaim uses the cluster's default storage class unless `storageClassName` is set. To update the receiver after a change to its sources, recreate the `faf-desync-diff` ConfigMap (`--dry-run=client -o yaml | kubectl apply -f -`) and `kubectl -n faf-desync rollout restart deployment/dumps`.
 
 ## Checking a deployment
 

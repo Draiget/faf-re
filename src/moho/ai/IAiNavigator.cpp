@@ -312,7 +312,7 @@ namespace
  */
 const char* moho::RBroadcasterRType_EAiNavigatorEvent::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("Broadcaster<%s>", ResolveEAiNavigatorEventType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("Broadcaster<%s>", ResolveEAiNavigatorEventType()->GetName());
   return sName.c_str();
 }
 
@@ -386,7 +386,7 @@ void moho::RBroadcasterRType_EAiNavigatorEvent::SerSave(
  */
 const char* moho::RListenerRType_EAiNavigatorEvent::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("Listener<%s>", ResolveEAiNavigatorEventType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("Listener<%s>", ResolveEAiNavigatorEventType()->GetName());
   return sName.c_str();
 }
 
@@ -725,7 +725,7 @@ namespace
    * What it does:
    * Alias lane for storing one 32-bit value through an output pointer.
    */
-  [[nodiscard]] std::uint32_t* StoreDwordValueAlias(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreDwordValueAlias(
     std::uint32_t* const destination,
     const std::uint32_t value
   ) noexcept
@@ -740,7 +740,7 @@ namespace
    * Secondary alias lane for storing one 32-bit value through an output
    * pointer.
    */
-  [[nodiscard]] std::uint32_t* StoreDwordValueAlias2(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreDwordValueAlias2(
     std::uint32_t* const destination,
     const std::uint32_t value
   ) noexcept
@@ -765,7 +765,7 @@ namespace
    * What it does:
    * Alias lane for loading one 32-bit value from a source pointer.
    */
-  [[nodiscard]] std::uint32_t LoadDwordValueAlias(const std::uint32_t* const source) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint32_t LoadDwordValueAlias(const std::uint32_t* const source) noexcept
   {
     return LoadDwordValue(source);
   }
@@ -776,7 +776,7 @@ namespace
    * What it does:
    * Secondary alias lane for loading one 32-bit value from a source pointer.
    */
-  [[nodiscard]] std::uint32_t LoadDwordValueAlias2(const std::uint32_t* const source) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint32_t LoadDwordValueAlias2(const std::uint32_t* const source) noexcept
   {
     return LoadDwordValue(source);
   }
@@ -788,7 +788,7 @@ namespace
    * Reads one stored 32-bit base value, advances it by `index * 4`, and writes
    * the adjusted value to the destination pointer.
    */
-  [[nodiscard]] std::uint32_t* AdvanceStoredDwordValue(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* AdvanceStoredDwordValue(
     std::uint32_t* const destination,
     const std::uint32_t* const source,
     const std::uint32_t index
@@ -807,7 +807,7 @@ namespace
    * Loads the third 32-bit lane from a source array and stores it through the
    * destination pointer.
    */
-  [[nodiscard]] std::uint32_t* LoadThirdDword(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* LoadThirdDword(
     std::uint32_t* const destination,
     const std::uint32_t* const source
   ) noexcept
@@ -888,7 +888,7 @@ namespace
    * Zero-length fill bridge that preserves the legacy no-op call shape used by
    * the caller thunk lane.
    */
-  [[nodiscard]] std::uint32_t FillZeroCellsBridge(SOCellPos* const destination) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint32_t FillZeroCellsBridge(SOCellPos* const destination) noexcept
   {
     const SOCellPos zeroCell{};
     return FillCellsWithValue(0u, zeroCell, destination);
@@ -901,7 +901,7 @@ namespace
    * Zero-length copy bridge that preserves the legacy null-tolerant forward
    * copy call shape.
    */
-  [[nodiscard]] SOCellPos* CopyZeroCellRangeBridge(SOCellPos* const destination) noexcept
+  [[maybe_unused]] [[nodiscard]] SOCellPos* CopyZeroCellRangeBridge(SOCellPos* const destination) noexcept
   {
     return CopyCellsForwardAllowNull(destination, nullptr, nullptr);
   }
@@ -912,7 +912,7 @@ namespace
    * What it does:
    * Secondary zero-length copy bridge for the same null-tolerant lane.
    */
-  [[nodiscard]] SOCellPos* CopyZeroCellRangeBridge2(SOCellPos* const destination) noexcept
+  [[maybe_unused]] [[nodiscard]] SOCellPos* CopyZeroCellRangeBridge2(SOCellPos* const destination) noexcept
   {
     return CopyCellsForwardAllowNull(destination, nullptr, nullptr);
   }
@@ -923,7 +923,7 @@ namespace
    * What it does:
    * Extracts the high byte from one 32-bit packed lane value.
    */
-  [[nodiscard]] std::uint8_t ExtractArgumentHighByte(const std::uint32_t value) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint8_t ExtractArgumentHighByte(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
   }

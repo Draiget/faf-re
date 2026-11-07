@@ -11,7 +11,7 @@ namespace
    * What it does:
    * Allocates one 3152-byte (0xC50) buffer through VC8's `_Allocate` with the
    * count folded to the constant (0x008620F0, cited on
-   * `msvc8::detail::allocate_checked`), zeroes the first three dwords and marks
+   * `fa::detail::allocate_checked`), zeroes the first three dwords and marks
    * a two-byte initialized / not-yet-flushed flag pair near the end
    * (`+0xC48 = 1`, `+0xC49 = 0`).
    *
@@ -25,7 +25,7 @@ namespace
    */
   [[maybe_unused]] void* AllocateAndTagStaticBootstrapBuffer3152()
   {
-    void* const buffer = msvc8::detail::allocate_checked<std::uint8_t>(0xC50u);
+    void* const buffer = fa::detail::allocate_checked<std::uint8_t>(0xC50u);
     if (buffer != nullptr) {
       auto* const dwords = static_cast<std::uint32_t*>(buffer);
       dwords[0] = 0u;
@@ -262,7 +262,7 @@ namespace gpg
      * What it does:
      * Formats inherited lexical text and appends current multimap element count.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
   };
 }
 
@@ -302,7 +302,7 @@ namespace
     if (gEntIdStringMultiMapValueType == nullptr) {
       constexpr const char* kTypeNames[] = {
         "std::string",
-        "msvc8::string",
+        "fa::string",
         "string",
       };
 
@@ -314,7 +314,7 @@ namespace
       }
 
       if (gEntIdStringMultiMapValueType == nullptr) {
-        gEntIdStringMultiMapValueType = gpg::LookupRType(typeid(msvc8::string));
+        gEntIdStringMultiMapValueType = gpg::LookupRType(typeid(fa::string));
       }
     }
 
@@ -359,7 +359,7 @@ namespace
       moho::EntId key = 0;
       archive->Read(entIdType, &key, *ownerRef);
 
-      msvc8::string value{};
+      fa::string value{};
       archive->ReadString(&value);
 
       destination->insert(std::make_pair(key, value));
@@ -395,7 +395,7 @@ namespace
 
     for (const auto& entry : *source) {
       archive->Write(entIdType, &entry.first, *ownerRef);
-      msvc8::string value = entry.second;
+      fa::string value = entry.second;
       archive->WriteString(&value);
     }
   }
@@ -427,7 +427,7 @@ void gpg::RMultiMapType_EntId_string::Init()
  */
 const char* gpg::RMultiMapType_EntId_string::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf(
+  static const fa::string sName = gpg::STR_Printf(
     "multimap<%s,%s>", ResolveEntIdTypeForMultiMapName()->GetName(), ResolveStringTypeForMultiMapName()->GetName()
   );
   return sName.c_str();
@@ -439,9 +439,9 @@ const char* gpg::RMultiMapType_EntId_string::GetName() const
  * What it does:
  * Formats inherited lexical text and appends current multimap element count.
  */
-msvc8::string gpg::RMultiMapType_EntId_string::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RMultiMapType_EntId_string::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   // The reflected object is the `EntIdStringMultiMap` this type describes; a
   // private `{proxy, head, size}` view of it read the third word, which is not
   // where that container keeps its count.
@@ -455,7 +455,7 @@ msvc8::string gpg::RMultiMapType_EntId_string::GetLexical(const gpg::RRef& ref) 
  *
  * What it does:
  * Constructs/preregisters RTTI metadata for
- * `std::multimap<moho::EntId,msvc8::string>`.
+ * `std::multimap<moho::EntId,fa::string>`.
  */
 [[nodiscard]] gpg::RType* preregister_RMultiMapType_EntId_string()
 {
@@ -506,7 +506,7 @@ namespace
      * teardown pass uses (see `DoTeardownCallbacks`, FUN_008698B0, which takes
      * `*v4 + 4`).
      */
-    void DispatchSessionListenerAttach(WldTeardownCallbackVector* const callbacks)
+    [[maybe_unused]] void DispatchSessionListenerAttach(WldTeardownCallbackVector* const callbacks)
     {
       const std::size_t callbackCount = callbacks->size();
       for (std::size_t i = 0; i < callbackCount; ++i) {
@@ -531,7 +531,7 @@ namespace
      * What it does:
      * Returns one first-dword lane from one build-template helper payload.
      */
-    [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane0(const void* const value) noexcept
+    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane0(const void* const value) noexcept
     {
       if (value == nullptr) {
         return 0u;
@@ -545,7 +545,7 @@ namespace
      * What it does:
      * Returns one second-dword lane from one build-template helper payload.
      */
-    [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane4(const void* const value) noexcept
+    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane4(const void* const value) noexcept
     {
       if (value == nullptr) {
         return 0u;
@@ -646,38 +646,6 @@ namespace
       return &previewTransform;
     }
 
-    [[nodiscard]] bool ContainsEntityPtr(const msvc8::vector<UserEntity*>& entities, const UserEntity* const entity)
-    {
-      return std::find(entities.begin(), entities.end(), entity) != entities.end();
-    }
-
-    void CollectSelectionEntities(const WeakSet<UserEntity>& selection, msvc8::vector<UserEntity*>& outEntities)
-    {
-      outEntities.clear();
-
-      for (UserEntity* const entity : selection) {
-        if (ContainsEntityPtr(outEntities, entity)) {
-          continue;
-        }
-        outEntities.push_back(entity);
-      }
-    }
-
-    [[nodiscard]] bool
-    AreEntitySetsEqual(const msvc8::vector<UserEntity*>& lhs, const msvc8::vector<UserEntity*>& rhs)
-    {
-      if (lhs.size() != rhs.size()) {
-        return false;
-      }
-
-      for (const UserEntity* const entity : lhs) {
-        if (!ContainsEntityPtr(rhs, entity)) {
-          return false;
-        }
-      }
-
-      return true;
-    }
 }
 
 
@@ -738,7 +706,7 @@ namespace
    * matching the binary's inline `mEntityMap` in-order scan (entity ids are
    * unique keys, so the collection order equals the binary's iteration order).
    */
-  void GetSessionUserUnits(CWldSession* const session, msvc8::vector<UserUnit*>& outUnits)
+  void GetSessionUserUnits(CWldSession* const session, fa::vector<UserUnit*>& outUnits)
   {
     CollectSessionUserUnits(session, outUnits);
   }

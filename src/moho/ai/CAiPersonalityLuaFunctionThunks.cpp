@@ -9,9 +9,6 @@
 
 namespace
 {
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_AiPersonalityStartup = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_AiPersonalityStartup = nullptr;
-
   template <moho::CScrLuaInitForm* (*Target)()>
   [[nodiscard]] moho::CScrLuaInitForm* ForwardAiPersonalityLuaThunk() noexcept
   {
