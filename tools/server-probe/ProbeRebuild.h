@@ -23,8 +23,14 @@ namespace faf::probe
 
     /** `GameInfo`: the map's size makes the codec; the rebuilder starts here. `army`: the player's (-1: none). */
     void OnGameInfo(float mapSizeX, float mapSizeZ, std::int32_t army);
-    /** One view's own and team frames (empty team: none), merged and rebuilt. */
-    void OnView(std::span<const std::uint8_t> own, std::span<const std::uint8_t> team);
+    /**
+     * One view's own and team frames (empty team: none), merged and rebuilt; and its army and grid lanes, decoded
+     * against what this client holds of them (plan WP11 step 2).
+     */
+    void OnView(
+      std::span<const std::uint8_t> own, std::span<const std::uint8_t> team, std::span<const std::uint8_t> armies,
+      std::span<const std::uint8_t> grids
+    );
 
     /** The rebuild's counts, one line each. */
     void Report(int uid) const;

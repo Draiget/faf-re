@@ -27,6 +27,8 @@
 #include "remote/ViewLanes.h"
 #include "remote/client/SyncRebuilder.h"
 #include "remote/client/ViewMerge.h"
+#include "remote/wire/ArmyLane.h"
+#include "remote/wire/BitStream.h"
 
 // Plan WP11 step 1: see ProbeRebuild.h.
 
@@ -57,6 +59,15 @@ namespace faf::probe
     remote::client::CViewFrameMerger merger;
     remote::wire::SFrameCodec codec{};
     std::uint64_t mergeFailures = 0;
+    // Plan WP11 step 2: the army and grid lanes as the client holds them.
+    std::vector<remote::wire::SArmyRecord> armies;
+    bool haveArmies = false;
+    std::vector<remote::wire::SGridSlot> grids;
+    std::uint64_t armyLanes = 0;
+    std::uint64_t armyFailures = 0;
+    std::uint64_t gridLanes = 0;
+    std::uint64_t gridFailures = 0;
+    std::uint64_t gridSlotsSeen = 0;
     std::uint64_t frames = 0;
     std::uint64_t applied = 0;
     std::uint64_t blueprints = 0;
@@ -136,10 +147,35 @@ namespace faf::probe
     mState->rebuilder->SetRules(mState->rules.get());
   }
 
-  void CProbeRebuild::OnView(const std::span<const std::uint8_t> own, const std::span<const std::uint8_t> team)
+  void CProbeRebuild::OnView(
+    const std::span<const std::uint8_t> own, const std::span<const std::uint8_t> team, const std::span<const std::uint8_t> armies,
+    const std::span<const std::uint8_t> grids
+  )
   {
     if (!mState || !mState->rebuilder) {
       return;
+    }
+    // Army lane: every army's record, each against the one this client holds.
+    if (!armies.empty()) {
+      ++mState->armyLanes;
+      remote::wire::BitReader reader(armies);
+      std::vector<remote::wire::SArmyRecord> decoded;
+      if (remote::wire::DecodeArmyLane(reader, mState->haveArmies ? &mState->armies : nullptr, decoded)) {
+        mState->armies = std::move(decoded);
+        mState->haveArmies = true;
+      } else {
+        ++mState->armyFailures;
+      }
+    }
+    // Grid lane: the view's intel grids, each a delta against the copy this client holds.
+    if (!grids.empty()) {
+      ++mState->gridLanes;
+      remote::wire::BitReader reader(grids);
+      if (remote::wire::DecodeGridLane(reader, mState->grids)) {
+        mState->gridSlotsSeen += mState->grids.size();
+      } else {
+        ++mState->gridFailures;
+      }
     }
     ++mState->frames;
     remote::wire::SViewFrame merged;
@@ -159,6 +195,16 @@ namespace faf::probe
       return;
     }
     const remote::client::SRebuildStats& s = mState->rebuilder->Stats();
+    std::string slots;
+    for (const remote::wire::SGridSlot& slot : mState->grids) {
+      slots += " army " + std::to_string(slot.army) + (slot.kind == 0 ? " vision " : " water ") + std::to_string(slot.bits.width) + "x" +
+               std::to_string(slot.bits.height);
+    }
+    std::printf(
+      "probe %d: rebuild: army lanes %llu (%llu failed), %zu armies held; grid lanes %llu (%llu failed), %zu grids held:%s\n", uid,
+      static_cast<unsigned long long>(mState->armyLanes), static_cast<unsigned long long>(mState->armyFailures), mState->armies.size(),
+      static_cast<unsigned long long>(mState->gridLanes), static_cast<unsigned long long>(mState->gridFailures), mState->grids.size(), slots.c_str()
+    );
     // What the last frame held: how many of its records the rebuild could create at all.
     std::uint64_t records = 0;
     std::uint64_t units = 0;

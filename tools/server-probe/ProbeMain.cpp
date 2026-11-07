@@ -484,11 +484,15 @@ namespace
     const std::uint64_t teamSize = reader.Varint();
     const std::uint8_t* const team = reader.Bytes(teamSize);
     bool ok = reader.Ok() && out.haveInfo;
-    // The other lanes' sizes must add up to the message, to its last byte.
+    // The other lanes' sizes must add up to the message, to its last byte: army, grid, Lua.
+    std::span<const std::uint8_t> lanes[3];
     for (int lane = 0; lane < 3 && ok; ++lane) {
       const std::uint64_t size = reader.Varint();
-      (void)reader.Bytes(size);
+      const std::uint8_t* const bytes = reader.Bytes(size);
       ok = reader.Ok();
+      if (ok) {
+        lanes[lane] = std::span<const std::uint8_t>(bytes, size);
+      }
     }
     ok = ok && reader.AtEnd();
     if (ok && out.views > 1u && faf::remote::wire::PeekFrameBaseline(std::span<const std::uint8_t>(frame, frameSize)) == faf::remote::wire::kNoBaseline) {
@@ -498,7 +502,7 @@ namespace
     }
     if (ok) {
       if (out.rebuild != nullptr) {
-        out.rebuild->OnView(std::span<const std::uint8_t>(frame, frameSize), std::span<const std::uint8_t>(team, teamSize));
+        out.rebuild->OnView(std::span<const std::uint8_t>(frame, frameSize), std::span<const std::uint8_t>(team, teamSize), lanes[0], lanes[1]);
       }
       faf::remote::wire::SViewFrame decoded;
       ok = out.window.Decode(std::span<const std::uint8_t>(frame, frameSize), out.codec, decoded) && decoded.entities.size() == entities;
