@@ -9,6 +9,8 @@
 #include "moho/render/GpuPathSettings.h"
 #include "moho/render/SkyDome.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
+#include "moho/sim/CWldMap.h"
+#include "moho/sim/STIMap.h"
 
 namespace moho
 {
@@ -568,7 +570,12 @@ namespace
         sessionInfo->mClientManager = nullptr;
         if (serverSession) {
 #if FAF_SERVER_MODE
-          driver = faf::remote::client::CreateServerSessionDriver(*wldSession->mRules, *sessionInfo->mLaunchInfo);
+          // The client's own map heights, as loaded: the server's terrain edits go on a copy of them.
+          const CHeightField* heights = nullptr;
+          if (wldSession->mWldMap != nullptr && wldSession->mWldMap->mTerrainRes != nullptr && wldSession->mWldMap->mTerrainRes->mMap != nullptr) {
+            heights = wldSession->mWldMap->mTerrainRes->mMap->mHeightField.get();
+          }
+          driver = faf::remote::client::CreateServerSessionDriver(*wldSession->mRules, *sessionInfo->mLaunchInfo, heights);
 #endif
         } else {
         // Engine addition (issue #275): does nothing unless a save came with this client's seat.

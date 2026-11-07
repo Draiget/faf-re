@@ -18,6 +18,7 @@
 
 namespace moho
 {
+  class CHeightField;
   class RRuleGameRules;
   struct SSyncData;
 }
@@ -52,6 +53,17 @@ namespace faf::remote::client
   /** Reads a whole `View` message (its kind byte first); its lanes must end at the message's last byte. */
   [[nodiscard]] bool ReadViewMessage(std::span<const std::uint8_t> message, SViewMessage& out);
 
+  /** One `SessionTables` message, its record as a span into its bytes. */
+  struct STablesMessage
+  {
+    std::uint32_t beat = 0;
+    bool reset = false;
+    std::span<const std::uint8_t> record; // empty with a reset
+  };
+
+  /** Reads a whole `SessionTables` message (its kind byte first). */
+  [[nodiscard]] bool ReadTablesMessage(std::span<const std::uint8_t> message, STablesMessage& out);
+
   struct SServerViewStats
   {
     std::uint64_t views = 0;
@@ -62,6 +74,9 @@ namespace faf::remote::client
     std::uint64_t gridLanes = 0;
     std::uint64_t gridFailures = 0;
     std::uint64_t blueprintsKnown = 0;
+    std::uint64_t tableRecords = 0;
+    std::uint64_t tableFailures = 0;
+    std::uint64_t tableResets = 0;
   };
 
   class CServerViewClient
@@ -72,6 +87,17 @@ namespace faf::remote::client
 
     /** One view into `packet`'s entity lanes (a fresh packet: nothing else to start from), and its army and grid lanes. */
     bool Apply(const SViewMessage& view, moho::SSyncData& packet);
+    /**
+     * A `SessionTables` message (plan WP11 step 4): the sounds, names, deposits and terrain edits the views after it
+     * name. A reset forgets the tables: the server sends every record again from the first.
+     */
+    bool ApplyTables(const STablesMessage& tables);
+    /**
+     * The heights this client's terrain starts from (its own load of the map): the server's terrain edits are applied
+     * to a copy, which each beat's packet then carries as the sim's field would.
+     */
+    void SeedTerrain(const moho::CHeightField& heights) { mRebuilder->SeedTerrain(heights); }
+    [[nodiscard]] const wire::CSessionTableReaders& Tables() const noexcept { return *mTables; }
 
     [[nodiscard]] const SServerGameInfo& Info() const noexcept { return mInfo; }
     [[nodiscard]] const std::vector<wire::SArmyRecord>& Armies() const noexcept { return mArmies; }
@@ -85,6 +111,7 @@ namespace faf::remote::client
   private:
     SServerGameInfo mInfo;
     wire::SFrameCodec mCodec{};
+    std::unique_ptr<wire::CSessionTableReaders> mTables;
     std::unique_ptr<CSyncRebuilder> mRebuilder;
     CViewFrameMerger mMerger;
     std::vector<wire::SArmyRecord> mArmies;

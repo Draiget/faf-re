@@ -64,6 +64,8 @@ namespace faf::server
       EnableTeamViews();
     }
     EnableLuaRouting({});
+    SendLuaSeparately(); // `LuaSync` (OnLuaRouterMade)
+    EnableSessionTables(mSessionTables);
   }
 
   CServerViews::~CServerViews()
@@ -156,6 +158,28 @@ namespace faf::server
     }
   }
 
+  void CServerViews::OnViewFrames(moho::Sim& sim)
+  {
+    // The builders are done with the beat (they interned what the frames name); its views go out after this.
+    if (mSessionTables.HasPending()) {
+      remote::wire::BitWriter record;
+      mSessionTables.WritePending(record);
+      std::vector<std::uint8_t> message;
+      message.reserve(8u + record.Bytes().size());
+      remote::net::ByteWriter writer(message);
+      writer.Byte(static_cast<std::uint8_t>(remote::net::ESeatMessage::SessionTables));
+      writer.Varint(ViewBeat());
+      writer.Byte(0u); // no reset
+      writer.Bytes(record.Bytes().data(), record.Bytes().size());
+      mTableBytes.fetch_add(message.size(), std::memory_order_relaxed);
+      mTableRecords.fetch_add(1u, std::memory_order_relaxed);
+      for (const auto& [army, uid] : mPlayers) {
+        mNet.QueueView(uid, message);
+      }
+    }
+    CViewLanes::OnViewFrames(sim);
+  }
+
   void CServerViews::OnLuaRouterMade(remote::CSyncRouter& router)
   {
     // On the sim's thread, at the end of `Sim::Sync` (SimTick.cpp), after the beat's views were encoded: the same
@@ -188,7 +212,9 @@ namespace faf::server
     const auto megabytes = [](const std::atomic<std::uint64_t>& bytes) {
       return std::to_string(bytes.load(std::memory_order_relaxed) / (1024u * 1024u));
     };
-    return "views so far: entities " + megabytes(mFrameBytes) + " MB, armies " + megabytes(mArmyBytes) + " MB, grids " + megabytes(mGridBytes) + " MB, Lua " + megabytes(mLuaBytes) + " MB";
+    return "views so far: entities " + megabytes(mFrameBytes) + " MB, armies " + megabytes(mArmyBytes) + " MB, grids " + megabytes(mGridBytes) + " MB, Lua " + megabytes(mLuaBytes) + " MB, session tables "
+         + std::to_string(mTableRecords.load(std::memory_order_relaxed)) + " records of "
+         + std::to_string(mTableBytes.load(std::memory_order_relaxed) / 1024u) + " KB to each player";
   }
 
   void CServerViews::OnViewsFinished()

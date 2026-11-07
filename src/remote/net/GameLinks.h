@@ -82,6 +82,13 @@ namespace faf::remote::net
      * `LuaSync` for a beat has none coming.
      */
     LuaSync = 12,
+    /**
+     * Server to player, reliable (plan WP11 step 4): varint beat, a flags byte (1: reset), then a session-table record
+     * (wire/SessionTables.h: new sounds, names, deposits and terrain edits) to the message's end. It comes before
+     * the first `View` that names its entries. Reset: the client forgets its tables; the session's every record
+     * follows, from the first, before the whole view a returning player gets (a reset carries no record itself).
+     */
+    SessionTables = 13,
   };
 
   /** What became of a player's command. */

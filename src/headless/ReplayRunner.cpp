@@ -727,6 +727,9 @@ namespace faf::headless
       if (options.viewTeams) {
         viewBench->EnableTeamViews();
       }
+      if (options.viewTables) {
+        viewBench->EnableBenchTables();
+      }
       if (!options.viewDumpPath.empty()) {
         viewDumpFile = std::fopen(options.viewDumpPath.c_str(), "wb");
         viewBench->SetViewDump(viewDumpFile);

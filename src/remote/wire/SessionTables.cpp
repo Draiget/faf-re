@@ -1,13 +1,44 @@
 #include "remote/wire/SessionTables.h"
 
 #include <algorithm>
+#include <atomic>
+#include <functional>
+#include <string>
+#include <unordered_map>
 
 // Engine addition, server mode: see SessionTables.h.
 
 namespace faf::remote::wire
 {
+  namespace
+  {
+    struct SNameHash
+    {
+      using is_transparent = void;
+      [[nodiscard]] std::size_t operator()(const std::string_view name) const noexcept { return std::hash<std::string_view>{}(name); }
+    };
+
+    /**
+     * Each thread's names already interned in one session (ids never change): a server's views ask for the same
+     * few names thousands of times a beat on every worker, and only a name the thread hasn't seen takes the lock.
+     */
+    struct SThreadNames
+    {
+      std::uint64_t session = 0; // `CSessionTableWriters::mSerial`; another session starts the cache again
+      std::unordered_map<std::string, std::uint32_t, SNameHash, std::equal_to<>> ids;
+    };
+    thread_local SThreadNames tNames;
+
+    std::atomic<std::uint64_t> sSessionSerials{0};
+  } // namespace
+
+  CSessionTableWriters::CSessionTableWriters()
+    : mSerial(sSessionSerials.fetch_add(1u, std::memory_order_relaxed) + 1u)
+  {}
+
   std::uint32_t CSessionTableWriters::Sound(const SSoundEntry& entry)
   {
+    const std::lock_guard<std::mutex> lock(mInternLock);
     const CSoundTableWriter::SInterned interned = mSounds.Intern(entry);
     if (interned.isNew) {
       mNewSounds.push_back(interned.id);
@@ -17,11 +48,25 @@ namespace faf::remote::wire
 
   std::uint32_t CSessionTableWriters::Name(const std::string_view name)
   {
-    const CNameTableWriter::SInterned interned = mNames.Intern(name);
-    if (interned.isNew) {
-      mNewNames.push_back(interned.id);
+    SThreadNames& cache = tNames;
+    if (cache.session != mSerial) {
+      cache.ids.clear();
+      cache.session = mSerial;
     }
-    return interned.id;
+    if (const auto found = cache.ids.find(name); found != cache.ids.end()) {
+      return found->second;
+    }
+    std::uint32_t id;
+    {
+      const std::lock_guard<std::mutex> lock(mInternLock);
+      const CNameTableWriter::SInterned interned = mNames.Intern(name);
+      if (interned.isNew) {
+        mNewNames.push_back(interned.id);
+      }
+      id = interned.id;
+    }
+    cache.ids.emplace(std::string(name), id);
+    return id;
   }
 
   bool CSessionTableWriters::Deposit(const SDeposit& deposit)

@@ -7,11 +7,13 @@
 #include <map>
 #include <memory>
 #include <span>
+#include <unordered_map>
 #include <vector>
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/ChunkedVector.h"
 #include "gpg/core/containers/FlatGenerationMap.h"
+#include "gpg/core/containers/Rect2.h"
 
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "remote/UnderlayPaths.h"
@@ -36,6 +38,7 @@
 namespace moho
 {
   class CHeightField;
+  class CSimResources;
   class Entity;
   class ReconBlip;
   class StatItem;
@@ -138,8 +141,10 @@ namespace faf::remote
     CSharedEntityRecords(const wire::SContentTables& tables, const wire::SFrameCodec& codec);
     ~CSharedEntityRecords();
 
-    /** Whether `entity`'s record can be shared now: it names nothing in a session table. */
+    /** Whether `entity`'s record can be shared now: it names no sound and no underlay. */
     [[nodiscard]] static bool Shareable(const moho::Entity& entity) noexcept;
+    /** The session a blip record's names are interned in (its unit detail's custom name and range visuals). */
+    void SetSessionTables(wire::CSessionTableWriters* session) noexcept { mSession = session; }
 
     /** A new beat with `changedCount` changed entities; what the last beat replaced is free again. */
     void BeginBeat(std::size_t changedCount);
@@ -172,6 +177,7 @@ namespace faf::remote
     const wire::SContentTables& mTables;
     wire::SFrameCodec mCodec;
     CUnderlayPathReader mNoUnderlays;
+    wire::CSessionTableWriters* mSession = nullptr;
     gpg::core::ChunkedVector<wire::SEntityRecord> mRecords;
     gpg::core::ChunkedVector<SBlipRecord> mBlipRecords;
     std::vector<std::uint32_t> mFree;
@@ -220,6 +226,83 @@ namespace faf::remote
     moho::SSTIEntityVariableData& data, moho::Entity& entity, moho::EUserEntityVisibilityMode mode, bool requestRefreshUI
   );
 
+  /**
+   * What a beat changed of the session's world for every view alike (WP11.2): the resource deposits the sim
+   * added and the terrain edits, with the heights each edit leaves, queued on the session record. A session's
+   * views take them once a beat, through one collector.
+   */
+  class CSessionEditCollector
+  {
+  public:
+    /**
+     * Queues on `session` the deposits `resources` holds past those sent, and an edit for each of the beat's changed
+     * rectangles (`SSyncData::mPlayableRectUpdates`) with the heights `field` holds there.
+     */
+    void Collect(
+      moho::CSimResources* resources, const moho::CHeightField* field, std::span<const gpg::Rect2i> rects,
+      wire::CSessionTableWriters& session
+    );
+    /**
+     * The heights as the client holds them after this beat's edits: the server's terrain for predictions the
+     * client makes on its own copy (ground following). The sim's own field may be ahead of the frames when the
+     * sim runs ahead of them (loopback, replays).
+     */
+    [[nodiscard]] const moho::CHeightField* SentTerrain() const noexcept { return mSentTerrain.get(); }
+    /** Beats with more resource deposits than the session record may carry (should stay 0). */
+    [[nodiscard]] std::uint64_t DepositOverflows() const noexcept { return mDepositOverflows; }
+    /** Terrain edits the session record could not carry (should stay 0). */
+    [[nodiscard]] std::uint64_t TerrainEditOverflows() const noexcept { return mTerrainEditOverflows; }
+
+  private:
+    std::uint64_t mDepositOverflows = 0;
+    std::uint64_t mTerrainEditOverflows = 0;
+    boost::shared_ptr<moho::CHeightField> mSentTerrain; // the client's heights, as the edits sent leave them
+  };
+
+  /**
+   * Plan WP11 step 4: the units' stats as frames carry them (`ReadUnitStats`), read once a beat for all of a
+   * session's views; each view's builder would otherwise read every tree it holds for each of its frames. Keyed
+   * by the sim's tree, which a unit's blips share. A value that did not change keeps its pointer, so a view
+   * whose record shares it skips the comparison (`TSharedValue::Share`).
+   */
+  class CSharedUnitStats
+  {
+  public:
+    using Tree = moho::Stats<moho::StatItem>;
+    using SStats = wire::TSharedValue<std::vector<wire::SUnitStat>>;
+
+    /**
+     * Reads every tree in `trees` (on the sim's workers with `parallel`); trees no longer listed are forgotten. A tree
+     * whose items are the ones read before has only its values read (`STAT_CollectItems`); its item paths are
+     * interned again only when its items change.
+     */
+    void Refresh(std::span<Tree* const> trees, wire::CSessionTableWriters& session, bool parallel);
+    /** `tree`'s stats as of this beat, or null when it was not read (a dead unit's blip reads its own). */
+    [[nodiscard]] const SStats* Find(const Tree* tree) const
+    {
+      const auto found = mTrees.find(tree);
+      return found != mTrees.end() ? &found->second.value : nullptr;
+    }
+    /** The trees whose stats changed this beat, or were read for the first time. */
+    [[nodiscard]] const std::vector<const Tree*>& Changed() const noexcept { return mChanged; }
+
+  private:
+    struct STree
+    {
+      std::vector<moho::StatItem*> items; // as `STAT_CollectItems` last listed them
+      std::vector<std::uint32_t> names;   // each item's path, interned
+      SStats value;
+      bool listed = false;  // this beat
+      bool changed = false; // this beat
+    };
+    /** One tree's beat, on any thread. */
+    static void ReadTree(Tree& tree, STree& state, wire::CSessionTableWriters& session);
+
+    std::unordered_map<const Tree*, STree> mTrees;
+    std::vector<STree*> mWork; // per listed tree, this beat
+    std::vector<const Tree*> mChanged;
+  };
+
   class CViewFrameBuilder
   {
   public:
@@ -229,9 +312,19 @@ namespace faf::remote
 
     /**
      * The session tables sounds and underlay names are interned into (WP7.2); without them the
-     * frames name no sounds and no underlays.
+     * frames name no sounds and no underlays. With `collectEdits` `Apply` also queues the beat's deposits
+     * and terrain edits there; views that share a session leave that to one `CSessionEditCollector`.
      */
-    void SetSessionTables(wire::CSessionTableWriters* session) noexcept { mSession = session; }
+    void SetSessionTables(wire::CSessionTableWriters* session, const bool collectEdits = true) noexcept
+    {
+      mSession = session;
+      mCollectEdits = collectEdits;
+    }
+    /**
+     * Unit stats read once a beat for every view (`CSharedUnitStats`): a unit's stats then come from there
+     * instead of each view reading the sim's tree again.
+     */
+    void SetSharedStats(const CSharedUnitStats* stats) noexcept { mSharedStats = stats; }
 
     /**
      * Applies one packet's entity lanes to the world the frames are built from. The sim's unit
@@ -366,16 +459,10 @@ namespace faf::remote
     [[nodiscard]] std::uint64_t UnknownBlueprints() const noexcept { return mUnknownBlueprints; }
     /** Underlay textures that are not plain file textures (should stay 0). */
     [[nodiscard]] std::uint64_t UnknownUnderlays() const noexcept { return mUnknownUnderlays; }
-    /** Beats with more resource deposits than the session record may carry (should stay 0). */
-    [[nodiscard]] std::uint64_t DepositOverflows() const noexcept { return mDepositOverflows; }
-    /**
-     * The heights as the client holds them after this beat's edits: the server's terrain for
-     * predictions the client makes on its own copy (ground following). The sim's own field may
-     * be ahead of the frames when the sim runs ahead of them (loopback, replays).
-     */
-    [[nodiscard]] const moho::CHeightField* SentTerrain() const noexcept { return mSentTerrain.get(); }
-    /** Terrain edits the session record could not carry (should stay 0). */
-    [[nodiscard]] std::uint64_t TerrainEditOverflows() const noexcept { return mTerrainEditOverflows; }
+    /** `CSessionEditCollector`'s, with `collectEdits`. */
+    [[nodiscard]] std::uint64_t DepositOverflows() const noexcept { return mEdits.DepositOverflows(); }
+    [[nodiscard]] const moho::CHeightField* SentTerrain() const noexcept { return mEdits.SentTerrain(); }
+    [[nodiscard]] std::uint64_t TerrainEditOverflows() const noexcept { return mEdits.TerrainEditOverflows(); }
 
   private:
     /** One record of the world: its id and where it lies in `mWorldSlots`. */
@@ -453,13 +540,16 @@ namespace faf::remote
     gpg::core::ChunkedVector<wire::SEntityRecord> mBefore; // the local ones among them, which change in place
     std::map<std::uint32_t, std::uint32_t> mOrphanedAt; // id -> beat of its erase
     std::map<std::uint32_t, boost::shared_ptr<moho::Stats<moho::StatItem>>> mUnitStats; // the sim's live trees
+    // With `mSharedStats`: the ids of each tree's records, and the records whose stats aren't set yet.
+    std::unordered_multimap<const moho::Stats<moho::StatItem>*, std::uint32_t> mStatsIds;
+    std::vector<std::uint32_t> mFreshStats;
     std::vector<boost::shared_ptr<moho::Stats<moho::StatItem>>> mDroppedStats;          // until `ReleaseDropped`
     std::uint32_t mNextFrameId = 1;
     std::uint64_t mUnknownBlueprints = 0;
     std::uint64_t mUnknownUnderlays = 0;
-    std::uint64_t mDepositOverflows = 0;
-    std::uint64_t mTerrainEditOverflows = 0;
-    boost::shared_ptr<moho::CHeightField> mSentTerrain; // the client's heights, as the edits sent leave them
+    CSessionEditCollector mEdits; // with `mCollectEdits`
+    bool mCollectEdits = true;
+    const CSharedUnitStats* mSharedStats = nullptr;
     moho::SSTIEntityVariableData mBlockScratch;  // a direct update's entity block
     CUnderlayPathReader mUnderlays;              // the entities' underlay paths, as of this beat
     wire::SUnitDetail mDetailScratch;            // a unit update's detail, before it is compared

@@ -25,6 +25,7 @@
 #include "moho/sim/FafGameVersion.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/STIMap.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "remote/ContentTables.h"
 #include "remote/FrameBuilder.h"
@@ -59,6 +60,8 @@ namespace faf::probe
     std::unique_ptr<moho::CWldMap> map;
     std::unique_ptr<LuaPlus::LuaState> sessionState;
     std::unique_ptr<remote::client::CServerViewClient> client;
+    bool seeded = false;
+    std::uint64_t tablesBad = 0;
   };
 
   CProbeRebuild::CProbeRebuild() = default;
@@ -172,6 +175,23 @@ namespace faf::probe
     info.mapSizeZ = mapSizeZ;
     info.army = army;
     mState->client = std::make_unique<remote::client::CServerViewClient>(*mState->rules, info);
+    // The heights as this client loaded the map: the server's terrain edits go on a copy, as in the game client.
+    if (mState->map && mState->map->mTerrainRes != nullptr && mState->map->mTerrainRes->mMap != nullptr
+        && mState->map->mTerrainRes->mMap->mHeightField) {
+      mState->client->SeedTerrain(*mState->map->mTerrainRes->mMap->mHeightField);
+      mState->seeded = true;
+    }
+  }
+
+  void CProbeRebuild::OnTables(const std::span<const std::uint8_t> message)
+  {
+    if (!mState || !mState->client) {
+      return;
+    }
+    remote::client::STablesMessage tables;
+    if (!remote::client::ReadTablesMessage(message, tables) || !mState->client->ApplyTables(tables)) {
+      ++mState->tablesBad;
+    }
   }
 
   void CProbeRebuild::OnView(
@@ -238,6 +258,15 @@ namespace faf::probe
       static_cast<unsigned long long>(v.blueprintsKnown), static_cast<unsigned long long>(s.created), static_cast<unsigned long long>(s.entityUpdates),
       static_cast<unsigned long long>(s.erased), static_cast<unsigned long long>(s.deleted), static_cast<unsigned long long>(s.noBlueprint),
       static_cast<unsigned long long>(s.unknownTableIds), static_cast<unsigned long long>(s.unitUpdates)
+    );
+    const remote::wire::CSessionTableReaders& tables = client.Tables();
+    std::printf(
+      "probe %d: rebuild: session tables %llu records (%llu bad, %llu resets): %u sounds, %u names, %zu deposits, %llu terrain edits "
+      "(%s); unit stat items applied %llu\n",
+      uid, static_cast<unsigned long long>(v.tableRecords), static_cast<unsigned long long>(v.tableFailures + mState->tablesBad),
+      static_cast<unsigned long long>(v.tableResets), tables.Sounds().Size(), tables.Names().Size(), tables.Deposits().size(),
+      static_cast<unsigned long long>(s.terrainEdits), mState->seeded ? "applied to the map's heights" : "counted, no heights",
+      static_cast<unsigned long long>(s.statsApplied)
     );
   }
 } // namespace faf::probe

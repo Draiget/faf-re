@@ -26,6 +26,7 @@
 
 namespace moho
 {
+  class CHeightField;
   class CSimResources;
   class LaunchInfoBase;
   class RRuleGameRules;
@@ -44,11 +45,12 @@ namespace faf::remote::client
   public:
     /**
      * `rules`: the session's (`CWldSession::mRules`), which outlives the driver. The local client: the session's
-     * client index, the player's uid and command source, as the launch info gives them.
+     * client index, the player's uid and command source, as the launch info gives them. `heights`: the client's own
+     * map's, as loaded (the server's terrain edits go on a copy); may be null.
      */
     CNetworkSimDriver(
       moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch, const char* playerName, int clientIndex, std::int32_t uid,
-      unsigned int sourceId
+      unsigned int sourceId, const moho::CHeightField* heights
     );
     ~CNetworkSimDriver() override;
 
@@ -131,9 +133,11 @@ namespace faf::remote::client
     // `mNewGrids`), made from the launch's army setups; given with the first packet, which makes the session's armies.
     std::vector<moho::SSTIArmyConstantData> mArmyConstants;
     bool mArmiesGiven = false;
-    // The session's resource deposits (it takes them from every packet, and its map draws them): the client's own,
-    // empty until the server sends the deposits (research map step 4, session tables).
+    // The session's resource deposits (it takes them from every packet, and its map draws them): an empty set for a
+    // packet the view client gave none (the session tables' deposits are the packets' from the first view on).
     boost::shared_ptr<moho::CSimResources> mResources;
+    const moho::CHeightField* mSeedHeights = nullptr; // copied into the view client when it is made
+    std::uint64_t mTablesBad = 0;
     std::deque<std::unique_ptr<moho::SSyncData>> mPackets;
     // Views waiting for their beat's Lua lane (`LuaSync`, sent once the server's `Sync` for the beat is routed).
     struct SPendingView
@@ -171,6 +175,8 @@ namespace faf::remote::client
   void SetServerLaunch(const SServerLaunch& launch);
   /** A server session's launch was set: `WLD_DoLoading` makes the network driver, not a sim. */
   [[nodiscard]] bool HasServerLaunch() noexcept;
-  /** `WLD_DoLoading`, in a server session: the driver, over the session's rules. */
-  [[nodiscard]] moho::ISTIDriver* CreateServerSessionDriver(moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch);
+  /** `WLD_DoLoading`, in a server session: the driver, over the session's rules and its map's heights (may be null). */
+  [[nodiscard]] moho::ISTIDriver* CreateServerSessionDriver(
+    moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch, const moho::CHeightField* heights
+  );
 } // namespace faf::remote::client

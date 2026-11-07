@@ -58,6 +58,8 @@ namespace faf::server
     void OnLanesEncoded(std::size_t army, const SLanes& lanes) override;
     /** Plan WP11: each beat's Lua lane goes as its own `LuaSync` message once `Sim::Sync` has routed the beat's table. */
     void OnLuaRouterMade(remote::CSyncRouter& router) override;
+    /** Plan WP11 step 4: the beat's new session-table entries go to every player before the beat's views. */
+    void OnViewFrames(moho::Sim& sim) override;
     void OnViewsFinished() override;
 
   private:
@@ -70,6 +72,9 @@ namespace faf::server
     std::atomic<std::uint64_t> mArmyBytes{0};
     std::atomic<std::uint64_t> mGridBytes{0};
     std::atomic<std::uint64_t> mLuaBytes{0};
+    std::atomic<std::uint64_t> mTableBytes{0}; // one player's share
+    std::atomic<std::uint64_t> mTableRecords{0};
+    remote::wire::CSessionTableWriters mSessionTables; // one for every view (`EnableSessionTables`)
     bool mInstalled = false;
   };
 } // namespace faf::server

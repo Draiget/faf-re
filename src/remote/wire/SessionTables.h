@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -62,11 +63,19 @@ namespace faf::remote::wire
   class CSessionTableWriters
   {
   public:
+    CSessionTableWriters();
+    CSessionTableWriters(const CSessionTableWriters&) = delete;
+    CSessionTableWriters& operator=(const CSessionTableWriters&) = delete;
+
     static constexpr std::uint32_t kMaxDeposits = 1u << 16;
     static constexpr std::uint32_t kMaxTerrainEdits = 1u << 12; // in one record
     static constexpr std::uint32_t kMaxEditCells = 1u << 21;    // in one edit: a 1025-cell square fits
 
-    /** The sound table id of `entry`, interning it (and queueing it for the next record). */
+    /**
+     * The sound table id of `entry`, interning it (and queueing it for the next record). `Sound` and `Name`
+     * may be called from several threads at once: a server's views are built on the sim's workers and share
+     * one session (plan WP11 step 4); the rest is for one thread, between them.
+     */
     [[nodiscard]] std::uint32_t Sound(const SSoundEntry& entry);
     /** The name table id of `name`, as `Sound`. */
     [[nodiscard]] std::uint32_t Name(std::string_view name);
@@ -87,6 +96,8 @@ namespace faf::remote::wire
     void WritePending(BitWriter& writer);
 
   private:
+    std::mutex mInternLock; // `Sound` and `Name`
+    std::uint64_t mSerial;  // tells this session's names from another's in a thread's cache (SessionTables.cpp)
     CSoundTableWriter mSounds;
     CNameTableWriter mNames;
     std::vector<std::uint32_t> mNewSounds;

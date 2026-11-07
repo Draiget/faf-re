@@ -51,7 +51,7 @@ namespace faf::remote::client
 
   CNetworkSimDriver::CNetworkSimDriver(
     moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch, const char* const playerName, const int clientIndex,
-    const std::int32_t uid, const unsigned int sourceId
+    const std::int32_t uid, const unsigned int sourceId, const moho::CHeightField* const heights
   )
     : mRules(rules)
     , mClientManager([this](moho::CMessage& message) { SendCommandFrame(message); }, nullptr)
@@ -60,6 +60,7 @@ namespace faf::remote::client
   {
     mEmptySync = EmptyTableBytes(*mEmptySyncLua);
     mResources.reset(new moho::CSimResources());
+    mSeedHeights = heights;
     // The armies, as `CArmyImpl`'s constructor names them from each army's setup (0x006FE690: `ArmyName`,
     // `PlayerName`, `Civilian`); their intel grids stay null, which user code reads as unknown (research WP11.3).
     if (const auto* const launchNew = dynamic_cast<const moho::LaunchInfoNew*>(&launch); launchNew != nullptr) {
@@ -109,11 +110,16 @@ namespace faf::remote::client
     const SServerViewStats& views = mViews ? mViews->Stats() : noStats;
     gpg::Logf(
       "server driver %s: %llu views (%llu applied, %llu bad, %llu frame failures), beat %d, %llu commands sent, answers %llu applied / "
-      "%llu refused / %llu dropped, %llu Lua lanes bad, %llu without their LuaSync",
+      "%llu refused / %llu dropped, %llu Lua lanes bad, %llu without their LuaSync; session tables: %llu records (%llu bad, %llu resets), "
+      "%zu deposits, %llu terrain edits, %llu unknown ids",
       when, static_cast<unsigned long long>(mViewsTaken), static_cast<unsigned long long>(views.applied), static_cast<unsigned long long>(mViewsBad),
       static_cast<unsigned long long>(views.frameFailures), static_cast<int>(mLastBeat), static_cast<unsigned long long>(mCommandsSent),
       static_cast<unsigned long long>(mAnswers[0]), static_cast<unsigned long long>(mAnswers[1]), static_cast<unsigned long long>(mAnswers[2]),
-      static_cast<unsigned long long>(mLuaLanesBad), static_cast<unsigned long long>(mLuaMissing)
+      static_cast<unsigned long long>(mLuaLanesBad), static_cast<unsigned long long>(mLuaMissing),
+      static_cast<unsigned long long>(views.tableRecords), static_cast<unsigned long long>(views.tableFailures + mTablesBad),
+      static_cast<unsigned long long>(views.tableResets), mViews ? mViews->Tables().Deposits().size() : std::size_t{0},
+      static_cast<unsigned long long>(mViews ? mViews->RebuildStats().terrainEdits : 0u),
+      static_cast<unsigned long long>(mViews ? mViews->RebuildStats().unknownTableIds : 0u)
     );
   }
 
@@ -132,6 +138,9 @@ namespace faf::remote::client
       // Again after a reconnect: the client keeps what it holds; the next view comes whole.
       if (!mViews) {
         mViews = std::make_unique<CServerViewClient>(mRules, info);
+        if (mSeedHeights != nullptr) {
+          mViews->SeedTerrain(*mSeedHeights); // no edit has reached the session's field yet: none is applied before a view
+        }
         gpg::Logf(
           "server driver: map %.0f x %.0f, army %d, source %u, %llu blueprints known", info.mapSizeX, info.mapSizeZ, static_cast<int>(info.army),
           info.source, static_cast<unsigned long long>(mViews->Stats().blueprintsKnown)
@@ -175,6 +184,14 @@ namespace faf::remote::client
         ReleaseViews();
       } else if (mEarlyLua.size() < 64u) {
         mEarlyLua[beat] = std::move(lane);
+      }
+      return;
+    }
+    case net::ESeatMessage::SessionTables: {
+      // Plan WP11 step 4: before the views that name its entries (or a reset, then every record again).
+      STablesMessage tables;
+      if (!mViews || !ReadTablesMessage(message, tables) || !mViews->ApplyTables(tables)) {
+        ++mTablesBad;
       }
       return;
     }
@@ -237,7 +254,9 @@ namespace faf::remote::client
       ++mViewsBad;
       return;
     }
-    packet->mSimResources.reset_from_owner(mResources);
+    if (packet->mSimResources.px == nullptr) {
+      packet->mSimResources.reset_from_owner(mResources);
+    }
     // Every army's record as this client holds it.
     const std::vector<wire::SArmyRecord>& armies = mViews->Armies();
     packet->mArmyUpdates.resize(armies.size());
@@ -524,8 +543,10 @@ namespace faf::remote::client
     return sHaveLaunch;
   }
 
-  moho::ISTIDriver* CreateServerSessionDriver(moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch)
+  moho::ISTIDriver* CreateServerSessionDriver(
+    moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch, const moho::CHeightField* const heights
+  )
   {
-    return new CNetworkSimDriver(rules, launch, sLaunch.playerName.c_str(), sLaunch.clientIndex, sLaunch.uid, sLaunch.source);
+    return new CNetworkSimDriver(rules, launch, sLaunch.playerName.c_str(), sLaunch.clientIndex, sLaunch.uid, sLaunch.source, heights);
   }
 } // namespace faf::remote::client

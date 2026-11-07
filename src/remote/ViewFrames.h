@@ -60,6 +60,19 @@ namespace faf::remote
         EnableTeams();
       }
     }
+    /**
+     * Plan WP11 step 4, before the first beat: every view's frames name their sounds, underlays, custom names,
+     * range visuals and unit stats in `session`, one table for all of them; each beat's new deposits and terrain
+     * edits are queued there once (`SessionEdits`). Whoever sends the frames sends `session`'s pending record
+     * to every player before the beat's frames (`OnViewFrames`).
+     */
+    void EnableSessionTables(wire::CSessionTableWriters& session) noexcept
+    {
+      mSession = &session;
+      mSharedRecords.SetSessionTables(&session);
+    }
+    [[nodiscard]] wire::CSessionTableWriters* SessionTables() const noexcept { return mSession; }
+    [[nodiscard]] const CSessionEditCollector& SessionEdits() const noexcept { return mEdits; }
     /** The sim of the last beat built (null before it); for checks that run on the sim thread. */
     [[nodiscard]] moho::Sim* LastSim() const noexcept { return mLastSim; }
 
@@ -209,6 +222,10 @@ namespace faf::remote
 
     const wire::SContentTables& mTables;
     wire::SFrameCodec mCodec;
+    wire::CSessionTableWriters* mSession = nullptr; // `EnableSessionTables`
+    CSessionEditCollector mEdits;
+    CSharedUnitStats mSharedStats;
+    std::vector<CSharedUnitStats::Tree*> mStatsTrees; // this beat's units' trees
     std::vector<std::unique_ptr<CViewFrameBuilder>> mBuilders;
     std::vector<SHeldView> mHeld;
     CSharedEntityRecords mSharedRecords;

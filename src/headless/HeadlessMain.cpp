@@ -216,6 +216,8 @@ namespace
       "  --lua-routing             with --view-bench: the Lua lane too: each player's Sync routed (remote/SyncRouting.h)\n"
       "  --view-pipeline <n>       with --view-bench: n threads finish the views while the sim goes on (default 0: it waits)\n"
       "  --view-teams              with --view-pipeline: one view per team and each player's own units\n"
+      "  --view-tables             with --view-bench: the session tables as a server keeps them (sounds, names, unit\n"
+      "                            stats, deposits and terrain edits), each beat's record written\n"
       "  --view-dump <file>        with --view-bench: what each player's client holds every 2000 beats, to compare two runs\n"
       "  --parallel-views          with --view-frames or --view-bench: the views are built on the sim's workers\n"
       "  --cpus <list>             run on these CPUs only, for example 8-15 or 0,2,4,6; a CPU set from taskset or a\n"
@@ -374,6 +376,7 @@ int HEADLESS_Main(int argc, char** argv)
   options.luaRouting = moho::CFG_GetArgOption("--lua-routing", 0, nullptr);
   options.parallelViews = moho::CFG_GetArgOption("--parallel-views", 0, nullptr);
   options.viewTeams = moho::CFG_GetArgOption("--view-teams", 0, nullptr);
+  options.viewTables = moho::CFG_GetArgOption("--view-tables", 0, nullptr);
   (void)ReadOption("--view-dump", options.viewDumpPath);
   if (ReadIntOption("--view-pipeline", options.viewPipelineThreads, bad) && options.viewPipelineThreads < 0) {
     bad = true;

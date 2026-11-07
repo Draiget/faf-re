@@ -2367,6 +2367,36 @@ namespace moho
       walk(stats.mItem.get(), fa::string());
     }
   }
+
+  // Engine addition, server mode: see the declaration.
+  void STAT_CollectItems(Stats<StatItem>& stats, std::vector<StatItem*>& out)
+  {
+    out.clear();
+    boost::mutex::scoped_lock lock(stats.mLock);
+    if (!stats.mItem) {
+      return;
+    }
+    // `STAT_VisitItems`' order (each item, then its children), without a path or a recursion.
+    struct SFrame
+    {
+      StatItem* parent;
+      StatIntrusiveNode* node;
+    };
+    std::vector<SFrame> stack;
+    stack.push_back({stats.mItem.get(), AsChildHead(stats.mItem.get())->next});
+    while (!stack.empty()) {
+      SFrame& top = stack.back();
+      StatIntrusiveNode* const node = top.node;
+      if (node == nullptr || node == AsChildHead(top.parent) || node->owner == nullptr) {
+        stack.pop_back();
+        continue;
+      }
+      top.node = node->next;
+      StatItem* const child = node->owner;
+      out.push_back(child);
+      stack.push_back({child, AsChildHead(child)->next});
+    }
+  }
 #endif
 
 } // namespace moho

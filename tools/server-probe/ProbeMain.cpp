@@ -422,6 +422,7 @@ namespace
     faf::probe::CProbeRebuild* rebuild = nullptr; // `--rebuild`
     int uid = 0;
     std::uint64_t launchInfos = 0;
+    std::uint64_t tableMessages = 0; // `SessionTables`
     double beatMs = 0.0;
     double lateBase = 0.0;      // the seconds at which beat 0 would have come
     bool haveLateBase = false;
@@ -472,6 +473,13 @@ namespace
         } else {
           std::printf("probe %d: %.1f s: rebuild: %s\n", out.uid, elapsed, error.c_str());
         }
+      }
+      return;
+    }
+    if (message[0] == static_cast<std::uint8_t>(ESeatMessage::SessionTables)) {
+      ++out.tableMessages;
+      if (out.rebuild != nullptr) {
+        out.rebuild->OnTables(message);
       }
       return;
     }
@@ -1129,9 +1137,9 @@ int main(const int argc, char** const argv)
   std::printf("probe %d: joined %llu times, %llu beat messages, last beat %llu\n", options.uid, static_cast<unsigned long long>(joins), static_cast<unsigned long long>(beatMessages), static_cast<unsigned long long>(lastBeat));
   const double viewSeconds = views.lastAt - views.firstAt;
   std::printf(
-    "probe %d: %llu views, %llu didn't decode, %llu whole after the first, %llu game infos, %llu launch infos, %llu checks (%llu didn't match), last at beat %llu with %llu entities, %.1f KB/s (frames %.1f), largest %llu bytes\n", options.uid,
+    "probe %d: %llu views, %llu didn't decode, %llu whole after the first, %llu game infos, %llu launch infos, %llu session-table messages, %llu checks (%llu didn't match), last at beat %llu with %llu entities, %.1f KB/s (frames %.1f), largest %llu bytes\n", options.uid,
     static_cast<unsigned long long>(views.views), static_cast<unsigned long long>(views.failed), static_cast<unsigned long long>(views.whole),
-    static_cast<unsigned long long>(views.gameInfos), static_cast<unsigned long long>(views.launchInfos), static_cast<unsigned long long>(views.checks), static_cast<unsigned long long>(views.mismatches),
+    static_cast<unsigned long long>(views.gameInfos), static_cast<unsigned long long>(views.launchInfos), static_cast<unsigned long long>(views.tableMessages), static_cast<unsigned long long>(views.checks), static_cast<unsigned long long>(views.mismatches),
     static_cast<unsigned long long>(views.lastBeat),
     static_cast<unsigned long long>(views.lastEntities), viewSeconds > 0.0 ? static_cast<double>(views.bytes) / 1024.0 / viewSeconds : 0.0,
     viewSeconds > 0.0 ? static_cast<double>(views.frameBytes) / 1024.0 / viewSeconds : 0.0, static_cast<unsigned long long>(views.maxMessage)
