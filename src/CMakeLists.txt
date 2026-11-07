@@ -169,6 +169,7 @@ set_property(SOURCE
     gpg/gal/backends/vulkan/VulkanLoader.cpp
     gpg/gal/backends/vulkan/VulkanSurface.cpp
     gpg/gal/backends/vulkan/VulkanCore.cpp
+    gpg/gal/backends/vulkan/VulkanMemoryAllocator.cpp
     gpg/gal/backends/vulkan/ResourcesVulkan.cpp
     gpg/gal/backends/vulkan/DeviceVulkan.cpp
     gpg/gal/backends/vulkan/GpuDrivenVulkan.cpp
