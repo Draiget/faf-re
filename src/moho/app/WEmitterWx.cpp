@@ -786,7 +786,8 @@ moho::WEmitterWx::WEmitterWx(UserEntity* const attachEntity, const Wm3::Vector3f
   // destructor's ReleaseInterlockRef (slot 37) gives it back.
   mSim = WLD_GetDriver()->ProcessEvents();
 
-  if (attachEntity != nullptr) {
+  // Engine addition, server mode: a server session's client has no sim (`ProcessEvents` gives none).
+  if (attachEntity != nullptr && mSim != nullptr) {
     Entity* const entity = mSim->mEntityDB->FindEntityById(attachEntity->mParams.mEntityId);
     mAttachedUnit.Set(entity != nullptr ? entity->IsUnit() : nullptr);
   } else {
@@ -984,7 +985,7 @@ moho::WEmitterWx::~WEmitterWx()
     delete panel;
   }
 
-  if (mPreviewEffect.GetObjectPtr() != nullptr) {
+  if (mPreviewEffect.GetObjectPtr() != nullptr && mSim != nullptr) {
     mSim->mEffectManager->DestroyEffect(mPreviewEffect.GetObjectPtr());
   }
   WLD_GetDriver()->ReleaseInterlockRef();

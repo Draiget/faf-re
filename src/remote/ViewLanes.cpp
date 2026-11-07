@@ -51,7 +51,7 @@ namespace faf::remote
     // Lua lane. `Sim::Sync` writes the `Sync` table after its entity walk, so these are the last
     // beat's, and it writes them again once this returns: a real server sends them when the beat's
     // sync is over.
-    if (mRouter != nullptr) {
+    if (mRouter != nullptr && !mLuaSeparately) {
       for (std::size_t army = 0; army < armyCount && army < mRouter->ViewCount(); ++army) {
         SClient& client = mClients[army];
         client.lua.Clear();

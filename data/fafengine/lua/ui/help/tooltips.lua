@@ -2,7 +2,7 @@
 -- /lua/ui/help/tooltips.lua.
 --
 -- The options screen shows Tooltips['options_<key>'] when the mouse is over an option; the hook of
--- /lua/options/options.lua adds four options, so their texts go here. FAF's Lua may carry them already (issue #327,
+-- /lua/options/options.lua adds five options, so their texts go here. FAF's Lua may carry them already (issue #327,
 -- FAForever/fa#7372); an entry that is there is left as FAF wrote it.
 
 do
@@ -22,6 +22,15 @@ do
         options_replay_keyframe_prepare = {
             title = "<LOC OPTIONS_REPLAY_KEYFRAME_PREPARE_TITLE>Replay background preparation",
             description = "<LOC OPTIONS_REPLAY_KEYFRAME_PREPARE_DESCRIPTION>A hidden low-priority copy of the game saves positions ahead of a replay you watch, so a first jump forward can load one. Off saves CPU, and jumps forward play through the game instead.",
+        },
+        options_splat_budget_tier = {
+            title = 'Ground splat limit',
+            description = 'Maximum ground splats drawn in each view, including tread marks. '
+                .. 'At Medium/High fidelity: Original 2,499; Enhanced 10,000; Very high 25,000; Extreme 50,000. '
+                .. 'At Low fidelity: 249; 1,000; 2,500; 5,000. '
+                .. 'Applies after pressing Apply or OK, without restarting. '
+                .. 'Higher limits use more memory and rendering time. Marks can still disappear when the selected limit '
+                .. 'or available memory is exceeded. This does not change splat lifetime or every type of decal.',
         },
     }
     for key, entry in entries do

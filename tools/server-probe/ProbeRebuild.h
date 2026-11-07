@@ -38,6 +38,9 @@ namespace faf::probe
       std::span<const std::uint8_t> grids
     );
 
+    /** A whole `SessionTables` message (plan WP11 step 4). */
+    void OnTables(std::span<const std::uint8_t> message);
+
     /** The match's rules are loaded (from the file, or from the server's `LaunchInfo`). */
     [[nodiscard]] bool HasRules() const noexcept;
 

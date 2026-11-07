@@ -9,6 +9,8 @@
 #include "moho/render/GpuPathSettings.h"
 #include "moho/render/SkyDome.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
+#include "moho/sim/CWldMap.h"
+#include "moho/sim/STIMap.h"
 
 namespace moho
 {
@@ -85,11 +87,12 @@ namespace
         line("session   : none (menu/lobby/teardown)");
       }
 
-      if (ISTIDriver* const driver = sSimDriver.get()) {
-        const auto* const simDriver = static_cast<const CSimDriver*>(driver);
+      if (const auto* const simDriver = dynamic_cast<const CSimDriver*>(sSimDriver.get())) {
         line("driver    : state=%d dispatchBeat=%d nextIssueBeat=%d",
              static_cast<int>(simDriver->DiagDriverState()), simDriver->DiagDispatchBeat(),
              simDriver->DiagNextIssueBeat());
+      } else if (sSimDriver.get() != nullptr) {
+        line("driver    : not the lockstep driver (loopback or a server session's)");
       } else {
         line("driver    : none");
       }
@@ -553,10 +556,28 @@ namespace
           (void)marker;
         }
 
+#if FAF_SERVER_MODE
+        // Engine addition, server mode (plan WP2.8): a server session's client has no sim. Its driver makes every
+        // beat from the server's views (remote/client/NetworkSimDriver.h); no rejoin restore, replay timeline,
+        // recording (the server keeps the replay) or sim pacing.
+        const bool serverSession = faf::remote::client::HasServerLaunch();
+#else
+        constexpr bool serverSession = false;
+#endif
         // Ownership of both the client manager and the replay sink moves into the
         // driver; the session info gives its client manager up here.
         IClientManager* const clientManager = sessionInfo->mClientManager;
         sessionInfo->mClientManager = nullptr;
+        if (serverSession) {
+#if FAF_SERVER_MODE
+          // The client's own map heights, as loaded: the server's terrain edits go on a copy of them.
+          const CHeightField* heights = nullptr;
+          if (wldSession->mWldMap != nullptr && wldSession->mWldMap->mTerrainRes != nullptr && wldSession->mWldMap->mTerrainRes->mMap != nullptr) {
+            heights = wldSession->mWldMap->mTerrainRes->mMap->mHeightField.get();
+          }
+          driver = faf::remote::client::CreateServerSessionDriver(*wldSession->mRules, *sessionInfo->mLaunchInfo, heights);
+#endif
+        } else {
         // Engine addition (issue #275): does nothing unless a save came with this client's seat.
         REJOIN_PrepareRestore(*sessionInfo);
         REPLAY_PrepareSession(*sessionInfo); // engine addition (replay timeline)
@@ -579,6 +600,7 @@ namespace
           driver, *wldSession->mRules, launchMap->GetBounds3D(), wldSession->IsMultiplayer != 0
         );
 #endif
+        }
       }
       sSimDriver.reset(driver);
 

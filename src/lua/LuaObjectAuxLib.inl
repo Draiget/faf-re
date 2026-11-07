@@ -806,6 +806,7 @@
 		sweep_boundaries::NoteLinked(state->l_G, sweep_boundaries::kListThreads, reinterpret_cast<GCObject*>(thread)); // engine addition: lua_ParallelSweep
 
 		thread->marked = 0;
+		faf_lua51_gc_color_thread(state, thread);
 		thread->stack = nullptr;
 		thread->stacksize = 0;
 		thread->openupval = nullptr;
@@ -1321,6 +1322,11 @@
 		luaC_link(state, reinterpret_cast<GCObject*>(closure), LUA_TFUNCTION);
 
 		closure->l.g = *environment;
+		faf_lua51_gc_barrier_value(
+			state,
+			reinterpret_cast<GCObject*>(closure),
+			environment
+		); // Lua 5.1.5 lfunc.c: luaF_newLclosure() environment barrier
 		closure->l.nupvalues = static_cast<lu_byte>(nelems);
 		return closure;
 	}

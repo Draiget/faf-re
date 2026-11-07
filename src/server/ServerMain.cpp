@@ -91,7 +91,7 @@ namespace
 
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--lobby-seconds <n>]\n";
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--lobby-seconds <n>] [--stats-every <beats>]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
   // `net_Lag` is 500 ms in a lockstep game, time for every player's beats to arrive. Here it's only the
@@ -791,6 +791,9 @@ namespace
         net->QueueView(client.uid, faf::server::MakeGameInfo(mapSizeX, mapSizeZ, playerArmy, client.commandSource));
       }
       views = std::make_unique<faf::server::CServerViews>(contentTables, *rules, mapSizeX, mapSizeZ, *net, std::move(viewPlayers), static_cast<unsigned int>(std::max(viewThreads, 1)), teamViews);
+      if (std::string statsEvery; ReadOption("--stats-every", statsEvery)) {
+        views->SetStatsEveryBeats(static_cast<std::uint32_t>(std::max(1, std::atoi(statsEvery.c_str()))));
+      }
       views->Install();
       Say("Views: %s", teamViews ? (teamsLocked ? "one per team, and each player's own units" : "one per team (--team-views), with teams unlocked")
                        : perPlayerViews ? "one per player (--per-player-views)" : "one per player, as teams aren't locked (TeamLock)");

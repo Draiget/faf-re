@@ -44,6 +44,11 @@ namespace faf::remote
       mLuaRouting = true;
       mLuaRoutingDump = std::move(dumpPrefix);
     }
+    /**
+     * With Lua routing: a subclass sends each beat's Lua `Sync` itself once the beat's table is routed (a server's
+     * `LuaSync`), so the views' Lua lanes, which would carry the beat before's, stay empty and are not encoded.
+     */
+    void SendLuaSeparately() noexcept { mLuaSeparately = true; }
 
   protected:
     /** One view's beat. `ok`: every lane encoded. */
@@ -139,6 +144,7 @@ namespace faf::remote
     std::vector<SClient> mClients;
     std::vector<SBeatGrid> mBeatGrids; // every army's grids, in army order; they keep their cells from beat to beat
     bool mLuaRouting = false;
+    bool mLuaSeparately = false;
     std::string mLuaRoutingDump;
     std::unique_ptr<CSyncRouter> mRouter; // made once the army count is known
   };

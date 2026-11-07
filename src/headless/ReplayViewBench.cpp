@@ -81,6 +81,13 @@ namespace faf::headless
   void CReplayViewBench::OnViewFrames(moho::Sim& sim)
   {
     const auto sendStart = std::chrono::steady_clock::now();
+    if (mSessionTables.HasPending()) {
+      // As a server's `CServerViews::OnViewFrames`: the beat's record, before the views.
+      remote::wire::BitWriter record;
+      mSessionTables.WritePending(record);
+      mTableBytes += record.Bytes().size();
+      ++mTableRecords;
+    }
     remote::CViewLanes::OnViewFrames(sim);
 
     const auto sendEnd = std::chrono::steady_clock::now();
@@ -186,10 +193,13 @@ namespace faf::headless
     summary += "; build+send " + Distribution(total, "ms");
     summary += "; beat interval " + Distribution(interval, "ms");
     summary += "; per client " + Distribution(perSecond, "B/s");
+    if (SessionTables() != nullptr) {
+      summary += "; session tables " + std::to_string(mTableRecords) + " records, " + std::to_string(mTableBytes / 1024u) + " KB";
+    }
     if (PhaseTimesOn() && mPhaseBeats != 0u) {
       // Per beat, ms: each step's wall time on the sim thread; for a step done a view at a time, the
       // sum over views, the slowest view and the team views' part of the sum.
-      static constexpr const char* kNames[] = {"read", "read blocks", "read blips", "build", "write", "shared", "index", "facts", "keep", "frames", "release", "grid setup", "grids", "lua"};
+      static constexpr const char* kNames[] = {"read", "read blocks", "read blips", "build", "write", "shared", "index", "facts", "keep", "tables", "frames", "release", "grid setup", "grids", "lua"};
       static_assert(std::size(kNames) == static_cast<std::size_t>(EViewPhase::Count));
       const double perBeat = 1000.0 / static_cast<double>(mPhaseBeats);
       double wall = 0.0;
