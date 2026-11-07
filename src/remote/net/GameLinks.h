@@ -59,6 +59,21 @@ namespace faf::remote::net
     ViewCheck = 8,
     /** Player to server, reliable: its frames didn't match a `ViewCheck`; it wants its next view whole. */
     ViewMismatch = 9,
+    /**
+     * Both ways, reliable, before the game launches (plan WP2.13): one lobby (`CLobby`) message on the virtual
+     * connection between two participants. Player to server: varint the uid it is for, then the message. Server to
+     * player: varint the uid it is from, then the message; the server writes the sender itself, so no player chooses
+     * whom a message seems to come from. Uid 0 is the server itself, whose messages are lobby signals
+     * (LobbySignals.h), as FAF's lobby server sends a game over GPGNet.
+     */
+    Lobby = 10,
+    /**
+     * Server to player, reliable, before `GameInfo` (plan WPR.55): the game's configuration as the server launched it
+     * (the table `CLobby.LaunchGame` takes: scenario, armies, options, mods), in the lobby's Lua byte form
+     * (`LuaObject::ToByteStream`). A client takes its launch from this, never from the lobby's own Launch message.
+     * Again after a reconnect, with `GameInfo`.
+     */
+    LaunchInfo = 11,
   };
 
   /** What became of a player's command. */

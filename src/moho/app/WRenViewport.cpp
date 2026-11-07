@@ -833,7 +833,8 @@ void moho::REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, const int 
 
   // 0x007FA941..0x007FA982: network-stats HUD, right-anchored.
   if (moho::ren_ShowNetworkStats) {
-    if (CSimDriver* const simDriver = static_cast<CSimDriver*>(moho::WLD_GetDriver())) {
+    // Engine addition: only the lockstep driver has these stats (the remote and server drivers draw none).
+    if (CSimDriver* const simDriver = dynamic_cast<CSimDriver*>(moho::WLD_GetDriver())) {
       simDriver->DrawNetworkStats(primBatcher, static_cast<float>(headWidth - 25), 25.0f, 1.0f, 0.0f);
     }
   }

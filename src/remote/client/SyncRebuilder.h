@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -109,6 +111,12 @@ namespace faf::remote::client
      */
     bool Apply(std::span<const std::uint8_t> frameBytes, moho::SSyncData& packet);
 
+    /**
+     * Plan WP11: rewrites `packet`'s entity lanes from a frame already decoded (a server's view: the player's own
+     * frame and its team's, merged by `CViewFrameMerger`). `wireBytes` is what it took on the wire, for the counts.
+     */
+    bool ApplyFrame(wire::SViewFrame frame, std::size_t wireBytes, moho::SSyncData& packet);
+
     ~CSyncRebuilder();
 
     [[nodiscard]] const SRebuildStats& Stats() const noexcept { return mStats; }
@@ -128,6 +136,8 @@ namespace faf::remote::client
     [[nodiscard]] const wire::SViewFrame* Baseline() const noexcept { return mHasShown ? &mShown : nullptr; }
 
   private:
+    bool ApplyFrame(wire::SViewFrame frame, std::size_t wireBytes, moho::SSyncData& packet, std::chrono::steady_clock::time_point start);
+
     struct SHeldEntity
     {
       bool live = false; // in the session's id map (not orphaned)

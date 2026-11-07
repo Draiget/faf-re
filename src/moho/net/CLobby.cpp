@@ -50,6 +50,12 @@
 #include "moho/sim/SSTICommandSource.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/ui/UiRuntimeTypes.h"
+#if FAF_SERVER_MODE
+#include <span>
+
+#include "remote/client/ServerConnect.h"
+#include "remote/client/ServerRelayConnector.h"
+#endif
 using namespace moho;
 
 namespace moho
@@ -492,11 +498,22 @@ namespace
 {
   // Engine addition (issue #215): live CLobby objects, for LOBBY_IsActive.
   std::atomic<int> sLiveLobbies{0};
+  // Engine addition, server mode (plan WP2.8): the lobby made over the server session's connector, while it lives.
+  moho::CLobby* sServerSessionLobby = nullptr;
 } // namespace
 
 bool moho::LOBBY_IsActive() noexcept
 {
   return sLiveLobbies.load(std::memory_order_relaxed) > 0;
+}
+
+void moho::LOBBY_ServerSessionLaunched()
+{
+  // As `CLobby::LaunchGame` ends a lobby (0x007C38C0): its script's `GameLaunched`, which closes the lobby's screen
+  // and destroys the lobby; the server's launch replaces the lobby's own.
+  if (CLobby* const lobby = sServerSessionLobby; lobby != nullptr) {
+    lobby->RunScript("GameLaunched");
+  }
 }
 
 /**
@@ -557,6 +574,9 @@ CLobby::CLobby(
 CLobby::~CLobby()
 {
   sLiveLobbies.fetch_sub(1, std::memory_order_relaxed); // Engine addition (issue #215)
+  if (sServerSessionLobby == this) {
+    sServerSessionLobby = nullptr; // engine addition, server mode
+  }
 
   if (mSocket != nullptr) {
     WIN_GetWaitHandleSet()->RemoveHandle(mSocket->CreateEvent());
@@ -1563,10 +1583,23 @@ int moho::cfunc_InternalCreateLobbyL(LuaPlus::LuaState* const state)
   if (!natTraversalProvider.expired()) {
     liveNatTraversalProvider = natTraversalProvider;
   }
-  const bool noNatTraversalProvider = (liveNatTraversalProvider.use_count() == 0);
+  bool noNatTraversalProvider = (liveNatTraversalProvider.use_count() == 0);
 
   INetConnector* connector = nullptr;
-  if (protocol == ENetProtocolType::kTcp) {
+#if FAF_SERVER_MODE
+  // Engine addition, server mode (plan WP2.12, WP2.13, WP12.1): in a server session the lobby's connections are
+  // virtual, one per participant over the channel to the server (remote/client/ServerRelayConnector.h), whatever
+  // protocol the lobby Lua names. The server names the participants as FAF's lobby server does through GPGNet
+  // (`ConnectToPeer`), so the lobby works as one with a NAT-traversal provider: no `NewPeer` from its host, no
+  // connection accepted that wasn't announced, no LAN discovery.
+  if (INetConnector* const relay = faf::remote::TakeServerLobbyConnector(); relay != nullptr) {
+    connector = relay;
+    noNatTraversalProvider = false;
+  }
+#endif
+  if (connector != nullptr) {
+    // the server session's
+  } else if (protocol == ENetProtocolType::kTcp) {
     connector = NET_MakeTCPConnector(static_cast<u_short>(localPort));
   } else if (protocol == ENetProtocolType::kUdp) {
     connector = NET_MakeUDPConnector(static_cast<u_short>(localPort), liveNatTraversalProvider);
@@ -1585,6 +1618,11 @@ int moho::cfunc_InternalCreateLobbyL(LuaPlus::LuaState* const state)
   gpg::Logf("LOBBY: Game port %d[%s] opened.", gamePort, protocolName.c_str());
 
   CLobby* const lobby = new CLobby(clazz, connector, maxConnections, noNatTraversalProvider, playerName, uid);
+#if FAF_SERVER_MODE
+  if (dynamic_cast<faf::remote::CServerRelayConnector*>(connector) != nullptr) {
+    sServerSessionLobby = lobby;
+  }
+#endif
   lobby->mLuaObj.PushStack(state);
   return 1;
 }
@@ -3243,6 +3281,34 @@ void CLobby::LaunchGame(
   const LuaPlus::LuaObject& dat
 )
 {
+#if FAF_SERVER_MODE
+  // Engine addition, server mode (plan WP2.14, WPR.55): the server starts the match. The host's configuration goes
+  // to it to be checked; every client, the host too, takes its launch from the server, never from the lobby's
+  // Launch message.
+  if (faf::remote::ServerSessionUid() != 0) {
+    if (peerConnection == nullptr) {
+      CMessage request(ELobbyMsg::LOBMSG_DirectScriptData);
+      bool encoded = false;
+      {
+        CMessageStream stream(request, CMessageStream::Access::kReadWrite); // done writing when it goes
+        encoded = const_cast<LuaPlus::LuaObject&>(dat).ToByteStream(stream);
+      }
+      if (!encoded) {
+        const char* reason = "The game configuration couldn't be sent to the server.";
+        CallbackStr("LaunchFailed", &reason);
+        return;
+      }
+      const auto* const bytes = reinterpret_cast<const std::uint8_t*>(request.mBuff.start_);
+      const std::size_t size = request.mBuff.Size();
+      constexpr std::size_t kHeaderBytes = 3u; // type, 16-bit size
+      (void)faf::remote::SendServerLaunchRequest(std::span<const std::uint8_t>(bytes + kHeaderBytes, size - kHeaderBytes));
+      gpg::Logf("LOBBY: launch sent to the server (%u bytes).", static_cast<unsigned>(size - kHeaderBytes));
+    } else {
+      gpg::Logf("LOBBY: the host launched; the server starts the match.");
+    }
+    return;
+  }
+#endif
   // Engine addition (plan WP2.7): the launch info, army order, client indices and command
   // sources are built by `BuildLaunchInfo`, which a game server shares; the participants are
   // this lobby's peers, given their indices by `AssignClientIndex` / `AssignCommandSource`.

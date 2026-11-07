@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "remote/net/GameLinks.h"
+#include "server/LobbyRelay.h"
 #include "server/SeatIntake.h"
 
 // Engine addition, dedicated server (plan WP1.1, WP3.5, WP10.1, WP10.5): the players' network. Its own
@@ -85,6 +86,25 @@ namespace faf::server
     /** Who went away or stopped being away since the last call, in order. */
     [[nodiscard]] std::vector<SPresence> TakePresence();
 
+    /**
+     * Plan WP2.13: lobby messages between participants are relayed on the network thread (`CLobbyRelay`); one for
+     * the server itself (uid 0) waits here. From any thread.
+     */
+    struct SLobbyMessage
+    {
+      std::int32_t from = 0;
+      std::vector<std::uint8_t> message;
+    };
+    [[nodiscard]] std::vector<SLobbyMessage> TakeLobbyMessages();
+    /** A lobby signal from the server to a participant, in order, once they've joined. From any thread. */
+    void QueueLobbyFromServer(std::int32_t uid, const std::vector<std::uint8_t>& message);
+    /** Participants whose channel came up for the first time since the last call, for the lobby's signals. */
+    [[nodiscard]] std::vector<std::int32_t> TakeLobbyJoined();
+    /** Participants out of the game since the last call, for the lobby's signals (the game's views read `TakeGone`). */
+    [[nodiscard]] std::vector<std::int32_t> TakeLobbyLeft();
+    /** At launch (plan WPR.51): the relay takes nothing more. From any thread. */
+    void CloseLobby() noexcept { mCloseLobby.store(true, std::memory_order_relaxed); }
+
     /** What arrived that wasn't a player's, for the console; after `Stop`. */
     [[nodiscard]] std::string LinkReport() const;
 
@@ -116,6 +136,7 @@ namespace faf::server
     void Remove(std::int32_t uid, SSeat& seat, const std::string& why);
     void Say(std::string line);
     void SendViews();
+    void SendLobby();
 
     void OnJoined(std::int32_t uid, const remote::net::SEndpoint& from, bool returning) override;
     void OnMessage(std::int32_t uid, const std::vector<std::uint8_t>& message) override;
@@ -150,10 +171,20 @@ namespace faf::server
     std::atomic<std::uint64_t> mBytesSent{0};
     std::mutex mViewLock;
     std::map<std::int32_t, std::vector<SQueuedMessage>> mViewQueue;
-    std::map<std::int32_t, std::vector<std::uint8_t>> mGameInfo; // each player's, to send again on their return
+    // Each player's LaunchInfo and GameInfo, in the order queued, to send again on their return.
+    std::map<std::int32_t, std::vector<std::vector<std::uint8_t>>> mStartMessages;
     std::vector<SQueuedMessage> mViewSending;
 
     std::mutex mNewsLock;
     std::vector<std::string> mNews;
+
+    CLobbyRelay mLobby;                        // on the network thread
+    std::vector<std::uint8_t> mLobbyFrame;     // the frame being relayed
+    std::atomic<bool> mCloseLobby{false};
+    std::uint64_t mLobbyUndelivered = 0;       // relayed to a participant with no channel
+    std::vector<SLobbyMessage> mLobbyIn;       // for the host; under mNewsLock
+    std::vector<std::int32_t> mLobbyLeft;      // likewise
+    std::vector<std::int32_t> mLobbyJoined;    // likewise
+    std::vector<SLobbyMessage> mLobbyOut;      // from the host, `from` being the participant it's for; under mViewLock
   };
 } // namespace faf::server

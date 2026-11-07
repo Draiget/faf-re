@@ -7,8 +7,13 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <algorithm>
 #include <cstring>
+#include <deque>
+#include <map>
 #include <memory>
+#include <span>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -22,10 +27,16 @@
 #include "moho/net/EClientMsg.h"
 #include "moho/net/ECmdStreamOp.h"
 #include "moho/net/IMessageReceiver.h"
+#include "netlink/EngineLinks.h"
 #include "remote/ServerClient.h"
+#include "remote/client/ServerRelayConnector.h"
+#include "remote/client/ViewMerge.h"
 #include "remote/ViewIdMap.h"
 #include "remote/net/Datagram.h"
 #include "remote/net/GameLinks.h"
+#include "remote/net/LobbySignals.h"
+#include "server/LobbySignaller.h"
+#include "server/LobbyRelay.h"
 #include "server/SeatIntake.h"
 
 namespace
@@ -442,3 +453,559 @@ TEST(Existing_Seat, EjectionEndsTheSourceAndFreesTheGame) { EjectionEndsTheSourc
 TEST(Existing_Seat, TheHookRunsAheadOfEachBeat) { TheHookRunsAheadOfEachBeat(); }
 TEST(Existing_Seat, TheIntakeHandsOnWhatItCanTranslate) { TheIntakeHandsOnWhatItCanTranslate(); }
 TEST(Existing_Seat, LoadedCountsForTheStart) { LoadedCountsForTheStart(); }
+
+// Plan WP2.13, WPR.51: the lobby relay (server/LobbyRelay.h).
+namespace
+{
+  using faf::server::CLobbyRelay;
+  using faf::server::ELobbyRelayVerdict;
+  using faf::server::SLobbyRelayLimits;
+
+  /** A Lobby frame's body: varint `to`, then `message`. */
+  std::vector<std::uint8_t> LobbyBody(const std::uint32_t to, const std::vector<std::uint8_t>& message)
+  {
+    std::vector<std::uint8_t> body;
+    faf::remote::net::ByteWriter writer(body);
+    writer.Varint(to);
+    writer.Bytes(message.data(), message.size());
+    return body;
+  }
+
+  struct SRelayed
+  {
+    ELobbyRelayVerdict verdict;
+    std::int32_t to = -1;
+    std::vector<std::uint8_t> frame;
+    std::vector<std::uint8_t> message;
+  };
+
+  SRelayed Relay(CLobbyRelay& relay, const std::int32_t from, const std::vector<std::uint8_t>& body, const std::uint64_t nowUs)
+  {
+    SRelayed result{};
+    std::span<const std::uint8_t> message;
+    result.verdict = relay.Take(from, body, nowUs, result.to, result.frame, message);
+    result.message.assign(message.begin(), message.end());
+    return result;
+  }
+} // namespace
+
+TEST(LobbyRelay, ForwardsWithTheSenderTheServerWrites)
+{
+  CLobbyRelay relay;
+  relay.AddParticipant(1001);
+  relay.AddParticipant(1002);
+  const std::vector<std::uint8_t> hello = {7u, 1u, 2u, 3u};
+  const SRelayed relayed = Relay(relay, 1001, LobbyBody(1002, hello), 1'000'000u);
+  ASSERT_EQ(relayed.verdict, ELobbyRelayVerdict::Forward);
+  EXPECT_EQ(relayed.to, 1002);
+  std::vector<std::uint8_t> expected;
+  faf::remote::net::ByteWriter writer(expected);
+  writer.Byte(static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::Lobby));
+  writer.Varint(1001u);
+  writer.Bytes(hello.data(), hello.size());
+  EXPECT_EQ(relayed.frame, expected);
+
+  // Uid 0 is the server, the lobby's host.
+  const SRelayed toServer = Relay(relay, 1002, LobbyBody(0, hello), 1'000'000u);
+  EXPECT_EQ(toServer.verdict, ELobbyRelayVerdict::ToServer);
+  EXPECT_EQ(toServer.message, hello);
+  const std::vector<std::uint8_t> fromServer = CLobbyRelay::FrameFromServer(hello);
+  EXPECT_EQ(fromServer, (std::vector<std::uint8_t>{static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::Lobby), 0u, 7u, 1u, 2u, 3u}));
+}
+
+TEST(LobbyRelay, OnlyBetweenParticipants)
+{
+  CLobbyRelay relay;
+  relay.AddParticipant(1001);
+  relay.AddParticipant(1002);
+  const std::vector<std::uint8_t> hello = {1u};
+  EXPECT_EQ(Relay(relay, 999, LobbyBody(1001, hello), 1u).verdict, ELobbyRelayVerdict::UnknownSender);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1003, hello), 1u).verdict, ELobbyRelayVerdict::UnknownTarget);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1001, hello), 1u).verdict, ELobbyRelayVerdict::UnknownTarget);
+  relay.RemoveParticipant(1002);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, hello), 1u).verdict, ELobbyRelayVerdict::UnknownTarget);
+  EXPECT_EQ(Relay(relay, 1002, LobbyBody(1001, hello), 1u).verdict, ELobbyRelayVerdict::UnknownSender);
+}
+
+TEST(LobbyRelay, MalformedFramesAreDropped)
+{
+  CLobbyRelay relay;
+  relay.AddParticipant(1001);
+  relay.AddParticipant(1002);
+  EXPECT_EQ(Relay(relay, 1001, {}, 1u).verdict, ELobbyRelayVerdict::Malformed);                       // nothing
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, {}), 1u).verdict, ELobbyRelayVerdict::Malformed);      // no message
+  EXPECT_EQ(Relay(relay, 1001, {0xEAu, 0x87u}, 1u).verdict, ELobbyRelayVerdict::Malformed);           // a uid cut short
+  EXPECT_EQ(Relay(relay, 1001, {0xEAu, 0x87u, 0x80u, 0x00u, 5u}, 1u).verdict, ELobbyRelayVerdict::Malformed); // a long form
+  EXPECT_EQ(Relay(relay, 1001, {0xFFu, 0xFFu, 0xFFu, 0xFFu, 0x0Fu, 5u}, 1u).verdict, ELobbyRelayVerdict::Malformed); // past 31 bits
+}
+
+TEST(LobbyRelay, CapsEachSendersSizeAndRate)
+{
+  SLobbyRelayLimits limits;
+  limits.maxMessageBytes = 100;
+  limits.bytesPerSecond = 1000.0;
+  limits.burstBytes = 2000.0;
+  limits.messagesPerSecond = 10.0;
+  limits.burstMessages = 5.0;
+  CLobbyRelay relay(limits);
+  relay.AddParticipant(1001);
+  relay.AddParticipant(1002);
+  relay.AddParticipant(1003);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, std::vector<std::uint8_t>(101u, 1u)), 1'000'000u).verdict, ELobbyRelayVerdict::TooLarge);
+
+  // Five messages at once, then the sixth waits for the bucket to fill (10 a second: 0.1 s each).
+  const std::vector<std::uint8_t> small(10u, 1u);
+  for (int i = 0; i < 5; ++i) {
+    EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, small), 1'000'000u).verdict, ELobbyRelayVerdict::Forward) << i;
+  }
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, small), 1'000'000u).verdict, ELobbyRelayVerdict::TooFast);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, small), 1'050'000u).verdict, ELobbyRelayVerdict::TooFast);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, small), 1'110'000u).verdict, ELobbyRelayVerdict::Forward);
+  // Another sender has a bucket of its own.
+  EXPECT_EQ(Relay(relay, 1003, LobbyBody(1002, small), 1'110'000u).verdict, ELobbyRelayVerdict::Forward);
+
+  // Bytes: 2000 at once, then 1000 a second; messages plentiful, so only bytes run out.
+  SLobbyRelayLimits byteLimits = limits;
+  byteLimits.messagesPerSecond = 1000.0;
+  byteLimits.burstMessages = 1000.0;
+  CLobbyRelay bytes(byteLimits);
+  bytes.AddParticipant(1001);
+  bytes.AddParticipant(1002);
+  const std::vector<std::uint8_t> big(100u, 1u);
+  int sent = 0;
+  std::uint64_t now = 10'000'000u;
+  for (int i = 0; i < 80; ++i, now += 50'000u) { // 2000 bytes a second asked for, over 3.95 s
+    sent += Relay(bytes, 1001, LobbyBody(1002, big), now).verdict == ELobbyRelayVerdict::Forward ? 1 : 0;
+  }
+  // The 2000-byte burst plus 3.95 s at 1000 a second: about 5950 bytes, 59 of the 80 messages.
+  EXPECT_GE(sent, 57);
+  EXPECT_LE(sent, 61);
+  EXPECT_EQ(bytes.Count(ELobbyRelayVerdict::TooFast), static_cast<std::uint64_t>(80 - sent));
+}
+
+TEST(LobbyRelay, ClosedAtLaunch)
+{
+  CLobbyRelay relay;
+  relay.AddParticipant(1001);
+  relay.AddParticipant(1002);
+  relay.Close();
+  EXPECT_FALSE(relay.Open());
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, {1u}), 1u).verdict, ELobbyRelayVerdict::Closed);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(0, {1u}), 1u).verdict, ELobbyRelayVerdict::Closed);
+  EXPECT_EQ(relay.Count(ELobbyRelayVerdict::Closed), 2u);
+}
+
+// Plan WP2.2, WP2.12: the server's lobby signals (remote/net/LobbySignals.h, server/LobbySignaller.h).
+namespace
+{
+  using faf::remote::net::ELobbySignal;
+  using faf::remote::net::SLobbySignal;
+  using faf::server::CLobbySignaller;
+
+  SLobbySignal Decoded(const std::vector<std::uint8_t>& message)
+  {
+    SLobbySignal signal;
+    EXPECT_TRUE(faf::remote::net::DecodeLobbySignal(message, signal));
+    return signal;
+  }
+
+  /** The signals for `uid`, in order, as "kind uid name text". */
+  std::vector<std::string> SignalsTo(const std::vector<CLobbySignaller::SOutgoing>& out, const std::int32_t uid)
+  {
+    std::vector<std::string> mine;
+    for (const CLobbySignaller::SOutgoing& message : out) {
+      if (message.to == uid) {
+        const SLobbySignal signal = Decoded(message.message);
+        mine.push_back(std::to_string(static_cast<int>(signal.kind)) + " " + std::to_string(signal.uid) + " " + signal.name + " " + signal.text);
+      }
+    }
+    return mine;
+  }
+} // namespace
+
+TEST(LobbySignals, RoundTripAndRefuseWhatIsNotOne)
+{
+  for (const SLobbySignal& signal :
+       {SLobbySignal{ELobbySignal::Host, faf::remote::net::kLobbySignalAutoLobby, 0, "Ann", "/maps/x/x_scenario.lua"},
+        SLobbySignal{ELobbySignal::Join, 0, 1001, "Bo", "Ann"}, SLobbySignal{ELobbySignal::ConnectToPeer, 0, 0x7FFFFFFF, "Cy", ""},
+        SLobbySignal{ELobbySignal::DisconnectFromPeer, 0, 1003, "", ""}, SLobbySignal{ELobbySignal::LaunchRefused, 0, 0, "", "the map"},
+        SLobbySignal{ELobbySignal::Launching, 0, 0, "", ""}}) {
+    const SLobbySignal back = Decoded(faf::remote::net::EncodeLobbySignal(signal));
+    EXPECT_EQ(back.kind, signal.kind);
+    EXPECT_EQ(back.flags, signal.flags);
+    EXPECT_EQ(back.uid, signal.uid);
+    EXPECT_EQ(back.name, signal.name);
+    EXPECT_EQ(back.text, signal.text);
+  }
+  SLobbySignal out;
+  std::vector<std::uint8_t> bytes = faf::remote::net::EncodeLobbySignal(SLobbySignal{ELobbySignal::Join, 0, 1001, "Bo", "Ann"});
+  bytes.push_back(0u);
+  EXPECT_FALSE(faf::remote::net::DecodeLobbySignal(bytes, out)); // bytes left over
+  bytes.pop_back();
+  bytes.pop_back();
+  EXPECT_FALSE(faf::remote::net::DecodeLobbySignal(bytes, out)); // cut short
+  bytes = faf::remote::net::EncodeLobbySignal(SLobbySignal{ELobbySignal::Join, 0, 1001, "Bo", "Ann"});
+  bytes[0] = 9u;
+  EXPECT_FALSE(faf::remote::net::DecodeLobbySignal(bytes, out)); // no such kind
+  const std::vector<std::uint8_t> longName = {2u, 0u, 1u, 0x81u, 0x02u}; // a 257-byte name
+  EXPECT_FALSE(faf::remote::net::DecodeLobbySignal(longName, out));
+}
+
+TEST(LobbySignaller, RolesWaitForTheHostThenEveryPairIsIntroduced)
+{
+  CLobbySignaller signaller("/maps/m/m_scenario.lua");
+  signaller.AddParticipant(1001, "Ann"); // first in the match: the logical host
+  signaller.AddParticipant(1002, "Bo");
+  signaller.AddParticipant(1003, "Cy");
+  EXPECT_EQ(signaller.Host(), 1001);
+  std::vector<CLobbySignaller::SOutgoing> out;
+
+  // Bo is in before the host: nothing yet.
+  signaller.OnJoined(1002, out);
+  EXPECT_TRUE(out.empty());
+  EXPECT_EQ(signaller.InLobby(), 0u);
+
+  // The host comes: it hosts, learns of Bo before Bo learns whom to join.
+  signaller.OnJoined(1001, out);
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_EQ(out[0].to, 1001);
+  EXPECT_EQ(SignalsTo(out, 1001), (std::vector<std::string>{"1 0 Ann /maps/m/m_scenario.lua", "3 1002 Bo "}));
+  EXPECT_EQ(out[2].to, 1002);
+  EXPECT_EQ(SignalsTo(out, 1002), (std::vector<std::string>{"2 1001 Bo Ann"}));
+  EXPECT_EQ(signaller.InLobby(), 2u);
+
+  // Cy: the host first, then Cy joins, then Bo and Cy both ways.
+  out.clear();
+  signaller.OnJoined(1003, out);
+  EXPECT_EQ(SignalsTo(out, 1001), (std::vector<std::string>{"3 1003 Cy "}));
+  EXPECT_EQ(SignalsTo(out, 1003), (std::vector<std::string>{"2 1001 Cy Ann", "3 1002 Bo "}));
+  EXPECT_EQ(SignalsTo(out, 1002), (std::vector<std::string>{"3 1003 Cy "}));
+  EXPECT_EQ(out.front().to, 1001);
+
+  // Twice in, someone not in the match: nothing.
+  out.clear();
+  signaller.OnJoined(1003, out);
+  signaller.OnJoined(999, out);
+  EXPECT_TRUE(out.empty());
+
+  // Bo leaves: the rest are told; the host leaves: the lobby can't go on.
+  signaller.OnLeft(1002, out);
+  EXPECT_EQ(SignalsTo(out, 1001), (std::vector<std::string>{"4 1002 Bo "}));
+  EXPECT_EQ(SignalsTo(out, 1003), (std::vector<std::string>{"4 1002 Bo "}));
+  out.clear();
+  signaller.OnLeft(1001, out);
+  EXPECT_TRUE(signaller.HostLeft());
+  EXPECT_EQ(SignalsTo(out, 1003), (std::vector<std::string>{"4 1001 Ann "}));
+  EXPECT_EQ(signaller.InLobby(), 1u);
+}
+
+TEST(LobbySignaller, AJoinerWhoLeftBeforeItsRoleIsNotAnnounced)
+{
+  CLobbySignaller signaller("");
+  signaller.AddParticipant(1001, "Ann");
+  signaller.AddParticipant(1002, "Bo");
+  std::vector<CLobbySignaller::SOutgoing> out;
+  signaller.OnJoined(1002, out);
+  signaller.OnLeft(1002, out);
+  signaller.OnJoined(1001, out);
+  EXPECT_EQ(SignalsTo(out, 1001), (std::vector<std::string>{"1 0 Ann "}));
+  EXPECT_TRUE(SignalsTo(out, 1002).empty());
+}
+
+// Plan WP2.13, WP12.1: the client's relay connector (remote/client/ServerRelayConnector.h) against the server's relay
+// and signals in one process. `CLobby` isn't in this build, so the test makes its calls as the signals ask: the host
+// accepts each participant it is told of (`ConnectToPeer`), a joiner connects to the host and sends Join on ConnMade.
+namespace
+{
+  using faf::remote::CLobbyInbox;
+  using faf::remote::CServerRelayConnector;
+  using faf::remote::IRelayChannel;
+
+  /** One client's channel to the in-process server, its frames in a `CLobbyInbox` as the client's are. */
+  struct SLoopChannel final : IRelayChannel
+  {
+    std::vector<std::vector<std::uint8_t>> out;
+    CLobbyInbox inbox;
+    std::vector<std::int32_t> gone;
+    bool up = true;
+
+    void SendLobbyFrame(const std::span<const std::uint8_t> frame) override { out.emplace_back(frame.begin(), frame.end()); }
+    bool TakeLobbyFrame(std::vector<std::uint8_t>& frame) override { return inbox.TakeLobbyFrame(frame); }
+    bool Up() const override { return up; }
+    void TakeGone(std::vector<std::int32_t>& uids) override
+    {
+      uids.insert(uids.end(), gone.begin(), gone.end());
+      gone.clear();
+    }
+  };
+
+  /** What a lobby would receive: each message's type and bytes, and the connection it came on. */
+  struct SRecorder final : moho::IMessageReceiver
+  {
+    struct SReceived
+    {
+      std::uint8_t type;
+      std::vector<std::uint8_t> bytes;
+      moho::INetConnection* connection;
+    };
+    std::vector<SReceived> received;
+
+    void ReceiveMessage(moho::CMessage* const message, moho::CMessageDispatcher* const dispatcher) override
+    {
+      const auto* const start = reinterpret_cast<const std::uint8_t*>(message->mBuff.start_);
+      received.push_back(
+        SReceived{start[0], std::vector<std::uint8_t>(start, start + message->mBuff.Size()), static_cast<moho::INetConnection*>(dispatcher)}
+      );
+    }
+    [[nodiscard]] std::size_t Count(const std::uint8_t type, const moho::INetConnection* const on) const
+    {
+      return static_cast<std::size_t>(
+        std::count_if(received.begin(), received.end(), [&](const SReceived& r) { return r.type == type && r.connection == on; })
+      );
+    }
+  };
+
+  /** The server: the relay between clients, and the signals it sends as participants come and go. */
+  struct SLoopServer
+  {
+    CLobbyRelay relay;
+    CLobbySignaller signaller{"/maps/m/m_scenario.lua"};
+    std::map<std::int32_t, SLoopChannel*> clients;
+
+    void Signal(const std::vector<CLobbySignaller::SOutgoing>& out)
+    {
+      for (const CLobbySignaller::SOutgoing& message : out) {
+        clients.at(message.to)->inbox.Push(CLobbyRelay::FrameFromServer(message.message));
+      }
+    }
+    void Joined(const std::int32_t uid)
+    {
+      std::vector<CLobbySignaller::SOutgoing> out;
+      signaller.OnJoined(uid, out);
+      Signal(out);
+    }
+    void Left(const std::int32_t uid)
+    {
+      std::vector<CLobbySignaller::SOutgoing> out;
+      signaller.OnLeft(uid, out);
+      Signal(out);
+    }
+    void Pump()
+    {
+      for (auto& [uid, channel] : clients) {
+        for (const std::vector<std::uint8_t>& frame : std::exchange(channel->out, {})) {
+          std::int32_t to = 0;
+          std::vector<std::uint8_t> forward;
+          std::span<const std::uint8_t> message;
+          if (relay.Take(uid, std::span<const std::uint8_t>(frame).subspan(1), 1'000'000u, to, forward, message) == ELobbyRelayVerdict::Forward) {
+            clients.at(to)->inbox.Push(forward);
+          }
+        }
+      }
+    }
+  };
+
+  void WriteMessage(moho::INetConnection& connection, const std::vector<std::uint8_t>& message)
+  {
+    std::vector<std::uint8_t> copy = message;
+    moho::NetDataSpan span(copy.data(), copy.data() + copy.size());
+    connection.Write(&span);
+  }
+
+  [[nodiscard]] u_long AddressOf(const std::int32_t uid)
+  {
+    return static_cast<u_long>(faf::netlink::EngineAddressFor(uid).addrHost);
+  }
+
+  [[nodiscard]] u_short PortOf(const std::int32_t uid)
+  {
+    return faf::netlink::EngineAddressFor(uid).portHost;
+  }
+
+  constexpr std::uint8_t kJoin = 100;
+  constexpr std::uint8_t kWelcome = 102;
+  constexpr std::uint8_t kDirectScript = 107;
+  constexpr std::uint8_t kConnMade = 201;
+  constexpr std::uint8_t kConnLostEof = 203;
+} // namespace
+
+TEST(RelayConnector, EngineAddressesMapBackToUids)
+{
+  for (const std::int32_t uid : {1, 1001, 0x00FFFFFF, 0x01000000, 0x7FFFFFFF}) {
+    EXPECT_EQ(CServerRelayConnector::UidForAddress(AddressOf(uid), PortOf(uid)), uid) << uid;
+  }
+  EXPECT_EQ(CServerRelayConnector::UidForAddress(0x7F000001u, 27019u), 0); // a real address: nobody's
+  EXPECT_EQ(CServerRelayConnector::UidForAddress(0xF0000001u, 80u), 0);     // in 240/4 but no engine port
+}
+
+TEST(RelayConnector, ASignalHoldsBackWhatCameAfterIt)
+{
+  CLobbyInbox inbox;
+  const std::vector<std::uint8_t> signal = CLobbyRelay::FrameFromServer(
+    faf::remote::net::EncodeLobbySignal(SLobbySignal{ELobbySignal::ConnectToPeer, 0, 1002, "Bo", ""})
+  );
+  const std::vector<std::uint8_t> fromBo = {static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::Lobby), 0xEAu, 0x07u, kJoin, 3u, 0u};
+  inbox.Push(signal);
+  inbox.Push(fromBo);
+  std::vector<std::uint8_t> frame;
+  EXPECT_FALSE(inbox.TakeLobbyFrame(frame)); // Bo's Join waits for the signal that announces Bo
+  SLobbySignal taken;
+  ASSERT_TRUE(inbox.TakeSignal(taken));
+  EXPECT_EQ(taken.uid, 1002);
+  EXPECT_FALSE(inbox.TakeSignal(taken));
+  ASSERT_TRUE(inbox.TakeLobbyFrame(frame));
+  EXPECT_EQ(frame, fromBo);
+
+  // A malformed signal is dropped, and what came after it flows.
+  inbox.Push(CLobbyRelay::FrameFromServer(std::vector<std::uint8_t>{9u, 0u}));
+  inbox.Push(fromBo);
+  EXPECT_FALSE(inbox.TakeSignal(taken));
+  EXPECT_EQ(inbox.DroppedSignals(), 1u);
+  EXPECT_TRUE(inbox.TakeLobbyFrame(frame));
+}
+
+TEST(RelayConnector, TheHostAcceptsWhomTheServerNamesAndTheJoinerConnects)
+{
+  SRecorder lobbyA;
+  SRecorder lobbyB;
+  SLoopChannel channelA;
+  SLoopChannel channelB;
+  SLoopServer server;
+  server.relay.AddParticipant(1001);
+  server.relay.AddParticipant(1002);
+  server.signaller.AddParticipant(1001, "Ann");
+  server.signaller.AddParticipant(1002, "Bo");
+  server.clients = {{1001, &channelA}, {1002, &channelB}};
+  auto* const connectorA = new CServerRelayConnector(channelA);
+  auto* const connectorB = new CServerRelayConnector(channelB);
+  const auto listen = [](SRecorder& lobby, moho::INetConnection* const connection) {
+    connection->PushReceiver(100, 120, &lobby);
+    connection->PushReceiver(200, 210, &lobby);
+  };
+
+  server.Joined(1002);
+  server.Joined(1001);
+  SLobbySignal signal;
+  // Ann hosts; as `ConnectToPeer` on a host (`CLobby::ConnectToPeer`), she accepts Bo's engine address.
+  ASSERT_TRUE(channelA.inbox.TakeSignal(signal));
+  EXPECT_EQ(signal.kind, ELobbySignal::Host);
+  ASSERT_TRUE(channelA.inbox.TakeSignal(signal));
+  ASSERT_EQ(signal.kind, ELobbySignal::ConnectToPeer);
+  moho::INetConnection* const aToB = connectorA->Accept(AddressOf(signal.uid), PortOf(signal.uid));
+  listen(lobbyA, aToB);
+  // Bo joins Ann at her engine address: ConnMade, then Join.
+  ASSERT_TRUE(channelB.inbox.TakeSignal(signal));
+  ASSERT_EQ(signal.kind, ELobbySignal::Join);
+  EXPECT_EQ(signal.uid, 1001);
+  moho::INetConnection* const bToA = connectorB->Connect(AddressOf(signal.uid), PortOf(signal.uid));
+  listen(lobbyB, bToA);
+  connectorB->Pull();
+  ASSERT_EQ(lobbyB.Count(kConnMade, bToA), 1u);
+  WriteMessage(*bToA, {kJoin, 3u, 0u});
+  server.Pump();
+  connectorA->Pull();
+  EXPECT_EQ(lobbyA.Count(kConnMade, aToB), 1u);
+  EXPECT_EQ(lobbyA.Count(kJoin, aToB), 1u); // on the connection the host made for 1002
+  u_long address = 0;
+  u_short port = 0;
+  EXPECT_FALSE(connectorA->FindNextAddress(address, port));
+  WriteMessage(*aToB, {kWelcome, 3u, 0u});
+  server.Pump();
+  connectorB->Pull();
+  EXPECT_EQ(lobbyB.Count(kWelcome, bToA), 1u);
+
+  // Script data arrives as from the participant that sent it.
+  const std::vector<std::uint8_t> script = {kDirectScript, 6u, 0u, 104u, 105u, 33u};
+  WriteMessage(*bToA, script);
+  server.Pump();
+  connectorA->Pull();
+  ASSERT_EQ(lobbyA.Count(kDirectScript, aToB), 1u);
+  EXPECT_EQ(lobbyA.received.back().bytes, script);
+
+  // A peer can't make up this side's connection events; a message with a wrong size is dropped.
+  WriteMessage(*aToB, {kConnLostEof, 3u, 0u});
+  WriteMessage(*aToB, {kDirectScript, 9u, 0u, 120u});
+  server.Pump();
+  connectorB->Pull();
+  EXPECT_EQ(lobbyB.Count(kConnLostEof, bToA), 0u);
+  EXPECT_EQ(connectorB->DroppedFrames(), 2u);
+
+  // The host leaves: Bo is told, and his connection to her ends once (CLobby: "HostLeft").
+  server.Left(1001);
+  ASSERT_TRUE(channelB.inbox.TakeSignal(signal));
+  EXPECT_EQ(signal.kind, ELobbySignal::DisconnectFromPeer);
+  channelB.gone.push_back(signal.uid);
+  connectorB->Pull();
+  connectorB->Pull();
+  EXPECT_EQ(lobbyB.Count(kConnLostEof, bToA), 1u);
+
+  // The channel gone: every connection of that side is lost, once.
+  channelA.up = false;
+  connectorA->Pull();
+  connectorA->Pull();
+  EXPECT_EQ(lobbyA.Count(kConnLostEof, aToB), 1u);
+
+  connectorA->Destroy();
+  connectorB->Destroy();
+}
+
+// Plan WP2.14: the host's launch against the match (server/LobbySignaller.h).
+TEST(LaunchCheck, TheMatchsMapAndSeatsAndNoSimMods)
+{
+  using faf::server::CheckLaunch;
+  using faf::server::SLaunchFacts;
+  const SLaunchFacts match{"/maps/SCMP_009/SCMP_009_scenario.lua", {1001, 1002}, 0};
+  EXPECT_EQ(CheckLaunch(SLaunchFacts{"/maps/scmp_009/scmp_009_scenario.lua", {1002, 1001}, 0}, match), ""); // case, order
+  EXPECT_NE(CheckLaunch(SLaunchFacts{"/maps/SCMP_010/SCMP_010_scenario.lua", {1001, 1002}, 0}, match).find("map"), std::string::npos);
+  EXPECT_NE(CheckLaunch(SLaunchFacts{match.scenario, {1001}, 0}, match).find("slots"), std::string::npos);        // a seat empty
+  EXPECT_NE(CheckLaunch(SLaunchFacts{match.scenario, {1001, 1002, 1003}, 0}, match).find("slots"), std::string::npos); // a stranger
+  EXPECT_NE(CheckLaunch(SLaunchFacts{match.scenario, {1001, 1002}, 1}, match).find("sim mods"), std::string::npos);
+}
+
+TEST(LaunchCheck, ARequestIsItsKindThenTheConfiguration)
+{
+  const std::vector<std::uint8_t> configuration = {4u, 1u, 2u};
+  const std::vector<std::uint8_t> message = faf::remote::net::EncodeLaunchRequest(configuration);
+  EXPECT_EQ(message, (std::vector<std::uint8_t>{faf::remote::net::kLobbyLaunchRequest, 4u, 1u, 2u}));
+  std::span<const std::uint8_t> back;
+  ASSERT_TRUE(faf::remote::net::IsLaunchRequest(message, back));
+  EXPECT_EQ(std::vector<std::uint8_t>(back.begin(), back.end()), configuration);
+  EXPECT_FALSE(faf::remote::net::IsLaunchRequest(std::vector<std::uint8_t>{faf::remote::net::kLobbyLaunchRequest}, back));
+  EXPECT_FALSE(faf::remote::net::IsLaunchRequest(faf::remote::net::EncodeLobbySignal(SLobbySignal{}), back));
+}
+
+// Plan WP11 step 3: a client's view is its own frame and its team's, less the team's blips of its own units.
+TEST(ViewMerge, OwnAndTeamLessBlipsOfOwnUnits)
+{
+  using faf::remote::client::CViewFrameMerger;
+  const auto record = [](const std::uint32_t id) {
+    faf::remote::wire::SEntityRecord r{};
+    r.id = id;
+    return r;
+  };
+  faf::remote::wire::SViewFrame own;
+  own.frameId = 7;
+  own.beat = 42;
+  own.entities = {record(0x00500001u), record(0x00500009u)}; // army 5's units
+  faf::remote::wire::SViewFrame team;
+  team.entities = {record(0x00500001u), record(0x00600002u), record(0x20000003u), record(0x30500004u), record(0x30600005u)};
+  faf::remote::wire::SViewFrame merged;
+  std::uint64_t leftOut = 0;
+  CViewFrameMerger::Merge(own, &team, 5, merged, leftOut);
+  std::vector<std::uint32_t> ids;
+  for (const auto& r : merged.entities) {
+    ids.push_back(r.id);
+  }
+  // The own unit once, the ally's unit, the prop, the blip of army 6; the blip of army 5's own unit left out.
+  EXPECT_EQ(ids, (std::vector<std::uint32_t>{0x00500001u, 0x00500009u, 0x00600002u, 0x20000003u, 0x30600005u}));
+  EXPECT_EQ(leftOut, 1u);
+  EXPECT_EQ(merged.beat, 42u);
+  EXPECT_EQ(merged.frameId, 7u);
+  EXPECT_TRUE(CViewFrameMerger::IsBlipOfArmy(0x30500004u, 5));
+  EXPECT_FALSE(CViewFrameMerger::IsBlipOfArmy(0x30500004u, -1));
+  EXPECT_FALSE(CViewFrameMerger::IsBlipOfArmy(0x00500001u, 5));
+
+  // No team frame (cut from the team): the own frame alone.
+  CViewFrameMerger::Merge(own, nullptr, 5, merged, leftOut);
+  EXPECT_EQ(merged.entities.size(), 2u);
+}

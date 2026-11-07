@@ -135,6 +135,7 @@
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "moho/sim/Sim.h"
 #if FAF_SERVER_MODE
+#include "remote/client/NetworkSimDriver.h"
 #include "remote/client/RemoteSimDriver.h"
 #include "remote/client/SessionSummary.h"
 #endif

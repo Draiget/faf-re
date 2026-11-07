@@ -47,13 +47,14 @@ namespace moho
     const std::string kDefaultEndpoint = std::string(kDefaultScheme) + kTelemetryDefaultHost;
   } // namespace
 
-  bool telemetry_Enabled = true;
+  // Issue #337: off unless the player agreed. The FAF client passes /telemetry when the player said yes.
+  bool telemetry_Enabled = false;
 
   TConVar<bool> gTConVar_telemetry_Enabled(
     "telemetry_Enabled",
     "Send one small record per desync and one per game end of a live multiplayer game to telemetry_Endpoint "
     "(OTLP/HTTP JSON), and the desync dump to telemetry_DumpEndpoint. The records carry no names, ids or paths. "
-    "On by default; /notelemetry turns it off.",
+    "Off by default: /telemetry (the player's consent, passed by the FAF client) turns it on, /notelemetry off.",
     &telemetry_Enabled
   );
 
@@ -747,11 +748,12 @@ namespace moho
     }
     sStarted = true;
     fa::vector<fa::string> args;
-    if (CFG_GetArgOption("/notelemetry", 0u, nullptr)) {
-      telemetry_Enabled = false;
-    }
+    // Issue #337: consent comes on the command line; with both switches, the refusal holds.
     if (CFG_GetArgOption("/telemetry", 0u, nullptr)) {
       telemetry_Enabled = true;
+    }
+    if (CFG_GetArgOption("/notelemetry", 0u, nullptr)) {
+      telemetry_Enabled = false;
     }
     if (CFG_GetArgOption("/telemetryendpoint", 1u, &args) && !args.empty()) {
       telemetry_Endpoint = args[0];
@@ -773,6 +775,8 @@ namespace moho
       if (!OutboxFiles(OutboxFolder()).empty()) {
         CSender::Get().RetryOutbox();
       }
+    } else {
+      gpg::Logf("Telemetry: off, nothing is sent (%s)", telemetry_Enabled ? "no endpoint" : "no /telemetry on the command line");
     }
   }
 
