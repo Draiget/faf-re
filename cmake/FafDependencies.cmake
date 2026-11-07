@@ -7,7 +7,7 @@
 #     missing and moved when their pin changes, always with core.autocrlf=false.
 #     Git for Windows turns autocrlf on system-wide, and converted line endings
 #     break the CR-exact patches.
-#   * Downloads (boost 1.34.1, wxWindows 2.4.2, DXC, libjuice, libdatachannel and its deps): pinned by SHA256, cached in
+#   * Downloads (boost 1.34.1, wxWindows 2.4.2, DXC, DirectXTex, libjuice, libdatachannel and its deps): pinned by SHA256, cached in
 #     dependencies/.downloads and extracted into dependencies/<name>.
 #   * Patches (dependencies/patches): applied in order onto a fresh baseline. A
 #     stamp file in each tree records the patches (and their hashes) it carries,
@@ -242,6 +242,22 @@ set(_faf_download_msdfgen
     "93cd1ad8918c1a78c5c96e82d4f4c77f0eb86c2e7e8579a0967e54196c4b7167"
     "msdfgen-1.13"
     "msdfgen-1.13.tar.gz")
+# GoogleTest 1.15.2 (BSD-3-Clause): the tests' framework (tests/README.md). The tag's source
+# archive; cmake/deps/googletest builds gtest and gtest_main without gmock.
+set(_faf_download_googletest
+    "https://github.com/google/googletest/archive/refs/tags/v1.15.2.tar.gz"
+    "7b42b4d6ed48810c5362c265a17faebe90dc2373c885e5216439d37927f02926"
+    "googletest-1.15.2"
+    "googletest-1.15.2.tar.gz")
+
+# DirectXTex may2026 (MIT): decodes textures when d3dx11_43.dll is missing
+# (gpg/gal/backends/common/ImageCodecDirectXTex.cpp, issue #318). The tag's source archive;
+# cmake/deps/directxtex builds its CPU code.
+set(_faf_download_DirectXTex
+    "https://github.com/microsoft/DirectXTex/archive/refs/tags/may2026.tar.gz"
+    "204ae68a66fb15d87867d836efbac9ae5aa799ca2a1867024d96a8168fa3651f"
+    "DirectXTex-may2026"
+    "DirectXTex-may2026.tar.gz")
 
 function(_faf_download_tree name)
   list(GET _faf_download_${name} 0 _url)
@@ -410,6 +426,7 @@ faf_dependency_download(usrsctp)
 faf_dependency_download(plog)
 faf_dependency_download(mbedtls)
 faf_dependency_download(monocypher)
+faf_dependency_download(DirectXTex)
 if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})
   faf_dependency_download(freetype)
 endif()
@@ -419,6 +436,9 @@ endif()
 if(NOT FAF_ZSTD_DIR)
   faf_dependency_download(zstd)
 endif()
+if(NOT DEFINED ENV{FAF_GTEST_DIR} AND NOT (FAF_GTEST_DIR AND EXISTS "${FAF_GTEST_DIR}/CMakeLists.txt"))
+  faf_dependency_download(googletest)
+endif()
 
 faf_dependency_patches(WildMagic3p8 submodule
   wildmagic3p8_faf_required.patch)
@@ -426,6 +446,8 @@ faf_dependency_patches(zlib-1.2.3 submodule
   zlib_1_2_3_faf_required.patch)
 faf_dependency_patches(boost_1_34_1 download
   boost_1_34_1_faf_required.patch)
+faf_dependency_patches(libjuice download
+  libjuice_1_7_4_faf_turn_release.patch)
 faf_dependency_patches(wxWindows-2.4.2 download
   wxwindows_2_4_2_faf_required.patch wxwindows_2_4_2_faf_x64.patch wxwindows_2_4_2_faf_x64_pointers.patch)
 if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})

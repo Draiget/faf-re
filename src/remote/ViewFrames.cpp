@@ -585,6 +585,20 @@ namespace faf::remote
     return wire::EncodeFrameChanges(changes, mCodec, writer);
   }
 
+  std::uint64_t CViewFrames::HeldFrameHash(const std::int32_t army) const
+  {
+    const auto slot = static_cast<std::size_t>(army);
+    const SHeldView& held = mHeld[slot];
+    const CViewFrameBuilder& builder = *mBuilders[slot];
+    std::uint64_t hash = 0;
+    for (std::uint32_t recordSlot = 0; recordSlot < held.sent.size(); ++recordSlot) {
+      if (held.sent[recordSlot] != 0u) {
+        hash += wire::HashRecord(held.ownSlot[recordSlot] != kNoOwn ? held.own[held.ownSlot[recordSlot]] : builder.RecordAt(recordSlot));
+      }
+    }
+    return hash;
+  }
+
   bool CViewFrames::SlotHoldsEntity(const std::size_t slot, const std::uint32_t id) const
   {
     if (slot >= mHeld.size()) {
@@ -794,6 +808,7 @@ namespace faf::remote
     if (sim.mEntityDB != nullptr && !AdvanceEntityIndex(*sim.mEntityDB)) {
       WalkEntityIndex(*sim.mEntityDB);
     }
+    MarkPhase(EViewPhase::Index);
     const auto readFacts = [this, &sim](const std::size_t begin, const std::size_t end) {
       for (std::size_t i = begin; i < end; ++i) {
         const std::uint32_t entry = mEntityReads[i].entry;
@@ -816,6 +831,7 @@ namespace faf::remote
     }
     std::sort(mLeavingEntities.begin(), mLeavingEntities.end());
     mLeavingEntities.erase(std::unique(mLeavingEntities.begin(), mLeavingEntities.end()), mLeavingEntities.end());
+    MarkPhase(EViewPhase::Facts);
     if (mHeldCheck) {
       if (sim.mEntityDB != nullptr) {
         std::size_t entry = 0;
@@ -877,6 +893,7 @@ namespace faf::remote
     std::set_difference(
       mLastCommands.begin(), mLastCommands.end(), mLiveCommands.begin(), mLiveCommands.end(), std::back_inserter(mReleasedCommands)
     );
+    MarkPhase(EViewPhase::Keep);
 
     // Each view's builder, id map and frame are its own; the sim is only read (plan I3), so the
     // views can be built on the sim's workers (plan WP5.7, `SetParallel`).
@@ -943,22 +960,37 @@ namespace faf::remote
         FinishFrame(army);
       }
     };
-    if (Parallel() && armyCount > 1u) {
-      moho::CSimWorkerPool::Get().ParallelFor(armyCount, 1u, [&buildFrame](const std::size_t begin, const std::size_t end) {
-        for (std::size_t army = begin; army < end; ++army) {
-          buildFrame(army);
+    const std::size_t sideJobs = PrepareSideJobs(sim);
+    if (Parallel() && armyCount + sideJobs > 1u) {
+      // The team views first: each holds what its whole team sees, the longest jobs; then the side
+      // jobs, then the armies' views.
+      const std::size_t armies = static_cast<std::size_t>(ArmyCount());
+      const std::size_t teams = armyCount > armies ? armyCount - armies : 0u;
+      moho::CSimWorkerPool::Get().ParallelFor(armyCount + sideJobs, 1u, [this, &buildFrame, teams, armies, sideJobs](const std::size_t begin, const std::size_t end) {
+        for (std::size_t job = begin; job < end; ++job) {
+          if (job >= teams && job < teams + sideJobs) {
+            this->RunSideJob(job - teams);
+            continue;
+          }
+          const std::size_t army = job < teams ? armies + job : job - teams - sideJobs;
+          this->TimeView(army, [&] { buildFrame(army); });
         }
       });
     } else {
       for (std::size_t army = 0; army < armyCount; ++army) {
-        buildFrame(army);
+        TimeView(army, [&] { buildFrame(army); });
+      }
+      for (std::size_t job = 0; job < sideJobs; ++job) {
+        RunSideJob(job);
       }
     }
+    MarkPhase(EViewPhase::Frames);
     // The sim's stats trees the builders let go of are dropped here, on the sim thread, in army order.
     for (std::size_t army = 0; army < armyCount; ++army) {
       mBuilders[army]->ReleaseDropped();
       mBuilt[army] = true;
     }
+    MarkPhase(EViewPhase::Release);
     AddBuildTime();
     OnViewFrames(sim);
     if (mJobs != nullptr) {

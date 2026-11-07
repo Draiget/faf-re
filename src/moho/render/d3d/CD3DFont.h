@@ -205,4 +205,9 @@ namespace moho
   );
   static_assert(offsetof(CD3DFont, mBitmap) == 0x50, "moho::CD3DFont::mBitmap offset must be 0x50");
   static_assert(sizeof(CD3DFont) == 0x54, "moho::CD3DFont size must be 0x54");
+  /**
+   * Engine addition (ren_GlyphCache): writes the glyphs rasterized since the cache was last written,
+   * once none was added for a few seconds, or at once with `now`. Cheap when there is nothing new.
+   */
+  void REN_SaveGlyphCache(bool now);
 } // namespace moho

@@ -12,8 +12,11 @@
 -- clients announced rejoin, this never shows. If a returning player stops reporting,
 -- the engine says "lost" again and the Connectivity dialog comes back. A player who
 -- is back gets the announcement a defeated player gets.
+--
+-- FAF's Lua may carry these rows itself (issue #327): its disconnect.lua then defines its
+-- own GetSessionClients in this module, and this block steps aside.
 
-do
+if not rawget(getfenv(1), 'GetSessionClients') then
     local UIUtil = import("/lua/ui/uiutil.lua")
     local LayoutHelpers = import("/lua/maui/layouthelpers.lua")
     local Bitmap = import("/lua/maui/bitmap.lua").Bitmap

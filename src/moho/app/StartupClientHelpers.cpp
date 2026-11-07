@@ -412,6 +412,21 @@ int moho::cfunc_GetCommandLineArgL(LuaPlus::LuaState* const state)
   LuaPlus::LuaStackObject requestedCountArg(state, 2);
   const int requestedArgCount = requestedCountArg.GetInteger();
 
+  // Engine addition (issue #336): the launcher's per-game upload token is for this client's
+  // uploads alone. Lua, mods' included, gets `false` for it, as if it were not given, so no
+  // script can show it or send it to other players.
+  if (optionText != nullptr && _stricmp(optionText, "/telemetrytoken") == 0) {
+    static bool sNoted = false;
+    if (!sNoted) {
+      sNoted = true;
+      gpg::Logf("GetCommandLineArg: /telemetrytoken is not given to Lua");
+    }
+    LuaPlus::LuaObject hidden(state);
+    hidden.AssignBoolean(state, false);
+    hidden.PushStack(state);
+    return 1;
+  }
+
   fa::vector<fa::string> optionValues;
   const bool foundOption = CFG_GetArgOption(optionText, static_cast<std::uint32_t>(requestedArgCount), &optionValues);
 
@@ -422,6 +437,10 @@ int moho::cfunc_GetCommandLineArgL(LuaPlus::LuaState* const state)
     if (requestedArgCount > 0) {
       const int cappedCount = std::min(requestedArgCount, static_cast<int>(optionValues.size()));
       for (int index = 0; index < cappedCount; ++index) {
+        // Issue #336: values run on into the next options; they end before the upload token.
+        if (_stricmp(optionValues[static_cast<std::size_t>(index)].c_str(), "/telemetrytoken") == 0) {
+          break;
+        }
         LuaPlus::LuaObject value(state);
         value.AssignString(state, optionValues[static_cast<std::size_t>(index)].c_str());
         // 0x0041B998: `LuaObject::Insert(i, value)` (Lua `table.insert`), not a raw store.

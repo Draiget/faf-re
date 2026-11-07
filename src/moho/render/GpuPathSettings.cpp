@@ -11,6 +11,11 @@
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "moho/console/CConCommand.h"
+#include "moho/render/ProjectileIconRenderer.h"
+#include "moho/render/RangeGpuRenderer.h"
+#include "moho/render/SelectionBracketGpuRenderer.h"
+#include "moho/render/StrategicIconRenderer.h"
+#include "moho/render/WorldShapeGpuRenderer.h"
 
 namespace moho
 {
@@ -83,6 +88,14 @@ namespace moho
       "Direct3D 12 / Vulkan: read DXT1/3/5 DDS textures straight from the file (1, the default) instead of decoding "
       "every texture through D3DX11 on a software device (0), which takes 25-45 ms per 1024x1024 texture.",
       &gpg::gal::imaging::gDdsDirectLoad
+    );
+
+    /** Engine addition: `ren_PrepareDuringLoading` (see REN_PrepareGpuPaths). */
+    TConVar<bool> gTConVar_ren_PrepareDuringLoading(
+      "ren_PrepareDuringLoading",
+      "Build the GPU-driven render paths and the map's sky dome while the loading screen waits for the sim (1, the "
+      "default) instead of in the first frame of play that draws them (0), where they took some 120 ms.",
+      &moho::ren_PrepareDuringLoading
     );
 
     /** Engine addition: `ren_EffectFastScan` (see gpg/gal/backends/d3d11/EffectSourceD3D11.h). */
@@ -177,3 +190,19 @@ namespace moho
     return text;
   }
 } // namespace moho
+
+bool moho::ren_PrepareDuringLoading = true;
+
+int moho::REN_PrepareGpuPaths()
+{
+  // `IsActive` builds a path's program on its first call, as the first frame that draws it would.
+  int active = 0;
+  active += StrategicIconRenderer::Get().IsActive() ? 1 : 0;
+  active += StrategicIconRenderer::Get().IsClassifyActive() ? 1 : 0;
+  active += ProjectileIconRenderer::Get().IsActive() ? 1 : 0;
+  active += SelectionBracketGpuRenderer::Get().IsActive() ? 1 : 0;
+  active += WorldShapeGpuRenderer::Get().IsActive() ? 1 : 0;
+  active += RangeGpuRenderer::Get().IsActive() ? 1 : 0;
+  active += REN_PrepareGpuVisionCaster() ? 1 : 0;
+  return active;
+}

@@ -148,6 +148,7 @@ CRejoinFeed::CRejoinFeed(
   mHeldIncoming.resize(clientCount);
   mPeerDispatched.resize(clientCount, -1);
   mPeerQueued.resize(clientCount);
+  mPeerStreamDispatched.resize(clientCount);
   mBacklog.resize(clientCount);
   if (mLive) {
     for (auto& fromPeer : mBacklog) {
@@ -375,8 +376,19 @@ void CRejoinFeed::NotePeerReport(const CNetClient& peer, CMessage& msg)
   for (std::int32_t& beat : queued) {
     reader.ReadExact(beat);
   }
+  // Issue #275: each client's stream position at that peer, after the queued beats.
+  // An older build ends the report before it.
+  std::vector<std::int32_t> streamDispatched;
+  const std::size_t withPositions = 1u + sizeof(std::int32_t) * (1u + 2u * queued.size());
+  if (static_cast<std::size_t>(msg.GetMessageSize()) >= withPositions) {
+    streamDispatched.resize(queued.size(), 0);
+    for (std::int32_t& beat : streamDispatched) {
+      reader.ReadExact(beat);
+    }
+  }
   mPeerDispatched[peerIndex] = dispatched;
   mPeerQueued[peerIndex] = queued;
+  mPeerStreamDispatched[peerIndex] = std::move(streamDispatched);
   ++mPeersReported;
 
   int peers = 0;
@@ -449,14 +461,39 @@ void CRejoinFeed::FinishCatchUp()
   const std::int32_t merged = mMergedBeat;
   std::vector<std::int32_t> ownCopyEnd(mManager.mClients.size(), -1);
 
+  // Issue #275: where a peer's copy of a client's stream starts. A multi-beat Advance
+  // can leave the stream past the peer's dispatched beat; an older build doesn't say.
+  const auto copyStart = [this](const std::size_t peer, const std::size_t index, const std::int32_t otherwise) {
+    const std::vector<std::int32_t>& positions = mPeerStreamDispatched[peer];
+    return index < positions.size() ? positions[index] : otherwise;
+  };
+
   for (CClientBase* const client : mManager.mClients) {
     const auto index = static_cast<std::size_t>(client->GetIndex());
     // The recording peer's copy holds whole beats, and this client's own only
     // as far as every peer does. A live peer's own copy then goes on from there,
     // with the orders it has not ended a beat for.
-    QueueBacklog(*client, *mBacklog[recordingPeer][index], merged, merged, client == mLocal ? mHandoverBeat : kNoStop);
+    const std::int32_t start = copyStart(recordingPeer, index, merged);
+    const std::int32_t stopAt = client == mLocal ? mHandoverBeat : kNoStop;
+    if (start > merged) {
+      // Beats the recording peer's copy no longer holds: consumed whole by a multi-beat
+      // Advance. Their orders came before it and are in the recording, so they are empty here.
+      const std::int32_t empty = std::min(start, stopAt) - static_cast<std::int32_t>(client->mQueuedBeat);
+      if (empty > 0) {
+        CMessage advance{ECmdStreamOp::CMDST_Advance};
+        CMessageStream stream(advance);
+        stream.Write(empty);
+        client->CClientBase::Process(advance);
+        NoteAcks(client->GetIndex(), static_cast<std::int32_t>(client->mQueuedBeat));
+        gpg::Logf(
+          "REJOIN: client %d's stream was at beat %d past the recording's %d: %d empty beats", client->GetIndex(), start, merged, empty
+        );
+      }
+    }
+    QueueBacklog(*client, *mBacklog[recordingPeer][index], start, merged, stopAt);
     if (client != mLocal && index != recordingPeer && dynamic_cast<CNetClient*>(client) != nullptr) {
-      ownCopyEnd[index] = QueueBacklog(*client, *mBacklog[index][index], mPeerDispatched[index], recordingQueued[index], kNoStop);
+      ownCopyEnd[index] =
+        QueueBacklog(*client, *mBacklog[index][index], copyStart(index, index, mPeerDispatched[index]), recordingQueued[index], kNoStop);
     }
   }
 
@@ -1234,6 +1271,11 @@ namespace
     for (CClientBase* const client : manager.mClients) {
       infoStream.Write(static_cast<std::int32_t>(client->mQueuedBeat));
     }
+    // Issue #275: where each client's backlog above starts. After a multi-beat Advance a
+    // client's stream is past the dispatched beat, and its copy holds none of those beats.
+    for (CClientBase* const client : manager.mClients) {
+      infoStream.Write(static_cast<std::int32_t>(client->mDispatchedBeat));
+    }
     peer.Process(info);
 
     // This client's books as the peer last heard them may be far behind.
@@ -1766,8 +1808,10 @@ fa::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(fa::string* const failureRe
       setup.receivedBytes = received;
       setup.deadline = now + kWait;
     }
-    // Any peer that lets clients back answers within a round trip, whatever else it is doing.
-    constexpr std::chrono::seconds kSilentPeerWait{30};
+    // Any peer that lets clients back answers within a round trip once its link is up. A link
+    // whose first attempt fails takes up to 15 s of checks and 5 s before the next offer, and
+    // a relay one longer (issue #275, two-machine runs fx1 and fx7): room for a second attempt.
+    constexpr std::chrono::seconds kSilentPeerWait{60};
     const bool silentPeer = now - sRejoinStart >= kSilentPeerWait && std::any_of(list.begin(), list.end(), [](const auto& peer) {
       return !peer->receiver.Heard();
     });

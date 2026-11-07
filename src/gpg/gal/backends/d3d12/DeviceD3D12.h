@@ -55,6 +55,14 @@ namespace gpg::gal
     struct Image;
   }
 
+  /**
+   * Engine addition (`ren_PrepareDeviceEarly`): starts creating the Direct3D 12 device of the first
+   * adapter on a helper thread - the driver's load, most of a device's creation - for
+   * `DeviceD3D12::Setup` to take when it picks that adapter and asks for no debug layer or DRED, which
+   * have to be on before a device exists. Otherwise it is released and Setup creates its own.
+   */
+  void D3D12_PrepareDeviceEarly();
+
   class DeviceD3D12 final : public Device, public effects::PassBinder
   {
   public:
@@ -133,6 +141,8 @@ namespace gpg::gal
     // GPU-driven additions (GpuDrivenD3D12.cpp)
     [[nodiscard]] std::uint32_t GetGpuDrivenFeatures() const override;
     [[nodiscard]] std::uint32_t GetGpuDrivenVerified() const override;
+    /** `kGpuPathMsdfCook` for an NVIDIA adapter, else 0 (issue #309). */
+    [[nodiscard]] std::uint32_t MsdfCookVerified() const;
     boost::shared_ptr<GpuBuffer> CreateGpuBuffer(const GpuBufferDesc& desc) override;
     void UpdateGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, const void* data) override;
     boost::shared_ptr<GpuProgram> CreateGpuProgram(const GpuProgramDesc& desc) override;

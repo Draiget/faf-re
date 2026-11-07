@@ -339,16 +339,15 @@ namespace moho
    * Address: 0x00493AE0 (FUN_00493AE0, func_ParticleSelectTechnique2)
    *
    * What it does:
-   * As above for a particle bucket, plus the drag flag -- which the shader
-   * variable takes as a 4-byte payload even though the lane is one byte -- and
-   * the extra `_REFRACT` suffix.
+   * As above for a particle bucket, plus the drag flag as a canonical 4-byte
+   * shader integer (0 or 1), and the extra `_REFRACT` suffix.
    */
   void SParticleRenderBucket::SelectTechnique() const
   {
-    const bool drag = dragEnabled;
+    const std::int32_t drag = dragEnabled ? 1 : 0;
     ShaderVar& dragEnabledShaderVar = GetParticleDragEnabledShaderVar();
     if (dragEnabledShaderVar.Exists()) {
-      dragEnabledShaderVar.mEffectVariable->SetValue(&drag, 4U);
+      dragEnabledShaderVar.mEffectVariable->SetValue(&drag, sizeof(drag));
     }
 
     BindBeamTextureShaderVar(GetParticleTexture0ShaderVar(), texture0);

@@ -222,6 +222,12 @@ namespace faf::remote::wire
   [[nodiscard]] std::uint64_t HashBlipUpdate(const SEntityRecord& record, const SUnitDetail& detail) noexcept;
 
   /**
+   * Plan WPR.30: a fingerprint of a whole record, the id and creation constants and motion included, so a server and
+   * its client can tell whether they hold the same frame. A frame's is the sum of its records', in any order.
+   */
+  [[nodiscard]] std::uint64_t HashRecord(const SEntityRecord& record) noexcept;
+
+  /**
    * Change-mask bits, one per field after the id. On the wire the mask is a varint, so the
    * fields that change every tick come first and a typical change costs one mask byte.
    * `kFieldKind` carries `isUnit`; the unit bits are only valid for a unit.
@@ -441,6 +447,42 @@ namespace faf::remote::wire
    * records are tested against the codec: the others passed when they were sent.
    */
   [[nodiscard]] bool EncodeFrameChanges(const SFrameChanges& changes, const SFrameCodec& codec, BitWriter& writer);
+
+  /**
+   * The bits the encoder writes for a record's position (its far bit included, dead reckoning's fields not) and
+   * for its orientation (the yaw bit included, orientation reckoning's not). `before`: the baseline's record,
+   * null for a creation. For `--wire-stats`, so its classes add up to what is sent.
+   */
+  [[nodiscard]] int PositionFieldBits(const SEntityRecord& record, const SEntityRecord* before, const SFrameCodec& codec) noexcept;
+  [[nodiscard]] int OrientationFieldBits(const SEntityRecord& record, const SEntityRecord* before) noexcept;
+
+  /**
+   * Entities 12 (plan WP10.13): the id and field mask that start each change of a frame. The first
+   * id goes whole (a varint), each later one as its gap from the one before in an order-0
+   * exponential-Golomb code, as changes are mostly a few ids apart. A mask goes as its place among
+   * the frame's last 15 masks, most recent first, in the same code, or as the escape 15 and the
+   * mask as a varint: a frame's changes share a handful of masks (most a unit's position and
+   * orientation). One object per frame on each side; `Bits` writes nothing and counts, for
+   * `--wire-stats`.
+   */
+  class CChangeHeaders
+  {
+  public:
+    void Write(BitWriter& writer, std::uint32_t id, std::uint32_t fields);
+    [[nodiscard]] bool Read(BitReader& reader, std::uint32_t& id, std::uint32_t& fields) noexcept;
+    [[nodiscard]] int Bits(std::uint32_t id, std::uint32_t fields) noexcept;
+
+  private:
+    static constexpr std::uint32_t kRecent = 15; // also the escape
+
+    [[nodiscard]] std::uint32_t Find(std::uint32_t fields) const noexcept;
+    void Use(std::uint32_t place, std::uint32_t fields) noexcept;
+
+    bool mFirst = true;
+    std::uint32_t mPrevious = 0;
+    std::uint32_t mRecentMasks[kRecent]{};
+    std::uint32_t mRecentCount = 0;
+  };
 
   /** The baseline a frame on the wire was encoded against (`kNoBaseline` for a full frame). */
   [[nodiscard]] std::uint32_t PeekFrameBaseline(std::span<const std::uint8_t> bytes) noexcept;

@@ -5,10 +5,10 @@
 local UIUtil = import('/lua/ui/uiutil.lua')
 local LayoutHelpers = import('/lua/maui/layouthelpers.lua')
 local Group = import('/lua/maui/group.lua').Group
-local FlatPanel = import('/fafengine/lua/ui/controls/flat_panel.lua')
-local FlatProgress = import('/fafengine/lua/ui/controls/flat_progress.lua').FlatProgress
-local FlatTextButton = import('/fafengine/lua/ui/controls/flat_text_button.lua').FlatTextButton
-local Scrubber = import('/fafengine/lua/ui/game/replay_scrubber.lua').Scrubber
+local FlatPanel = import('/fafengine/modules/lua/ui/controls/flat_panel.lua')
+local FlatProgress = import('/fafengine/modules/lua/ui/controls/flat_progress.lua').FlatProgress
+local FlatTextButton = import('/fafengine/modules/lua/ui/controls/flat_text_button.lua').FlatTextButton
+local Scrubber = import('/fafengine/modules/lua/ui/game/replay_scrubber.lua').Scrubber
 
 local kBarWidth = 900
 local kBarHeight = 34
@@ -232,6 +232,6 @@ function Create()
     end
 
     bar:SetShown(false)
-    IN_AddKeyMapTable({[kToggleKey] = {action = "UI_Lua import('/fafengine/lua/ui/game/replay_timeline.lua').Toggle()"}})
+    IN_AddKeyMapTable({[kToggleKey] = {action = "UI_Lua import('/fafengine/modules/lua/ui/game/replay_timeline.lua').Toggle()"}})
     return bar
 end

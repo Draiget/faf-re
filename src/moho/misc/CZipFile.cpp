@@ -6,6 +6,7 @@
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -232,6 +233,14 @@ namespace
 
     entry.mCachedDataOffset = static_cast<std::int32_t>(dataOffset);
     return true;
+  }
+
+  // Engine addition: the lock ReadEntry holds for one entry, one of a fixed set chosen by the
+  // entry's address (the archive object keeps the binary's layout, with no room for one per entry).
+  [[nodiscard]] std::mutex& EntryLock(const void* const entry)
+  {
+    static std::mutex locks[64];
+    return locks[(reinterpret_cast<std::uintptr_t>(entry) >> 4U) % 64U];
   }
 } // namespace
 
@@ -678,6 +687,10 @@ namespace moho
     }
 
     CZipFileEntry& entry = *cachedEntry.mEntry.get();
+    // Engine addition: an entry is read and cached by one thread at a time; a second reader waits
+    // and takes the cached bytes. The binary filled the cache unguarded, which two threads reading
+    // one entry (the session loader and the main thread) would race on.
+    const std::lock_guard<std::mutex> entryGuard(EntryLock(&cachedEntry));
     if (cachedEntry.mData) {
       return MakeConstMemBuffer(cachedEntry.mData, static_cast<std::size_t>(entry.mUncompressedSize));
     }

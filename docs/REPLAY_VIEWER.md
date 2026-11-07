@@ -1,6 +1,6 @@
 # Replay viewer
 
-How the timeline bar moves through a replay, and why a click sometimes loads a saved position and sometimes plays through the game. The code is in `src/moho/sim/ReplayTimeline.cpp` and `data/fafengine/lua/ui/game/replay_timeline.lua`.
+How the timeline bar moves through a replay, and why a click sometimes loads a saved position and sometimes plays through the game. The code is in `src/moho/sim/ReplayTimeline.cpp` and `data/fafengine/modules/lua/ui/game/replay_timeline.lua`.
 
 ## The bar
 

@@ -88,4 +88,6 @@ The primitive is Monocypher 4.0.2 ([monocypher.org](https://monocypher.org)), du
 
 Windows x64, Windows x86 and Linux give byte-identical output.
 
+Between two players' links the keys come from the X25519 public keys in their ICE ufrags instead of a handshake (#289, [NETBRIDGE.md](NETBRIDGE.md#lane-encryption-289)); `tests/netlink/NetlinkTests.cpp` covers that.
+
 Not covered yet: sockets (WP10.1, #140), the handshake that makes the keys (WP10.5), rate control (WP10.7) and the `tools/relay` matrix over real sockets (WP10.11).

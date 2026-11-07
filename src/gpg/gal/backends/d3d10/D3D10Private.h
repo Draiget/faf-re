@@ -49,9 +49,8 @@
 #include <stdexcept>
 #include <type_traits>
 
-// D3DXFloat32To16Array: the float16 formatter packs its halves with it, as the
-// D3D9 one does (both call the d3dx9 import at 0x00AC65C0).
-#include <d3dx9math.h>
+// The float16 formatter packs with gpg::gal::FloatToHalf (gpg/gal/HalfFloat.h), D3DX9's
+// conversion without D3DX (the binary calls the d3dx9 import at 0x00AC65C0).
 
 namespace gpg::gal
 {

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <utility>
 
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityId.h"
@@ -25,7 +26,8 @@ namespace faf::remote
     constexpr std::int32_t kUnitReconFlags = 28; // `Unit::SyncInterface`, 0x006AC4DC..0x006AC500
     constexpr std::size_t kMaxViews = wire::kMaxArmyRecords; // no frame names more armies; `SEntityViews` has a bit per view
     static_assert(kMaxViews <= 32u);
-    constexpr std::size_t kChangedGrain = 256;
+    constexpr std::size_t kChangedGrain = 64; // blips, the costly part, sit together by id: small chunks spread them
+    constexpr std::size_t kBlipGrain = 8;
 
     /** What makes one view's update of a blip differ from another's; floats by their bits. */
     struct SBlipKey
@@ -107,6 +109,10 @@ namespace faf::remote
       CheckTeams(sim);
     }
     const std::size_t slots = armyCount + mTeams.size();
+    if (mPhaseTimesOn) {
+      mPhaseMark = mBuildStart;
+      mViewSeconds.assign(slots, 0.0);
+    }
     while (mPackets.size() < slots) {
       mPackets.push_back(std::make_unique<moho::SSyncData>());
       mHasView.push_back(1u);
@@ -141,6 +147,7 @@ namespace faf::remote
       mSharedRecords->BeginBeat(Entities().size());
     }
     ReadChangedEntities(sim);
+    MarkPhase(EViewPhase::ReadBlips);
 
     // Each view reads the sim and the change set and writes its own packet and view state only
     // (plan I3), so the views can be built on the sim's workers (plan WP5.7).
@@ -167,21 +174,46 @@ namespace faf::remote
       }
     };
     if (mParallel && slots > 1u) {
-      moho::CSimWorkerPool::Get().ParallelFor(slots, 1u, [&build](const std::size_t begin, const std::size_t end) {
-        for (std::size_t army = begin; army < end; ++army) {
-          build(army);
+      // The team views first: each holds what its whole team sees, the longest jobs.
+      const std::size_t teams = slots - armyCount;
+      moho::CSimWorkerPool::Get().ParallelFor(slots, 1u, [this, &build, teams, armyCount](const std::size_t begin, const std::size_t end) {
+        for (std::size_t job = begin; job < end; ++job) {
+          const std::size_t army = job < teams ? armyCount + job : job - teams;
+          this->TimeView(army, [&] { build(army); });
         }
       });
     } else {
       for (std::size_t army = 0; army < slots; ++army) {
-        build(army);
+        TimeView(army, [&] { build(army); });
       }
     }
+    MarkPhase(EViewPhase::Build);
     WriteChangedEntities();
+    MarkPhase(EViewPhase::Write);
     if (mSharedRecords != nullptr) {
       mSharedRecords->Build(Entities(), mParallel);
     }
+    MarkPhase(EViewPhase::Shared);
     OnViewPackets(sim);
+  }
+
+  void CViewPackets::MarkPhase(const EViewPhase phase) noexcept
+  {
+    if (!mPhaseTimesOn) {
+      return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    SPhaseTime& time = mPhaseTimes[static_cast<std::size_t>(phase)];
+    time.wall += std::chrono::duration<double>(now - mPhaseMark).count();
+    mPhaseMark = now;
+    double slowest = 0.0;
+    for (std::size_t slot = 0; slot < mViewSeconds.size(); ++slot) {
+      const double seconds = std::exchange(mViewSeconds[slot], 0.0);
+      time.viewSum += seconds;
+      time.teamViews += slot >= static_cast<std::size_t>(mArmySlots) ? seconds : 0.0;
+      slowest = std::max(slowest, seconds);
+    }
+    time.viewMax += slowest;
   }
 
   void CViewPackets::BuildTeams(const moho::Sim& sim)
@@ -458,6 +490,7 @@ namespace faf::remote
     } else {
       read(0u, entities.size());
     }
+    MarkPhase(EViewPhase::Read);
 
     // The blocks of vision ranges and blip hashes stay in place while the views fill them.
     for (std::size_t i = 0; i < entities.size(); ++i) {
@@ -496,25 +529,29 @@ namespace faf::remote
         (void)mEntityViews.Insert(id, changed.before);
       }
     }
+    MarkPhase(EViewPhase::ReadBlocks);
 
     // One update for each group of views a blip shows the same to.
     if (mSharedRecords != nullptr) {
       std::size_t blipRecords = 0;
+      mBlipIndices.clear();
       for (std::size_t i = 0; i < entities.size(); ++i) {
         SChangedView& changed = mChanged[i];
         if (changed.target.blip != nullptr) {
           changed.firstBlipRecord = static_cast<std::uint32_t>(blipRecords);
           blipRecords += changed.blipRecordCount;
+          if (changed.blipRecordCount != 0u) {
+            mBlipIndices.push_back(static_cast<std::uint32_t>(i));
+          }
         }
       }
       mSharedRecords->ReserveBlipRecords(blipRecords);
+      // Over the blips alone, in small chunks: their ids keep them together in the change set, so
+      // chunks of all its entities left a few workers with every blip.
       const auto fill = [&](const std::size_t begin, const std::size_t end) {
         moho::SSTIEntityVariableData block;
-        for (std::size_t i = begin; i < end; ++i) {
-          const SChangedView& changed = mChanged[i];
-          if (changed.target.blip == nullptr) {
-            continue;
-          }
+        for (std::size_t at = begin; at < end; ++at) {
+          const SChangedView& changed = mChanged[mBlipIndices[at]];
           for (std::size_t k = 0; k < changed.blipRecordCount; ++k) {
             const std::size_t view = changed.blipRecordView[k];
             std::uint32_t vision = 0;
@@ -526,10 +563,10 @@ namespace faf::remote
           }
         }
       };
-      if (mParallel && entities.size() > kChangedGrain) {
-        moho::CSimWorkerPool::Get().ParallelFor(entities.size(), kChangedGrain, fill);
+      if (mParallel && mBlipIndices.size() > kBlipGrain) {
+        moho::CSimWorkerPool::Get().ParallelFor(mBlipIndices.size(), kBlipGrain, fill);
       } else {
-        fill(0u, entities.size());
+        fill(0u, mBlipIndices.size());
       }
     }
   }

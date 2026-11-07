@@ -2,6 +2,10 @@
 nightly (or release), how to install it, and the zips' checksums.
 
 usage: TAG=... SHA=... PREVIOUS=... [PARITY_RUN=... PARITY_URL=... NOTE=...] nightly_notes.py --out notes.md
+           [--player-notes player-notes.md]
+
+--player-notes also writes the short notes for players that FAF Develop's changelog shows (issue #323):
+each `Player-Note:` trailer of the commits since the previous nightly or release, one line per note.
 
 Reads git history, zips/SHA256SUMS.txt and, when the parity run's report was downloaded, report/report.json.
 """
@@ -20,6 +24,23 @@ def changes(previous, sha):
     log = subprocess.run(["git", "log", "--no-merges", "--format=- %s (%h)", "%s..%s" % (previous, sha)],
                          capture_output=True, text=True, encoding="utf-8", check=True).stdout
     return log.splitlines()
+
+
+def player_notes(previous, sha):
+    """The `Player-Note:` trailers of the commits in previous..sha, oldest first, as Markdown list lines."""
+    log = subprocess.run(["git", "log", "--no-merges", "--reverse", "--format=%(trailers:key=Player-Note,valueonly,separator=%x00)",
+                          "%s..%s" % (previous, sha)],
+                         capture_output=True, text=True, encoding="utf-8", check=True).stdout
+    notes = [note.strip() for line in log.splitlines() for note in line.split("\0") if note.strip()]
+    return ["- " + note for note in notes]
+
+
+def write_player_notes(path, tag, previous, sha):
+    notes = player_notes(previous, sha)
+    lines = ["## faf-re %s" % tag, ""] + (notes or ["No player-facing changes since %s." % previous]) + [""]
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(lines))
+    print("%d player notes since %s" % (len(notes), previous))
 
 
 def parity_line():
@@ -45,8 +66,11 @@ def parity_line():
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--out", required=True)
+    parser.add_argument("--player-notes", help="also write the notes for players to this file")
     args = parser.parse_args()
     tag, sha, previous = os.environ["TAG"], os.environ["SHA"], os.environ["PREVIOUS"]
+    if args.player_notes:
+        write_player_notes(args.player_notes, tag, previous, sha)
 
     commits = changes(previous, sha)
     shown, size = [], 0

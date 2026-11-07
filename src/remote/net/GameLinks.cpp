@@ -23,11 +23,48 @@ namespace faf::remote::net
 
   bool CServerLinks::Open(const SEndpoint& local, std::string& error)
   {
-    if (!mCookies.Init()) {
+    if (!mCookies.Init() || !FillRandom(&mAddressSalt, sizeof(mAddressSalt))) {
       error = "the system gave no random secret for the handshake";
       return false;
     }
     return mSocket.Open(local, error);
+  }
+
+  void CServerLinks::AllowAddress(const std::uint32_t ip)
+  {
+    mAllowlistOn = true;
+    mAllowed.insert(ip);
+  }
+
+  bool CServerLinks::TakeAddressBudget(const std::uint32_t ip, const std::uint64_t nowUs) noexcept
+  {
+    // Salted, so a flood can't pick addresses that share a player's bucket.
+    const std::uint64_t mixed = (static_cast<std::uint64_t>(ip) ^ mAddressSalt) * 0x9E3779B97F4A7C15ull;
+    SAddressBucket& bucket = mAddressBuckets[static_cast<std::size_t>(mixed >> 52) % kAddressBuckets];
+    if (nowUs > bucket.lastUs) {
+      bucket.tokens = std::min(kHandshakeBurstPerAddress, bucket.tokens + static_cast<double>(nowUs - bucket.lastUs) * 1e-6 * kHandshakesPerAddressPerSecond);
+      bucket.lastUs = nowUs;
+    }
+    if (bucket.tokens < 1.0) {
+      ++mStats.addressLimited;
+      return false;
+    }
+    bucket.tokens -= 1.0;
+    return true;
+  }
+
+  bool CServerLinks::TakeUnlistedBudget(const std::uint64_t nowUs) noexcept
+  {
+    if (nowUs > mUnlistedBudgetUs) {
+      mUnlistedBudget = std::min(kUnlistedHandshakesPerSecond, mUnlistedBudget + static_cast<double>(nowUs - mUnlistedBudgetUs) * 1e-6 * kUnlistedHandshakesPerSecond);
+      mUnlistedBudgetUs = nowUs;
+    }
+    if (mUnlistedBudget < 1.0) {
+      ++mStats.unlistedDropped;
+      return false;
+    }
+    mUnlistedBudget -= 1.0;
+    return true;
   }
 
   void CServerLinks::AddPlayer(const std::int32_t uid, const Token& token)
@@ -114,6 +151,10 @@ namespace faf::remote::net
     player.usedPublics.push_back(request.clientPublic);
     player.accept = std::move(session->accept);
     player.lost = false;
+    // A valid token lists its address (plan WPR.48): a player behind a VPN comes in once and then as any other.
+    if (mAllowlistOn) {
+      mAllowed.insert(from.ip);
+    }
 
     // Someone else's channel at this address, as when one machine restarts a game on the port another left.
     if (const auto other = mByAddress.find(from.Key()); other != mByAddress.end() && other->second != request.uid) {
@@ -149,19 +190,23 @@ namespace faf::remote::net
     }
 
     const std::optional<EHandshakeType> type = HandshakeTypeOf(data, size);
+    if (type != EHandshakeType::Hello && type != EHandshakeType::Connect) {
+      ++mStats.strangersDropped;
+      return;
+    }
+    // An address off the allowlist shares one small budget, then its own; a listed one has its own. The global
+    // budget last, so what one address sends can't spend it.
+    const bool listed = !mAllowlistOn || mAllowed.contains(from.ip);
+    if ((!listed && !TakeUnlistedBudget(nowUs)) || !TakeAddressBudget(from.ip, nowUs) || !TakeHandshakeBudget(nowUs)) {
+      return;
+    }
     if (type == EHandshakeType::Hello) {
-      if (TakeHandshakeBudget(nowUs)) {
-        const auto answer = AnswerHello(data, size, mCookies, from.Key(), nowUs);
-        if (!answer.empty()) {
-          (void)mSocket.SendTo(answer.data(), answer.size(), from);
-        }
-      }
-    } else if (type == EHandshakeType::Connect) {
-      if (TakeHandshakeBudget(nowUs)) {
-        HandleConnect(data, size, from, nowUs, events);
+      const auto answer = AnswerHello(data, size, mCookies, from.Key(), nowUs);
+      if (!answer.empty()) {
+        (void)mSocket.SendTo(answer.data(), answer.size(), from);
       }
     } else {
-      ++mStats.strangersDropped;
+      HandleConnect(data, size, from, nowUs, events);
     }
   }
 

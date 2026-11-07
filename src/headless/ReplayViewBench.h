@@ -70,6 +70,8 @@ namespace faf::headless
     std::uint64_t mEntities = 0;                 // in all frames, all beats
     double mLastBuildSeconds = 0.0;
     bool mHaveLastFrames = false;
+    double mWaitSeconds = 0.0;    // the sim thread's wait for the last beat's views to finish
+    std::uint64_t mPhaseBeats = 0; // beats the phase times cover
     std::chrono::steady_clock::time_point mLastFrames{};
     std::uint64_t mEncodeFailures = 0;
     struct SLuaTestStep

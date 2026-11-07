@@ -27,6 +27,7 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <span>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -42,6 +43,11 @@
 #include "gpg/core/utils/Global.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaTableIterator.h"
+#include "gpg/core/streams/BinaryReader.h"
+#include "moho/net/CMessage.h"
+#include "moho/net/CMessageStream.h"
+#include "moho/net/ELobbyMsg.h"
+#include "remote/net/LobbySignals.h"
 #include "moho/app/IWinApp.h"
 #include "moho/app/WinApp.h"
 #include "moho/core/ThreadPlacement.h"
@@ -65,6 +71,7 @@
 #include "platform/X87Precision.h"
 #include "remote/net/UdpSocket.h"
 #include "remote/ContentTables.h"
+#include "server/LobbySignaller.h"
 #include "server/ServerNet.h"
 #include "server/ServerViews.h"
 #include "server/SpeedWatch.h"
@@ -84,7 +91,7 @@ namespace
 
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>]\n";
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--lobby-seconds <n>]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
   // `net_Lag` is 500 ms in a lockstep game, time for every player's beats to arrive. Here it's only the
@@ -271,6 +278,53 @@ namespace
     return tokens;
   }
 
+  /**
+   * Plan WPR.45: `MatchAddresses`, by `OwnerID`, each an IPv4 address or a list of them, outside `MatchConfig` as the
+   * tokens are. The addresses FAF knows its players by. False with `error` for one that doesn't parse.
+   */
+  [[nodiscard]] bool ReadAddresses(LuaPlus::LuaState* const state, std::vector<std::uint32_t>& addresses, std::string& error)
+  {
+    LuaPlus::LuaObject table = state->GetGlobal("MatchAddresses");
+    if (!table.IsTable()) {
+      return true;
+    }
+    const auto add = [&](const LuaPlus::LuaObject& value) {
+      faf::remote::net::SEndpoint endpoint;
+      if (!value.IsString() || !faf::remote::net::ParseEndpoint(std::string(value.GetString()) + ":1", endpoint)) {
+        error = std::string("MatchAddresses holds ") + (value.IsString() ? value.GetString() : "a value that isn't a string") + ", not an IPv4 address";
+        return false;
+      }
+      addresses.push_back(endpoint.ip);
+      return true;
+    };
+    for (LuaPlus::LuaTableIterator it(&table, 1); !it.m_isDone; it.Next()) {
+      LuaPlus::LuaObject value = it.GetValue();
+      if (value.IsTable()) {
+        for (LuaPlus::LuaTableIterator one(&value, 1); !one.m_isDone; one.Next()) {
+          if (!add(one.GetValue())) {
+            return false;
+          }
+        }
+      } else if (!add(value)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** Plan WPR.42: the sim mods a match names. FAF's lobby puts only sim mods in `GameMods` (`Mods.GetGameMods`). */
+  [[nodiscard]] int CountSimMods(const LuaPlus::LuaObject& config)
+  {
+    LuaPlus::LuaObject mods = config["GameMods"];
+    int count = 0;
+    if (mods.IsTable()) {
+      for (LuaPlus::LuaTableIterator it(&mods, 1); !it.m_isDone; it.Next()) {
+        ++count;
+      }
+    }
+    return count;
+  }
+
   [[nodiscard]] std::vector<SMatchPlayer> ReadPlayers(const LuaPlus::LuaObject& config)
   {
     std::vector<SMatchPlayer> players;
@@ -295,6 +349,53 @@ namespace
     }
     std::sort(players.begin(), players.end(), [](const SMatchPlayer& lhs, const SMatchPlayer& rhs) { return lhs.slot < rhs.slot; });
     return players;
+  }
+
+  /** Plan WP2.14: what a launch check compares, from a game configuration. */
+  [[nodiscard]] faf::server::SLaunchFacts ReadLaunchFacts(const LuaPlus::LuaObject& config)
+  {
+    faf::server::SLaunchFacts facts;
+    LuaPlus::LuaObject options = config["GameOptions"];
+    if (options.IsTable()) {
+      const LuaPlus::LuaObject scenario = options["ScenarioFile"];
+      facts.scenario = scenario.IsString() ? scenario.GetString() : "";
+    }
+    LuaPlus::LuaObject players = config["PlayerOptions"];
+    if (players.IsTable()) {
+      for (LuaPlus::LuaTableIterator it(&players, 1); !it.m_isDone; it.Next()) {
+        LuaPlus::LuaObject player = it.GetValue();
+        if (!player.IsTable()) {
+          continue;
+        }
+        const LuaPlus::LuaObject human = player["Human"];
+        if (!human.IsBoolean() || !human.GetBoolean()) {
+          continue;
+        }
+        const LuaPlus::LuaObject owner = player["OwnerID"];
+        facts.humans.push_back(
+          owner.IsString() ? std::atoi(owner.GetString()) : (owner.IsNumber() ? static_cast<std::int32_t>(owner.GetNumber()) : -1)
+        );
+      }
+    }
+    facts.gameMods = CountSimMods(config);
+    return facts;
+  }
+
+  /** A launch request's configuration, decoded as `CLobby` decodes script data; false when it isn't a table. */
+  [[nodiscard]] bool DecodeLaunchConfig(
+    LuaPlus::LuaState* const state, const std::span<const std::uint8_t> bytes, LuaPlus::LuaObject& codec, LuaPlus::LuaObject& out
+  )
+  {
+    try {
+      moho::CMessage message(moho::ELobbyMsg::LOBMSG_DirectScriptData);
+      (void)message.Append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+      moho::CMessageStream stream(&message, moho::CMessageStream::Access::kReadOnly);
+      const gpg::BinaryReader reader{&stream};
+      codec.SCR_FromByteStream(out, state, &reader);
+    } catch (const std::exception&) {
+      return false;
+    }
+    return out.IsTable();
   }
 
   /** What to call the game: the match file's `MatchName`, or the map's name without its `<LOC id>`. */
@@ -419,11 +520,25 @@ namespace
       netConfig.reconnectSeconds = std::atof(text.c_str());
     }
     const double awayPauseSeconds = ReadOption("--away-pause-seconds", text) ? std::atof(text.c_str()) : 0.0;
+    // Plan WP2.2: a lobby before the game, the server signalling it. Until launch interception (WP2.14) it stays
+    // open this long and then the game starts as the match file says.
+    const double lobbySeconds = ReadOption("--lobby-seconds", text) ? std::atof(text.c_str()) : 0.0;
 
     LuaPlus::LuaState* const state = faf::headless::ReplayLuaState();
     LuaPlus::LuaObject config;
     std::int32_t seed = 1;
     if (!LoadMatch(state, matchPath, config, seed, end.error)) {
+      Say("Can't host: %s", end.error.c_str());
+      return kExitBadInput;
+    }
+    // A sim mod's Lua would run unchecked inside the server's sim; UI mods stay on the players' machines.
+    if (const int simMods = CountSimMods(config); simMods > 0) {
+      end.error = "the match names " + std::to_string(simMods) + " sim mods, and a dedicated server runs none";
+      Say("Can't host: %s", end.error.c_str());
+      return kExitBadInput;
+    }
+    std::vector<std::uint32_t> allowedAddresses;
+    if (!ReadAddresses(state, allowedAddresses, end.error)) {
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
     }
@@ -495,6 +610,16 @@ namespace
       net->AddSeat(client.uid, client.name.c_str(), token->second, seat);
     }
     if (net) {
+      for (const std::uint32_t ip : allowedAddresses) {
+        net->AllowAddress(ip);
+      }
+      if (!allowedAddresses.empty()) {
+        Say("%d addresses from MatchAddresses get a full handshake budget; others share a small one, and a valid token lists them",
+            static_cast<int>(allowedAddresses.size()));
+      }
+      if (lobbySeconds <= 0.0) {
+        net->CloseLobby(); // the game starts at once: nothing to relay (plan WPR.51)
+      }
       std::string netError;
       if (!net->Start(netError)) {
         end.error = netError;
@@ -502,6 +627,86 @@ namespace
         return kExitBadInput;
       }
       Say("Listening on %s, %d seats, %.0f s to join", net->Local().Text().c_str(), static_cast<int>(roster.Remotes().size()), netConfig.joinSeconds);
+      if (lobbySeconds > 0.0) {
+        // Plan WP2.2, WP2.12: the server signals each participant's game as FAF's lobby server does over GPGNet; the
+        // match's first participant hosts the lobby in its own FAF lobby; their lobbies talk through the relay.
+        // The host's lobby starts on the match's scenario (`HostGame`'s scenario file, not the map file).
+        const LuaPlus::LuaObject scenarioFile = gameOptions["ScenarioFile"];
+        faf::server::CLobbySignaller signaller(scenarioFile.IsString() ? scenarioFile.GetString() : "");
+        for (const moho::SLaunchClient& client : roster.Remotes()) {
+          signaller.AddParticipant(client.uid, client.name.c_str());
+        }
+        Say("Lobby open for %.0f s, hosted by uid %d", lobbySeconds, static_cast<int>(signaller.Host()));
+        const Clock::time_point lobbyEnd = Clock::now() + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(lobbySeconds));
+        std::vector<faf::server::CLobbySignaller::SOutgoing> out;
+        std::size_t lastIn = 0;
+        std::uint64_t toServer = 0;
+        bool hostLeftSaid = false;
+        bool launched = false;
+        // Plan WP2.14: what the host's launch is checked against. The match file's configuration stays the one the
+        // game starts with (plan WPR.55: the clients' launch comes from the server, never from the lobby's message).
+        const faf::server::SLaunchFacts matchFacts = ReadLaunchFacts(config);
+        const auto signal = [&net](const std::int32_t to, const faf::remote::net::ELobbySignal kind, std::string text) {
+          faf::remote::net::SLobbySignal message;
+          message.kind = kind;
+          message.text = std::move(text);
+          net->QueueLobbyFromServer(to, faf::remote::net::EncodeLobbySignal(message));
+        };
+        while (!launched && Clock::now() < lobbyEnd && gStopSignal == 0) {
+          for (const faf::server::CServerNet::SLobbyMessage& message : net->TakeLobbyMessages()) {
+            ++toServer;
+            std::span<const std::uint8_t> bytes;
+            if (!faf::remote::net::IsLaunchRequest(message.message, bytes)) {
+              continue;
+            }
+            if (message.from != signaller.Host() || launched) {
+              Say("Lobby: a launch from uid %d, who isn't the host, ignored", static_cast<int>(message.from));
+              continue;
+            }
+            LuaPlus::LuaObject requested;
+            std::string refusal;
+            if (!DecodeLaunchConfig(state, bytes, config, requested)) {
+              refusal = "the launch couldn't be read";
+            } else {
+              refusal = faf::server::CheckLaunch(ReadLaunchFacts(requested), matchFacts);
+            }
+            if (!refusal.empty()) {
+              Say("Lobby: launch refused: %s", refusal.c_str());
+              signal(message.from, faf::remote::net::ELobbySignal::LaunchRefused, refusal);
+              continue;
+            }
+            Say("Lobby: the host launched; starting the match");
+            for (const std::int32_t uid : signaller.InLobbyUids()) {
+              signal(uid, faf::remote::net::ELobbySignal::Launching, {});
+            }
+            launched = true;
+          }
+          for (const std::int32_t uid : net->TakeLobbyJoined()) {
+            signaller.OnJoined(uid, out);
+          }
+          for (const std::int32_t uid : net->TakeLobbyLeft()) {
+            signaller.OnLeft(uid, out);
+          }
+          for (const faf::server::CLobbySignaller::SOutgoing& message : out) {
+            net->QueueLobbyFromServer(message.to, message.message);
+          }
+          out.clear();
+          if (const std::size_t in = signaller.InLobby(); in != lastIn) {
+            lastIn = in;
+            Say("Lobby: %d of %d participants in", static_cast<int>(in), static_cast<int>(roster.Remotes().size()));
+          }
+          if (signaller.HostLeft() && !std::exchange(hostLeftSaid, true)) {
+            Say("Lobby: the host left; the lobby can't go on");
+          }
+          for (const std::string& line : net->TakeNews()) {
+            Say("%s", line.c_str());
+          }
+          std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+        net->CloseLobby();
+        Say("Lobby closed: %d of %d participants in, %llu messages to the server", static_cast<int>(lastIn), static_cast<int>(roster.Remotes().size()),
+            static_cast<unsigned long long>(toServer));
+      }
     } else if (!roster.Remotes().empty()) {
       Say("%d seats stay empty: this server isn't listening (--listen)", static_cast<int>(roster.Remotes().size()));
     }
@@ -845,6 +1050,10 @@ namespace
       views->Uninstall();
       Say("%s", net->Intake().Report().c_str());
       Say("%s", views->LaneReport().c_str());
+    }
+    if (net) {
+      net->Stop(); // its counters are the network thread's
+      Say("%s", net->LinkReport().c_str());
     }
     while (driver->HasSyncData()) {
       moho::SSyncData* rawPacket = nullptr;

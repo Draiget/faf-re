@@ -1,6 +1,8 @@
 #include "server/ServerNet.h"
 
 #include <chrono>
+#include <iterator>
+#include <span>
 #include <utility>
 
 #include "remote/ServerClient.h"
@@ -39,6 +41,7 @@ namespace faf::server
     entry.seat = &seat;
     mIntake.AddSeat(uid, seat);
     mLinks.AddPlayer(uid, remote::net::MakeToken(token));
+    mLobby.AddParticipant(uid);
   }
 
   bool CServerNet::Start(std::string& error)
@@ -64,7 +67,11 @@ namespace faf::server
     while (!mStop.load(std::memory_order_relaxed)) {
       mNowUs = NowUs();
       // Time since the start, as a cookie's period counts from 0.
+      if (mLobby.Open() && mCloseLobby.load(std::memory_order_relaxed)) {
+        mLobby.Close();
+      }
       mLinks.Pump(mNowUs - mStartUs, *this);
+      SendLobby();
       SendViews();
       Tick(mNowUs);
       mLinks.Wait(kWaitMilliseconds);
@@ -133,6 +140,56 @@ namespace faf::server
     }
   }
 
+  std::vector<CServerNet::SLobbyMessage> CServerNet::TakeLobbyMessages()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    return std::exchange(mLobbyIn, {});
+  }
+
+  std::vector<std::int32_t> CServerNet::TakeLobbyLeft()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    return std::exchange(mLobbyLeft, {});
+  }
+
+  std::vector<std::int32_t> CServerNet::TakeLobbyJoined()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    return std::exchange(mLobbyJoined, {});
+  }
+
+  void CServerNet::QueueLobbyFromServer(const std::int32_t uid, const std::vector<std::uint8_t>& message)
+  {
+    const std::scoped_lock lock(mViewLock);
+    mLobbyOut.push_back(SLobbyMessage{uid, CLobbyRelay::FrameFromServer(message)});
+  }
+
+  void CServerNet::SendLobby()
+  {
+    std::vector<SLobbyMessage> sending;
+    {
+      const std::scoped_lock lock(mViewLock);
+      sending.swap(mLobbyOut);
+    }
+    std::vector<SLobbyMessage> waiting;
+    for (SLobbyMessage& frame : sending) {
+      const auto found = mSeats.find(frame.from);
+      if (found == mSeats.end() || found->second.gone) {
+        continue;
+      }
+      // Before the participant's first join there's no channel: the frame waits, in order with the rest.
+      if (!found->second.joinedEver || !waiting.empty()) {
+        waiting.push_back(std::move(frame));
+        continue;
+      }
+      (void)mLinks.SendReliable(frame.from, frame.message.data(), frame.message.size());
+    }
+    if (!waiting.empty()) {
+      const std::scoped_lock lock(mViewLock);
+      mLobbyOut.insert(mLobbyOut.begin(), std::make_move_iterator(waiting.begin()), std::make_move_iterator(waiting.end()));
+    }
+  }
+
   void CServerNet::Tick(const std::uint64_t nowUs)
   {
     if (const std::int32_t beat = mBeat.load(std::memory_order_relaxed); beat != mBeatSent) {
@@ -175,12 +232,14 @@ namespace faf::server
   {
     seat.gone = true;
     seat.lost = false;
+    mLobby.RemoveParticipant(uid);
     seat.seat->Eject();
     mIntake.Forget(uid);
     mToUnlink.push_back(uid);
     {
       const std::scoped_lock lock(mNewsLock);
       mGone.push_back(uid);
+      mLobbyLeft.push_back(uid);
       mPresence.push_back(SPresence{uid, false});
     }
     Say(seat.name + " is out of the game: " + why);
@@ -196,6 +255,23 @@ namespace faf::server
   {
     const std::scoped_lock lock(mNewsLock);
     return std::exchange(mGone, {});
+  }
+
+  std::string CServerNet::LinkReport() const
+  {
+    const remote::net::SGameLinkStats& stats = mLinks.Stats();
+    return "network: " + std::to_string(stats.datagramsIn) + " datagrams in; dropped: " + std::to_string(stats.strangersDropped) + " not a player's, " +
+           std::to_string(stats.unlistedDropped) + " from unlisted addresses past their budget, " + std::to_string(stats.addressLimited) +
+           " handshakes past their address's limit, " + std::to_string(stats.handshakesLimited) + " past the server's, " + std::to_string(stats.badCookies) +
+           " with a bad cookie; " + std::to_string(stats.refused) + " refused; " + std::to_string(mViewMismatches) +
+           " views reported damaged; lobby: " + std::to_string(mLobby.Count(ELobbyRelayVerdict::Forward)) + " relayed (" +
+           std::to_string(mLobbyUndelivered) + " to no channel), " + std::to_string(mLobby.Count(ELobbyRelayVerdict::ToServer)) +
+           " for the server, dropped " + std::to_string(mLobby.Count(ELobbyRelayVerdict::TooFast)) + " too fast, " +
+           std::to_string(mLobby.Count(ELobbyRelayVerdict::TooLarge)) + " too large, " +
+           std::to_string(mLobby.Count(ELobbyRelayVerdict::Closed)) + " after launch, " +
+           std::to_string(mLobby.Count(ELobbyRelayVerdict::UnknownSender) + mLobby.Count(ELobbyRelayVerdict::UnknownTarget) +
+                          mLobby.Count(ELobbyRelayVerdict::Malformed)) +
+           " malformed or misaddressed";
   }
 
   std::vector<std::int32_t> CServerNet::TakeReturned()
@@ -223,7 +299,10 @@ namespace faf::server
       return;
     }
     SSeat& seat = found->second;
-    seat.joinedEver = true;
+    if (!std::exchange(seat.joinedEver, true) && mLobby.Open()) {
+      const std::scoped_lock lock(mNewsLock);
+      mLobbyJoined.push_back(uid);
+    }
     const bool wasLost = std::exchange(seat.lost, false);
     if (returning) {
       seat.viewBroken = true;
@@ -289,10 +368,41 @@ namespace faf::server
     case remote::net::ESeatMessage::Leaving:
       Remove(uid, seat, "left");
       return;
+    case remote::net::ESeatMessage::ViewMismatch:
+      // Plan WPR.30: the next view goes whole. At most one in `kResyncSeconds`, as each costs a whole frame.
+      ++mViewMismatches;
+      if (seat.viewBroken || (seat.lastResyncUs != 0u && mNowUs - seat.lastResyncUs < static_cast<std::uint64_t>(kResyncSeconds * 1e6))) {
+        return;
+      }
+      seat.lastResyncUs = mNowUs;
+      seat.viewBroken = true;
+      {
+        const std::scoped_lock lock(mNewsLock);
+        mReturned.push_back(uid);
+      }
+      Say(seat.name + "'s view didn't match the server's check; it gets it whole with the next beat");
+      return;
+    case remote::net::ESeatMessage::Lobby: {
+      // Plan WP2.13: to another participant with the sender written here, or to the server itself (uid 0).
+      std::int32_t to = 0;
+      std::span<const std::uint8_t> lobbyMessage;
+      const ELobbyRelayVerdict verdict =
+        mLobby.Take(uid, std::span<const std::uint8_t>(message).subspan(1), mNowUs, to, mLobbyFrame, lobbyMessage);
+      if (verdict == ELobbyRelayVerdict::Forward) {
+        if (!mLinks.SendReliable(to, mLobbyFrame.data(), mLobbyFrame.size())) {
+          ++mLobbyUndelivered;
+        }
+      } else if (verdict == ELobbyRelayVerdict::ToServer) {
+        const std::scoped_lock lock(mNewsLock);
+        mLobbyIn.push_back(SLobbyMessage{uid, std::vector<std::uint8_t>(lobbyMessage.begin(), lobbyMessage.end())});
+      }
+      return; // the relay counts what it drops
+    }
     case remote::net::ESeatMessage::Beat:
     case remote::net::ESeatMessage::View:
     case remote::net::ESeatMessage::GameInfo:
     case remote::net::ESeatMessage::CommandAnswer:
+    case remote::net::ESeatMessage::ViewCheck:
       break; // the server's own to send
     }
     ++mBadMessages;

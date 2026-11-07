@@ -50,6 +50,7 @@ namespace faf::headless
     EnableIdMaps();       // the server's frames carry each view's own ids
     SkipCivilianViews(); // and no client receives a civilian army's view
     EnableHeldFrames(check);
+    EnablePhaseTimes();
     if (fopen_s(&mFile, path.c_str(), "w") != 0) {
       mFile = nullptr;
       return;
@@ -120,6 +121,8 @@ namespace faf::headless
   void CReplayViewBench::OnViewsFinished()
   {
     mBeat.sendMs += ViewWaitSeconds() * 1000.0; // what the views still cost the sim thread
+    mWaitSeconds += ViewWaitSeconds();
+    ++mPhaseBeats;
     const auto armyCount = static_cast<std::size_t>(ArmyCount());
     std::uint64_t entities = 0;
     std::uint64_t bytes = 0;
@@ -183,6 +186,28 @@ namespace faf::headless
     summary += "; build+send " + Distribution(total, "ms");
     summary += "; beat interval " + Distribution(interval, "ms");
     summary += "; per client " + Distribution(perSecond, "B/s");
+    if (PhaseTimesOn() && mPhaseBeats != 0u) {
+      // Per beat, ms: each step's wall time on the sim thread; for a step done a view at a time, the
+      // sum over views, the slowest view and the team views' part of the sum.
+      static constexpr const char* kNames[] = {"read", "read blocks", "read blips", "build", "write", "shared", "index", "facts", "keep", "frames", "release", "grid setup", "grids", "lua"};
+      static_assert(std::size(kNames) == static_cast<std::size_t>(EViewPhase::Count));
+      const double perBeat = 1000.0 / static_cast<double>(mPhaseBeats);
+      double wall = 0.0;
+      summary += "\n  view steps, ms a beat:";
+      for (std::size_t phase = 0; phase < std::size(kNames); ++phase) {
+        const SPhaseTime& time = PhaseTime(static_cast<EViewPhase>(phase));
+        wall += time.wall;
+        std::snprintf(text, sizeof(text), " %s %.2f", kNames[phase], time.wall * perBeat);
+        summary += text;
+        if (time.viewSum > 0.0) {
+          std::snprintf(text, sizeof(text), " (views %.2f, slowest %.2f, teams %.2f)", time.viewSum * perBeat, time.viewMax * perBeat, time.teamViews * perBeat);
+          summary += text;
+        }
+        summary += ";";
+      }
+      std::snprintf(text, sizeof(text), " all %.2f; waiting for the last beat's views %.2f", wall * perBeat, mWaitSeconds * perBeat);
+      summary += text;
+    }
     if (mSyncSpy != nullptr) {
       summary += "\n  ";
       summary += mSyncSpy->Summary();

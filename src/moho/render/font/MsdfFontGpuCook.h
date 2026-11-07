@@ -18,7 +18,7 @@ namespace moho
    * batches below keep every dispatch short.
    */
 
-  /** `ren_GpuFontCook`: -1 where the backend has verified it, 1 wherever it has compute, 0 never. */
+  /** `ren_GpuFontCook`: -1 where the backend has verified it (NVIDIA adapters for now), 1 wherever it has compute, 0 never. */
   extern int ren_GpuFontCook;
   /** `ren_GpuFontCookCompare`: also cook each font on the CPU, ignore the cache, and log how far apart they are. */
   extern bool ren_GpuFontCookCompare;

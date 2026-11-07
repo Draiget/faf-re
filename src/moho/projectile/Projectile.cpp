@@ -788,8 +788,10 @@ namespace moho
     // FAF FA-Binary-Patches #154 (Fix projectiles falling below zero): a
     // projectile whose current position is below height 0 -- off the map, where
     // there is no terrain to hit -- impacts now. `comiss y, 0.0; jb` at the
-    // 0x0069BDDA hook: a NaN height impacts too.
-    if (FAF_IsSimFixActive(EFafSimFix::ProjectileImpactBelowZero) && !(mVarDat.mCurTransform.pos_.y >= 0.0f)) {
+    // 0x0069BDDA hook: a NaN height impacts too. #180 removes this hook and
+    // replaces it with the map-edge terrain check in CheckCollision.
+    if (FAF_IsSimFixActive(EFafSimFix::ProjectileImpactBelowZero) &&
+        !FAF_IsSimFixActive(EFafSimFix::ProjectileMapEdgeCollision) && !(mVarDat.mCurTransform.pos_.y >= 0.0f)) {
       this->Impact();
       return 1;
     }
@@ -1504,6 +1506,40 @@ namespace moho
           // 0x0069DB50: ground reached no later than the water surface
           // (`comiss terrain, water; jbe` -- an unordered compare also counts).
           terrainBeforeWater = !(terrainHit.distance > waterCrossingDistance);
+        }
+      } else if (FAF_IsSimFixActive(EFafSimFix::ProjectileMapEdgeCollision)) {
+        // FAF FA-Binary-Patches #180 (section/Fixes/ProjectileMapEdgeCollision.cpp,
+        // entered from FixCollisions' terrain miss): Intersection finds no
+        // terrain outside the map, so the terrain counts as extending outwards
+        // from the map edge. GetElevation clamps its samples to the grid, so
+        // outside the map it returns the height of the nearest edge point.
+        // A NaN x or z counts as outside (`comiss; jb`).
+        const float maxX = static_cast<float>(heightField->width - 1);
+        const float maxZ = static_cast<float>(heightField->height - 1);
+        if (!(nextPos.x >= 0.0f) || !(nextPos.z >= 0.0f) || nextPos.x > maxX || nextPos.z > maxZ) {
+          const float edgeElevation = heightField->GetElevation(nextPos.x, nextPos.z);
+          if (edgeElevation > nextPos.y) {
+            // Fraction of the segment where it crosses the edge height; 0 when
+            // it started at or below it.
+            float fraction = 0.0f;
+            if (curPos.y > edgeElevation) {
+              fraction = (curPos.y - edgeElevation) / (curPos.y - nextPos.y);
+            }
+            // Only replaces a queued impact that comes later along the segment
+            // (a NaN interpolation is kept).
+            if (mImpactInterpolation < 0.0f || mImpactInterpolation > fraction) {
+              mImpactInterpolation = fraction;
+              mImpactPosition = Wm3::Vector3f{
+                (nextPos.x - curPos.x) * fraction + curPos.x,
+                edgeElevation,
+                (nextPos.z - curPos.z) * fraction + curPos.z,
+              };
+              // Joins the terrain hit at SPLICE (0x0069DB46): IMPACT_Terrain,
+              // then the hit distance against the water crossing.
+              mImpactType = IMPACT_Terrain;
+              terrainBeforeWater = !((fraction * distMoved) > waterCrossingDistance);
+            }
+          }
         }
       }
 

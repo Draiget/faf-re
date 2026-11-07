@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -30,12 +31,24 @@ namespace faf::remote::wire
 
   /** Writes `current` as a delta against `baseline` (null: all hidden). False on a malformed grid. */
   [[nodiscard]] bool EncodeGridDelta(const SGridBits& current, const SGridBits* baseline, BitWriter& writer);
+  /** The words `EncodeGridDeltaInPlace` keeps a grid of this many cells in. */
+  [[nodiscard]] constexpr std::size_t GridSeenWords(const std::size_t cells) noexcept { return (cells + 63u) / 64u; }
   /**
-   * `EncodeGridDelta` straight from the sim's cells, any value but 0 being a set cell, against the
-   * cells of last time in `held`, which become `now`: one pass over the two, with no copy of the
-   * grid to make first. The same bits.
+   * `EncodeGridDelta` straight from the sim's cells, any value but 0 being a set cell, against what
+   * was set last time in `seen` (bit `i % 64` of word `i / 64` for cell `i`, `GridSeenWords` words),
+   * which then holds `now`'s: one pass over the sim's cells, 64 at a time, and an eighth of that
+   * for what the client holds. The same bits.
    */
-  void EncodeGridDeltaInPlace(std::uint32_t width, std::uint32_t height, const std::int8_t* now, std::int8_t* held, BitWriter& writer);
+  void EncodeGridDeltaInPlace(std::uint32_t width, std::uint32_t height, const std::int8_t* now, std::uint64_t* seen, BitWriter& writer);
+  /**
+   * The same, reading only the chunks of `chunkCells` cells (a multiple of 64) whose byte in
+   * `changed` is set, and clearing them: the sim sets them where it may have changed a cell
+   * (`moho::CIntelGrid::ChangedChunks`). `readAll` reads every chunk (a `seen` just reset).
+   */
+  void EncodeGridDeltaInPlace(
+    std::uint32_t width, std::uint32_t height, const std::int8_t* now, std::uint64_t* seen, BitWriter& writer, std::uint8_t* changed,
+    std::uint32_t chunkCells, bool readAll
+  );
 
   /**
    * Reads one grid against `baseline` (the copy the encoder used, or null). Refuses a grid larger

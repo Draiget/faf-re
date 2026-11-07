@@ -118,6 +118,38 @@ namespace faf::remote
     /** Wall time spent building views since the start, in seconds (`AddBuildTime`). */
     [[nodiscard]] double BuildSeconds() const noexcept { return mBuildSeconds; }
 
+    /** The steps of a beat's views on the sim thread, in order, timed with `EnablePhaseTimes`. */
+    enum class EViewPhase : std::uint8_t
+    {
+      Read,    // the change set read once for every view
+      ReadBlocks, // blips' vision and hash blocks handed out
+      ReadBlips,  // blips' shared updates
+      Build,   // each view's packet
+      Write,   // what the views changed, written back
+      Shared,  // records shared by several views
+      Index,   // the entity index
+      Facts,   // which views keep each entity
+      Keep,    // whose answers changed
+      Frames,  // each view's frame
+      Release, // stats trees let go of
+      GridSetup, // the lanes' start: Lua routing, which grids go to whom
+      Grids,   // intel grids encoded
+      Lua,     // the Lua lane
+      Count
+    };
+    /** One step's time over every beat: its wall time; for a step done one view at a time, the sum and the slowest view's. */
+    struct SPhaseTime
+    {
+      double wall = 0.0;
+      double viewSum = 0.0;
+      double viewMax = 0.0;
+      double teamViews = 0.0; // the team views' share of `viewSum`
+    };
+    /** Times each step of the views from the next beat on (headless's `--view-bench`). */
+    void EnablePhaseTimes() noexcept { mPhaseTimesOn = true; }
+    [[nodiscard]] bool PhaseTimesOn() const noexcept { return mPhaseTimesOn; }
+    [[nodiscard]] const SPhaseTime& PhaseTime(const EViewPhase phase) const noexcept { return mPhaseTimes[static_cast<std::size_t>(phase)]; }
+
     /**
      * Plan WPR.35: from the next beat on, an entity update is not copied into the packet: `Direct`
      * lists what to read from the sim instead, valid until the sim runs on. Off by default, since
@@ -209,6 +241,20 @@ namespace faf::remote
     {
       mBuildSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - mBuildStart).count();
     }
+    /** With phase times: the time since the last mark (or the beat's start) goes to `phase`, with the views' own times. */
+    void MarkPhase(EViewPhase phase) noexcept;
+    /** With phase times: runs `work` and records its time as view `slot`'s in the step under way. */
+    template <class Work>
+    void TimeView(const std::size_t slot, Work&& work)
+    {
+      if (!mPhaseTimesOn || slot >= mViewSeconds.size()) {
+        work();
+        return;
+      }
+      const auto start = std::chrono::steady_clock::now();
+      work();
+      mViewSeconds[slot] = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    }
     /** The facts of `Entities()[index]`, read this beat. */
     [[nodiscard]] const SEntityFacts& ChangedFacts(const std::size_t index) const noexcept { return mChanged[index].facts; }
     /** The views that keep an entity with these facts (`ViewsThatSee`, by slot), one bit each. */
@@ -233,7 +279,12 @@ namespace faf::remote
     bool mSkipCivilians = false;
     std::chrono::steady_clock::time_point mBuildStart{};
     double mBuildSeconds = 0.0;
+    bool mPhaseTimesOn = false;
+    std::chrono::steady_clock::time_point mPhaseMark{};
+    SPhaseTime mPhaseTimes[static_cast<std::size_t>(EViewPhase::Count)]{};
+    std::vector<double> mViewSeconds; // this step's time per view slot (`TimeView`), each written by its own job
     std::unique_ptr<SChangedView[]> mChanged;
+    std::vector<std::uint32_t> mBlipIndices; // this beat's changed blips with shared updates, by `mChanged` index
     std::size_t mChangedCapacity = 0;
     gpg::core::FlatGenerationMap<SEntityViews> mEntityViews; // entities a view has or had a vision range of
     gpg::core::ChunkedVector<std::uint32_t> mVisions; // a block of one per view for each blip with a creator
