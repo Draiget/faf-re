@@ -1708,11 +1708,13 @@ namespace
 	{
 		if (object->tt == LUA_TTABLE) {
 			static_cast<Table*>(object->value.p)->metatable = reinterpret_cast<Table*>(metatableObject);
+			faf_lua51_gc_barrier_f(state, static_cast<GCObject*>(object->value.p), metatableObject); // Lua 5.1.5 lapi.c: setmetatable barrier
 			return;
 		}
 
 		if (object->tt == LUA_TUSERDATA) {
 			static_cast<Udata*>(object->value.p)->metatable = reinterpret_cast<Table*>(metatableObject);
+			faf_lua51_gc_barrier_f(state, static_cast<GCObject*>(object->value.p), metatableObject); // Lua 5.1.5 lapi.c: setmetatable barrier
 			return;
 		}
 
@@ -2379,6 +2381,11 @@ void LuaObject::Register(const char* const key, CFunction const value, const int
 
 	for (int upvalueIndex = tagMethod - 1; upvalueIndex >= 0; --upvalueIndex) {
 		closure->c.upvalue[upvalueIndex] = closureState->top[upvalueIndex];
+		faf_lua51_gc_barrier_value(
+			closureState,
+			reinterpret_cast<GCObject*>(closure),
+			&closure->c.upvalue[upvalueIndex]
+		); // Lua 5.1.5 lapi.c: lua_pushcclosure()
 		closureState->top[upvalueIndex].tt = 0;
 	}
 
@@ -3180,6 +3187,8 @@ namespace LuaPlus
 	 */
 	struct LuaObjectSerializer : gpg::SerSaveLoadHelper<LuaObject>
 	{};
+
+#include "LuaIncrementalGcCore.inc"
 } // namespace LuaPlus
 
 namespace

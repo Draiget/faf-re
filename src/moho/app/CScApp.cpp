@@ -31,6 +31,7 @@
 #include "moho/console/CConCommand.h"
 #include "moho/audio/IUserSoundManager.h"
 #include "moho/audio/SofdecRuntime.h"
+#include "lua/LuaIncrementalGc.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/ScrDebugHooks.h"
 #include "moho/misc/SessionStartup.h"
@@ -337,6 +338,30 @@ namespace
     frontEndData.SetString("replay_filename", replayPath.c_str());
   }
 
+  /// Case-insensitive console command name comparison, matching the console's
+  /// own command lookup.
+  [[nodiscard]] bool IsCommandName(const std::string& token, const char* name)
+  {
+    if (name == nullptr) {
+      return false;
+    }
+
+    const std::size_t nameLength = std::strlen(name);
+    if (token.size() != nameLength) {
+      return false;
+    }
+
+    for (std::size_t index = 0; index < nameLength; ++index) {
+      const unsigned char left = static_cast<unsigned char>(token[index]);
+      const unsigned char right = static_cast<unsigned char>(name[index]);
+      if (std::tolower(left) != std::tolower(right)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   [[nodiscard]] fa::string ResolveLoadPath(gpg::StrArg requestedPath)
   {
     fa::string loadPath;
@@ -385,6 +410,56 @@ namespace
     }
 
     moho::PlaceCurrentThread(moho::EThreadRole::Main);
+  }
+
+  /**
+   * Engine addition: applies the startup-only `lua_IncrementalGC` convar from
+   * `/con` before the UI VMs are created.
+   *
+   * `RunCommandLinePrologue` already runs every `/con` command, but only later:
+   * the front-end UI root is built by `USER_GetLuaState()` in `CScApp::Init`,
+   * which runs before either caller of the prologue. The collector role of a
+   * Lua VM is fixed when the VM is created, so the `lua_IncrementalGC` segment
+   * is executed here as well, ahead of that root. The later prologue pass runs
+   * it again, which is harmless: the convar just takes the same value.
+   *
+   * The parsing mirrors the prologue: `=` becomes a space, `;` separates the
+   * segments. Only a segment whose first token is the convar name is executed
+   * (compared case-insensitively, like the console command lookup itself).
+   */
+  void ApplyEarlyLuaIncrementalGcCommand()
+  {
+    fa::vector<fa::string> args;
+
+    if (moho::CFG_GetArgOption("/con", 1, &args) && !args.empty()) {
+      std::string commands = args[0].c_str();
+      std::replace(commands.begin(), commands.end(), '=', ' ');
+      std::size_t begin = 0;
+      while (begin <= commands.size()) {
+        const std::size_t end = std::min(commands.find(';', begin), commands.size());
+        if (end > begin) {
+          const std::string segment = commands.substr(begin, end - begin);
+
+          std::size_t tokenBegin = 0;
+          while (tokenBegin < segment.size() &&
+                 (segment[tokenBegin] == ' ' || segment[tokenBegin] == '\t')) {
+            ++tokenBegin;
+          }
+          std::size_t tokenEnd = segment.find_first_of(" \t", tokenBegin);
+          const std::string token = segment.substr(tokenBegin, tokenEnd - tokenBegin);
+
+          if (IsCommandName(token, "lua_IncrementalGC")) {
+            moho::CON_Execute(segment.c_str());
+          }
+        }
+        begin = end + 1;
+      }
+      args.clear();
+    }
+
+    // The convar is bound to the configured value; copy it into the live
+    // runtime flag, which the UI VMs read when they are created.
+    moho::CaptureIncrementalGcStartupSetting();
   }
 
   bool wld_EarlyCommandLineSession = true;
@@ -1144,6 +1219,12 @@ bool CScApp::Init()
   if (!AppInitCommonServices()) {
     return false;
   }
+
+  // Engine addition: `lua_IncrementalGC` is a startup-only switch - the
+  // collector role of a Lua VM is fixed when the VM is created. Apply the
+  // `/con lua_IncrementalGC=...` value here, before USER_GetLuaState() builds
+  // the front-end UI root, and copy it into the live runtime flag.
+  ApplyEarlyLuaIncrementalGcCommand();
 
   fa::vector<fa::string> preferenceArgs;
   if (moho::CFG_GetArgOption("/prefs", 1, &preferenceArgs) && !preferenceArgs.empty()) {
