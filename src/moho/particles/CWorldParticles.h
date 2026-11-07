@@ -154,6 +154,12 @@ namespace moho
      */
     [[nodiscard]] ParticleBuffer* AcquireParticleBuffer();
 
+    /** Whether an upload can try allocating an owner for an available buffer. */
+    [[nodiscard]] bool HasAvailableParticleBuffer() const noexcept
+    {
+      return !mAvailableParticleBuffers.empty();
+    }
+
     /**
      * Address: 0x00492CA0 (FUN_00492CA0, sub_492CA0)
      *

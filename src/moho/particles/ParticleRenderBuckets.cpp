@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <memory>
 #include <new>
 #include <stdexcept>
 #include <unordered_map>
@@ -609,23 +610,33 @@ namespace moho
     }
 
     while (!bucket.pendingParticles.empty()) {
-      ParticleBuffer* const pooledBuffer = bucket.owner->AcquireParticleBuffer();
-      if (pooledBuffer == nullptr) {
+      if (!bucket.owner->HasAvailableParticleBuffer()) {
         // FAF hot-patch (FA-Binary-Patches CameraPerf): the "Particle cap exceeded" log call
         // at 0x00493A9B is NOPed out; the excess is still discarded.
         bucket.pendingParticles.clear();
         return false;
       }
 
-      auto* const newWorkItem = static_cast<SParticleRenderWorkItem*>(::operator new(sizeof(SParticleRenderWorkItem)));
-      (void)InitializeParticleRenderWorkItem(
-        *newWorkItem,
-        static_cast<std::uint32_t>(pooledBuffer->mMaxParticles),
-        pooledBuffer
-      );
-
+      // Leave the buffer in the pool until both allocations have succeeded.
+      // Returning it with ReleaseParticleBuffer during unwinding would allocate
+      // another list node and could fail again. The default member initializers
+      // match InitializeParticleRenderWorkItem without raw partial construction.
+      auto pendingWorkItem = std::make_unique<SParticleRenderWorkItem>();
+      SParticleRenderWorkItem* const newWorkItem = pendingWorkItem.get();
       bucket.activeWorkItems.push_back(newWorkItem);
 
+      // Allocation callbacks may have changed the available pool. Only the
+      // actual acquisition determines which buffer this work item borrows.
+      ParticleBuffer* const pooledBuffer = bucket.owner->AcquireParticleBuffer();
+      if (pooledBuffer == nullptr) {
+        bucket.activeWorkItems.pop_back();
+        bucket.pendingParticles.clear();
+        return false;
+      }
+      newWorkItem->mIntervalCapacityHint = static_cast<std::uint32_t>(pooledBuffer->mMaxParticles);
+      newWorkItem->mParticleBuffer = pooledBuffer;
+      // Upload may throw, but the bucket now owns the work item and its buffer.
+      (void)pendingWorkItem.release();
       UploadPendingParticlesIntoWorkItem(*newWorkItem, frameDelta, bucket.pendingParticles);
     }
 
