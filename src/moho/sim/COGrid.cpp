@@ -509,15 +509,15 @@ namespace moho
    */
   EntityOccupationManager::~EntityOccupationManager()
   {
-    operator delete[](mUnitBuckets);
-    operator delete[](mPropBuckets);
-    operator delete[](mEntityBuckets);
+    ::operator delete(mUnitBuckets);
+    ::operator delete(mPropBuckets);
+    ::operator delete(mEntityBuckets);
 
     // 0x004FCE2C..0x004FCE59; the vector's own storage is released by
     // ~vector (the `_Tidy` at 0x004FCE5C).
     const int blockCount = static_cast<int>(mAllBlocks.size());
     for (int index = 0; index < blockCount; ++index) {
-      operator delete[](mAllBlocks[index]);
+      ::operator delete(mAllBlocks[index]);
     }
   }
 
