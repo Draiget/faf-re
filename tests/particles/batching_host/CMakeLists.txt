@@ -65,6 +65,11 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_G
   # without editing production or making them fatal to this host recorder.
   target_compile_options(faf_particle_batch_reclaim_host_tests PRIVATE -Wno-error=changes-meaning -Wno-error=use-after-free)
 endif()
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT MSVC)
+  # Production LayoutAsserts.h intentionally wraps static_assert in host builds.
+  # Keep Clang's diagnostic visible without making this existing macro fatal.
+  target_compile_options(faf_particle_batch_reclaim_host_tests PRIVATE -Wno-error=keyword-macro)
+endif()
 enable_testing()
 add_test(NAME particle_batch_reclaim_host COMMAND faf_particle_batch_reclaim_host_tests)
 add_test(NAME particle_pool_reclaim COMMAND faf_particle_pool_reclaim_tests)
