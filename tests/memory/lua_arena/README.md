@@ -4,7 +4,7 @@ Run the repository's `tools/test-lua-arena-reuse.sh` wrapper. It uses CMake, Goo
 
 CTest is the supported suite entry point. Every case is a separate process because the actual included LuaArena.cpp owns process-global reservation state and thread-local caches. Running a multi-case executable with no filter is deliberately rejected in SetUp before allocator state is touched. For a single case, use --gtest_filter=Suite.Case. Do not use --gtest_repeat greater than 1.
 
-These tests compile the actual allocator on x64 without faf_engine. They do not validate Windows VirtualAlloc behavior, full-engine builds, retail game data, or replay parity. Capacity-restricted tests leave OS reservation size unchanged. Fault-injection scopes make no GoogleTest calls while operator new is disabled and restore the flag through RAII before assertions.
+These tests compile the actual allocator on x64 without faf_engine, so they reserve and commit through VirtualAlloc on Windows and mmap on Linux. They do not validate full-engine builds, retail game data, or replay parity. In the engine build the target is `faf_lua_arena_reuse_tests` (Windows x64; the Linux engine build skips `tests/`). Capacity-restricted tests leave OS reservation size unchanged. Fault-injection scopes make no GoogleTest calls while operator new is disabled and restore the flag through RAII before assertions.
 
 The wrapper defaults to BUILD_CONFIG=Release. Set BUILD_CONFIG to choose another configuration; it passes the same value to CMAKE_BUILD_TYPE, cmake --build --config and ctest -C, including multi-configuration generators such as Visual Studio. For example:
 
