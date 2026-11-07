@@ -1090,6 +1090,8 @@ namespace LuaPlus
 		 */
 		explicit LuaState(StandardLibraries initStandardLibrary);
 
+		LuaState(StandardLibraries initStandardLibrary, int collectorRole);
+
 		/**
 		 * Address: 0x0090A520 (FUN_0090A520, LuaPlus::LuaState::LuaState)
 		 *

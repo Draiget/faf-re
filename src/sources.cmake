@@ -121,6 +121,7 @@ set(FAF_ENGINE_SOURCES
   lua/LuaDump.cpp
   lua/LuaError.cpp
   lua/LuaObject.cpp
+  lua/LuaIncrementalGc.cpp
   lua/LuaParser.cpp
   lua/LuaObjectTypeInfo.cpp
   lua/LuaRuntimeTypeInfo.cpp

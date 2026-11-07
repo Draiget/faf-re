@@ -170,6 +170,11 @@
 
 		for (int index = 0; index < count; ++index) {
 			proto->upvalues[index] = LuaLoadTString(loadState);
+			faf_lua51_gc_barrier_f(
+				loadState->state,
+				reinterpret_cast<GCObject*>(proto),
+				reinterpret_cast<GCObject*>(proto->upvalues[index])
+			); // Lua 5.1.5 lparser.c: Proto upvalue-name barrier
 		}
 	}
 
@@ -216,6 +221,11 @@
 				TString* const stringValue = LuaLoadTString(loadState);
 				constantLane.tt = static_cast<int>(stringValue->tt);
 				constantLane.value.p = stringValue;
+				faf_lua51_gc_barrier_f(
+					loadState->state,
+					reinterpret_cast<GCObject*>(proto),
+					reinterpret_cast<GCObject*>(stringValue)
+				); // Lua 5.1.5 lparser.c: Proto constant barrier
 				continue;
 			}
 
@@ -233,6 +243,11 @@
 
 		for (int index = 0; index < childCount; ++index) {
 			proto->p[index] = LuaLoadProtoObject(loadState, proto->source);
+			faf_lua51_gc_barrier_f(
+				loadState->state,
+				reinterpret_cast<GCObject*>(proto),
+				reinterpret_cast<GCObject*>(proto->p[index])
+			); // Lua 5.1.5 lparser.c: nested Proto barrier
 		}
 	}
 
@@ -276,6 +291,10 @@
 	 */
 	extern "C" void reallymarkobject(GCState* const st, GCObject* const object)
 	{
+		if (moho::lua_IncrementalGC && moho::lua_incremental::IsUiState(st->g)) {
+			faf_lua51_gc_mark_object(st->g, object);
+			return;
+		}
 		GCObject* current = object;
 		current->gch.marked |= 1u;
 

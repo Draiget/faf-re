@@ -22,6 +22,7 @@
 			TString* const candidate = &object->ts;
 			if (candidate->tt == LUA_TSTRING && candidate->len == length) {
 				if (length == 0u || (source != nullptr && std::memcmp(source, candidate->str, length) == 0)) {
+					faf_lua51_gc_revive_string(state, object);
 					return candidate;
 				}
 			}
