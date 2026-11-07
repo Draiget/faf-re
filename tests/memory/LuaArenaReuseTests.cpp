@@ -157,6 +157,15 @@ namespace
   }
 }
 
+// clang's ThreadSanitizer runtime defines operator new itself, so the replacement (and with it the
+// FullCapacity host-new check) is left out there; GCC's TSan and the other builds keep it.
+#if defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+#define FAF_LUA_ARENA_RUNTIME_OWNS_NEW 1
+#endif
+#endif
+
+#ifndef FAF_LUA_ARENA_RUNTIME_OWNS_NEW
 void* operator new(std::size_t bytes)
 {
   if (failHostNew) {
@@ -187,3 +196,4 @@ void operator delete[](void* block) noexcept { std::free(block); }
 void operator delete[](void* block, std::size_t) noexcept { std::free(block); }
 void operator delete(void* block, const std::nothrow_t&) noexcept { std::free(block); }
 void operator delete[](void* block, const std::nothrow_t&) noexcept { std::free(block); }
+#endif

@@ -1,6 +1,6 @@
 # Lua arena host regression tests
 
-Run the repository's `tools/test-lua-arena-reuse.sh` wrapper. It uses CMake, GoogleTest 1.15.2, gtest_main and CTest. Set SANITIZER=address, SANITIZER=undefined or SANITIZER=thread for instrumented host runs; use a separate BUILD_DIR per configuration. Pass -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=/path/to/googletest to use an offline source tree.
+Run the repository's `tools/test-lua-arena-reuse.sh` wrapper. It uses CMake, GoogleTest 1.15.2, gtest_main and CTest. Set SANITIZER=address, SANITIZER=undefined or SANITIZER=thread for instrumented host runs; use a separate BUILD_DIR per configuration. Under clang's ThreadSanitizer the test leaves operator new to the sanitizer runtime, so FullCapacity there does not check that the arena runs without host allocations. Pass -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=/path/to/googletest to use an offline source tree.
 
 CTest is the supported suite entry point. Every case is a separate process because the actual included LuaArena.cpp owns process-global reservation state and thread-local caches. Running a multi-case executable with no filter is deliberately rejected in SetUp before allocator state is touched. For a single case, use --gtest_filter=Suite.Case. Do not use --gtest_repeat greater than 1.
 
