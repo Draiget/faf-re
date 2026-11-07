@@ -258,9 +258,7 @@ namespace
     lua_pushlstring(activeState, damageType.c_str(), static_cast<size_t>(damageType.size()));
     lua_call(activeState, 4, 1);
 
-    const float result = static_cast<float>(lua_tonumber(activeState, -1));
-
-    return result;
+    return static_cast<float>(lua_tonumber(activeState, -1));
   }
 
   /**
@@ -303,7 +301,6 @@ namespace
     payloadObject.PushStack(activeState);
     lua_pushlstring(activeState, damageType.c_str(), static_cast<size_t>(damageType.size()));
     lua_call(activeState, 5, 1);
-
   }
 
   /**
