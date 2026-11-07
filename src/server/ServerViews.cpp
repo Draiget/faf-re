@@ -169,6 +169,11 @@ namespace faf::server
 
   void CServerViews::OnViewFrames(moho::Sim& sim)
   {
+    // #178: the frames' headers carry the game speed and the server's clock for the clients' beat clocks.
+    SetFrameClock(
+      mFrameSimRate.load(std::memory_order_relaxed),
+      static_cast<std::uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - mStart).count())
+    );
     // The builders are done with the beat (they interned what the frames name); its views go out after this.
     if (mSessionTables.HasPending()) {
       remote::wire::BitWriter record;

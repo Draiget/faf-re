@@ -326,6 +326,7 @@ namespace faf::remote::client
       mStats.posesWithoutMesh += bones != nullptr ? 1u : 0u;
       held.pose.reset();
       held.poseSkeleton = nullptr;
+      held.poseBones.clear();
       held.poseMoving = false;
       data.mSharedPose.reset();
       data.mPriorSharedPose.reset();
@@ -338,6 +339,7 @@ namespace faf::remote::client
       }
       held.pose.reset(new moho::CAniPose(skeleton, scale));
       held.poseSkeleton = skeleton.get();
+      held.poseBones.clear();
       ++mStats.posesMade;
     }
     boost::shared_ptr<moho::CAniPose> prior = held.pose;
@@ -346,27 +348,47 @@ namespace faf::remote::client
       boost::shared_ptr<moho::CAniPose> next(new moho::CAniPose(*held.pose));
       moho::CAniPoseBone* const first = next->mBones.begin();
       const std::size_t count = next->mBones.size();
-      if (bones->whole && bones->bones.size() != count) {
-        ++mStats.poseBonesBad;
+      if (bones->whole) {
+        if (bones->bones.size() != count) {
+          ++mStats.poseBonesBad;
+        }
+        held.poseBones = bones->bones;
+      } else if (held.poseBones.size() != count) {
+        ++mStats.poseBonesBad; // differences against values this client never got: wait for a whole one
+        held.poseBones.clear();
       }
-      for (std::size_t i = 0; i < bones->bones.size(); ++i) {
+      for (std::size_t i = 0; i < bones->bones.size() && held.poseBones.size() == count; ++i) {
         const std::size_t index = bones->whole ? i : bones->indices[i];
         if (index >= count) {
           ++mStats.poseBonesBad;
           continue;
         }
-        const wire::SPoseBone& bone = bones->bones[i];
+        wire::SPoseBone& value = held.poseBones[index];
+        if (!bones->whole) {
+          const wire::SPoseBone& step = bones->bones[i];
+          for (std::size_t c = 0; c < 3; ++c) {
+            value.position[c] += step.position[c];
+          }
+          for (std::size_t c = 0; c < 4; ++c) {
+            value.rotation[c] += step.rotation[c];
+          }
+          value.visible = step.visible;
+          value.skipInterp = step.skipInterp;
+        }
+        float position[3];
+        float rotation[4];
+        wire::DequantizeBone(value, position, rotation);
         moho::VTransform local;
-        local.orient_.x = bone.rotation[0];
-        local.orient_.y = bone.rotation[1];
-        local.orient_.z = bone.rotation[2];
-        local.orient_.w = bone.rotation[3];
-        local.pos_.x = bone.position[0];
-        local.pos_.y = bone.position[1];
-        local.pos_.z = bone.position[2];
+        local.orient_.x = rotation[0];
+        local.orient_.y = rotation[1];
+        local.orient_.z = rotation[2];
+        local.orient_.w = rotation[3];
+        local.pos_.x = position[0];
+        local.pos_.y = position[1];
+        local.pos_.z = position[2];
         first[index].SetLocalTransform(local);
-        first[index].mVisible = bone.visible ? 1u : 0u;
-        first[index].mSkipNextInterp = bone.skipInterp ? 1u : 0u;
+        first[index].mVisible = value.visible ? 1u : 0u;
+        first[index].mSkipNextInterp = value.skipInterp ? 1u : 0u;
         ++mStats.poseBonesApplied;
       }
       held.pose = std::move(next);

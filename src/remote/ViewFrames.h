@@ -73,6 +73,15 @@ namespace faf::remote
       mSharedRecords.SetSessionTables(&session);
       mSharedStats.SetReadEvery(statsEveryBeats);
     }
+    /**
+     * Plan WP11.5 (#178), on the sim thread before a beat's frames are encoded: the sim rate and the server's clock
+     * (ms) the held frames' headers carry, for the client's beat clock.
+     */
+    void SetFrameClock(const std::int32_t simRate, const std::uint32_t serverMs) noexcept
+    {
+      mFrameSimRate = simRate;
+      mFrameServerMs = serverMs;
+    }
     /** Plan WP8.1, before the first beat: the units' poses are tracked each beat for the views' pose lanes. */
     void EnablePoses() noexcept { mPosesOn = true; }
     [[nodiscard]] bool PosesOn() const noexcept { return mPosesOn; }
@@ -243,6 +252,8 @@ namespace faf::remote
     std::vector<std::uint32_t> mUnitIds; // this beat's units' ids (the entity index's first entries)
     bool mPosesOn = false;
     CPoseTracker mPoses;
+    std::int32_t mFrameSimRate = 0;   // `SetFrameClock`
+    std::uint32_t mFrameServerMs = 0;
     std::vector<std::unique_ptr<CViewFrameBuilder>> mBuilders;
     std::vector<SHeldView> mHeld;
     CSharedEntityRecords mSharedRecords;

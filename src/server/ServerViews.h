@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -49,6 +50,8 @@ namespace faf::server
     void Uninstall();
 
     [[nodiscard]] std::uint64_t Failures() const noexcept { return mFailures; }
+    /** #178: the game speed the frames carry (the requested sim rate), from any thread. */
+    void SetFrameSimRate(const int rate) noexcept { mFrameSimRate.store(rate, std::memory_order_relaxed); }
     /** What the views have been made of so far, for the console. */
     [[nodiscard]] std::string LaneReport() const;
 
@@ -73,6 +76,8 @@ namespace faf::server
     std::atomic<std::uint64_t> mGridBytes{0};
     std::atomic<std::uint64_t> mLuaBytes{0};
     std::atomic<std::uint64_t> mPoseBytes{0};
+    std::atomic<int> mFrameSimRate{0};
+    std::chrono::steady_clock::time_point mStart = std::chrono::steady_clock::now();
     std::atomic<std::uint64_t> mTableBytes{0}; // one player's share
     std::atomic<std::uint64_t> mTableRecords{0};
     remote::wire::CSessionTableWriters mSessionTables; // one for every view (`EnableSessionTables`)

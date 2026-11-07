@@ -16,6 +16,7 @@
 
 namespace moho
 {
+  class CAniActor;
   class CAniPose;
   class Entity;
   class Unit;
@@ -26,17 +27,25 @@ namespace faf::remote
   class CPoseTracker
   {
   public:
-    static constexpr float kPositionTolerance = 0.001f;
-    static constexpr float kRotationTolerance = 0.0001f;
+    /** A bone's local transform and flags as last read, to skip the ones that didn't change at all. */
+    struct SRawBone
+    {
+      float transform[7]; // the `VTransform` as stored
+      std::uint32_t flags;
+    };
 
     struct SUnit
     {
       std::uint32_t id = 0;
       moho::Entity* entity = nullptr;
       moho::Unit* unit = nullptr;          // null: not a unit
-      const moho::CAniPose* pose = nullptr; // the pose read last
+      const void* skeleton = nullptr;      // the skeleton of the pose read last
+      const moho::CAniActor* actor = nullptr; // the actor read last
+      std::uint8_t quietReads = 0;         // reads in a row with no enabled manipulator (past 2: not read)
       std::vector<wire::SPoseBone> sent;   // every bone as the clients that held the unit since hold it
+      std::vector<SRawBone> raw;           // every bone as last read
       std::vector<std::uint16_t> changed;  // this beat's, ascending
+      std::vector<wire::SPoseBone> differences; // each changed bone's step from what the clients held
       bool reset = false;                  // this beat: every client gets it whole (a new unit, or a new skeleton)
     };
 
@@ -64,6 +73,9 @@ namespace faf::remote
 
   private:
     static void ReadUnit(SUnit& unit);
+    /** `Refresh`'s two parts: this beat's units over last beat's, then every unit's pose read. */
+    void Merge(std::span<const std::uint32_t> ids, std::span<moho::Entity* const> entities);
+    void ReadAll(bool parallel);
 
     std::vector<SUnit> mUnits; // ascending ids
     std::vector<SUnit> mNext;

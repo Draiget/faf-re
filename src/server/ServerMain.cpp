@@ -874,6 +874,9 @@ namespace
       const float gameRate = moho::SIM_GetMeasuredGameRate();
       const float beatMs = gameRate > 0.0f ? faf::server::kSpeedZeroBeatMs / gameRate : 0.0f;
       const int requested = manager->GetSimRateRequested();
+      if (views) {
+        views->SetFrameSimRate(requested); // #178: the players' clients pace their display by it
+      }
       // What the game really did over the last seconds: a median beat time doesn't show spikes.
       int speed = requested;
       std::pair<double, int>& oldest = beatHistory[beatSamples % beatHistory.size()];

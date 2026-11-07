@@ -204,7 +204,7 @@ namespace faf::headless
     if (PhaseTimesOn() && mPhaseBeats != 0u) {
       // Per beat, ms: each step's wall time on the sim thread; for a step done a view at a time, the
       // sum over views, the slowest view and the team views' part of the sum.
-      static constexpr const char* kNames[] = {"read", "read blocks", "read blips", "build", "write", "shared", "index", "facts", "keep", "tables", "frames", "release", "grid setup", "grids", "lua"};
+      static constexpr const char* kNames[] = {"read", "read blocks", "read blips", "build", "write", "shared", "index", "facts", "keep", "poses", "tables", "frames", "release", "grid setup", "grids", "lua"};
       static_assert(std::size(kNames) == static_cast<std::size_t>(EViewPhase::Count));
       const double perBeat = 1000.0 / static_cast<double>(mPhaseBeats);
       double wall = 0.0;

@@ -154,6 +154,7 @@ namespace faf::remote::client
       // old one becoming the prior pose, as `CAniActor` steps), the skeleton it was made with, and whether last
       // beat moved it (the next beat without bones gives the session prior == current).
       boost::shared_ptr<moho::CAniPose> pose;
+      std::vector<wire::SPoseBone> poseBones; // the lane's values as this client holds them (differences add to them)
       const void* poseSkeleton = nullptr;
       bool poseMoving = false;
     };

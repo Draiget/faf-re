@@ -556,6 +556,8 @@ namespace faf::remote
     changes.frameId = held.frameId;
     changes.baselineId = held.baselineId;
     changes.beat = held.beat;
+    changes.simRate = mFrameSimRate;
+    changes.serverMs = mFrameServerMs;
     changes.entityCount = held.count;
     changes.removed = held.removed;
     changes.created = held.created;
@@ -583,6 +585,8 @@ namespace faf::remote
     changes.frameId = held.frameId;
     changes.baselineId = wire::kNoBaseline;
     changes.beat = held.beat;
+    changes.simRate = mFrameSimRate;
+    changes.serverMs = mFrameServerMs;
     changes.entityCount = held.count;
     changes.created = records;
     return wire::EncodeFrameChanges(changes, mCodec, writer);
@@ -931,6 +935,7 @@ namespace faf::remote
     if (mPosesOn) {
       // Plan WP8.1: every unit's bones against what its clients hold, once for every view.
       mPoses.Refresh(mUnitIds, std::span<moho::Entity* const>(mEntityPointers.data(), units), Parallel());
+      MarkPhase(EViewPhase::Poses);
     }
     if (mSession != nullptr) {
       // Plan WP11 step 4, once for every view: the deposits the sim added, the beat's terrain edits (its changed
@@ -944,8 +949,8 @@ namespace faf::remote
       );
       mSharedStats.Refresh(mUnitIds, std::span<moho::Entity* const>(mEntityPointers.data(), units), *mSession, Parallel());
     }
-    if (mSession != nullptr || mPosesOn) {
-      MarkPhase(EViewPhase::Tables); // with the poses
+    if (mSession != nullptr) {
+      MarkPhase(EViewPhase::Tables);
     }
 
     // Each view's builder, id map and frame are its own; the sim is only read (plan I3), so the
