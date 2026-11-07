@@ -100,22 +100,18 @@ namespace
     ASSERT_TRUE(lua::ArenaAllocate(16384) != nullptr);
   }
 
-  TEST_F(LuaArenaReuse, ZeroSpanRecord)
+  TEST_F(LuaArenaReuse, OversizedRejected)
   {
-    // The current allocator can round SIZE_MAX to zero spans. Keep this existing
-    // failure case from turning into an overlapping small allocation during reuse.
-    void* const zero = lua::ArenaAllocate(std::numeric_limits<std::size_t>::max());
-    ASSERT_TRUE(zero != nullptr);
-    lua::ArenaFree(zero);
+    // SIZE_MAX used to round to a zero-span block that overlapped the next allocation.
+    EXPECT_EQ(lua::ArenaAllocate(std::numeric_limits<std::size_t>::max()), nullptr);
+    EXPECT_EQ(lua::ArenaAllocate(gReserveBytes + 1u), nullptr);
     void* const live = lua::ArenaAllocate(gReserveBytes);
-    ASSERT_TRUE(live != nullptr);
+    ASSERT_NE(live, nullptr);
     std::memset(live, 61, 16384);
-    ASSERT_TRUE(lua::ArenaAllocate(16384) == nullptr);
-    ASSERT_TRUE(static_cast<char*>(live)[0] == 61);
-    ASSERT_TRUE(static_cast<char*>(live)[16383] == 61);
+    EXPECT_EQ(lua::ArenaAllocate(16384), nullptr);
+    EXPECT_EQ(static_cast<char*>(live)[16383], 61);
     lua::ArenaFree(live);
-    void* const recovered = lua::ArenaAllocate(16384);
-    ASSERT_TRUE(recovered == live);
+    EXPECT_EQ(lua::ArenaAllocate(16384), live);
   }
 
   TEST_F(LuaArenaReuse, ConcurrentReuse)

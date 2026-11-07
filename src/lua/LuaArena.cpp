@@ -196,18 +196,14 @@ namespace
     {
       std::lock_guard<std::mutex> guard(gSpanLock);
       span = TakeSpans(1u);
-      if (span == kSpanCount && gFreeRuns != nullptr) {
-        // Reuse already committed storage only after allocating a fresh span fails.
-        for (LargeRun& run : *gFreeRuns) {
-          if (run.spans == 0u) {
-            continue;
-          }
-          span = run.firstSpan++;
-          if (--run.spans == 0u) {
-            run = gFreeRuns->back();
-            gFreeRuns->pop_back();
-          }
-          break;
+      if (span == kSpanCount && gFreeRuns != nullptr && !gFreeRuns->empty()) {
+        // Only once the range has no fresh span left, so a game that never fills it keeps its addresses:
+        // the first freed large run gives up its first span.
+        LargeRun& run = gFreeRuns->front();
+        span = run.firstSpan++;
+        if (--run.spans == 0u) {
+          run = gFreeRuns->back();
+          gFreeRuns->pop_back();
         }
       }
       if (span == kSpanCount) {
@@ -299,6 +295,10 @@ namespace
 
   [[nodiscard]] void* AllocateLarge(const std::size_t bytes) noexcept
   {
+    // Also keeps the span count from wrapping to 0, so every free run holds at least one span.
+    if (bytes > gReserveBytes) {
+      return nullptr;
+    }
     const std::size_t spans = (bytes + kSpanBytes - 1u) / kSpanBytes;
     std::lock_guard<std::mutex> guard(gSpanLock);
     std::size_t first = kSpanCount;

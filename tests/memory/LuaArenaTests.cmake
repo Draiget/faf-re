@@ -1,7 +1,8 @@
 # Compile the actual allocator in isolation, not faf_engine; these are host tests.
 # Each filter runs in a fresh process because the allocator owns global state.
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-  # Older PR bases predate the engine-wide GoogleTest dependency.
+  # The engine build has gtest_main; the standalone lua_arena/ project fetches the release
+  # cmake/FafDependencies.cmake pins (same archive, same SHA256).
   if(NOT TARGET gtest_main)
     include(FetchContent)
     set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
@@ -29,7 +30,7 @@ if(CMAKE_SIZEOF_VOID_P EQUAL 8)
   target_include_directories(faf_lua_arena_reuse_tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../src)
   target_link_libraries(faf_lua_arena_reuse_tests PRIVATE gtest_main Threads::Threads)
   set_target_properties(faf_lua_arena_reuse_tests PROPERTIES FOLDER "Tests/Memory")
-  foreach(_case IN ITEMS FullCapacity MixedSizes ZeroSpanRecord ConcurrentReuse)
+  foreach(_case IN ITEMS FullCapacity MixedSizes OversizedRejected ConcurrentReuse)
     add_test(NAME LuaArenaReuse_${_case} COMMAND faf_lua_arena_reuse_tests --gtest_filter=LuaArenaReuse.${_case})
     set_tests_properties(LuaArenaReuse_${_case} PROPERTIES LABELS "LuaArenaHost" TIMEOUT 120)
   endforeach()
