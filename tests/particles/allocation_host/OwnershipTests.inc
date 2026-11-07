@@ -324,3 +324,94 @@ TEST_F(ParticleUpload, SuccessfulStateSnapshotsPreservePriorBaseline) {
   }
 }
 }
+
+namespace {
+void ExpectFirstUploadedId(const SParticleRenderBucket& bucket, float expected) {
+  ASSERT_EQ(bucket.activeWorkItems.size(),1U);
+  auto* buffer=static_cast<ParticleBuffer*>(bucket.activeWorkItems.front()->mParticleBuffer);
+  ASSERT_NE(buffer,nullptr);
+  float actual=0;
+  std::memcpy(&actual,buffer->mInstanceVertexBuffer->bytes.data(),sizeof(actual));
+  EXPECT_EQ(actual,expected);
+  EXPECT_EQ(bucket.activeWorkItems.front()->mRenderStartIndex,1U);
+}
+void RetryAfterPrelinkFailure(gpg::gal::Device& device,std::size_t point) {
+  {
+    CParticleTexture texture; CWorldParticles world(1);auto& bucket=world.P(0);
+    auto* original=world.owned_p.front().get();
+    Seed(bucket,1,texture,41);
+    allocation_probe::persistent=true;allocation_probe::Arm(point);
+    bool threw=false;
+    try {(void)EnsureAndFillParticleBucketWorkItems(bucket,7);}
+    catch(const std::bad_alloc&) {threw=true;}
+    catch(...) {allocation_probe::armed=false;throw;}
+    allocation_probe::armed=false;allocation_probe::persistent=false;
+    EXPECT_TRUE(threw);EXPECT_EQ(allocation_probe::observed,point);
+    ExpectOwnerPartition(world,bucket);
+    ASSERT_EQ(bucket.pendingParticles.size(),1U);
+    EXPECT_EQ(bucket.pendingParticles.front().mPos.x,41);
+    EXPECT_EQ(bucket.pendingParticles.front().mInterop,0U);
+    EXPECT_EQ(texture.references,2);
+    EXPECT_TRUE(bucket.activeWorkItems.empty());
+    EXPECT_TRUE(EnsureAndFillParticleBucketWorkItems(bucket,7));
+    EXPECT_TRUE(bucket.pendingParticles.empty());EXPECT_EQ(texture.references,0);
+    ExpectOwnerPartition(world,bucket);ExpectFirstUploadedId(bucket,41);
+    EXPECT_EQ(bucket.activeWorkItems.front()->mParticleBuffer,original);
+    PruneExpiredParticleBucketWorkItems(bucket,10000);
+    EXPECT_TRUE(bucket.activeWorkItems.empty());
+    ASSERT_EQ(world.mAvailableParticleBuffers.size(),1U);
+    EXPECT_EQ(world.mAvailableParticleBuffers.front(),original);
+    Seed(bucket,1,texture,91);
+    EXPECT_TRUE(EnsureAndFillParticleBucketWorkItems(bucket,11));
+    ExpectFirstUploadedId(bucket,91);ExpectOwnerPartition(world,bucket);
+    EXPECT_EQ(bucket.activeWorkItems.front()->mParticleBuffer,original);
+    RecycleAndDestroyParticleBucketWorkItems(bucket);
+    EXPECT_TRUE(bucket.activeWorkItems.empty());EXPECT_EQ(texture.references,0);
+    ASSERT_EQ(world.mAvailableParticleBuffers.size(),1U);
+    EXPECT_EQ(world.mAvailableParticleBuffers.front(),original);
+  }
+  sParticleGather={};sParticleMirror={};device=gpg::gal::Device{};
+  EXPECT_EQ(LiveTrackedAllocations(),0U);
+}
+TEST_F(ParticleUpload, WorkItemAllocationFailureCanRetryPruneAndReuseSameBucket) {
+  RetryAfterPrelinkFailure(device,1);
+}
+TEST_F(ParticleUpload, ActiveVectorFailureCanRetryPruneAndReuseSameBucket) {
+  RetryAfterPrelinkFailure(device,2);
+}
+TEST_F(ParticleUpload, AllocationCallbackLateExhaustionCanRefillRetryAndReuseSameBucket) {
+  for(std::size_t point:{1U,2U}) {
+    SCOPED_TRACE(point);
+    {
+      CParticleTexture texture;CWorldParticles world(1);auto& bucket=world.P(0);
+      auto* original=world.owned_p.front().get();Seed(bucket,1,texture,41);
+      callbackWorld=&world;callbackPoint=point;callbackCount=1;callbackBorrowed.fill(nullptr);
+      allocation_probe::onRequest=BorrowFromAllocationCallback;
+      allocation_probe::persistent=false;allocation_probe::Arm(std::numeric_limits<std::size_t>::max());
+      bool returned=false;
+      try {returned=EnsureAndFillParticleBucketWorkItems(bucket,7);}
+      catch(...) {allocation_probe::armed=false;allocation_probe::onRequest=nullptr;callbackWorld=nullptr;throw;}
+      allocation_probe::armed=false;allocation_probe::onRequest=nullptr;callbackWorld=nullptr;
+      EXPECT_FALSE(returned);EXPECT_EQ(callbackBorrowed[0],original);
+      EXPECT_TRUE(bucket.activeWorkItems.empty());EXPECT_TRUE(world.mAvailableParticleBuffers.empty());
+      EXPECT_TRUE(bucket.pendingParticles.empty());EXPECT_EQ(texture.references,0);
+      world.ReleaseParticleBuffer(callbackBorrowed[0]);
+      // Exhaustion deliberately discarded the old payload; retry with new payload.
+      Seed(bucket,1,texture,91);
+      EXPECT_TRUE(EnsureAndFillParticleBucketWorkItems(bucket,11));
+      ExpectOwnerPartition(world,bucket);ExpectFirstUploadedId(bucket,91);
+      EXPECT_EQ(bucket.activeWorkItems.front()->mParticleBuffer,original);
+      RecycleAndDestroyParticleBucketWorkItems(bucket);
+      EXPECT_TRUE(bucket.activeWorkItems.empty());EXPECT_EQ(texture.references,0);
+      ASSERT_EQ(world.mAvailableParticleBuffers.size(),1U);
+      EXPECT_EQ(world.mAvailableParticleBuffers.front(),original);
+      Seed(bucket,1,texture,121);
+      EXPECT_TRUE(EnsureAndFillParticleBucketWorkItems(bucket,15));
+      ExpectOwnerPartition(world,bucket);ExpectFirstUploadedId(bucket,121);
+      EXPECT_EQ(bucket.activeWorkItems.front()->mParticleBuffer,original);
+    }
+    sParticleGather={};sParticleMirror={};device=gpg::gal::Device{};
+    EXPECT_EQ(LiveTrackedAllocations(),0U);
+  }
+}
+}
