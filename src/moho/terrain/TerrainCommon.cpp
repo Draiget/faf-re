@@ -1,10 +1,26 @@
 #include "moho/terrain/TerrainCommon.h"
+#include "moho/terrain/SplatBudget.h"
+
+#include "moho/console/CConCommand.h"
 
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/d3d/CD3DDevice.h"
 
 namespace moho
 {
+  int ren_SplatBudgetTier = 0;
+  namespace
+  {
+    TConVar<int> gTConVar_ren_SplatBudgetTier(
+      "ren_SplatBudgetTier",
+      "Visible ground splats per view: 0 original (2499 high/medium, 249 low), "
+      "1 enhanced (10000/1000), 2 very high (25000/2500), 3 extreme (50000/5000). "
+      "Higher settings use more memory and GPU time. Changes apply to the next view; "
+      "invalid values use original limits.",
+      &ren_SplatBudgetTier
+    );
+  } // namespace
+
   /**
    * Address: 0x007FF840 (FUN_007FF840, ??0TerrainCommon@Moho@@QAE@@Z)
    * Address: 0x007FF7C0 (FUN_007FF7C0, ??0IRenTerrain@Moho@@QAE@@Z)
