@@ -360,7 +360,8 @@ if(FAF_SERVER_MODE)
   list(APPEND _faf_client_sources remote/client/OracleGolden.cpp)
   # The client's channel to the server and its lobby connector (/connectserver): headless has no use for them, and
   # their socket and crypto imports aren't allowed there (cmake/HeadlessImports.cmake).
-  list(APPEND _faf_client_sources remote/client/ServerConnect.cpp remote/client/ServerRelayConnector.cpp)
+  list(APPEND _faf_client_sources remote/client/ServerConnect.cpp remote/client/ServerRelayConnector.cpp
+    remote/client/ServerViewClient.cpp remote/client/NetworkSimDriver.cpp)
 endif()
 set(_faf_sim_objects "$<TARGET_OBJECTS:faf_engine>")
 set(_faf_client_regex "")

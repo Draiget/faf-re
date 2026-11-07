@@ -130,6 +130,7 @@ namespace faf::remote
       Index,   // the entity index
       Facts,   // which views keep each entity
       Keep,    // whose answers changed
+      Tables,  // the session tables' edits and the units' stats, once for every view
       Frames,  // each view's frame
       Release, // stats trees let go of
       GridSetup, // the lanes' start: Lua routing, which grids go to whom
@@ -169,6 +170,11 @@ namespace faf::remote
 
     /** The views' packets of a sealed beat are ready (`Packet`). */
     virtual void OnViewPackets(moho::Sim& sim) { (void)sim; }
+    /**
+     * In `OnViewPackets`: the sim's own packet of the beat, as far as `Sim::Sync` has written it (the lanes before
+     * its entity walk, such as the changed terrain rectangles; not its terrain field or deposits, written after).
+     */
+    [[nodiscard]] const moho::SSyncData* SyncPacket() const noexcept { return mSyncPacket; }
 
   private:
     static constexpr std::uint32_t kNoVisions = 0xFFFFFFFFu;
@@ -280,6 +286,7 @@ namespace faf::remote
     std::chrono::steady_clock::time_point mBuildStart{};
     double mBuildSeconds = 0.0;
     bool mPhaseTimesOn = false;
+    const moho::SSyncData* mSyncPacket = nullptr; // `SyncPacket`, during `OnBeatChanges`
     std::chrono::steady_clock::time_point mPhaseMark{};
     SPhaseTime mPhaseTimes[static_cast<std::size_t>(EViewPhase::Count)]{};
     std::vector<double> mViewSeconds; // this step's time per view slot (`TimeView`), each written by its own job

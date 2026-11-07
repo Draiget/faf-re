@@ -60,6 +60,24 @@ namespace faf::remote
         EnableTeams();
       }
     }
+    /**
+     * Plan WP11 step 4, before the first beat: every view's frames name their sounds, underlays, custom names,
+     * range visuals and unit stats in `session`, one table for all of them; each beat's new deposits and terrain
+     * edits are queued there once (`SessionEdits`). Whoever sends the frames sends `session`'s pending record
+     * to every player before the beat's frames (`OnViewFrames`).
+     */
+    void EnableSessionTables(wire::CSessionTableWriters& session, const std::uint32_t statsEveryBeats = kStatsEveryBeats) noexcept
+    {
+      mSession = &session;
+      mSharedRecords.SetSessionTables(&session);
+      mSharedStats.SetReadEvery(statsEveryBeats);
+    }
+    /** `CSharedUnitStats::SetReadEvery`'s default: a unit's stats at most 0.3 s late (server `--stats-every`). */
+    static constexpr std::uint32_t kStatsEveryBeats = 4;
+    /** `--stats-every <beats>` (server and headless view bench): 1 reads every unit's stats every beat. */
+    void SetStatsEveryBeats(const std::uint32_t beats) noexcept { mSharedStats.SetReadEvery(beats); }
+    [[nodiscard]] wire::CSessionTableWriters* SessionTables() const noexcept { return mSession; }
+    [[nodiscard]] const CSessionEditCollector& SessionEdits() const noexcept { return mEdits; }
     /** The sim of the last beat built (null before it); for checks that run on the sim thread. */
     [[nodiscard]] moho::Sim* LastSim() const noexcept { return mLastSim; }
 
@@ -209,6 +227,10 @@ namespace faf::remote
 
     const wire::SContentTables& mTables;
     wire::SFrameCodec mCodec;
+    wire::CSessionTableWriters* mSession = nullptr; // `EnableSessionTables`
+    CSessionEditCollector mEdits;
+    CSharedUnitStats mSharedStats;
+    std::vector<std::uint32_t> mUnitIds; // this beat's units' ids (the entity index's first entries)
     std::vector<std::unique_ptr<CViewFrameBuilder>> mBuilders;
     std::vector<SHeldView> mHeld;
     CSharedEntityRecords mSharedRecords;

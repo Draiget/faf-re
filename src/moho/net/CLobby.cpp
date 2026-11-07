@@ -54,6 +54,7 @@
 #include <span>
 
 #include "remote/client/ServerConnect.h"
+#include "remote/client/ServerRelayConnector.h"
 #endif
 using namespace moho;
 
@@ -497,11 +498,22 @@ namespace
 {
   // Engine addition (issue #215): live CLobby objects, for LOBBY_IsActive.
   std::atomic<int> sLiveLobbies{0};
+  // Engine addition, server mode (plan WP2.8): the lobby made over the server session's connector, while it lives.
+  moho::CLobby* sServerSessionLobby = nullptr;
 } // namespace
 
 bool moho::LOBBY_IsActive() noexcept
 {
   return sLiveLobbies.load(std::memory_order_relaxed) > 0;
+}
+
+void moho::LOBBY_ServerSessionLaunched()
+{
+  // As `CLobby::LaunchGame` ends a lobby (0x007C38C0): its script's `GameLaunched`, which closes the lobby's screen
+  // and destroys the lobby; the server's launch replaces the lobby's own.
+  if (CLobby* const lobby = sServerSessionLobby; lobby != nullptr) {
+    lobby->RunScript("GameLaunched");
+  }
 }
 
 /**
@@ -562,6 +574,9 @@ CLobby::CLobby(
 CLobby::~CLobby()
 {
   sLiveLobbies.fetch_sub(1, std::memory_order_relaxed); // Engine addition (issue #215)
+  if (sServerSessionLobby == this) {
+    sServerSessionLobby = nullptr; // engine addition, server mode
+  }
 
   if (mSocket != nullptr) {
     WIN_GetWaitHandleSet()->RemoveHandle(mSocket->CreateEvent());
@@ -1603,6 +1618,11 @@ int moho::cfunc_InternalCreateLobbyL(LuaPlus::LuaState* const state)
   gpg::Logf("LOBBY: Game port %d[%s] opened.", gamePort, protocolName.c_str());
 
   CLobby* const lobby = new CLobby(clazz, connector, maxConnections, noNatTraversalProvider, playerName, uid);
+#if FAF_SERVER_MODE
+  if (dynamic_cast<faf::remote::CServerRelayConnector*>(connector) != nullptr) {
+    sServerSessionLobby = lobby;
+  }
+#endif
   lobby->mLuaObj.PushStack(state);
   return 1;
 }

@@ -11,10 +11,13 @@
 #include "moho/command/CCommandDb.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/entity/EntityId.h"
 #include "moho/sim/SSTIArmyVariableData.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SimWorkerPool.h"
+#include "moho/sim/STIMap.h"
+#include "moho/unit/core/Unit.h"
 #include "remote/VisibilityOracle.h"
 
 // Engine addition, server mode: see ViewFrames.h.
@@ -778,6 +781,10 @@ namespace faf::remote
       mRetiring.emplace_back();
       mRetired.emplace_back();
       mBuilders.push_back(std::make_unique<CViewFrameBuilder>(mTables, mCodec));
+      if (mSession != nullptr) {
+        mBuilders.back()->SetSessionTables(mSession, false); // the edits are taken once below
+        mBuilders.back()->SetSharedStats(&mSharedStats);
+      }
       mHeld.emplace_back();
       mFrames.emplace_back();
       mPreviousFrames.emplace_back();
@@ -894,6 +901,28 @@ namespace faf::remote
       mLastCommands.begin(), mLastCommands.end(), mLiveCommands.begin(), mLiveCommands.end(), std::back_inserter(mReleasedCommands)
     );
     MarkPhase(EViewPhase::Keep);
+
+    if (mSession != nullptr) {
+      // Plan WP11 step 4, once for every view: the deposits the sim added, the beat's terrain edits (its changed
+      // rectangles with the heights there now), and every unit's stats.
+      const moho::SSyncData* const syncPacket = SyncPacket();
+      mEdits.Collect(
+        sim.mSimResources.px, sim.mMapData != nullptr ? sim.mMapData->mHeightField.get() : nullptr,
+        syncPacket != nullptr ? std::span<const gpg::Rect2i>(syncPacket->mPlayableRectUpdates.data(), syncPacket->mPlayableRectUpdates.size())
+                              : std::span<const gpg::Rect2i>(),
+        *mSession
+      );
+      // Units are id family 0 (moho/entity/EntityId.h), the index's first ids: the props and projectiles after them
+      // aren't touched.
+      mUnitIds.clear();
+      std::size_t units = 0;
+      while (units < mEntityIndex.size() && mEntityIndex[units].id < moho::ToRaw(moho::EEntityIdSentinel::FirstNonUnitFamily)) {
+        mUnitIds.push_back(mEntityIndex[units].id);
+        ++units;
+      }
+      mSharedStats.Refresh(mUnitIds, std::span<moho::Entity* const>(mEntityPointers.data(), units), *mSession, Parallel());
+      MarkPhase(EViewPhase::Tables);
+    }
 
     // Each view's builder, id map and frame are its own; the sim is only read (plan I3), so the
     // views can be built on the sim's workers (plan WP5.7, `SetParallel`).

@@ -91,7 +91,7 @@ namespace
 
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--lobby-seconds <n>]\n";
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--lobby-seconds <n>] [--stats-every <beats>]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
   // `net_Lag` is 500 ms in a lockstep game, time for every player's beats to arrive. Here it's only the
@@ -396,6 +396,31 @@ namespace
       return false;
     }
     return out.IsTable();
+  }
+
+  /**
+   * Plan WPR.55: the `LaunchInfo` message, the match's configuration in the lobby's Lua byte form. Empty when it can't
+   * be written or is too large for one message's 16-bit size.
+   */
+  [[nodiscard]] std::vector<std::uint8_t> MakeLaunchInfo(LuaPlus::LuaObject& config)
+  {
+    moho::CMessage message(moho::ELobbyMsg::LOBMSG_DirectScriptData);
+    bool written = false;
+    {
+      moho::CMessageStream stream(message, moho::CMessageStream::Access::kReadWrite);
+      written = config.ToByteStream(stream);
+    }
+    constexpr std::size_t kHeaderBytes = 3u; // type, 16-bit size
+    const std::size_t size = message.mBuff.Size();
+    if (!written || size <= kHeaderBytes || size > 0xFFFFu) {
+      return {};
+    }
+    const auto* const bytes = reinterpret_cast<const std::uint8_t*>(message.mBuff.start_);
+    std::vector<std::uint8_t> out;
+    out.reserve(1u + size - kHeaderBytes);
+    out.push_back(static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::LaunchInfo));
+    out.insert(out.end(), bytes + kHeaderBytes, bytes + size);
+    return out;
   }
 
   /** What to call the game: the match file's `MatchName`, or the map's name without its `<LOC id>`. */
@@ -743,6 +768,14 @@ namespace
     const faf::remote::wire::SContentTables contentTables = faf::remote::BuildContentTables(*rules);
     std::unique_ptr<faf::server::CServerViews> views;
     if (net && !roster.Remotes().empty()) {
+      // Plan WPR.55: every client's launch comes from here; a game too large for one message is refused at start.
+      const std::vector<std::uint8_t> launchInfo = MakeLaunchInfo(config);
+      if (launchInfo.empty()) {
+        end.error = "the match's configuration doesn't fit one launch message";
+        Say("Can't host: %s", end.error.c_str());
+        WriteResult(resultPath, end);
+        return kExitBadInput;
+      }
       std::map<std::size_t, std::int32_t> viewPlayers;
       const auto& armies = sessionInfo->mLaunchInfo->mArmyLaunchInfo;
       for (const moho::SLaunchClient& client : roster.Remotes()) {
@@ -754,9 +787,13 @@ namespace
             break;
           }
         }
+        net->QueueView(client.uid, launchInfo);
         net->QueueView(client.uid, faf::server::MakeGameInfo(mapSizeX, mapSizeZ, playerArmy, client.commandSource));
       }
       views = std::make_unique<faf::server::CServerViews>(contentTables, *rules, mapSizeX, mapSizeZ, *net, std::move(viewPlayers), static_cast<unsigned int>(std::max(viewThreads, 1)), teamViews);
+      if (std::string statsEvery; ReadOption("--stats-every", statsEvery)) {
+        views->SetStatsEveryBeats(static_cast<std::uint32_t>(std::max(1, std::atoi(statsEvery.c_str()))));
+      }
       views->Install();
       Say("Views: %s", teamViews ? (teamsLocked ? "one per team, and each player's own units" : "one per team (--team-views), with teams unlocked")
                        : perPlayerViews ? "one per player (--per-player-views)" : "one per player, as teams aren't locked (TeamLock)");
