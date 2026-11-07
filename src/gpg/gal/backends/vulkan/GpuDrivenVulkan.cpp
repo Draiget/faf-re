@@ -33,7 +33,8 @@ namespace gpg::gal
     constexpr std::uint32_t kFirstTextureBinding = 5U;  // t4..t5
     constexpr std::uint32_t kFirstWriteBinding = 7U;    // u0..u1
     constexpr std::uint32_t kSamplerBinding = 9U;       // s0
-    constexpr std::uint32_t kBindingCount = 10U;
+    constexpr std::uint32_t kDepthBinding = 10U;        // t6, the bound depth target ([[vk::binding(10, 0)]] in HLSL)
+    constexpr std::uint32_t kBindingCount = 11U;
     constexpr VkDeviceSize kNullBufferBytes = 256U;
 
     /** The Vulkan device, while it exists (buffers and programs can outlive it at exit). */
@@ -185,6 +186,7 @@ namespace gpg::gal
       bindings[binding].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
       bindings[binding].descriptorType = (binding == kConstantBinding)       ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
         : (binding >= kFirstTextureBinding && binding < kFirstWriteBinding) ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
+        : (binding == kDepthBinding)                                          ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
         : (binding == kSamplerBinding)                                        ? VK_DESCRIPTOR_TYPE_SAMPLER
                                                                               : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     }
@@ -499,9 +501,12 @@ namespace gpg::gal
     }
     VkPipelineColorBlendAttachmentState attachment{};
     attachment.blendEnable = (state.blend != GpuBlend::Opaque) ? VK_TRUE : VK_FALSE;
-    attachment.srcColorBlendFactor = (state.blend != GpuBlend::Opaque) ? VK_BLEND_FACTOR_SRC_ALPHA : VK_BLEND_FACTOR_ONE;
+    attachment.srcColorBlendFactor = (state.blend == GpuBlend::Opaque) ? VK_BLEND_FACTOR_ONE
+      : (state.blend == GpuBlend::Multiply)                                ? VK_BLEND_FACTOR_ZERO
+                                                                           : VK_BLEND_FACTOR_SRC_ALPHA;
     attachment.dstColorBlendFactor = (state.blend == GpuBlend::AlphaBlend) ? VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA
       : (state.blend == GpuBlend::Additive)                                 ? VK_BLEND_FACTOR_ONE
+      : (state.blend == GpuBlend::Multiply)                                 ? VK_BLEND_FACTOR_SRC_COLOR
                                                                             : VK_BLEND_FACTOR_ZERO;
     attachment.colorBlendOp = VK_BLEND_OP_ADD;
     attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
@@ -571,7 +576,7 @@ namespace gpg::gal
         const VkDescriptorPoolSize sizes[4] = {
           {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1024U},
           {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1024U * 6U},
-          {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1024U * 2U},
+          {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1024U * 3U},
           {VK_DESCRIPTOR_TYPE_SAMPLER, 1024U},
         };
         VkDescriptorPoolCreateInfo info{};
@@ -606,7 +611,7 @@ namespace gpg::gal
     }
 
     VkDescriptorBufferInfo buffers[1U + kGpuMaxReadBuffers + kGpuMaxWriteBuffers]{};
-    VkDescriptorImageInfo images[kGpuMaxTextures + 1U]{};
+    VkDescriptorImageInfo images[kGpuMaxTextures + 2U]{}; // the textures, the sampler, the bound depth
     VkWriteDescriptorSet writes[kBindingCount]{};
     for (std::uint32_t binding = 0U; binding < kBindingCount; ++binding) {
       writes[binding].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -647,6 +652,19 @@ namespace gpg::gal
       writes[kFirstWriteBinding + slot].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       writes[kFirstWriteBinding + slot].pBufferInfo = &info;
     }
+    VkDescriptorImageInfo& depthInfo = images[kGpuMaxTextures + 1U];
+    depthInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    depthInfo.imageView = mNullViews[0];
+    if (bindings.readBoundDepth && outputContext_.depthStencil != nullptr) {
+      // BeginRendering moves it back to DEPTH_STENCIL_ATTACHMENT_OPTIMAL for the next draw.
+      auto* const depth = static_cast<DepthStencilTargetVulkan*>(outputContext_.depthStencil.get());
+      if (depth->SampledView() != VK_NULL_HANDLE) {
+        Transition(depth->Image(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        depthInfo.imageView = depth->SampledView();
+      }
+    }
+    writes[kDepthBinding].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    writes[kDepthBinding].pImageInfo = &depthInfo;
     images[kGpuMaxTextures].sampler = mGpuSamplers[static_cast<int>(sampler)];
     writes[kSamplerBinding].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
     writes[kSamplerBinding].pImageInfo = &images[kGpuMaxTextures];

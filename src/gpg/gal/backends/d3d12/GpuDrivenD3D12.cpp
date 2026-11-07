@@ -31,7 +31,7 @@ namespace gpg::gal
       D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     constexpr D3D12_RESOURCE_STATES kTextureRead =
       D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    constexpr std::uint32_t kReadSlots = kGpuMaxReadBuffers + kGpuMaxTextures; // t0..t5
+    constexpr std::uint32_t kReadSlots = kGpuMaxReadBuffers + kGpuMaxTextures + 1U; // t0..t6, t6 the bound depth
 
     /** The Direct3D 12 device, while it exists (buffers can outlive it at exit). */
     [[nodiscard]] DeviceD3D12* ActiveDevice() noexcept
@@ -465,9 +465,12 @@ namespace gpg::gal
     desc.PS = {program.mPixelCode.data(), program.mPixelCode.size()};
     D3D12_RENDER_TARGET_BLEND_DESC& target = desc.BlendState.RenderTarget[0];
     target.BlendEnable = (state.blend != GpuBlend::Opaque) ? TRUE : FALSE;
-    target.SrcBlend = (state.blend != GpuBlend::Opaque) ? D3D12_BLEND_SRC_ALPHA : D3D12_BLEND_ONE;
+    target.SrcBlend = (state.blend == GpuBlend::Opaque) ? D3D12_BLEND_ONE
+      : (state.blend == GpuBlend::Multiply)               ? D3D12_BLEND_ZERO
+                                                          : D3D12_BLEND_SRC_ALPHA;
     target.DestBlend = (state.blend == GpuBlend::AlphaBlend) ? D3D12_BLEND_INV_SRC_ALPHA
       : (state.blend == GpuBlend::Additive)                   ? D3D12_BLEND_ONE
+      : (state.blend == GpuBlend::Multiply)                   ? D3D12_BLEND_SRC_COLOR
                                                               : D3D12_BLEND_ZERO;
     target.BlendOp = D3D12_BLEND_OP_ADD;
     target.SrcBlendAlpha = D3D12_BLEND_ONE;
@@ -560,9 +563,18 @@ namespace gpg::gal
           view = buffer->ShaderView();
           Transition(buffer->Resource(), bufferRead);
         }
-      } else if (auto* const texture = static_cast<TextureD3D12*>(bindings.textures[slot - kGpuMaxReadBuffers])) {
-        view = texture->View();
-        Transition(texture->Resource(), kTextureRead);
+      } else if (slot < kGpuMaxReadBuffers + kGpuMaxTextures) {
+        if (auto* const texture = static_cast<TextureD3D12*>(bindings.textures[slot - kGpuMaxReadBuffers])) {
+          view = texture->View();
+          Transition(texture->Resource(), kTextureRead);
+        }
+      } else if (bindings.readBoundDepth && outputContext_.depthStencil != nullptr) {
+        // The next target bind moves it back to DEPTH_WRITE (BindTargets).
+        auto* const depth = static_cast<DepthStencilTargetD3D12*>(outputContext_.depthStencil.get());
+        if (depth->ShaderView().ptr != 0U) {
+          view = depth->ShaderView();
+          Transition(depth->Resource(), kTextureRead);
+        }
       }
       D3D12_CPU_DESCRIPTOR_HANDLE destination = cpu;
       destination.ptr += static_cast<SIZE_T>(slot) * increment;

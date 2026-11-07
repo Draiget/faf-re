@@ -877,7 +877,8 @@ namespace gpg::gal
       OutputContext& output = mHeadOutputContexts[headIndex];
       auto* const target = new RenderTargetVulkan(std::move(buffers), DXGI_FORMAT_B8G8R8A8_UNORM, static_cast<int>(headIndex));
       output.surface.reset(target);
-      const DepthStencilTargetContext depthContext(swapChain.extent.width, swapChain.extent.height, 3U, false);
+      // Engine change: readable by shaders, for ren_Ao (GpuBindings::readBoundDepth).
+      const DepthStencilTargetContext depthContext(swapChain.extent.width, swapChain.extent.height, 3U, true);
       output.depthStencil = CreateDepthStencilTarget(&depthContext);
       gpg::Logf("Vulkan: head %u back buffer target %p (%ux%u)", static_cast<unsigned>(headIndex), target, swapChain.extent.width,
                 swapChain.extent.height);
@@ -1837,7 +1838,14 @@ namespace gpg::gal
     info.arrayLayers = 1U;
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | (context->field0x10_ ? VK_IMAGE_USAGE_SAMPLED_BIT : 0U);
+    // A readable target that this format can't sample stays a plain attachment, with no sampled view.
+    bool sampled = context->field0x10_;
+    if (sampled) {
+      VkFormatProperties properties{};
+      Vk().vkGetPhysicalDeviceFormatProperties(mPhysical, format, &properties);
+      sampled = (properties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0U;
+    }
+    info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | (sampled ? VK_IMAGE_USAGE_SAMPLED_BIT : 0U);
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateImage(mDevice, &info, nullptr, &image.image));
     VkMemoryRequirements requirements{};
     Vk().vkGetImageMemoryRequirements(mDevice, image.image, &requirements);
@@ -1855,7 +1863,13 @@ namespace gpg::gal
     view.subresourceRange = {AspectOf(format), 0U, 1U, 0U, 1U};
     VkImageView imageView = VK_NULL_HANDLE;
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateImageView(mDevice, &view, nullptr, &imageView));
-    return boost::shared_ptr<DepthStencilTarget>(new DepthStencilTargetVulkan(*context, image, imageView));
+    // Shaders read depth alone (GpuBindings::readBoundDepth): a view of the depth aspect.
+    VkImageView sampledView = VK_NULL_HANDLE;
+    if (sampled) {
+      view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+      CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateImageView(mDevice, &view, nullptr, &sampledView));
+    }
+    return boost::shared_ptr<DepthStencilTarget>(new DepthStencilTargetVulkan(*context, image, imageView, sampledView));
   }
 
   boost::shared_ptr<VertexFormat> DeviceVulkan::CreateVertexFormat(const std::uint32_t formatCode)

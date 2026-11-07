@@ -108,6 +108,13 @@ Every performance change has a switch that brings back the original path, and bo
 | `ren_FrustumCacheLodUnits` | 20000 | `/con` | live | From this many entities in view, a camera's unit lists refresh every `ren_FrustumCacheLodInterval` s |
 | `ren_FrustumCacheLodInterval` | 2.0 | `/con` | live | That refresh interval, in seconds |
 | `ren_ShadowStable` | -1 (auto) | `/con` | live | Shadow texels stay on the same world positions while the camera pans, so shadow edges don't crawl: the shadow map's light eye is anchored to the world, its box length is held within 12%, and its corner snaps to whole texels. 1 on, 0 the original fit, -1 on except on Direct3D 9 |
+| `ren_Ao` | -1 (auto) | `/con`, and Options > Video > Ambient occlusion | live | Ambient occlusion: creases, the ground under units and where they meet it darken, from the depth of terrain and opaque meshes (half-resolution compute pass, then a depth-aware blur multiplied into the colour; alpha untouched). Direct3D 12 and Vulkan: their head depth target is created readable. -1 on there, 0 off; Direct3D 9 and 11 keep the original look |
+| `ren_AoRadius` | 2.0 | `/con` | live | How far, in world units, a surface looks for occluders |
+| `ren_AoIntensity` | 1.0 | `/con` | live | Ambient occlusion strength |
+| `ren_AoBias` | 0.25 | `/con` | live | How steeply (a cosine, 0 to 1) a neighbour must rise above a surface before it occludes it; keeps the shallow creases between terrain triangles clean |
+| `ren_AoFadeStart` / `ren_AoFadeEnd` | 120 / 260 | `/con` | live | Camera distance where ambient occlusion starts to fade out, and where it is gone |
+| `ren_AoContact` | 0.35 | `/con` | live | Contact shadows, part of `ren_Ao`: a short ray from each sunlit surface towards the sun darkens it by this much where nearby depth blocks the ray, which keeps units and props attached to the ground where the shadow map is too coarse. 0 turns them off |
+| `ren_AoContactLength` | 1.5 | `/con` | live | Contact shadow ray length, world units |
 | `ren_GpuIcons` | −1 (auto) | `/con` | live | Strategic icons drawn by the GPU (1 on, 0 off, −1 when the device verified the path) |
 | `ren_GpuIconClassify` | −1 (auto) | `/con` | live | Icon classification in a compute pass |
 | `ren_GpuFog` | −1 (auto) | `/con` | live | Fog of war drawn by the GPU |

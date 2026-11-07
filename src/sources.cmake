@@ -914,6 +914,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/CDecalBufferTypeInfo.cpp
   moho/render/CWldTerrainDecal.cpp
   moho/render/CDecalHandleTypeInfo.cpp
+  moho/render/AmbientOcclusionRenderer.cpp
   moho/render/BoundaryRenderer.cpp
   moho/render/BoxRenderer.cpp
   moho/render/CRenFrame.cpp

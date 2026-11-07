@@ -190,3 +190,53 @@ do
         end
     end
 end
+
+-- Ambient occlusion (ren_Ao), on Direct3D 12 and Vulkan. Shown only by an engine that has the command,
+-- as the splat limit above.
+do
+    local command = 'ren_Ao'
+    local function Supported()
+        if type(ConTextMatches) ~= 'function' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local video = options and options.video
+    if video and video.items and Supported() then
+        local position = table.getn(video.items) + 1
+        for index, item in ipairs(video.items) do
+            if item.key == 'shadow_resolution' then
+                position = index + 1
+            end
+        end
+        table.insert(video.items, position, {
+            title = 'Ambient occlusion',
+            key = 'ambient_occlusion',
+            type = 'toggle',
+            default = -1,
+            tip = 'Darkens creases and the ground under units. Direct3D 12 and Vulkan only; other renderers keep the original look.',
+            set = function(key, value, startup)
+                if value ~= 0 and value ~= -1 then
+                    value = -1
+                end
+                ConExecute(command .. ' ' .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    { text = '<LOC _On>', key = -1 },
+                    { text = '<LOC _Off>', key = 0 },
+                },
+            },
+        })
+    end
+end

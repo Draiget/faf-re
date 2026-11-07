@@ -1,5 +1,6 @@
 #include "moho/app/WxPrivate.h"
 #include "moho/app/NetworkPanel.h"
+#include "moho/render/AmbientOcclusionRenderer.h"
 
 namespace
 {
@@ -1938,6 +1939,12 @@ void moho::WRenViewport::RenderWorldView(
   {
     const gpg::gal::RenderProfileScope profileMeshes("Meshes");
     RenderMeshes(0x14, false);
+  }
+  // Engine addition (ren_Ao): ambient occlusion from the depth of terrain and the opaque meshes,
+  // before effects and water draw over it.
+  if (moho::AmbientOcclusionRenderer& occlusion = moho::AmbientOcclusionRenderer::Get(); occlusion.IsActive()) {
+    const gpg::gal::RenderProfileScope profileOcclusion("AmbientOcclusion");
+    occlusion.Render(*mCam, mScreenPos.x, mScreenPos.y, mScreenSize.x, mScreenSize.y);
   }
   {
     const gpg::gal::RenderProfileScope profileEffects("Effects");

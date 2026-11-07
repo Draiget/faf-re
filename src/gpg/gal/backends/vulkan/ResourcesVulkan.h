@@ -95,18 +95,23 @@ namespace gpg::gal
   class DepthStencilTargetVulkan final : public DepthStencilTarget
   {
   public:
-    DepthStencilTargetVulkan(const DepthStencilTargetContext& context, vulkan::TrackedImage image, VkImageView view);
+    DepthStencilTargetVulkan(
+      const DepthStencilTargetContext& context, vulkan::TrackedImage image, VkImageView view, VkImageView sampledView = VK_NULL_HANDLE
+    );
     ~DepthStencilTargetVulkan() override;
 
     DepthStencilTargetContext* GetContext() override;
 
     [[nodiscard]] vulkan::TrackedImage& Image() noexcept { return mImage; }
     [[nodiscard]] VkImageView View() const noexcept { return mView; }
+    /** The depth aspect for shaders, when the target was created readable and the format can be sampled. */
+    [[nodiscard]] VkImageView SampledView() const noexcept { return mSampledView; }
 
   private:
     DepthStencilTargetContext mContext;
     vulkan::TrackedImage mImage;
     VkImageView mView = VK_NULL_HANDLE;
+    VkImageView mSampledView = VK_NULL_HANDLE;
   };
 
   /** Cube targets stay empty, as on D3D10, D3D11 and D3D12. */
