@@ -361,3 +361,13 @@ add_dependencies(headless faf_sim_libm_gate)
 # sections must equal Windows' faf_registration_dump_sim (src/CMakeLists.txt).
 add_executable(faf_registration_dump_sim EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/registry/RegistrationDump.cpp")
 target_link_libraries(faf_registration_dump_sim PRIVATE faf_sim)
+
+# Regression for collision allocator; no game data required.
+enable_testing()
+add_executable(faf_occupation_manager_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/collision_allocator/OccupationManagerTests.cpp")
+target_link_libraries(faf_occupation_manager_tests PRIVATE faf_sim gtest_main)
+set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
+set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
+target_compile_definitions(faf_occupation_manager_tests PRIVATE FAF_OCCUPATION_DELETE_TRACE=1)
+target_link_options(faf_occupation_manager_tests PRIVATE -Wl,--wrap=_ZdlPv -Wl,--wrap=_ZdaPv)

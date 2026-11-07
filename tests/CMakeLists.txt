@@ -237,3 +237,10 @@ if(TARGET faf_msdf_safety_tests)
 endif()
 add_custom_target(existing_tests DEPENDS ${_faf_existing_test_targets})
 set_target_properties(existing_tests PROPERTIES FOLDER "Tests/Existing")
+
+# Regression for collision allocator; no game data required.
+add_executable(faf_occupation_manager_tests EXCLUDE_FROM_ALL "collision_allocator/OccupationManagerTests.cpp")
+target_link_libraries(faf_occupation_manager_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
+set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
