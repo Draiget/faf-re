@@ -11,10 +11,13 @@
 #include "moho/command/CCommandDb.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/entity/EntityId.h"
 #include "moho/sim/SSTIArmyVariableData.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SimWorkerPool.h"
+#include "moho/sim/STIMap.h"
+#include "moho/unit/core/Unit.h"
 #include "remote/VisibilityOracle.h"
 
 // Engine addition, server mode: see ViewFrames.h.
@@ -778,6 +781,10 @@ namespace faf::remote
       mRetiring.emplace_back();
       mRetired.emplace_back();
       mBuilders.push_back(std::make_unique<CViewFrameBuilder>(mTables, mCodec));
+      if (mSession != nullptr) {
+        mBuilders.back()->SetSessionTables(mSession, false); // the edits are taken once below
+        mBuilders.back()->SetSharedStats(&mSharedStats);
+      }
       mHeld.emplace_back();
       mFrames.emplace_back();
       mPreviousFrames.emplace_back();
@@ -808,6 +815,7 @@ namespace faf::remote
     if (sim.mEntityDB != nullptr && !AdvanceEntityIndex(*sim.mEntityDB)) {
       WalkEntityIndex(*sim.mEntityDB);
     }
+    MarkPhase(EViewPhase::Index);
     const auto readFacts = [this, &sim](const std::size_t begin, const std::size_t end) {
       for (std::size_t i = begin; i < end; ++i) {
         const std::uint32_t entry = mEntityReads[i].entry;
@@ -830,6 +838,7 @@ namespace faf::remote
     }
     std::sort(mLeavingEntities.begin(), mLeavingEntities.end());
     mLeavingEntities.erase(std::unique(mLeavingEntities.begin(), mLeavingEntities.end()), mLeavingEntities.end());
+    MarkPhase(EViewPhase::Facts);
     if (mHeldCheck) {
       if (sim.mEntityDB != nullptr) {
         std::size_t entry = 0;
@@ -891,6 +900,29 @@ namespace faf::remote
     std::set_difference(
       mLastCommands.begin(), mLastCommands.end(), mLiveCommands.begin(), mLiveCommands.end(), std::back_inserter(mReleasedCommands)
     );
+    MarkPhase(EViewPhase::Keep);
+
+    if (mSession != nullptr) {
+      // Plan WP11 step 4, once for every view: the deposits the sim added, the beat's terrain edits (its changed
+      // rectangles with the heights there now), and every unit's stats.
+      const moho::SSyncData* const syncPacket = SyncPacket();
+      mEdits.Collect(
+        sim.mSimResources.px, sim.mMapData != nullptr ? sim.mMapData->mHeightField.get() : nullptr,
+        syncPacket != nullptr ? std::span<const gpg::Rect2i>(syncPacket->mPlayableRectUpdates.data(), syncPacket->mPlayableRectUpdates.size())
+                              : std::span<const gpg::Rect2i>(),
+        *mSession
+      );
+      // Units are id family 0 (moho/entity/EntityId.h), the index's first ids: the props and projectiles after them
+      // aren't touched.
+      mUnitIds.clear();
+      std::size_t units = 0;
+      while (units < mEntityIndex.size() && mEntityIndex[units].id < moho::ToRaw(moho::EEntityIdSentinel::FirstNonUnitFamily)) {
+        mUnitIds.push_back(mEntityIndex[units].id);
+        ++units;
+      }
+      mSharedStats.Refresh(mUnitIds, std::span<moho::Entity* const>(mEntityPointers.data(), units), *mSession, Parallel());
+      MarkPhase(EViewPhase::Tables);
+    }
 
     // Each view's builder, id map and frame are its own; the sim is only read (plan I3), so the
     // views can be built on the sim's workers (plan WP5.7, `SetParallel`).
@@ -957,22 +989,37 @@ namespace faf::remote
         FinishFrame(army);
       }
     };
-    if (Parallel() && armyCount > 1u) {
-      moho::CSimWorkerPool::Get().ParallelFor(armyCount, 1u, [&buildFrame](const std::size_t begin, const std::size_t end) {
-        for (std::size_t army = begin; army < end; ++army) {
-          buildFrame(army);
+    const std::size_t sideJobs = PrepareSideJobs(sim);
+    if (Parallel() && armyCount + sideJobs > 1u) {
+      // The team views first: each holds what its whole team sees, the longest jobs; then the side
+      // jobs, then the armies' views.
+      const std::size_t armies = static_cast<std::size_t>(ArmyCount());
+      const std::size_t teams = armyCount > armies ? armyCount - armies : 0u;
+      moho::CSimWorkerPool::Get().ParallelFor(armyCount + sideJobs, 1u, [this, &buildFrame, teams, armies, sideJobs](const std::size_t begin, const std::size_t end) {
+        for (std::size_t job = begin; job < end; ++job) {
+          if (job >= teams && job < teams + sideJobs) {
+            this->RunSideJob(job - teams);
+            continue;
+          }
+          const std::size_t army = job < teams ? armies + job : job - teams - sideJobs;
+          this->TimeView(army, [&] { buildFrame(army); });
         }
       });
     } else {
       for (std::size_t army = 0; army < armyCount; ++army) {
-        buildFrame(army);
+        TimeView(army, [&] { buildFrame(army); });
+      }
+      for (std::size_t job = 0; job < sideJobs; ++job) {
+        RunSideJob(job);
       }
     }
+    MarkPhase(EViewPhase::Frames);
     // The sim's stats trees the builders let go of are dropped here, on the sim thread, in army order.
     for (std::size_t army = 0; army < armyCount; ++army) {
       mBuilders[army]->ReleaseDropped();
       mBuilt[army] = true;
     }
+    MarkPhase(EViewPhase::Release);
     AddBuildTime();
     OnViewFrames(sim);
     if (mJobs != nullptr) {

@@ -126,6 +126,10 @@ namespace moho
     // Per reporting peer: its dispatched beat, and the queued beat of every client.
     std::vector<int32_t> mPeerDispatched;
     std::vector<std::vector<int32_t>> mPeerQueued;
+    // Per peer, each client's stream position there: where that peer's copy of the client's
+    // stream starts. It can be past the peer's dispatched beat after a multi-beat Advance
+    // (issue #275). Empty when the peer's build doesn't send it.
+    std::vector<std::vector<int32_t>> mPeerStreamDispatched;
     // [peer][client]: what that peer holds of that client's stream.
     std::vector<std::vector<std::unique_ptr<gpg::PipeStream>>> mBacklog;
     std::vector<std::vector<CMessage>> mHeldIncoming;

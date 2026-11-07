@@ -1,7 +1,7 @@
 -- A thin progress line: a known share, or a block that sweeps back and forth while the length of the work isn't known.
 
 local Group = import('/lua/maui/group.lua').Group
-local FlatPanel = import('/fafengine/lua/ui/controls/flat_panel.lua')
+local FlatPanel = import('/fafengine/modules/lua/ui/controls/flat_panel.lua')
 local UIUtil = import('/lua/ui/uiutil.lua')
 
 local kGroove = 'ff26323a'

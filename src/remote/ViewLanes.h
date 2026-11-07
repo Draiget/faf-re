@@ -44,6 +44,11 @@ namespace faf::remote
       mLuaRouting = true;
       mLuaRoutingDump = std::move(dumpPrefix);
     }
+    /**
+     * With Lua routing: a subclass sends each beat's Lua `Sync` itself once the beat's table is routed (a server's
+     * `LuaSync`), so the views' Lua lanes, which would carry the beat before's, stay empty and are not encoded.
+     */
+    void SendLuaSeparately() noexcept { mLuaSeparately = true; }
 
   protected:
     /** One view's beat. `ok`: every lane encoded. */
@@ -78,6 +83,9 @@ namespace faf::remote
     }
 
     void OnViewFrames(moho::Sim& sim) override;
+    /** The grids, encoded in the frames' batch of jobs. */
+    std::size_t PrepareSideJobs(moho::Sim& sim) override;
+    void RunSideJob(std::size_t index) override;
     void OnViewReady(std::size_t army) override { Send(army); }
 
     /** A view's lanes are encoded. Without a pipeline on a sim worker or the sim thread, with one on its threads. */
@@ -123,11 +131,12 @@ namespace faf::remote
     {
       wire::SGridSlot slot;                     // who and which; no cells
       std::uint32_t receivers = 0;              // the views that get it, by bit
-      const moho::CIntelGrid* source = nullptr; // the sim's grid
-      std::vector<std::int8_t> cells;           // as of this beat, once `delta` is written
+      moho::CIntelGrid* source = nullptr;       // the sim's grid (its change flags are cleared as it is read)
+      std::vector<std::uint64_t> seen;          // its cells set as of this beat, a bit each (`wire::GridSeenWords`), once `delta` is written
       wire::BitWriter delta;                    // the slot against last beat's cells
       std::uint16_t key = 0;                    // army and kind
       bool fresh = true;                        // no cells to go from: every client gets it whole
+      bool skipped = false;                     // no view received it, so `seen` wasn't kept up
     };
 
     void Send(std::size_t army);
@@ -135,6 +144,7 @@ namespace faf::remote
     std::vector<SClient> mClients;
     std::vector<SBeatGrid> mBeatGrids; // every army's grids, in army order; they keep their cells from beat to beat
     bool mLuaRouting = false;
+    bool mLuaSeparately = false;
     std::string mLuaRoutingDump;
     std::unique_ptr<CSyncRouter> mRouter; // made once the army count is known
   };

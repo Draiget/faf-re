@@ -27,6 +27,11 @@ namespace gpg::diag
     return kLabel;
   }
 
+  const char* BuildVersion() noexcept
+  {
+    return FAF_BUILD_SHOWN;
+  }
+
   const char* BuildCommit() noexcept
   {
     return FAF_BUILD_COMMIT;

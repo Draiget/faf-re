@@ -45,7 +45,6 @@ namespace moho
 
     constexpr std::int32_t kCompositeWidth = 1024;
     constexpr std::int32_t kCompositeHeight = 1024;
-    constexpr std::uint32_t kCompositeBytes = 0x00100000u;
     constexpr std::int32_t kDynamicTextureFormat = 12;
 
     /**
@@ -135,8 +134,13 @@ namespace moho
    * backing store, and creates one dynamic texture sheet.
    */
   CD3DTextureBatcher::CD3DTextureBatcher()
-    : mWidth(kCompositeWidth)
-    , mHeight(kCompositeHeight)
+    : CD3DTextureBatcher(kCompositeWidth, kCompositeHeight)
+  {
+  }
+
+  CD3DTextureBatcher::CD3DTextureBatcher(const std::int32_t width, const std::int32_t height)
+    : mWidth(width)
+    , mHeight(height)
     , mRects()
     , mDynTexSheet()
     , mMap()
@@ -146,16 +150,12 @@ namespace moho
   {
     if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
       if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {
-        (void)resources->NewDynamicTextureSheet(
-          mDynTexSheet,
-          kCompositeWidth,
-          kCompositeHeight,
-          kDynamicTextureFormat
-        );
+        (void)resources->NewDynamicTextureSheet(mDynTexSheet, width, height, kDynamicTextureFormat);
       }
     }
 
-    mPixels.resize(kCompositeBytes);
+    // One byte per texel, rows in blocks of four (GetCompositeTexture): 0x100000 bytes at 1024x1024.
+    mPixels.resize(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
     Reset();
   }
 

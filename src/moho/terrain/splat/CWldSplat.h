@@ -25,6 +25,23 @@ namespace moho
   struct SDecalInfo;
 
   /**
+   * Engine fix: `ren_SplatAtlasFix`. All terrain splats (tread and scorch marks) draw from one
+   * texture atlas, which retail sizes 1024x1024 and never clears during a game. Once it is full a
+   * new splat texture gets no place, and its splats keep texture coordinates nobody set, so they
+   * show pieces of other textures (the Fatboy's 512x512 treads after a Galactic Colossus, for
+   * one). On (the default): the atlas is 2048x2048, a frame whose splats do not fit clears it and
+   * starts over, and a splat that still has no place is not drawn. Off: retail. The atlas size is
+   * read when a map's terrain is created; the rest each frame.
+   */
+  extern bool ren_SplatAtlasFix;
+
+  /// A new terrain splat atlas: 2048x2048 with `ren_SplatAtlasFix`, else retail's 1024x1024.
+  [[nodiscard]] CD3DTextureBatcher* REN_NewSplatTextureBatcher();
+
+  /// Clears a terrain splat atlas, for a pass that restarts after CWldSplat::AtlasMiss::Restart.
+  void REN_ResetSplatTextureBatcher(CD3DTextureBatcher* batcher);
+
+  /**
    * CWldTerrainDecal specialization that owns one terrain-splat quad and one
    * retained batch-texture lane.
    */
@@ -98,8 +115,21 @@ namespace moho
      * What it does:
      * Adds the retained batch texture to the atlas and writes the returned UV
      * rectangle into the splat quad.
+     *
+     * Engine addition: returns whether the quad now holds this texture's UVs;
+     * false when the splat has no texture or the atlas has no room for it.
      */
-    void UpdateBatchTexture(CD3DTextureBatcher* batcher);
+    bool UpdateBatchTexture(CD3DTextureBatcher* batcher);
+
+    /**
+     * Engine fix (`ren_SplatAtlasFix`): what a terrain splat pass does with
+     * this splat after UpdateBatchTexture returned `placed`. Draw it when it
+     * got its UVs, or always when the fix is off (retail draws whatever UVs
+     * the quad holds). Otherwise `Restart` when `mayRestart` and the atlas was
+     * full, so the pass clears the atlas and starts over, else `Skip`.
+     */
+    enum class AtlasMiss { Draw, Skip, Restart };
+    [[nodiscard]] AtlasMiss OnAtlasResult(bool placed, bool mayRestart) const noexcept;
 
     /**
      * Address: 0x0089E2B0 (FUN_0089E2B0, Moho::CWldSplat::GetSplatVertices)

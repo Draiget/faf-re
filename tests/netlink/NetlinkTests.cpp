@@ -695,10 +695,19 @@ namespace
     std::unique_ptr<Link> a;
     std::unique_ptr<Link> b;
     std::atomic<bool> answererDropped{false};
+    // Offers the offerer has made: a new attempt. Its ICE checks may not start (attempts
+    // counts those): without a STUN or TURN server, an attempt within 2 minutes of another
+    // has no candidate to offer, and an empty answer ends it at once (issue #275).
+    std::atomic<int> offers{0};
     auto callbacks = [&](std::unique_ptr<Link>& other, const char* name) {
       LinkCallbacks cb;
       cb.onSignal = [&other](const CandidatesMessage& m) { other->OnSignal(*CandidatesMessageFromJson(ToJson(m))); };
-      cb.onLog = [name](const std::string& text) { std::printf("    %s: %s\n", name, text.c_str()); };
+      cb.onLog = [name, &offers](const std::string& text) {
+        std::printf("    %s: %s\n", name, text.c_str());
+        if (text.rfind("initiating ICE as offerer", 0) == 0) {
+          ++offers;
+        }
+      };
       cb.onConnected = [&answererDropped, name](const bool up) {
         if (!up && std::strcmp(name, "answerer") == 0) {
           answererDropped = true;
@@ -751,12 +760,11 @@ namespace
       Check(sealedUp() && a->GetStats().attempts == 1, "after GameEnded, Reconnect does nothing");
     }
 
-    const std::uint32_t before = a->GetStats().attempts;
+    const int before = offers.load();
     asked.Reconnect();
-    const double seconds = waitFor(20, [&] { return answererDropped.load() && a->GetStats().attempts > before; });
-    std::printf("  reconnect on the %s: dropped and attempt %u started after %.1f s\n", side, a->GetStats().attempts,
-                seconds);
-    Check(answererDropped.load() && a->GetStats().attempts > before,
+    const double seconds = waitFor(20, [&] { return answererDropped.load() && offers.load() > before; });
+    std::printf("  reconnect on the %s: dropped and offer %d made after %.1f s\n", side, offers.load(), seconds);
+    Check(answererDropped.load() && offers.load() > before,
           (std::string("reconnect on the ") + side + ": the connection drops and the offerer starts a new attempt").c_str());
 
     if (onOfferer) {
@@ -773,6 +781,63 @@ namespace
             "reconnect with a picked path: 'no relay' connects over host candidates, lane sealed");
     }
 
+    stop = true;
+    ticker.join();
+    a->Close();
+    b->Close();
+  }
+
+  // Issue #275: an answer with no candidate the offerer may use (here: the offerer takes relayed
+  // candidates only, and there is no relay) ends the attempt at once, not after kCheckTimeout.
+  void EmptyAnswerTest(const std::string& bind)
+  {
+    std::unique_ptr<Link> a;
+    std::unique_ptr<Link> b;
+    std::mutex logMutex;
+    std::vector<std::string> offererLog;
+    LinkCallbacks ca;
+    ca.onSignal = [&b](const CandidatesMessage& m) { b->OnSignal(*CandidatesMessageFromJson(ToJson(m))); };
+    ca.onLog = [&](const std::string& text) {
+      std::lock_guard lock(logMutex);
+      offererLog.push_back(text);
+    };
+    LinkCallbacks cb;
+    cb.onSignal = [&a](const CandidatesMessage& m) { a->OnSignal(*CandidatesMessageFromJson(ToJson(m))); };
+    LinkOptions oa;
+    oa.bindAddress = bind;
+    oa.localId = 1;
+    oa.remoteId = 2;
+    oa.offerer = true;
+    oa.forceRelay = true; // takes relayed candidates only; with no TURN server there are none
+    LinkOptions ob;
+    ob.bindAddress = bind;
+    ob.localId = 2;
+    ob.remoteId = 1;
+    a = std::make_unique<Link>(oa, ca);
+    b = std::make_unique<Link>(ob, cb);
+    std::atomic<bool> stop{false};
+    std::thread ticker([&] {
+      while (!stop) {
+        a->Tick();
+        b->Tick();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+    });
+    const auto said = [&](const char* text) {
+      std::lock_guard lock(logMutex);
+      return std::any_of(offererLog.begin(), offererLog.end(),
+                         [&](const std::string& line) { return line.find(text) != std::string::npos; });
+    };
+    const auto t0 = std::chrono::steady_clock::now();
+    a->Start();
+    b->Start();
+    while (!said("no usable candidates in the answer") && std::chrono::steady_clock::now() < t0 + std::chrono::seconds(20)) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    std::printf("  empty answer: attempt ended after %.1f s\n", seconds);
+    Check(said("no usable candidates in the answer"), "an answer with nothing usable ends the attempt");
+    Check(seconds < 8.0, "and well before the 15 s of checks");
     stop = true;
     ticker.join();
     a->Close();
@@ -862,6 +927,7 @@ TEST(Existing_Netlink, KeyUnitTests) { KeyUnitTests(); }
 TEST(Existing_Netlink, EncryptedLane) { EncryptedLaneTest(gBind); }
 TEST(Existing_Netlink, ReconnectOnOfferer) { ReconnectTest(gBind, true); }
 TEST(Existing_Netlink, ReconnectOnAnswerer) { ReconnectTest(gBind, false); }
+TEST(Existing_Netlink, EmptyAnswer) { EmptyAnswerTest(gBind); }
 TEST(Existing_Netlink, Loopback) { LoopbackTest(gBind, gDatagrams); }
 TEST(Existing_Netlink, Lane) { LaneTest(gBind, 2000); }
 TEST(Existing_Netlink, OurPeer) { OurPeerTest(gBind); }

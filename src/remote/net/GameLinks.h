@@ -59,6 +59,36 @@ namespace faf::remote::net
     ViewCheck = 8,
     /** Player to server, reliable: its frames didn't match a `ViewCheck`; it wants its next view whole. */
     ViewMismatch = 9,
+    /**
+     * Both ways, reliable, before the game launches (plan WP2.13): one lobby (`CLobby`) message on the virtual
+     * connection between two participants. Player to server: varint the uid it is for, then the message. Server to
+     * player: varint the uid it is from, then the message; the server writes the sender itself, so no player chooses
+     * whom a message seems to come from. Uid 0 is the server itself, whose messages are lobby signals
+     * (LobbySignals.h), as FAF's lobby server sends a game over GPGNet.
+     */
+    Lobby = 10,
+    /**
+     * Server to player, reliable, before `GameInfo` (plan WPR.55): the game's configuration as the server launched it
+     * (the table `CLobby.LaunchGame` takes: scenario, armies, options, mods), in the lobby's Lua byte form
+     * (`LuaObject::ToByteStream`). A client takes its launch from this, never from the lobby's own Launch message.
+     * Again after a reconnect, with `GameInfo`.
+     */
+    LaunchInfo = 11,
+    /**
+     * Server to player, reliable (plan WP11): varint beat, then that beat's Lua lane (wire/LuaSyncLane.h: the player's
+     * `Sync` table and print lines), sent once `Sim::Sync` has written and routed the beat's table. A `View`'s own Lua
+     * lane is then empty: it is built in `Sim::Sync`'s entity walk, before the table exists. It may come before or
+     * after the beat's `View` (the views' pipeline), never after the next beat's: a client with the next `View` and no
+     * `LuaSync` for a beat has none coming.
+     */
+    LuaSync = 12,
+    /**
+     * Server to player, reliable (plan WP11 step 4): varint beat, a flags byte (1: reset), then a session-table record
+     * (wire/SessionTables.h: new sounds, names, deposits and terrain edits) to the message's end. It comes before
+     * the first `View` that names its entries. Reset: the client forgets its tables; the session's every record
+     * follows, from the first, before the whole view a returning player gets (a reset carries no record itself).
+     */
+    SessionTables = 13,
   };
 
   /** What became of a player's command. */

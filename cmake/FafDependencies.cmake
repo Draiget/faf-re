@@ -7,7 +7,7 @@
 #     missing and moved when their pin changes, always with core.autocrlf=false.
 #     Git for Windows turns autocrlf on system-wide, and converted line endings
 #     break the CR-exact patches.
-#   * Downloads (boost 1.34.1, wxWindows 2.4.2, DXC, libjuice, libdatachannel and its deps): pinned by SHA256, cached in
+#   * Downloads (boost 1.34.1, wxWindows 2.4.2, DXC, DirectXTex, libjuice, libdatachannel and its deps): pinned by SHA256, cached in
 #     dependencies/.downloads and extracted into dependencies/<name>.
 #   * Patches (dependencies/patches): applied in order onto a fresh baseline. A
 #     stamp file in each tree records the patches (and their hashes) it carries,
@@ -250,6 +250,15 @@ set(_faf_download_googletest
     "googletest-1.15.2"
     "googletest-1.15.2.tar.gz")
 
+# DirectXTex may2026 (MIT): decodes textures when d3dx11_43.dll is missing
+# (gpg/gal/backends/common/ImageCodecDirectXTex.cpp, issue #318). The tag's source archive;
+# cmake/deps/directxtex builds its CPU code.
+set(_faf_download_DirectXTex
+    "https://github.com/microsoft/DirectXTex/archive/refs/tags/may2026.tar.gz"
+    "204ae68a66fb15d87867d836efbac9ae5aa799ca2a1867024d96a8168fa3651f"
+    "DirectXTex-may2026"
+    "DirectXTex-may2026.tar.gz")
+
 function(_faf_download_tree name)
   list(GET _faf_download_${name} 0 _url)
   list(GET _faf_download_${name} 1 _sha256)
@@ -417,6 +426,7 @@ faf_dependency_download(usrsctp)
 faf_dependency_download(plog)
 faf_dependency_download(mbedtls)
 faf_dependency_download(monocypher)
+faf_dependency_download(DirectXTex)
 if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})
   faf_dependency_download(freetype)
 endif()

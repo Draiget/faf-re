@@ -1,4 +1,6 @@
 #include "moho/terrain/LowFidelityTerrain.h"
+#include "moho/terrain/SplatChunkRenderer.h"
+#include "moho/terrain/SplatBudget.h"
 
 #include <algorithm>
 #include <cmath>
@@ -40,7 +42,6 @@ namespace
   constexpr std::int32_t kSkirtMaxIndexCount = 199998;
   constexpr std::int32_t kTriangleListPrimitiveType = 4;
   constexpr float kMinDecalAlpha = 0.0039215689f; // 1/255
-  constexpr std::int32_t kMaxSplatsPerFrame = 250;
 
   /**
    * x87 "frndint" (round-to-nearest) + correction is the binary's idiom for
@@ -307,7 +308,7 @@ namespace moho
     }
 
     if (texture_batcher == nullptr) {
-      texture_batcher = new CD3DTextureBatcher();
+      texture_batcher = REN_NewSplatTextureBatcher();
     }
 
     ID3DDeviceResources* const dynamicResources = D3D_GetDevice()->GetResources();
@@ -817,6 +818,17 @@ namespace moho
       return;
     }
 
+    // Keep the original single-draw path for ordinary views. Only overflow
+    // uses pass-major chunks, so every existing sheet/index stays in bounds.
+    if (splatVertexCount > 1000U) {
+      D3D_GetDevice()->SelectTechnique("LowFidelitySplat");
+      GetTerrainShaderVars().decalAlbedoTexture.GetTexture(
+        boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture_batcher->GetCompositeTexture()));
+      DrawSplatChunksPassMajor(
+        D3D_GetDevice(), mDynamicVertexSheet, mDynamicIndexSheet, mSplatVertices.data(), splatVertexCount, 250);
+      return;
+    }
+
     void* const lockedVertices =
       mDynamicVertexSheet->GetVertStream(0U)->Lock(0, static_cast<std::int32_t>(splatVertexCount), false, true);
     // Raw GPU upload: splat vertex blob into the locked stream.
@@ -1090,7 +1102,7 @@ namespace moho
       }
     }
 
-    mSplatVertices.ResetStorageToInline();
+    auto splatOutputBudget = PrepareSplatOutput(mSplatVertices, ren_SplatBudgetTier);
 
     if (!minimapPass && ren_Splats) {
       auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
@@ -1098,51 +1110,73 @@ namespace moho
       gpg::fastvector<CWldTerrainDecal*> visibleSplats;
       (void)decalManager->PropsInView(mCamera, visibleSplats, ren_IgnoreDecalLOD);
 
-      std::int32_t splatBudget = 0;
-      for (CWldTerrainDecal* const decalEntry : visibleSplats) {
-        auto* const splat = static_cast<CWldSplat*>(decalEntry);
+      auto& splatVertexLane = mSplatVertices;
 
-        if (splat->mFidelity > 0) {
-          continue;
+      // Engine fix (ren_SplatAtlasFix): when the atlas has no room for a splat, it is cleared and
+      // the walk runs once more, so only this frame's textures hold places.
+      for (bool mayRestart = true;; mayRestart = false) {
+        bool restart = false;
+        std::size_t splatBudget = 0;
+        for (CWldTerrainDecal* const decalEntry : visibleSplats) {
+          auto* const splat = static_cast<CWldSplat*>(decalEntry);
+
+          if (splat->mFidelity > 0) {
+            continue;
+          }
+
+          const CWldSplat::SplatVertex& firstVertex = splat->mSplatVertices[0];
+          const Vector4f& row1 = mCamera->viewport.r[1];
+          const float worldDistance = (firstVertex.mPosition.z * row1.z) + (firstVertex.mPosition.y * row1.y)
+            + (firstVertex.mPosition.x * row1.x) + row1.w;
+
+          if (worldDistance > splat->mCutoffLOD) {
+            continue;
+          }
+          if (splatBudget++ >= splatOutputBudget.available
+            && !TryGrowSplatOutput(mSplatVertices, splatOutputBudget)) {
+            break;
+          }
+
+          float fadeAlpha;
+          if (splat->mNearCutoff <= 0.0f) {
+            const float farFadeStart = splat->mCutoffLOD * ren_DecalFadeFraction;
+            const float clampedDistance = std::min(worldDistance, splat->mCutoffLOD);
+            const float fadeFloor = std::max(farFadeStart, std::min(clampedDistance, farFadeStart));
+            fadeAlpha = 1.0f - ((clampedDistance - fadeFloor) / (splat->mCutoffLOD - fadeFloor));
+          } else {
+            const float nearFadeStart = splat->mNearCutoff * ren_DecalFadeFraction;
+            const float clampedDistance = std::min(worldDistance, splat->mNearCutoff);
+            const float fadeCeiling = std::max(clampedDistance, nearFadeStart);
+            fadeAlpha = (fadeCeiling - nearFadeStart) / (splat->mNearCutoff - nearFadeStart);
+          }
+          const float bakedAlpha = fadeAlpha * splat->mCurrentAlpha;
+
+          const CWldSplat::AtlasMiss atlas =
+            splat->OnAtlasResult(splat->UpdateBatchTexture(texture_batcher), mayRestart);
+          if (atlas == CWldSplat::AtlasMiss::Restart) {
+            restart = true;
+            break;
+          }
+          if (atlas == CWldSplat::AtlasMiss::Skip) {
+            continue;
+          }
+
+          const std::size_t countBeforeAppend = splatVertexLane.Size();
+          for (const CWldSplat::SplatVertex& sourceVertex : splat->mSplatVertices) {
+            splatVertexLane.PushBack(sourceVertex);
+          }
+
+          for (std::size_t v = countBeforeAppend; v < splatVertexLane.Size(); ++v) {
+            splatVertexLane[v].mAlpha = bakedAlpha;
+          }
         }
-
-        const CWldSplat::SplatVertex& firstVertex = splat->mSplatVertices[0];
-        const Vector4f& row1 = mCamera->viewport.r[1];
-        const float worldDistance = (firstVertex.mPosition.z * row1.z) + (firstVertex.mPosition.y * row1.y)
-          + (firstVertex.mPosition.x * row1.x) + row1.w;
-
-        if (worldDistance > splat->mCutoffLOD) {
-          continue;
-        }
-        if (++splatBudget >= kMaxSplatsPerFrame) {
+        if (!restart) {
           break;
         }
-
-        float fadeAlpha;
-        if (splat->mNearCutoff <= 0.0f) {
-          const float farFadeStart = splat->mCutoffLOD * ren_DecalFadeFraction;
-          const float clampedDistance = std::min(worldDistance, splat->mCutoffLOD);
-          const float fadeFloor = std::max(farFadeStart, std::min(clampedDistance, farFadeStart));
-          fadeAlpha = 1.0f - ((clampedDistance - fadeFloor) / (splat->mCutoffLOD - fadeFloor));
-        } else {
-          const float nearFadeStart = splat->mNearCutoff * ren_DecalFadeFraction;
-          const float clampedDistance = std::min(worldDistance, splat->mNearCutoff);
-          const float fadeCeiling = std::max(clampedDistance, nearFadeStart);
-          fadeAlpha = (fadeCeiling - nearFadeStart) / (splat->mNearCutoff - nearFadeStart);
-        }
-        const float bakedAlpha = fadeAlpha * splat->mCurrentAlpha;
-
-        splat->UpdateBatchTexture(texture_batcher);
-
-        auto& splatVertexLane = mSplatVertices;
-        const std::size_t countBeforeAppend = splatVertexLane.Size();
-        for (const CWldSplat::SplatVertex& sourceVertex : splat->mSplatVertices) {
-          splatVertexLane.PushBack(sourceVertex);
-        }
-
-        for (std::size_t v = countBeforeAppend; v < splatVertexLane.Size(); ++v) {
-          splatVertexLane[v].mAlpha = bakedAlpha;
-        }
+        REN_ResetSplatTextureBatcher(texture_batcher);
+        // Rebuild every UV after the atlas reset, retaining capacity and the
+        // per-view budget so restart does not bypass guarded growth.
+        splatVertexLane.Clear();
       }
     }
 

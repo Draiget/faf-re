@@ -12,6 +12,7 @@ add_library(faf_netchannel STATIC
   DatagramCipher.cpp
   GameLinks.cpp
   Handshake.cpp
+  LobbySignals.cpp
   NetChannel.cpp
   ReliableStream.cpp
   StyleProof.cpp

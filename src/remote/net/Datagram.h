@@ -119,6 +119,8 @@ namespace faf::remote::net
 
     [[nodiscard]] bool Ok() const noexcept { return !mFailed; }
     [[nodiscard]] bool AtEnd() const noexcept { return mPos == mSize; }
+    /** Bytes not read yet. */
+    [[nodiscard]] std::size_t Remaining() const noexcept { return mSize - mPos; }
 
   private:
     const std::uint8_t* mData;

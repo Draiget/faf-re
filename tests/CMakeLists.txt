@@ -64,6 +64,11 @@ set_target_properties(faf_effect_scan_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME effect_scan COMMAND faf_effect_scan_tests)
 set_tests_properties(effect_scan PROPERTIES LABELS "Existing")
 
+# Engine addition: where UserDecal:SetOrientation puts a decal's corner so it stays centred.
+add_executable(faf_scripted_decal_tests EXCLUDE_FROM_ALL scripted_decal/PlacementTests.cpp)
+target_include_directories(faf_scripted_decal_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME scripted_decal_placement COMMAND faf_scripted_decal_tests)
+
 # Engine addition: ImageCodec's DDS writer against the d3dx11_43.dll the process loads, so the
 # same exe checks Microsoft's on Windows and Wine's under Wine.
 add_executable(faf_image_codec_tests EXCLUDE_FROM_ALL image_codec/ImageCodecTests.cpp)
@@ -120,6 +125,13 @@ target_link_libraries(faf_replay_scan_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_replay_scan_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME replay_scan COMMAND faf_replay_scan_tests)
 set_tests_properties(replay_scan PROPERTIES LABELS "Existing")
+
+# CZipFile reads entries whose data starts at or past 2 GiB, as the binary does (tests/zip, PR #291).
+add_executable(faf_zip_offset_tests EXCLUDE_FROM_ALL zip/ZipOffsetTests.cpp)
+target_link_libraries(faf_zip_offset_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_zip_offset_tests PROPERTIES FOLDER "Tests/Existing")
+add_test(NAME zip_offset COMMAND faf_zip_offset_tests)
+set_tests_properties(zip_offset PROPERTIES LABELS "Existing")
 
 # Engine addition (#247): the user preferences from several threads at once
 # (tests/prefs); fails without USER_PreferencesLock.
@@ -213,6 +225,7 @@ set(_faf_existing_test_targets
   faf_sim_math_tests
   faf_replay_scan_tests
   faf_prefs_thread_tests
+  faf_zip_offset_tests
   faf_recon_scroll_packet_tests
   faf_coroutine_tests
   faf_msdf_cook_tests
@@ -232,6 +245,15 @@ if(TARGET faf_msdf_safety_tests)
 endif()
 add_custom_target(existing_tests DEPENDS ${_faf_existing_test_targets})
 set_target_properties(existing_tests PROPERTIES FOLDER "Tests/Existing")
+
+add_subdirectory(vulkan)
+
+# Rendering-only bounded terrain splat output; no game data or renderer required.
+add_executable(faf_splat_budget_tests EXCLUDE_FROM_ALL terrain/splat_budget/SplatBudgetTests.cpp)
+target_link_libraries(faf_splat_budget_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_splat_budget_tests PROPERTIES FOLDER "Tests/Terrain")
+add_test(NAME splat_budget COMMAND faf_splat_budget_tests)
+set_tests_properties(splat_budget PROPERTIES TIMEOUT 120 LABELS "Terrain")
 
 # Header-only particle pool reclamation policy; no graphics device required.
 add_executable(faf_particle_pool_reclaim_tests EXCLUDE_FROM_ALL particles/ParticlePoolReclaimTests.cpp)

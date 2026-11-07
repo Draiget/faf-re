@@ -260,8 +260,11 @@ namespace moho
     mHeight = static_cast<std::uint32_t>(height);
 
     const std::size_t cellCount = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
-    mGrid.reset(new std::int8_t[cellCount]);
+    // Engine addition: the change flags after the cells (`ChangedChunks`), all set.
+    const std::size_t chunks = (cellCount + kChangeChunkCells - 1u) / kChangeChunkCells;
+    mGrid.reset(new std::int8_t[cellCount + chunks]);
     std::memset(mGrid.get(), 0, cellCount);
+    std::memset(mGrid.get() + cellCount, 1, chunks);
 
     mGridSize = size;
   }
@@ -479,6 +482,21 @@ namespace moho
 
     if (x >= xMax) {
       return;
+    }
+
+    // Engine addition (`ChangedChunks`): every chunk the circle's rows can touch, before the writes
+    // below (each column's rows lie within `gridPos.z +- radius`). Only a server's view code reads them.
+    {
+      const std::int64_t zLo = std::clamp<std::int64_t>(static_cast<std::int64_t>(gridPos.z) - radius, 0, height);
+      const std::int64_t zHi = std::clamp<std::int64_t>(static_cast<std::int64_t>(gridPos.z) + radius, 0, height);
+      if (zLo < zHi) {
+        std::uint8_t* const chunks = ChangedChunks();
+        const auto firstChunk = static_cast<std::size_t>((zLo * width + x) / kChangeChunkCells);
+        const auto lastChunk = static_cast<std::size_t>(((zHi - 1) * width + xMax - 1) / kChangeChunkCells);
+        for (std::size_t chunk = firstChunk; chunk <= lastChunk; ++chunk) {
+          chunks[chunk] = 1u;
+        }
+      }
     }
 
     const std::int32_t radiusSq = radius * radius;

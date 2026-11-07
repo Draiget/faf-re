@@ -1,6 +1,7 @@
 // FAF addition, not in the shipped binary: see ImageCodec.h.
 
 #include "ImageCodec.h"
+#include "ImageCodecDirectXTex.h"
 #include "TextureQuality.h"
 
 #include <algorithm>
@@ -96,11 +97,28 @@ namespace gpg::gal::imaging
 
   bool ImageCodec::Load()
   {
+    mState = LoadD3dx();
+    if (mState == nullptr) {
+      // Issue #318: without the June 2010 runtime, DirectXTex decodes (ImageCodecDirectXTex.cpp).
+      gpg::Logf("imaging: textures decode with DirectXTex");
+      mState = std::make_unique<State>();
+    }
+    return true;
+  }
+
+  std::unique_ptr<ImageCodec::State> ImageCodec::LoadD3dx()
+  {
+    char forced[8]{};
+    std::size_t forcedLength = 0U;
+    if (::getenv_s(&forcedLength, forced, sizeof(forced), "FAF_IMAGECODEC_DIRECTXTEX") == 0 && forcedLength != 0U && forced[0] == '1') {
+      gpg::Logf("imaging: FAF_IMAGECODEC_DIRECTXTEX=1, d3dx11_43.dll not used");
+      return nullptr;
+    }
     auto state = std::make_unique<State>();
     state->module = ::LoadLibraryA("d3dx11_43.dll");
     if (state->module == nullptr) {
-      gpg::Warnf("imaging: d3dx11_43.dll is not installed (DirectX End-User Runtime, June 2010)");
-      return false;
+      gpg::Logf("imaging: d3dx11_43.dll is not installed (DirectX End-User Runtime, June 2010)");
+      return nullptr;
     }
     state->getImageInfo =
       reinterpret_cast<decltype(&::D3DX11GetImageInfoFromMemory)>(::GetProcAddress(state->module, "D3DX11GetImageInfoFromMemory"));
@@ -111,7 +129,7 @@ namespace gpg::gal::imaging
     state->saveToFile = reinterpret_cast<decltype(&::D3DX11SaveTextureToFileA)>(::GetProcAddress(state->module, "D3DX11SaveTextureToFileA"));
     if (state->getImageInfo == nullptr || state->createTexture == nullptr || state->saveToMemory == nullptr || state->saveToFile == nullptr) {
       gpg::Warnf("imaging: d3dx11_43.dll lacks the texture exports");
-      return false;
+      return nullptr;
     }
     const HRESULT result = ::D3D11CreateDevice(
       nullptr, D3D_DRIVER_TYPE_WARP, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0U, D3D11_SDK_VERSION, &state->device,
@@ -119,10 +137,19 @@ namespace gpg::gal::imaging
     );
     if (FAILED(result)) {
       gpg::Warnf("imaging: no WARP device for texture decoding (HRESULT 0x%08lX)", static_cast<unsigned long>(result));
-      return false;
+      return nullptr;
     }
-    mState = std::move(state);
-    return true;
+    return state;
+  }
+
+  bool ImageCodec::UsesD3dx() const noexcept
+  {
+    return mState->createTexture != nullptr;
+  }
+
+  HRESULT ImageCodec::DecodeFull(const void* const data, const std::size_t bytes, const DecodeOptions& options, Image& outImage)
+  {
+    return UsesD3dx() ? DecodeWithD3dx(data, bytes, options, outImage) : DecodeWithDirectXTex(data, bytes, options, outImage);
   }
 
   bool gDdsDirectLoad = true;
@@ -313,11 +340,15 @@ namespace gpg::gal::imaging
       return hash;
     }
 
-    [[nodiscard]] std::uint64_t DecodeCacheKey(const void* const data, const std::size_t bytes, const DecodeOptions& options)
+    [[nodiscard]] std::uint64_t DecodeCacheKey(const void* const data, const std::size_t bytes, const DecodeOptions& options, const bool d3dx)
     {
       effects::Fnv1a64 hash;
       // 3: a 2D quality skip drops whole levels; entries from D3DX11's FirstMipLevel were scaled up.
       hash.Add("faf image decode cache 3");
+      if (!d3dx) {
+        // DirectXTex builds missing levels a little differently (issue #318): its own entries.
+        hash.Add("directxtex");
+      }
       // The file stores Image::Subresource as is, whose offset is pointer-sized: x86 and x64
       // builds share the directory and keep separate entries.
       const std::uint32_t pointerBytes = sizeof(void*);
@@ -514,7 +545,7 @@ namespace gpg::gal::imaging
     if (gDdsDirectLoad && TryReadBlockCompressedDds(static_cast<const std::uint8_t*>(data), bytes, options, outImage)) {
       if (VerifyRequested()) {
         Image reference;
-        const HRESULT result = DecodeWithD3dx(data, bytes, options, reference);
+        const HRESULT result = DecodeFull(data, bytes, options, reference);
         bool same = SUCCEEDED(result) && reference.format == outImage.format && reference.width == outImage.width &&
           reference.height == outImage.height && reference.mipLevels == outImage.mipLevels &&
           reference.arraySize == outImage.arraySize && reference.cube == outImage.cube &&
@@ -563,11 +594,12 @@ namespace gpg::gal::imaging
       return S_OK;
     }
 
-    tLastDecodeRoute = "d3dx";
+    const bool d3dx = UsesD3dx();
+    tLastDecodeRoute = d3dx ? "d3dx" : "directxtex";
     if (!gTextureDecodeCache) {
-      return DecodeWithD3dx(data, bytes, options, outImage);
+      return DecodeFull(data, bytes, options, outImage);
     }
-    std::uint64_t key = DecodeCacheKey(data, bytes, options);
+    std::uint64_t key = DecodeCacheKey(data, bytes, options, d3dx);
     std::string path = DecodeCachePath(key);
     // Reject pre-fix nonzero-skip cube/volume entries even if a permissive
     // D3DX decoder recognizes a resource kind the header probe did not.
@@ -578,7 +610,7 @@ namespace gpg::gal::imaging
     }
     LARGE_INTEGER start{}, end{}, frequency{};
     ::QueryPerformanceCounter(&start);
-    const HRESULT result = DecodeWithD3dx(data, bytes, options, outImage);
+    const HRESULT result = DecodeFull(data, bytes, options, outImage);
     ::QueryPerformanceCounter(&end);
     ::QueryPerformanceFrequency(&frequency);
     const auto microseconds = static_cast<std::uint64_t>(1000000.0 * static_cast<double>(end.QuadPart - start.QuadPart) / static_cast<double>(frequency.QuadPart));
@@ -586,11 +618,11 @@ namespace gpg::gal::imaging
       // Metadata is authoritative for unusual inputs. Never write a full
       // cube/volume under the old quality-dependent identity.
       options.skipMipLevels = 0U;
-      key = DecodeCacheKey(data, bytes, options);
+      key = DecodeCacheKey(data, bytes, options, d3dx);
       path = DecodeCachePath(key);
     }
     if (SUCCEEDED(result) && !path.empty() && microseconds >= kDecodeCacheMinMicroseconds) {
-      tLastDecodeRoute = "d3dx, cached for later sessions";
+      tLastDecodeRoute = d3dx ? "d3dx, cached for later sessions" : "directxtex, cached for later sessions";
       // Written on a background thread from a copy, so the frame does not wait for the disk.
       auto copy = std::make_shared<Image>(outImage);
       std::thread([path, key, copy] { WriteDecodeCache(path, key, *copy); }).detach();
@@ -600,6 +632,9 @@ namespace gpg::gal::imaging
 
   HRESULT ImageCodec::GetImageSize(const void* const data, const std::size_t bytes, std::uint32_t& outWidth, std::uint32_t& outHeight)
   {
+    if (!UsesD3dx()) {
+      return GetImageSizeWithDirectXTex(data, bytes, outWidth, outHeight);
+    }
     const std::lock_guard<std::mutex> lock(mMutex);
     D3DX11_IMAGE_INFO info{};
     const HRESULT result = mState->getImageInfo(data, bytes, nullptr, &info, nullptr);
@@ -912,6 +947,9 @@ namespace gpg::gal::imaging
     if (format == FileFormat::Dds && OwnDdsRequested()) {
       return WriteDds(image, outBytes);
     }
+    if (!UsesD3dx()) {
+      return EncodeWithDirectXTex(image, format, outBytes);
+    }
     const std::lock_guard<std::mutex> lock(mMutex);
     ComPtr<ID3D11Texture2D> texture;
     HRESULT result = CreateEncodable(mState->device.Get(), image, texture);
@@ -999,6 +1037,25 @@ namespace gpg::gal::imaging
   {
     if (HRESULT written = S_OK; format == FileFormat::Bmp && WriteBgraBmp(image, path, written)) {
       return written;
+    }
+    if (!UsesD3dx()) {
+      std::vector<std::uint8_t> encoded;
+      HRESULT result = EncodeWithDirectXTex(image, format, encoded);
+      if (SUCCEEDED(result)) {
+        HANDLE const file = ::CreateFileA(path, GENERIC_WRITE, 0U, nullptr, CREATE_ALWAYS, 0U, nullptr);
+        DWORD written = 0U;
+        const bool ok = file != INVALID_HANDLE_VALUE &&
+          ::WriteFile(file, encoded.data(), static_cast<DWORD>(encoded.size()), &written, nullptr) && written == encoded.size();
+        if (file != INVALID_HANDLE_VALUE) {
+          ::CloseHandle(file);
+        }
+        result = ok ? S_OK : E_FAIL;
+      }
+      if (FAILED(result)) {
+        gpg::Warnf("imaging: DirectXTex could not save %s (DXGI format %d, %ux%u, file format %d): HRESULT 0x%08lX", path,
+                   static_cast<int>(image.format), image.width, image.height, static_cast<int>(format), static_cast<unsigned long>(result));
+      }
+      return result;
     }
     const std::lock_guard<std::mutex> lock(mMutex);
     ComPtr<ID3D11Texture2D> texture;

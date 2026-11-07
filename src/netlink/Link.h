@@ -224,6 +224,7 @@ namespace faf::netlink
     void DestroyAgentLocked();
     std::uint32_t AttemptsInLastTwoMinutesLocked(Clock::time_point now) const;
     bool AllowedLocked(CandidateType type, Clock::time_point now) const;
+    bool UsableRemoteLocked(const Candidate& c, Clock::time_point now) const;
     std::string RemoteDescriptionLocked(const CandidatesMessage& remote, Clock::time_point now) const;
     void Run(Pending& p);
     void Log(Pending& out, std::string text);

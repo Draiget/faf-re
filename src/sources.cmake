@@ -87,6 +87,8 @@ set(FAF_ENGINE_SOURCES
   gpg/gal/effects/EffectParameters.cpp
   gpg/gal/effects/EffectRuntime.cpp
   gpg/gal/backends/common/ImageCodec.cpp
+  gpg/gal/backends/common/ImageCodecDirectXTex.cpp
+  gpg/core/utils/EmbeddedFiles.cpp
   gpg/gal/backends/common/LockShadow.cpp
   gpg/gal/backends/common/RuntimeInfo.cpp
   gpg/gal/backends/common/WindowsCursor.cpp
@@ -99,6 +101,7 @@ set(FAF_ENGINE_SOURCES
   gpg/gal/backends/vulkan/VulkanLoader.cpp
   gpg/gal/backends/vulkan/VulkanSurface.cpp
   gpg/gal/backends/vulkan/VulkanCore.cpp
+  gpg/gal/backends/vulkan/VulkanMemoryAllocator.cpp
   gpg/gal/backends/vulkan/ResourcesVulkan.cpp
   gpg/gal/backends/vulkan/DeviceVulkan.cpp
   gpg/gal/backends/vulkan/GpuDrivenVulkan.cpp
@@ -310,6 +313,7 @@ set(FAF_ENGINE_SOURCES
   moho/misc/ScrWatchCtrl.cpp
   moho/script/CScriptObject.cpp
   moho/lua/CScrLuaObjectFactory.cpp
+  moho/lua/ScriptChunkCache.cpp
   moho/ai/AirPlatformExtractor.cpp
   moho/task/CLuaTask.cpp
   moho/script/CScriptEvent.cpp
@@ -1070,6 +1074,7 @@ set(FAF_ENGINE_SOURCES
   moho/audio/SofdecRuntime.cpp
   moho/movie/sfd/SfdHeaderInfo.cpp
   moho/app/CScApp.cpp
+  moho/app/ServerLobbyUi.cpp
   moho/app/UserWorkerPool.cpp
   moho/app/CWaitHandleSet.cpp
   moho/app/IWinApp.cpp
@@ -1082,6 +1087,7 @@ set(FAF_ENGINE_SOURCES
   moho/sim/IdPool.cpp
   gpg/core/utils/Global.cpp
   gpg/core/utils/Logging.cpp
+  gpg/core/utils/LocalCache.cpp
   ${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src/barrier.cpp
   ${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src/condition.cpp
   ${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src/exceptions.cpp

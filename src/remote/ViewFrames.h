@@ -60,6 +60,24 @@ namespace faf::remote
         EnableTeams();
       }
     }
+    /**
+     * Plan WP11 step 4, before the first beat: every view's frames name their sounds, underlays, custom names,
+     * range visuals and unit stats in `session`, one table for all of them; each beat's new deposits and terrain
+     * edits are queued there once (`SessionEdits`). Whoever sends the frames sends `session`'s pending record
+     * to every player before the beat's frames (`OnViewFrames`).
+     */
+    void EnableSessionTables(wire::CSessionTableWriters& session, const std::uint32_t statsEveryBeats = kStatsEveryBeats) noexcept
+    {
+      mSession = &session;
+      mSharedRecords.SetSessionTables(&session);
+      mSharedStats.SetReadEvery(statsEveryBeats);
+    }
+    /** `CSharedUnitStats::SetReadEvery`'s default: a unit's stats at most 0.3 s late (server `--stats-every`). */
+    static constexpr std::uint32_t kStatsEveryBeats = 4;
+    /** `--stats-every <beats>` (server and headless view bench): 1 reads every unit's stats every beat. */
+    void SetStatsEveryBeats(const std::uint32_t beats) noexcept { mSharedStats.SetReadEvery(beats); }
+    [[nodiscard]] wire::CSessionTableWriters* SessionTables() const noexcept { return mSession; }
+    [[nodiscard]] const CSessionEditCollector& SessionEdits() const noexcept { return mEdits; }
     /** The sim of the last beat built (null before it); for checks that run on the sim thread. */
     [[nodiscard]] moho::Sim* LastSim() const noexcept { return mLastSim; }
 
@@ -134,6 +152,13 @@ namespace faf::remote
      * this is the last call of the beat that may read the sim, and the frames come later.
      */
     virtual void OnViewFrames(moho::Sim& sim) { (void)sim; }
+    /**
+     * Other work of the beat that reads the stopped sim and nothing of the frames: on the sim thread,
+     * before the frames, says how many jobs there are; `RunSideJob` then runs each on the workers in
+     * the frames' batch, so work that mostly waits on memory overlaps theirs (plan #118).
+     */
+    virtual std::size_t PrepareSideJobs(moho::Sim& sim) { (void)sim; return 0u; }
+    virtual void RunSideJob(const std::size_t index) { (void)index; }
     /** With a pipeline, on one of its threads: `army`'s frame is ready. Must not read the sim. */
     virtual void OnViewReady(const std::size_t army) { (void)army; }
     /** With a pipeline, on the sim thread: every view's `OnViewReady` of the last beat is over. */
@@ -202,6 +227,10 @@ namespace faf::remote
 
     const wire::SContentTables& mTables;
     wire::SFrameCodec mCodec;
+    wire::CSessionTableWriters* mSession = nullptr; // `EnableSessionTables`
+    CSessionEditCollector mEdits;
+    CSharedUnitStats mSharedStats;
+    std::vector<std::uint32_t> mUnitIds; // this beat's units' ids (the entity index's first entries)
     std::vector<std::unique_ptr<CViewFrameBuilder>> mBuilders;
     std::vector<SHeldView> mHeld;
     CSharedEntityRecords mSharedRecords;

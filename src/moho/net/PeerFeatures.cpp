@@ -177,6 +177,10 @@ void CPeerFeatures::Receive(CClientManagerImpl& manager, CNetClient& client, CMe
   gpg::Logf(
     "PEERS: everyone supports OrderStreamCheck: %s", EveryoneSupports(manager, EPeerFeature::OrderStreamCheck) ? "yes" : "no"
   );
+  if ((peer.announcement.mask & PeerFeatureBit(EPeerFeature::OrderStreamCheck)) != 0u) {
+    // CClientBase compares this client's order stream reports from now on.
+    gpg::Logf("PEERS: client %d:%s's order stream reports are compared", client.GetIndex(), client.GetNickname().c_str());
+  }
   OfferRejoinToLauncher(manager);
 }
 

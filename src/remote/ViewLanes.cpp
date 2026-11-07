@@ -45,66 +45,13 @@ namespace faf::remote
     if (mRouter != nullptr) {
       OnLuaRouterBeat(sim, *mRouter);
     }
-
-    // Every army's grids, encoded once for all the views that receive them, on the workers.
-    std::size_t slots = 0;
-    for (std::size_t index = 0; index < sim.mArmiesList.size(); ++index) {
-      const moho::CArmyImpl* const army = sim.mArmiesList[index];
-      if (army == nullptr) {
-        continue;
-      }
-      const moho::CIntelGrid* const kinds[2] = {army->mConstDat.mVisionReconGrid.get(), army->mConstDat.mWaterReconGrid.get()};
-      for (std::uint8_t kind = 0; kind < 2u; ++kind) {
-        const moho::CIntelGrid* const grid = kinds[kind];
-        if (grid == nullptr) {
-          continue;
-        }
-        if (mBeatGrids.size() <= slots) {
-          mBeatGrids.emplace_back();
-        }
-        SBeatGrid& beatGrid = mBeatGrids[slots++];
-        wire::SGridSlot& slot = beatGrid.slot;
-        slot.army = static_cast<std::uint8_t>(index);
-        slot.kind = kind;
-        slot.gridSize = grid->mGridSize;
-        slot.bits.width = grid->mWidth;
-        slot.bits.height = grid->mHeight;
-        beatGrid.fresh = beatGrid.source != grid || beatGrid.cells.size() != static_cast<std::size_t>(grid->mWidth) * grid->mHeight;
-        if (beatGrid.fresh) {
-          beatGrid.cells.assign(static_cast<std::size_t>(grid->mWidth) * grid->mHeight, 0);
-        }
-        beatGrid.source = grid;
-        beatGrid.key = static_cast<std::uint16_t>(index * 2u + kind);
-        // The view army's grids and those of every army that counts it as an ally
-        // (`UserArmy::CanSeeCell`, 0x008B17F0).
-        beatGrid.receivers = 0u;
-        for (std::size_t view = 0; view < armyCount && view < 32u; ++view) {
-          if (view == index || army->mVarDat.mAllies.Contains(static_cast<unsigned int>(view))) {
-            beatGrid.receivers |= std::uint32_t{1} << view;
-          }
-        }
-      }
-    }
-    mBeatGrids.resize(slots);
-    const auto copyGrids = [this](const std::size_t begin, const std::size_t end) {
-      for (std::size_t i = begin; i < end; ++i) {
-        SBeatGrid& beatGrid = mBeatGrids[i];
-        const moho::CIntelGrid* const grid = beatGrid.source;
-        beatGrid.delta.Clear();
-        wire::WriteGridSlotHeader(beatGrid.slot, beatGrid.delta);
-        wire::EncodeGridDeltaInPlace(grid->mWidth, grid->mHeight, grid->mGrid.get(), beatGrid.cells.data(), beatGrid.delta);
-      }
-    };
-    if (Parallel() && slots > 1u) {
-      moho::CSimWorkerPool::Get().ParallelFor(slots, 1u, copyGrids);
-    } else {
-      copyGrids(0u, slots);
-    }
+    // The grids were encoded with the frames (`PrepareSideJobs`).
+    MarkPhase(EViewPhase::Grids);
 
     // Lua lane. `Sim::Sync` writes the `Sync` table after its entity walk, so these are the last
     // beat's, and it writes them again once this returns: a real server sends them when the beat's
     // sync is over.
-    if (mRouter != nullptr) {
+    if (mRouter != nullptr && !mLuaSeparately) {
       for (std::size_t army = 0; army < armyCount && army < mRouter->ViewCount(); ++army) {
         SClient& client = mClients[army];
         client.lua.Clear();
@@ -113,6 +60,7 @@ namespace faf::remote
         }
       }
     }
+    MarkPhase(EViewPhase::Lua);
 
     if (!PipelineOn()) {
       if (Parallel() && armyCount > 1u) {
@@ -127,6 +75,74 @@ namespace faf::remote
         }
       }
     }
+  }
+
+  std::size_t CViewLanes::PrepareSideJobs(moho::Sim& sim)
+  {
+    // Every army's grids, encoded once for all the views that receive them, on the workers with the
+    // frames: the grids mostly wait on memory (a vision cell is 2 map units), the frames mostly compute.
+    const auto armyCount = static_cast<std::size_t>(ArmyCount());
+    std::size_t slots = 0;
+    for (std::size_t index = 0; index < sim.mArmiesList.size(); ++index) {
+      const moho::CArmyImpl* const army = sim.mArmiesList[index];
+      if (army == nullptr) {
+        continue;
+      }
+      moho::CIntelGrid* const kinds[2] = {army->mConstDat.mVisionReconGrid.get(), army->mConstDat.mWaterReconGrid.get()};
+      for (std::uint8_t kind = 0; kind < 2u; ++kind) {
+        moho::CIntelGrid* const grid = kinds[kind];
+        if (grid == nullptr) {
+          continue;
+        }
+        if (mBeatGrids.size() <= slots) {
+          mBeatGrids.emplace_back();
+        }
+        SBeatGrid& beatGrid = mBeatGrids[slots++];
+        wire::SGridSlot& slot = beatGrid.slot;
+        slot.army = static_cast<std::uint8_t>(index);
+        slot.kind = kind;
+        slot.gridSize = grid->mGridSize;
+        slot.bits.width = grid->mWidth;
+        slot.bits.height = grid->mHeight;
+        const std::size_t words = wire::GridSeenWords(static_cast<std::size_t>(grid->mWidth) * grid->mHeight);
+        beatGrid.fresh = beatGrid.source != grid || beatGrid.seen.size() != words || beatGrid.skipped;
+        if (beatGrid.fresh) {
+          beatGrid.seen.assign(words, 0u);
+        }
+        beatGrid.source = grid;
+        beatGrid.key = static_cast<std::uint16_t>(index * 2u + kind);
+        // The view army's grids and those of every army that counts it as an ally
+        // (`UserArmy::CanSeeCell`, 0x008B17F0).
+        beatGrid.receivers = 0u;
+        for (std::size_t view = 0; view < armyCount && view < 32u; ++view) {
+          if (view == index || army->mVarDat.mAllies.Contains(static_cast<unsigned int>(view))) {
+            beatGrid.receivers |= std::uint32_t{1} << view;
+          }
+        }
+      }
+    }
+    mBeatGrids.resize(slots);
+    MarkPhase(EViewPhase::GridSetup);
+    return slots;
+  }
+
+  void CViewLanes::RunSideJob(const std::size_t index)
+  {
+    SBeatGrid& beatGrid = mBeatGrids[index];
+    moho::CIntelGrid* const grid = beatGrid.source;
+    beatGrid.delta.Clear();
+    // A grid no view receives (a civilian army's, mostly) isn't read; whoever gets it later gets it whole.
+    beatGrid.skipped = beatGrid.receivers == 0u;
+    if (beatGrid.skipped) {
+      return;
+    }
+    wire::WriteGridSlotHeader(beatGrid.slot, beatGrid.delta);
+    // Only the chunks the sim may have rastered since last beat (a vision cell is 2 map units, so a
+    // grid is up to a megabyte); a grid the clients get whole is read whole.
+    wire::EncodeGridDeltaInPlace(
+      grid->mWidth, grid->mHeight, grid->mGrid.get(), beatGrid.seen.data(), beatGrid.delta, grid->ChangedChunks(),
+      moho::CIntelGrid::kChangeChunkCells, beatGrid.fresh
+    );
   }
 
   void CViewLanes::Send(const std::size_t army)
@@ -200,10 +216,10 @@ namespace faf::remote
       } else {
         // A client new to this grid gets it whole, which is rare enough to make its cells here.
         wire::SGridSlot whole = beatGrid.slot;
-        whole.bits.cells.resize(beatGrid.cells.size());
-        std::transform(beatGrid.cells.begin(), beatGrid.cells.end(), whole.bits.cells.begin(), [](const std::int8_t cell) {
-          return static_cast<std::uint8_t>(cell != 0 ? 1u : 0u);
-        });
+        whole.bits.cells.resize(static_cast<std::size_t>(whole.bits.width) * whole.bits.height);
+        for (std::size_t cell = 0; cell < whole.bits.cells.size(); ++cell) {
+          whole.bits.cells[cell] = static_cast<std::uint8_t>((beatGrid.seen[cell / 64u] >> (cell % 64u)) & 1u);
+        }
         gridsOk = wire::EncodeGridSlot(whole, nullptr, gridWriter) && gridsOk;
       }
     }
