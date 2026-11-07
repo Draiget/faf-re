@@ -422,7 +422,7 @@ Compare dumps with `tools/cmd/desync-diff` (`desync-diff A B`, issue #217); it p
 
 ## Desync telemetry
 
-Issues #218 and #219. On by default, to the faf-re desync server (`fafre-metrics.draiget.dev`, behind Cloudflare); `/notelemetry` turns it off. Setting up a collector and dump receiver of your own: [Desync diagnostics](DESYNC_DIAGNOSTICS.md). A live multiplayer game sends two kinds of OpenTelemetry log record, as one OTLP/HTTP JSON `POST` each to `<telemetry_Endpoint>/v1/logs`:
+Issues #218 and #219. Off unless the player agreed (#337): `/telemetry` on the command line is that consent, which the FAF client passes; then it goes to the faf-re desync server (`fafre-metrics.draiget.dev`, behind Cloudflare). `/notelemetry` turns it off and wins over `/telemetry`. Setting up a collector and dump receiver of your own: [Desync diagnostics](DESYNC_DIAGNOSTICS.md). A live multiplayer game sends two kinds of OpenTelemetry log record, as one OTLP/HTTP JSON `POST` each to `<telemetry_Endpoint>/v1/logs`:
 
 - `faf.desync`: one per player whose hash differed from ours at the first mismatched beat, sent when the sim reaches the dump beat (the mismatched beat + 30, as for the recorder), so every player's report for that beat has arrived. Later desyncs only raise `faf.desync.later_records` in the game-end record.
 - `faf.game.end`: one per game, desync or not, when the game's sim is destroyed (quitting, or leaving to the menu).
@@ -435,7 +435,7 @@ Sending runs on its own thread; the sim and render threads only queue a record. 
 
 | Switch | Default | At startup | Applies | What it does |
 |---|---|---|---|---|
-| `telemetry_Enabled` | 1 | `/notelemetry`, `/telemetry` or `/con` | next record | Sends the records (live multiplayer games only). Nothing starts while it is off: no thread, no file, no connection. `/telemetry` wins over `/notelemetry` |
+| `telemetry_Enabled` | 0 | `/telemetry`, `/notelemetry` or `/con` | next record | Sends the records (live multiplayer games only). Off by default (#337): `/telemetry` is the player's consent. Nothing starts while it is off: no thread, no file, no connection. `/notelemetry` wins over `/telemetry` |
 | `telemetry_Endpoint` | `https://fafre-metrics.draiget.dev` (Linux: `http://`) | `/telemetryendpoint URL` or `/con` | next record | Collector base URL, `http://host:port` or `https://host`; `/v1/logs` is appended unless the path ends with it. Empty sends nothing |
 | `telemetry_Token` | the desync server's upload token | `/telemetrytoken T` or `/con` | next record | Sent as `Authorization: Bearer T`. It ships with the game, so it only keeps casual junk out; reading what arrived needs the server's read token |
 | `telemetry_DumpEndpoint` | `https://fafre-metrics.draiget.dev/dumps` (Linux: `http://`) | `/telemetrydumpendpoint URL` or `/con` | next dump | Where the recorder's dump is POSTed as `.tar.gz`, `http://host:port/path` or `https://host/path`, used as given. Needs `telemetry_Enabled`, `telemetry_Endpoint` and a dump; empty uploads nothing |
