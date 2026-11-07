@@ -559,9 +559,14 @@ namespace moho
         }
       }
     }
+
+    if (const AniPoseUpdatedHook updated = gAniPoseUpdatedHook; updated != nullptr) {
+      updated(*this);
+    }
   }
 
   AniBoneWriteHook gAniBoneWriteHook = nullptr;
+  AniPoseUpdatedHook gAniPoseUpdatedHook = nullptr;
 
   void POSE_SetKeepClientHandles(const bool keep) noexcept
   {

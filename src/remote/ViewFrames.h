@@ -83,7 +83,11 @@ namespace faf::remote
       mFrameServerMs = serverMs;
     }
     /** Plan WP8.1, before the first beat: the units' poses are tracked each beat for the views' pose lanes. */
-    void EnablePoses() noexcept { mPosesOn = true; }
+    void EnablePoses()
+    {
+      mPosesOn = true;
+      mPoses.InstallHook(); // #118: the animation step marks the bones it changed
+    }
     [[nodiscard]] bool PosesOn() const noexcept { return mPosesOn; }
     [[nodiscard]] const CPoseTracker& Poses() const noexcept { return mPoses; }
     /**

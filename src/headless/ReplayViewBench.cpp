@@ -196,7 +196,8 @@ namespace faf::headless
     if (PosesOn()) {
       const std::uint64_t beats = Poses().Beats() != 0u ? Poses().Beats() : 1u;
       summary += "; poses: " + std::to_string(Poses().PosedUnits()) + " units with a pose at the end, "
-               + std::to_string(Poses().TotalChangedBones() / beats) + " bones changed a beat (all units)";
+               + std::to_string(Poses().TotalChangedBones() / beats) + " bones changed a beat (all units), "
+               + std::to_string(Poses().TotalHookedUnits() / beats) + " units a beat read from the animation hook's marks";
     }
     if (SessionTables() != nullptr) {
       summary += "; session tables " + std::to_string(mTableRecords) + " records, " + std::to_string(mTableBytes / 1024u) + " KB";

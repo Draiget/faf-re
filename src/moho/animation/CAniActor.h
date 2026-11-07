@@ -50,6 +50,14 @@ namespace moho
   using AniBoneWriteHook = void (*)(const CAniPose* pose, const char* manipulatorClass, int boneIndex);
   extern AniBoneWriteHook gAniBoneWriteHook;
 
+  /**
+   * Engine addition, server mode (plan WP8.1, #118): when set, `UpdateManipulators` calls it once per actor update,
+   * after its manipulators ran, on whichever thread ran the update (a pose job's worker or the sim thread), while the
+   * pose's bones are still in that thread's cache. It may only read the actor and its pose. Null in the game.
+   */
+  using AniPoseUpdatedHook = void (*)(const CAniActor& actor);
+  extern AniPoseUpdatedHook gAniPoseUpdatedHook;
+
   class CAniActor
   {
   public:
