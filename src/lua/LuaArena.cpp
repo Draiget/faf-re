@@ -196,12 +196,36 @@ namespace
     return first;
   }
 
+  // Preserve the old first-fit / swap-pop choice until it cannot satisfy a request.
+  [[nodiscard]] std::size_t TakeFreeRun(const std::size_t spans) noexcept
+  {
+    for (std::size_t index = 0; index < gFreeRunCount; ++index) {
+      LargeRun& run = gFreeRuns[index];
+      if (run.spans >= spans) {
+        gFreeRunsChanged = true;
+        const std::size_t first = run.firstSpan;
+        run.firstSpan += spans;
+        run.spans -= spans;
+        if (run.spans == 0u) {
+          run = gFreeRuns[--gFreeRunCount];
+        }
+        return first;
+      }
+    }
+    return kSpanCount;
+  }
+
   [[nodiscard]] FreeBlock* CarveSpan(const std::uint32_t sizeClass, std::uint32_t& outCount) noexcept
   {
     std::size_t span = kSpanCount;
     {
       std::lock_guard<std::mutex> guard(gSpanLock);
       span = TakeSpans(1u);
+      if (span == kSpanCount) {
+        // Only once the range has no fresh span left, so a game that never fills it keeps its addresses:
+        // the first freed large run gives up its first span.
+        span = TakeFreeRun(1u);
+      }
       if (span == kSpanCount) {
         return nullptr;
       }
@@ -288,25 +312,6 @@ namespace
     }
   };
   thread_local ThreadExitGuard tExitGuard;
-
-  // Preserve the old first-fit / swap-pop choice until it cannot satisfy a request.
-  [[nodiscard]] std::size_t TakeFreeRun(const std::size_t spans) noexcept
-  {
-    for (std::size_t index = 0; index < gFreeRunCount; ++index) {
-      LargeRun& run = gFreeRuns[index];
-      if (run.spans >= spans) {
-        gFreeRunsChanged = true;
-        const std::size_t first = run.firstSpan;
-        run.firstSpan += spans;
-        run.spans -= spans;
-        if (run.spans == 0u) {
-          run = gFreeRuns[--gFreeRunCount];
-        }
-        return first;
-      }
-    }
-    return kSpanCount;
-  }
 
   // Do not reorder the list for an unsatisfiable request: Lua hashes pointer keys.
   // The summary costs O(arena spans + free runs), once per changed free-list state.

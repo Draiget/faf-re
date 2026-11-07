@@ -1,7 +1,8 @@
 # Compile the actual allocator in isolation, not faf_engine; these are host tests.
 # Each filter runs in a fresh process because the allocator owns global state.
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-  # Older PR bases predate the engine-wide GoogleTest dependency.
+  # The engine build has gtest_main; the standalone lua_arena/ project fetches the release
+  # cmake/FafDependencies.cmake pins (same archive, same SHA256).
   if(NOT TARGET gtest_main)
     include(FetchContent)
     set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
@@ -17,36 +18,31 @@ if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     endif()
   endif()
   find_package(Threads REQUIRED)
-  add_executable(faf_lua_arena_large_run_tests EXCLUDE_FROM_ALL ${CMAKE_CURRENT_LIST_DIR}/LuaArenaLargeRunTests.cpp)
-  target_compile_features(faf_lua_arena_large_run_tests PRIVATE cxx_std_20)
-  if(WIN32)
-    # LuaArena.cpp defines WIN32_LEAN_AND_MEAN before Windows.h itself.
-    target_compile_definitions(faf_lua_arena_large_run_tests PRIVATE NOMINMAX)
-  endif()
-  if(MSVC)
-    target_compile_options(faf_lua_arena_large_run_tests PRIVATE /EHsc)
-  endif()
-  target_include_directories(faf_lua_arena_large_run_tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../src)
-  target_link_libraries(faf_lua_arena_large_run_tests PRIVATE gtest_main Threads::Threads)
-  set_target_properties(faf_lua_arena_large_run_tests PROPERTIES FOLDER "Tests/Memory")
-  foreach(_case IN ITEMS FullCapacity FailedRequestOrder HostHeapFailure Oversize CrossThreadFree)
-    add_test(NAME LuaArenaLargeRun_${_case} COMMAND faf_lua_arena_large_run_tests --gtest_filter=LuaArenaLargeRun.${_case})
-    set_tests_properties(LuaArenaLargeRun_${_case} PROPERTIES LABELS "LuaArenaHost" TIMEOUT 120)
-  endforeach()
-  add_executable(faf_lua_arena_pressure_tests EXCLUDE_FROM_ALL ${CMAKE_CURRENT_LIST_DIR}/LuaArenaPressureTests.cpp)
-  target_compile_features(faf_lua_arena_pressure_tests PRIVATE cxx_std_20)
-  if(WIN32)
-    # LuaArena.cpp defines WIN32_LEAN_AND_MEAN before Windows.h itself.
-    target_compile_definitions(faf_lua_arena_pressure_tests PRIVATE NOMINMAX)
-  endif()
-  if(MSVC)
-    target_compile_options(faf_lua_arena_pressure_tests PRIVATE /EHsc)
-  endif()
-  target_include_directories(faf_lua_arena_pressure_tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../src)
-  target_link_libraries(faf_lua_arena_pressure_tests PRIVATE gtest_main Threads::Threads)
-  set_target_properties(faf_lua_arena_pressure_tests PROPERTIES FOLDER "Tests/Memory")
-  foreach(_case IN ITEMS RandomizedOccupancyOracle)
-    add_test(NAME LuaArenaPressure_${_case} COMMAND faf_lua_arena_pressure_tests --gtest_filter=LuaArenaPressure.${_case})
-    set_tests_properties(LuaArenaPressure_${_case} PROPERTIES LABELS "LuaArenaHost" TIMEOUT 120)
-  endforeach()
+
+  # faf_lua_arena_host_test(<target> <source> <suite> <case>...): one executable, one CTest per case.
+  function(faf_lua_arena_host_test target source suite)
+    add_executable(${target} EXCLUDE_FROM_ALL ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/${source})
+    target_compile_features(${target} PRIVATE cxx_std_20)
+    if(WIN32)
+      # LuaArena.cpp defines WIN32_LEAN_AND_MEAN before Windows.h itself.
+      target_compile_definitions(${target} PRIVATE NOMINMAX)
+    endif()
+    if(MSVC)
+      target_compile_options(${target} PRIVATE /EHsc)
+    endif()
+    target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../../src)
+    target_link_libraries(${target} PRIVATE gtest_main Threads::Threads)
+    set_target_properties(${target} PROPERTIES FOLDER "Tests/Memory")
+    foreach(_case IN LISTS ARGN)
+      add_test(NAME ${suite}_${_case} COMMAND ${target} --gtest_filter=${suite}.${_case})
+      set_tests_properties(${suite}_${_case} PROPERTIES LABELS "LuaArenaHost" TIMEOUT 120)
+    endforeach()
+  endfunction()
+
+  faf_lua_arena_host_test(faf_lua_arena_large_run_tests LuaArenaLargeRunTests.cpp LuaArenaLargeRun
+    FullCapacity FailedRequestOrder HostHeapFailure Oversize CrossThreadFree)
+  faf_lua_arena_host_test(faf_lua_arena_pressure_tests LuaArenaPressureTests.cpp LuaArenaPressure
+    RandomizedOccupancyOracle)
+  faf_lua_arena_host_test(faf_lua_arena_reuse_tests LuaArenaReuseTests.cpp LuaArenaReuse
+    FullCapacity MixedSizes OversizedRejected ConcurrentReuse)
 endif()
