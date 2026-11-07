@@ -456,6 +456,34 @@ namespace faf::remote::wire
   [[nodiscard]] int PositionFieldBits(const SEntityRecord& record, const SEntityRecord* before, const SFrameCodec& codec) noexcept;
   [[nodiscard]] int OrientationFieldBits(const SEntityRecord& record, const SEntityRecord* before) noexcept;
 
+  /**
+   * Entities 12 (plan WP10.13): the id and field mask that start each change of a frame. The first
+   * id goes whole (a varint), each later one as its gap from the one before in an order-0
+   * exponential-Golomb code, as changes are mostly a few ids apart. A mask goes as its place among
+   * the frame's last 15 masks, most recent first, in the same code, or as the escape 15 and the
+   * mask as a varint: a frame's changes share a handful of masks (most a unit's position and
+   * orientation). One object per frame on each side; `Bits` writes nothing and counts, for
+   * `--wire-stats`.
+   */
+  class CChangeHeaders
+  {
+  public:
+    void Write(BitWriter& writer, std::uint32_t id, std::uint32_t fields);
+    [[nodiscard]] bool Read(BitReader& reader, std::uint32_t& id, std::uint32_t& fields) noexcept;
+    [[nodiscard]] int Bits(std::uint32_t id, std::uint32_t fields) noexcept;
+
+  private:
+    static constexpr std::uint32_t kRecent = 15; // also the escape
+
+    [[nodiscard]] std::uint32_t Find(std::uint32_t fields) const noexcept;
+    void Use(std::uint32_t place, std::uint32_t fields) noexcept;
+
+    bool mFirst = true;
+    std::uint32_t mPrevious = 0;
+    std::uint32_t mRecentMasks[kRecent]{};
+    std::uint32_t mRecentCount = 0;
+  };
+
   /** The baseline a frame on the wire was encoded against (`kNoBaseline` for a full frame). */
   [[nodiscard]] std::uint32_t PeekFrameBaseline(std::span<const std::uint8_t> bytes) noexcept;
 

@@ -929,29 +929,33 @@ int moho::cfunc_AudioSetLanguageUserL(LuaPlus::LuaState* const state)
     languageText = "";
   }
 
+  // Engine addition (snd_CreateEarly): while the sound manager is still being built, the language
+  // is set by the thread building it, right after; nothing comes back to Lua either way.
   const fa::string normalizedLanguage = gpg::STR_ToLower(languageText);
-  CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(USER_GetSound());
-  if (userSound == nullptr) {
-    return 0;
-  }
+  USER_WithSound([normalizedLanguage](IUserSoundManager* const sound) {
+    CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(sound);
+    if (userSound == nullptr) {
+      return;
+    }
 
-  if (normalizedLanguage == userSound->mLanguageTag || !HasLocalizedVoiceDirectory(normalizedLanguage)) {
-    return 0;
-  }
+    if (normalizedLanguage == userSound->mLanguageTag || !HasLocalizedVoiceDirectory(normalizedLanguage)) {
+      return;
+    }
 
-  fa::string localizedRootPath = gpg::STR_Printf("/sounds/voice/%s", normalizedLanguage.c_str());
-  if (AudioEngine* const voiceEngine = userSound->mTutorialEngine.get(); voiceEngine != nullptr) {
-    voiceEngine->Shutdown();
-  }
-  userSound->mTutorialEngine = AudioEngine::Create(localizedRootPath.c_str());
+    fa::string localizedRootPath = gpg::STR_Printf("/sounds/voice/%s", normalizedLanguage.c_str());
+    if (AudioEngine* const voiceEngine = userSound->mTutorialEngine.get(); voiceEngine != nullptr) {
+      voiceEngine->Shutdown();
+    }
+    userSound->mTutorialEngine = AudioEngine::Create(localizedRootPath.c_str());
 
-  localizedRootPath.append("/tutorials");
-  if (AudioEngine* const tutorialEngine = userSound->mAmbientEngine.get(); tutorialEngine != nullptr) {
-    tutorialEngine->Shutdown();
-  }
-  userSound->mAmbientEngine = AudioEngine::Create(localizedRootPath.c_str());
+    localizedRootPath.append("/tutorials");
+    if (AudioEngine* const tutorialEngine = userSound->mAmbientEngine.get(); tutorialEngine != nullptr) {
+      tutorialEngine->Shutdown();
+    }
+    userSound->mAmbientEngine = AudioEngine::Create(localizedRootPath.c_str());
 
-  userSound->mLanguageTag.assign(normalizedLanguage, 0u, fa::string::npos);
+    userSound->mLanguageTag.assign(normalizedLanguage, 0u, fa::string::npos);
+  });
   return 0;
 }
 

@@ -204,12 +204,14 @@ jobs:
         run: |
           # The exes also ship on their own, for replacing one that is already installed.
           (cd zips && for z in faf-engine-*.zip; do unzip -j -o "$z" 'main*.exe'; done && sha256sum faf-engine-*.zip main*.exe > SHA256SUMS.txt)
-          python tools/release/nightly_notes.py --out notes.md
+          python tools/release/nightly_notes.py --out notes.md --player-notes player-notes.md
           cat notes.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
           name: notes
-          path: notes.md
+          path: |
+            notes.md
+            player-notes.md
           retention-days: 7
       - if: github.event_name == 'workflow_run' || inputs.publish
         env:
@@ -217,7 +219,7 @@ jobs:
           SHA: ${{ needs.plan.outputs.sha }}
           TAG: ${{ needs.plan.outputs.tag }}
         run: |
-          gh release create "$TAG" zips/faf-engine-*.zip zips/main*.exe zips/SHA256SUMS.txt --target "$SHA" --latest \
+          gh release create "$TAG" zips/faf-engine-*.zip zips/main*.exe zips/SHA256SUMS.txt player-notes.md --target "$SHA" --latest \
             --title "$TAG x64\\x86" --notes-file notes.md
           gh release view "$TAG" --json tagName,isPrerelease,url | tee -a "$GITHUB_STEP_SUMMARY"
 

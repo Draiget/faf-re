@@ -27,7 +27,7 @@ Feature traffic for the lobby goes in this message with a first byte other than 
 
 | Feature | Bit | Announced when | What it means |
 |---|---|---|---|
-| `OrderStreamCheck` | 0 | `net_CheckOrderStreams` was on as the game began | This client's acks carry `CommandStreamCheck`'s hash after their fields |
+| `OrderStreamCheck` | 0 | `net_CheckOrderStreams` was on as the game began | This client's acks carry `CommandStreamCheck`'s hash after their fields. With `net_PeerFeatures` on, a peer's hash is compared only once it announced this; off, the ack's size says it, as before |
 | `SkewCorrection` | 1 | `wld_SkewCorrection` was on as the game began | This client's display clock keeps to real time; the correction only runs when every player announces this |
 | `FastAck` | 2 | `net_FastRetransmit` was on as the game began | This client acknowledges within `net_FastAckDelay`, which the shared start takes off that peer's ping |
 | `SignedStyle` | 3 | In the lobby, when this client has a valid style key | This client answers a style challenge |

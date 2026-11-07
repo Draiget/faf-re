@@ -797,6 +797,13 @@ namespace faf::netlink
     Log(out, log.str());
   }
 
+  // CandidateUtil.unpackCandidates: same generation, an address, an allowed type;
+  // libjuice relays and connects over UDP only.
+  bool Link::UsableRemoteLocked(const Candidate& c, const Clock::time_point now) const
+  {
+    return c.generation == 0 && !c.ip.empty() && c.port > 0 && AllowedLocked(c.type, now) && Lower(c.protocol) == "udp";
+  }
+
   std::string Link::RemoteDescriptionLocked(const CandidatesMessage& remote, const Clock::time_point now) const
   {
     std::string sdp = "a=ice-ufrag:" + remote.ufrag + "\r\na=ice-pwd:" + remote.password + "\r\n";
@@ -806,8 +813,7 @@ namespace faf::netlink
     for (const Candidate& c : sorted) {
       // CandidateUtil.unpackCandidates: same generation, an address, an
       // allowed type; libjuice relays and connects over UDP only.
-      if (c.generation != 0 || c.ip.empty() || c.port <= 0 || !AllowedLocked(c.type, now) ||
-          Lower(c.protocol) != "udp") {
+      if (!UsableRemoteLocked(c, now)) {
         continue;
       }
       sdp += CandidateToSdp(c) + "\r\n";
@@ -879,6 +885,16 @@ namespace faf::netlink
     NoteRemoteUfragLocked(out, remote.ufrag);
     if (!remote.fafPath.empty()) {
       NotePeerPathLocked(out, remote.fafPath);
+    }
+    // Issue #275: an answer with nothing this link may use can't connect, so start again
+    // now (the retry waits kRetryAfterFailure) rather than after kCheckTimeout of checks
+    // against nothing. A peer answers that way when its relay isn't there yet.
+    const bool anyUsable = std::any_of(remote.candidates.begin(), remote.candidates.end(),
+                                       [&](const Candidate& c) { return UsableRemoteLocked(c, now); });
+    if (!anyUsable) {
+      Log(out, "the answer holds no candidate this link may use (" + std::to_string(remote.candidates.size()) + " sent)");
+      ConnectionLostLocked(out, "no usable candidates in the answer", now);
+      return;
     }
     const std::string sdp = RemoteDescriptionLocked(remote, now);
     if (juice_set_remote_description(mAgent, sdp.c_str()) < 0) {

@@ -7,6 +7,12 @@
 // loads textures with (d3dx11_43.dll), on a private WARP Direct3D 11 device,
 // and hands back the decoded levels in CPU memory - so every backend sees
 // identical texels for the same file.
+//
+// Without d3dx11_43.dll (the DirectX End-User Runtime of June 2010), or with
+// FAF_IMAGECODEC_DIRECTXTEX=1, DirectXTex decodes instead (ImageCodecDirectXTex.cpp,
+// issue #318): the same formats, sizes and mip counts, and the file's own levels
+// byte for byte. The levels D3DX11 builds for a file without them come out within
+// about 32-45 dB of D3DX11's, as the two filter and BC-encode differently.
 
 #include <cstddef>
 #include <cstdint>
@@ -92,7 +98,8 @@ namespace gpg::gal::imaging
    * game's textures without mip levels, whose chain D3DX11 builds and BC-compresses again on
    * the CPU, 30-40 ms each) is kept in the shader cache directory under a hash of the file's
    * bytes and the decode options, and the next session reads it back instead. The cached
-   * image is D3DX11's own output, so the texels are the same. Console variable
+   * image is the decoder's own output, so the texels are the same; DirectXTex's entries have
+   * keys of their own, as its built levels differ from D3DX11's. Console variable
    * `ren_TextureDecodeCache`; 0 decodes every time.
    */
   extern bool gTextureDecodeCache;
@@ -100,7 +107,7 @@ namespace gpg::gal::imaging
   class ImageCodec
   {
   public:
-    /** The process-wide codec; nullptr when d3dx11_43.dll or a WARP device is not available. */
+    /** The process-wide codec: D3DX11 on a WARP device when both are there, DirectXTex otherwise. */
     [[nodiscard]] static ImageCodec* Instance();
 
     ~ImageCodec();
@@ -134,11 +141,16 @@ namespace gpg::gal::imaging
     [[nodiscard]] static FileFormat FromGalFormat(int galFormat) noexcept;
 
   private:
+    struct State;
+
     ImageCodec() = default;
     [[nodiscard]] bool Load();
+    /** d3dx11_43.dll's exports and a WARP device; nullptr without them. */
+    [[nodiscard]] static std::unique_ptr<State> LoadD3dx();
+    [[nodiscard]] bool UsesD3dx() const noexcept;
+    HRESULT DecodeFull(const void* data, std::size_t bytes, const DecodeOptions& options, Image& outImage);
     HRESULT DecodeWithD3dx(const void* data, std::size_t bytes, const DecodeOptions& options, Image& outImage);
 
-    struct State;
     std::unique_ptr<State> mState;
     std::mutex mMutex;
   };

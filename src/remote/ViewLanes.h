@@ -78,6 +78,9 @@ namespace faf::remote
     }
 
     void OnViewFrames(moho::Sim& sim) override;
+    /** The grids, encoded in the frames' batch of jobs. */
+    std::size_t PrepareSideJobs(moho::Sim& sim) override;
+    void RunSideJob(std::size_t index) override;
     void OnViewReady(std::size_t army) override { Send(army); }
 
     /** A view's lanes are encoded. Without a pipeline on a sim worker or the sim thread, with one on its threads. */
@@ -123,11 +126,12 @@ namespace faf::remote
     {
       wire::SGridSlot slot;                     // who and which; no cells
       std::uint32_t receivers = 0;              // the views that get it, by bit
-      const moho::CIntelGrid* source = nullptr; // the sim's grid
-      std::vector<std::int8_t> cells;           // as of this beat, once `delta` is written
+      moho::CIntelGrid* source = nullptr;       // the sim's grid (its change flags are cleared as it is read)
+      std::vector<std::uint64_t> seen;          // its cells set as of this beat, a bit each (`wire::GridSeenWords`), once `delta` is written
       wire::BitWriter delta;                    // the slot against last beat's cells
       std::uint16_t key = 0;                    // army and kind
       bool fresh = true;                        // no cells to go from: every client gets it whole
+      bool skipped = false;                     // no view received it, so `seen` wasn't kept up
     };
 
     void Send(std::size_t army);

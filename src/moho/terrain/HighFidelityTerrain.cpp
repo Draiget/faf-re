@@ -408,7 +408,7 @@ namespace moho
     }
 
     if (sHighFidelityTextureBatcher == nullptr) {
-      sHighFidelityTextureBatcher = new CD3DTextureBatcher();
+      sHighFidelityTextureBatcher = REN_NewSplatTextureBatcher();
     }
 
     if (!sHighFidelityGridTexture) {
@@ -825,48 +825,68 @@ namespace moho
 
         auto& splatVertices = mSplatVertices;
 
-        std::size_t splatBudget = 0;
-        for (CWldTerrainDecal* const decalEntry : visibleSplats) {
-          auto* const splat = static_cast<CWldSplat*>(decalEntry);
+        // Engine fix (ren_SplatAtlasFix): when the atlas has no room for a splat, it is cleared and
+        // the walk runs once more, so only this frame's textures hold places.
+        for (bool mayRestart = true;; mayRestart = false) {
+          bool restart = false;
+          std::size_t splatBudget = 0;
+          for (CWldTerrainDecal* const decalEntry : visibleSplats) {
+            auto* const splat = static_cast<CWldSplat*>(decalEntry);
 
-          const CWldSplat::SplatVertex& firstVertex = splat->mSplatVertices[0];
-          const Vector4f& row1 = mCamera->viewport.r[1];
-          const float worldDistance = (firstVertex.mPosition.z * row1.z) + (firstVertex.mPosition.y * row1.y)
-            + (firstVertex.mPosition.x * row1.x) + row1.w;
+            const CWldSplat::SplatVertex& firstVertex = splat->mSplatVertices[0];
+            const Vector4f& row1 = mCamera->viewport.r[1];
+            const float worldDistance = (firstVertex.mPosition.z * row1.z) + (firstVertex.mPosition.y * row1.y)
+              + (firstVertex.mPosition.x * row1.x) + row1.w;
 
-          if (worldDistance > splat->mCutoffLOD) {
-            continue;
+            if (worldDistance > splat->mCutoffLOD) {
+              continue;
+            }
+            if (splatBudget++ >= splatOutputBudget.available
+              && !TryGrowSplatOutput(mSplatVertices, splatOutputBudget)) {
+              break;
+            }
+
+            float fadeAlpha;
+            if (splat->mNearCutoff <= 0.0f) {
+              const float farFadeStart = splat->mCutoffLOD * ren_DecalFadeFraction;
+              const float clampedDistance = std::min(worldDistance, splat->mCutoffLOD);
+              const float fadeFloor = std::max(farFadeStart, std::min(clampedDistance, farFadeStart));
+              fadeAlpha = 1.0f - ((clampedDistance - fadeFloor) / (splat->mCutoffLOD - fadeFloor));
+            } else {
+              const float nearFadeStart = splat->mNearCutoff * ren_DecalFadeFraction;
+              const float clampedDistance = std::min(worldDistance, splat->mNearCutoff);
+              const float fadeCeiling = std::max(clampedDistance, nearFadeStart);
+              fadeAlpha = (fadeCeiling - nearFadeStart) / (splat->mNearCutoff - nearFadeStart);
+            }
+            const float bakedAlpha = fadeAlpha * splat->mCurrentAlpha;
+
+            const CWldSplat::AtlasMiss atlas =
+              splat->OnAtlasResult(splat->UpdateBatchTexture(sHighFidelityTextureBatcher), mayRestart);
+            if (atlas == CWldSplat::AtlasMiss::Restart) {
+              restart = true;
+              break;
+            }
+            splat->UpdateVertices();
+            if (atlas == CWldSplat::AtlasMiss::Skip) {
+              continue;
+            }
+
+            const std::size_t countBeforeAppend = splatVertices.Size();
+            for (const CWldSplat::SplatVertex& sourceVertex : splat->mSplatVertices) {
+              splatVertices.PushBack(sourceVertex);
+            }
+
+            for (std::size_t v = countBeforeAppend; v < splatVertices.Size(); ++v) {
+              splatVertices[v].mAlpha = bakedAlpha;
+            }
           }
-          if (splatBudget++ >= splatOutputBudget.available
-            && !TryGrowSplatOutput(mSplatVertices, splatOutputBudget)) {
+          if (!restart) {
             break;
           }
-
-          float fadeAlpha;
-          if (splat->mNearCutoff <= 0.0f) {
-            const float farFadeStart = splat->mCutoffLOD * ren_DecalFadeFraction;
-            const float clampedDistance = std::min(worldDistance, splat->mCutoffLOD);
-            const float fadeFloor = std::max(farFadeStart, std::min(clampedDistance, farFadeStart));
-            fadeAlpha = 1.0f - ((clampedDistance - fadeFloor) / (splat->mCutoffLOD - fadeFloor));
-          } else {
-            const float nearFadeStart = splat->mNearCutoff * ren_DecalFadeFraction;
-            const float clampedDistance = std::min(worldDistance, splat->mNearCutoff);
-            const float fadeCeiling = std::max(clampedDistance, nearFadeStart);
-            fadeAlpha = (fadeCeiling - nearFadeStart) / (splat->mNearCutoff - nearFadeStart);
-          }
-          const float bakedAlpha = fadeAlpha * splat->mCurrentAlpha;
-
-          splat->UpdateBatchTexture(sHighFidelityTextureBatcher);
-          splat->UpdateVertices();
-
-          const std::size_t countBeforeAppend = splatVertices.Size();
-          for (const CWldSplat::SplatVertex& sourceVertex : splat->mSplatVertices) {
-            splatVertices.PushBack(sourceVertex);
-          }
-
-          for (std::size_t v = countBeforeAppend; v < splatVertices.Size(); ++v) {
-            splatVertices[v].mAlpha = bakedAlpha;
-          }
+          REN_ResetSplatTextureBatcher(sHighFidelityTextureBatcher);
+          // Rebuild every UV after the atlas reset, retaining capacity and the
+          // per-view budget so restart does not bypass guarded growth.
+          splatVertices.Clear();
         }
       }
 
