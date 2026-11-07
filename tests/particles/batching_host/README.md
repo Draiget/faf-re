@@ -103,8 +103,14 @@ compiler command, exit status and failing test names.
 
 ## Evidence boundary
 
-At PR head `2e26bc4b01c4a1b2a421ed956f88d6fd33be65d2`, these tests narrow the
-batching-on **source-control-flow** gap. They cannot establish Windows build
-success, device/backend/GPU reuse safety, visible equivalence, game performance,
-or PR readiness. PR #338 should remain draft until its separate validation
-requirements are satisfied.
+These tests narrow the batching-on **source-control-flow** gap. They do not
+establish Windows build success, native device/backend/GPU execution, visible
+equivalence or game performance. Review readiness also depends on the current
+source/base, applicable compilation checks and the buffer-discard/copy lifetime
+contract; it is not equivalent to merge, deployment or visual acceptance.
+
+For renderer integration, exercise a constrained pool where an expired later
+bucket supplies an earlier bucket, with batching off/on and particle, trail,
+water and refraction lanes. Check membership/draw order and graphics validation.
+Those results remain separate from the host recorder and must be reported as
+such; do not infer an in-game or GPU pass from this suite.
