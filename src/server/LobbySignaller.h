@@ -19,6 +19,20 @@
 
 namespace faf::server
 {
+  /** What a launch check compares (plan WP2.14), read from a game configuration (`CLobby::LaunchGame`'s table). */
+  struct SLaunchFacts
+  {
+    std::string scenario;             // GameOptions.ScenarioFile
+    std::vector<std::int32_t> humans; // OwnerID of each human in PlayerOptions, sorted
+    int gameMods = 0;                 // entries in GameMods: FAF's lobby puts only sim mods there
+  };
+
+  /**
+   * Plan WP2.14: the host's launch against the match: the same scenario (case aside), the same human seats by uid,
+   * no sim mods. Empty when it may launch, otherwise the reason, for the host's lobby.
+   */
+  [[nodiscard]] std::string CheckLaunch(const SLaunchFacts& requested, const SLaunchFacts& match);
+
   class CLobbySignaller
   {
   public:
@@ -44,6 +58,7 @@ namespace faf::server
     [[nodiscard]] std::int32_t Host() const noexcept { return mParticipants.empty() ? 0 : mParticipants.front().uid; }
     /** Participants who have their role and haven't left. */
     [[nodiscard]] std::size_t InLobby() const noexcept;
+    [[nodiscard]] std::vector<std::int32_t> InLobbyUids() const;
     /** The logical host left before launch: the lobby can't go on (no succession yet). */
     [[nodiscard]] bool HostLeft() const noexcept { return mHostLeft; }
 

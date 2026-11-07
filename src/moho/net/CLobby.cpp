@@ -51,6 +51,8 @@
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/ui/UiRuntimeTypes.h"
 #if FAF_SERVER_MODE
+#include <span>
+
 #include "remote/client/ServerConnect.h"
 #endif
 using namespace moho;
@@ -3259,6 +3261,34 @@ void CLobby::LaunchGame(
   const LuaPlus::LuaObject& dat
 )
 {
+#if FAF_SERVER_MODE
+  // Engine addition, server mode (plan WP2.14, WPR.55): the server starts the match. The host's configuration goes
+  // to it to be checked; every client, the host too, takes its launch from the server, never from the lobby's
+  // Launch message.
+  if (faf::remote::ServerSessionUid() != 0) {
+    if (peerConnection == nullptr) {
+      CMessage request(ELobbyMsg::LOBMSG_DirectScriptData);
+      bool encoded = false;
+      {
+        CMessageStream stream(request, CMessageStream::Access::kReadWrite); // done writing when it goes
+        encoded = const_cast<LuaPlus::LuaObject&>(dat).ToByteStream(stream);
+      }
+      if (!encoded) {
+        const char* reason = "The game configuration couldn't be sent to the server.";
+        CallbackStr("LaunchFailed", &reason);
+        return;
+      }
+      const auto* const bytes = reinterpret_cast<const std::uint8_t*>(request.mBuff.start_);
+      const std::size_t size = request.mBuff.Size();
+      constexpr std::size_t kHeaderBytes = 3u; // type, 16-bit size
+      (void)faf::remote::SendServerLaunchRequest(std::span<const std::uint8_t>(bytes + kHeaderBytes, size - kHeaderBytes));
+      gpg::Logf("LOBBY: launch sent to the server (%u bytes).", static_cast<unsigned>(size - kHeaderBytes));
+    } else {
+      gpg::Logf("LOBBY: the host launched; the server starts the match.");
+    }
+    return;
+  }
+#endif
   // Engine addition (plan WP2.7): the launch info, army order, client indices and command
   // sources are built by `BuildLaunchInfo`, which a game server shares; the participants are
   // this lobby's peers, given their indices by `AssignClientIndex` / `AssignCommandSource`.

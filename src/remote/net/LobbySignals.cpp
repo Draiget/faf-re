@@ -47,12 +47,30 @@ namespace faf::remote::net
     const std::uint8_t kind = reader.Byte();
     out.flags = reader.Byte();
     const std::uint64_t uid = reader.Varint();
-    if (!reader.Ok() || kind < static_cast<std::uint8_t>(ELobbySignal::Host) || kind > static_cast<std::uint8_t>(ELobbySignal::DisconnectFromPeer)
+    if (!reader.Ok() || kind < static_cast<std::uint8_t>(ELobbySignal::Host) || kind > static_cast<std::uint8_t>(ELobbySignal::Launching)
         || uid > 0x7FFFFFFFu) {
       return false;
     }
     out.kind = static_cast<ELobbySignal>(kind);
     out.uid = static_cast<std::int32_t>(uid);
     return ReadText(reader, kLobbySignalMaxName, out.name) && ReadText(reader, kLobbySignalMaxText, out.text) && reader.AtEnd();
+  }
+
+  std::vector<std::uint8_t> EncodeLaunchRequest(const std::span<const std::uint8_t> configuration)
+  {
+    std::vector<std::uint8_t> message;
+    message.reserve(1u + configuration.size());
+    message.push_back(kLobbyLaunchRequest);
+    message.insert(message.end(), configuration.begin(), configuration.end());
+    return message;
+  }
+
+  bool IsLaunchRequest(const std::span<const std::uint8_t> message, std::span<const std::uint8_t>& configuration)
+  {
+    if (message.size() < 2u || message[0] != kLobbyLaunchRequest) {
+      return false;
+    }
+    configuration = message.subspan(1);
+    return true;
   }
 } // namespace faf::remote::net

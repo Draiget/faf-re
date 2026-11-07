@@ -26,7 +26,17 @@ namespace faf::remote::net
     ConnectToPeer = 3,
     /** A participant left: `uid` is theirs. */
     DisconnectFromPeer = 4,
+    /** To the host (plan WP2.14): the server won't launch what it asked for; `text` says why. */
+    LaunchRefused = 5,
+    /** To everyone in the lobby (plan WP2.14): the server is starting the match. */
+    Launching = 6,
   };
+
+  /**
+   * Player to server (plan WP2.14): a `Lobby` frame to uid 0 whose message is this byte, then the game configuration
+   * `CLobby::LaunchGame` was given, in the lobby's own Lua byte form (`LuaObject::ToByteStream`).
+   */
+  constexpr std::uint8_t kLobbyLaunchRequest = 16;
 
   enum ELobbySignalFlags : std::uint8_t
   {
@@ -49,4 +59,9 @@ namespace faf::remote::net
   [[nodiscard]] std::vector<std::uint8_t> EncodeLobbySignal(const SLobbySignal& signal);
   /** False for an unknown kind, a negative uid, a string over its limit, or bytes left over. */
   [[nodiscard]] bool DecodeLobbySignal(std::span<const std::uint8_t> message, SLobbySignal& out);
+
+  /** The message of a launch request: `kLobbyLaunchRequest`, then the configuration's bytes. */
+  [[nodiscard]] std::vector<std::uint8_t> EncodeLaunchRequest(std::span<const std::uint8_t> configuration);
+  /** True for a launch request; `configuration` is then its bytes. */
+  [[nodiscard]] bool IsLaunchRequest(std::span<const std::uint8_t> message, std::span<const std::uint8_t>& configuration);
 } // namespace faf::remote::net

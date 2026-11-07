@@ -627,7 +627,8 @@ TEST(LobbySignals, RoundTripAndRefuseWhatIsNotOne)
   for (const SLobbySignal& signal :
        {SLobbySignal{ELobbySignal::Host, faf::remote::net::kLobbySignalAutoLobby, 0, "Ann", "/maps/x/x_scenario.lua"},
         SLobbySignal{ELobbySignal::Join, 0, 1001, "Bo", "Ann"}, SLobbySignal{ELobbySignal::ConnectToPeer, 0, 0x7FFFFFFF, "Cy", ""},
-        SLobbySignal{ELobbySignal::DisconnectFromPeer, 0, 1003, "", ""}}) {
+        SLobbySignal{ELobbySignal::DisconnectFromPeer, 0, 1003, "", ""}, SLobbySignal{ELobbySignal::LaunchRefused, 0, 0, "", "the map"},
+        SLobbySignal{ELobbySignal::Launching, 0, 0, "", ""}}) {
     const SLobbySignal back = Decoded(faf::remote::net::EncodeLobbySignal(signal));
     EXPECT_EQ(back.kind, signal.kind);
     EXPECT_EQ(back.flags, signal.flags);
@@ -945,4 +946,29 @@ TEST(RelayConnector, TheHostAcceptsWhomTheServerNamesAndTheJoinerConnects)
 
   connectorA->Destroy();
   connectorB->Destroy();
+}
+
+// Plan WP2.14: the host's launch against the match (server/LobbySignaller.h).
+TEST(LaunchCheck, TheMatchsMapAndSeatsAndNoSimMods)
+{
+  using faf::server::CheckLaunch;
+  using faf::server::SLaunchFacts;
+  const SLaunchFacts match{"/maps/SCMP_009/SCMP_009_scenario.lua", {1001, 1002}, 0};
+  EXPECT_EQ(CheckLaunch(SLaunchFacts{"/maps/scmp_009/scmp_009_scenario.lua", {1002, 1001}, 0}, match), ""); // case, order
+  EXPECT_NE(CheckLaunch(SLaunchFacts{"/maps/SCMP_010/SCMP_010_scenario.lua", {1001, 1002}, 0}, match).find("map"), std::string::npos);
+  EXPECT_NE(CheckLaunch(SLaunchFacts{match.scenario, {1001}, 0}, match).find("slots"), std::string::npos);        // a seat empty
+  EXPECT_NE(CheckLaunch(SLaunchFacts{match.scenario, {1001, 1002, 1003}, 0}, match).find("slots"), std::string::npos); // a stranger
+  EXPECT_NE(CheckLaunch(SLaunchFacts{match.scenario, {1001, 1002}, 1}, match).find("sim mods"), std::string::npos);
+}
+
+TEST(LaunchCheck, ARequestIsItsKindThenTheConfiguration)
+{
+  const std::vector<std::uint8_t> configuration = {4u, 1u, 2u};
+  const std::vector<std::uint8_t> message = faf::remote::net::EncodeLaunchRequest(configuration);
+  EXPECT_EQ(message, (std::vector<std::uint8_t>{faf::remote::net::kLobbyLaunchRequest, 4u, 1u, 2u}));
+  std::span<const std::uint8_t> back;
+  ASSERT_TRUE(faf::remote::net::IsLaunchRequest(message, back));
+  EXPECT_EQ(std::vector<std::uint8_t>(back.begin(), back.end()), configuration);
+  EXPECT_FALSE(faf::remote::net::IsLaunchRequest(std::vector<std::uint8_t>{faf::remote::net::kLobbyLaunchRequest}, back));
+  EXPECT_FALSE(faf::remote::net::IsLaunchRequest(faf::remote::net::EncodeLobbySignal(SLobbySignal{}), back));
 }

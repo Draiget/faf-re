@@ -27,6 +27,7 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <span>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -42,6 +43,11 @@
 #include "gpg/core/utils/Global.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaTableIterator.h"
+#include "gpg/core/streams/BinaryReader.h"
+#include "moho/net/CMessage.h"
+#include "moho/net/CMessageStream.h"
+#include "moho/net/ELobbyMsg.h"
+#include "remote/net/LobbySignals.h"
 #include "moho/app/IWinApp.h"
 #include "moho/app/WinApp.h"
 #include "moho/core/ThreadPlacement.h"
@@ -345,6 +351,53 @@ namespace
     return players;
   }
 
+  /** Plan WP2.14: what a launch check compares, from a game configuration. */
+  [[nodiscard]] faf::server::SLaunchFacts ReadLaunchFacts(const LuaPlus::LuaObject& config)
+  {
+    faf::server::SLaunchFacts facts;
+    LuaPlus::LuaObject options = config["GameOptions"];
+    if (options.IsTable()) {
+      const LuaPlus::LuaObject scenario = options["ScenarioFile"];
+      facts.scenario = scenario.IsString() ? scenario.GetString() : "";
+    }
+    LuaPlus::LuaObject players = config["PlayerOptions"];
+    if (players.IsTable()) {
+      for (LuaPlus::LuaTableIterator it(&players, 1); !it.m_isDone; it.Next()) {
+        LuaPlus::LuaObject player = it.GetValue();
+        if (!player.IsTable()) {
+          continue;
+        }
+        const LuaPlus::LuaObject human = player["Human"];
+        if (!human.IsBoolean() || !human.GetBoolean()) {
+          continue;
+        }
+        const LuaPlus::LuaObject owner = player["OwnerID"];
+        facts.humans.push_back(
+          owner.IsString() ? std::atoi(owner.GetString()) : (owner.IsNumber() ? static_cast<std::int32_t>(owner.GetNumber()) : -1)
+        );
+      }
+    }
+    facts.gameMods = CountSimMods(config);
+    return facts;
+  }
+
+  /** A launch request's configuration, decoded as `CLobby` decodes script data; false when it isn't a table. */
+  [[nodiscard]] bool DecodeLaunchConfig(
+    LuaPlus::LuaState* const state, const std::span<const std::uint8_t> bytes, LuaPlus::LuaObject& codec, LuaPlus::LuaObject& out
+  )
+  {
+    try {
+      moho::CMessage message(moho::ELobbyMsg::LOBMSG_DirectScriptData);
+      (void)message.Append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+      moho::CMessageStream stream(&message, moho::CMessageStream::Access::kReadOnly);
+      const gpg::BinaryReader reader{&stream};
+      codec.SCR_FromByteStream(out, state, &reader);
+    } catch (const std::exception&) {
+      return false;
+    }
+    return out.IsTable();
+  }
+
   /** What to call the game: the match file's `MatchName`, or the map's name without its `<LOC id>`. */
   [[nodiscard]] std::string ReadMatchTitle(const LuaPlus::LuaObject& config, LuaPlus::LuaState* const state)
   {
@@ -589,8 +642,45 @@ namespace
         std::size_t lastIn = 0;
         std::uint64_t toServer = 0;
         bool hostLeftSaid = false;
-        while (Clock::now() < lobbyEnd && gStopSignal == 0) {
-          toServer += net->TakeLobbyMessages().size(); // the launch request (WP2.14) comes here
+        bool launched = false;
+        // Plan WP2.14: what the host's launch is checked against. The match file's configuration stays the one the
+        // game starts with (plan WPR.55: the clients' launch comes from the server, never from the lobby's message).
+        const faf::server::SLaunchFacts matchFacts = ReadLaunchFacts(config);
+        const auto signal = [&net](const std::int32_t to, const faf::remote::net::ELobbySignal kind, std::string text) {
+          faf::remote::net::SLobbySignal message;
+          message.kind = kind;
+          message.text = std::move(text);
+          net->QueueLobbyFromServer(to, faf::remote::net::EncodeLobbySignal(message));
+        };
+        while (!launched && Clock::now() < lobbyEnd && gStopSignal == 0) {
+          for (const faf::server::CServerNet::SLobbyMessage& message : net->TakeLobbyMessages()) {
+            ++toServer;
+            std::span<const std::uint8_t> bytes;
+            if (!faf::remote::net::IsLaunchRequest(message.message, bytes)) {
+              continue;
+            }
+            if (message.from != signaller.Host() || launched) {
+              Say("Lobby: a launch from uid %d, who isn't the host, ignored", static_cast<int>(message.from));
+              continue;
+            }
+            LuaPlus::LuaObject requested;
+            std::string refusal;
+            if (!DecodeLaunchConfig(state, bytes, config, requested)) {
+              refusal = "the launch couldn't be read";
+            } else {
+              refusal = faf::server::CheckLaunch(ReadLaunchFacts(requested), matchFacts);
+            }
+            if (!refusal.empty()) {
+              Say("Lobby: launch refused: %s", refusal.c_str());
+              signal(message.from, faf::remote::net::ELobbySignal::LaunchRefused, refusal);
+              continue;
+            }
+            Say("Lobby: the host launched; starting the match");
+            for (const std::int32_t uid : signaller.InLobbyUids()) {
+              signal(uid, faf::remote::net::ELobbySignal::Launching, {});
+            }
+            launched = true;
+          }
           for (const std::int32_t uid : net->TakeLobbyJoined()) {
             signaller.OnJoined(uid, out);
           }

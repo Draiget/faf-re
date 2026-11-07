@@ -20,12 +20,19 @@
 #include <deque>
 #include <map>
 #include <random>
+#include <fstream>
 #include <span>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
 
+#include "lua/LuaObject.h"
 #include "moho/command/SSTICommandIssueData.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/net/CMessage.h"
+#include "moho/net/CMessageStream.h"
+#include "moho/net/ELobbyMsg.h"
 #include "moho/net/ECmdStreamOp.h"
 #include "remote/net/Datagram.h"
 #include "remote/FrameWindow.h"
@@ -191,6 +198,10 @@ namespace
     std::string lobbyName;
     std::int32_t lobbySayTo = 0;
     double lobbySayAt = -1.0;
+    // Plan WP2.14: send the lobby's launch to the server at a time, with `MatchConfig` from a match file as the
+    // configuration (the host's `CLobby::LaunchGame` sends what FAF's lobby built).
+    std::string lobbyLaunch;
+    double lobbyLaunchAt = -1.0;
   };
 
   [[nodiscard]] double Argument(const char* const text)
@@ -238,6 +249,10 @@ namespace
         out.lobbySayTo = std::atoi(value);
       } else if (name == "--lobby-say-at") {
         out.lobbySayAt = Argument(value);
+      } else if (name == "--lobby-launch") {
+        out.lobbyLaunch = value;
+      } else if (name == "--lobby-launch-at") {
+        out.lobbyLaunchAt = Argument(value);
       } else if (name == "--save-views") {
         out.saveViews = value;
       } else if (name == "--break-alliance-at") {
@@ -587,6 +602,12 @@ namespace
         seen.deleted.push_back(signal.uid);
         std::printf("probe %d: %.1f s: lobby: peer %d left\n", uid, elapsed, signal.uid);
         break;
+      case ELobbySignal::LaunchRefused:
+        std::printf("probe %d: %.1f s: lobby: launch refused: %s\n", uid, elapsed, signal.text.c_str());
+        break;
+      case ELobbySignal::Launching:
+        std::printf("probe %d: %.1f s: lobby: the server is starting the match\n", uid, elapsed);
+        break;
       }
       return;
     }
@@ -685,7 +706,7 @@ int main(const int argc, char** const argv)
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> [--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
       "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>]] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>]\n"
+      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>]] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>]\n"
     );
     return 3;
   }
@@ -780,6 +801,36 @@ int main(const int argc, char** const argv)
       if (!options.noLoad && joins == 1u) {
         const auto kind = static_cast<std::uint8_t>(ESeatMessage::Loaded);
         (void)link.SendReliable(&kind, 1u);
+      }
+    }
+    if (Due(options.lobbyLaunchAt, elapsed) && !options.lobbyLaunch.empty()) {
+      static LuaPlus::LuaState sLaunchState(LuaPlus::LuaState::LIB_BASE);
+      std::ifstream file(options.lobbyLaunch, std::ios::binary);
+      std::stringstream text;
+      text << file.rdbuf();
+      LuaPlus::LuaObject config;
+      if (file && moho::SCR_LuaDoString(text.str().c_str(), &sLaunchState)) {
+        config = sLaunchState.GetGlobal("MatchConfig");
+      }
+      moho::CMessage request(moho::ELobbyMsg::LOBMSG_DirectScriptData);
+      bool encoded = false;
+      if (config.IsTable()) {
+        moho::CMessageStream stream(request, moho::CMessageStream::Access::kReadWrite);
+        encoded = config.ToByteStream(stream);
+      }
+      if (!encoded) {
+        std::printf("probe %d: %.1f s: lobby: no MatchConfig in %s to launch\n", options.uid, elapsed, options.lobbyLaunch.c_str());
+      } else {
+        const auto* const bytes = reinterpret_cast<const std::uint8_t*>(request.mBuff.start_) + 3;
+        const std::size_t size = request.mBuff.Size() - 3u;
+        const std::vector<std::uint8_t> message = faf::remote::net::EncodeLaunchRequest(std::span<const std::uint8_t>(bytes, size));
+        std::vector<std::uint8_t> frame;
+        faf::remote::net::ByteWriter writer(frame);
+        writer.Byte(static_cast<std::uint8_t>(ESeatMessage::Lobby));
+        writer.Varint(0u);
+        writer.Bytes(message.data(), message.size());
+        (void)link.SendReliable(frame.data(), frame.size());
+        std::printf("probe %d: %.1f s: lobby: launch sent from %s, %zu bytes\n", options.uid, elapsed, options.lobbyLaunch.c_str(), size);
       }
     }
     if (Due(options.lobbySayAt, elapsed) && options.lobbySayTo != 0) {

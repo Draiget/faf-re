@@ -135,6 +135,16 @@ namespace
       connectToPeer(address.c_str(), signal.name.c_str(), uidText.c_str());
       return;
     }
+    case ELobbySignal::LaunchRefused:
+    case ELobbySignal::Launching: {
+      const std::string text = signal.kind == ELobbySignal::Launching ? std::string("The game server is starting the match.")
+                                                                      : "The game server won't start this: " + signal.text + ".";
+      gpg::Logf("SERVER LOBBY: %s", text.c_str());
+      // FAF's lobby.lua `AddChatText(text)`; autolobby.lua has none, which the log line covers.
+      LuaPlus::LuaFunction<void> addChatText(LobbyMethod("AddChatText"));
+      addChatText(text.c_str());
+      return;
+    }
     case ELobbySignal::DisconnectFromPeer: {
       gpg::Logf("SERVER LOBBY: uid %d left.", signal.uid);
       if (signal.uid == mHostUid) {

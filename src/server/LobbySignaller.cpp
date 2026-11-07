@@ -1,6 +1,7 @@
 #include "server/LobbySignaller.h"
 
 #include <algorithm>
+#include <cctype>
 #include <utility>
 
 // Engine addition, dedicated server: see LobbySignaller.h.
@@ -9,6 +10,28 @@ namespace faf::server
 {
   using remote::net::ELobbySignal;
   using remote::net::SLobbySignal;
+
+  std::string CheckLaunch(const SLaunchFacts& requested, const SLaunchFacts& match)
+  {
+    const auto lower = [](std::string text) {
+      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      return text;
+    };
+    if (lower(requested.scenario) != lower(match.scenario)) {
+      return "the map isn't the match's (" + match.scenario + ")";
+    }
+    std::vector<std::int32_t> asked = requested.humans;
+    std::vector<std::int32_t> seats = match.humans;
+    std::sort(asked.begin(), asked.end());
+    std::sort(seats.begin(), seats.end());
+    if (asked != seats) {
+      return "the players in the slots aren't the match's";
+    }
+    if (requested.gameMods > 0) {
+      return "a dedicated server runs no sim mods";
+    }
+    return {};
+  }
 
   CLobbySignaller::CLobbySignaller(std::string scenario, const std::uint8_t flags)
     : mScenario(std::move(scenario))
@@ -31,6 +54,17 @@ namespace faf::server
   std::size_t CLobbySignaller::InLobby() const noexcept
   {
     return static_cast<std::size_t>(std::count_if(mParticipants.begin(), mParticipants.end(), [](const SParticipant& p) { return p.lobbied && !p.left; }));
+  }
+
+  std::vector<std::int32_t> CLobbySignaller::InLobbyUids() const
+  {
+    std::vector<std::int32_t> uids;
+    for (const SParticipant& p : mParticipants) {
+      if (p.lobbied && !p.left) {
+        uids.push_back(p.uid);
+      }
+    }
+    return uids;
   }
 
   void CLobbySignaller::Push(std::vector<SOutgoing>& out, const std::int32_t to, const SLobbySignal& signal)

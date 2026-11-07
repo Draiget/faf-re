@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <span>
 #include <string>
 
 #include "remote/net/LobbySignals.h"
@@ -63,6 +64,11 @@ namespace faf::remote
   [[nodiscard]] bool TakeServerLobbySignal(net::SLobbySignal& signal);
   /** The lobby's connection to `uid` ends (`ConnLostEof`): the server said that participant left. */
   void EndServerLobbyPeer(std::int32_t uid);
+  /**
+   * Plan WP2.14: the lobby's host asks the server to launch this configuration (its Lua bytes, as
+   * `LuaObject::ToByteStream` writes them). False outside a server session.
+   */
+  bool SendServerLaunchRequest(std::span<const std::uint8_t> configuration);
   /** This player's uid in the server session, or 0 outside one. */
   [[nodiscard]] std::int32_t ServerSessionUid();
   /** The channel to the server is connected or reconnecting. */

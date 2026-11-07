@@ -16,7 +16,9 @@
 #include "moho/net/Common.h"
 #include "remote/client/ServerRelayConnector.h"
 #include "remote/net/GameLinks.h"
+#include "remote/net/Datagram.h"
 #include "remote/net/Handshake.h"
+#include "remote/net/LobbySignals.h"
 #include "remote/net/UdpSocket.h"
 
 namespace gpg
@@ -205,6 +207,21 @@ namespace faf::remote
     if (sSession != nullptr) {
       sSession->channel.MarkGone(uid);
     }
+  }
+
+  bool SendServerLaunchRequest(const std::span<const std::uint8_t> configuration)
+  {
+    if (sSession == nullptr) {
+      return false;
+    }
+    const std::vector<std::uint8_t> message = net::EncodeLaunchRequest(configuration);
+    std::vector<std::uint8_t> frame;
+    net::ByteWriter writer(frame);
+    writer.Byte(static_cast<std::uint8_t>(net::ESeatMessage::Lobby));
+    writer.Varint(0u); // the server itself
+    writer.Bytes(message.data(), message.size());
+    sSession->channel.SendLobbyFrame(frame);
+    return true;
   }
 
   std::int32_t ServerSessionUid()
