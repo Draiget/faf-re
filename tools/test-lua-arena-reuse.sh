@@ -1,17 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
-build=$(mktemp -d)
-trap 'rm -rf "$build"' EXIT
-cxx=${CXX:-g++}
-flags=(-std=c++20 -O2 -pthread -I"$root/src")
-case "${SANITIZER:-none}" in
-  none) ;;
-  undefined) flags+=(-O1 -g -fsanitize=undefined -fno-sanitize-recover=all) ;;
-  thread) flags+=(-O1 -g -fsanitize=thread) ;;
-  *) echo 'SANITIZER must be none, undefined, or thread' >&2; exit 2 ;;
-esac
-"$cxx" "${flags[@]}" "$root/tests/memory/LuaArenaReuseTests.cpp" -o "$build/reuse"
-for mode in full mixed threads zero-run; do
-  "$build/reuse" "$mode"
-done
+build=${BUILD_DIR:-"$root/build/lua-arena-host"}
+config=${BUILD_CONFIG:-Release}
+cmake -S "$root/tests/memory/lua_arena" -B "$build" \
+  -DCMAKE_BUILD_TYPE="$config" -DFAF_LUA_ARENA_SANITIZER="${SANITIZER:-none}" "$@"
+cmake --build "$build" --config "$config" --parallel --target faf_lua_arena_reuse_tests
+ctest --test-dir "$build" -C "$config" --output-on-failure -L LuaArenaHost
