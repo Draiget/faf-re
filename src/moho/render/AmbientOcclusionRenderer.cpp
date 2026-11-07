@@ -1,6 +1,10 @@
 #include "moho/render/AmbientOcclusionRenderer.h"
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
+#include <vector>
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
@@ -11,6 +15,8 @@
 #include "moho/render/AmbientOcclusionShader.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/sim/CWldMap.h"
+#include "moho/sim/STIMap.h"
+#include "moho/terrain/StratumMaterial.h"
 
 namespace moho
 {
@@ -52,6 +58,15 @@ namespace moho
     "ren_AoContactLength", "Contact shadow ray length in world units.", &ren_AoContactLength
   );
 
+  float ren_TerrainShadows = 0.45f;
+  TConVar<float> gTConVar_ren_TerrainShadows(
+    "ren_TerrainShadows",
+    "Terrain shadows from the heightfield beyond the shadow map's reach (part of ren_Ao): how much of the sun's "
+    "direct light they take, 0 to 1 (0 off). Off on maps that bake their own (stratum 7 terrain info) and when "
+    "shadows are off.",
+    &ren_TerrainShadows
+  );
+
   // Defined in moho/app/WxRuntimeTypes.cpp (0x007FA170).
   [[nodiscard]] IWldTerrainRes* REN_GetTerrainRes();
 
@@ -73,8 +88,13 @@ namespace moho
       VMatrix4 viewProjection;
       float sun[4];
       float contact[4];
+      float terrainGrid[4];
+      float terrainShadowSize[4];
     };
-    static_assert(sizeof(AoConstants) == 240, "AoConstants matches the shader's cbuffer");
+    static_assert(sizeof(AoConstants) == 272, "AoConstants matches the shader's cbuffer");
+
+    /** Terrain-shadow cells across the larger side of the map at most. */
+    constexpr std::int32_t kTerrainShadowCells = 1024;
 
     [[nodiscard]] bool BackendReadsBoundDepth(gpg::gal::Device& device)
     {
@@ -111,6 +131,11 @@ namespace moho
         compute.computeEntry = "AoCS";
         mCompute = device->CreateGpuProgram(compute);
 
+        gpg::gal::GpuProgramDesc bake = compute;
+        bake.name = "TerrainShadowBake";
+        bake.computeEntry = "TerrainShadowCS";
+        mBake = device->CreateGpuProgram(bake);
+
         gpg::gal::GpuProgramDesc composite{};
         composite.name = "AmbientOcclusionComposite";
         composite.source = kAmbientOcclusionShaderSource;
@@ -132,7 +157,113 @@ namespace moho
     return mSupported;
   }
 
-  void AmbientOcclusionRenderer::Render(const GeomCamera3& camera, const int x, const int y, const int width, const int height)
+  bool AmbientOcclusionRenderer::PrepareTerrainShadows(const float sun[3])
+  {
+    IWldTerrainRes* const terrain = REN_GetTerrainRes();
+    if (terrain == nullptr || mBake == nullptr || terrain->mMap == nullptr) {
+      return false;
+    }
+    // A map with a terrain info texture (stratum 7 albedo tile under 1, terrain.fx
+    // ShaderUsesTerrainInfoTexture) already darkens its terrain with baked shadows.
+    if (terrain->GetStratumMaterial().mStratum7AlbedoTexture.mScaleX < 1.0f) {
+      return false;
+    }
+    CHeightField* const field = terrain->mMap->mHeightField.get();
+    if (field == nullptr || field->Width() < 2 || field->Height() < 2) {
+      return false;
+    }
+    if (field == mBakedField && field->Width() == mFieldWidth && field->Height() == mFieldHeight
+        && sun[0] == mBakedSun[0] && sun[1] == mBakedSun[1] && sun[2] == mBakedSun[2]) {
+      return mTerrainShadow != nullptr;
+    }
+
+    mBakedField = field;
+    mFieldWidth = field->Width();
+    mFieldHeight = field->Height();
+    std::copy(sun, sun + 3, mBakedSun);
+    mTerrainShadow.reset();
+
+    const std::size_t samples = static_cast<std::size_t>(mFieldWidth) * static_cast<std::size_t>(mFieldHeight);
+    std::vector<std::uint32_t> packed((samples + 1U) / 2U, 0U);
+    const std::uint16_t* const heights = field->GetArrayAt(0, 0);
+    for (std::size_t index = 0; index < samples; ++index) {
+      packed[index >> 1U] |= static_cast<std::uint32_t>(heights[index]) << ((index & 1U) * 16U);
+    }
+    gpg::gal::GpuBufferDesc heightDesc{};
+    heightDesc.name = "TerrainShadowHeights";
+    heightDesc.stride = sizeof(std::uint32_t);
+    heightDesc.capacity = static_cast<std::uint32_t>(packed.size());
+    mHeights = mDevice->CreateGpuBuffer(heightDesc);
+    if (mHeights == nullptr) {
+      return false;
+    }
+    mDevice->UpdateGpuBuffer(*mHeights, 0U, static_cast<std::uint32_t>(packed.size()), packed.data());
+
+    const std::int32_t larger = std::max(mFieldWidth, mFieldHeight);
+    mShadowCellSize = static_cast<std::uint32_t>((larger + kTerrainShadowCells - 1) / kTerrainShadowCells);
+    mShadowAcross = (static_cast<std::uint32_t>(mFieldWidth) + mShadowCellSize - 1U) / mShadowCellSize;
+    mShadowDown = (static_cast<std::uint32_t>(mFieldHeight) + mShadowCellSize - 1U) / mShadowCellSize;
+    gpg::gal::GpuBufferDesc shadowDesc{};
+    shadowDesc.name = "TerrainShadow";
+    shadowDesc.stride = sizeof(float);
+    shadowDesc.capacity = mShadowAcross * mShadowDown;
+    shadowDesc.shaderWrite = true;
+    mTerrainShadow = mDevice->CreateGpuBuffer(shadowDesc);
+    if (mTerrainShadow == nullptr) {
+      return false;
+    }
+
+    AoConstants constants{};
+    constants.sun[0] = sun[0];
+    constants.sun[1] = sun[1];
+    constants.sun[2] = sun[2];
+    constants.terrainGrid[0] = static_cast<float>(mFieldWidth);
+    constants.terrainGrid[1] = static_cast<float>(mFieldHeight);
+    constants.terrainGrid[2] = static_cast<float>(mShadowCellSize);
+    constants.terrainShadowSize[0] = static_cast<float>(mShadowAcross);
+    constants.terrainShadowSize[1] = static_cast<float>(mShadowDown);
+    gpg::gal::GpuDispatch bake{};
+    bake.program = mBake.get();
+    bake.bindings.constants = &constants;
+    bake.bindings.constantBytes = sizeof(constants);
+    bake.bindings.readBuffers[1] = mHeights.get();
+    bake.bindings.writeBuffers[1] = mTerrainShadow.get();
+    bake.groupsX = (mShadowAcross + 7U) / 8U;
+    bake.groupsY = (mShadowDown + 7U) / 8U;
+    mDevice->DispatchGpuProgram(bake);
+    gpg::Logf("Terrain shadows: baked %ux%u cells over a %dx%d heightfield, sun (%.3f, %.3f, %.3f) (ren_TerrainShadows)",
+              mShadowAcross, mShadowDown, mFieldWidth, mFieldHeight, sun[0], sun[1], sun[2]);
+
+    // Diagnostics: FAF_TERRAIN_SHADOW_DUMP=<folder> writes the heightfield, the baked visibility and the sun
+    // there, so a CPU march can check the bake cell by cell.
+    std::size_t length = 0;
+    char folder[512] = {};
+    if (::getenv_s(&length, folder, sizeof(folder), "FAF_TERRAIN_SHADOW_DUMP") == 0 && length > 1U) {
+      std::vector<float> visibility(static_cast<std::size_t>(mShadowAcross) * mShadowDown);
+      if (mDevice->ReadGpuBuffer(*mTerrainShadow, 0U, static_cast<std::uint32_t>(visibility.size()), visibility.data())) {
+        const std::string base(folder);
+        if (std::FILE* const out = std::fopen((base + "/terrain_shadow.bin").c_str(), "wb")) {
+          std::fwrite(visibility.data(), sizeof(float), visibility.size(), out);
+          std::fclose(out);
+        }
+        if (std::FILE* const out = std::fopen((base + "/terrain_heights.bin").c_str(), "wb")) {
+          std::fwrite(heights, sizeof(std::uint16_t), samples, out);
+          std::fclose(out);
+        }
+        if (std::FILE* const out = std::fopen((base + "/terrain_meta.txt").c_str(), "w")) {
+          std::fprintf(out, "%d %d %u %u %u %.9g %.9g %.9g\n", mFieldWidth, mFieldHeight, mShadowCellSize, mShadowAcross,
+                       mShadowDown, sun[0], sun[1], sun[2]);
+          std::fclose(out);
+        }
+        gpg::Logf("Terrain shadows: dumped to %s", folder);
+      }
+    }
+    return true;
+  }
+
+  void AmbientOcclusionRenderer::Render(
+    const GeomCamera3& camera, const int x, const int y, const int width, const int height, const float shadowReach
+  )
   {
     if (!mSupported || width < 8 || height < 8 || ren_AoRadius <= 0.0f || ren_AoIntensity <= 0.0f) {
       return;
@@ -174,15 +305,26 @@ namespace moho
     constants.fadeStart = ren_AoFadeStart;
     constants.fadeEnd = std::max(ren_AoFadeEnd, ren_AoFadeStart + 1.0f);
     constants.viewProjection = camera.viewProjection;
-    if (IWldTerrainRes* const terrain = REN_GetTerrainRes(); terrain != nullptr && ren_AoContact > 0.0f) {
+    if (IWldTerrainRes* const terrain = REN_GetTerrainRes(); terrain != nullptr) {
       Wm3::Vector3f sun = terrain->GetSunDirection();
       sun.Normalize();
       constants.sun[0] = sun.X();
       constants.sun[1] = sun.Y();
       constants.sun[2] = sun.Z();
-      constants.sun[3] = std::min(ren_AoContact, 1.0f);
-      constants.contact[0] = std::max(ren_AoContactLength, 0.1f);
-      constants.contact[1] = std::max(ren_AoContactLength, 0.1f);
+      if (ren_AoContact > 0.0f) {
+        constants.sun[3] = std::min(ren_AoContact, 1.0f);
+        constants.contact[0] = std::max(ren_AoContactLength, 0.1f);
+        constants.contact[1] = std::max(ren_AoContactLength, 0.1f);
+      }
+      if (ren_TerrainShadows > 0.0f && shadowReach >= 0.0f && PrepareTerrainShadows(constants.sun)) {
+        constants.terrainGrid[0] = static_cast<float>(mFieldWidth);
+        constants.terrainGrid[1] = static_cast<float>(mFieldHeight);
+        constants.terrainGrid[2] = static_cast<float>(mShadowCellSize);
+        constants.terrainGrid[3] = std::min(ren_TerrainShadows, 1.0f);
+        constants.terrainShadowSize[0] = static_cast<float>(mShadowAcross);
+        constants.terrainShadowSize[1] = static_cast<float>(mShadowDown);
+        constants.terrainShadowSize[2] = shadowReach;
+      }
     }
 
     gpg::gal::GpuDispatch dispatch{};
@@ -190,6 +332,10 @@ namespace moho
     dispatch.bindings.constants = &constants;
     dispatch.bindings.constantBytes = sizeof(constants);
     dispatch.bindings.writeBuffers[0] = mTerms.get();
+    if (constants.terrainGrid[3] > 0.0f) {
+      dispatch.bindings.readBuffers[1] = mHeights.get();
+      dispatch.bindings.readBuffers[2] = mTerrainShadow.get();
+    }
     dispatch.bindings.readBoundDepth = true;
     dispatch.groupsX = (samplesAcross + 7U) / 8U;
     dispatch.groupsY = (samplesDown + 7U) / 8U;

@@ -2,7 +2,8 @@
 
 // Engine addition, not in the shipped binary.
 //
-// HLSL for `ren_Ao` (AmbientOcclusionRenderer): screen-space ambient occlusion
+// HLSL for `ren_Ao` (AmbientOcclusionRenderer), with contact shadows and terrain shadows
+// from the heightfield (`TerrainShadowCS` bakes them once per map): screen-space ambient occlusion
 // from the depth of terrain and opaque meshes. Each sample counts by how steeply
 // it rises above the surface (the cosine to the normal) less an allowance.
 // `AoCS` runs at half resolution and writes one {occlusion, distance} pair per
@@ -34,6 +35,8 @@ cbuffer AoConstants : register(b0)
     row_major float4x4 ViewProjection;
     float4 Sun;        // direction towards the sun, then the contact shadow strength (0: off)
     float4 Contact;    // contact ray length and the thickness that counts as a blocker, world units
+    float4 TerrainGrid;   // heightfield width and depth, field cells per terrain-shadow cell, strength (0: off)
+    float4 TerrainShadowSize; // terrain-shadow cells across and down, shadow map reach (0: none), unused
 };
 
 #define CONTACT_STEPS 8
@@ -42,7 +45,10 @@ cbuffer AoConstants : register(b0)
 #define AO_TURNS 7.0
 
 RWStructuredBuffer<float2> AoTerms : register(u0);
+RWStructuredBuffer<float> TerrainShadowOut : register(u1);
 StructuredBuffer<float2> AoInput : register(t0);
+StructuredBuffer<uint> TerrainHeights : register(t1); // two 16-bit samples per element, row by row
+StructuredBuffer<float> TerrainShadow : register(t2);
 #ifdef __spirv__
 [[vk::binding(10, 0)]]
 #endif
@@ -71,6 +77,75 @@ float3 Tangent(float3 center, int2 pixel, int2 step)
     return dot(forward, forward) < dot(backward, backward) ? forward : backward;
 }
 
+// The sim's heightfield: one sample per world unit, raw heights in 1/128 units.
+float FieldHeight(int2 cell)
+{
+    cell = clamp(cell, int2(0, 0), int2(TerrainGrid.xy) - 1);
+    const uint index = (uint)cell.y * (uint)TerrainGrid.x + (uint)cell.x;
+    const uint pair = TerrainHeights[index >> 1];
+    return (float)(((index & 1) != 0) ? (pair >> 16) : (pair & 0xFFFF)) * 0.0078125;
+}
+
+float FieldHeightAt(float2 xz)
+{
+    const float2 base = floor(xz);
+    const float2 f = xz - base;
+    const int2 c = int2(base);
+    return lerp(lerp(FieldHeight(c), FieldHeight(c + int2(1, 0)), f.x), lerp(FieldHeight(c + int2(0, 1)), FieldHeight(c + int2(1, 1)), f.x), f.y);
+}
+
+// Bakes sun visibility over the heightfield once per map: each cell marches towards the sun in growing
+// steps and keeps how far the ray clears the ground, softened with distance into a penumbra.
+[numthreads(8, 8, 1)]
+void TerrainShadowCS(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= (uint)TerrainShadowSize.x || id.y >= (uint)TerrainShadowSize.y) {
+        return;
+    }
+    const float2 xz = (float2(id.xy) + 0.5) * TerrainGrid.z;
+    const float3 start = float3(xz.x, FieldHeightAt(xz) + 0.1, xz.y);
+    float visibility = Sun.y > 0.0 ? 1.0 : 0.0;
+    float t = 0.5;
+    [loop]
+    for (int i = 0; i < 160 && visibility > 0.0; ++i) {
+        t += 0.5 + t * 0.04;
+        const float3 q = start + Sun.xyz * t;
+        if (q.x < 0.0 || q.z < 0.0 || q.x > TerrainGrid.x - 1.0 || q.z > TerrainGrid.y - 1.0) {
+            break;
+        }
+        const float clearance = q.y - FieldHeightAt(q.xz);
+        visibility = min(visibility, saturate(0.5 + clearance / (0.03 * t + 0.4)));
+    }
+    TerrainShadowOut[id.y * (uint)TerrainShadowSize.x + id.x] = visibility;
+}
+
+// How much of the sun's direct light the heightfield's shadow takes from this point, beyond the reach
+// of the shadow map. Lighting falls with the heightfield's own normal, so far terrain stays smooth.
+float TerrainShadowFactor(float3 world, float distance)
+{
+    if (TerrainGrid.w <= 0.0) {
+        return 1.0;
+    }
+    const float reach = TerrainShadowSize.z;
+    const float fadeIn = reach > 0.0 ? saturate((distance - reach) / (0.15 * reach + 1.0)) : 1.0;
+    if (fadeIn <= 0.0) {
+        return 1.0;
+    }
+    const float2 at = world.xz / TerrainGrid.z - 0.5;
+    const float2 base = floor(at);
+    const float2 f = at - base;
+    const int2 size = int2(TerrainShadowSize.xy);
+    const int2 c0 = clamp(int2(base), int2(0, 0), size - 1);
+    const int2 c1 = clamp(int2(base) + 1, int2(0, 0), size - 1);
+    const float v = lerp(lerp(TerrainShadow[c0.y * size.x + c0.x], TerrainShadow[c0.y * size.x + c1.x], f.x),
+                         lerp(TerrainShadow[c1.y * size.x + c0.x], TerrainShadow[c1.y * size.x + c1.x], f.x), f.y);
+    const float2 xz = world.xz;
+    const float3 normal = normalize(float3(FieldHeightAt(xz - float2(1.0, 0.0)) - FieldHeightAt(xz + float2(1.0, 0.0)), 2.0,
+                                           FieldHeightAt(xz - float2(0.0, 1.0)) - FieldHeightAt(xz + float2(0.0, 1.0))));
+    const float lit = saturate(dot(normal, Sun.xyz));
+    return 1.0 - TerrainGrid.w * (1.0 - v) * lit * fadeIn;
+}
+
 [numthreads(8, 8, 1)]
 void AoCS(uint3 id : SV_DispatchThreadID)
 {
@@ -88,10 +163,11 @@ void AoCS(uint3 id : SV_DispatchThreadID)
 
     const float3 center = WorldPosition(pixel, depth);
     const float distance = length(center - Eye.xyz);
+    const float terrain = TerrainShadowFactor(center, distance);
     const float fade = saturate((FadeEnd - distance) / max(FadeEnd - FadeStart, 0.001));
     const float sampleRadius = Radius * ProjScale / max(distance, 0.001);
     if (fade <= 0.0 || sampleRadius < 1.0) {
-        AoTerms[index] = float2(1.0, distance);
+        AoTerms[index] = float2(terrain, distance);
         return;
     }
 
@@ -148,7 +224,7 @@ void AoCS(uint3 id : SV_DispatchThreadID)
             }
         }
     }
-    AoTerms[index] = float2(lerp(1.0, occlusion, fade), distance);
+    AoTerms[index] = float2(lerp(1.0, occlusion, fade) * terrain, distance);
 }
 
 float4 AoCompositeVS(uint vertexId : SV_VertexID) : SV_Position

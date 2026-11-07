@@ -34,14 +34,29 @@ namespace moho
     /**
      * Darkens the bound colour target over the view at (`x`, `y`), `width` by `height` pixels, by the
      * occlusion the bound depth shows. Call it with the world view's viewport set, after the opaque
-     * meshes and before effects and water.
+     * meshes and before effects and water. `shadowReach` is how far the shadow map reaches this frame:
+     * terrain shadows from the heightfield take over beyond it; 0 when the map is off past
+     * ren_ShadowLOD, and negative when the player has shadows off, which keeps them off too.
      */
-    void Render(const GeomCamera3& camera, int x, int y, int width, int height);
+    void Render(const GeomCamera3& camera, int x, int y, int width, int height, float shadowReach);
 
   private:
+    /** Re-bakes terrain shadows when the map's heightfield or the sun changed; false when there are none. */
+    [[nodiscard]] bool PrepareTerrainShadows(const float sun[3]);
+
     gpg::gal::Device* mDevice = nullptr;
     bool mSupported = false;
     boost::shared_ptr<gpg::gal::GpuProgram> mCompute;
+    boost::shared_ptr<gpg::gal::GpuProgram> mBake;
+    boost::shared_ptr<gpg::gal::GpuBuffer> mHeights;
+    boost::shared_ptr<gpg::gal::GpuBuffer> mTerrainShadow;
+    const void* mBakedField = nullptr;
+    float mBakedSun[3]{};
+    std::int32_t mFieldWidth = 0;
+    std::int32_t mFieldHeight = 0;
+    std::uint32_t mShadowCellSize = 1U;
+    std::uint32_t mShadowAcross = 0U;
+    std::uint32_t mShadowDown = 0U;
     boost::shared_ptr<gpg::gal::GpuProgram> mComposite;
     boost::shared_ptr<gpg::gal::GpuBuffer> mTerms;
     std::uint32_t mTermCapacity = 0U;

@@ -95,6 +95,8 @@ namespace moho
   extern bool ren_Select;       // 0x00F57E4C = 0x01
   extern bool ren_fog;          // 0x00F57E4D = 0x01
   extern bool ren_Shadows;      // 0x00F57E53 = 0x01
+  extern float ren_ShadowCoeff;
+  extern std::int32_t shadow_Fidelity;
 }
 
 
@@ -1945,7 +1947,11 @@ void moho::WRenViewport::RenderWorldView(
   // before effects and water draw over it.
   if (moho::AmbientOcclusionRenderer& occlusion = moho::AmbientOcclusionRenderer::Get(); occlusion.IsActive()) {
     const gpg::gal::RenderProfileScope profileOcclusion("AmbientOcclusion");
-    occlusion.Render(*mCam, mScreenPos.x, mScreenPos.y, mScreenSize.x, mScreenSize.y);
+    // How far the shadow map reaches: terrain shadows take over beyond it, and stay off with shadows off.
+    const float shadowReach = (!moho::ren_Shadows || moho::shadow_Fidelity == 0) ? -1.0f
+      : mShadowRenderer.mShadowCameraValid                                      ? moho::ren_ShadowCoeff * worldView->mView->CameraGetTargetZoom()
+                                                                                 : 0.0f;
+    occlusion.Render(*mCam, mScreenPos.x, mScreenPos.y, mScreenSize.x, mScreenSize.y, shadowReach);
   }
   {
     const gpg::gal::RenderProfileScope profileEffects("Effects");
