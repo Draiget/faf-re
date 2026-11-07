@@ -729,6 +729,9 @@ namespace faf::headless
       }
       if (options.viewTables) {
         viewBench->EnableBenchTables();
+        if (options.statsEvery > 0) {
+          viewBench->SetStatsEveryBeats(static_cast<std::uint32_t>(options.statsEvery));
+        }
       }
       if (!options.viewDumpPath.empty()) {
         viewDumpFile = std::fopen(options.viewDumpPath.c_str(), "wb");

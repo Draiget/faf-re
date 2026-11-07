@@ -2382,7 +2382,8 @@ namespace moho
       StatItem* parent;
       StatIntrusiveNode* node;
     };
-    std::vector<SFrame> stack;
+    thread_local std::vector<SFrame> stack; // a server reads thousands of trees a beat
+    stack.clear();
     stack.push_back({stats.mItem.get(), AsChildHead(stats.mItem.get())->next});
     while (!stack.empty()) {
       SFrame& top = stack.back();

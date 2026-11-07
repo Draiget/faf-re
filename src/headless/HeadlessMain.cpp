@@ -218,6 +218,7 @@ namespace
       "  --view-teams              with --view-pipeline: one view per team and each player's own units\n"
       "  --view-tables             with --view-bench: the session tables as a server keeps them (sounds, names, unit\n"
       "                            stats, deposits and terrain edits), each beat's record written\n"
+      "  --stats-every <beats>     with --view-tables: each unit's stats read every <beats> beats (default 4)\n"
       "  --view-dump <file>        with --view-bench: what each player's client holds every 2000 beats, to compare two runs\n"
       "  --parallel-views          with --view-frames or --view-bench: the views are built on the sim's workers\n"
       "  --cpus <list>             run on these CPUs only, for example 8-15 or 0,2,4,6; a CPU set from taskset or a\n"
@@ -377,6 +378,9 @@ int HEADLESS_Main(int argc, char** argv)
   options.parallelViews = moho::CFG_GetArgOption("--parallel-views", 0, nullptr);
   options.viewTeams = moho::CFG_GetArgOption("--view-teams", 0, nullptr);
   options.viewTables = moho::CFG_GetArgOption("--view-tables", 0, nullptr);
+  if (std::string statsEvery; ReadOption("--stats-every", statsEvery)) {
+    options.statsEvery = std::atoi(statsEvery.c_str());
+  }
   (void)ReadOption("--view-dump", options.viewDumpPath);
   if (ReadIntOption("--view-pipeline", options.viewPipelineThreads, bad) && options.viewPipelineThreads < 0) {
     bad = true;

@@ -66,11 +66,16 @@ namespace faf::remote
      * edits are queued there once (`SessionEdits`). Whoever sends the frames sends `session`'s pending record
      * to every player before the beat's frames (`OnViewFrames`).
      */
-    void EnableSessionTables(wire::CSessionTableWriters& session) noexcept
+    void EnableSessionTables(wire::CSessionTableWriters& session, const std::uint32_t statsEveryBeats = kStatsEveryBeats) noexcept
     {
       mSession = &session;
       mSharedRecords.SetSessionTables(&session);
+      mSharedStats.SetReadEvery(statsEveryBeats);
     }
+    /** `CSharedUnitStats::SetReadEvery`'s default: a unit's stats at most 0.3 s late (server `--stats-every`). */
+    static constexpr std::uint32_t kStatsEveryBeats = 4;
+    /** `--stats-every <beats>` (server and headless view bench): 1 reads every unit's stats every beat. */
+    void SetStatsEveryBeats(const std::uint32_t beats) noexcept { mSharedStats.SetReadEvery(beats); }
     [[nodiscard]] wire::CSessionTableWriters* SessionTables() const noexcept { return mSession; }
     [[nodiscard]] const CSessionEditCollector& SessionEdits() const noexcept { return mEdits; }
     /** The sim of the last beat built (null before it); for checks that run on the sim thread. */
@@ -225,7 +230,7 @@ namespace faf::remote
     wire::CSessionTableWriters* mSession = nullptr; // `EnableSessionTables`
     CSessionEditCollector mEdits;
     CSharedUnitStats mSharedStats;
-    std::vector<CSharedUnitStats::Tree*> mStatsTrees; // this beat's units' trees
+    std::vector<std::uint32_t> mUnitIds; // this beat's units' ids (the entity index's first entries)
     std::vector<std::unique_ptr<CViewFrameBuilder>> mBuilders;
     std::vector<SHeldView> mHeld;
     CSharedEntityRecords mSharedRecords;

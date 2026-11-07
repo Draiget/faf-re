@@ -48,6 +48,12 @@ namespace faf::remote::wire
 
   std::uint32_t CSessionTableWriters::Name(const std::string_view name)
   {
+    // Most names asked for are empty (a unit's custom name, a weapon's range visuals): no hash for those.
+    if (name.empty()) {
+      if (const std::uint32_t empty = mEmptyName.load(std::memory_order_acquire); empty != kNoEmptyName) {
+        return empty;
+      }
+    }
     SThreadNames& cache = tNames;
     if (cache.session != mSerial) {
       cache.ids.clear();
@@ -64,6 +70,9 @@ namespace faf::remote::wire
         mNewNames.push_back(interned.id);
       }
       id = interned.id;
+    }
+    if (name.empty()) {
+      mEmptyName.store(id, std::memory_order_release);
     }
     cache.ids.emplace(std::string(name), id);
     return id;

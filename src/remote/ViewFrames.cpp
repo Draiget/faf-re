@@ -11,6 +11,7 @@
 #include "moho/command/CCommandDb.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/entity/EntityId.h"
 #include "moho/sim/SSTIArmyVariableData.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDriver.h"
@@ -911,13 +912,15 @@ namespace faf::remote
                               : std::span<const gpg::Rect2i>(),
         *mSession
       );
-      mStatsTrees.clear();
-      for (moho::Entity* const entity : mEntityPointers) {
-        if (moho::Unit* const unit = entity->IsUnit(); unit != nullptr && unit->mConstDat.mStatsRoot) {
-          mStatsTrees.push_back(unit->mConstDat.mStatsRoot.get());
-        }
+      // Units are id family 0 (moho/entity/EntityId.h), the index's first ids: the props and projectiles after them
+      // aren't touched.
+      mUnitIds.clear();
+      std::size_t units = 0;
+      while (units < mEntityIndex.size() && mEntityIndex[units].id < moho::ToRaw(moho::EEntityIdSentinel::FirstNonUnitFamily)) {
+        mUnitIds.push_back(mEntityIndex[units].id);
+        ++units;
       }
-      mSharedStats.Refresh(mStatsTrees, *mSession, Parallel());
+      mSharedStats.Refresh(mUnitIds, std::span<moho::Entity* const>(mEntityPointers.data(), units), *mSession, Parallel());
       MarkPhase(EViewPhase::Tables);
     }
 

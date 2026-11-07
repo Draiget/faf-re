@@ -272,16 +272,27 @@ namespace faf::remote
     using SStats = wire::TSharedValue<std::vector<wire::SUnitStat>>;
 
     /**
-     * Reads every tree in `trees` (on the sim's workers with `parallel`); trees no longer listed are forgotten. A tree
-     * whose items are the ones read before has only its values read (`STAT_CollectItems`); its item paths are
+     * This beat's units: the ids of entity family 0 in ascending order and their entities (the views' entity index
+     * starts with them). A unit seen last beat with the same id and entity keeps its tree without being read from the
+     * sim; units gone are forgotten. Then the trees due this beat are read (on the sim's workers with `parallel`): a
+     * tree whose items are the ones read before has only its values read (`STAT_CollectItems`); its item paths are
      * interned again only when its items change.
      */
-    void Refresh(std::span<Tree* const> trees, wire::CSessionTableWriters& session, bool parallel);
+    void Refresh(
+      std::span<const std::uint32_t> ids, std::span<moho::Entity* const> entities, wire::CSessionTableWriters& session,
+      bool parallel
+    );
+    /**
+     * Each tree is read every `beats` beats, a share of them each beat (a new tree at once): a unit's stats reach its
+     * views up to `beats - 1` beats late. Plan #118: reading every unit's stats every beat cost 2 ms of a 16-seat beat.
+     */
+    void SetReadEvery(const std::uint32_t beats) noexcept { mReadEvery = beats == 0u ? 1u : beats; }
+    [[nodiscard]] std::uint32_t ReadEvery() const noexcept { return mReadEvery; }
     /** `tree`'s stats as of this beat, or null when it was not read (a dead unit's blip reads its own). */
     [[nodiscard]] const SStats* Find(const Tree* tree) const
     {
-      const auto found = mTrees.find(tree);
-      return found != mTrees.end() ? &found->second.value : nullptr;
+      const auto found = mByTree.find(tree);
+      return found != mByTree.end() ? &found->second->value : nullptr;
     }
     /** The trees whose stats changed this beat, or were read for the first time. */
     [[nodiscard]] const std::vector<const Tree*>& Changed() const noexcept { return mChanged; }
@@ -292,14 +303,29 @@ namespace faf::remote
       std::vector<moho::StatItem*> items; // as `STAT_CollectItems` last listed them
       std::vector<std::uint32_t> names;   // each item's path, interned
       SStats value;
-      bool listed = false;  // this beat
+      bool fresh = true;    // not read yet
       bool changed = false; // this beat
+    };
+    struct SUnit
+    {
+      std::uint32_t id = 0;
+      moho::Entity* entity = nullptr;
+      Tree* tree = nullptr; // null: not a unit, or no tree (asked again each beat)
+      std::unique_ptr<STree> state;
     };
     /** One tree's beat, on any thread. */
     static void ReadTree(Tree& tree, STree& state, wire::CSessionTableWriters& session);
+    /** `unit`'s tree, from the sim. */
+    void Attach(SUnit& unit);
+    void Forget(SUnit& unit);
 
-    std::unordered_map<const Tree*, STree> mTrees;
-    std::vector<STree*> mWork; // per listed tree, this beat
+    std::vector<SUnit> mUnits;     // last beat's, by id
+    std::vector<SUnit> mNextUnits; // this beat's, while merging
+    std::unordered_map<const Tree*, STree*> mByTree;
+    std::vector<STree*> mWork;     // per tree read this beat
+    std::vector<Tree*> mWorkTrees; // likewise
+    std::uint32_t mReadEvery = 1;
+    std::uint32_t mBeat = 0; // `Refresh` calls
     std::vector<const Tree*> mChanged;
   };
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <atomic>
 #include <cstdint>
 #include <mutex>
 #include <utility>
@@ -79,6 +80,8 @@ namespace faf::remote::wire
     [[nodiscard]] std::uint32_t Sound(const SSoundEntry& entry);
     /** The name table id of `name`, as `Sound`. */
     [[nodiscard]] std::uint32_t Name(std::string_view name);
+    /** Tells this session from any other (for a thread's own caches of its ids). */
+    [[nodiscard]] std::uint64_t Serial() const noexcept { return mSerial; }
     /** Queues a deposit the sim added (false past `kMaxDeposits`, which the client would refuse). */
     bool Deposit(const SDeposit& deposit);
     /** Deposits queued or written so far: the sim's deposits from this index on are new. */
@@ -98,6 +101,8 @@ namespace faf::remote::wire
   private:
     std::mutex mInternLock; // `Sound` and `Name`
     std::uint64_t mSerial;  // tells this session's names from another's in a thread's cache (SessionTables.cpp)
+    static constexpr std::uint32_t kNoEmptyName = 0xFFFFFFFFu;
+    std::atomic<std::uint32_t> mEmptyName{kNoEmptyName}; // the empty name's id, once interned
     CSoundTableWriter mSounds;
     CNameTableWriter mNames;
     std::vector<std::uint32_t> mNewSounds;

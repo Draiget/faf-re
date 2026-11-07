@@ -4,6 +4,8 @@
 #include <array>
 #include <bit>
 #include <cmath>
+#include <string>
+#include <unordered_map>
 
 #include "moho/audio/CSndParams.h"
 #include "moho/audio/CSndVar.h"
@@ -36,12 +38,40 @@ namespace faf::remote
       if (params == nullptr || session == nullptr) {
         return wire::COrdinalTable::kNone;
       }
+      // Each thread's sounds already interned: the same few `CSndParams` come back every beat on every view. An
+      // entry holds for the same object with the same names (an object freed and made again may differ).
+      struct SCached
+      {
+        std::string bank, cue, lodCutoff, rpcLoop;
+        std::uint32_t id;
+      };
+      struct SThreadSounds
+      {
+        std::uint64_t session = 0;
+        std::unordered_map<const moho::CSndParams*, SCached> ids;
+      };
+      thread_local SThreadSounds sounds;
+      if (sounds.session != session->Serial()) {
+        sounds.ids.clear();
+        sounds.session = session->Serial();
+      }
+      const char* const lodCutoff = params->mLodCutoff != nullptr ? params->mLodCutoff->mName.c_str() : "";
+      const char* const rpcLoop = params->mRpcLoopVariable != nullptr ? params->mRpcLoopVariable->mName.c_str() : "";
+      if (const auto found = sounds.ids.find(params); found != sounds.ids.end()) {
+        const SCached& cached = found->second;
+        if (cached.bank == params->mBank.c_str() && cached.cue == params->mCue.c_str() && cached.lodCutoff == lodCutoff
+            && cached.rpcLoop == rpcLoop) {
+          return cached.id;
+        }
+      }
       wire::SSoundEntry entry;
       entry.bank = params->mBank.c_str();
       entry.cue = params->mCue.c_str();
-      entry.lodCutoff = params->mLodCutoff != nullptr ? params->mLodCutoff->mName.c_str() : "";
-      entry.rpcLoop = params->mRpcLoopVariable != nullptr ? params->mRpcLoopVariable->mName.c_str() : "";
-      return session->Sound(entry);
+      entry.lodCutoff = lodCutoff;
+      entry.rpcLoop = rpcLoop;
+      const std::uint32_t id = session->Sound(entry);
+      sounds.ids[params] = SCached{entry.bank, entry.cue, entry.lodCutoff, entry.rpcLoop, id};
+      return id;
     }
 
     void ApplyAppearance(
@@ -828,38 +858,94 @@ namespace faf::remote
     state.changed = state.value.Assign(stats);
   }
 
-  void CSharedUnitStats::Refresh(const std::span<Tree* const> trees, wire::CSessionTableWriters& session, const bool parallel)
+  void CSharedUnitStats::Attach(SUnit& unit)
   {
-    mWork.resize(trees.size());
-    for (std::size_t i = 0; i < trees.size(); ++i) {
-      STree& state = mTrees[trees[i]]; // a node: stays put while others are added
-      state.listed = true;
+    moho::Unit* const asUnit = unit.entity->IsUnit();
+    if (asUnit == nullptr || !asUnit->mConstDat.mStatsRoot) {
+      return;
+    }
+    unit.tree = asUnit->mConstDat.mStatsRoot.get();
+    unit.state = std::make_unique<STree>();
+    mByTree[unit.tree] = unit.state.get();
+  }
+
+  void CSharedUnitStats::Forget(SUnit& unit)
+  {
+    if (unit.tree != nullptr) {
+      if (const auto found = mByTree.find(unit.tree); found != mByTree.end() && found->second == unit.state.get()) {
+        mByTree.erase(found);
+      }
+    }
+  }
+
+  void CSharedUnitStats::Refresh(
+    const std::span<const std::uint32_t> ids, const std::span<moho::Entity* const> entities, wire::CSessionTableWriters& session,
+    const bool parallel
+  )
+  {
+    // Last beat's units merged with this beat's, both by id: only a new unit is read from the sim.
+    mNextUnits.clear();
+    mNextUnits.reserve(ids.size());
+    std::size_t old = 0;
+    for (std::size_t i = 0; i < ids.size(); ++i) {
+      while (old < mUnits.size() && mUnits[old].id < ids[i]) {
+        Forget(mUnits[old++]);
+      }
+      if (old < mUnits.size() && mUnits[old].id == ids[i]) {
+        if (mUnits[old].entity == entities[i]) {
+          mNextUnits.push_back(std::move(mUnits[old++]));
+          if (mNextUnits.back().tree == nullptr) {
+            Attach(mNextUnits.back());
+          }
+          continue;
+        }
+        Forget(mUnits[old++]); // the id is another entity's now
+      }
+      SUnit unit;
+      unit.id = ids[i];
+      unit.entity = entities[i];
+      Attach(unit);
+      mNextUnits.push_back(std::move(unit));
+    }
+    while (old < mUnits.size()) {
+      Forget(mUnits[old++]);
+    }
+    mUnits.swap(mNextUnits);
+
+    mWork.clear();
+    mWorkTrees.clear();
+    const std::uint32_t beat = mBeat++;
+    for (SUnit& unit : mUnits) {
+      if (unit.tree == nullptr) {
+        continue;
+      }
+      STree& state = *unit.state;
       state.changed = false;
-      mWork[i] = &state;
+      // A tree's share: its address, mixed, spreads the trees evenly over the beats.
+      const auto phase = static_cast<std::uint32_t>((static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(unit.tree)) * 0x9E3779B97F4A7C15ull) >> 40u);
+      if (state.fresh || mReadEvery <= 1u || (phase + beat) % mReadEvery == 0u) {
+        state.fresh = false;
+        mWork.push_back(&state);
+        mWorkTrees.push_back(unit.tree);
+      }
     }
     const auto read = [&](const std::size_t begin, const std::size_t end) {
       for (std::size_t i = begin; i < end; ++i) {
-        ReadTree(*trees[i], *mWork[i], session);
+        ReadTree(*mWorkTrees[i], *mWork[i], session);
       }
     };
     constexpr std::size_t kGrain = 64;
-    if (parallel && trees.size() > kGrain) {
-      moho::CSimWorkerPool::Get().ParallelFor(trees.size(), kGrain, read);
+    if (parallel && mWork.size() > kGrain) {
+      moho::CSimWorkerPool::Get().ParallelFor(mWork.size(), kGrain, read);
     } else {
-      read(0u, trees.size());
+      read(0u, mWork.size());
     }
-    // The trees not listed go; the changed ones are listed for the views.
+    // The changed ones, for the views.
     mChanged.clear();
-    for (auto it = mTrees.begin(); it != mTrees.end();) {
-      if (!it->second.listed) {
-        it = mTrees.erase(it);
-        continue;
+    for (std::size_t i = 0; i < mWork.size(); ++i) {
+      if (mWork[i]->changed) {
+        mChanged.push_back(mWorkTrees[i]);
       }
-      if (it->second.changed) {
-        mChanged.push_back(it->first);
-      }
-      it->second.listed = false;
-      ++it;
     }
   }
 
