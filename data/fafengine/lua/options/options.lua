@@ -123,7 +123,9 @@ end
 do
     local command = 'ren_SplatBudgetTier'
     local function Supported()
-        if type(ConTextMatches) ~= 'function' then
+        -- The engine's Lua reports C functions as 'cfunction'.
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
             return false
         end
         local ok, matches = pcall(ConTextMatches, command)
@@ -196,7 +198,9 @@ end
 do
     local command = 'ren_Ao'
     local function Supported()
-        if type(ConTextMatches) ~= 'function' then
+        -- The engine's Lua reports C functions as 'cfunction'.
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
             return false
         end
         local ok, matches = pcall(ConTextMatches, command)
@@ -246,7 +250,9 @@ end
 do
     local command = 'ren_Fxaa'
     local function Supported()
-        if type(ConTextMatches) ~= 'function' then
+        -- The engine's Lua reports C functions as 'cfunction'.
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
             return false
         end
         local ok, matches = pcall(ConTextMatches, command)
