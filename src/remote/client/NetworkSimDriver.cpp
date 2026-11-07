@@ -409,4 +409,26 @@ namespace faf::remote::client
   }
 
   void CNetworkSimDriver::DrawNetworkStats(moho::CD3DPrimBatcher*, float, float, float, float) {}
+
+  namespace
+  {
+    SServerLaunch sLaunch;
+    bool sHaveLaunch = false;
+  } // namespace
+
+  void SetServerLaunch(const SServerLaunch& launch)
+  {
+    sLaunch = launch;
+    sHaveLaunch = true;
+  }
+
+  bool HasServerLaunch() noexcept
+  {
+    return sHaveLaunch;
+  }
+
+  moho::ISTIDriver* CreateServerSessionDriver(moho::RRuleGameRules& rules)
+  {
+    return new CNetworkSimDriver(rules, sLaunch.playerName.c_str(), sLaunch.clientIndex, sLaunch.uid, sLaunch.source);
+  }
 } // namespace faf::remote::client

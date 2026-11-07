@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "moho/net/CClientManagerImpl.h"
@@ -126,4 +127,20 @@ namespace faf::remote::client
     std::uint64_t mAnswers[3] = {};
     std::uint64_t mLuaLanesBad = 0;
   };
+
+  /** Plan WP2.8: this player's part of the server's launch, as the session starter worked it out. */
+  struct SServerLaunch
+  {
+    std::string playerName;
+    int clientIndex = -1;
+    std::int32_t uid = 0;
+    unsigned int source = 0;
+  };
+
+  /** The session starter: the next session is a server session, this player's part of it as given. */
+  void SetServerLaunch(const SServerLaunch& launch);
+  /** A server session's launch was set: `WLD_DoLoading` makes the network driver, not a sim. */
+  [[nodiscard]] bool HasServerLaunch() noexcept;
+  /** `WLD_DoLoading`, in a server session: the driver, over the session's rules. */
+  [[nodiscard]] moho::ISTIDriver* CreateServerSessionDriver(moho::RRuleGameRules& rules);
 } // namespace faf::remote::client

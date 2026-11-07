@@ -884,6 +884,9 @@ namespace moho
 
     for (std::size_t clientIndex = 0; clientIndex < clientCount; ++clientIndex) {
       auto* const client = static_cast<CClientBase*>(clientManager->GetClient(static_cast<int>(clientIndex)));
+      if (client == nullptr) {
+        continue; // engine addition: a server session's roster has no client in a slot nobody holds
+      }
 
       LuaPlus::LuaObject clientEntry{};
       clientEntry.AssignNewTable(state, 0, 0);
