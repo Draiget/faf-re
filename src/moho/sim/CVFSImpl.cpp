@@ -723,12 +723,7 @@ namespace
     const moho::SVFSMountPoint* sourceBegin
   )
   {
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationEnd;
-      *destinationEnd = *sourceEnd;
-    }
-    return destinationEnd;
+    return std::copy_backward(sourceBegin, sourceEnd, destinationEnd);
   }
 
   /**

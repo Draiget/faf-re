@@ -2,6 +2,7 @@
 #include "moho/script/CScriptObject.h"
 #include "CScriptObject.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <exception>
 #include <string>
@@ -495,12 +496,7 @@ namespace
     const LuaPlus::LuaObject* sourceEnd
   )
   {
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationEnd;
-      *destinationEnd = *sourceEnd;
-    }
-    return destinationEnd;
+    return std::copy_backward(sourceBegin, sourceEnd, destinationEnd);
   }
 
 } // namespace
