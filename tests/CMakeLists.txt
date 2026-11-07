@@ -126,6 +126,13 @@ set_target_properties(faf_replay_scan_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME replay_scan COMMAND faf_replay_scan_tests)
 set_tests_properties(replay_scan PROPERTIES LABELS "Existing")
 
+# CZipFile reads entries whose data starts at or past 2 GiB, as the binary does (tests/zip, PR #291).
+add_executable(faf_zip_offset_tests EXCLUDE_FROM_ALL zip/ZipOffsetTests.cpp)
+target_link_libraries(faf_zip_offset_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_zip_offset_tests PROPERTIES FOLDER "Tests/Existing")
+add_test(NAME zip_offset COMMAND faf_zip_offset_tests)
+set_tests_properties(zip_offset PROPERTIES LABELS "Existing")
+
 # Engine addition (#247): the user preferences from several threads at once
 # (tests/prefs); fails without USER_PreferencesLock.
 add_executable(faf_prefs_thread_tests EXCLUDE_FROM_ALL prefs/PrefsThreadTests.cpp)
@@ -218,6 +225,7 @@ set(_faf_existing_test_targets
   faf_sim_math_tests
   faf_replay_scan_tests
   faf_prefs_thread_tests
+  faf_zip_offset_tests
   faf_recon_scroll_packet_tests
   faf_coroutine_tests
   faf_msdf_cook_tests
@@ -238,11 +246,11 @@ endif()
 add_custom_target(existing_tests DEPENDS ${_faf_existing_test_targets})
 set_target_properties(existing_tests PROPERTIES FOLDER "Tests/Existing")
 
-# Vulkan attachment barriers: SDK structs only, no device or engine runtime needed.
-add_executable(faf_vulkan_attachment_tests EXCLUDE_FROM_ALL vulkan/AttachmentBarrierTests.cpp)
-target_include_directories(faf_vulkan_attachment_tests PRIVATE
-  ${CMAKE_SOURCE_DIR}/src "${FAF_DEPENDENCIES_DIR}/vulkan/include")
-target_link_libraries(faf_vulkan_attachment_tests PRIVATE gtest_main)
-set_target_properties(faf_vulkan_attachment_tests PROPERTIES FOLDER "Tests/Rendering")
-add_test(NAME vulkan_attachment_barriers COMMAND faf_vulkan_attachment_tests)
-set_tests_properties(vulkan_attachment_barriers PROPERTIES LABELS "Rendering")
+add_subdirectory(vulkan)
+
+# Rendering-only bounded terrain splat output; no game data or renderer required.
+add_executable(faf_splat_budget_tests EXCLUDE_FROM_ALL terrain/splat_budget/SplatBudgetTests.cpp)
+target_link_libraries(faf_splat_budget_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_splat_budget_tests PROPERTIES FOLDER "Tests/Terrain")
+add_test(NAME splat_budget COMMAND faf_splat_budget_tests)
+set_tests_properties(splat_budget PROPERTIES TIMEOUT 120 LABELS "Terrain")

@@ -4,6 +4,7 @@
 #include <cstdint>
 #if FAF_SERVER_MODE
 #include <functional>
+#include <vector>
 #endif
 
 #include "boost/mutex.h"
@@ -108,6 +109,11 @@ namespace moho
    * (the sim adds items under it). A game server reads a unit's stats this way to send them.
    */
   void STAT_VisitItems(Stats<StatItem>& stats, const std::function<void(const fa::string& path, StatItem& item)>& visit);
+  /**
+   * Engine addition, server mode: the items `STAT_VisitItems` visits, in its order, without their paths: a server
+   * that read a tree once checks each beat whether its items are still the same ones before reading only values.
+   */
+  void STAT_CollectItems(Stats<StatItem>& stats, std::vector<StatItem*>& out);
 #endif
 
   /**

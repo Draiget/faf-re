@@ -1596,10 +1596,6 @@ namespace faf::remote
       }
     }
 
-    if (mPayloadObserver) {
-      mPayloadObserver(sim);
-    }
-
     // Print lines written with no focus reach every player, as they do every lockstep client, after
     // those written under the player's focus.
     for (SPlayerSync& view : mPlayers) {
@@ -1608,6 +1604,11 @@ namespace faf::remote
       for (const fa::string& line : packet.mPrintField) {
         view.prints.emplace_back(line.c_str());
       }
+    }
+
+    // The beat's payloads and print lines are all there (a server sends them now, plan WP11 `LuaSync`).
+    if (mPayloadObserver) {
+      mPayloadObserver(sim);
     }
 
     // The views' own tables are emptied as `Sync` is, by the game's own function.

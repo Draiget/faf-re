@@ -101,6 +101,7 @@ set(FAF_ENGINE_SOURCES
   gpg/gal/backends/vulkan/VulkanLoader.cpp
   gpg/gal/backends/vulkan/VulkanSurface.cpp
   gpg/gal/backends/vulkan/VulkanCore.cpp
+  gpg/gal/backends/vulkan/VulkanMemoryAllocator.cpp
   gpg/gal/backends/vulkan/ResourcesVulkan.cpp
   gpg/gal/backends/vulkan/DeviceVulkan.cpp
   gpg/gal/backends/vulkan/GpuDrivenVulkan.cpp
@@ -1073,6 +1074,7 @@ set(FAF_ENGINE_SOURCES
   moho/audio/SofdecRuntime.cpp
   moho/movie/sfd/SfdHeaderInfo.cpp
   moho/app/CScApp.cpp
+  moho/app/ServerLobbyUi.cpp
   moho/app/UserWorkerPool.cpp
   moho/app/CWaitHandleSet.cpp
   moho/app/IWinApp.cpp

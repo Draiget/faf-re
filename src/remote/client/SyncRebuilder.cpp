@@ -312,7 +312,7 @@ namespace faf::remote::client
 
   void CSyncRebuilder::ApplyDeposits(moho::SSyncData& packet)
   {
-    if (mSession == nullptr || packet.mSimResources.px == nullptr) {
+    if (mSession == nullptr || (packet.mSimResources.px == nullptr && !mNoSim)) {
       return; // no session record, or a beat without the sim's deposits: the packet's stays
     }
     if (!mResources) {
@@ -328,7 +328,7 @@ namespace faf::remote::client
       footprint.z1 = deposit.z1;
       mResources->AddDeposit(static_cast<moho::EDepositType>(deposit.type), &footprint);
     }
-    {
+    if (packet.mSimResources.px != nullptr) {
       // Check: the client's deposits are the sim's, in order.
       moho::CSimResources& sim = *packet.mSimResources.px;
       boost::mutex::scoped_lock simLock(sim.lock_);
@@ -380,7 +380,11 @@ namespace faf::remote::client
   void CSyncRebuilder::ApplyTerrain(moho::SSyncData& packet)
   {
     const moho::CHeightField* const sim = packet.mTerrainUpdate.px;
-    if (mSession == nullptr || sim == nullptr) {
+    if (mSession != nullptr && sim == nullptr && mNoSim && !mTerrain) {
+      mStats.terrainEdits += mSession->TakeTerrainEdits().size(); // no heights to apply them to (the probe): counted
+      return;
+    }
+    if (mSession == nullptr || (sim == nullptr && !mNoSim)) {
       return; // no session record, or a beat without the sim's field: the packet's stays
     }
     if (!mTerrain) {
@@ -410,15 +414,17 @@ namespace faf::remote::client
       }
       ++mStats.terrainEdits;
     }
-    // Checks: the same rectangles as the sim's, and the same heights everywhere after an edit.
-    bool sameRects = rects.size() == packet.mPlayableRectUpdates.size();
-    for (std::size_t i = 0; sameRects && i < rects.size(); ++i) {
-      const gpg::Rect2i& a = rects[i];
-      const gpg::Rect2i& b = packet.mPlayableRectUpdates[i];
-      sameRects = a.x0 == b.x0 && a.z0 == b.z0 && a.x1 == b.x1 && a.z1 == b.z1;
+    // Checks, with a sim: the same rectangles as the sim's, and the same heights everywhere after an edit.
+    if (sim != nullptr) {
+      bool sameRects = rects.size() == packet.mPlayableRectUpdates.size();
+      for (std::size_t i = 0; sameRects && i < rects.size(); ++i) {
+        const gpg::Rect2i& a = rects[i];
+        const gpg::Rect2i& b = packet.mPlayableRectUpdates[i];
+        sameRects = a.x0 == b.x0 && a.z0 == b.z0 && a.x1 == b.x1 && a.z1 == b.z1;
+      }
+      mStats.terrainRectMismatches += sameRects ? 0u : 1u;
+      mSimTerrain.reset_from(packet.mTerrainUpdate); // for `TerrainCellsDiffering`
     }
-    mStats.terrainRectMismatches += sameRects ? 0u : 1u;
-    mSimTerrain.reset_from(packet.mTerrainUpdate); // for `TerrainCellsDiffering`
     packet.mPlayableRectUpdates.swap(rects);
     packet.mTerrainUpdate.reset_from_owner(mTerrain);
   }
@@ -526,8 +532,21 @@ namespace faf::remote::client
       ++mStats.decodeFailures;
       return false;
     }
+    return ApplyFrame(std::move(frame), frameBytes.size(), packet, start);
+  }
+
+  bool CSyncRebuilder::ApplyFrame(wire::SViewFrame frame, const std::size_t wireBytes, moho::SSyncData& packet)
+  {
+    return ApplyFrame(std::move(frame), wireBytes, packet, std::chrono::steady_clock::now());
+  }
+
+  bool CSyncRebuilder::ApplyFrame(
+    wire::SViewFrame frame, const std::size_t wireBytes, moho::SSyncData& packet, const std::chrono::steady_clock::time_point start
+  )
+  {
+    using Clock = std::chrono::steady_clock;
     ++mStats.frames;
-    mStats.frameBytes += frameBytes.size();
+    mStats.frameBytes += wireBytes;
 
     const Clock::time_point decoded = Clock::now();
     ApplyTerrain(packet);

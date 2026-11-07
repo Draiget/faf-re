@@ -13,3 +13,5 @@ if(WIN32 AND FAF_TARGET_ARCH STREQUAL "x86")
     # Exit 77 is deliberately NOT SKIP_RETURN_CODE: unavailable required evidence fails the gate.
   endforeach()
 endif()
+
+include(${CMAKE_CURRENT_LIST_DIR}/LuaArenaTests.cmake)
