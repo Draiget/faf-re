@@ -398,6 +398,31 @@ namespace
     return out.IsTable();
   }
 
+  /**
+   * Plan WPR.55: the `LaunchInfo` message, the match's configuration in the lobby's Lua byte form. Empty when it can't
+   * be written or is too large for one message's 16-bit size.
+   */
+  [[nodiscard]] std::vector<std::uint8_t> MakeLaunchInfo(LuaPlus::LuaObject& config)
+  {
+    moho::CMessage message(moho::ELobbyMsg::LOBMSG_DirectScriptData);
+    bool written = false;
+    {
+      moho::CMessageStream stream(message, moho::CMessageStream::Access::kReadWrite);
+      written = config.ToByteStream(stream);
+    }
+    constexpr std::size_t kHeaderBytes = 3u; // type, 16-bit size
+    const std::size_t size = message.mBuff.Size();
+    if (!written || size <= kHeaderBytes || size > 0xFFFFu) {
+      return {};
+    }
+    const auto* const bytes = reinterpret_cast<const std::uint8_t*>(message.mBuff.start_);
+    std::vector<std::uint8_t> out;
+    out.reserve(1u + size - kHeaderBytes);
+    out.push_back(static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::LaunchInfo));
+    out.insert(out.end(), bytes + kHeaderBytes, bytes + size);
+    return out;
+  }
+
   /** What to call the game: the match file's `MatchName`, or the map's name without its `<LOC id>`. */
   [[nodiscard]] std::string ReadMatchTitle(const LuaPlus::LuaObject& config, LuaPlus::LuaState* const state)
   {
@@ -743,6 +768,14 @@ namespace
     const faf::remote::wire::SContentTables contentTables = faf::remote::BuildContentTables(*rules);
     std::unique_ptr<faf::server::CServerViews> views;
     if (net && !roster.Remotes().empty()) {
+      // Plan WPR.55: every client's launch comes from here; a game too large for one message is refused at start.
+      const std::vector<std::uint8_t> launchInfo = MakeLaunchInfo(config);
+      if (launchInfo.empty()) {
+        end.error = "the match's configuration doesn't fit one launch message";
+        Say("Can't host: %s", end.error.c_str());
+        WriteResult(resultPath, end);
+        return kExitBadInput;
+      }
       std::map<std::size_t, std::int32_t> viewPlayers;
       const auto& armies = sessionInfo->mLaunchInfo->mArmyLaunchInfo;
       for (const moho::SLaunchClient& client : roster.Remotes()) {
@@ -754,6 +787,7 @@ namespace
             break;
           }
         }
+        net->QueueView(client.uid, launchInfo);
         net->QueueView(client.uid, faf::server::MakeGameInfo(mapSizeX, mapSizeZ, playerArmy, client.commandSource));
       }
       views = std::make_unique<faf::server::CServerViews>(contentTables, *rules, mapSizeX, mapSizeZ, *net, std::move(viewPlayers), static_cast<unsigned int>(std::max(viewThreads, 1)), teamViews);

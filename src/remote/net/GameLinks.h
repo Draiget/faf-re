@@ -67,6 +67,13 @@ namespace faf::remote::net
      * (LobbySignals.h), as FAF's lobby server sends a game over GPGNet.
      */
     Lobby = 10,
+    /**
+     * Server to player, reliable, before `GameInfo` (plan WPR.55): the game's configuration as the server launched it
+     * (the table `CLobby.LaunchGame` takes: scenario, armies, options, mods), in the lobby's Lua byte form
+     * (`LuaObject::ToByteStream`). A client takes its launch from this, never from the lobby's own Launch message.
+     * Again after a reconnect, with `GameInfo`.
+     */
+    LaunchInfo = 11,
   };
 
   /** What became of a player's command. */

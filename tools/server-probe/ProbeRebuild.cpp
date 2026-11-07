@@ -15,6 +15,10 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/misc/StartupHelpers.h"
+#include "gpg/core/streams/BinaryReader.h"
+#include "moho/net/CMessage.h"
+#include "moho/net/CMessageStream.h"
+#include "moho/net/ELobbyMsg.h"
 #include "moho/net/LaunchInfoBuilder.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
@@ -76,8 +80,11 @@ namespace faf::probe
   CProbeRebuild::CProbeRebuild() = default;
   CProbeRebuild::~CProbeRebuild() = default;
 
-  bool CProbeRebuild::Load(const std::string& matchPath, const int uid, std::string& error)
+  bool CProbeRebuild::Start(std::string& error)
   {
+    if (mState) {
+      return true;
+    }
     // `WinMain` / `CScApp::Init` without a window, as the server does.
     moho::APP_InitializeIdentity();
     moho::PLAT_Init();
@@ -88,6 +95,44 @@ namespace faf::probe
       return false;
     }
     moho::USER_LoadPreferences(fa::string("Game.prefs"));
+    return true;
+  }
+
+  bool CProbeRebuild::OnLaunchInfo(const std::span<const std::uint8_t> configuration, const int uid, std::string& error)
+  {
+    if (!mState || mState->rules) {
+      return true; // not asked to rebuild from it, or the rules are loaded already (a reconnect sends it again)
+    }
+    // As `CLobby::OnScriptData` reads script data: the lobby's Lua byte form.
+    LuaPlus::LuaState* const state = faf::headless::ReplayLuaState();
+    LuaPlus::LuaObject config;
+    try {
+      moho::CMessage message(moho::ELobbyMsg::LOBMSG_DirectScriptData);
+      (void)message.Append(reinterpret_cast<const char*>(configuration.data()), configuration.size());
+      moho::CMessageStream stream(&message, moho::CMessageStream::Access::kReadOnly);
+      const gpg::BinaryReader reader{&stream};
+      LuaPlus::LuaObject codec = state->GetGlobals();
+      codec.SCR_FromByteStream(config, state, &reader);
+    } catch (const std::exception& exception) {
+      error = std::string("the launch info doesn't read: ") + exception.what();
+      return false;
+    }
+    if (!config.IsTable()) {
+      error = "the launch info isn't a table";
+      return false;
+    }
+    // A client with no sim needs only the rules from it: the server's own observer entry (uid 0) is left out.
+    LuaPlus::LuaObject noObservers;
+    noObservers.AssignNewTable(state, 0, 0u);
+    config.SetObject("Observers", noObservers);
+    return LoadRules(config, uid, error);
+  }
+
+  bool CProbeRebuild::Load(const std::string& matchPath, const int uid, std::string& error)
+  {
+    if (!Start(error)) {
+      return false;
+    }
 
     // The match, as the server reads it (`MatchConfig`, `MatchSeed`); a client will get it from the server (WPR.55).
     LuaPlus::LuaState* const state = faf::headless::ReplayLuaState();
@@ -99,21 +144,26 @@ namespace faf::probe
       return false;
     }
     LuaPlus::LuaObject config = state->GetGlobal("MatchConfig");
-    const LuaPlus::LuaObject seedObject = state->GetGlobal("MatchSeed");
     if (!config.IsTable()) {
       error = matchPath + " sets no MatchConfig";
       return false;
     }
+    return LoadRules(config, uid, error);
+  }
+
+  bool CProbeRebuild::LoadRules(LuaPlus::LuaObject& config, const int uid, std::string& error)
+  {
+    LuaPlus::LuaState* const state = faf::headless::ReplayLuaState();
     // As the player this probe is: `BuildLaunchInfo` wants the local player in the match.
     moho::CLaunchRoster roster(uid, fa::string("probe"), {});
-    moho::SLaunchBuild build = moho::BuildLaunchInfo(
-      config, roster, seedObject.IsNumber() ? static_cast<std::int32_t>(seedObject.GetNumber()) : 1, true, state
-    );
+    // The seed is the sim's; a client with no sim needs none.
+    moho::SLaunchBuild build = moho::BuildLaunchInfo(config, roster, 1, true, state);
     if (build.failure != nullptr) {
       error = std::string("the match can't launch: ") + build.failure;
       return false;
     }
-    moho::SWldSessionInfo sessionInfo;
+    moho::SWldSessionInfo sessionInfo{}; // value-initialised: `LoadSessionScenario` beats a non-null client manager
+    sessionInfo.mClientManager = nullptr;
     sessionInfo.mMapName = build.mapName;
     sessionInfo.mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
     moho::SWldGameData gameData{};
@@ -186,6 +236,11 @@ namespace faf::probe
     // A fresh packet each beat: a client with no sim has nothing else to start from.
     moho::SSyncData packet{};
     mState->applied += mState->rebuilder->ApplyFrame(std::move(merged), own.size() + team.size(), packet) ? 1u : 0u;
+  }
+
+  bool CProbeRebuild::HasRules() const noexcept
+  {
+    return mState && mState->rules;
   }
 
   void CProbeRebuild::Report(const int uid) const

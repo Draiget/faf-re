@@ -171,7 +171,8 @@ namespace faf::server
     std::atomic<std::uint64_t> mBytesSent{0};
     std::mutex mViewLock;
     std::map<std::int32_t, std::vector<SQueuedMessage>> mViewQueue;
-    std::map<std::int32_t, std::vector<std::uint8_t>> mGameInfo; // each player's, to send again on their return
+    // Each player's LaunchInfo and GameInfo, in the order queued, to send again on their return.
+    std::map<std::int32_t, std::vector<std::vector<std::uint8_t>>> mStartMessages;
     std::vector<SQueuedMessage> mViewSending;
 
     std::mutex mNewsLock;

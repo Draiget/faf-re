@@ -81,8 +81,10 @@ namespace faf::server
   void CServerNet::QueueView(const std::int32_t uid, std::vector<std::uint8_t> message, const bool fresh)
   {
     const std::scoped_lock lock(mViewLock);
-    if (!message.empty() && message[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::GameInfo)) {
-      mGameInfo[uid] = message;
+    if (!message.empty()
+        && (message[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::GameInfo)
+            || message[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::LaunchInfo))) {
+      mStartMessages[uid].push_back(message);
     }
     mViewQueue[uid].push_back(SQueuedMessage{std::move(message), fresh});
   }
@@ -100,7 +102,7 @@ namespace faf::server
         continue;
       }
       mViewSending.clear();
-      std::vector<std::uint8_t> gameInfo;
+      std::vector<std::vector<std::uint8_t>> startMessages;
       {
         const std::scoped_lock lock(mViewLock);
         const auto queue = mViewQueue.find(uid);
@@ -108,8 +110,8 @@ namespace faf::server
           mViewSending.swap(queue->second);
         }
         if (seat.viewBroken) {
-          if (const auto info = mGameInfo.find(uid); info != mGameInfo.end()) {
-            gameInfo = info->second;
+          if (const auto info = mStartMessages.find(uid); info != mStartMessages.end()) {
+            startMessages = info->second;
           }
         }
       }
@@ -126,8 +128,8 @@ namespace faf::server
           continue;
         }
         seat.viewBroken = false;
-        if (!gameInfo.empty()) {
-          (void)mLinks.SendReliable(uid, gameInfo.data(), gameInfo.size());
+        for (const std::vector<std::uint8_t>& message : startMessages) {
+          (void)mLinks.SendReliable(uid, message.data(), message.size());
         }
         Say(seat.name + " has their view again, from beat " + std::to_string(mBeat.load(std::memory_order_relaxed)));
       }
@@ -401,6 +403,7 @@ namespace faf::server
     case remote::net::ESeatMessage::Beat:
     case remote::net::ESeatMessage::View:
     case remote::net::ESeatMessage::GameInfo:
+    case remote::net::ESeatMessage::LaunchInfo:
     case remote::net::ESeatMessage::CommandAnswer:
     case remote::net::ESeatMessage::ViewCheck:
       break; // the server's own to send
