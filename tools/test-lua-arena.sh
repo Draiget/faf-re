@@ -1,23 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
-build=$(mktemp -d)
-trap 'rm -rf "$build"' EXIT
-cxx=${CXX:-g++}
-flags=(-std=c++20 -O2 -pthread -I"$root/src")
-case "${SANITIZER:-none}" in
-  none) ;;
-  undefined) flags+=(-O1 -g -fsanitize=undefined -fno-sanitize-recover=all) ;;
-  thread) flags+=(-O1 -g -fsanitize=thread) ;;
-  *) echo 'SANITIZER must be none, undefined, or thread' >&2; exit 2 ;;
-esac
-"$cxx" "${flags[@]}" "$root/tests/memory/LuaArenaLargeRunTests.cpp" -o "$build/large-runs"
-if [[ ${SANITIZER:-none} == thread ]]; then
-  "$build/large-runs" threads
-else
-  for mode in capacity failed-order host-oom oversized threads; do
-    "$build/large-runs" "$mode"
-  done
-  "$cxx" "${flags[@]}" "$root/tests/memory/LuaArenaPressureTests.cpp" -o "$build/pressure"
-  "$build/pressure"
-fi
+build=${BUILD_DIR:-"$root/build/lua-arena-host"}
+config=${BUILD_CONFIG:-Release}
+cmake -S "$root/tests/memory/lua_arena" -B "$build" \
+  -DCMAKE_BUILD_TYPE="$config" -DFAF_LUA_ARENA_SANITIZER="${SANITIZER:-none}" "$@"
+cmake --build "$build" --config "$config" --parallel --target faf_lua_arena_large_run_tests faf_lua_arena_pressure_tests
+ctest --test-dir "$build" -C "$config" --output-on-failure -L LuaArenaHost
