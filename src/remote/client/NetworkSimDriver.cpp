@@ -5,6 +5,9 @@
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
+#include "moho/lua/SCR_String.h"
+#include "moho/misc/LaunchInfoBase.h"
+#include "moho/resource/CSimResources.h"
 #include "moho/net/CMessage.h"
 #include "moho/net/CMessageStream.h"
 #include "moho/net/ELobbyMsg.h"
@@ -46,7 +49,8 @@ namespace faf::remote::client
   } // namespace
 
   CNetworkSimDriver::CNetworkSimDriver(
-    moho::RRuleGameRules& rules, const char* const playerName, const int clientIndex, const std::int32_t uid, const unsigned int sourceId
+    moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch, const char* const playerName, const int clientIndex,
+    const std::int32_t uid, const unsigned int sourceId
   )
     : mRules(rules)
     , mClientManager([this](moho::CMessage& message) { SendCommandFrame(message); }, nullptr)
@@ -54,6 +58,30 @@ namespace faf::remote::client
     , mEmptySyncLua(new LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE))
   {
     mEmptySync = EmptyTableBytes(*mEmptySyncLua);
+    mResources.reset(new moho::CSimResources());
+    // The armies, as `CArmyImpl`'s constructor names them from each army's setup (0x006FE690: `ArmyName`,
+    // `PlayerName`, `Civilian`); their intel grids stay null, which user code reads as unknown (research WP11.3).
+    if (const auto* const launchNew = dynamic_cast<const moho::LaunchInfoNew*>(&launch); launchNew != nullptr) {
+      for (std::size_t index = 0; index < launchNew->mStrVec.size(); ++index) {
+        moho::SSTIArmyConstantData army{};
+        army.mArmyIndex = static_cast<std::int32_t>(index);
+        try {
+          LuaPlus::LuaObject setup;
+          (void)moho::SCR_FromString(&setup, launchNew->mStrVec[index], mEmptySyncLua.get());
+          if (setup.IsTable()) {
+            const LuaPlus::LuaObject armyName = setup["ArmyName"];
+            const LuaPlus::LuaObject playerName = setup["PlayerName"];
+            const LuaPlus::LuaObject civilian = setup["Civilian"];
+            army.mArmyName.assign_owned(armyName.IsString() ? armyName.GetString() : "");
+            army.mPlayerName.assign_owned(playerName.IsString() ? playerName.GetString() : "");
+            army.mIsCivilian = static_cast<std::uint8_t>(civilian.IsBoolean() && civilian.GetBoolean() ? 1u : 0u);
+          }
+        } catch (const std::exception& error) {
+          gpg::Warnf("server driver: army %zu's setup doesn't read: %s", index, error.what());
+        }
+        mArmyConstants.push_back(army);
+      }
+    }
     mAvailable = ::CreateEventW(nullptr, TRUE, FALSE, nullptr); // manual reset: set while packets wait
     (void)mClientManager.CreateLocalClient(playerName, clientIndex, uid, sourceId);
     mClientManager.SetLoadedHandler([] {
@@ -61,7 +89,9 @@ namespace faf::remote::client
       (void)SendServerGameMessage(std::span<const std::uint8_t>(&loaded, 1u));
       gpg::Logf("server driver: loaded; told the server");
     });
-    gpg::Logf("server driver: on, as client %d (uid %d, source %u)", clientIndex, static_cast<int>(uid), sourceId);
+    gpg::Logf(
+      "server driver: on, as client %d (uid %d, source %u), %zu armies", clientIndex, static_cast<int>(uid), sourceId, mArmyConstants.size()
+    );
   }
 
   CNetworkSimDriver::~CNetworkSimDriver()
@@ -148,10 +178,17 @@ namespace faf::remote::client
     packet->mCurTick = static_cast<std::int32_t>(view.beat);
     packet->mAdvanced = true;
     packet->mFocusArmy = mViews->Info().army;
+    if (!mArmiesGiven) {
+      mArmiesGiven = true;
+      for (const moho::SSTIArmyConstantData& army : mArmyConstants) {
+        packet->mNewGrids.push_back(army);
+      }
+    }
     if (!mViews->Apply(view, *packet)) {
       ++mViewsBad;
       return;
     }
+    packet->mSimResources.reset_from_owner(mResources);
     // Every army's record as this client holds it.
     const std::vector<wire::SArmyRecord>& armies = mViews->Armies();
     packet->mArmyUpdates.resize(armies.size());
@@ -427,8 +464,8 @@ namespace faf::remote::client
     return sHaveLaunch;
   }
 
-  moho::ISTIDriver* CreateServerSessionDriver(moho::RRuleGameRules& rules)
+  moho::ISTIDriver* CreateServerSessionDriver(moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch)
   {
-    return new CNetworkSimDriver(rules, sLaunch.playerName.c_str(), sLaunch.clientIndex, sLaunch.uid, sLaunch.source);
+    return new CNetworkSimDriver(rules, launch, sLaunch.playerName.c_str(), sLaunch.clientIndex, sLaunch.uid, sLaunch.source);
   }
 } // namespace faf::remote::client

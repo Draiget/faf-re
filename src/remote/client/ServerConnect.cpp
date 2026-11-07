@@ -161,6 +161,9 @@ namespace faf::remote
 
       void SendGameMessage(const std::span<const std::uint8_t> message) { (void)mLink.SendReliable(message.data(), message.size()); }
 
+      /** The link moves (keepalives, acknowledgements); what arrives waits in order for its taker. */
+      void KeepAlive() { Pump(); }
+
     private:
       // The lobby pulls every frame, and the session's task too: the link moves here.
       void Pump()
@@ -243,6 +246,13 @@ namespace faf::remote
   bool TakeServerGameMessage(std::vector<std::uint8_t>& message)
   {
     return sSession != nullptr && sSession->channel.TakeGameMessage(message);
+  }
+
+  void KeepServerSessionAlive()
+  {
+    if (sSession != nullptr) {
+      sSession->channel.KeepAlive();
+    }
   }
 
   bool SendServerGameMessage(const std::span<const std::uint8_t> message)

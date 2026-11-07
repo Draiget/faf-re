@@ -75,6 +75,11 @@ namespace faf::remote
    * `CommandAnswer`, `ViewCheck`; not a lobby frame), in arrival order. False when none is waiting or outside a session.
    */
   [[nodiscard]] bool TakeServerGameMessage(std::vector<std::uint8_t>& message);
+  /**
+   * The link to the server moves without taking anything from it (keepalives, acknowledgements): every frame while
+   * the map loads, when neither the lobby nor the session's driver reads the channel. Its 10 s timeout would end it.
+   */
+  void KeepServerSessionAlive();
   /** Plan WP11: one message from the game's session to the server (a `Command`, `Loaded`, `Leaving`...), reliably. */
   bool SendServerGameMessage(std::span<const std::uint8_t> message);
   /** This player's uid in the server session, or 0 outside one. */

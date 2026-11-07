@@ -89,6 +89,9 @@ namespace
         }
       }
     }
+    if (mLaunched) {
+      faf::remote::KeepServerSessionAlive(); // the map loads; the driver reads the channel once the session runs
+    }
     if (mLobby == nullptr && !mLostSaid && !mLaunched && !faf::remote::ServerSessionUp()) {
       mLostSaid = true;
       gpg::Logf("SERVER LOBBY: the channel to the server is gone before the lobby started.");

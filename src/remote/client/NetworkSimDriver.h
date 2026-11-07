@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "boost/shared_ptr.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/sim/ISTIDriver.h"
 #include "remote/client/RemoteClientManager.h"
@@ -23,7 +24,10 @@
 
 namespace moho
 {
+  class CSimResources;
+  class LaunchInfoBase;
   class RRuleGameRules;
+  struct SSTIArmyConstantData;
 }
 
 namespace LuaPlus
@@ -40,7 +44,10 @@ namespace faf::remote::client
      * `rules`: the session's (`CWldSession::mRules`), which outlives the driver. The local client: the session's
      * client index, the player's uid and command source, as the launch info gives them.
      */
-    CNetworkSimDriver(moho::RRuleGameRules& rules, const char* playerName, int clientIndex, std::int32_t uid, unsigned int sourceId);
+    CNetworkSimDriver(
+      moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch, const char* playerName, int clientIndex, std::int32_t uid,
+      unsigned int sourceId
+    );
     ~CNetworkSimDriver() override;
 
     void DisconnectClients() override;
@@ -116,6 +123,13 @@ namespace faf::remote::client
     std::unique_ptr<CServerViewClient> mViews;
     std::unique_ptr<LuaPlus::LuaState> mEmptySyncLua; // makes the `Sync` table's bytes for a view with no Lua lane
     std::vector<std::uint8_t> mEmptySync;
+    // Every army's constants (index, names, civilian), as the sim's first packet gives them (`Sim::Sync`
+    // `mNewGrids`), made from the launch's army setups; given with the first packet, which makes the session's armies.
+    std::vector<moho::SSTIArmyConstantData> mArmyConstants;
+    bool mArmiesGiven = false;
+    // The session's resource deposits (it takes them from every packet, and its map draws them): the client's own,
+    // empty until the server sends the deposits (research map step 4, session tables).
+    boost::shared_ptr<moho::CSimResources> mResources;
     std::deque<std::unique_ptr<moho::SSyncData>> mPackets;
     HANDLE mAvailable = nullptr;
     std::int32_t mLastBeat = -1;
@@ -142,5 +156,5 @@ namespace faf::remote::client
   /** A server session's launch was set: `WLD_DoLoading` makes the network driver, not a sim. */
   [[nodiscard]] bool HasServerLaunch() noexcept;
   /** `WLD_DoLoading`, in a server session: the driver, over the session's rules. */
-  [[nodiscard]] moho::ISTIDriver* CreateServerSessionDriver(moho::RRuleGameRules& rules);
+  [[nodiscard]] moho::ISTIDriver* CreateServerSessionDriver(moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch);
 } // namespace faf::remote::client

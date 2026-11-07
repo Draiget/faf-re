@@ -568,7 +568,7 @@ namespace
         sessionInfo->mClientManager = nullptr;
         if (serverSession) {
 #if FAF_SERVER_MODE
-          driver = faf::remote::client::CreateServerSessionDriver(*wldSession->mRules);
+          driver = faf::remote::client::CreateServerSessionDriver(*wldSession->mRules, *sessionInfo->mLaunchInfo);
 #endif
         } else {
         // Engine addition (issue #275): does nothing unless a save came with this client's seat.
