@@ -1,5 +1,6 @@
 #include "remote/client/NetworkSimDriver.h"
 
+#include <algorithm>
 #include <utility>
 
 #include "gpg/core/streams/MemBufferStream.h"
@@ -108,11 +109,11 @@ namespace faf::remote::client
     const SServerViewStats& views = mViews ? mViews->Stats() : noStats;
     gpg::Logf(
       "server driver %s: %llu views (%llu applied, %llu bad, %llu frame failures), beat %d, %llu commands sent, answers %llu applied / "
-      "%llu refused / %llu dropped, %llu Lua lanes bad",
+      "%llu refused / %llu dropped, %llu Lua lanes bad, %llu without their LuaSync",
       when, static_cast<unsigned long long>(mViewsTaken), static_cast<unsigned long long>(views.applied), static_cast<unsigned long long>(mViewsBad),
       static_cast<unsigned long long>(views.frameFailures), static_cast<int>(mLastBeat), static_cast<unsigned long long>(mCommandsSent),
       static_cast<unsigned long long>(mAnswers[0]), static_cast<unsigned long long>(mAnswers[1]), static_cast<unsigned long long>(mAnswers[2]),
-      static_cast<unsigned long long>(mLuaLanesBad)
+      static_cast<unsigned long long>(mLuaLanesBad), static_cast<unsigned long long>(mLuaMissing)
     );
   }
 
@@ -144,7 +145,37 @@ namespace faf::remote::client
         ++mViewsBad;
         return;
       }
-      QueueView(view);
+      SPendingView pending;
+      pending.message = message;
+      pending.beat = view.beat;
+      if (const auto early = mEarlyLua.find(view.beat); early != mEarlyLua.end()) {
+        pending.lua = std::move(early->second);
+        pending.haveLua = true;
+        mEarlyLua.erase(early);
+      }
+      mPendingViews.push_back(std::move(pending));
+      ReleaseViews();
+      return;
+    }
+    case net::ESeatMessage::LuaSync: {
+      // Plan WP11: the beat's Lua lane, after the server routed the beat's `Sync`.
+      net::ByteReader reader(message.data() + 1, message.size() - 1u);
+      const auto beat = static_cast<std::uint32_t>(reader.Varint());
+      const std::uint64_t size = reader.Varint();
+      const std::uint8_t* const bytes = reader.Bytes(static_cast<std::size_t>(size));
+      if (!reader.Ok()) {
+        ++mLuaLanesBad;
+        return;
+      }
+      std::vector<std::uint8_t> lane(bytes, bytes + size);
+      const auto pending = std::find_if(mPendingViews.begin(), mPendingViews.end(), [beat](const SPendingView& view) { return view.beat == beat; });
+      if (pending != mPendingViews.end()) {
+        pending->lua = std::move(lane);
+        pending->haveLua = true;
+        ReleaseViews();
+      } else if (mEarlyLua.size() < 64u) {
+        mEarlyLua[beat] = std::move(lane);
+      }
       return;
     }
     case net::ESeatMessage::Beat: {
@@ -170,7 +201,25 @@ namespace faf::remote::client
     }
   }
 
-  void CNetworkSimDriver::QueueView(const SViewMessage& view)
+  void CNetworkSimDriver::ReleaseViews()
+  {
+    // In order: a view waits for its beat's `LuaSync`, unless the next beat's view is here (none is coming then).
+    while (!mPendingViews.empty() && (mPendingViews.front().haveLua || mPendingViews.size() > 1u)) {
+      SPendingView pending = std::move(mPendingViews.front());
+      mPendingViews.pop_front();
+      SViewMessage view;
+      if (!ReadViewMessage(pending.message, view)) {
+        ++mViewsBad;
+        continue;
+      }
+      if (!pending.haveLua) {
+        ++mLuaMissing;
+      }
+      QueueView(view, pending.haveLua ? std::span<const std::uint8_t>(pending.lua) : view.lua);
+    }
+  }
+
+  void CNetworkSimDriver::QueueView(const SViewMessage& view, const std::span<const std::uint8_t> lua)
   {
     ++mViewsTaken;
     auto packet = std::make_unique<moho::SSyncData>();
@@ -198,14 +247,25 @@ namespace faf::remote::client
     // The beat's Lua `Sync` table (the session deserialises it every beat): the view's Lua lane, or an empty table.
     std::vector<std::uint8_t> table;
     std::vector<std::string> prints;
-    if (!view.lua.empty()) {
-      wire::BitReader reader(view.lua);
+    if (!lua.empty()) {
+      wire::BitReader reader(lua);
       if (!wire::DecodeLuaSyncLane(reader, table, prints)) {
         ++mLuaLanesBad;
         table.clear();
       }
     }
     const std::vector<std::uint8_t>& sync = table.empty() ? mEmptySync : table;
+    if (mViewsTaken <= 3u || (!table.empty() && mLuaTablesLogged < 3u)) {
+      // The first beats' Lua `Sync` (what the session's `OnSync` gets), for the log.
+      static constexpr char kPlayableArea[] = "NewPlayableArea";
+      const bool playableArea =
+        std::search(table.begin(), table.end(), std::begin(kPlayableArea), std::end(kPlayableArea) - 1) != table.end();
+      mLuaTablesLogged += table.empty() ? 0u : 1u;
+      gpg::Logf(
+        "server driver: beat %u Lua lane %zu bytes, Sync table %zu bytes%s, %zu prints", view.beat, lua.size(), table.size(),
+        playableArea ? " (NewPlayableArea)" : "", prints.size()
+      );
+    }
     auto* const stream = new gpg::MemBufferStream(static_cast<unsigned int>(sync.size() + 16u));
     stream->Write(reinterpret_cast<const char*>(sync.data()), sync.size());
     packet->mStream = stream;

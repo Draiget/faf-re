@@ -56,6 +56,8 @@ namespace faf::server
     /** Last beat's views are over, so the id maps are quiet: the players' commands go in, and whoever left loses their view. */
     void OnBeatStarting() override;
     void OnLanesEncoded(std::size_t army, const SLanes& lanes) override;
+    /** Plan WP11: each beat's Lua lane goes as its own `LuaSync` message once `Sim::Sync` has routed the beat's table. */
+    void OnLuaRouterMade(remote::CSyncRouter& router) override;
     void OnViewsFinished() override;
 
   private:

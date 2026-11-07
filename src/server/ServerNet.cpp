@@ -404,6 +404,7 @@ namespace faf::server
     case remote::net::ESeatMessage::View:
     case remote::net::ESeatMessage::GameInfo:
     case remote::net::ESeatMessage::LaunchInfo:
+    case remote::net::ESeatMessage::LuaSync:
     case remote::net::ESeatMessage::CommandAnswer:
     case remote::net::ESeatMessage::ViewCheck:
       break; // the server's own to send

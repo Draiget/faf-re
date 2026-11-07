@@ -2,7 +2,9 @@
 
 #include <cstdint>
 #include <deque>
+#include <map>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -109,8 +111,10 @@ namespace faf::remote::client
   private:
     /** One message from the server for the session. */
     void Take(const std::vector<std::uint8_t>& message);
-    /** The packet for one view: its entity lanes rebuilt, the beat's fields and its Lua `Sync` table. */
-    void QueueView(const SViewMessage& view);
+    /** The packet for one view: its entity lanes rebuilt, the beat's fields and its Lua `Sync` table (`lua`). */
+    void QueueView(const SViewMessage& view, std::span<const std::uint8_t> lua);
+    /** Views whose beat's `LuaSync` has come, or that the next beat's view proves won't come, become packets. */
+    void ReleaseViews();
     /** Sends one command message (`CMarshaller` built it) as a `Command` frame. */
     void SendCommandFrame(moho::CMessage& message);
     /** The beat a command just sent will be applied at, as best this side knows: the newest shown plus one. */
@@ -131,6 +135,17 @@ namespace faf::remote::client
     // empty until the server sends the deposits (research map step 4, session tables).
     boost::shared_ptr<moho::CSimResources> mResources;
     std::deque<std::unique_ptr<moho::SSyncData>> mPackets;
+    // Views waiting for their beat's Lua lane (`LuaSync`, sent once the server's `Sync` for the beat is routed).
+    struct SPendingView
+    {
+      std::vector<std::uint8_t> message;
+      std::uint32_t beat = 0;
+      bool haveLua = false;
+      std::vector<std::uint8_t> lua;
+    };
+    std::deque<SPendingView> mPendingViews;
+    std::map<std::uint32_t, std::vector<std::uint8_t>> mEarlyLua; // a `LuaSync` before its view (the pipeline)
+    std::uint64_t mLuaMissing = 0;
     HANDLE mAvailable = nullptr;
     std::int32_t mLastBeat = -1;
     std::int32_t mServerBeat = -1;
@@ -140,6 +155,7 @@ namespace faf::remote::client
     std::uint64_t mCommandsSent = 0;
     std::uint64_t mAnswers[3] = {};
     std::uint64_t mLuaLanesBad = 0;
+    std::uint64_t mLuaTablesLogged = 0;
   };
 
   /** Plan WP2.8: this player's part of the server's launch, as the session starter worked it out. */
