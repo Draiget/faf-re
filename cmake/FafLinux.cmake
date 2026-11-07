@@ -208,6 +208,11 @@ target_include_directories(faf_sim_settings INTERFACE
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_link_libraries(faf_sim_settings INTERFACE faf_codegen)
 target_link_libraries(faf_sim PUBLIC Wm3Headers zlib123 faf_monocypher faf_zstd)
+# The client half of server mode (remote/client/ServerConnect.cpp, /connectserver) holds the channel to the server:
+# every program built from faf_sim links the net channel, as Windows' server-mode faf_main does.
+if(TARGET faf_netchannel)
+  target_link_libraries(faf_sim PUBLIC faf_netchannel)
+endif()
 
 set(_faf_sim_options
   # The recovered tree's x86 layout asserts, off as on Windows x64 (see the
