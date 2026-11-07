@@ -1804,7 +1804,7 @@ namespace
       // (see SCR_FromLocalByteStream); the binary calls SCR_FromByteStream.
       currentSync.SCR_FromLocalByteStream(currentSync, mState, &syncReader);
       mState->GetGlobals().SetObject("Sync", currentSync);
-      SIM_AddRestoredUiData(currentSync, mState); // engine addition (replay keyframes)
+      SIM_AddRestoredUiData(currentSync, mState, IsReplay != 0); // engine addition (replay keyframes)
     }
     (void)SCR_LuaDoString("OnSync()", mState);
 
