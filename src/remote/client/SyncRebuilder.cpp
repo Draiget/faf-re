@@ -526,8 +526,21 @@ namespace faf::remote::client
       ++mStats.decodeFailures;
       return false;
     }
+    return ApplyFrame(std::move(frame), frameBytes.size(), packet, start);
+  }
+
+  bool CSyncRebuilder::ApplyFrame(wire::SViewFrame frame, const std::size_t wireBytes, moho::SSyncData& packet)
+  {
+    return ApplyFrame(std::move(frame), wireBytes, packet, std::chrono::steady_clock::now());
+  }
+
+  bool CSyncRebuilder::ApplyFrame(
+    wire::SViewFrame frame, const std::size_t wireBytes, moho::SSyncData& packet, const std::chrono::steady_clock::time_point start
+  )
+  {
+    using Clock = std::chrono::steady_clock;
     ++mStats.frames;
-    mStats.frameBytes += frameBytes.size();
+    mStats.frameBytes += wireBytes;
 
     const Clock::time_point decoded = Clock::now();
     ApplyTerrain(packet);

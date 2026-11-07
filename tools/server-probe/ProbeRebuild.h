@@ -21,10 +21,10 @@ namespace faf::probe
     /** The engine's services, then the match file's rules (as the server loads them). False with `error`. */
     [[nodiscard]] bool Load(const std::string& matchPath, int uid, std::string& error);
 
-    /** `GameInfo`: the map's size makes the codec; the rebuilder starts here. */
-    void OnGameInfo(float mapSizeX, float mapSizeZ);
-    /** One view's own frame (the entities lane). */
-    void OnFrame(std::span<const std::uint8_t> frame);
+    /** `GameInfo`: the map's size makes the codec; the rebuilder starts here. `army`: the player's (-1: none). */
+    void OnGameInfo(float mapSizeX, float mapSizeZ, std::int32_t army);
+    /** One view's own and team frames (empty team: none), merged and rebuilt. */
+    void OnView(std::span<const std::uint8_t> own, std::span<const std::uint8_t> team);
 
     /** The rebuild's counts, one line each. */
     void Report(int uid) const;

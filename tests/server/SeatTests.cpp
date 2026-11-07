@@ -30,6 +30,7 @@
 #include "netlink/EngineLinks.h"
 #include "remote/ServerClient.h"
 #include "remote/client/ServerRelayConnector.h"
+#include "remote/client/ViewMerge.h"
 #include "remote/ViewIdMap.h"
 #include "remote/net/Datagram.h"
 #include "remote/net/GameLinks.h"
@@ -971,4 +972,40 @@ TEST(LaunchCheck, ARequestIsItsKindThenTheConfiguration)
   EXPECT_EQ(std::vector<std::uint8_t>(back.begin(), back.end()), configuration);
   EXPECT_FALSE(faf::remote::net::IsLaunchRequest(std::vector<std::uint8_t>{faf::remote::net::kLobbyLaunchRequest}, back));
   EXPECT_FALSE(faf::remote::net::IsLaunchRequest(faf::remote::net::EncodeLobbySignal(SLobbySignal{}), back));
+}
+
+// Plan WP11 step 3: a client's view is its own frame and its team's, less the team's blips of its own units.
+TEST(ViewMerge, OwnAndTeamLessBlipsOfOwnUnits)
+{
+  using faf::remote::client::CViewFrameMerger;
+  const auto record = [](const std::uint32_t id) {
+    faf::remote::wire::SEntityRecord r{};
+    r.id = id;
+    return r;
+  };
+  faf::remote::wire::SViewFrame own;
+  own.frameId = 7;
+  own.beat = 42;
+  own.entities = {record(0x00500001u), record(0x00500009u)}; // army 5's units
+  faf::remote::wire::SViewFrame team;
+  team.entities = {record(0x00500001u), record(0x00600002u), record(0x20000003u), record(0x30500004u), record(0x30600005u)};
+  faf::remote::wire::SViewFrame merged;
+  std::uint64_t leftOut = 0;
+  CViewFrameMerger::Merge(own, &team, 5, merged, leftOut);
+  std::vector<std::uint32_t> ids;
+  for (const auto& r : merged.entities) {
+    ids.push_back(r.id);
+  }
+  // The own unit once, the ally's unit, the prop, the blip of army 6; the blip of army 5's own unit left out.
+  EXPECT_EQ(ids, (std::vector<std::uint32_t>{0x00500001u, 0x00500009u, 0x00600002u, 0x20000003u, 0x30600005u}));
+  EXPECT_EQ(leftOut, 1u);
+  EXPECT_EQ(merged.beat, 42u);
+  EXPECT_EQ(merged.frameId, 7u);
+  EXPECT_TRUE(CViewFrameMerger::IsBlipOfArmy(0x30500004u, 5));
+  EXPECT_FALSE(CViewFrameMerger::IsBlipOfArmy(0x30500004u, -1));
+  EXPECT_FALSE(CViewFrameMerger::IsBlipOfArmy(0x00500001u, 5));
+
+  // No team frame (cut from the team): the own frame alone.
+  CViewFrameMerger::Merge(own, nullptr, 5, merged, leftOut);
+  EXPECT_EQ(merged.entities.size(), 2u);
 }

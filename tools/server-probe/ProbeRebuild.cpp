@@ -26,6 +26,7 @@
 #include "remote/FrameBuilder.h"
 #include "remote/ViewLanes.h"
 #include "remote/client/SyncRebuilder.h"
+#include "remote/client/ViewMerge.h"
 
 // Plan WP11 step 1: see ProbeRebuild.h.
 
@@ -53,6 +54,9 @@ namespace faf::probe
     std::unique_ptr<moho::CWldMap> map;
     std::unique_ptr<LuaPlus::LuaState> sessionState;
     std::unique_ptr<remote::client::CSyncRebuilder> rebuilder;
+    remote::client::CViewFrameMerger merger;
+    remote::wire::SFrameCodec codec{};
+    std::uint64_t mergeFailures = 0;
     std::uint64_t frames = 0;
     std::uint64_t applied = 0;
     std::uint64_t blueprints = 0;
@@ -113,11 +117,13 @@ namespace faf::probe
     return true;
   }
 
-  void CProbeRebuild::OnGameInfo(const float mapSizeX, const float mapSizeZ)
+  void CProbeRebuild::OnGameInfo(const float mapSizeX, const float mapSizeZ, const std::int32_t army)
   {
     if (!mState || !mState->rules || mState->rebuilder) {
       return;
     }
+    mState->merger.SetArmy(army);
+    mState->codec = remote::MakeViewCodec(mapSizeX, mapSizeZ);
     // The client's own tables from its own rules, as the server builds its (WP7.2: both sides build them at load).
     const remote::wire::SContentTables tables = remote::BuildContentTables(*mState->rules);
     std::vector<const moho::REntityBlueprint*> blueprints = remote::client::ResolveBlueprints(*mState->rules, tables);
@@ -130,15 +136,20 @@ namespace faf::probe
     mState->rebuilder->SetRules(mState->rules.get());
   }
 
-  void CProbeRebuild::OnFrame(const std::span<const std::uint8_t> frame)
+  void CProbeRebuild::OnView(const std::span<const std::uint8_t> own, const std::span<const std::uint8_t> team)
   {
     if (!mState || !mState->rebuilder) {
       return;
     }
     ++mState->frames;
+    remote::wire::SViewFrame merged;
+    if (!mState->merger.Decode(own, team, mState->codec, merged)) {
+      ++mState->mergeFailures;
+      return;
+    }
     // A fresh packet each beat: a client with no sim has nothing else to start from.
     moho::SSyncData packet{};
-    mState->applied += mState->rebuilder->Apply(frame, packet) ? 1u : 0u;
+    mState->applied += mState->rebuilder->ApplyFrame(std::move(merged), own.size() + team.size(), packet) ? 1u : 0u;
   }
 
   void CProbeRebuild::Report(const int uid) const
@@ -162,9 +173,10 @@ namespace faf::probe
       }
     }
     std::printf(
-      "probe %d: rebuild: last frame %llu records: %llu units, %llu orphaned, %llu with no army\n", uid,
+      "probe %d: rebuild: last frame %llu records: %llu units, %llu orphaned, %llu with no army; %llu views failed to decode, %llu own blips left out\n", uid,
       static_cast<unsigned long long>(records), static_cast<unsigned long long>(units), static_cast<unsigned long long>(orphaned),
-      static_cast<unsigned long long>(armyless)
+      static_cast<unsigned long long>(armyless), static_cast<unsigned long long>(mState->mergeFailures),
+      static_cast<unsigned long long>(mState->merger.BlipsLeftOut())
     );
     std::printf(
       "probe %d: rebuild: %llu frames, %llu applied, %llu failed to decode; %llu blueprints known; created %llu, updates %llu, erased %llu, "

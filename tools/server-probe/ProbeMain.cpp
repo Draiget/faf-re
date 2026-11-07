@@ -456,7 +456,7 @@ namespace
       out.mapZ = sizes[1];
       out.haveInfo = true;
       if (out.rebuild != nullptr) {
-        out.rebuild->OnGameInfo(sizes[0], sizes[1]);
+        out.rebuild->OnGameInfo(sizes[0], sizes[1], out.army);
       }
       ++out.gameInfos;
       return;
@@ -498,7 +498,7 @@ namespace
     }
     if (ok) {
       if (out.rebuild != nullptr) {
-        out.rebuild->OnFrame(std::span<const std::uint8_t>(frame, frameSize));
+        out.rebuild->OnView(std::span<const std::uint8_t>(frame, frameSize), std::span<const std::uint8_t>(team, teamSize));
       }
       faf::remote::wire::SViewFrame decoded;
       ok = out.window.Decode(std::span<const std::uint8_t>(frame, frameSize), out.codec, decoded) && decoded.entities.size() == entities;

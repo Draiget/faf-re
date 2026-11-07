@@ -49,4 +49,5 @@ set(FAF_REMOTE_CLIENT_SOURCES
   remote/client/ServerRelayConnector.cpp
   remote/client/SessionSummary.cpp
   remote/client/SyncRebuilder.cpp
+  remote/client/ViewMerge.cpp
 )
