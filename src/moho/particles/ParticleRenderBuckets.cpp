@@ -461,7 +461,10 @@ namespace moho
       instance->rampSelection = particle.mRampSelection;
       instance->value3 = particle.mValue3;
       instance->resistance = particle.mResistance;
-      instance->inverseResistance = 1.0f / particle.mResistance;
+      // Engine change: retail divides with no guard (0x004933FE). A drag emitter with resistance 0
+      // (seraphim_airmoveexhaust_01_emit) then hands the shader an infinity, and Direct3D 12 and Vulkan
+      // turn its particles' positions into NaN and draw nothing; with 0 they stay where they were born.
+      instance->inverseResistance = particle.mResistance != 0.0f ? 1.0f / particle.mResistance : 0.0f;
       instance->inverseResistanceSq = instance->inverseResistance * instance->inverseResistance;
     }
 
