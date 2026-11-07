@@ -177,3 +177,16 @@ do
         end
     end
 end
+
+-- Shadow maps up to 4096, for the renderers newer than Direct3D 9. The engine holds Direct3D 9 at 2048 (Shadow::Init).
+do
+    local video = options and options.video
+    if video and video.items then
+        for _, item in video.items do
+            if item.key == 'shadow_resolution' and item.custom then
+                item.custom.max = 4096
+                break
+            end
+        end
+    end
+end

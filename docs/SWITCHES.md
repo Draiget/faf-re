@@ -107,6 +107,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `ren_ParticleKeyShortcut` | 1 | `/con` | live | Particles reuse the cached render bucket when their key would match, without building the key |
 | `ren_FrustumCacheLodUnits` | 20000 | `/con` | live | From this many entities in view, a camera's unit lists refresh every `ren_FrustumCacheLodInterval` s |
 | `ren_FrustumCacheLodInterval` | 2.0 | `/con` | live | That refresh interval, in seconds |
+| `ren_ShadowStable` | -1 (auto) | `/con` | live | Shadow texels stay on the same world positions while the camera pans, so shadow edges don't crawl: the shadow map's light eye is anchored to the world, its box length is held within 12%, and its corner snaps to whole texels. 1 on, 0 the original fit, -1 on except on Direct3D 9 |
 | `ren_GpuIcons` | −1 (auto) | `/con` | live | Strategic icons drawn by the GPU (1 on, 0 off, −1 when the device verified the path) |
 | `ren_GpuIconClassify` | −1 (auto) | `/con` | live | Icon classification in a compute pass |
 | `ren_GpuFog` | −1 (auto) | `/con` | live | Fog of war drawn by the GPU |

@@ -56,6 +56,11 @@ set_target_properties(faf_profiler_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME profiler_facade COMMAND faf_profiler_tests)
 set_tests_properties(profiler_facade PROPERTIES LABELS "Existing")
 
+# Engine addition: the stable shadow box (ren_ShadowStable), pure maths with no device.
+add_executable(faf_shadow_fit_tests EXCLUDE_FROM_ALL render/ShadowStableFitTests.cpp)
+target_include_directories(faf_shadow_fit_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME shadow_stable_fit COMMAND faf_shadow_fit_tests)
+
 # Engine addition: EffectScan.h against the std::regex patterns it replaced, on generated text.
 add_executable(faf_effect_scan_tests EXCLUDE_FROM_ALL effect_scan/EffectScanTests.cpp)
 target_include_directories(faf_effect_scan_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
