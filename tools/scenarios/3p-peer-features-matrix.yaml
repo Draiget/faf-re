@@ -1,0 +1,53 @@
+name: 3p-peer-features-matrix
+description: >
+  Issue #285's compatibility check, direct links: the shipped game, our x86 and
+  our x64 in one game, the announcement on for ours. Each of ours must see the
+  other's list and none from retail, compare only the other's order stream
+  reports, retail must log the one message it ignores from each of them, and
+  the game must play on with no desync. PF285_X86 and PF285_X64 are the two
+  builds under test (the x86 one in the FAF bin folder, for its DLLs). Needs
+  init_mpemu_localvault.lua in the FAF bin folder. Run with -advertise on hosts
+  that drop UDP to wildcard sockets. Do not click into the game windows.
+timeout: 15m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+  saveReplays: true
+
+players:
+  - { uid: 1, name: Retail, faction: uef }
+  - { uid: 2, name: Ours86, faction: cybran, exe: '%ProgramData%\FAForever\bin\pf285_x86.exe', args: ['/con', 'net_PeerFeatures=1'] }
+  - { uid: 3, name: Ours64, faction: aeon, exe: '%ProgramData%\FAForever\bin_x64\pf285_x64.exe', args: ['/con', 'net_PeerFeatures=1'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 3m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  logsContain:
+    - { uids: [2], pattern: 'PEERS: client \d+:Ours64 announced features' }
+    - { uids: [3], pattern: 'PEERS: client \d+:Ours86 announced features' }
+    - { uids: [1], pattern: 'Ignoring message type 58' }
+    - { uids: [2], pattern: 'PEERS: client \d+:Ours64''s order stream reports are compared' }
+    - { uids: [3], pattern: 'PEERS: client \d+:Ours86''s order stream reports are compared' }
+  logsAbsent:
+    - { uids: [2, 3], pattern: 'PEERS: client \d+:Retail announced' }
+    - { uids: [2, 3], pattern: 'PEERS: everyone supports \S+: yes' }
+    - { uids: [2, 3], pattern: 'mismatched' }
+    - { uids: [2, 3], pattern: 'Retail''s order stream reports' }
