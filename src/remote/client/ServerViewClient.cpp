@@ -53,6 +53,23 @@ namespace faf::remote::client
     return reader.AtEnd();
   }
 
+  bool ReadTablesMessage(const std::span<const std::uint8_t> message, STablesMessage& out)
+  {
+    if (message.empty() || message[0] != static_cast<std::uint8_t>(net::ESeatMessage::SessionTables)) {
+      return false;
+    }
+    net::ByteReader reader(message.data() + 1, message.size() - 1u);
+    out.beat = static_cast<std::uint32_t>(reader.Varint());
+    const std::uint8_t flags = reader.Byte();
+    if (!reader.Ok() || flags > 1u) {
+      return false;
+    }
+    out.reset = flags == 1u;
+    const std::size_t at = message.size() - reader.Remaining();
+    out.record = message.subspan(at);
+    return !out.reset || out.record.empty();
+  }
+
   CServerViewClient::CServerViewClient(moho::RRuleGameRules& rules, const SServerGameInfo& info)
     : mInfo(info)
     , mCodec(MakeViewCodec(info.mapSizeX, info.mapSizeZ))
@@ -65,7 +82,30 @@ namespace faf::remote::client
     }
     mRebuilder = std::make_unique<CSyncRebuilder>(mCodec, std::move(blueprints), ResolveMeshes(rules, tables));
     mRebuilder->SetRules(&rules);
+    mRebuilder->SetNoSim();
+    mTables = std::make_unique<wire::CSessionTableReaders>();
+    mRebuilder->SetSessionTables(mTables.get());
     mMerger.SetArmy(info.army);
+  }
+
+  bool CServerViewClient::ApplyTables(const STablesMessage& tables)
+  {
+    if (tables.reset) {
+      // Every record follows from the first, before the next view. The ids come out as before (the server's never
+      // change); deposits past those applied are added (`CSyncRebuilder::ApplyDeposits` counts them); the terrain
+      // edits are applied again in order, which leaves the heights the last of them left.
+      ++mStats.tableResets;
+      mTables = std::make_unique<wire::CSessionTableReaders>();
+      mRebuilder->SetSessionTables(mTables.get());
+      return true;
+    }
+    ++mStats.tableRecords;
+    wire::BitReader reader(tables.record);
+    if (!mTables->Read(reader)) {
+      ++mStats.tableFailures;
+      return false;
+    }
+    return true;
   }
 
   bool CServerViewClient::Apply(const SViewMessage& view, moho::SSyncData& packet)

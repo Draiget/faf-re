@@ -86,6 +86,9 @@ namespace faf::server
             || message[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::LaunchInfo))) {
       mStartMessages[uid].push_back(message);
     }
+    if (!message.empty() && message[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::SessionTables)) {
+      mTableLogs[uid].push_back(message);
+    }
     mViewQueue[uid].push_back(SQueuedMessage{std::move(message), fresh});
   }
 
@@ -103,6 +106,7 @@ namespace faf::server
       }
       mViewSending.clear();
       std::vector<std::vector<std::uint8_t>> startMessages;
+      std::vector<std::vector<std::uint8_t>> tableLog;
       {
         const std::scoped_lock lock(mViewLock);
         const auto queue = mViewQueue.find(uid);
@@ -112,6 +116,9 @@ namespace faf::server
         if (seat.viewBroken) {
           if (const auto info = mStartMessages.find(uid); info != mStartMessages.end()) {
             startMessages = info->second;
+          }
+          if (const auto log = mTableLogs.find(uid); log != mTableLogs.end()) {
+            tableLog = log->second; // with the queue's: they were taken together
           }
         }
       }
@@ -130,6 +137,17 @@ namespace faf::server
         seat.viewBroken = false;
         for (const std::vector<std::uint8_t>& message : startMessages) {
           (void)mLinks.SendReliable(uid, message.data(), message.size());
+        }
+        // The session tables again from the first record, less those still to go after the fresh view in the queue.
+        std::size_t queuedTables = 0;
+        for (std::size_t i = first; i < mViewSending.size(); ++i) {
+          const std::vector<std::uint8_t>& bytes = mViewSending[i].bytes;
+          queuedTables += !bytes.empty() && bytes[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::SessionTables) ? 1u : 0u;
+        }
+        const std::uint8_t reset[] = {static_cast<std::uint8_t>(remote::net::ESeatMessage::SessionTables), 0u, 1u};
+        (void)mLinks.SendReliable(uid, reset, sizeof(reset));
+        for (std::size_t i = 0; i + queuedTables < tableLog.size(); ++i) {
+          (void)mLinks.SendReliable(uid, tableLog[i].data(), tableLog[i].size());
         }
         Say(seat.name + " has their view again, from beat " + std::to_string(mBeat.load(std::memory_order_relaxed)));
       }
@@ -404,6 +422,8 @@ namespace faf::server
     case remote::net::ESeatMessage::View:
     case remote::net::ESeatMessage::GameInfo:
     case remote::net::ESeatMessage::LaunchInfo:
+    case remote::net::ESeatMessage::LuaSync:
+    case remote::net::ESeatMessage::SessionTables:
     case remote::net::ESeatMessage::CommandAnswer:
     case remote::net::ESeatMessage::ViewCheck:
       break; // the server's own to send

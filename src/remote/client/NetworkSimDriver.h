@@ -2,7 +2,9 @@
 
 #include <cstdint>
 #include <deque>
+#include <map>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -24,6 +26,7 @@
 
 namespace moho
 {
+  class CHeightField;
   class CSimResources;
   class LaunchInfoBase;
   class RRuleGameRules;
@@ -42,11 +45,12 @@ namespace faf::remote::client
   public:
     /**
      * `rules`: the session's (`CWldSession::mRules`), which outlives the driver. The local client: the session's
-     * client index, the player's uid and command source, as the launch info gives them.
+     * client index, the player's uid and command source, as the launch info gives them. `heights`: the client's own
+     * map's, as loaded (the server's terrain edits go on a copy); may be null.
      */
     CNetworkSimDriver(
       moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch, const char* playerName, int clientIndex, std::int32_t uid,
-      unsigned int sourceId
+      unsigned int sourceId, const moho::CHeightField* heights
     );
     ~CNetworkSimDriver() override;
 
@@ -109,8 +113,10 @@ namespace faf::remote::client
   private:
     /** One message from the server for the session. */
     void Take(const std::vector<std::uint8_t>& message);
-    /** The packet for one view: its entity lanes rebuilt, the beat's fields and its Lua `Sync` table. */
-    void QueueView(const SViewMessage& view);
+    /** The packet for one view: its entity lanes rebuilt, the beat's fields and its Lua `Sync` table (`lua`). */
+    void QueueView(const SViewMessage& view, std::span<const std::uint8_t> lua);
+    /** Views whose beat's `LuaSync` has come, or that the next beat's view proves won't come, become packets. */
+    void ReleaseViews();
     /** Sends one command message (`CMarshaller` built it) as a `Command` frame. */
     void SendCommandFrame(moho::CMessage& message);
     /** The beat a command just sent will be applied at, as best this side knows: the newest shown plus one. */
@@ -127,10 +133,23 @@ namespace faf::remote::client
     // `mNewGrids`), made from the launch's army setups; given with the first packet, which makes the session's armies.
     std::vector<moho::SSTIArmyConstantData> mArmyConstants;
     bool mArmiesGiven = false;
-    // The session's resource deposits (it takes them from every packet, and its map draws them): the client's own,
-    // empty until the server sends the deposits (research map step 4, session tables).
+    // The session's resource deposits (it takes them from every packet, and its map draws them): an empty set for a
+    // packet the view client gave none (the session tables' deposits are the packets' from the first view on).
     boost::shared_ptr<moho::CSimResources> mResources;
+    const moho::CHeightField* mSeedHeights = nullptr; // copied into the view client when it is made
+    std::uint64_t mTablesBad = 0;
     std::deque<std::unique_ptr<moho::SSyncData>> mPackets;
+    // Views waiting for their beat's Lua lane (`LuaSync`, sent once the server's `Sync` for the beat is routed).
+    struct SPendingView
+    {
+      std::vector<std::uint8_t> message;
+      std::uint32_t beat = 0;
+      bool haveLua = false;
+      std::vector<std::uint8_t> lua;
+    };
+    std::deque<SPendingView> mPendingViews;
+    std::map<std::uint32_t, std::vector<std::uint8_t>> mEarlyLua; // a `LuaSync` before its view (the pipeline)
+    std::uint64_t mLuaMissing = 0;
     HANDLE mAvailable = nullptr;
     std::int32_t mLastBeat = -1;
     std::int32_t mServerBeat = -1;
@@ -140,6 +159,7 @@ namespace faf::remote::client
     std::uint64_t mCommandsSent = 0;
     std::uint64_t mAnswers[3] = {};
     std::uint64_t mLuaLanesBad = 0;
+    std::uint64_t mLuaTablesLogged = 0;
   };
 
   /** Plan WP2.8: this player's part of the server's launch, as the session starter worked it out. */
@@ -155,6 +175,8 @@ namespace faf::remote::client
   void SetServerLaunch(const SServerLaunch& launch);
   /** A server session's launch was set: `WLD_DoLoading` makes the network driver, not a sim. */
   [[nodiscard]] bool HasServerLaunch() noexcept;
-  /** `WLD_DoLoading`, in a server session: the driver, over the session's rules. */
-  [[nodiscard]] moho::ISTIDriver* CreateServerSessionDriver(moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch);
+  /** `WLD_DoLoading`, in a server session: the driver, over the session's rules and its map's heights (may be null). */
+  [[nodiscard]] moho::ISTIDriver* CreateServerSessionDriver(
+    moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch, const moho::CHeightField* heights
+  );
 } // namespace faf::remote::client
