@@ -125,6 +125,8 @@ Without `/telemetry` on its command line a game sends nothing: no records, no du
 /telemetrydumpendpoint https://dumps.example.org/dumps
 ```
 
+The token is this client's alone (#336): the launcher passes it, and no other player may see it. It never reaches the game log, the replay or the dump (whose copy of the command line shows `/telemetrytoken <token>`), and Lua never gets it: `GetCommandLineArg('/telemetrytoken', n)` answers `false`, and the values of an option given before it end before it.
+
 The first line moves the records. The second moves the dump the recorder writes (an empty URL uploads none); the recorder is on by default in live multiplayer, and with `/nodesyncdump` there is no dump to upload. `/v1/logs` is appended to the collector URL unless it already ends with it. Records and dumps are only sent from live multiplayer games, never from replays.
 
 The game log shows it working:
