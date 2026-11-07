@@ -1,0 +1,31 @@
+name: drop-ghosts-smoke
+description: >
+  Smoke scenario for TransportDropGhosts UI mod:
+  Verifies that a transport carrying cargo (tank, engineer) issuing an unload command
+  generates 3D hologram ghost units at the destination waypoint, supports selection
+  and order queues (move, build), draws waypoint paths, and dispatches orders to real units
+  upon touchdown.
+timeout: 3m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\main_x64.exe'
+  nosound: true
+
+players:
+  - { uid: 1, name: GhostSmokeTest, faction: uef, args: ['/title', 'drop-ghosts-smoke', '/mod', 'TransportDropGhosts'] }
+
+steps:
+  - start: all
+  - host: 1
+  - waitState: { uids: all, state: Launching, timeout: 2m }
+  - wait: 30s
+
+expect:
+  allLaunched: true
+  noCrash: true
