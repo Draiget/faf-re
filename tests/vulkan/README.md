@@ -1,11 +1,17 @@
-# Vulkan allocator host regression
+# Vulkan host tests
 
-Build `faf_vulkan_allocator_tests` with the normal repository preset, then run:
+Both executables build with the normal repository preset and run under the `Vulkan` label:
 
 ```powershell
-cmake --build --preset clang-x64-release --target faf_vulkan_allocator_tests
+cmake --build --preset clang-x64-release --target faf_vulkan_allocator_tests faf_vulkan_attachment_tests
 ctest --test-dir build/clang-x64-release -L Vulkan --output-on-failure
 ```
+
+## Attachment barriers
+
+`faf_vulkan_attachment_tests` checks `AttachmentWriteBarrier` (`src/gpg/gal/backends/vulkan/VulkanAttachmentBarrier.h`), the barrier `DeviceVulkan::BeginRendering` records when a color or depth target starts a new dynamic-rendering instance in the layout it already has. Six tests cover color, depth and depth/stencil: stages, access masks, kept layout, image and the mip 0 / layer 0 range that render-target views use. It needs only the pinned Vulkan headers; no driver, device or engine.
+
+## Allocator
 
 This GoogleTest executable compiles the same `VulkanMemoryAllocator.cpp` that `faf_engine` uses. It does not link the engine, load a Vulkan driver, or need a GPU. Vulkan types and callback signatures come from the repository's pinned Vulkan headers. Five callbacks supply fixed-capacity handle accounting; `CheckVk` and `backend::ThrowError` use test exception transport.
 
