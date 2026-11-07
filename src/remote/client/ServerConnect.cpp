@@ -146,6 +146,21 @@ namespace faf::remote
 
       void MarkGone(const std::int32_t uid) { mGone.push_back(uid); }
 
+      /** The next message for the game's session (not a lobby frame), in arrival order. */
+      [[nodiscard]] bool TakeGameMessage(std::vector<std::uint8_t>& message)
+      {
+        Pump();
+        if (mForGameNext >= mForGame.size()) {
+          mForGame.clear();
+          mForGameNext = 0;
+          return false;
+        }
+        message = std::move(mForGame[mForGameNext++]);
+        return true;
+      }
+
+      void SendGameMessage(const std::span<const std::uint8_t> message) { (void)mLink.SendReliable(message.data(), message.size()); }
+
     private:
       // The lobby pulls every frame, and the session's task too: the link moves here.
       void Pump()
@@ -166,6 +181,7 @@ namespace faf::remote
       std::vector<std::uint8_t> mMessage;
       std::vector<std::int32_t> mGone;
       std::vector<std::vector<std::uint8_t>> mForGame;
+      std::size_t mForGameNext = 0;
     };
 
     /** One server session: the link, the channel the lobby uses over it, the lobby's connector once. */
@@ -221,6 +237,20 @@ namespace faf::remote
     writer.Varint(0u); // the server itself
     writer.Bytes(message.data(), message.size());
     sSession->channel.SendLobbyFrame(frame);
+    return true;
+  }
+
+  bool TakeServerGameMessage(std::vector<std::uint8_t>& message)
+  {
+    return sSession != nullptr && sSession->channel.TakeGameMessage(message);
+  }
+
+  bool SendServerGameMessage(const std::span<const std::uint8_t> message)
+  {
+    if (sSession == nullptr) {
+      return false;
+    }
+    sSession->channel.SendGameMessage(message);
     return true;
   }
 

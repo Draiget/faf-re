@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <vector>
 
 #include "remote/net/LobbySignals.h"
 
@@ -69,6 +70,13 @@ namespace faf::remote
    * `LuaObject::ToByteStream` writes them). False outside a server session.
    */
   bool SendServerLaunchRequest(std::span<const std::uint8_t> configuration);
+  /**
+   * Plan WP11: the next message from the server for the game's session (`LaunchInfo`, `GameInfo`, `View`, `Beat`,
+   * `CommandAnswer`, `ViewCheck`; not a lobby frame), in arrival order. False when none is waiting or outside a session.
+   */
+  [[nodiscard]] bool TakeServerGameMessage(std::vector<std::uint8_t>& message);
+  /** Plan WP11: one message from the game's session to the server (a `Command`, `Loaded`, `Leaving`...), reliably. */
+  bool SendServerGameMessage(std::span<const std::uint8_t> message);
   /** This player's uid in the server session, or 0 outside one. */
   [[nodiscard]] std::int32_t ServerSessionUid();
   /** The channel to the server is connected or reconnecting. */
