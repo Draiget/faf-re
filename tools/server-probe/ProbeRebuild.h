@@ -35,7 +35,7 @@ namespace faf::probe
      */
     void OnView(
       std::span<const std::uint8_t> own, std::span<const std::uint8_t> team, std::span<const std::uint8_t> armies,
-      std::span<const std::uint8_t> grids
+      std::span<const std::uint8_t> grids, std::span<const std::uint8_t> poses = {}, bool hasPoses = false
     );
 
     /** A whole `SessionTables` message (plan WP11 step 4). */

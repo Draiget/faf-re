@@ -615,6 +615,22 @@ namespace faf::remote
     return std::any_of(held.recentlyGone.begin(), held.recentlyGone.end(), [id](const auto& gone) { return gone.second == id; });
   }
 
+  void CViewFrames::HeldUnitIds(const std::size_t army, std::vector<std::uint32_t>& out) const
+  {
+    out.clear();
+    if (army >= mBuilders.size()) {
+      return;
+    }
+    mBuilders[army]->AppendUnitIds(out);
+    if (const std::size_t teamSlot = TeamSlotOf(army); TeamsOn() && teamSlot != army && !CutFromTeam(army) && teamSlot < mBuilders.size()) {
+      // Own units and the team's: both ascending, merged.
+      const std::size_t own = out.size();
+      mBuilders[teamSlot]->AppendUnitIds(out);
+      std::inplace_merge(out.begin(), out.begin() + static_cast<std::ptrdiff_t>(own), out.end());
+      out.erase(std::unique(out.begin(), out.end()), out.end());
+    }
+  }
+
   bool CViewFrames::ViewHoldsEntity(const std::size_t army, const std::uint32_t id) const
   {
     return SlotHoldsEntity(army, id) || (TeamSlotOf(army) != army && !CutFromTeam(army) && SlotHoldsEntity(TeamSlotOf(army), id));
@@ -902,6 +918,20 @@ namespace faf::remote
     );
     MarkPhase(EViewPhase::Keep);
 
+    // Units are id family 0 (moho/entity/EntityId.h), the index's first ids: the props and projectiles after them
+    // aren't touched.
+    std::size_t units = 0;
+    if (mSession != nullptr || mPosesOn) {
+      mUnitIds.clear();
+      while (units < mEntityIndex.size() && mEntityIndex[units].id < moho::ToRaw(moho::EEntityIdSentinel::FirstNonUnitFamily)) {
+        mUnitIds.push_back(mEntityIndex[units].id);
+        ++units;
+      }
+    }
+    if (mPosesOn) {
+      // Plan WP8.1: every unit's bones against what its clients hold, once for every view.
+      mPoses.Refresh(mUnitIds, std::span<moho::Entity* const>(mEntityPointers.data(), units), Parallel());
+    }
     if (mSession != nullptr) {
       // Plan WP11 step 4, once for every view: the deposits the sim added, the beat's terrain edits (its changed
       // rectangles with the heights there now), and every unit's stats.
@@ -912,16 +942,10 @@ namespace faf::remote
                               : std::span<const gpg::Rect2i>(),
         *mSession
       );
-      // Units are id family 0 (moho/entity/EntityId.h), the index's first ids: the props and projectiles after them
-      // aren't touched.
-      mUnitIds.clear();
-      std::size_t units = 0;
-      while (units < mEntityIndex.size() && mEntityIndex[units].id < moho::ToRaw(moho::EEntityIdSentinel::FirstNonUnitFamily)) {
-        mUnitIds.push_back(mEntityIndex[units].id);
-        ++units;
-      }
       mSharedStats.Refresh(mUnitIds, std::span<moho::Entity* const>(mEntityPointers.data(), units), *mSession, Parallel());
-      MarkPhase(EViewPhase::Tables);
+    }
+    if (mSession != nullptr || mPosesOn) {
+      MarkPhase(EViewPhase::Tables); // with the poses
     }
 
     // Each view's builder, id map and frame are its own; the sim is only read (plan I3), so the

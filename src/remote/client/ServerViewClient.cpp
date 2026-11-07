@@ -50,6 +50,17 @@ namespace faf::remote::client
       }
       *lane = std::span<const std::uint8_t>(bytes, static_cast<std::size_t>(size));
     }
+    // Plan WP8.1: a server that sends poses adds them as a sixth lane.
+    out.poses = {};
+    if (!reader.AtEnd()) {
+      const std::uint64_t size = reader.Varint();
+      const std::uint8_t* const bytes = reader.Bytes(static_cast<std::size_t>(size));
+      if (!reader.Ok()) {
+        return false;
+      }
+      out.poses = std::span<const std::uint8_t>(bytes, static_cast<std::size_t>(size));
+      out.hasPoses = true;
+    }
     return reader.AtEnd();
   }
 
@@ -131,9 +142,23 @@ namespace faf::remote::client
         ++mStats.gridFailures;
       }
     }
+    // Pose lane (plan WP8.1): the bones the rebuilder puts on the units' client poses.
+    mPoses.clear();
+    if (view.hasPoses) {
+      ++mStats.poseLanes;
+      mStats.poseBytes += view.poses.size();
+      wire::BitReader reader(view.poses);
+      if (!wire::DecodePoseLane(reader, mPoses)) {
+        ++mStats.poseFailures;
+        mPoses.clear();
+      }
+    }
+    mRebuilder->SetPoseLane(view.hasPoses ? &mPoses : nullptr);
     wire::SViewFrame merged;
-    if (!mMerger.Decode(view.own, view.team, mCodec, merged)
-        || !mRebuilder->ApplyFrame(std::move(merged), view.own.size() + view.team.size(), packet)) {
+    const bool applied = mMerger.Decode(view.own, view.team, mCodec, merged)
+                      && mRebuilder->ApplyFrame(std::move(merged), view.own.size() + view.team.size(), packet);
+    mRebuilder->SetPoseLane(nullptr);
+    if (!applied) {
       ++mStats.frameFailures;
       return false;
     }

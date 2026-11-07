@@ -423,6 +423,7 @@ namespace
     int uid = 0;
     std::uint64_t launchInfos = 0;
     std::uint64_t tableMessages = 0; // `SessionTables`
+    std::uint64_t poseBytes = 0;     // the views' pose lanes
     double beatMs = 0.0;
     double lateBase = 0.0;      // the seconds at which beat 0 would have come
     bool haveLateBase = false;
@@ -516,6 +517,19 @@ namespace
         lanes[lane] = std::span<const std::uint8_t>(bytes, size);
       }
     }
+    // Plan WP8.1: a server that sends poses adds them as a sixth lane.
+    std::span<const std::uint8_t> poses;
+    bool hasPoses = false;
+    if (ok && !reader.AtEnd()) {
+      const std::uint64_t size = reader.Varint();
+      const std::uint8_t* const bytes = reader.Bytes(size);
+      ok = reader.Ok();
+      if (ok) {
+        poses = std::span<const std::uint8_t>(bytes, size);
+        hasPoses = true;
+        out.poseBytes += size;
+      }
+    }
     ok = ok && reader.AtEnd();
     if (ok && out.views > 1u && faf::remote::wire::PeekFrameBaseline(std::span<const std::uint8_t>(frame, frameSize)) == faf::remote::wire::kNoBaseline) {
       ++out.whole;
@@ -524,7 +538,9 @@ namespace
     }
     if (ok) {
       if (out.rebuild != nullptr) {
-        out.rebuild->OnView(std::span<const std::uint8_t>(frame, frameSize), std::span<const std::uint8_t>(team, teamSize), lanes[0], lanes[1]);
+        out.rebuild->OnView(
+          std::span<const std::uint8_t>(frame, frameSize), std::span<const std::uint8_t>(team, teamSize), lanes[0], lanes[1], poses, hasPoses
+        );
       }
       faf::remote::wire::SViewFrame decoded;
       ok = out.window.Decode(std::span<const std::uint8_t>(frame, frameSize), out.codec, decoded) && decoded.entities.size() == entities;
@@ -1137,12 +1153,13 @@ int main(const int argc, char** const argv)
   std::printf("probe %d: joined %llu times, %llu beat messages, last beat %llu\n", options.uid, static_cast<unsigned long long>(joins), static_cast<unsigned long long>(beatMessages), static_cast<unsigned long long>(lastBeat));
   const double viewSeconds = views.lastAt - views.firstAt;
   std::printf(
-    "probe %d: %llu views, %llu didn't decode, %llu whole after the first, %llu game infos, %llu launch infos, %llu session-table messages, %llu checks (%llu didn't match), last at beat %llu with %llu entities, %.1f KB/s (frames %.1f), largest %llu bytes\n", options.uid,
+    "probe %d: %llu views, %llu didn't decode, %llu whole after the first, %llu game infos, %llu launch infos, %llu session-table messages, %llu checks (%llu didn't match), last at beat %llu with %llu entities, %.1f KB/s (frames %.1f, poses %.1f), largest %llu bytes\n", options.uid,
     static_cast<unsigned long long>(views.views), static_cast<unsigned long long>(views.failed), static_cast<unsigned long long>(views.whole),
     static_cast<unsigned long long>(views.gameInfos), static_cast<unsigned long long>(views.launchInfos), static_cast<unsigned long long>(views.tableMessages), static_cast<unsigned long long>(views.checks), static_cast<unsigned long long>(views.mismatches),
     static_cast<unsigned long long>(views.lastBeat),
     static_cast<unsigned long long>(views.lastEntities), viewSeconds > 0.0 ? static_cast<double>(views.bytes) / 1024.0 / viewSeconds : 0.0,
-    viewSeconds > 0.0 ? static_cast<double>(views.frameBytes) / 1024.0 / viewSeconds : 0.0, static_cast<unsigned long long>(views.maxMessage)
+    viewSeconds > 0.0 ? static_cast<double>(views.frameBytes) / 1024.0 / viewSeconds : 0.0,
+    viewSeconds > 0.0 ? static_cast<double>(views.poseBytes) / 1024.0 / viewSeconds : 0.0, static_cast<unsigned long long>(views.maxMessage)
   );
   std::printf(
     "probe %d: answers: %llu applied, %llu refused, %llu dropped%s\n", options.uid, static_cast<unsigned long long>(answers[0]), static_cast<unsigned long long>(answers[1]),

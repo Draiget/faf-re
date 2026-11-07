@@ -443,6 +443,16 @@ namespace faf::remote
     void ClearBefore() noexcept;
     /** How many slots records can lie in (a slot is below this). */
     [[nodiscard]] std::size_t SlotCount() const noexcept { return mWorldSlots.size(); }
+    /** The ids of the world's units (entity family 0, the index's first ids), ascending, appended to `out`. */
+    void AppendUnitIds(std::vector<std::uint32_t>& out) const
+    {
+      for (const SWorldEntry& entry : mWorldIndex) {
+        if (entry.id >= 0x10000000u) {
+          break;
+        }
+        out.push_back(entry.id);
+      }
+    }
     /** `visit(id, slot)` for every record, in ascending id order, without reading the records. */
     template <class Visit>
     void ForEachRecord(Visit&& visit) const

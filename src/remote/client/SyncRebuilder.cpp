@@ -10,7 +10,10 @@
 #include <utility>
 
 #include "gpg/core/utils/Logging.h"
+#include "moho/animation/CAniPose.h"
 #include "moho/audio/CSndParams.h"
+#include "moho/render/camera/VTransform.h"
+#include "moho/resource/RScmResource.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/misc/StatItem.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -308,6 +311,76 @@ namespace faf::remote::client
       }
       ++mStats.statsApplied;
     }
+  }
+
+  void CSyncRebuilder::UpdatePoses(
+    const wire::SEntityRecord& record, SHeldEntity& held, const wire::SUnitPose* const bones, moho::SSTIUnitVariableData& data
+  )
+  {
+    // The skeleton of the unit's mesh as this client resolved it, and its blueprint's scale (`Unit::SetMesh`).
+    boost::shared_ptr<const moho::CAniSkel> skeleton;
+    if (moho::RScmResource* const mesh = held.data.mScmResource.get(); mesh != nullptr) {
+      skeleton = mesh->GetSkeleton();
+    }
+    if (!skeleton) {
+      mStats.posesWithoutMesh += bones != nullptr ? 1u : 0u;
+      held.pose.reset();
+      held.poseSkeleton = nullptr;
+      held.poseMoving = false;
+      data.mSharedPose.reset();
+      data.mPriorSharedPose.reset();
+      return;
+    }
+    if (!held.pose || held.poseSkeleton != skeleton.get()) {
+      float scale = 1.0f;
+      if (record.blueprint < mBlueprints.size() && mBlueprints[record.blueprint] != nullptr) {
+        scale = static_cast<const moho::RUnitBlueprint*>(mBlueprints[record.blueprint])->Display.UniformScale;
+      }
+      held.pose.reset(new moho::CAniPose(skeleton, scale));
+      held.poseSkeleton = skeleton.get();
+      ++mStats.posesMade;
+    }
+    boost::shared_ptr<moho::CAniPose> prior = held.pose;
+    if (bones != nullptr) {
+      // A new current pose, as `CAniActor` steps: a copy of the last one with the lane's bones over it.
+      boost::shared_ptr<moho::CAniPose> next(new moho::CAniPose(*held.pose));
+      moho::CAniPoseBone* const first = next->mBones.begin();
+      const std::size_t count = next->mBones.size();
+      if (bones->whole && bones->bones.size() != count) {
+        ++mStats.poseBonesBad;
+      }
+      for (std::size_t i = 0; i < bones->bones.size(); ++i) {
+        const std::size_t index = bones->whole ? i : bones->indices[i];
+        if (index >= count) {
+          ++mStats.poseBonesBad;
+          continue;
+        }
+        const wire::SPoseBone& bone = bones->bones[i];
+        moho::VTransform local;
+        local.orient_.x = bone.rotation[0];
+        local.orient_.y = bone.rotation[1];
+        local.orient_.z = bone.rotation[2];
+        local.orient_.w = bone.rotation[3];
+        local.pos_.x = bone.position[0];
+        local.pos_.y = bone.position[1];
+        local.pos_.z = bone.position[2];
+        first[index].SetLocalTransform(local);
+        first[index].mVisible = bone.visible ? 1u : 0u;
+        first[index].mSkipNextInterp = bone.skipInterp ? 1u : 0u;
+        ++mStats.poseBonesApplied;
+      }
+      held.pose = std::move(next);
+      held.poseMoving = true;
+      ++mStats.poseBeats;
+    } else {
+      held.poseMoving = false; // still: the session interpolates nothing
+    }
+    held.pose->SetWorldTransform(held.data.mCurTransform);
+    if (prior == held.pose) {
+      prior->SetWorldTransform(held.data.mCurTransform);
+    }
+    data.mPriorSharedPose = prior;
+    data.mSharedPose = held.pose;
   }
 
   void CSyncRebuilder::ApplyDeposits(moho::SSyncData& packet)
@@ -782,6 +855,7 @@ namespace faf::remote::client
     unitUpdates.reserve(packet.mUnitUpdates.size() + delta.changed.size());
     {
       auto changeIt = delta.changed.begin();
+      std::size_t poseAt = 0; // the pose lane's units, ascending as the frame's records
       for (const wire::SEntityRecord& record : frame.entities) {
         while (changeIt != delta.changed.end() && changeIt->record.id < record.id) {
           ++changeIt;
@@ -791,7 +865,20 @@ namespace faf::remote::client
         const bool created = createdNow.count(record.id) != 0u;
         const auto packetIt = packetUnitUpdates.find(record.id);
         const bool fromPacket = packetIt != packetUnitUpdates.end();
-        if (!record.isUnit || !updatable(record.id) || (!created && !unitChanged && !fromPacket)) {
+        const wire::SUnitPose* bones = nullptr;
+        bool poseMoving = false;
+        if (mNoSim && record.isUnit) {
+          while (mPoseLane != nullptr && poseAt < mPoseLane->size() && (*mPoseLane)[poseAt].id < record.id) {
+            ++poseAt;
+          }
+          if (mPoseLane != nullptr && poseAt < mPoseLane->size() && (*mPoseLane)[poseAt].id == record.id) {
+            bones = &(*mPoseLane)[poseAt];
+          }
+          if (const auto found = mHeld.find(record.id); found != mHeld.end()) {
+            poseMoving = found->second.poseMoving;
+          }
+        }
+        if (!record.isUnit || !updatable(record.id) || (!created && !unitChanged && !fromPacket && bones == nullptr && !poseMoving)) {
           continue;
         }
         SHeldEntity& held = mHeld[record.id];
@@ -813,6 +900,8 @@ namespace faf::remote::client
           entry.mReserved234 = packetIt->second->mReserved234;
           ++mStats.unitPosesBorrowed;
           mStats.unitDataMismatches += SameUnitData(data, sim) && entry.mReconFlags == packetIt->second->mReconFlags ? 0u : 1u;
+        } else if (mNoSim) {
+          UpdatePoses(record, held, bones, data);
         }
         *held.unit = data;
         ++mStats.unitUpdates;

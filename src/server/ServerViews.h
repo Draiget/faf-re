@@ -72,6 +72,7 @@ namespace faf::server
     std::atomic<std::uint64_t> mArmyBytes{0};
     std::atomic<std::uint64_t> mGridBytes{0};
     std::atomic<std::uint64_t> mLuaBytes{0};
+    std::atomic<std::uint64_t> mPoseBytes{0};
     std::atomic<std::uint64_t> mTableBytes{0}; // one player's share
     std::atomic<std::uint64_t> mTableRecords{0};
     remote::wire::CSessionTableWriters mSessionTables; // one for every view (`EnableSessionTables`)

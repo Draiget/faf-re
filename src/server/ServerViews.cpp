@@ -66,6 +66,7 @@ namespace faf::server
     EnableLuaRouting({});
     SendLuaSeparately(); // `LuaSync` (OnLuaRouterMade)
     EnableSessionTables(mSessionTables);
+    EnablePoses();
   }
 
   CServerViews::~CServerViews()
@@ -133,7 +134,10 @@ namespace faf::server
     mArmyBytes.fetch_add(lanes.armies.Bytes().size(), std::memory_order_relaxed);
     mGridBytes.fetch_add(lanes.grids.Bytes().size(), std::memory_order_relaxed);
     std::vector<std::uint8_t> message;
-    message.reserve(24u + lanes.frame.Bytes().size() + teamFrame.Bytes().size() + lanes.armies.Bytes().size() + lanes.grids.Bytes().size() + lanes.lua.Bytes().size());
+    message.reserve(
+      30u + lanes.frame.Bytes().size() + teamFrame.Bytes().size() + lanes.armies.Bytes().size() + lanes.grids.Bytes().size()
+      + (lanes.poses != nullptr ? lanes.poses->Bytes().size() : 0u)
+    );
     remote::net::ByteWriter writer(message);
     writer.Byte(static_cast<std::uint8_t>(remote::net::ESeatMessage::View));
     writer.Varint(ViewBeat());
@@ -144,6 +148,11 @@ namespace faf::server
     WriteLane(writer, lanes.armies);
     WriteLane(writer, lanes.grids);
     WriteLane(writer, noFrame); // the Lua lane goes as `LuaSync`, once the beat's `Sync` is routed (OnLuaRouterMade)
+    if (lanes.poses != nullptr) {
+      // Plan WP8.1: the sixth lane, the units' bones (a client reads it when the message goes on past the Lua lane).
+      mPoseBytes.fetch_add(lanes.poses->Bytes().size(), std::memory_order_relaxed);
+      WriteLane(writer, *lanes.poses);
+    }
     mNet.QueueView(player->second, std::move(message), lanes.fresh);
     if (lanes.check) {
       std::vector<std::uint8_t> check;
@@ -212,7 +221,7 @@ namespace faf::server
     const auto megabytes = [](const std::atomic<std::uint64_t>& bytes) {
       return std::to_string(bytes.load(std::memory_order_relaxed) / (1024u * 1024u));
     };
-    return "views so far: entities " + megabytes(mFrameBytes) + " MB, armies " + megabytes(mArmyBytes) + " MB, grids " + megabytes(mGridBytes) + " MB, Lua " + megabytes(mLuaBytes) + " MB, session tables "
+    return "views so far: entities " + megabytes(mFrameBytes) + " MB, armies " + megabytes(mArmyBytes) + " MB, grids " + megabytes(mGridBytes) + " MB, Lua " + megabytes(mLuaBytes) + " MB, poses " + megabytes(mPoseBytes) + " MB, session tables "
          + std::to_string(mTableRecords.load(std::memory_order_relaxed)) + " records of "
          + std::to_string(mTableBytes.load(std::memory_order_relaxed) / 1024u) + " KB to each player";
   }

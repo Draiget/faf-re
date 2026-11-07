@@ -130,7 +130,7 @@ namespace faf::remote
       Index,   // the entity index
       Facts,   // which views keep each entity
       Keep,    // whose answers changed
-      Tables,  // the session tables' edits and the units' stats, once for every view
+      Tables,  // the session tables' edits, the units' stats and poses, once for every view
       Frames,  // each view's frame
       Release, // stats trees let go of
       GridSetup, // the lanes' start: Lua routing, which grids go to whom
