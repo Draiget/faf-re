@@ -110,12 +110,18 @@ namespace
     {
       mPath = std::filesystem::temp_directory_path() /
               ("faf_zip_offset_" + std::to_string(GetCurrentProcessId()) + "_" + std::to_string(GetParam()) + ".zip");
+      // Every read goes to the archive, so the second one seeks from the cached offset.
       moho::CZipFile::SetKeepEntryData(false);
     }
 
     void TearDown() override
     {
+      // Back to the build's default (CZipFile.cpp: x86 keeps the bytes, as the binary does; x64 doesn't).
+#if defined(_M_IX86)
       moho::CZipFile::SetKeepEntryData(true);
+#else
+      moho::CZipFile::SetKeepEntryData(false);
+#endif
       std::error_code error;
       std::filesystem::remove(mPath, error);
     }
