@@ -62,6 +62,7 @@ namespace faf::probe
     std::unique_ptr<remote::client::CServerViewClient> client;
     bool seeded = false;
     std::uint64_t tablesBad = 0;
+    std::string gameMods; // the launch's `GameMods`, in its byte form
   };
 
   CProbeRebuild::CProbeRebuild() = default;
@@ -161,7 +162,17 @@ namespace faf::probe
     mState->sessionState.reset(gameData.mState);
     mState->rules.reset(gameData.mGameRules);
     mState->map.reset(gameData.mWldMap);
+    mState->gameMods.assign(build.launchInfo->mGameMods.c_str(), build.launchInfo->mGameMods.size());
     gameData = moho::SWldGameData{};
+    return true;
+  }
+
+  bool CProbeRebuild::Content(remote::SContentReport& out) const
+  {
+    if (!mState || !mState->rules) {
+      return false;
+    }
+    out = remote::MakeContentReport(*mState->rules, mState->gameMods);
     return true;
   }
 

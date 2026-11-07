@@ -11,6 +11,7 @@ set(FAF_REMOTE_SOURCES
   remote/PoseTracker.cpp
   remote/UnderlayPaths.cpp
   remote/ContentTables.cpp
+  remote/ContentCheck.cpp
   remote/VisibilityOracle.cpp
   remote/SpatialOracle.cpp
   remote/BeatChangeSet.cpp
