@@ -33,7 +33,7 @@ namespace gpg
     /**
      * Address: 0x00481AE0 (FUN_00481AE0)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x00481AA0 (FUN_00481AA0)

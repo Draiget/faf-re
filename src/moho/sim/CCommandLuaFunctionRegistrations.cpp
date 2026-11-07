@@ -1,3 +1,4 @@
+#include "moho/lua/ScrLuaUserData.h"
 #include "moho/sim/CCommandLuaFunctionRegistrations.h"
 
 #include <algorithm>
@@ -72,7 +73,6 @@ namespace moho
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kInvalidUnitSetError = "Invalid unit set in %s; expected a table but got a %s";
   constexpr const char* kExpectedGameObjectError = "Expected a game object. (Did you call with '.' instead of ':'?)";
   constexpr const char* kIncorrectGameObjectTypeError =
@@ -151,82 +151,10 @@ namespace
   constexpr const char* kInvalidCellError =
     "Invalid cell in %s; expected a two element table but got a %s";
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
-
-
-  [[nodiscard]] gpg::RType* CachedUnitType()
-  {
-    static gpg::RType* cachedType = nullptr;
-    if (cachedType == nullptr) {
-      cachedType = gpg::LookupRType(typeid(moho::Unit));
-    }
-    return cachedType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitCommandType()
-  {
-    static gpg::RType* cachedType = nullptr;
-    if (cachedType == nullptr) {
-      cachedType = gpg::LookupRType(typeid(moho::CUnitCommand));
-    }
-    return cachedType;
-  }
-
-  /**
-   * The reflected reference is assembled from the userdata HEADER, not read out
-   * of its payload. This fork carries the `gpg::RType*` in `Udata::len`, and the
-   * value itself starts one header past the allocation, which is exactly what
-   * `LuaPlus::LuaObject::GetUserData` (0x00907540) does:
-   *
-   *     lea edx, [ecx+10h]   ; mObj  = payload, laid out after the header
-   *     mov ecx, [ecx+0Ch]   ; mType = Udata::len reinterpreted as RType*
-   *
-   * Reading `*(gpg::RRef*)lua_touserdata(...)` instead - as this helper used to -
-   * takes the first eight payload bytes as if they were a reference. For a
-   * `_c_object` slot those bytes are the `CScriptObject*` value followed by
-   * whatever the allocator left, so every upcast failed and each caller reported
-   * "Expected a game object" for a perfectly good object.
-   */
-  [[nodiscard]] gpg::RRef ExtractUserDataRef(const LuaPlus::LuaObject& userDataObject)
-  {
-    if (!userDataObject.IsUserData()) {
-      return gpg::RRef{};
-    }
-
-    return userDataObject.GetUserData();
-  }
-
-  [[nodiscard]] moho::CScriptObject** ExtractScriptObjectSlot(const LuaPlus::LuaObject& object)
-  {
-    LuaPlus::LuaObject payload(object);
-    if (payload.IsTable()) {
-      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
-    }
-
-    if (!payload.IsUserData()) {
-      return nullptr;
-    }
-
-    const gpg::RRef userDataRef = ExtractUserDataRef(payload);
-    if (!userDataRef.mObj) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, moho::CScriptObject::GetPointerType());
-    return static_cast<moho::CScriptObject**>(upcast.mObj);
-  }
 
   [[nodiscard]] moho::Unit* GetUnitOptionalForIssue(const LuaPlus::LuaObject& unitObject, LuaPlus::LuaState* state)
   {
-    moho::CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlot(unitObject);
+    moho::CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(unitObject);
     if (!scriptObjectSlot) {
       luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
       return nullptr;
@@ -238,7 +166,7 @@ namespace
     }
 
     const gpg::RRef sourceRef = moho::SCR_MakeScriptObjectRef(scriptObject);
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, CachedUnitType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, gpg::RTypeOf<moho::Unit>());
     if (!upcast.mObj) {
       luaL_error(state ? state->GetActiveCState() : nullptr, kIncorrectGameObjectTypeError);
       return nullptr;
@@ -252,7 +180,7 @@ namespace
     LuaPlus::LuaState* state
   )
   {
-    moho::CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlot(commandObject);
+    moho::CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(commandObject);
     if (!scriptObjectSlot) {
       luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
       return nullptr;
@@ -264,7 +192,7 @@ namespace
     }
 
     const gpg::RRef sourceRef = moho::SCR_MakeScriptObjectRef(scriptObject);
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, CachedCUnitCommandType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, gpg::RTypeOf<moho::CUnitCommand>());
     if (!upcast.mObj) {
       luaL_error(state ? state->GetActiveCState() : nullptr, kIncorrectGameObjectTypeError);
       return nullptr;
@@ -500,10 +428,7 @@ namespace
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 4) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, helpText, 4, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 4, helpText);
 
     moho::UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -593,10 +518,7 @@ namespace
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 4) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, helpText, 4, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 4, helpText);
 
     moho::UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -1298,10 +1220,7 @@ namespace moho
       return 0;
     }
 
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIsCommandDoneHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kIsCommandDoneHelpText);
 
     const LuaPlus::LuaObject commandObject(LuaPlus::LuaStackObject(state, 1));
     CUnitCommand* const command = GetUnitCommandOptionalForIssue(commandObject, state);
@@ -1334,10 +1253,7 @@ namespace moho
       return 0;
     }
 
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueClearCommandsHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kIssueClearCommandsHelpText);
 
     UnitSet units{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -1396,10 +1312,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueStopHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kIssueStopHelpText);
 
     UnitSet units{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -1424,10 +1337,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssuePauseHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kIssuePauseHelpText);
 
     UnitSet units{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -1465,7 +1375,7 @@ namespace moho
   CScrLuaInitForm* func_IsCommandDone_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kIsCommandDoneName,
       &moho::cfunc_IsCommandDone,
       nullptr,
@@ -1484,7 +1394,7 @@ namespace moho
   CScrLuaInitForm* func_IssueClearCommands_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kIssueClearCommandsName,
       &moho::cfunc_IssueClearCommands,
       nullptr,
@@ -1503,7 +1413,7 @@ namespace moho
   CScrLuaInitForm* func_IssueStop_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kIssueStopName,
       &moho::cfunc_IssueStop,
       nullptr,
@@ -1522,7 +1432,7 @@ namespace moho
   CScrLuaInitForm* func_IssuePause_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kIssuePauseName,
       &moho::cfunc_IssuePause,
       nullptr,
@@ -1541,7 +1451,7 @@ namespace moho
   CScrLuaInitForm* func_IssueOverCharge_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kIssueOverChargeName,
       &moho::cfunc_IssueOverCharge,
       nullptr,
@@ -1560,7 +1470,7 @@ namespace moho
   CScrLuaInitForm* func_IssueDive_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kIssueDiveName,
       &moho::cfunc_IssueDive,
       nullptr,
@@ -1579,7 +1489,7 @@ namespace moho
   CScrLuaInitForm* func_IssueFactoryRallyPoint_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kIssueFactoryRallyPointName,
       &moho::cfunc_IssueFactoryRallyPoint,
       nullptr,
@@ -1598,7 +1508,7 @@ namespace moho
   CScrLuaInitForm* func_IssueClearFactoryCommands_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kIssueClearFactoryCommandsName,
       &moho::cfunc_IssueClearFactoryCommands,
       nullptr,
@@ -1617,7 +1527,7 @@ namespace moho
   CScrLuaInitForm* func_IssueMove_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueMove",
       &moho::cfunc_IssueMove,
       nullptr,
@@ -1636,7 +1546,7 @@ namespace moho
   CScrLuaInitForm* func_IssueMoveOffFactory_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueMoveOffFactory",
       &moho::cfunc_IssueMoveOffFactory,
       nullptr,
@@ -1655,7 +1565,7 @@ namespace moho
   CScrLuaInitForm* func_IssueFormMove_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueFormMove",
       &moho::cfunc_IssueFormMove,
       nullptr,
@@ -1674,7 +1584,7 @@ namespace moho
   CScrLuaInitForm* func_IssueGuard_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueGuard",
       &moho::cfunc_IssueGuard,
       nullptr,
@@ -1693,7 +1603,7 @@ namespace moho
   CScrLuaInitForm* func_IssueFactoryAssist_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueFactoryAssist",
       &moho::cfunc_IssueFactoryAssist,
       nullptr,
@@ -1712,7 +1622,7 @@ namespace moho
   CScrLuaInitForm* func_IssueAttack_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueAttack",
       &moho::cfunc_IssueAttack,
       nullptr,
@@ -1731,7 +1641,7 @@ namespace moho
   CScrLuaInitForm* func_IssueFormAttack_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueFormAttack",
       &moho::cfunc_IssueFormAttack,
       nullptr,
@@ -1750,7 +1660,7 @@ namespace moho
   CScrLuaInitForm* func_IssueSiloBuildTactical_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueSiloBuildTactical",
       &moho::cfunc_IssueSiloBuildTactical,
       nullptr,
@@ -1769,7 +1679,7 @@ namespace moho
   CScrLuaInitForm* func_IssueSiloBuildNuke_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueSiloBuildNuke",
       &moho::cfunc_IssueSiloBuildNuke,
       nullptr,
@@ -1788,7 +1698,7 @@ namespace moho
   CScrLuaInitForm* func_IssueNuke_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueNuke",
       &moho::cfunc_IssueNuke,
       nullptr,
@@ -1807,7 +1717,7 @@ namespace moho
   CScrLuaInitForm* func_IssueTactical_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueTactical",
       &moho::cfunc_IssueTactical,
       nullptr,
@@ -1826,7 +1736,7 @@ namespace moho
   CScrLuaInitForm* func_IssueTeleport_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueTeleport",
       &moho::cfunc_IssueTeleport,
       nullptr,
@@ -1845,7 +1755,7 @@ namespace moho
   CScrLuaInitForm* func_IssuePatrol_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssuePatrol",
       &moho::cfunc_IssuePatrol,
       nullptr,
@@ -1864,7 +1774,7 @@ namespace moho
   CScrLuaInitForm* func_IssueFormPatrol_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueFormPatrol",
       &moho::cfunc_IssueFormPatrol,
       nullptr,
@@ -1883,7 +1793,7 @@ namespace moho
   CScrLuaInitForm* func_IssueAggressiveMove_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueAggressiveMove",
       &moho::cfunc_IssueAggressiveMove,
       nullptr,
@@ -1902,7 +1812,7 @@ namespace moho
   CScrLuaInitForm* func_IssueFormAggressiveMove_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueFormAggressiveMove",
       &moho::cfunc_IssueFormAggressiveMove,
       nullptr,
@@ -1921,7 +1831,7 @@ namespace moho
   CScrLuaInitForm* func_IssueFerry_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueFerry",
       &moho::cfunc_IssueFerry,
       nullptr,
@@ -1940,7 +1850,7 @@ namespace moho
   CScrLuaInitForm* func_IssueBuildMobile_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueBuildMobile",
       &moho::cfunc_IssueBuildMobile,
       nullptr,
@@ -1959,7 +1869,7 @@ namespace moho
   CScrLuaInitForm* func_IssueRepair_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueRepair",
       &moho::cfunc_IssueRepair,
       nullptr,
@@ -1978,7 +1888,7 @@ namespace moho
   CScrLuaInitForm* func_IssueSacrifice_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueSacrifice",
       &moho::cfunc_IssueSacrifice,
       nullptr,
@@ -1997,7 +1907,7 @@ namespace moho
   CScrLuaInitForm* func_IssueUpgrade_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueUpgrade",
       &moho::cfunc_IssueUpgrade,
       nullptr,
@@ -2016,7 +1926,7 @@ namespace moho
   CScrLuaInitForm* func_IssueScript_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueScript",
       &moho::cfunc_IssueScript,
       nullptr,
@@ -2035,7 +1945,7 @@ namespace moho
   CScrLuaInitForm* func_IssueReclaim_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueReclaim",
       &moho::cfunc_IssueReclaim,
       nullptr,
@@ -2054,7 +1964,7 @@ namespace moho
   CScrLuaInitForm* func_IssueCapture_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueCapture",
       &moho::cfunc_IssueCapture,
       nullptr,
@@ -2073,7 +1983,7 @@ namespace moho
   CScrLuaInitForm* func_IssueKillSelf_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueKillSelf",
       &moho::cfunc_IssueKillSelf,
       nullptr,
@@ -2092,7 +2002,7 @@ namespace moho
   CScrLuaInitForm* func_IssueDestroySelf_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueDestroySelf",
       &moho::cfunc_IssueDestroySelf,
       nullptr,
@@ -2111,7 +2021,7 @@ namespace moho
   CScrLuaInitForm* func_IssueTransportLoad_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueTransportLoad",
       &moho::cfunc_IssueTransportLoad,
       nullptr,
@@ -2130,7 +2040,7 @@ namespace moho
   CScrLuaInitForm* func_IssueTransportUnload_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueTransportUnload",
       &moho::cfunc_IssueTransportUnload,
       nullptr,
@@ -2149,7 +2059,7 @@ namespace moho
   CScrLuaInitForm* func_IssueTeleportToBeacon_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueTeleportToBeacon",
       &moho::cfunc_IssueTeleportToBeacon,
       nullptr,
@@ -2168,7 +2078,7 @@ namespace moho
   CScrLuaInitForm* func_IssueTransportUnloadSpecific_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueTransportUnloadSpecific",
       &moho::cfunc_IssueTransportUnloadSpecific,
       nullptr,
@@ -2187,7 +2097,7 @@ namespace moho
   CScrLuaInitForm* func_IssueBuildFactory_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "IssueBuildFactory",
       &moho::cfunc_IssueBuildFactory,
       nullptr,
@@ -2218,16 +2128,7 @@ namespace moho
    */
   int cfunc_IssueClearFactoryCommandsL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(
-        state,
-        kLuaExpectedArgsWarning,
-        kIssueClearFactoryCommandsHelpText,
-        1,
-        argumentCount
-      );
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kIssueClearFactoryCommandsHelpText);
 
     UnitSet units{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -2268,10 +2169,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueMoveOffFactoryHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueMoveOffFactoryHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -2364,13 +2262,10 @@ namespace moho
    */
   int cfunc_CoordinateAttacksL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCoordinateAttacksHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kCoordinateAttacksHelpText);
 
     const LuaPlus::LuaObject commandListObject(LuaPlus::LuaStackObject(state, 1));
-    msvc8::vector<CUnitCommand*> commands{};
+    fa::vector<CUnitCommand*> commands{};
     if (commandListObject.IsTable()) {
       const int commandCount = commandListObject.GetCount();
       for (int commandIndex = 1; commandIndex <= commandCount; ++commandIndex) {
@@ -2415,7 +2310,7 @@ namespace moho
   CScrLuaInitForm* func_CoordinateAttacks_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCoordinateAttacksName,
       &moho::cfunc_CoordinateAttacks,
       nullptr,
@@ -2445,10 +2340,7 @@ namespace moho
    */
   int cfunc_IssueSiloBuildTacticalL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueSiloBuildTacticalHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kIssueSiloBuildTacticalHelpText);
 
     UnitSet units{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -2457,7 +2349,7 @@ namespace moho
     for (Unit* unit : units) {
       IAiSiloBuild* const aiSiloBuild = unit ? unit->AiSiloBuild : nullptr;
       if (aiSiloBuild) {
-        aiSiloBuild->SiloAddBuild(SILOTYPE_Tactical);
+        (void)aiSiloBuild->SiloAddBuild(SILOTYPE_Tactical);
       }
     }
 
@@ -2484,10 +2376,7 @@ namespace moho
    */
   int cfunc_IssueSiloBuildNukeL(LuaPlus::LuaState* const state)
   {
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueSiloBuildNukeHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kIssueSiloBuildNukeHelpText);
 
     UnitSet units{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -2496,7 +2385,7 @@ namespace moho
     for (Unit* unit : units) {
       IAiSiloBuild* const aiSiloBuild = unit ? unit->AiSiloBuild : nullptr;
       if (aiSiloBuild) {
-        aiSiloBuild->SiloAddBuild(SILOTYPE_Nuke);
+        (void)aiSiloBuild->SiloAddBuild(SILOTYPE_Nuke);
       }
     }
 
@@ -2528,10 +2417,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueTacticalHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueTacticalHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -2580,10 +2466,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueNukeHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueNukeHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -2632,10 +2515,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueTeleportHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueTeleportHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -2685,10 +2565,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueMoveHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueMoveHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -2751,10 +2628,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueDiveHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kIssueDiveHelpText);
 
     // The dive command object is constructed before the unit list is parsed,
     // mirroring the binary's ordering (FUN_006F20A0).
@@ -2804,10 +2678,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueFactoryAssistHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueFactoryAssistHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -2858,10 +2729,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueTransportUnloadHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueTransportUnloadHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -2914,10 +2782,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueTeleportToBeaconHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueTeleportToBeaconHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -2967,10 +2832,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueFactoryRallyPointHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueFactoryRallyPointHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -3032,10 +2894,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueGuardHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueGuardHelpText);
 
     CAiTarget target{};
     // 0x006EEF60 `CAiTarget::SetTarget(state, "IssuePatrol", arg)` -- the
@@ -3094,10 +2953,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueAttackHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueAttackHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -3194,10 +3050,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssuePatrolHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssuePatrolHelpText);
 
     CAiTarget target{};
     // 0x006EEF60 `CAiTarget::SetTarget(state, "IssueAggressiveMove", arg)` -- the
@@ -3287,10 +3140,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueFerryHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueFerryHelpText);
 
     CAiTarget target{};
     // 0x006EEF60 `CAiTarget::SetTarget(state, <context>, arg)` -- the binary's
@@ -3336,9 +3186,9 @@ namespace moho
    * (x = element[1], z = element[2]). Raises the binary's Lua errors when the
    * argument is not a table, or any element is not a two-element table.
    */
-  [[nodiscard]] msvc8::vector<SOCellPos> func_GetCells(LuaPlus::LuaState* const state, LuaPlus::LuaStackObject cellListArg)
+  [[nodiscard]] fa::vector<SOCellPos> func_GetCells(LuaPlus::LuaState* const state, LuaPlus::LuaStackObject cellListArg)
   {
-    msvc8::vector<SOCellPos> cells{};
+    fa::vector<SOCellPos> cells{};
 
     lua_State* const rawState = cellListArg.m_state->m_state;
     if (lua_type(rawState, cellListArg.m_stackIndex) != LUA_TTABLE) {
@@ -3353,7 +3203,7 @@ namespace moho
 
       if (!cellObject.IsTable() || cellObject.GetCount() != 2) {
         if (cellObject.IsTable()) {
-          const msvc8::string describe = gpg::STR_Printf("%d element table", cellObject.GetCount());
+          const fa::string describe = gpg::STR_Printf("%d element table", cellObject.GetCount());
           LuaPlus::LuaState::Error(state, kInvalidCellError, kIssueBuildMobileName, describe.c_str());
         } else {
           const LuaPlus::LuaObject listObject(cellListArg);
@@ -3394,10 +3244,7 @@ namespace moho
   int cfunc_IssueBuildMobileL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 5) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueBuildMobileName, 5, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 5, kIssueBuildMobileName);
 
     // arg1: candidate builders.
     UnitSet candidateUnits{};
@@ -3415,7 +3262,7 @@ namespace moho
       ResolveUnitBlueprintFromLuaArgument(state, LuaPlus::LuaStackObject(state, 3), kIssueBuildMobileName);
 
     // arg4: cell list.
-    const msvc8::vector<SOCellPos> cells = func_GetCells(state, LuaPlus::LuaStackObject(state, 4));
+    const fa::vector<SOCellPos> cells = func_GetCells(state, LuaPlus::LuaStackObject(state, 4));
 
     if (blueprint == nullptr) {
       return 0;
@@ -3527,10 +3374,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueOverChargeHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueOverChargeHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -3590,10 +3434,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueRepairHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueRepairHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -3663,10 +3504,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueScriptHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueScriptHelpText);
 
     UnitSet units{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -3730,10 +3568,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueReclaimHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueReclaimHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -3812,10 +3647,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueCaptureHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueCaptureHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -3891,10 +3723,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueSacrificeHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueSacrificeHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -3961,10 +3790,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueKillSelfHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kIssueKillSelfHelpText);
 
     UnitSet units{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -4008,10 +3834,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueDestroySelfHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kIssueDestroySelfHelpText);
 
     UnitSet units{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -4059,10 +3882,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueUpgradeHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueUpgradeHelpText);
 
     UnitSet units{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -4126,10 +3946,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 3) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueBuildFactoryHelpText, 3, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 3, kIssueBuildFactoryHelpText);
 
     UnitSet units{};
     LuaPlus::LuaStackObject unitListArg(state, 1);
@@ -4186,10 +4003,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueAggressiveMoveHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueAggressiveMoveHelpText);
 
     CAiTarget target{};
     // 0x006EEF60 `CAiTarget::SetTarget(state, <context>, arg)` -- the binary's
@@ -4294,10 +4108,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueTransportLoadHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIssueTransportLoadHelpText);
 
     const LuaPlus::LuaObject unitToLoadObject(LuaPlus::LuaStackObject(state, 2));
     Unit* const unitToLoad = SCR_FromLua_Unit(unitToLoadObject);
@@ -4363,10 +4174,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 3) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIssueTransportUnloadSpecificHelpText, 3, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 3, kIssueTransportUnloadSpecificHelpText);
 
     UnitSet sourceUnits{};
     LuaPlus::LuaStackObject unitListArg(state, 1);

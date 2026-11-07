@@ -29,15 +29,6 @@ namespace
     }
   };
 
-  gpg::RType* gQuatfType = nullptr;
-
-  [[nodiscard]] gpg::RType* ResolveQuatfType()
-  {
-    if (gQuatfType == nullptr) {
-      gQuatfType = gpg::LookupRType(typeid(Wm3::Quatf));
-    }
-    return gQuatfType;
-  }
 
 } // namespace
 
@@ -70,7 +61,7 @@ namespace moho
     const gpg::RRef ownerRef{};
     archive->ReadInt(&cmd);
 
-    gpg::RType* const quatType = ResolveQuatfType();
+    gpg::RType* const quatType = gpg::RTypeOf<Wm3::Quatf>();
     GPG_ASSERT(quatType != nullptr);
     archive->Read(quatType, &origin, ownerRef);
 
@@ -97,7 +88,7 @@ namespace moho
     const gpg::RRef ownerRef{};
     archive->WriteInt(cmd);
 
-    gpg::RType* const quatType = ResolveQuatfType();
+    gpg::RType* const quatType = gpg::RTypeOf<Wm3::Quatf>();
     GPG_ASSERT(quatType != nullptr);
     archive->Write(quatType, &origin, ownerRef);
 
@@ -105,7 +96,7 @@ namespace moho
 
     archive->WritePointer<moho::REntityBlueprint>(blueprint, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->WriteString(const_cast<msvc8::string*>(&unk2));
+    archive->WriteString(const_cast<fa::string*>(&unk2));
 
     if (gSimExactArchive.load(std::memory_order_relaxed)) {
       archive->WriteInt(mFormationScriptIndex);

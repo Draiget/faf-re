@@ -1,4 +1,5 @@
 #include "moho/console/CConCommand.h"
+#include "moho/console/ConCommandJoin.h"
 
 #include <algorithm>
 #include <cctype>
@@ -67,7 +68,7 @@ namespace moho
 
 namespace moho
 {
-  [[nodiscard]] msvc8::string ToString(const Wm3::Vec3f& value);
+  [[nodiscard]] fa::string ToString(const Wm3::Vec3f& value);
 }
 
 bool moho::con_TestVarBool = false;
@@ -79,7 +80,7 @@ float moho::con_TestVarFloat = 0.0f;
  * Address: 0x00BC3AB0 (FUN_00BC3AB0, dynamic initializer for `con_TestVarStr`)
  * Address: 0x00BEED60 (FUN_00BEED60, dynamic atexit destructor for `con_TestVarStr`)
  */
-msvc8::string moho::con_TestVarStr("string");
+fa::string moho::con_TestVarStr("string");
 bool moho::snd_ExtraDoWorkCalls = true; // 0x00F58026
 int moho::recon_debug = -1; // 0x00F58AC8 is initialised .data: -1, no army selected
 bool moho::sPathDebuggerEnabled = false;
@@ -113,7 +114,6 @@ namespace
   constexpr const char* kConExecuteHelpText = "ConExecute('command string') -- Perform a console command";
   constexpr const char* kConExecuteSaveHelpText =
     "ConExecuteSave('command string') -- Perform a console command, saved to stack";
-  constexpr const char* kNoSessionLocToken = "<LOC _No_session>";
 
   /**
    * Address: 0x00BC3890 (FUN_00BC3890, dynamic initializer for `gSavedConsoleCommands`)
@@ -122,107 +122,57 @@ namespace
    * What it does:
    * Saved console-command history, newest first.
    */
-  msvc8::vector<msvc8::string> gSavedConsoleCommands;
+  fa::vector<fa::string> gSavedConsoleCommands;
 
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
   }
 
-  [[nodiscard]] CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("User"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("User");
-    return sSet;
-  }
-
   [[nodiscard]]
-  bool TokenEq(const msvc8::string* token, const std::string_view text) noexcept
+  bool TokenEq(const fa::string* token, const std::string_view text) noexcept
   {
     return token != nullptr && token->view() == text;
   }
 
   [[nodiscard]]
-  bool TokenEqNoCase(const msvc8::string* token, const char* text) noexcept
+  bool TokenEqNoCase(const fa::string* token, const char* text) noexcept
   {
     return token != nullptr && token->equals_no_case(text);
   }
 
   [[nodiscard]]
-  const char* TokenDataOrEmpty(const msvc8::string* token) noexcept
+  const char* TokenDataOrEmpty(const fa::string* token) noexcept
   {
     return token != nullptr ? token->c_str() : "";
   }
 
   [[nodiscard]]
-  int ParseIntToken(const msvc8::string* token) noexcept
+  int ParseIntToken(const fa::string* token) noexcept
   {
     return std::atoi(TokenDataOrEmpty(token));
   }
 
   [[nodiscard]]
-  std::uint32_t ParseUInt32Token(const msvc8::string* token) noexcept
+  std::uint32_t ParseUInt32Token(const fa::string* token) noexcept
   {
     return static_cast<std::uint32_t>(gpg::STR_ParseUInt32(TokenDataOrEmpty(token)));
   }
 
   [[nodiscard]]
-  float ParseFloatToken(const msvc8::string* token) noexcept
+  float ParseFloatToken(const fa::string* token) noexcept
   {
     return static_cast<float>(std::atof(TokenDataOrEmpty(token)));
   }
 
 
-  void PrintLocalizedConsoleLine(const char* const locToken)
-  {
-    const msvc8::string localizedText = Loc(USER_GetLuaState(), locToken != nullptr ? locToken : "");
-    CON_Printf("%s", localizedText.c_str());
-  }
-
-
-  /**
-   * Address: 0x0047BB90 (FUN_0047BB90, func_AppendStrings)
-   *
-   * What it does:
-   * Resets output string, appends first string in `[begin,end)`, then appends
-   * `separator` + each subsequent item.
-   */
-  [[nodiscard]]
-  msvc8::string AppendJoinedStringRange(
-    const msvc8::string* const begin, const msvc8::string* const end, const char* separator
-  )
-  {
-    std::string joined;
-    if (separator == nullptr) {
-      separator = "";
-    }
-
-    if (begin != nullptr && end != nullptr && begin < end) {
-      joined.append(begin->view());
-      for (const msvc8::string* cursor = begin + 1; cursor < end; ++cursor) {
-        joined.append(separator);
-        joined.append(cursor->view());
-      }
-    }
-
-    msvc8::string out;
-    out.assign_owned(joined);
-    return out;
-  }
 
 
   static_assert(sizeof(Wm3::Vector2f) == 0x8, "Wm3::Vector2f size must be 0x8");
 
 
   [[nodiscard]]
-  msvc8::string JoinConCommandTokens(const msvc8::vector<msvc8::string>& args, const std::size_t firstTokenIndex)
+  fa::string JoinConCommandTokens(const fa::vector<fa::string>& args, const std::size_t firstTokenIndex)
   {
     const std::size_t count = args.size();
     if (firstTokenIndex >= count) {
@@ -233,14 +183,14 @@ namespace
   }
 
   template <typename TValue, typename ParseFn>
-  void ApplyIntegralConVarCommand(const msvc8::vector<msvc8::string>& args, TValue* value, ParseFn parseFn)
+  void ApplyIntegralConVarCommand(const fa::vector<fa::string>& args, TValue* value, ParseFn parseFn)
   {
     if (value == nullptr) {
       return;
     }
 
-    const msvc8::string* const op = ConCommandArg(args, 1);
-    const msvc8::string* const rhs = ConCommandArg(args, 2);
+    const fa::string* const op = ConCommandArg(args, 1);
+    const fa::string* const rhs = ConCommandArg(args, 2);
 
     if (TokenEq(op, "=") && rhs != nullptr) {
       *value = static_cast<TValue>(parseFn(rhs));
@@ -304,7 +254,7 @@ namespace
    * What it does:
    * Parses bool convar commands (`=`, on/off/true/false/show/tog, numeric fallback).
    */
-  void HandleBoolConVarCommand(const msvc8::vector<msvc8::string>& args, const char* name, bool* value)
+  void HandleBoolConVarCommand(const fa::vector<fa::string>& args, const char* name, bool* value)
   {
     if (value == nullptr) {
       return;
@@ -316,8 +266,8 @@ namespace
       return;
     }
 
-    const msvc8::string* const op = ConCommandArg(args, 1);
-    const msvc8::string* const rhs = ConCommandArg(args, 2);
+    const fa::string* const op = ConCommandArg(args, 1);
+    const fa::string* const rhs = ConCommandArg(args, 2);
 
     if (TokenEq(op, "=") && rhs != nullptr) {
       *value = ParseIntToken(rhs) != 0;
@@ -350,7 +300,7 @@ namespace
    * What it does:
    * Parses int convar commands with arithmetic/bitwise operators and aliases.
    */
-  void HandleIntConVarCommand(const msvc8::vector<msvc8::string>& args, int* value)
+  void HandleIntConVarCommand(const fa::vector<fa::string>& args, int* value)
   {
     ApplyIntegralConVarCommand<int>(args, value, ParseIntToken);
   }
@@ -362,7 +312,7 @@ namespace
    * What it does:
    * Parses uint8 convar commands with arithmetic/bitwise operators and aliases.
    */
-  void HandleUInt8ConVarCommand(const msvc8::vector<msvc8::string>& args, std::uint8_t* value)
+  void HandleUInt8ConVarCommand(const fa::vector<fa::string>& args, std::uint8_t* value)
   {
     ApplyIntegralConVarCommand<std::uint8_t>(args, value, ParseIntToken);
   }
@@ -374,7 +324,7 @@ namespace
    * What it does:
    * Parses uint32 convar commands; supports decimal and `0x` numeric formats.
    */
-  void HandleUInt32ConVarCommand(const msvc8::vector<msvc8::string>& args, std::uint32_t* value)
+  void HandleUInt32ConVarCommand(const fa::vector<fa::string>& args, std::uint32_t* value)
   {
     ApplyIntegralConVarCommand<std::uint32_t>(args, value, ParseUInt32Token);
   }
@@ -386,14 +336,14 @@ namespace
    * What it does:
    * Parses float convar commands (`=`, `+=`, `-=`, `*=`, `/=`, direct numeric).
    */
-  void HandleFloatConVarCommand(const msvc8::vector<msvc8::string>& args, float* value)
+  void HandleFloatConVarCommand(const fa::vector<fa::string>& args, float* value)
   {
     if (value == nullptr) {
       return;
     }
 
-    const msvc8::string* const op = ConCommandArg(args, 1);
-    const msvc8::string* const rhs = ConCommandArg(args, 2);
+    const fa::string* const op = ConCommandArg(args, 1);
+    const fa::string* const rhs = ConCommandArg(args, 2);
 
     if (TokenEq(op, "=") && rhs != nullptr) {
       *value = ParseFloatToken(rhs);
@@ -426,15 +376,15 @@ namespace
    * What it does:
    * Parses string convar commands (`= value` or direct assignment); prints current value when no args.
    */
-  void HandleStringConVarCommand(const msvc8::vector<msvc8::string>& args, const char* name, msvc8::string* value)
+  void HandleStringConVarCommand(const fa::vector<fa::string>& args, const char* name, fa::string* value)
   {
     if (value == nullptr) {
       return;
     }
 
     if (args.size() >= 2) {
-      const msvc8::string* const op = ConCommandArg(args, 1);
-      const msvc8::string* const rhs = ConCommandArg(args, 2);
+      const fa::string* const op = ConCommandArg(args, 1);
+      const fa::string* const rhs = ConCommandArg(args, 2);
 
       if (TokenEq(op, "=") && rhs != nullptr) {
         *value = TokenDataOrEmpty(rhs);
@@ -529,7 +479,7 @@ namespace
     const std::string& text,
     const std::size_t begin,
     const std::size_t end,
-    msvc8::vector<msvc8::string>& outTokens
+    fa::vector<fa::string>& outTokens
   )
   {
     if (begin == std::string::npos || end < begin) {
@@ -537,11 +487,11 @@ namespace
     }
 
     const std::size_t len = end - begin;
-    outTokens.push_back(msvc8::string(text.data() + begin, len));
+    outTokens.push_back(fa::string(text.data() + begin, len));
   }
 
   void ParseCommandLine(
-    const char* const commandText, msvc8::vector<msvc8::string>& tokens, msvc8::string& remainder
+    const char* const commandText, fa::vector<fa::string>& tokens, fa::string& remainder
   )
   {
     tokens.clear();
@@ -583,7 +533,7 @@ namespace
       if (ch == ';') {
         tokenEnd = index;
         if (index + 1 < text.size()) {
-          remainder = msvc8::string(text.c_str() + index + 1, text.size() - (index + 1));
+          remainder = fa::string(text.c_str() + index + 1, text.size() - (index + 1));
         }
         break;
       }
@@ -629,7 +579,7 @@ namespace
    * Builds a quoted token and escapes embedded `"` and `\\`.
    */
   [[nodiscard]]
-  msvc8::string StringifyToken(const msvc8::string& token)
+  fa::string StringifyToken(const fa::string& token)
   {
     std::string out;
     out.reserve(token.size() + 2);
@@ -643,11 +593,11 @@ namespace
     }
 
     out.push_back('"');
-    return msvc8::string(out.data(), out.size());
+    return fa::string(out.data(), out.size());
   }
 
   [[nodiscard]]
-  bool TokenNeedsStringify(const msvc8::string& token) noexcept
+  bool TokenNeedsStringify(const fa::string& token) noexcept
   {
     const std::string_view text = token.view();
     if (text.empty()) {
@@ -665,13 +615,13 @@ namespace
    * What it does:
    * Decrements each character in-place by one.
    */
-  void DecStringChars(msvc8::string& text)
+  void DecStringChars(fa::string& text)
   {
     std::string decoded = text.to_std();
     for (char& ch : decoded) {
       --ch;
     }
-    text = msvc8::string(decoded.data(), decoded.size());
+    text = fa::string(decoded.data(), decoded.size());
   }
 
   /**
@@ -680,7 +630,7 @@ namespace
    * What it does:
    * Dispatches one formatted console line to each registered output handler.
    */
-  void OutputToConHandlers(const msvc8::string& line)
+  void OutputToConHandlers(const fa::string& line)
   {
     for (IConOutputHandler* handler : CON_GetOutputHandlers()) {
       if (handler != nullptr) {
@@ -824,7 +774,7 @@ void moho::UnregisterConCommand(CConCommand& command)
  * Parses one console command lane into tokens and remainder text.
  */
 void moho::CON_ParseCommand(
-  const char* const commandText, msvc8::vector<msvc8::string>& tokens, msvc8::string& remainder
+  const char* const commandText, fa::vector<fa::string>& tokens, fa::string& remainder
 )
 {
   ParseCommandLine(commandText, tokens, remainder);
@@ -836,7 +786,7 @@ void moho::CON_ParseCommand(
  * What it does:
  * Rebuilds one command string from parsed tokens with quote escaping.
  */
-msvc8::string moho::CON_UnparseCommand(const msvc8::vector<msvc8::string>& tokens)
+fa::string moho::CON_UnparseCommand(const fa::vector<fa::string>& tokens)
 {
   std::string out;
   for (std::size_t index = 0; index < tokens.size(); ++index) {
@@ -844,16 +794,16 @@ msvc8::string moho::CON_UnparseCommand(const msvc8::vector<msvc8::string>& token
       out.push_back(' ');
     }
 
-    const msvc8::string& token = tokens[index];
+    const fa::string& token = tokens[index];
     if (TokenNeedsStringify(token)) {
-      const msvc8::string escaped = StringifyToken(token);
+      const fa::string escaped = StringifyToken(token);
       out.append(escaped.view());
     } else {
       out.append(token.view());
     }
   }
 
-  return msvc8::string(out.data(), out.size());
+  return fa::string(out.data(), out.size());
 }
 
 /**
@@ -868,7 +818,7 @@ msvc8::string moho::CON_UnparseCommand(const msvc8::vector<msvc8::string>& token
  * What it does:
  * Appends command listing text into `outText`.
  */
-void moho::CON_GetCommandList(msvc8::string& outText, const bool includeDescriptions)
+void moho::CON_GetCommandList(fa::string& outText, const bool includeDescriptions)
 {
   std::string merged = outText.to_std();
 
@@ -900,7 +850,7 @@ void moho::CON_GetCommandList(msvc8::string& outText, const bool includeDescript
     }
   }
 
-  outText = msvc8::string(merged.data(), merged.size());
+  outText = fa::string(merged.data(), merged.size());
 }
 
 /**
@@ -911,9 +861,9 @@ void moho::CON_GetCommandList(msvc8::string& outText, const bool includeDescript
  * What it does:
  * Returns command names starting with `prefix` (case-insensitive).
  */
-msvc8::vector<msvc8::string> moho::CON_GetFindTextMatches(const char* const prefix)
+fa::vector<fa::string> moho::CON_GetFindTextMatches(const char* const prefix)
 {
-  msvc8::vector<msvc8::string> matches;
+  fa::vector<fa::string> matches;
   if (prefix == nullptr || prefix[0] == '\0') {
     return matches;
   }
@@ -929,10 +879,10 @@ msvc8::vector<msvc8::string> moho::CON_GetFindTextMatches(const char* const pref
     if (_strnicmp(prefix, it->first.c_str(), needleSize) != 0) {
       break;
     }
-    matches.push_back(msvc8::string(it->first.data(), it->first.size()));
+    matches.push_back(fa::string(it->first.data(), it->first.size()));
   }
 
-  msvc8::vector<msvc8::string> out;
+  fa::vector<fa::string> out;
   // FUN_0041F190: the clear+copy loop is `vector<string>::operator=`'s
   // assign-from-source shape (cited on `operator=` in legacy/containers/Vector.h).
   out = matches;
@@ -958,7 +908,7 @@ void moho::CON_Printf(const char* const format, ...)
   va_list args;
   va_start(args, format);
   const char* formatRef = format;
-  const msvc8::string line = gpg::STR_Va(formatRef, args);
+  const fa::string line = gpg::STR_Va(formatRef, args);
   va_end(args);
 
   if (::GetCurrentThreadId() == THREAD_GetMainThreadId()) {
@@ -966,7 +916,7 @@ void moho::CON_Printf(const char* const format, ...)
     return;
   }
 
-  const msvc8::string captured(line);
+  const fa::string captured(line);
   boost::function<void(), std::allocator<void>> callback = [captured]() { OutputToConHandlers(captured); };
   THREAD_InvokeAsync(callback, 0u);
 }
@@ -977,7 +927,7 @@ void moho::CON_Printf(const char* const format, ...)
  * What it does:
  * Returns the global saved execute stack.
  */
-const msvc8::vector<msvc8::string>& moho::CON_GetExecuteStack()
+const fa::vector<fa::string>& moho::CON_GetExecuteStack()
 {
   return gSavedConsoleCommands;
 }
@@ -1008,10 +958,10 @@ void moho::ExecuteConsoleCommandText(const char* commandText)
     return;
   }
 
-  msvc8::string pending(commandText);
+  fa::string pending(commandText);
   while (!pending.empty()) {
-    msvc8::vector<msvc8::string> parsedTokens;
-    msvc8::string remainder;
+    fa::vector<fa::string> parsedTokens;
+    fa::string remainder;
     CON_ParseCommand(pending.c_str(), parsedTokens, remainder);
 
     if (!parsedTokens.empty()) {
@@ -1021,16 +971,16 @@ void moho::ExecuteConsoleCommandText(const char* commandText)
         // try state 3 around the Handle call at 0x0041CE08, handler 0x0041CE16).
         try {
           command->Handle(parsedTokens);
-        } catch (const msvc8::runtime_error& error) {
+        } catch (const fa::runtime_error& error) {
           gpg::Warnf("Error running console command %s: %s", commandText, error.what());
         }
       } else {
-        msvc8::string easterEgg("ipdlfz");
+        fa::string easterEgg("ipdlfz");
         DecStringChars(easterEgg);
         if (parsedTokens[0] == easterEgg) {
-          msvc8::string go("Hp");
-          msvc8::string tips("Ujqt");
-          msvc8::string sens("Tfot");
+          fa::string go("Hp");
+          fa::string tips("Ujqt");
+          fa::string sens("Tfot");
           DecStringChars(go);
           DecStringChars(tips);
           DecStringChars(sens);
@@ -1073,7 +1023,7 @@ void moho::CON_Executef(const char* format, ...)
 
   va_list args;
   va_start(args, format);
-  const msvc8::string rendered = gpg::STR_Va(format, args);
+  const fa::string rendered = gpg::STR_Va(format, args);
   va_end(args);
   CON_Execute(rendered.c_str());
 }
@@ -1091,11 +1041,11 @@ void moho::CON_ExecuteSave(const char* commandText)
     return;
   }
 
-  gSavedConsoleCommands.push_back(msvc8::string(commandText));
+  gSavedConsoleCommands.push_back(fa::string(commandText));
   for (std::size_t index = gSavedConsoleCommands.size() - 1; index != 0u; --index) {
     gSavedConsoleCommands[index] = gSavedConsoleCommands[index - 1];
   }
-  gSavedConsoleCommands[0] = msvc8::string(commandText);
+  gSavedConsoleCommands[0] = fa::string(commandText);
   while (gSavedConsoleCommands.size() > kSavedConsoleCommandLimit) {
     gSavedConsoleCommands.pop_back();
   }
@@ -1124,7 +1074,7 @@ void moho::CON_ExecuteLastCommand()
  * What it does:
  * Emits joined command arguments (`arg1..argN`) through console output.
  */
-void moho::CON_Echo(const msvc8::vector<msvc8::string>& args)
+void moho::CON_Echo(const fa::vector<fa::string>& args)
 {
   if (args.size() < 2u) {
     return;
@@ -1132,7 +1082,7 @@ void moho::CON_Echo(const msvc8::vector<msvc8::string>& args)
 
   std::string text(ConCommandArg(args, 1)->view());
   for (std::size_t index = 2; index < args.size(); ++index) {
-    const msvc8::string* const token = ConCommandArg(args, index);
+    const fa::string* const token = ConCommandArg(args, index);
     if (token == nullptr) {
       continue;
     }
@@ -1150,11 +1100,11 @@ void moho::CON_Echo(const msvc8::vector<msvc8::string>& args)
  * What it does:
  * Emits one formatted line per registered command.
  */
-void moho::CON_ListCommands(const msvc8::vector<msvc8::string>& args)
+void moho::CON_ListCommands(const fa::vector<fa::string>& args)
 {
   (void)args;
 
-  msvc8::vector<msvc8::string> lines;
+  fa::vector<fa::string> lines;
   {
     auto& registry = GetConsoleCommandRegistry();
     std::scoped_lock lock{registry.lock};
@@ -1172,7 +1122,7 @@ void moho::CON_ListCommands(const msvc8::vector<msvc8::string>& args)
     }
   }
 
-  for (const msvc8::string& line : lines) {
+  for (const fa::string& line : lines) {
     CON_Printf("%s", line.c_str());
   }
 }
@@ -1183,10 +1133,10 @@ void moho::CON_ListCommands(const msvc8::vector<msvc8::string>& args)
  * What it does:
  * Prints the current engine-version string to console output.
  */
-void moho::CON_GetVersion(const msvc8::vector<msvc8::string>& args)
+void moho::CON_GetVersion(const fa::vector<fa::string>& args)
 {
   (void)args;
-  const msvc8::string engineVersion = moho::GetEngineVersion();
+  const fa::string engineVersion = moho::GetEngineVersion();
   CON_Printf("%s", engineVersion.c_str());
 }
 
@@ -1196,7 +1146,7 @@ void moho::CON_GetVersion(const msvc8::vector<msvc8::string>& args)
  * What it does:
  * Iterates all registered Lua init-form sets and dumps their binder docs.
  */
-void moho::CON_LUADOC(const msvc8::vector<msvc8::string>& args)
+void moho::CON_LUADOC(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -1213,9 +1163,9 @@ void moho::CON_LUADOC(const msvc8::vector<msvc8::string>& args)
  * Joins command tokens from index 1 with spaces and emits one info-severity
  * log line.
  */
-void moho::CON_Log(const msvc8::vector<msvc8::string>& args)
+void moho::CON_Log(const fa::vector<fa::string>& args)
 {
-  const msvc8::string message = JoinConCommandTokens(args, 1u);
+  const fa::string message = JoinConCommandTokens(args, 1u);
   gpg::Logf("%s", message.c_str());
 }
 
@@ -1226,9 +1176,9 @@ void moho::CON_Log(const msvc8::vector<msvc8::string>& args)
  * Joins command tokens from index 1 with spaces and emits one warn-severity
  * log line.
  */
-void moho::CON_Debug_Warn(const msvc8::vector<msvc8::string>& args)
+void moho::CON_Debug_Warn(const fa::vector<fa::string>& args)
 {
-  const msvc8::string message = JoinConCommandTokens(args, 1u);
+  const fa::string message = JoinConCommandTokens(args, 1u);
   gpg::Warnf("%s", message.c_str());
 }
 
@@ -1239,9 +1189,9 @@ void moho::CON_Debug_Warn(const msvc8::vector<msvc8::string>& args)
  * Joins command tokens from index 1 with spaces and terminates through
  * `gpg::Die("%s", ...)`.
  */
-void moho::CON_Debug_Error(const msvc8::vector<msvc8::string>& args)
+void moho::CON_Debug_Error(const fa::vector<fa::string>& args)
 {
-  const msvc8::string message = JoinConCommandTokens(args, 1u);
+  const fa::string message = JoinConCommandTokens(args, 1u);
   gpg::Die("%s", message.c_str());
 }
 
@@ -1251,7 +1201,7 @@ void moho::CON_Debug_Error(const msvc8::vector<msvc8::string>& args)
  * What it does:
  * Debug no-op callback slot.
  */
-void moho::CON_Debug_Assert(const msvc8::vector<msvc8::string>& args)
+void moho::CON_Debug_Assert(const fa::vector<fa::string>& args)
 {
   (void)args;
 }
@@ -1262,7 +1212,7 @@ void moho::CON_Debug_Assert(const msvc8::vector<msvc8::string>& args)
  * What it does:
  * Intentionally crashes by writing zero to absolute address 0.
  */
-void moho::CON_Debug_Crash(const msvc8::vector<msvc8::string>& args)
+void moho::CON_Debug_Crash(const fa::vector<fa::string>& args)
 {
   (void)args;
   *reinterpret_cast<volatile std::uint32_t*>(0) = 0u;
@@ -1274,7 +1224,7 @@ void moho::CON_Debug_Crash(const msvc8::vector<msvc8::string>& args)
  * What it does:
  * Throws `std::exception` with fixed debug text.
  */
-void moho::CON_Debug_Throw(const msvc8::vector<msvc8::string>& args)
+void moho::CON_Debug_Throw(const fa::vector<fa::string>& args)
 {
   (void)args;
 #if defined(_WIN32)
@@ -1293,9 +1243,9 @@ void moho::CON_Debug_Throw(const msvc8::vector<msvc8::string>& args)
  * Emits one no-support line when called with a filespec argument; otherwise
  * prints command usage.
  */
-void moho::CON_p4_Edit(const msvc8::vector<msvc8::string>& args)
+void moho::CON_p4_Edit(const fa::vector<fa::string>& args)
 {
-  const msvc8::string* const commandToken = ConCommandArg(args, 0u);
+  const fa::string* const commandToken = ConCommandArg(args, 0u);
   GPG_ASSERT(commandToken != nullptr);
 
   if (commandToken != nullptr && args.size() >= 2u) {
@@ -1313,9 +1263,9 @@ void moho::CON_p4_Edit(const msvc8::vector<msvc8::string>& args)
  * Emits one no-support line when called with a filespec argument; otherwise
  * prints command usage.
  */
-void moho::CON_p4_IsOpenedForEdit(const msvc8::vector<msvc8::string>& args)
+void moho::CON_p4_IsOpenedForEdit(const fa::vector<fa::string>& args)
 {
-  const msvc8::string* const commandToken = ConCommandArg(args, 0u);
+  const fa::string* const commandToken = ConCommandArg(args, 0u);
   GPG_ASSERT(commandToken != nullptr);
 
   if (commandToken != nullptr && args.size() >= 2u) {
@@ -1342,13 +1292,13 @@ namespace
  * two command tokens are present, forwards token `0` to
  * `d3d_AntiAliasingSamples`.
  */
-void moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken(const msvc8::vector<msvc8::string>& args)
+void moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken(const fa::vector<fa::string>& args)
 {
   if (args.size() != 2u) {
     return;
   }
 
-  const msvc8::string* const sampleToken = ConCommandArg(args, 0u);
+  const fa::string* const sampleToken = ConCommandArg(args, 0u);
   if (sampleToken == nullptr) {
     return;
   }
@@ -1371,10 +1321,7 @@ namespace
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kConTextMatchesHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kConTextMatchesHelpText);
 
     LuaPlus::LuaStackObject prefixStack(state, 1);
     const char* const prefix = lua_tostring(rawState, 1);
@@ -1382,12 +1329,12 @@ namespace
       prefixStack.TypeError("string");
     }
 
-    msvc8::vector<msvc8::string> matches = CON_GetFindTextMatches(prefix);
+    fa::vector<fa::string> matches = CON_GetFindTextMatches(prefix);
 
     LuaPlus::LuaObject resultTable(state);
     resultTable.AssignNewTable(state, 0, static_cast<int>(matches.size()));
     int luaIndex = 1;
-    for (const msvc8::string& match : matches) {
+    for (const fa::string& match : matches) {
       resultTable.SetString(luaIndex, match.c_str());
       ++luaIndex;
     }
@@ -1452,7 +1399,7 @@ int moho::cfunc_ConTextMatches(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_ConTextMatches_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "ConTextMatches",
     &moho::cfunc_ConTextMatches,
     nullptr,
@@ -1515,7 +1462,7 @@ int moho::cfunc_ConExecuteSave(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_ConExecute_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "ConExecute",
     &moho::cfunc_ConExecute,
     nullptr,
@@ -1534,7 +1481,7 @@ moho::CScrLuaInitForm* moho::func_ConExecute_LuaFuncDef()
 moho::CScrLuaInitForm* moho::func_ConExecuteSave_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "ConExecuteSave",
     &moho::cfunc_ConExecuteSave,
     nullptr,
@@ -1568,7 +1515,7 @@ moho::CScrLuaInitForm* moho::register_ConExecuteSave_LuaFuncDef()
  * Dispatches bool convar command parsing and mutation.
  */
 template <>
-void moho::TConVar<bool>::Handle(const msvc8::vector<msvc8::string>& args)
+void moho::TConVar<bool>::Handle(const fa::vector<fa::string>& args)
 {
   HandleBoolConVarCommand(args, mName, mValue);
 }
@@ -1581,7 +1528,7 @@ void moho::TConVar<bool>::Handle(const msvc8::vector<msvc8::string>& args)
  * Handles int convar command; prints current value when no RHS command args are provided.
  */
 template <>
-void moho::TConVar<int>::Handle(const msvc8::vector<msvc8::string>& args)
+void moho::TConVar<int>::Handle(const fa::vector<fa::string>& args)
 {
   int* const value = mValue;
   if (value == nullptr) {
@@ -1603,7 +1550,7 @@ void moho::TConVar<int>::Handle(const msvc8::vector<msvc8::string>& args)
  * Handles uint8 convar command; prints current value when no RHS command args are provided.
  */
 template <>
-void moho::TConVar<std::uint8_t>::Handle(const msvc8::vector<msvc8::string>& args)
+void moho::TConVar<std::uint8_t>::Handle(const fa::vector<fa::string>& args)
 {
   std::uint8_t* const value = mValue;
   if (value == nullptr) {
@@ -1625,7 +1572,7 @@ void moho::TConVar<std::uint8_t>::Handle(const msvc8::vector<msvc8::string>& arg
  * Handles float convar command; prints current value when no RHS command args are provided.
  */
 template <>
-void moho::TConVar<float>::Handle(const msvc8::vector<msvc8::string>& args)
+void moho::TConVar<float>::Handle(const fa::vector<fa::string>& args)
 {
   float* const value = mValue;
   if (value == nullptr) {
@@ -1647,7 +1594,7 @@ void moho::TConVar<float>::Handle(const msvc8::vector<msvc8::string>& args)
  * Handles uint32 convar command; prints current value when no RHS command args are provided.
  */
 template <>
-void moho::TConVar<std::uint32_t>::Handle(const msvc8::vector<msvc8::string>& args)
+void moho::TConVar<std::uint32_t>::Handle(const fa::vector<fa::string>& args)
 {
   std::uint32_t* const value = mValue;
   if (value == nullptr) {
@@ -1669,7 +1616,7 @@ void moho::TConVar<std::uint32_t>::Handle(const msvc8::vector<msvc8::string>& ar
  * Handles string convar command assignment and value display.
  */
 template <>
-void moho::TConVar<msvc8::string>::Handle(const msvc8::vector<msvc8::string>& args)
+void moho::TConVar<fa::string>::Handle(const fa::vector<fa::string>& args)
 {
   HandleStringConVarCommand(args, mName, mValue);
 }
@@ -1838,7 +1785,7 @@ namespace
    * Address: 0x00BC3AD0 (FUN_00BC3AD0, dynamic initializer for `gTConVar_con_TestVarStr`)
    * Address: 0x00BEED90 (FUN_00BEED90, dynamic atexit destructor for `gTConVar_con_TestVarStr`)
    */
-  TConVar<msvc8::string> gTConVar_con_TestVarStr(
+  TConVar<fa::string> gTConVar_con_TestVarStr(
     "con_TestVarStr",
     kConsoleStartupTestVarDescription,
     &moho::con_TestVarStr
@@ -2318,7 +2265,7 @@ namespace
 bool moho::dbg_MonitorAddressSpace = false;
 float moho::dump_Rate = 30.0f;
 float moho::efx_WaveCutoff = 400.0f;
-float moho::sc_FrameTimeClamp = 10.0f;
+float moho::sc_FrameTimeClamp = 4.0f; // engine change: the binary has 10 ms, which caps the game at 100 FPS
 bool moho::sc_SkipIntro = false;
 
 namespace moho

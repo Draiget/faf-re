@@ -1,4 +1,5 @@
 #include "moho/ai/CAiPersonality.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 #include <cstring>
 #include <cstdint>
@@ -70,7 +71,6 @@ namespace
   constexpr const char* kAiPersonalityAdjustDelayName = "AdjustDelay";
   constexpr const char* kAiPersonalityAdjustDelayHelpText = "CAiPersonality:AdjustDelay()";
 
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kAiPersonalityGetPersonalityNameName = "GetPersonalityName";
   constexpr const char* kAiPersonalityGetPersonalityNameHelpText = "CAiPersonality:GetPersonalityName()";
   constexpr const char* kAiPersonalityGetChatPersonalityName = "GetChatPersonality";
@@ -144,31 +144,11 @@ namespace
 
   gpg::RType* gCScriptObjectType = nullptr;
   gpg::RType* gSimType = nullptr;
-  gpg::RType* gAiPersonalityRangeType = nullptr;
-  gpg::RType* gStringVectorType = nullptr;
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
 
   [[nodiscard]] gpg::RType* CachedCScriptObjectType()
   {
     if (!CScriptObject::sType) {
-      CScriptObject::sType = CachedType<CScriptObject>(gCScriptObjectType);
+      CScriptObject::sType = gpg::CachedLookup<CScriptObject>(gCScriptObjectType);
     }
     return CScriptObject::sType;
   }
@@ -176,66 +156,11 @@ namespace
   [[nodiscard]] gpg::RType* CachedSimType()
   {
     if (!Sim::sType) {
-      Sim::sType = CachedType<Sim>(gSimType);
+      Sim::sType = gpg::CachedLookup<Sim>(gSimType);
     }
     return Sim::sType;
   }
 
-  [[nodiscard]] gpg::RType* CachedPersonalityRangeType()
-  {
-    return CachedType<SAiPersonalityRange>(gAiPersonalityRangeType);
-  }
-
-  [[nodiscard]] gpg::RType* CachedStringVectorType()
-  {
-    return CachedType<msvc8::vector<msvc8::string>>(gStringVectorType);
-  }
-
-  template <typename TObject>
-  [[nodiscard]] TObject* ReadPointerWithType(gpg::ReadArchive* const archive, const gpg::RRef& owner, gpg::RType* expectedType)
-  {
-    const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, owner);
-    if (!tracked.object) {
-      return nullptr;
-    }
-
-    gpg::RRef source{};
-    source.mObj = tracked.object;
-    source.mType = tracked.type;
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
-    return static_cast<TObject*>(upcast.mObj);
-  }
-
-  template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType && staticType && dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType ? dynamicType : staticType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
 
   template <typename TObject>
   void WritePointerWithType(
@@ -246,7 +171,7 @@ namespace
     const gpg::RRef& owner
   )
   {
-    const gpg::RRef objectRef = MakeTypedRef(object, staticType);
+    const gpg::RRef objectRef = gpg::MakeDerivedRef(object, staticType);
     gpg::WriteRawPointer(archive, objectRef, state, owner);
   }
 
@@ -309,7 +234,7 @@ namespace
   }
 
   void LoadStringListField(
-    const LuaPlus::LuaObject& row, const std::int32_t fieldIndex, msvc8::vector<msvc8::string>& outList
+    const LuaPlus::LuaObject& row, const std::int32_t fieldIndex, fa::vector<fa::string>& outList
   )
   {
     outList.clear();
@@ -323,7 +248,7 @@ namespace
     outList.reserve(static_cast<std::size_t>(count));
     for (std::int32_t i = 1; i <= count; ++i) {
       LuaPlus::LuaObject itemObj = listObj.GetByIndex(i);
-      msvc8::string value;
+      fa::string value;
       value.assign_owned(SafeCString(itemObj.GetString()));
       outList.push_back(value);
     }
@@ -361,7 +286,7 @@ int moho::cfunc_CAiPersonalityAdjustDelayL(LuaPlus::LuaState* const state)
   const float scaledAdjustment = (1.0f - personality->mDifficulty) * static_cast<float>(delay * spread);
   // 0x005BAAFB-0x005BAAFF: the adjustment goes through a bare `fld`/`fistp`
   // (round to nearest, ties to even), not the `__ftol` truncation a cast gives.
-  const int adjustedDelay = delay + msvc8::RoundToInt(scaledAdjustment);
+  const int adjustedDelay = delay + fa::RoundToInt(scaledAdjustment);
   lua_pushnumber(state->m_state, static_cast<float>(adjustedDelay));
   return 1;
 }
@@ -387,7 +312,7 @@ int moho::cfunc_CAiPersonalityAdjustDelay(lua_State* const luaContext)
 CScrLuaInitForm* moho::func_CAiPersonalityAdjustDelay_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityAdjustDelayName,
     &moho::cfunc_CAiPersonalityAdjustDelay,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -408,10 +333,7 @@ namespace
       return nullptr;
     }
 
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, helpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, helpText);
 
     const LuaPlus::LuaObject personalityObject(LuaPlus::LuaStackObject(state, 1));
     return SCR_FromLua_CAiPersonality(personalityObject, state);
@@ -425,7 +347,7 @@ namespace
          + (range.mMaxValue * personality->mDifficulty);
   }
 
-  int PushStringVectorTable(LuaPlus::LuaState* const state, const msvc8::vector<msvc8::string>& values)
+  int PushStringVectorTable(LuaPlus::LuaState* const state, const fa::vector<fa::string>& values)
   {
     LuaPlus::LuaObject resultTable;
     resultTable.AssignNewTable(state, static_cast<int>(values.size()), 0);
@@ -436,7 +358,7 @@ namespace
     // `luaL_setn` (the weak sizes table) -- a raw indexed store does not, and
     // `table.getn` then disagrees once script code appends by index.
     int luaIndex = 1;
-    for (const msvc8::string& value : values) {
+    for (const fa::string& value : values) {
       LuaPlus::LuaObject entry;
       entry.AssignString(state, value.c_str());
       resultTable.Insert(luaIndex++, entry);
@@ -533,11 +455,6 @@ namespace
     return moho::cfunc_CAiPersonalityGetSuperWeaponTendencyL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetFavouriteStructures(lua_State* const luaContext)
-  {
-    return moho::cfunc_CAiPersonalityGetFavouriteStructures(luaContext);
-  }
-
   int LuaCallback_CAiPersonalityGetAirUnitsEmphasis(lua_State* const luaContext)
   {
     return moho::cfunc_CAiPersonalityGetAirUnitsEmphasisL(moho::SCR_ResolveBindingState(luaContext));
@@ -576,11 +493,6 @@ namespace
   int LuaCallback_CAiPersonalityGetInDirectDamageEmphasis(lua_State* const luaContext)
   {
     return moho::cfunc_CAiPersonalityGetInDirectDamageEmphasisL(moho::SCR_ResolveBindingState(luaContext));
-  }
-
-  int LuaCallback_CAiPersonalityGetFavouriteUnits(lua_State* const luaContext)
-  {
-    return moho::cfunc_CAiPersonalityGetFavouriteUnits(luaContext);
   }
 
   int LuaCallback_CAiPersonalityGetSurvivalEmphasis(lua_State* const luaContext)
@@ -1008,7 +920,7 @@ int moho::cfunc_CAiPersonalityGetFormationUseL(LuaPlus::LuaState* const state)
 CScrLuaInitForm* moho::func_CAiPersonalityGetPersonalityName_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetPersonalityNameName,
     &LuaCallback_CAiPersonalityGetPersonalityName,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1027,7 +939,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetPersonalityName_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetChatPersonality_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetChatPersonalityName,
     &LuaCallback_CAiPersonalityGetChatPersonality,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1046,7 +958,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetChatPersonality_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetDifficulty_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetDifficultyName,
     &LuaCallback_CAiPersonalityGetDifficulty,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1065,7 +977,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetDifficulty_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetArmySize_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetArmySizeName,
     &moho::cfunc_CAiPersonalityGetArmySize,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1084,7 +996,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetArmySize_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetPlatoonSize_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetPlatoonSizeName,
     &moho::cfunc_CAiPersonalityGetPlatoonSize,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1103,7 +1015,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetPlatoonSize_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetAttackFrequency_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetAttackFrequencyName,
     &moho::cfunc_CAiPersonalityGetAttackFrequency,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1122,7 +1034,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetAttackFrequency_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetRepeatAttackFrequency_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetRepeatAttackFrequencyName,
     &LuaCallback_CAiPersonalityGetRepeatAttackFrequency,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1141,7 +1053,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetRepeatAttackFrequency_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetCounterForces_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetCounterForcesName,
     &LuaCallback_CAiPersonalityGetCounterForces,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1160,7 +1072,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetCounterForces_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetIntelGathering_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetIntelGatheringName,
     &LuaCallback_CAiPersonalityGetIntelGathering,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1179,7 +1091,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetIntelGathering_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetCoordinatedAttacks_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetCoordinatedAttacksName,
     &LuaCallback_CAiPersonalityGetCoordinatedAttacks,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1198,7 +1110,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetCoordinatedAttacks_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetExpansionDriven_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetExpansionDrivenName,
     &LuaCallback_CAiPersonalityGetExpansionDriven,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1217,7 +1129,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetExpansionDriven_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetTechAdvancement_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetTechAdvancementName,
     &LuaCallback_CAiPersonalityGetTechAdvancement,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1236,7 +1148,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetTechAdvancement_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetUpgradesDriven_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetUpgradesDrivenName,
     &LuaCallback_CAiPersonalityGetUpgradesDriven,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1255,7 +1167,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetUpgradesDriven_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetDefenseDriven_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetDefenseDrivenName,
     &LuaCallback_CAiPersonalityGetDefenseDriven,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1274,7 +1186,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetDefenseDriven_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetEconomyDriven_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetEconomyDrivenName,
     &LuaCallback_CAiPersonalityGetEconomyDriven,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1293,7 +1205,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetEconomyDriven_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetFactoryTycoon_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetFactoryTycoonName,
     &LuaCallback_CAiPersonalityGetFactoryTycoon,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1312,7 +1224,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetFactoryTycoon_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetIntelBuildingTycoon_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetIntelBuildingTycoonName,
     &LuaCallback_CAiPersonalityGetIntelBuildingTycoon,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1331,7 +1243,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetIntelBuildingTycoon_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetSuperWeaponTendency_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetSuperWeaponTendencyName,
     &LuaCallback_CAiPersonalityGetSuperWeaponTendency,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1350,7 +1262,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetSuperWeaponTendency_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetFavouriteStructures_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetFavouriteStructuresName,
     &moho::cfunc_CAiPersonalityGetFavouriteStructures,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1369,7 +1281,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetFavouriteStructures_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetAirUnitsEmphasis_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetAirUnitsEmphasisName,
     &LuaCallback_CAiPersonalityGetAirUnitsEmphasis,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1388,7 +1300,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetAirUnitsEmphasis_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetTankUnitsEmphasis_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetTankUnitsEmphasisName,
     &LuaCallback_CAiPersonalityGetTankUnitsEmphasis,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1407,7 +1319,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetTankUnitsEmphasis_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetBotUnitsEmphasis_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetBotUnitsEmphasisName,
     &LuaCallback_CAiPersonalityGetBotUnitsEmphasis,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1426,7 +1338,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetBotUnitsEmphasis_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetSeaUnitsEmphasis_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetSeaUnitsEmphasisName,
     &LuaCallback_CAiPersonalityGetSeaUnitsEmphasis,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1445,7 +1357,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetSeaUnitsEmphasis_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetSpecialtyForcesEmphasis_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetSpecialtyForcesEmphasisName,
     &LuaCallback_CAiPersonalityGetSpecialtyForcesEmphasis,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1464,7 +1376,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetSpecialtyForcesEmphasis_LuaFuncDef(
 CScrLuaInitForm* moho::func_CAiPersonalityGetSupportUnitsEmphasis_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetSupportUnitsEmphasisName,
     &LuaCallback_CAiPersonalityGetSupportUnitsEmphasis,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1483,7 +1395,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetSupportUnitsEmphasis_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetDirectDamageEmphasis_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetDirectDamageEmphasisName,
     &LuaCallback_CAiPersonalityGetDirectDamageEmphasis,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1502,7 +1414,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetDirectDamageEmphasis_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetInDirectDamageEmphasis_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetInDirectDamageEmphasisName,
     &LuaCallback_CAiPersonalityGetInDirectDamageEmphasis,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1521,7 +1433,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetInDirectDamageEmphasis_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetFavouriteUnits_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetFavouriteUnitsName,
     &moho::cfunc_CAiPersonalityGetFavouriteUnits,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1540,7 +1452,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetFavouriteUnits_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetSurvivalEmphasis_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetSurvivalEmphasisName,
     &LuaCallback_CAiPersonalityGetSurvivalEmphasis,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1559,7 +1471,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetSurvivalEmphasis_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetTeamSupport_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetTeamSupportName,
     &LuaCallback_CAiPersonalityGetTeamSupport,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1578,7 +1490,7 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetTeamSupport_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiPersonalityGetFormationUse_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetFormationUseName,
     &LuaCallback_CAiPersonalityGetFormationUse,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1693,7 +1605,7 @@ int moho::cfunc_CAiPersonalityGetTargetSpread(lua_State* const luaContext)
 CScrLuaInitForm* moho::func_CAiPersonalityGetTargetSpread_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetTargetSpreadName,
     &moho::cfunc_CAiPersonalityGetTargetSpread,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1741,7 +1653,7 @@ int moho::cfunc_CAiPersonalityGetQuittingTendency(lua_State* const luaContext)
 CScrLuaInitForm* moho::func_CAiPersonalityGetQuittingTendency_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetQuittingTendencyName,
     &moho::cfunc_CAiPersonalityGetQuittingTendency,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1789,7 +1701,7 @@ int moho::cfunc_CAiPersonalityGetChatFrequency(lua_State* const luaContext)
 CScrLuaInitForm* moho::func_CAiPersonalityGetChatFrequency_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiPersonalityGetChatFrequencyName,
     &moho::cfunc_CAiPersonalityGetChatFrequency,
     &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
@@ -1969,10 +1881,7 @@ gpg::RType* CAiPersonality::GetClass() const
  */
 gpg::RRef CAiPersonality::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**
@@ -2044,13 +1953,13 @@ void CAiPersonality::MemberDeserialize(gpg::ReadArchive* const archive)
 
   const gpg::RRef owner{};
   archive->Read(CachedCScriptObjectType(), this, owner);
-  mSim = ReadPointerWithType<Sim>(archive, owner, CachedSimType());
+  mSim = gpg::ReadPointerAs<Sim>(archive, owner, CachedSimType());
   archive->ReadString(&mPersonalityName);
   archive->ReadString(&mChatPersonality);
 
-  gpg::RType* const rangeType = CachedPersonalityRangeType();
+  gpg::RType* const rangeType = gpg::RTypeOf<SAiPersonalityRange>();
   GPG_ASSERT(rangeType != nullptr);
-  gpg::RType* const stringVectorType = CachedStringVectorType();
+  gpg::RType* const stringVectorType = gpg::RTypeOf<fa::vector<fa::string>>();
   GPG_ASSERT(stringVectorType != nullptr);
 
   archive->Read(rangeType, &mArmySize, owner);
@@ -2099,12 +2008,12 @@ void CAiPersonality::MemberSerialize(gpg::WriteArchive* const archive) const
   const gpg::RRef owner{};
   archive->Write(CachedCScriptObjectType(), const_cast<CAiPersonality*>(this), owner);
   WritePointerWithType(archive, mSim, CachedSimType(), gpg::TrackedPointerState::Unowned, owner);
-  archive->WriteString(const_cast<msvc8::string*>(&mPersonalityName));
-  archive->WriteString(const_cast<msvc8::string*>(&mChatPersonality));
+  archive->WriteString(const_cast<fa::string*>(&mPersonalityName));
+  archive->WriteString(const_cast<fa::string*>(&mChatPersonality));
 
-  gpg::RType* const rangeType = CachedPersonalityRangeType();
+  gpg::RType* const rangeType = gpg::RTypeOf<SAiPersonalityRange>();
   GPG_ASSERT(rangeType != nullptr);
-  gpg::RType* const stringVectorType = CachedStringVectorType();
+  gpg::RType* const stringVectorType = gpg::RTypeOf<fa::vector<fa::string>>();
   GPG_ASSERT(stringVectorType != nullptr);
 
   archive->Write(rangeType, const_cast<SAiPersonalityRange*>(&mArmySize), owner);
@@ -2122,7 +2031,7 @@ void CAiPersonality::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->Write(rangeType, const_cast<SAiPersonalityRange*>(&mFactoryTycoon), owner);
   archive->Write(rangeType, const_cast<SAiPersonalityRange*>(&mIntelBuildingTycoon), owner);
   archive->Write(rangeType, const_cast<SAiPersonalityRange*>(&mSuperWeaponTendency), owner);
-  archive->Write(stringVectorType, const_cast<msvc8::vector<msvc8::string>*>(&mFavouriteStructures), owner);
+  archive->Write(stringVectorType, const_cast<fa::vector<fa::string>*>(&mFavouriteStructures), owner);
   archive->Write(rangeType, const_cast<SAiPersonalityRange*>(&mAirUnitsEmphasis), owner);
   archive->Write(rangeType, const_cast<SAiPersonalityRange*>(&mTankUnitsEmphasis), owner);
   archive->Write(rangeType, const_cast<SAiPersonalityRange*>(&mBotUnitsEmphasis), owner);
@@ -2131,7 +2040,7 @@ void CAiPersonality::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->Write(rangeType, const_cast<SAiPersonalityRange*>(&mSupportUnitsEmphasis), owner);
   archive->Write(rangeType, const_cast<SAiPersonalityRange*>(&mDirectDamageEmphasis), owner);
   archive->Write(rangeType, const_cast<SAiPersonalityRange*>(&mIndirectDamageEmphasis), owner);
-  archive->Write(stringVectorType, const_cast<msvc8::vector<msvc8::string>*>(&mFavouriteUnits), owner);
+  archive->Write(stringVectorType, const_cast<fa::vector<fa::string>*>(&mFavouriteUnits), owner);
   archive->Write(rangeType, const_cast<SAiPersonalityRange*>(&mSurvivalEmphasis), owner);
   archive->Write(rangeType, const_cast<SAiPersonalityRange*>(&mTeamSupport), owner);
   archive->Write(rangeType, const_cast<SAiPersonalityRange*>(&mFormationUse), owner);

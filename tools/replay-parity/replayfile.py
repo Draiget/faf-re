@@ -3,8 +3,40 @@ CI parity tools (tools/parity-data, Linux): .fafreplay decoding, the replay head
 stream, the checksums the live clients recorded, and the lines headless prints.
 """
 import json
+import os
 import re
+import shutil
 import struct
+import zipfile
+
+def has_scenario(path):
+    """Whether path is a map folder: the engine skips one without a <name>_scenario.lua in it."""
+    try:
+        return any(n.lower().endswith("_scenario.lua") for n in os.listdir(path))
+    except OSError:
+        return False
+
+
+def extract_map(zip_path, maps_dir, folder):
+    """A map zip into maps_dir/<folder>: the zip's folder holding the scenario file, renamed to the
+    replay's name for it. The names may differ in case alone (FAF's retail maps are SCMP_015/, the
+    replay says scmp_015), and the folder need not be at the top (FAF's scmp_001 zip has
+    SC/Supreme Commander - Forged Alliance/maps/SCMP_001/)."""
+    raw = os.path.join(maps_dir, ".unzip-" + folder)
+    shutil.rmtree(raw, ignore_errors=True)
+    with zipfile.ZipFile(zip_path) as z:
+        z.extractall(raw)
+    found = [d for d, _, _ in os.walk(raw) if has_scenario(d)]
+    named = [d for d in found if os.path.basename(d).lower() == folder.lower()]
+    if len(named) != 1 and len(found) != 1:
+        shutil.rmtree(raw, ignore_errors=True)
+        raise ValueError("no one map folder %s in the map zip (%d with a scenario file)" % (folder, len(found)))
+    path = os.path.join(maps_dir, folder)
+    shutil.rmtree(path, ignore_errors=True)
+    os.replace((named or found)[0], path)
+    shutil.rmtree(raw, ignore_errors=True)
+    return path
+
 
 def zstd_decompress(blob):
     """Imported on first use, so the tools that never meet a zstd replay run on any Python."""

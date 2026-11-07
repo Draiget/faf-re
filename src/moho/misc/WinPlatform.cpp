@@ -6,6 +6,7 @@
 // exception filter. A POSIX build implements the same functions elsewhere.
 
 #include "moho/app/WinApp.h"
+#include "moho/misc/WideStringRange.h"
 #include "platform/Platform.h"
 #include <DbgHelp.h>
 #include <algorithm>
@@ -20,12 +21,17 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include "boost/mutex.h"
+#include <mutex>
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Vector.h"
 
 // Engine addition: helpers shared with the file these functions came from.
+using moho::AppendWideRangePreservingOverlap;
+using moho::AppendWideSubstringRangeClamped;
+using moho::CompareWideStringPrefixRange;
+using moho::CompareWideStringWithNullTerminatedInput;
+
 namespace
 {
   struct StackWalkSeedRegisters
@@ -41,7 +47,7 @@ namespace
    * Captures caller `EIP/ESP/EBP` seed registers for `StackWalk` when no
    * external context record is supplied.
    */
-  void CaptureStackWalkSeedRegisters(StackWalkSeedRegisters* const outRegisters)
+  [[maybe_unused]] void CaptureStackWalkSeedRegisters(StackWalkSeedRegisters* const outRegisters)
   {
 #if defined(_M_IX86)
     if (outRegisters == nullptr) {
@@ -65,64 +71,6 @@ namespace
   constexpr wchar_t kPathSeparator = L'\\';
 
   /**
-   * Address: 0x004A1AE0 (FUN_004A1AE0)
-   * Mangled: ?append@wstring@std@@QAEAAV12@ABV12@II@Z
-   *
-   * What it does:
-   * Appends a clamped substring range from `source` into `destination`.
-   */
-  [[maybe_unused]] std::wstring* AppendWideSubstringRangeClamped(
-    std::wstring* const destination,
-    const std::wstring& source,
-    std::size_t count,
-    const std::size_t sourceOffset
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-    if (sourceOffset > source.size()) {
-      throw std::out_of_range("wstring::append sourceOffset");
-    }
-
-    const std::size_t available = source.size() - sourceOffset;
-    if (count > available) {
-      count = available;
-    }
-
-    destination->append(source, sourceOffset, count);
-    return destination;
-  }
-
-  /**
-   * Address: 0x004A19E0 (FUN_004A19E0)
-   * Mangled: ??Ywstring@std@@VQAEAAV01@PB_W@Z
-   *
-   * What it does:
-   * Appends one wide source range into destination while preserving overlapping
-   * source semantics.
-   */
-  [[maybe_unused]] std::wstring* AppendWideRangePreservingOverlap(
-    std::wstring* const destination,
-    const wchar_t* const source,
-    const std::size_t sourceLength
-  )
-  {
-    if (destination == nullptr || source == nullptr) {
-      return destination;
-    }
-
-    const wchar_t* const destinationData = destination->data();
-    const wchar_t* const destinationEnd = destinationData + destination->size();
-    if (source >= destinationData && source < destinationEnd) {
-      const std::size_t sourceOffset = static_cast<std::size_t>(source - destinationData);
-      return AppendWideSubstringRangeClamped(destination, *destination, sourceLength, sourceOffset);
-    }
-
-    destination->append(source, sourceLength);
-    return destination;
-  }
-  /**
    * Address: 0x004A1920 (FUN_004A1920, sub_4A1920)
    *
    * What it does:
@@ -139,48 +87,6 @@ namespace
     const wchar_t* const safeSource = (source != nullptr) ? source : L"";
     destination->assign(safeSource, std::wcslen(safeSource));
     return destination;
-  }
-  /**
-   * Address: 0x004A1950 (FUN_004A1950)
-   * Mangled: ?compare@?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@QBEHPB_W@Z
-   *
-   * What it does:
-   * Lexicographically compares up to `lhsRequestedLength` characters from one
-   * wide string against one raw wide range and returns `-1/0/1`.
-   */
-  [[maybe_unused]] int CompareWideStringPrefixRange(
-    std::size_t lhsRequestedLength,
-    const std::wstring* const lhs,
-    const std::size_t rhsLength,
-    const wchar_t* const rhs
-  ) noexcept
-  {
-    if (lhs == nullptr || rhs == nullptr) {
-      return (lhs == nullptr) ? ((rhs == nullptr) ? 0 : -1) : 1;
-    }
-
-    std::size_t lhsLength = lhsRequestedLength;
-    if (lhs->size() < lhsLength) {
-      lhsLength = lhs->size();
-    }
-
-    std::size_t compareCount = lhsLength;
-    if (compareCount > rhsLength) {
-      compareCount = rhsLength;
-    }
-
-    for (std::size_t i = 0; i < compareCount; ++i) {
-      const wchar_t left = (*lhs)[i];
-      const wchar_t right = rhs[i];
-      if (left != right) {
-        return (left < right) ? -1 : 1;
-      }
-    }
-
-    if (lhsLength >= rhsLength) {
-      return (lhsLength != rhsLength) ? 1 : 0;
-    }
-    return -1;
   }
   /**
    * Address: 0x004A1020 (FUN_004A1020, sub_4A1020)
@@ -245,25 +151,6 @@ namespace
   [[maybe_unused]] std::wstring* AssignErrorReportOutputDirFromNullTerminatedInput(const wchar_t* const source)
   {
     return AssignWideStringFromNullTerminatedInput(GetLegacyErrorReportOutputDirStorage(), source);
-  }
-  /**
-   * Address: 0x004A1880 (FUN_004A1880, sub_4A1880)
-   *
-   * What it does:
-   * Compares one wide string against one zero-terminated wide source.
-   */
-  [[maybe_unused]] int CompareWideStringWithNullTerminatedInput(
-    const std::wstring* const lhs,
-    const wchar_t* const rhs
-  ) noexcept
-  {
-    const wchar_t* const safeRhs = (rhs != nullptr) ? rhs : L"";
-    return CompareWideStringPrefixRange(
-      (lhs != nullptr) ? lhs->size() : 0U,
-      lhs,
-      std::wcslen(safeRhs),
-      safeRhs
-    );
   }
   class CrashReportAttachmentRegistry
   {
@@ -335,7 +222,7 @@ namespace
 
   CrashReportAttachmentRegistry sCrashReportAttachments;
 
-  boost::mutex* sMutexSymHandler = nullptr;
+  std::recursive_mutex* sMutexSymHandler = nullptr;
 
   /**
    * Address: 0x004A1E20 (FUN_004A1E20, Moho::InitSymHandlerMutex)
@@ -343,17 +230,19 @@ namespace
    *
    * What it does:
    * Constructs the process-global symbol-handler mutex once and publishes it
-   * through `sMutexSymHandler`.
+   * through `sMutexSymHandler`. Recursive, as the binary's CRITICAL_SECTION is:
+   * a fault inside a locked symbol call reaches the crash report's call stack
+   * on the same thread.
    */
   void InitSymHandlerMutex()
   {
-    static boost::mutex sMutex;
+    static std::recursive_mutex sMutex;
     sMutexSymHandler = &sMutex;
   }
   std::once_flag sSymHandlerMutexInitOnce;
 
   [[nodiscard]]
-  boost::mutex& GetSymHandlerMutex()
+  std::recursive_mutex& GetSymHandlerMutex()
   {
     std::call_once(sSymHandlerMutexInitOnce, &InitSymHandlerMutex);
     return *sMutexSymHandler;
@@ -385,7 +274,7 @@ moho::AppPumpStepHook moho::sAppPumpStep = nullptr;
  */
 void moho::PLAT_Init()
 {
-  boost::mutex::scoped_lock lock(GetSymHandlerMutex());
+  std::lock_guard<std::recursive_mutex> lock(GetSymHandlerMutex());
 
   if (sMohoEngineMuexInitialized) {
     return;
@@ -409,7 +298,7 @@ void moho::PLAT_Init()
  */
 void moho::PLAT_Exit()
 {
-  boost::mutex::scoped_lock lock(GetSymHandlerMutex());
+  std::lock_guard<std::recursive_mutex> lock(GetSymHandlerMutex());
 
   if (!sMohoEngineMuexInitialized) {
     return;
@@ -464,7 +353,7 @@ std::uint32_t moho::PLAT_GetCallStack(
     return 0;
   }
 
-  boost::mutex::scoped_lock lock(GetSymHandlerMutex());
+  std::lock_guard<std::recursive_mutex> lock(GetSymHandlerMutex());
   if (!sSymbolHandlerInitialized) {
     return 0;
   }
@@ -594,7 +483,7 @@ bool moho::PLAT_GetSymbolInfo(const std::uintptr_t address, SPlatSymbolInfo* con
     return false;
   }
 
-  boost::mutex::scoped_lock lock(GetSymHandlerMutex());
+  std::lock_guard<std::recursive_mutex> lock(GetSymHandlerMutex());
   if (!sSymbolHandlerInitialized) {
     return false;
   }
@@ -635,7 +524,7 @@ bool moho::PLAT_GetSymbolInfo(const std::uintptr_t address, SPlatSymbolInfo* con
   return true;
 }
 
-msvc8::string moho::SPlatSymbolInfo::FormatResolvedLine() const
+fa::string moho::SPlatSymbolInfo::FormatResolvedLine() const
 {
   return gpg::STR_Printf(
     "%s + %zu bytes (%s(%u) + %u bytes)",
@@ -655,11 +544,11 @@ msvc8::string moho::SPlatSymbolInfo::FormatResolvedLine() const
  * What it does:
  * Formats callstack entries from `[firstFrame, endFrame)` into text lines.
  */
-msvc8::string moho::PLAT_FormatCallstack(
+fa::string moho::PLAT_FormatCallstack(
   std::int32_t firstFrame, const std::int32_t endFrame, const std::uintptr_t* const frames
 )
 {
-  msvc8::string formatted;
+  fa::string formatted;
   formatted.assign_owned("");
   if (frames == nullptr || firstFrame >= endFrame) {
     return formatted;
@@ -676,7 +565,7 @@ msvc8::string moho::PLAT_FormatCallstack(
       assembled.append(symbolInfo.FormatResolvedLine().c_str());
       assembled.append("\r\n");
     } else {
-      const msvc8::string line = gpg::STR_Printf("\tUnknown symbol (address %p)\r\n", reinterpret_cast<const void*>(frames[frameIndex]));
+      const fa::string line = gpg::STR_Printf("\tUnknown symbol (address %p)\r\n", reinterpret_cast<const void*>(frames[frameIndex]));
       assembled.append(line.c_str());
     }
   }
@@ -694,11 +583,11 @@ msvc8::string moho::PLAT_FormatCallstack(
  * Converts one decorated symbol into undecorated text under the shared
  * symbol-handler mutex, with optional underscore stripping.
  */
-msvc8::string moho::PLAT_UnDecorateSymbolName(const char* const name, const bool stripLeadingUnderscore)
+fa::string moho::PLAT_UnDecorateSymbolName(const char* const name, const bool stripLeadingUnderscore)
 {
-  boost::mutex::scoped_lock lock(GetSymHandlerMutex());
+  std::lock_guard<std::recursive_mutex> lock(GetSymHandlerMutex());
 
-  msvc8::string result;
+  fa::string result;
   if (name == nullptr) {
     result.assign_owned("");
     return result;
@@ -722,7 +611,7 @@ msvc8::string moho::PLAT_UnDecorateSymbolName(const char* const name, const bool
  * What it does:
  * Converts current `GetLastError()` value into readable UTF-8 text.
  */
-msvc8::string moho::WIN_GetLastError()
+fa::string moho::WIN_GetLastError()
 {
   const DWORD errorCode = ::GetLastError();
 
@@ -741,7 +630,7 @@ msvc8::string moho::WIN_GetLastError()
     return gpg::STR_Printf("Unknown error 0x%08x", errorCode);
   }
 
-  const msvc8::string message = gpg::STR_WideToUtf8(messageBuffer);
+  const fa::string message = gpg::STR_WideToUtf8(messageBuffer);
   (void)::LocalFree(messageBuffer);
   return message;
 }

@@ -1,3 +1,4 @@
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CLuaConOutputHandler.h"
 
 #include <cstdint>
@@ -12,48 +13,6 @@ namespace
 {
   constexpr const char* kAddConOutputReceiverHelp = "handler AddConsoleOutputReciever(func(text))";
   constexpr const char* kRemoveConOutputReceiverHelp = "RemoveConsoleOutputReciever(handler)";
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
-      return *set;
-    }
-
-    // Every file that wants this set must resolve the one that already
-
-    // exists. Declaring a fresh static here creates a second set with the
-
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-
-    // half the binders never get run.
-
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("User"); existing != nullptr) {
-
-      return *existing;
-
-    }
-
-
-    static moho::CScrLuaInitFormSet sSet("User");
-    return sSet;
-  }
-
-  gpg::RType* CachedCLuaConOutputHandlerType()
-  {
-    if (!moho::CLuaConOutputHandler::sType) {
-      moho::CLuaConOutputHandler::sType = gpg::LookupRType(typeid(moho::CLuaConOutputHandler));
-    }
-    return moho::CLuaConOutputHandler::sType;
-  }
-
-  gpg::RType* CachedRObjectType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(gpg::RObject));
-    }
-    return cached;
-  }
 
   /**
    * Address: 0x00420FF0 (FUN_00420FF0, sub_420FF0)
@@ -247,7 +206,7 @@ moho::CLuaConOutputHandler::~CLuaConOutputHandler() = default;
  */
 gpg::RType* moho::CLuaConOutputHandler::GetClass() const
 {
-  return CachedCLuaConOutputHandlerType();
+  return gpg::RTypeOf<moho::CLuaConOutputHandler>();
 }
 
 /**
@@ -309,14 +268,8 @@ const char* moho::CLuaConOutputHandlerTypeInfo::GetName() const
  */
 void moho::CLuaConOutputHandlerTypeInfo::AddBaseRObject(gpg::RType* const typeInfo)
 {
-  gpg::RType* const rObjectType = CachedRObjectType();
-  gpg::RField baseField{};
-  baseField.mName = rObjectType->GetName();
-  baseField.mType = rObjectType;
-  baseField.mOffset = gpg::BaseSubobjectOffset<CLuaConOutputHandler, gpg::RObject>();
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::RType* const rObjectType = gpg::RTypeOf<gpg::RObject>();
+  gpg::AddReflectedBaseType(typeInfo, rObjectType, gpg::BaseSubobjectOffset<CLuaConOutputHandler, gpg::RObject>());
 }
 
 /**
@@ -339,7 +292,7 @@ void moho::CLuaConOutputHandlerTypeInfo::Init()
 moho::CScrLuaInitForm* moho::func_AddConsoleOutputReciever_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "AddConsoleOutputReciever",
     &moho::cfunc_AddConsoleOutputReciever,
     nullptr,
@@ -358,7 +311,7 @@ moho::CScrLuaInitForm* moho::func_AddConsoleOutputReciever_LuaFuncDef()
 moho::CScrLuaInitForm* moho::func_RemoveConsoleOutputReciever_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "RemoveConsoleOutputReciever",
     &moho::cfunc_RemoveConsoleOutputReciever,
     nullptr,

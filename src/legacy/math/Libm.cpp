@@ -38,7 +38,7 @@
 
 #include <emmintrin.h>
 
-namespace msvc8::libm
+namespace fa::libm
 {
   namespace
   {
@@ -687,4 +687,4 @@ namespace msvc8::libm
     }
     return (hx >> 31) != 0 ? -x : x;
   }
-} // namespace msvc8::libm
+} // namespace fa::libm

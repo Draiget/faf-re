@@ -35,40 +35,7 @@ using namespace moho;
 namespace
 {
   using RebuildMapStorage = std::map<unsigned int, const RUnitBlueprint*>;
-  using FactoryCommandQueueStorage = msvc8::vector<WeakPtr<CUnitCommand>>;
-
-  [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
-  {
-    for (const char* const name : names) {
-      if (!name) {
-        continue;
-      }
-
-      if (gpg::RType* const type = gpg::REF_FindTypeNamed(name)) {
-        return type;
-      }
-    }
-
-    return nullptr;
-  }
-
-  [[nodiscard]] gpg::RType* CachedUnitType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Unit));
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return type;
-  }
+  using FactoryCommandQueueStorage = fa::vector<WeakPtr<CUnitCommand>>;
 
   [[nodiscard]] gpg::RType* CachedRebuildMapType()
   {
@@ -76,7 +43,7 @@ namespace
     if (!type) {
       type = gpg::LookupRType(typeid(RebuildMapStorage));
       if (!type) {
-        type = ResolveTypeByAnyName(
+        type = gpg::REF_FindFirstTypeNamed(
           {"std::map<unsigned int,Moho::RUnitBlueprint const *>", "map<unsigned int,Moho::RUnitBlueprint const *>"}
         );
       }
@@ -90,7 +57,7 @@ namespace
     if (!type) {
       type = gpg::LookupRType(typeid(FactoryCommandQueueStorage));
       if (!type) {
-        type = ResolveTypeByAnyName(
+        type = gpg::REF_FindFirstTypeNamed(
           {"std::vector<Moho::WeakPtr<Moho::CUnitCommand>>", "vector<WeakPtr<CUnitCommand>>"}
         );
       }
@@ -101,7 +68,7 @@ namespace
   [[nodiscard]] gpg::RRef MakeUnitRef(Unit* unit)
   {
     gpg::RRef out{};
-    gpg::RType* const staticType = CachedUnitType();
+    gpg::RType* const staticType = gpg::RTypeOf<Unit>();
     out.mObj = nullptr;
     out.mType = staticType;
     if (!unit || !staticType) {
@@ -141,7 +108,7 @@ namespace
       return nullptr;
     }
 
-    gpg::RType* const expectedType = CachedUnitType();
+    gpg::RType* const expectedType = gpg::RTypeOf<Unit>();
     if (!expectedType || !tracked.type) {
       return static_cast<Unit*>(tracked.object);
     }
@@ -157,7 +124,7 @@ namespace
 
     const char* const expected = expectedType->GetName();
     const char* const actual = source.GetTypeName();
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "Unit",
@@ -278,7 +245,7 @@ void CAiBuilderImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->ReadBool(&value);
   mIsOnTarget = value ? 1u : 0u;
 
-  if (gpg::RType* const vector3Type = CachedVector3fType()) {
+  if (gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3f>()) {
     archive->Read(vector3Type, &mAimTarget, owner);
   }
 
@@ -317,7 +284,7 @@ void CAiBuilderImpl::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->WriteBool(mIsFactory != 0u);
   archive->WriteBool(mIsOnTarget != 0u);
 
-  if (gpg::RType* const vector3Type = CachedVector3fType()) {
+  if (gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3f>()) {
     archive->Write(vector3Type, &mAimTarget, owner);
   }
 
@@ -471,7 +438,7 @@ void CAiBuilderImpl::BuilderSetFactoryQueueDirty(const bool dirty)
 /**
  * Address: 0x0059F470 (FUN_0059F470)
  */
-msvc8::vector<WeakPtr<CUnitCommand>>& CAiBuilderImpl::BuilderGetFactoryCommandQueue()
+fa::vector<WeakPtr<CUnitCommand>>& CAiBuilderImpl::BuilderGetFactoryCommandQueue()
 {
   return mFactoryCommands;
 }

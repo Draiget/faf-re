@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <map>
 
-#include "boost/mutex.h"
+#include <mutex>
 #include "legacy/containers/String.h"
 #include "moho/containers/TDatList.h"
 
@@ -12,7 +12,7 @@ namespace moho
   struct Host : TDatListItem<Host, void>
   {
     // +0x08
-    msvc8::string mName;
+    fa::string mName;
 
     // +0x24
     // FA/Moho keep a back-link to a map node/iterator for O(1) erase from the tree.
@@ -26,7 +26,7 @@ namespace moho
      * Initializes intrusive list lanes, copies host name, and clears map-node
      * back-link metadata.
      */
-    explicit Host(const msvc8::string& name);
+    explicit Host(const fa::string& name);
 
     Host() = default;
 
@@ -57,7 +57,7 @@ namespace moho
   {
     using HostMap = std::map<std::uint32_t, Host*>;
 
-    boost::mutex mLock;
+    std::mutex mLock;
     HostMap mHosts;
     TDatList<Host, void> mHostList;
 
@@ -86,7 +86,7 @@ namespace moho
      * Returns a cached hostname for `host` (host byte order) and updates MRU ordering.
      * On cache miss, resolves with getnameinfo and inserts into the MRU cache.
      */
-    msvc8::string GetHostName(std::uint32_t host);
+    fa::string GetHostName(std::uint32_t host);
 
     /**
      * Address: <synthetic overload for lifted call sites>
@@ -94,7 +94,7 @@ namespace moho
      * What it does:
      * Compatibility overload that forwards to the value-returning variant.
      */
-    msvc8::string& GetHostName(std::uint32_t host, msvc8::string& out);
+    fa::string& GetHostName(std::uint32_t host, fa::string& out);
 
   private:
     // FA binary: 0x4C entries, Moho binary: 0x0C entries.
@@ -124,6 +124,6 @@ namespace moho
      * What it does:
      * Reverse DNS via getnameinfo; falls back to dotted IPv4 on failure.
      */
-    static msvc8::string ResolveHostName(std::uint32_t host);
+    static fa::string ResolveHostName(std::uint32_t host);
   };
 } // namespace moho

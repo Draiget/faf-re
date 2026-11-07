@@ -80,7 +80,7 @@ namespace moho
      * `reflectedOnly` is the reflection pass: when set, `FillBatch` packs only
      * instances whose `MeshInstance::isReflected` flag is still on.
      */
-    virtual void Render(const msvc8::vector<MeshInstance*>& meshInstances, bool reflectedOnly);
+    virtual void Render(const fa::vector<MeshInstance*>& meshInstances, bool reflectedOnly);
 
   protected:
     // Slots 5-9 in MeshBatch vtable (implemented by concrete batchers).
@@ -101,7 +101,7 @@ namespace moho
     std::int32_t mAttachCount;                        // +0x20
     std::int32_t mMaxInstancesPerDraw;                // +0x24
     std::int32_t mActiveInstanceBudget;               // +0x28
-    msvc8::vector<std::int32_t> mBoneRemapIndices;    // +0x2C
+    fa::vector<std::int32_t> mBoneRemapIndices;    // +0x2C
     std::uint8_t mUseSecondaryData;                   // +0x3C
     std::uint8_t pad_3D_3F[0x03]{};
     std::int32_t mParameterAnnotation;                  // +0x40
@@ -241,7 +241,7 @@ namespace moho
     static void BeginBonePalettes();
 
     /** Writes the bones of every posed instance of one skinned bucket. */
-    void PrepareBonePalettes(const msvc8::vector<MeshInstance*>& instances);
+    void PrepareBonePalettes(const fa::vector<MeshInstance*>& instances);
 
     /** Sends the bones written since the last upload to the GPU. */
     static void UploadBonePalettes();

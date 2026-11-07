@@ -89,7 +89,7 @@ IWinApp::~IWinApp()
  * Default command-line help text provider.
  * FA retail default is a false/nullsub return.
  */
-bool IWinApp::AppGetHelpText(msvc8::string& outHelpText, const bool shortMode)
+bool IWinApp::AppGetHelpText(fa::string& outHelpText, const bool shortMode)
 {
   (void)shortMode;
   outHelpText.assign_owned("");
@@ -113,9 +113,9 @@ bool IWinApp::AppInitCommonServices()
   THREAD_InitInvoke();
   gpg::EnableLogHistory(100);
 
-  msvc8::vector<msvc8::string> logArgs;
+  fa::vector<fa::string> logArgs;
   if (CFG_GetArgOption("/log", 1, &logArgs) && !logArgs.empty()) {
-    const msvc8::string logFileName = FILE_SuggestedExt(logArgs[0].c_str(), "sclog");
+    const fa::string logFileName = FILE_SuggestedExt(logArgs[0].c_str(), "sclog");
     // This construction is the real source-level trigger for a chain of
     // Dinkumware iostream/CRT internals, none of which need a hand-written
     // body -- they're satisfied automatically once this expression compiles:
@@ -137,9 +137,6 @@ bool IWinApp::AppInitCommonServices()
     //   out-of-range-openmode exception path both _Fiopen emissions share.
     // DB-integrity fix: FUN_004F2B50 was marked `recovered` with a note
     // claiming this exact call site as its citation, but no `Address:`
-    // annotation for it existed anywhere in src (fake-recovered-status
-    // contamination, same shape documented elsewhere this session) -- this
-    // comment is that citation, now real.
     std::ofstream* const logStream = new std::ofstream(logFileName.c_str(), std::ios::out | std::ios::trunc);
     if ((logStream->rdstate() & (std::ios::failbit | std::ios::badbit)) != 0) {
       delete logStream;
@@ -163,7 +160,7 @@ bool IWinApp::AppInitCommonServices()
   RES_ActivatePendingFactories();
 
   const std::filesystem::path launchDirectory = ResolveLaunchDirectory();
-  const msvc8::string dataPathScriptName("SupComDataPath.lua");
+  const fa::string dataPathScriptName("SupComDataPath.lua");
   if (!DISK_SetupDataAndSearchPaths(dataPathScriptName, launchDirectory)) {
     gpg::Die("Failed to setup initial search path.");
   }

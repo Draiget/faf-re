@@ -24,7 +24,7 @@ namespace moho
    */
   struct SArmyVectorWithMeta
   {
-    msvc8::vector<std::uint32_t> mWords; // +0x00
+    fa::vector<std::uint32_t> mWords; // +0x00
     // A dword in the binary; the path preview stores a footprint pointer in
     // it, so it is pointer-sized (the same unsigned int on x86).
     std::uintptr_t mMetaWord;            // +0x10
@@ -33,7 +33,7 @@ namespace moho
 
     /**
      * Member-wise copy-ctor. Performs the engine-emitted out-of-line
-     * `msvc8::vector<uint32_t>` copy-construction via the per-type named
+     * `fa::vector<uint32_t>` copy-construction via the per-type named
      * helper `moho::CopyConstructVectorUint32` so the linker keeps the
      * FUN_00560A90 symbol shape; trailing scalar `mMetaWord` is copied
      * directly.
@@ -90,7 +90,7 @@ namespace moho
     BVIntSet mValidCommandSources;  // 0x0A8
     std::uint32_t mPlayerColorBgra; // 0x0C8
     std::uint32_t mArmyColorBgra;   // 0x0CC
-    msvc8::string mArmyType;        // 0x0D0
+    fa::string mArmyType;        // 0x0D0
     std::int32_t mFaction;          // 0x0EC
     std::uint8_t mUseWholeMap;      // 0x0F0
     std::uint8_t mPad_00F1_00F4[0x03]{};

@@ -7,6 +7,7 @@
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
+#include "gpg/gal/PlacedResources.h"
 
 namespace gpg::gal::vulkan
 {
@@ -222,10 +223,14 @@ namespace gpg::gal::vulkan
       return VK_FORMAT_R16G16_SFLOAT;
     case DXGI_FORMAT_R16G16B16A16_UINT:
       return VK_FORMAT_R16G16B16A16_UINT;
+    case DXGI_FORMAT_R16G16B16A16_UNORM:
+      return VK_FORMAT_R16G16B16A16_UNORM;
     case DXGI_FORMAT_R8G8B8A8_UINT:
       return VK_FORMAT_R8G8B8A8_UINT;
     case DXGI_FORMAT_R8G8B8A8_UNORM:
       return VK_FORMAT_R8G8B8A8_UNORM;
+    case DXGI_FORMAT_R8G8B8A8_SNORM:
+      return VK_FORMAT_R8G8B8A8_SNORM;
     case DXGI_FORMAT_B8G8R8A8_UNORM:
       return VK_FORMAT_B8G8R8A8_UNORM;
     case DXGI_FORMAT_R8_SINT:
@@ -389,8 +394,15 @@ namespace gpg::gal::vulkan
     }
     block->free[start] = size;
 
-    // An oversized block that is wholly free goes back to the driver.
-    if (block->size > kBlockSize && block->free.size() == 1U && block->free.begin()->second == block->size) {
+    // A wholly free block goes back to the driver: at once if it's oversized, otherwise when
+    // another empty block of its kind stays for the next allocations.
+    const auto wholeFree = [](const Block& candidate) {
+      return candidate.free.size() == 1U && candidate.free.begin()->second == candidate.size;
+    };
+    const bool anotherEmpty = std::any_of(mBlocks.begin(), mBlocks.end(), [&](const std::unique_ptr<Block>& other) {
+      return other != nullptr && other.get() != block && other->type == block->type && other->linear == block->linear && wholeFree(*other);
+    });
+    if (wholeFree(*block) && (block->size > kBlockSize || anotherEmpty)) {
       if (block->mapped != nullptr) {
         Vk().vkUnmapMemory(mDevice, block->memory);
       }
@@ -492,14 +504,38 @@ namespace gpg::gal::vulkan
         page->used = 0U;
       }
     }
+    // Oversized pages that sit idle go, and so do idle ordinary pages past the reserve.
+    const std::uint64_t idleReserve = static_cast<std::uint64_t>(std::max(gUploadIdleMB, 0)) << 20U;
+    std::uint64_t idleKept = 0U;
     for (auto page = mPages.begin(); page != mPages.end();) {
-      if (!(*page)->busy && (*page)->size > kPageSize && page->get() != mCurrent) {
+      if ((*page)->busy || page->get() == mCurrent) {
+        ++page;
+      } else if ((*page)->size > kPageSize || idleKept + (*page)->size > idleReserve) {
         DestroyPage(**page);
         page = mPages.erase(page);
       } else {
+        idleKept += (*page)->size;
         ++page;
       }
     }
+  }
+
+  std::uint64_t UploadAllocator::PageBytes() const noexcept
+  {
+    std::uint64_t bytes = 0U;
+    for (const auto& page : mPages) {
+      bytes += page->size;
+    }
+    return bytes;
+  }
+
+  std::uint64_t MemoryAllocator::BlockBytes() const noexcept
+  {
+    std::uint64_t bytes = 0U;
+    for (const std::unique_ptr<Block>& block : mBlocks) {
+      bytes += block != nullptr ? block->size : 0U; // a slot Free emptied
+    }
+    return bytes;
   }
 
   std::uint64_t UploadAllocator::TakeAllocatedBytes() noexcept

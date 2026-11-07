@@ -69,7 +69,7 @@ namespace
     return lhs.get() == rhs.get();
   }
 
-  [[nodiscard]] bool IsMsvc8StringLess(const msvc8::string& lhs, const msvc8::string& rhs) noexcept
+  [[nodiscard]] bool IsMsvc8StringLess(const fa::string& lhs, const fa::string& rhs) noexcept
   {
     const char* const lhsData = lhs.data();
     const char* const rhsData = rhs.data();
@@ -301,19 +301,13 @@ namespace moho
     if (beam.mTexture1.tex != nullptr) {
       beam.mTexture1.tex->GetTexture(texture0);
     }
-    boost::AssignSharedPairRetain(
-      reinterpret_cast<boost::SharedCountPair*>(&bucketKey.texture0),
-      reinterpret_cast<const boost::SharedCountPair*>(&texture0)
-    );
+    boost::AssignSharedPairRetain(&bucketKey.texture0, &texture0);
 
     CParticleTexture::TextureResourceHandle texture1{};
     if (beam.mTexture2.tex != nullptr) {
       beam.mTexture2.tex->GetTexture(texture1);
     }
-    boost::AssignSharedPairRetain(
-      reinterpret_cast<boost::SharedCountPair*>(&bucketKey.texture1),
-      reinterpret_cast<const boost::SharedCountPair*>(&texture1)
-    );
+    boost::AssignSharedPairRetain(&bucketKey.texture1, &texture1);
     bucketKey.blendMode = static_cast<std::int32_t>(beam.mBlendMode);
 
     buckets[bucketKey].push_back(beam);
@@ -496,7 +490,7 @@ namespace moho
 
     for (auto bucketIt = beams.mBuckets.begin(); bucketIt != beams.mBuckets.end(); ++bucketIt) {
       const SBeamBucketKey& bucketKey = bucketIt->first;
-      const msvc8::vector<SWorldBeam>& beamList = bucketIt->second;
+      const fa::vector<SWorldBeam>& beamList = bucketIt->second;
       if (beamList.empty()) {
         continue;
       }
@@ -648,14 +642,8 @@ namespace moho
     destination->sortScalar = source->sortScalar;
     destination->dragEnabled = source->dragEnabled;
 
-    boost::AssignWeakPairFromShared(
-      reinterpret_cast<boost::SharedCountPair*>(&destination->texture0),
-      reinterpret_cast<const boost::SharedCountPair*>(&source->texture0)
-    );
-    boost::AssignWeakPairFromShared(
-      reinterpret_cast<boost::SharedCountPair*>(&destination->texture1),
-      reinterpret_cast<const boost::SharedCountPair*>(&source->texture1)
-    );
+    boost::AssignWeakPairFromShared(&destination->texture0, &source->texture0);
+    boost::AssignWeakPairFromShared(&destination->texture1, &source->texture1);
 
     destination->tag = source->tag;
     destination->blendMode = source->blendMode;
@@ -677,7 +665,7 @@ namespace moho
 
     key->texture0.reset();
     key->texture1.reset();
-    key->tag = msvc8::string{};
+    key->tag = fa::string{};
 
     key->sortScalar = trail.mSortOrder;
 
@@ -685,19 +673,13 @@ namespace moho
     if (trail.mTexture.tex != nullptr) {
       trail.mTexture.tex->GetTexture(texture0);
     }
-    boost::AssignSharedPairRetain(
-      reinterpret_cast<boost::SharedCountPair*>(&key->texture0),
-      reinterpret_cast<const boost::SharedCountPair*>(&texture0)
-    );
+    boost::AssignSharedPairRetain(&key->texture0, &texture0);
 
     CParticleTexture::TextureResourceHandle texture1{};
     if (trail.mRampTexture.tex != nullptr) {
       trail.mRampTexture.tex->GetTexture(texture1);
     }
-    boost::AssignSharedPairRetain(
-      reinterpret_cast<boost::SharedCountPair*>(&key->texture1),
-      reinterpret_cast<const boost::SharedCountPair*>(&texture1)
-    );
+    boost::AssignSharedPairRetain(&key->texture1, &texture1);
 
     key->tag.assign_owned(trail.mTypeTag != nullptr ? trail.mTypeTag : "");
     key->blendMode = trail.mBlendMode;
@@ -766,14 +748,8 @@ namespace moho
     }
 
     destination->sortScalar = source->sortScalar;
-    boost::AssignWeakPairFromShared(
-      reinterpret_cast<boost::SharedCountPair*>(&destination->texture0),
-      reinterpret_cast<const boost::SharedCountPair*>(&source->texture0)
-    );
-    boost::AssignWeakPairFromShared(
-      reinterpret_cast<boost::SharedCountPair*>(&destination->texture1),
-      reinterpret_cast<const boost::SharedCountPair*>(&source->texture1)
-    );
+    boost::AssignWeakPairFromShared(&destination->texture0, &source->texture0);
+    boost::AssignWeakPairFromShared(&destination->texture1, &source->texture1);
     destination->tag = source->tag;
     destination->blendMode = source->blendMode;
     return destination;

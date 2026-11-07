@@ -374,7 +374,7 @@ namespace moho
     }
 
     if (sMediumFidelityTextureBatcher == nullptr) {
-      sMediumFidelityTextureBatcher = new CD3DTextureBatcher();
+      sMediumFidelityTextureBatcher = REN_NewSplatTextureBatcher();
     }
 
     if (!sMediumFidelityGridTexture) {
@@ -711,7 +711,7 @@ namespace moho
    */
   void MediumFidelityTerrain::DrawTerrain(
     boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
-    const msvc8::string* const techniqueName
+    const fa::string* const techniqueName
   )
   {
     auto& shaderVars = GetTerrainShaderVars();
@@ -1213,10 +1213,10 @@ namespace moho
     // The technique name is an annotation on the stratum material's shader
     // rather than a literal, so a map can override the normal pass.
     CD3DEffect* const effect = device->GetCurEffect();
-    const msvc8::string technique = effect->GetStringAnnotation(
+    const fa::string technique = effect->GetStringAnnotation(
       terrainRes->GetStratumMaterial().mShaderName,
-      msvc8::string{"normals"},
-      msvc8::string{"TTerrainNormals"});
+      fa::string{"normals"},
+      fa::string{"TTerrainNormals"});
     device->SelectTechnique(technique.c_str());
 
     LoadTerrainLighting(nullptr);
@@ -1609,8 +1609,7 @@ namespace moho
                   sEngineStatRenderFlatDecals = engineStats->GetItem("Render_FlatDecals", true);
                   (void)sEngineStatRenderFlatDecals->Release(0);
                 }
-                _InterlockedExchangeAdd(
-                  reinterpret_cast<volatile long*>(&sEngineStatRenderFlatDecals->mPrimaryValueBits), 1);
+                sEngineStatRenderFlatDecals->AddPrimaryBits(1);
               }
             } else {
               std::int32_t baselineIndexCount = 0;
@@ -1634,7 +1633,7 @@ namespace moho
                   sEngineStatRenderDecals = engineStats->GetItem("Render_Decals", true);
                   (void)sEngineStatRenderDecals->Release(0);
                 }
-                _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&sEngineStatRenderDecals->mPrimaryValueBits), 1);
+                sEngineStatRenderDecals->AddPrimaryBits(1);
               }
             }
           }
@@ -1649,46 +1648,64 @@ namespace moho
         gpg::fastvector<CWldTerrainDecal*> visibleSplats;
         (void)decalManager->PropsInView(mCamera, visibleSplats, ren_IgnoreDecalLOD);
 
-        std::int32_t splatBudget = 0;
-        for (CWldTerrainDecal* const decalEntry : visibleSplats) {
-          auto* const splat = static_cast<CWldSplat*>(decalEntry);
+        // Engine fix (ren_SplatAtlasFix): when the atlas has no room for a splat, it is cleared and
+        // the walk runs once more, so only this frame's textures hold places.
+        for (bool mayRestart = true;; mayRestart = false) {
+          bool restart = false;
+          std::int32_t splatBudget = 0;
+          for (CWldTerrainDecal* const decalEntry : visibleSplats) {
+            auto* const splat = static_cast<CWldSplat*>(decalEntry);
 
-          const CWldSplat::SplatVertex& firstVertex = splat->mSplatVertices[0];
-          const Vector4f& row1 = mCamera->viewport.r[1];
-          const float worldDistance = (firstVertex.mPosition.z * row1.z) + (firstVertex.mPosition.y * row1.y)
-            + (firstVertex.mPosition.x * row1.x) + row1.w;
+            const CWldSplat::SplatVertex& firstVertex = splat->mSplatVertices[0];
+            const Vector4f& row1 = mCamera->viewport.r[1];
+            const float worldDistance = (firstVertex.mPosition.z * row1.z) + (firstVertex.mPosition.y * row1.y)
+              + (firstVertex.mPosition.x * row1.x) + row1.w;
 
-          if (worldDistance > splat->mCutoffLOD) {
-            continue;
+            if (worldDistance > splat->mCutoffLOD) {
+              continue;
+            }
+            if (++splatBudget >= kMaxSplatsPerFrame) {
+              break;
+            }
+
+            float fadeAlpha;
+            if (splat->mNearCutoff <= 0.0f) {
+              const float farFadeStart = splat->mCutoffLOD * ren_DecalFadeFraction;
+              const float clampedDistance = std::min(worldDistance, splat->mCutoffLOD);
+              const float fadeFloor = std::max(farFadeStart, std::min(clampedDistance, farFadeStart));
+              fadeAlpha = 1.0f - ((clampedDistance - fadeFloor) / (splat->mCutoffLOD - fadeFloor));
+            } else {
+              const float nearFadeStart = splat->mNearCutoff * ren_DecalFadeFraction;
+              const float clampedDistance = std::min(worldDistance, splat->mNearCutoff);
+              const float fadeCeiling = std::max(clampedDistance, nearFadeStart);
+              fadeAlpha = (fadeCeiling - nearFadeStart) / (splat->mNearCutoff - nearFadeStart);
+            }
+            const float bakedAlpha = fadeAlpha * splat->mCurrentAlpha;
+
+            const CWldSplat::AtlasMiss atlas =
+              splat->OnAtlasResult(splat->UpdateBatchTexture(sMediumFidelityTextureBatcher), mayRestart);
+            if (atlas == CWldSplat::AtlasMiss::Restart) {
+              restart = true;
+              break;
+            }
+            if (atlas == CWldSplat::AtlasMiss::Skip) {
+              continue;
+            }
+
+            const std::size_t countBeforeAppend = mSplatVertices.Size();
+            for (const CWldSplat::SplatVertex& sourceVertex : splat->mSplatVertices) {
+              mSplatVertices.PushBack(sourceVertex);
+            }
+
+            for (std::size_t v = countBeforeAppend; v < mSplatVertices.Size(); ++v) {
+              mSplatVertices[v].mAlpha = bakedAlpha;
+            }
           }
-          if (++splatBudget >= kMaxSplatsPerFrame) {
+          if (!restart) {
             break;
           }
-
-          float fadeAlpha;
-          if (splat->mNearCutoff <= 0.0f) {
-            const float farFadeStart = splat->mCutoffLOD * ren_DecalFadeFraction;
-            const float clampedDistance = std::min(worldDistance, splat->mCutoffLOD);
-            const float fadeFloor = std::max(farFadeStart, std::min(clampedDistance, farFadeStart));
-            fadeAlpha = 1.0f - ((clampedDistance - fadeFloor) / (splat->mCutoffLOD - fadeFloor));
-          } else {
-            const float nearFadeStart = splat->mNearCutoff * ren_DecalFadeFraction;
-            const float clampedDistance = std::min(worldDistance, splat->mNearCutoff);
-            const float fadeCeiling = std::max(clampedDistance, nearFadeStart);
-            fadeAlpha = (fadeCeiling - nearFadeStart) / (splat->mNearCutoff - nearFadeStart);
-          }
-          const float bakedAlpha = fadeAlpha * splat->mCurrentAlpha;
-
-          splat->UpdateBatchTexture(sMediumFidelityTextureBatcher);
-
-          const std::size_t countBeforeAppend = mSplatVertices.Size();
-          for (const CWldSplat::SplatVertex& sourceVertex : splat->mSplatVertices) {
-            mSplatVertices.PushBack(sourceVertex);
-          }
-
-          for (std::size_t v = countBeforeAppend; v < mSplatVertices.Size(); ++v) {
-            mSplatVertices[v].mAlpha = bakedAlpha;
-          }
+          REN_ResetSplatTextureBatcher(sMediumFidelityTextureBatcher);
+          mSplatVertices.ResetStorageToInline();
         }
       }
 

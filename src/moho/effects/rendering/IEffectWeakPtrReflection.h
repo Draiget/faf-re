@@ -50,7 +50,7 @@ namespace moho
     /**
      * Address: 0x00674970 (FUN_00674970, Moho::RWeakPtrType_IEffect::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x00674B00 (FUN_00674B00, Moho::RWeakPtrType_IEffect::IsIndexed)

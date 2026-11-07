@@ -31,26 +31,6 @@ namespace moho
       return type;
     }
 
-    [[nodiscard]] gpg::RType* CachedCScriptObjectType()
-    {
-      gpg::RType* type = CScriptObject::sType;
-      if (type == nullptr) {
-        type = gpg::LookupRType(typeid(CScriptObject));
-        CScriptObject::sType = type;
-      }
-      return type;
-    }
-
-    [[nodiscard]] gpg::RType* CachedSDecalInfoType()
-    {
-      gpg::RType* type = SDecalInfo::sType;
-      if (type == nullptr) {
-        type = gpg::LookupRType(typeid(SDecalInfo));
-        SDecalInfo::sType = type;
-      }
-      return type;
-    }
-
 
     /**
      * Address: 0x0077D910 (FUN_0077D910)
@@ -233,10 +213,10 @@ namespace moho
   void CDecalHandle::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     const gpg::RRef baseOwnerRef{};
-    archive->Read(CachedCScriptObjectType(), static_cast<CScriptObject*>(this), baseOwnerRef);
+    archive->Read(gpg::RTypeOf<CScriptObject>(), static_cast<CScriptObject*>(this), baseOwnerRef);
 
     const gpg::RRef decalOwnerRef{};
-    archive->Read(CachedSDecalInfoType(), &mInfo, decalOwnerRef);
+    archive->Read(gpg::RTypeOf<SDecalInfo>(), &mInfo, decalOwnerRef);
 
     archive->ReadUInt(&mArmyVisibilityFlags);
 
@@ -255,10 +235,10 @@ namespace moho
   void CDecalHandle::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     const gpg::RRef baseOwnerRef{};
-    archive->Write(CachedCScriptObjectType(), static_cast<const CScriptObject*>(this), baseOwnerRef);
+    archive->Write(gpg::RTypeOf<CScriptObject>(), static_cast<const CScriptObject*>(this), baseOwnerRef);
 
     const gpg::RRef decalOwnerRef{};
-    archive->Write(CachedSDecalInfoType(), &mInfo, decalOwnerRef);
+    archive->Write(gpg::RTypeOf<SDecalInfo>(), &mInfo, decalOwnerRef);
 
     archive->WriteUInt(mArmyVisibilityFlags);
     archive->WriteInt(static_cast<int>(mCreatedAtTick));
@@ -277,10 +257,7 @@ namespace moho
    */
   gpg::RRef CDecalHandle::GetDerivedObjectRef()
   {
-    gpg::RRef out{};
-    out.mObj = this;
-    out.mType = GetClass();
-    return out;
+    return gpg::MakeSelfRef(this);
   }
 
   /**

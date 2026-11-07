@@ -12,7 +12,7 @@
 #endif
 #include <Windows.h>
 
-#include <boost/thread/mutex.hpp>
+#include <mutex>
 
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
@@ -38,15 +38,16 @@ namespace
     moho::ScrDebugWindow* debugWindow = nullptr; // 0x010A63A4
     std::uint32_t debugWindowOwnerThreadId = 0;
 
-    boost::mutex hookBindingMutex;
-    boost::mutex singleStepMutex;
-    boost::mutex breakpointMutex;
-    boost::mutex pausedQueueMutex;
+    std::mutex hookBindingMutex;
+    std::mutex singleStepMutex;
+    // Recursive: their sections call into preferences, Lua and the debug window.
+    std::recursive_mutex breakpointMutex;
+    std::recursive_mutex pausedQueueMutex;
 
-    msvc8::list<LuaHookBinding> hookBindings;
-    msvc8::list<LuaPlus::LuaState*> singleStepRootStates;
-    msvc8::list<moho::ScrBreakpoint> breakpoints;
-    msvc8::list<moho::PausedThread*> pausedThreads;
+    fa::list<LuaHookBinding> hookBindings;
+    fa::list<LuaPlus::LuaState*> singleStepRootStates;
+    fa::list<moho::ScrBreakpoint> breakpoints;
+    fa::list<moho::PausedThread*> pausedThreads;
 
     bool hasPendingSingleStepRoots = false;
     bool hasEnabledBreakpoints = false;
@@ -86,7 +87,7 @@ namespace
     return 0;
   }
 
-  [[nodiscard]] msvc8::list<moho::ScrBreakpoint>::iterator FindBreakpointExact(
+  [[nodiscard]] fa::list<moho::ScrBreakpoint>::iterator FindBreakpointExact(
     ScrDebugState& runtime,
     const moho::ScrBreakpoint& key
   )
@@ -145,17 +146,17 @@ namespace
       return;
     }
 
-    msvc8::list<msvc8::string> serializedBreakpoints;
+    fa::list<fa::string> serializedBreakpoints;
     for (const moho::ScrBreakpoint& breakpoint : runtime.breakpoints) {
       serializedBreakpoints.push_back(breakpoint.AsString());
     }
 
-    preferences->SetStringArr(msvc8::string(kBreakpointPreferenceKey), serializedBreakpoints);
+    preferences->SetStringArr(fa::string(kBreakpointPreferenceKey), serializedBreakpoints);
   }
 
-  [[nodiscard]] msvc8::string ToMountedSourcePath(const char* sourcePath)
+  [[nodiscard]] fa::string ToMountedSourcePath(const char* sourcePath)
   {
-    msvc8::string mountedPath;
+    fa::string mountedPath;
     if (sourcePath == nullptr) {
       return mountedPath;
     }
@@ -240,7 +241,7 @@ namespace
 
   bool ConsumeSingleStepRootState(ScrDebugState& runtime, LuaPlus::LuaState* const rootState)
   {
-    boost::mutex::scoped_lock lock(runtime.singleStepMutex);
+    std::lock_guard<std::mutex> lock(runtime.singleStepMutex);
 
     if (rootState == nullptr || runtime.singleStepRootStates.empty()) {
       runtime.hasPendingSingleStepRoots = !runtime.singleStepRootStates.empty();
@@ -265,7 +266,7 @@ namespace
       return;
     }
 
-    boost::mutex::scoped_lock lock(runtime.singleStepMutex);
+    std::lock_guard<std::mutex> lock(runtime.singleStepMutex);
     for (LuaPlus::LuaState* const queuedRootState : runtime.singleStepRootStates) {
       if (queuedRootState == rootState) {
         runtime.hasPendingSingleStepRoots = true;
@@ -280,7 +281,7 @@ namespace
   /**
    * Address: 0x004B5B10 (FUN_004B5B10)
    *
-   * LuaPlus::LuaState *,msvc8::string const &,int,lua_Debug *
+   * LuaPlus::LuaState *,fa::string const &,int,lua_Debug *
    *
    * What it does:
    * Posts one pause event to the debug window, enqueues one paused-thread
@@ -288,7 +289,7 @@ namespace
    */
   void PauseLuaThreadAtSource(
     LuaPlus::LuaState* const luaState,
-    const msvc8::string& mountedSource,
+    const fa::string& mountedSource,
     const int sourceLine,
     lua_Debug* const debugFrame
   )
@@ -297,7 +298,7 @@ namespace
     moho::PausedThread* pausedThread = nullptr;
 
     {
-      boost::mutex::scoped_lock lock(runtime.pausedQueueMutex);
+      std::lock_guard<std::recursive_mutex> lock(runtime.pausedQueueMutex);
 
       // Engine addition (plan WPL.4): the pause event goes to the client's
       // window through sScrDebugWindowPostPause (ScrDebugHooks.h).
@@ -349,7 +350,7 @@ void moho::SCR_HookState(LuaPlus::LuaState* const state)
 
   ScrDebugState& runtime = GetScrDebugState();
   {
-    boost::mutex::scoped_lock lock(runtime.hookBindingMutex);
+    std::lock_guard<std::mutex> lock(runtime.hookBindingMutex);
     BindLuaStateForHook(runtime, state);
   }
 
@@ -375,7 +376,7 @@ void moho::SCR_UnhookState(LuaPlus::LuaState* const state)
 
   ScrDebugState& runtime = GetScrDebugState();
   {
-    boost::mutex::scoped_lock lock(runtime.hookBindingMutex);
+    std::lock_guard<std::mutex> lock(runtime.hookBindingMutex);
     UnbindLuaStateForHook(runtime, state);
   }
 
@@ -394,7 +395,7 @@ void moho::SCR_UnhookState(LuaPlus::LuaState* const state)
 void moho::SCR_AddBreakpoint(const ScrBreakpoint& breakpoint)
 {
   ScrDebugState& runtime = GetScrDebugState();
-  boost::mutex::scoped_lock lock(runtime.breakpointMutex);
+  std::lock_guard<std::recursive_mutex> lock(runtime.breakpointMutex);
 
   if (InsertBreakpointSortedUnique(runtime, breakpoint)) {
     RefreshAnyEnabledBreakpointsFlag(runtime);
@@ -413,7 +414,7 @@ void moho::SCR_AddBreakpoint(const ScrBreakpoint& breakpoint)
 void moho::SCR_EnableBreakpoint(const ScrBreakpoint& breakpoint, const bool enabled)
 {
   ScrDebugState& runtime = GetScrDebugState();
-  boost::mutex::scoped_lock lock(runtime.breakpointMutex);
+  std::lock_guard<std::recursive_mutex> lock(runtime.breakpointMutex);
 
   const auto it = FindBreakpointExact(runtime, breakpoint);
   if (it != runtime.breakpoints.end()) {
@@ -435,7 +436,7 @@ void moho::SCR_EnableBreakpoint(const ScrBreakpoint& breakpoint, const bool enab
 void moho::SCR_EnableAllBreakpoints(const bool enabled)
 {
   ScrDebugState& runtime = GetScrDebugState();
-  boost::mutex::scoped_lock lock(runtime.breakpointMutex);
+  std::lock_guard<std::recursive_mutex> lock(runtime.breakpointMutex);
 
   for (ScrBreakpoint& breakpoint : runtime.breakpoints) {
     breakpoint.enabled = enabled;
@@ -455,7 +456,7 @@ void moho::SCR_EnableAllBreakpoints(const bool enabled)
 void moho::SCR_RemoveBreakpoint(const ScrBreakpoint& breakpoint)
 {
   ScrDebugState& runtime = GetScrDebugState();
-  boost::mutex::scoped_lock lock(runtime.breakpointMutex);
+  std::lock_guard<std::recursive_mutex> lock(runtime.breakpointMutex);
 
   const auto it = FindBreakpointExact(runtime, breakpoint);
   if (it != runtime.breakpoints.end()) {
@@ -475,7 +476,7 @@ void moho::SCR_RemoveBreakpoint(const ScrBreakpoint& breakpoint)
 void moho::SCR_RemoveAllBreakpoints()
 {
   ScrDebugState& runtime = GetScrDebugState();
-  boost::mutex::scoped_lock lock(runtime.breakpointMutex);
+  std::lock_guard<std::recursive_mutex> lock(runtime.breakpointMutex);
 
   runtime.breakpoints.clear();
   RefreshAnyEnabledBreakpointsFlag(runtime);
@@ -491,14 +492,14 @@ void moho::SCR_RemoveAllBreakpoints()
  * Enumerates breakpoints matching one mounted source path into output storage.
  */
 void moho::SCR_EnumerateBreakpoints(
-  const msvc8::string& sourcePath,
-  msvc8::vector<ScrBreakpoint>& outBreakpoints
+  const fa::string& sourcePath,
+  fa::vector<ScrBreakpoint>& outBreakpoints
 )
 {
   outBreakpoints.clear();
 
   ScrDebugState& runtime = GetScrDebugState();
-  boost::mutex::scoped_lock lock(runtime.breakpointMutex);
+  std::lock_guard<std::recursive_mutex> lock(runtime.breakpointMutex);
   if (!runtime.hasEnabledBreakpoints) {
     return;
   }
@@ -519,12 +520,12 @@ void moho::SCR_EnumerateBreakpoints(
  * What it does:
  * Enumerates call-stack activation frames for the currently paused script state.
  */
-void moho::SCR_EnumerateCallStack(msvc8::vector<ScrActivation>& outActivations)
+void moho::SCR_EnumerateCallStack(fa::vector<ScrActivation>& outActivations)
 {
   outActivations.clear();
 
   ScrDebugState& runtime = GetScrDebugState();
-  boost::mutex::scoped_lock lock(runtime.pausedQueueMutex);
+  std::lock_guard<std::recursive_mutex> lock(runtime.pausedQueueMutex);
 
   LuaPlus::LuaState* const pausedLuaState = GetFrontPausedLuaStateUnlocked(runtime);
   if (pausedLuaState == nullptr || pausedLuaState->m_state == nullptr) {
@@ -540,8 +541,8 @@ void moho::SCR_EnumerateCallStack(msvc8::vector<ScrActivation>& outActivations)
       ++source;
     }
 
-    const msvc8::string mountedSource = ToMountedSourcePath(source);
-    const msvc8::string activationName(debugFrame.name != nullptr ? debugFrame.name : "");
+    const fa::string mountedSource = ToMountedSourcePath(source);
+    const fa::string activationName(debugFrame.name != nullptr ? debugFrame.name : "");
     outActivations.push_back(ScrActivation(mountedSource, activationName, debugFrame.currentline));
   }
 }
@@ -554,12 +555,12 @@ void moho::SCR_EnumerateCallStack(msvc8::vector<ScrActivation>& outActivations)
  * What it does:
  * Enumerates locals and closure upvalues from one Lua stack level.
  */
-void moho::SCR_EnumerateLocals(const int level, msvc8::vector<ScrWatch>& outWatches)
+void moho::SCR_EnumerateLocals(const int level, fa::vector<ScrWatch>& outWatches)
 {
   outWatches.clear();
 
   ScrDebugState& runtime = GetScrDebugState();
-  boost::mutex::scoped_lock lock(runtime.pausedQueueMutex);
+  std::lock_guard<std::recursive_mutex> lock(runtime.pausedQueueMutex);
 
   LuaPlus::LuaState* const pausedLuaState = GetFrontPausedLuaStateUnlocked(runtime);
   if (pausedLuaState == nullptr || pausedLuaState->m_state == nullptr) {
@@ -577,7 +578,7 @@ void moho::SCR_EnumerateLocals(const int level, msvc8::vector<ScrWatch>& outWatc
        localName = lua_getlocal(pausedLuaState->m_state, &debugFrame, index)) {
     ++index;
 
-    const msvc8::string watchName(localName);
+    const fa::string watchName(localName);
     const LuaPlus::LuaObject watchValue(pausedLuaState, -1);
     outWatches.push_back(ScrWatch(watchName, watchValue));
   }
@@ -590,7 +591,7 @@ void moho::SCR_EnumerateLocals(const int level, msvc8::vector<ScrWatch>& outWatc
        upvalueName = lua_getupvalue(pausedLuaState->m_state, -1, index)) {
     ++index;
 
-    const msvc8::string watchName(upvalueName);
+    const fa::string watchName(upvalueName);
     const LuaPlus::LuaObject watchValue(pausedLuaState, -1);
     outWatches.push_back(ScrWatch(watchName, watchValue));
 
@@ -608,12 +609,12 @@ void moho::SCR_EnumerateLocals(const int level, msvc8::vector<ScrWatch>& outWatc
  * What it does:
  * Enumerates global Lua table entries for the currently paused script state.
  */
-void moho::SCR_EnumerateGlobals(msvc8::vector<ScrWatch>& outWatches)
+void moho::SCR_EnumerateGlobals(fa::vector<ScrWatch>& outWatches)
 {
   outWatches.clear();
 
   ScrDebugState& runtime = GetScrDebugState();
-  boost::mutex::scoped_lock lock(runtime.pausedQueueMutex);
+  std::lock_guard<std::recursive_mutex> lock(runtime.pausedQueueMutex);
 
   LuaPlus::LuaState* const pausedLuaState = GetFrontPausedLuaStateUnlocked(runtime);
   if (pausedLuaState == nullptr || pausedLuaState->m_state == nullptr) {
@@ -628,7 +629,7 @@ void moho::SCR_EnumerateGlobals(msvc8::vector<ScrWatch>& outWatches)
   LuaPlus::LuaTableIterator iterator(globals, true);
   while (!iterator.m_isDone) {
     const char* const keyName = iterator.m_keyObj.GetString();
-    const msvc8::string watchName(keyName != nullptr ? keyName : "");
+    const fa::string watchName(keyName != nullptr ? keyName : "");
     outWatches.push_back(ScrWatch(watchName, iterator.m_valueObj));
     iterator.Next();
   }
@@ -644,7 +645,7 @@ void moho::SCR_EnumerateGlobals(msvc8::vector<ScrWatch>& outWatches)
 void moho::SCR_DebugStep()
 {
   ScrDebugState& runtime = GetScrDebugState();
-  boost::mutex::scoped_lock queueLock(runtime.pausedQueueMutex);
+  std::lock_guard<std::recursive_mutex> queueLock(runtime.pausedQueueMutex);
 
   PausedThread* const pausedThread = PopPausedThreadUnlocked(runtime);
   if (pausedThread == nullptr) {
@@ -668,7 +669,7 @@ void moho::SCR_DebugStep()
 void moho::SCR_DebugResume()
 {
   ScrDebugState& runtime = GetScrDebugState();
-  boost::mutex::scoped_lock queueLock(runtime.pausedQueueMutex);
+  std::lock_guard<std::recursive_mutex> queueLock(runtime.pausedQueueMutex);
 
   PausedThread* const pausedThread = PopPausedThreadUnlocked(runtime);
   if (pausedThread == nullptr) {
@@ -688,7 +689,7 @@ void moho::SCR_DebugResume()
 void moho::SCR_LoadBreakpoints()
 {
   ScrDebugState& runtime = GetScrDebugState();
-  boost::mutex::scoped_lock lock(runtime.breakpointMutex);
+  std::lock_guard<std::recursive_mutex> lock(runtime.breakpointMutex);
 
   runtime.breakpoints.clear();
   runtime.hasEnabledBreakpoints = false;
@@ -698,12 +699,12 @@ void moho::SCR_LoadBreakpoints()
     return;
   }
 
-  const msvc8::list<msvc8::string> fallback;
-  const msvc8::list<msvc8::string> serializedBreakpoints =
-    preferences->GetStringArr(msvc8::string(kBreakpointPreferenceKey), fallback);
+  const fa::list<fa::string> fallback;
+  const fa::list<fa::string> serializedBreakpoints =
+    preferences->GetStringArr(fa::string(kBreakpointPreferenceKey), fallback);
 
-  const msvc8::string emptyName("");
-  for (const msvc8::string& serializedBreakpoint : serializedBreakpoints) {
+  const fa::string emptyName("");
+  for (const fa::string& serializedBreakpoint : serializedBreakpoints) {
     ScrBreakpoint breakpoint(emptyName, -1);
     breakpoint.enabled = false;
     breakpoint.FromString(serializedBreakpoint);
@@ -723,7 +724,7 @@ void moho::SCR_LoadBreakpoints()
 void moho::SCR_SaveBreakpoints()
 {
   ScrDebugState& runtime = GetScrDebugState();
-  boost::mutex::scoped_lock lock(runtime.breakpointMutex);
+  std::lock_guard<std::recursive_mutex> lock(runtime.breakpointMutex);
   SaveBreakpointsUnlocked(runtime);
 }
 
@@ -742,7 +743,7 @@ void moho::DebugLuaHook(lua_State* const state, lua_Debug* const debugFrame)
 
   LuaPlus::LuaState* luaState = nullptr;
   {
-    boost::mutex::scoped_lock lock(runtime.hookBindingMutex);
+    std::lock_guard<std::mutex> lock(runtime.hookBindingMutex);
     luaState = FindLuaStateForHook(runtime, state);
   }
   if (luaState == nullptr) {
@@ -770,15 +771,15 @@ void moho::DebugLuaHook(lua_State* const state, lua_Debug* const debugFrame)
   const int currentLine = debugFrame->currentline;
 
   if (ConsumeSingleStepRootState(runtime, luaState->m_rootState)) {
-    const msvc8::string mountedSource = ToMountedSourcePath(source);
+    const fa::string mountedSource = ToMountedSourcePath(source);
     PauseLuaThreadAtSource(luaState, mountedSource, currentLine, debugFrame);
     return;
   }
 
   bool shouldPauseForBreakpoint = false;
-  msvc8::string mountedSource;
+  fa::string mountedSource;
   {
-    boost::mutex::scoped_lock lock(runtime.breakpointMutex);
+    std::lock_guard<std::recursive_mutex> lock(runtime.breakpointMutex);
     if (runtime.hasEnabledBreakpoints) {
       mountedSource = ToMountedSourcePath(source);
       const ScrBreakpoint breakpointKey(mountedSource, currentLine);
@@ -851,14 +852,14 @@ void moho::SCR_DestroyDebugWindow()
   runtime.debugWindow = nullptr;
 
   {
-    boost::mutex::scoped_lock breakpointLock(runtime.breakpointMutex);
+    std::lock_guard<std::recursive_mutex> breakpointLock(runtime.breakpointMutex);
     SaveBreakpointsUnlocked(runtime);
     runtime.breakpoints.clear();
     runtime.hasEnabledBreakpoints = false;
   }
 
   {
-    boost::mutex::scoped_lock pausedQueueLock(runtime.pausedQueueMutex);
+    std::lock_guard<std::recursive_mutex> pausedQueueLock(runtime.pausedQueueMutex);
     runtime.pausedThreads.clear();
     runtime.hasPendingSingleStepRoots = false;
   }

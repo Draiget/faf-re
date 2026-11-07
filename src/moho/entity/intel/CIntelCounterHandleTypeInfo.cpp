@@ -50,14 +50,7 @@ namespace moho
    */
   void CIntelCounterHandleTypeInfo::AddBase_CIntelPosHandle(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CIntelPosHandle::StaticGetClass();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, CIntelPosHandle::StaticGetClass());
   }
 } // namespace moho
 

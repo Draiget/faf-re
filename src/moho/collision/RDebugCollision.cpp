@@ -14,25 +14,9 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedRDebugCollisionType()
-  {
-    if (!moho::RDebugCollision::sType) {
-      moho::RDebugCollision::sType = gpg::LookupRType(typeid(moho::RDebugCollision));
-    }
-    return moho::RDebugCollision::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedRDebugOverlayType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::RDebugOverlay));
-    }
-    return sType;
-  }
 
   template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* object, gpg::RType* staticType)
+  [[nodiscard]] gpg::RRef MakeStaticRef(TObject* object, gpg::RType* staticType)
   {
     gpg::RRef out{};
     out.mObj = object;
@@ -45,7 +29,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef CreateRDebugCollisionRefOwned()
   {
-    return MakeTypedRef(new moho::RDebugCollision(), CachedRDebugCollisionType());
+    return MakeStaticRef(new moho::RDebugCollision(), gpg::RTypeOf<moho::RDebugCollision>());
   }
 
   /**
@@ -65,7 +49,7 @@ namespace
     if (object) {
       new (object) moho::RDebugCollision();
     }
-    return MakeTypedRef(object, CachedRDebugCollisionType());
+    return MakeStaticRef(object, gpg::RTypeOf<moho::RDebugCollision>());
   }
 
   /**
@@ -118,7 +102,7 @@ namespace moho
    */
   gpg::RType* RDebugCollision::GetClass() const
   {
-    return CachedRDebugCollisionType();
+    return gpg::RTypeOf<moho::RDebugCollision>();
   }
 
   /**
@@ -126,7 +110,7 @@ namespace moho
    */
   gpg::RRef RDebugCollision::GetDerivedObjectRef()
   {
-    return MakeTypedRef(this, GetClass());
+    return MakeStaticRef(this, GetClass());
   }
 
   /**
@@ -201,7 +185,7 @@ namespace moho
    */
   void RDebugCollisionTypeInfo::AddBase_RDebugOverlay(gpg::RType* const typeInfo)
   {
-    gpg::AddBaseIfPresent(typeInfo, CachedRDebugOverlayType(), 0);
+    gpg::AddBaseIfPresent(typeInfo, gpg::RTypeOf<moho::RDebugOverlay>(), 0);
   }
 
   /**

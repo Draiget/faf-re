@@ -65,18 +65,6 @@ namespace
     return static_cast<moho::ETaskState>(static_cast<int>(current) + 1);
   }
 
-  void WakeTaskThreadForImmediateTick(moho::CTaskThread* const ownerThread)
-  {
-    if (ownerThread == nullptr) {
-      return;
-    }
-
-    ownerThread->mPendingFrames = 0;
-    if (ownerThread->mStaged) {
-      ownerThread->Unstage();
-    }
-  }
-
   void DestroyEconomyRequestPointer(moho::CEconRequest*& request)
   {
     if (request == nullptr) {
@@ -152,35 +140,6 @@ namespace
     return targetUnit->GetAttributes().mCapturable;
   }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrEntityType()
-  {
-    gpg::RType* type = moho::WeakPtr<moho::Entity>::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Entity>));
-      moho::WeakPtr<moho::Entity>::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSEconValueType()
-  {
-    gpg::RType* type = moho::SEconValue::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::SEconValue));
-      moho::SEconValue::sType = type;
-    }
-    return type;
-  }
 } // namespace
 
 namespace moho
@@ -406,7 +365,7 @@ namespace moho
         // cannot hoist that load and neither may we: a script that destroys an
         // attached unit erases it from this very list, and a cached `end()`
         // would then read the slot the erase vacated.
-        const msvc8::vector<Entity*>& attachedEntities = targetEntity->GetAttachedEntities();
+        const fa::vector<Entity*>& attachedEntities = targetEntity->GetAttachedEntities();
         for (Entity* const* cursor = attachedEntities.begin(); cursor != attachedEntities.end(); ++cursor) {
           Entity* const attachedEntity = *cursor;
           Unit* const attachedUnit = (attachedEntity != nullptr) ? attachedEntity->IsUnit() : nullptr;
@@ -528,18 +487,18 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
 
     archive->WritePointer<moho::CUnitCommand>(mCommand, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedWeakPtrEntityType(), &mTargetEntity, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mTargetEntity, ownerRef);
     archive->WriteBool(mHasStarted);
     archive->WriteInt(mCaptureProgress);
     archive->WriteInt(mCaptureTime);
 
     archive->WritePointer<moho::CEconRequest>(mConsumptionData, gpg::TrackedPointerState::Owned, ownerRef);
 
-    archive->Write(CachedSEconValueType(), &mCaptureRate, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::SEconValue>(), &mCaptureRate, ownerRef);
   }
 
   /**
@@ -557,9 +516,9 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), nullOwner);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), nullOwner);
     archive->ReadPointer(&mCommand, &nullOwner);
-    archive->Read(CachedWeakPtrEntityType(), &mTargetEntity, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mTargetEntity, nullOwner);
     archive->ReadBool(&mHasStarted);
     archive->ReadInt(&mCaptureProgress);
     archive->ReadInt(&mCaptureTime);
@@ -571,7 +530,7 @@ namespace moho
     mConsumptionData = loadedConsumption;
     DestroyEconomyRequestPointer(previousConsumption);
 
-    archive->Read(CachedSEconValueType(), &mCaptureRate, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::SEconValue>(), &mCaptureRate, nullOwner);
   }
 
   /**
@@ -695,7 +654,7 @@ namespace moho
     mCaptureProgress = 0;
     mCaptureTime = 0;
     mTaskState = TASKSTATE_Preparing;
-    WakeTaskThreadForImmediateTick(mOwnerThread);
+    moho::WakeTaskThreadForImmediateTick(mOwnerThread);
   }
 } // namespace moho
 

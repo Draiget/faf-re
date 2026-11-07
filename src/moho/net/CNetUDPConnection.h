@@ -76,7 +76,7 @@ namespace moho
      * Slot: 6
      * Demangled: moho::CNetUDPConnection::ToString
      */
-    msvc8::string ToString() override;
+    fa::string ToString() override;
 
     /**
      * Address: 0x00489660
@@ -84,6 +84,16 @@ namespace moho
      * Demangled: moho::CNetUDPConnection::ScheduleDestroy
      */
     void ScheduleDestroy() override;
+
+    /**
+     * Engine addition (issue #275), not in the binary.
+     *
+     * What it does:
+     * Sets how many packets this link may have on the way, in both directions. The binary's
+     * is 32 on every link, and a client that keeps to it drops what comes from further ahead,
+     * so this is only for a link whose far end runs this build.
+     */
+    void SetWindow(uint16_t window);
 
     /**
      * Address: 0x00485D30
@@ -391,7 +401,8 @@ namespace moho
     uint16_t mNextSequenceNumber{0};
     uint16_t mRemoteExpectedSequenceNumber{0};
     uint16_t mExpectedSequenceNumber{0};
-    uint16_t mReserved4B6{0};
+    // Unused in the binary, which has 32 in its place wherever this is read.
+    uint16_t mWindow{32};
     gpg::PipeStream mPendingOutputData;
     gpg::ZLibOutputFilterStream* mOutputFilterStream{nullptr};
     bool mOutputFlushPending{false};
@@ -429,4 +440,5 @@ namespace moho
     gpg::MD5Context mTotalBytesDispatchedMD5;
   };
   static_assert(sizeof(CNetUDPConnection) == 0xFE8, "CNetUDPConnection size must be 0xFE8");
+
 } // namespace moho

@@ -177,7 +177,7 @@ namespace moho
      * What it does:
      * Copies this weapon label text into caller-provided output storage.
      */
-    msvc8::string* GetLabel(msvc8::string* outLabel) const;
+    fa::string* GetLabel(fa::string* outLabel) const;
 
     /**
      * Address: 0x006A4C70 (FUN_006A4C70, Moho::UnitWeapon::GetCat1)
@@ -403,7 +403,7 @@ namespace moho
      * Resolves one projectile blueprint id text into a projectile blueprint
      * resource and updates this weapon's silo-dependent projectile lane.
      */
-    void ChangeProjectileBlueprint(const msvc8::string& blueprint);
+    void ChangeProjectileBlueprint(const fa::string& blueprint);
 
     /**
      * Address: 0x006D61E0 (FUN_006D61E0)
@@ -537,7 +537,7 @@ namespace moho
     std::int32_t mBone;                         // +0xA8
     std::uint8_t mEnabled;                      // +0xAC
     std::uint8_t mPadAD[3];                     // +0xAD
-    msvc8::string mLabel;                       // +0xB0
+    fa::string mLabel;                       // +0xB0
     CAiTarget mTarget;                          // +0xCC
     CFireWeaponTask* mFireWeaponTask;           // +0xEC
     std::uint8_t mCanFire;                      // +0xF0
@@ -546,8 +546,8 @@ namespace moho
     EntityCategorySet mCat2;                    // +0x120
     ELayer mFireTargetLayerCaps;                // +0x148
     float mFiringRandomness;                    // +0x14C
-    msvc8::vector<EntityCategorySet> mTargetPriorities; // +0x150
-    msvc8::vector<SBlackListInfo> mBlacklist;           // +0x160
+    fa::vector<EntityCategorySet> mTargetPriorities; // +0x150
+    fa::vector<SBlackListInfo> mBlacklist;           // +0x160
     std::int32_t mUnknown170;                   // +0x170
     std::uint8_t mUnknown174;                   // +0x174
     std::uint8_t mPad175To177[3];               // +0x175

@@ -32,43 +32,9 @@ namespace
     return sInstance;
   }
 
-  /**
-   * Address: 0x006358F0 (FUN_006358F0)
-   *
-   * What it does:
-   * Resolves and caches the reflected runtime type for
-   * `CBuilderArmManipulator`.
-   */
-  [[nodiscard]] gpg::RType* ResolveCBuilderArmManipulatorTypeCachePrimary()
-  {
-    gpg::RType* type = moho::CBuilderArmManipulator::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CBuilderArmManipulator));
-      moho::CBuilderArmManipulator::sType = type;
-    }
-    return type;
-  }
-
-  /**
-   * Address: 0x00636F10 (FUN_00636F10)
-   *
-   * What it does:
-   * Secondary duplicate lane that resolves/caches
-   * `CBuilderArmManipulator` reflection type.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveCBuilderArmManipulatorTypeCacheSecondary()
-  {
-    gpg::RType* type = moho::CBuilderArmManipulator::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CBuilderArmManipulator));
-      moho::CBuilderArmManipulator::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RType* CachedCBuilderArmManipulatorType()
   {
-    return ResolveCBuilderArmManipulatorTypeCachePrimary();
+    return gpg::CachedLookup<moho::CBuilderArmManipulator>(moho::CBuilderArmManipulator::sType);
   }
 
   /**
@@ -255,10 +221,7 @@ namespace moho
    */
   gpg::RRef CBuilderArmManipulatorTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const manipulator = static_cast<CBuilderArmManipulator*>(objectStorage);
-    if (manipulator) {
-      new (manipulator) CBuilderArmManipulator();
-    }
+    auto* const manipulator = gpg::ConstructInStorage<CBuilderArmManipulator>(objectStorage);
 
     return MakeBuilderArmManipulatorRef(manipulator);
   }
@@ -281,13 +244,7 @@ namespace moho
   void CBuilderArmManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedIAniManipulatorType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType);
   }
 
   /**

@@ -260,11 +260,11 @@ namespace moho
    * farthest-point update (`~Distance` 0x00A38C40 at 0x0082A1EC).
    */
   void SimplifyPathSpan(
-    const msvc8::vector<Wm3::Vector3f>& points,
+    const fa::vector<Wm3::Vector3f>& points,
     const std::int32_t first,
     const std::int32_t last,
-    msvc8::list<Wm3::Vector3f>& simplified,
-    const msvc8::list<Wm3::Vector3f>::iterator insertBefore,
+    fa::list<Wm3::Vector3f>& simplified,
+    const fa::list<Wm3::Vector3f>::iterator insertBefore,
     const float tolerance
   )
   {
@@ -284,7 +284,7 @@ namespace moho
       return;
     }
 
-    const msvc8::list<Wm3::Vector3f>::iterator inserted = simplified.insert(insertBefore, points[farthest]);
+    const fa::list<Wm3::Vector3f>::iterator inserted = simplified.insert(insertBefore, points[farthest]);
     SimplifyPathSpan(points, first, farthest, simplified, inserted, tolerance);
     SimplifyPathSpan(points, farthest, last, simplified, insertBefore, tolerance);
   }
@@ -519,7 +519,7 @@ namespace moho
       DrawBuildDragAdjacencyHighlights(buildDrag, batcher, camera);
 
       if (mode.mMode == COMMOD_BuildAnchored) {
-        msvc8::vector<UserUnit*> selection{};
+        fa::vector<UserUnit*> selection{};
         buildDrag.mSession->GetSelectionUnits(selection);
 
         for (UserUnit* const unit : selection) {

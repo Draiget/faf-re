@@ -304,93 +304,6 @@ namespace
    */
   EntityAttributesSerializerHelper::~EntityAttributesSerializerHelper() = default;
 
-  void DeserializeSSTIEntityVariableDataSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    auto* const object = reinterpret_cast<moho::SSTIEntityVariableData*>(objectPtr);
-    if (archive == nullptr || object == nullptr) {
-      return;
-    }
-
-    object->MemberDeserialize(archive, 2);
-  }
-
-  void SerializeSSTIEntityVariableDataSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    auto* const object = reinterpret_cast<moho::SSTIEntityVariableData*>(objectPtr);
-    if (archive == nullptr || object == nullptr) {
-      return;
-    }
-
-    object->MemberSerialize(archive, 2);
-  }
-
-
-  [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)
-  {
-    for (const char* const name : names) {
-      if (!name) {
-        continue;
-      }
-
-      if (gpg::RType* const type = gpg::REF_FindTypeNamed(name)) {
-        return type;
-      }
-    }
-
-    return nullptr;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveRScmResourceType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = ResolveTypeByAnyName({"RScmResource", "Moho::RScmResource"});
-      if (!sType) {
-        sType = gpg::LookupRType(typeid(moho::RScmResource));
-      }
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveRMeshBlueprintType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = ResolveTypeByAnyName({"RMeshBlueprint", "Moho::RMeshBlueprint"});
-      if (!sType) {
-        sType = gpg::LookupRType(typeid(moho::RMeshBlueprint));
-      }
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(Wm3::Vec3f));
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVTransformType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::VTransform));
-    }
-    return sType;
-  }
 
   [[nodiscard]] gpg::RType* ResolveEntIdType()
   {
@@ -408,23 +321,11 @@ namespace
     return gpg::RTypeOf<gpg::fastvector<moho::SSTIEntityAttachInfo>>();
   }
 
-  [[nodiscard]] gpg::RType* ResolveCSndParamsType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = ResolveTypeByAnyName({"CSndParams", "Moho::CSndParams"});
-      if (!sType) {
-        sType = gpg::LookupRType(typeid(moho::CSndParams));
-      }
-    }
-    return sType;
-  }
-
   [[nodiscard]] gpg::RType* ResolveVisibilityModeType()
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
-      sType = ResolveTypeByAnyName({"EVisibilityMode", "Moho::EVisibilityMode"});
+      sType = gpg::REF_FindFirstTypeNamed({"EVisibilityMode", "Moho::EVisibilityMode"});
       if (!sType) {
         sType = gpg::LookupRType(typeid(int));
       }
@@ -436,7 +337,7 @@ namespace
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
-      sType = ResolveTypeByAnyName({"ELayer", "Moho::ELayer"});
+      sType = gpg::REF_FindFirstTypeNamed({"ELayer", "Moho::ELayer"});
       if (!sType) {
         sType = gpg::LookupRType(typeid(int));
       }
@@ -448,7 +349,7 @@ namespace
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
-      sType = ResolveTypeByAnyName({"EntityAttributes", "Moho::EntityAttributes", "SSTIIntelAttributes"});
+      sType = gpg::REF_FindFirstTypeNamed({"EntityAttributes", "Moho::EntityAttributes", "SSTIIntelAttributes"});
       if (!sType) {
         sType = moho::preregister_EntityAttributesTypeInfo();
       }
@@ -656,7 +557,7 @@ namespace moho
     (void)archive->ReadPointer(&meshBlueprint, &ownerRef);
     mMeshBlueprint = meshBlueprint;
 
-    gpg::RType* const vector3Type = ResolveVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vec3f>();
     GPG_ASSERT(vector3Type != nullptr);
     archive->Read(vector3Type, &mScale, ownerRef);
     archive->ReadFloat(&mHealth);
@@ -665,7 +566,7 @@ namespace moho
     ReadBoolByte(archive, mIsDead);
     ReadBoolByte(archive, mRequestRefreshUI);
 
-    gpg::RType* const transformType = ResolveVTransformType();
+    gpg::RType* const transformType = gpg::RTypeOf<moho::VTransform>();
     GPG_ASSERT(transformType != nullptr);
     archive->Read(transformType, &mCurTransform, ownerRef);
     archive->Read(transformType, &mLastTransform, ownerRef);
@@ -738,7 +639,7 @@ namespace moho
 
     archive->WritePointer<moho::RMeshBlueprint>(const_cast<RMeshBlueprint*>(mMeshBlueprint), gpg::TrackedPointerState::Unowned, ownerRef);
 
-    gpg::RType* const vector3Type = ResolveVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vec3f>();
     GPG_ASSERT(vector3Type != nullptr);
     archive->Write(vector3Type, &mScale, ownerRef);
     archive->WriteFloat(mHealth);
@@ -747,7 +648,7 @@ namespace moho
     archive->WriteBool(mIsDead != 0u);
     archive->WriteBool(mRequestRefreshUI != 0u);
 
-    gpg::RType* const transformType = ResolveVTransformType();
+    gpg::RType* const transformType = gpg::RTypeOf<moho::VTransform>();
     GPG_ASSERT(transformType != nullptr);
     archive->Write(transformType, &mCurTransform, ownerRef);
     archive->Write(transformType, &mLastTransform, ownerRef);

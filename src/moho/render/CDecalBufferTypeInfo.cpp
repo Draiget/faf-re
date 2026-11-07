@@ -52,10 +52,7 @@ namespace
    */
   void Dtr_CDecalBuffer(void* const objectStorage)
   {
-    auto* const object = static_cast<moho::CDecalBuffer*>(objectStorage);
-    if (object != nullptr) {
-      object->~CDecalBuffer();
-    }
+    gpg::DestructInStorage<moho::CDecalBuffer>(objectStorage);
   }
 
   /**

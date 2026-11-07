@@ -40,6 +40,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/OutputContext.hpp"
+#include "gpg/gal/backends/common/PipelineMemo.h"
 #include "gpg/gal/backends/common/WindowsCursor.h"
 #include "gpg/gal/backends/dxgi/DxgiFactory.h"
 #include "gpg/gal/backends/dxgi/DxgiSwapChain.h"
@@ -54,6 +55,14 @@ namespace gpg::gal
     struct Image;
   }
 
+  /**
+   * Engine addition (`ren_PrepareDeviceEarly`): starts creating the Direct3D 12 device of the first
+   * adapter on a helper thread - the driver's load, most of a device's creation - for
+   * `DeviceD3D12::Setup` to take when it picks that adapter and asks for no debug layer or DRED, which
+   * have to be on before a device exists. Otherwise it is released and Setup creates its own.
+   */
+  void D3D12_PrepareDeviceEarly();
+
   class DeviceD3D12 final : public Device, public effects::PassBinder
   {
   public:
@@ -67,7 +76,7 @@ namespace gpg::gal
     DeviceContext* GetDeviceContext() override;
     int GetCurThreadId() override;
     void Func1() const override;
-    void GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
+    void GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
     OutputContext* GetHeadOutputContext(unsigned int headIndex) override;
     const OutputContext* GetHeadOutputContext(unsigned int headIndex) const override;
     boost::shared_ptr<PipelineState> GetPipelineState() override;
@@ -92,10 +101,10 @@ namespace gpg::gal
       const RECT* sourceRect,
       const RECT* destinationRect
     ) override;
-    void SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const msvc8::string& filePath) override;
-    void SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const msvc8::string& filePath, int fileFormat) override;
+    void SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
+    void SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, int fileFormat) override;
     void SaveTexture(
-      const boost::shared_ptr<Texture>& texture, const msvc8::string& filePath, int fileFormat, gpg::MemBuffer<char>* outBuffer
+      const boost::shared_ptr<Texture>& texture, const fa::string& filePath, int fileFormat, gpg::MemBuffer<char>* outBuffer
     ) override;
     void GetTexture2D(
       const void* sourceData, std::uint32_t sourceBytes, gpg::MemBuffer<char>* outTextureData, std::uint32_t* outWidth, int* outHeight
@@ -132,6 +141,8 @@ namespace gpg::gal
     // GPU-driven additions (GpuDrivenD3D12.cpp)
     [[nodiscard]] std::uint32_t GetGpuDrivenFeatures() const override;
     [[nodiscard]] std::uint32_t GetGpuDrivenVerified() const override;
+    /** `kGpuPathMsdfCook` for an NVIDIA adapter, else 0 (issue #309). */
+    [[nodiscard]] std::uint32_t MsdfCookVerified() const;
     boost::shared_ptr<GpuBuffer> CreateGpuBuffer(const GpuBufferDesc& desc) override;
     void UpdateGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, const void* data) override;
     boost::shared_ptr<GpuProgram> CreateGpuProgram(const GpuProgramDesc& desc) override;
@@ -140,6 +151,10 @@ namespace gpg::gal
     void BeginProfileRegion(std::uint32_t region) override;
     void EndProfileRegion(std::uint32_t region) override;
     bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out) override;
+    void ReleaseBufferCopy(VertexBuffer& buffer) override;
+    void ReleaseBufferCopy(IndexBuffer& buffer) override;
+    void CopyLockedRangeOnly(VertexBuffer& buffer) override;
+    void CopyLockedRangeOnly(IndexBuffer& buffer) override;
     bool CopyVertexBufferRegion(
       VertexBuffer& destination, std::uint32_t destinationOffset, VertexBuffer& source, std::uint32_t sourceOffset, std::uint32_t byteCount
     ) override;
@@ -154,6 +169,7 @@ namespace gpg::gal
     [[nodiscard]] ID3D12Device* Native() const noexcept { return mDevice.Get(); }
     /** Engine addition (gal::gPlacedResources): where static buffers are placed. */
     [[nodiscard]] d3d12::PlacedHeapAllocator& PlacedBuffers() noexcept { return mPlacedBuffers; }
+    [[nodiscard]] d3d12::SharedBufferAllocator& SharedBuffers() noexcept { return mSharedBuffers; }
     [[nodiscard]] std::recursive_mutex& Mutex() noexcept { return mMutex; }
     /** The submission the commands being recorded belong to. */
     [[nodiscard]] std::uint64_t RecordingSerial() const noexcept { return mSubmittedSerial + 1U; }
@@ -171,6 +187,7 @@ namespace gpg::gal
     void ReadTexture(d3d12::TrackedResource& source, imaging::Image& image);
     /** Keeps `resource` and frees `descriptors` once the GPU is done with the commands recorded so far. */
     void Retire(Microsoft::WRL::ComPtr<ID3D12Resource> resource);
+    void RetireSharedRange(Microsoft::WRL::ComPtr<IUnknown> range);
     void RetireDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_CPU_DESCRIPTOR_HANDLE handle);
     [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE type);
 
@@ -201,7 +218,7 @@ namespace gpg::gal
       std::uint64_t tableFrame = 0;               // the frame's view arena the table is in
       std::uint64_t tableEpoch = 0;
       D3D12_GPU_DESCRIPTOR_HANDLE samplers{};
-      std::shared_ptr<const std::vector<effects::TextureBinding>> sampled; // what the texture table holds
+      const std::vector<effects::TextureBinding>* sampled = nullptr; // what the texture table holds, in the effect's state
       std::uint32_t techniqueIndex = 0;
       std::uint32_t passIndex = 0;
       const char* technique = ""; // diagnostics
@@ -292,7 +309,7 @@ namespace gpg::gal
     // ---- core objects --------------------------------------------------------
     d3d12::Library mLibrary;
     int mCurThreadId = 0;
-    msvc8::vector<msvc8::string> mLog{};
+    fa::vector<fa::string> mLog{};
     DeviceContext mDeviceContext{DeviceApi::Unset};
     dxgi::Factory mFactory;
     std::uint32_t mAdapterIndex = 0;
@@ -319,6 +336,7 @@ namespace gpg::gal
     {
       std::uint64_t serial = 0;
       Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+      Microsoft::WRL::ComPtr<IUnknown> sharedRange; // a shared buffer's range, given back with the entry
       D3D12_DESCRIPTOR_HEAP_TYPE type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
       D3D12_CPU_DESCRIPTOR_HANDLE descriptor{};
     };
@@ -327,6 +345,7 @@ namespace gpg::gal
     d3d12::UploadAllocator mUpload;
     d3d12::PlacedHeapAllocator mPlacedTextures; // engine addition: gal::gPlacedResources
     d3d12::PlacedHeapAllocator mPlacedBuffers;
+    d3d12::SharedBufferAllocator mSharedBuffers; // engine addition: gal::gSharedBuffers
     d3d12::DescriptorPool mRtvPool;
     d3d12::DescriptorPool mDsvPool;
     d3d12::DescriptorPool mSrvPool;
@@ -345,6 +364,21 @@ namespace gpg::gal
 
     // ---- pipeline state ------------------------------------------------------
     std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D12PipelineState>> mPipelines;
+    /** Everything mPipelines' string key is built from; see PipelineMemo. */
+    struct PipelineInputs
+    {
+      std::uint64_t vertexKey;
+      std::uint64_t pixelKey;
+      std::uint32_t format;
+      std::uint32_t sampleMask;
+      effects::BlendDesc blend;
+      effects::DepthStencilDesc depth;
+      effects::RasterizerDesc rasterizer;
+      DXGI_FORMAT renderFormat;
+      DXGI_FORMAT depthFormat;
+      D3D12_PRIMITIVE_TOPOLOGY_TYPE topologyType;
+    };
+    PipelineMemo<PipelineInputs, ID3D12PipelineState*> mPipelineMemo;
     d3d12::PipelineCache mPipelineCache; // engine addition: mPipelines' entries kept on disk across sessions
     std::map<std::string, D3D12_GPU_DESCRIPTOR_HANDLE> mSamplerTables; // by content
     std::uint64_t mArenaEpoch = 0; // bumped when a frame's view arena is emptied mid-frame

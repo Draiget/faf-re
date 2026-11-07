@@ -25,6 +25,23 @@ namespace moho
   struct SDecalInfo;
 
   /**
+   * Engine fix: `ren_SplatAtlasFix`. All terrain splats (tread and scorch marks) draw from one
+   * texture atlas, which retail sizes 1024x1024 and never clears during a game. Once it is full a
+   * new splat texture gets no place, and its splats keep texture coordinates nobody set, so they
+   * show pieces of other textures (the Fatboy's 512x512 treads after a Galactic Colossus, for
+   * one). On (the default): the atlas is 2048x2048, a frame whose splats do not fit clears it and
+   * starts over, and a splat that still has no place is not drawn. Off: retail. The atlas size is
+   * read when a map's terrain is created; the rest each frame.
+   */
+  extern bool ren_SplatAtlasFix;
+
+  /// A new terrain splat atlas: 2048x2048 with `ren_SplatAtlasFix`, else retail's 1024x1024.
+  [[nodiscard]] CD3DTextureBatcher* REN_NewSplatTextureBatcher();
+
+  /// Clears a terrain splat atlas, for a pass that restarts after CWldSplat::AtlasMiss::Restart.
+  void REN_ResetSplatTextureBatcher(CD3DTextureBatcher* batcher);
+
+  /**
    * CWldTerrainDecal specialization that owns one terrain-splat quad and one
    * retained batch-texture lane.
    */
@@ -73,7 +90,7 @@ namespace moho
      * Stores the splat name, resolves the texture from disk when non-empty,
      * and keeps the previous texture lane intact when the name is empty.
      */
-    void SetName(const msvc8::string& name, int slot) override;
+    void SetName(const fa::string& name, int slot) override;
 
     /**
      * Address: 0x0089E090 (FUN_0089E090, Moho::CWldSplat::Update)
@@ -98,8 +115,21 @@ namespace moho
      * What it does:
      * Adds the retained batch texture to the atlas and writes the returned UV
      * rectangle into the splat quad.
+     *
+     * Engine addition: returns whether the quad now holds this texture's UVs;
+     * false when the splat has no texture or the atlas has no room for it.
      */
-    void UpdateBatchTexture(CD3DTextureBatcher* batcher);
+    bool UpdateBatchTexture(CD3DTextureBatcher* batcher);
+
+    /**
+     * Engine fix (`ren_SplatAtlasFix`): what a terrain splat pass does with
+     * this splat after UpdateBatchTexture returned `placed`. Draw it when it
+     * got its UVs, or always when the fix is off (retail draws whatever UVs
+     * the quad holds). Otherwise `Restart` when `mayRestart` and the atlas was
+     * full, so the pass clears the atlas and starts over, else `Skip`.
+     */
+    enum class AtlasMiss { Draw, Skip, Restart };
+    [[nodiscard]] AtlasMiss OnAtlasResult(bool placed, bool mayRestart) const noexcept;
 
     /**
      * Address: 0x0089E2B0 (FUN_0089E2B0, Moho::CWldSplat::GetSplatVertices)
@@ -214,7 +244,7 @@ namespace moho
     [[nodiscard]] virtual CWldSplat* GetSplat(std::int32_t index) const = 0;
 
     /// Slot 17.
-    virtual bool NewSplatAt(const Wm3::Vec3f& position, EWldTerrainDecalType type, const msvc8::string& name) = 0;
+    virtual bool NewSplatAt(const Wm3::Vec3f& position, EWldTerrainDecalType type, const fa::string& name) = 0;
 
     /// Slot 18.
     virtual void AddSplat(CWldTerrainDecal* decal) = 0;
@@ -229,10 +259,10 @@ namespace moho
     virtual void MoveDecalTowardFront(CWldTerrainDecal* decal) = 0;
 
     /// Slot 22.
-    virtual void AddDecals(const msvc8::vector<SDecalInfo>& decals) = 0;
+    virtual void AddDecals(const fa::vector<SDecalInfo>& decals) = 0;
 
     /// Slot 23.
-    virtual void RemoveDecals(const msvc8::vector<std::uint32_t>& decalHandles) = 0;
+    virtual void RemoveDecals(const fa::vector<std::uint32_t>& decalHandles) = 0;
 
     /// Slot 24.
     virtual void ProcessRemovals(std::int32_t tick) = 0;
@@ -462,7 +492,7 @@ namespace moho
      * Creates one splat, applies type/name/transform defaults, refreshes the
      * splat runtime state, and reports success.
      */
-    bool NewSplatAt(const Wm3::Vec3f& position, EWldTerrainDecalType type, const msvc8::string& name) override;
+    bool NewSplatAt(const Wm3::Vec3f& position, EWldTerrainDecalType type, const fa::string& name) override;
 
     /**
      * Address: 0x00878530 (FUN_00878530, Moho::CDecalManager::AddSplat)
@@ -515,7 +545,7 @@ namespace moho
      * the handle / fade deadline / army / fidelity lanes across, and settle the
      * cutoff LOD.
      */
-    void AddDecals(const msvc8::vector<SDecalInfo>& decals) override;
+    void AddDecals(const fa::vector<SDecalInfo>& decals) override;
 
     /**
      * Address: 0x00878A40 (FUN_00878A40, Moho::CDecalManager::RemoveDecals)
@@ -525,7 +555,7 @@ namespace moho
      * Scans all active decals for each requested runtime handle and marks
      * matching decals for deferred removal.
      */
-    void RemoveDecals(const msvc8::vector<std::uint32_t>& decalHandles) override;
+    void RemoveDecals(const fa::vector<std::uint32_t>& decalHandles) override;
 
     /**
      * Address: 0x00878A90 (FUN_00878A90, Moho::CDecalManager::ProcessRemovals)
@@ -586,6 +616,10 @@ namespace moho
      * (WRenViewport::Render, 0x007F9779..0x007F979C).
      */
     void ClearPendingChanges() override;
+
+    /** Engine addition (replay timeline): at once, with no fade, for a sim that replaces the last one. */
+    void RemoveAllDecals();
+
     /**
      * Address: 0x00877A60 (FUN_00877A60, Moho::CDecalManager::CDecalManager)
      *
@@ -648,11 +682,11 @@ namespace moho
   public:
     std::uint32_t mDecalCount; // +0x04
     std::uint32_t mNumDecals; // +0x08
-    msvc8::vector<CWldTerrainDecal*> mDecals; // +0x0C (4-word binary vector: proxy@0x0C,first@0x10,last@0x14,end@0x18)
-    msvc8::map<std::uint32_t, CWldTerrainDecal*> mDecalGroupLookupByDecalIndex; // +0x1C (3-word canonical rb_tree: proxy@0x1C,head@0x20,size@0x24)
-    msvc8::vector<CDecalGroup*> mDecalGroups; // +0x28
-    msvc8::map<std::uint32_t, CDecalGroup*> mDecalGroupLookupBySplatIndex; // +0x38
-    msvc8::vector<CWldSplat*> mSplats; // +0x44
+    fa::vector<CWldTerrainDecal*> mDecals; // +0x0C (4-word binary vector: proxy@0x0C,first@0x10,last@0x14,end@0x18)
+    fa::map<std::uint32_t, CWldTerrainDecal*> mDecalGroupLookupByDecalIndex; // +0x1C (3-word canonical rb_tree: proxy@0x1C,head@0x20,size@0x24)
+    fa::vector<CDecalGroup*> mDecalGroups; // +0x28
+    fa::map<std::uint32_t, CDecalGroup*> mDecalGroupLookupBySplatIndex; // +0x38
+    fa::vector<CWldSplat*> mSplats; // +0x44
     SpatialDB<CWldTerrainDecal> mSpatialDb; // +0x54 (built by 0x00501D80, the database ctor)
     IWldTerrainRes* mWldTerrain; // +0xE4
     float mLodThresholds[10]; // +0xE8 (decal-area decile LOD histogram)

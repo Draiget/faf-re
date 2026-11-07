@@ -21,36 +21,11 @@ namespace
     return sInstance;
   }
 
-  /**
-   * Address: 0x00510490 (FUN_00510490)
-   *
-   * What it does:
-   * Lazily resolves and caches RTTI metadata for `REmitterBlueprint`.
-   */
-  [[nodiscard]] gpg::RType* CachedEmitterBlueprintType()
-  {
-    gpg::RType* cached = moho::REmitterBlueprint::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::REmitterBlueprint));
-      moho::REmitterBlueprint::sType = cached;
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEffectBlueprintType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::REffectBlueprint));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeEmitterBlueprintRef(moho::REmitterBlueprint* object)
   {
     gpg::RRef out{};
     out.mObj = object;
-    out.mType = CachedEmitterBlueprintType();
+    out.mType = gpg::RTypeOf<moho::REmitterBlueprint>();
     return out;
   }
 
@@ -140,14 +115,7 @@ namespace moho
  */
 void REmitterBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeInfo)
 {
-  gpg::RType* const effectType = CachedEffectBlueprintType();
-  gpg::RField baseField{};
-  baseField.mName = effectType->GetName();
-  baseField.mType = effectType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBase<moho::REffectBlueprint>(typeInfo);
 }
 
 /**
@@ -211,10 +179,10 @@ void REmitterBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeI
     typeInfo->AddField<float>("TextureFramecount", offsetof(REmitterBlueprint, TextureFrameCount), 3, "number of frames in texture we are using.");
     typeInfo->AddField<std::int32_t>("Blendmode", offsetof(REmitterBlueprint, BlendMode), 3, "Blendmode for this emitter.");
 
-    gpg::RField* const textureNameField = typeInfo->AddField<msvc8::string>("TextureName", offsetof(REmitterBlueprint, TextureName), 3, "Name of texture we are using for this particle");
+    gpg::RField* const textureNameField = typeInfo->AddField<fa::string>("TextureName", offsetof(REmitterBlueprint, TextureName), 3, "Name of texture we are using for this particle");
     textureNameField->mName = "Texture";
 
-    gpg::RField* const rampTextureNameField = typeInfo->AddField<msvc8::string>("RampTextureName", offsetof(REmitterBlueprint, RampTextureName), 3, "Name of ramp texture we are using for this particle");
+    gpg::RField* const rampTextureNameField = typeInfo->AddField<fa::string>("RampTextureName", offsetof(REmitterBlueprint, RampTextureName), 3, "Name of ramp texture we are using for this particle");
     rampTextureNameField->mName = "RampTexture";
   }
 

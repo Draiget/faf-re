@@ -145,16 +145,16 @@ gpg::RFastVectorType<moho::EntId>::~RFastVectorType() = default;
  */
 const char* gpg::RFastVectorType<moho::EntId>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedEntIdType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("fastvector<%s>", CachedEntIdType()->GetName());
   return sName.c_str();
 }
 
 /**
  * Address: 0x00552F30 (FUN_00552F30, gpg::RFastVectorType_EntId::GetLexical)
  */
-msvc8::string gpg::RFastVectorType<moho::EntId>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RFastVectorType<moho::EntId>::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 

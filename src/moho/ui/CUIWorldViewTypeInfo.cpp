@@ -37,19 +37,7 @@ namespace
    */
   void AddCMauiControlBase(gpg::RType& typeInfo)
   {
-    gpg::RType* baseType = moho::CMauiControl::sType;
-    if (baseType == nullptr) {
-      baseType = gpg::LookupRType(typeid(moho::CMauiControl));
-      moho::CMauiControl::sType = baseType;
-    }
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo.AddBase(baseField);
+    gpg::AddReflectedBaseViaSlot<moho::CMauiControl>(&typeInfo);
   }
 } // namespace
 

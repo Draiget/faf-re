@@ -48,7 +48,6 @@ using namespace moho;
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedAtLeastArgsWarning = "%s\n  expected at least %d args, but got %d";
   constexpr const char* kGpgNetActiveHelpText = "bool GpgNetActive()";
   constexpr const char* kGpgNetSendHelpText = "GpgNetSend(cmd,args...)";
@@ -132,7 +131,7 @@ namespace
    * propagating an exception.
    */
   void LogUnknownCommand(
-    const msvc8::string& commandName
+    const fa::string& commandName
   )
   {
     gpg::Warnf("GPGNET: Ignoring unknown gpg.net command \"%s\".", commandName.c_str());
@@ -186,7 +185,7 @@ namespace
    * Returns the live element count for one legacy vector lane.
    */
   [[nodiscard]] std::size_t GetCommandArgCount(
-    const msvc8::vector<SNetCommandArg>& args
+    const fa::vector<SNetCommandArg>& args
   ) noexcept
   {
     return args.size();
@@ -200,14 +199,14 @@ namespace
    * finishes destruction.
    */
   void DestroyCommandArgStorage(
-    msvc8::vector<SNetCommandArg>& args
+    fa::vector<SNetCommandArg>& args
   ) noexcept
   {
-    args = msvc8::vector<SNetCommandArg>{};
+    args = fa::vector<SNetCommandArg>{};
   }
 
   /**
-   * Address: 0x007BBA90 (FUN_007BBA90, msvc8::deque<Moho::SNetCommand>::
+   * Address: 0x007BBA90 (FUN_007BBA90, fa::deque<Moho::SNetCommand>::
    * clear_and_release -- see the citation on that method in Deque.h)
    *
    * What it does:
@@ -215,7 +214,7 @@ namespace
    * AND every allocated node/map block -- not just a logical clear.
    */
   void ClearCommandQueue(
-    msvc8::deque<SNetCommand>& commands
+    fa::deque<SNetCommand>& commands
   ) noexcept
   {
     commands.clear_and_release();
@@ -230,7 +229,7 @@ namespace
    * `ClearCommandQueue`.
    */
   [[maybe_unused]] void ClearCommandQueueThunk(
-    msvc8::deque<SNetCommand>& commands
+    fa::deque<SNetCommand>& commands
   ) noexcept
   {
     ClearCommandQueue(commands);
@@ -243,7 +242,7 @@ namespace
    * Appends one `SNetCommand` to the back of the legacy deque command queue.
    */
   void PushBackQueuedCommand(
-    msvc8::deque<SNetCommand>& commandQueue,
+    fa::deque<SNetCommand>& commandQueue,
     const SNetCommand& command
   )
   {
@@ -258,7 +257,7 @@ namespace
    * and returns the stored front element address.
    */
   [[maybe_unused]] [[nodiscard]] SNetCommand* PushFrontQueuedCommand(
-    msvc8::deque<SNetCommand>& commandQueue,
+    fa::deque<SNetCommand>& commandQueue,
     const SNetCommand& command
   )
   {
@@ -282,7 +281,7 @@ namespace
     while (destinationBegin != destinationEnd) {
       destinationBegin->mType = prototype.mType;
       destinationBegin->mNum = prototype.mNum;
-      destinationBegin->mStr.assign(prototype.mStr, 0, msvc8::string::npos);
+      destinationBegin->mStr.assign(prototype.mStr, 0, fa::string::npos);
       ++destinationBegin;
     }
     return destinationEnd;
@@ -298,7 +297,7 @@ namespace
    * destination lanes, and on exception destroys already-written lanes before
    * rethrowing.
    */
-  void CopyAssignCommandArgRangeWithRollback(
+  [[maybe_unused]] void CopyAssignCommandArgRangeWithRollback(
     const SNetCommandArg& prototype,
     std::uint32_t count,
     SNetCommandArg* const destination
@@ -338,7 +337,7 @@ namespace
     while (sourceBegin != sourceEnd) {
       destination->mType = sourceBegin->mType;
       destination->mNum = sourceBegin->mNum;
-      destination->mStr.assign(sourceBegin->mStr, 0, msvc8::string::npos);
+      destination->mStr.assign(sourceBegin->mStr, 0, fa::string::npos);
       ++destination;
       ++sourceBegin;
     }
@@ -432,7 +431,7 @@ void moho::GPGNET_ReportBottleneck(
       break;
   }
 
-  msvc8::string impactedOwners{};
+  fa::string impactedOwners{};
   const unsigned int endValue = info.mSubobj.Max();
   unsigned int ownerIndex = info.mSubobj.GetNext(std::numeric_limits<unsigned int>::max());
   if (ownerIndex != endValue) {
@@ -448,10 +447,10 @@ void moho::GPGNET_ReportBottleneck(
     }
   }
 
-  msvc8::string bottleneckTypeText{};
+  fa::string bottleneckTypeText{};
   bottleneckTypeText.assign_owned(bottleneckType);
-  const msvc8::string beatText = gpg::STR_Printf("%u", static_cast<unsigned int>(info.mVal));
-  const msvc8::string millisText = gpg::STR_Printf("%.1f", static_cast<double>(info.mFloat));
+  const fa::string beatText = gpg::STR_Printf("%u", static_cast<unsigned int>(info.mVal));
+  const fa::string millisText = gpg::STR_Printf("%.1f", static_cast<double>(info.mFloat));
 
   const SNetCommandArg typeArg(bottleneckTypeText);
   const SNetCommandArg beatArg(beatText);
@@ -487,8 +486,8 @@ void moho::GPGNET_ReportBottleneckCleared()
 void moho::GPGNET_ReportDesync(
   const int beat,
   const int army,
-  const msvc8::string& hash1,
-  const msvc8::string& hash2
+  const fa::string& hash1,
+  const fa::string& hash2
 )
 {
   const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
@@ -511,7 +510,7 @@ void moho::GPGNET_ReportDesync(
  * payload string.
  */
 void moho::GPGNET_SubmitArmyStats(
-  const msvc8::string& statsPayload
+  const fa::string& statsPayload
 )
 {
   const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
@@ -521,6 +520,21 @@ void moho::GPGNET_SubmitArmyStats(
 
   const SNetCommandArg payloadArg(statsPayload);
   active->WriteCommandWith1Arg("Stats", &payloadArg);
+}
+
+/**
+ * Engine addition (issue #275), not in the binary.
+ */
+void moho::GPGNET_ReportRejoinOffer(const fa::string& localSource, const fa::string& seats)
+{
+  const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
+  if (!active) {
+    return;
+  }
+
+  const SNetCommandArg sourceArg(localSource);
+  const SNetCommandArg seatsArg(seats);
+  active->WriteCommandWith2Args("RejoinOffer", &sourceArg, &seatsArg);
 }
 
 /**
@@ -601,10 +615,7 @@ int moho::cfunc_GpgNetActiveL(
     return 0;
   }
 
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 0) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGpgNetActiveHelpText, 0, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 0, kGpgNetActiveHelpText);
 
   lua_pushboolean(state->m_state, GPGNET_GetPtr() ? 1 : 0);
   (void)lua_gettop(state->m_state);
@@ -667,7 +678,7 @@ int moho::cfunc_GpgNetSendL(
     commandName = "";
   }
 
-  msvc8::vector<SNetCommandArg> args;
+  fa::vector<SNetCommandArg> args;
   for (int index = 2; index <= argumentCount; ++index) {
     const int luaType = lua_type(rawState, index);
     if (luaType == LUA_TNUMBER) {
@@ -698,7 +709,7 @@ int moho::cfunc_GpgNetSendL(
         text = "";
       }
 
-      args.push_back(SNetCommandArg(msvc8::string(text)));
+      args.push_back(SNetCommandArg(fa::string(text)));
       continue;
     }
 
@@ -721,7 +732,7 @@ int moho::cfunc_GpgNetSendL(
  */
 moho::SNetCommand::SNetCommand(
   const char* const name,
-  const msvc8::vector<SNetCommandArg>& args,
+  const fa::vector<SNetCommandArg>& args,
   const int val
 )
   : mName(name)
@@ -904,7 +915,7 @@ void CGpgNetInterface::ReceivePacket(
     gpg::Logf("GPGNET: received nat packet from %s:%d", ip.c_str(), port);
   }
 
-  const msvc8::string connStr = gpg::STR_Printf("%s:%d", ip.c_str(), static_cast<int>(port));
+  const fa::string connStr = gpg::STR_Printf("%s:%d", ip.c_str(), static_cast<int>(port));
   SNetCommandArg argFrom(connStr);
 
   const SNetCommandArg argData(data, size);
@@ -931,7 +942,7 @@ void CGpgNetInterface::ExpectedInt() noexcept(
  * What it does:
  * Returns string payload reference or throws type-error if arg is not string.
  */
-const msvc8::string& CGpgNetInterface::ExpectedString(const SNetCommandArg* arg) noexcept(false)
+const fa::string& CGpgNetInterface::ExpectedString(const SNetCommandArg* arg) noexcept(false)
 {
   if (arg->mType != SNetCommandArg::NETARG_String) {
     throw std::runtime_error("incorrect argument type, expected string");
@@ -963,7 +974,7 @@ void CGpgNetInterface::EnqueueCommand0(
   int val
 )
 {
-  msvc8::vector<SNetCommandArg> args;
+  fa::vector<SNetCommandArg> args;
   EnqueueCommand(str, args, val);
 }
 
@@ -992,7 +1003,7 @@ namespace
    * constructor. This Functor's bound-argument list (two plain DWORD-sized
    * values plus `this`) fits boost::function's small-object buffer, so MSVC8
    * emits the flat this-adjusted-thiscall invoker/manager pair instead of the
-   * heap-allocating path the sibling `Connect(const msvc8::string&)` overload
+   * heap-allocating path the sibling `Connect(const fa::string&)` overload
    * needs for its `std::string`-bound Functor (see `MakeConnectThreadLaunchCallback`
    * below). IDA's own analysis names the bind assembler
    * `boost::bind_CGpgNetInterfaceConnect`, confirming the correspondence.
@@ -1061,7 +1072,7 @@ namespace
    * What it does:
    * Builds the callable handed to the launch-template connect worker thread.
    *
-   * `Connect(const msvc8::string&)` binds `this` and a copy of
+   * `Connect(const fa::string&)` binds `this` and a copy of
    * `launchCommandTemplate` to `ConnectThread` and hands the result to
    * `boost::thread`'s `function0<void>` constructor. Unlike the simpler
    * `Connect(u_long,u_short)` overload (see `boost::bind_CGpgNetInterfaceConnect`
@@ -1092,7 +1103,7 @@ namespace
    * simplification introduced by an earlier recovery pass. Untangling that
    * is a separate, codebase-wide effort (`gpg::StrArg` / `moho::StrArg` are
    * used as `const char*` at dozens of call sites already). This helper
-   * therefore keeps `ConnectThread`'s existing `const msvc8::string&`
+   * therefore keeps `ConnectThread`'s existing `const fa::string&`
    * parameter rather than silently reintroducing a conflicting `StrArg`
    * class here; the mismatch is a known, evidenced gap, not a guess.
    *
@@ -1108,7 +1119,7 @@ namespace
    */
   [[nodiscard]] boost::function0<void> MakeConnectThreadLaunchCallback(
     CGpgNetInterface* const self,
-    const msvc8::string& launchCommandTemplate
+    const fa::string& launchCommandTemplate
   )
   {
     return boost::function0<void>(
@@ -1125,7 +1136,7 @@ namespace
  * (for example containing `%s` endpoint substitution).
  */
 void CGpgNetInterface::Connect(
-  const msvc8::string& launchCommandTemplate
+  const fa::string& launchCommandTemplate
 )
 {
   boost::mutex::scoped_lock lock(mLock);
@@ -1155,7 +1166,7 @@ void CGpgNetInterface::Connect(
  */
 void CGpgNetInterface::WriteCommand(
   const char* name,
-  const msvc8::vector<SNetCommandArg>& args
+  const fa::vector<SNetCommandArg>& args
 )
 {
   boost::mutex::scoped_lock lock(mLock);
@@ -1360,10 +1371,10 @@ void CGpgNetInterface::WriteCommandName(
  * Address: 0x007B74A0 (FUN_007B74A0)
  *
  * What it does:
- * Writes `msvc8::string` payload as `uint32 len + raw bytes`.
+ * Writes `fa::string` payload as `uint32 len + raw bytes`.
  */
 void CGpgNetInterface::WriteString(
-  const msvc8::string& str
+  const fa::string& str
 )
 {
   if (!mTcpSocket) {
@@ -1437,7 +1448,7 @@ void CGpgNetInterface::EnsureConnectedAndCloseSocket()
  */
 void CGpgNetInterface::PullTask()
 {
-  msvc8::deque<SNetCommand> pending;
+  fa::deque<SNetCommand> pending;
 
   {
     boost::mutex::scoped_lock lock(mLock);
@@ -1497,7 +1508,7 @@ void CGpgNetInterface::PullTask()
  * Logs diagnostic dump for Test command arguments.
  */
 void CGpgNetInterface::Test(
-  msvc8::vector<SNetCommandArg>& args
+  fa::vector<SNetCommandArg>& args
 )
 {
   const std::size_t argCount = GetCommandArgCount(args);
@@ -1513,7 +1524,7 @@ void CGpgNetInterface::Test(
       gpg::Logf(" arg[%d]=\"%s\" [str]", static_cast<int>(i), arg.mStr.c_str());
       break;
     case SNetCommandArg::NETARG_Data: {
-      msvc8::string hexDump;
+      fa::string hexDump;
       for (std::size_t b = 0; b < arg.mStr.size(); ++b) {
         if (b != 0) {
           hexDump.append(1, ' ');
@@ -1538,15 +1549,24 @@ void CGpgNetInterface::Test(
  * Verifies empty argument list and sends `GameState = "Idle"` to GPGNet.
  */
 void CGpgNetInterface::Connected(
-  msvc8::vector<SNetCommandArg>& args
+  fa::vector<SNetCommandArg>& args
 )
 {
   if (!args.empty()) {
     throw std::runtime_error("Wrong number of arguments to Connected command, expected 0");
   }
 
+  // Engine addition (issue #275): the lobby server takes Idle from a host as "this game is a lobby
+  // again" (FAF server, gameconnection.py), and the game is running. Results still go as usual.
+  if (moho::CFG_GetArgOption(gpg::StrArg{"/rejoin"}, 0u, nullptr)) {
+    gpg::Logf("GPGNET: coming back to a running game, so no lobby states.");
+    // In native mode its links died with it. The launcher sends what it needs for new ones.
+    NATIVENET_Start();
+    return;
+  }
+
   gpg::Logf("GPGNET: entering idle state.");
-  SNetCommandArg stateArg(msvc8::string("Idle"));
+  SNetCommandArg stateArg(fa::string("Idle"));
   WriteCommandWith1Arg("GameState", &stateArg);
   // Engine addition (issue #233): with net_InEngineLinks 1, ask the adapter
   // to leave the peer links to the game.
@@ -1599,7 +1619,7 @@ LuaPlus::LuaObject* moho::NET_MakeNATTraversal(
  * passes it as the 5th `CreateLobby(...)` argument.
  */
 void CGpgNetInterface::CreateLobby(
-  msvc8::vector<SNetCommandArg>& args
+  fa::vector<SNetCommandArg>& args
 )
 {
   if (args.size() != 5) {
@@ -1635,10 +1655,10 @@ void CGpgNetInterface::CreateLobby(
 
   const bool useUdp = ExpectIntArg(*this, &args[0]) != 0;
   const int localPort = ExpectIntArg(*this, &args[1]);
-  const msvc8::string& playerName = ExpectedString(&args[2]);
+  const fa::string& playerName = ExpectedString(&args[2]);
   const int playerUid = ExpectIntArg(*this, &args[3]);
   const int natPort = ExpectIntArg(*this, &args[4]);
-  const msvc8::string playerUidText = gpg::STR_Printf("%d", playerUid);
+  const fa::string playerUidText = gpg::STR_Printf("%d", playerUid);
 
   // Build the NAT-traversal userdata bound to this GPGNet interface (the
   // engine binary's CreateLobby call shape — NET_MakeNATTraversal is the
@@ -1654,7 +1674,7 @@ void CGpgNetInterface::CreateLobby(
     createLobbyFn.Call_UDP(useUdp, localPort, playerName, playerUidText.c_str(), &natTraversal, natPort);
 
   gpg::Logf("GPGNET: entering lobby state.");
-  SNetCommandArg stateArg(msvc8::string("Lobby"));
+  SNetCommandArg stateArg(fa::string("Lobby"));
   WriteCommandWith1Arg("GameState", &stateArg);
 }
 
@@ -1665,7 +1685,7 @@ void CGpgNetInterface::CreateLobby(
  * Invokes lobby `HostGame` script callback with optional scenario path.
  */
 void CGpgNetInterface::HostGame(
-  msvc8::vector<SNetCommandArg>& args
+  fa::vector<SNetCommandArg>& args
 )
 {
   if (args.size() > 1) {
@@ -1677,9 +1697,9 @@ void CGpgNetInterface::HostGame(
   );
   LuaPlus::LuaFunction<void> hostGame(hostGameObj);
 
-  msvc8::string scenarioPath;
+  fa::string scenarioPath;
   if (!args.empty()) {
-    const msvc8::string& mapName = ExpectedString(&args[0]);
+    const fa::string& mapName = ExpectedString(&args[0]);
     scenarioPath = gpg::STR_Printf("/maps/%s/%s_scenario.lua", mapName.c_str(), mapName.c_str());
   }
 
@@ -1695,7 +1715,7 @@ void CGpgNetInterface::HostGame(
  * Invokes lobby `JoinGame` script callback with host/player/uid parameters.
  */
 void CGpgNetInterface::JoinGame(
-  msvc8::vector<SNetCommandArg>& args
+  fa::vector<SNetCommandArg>& args
 )
 {
   if (args.size() != 3) {
@@ -1707,10 +1727,10 @@ void CGpgNetInterface::JoinGame(
   );
   LuaPlus::LuaFunction<void> joinGame(joinGameObj);
 
-  const msvc8::string& hostAddress = ExpectedString(&args[0]);
-  const msvc8::string& playerName = ExpectedString(&args[1]);
+  const fa::string& hostAddress = ExpectedString(&args[0]);
+  const fa::string& playerName = ExpectedString(&args[1]);
   const int playerUid = ExpectIntArg(*this, &args[2]);
-  const msvc8::string playerUidText = gpg::STR_Printf("%d", playerUid);
+  const fa::string playerUidText = gpg::STR_Printf("%d", playerUid);
 
   joinGame(hostAddress.c_str(), false, playerName.c_str(), playerUidText.c_str());
 }
@@ -1722,7 +1742,7 @@ void CGpgNetInterface::JoinGame(
  * Invokes lobby `ConnectToPeer` script callback.
  */
 void CGpgNetInterface::ConnectToPeer(
-  msvc8::vector<SNetCommandArg>& args
+  fa::vector<SNetCommandArg>& args
 )
 {
   if (args.size() != 3) {
@@ -1734,10 +1754,10 @@ void CGpgNetInterface::ConnectToPeer(
   );
   LuaPlus::LuaFunction<void> connectToPeer(connectToPeerObj);
 
-  const msvc8::string& endpoint = ExpectedString(&args[0]);
-  const msvc8::string& playerName = ExpectedString(&args[1]);
+  const fa::string& endpoint = ExpectedString(&args[0]);
+  const fa::string& playerName = ExpectedString(&args[1]);
   const int peerUid = ExpectIntArg(*this, &args[2]);
-  const msvc8::string peerUidText = gpg::STR_Printf("%d", peerUid);
+  const fa::string peerUidText = gpg::STR_Printf("%d", peerUid);
 
   connectToPeer(endpoint.c_str(), playerName.c_str(), peerUidText.c_str());
 }
@@ -1749,7 +1769,7 @@ void CGpgNetInterface::ConnectToPeer(
  * Invokes lobby `DisconnectFromPeer` script callback for one uid.
  */
 void CGpgNetInterface::DisconnectFromPeer(
-  msvc8::vector<SNetCommandArg>& args
+  fa::vector<SNetCommandArg>& args
 )
 {
   if (args.size() != 1) {
@@ -1762,7 +1782,7 @@ void CGpgNetInterface::DisconnectFromPeer(
   LuaPlus::LuaFunction<void> disconnectFromPeer(disconnectObj);
 
   const int peerUid = ExpectIntArg(*this, &args[0]);
-  const msvc8::string peerUidText = gpg::STR_Printf("%d", peerUid);
+  const fa::string peerUidText = gpg::STR_Printf("%d", peerUid);
   disconnectFromPeer(peerUidText.c_str());
 }
 
@@ -1773,7 +1793,7 @@ void CGpgNetInterface::DisconnectFromPeer(
  * Invokes lobby `SetHasSupcom` script callback.
  */
 void CGpgNetInterface::HasSupCom(
-  msvc8::vector<SNetCommandArg>& args
+  fa::vector<SNetCommandArg>& args
 )
 {
   if (args.size() != 1) {
@@ -1794,7 +1814,7 @@ void CGpgNetInterface::HasSupCom(
  * Invokes lobby `SetHasForgedAlliance` script callback.
  */
 void CGpgNetInterface::HasForgedAlliance(
-  msvc8::vector<SNetCommandArg>& args
+  fa::vector<SNetCommandArg>& args
 )
 {
   if (args.size() != 1) {
@@ -1816,7 +1836,7 @@ void CGpgNetInterface::HasForgedAlliance(
  * endpoint, and forwards payload through registered NAT traversal handler.
  */
 void CGpgNetInterface::SendNatPacket(
-  msvc8::vector<SNetCommandArg>& args
+  fa::vector<SNetCommandArg>& args
 )
 {
   if (args.size() != 2) {
@@ -1828,7 +1848,7 @@ void CGpgNetInterface::SendNatPacket(
     throw std::runtime_error("Can't send nat packets if we don't have a nat handler.");
   }
 
-  const msvc8::string& endpoint = ExpectedString(&args[0]);
+  const fa::string& endpoint = ExpectedString(&args[0]);
 
   u_long remoteAddress = 0;
   u_short remotePort = 0;
@@ -1855,7 +1875,7 @@ void CGpgNetInterface::SendNatPacket(
  * driver, then disconnects/ejects it and prints the localized console notice.
  */
 void CGpgNetInterface::EjectPlayer(
-  msvc8::vector<SNetCommandArg>& args
+  fa::vector<SNetCommandArg>& args
 )
 {
   if (args.size() != 1) {
@@ -1877,7 +1897,7 @@ void CGpgNetInterface::EjectPlayer(
   if (targetClient == clientManager->GetLocalClient()) {
     clientManager->Disconnect();
 
-    const msvc8::string localizedMessage = Loc(
+    const fa::string localizedMessage = Loc(
       USER_GetLuaState(),
       "<LOC Engine0016>You have been ejected due to connectivity issues."
     );
@@ -1887,7 +1907,7 @@ void CGpgNetInterface::EjectPlayer(
 
   targetClient->Eject();
 
-  const msvc8::string localizedMessage = Loc(
+  const fa::string localizedMessage = Loc(
     USER_GetLuaState(),
     "<LOC Engine0017>%s has been ejected due to connectivity issues."
   );
@@ -1928,10 +1948,10 @@ void CGpgNetInterface::ConnectThread(
  * command read loop.
  */
 void CGpgNetInterface::ConnectThread(
-  const msvc8::string& launchCommandTemplate
+  const fa::string& launchCommandTemplate
 )
 {
-  const msvc8::string loopbackAddress("127.0.0.1");
+  const fa::string loopbackAddress("127.0.0.1");
   INetTCPServer* const createdServer = NET_CreateTCPServer(
     NET_GetUInt32FromDottedOcted(loopbackAddress),
     0
@@ -1953,8 +1973,8 @@ void CGpgNetInterface::ConnectThread(
   PROCESS_INFORMATION processInformation{};
 
   const u_short localPort = mTcpServer->GetLocalPort();
-  const msvc8::string listenerAddress = gpg::STR_Printf("127.0.0.1:%d", static_cast<int>(localPort));
-  const msvc8::string launchCommand = gpg::STR_Printf(launchCommandTemplate.c_str(), listenerAddress.c_str());
+  const fa::string listenerAddress = gpg::STR_Printf("127.0.0.1:%d", static_cast<int>(localPort));
+  const fa::string launchCommand = gpg::STR_Printf(launchCommandTemplate.c_str(), listenerAddress.c_str());
 
   std::vector<char> launchCommandBuffer(launchCommand.size() + 1u, '\0');
   if (!launchCommand.empty()) {
@@ -1976,7 +1996,7 @@ void CGpgNetInterface::ConnectThread(
   );
 
   if (!launchOk) {
-    const msvc8::string lastError = WIN_GetLastError();
+    const fa::string lastError = WIN_GetLastError();
     gpg::Logf("CreateProcess() failed: %s", lastError.c_str());
     EnqueueCommand0("LaunchFailed", kNetStateTimedOut);
     return;
@@ -2033,7 +2053,7 @@ void CGpgNetInterface::ReadFromSocket()
         throw std::runtime_error("premature EOF reading from gpg.net socket");
       }
 
-      msvc8::string commandName;
+      fa::string commandName;
       if (commandNameLength != 0) {
         std::vector<char> nameBuffer(commandNameLength);
         ReadExactFromSocket(
@@ -2050,7 +2070,7 @@ void CGpgNetInterface::ReadFromSocket()
       // prefill is the real call site of the vector(count, value)
       // constructor cited at Vector.h FUN_007BB6A0; each slot is
       // overwritten in place below with its decoded value.
-      msvc8::vector<SNetCommandArg> args(argCount, SNetCommandArg{0});
+      fa::vector<SNetCommandArg> args(argCount, SNetCommandArg{0});
       for (uint32_t i = 0; i < argCount; ++i) {
         args[i] = moho::NET_DecodeSocketArg(reader);
       }
@@ -2058,8 +2078,8 @@ void CGpgNetInterface::ReadFromSocket()
       EnqueueCommand(commandName.c_str(), args, kNetStateEstablishing);
     }
   } catch (const std::exception& ex) {
-    msvc8::vector<SNetCommandArg> args;
-    args.push_back(SNetCommandArg(msvc8::string(ex.what() ? ex.what() : "communication error")));
+    fa::vector<SNetCommandArg> args;
+    args.push_back(SNetCommandArg(fa::string(ex.what() ? ex.what() : "communication error")));
     EnqueueCommand("CommunicationError", args, kNetStateTimedOut);
   }
 }
@@ -2073,7 +2093,7 @@ void CGpgNetInterface::ReadFromSocket()
  */
 void CGpgNetInterface::EnqueueCommand(
   const char* name,
-  msvc8::vector<SNetCommandArg>& args,
+  fa::vector<SNetCommandArg>& args,
   int val
 )
 {
@@ -2133,10 +2153,7 @@ int moho::cfunc_LaunchGPGNetL(LuaPlus::LuaState* const state)
   }
 
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 0) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kLaunchGPGNetHelpText, 0, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 0, kLaunchGPGNetHelpText);
 
   HWND ownerWindow = nullptr;
   if (moho::sMainWindow != nullptr) {

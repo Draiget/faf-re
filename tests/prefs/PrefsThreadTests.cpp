@@ -6,7 +6,8 @@
 // stack and links LuaObject temporaries into its object list. Without USER_PreferencesLock, the
 // threads here corrupt the state within seconds; with it, every value they wrote reads back.
 //
-// usage: faf_prefs_thread_tests [iterations per thread, default 20000]
+// FAF_PREFS_ITERATIONS=<n> sets the iterations per thread (default 20000); the command line
+// belongs to GoogleTest.
 //
 // FAF_PREFS_NOLOCK=1 gives each thread a lock of its own (USER_PreferencesLock), which brings the
 // race back: on 2026-11-01 four such runs ended in 0xC0000409 (a stack cookie overwritten) twice,
@@ -18,6 +19,7 @@
 #include <mutex>
 #include <thread>
 #include <vector>
+#include <gtest/gtest.h>
 
 #include "gpg/core/containers/String.h"
 #include "lua/LuaObject.h"
@@ -28,20 +30,18 @@ namespace
   constexpr int kThreads = 4;
   constexpr int kKeysPerThread = 32;
 
-  msvc8::string KeyOf(const int thread, const int slot)
+  fa::string KeyOf(const int thread, const int slot)
   {
     return gpg::STR_Printf("prefs_thread_test.t%d.k%d", thread, slot);
   }
 } // namespace
 
-int main(int argc, char** argv)
+TEST(Existing_PrefsThread, MultiThreadConcurrentAccess)
 {
-  const int iterations = argc > 1 ? std::atoi(argv[1]) : 20000;
+  const char* const iterationsEnv = std::getenv("FAF_PREFS_ITERATIONS");
+  const int iterations = iterationsEnv != nullptr && std::atoi(iterationsEnv) > 0 ? std::atoi(iterationsEnv) : 20000;
   moho::IUserPrefs* const prefs = moho::USER_GetPreferences();
-  if (prefs == nullptr) {
-    std::printf("FAIL: no preferences object\n");
-    return 1;
-  }
+  ASSERT_NE(prefs, nullptr) << "no preferences object";
 
   std::atomic<int> ready{0};
   std::vector<std::thread> threads;
@@ -50,10 +50,10 @@ int main(int argc, char** argv)
       ++ready;
       while (ready.load() < kThreads) {
       }
-      const msvc8::string missing("prefs_thread_test.missing");
-      const msvc8::string fallback("fallback");
+      const fa::string missing("prefs_thread_test.missing");
+      const fa::string fallback("fallback");
       for (int i = 0; i < iterations; ++i) {
-        const msvc8::string key = KeyOf(t, i % kKeysPerThread);
+        const fa::string key = KeyOf(t, i % kKeysPerThread);
         prefs->SetInteger(key, i);
         (void)prefs->GetInteger(key, -1);
         (void)prefs->GetString(missing, fallback);
@@ -86,11 +86,5 @@ int main(int argc, char** argv)
       }
     }
   }
-  if (wrong != 0) {
-    std::printf("FAIL: %d of %d values wrong after %d threads x %d iterations\n", wrong, kThreads * kKeysPerThread, kThreads,
-      iterations);
-    return 1;
-  }
-  std::printf("ok: %d threads x %d iterations, all %d values read back\n", kThreads, iterations, kThreads * kKeysPerThread);
-  return 0;
+  EXPECT_EQ(wrong, 0) << wrong << " of " << (kThreads * kKeysPerThread) << " values wrong after " << kThreads << " threads x " << iterations << " iterations";
 }

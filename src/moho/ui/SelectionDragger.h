@@ -116,7 +116,7 @@ namespace moho
    * this file's own `AddSelectionRange`/`DecodeSelectionEntity` helpers. The
    * bucket-vector growth path (0x00867890/0x00867B90/0x00868040, a hand-rolled
    * `vector<WeakSet<UserEntity>>::resize`) is likewise not ported literally;
-   * the recovered body grows an `msvc8::vector<WeakSet<UserEntity>>`
+   * the recovered body grows an `fa::vector<WeakSet<UserEntity>>`
    * through the already-recovered generic `resize()` plus a per-slot
    * `InitializeLocalSelectionSet()` call, matching the binary's per-element
    * defensive-copy-of-an-empty-source semantics without needing the raw

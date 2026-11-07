@@ -166,7 +166,7 @@ namespace moho
     SOCKET mSocket{INVALID_SOCKET}; // +0x1C
     std::uint32_t mMode{0};         // +0x20
     std::uint8_t mFailed{0};        // +0x24
-    std::uint8_t mPad0x25{0};       // +0x25
+    [[maybe_unused]] std::uint8_t mPad0x25{0};       // +0x25
     char mBuffer[kBufferSize]{};    // +0x26
   };
   static_assert(sizeof(CNetTCPBuf) == 0x1028, "CNetTCPBuf size must be 0x1028");

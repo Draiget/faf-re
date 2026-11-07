@@ -16,7 +16,7 @@
 
 namespace
 {
-  void PromptSnapshotDirectory(msvc8::string& directory)
+  void PromptSnapshotDirectory(fa::string& directory)
   {
     wxDirDialog directoryDialog(
       nullptr,
@@ -25,7 +25,7 @@ namespace
       wxDD_NEW_DIR_BUTTON
     );
     if (directoryDialog.ShowModal() == wxID_OK) {
-      directory.assign(gpg::STR_WideToUtf8(directoryDialog.GetPath().c_str()), 0, msvc8::string::npos);
+      directory.assign(gpg::STR_WideToUtf8(directoryDialog.GetPath().c_str()), 0, fa::string::npos);
     }
   }
 

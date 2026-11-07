@@ -155,7 +155,6 @@ namespace
   constexpr const char* kAiAttackerImplForceEngageHelpText = "Force to engage enemy target";
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
 
-  constexpr std::int32_t kExtraDataMissingValue = static_cast<std::int32_t>(0xF0000000u);
   constexpr EAiAttackerEvent kAiAttackerEventCanTarget = static_cast<EAiAttackerEvent>(0x9);
   constexpr const char* kEngineerCategoryName = "ENGINEER";
   constexpr std::array<float, 4> kBallisticArcHeightFactors{
@@ -166,7 +165,7 @@ namespace
   };
   std::int32_t gRecoveredCScrLuaMetatableFactoryCAiAttackerImplIndex = 0;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A00 = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F599F0 = nullptr;
+  [[maybe_unused]] moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F599F0 = nullptr;
 
   [[nodiscard]] CAiTarget BuildClearedTarget()
   {
@@ -247,7 +246,7 @@ namespace
       } else {
         const float checkInterval =
           (task->mWeapon->mWeaponBlueprint != nullptr) ? task->mWeapon->mWeaponBlueprint->TargetCheckInterval : 0.0f;
-        const int roundedFrames = msvc8::CeilToIntX87(checkInterval * 10.0f); // 0x005D956D..0x005D9580
+        const int roundedFrames = fa::CeilToIntX87(checkInterval * 10.0f); // 0x005D956D..0x005D9580
         pendingFrames = (roundedFrames > 1) ? roundedFrames : 1;
       }
     }
@@ -264,7 +263,7 @@ namespace
   }
 
   [[nodiscard]] CAcquireTargetTask*
-  FindAcquireTaskForWeapon(msvc8::vector<CAcquireTargetTask*>& tasks, UnitWeapon* const weapon) noexcept
+  FindAcquireTaskForWeapon(fa::vector<CAcquireTargetTask*>& tasks, UnitWeapon* const weapon) noexcept
   {
     for (CAcquireTargetTask* const task : tasks) {
       if (task != nullptr && task->mWeapon == weapon) {
@@ -286,16 +285,6 @@ namespace
     const int index = moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex();
     *TargetIndex = index;
     return index;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
   }
 
   void RequireLuaArgCount(LuaPlus::LuaState* const state, const char* const helpText, const int expectedArgs)
@@ -1265,7 +1254,7 @@ namespace
 {
   /// Whether a reclaim or capture command in `commands` targets `target` (or, through a blip, its source).
   [[nodiscard]] bool QueuedCommandExemptsTarget(
-    const msvc8::vector<WeakPtr<CUnitCommand>>& commands, const Entity* const target
+    const fa::vector<WeakPtr<CUnitCommand>>& commands, const Entity* const target
   )
   {
     for (const WeakPtr<CUnitCommand>& weakCommand : commands) {
@@ -1312,10 +1301,10 @@ bool CAiAttackerImpl::IsTargetExempt(Entity* const target)
     // decodes, the command type, and CAiTarget::GetEntity (0x005E2CE0), which decodes the target
     // and a blip's source unit -- so the queue cannot change under it, and the copy's nodes were
     // linked at their commands' chain heads and unlinked again, leaving every chain as it was.
-    const msvc8::vector<WeakPtr<CUnitCommand>>& commandQueue = ownerUnit->CommandQueue->mCommandVec;
+    const fa::vector<WeakPtr<CUnitCommand>>& commandQueue = ownerUnit->CommandQueue->mCommandVec;
     const bool exempted = sim_ExemptCheckInPlace
       ? QueuedCommandExemptsTarget(commandQueue, target)
-      : QueuedCommandExemptsTarget(msvc8::vector<WeakPtr<CUnitCommand>>(commandQueue), target);
+      : QueuedCommandExemptsTarget(fa::vector<WeakPtr<CUnitCommand>>(commandQueue), target);
     if (exempted) {
       return true;
     }
@@ -1490,10 +1479,7 @@ gpg::RType* CAiAttackerImpl::GetClass() const
  */
 gpg::RRef CAiAttackerImpl::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**
@@ -1517,7 +1503,7 @@ void CAiAttackerImpl::PushStack(LuaPlus::LuaState* const luaState)
 void CAiAttackerImpl::Stop()
 {
   CAiTarget stopTarget{};
-  std::memset(&stopTarget, 0, 0x0C);
+  std::memset(static_cast<void*>(&stopTarget), 0, 0x0C);
   stopTarget.targetPoint = -1;
   stopTarget.targetIsMobile = false;
   SetDesiredTarget(&stopTarget);
@@ -2120,7 +2106,7 @@ int moho::cfunc_CAiAttackerImplIsWithinAttackRangeL(LuaPlus::LuaState* const sta
 CScrLuaInitForm* moho::func_CAiAttackerImplIsWithinAttackRange_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplIsWithinAttackRangeName,
     &moho::cfunc_CAiAttackerImplIsWithinAttackRange,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2174,7 +2160,7 @@ int moho::cfunc_CAiAttackerImplIsTooCloseL(LuaPlus::LuaState* const state)
 CScrLuaInitForm* moho::func_CAiAttackerImplGetUnit_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplGetUnitName,
     &moho::cfunc_CAiAttackerImplGetUnit,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2193,7 +2179,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplGetUnit_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiAttackerImplAttackerWeaponsBusy_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplAttackerWeaponsBusyName,
     &moho::cfunc_CAiAttackerImplAttackerWeaponsBusy,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2212,7 +2198,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplAttackerWeaponsBusy_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiAttackerImplGetWeaponCount_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplGetWeaponCountName,
     &moho::cfunc_CAiAttackerImplGetWeaponCount,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2231,7 +2217,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplGetWeaponCount_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiAttackerImplSetDesiredTarget_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplSetDesiredTargetName,
     &moho::cfunc_CAiAttackerImplSetDesiredTarget,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2250,7 +2236,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplSetDesiredTarget_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiAttackerImplGetDesiredTarget_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplGetDesiredTargetName,
     &moho::cfunc_CAiAttackerImplGetDesiredTarget,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2269,7 +2255,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplGetDesiredTarget_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiAttackerImplStop_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplStopName,
     &moho::cfunc_CAiAttackerImplStop,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2288,7 +2274,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplStop_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiAttackerImplCanAttackTarget_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplCanAttackTargetName,
     &moho::cfunc_CAiAttackerImplCanAttackTarget,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2307,7 +2293,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplCanAttackTarget_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiAttackerImplFindBestEnemy_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplFindBestEnemyName,
     &moho::cfunc_CAiAttackerImplFindBestEnemy,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2326,7 +2312,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplFindBestEnemy_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiAttackerImplGetTargetWeapon_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplGetTargetWeaponName,
     &moho::cfunc_CAiAttackerImplGetTargetWeapon,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2345,7 +2331,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplGetTargetWeapon_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiAttackerImplGetPrimaryWeapon_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplGetPrimaryWeaponName,
     &moho::cfunc_CAiAttackerImplGetPrimaryWeapon,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2364,7 +2350,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplGetPrimaryWeapon_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiAttackerImplGetMaxWeaponRange_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplGetMaxWeaponRangeName,
     &moho::cfunc_CAiAttackerImplGetMaxWeaponRange,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2383,7 +2369,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplGetMaxWeaponRange_LuaFuncDef()
 CScrLuaInitForm* moho::func_CAiAttackerImplIsTooClose_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplIsTooCloseName,
     &moho::cfunc_CAiAttackerImplIsTooClose,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2402,10 +2388,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplIsTooClose_LuaFuncDef()
  */
 int moho::cfunc_CAiAttackerImplIsTargetExemptL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kAiAttackerImplIsTargetExemptHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kAiAttackerImplIsTargetExemptHelpText);
 
   const LuaPlus::LuaObject attackerObject(LuaPlus::LuaStackObject(state, 1));
   CAiAttackerImpl* const attacker = SCR_FromLua_CAiAttackerImpl(attackerObject, state);
@@ -2439,7 +2422,7 @@ int moho::cfunc_CAiAttackerImplIsTargetExempt(lua_State* const luaContext)
 CScrLuaInitForm* moho::func_CAiAttackerImplIsTargetExempt_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplIsTargetExemptName,
     &moho::cfunc_CAiAttackerImplIsTargetExempt,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2458,10 +2441,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplIsTargetExempt_LuaFuncDef()
  */
 int moho::cfunc_CAiAttackerImplHasSlavedTargetL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kAiAttackerImplHasSlavedTargetHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kAiAttackerImplHasSlavedTargetHelpText);
 
   const LuaPlus::LuaObject attackerObject(LuaPlus::LuaStackObject(state, 1));
   CAiAttackerImpl* const attacker = SCR_FromLua_CAiAttackerImpl(attackerObject, state);
@@ -2501,7 +2481,7 @@ int moho::cfunc_CAiAttackerImplHasSlavedTarget(lua_State* const luaContext)
 CScrLuaInitForm* moho::func_CAiAttackerImplHasSlavedTarget_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplHasSlavedTargetName,
     &moho::cfunc_CAiAttackerImplHasSlavedTarget,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2519,12 +2499,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplHasSlavedTarget_LuaFuncDef()
  */
 int moho::cfunc_CAiAttackerImplResetReportingStateL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(
-      state, kLuaExpectedArgsWarning, kAiAttackerImplResetReportingStateHelpText, 1, argumentCount
-    );
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kAiAttackerImplResetReportingStateHelpText);
 
   const LuaPlus::LuaObject attackerObject(LuaPlus::LuaStackObject(state, 1));
   CAiAttackerImpl* const attacker = SCR_FromLua_CAiAttackerImpl(attackerObject, state);
@@ -2554,7 +2529,7 @@ int moho::cfunc_CAiAttackerImplResetReportingState(lua_State* const luaContext)
 CScrLuaInitForm* moho::func_CAiAttackerImplResetReportingState_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplResetReportingStateName,
     &moho::cfunc_CAiAttackerImplResetReportingState,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2576,10 +2551,7 @@ CScrLuaInitForm* moho::func_CAiAttackerImplResetReportingState_LuaFuncDef()
  */
 int moho::cfunc_CAiAttackerImplForceEngageL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kAiAttackerImplForceEngageHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kAiAttackerImplForceEngageHelpText);
 
   const LuaPlus::LuaObject attackerObject(LuaPlus::LuaStackObject(state, 1));
   CAiAttackerImpl* const attacker = SCR_FromLua_CAiAttackerImpl(attackerObject, state);
@@ -2610,7 +2582,7 @@ int moho::cfunc_CAiAttackerImplForceEngage(lua_State* const luaContext)
 CScrLuaInitForm* moho::func_CAiAttackerImplForceEngage_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kAiAttackerImplForceEngageName,
     &moho::cfunc_CAiAttackerImplForceEngage,
     &CScrLuaMetatableFactory<CAiAttackerImpl>::Instance(),
@@ -2890,7 +2862,7 @@ namespace
   const CAiAttackerImplLuaFuncDefBootstrap gCAiAttackerImplLuaFuncDefBootstrap{};
 
   moho::CScrLuaClassBinder gAttackerMethodsClassBinder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     "moho.CAiAttackerImpl_methods",
     &moho::CScrLuaMetatableFactory<moho::CAiAttackerImpl>::Instance(),
     "CAiAttackerImpl",

@@ -65,7 +65,7 @@ namespace
    */
   wxBitmap LoadToolBitmap(const char* const mountedPath)
   {
-    msvc8::string diskPath;
+    fa::string diskPath;
     (void)moho::DISK_GetVFS()->FindFile(&diskPath, mountedPath, nullptr);
     return wxBitmap(gpg::STR_Utf8ToWide(diskPath.c_str()).c_str(), wxBITMAP_TYPE_BMP);
   }
@@ -184,7 +184,7 @@ moho::ScrDebugWindow::ScrDebugWindow()
     new wxSplitterWindow(mainSplitter, ID_SourceSplitter, wxDefaultPosition, wxDefaultSize, 0);
   sourceSplitter->SetMinimumPaneSize(8);
 
-  msvc8::string rootPath;
+  fa::string rootPath;
   (void)DISK_GetVFS()->FindFile(&rootPath, "/", nullptr);
   mSourceTree = new wxGenericDirCtrl(
     sourceSplitter, ID_SourceTree, gpg::STR_Utf8ToWide(rootPath.c_str()).c_str(), wxDefaultPosition, wxDefaultSize, 0,
@@ -251,8 +251,8 @@ moho::ScrDebugWindow::ScrDebugWindow()
 
   // Reopen the saved files; any that no longer opens leaves the list.
   bool filesDropped = false;
-  mRecentFiles = prefs->GetStringArr("Options.Debug.Files", msvc8::list<msvc8::string>());
-  for (msvc8::list<msvc8::string>::iterator file = mRecentFiles.begin(); file != mRecentFiles.end();) {
+  mRecentFiles = prefs->GetStringArr("Options.Debug.Files", fa::list<fa::string>());
+  for (fa::list<fa::string>::iterator file = mRecentFiles.begin(); file != mRecentFiles.end();) {
     if (mSourceCtrl->Open(*file)) {
       ++file;
     } else {
@@ -269,7 +269,7 @@ moho::ScrDebugWindow::ScrDebugWindow()
 /**
  * Address: 0x004BEBE0 (FUN_004BEBE0)
  */
-bool moho::ScrDebugWindow::OpenFile(const msvc8::string& fileName)
+bool moho::ScrDebugWindow::OpenFile(const fa::string& fileName)
 {
   if (!mSourceCtrl->Open(fileName)) {
     return false;
@@ -294,10 +294,10 @@ void moho::ScrDebugWindow::OnScriptPause(ScrPauseEvent& event)
   }
 
   mCallStack->DeleteAllItems();
-  msvc8::vector<ScrActivation> callStack;
+  fa::vector<ScrActivation> callStack;
   SCR_EnumerateCallStack(callStack);
   int row = 0;
-  for (msvc8::vector<ScrActivation>::iterator activation = callStack.begin(); activation != callStack.end();
+  for (fa::vector<ScrActivation>::iterator activation = callStack.begin(); activation != callStack.end();
        ++activation, ++row) {
     std::ostringstream line;
     line << activation->line;
@@ -309,10 +309,10 @@ void moho::ScrDebugWindow::OnScriptPause(ScrPauseEvent& event)
     mCallStack->SetItemState(0, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
   }
 
-  msvc8::vector<ScrWatch> locals;
+  fa::vector<ScrWatch> locals;
   SCR_EnumerateLocals(0, locals);
   mLocals->Update(locals);
-  msvc8::vector<ScrWatch> globals;
+  fa::vector<ScrWatch> globals;
   SCR_EnumerateGlobals(globals);
   mGlobals->Update(globals);
 
@@ -328,7 +328,7 @@ void moho::ScrDebugWindow::OnScriptPause(ScrPauseEvent& event)
  */
 void moho::ScrDebugWindow::OnCloseFile(wxCommandEvent& event)
 {
-  const msvc8::string fileName = mSourceCtrl->GetCurrentFileName();
+  const fa::string fileName = mSourceCtrl->GetCurrentFileName();
   mSourceCtrl->CloseCurrent();
   mRecentFiles.erase(std::remove(mRecentFiles.begin(), mRecentFiles.end(), fileName), mRecentFiles.end());
   USER_GetPreferences()->SetStringArr("Options.Debug.Files", mRecentFiles);
@@ -340,7 +340,7 @@ void moho::ScrDebugWindow::OnCloseFile(wxCommandEvent& event)
  */
 void moho::ScrDebugWindow::OnCloseAllFiles(wxCommandEvent& event)
 {
-  msvc8::string fileName = mSourceCtrl->GetCurrentFileName();
+  fa::string fileName = mSourceCtrl->GetCurrentFileName();
   while (!fileName.empty()) {
     mSourceCtrl->CloseCurrent();
     mRecentFiles.erase(std::remove(mRecentFiles.begin(), mRecentFiles.end(), fileName), mRecentFiles.end());
@@ -458,14 +458,14 @@ void moho::ScrDebugWindow::OnClearBreakpoints(wxCommandEvent& event)
  */
 void moho::ScrDebugWindow::OnCallStackSelected(wxListEvent& event)
 {
-  msvc8::vector<ScrActivation> callStack;
+  fa::vector<ScrActivation> callStack;
   SCR_EnumerateCallStack(callStack);
   if (event.GetIndex() < static_cast<long>(callStack.size())) {
     const ScrActivation& activation = callStack[event.GetIndex()];
     OpenFile(activation.file);
     mSourceCtrl->SetCursorLine(activation.file, activation.line);
 
-    msvc8::vector<ScrWatch> locals;
+    fa::vector<ScrWatch> locals;
     SCR_EnumerateLocals(event.GetIndex(), locals);
     mLocals->Update(locals);
   }
@@ -477,7 +477,7 @@ void moho::ScrDebugWindow::OnCallStackSelected(wxListEvent& event)
 void moho::ScrDebugWindow::OnSourceFileActivated(wxTreeEvent& event)
 {
   CVirtualFileSystem* const vfs = DISK_GetVFS();
-  msvc8::string mountedPath;
+  fa::string mountedPath;
   (void)vfs->ToMountedPath(&mountedPath, gpg::STR_WideToUtf8(mSourceTree->GetPath().c_str()).c_str());
   OpenFile(mountedPath);
 }
@@ -602,7 +602,7 @@ namespace
     (void)window.Destroy();
   }
 
-  void PostScrDebugPause(moho::ScrDebugWindow& window, const msvc8::string& source, const int line)
+  void PostScrDebugPause(moho::ScrDebugWindow& window, const fa::string& source, const int line)
   {
     moho::ScrPauseEvent pauseEvent(source, line);
     window.AddPendingEvent(pauseEvent);

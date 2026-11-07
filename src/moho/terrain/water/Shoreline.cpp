@@ -3,13 +3,18 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <new>
 
+#include "gpg/gal/Device.hpp"
+#include "gpg/gal/DeviceContext.hpp"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/render/ID3DVertexSheet.h"
 #include "moho/render/ID3DVertexStream.h"
+#include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
 #include "moho/sim/CWldMap.h"
@@ -28,7 +33,7 @@ namespace
    * What it does:
    * Constructs one `shared_ptr<ShoreCell>` from one raw shoreline-cell pointer lane.
    */
-  ShoreCellRef* ConstructSharedShoreCellFromRaw(ShoreCellRef* const outShoreCell, moho::ShoreCell* const shoreCell)
+  [[maybe_unused]] ShoreCellRef* ConstructSharedShoreCellFromRaw(ShoreCellRef* const outShoreCell, moho::ShoreCell* const shoreCell)
   {
     return ::new (outShoreCell) ShoreCellRef(shoreCell);
   }
@@ -122,11 +127,7 @@ namespace
       return;
     }
 
-    volatile long* const counter = reinterpret_cast<volatile long*>(&slot->mPrimaryValueBits);
-    long observed = 0;
-    do {
-      observed = ::InterlockedCompareExchange(counter, 0, 0);
-    } while (::InterlockedCompareExchange(counter, static_cast<long>(value), observed) != observed);
+    slot->StorePrimaryBits(value);
   }
 
   [[nodiscard]] float ReadHeightSampleMeters(
@@ -586,7 +587,7 @@ namespace
    * Appends one shoreline-cell shared pointer at vector tail, using the
    * in-place lane when capacity is available and growing storage otherwise.
    */
-  void AppendShoreCellRef(msvc8::vector<ShoreCellRef>& shorelineCells, const ShoreCellRef& cell)
+  void AppendShoreCellRef(fa::vector<ShoreCellRef>& shorelineCells, const ShoreCellRef& cell)
   {
     shorelineCells.push_back(cell);
   }
@@ -643,6 +644,27 @@ namespace moho
 {
   bool ren_Shoreline = false;
   float ren_ShorelineCutoff = 1000.0f; // 0x00F57D64 (shipped .data)
+
+  bool ren_ShorelineMemo = true;
+  namespace
+  {
+    TConVar<bool> gTConVar_ren_ShorelineMemo(
+      "ren_ShorelineMemo",
+      "Direct3D 12 / Vulkan: the shoreline stays in GPU memory and is rewritten only when the view changes (1, the default), "
+      "or each frame (0). GPU memory is chosen when a shoreline is generated.",
+      &ren_ShorelineMemo
+    );
+
+    /** The view the shoreline's vertices were last written for. */
+    struct ShorelineView
+    {
+      const Shoreline* owner = nullptr;
+      VTransform transform{};
+      gpg::gal::Matrix projection{};
+    };
+    ShorelineView sShorelineView;
+    bool sShorelineGpuSheet = false;
+  } // namespace
 
   /**
    * Address: 0x008126E0 (FUN_008126E0, ??0ShoreCell@Moho@@QAE@XZ)
@@ -703,6 +725,7 @@ namespace moho
    */
   void Shoreline::Destroy()
   {
+    sShorelineView.owner = nullptr;
     mVertexSheet.reset();
 
     mCells.clear();
@@ -731,8 +754,13 @@ namespace moho
 
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
     CD3DVertexFormat* const vertexFormat = resources->GetVertexFormat(kShorelineVertexFormatToken);
-    CD3DVertexSheet* const vertexSheet =
-      resources->NewVertexSheet(kShorelineVertexSheetUsageToken, kShorelineVertexSheetVertexCount, vertexFormat);
+    // Engine change (ren_ShorelineMemo): upload memory is recycled, so a dynamic sheet is copied again each
+    // frame though a still camera sees the same shoreline. In GPU memory it uploads only when rewritten.
+    const gpg::gal::DeviceApi deviceApi = gpg::gal::Device::GetInstance()->GetDeviceContext()->mDeviceType;
+    sShorelineGpuSheet = ren_ShorelineMemo && (deviceApi == gpg::gal::DeviceApi::Direct3D12 || deviceApi == gpg::gal::DeviceApi::Vulkan);
+    CD3DVertexSheet* const vertexSheet = resources->NewVertexSheet(
+      sShorelineGpuSheet ? 0U : kShorelineVertexSheetUsageToken, kShorelineVertexSheetVertexCount, vertexFormat
+    );
     mVertexSheet = boost::shared_ptr<ID3DVertexSheet>(static_cast<ID3DVertexSheet*>(vertexSheet));
 
     const float waterElevation = (map->mWaterEnabled != 0u) ? map->mWaterElevation : kNoWaterElevation;
@@ -801,6 +829,18 @@ namespace moho
     EnsureNamedStat(sEngineStatShorelineTriangles, "Shoreline_Triangles");
     StoreStatCounter(sEngineStatShorelineTriangles, 0);
 
+    // Engine change (ren_ShorelineMemo): the cells only change in Generate, so the same view gives the same
+    // vertices. Collecting the visible cells alone was over 2 % of a near-zoom frame.
+    const bool keepVertices = ren_ShorelineMemo && sShorelineGpuSheet && sShorelineView.owner == this &&
+      std::memcmp(static_cast<const void*>(&sShorelineView.transform), static_cast<const void*>(&camera.tranform), sizeof(VTransform)) == 0 &&
+      std::memcmp(static_cast<const void*>(&sShorelineView.projection), static_cast<const void*>(&camera.projection), sizeof(gpg::gal::Matrix)) == 0;
+    if (keepVertices) {
+      StoreStatCounter(sEngineStatShorelineVertices, mShorelineTris * 3);
+      StoreStatCounter(sEngineStatShorelineTriangles, mShorelineTris);
+      return;
+    }
+    sShorelineView.owner = nullptr;
+
     mShorelineTris = 0;
 
     if (mCells.empty()) {
@@ -812,13 +852,29 @@ namespace moho
       const_cast<GeomCamera3*>(&camera), visibleCells, static_cast<EEntityType>(kSpatialRoutingMask)
     );
 
+    if (sShorelineGpuSheet) {
+      sShorelineView.owner = this;
+      sShorelineView.transform = camera.tranform;
+      sShorelineView.projection = camera.projection;
+    }
+
     if (visibleCells.empty()) {
       return;
     }
 
+    // A GPU sheet's draw reads only what this writes, so only that is uploaded.
+    std::int32_t lockVertices = kShorelineVertexSheetVertexCount;
+    if (sShorelineGpuSheet) {
+      std::int32_t triangles = 0;
+      for (const ShoreCell* const cell : visibleCells) {
+        triangles += 1 + (cell->mType > 1 ? 1 : 0) + (cell->mType > 2 ? 1 : 0);
+      }
+      lockVertices = std::min(triangles * 3, kShorelineVertexSheetVertexCount);
+    }
+
     auto* const vertexStream = mVertexSheet->GetVertStream(0U);
     auto* writeCursor =
-      static_cast<ShorelineMeshRecord*>(vertexStream->Lock(0, kShorelineVertexSheetVertexCount, false, true));
+      static_cast<ShorelineMeshRecord*>(vertexStream->Lock(0, lockVertices, false, true));
 
     std::int32_t vertexCount = 0;
     for (ShoreCell* const cell : visibleCells) {

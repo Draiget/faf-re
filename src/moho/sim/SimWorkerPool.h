@@ -49,15 +49,21 @@ namespace moho
    *   Checking exactly that is the determinism test for any parallel phase.
    *
    * Worker count: the `sim_Workers` console variable, seeded from `/simworkers N` on the command
-   * line. 0, the default, runs every job inline on the caller, which is the original serial path.
+   * line, otherwise `gSimDefaultWorkers`. 0 runs every job inline on the caller, the original serial path.
    * A changed value takes effect at the next dispatch. Threads are created on first use.
    */
   /**
    * Engine addition: `sim_Workers`, a user-side (process-local) console variable. It is never sent
    * to the sim, so clients may differ; parallel phases produce the serial result either way.
-   * -1 until first use, then the `/simworkers` value (0 when absent).
+   * -1 until first use, then the `/simworkers` value (`gSimDefaultWorkers` when absent).
    */
   extern int sim_Workers;
+
+  /**
+   * Engine addition: the worker count without `/simworkers`. 0 unless the exe sets it before the first sim:
+   * the game runs with workers, while headless and the server stay serial, as a full machine runs slower with them.
+   */
+  extern int gSimDefaultWorkers;
 
   /**
    * Engine addition: per-phase switches, user-side like `sim_Workers`, so any parallel phase can

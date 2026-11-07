@@ -41,7 +41,7 @@ namespace moho
      * The copy constructor: copies both bone indices, links `reservedUnit`
      * into the owner chain `other.reservedUnit` sits in, and copy-constructs
      * `reservedBones`. It is the element constructor that
-     * `msvc8::vector<SAiReservedTransportBone>`'s `_Uninit_copy`
+     * `fa::vector<SAiReservedTransportBone>`'s `_Uninit_copy`
      * (0x005EFF70, cited on `uninit_copy_n` in Vector.h) and its
      * `resize`/`_Insert_n` paths (0x005EA590, cited on `resize`) run per
      * element; an earlier `Vector.cpp` transcription had folded it into a
@@ -80,7 +80,7 @@ namespace moho
      * `reservedUnit` weak-pointer node onto the source's owner-chain slot
      * (unlinking it from its previous owner chain first when the slot
      * differs), and assigns the nested `reservedBones` vector via its own
-     * `operator=` (tail call into `msvc8::vector<int>::operator=`,
+     * `operator=` (tail call into `fa::vector<int>::operator=`,
      * 0x005ED190). Used by the erase-and-shift loop
      * (`EraseReservedTransportBoneAndAdvance`) and by the vector's own
      * `operator=` whenever `vector<SAiReservedTransportBone>` needs to assign
@@ -91,7 +91,7 @@ namespace moho
     std::uint32_t transportBoneIndex; // +0x00
     std::uint32_t attachBoneIndex;    // +0x04
     WeakPtr<Unit> reservedUnit;       // +0x08
-    msvc8::vector<int> reservedBones; // +0x10
+    fa::vector<int> reservedBones; // +0x10
   };
 
   static_assert(sizeof(SAiReservedTransportBone) == 0x20, "SAiReservedTransportBone size must be 0x20");
@@ -111,6 +111,6 @@ namespace moho
    * and unlinks it. Eleven callers -- every erase, tidy and range destroy of
    * the vector that holds one. The two jump-only alias lanes at 0x005EE820
    * and 0x005EF8B0 are dead: zero data_refs and zero call_edges for both, and
-   * no source-level caller anywhere in `src/**`.
+   * no source-level caller anywhere in `src/ **`.
    */
 } // namespace moho

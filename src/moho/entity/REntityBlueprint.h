@@ -61,17 +61,17 @@ namespace moho
     // blueprint-kind test work: 0x00677360 asks the reflection system to
     // upcast the blueprint to RUnitBlueprint, which needs a dynamic type.
     RRuleGameRules* mOwner;                                   // +0x04 (owner game-rules pointer)
-    msvc8::string mBlueprintId;                               // +0x08
-    msvc8::string mBlueprintLabel;                            // +0x24 (optional label used by unique-name formatting)
-    msvc8::string mSource;                                    // +0x40 (source blueprint path/id string)
+    fa::string mBlueprintId;                               // +0x08
+    fa::string mBlueprintLabel;                            // +0x24 (optional label used by unique-name formatting)
+    fa::string mSource;                                    // +0x40 (source blueprint path/id string)
     std::uint32_t mCategoryBitIndex;                          // +0x5C
     /**
      * Address: 0x00512870 (`Moho::REntityBlueprintTypeInfo::AddFields`) --
      * `push 60h` / `push offset "Categories"` / `call
-     * gpg::RType::AddField<msvc8::vector<msvc8::string>>` registers the
+     * gpg::RType::AddField<fa::vector<fa::string>>` registers the
      * reflected "Categories" field at `this+0x60` with an explicit
      * `vector<string>` type descriptor; the very next reflected field
-     * (`push 70h` / "ScriptModule" / `AddField<msvc8::string>`) starts
+     * (`push 70h` / "ScriptModule" / `AddField<fa::string>`) starts
      * exactly 0x10 bytes later, so the reflected field spans the full
      * `[0x60, 0x70)` range with no gap.
      *
@@ -103,9 +103,9 @@ namespace moho
      * neither is read anywhere in this binary. All four sources therefore
      * agree on one layout; none actually conflicts.
      */
-    msvc8::vector<msvc8::string> mCategories;                // +0x60
-    msvc8::string mScriptModule;                              // +0x70
-    msvc8::string mScriptClass;                               // +0x8C
+    fa::vector<fa::string> mCategories;                // +0x60
+    fa::string mScriptModule;                              // +0x70
+    fa::string mScriptClass;                               // +0x8C
     ECollisionShape mCollisionShape;                          // +0xA8
     float mSizeX;                                             // +0xAC
     float mSizeY;                                             // +0xB0
@@ -138,7 +138,7 @@ namespace moho
     float mSelectionMeshUseTopAmount;                         // +0x130
     float mSelectionThickness;                                // +0x134
     float mUseOOBTestZoom;                                    // +0x138
-    msvc8::string mStrategicIconName;                         // +0x13C
+    fa::string mStrategicIconName;                         // +0x13C
     /**
      * Strategic-icon draw-order tier. `CWldSession::RenderStrategicIcons`
      * (0x0085B6E0) reads it with a single-byte compare against `'A'` (0x41)

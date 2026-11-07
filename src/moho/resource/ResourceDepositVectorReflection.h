@@ -29,7 +29,7 @@ namespace gpg
     /**
      * Address: 0x00547580 (FUN_00547580, gpg::RVectorType_ResourceDeposit::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x00547610 (FUN_00547610, gpg::RVectorType_ResourceDeposit::IsIndexed)
@@ -77,7 +77,7 @@ namespace moho
    *
    * What it does:
    * Constructs/preregisters RTTI metadata for
-   * `msvc8::vector<moho::ResourceDeposit>`.
+   * `fa::vector<moho::ResourceDeposit>`.
    */
   [[nodiscard]] gpg::RType* preregister_VectorResourceDepositType();
   void register_VectorResourceDepositType();

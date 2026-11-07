@@ -11,6 +11,13 @@ namespace moho
   extern bool net_LogPackets;            // 0x010A6381
   extern int32_t net_DebugLevel;         // 0x010A6384
   extern int32_t net_PeerFeatures;       // engine addition (issue #285), off by default
+  extern int32_t net_LobbyPeerFeatures;  // engine addition, on by default
+  extern int32_t net_RejoinAccept;       // engine addition (issue #275), off by default
+  extern int32_t net_RejoinSendRate;     // engine addition (issue #275)
+  extern int32_t net_RejoinKeyframes;    // engine addition (issue #275)
+  extern int32_t net_RejoinWindow;       // engine addition (issue #275)
+  extern int32_t net_RejoinZstd;         // engine addition (issue #275)
+  extern int32_t net_RejoinFastSave;     // engine addition (issue #275)
   extern int32_t net_AckDelay;           // 0x00F58DE0
   extern int32_t net_SendDelay;          // 0x00F58DE4
   extern int32_t net_MinResendDelay;     // 0x00F58DE8
@@ -50,12 +57,36 @@ namespace moho
   extern int32_t net_TestBurstBytes;
   extern int32_t net_NativeNetWebRtc;
   extern int32_t net_NativeNetRedundancy;
+  extern int32_t net_NativeNetEncrypt;
   extern int32_t net_FastRetransmit;
   extern float net_FastResendPings;
   extern int32_t net_FastAckDelay;
 
   // Issue #237: net_FastRetransmit, or /fastretransmit on the command line.
   bool NET_FastRetransmitEnabled();
+  // How long a received packet waits for its acknowledgement, in ms: net_AckDelay, or
+  // net_FastAckDelay when that is less and net_FastRetransmit is on.
+  [[nodiscard]] int32_t NET_AckDelayMs();
   // Counts early resends; logs the first and every 1000th.
   void NET_CountFastRetransmits(int count);
+
+  /**
+   * Engine addition (wld_PreciseSharedStart): when this client's ready message (`CLIMSG_Ready`)
+   * left on the wire (the latest over all UDP connections), in microseconds on the steady clock;
+   * 0 before it did. It leaves up to `net_SendDelay` after it was queued, and the peers time that
+   * departure too, from its arrival, so both sides time the same moment.
+   */
+  [[nodiscard]] std::int64_t NET_GetReadyDepartureUs() noexcept;
+
+  /** Engine addition (wld_PreciseSharedStart): this client's ready message left just now. */
+  void NET_NoteReadyLeftNow() noexcept;
+
+  /** Engine addition (wld_PreciseSharedStart): forget the last session's ready departure. */
+  void NET_ResetReadyDeparture() noexcept;
+
+  /**
+   * Engine addition (wld_PreciseSharedStart, wld_SkewCorrection): `std::chrono::steady_clock` in
+   * microseconds, which every process on the PC reads alike.
+   */
+  [[nodiscard]] std::int64_t NET_SteadyClockMicroseconds() noexcept;
 } // namespace moho

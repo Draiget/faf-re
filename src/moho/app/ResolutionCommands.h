@@ -32,7 +32,7 @@ namespace moho
    * `sDeviceLock` is held for the duration so device-context readers never
    * observe a half-updated head while the resize is in flight.
    */
-  void SC_PrimaryAdapter(const msvc8::vector<msvc8::string>& args);
+  void SC_PrimaryAdapter(const fa::vector<fa::string>& args);
 
 
   /**
@@ -46,7 +46,7 @@ namespace moho
    * the device context's `mVSync` to `atoi(arg) == 1` and resets the device
    * (`CD3DDevice::Clear()` + `InitContext()`) while `sDeviceLock` is held.
    */
-  void SC_VerticalSync(const msvc8::vector<msvc8::string>& args);
+  void SC_VerticalSync(const fa::vector<fa::string>& args);
 
 
   /**
@@ -63,7 +63,7 @@ namespace moho
    * has exactly one head, and that head is windowed - otherwise this is a
    * no-op. More than one argument is a no-op.
    */
-  void SC_ToggleCursorClip(const msvc8::vector<msvc8::string>& args);
+  void SC_ToggleCursorClip(const fa::vector<fa::string>& args);
 
 
   /**
@@ -79,6 +79,6 @@ namespace moho
    * (StartupHelpers.cpp), which republishes the secondary-adapter Lua
    * options-menu state.
    */
-  void SC_SecondaryAdapter(const msvc8::vector<msvc8::string>& args);
+  void SC_SecondaryAdapter(const fa::vector<fa::string>& args);
 
 } // namespace moho

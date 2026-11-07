@@ -20,20 +20,6 @@ namespace
     return &sInstance;
   }
 
-  /**
-   * Binary 0x0059DB00..0x0059DB19: `CFormationInstance::sType` (0x010C6F80), filled by
-   * `gpg::LookupRType(typeid(CFormationInstance))` (FUN_008E0750) on first use. A lookup by
-   * name found nothing when this type initialized before `CFormationInstance` was named, which
-   * left `CAiFormationInstance` without its base and failed every save on `isDer`.
-   */
-  [[nodiscard]] gpg::RType* CachedCFormationInstanceType()
-  {
-    if (!CFormationInstance::sType) {
-      CFormationInstance::sType = gpg::LookupRType(typeid(CFormationInstance));
-    }
-    return CFormationInstance::sType;
-  }
-
   [[nodiscard]] gpg::RRef MakeFormationInstanceRef(CAiFormationInstance* const object)
   {
     gpg::RRef out{};
@@ -50,15 +36,7 @@ namespace
    */
   void AddCFormationInstanceBaseToCAiFormationInstanceType(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedCFormationInstanceType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<CFormationInstance>(typeInfo);
   }
 
 } // namespace
@@ -140,10 +118,7 @@ gpg::RRef CAiFormationInstanceTypeInfo::NewRef()
  */
 gpg::RRef CAiFormationInstanceTypeInfo::CtrRef(void* const objectStorage)
 {
-  auto* const object = static_cast<CAiFormationInstance*>(objectStorage);
-  if (object) {
-    new (object) CAiFormationInstance();
-  }
+  auto* const object = gpg::ConstructInStorage<CAiFormationInstance>(objectStorage);
   return MakeFormationInstanceRef(object);
 }
 

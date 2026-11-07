@@ -89,7 +89,7 @@ namespace moho
      * Stores terrain skycube texture path and resolves the corresponding D3D
      * texture resource handle.
      */
-    void SetSkycube(const msvc8::string& texturePath) override;
+    void SetSkycube(const fa::string& texturePath) override;
 
     /**
      * Address: 0x008A12C0 (FUN_008A12C0,
@@ -100,7 +100,7 @@ namespace moho
      * The skycube counterpart of `GetBackgroundFile`: `lea eax, [ecx+980h];
      * retn`, returning the stored path by reference.
      */
-    [[nodiscard]] const msvc8::string& GetSkycubeFile() const override;
+    [[nodiscard]] const fa::string& GetSkycubeFile() const override;
 
     /**
      * Address: 0x008A12D0 (FUN_008A12D0, ?GetSkycube@CWldTerrainRes@Moho@@UBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ)
@@ -117,7 +117,7 @@ namespace moho
      * Stores terrain background texture path and resolves the corresponding D3D
      * texture resource handle.
      */
-    void SetBackground(const msvc8::string& texturePath) override;
+    void SetBackground(const fa::string& texturePath) override;
 
     /**
      * Address: 0x008A1180 (FUN_008A1180,
@@ -128,7 +128,7 @@ namespace moho
      * Returns the path `SetBackground` stored, by reference. The whole body is
      * `lea eax, [ecx+95Ch]; retn` -- the string itself, not a copy.
      */
-    [[nodiscard]] const msvc8::string& GetBackgroundFile() const override;
+    [[nodiscard]] const fa::string& GetBackgroundFile() const override;
 
     /**
      * Address: 0x008A1190 (FUN_008A1190, ?GetBackground@CWldTerrainRes@Moho@@UBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ)
@@ -146,7 +146,7 @@ namespace moho
      * Resolves one environment texture path and upserts it into the
      * terrain environment-lookup map keyed by environment id.
      */
-    void AddEnvLookup(const msvc8::string& environmentKey, const msvc8::string& texturePath) override;
+    void AddEnvLookup(const fa::string& environmentKey, const fa::string& texturePath) override;
 
     /**
      * Address: 0x008A13F0 (FUN_008A13F0)
@@ -155,7 +155,7 @@ namespace moho
      * What it does:
      * Removes one environment-lookup map entry by key when present.
      */
-    void RemoveEnvLookup(const msvc8::string& environmentKey) override;
+    void RemoveEnvLookup(const fa::string& environmentKey) override;
 
     /**
      * Address: 0x008A1430 (FUN_008A1430)
@@ -164,7 +164,7 @@ namespace moho
      * What it does:
      * Returns one environment texture handle by key, with `<default>` fallback.
      */
-    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetEnvLookup(const msvc8::string& environmentKey) const override;
+    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetEnvLookup(const fa::string& environmentKey) const override;
 
     /**
      * Address: 0x008A1500 (FUN_008A1500)
@@ -364,7 +364,7 @@ namespace moho
      * What it does:
      * Returns the debug dirty-rectangle list lane.
      */
-    [[nodiscard]] const msvc8::list<gpg::Rect2i>& GetDebugDirtyRects() const override;
+    [[nodiscard]] const fa::list<gpg::Rect2i>& GetDebugDirtyRects() const override;
 
     /**
      * Address: 0x008A5FB0 (FUN_008A5FB0, ?GetNormalMapCount@CWldTerrainRes@Moho@@EAEHXZ)
@@ -917,9 +917,9 @@ namespace moho
     TerrainNormalMapHandleArray mNormalMap;                // +0x948
     std::int32_t mNormalMapWidth;                          // +0x954
     std::int32_t mNormalMapHeight;                         // +0x958
-    msvc8::string mBackgroundFile;                         // +0x95C
+    fa::string mBackgroundFile;                         // +0x95C
     ID3DDeviceResources::TextureResourceHandle mBackgroundTexture; // +0x978
-    msvc8::string mSkycubeFile;                            // +0x980
+    fa::string mSkycubeFile;                            // +0x980
     ID3DDeviceResources::TextureResourceHandle mSkycubeTexture;     // +0x99C
     TerrainEnvironmentLookupMap mEnvLookup;                // +0x9A4
     TerrainEditWordBuffer mEditWordBuffer;                 // +0x9B0

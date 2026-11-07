@@ -20,7 +20,7 @@
 <line x1="1.0" y1="164.0" x2="469.1" y2="164.0" stroke="#3d444d"/>
 <line x1="1.0" y1="160.0" x2="1.0" y2="164.0" stroke="#3d444d"/>
 <line x1="469.1" y1="160.0" x2="469.1" y2="164.0" stroke="#3d444d"/>
-<text x="235.1" y="181.0" font-size="13" fill="#e6edf3" font-weight="600" text-anchor="middle">231 desyncs (1.76 %)</text>
+<text x="235.1" y="181.0" font-size="13" fill="#e6edf3" font-weight="600" text-anchor="middle">231 with a differing checksum (1.76 %)</text>
 <line x1="473.1" y1="164.0" x2="879.0" y2="164.0" stroke="#3d444d"/>
 <line x1="473.1" y1="160.0" x2="473.1" y2="164.0" stroke="#3d444d"/>
 <line x1="879.0" y1="160.0" x2="879.0" y2="164.0" stroke="#3d444d"/>

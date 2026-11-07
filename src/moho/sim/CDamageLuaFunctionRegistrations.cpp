@@ -1,4 +1,5 @@
 #include "moho/sim/CDamageLuaFunctionRegistrations.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 #include <cstring>
 
@@ -25,16 +26,6 @@ namespace
     "DamageRing(instigator,location,minRadius,maxRadius,amount,damageType,damageFriendly,[damageSelf])";
   constexpr const char* kMetaImpactHelpText =
     "MetaImpact(instigator,location,fMaxRadius,iAmount,affectsCategory,[damageFriendly])";
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
 
   void RequireLuaArgCount(
     LuaPlus::LuaState* const state, const char* const helpText, const int expectedCount
@@ -142,7 +133,7 @@ namespace moho
   CScrLuaInitForm* func_Damage_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "Damage",
       &cfunc_Damage,
       nullptr,
@@ -165,10 +156,7 @@ namespace moho
       return 0;
     }
 
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 5) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kDamageHelpText, 5, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 5, kDamageHelpText);
 
     Sim* const sim = lua_getglobaluserdata(state->m_state);
     CDamage damage(sim);
@@ -248,7 +236,7 @@ namespace moho
   CScrLuaInitForm* func_DamageArea_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "DamageArea",
       &cfunc_DamageArea,
       nullptr,
@@ -365,7 +353,7 @@ namespace moho
   CScrLuaInitForm* func_DamageRing_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "DamageRing",
       &cfunc_DamageRing,
       nullptr,
@@ -520,7 +508,7 @@ namespace moho
   CScrLuaInitForm* func_CDamageGetInstigator_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "GetInstigator",
       &cfunc_CDamageGetInstigator,
       &CScrLuaMetatableFactory<CDamage>::Instance(),
@@ -577,7 +565,7 @@ namespace moho
   CScrLuaInitForm* func_CDamageSetInstigator_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetInstigator",
       &cfunc_CDamageSetInstigator,
       &CScrLuaMetatableFactory<CDamage>::Instance(),
@@ -634,7 +622,7 @@ namespace moho
   CScrLuaInitForm* func_CDamageGetTarget_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "GetTarget",
       &cfunc_CDamageGetTarget,
       &CScrLuaMetatableFactory<CDamage>::Instance(),
@@ -692,7 +680,7 @@ namespace moho
   CScrLuaInitForm* func_CDamageSetTarget_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "SetTarget",
       &cfunc_CDamageSetTarget,
       &CScrLuaMetatableFactory<CDamage>::Instance(),
@@ -722,7 +710,7 @@ namespace moho
   CScrLuaInitForm* func_MetaImpact_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "MetaImpact",
       &cfunc_MetaImpact,
       nullptr,
@@ -879,7 +867,7 @@ namespace
 
   // Publish the original Sim class table used by CDamage's method binders.
   moho::CScrLuaClassBinder gDamageClassBinder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     "moho.CDamage",
     &moho::CScrLuaMetatableFactory<moho::CDamage>::Instance(),
     kCDamageLuaClassName,

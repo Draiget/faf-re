@@ -17,10 +17,10 @@ public:
    * Address: 0x008DEF90 (FUN_008DEF90, ?GetLexical@RBoolType@@UBE...)
    *
    * What it does:
-   * Returns "true" or "false" as an `msvc8::string` based on the bool value
+   * Returns "true" or "false" as an `fa::string` based on the bool value
    * referenced by `ref.mObj`.
    */
-  [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+  [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
   /**
    * Address: 0x008DEEF0 (FUN_008DEEF0, ?SetLexical@RBoolType@@UBE_N...)

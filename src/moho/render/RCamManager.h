@@ -77,10 +77,10 @@ namespace moho
      * What it does:
      * Returns a copy of the current camera pointer vector.
      */
-    [[nodiscard]] msvc8::vector<CameraImpl*> GetAllCameras();
+    [[nodiscard]] fa::vector<CameraImpl*> GetAllCameras();
 
   public:
-    msvc8::vector<CameraImpl*> mCams; // +0x00
+    fa::vector<CameraImpl*> mCams; // +0x00
   };
 
   static_assert(sizeof(RCamManager) == 0x10, "RCamManager size must be 0x10");
@@ -132,7 +132,7 @@ namespace moho
    * What it does:
    * Copies all non-minimap camera views into one output camera-view vector.
    */
-  [[nodiscard]] msvc8::vector<GeomCamera3> CAM_GetAllCameras();
+  [[nodiscard]] fa::vector<GeomCamera3> CAM_GetAllCameras();
 
   /**
    * Address: 0x007AADE0 (FUN_007AADE0, ?CAM_GetAllRCamCameras@Moho@@YA?AV?$vector@PAVCameraImpl@Moho@@V?$allocator@PAVCameraImpl@Moho@@@std@@@std@@XZ)
@@ -140,7 +140,7 @@ namespace moho
    * What it does:
    * Returns a copy of all runtime camera implementation pointers.
    */
-  [[nodiscard]] msvc8::vector<CameraImpl*> CAM_GetAllRCamCameras();
+  [[nodiscard]] fa::vector<CameraImpl*> CAM_GetAllRCamCameras();
 
   /**
    * Address: 0x008D3870 (FUN_008D3870, sub_8D3870)
@@ -148,6 +148,6 @@ namespace moho
    * What it does:
    * The `SC_CameraScaleLOD <index>` debug console command. See definition.
    */
-  void SC_CameraScaleLOD(const msvc8::vector<msvc8::string>& args);
+  void SC_CameraScaleLOD(const fa::vector<fa::string>& args);
 
 } // namespace moho

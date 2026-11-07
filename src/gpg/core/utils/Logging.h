@@ -8,7 +8,6 @@
 #include <span>
 #include <streambuf>
 
-#include "boost/mutex.h"
 #include "gpg/core/containers/DList.h"
 #include "Sync.h"
 #include "Tss.h"
@@ -68,8 +67,8 @@ namespace gpg
 
         virtual void OnMessage(
             LogSeverity level,
-            const msvc8::string& message,
-            const msvc8::vector<msvc8::string>& context,
+            const fa::string& message,
+            const fa::vector<fa::string>& context,
             int previousDepth
         ) = 0;
 
@@ -78,8 +77,8 @@ namespace gpg
          */
         virtual void OnLog(
             int level,
-            const msvc8::string& message,
-            std::span<const msvc8::string> context,
+            const fa::string& message,
+            std::span<const fa::string> context,
             int previousDepth
         );
 
@@ -154,17 +153,17 @@ namespace gpg
          */
         void OnMessage(
             LogSeverity level,
-            const msvc8::string& message,
-            const msvc8::vector<msvc8::string>& context,
+            const fa::string& message,
+            const fa::vector<fa::string>& context,
             int previousDepth
         ) override;
 
     private:
         std::ostream* mStream{};
         std::uint8_t mOwnStream{};
-        std::uint8_t mPad0{};
-        std::uint8_t mPad1{};
-        std::uint8_t mPad2{};
+        [[maybe_unused]] std::uint8_t mPad0{};
+        [[maybe_unused]] std::uint8_t mPad1{};
+        [[maybe_unused]] std::uint8_t mPad2{};
     };
     static_assert(sizeof(StreamLogTarget) == 0x10, "StreamLogTarget size must be 0x10");
 
@@ -259,7 +258,7 @@ namespace gpg
         StreamBuffer* TailBuffer();
         bool IsSingleBuffer();
 
-        boost::mutex mMutex{};
+        std::mutex mMutex{};
         DList<StreamBuffer, void> mChunks{};
         std::uint8_t* mReadLimit{};
         std::uint8_t* mWriteCommit{};
@@ -322,7 +321,7 @@ namespace gpg
     struct ThreadCtxEntry
     {
         ScopedLogContext* owner{};
-        msvc8::string text;
+        fa::string text;
         ThreadState* state{};
 
         /**
@@ -346,7 +345,7 @@ namespace gpg
     /**
      * Thread-local state, stored in TSS.
      *
-     * The context-label array is `msvc8::vector<ThreadCtxEntry*>` --
+     * The context-label array is `fa::vector<ThreadCtxEntry*>` --
      * previously modeled as a hand-rolled `begin`/`end`/`cap` triple with a
      * separate `EnsureThreadContextCapacity` growth helper that doubled
      * capacity, which diverges from MSVC8's real ~1.5x vector growth (the
@@ -361,7 +360,7 @@ namespace gpg
      */
     struct ThreadState
     {
-        msvc8::vector<ThreadCtxEntry*> mEntries;
+        fa::vector<ThreadCtxEntry*> mEntries;
         std::uint32_t depthCache{};
 
         /**
@@ -468,7 +467,7 @@ namespace gpg
          * to each registered log target, honoring one-shot flush and pending
          * detach flags.
          */
-        void Dispatch(LogSeverity level, const msvc8::string& msg);
+        void Dispatch(LogSeverity level, const fa::string& msg);
     };
 
     /**
@@ -492,7 +491,7 @@ namespace gpg
          * from the allocate-and-push body (0x00937370, called only from
          * 0x00937B50); this constructor covers both.
          */
-        explicit ScopedLogContext(const msvc8::string& text);
+        explicit ScopedLogContext(const fa::string& text);
         explicit ScopedLogContext(const char* text);
 
         /**
@@ -552,7 +551,7 @@ namespace gpg
      * What it does:
      * Dispatches one preformatted log line at a requested severity.
      */
-    void LogMessage(LogSeverity level, const msvc8::string& message);
+    void LogMessage(LogSeverity level, const fa::string& message);
 
     // ReSharper disable once IdentifierTypo
     /**
@@ -608,7 +607,7 @@ namespace gpg
      * Returns the currently retained in-memory log history as a newline-delimited
      * UTF-8 text blob.
      */
-    msvc8::string GetRecentLogLines();
+    fa::string GetRecentLogLines();
 
     FILETIME FileTimeLocal();
 
@@ -618,7 +617,7 @@ namespace gpg
      * What it does:
      * Converts microsecond timestamp to local `HH:MM:SS.mmm` text.
      */
-    msvc8::string FileTimeToString(LONGLONG time);
+    fa::string FileTimeToString(LONGLONG time);
 
     /**
      * Global state backing nested log-scope indentation. `g_LogScopeDepth`
@@ -633,7 +632,7 @@ namespace gpg
      */
     extern int g_LogScopeDepth;
     extern int g_LogScopeDepthScale;
-    extern msvc8::string g_LogScopePadding;
+    extern fa::string g_LogScopePadding;
 
     /**
      * Address: 0x00406110 (FUN_00406110, sub_406110)
@@ -643,7 +642,7 @@ namespace gpg
      * `g_LogScopePadding` to `depth * scale` space characters, and returns
      * a pointer to the refreshed global padding string.
      */
-    msvc8::string* IncreaseLogScopeDepth();
+    fa::string* IncreaseLogScopeDepth();
 
     /**
      * Address: 0x004061B0 (FUN_004061B0, sub_4061B0)
@@ -653,14 +652,14 @@ namespace gpg
      * counter, refreshes the shared padding string, and returns the
      * global padding pointer.
      */
-    msvc8::string* DecreaseLogScopeDepth();
+    fa::string* DecreaseLogScopeDepth();
 
     /**
      * Binary identity: `class gpg::StrArg` (mangled `VStrArg@gpg`).
      *
      * RAII-style helper used by subsystem init paths to emit an indented
      * log line on scope exit. The constructor copies a format string into
-     * an embedded `msvc8::string` and bumps the global log-scope depth;
+     * an embedded `fa::string` and bumps the global log-scope depth;
      * `Emit` formats the stored body with the current scope width and
      * dispatches it through `gpg::LogMessage` at the stored severity,
      * then resets the embedded body string.
@@ -689,7 +688,7 @@ namespace gpg
          * severity lane, and bumps the global log-scope depth through
          * `IncreaseLogScopeDepth`.
          */
-        explicit LogScopeEntry(const msvc8::string& fmt);
+        explicit LogScopeEntry(const fa::string& fmt);
 
         /**
          * Address: 0x004062E0 (FUN_004062E0, func_Log)
@@ -707,7 +706,7 @@ namespace gpg
         LogScopeEntry& operator=(const LogScopeEntry&) = delete;
 
         // +0x00 .. +0x1C
-        msvc8::string body{};
+        fa::string body{};
         // +0x1C .. +0x38 - unproven 28-byte slab kept opaque so the
         // known offsets of later fields stay binary-accurate.
         std::array<std::byte, 0x1C> aux_0x1C{};

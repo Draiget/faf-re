@@ -51,7 +51,6 @@ namespace
     "may result in the bone's position snapping.";
   constexpr const char* kIAniManipulatorDestroyHelpText = "Manipulator:Destroy() -- destroy a manipulator.";
 
-  [[nodiscard]] gpg::RType* CachedIAniManipulatorType();
 
   /**
    * Cubic arccos approximation shared by the foot-plant leg solve.
@@ -81,16 +80,6 @@ namespace
   {
     // 0x0050CD23: `fsubr [0x00FB7914]`, the half-pi float.
     return moho::kHalfPi - ApproximateFootPlantAcos(value);
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
   }
 
   moho::IAniManipulator* ManipulatorFromActorOrderLinkSlot(
@@ -244,14 +233,7 @@ namespace
    */
   void AddIAniManipulatorBase(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = moho::IAniManipulator::StaticGetClass();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, moho::IAniManipulator::StaticGetClass());
   }
 
   [[nodiscard]] gpg::RRef CreateFootPlantManipulatorRefCallback();
@@ -426,65 +408,6 @@ namespace
   }
 
   /**
-   * The shared body behind `IAniManipulator::StaticGetClass` (0x0062FC10) and
-   * `IAniManipulator::GetClass` (0x0062FC30), which are two out-of-line copies
-   * of exactly this: read the cache at 0x010C738C, and on a miss pass the type
-   * descriptor at 0x00F71B60 to `gpg::LookupRType` (0x008E0750). It carries no
-   * address of its own for that reason -- the addresses belong to the two
-   * members, the same way `CachedCAimManipulatorType` relates to
-   * `CAimManipulator`'s pair.
-   *
-   * `CAimManipulator.cpp` has its own separate emission of this body at
-   * 0x00632C20, because it is a file-static there too and its serializers call
-   * it rather than inlining it.
-   *
-   * No copy has a caller in the binary: `GetClass` is reached through the
-   * vtable, and everything else inlined it -- including the two per-TypeInfo
-   * registrations at 0x00635310
-   * (`CBoneEntityManipulatorTypeInfo::AddBase_IAniManipulator`) and 0x0063A150
-   * (`CFootPlantManipulatorTypeInfo::AddBase_IAniManipulator`).
-   */
-  gpg::RType* CachedIAniManipulatorType()
-  {
-    if (!moho::IAniManipulator::sType) {
-      moho::IAniManipulator::sType = gpg::LookupRType(typeid(moho::IAniManipulator));
-    }
-    return moho::IAniManipulator::sType;
-  }
-
-  template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    GPG_ASSERT(derived);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
-
-  /**
    * Address: 0x0063CD60 (FUN_0063CD60, ?AddBase_CScriptEvent@IAniManipulatorTypeInfo@Moho@@SGXPAVRType@gpg@@@Z)
    *
    * IDA signature:
@@ -498,23 +421,10 @@ namespace
    */
   void AddCScriptEventBase(gpg::RType* const typeInfo)
   {
-    if (moho::CScriptEvent::sType == nullptr) {
-      moho::CScriptEvent::sType = gpg::LookupRType(typeid(moho::CScriptEvent));
-    }
-
-    gpg::RType* const baseType = moho::CScriptEvent::sType;
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseViaSlot<moho::CScriptEvent>(typeInfo);
   }
 
-  gpg::RType* gCAniActorType = nullptr;
   gpg::RType* gSimType = nullptr;
-  gpg::RType* gFastVectorSAniManipBindingType = nullptr;
   gpg::RType* gWeakPtrUnitType = nullptr;
 
   // Address: 0x00BD2C40 (dynamic initializer for the global
@@ -561,14 +471,6 @@ namespace
   // fixes that.
   moho::CFootPlantManipulatorSerializer gCFootPlantManipulatorSerializer;
 
-  [[nodiscard]] gpg::RType* CachedCAniActorType()
-  {
-    if (!gCAniActorType) {
-      gCAniActorType = gpg::LookupRType(typeid(moho::CAniActor));
-    }
-    return gCAniActorType;
-  }
-
   [[nodiscard]] gpg::RType* CachedSimType()
   {
     if (!gSimType) {
@@ -578,14 +480,6 @@ namespace
     return gSimType;
   }
 
-  [[nodiscard]] gpg::RType* CachedFastVectorSAniManipBindingType()
-  {
-    if (!gFastVectorSAniManipBindingType) {
-      gFastVectorSAniManipBindingType = gpg::LookupRType(typeid(gpg::fastvector<moho::SAniManipBinding>));
-    }
-    return gFastVectorSAniManipBindingType;
-  }
-
   [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
   {
     if (!gWeakPtrUnitType) {
@@ -593,31 +487,6 @@ namespace
       moho::WeakPtr<moho::Unit>::sType = gWeakPtrUnitType;
     }
     return gWeakPtrUnitType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrEntityType()
-  {
-    if (!moho::WeakPtr<moho::Entity>::sType) {
-      moho::WeakPtr<moho::Entity>::sType = gpg::LookupRType(typeid(moho::WeakPtr<moho::Entity>));
-    }
-    return moho::WeakPtr<moho::Entity>::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCScriptEventType()
-  {
-    if (!moho::CScriptEvent::sType) {
-      moho::CScriptEvent::sType = gpg::LookupRType(typeid(moho::CScriptEvent));
-    }
-    return moho::CScriptEvent::sType;
   }
 
   /**
@@ -666,12 +535,12 @@ namespace
     }
 
     const gpg::RRef nullOwner{};
-    archive->Read(CachedCScriptEventType(), object, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::CScriptEvent>(), object, nullOwner);
     archive->ReadBool(&object->mEnabled);
-    object->mOwnerActor = ReadUnownedPointer<moho::CAniActor>(archive, CachedCAniActorType());
+    object->mOwnerActor = ReadUnownedPointer<moho::CAniActor>(archive, gpg::RTypeOf<moho::CAniActor>());
     object->mOwnerSim = ReadUnownedPointer<moho::Sim>(archive, CachedSimType());
     archive->ReadInt(&object->mPrecedence);
-    archive->Read(CachedFastVectorSAniManipBindingType(), &object->mWatchBones, nullOwner);
+    archive->Read(gpg::RTypeOf<gpg::fastvector<moho::SAniManipBinding>>(), &object->mWatchBones, nullOwner);
   }
 
   /**
@@ -687,13 +556,13 @@ namespace
     }
 
     const gpg::RRef nullOwner{};
-    archive->Write(CachedCScriptEventType(), const_cast<moho::IAniManipulator*>(object), nullOwner);
+    archive->Write(gpg::RTypeOf<moho::CScriptEvent>(), const_cast<moho::IAniManipulator*>(object), nullOwner);
     archive->WriteBool(object->mEnabled);
-    WriteUnownedPointer(archive, object->mOwnerActor, CachedCAniActorType());
+    WriteUnownedPointer(archive, object->mOwnerActor, gpg::RTypeOf<moho::CAniActor>());
     WriteUnownedPointer(archive, object->mOwnerSim, CachedSimType());
     archive->WriteInt(object->mPrecedence);
     archive->Write(
-      CachedFastVectorSAniManipBindingType(),
+      gpg::RTypeOf<gpg::fastvector<moho::SAniManipBinding>>(),
       const_cast<gpg::fastvector_n<moho::SAniManipBinding, 2>*>(&object->mWatchBones),
       nullOwner
     );
@@ -719,7 +588,7 @@ namespace
     }
 
     const gpg::RRef nullOwner{};
-    archive->Read(CachedIAniManipulatorType(), static_cast<moho::IAniManipulator*>(object), nullOwner);
+    archive->Read(gpg::RTypeOf<moho::IAniManipulator>(), static_cast<moho::IAniManipulator*>(object), nullOwner);
     archive->Read(CachedWeakPtrUnitType(), &object->mGoalUnit, nullOwner);
     archive->ReadInt(&object->mFootBoneIndex);
     archive->ReadInt(&object->mKneeBoneIndex);
@@ -744,7 +613,7 @@ namespace
   {
     const gpg::RRef nullOwner{};
     archive->Write(
-      CachedIAniManipulatorType(),
+      gpg::RTypeOf<moho::IAniManipulator>(),
       const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(object)),
       nullOwner
     );
@@ -1348,11 +1217,11 @@ namespace moho
     }
 
     const gpg::RRef owner{};
-    archive->Read(CachedIAniManipulatorType(), static_cast<moho::IAniManipulator*>(this), owner);
+    archive->Read(gpg::RTypeOf<moho::IAniManipulator>(), static_cast<moho::IAniManipulator*>(this), owner);
     archive->Read(CachedWeakPtrUnitType(), &mGoalUnit, owner);
-    archive->Read(CachedWeakPtrEntityType(), &mTargetEntity, owner);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mTargetEntity, owner);
     archive->ReadInt(&mReferenceBoneIndex);
-    archive->Read(CachedVector3fType(), &mPivot, owner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mPivot, owner);
   }
 
   /**
@@ -1370,12 +1239,12 @@ namespace moho
 
     const gpg::RRef owner{};
     archive->Write(
-      CachedIAniManipulatorType(), const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(this)), owner
+      gpg::RTypeOf<moho::IAniManipulator>(), const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(this)), owner
     );
     archive->Write(CachedWeakPtrUnitType(), const_cast<moho::WeakPtr<moho::Unit>*>(&mGoalUnit), owner);
-    archive->Write(CachedWeakPtrEntityType(), const_cast<moho::WeakPtr<moho::Entity>*>(&mTargetEntity), owner);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), const_cast<moho::WeakPtr<moho::Entity>*>(&mTargetEntity), owner);
     archive->WriteInt(mReferenceBoneIndex);
-    archive->Write(CachedVector3fType(), const_cast<Wm3::Vector3f*>(&mPivot), owner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), const_cast<Wm3::Vector3f*>(&mPivot), owner);
   }
 
   /**
@@ -1411,12 +1280,12 @@ namespace moho
    */
   gpg::RType* IAniManipulator::StaticGetClass()
   {
-    return CachedIAniManipulatorType();
+    return gpg::RTypeOf<moho::IAniManipulator>();
   }
 
   gpg::RType* IAniManipulator::GetClass() const
   {
-    return CachedIAniManipulatorType();
+    return gpg::RTypeOf<moho::IAniManipulator>();
   }
 
   /**
@@ -1424,7 +1293,7 @@ namespace moho
    */
   gpg::RRef IAniManipulator::GetDerivedObjectRef()
   {
-    return MakeTypedRef(this, CachedIAniManipulatorType());
+    return gpg::MakeTypedRef(this, gpg::RTypeOf<moho::IAniManipulator>());
   }
 
   /**
@@ -1460,7 +1329,7 @@ namespace moho
   CScrLuaInitForm* func_IAniManipulatorSetPrecedence_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kIAniManipulatorSetPrecedenceName,
       &moho::cfunc_IAniManipulatorSetPrecedence,
       &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
@@ -1484,10 +1353,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kIAniManipulatorSetPrecedenceHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kIAniManipulatorSetPrecedenceHelpText);
 
     LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
     IAniManipulator* const manipulator = SCR_FromLua_IAniManipulator(manipulatorObject, state);
@@ -1526,7 +1392,7 @@ namespace moho
   CScrLuaInitForm* func_IAniManipulatorEnable_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kIAniManipulatorEnableName,
       &moho::cfunc_IAniManipulatorEnable,
       &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
@@ -1549,11 +1415,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kIAniManipulatorEnableHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kIAniManipulatorEnableHelpText);
 
     LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
     IAniManipulator* const manipulator = SCR_FromLua_IAniManipulator(manipulatorObject, state);
@@ -1585,7 +1447,7 @@ namespace moho
   CScrLuaInitForm* func_IAniManipulatorDisable_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kIAniManipulatorDisableName,
       &moho::cfunc_IAniManipulatorDisable,
       &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
@@ -1608,11 +1470,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kIAniManipulatorDisableHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kIAniManipulatorDisableHelpText);
 
     LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
     IAniManipulator* const manipulator = SCR_FromLua_IAniManipulator(manipulatorObject, state);
@@ -1644,7 +1502,7 @@ namespace moho
   CScrLuaInitForm* func_IAniManipulatorDestroy_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kIAniManipulatorDestroyName,
       &moho::cfunc_IAniManipulatorDestroy,
       &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
@@ -1667,11 +1525,7 @@ namespace moho
       return 0;
     }
 
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kIAniManipulatorDestroyHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kIAniManipulatorDestroyHelpText);
 
     LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
     IAniManipulator* const manipulator = SCR_FromLua_IAniManipulatorOpt(manipulatorObject, state);

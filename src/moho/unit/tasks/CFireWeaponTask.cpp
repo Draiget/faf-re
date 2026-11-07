@@ -47,21 +47,11 @@ namespace
   }
 
   template <class T>
-  gpg::RType* CachedRType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(T));
-    }
-    return cached;
-  }
-
-  template <class T>
   gpg::RRef MakeTrackedRef(T* object)
   {
     gpg::RRef out{};
     out.mObj = nullptr;
-    out.mType = CachedRType<T>();
+    out.mType = gpg::RTypeOf<T>();
     if (!object) {
       return out;
     }
@@ -105,7 +95,7 @@ namespace
 
     const char* const expected = expectedType ? expectedType->GetName() : "null";
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "null",
@@ -293,9 +283,9 @@ void CFireWeaponTask::MemberDeserialize(gpg::ReadArchive* const archive, int /*v
     return;
   }
 
-  archive->Read(CachedRType<CTask>(), this, ownerRef);
-  mWeapon = ReadTrackedPointer<UnitWeapon>(archive, CachedRType<UnitWeapon>(), ownerRef);
-  mUnit = ReadTrackedPointer<Unit>(archive, CachedRType<Unit>(), ownerRef);
+  archive->Read(gpg::RTypeOf<CTask>(), this, ownerRef);
+  mWeapon = ReadTrackedPointer<UnitWeapon>(archive, gpg::RTypeOf<UnitWeapon>(), ownerRef);
+  mUnit = ReadTrackedPointer<Unit>(archive, gpg::RTypeOf<Unit>(), ownerRef);
   archive->ReadInt(&mFireClock);
 }
 
@@ -313,7 +303,7 @@ void CFireWeaponTask::MemberSerialize(gpg::WriteArchive* const archive, int /*ve
     return;
   }
 
-  archive->Write(CachedRType<CTask>(), this, ownerRef);
+  archive->Write(gpg::RTypeOf<CTask>(), this, ownerRef);
   WriteTrackedPointer(archive, mWeapon, gpg::TrackedPointerState::Unowned, ownerRef);
   WriteTrackedPointer(archive, mUnit, gpg::TrackedPointerState::Unowned, ownerRef);
   archive->WriteInt(mFireClock);

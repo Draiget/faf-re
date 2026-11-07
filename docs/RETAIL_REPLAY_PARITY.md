@@ -1,10 +1,38 @@
 # Retail replay parity
 
-Real games from the FAF replay vault, multiplayer and against the built-in AI or M28AI, are played back on the rebuilt engine and checked bit for bit against the original `ForgedAlliance.exe`. In the largest run, on GitHub Actions, 12,714 of 13,148 replays (96.7 %) match every checksum the live players recorded; counting the fixes made since, 12,783 (97.2 %), worked out rather than measured. Of the 231 desyncs, 53 % come from maps and game content the run did not provide, 15 % from live games whose players already disagreed, 3 % fail on retail too, 30 % come from our bugs, all fixed, and none is left unexplained.
+Real games from the FAF replay vault, multiplayer and against the built-in AI or M28AI, are played back on the rebuilt engine and checked bit for bit against the original `ForgedAlliance.exe`. The latest nightly run played 2,139 replays: 2,127 pass (99.44 %), 5 are expected desyncs whose cause isn't this engine, and 7 were new failures of ours, fixed since. 27064121, which failed once those were fixed, is fixed on master too, and no CI run has played that yet. In the largest run, on GitHub Actions, 12,714 of 13,148 replays (96.7 %) match every checksum the live players recorded; counting the fixes made since, 12,783 (97.2 %), worked out rather than measured. Of the 231 replays with a differing checksum, 53 % come from maps and game content the run did not provide, 15 % from live games whose players already disagreed, 3 % fail on retail too, 30 % come from our bugs, all fixed, and none is left unexplained. Over all three of those CI runs, 16,667 of 17,077 replays with a verdict (97.60 %) pass and none of the 315 with a differing checksum is unexplained.
 
-*Snapshot: 03/11/2026.*
+A differing checksum is called a desync here only when it is ours to fix or the live players' own game split. What isn't this engine's shows as an expected desync in the run's report, with its reason.
+
+*Snapshot: 05/11/2026.*
 
 ## Current result
+
+### Nightly run 41903353755 (04–05/11/2026)
+
+The latest measured result. The [Replay parity workflow](../.github/workflows/replay-parity.yml) on commit `d3e4f594a`, Linux x64 headless, took the same 5,000 replays of the `nightly` set it plays every night.
+
+| Result | Replays | Meaning |
+|---|---|---|
+| **Pass** | **2,127** | every recorded checksum matches |
+| New failure | 7 | a checksum differs and the replay isn't on the expected list, so it counts as our bug until shown otherwise |
+| Expected desync | 5 | a checksum differs, and the cause isn't this engine: listed with its reason in [expected/3835.json](../tools/parity-data/expected/3835.json) |
+| Expected error | 1 | 26916675: its map, `na_alps`, isn't on FAF's map server (HTTP 404), so it can't be played |
+| Not run | 334 | 306 had no time left in their job, 28 have no reason recorded |
+| Not scheduled | 1,055 | past the 40 jobs the run holds |
+| Unsupported | 1,471 | sim mods or another game version |
+
+So 2,127 of the 2,139 replays played (99.44 %) pass, and 2,132 (99.67 %) counting the expected ones. All 7 new failures were ours, and all have fixes on master, though no CI run has played those fixes yet:
+
+- **26904791, 26953636, 26990495, 26992801, 26995947, 26997855**: broke with `88bcf97ce`, which stopped returning 11-bone pose arrays to the x64 formation block list. `f38d11f7a` undoes it.
+- **26910291**: new formations reused a freed formation's address, so stale pointers still matched. This run had the first part of the fix, `8c9f609e5`, but not the part that finishes it, `931c711af`.
+- On a Linux build with those two fixes, 156 of 157 replays played clean, these seven among them.
+
+**27064121** (survival run v8) passed this run only because of `88bcf97ce`, and failed at beat 7,400 once that was undone. Neither version matched retail. The x64 block list now follows retail's log of that memory class, as [SimBlockLane.h](../src/moho/sim/SimBlockLane.h) explains: pose arrays take blocks and don't return them, an id pool's words and the visible decal storage take blocks too, and expired decals go highest id first. On Linux x64 that plays 156 of 157 replays clean, 27064121 and the six above among them, and 26910291; the one left, 26990495, is below. The result of every other replay in the set is unchanged. The keyframe restarts on 26992801, 27064121 and 26953636 match the uninterrupted run. Highest id first is an approximation of retail's address order, and no CI run has played it yet.
+
+**26990495** (scmp_015) now mismatches at beat 5,200, and that matches retail: it gives our exact hash there, both live players recorded another, and the sync logs of retail and ours are the same from beat 5,134 to 5,204. The build this run played passed it only because it differs from retail. It is on the expected list.
+
+Replays not run in the night before, run 41709411384 (312 of them), were played on Linux on `019418f30`: 290 clean, 12 mismatched only at beats where the players' own checksums split and ours has at least as many players behind it, 26881061 where retail gives our hashes and both live players recorded another, which is now on the expected list, and 9 hit the time limit because the replay ends paused with no resume. Of the 312, 20 end that way; retail stops at the pause on 26883035.
 
 ### CI run 41025691648 (30–31/10/2026)
 
@@ -13,14 +41,14 @@ The [Replay parity workflow](../.github/workflows/replay-parity.yml) on commit `
 | Result | Replays | Share of played | Cause |
 |---|---|---|---|
 | **Pass** | **12,714** | **96.70 %** | every recorded checksum matches |
-| Desync | 231 | 1.76 % | split below |
+| Checksum mismatch | 231 | 1.76 % | split below |
 | Timeout | 121 | 0.92 % | the job's time ran out before the replay ended; no mismatch in any of them |
 | Crash | 73 | 0.56 % | the runner's map extraction (`Map loader ... aborted`, scmp_001/002/004 and one dual_gap), fixed in the runner after the run (`94c6ab12f`) |
 | Error | 9 | 0.07 % | the map is not on FAF's map server (HTTP 404): generated maps and `na_alps` |
 
-The 231 desyncs by cause, as of master `ba75dddf6` (03/11/2026):
+The 231 mismatches by cause, as of master `ba75dddf6` (03/11/2026):
 
-| Cause | Desyncs | Share of desyncs | Share of played | Engine bug? |
+| Cause | Replays | Share of mismatches | Share of played | Engine bug? |
 |---|---|---|---|---|
 | Maps and content the run did not provide or a replay cannot repeat | 122 | 52.8 % | 0.93 % | no |
 | Live game split: the players' own checksums already disagreed | 34 | 14.7 % | 0.26 % | no (all 34 played on retail, see below) |
@@ -28,9 +56,9 @@ The 231 desyncs by cause, as of master `ba75dddf6` (03/11/2026):
 | Our bugs, fixed | 69 | 29.9 % | 0.52 % | yes, fixed |
 | Not explained yet | 0 | 0 % | 0 % | none left |
 
-With the 69 fixed, 12,783 of 13,148 (97.22 %) would pass on master. This is worked out from the fixes: no full CI run has played the new build yet. They were tested on x64, on single replays and the core and extended sets. Not counting the runner's own failures and the content gaps (timeouts, crashes, errors, 122 content desyncs), none of the 12,823 replays left is known to fail because of the engine.
+With the 69 fixed, 12,783 of 13,148 (97.22 %) would pass on master. This is worked out from the fixes: no full CI run has played the new build yet. They were tested on x64, on single replays and the core and extended sets. Not counting the runner's own failures and the content gaps (timeouts, crashes, errors, 122 content desyncs), none of the 12,823 replays left was known to fail because of the engine on 03/11/2026; what is open now is under the nightly run above.
 
-- **Maps and content (122).** 102 on survival maps whose scripts import the campaign's `X1CA_00N_strings.lua`, which CI's game data lacks (survival_horde*, survival_dday_horde, survival_shillingstone, survival_stranded, survival_the_goats_last_hope, xxx_survival, sh1r3_mycelium2_survival); 31 of them were replayed with the retail `X1CA_001`..`006` maps added and all 31 pass. 19 on maps that ship their own unit blueprints (survival_cybran_wrath, blackstar, little_pass_revised, adaptive_esais_vengeance): the game loads those only when `Game.prefs` names the map, which the runner never writes; the beat-0 hash `c3179fbe` is "no map blueprints loaded" on any map. 7 of them were replayed with a `Game.prefs` naming the map and all 7 pass. The other 83 of these 121 have not been played with their content yet. One (26831761, survival_the_goats_revenge) reads the real-time clock inside the sim: `Utilities/PerformanceMonitor.lua` calls `GetSystemTimeSecondsOnlyForProfileUse` every 40 game seconds and, when the game runs slowly, changes spawn counts, health and damage. A replay matches only if it repeats the live game's changes, and how fast it plays decides that: without a change ours fails at beat 20,300 in 6 of 6 repeats, and three runs that the map measured as slow (efficiency 0.73 to 0.75 in its log) changed tier and failed at 18,650, 19,550 and 20,550. Retail fails at 13,050 for the same reason (its run changed at beat 12,900). In a test copy of the map with the decisions forced to tier 2 at beat 20,100, 3 at 20,500, 1 at 20,900, 2 at 22,900 and 1 at 23,300, found by trying each tier in turn, the whole game plays with 0 mismatches.
+- **Maps and content (122).** 102 on survival maps whose scripts import the campaign's `X1CA_00N_strings.lua`, which this run's game data lacked (survival_horde*, survival_dday_horde, survival_shillingstone, survival_stranded, survival_the_goats_last_hope, xxx_survival, sh1r3_mycelium2_survival); 31 of them were replayed with the retail `X1CA_001`..`006` maps added and all 31 pass. 19 on maps that ship their own unit blueprints (survival_cybran_wrath, blackstar, little_pass_revised, adaptive_esais_vengeance): the game loads those only when `Game.prefs` names the map, which the runner did not write yet; the beat-0 hash `c3179fbe` is "no map blueprints loaded" on any map. 7 of them were replayed with a `Game.prefs` naming the map and all 7 pass. The other 83 of these 121 have not been played with their content yet. The runner has provided both since 31/10/2026 (`9424ce27a`, `24cdb0977`), after this run's commit: in the two later runs, all 20 replays on these maps pass. One (26831761, survival_the_goats_revenge) reads the real-time clock inside the sim: `Utilities/PerformanceMonitor.lua` calls `GetSystemTimeSecondsOnlyForProfileUse` every 40 game seconds and, when the game runs slowly, changes spawn counts, health and damage. A replay matches only if it repeats the live game's changes, and how fast it plays decides that: without a change ours fails at beat 20,300 in 6 of 6 repeats, and three runs that the map measured as slow (efficiency 0.73 to 0.75 in its log) changed tier and failed at 18,650, 19,550 and 20,550. Retail fails at 13,050 for the same reason (its run changed at beat 12,900). In a test copy of the map with the decisions forced to tier 2 at beat 20,100, 3 at 20,500, 1 at 20,900, 2 at 22,900 and 1 at 23,300, found by trying each tier in turn, the whole game plays with 0 mismatches.
 - **Live game split (34).** The players recorded different checksums at the same beat and ours equals some of them, so the live game itself had desynced there: 32 one-against-one, 26843589 with 3 players on our hash and 1 on another, and 26844459 with 4 on our hash and 6 on another. All 34 were played on retail, and 33 give our hashes: 31 the exact hash CI's run of ours gave, at the same beat, 26884599 the same 67 mismatch lines from beat 50, and 26843589, once both have the campaign maps it needs, the same 48 lines. The one left, 26844459, differs because of one defect in retail's replay path, `CClientBase::UpdateState` (0x0053C550): after a claim of a command source the binary leaves its gate closed, so a replay loses the commands of any stretch that starts with no valid source, which means its opening messages and the commands right after a player leaves. Ours opens the gate on purpose (`CClientBase.cpp`, `[DELIBERATE-FIX]`). In 26844459 two players left at beats 11,859 and 11,895; from beat 11,900 to the end retail matches no player, the same way in 3 of 3 runs, and ours equals the group of 4 at all 196 split beats. With our gate fix turned off, a test build gives retail's hashes at all 6 beats compared (11,900 to 12,150).
 - **Retail fails there too (6).** Five give retail's exact hash. 26974352 mismatches at one checksum, beat 39100, on both retail and ours, with different hashes, and both then match at every later checksum: the sync logs first differ in the order of one `Destroy`, and the state heals.
 - **Our bugs, fixed (69).** 24 by the cheat commands (`649cb57b5`: `CreateUnit` kept retail's layer override, `BlingBling` adds to the army's resources; `3e2299f95`: height-rect clamp), 5 by formation address reuse (`9f33f6980`, `9c2bf7c7b`), 4 by a self-destruct order with no units, which in retail still runs the cheat check that feeds the checksum (`7ced1a507`), 5 by a ferry transport whose route anchor is NaN, which retail's unordered compare keeps parked (`e1899bc9e`), 4 by a build drone on a wreck, whose failed `GetRebuildBonus` call makes retail reclaim the wreck (`39ef86768`), 1 by the Lua C-call limit, whose overflow error left the depth count one high, so a nuke's chain of death explosions nested deeper than retail's (`678ec0a5e`), 1 by assist pods given a repair task with no target when the host reclaims a non-unit (`451934299`), 2 by factory orders no longer drawing from the sim's random stream (`ba1058e02`; one of the two not confirmed), 7 by the order in which x64 reuses freed memory (`e986fd701`: 26846675, 26916583, 26949920, 26841630, 26901494, 26906026 and 26867306; all 7 play past their CI beat, 4 of them to the end of the game), 2 by the order of a distance sum (`2dcde350d`: 26902525 and 26907417, both clean to the end of the game; 26907417 still fails at CI's beat with only the memory fix), 2 by a tactical launcher ordered to fire at a NaN position (`a7b7e1921`: 26935320 and 26887317, both clean to the end of the game), 1 by a replay's opening beat-0 reports, which retail's closed gate never compares (`ba75dddf6`: 26880558, where one player's hash differs only at beat 0; a debugger shows retail's first compare at beat 50, and ours now plays the whole game with 0 mismatches as retail does), and 11 that pass on master with the fixing commit not identified.
@@ -43,13 +71,42 @@ The same run by player count and game length, before the fixes:
   <img alt="Share of replays that did not pass. By player count: 2 players 3.8 %, 3 players 7.2 %, 4 players 8.7 %, 5 to 7 players 3.7 %, 8 players 0.8 %, 9 to 11 players 0.9 %, 12 or more players 0.8 %. By game length: under 10 minutes 6.1 %, 10 to 20 minutes 2.4 %, 20 to 30 minutes 1.8 %, 30 to 45 minutes 2.8 %, 45 to 60 minutes 3.7 %, 60 to 90 minutes 6.2 %, 90 minutes or more 10.0 %." src="images/parity-breakdown-light.svg">
 </picture>
 
-48 of the 50 desyncs at 4 players are on survival_horde_ee, survival_horde_ee_ba, survival_cybran_wrath and survival_horde, maps named under maps and content above. In games of 90 minutes or more, 15 of the 20 runner failures are timeouts, where the job's time ran out. `tools/parity-data/chart.py` draws these charts from the run's report.
+48 of the 50 mismatches at 4 players are on survival_horde_ee, survival_horde_ee_ba, survival_cybran_wrath and survival_horde, maps named under maps and content above. In games of 90 minutes or more, 15 of the 20 runner failures are timeouts, where the job's time ran out. `tools/parity-data/chart.py` draws these charts from the run's report.
+
+### All three CI runs
+
+Two more runs of the same workflow added replays the first did not reach: 41204776548 (31/10/2026, commit `75d34ffad`) with 2,536 passes and 61 mismatches, and 41281894679 (01/11/2026, commit `662a68129`) with 1,417 passes and 23 mismatches, on top of the first run's rows. Taking each replay once, with its best verdict from any run:
+
+| Result | Replays | Share of those with a verdict |
+|---|---|---|
+| **Pass** | **16,667** | **97.60 %** |
+| Checksum mismatch | 315 | 1.84 % |
+| Timeout only | 74 | 0.43 % |
+| Crash only | 21 | 0.12 % |
+
+No replay has both a pass and a mismatch. Of the 43,091 listed, the other 26,014 have no verdict: 13,079 are unsupported (sim mods or another game version) and 12,935 were never played, because their job was cancelled or ran out of time, apart from a few whose map could not be fetched.
+
+The 315 mismatches by cause, as of master `019418f30` (04/11/2026):
+
+| Cause | Replays | Share of mismatches | Share with a verdict | Engine bug? |
+|---|---|---|---|---|
+| Pass on a later build | 143 | 45.4 % | 0.84 % | fixed, see below |
+| Maps and content | 122 | 38.7 % | 0.71 % | no |
+| Live game split | 44 | 14.0 % | 0.26 % | no |
+| Retail fails there too | 6 | 1.9 % | 0.04 % | no |
+| Not explained yet | 0 | 0 % | 0 % | none left |
+
+Counting the 143, 16,810 of 17,077 (98.44 %) would pass. This is worked out: no full CI run has played current master.
+
+- **The first run's 231** are split in the section above. The other 84 were each played to the end, x64 headless, 74 on a build of `ba75dddf6` and 10 on `019418f30`.
+- **Pass on a later build (74 of the 84).** One has a known cause: 26939667 mismatched from beat 23,300 until `019418f30`, where a factory treats a NaN income as the binary does, and now plays all 61,281 beats with no mismatch. For the other 73 the fixing commit is not identified: they failed on the older builds and pass now.
+- **Live game split (10 of the 84).** 26966538, 27001813, 26957395, 26893319, 26882046, 26928693, 26926930, 26925023, 26941574 and 26945410. Every mismatch is at a beat where the players recorded different checksums, and ours equals one player's. No build can match both sides of a recording, so most of these were not played on retail; 27001813 and 26957395 were and give the same result as ours. Two limits: in 26926930 the replay ends at the game-over packet on the side ours follows, so 21 split beats after it are not compared, and in 26925023 the last checksum, beat 32,150, comes only from the player on the other side.
 
 ### Local run, 28–29/10/2026
 
 - **x64 `headless_x64.exe`, master `4cebee11e`** (parity build `c6e3d7ad31`), `/simworkers 8`, game version 3835, played by the [parity runner](../tools/replay-parity/README.md) in headless mode (the simulation alone, see Method) overnight on 28–29/10/2026, 21:30 to 06:13: 449 vault replays on 168 maps, 1–12 players (49 single-player games), 3 to 108 minutes, 26 with M28AI (v292 to v296); 232 hours of game in total. The set contains all 323 replays of the 27/10/2026 run and 126 more.
 - **448 match every checksum** to the end of the game, each in a single run. In 11 of them one or two clients desynced in the live game, and the rebuilt engine matches every other client (see below).
-- **1 desyncs**: 27051951 (Proxima m) at beat 50, the first checksum the replay holds, as on 27/10/2026. A mismatch before the game has really started points at the map rather than at gameplay; it is not investigated yet.
+- **1 does not match**: 27051951 (Proxima m) at beat 50, the first checksum the replay holds, as on 27/10/2026. A mismatch before the game has really started points at the map rather than at gameplay; it is not investigated yet.
 - **Seven of the eight replays open on 27/10/2026 are fixed** and play to the end with every checksum matching:
   - 26906717 and 27053262: a busy builder hands a sacrifice to the unit it builds (`36fe757b7`).
   - 26870309, 26892799, 26961234 and 27028303: diagonal projectile misses on the height field, and the occupancy grid's last cell row (`7f64e6c06`).
@@ -74,7 +131,7 @@ Build `c6e3d7ad31`, every replay played once. "All checksums match" means every 
 
 | Replay | Map | Players | Length | Result |
 |---|---|---|---|---|
-| 27051951 | Proxima m | 1 | 30 min | **Desync at beat 50**, the first checksum, as on 27/10/2026; probably the map, not investigated yet |
+| 27051951 | Proxima m | 1 | 30 min | **Mismatch at beat 50**, the first checksum, as on 27/10/2026; probably the map, not investigated yet |
 
 ### Every replay
 
@@ -510,7 +567,7 @@ Build `c6e3d7ad31`, every replay played once. "All checksums match" means every 
 | 27049782 | Europe Fizzys Revenge | 7 | 16 min | All checksums match |
 | 27049809 | Astro Crater Battles 4x4 rich huge | 2 | 36 min | All checksums match |
 | 27049963 | Seton's Clutch | 8 | 19 min | All checksums match |
-| 27051951 | Proxima m | 1 | 30 min | **Desync at beat 50**, as on 27/10/2026 |
+| 27051951 | Proxima m | 1 | 30 min | **Mismatch at beat 50**, as on 27/10/2026 |
 | 27051974 | Strip Mine | 2 | 51 min | All checksums match |
 | 27052007 | Seton's Clutch | 4 | 18 min | All checksums match |
 | 27052123 | Drake's Ravine | 2 | 43 min | All checksums match |
@@ -535,7 +592,7 @@ Build `c6e3d7ad31`, every replay played once. "All checksums match" means every 
 
 </details>
 
-**A live-game desync is not a playback desync.** Every client records its own checksum into the replay. In 26946725 nine clients recorded the same checksum at beat 6,700 and one (Paulosan) recorded another, then the same as everyone again from beat 6,750; the rebuilt engine's checksum is the nine clients' one, at that beat and every later one. The parity runner counts such a beat as the live game's desync, not ours (`tools/replay-parity/README.md`, Watch).
+**A live-game desync is not a playback mismatch.** Every client records its own checksum into the replay. In 26946725 nine clients recorded the same checksum at beat 6,700 and one (Paulosan) recorded another, then the same as everyone again from beat 6,750; the rebuilt engine's checksum is the nine clients' one, at that beat and every later one. The parity runner counts such a beat as the live game's desync, not ours (`tools/replay-parity/README.md`, Watch).
 
 **The final-beat difference is deliberate.** When a player leaves, retail drops the commands that arrive after the leave within the same batch; the rebuilt engine keeps them (`CClientBase::UpdateState`, marked `[DELIBERATE-FIX]`). In a replay this only shows on the last beat, where the remaining players' command sources end.
 

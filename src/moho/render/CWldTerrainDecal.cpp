@@ -96,7 +96,7 @@ namespace
   void ReleaseTrackedCountedObjectPtr(moho::CountedPtr<moho::CountedObject>& ptr) noexcept
   {
     if (ptr.tex != nullptr) {
-      ptr.tex->ReleaseReference();
+      (void)ptr.tex->ReleaseReference();
       ptr.tex = nullptr;
     }
   }
@@ -229,7 +229,7 @@ namespace moho
   extern float ren_DecalFlatTol;
   extern float ren_DecalFadeFraction;
 
-  msvc8::string CWldTerrainDecal::sTypeDesc[10] = {
+  fa::string CWldTerrainDecal::sTypeDesc[10] = {
     "Undefined",
     "Albedo",
     "Normals",
@@ -341,7 +341,7 @@ namespace moho
     writer.Write(kNameSlotCount);
 
     for (std::int32_t slot = 0; slot < kNameSlotCount; ++slot) {
-      const msvc8::string& name = mNames[slot];
+      const fa::string& name = mNames[slot];
       const std::int32_t nameByteLength = static_cast<std::int32_t>(name.size());
       writer.Write(nameByteLength);
       writer.Write(name.raw_data_unsafe(), static_cast<std::size_t>(nameByteLength));
@@ -393,7 +393,7 @@ namespace moho
         reader.Read(nameBytes.data(), static_cast<std::size_t>(nameLength));
       }
 
-      msvc8::string name;
+      fa::string name;
       name.assign(nameBytes.data(), static_cast<std::size_t>(nameLength));
 
       SetName(name, slot);
@@ -434,11 +434,11 @@ namespace moho
    * Resolves one decal type enum from static descriptor text and warns when
    * caller input does not match any known descriptor lane.
    */
-  EWldTerrainDecalType CWldTerrainDecal::LookupDecalType(const msvc8::string& typeDescription)
+  EWldTerrainDecalType CWldTerrainDecal::LookupDecalType(const fa::string& typeDescription)
   {
-    msvc8::string* const begin = &sTypeDesc[0];
-    msvc8::string* const end = begin + 10;
-    msvc8::string* const found = SearchStringArrayFor(begin, end, &typeDescription);
+    fa::string* const begin = &sTypeDesc[0];
+    fa::string* const end = begin + 10;
+    fa::string* const found = SearchStringArrayFor(begin, end, &typeDescription);
     if (found != end) {
       return static_cast<EWldTerrainDecalType>(found - begin);
     }
@@ -453,7 +453,7 @@ namespace moho
    * What it does:
    * Writes one name lane and refreshes the matching counted texture reference.
    */
-  void CWldTerrainDecal::SetName(const msvc8::string& name, const int slot)
+  void CWldTerrainDecal::SetName(const fa::string& name, const int slot)
   {
     mNames[slot] = name;
 
@@ -461,7 +461,7 @@ namespace moho
       CAnimTexture* const texture = CAnimTexture::FindOrCreate(mNames[slot].c_str());
       SetTrackedCountedObjectPtr(mResourceRefs[slot], texture);
       if (texture != nullptr) {
-        texture->ReleaseReference();
+        (void)texture->ReleaseReference();
       }
       return;
     }

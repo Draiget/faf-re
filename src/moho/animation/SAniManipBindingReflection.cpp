@@ -73,7 +73,7 @@ namespace gpg
     ~RFastVectorType() override;
 
     [[nodiscard]] const char* GetName() const override;
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
     /**
@@ -123,14 +123,6 @@ namespace
   {
     static FastVectorSAniManipBindingType sInstance;
     return &sInstance;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSAniManipBindingType()
-  {
-    if (!moho::SAniManipBinding::sType) {
-      moho::SAniManipBinding::sType = gpg::LookupRType(typeid(moho::SAniManipBinding));
-    }
-    return moho::SAniManipBinding::sType;
   }
 
   struct SAniManipBindingInline
@@ -184,7 +176,7 @@ namespace
     moho::SAniManipBinding fill{};
     vec.resize(static_cast<std::size_t>(count), fill);
 
-    gpg::RType* const elementType = CachedSAniManipBindingType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::SAniManipBinding>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Read(elementType, &vec[i], owner);
@@ -207,7 +199,7 @@ namespace
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
-    gpg::RType* const elementType = CachedSAniManipBindingType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::SAniManipBinding>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Write(elementType, &vec[i], owner);
@@ -277,16 +269,16 @@ namespace gpg
    */
   const char* RFastVectorType<moho::SAniManipBinding>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSAniManipBindingType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::SAniManipBinding>()->GetName());
     return sName.c_str();
   }
 
   /**
    * Address: 0x0063C3E0 (FUN_0063C3E0, gpg::RFastVectorType_SAniManipBinding::GetLexical)
    */
-  msvc8::string RFastVectorType<moho::SAniManipBinding>::GetLexical(const gpg::RRef& ref) const
+  fa::string RFastVectorType<moho::SAniManipBinding>::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
@@ -318,7 +310,7 @@ namespace gpg
   gpg::RRef RFastVectorType<moho::SAniManipBinding>::SubscriptIndex(void* obj, const int ind) const
   {
     gpg::RRef out{};
-    out.mType = CachedSAniManipBindingType();
+    out.mType = gpg::RTypeOf<moho::SAniManipBinding>();
     out.mObj = nullptr;
     if (!obj || ind < 0) {
       return out;

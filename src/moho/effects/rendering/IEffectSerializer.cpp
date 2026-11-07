@@ -12,13 +12,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCScriptObjectType()
-  {
-    if (!moho::CScriptObject::sType) {
-      moho::CScriptObject::sType = gpg::LookupRType(typeid(moho::CScriptObject));
-    }
-    return moho::CScriptObject::sType;
-  }
 
   /**
    * Address: 0x007714E0 (FUN_007714E0, write manager pointer helper)
@@ -48,7 +41,7 @@ namespace moho
   void IEffect::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     const gpg::RRef nullOwner{};
-    archive->Read(CachedCScriptObjectType(), static_cast<moho::CScriptObject*>(this), nullOwner);
+    archive->Read(gpg::RTypeOf<moho::CScriptObject>(), static_cast<moho::CScriptObject*>(this), nullOwner);
 
     moho::IEffectManager* manager = nullptr;
     archive->ReadPointer(&manager, &nullOwner);
@@ -67,7 +60,7 @@ namespace moho
   void IEffect::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     const gpg::RRef nullOwner{};
-    archive->Write(CachedCScriptObjectType(), static_cast<const moho::CScriptObject*>(this), nullOwner);
+    archive->Write(gpg::RTypeOf<moho::CScriptObject>(), static_cast<const moho::CScriptObject*>(this), nullOwner);
 
     moho::IEffectManager* manager = GetManager();
     (void)SerializeIEffectManagerPointer(&manager, archive);

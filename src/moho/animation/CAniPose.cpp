@@ -27,48 +27,6 @@ namespace
     "Bypasses redundant GetBone lookups and pose hierarchy rebuilds when skeleton matches.",
     &sim_FastBoneUpdates
   );
-  [[nodiscard]] gpg::RType* CachedVTransformType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::VTransform));
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedFastVectorCAniPoseBoneType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(gpg::fastvector<moho::CAniPoseBone>));
-    }
-    return sType;
-  }
-
-  /**
-   * Address: 0x0054D000 (FUN_0054D000)
-   *
-   * What it does:
-   * Resolves and caches the reflected runtime type for `CAniPoseBone`.
-   */
-  [[nodiscard]] gpg::RType* CachedCAniPoseBoneType()
-  {
-    gpg::RType* type = moho::CAniPoseBone::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CAniPoseBone));
-      moho::CAniPoseBone::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCAniSkelType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::CAniSkel));
-    }
-    return sType;
-  }
 
   // Address: 0x00BC9960 (FUN_00BC9960, register_CAniPoseSerializer) -- MSVC's
   // own compiler-generated dynamic initializer for this global runs the real
@@ -138,7 +96,7 @@ namespace
     }
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Read(CachedCAniPoseBoneType(), objectStorage, owner);
+    archive->Read(gpg::CachedLookup<moho::CAniPoseBone>(moho::CAniPoseBone::sType), objectStorage, owner);
     return archive;
   }
 
@@ -159,7 +117,7 @@ namespace
     }
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Write(CachedCAniPoseBoneType(), objectSlot, owner);
+    archive->Write(gpg::CachedLookup<moho::CAniPoseBone>(moho::CAniPoseBone::sType), objectSlot, owner);
     return archive;
   }
 
@@ -207,35 +165,6 @@ namespace
 
   [[maybe_unused]] CAniPoseSerializerStartupBootstrap gCAniPoseSerializerStartupBootstrap;
 
-  template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (object == nullptr) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    if (dynamicType != nullptr && staticType != nullptr && dynamicType->IsDerivedFrom(staticType, &baseOffset)) {
-      out.mObj =
-        reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = object;
-    out.mType = dynamicType ? dynamicType : staticType;
-    return out;
-  }
 
   [[nodiscard]] moho::VTransform MakeIdentityPoseTransform() noexcept
   {
@@ -302,31 +231,6 @@ namespace
     laneView->lane38 = 0.0f;
     laneView->lane3C = 0.0f;
     return laneView;
-  }
-
-  [[nodiscard]] constexpr std::intptr_t PoseBoneStrideBytes() noexcept
-  {
-    return static_cast<std::intptr_t>(sizeof(moho::CAniPoseBone));
-  }
-
-  [[nodiscard]] moho::CAniPoseBone* PoseBoneByteOffset(
-    moho::CAniPoseBone* const begin,
-    const std::int32_t elementOffset
-  ) noexcept
-  {
-    const std::intptr_t beginBytes = reinterpret_cast<std::intptr_t>(begin);
-    const std::intptr_t offsetBytes = static_cast<std::intptr_t>(elementOffset) * PoseBoneStrideBytes();
-    return reinterpret_cast<moho::CAniPoseBone*>(beginBytes + offsetBytes);
-  }
-
-  [[nodiscard]] const moho::CAniPoseBone* PoseBoneByteOffset(
-    const moho::CAniPoseBone* const begin,
-    const std::int32_t elementOffset
-  ) noexcept
-  {
-    const std::intptr_t beginBytes = reinterpret_cast<std::intptr_t>(begin);
-    const std::intptr_t offsetBytes = static_cast<std::intptr_t>(elementOffset) * PoseBoneStrideBytes();
-    return reinterpret_cast<const moho::CAniPoseBone*>(beginBytes + offsetBytes);
   }
 
   /**
@@ -630,7 +534,7 @@ namespace moho
         for (std::uint32_t index = 0; index < boneCount; ++index) {
           CAniPoseBone& candidate = bonesBegin[static_cast<std::size_t>(index)];
           if (candidate.mParent == this) {
-            candidate.SetVisibleRecur(visible);
+            (void)candidate.SetVisibleRecur(visible);
           }
         }
       }
@@ -652,7 +556,7 @@ namespace moho
     archive->WriteBool(mCompositeIsLocal);
 
     const gpg::RRef nullOwner{};
-    archive->Write(CachedVTransformType(), &mLocalTransform, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::VTransform>(), &mLocalTransform, nullOwner);
 
     archive->WriteBool(mVisible);
     archive->WriteBool(mSkipNextInterp);
@@ -670,7 +574,7 @@ namespace moho
     mCompositeIsLocal = compositeIsLocal ? 1u : 0u;
 
     const gpg::RRef nullOwner{};
-    archive->Read(CachedVTransformType(), &mLocalTransform, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::VTransform>(), &mLocalTransform, nullOwner);
 
     bool visible = false;
     archive->ReadBool(&visible);
@@ -1281,8 +1185,8 @@ namespace moho
     const gpg::RRef nullOwner{};
     archive->ReadPointerShared(&mSkeleton, &nullOwner);
     archive->ReadFloat(&mScale);
-    archive->Read(CachedVTransformType(), &mLocalTransform, nullOwner);
-    archive->Read(CachedFastVectorCAniPoseBoneType(), &mBones, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::VTransform>(), &mLocalTransform, nullOwner);
+    archive->Read(gpg::RTypeOf<gpg::fastvector<moho::CAniPoseBone>>(), &mBones, nullOwner);
 
     CAniPoseBone* const bonesBegin = mBones.begin();
     CAniPoseBone* const bonesEnd = mBones.end();
@@ -1325,12 +1229,12 @@ namespace moho
   {
     const gpg::RRef nullOwner{};
     const gpg::RRef skeletonRef =
-      MakeDerivedRef(const_cast<CAniSkel*>(mSkeleton.get()), CachedCAniSkelType());
+      gpg::MakeDerivedRef(const_cast<CAniSkel*>(mSkeleton.get()), gpg::RTypeOf<moho::CAniSkel>());
     gpg::WriteRawPointer(archive, skeletonRef, gpg::TrackedPointerState::Shared, nullOwner);
 
     archive->WriteFloat(mScale);
-    archive->Write(CachedVTransformType(), &mLocalTransform, nullOwner);
-    archive->Write(CachedFastVectorCAniPoseBoneType(), &mBones, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::VTransform>(), &mLocalTransform, nullOwner);
+    archive->Write(gpg::RTypeOf<gpg::fastvector<moho::CAniPoseBone>>(), &mBones, nullOwner);
     archive->WriteFloat(mMaxOffset);
 
     // Engine addition (replay keyframes): see SIM_NoteKeyframeBlock.

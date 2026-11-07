@@ -60,7 +60,7 @@ namespace gpg::gal
      */
     bool Update(const state_type& state, const value_type& value)
     {
-      const typename msvc8::map<state_type, value_type>::iterator it = tree_.find(state);
+      const typename fa::map<state_type, value_type>::iterator it = tree_.find(state);
       if (it == tree_.end())
       {
         tree_[state] = value;
@@ -77,6 +77,6 @@ namespace gpg::gal
     }
 
   protected:
-    msvc8::map<state_type, value_type> tree_; // +0x04 {proxy, head, size}
+    fa::map<state_type, value_type> tree_; // +0x04 {proxy, head, size}
   };
 } // namespace gpg::gal

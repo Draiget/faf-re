@@ -22,16 +22,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedCTaskType()
-  {
-    gpg::RType* type = CTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(CTask));
-      CTask::sType = type;
-    }
-    return type;
-  }
-
   /**
    * Address: 0x005DBF30 (FUN_005DBF30)
    *
@@ -93,15 +83,9 @@ void LAiAttackerImplTypeInfo::Init()
  */
 void __stdcall LAiAttackerImplTypeInfo::AddBase_CTask(gpg::RType* const typeInfo)
 {
-  gpg::RType* const baseType = CachedCTaskType();
+  gpg::RType* const baseType = gpg::CachedLookup<CTask>(CTask::sType);
 
-  gpg::RField baseField{};
-  baseField.mName = baseType->GetName();
-  baseField.mType = baseType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBaseType(typeInfo, baseType);
 }
 
 /**

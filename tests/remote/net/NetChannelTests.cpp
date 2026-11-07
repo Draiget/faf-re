@@ -17,11 +17,14 @@
 #include <string>
 #include <vector>
 
+#include <gtest/gtest.h>
+
 #include "monocypher.h"
 #include "remote/net/Datagram.h"
 #include "remote/net/DatagramCipher.h"
 #include "remote/net/NetChannel.h"
 #include "remote/net/ReliableStream.h"
+#include "remote/net/StyleProof.h"
 
 using namespace faf::remote::net;
 
@@ -29,38 +32,7 @@ namespace
 {
   // --- Harness (as tests/remote/WireTests.cpp) -------------------------------------------
 
-  int gFailures = 0;
-  int gChecks = 0;
-
-#define CHECK(cond)                                                                \
-  do {                                                                             \
-    ++gChecks;                                                                     \
-    if (!(cond)) {                                                                 \
-      ++gFailures;                                                                 \
-      std::printf("  FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond);                \
-    }                                                                              \
-  } while (0)
-
-  struct TestCase
-  {
-    const char* name;
-    void (*body)();
-  };
-
-  void RunTest(const TestCase& test)
-  {
-    const int failuresBefore = gFailures;
-    try {
-      test.body();
-    } catch (const std::exception& e) {
-      ++gFailures;
-      std::printf("  FAIL %s: exception escaped: %s\n", test.name, e.what());
-    } catch (...) {
-      ++gFailures;
-      std::printf("  FAIL %s: exception escaped\n", test.name);
-    }
-    std::printf("%s %s\n", gFailures == failuresBefore ? "PASS" : "FAIL", test.name);
-  }
+#define CHECK(cond) EXPECT_TRUE(cond)
 
   using Bytes = std::vector<std::uint8_t>;
 
@@ -1071,35 +1043,70 @@ namespace
     }
   }
 
-  const TestCase kTests[] = {
-    {"header round trip and refusals (WP10.2)", TestHeaderRoundTrip},
-    {"varints", TestVarints},
-    {"receive window against a model: verdicts and ack bits (WP10.2)", TestReceiveWindowModel},
-    {"range set against a model (WP10.3)", TestRangeSetModel},
-    {"receiver reassembly from shuffled overlapping fragments (WP10.3)", TestReceiverReassembly},
-    {"reliable messages over lossy links, both ways (WP10.3)", TestReliableMatrix},
-    {"in-flight limit (WP10.3)", TestInFlightLimit},
-    {"message size limits", TestMessageLimits},
-    {"unreliable messages: at most once, intact", TestUnreliable},
-    {"redundant lane: losses covered by repeats, each message once (#240)", TestRedundantLane},
-    {"seal and open (WP10.6)", TestSealOpen},
-    {"cipher known answers: XChaCha20-Poly1305 vector, the channel's layout (WP10.6)", TestCipherKnownAnswers},
-    {"encrypted channel: delivery, tampering, replay, plaintext, one-sided keys (WP10.6)", TestEncryptedChannel},
-    {"keys set mid-session at different moments on each end (WP10.6)", TestKeysMidSession},
-    {"the sequence ends in failure, never a wrap (WP10.2, WP10.6)", TestSequenceEnd},
-    {"keepalive and RTT on an idle link (WP10.8)", TestKeepaliveAndRtt},
-    {"loss statistics at 10% loss (WP10.8)", TestLossStatistics},
-    {"timeout after a long partition, none after a short one (WP10.8)", TestTimeoutAndPartition},
-    {"retransmission backoff during a partition", TestBackoff},
-    {"fuzzed datagrams", TestFuzz},
-  };
+  // --- Lobby style proof ----------------------------------------------------------------
+
+  void TestStyleProof()
+  {
+    StyleSeed seed{};
+    seed.fill(7);
+    StyleSigningKey key;
+    MakeStyleSigningKey(seed, key);
+    CHECK(seed[0] == 0); // wiped
+
+    StyleSeed otherSeed{};
+    otherSeed.fill(9);
+    StyleSigningKey otherKey;
+    MakeStyleSigningKey(otherSeed, otherKey);
+
+    StyleChallenge challenge{};
+    challenge.fill(0x11);
+    const StyleColor color{0x12, 0x34, 0x56};
+    const StyleSignature proof = SignStyle(key, 100, 200, challenge, color);
+
+    CHECK(CheckStyle(key.publicKey, 100, 200, challenge, color, proof));
+
+    // A key other than the one the engine knows.
+    const StyleSignature forged = SignStyle(otherKey, 100, 200, challenge, color);
+    CHECK(!CheckStyle(key.publicKey, 100, 200, challenge, color, forged));
+
+    // Replayed against a new challenge.
+    StyleChallenge otherChallenge = challenge;
+    otherChallenge[31] ^= 1;
+    CHECK(!CheckStyle(key.publicKey, 100, 200, otherChallenge, color, proof));
+
+    // Passed on by a third player, who forwarded the challenge to the holder.
+    CHECK(!CheckStyle(key.publicKey, 300, 200, challenge, color, proof));
+    // Shown to a player it wasn't made for.
+    CHECK(!CheckStyle(key.publicKey, 100, 300, challenge, color, proof));
+
+    // Another colour under the same signature.
+    CHECK(!CheckStyle(key.publicKey, 100, 200, challenge, StyleColor{0x12, 0x34, 0x57}, proof));
+
+    StyleSignature tampered = proof;
+    tampered[0] ^= 1;
+    CHECK(!CheckStyle(key.publicKey, 100, 200, challenge, color, tampered));
+  }
+
 } // namespace
 
-int main()
-{
-  for (const TestCase& test : kTests) {
-    RunTest(test);
-  }
-  std::printf("%d checks, %d failures\n", gChecks, gFailures);
-  return gFailures;
-}
+TEST(Existing_NetChannel, StyleProof) { TestStyleProof(); }
+TEST(Existing_NetChannel, HeaderRoundTrip) { TestHeaderRoundTrip(); }
+TEST(Existing_NetChannel, Varints) { TestVarints(); }
+TEST(Existing_NetChannel, ReceiveWindowModel) { TestReceiveWindowModel(); }
+TEST(Existing_NetChannel, RangeSetModel) { TestRangeSetModel(); }
+TEST(Existing_NetChannel, ReceiverReassembly) { TestReceiverReassembly(); }
+TEST(Existing_NetChannel, ReliableMatrix) { TestReliableMatrix(); }
+TEST(Existing_NetChannel, InFlightLimit) { TestInFlightLimit(); }
+TEST(Existing_NetChannel, MessageLimits) { TestMessageLimits(); }
+TEST(Existing_NetChannel, Unreliable) { TestUnreliable(); }
+TEST(Existing_NetChannel, RedundantLane) { TestRedundantLane(); }
+TEST(Existing_NetChannel, SealOpen) { TestSealOpen(); }
+TEST(Existing_NetChannel, CipherKnownAnswers) { TestCipherKnownAnswers(); }
+TEST(Existing_NetChannel, EncryptedChannel) { TestEncryptedChannel(); }
+TEST(Existing_NetChannel, KeysMidSession) { TestKeysMidSession(); }
+TEST(Existing_NetChannel, SequenceEnd) { TestSequenceEnd(); }
+TEST(Existing_NetChannel, KeepaliveAndRtt) { TestKeepaliveAndRtt(); }
+TEST(Existing_NetChannel, LossStatistics) { TestLossStatistics(); }
+TEST(Existing_NetChannel, TimeoutAndPartition) { TestTimeoutAndPartition(); }
+TEST(Existing_NetChannel, Backoff) { TestBackoff(); }
+TEST(Existing_NetChannel, Fuzz) { TestFuzz(); }

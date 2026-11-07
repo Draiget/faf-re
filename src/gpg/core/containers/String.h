@@ -5,10 +5,15 @@
 
 namespace gpg
 {
+  /// Engine addition: STR_ToLower and STR_CanonizeFilename copy the text once and edit it in place
+  /// (true) or build it a character at a time as the binary does. Same text either way; the
+  /// `res_LowerInPlace` console variable (registered in moho/misc/FileWaitHandleSet.cpp).
+  extern bool str_LowerInPlace;
+
   using StrArg = const char*;
   using WStrArg = const wchar_t*;
 
-  extern msvc8::string sWhitespaceChars; // 0x00F32308
+  extern fa::string sWhitespaceChars; // 0x00F32308
 
   /**
    * Address: 0x009380A0 (FUN_009380A0, gpg::STR_Utf8ByteOffset)
@@ -49,7 +54,7 @@ namespace gpg
    * Returns one UTF-8 codepoint-range substring; throws `std::out_of_range`
    * when `pos` starts past the end of the source string.
   */
-  msvc8::string STR_Utf8SubString(StrArg str, int pos, int len);
+  fa::string STR_Utf8SubString(StrArg str, int pos, int len);
   /**
    * Address: 0x00937F90 (FUN_00937F90, gpg::STR_EncodeUtf8Char)
    *
@@ -74,7 +79,7 @@ namespace gpg
    * Encodes one wide-character string as UTF-8 via `STR_EncodeUtf8Char`,
    * appending each codepoint until the terminating NUL.
    */
-  msvc8::string STR_WideToUtf8(const wchar_t*);                         // 0x00938680
+  fa::string STR_WideToUtf8(const wchar_t*);                         // 0x00938680
   /**
    * Address: 0x00938720 (FUN_00938720, gpg::STR_Utf8ToWide)
    *
@@ -92,7 +97,7 @@ namespace gpg
    * Skips delimiter characters, copies the next token into `dest`, and advances
    * the scan pointer past one trailing delimiter. Clears `dest` at end of input.
    */
-  bool STR_GetToken(const char*& find, const char* str, msvc8::string& dest);
+  bool STR_GetToken(const char*& find, const char* str, fa::string& dest);
   /**
    * Address: 0x00938F40 (FUN_00938F40, gpg::STR_GetTokens)
    *
@@ -100,12 +105,12 @@ namespace gpg
    * Repeatedly tokenizes one source string via `STR_GetToken` and appends each
    * produced token to `dest`.
    */
-  void STR_GetTokens(StrArg find, const char* str, msvc8::vector<msvc8::string>& dest);
-  int STR_GetWordStartIndex(msvc8::string& str, int pos);                               // 0x009384A0
+  void STR_GetTokens(StrArg find, const char* str, fa::vector<fa::string>& dest);
+  int STR_GetWordStartIndex(fa::string& str, int pos);                               // 0x009384A0
   /**
    * Address: 0x00938570 (FUN_00938570, gpg::STR_GetNextWordStartIndex)
    *
-   * msvc8::string &, int
+   * fa::string &, int
    *
    * IDA signature:
    * int __cdecl gpg::STR_GetNextWordStartIndex(std::string *str, int pos);
@@ -114,7 +119,7 @@ namespace gpg
    * Scans forward from `pos` and returns the first non-whitespace codepoint
    * after the next whitespace separator; returns UTF-8 length when none exists.
    */
-  int STR_GetNextWordStartIndex(msvc8::string& str, int pos);
+  int STR_GetNextWordStartIndex(fa::string& str, int pos);
   /**
    * Address: 0x00938190 (FUN_00938190, gpg::STR_EndsWith)
    *
@@ -174,7 +179,7 @@ namespace gpg
    * Replaces every occurrence of `what` in `str` with `with` while `unk` is
    * non-zero, returning the number of replacements performed.
    */
-  int STR_Replace(msvc8::string& str, StrArg what, StrArg with, unsigned int unk);
+  int STR_Replace(fa::string& str, StrArg what, StrArg with, unsigned int unk);
   int STR_ParseUInt32(StrArg str);                                                 // 0x00938150
   int STR_Xtoi(StrArg str);                                                        // 0x009380F0
   bool STR_IsAsciiWhitespace(char ch);
@@ -195,7 +200,7 @@ namespace gpg
   bool STR_WildcardValidPrefix(StrArg prefix, StrArg pattern);
   bool STR_WildcardValidPrefix(StrArg, StrArg, bool caseSensitive);
 
-  msvc8::string STR_GetWhitespaceCharacters();  // 0x00938C80
+  fa::string STR_GetWhitespaceCharacters();  // 0x00938C80
   /**
    * Address: 0x00938BF0 (FUN_00938BF0, gpg::STR_Chop)
    *
@@ -203,16 +208,16 @@ namespace gpg
    * Returns `str` without its trailing `chr` delimiter (or without the last
    * character when `chr==0`).
    */
-  msvc8::string STR_Chop(StrArg str, char chr);
-  msvc8::string STR_ToLower(StrArg str);        // 0x00938A80
+  fa::string STR_Chop(StrArg str, char chr);
+  fa::string STR_ToLower(StrArg str);        // 0x00938A80
   /**
    * Address: 0x009389C0 (FUN_009389C0, gpg::STR_ToUpper)
    *
    * What it does:
    * Returns one uppercase ASCII copy of `str`.
    */
-  msvc8::string STR_ToUpper(StrArg str);
-  void STR_NormalizeFilenameLowerSlash(msvc8::string& inOut);
+  fa::string STR_ToUpper(StrArg str);
+  void STR_NormalizeFilenameLowerSlash(fa::string& inOut);
   void STR_NormalizeFilenameLowerSlash(std::string& inOut);
 
   /**
@@ -222,8 +227,8 @@ namespace gpg
    * Initializes destination string storage and canonicalizes one filename/path
    * (lowercase + separator normalization).
    */
-  msvc8::string* STR_InitFilename(msvc8::string* out, StrArg in);
-  msvc8::string* STR_SetFilename(msvc8::string* out, StrArg in);
+  fa::string* STR_InitFilename(fa::string* out, StrArg in);
+  fa::string* STR_SetFilename(fa::string* out, StrArg in);
 
   /**
    * Address: 0x0050E460 (FUN_0050E460, gpg::STR_CopyFilename)
@@ -231,7 +236,7 @@ namespace gpg
    * What it does:
    * Copies one filename string through the filename canonicalization lane.
    */
-  msvc8::string* STR_CopyFilename(msvc8::string* out, const msvc8::string* filename);
+  fa::string* STR_CopyFilename(fa::string* out, const fa::string* filename);
 
   /**
    * Address: 0x00458450 (FUN_00458450, gpg::STR_CanonizeFilename)
@@ -239,7 +244,7 @@ namespace gpg
    * What it does:
    * Lowercases one path and normalizes `/` separators to `\\`.
    */
-  void STR_CanonizeFilename(msvc8::string* out, StrArg in);
+  void STR_CanonizeFilename(fa::string* out, StrArg in);
   /**
    * Address: 0x009388C0 (FUN_009388C0, gpg::STR_TrimWhitespace)
    *
@@ -247,7 +252,7 @@ namespace gpg
    * Trims leading/trailing ASCII whitespace (`' '`, `'\t'`, `'\r'`, `'\n'`)
    * from one input C-string and returns the trimmed copy.
    */
-  msvc8::string STR_TrimWhitespace(StrArg str);
+  fa::string STR_TrimWhitespace(StrArg str);
 
   /**
    * Address: 0x00938F10 (FUN_00938F10)
@@ -256,7 +261,7 @@ namespace gpg
    * What it does:
    * Starts one varargs lane at `fmt` and forwards formatting through `STR_Va`.
    */
-  msvc8::string STR_Printf(const char* fmt, ...);
+  fa::string STR_Printf(const char* fmt, ...);
 
   /**
    * Address: 0x00938E00 (FUN_00938E00)
@@ -266,5 +271,5 @@ namespace gpg
    * Formats one vararg message into stack buffer first, then grows a dynamic
    * buffer until `_vsnprintf` succeeds.
    */
-  msvc8::string STR_Va(const char*& fmt, va_list va);
+  fa::string STR_Va(const char*& fmt, va_list va);
 } // namespace gpg

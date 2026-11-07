@@ -3,7 +3,7 @@ description: >
   Dump upload check (telemetry_DumpEndpoint). Two clients of our x64 build
   (staged as bin_x64\desync_test.exe) play faf_re_lockstep with telemetry and
   the desync recorder on. Records go to an OpenTelemetry collector on
-  127.0.0.1:4318, dumps to tools\desync-diff\receive.py on 127.0.0.1:4319
+  127.0.0.1:4318, dumps to tools\bin\desync-diff.exe serve on 127.0.0.1:4319
   (start both first; see docs/SWITCHES.md, "Desync telemetry"). Client 2
   raises one unit's health by one float step at beat 300 (/desynctestbeat), a
   real desync. Each client must write its zip and a .tar.gz copy, and post the

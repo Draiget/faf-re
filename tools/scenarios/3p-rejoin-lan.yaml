@@ -1,0 +1,56 @@
+name: 3p-rejoin-lan
+description: >
+  A rejoin over a real LAN. Three game windows run here; at 8 minutes player 2 is killed
+  and its seat comes back as a headless client on another machine, through this run's
+  relay. tmp/claude/rejoin/lan_run.sh drives the other machine: first a client with the
+  wrong key, which must get nothing, then one with the seat's key.
+timeout: 35m
+
+mode: relay
+relayFollow: true
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: sandbox
+  DisconnectionDelay02: '600'
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\rejoin_test.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+  saveReplays: true
+
+players:
+  - { uid: 1, name: Stays, faction: uef, args: ['/title', 'rejoin-demo-stays', '/con', 'net_PeerFeatures=1;net_RejoinAccept=1;net_CheckOrderStreams=0;net_LogShownBeatMs=500;net_LogTraffic=100'] }
+  - { uid: 2, name: Rejoins, faction: cybran, args: ['/title', 'rejoin-demo-back', '/con', 'net_PeerFeatures=1;net_RejoinAccept=1;net_CheckOrderStreams=0;net_LogShownBeatMs=500;net_LogTraffic=100'] }
+  - { uid: 3, name: Behind, faction: aeon, args: ['/title', 'rejoin-demo-behind', '/con', 'net_PeerFeatures=1;net_RejoinAccept=1;net_CheckOrderStreams=0;net_LogShownBeatMs=500;net_LogTraffic=100'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 8m
+  - kill: 2
+  - wait: 5s
+  - note: player 2's seat is handed to another machine
+  - rejoin: { uid: 2, source: 1, remote: true, peers: [{ uid: 1, source: 0 }, { uid: 3, source: 2 }] }
+  - wait: 9m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  logsContain:
+    - { uids: [1, 3], pattern: 'REJOIN: client \d+.s proof failed' }
+    - { uids: [1, 3], pattern: 'REJOIN: client \d+:\S+ is asked to prove its seat' }
+    - { uids: [1, 3], pattern: 'REJOIN: client \d+ proved its seat' }
+    - { uids: [1, 3], pattern: 'REJOIN: client \d+:\S+ came back on a new link' }
+    - { uids: [1, 3], pattern: 'REJOIN: client \d+:\S+ served' }
+    - { uids: [1, 3], pattern: 'REJOIN: showing Rejoins as back' }
+  logsAbsent:
+    - { uids: [1, 3], pattern: 'has been abandoned by all players' }
+    - { uids: [1, 3], pattern: 'mismatched' }
+    - { uids: [1, 3], pattern: 'Error running .*/lua/ui/uimain|Evaluating LazyVar failed' }

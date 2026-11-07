@@ -38,7 +38,7 @@ namespace
   std::recursive_mutex gSndVarRegistryMutex;
 
   /**
-   * Address: 0x010A92B8 (`msvc8::list<CSndVar*>`; `_Myhead` 0x010A92BC,
+   * Address: 0x010A92B8 (`fa::list<CSndVar*>`; `_Myhead` 0x010A92BC,
    *   `_Mysize` 0x010A92C0). Node `_Buynode` 0x004E2610 over
    *   `allocator<_Node>::allocate` 0x004E4FF0 (0x0C bytes: `_Next` +0x00,
    *   `_Prev` +0x04, the `CSndVar*` at +0x08), self-linked by the constructor
@@ -46,10 +46,10 @@ namespace
    *   `UnregisterSndVarInstance` (0x004DFA20) and `LookupSndVarNameById`
    *   (0x004DFAE0).
    */
-  msvc8::list<moho::CSndVar*> gSndVarRegistry;
+  fa::list<moho::CSndVar*> gSndVarRegistry;
 
   /**
-   * Address: 0x010A9294 (`msvc8::multimap<std::uint32_t, CSndVar*>`; `_Myhead`
+   * Address: 0x010A9294 (`fa::multimap<std::uint32_t, CSndVar*>`; `_Myhead`
    *   0x010A9298, `_Mysize` 0x010A929C). Node `_Buynode` 0x004E3FD0 over
    *   `allocator<_Node>::allocate` 0x004E51F0 (0x18 bytes), initialised by the
    *   constructor group at 0x004DFCD2. `SND_FindOrCreateVariable` (0x004DF390)
@@ -62,16 +62,16 @@ namespace
    * that is `_Tree::insert`'s `if (_Multi)` branch, which never probes for an
    * equivalent key. Key at node+0x0C, the variable pointer at node+0x10.
    */
-  msvc8::multimap<std::uint32_t, moho::CSndVar*> gSndVarNameCache;
+  fa::multimap<std::uint32_t, moho::CSndVar*> gSndVarNameCache;
 
-  [[nodiscard]] std::uint32_t HashSndVarName(const msvc8::string& name)
+  [[nodiscard]] std::uint32_t HashSndVarName(const fa::string& name)
   {
     const std::string hashInput(name.c_str(), name.size());
     return gpg::Hash(hashInput, kSndVarHashSalt);
   }
 
   [[nodiscard]] moho::CSndVar*
-  FindCachedSndVarByNameLocked(const msvc8::string& variableName, const std::uint32_t nameHash)
+  FindCachedSndVarByNameLocked(const fa::string& variableName, const std::uint32_t nameHash)
   {
     const auto [first, last] = gSndVarNameCache.equal_range(nameHash);
     for (auto it = first; it != last; ++it) {
@@ -100,11 +100,11 @@ namespace
    *
    * What it does:
    * Registers one `CSndVar` instance in the process-global variable-name lane.
-   * `push_back` on the `msvc8::list<CSndVar*>` registry instantiates the
+   * `push_back` on the `fa::list<CSndVar*>` registry instantiates the
    * generic `list<T>::insert` node-buy/`_Incsize` pair (see
-   * `Address: 0x004E3490` cited on `msvc8::list<T>::insert` in
+   * `Address: 0x004E3490` cited on `fa::list<T>::insert` in
    * legacy/containers/Vector.h) -- the same emission shape as the sibling
-   * `msvc8::list<CSndParams*>` registry's `FUN_004E32D0`/`FUN_004E3310` pair
+   * `fa::list<CSndParams*>` registry's `FUN_004E32D0`/`FUN_004E3310` pair
    * used by `func_RegisterCSndParams` (CSndParams.cpp).
    */
   void RegisterSndVarInstance(moho::CSndVar* const value)
@@ -139,7 +139,7 @@ namespace
    * Returns the registered variable name for one resolved variable id, or an
    * empty string when no matching descriptor is present.
    */
-  msvc8::string LookupSndVarNameById(const std::uint16_t variableId)
+  fa::string LookupSndVarNameById(const std::uint16_t variableId)
   {
     std::lock_guard<std::recursive_mutex> lock(gSndVarRegistryMutex);
     for (const moho::CSndVar* const entry : gSndVarRegistry) {
@@ -148,25 +148,8 @@ namespace
       }
     }
 
-    return msvc8::string("");
+    return fa::string("");
   }
-
-  [[nodiscard]] gpg::RType* ResolveCSndVarType()
-  {
-    gpg::RType* type = moho::CSndVar::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::CSndVar));
-      moho::CSndVar::sType = type;
-    }
-    return type;
-  }
-
-  constexpr int kSerializationSaveConstructLine = 189;
-  constexpr int kSerializationConstructLine = 231;
-  constexpr const char* kSerializationSourcePath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-  constexpr const char* kSaveConstructAssertText = "!type->mSerSaveConstructArgsFunc";
-  constexpr const char* kConstructAssertText = "!type->mSerConstructFunc";
 
 } // namespace
 
@@ -175,12 +158,12 @@ namespace moho
   /**
    * Address: 0x004DF390 (FUN_004DF390, func_NewCSndVar)
    *
-   * msvc8::string const&
+   * fa::string const&
    *
    * What it does:
    * Returns one interned `CSndVar` for the supplied variable name.
    */
-  CSndVar* SND_FindOrCreateVariable(const msvc8::string& variableName)
+  CSndVar* SND_FindOrCreateVariable(const fa::string& variableName)
   {
     if (variableName.empty()) {
       return nullptr;
@@ -239,7 +222,7 @@ namespace moho
    * What it does:
    * Returns the registered name for one global sound variable id.
    */
-  msvc8::string SND_GetVariableName(const int variableId)
+  fa::string SND_GetVariableName(const int variableId)
   {
     return LookupSndVarNameById(static_cast<std::uint16_t>(variableId));
   }
@@ -249,7 +232,7 @@ namespace moho
 {
   void CSndVar::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
   {
-    msvc8::string name;
+    fa::string name;
     archive.ReadString(&name);
     result.SetOwned(gpg::MakeRRef(SND_FindOrCreateVariable(name)), 1u);
   }

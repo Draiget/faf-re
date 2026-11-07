@@ -1,6 +1,7 @@
-// Engine addition (dedicated-server plan WPR.12, WPL.5): gpg::gal::Math without D3DX, for
-// the programs that link the simulation without the client (headless, the game server,
-// the Linux build). The client (faf_main) links gpg/gal/Matrix.cpp, the D3DX version.
+// gpg::gal::Math without D3DX (dedicated-server plan WPR.12, WPL.5; issue #317 for the client).
+// Every program links this one: the client, headless, the game server and the Linux build. Until
+// #317 the client linked a version that called d3dx9_43.dll, which only the Direct3D 9 renderer
+// needs now.
 //
 // The matrices are D3DX's (row vectors, `out = lhs * rhs`; the same rotation, scaling and
 // translation layouts); products are summed in index order and the inverse is the
@@ -8,7 +9,7 @@
 // (MathReflection.cpp) and the effect emitters' bone attachment
 // (CEfxEmitter::InterpolatePosition); neither feeds the simulation's checksummed state, so
 // a last-bit difference from D3DX's SSE code changes no game result (the core replays
-// check that).
+// check that, on the headless build, which always linked this file).
 
 #include "gpg/gal/Matrix.h"
 
@@ -41,6 +42,7 @@ namespace
 
 namespace gpg::gal::Math
 {
+  // Address: 0x00940690 (FUN_00940690, ?mul@Math@gal@gpg@@YAPBUMatrix@23@PAU423@PBU423@1@Z)
   Matrix* mul(Matrix* const outMatrix, const Matrix* const lhs, const Matrix* const rhs)
   {
     Matrix result{};
@@ -57,6 +59,7 @@ namespace gpg::gal::Math
     return outMatrix;
   }
 
+  // Address: 0x009406B0 (FUN_009406B0, ?invert@Math@gal@gpg@@YAPBUMatrix@23@PAU423@PBU423@@Z)
   Matrix* invert(Matrix* const outMatrix, const Matrix* const sourceMatrix)
   {
     float m[16];
@@ -111,6 +114,7 @@ namespace gpg::gal::Math
     return outMatrix;
   }
 
+  // Address: 0x00940770 (FUN_00940770, sub_940770)
   Matrix* translation(Matrix* const outMatrix, const float x, const float y, const float z)
   {
     SetIdentity(*outMatrix);
@@ -120,6 +124,7 @@ namespace gpg::gal::Math
     return outMatrix;
   }
 
+  // Address: 0x009407A0 (FUN_009407A0, sub_9407A0)
   Matrix* scaling(Matrix* const outMatrix, const float x, const float y, const float z)
   {
     SetIdentity(*outMatrix);
@@ -129,6 +134,7 @@ namespace gpg::gal::Math
     return outMatrix;
   }
 
+  // Address: 0x009406D0 (FUN_009406D0, ?rotationAxisX@Math@gal@gpg@@YAPBUMatrix@23@PAU423@M@Z)
   Matrix* rotationAxisX(Matrix* const outMatrix, const float angle)
   {
     const float c = std::cos(angle);
@@ -141,6 +147,7 @@ namespace gpg::gal::Math
     return outMatrix;
   }
 
+  // Address: 0x009406F0 (FUN_009406F0, ?rotationAxisY@Math@gal@gpg@@YAPBUMatrix@23@PAU423@M@Z)
   Matrix* rotationAxisY(Matrix* const outMatrix, const float angle)
   {
     const float c = std::cos(angle);
@@ -153,6 +160,7 @@ namespace gpg::gal::Math
     return outMatrix;
   }
 
+  // Address: 0x00940710 (FUN_00940710, ?rotationAxisZ@Math@gal@gpg@@YAPBUMatrix@23@PAU423@M@Z)
   Matrix* rotationAxisZ(Matrix* const outMatrix, const float angle)
   {
     const float c = std::cos(angle);
@@ -165,6 +173,7 @@ namespace gpg::gal::Math
     return outMatrix;
   }
 
+  // Address: 0x00940730 (FUN_00940730, ?rotationAxis@Math@gal@gpg@@YAPBUMatrix@23@PAU423@PBUVector3@23@M@Z)
   Matrix* rotationAxis(Matrix* const outMatrix, const Wm3::Vector3f* const axis, const float angle)
   {
     float x = axis->x;
@@ -193,6 +202,7 @@ namespace gpg::gal::Math
     return outMatrix;
   }
 
+  // Address: 0x00940750 (FUN_00940750, ?rotationQuaternion@Math@gal@gpg@@YAPBUMatrix@23@PAU423@PBUQuaternion@23@@Z)
   Matrix* rotationQuaternion(Matrix* const outMatrix, const Wm3::Quaternionf* const rotation)
   {
     // The caller passes D3DX's lane order, x, y, z, w (VMatrix4::LoadRotate).

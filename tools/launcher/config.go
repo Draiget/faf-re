@@ -125,6 +125,8 @@ type ContractConfig struct {
 	JarBind string `yaml:"jarBind"`
 	// ForceRelay passes --force-relay.
 	ForceRelay bool `yaml:"forceRelay"`
+	// KeepSession: seconds the adapter keeps its links after a running game exits (issue #275).
+	KeepSession int `yaml:"keepSession"`
 	// NoTurn hands out no ICE servers.
 	NoTurn bool `yaml:"noTurn"`
 	// IceServers, when set, are handed out instead of mpemu's own TURN server
@@ -186,6 +188,10 @@ type Config struct {
 	// Filled by the runner, not the scenario file.
 	HubSecret string `yaml:"-"` // MPEMU_SECRET / -secret-file
 	Advertise string `yaml:"-"` // how other machines reach games on this one
+	// RelayFollow lets the local relay follow a game whose address changes, as it does
+	// on a hub: a killed seat can come back from another machine, with the other
+	// players still talking to the same relay ports.
+	RelayFollow bool `yaml:"relayFollow"`
 	RunID     string `yaml:"-"`
 	RunDir    string `yaml:"-"`
 	HTTPAddr  string `yaml:"-"`
@@ -230,6 +236,7 @@ func (c *Config) Normalize() error {
 	c.Contract.Java = ExpandPath(c.Contract.Java)
 	c.Contract.ClientLib = ExpandPath(c.Contract.ClientLib)
 	c.Contract.Adapter = ExpandPath(c.Contract.Adapter)
+	c.Contract.NativeBind = ExpandPath(c.Contract.NativeBind)
 	for i := range c.Contract.ExeArgs {
 		c.Contract.ExeArgs[i] = ExpandPath(c.Contract.ExeArgs[i])
 	}

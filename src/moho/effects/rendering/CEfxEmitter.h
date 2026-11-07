@@ -124,7 +124,7 @@ namespace moho
      * Interpolates emitter attachment transform at `(tick=0, interp=0.0)` and
      * projects the first start-vector lane through that matrix into `mPos`.
      */
-    void Interpolate();
+    void Interpolate() override;
 
     /**
      * Address: 0x0065C700 (FUN_0065C700, Moho::CEfxEmitter::ProcessLifetime)
@@ -228,7 +228,7 @@ namespace moho
     friend struct CEfxEmitterLayoutVerifier;
 
     EmitterType mEmitterType;               // +0x190
-    std::uint8_t mPad194[0x04];             // +0x194
+    [[maybe_unused]] std::uint8_t mPad194[0x04];             // +0x194
     /**
      * A `0x10` `{start_, end_, capacity_, originalVec_}`
      * head at `+0x198` followed immediately by its own `21 * 0x38` inline window
@@ -254,11 +254,11 @@ namespace moho
     std::uint32_t mLife;                    // +0x648
     SWorldParticle mParticle;               // +0x64C
     bool mValid;                            // +0x6D8
-    std::uint8_t mPad6D9[0x03];             // +0x6D9
+    [[maybe_unused]] std::uint8_t mPad6D9[0x03];             // +0x6D9
     std::uint32_t mZCurveMask;              // +0x6DC
     std::int32_t mMaxLifetime;              // +0x6E0
     bool mVisible;                          // +0x6E4
-    std::uint8_t mPad6E5[0x03];             // +0x6E5
+    [[maybe_unused]] std::uint8_t mPad6E5[0x03];             // +0x6E5
     std::uint32_t mLastUpdate;              // +0x6E8
     Wm3::Vec3f mPos;                        // +0x6EC
   };

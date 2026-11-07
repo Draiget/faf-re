@@ -10,8 +10,13 @@ endif()
 add_library(faf_netchannel STATIC
   Datagram.cpp
   DatagramCipher.cpp
+  GameLinks.cpp
+  Handshake.cpp
+  LobbySignals.cpp
   NetChannel.cpp
   ReliableStream.cpp
+  StyleProof.cpp
+  UdpSocket.cpp
 )
 target_include_directories(faf_netchannel PUBLIC "${PROJECT_SOURCE_DIR}/src")
 target_compile_features(faf_netchannel PUBLIC cxx_std_20)
@@ -20,4 +25,5 @@ if(FAF_LINUX)
   target_compile_options(faf_netchannel PRIVATE -Wall -Wextra)
 else()
   target_compile_options(faf_netchannel PRIVATE /W4 /EHsc)
+  target_link_libraries(faf_netchannel PRIVATE ws2_32 bcrypt)
 endif()

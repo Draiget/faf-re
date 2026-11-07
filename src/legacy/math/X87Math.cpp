@@ -68,7 +68,7 @@ extern "C" void __cdecl msvc8_x87_scale_vector_to_length_of(
 extern "C" float __cdecl msvc8_x87_vector_length_zyx(const float* lanes);
 #endif
 
-namespace msvc8
+namespace fa
 {
   namespace
   {
@@ -860,7 +860,7 @@ namespace msvc8
   {
     // Engine addition (plan WPL.11): the domain errors' NaN as on Windows x64 (DomainErrorNaN);
     // in the domain a double asin, as the binary's asinf called the CRT's: the engine's
-    // (msvc8::libm, equal to the Windows x64 UCRT's for every float), not the host's.
+    // (fa::libm, equal to the Windows x64 UCRT's for every float), not the host's.
     if (!std::isnan(x) && !(x >= -1.0f && x <= 1.0f)) {
       return static_cast<float>(DomainErrorNaN());
     }
@@ -975,7 +975,7 @@ namespace msvc8
     return PowPositiveBase(controlWord, x, y);
   }
 
-  static double PowPositiveBase(const unsigned int controlWord, const double x, const double y) noexcept
+  static double PowPositiveBase([[maybe_unused]] const unsigned int controlWord, const double x, const double y) noexcept
   {
 #if defined(_M_IX86)
     double result;
@@ -1007,7 +1007,7 @@ namespace msvc8
   }
 
   // expf and logf: a double exp/log rounded once, as the x86 CRT's float overloads do; the
-  // engine's (msvc8::libm, plan WPL.11), equal to the Windows x64 UCRT's for every float.
+  // engine's (fa::libm, plan WPL.11), equal to the Windows x64 UCRT's for every float.
   float expf(const float x) noexcept
   {
     return static_cast<float>(libm::exp(static_cast<double>(x)));
@@ -1047,4 +1047,4 @@ namespace msvc8
     return msvc8_x87_vector_length_zyx(lanes);
 #endif
   }
-} // namespace msvc8
+} // namespace fa

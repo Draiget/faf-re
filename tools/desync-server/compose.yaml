@@ -24,16 +24,21 @@ services:
     user: "0"
 
   dumps:
-    image: python:3.12-slim
-    command: ["python", "/opt/faf/receive.py", "--host", "0.0.0.0", "--port", "4319", "--prefix", "/dumps",
-              "--out", "/data/dumps", "--max-mb", "64"]
+    # `desync-diff serve` (tools/cmd/desync-diff), Go with the standard library only: built from the mounted
+    # sources at start (the build cache in data/gocache makes later starts quick), then run.
+    image: golang:1.25.5-alpine
+    command: ["sh", "-c", "rm -rf /tmp/b && mkdir /tmp/b && cp /src/*.go /tmp/b/ && cd /tmp/b && go mod init desync-diff
+              && go build -trimpath -o /tmp/desync-diff . && exec /tmp/desync-diff serve --host 0.0.0.0 --port 4319
+              --prefix /dumps --out /data/dumps --max-mb 64"]
     environment:
       FAF_UPLOAD_TOKEN: ${FAF_UPLOAD_TOKEN:?set it in .env}
       FAF_READ_TOKEN: ${FAF_READ_TOKEN:?set it in .env}
-      PYTHONUNBUFFERED: "1"
+      CGO_ENABLED: "0"
+      GOTOOLCHAIN: local
+      GOCACHE: /gocache
     volumes:
-      - ../desync-diff/receive.py:/opt/faf/receive.py:ro
-      - ../desync-diff/desync_diff.py:/opt/faf/desync_diff.py:ro
+      - ../cmd/desync-diff:/src:ro
+      - ./data/gocache:/gocache
       - ./data/dumps:/data/dumps
     ports:
       - "4319:4319"

@@ -102,13 +102,7 @@ namespace moho
       CTask::sType = baseType;
     }
 
-    gpg::RField field{};
-    field.mName = baseType->GetName();
-    field.mType = baseType;
-    field.mOffset = 0;
-    field.mFlags = 0;
-    field.mDesc = nullptr;
-    typeInfo->AddBase(field);
+    gpg::AddReflectedBaseType(typeInfo, baseType);
   }
 
   /**
@@ -122,13 +116,7 @@ namespace moho
       ManyToOneListener_EProjectileImpactEvent::sType = baseType;
     }
 
-    gpg::RField field{};
-    field.mName = baseType->GetName();
-    field.mType = baseType;
-    field.mOffset = gpg::BaseSubobjectOffset<CAcquireTargetTask, ManyToOneListener_EProjectileImpactEvent>();
-    field.mFlags = 0;
-    field.mDesc = nullptr;
-    typeInfo->AddBase(field);
+    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::BaseSubobjectOffset<CAcquireTargetTask, ManyToOneListener_EProjectileImpactEvent>());
   }
 
   /**
@@ -142,13 +130,7 @@ namespace moho
       ManyToOneListener_ECollisionBeamEvent::sType = baseType;
     }
 
-    gpg::RField field{};
-    field.mName = baseType->GetName();
-    field.mType = baseType;
-    field.mOffset = gpg::BaseSubobjectOffset<CAcquireTargetTask, ManyToOneListener_ECollisionBeamEvent>();
-    field.mFlags = 0;
-    field.mDesc = nullptr;
-    typeInfo->AddBase(field);
+    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::BaseSubobjectOffset<CAcquireTargetTask, ManyToOneListener_ECollisionBeamEvent>());
   }
 
   /**

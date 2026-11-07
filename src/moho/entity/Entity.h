@@ -632,13 +632,13 @@ namespace moho
      * VFTable SLOT: 0
      */
     [[nodiscard]]
-    virtual gpg::RType* GetClass() const override;
+    gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x00676C60 (FUN_00676C60)
      * VFTable SLOT: 1
      */
-    virtual gpg::RRef GetDerivedObjectRef() override;
+    gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x0067CFA0 (FUN_0067CFA0, Moho::Entity::GetPointerType)
@@ -781,7 +781,7 @@ namespace moho
      * Address: 0x00678D40 (FUN_00678D40)
      * VFTable SLOT: 3
      */
-    virtual msvc8::string GetErrorDescription() override;
+    fa::string GetErrorDescription() override;
 
     /**
      * Address: 0x005BDB10 (FUN_005BDB10)
@@ -1073,13 +1073,13 @@ namespace moho
      *
      * std::auto_ptr<Moho::Motor>&
      */
-    virtual void SetMotor(msvc8::auto_ptr<Motor>&);
+    virtual void SetMotor(fa::auto_ptr<Motor>&);
 
     /**
      * Address: 0x005BDC10 (FUN_005BDC10)
      * VFTable SLOT: 22
      */
-    virtual msvc8::vector<Entity*>& GetAttachedEntities();
+    virtual fa::vector<Entity*>& GetAttachedEntities();
 
     /**
       * Alias of FUN_00679550 (non-canonical helper lane).
@@ -1434,7 +1434,7 @@ namespace moho
      * What it does:
      * Returns the entity's unique runtime name string.
      */
-    [[nodiscard]] msvc8::string GetUniqueName() const;
+    [[nodiscard]] fa::string GetUniqueName() const;
 
     /**
      * Address: 0x00689F50 (FUN_00689F50)
@@ -1513,7 +1513,7 @@ namespace moho
     float mPendingVelocityScale;                   // 0x0170
     std::uint32_t mLastTickProcessed;              // 0x0174
     CColPrimitiveBase* CollisionExtents;           // 0x0178
-    msvc8::vector<Entity*> mAttachedEntities;      // 0x017C
+    fa::vector<Entity*> mAttachedEntities;      // 0x017C
     SEntAttachInfo mAttachInfo;                    // 0x018C
     std::uint8_t mQueueRelinkBlocked;              // 0x01B8
     std::uint8_t DestroyQueuedFlag;                // 0x01B9
@@ -1531,7 +1531,7 @@ namespace moho
     SPhysBody* mPhysBody;                  // 0x01F4 (owned physics body; serialized OWNED)
     std::uint8_t RealtimeStatsEnabled;     // 0x01F8 (per-entity realtime-stats accounting gate; FUN_00689F50)
     char pad_01F9_01FB[0x03];              // 0x01F9
-    msvc8::string mUniqueName;             // 0x01FC (FUN_00689F20)
+    fa::string mUniqueName;             // 0x01FC (FUN_00689F20)
     EntitySetTemplate<Entity> mShooters;   // 0x0218 (Entity:AddShooter/RemoveShooter ownership set)
     // World-space bounds of `CollisionExtents`, refreshed by `UpdateAABox`
     // (0x00679180, `?UpdateAABox@Entity@Moho@@QAEXXZ`); serialized through the

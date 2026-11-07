@@ -51,21 +51,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x008C6520 (FUN_008C6520)
-   *
-   * What it does:
-   * Lazily resolves and caches one reflection type lane for `moho::UserEntity`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveUserEntityTypeCacheLane()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::UserEntity));
-    }
-    return cached;
-  }
-
   // 0x00416F60
   [[nodiscard]] bool ContainsCell(const moho::VisibilityRect& rect, const std::int32_t x, const std::int32_t z)
   {
@@ -638,7 +623,7 @@ namespace moho
    */
   bool UserEntity::IsSelectable() const
   {
-    const msvc8::string selectableCategory("SELECTABLE", 10u);
+    const fa::string selectableCategory("SELECTABLE", 10u);
     return IsInCategory(selectableCategory);
   }
 
@@ -838,7 +823,7 @@ namespace moho
       const auto cellX = static_cast<std::int32_t>(mVariableData.mCurTransform.pos_.x);
       const auto cellZ = static_cast<std::int32_t>(mVariableData.mCurTransform.pos_.z);
       VisibilityRect visibleRect{};
-      mSession->TryGetPlayableMapRect(visibleRect);
+      (void)mSession->TryGetPlayableMapRect(visibleRect);
       meshInstance->isHidden = ContainsCell(visibleRect, cellX, cellZ) ? 0 : 1;
       return;
     }
@@ -893,7 +878,7 @@ namespace moho
    * Address: 0x008B97C0 (FUN_008B97C0,
    * ?IsInCategory@UserEntity@Moho@@QBE_NABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
    */
-  bool UserEntity::IsInCategory(const msvc8::string& category) const
+  bool UserEntity::IsInCategory(const fa::string& category) const
   {
     if (!mSession || !mParams.mBlueprint) {
       return false;

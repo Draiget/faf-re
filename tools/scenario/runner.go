@@ -279,6 +279,12 @@ func (r *runner) step(ctx context.Context, s Step) error {
 				return err
 			}
 		}
+	case s.Rejoin != nil:
+		peers := make([]launcher.RejoinPeer, 0, len(s.Rejoin.Peers))
+		for _, p := range s.Rejoin.Peers {
+			peers = append(peers, launcher.RejoinPeer{UID: p.UID, Source: p.Source})
+		}
+		return r.l.Rejoin(s.Rejoin.UID, s.Rejoin.Source, s.Rejoin.KeyOf, s.Rejoin.Launcher, s.Rejoin.Remote, peers)
 	case s.Send != nil:
 		return r.l.Send(s.Send.UID, gpgnet.New(s.Send.Cmd, normalizeArgs(s.Send.Args)...))
 	case s.Check != nil:
@@ -440,7 +446,7 @@ func (r *runner) checkLogsAbsent(la LogsAgree) []string {
 	}
 	var fails []string
 	for _, uid := range la.UIDs.Resolve(r.l.Players(), r.l.Host()) {
-		got, err := logMatches(filepath.Join(r.opts.RunDir, fmt.Sprintf("game-%d.log", uid)), re)
+		got, err := logMatches(filepath.Join(r.opts.RunDir, fmt.Sprintf("game-%d%s.log", uid, la.Suffix)), re)
 		if err != nil {
 			fails = append(fails, fmt.Sprintf("logsAbsent %q: player %d: %v", la.Pattern, uid, err))
 			continue
@@ -459,7 +465,7 @@ func (r *runner) checkLogsContain(lc LogsAgree) []string {
 	}
 	var fails []string
 	for _, uid := range lc.UIDs.Resolve(r.l.Players(), r.l.Host()) {
-		got, err := logMatches(filepath.Join(r.opts.RunDir, fmt.Sprintf("game-%d.log", uid)), re)
+		got, err := logMatches(filepath.Join(r.opts.RunDir, fmt.Sprintf("game-%d%s.log", uid, lc.Suffix)), re)
 		if err != nil {
 			fails = append(fails, fmt.Sprintf("logsContain %q: player %d: %v", lc.Pattern, uid, err))
 			continue

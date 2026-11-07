@@ -32,8 +32,12 @@ namespace moho
     ProjectileImpactBelowZero = 2,  ///< #154: a projectile below height 0 impacts (3840)
     RefuelUndockAboveMaxHealth = 3, ///< #169: aircraft undock when health >= max health (3840)
     ShieldRepair = 4,               ///< #175: shield repair scales with resources, and needs the shield on (3840)
-    Count = 5,
+    ProjectileMapEdgeCollision = 5, ///< #180: terrain extends past the map edge; replaces #154 (not released yet)
+    Count = 6,
   };
+
+  /// `SFafSimFixInfo::mFirstGameVersion` of a fix no FAF release carries yet: on only by its switch.
+  inline constexpr int kFafGameVersionUnreleased = 0x7FFFFFFF;
 
   /// Fixes active in the current session, one bit per `EFafSimFix`; set by `FAF_BeginSession`.
   extern std::uint32_t gFafSessionSimFixes;

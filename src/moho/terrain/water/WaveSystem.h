@@ -34,10 +34,10 @@ namespace moho
    * One water-wave particle-strip preset: a texture/ramp pair plus the
    * position, timing, scale, velocity-delta and frame-strip parameters that
    * drive one entry of a `WavePattern`'s `parameters` array. Polymorphic
-   * (a single virtual-destructor vtable slot) so `msvc8::vector<WaveParameters>`
+   * (a single virtual-destructor vtable slot) so `fa::vector<WaveParameters>`
    * tears its elements down through the class's own vtable rather than a
    * statically-bound call -- see `WavePattern::~WavePattern` below.
-   * Address: 0x0088B2A0 (FUN_0088B2A0 -- the compiler-generated copy assignment (`operator= = default` below), emitted out of line for `msvc8::vector<WaveParameters>` (136-byte polymorphic element, `WavePattern::mWaves` at +0x3C): `mTexturePath`/`mRampPath` through `basic_string::assign(rhs, 0, npos)` (0x004056B0), then +0x3C..+0x84 member-wise, vptr untouched; `this` in ESI, `rhs` in EDI; callers 0x0088AD60 (`std::copy`, stride 0x88), 0x0088AE30 (`std::fill`), 0x0088AE60 (`std::copy_backward`) and the untokenized adapter sites 0x0088B070, 0x0088B1C0, 0x0088B20C, 0x0088B48C; formerly `CopyWaveParametersPayloadRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+   * Address: 0x0088B2A0 (FUN_0088B2A0 -- the compiler-generated copy assignment (`operator= = default` below), emitted out of line for `fa::vector<WaveParameters>` (136-byte polymorphic element, `WavePattern::mWaves` at +0x3C): `mTexturePath`/`mRampPath` through `basic_string::assign(rhs, 0, npos)` (0x004056B0), then +0x3C..+0x84 member-wise, vptr untouched; `this` in ESI, `rhs` in EDI; callers 0x0088AD60 (`std::copy`, stride 0x88), 0x0088AE30 (`std::fill`), 0x0088AE60 (`std::copy_backward`) and the untokenized adapter sites 0x0088B070, 0x0088B1C0, 0x0088B20C, 0x0088B48C; formerly `CopyWaveParametersPayloadRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
    */
   class WaveParameters
   {
@@ -65,8 +65,8 @@ namespace moho
      * `PopulateFromLua`'s reads exactly.
      */
     WaveParameters(
-      const msvc8::string& texturePath,
-      const msvc8::string& rampPath,
+      const fa::string& texturePath,
+      const fa::string& rampPath,
       const Wm3::Vec3f& position,
       float period,
       float periodVariance,
@@ -96,7 +96,7 @@ namespace moho
      * What it does:
      * Releases `mRampPath`'s and `mTexturePath`'s heap buffers (in that
      * reverse-declaration order, matching the binary) when either grew past
-     * the inline SSO capacity. `msvc8::string` has no destructor of its own
+     * the inline SSO capacity. `fa::string` has no destructor of its own
      * by design (see `legacy/containers/String.h`), so owning classes tidy
      * their string members explicitly.
      */
@@ -117,8 +117,8 @@ namespace moho
      */
     void PopulateFromLua(LuaPlus::LuaObject& source);
 
-    msvc8::string mTexturePath;                    // +0x04 ("texture")
-    msvc8::string mRampPath;                        // +0x20 ("ramp")
+    fa::string mTexturePath;                    // +0x04 ("texture")
+    fa::string mRampPath;                        // +0x20 ("ramp")
     Wm3::Vec3f mPosition{0.0f, 0.0f, 0.0f};          // +0x3C ("position", 1-based array)
     float mPeriod = 0.0f;                            // +0x48
     float mPeriodVariance = 0.0f;                    // +0x4C
@@ -149,7 +149,7 @@ namespace moho
    * A named, shareable collection of `WaveParameters` presets loaded from one
    * Lua table: `name`/`preview` identify the pattern, `parameters` is the
    * array of per-wave preset tables that populate `mWaves`. Polymorphic
-   * (single virtual-destructor vtable slot) so `msvc8::vector<WaveParameters>`
+   * (single virtual-destructor vtable slot) so `fa::vector<WaveParameters>`
    * -- `mWaves` -- destroys its polymorphic elements through their own
    * vtable slot 0 rather than a statically-bound call; see
    * `legacy/containers/Vector.h`'s `destroy_range`.
@@ -168,7 +168,7 @@ namespace moho
    * `ForgedAlliance.exe` binaries), is a caller of the Lua-table constructor
    * itself -- the whole construction-side API (both `WavePattern`
    * constructors, `WaveParameters`'s both constructors, and the
-   * `msvc8::vector<WaveParameters>::push_back` growth path below) is
+   * `fa::vector<WaveParameters>::push_back` growth path below) is
    * evidenced, real, internally self-consistent engine code with no
    * currently-discoverable external invocation. The most likely explanation
    * is whole-TU linkage: this file's `WaveGenerator`/`WaveSystem` code is
@@ -191,7 +191,7 @@ namespace moho
      * What it does:
      * Tidies `mPreview` then `mName` (reverse declaration order, matching
      * the binary); `mWaves` tears down automatically via
-     * `msvc8::vector<WaveParameters>::~vector()` since it is the
+     * `fa::vector<WaveParameters>::~vector()` since it is the
      * last-declared member.
      */
     virtual ~WavePattern();
@@ -212,9 +212,9 @@ namespace moho
      */
     void LoadParametersFromLua(LuaPlus::LuaObject& source);
 
-    msvc8::string mName;                       // +0x04 ("name")
-    msvc8::string mPreview;                     // +0x20 ("preview")
-    msvc8::vector<WaveParameters> mWaves;       // +0x3C ("parameters")
+    fa::string mName;                       // +0x04 ("name")
+    fa::string mPreview;                     // +0x20 ("preview")
+    fa::vector<WaveParameters> mWaves;       // +0x3C ("parameters")
   };
 
   static_assert(sizeof(WavePattern) == 0x4C, "WavePattern size must be 0x4C");
@@ -240,8 +240,8 @@ namespace moho
      */
     WaveGenerator(
       SpatialDB<WaveGenerator>* spatialStorage,
-      const msvc8::string& primaryTexturePath,
-      const msvc8::string& rampTexturePath,
+      const fa::string& primaryTexturePath,
+      const fa::string& rampTexturePath,
       const Wm3::Vec3f& position,
       float angle,
       const Wm3::Vec3f& direction,
@@ -320,18 +320,18 @@ namespace moho
     void RebuildSpatialBounds();
 
   private:
-    std::uint32_t mReserved04;             // +0x04
+    [[maybe_unused]] std::uint32_t mReserved04;             // +0x04
     SpatialDBEntry<WaveGenerator> mSpatialEntry; // +0x08
     Wm3::AxisAlignedBox3f mBounds;         // +0x10
     Wm3::Vec3f mBoundsCenter;              // +0x28
     VAxes3 mBoundsAxes;                    // +0x34
     Wm3::Vec3f mBoundsHalfExtents;         // +0x58
-    std::uint32_t mReserved64;             // +0x64
+    [[maybe_unused]] std::uint32_t mReserved64;             // +0x64
     double mCurrentTime;                   // +0x68
     double mUpdateInterval;                // +0x70
-    msvc8::string mPrimaryTexturePath;     // +0x78
+    fa::string mPrimaryTexturePath;     // +0x78
     CParticleTexture* mPrimaryTexture;     // +0x94
-    msvc8::string mRampTexturePath;        // +0x98
+    fa::string mRampTexturePath;        // +0x98
     CParticleTexture* mRampTexture;        // +0xB4
     Wm3::Vec3f mPosition;                  // +0xB8
     float mAngle;                          // +0xC4
@@ -346,7 +346,7 @@ namespace moho
     float mMinFramerate;                   // +0xF0
     float mMaxFramerate;                   // +0xF4
     float mTextureSelectionRange;          // +0xF8
-    std::uint8_t mTailPaddingFC[0x04];     // +0xFC
+    [[maybe_unused]] std::uint8_t mTailPaddingFC[0x04];     // +0xFC
   };
 
   class WaveSystem
@@ -404,8 +404,8 @@ namespace moho
      * lanes and returns the stored generator pointer.
      */
     WaveGenerator* CreateWaveGenerator(
-      const msvc8::string& primaryTexturePath,
-      const msvc8::string& rampTexturePath,
+      const fa::string& primaryTexturePath,
+      const fa::string& rampTexturePath,
       const Wm3::Vec3f& position,
       float angle,
       const Wm3::Vec3f& direction,

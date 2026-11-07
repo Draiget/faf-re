@@ -24,6 +24,7 @@
 
 #include <shellapi.h>
 
+#include "headless/HeadlessMain.h"
 #include "CScApp.h"
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
@@ -95,7 +96,7 @@ namespace
   std::FILE* sAllocLogFile = nullptr;
   CRITICAL_SECTION sAllocLogLock{};
   bool sInMemHook = false;
-  msvc8::hash_set<std::uintptr_t> sMemHookAddr;
+  fa::hash_set<std::uintptr_t> sMemHookAddr;
 
   STICKYKEYS sSavedStickyKeys{};
   TOGGLEKEYS sSavedToggleKeys{};
@@ -153,7 +154,7 @@ namespace
         if (sMemHookAddr.insert(frames[index]).second) {
           moho::SPlatSymbolInfo symbolInfo{};
           if (moho::PLAT_GetSymbolInfo(frames[index], &symbolInfo)) {
-            const msvc8::string symbolLine = symbolInfo.FormatResolvedLine();
+            const fa::string symbolLine = symbolInfo.FormatResolvedLine();
             std::fwrite(symbolLine.c_str(), 1, symbolLine.size() + 1U, sAllocLogFile);
           }
         }
@@ -202,13 +203,13 @@ namespace
    * Registrar: FUN_00BE9700 (`__xc_a` lane), data-xref
    * `dword_F5BEFC = offset sub_8D4260` is the callsite evidence.
    */
-  void SC_StartMemoryLog(const msvc8::vector<msvc8::string>& args)
+  void SC_StartMemoryLog(const fa::vector<fa::string>& args)
   {
     if (args.size() != 2u) {
       return;
     }
 
-    const msvc8::string* const pathToken = moho::ConCommandArg(args, 1u);
+    const fa::string* const pathToken = moho::ConCommandArg(args, 1u);
     if (pathToken == nullptr) {
       return;
     }
@@ -240,9 +241,9 @@ namespace
     return 0;
   }
 
-  void SC_FafCrashTest(const msvc8::vector<msvc8::string>& args)
+  void SC_FafCrashTest(const fa::vector<fa::string>& args)
   {
-    const msvc8::string* const kindToken = moho::ConCommandArg(args, 1u);
+    const fa::string* const kindToken = moho::ConCommandArg(args, 1u);
     RunCrashTest((kindToken != nullptr) ? kindToken->c_str() : "nullread");
   }
 
@@ -258,7 +259,7 @@ namespace
    * Registrar: FUN_00BE9740 (`__xc_a` lane), data-xref
    * `dword_F5BF0C = offset sub_8D42B0` is the callsite evidence.
    */
-  void SC_StopMemoryLog(const msvc8::vector<msvc8::string>& args)
+  void SC_StopMemoryLog(const fa::vector<fa::string>& args)
   {
     (void)args;
     func_CleanupAllocLoc();
@@ -454,12 +455,19 @@ namespace
  * Applies startup command-line behavior, executes CScApp through WIN_AppExecute,
  * restores input system settings, and returns IWinApp::exitValue.
  */
+int (*gGameReplayPlayerMain)(int argc, char** argv) = nullptr;
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
   (void)hInstance;
   (void)hPrevInstance;
   (void)lpCmdLine;
   (void)nShowCmd;
+
+  // Engine addition (replay timeline): the viewer's hidden process, this same exe with no window or device.
+  if (gGameReplayPlayerMain != nullptr && moho::CFG_GetArgOption("/replaykeyframes", 0, nullptr)) {
+    return gGameReplayPlayerMain(0, nullptr);
+  }
 
   gpg::SetThreadName(0xFFFFFFFFu, "Main");
 
@@ -475,7 +483,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   // `/crashtestdelay <seconds>` postpones the fault until the game is up, so
   // the report's Lua section shows live sim/UI frames.
   if (moho::CFG_GetArgOption("/crashtest", 0, nullptr)) {
-    msvc8::vector<msvc8::string> crashTestArgs;
+    fa::vector<fa::string> crashTestArgs;
     const char* kind = "nullread";
     if (moho::CFG_GetArgOption("/crashtest", 1, &crashTestArgs) && !crashTestArgs.empty()) {
       kind = crashTestArgs[0].c_str();
@@ -484,7 +492,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     moho::PLAT_CatchStructuredExceptions();
 
     DWORD delaySeconds = 0;
-    msvc8::vector<msvc8::string> delayArgs;
+    fa::vector<fa::string> delayArgs;
     if (moho::CFG_GetArgOption("/crashtestdelay", 1, &delayArgs) && !delayArgs.empty()) {
       delaySeconds = std::strtoul(delayArgs[0].c_str(), nullptr, 10);
     }
@@ -508,12 +516,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   {
     gpg::diag::InstallProbeWatchHandler();
 
-    msvc8::vector<msvc8::string> watchArgs;
+    fa::vector<fa::string> watchArgs;
     if (moho::CFG_GetArgOption("/w", 1, &watchArgs) && !watchArgs.empty()) {
       (void)gpg::diag::ParseWatchSpec(watchArgs[0].c_str());
     }
 
-    msvc8::vector<msvc8::string> probeArgs;
+    fa::vector<fa::string> probeArgs;
     if (moho::CFG_GetArgOption("/p", 1, &probeArgs) && !probeArgs.empty()) {
       // One address per comma-separated token.
       const char* p = probeArgs[0].c_str();
@@ -542,7 +550,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     moho::APP_SetAqtimeInstrumentationMode(0);
   }
 
-  msvc8::vector<msvc8::string> allocLogArgs;
+  fa::vector<fa::string> allocLogArgs;
   if (moho::CFG_GetArgOption("/alloclog", 1, &allocLogArgs) && !allocLogArgs.empty()) {
     InitializeAllocationLog(allocLogArgs[0].c_str());
   }

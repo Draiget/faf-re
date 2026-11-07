@@ -7,7 +7,7 @@
 
 #include <cstddef> // std::nullptr_t
 
-namespace msvc8
+namespace fa
 {
     template<class T>
     struct auto_ptr_ref
@@ -209,9 +209,9 @@ namespace msvc8
     inline bool operator!=(const auto_ptr<T>& a, std::nullptr_t) { return a.get() != nullptr; }
 #endif
 
-} // namespace msvc8
+} // namespace fa
 
 // Size check for 32-bit builds (x86). Will intentionally fail on x64.
 #if defined(_M_IX86) || defined(__i386__)
-typedef char msvc8_auto_ptr_size_check[(sizeof(msvc8::auto_ptr<int>) == 4) ? 1 : -1];
+typedef char msvc8_auto_ptr_size_check[(sizeof(fa::auto_ptr<int>) == 4) ? 1 : -1];
 #endif

@@ -4,7 +4,7 @@
 
 #include "legacy/math/X87Float.h"
 
-// The binary's x87 rules (msvc8::X87Float): an expression stays on the stack,
+// The binary's x87 rules (fa::X87Float): an expression stays on the stack,
 // and is rounded to float wherever the 2007 build stored it - each named
 // variable, each Vector3 temporary, each argument and result of an inlined
 // Wild Magic member (Dot, FAbs, Sqrt: IntrSegment3Sphere3<float>::Find stores
@@ -15,7 +15,7 @@
 
 namespace
 {
-  using msvc8::X87Float;
+  using fa::X87Float;
   using Wm3::Vector2f;
   using Wm3::Vector3f;
 

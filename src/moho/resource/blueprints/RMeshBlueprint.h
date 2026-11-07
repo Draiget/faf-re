@@ -30,13 +30,13 @@ namespace moho
    */
   struct RMeshBlueprintLOD
   {
-    msvc8::string mMeshName;      // +0x00
-    msvc8::string mAlbedoName;    // +0x1C
-    msvc8::string mNormalsName;   // +0x38
-    msvc8::string mSpecularName;  // +0x54
-    msvc8::string mLookupName;    // +0x70
-    msvc8::string mSecondaryName; // +0x8C
-    msvc8::string mShaderName;    // +0xA8
+    fa::string mMeshName;      // +0x00
+    fa::string mAlbedoName;    // +0x1C
+    fa::string mNormalsName;   // +0x38
+    fa::string mSpecularName;  // +0x54
+    fa::string mLookupName;    // +0x70
+    fa::string mSecondaryName; // +0x8C
+    fa::string mShaderName;    // +0xA8
     float mLodCutoff{1000.0f};    // +0xC4
     std::uint8_t mScrolling{0};   // +0xC8
     std::uint8_t mOcclude{0};     // +0xC9
@@ -75,7 +75,7 @@ namespace moho
      *
      * Declared out of line so the emitted symbol matches the binary's; every
      * LOD destruction, including each element of
-     * `msvc8::vector<RMeshBlueprintLOD>`, goes through it.
+     * `fa::vector<RMeshBlueprintLOD>`, goes through it.
      */
     ~RMeshBlueprintLOD();
 
@@ -87,7 +87,7 @@ namespace moho
      * int __usercall sub_51B080@<eax>(int a1@<edi>, int a2@<esi>);
      *
      * What it does:
-     * Copy-assigns every LOD field in-place: 7 `msvc8::string` lanes via
+     * Copy-assigns every LOD field in-place: 7 `fa::string` lanes via
      * `std::string::assign(src, 0, npos)`, the `mLodCutoff` float, and the
      * three `{mScrolling, mOcclude, mSilhouette}` byte flags. Returns `this`
      * as the call result to match the VC8 operator= ABI.
@@ -103,7 +103,7 @@ namespace moho
      * fallback naming rules (`_lod%d.scm`, `_albedo.dds`, `_normalsTS.dds`,
      * `_SpecTeam.dds`, `_lookup.dds`).
      */
-    void Init(const msvc8::string& sourcePath, std::uint32_t lodIndex);
+    void Init(const fa::string& sourcePath, std::uint32_t lodIndex);
   };
 
   /**
@@ -137,7 +137,7 @@ namespace moho
       gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
     );
 
-    msvc8::vector<RMeshBlueprintLOD> mLods; // +0x60
+    fa::vector<RMeshBlueprintLOD> mLods; // +0x60
     float mIconFadeInZoom{0.0f};            // +0x70
     float mSortOrder{0.0f};                 // +0x74
     float mUniformScale{1.0f};              // +0x78

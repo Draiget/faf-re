@@ -39,43 +39,6 @@ namespace
   constexpr float kStorageBlendFactor = 0.1f;
   constexpr float kStoragePreserveFactor = 0.9f;
 
-  /**
-   * The shared body behind `CStorageManipulator::StaticGetClass` (0x006498C0)
-   * and `CStorageManipulator::GetClass` (0x00648D70), which are two out-of-line
-   * copies of exactly this: read the cache at 0x010C73DC, and on a miss pass
-   * the type descriptor at 0x00F7394C to `gpg::LookupRType` (0x008E0750). It
-   * carries no address of its own for that reason -- the addresses belong to
-   * the two members, the same way `CachedIAniManipulatorType` relates to
-   * `IAniManipulator`'s pair.
-   */
-  [[nodiscard]] gpg::RType* CachedCStorageManipulatorType()
-  {
-    if (!moho::CStorageManipulator::sType) {
-      moho::CStorageManipulator::sType = gpg::LookupRType(typeid(moho::CStorageManipulator));
-    }
-    return moho::CStorageManipulator::sType;
-  }
-
-  /// The binary reads and fills one global for this descriptor (0x010C6330)
-  /// before each of the three vector reads/writes in the serializers.
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEEconResourceType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::EEconResource));
-    }
-    return type;
-  }
-
   [[nodiscard]] moho::CAniPoseBone* ResolveWatchedBoneForStorageManipulator(
     moho::IAniManipulator* const manipulator
   ) noexcept
@@ -172,7 +135,7 @@ namespace moho
    */
   gpg::RType* CStorageManipulator::StaticGetClass()
   {
-    return CachedCStorageManipulatorType();
+    return gpg::RTypeOf<moho::CStorageManipulator>();
   }
 
   /**
@@ -182,7 +145,7 @@ namespace moho
    */
   gpg::RType* CStorageManipulator::GetClass() const
   {
-    return CachedCStorageManipulatorType();
+    return gpg::RTypeOf<moho::CStorageManipulator>();
   }
 
   /**
@@ -435,13 +398,7 @@ namespace moho
       return;
     }
 
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType);
   }
 
   /**
@@ -471,7 +428,7 @@ namespace moho
      * Address: 0x00648E60 (FUN_00648E60, Moho::CStorageManipulatorTypeInfo::dtr)
      *
      * What it does:
-     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes and
+     * Frees the `RType` base's two `fa::vector<RField>` storage lanes and
      * restores the `gpg::RObject` vftable. Defaulted in source: the
      * compiler-generated `~RType()` reproduces this behavior, matching every
      * other manipulator TypeInfo dtor in this family.
@@ -684,12 +641,12 @@ namespace moho
 
     archive->WritePointer<moho::Unit>(mUnit, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    gpg::RType* const vector3Type = CachedVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3f>();
     archive->Write(vector3Type, &mMax, ownerRef);
     archive->Write(vector3Type, &mMin, ownerRef);
     archive->Write(vector3Type, &mCur, ownerRef);
 
-    archive->Write(CachedEEconResourceType(), &mResourceType, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::EEconResource>(), &mResourceType, ownerRef);
   }
 
   /**
@@ -717,12 +674,12 @@ namespace moho
 
     archive->ReadPointer(&mUnit, &ownerRef);
 
-    gpg::RType* const vector3Type = CachedVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3f>();
     archive->Read(vector3Type, &mMax, ownerRef);
     archive->Read(vector3Type, &mMin, ownerRef);
     archive->Read(vector3Type, &mCur, ownerRef);
 
-    archive->Read(CachedEEconResourceType(), &mResourceType, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::EEconResource>(), &mResourceType, ownerRef);
   }
 
   /**

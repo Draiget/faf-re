@@ -41,10 +41,10 @@ namespace moho
     [[nodiscard]] gpg::Rect2i SkirtRectToCellRect(const gpg::Rect2f& skirt) noexcept
     {
       gpg::Rect2i out{};
-      out.x0 = msvc8::FloorToIntX87(skirt.x0 - 1.0f);
-      out.x1 = msvc8::CeilToIntX87(skirt.x1 + 1.0f);
-      out.z0 = msvc8::FloorToIntX87(skirt.z0 - 1.0f);
-      out.z1 = msvc8::CeilToIntX87(skirt.z1 + 1.0f);
+      out.x0 = fa::FloorToIntX87(skirt.x0 - 1.0f);
+      out.x1 = fa::CeilToIntX87(skirt.x1 + 1.0f);
+      out.z0 = fa::FloorToIntX87(skirt.z0 - 1.0f);
+      out.z1 = fa::CeilToIntX87(skirt.z1 + 1.0f);
       return out;
     }
 
@@ -231,83 +231,7 @@ namespace
     return -1;
   }
 
-  [[nodiscard]] gpg::RType* CachedCUnitCallTeleportType()
-  {
-    gpg::RType* type = moho::CUnitCallTeleport::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitCallTeleport));
-      moho::CUnitCallTeleport::sType = type;
-    }
-    return type;
-  }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCAiTargetType()
-  {
-    gpg::RType* type = moho::CAiTarget::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CAiTarget));
-      moho::CAiTarget::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedQuaternionfType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Quaternion<float>));
-    }
-    return cached;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 } // namespace
 
 namespace moho
@@ -682,10 +606,10 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
-    archive->Read(CachedCAiTargetType(), &mTarget, ownerRef);
-    archive->Read(CachedWeakPtrUnitType(), &mTeleportBeaconUnit, ownerRef);
-    archive->Read(CachedQuaternionfType(), &mOrientation, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CAiTarget>(), &mTarget, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTeleportBeaconUnit, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Quaternion<float>>(), &mOrientation, ownerRef);
   }
 
   /**
@@ -712,10 +636,10 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
-    archive->Write(CachedCAiTargetType(), &mTarget, ownerRef);
-    archive->Write(CachedWeakPtrUnitType(), &mTeleportBeaconUnit, ownerRef);
-    archive->Write(CachedQuaternionfType(), &mOrientation, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CAiTarget>(), &mTarget, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTeleportBeaconUnit, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Quaternion<float>>(), &mOrientation, ownerRef);
   }
 
   /**
@@ -733,8 +657,8 @@ namespace moho
     }
 
     gpg::RRef nullOwner{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), nullOwner);
-    archive->Read(CachedWeakPtrUnitType(), &mTargetTransportUnit, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), nullOwner);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTargetTransportUnit, nullOwner);
     archive->ReadBool(&mCompletedSuccessfully);
     archive->ReadBool(&mIsOccupying);
   }
@@ -754,8 +678,8 @@ namespace moho
     }
 
     gpg::RRef nullOwner{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), nullOwner);
-    archive->Write(CachedWeakPtrUnitType(), &mTargetTransportUnit, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), nullOwner);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTargetTransportUnit, nullOwner);
     archive->WriteBool(mCompletedSuccessfully);
     archive->WriteBool(mIsOccupying);
   }
@@ -816,12 +740,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitCallTeleport(gpg::RRef* const outRef, moho::CUnitCallTeleport* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = MakeDerivedRef(value, CachedCUnitCallTeleportType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

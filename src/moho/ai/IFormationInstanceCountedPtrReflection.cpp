@@ -1,3 +1,4 @@
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/IFormationInstanceCountedPtrReflection.h"
 
 #include <cstdint>
@@ -37,39 +38,7 @@ namespace
 
   thread_local IFormationInstanceTypeCache gIFormationInstanceTypeCache{};
 
-  template <class T>
-  [[nodiscard]] gpg::RType* CachedRType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(T));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedIFormationInstanceType()
-  {
-    return CachedRType<moho::IFormationInstance>();
-  }
-
   using FormationStatusBroadcaster = moho::Broadcaster<moho::EFormationdStatus>;
-
-  /**
-   * The binary keeps one global for this descriptor -- `0x010C6F84`, which
-   * both serializers below read, test for null, fill from
-   * `LookupRType(0x00F68650)` and store back. That global is the
-   * instantiation's own `sType` lane, so this reads and writes it rather than
-   * caching a second copy in a function-local static.
-   */
-  [[nodiscard]] gpg::RType* ResolveBroadcasterEFormationdStatusType()
-  {
-    gpg::RType* type = FormationStatusBroadcaster::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(FormationStatusBroadcaster));
-      FormationStatusBroadcaster::sType = type;
-    }
-    return type;
-  }
 
   // NOTE: 0x00570F10 (Moho::AddIFormationInstanceBaseField-shaped helper) is
   // recovered and wired at its real caller, `CFormationInstanceTypeInfo::Init`
@@ -297,7 +266,7 @@ namespace moho
 
     const gpg::RRef ownerRef{};
     archive->Read(
-      ResolveBroadcasterEFormationdStatusType(),
+      gpg::RTypeOf<FormationStatusBroadcaster>(),
       static_cast<FormationStatusBroadcaster*>(object),
       ownerRef
     );
@@ -322,7 +291,7 @@ namespace moho
 
     const gpg::RRef ownerRef{};
     archive->Write(
-      ResolveBroadcasterEFormationdStatusType(),
+      gpg::RTypeOf<FormationStatusBroadcaster>(),
       static_cast<const FormationStatusBroadcaster*>(object),
       ownerRef
     );
@@ -357,22 +326,22 @@ namespace moho
    */
   const char* RCountedPtrType<moho::IFormationInstance>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("CountedPtr<%s>", CachedIFormationInstanceType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("CountedPtr<%s>", gpg::RTypeOf<moho::IFormationInstance>()->GetName());
     return sName.c_str();
   }
 
   /**
    * Address: 0x006E9E40 (FUN_006E9E40, Moho::RCountedPtrType<Moho::IFormationInstance>::GetLexical)
    */
-  msvc8::string RCountedPtrType<moho::IFormationInstance>::GetLexical(const gpg::RRef& ref) const
+  fa::string RCountedPtrType<moho::IFormationInstance>::GetLexical(const gpg::RRef& ref) const
   {
     auto* const slot = AsSlot(ref.mObj);
     if (!slot || !*slot) {
-      return msvc8::string("NULL");
+      return fa::string("NULL");
     }
 
     const gpg::RRef instanceRef = MakeIFormationInstanceRef(*slot);
-    const msvc8::string inner = instanceRef.GetLexical();
+    const fa::string inner = instanceRef.GetLexical();
     return gpg::STR_Printf("[%s]", inner.c_str());
   }
 

@@ -38,7 +38,7 @@ WHAT = [
     ("idle wait (beat/vsync)", lambda n, p: n in ("boost::detail::condition_impl::do_wait", "gpg::gal::DeviceD3D9::Present")),
     ("Lua GC", lambda n, p: n in GC),
     ("allocator", lambda n, p: n in ("malloc_0", "free", "operatornew", "realloc_0", "AllocateSmallBlocksAmount",
-                                     "msvc8::detail::allocate_checked", "operator delete", "operatordelete")
+                                     "fa::detail::allocate_checked", "operator delete", "operatordelete")
      ),
     ("Lua VM + LuaPlus", lambda n, p: p.startswith("src/lua/") or n.startswith(("lua", "LuaPlus::"))),
     ("spatial query (COGrid)", lambda n, p: any(s in n for s in ("COGrid::", "EntityOccupationManager", "GatherUnmarked",

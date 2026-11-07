@@ -1,0 +1,78 @@
+diff --git a/src/base/fthash.c b/src/base/fthash.c
+--- a/src/base/fthash.c
++++ b/src/base/fthash.c
+@@ -144,7 +144,15 @@
+     hash->limit  = hash->size / 3;
+ 
+     if ( FT_NEW_ARRAY( hash->table, hash->size ) )
++    {
++      /* Keep the old table, which the free function and later */
++      /* inserts still use; dropping it left a null table with */
++      /* the new size.                                          */
++      hash->table = obp;
++      hash->size  = sz;
++      hash->limit = sz / 3;
+       goto Exit;
++    }
+ 
+     for ( i = 0, bp = obp; i < sz; i++, bp++ )
+     {
+@@ -187,6 +195,12 @@
+     }
+ 
+     FT_MEM_NEW_ARRAY( hash->table, sz );
++    if ( error )
++    {
++      /* The free function walks `size` buckets, and there are none. */
++      hash->size  = 0;
++      hash->limit = 0;
++    }
+ 
+     return error;
+   }
+@@ -212,7 +226,7 @@
+   ft_hash_str_free( FT_Hash    hash,
+                     FT_Memory  memory )
+   {
+-    if ( hash )
++    if ( hash && hash->table )
+     {
+       FT_UInt       sz = hash->size;
+       FT_Hashnode*  bp = hash->table;
+@@ -333,7 +347,15 @@
+   hash_lookup( FT_Hashkey  key,
+                FT_Hash     hash )
+   {
+-    FT_Hashnode*  np = hash_bucket( key, hash );
++    FT_Hashnode*  np;
++
++
++    /* A table that failed to build is a blank one: callers such */
++    /* as the autohinter look up in it after the failure.        */
++    if ( !hash || !hash->table )
++      return NULL;
++
++    np = hash_bucket( key, hash );
+ 
+ 
+     return (*np) ? &(*np)->data
+@@ -376,6 +398,9 @@
+     FT_Hashnode  nn = NULL;
+ 
+ 
++    if ( !hash || !hash->table )
++      return 0;
++
+     while ( 1 )
+     {
+       if ( *idx >= hash->size )
+@@ -408,6 +433,9 @@
+     FT_Hashnode  nn = NULL;
+ 
+ 
++    if ( !hash || !hash->table )
++      return 0;
++
+     while ( 1 )
+     {
+       if ( *idx >= hash->size )

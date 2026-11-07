@@ -21,24 +21,6 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedListenerECommandEventType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Listener<moho::ECommandEvent>));
-    }
-    return cached;
-  }
 } // namespace
 
 namespace moho
@@ -99,15 +81,7 @@ namespace moho
    */
   void __stdcall CUnitRepairTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedCCommandTaskType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
 
   /**
@@ -119,15 +93,7 @@ namespace moho
    */
   void __stdcall CUnitRepairTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedListenerECommandEventType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = gpg::BaseSubobjectOffset<CUnitRepairTask, Listener<ECommandEvent>>();
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(typeInfo, gpg::BaseSubobjectOffset<CUnitRepairTask, Listener<ECommandEvent>>());
   }
 
   /**
@@ -155,10 +121,7 @@ namespace moho
    */
   gpg::RRef CUnitRepairTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitRepairTask*>(objectStorage);
-    if (task) {
-      new (task) CUnitRepairTask();
-    }
+    auto* const task = gpg::ConstructInStorage<CUnitRepairTask>(objectStorage);
 
     gpg::RRef ref{};
     ref = gpg::MakeRRef<moho::CUnitRepairTask>(task);

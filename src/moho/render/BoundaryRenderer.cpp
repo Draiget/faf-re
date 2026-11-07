@@ -75,7 +75,7 @@ namespace
     const Wm3::AxisAlignedBox3f& volume,
     const unsigned int headIndex,
     const moho::GeomCamera3& camera,
-    const msvc8::string& techniqueName
+    const fa::string& techniqueName
   )
   {
     auto* const device = gpg::gal::Device::GetInstance();
@@ -215,10 +215,10 @@ namespace moho
 
     // Outer shell clockwise, playable shell counter-clockwise: the two casts
     // leave exactly the ring between them marked in the stencil buffer.
-    const msvc8::string outerTechnique{"CastBoundaryCW"};
+    const fa::string outerTechnique{"CastBoundaryCW"};
     CastBoundaryVolume(boundary.mBoundaryRendererBody, mapVolume, headIndex, camera, outerTechnique);
 
-    const msvc8::string innerTechnique{"CastBoundaryCCW"};
+    const fa::string innerTechnique{"CastBoundaryCCW"};
     CastBoundaryVolume(boundary.mBoundaryRendererBody, playableVolume, headIndex, camera, innerTechnique);
 
     const auto headWidth = static_cast<std::int32_t>(head.mWidth);

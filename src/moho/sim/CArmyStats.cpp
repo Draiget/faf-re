@@ -63,7 +63,7 @@ namespace
         return static_cast<float>(item->GetInt(false));
       case moho::EStatType::kString:
       default: {
-        msvc8::string value;
+        fa::string value;
         item->SetValueCopy(&value);
         return static_cast<float>(std::atof(value.c_str()));
       }
@@ -90,44 +90,6 @@ namespace
     }
   }
 
-  [[nodiscard]] int CompareNameIndexKey(const msvc8::string& lhs, const msvc8::string& rhs)
-  {
-    return std::strcmp(lhs.c_str(), rhs.c_str());
-  }
-
-  [[nodiscard]] std::int32_t AtomicExchangeAddI32(volatile std::int32_t* const slot, const std::int32_t value) noexcept
-  {
-#if defined(_MSC_VER)
-    return static_cast<std::int32_t>(
-      _InterlockedExchangeAdd(reinterpret_cast<volatile platform::InterlockedLong*>(slot), static_cast<long>(value))
-    );
-#else
-    const std::int32_t previous = *slot;
-    *slot = previous + value;
-    return previous;
-#endif
-  }
-
-  [[nodiscard]] std::int32_t
-  AtomicCompareExchangeI32(volatile std::int32_t* const slot, const std::int32_t desired, const std::int32_t expected) noexcept
-  {
-#if defined(_MSC_VER)
-    return static_cast<std::int32_t>(
-      _InterlockedCompareExchange(
-        reinterpret_cast<volatile platform::InterlockedLong*>(slot),
-        static_cast<long>(desired),
-        static_cast<long>(expected)
-      )
-    );
-#else
-    const std::int32_t observed = *slot;
-    if (observed == expected) {
-      *slot = desired;
-    }
-    return observed;
-#endif
-  }
-
   [[nodiscard]] float IntBitsToFloat(const std::int32_t bits) noexcept
   {
     return std::bit_cast<float>(bits);
@@ -138,7 +100,7 @@ namespace
     return std::bit_cast<std::int32_t>(value);
   }
 
-  [[nodiscard]] moho::CArmyStatItem* FindArmyChildByName(moho::CArmyStatItem* parent, const msvc8::string& token)
+  [[nodiscard]] moho::CArmyStatItem* FindArmyChildByName(moho::CArmyStatItem* parent, const fa::string& token)
   {
     if (parent == nullptr) {
       return nullptr;
@@ -147,7 +109,7 @@ namespace
     return static_cast<moho::CArmyStatItem*>(parent->FindDirectChildByName(token));
   }
 
-  void AppendMsvcString(std::string& out, const msvc8::string& text)
+  void AppendMsvcString(std::string& out, const fa::string& text)
   {
     out.append(text.c_str(), text.size());
   }
@@ -175,7 +137,7 @@ namespace
   }
 
   void CollectBlueprintStatKeys(
-    msvc8::set<const moho::RUnitBlueprint*>& outKeys,
+    fa::set<const moho::RUnitBlueprint*>& outKeys,
     const moho::CArmyStatItem* const item
   )
   {
@@ -216,7 +178,7 @@ namespace
   // --- shared red-black erase mechanics --------------------------------------
   //
   // The per-blueprint stat map (`std::map<const RUnitBlueprint*, float>`) and the
-  // stat-path name index (`std::map<msvc8::string, CArmyStatItem*>`) are two
+  // stat-path name index (`std::map<fa::string, CArmyStatItem*>`) are two
   // instantiations of one MSVC8 `std::_Tree`, so the erase rebalance below is
   // written once and shared by both node families through the `RotateRb*`
   // overload set.
@@ -259,7 +221,7 @@ namespace
    * the per-process snapshot counter (`dword_10A63D8`, 0x010A63D8). Both are
    * file-scope state in the binary and only `CArmyStats::DumpStats` touches them.
    */
-  msvc8::string gSnapshotDirectory;
+  fa::string gSnapshotDirectory;
   std::int32_t gSnapshotIndex = 0;
 
   /**
@@ -314,15 +276,6 @@ namespace
   }
 
 
-
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
 
   gpg::RType* gArmyStatsBaseType = nullptr;
   gpg::RType* gArmyNameIndexType = nullptr;
@@ -403,7 +356,7 @@ namespace moho
     : StatItem(name)
     , mBlueprintStats{}
   {
-    // `msvc8::map`'s own constructor builds the head sentinel and zeroes the
+    // `fa::map`'s own constructor builds the head sentinel and zeroes the
     // size, which is what the binary open-codes here.
   }
 
@@ -439,7 +392,7 @@ namespace moho
     for (const auto& entry : mBlueprintStats) {
       const RUnitBlueprint* const blueprint = entry.first;
       if (blueprint != nullptr) {
-        const msvc8::string value = gpg::STR_Printf("%.2f", entry.second);
+        const fa::string value = gpg::STR_Printf("%.2f", entry.second);
         blueprints.SetString(blueprint->mBlueprintId.c_str(), value.c_str());
       }
     }
@@ -521,7 +474,7 @@ namespace moho
    * Address: 0x005953A0 (FUN_005953A0, token walk)
    */
   CArmyStatItem* Stats<CArmyStatItem>::WalkTokenPath(
-    CArmyStatItem* root, const msvc8::vector<msvc8::string>& tokens, const bool allowCreate, bool* const didCreate
+    CArmyStatItem* root, const fa::vector<fa::string>& tokens, const bool allowCreate, bool* const didCreate
   )
   {
     if (didCreate != nullptr) {
@@ -575,7 +528,7 @@ namespace moho
   {
     boost::mutex::scoped_lock lock(mLock);
 
-    msvc8::vector<msvc8::string> tokens;
+    fa::vector<fa::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
 
     bool didCreate = false;
@@ -607,7 +560,7 @@ namespace moho
   {
     boost::mutex::scoped_lock lock(mLock);
 
-    msvc8::vector<msvc8::string> tokens;
+    fa::vector<fa::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
 
     bool didCreate = false;
@@ -651,11 +604,11 @@ namespace moho
    *
    * What it does:
    * Explicitly tears down the trigger list, then returns; `mNameIndex` (a real
-   * `msvc8::map<msvc8::string, CArmyStatItem*>`) and the `Stats<CArmyStatItem>`
+   * `fa::map<fa::string, CArmyStatItem*>`) and the `Stats<CArmyStatItem>`
    * base class are destroyed automatically by the compiler-generated epilogue
    * that follows. The binary's own body confirms this directly: it inlines
    * `mNameIndex`'s `erase_range`-then-`delete`-then-zero sequence in place
-   * (cited on `msvc8::rb_tree::erase_range`/`~rb_tree` in RbTree.h) rather than
+   * (cited on `fa::rb_tree::erase_range`/`~rb_tree` in RbTree.h) rather than
    * calling out to any separate "destroy the name index" symbol, then tail-calls
    * `Stats<CArmyStatItem>::~Stats()` (0x006FD850). No such symbol as a
    * standalone `DestroyNameIndexTree` exists anywhere in this binary; an
@@ -703,9 +656,9 @@ namespace moho
     }
 
     const gpg::RRef owner{};
-    archive->Read(CachedType<Stats<CArmyStatItem>>(gArmyStatsBaseType), static_cast<Stats<CArmyStatItem>*>(this), owner);
-    archive->Read(CachedType<ArmyNameIndexTree>(gArmyNameIndexType), &mNameIndex, owner);
-    archive->Read(CachedType<ArmyTriggerList>(gArmyTriggerListType), &mTriggers, owner);
+    archive->Read(gpg::CachedLookup<Stats<CArmyStatItem>>(gArmyStatsBaseType), static_cast<Stats<CArmyStatItem>*>(this), owner);
+    archive->Read(gpg::CachedLookup<ArmyNameIndexTree>(gArmyNameIndexType), &mNameIndex, owner);
+    archive->Read(gpg::CachedLookup<ArmyTriggerList>(gArmyTriggerListType), &mTriggers, owner);
   }
 
   /**
@@ -726,12 +679,12 @@ namespace moho
 
     const gpg::RRef owner{};
     archive->Write(
-      CachedType<Stats<CArmyStatItem>>(gArmyStatsBaseType),
+      gpg::CachedLookup<Stats<CArmyStatItem>>(gArmyStatsBaseType),
       static_cast<const Stats<CArmyStatItem>*>(this),
       owner
     );
-    archive->Write(CachedType<ArmyNameIndexTree>(gArmyNameIndexType), &mNameIndex, owner);
-    archive->Write(CachedType<ArmyTriggerList>(gArmyTriggerListType), &mTriggers, owner);
+    archive->Write(gpg::CachedLookup<ArmyNameIndexTree>(gArmyNameIndexType), &mNameIndex, owner);
+    archive->Write(gpg::CachedLookup<ArmyTriggerList>(gArmyTriggerListType), &mTriggers, owner);
   }
 
   /**
@@ -739,7 +692,7 @@ namespace moho
    */
   CArmyStatItem* CArmyStats::GetStat(const char* statPath)
   {
-    const msvc8::string key(statPath);
+    const fa::string key(statPath);
     if (const auto found = mNameIndex.find(key); found != mNameIndex.end()) {
       return found->second;
     }
@@ -749,7 +702,7 @@ namespace moho
       return nullptr;
     }
 
-    item->Release(0);
+    (void)item->Release(0);
     mNameIndex[key] = item;
     return item;
   }
@@ -759,13 +712,13 @@ namespace moho
    */
   CArmyStatItem* CArmyStats::GetItem(const char* const statPath)
   {
-    const msvc8::string key(statPath);
+    const fa::string key(statPath);
     if (const auto found = mNameIndex.find(key); found != mNameIndex.end()) {
       return found->second;
     }
 
     CArmyStatItem* const item = TraverseTables(statPath, true);
-    item->Release(0);
+    (void)item->Release(0);
     mNameIndex[key] = item;
     return item;
   }
@@ -774,7 +727,7 @@ namespace moho
    * Address: 0x0070CC40 (FUN_0070CC40, Moho::CArmyStats::ArmyXmlStatsNode)
    * Mangled: ?ArmyXmlStatsNode@CArmyStats@Moho@@QAE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV34@@Z
    */
-  msvc8::string CArmyStats::ArmyXmlStatsNode(const msvc8::string& indent)
+  fa::string CArmyStats::ArmyXmlStatsNode(const fa::string& indent)
   {
     CAiBrain* const brain = mOwnerArmy;
     CArmyImpl* const army = brain->mArmy;
@@ -793,7 +746,7 @@ namespace moho
     CArmyStatItem* const damageDealt = GetItem("Units_TotalDamageDealt");
     CArmyStatItem* const damageReceived = GetItem("Units_TotalDamageReceive");
 
-    msvc8::set<const RUnitBlueprint*> blueprintKeys;
+    fa::set<const RUnitBlueprint*> blueprintKeys;
     CollectBlueprintStatKeys(blueprintKeys, unitsActive);
     CollectBlueprintStatKeys(blueprintKeys, enemiesKilled);
 
@@ -869,7 +822,7 @@ namespace moho
     AppendMsvcString(xml, gpg::STR_Printf("%s    </EconomyStats>\n", indentText));
     AppendMsvcString(xml, gpg::STR_Printf("%s</Army>\n", indentText));
 
-    msvc8::string result;
+    fa::string result;
     result.assign_owned(std::string_view(xml.data(), xml.size()));
     return result;
   }
@@ -883,13 +836,13 @@ namespace moho
    */
   CArmyStatItem* ResolveArmyStatItemCachedCreate(CArmyStats* const armyStats, const char* const statPath)
   {
-    const msvc8::string key(statPath);
+    const fa::string key(statPath);
     if (const auto found = armyStats->mNameIndex.find(key); found != armyStats->mNameIndex.end()) {
       return found->second;
     }
 
     CArmyStatItem* const item = armyStats->TraverseTablesCreate(statPath);
-    item->Release(0);
+    (void)item->Release(0);
     armyStats->mNameIndex[key] = item;
     return item;
   }
@@ -957,7 +910,7 @@ namespace moho
 
     if (gSnapshotDirectory.size() == 0u) {
       gSnapshotDirectory.assign(
-        gpg::STR_Printf("%s/Desktop", std::getenv("USERPROFILE")), 0, msvc8::string::npos
+        gpg::STR_Printf("%s/Desktop", std::getenv("USERPROFILE")), 0, fa::string::npos
       );
 
       // Engine addition (dedicated-server plan WPL.4): the wxDirDialog
@@ -975,7 +928,7 @@ namespace moho
     RRuleGameRules* const rules = brain->mSim->mRules;
 
     const std::int32_t snapshotIndex = gSnapshotIndex++;
-    const msvc8::string snapshotPath =
+    const fa::string snapshotPath =
       gpg::STR_Printf("%s/SnapShot%d.txt", gSnapshotDirectory.c_str(), snapshotIndex);
 
     gpg::FileStream snapshotStream(snapshotPath.c_str(), gpg::Stream::ModeSend, 0u, 4096);
@@ -1061,7 +1014,7 @@ namespace moho
   {
     CArmyStatItem* const item = GetItem(statPath);
     item->SynchronizeAsInt();
-    return AtomicExchangeAddI32(&item->mPrimaryValueBits, *delta);
+    return platform::AtomicAdd(&item->mPrimaryValueBits, *delta);
   }
 
   /**
@@ -1074,8 +1027,8 @@ namespace moho
 
     volatile std::int32_t* const counter = &item->mPrimaryValueBits;
     for (;;) {
-      const std::int32_t observed = AtomicCompareExchangeI32(counter, 0, 0);
-      const std::int32_t result = AtomicCompareExchangeI32(counter, *value, observed);
+      const std::int32_t observed = platform::AtomicLoad(counter);
+      const std::int32_t result = platform::AtomicCompareExchange(counter, *value, observed);
       if (result == observed) {
         return result;
       }
@@ -1097,8 +1050,8 @@ namespace moho
 
     volatile std::int32_t* const counter = &item->mPrimaryValueBits;
     for (;;) {
-      const std::int32_t observed = AtomicCompareExchangeI32(counter, 0, 0);
-      const std::int32_t previous = AtomicCompareExchangeI32(counter, *value, observed);
+      const std::int32_t observed = platform::AtomicLoad(counter);
+      const std::int32_t previous = platform::AtomicCompareExchange(counter, *value, observed);
       if (previous == observed) {
         return previous;
       }
@@ -1113,13 +1066,13 @@ namespace moho
     CArmyStatItem* const item = GetItem(statPath);
     volatile std::int32_t* const counter = &item->mPrimaryValueBits;
 
-    std::int32_t result = AtomicCompareExchangeI32(counter, 0, 0);
+    std::int32_t result = platform::AtomicLoad(counter);
     const std::int32_t targetValue = *candidate;
     if (targetValue > result) {
       item->SynchronizeAsInt();
       for (;;) {
-        const std::int32_t observed = AtomicCompareExchangeI32(counter, 0, 0);
-        result = AtomicCompareExchangeI32(counter, targetValue, observed);
+        const std::int32_t observed = platform::AtomicLoad(counter);
+        result = platform::AtomicCompareExchange(counter, targetValue, observed);
         if (result == observed) {
           break;
         }
@@ -1152,7 +1105,7 @@ namespace moho
     }
     volatile std::int32_t* const counter = &item->mPrimaryValueBits;
 
-    const std::int32_t currentBits = AtomicCompareExchangeI32(counter, 0, 0);
+    const std::int32_t currentBits = platform::AtomicLoad(counter);
     const float currentValue = IntBitsToFloat(currentBits);
     const float targetValue = (currentValue > candidateValue) ? currentValue : candidateValue;
     if (targetValue == currentValue) {
@@ -1162,8 +1115,8 @@ namespace moho
     item->SynchronizeAsFloat();
     const std::int32_t targetBits = FloatToIntBits(targetValue);
     for (;;) {
-      const std::int32_t observed = AtomicCompareExchangeI32(counter, 0, 0);
-      const std::int32_t previous = AtomicCompareExchangeI32(counter, targetBits, observed);
+      const std::int32_t observed = platform::AtomicLoad(counter);
+      const std::int32_t previous = platform::AtomicCompareExchange(counter, targetBits, observed);
       if (previous == observed) {
         return;
       }
@@ -1302,14 +1255,14 @@ namespace moho
    */
   CArmyStatItem* CArmyStats::GetStringItemCached(const gpg::StrArg statPath)
   {
-    const msvc8::string key(statPath ? statPath : "");
+    const fa::string key(statPath ? statPath : "");
     if (const auto found = mNameIndex.find(key); found != mNameIndex.end()) {
       return found->second;
     }
 
     CArmyStatItem* const item = GetStringItem(key.c_str());
     if (item != nullptr) {
-      item->Release(0);
+      (void)item->Release(0);
     }
     mNameIndex[key] = item;
     return item;
@@ -1318,7 +1271,7 @@ namespace moho
   /**
    * Address: 0x00704000 (FUN_00704000, sub_704000)
    */
-  void CArmyStats::SetStringValueByPath(const gpg::StrArg statPath, const msvc8::string& value)
+  void CArmyStats::SetStringValueByPath(const gpg::StrArg statPath, const fa::string& value)
   {
     CArmyStatItem* const item = GetStringItemCached(statPath);
     if (item == nullptr) {

@@ -46,10 +46,10 @@ bool RBoolType::SetLexical(const gpg::RRef& ref, const char* const str) const
  * What it does:
  * Returns "true" or "false" based on the bool value referenced by ref.mObj.
  */
-msvc8::string RBoolType::GetLexical(const gpg::RRef& ref) const
+fa::string RBoolType::GetLexical(const gpg::RRef& ref) const
 {
   const auto* const value = static_cast<const bool*>(ref.mObj);
-  return *value ? msvc8::string{"true"} : msvc8::string{"false"};
+  return *value ? fa::string{"true"} : fa::string{"false"};
 }
 
 RBoolType::~RBoolType() = default;

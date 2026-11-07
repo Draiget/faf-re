@@ -1,4 +1,5 @@
 #include "moho/script/CUnitScriptTask.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 #include <cmath>
 #include <exception>
@@ -37,7 +38,6 @@ using namespace moho;
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kGetUnitName = "GetUnit";
   constexpr const char* kGetUnitHelpText = "Get the unit performing the task";
   constexpr const char* kSetAIResultName = "SetAIResult";
@@ -49,16 +49,6 @@ namespace
   constexpr const char* kLUnitMoveCannotDeduceTarget = "Could not deduce target from lua object.";
   constexpr const char* kLUnitMoveNearName = "LUnitMoveNear";
   constexpr const char* kLUnitMoveNearHelpText = "ScriptTask.LUnitMoveNear(self,target,range)";
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
 
   /**
    * Address: 0x00623B10 (FUN_00623B10)
@@ -90,39 +80,9 @@ namespace
     return upcast.mObj;
   }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* cached = CCommandTask::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CCommandTask));
-      CCommandTask::sType = cached;
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RType* CachedCScriptObjectType()
   {
     return CScriptObject::StaticGetClass();
-  }
-
-  [[nodiscard]] gpg::RType* CachedLuaObjectType()
-  {
-    gpg::RType* cached = LuaPlus::LuaObject::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(LuaPlus::LuaObject));
-      LuaPlus::LuaObject::sType = cached;
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitCommandType()
-  {
-    gpg::RType* cached = CUnitCommand::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CUnitCommand));
-      CUnitCommand::sType = cached;
-    }
-    return cached;
   }
 
   /**
@@ -174,41 +134,11 @@ namespace
     return ref;
   }
 
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
-
   [[nodiscard]] gpg::RRef MakeCUnitCommandRef(CUnitCommand* command)
   {
     gpg::RRef ref{};
     ref.mObj = nullptr;
-    ref.mType = CachedCUnitCommandType();
+    ref.mType = gpg::RTypeOf<CUnitCommand>();
     if (!command) {
       return ref;
     }
@@ -245,14 +175,14 @@ namespace
     source.mObj = tracked.object;
     source.mType = tracked.type;
 
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCUnitCommandType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<CUnitCommand>());
     if (upcast.mObj) {
       return static_cast<CUnitCommand*>(upcast.mObj);
     }
 
-    const char* const expected = CachedCUnitCommandType() ? CachedCUnitCommandType()->GetName() : "CUnitCommand";
+    const char* const expected = gpg::RTypeOf<CUnitCommand>() ? gpg::RTypeOf<CUnitCommand>()->GetName() : "CUnitCommand";
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
       expected ? expected : "CUnitCommand",
       actual ? actual : "null"
@@ -415,7 +345,7 @@ int moho::cfunc_CUnitScriptTaskGetUnit(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CUnitScriptTaskGetUnit_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kGetUnitName,
     &moho::cfunc_CUnitScriptTaskGetUnit,
     &CScrLuaMetatableFactory<CUnitScriptTask>::Instance(),
@@ -433,11 +363,7 @@ moho::CScrLuaInitForm* moho::func_CUnitScriptTaskGetUnit_LuaFuncDef()
  */
 int moho::cfunc_CUnitScriptTaskGetUnitL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetUnitHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kGetUnitHelpText);
 
   const LuaPlus::LuaObject taskObject(LuaPlus::LuaStackObject(state, 1));
   CUnitScriptTask* const task = SCR_FromLua_CUnitScriptTask(taskObject, state);
@@ -466,7 +392,7 @@ int moho::cfunc_CUnitScriptTaskSetAIResult(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CUnitScriptTaskSetAIResult_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kSetAIResultName,
     &moho::cfunc_CUnitScriptTaskSetAIResult,
     &CScrLuaMetatableFactory<CUnitScriptTask>::Instance(),
@@ -485,10 +411,7 @@ moho::CScrLuaInitForm* moho::func_CUnitScriptTaskSetAIResult_LuaFuncDef()
 int moho::cfunc_CUnitScriptTaskSetAIResultL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetAIResultHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kSetAIResultHelpText);
 
   const LuaPlus::LuaObject taskObject(LuaPlus::LuaStackObject(state, 1));
   CUnitScriptTask* const task = SCR_FromLua_CUnitScriptTask(taskObject, state);
@@ -521,10 +444,7 @@ int moho::cfunc_CUnitScriptTaskSetAIResultL(LuaPlus::LuaState* const state)
 int moho::cfunc_LUnitMoveL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kLUnitMoveHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kLUnitMoveHelpText);
 
   const LuaPlus::LuaObject taskObject(LuaPlus::LuaStackObject(state, 1));
   CUnitScriptTask* const task = SCR_FromLua_CUnitScriptTask(taskObject, state);
@@ -552,8 +472,8 @@ int moho::cfunc_LUnitMoveL(LuaPlus::LuaState* const state)
   // targets fold the same way as in the shipped engine.
   const float halfFootprintX = static_cast<float>(footprint.mSizeX) * 0.5f;
   const float halfFootprintZ = static_cast<float>(footprint.mSizeZ) * 0.5f;
-  const int originX = static_cast<int>(static_cast<std::int16_t>(msvc8::RoundToInt(targetPos.x - halfFootprintX)));
-  const int originZ = static_cast<int>(static_cast<std::int16_t>(msvc8::RoundToInt(targetPos.z - halfFootprintZ)));
+  const int originX = static_cast<int>(static_cast<std::int16_t>(fa::RoundToInt(targetPos.x - halfFootprintX)));
+  const int originZ = static_cast<int>(static_cast<std::int16_t>(fa::RoundToInt(targetPos.z - halfFootprintZ)));
 
   SNavGoal goal{};
   goal.mPos1 = gpg::Rect2i{originX, originZ, originX + 1, originZ + 1};
@@ -595,7 +515,7 @@ int moho::cfunc_LUnitMove(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_LUnitMove_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kLUnitMoveName,
     &moho::cfunc_LUnitMove,
     nullptr,
@@ -633,8 +553,8 @@ namespace
       // `fld`/`fistp` (round to nearest, ties to even -- not `__ftol`
       // truncation), then read back through `movsx word` so out-of-range
       // ground targets fold to int16 the same way.
-      const auto originX = static_cast<std::int16_t>(msvc8::RoundToInt(target->position.x - 0.5f));
-      const auto originZ = static_cast<std::int16_t>(msvc8::RoundToInt(target->position.z - 0.5f));
+      const auto originX = static_cast<std::int16_t>(fa::RoundToInt(target->position.x - 0.5f));
+      const auto originZ = static_cast<std::int16_t>(fa::RoundToInt(target->position.z - 0.5f));
       out->x0 = originX;
       out->z0 = originZ;
       out->x1 = originX + 1;
@@ -695,10 +615,7 @@ namespace
 int moho::cfunc_LUnitMoveNearL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 3) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kLUnitMoveNearHelpText, 3, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 3, kLUnitMoveNearHelpText);
 
   const LuaPlus::LuaObject taskObject(LuaPlus::LuaStackObject(state, 1));
   CUnitScriptTask* const task = SCR_FromLua_CUnitScriptTask(taskObject, state);
@@ -754,7 +671,7 @@ int moho::cfunc_LUnitMoveNear(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_LUnitMoveNear_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kLUnitMoveNearName,
     &moho::cfunc_LUnitMoveNear,
     nullptr,
@@ -785,7 +702,7 @@ void CUnitScriptTask::MemberDeserialize(gpg::ReadArchive* const archive, const i
   }
 
   gpg::RRef owner{};
-  archive->Read(CachedCCommandTaskType(), this, owner);
+  archive->Read(gpg::RTypeOf<CCommandTask>(), this, owner);
 
   CScriptObject* const scriptObject = static_cast<CScriptObject*>(this);
   gpg::RRef scriptOwner{};
@@ -795,7 +712,7 @@ void CUnitScriptTask::MemberDeserialize(gpg::ReadArchive* const archive, const i
   mSourceCommand = ReadTrackedCUnitCommandPointer(archive, pointerOwner);
 
   gpg::RRef luaOwner{};
-  archive->Read(CachedLuaObjectType(), &mSourceLuaObj, luaOwner);
+  archive->Read(gpg::RTypeOf<LuaPlus::LuaObject>(), &mSourceLuaObj, luaOwner);
 }
 
 /**
@@ -808,7 +725,7 @@ void CUnitScriptTask::MemberSerialize(gpg::WriteArchive* const archive, const in
   }
 
   gpg::RRef owner{};
-  archive->Write(CachedCCommandTaskType(), this, owner);
+  archive->Write(gpg::RTypeOf<CCommandTask>(), this, owner);
 
   CScriptObject* const scriptObject = static_cast<CScriptObject*>(this);
   gpg::RRef scriptOwner{};
@@ -818,7 +735,7 @@ void CUnitScriptTask::MemberSerialize(gpg::WriteArchive* const archive, const in
   gpg::WriteRawPointer(archive, sourceCommandRef, gpg::TrackedPointerState::Unowned, scriptOwner);
 
   gpg::RRef luaOwner{};
-  archive->Write(CachedLuaObjectType(), &mSourceLuaObj, luaOwner);
+  archive->Write(gpg::RTypeOf<LuaPlus::LuaObject>(), &mSourceLuaObj, luaOwner);
 }
 
 /**
@@ -889,12 +806,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitScriptTask(gpg::RRef* const outRef, moho::CUnitScriptTask* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = MakeDerivedRef(value, CachedCUnitScriptTaskType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value, &CachedCUnitScriptTaskType);
   }
 } // namespace gpg
 

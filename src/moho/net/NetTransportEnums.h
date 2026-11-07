@@ -96,7 +96,7 @@ namespace moho
     PT_NumTypes
   };
 
-  void NetPacketTypeToStr(EPacketType state, msvc8::string& out);
+  void NetPacketTypeToStr(EPacketType state, fa::string& out);
   const char* NetConnectionStateToStr(ENetConnectionState state);
 
   enum ENetCompressionMethod : uint8_t

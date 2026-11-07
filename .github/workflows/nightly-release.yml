@@ -1,6 +1,6 @@
 name: Nightly release
 
-# Publishes a pre-release of master's head once that night's Replay parity has passed: the x64 and
+# Publishes master's head as the latest release once that night's Replay parity lists no new failure: the x64 and
 # x86 engine, the commits since the previous nightly, and the parity run it passed. Started by hand
 # it only builds and writes the notes, unless `publish` is ticked. tools/release/README.md.
 on:
@@ -15,9 +15,15 @@ on:
         required: true
         default: master
       publish:
-        description: Also publish the pre-release (otherwise the zips and notes stay this run's artifacts)
+        description: Also publish the release as the latest (otherwise the zips and notes stay this run's artifacts)
         type: boolean
         default: false
+      parity_run:
+        description: A Replay parity run to report in the notes, its new failures too (optional)
+        required: false
+      note:
+        description: A line for the notes, such as what was fixed after that run (optional)
+        required: false
 
 permissions:
   contents: read
@@ -33,14 +39,17 @@ env:
 
 jobs:
   plan:
-    # Only a scheduled parity run that passed: a run by hand may have played any commit or set.
+    # Only a scheduled parity run that finished: a run by hand may have played any commit or set.
+    # New failures don't fail that run, so the plan step below reads them from its report.
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.event == 'schedule' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read  # the parity run's report
     outputs:
       sha: ${{ steps.plan.outputs.sha }}
-      version: ${{ steps.plan.outputs.version }}
       tag: ${{ steps.plan.outputs.tag }}
       previous: ${{ steps.plan.outputs.previous }}
       skip: ${{ steps.plan.outputs.skip }}
@@ -53,24 +62,36 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REF: ${{ github.event.workflow_run.head_sha || inputs.ref }}
+          PARITY_RUN: ${{ github.event.workflow_run.id }}
         run: |
           sha=$(gh api "repos/${{ github.repository }}/commits/$REF" --jq .sha)
-          # The last real release the commit descends from, never an earlier nightly.
-          version=$(git describe --tags --abbrev=0 --exclude='*-nightly-*' "$sha")
-          tag="$version-nightly-${sha:0:7}"
-          # The newest nightly the commit descends from, else the release itself.
-          previous=$(git tag --list '*-nightly-*' --merged "$sha" --sort=-creatordate | grep -vx "$tag" | head -n 1 || true)
+          # YYYY.MM.NNN-nightly: the month's next number, counting its releases and nightlies alike.
+          # Three digits, so it can't be read as a day. The sed pattern leaves out the old
+          # YYYY.DD.MM.NNN tags, which have one more part.
+          month=$(date -u +%Y.%m)
+          last=$(git tag --list "$month.*" | sed -nE "s/^$month\.([0-9]+)(-nightly)?$/\1/p" | sort -n | tail -n 1)
+          tag=$(printf '%s.%03d-nightly' "$month" "$((10#${last:-0} + 1))")
+          # The newest release or nightly the commit descends from.
+          previous=$(git tag --merged "$sha" --sort=-creatordate | head -n 1)
           # Master did not move since the last nightly: that release already holds this commit.
           skip=false
-          if gh release view "$tag" > /dev/null 2>&1; then skip=true; fi
+          if [ -n "$(git tag --points-at "$sha" --list '*-nightly*')" ]; then skip=true; fi
+          # New failures in the parity run: nothing to publish. No report at all fails this step.
+          if [ -n "$PARITY_RUN" ]; then
+            gh run download "$PARITY_RUN" -R "${{ github.repository }}" -n report -D parity-report
+            new=$(jq -r '.regressions | length' parity-report/report.json)
+            if [ "$new" != "0" ]; then
+              skip=true
+              echo "Parity run $PARITY_RUN has $new new failures: nothing to publish." | tee -a "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
           {
             echo "sha=$sha"
-            echo "version=$version"
             echo "tag=$tag"
-            echo "previous=${previous:-$version}"
+            echo "previous=$previous"
             echo "skip=$skip"
           } >> "$GITHUB_OUTPUT"
-          echo "$tag on $sha, changes since ${previous:-$version}, already published: $skip" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "$tag on $sha, changes since $previous, already published: $skip" | tee -a "$GITHUB_STEP_SUMMARY"
 
   build:
     needs: plan
@@ -166,27 +187,31 @@ jobs:
           pattern: zip-*
           path: zips
           merge-multiple: true
-      - if: github.event_name == 'workflow_run'
+      - if: github.event_name == 'workflow_run' || inputs.parity_run != ''
         uses: actions/download-artifact@v8
         with:
           name: report
           path: report
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ github.event.workflow_run.id || inputs.parity_run }}
           github-token: ${{ github.token }}
       - env:
           SHA: ${{ needs.plan.outputs.sha }}
           TAG: ${{ needs.plan.outputs.tag }}
           PREVIOUS: ${{ needs.plan.outputs.previous }}
-          PARITY_RUN: ${{ github.event.workflow_run.id }}
-          PARITY_URL: ${{ github.event.workflow_run.html_url }}
+          NOTE: ${{ inputs.note }}
+          PARITY_RUN: ${{ github.event.workflow_run.id || inputs.parity_run }}
+          PARITY_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id || inputs.parity_run }}
         run: |
-          (cd zips && sha256sum faf-engine-*.zip > SHA256SUMS.txt)
-          python tools/release/nightly_notes.py --out notes.md
+          # The exes also ship on their own, for replacing one that is already installed.
+          (cd zips && for z in faf-engine-*.zip; do unzip -j -o "$z" 'main*.exe'; done && sha256sum faf-engine-*.zip main*.exe > SHA256SUMS.txt)
+          python tools/release/nightly_notes.py --out notes.md --player-notes player-notes.md
           cat notes.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
           name: notes
-          path: notes.md
+          path: |
+            notes.md
+            player-notes.md
           retention-days: 7
       - if: github.event_name == 'workflow_run' || inputs.publish
         env:
@@ -194,6 +219,18 @@ jobs:
           SHA: ${{ needs.plan.outputs.sha }}
           TAG: ${{ needs.plan.outputs.tag }}
         run: |
-          gh release create "$TAG" zips/faf-engine-*.zip zips/SHA256SUMS.txt --target "$SHA" --prerelease --latest=false \
+          gh release create "$TAG" zips/faf-engine-*.zip zips/main*.exe zips/SHA256SUMS.txt player-notes.md --target "$SHA" --latest \
             --title "$TAG x64\\x86" --notes-file notes.md
           gh release view "$TAG" --json tagName,isPrerelease,url | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # A failed build or publish of a nightly is CI's: Nightly retry re-runs the failed jobs, twice at most.
+  retry:
+    needs: [plan, build, release]
+    if: failure() && github.run_attempt < 3 && (github.event_name == 'workflow_run' || inputs.publish)
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write  # starts Nightly retry
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run nightly-retry.yml -R "$GITHUB_REPOSITORY" --ref master -f run_id=${{ github.run_id }}

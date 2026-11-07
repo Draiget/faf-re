@@ -1,4 +1,5 @@
 #include "moho/ai/CAiNavigatorImpl.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "gpg/core/utils/Logging.h"
 #include <cmath>
 
@@ -109,48 +110,6 @@ namespace
   constexpr const char* kNavigatorCanPathToGoalMethodName = "CanPathToGoal";
   constexpr const char* kNavigatorEmptyHelpText = "";
 
-  [[nodiscard]] gpg::RType* CachedIAiNavigatorType()
-  {
-    if (!IAiNavigator::sType) {
-      IAiNavigator::sType = gpg::LookupRType(typeid(IAiNavigator));
-    }
-    return IAiNavigator::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCScriptObjectType()
-  {
-    if (!CScriptObject::sType) {
-      CScriptObject::sType = gpg::LookupRType(typeid(CScriptObject));
-    }
-    return CScriptObject::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCTaskType()
-  {
-    if (!CTask::sType) {
-      CTask::sType = gpg::LookupRType(typeid(CTask));
-    }
-    return CTask::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedUnitType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Unit));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEAiNavigatorStatusType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(EAiNavigatorStatus));
-    }
-    return cached;
-  }
-
   template <typename TObject>
   [[nodiscard]] TObject* ReadPointerWithType(
     gpg::ReadArchive* const archive,
@@ -168,36 +127,6 @@ namespace
     return static_cast<TObject*>(upcast.mObj);
   }
 
-  template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* const object, gpg::RType* const staticType)
-  {
-    gpg::RRef ref{};
-    ref.mObj = nullptr;
-    ref.mType = staticType;
-    if (!object) {
-      return ref;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType && staticType && dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    if (!derived) {
-      ref.mObj = object;
-      ref.mType = dynamicType ? dynamicType : staticType;
-      return ref;
-    }
-
-    ref.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    ref.mType = dynamicType;
-    return ref;
-  }
 
   template <typename TObject>
   void WritePointerWithType(
@@ -208,7 +137,7 @@ namespace
     const gpg::RRef& ownerRef
   )
   {
-    const gpg::RRef objectRef = MakeTypedRef(object, staticType);
+    const gpg::RRef objectRef = gpg::MakeDerivedRef(object, staticType);
     gpg::WriteRawPointer(archive, objectRef, state, ownerRef);
   }
 
@@ -277,11 +206,7 @@ CScrLuaMetatableFactory<CAiNavigatorImpl> CScrLuaMetatableFactory<CAiNavigatorIm
  */
 int moho::cfunc_CAiNavigatorImplSetGoalL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kNavigatorSetGoalHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kNavigatorSetGoalHelpText);
 
   const LuaPlus::LuaObject navigatorObject(LuaPlus::LuaStackObject(state, 1));
   CAiNavigatorImpl* const navigator = SCR_FromLua_CAiNavigatorImpl(navigatorObject, state);
@@ -334,11 +259,7 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplSetGoal_LuaFuncDef()
  */
 int moho::cfunc_CAiNavigatorImplSetDestUnitL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kNavigatorSetDestUnitHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kNavigatorSetDestUnitHelpText);
 
   const LuaPlus::LuaObject navigatorObject(LuaPlus::LuaStackObject(state, 1));
   CAiNavigatorImpl* const navigator = SCR_FromLua_CAiNavigatorImpl(navigatorObject, state);
@@ -388,11 +309,7 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplSetDestUnit_LuaFuncDef()
  */
 int moho::cfunc_CAiNavigatorImplAbortMoveL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kNavigatorAbortMoveHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kNavigatorAbortMoveHelpText);
 
   const LuaPlus::LuaObject navigatorObject(LuaPlus::LuaStackObject(state, 1));
   CAiNavigatorImpl* const navigator = SCR_FromLua_CAiNavigatorImpl(navigatorObject, state);
@@ -439,17 +356,7 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplAbortMove_LuaFuncDef()
  */
 int moho::cfunc_CAiNavigatorImplBroadcastResumeTaskEventL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(
-      state,
-      kLuaExpectedArgsWarning,
-      kNavigatorBroadcastResumeTaskEventHelpText,
-      1,
-      argumentCount
-    );
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kNavigatorBroadcastResumeTaskEventHelpText);
 
   const LuaPlus::LuaObject navigatorObject(LuaPlus::LuaStackObject(state, 1));
   CAiNavigatorImpl* const navigator = SCR_FromLua_CAiNavigatorImpl(navigatorObject, state);
@@ -497,11 +404,7 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplBroadcastResumeTaskEvent_LuaFuncDef(
  */
 int moho::cfunc_CAiNavigatorImplSetSpeedThroughGoalL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kNavigatorSetSpeedThroughGoalHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kNavigatorSetSpeedThroughGoalHelpText);
 
   const LuaPlus::LuaObject navigatorObject(LuaPlus::LuaStackObject(state, 1));
   CAiNavigatorImpl* const navigator = SCR_FromLua_CAiNavigatorImpl(navigatorObject, state);
@@ -550,11 +453,7 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplSetSpeedThroughGoal_LuaFuncDef()
  */
 int moho::cfunc_CAiNavigatorImplGetCurrentTargetPosL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kNavigatorGetCurrentTargetPosHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kNavigatorGetCurrentTargetPosHelpText);
 
   const LuaPlus::LuaObject navigatorObject(LuaPlus::LuaStackObject(state, 1));
   CAiNavigatorImpl* const navigator = SCR_FromLua_CAiNavigatorImpl(navigatorObject, state);
@@ -604,11 +503,7 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplGetCurrentTargetPos_LuaFuncDef()
  */
 int moho::cfunc_CAiNavigatorImplGetGoalPosL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kNavigatorGetGoalPosHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kNavigatorGetGoalPosHelpText);
 
   const LuaPlus::LuaObject navigatorObject(LuaPlus::LuaStackObject(state, 1));
   CAiNavigatorImpl* const navigator = SCR_FromLua_CAiNavigatorImpl(navigatorObject, state);
@@ -659,10 +554,7 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplGetGoalPos_LuaFuncDef()
 int moho::cfunc_CAiNavigatorImplGetStatusL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kNavigatorEmptyHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kNavigatorEmptyHelpText);
 
   const LuaPlus::LuaObject navigatorObject(LuaPlus::LuaStackObject(state, 1));
   CAiNavigatorImpl* const navigator = SCR_FromLua_CAiNavigatorImpl(navigatorObject, state);
@@ -713,10 +605,7 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplGetStatus_LuaFuncDef()
 int moho::cfunc_CAiNavigatorImplHasGoodPathL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kNavigatorEmptyHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kNavigatorEmptyHelpText);
 
   const LuaPlus::LuaObject navigatorObject(LuaPlus::LuaStackObject(state, 1));
   CAiNavigatorImpl* const navigator = SCR_FromLua_CAiNavigatorImpl(navigatorObject, state);
@@ -767,10 +656,7 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplHasGoodPath_LuaFuncDef()
 int moho::cfunc_CAiNavigatorImplFollowingLeaderL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kNavigatorEmptyHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kNavigatorEmptyHelpText);
 
   const LuaPlus::LuaObject navigatorObject(LuaPlus::LuaStackObject(state, 1));
   CAiNavigatorImpl* const navigator = SCR_FromLua_CAiNavigatorImpl(navigatorObject, state);
@@ -819,11 +705,7 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplFollowingLeader_LuaFuncDef()
  */
 int moho::cfunc_CAiNavigatorImplIgnoreFormationL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kNavigatorEmptyHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kNavigatorEmptyHelpText);
 
   const LuaPlus::LuaObject navigatorObject(LuaPlus::LuaStackObject(state, 1));
   CAiNavigatorImpl* const navigator = SCR_FromLua_CAiNavigatorImpl(navigatorObject, state);
@@ -873,10 +755,7 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplIgnoreFormation_LuaFuncDef()
 int moho::cfunc_CAiNavigatorImplIsIgnorningFormationL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kNavigatorEmptyHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kNavigatorEmptyHelpText);
 
   const LuaPlus::LuaObject navigatorObject(LuaPlus::LuaStackObject(state, 1));
   CAiNavigatorImpl* const navigator = SCR_FromLua_CAiNavigatorImpl(navigatorObject, state);
@@ -926,10 +805,7 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplIsIgnorningFormation_LuaFuncDef()
 int moho::cfunc_CAiNavigatorImplAtgoalL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kNavigatorEmptyHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kNavigatorEmptyHelpText);
 
   const LuaPlus::LuaObject navigatorObject(LuaPlus::LuaStackObject(state, 1));
   CAiNavigatorImpl* const navigator = SCR_FromLua_CAiNavigatorImpl(navigatorObject, state);
@@ -1330,17 +1206,17 @@ void CAiNavigatorImpl::MemberDeserialize(gpg::ReadArchive* const archive, const 
   }
 
   const gpg::RRef ownerRef{};
-  archive->Read(CachedIAiNavigatorType(), this, ownerRef);
-  archive->Read(CachedCScriptObjectType(), static_cast<CScriptObject*>(this), ownerRef);
-  archive->Read(CachedCTaskType(), static_cast<CTask*>(this), ownerRef);
+  archive->Read(gpg::RTypeOf<IAiNavigator>(), this, ownerRef);
+  archive->Read(gpg::RTypeOf<CScriptObject>(), static_cast<CScriptObject*>(this), ownerRef);
+  archive->Read(gpg::CachedLookup<CTask>(CTask::sType), static_cast<CTask*>(this), ownerRef);
 
-  Unit* const loadedUnit = ReadPointerWithType<Unit>(archive, ownerRef, CachedUnitType());
+  Unit* const loadedUnit = ReadPointerWithType<Unit>(archive, ownerRef, gpg::RTypeOf<Unit>());
 
   bool ignoreFormation = false;
   archive->ReadBool(&ignoreFormation);
 
   EAiNavigatorStatus status = AINAVSTATUS_Idle;
-  archive->Read(CachedEAiNavigatorStatusType(), &status, ownerRef);
+  archive->Read(gpg::RTypeOf<EAiNavigatorStatus>(), &status, ownerRef);
 
 
   mUnit = loadedUnit;
@@ -1366,14 +1242,14 @@ void CAiNavigatorImpl::MemberSerialize(gpg::WriteArchive* const archive, const i
   }
 
   const gpg::RRef ownerRef{};
-  archive->Write(CachedIAiNavigatorType(), this, ownerRef);
-  archive->Write(CachedCScriptObjectType(), static_cast<const CScriptObject*>(this), ownerRef);
-  archive->Write(CachedCTaskType(), static_cast<const CTask*>(this), ownerRef);
+  archive->Write(gpg::RTypeOf<IAiNavigator>(), this, ownerRef);
+  archive->Write(gpg::RTypeOf<CScriptObject>(), static_cast<const CScriptObject*>(this), ownerRef);
+  archive->Write(gpg::CachedLookup<CTask>(CTask::sType), static_cast<const CTask*>(this), ownerRef);
 
-  WritePointerWithType(archive, mUnit, CachedUnitType(), gpg::TrackedPointerState::Unowned, ownerRef);
+  WritePointerWithType(archive, mUnit, gpg::RTypeOf<Unit>(), gpg::TrackedPointerState::Unowned, ownerRef);
 
   archive->WriteBool(mIgnoreFormation != 0u);
-  archive->Write(CachedEAiNavigatorStatusType(), &mStatus, ownerRef);
+  archive->Write(gpg::RTypeOf<EAiNavigatorStatus>(), &mStatus, ownerRef);
 }
 
 /**
@@ -1394,10 +1270,7 @@ gpg::RType* CAiNavigatorImpl::GetClass() const
  */
 gpg::RRef CAiNavigatorImpl::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**

@@ -42,7 +42,7 @@ namespace moho
    * Decodes one color string into packed ARGB and throws `XDataError` on
    * unknown color names/hex payloads.
    */
-  [[nodiscard]] std::uint32_t SCR_DecodeColor(const msvc8::string& colorText);
+  [[nodiscard]] std::uint32_t SCR_DecodeColor(const fa::string& colorText);
 
   /**
    * Address: 0x004B2E60 (FUN_004B2E60, Moho::SCR_EncodeColor)

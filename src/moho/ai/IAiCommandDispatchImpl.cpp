@@ -70,41 +70,12 @@ using namespace moho;
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedIAiCommandDispatchImplType()
-  {
-    gpg::RType* type = IAiCommandDispatchImpl::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(IAiCommandDispatchImpl));
-      IAiCommandDispatchImpl::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(CCommandTask));
-      CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitCommandQueueType()
-  {
-    gpg::RType* type = CUnitCommandQueue::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(CUnitCommandQueue));
-      CUnitCommandQueue::sType = type;
-    }
-    return type;
-  }
 
   [[nodiscard]] gpg::RRef MakeDispatchObjectRef(IAiCommandDispatchImpl* const object)
   {
     gpg::RRef ref{};
     ref.mObj = object;
-    ref.mType = CachedIAiCommandDispatchImplType();
+    ref.mType = gpg::RTypeOf<IAiCommandDispatchImpl>();
     return ref;
   }
 
@@ -119,7 +90,7 @@ namespace
       return nullptr;
     }
 
-    gpg::RType* const expectedType = CachedCUnitCommandQueueType();
+    gpg::RType* const expectedType = gpg::RTypeOf<CUnitCommandQueue>();
     if (!expectedType || !tracked.type) {
       return static_cast<CUnitCommandQueue*>(tracked.object);
     }
@@ -135,7 +106,7 @@ namespace
 
     const char* const expected = expectedType->GetName();
     const char* const actual = source.GetTypeName();
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "CUnitCommandQueue",
@@ -147,7 +118,7 @@ namespace
   [[nodiscard]] gpg::RRef MakeCommandQueueRef(CUnitCommandQueue* const queue)
   {
     gpg::RRef out{};
-    gpg::RType* const staticType = CachedCUnitCommandQueueType();
+    gpg::RType* const staticType = gpg::RTypeOf<CUnitCommandQueue>();
     out.mObj = nullptr;
     out.mType = staticType;
     if (!queue || !staticType) {
@@ -337,7 +308,7 @@ namespace
         if (CAiFormationInstance* const formation = CUnitCommand::InFormation(unit, command)) {
           SOCellPos cell;
           const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
-          CUnitFormAndMoveTask::Create(formation, dispatch);
+          (void)CUnitFormAndMoveTask::Create(formation, dispatch);
         } else {
           SOCellPos cell;
           const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
@@ -351,7 +322,7 @@ namespace
           const LuaPlus::LuaObject blueprintLua =
             unitBlueprint->GetLuaBlueprint(dispatch->mSim->mLuaState);
           if (unit->RunScriptBool("CheckBuildRestriction", blueprintLua)) {
-            CFactoryBuildTask::Create(dispatch, unitBlueprint, command, nullptr);
+            (void)CFactoryBuildTask::Create(dispatch, unitBlueprint, command, nullptr);
           }
         }
         return;
@@ -369,7 +340,7 @@ namespace
               const Wm3::Vector3f buildDirection = command->mVarDat.mTarget2.mPos;
               const Wm3::Quatf buildOrientation = command->mConstDat.origin;
               const Wm3::Vector3f buildPosition = command->mTarget.GetTargetPosGun(false);
-              CUnitMobileBuildTask::Create(dispatch, unitBlueprint, buildPosition, buildOrientation, buildDirection);
+              (void)CUnitMobileBuildTask::Create(dispatch, unitBlueprint, buildPosition, buildOrientation, buildDirection);
             }
           }
         }
@@ -388,24 +359,24 @@ namespace
       case EUnitCommandType::UNITCOMMAND_Attack: {
         CUnitCommand::Move(unit, command);
         CAiFormationInstance* const formation = CUnitCommand::InFormation(unit, command);
-        CAttackTargetTask::CreateRespectFormation(dispatch, &command->mTarget, formation, false);
+        (void)CAttackTargetTask::CreateRespectFormation(dispatch, &command->mTarget, formation, false);
         return;
       }
 
       case EUnitCommandType::UNITCOMMAND_FormAttack: {
         CUnitCommand::Move(unit, command);
         CAiFormationInstance* const formation = CUnitCommand::InFormation(unit, command);
-        CAttackTargetTask::Create(dispatch, &command->mTarget, formation);
+        (void)CAttackTargetTask::Create(dispatch, &command->mTarget, formation);
         return;
       }
 
       case EUnitCommandType::UNITCOMMAND_Nuke: {
-        CUnitFireAtTask::Create(dispatch, &command->mTarget, 1);
+        (void)CUnitFireAtTask::Create(dispatch, &command->mTarget, 1);
         return;
       }
 
       case EUnitCommandType::UNITCOMMAND_Tactical: {
-        CUnitFireAtTask::Create(dispatch, &command->mTarget, 0);
+        (void)CUnitFireAtTask::Create(dispatch, &command->mTarget, 0);
         return;
       }
 
@@ -419,7 +390,7 @@ namespace
           if (command->mTarget.GetEntity() == nullptr) {
             CUnitCommand::Move(unit, command);
           }
-          CUnitGuardTask::Create(dispatch, &command->mTarget);
+          (void)CUnitGuardTask::Create(dispatch, &command->mTarget);
         } else {
           dispatch->Stop();
         }
@@ -429,12 +400,12 @@ namespace
       case EUnitCommandType::UNITCOMMAND_Patrol: {
         SOCellPos cell;
         const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
-        CUnitPatrolTask::Create(dispatch, &goal, false);
+        (void)CUnitPatrolTask::Create(dispatch, &goal, false);
         return;
       }
 
       case EUnitCommandType::UNITCOMMAND_Ferry: {
-        CUnitFerryTask::CreateFromDispatch(dispatch, unit->GetPosition());
+        (void)CUnitFerryTask::CreateFromDispatch(dispatch, unit->GetPosition());
         return;
       }
 
@@ -448,7 +419,7 @@ namespace
         // the plain overload's bool. With no bound formation the patrol task ended
         // on its own arrival test instead of waiting on the formation.
         CAiFormationInstance* const formation = CUnitCommand::InFormation(unit, command);
-        CUnitPatrolTask::CreateWithFormation(dispatch, &goal, formation);
+        (void)CUnitPatrolTask::CreateWithFormation(dispatch, &goal, formation);
         return;
       }
 
@@ -477,7 +448,7 @@ namespace
       }
 
       case EUnitCommandType::UNITCOMMAND_Capture: {
-        CUnitCaptureTask::Create(dispatch, &command->mTarget);
+        (void)CUnitCaptureTask::Create(dispatch, &command->mTarget);
         return;
       }
 
@@ -511,7 +482,7 @@ namespace
           SOCellPos cell;
           const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
           Unit* const ferryTarget = CUnitCommand::GetTarget(command);
-          CUnitWaitForFerryTask::Create(dispatch, goal, ferryTarget);
+          (void)CUnitWaitForFerryTask::Create(dispatch, goal, ferryTarget);
           return;
         }
 
@@ -542,7 +513,7 @@ namespace
               }
             }
             if (!unit->IsInCategory("AIRSTAGINGPLATFORM")) {
-              CUnitLoadUnits::Create(dispatch, &workingSet);
+              (void)CUnitLoadUnits::Create(dispatch, &workingSet);
             }
           }
           return;
@@ -579,7 +550,7 @@ namespace
             CUnitCarrierRetrieve::Create(dispatch, loadSet);
             return;
           }
-          CUnitLoadUnits::Create(dispatch, &loadSet);
+          (void)CUnitLoadUnits::Create(dispatch, &loadSet);
           return;
         }
 
@@ -666,24 +637,24 @@ namespace
           }
         } else {
           if (_stricmp(selfBp->General.UpgradesTo.name.c_str(), targetBp->mBlueprintId.c_str()) == 0) {
-            CUnitUpgradeTask::Create(dispatch, targetBp);
+            (void)CUnitUpgradeTask::Create(dispatch, targetBp);
             return;
           }
           if (_stricmp(selfBp->mBlueprintId.c_str(), targetBp->mBlueprintId.c_str()) != 0) {
             return;
           }
         }
-        CUnitUpgradeTask::Create(dispatch, targetBp);
+        (void)CUnitUpgradeTask::Create(dispatch, targetBp);
         return;
       }
 
       case EUnitCommandType::UNITCOMMAND_Script: {
-        CUnitScriptTask::Create(dispatch, &command->mArgs);
+        (void)CUnitScriptTask::Create(dispatch, &command->mArgs);
         return;
       }
 
       case EUnitCommandType::UNITCOMMAND_AssistCommander: {
-        CUnitPodAssist::Create(dispatch);
+        (void)CUnitPodAssist::Create(dispatch);
         return;
       }
 
@@ -704,14 +675,14 @@ namespace
         }
         if (target->IsBeingBuilt() || target->IsUnitState(UNITSTATE_Upgrading) ||
             target->mVarDat.mMaxHealth > target->mVarDat.mHealth) {
-          CUnitSacrificeTask::Create(dispatch, target);
+          (void)CUnitSacrificeTask::Create(dispatch, target);
         } else if (target->IsUnitState(UNITSTATE_Building)) {
           // A builder that is done but busy hands the sacrifice on to the unit
           // it is building (0x00609A50-0x00609A9C: GetFocusEntity()->IsUnit()
           // is the task's recipient, not the builder).
           if (Entity* const focusEntity = target->GetFocusEntity(); focusEntity != nullptr) {
             if (Unit* const focusUnit = focusEntity->IsUnit(); focusUnit != nullptr) {
-              CUnitSacrificeTask::Create(dispatch, focusUnit);
+              (void)CUnitSacrificeTask::Create(dispatch, focusUnit);
             }
           }
         }
@@ -728,7 +699,7 @@ namespace
           CArmyImpl* const targetArmy = targetEntity->ArmyRef;
           if (targetArmy == nullptr ||
               unit->ArmyRef->GetAllianceWith(targetArmy) != EAlliance::ALLIANCE_Ally) {
-            CAttackTargetTask::CreateRespectFormation(dispatch, &command->mTarget, nullptr, true);
+            (void)CAttackTargetTask::CreateRespectFormation(dispatch, &command->mTarget, nullptr, true);
           }
         }
         return;
@@ -738,7 +709,7 @@ namespace
         CUnitCommand::Move(unit, command);
         SOCellPos cell;
         const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
-        CUnitPatrolTask::Create(dispatch, &goal, true);
+        (void)CUnitPatrolTask::Create(dispatch, &goal, true);
         return;
       }
 
@@ -766,7 +737,7 @@ namespace
           SOCellPos cell;
           const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
           if (unit->IsInCategory("TRANSPORTATION")) {
-            CUnitAssistMoveTask::Create(dispatch, &goal);
+            (void)CUnitAssistMoveTask::Create(dispatch, &goal);
           } else {
             NewMoveTask(goal, dispatch, 1, nullptr, 0);
           }
@@ -1160,7 +1131,7 @@ void IAiCommandDispatchImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   }
 
   const gpg::RRef ownerRef{};
-  archive->Read(CachedCCommandTaskType(), this, ownerRef);
+  archive->Read(gpg::RTypeOf<CCommandTask>(), this, ownerRef);
 
   bool state = false;
   archive->ReadBool(&state);
@@ -1179,7 +1150,7 @@ void IAiCommandDispatchImpl::MemberSerialize(gpg::WriteArchive* const archive) c
   }
 
   const gpg::RRef ownerRef{};
-  archive->Write(CachedCCommandTaskType(), this, ownerRef);
+  archive->Write(gpg::RTypeOf<CCommandTask>(), this, ownerRef);
   archive->WriteBool(mState != 0u);
 
   const gpg::RRef queueRef = MakeCommandQueueRef(mCommandQueue);

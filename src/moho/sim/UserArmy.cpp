@@ -98,7 +98,7 @@ namespace moho
   /**
    * Address: 0x008B2500 (FUN_008B2500)
    */
-  msvc8::vector<WeakPtr<UserUnit>> UserArmy::GetAvatars() const
+  fa::vector<WeakPtr<UserUnit>> UserArmy::GetAvatars() const
   {
     return mAvatars;
   }
@@ -186,7 +186,7 @@ namespace moho
       return true;
     }
 
-    const msvc8::vector<UserArmy*>& armies = mSession->userArmies;
+    const fa::vector<UserArmy*>& armies = mSession->userArmies;
     for (std::size_t i = 0; i < armies.size(); ++i) {
       UserArmy* const ally = armies[i];
       if (ally == this || !ally->IsAlly(mArmyIndex)) {
@@ -244,7 +244,7 @@ namespace moho
       return nullptr;
     }
 
-    const msvc8::vector<UserArmy*>& userArmies = session->userArmies;
+    const fa::vector<UserArmy*>& userArmies = session->userArmies;
     const int armyCount = static_cast<int>(userArmies.size());
     UserArmy* resolved = nullptr;
 

@@ -263,11 +263,11 @@ namespace moho
      *
      * What it does:
      * `mCats = categories`: moves `this` to `&mCats` in EAX and calls
-     * `msvc8::vector<EntityCategorySet>::operator=` (0x006DE1C0). The
+     * `fa::vector<EntityCategorySet>::operator=` (0x006DE1C0). The
      * out-of-line copy has no caller; `CPlatoon::SetPrioritizedTargetList`
      * (0x00725990, itself inlined into the Lua binding 0x0072E940) inlines it.
      */
-    void SetPrioritizedTargetList(const msvc8::vector<EntityCategorySet>& categories);
+    void SetPrioritizedTargetList(const fa::vector<EntityCategorySet>& categories);
 
     /**
      * Address: 0x00724920 (FUN_00724920)
@@ -303,8 +303,8 @@ namespace moho
     std::uint32_t mPad_0x04;                                  // +0x04 (binary leaves this uninitialised; reserved/unused slot)
     EntitySetTemplate<Unit> mUnits;                            // +0x08 (size 0x28)
     ESquadClass mSquadClass;                                  // +0x30
-    msvc8::string mName;                                      // +0x34 (size 0x1C)
-    msvc8::vector<EntityCategorySet> mCats;                   // +0x50 (size 0x10)
+    fa::string mName;                                      // +0x34 (size 0x1C)
+    fa::vector<EntityCategorySet> mCats;                   // +0x50 (size 0x10)
   };
 
   static_assert(offsetof(CSquad, mSim) == 0x00, "CSquad::mSim offset must be 0x00");

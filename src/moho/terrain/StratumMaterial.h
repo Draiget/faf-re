@@ -24,7 +24,7 @@ namespace moho
   {
     CStratumMaterial() = default;
 
-    msvc8::string mPath{};                               // +0x00
+    fa::string mPath{};                               // +0x00
     float mScaleX{1.0f};                                 // +0x1C
     float mScaleY{1.0f};                                 // +0x20
     float v3{0.0f};                                      // +0x24
@@ -111,7 +111,7 @@ namespace moho
     std::uint8_t byte0{0};                       // +0x00
     std::uint8_t byte1{0};                       // +0x01
     std::uint8_t pad02_03[2]{};                  // +0x02
-    msvc8::string mShaderName{};                 // +0x04
+    fa::string mShaderName{};                 // +0x04
     /// The stratum-mask textures' own dimensions, half the chart size:
     /// `CWldTerrainRes::Reset` halves each axis (0x008A65AC/0x008A65B1) and
     /// stores them here (0x008A65B3, 0x008A65B9) right before creating the

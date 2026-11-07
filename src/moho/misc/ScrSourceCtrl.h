@@ -53,7 +53,7 @@ namespace moho
      * and adds it selected, labelled with the file's base name. A file that
      * will not load gets no page and returns false.
      */
-    bool Open(const msvc8::string& fileName);
+    bool Open(const fa::string& fileName);
 
     /**
      * Address: 0x004C38A0 (FUN_004C38A0)
@@ -62,7 +62,7 @@ namespace moho
      * Deletes the page showing `fileName`, if any. Nothing in the image
      * calls it.
      */
-    void Close(const msvc8::string& fileName);
+    void Close(const fa::string& fileName);
 
     /**
      * Address: 0x004C3940 (FUN_004C3940)
@@ -86,7 +86,7 @@ namespace moho
      * What it does:
      * The selected page's file, or an empty string.
      */
-    [[nodiscard]] msvc8::string GetCurrentFileName() const;
+    [[nodiscard]] fa::string GetCurrentFileName() const;
 
     /**
      * Address: 0x004C3A40 (FUN_004C3A40)
@@ -94,7 +94,7 @@ namespace moho
      * What it does:
      * ScrFileCtrl::FindFirst on the selected page.
      */
-    void FindFirst(const msvc8::string& text);
+    void FindFirst(const fa::string& text);
 
     /**
      * Address: 0x004C3A70 (FUN_004C3A70)
@@ -102,7 +102,7 @@ namespace moho
      * What it does:
      * ScrFileCtrl::FindNext on the selected page.
      */
-    void FindNext(const msvc8::string& text);
+    void FindNext(const fa::string& text);
 
     /**
      * Address: 0x004C3AA0 (FUN_004C3AA0)
@@ -110,7 +110,7 @@ namespace moho
      * What it does:
      * ScrFileCtrl::FindPrevious on the selected page.
      */
-    void FindPrevious(const msvc8::string& text);
+    void FindPrevious(const fa::string& text);
 
     /**
      * Address: 0x004C3AD0 (FUN_004C3AD0)
@@ -135,7 +135,7 @@ namespace moho
      * Takes the breakpoint marker off `line` of the page showing `fileName`.
      * Nothing in the image calls it.
      */
-    void RemoveBreakpoint(const msvc8::string& fileName, int line);
+    void RemoveBreakpoint(const fa::string& fileName, int line);
 
     /**
      * Address: 0x004C3B90 (FUN_004C3B90)
@@ -153,7 +153,7 @@ namespace moho
      * lower-cased `fileName` and puts the cursor on `line`. False when no
      * page shows it or the line is out of range.
      */
-    bool SetCursorLine(const msvc8::string& fileName, int line);
+    bool SetCursorLine(const fa::string& fileName, int line);
 
     /**
      * Address: 0x004C3D30 (FUN_004C3D30)
@@ -165,7 +165,7 @@ namespace moho
     void ClearCursor();
 
   public:
-    msvc8::vector<ScrFileCtrl*> mPages; // +0x148
+    fa::vector<ScrFileCtrl*> mPages; // +0x148
   };
 
   static_assert(offsetof(ScrSourceCtrl, mPages) == 0x148, "ScrSourceCtrl::mPages offset must be 0x148");

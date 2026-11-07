@@ -16,6 +16,7 @@
 #include <thread>
 #include <utility>
 
+#include "gpg/core/utils/LocalCache.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/Device.hpp"
@@ -179,30 +180,7 @@ namespace gpg::gal::effects
 
   const std::string& ShaderCacheDirectory()
   {
-    static const std::string directory = [] {
-      std::string path;
-      if (const char* const configured = std::getenv("FAF_SHADER_CACHE_DIR"); configured != nullptr && configured[0] != '\0') {
-        path = configured;
-      } else {
-        char localAppData[MAX_PATH]{};
-        if (SUCCEEDED(::SHGetFolderPathA(nullptr, CSIDL_LOCAL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, localAppData))) {
-          path = std::string(localAppData) + "\\FAForever\\ShaderCache";
-        }
-      }
-      if (path.empty()) {
-        return std::string();
-      }
-      if (path.back() != '\\' && path.back() != '/') {
-        path += '\\';
-      }
-      const int result = ::SHCreateDirectoryExA(nullptr, path.c_str(), nullptr);
-      if (result != ERROR_SUCCESS && result != ERROR_ALREADY_EXISTS && result != ERROR_FILE_EXISTS) {
-        gpg::Warnf("effects: cannot create the shader cache %s (error %d); compiling every run", path.c_str(), result);
-        return std::string();
-      }
-      return path;
-    }();
-    return directory;
+    return gpg::LocalCacheDirectory();
   }
 
   EffectProgram::EffectProgram(
@@ -434,11 +412,11 @@ namespace gpg::gal
   {
     [[noreturn]] void Throw(const int line, const std::string& message)
     {
-      throw Error(msvc8::string("EffectRuntime.cpp"), line, msvc8::string(message.c_str()));
+      throw Error(fa::string("EffectRuntime.cpp"), line, fa::string(message.c_str()));
     }
 
     template <class Read>
-    bool ReadAnnotation(const effects::Annotations* const annotations, const msvc8::string& name, Read&& read)
+    bool ReadAnnotation(const effects::Annotations* const annotations, const fa::string& name, Read&& read)
     {
       if (annotations == nullptr) {
         return false;
@@ -478,7 +456,7 @@ namespace gpg::gal
     return &mContext;
   }
 
-  void ProgramEffect::GetTechniques(msvc8::vector<boost::shared_ptr<EffectTechnique>>& outTechniques)
+  void ProgramEffect::GetTechniques(fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques)
   {
     const auto count = static_cast<std::uint32_t>(mProgram->Description().techniques.size());
     for (std::uint32_t technique = 0U; technique < count; ++technique) {
@@ -533,7 +511,7 @@ namespace gpg::gal
 
   ProgramEffectTechnique::~ProgramEffectTechnique() = default;
 
-  msvc8::string* ProgramEffectTechnique::GetName()
+  fa::string* ProgramEffectTechnique::GetName()
   {
     return &mName;
   }
@@ -578,7 +556,7 @@ namespace gpg::gal
     mBinder.UnbindPass();
   }
 
-  bool ProgramEffectTechnique::GetAnnotationBool(bool* const outValue, const msvc8::string& annotationName)
+  bool ProgramEffectTechnique::GetAnnotationBool(bool* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(&mProgram->Description().techniques[mTechnique].annotations, annotationName, [&](const effects::Annotation& a) {
       double value = 0.0;
@@ -590,7 +568,7 @@ namespace gpg::gal
     });
   }
 
-  bool ProgramEffectTechnique::GetAnnotationInt(int* const outValue, const msvc8::string& annotationName)
+  bool ProgramEffectTechnique::GetAnnotationInt(int* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(&mProgram->Description().techniques[mTechnique].annotations, annotationName, [&](const effects::Annotation& a) {
       double value = 0.0;
@@ -602,7 +580,7 @@ namespace gpg::gal
     });
   }
 
-  bool ProgramEffectTechnique::GetAnnotationFloat(float* const outValue, const msvc8::string& annotationName)
+  bool ProgramEffectTechnique::GetAnnotationFloat(float* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(&mProgram->Description().techniques[mTechnique].annotations, annotationName, [&](const effects::Annotation& a) {
       double value = 0.0;
@@ -614,7 +592,7 @@ namespace gpg::gal
     });
   }
 
-  bool ProgramEffectTechnique::GetAnnotationString(msvc8::string* const outValue, const msvc8::string& annotationName)
+  bool ProgramEffectTechnique::GetAnnotationString(fa::string* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(&mProgram->Description().techniques[mTechnique].annotations, annotationName, [&](const effects::Annotation& a) {
       if (a.kind != effects::Annotation::Kind::String) {
@@ -638,7 +616,7 @@ namespace gpg::gal
 
   ProgramEffectVariable::~ProgramEffectVariable() = default;
 
-  msvc8::string* ProgramEffectVariable::GetName()
+  fa::string* ProgramEffectVariable::GetName()
   {
     return &mName;
   }
@@ -744,7 +722,7 @@ namespace gpg::gal
     return &mProgram->Description().parameters[static_cast<std::size_t>(mParameter)].annotations;
   }
 
-  bool ProgramEffectVariable::GetAnnotationBool(bool* const outValue, const msvc8::string& annotationName)
+  bool ProgramEffectVariable::GetAnnotationBool(bool* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(OwnAnnotations(), annotationName, [&](const effects::Annotation& a) {
       double value = 0.0;
@@ -756,7 +734,7 @@ namespace gpg::gal
     });
   }
 
-  bool ProgramEffectVariable::GetAnnotationInt(int* const outValue, const msvc8::string& annotationName)
+  bool ProgramEffectVariable::GetAnnotationInt(int* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(OwnAnnotations(), annotationName, [&](const effects::Annotation& a) {
       double value = 0.0;
@@ -768,7 +746,7 @@ namespace gpg::gal
     });
   }
 
-  bool ProgramEffectVariable::GetAnnotationFloat(float* const outValue, const msvc8::string& annotationName)
+  bool ProgramEffectVariable::GetAnnotationFloat(float* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(OwnAnnotations(), annotationName, [&](const effects::Annotation& a) {
       double value = 0.0;
@@ -780,7 +758,7 @@ namespace gpg::gal
     });
   }
 
-  bool ProgramEffectVariable::GetAnnotationString(msvc8::string* const outValue, const msvc8::string& annotationName)
+  bool ProgramEffectVariable::GetAnnotationString(fa::string* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(OwnAnnotations(), annotationName, [&](const effects::Annotation& a) {
       if (a.kind != effects::Annotation::Kind::String) {

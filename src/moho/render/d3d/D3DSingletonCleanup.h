@@ -17,7 +17,7 @@ namespace moho
    * `auto_ptr::reset` shape: delete the old holder when it differs from the
    * incoming pointer, then store the incoming pointer.
    */
-  extern msvc8::auto_ptr<CD3DVertexStream> sVertexStream;
+  extern fa::auto_ptr<CD3DVertexStream> sVertexStream;
 
   /**
    * Address: 0x00BC40D0 (FUN_00BC40D0, dynamic initializer for `sIndexSheet`)
@@ -27,7 +27,7 @@ namespace moho
    * Owns the shared quad index sheet (`Moho::sIndexSheet`, binary global
    * 0x010A7928).
    */
-  extern msvc8::auto_ptr<CD3DIndexSheet> sIndexSheet;
+  extern fa::auto_ptr<CD3DIndexSheet> sIndexSheet;
 
   class CD3DVertexFormat;
 
@@ -83,7 +83,7 @@ namespace moho
    * (if different from the new one) via its deleting dtor. Returns
    * the address of the updated slot.
    */
-  msvc8::auto_ptr<CD3DVertexStream>* func_MoveIntoSharedVertexStream(CD3DVertexStream** inOutStream);
+  fa::auto_ptr<CD3DVertexStream>* func_MoveIntoSharedVertexStream(CD3DVertexStream** inOutStream);
 
   /**
    * Address: 0x0043CAF0 (FUN_0043CAF0, sub_43CAF0)

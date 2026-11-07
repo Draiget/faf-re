@@ -1,4 +1,6 @@
 #include "moho/lua/SCR_String.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/CScrLuaInitForm.h"
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/BinaryReader.h"
@@ -19,20 +21,6 @@ namespace
   constexpr const char* kExistsHelpText = "exists(name) -> bool -- returns true if the given resource file exists";
   constexpr const char* kGetVersionHelpText = "GetVersion() -> string";
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Core");
-    return sSet;
-  }
-
 } // namespace
 
 /**
@@ -47,7 +35,7 @@ namespace
  * receives a fully populated LuaObject. Lifetime is managed by RAII.
  */
 LuaPlus::LuaObject* moho::SCR_FromString(
-    LuaPlus::LuaObject* const outObject, const msvc8::string& source, LuaPlus::LuaState* const state)
+    LuaPlus::LuaObject* const outObject, const fa::string& source, LuaPlus::LuaState* const state)
 {
   gpg::MemBufferStream stream{0x100u};
   stream.Write(source.c_str(), source.size());
@@ -76,10 +64,7 @@ int moho::cfunc_STR_xtoi(lua_State* const luaContext)
  */
 int moho::cfunc_STR_xtoiL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kXtoiHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kXtoiHelpText);
 
   LuaPlus::LuaStackObject sourceArgument(state, 1);
   const char* const sourceText = lua_tostring(state->m_state, 1);
@@ -100,7 +85,7 @@ int moho::cfunc_STR_xtoiL(LuaPlus::LuaState* const state)
  */
 moho::CScrLuaInitForm* moho::func_STR_xtoi_LuaFuncDef()
 {
-  static CScrLuaBinder binder(CoreLuaInitSet(), "STR_xtoi", &moho::cfunc_STR_xtoi, nullptr, "<global>", kXtoiHelpText);
+  static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), "STR_xtoi", &moho::cfunc_STR_xtoi, nullptr, "<global>", kXtoiHelpText);
   return &binder;
 }
 
@@ -135,10 +120,7 @@ int moho::cfunc_STR_itox(lua_State* const luaContext)
  */
 int moho::cfunc_STR_itoxL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kItoxHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kItoxHelpText);
 
   LuaPlus::LuaStackObject valueArgument(state, 1);
   if (lua_type(state->m_state, 1) != LUA_TNUMBER) {
@@ -146,7 +128,7 @@ int moho::cfunc_STR_itoxL(LuaPlus::LuaState* const state)
   }
 
   const double numericValue = lua_tonumber(state->m_state, 1);
-  const msvc8::string hexText = gpg::STR_Printf("%X", static_cast<int>(numericValue));
+  const fa::string hexText = gpg::STR_Printf("%X", static_cast<int>(numericValue));
   lua_pushstring(state->m_state, hexText.c_str());
   return 1;
 }
@@ -159,7 +141,7 @@ int moho::cfunc_STR_itoxL(LuaPlus::LuaState* const state)
  */
 moho::CScrLuaInitForm* moho::func_STR_itox_LuaFuncDef()
 {
-  static CScrLuaBinder binder(CoreLuaInitSet(), "STR_itox", &moho::cfunc_STR_itox, nullptr, "<global>", kItoxHelpText);
+  static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), "STR_itox", &moho::cfunc_STR_itox, nullptr, "<global>", kItoxHelpText);
   return &binder;
 }
 
@@ -193,10 +175,7 @@ int moho::cfunc_STR_Utf8Len(lua_State* const luaContext)
  */
 int moho::cfunc_STR_Utf8LenL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kUtf8LenHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kUtf8LenHelpText);
 
   LuaPlus::LuaStackObject sourceArgument(state, 1);
   const char* const sourceText = lua_tostring(state->m_state, 1);
@@ -218,7 +197,7 @@ int moho::cfunc_STR_Utf8LenL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_STR_Utf8Len_LuaFuncDef()
 {
   static CScrLuaBinder
-    binder(CoreLuaInitSet(), "STR_Utf8Len", &moho::cfunc_STR_Utf8Len, nullptr, "<global>", kUtf8LenHelpText);
+    binder(moho::SCR_CoreLuaInitSet(), "STR_Utf8Len", &moho::cfunc_STR_Utf8Len, nullptr, "<global>", kUtf8LenHelpText);
   return &binder;
 }
 
@@ -253,10 +232,7 @@ int moho::cfunc_STR_Utf8SubString(lua_State* const luaContext)
  */
 int moho::cfunc_STR_Utf8SubStringL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 3) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kUtf8SubStringHelpText, 3, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 3, kUtf8SubStringHelpText);
 
   const LuaPlus::LuaStackObject countArgument(state, 3);
   const int count = countArgument.GetInteger();
@@ -267,7 +243,7 @@ int moho::cfunc_STR_Utf8SubStringL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaStackObject sourceArgument(state, 1);
   const char* const sourceText = sourceArgument.GetString();
 
-  const msvc8::string substring = gpg::STR_Utf8SubString(sourceText, start - 1, count);
+  const fa::string substring = gpg::STR_Utf8SubString(sourceText, start - 1, count);
   lua_pushstring(state->m_state, substring.c_str());
   return 1;
 }
@@ -281,7 +257,7 @@ int moho::cfunc_STR_Utf8SubStringL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_STR_Utf8SubString_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "STR_Utf8SubString",
     &moho::cfunc_STR_Utf8SubString,
     nullptr,
@@ -321,10 +297,7 @@ int moho::cfunc_STR_GetTokens(lua_State* const luaContext)
  */
 int moho::cfunc_STR_GetTokensL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kGetTokensHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kGetTokensHelpText);
 
   LuaPlus::LuaStackObject sourceArgument(state, 1);
   const char* const sourceText = lua_tostring(state->m_state, 1);
@@ -338,14 +311,14 @@ int moho::cfunc_STR_GetTokensL(LuaPlus::LuaState* const state)
     LuaPlus::LuaStackObject::TypeError(&delimiterArgument, "string");
   }
 
-  msvc8::vector<msvc8::string> tokens{};
+  fa::vector<fa::string> tokens{};
   gpg::STR_GetTokens(sourceText, delimiterText, tokens);
 
   LuaPlus::LuaObject tokenTable;
   tokenTable.AssignNewTable(state, static_cast<int>(tokens.size()), 0);
 
   int tokenIndex = 0;
-  for (const msvc8::string& token : tokens) {
+  for (const fa::string& token : tokens) {
     tokenTable.SetString(tokenIndex++, token.c_str());
   }
 
@@ -362,7 +335,7 @@ int moho::cfunc_STR_GetTokensL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_STR_GetTokens_LuaFuncDef()
 {
   static CScrLuaBinder
-    binder(CoreLuaInitSet(), "STR_GetTokens", &moho::cfunc_STR_GetTokens, nullptr, "<global>", kGetTokensHelpText);
+    binder(moho::SCR_CoreLuaInitSet(), "STR_GetTokens", &moho::cfunc_STR_GetTokens, nullptr, "<global>", kGetTokensHelpText);
   return &binder;
 }
 
@@ -383,7 +356,7 @@ moho::CScrLuaInitForm* moho::register_STR_GetTokens_LuaFuncDef()
  * What it does:
  * Builds the fixed engine version string used by Lua and console callbacks.
  */
-msvc8::string moho::GetEngineVersion()
+fa::string moho::GetEngineVersion()
 {
   // The build the engine reports is the FAF game version the FAF client stamps
   // into the exe (0xEFB / 3835 in the target binary; FUN_004D3D30 asm
@@ -411,10 +384,7 @@ int moho::cfunc_exists(lua_State* const luaContext)
  */
 int moho::cfunc_existsL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kExistsHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kExistsHelpText);
 
   LuaPlus::LuaStackObject sourceArgument(state, 1);
   const char* const sourcePath = lua_tostring(state->m_state, 1);
@@ -438,7 +408,7 @@ int moho::cfunc_existsL(LuaPlus::LuaState* const state)
  */
 moho::CScrLuaInitForm* moho::func_exists_LuaFuncDef()
 {
-  static CScrLuaBinder binder(CoreLuaInitSet(), "exists", &moho::cfunc_exists, nullptr, "<global>", kExistsHelpText);
+  static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), "exists", &moho::cfunc_exists, nullptr, "<global>", kExistsHelpText);
   return &binder;
 }
 
@@ -472,12 +442,9 @@ int moho::cfunc_GetVersion(lua_State* const luaContext)
  */
 int moho::cfunc_GetVersionL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 0) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kGetVersionHelpText, 0, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 0, kGetVersionHelpText);
 
-  const msvc8::string engineVersion = GetEngineVersion();
+  const fa::string engineVersion = GetEngineVersion();
   lua_pushstring(state->m_state, engineVersion.c_str());
   (void)lua_gettop(state->m_state);
   return 1;
@@ -492,7 +459,7 @@ int moho::cfunc_GetVersionL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_GetVersion_LuaFuncDef()
 {
   static CScrLuaBinder
-    binder(CoreLuaInitSet(), "GetVersion", &moho::cfunc_GetVersion, nullptr, "<global>", kGetVersionHelpText);
+    binder(moho::SCR_CoreLuaInitSet(), "GetVersion", &moho::cfunc_GetVersion, nullptr, "<global>", kGetVersionHelpText);
   return &binder;
 }
 

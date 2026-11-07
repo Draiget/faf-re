@@ -9,6 +9,7 @@
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RBlueprint.h"
+#include "moho/sim/CWldSessionLoaderImpl.h"
 
 namespace moho
 {
@@ -123,7 +124,7 @@ namespace moho
     // 0x005120A5..0x005120BC: the inlined float ceil; the low byte is stored.
     [[nodiscard]] std::uint8_t RoundExtentUpToCellCount(const float extent) noexcept
     {
-      return static_cast<std::uint8_t>(msvc8::CeilToIntX87(extent));
+      return static_cast<std::uint8_t>(fa::CeilToIntX87(extent));
     }
 
     /** Where a non-absolute `StrategicIconName` is resolved from. */
@@ -147,8 +148,8 @@ namespace moho
      * `CD3DBatchTexture::FromFile` returns one directly.
      */
     [[nodiscard]] boost::shared_ptr<moho::CD3DBatchTexture> LoadStrategicIconTexture(
-      const msvc8::string& iconPath,
-      const msvc8::string& variantLabel
+      const fa::string& iconPath,
+      const fa::string& variantLabel
     )
     {
       // Engine addition (plan WPL.4): the texture is the client's
@@ -206,14 +207,18 @@ namespace moho
       return;
     }
 
-    const msvc8::string iconBasePath = msvc8::string(kStrategicIconDirectory) + mStrategicIconName;
+    // Engine addition (wld_EarlyCommandLineSession): an early load's rules can get here while the app is
+    // still creating its graphics device, which the icon textures below need.
+    WLD_WaitForDeviceUse();
 
-    mStrategicIconRest = LoadStrategicIconTexture(iconBasePath + "_rest.dds", msvc8::string("'rest'"));
+    const fa::string iconBasePath = fa::string(kStrategicIconDirectory) + mStrategicIconName;
+
+    mStrategicIconRest = LoadStrategicIconTexture(iconBasePath + "_rest.dds", fa::string("'rest'"));
     mStrategicIconSelected =
-      LoadStrategicIconTexture(iconBasePath + "_selected.dds", msvc8::string("'selected'"));
-    mStrategicIconOver = LoadStrategicIconTexture(iconBasePath + "_over.dds", msvc8::string("'over'"));
+      LoadStrategicIconTexture(iconBasePath + "_selected.dds", fa::string("'selected'"));
+    mStrategicIconOver = LoadStrategicIconTexture(iconBasePath + "_over.dds", fa::string("'over'"));
     mStrategicIconSelectedOver =
-      LoadStrategicIconTexture(iconBasePath + "_selectedover.dds", msvc8::string("'selected over'"));
+      LoadStrategicIconTexture(iconBasePath + "_selectedover.dds", fa::string("'selected over'"));
   }
 
   /**

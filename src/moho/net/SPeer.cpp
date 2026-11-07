@@ -13,13 +13,13 @@ namespace moho
   /**
    * Address: 0x007C05C0 (FUN_007C05C0)
    *
-   * msvc8::string const &,int,unsigned long,unsigned short,INetConnection *,ENetworkPlayerState
+   * fa::string const &,int,unsigned long,unsigned short,INetConnection *,ENetworkPlayerState
    *
    * What it does:
    * Initializes peer identity/address fields and sentinel ids used by command/client mapping paths.
    */
   SPeer::SPeer(
-    const msvc8::string& playerName_,
+    const fa::string& playerName_,
     const int32_t uid_,
     const u_long address_,
     const u_short port_,
@@ -54,7 +54,7 @@ namespace moho
    * What it does:
    * Formats this peer into `"name" [host:port, uid=n]`.
    */
-  msvc8::string SPeer::ToString() const
+  fa::string SPeer::ToString() const
   {
     const auto hostname = NET_GetHostName(address);
     return gpg::STR_Printf("\"%s\" [%s:%d, uid=%d]", playerName.c_str(), hostname.c_str(), port, uid);
@@ -83,7 +83,7 @@ namespace moho
     *std::to_chars(idBuf, idBuf + kPlayerUidBufSize - 1, peer->uid).ptr = '\0';
     out.SetString("id", idBuf);
 
-    msvc8::string peerStatus;
+    fa::string peerStatus;
     ENetworkPlayerStateToStr(peer->state, peerStatus);
     out.SetString("status", peerStatus.c_str());
 

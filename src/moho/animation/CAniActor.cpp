@@ -43,69 +43,13 @@ namespace
   // ctor: 0x0063C1E0.
   moho::CAniActorSerializer gCAniActorSerializer;
 
-  gpg::RType* gCAniPoseType = nullptr;
 
-  [[nodiscard]] gpg::RType* CachedCAniActorType()
-  {
-    if (!moho::CAniActor::sType) {
-      moho::CAniActor::sType = gpg::LookupRType(typeid(moho::CAniActor));
-    }
-    return moho::CAniActor::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCAniPoseType()
-  {
-    if (!gCAniPoseType) {
-      gCAniPoseType = gpg::LookupRType(typeid(moho::CAniPose));
-    }
-    return gCAniPoseType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
-  {
-    if (!moho::IAniManipulator::sType) {
-      moho::IAniManipulator::sType = gpg::LookupRType(typeid(moho::IAniManipulator));
-    }
-    return moho::IAniManipulator::sType;
-  }
-
-  template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    GPG_ASSERT(derived);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
 
   [[noreturn]] void ThrowPointerTypeMismatch(const gpg::RRef& source, gpg::RType* const expectedType, const char* fallback)
   {
     const char* const expected = expectedType ? expectedType->GetName() : fallback;
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : fallback,
@@ -141,7 +85,7 @@ namespace
     }
 
     moho::IAniManipulator* const manipulator =
-      UpcastTrackedPointer<moho::IAniManipulator>(tracked, CachedIAniManipulatorType(), "IAniManipulator");
+      UpcastTrackedPointer<moho::IAniManipulator>(tracked, gpg::RTypeOf<moho::IAniManipulator>(), "IAniManipulator");
     tracked.state = gpg::TrackedPointerState::Owned;
     return manipulator;
   }
@@ -326,12 +270,12 @@ namespace
 
     for (auto* node = actor->mManipulatorsByPrecedence.mNext; node != listHead; node = node->mNext) {
       moho::IAniManipulator* const manipulator = ListNodeToManipulator(node);
-      const gpg::RRef objectRef = MakeDerivedRef(manipulator, CachedIAniManipulatorType());
+      const gpg::RRef objectRef = gpg::MakeTypedRef(manipulator, gpg::RTypeOf<moho::IAniManipulator>());
       gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Owned, owner);
     }
 
     gpg::WriteRawPointer(
-      archive, MakeDerivedRef<moho::IAniManipulator>(nullptr, CachedIAniManipulatorType()), gpg::TrackedPointerState::Owned, owner
+      archive, gpg::MakeTypedRef<moho::IAniManipulator>(nullptr, gpg::RTypeOf<moho::IAniManipulator>()), gpg::TrackedPointerState::Owned, owner
     );
   }
 

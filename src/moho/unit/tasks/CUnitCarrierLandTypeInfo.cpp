@@ -33,34 +33,6 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RRef MakeCUnitCarrierLandRef(moho::CUnitCarrierLand* const object)
   {
     gpg::RRef ref{};
@@ -116,15 +88,7 @@ namespace moho
    */
   void __stdcall CUnitCarrierLandTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedCCommandTaskType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
 
   /**
@@ -145,10 +109,7 @@ namespace moho
    */
   gpg::RRef CUnitCarrierLandTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<moho::CUnitCarrierLand*>(objectStorage);
-    if (object) {
-      new (object) moho::CUnitCarrierLand();
-    }
+    auto* const object = gpg::ConstructInStorage<moho::CUnitCarrierLand>(objectStorage);
     return MakeCUnitCarrierLandRef(object);
   }
 
@@ -187,14 +148,14 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
-    archive->Read(CachedWeakPtrUnitType(), &mTargetCarrier, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTargetCarrier, ownerRef);
     archive->ReadBool(&mHasLoadedIntoCarrier);
     archive->ReadInt(&mReservationResult);
     archive->ReadFloat(&mCarrierHeight);
-    archive->Read(CachedVector3fType(), &mCarrierAttachPos, ownerRef);
-    archive->Read(CachedVector3fType(), &mCarrierAttachDir, ownerRef);
-    archive->Read(CachedVector3fType(), &mCarrierApproachPos, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mCarrierAttachPos, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mCarrierAttachDir, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mCarrierApproachPos, ownerRef);
   }
 
   /**
@@ -211,14 +172,14 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
-    archive->Write(CachedWeakPtrUnitType(), &mTargetCarrier, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTargetCarrier, ownerRef);
     archive->WriteBool(mHasLoadedIntoCarrier);
     archive->WriteInt(mReservationResult);
     archive->WriteFloat(mCarrierHeight);
-    archive->Write(CachedVector3fType(), &mCarrierAttachPos, ownerRef);
-    archive->Write(CachedVector3fType(), &mCarrierAttachDir, ownerRef);
-    archive->Write(CachedVector3fType(), &mCarrierApproachPos, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mCarrierAttachPos, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mCarrierAttachDir, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mCarrierApproachPos, ownerRef);
   }
 
   /**
@@ -292,14 +253,6 @@ namespace moho
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCUnitCarrierLandType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitCarrierLand));
-    }
-    return cached;
-  }
 
   /**
    * Address: 0x00606CD0 (FUN_00606CD0, Moho::CUnitCarrierLandSerializer::Deserialize)
@@ -310,7 +263,7 @@ namespace
    * `version` and the owner-ref lane are unused by the member (mirrors the
    * binary tail call).
    */
-  void DeserializeCUnitCarrierLandSerializerCallback(
+  [[maybe_unused]] void DeserializeCUnitCarrierLandSerializerCallback(
     gpg::ReadArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -333,7 +286,7 @@ namespace
    * `version` and the owner-ref lane are unused by the member (mirrors the
    * binary tail call).
    */
-  void SerializeCUnitCarrierLandSerializerCallback(
+  [[maybe_unused]] void SerializeCUnitCarrierLandSerializerCallback(
     gpg::WriteArchive* const archive,
     const std::intptr_t objectPtr,
     const int,

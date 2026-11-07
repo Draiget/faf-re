@@ -44,15 +44,6 @@ namespace
   // (mirrors the binary's sEngineStat_Render_ActiveEmitters_1 global).
   moho::StatItem* sEngineStatRenderActiveEmitters = nullptr;
 
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return type;
-  }
-
   [[nodiscard]] float ProjectViewportDepthRow1(const moho::VMatrix4& viewport, const Wm3::Vec3f& point) noexcept
   {
     return (point.x * viewport.r[1].x) + (point.y * viewport.r[1].y) + (point.z * viewport.r[1].z) + viewport.r[1].w;
@@ -180,7 +171,7 @@ namespace moho
     mParams.resize(TRAIL_LASTPARAM, 0.0f);
     mParticleTextures.resize(2, nullptr);
     {
-      const msvc8::string emptyString;
+      const fa::string emptyString;
       mStrings.resize(2, emptyString);
     }
 
@@ -329,7 +320,7 @@ namespace moho
     archive->ReadFloat(&mTotalTicks);
     archive->ReadFloat(&mLife);
     archive->ReadFloat(&mLength);
-    archive->Read(CachedVector3fType(), &mSerializedTrailPosition, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mSerializedTrailPosition, nullOwner);
     archive->ReadBool(&mCreated);
     archive->ReadBool(&mVisible);
     archive->ReadUInt(&mLastUpdate);
@@ -357,7 +348,7 @@ namespace moho
     archive->WriteFloat(mTotalTicks);
     archive->WriteFloat(mLife);
     archive->WriteFloat(mLength);
-    archive->Write(CachedVector3fType(), &mSerializedTrailPosition, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mSerializedTrailPosition, nullOwner);
     archive->WriteBool(mCreated);
     archive->WriteBool(mVisible);
     archive->WriteUInt(mLastUpdate);
@@ -384,7 +375,7 @@ namespace moho
     }
 
     Sim* const sim = mManager->GetSim();
-    const msvc8::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
+    const fa::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
 
     for (const GeomCamera3& camera : cameras) {
       if (CanSeeCam(&camera)
@@ -538,8 +529,7 @@ namespace moho
     }
 
     PrepareTickStats();
-    _InterlockedExchangeAdd(
-      reinterpret_cast<volatile platform::InterlockedLong*>(&sEngineStatRenderActiveEmitters->mPrimaryValueBits), 1);
+    sEngineStatRenderActiveEmitters->AddPrimaryBits(1);
 
     const std::int32_t pendingTicks = mTrailLength;
     const RTrailBlueprint* const bp = mTrailBlueprint;

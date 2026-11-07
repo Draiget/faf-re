@@ -21,7 +21,7 @@ void moho::TrimRange(const char* s, const size_t n, const char*& outBegin, const
   outEnd = e;
 }
 
-void moho::SplitByComma(const msvc8::string& src, msvc8::vector<msvc8::string>& out)
+void moho::SplitByComma(const fa::string& src, fa::vector<fa::string>& out)
 {
   const char* s = src.c_str();
   const size_t n = src.size();
@@ -45,15 +45,15 @@ void moho::SplitByComma(const msvc8::string& src, msvc8::vector<msvc8::string>& 
     const char* te;
     TrimRange(s + i, j - i, tb, te);
     if (te > tb) {
-      out.push_back(msvc8::string(tb, static_cast<size_t>(te - tb)));
+      out.push_back(fa::string(tb, static_cast<size_t>(te - tb)));
     }
     i = (j < n ? j + 1 : j);
   }
 }
 
-msvc8::string moho::Join(const msvc8::vector<msvc8::string>& items, const char* sep)
+fa::string moho::Join(const fa::vector<fa::string>& items, const char* sep)
 {
-  msvc8::string out;
+  fa::string out;
   if (items.empty()) {
     return out;
   }
@@ -75,13 +75,13 @@ msvc8::string moho::Join(const msvc8::vector<msvc8::string>& items, const char* 
   return out;
 }
 
-bool moho::IsNameIgnored(const msvc8::string& ignoreList, const char* name)
+bool moho::IsNameIgnored(const fa::string& ignoreList, const char* name)
 {
   if (!name || ignoreList.empty()) {
     return false;
   }
 
-  msvc8::vector<msvc8::string> tokens;
+  fa::vector<fa::string> tokens;
   tokens.reserve(8); // small, avoids reallocs
   SplitByComma(ignoreList, tokens);
 
@@ -101,7 +101,7 @@ bool moho::IsNameIgnored(const msvc8::string& ignoreList, const char* name)
  * Returns the path stem lane delimited by slash/dot markers using the same
  * index math as the original binary helper.
  */
-msvc8::string moho::BP_ShortId(const msvc8::string& idText)
+fa::string moho::BP_ShortId(const fa::string& idText)
 {
   const std::string_view text = idText.view();
   const std::size_t slash = text.find_last_of('/');
@@ -122,11 +122,11 @@ msvc8::string moho::BP_ShortId(const msvc8::string& idText)
  */
 bool moho::URI_Split(
   const gpg::StrArg uri,
-  msvc8::string* const scheme,
-  msvc8::string* const authority,
-  msvc8::string* const path,
-  msvc8::string* const query,
-  msvc8::string* const fragment
+  fa::string* const scheme,
+  fa::string* const authority,
+  fa::string* const path,
+  fa::string* const query,
+  fa::string* const fragment
 )
 {
   if (scheme == nullptr || authority == nullptr || path == nullptr || query == nullptr || fragment == nullptr) {

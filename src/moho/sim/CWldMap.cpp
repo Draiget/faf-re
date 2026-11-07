@@ -76,7 +76,7 @@ namespace
    * helper performs that identical refcount-preserving raw copy through the
    * SharedPtrRaw machinery so no open `{px,pi}` arithmetic leaks into Load.
    */
-  void AdoptWaterMapSheetFromResource(
+  [[maybe_unused]] void AdoptWaterMapSheetFromResource(
     boost::shared_ptr<moho::CD3DDynamicTextureSheet>& waterMap,
     const moho::ID3DDeviceResources::TextureResourceHandle& sheet
   ) noexcept
@@ -92,20 +92,6 @@ namespace
   }
 
 
-  void AdoptDynamicSheetAsStratumMask(
-    boost::SharedPtrRaw<moho::RD3DTextureResource>& mask,
-    const boost::shared_ptr<moho::CD3DDynamicTextureSheet>& sheet
-  ) noexcept
-  {
-    const boost::SharedPtrRaw<moho::CD3DDynamicTextureSheet> borrow =
-      boost::SharedPtrRawFromSharedBorrow(sheet);
-
-    boost::SharedPtrRaw<moho::RD3DTextureResource> reinterpreted{};
-    reinterpreted.px = reinterpret_cast<moho::RD3DTextureResource*>(borrow.px);
-    reinterpreted.pi = borrow.pi;
-    mask.assign_retain(reinterpreted);
-  }
-
 
   /**
    * Address: 0x008915F0 (FUN_008915F0, sub_8915F0)
@@ -114,7 +100,7 @@ namespace
    * Writes two contiguous 32-bit lanes to a binary writer in one 8-byte
    * payload.
    */
-  void WriteBinaryWriterPairU32(gpg::BinaryWriter& writer, const std::uint32_t first, const std::uint32_t second)
+  [[maybe_unused]] void WriteBinaryWriterPairU32(gpg::BinaryWriter& writer, const std::uint32_t first, const std::uint32_t second)
   {
     const std::uint32_t pair[2]{first, second};
     writer.Write(reinterpret_cast<const char*>(pair), sizeof(pair));
@@ -240,7 +226,7 @@ namespace
    * What it does:
    * Clears one legacy string lane to empty state and returns zero.
    */
-  [[maybe_unused]] int ClearLegacyStringAndReturnZero(msvc8::string* const value) noexcept
+  [[maybe_unused]] int ClearLegacyStringAndReturnZero(fa::string* const value) noexcept
   {
     value->tidy(true, 0U);
     return 0;
@@ -252,7 +238,7 @@ namespace
    * What it does:
    * Clears one legacy string lane to empty state and returns the same pointer.
    */
-  [[maybe_unused]] msvc8::string* ClearLegacyStringAndReturnSelf(msvc8::string* const value) noexcept
+  [[maybe_unused]] fa::string* ClearLegacyStringAndReturnSelf(fa::string* const value) noexcept
   {
     value->tidy(true, 0U);
     return value;
@@ -269,7 +255,7 @@ namespace
     const moho::CWldPropEntry* const source
   )
   {
-    destination->mBlueprintPath.assign(source->mBlueprintPath, 0u, msvc8::string::npos);
+    destination->mBlueprintPath.assign(source->mBlueprintPath, 0u, fa::string::npos);
     destination->mTransform = source->mTransform;
     return destination;
   }
@@ -385,7 +371,7 @@ namespace
    * storage record.
    */
   moho::CWldPropEntry*
-  PackWldPropEntry(moho::CWldPropEntry& outEntry, const moho::VTransform& transform, const msvc8::string& path)
+  PackWldPropEntry(moho::CWldPropEntry& outEntry, const moho::VTransform& transform, const fa::string& path)
   {
     outEntry.mBlueprintPath.assign_owned(path.c_str());
     outEntry.mTransform = transform;
@@ -430,9 +416,9 @@ namespace moho
    * Callsite evidence (per CLAUDE.md callsite verification rule):
    *  - code xref from Moho::CUIMapPreview::SetTextureFromMap (FUN_008509A0) at 0x00850A25
    */
-  msvc8::auto_ptr<CWldMap> WLD_LoadMapPreview(gpg::StrArg mapPath)
+  fa::auto_ptr<CWldMap> WLD_LoadMapPreview(gpg::StrArg mapPath)
   {
-    msvc8::auto_ptr<CWldMap> map(new CWldMap());
+    fa::auto_ptr<CWldMap> map(new CWldMap());
 
     CBackgroundTaskControl loadControl{};
     (void)map->MapLoad(mapPath, nullptr, true, loadControl);
@@ -487,7 +473,7 @@ namespace moho
     mEntries.resize(entryCount, MakeDefaultWldPropEntry());
 
     for (std::uint32_t index = 0; index < entryCount; ++index) {
-      msvc8::string blueprintPath;
+      fa::string blueprintPath;
       blueprintPath.tidy(false, 0U);
       reader.ReadString(&blueprintPath);
 
@@ -686,7 +672,7 @@ namespace moho
           previewNameWide.push_back(static_cast<wchar_t>(wideChar));
         }
 
-        const msvc8::string previewNameUtf8 = gpg::STR_WideToUtf8(previewNameWide.c_str());
+        const fa::string previewNameUtf8 = gpg::STR_WideToUtf8(previewNameWide.c_str());
         mPreviewName.assign_owned(previewNameUtf8.c_str());
 
         std::uint32_t metadataEntryCount = 0U;
@@ -821,7 +807,7 @@ namespace moho
    * handle in one terrain environment entry object.
    */
   TerrainEnvironmentLookupEntry::TerrainEnvironmentLookupEntry(
-    const msvc8::string& environmentName,
+    const fa::string& environmentName,
     boost::shared_ptr<RD3DTextureResource> texture
   )
   {
@@ -922,7 +908,7 @@ namespace moho
   {
     Reset();
 
-    msvc8::string resolvedPath;
+    fa::string resolvedPath;
     resolvedPath.tidy(false, 0U);
     const char* openPath = mapName != nullptr ? mapName : "";
 
@@ -932,7 +918,7 @@ namespace moho
       openPath = resolvedPath.c_str();
     }
 
-    msvc8::auto_ptr<gpg::Stream> stream = DISK_OpenFileRead(openPath);
+    fa::auto_ptr<gpg::Stream> stream = DISK_OpenFileRead(openPath);
     if (!stream.get()) {
       return false;
     }

@@ -67,8 +67,8 @@ namespace moho
     std::uint8_t CatchupEmit;         // +0x41
     std::uint8_t pad_0042_0044[0x02]; // +0x42
     float TextureRepeatRate;          // +0x44
-    msvc8::string RepeatTexture;      // +0x48
-    msvc8::string RampTexture;        // +0x64
+    fa::string RepeatTexture;      // +0x48
+    fa::string RampTexture;        // +0x64
     static gpg::RType* sType;
 
     /**

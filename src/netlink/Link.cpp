@@ -28,6 +28,9 @@ namespace faf::netlink
     std::atomic<std::uint64_t> sWireBytes{0};
 
     constexpr auto kGatherTimeout = 5000ms;          // gatheringFuture cancel
+    // libjuice tries a silent ICE server for 23.5 s. The offerer waits kAwaitCandidatesTimeout for
+    // the answer, relayed both ways by the lobby server, so what was found by now goes out.
+    constexpr auto kGatherSendFound = 4000ms;
     constexpr auto kAwaitCandidatesTimeout = 6000ms; // no answer to our candidates
     constexpr auto kCheckTimeout = 15000ms;          // startIce loop
     constexpr auto kRetryAfterFailure = 5000ms;      // offerer, attempt never connected
@@ -90,6 +93,17 @@ namespace faf::netlink
         }
       }
       return {};
+    }
+
+    // Issue #322: the word after " typ " in an SDP candidate line, empty when there is none.
+    std::string CandidateTypeOf(const std::string_view line)
+    {
+      const std::size_t at = line.find(" typ ");
+      if (at == std::string_view::npos) {
+        return {};
+      }
+      std::string_view rest = line.substr(at + 5);
+      return std::string(rest.substr(0, rest.find(' ')));
     }
 
     std::string Lower(std::string s)
@@ -433,7 +447,7 @@ namespace faf::netlink
     o.remoteId = mOptions.remoteId;
     o.offerer = mOptions.offerer;
     o.iceServers = mOptions.iceServers;
-    o.forceRelay = mOptions.forceRelay;
+    o.forceRelay = mOptions.forceRelay || mChoice.mode == PathChoice::Mode::RelayOnly;
     o.bindAddress = mOptions.bindAddress;
     auto onLog = [this](const std::string& text) {
       if (mCallbacks.onLog) {
@@ -504,7 +518,15 @@ namespace faf::netlink
       s.laneUnacked = lane.redundantUnacked;
       s.laneDuplicates = lane.redundantDuplicates;
       s.laneLost = lane.datagramsLost;
+      s.laneUnauthenticated = lane.unauthenticatedDropped;
+      if (lane.rttSamples > 0) {
+        s.laneRttMs = static_cast<double>(lane.rttSmoothedUs) / 1000.0;
+      }
     }
+    s.laneEncrypted = s.onLane && mLaneKeyed;
+    s.localType = mLocalType;
+    s.remoteType = mRemoteType;
+    s.choice = mChoice;
     s.dataReceived = mDataReceived.load();
     s.invalidReceived = mInvalidReceived.load();
     s.echoesAnswered = mEchoesAnswered.load();
@@ -529,6 +551,17 @@ namespace faf::netlink
   // CandidateUtil.isAllowedCandidate with PeerIceModule's flags.
   bool Link::AllowedLocked(const CandidateType type, const Clock::time_point now) const
   {
+    // Issue #322: the player's pick in the network panel holds over the policy.
+    // /nativenetrelay (forceRelay) still holds over "no relay".
+    // Our own pick first, else what our peer picked for this attempt.
+    const PathChoice::Mode mode = mChoice.mode != PathChoice::Mode::Auto ? mChoice.mode : mPeerMode;
+    if (mode == PathChoice::Mode::RelayOnly) {
+      return type == CandidateType::Relayed;
+    }
+    if (mode == PathChoice::Mode::NoRelay && !mOptions.forceRelay) {
+      return type == CandidateType::Host || type == CandidateType::ServerReflexive ||
+             type == CandidateType::PeerReflexive;
+    }
     const std::uint32_t previous = AttemptsInLastTwoMinutesLocked(now);
     const bool allowHost = previous < kForceSrflxCount && !mOptions.forceRelay;
     const bool allowReflexive = previous < kForceRelayCount && !mOptions.forceRelay;
@@ -543,9 +576,7 @@ namespace faf::netlink
 
   void Link::DestroyAgentLocked()
   {
-    // Issue #240: a new connection starts a new lane (lazily, under mLaneMutex).
     mLaneActive = false;
-    mLaneReset = true;
     juice_agent* agent = nullptr;
     {
       std::unique_lock agentLock(mIn->agentMutex);
@@ -556,6 +587,69 @@ namespace faf::netlink
     if (agent != nullptr) {
       juice_destroy(agent); // joins libjuice's thread; never called from it
     }
+    // Issue #240: a new connection starts a new lane (lazily, under mLaneMutex).
+    // After the agent is gone, so no late datagram of this connection makes the
+    // next connection's lane before its keys are known (#289).
+    {
+      std::lock_guard laneLock(mLaneMutex);
+      mLaneReset = true;
+      if (mLaneKeys) {
+        remote::net::WipeKey(mLaneKeys->send);
+        remote::net::WipeKey(mLaneKeys->receive);
+        mLaneKeys.reset();
+      }
+    }
+    mLaneKeyed = false;
+    mKeyPair.Clear();
+    mLocalType.clear();
+    mRemoteType.clear();
+  }
+
+  // Issue #322: our peer's player picked a path; follow it on this attempt. "auto"
+  // starts the attempt policy afresh, as the pick did on the peer's side.
+  void Link::NotePeerPathLocked(Pending& out, const std::string& path)
+  {
+    if (path == "relay") {
+      mPeerMode = PathChoice::Mode::RelayOnly;
+    } else if (path == "norelay") {
+      mPeerMode = PathChoice::Mode::NoRelay;
+    } else if (path == "auto") {
+      mPeerMode = PathChoice::Mode::Auto;
+      mAttemptTimes.clear();
+    } else {
+      return;
+    }
+    Log(out, "the peer picked the path " + path + " for this attempt");
+  }
+
+  void Link::NoteRemoteUfragLocked(Pending& out, const std::string& ufrag)
+  {
+    mRemoteUfrag = ufrag;
+    mRemoteMarked = !mOptions.ufragPrefix.empty() && mRemoteUfrag.rfind(mOptions.ufragPrefix, 0) == 0;
+    mRemoteWebRtc = mRemoteMarked && mRemoteUfrag.rfind(mOptions.ufragPrefix + "w+", 0) == 0;
+    mRemoteLane = mRemoteMarked && OffersAfterPrefix(mRemoteUfrag, mOptions.ufragPrefix, "c+");
+    // Issue #289: both sides decide the same way, each from the other's ufrag
+    // and its own, so the lane is sealed on both or on neither.
+    if (!mKeyPair.IsSet() || !mRemoteLane) {
+      return;
+    }
+    const std::optional<LinkPublicKey> peerKey = KeyFromUfrag(mRemoteUfrag, mOptions.ufragPrefix);
+    if (!peerKey) {
+      Log(out, "the peer offers no lane key; the lane stays unencrypted");
+      return;
+    }
+    std::optional<remote::net::ChannelKeys> keys = mKeyPair.Derive(*peerKey, mOptions.offerer);
+    if (!keys) {
+      Log(out, "the peer's lane key is unusable; the lane stays unencrypted");
+      return;
+    }
+    {
+      std::lock_guard laneLock(mLaneMutex);
+      mLaneKeys = *keys;
+    }
+    remote::net::WipeKey(keys->send);
+    remote::net::WipeKey(keys->receive);
+    mLaneKeyed = true;
   }
 
   void Link::InitiateLocked(Pending& out, const CandidatesMessage* remote)
@@ -565,6 +659,10 @@ namespace faf::netlink
       return;
     }
     DestroyAgentLocked();
+    mPeerMode = PathChoice::Mode::Auto;
+    if (remote != nullptr && !remote->fafPath.empty()) {
+      NotePeerPathLocked(out, remote->fafPath); // before any candidate is filtered
+    }
     {
       std::lock_guard cb(mIn->cbMutex);
       mIn->candidates.clear();
@@ -586,7 +684,18 @@ namespace faf::netlink
       }
     }
     std::vector<std::uint16_t> turnPorts;
+    // Issue #322: "relay via host:port" keeps that TURN server only, when it is in the list.
+    bool chosenTurnListed = false;
     for (const IceServer& s : mOptions.iceServers) {
+      chosenTurnListed = chosenTurnListed || (s.kind == IceServer::Kind::Turn && IceServerName(s) == mChoice.turnServer);
+    }
+    if (!mChoice.turnServer.empty() && !chosenTurnListed) {
+      Log(out, "TURN server " + mChoice.turnServer + " is no longer in the list, using every TURN server");
+    }
+    for (const IceServer& s : mOptions.iceServers) {
+      if (chosenTurnListed && IceServerName(s) != mChoice.turnServer) {
+        continue;
+      }
       if (s.kind == IceServer::Kind::Turn) {
         mIn->turnHosts.push_back(s.host);
         mIn->turnUsers.push_back(s.username);
@@ -640,8 +749,21 @@ namespace faf::netlink
       const std::string mark =
         mOptions.ufragPrefix + (mOptions.webrtc ? "w+" : "") + (mOptions.redundancy > 0 ? "c+" : "");
       const std::size_t prefix = mark.size();
-      const std::string ufrag = mark + RandomToken(prefix + 4 < 14 ? 14 - prefix : 4);
-      juice_set_local_ice_attributes(agent, ufrag.c_str(), RandomToken(26).c_str());
+      std::string ufrag = mark + RandomToken(prefix + 4 < 14 ? 14 - prefix : 4);
+      // Issue #289: a new key pair per attempt; its public key ends the ufrag
+      // in place of the random token. Hex digits hold no '+', so the marks
+      // before it read as they always have.
+      if (mOptions.encrypt && mOptions.redundancy > 0) {
+        if (mKeyPair.Generate()) {
+          ufrag = mark + KeyMarkFor(mKeyPair.Public());
+        } else {
+          Log(out, "no random source for a lane key; the lane stays unencrypted");
+        }
+      }
+      if (juice_set_local_ice_attributes(agent, ufrag.c_str(), RandomToken(26).c_str()) != JUICE_ERR_SUCCESS) {
+        Log(out, "ufrag refused by libjuice: " + ufrag);
+        mKeyPair.Clear();
+      }
     }
     {
       std::unique_lock agentLock(mIn->agentMutex);
@@ -654,10 +776,7 @@ namespace faf::netlink
     mOurPeerReported = false;
     mProbesSent = 0;
     if (remote != nullptr) {
-      mRemoteUfrag = remote->ufrag;
-      mRemoteMarked = !mOptions.ufragPrefix.empty() && mRemoteUfrag.rfind(mOptions.ufragPrefix, 0) == 0;
-      mRemoteWebRtc = mRemoteMarked && mRemoteUfrag.rfind(mOptions.ufragPrefix + "w+", 0) == 0;
-      mRemoteLane = mRemoteMarked && OffersAfterPrefix(mRemoteUfrag, mOptions.ufragPrefix, "c+");
+      NoteRemoteUfragLocked(out, remote->ufrag);
       // Answerer: the remote description goes in before gathering, so
       // libjuice takes the controlled role (the offerer controls, as
       // agent.setControlling(peer.isLocalOffer())).
@@ -678,6 +797,13 @@ namespace faf::netlink
     Log(out, log.str());
   }
 
+  // CandidateUtil.unpackCandidates: same generation, an address, an allowed type;
+  // libjuice relays and connects over UDP only.
+  bool Link::UsableRemoteLocked(const Candidate& c, const Clock::time_point now) const
+  {
+    return c.generation == 0 && !c.ip.empty() && c.port > 0 && AllowedLocked(c.type, now) && Lower(c.protocol) == "udp";
+  }
+
   std::string Link::RemoteDescriptionLocked(const CandidatesMessage& remote, const Clock::time_point now) const
   {
     std::string sdp = "a=ice-ufrag:" + remote.ufrag + "\r\na=ice-pwd:" + remote.password + "\r\n";
@@ -687,8 +813,7 @@ namespace faf::netlink
     for (const Candidate& c : sorted) {
       // CandidateUtil.unpackCandidates: same generation, an address, an
       // allowed type; libjuice relays and connects over UDP only.
-      if (c.generation != 0 || c.ip.empty() || c.port <= 0 || !AllowedLocked(c.type, now) ||
-          Lower(c.protocol) != "udp") {
+      if (!UsableRemoteLocked(c, now)) {
         continue;
       }
       sdp += CandidateToSdp(c) + "\r\n";
@@ -711,6 +836,13 @@ namespace faf::netlink
     msg.destId = mOptions.remoteId;
     msg.ufrag = SdpAttribute(sdp, "ice-ufrag");
     msg.password = SdpAttribute(sdp, "ice-pwd");
+    if (mChoicePicked && mRemoteMarked) {
+      msg.fafPath = mChoice.mode == PathChoice::Mode::RelayOnly ? "relay" :
+                    mChoice.mode == PathChoice::Mode::NoRelay  ? "norelay" :
+                                                                 "auto";
+      // "auto" restarts the peer's policy once; later attempts escalate as usual.
+      mChoicePicked = mChoice.mode != PathChoice::Mode::Auto;
+    }
     for (Candidate& c : gathered) {
       if (!AllowedLocked(c.type, now)) {
         continue;
@@ -750,10 +882,20 @@ namespace faf::netlink
       Log(out, std::string("received candidates unexpectedly, state ") + LinkStateName(mState));
       return;
     }
-    mRemoteUfrag = remote.ufrag;
-    mRemoteMarked = !mOptions.ufragPrefix.empty() && mRemoteUfrag.rfind(mOptions.ufragPrefix, 0) == 0;
-    mRemoteWebRtc = mRemoteMarked && mRemoteUfrag.rfind(mOptions.ufragPrefix + "w+", 0) == 0;
-    mRemoteLane = mRemoteMarked && OffersAfterPrefix(mRemoteUfrag, mOptions.ufragPrefix, "c+");
+    NoteRemoteUfragLocked(out, remote.ufrag);
+    if (!remote.fafPath.empty()) {
+      NotePeerPathLocked(out, remote.fafPath);
+    }
+    // Issue #275: an answer with nothing this link may use can't connect, so start again
+    // now (the retry waits kRetryAfterFailure) rather than after kCheckTimeout of checks
+    // against nothing. A peer answers that way when its relay isn't there yet.
+    const bool anyUsable = std::any_of(remote.candidates.begin(), remote.candidates.end(),
+                                       [&](const Candidate& c) { return UsableRemoteLocked(c, now); });
+    if (!anyUsable) {
+      Log(out, "the answer holds no candidate this link may use (" + std::to_string(remote.candidates.size()) + " sent)");
+      ConnectionLostLocked(out, "no usable candidates in the answer", now);
+      return;
+    }
     const std::string sdp = RemoteDescriptionLocked(remote, now);
     if (juice_set_remote_description(mAgent, sdp.c_str()) < 0) {
       Log(out, "remote description rejected: " + sdp);
@@ -818,6 +960,26 @@ namespace faf::netlink
         ApplyRemoteLocked(p, m, now);
       }
 
+      if (mReconnectAsked) {
+        mReconnectAsked = false;
+        if (mGameEnded) {
+          Log(p, "reconnect not done: the game has ended");
+        } else {
+          if (mPendingChoice) {
+            // A path the player picked: the attempt policy starts afresh.
+            mChoice = *mPendingChoice;
+            mPendingChoice.reset();
+            mChoicePicked = true;
+            mAttemptTimes.clear();
+            Log(p, "path: " + PathChoiceText(mChoice));
+          }
+          ConnectionLostLocked(p, "reconnect asked", now);
+          if (mOptions.offerer) {
+            mRestartAt = now;
+          }
+        }
+      }
+
       bool gatheringDone = false;
       int juiceState = JUICE_STATE_DISCONNECTED;
       bool juiceStateChanged = false;
@@ -830,6 +992,16 @@ namespace faf::netlink
       }
 
       if (mState == LinkState::Gathering && mAgent != nullptr) {
+        if (!gatheringDone && mGatherDeadline && now >= *mGatherDeadline - kGatherTimeout + kGatherSendFound) {
+          std::lock_guard cb(mIn->cbMutex);
+          for (const Candidate& c : mIn->candidates) {
+            if (AllowedLocked(c.type, now)) {
+              Log(p, "an ICE server hasn't answered, going on with the candidates found");
+              gatheringDone = true;
+              break;
+            }
+          }
+        }
         if (gatheringDone) {
           mGatherDeadline.reset();
           SendCandidatesLocked(p, now);
@@ -863,6 +1035,8 @@ namespace faf::netlink
           char remote[JUICE_MAX_CANDIDATE_SDP_STRING_LEN] = {};
           if (juice_get_selected_candidates(mAgent, local, sizeof(local), remote, sizeof(remote)) == 0) {
             Log(p, std::string("connected, selected pair: ") + local + " <-> " + remote);
+            mLocalType = CandidateTypeOf(local);
+            mRemoteType = CandidateTypeOf(remote);
           }
           if (mCallbacks.onConnected) {
             p.actions.push_back([this] { mCallbacks.onConnected(true); });
@@ -895,10 +1069,12 @@ namespace faf::netlink
         }
       }
 
-      // Issue #234: probe a marked peer, at most 5 times a second apart.
-      if (mState == LinkState::Connected && mRemoteMarked && !mOurPeer.load() && mProbesSent < 5 &&
-          now >= mNextProbe) {
-        mNextProbe = now + std::chrono::seconds(1);
+      // Issue #234: probe a marked peer, 5 times a second apart, then every 5 s
+      // until it answers. A reconnect can come up while the path still drops
+      // what the link sends (ICE checks got through), and without an answer the
+      // lane and its encryption (#289) would stay off for the whole connection.
+      if (mState == LinkState::Connected && mRemoteMarked && !mOurPeer.load() && now >= mNextProbe) {
+        mNextProbe = now + std::chrono::seconds(mProbesSent < 5 ? 1 : 5);
         ++mProbesSent;
         static constexpr char kProbe[] = "fnetlink-probe 1";
         SendFramed(kProbe, sizeof(kProbe) - 1);
@@ -935,7 +1111,8 @@ namespace faf::netlink
           !mLaneActive.load()) {
         mLaneActive = true;
         Log(p, "game datagrams move onto the redundant lane, each repeated up to " +
-                 std::to_string(mOptions.redundancy) + " times until acked");
+                 std::to_string(mOptions.redundancy) + " times until acked" +
+                 (mLaneKeyed ? ", encrypted" : ", not encrypted"));
       }
 
       if (mState == LinkState::Disconnected && mRestartAt && now >= *mRestartAt) {
@@ -1030,6 +1207,10 @@ namespace faf::netlink
       config.timeoutUs = 24ull * 3600 * 1000 * 1000;
       config.keepaliveIntervalUs = 1'000'000;
       mLane = std::make_unique<remote::net::NetChannel>(config);
+      // Issue #289: sealed from its first datagram, with this connection's keys.
+      if (mLaneKeys) {
+        (void)mLane->SetKeys(*mLaneKeys);
+      }
     }
     return *mLane;
   }

@@ -40,7 +40,7 @@ namespace moho
    */
   const char* BVSetRType<const RBlueprint*, EntityCategoryHelper>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf(
+    static const fa::string sName = gpg::STR_Printf(
       "BVSet<%s,%s>", CachedRBlueprintPointerType()->GetName(), EntityCategoryHelper::StaticGetClass()->GetName()
     );
     return sName.c_str();

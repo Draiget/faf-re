@@ -11,14 +11,14 @@
 
 namespace
 {
-  using WeaponVector = msvc8::vector<moho::RUnitBlueprintWeapon>;
+  using WeaponVector = fa::vector<moho::RUnitBlueprintWeapon>;
 
   /**
-   * Address: 0x00524590 (FUN_00524590, msvc8::vector<RUnitBlueprintWeapon>::push_back)
+   * Address: 0x00524590 (FUN_00524590, fa::vector<RUnitBlueprintWeapon>::push_back)
    *
    * What it does:
    * Per-T canonical-template-helper binding for the engine-instantiated
-   * `msvc8::vector<RUnitBlueprintWeapon>::push_back(const&)` fast/slow-path
+   * `fa::vector<RUnitBlueprintWeapon>::push_back(const&)` fast/slow-path
    * body (388-byte element stride: sizeof(RUnitBlueprintWeapon) == 0x184).
    * Rewires the inline `loaded.push_back(element);` site in
    * `RVectorType_RUnitBlueprintWeapon::SerLoad` (FUN_00523D50) through an
@@ -30,15 +30,6 @@ namespace
     const moho::RUnitBlueprintWeapon& value)
   {
     destination.push_back(value);
-  }
-
-  [[nodiscard]] gpg::RType* CachedRUnitBlueprintWeaponType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RUnitBlueprintWeapon));
-    }
-    return cached;
   }
 
   [[nodiscard]] gpg::RVectorType_RUnitBlueprintWeapon& AcquireRUnitBlueprintWeaponVectorType()
@@ -82,7 +73,7 @@ namespace
    * What it does:
    * Per-field copy-assignment body for one 0x184-byte
    * `Moho::RUnitBlueprintWeapon` element. Copies the owner pointer and weapon
-   * index, then string-assigns each of the five embedded `msvc8::string`
+   * index, then string-assigns each of the five embedded `fa::string`
    * lanes (`Label`, `DisplayName`, `DamageType`, `TargetRestrictOnlyAllow`,
    * `TargetRestrictDisallow`, `UIMinRangeVisualId`, `UIMaxRangeVisualId`) and
    * mirrors the scalar/flag/float gameplay-field block.
@@ -110,7 +101,7 @@ namespace
    * copy through `CopyAssignRUnitBlueprintWeapon` (FUN_00527680) by name so the
    * out-of-line copy-assignment symbol stays bound.
    */
-  const moho::RUnitBlueprintWeapon* CopyAssignUnitBlueprintWeaponRange(
+  [[maybe_unused]] const moho::RUnitBlueprintWeapon* CopyAssignUnitBlueprintWeaponRange(
     moho::RUnitBlueprintWeapon* destinationBegin,
     moho::RUnitBlueprintWeapon* destinationEnd,
     const moho::RUnitBlueprintWeapon* sourceBegin
@@ -180,7 +171,7 @@ namespace
    * void __stdcall __noreturn sub_524AD0(_DWORD *a1, int a2, unsigned int a3);
    *
    * What it does:
-   * Engine-instantiated body of `msvc8::vector<RUnitBlueprintWeapon>::_Insert_n`
+   * Engine-instantiated body of `fa::vector<RUnitBlueprintWeapon>::_Insert_n`
    * (insert N default-constructed elements at `insertAt`). The binary:
    *   - Default-constructs one `RUnitBlueprintWeapon` template value on the
    *     stack (FUN_00524E50 copy-ctor is also dispatched from here for the
@@ -272,11 +263,11 @@ gpg::RVectorType_RUnitBlueprintWeapon::~RVectorType_RUnitBlueprintWeapon() = def
  *
  * What it does:
  * Builds and caches lexical reflection name `vector<element>` for
- * `msvc8::vector<moho::RUnitBlueprintWeapon>`.
+ * `fa::vector<moho::RUnitBlueprintWeapon>`.
  */
 const char* gpg::RVectorType_RUnitBlueprintWeapon::GetName() const
 {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedRUnitBlueprintWeaponType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::RUnitBlueprintWeapon>()->GetName());
     return sName.c_str();
 }
 
@@ -285,11 +276,11 @@ const char* gpg::RVectorType_RUnitBlueprintWeapon::GetName() const
  *
  * What it does:
  * Returns base lexical text plus reflected vector size for one
- * `msvc8::vector<moho::RUnitBlueprintWeapon>` instance.
+ * `fa::vector<moho::RUnitBlueprintWeapon>` instance.
  */
-msvc8::string gpg::RVectorType_RUnitBlueprintWeapon::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_RUnitBlueprintWeapon::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 
@@ -340,7 +331,7 @@ void gpg::RVectorType_RUnitBlueprintWeapon::SerLoad(
   WeaponVector loaded{};
   EnsureWeaponVectorCapacity(loaded, static_cast<std::size_t>(count));
 
-  gpg::RType* const elementType = CachedRUnitBlueprintWeaponType();
+  gpg::RType* const elementType = gpg::RTypeOf<moho::RUnitBlueprintWeapon>();
   if (!elementType) {
     *storage = loaded;
     return;
@@ -385,7 +376,7 @@ void gpg::RVectorType_RUnitBlueprintWeapon::SerSave(
     return;
   }
 
-  gpg::RType* const elementType = CachedRUnitBlueprintWeaponType();
+  gpg::RType* const elementType = gpg::RTypeOf<moho::RUnitBlueprintWeapon>();
   if (!elementType) {
     return;
   }
@@ -403,7 +394,7 @@ void gpg::RVectorType_RUnitBlueprintWeapon::SerSave(
 gpg::RRef gpg::RVectorType_RUnitBlueprintWeapon::SubscriptIndex(void* const obj, const int ind) const
 {
   gpg::RRef out{};
-  out.mType = CachedRUnitBlueprintWeaponType();
+  out.mType = gpg::RTypeOf<moho::RUnitBlueprintWeapon>();
   out.mObj = nullptr;
 
   auto* const storage = static_cast<WeaponVector*>(obj);

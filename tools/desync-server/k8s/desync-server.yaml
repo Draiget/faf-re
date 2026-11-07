@@ -1,7 +1,7 @@
 # faf-re desync test server on Kubernetes: the OpenTelemetry collector and the dump receiver behind
 # one Ingress host, /v1/logs to the collector and /dumps to the receiver. Before applying (README.md):
 #   - the faf-desync-tokens Secret (FAF_UPLOAD_TOKEN, FAF_READ_TOKEN),
-#   - the faf-desync-tools ConfigMap (tools/desync-diff/receive.py and desync_diff.py),
+#   - the faf-desync-diff ConfigMap (the Go sources of tools/cmd/desync-diff, built at pod start),
 #   - the faf-desync-collector ConfigMap (tools/desync-server/collector.yaml),
 #   - HOST below replaced by the server's name (and the TLS lines filled in or removed).
 apiVersion: v1
@@ -75,15 +75,31 @@ spec:
     metadata:
       labels: {app: dumps}
     spec:
+      # The receiver is Go with the standard library only: the init container builds it from the
+      # ConfigMap's sources into a shared folder, so no image has to be built or pushed.
+      initContainers:
+        - name: build
+          image: golang:1.25.5-alpine
+          command: ["sh", "-c", "mkdir -p /tmp/src && cp /opt/src/*.go /tmp/src/ && cd /tmp/src && go mod init desync-diff
+                    && go build -trimpath -ldflags=-s -o /opt/bin/desync-diff ."]
+          env:
+            - {name: CGO_ENABLED, value: "0"}
+            - {name: GOTOOLCHAIN, value: local}
+            - {name: GOCACHE, value: /tmp/gocache}
+            - {name: HOME, value: /tmp}
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          volumeMounts:
+            - {name: src, mountPath: /opt/src}
+            - {name: bin, mountPath: /opt/bin}
       containers:
         - name: dumps
-          image: python:3.12-slim
-          command: ["python", "/opt/faf/receive.py", "--host", "0.0.0.0", "--port", "4319", "--prefix", "/dumps",
+          image: alpine:3.22.2
+          command: ["/opt/bin/desync-diff", "serve", "--host", "0.0.0.0", "--port", "4319", "--prefix", "/dumps",
                     "--out", "/data/dumps", "--max-mb", "64"]
           envFrom:
             - secretRef: {name: faf-desync-tokens}
-          env:
-            - {name: PYTHONUNBUFFERED, value: "1"}
           ports:
             - containerPort: 4319
           readinessProbe:
@@ -92,11 +108,13 @@ spec:
             requests: {cpu: 50m, memory: 64Mi}
             limits: {cpu: "1", memory: 512Mi}
           volumeMounts:
-            - {name: tools, mountPath: /opt/faf}
+            - {name: bin, mountPath: /opt/bin, readOnly: true}
             - {name: data, mountPath: /data/dumps, subPath: dumps}
       volumes:
-        - name: tools
-          configMap: {name: faf-desync-tools}
+        - name: src
+          configMap: {name: faf-desync-diff}
+        - name: bin
+          emptyDir: {}
         - name: data
           persistentVolumeClaim: {claimName: faf-desync-data}
 ---

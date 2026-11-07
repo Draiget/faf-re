@@ -1,4 +1,6 @@
 #include "moho/lua/SCR_Trace.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/CScrLuaInitForm.h"
 
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -6,20 +8,6 @@
 namespace
 {
   constexpr const char* kTraceHelpText = "Trace(true) -- turns on debug tracing\nTrace(false) -- turns it off again";
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Core");
-    return sSet;
-  }
 
 } // namespace
 
@@ -43,10 +31,7 @@ int moho::cfunc_Trace(lua_State* const luaContext)
  */
 int moho::cfunc_TraceL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kTraceHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kTraceHelpText);
 
   const LuaPlus::LuaStackObject traceToggle(state, 1);
   (void)traceToggle.GetBoolean();
@@ -62,7 +47,7 @@ int moho::cfunc_TraceL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_Trace_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "Trace",
     &moho::cfunc_Trace,
     nullptr,

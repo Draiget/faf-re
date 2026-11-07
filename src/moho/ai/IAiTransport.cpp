@@ -131,7 +131,7 @@ namespace gpg
      *
      * What it does:
      * Constructs and preregisters reflection metadata for
-     * `msvc8::vector<int>`.
+     * `fa::vector<int>`.
      */
     RVectorType_int();
 
@@ -149,7 +149,7 @@ namespace gpg
      * Appends `size=<count>` suffix to the base lexical representation for
      * one `vector<int>` payload.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
 
     /**
@@ -164,7 +164,7 @@ namespace gpg
      * Address: 0x005E9F20 (FUN_005E9F20, gpg::RVectorType_int::SerLoad)
      *
      * What it does:
-     * Deserializes one `msvc8::vector<int>` payload from archive lanes.
+     * Deserializes one `fa::vector<int>` payload from archive lanes.
      */
     static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
@@ -172,7 +172,7 @@ namespace gpg
      * Address: 0x005EA020 (FUN_005EA020, gpg::RVectorType_int::SerSave)
      *
      * What it does:
-     * Serializes one `msvc8::vector<int>` payload into archive lanes.
+     * Serializes one `fa::vector<int>` payload into archive lanes.
      */
     static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
@@ -189,7 +189,7 @@ namespace gpg
      *
      * What it does:
      * Constructs and preregisters reflection metadata for
-     * `msvc8::vector<SAiReservedTransportBone>`.
+     * `fa::vector<SAiReservedTransportBone>`.
      */
     RVectorType_SAiReservedTransportBone();
 
@@ -207,7 +207,7 @@ namespace gpg
      * Appends `size=<count>` suffix to the base lexical representation for
      * one `vector<SAiReservedTransportBone>` payload.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
 
     /**
@@ -247,7 +247,7 @@ namespace gpg
      *
      * What it does:
      * Constructs and preregisters reflection metadata for
-     * `msvc8::vector<SAttachPoint>`.
+     * `fa::vector<SAttachPoint>`.
      */
     RVectorType_SAttachPoint();
 
@@ -265,7 +265,7 @@ namespace gpg
      * Appends `size=<count>` suffix to the base lexical representation for
      * one `vector<SAttachPoint>` payload.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
 
     /**
@@ -306,9 +306,9 @@ namespace
   using ReservedTransportBoneVectorType = gpg::RVectorType_SAiReservedTransportBone;
   using AttachPointVectorType = gpg::RVectorType_SAttachPoint;
 
-  using IntVector = msvc8::vector<int>;
-  using ReservedTransportBoneVector = msvc8::vector<moho::SAiReservedTransportBone>;
-  using AttachPointVector = msvc8::vector<moho::SAttachPoint>;
+  using IntVector = fa::vector<int>;
+  using ReservedTransportBoneVector = fa::vector<moho::SAiReservedTransportBone>;
+  using AttachPointVector = fa::vector<moho::SAttachPoint>;
 
   [[nodiscard]] BroadcasterTransportType* AcquireBroadcasterTransportType()
   {
@@ -401,9 +401,9 @@ namespace
   }
 
   template <class TVector>
-  [[nodiscard]] msvc8::string MakeVectorLexical(const gpg::RType* const ownerType, const gpg::RRef& ref, const TVector* vec)
+  [[nodiscard]] fa::string MakeVectorLexical(const gpg::RType* const ownerType, const gpg::RRef& ref, const TVector* vec)
   {
-    const msvc8::string base = ownerType != nullptr ? ownerType->gpg::RType::GetLexical(ref) : msvc8::string("vector");
+    const fa::string base = ownerType != nullptr ? ownerType->gpg::RType::GetLexical(ref) : fa::string("vector");
     const int size = vec ? static_cast<int>(vec->size()) : 0;
     return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
   }
@@ -419,7 +419,7 @@ namespace
  */
 const char* moho::RBroadcasterRType_EAiTransportEvent::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("Broadcaster<%s>", ResolveEAiTransportEventType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("Broadcaster<%s>", ResolveEAiTransportEventType()->GetName());
   return sName.c_str();
 }
 
@@ -492,7 +492,7 @@ void moho::RBroadcasterRType_EAiTransportEvent::SerSave(
  */
 const char* moho::RListenerRType_EAiTransportEvent::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("Listener<%s>", ResolveEAiTransportEventType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("Listener<%s>", ResolveEAiTransportEventType()->GetName());
   return sName.c_str();
 }
 
@@ -527,11 +527,11 @@ moho::RListenerRType_EAiTransportEvent::RListenerRType_EAiTransportEvent()
  *
  * What it does:
  * Constructs and preregisters reflection metadata for
- * `msvc8::vector<int>`.
+ * `fa::vector<int>`.
  */
 gpg::RVectorType_int::RVectorType_int()
 {
-  gpg::PreRegisterRType(typeid(msvc8::vector<int>), this);
+  gpg::PreRegisterRType(typeid(fa::vector<int>), this);
 }
 
 /**
@@ -549,7 +549,7 @@ gpg::RVectorType_int::~RVectorType_int() = default;
  */
 const char* gpg::RVectorType_int::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveIntType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("vector<%s>", ResolveIntType()->GetName());
   return sName.c_str();
 }
 
@@ -560,7 +560,7 @@ const char* gpg::RVectorType_int::GetName() const
  * Appends `size=<count>` suffix to the base lexical representation for one
  * `vector<int>` payload.
  */
-msvc8::string gpg::RVectorType_int::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_int::GetLexical(const gpg::RRef& ref) const
 {
   return MakeVectorLexical(this, ref, static_cast<const IntVector*>(ref.mObj));
 }
@@ -673,11 +673,11 @@ void gpg::RVectorType_int::SetCount(void* const obj, const int count) const
  *
  * What it does:
  * Constructs and preregisters reflection metadata for
- * `msvc8::vector<SAiReservedTransportBone>`.
+ * `fa::vector<SAiReservedTransportBone>`.
  */
 gpg::RVectorType_SAiReservedTransportBone::RVectorType_SAiReservedTransportBone()
 {
-  gpg::PreRegisterRType(typeid(msvc8::vector<moho::SAiReservedTransportBone>), this);
+  gpg::PreRegisterRType(typeid(fa::vector<moho::SAiReservedTransportBone>), this);
 }
 
 /**
@@ -695,7 +695,7 @@ gpg::RVectorType_SAiReservedTransportBone::~RVectorType_SAiReservedTransportBone
  */
 const char* gpg::RVectorType_SAiReservedTransportBone::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveReservedTransportBoneType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("vector<%s>", ResolveReservedTransportBoneType()->GetName());
   return sName.c_str();
 }
 
@@ -706,7 +706,7 @@ const char* gpg::RVectorType_SAiReservedTransportBone::GetName() const
  * Appends `size=<count>` suffix to the base lexical representation for one
  * `vector<SAiReservedTransportBone>` payload.
  */
-msvc8::string gpg::RVectorType_SAiReservedTransportBone::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_SAiReservedTransportBone::GetLexical(const gpg::RRef& ref) const
 {
   return MakeVectorLexical(this, ref, static_cast<const ReservedTransportBoneVector*>(ref.mObj));
 }
@@ -848,11 +848,11 @@ void gpg::RVectorType_SAiReservedTransportBone::SetCount(void* const obj, const 
  *
  * What it does:
  * Constructs and preregisters reflection metadata for
- * `msvc8::vector<SAttachPoint>`.
+ * `fa::vector<SAttachPoint>`.
  */
 gpg::RVectorType_SAttachPoint::RVectorType_SAttachPoint()
 {
-  gpg::PreRegisterRType(typeid(msvc8::vector<moho::SAttachPoint>), this);
+  gpg::PreRegisterRType(typeid(fa::vector<moho::SAttachPoint>), this);
 }
 
 /**
@@ -869,7 +869,7 @@ gpg::RVectorType_SAttachPoint::~RVectorType_SAttachPoint() = default;
  */
 const char* gpg::RVectorType_SAttachPoint::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveAttachPointType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("vector<%s>", ResolveAttachPointType()->GetName());
   return sName.c_str();
 }
 
@@ -880,7 +880,7 @@ const char* gpg::RVectorType_SAttachPoint::GetName() const
  * Appends `size=<count>` suffix to the base lexical representation for one
  * `vector<SAttachPoint>` payload.
  */
-msvc8::string gpg::RVectorType_SAttachPoint::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_SAttachPoint::GetLexical(const gpg::RRef& ref) const
 {
   return MakeVectorLexical(this, ref, static_cast<const AttachPointVector*>(ref.mObj));
 }
@@ -1066,7 +1066,7 @@ void moho::register_RListenerRType_EAiTransportEvent()
  * Address: 0x00BCEFE0 (FUN_00BCEFE0, register_RVectorType_int)
  *
  * What it does:
- * Constructs/preregisters the `msvc8::vector<int>` reflection type and
+ * Constructs/preregisters the `fa::vector<int>` reflection type and
  * installs process-exit cleanup.
  */
 void moho::register_RVectorType_int()
@@ -1078,7 +1078,7 @@ void moho::register_RVectorType_int()
  * Address: 0x00BCF000 (FUN_00BCF000, register_RVectorType_SAiReservedTransportBone)
  *
  * What it does:
- * Constructs/preregisters the `msvc8::vector<SAiReservedTransportBone>`
+ * Constructs/preregisters the `fa::vector<SAiReservedTransportBone>`
  * reflection type and installs process-exit cleanup.
  */
 void moho::register_RVectorType_SAiReservedTransportBone()
@@ -1090,7 +1090,7 @@ void moho::register_RVectorType_SAiReservedTransportBone()
  * Address: 0x00BCF020 (FUN_00BCF020, register_RVectorType_SAttachPoint)
  *
  * What it does:
- * Constructs/preregisters the `msvc8::vector<SAttachPoint>` reflection type
+ * Constructs/preregisters the `fa::vector<SAttachPoint>` reflection type
  * and installs process-exit cleanup.
  */
 void moho::register_RVectorType_SAttachPoint()

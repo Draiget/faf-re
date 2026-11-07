@@ -275,7 +275,7 @@ namespace moho
      * of NAT-traversal packets.
      */
     [[nodiscard]]
-    msvc8::string ToString() const;
+    fa::string ToString() const;
 
     /**
      * Address: 0x00487A30 (FUN_00487A30)

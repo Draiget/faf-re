@@ -144,7 +144,7 @@ namespace moho
      * Block allocator for entries: 500 at a time, recycled through a free
      * list, and released only when the pool dies. Both lists hold one
      * `Entry*` per node - the `{next, prev, value}` 0x0C node and
-     * `{proxy, head, size}` 0x0C head of `msvc8::list`, which is what IDA
+     * `{proxy, head, size}` 0x0C head of `fa::list`, which is what IDA
      * types the free list (`_List_nod_VisionDB_Entry::_Node`, 0x0081BA00).
      */
     class Pool
@@ -197,9 +197,9 @@ namespace moho
       void FreeEntry(Entry* entry);
 
       /// One node per block allocated; the value is the block's first entry.
-      msvc8::list<Entry*> mEntryBlocks; // +0x04
+      fa::list<Entry*> mEntryBlocks; // +0x04
       /// The entries `NewEntry` hands out next.
-      msvc8::list<Entry*> mFreeEntries; // +0x10
+      fa::list<Entry*> mFreeEntries; // +0x10
     };
     MOHO_VISIONDB_X86_ASSERT(sizeof(Pool) == 0x1C, "VisionDB::Pool size must be 0x1C");
     MOHO_VISIONDB_X86_ASSERT(offsetof(Pool, mEntryBlocks) == 0x04, "VisionDB::Pool::mEntryBlocks offset must be 0x04");

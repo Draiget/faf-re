@@ -450,40 +450,6 @@ namespace moho
       std::uint16_t mDosDate = 0;
     };
 
-    [[nodiscard]] std::string JsonString(const std::string& text)
-    {
-      std::string out = "\"";
-      for (const char c : text) {
-        switch (c) {
-        case '"':
-          out += "\\\"";
-          break;
-        case '\\':
-          out += "\\\\";
-          break;
-        case '\n':
-          out += "\\n";
-          break;
-        case '\r':
-          out += "\\r";
-          break;
-        case '\t':
-          out += "\\t";
-          break;
-        default:
-          if (static_cast<unsigned char>(c) < 0x20u) {
-            char escaped[8];
-            std::snprintf(escaped, sizeof(escaped), "\\u%04x", static_cast<unsigned>(static_cast<unsigned char>(c)));
-            out += escaped;
-          } else {
-            out += c;
-          }
-        }
-      }
-      out += '"';
-      return out;
-    }
-
     [[nodiscard]] std::string Printf(const char* const format, ...)
     {
       va_list args;
@@ -516,7 +482,7 @@ namespace moho
     /// The FAF game id from `/savereplay gpgnet://host:port/<game id>/<player>.SCFAreplay`, or empty.
     [[nodiscard]] std::string FafGameIdFromCommandLine()
     {
-      msvc8::vector<msvc8::string> args;
+      fa::vector<fa::string> args;
       if (!CFG_GetArgOption("/savereplay", 1u, &args) || args.empty()) {
         return {};
       }
@@ -538,7 +504,7 @@ namespace moho
     /// The folder of `/log <file>`, else the working folder.
     [[nodiscard]] std::filesystem::path DumpFolder()
     {
-      msvc8::vector<msvc8::string> args;
+      fa::vector<fa::string> args;
       if (CFG_GetArgOption("/log", 1u, &args) && !args.empty()) {
         std::error_code error;
         const std::filesystem::path folder = std::filesystem::path(args[0].c_str()).parent_path();
@@ -576,7 +542,7 @@ namespace moho
     /// hold a path, and telemetry records carry none).
     [[nodiscard]] std::string ConsoleSwitches(const bool withText = true)
     {
-      msvc8::string names;
+      fa::string names;
       CON_GetCommandList(names, false);
       std::string out;
       const std::string all = names.c_str();
@@ -603,7 +569,7 @@ namespace moho
           value = std::to_string(static_cast<unsigned>(*asByte->mValue));
         } else if (const auto* const asFloat = dynamic_cast<TConVar<float>*>(command)) {
           value = Printf("%.6g", static_cast<double>(*asFloat->mValue));
-        } else if (const auto* const asString = dynamic_cast<TConVar<msvc8::string>*>(command)) {
+        } else if (const auto* const asString = dynamic_cast<TConVar<fa::string>*>(command)) {
           if (!withText) {
             continue;
           }
@@ -639,7 +605,7 @@ namespace moho
     }
 
     /// Recorder thread: one beat's `StateTap` records as sync-log-style text (the lines
-    /// tools/desync-diff compares), each float with its bits. `armies` maps an army index to its
+    /// tools/cmd/desync-diff compares), each float with its bits. `armies` maps an army index to its
     /// `"player" [army]` line.
     [[nodiscard]] std::string DescribeState(const SStateBeat& beat, const std::map<int, std::string>& armies)
     {
@@ -1044,7 +1010,7 @@ namespace moho
       } else if (CFG_GetArgOption("/nodesyncdump", 0u, nullptr)) {
         sim_DesyncDump = 0;
       }
-      msvc8::vector<msvc8::string> args;
+      fa::vector<fa::string> args;
       if (CFG_GetArgOption("/desynctestbeat", 1u, &args) && !args.empty()) {
         sim_DesyncTestNudgeBeat = std::atoi(args[0].c_str());
       }
@@ -1390,9 +1356,9 @@ namespace moho
 
     std::string header = "{\n";
     header += "  \"format\": 1,\n";
-    header += "  \"build\": {\"label\": " + JsonString(gpg::diag::BuildLabel()) + ", \"identity\": "
-      + JsonString(gpg::diag::BuildIdentity()) + ", \"commit\": " + JsonString(gpg::diag::BuildCommit())
-      + ", \"arch\": " + JsonString(gpg::diag::BuildArch()) + ", \"dirty\": "
+    header += "  \"build\": {\"label\": " + TELEMETRY_JsonString(gpg::diag::BuildLabel()) + ", \"identity\": "
+      + TELEMETRY_JsonString(gpg::diag::BuildIdentity()) + ", \"commit\": " + TELEMETRY_JsonString(gpg::diag::BuildCommit())
+      + ", \"arch\": " + TELEMETRY_JsonString(gpg::diag::BuildArch()) + ", \"dirty\": "
       + (gpg::diag::BuildDirty() ? "true" : "false") + "},\n";
     // The game mods are the launch info's serialized Lua table, not text: the header names its MD5.
     gpg::MD5Context modsHash{};
@@ -1401,14 +1367,14 @@ namespace moho
     header += Printf(
       "  \"game\": {\"faf_game_version\": %d, \"sim_fixes\": %u, \"map\": %s, \"game_mods_md5\": \"%s\", "
       "\"replay\": %s, \"faf_game_id\": %s},\n",
-      FAF_GetSessionGameVersion(), static_cast<unsigned>(gFafSessionSimFixes), JsonString(mapName).c_str(),
-      modsHash.Digest().ToString().c_str(), isReplay ? "true" : "false", JsonString(FafGameIdFromCommandLine()).c_str()
+      FAF_GetSessionGameVersion(), static_cast<unsigned>(gFafSessionSimFixes), TELEMETRY_JsonString(mapName).c_str(),
+      modsHash.Digest().ToString().c_str(), isReplay ? "true" : "false", TELEMETRY_JsonString(FafGameIdFromCommandLine()).c_str()
     );
 
     header += "  \"command_sources\": [";
     for (std::size_t i = 0; i < sim.mCommandSources.size(); ++i) {
       header += (i == 0 ? "" : ", ") + Printf("{\"index\": %u, \"name\": ", static_cast<unsigned>(i))
-        + JsonString(sim.mCommandSources[i].mName.c_str()) + "}";
+        + TELEMETRY_JsonString(sim.mCommandSources[i].mName.c_str()) + "}";
     }
     header += "],\n";
     header += "  \"armies\": [";
@@ -1418,8 +1384,8 @@ namespace moho
         continue;
       }
       header += (firstArmy ? "" : ", ") + Printf("{\"index\": %d, \"player\": ", army->mConstDat.mArmyIndex)
-        + JsonString(army->mConstDat.mPlayerName.raw_data_unsafe()) + ", \"army\": "
-        + JsonString(army->mConstDat.mArmyName.raw_data_unsafe()) + "}";
+        + TELEMETRY_JsonString(army->mConstDat.mPlayerName.raw_data_unsafe()) + ", \"army\": "
+        + TELEMETRY_JsonString(army->mConstDat.mArmyName.raw_data_unsafe()) + "}";
       firstArmy = false;
     }
     header += "],\n";
@@ -1435,7 +1401,7 @@ namespace moho
       const SDesyncRecord& desync = impl.mDesyncs[i];
       header += (i == 0 ? "" : ", ")
         + Printf("{\"beat\": %d, \"source\": %d, \"detected_at_beat\": %d, ", desync.mBeat, desync.mSource, desync.mDetectedAtBeat)
-        + "\"ours\": " + JsonString(desync.mOurs) + ", \"reported\": " + JsonString(desync.mReported) + "}";
+        + "\"ours\": " + TELEMETRY_JsonString(desync.mOurs) + ", \"reported\": " + TELEMETRY_JsonString(desync.mReported) + "}";
     }
     header += "]},\n";
 
@@ -1447,12 +1413,12 @@ namespace moho
       SIM_GetChecksumPeriod(sim), SimWorkerCount(), CFG_GetArgOption("/sse2", 0u, nullptr) ? "true" : "false",
       fpuNow.mX87ControlWord, fpuNow.mMxcsr, impl.mStartFpu.mX87ControlWord, impl.mStartFpu.mMxcsr
     );
-    header += JsonString(ConsoleSwitches()) + "},\n";
+    header += TELEMETRY_JsonString(ConsoleSwitches()) + "},\n";
 
-    msvc8::vector<msvc8::string> replayArgs;
+    fa::vector<fa::string> replayArgs;
     const std::string replayPath =
       CFG_GetArgOption("/savereplay", 1u, &replayArgs) && !replayArgs.empty() ? replayArgs[0].c_str() : "";
-    header += "  \"replay\": " + JsonString(replayPath) + "\n";
+    header += "  \"replay\": " + TELEMETRY_JsonString(replayPath) + "\n";
     header += "}\n";
 
     std::string hashes = "beat,source,name,reported,ours,match\n";

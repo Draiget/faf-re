@@ -43,6 +43,9 @@ namespace moho
 {
   /// Engine addition (LuaObject.cpp): whether `f_parser` loads compiled chunks.
   extern bool lua_AllowPrecompiledChunks;
+  /// Engine addition (ScriptChunkCache.cpp): set while this thread loads a chunk the engine compiled
+  /// itself from source and kept in its script cache; such a chunk is neither refused nor logged.
+  extern thread_local bool lua_LoadingCachedChunk;
 } // namespace moho
 
 /// Locals per function (upstream `MAXVARS`). Sets `FuncState::actvar`.

@@ -128,12 +128,12 @@ namespace moho
    * Address: 0x004E6FA0 (FUN_004E6FA0)
    * Address: 0x004E6AE0 (FUN_004E6AE0)
    *
-   * msvc8::vector<moho::STimeBarEventRecord> &,float
+   * fa::vector<moho::STimeBarEventRecord> &,float
    *
    * What it does:
    * Captures active sections plus recent history events into `outEvents`, newest-first.
    */
-  void TIME_CollectTimeBarEvents(msvc8::vector<STimeBarEventRecord>& outEvents, float maxAgeSeconds);
+  void TIME_CollectTimeBarEvents(fa::vector<STimeBarEventRecord>& outEvents, float maxAgeSeconds);
 
   /**
    * Address: 0x004E83A0 (FUN_004E83A0)

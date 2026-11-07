@@ -63,14 +63,7 @@ namespace moho
    */
   void CEffectManagerImplTypeInfo::AddBase_IEffectManager(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = IEffectManager::StaticGetClass();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, IEffectManager::StaticGetClass());
   }
 
   /**

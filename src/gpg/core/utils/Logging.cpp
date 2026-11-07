@@ -45,7 +45,7 @@ public:
     {
         EntryKind kind = EntryKind::Message;
         gpg::LogSeverity severity = gpg::LogSeverity::Info;
-        msvc8::string text{};
+        fa::string text{};
         std::int32_t contextDepth = 0;
     };
 
@@ -64,12 +64,12 @@ public:
 
     /**
      * Address: 0x008E4960 (FUN_008E4960, HistoryLogTarget::~HistoryLogTarget)
-     * Address: 0x008E45E0 (FUN_008E45E0, `msvc8::list<Entry>`'s node teardown
+     * Address: 0x008E45E0 (FUN_008E45E0, `fa::list<Entry>`'s node teardown
      *   walk -- confirmed callsite at 0x008E498B inside this destructor's own
      *   body; emitted by `mEntries`' implicit destructor)
-     * Address: 0x008E42C0 (FUN_008E42C0, `msvc8::list<Entry>`'s node
+     * Address: 0x008E42C0 (FUN_008E42C0, `fa::list<Entry>`'s node
      *   buy/allocate half: operator new(0x30) -- 8-byte next/prev plus
-     *   Entry's 40-byte payload (kind+severity+msvc8::string+contextDepth) --
+     *   Entry's 40-byte payload (kind+severity+fa::string+contextDepth) --
      *   then self-links the fresh node as an empty sentinel. Reached from
      *   this constructor's list init and from every per-message
      *   `mEntries.push_back` in OnMessage.)
@@ -96,7 +96,7 @@ public:
      */
     void Enable(const std::int32_t maxMessages)
     {
-        boost::recursive_mutex::scoped_lock lock(mLock);
+        std::lock_guard<std::recursive_mutex> lock(mLock);
         mMaxMessages = maxMessages;
         TrimLocked();
     }
@@ -110,12 +110,12 @@ public:
      */
     void OnMessage(
         const gpg::LogSeverity level,
-        const msvc8::string& message,
-        const msvc8::vector<msvc8::string>& context,
+        const fa::string& message,
+        const fa::vector<fa::string>& context,
         const int previousDepth
     ) override
     {
-        boost::recursive_mutex::scoped_lock lock(mLock);
+        std::lock_guard<std::recursive_mutex> lock(mLock);
 
         int startDepth = previousDepth;
         if (startDepth < 0) {
@@ -154,9 +154,9 @@ public:
      */
     void ReplayTo(gpg::LogTarget& target)
     {
-        msvc8::list<Entry> snapshot{};
+        fa::list<Entry> snapshot{};
         {
-            boost::recursive_mutex::scoped_lock lock(mLock);
+            std::lock_guard<std::recursive_mutex> lock(mLock);
             if (mEntries.empty()) {
                 return;
             }
@@ -165,7 +165,7 @@ public:
             snapshot = mEntries;
         }
 
-        msvc8::vector<msvc8::string> context{};
+        fa::vector<fa::string> context{};
         int previousDepth = 0;
         for (const Entry& entry : snapshot) {
             const int retainedDepth = entry.contextDepth;
@@ -195,7 +195,7 @@ public:
         }
 
         {
-            boost::recursive_mutex::scoped_lock lock(mLock);
+            std::lock_guard<std::recursive_mutex> lock(mLock);
             if (mReplayDepth > 0) {
                 --mReplayDepth;
             }
@@ -206,7 +206,7 @@ public:
 private:
     /**
      * Address: 0x008E4770 (FUN_008E4770, HistoryLogTarget::TrimLocked)
-     * Address: 0x008E4660 (FUN_008E4660, `msvc8::list<Entry>::erase`'s node
+     * Address: 0x008E4660 (FUN_008E4660, `fa::list<Entry>::erase`'s node
      *   unlink -- confirmed callsite at 0x008E4833 inside this function's own
      *   body; emitted by the `mEntries.erase(...)` calls below)
      *
@@ -270,12 +270,12 @@ private:
         }
     }
 
-    boost::recursive_mutex mLock{};
+    std::recursive_mutex mLock{};
     // A list, as in the binary (node alloc 0x008E42C0, unlink 0x008E4660):
     // once the cap is reached every new message evicts the oldest one, which is
     // an O(1) unlink here. As a vector, each eviction shifted every retained
     // entry - on every log line, since `EnableLogHistory(100)` runs at startup.
-    msvc8::list<Entry> mEntries{};
+    fa::list<Entry> mEntries{};
     std::int32_t mMaxMessages = 0;
     std::int32_t mMessageCount = 0;
     std::int32_t mReplayDepth = 0;
@@ -322,7 +322,7 @@ gpg::ThreadState* EnsureThreadState()
 }
 
 /**
- * Address: 0x00936FF0 (FUN_00936FF0, msvc8::vector<gpg::ThreadCtxEntry*>::
+ * Address: 0x00936FF0 (FUN_00936FF0, fa::vector<gpg::ThreadCtxEntry*>::
  * _Insert_n for the 4-byte pointer element)
  * Address: 0x00936990 (FUN_00936990, the same instantiation's `uninit_move_n`
  * -- `memmove_s`-based, serving both the reallocation head/tail relocate and
@@ -336,7 +336,7 @@ gpg::ThreadState* EnsureThreadState()
  * `EnsureThreadContextCapacity` growth helper that doubled capacity -- which
  * diverged from the binary's real ~1.5x `_Insert_n` growth (confirmed
  * against 0x00936FF0's own decompile: `v10 = (v7 >> 1) + v7`). Reverted to
- * `msvc8::vector<ThreadCtxEntry*>` so growth, relocation, and this instance's
+ * `fa::vector<ThreadCtxEntry*>` so growth, relocation, and this instance's
  * `_Insert_n`/`uninit_move_n` pair are modeled once, in `Vector.h`, instead
  * of a second time here with different (wrong) arithmetic.
  */
@@ -409,7 +409,7 @@ void LogContextPushFormatted(const int level, const char* const fmt, ...)
     va_list va;
     va_start(va, fmt);
     const char* formatCursor = fmt;
-    const msvc8::string message = STR_Va(formatCursor, va);
+    const fa::string message = STR_Va(formatCursor, va);
     va_end(va);
 
     std::call_once(gpg::g_LogOnce, &gpg::InitLogSingleton);
@@ -683,14 +683,14 @@ void LogTarget::Detach()
 
 void LogTarget::OnLog(
     const int level,
-    const msvc8::string& message,
-    std::span<const msvc8::string> context,
+    const fa::string& message,
+    std::span<const fa::string> context,
     int previousDepth
 )
 {
-    msvc8::vector<msvc8::string> contextCopy;
+    fa::vector<fa::string> contextCopy;
     contextCopy.reserve(context.size());
-    for (const msvc8::string& entry : context) {
+    for (const fa::string& entry : context) {
         contextCopy.push_back(entry);
     }
 
@@ -748,8 +748,8 @@ StreamLogTarget::~StreamLogTarget()
  */
 void StreamLogTarget::OnMessage(
     const LogSeverity level,
-    const msvc8::string& message,
-    const msvc8::vector<msvc8::string>& context,
+    const fa::string& message,
+    const fa::vector<fa::string>& context,
     int previousDepth
 )
 {
@@ -897,7 +897,7 @@ PipeBuf::int_type PipeBuf::overflow(const int_type ch)
 
     auto* const fresh = new StreamBuffer{};
     {
-        boost::mutex::scoped_lock lock(mMutex);
+        std::lock_guard<std::mutex> lock(mMutex);
         if (IsSingleBuffer()) {
             mReadLimit = reinterpret_cast<std::uint8_t*>(putEnd);
         }
@@ -944,7 +944,7 @@ std::streamsize PipeBuf::xsputn(const char* const src, const std::streamsize cou
 
         auto* const fresh = new StreamBuffer{};
         {
-            boost::mutex::scoped_lock lock(mMutex);
+            std::lock_guard<std::mutex> lock(mMutex);
             if (IsSingleBuffer()) {
                 mReadLimit = reinterpret_cast<std::uint8_t*>(epptr());
             }
@@ -970,7 +970,7 @@ std::streamsize PipeBuf::xsputn(const char* const src, const std::streamsize cou
  */
 std::streamsize PipeBuf::showmanyc()
 {
-    boost::mutex::scoped_lock lock(mMutex);
+    std::lock_guard<std::mutex> lock(mMutex);
 
     StreamBuffer* const head = HeadBuffer();
     StreamBuffer* const tail = TailBuffer();
@@ -1006,7 +1006,7 @@ PipeBuf::int_type PipeBuf::underflow()
     }
 
     while (true) {
-        boost::mutex::scoped_lock lock(mMutex);
+        std::lock_guard<std::mutex> lock(mMutex);
 
         StreamBuffer* head = HeadBuffer();
         StreamBuffer* tail = TailBuffer();
@@ -1081,7 +1081,7 @@ std::streamsize PipeBuf::xsgetn(char* const dst, const std::streamsize count)
             continue;
         }
 
-        boost::mutex::scoped_lock lock(mMutex);
+        std::lock_guard<std::mutex> lock(mMutex);
         StreamBuffer* head = HeadBuffer();
         StreamBuffer* tail = TailBuffer();
         if (!head || !tail) {
@@ -1130,7 +1130,7 @@ std::streamsize PipeBuf::xsgetn(char* const dst, const std::streamsize count)
  */
 int PipeBuf::sync()
 {
-    boost::mutex::scoped_lock lock(mMutex);
+    std::lock_guard<std::mutex> lock(mMutex);
     mWriteCommit = reinterpret_cast<std::uint8_t*>(pptr());
     if (IsSingleBuffer()) {
         mReadLimit = mWriteCommit;
@@ -1200,7 +1200,7 @@ int DebugOutputStreambuf::sync()
  * emitted depth for this thread lane, then calls every attached target while
  * processing deferred removals safely after callback return.
  */
-void LogContext::Dispatch(const LogSeverity level, const msvc8::string& msg)
+void LogContext::Dispatch(const LogSeverity level, const fa::string& msg)
 {
     if (level >= LogSeverity::Warn && head.next == &head) {
         ::OutputDebugStringA(msg.c_str());
@@ -1210,8 +1210,8 @@ void LogContext::Dispatch(const LogSeverity level, const msvc8::string& msg)
     rw.lock();
 
     ThreadState* const tls = tss.get();
-    msvc8::vector<msvc8::string> snapshot;
-    msvc8::vector<msvc8::string> deferredOnMessageErrors;
+    fa::vector<fa::string> snapshot;
+    fa::vector<fa::string> deferredOnMessageErrors;
     int prevDepth = 0;
 
     if (tls) {
@@ -1247,10 +1247,10 @@ void LogContext::Dispatch(const LogSeverity level, const msvc8::string& msg)
             try {
                 current->obj->OnMessage(level, msg, snapshot, sendPrev);
             } catch (const std::exception& ex) {
-                deferredOnMessageErrors.push_back(msvc8::string(ex.what() ? ex.what() : "<unknown>"));
+                deferredOnMessageErrors.push_back(fa::string(ex.what() ? ex.what() : "<unknown>"));
                 current->pendingRemove = 1;
             } catch (...) {
-                deferredOnMessageErrors.push_back(msvc8::string("<unknown>"));
+                deferredOnMessageErrors.push_back(fa::string("<unknown>"));
                 current->pendingRemove = 1;
             }
         }
@@ -1267,7 +1267,7 @@ void LogContext::Dispatch(const LogSeverity level, const msvc8::string& msg)
 
     rw.unlock();
 
-    for (const msvc8::string& errorText : deferredOnMessageErrors) {
+    for (const fa::string& errorText : deferredOnMessageErrors) {
         LogContextPushFormatted(
             3,
             "LogTarget::OnMessage() puked: %s.\nDeleted target.",
@@ -1276,7 +1276,7 @@ void LogContext::Dispatch(const LogSeverity level, const msvc8::string& msg)
     }
 }
 
-ScopedLogContext::ScopedLogContext(const msvc8::string& text)
+ScopedLogContext::ScopedLogContext(const fa::string& text)
 {
     gpg::ThreadState* const tls = EnsureThreadState();
     if (!tls) {
@@ -1291,7 +1291,7 @@ ScopedLogContext::ScopedLogContext(const msvc8::string& text)
 }
 
 ScopedLogContext::ScopedLogContext(const char* const text)
-    : ScopedLogContext(msvc8::string(text ? text : ""))
+    : ScopedLogContext(fa::string(text ? text : ""))
 {
 }
 
@@ -1343,12 +1343,12 @@ ScopedLogContext::~ScopedLogContext()
 // ---------------------------------------------------------------------------
 int gpg::g_LogScopeDepth = 0;
 int gpg::g_LogScopeDepthScale = 0;
-msvc8::string gpg::g_LogScopePadding{};
+fa::string gpg::g_LogScopePadding{};
 
 namespace {
 
 /// Rebuilds `gpg::g_LogScopePadding` to `width` space characters, using the
-/// owning-copy lane so the embedded SSO limit of `msvc8::string` is not a
+/// owning-copy lane so the embedded SSO limit of `fa::string` is not a
 /// cap. Matches the original binary's `std::string::assign_1(tmp, width, 0x20)
 /// -> std::string::assign(global, tmp, 0, -1)` flow behaviourally, without
 /// the decompiler-shaped raw-byte ctor/dtor dance.
@@ -1377,7 +1377,7 @@ void RefreshLogScopePadding(const unsigned int width)
  * space characters, and returns a pointer to the refreshed global
  * padding string.
  */
-msvc8::string* gpg::IncreaseLogScopeDepth()
+fa::string* gpg::IncreaseLogScopeDepth()
 {
     const unsigned int width =
         static_cast<unsigned int>(++g_LogScopeDepth) *
@@ -1398,7 +1398,7 @@ msvc8::string* gpg::IncreaseLogScopeDepth()
  * refreshes the shared padding string, and returns the global padding
  * pointer.
  */
-msvc8::string* gpg::DecreaseLogScopeDepth()
+fa::string* gpg::DecreaseLogScopeDepth()
 {
     const unsigned int width =
         static_cast<unsigned int>(--g_LogScopeDepth) *
@@ -1421,7 +1421,7 @@ msvc8::string* gpg::DecreaseLogScopeDepth()
  * the severity field, and bumps the global log-scope depth through
  * `IncreaseLogScopeDepth`.
  */
-gpg::LogScopeEntry::LogScopeEntry(const msvc8::string& fmt)
+gpg::LogScopeEntry::LogScopeEntry(const fa::string& fmt)
 {
     body.assign_owned(fmt.view());
     severity = LogSeverity::Debug;
@@ -1451,7 +1451,7 @@ void gpg::LogScopeEntry::Emit()
     (void)DecreaseLogScopeDepth();
 
     const unsigned int widthArg = 0u - field_0x38;
-    const msvc8::string formatted = STR_Printf(body.c_str(), widthArg);
+    const fa::string formatted = STR_Printf(body.c_str(), widthArg);
     LogMessage(severity, formatted);
 
     body.clear();
@@ -1463,7 +1463,7 @@ void gpg::LogScopeEntry::Emit()
  * What it does:
  * Dispatches one preformatted message with explicit severity to registered targets.
  */
-void gpg::LogMessage(const LogSeverity level, const msvc8::string& message)
+void gpg::LogMessage(const LogSeverity level, const fa::string& message)
 {
     std::call_once(g_LogOnce, &InitLogSingleton);
     if (g_LogCtx) {
@@ -1481,7 +1481,7 @@ void gpg::Logf(const char* fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-    const msvc8::string msg = STR_Va(fmt, va);
+    const fa::string msg = STR_Va(fmt, va);
     va_end(va);
 
     std::call_once(g_LogOnce, &InitLogSingleton);
@@ -1500,7 +1500,7 @@ void gpg::Warnf(const char* fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-    const msvc8::string msg = STR_Va(fmt, va);
+    const fa::string msg = STR_Va(fmt, va);
     va_end(va);
 
     std::call_once(g_LogOnce, &InitLogSingleton);
@@ -1519,7 +1519,7 @@ void gpg::Debugf(const char* fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-    const msvc8::string msg = STR_Va(fmt, va);
+    const fa::string msg = STR_Va(fmt, va);
     va_end(va);
 
     std::call_once(g_LogOnce, &InitLogSingleton);
@@ -1567,13 +1567,13 @@ bool gpg::ReplayLogHistory(LogTarget* const target)
  * Builds one newline-delimited UTF-8 text snapshot by replaying retained
  * history entries through a stream log target.
  */
-msvc8::string gpg::GetRecentLogLines()
+fa::string gpg::GetRecentLogLines()
 {
     std::ostringstream stream{};
     StreamLogTarget sink(stream, 0u);
     (void)ReplayLogHistory(&sink);
 
-    msvc8::string result;
+    fa::string result;
     result.assign_owned(stream.str());
     return result;
 }
@@ -1593,7 +1593,7 @@ FILETIME gpg::FileTimeLocal()
  * What it does:
  * Converts microsecond timestamp to local `HH:MM:SS.mmm` text.
  */
-msvc8::string gpg::FileTimeToString(const LONGLONG time)
+fa::string gpg::FileTimeToString(const LONGLONG time)
 {
     FILETIME ft100ns{};
     *reinterpret_cast<ULONGLONG*>(&ft100ns) =

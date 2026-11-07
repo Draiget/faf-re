@@ -179,7 +179,7 @@ namespace moho
      */
     void DrawTerrain(
       boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
-      const msvc8::string* techniqueName
+      const fa::string* techniqueName
     ) override;
 
     /**
@@ -291,7 +291,7 @@ namespace moho
     CD3DIndexSheet* mTerrainIndexSheet = nullptr;                   // +0x18
     GeomCamera3* mCamera = nullptr;                                 // +0x1C
     std::uint32_t mSkirtStartIndex = 0u;                            // +0x20
-    std::uint32_t mUnknown24 = 0u;                                  // +0x24
+    std::uint32_t mTerrainEndVertex = 0u;                           // +0x24
     std::uint32_t mSkirtEndIndex = 0u;                              // +0x28
     std::int32_t mSkirtEndVertex = 0;                               // +0x2C
     std::int32_t mSkirtBaseVertex = 0;                              // +0x30
@@ -325,6 +325,16 @@ namespace moho
     CD3DIndexSheet* mDynamicIndexSheet = nullptr;                   // +0x9CB4
 
   private:
+    /**
+     * Address: 0x00807F50 (FUN_00807F50, low-fidelity indexed draw helper)
+     *
+     * What it does:
+     * Draws the prebuilt terrain batch from `mTerrainIndexSheet` and
+     * `mTerrainVertexSheet`. The terrain's indices end where the skirt's start,
+     * so `mSkirtStartIndex` is also its index count.
+     */
+    void DrawTriangles();
+
     /**
      * Address: 0x008094B0 (FUN_008094B0, sub_8094B0)
      *

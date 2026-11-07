@@ -79,6 +79,20 @@ namespace gpg::gal
         boost::shared_ptr<DepthStencilTarget> depthStencil; // +0x18
     };
 
+    /**
+     * Engine addition: a device's per-head output contexts, `count` of them constructed empty. Null for 0.
+     *
+     * The binary uses `new[]` and `delete[]`. clang-cl (LLVM 22) compiles that `delete[]` into a call to the
+     * deleting destructor in this class's vtable, and the one it puts there destroys one element and frees the
+     * array's own address, skipping the element count `new[]` stored in front of it. Every Direct3D 9 device
+     * reset then freed a pointer the heap never handed out: Windows' heap stops the game, and the small-block
+     * pool hid it until the pool handed that memory out twice (a crash in `CBloomRenderer::Init` after a reset).
+     */
+    [[nodiscard]] OutputContext* NewOutputContexts(std::uint32_t count);
+
+    /** Destroys and frees what `NewOutputContexts(count)` returned, with the same `count`. Null does nothing. */
+    void DeleteOutputContexts(OutputContext* contexts, std::uint32_t count) noexcept;
+
     static_assert(offsetof(OutputContext, cubeTarget) == 0x04, "OutputContext::cubeTarget offset must be 0x04");
     static_assert(offsetof(OutputContext, face) == 0x0C, "OutputContext::face offset must be 0x0C");
     static_assert(offsetof(OutputContext, surface) == 0x10, "OutputContext::surface offset must be 0x10");

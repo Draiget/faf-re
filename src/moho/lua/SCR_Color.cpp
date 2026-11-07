@@ -1,4 +1,6 @@
 #include "moho/lua/SCR_Color.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/CScrLuaInitForm.h"
 
 #include <array>
 #include <cstdio>
@@ -164,32 +166,18 @@ namespace
 
   struct Msvc8StringLess
   {
-    [[nodiscard]] bool operator()(const msvc8::string& lhs, const msvc8::string& rhs) const noexcept
+    [[nodiscard]] bool operator()(const fa::string& lhs, const fa::string& rhs) const noexcept
     {
       return std::strcmp(lhs.c_str(), rhs.c_str()) < 0;
     }
   };
 
-  using ColorNameMap = std::map<msvc8::string, std::uint32_t, Msvc8StringLess>;
+  using ColorNameMap = std::map<fa::string, std::uint32_t, Msvc8StringLess>;
 
   constexpr const char* kUnknownColorFmt = "Unknown color: %s";
   constexpr const char* kInvalidColorTypeText = "Invalid color, must be a string.";
   constexpr const char* kEnumColorNamesHelpText =
     "table EnumColorNames() - returns a table containing strings of all the color names";
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Core");
-    return sSet;
-  }
 
   [[nodiscard]] const ColorNameMap& GetColorNameMap()
   {
@@ -230,7 +218,7 @@ namespace
  */
 bool moho::SCR_ParseColor(const char* const colorText, std::uint32_t* const outColor)
 {
-  const msvc8::string loweredColor = gpg::STR_ToLower(colorText);
+  const fa::string loweredColor = gpg::STR_ToLower(colorText);
   const ColorNameMap& colorMap = GetColorNameMap();
   const auto foundIt = colorMap.find(loweredColor);
   if (foundIt != colorMap.end()) {
@@ -291,11 +279,11 @@ std::uint32_t moho::SCR_DecodeColor(LuaPlus::LuaState* const state, const LuaPlu
  * Decodes one color string into packed ARGB and throws `XDataError` on
  * unknown color names/hex payloads.
  */
-std::uint32_t moho::SCR_DecodeColor(const msvc8::string& colorText)
+std::uint32_t moho::SCR_DecodeColor(const fa::string& colorText)
 {
   std::uint32_t decodedColor = 0;
   if (!SCR_ParseColor(colorText.c_str(), &decodedColor)) {
-    const msvc8::string errorMessage = gpg::STR_Printf(kUnknownColorFmt, colorText.c_str());
+    const fa::string errorMessage = gpg::STR_Printf(kUnknownColorFmt, colorText.c_str());
     throw XDataError(errorMessage.c_str());
   }
 
@@ -336,10 +324,7 @@ int moho::cfunc_EnumColorNames(lua_State* const luaContext)
  */
 int moho::cfunc_EnumColorNamesL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 0) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kEnumColorNamesHelpText, 0, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 0, kEnumColorNamesHelpText);
 
   LuaPlus::LuaObject colorNamesTable;
   colorNamesTable.AssignNewTable(state, 0, 0);
@@ -362,7 +347,7 @@ int moho::cfunc_EnumColorNamesL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_EnumColorNames_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "EnumColorNames",
     &moho::cfunc_EnumColorNames,
     nullptr,

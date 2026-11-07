@@ -29,7 +29,7 @@ namespace moho
   {
     static gpg::RType* sType;
 
-    msvc8::list<SNamedFootprint> mFootprints; // +0x00
+    fa::list<SNamedFootprint> mFootprints; // +0x00
   };
 
   static_assert(

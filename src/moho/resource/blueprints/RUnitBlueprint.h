@@ -103,9 +103,9 @@ namespace moho
      */
     ~RUnitBlueprintDisplay();
 
-    msvc8::string DisplayName;         // +0x00
+    fa::string DisplayName;         // +0x00
     RResId MeshBlueprint;              // +0x1C
-    msvc8::string PlaceholderMeshName; // +0x38
+    fa::string PlaceholderMeshName; // +0x38
     RResId IconName;                   // +0x54
     float UniformScale;                // +0x70
     std::uint8_t SpawnRandomRotation;  // +0x74
@@ -284,8 +284,8 @@ namespace moho
     float FuelUseTime;                                           // +0x8C
     float FuelRechargeRate;                                      // +0x90
     float GroundCollisionOffset;                                 // +0x94
-    msvc8::vector<RUnitBlueprintOccupyRect> OccupyRects;         // +0x98
-    msvc8::vector<RUnitBlueprintRaisedPlatform> RaisedPlatforms; // +0xA8
+    fa::vector<RUnitBlueprintOccupyRect> OccupyRects;         // +0x98
+    fa::vector<RUnitBlueprintRaisedPlatform> RaisedPlatforms; // +0xA8
 
     /**
      * Address: 0x0051F260 (FUN_0051F260)
@@ -456,7 +456,7 @@ namespace moho
    * - 0x00521AB0 (FUN_00521AB0) registers full Defense member set and offsets.
    * - Primitive helper mapping:
    *   - `FUN_0040DFA0` => `float` slots (`TypeDescriptor_00f5c858`)
-   *   - `FUN_0050E1F0` => `msvc8::string` slot (`std::basic_string<>::RTTI_Type_Descriptor`)
+   *   - `FUN_0050E1F0` => `fa::string` slot (`std::basic_string<>::RTTI_Type_Descriptor`)
    *   - `FUN_005255A0` => nested `RUnitBlueprintDefenseShield` at +0x38.
    */
   struct RUnitBlueprintDefense
@@ -468,7 +468,7 @@ namespace moho
     float SurfaceThreatLevel;           // +0x10
     float SubThreatLevel;               // +0x14
     float EconomyThreatLevel;           // +0x18
-    msvc8::string ArmorType;            // +0x1C
+    fa::string ArmorType;            // +0x1C
     RUnitBlueprintDefenseShield Shield; // +0x38
   };
 
@@ -483,7 +483,7 @@ namespace moho
    * - Primitive helper mapping:
    *   - `FUN_0040DFA0` => `float` slots (`TypeDescriptor_00f5c858`)
    *   - `FUN_00510DD0` => `bool` slots (`TypeDescriptor_00f5f7c4`)
-   *   - `FUN_0050E1F0` => `msvc8::string` slots (`std::basic_string<>::RTTI_Type_Descriptor`)
+   *   - `FUN_0050E1F0` => `fa::string` slots (`std::basic_string<>::RTTI_Type_Descriptor`)
    *   - `FUN_00513230` => `std::vector<>` slot (`std::vector<>::RTTI_Type_Descriptor`)
    */
   struct RUnitBlueprintAI
@@ -511,12 +511,12 @@ namespace moho
     float StagingPlatformScanRadius;          // +0x08
     std::uint8_t ShowAssistRangeOnSelect;     // +0x0C
     std::uint8_t pad_000D_0010[0x03];         // +0x0D
-    msvc8::string GuardFormationName;         // +0x10
+    fa::string GuardFormationName;         // +0x10
     std::uint8_t NeedUnpack;                  // +0x2C
     std::uint8_t InitialAutoMode;             // +0x2D
     std::uint8_t pad_002E_0030[0x02];         // +0x2E
-    msvc8::string BeaconName;                 // +0x30
-    msvc8::vector<msvc8::string> TargetBones; // +0x4C
+    fa::string BeaconName;                 // +0x30
+    fa::vector<fa::string> TargetBones; // +0x4C
     float RefuelingMultiplier;                // +0x5C
     float RefuelingRepairAmount;              // +0x60
     float RepairConsumeEnergy;                // +0x64
@@ -562,8 +562,8 @@ namespace moho
 
     RUnitBlueprint* OwnerBlueprint;                 // +0x00
     std::uint32_t WeaponIndex;                      // +0x04
-    msvc8::string Label;                            // +0x08
-    msvc8::string DisplayName;                      // +0x24
+    fa::string Label;                            // +0x08
+    fa::string DisplayName;                      // +0x24
     UnitWeaponRangeCategory RangeCategory;          // +0x40
     std::uint8_t DummyWeapon;                       // +0x44
     std::uint8_t PrefersPrimaryWeaponTarget;        // +0x45
@@ -596,12 +596,12 @@ namespace moho
     float ProjectileLifetimeUsesMultiplier;         // +0x9C
     float Damage;                                   // +0xA0
     float DamageRadius;                             // +0xA4
-    msvc8::string DamageType;                       // +0xA8
+    fa::string DamageType;                       // +0xA8
     float RateOfFire;                               // +0xC4
     RResId ProjectileId;                            // +0xC8
     ERuleBPUnitWeaponBallisticArc BallisticArc;     // +0xE4
-    msvc8::string TargetRestrictOnlyAllow;          // +0xE8
-    msvc8::string TargetRestrictDisallow;           // +0x104
+    fa::string TargetRestrictOnlyAllow;          // +0xE8
+    fa::string TargetRestrictDisallow;           // +0x104
     std::uint8_t ManualFire;                        // +0x120
     std::uint8_t NukeWeapon;                        // +0x121
     std::uint8_t OverChargeWeapon;                  // +0x122
@@ -628,8 +628,8 @@ namespace moho
     std::uint8_t IgnoreIfDisabled;                  // +0x149
     std::uint8_t CannotAttackGround;                // +0x14A
     std::uint8_t pad_014B_014C[0x01];               // +0x14B
-    msvc8::string UIMinRangeVisualId;               // +0x14C
-    msvc8::string UIMaxRangeVisualId;               // +0x168
+    fa::string UIMinRangeVisualId;               // +0x14C
+    fa::string UIMaxRangeVisualId;               // +0x168
 
     /**
      * Address: 0x0051F4C0 (FUN_0051F4C0)
@@ -691,7 +691,7 @@ namespace moho
    */
   struct RUnitBlueprintWeapons
   {
-    msvc8::vector<RUnitBlueprintWeapon> WeaponBlueprints; // +0x00
+    fa::vector<RUnitBlueprintWeapon> WeaponBlueprints; // +0x00
     std::uint32_t UnresolvedFaTailWord;                   // +0x10 (FA-only; semantics unresolved)
   };
 
@@ -736,8 +736,8 @@ namespace moho
     float StorageMass;                                // +0x14
     std::uint8_t NaturalProducer;                     // +0x18
     std::uint8_t pad_0019_001C[0x03];                 // +0x19
-    msvc8::vector<msvc8::string> BuildableCategories; // +0x1C
-    msvc8::vector<msvc8::string> RebuildBonusIds;     // +0x2C
+    fa::vector<fa::string> BuildableCategories; // +0x1C
+    fa::vector<fa::string> RebuildBonusIds;     // +0x2C
     std::uint32_t UnresolvedWord3C;                   // +0x3C
     EntityCategorySet CategoryCache; // +0x40 (resolved BuildableCategories)
     float InitialRallyX;                              // +0x68
@@ -843,7 +843,7 @@ namespace moho
      * Runs base entity-blueprint initialization, computes derived unit physics,
      * applies air/display defaults, and post-initializes weapon records.
      */
-    void OnInitBlueprint();
+    void OnInitBlueprint() override;
 
     /**
      * Address: 0x00529E90 (FUN_00529E90, Moho::RUnitBlueprint::AddEconomyRestrictions)
@@ -879,7 +879,7 @@ namespace moho
      * Returns the reflected runtime type descriptor for this
      * `RUnitBlueprint` instance.
      */
-    [[nodiscard]] gpg::RType* GetClass() const;
+    [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x0051E440 (FUN_0051E440, ?GetDerivedObjectRef@RUnitBlueprint@Moho@@UAE?AVRRef@gpg@@XZ)
@@ -887,7 +887,7 @@ namespace moho
      * What it does:
      * Packs `{this, GetClass()}` as a reflected object reference handle.
      */
-    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x0051E460 (FUN_0051E460)

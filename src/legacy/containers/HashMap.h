@@ -13,7 +13,7 @@
  * pinned by binary evidence rather than by the modern `std::unordered_map`
  * design:
  *
- *   - Elements live in a single sorted `msvc8::list`, not in per-bucket chains.
+ *   - Elements live in a single sorted `fa::list`, not in per-bucket chains.
  *     A bucket is a *window* `[mVec[b], mVec[b + 1])` into that one list, so
  *     adjacent buckets share boundary iterators and an empty bucket is simply a
  *     window whose two boundaries are equal.
@@ -51,7 +51,7 @@
 
 #include "legacy/containers/Vector.h"
 
-namespace msvc8
+namespace fa
 {
     /**
      * Address: 0x00769560 (inlined into every `_Buckno` call site; also
@@ -426,7 +426,7 @@ namespace msvc8
          * 16 embedded `gpg::HaStar::Cluster` handles -- is torn down through
          * the compiler's `` `eh vector destructor iterator' `` before
          * `operator delete`, which is `mList.erase(where)`'s own key
-         * destruction for this non-trivial `value_type` (the `msvc8::list<T>`
+         * destruction for this non-trivial `value_type` (the `fa::list<T>`
          * instantiation that call lands in is `Vector.h`'s `list<T>`; not
          * modeled from this header).
          */
@@ -523,7 +523,7 @@ namespace msvc8
          * `OccupationCacheMap` instantiation
          * (`gpg::HaStar::ClusterInternalCache<gpg::HaStar::OccupationData>`,
          * `gpg/core/algorithms/Cluster.cpp`) -- see
-         * `msvc8::vector<T>::assign(count, value)`'s `Address:` block
+         * `fa::vector<T>::assign(count, value)`'s `Address:` block
          * (`legacy/containers/Vector.h`) for the full evidence trail.
          *
          * What it does:
@@ -705,5 +705,5 @@ namespace msvc8
     {
     };
 
-    static_assert(sizeof(hash_set<unsigned int>) == 0x28, "msvc8::hash_set size must be 0x28");
-} // namespace msvc8
+    static_assert(sizeof(hash_set<unsigned int>) == 0x28, "fa::hash_set size must be 0x28");
+} // namespace fa

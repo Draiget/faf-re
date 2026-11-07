@@ -38,28 +38,6 @@ namespace
     return valueStorage != nullptr && (*reinterpret_cast<const std::uint8_t*>(valueStorage) != 0u);
   }
 
-  template <class T>
-  [[nodiscard]] gpg::RType* ResolveCachedType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(T));
-    }
-    return sType;
-  }
-
-  void DeserializeCUnitUpgradeTaskSerializerCallback(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
-  {
-    auto* const task = reinterpret_cast<moho::CUnitUpgradeTask*>(objectPtr);
-    task->MemberDeserialize(archive);
-  }
-
-  void SerializeCUnitUpgradeTaskSerializerCallback(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
-  {
-    const auto* const task = reinterpret_cast<const moho::CUnitUpgradeTask*>(objectPtr);
-    task->MemberSerialize(archive);
-  }
-
 } // namespace
 
 namespace moho
@@ -78,7 +56,7 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    if (gpg::RType* const commandTaskType = ResolveCachedType<CCommandTask>()) {
+    if (gpg::RType* const commandTaskType = gpg::RTypeOf<CCommandTask>()) {
       archive->Read(commandTaskType, this, ownerRef);
     }
 
@@ -87,12 +65,12 @@ namespace moho
     archive->ReadPointer(&toBlueprint, &blueprintRef);
     mToBlueprint = toBlueprint;
 
-    if (gpg::RType* const buildHelperType = ResolveCachedType<CBuildTaskHelper>()) {
+    if (gpg::RType* const buildHelperType = gpg::RTypeOf<CBuildTaskHelper>()) {
       const gpg::RRef buildHelperRef{};
       archive->Read(buildHelperType, &mBuildHelper, buildHelperRef);
     }
 
-    if (gpg::RType* const weakUnitType = ResolveCachedType<WeakPtr<Unit>>()) {
+    if (gpg::RType* const weakUnitType = gpg::RTypeOf<WeakPtr<Unit>>()) {
       const gpg::RRef upgradedUnitRef{};
       archive->Read(weakUnitType, &mUpgradedUnit, upgradedUnitRef);
     }
@@ -113,17 +91,17 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    if (gpg::RType* const commandTaskType = ResolveCachedType<CCommandTask>()) {
+    if (gpg::RType* const commandTaskType = gpg::RTypeOf<CCommandTask>()) {
       archive->Write(commandTaskType, this, ownerRef);
     }
 
     archive->WritePointer<moho::RUnitBlueprint>(const_cast<RUnitBlueprint*>(mToBlueprint), gpg::TrackedPointerState::Unowned, ownerRef);
 
-    if (gpg::RType* const buildHelperType = ResolveCachedType<CBuildTaskHelper>()) {
+    if (gpg::RType* const buildHelperType = gpg::RTypeOf<CBuildTaskHelper>()) {
       archive->Write(buildHelperType, &mBuildHelper, ownerRef);
     }
 
-    if (gpg::RType* const weakUnitType = ResolveCachedType<WeakPtr<Unit>>()) {
+    if (gpg::RType* const weakUnitType = gpg::RTypeOf<WeakPtr<Unit>>()) {
       archive->Write(weakUnitType, &mUpgradedUnit, ownerRef);
     }
   }

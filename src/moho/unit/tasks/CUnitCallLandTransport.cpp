@@ -28,7 +28,7 @@ namespace
   constexpr std::uint64_t kUnitStateMaskCallLandTransportPending = 0x0000000000000100ull;
   constexpr std::uint64_t kUnitStateMaskWaitingForTransport = 0x0000000000000080ull;
   constexpr std::uint64_t kUnitStateMaskTeleporting = 0x0000000000080000ull;
-  constexpr float kPi = 3.1415927f;
+  [[maybe_unused]] constexpr float kPi = 3.1415927f;
   constexpr std::int16_t kInvalidCellPosComponent = static_cast<std::int16_t>(0x8000);
 
   [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
@@ -41,73 +41,7 @@ namespace
     return cellPos.x != kInvalidCellPosComponent && cellPos.z != kInvalidCellPosComponent;
   }
 
-  [[nodiscard]] gpg::RType* CachedCUnitCallLandTransportType()
-  {
-    gpg::RType* type = moho::CUnitCallLandTransport::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitCallLandTransport));
-      moho::CUnitCallLandTransport::sType = type;
-    }
-    return type;
-  }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVTransformType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::VTransform));
-    }
-    return cached;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 } // namespace
 
 namespace moho
@@ -254,7 +188,7 @@ namespace moho
 
       case TASKSTATE_Processing: {
         if (mBeamupTime > 1.0f) {
-          const float blend = (msvc8::cos(mBeamupTime * kPi * 0.1f) * 0.5f) + 0.5f;
+          const float blend = (fa::cos(mBeamupTime * kPi * 0.1f) * 0.5f) + 0.5f;
           mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
           if (const RUnitBlueprint* const blueprint = mUnit->GetBlueprint(); blueprint != nullptr) {
             mDestinationTransform.pos_.y -= blueprint->mSizeY;
@@ -351,12 +285,12 @@ namespace moho
     }
 
     gpg::RRef nullOwner{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), nullOwner);
-    archive->Read(CachedWeakPtrUnitType(), &mTargetTransportUnit, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), nullOwner);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTargetTransportUnit, nullOwner);
     archive->ReadBool(&mHasBeamupDestination);
     archive->ReadFloat(&mBeamupTime);
-    archive->Read(CachedVTransformType(), &mSourceTransform, nullOwner);
-    archive->Read(CachedVTransformType(), &mDestinationTransform, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::VTransform>(), &mSourceTransform, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::VTransform>(), &mDestinationTransform, nullOwner);
     archive->ReadBool(&mIsOccupying);
   }
 
@@ -374,12 +308,12 @@ namespace moho
     }
 
     gpg::RRef nullOwner{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), nullOwner);
-    archive->Write(CachedWeakPtrUnitType(), &mTargetTransportUnit, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), nullOwner);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTargetTransportUnit, nullOwner);
     archive->WriteBool(mHasBeamupDestination);
     archive->WriteFloat(mBeamupTime);
-    archive->Write(CachedVTransformType(), &mSourceTransform, nullOwner);
-    archive->Write(CachedVTransformType(), &mDestinationTransform, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::VTransform>(), &mSourceTransform, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::VTransform>(), &mDestinationTransform, nullOwner);
     archive->WriteBool(mIsOccupying);
   }
 
@@ -396,12 +330,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitCallLandTransport(gpg::RRef* const outRef, moho::CUnitCallLandTransport* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = MakeDerivedRef(value, CachedCUnitCallLandTransportType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

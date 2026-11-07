@@ -77,13 +77,7 @@ namespace moho
     }
 
     GPG_ASSERT(taskType != nullptr);
-    gpg::RField baseField{};
-    baseField.mName = taskType->GetName();
-    baseField.mType = taskType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, taskType);
   }
 
   /**
@@ -100,10 +94,7 @@ namespace moho
    */
   gpg::RRef CFireWeaponTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CFireWeaponTask*>(objectStorage);
-    if (task) {
-      new (task) CFireWeaponTask();
-    }
+    auto* const task = gpg::ConstructInStorage<CFireWeaponTask>(objectStorage);
     return gpg::RRef{task, gpg::LookupRType(typeid(CFireWeaponTask))};
   }
 

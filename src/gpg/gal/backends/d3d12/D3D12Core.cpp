@@ -284,6 +284,175 @@ namespace gpg::gal::d3d12
   }
 
   // ---------------------------------------------------------------------------
+  // SharedBufferAllocator
+
+  namespace
+  {
+    constexpr std::uint64_t kSharedBufferSize = 16ULL << 20U;
+    constexpr std::uint64_t kLargestShared = 1ULL << 20U; // larger ones have a resource of their own
+    constexpr std::uint64_t kSharedAlignment = 16U;
+  } // namespace
+
+  struct SharedBufferAllocator::State
+  {
+    struct Block
+    {
+      TrackedResource buffer;
+      std::map<std::uint64_t, std::uint64_t> free; // offset -> size, adjacent ranges merged
+      std::uint64_t used = 0;
+    };
+
+    std::mutex mutex;
+    PlacedHeapAllocator* placed = nullptr;
+    std::vector<std::unique_ptr<Block>> blocks;
+
+    void Give(Block* block, std::uint64_t offset, std::uint64_t size);
+  };
+
+  void SharedBufferAllocator::State::Give(Block* const block, const std::uint64_t offset, const std::uint64_t size)
+  {
+    std::uint64_t start = offset;
+    std::uint64_t length = size;
+    auto next = block->free.lower_bound(offset);
+    if (next != block->free.begin()) {
+      const auto previous = std::prev(next);
+      if (previous->first + previous->second == start) {
+        start = previous->first;
+        length += previous->second;
+        block->free.erase(previous);
+      }
+    }
+    if (next != block->free.end() && next->first == offset + size) {
+      length += next->second;
+      block->free.erase(next);
+    }
+    block->free.emplace(start, length);
+    block->used -= size;
+
+    // An empty block goes when another empty one is kept for the next buffers.
+    if (block->used == 0U) {
+      const auto empty = std::count_if(blocks.begin(), blocks.end(), [](const std::unique_ptr<Block>& b) { return b->used == 0U; });
+      if (empty > 1) {
+        blocks.erase(std::find_if(blocks.begin(), blocks.end(), [block](const std::unique_ptr<Block>& b) { return b.get() == block; }));
+      }
+    }
+  }
+
+  /** Gives a shared buffer's range back when the last draw that may read it has finished. */
+  class SharedBufferAllocator::RangeOwner final : public IUnknown
+  {
+  public:
+    RangeOwner(std::shared_ptr<State> state, State::Block* const block, const std::uint64_t offset, const std::uint64_t size)
+      : mState(std::move(state))
+      , mBlock(block)
+      , mOffset(offset)
+      , mSize(size)
+    {
+    }
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** const object) override
+    {
+      if (object == nullptr) {
+        return E_POINTER;
+      }
+      if (riid == __uuidof(IUnknown)) {
+        AddRef();
+        *object = static_cast<IUnknown*>(this);
+        return S_OK;
+      }
+      *object = nullptr;
+      return E_NOINTERFACE;
+    }
+
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++mReferences; }
+
+    ULONG STDMETHODCALLTYPE Release() override
+    {
+      const ULONG left = --mReferences;
+      if (left == 0U) {
+        {
+          const std::lock_guard<std::mutex> lock(mState->mutex);
+          mState->Give(mBlock, mOffset, mSize);
+        }
+        delete this;
+      }
+      return left;
+    }
+
+  private:
+    std::shared_ptr<State> mState;
+    State::Block* mBlock;
+    std::uint64_t mOffset;
+    std::uint64_t mSize;
+    std::atomic<ULONG> mReferences{1U};
+  };
+
+  SharedBufferAllocator::SharedBufferAllocator() = default;
+  SharedBufferAllocator::~SharedBufferAllocator() = default;
+
+  void SharedBufferAllocator::Initialize(PlacedHeapAllocator* const placed)
+  {
+    mState = std::make_shared<State>();
+    mState->placed = placed;
+  }
+
+  void SharedBufferAllocator::Release() noexcept
+  {
+    mState.reset();
+  }
+
+  bool SharedBufferAllocator::Take(
+    const std::uint64_t size, TrackedResource*& outResource, std::uint64_t& outOffset, ComPtr<IUnknown>& outOwner
+  )
+  {
+    if (mState == nullptr || size > kLargestShared) {
+      return false;
+    }
+    const std::uint64_t rounded = AlignUp(size, kSharedAlignment);
+    const std::lock_guard<std::mutex> lock(mState->mutex);
+    State::Block* block = nullptr;
+    std::uint64_t offset = 0U;
+    for (const std::unique_ptr<State::Block>& candidate : mState->blocks) {
+      const auto range = std::find_if(candidate->free.begin(), candidate->free.end(), [rounded](const auto& entry) {
+        return entry.second >= rounded;
+      });
+      if (range != candidate->free.end()) {
+        block = candidate.get();
+        offset = range->first;
+        const std::uint64_t left = range->second - rounded;
+        block->free.erase(range);
+        if (left != 0U) {
+          block->free.emplace(offset + rounded, left);
+        }
+        break;
+      }
+    }
+    if (block == nullptr) {
+      D3D12_RESOURCE_DESC desc{};
+      desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+      desc.Width = kSharedBufferSize;
+      desc.Height = 1U;
+      desc.DepthOrArraySize = 1U;
+      desc.MipLevels = 1U;
+      desc.SampleDesc.Count = 1U;
+      desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+      auto created = std::make_unique<State::Block>();
+      if (!mState->placed->Create(desc, D3D12_RESOURCE_STATE_COMMON, created->buffer.resource)) {
+        return false;
+      }
+      static_cast<void>(created->buffer.resource->SetName(L"shared static buffers"));
+      created->free.emplace(rounded, kSharedBufferSize - rounded);
+      block = created.get();
+      mState->blocks.push_back(std::move(created));
+    }
+    block->used += rounded;
+    outResource = &block->buffer;
+    outOffset = offset;
+    outOwner.Attach(new RangeOwner(mState, block, offset, rounded));
+    return true;
+  }
+
+  // ---------------------------------------------------------------------------
   // PlacedHeapAllocator
 
   namespace
@@ -330,12 +499,19 @@ namespace gpg::gal::d3d12
         if (offset + size > start + length) {
           continue;
         }
-        heap->free.erase(range);
+        // Keep the original range until the only possibly allocating step succeeds.
         if (offset > start) {
-          heap->free.emplace(start, offset - start);
-        }
-        if (offset + size < start + length) {
-          heap->free.emplace(offset + size, start + length - offset - size);
+          if (offset + size < start + length) {
+            heap->free.emplace(offset + size, start + length - offset - size);
+          }
+          range->second = offset - start;
+        } else if (offset + size < start + length) {
+          auto remainder = heap->free.extract(range);
+          remainder.key() = offset + size;
+          remainder.mapped() = start + length - offset - size;
+          heap->free.insert(std::move(remainder));
+        } else {
+          heap->free.erase(range);
         }
         heap->used += size;
         outOffset = offset;
@@ -362,9 +538,9 @@ namespace gpg::gal::d3d12
     static_cast<void>(heap->heap->SetName(name.c_str()));
     heap->free.emplace(size, kPlacedHeapSize - size);
     heap->used = size;
+    heaps.push_back(std::move(heap));
     heapBytes += kPlacedHeapSize;
     outOffset = 0U;
-    heaps.push_back(std::move(heap));
     return heaps.back().get();
   }
 
@@ -529,5 +705,5 @@ namespace gpg::gal::d3d12
 namespace gpg::gal
 {
   bool gPlacedResources = true;
-  int gUploadIdleMB = 32;
+  bool gSharedBuffers = true;
 } // namespace gpg::gal

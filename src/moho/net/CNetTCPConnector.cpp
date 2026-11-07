@@ -8,6 +8,7 @@
 #include "CNetTCPConnection.h"
 #include "Common.h"
 #include "ELobbyMsg.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/misc/WeakPtr.h"
 
@@ -152,7 +153,7 @@ namespace moho
 CNetTCPConnector::~CNetTCPConnector()
 {
   while (!mConnections.empty()) {
-    delete mConnections.front();
+    GPG_NONVIRTUAL_DESTROY(delete mConnections.front());
   }
 
   if (mSocket != INVALID_SOCKET) {

@@ -4,8 +4,10 @@
 
 #include "CClientManagerImpl.h"
 #include "Common.h"
+#include "CRejoinFeed.h"
 #include "EClientMsg.h"
 #include "ECmdStreamOp.h"
+#include "ELobbyMsg.h"
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/Logging.h"
 #include "INetConnection.h"
@@ -81,6 +83,11 @@ void CNetClient::Process(
     return;
   }
 
+  // Engine addition (issue #275): the backlog this client is about to get holds this.
+  if (msg.GetType().raw() < static_cast<uint8_t>(EClientMsg::CLIMSG_Ack) && REJOIN_BacklogPending(*this)) {
+    return;
+  }
+
   const auto bytes = static_cast<int>(msg.mBuff.Size());
   const auto elapsedUs = gpg::time::CyclesToMicroseconds(mManager->mTimer3.ElapsedCycles());
   mManager->mStampBuffer.Push(0, elapsedUs, bytes);
@@ -115,6 +122,10 @@ void CNetClient::Process(
 void CNetClient::Open()
 {
   if (mConnection != nullptr) {
+    // Engine addition (issue #275): set only when `CClientBase::Eject` is what closes the link.
+    if (mEjectPending) {
+      REJOIN_NoteSeatEjected(*mManager, *this);
+    }
     mConnection->ScheduleDestroy();
     mConnection = nullptr;
   }
@@ -160,11 +171,52 @@ void CNetClient::ReceiveMessage(
     return;
   }
 
+  // Engine addition (issue #275): while catching up, what this peer says waits
+  // its turn behind the recorded stream.
+  if (mManager->mRejoinFeed != nullptr && mManager->mRejoinFeed->TakeIncoming(*this, *message)) {
+    return;
+  }
+
   // Engine addition (issue #285).
   if (message->GetType().raw() == static_cast<uint8_t>(EClientMsg::CLIMSG_PeerFeatures)) {
     mManager->mPeerFeatures->Receive(*mManager, *this, *message);
     return;
   }
 
+  // Engine addition (issue #275): when every client can rejoin, the seat stays
+  // held. A restart of the peer replaces this link, and the Connectivity dialog
+  // can still eject it. With a retail client in the game, nothing changes.
+  if (mManager->mPeerFeatures->EveryoneSupports(*mManager, EPeerFeature::Rejoin)) {
+    // A player who quits says goodbye, and that link ends cleanly (`LOBMSG_ConnLostEof`): they
+    // left, as in any game. Only a link that was lost keeps the seat for them.
+    if (message->GetType().raw() == static_cast<std::uint8_t>(ELobbyMsg::LOBMSG_ConnLostErrored)) {
+      mManager->mPeerFeatures->NoteRejoinLost(mIndex);
+      gpg::Logf("REJOIN: link to client %d:%s lost, seat held", mIndex, mNickname.c_str());
+      return;
+    }
+  }
+
   CClientBase::Process(*message);
+}
+
+/**
+ * Engine addition, not in the binary: see the declaration.
+ */
+void CNetClient::ReplaceConnection(INetConnection* const connection)
+{
+  std::scoped_lock lock(mManager->mLock);
+
+  if (mConnection != nullptr) {
+    auto* const previous = static_cast<CMessageDispatcher*>(mConnection);
+    previous->RemoveReceiver(MSGTYPE_SimBase, MSGTYPE_SimEnd, this);
+    previous->RemoveReceiver(MSGTYPE_ClientBase, MSGTYPE_ClientEnd, this);
+    previous->RemoveReceiver(MSGTYPE_LobbyBase, MSGTYPE_LobbyEnd, this);
+    mConnection->ScheduleDestroy();
+  }
+
+  mConnection = connection;
+  auto* const dispatcher = static_cast<CMessageDispatcher*>(mConnection);
+  dispatcher->PushReceiver(MSGTYPE_SimBase, MSGTYPE_SimEnd, this);
+  dispatcher->PushReceiver(MSGTYPE_ClientBase, MSGTYPE_ClientEnd, this);
+  dispatcher->PushReceiver(MSGTYPE_LobbyBase, MSGTYPE_LobbyEnd, this);
 }

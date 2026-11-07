@@ -294,7 +294,7 @@ void CWaterShaderProperties::Load(const unsigned int version, gpg::BinaryReader&
  * Resets the vtable pointer, calls releaseTextures() to atomically drop all
  * six texture sheet reference counts, then runs the eh_vector_destructor
  * on mTextures[0..3] (no-op after releaseTextures zeroes all pi_ fields),
- * and finally destroys the six msvc8::string members via eh_vector_destructor
+ * and finally destroys the six fa::string members via eh_vector_destructor
  * and explicit SSO/heap teardown.
  *
  * In the binary, mTextures[4] and mTextures[5] are released manually before

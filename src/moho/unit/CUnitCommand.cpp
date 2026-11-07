@@ -58,15 +58,6 @@ startup_CScrLuaMetatableFactory_CUnitCommand_Index()
 
 namespace
 {
-  gpg::RType* gUnitBlueprintType = nullptr;
-
-  [[nodiscard]] gpg::RType* CachedRUnitBlueprintType()
-  {
-    if (gUnitBlueprintType == nullptr) {
-      gUnitBlueprintType = gpg::LookupRType(typeid(RUnitBlueprint));
-    }
-    return gUnitBlueprintType;
-  }
 
   /**
    * Reflection-mediated downcast of a blueprint reference to `RUnitBlueprint`,
@@ -79,7 +70,7 @@ namespace
     gpg::RRef blueprintRef{};
     blueprintRef = gpg::MakeRRef<moho::REntityBlueprint>(blueprint);
 
-    const gpg::RRef unitRef = gpg::REF_UpcastPtr(blueprintRef, CachedRUnitBlueprintType());
+    const gpg::RRef unitRef = gpg::REF_UpcastPtr(blueprintRef, gpg::RTypeOf<RUnitBlueprint>());
     return static_cast<const RUnitBlueprint*>(unitRef.mObj);
   }
 
@@ -144,7 +135,7 @@ namespace
 
     EntityCategorySet reachable = BuildableAfterBecoming(*blueprint, armyBuildable, restrictions);
 
-    msvc8::vector<CUnitCommand*> unreachableCommands{};
+    fa::vector<CUnitCommand*> unreachableCommands{};
 
     for (const WeakPtr<CUnitCommand>& slot : queue.mCommandVec) {
       CUnitCommand* const command = slot.GetObjectPtr();
@@ -198,16 +189,6 @@ namespace
 
   constexpr std::uint32_t kNoTargetEntityId = 0xF0000000u;
 
-  template <class TObject>
-  [[nodiscard]] gpg::RType* ResolveCachedType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(TObject));
-    }
-    return sType;
-  }
-
   [[nodiscard]] gpg::RType* ResolveBroadcasterCommandEventType()
   {
     static gpg::RType* sType = nullptr;
@@ -220,26 +201,11 @@ namespace
     return sType;
   }
 
-  /**
-   * Address: 0x006EBFA0 (FUN_006EBFA0)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `Broadcaster<ECommandEvent>` lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyBroadcasterCommandEventType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Broadcaster<ECommandEvent>));
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RType* ResolveWeakPtrCUnitCommandVectorType()
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
-      sType = gpg::LookupRType(typeid(msvc8::vector<WeakPtr<CUnitCommand>>));
+      sType = gpg::LookupRType(typeid(fa::vector<WeakPtr<CUnitCommand>>));
       if (!sType) {
         sType = register_WeakPtr_CUnitCommand_VectorType_00();
       }
@@ -256,26 +222,6 @@ namespace
         sType = register_WeakPtr_Unit_Type_00();
       }
       WeakPtr<Unit>::sType = sType;
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveLuaObjectType()
-  {
-    gpg::RType* sType = LuaPlus::LuaObject::sType;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(LuaPlus::LuaObject));
-      LuaPlus::LuaObject::sType = sType;
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEntityUnitSetType()
-  {
-    gpg::RType* sType = EntitySetTemplate<Unit>::sType;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(EntitySetTemplate<Unit>));
-      EntitySetTemplate<Unit>::sType = sType;
     }
     return sType;
   }
@@ -321,7 +267,7 @@ namespace
    * Loads one reflected `SSTICommandConstantData` payload through cached RTTI
    * lookup and returns the archive pointer for chaining.
    */
-  gpg::ReadArchive* ReadSSTICommandConstantDataArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::ReadArchive* ReadSSTICommandConstantDataArchiveAndReturnArchive(
     gpg::ReadArchive* const archive,
     void* const objectPtr,
     gpg::RRef* const ownerRef
@@ -329,7 +275,7 @@ namespace
   {
     if (archive != nullptr) {
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = ResolveCachedType<SSTICommandConstantData>()) {
+      if (gpg::RType* const type = gpg::RTypeOf<SSTICommandConstantData>()) {
         archive->Read(type, objectPtr, owner);
       }
     }
@@ -344,7 +290,7 @@ namespace
    * Loads one reflected `SSTICommandVariableData` payload through cached RTTI
    * lookup and returns the archive pointer for chaining.
    */
-  gpg::ReadArchive* ReadSSTICommandVariableDataArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::ReadArchive* ReadSSTICommandVariableDataArchiveAndReturnArchive(
     gpg::ReadArchive* const archive,
     void* const objectPtr,
     gpg::RRef* const ownerRef
@@ -352,7 +298,7 @@ namespace
   {
     if (archive != nullptr) {
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = ResolveCachedType<SSTICommandVariableData>()) {
+      if (gpg::RType* const type = gpg::RTypeOf<SSTICommandVariableData>()) {
         archive->Read(type, objectPtr, owner);
       }
     }
@@ -367,7 +313,7 @@ namespace
    * Loads one reflected `CountedPtr<IFormationInstance>` payload through
    * cached RTTI lookup and returns the archive pointer for chaining.
    */
-  gpg::ReadArchive* ReadCountedPtrIFormationInstanceArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::ReadArchive* ReadCountedPtrIFormationInstanceArchiveAndReturnArchive(
     gpg::ReadArchive* const archive,
     void* const objectPtr,
     gpg::RRef* const ownerRef
@@ -390,7 +336,7 @@ namespace
    * Saves one reflected `Broadcaster<ECommandEvent>` payload through cached
    * RTTI lookup and returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteBroadcasterCommandEventArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteBroadcasterCommandEventArchiveAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
@@ -413,7 +359,7 @@ namespace
    * Saves one reflected `SSTICommandConstantData` payload through cached RTTI
    * lookup and returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteSSTICommandConstantDataArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteSSTICommandConstantDataArchiveAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
@@ -421,7 +367,7 @@ namespace
   {
     if (archive != nullptr) {
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = ResolveCachedType<SSTICommandConstantData>()) {
+      if (gpg::RType* const type = gpg::RTypeOf<SSTICommandConstantData>()) {
         archive->Write(type, objectPtr, owner);
       }
     }
@@ -436,7 +382,7 @@ namespace
    * Saves one reflected `SSTICommandVariableData` payload through cached RTTI
    * lookup and returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteSSTICommandVariableDataArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteSSTICommandVariableDataArchiveAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
@@ -444,7 +390,7 @@ namespace
   {
     if (archive != nullptr) {
       const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = ResolveCachedType<SSTICommandVariableData>()) {
+      if (gpg::RType* const type = gpg::RTypeOf<SSTICommandVariableData>()) {
         archive->Write(type, objectPtr, owner);
       }
     }
@@ -459,7 +405,7 @@ namespace
    * Saves one reflected `CountedPtr<IFormationInstance>` payload through
    * cached RTTI lookup and returns the archive pointer for chaining.
    */
-  gpg::WriteArchive* WriteCountedPtrIFormationInstanceArchiveAndReturnArchive(
+  [[maybe_unused]] gpg::WriteArchive* WriteCountedPtrIFormationInstanceArchiveAndReturnArchive(
     gpg::WriteArchive* const archive,
     void* const objectPtr,
     const gpg::RRef* const ownerRef
@@ -482,7 +428,7 @@ namespace
    * Read-callback bridge that loads one reflected `Broadcaster<ECommandEvent>`
    * payload through cached RTTI lookup.
    */
-  void ReadBroadcasterCommandEventArchiveCallback(
+  [[maybe_unused]] void ReadBroadcasterCommandEventArchiveCallback(
     gpg::ReadArchive* const archive,
     void* const objectPtr,
     gpg::RRef* const ownerRef
@@ -491,35 +437,6 @@ namespace
     (void)ReadBroadcasterCommandEventArchiveAndReturnArchive(archive, objectPtr, ownerRef);
   }
 
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<std::uint8_t*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 
   // The serializer works on the `Broadcaster` secondary base. That slice sits at
   // +0x34 in the binary layout, which is exactly where the compiler puts it:
@@ -531,7 +448,7 @@ namespace
     return static_cast<Broadcaster<ECommandEvent>*>(command);
   }
 
-  [[nodiscard]] const void* BroadcasterSubobjectPtr(const CUnitCommand* const command) noexcept
+  [[maybe_unused]] [[nodiscard]] const void* BroadcasterSubobjectPtr(const CUnitCommand* const command) noexcept
   {
     return static_cast<const Broadcaster<ECommandEvent>*>(command);
   }
@@ -645,20 +562,20 @@ namespace
    * Appends one command descriptor record into sync publication output.
    *
    * The binary emits one additional helper at `0x006EC380` which drives
-   * the grow path of `msvc8::vector<SSTICommandConstantData>::push_back`
+   * the grow path of `fa::vector<SSTICommandConstantData>::push_back`
    * / `insert_n`: it runs one uninitialized-fill lane (stride
    * `sizeof(SSTICommandConstantData)=0x3C`) that copy-constructs each
    * descriptor by blitting the first `0x20` trivial bytes (cmd/mFormationScriptIndex/
-   * origin/unk1/blueprint), placement-constructs an empty `msvc8::string`
+   * origin/unk1/blueprint), placement-constructs an empty `fa::string`
    * at `+0x20`, and copy-assigns `unk2` from the source. On partial-fill
    * failure (e.g. string allocation throw), its SEH funclet runs the
    * per-lane string-reset helper (`ResetSSTICommandConstantDataStringLane`
    * at `0x006ECB50`) over the already-constructed prefix before
    * re-raising. The same semantic is preserved here via the typed
-   * `msvc8::vector::push_back` call.
+   * `fa::vector::push_back` call.
    */
   void AppendPublishedCommandDescriptor(
-    msvc8::vector<SSTICommandConstantData>& descriptors,
+    fa::vector<SSTICommandConstantData>& descriptors,
     const SSTICommandConstantData& descriptor
   )
   {
@@ -689,7 +606,7 @@ namespace
    * Appends one published-command packet into sync publication output.
    */
   void AppendPublishedCommandPacket(
-    msvc8::vector<SSyncPublishedCommandPacket>& packets,
+    fa::vector<SSyncPublishedCommandPacket>& packets,
     const SSyncPublishedCommandPacket& packet
   )
   {
@@ -774,7 +691,7 @@ CUnitCommand::CUnitCommand()
   mConstDat.origin = Wm3::Quatf{1.0f, 0.0f, 0.0f, 0.0f};
   mConstDat.unk1 = 0.0f;
   mConstDat.blueprint = nullptr;
-  mConstDat.unk2 = msvc8::string{};
+  mConstDat.unk2 = fa::string{};
 
   mVarDat = SSTICommandVariableData{};
 
@@ -869,7 +786,7 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
     return;
   }
 
-  const msvc8::vector<WeakPtr<CUnitCommand>> coordinatingPeers = coordinatingCommand->GetCoordinatingOrdersSnapshot();
+  const fa::vector<WeakPtr<CUnitCommand>> coordinatingPeers = coordinatingCommand->GetCoordinatingOrdersSnapshot();
   for (const WeakPtr<CUnitCommand>& peerWeak : coordinatingPeers) {
     CUnitCommand* const peer = peerWeak.GetObjectPtr();
     if (!peer || peer == this) {
@@ -904,7 +821,7 @@ gpg::RRef CUnitCommand::GetDerivedObjectRef()
  * What it does:
  * Returns a by-value snapshot of this command's coordinating-order weak links.
  */
-msvc8::vector<WeakPtr<CUnitCommand>> CUnitCommand::GetCoordinatingOrdersSnapshot() const
+fa::vector<WeakPtr<CUnitCommand>> CUnitCommand::GetCoordinatingOrdersSnapshot() const
 {
   return mCoordinatingOrders;
 }
@@ -937,7 +854,7 @@ void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, const int 
 
   const gpg::RRef ownerRef{};
 
-  if (gpg::RType* const scriptType = ResolveCachedType<CScriptObject>()) {
+  if (gpg::RType* const scriptType = gpg::RTypeOf<CScriptObject>()) {
     archive->Read(scriptType, this, ownerRef);
   }
 
@@ -947,15 +864,15 @@ void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, const int 
 
   (void)archive->ReadPointer(&mSim, &ownerRef);
 
-  if (gpg::RType* const constDataType = ResolveCachedType<SSTICommandConstantData>()) {
+  if (gpg::RType* const constDataType = gpg::RTypeOf<SSTICommandConstantData>()) {
     archive->Read(constDataType, &mConstDat, ownerRef);
   }
 
-  if (gpg::RType* const variableDataType = ResolveCachedType<SSTICommandVariableData>()) {
+  if (gpg::RType* const variableDataType = gpg::RTypeOf<SSTICommandVariableData>()) {
     archive->Read(variableDataType, &mVarDat, ownerRef);
   }
 
-  if (gpg::RType* const unitSetType = ResolveEntityUnitSetType()) {
+  if (gpg::RType* const unitSetType = gpg::RTypeOf<EntitySetTemplate<Unit>>()) {
     archive->Read(unitSetType, &mUnitSet, ownerRef);
   }
 
@@ -972,7 +889,7 @@ void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, const int 
     mFormationInstance = static_cast<CAiFormationInstance*>(formation);
   }
 
-  if (gpg::RType* const targetType = ResolveCachedType<CAiTarget>()) {
+  if (gpg::RType* const targetType = gpg::RTypeOf<CAiTarget>()) {
     archive->Read(targetType, &mTarget, ownerRef);
   }
 
@@ -995,7 +912,7 @@ void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, const int 
   }
 
   if (version >= 2) {
-    if (gpg::RType* const luaObjectType = ResolveLuaObjectType()) {
+    if (gpg::RType* const luaObjectType = gpg::RTypeOf<LuaPlus::LuaObject>()) {
       archive->Read(luaObjectType, &mArgs, ownerRef);
     }
   }
@@ -1018,7 +935,7 @@ void CUnitCommand::MemberSerialize(gpg::WriteArchive* const archive, const int v
 
   const gpg::RRef ownerRef{};
 
-  if (gpg::RType* const scriptType = ResolveCachedType<CScriptObject>()) {
+  if (gpg::RType* const scriptType = gpg::RTypeOf<CScriptObject>()) {
     archive->Write(scriptType, this, ownerRef);
   }
 
@@ -1026,20 +943,20 @@ void CUnitCommand::MemberSerialize(gpg::WriteArchive* const archive, const int v
     archive->Write(broadcasterType, BroadcasterSubobjectPtr(this), ownerRef);
   }
 
-  if (gpg::RType* const simType = ResolveCachedType<Sim>()) {
-    const gpg::RRef simRef = MakeDerivedRef(mSim, simType);
+  if (gpg::RType* const simType = gpg::RTypeOf<Sim>()) {
+    const gpg::RRef simRef = gpg::MakeDerivedRef(mSim, simType);
     gpg::WriteRawPointer(archive, simRef, gpg::TrackedPointerState::Unowned, ownerRef);
   }
 
-  if (gpg::RType* const constDataType = ResolveCachedType<SSTICommandConstantData>()) {
+  if (gpg::RType* const constDataType = gpg::RTypeOf<SSTICommandConstantData>()) {
     archive->Write(constDataType, &mConstDat, ownerRef);
   }
 
-  if (gpg::RType* const variableDataType = ResolveCachedType<SSTICommandVariableData>()) {
+  if (gpg::RType* const variableDataType = gpg::RTypeOf<SSTICommandVariableData>()) {
     archive->Write(variableDataType, &mVarDat, ownerRef);
   }
 
-  if (gpg::RType* const unitSetType = ResolveEntityUnitSetType()) {
+  if (gpg::RType* const unitSetType = gpg::RTypeOf<EntitySetTemplate<Unit>>()) {
     archive->Write(unitSetType, &mUnitSet, ownerRef);
   }
 
@@ -1050,7 +967,7 @@ void CUnitCommand::MemberSerialize(gpg::WriteArchive* const archive, const int v
     archive->Write(formationType, &formation, ownerRef);
   }
 
-  if (gpg::RType* const targetType = ResolveCachedType<CAiTarget>()) {
+  if (gpg::RType* const targetType = gpg::RTypeOf<CAiTarget>()) {
     archive->Write(targetType, &mTarget, ownerRef);
   }
 
@@ -1070,7 +987,7 @@ void CUnitCommand::MemberSerialize(gpg::WriteArchive* const archive, const int v
   }
 
   if (version >= 2) {
-    if (gpg::RType* const luaObjectType = ResolveLuaObjectType()) {
+    if (gpg::RType* const luaObjectType = gpg::RTypeOf<LuaPlus::LuaObject>()) {
       archive->Write(luaObjectType, &mArgs, ownerRef);
     }
   }
@@ -1078,7 +995,7 @@ void CUnitCommand::MemberSerialize(gpg::WriteArchive* const archive, const int v
 
 /**
  * Address: 0x006E8B40 (FUN_006E8B40)
- * Address: 0x006E96F0 (FUN_006E96F0, `msvc8::vector<WeakPtr<CUnitCommand>>::insert(pos, value)`
+ * Address: 0x006E96F0 (FUN_006E96F0, `fa::vector<WeakPtr<CUnitCommand>>::insert(pos, value)`
  *   for the `queue` insert below: offset, `_Insert_n` 0x006EA440, `begin() + offset`)
  *
  * What it does:
@@ -1088,7 +1005,7 @@ void CUnitCommand::MemberSerialize(gpg::WriteArchive* const archive, const int v
  * A negative index is `index + size() + 1` (0x006E8BAD..0x006E8BBA); nothing
  * clamps it into range.
  */
-void CUnitCommand::AddUnit(Unit* const unit, msvc8::vector<WeakPtr<CUnitCommand>>& queue, const int index)
+void CUnitCommand::AddUnit(Unit* const unit, fa::vector<WeakPtr<CUnitCommand>>& queue, const int index)
 {
   if (!unit || unit->IsDead() || unit->DestroyQueued()) {
     return;
@@ -1145,7 +1062,7 @@ void CUnitCommand::AddUnit(Unit* const unit)
  * a miss (0x006E8C9A, 0x006E8CAA):
  * Address: 0x006EC170 (FUN_006EC170, `std::find` over `WeakPtr<CUnitCommand>` for a `CUnitCommand*`)
  */
-void CUnitCommand::RemoveUnit(Unit* const unit, msvc8::vector<WeakPtr<CUnitCommand>>& queue)
+void CUnitCommand::RemoveUnit(Unit* const unit, fa::vector<WeakPtr<CUnitCommand>>& queue)
 {
   if (!mUnitSet.Remove(unit)) {
     return;
@@ -1464,7 +1381,7 @@ void CUnitCommand::DecreaseCount(const int amount)
   }
 
   // Iterate a copy: RemoveCommandFromQueue mutates the command's own unit set.
-  msvc8::vector<Entity*> assignedUnits{};
+  fa::vector<Entity*> assignedUnits{};
   assignedUnits.reserve(mUnitSet.mVec.size());
   for (Entity* const entry : mUnitSet.mVec) {
     assignedUnits.push_back(entry);
@@ -1561,7 +1478,7 @@ void CUnitCommand::DestroyInternal()
   mArgs = LuaPlus::LuaObject{};
 
   // +0x148..+0x154: coordinating-order vector storage (8-byte owner-link elements).
-  mCoordinatingOrders = msvc8::vector<WeakPtr<CUnitCommand>>{};
+  mCoordinatingOrders = fa::vector<WeakPtr<CUnitCommand>>{};
 
   // +0x120 is `mTarget`'s entity weak link (`mTarget` at +0x11C, its
   // `targetEntity` at +0x04), unlinked with the 0x0057D490 shape. It was
@@ -1578,8 +1495,8 @@ void CUnitCommand::DestroyInternal()
   // +0x0F8 command unit-set vector payload.
   mUnitSet.mVec = gpg::core::FastVectorN<Entity*, 4>{};
 
-  // +0x0068 legacy msvc8::string payload in constant command data.
-  mConstDat.unk2 = msvc8::string{};
+  // +0x0068 legacy fa::string payload in constant command data.
+  mConstDat.unk2 = fa::string{};
 
   // `mUnitSet`'s list node (+0xF0, unlinked and self-linked at 0x006E8689)
   // and the `Broadcaster` base (+0x34, at 0x006E86E4) are ordinary ring

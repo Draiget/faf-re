@@ -3,7 +3,7 @@
     python tools/parity-data/chart.py --report <report dir>/report.json
 
 Download the report with: gh run download <run id> -R Draiget/faf-re -n report -D <report dir>.
-The report has each replay's verdict, players and length. Why a replay desynced is worked out by
+The report has each replay's verdict, players and length. Why a replay's checksum differs is worked out by
 hand, so the causes come from parity_chart.json; update that file with the run. Each chart is
 written twice, for GitHub's light and dark themes (a <picture> in the Markdown picks one).
 """
@@ -115,7 +115,7 @@ def overview(path, theme, data, counts):
     # What each group of blocks adds up to.
     y = bottom + height + 8
     groups = (
-        (spans[0][0], spans[len(causes) - 1][0] + spans[len(causes) - 1][1], "%d desyncs (%s)" % (desync, percent(desync, played))),
+        (spans[0][0], spans[len(causes) - 1][0] + spans[len(causes) - 1][1], "%d with a differing checksum (%s)" % (desync, percent(desync, played))),
         (spans[-1][0], width, "%d CI runner failures (%s)" % (runner, percent(runner, played))))
     for start, end, label in groups:
         svg.line(start + 1, y, end - 1, y, t["grid"])
@@ -169,9 +169,9 @@ def breakdown(path, theme, data, players, lengths, skipped):
     svg.text(0, 20, title, t["ink"], 18, "600")
     svg.text(0, 42, "CI run %s, commit %s, before the fixes. Share of each row's replays." % (data["run"], data["commit"]), t["muted"])
     svg.rect(0, 56, 11, 11, t["desync"], 2)
-    svg.text(18, 66, "Desync", t["muted"])
-    svg.rect(84, 56, 11, 11, t["runner"], 2)
-    svg.text(102, 66, "CI runner failure", t["muted"])
+    svg.text(18, 66, "Checksum mismatch", t["muted"])
+    svg.rect(150, 56, 11, 11, t["runner"], 2)
+    svg.text(168, 66, "CI runner failure", t["muted"])
     bottom = max(not_passed_panel(svg, t, 0, 96, "By player count", players), not_passed_panel(svg, t, 460, 96, "By game length", lengths))
     svg.text(0, bottom + 14, skipped, t["muted"], 12)
     svg.write(path)
@@ -215,6 +215,9 @@ def main():
     with open(args.data, encoding="utf-8") as f:
         data = json.load(f)
 
+    for r in replays:  # the chart splits the desyncs by cause itself, from its data file
+        if r["verdict"] == "expected-desync":
+            r["verdict"] = "desync"
     played = [r for r in replays if r["verdict"] in PLAYED]
     errors = [r for r in replays if r["verdict"] == "error" and not str(r.get("why", "")).startswith(NOT_REACHED)]
     counts = {v: sum(r["verdict"] == v for r in played) for v in PLAYED}

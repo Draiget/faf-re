@@ -13,14 +13,6 @@
 
 namespace
 {
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
 
   gpg::RType* gETriggerOperatorType = nullptr;
   gpg::RType* gSConditionCategorySetType = nullptr;
@@ -71,12 +63,12 @@ namespace moho
 
   gpg::RType* SCondition::StaticGetClass()
   {
-    return CachedType<SCondition>(sType);
+    return gpg::CachedLookup<SCondition>(sType);
   }
 
   gpg::RType* STrigger::StaticGetClass()
   {
-    return CachedType<STrigger>(sType);
+    return gpg::CachedLookup<STrigger>(sType);
   }
 
   /**
@@ -100,8 +92,8 @@ namespace moho
       mItem = static_cast<CArmyStatItem*>(upcastRef.mObj ? upcastRef.mObj : tracked.object);
     }
 
-    archive->Read(CachedType<ETriggerOperator>(gETriggerOperatorType), &mOp, gpg::RRef{});
-    archive->Read(CachedType<BVSet<const RBlueprint*, EntityCategoryHelper>>(gSConditionCategorySetType), &mCat, gpg::RRef{});
+    archive->Read(gpg::CachedLookup<ETriggerOperator>(gETriggerOperatorType), &mOp, gpg::RRef{});
+    archive->Read(gpg::CachedLookup<BVSet<const RBlueprint*, EntityCategoryHelper>>(gSConditionCategorySetType), &mCat, gpg::RRef{});
     archive->ReadFloat(&mVal);
   }
 
@@ -120,9 +112,9 @@ namespace moho
     itemRef.mType = CArmyStatItem::StaticGetClass();
     gpg::WriteRawPointer(archive, itemRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});
 
-    archive->Write(CachedType<ETriggerOperator>(gETriggerOperatorType), &mOp, gpg::RRef{});
+    archive->Write(gpg::CachedLookup<ETriggerOperator>(gETriggerOperatorType), &mOp, gpg::RRef{});
     archive->Write(
-      CachedType<BVSet<const RBlueprint*, EntityCategoryHelper>>(gSConditionCategorySetType), &mCat, gpg::RRef{}
+      gpg::CachedLookup<BVSet<const RBlueprint*, EntityCategoryHelper>>(gSConditionCategorySetType), &mCat, gpg::RRef{}
     );
     archive->WriteFloat(mVal);
   }
@@ -158,7 +150,7 @@ namespace moho
     }
 
     archive->ReadString(&mName);
-    archive->Read(CachedType<gpg::fastvector<SCondition>>(gFastVectorSConditionType), &mConditions, gpg::RRef{});
+    archive->Read(gpg::CachedLookup<gpg::fastvector<SCondition>>(gFastVectorSConditionType), &mConditions, gpg::RRef{});
   }
 
   /**
@@ -171,8 +163,8 @@ namespace moho
       return;
     }
 
-    archive->WriteString(const_cast<msvc8::string*>(&mName));
-    archive->Write(CachedType<gpg::fastvector<SCondition>>(gFastVectorSConditionType), &mConditions, gpg::RRef{});
+    archive->WriteString(const_cast<fa::string*>(&mName));
+    archive->Write(gpg::CachedLookup<gpg::fastvector<SCondition>>(gFastVectorSConditionType), &mConditions, gpg::RRef{});
   }
 } // namespace moho
 

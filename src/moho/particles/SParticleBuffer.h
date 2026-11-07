@@ -29,9 +29,9 @@ namespace moho
      */
     SParticleBuffer();
 
-    msvc8::vector<SWorldParticle> mParticles; // +0x00
-    msvc8::vector<SWorldTrail> mTrails;  // +0x10
-    msvc8::vector<SWorldBeam> mBeams;         // +0x20
+    fa::vector<SWorldParticle> mParticles; // +0x00
+    fa::vector<SWorldTrail> mTrails;  // +0x10
+    fa::vector<SWorldBeam> mBeams;         // +0x20
   };
 
   static_assert(offsetof(SParticleBuffer, mParticles) == 0x00, "SParticleBuffer::mParticles offset must be 0x00");

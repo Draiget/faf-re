@@ -612,7 +612,7 @@ namespace moho
     WeakPtr<UserEntity> mCreator;                        // 0x03C0
     UserCommandQueue* mManager;        // 0x03C8
     UserCommandQueue* mFactoryManager; // 0x03CC
-    msvc8::set<msvc8::string> mSelectionSets; // 0x03D0
+    fa::set<fa::string> mSelectionSets; // 0x03D0
     bool mQueueEmptyCached;          // 0x03DC
     bool mIsEngineer; // 0x03DD
     bool mIsFactory;  // 0x03DE
@@ -1201,7 +1201,7 @@ namespace moho
    * `RUnitBlueprint`). `out` is a real `std::list<T>` in the binary --
    * see the definition in UserUnit.cpp for the node-buy/`_Incsize` evidence.
    */
-  void CollectUpgradeCommandTargetBlueprints(UserUnit* unit, msvc8::list<const RUnitBlueprint*>& out);
+  void CollectUpgradeCommandTargetBlueprints(UserUnit* unit, fa::list<const RUnitBlueprint*>& out);
 
   /**
    * Bridge for the recovered `cfunc_IssueDockCommandL` worker (FUN_00840A70):

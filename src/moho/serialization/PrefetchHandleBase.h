@@ -129,7 +129,7 @@ namespace moho
      * What it does:
      * Returns the prefetch payload path lane for this handle.
      */
-    [[nodiscard]] const msvc8::string& GetName() const;
+    [[nodiscard]] const fa::string& GetName() const;
 
     /**
      * Address: 0x004ABE10 (FUN_004ABE10, Moho::PrefetchHandleBase::GetResourceRType)

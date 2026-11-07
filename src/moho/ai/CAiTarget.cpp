@@ -1,4 +1,5 @@
 #include "moho/ai/CAiTarget.h"
+#include "moho/lua/LuaVector3.h"
 
 #include <cstdlib>
 #include <cstddef>
@@ -39,33 +40,6 @@ namespace
     return entityDb != nullptr ? entityDb->FindEntityById(static_cast<std::uint32_t>(entityId)) : nullptr;
   }
 
-  [[nodiscard]] gpg::RType* CachedEAiTargetType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(EAiTargetType));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrEntityType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(WeakPtr<Entity>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return cached;
-  }
-
   [[nodiscard]] const char* ToAiTargetTypeLexical(const EAiTargetType targetType) noexcept
   {
     switch (targetType) {
@@ -91,22 +65,6 @@ namespace
       return EAiTargetType::AITARGET_Ground;
     }
     return EAiTargetType::AITARGET_None;
-  }
-
-  [[nodiscard]] Wm3::Vec3f ReadVector3FromLuaObject(const LuaPlus::LuaObject& object) noexcept
-  {
-    Wm3::Vec3f out = Wm3::Vec3f::Zero();
-    if (!object.IsTable()) {
-      return out;
-    }
-
-    const LuaPlus::LuaObject xObject = object[1];
-    const LuaPlus::LuaObject yObject = object[2];
-    const LuaPlus::LuaObject zObject = object[3];
-    out.x = static_cast<float>(xObject.GetNumber());
-    out.y = static_cast<float>(yObject.GetNumber());
-    out.z = static_cast<float>(zObject.GetNumber());
-    return out;
   }
 
   [[nodiscard]] const Wm3::Vec3f& InvalidTargetVector() noexcept
@@ -721,9 +679,9 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Read(CachedEAiTargetType(), &targetType, nullOwner);
-    archive->Read(CachedWeakPtrEntityType(), &targetEntity, nullOwner);
-    archive->Read(CachedVector3fType(), &position, nullOwner);
+    archive->Read(gpg::RTypeOf<EAiTargetType>(), &targetType, nullOwner);
+    archive->Read(gpg::RTypeOf<WeakPtr<Entity>>(), &targetEntity, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &position, nullOwner);
     archive->ReadInt(&targetPoint);
     archive->ReadBool(&targetIsMobile);
   }
@@ -742,9 +700,9 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Write(CachedEAiTargetType(), &targetType, nullOwner);
-    archive->Write(CachedWeakPtrEntityType(), &targetEntity, nullOwner);
-    archive->Write(CachedVector3fType(), &position, nullOwner);
+    archive->Write(gpg::RTypeOf<EAiTargetType>(), &targetType, nullOwner);
+    archive->Write(gpg::RTypeOf<WeakPtr<Entity>>(), &targetEntity, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &position, nullOwner);
     archive->WriteInt(targetPoint);
     archive->WriteBool(targetIsMobile);
   }

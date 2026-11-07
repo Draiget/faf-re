@@ -10,6 +10,9 @@
 #include <limits>
 
 #include "gpg/core/containers/Rect2.h"
+#include "gpg/gal/Device.hpp"
+#include "gpg/gal/DeviceContext.hpp"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/StatItem.h"
@@ -328,6 +331,17 @@ namespace moho
    * Rebuilds high-fidelity terrain sheets/tessellation, regenerates shoreline
    * cells, and lazily initializes shared terrain texture helpers.
    */
+  bool ren_TerrainGpuBuffers = true;
+  namespace
+  {
+    TConVar<bool> gTConVar_ren_TerrainGpuBuffers(
+      "ren_TerrainGpuBuffers",
+      "Direct3D 12 / Vulkan: the terrain's vertices and indices stay in GPU memory and upload only after a rebuild (1, the "
+      "default), or are copied each frame (0). Read when a terrain is created.",
+      &ren_TerrainGpuBuffers
+    );
+  } // namespace
+
   bool HighFidelityTerrain::Init()
   {
     if (mTerrainResource == nullptr) {
@@ -342,8 +356,25 @@ namespace moho
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
 
     CD3DVertexFormat* const terrainVertexFormat = resources->GetVertexFormat(10);
-    ReplaceOwned(mTerrainVertexSheet, resources->NewVertexSheet(1U, 0xFFFF, terrainVertexFormat));
-    ReplaceOwned(mTerrainIndexSheet, resources->CreateIndexSheet(true, 199998));
+    // Engine change (ren_TerrainGpuBuffers): upload memory is recycled, so a dynamic sheet is copied again
+    // each frame though the mesh rarely changes. In GPU memory it uploads only after a rebuild.
+    const gpg::gal::DeviceApi deviceApi = gpg::gal::Device::GetInstance()->GetDeviceContext()->mDeviceType;
+    const bool gpuSheets = ren_TerrainGpuBuffers && (deviceApi == gpg::gal::DeviceApi::Direct3D12 || deviceApi == gpg::gal::DeviceApi::Vulkan);
+    mTerrainSheetState = gpuSheets ? 3u : 0u;
+    ReplaceOwned(mTerrainVertexSheet, resources->NewVertexSheet(gpuSheets ? 0U : 1U, 0xFFFF, terrainVertexFormat));
+    ReplaceOwned(mTerrainIndexSheet, resources->CreateIndexSheet(!gpuSheets, 199998));
+    // Engine addition: this frame's draws read only what UpdateRenderContext locks and writes.
+    {
+      gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
+      ID3DVertexStream::BufferHandle vertexBuffer;
+      if (mTerrainVertexSheet->GetVertStream(0U)->GetBuffer(vertexBuffer) && vertexBuffer) {
+        galDevice->CopyLockedRangeOnly(*vertexBuffer);
+      }
+      ID3DIndexSheet::BufferHandle indexBuffer;
+      if (mTerrainIndexSheet->GetBuffer(indexBuffer) && indexBuffer) {
+        galDevice->CopyLockedRangeOnly(*indexBuffer);
+      }
+    }
 
     CD3DVertexFormat* const dynamicVertexFormat = resources->GetVertexFormat(4);
     ReplaceOwned(mDynamicVertexSheet, resources->NewVertexSheet(1U, 10000, dynamicVertexFormat));
@@ -376,7 +407,7 @@ namespace moho
     }
 
     if (sHighFidelityTextureBatcher == nullptr) {
-      sHighFidelityTextureBatcher = new CD3DTextureBatcher();
+      sHighFidelityTextureBatcher = REN_NewSplatTextureBatcher();
     }
 
     if (!sHighFidelityGridTexture) {
@@ -534,12 +565,7 @@ namespace moho
     const Wm3::Vector3f sunDirection = terrainRes->GetSunDirection();
     SetShaderVarMem(shaderVars.sunDirection, 3U, &sunDirection.x);
 
-    Wm3::Vector3f sunAmbience = terrainRes->GetSunAmbience();
-    if (getenv("FAF_FORCE_AMBIENT") != nullptr) {
-      sunAmbience.x = 0.5f;
-      sunAmbience.y = 0.5f;
-      sunAmbience.z = 0.5f;
-    }
+    const Wm3::Vector3f sunAmbience = terrainRes->GetSunAmbience();
     SetShaderVarMem(shaderVars.sunAmbience, 3U, &sunAmbience.x);
 
     const Wm3::Vector3f sunColor = terrainRes->GetSunColor();
@@ -668,7 +694,8 @@ namespace moho
 
       mShoreline.Update(*mCamera);
 
-      if (ren_GenerateMesh && (dirty || decalsDirty)) {
+      const bool rebuildMesh = ren_GenerateMesh && (dirty || decalsDirty);
+      if (rebuildMesh) {
         mTesselator->Rebuild(mCamera, terrainRes);
 
         if (shaderVarTerrainHeightScale.Exists()) {
@@ -756,8 +783,7 @@ namespace moho
                   sEngineStatRenderFlatDecals = engineStats->GetItem("Render_FlatDecals", true);
                   (void)sEngineStatRenderFlatDecals->Release(0);
                 }
-                _InterlockedExchangeAdd(
-                  reinterpret_cast<volatile long*>(&sEngineStatRenderFlatDecals->mPrimaryValueBits), 1);
+                sEngineStatRenderFlatDecals->AddPrimaryBits(1);
               }
             } else {
               std::int32_t baselineIndexCount = 0;
@@ -781,7 +807,7 @@ namespace moho
                   sEngineStatRenderDecals = engineStats->GetItem("Render_Decals", true);
                   (void)sEngineStatRenderDecals->Release(0);
                 }
-                _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&sEngineStatRenderDecals->mPrimaryValueBits), 1);
+                sEngineStatRenderDecals->AddPrimaryBits(1);
               }
             }
           }
@@ -798,47 +824,65 @@ namespace moho
 
         auto& splatVertices = mSplatVertices;
 
-        std::int32_t splatBudget = 0;
-        for (CWldTerrainDecal* const decalEntry : visibleSplats) {
-          auto* const splat = static_cast<CWldSplat*>(decalEntry);
+        // Engine fix (ren_SplatAtlasFix): when the atlas has no room for a splat, it is cleared and
+        // the walk runs once more, so only this frame's textures hold places.
+        for (bool mayRestart = true;; mayRestart = false) {
+          bool restart = false;
+          std::int32_t splatBudget = 0;
+          for (CWldTerrainDecal* const decalEntry : visibleSplats) {
+            auto* const splat = static_cast<CWldSplat*>(decalEntry);
 
-          const CWldSplat::SplatVertex& firstVertex = splat->mSplatVertices[0];
-          const Vector4f& row1 = mCamera->viewport.r[1];
-          const float worldDistance = (firstVertex.mPosition.z * row1.z) + (firstVertex.mPosition.y * row1.y)
-            + (firstVertex.mPosition.x * row1.x) + row1.w;
+            const CWldSplat::SplatVertex& firstVertex = splat->mSplatVertices[0];
+            const Vector4f& row1 = mCamera->viewport.r[1];
+            const float worldDistance = (firstVertex.mPosition.z * row1.z) + (firstVertex.mPosition.y * row1.y)
+              + (firstVertex.mPosition.x * row1.x) + row1.w;
 
-          if (worldDistance > splat->mCutoffLOD) {
-            continue;
+            if (worldDistance > splat->mCutoffLOD) {
+              continue;
+            }
+            if (++splatBudget >= kMaxSplatsPerFrame) {
+              break;
+            }
+
+            float fadeAlpha;
+            if (splat->mNearCutoff <= 0.0f) {
+              const float farFadeStart = splat->mCutoffLOD * ren_DecalFadeFraction;
+              const float clampedDistance = std::min(worldDistance, splat->mCutoffLOD);
+              const float fadeFloor = std::max(farFadeStart, std::min(clampedDistance, farFadeStart));
+              fadeAlpha = 1.0f - ((clampedDistance - fadeFloor) / (splat->mCutoffLOD - fadeFloor));
+            } else {
+              const float nearFadeStart = splat->mNearCutoff * ren_DecalFadeFraction;
+              const float clampedDistance = std::min(worldDistance, splat->mNearCutoff);
+              const float fadeCeiling = std::max(clampedDistance, nearFadeStart);
+              fadeAlpha = (fadeCeiling - nearFadeStart) / (splat->mNearCutoff - nearFadeStart);
+            }
+            const float bakedAlpha = fadeAlpha * splat->mCurrentAlpha;
+
+            const CWldSplat::AtlasMiss atlas =
+              splat->OnAtlasResult(splat->UpdateBatchTexture(sHighFidelityTextureBatcher), mayRestart);
+            if (atlas == CWldSplat::AtlasMiss::Restart) {
+              restart = true;
+              break;
+            }
+            splat->UpdateVertices();
+            if (atlas == CWldSplat::AtlasMiss::Skip) {
+              continue;
+            }
+
+            const std::size_t countBeforeAppend = splatVertices.Size();
+            for (const CWldSplat::SplatVertex& sourceVertex : splat->mSplatVertices) {
+              splatVertices.PushBack(sourceVertex);
+            }
+
+            for (std::size_t v = countBeforeAppend; v < splatVertices.Size(); ++v) {
+              splatVertices[v].mAlpha = bakedAlpha;
+            }
           }
-          if (++splatBudget >= kMaxSplatsPerFrame) {
+          if (!restart) {
             break;
           }
-
-          float fadeAlpha;
-          if (splat->mNearCutoff <= 0.0f) {
-            const float farFadeStart = splat->mCutoffLOD * ren_DecalFadeFraction;
-            const float clampedDistance = std::min(worldDistance, splat->mCutoffLOD);
-            const float fadeFloor = std::max(farFadeStart, std::min(clampedDistance, farFadeStart));
-            fadeAlpha = 1.0f - ((clampedDistance - fadeFloor) / (splat->mCutoffLOD - fadeFloor));
-          } else {
-            const float nearFadeStart = splat->mNearCutoff * ren_DecalFadeFraction;
-            const float clampedDistance = std::min(worldDistance, splat->mNearCutoff);
-            const float fadeCeiling = std::max(clampedDistance, nearFadeStart);
-            fadeAlpha = (fadeCeiling - nearFadeStart) / (splat->mNearCutoff - nearFadeStart);
-          }
-          const float bakedAlpha = fadeAlpha * splat->mCurrentAlpha;
-
-          splat->UpdateBatchTexture(sHighFidelityTextureBatcher);
-          splat->UpdateVertices();
-
-          const std::size_t countBeforeAppend = splatVertices.Size();
-          for (const CWldSplat::SplatVertex& sourceVertex : splat->mSplatVertices) {
-            splatVertices.PushBack(sourceVertex);
-          }
-
-          for (std::size_t v = countBeforeAppend; v < splatVertices.Size(); ++v) {
-            splatVertices[v].mAlpha = bakedAlpha;
-          }
+          REN_ResetSplatTextureBatcher(sHighFidelityTextureBatcher);
+          splatVertices.ResetStorageToInline();
         }
       }
 
@@ -849,14 +893,19 @@ namespace moho
         collisionIndexCount = kSkirtMaxIndexCount;
       }
 
-      if (rectCacheCount > 0) {
+      // GPU sheets keep their contents until the mesh is rebuilt; decals are appended in that rebuild too.
+      const bool uploadMesh = (mTerrainSheetState == 0u) || rebuildMesh || (mTerrainSheetState & 2u) != 0u;
+      if (uploadMesh) {
+        mTerrainSheetState &= ~2u;
+      }
+      if (uploadMesh && rectCacheCount > 0) {
         void* const lockedVertices = mTerrainVertexSheet->GetVertStream(0U)->Lock(0, rectCacheCount, false, true);
         // Raw GPU upload: tessellator rect blob into the locked stream.
         std::copy_n(mTesselator->GetRectCacheData(), rectCacheCount, static_cast<CTesselator::Rect16*>(lockedVertices));
         mTerrainVertexSheet->GetVertStream(0U)->Unlock();
       }
 
-      if (collisionIndexCount > 0) {
+      if (uploadMesh && collisionIndexCount > 0) {
         std::int16_t* const lockedIndices = mTerrainIndexSheet->Lock(0, collisionIndexCount, false, true);
         // Raw GPU upload: collision index blob into the locked sheet.
         std::copy_n(mTesselator->GetCollisionIndexData(), collisionIndexCount, lockedIndices);
@@ -1006,10 +1055,10 @@ namespace moho
     // The technique name is an annotation on the stratum material's shader
     // rather than a literal, so a map can override the normal pass.
     CD3DEffect* const effect = device->GetCurEffect();
-    const msvc8::string technique = effect->GetStringAnnotation(
+    const fa::string technique = effect->GetStringAnnotation(
       terrainRes->GetStratumMaterial().mShaderName,
-      msvc8::string{"normals"},
-      msvc8::string{"TTerrainNormals"});
+      fa::string{"normals"},
+      fa::string{"TTerrainNormals"});
     device->SelectTechnique(technique.c_str());
 
     LoadTerrainLighting(nullptr);
@@ -1655,7 +1704,7 @@ namespace moho
    */
   void HighFidelityTerrain::DrawTerrain(
     boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
-    const msvc8::string* const techniqueName
+    const fa::string* const techniqueName
   )
   {
     LoadTerrainLighting(nullptr);

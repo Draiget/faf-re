@@ -8,7 +8,8 @@ name: Replay parity
 # Run it from master (its caches are the ones every run can read) with the commit to test.
 # Every night at 20:00 UTC (00:00 UTC+4) it plays master's head on the nightly set: every replay
 # that desynced before and others picked once, the same ones each night, as many as 40 jobs of 150
-# minutes play (20 at once, so two rounds, about 5 h 30 min). Passing starts the Nightly release.
+# minutes play (20 at once, so two rounds, about 5 h 30 min). New failures don't fail the run: the
+# report lists them, and the Nightly release publishes only when it lists none.
 on:
   schedule:
     - cron: "0 20 * * *"
@@ -276,7 +277,7 @@ jobs:
       - run: >
           python tools/parity-data/report.py --plan plan.json --results results
           ${{ inputs.after_run != '' && '--after after' || '' }}
-          --expected tools/parity-data/expected/$GAME_VERSION.json --out report
+          --expected tools/parity-data/expected/$GAME_VERSION.json --out report --no-fail
           --title "Replay parity: ${{ inputs.ref || 'master' }}, set ${{ inputs.set || 'nightly' }}${{ inputs.batch && inputs.batch != '1/1' && format(' batch {0}', inputs.batch) || '' }}, game version $GAME_VERSION${{ inputs.after_run != '' && format(', after run {0}', inputs.after_run) || '' }}"
       - if: always()
         uses: actions/upload-artifact@v7
@@ -284,3 +285,42 @@ jobs:
           name: report
           path: report
           retention-days: 90
+
+  # A desync never fails the run (report --no-fail), so a failed job in the nightly is CI's: a lost
+  # runner, a timeout, a cache or network error. Nightly retry re-runs the failed jobs once this run
+  # has ended, twice at most. tools/release/README.md.
+  retry:
+    needs: [build, plan, run, report]
+    if: failure() && github.event_name == 'schedule' && github.run_attempt < 3
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write  # starts Nightly retry
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run nightly-retry.yml -R "$GITHUB_REPOSITORY" --ref master -f run_id=${{ github.run_id }}
+
+  # A re-run started by Nightly retry ends without starting Nightly release (GitHub starts no
+  # workflow from what the workflow token did), so this run starts it, when the report is clean.
+  release:
+    needs: [run, report]
+    if: github.event_name == 'schedule' && github.run_attempt > 1 && github.triggering_actor == 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write  # starts Nightly release
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: report
+          path: report
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          new=$(jq -r '.regressions | length' report/report.json)
+          if [ "$new" != "0" ]; then
+            echo "$new new failures: no nightly release." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh workflow run nightly-release.yml -R "$GITHUB_REPOSITORY" --ref master -f ref=${{ github.sha }} \
+            -f publish=true -f parity_run=${{ github.run_id }} \
+            -f note="Replay parity passed on attempt ${{ github.run_attempt }}, after Nightly retry re-ran its failed jobs."

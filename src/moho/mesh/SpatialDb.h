@@ -84,10 +84,10 @@ namespace moho
   /**
    * The spatial database's map type: a VC8 multiset of entries in fade order.
    * Its insert/erase/destroy bodies are the tree's own and are cited on
-   * `msvc8::multiset` and `msvc8::detail::rb_tree`.
+   * `fa::multiset` and `fa::detail::rb_tree`.
    */
   template <class T>
-  using SpatialMap = msvc8::multiset<SpatialEntry<T>, SpatialEntryLess<T>>;
+  using SpatialMap = fa::multiset<SpatialEntry<T>, SpatialEntryLess<T>>;
 
   static_assert(sizeof(SpatialMap<UserEntity>) == 0x0C, "SpatialMap<T> size must be 0x0C");
 
@@ -102,8 +102,8 @@ namespace moho
     std::int32_t mPropCount;                    // +0x20
     std::int32_t mEntityCount;                  // +0x24
     Wm3::AxisAlignedBox3f mBounds;              // +0x28
-    msvc8::vector<SpatialShard<T>*> mShards;    // +0x40, the 4x4 children while mLevel > 0
-    msvc8::vector<SpatialShardData<T>*> mData;  // +0x50, the 4x4 leaf lanes once mLevel <= 0
+    fa::vector<SpatialShard<T>*> mShards;    // +0x40, the 4x4 children while mLevel > 0
+    fa::vector<SpatialShardData<T>*> mData;  // +0x50, the 4x4 leaf lanes once mLevel <= 0
 
     /**
      * Address: 0x005011A0 (FUN_005011A0, Moho::SpatialShard<T>::SpatialShard)
@@ -410,7 +410,7 @@ namespace moho
   template <class T>
   struct SpatialDB
   {
-    msvc8::vector<SpatialShard<T>*> mShards;  // +0x00, the 4x4 top-level shards
+    fa::vector<SpatialShard<T>*> mShards;  // +0x00, the 4x4 top-level shards
     SpatialShardData<T> mShardData;           // +0x10, entries outside the shard grid
     std::int32_t mMapWidth;                   // +0x70
     std::int32_t mMapHeight;                  // +0x74

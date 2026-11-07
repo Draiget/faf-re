@@ -51,7 +51,7 @@ namespace moho
      * What it does:
      * Returns `"NULL"` for empty weak pointers, otherwise wraps pointee lexical with brackets.
      */
-    msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x00541850 (FUN_00541850, FA), 0x1012F1D0 (MohoEngine)
@@ -128,7 +128,7 @@ namespace gpg
      * What it does:
      * Appends vector size info to the base lexical string.
      */
-    msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x0056BF40 (FUN_0056BF40, FA), 0x1015A270 (MohoEngine)

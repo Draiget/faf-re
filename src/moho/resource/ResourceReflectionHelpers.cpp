@@ -1,3 +1,4 @@
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/resource/ResourceReflectionHelpers.h"
 
 #include <typeinfo>
@@ -14,43 +15,36 @@ namespace moho::resource_reflection
 {
   namespace
   {
-    [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cachedType, const std::type_info& typeInfo)
-    {
-      if (cachedType == nullptr) {
-        cachedType = gpg::LookupRType(typeInfo);
-      }
-      return cachedType;
-    }
   } // namespace
 
   gpg::RType* ResolveCAniSkelType()
   {
-    return ResolveCachedType(moho::CAniSkel::sType, typeid(moho::CAniSkel));
+    return gpg::CachedLookup(moho::CAniSkel::sType, typeid(moho::CAniSkel));
   }
 
   gpg::RType* ResolveCAniResourceSkelType()
   {
-    return ResolveCachedType(moho::CAniResourceSkel::sType, typeid(moho::CAniResourceSkel));
+    return gpg::CachedLookup(moho::CAniResourceSkel::sType, typeid(moho::CAniResourceSkel));
   }
 
   gpg::RType* ResolveCParticleTextureType()
   {
-    return ResolveCachedType(moho::CParticleTexture::sType, typeid(moho::CParticleTexture));
+    return gpg::CachedLookup(moho::CParticleTexture::sType, typeid(moho::CParticleTexture));
   }
 
   gpg::RType* ResolveCSimResourcesType()
   {
-    return ResolveCachedType(moho::CSimResources::sType, typeid(moho::CSimResources));
+    return gpg::CachedLookup(moho::CSimResources::sType, typeid(moho::CSimResources));
   }
 
   gpg::RType* ResolveISimResourcesType()
   {
-    return ResolveCachedType(moho::ISimResources::sType, typeid(moho::ISimResources));
+    return gpg::CachedLookup(moho::ISimResources::sType, typeid(moho::ISimResources));
   }
 
   gpg::RType* ResolveIResourcesType()
   {
-    return ResolveCachedType(moho::IResources::sType, typeid(moho::IResources));
+    return gpg::CachedLookup(moho::IResources::sType, typeid(moho::IResources));
   }
 
   // ResolveRD3DTextureResourceType and ResolveID3DTextureSheetType are defined in
@@ -58,7 +52,7 @@ namespace moho::resource_reflection
 
   gpg::RType* ResolveMemBufferConstType()
   {
-    return ResolveCachedType(gpg::MemBuffer<const char>::sType, typeid(gpg::MemBuffer<const char>));
+    return gpg::CachedLookup(gpg::MemBuffer<const char>::sType, typeid(gpg::MemBuffer<const char>));
   }
 
   void AddBase(gpg::RType* const ownerType, gpg::RType* const baseType)
@@ -67,13 +61,7 @@ namespace moho::resource_reflection
       return;
     }
 
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    ownerType->AddBase(baseField);
+    gpg::AddReflectedBaseType(ownerType, baseType);
   }
 
   void RegisterSerializeCallbacks(

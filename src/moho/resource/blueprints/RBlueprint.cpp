@@ -19,15 +19,6 @@ namespace
 {
   using TypeInfo = moho::RBlueprintTypeInfo;
 
-  [[nodiscard]] gpg::RType* CachedRObjectType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(gpg::RObject));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x00BF23C0 (FUN_00BF23C0, atexit destructor of the
    *   RBlueprintTypeInfo object)
@@ -79,7 +70,7 @@ namespace moho
   void RBlueprint::InitIdentity(
     RRuleGameRules* const owner,
     const RResId& resId,
-    msvc8::string& outBlueprintId,
+    fa::string& outBlueprintId,
     std::int32_t& outOrdinal
   )
   {
@@ -230,14 +221,7 @@ namespace moho
 */
 void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
 {
-  gpg::RType* const rObjectType = CachedRObjectType();
-  gpg::RField baseField{};
-  baseField.mName = rObjectType->GetName();
-  baseField.mType = rObjectType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBase<gpg::RObject>(typeInfo);
 }
 
 /**
@@ -281,15 +265,15 @@ void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
    */
   gpg::RField* RBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    gpg::RField* field = typeInfo->AddField<msvc8::string>("BlueprintId", offsetof(RBlueprint, mBlueprintId));
+    gpg::RField* field = typeInfo->AddField<fa::string>("BlueprintId", offsetof(RBlueprint, mBlueprintId));
     field->mFlags = 1;
     field->mDesc = "Blueprint Id";
 
-    field = typeInfo->AddField<msvc8::string>("Description", offsetof(RBlueprint, mDescription));
+    field = typeInfo->AddField<fa::string>("Description", offsetof(RBlueprint, mDescription));
     field->mFlags = 3;
     field->mDesc = "Generic type of unit (non-display name)";
 
-    field = typeInfo->AddField<msvc8::string>("Source", offsetof(RBlueprint, mSource));
+    field = typeInfo->AddField<fa::string>("Source", offsetof(RBlueprint, mSource));
     field->mFlags = 1;
     field->mDesc = "File this blueprint was defined in";
 

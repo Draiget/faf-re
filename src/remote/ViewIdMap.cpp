@@ -24,7 +24,11 @@ namespace faf::remote
     if (family == kFamilyReconBlip) {
       return true;
     }
-    return family == kFamilyProjectile && Source(simId) != static_cast<std::uint32_t>(mViewArmy);
+    if (family != kFamilyProjectile) {
+      return false;
+    }
+    const std::uint32_t source = Source(simId);
+    return source >= 32u || ((mKeptSources >> source) & 1u) == 0u;
   }
 
   std::uint32_t CViewIdMap::Entity(const std::uint32_t simId)

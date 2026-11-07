@@ -11,7 +11,7 @@
 #ifndef LUAPLUS_LIB
 #define LUAPLUS_LIB
 #endif LUAPLUS_LIB
-#endif _WIN32_WCE
+#endif // _WIN32_WCE
 
 #ifdef _MSC_VER
 	#ifndef LUAPLUS_LIB
@@ -29,14 +29,14 @@
 		#define LUA_API
 	#endif
 	#define LUAPLUS_CLASS LUA_API
-#else !_MSC_VER
+#else // !_MSC_VER
     #ifndef LUA_API
         #define LUA_API extern
     #endif
     #ifndef LUAPLUS_CLASS
         #define LUAPLUS_CLASS LUA_API
     #endif
-#endif _MSC_VER
+#endif // _MSC_VER
 
 #define LUALIB_API LUA_API
 

@@ -4,7 +4,7 @@
 //   gen    - fills the input words (floats as raw bits)
 //   retail - unpacks the inputs, calls the retail:: thunk, packs every output
 //            word (written lanes, return value, in-place inputs after the call)
-//   ours   - the same, calling the recovered moho:: / msvc8:: / Wm3:: function
+//   ours   - the same, calling the recovered moho:: / fa:: / Wm3:: function
 // Output buffers are pre-filled with kCanary so "did not write a lane" is
 // compared too.
 
@@ -106,11 +106,11 @@ namespace difffuzz
       in[1] = Bits(rng.Chance(50) ? GenPlain(rng, 10.0f) : GenFloat(rng));
     }
     void SinRetail(const u32* in, u32* out) { Put(out, 0, retail::Sinf(F(in, 0))); }
-    void SinOurs(const u32* in, u32* out) { Put(out, 0, msvc8::sinf(F(in, 0))); }
+    void SinOurs(const u32* in, u32* out) { Put(out, 0, fa::sinf(F(in, 0))); }
     void CosRetail(const u32* in, u32* out) { Put(out, 0, retail::Cosf(F(in, 0))); }
-    void CosOurs(const u32* in, u32* out) { Put(out, 0, msvc8::cosf(F(in, 0))); }
+    void CosOurs(const u32* in, u32* out) { Put(out, 0, fa::cosf(F(in, 0))); }
     void Atan2Retail(const u32* in, u32* out) { Put(out, 0, retail::Atan2f(F(in, 0), F(in, 1))); }
-    void Atan2Ours(const u32* in, u32* out) { Put(out, 0, msvc8::atan2f(F(in, 0), F(in, 1))); }
+    void Atan2Ours(const u32* in, u32* out) { Put(out, 0, fa::atan2f(F(in, 0), F(in, 1))); }
 
     // ---- acos 0x00A8DCD0 (double in/out; SLERP feeds it a widened float dot)
     void GenAcos(Rng& rng, u32* in)
@@ -142,7 +142,7 @@ namespace difffuzz
     {
       double d;
       std::memcpy(&d, in, 8);
-      const double r = msvc8::acos(d);
+      const double r = fa::acos(d);
       std::memcpy(out, &r, 8);
     }
 
@@ -171,7 +171,7 @@ namespace difffuzz
       double x, y;
       std::memcpy(&x, in, 8);
       std::memcpy(&y, in + 2, 8);
-      const double r = msvc8::fmod(x, y);
+      const double r = fa::fmod(x, y);
       std::memcpy(out, &r, 8);
     }
 
@@ -214,7 +214,7 @@ namespace difffuzz
       float x, y;
       std::memcpy(&x, in, 4);
       std::memcpy(&y, in + 1, 4);
-      const float r = static_cast<float>(msvc8::pow(static_cast<double>(x), static_cast<double>(y)));
+      const float r = static_cast<float>(fa::pow(static_cast<double>(x), static_cast<double>(y)));
       std::memcpy(out, &r, 4);
     }
 
@@ -285,25 +285,25 @@ namespace difffuzz
       Put(out, 0, static_cast<float>(std::fabs(static_cast<double>(F(in, 0)))));
     }
     void LuaTanRetail(const u32* in, u32* out) { Put(out, 0, retail::UnaryFloatLeaf(kRetailTan, F(in, 0))); }
-    void LuaTanOurs(const u32* in, u32* out) { Put(out, 0, msvc8::tanf(F(in, 0))); }
+    void LuaTanOurs(const u32* in, u32* out) { Put(out, 0, fa::tanf(F(in, 0))); }
     // math_atan: `fld1; fpatan` == the float atan2 leaf with x = 1.
     void LuaAtanRetail(const u32* in, u32* out) { Put(out, 0, retail::Atan2f(F(in, 0), 1.0f)); }
-    void LuaAtanOurs(const u32* in, u32* out) { Put(out, 0, msvc8::atanf(F(in, 0))); }
+    void LuaAtanOurs(const u32* in, u32* out) { Put(out, 0, fa::atanf(F(in, 0))); }
     void LuaSqrtRetail(const u32* in, u32* out) { Put(out, 0, retail::Sqrtf(F(in, 0))); } // math_sqrt: inline fsqrt
     void LuaSqrtOurs(const u32* in, u32* out)
     {
       Put(out, 0, static_cast<float>(std::sqrt(static_cast<double>(F(in, 0)))));
     }
     void LuaLogRetail(const u32* in, u32* out) { Put(out, 0, retail::UnaryFloatLeaf(kRetailLn, F(in, 0))); }
-    void LuaLogOurs(const u32* in, u32* out) { Put(out, 0, msvc8::IntrinsicLn(F(in, 0))); }
+    void LuaLogOurs(const u32* in, u32* out) { Put(out, 0, fa::IntrinsicLn(F(in, 0))); }
     void LuaLog10Retail(const u32* in, u32* out) { Put(out, 0, retail::UnaryFloatLeaf(kRetailLog10, F(in, 0))); }
-    void LuaLog10Ours(const u32* in, u32* out) { Put(out, 0, msvc8::IntrinsicLog10(F(in, 0))); }
+    void LuaLog10Ours(const u32* in, u32* out) { Put(out, 0, fa::IntrinsicLog10(F(in, 0))); }
     void LuaExpRetail(const u32* in, u32* out) { Put(out, 0, retail::UnaryFloatLeaf(kRetailExp, F(in, 0))); }
-    void LuaExpOurs(const u32* in, u32* out) { Put(out, 0, msvc8::IntrinsicExp(F(in, 0))); }
+    void LuaExpOurs(const u32* in, u32* out) { Put(out, 0, fa::IntrinsicExp(F(in, 0))); }
     void LuaDegRetail(const u32* in, u32* out) { Put(out, 0, retail::MulImageConstant(F(in, 0), kRetailDegrees)); }
-    void LuaDegOurs(const u32* in, u32* out) { Put(out, 0, msvc8::MultiplyX87(F(in, 0), 57.29578f)); }
+    void LuaDegOurs(const u32* in, u32* out) { Put(out, 0, fa::MultiplyX87(F(in, 0), 57.29578f)); }
     void LuaRadRetail(const u32* in, u32* out) { Put(out, 0, retail::MulImageConstant(F(in, 0), kRetailRadians)); }
-    void LuaRadOurs(const u32* in, u32* out) { Put(out, 0, msvc8::MultiplyX87(F(in, 0), 0.017453292f)); }
+    void LuaRadOurs(const u32* in, u32* out) { Put(out, 0, fa::MultiplyX87(F(in, 0), 0.017453292f)); }
 
     void LuaAsinRetail(const u32* in, u32* out)
     {
@@ -313,7 +313,7 @@ namespace difffuzz
     }
     void LuaAsinOurs(const u32* in, u32* out)
     {
-      Put(out, 0, static_cast<float>(msvc8::asin(static_cast<double>(F(in, 0)))));
+      Put(out, 0, static_cast<float>(fa::asin(static_cast<double>(F(in, 0)))));
     }
     void LuaAcosRetail(const u32* in, u32* out)
     {
@@ -323,7 +323,7 @@ namespace difffuzz
     }
     void LuaAcosOurs(const u32* in, u32* out)
     {
-      Put(out, 0, static_cast<float>(msvc8::acos(static_cast<double>(F(in, 0)))));
+      Put(out, 0, static_cast<float>(fa::acos(static_cast<double>(F(in, 0)))));
     }
     void LuaCeilRetail(const u32* in, u32* out)
     {
@@ -375,7 +375,7 @@ namespace difffuzz
     }
     void LuaModOurs(const u32* in, u32* out)
     {
-      Put(out, 0, static_cast<float>(msvc8::fmod(static_cast<double>(F(in, 0)), static_cast<double>(F(in, 1)))));
+      Put(out, 0, static_cast<float>(fa::fmod(static_cast<double>(F(in, 0)), static_cast<double>(F(in, 1)))));
     }
 
     void LuaFrexpRetail(const u32* in, u32* out)
@@ -389,7 +389,7 @@ namespace difffuzz
     void LuaFrexpOurs(const u32* in, u32* out)
     {
       int exponent = 0;
-      const float mantissa = static_cast<float>(msvc8::frexp(static_cast<double>(F(in, 0)), &exponent));
+      const float mantissa = static_cast<float>(fa::frexp(static_cast<double>(F(in, 0)), &exponent));
       Put(out, 0, mantissa);
       Put(out, 1, static_cast<float>(exponent));
     }
@@ -516,7 +516,7 @@ namespace difffuzz
       float r = sample;
       if (in[1] == 1) {
         const int upper = static_cast<int>(in[2]);
-        const float scaled = msvc8::MultiplyIntegerX87(upper, sample);
+        const float scaled = fa::MultiplyIntegerX87(upper, sample);
         const float picked = std::floor(scaled);
         r = picked + 1.0f;
       } else if (in[1] == 2) {
@@ -524,7 +524,7 @@ namespace difffuzz
         const int upper = static_cast<int>(in[3]);
         const auto span =
           static_cast<std::int32_t>(static_cast<std::uint32_t>(upper) - static_cast<std::uint32_t>(lower) + 1u);
-        const float scaled = msvc8::MultiplyIntegerX87(span, sample);
+        const float scaled = fa::MultiplyIntegerX87(span, sample);
         const float picked = std::floor(scaled);
         r = static_cast<float>(static_cast<double>(picked) + static_cast<double>(lower));
       }
@@ -534,7 +534,7 @@ namespace difffuzz
     void LuaSeedRetail(const u32* in, u32* out) { out[0] = retail::RandomSeedWord(F(in, 0)); }
     void LuaSeedOurs(const u32* in, u32* out)
     {
-      out[0] = static_cast<unsigned int>(msvc8::TruncateToInt64(F(in, 0))); // math_randomseed
+      out[0] = static_cast<unsigned int>(fa::TruncateToInt64(F(in, 0))); // math_randomseed
     }
 
     // ---- Wm3::Vector3<float>::Normalize 0x00452AF0 --------------------------
@@ -2601,9 +2601,9 @@ namespace difffuzz
     {
       const float direction = F(in, 0);
       const float elevation = F(in, 1);
-      Put(out, 0, msvc8::SinTimesCos(direction, elevation));
-      Put(out, 1, -msvc8::sin(elevation));
-      Put(out, 2, msvc8::CosTimesCos(direction, elevation));
+      Put(out, 0, fa::SinTimesCos(direction, elevation));
+      Put(out, 1, -fa::sin(elevation));
+      Put(out, 2, fa::CosTimesCos(direction, elevation));
     }
 
     // CUnitMotion::CalcWingedOrientation 0x006BDAF2..0x006BDB31 (and the
@@ -2620,7 +2620,7 @@ namespace difffuzz
     }
     void Atan2DiffOurs(const u32* in, u32* out)
     {
-      Put(out, 0, msvc8::Atan2Difference(F(in, 0), F(in, 1), F(in, 2), F(in, 3)));
+      Put(out, 0, fa::Atan2Difference(F(in, 0), F(in, 1), F(in, 2), F(in, 3)));
     }
 
     // CUnitMotion::HandleDivingAndSurfacing 0x006C336C..0x006C3380: the depth
@@ -2637,7 +2637,7 @@ namespace difffuzz
     void DiveOurs(const u32* in, u32* out)
     {
       constexpr float kPi = 3.1415927f; // CUnitMotion.cpp HandleDivingAndSurfacing
-      Put(out, 0, msvc8::SinOfProductTimes(F(in, 0), kPi, F(in, 1)));
+      Put(out, 0, fa::SinOfProductTimes(F(in, 0), kPi, F(in, 1)));
     }
 
     // cfunc_ProjectileGetCurrentSpeedL 0x006A2846..0x006A2861: |velocity|.
@@ -2646,12 +2646,12 @@ namespace difffuzz
     {
       float lanes[3];
       std::memcpy(lanes, in, sizeof(lanes));
-      Put(out, 0, msvc8::VectorLengthZYXX87(lanes));
+      Put(out, 0, fa::VectorLengthZYXX87(lanes));
     }
 
     // The Lua table code's number keys: cvttss2si (lua_getn 0x0090AD62).
     void KeyRetail(const u32* in, u32* out) { out[0] = static_cast<u32>(retail::TruncateFloatKey(F(in, 0))); }
-    void KeyOurs(const u32* in, u32* out) { out[0] = static_cast<u32>(msvc8::TruncateToInt(F(in, 0))); }
+    void KeyOurs(const u32* in, u32* out) { out[0] = static_cast<u32>(fa::TruncateToInt(F(in, 0))); }
     void GenFloatKey(Rng& rng, u32* in)
     {
       const u32 mode = rng.Below(100);
@@ -2668,7 +2668,7 @@ namespace difffuzz
     // Near-integers, near-halves (frndint's ties), the int range's edges and
     // raw bits (NaN, infinities, denormals).
     void CeilRetail(const u32* in, u32* out) { out[0] = static_cast<u32>(retail::CeilFloatToInt(F(in, 0))); }
-    void CeilOurs(const u32* in, u32* out) { out[0] = static_cast<u32>(msvc8::CeilToIntX87(F(in, 0))); }
+    void CeilOurs(const u32* in, u32* out) { out[0] = static_cast<u32>(fa::CeilToIntX87(F(in, 0))); }
     void GenCeilInput(Rng& rng, u32* in)
     {
       const u32 mode = rng.Below(100);
@@ -2687,12 +2687,12 @@ namespace difffuzz
       {"sqrtf", 0x00452FC0, "std::sqrt(float) (inlined by every caller)", 1, 1, "x", "r", GenScalar, SqrtRetail, SqrtOurs},
       {"sqrtf_b", 0x0040EAF0, "std::sqrtf (VecSetLength)", 1, 1, "x", "r", GenScalar, SqrtBRetail, SqrtOurs},
       {"fabsf", 0x0040DAB0, "std::fabs(float) (QuatsNearEqual)", 1, 1, "x", "r", GenScalar, FabsRetail, FabsOurs},
-      {"sinf", 0x005734E0, "legacy/math/X87Math.cpp msvc8::sinf", 2, 1, "x _", "r", GenTrig, SinRetail, SinOurs},
-      {"cosf", 0x005734D0, "legacy/math/X87Math.cpp msvc8::cosf", 2, 1, "x _", "r", GenTrig, CosRetail, CosOurs},
-      {"atan2f", 0x004E9DF0, "legacy/math/X87Math.cpp msvc8::atan2f", 2, 1, "y x", "r", GenTrig, Atan2Retail, Atan2Ours},
-      {"acos", 0x00A8DCD0, "legacy/math/X87Math.cpp msvc8::acos(double)", 2, 2, "x(f64)", "r(f64)", GenAcos, AcosRetail, AcosOurs},
-      {"pow", 0x00A8E0E0, "legacy/math/X87Math.cpp msvc8::pow (Lua math.pow)", 2, 1, "x y", "r", GenPow, PowRetail, PowOurs},
-      {"fmod", 0x00A8E06A, "legacy/math/X87Math.cpp msvc8::fmod", 4, 2, "x(f64) y(f64)", "r(f64)", GenFmod, FmodRetail, FmodOurs},
+      {"sinf", 0x005734E0, "legacy/math/X87Math.cpp fa::sinf", 2, 1, "x _", "r", GenTrig, SinRetail, SinOurs},
+      {"cosf", 0x005734D0, "legacy/math/X87Math.cpp fa::cosf", 2, 1, "x _", "r", GenTrig, CosRetail, CosOurs},
+      {"atan2f", 0x004E9DF0, "legacy/math/X87Math.cpp fa::atan2f", 2, 1, "y x", "r", GenTrig, Atan2Retail, Atan2Ours},
+      {"acos", 0x00A8DCD0, "legacy/math/X87Math.cpp fa::acos(double)", 2, 2, "x(f64)", "r(f64)", GenAcos, AcosRetail, AcosOurs},
+      {"pow", 0x00A8E0E0, "legacy/math/X87Math.cpp fa::pow (Lua math.pow)", 2, 1, "x y", "r", GenPow, PowRetail, PowOurs},
+      {"fmod", 0x00A8E06A, "legacy/math/X87Math.cpp fa::fmod", 4, 2, "x(f64) y(f64)", "r(f64)", GenFmod, FmodRetail, FmodOurs},
       {"Wm3Normalize", 0x00452AF0, "Wm3Vector3.h Vector3::Normalize(Vector3*)", 3, 4, "v[3]", "v[3] len", GenV3, NormalizeRetail, NormalizeOurs},
       {"NormalizeVectorInto", 0x0044F7E0, "moho/math/Vector3f.cpp NormalizeVectorInto", 3, 7, "src[3]", "dest[3] ret src[3]", GenV3, NormIntoRetail, NormIntoOurs},
       {"QuatCrossAdd", 0x0044F880, "moho/sim/Sim.cpp QuatCrossAdd (mirrored)", 9, 5, "v1[3] v2[3] fallback[3]", "q[4] ret", GenCrossAdd, CrossAddRetail, CrossAddOurs},
@@ -2736,23 +2736,23 @@ namespace difffuzz
       {"WrapPositiveModulo", 0x00422940, "moho/animation/CAnimTexture.cpp WrapPositiveModulo (mirrored)", 2, 1, "value range", "r", GenWrap, WrapRetail, WrapOurs},
       // Lua math library, one row per `math.*` entry (--filter lua_).
       {"lua_abs", 0x00919A50, "lua/LuaObject.cpp math_abs (inline fabs; retail leaf 0x0040DAB0)", 1, 1, "x", "r", GenLuaAny, LuaAbsRetail, LuaAbsOurs},
-      {"lua_sin", 0x00919A80, "lua/LuaObject.cpp math_sin -> msvc8::sinf (retail leaf 0x005734E0)", 2, 1, "x _", "r", GenTrig, SinRetail, SinOurs},
-      {"lua_cos", 0x00919AB0, "lua/LuaObject.cpp math_cos -> msvc8::cosf (retail leaf 0x005734D0)", 2, 1, "x _", "r", GenTrig, CosRetail, CosOurs},
-      {"lua_tan", 0x00919AE0, "lua/LuaObject.cpp math_tan -> msvc8::tanf (retail leaf 0x00919A40)", 1, 1, "x", "r", GenLuaAny, LuaTanRetail, LuaTanOurs},
+      {"lua_sin", 0x00919A80, "lua/LuaObject.cpp math_sin -> fa::sinf (retail leaf 0x005734E0)", 2, 1, "x _", "r", GenTrig, SinRetail, SinOurs},
+      {"lua_cos", 0x00919AB0, "lua/LuaObject.cpp math_cos -> fa::cosf (retail leaf 0x005734D0)", 2, 1, "x _", "r", GenTrig, CosRetail, CosOurs},
+      {"lua_tan", 0x00919AE0, "lua/LuaObject.cpp math_tan -> fa::tanf (retail leaf 0x00919A40)", 1, 1, "x", "r", GenLuaAny, LuaTanRetail, LuaTanOurs},
       {"lua_asin", 0x00A8DE20, "lua/LuaObject.cpp math_asin (_CIasin)", 1, 1, "x", "r", GenLuaUnit, LuaAsinRetail, LuaAsinOurs},
-      {"lua_acos", 0x00A8DCD0, "lua/LuaObject.cpp math_acos -> msvc8::acos (_CIacos)", 1, 1, "x", "r", GenLuaUnit, LuaAcosRetail, LuaAcosOurs},
-      {"lua_atan", 0x00919B70, "lua/LuaObject.cpp math_atan -> msvc8::atanf (fld1; fpatan via leaf 0x004E9DF0)", 1, 1, "x", "r", GenLuaAny, LuaAtanRetail, LuaAtanOurs},
-      {"lua_atan2", 0x00919BA0, "lua/LuaObject.cpp math_atan2 -> msvc8::atan2f (retail leaf 0x004E9DF0)", 2, 1, "y x", "r", GenTrig, Atan2Retail, Atan2Ours},
+      {"lua_acos", 0x00A8DCD0, "lua/LuaObject.cpp math_acos -> fa::acos (_CIacos)", 1, 1, "x", "r", GenLuaUnit, LuaAcosRetail, LuaAcosOurs},
+      {"lua_atan", 0x00919B70, "lua/LuaObject.cpp math_atan -> fa::atanf (fld1; fpatan via leaf 0x004E9DF0)", 1, 1, "x", "r", GenLuaAny, LuaAtanRetail, LuaAtanOurs},
+      {"lua_atan2", 0x00919BA0, "lua/LuaObject.cpp math_atan2 -> fa::atan2f (retail leaf 0x004E9DF0)", 2, 1, "y x", "r", GenTrig, Atan2Retail, Atan2Ours},
       {"lua_ceil", 0x00A840A0, "lua/LuaObject.cpp math_ceil (CRT ceil)", 1, 1, "x", "r", GenLuaNotNan, LuaCeilRetail, LuaCeilOurs},
       {"lua_floor", 0x00A8DF30, "lua/LuaObject.cpp math_floor (CRT floor)", 1, 1, "x", "r", GenLuaNotNan, LuaFloorRetail, LuaFloorOurs},
-      {"lua_mod", 0x00A8E06A, "lua/LuaObject.cpp math_mod -> msvc8::fmod (_CIfmod)", 2, 1, "x y", "r", GenLuaMod, LuaModRetail, LuaModOurs},
+      {"lua_mod", 0x00A8E06A, "lua/LuaObject.cpp math_mod -> fa::fmod (_CIfmod)", 2, 1, "x y", "r", GenLuaMod, LuaModRetail, LuaModOurs},
       {"lua_frexp", 0x00A8DA05, "lua/LuaObject.cpp math_frexp (CRT frexp)", 1, 2, "x", "mantissa exponent", GenLuaFinite, LuaFrexpRetail, LuaFrexpOurs},
       {"lua_ldexp", 0x00A8DADF, "lua/LuaObject.cpp math_ldexp (_ftol2 + CRT ldexp)", 2, 1, "x n", "r", GenLuaLdexp, LuaLdexpRetail, LuaLdexpOurs},
       {"lua_sqrt", 0x00919C80, "lua/LuaObject.cpp math_sqrt (inline fsqrt; retail leaf 0x00452FC0)", 1, 1, "x", "r", GenLuaAny, LuaSqrtRetail, LuaSqrtOurs},
-      {"lua_pow", 0x00A8E0E0, "lua/LuaObject.cpp math_pow -> msvc8::pow (_CIpow)", 2, 1, "x y", "r", GenPow, PowRetail, PowOurs},
-      {"lua_log", 0x00919CF0, "lua/LuaObject.cpp math_log -> msvc8::IntrinsicLn (retail leaf 0x0040EAD0)", 1, 1, "x", "r", GenLuaAny, LuaLogRetail, LuaLogOurs},
-      {"lua_log10", 0x00919D20, "lua/LuaObject.cpp math_log10 -> msvc8::IntrinsicLog10 (retail leaf 0x00919980)", 1, 1, "x", "r", GenLuaAny, LuaLog10Retail, LuaLog10Ours},
-      {"lua_exp", 0x00919D50, "lua/LuaObject.cpp math_exp -> msvc8::IntrinsicExp (retail leaf 0x009199D0)", 1, 1, "x", "r", GenLuaAny, LuaExpRetail, LuaExpOurs},
+      {"lua_pow", 0x00A8E0E0, "lua/LuaObject.cpp math_pow -> fa::pow (_CIpow)", 2, 1, "x y", "r", GenPow, PowRetail, PowOurs},
+      {"lua_log", 0x00919CF0, "lua/LuaObject.cpp math_log -> fa::IntrinsicLn (retail leaf 0x0040EAD0)", 1, 1, "x", "r", GenLuaAny, LuaLogRetail, LuaLogOurs},
+      {"lua_log10", 0x00919D20, "lua/LuaObject.cpp math_log10 -> fa::IntrinsicLog10 (retail leaf 0x00919980)", 1, 1, "x", "r", GenLuaAny, LuaLog10Retail, LuaLog10Ours},
+      {"lua_exp", 0x00919D50, "lua/LuaObject.cpp math_exp -> fa::IntrinsicExp (retail leaf 0x009199D0)", 1, 1, "x", "r", GenLuaAny, LuaExpRetail, LuaExpOurs},
       {"lua_deg", 0x00919D90, "lua/LuaObject.cpp math_deg (fmul dword [0x00D46340])", 1, 1, "x", "r", GenLuaAny, LuaDegRetail, LuaDegOurs},
       {"lua_rad", 0x00919DC0, "lua/LuaObject.cpp math_rad (fmul dword [0x00D46344])", 1, 1, "x", "r", GenLuaAny, LuaRadRetail, LuaRadOurs},
       {"lua_random", 0x00919F90, "lua/LuaObject.cpp math_random arithmetic (retail floor 0x00A8DF30)", 4, 1, "rand argc a b", "r", GenLuaRandom, LuaRandomRetail, LuaRandomOurs},
@@ -2792,12 +2792,12 @@ namespace difffuzz
       {"RayBoxSlabClip", 0x00473DF0, "moho/math/Wm3AxisAlignedBox3FafExtras.cpp RayBoxSlabClip", 14, 9, "origin[3] dir[3] tEnter tExit min[3] max[3]", "state[8] ret", GenRaySlab, RaySlabRetail, RaySlabOurs},
       {"CAniPoseBone::Rotate", 0x0054BC00, "moho/animation/CAniPose.cpp CAniPoseBone::Rotate (MultiplyQuat)", 8, 4, "orient[4] rotation[4]", "orient[4]", GenBoneRotate, BoneRotateRetail, BoneRotateOurs},
       {"MotorFallDown::FallAxis", 0x006952A9, "moho/entity/MotorFallDown.cpp (SinTimesCos, -sin, CosTimesCos; site 0x006952A9..0x006953B1)", 2, 3, "direction elevation", "axis[3]", GenFallAxis, FallAxisRetail, FallAxisOurs},
-      {"Atan2Difference", 0x006BDAF2, "legacy/math/X87Math.cpp msvc8::Atan2Difference (site 0x006BDAF2..0x006BDB31, leaf 0x004E9DF0)", 4, 1, "y1 x1 y2 x2", "r", GenAtan2Pair, Atan2DiffRetail, Atan2DiffOurs},
-      {"CUnitMotion::DiveCurveSpeed", 0x006C336C, "moho/unit/CUnitMotion.cpp msvc8::SinOfProductTimes(phase, pi, base) (site 0x006C336C..0x006C3380)", 2, 1, "phase base", "r", GenDivePhase, DiveRetail, DiveOurs},
-      {"VectorLengthZYXX87", 0x006A2846, "legacy/math/X87Math.cpp msvc8::VectorLengthZYXX87 (site 0x006A2846..0x006A2861)", 3, 1, "v[3]", "r", GenV3, VelocityRetail, VelocityOurs},
-      {"TruncateToInt", 0x0090AD62, "legacy/math/X87Math.h msvc8::TruncateToInt (cvttss2si, lua_getn 0x0090AD62)", 1, 1, "key", "int", GenFloatKey, KeyRetail, KeyOurs, true},
+      {"Atan2Difference", 0x006BDAF2, "legacy/math/X87Math.cpp fa::Atan2Difference (site 0x006BDAF2..0x006BDB31, leaf 0x004E9DF0)", 4, 1, "y1 x1 y2 x2", "r", GenAtan2Pair, Atan2DiffRetail, Atan2DiffOurs},
+      {"CUnitMotion::DiveCurveSpeed", 0x006C336C, "moho/unit/CUnitMotion.cpp fa::SinOfProductTimes(phase, pi, base) (site 0x006C336C..0x006C3380)", 2, 1, "phase base", "r", GenDivePhase, DiveRetail, DiveOurs},
+      {"VectorLengthZYXX87", 0x006A2846, "legacy/math/X87Math.cpp fa::VectorLengthZYXX87 (site 0x006A2846..0x006A2861)", 3, 1, "v[3]", "r", GenV3, VelocityRetail, VelocityOurs},
+      {"TruncateToInt", 0x0090AD62, "legacy/math/X87Math.h fa::TruncateToInt (cvttss2si, lua_getn 0x0090AD62)", 1, 1, "key", "int", GenFloatKey, KeyRetail, KeyOurs, true},
       // seventh wave
-      {"CeilToIntX87", 0x00425110, "legacy/math/X87Math.cpp msvc8::CeilToIntX87 (frndint, cmova +1, fistp)", 1, 1, "value", "int", GenCeilInput, CeilRetail, CeilOurs, true},
+      {"CeilToIntX87", 0x00425110, "legacy/math/X87Math.cpp fa::CeilToIntX87 (frndint, cmova +1, fistp)", 1, 1, "value", "int", GenCeilInput, CeilRetail, CeilOurs, true},
     };
   } // namespace
 

@@ -27,15 +27,6 @@ namespace moho
 
 namespace
 {
-  [[nodiscard]] gpg::RType* ResolveRScmResourceTypeCached() noexcept
-  {
-    gpg::RType* resourceType = moho::RScmResource::sType;
-    if (resourceType == nullptr) {
-      resourceType = gpg::LookupRType(typeid(moho::RScmResource));
-      moho::RScmResource::sType = resourceType;
-    }
-    return resourceType;
-  }
 
   struct RScmResourcePrefetchBootstrap
   {
@@ -240,7 +231,7 @@ namespace moho
 {
   void RScmResource::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
   {
-    msvc8::string path;
+    fa::string path;
     archive.ReadString(&path);
     result.SetShared(GetModel(path.c_str(), nullptr), 1u);
   }
@@ -252,7 +243,7 @@ namespace moho
     gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
   )
   {
-    msvc8::string mountedPath;
+    fa::string mountedPath;
     (void)FILE_ToMountedPath(&mountedPath, mName.c_str());
     archive.WriteString(&mountedPath);
     result.SetShared(1u);

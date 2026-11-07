@@ -218,7 +218,7 @@ namespace moho
      * What it does:
      * Returns the cached RTTI descriptor for this provider class.
      */
-    [[nodiscard]] gpg::RType* GetClass() const;
+    [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x0086A3C0 (FUN_0086A3C0, Moho::CLuaWldUIProvider::GetDerivedObjectRef)
@@ -226,7 +226,7 @@ namespace moho
      * What it does:
      * Builds one reflected reference for this provider instance.
      */
-    gpg::RRef GetDerivedObjectRef();
+    gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x0086A650 (FUN_0086A650, Moho::CLuaWldUIProvider::StartLoadingDialog)
@@ -303,12 +303,12 @@ namespace moho
 
   public:
     /// The texture prefetches `CreateGameInterface` loads, held so the data
-    /// stays resident while the game UI is up. An `msvc8::vector`: the
+    /// stays resident while the game UI is up. An `fa::vector`: the
     /// constructor zeroes first/last/end at +0x3C..+0x44 (0x0086A56E..0x0086A574)
     /// and never writes the allocator word at +0x38, and the `push_back` it
     /// grows through (0x004A5C60, `lea edi,[ebx+38h]` at 0x0086A7AF) finds
     /// first/last/end at +4/+8/+0xC of the object.
-    msvc8::vector<boost::shared_ptr<PrefetchData>> mPrefetchData; // +0x38
+    fa::vector<boost::shared_ptr<PrefetchData>> mPrefetchData; // +0x38
   };
   static_assert(offsetof(CLuaWldUIProvider, mPrefetchData) == 0x38, "CLuaWldUIProvider::mPrefetchData offset must be 0x38");
   static_assert(sizeof(CLuaWldUIProvider) == 0x48, "CLuaWldUIProvider size must be 0x48");
@@ -883,13 +883,13 @@ namespace moho
     // 0x00852C75 and then divides `[+0x64,+0x68)` by 204 (0x00852CD4,
     // sizeof(RMeshBlueprintLOD)) to test whether the LOD chain is empty.
     RMeshBlueprint* mActiveBuildMesh = nullptr;             // +0x04
-    msvc8::vector<boost::shared_ptr<MeshInstance>> mMeshes; // +0x08
-    msvc8::vector<RUnitBlueprint*> mBlueprints;             // +0x18
+    fa::vector<boost::shared_ptr<MeshInstance>> mMeshes; // +0x08
+    fa::vector<RUnitBlueprint*> mBlueprints;             // +0x18
     // The binary's "preview positions" lane is an ordinary MSVC8 std::map
     // keyed by the order's command id: node {left,parent,right} at 0x00..0x0B,
     // pair<const CmdId, shared_ptr<MeshInstance>> at 0x0C, _Color at 0x18 and
-    // _Isnil at 0x19 - exactly msvc8::map's node shape.
-    msvc8::map<CmdId, boost::shared_ptr<MeshInstance>> mPreviewPositions; // +0x28
+    // _Isnil at 0x19 - exactly fa::map's node shape.
+    fa::map<CmdId, boost::shared_ptr<MeshInstance>> mPreviewPositions; // +0x28
     boost::shared_ptr<MeshMaterial> mUnitPlaceMaterial;     // +0x34
     CWldTerrainDecal* mDecal = nullptr;                     // +0x3C
     // Command *mode*, not caps: FUN_00852C10 copies `CommandModeData::mMode`
@@ -904,6 +904,9 @@ namespace moho
     /// whenever that flips, copies it into every `mPreviewPositions` mesh's
     /// hidden flag, so the ghosts give way while the full graph is drawn.
     bool mQueuedGhostsHidden = false;                       // +0x5D
+    /// Engine addition, in the tail padding (`ren_BuildGhostsPerBeat`): the beat and order count the
+    /// queued ghosts were last rebuilt for.
+    std::uint16_t mQueuedGhostStamp = 0xFFFFU;              // +0x5E
   };
   static_assert(offsetof(CBuildDragPreview, mSession) == 0x00, "CBuildDragPreview::mSession offset must be 0x00");
   static_assert(
@@ -1324,13 +1327,13 @@ namespace moho
   /**
    * Address: 0x010C1B48 (data segment global, 256 * 28 bytes = 0x1C00)
    *
-   * Lookup table mapping wxKeyCode (0..255) to msvc8::string name. Populated
+   * Lookup table mapping wxKeyCode (0..255) to fa::string name. Populated
    * at startup by `IN_InitKeyHandler` with "Unknown%02X" placeholders, then
    * overwritten from `/lua/keymap/keyNames.lua` via `CUIKeyHandlerLoadKeyMappings`.
    * Consumed by `IN_FindKeyNameIndex` / `IN_FindKeyNameIndexCi` to translate
    * key-binding token strings into wx key codes.
    */
-  extern msvc8::string in_keyNames[256];
+  extern fa::string in_keyNames[256];
 
   /**
    * Address: 0x00838F30 (FUN_00838F30, Moho::IN_FindKeyNameIndex)
@@ -1339,7 +1342,7 @@ namespace moho
    * Case-sensitive linear scan of `in_keyNames` for one key name; returns the
    * matching wxKeyCode (0..255) or -1 when no slot matches.
    */
-  [[nodiscard]] int IN_FindKeyNameIndex(const msvc8::string& needle);
+  [[nodiscard]] int IN_FindKeyNameIndex(const fa::string& needle);
 
   /**
    * Address: 0x00838F80 (FUN_00838F80, Moho::IN_FindKeyNameIndexCi)
@@ -1348,7 +1351,7 @@ namespace moho
    * Case-insensitive linear scan of `in_keyNames` for one key name; returns
    * the matching wxKeyCode (0..255) or -1 when no slot matches.
    */
-  [[nodiscard]] int IN_FindKeyNameIndexCi(const msvc8::string& needle);
+  [[nodiscard]] int IN_FindKeyNameIndexCi(const fa::string& needle);
 
   /**
    * Address: 0x00838E70 (FUN_00838E70, Moho::IN_GetKeyName)
@@ -1357,7 +1360,7 @@ namespace moho
    * Yields `in_keyNames[keyCode]`, or an empty string for a code outside the
    * 256-slot table.
    */
-  [[nodiscard]] msvc8::scoped_string IN_GetKeyName(unsigned int keyCode);
+  [[nodiscard]] fa::scoped_string IN_GetKeyName(unsigned int keyCode);
 
   /**
    * Address: 0x00839840 (FUN_00839840, Moho::IN_DescribeKeyBinding)
@@ -1366,7 +1369,7 @@ namespace moho
    * Renders one packed key mask as the chord spelling `IN_BindKey` accepts:
    * the `Ctrl-` / `Alt-` / `Shift-` prefixes in that order, then the key name.
    */
-  [[nodiscard]] msvc8::scoped_string IN_DescribeKeyBinding(std::uint32_t keyMask);
+  [[nodiscard]] fa::scoped_string IN_DescribeKeyBinding(std::uint32_t keyMask);
 
   /**
    * Address: 0x00839DC0 (FUN_00839DC0, Moho::IN_DumpKeyBindings)
@@ -1377,7 +1380,7 @@ namespace moho
    * `"<chord> :: <console command> :: repeat = <true|false>"`. Takes no
    * command arguments, matching the binary's `CConFunc::Callback` shape.
    */
-  void IN_DumpKeyBindings(const msvc8::vector<msvc8::string>& args);
+  void IN_DumpKeyBindings(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00839EE0 (FUN_00839EE0, Moho::IN_DumpKeyNames)
@@ -1388,7 +1391,7 @@ namespace moho
    * command arguments (the incoming pointer is unused, matching the
    * binary's `CConFunc::Callback` shape).
    */
-  void IN_DumpKeyNames(const msvc8::vector<msvc8::string>& args);
+  void IN_DumpKeyNames(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00838C70 (FUN_00838C70, Moho::IN_InitKeyHandler)
@@ -1438,7 +1441,7 @@ namespace moho
    * table; modifier tokens ("ALT", "CTRL"/"CONTROL", "SHIFT") OR their
    * corresponding high-bit flags into the result.
    */
-  int IN_ParseKeyModifiers(const msvc8::string& keyBindingSpec);
+  int IN_ParseKeyModifiers(const fa::string& keyBindingSpec);
 
   /**
    * Address: 0x00839F20 (FUN_00839F20, Moho::IN_BindKey)
@@ -1453,7 +1456,7 @@ namespace moho
    * command global in `CConCommand.cpp` (initializer 0x00BE4850) holds this
    * function's address, which is why the declaration has to be visible from `CConCommand.cpp`.
    */
-  void IN_BindKey(const msvc8::vector<msvc8::string>& args);
+  void IN_BindKey(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0083A080 (FUN_0083A080, sub_83A080)
@@ -1471,7 +1474,7 @@ namespace moho
    * (initializer 0x00BE48D0) holds this function's address, which is why the declaration
    * has to be visible from `CConCommand.cpp`.
    */
-  void IN_SetKeyName(const msvc8::vector<msvc8::string>& args);
+  void IN_SetKeyName(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x008365B0 (FUN_008365B0, cfunc_ClearCurrentFactoryForQueueDisplay)
@@ -1734,7 +1737,7 @@ namespace moho
      * Constructs one control from Lua object + parent lanes and stores one
      * control kind tag used by Lua-side MAUI initialization.
      */
-    CMauiControl(LuaPlus::LuaObject* luaObject, CMauiControl* parent, msvc8::string controlKind);
+    CMauiControl(LuaPlus::LuaObject* luaObject, CMauiControl* parent, fa::string controlKind);
 
     /**
      * Address: 0x00786D00 (FUN_00786D00, Moho::CMauiControl::~CMauiControl)
@@ -2144,7 +2147,7 @@ namespace moho
      * What it does:
      * Returns one copied debug-name string from the control runtime lane.
      */
-    [[nodiscard]] msvc8::string GetDebugName();
+    [[nodiscard]] fa::string GetDebugName();
 
     /**
      * Address: 0x0077F720 (FUN_0077F720, Moho::CMauiControl::SetDebugName)
@@ -2152,7 +2155,7 @@ namespace moho
      * What it does:
      * Copies one debug-name string into the control debug-name lane.
      */
-    void SetDebugName(msvc8::string debugName);
+    void SetDebugName(fa::string debugName);
 
 
     /**
@@ -2184,7 +2187,7 @@ namespace moho
     /// `mDepthLV`'s value, cached for depth sorting.
     float mDepth;                                  // +0xD4
     /// Children in draw order, rebuilt when the control is invalidated.
-    msvc8::vector<CMauiControl*> mRenderedChildren; // +0xD8
+    fa::vector<CMauiControl*> mRenderedChildren; // +0xD8
     bool mInvalidated;                             // +0xE8
     bool mDisableHitTest;                          // +0xE9
     bool mIsHidden;                                // +0xEA
@@ -2194,7 +2197,7 @@ namespace moho
     std::uint32_t mVertexAlpha;                    // +0xF4
     std::int32_t mRenderPass;                      // +0xF8
     CMauiControl* mRootFrame;                      // +0xFC
-    msvc8::string mDebugName;                      // +0x100
+    fa::string mDebugName;                      // +0x100
   };
 
   static_assert(sizeof(CMauiControl) == 0x11C, "moho::CMauiControl size must be 0x11C");
@@ -2332,7 +2335,7 @@ namespace moho
      * What it does:
      * Returns one copy of the current edit text lane.
      */
-    [[nodiscard]] msvc8::string GetText();
+    [[nodiscard]] fa::string GetText();
 
     /**
      * Address: 0x007906F0 (FUN_007906F0, Moho::CMauiEdit::GetSelection)
@@ -2340,7 +2343,7 @@ namespace moho
      * What it does:
      * Returns the currently selected UTF-8 substring from the edit text lane.
      */
-    [[nodiscard]] msvc8::string GetSelection();
+    [[nodiscard]] fa::string GetSelection();
 
     /**
      * Address: 0x0078F380 (FUN_0078F380, Moho::CMauiEdit::SetText)
@@ -2349,7 +2352,7 @@ namespace moho
      * Applies one UTF-8 text lane (clamped by max chars), refreshes caret/clip
      * state, and emits `OnTextChanged` callback when reentrancy guard allows.
      */
-    void SetText(const msvc8::string& text);
+    void SetText(const fa::string& text);
 
     /**
      * Address: 0x0078F4C0 (FUN_0078F4C0, Moho::CMauiEdit::ClearText)
@@ -2443,7 +2446,7 @@ namespace moho
      * Deletes the current selection lane and inserts replacement UTF-8 text
      * (clamped against max-char limit) at the caret.
      */
-    void ReplaceSelection(const msvc8::string& replacementText);
+    void ReplaceSelection(const fa::string& replacementText);
 
     /**
      * Address: 0x00790590 (FUN_00790590, Moho::CMauiEdit::DeleteSelection)
@@ -2531,7 +2534,7 @@ namespace moho
      * Invokes script callback `OnTextChanged(self, newText, oldText)` when
      * present while holding the weak-object callback guard lane.
      */
-    void TextChanged(const msvc8::string& newText, const msvc8::string& oldText);
+    void TextChanged(const fa::string& newText, const fa::string& oldText);
 
   public:
     // ---------------------------------------------------------------------
@@ -2551,7 +2554,7 @@ namespace moho
     std::uint32_t mHighlightBackgroundColor = 0; // +0x138
     bool mDropShadow = false;                    // +0x13C
     bool mIsEnabled = false;                     // +0x13D
-    msvc8::string mText{};                       // +0x140
+    fa::string mText{};                       // +0x140
     std::int32_t mCaretPosition = 0;             // +0x15C
     bool mCaretVisible = false;                  // +0x160
     std::uint32_t mCaretColor = 0;               // +0x164
@@ -2863,7 +2866,7 @@ namespace moho
      * What it does:
      * Rebuilds frame-pattern lanes from Lua-provided frame-order values.
      */
-    void SetFramePattern(const msvc8::vector<std::int32_t>& framePattern);
+    void SetFramePattern(const fa::vector<std::int32_t>& framePattern);
 
     /**
      * Address: 0x00780420 (FUN_00780420, Moho::CMauiBitmap::SetForwardPattern)
@@ -2942,7 +2945,7 @@ namespace moho
     // "HEAP CORRUPTION DETECTED: after Normal block" inside
     // `CMauiBitmap::~CMauiBitmap` via `CMauiFrame::PurgeDeleted`.
     // ---------------------------------------------------------------------
-    msvc8::vector<boost::shared_ptr<CD3DBatchTexture>> mTextureBatches; // +0x11C
+    fa::vector<boost::shared_ptr<CD3DBatchTexture>> mTextureBatches; // +0x11C
     CScriptLazyVar_float mBitmapWidthLV{};                              // +0x12C
     CScriptLazyVar_float mBitmapHeightLV{};                             // +0x140
     float mU0 = 0.0f;                                                   // +0x154
@@ -2959,12 +2962,12 @@ namespace moho
     bool mDoLoop = false;                                               // +0x171
     std::int32_t mCurrentFrame = 0;                                     // +0x174
     float mCurrentFrameTimeSeconds = 0.0f;                              // +0x178
-    /// The frame pattern. An ordinary `msvc8::vector`: `SetFramePattern`
+    /// The frame pattern. An ordinary `fa::vector`: `SetFramePattern`
     /// (0x007802D0) takes the object at `this+0x17C` and clears through
     /// `[obj+8]`, and like `mTextureBatches` at +0x11C its allocator word is
     /// never written - the constructor and destructor only touch
     /// first/last/end at +0x180..+0x188.
-    msvc8::vector<std::int32_t> mFrames;                                // +0x17C
+    fa::vector<std::int32_t> mFrames;                                // +0x17C
   };
 
   static_assert(sizeof(CMauiBitmap) == 0x18C, "CMauiBitmap size must be 0x18C");
@@ -3033,7 +3036,7 @@ namespace moho
   /**
    * One histogram data series ("column"), 0x14 bytes: a packed colour (from
    * `SCR_DecodeColor`) and the series' values. The values are an
-   * `msvc8::vector<float>` - the word at +0x04 that nothing initialises is its
+   * `fa::vector<float>` - the word at +0x04 that nothing initialises is its
    * allocator slot, and a column's destructor is exactly that vector's
    * `_Tidy` (`destroy_range` 0x00798D10: free first, then zero first/last/end
    * at +0x08..+0x10).
@@ -3041,7 +3044,7 @@ namespace moho
   struct SHistogramColumn
   {
     std::uint32_t mColor = 0;     // +0x00
-    msvc8::vector<float> mValues; // +0x04
+    fa::vector<float> mValues; // +0x04
   };
   static_assert(sizeof(SHistogramColumn) == 0x14, "SHistogramColumn size must be 0x14");
   static_assert(offsetof(SHistogramColumn, mValues) == 0x04, "SHistogramColumn::mValues offset must be 0x04");
@@ -3120,10 +3123,10 @@ namespace moho
     // ---------------------------------------------------------------------
     std::int32_t mXIncrement = 0;           // +0x11C
     std::int32_t mYIncrement = 0;           // +0x120
-    /// The data series. An `msvc8::vector`: the constructor (0x007977A0) and
+    /// The data series. An `fa::vector`: the constructor (0x007977A0) and
     /// the destructor (0x00797840) touch only first/last/end at +0x128..+0x130,
     /// and the word at +0x124 they skip is its allocator slot.
-    msvc8::vector<SHistogramColumn> mColumns; // +0x124
+    fa::vector<SHistogramColumn> mColumns; // +0x124
   };
 
   static_assert(sizeof(CMauiHistogram) == 0x134, "CMauiHistogram size must be 0x134");
@@ -3265,7 +3268,7 @@ namespace moho
      * What it does:
      * Adds one string lane to the item-list payload.
      */
-    void AddItem(msvc8::string text);
+    void AddItem(fa::string text);
 
     /**
      * Address: 0x00799780 (FUN_00799780, Moho::CMauiItemList::ModifyItem)
@@ -3274,7 +3277,7 @@ namespace moho
      * Replaces one existing item string lane by index and throws when index is
      * out of range.
      */
-    void ModifyItem(std::uint32_t index, msvc8::string text);
+    void ModifyItem(std::uint32_t index, fa::string text);
 
     /**
      * Address: 0x00799940 (FUN_00799940, Moho::CMauiItemList::DeleteItem)
@@ -3339,7 +3342,7 @@ namespace moho
     std::uint32_t mSelectedBackgroundColor = 0;  // +0x12C
     std::uint32_t mHighlightForegroundColor = 0; // +0x130
     std::uint32_t mHighlightBackgroundColor = 0; // +0x134
-    msvc8::vector<msvc8::string> mItems;         // +0x138
+    fa::vector<fa::string> mItems;         // +0x138
     std::int32_t mCurSelection = -1;             // +0x148
     std::int32_t mHoverItem = -1;                // +0x14C
     bool mShowSelection = false;                 // +0x150
@@ -3419,7 +3422,7 @@ namespace moho
      * by RTTI on first use (overrides the base CMauiControl accessor with the
      * mesh-specific type cache).
      */
-    [[nodiscard]] gpg::RType* GetClass() const;
+    [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x0079DC30 (FUN_0079DC30, Moho::CMauiMesh::GetDerivedObjectRef)
@@ -3427,7 +3430,7 @@ namespace moho
      * What it does:
      * Packs {this, GetClass()} into a reflection reference handle.
      */
-    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef() override;
 
     /** Per-type cached reflection descriptor (lazy-initialized by GetClass). */
     static gpg::RType* sType;
@@ -3632,7 +3635,7 @@ namespace moho
     bool mDoLoop = false;                  // +0x121
     bool mIsStopped = false;               // +0x122
     bool mIsMinimized = false;             // +0x123
-    msvc8::string mSubtitleCache{};        // +0x124
+    fa::string mSubtitleCache{};        // +0x124
     CScriptLazyVar_float mMovieWidthLV{};  // +0x140
     CScriptLazyVar_float mMovieHeightLV{}; // +0x154
   };
@@ -3878,7 +3881,7 @@ namespace moho
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
     CD3DFont* mFont = nullptr;                     // +0x11C
-    msvc8::string mText{};                         // +0x120
+    fa::string mText{};                         // +0x120
     std::uint32_t mColor = 0;                      // +0x13C
     bool mDropShadow = false;                      // +0x140
     bool mClipToWidth = false;                     // +0x141
@@ -3936,7 +3939,7 @@ namespace moho
      * What it does:
      * Returns cached reflection descriptor for this `CMauiBorder` instance.
      */
-    [[nodiscard]] gpg::RType* GetClass() const;
+    [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x00784880 (FUN_00784880, Moho::CMauiBorder::GetDerivedObjectRef)
@@ -3944,7 +3947,7 @@ namespace moho
      * What it does:
      * Packs `{this, GetClass()}` as a reflection reference handle.
      */
-    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x00784D60 (FUN_00784D60, Moho::CMauiBorder::SetTextures)
@@ -4111,8 +4114,8 @@ namespace moho
   static_assert(offsetof(CUIMapPreview, mTexture) == 0x11c, "CUIMapPreview::mTexture offset must be 0x11c");
 
 
-  static_assert(sizeof(msvc8::vector<CMauiControl*>) == 0x10, "msvc8::vector must be 0x10");
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(msvc8::string) == 0x1C, "msvc8::string size must be 0x1C");
+  static_assert(sizeof(fa::vector<CMauiControl*>) == 0x10, "fa::vector must be 0x10");
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(fa::string) == 0x1C, "fa::string size must be 0x1C");
 
 
   /**
@@ -4219,14 +4222,14 @@ namespace moho
      *
      * VFTable SLOT: 0
      */
-    [[nodiscard]] gpg::RType* GetClass() const;
+    [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x0086DB90 (FUN_0086DB90, Moho::CUIWorldView::GetDerivedObjectRef)
      *
      * VFTable SLOT: 1
      */
-    [[nodiscard]] gpg::RRef GetDerivedObjectRef();
+    [[nodiscard]] gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x0086EF40 (FUN_0086EF40, Moho::CUIWorldView::DoRender)
@@ -4482,7 +4485,7 @@ namespace moho
     /// hand `CameraSpin` a delta. Read at 0x008709DE / 0x008709F1 and rewritten
     /// at 0x00870A5F / 0x00870A68.
     Wm3::Vector2f mLastCursorScreenPos;             // +0x278
-    msvc8::string mCameraTrack;                     // +0x280
+    fa::string mCameraTrack;                     // +0x280
     /// The selection dragger this view has posted and draws each frame
     /// (`ISelectionDragger::Render`, from `DoRender`). A weak link, so it
     /// clears itself when the dragger deletes itself on release.
@@ -4560,7 +4563,7 @@ namespace moho
 
 
 
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(msvc8::vector<msvc8::string>) == 0x10, "msvc8::vector<msvc8::string> size must be 0x10");
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(fa::vector<fa::string>) == 0x10, "fa::vector<fa::string> size must be 0x10");
 
 
   /**
@@ -8105,6 +8108,17 @@ namespace moho
    */
   CScrLuaInitForm* func_CMauiTextSetDropShadow_LuaFuncDef();
 
+  // Engine additions: draw scale of a text control, and fonts from mods (issue #304).
+  int cfunc_CMauiTextSetTextScale(lua_State* luaContext);
+  int cfunc_CMauiTextSetTextScaleL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_CMauiTextSetTextScale_LuaFuncDef();
+  int cfunc_CMauiTextGetTextScale(lua_State* luaContext);
+  int cfunc_CMauiTextGetTextScaleL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_CMauiTextGetTextScale_LuaFuncDef();
+  int cfunc_LoadFont(lua_State* luaContext);
+  int cfunc_LoadFontL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_LoadFont_LuaFuncDef();
+
   /**
    * Address: 0x007A3BE0 (FUN_007A3BE0, cfunc_CMauiTextSetDropShadowL)
    *
@@ -9530,14 +9544,14 @@ namespace moho
    *
    * Layout proven from the emitted element helpers for the 0x30-stride lane at
    * `0x010C1A10`:
-   *   +0x00 `msvc8::string blueprintId` - `0x00835D75` writes `myRes=0x0F` at
+   *   +0x00 `fa::string blueprintId` - `0x00835D75` writes `myRes=0x0F` at
    *         `+0x18` and `mySize=0` at `+0x14`, and `0x00836108` reads
    *         `cmp [item+0x18], 0x10` before choosing `[item+0x04]` (heap) or
    *         `item+0x04` (SSO buffer) as the `c_str()` lane.
    *   +0x1C `std::int32_t count`         - `0x00835D8E` stores the ctor's count
    *         argument, `0x00836128` reads it for the Lua `count` field, and
    *         `0x00835F85` accumulates into it (`[itemEnd-0x14]`).
-   *   +0x20 `msvc8::vector<CmdId> commands` - `0x00835D95..0x00835D9B` zero
+   *   +0x20 `fa::vector<CmdId> commands` - `0x00835D95..0x00835D9B` zero
    *         `+0x24/+0x28/+0x2C` (the `_Myfirst/_Mylast/_Myend` triple behind the
    *         proxy slot at `+0x20`), and `0x00835F92` takes `itemEnd-0x10` as the
    *         push-back target for the owning command's id.
@@ -9557,7 +9571,7 @@ namespace moho
      * Assigns the blueprint id into the embedded legacy string, stores the
      * queued count and zeroes the command-id vector's data triple.
      */
-    FactoryQueueDisplayItem(const msvc8::string& sourceBlueprintId, std::int32_t sourceCount);
+    FactoryQueueDisplayItem(const fa::string& sourceBlueprintId, std::int32_t sourceCount);
 
     /**
      * Address: 0x00837670 (FUN_00837670, sub_837670)
@@ -9585,9 +9599,9 @@ namespace moho
     FactoryQueueDisplayItem() noexcept;
     FactoryQueueDisplayItem& operator=(const FactoryQueueDisplayItem& other);
 
-    msvc8::string blueprintId;      // +0x00
+    fa::string blueprintId;      // +0x00
     std::int32_t count;             // +0x1C
-    msvc8::vector<CmdId> commands;  // +0x20
+    fa::vector<CmdId> commands;  // +0x20
   };
   static_assert(offsetof(FactoryQueueDisplayItem, count) == 0x1C, "FactoryQueueDisplayItem::count offset must be 0x1C");
   static_assert(
@@ -9596,7 +9610,7 @@ namespace moho
   );
   static_assert(sizeof(FactoryQueueDisplayItem) == 0x30, "FactoryQueueDisplayItem size must be 0x30");
 
-  using FactoryQueueDisplaySnapshot = msvc8::vector<FactoryQueueDisplayItem>;
+  using FactoryQueueDisplaySnapshot = fa::vector<FactoryQueueDisplayItem>;
 
   /**
    * Data: 0x010C1A10 - the UI-owned factory build-queue mirror.
@@ -9721,11 +9735,11 @@ namespace moho
    * `gpg/core/utils/Logging.h`'s `LogScopeEntry` note and
    * `CGpgNetInterface.cpp`'s `MakeConnectThreadLaunchCallback`): this SDK's
    * `gpg::StrArg` is currently the simplified `= const char*` alias with no
-   * implicit conversion from `msvc8::string`, so this parameter is kept as
-   * `const msvc8::string&` -- matching that same already-documented,
+   * implicit conversion from `fa::string`, so this parameter is kept as
+   * `const fa::string&` -- matching that same already-documented,
    * evidenced gap rather than reintroducing the class here.
    */
-  void func_ReceiveChat(const msvc8::string& senderName, const gpg::MemBuffer<const char>& data);
+  void func_ReceiveChat(const fa::string& senderName, const gpg::MemBuffer<const char>& data);
 
   /**
    * Address: 0x0083EDF0 (FUN_0083EDF0, ?UI_StopCursorText@Moho@@YAXXZ)
@@ -9845,7 +9859,7 @@ namespace moho
   [[nodiscard]] const VMatrix4& UI_IdentityMatrix();
 
   /**
-   * Address: 0x00855040 (FUN_00855040, msvc8::vector<boost::shared_ptr<MeshInstance>>::push_back)
+   * Address: 0x00855040 (FUN_00855040, fa::vector<boost::shared_ptr<MeshInstance>>::push_back)
    *
    * What it does:
    * Per-T canonical-template-helper binding for the engine-instantiated
@@ -9855,6 +9869,6 @@ namespace moho
    * the MSVC8 per-T template emission symbol shape.
    */
   void PushBackMeshInstanceSharedPtrVector(
-    msvc8::vector<boost::shared_ptr<MeshInstance>>& destination,
+    fa::vector<boost::shared_ptr<MeshInstance>>& destination,
     const boost::shared_ptr<MeshInstance>& value);
 } // namespace moho

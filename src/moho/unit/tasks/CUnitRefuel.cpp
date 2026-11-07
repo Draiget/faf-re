@@ -155,65 +155,7 @@ namespace
     navigator->SetGoal(goal);
   }
 
-  [[nodiscard]] gpg::RType* CachedCUnitRefuelType()
-  {
-    gpg::RType* type = moho::CUnitRefuel::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitRefuel));
-      moho::CUnitRefuel::sType = type;
-    }
-    return type;
-  }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    gpg::RType* type = moho::WeakPtr<moho::Unit>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-      moho::WeakPtr<moho::Unit>::sType = type;
-    }
-    return type;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 } // namespace
 
 namespace moho
@@ -315,10 +257,10 @@ namespace moho
   void CUnitRefuel::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     const gpg::RRef baseRef{};
-    archive->Read(CachedCCommandTaskType(), this, baseRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), this, baseRef);
 
     const gpg::RRef targetRef{};
-    archive->Read(CachedWeakPtrUnitType(), &mTargetUnit, targetRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTargetUnit, targetRef);
 
     archive->ReadBool(&mHasTransportReservation);
     archive->ReadBool(&mIsCarrier);
@@ -334,10 +276,10 @@ namespace moho
   void CUnitRefuel::MemberSerialize(gpg::WriteArchive* const archive) const
   {
     const gpg::RRef baseRef{};
-    archive->Write(CachedCCommandTaskType(), this, baseRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), this, baseRef);
 
     const gpg::RRef targetRef{};
-    archive->Write(CachedWeakPtrUnitType(), &mTargetUnit, targetRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mTargetUnit, targetRef);
 
     archive->WriteBool(mHasTransportReservation);
     archive->WriteBool(mIsCarrier);
@@ -601,12 +543,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitRefuel(gpg::RRef* const outRef, moho::CUnitRefuel* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = MakeDerivedRef(value, CachedCUnitRefuelType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 } // namespace gpg
 

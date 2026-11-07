@@ -79,7 +79,7 @@ namespace moho
   void SNamedFootprintTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
     AddBase_SFootprint(typeInfo);
-    typeInfo->AddField<msvc8::string>("Name", offsetof(SNamedFootprint, mName));
+    typeInfo->AddField<fa::string>("Name", offsetof(SNamedFootprint, mName));
     typeInfo->AddField<int>("Index", offsetof(SNamedFootprint, mIndex));
   }
 
@@ -114,7 +114,7 @@ namespace moho
    *
    * What it does:
    * Constructs the `gpg::RListType<SNamedFootprint>` static at 0x011047E8,
-   * which preregisters it for `typeid(msvc8::list<SNamedFootprint>)`, and
+   * which preregisters it for `typeid(fa::list<SNamedFootprint>)`, and
    * returns it.
    */
   gpg::RType* preregister_SNamedFootprintListTypeInfo()
@@ -127,7 +127,7 @@ namespace moho
    * Address: 0x00BC83A0 (FUN_00BC83A0, register_SNamedFootprintListTypeInfoStartup)
    *
    * What it does:
-   * Preregisters `msvc8::list<SNamedFootprint>` RTTI.
+   * Preregisters `fa::list<SNamedFootprint>` RTTI.
    */
   void register_SNamedFootprintListTypeInfoStartup()
   {

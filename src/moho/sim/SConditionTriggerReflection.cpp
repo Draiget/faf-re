@@ -214,15 +214,6 @@ namespace
 #if defined(MOHO_ABI_MSVC8_COMPAT)
 #endif
 
-  [[nodiscard]] gpg::RType* CachedSConditionType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::SCondition));
-    }
-    return cached;
-  }
-
   class RFastVectorSConditionTypeInfo final : public gpg::RType, public gpg::RIndexed
   {
   public:
@@ -247,7 +238,7 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSConditionType()->GetName());
+      static const fa::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::SCondition>()->GetName());
       return sName.c_str();
     }
 
@@ -257,9 +248,9 @@ namespace
      * What it does:
      * Formats inherited lexical text and appends current fastvector size.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override
     {
-      const msvc8::string base = gpg::RType::GetLexical(ref);
+      const fa::string base = gpg::RType::GetLexical(ref);
       return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
     }
 
@@ -486,7 +477,7 @@ namespace
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int index = 0u; index < count; ++index) {
-      msvc8::string key{};
+      fa::string key{};
       moho::CArmyStatItem* value = nullptr;
       archive->ReadString(&key);
       archive->ReadPointer(&value, &owner);
@@ -521,7 +512,7 @@ namespace
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (const auto& entry : *source) {
-      archive->WriteString(const_cast<msvc8::string*>(&entry.first));
+      archive->WriteString(const_cast<fa::string*>(&entry.first));
 
       gpg::RRef pointerRef{};
       gpg::RRef_CArmyStatItem(&pointerRef, entry.second);
@@ -585,7 +576,7 @@ namespace
   {
     auto* const stats = new (std::nothrow) moho::Stats<moho::CArmyStatItem>();
     if (constructResult == nullptr) {
-      delete stats;
+      GPG_NONVIRTUAL_DESTROY(delete stats);
       return;
     }
 
@@ -603,7 +594,7 @@ namespace
    */
   void DeleteStatsCArmyStatItemOwnedObject(void* const object)
   {
-    delete static_cast<moho::Stats<moho::CArmyStatItem>*>(object);
+    GPG_NONVIRTUAL_DESTROY(delete static_cast<moho::Stats<moho::CArmyStatItem>*>(object));
   }
 
   class RMapUnitBlueprintFloatTypeInfo final : public gpg::RType
@@ -631,7 +622,7 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName = gpg::STR_Printf(
+      static const fa::string sName = gpg::STR_Printf(
         "map<%s,%s>", moho::RUnitBlueprint::GetPointerType()->GetName(), gpg::LookupRType(typeid(float))->GetName()
       );
       return sName.c_str();
@@ -643,9 +634,9 @@ namespace
      * What it does:
      * Formats inherited lexical text and appends current map element count.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override
     {
-      const msvc8::string base = gpg::RType::GetLexical(ref);
+      const fa::string base = gpg::RType::GetLexical(ref);
       const auto* const map = static_cast<const UnitBlueprintWeightMap*>(ref.mObj);
       const int size = map ? static_cast<int>(map->size()) : 0;
       return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
@@ -686,7 +677,7 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName = gpg::STR_Printf("Stats<%s>", moho::CArmyStatItem::StaticGetClass()->GetName());
+      static const fa::string sName = gpg::STR_Printf("Stats<%s>", moho::CArmyStatItem::StaticGetClass()->GetName());
       return sName.c_str();
     }
 
@@ -701,9 +692,9 @@ namespace
     {
       size_ = sizeof(moho::Stats<moho::CArmyStatItem>);
       version_ = 1;
-      serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(&DeserializeStatsCArmyStatItemOwnedRootLane);
+      serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(reinterpret_cast<void (*)()>(&DeserializeStatsCArmyStatItemOwnedRootLane));
       serSaveFunc_ = &SerializeStatsCArmyStatItemOwnedRoot;
-      serConstructFunc_ = reinterpret_cast<gpg::RType::construct_func_t>(&ConstructStatsCArmyStatItemForSerializer);
+      serConstructFunc_ = reinterpret_cast<gpg::RType::construct_func_t>(reinterpret_cast<void (*)()>(&ConstructStatsCArmyStatItemForSerializer));
       deleteFunc_ = &DeleteStatsCArmyStatItemOwnedObject;
     }
   };
@@ -734,8 +725,8 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName = gpg::STR_Printf(
-        "map<%s,%s>", gpg::LookupRType(typeid(msvc8::string))->GetName(), moho::CArmyStatItem::GetPointerType()->GetName()
+      static const fa::string sName = gpg::STR_Printf(
+        "map<%s,%s>", gpg::LookupRType(typeid(fa::string))->GetName(), moho::CArmyStatItem::GetPointerType()->GetName()
       );
       return sName.c_str();
     }
@@ -746,9 +737,9 @@ namespace
      * What it does:
      * Formats inherited lexical text and appends current map element count.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override
     {
-      const msvc8::string base = gpg::RType::GetLexical(ref);
+      const fa::string base = gpg::RType::GetLexical(ref);
       const auto* const map = static_cast<const StringToArmyStatItemMap*>(ref.mObj);
       const int size = map ? static_cast<int>(map->size()) : 0;
       return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
@@ -851,7 +842,7 @@ namespace
    * `gpg::RListType<boost::shared_ptr<moho::STrigger>>` (the trigger lists):
    *
    * Address: 0x00712F40 (FUN_00712F40 -- its construction, preregistering it for
-   * `typeid(msvc8::list<boost::shared_ptr<moho::STrigger>>)`.)
+   * `typeid(fa::list<boost::shared_ptr<moho::STrigger>>)`.)
    * Address: 0x00713310 (FUN_00713310 -- the implicit scalar deleting destructor.)
    * Address: 0x0070F360 (FUN_0070F360 -- `GetName`, from the looked-up `boost::shared_ptr<STrigger>` type's name.)
    * Address: 0x00BFF880 (FUN_00BFF880 -- the atexit destructor of `GetName`'s name string.)

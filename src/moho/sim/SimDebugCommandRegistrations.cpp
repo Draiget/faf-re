@@ -78,7 +78,7 @@ namespace moho
    * Address: 0x00735430 (FUN_00735430, the TSimConVar<string> constructor the initializer calls,
    *   cloned with `this` bound to this global and the default passed by value)
    */
-  TSimConVar<msvc8::string> gSimConVar_sim_TestVarStr(false, "sim_TestVarStr", msvc8::string("yea!"));
+  TSimConVar<fa::string> gSimConVar_sim_TestVarStr(false, "sim_TestVarStr", fa::string("yea!"));
 
   /**
    * Address: 0x00BDB3A0 (FUN_00BDB3A0, dynamic initializer for `gConAlias_sim_TestFunc`)

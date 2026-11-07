@@ -57,7 +57,7 @@ namespace
   /**
    * Address: 0x006E0A70 (FUN_006E0A70, ??1CommandDatabase@Moho@@QAE@@Z -- the
    * diagnostic-dump half of the destructor, ahead of the member-teardown tail
-   * cited on `msvc8::detail::rb_tree::~rb_tree` in RbTree.h)
+   * cited on `fa::detail::rb_tree::~rb_tree` in RbTree.h)
    *
    * What it does:
    * Dies with a dump of every still-owned command when the command map is
@@ -96,7 +96,7 @@ namespace moho
    * `_Mysize` - the same split-allocator shape as
    * `AllocateAllUnitsTreeNode`/`InitializeAllUnitsTreeHeadLane` in
    * EntityDb.cpp. Here the split is fused inside `commands`'s own default
-   * construction: `msvc8::map`'s shared `detail::rb_tree` default
+   * construction: `fa::map`'s shared `detail::rb_tree` default
    * constructor (legacy/containers/RbTree.h) calls `rb_tree::buy_head()`,
    * which performs the identical alloc + self-link + isNil=1/color=black
    * sequence, so no separate call is needed in this constructor's body.
@@ -104,7 +104,7 @@ namespace moho
    * `pendingReleasedCmdIds` (binary's `this->vec`):
    * Declared at +0x0CC0, immediately after `pool`'s 0x0CB0-byte `IdPool`
    * span, closing the struct out exactly at the asserted 0xCD0 size.
-   * `msvc8::vector<CmdId>`'s default constructor already zeroes
+   * `fa::vector<CmdId>`'s default constructor already zeroes
    * `_Myfirst`/`_Mylast`/`_Myend`, matching the binary's explicit
    * zero-stores.
    */
@@ -128,7 +128,7 @@ namespace moho
    * its header and zeroed head/size lanes -- is exactly the member
    * destruction the compiler emits automatically for `commands` at the close
    * of this scope (see the FUN_006E0A70 citation on
-   * `msvc8::detail::rb_tree::~rb_tree`, RbTree.h); there is no separate
+   * `fa::detail::rb_tree::~rb_tree`, RbTree.h); there is no separate
    * hand-written call for it in this function's own body.
    */
   CCommandDB::~CCommandDB()
@@ -171,7 +171,7 @@ namespace moho
     }
 
     /**
-     * Address: 0x006E15B0 (FUN_006E15B0, `msvc8::map<Moho::CmdId,
+     * Address: 0x006E15B0 (FUN_006E15B0, `fa::map<Moho::CmdId,
      * Moho::CUnitCommand*>::insert_unique` -- `Moho::CCommandDB::commands` in
      * CCommandDb.h. Matches `rb_tree::insert_unique` field for field: descend
      * recording the last branch taken, `where == leftmost()` fast path
@@ -218,11 +218,11 @@ namespace moho
    * Address: 0x006E0EC0 (FUN_006E0EC0, ?RemoveCmd@CCommandDB@Moho@@...)
    *
    * What it does:
-   * See the declaration. `msvc8::map<CmdId, CUnitCommand*>::find`/`erase_node`
+   * See the declaration. `fa::map<CmdId, CUnitCommand*>::find`/`erase_node`
    * for this instantiation are `sub_6E1940`/`sub_6E1670`, address-cited on
    * `rb_tree::find_node`/`erase_node` in `RbTree.h`; the recycle-bucket block
    * at 0x006E0EF6 is `IdPool::QueueReleasedLowId` (0x004039F0) inlined, and the
-   * tail call is the `msvc8::vector<CmdId>::push_back` emission FUN_006E1A10.
+   * tail call is the `fa::vector<CmdId>::push_back` emission FUN_006E1A10.
    */
   void CCommandDB::RemoveCmd(const CmdId cmdId)
   {

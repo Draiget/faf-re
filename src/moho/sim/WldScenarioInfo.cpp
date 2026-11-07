@@ -13,7 +13,7 @@ namespace moho
   /**
    * Address: 0x0088BD40 (FUN_0088BD40)
    */
-  LuaPlus::LuaObject WLD_LoadScenarioInfo(const msvc8::string& scenarioFile, LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject WLD_LoadScenarioInfo(const fa::string& scenarioFile, LuaPlus::LuaState* const state)
   {
     if (state == nullptr) {
       return {};

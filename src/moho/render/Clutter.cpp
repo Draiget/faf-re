@@ -15,7 +15,7 @@
 #include "moho/sim/STIMap.h"
 
 #include <algorithm>
-#include <boost/mutex.h>
+#include <mutex>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -135,7 +135,7 @@ namespace
 
   [[nodiscard]] float NextGlobalRandomSignedUnit()
   {
-    boost::mutex::scoped_lock randomLock(moho::math_GlobalRandomMutex);
+    std::lock_guard<std::mutex> randomLock(moho::math_GlobalRandomMutex);
     const std::uint32_t randomWord = moho::math_GlobalRandomStream.twister.NextUInt32();
     constexpr double kInvTwoTo31 = 4.656612873077392578125e-10;
     return static_cast<float>(static_cast<double>(randomWord) * kInvTwoTo31 - 1.0);
@@ -143,7 +143,7 @@ namespace
 
   [[nodiscard]] float NextGlobalRandomUnit()
   {
-    boost::mutex::scoped_lock randomLock(moho::math_GlobalRandomMutex);
+    std::lock_guard<std::mutex> randomLock(moho::math_GlobalRandomMutex);
     const std::uint32_t randomWord = moho::math_GlobalRandomStream.twister.NextUInt32();
     constexpr double kInvTwoTo32 = 2.3283064365386962890625e-10;
     return static_cast<float>(static_cast<double>(randomWord) * kInvTwoTo32);
@@ -287,7 +287,7 @@ namespace
   moho::ClutterSurfaceElement* InitializeClutterSeedFromBlueprintPath(
     moho::ClutterSurfaceElement* const seed,
     const float selectionWeight,
-    const msvc8::string& meshBlueprintId
+    const fa::string& meshBlueprintId
   )
   {
     ResetClutterSeedVtable(seed);
@@ -300,7 +300,7 @@ namespace
       return seed;
     }
 
-    msvc8::string normalizedPath{};
+    fa::string normalizedPath{};
     gpg::STR_CopyFilename(&normalizedPath, &meshBlueprintId);
     moho::RPropBlueprint* const propBlueprint = rules->GetPropBlueprint(normalizedPath);
     if (!propBlueprint) {
@@ -317,7 +317,7 @@ namespace
    *
    * What it does:
    * Appends one seed to a surface's seed vector, growing capacity 1.5x when
-   * full. `Moho::Clutter::Surface::mSeeds` is `msvc8::vector<
+   * full. `Moho::Clutter::Surface::mSeeds` is `fa::vector<
    * ClutterSurfaceElement>` (`Clutter.h`) -- this call is the natural
    * source-level `insert(pos, value)` the compiler folded to `count=1` at
    * `FUN_007D8620`/`FUN_007D9620` (cited on the canonical
@@ -343,7 +343,7 @@ namespace moho
 
   /**
    * Address: 0x007D7E00 (FUN_007D7E00, inlined into the tail-destroy loop of
-   * `msvc8::vector<ClutterSurfaceElement>::erase(first,last)` --
+   * `fa::vector<ClutterSurfaceElement>::erase(first,last)` --
    * `legacy/containers/Vector.h`)
    * Address: 0x007D7EB0 (FUN_007D7EB0, ??1Surface@Clutter@Moho@@QAE@@Z,
    * inlined into `Surface::~Surface`'s own `mSeeds` teardown sweep, below)
@@ -373,7 +373,7 @@ namespace moho
    * emitting a standalone symbol, so there is no separate address to cite
    * beyond the ones already on `DestroyInPlace()`. Declaring this as a real
    * (non-trivial) destructor, instead of leaving the type implicitly
-   * trivial, is what makes `msvc8::vector<ClutterSurfaceElement>`'s
+   * trivial, is what makes `fa::vector<ClutterSurfaceElement>`'s
    * existing, unmodified `destroy_range`/`erase`/`clear`/`tidy` machinery
    * (`Vector.h`) emit the per-element call `FUN_007D7E00` and `FUN_007D7EB0`
    * both show -- previously the struct was (wrongly) trivially destructible
@@ -387,7 +387,7 @@ namespace moho
 
   /**
    * Address: 0x007D94B0 (FUN_007D94B0, inlined into the tail-shift step of
-   * `msvc8::vector<ClutterSurfaceElement>::erase(first,last)` --
+   * `fa::vector<ClutterSurfaceElement>::erase(first,last)` --
    * `legacy/containers/Vector.h`)
    *
    * What it does:
@@ -471,7 +471,7 @@ namespace moho
    * buffer, then zeroing `{first_,last_,end_}` (`myProxy_` deliberately left
    * alone) -- exactly `ClutterSurfaceElement::~ClutterSurfaceElement()`
    * (which forwards to `DestroyInPlace()`) run per live element by
-   * `msvc8::vector<ClutterSurfaceElement>`'s own `tidy()`-shaped teardown
+   * `fa::vector<ClutterSurfaceElement>`'s own `tidy()`-shaped teardown
    * (`Vector.h`), which reduces to a runtime no-op per element since
    * `ClutterSurfaceElement`'s poisoned vtable resets to
    * `SeedVtableResetTag`'s trivial defaulted destructor -- see
@@ -789,7 +789,7 @@ namespace moho
       const char* const meshBlueprintPath = seedObject[2].GetString();
       const float selectionWeight = static_cast<float>(seedObject[1].GetNumber());
 
-      msvc8::string meshBlueprintId(meshBlueprintPath ? meshBlueprintPath : "");
+      fa::string meshBlueprintId(meshBlueprintPath ? meshBlueprintPath : "");
       ClutterSurfaceElement seed{};
       (void)InitializeClutterSeedFromBlueprintPath(&seed, selectionWeight, meshBlueprintId);
       (void)AppendSurfaceSeed(&surface, seed);
@@ -990,7 +990,7 @@ namespace moho
       // Address: 0x007D7E00 (FUN_007D7E00, called at 0x007D6300 as
       // `sub_7D7E00(&mSeeds, &scratchOut, mSeeds.first_, mSeeds.last_)` once
       // per loop iteration -- i.e. `erase(begin(),end())`, exactly `clear()`.
-      // `msvc8::vector<ClutterSurfaceElement>::erase(first,last)`
+      // `fa::vector<ClutterSurfaceElement>::erase(first,last)`
       // (`Vector.h`) already models this byte-for-byte; see that member's
       // Doxygen citation for the full shape/evidence, including the second,
       // unnamed call site and why `ClutterSurfaceElement` needed its own

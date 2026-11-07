@@ -158,8 +158,8 @@ namespace moho
     const gpg::RRef ownerRef{};
     archive->Read(gpg::RTypeOf<ReconBlipMap>(), &mBlipMap, ownerRef);
     RECON_DropBlipIndex(this); // engine addition, sim_ReconBlipIndex
-    archive->Read(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &mBblips, ownerRef);
-    archive->Read(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &mTempBlips, ownerRef);
+    archive->Read(gpg::RTypeOf<fa::vector<ReconBlip*>>(), &mBblips, ownerRef);
+    archive->Read(gpg::RTypeOf<fa::vector<ReconBlip*>>(), &mTempBlips, ownerRef);
     archive->ReadPointer(&mArmy, &ownerRef);
     archive->ReadPointer(&mMapData, &ownerRef);
     archive->ReadPointer(&mSim, &ownerRef);
@@ -186,8 +186,8 @@ namespace moho
   {
     const gpg::RRef ownerRef{};
     archive->Write(gpg::RTypeOf<ReconBlipMap>(), &mBlipMap, ownerRef);
-    archive->Write(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &mBblips, ownerRef);
-    archive->Write(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &mTempBlips, ownerRef);
+    archive->Write(gpg::RTypeOf<fa::vector<ReconBlip*>>(), &mBblips, ownerRef);
+    archive->Write(gpg::RTypeOf<fa::vector<ReconBlip*>>(), &mTempBlips, ownerRef);
     archive->WritePointer(mArmy, gpg::TrackedPointerState::Unowned, ownerRef);
     archive->WritePointer(mMapData, gpg::TrackedPointerState::Unowned, ownerRef);
     archive->WritePointer(mSim, gpg::TrackedPointerState::Unowned, ownerRef);

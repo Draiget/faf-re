@@ -2,17 +2,15 @@
 downloads from FAF, the run-time estimate and the core and extended sets."""
 import gzip
 import os
-import shutil
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "replay-parity"))
-from replayfile import decode_fafreplay, header_summary, replay_beats, replay_body_info  # noqa: E402
+from replayfile import decode_fafreplay, extract_map, has_scenario, header_summary, replay_beats, replay_body_info  # noqa: E402
 
 # Cloudflare in front of FAF refuses Python's default user agent (error 1010).
 USER_AGENT = "faf-re-parity-data/1.0 (+https://github.com/Draiget/faf-re)"
@@ -136,35 +134,6 @@ def check_replay(raw, game_version):
     except (ValueError, IndexError):
         info["beats"] = None  # the engine is the judge of a damaged stream; only the length is unknown
     return info, None, data
-
-
-def has_scenario(path):
-    """Whether path is a map folder: the engine skips one without a <name>_scenario.lua in it."""
-    try:
-        return any(n.lower().endswith("_scenario.lua") for n in os.listdir(path))
-    except OSError:
-        return False
-
-
-def extract_map(zip_path, maps_dir, folder):
-    """A map zip into maps_dir/<folder>: the zip's folder holding the scenario file, renamed to the
-    replay's name for it. The names may differ in case alone (FAF's retail maps are SCMP_015/, the
-    replay says scmp_015), and the folder need not be at the top (FAF's scmp_001 zip has
-    SC/Supreme Commander - Forged Alliance/maps/SCMP_001/)."""
-    raw = os.path.join(maps_dir, ".unzip-" + folder)
-    shutil.rmtree(raw, ignore_errors=True)
-    with zipfile.ZipFile(zip_path) as z:
-        z.extractall(raw)
-    found = [d for d, _, _ in os.walk(raw) if has_scenario(d)]
-    named = [d for d in found if os.path.basename(d).lower() == folder.lower()]
-    if len(named) != 1 and len(found) != 1:
-        shutil.rmtree(raw, ignore_errors=True)
-        raise ValueError("no one map folder %s in the map zip (%d with a scenario file)" % (folder, len(found)))
-    path = os.path.join(maps_dir, folder)
-    shutil.rmtree(path, ignore_errors=True)
-    os.replace((named or found)[0], path)
-    shutil.rmtree(raw, ignore_errors=True)
-    return path
 
 
 def find_mod_info(root):

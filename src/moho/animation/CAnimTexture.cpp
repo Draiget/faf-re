@@ -24,7 +24,7 @@ namespace moho
    * buy the header sentinel (0x004247E0), mark it nil, self-link all three
    * links, zero the size and `atexit` the destructor.
    */
-  msvc8::map<msvc8::string, CAnimTexture*> sAnimTextureMap;
+  fa::map<fa::string, CAnimTexture*> sAnimTextureMap;
 } // namespace moho
 
 namespace
@@ -98,7 +98,7 @@ namespace moho
   CAnimTexture* CAnimTexture::FindOrCreate(const char* const baseTextureName)
   {
     const char* const keyText = baseTextureName ? baseTextureName : "";
-    const msvc8::string key(keyText);
+    const fa::string key(keyText);
 
     const auto cached = sAnimTextureMap.find(key);
     if (cached != sAnimTextureMap.end()) {
@@ -147,7 +147,7 @@ namespace moho
     outFrame.add_ref_copy();
   }
 
-  const msvc8::string& CAnimTexture::GetBaseTextureName() const noexcept
+  const fa::string& CAnimTexture::GetBaseTextureName() const noexcept
   {
     return mBaseTextureName;
   }
@@ -163,7 +163,7 @@ namespace moho
     mFrames.clear();
     mBaseTextureName.assign_owned(baseTextureName);
 
-    msvc8::string frameName{};
+    fa::string frameName{};
     frameName.tidy(false, 0U);
     frameName.assign_owned(baseTextureName);
 
@@ -199,7 +199,7 @@ namespace moho
    * Increments the trailing numeric suffix in-place and wraps carries to `0`.
    * Returns false only when no suitable numeric suffix exists.
    */
-  bool CAnimTexture::IncrementFrameNameSuffix(msvc8::string& textureName)
+  bool CAnimTexture::IncrementFrameNameSuffix(fa::string& textureName)
   {
     if (!textureName.basic_sanity() || textureName.empty()) {
       return false;

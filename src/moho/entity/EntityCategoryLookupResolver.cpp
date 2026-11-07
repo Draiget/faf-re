@@ -117,7 +117,7 @@ namespace moho
       return &lookup.mCategoryFallback;
     }
 
-    return lookup.FindOrFallback(msvc8::string(categoryName));
+    return lookup.FindOrFallback(fa::string(categoryName));
   }
 
   /**
@@ -163,7 +163,7 @@ namespace moho
       const char* termStart = nullptr;
       const char* termEnd = nullptr;
       while (NextBoundedToken(termCursor, clauseEnd, ' ', termStart, termEnd)) {
-        const msvc8::string termToken(termStart, termEnd);
+        const fa::string termToken(termStart, termEnd);
         const EntityCategorySet* const range = lookupTable->TryFind(termToken);
         if (range == nullptr) {
           continue;

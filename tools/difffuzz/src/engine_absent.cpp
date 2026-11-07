@@ -25,7 +25,7 @@ namespace
 namespace gpg
 {
   void HandleAssertFailure(const char*, int, const char*) { NoEngineDefinition("gpg::HandleAssertFailure"); }
-  msvc8::string STR_Printf(const char*, ...) { NoEngineDefinition("gpg::STR_Printf"); }
+  fa::string STR_Printf(const char*, ...) { NoEngineDefinition("gpg::STR_Printf"); }
 } // namespace gpg
 
 namespace moho

@@ -10,13 +10,6 @@ using namespace moho;
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCScriptEventType()
-  {
-    if (!CScriptEvent::sType) {
-      CScriptEvent::sType = gpg::LookupRType(typeid(CScriptEvent));
-    }
-    return CScriptEvent::sType;
-  }
 
   /**
    * Address: 0x007B0E30 (FUN_007B0E30)
@@ -27,18 +20,7 @@ namespace
    */
   void AddCScriptEventBaseToCameraImplType(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedCScriptEventType();
-    if (!baseType) {
-      return;
-    }
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = gpg::BaseSubobjectOffset<CameraImpl, CScriptEvent>();
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<CScriptEvent>(typeInfo, gpg::BaseSubobjectOffset<CameraImpl, CScriptEvent>());
   }
 
   /**

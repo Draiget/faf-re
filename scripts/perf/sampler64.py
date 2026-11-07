@@ -268,7 +268,7 @@ def main():
             edb = struct.unpack("<Q", edb)[0]
             m = rpm(hp, edb + units_map_off, 24)
             if m:
-                # msvc8::map under pack(4): {proxy, _Myhead, _Mysize}; the header node has _Isnil set.
+                # fa::map under pack(4): {proxy, _Myhead, _Mysize}; the header node has _Isnil set.
                 nonlocal NIL_OFF
                 for hoff, nil in ((8, 0x29), (8, 0x25), (4, 0x25), (4, 0x29)):
                     head, size = struct.unpack_from("<QI", m, hoff)

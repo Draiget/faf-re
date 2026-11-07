@@ -7,6 +7,7 @@
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -167,7 +168,7 @@ namespace
   }
 
   [[nodiscard]]
-  std::unique_ptr<gpg::Stream> OpenZipBackingStream(const msvc8::string& zipPath)
+  std::unique_ptr<gpg::Stream> OpenZipBackingStream(const fa::string& zipPath)
   {
     try {
       return std::make_unique<gpg::FileStream>(
@@ -233,6 +234,14 @@ namespace
       entry.mCachedDataOffset = std::bit_cast<std::int32_t>(cachedOffset);
     }
     return true;
+  }
+
+  // Engine addition: the lock ReadEntry holds for one entry, one of a fixed set chosen by the
+  // entry's address (the archive object keeps the binary's layout, with no room for one per entry).
+  [[nodiscard]] std::mutex& EntryLock(const void* const entry)
+  {
+    static std::mutex locks[64];
+    return locks[(reinterpret_cast<std::uintptr_t>(entry) >> 4U) % 64U];
   }
 } // namespace
 
@@ -375,7 +384,7 @@ namespace moho
         continue;
       }
 
-      const std::uint32_t newEntryIndex = static_cast<std::uint32_t>(mEntries.size());
+      [[maybe_unused]] const std::uint32_t newEntryIndex = static_cast<std::uint32_t>(mEntries.size());
       SZipFileCachedEntry cachedEntry{};
       cachedEntry.mEntry = parsedEntry;
       mEntries.push_back(cachedEntry);
@@ -411,7 +420,7 @@ namespace moho
 
     mEntryByCanonicalPath.reserve(sorted.size());
     for (const std::uint32_t entryIndex : sorted) {
-      const msvc8::string& name = mEntries[entryIndex].mEntry->mName;
+      const fa::string& name = mEntries[entryIndex].mEntry->mName;
       if (!mEntryByCanonicalPath.empty() && !less(mEntries[mEntryByCanonicalPath.back()].mEntry->mName, name)) {
         gpg::Logf("%s: duplicate entries for %s.", archivePath, name.c_str());
         continue;
@@ -431,7 +440,7 @@ namespace moho
   {
     // `mEntryByCanonicalPath`'s teardown is its destructor, which MSVC emits for
     // the member; only the two lanes with no destructor of their own are here.
-    mEntries = msvc8::vector<SZipFileCachedEntry>();
+    mEntries = fa::vector<SZipFileCachedEntry>();
     mPath.tidy(true, 0U);
   }
 
@@ -462,7 +471,7 @@ namespace moho
    * What it does:
    * Resolves one canonical zip entry name to entry index, or returns `0xFFFFFFFF`.
    */
-  std::uint32_t CZipFile::FindFile(const msvc8::string& canonicalPath) const
+  std::uint32_t CZipFile::FindFile(const fa::string& canonicalPath) const
   {
 #if FAF_RETAIL_LAYOUT
     const SZipFileNameIndexMap::const_iterator matched = mEntryByCanonicalPath.find(canonicalPath);
@@ -473,7 +482,7 @@ namespace moho
       mEntryByCanonicalPath.begin(),
       mEntryByCanonicalPath.end(),
       canonicalPath,
-      [&](const std::uint32_t entryIndex, const msvc8::string& name) { return less(mEntries[entryIndex].mEntry->mName, name); }
+      [&](const std::uint32_t entryIndex, const fa::string& name) { return less(mEntries[entryIndex].mEntry->mName, name); }
     );
     if (matched == mEntryByCanonicalPath.end() || less(canonicalPath, mEntries[*matched].mEntry->mName)) {
       return kInvalidEntryIndex;
@@ -488,11 +497,11 @@ namespace moho
    * What it does:
    * Opens one zip entry by canonical path as a memory-backed read stream.
    */
-  msvc8::auto_ptr<gpg::Stream> CZipFile::OpenFile(const msvc8::string& canonicalPath) const
+  fa::auto_ptr<gpg::Stream> CZipFile::OpenFile(const fa::string& canonicalPath) const
   {
     const std::uint32_t entryIndex = FindFile(canonicalPath);
     if (entryIndex == kInvalidEntryIndex) {
-      return msvc8::auto_ptr<gpg::Stream>();
+      return fa::auto_ptr<gpg::Stream>();
     }
 
     return OpenEntry(entryIndex);
@@ -504,7 +513,7 @@ namespace moho
    * What it does:
    * Reads one zip entry by canonical path into immutable shared-memory bytes.
    */
-  gpg::MemBuffer<const char> CZipFile::ReadFile(const msvc8::string& canonicalPath) const
+  gpg::MemBuffer<const char> CZipFile::ReadFile(const fa::string& canonicalPath) const
   {
     const std::uint32_t entryIndex = FindFile(canonicalPath);
     if (entryIndex == kInvalidEntryIndex) {
@@ -520,7 +529,7 @@ namespace moho
    * What it does:
    * Reads one zip entry by canonical path and returns a mutable byte copy.
    */
-  gpg::MemBuffer<char> CZipFile::CopyFile(const msvc8::string& canonicalPath) const
+  gpg::MemBuffer<char> CZipFile::CopyFile(const fa::string& canonicalPath) const
   {
     const std::uint32_t entryIndex = FindFile(canonicalPath);
     if (entryIndex == kInvalidEntryIndex) {
@@ -536,7 +545,7 @@ namespace moho
    * What it does:
    * Returns the canonical zip-entry name for one validated entry index.
    */
-  const msvc8::string& CZipFile::GetEntryName(const std::uint32_t entryIndex) const
+  const fa::string& CZipFile::GetEntryName(const std::uint32_t entryIndex) const
   {
     return GetEntryOrThrow(entryIndex, "Out of bound access in CZipFile::GetEntryName()").mName;
   }
@@ -572,23 +581,36 @@ namespace moho
    * What it does:
    * Opens one zip entry by index as a memory-backed read stream.
    */
-  msvc8::auto_ptr<gpg::Stream> CZipFile::OpenEntry(const std::uint32_t entryIndex) const
+  fa::auto_ptr<gpg::Stream> CZipFile::OpenEntry(const std::uint32_t entryIndex) const
   {
     (void)GetEntryOrThrow(entryIndex, "Out of bound access in CZipFile::OpenEntry()");
 
     const gpg::MemBuffer<const char> entryBytes = ReadEntry(entryIndex);
     if (entryBytes.data() == nullptr) {
-      return msvc8::auto_ptr<gpg::Stream>();
+      return fa::auto_ptr<gpg::Stream>();
     }
 
-    return msvc8::auto_ptr<gpg::Stream>(
+    return fa::auto_ptr<gpg::Stream>(
       new gpg::MemBufferStream(entryBytes, static_cast<unsigned int>(-1))
     );
   }
 
   namespace
   {
+    // Engine addition: the binary keeps every file it decompressed for the whole session, so a texture's
+    // bytes stay after its upload and a mesh file's after its geometry is built. On x64 a second read
+    // decompresses again; x86 keeps the original behaviour.
+#if defined(_M_IX86)
     bool gKeepEntryData = true;
+#else
+    bool gKeepEntryData = false;
+#endif
+    TConVar<bool> gTConVar_res_ZipKeepData(
+      "res_ZipKeepData",
+      "Keep every file decompressed from an archive for the whole session, as the original game does (1), or "
+      "decompress a file again when it is read again (0).",
+      &gKeepEntryData
+    );
 
     bool res_ZipKeepOpen = true;
     TConVar<bool> gTConVar_res_ZipKeepOpen(
@@ -607,7 +629,7 @@ namespace moho
     thread_local std::vector<KeptArchive>* tKeptArchives = nullptr;
 
     /** This thread's open stream for `zipPath`, opened on first use; null outside a read scope. */
-    [[nodiscard]] gpg::Stream* KeptArchiveStream(const msvc8::string& zipPath)
+    [[nodiscard]] gpg::Stream* KeptArchiveStream(const fa::string& zipPath)
     {
       if (tKeptArchives == nullptr) {
         return nullptr;
@@ -666,6 +688,10 @@ namespace moho
     }
 
     CZipFileEntry& entry = *cachedEntry.mEntry.get();
+    // Engine addition: an entry is read and cached by one thread at a time; a second reader waits
+    // and takes the cached bytes. The binary filled the cache unguarded, which two threads reading
+    // one entry (the session loader and the main thread) would race on.
+    const std::lock_guard<std::mutex> entryGuard(EntryLock(&cachedEntry));
     if (cachedEntry.mData) {
       return MakeConstMemBuffer(cachedEntry.mData, static_cast<std::size_t>(entry.mUncompressedSize));
     }

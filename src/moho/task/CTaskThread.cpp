@@ -25,58 +25,8 @@ moho::CTaskStage* moho::sUserStage = nullptr;
 
 namespace
 {
-  gpg::RType* CachedCTaskThreadType()
-  {
-    gpg::RType* cached = CTaskThread::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CTaskThread));
-      CTaskThread::sType = cached;
-    }
-    return cached;
-  }
 
-  gpg::RType* CachedCTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CTask));
-    }
-    return cached;
-  }
 
-  gpg::RType* CachedCTaskStageType();
-
-  template <class T>
-  gpg::RRef MakeDerivedRef(T* object, gpg::RType* baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    GPG_ASSERT(derived);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
 
   template <class T>
   T* ReadTypedPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef, gpg::RType* expectedType)
@@ -96,7 +46,7 @@ namespace
 
     const char* const expected = expectedType ? expectedType->GetName() : "<unknown>";
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "<unknown>",
@@ -126,7 +76,7 @@ namespace
    */
   CTask* DeserializeWeakTaskPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
   {
-    return ReadTypedPointer<CTask>(archive, ownerRef, CachedCTaskType());
+    return ReadTypedPointer<CTask>(archive, ownerRef, gpg::RTypeOf<CTask>());
   }
 
   /**
@@ -140,14 +90,14 @@ namespace
   {
     for (CTask* task = thread->mTaskTop; task != nullptr; task = task->mSubtask) {
       archive->WriteBool(task->mAutoDelete);
-      const gpg::RRef taskRef = MakeDerivedRef(task, CachedCTaskType());
+      const gpg::RRef taskRef = gpg::MakeTypedRef(task, gpg::RTypeOf<CTask>());
       const gpg::TrackedPointerState state =
         task->mAutoDelete ? gpg::TrackedPointerState::Owned : gpg::TrackedPointerState::Unowned;
       gpg::WriteRawPointer(archive, taskRef, state, ownerRef);
     }
 
     archive->WriteBool(false);
-    const gpg::RRef nullTaskRef = MakeDerivedRef<CTask>(nullptr, CachedCTaskType());
+    const gpg::RRef nullTaskRef = gpg::MakeTypedRef<CTask>(nullptr, gpg::RTypeOf<CTask>());
     gpg::WriteRawPointer(archive, nullTaskRef, gpg::TrackedPointerState::Unowned, ownerRef);
   }
 
@@ -187,7 +137,7 @@ namespace
    */
   [[nodiscard]] CTaskStage* UpcastCTaskStageRef(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCTaskStageType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<CTaskStage>());
     return static_cast<CTaskStage*>(upcast.mObj);
   }
 
@@ -209,9 +159,9 @@ namespace
       return stage;
     }
 
-    const char* const expected = CachedCTaskStageType() ? CachedCTaskStageType()->GetName() : "<unknown>";
+    const char* const expected = gpg::RTypeOf<CTaskStage>() ? gpg::RTypeOf<CTaskStage>()->GetName() : "<unknown>";
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "<unknown>",
@@ -229,7 +179,7 @@ namespace
    */
   [[nodiscard]] CTaskThread* UpcastCTaskThreadRef(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCTaskThreadType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<CTaskThread>());
     return static_cast<CTaskThread*>(upcast.mObj);
   }
 
@@ -256,9 +206,9 @@ namespace
     source.mType = tracked.type;
     CTaskThread* const thread = UpcastCTaskThreadRef(source);
     if (!thread) {
-      const char* const expected = CachedCTaskThreadType()->GetName();
+      const char* const expected = gpg::RTypeOf<CTaskThread>()->GetName();
       const char* const actual = source.GetTypeName();
-      const msvc8::string msg = gpg::STR_Printf(
+      const fa::string msg = gpg::STR_Printf(
         "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
         "instead",
         expected ? expected : "CTaskThread",
@@ -276,17 +226,7 @@ namespace
    */
   gpg::RRef SerializeTaskThreadPointer(const CTaskThread* thread)
   {
-    return MakeDerivedRef(const_cast<CTaskThread*>(thread), CachedCTaskThreadType());
-  }
-
-  gpg::RType* CachedCTaskStageType()
-  {
-    gpg::RType* cached = CTaskStage::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CTaskStage));
-      CTaskStage::sType = cached;
-    }
-    return cached;
+    return gpg::MakeTypedRef(const_cast<CTaskThread*>(thread), gpg::RTypeOf<CTaskThread>());
   }
 
   void InitializeTaskStage(CTaskStage* const stage)
@@ -301,7 +241,7 @@ namespace
   {
     gpg::RRef out{};
     out.mObj = stage;
-    out.mType = CachedCTaskStageType();
+    out.mType = gpg::RTypeOf<CTaskStage>();
     return out;
   }
 

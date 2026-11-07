@@ -132,7 +132,7 @@ namespace moho
     /** Address: 0x00654270 (FUN_00654270, Moho::IEffect::OnInit) */
     virtual void OnInit(std::int32_t paramIndex, const char* paramName);
     /** Address: 0x00654280 (FUN_00654280, Moho::IEffect::GetStringParam) */
-    virtual msvc8::string* GetStringParam(std::int32_t paramIndex);
+    virtual fa::string* GetStringParam(std::int32_t paramIndex);
     /** Address: 0x00654290 (FUN_00654290, Moho::IEffect::GetTextureParam) */
     virtual CParticleTexture** GetTextureParam(CParticleTexture** outTexture, std::int32_t paramIndex);
     /** Address: 0x006542A0 (FUN_006542A0, Moho::IEffect::GetFloatParam) */

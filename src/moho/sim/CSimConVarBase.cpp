@@ -146,14 +146,14 @@ CSimConVarInstanceBase* moho::TSimConVar<float>::CreateInstance()
  * CSimConVarInstanceBase.cpp).
  */
 template <>
-CSimConVarInstanceBase* moho::TSimConVar<msvc8::string>::CreateInstance()
+CSimConVarInstanceBase* moho::TSimConVar<fa::string>::CreateInstance()
 {
-  auto* const raw = ::operator new(sizeof(TSimConVarInstance<msvc8::string>), std::nothrow);
+  auto* const raw = ::operator new(sizeof(TSimConVarInstance<fa::string>), std::nothrow);
   if (!raw) {
     return nullptr;
   }
 
-  return ConstructTSimConVarInstanceString(static_cast<TSimConVarInstance<msvc8::string>*>(raw), mName, mDefaultValue);
+  return ConstructTSimConVarInstanceString(static_cast<TSimConVarInstance<fa::string>*>(raw), mName, mDefaultValue);
 }
 
 std::uint32_t CSimConVarBase::AllocateSimConVarIndex() noexcept

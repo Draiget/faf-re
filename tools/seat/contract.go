@@ -35,6 +35,9 @@ type Contract struct {
 	// to every interface: the address the game and the jar reach each other on,
 	// through a jarBridge. Its ICE host candidates are limited to it too.
 	JarBind string `json:"jarBind,omitempty"`
+	// KeepSession asks the adapter to keep its peer links this many seconds after the
+	// game exits while running, and the seat does not stop the adapter when it does.
+	KeepSession int `json:"keepSession,omitempty"`
 	// Bus is the run's IceMsg relay; set by the launcher (local seats only).
 	Bus *ContractBus `json:"-"`
 }
@@ -180,7 +183,73 @@ func (s *Seat) startContract(ctx context.Context) error {
 			return err
 		}
 	}
+	if c.KeepSession > 0 {
+		if _, err := link.rpc.Call("setKeepSessionOnGameExit", c.KeepSession); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// adapterPorts is the adapter's peerPorts reply.
+type adapterPorts struct {
+	LobbyPort int            `json:"lobbyPort"`
+	Peers     map[string]int `json:"peers"`
+}
+
+// RejoinViaAdapter starts the game again as the FAF client would after a crash: the peers'
+// ports come from the adapter, and sources gives each player's source.
+func (s *Seat) RejoinViaAdapter(ctx context.Context, sources map[int]int, source int) error {
+	s.mu.Lock()
+	link, bridge := s.contract, s.bridge
+	s.mu.Unlock()
+	if link == nil {
+		return errors.New("rejoin through an adapter needs contract mode")
+	}
+	ch, err := link.rpc.Call("peerPorts")
+	if err != nil {
+		return err
+	}
+	var reply fafclient.Message
+	select {
+	case reply = <-ch:
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(10 * time.Second):
+		return errors.New("the adapter did not answer peerPorts")
+	}
+	if reply.Error != nil {
+		return fmt.Errorf("peerPorts: %s", reply.Error.Message)
+	}
+	var ports adapterPorts
+	if err := json.Unmarshal(reply.Result, &ports); err != nil {
+		return fmt.Errorf("peerPorts reply: %w", err)
+	}
+	var list []string
+	for id, port := range ports.Peers {
+		uid, err := strconv.Atoi(id)
+		if err != nil {
+			return fmt.Errorf("peerPorts id %q: %w", id, err)
+		}
+		peerSource, ok := sources[uid]
+		if !ok {
+			continue
+		}
+		addr := fmt.Sprintf("127.0.0.1:%d", port)
+		if bridge != nil {
+			if addr, err = bridge.peerSocket(addr); err != nil {
+				return err
+			}
+		}
+		list = append(list, fmt.Sprintf("%s=%d", addr, peerSource))
+	}
+	if len(list) == 0 {
+		return errors.New("the adapter lists no peers, so it kept no session")
+	}
+	s.mu.Lock()
+	s.lobbyPort = ports.LobbyPort
+	s.mu.Unlock()
+	return s.Rejoin(strings.Join(list, ","), source, 0, true)
 }
 
 // readDirector turns the director's GPGNet commands into adapter calls.
@@ -268,7 +337,7 @@ func (c *contractLink) onCallback(m fafclient.Message) {
 		if len(m.Params) > 0 {
 			_ = json.Unmarshal(m.Params[0], &state)
 		}
-		if state == "Disconnected" {
+		if state == "Disconnected" && c.s.cfg.Contract.KeepSession == 0 {
 			_, _ = c.rpc.Call("quit") // IceAdapterImpl.onIceAdapterStateChanged
 		}
 	}

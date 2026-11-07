@@ -46,7 +46,7 @@ namespace moho
   // The tracked-entity set the shipped record carries at +0x18: an 0x0C head
   // over an 0x14 node holding the entity id at node+0x0C with the colour and
   // nil pair at +0x10/+0x11.
-  using TrackedEntitySet = msvc8::set<std::int32_t>;
+  using TrackedEntitySet = fa::set<std::int32_t>;
 
   static_assert(sizeof(TrackedEntitySet) == 0x0C, "TrackedEntitySet size must be 0x0C");
 
@@ -115,7 +115,7 @@ namespace moho
     offsetof(SoundHandleRecord, mPlayingSeconds) == 0x24, "SoundHandleRecord::mPlayingSeconds offset must be 0x24"
   );
 
-  static_assert(sizeof(msvc8::set<IXACTCue*>) == 0x0C, "msvc8::set<IXACTCue*> size must be 0x0C");
+  static_assert(sizeof(fa::set<IXACTCue*>) == 0x0C, "fa::set<IXACTCue*> size must be 0x0C");
 
   /**
    * VFTABLE: 0x00E4C444
@@ -199,16 +199,16 @@ namespace moho
      * Address: 0x008AAC50 (FUN_008AAC50)
      * Slot: 3
      *
-     * msvc8::string const&, msvc8::string const&
+     * fa::string const&, fa::string const&
      *
      * IDA signature:
-     * void __thiscall Moho::CUserSoundManager::Play(Moho::CUserSoundManager *this, msvc8::string const& bankName,
-     * msvc8::string const& cueName);
+     * void __thiscall Moho::CUserSoundManager::Play(Moho::CUserSoundManager *this, fa::string const& bankName,
+     * fa::string const& cueName);
      *
      * What it does:
      * Resolves/plays a one-shot cue by bank+cue string names.
      */
-    void Play(const msvc8::string& bankName, const msvc8::string& cueName) override;
+    void Play(const fa::string& bankName, const fa::string& cueName) override;
 
     /**
      * Address: 0x008AAE00 (FUN_008AAE00)
@@ -419,7 +419,7 @@ namespace moho
     SoundHandleIdPool mLoopHandleIdPool;                     // +0x118
     gpg::fastvector_n<SoundHandleRecord, 256> mSoundHandles; // +0x140
 
-    msvc8::set<IXACTCue*> mPendingDestroyCues; // +0x2950
+    fa::set<IXACTCue*> mPendingDestroyCues; // +0x2950
     WeakPtr<UserArmy> mListenerArmy;           // +0x295C (the army whose recon filters positional sounds)
     TDatList<HSound, void> mActiveLoops;       // +0x2964
 
@@ -432,7 +432,7 @@ namespace moho
     float mCurrentCameraDistanceMetric; // +0x29C4
     std::uint8_t mWorldSoundsEnabled;   // +0x29C8
     std::uint8_t mReserved29C9[0x03];   // +0x29C9
-    msvc8::string mLanguageTag;         // +0x29CC
+    fa::string mLanguageTag;         // +0x29CC
 
     CSndVar mDuckLengthVar;            // +0x29E8
     CSndVar mDuckVar;                  // +0x2A08

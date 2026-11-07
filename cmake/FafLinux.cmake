@@ -67,6 +67,7 @@ set(FAF_DEPENDENCIES_DIR "${PROJECT_SOURCE_DIR}/dependencies" CACHE PATH
     "Third-party tree (dependencies/ in the repository)")
 
 include(FafCodegen)
+include(FafWarnings)
 
 # --- Toolchain check ------------------------------------------------------------------
 # tests/linux/ToolchainCheck.cpp: data model, char signedness, no FMA
@@ -100,14 +101,18 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/zlib" "${CMAKE_BINARY_DIR}/de
 # simulation targets build as before.
 option(FAF_FETCH_DEPENDENCIES "Fetch the net channel's Monocypher download at configure time" ON)
 if(FAF_FETCH_DEPENDENCIES)
-  set(FAF_DEPENDENCIES_ONLY monocypher)
+  set(FAF_DEPENDENCIES_ONLY monocypher zstd googletest)
   include(FafDependencies)
 endif()
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/monocypher" "${CMAKE_BINARY_DIR}/deps/monocypher")
+add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/zstd" "${CMAKE_BINARY_DIR}/deps/zstd")
+add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/googletest" "${CMAKE_BINARY_DIR}/deps/googletest")
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/remote/net" "${CMAKE_BINARY_DIR}/remote/net")
 if(TARGET faf_netchannel)
   add_executable(faf_netchannel_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/NetChannelTests.cpp")
-  target_link_libraries(faf_netchannel_tests PRIVATE faf_netchannel faf_monocypher)
+  target_link_libraries(faf_netchannel_tests PRIVATE faf_netchannel faf_monocypher gtest_main)
+  add_executable(faf_gamelink_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/GameLinkTests.cpp")
+  target_link_libraries(faf_gamelink_tests PRIVATE faf_netchannel faf_monocypher gtest_main)
 endif()
 
 # --- faf_sim ----------------------------------------------------------------------------
@@ -168,7 +173,7 @@ faf_build_info(faf_sim x64-linux)
 # Windows build assembles X87Math64.asm, plan WPL.10).
 enable_language(ASM)
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math64.S")
-# gpg::gal::Math without D3DX (Windows' faf_main uses gpg/gal/Matrix.cpp, plan WPR.12).
+# gpg::gal::Math without D3DX (plan WPR.12; Windows' faf_main links it too, #317).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/gal/MatrixPortable.cpp")
 # The Win32 calls the shared code makes, on POSIX (plan WPL.5).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32Shim.cpp")
@@ -202,7 +207,12 @@ target_include_directories(faf_sim_settings INTERFACE
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_link_libraries(faf_sim_settings INTERFACE faf_codegen)
-target_link_libraries(faf_sim PUBLIC Wm3Headers zlib123)
+target_link_libraries(faf_sim PUBLIC Wm3Headers zlib123 faf_monocypher faf_zstd)
+# The client half of server mode (remote/client/ServerConnect.cpp, /connectserver) holds the channel to the server:
+# every program built from faf_sim links the net channel, as Windows' server-mode faf_main does.
+if(TARGET faf_netchannel)
+  target_link_libraries(faf_sim PUBLIC faf_netchannel)
+endif()
 
 set(_faf_sim_options
   # The recovered tree's x86 layout asserts, off as on Windows x64 (see the
@@ -213,23 +223,8 @@ set(_faf_sim_options
   ${FAF_LINUX_MS_DIALECT}
   # boost.thread checks for the compiler's threading mode (_REENTRANT).
   -pthread
-  # The Windows build's diagnostics settings (src/CMakeLists.txt).
-  -Wno-microsoft
-  -Wno-unused-parameter -Wno-unused-variable -Wno-unused-private-field
-  -Wno-unused-function -Wno-unused-local-typedef -Wno-unused-but-set-variable
-  -Wno-unused-lambda-capture -Wno-unused-value -Wno-unused-command-line-argument
-  -Wno-missing-field-initializers -Wno-sign-compare -Wno-switch
-  -Wno-invalid-offsetof -Wno-keyword-macro -Wno-unknown-pragmas
-  -Wno-ignored-pragma-intrinsic -Wno-pragma-pack -Wno-ignored-attributes
-  -Wno-deprecated-declarations -Wno-deprecated-enum-enum-conversion
-  -Wno-nonportable-include-path -Wno-reorder-ctor
-  -Wno-delete-non-abstract-non-virtual-dtor -Wno-overloaded-virtual
-  -Wno-inconsistent-missing-override -Wno-missing-braces -Wno-braced-scalar-init
-  -Wno-char-subscripts -Wno-parentheses -Wno-dangling-else
-  -Wno-tautological-constant-out-of-range-compare
-  -Wno-tautological-undefined-compare -Wno-undefined-var-template
-  -Wno-writable-strings -Wno-comment -Wno-extra-tokens -Wno-nontrivial-memcall
-  -Wno-mismatched-tags -Wno-extra-qualification
+  -Wall
+  ${FAF_WARNING_OPTIONS}
   # Options clang 18 does not know yet (the Windows build uses a newer clang).
   -Wno-unknown-warning-option)
 target_compile_options(faf_sim_settings INTERFACE "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_sim_options}>")
@@ -242,12 +237,22 @@ foreach(_src IN LISTS _faf_sim_files)
     set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_OPTIONS -w)
   endif()
 endforeach()
+include(FafPrecompiledHeaders)
+faf_precompile(faf_sim)
 
 # --- faf_sim_math_tests (plan WPL.23) ---------------------------------------------------
 # The golden sim-math tests (tests/sim_math) on every faf_sim object, as Windows runs
 # them on faf_engine: every golden case, the pathfinder's and the random stream's too.
 add_executable(faf_sim_math_tests "${PROJECT_SOURCE_DIR}/tests/sim_math/SimMathTests.cpp")
-target_link_libraries(faf_sim_math_tests PRIVATE faf_sim)
+target_link_libraries(faf_sim_math_tests PRIVATE faf_sim gtest)
+target_compile_definitions(faf_sim_math_tests PRIVATE
+  FAF_SIM_MATH_GOLDEN="${PROJECT_SOURCE_DIR}/tests/sim_math/golden.txt"
+)
+if(EXISTS "${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-x64.txt")
+  target_compile_definitions(faf_sim_math_tests PRIVATE
+    FAF_SIM_MATH_KNOWN="${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-x64.txt"
+  )
+endif()
 set(_faf_sim_math_args "${PROJECT_SOURCE_DIR}/tests/sim_math/golden.txt")
 if(EXISTS "${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-x64.txt")
   list(APPEND _faf_sim_math_args --known "${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-x64.txt")
@@ -283,16 +288,57 @@ set(_faf_headless_files "")
 foreach(_src IN LISTS FAF_HEADLESS_SOURCES)
   list(APPEND _faf_headless_files "${PROJECT_SOURCE_DIR}/src/${_src}")
 endforeach()
-add_executable(headless ${_faf_headless_files})
+add_executable(headless ${_faf_headless_files}
+  "${PROJECT_SOURCE_DIR}/src/headless/ReplayTargetAudit.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbySignaller.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
+)
+target_compile_definitions(headless PRIVATE FAF_HEADLESS_NET=1)
+target_link_libraries(headless PRIVATE faf_netchannel faf_monocypher)
 target_link_libraries(headless PRIVATE faf_sim)
 target_compile_definitions(headless PRIVATE FAF_SERVER_MODE=1)
 target_link_options(headless PRIVATE -Wl,--error-limit=0)
+
+# --- server (plan WP1.1) --------------------------------------------------------------------
+# The dedicated server, Linux only (plan D2): the sim, and what `headless` shares for loading a game.
+add_executable(server
+  "${PROJECT_SOURCE_DIR}/src/server/ServerMain.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbySignaller.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
+  "${PROJECT_SOURCE_DIR}/src/headless/SessionLoad.cpp"
+  "${PROJECT_SOURCE_DIR}/src/headless/ReplayLuaState.cpp"
+)
+target_link_libraries(server PRIVATE faf_sim faf_netchannel faf_monocypher)
+target_compile_definitions(server PRIVATE FAF_SERVER_MODE=1)
+target_link_options(server PRIVATE -Wl,--error-limit=0)
+
+add_executable(faf_server_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SpeedWatchTests.cpp")
+target_include_directories(faf_server_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(faf_server_tests PRIVATE gtest_main)
+
+add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp" "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbySignaller.cpp")
+target_link_libraries(faf_seat_tests PRIVATE faf_sim faf_netchannel faf_monocypher gtest_main)
+target_compile_definitions(faf_seat_tests PRIVATE FAF_SERVER_MODE=1)
+target_link_options(faf_seat_tests PRIVATE -Wl,--error-limit=0)
+
+add_executable(faf_server_probe EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeMain.cpp")
+target_link_libraries(faf_server_probe PRIVATE faf_sim faf_netchannel faf_monocypher)
+target_compile_definitions(faf_server_probe PRIVATE FAF_SERVER_MODE=1)
+target_link_options(faf_server_probe PRIVATE -Wl,--error-limit=0)
 
 # --- faf_remote_tests -------------------------------------------------------------------
 # The wire format's tests (tests/remote/WireTests.cpp) on the Linux objects, as Windows'
 # server-mode build runs them on faf_engine.
 add_executable(faf_remote_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/WireTests.cpp")
-target_link_libraries(faf_remote_tests PRIVATE faf_sim)
+target_link_libraries(faf_remote_tests PRIVATE faf_sim gtest_main)
 target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_remote_tests PRIVATE -Wl,--error-limit=0)
 

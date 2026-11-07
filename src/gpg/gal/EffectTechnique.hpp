@@ -40,7 +40,7 @@ namespace gpg::gal
          * What it does:
          * The technique's name in the effect.
          */
-        virtual msvc8::string* GetName() = 0;
+        virtual fa::string* GetName() = 0;
 
         /**
          * Slot: 2
@@ -82,7 +82,7 @@ namespace gpg::gal
          * Reads the technique's bool annotation `annotationName`; false when
          * it has none.
          */
-        virtual bool GetAnnotationBool(bool* outValue, const msvc8::string& annotationName) = 0;
+        virtual bool GetAnnotationBool(bool* outValue, const fa::string& annotationName) = 0;
 
         /**
          * Slot: 7
@@ -90,7 +90,7 @@ namespace gpg::gal
          * What it does:
          * Reads the technique's int annotation `annotationName`.
          */
-        virtual bool GetAnnotationInt(int* outValue, const msvc8::string& annotationName) = 0;
+        virtual bool GetAnnotationInt(int* outValue, const fa::string& annotationName) = 0;
 
         /**
          * Slot: 8
@@ -98,7 +98,7 @@ namespace gpg::gal
          * What it does:
          * Reads the technique's float annotation `annotationName`.
          */
-        virtual bool GetAnnotationFloat(float* outValue, const msvc8::string& annotationName) = 0;
+        virtual bool GetAnnotationFloat(float* outValue, const fa::string& annotationName) = 0;
 
         /**
          * Slot: 9
@@ -106,7 +106,7 @@ namespace gpg::gal
          * What it does:
          * Reads the technique's string annotation `annotationName`.
          */
-        virtual bool GetAnnotationString(msvc8::string* outValue, const msvc8::string& annotationName) = 0;
+        virtual bool GetAnnotationString(fa::string* outValue, const fa::string& annotationName) = 0;
     };
 
     static_assert(sizeof(EffectTechnique) == 0x4, "gpg::gal::EffectTechnique size must be 0x4");

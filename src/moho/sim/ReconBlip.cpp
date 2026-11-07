@@ -95,19 +95,9 @@ namespace
   constexpr const char* kReconBlipIsOnRadarHelpText = "bool = ReconBlip:IsOnRadar()";
   constexpr const char* kReconBlipIsKnownFakeName = "IsKnownFake";
   constexpr const char* kReconBlipIsKnownFakeHelpText = "bool = ReconBlip:IsKnownFake()";
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
 
   constexpr std::uint32_t kUnitCollisionBucketFlags = 0x100u;
   constexpr std::uint32_t kReconEntityFamilyPrefix = 0x300u;
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
 
   int PushReconFlagFromLuaState(
     LuaPlus::LuaState* const state, const char* const helpText, const std::uint32_t flagMask
@@ -118,10 +108,7 @@ namespace
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, helpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, helpText);
 
     const LuaPlus::LuaObject blipObject(LuaPlus::LuaStackObject(state, 1));
     ReconBlip* const blip = SCR_FromLua_ReconBlip(blipObject, state);
@@ -155,7 +142,7 @@ namespace
    * Copies one source entity mesh shared-pair `(px,pi)` and retains one shared
    * control-block owner when the control lane is non-null.
    */
-  [[nodiscard]] boost::SharedPtrRaw<RScmResource> CopyEntityMeshSharedRetained(const Entity* const source) noexcept
+  [[maybe_unused]] [[nodiscard]] boost::SharedPtrRaw<RScmResource> CopyEntityMeshSharedRetained(const Entity* const source) noexcept
   {
     boost::SharedPtrRaw<RScmResource> out{};
     if (source == nullptr) {
@@ -205,13 +192,6 @@ namespace
     return {direction.x * randomScale, direction.y * randomScale, direction.z * randomScale};
   }
 
-  [[nodiscard]] gpg::RRef MakeReconBlipRef(ReconBlip* const object) noexcept
-  {
-    gpg::RRef ref{};
-    ref.mObj = object;
-    ref.mType = object ? ReconBlip::StaticGetClass() : nullptr;
-    return ref;
-  }
 } // namespace
 
 gpg::RType* SPerArmyReconInfo::sType = nullptr;
@@ -285,11 +265,7 @@ int moho::cfunc_ReconBlipGetBlueprint(lua_State* const luaContext)
  */
 int moho::cfunc_ReconBlipGetBlueprintL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kReconBlipGetBlueprintHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kReconBlipGetBlueprintHelpText);
 
   const LuaPlus::LuaObject blipObject(LuaPlus::LuaStackObject(state, 1));
   ReconBlip* const blip = SCR_FromLua_ReconBlip(blipObject, state);
@@ -318,10 +294,7 @@ int moho::cfunc_ReconBlipGetSource(lua_State* const luaContext)
 int moho::cfunc_ReconBlipGetSourceL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kReconBlipGetSourceHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kReconBlipGetSourceHelpText);
 
   const LuaPlus::LuaObject blipObject(LuaPlus::LuaStackObject(state, 1));
   ReconBlip* const blip = SCR_FromLua_ReconBlip(blipObject, state);
@@ -497,7 +470,7 @@ int moho::cfunc_ReconBlipIsKnownFakeL(LuaPlus::LuaState* const state)
 CScrLuaInitForm* moho::func_ReconBlipGetBlueprint_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipGetBlueprintName,
     &moho::cfunc_ReconBlipGetBlueprint,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -516,7 +489,7 @@ CScrLuaInitForm* moho::func_ReconBlipGetBlueprint_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipGetSource_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipGetSourceName,
     &moho::cfunc_ReconBlipGetSource,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -535,7 +508,7 @@ CScrLuaInitForm* moho::func_ReconBlipGetSource_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsSeenEver_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsSeenEverName,
     &moho::cfunc_ReconBlipIsSeenEver,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -554,7 +527,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsSeenEver_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsSeenNow_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsSeenNowName,
     &moho::cfunc_ReconBlipIsSeenNow,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -573,7 +546,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsSeenNow_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsMaybeDead_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsMaybeDeadName,
     &moho::cfunc_ReconBlipIsMaybeDead,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -592,7 +565,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsMaybeDead_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsOnOmni_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsOnOmniName,
     &moho::cfunc_ReconBlipIsOnOmni,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -611,7 +584,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsOnOmni_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsOnSonar_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsOnSonarName,
     &moho::cfunc_ReconBlipIsOnSonar,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -630,7 +603,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsOnSonar_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsOnRadar_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsOnRadarName,
     &moho::cfunc_ReconBlipIsOnRadar,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -649,7 +622,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsOnRadar_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsKnownFake_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsKnownFakeName,
     &moho::cfunc_ReconBlipIsKnownFake,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -841,7 +814,7 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
 ReconBlip::~ReconBlip()
 {
   // `mReconDat` is the last-declared member, so MSVC emits its
-  // `msvc8::vector<SPerArmyReconInfo>::~vector()` (FUN_005C5580, called at
+  // `fa::vector<SPerArmyReconInfo>::~vector()` (FUN_005C5580, called at
   // 0x005BECBB) as the first teardown step of this epilogue. Nothing to write.
   // FUN_005BEC90 destroys the payload in place and re-inits it before the
   // rest of the epilogue runs; `mUnitVarDat`'s own destructor then sees an
@@ -879,10 +852,7 @@ void ReconBlip::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg:
  */
 gpg::RRef ReconBlip::GetDerivedObjectRef()
 {
-  gpg::RRef objectRef{};
-  objectRef.mObj = this;
-  objectRef.mType = GetClass();
-  return objectRef;
+  return gpg::MakeSelfRef(this);
 }
 
 /**
@@ -1245,34 +1215,6 @@ bool ReconBlip::IsMaybeDead(CArmyImpl* const army) const
 bool ReconBlip::IsFake() const noexcept
 {
   return mUnitConstDat.mFake != 0u;
-}
-
-SPerArmyReconInfo* ReconBlip::GetPerArmyReconInfo(const std::int32_t armyIndex) noexcept
-{
-  if (armyIndex < 0 || mReconDat.begin() == nullptr || mReconDat.end() == nullptr) {
-    return nullptr;
-  }
-
-  const std::ptrdiff_t count = mReconDat.end() - mReconDat.begin();
-  if (armyIndex >= count) {
-    return nullptr;
-  }
-
-  return mReconDat.begin() + armyIndex;
-}
-
-const SPerArmyReconInfo* ReconBlip::GetPerArmyReconInfo(const std::int32_t armyIndex) const noexcept
-{
-  if (armyIndex < 0 || mReconDat.begin() == nullptr || mReconDat.end() == nullptr) {
-    return nullptr;
-  }
-
-  const std::ptrdiff_t count = mReconDat.end() - mReconDat.begin();
-  if (armyIndex >= count) {
-    return nullptr;
-  }
-
-  return mReconDat.begin() + armyIndex;
 }
 
 /**

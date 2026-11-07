@@ -13,67 +13,6 @@ namespace moho::runtime
     constexpr HRESULT kHrInvalidArg = static_cast<HRESULT>(0x80070057u);
     constexpr HRESULT kHrInsufficientBuffer = static_cast<HRESULT>(0x8007007Au);
 
-    [[nodiscard]] const char* LookupWinErrorStringNarrow(const HRESULT errorCode)
-    {
-      thread_local char errorText[512]{};
-      errorText[0] = '\0';
-
-      const DWORD formatChars = ::FormatMessageA(
-        FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-        nullptr,
-        static_cast<DWORD>(errorCode),
-        0,
-        errorText,
-        static_cast<DWORD>(sizeof(errorText)),
-        nullptr
-      );
-      if (formatChars == 0) {
-        return "Unknown";
-      }
-
-      DWORD trimCursor = formatChars;
-      while (trimCursor > 0) {
-        const char tail = errorText[trimCursor - 1];
-        if (tail != '\r' && tail != '\n' && tail != '\t' && tail != ' ') {
-          break;
-        }
-        errorText[trimCursor - 1] = '\0';
-        --trimCursor;
-      }
-
-      return (errorText[0] != '\0') ? errorText : "Unknown";
-    }
-
-    [[nodiscard]] const wchar_t* LookupWinErrorStringWide(const HRESULT errorCode)
-    {
-      thread_local wchar_t errorText[512]{};
-      errorText[0] = L'\0';
-
-      const DWORD formatChars = ::FormatMessageW(
-        FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-        nullptr,
-        static_cast<DWORD>(errorCode),
-        0,
-        errorText,
-        static_cast<DWORD>(sizeof(errorText) / sizeof(errorText[0])),
-        nullptr
-      );
-      if (formatChars == 0) {
-        return L"Unknown";
-      }
-
-      DWORD trimCursor = formatChars;
-      while (trimCursor > 0) {
-        const wchar_t tail = errorText[trimCursor - 1];
-        if (tail != L'\r' && tail != L'\n' && tail != L'\t' && tail != L' ') {
-          break;
-        }
-        errorText[trimCursor - 1] = L'\0';
-        --trimCursor;
-      }
-
-      return (errorText[0] != L'\0') ? errorText : L"Unknown";
-    }
   }
 
   /**

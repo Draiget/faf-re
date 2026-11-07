@@ -17,6 +17,8 @@
 #include "gpg/core/utils/Logging.h"
 #include "IClientMgrUIInterface.h"
 #include "moho/misc/DiagnosticBudget.h"
+#include "moho/net/NetConVars.h"
+#include "moho/net/PeerFeatures.h"
 using namespace moho;
 
 namespace
@@ -174,7 +176,7 @@ void CClientBase::Debug()
   gpg::Logf("      mNickname=\"%s\"", mNickname.c_str());
   gpg::Logf("      mIndex=%d", mIndex);
 
-  msvc8::string validSources;
+  fa::string validSources;
   for (auto value = mValidCommandSources.GetNext(std::numeric_limits<unsigned>::max());
        value < mValidCommandSources.Max();
        value = mValidCommandSources.GetNext(value)) {
@@ -192,7 +194,7 @@ void CClientBase::Debug()
   gpg::Logf("      mDispatchedBeat=%d", mDispatchedBeat);
   gpg::Logf("      mAvailableBeatRemote=%d", mAvailableBeatRemote);
 
-  msvc8::string ackList;
+  fa::string ackList;
   for (size_t i = 0; i < mLatestAckReceived.size(); ++i) {
     if (!ackList.empty()) {
       ackList = ackList + ",";
@@ -230,7 +232,7 @@ void CClientBase::Debug()
  * comma-joined from `mSubobj`; the trailing millisecond field is appended only
  * when `mType != Nothing`.
  */
-msvc8::string& moho::FormatBottleneckLabel(const SClientBottleneckInfo& info, msvc8::string& out)
+fa::string& moho::FormatBottleneckLabel(const SClientBottleneckInfo& info, fa::string& out)
 {
   // Type token (switch on mType, 0..3) -> assignment (0x0053B703..0x0053B71F).
   switch (info.mType) {
@@ -400,8 +402,14 @@ void CClientBase::Process(CMessage& msg)
     // Engine addition: the hash this client reports for that stream, when it
     // sent one (the shipped engine does not). Our own acks describe our own
     // copy, so there is nothing to compare.
+    // Issue #285: with announcements on (net_PeerFeatures), a report counts only from a
+    // peer that announced OrderStreamCheck; reports before its announcement are skipped.
+    // Off, the message's size says it, as before. The bytes sent don't change either way.
     CommandStreamCheck* const streamCheck = mManager->mStreamCheck.get();
-    if (streamCheck != nullptr && this != mManager->mLocalClient &&
+    const bool reportAnnounced = net_PeerFeatures == 0 ||
+      (mManager->mPeerFeatures != nullptr &&
+       mManager->mPeerFeatures->PeerSupports(mIndex, EPeerFeature::OrderStreamCheck));
+    if (streamCheck != nullptr && this != mManager->mLocalClient && reportAnnounced &&
         static_cast<std::size_t>(msg.GetMessageSize()) >=
           sizeof(uint8_t) + sizeof(int32_t) + CommandStreamCheck::kAckDigestBytes) {
       CommandStreamCheck::AckDigest digest{};
@@ -452,6 +460,8 @@ void CClientBase::Process(CMessage& msg)
 
   case static_cast<uint8_t>(EClientMsg::CLIMSG_Ready):
     mReady = true;
+    // Engine addition (wld_PreciseSharedStart): note when this ready was handled, for the shared start.
+    mManager->NoteClientReady(mIndex);
     return;
 
   case static_cast<uint8_t>(EClientMsg::CLIMSG_Eject): {
@@ -806,7 +816,7 @@ void CClientBase::UpdateState(
         outPipe->Write(message.mBuff.start_, message.mBuff.Size());
 
         if (op == ECmdStreamOp::CMDST_CommandSourceTerminated) {
-          mValidCommandSources.Remove(mCommandSourceId);
+          (void)mValidCommandSources.Remove(mCommandSourceId);
           mValidCommandSources.Finalize();
           hasCommandSource = false;
           mCommandSourceId = kInvalidCommandSource;
@@ -828,7 +838,7 @@ bool CClientBase::NoEjectionPending()
 /**
  * Address: 0x0053CA60 (FUN_0053CA60)
  */
-const msvc8::vector<int32_t>* CClientBase::GetLatestAcksVector()
+const fa::vector<int32_t>* CClientBase::GetLatestAcksVector()
 {
   std::scoped_lock lock(mManager->mLock);
   return &mLatestAckReceived;
@@ -890,7 +900,7 @@ void CClientBase::Eject()
 /**
  * Address: 0x0053CC60 (FUN_0053CC60)
  */
-void CClientBase::CollectEjecters(msvc8::vector<const CClientBase*>& out)
+void CClientBase::CollectEjecters(fa::vector<const CClientBase*>& out)
 {
   std::scoped_lock lock(mManager->mLock);
 

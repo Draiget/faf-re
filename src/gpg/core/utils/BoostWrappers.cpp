@@ -111,7 +111,7 @@ namespace boost
    * Initializes one single-lane Win32 mutex owner and throws
    * `boost::thread_resource_error` when mutex creation fails.
    */
-  WinMutexHandle* InitializeUnnamedMutexHandleOrThrow(
+  [[maybe_unused]] WinMutexHandle* InitializeUnnamedMutexHandleOrThrow(
     WinMutexHandle* const outHandle
   )
   {
@@ -136,7 +136,7 @@ namespace boost
    * Initializes one two-lane Win32 mutex owner (`handle`, `lane04`) and throws
    * `boost::thread_resource_error` when mutex creation fails.
    */
-  WinMutexHandlePair* InitializeUnnamedMutexHandlePairOrThrow(
+  [[maybe_unused]] WinMutexHandlePair* InitializeUnnamedMutexHandlePairOrThrow(
     WinMutexHandlePair* const outHandlePair
   )
   {
@@ -1487,7 +1487,7 @@ namespace boost
         return;
       }
 
-      delete countedImpl->px;
+      GPG_NONVIRTUAL_DESTROY(delete countedImpl->px);
       countedImpl->px = nullptr;
     }
 
@@ -1529,22 +1529,6 @@ namespace boost
       "SpCountedImplPd::deleterStorage offset must be 0x10"
     );
 
-    [[nodiscard]] bool SpTypeInfoMatchesRawName(
-      const boost::detail::sp_typeinfo& requestedType,
-      const char* const expectedRawName
-    ) noexcept
-    {
-#if defined(_MSC_VER)
-      const char* const rawName = requestedType.raw_name();
-      if (rawName != nullptr && std::strcmp(rawName, expectedRawName) == 0) {
-        return true;
-      }
-#endif
-
-      const char* const name = requestedType.name();
-      return name != nullptr && std::strcmp(name, expectedRawName) == 0;
-    }
-
     template <class TPointee>
     [[nodiscard]] void* GetSpCountedImplPdDeleterStorage(
       SpCountedImplStorage<TPointee>* const countedImpl
@@ -1570,12 +1554,6 @@ namespace boost
         return nullptr;
       }
     };
-
-    [[nodiscard]] void* RecoveredSpCountedImplPVtable() noexcept
-    {
-      static RecoveredSpCountedBaseVtableProbe probe;
-      return *reinterpret_cast<void**>(&probe);
-    }
 
     /**
      * Dedicated (non-shared) vtable probe for `sp_counted_impl_p<gpg::HaStar::

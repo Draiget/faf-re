@@ -63,7 +63,7 @@ namespace moho
    * The record embeds a full `SSTIUnitVariableData` payload, so its complete
    * definition (and that of `QueueUnitVariableUpdate`) lives in SimDriver.cpp,
    * where `moho/unit/core/Unit.h` is includable. Here it is only forward-declared
-   * and stored behind the pointer-only `msvc8::vector<T>` lane, which does not
+   * and stored behind the pointer-only `fa::vector<T>` lane, which does not
    * require a complete `T` because `SSyncData`'s ctor/dtor are out-of-line.
    */
   struct SUnitVariableUpdateEntry;
@@ -235,56 +235,56 @@ namespace moho
     /// `IUserSoundManager::UpdateSoundRequests`. 0x10 of vector head plus
     /// eight inline 0x1C-byte requests is the whole 0xF0.
     gpg::core::FastVectorN<SAudioRequest, 8> mAudioRequests; // +0x018
-    msvc8::vector<SSTIArmyConstantData> mNewGrids;          // +0x108
-    msvc8::vector<SSTIArmyVariableData> mArmyUpdates;       // +0x118
-    msvc8::vector<SCreateEntityParams> mNewEntities;        // +0x128
-    msvc8::vector<SCreateUnitParams> mNewUnits;             // +0x138
-    msvc8::vector<SEntityVariableUpdateEntry> mEntityUpdates; // +0x148
-    msvc8::vector<SUnitVariableUpdateEntry> mUnitUpdates;   // +0x158
-    msvc8::vector<EntId> mDeleteIds;                        // +0x168
-    msvc8::vector<EntId> mEraseIds;                         // +0x178
+    fa::vector<SSTIArmyConstantData> mNewGrids;          // +0x108
+    fa::vector<SSTIArmyVariableData> mArmyUpdates;       // +0x118
+    fa::vector<SCreateEntityParams> mNewEntities;        // +0x128
+    fa::vector<SCreateUnitParams> mNewUnits;             // +0x138
+    fa::vector<SEntityVariableUpdateEntry> mEntityUpdates; // +0x148
+    fa::vector<SUnitVariableUpdateEntry> mUnitUpdates;   // +0x158
+    fa::vector<EntId> mDeleteIds;                        // +0x168
+    fa::vector<EntId> mEraseIds;                         // +0x178
     /// Consumed by `CWldSession::DoBeat` as the new-command run (60-byte records).
-    msvc8::vector<SSTICommandConstantData> mPublishedCommandDescriptors; // +0x188
+    fa::vector<SSTICommandConstantData> mPublishedCommandDescriptors; // +0x188
     /// Consumed by `CWldSession::DoBeat` as the command-update run (120-byte records).
-    msvc8::vector<SSyncPublishedCommandPacket> mPublishedCommandPackets; // +0x198
+    fa::vector<SSyncPublishedCommandPacket> mPublishedCommandPackets; // +0x198
     /// Consumed by `CWldSession::DoBeat` as the delete-command id run.
-    msvc8::vector<CmdId> mPendingCommandEventRemovals;      // +0x1A8
+    fa::vector<CmdId> mPendingCommandEventRemovals;      // +0x1A8
     /// Consumed by `CWldSession::DoBeat` as the erase-command id run.
-    msvc8::vector<CmdId> mPendingReleasedCommandIds;        // +0x1B8
+    fa::vector<CmdId> mPendingReleasedCommandIds;        // +0x1B8
     boost::shared_ptr<void> mParticleBuffer;                // +0x1C8
     /// Handed straight to `CDecalManager::AddDecals` / `RemoveDecals` by
     /// `CWldSession::DoBeat`; the removal run carries decal handles, not
     /// entity ids.
-    msvc8::vector<SDecalInfo> mAddDecals;                   // +0x1D0
-    msvc8::vector<std::uint32_t> mRemoveDecals;             // +0x1E0
-    msvc8::vector<SCamShakeParams> mCamShakeParams;         // +0x1F0
-    msvc8::vector<SCamFollowParams> mFollowCameras;         // +0x200
+    fa::vector<SDecalInfo> mAddDecals;                   // +0x1D0
+    fa::vector<std::uint32_t> mRemoveDecals;             // +0x1E0
+    fa::vector<SCamShakeParams> mCamShakeParams;         // +0x1F0
+    fa::vector<SCamFollowParams> mFollowCameras;         // +0x200
     /// Allied-upgrade notifications for this beat. `Sim::Sync` swaps
     /// `Sim::mAllyUpgradeNotifications` (`Sim+0x09D8`) into this lane at
     /// 0x00747A60 -- `[ebx+9DCh/9E0h/9E4h]` against `[eax+214h/218h/21Ch]`.
-    /// Previously declared `msvc8::vector<std::byte> mAuxiliaryVector17` and
+    /// Previously declared `fa::vector<std::byte> mAuxiliaryVector17` and
     /// described as "untouched by `CWldSession::DoBeat`"; the element type is
     /// pinned by the swap's source, which is a
-    /// `msvc8::vector<SUpgradeNotifyPair>`.
-    msvc8::vector<SUpgradeNotifyPair> mAllyUpgradeNotifications; // +0x210
-    msvc8::vector<SEntityPoseUpdateEntry> mPoseUpdates;     // +0x220
-    msvc8::vector<gpg::Rect2i> mPlayableRectUpdates;        // +0x230
-    msvc8::vector<SDesyncInfo> mDesyncs;                    // +0x240
+    /// `fa::vector<SUpgradeNotifyPair>`.
+    fa::vector<SUpgradeNotifyPair> mAllyUpgradeNotifications; // +0x210
+    fa::vector<SEntityPoseUpdateEntry> mPoseUpdates;     // +0x220
+    fa::vector<gpg::Rect2i> mPlayableRectUpdates;        // +0x230
+    fa::vector<SDesyncInfo> mDesyncs;                    // +0x240
     int32_t mPausedBy = -1;                                 // +0x250
-    msvc8::string mSubmitArmyStats;                         // +0x254
+    fa::string mSubmitArmyStats;                         // +0x254
     bool mGameOver = false;                                 // +0x270
     bool mFogOfWar = false;                                 // +0x271
     std::uint8_t pad_0272_0274[0x02]{};                     // +0x272
     boost::SharedPtrRaw<CHeightField> mTerrainUpdate;       // +0x274
     boost::SharedPtrRaw<CSimResources> mSimResources;       // +0x27C
-    msvc8::vector<msvc8::string> mPrintField;               // +0x284
+    fa::vector<fa::string> mPrintField;               // +0x284
     /// Copied wholesale onto `CWldSession::mSyncExtraUnitData` by
-    /// `CWldSession::DoBeat` via `msvc8::vector<SExtraUnitData>::operator=`
+    /// `CWldSession::DoBeat` via `fa::vector<SExtraUnitData>::operator=`
     /// (0x00895214, FUN_007530C0, `legacy/containers/Vector.h`). Previously
-    /// mistyped `msvc8::vector<SyncInlineVector>`; see the field-level note
+    /// mistyped `fa::vector<SyncInlineVector>`; see the field-level note
     /// on `CWldSession::mSyncExtraUnitData` (`CWldSession.h`) for the full
     /// citation-correction evidence.
-    msvc8::vector<SExtraUnitData> mSyncExtraUnitData;  // +0x294
+    fa::vector<SExtraUnitData> mSyncExtraUnitData;  // +0x294
     boost::SharedPtrRaw<CDebugCanvas> mTickDebugCanvas;     // +0x2A4
     boost::SharedPtrRaw<CDebugCanvas> mBeatDebugCanvas;     // +0x2AC
     std::uint8_t pad_02B4_02B8[0x04]{};                     // +0x2B4
@@ -509,19 +509,19 @@ namespace moho
    * Paged deque of pending sync-data payload pointers, matching a
    * `boost::ptr_deque<SSyncData>` binding over `std::deque<SSyncData*>`.
    *
-   * Field layout is exactly `msvc8::deque<SSyncData*>`'s 0x14-byte ABI
+   * Field layout is exactly `fa::deque<SSyncData*>`'s 0x14-byte ABI
    * (`_Myproxy`/`_Map`/`_Mapsize`/`_Myoff`/`_Mysize`) -- confirmed by IDA's
    * own field recovery for `Moho::CSimDriver::mSyncdat` in `FUN_0073B570`
    * (the ctor zero-inits `mSyncdat._Map/_Mapsize/_Myoff/_Mysize` directly)
    * and by the paged double-indirection (`pages[block][lane]`) addressing
    * in `FUN_00741980`/`FUN_007408F0`/`FUN_0073F9C0`. This is NOT a flat
    * single-array ring buffer; every live element sits behind a `_Map`
-   * page-pointer lookup, exactly like every other `msvc8::deque<T>` user
+   * page-pointer lookup, exactly like every other `fa::deque<T>` user
    * in this codebase.
    */
   struct SSyncDataQueue
   {
-    msvc8::deque<SSyncData*> mSyncdat; // +0x00, binary field name (IDA: mSyncdat)
+    fa::deque<SSyncData*> mSyncdat; // +0x00, binary field name (IDA: mSyncdat)
 
     ~SSyncDataQueue();
 
@@ -539,7 +539,7 @@ namespace moho
      * Destroys and null-clears every live payload currently queued,
      * walking the deque's real page/lane storage via its iterators.
      * Ownership semantics (deleting the pointed-to `SSyncData`) belong to
-     * this ptr_deque-shaped wrapper, not to `msvc8::deque<T>` itself --
+     * this ptr_deque-shaped wrapper, not to `fa::deque<T>` itself --
      * the generic container only ever destroys the pointer value, never
      * the pointee.
      */
@@ -598,8 +598,8 @@ namespace moho
      * Initializes driver state, synchronization primitives, marshaller, and startup thread state.
      */
     CSimDriver(
-      msvc8::auto_ptr<gpg::Stream> stream,
-      msvc8::auto_ptr<CClientManagerImpl> clientManager,
+      fa::auto_ptr<gpg::Stream> stream,
+      fa::auto_ptr<CClientManagerImpl> clientManager,
       const boost::shared_ptr<LaunchInfoBase>& launchInfo,
       uint32_t commandSourceId
     );
@@ -682,7 +682,7 @@ namespace moho
     /**
      * Address: 0x0073B270 (FUN_0073B270)
      */
-    void SetGeomCams(const msvc8::vector<GeomCamera3>& geoCams) override;
+    void SetGeomCams(const fa::vector<GeomCamera3>& geoCams) override;
     /**
      * Address: 0x0073B3F0 (FUN_0073B3F0)
      * Retail build: compare-only path for mask A.
@@ -912,8 +912,8 @@ namespace moho
     // 0x00BBB945) destroy the same members through their smart-pointer
     // destructors when a later initialiser throws.
     boost::scoped_ptr<Sim> mSim;                          // +0x04
-    msvc8::auto_ptr<CClientManagerImpl> mClientManager;   // +0x08
-    msvc8::auto_ptr<gpg::Stream> mStream;                 // +0x0C
+    fa::auto_ptr<CClientManagerImpl> mClientManager;   // +0x08
+    fa::auto_ptr<gpg::Stream> mStream;                 // +0x0C
     boost::shared_ptr<LaunchInfoBase> mLaunchInfo;        // +0x10
     uint32_t mCommandSourceId = 0;                 // +0x18
     int32_t mLastDequeuedBeat = -1;                // +0x1C
@@ -955,7 +955,7 @@ namespace moho
     // +0x195..+0x197: compiler-inserted alignment before 4-byte aligned flag group.
     alignas(4) bool mSaveRequestUsesSuggestedName = false; // +0x198
     // +0x199..+0x19B: compiler-inserted alignment before string.
-    msvc8::string mPendingSaveName; // +0x19C
+    fa::string mPendingSaveName; // +0x19C
     NetSpeeds mSimSpeedSamples;     // +0x1B8
     int32_t mCurrentSimRate = 10;   // +0x228
   };
@@ -1019,8 +1019,21 @@ namespace moho
 
   void SIM_SetSessionPacing(ESimSessionPacing pacing) noexcept;
 
+  /**
+   * Engine addition (game server): keep issuing beats while the sim is paused. A lockstep client
+   * waits for some player's beat there, as any command of a player comes with one. A server's seats
+   * only follow its beats, so without any a player's resume would never reach the sim.
+   */
+  void SIM_SetIssueWhilePaused(bool issue) noexcept;
+
   /// Engine addition: the pacing `SIM_SetSessionPacing` last set.
   [[nodiscard]] ESimSessionPacing SIM_GetSessionPacing() noexcept;
+
+  /**
+   * Engine addition: the rate the sim last measured it can hold, from its median beat time, whatever
+   * the pacing. 1.0 is speed +0 (100 ms a beat); 0 before its first measure.
+   */
+  [[nodiscard]] float SIM_GetMeasuredGameRate() noexcept;
 
   /**
    * Engine addition: user-side console variables. Outside network sessions the issue thread keeps
@@ -1043,6 +1056,30 @@ namespace moho
    * frame take at most about that many beats and caps the session at lead x frame rate.
    */
   extern int sim_LeadOnSchedule;
+
+  /**
+   * Engine addition: user-side console variables for the display-clock skew correction, which the
+   * retail engine carries but never feeds (`CSimDriver::GetSimSpeed` returns 0).
+   * - `wld_SkewCorrection` (default 0): 1 announces it to the other players (`net_PeerFeatures`); in
+   *   a network game where all of them announce it, `GetSimSpeed` returns how many beats the beat on
+   *   screen is ahead of real time (negative when behind), measured tick by tick from the first
+   *   tick on screen with paused time left out. `WLD_GetSimRate` then runs the display clock at
+   *   `wld_SkewRateAdjustBase^-skew`, within [1 / `wld_SkewRateAdjustMax`, `wld_SkewRateAdjustMax`].
+   *   It changes when beats are issued, never what the sim computes.
+   * - `wld_SkewMaxLag` (default 2 s): the skew is clamped to this much real time either way.
+   * - `wld_SkewLog` (default 0): log the drift every this many seconds.
+   * - `wld_PreciseSharedStart` (default 1): in a network session the count is measured against the
+   *   moment the last player's ready message left its sender (`CClientManagerImpl::EstimateSharedStartUs`),
+   *   which every player times alike, so every player's screen keeps to one schedule; 0 counts
+   *   from this client's own first tick on screen, as outside network sessions.
+   * - `wld_ReadyAfterFirstFrame` (default 1): this client's ready message waits for the first frame
+   *   of the game interface to be drawn; 0 sends it before that frame, as the binary does.
+   */
+  extern int wld_SkewCorrection;
+  extern float wld_SkewMaxLag;
+  extern int wld_SkewLog;
+  extern int wld_PreciseSharedStart;
+  extern int wld_ReadyAfterFirstFrame;
 
   /**
    * Engine addition: while a lead paces the session (see above), the sim's measured speed (game

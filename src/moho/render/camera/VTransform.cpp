@@ -20,14 +20,6 @@
 
 namespace
 {
-  constexpr const char* kSerializationSourcePath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-  constexpr int kSerializationLoadLine = 84;
-  constexpr int kSerializationSaveLine = 87;
-
-  gpg::RType* gCachedVector3fType = nullptr;
-  gpg::RType* gCachedQuaternionfType = nullptr;
-
   /**
    * Address: 0x00BF1770 (FUN_00BF1770, atexit destructor of the VTransformTypeInfo object)
    */
@@ -35,22 +27,6 @@ namespace
   {
     static moho::VTransformTypeInfo sInstance;
     return sInstance;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    if (gCachedVector3fType == nullptr) {
-      gCachedVector3fType = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return gCachedVector3fType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveQuaternionfType()
-  {
-    if (gCachedQuaternionfType == nullptr) {
-      gCachedQuaternionfType = gpg::LookupRType(typeid(Wm3::Quaternionf));
-    }
-    return gCachedQuaternionfType;
   }
 
 } // namespace
@@ -340,7 +316,7 @@ namespace moho
    * What it does:
    * Formats one 3D vector lane as `x=...,y=...,z=...`.
    */
-  msvc8::string ToString(const Wm3::Vec3f& value)
+  fa::string ToString(const Wm3::Vec3f& value)
   {
     return gpg::STR_Printf("x=%f,y=%f,z=%f", value.x, value.y, value.z);
   }
@@ -351,10 +327,10 @@ namespace moho
    * What it does:
    * Formats one quaternion in scalar/vector form (`v=(x,y,z),s=w`).
    */
-  msvc8::string ToString(const Wm3::Quatf& value)
+  fa::string ToString(const Wm3::Quatf& value)
   {
     const Wm3::Vec3f vectorLane{value.x, value.y, value.z};
-    const msvc8::string vectorText = ToString(vectorLane);
+    const fa::string vectorText = ToString(vectorLane);
     return gpg::STR_Printf("v=(%s),s=%f", vectorText.c_str(), value.w);
   }
 
@@ -364,10 +340,10 @@ namespace moho
    * What it does:
    * Formats one transform as translation plus quaternion rotation text.
    */
-  msvc8::string ToString(const VTransform& value)
+  fa::string ToString(const VTransform& value)
   {
-    const msvc8::string rotationText = ToString(value.orient_);
-    const msvc8::string translationText = ToString(value.pos_);
+    const fa::string rotationText = ToString(value.orient_);
+    const fa::string translationText = ToString(value.pos_);
     return gpg::STR_Printf("t=%s, r={%s}", translationText.c_str(), rotationText.c_str());
   }
 
@@ -415,8 +391,8 @@ namespace moho
   {
     GPG_ASSERT(archive != nullptr);
     const gpg::RRef ownerRef{};
-    archive->Read(ResolveVector3fType(), &pos_, ownerRef);
-    archive->Read(ResolveQuaternionfType(), &orient_, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &pos_, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Quaternionf>(), &orient_, ownerRef);
   }
 
   /**
@@ -426,8 +402,8 @@ namespace moho
   {
     GPG_ASSERT(archive != nullptr);
     const gpg::RRef ownerRef{};
-    archive->Write(ResolveVector3fType(), &pos_, ownerRef);
-    archive->Write(ResolveQuaternionfType(), &orient_, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &pos_, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Quaternionf>(), &orient_, ownerRef);
   }
 
   /**

@@ -42,15 +42,6 @@ namespace moho
 
 namespace
 {
-  gpg::RType* gCollisionBeamEventType = nullptr;
-
-  [[nodiscard]] gpg::RType* LookupCollisionBeamEventType()
-  {
-    if (gCollisionBeamEventType == nullptr) {
-      gCollisionBeamEventType = gpg::LookupRType(typeid(moho::ECollisionBeamEvent));
-    }
-    return gCollisionBeamEventType;
-  }
 
   class RManyToOneBroadcasterCollisionBeamEventTypeInfo final : public gpg::RType
   {
@@ -64,8 +55,8 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName =
-        gpg::STR_Printf("ManyToOneBroadcaster<%s>", LookupCollisionBeamEventType()->GetName());
+      static const fa::string sName =
+        gpg::STR_Printf("ManyToOneBroadcaster<%s>", gpg::RTypeOf<moho::ECollisionBeamEvent>()->GetName());
       return sName.c_str();
     }
 
@@ -88,10 +79,10 @@ namespace
       size_ = sizeof(moho::ManyToOneBroadcaster_ECollisionBeamEvent);
       version_ = 1;
       serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(
-        &gpg::LoadAndBroadcastManyToOneListenerECollisionBeamEvent
+        reinterpret_cast<void (*)()>(&gpg::LoadAndBroadcastManyToOneListenerECollisionBeamEvent)
       );
       serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(
-        &gpg::SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1
+        reinterpret_cast<void (*)()>(&gpg::SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1)
       );
     }
   };
@@ -108,8 +99,8 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName =
-        gpg::STR_Printf("ManyToOneListener<%s>", LookupCollisionBeamEventType()->GetName());
+      static const fa::string sName =
+        gpg::STR_Printf("ManyToOneListener<%s>", gpg::RTypeOf<moho::ECollisionBeamEvent>()->GetName());
       return sName.c_str();
     }
 
@@ -182,8 +173,8 @@ namespace moho
   void initialize_CollisionBeamTrigConstants()
   {
     constexpr float kCollisionBeamConeHalfAngleRadians = 0.39269909f;
-    const float sinValue = msvc8::sinf(kCollisionBeamConeHalfAngleRadians);
-    gCollisionBeamConeCosine = msvc8::cosf(kCollisionBeamConeHalfAngleRadians);
+    const float sinValue = fa::sinf(kCollisionBeamConeHalfAngleRadians);
+    gCollisionBeamConeCosine = fa::cosf(kCollisionBeamConeHalfAngleRadians);
     gCollisionBeamConeSine = sinValue;
 
     // Preserve original lane (`sinValue * 0.0f`) including signed-zero behavior.

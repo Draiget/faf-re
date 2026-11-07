@@ -488,7 +488,7 @@ int64_t CNetUDPConnector::GetTime()
  */
 int32_t CNetUDPConnector::ChooseTimeout(const int32_t current, const int32_t choice)
 {
-  if (current == -1 || choice != -1 && choice < current) {
+  if (current == -1 || (choice != -1 && choice < current)) {
     return choice;
   }
   return current;
@@ -587,9 +587,9 @@ void CNetUDPConnector::HandleReceivedDatagram(
   }
 
   if (net_DebugLevel >= 2) {
-    const msvc8::string packetString = packet->ToString();
-    const msvc8::string hostString = NET_GetHostName(addrHost);
-    const msvc8::string timeString = gpg::FileTimeToString(timeNow);
+    const fa::string packetString = packet->ToString();
+    const fa::string hostString = NET_GetHostName(addrHost);
+    const fa::string timeString = gpg::FileTimeToString(timeNow);
     gpg::Debugf(
       "%s:                     recv %s:%hu, %s",
       timeString.c_str(),
@@ -619,7 +619,7 @@ void CNetUDPConnector::HandleReceivedDatagram(
 
   if (static_cast<unsigned>(n) < 15U) {
     if (net_DebugLevel) {
-      const msvc8::string host = NET_GetHostName(addrHost);
+      const fa::string host = NET_GetHostName(addrHost);
       gpg::Logf(
         "CNetUDPConnector<%hu>::ReceiveData(): ignoring short (%d bytes) packet from %s:%hu",
         GetLocalPort(),
@@ -635,7 +635,7 @@ void CNetUDPConnector::HandleReceivedDatagram(
     const int expected = static_cast<int>(packet->header.mPayloadLength) + kNetPacketHeaderSize;
     if (n != expected) {
       if (net_DebugLevel) {
-        const msvc8::string host = NET_GetHostName(addrHost);
+        const fa::string host = NET_GetHostName(addrHost);
         gpg::Logf(
           "CNetUDPConnector<%hu>::ReceiveData(): ignoring packet with payload length mismatch "
           "(got %d, header says %d) from %s:%hu",
@@ -666,7 +666,7 @@ void CNetUDPConnector::HandleReceivedDatagram(
 
     if (!target) {
       if (net_DebugLevel) {
-        const msvc8::string host = NET_GetHostName(addrHost);
+        const fa::string host = NET_GetHostName(addrHost);
         gpg::Logf(
           "CNetUDPConnector<%hu>::ReceiveData(): ignoring packet of type %d from unknown host %s:%hu",
           GetLocalPort(),
@@ -696,7 +696,7 @@ void CNetUDPConnector::HandleReceivedDatagram(
       break;
     default:
       if (net_DebugLevel) {
-        const msvc8::string host = NET_GetHostName(addrHost);
+        const fa::string host = NET_GetHostName(addrHost);
         gpg::Logf(
           "CNetUDPConnector<%hu>::ReceiveData(): ignoring unimplemented packet of type %d from %s:%hu",
           GetLocalPort(),
@@ -709,7 +709,7 @@ void CNetUDPConnector::HandleReceivedDatagram(
     }
   } else {
     if (net_DebugLevel) {
-      const msvc8::string host = NET_GetHostName(addrHost);
+      const fa::string host = NET_GetHostName(addrHost);
       gpg::Logf(
         "CNetUDPConnector<%hu>::ReceiveData(): ignoring unknown packet type (%d) from %s:%hu",
         GetLocalPort(),
@@ -858,7 +858,7 @@ void CNetUDPConnector::LogPacket(
     }
 
     const unsigned localPort = GetLocalPort();
-    const msvc8::string path = gpg::STR_Printf("%s\\%s-%u.pktlog", temp, host, localPort);
+    const fa::string path = gpg::STR_Printf("%s\\%s-%u.pktlog", temp, host, localPort);
 
     const errno_t openError = fopen_s(&mPacketLogFile, path.c_str(), "ab");
     if (openError != 0 || !mPacketLogFile) {
@@ -986,7 +986,7 @@ SNetPacket* CNetUDPConnector::NewPacket()
  */
 void CNetUDPConnector::Entry()
 {
-  const msvc8::string name = gpg::STR_Printf("CNetUDPConnector for port %d", GetLocalPort());
+  const fa::string name = gpg::STR_Printf("CNetUDPConnector for port %d", GetLocalPort());
   gpg::SetThreadName(0xFFFFFFFF, name.c_str());
   THREAD_SetAffinity(false);
 #if defined(_WIN32)
@@ -1080,10 +1080,10 @@ int32_t CNetUDPConnector::SendData()
 
     mSendStampBuffer.Add(0, curTime, packet.mPacket->mSize);
     if (net_DebugLevel >= 2) {
-      msvc8::string packStr = packet.mPacket->ToString();
-      msvc8::string hostStr = NET_GetHostName(packet.mAddr);
+      fa::string packStr = packet.mPacket->ToString();
+      fa::string hostStr = NET_GetHostName(packet.mAddr);
       curTime = GetTime();
-      msvc8::string timeStr = gpg::FileTimeToString(curTime);
+      fa::string timeStr = gpg::FileTimeToString(curTime);
       gpg::Debugf("%s: send %s:%d, %s", timeStr.c_str(), hostStr.c_str(), packet.mPort, packStr.c_str());
     }
     DisposePacket(packet.mPacket);

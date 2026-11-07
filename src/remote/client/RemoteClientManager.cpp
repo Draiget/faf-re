@@ -40,7 +40,7 @@ namespace faf::remote::client
   void CRosterClient::Update(const wire::SRosterEntry& entry)
   {
     if (entry.name != mEntry.name) {
-      mNickname = msvc8::string(entry.name.c_str());
+      mNickname = fa::string(entry.name.c_str());
     }
     mOwnerId = entry.ownerId;
     if (entry.sources != mEntry.sources) {
@@ -66,7 +66,7 @@ namespace faf::remote::client
     return mEntry.connected;
   }
 
-  void CRosterClient::CollectEjecters(msvc8::vector<const moho::CClientBase*>& out)
+  void CRosterClient::CollectEjecters(fa::vector<const moho::CClientBase*>& out)
   {
     for (const std::uint8_t index : mEntry.ejectedBy) {
       if (const CRosterClient* const ejecter = mOwner.RosterClient(index); ejecter != nullptr) {
@@ -158,7 +158,7 @@ namespace faf::remote::client
       entry.ping = client->GetStatusMetricA();
       entry.quiet = client->GetStatusMetricB();
       entry.connected = client->NoEjectionPending();
-      msvc8::vector<const moho::CClientBase*> ejecters;
+      fa::vector<const moho::CClientBase*> ejecters;
       client->CollectEjecters(ejecters);
       for (const moho::CClientBase* const ejecter : ejecters) {
         entry.ejectedBy.push_back(static_cast<std::uint8_t>(ejecter->GetIndex()));

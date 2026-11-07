@@ -174,7 +174,7 @@ namespace
    * Reads one position lane `{x,*,z}` and samples elevation from one indirect
    * `CHeightField*` owner lane.
    */
-  float SampleHeightFieldElevationFromPositionXZ(
+  [[maybe_unused]] float SampleHeightFieldElevationFromPositionXZ(
     const Wm3::Vec3f* const position,
     moho::CHeightField* const* const heightField
   )
@@ -272,7 +272,7 @@ namespace
    * What it does:
    * Returns pointer to one min/max entry at `(x,z)` without clamping.
    */
-  [[nodiscard]] moho::SMinMax<std::uint16_t>*
+  [[maybe_unused]] [[nodiscard]] moho::SMinMax<std::uint16_t>*
   MinMaxGridCellPtr(moho::CHeightFieldMinMaxGrid& grid, const std::int32_t x, const std::int32_t z) noexcept
   {
     return &grid.data[x + z * grid.width];
@@ -359,7 +359,7 @@ namespace
    * What it does:
    * Duplicate lane returning raw 16-bit height-word data pointer.
    */
-  [[nodiscard]] std::uint16_t* GetHeightWordDataVariant2(moho::CHeightField& field) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint16_t* GetHeightWordDataVariant2(moho::CHeightField& field) noexcept
   {
     return field.data;
   }
@@ -370,13 +370,13 @@ namespace
    * What it does:
    * Returns backing height-word byte count (`2 * width * height`).
    */
-  [[nodiscard]] std::int32_t GetHeightWordDataByteCount(const moho::CHeightField& field) noexcept
+  [[maybe_unused]] [[nodiscard]] std::int32_t GetHeightWordDataByteCount(const moho::CHeightField& field) noexcept
   {
     return 2 * field.width * field.height;
   }
 
 
-  using HeightFieldTierVector = msvc8::vector<moho::CHeightFieldTier>;
+  using HeightFieldTierVector = fa::vector<moho::CHeightFieldTier>;
 
   [[nodiscard]] std::size_t MinMaxGridSampleCount(const moho::CHeightFieldMinMaxGrid& grid) noexcept
   {
@@ -495,7 +495,7 @@ namespace
    * What it does:
    * Assigns one min/max tier grid, reallocating destination storage as needed.
    */
-  moho::CHeightFieldMinMaxGrid*
+  [[maybe_unused]] moho::CHeightFieldMinMaxGrid*
   AssignMinMaxGrid(moho::CHeightFieldMinMaxGrid& dst, const moho::CHeightFieldMinMaxGrid& src)
   {
     if (&dst == &src) {
@@ -514,7 +514,7 @@ namespace
    * Assigns one error-word tier grid, reallocating destination storage as
    * needed.
    */
-  moho::CHeightFieldI16Grid*
+  [[maybe_unused]] moho::CHeightFieldI16Grid*
   AssignHeightWordGrid(moho::CHeightFieldI16Grid& dst, const moho::CHeightFieldI16Grid& src)
   {
     if (&dst == &src) {
@@ -532,7 +532,7 @@ namespace
    * What it does:
    * Returns high byte of an integer lane.
    */
-  std::uint8_t HighByteVariant1(const std::uint32_t value) noexcept
+  [[maybe_unused]] std::uint8_t HighByteVariant1(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
   }
@@ -543,7 +543,7 @@ namespace
    * What it does:
    * Duplicate lane returning high byte of an integer.
    */
-  std::uint8_t HighByteVariant2(const std::uint32_t value) noexcept
+  [[maybe_unused]] std::uint8_t HighByteVariant2(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
   }
@@ -569,7 +569,7 @@ namespace
    * What it does:
    * Duplicate lane copying one tier from pointer source.
    */
-  moho::CHeightFieldTier*
+  [[maybe_unused]] moho::CHeightFieldTier*
   CopyHeightFieldTierFromPointerVariant2(moho::CHeightFieldTier& dst, const moho::CHeightFieldTier* source)
   {
     return CopyHeightFieldTierFromPointerVariant1(dst, source);
@@ -618,7 +618,7 @@ namespace
    * Intersects parametric segment line against plane `{normal,dist}` and
    * returns NaN vector when outside segment range.
    */
-  [[nodiscard]] Wm3::Vec3f
+  [[maybe_unused]] [[nodiscard]] Wm3::Vec3f
   PlaneIntersection(const moho::GeomLine3& line, const moho::VecDist& plane, moho::CGeomHitResult* outHit)
   {
     // 0x00577540-0x0057756C: the denominator sums `(y + z) + x`; the
@@ -684,15 +684,6 @@ namespace
     const std::int32_t sampleX = ClampIndex(x, field.width - 1);
     const std::int32_t sampleZ = ClampIndex(z, field.height - 1);
     return static_cast<std::uint16_t>(field.data[sampleX + sampleZ * field.width]);
-  }
-
-  [[nodiscard]] Wm3::Vec3f Cross3(const Wm3::Vec3f& a, const Wm3::Vec3f& b) noexcept
-  {
-    return {
-      a.y * b.z - a.z * b.y,
-      a.z * b.x - a.x * b.z,
-      a.x * b.y - a.y * b.x,
-    };
   }
 
   /**
@@ -889,7 +880,7 @@ namespace
    * What it does:
    * Routes one z-row update through the tier-error kernel without progress ticks.
    */
-  void
+  [[maybe_unused]] void
   UpdateErrorSingleRowNoProgress(moho::CHeightField& field, const std::int32_t z, const std::int32_t x0, const std::int32_t x1)
   {
     UpdateErrorKernel(field, nullptr, x0, z, x1, z);
@@ -976,8 +967,8 @@ namespace
 
         const std::int32_t alignMask = -newStep;
         // 0x0040D9DA, 0x0040DA0C: the binary's inlined floor.
-        line.xEdge = msvc8::FloorToIntX87(line.x0) & alignMask;
-        line.zEdge = msvc8::FloorToIntX87(line.z0) & alignMask;
+        line.xEdge = fa::FloorToIntX87(line.x0) & alignMask;
+        line.zEdge = fa::FloorToIntX87(line.z0) & alignMask;
       }
       return;
     }
@@ -1347,8 +1338,8 @@ namespace moho
       // 0x0044FB9D..0x0044FBD0: frndint, the -1 borrow and fistp. Outside the
       // int range (and for NaN) that is not std::floor, and the fraction below
       // is `x + 2^31`, not 0 (difffuzz, plan WPR.21).
-      const int fx = msvc8::FloorToIntX87(x);
-      const int fz = msvc8::FloorToIntX87(z);
+      const int fx = fa::FloorToIntX87(x);
+      const int fz = fa::FloorToIntX87(z);
 
       const int wMax = field.width - 1;
       const int hMax = field.height - 1;
@@ -1380,7 +1371,7 @@ namespace moho
     // The simulation sets PC24: double intermediates ignore that control and
     // produce different heights. Preserve the original arithmetic explicitly.
     const ElevationSample s = SampleElevation(*this, x, z);
-    return msvc8::BilinearHeight(s.h00, s.h01, s.h10, s.h11, s.fracX, s.fracZ);
+    return fa::BilinearHeight(s.h00, s.h01, s.h10, s.h11, s.fracX, s.fracZ);
   }
 
   /**
@@ -1408,7 +1399,7 @@ namespace moho
     Wm3::Vec3f out{};
     out.x = left - right;
     out.y = 1.0f;
-    out.z = msvc8::SubtractBilinearHeight(
+    out.z = fa::SubtractBilinearHeight(
       top, bottom.h00, bottom.h01, bottom.h10, bottom.h11, bottom.fracX, bottom.fracZ
     );
     (void)out.Normalize();
@@ -2213,7 +2204,7 @@ namespace moho
 
     std::int32_t tier = tierCount;
     const float scaledSpan = (end - start) * dirMax * 2.0f;
-    const std::int32_t walkSpanCeil = msvc8::CeilToIntX87(scaledSpan); // 0x0047718A..0x0047719D
+    const std::int32_t walkSpanCeil = fa::CeilToIntX87(scaledSpan); // 0x0047718A..0x0047719D
     const std::int32_t spanBit = HighestBitIndex(walkSpanCeil);
     if (spanBit < tier) {
       tier = spanBit;
@@ -2764,7 +2755,7 @@ namespace moho
       return;
     }
 
-    msvc8::vector<LuaPlus::LuaObject> parsedEntries{};
+    fa::vector<LuaPlus::LuaObject> parsedEntries{};
     for (LuaPlus::LuaTableIterator iter(&terrainTypesTable, 1); !iter.m_isDone; iter.Next()) {
       LuaPlus::LuaObject entry = iter.GetValue();
       if (!entry || !entry.IsTable()) {
@@ -3506,8 +3497,8 @@ namespace moho
     // (0.0078125f) gives the real elevation.
     constexpr float kHeightSampleToWorld = 1.0f / 128.0f;
     // Decompiled value at `func_Rect2fToInt16`: world-to-collision-cell quantization.
-    constexpr int kWorldToCollisionCellShift = 2;
-    constexpr int kCollisionCellMax = 0xFFFF;
+    [[maybe_unused]] constexpr int kWorldToCollisionCellShift = 2;
+    [[maybe_unused]] constexpr int kCollisionCellMax = 0xFFFF;
 
     [[nodiscard]] float SampleClampedElevation(
       const CHeightField& field, const int cellX, const int cellZ
@@ -3700,10 +3691,10 @@ namespace moho
 
     // Integer skirt rect: floor the top-left and ceil the bottom-right for
     // the map-bounds check (0x00565484..0x005654FB).
-    const std::int32_t skirtCellX0 = msvc8::FloorToIntX87(skirtWorldRect.x0);
-    const std::int32_t skirtCellZ0 = msvc8::FloorToIntX87(skirtWorldRect.z0);
-    const std::int32_t skirtCellX1 = msvc8::CeilToIntX87(skirtWorldRect.x1);
-    const std::int32_t skirtCellZ1 = msvc8::CeilToIntX87(skirtWorldRect.z1);
+    const std::int32_t skirtCellX0 = fa::FloorToIntX87(skirtWorldRect.x0);
+    const std::int32_t skirtCellZ0 = fa::FloorToIntX87(skirtWorldRect.z0);
+    const std::int32_t skirtCellX1 = fa::CeilToIntX87(skirtWorldRect.x1);
+    const std::int32_t skirtCellZ1 = fa::CeilToIntX87(skirtWorldRect.z1);
 
     const CHeightField* const field = map.mHeightField.get();
     if (skirtCellX0 < 0 || skirtCellX1 > (field->width - 1) ||

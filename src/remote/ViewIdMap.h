@@ -35,8 +35,11 @@ namespace faf::remote
   {
   public:
     explicit CViewIdMap(std::int32_t viewArmy) noexcept
-      : mViewArmy(viewArmy)
+      : mKeptSources(viewArmy >= 0 && viewArmy < 32 ? std::uint32_t{1} << viewArmy : 0u)
     {}
+
+    /** Plan WPR.35, a team's view: the armies whose projectiles keep their ids, one bit each. */
+    void SetKeptSources(const std::uint32_t armies) noexcept { mKeptSources = armies; }
 
     /** Whether a sim entity id is renumbered for this view. */
     [[nodiscard]] bool MapsEntity(std::uint32_t simId) const noexcept;
@@ -50,6 +53,8 @@ namespace faf::remote
      * into view ids, allocating on first appearance, and sorts the records by their new ids.
      */
     void Translate(wire::SViewFrame& frame, const OwnCommandTest& isOwnCommand);
+    /** `simId` as this view's client knows it, allocating on first appearance. */
+    [[nodiscard]] std::uint32_t EntityId(const std::uint32_t simId) { return MapsEntity(simId) ? Entity(simId) : simId; }
     /** `Translate` for one record, without the sort. */
     void TranslateRecord(wire::SEntityRecord& record, const OwnCommandTest& isOwnCommand);
 
@@ -115,7 +120,7 @@ namespace faf::remote
     [[nodiscard]] std::uint32_t Entity(std::uint32_t simId);
     [[nodiscard]] std::uint32_t Command(std::uint32_t simId, const OwnCommandTest& isOwnCommand);
 
-    std::int32_t mViewArmy;
+    std::uint32_t mKeptSources;
     std::unordered_map<std::uint32_t, std::uint32_t> mEntityToView;
     std::unordered_map<std::uint32_t, std::uint32_t> mEntityToSim;
     std::unordered_map<std::uint32_t, std::uint32_t> mCommandToView;

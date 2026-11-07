@@ -16,6 +16,9 @@ cmake_minimum_required(VERSION 3.25)
 # ON keeps the binary's exact container sizes, to check the layout asserts against
 # them (src/legacy/containers/Layout.h). Preset clang-x86-retail-layout.
 option(FAF_RETAIL_LAYOUT "Keep the 2007 binary's exact legacy container layout" OFF)
+# Temporary: branches written before the namespace rename still compile. Remove once they have moved over.
+add_compile_definitions(msvc8=fa)
+
 if(FAF_RETAIL_LAYOUT)
   add_compile_definitions(FAF_RETAIL_LAYOUT=1)
 else()
@@ -116,6 +119,7 @@ if(NOT EXISTS "${FAF_DXSDK_DIR}/Include/d3dx9.h")
   message(FATAL_ERROR "DirectX SDK (June 2010) not found: FAF_DXSDK_DIR=${FAF_DXSDK_DIR}")
 endif()
 
+include(FafPgoWindows)
 include(FafCodegen)
 
 # Server-authoritative sessions (docs/SWITCHES.md, "Server mode"): the client's
@@ -131,6 +135,11 @@ if(FAF_TARGET_ARCH STREQUAL "x64")
   add_subdirectory(cmake/deps/zlib)
 endif()
 add_subdirectory(cmake/deps/monocypher)
+add_subdirectory(cmake/deps/zstd)
+add_subdirectory(cmake/deps/freetype)
+add_subdirectory(cmake/deps/msdfgen)
+add_subdirectory(cmake/deps/googletest)
+add_subdirectory(cmake/deps/directxtex)
 
 # --- Profiler (optional Tracy integration) --------------------------------------------
 option(FAF_ENABLE_TRACY "Enable Tracy profiler instrumentation" OFF)

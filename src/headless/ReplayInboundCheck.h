@@ -101,7 +101,7 @@ namespace faf::headless
 
     const remote::CViewFrames& mViews;
     std::unique_ptr<LuaPlus::LuaState> mLuaState; // the decoders' own, apart from the sim's
-    msvc8::auto_ptr<gpg::Stream> mNoRecording;
+    fa::auto_ptr<gpg::Stream> mNoRecording;
     std::vector<std::vector<char>> mCaptured; // what a marshaller sent for one message
     faf::remote::client::CRemoteClientManager mCapture;
     std::unique_ptr<moho::CMarshaller> mMarshaller;

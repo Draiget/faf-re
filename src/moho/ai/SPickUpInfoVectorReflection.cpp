@@ -13,15 +13,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedSPickUpInfoType()
-  {
-    gpg::RType* type = moho::SPickUpInfo::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SPickUpInfo));
-      moho::SPickUpInfo::sType = type;
-    }
-    return type;
-  }
 
   [[nodiscard]] gpg::RVectorType_SPickUpInfo& AcquireSPickUpInfoVectorType()
   {
@@ -50,7 +41,7 @@ namespace
  */
 const char* gpg::RVectorType_SPickUpInfo::GetName() const
 {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedSPickUpInfoType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::SPickUpInfo>()->GetName());
     return sName.c_str();
 }
 
@@ -61,9 +52,9 @@ const char* gpg::RVectorType_SPickUpInfo::GetName() const
  * Returns base lexical text plus reflected vector size for one
  * `vector<moho::SPickUpInfo>` instance.
  */
-msvc8::string gpg::RVectorType_SPickUpInfo::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_SPickUpInfo::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 
@@ -89,7 +80,7 @@ const gpg::RIndexed* gpg::RVectorType_SPickUpInfo::IsIndexed() const
  */
 void gpg::RVectorType_SPickUpInfo::Init()
 {
-  size_ = sizeof(msvc8::vector<moho::SPickUpInfo>);
+  size_ = sizeof(fa::vector<moho::SPickUpInfo>);
   version_ = 1;
   serLoadFunc_ = &RVectorType_SPickUpInfo::SerLoad;
   serSaveFunc_ = &RVectorType_SPickUpInfo::SerSave;
@@ -112,16 +103,16 @@ void gpg::RVectorType_SPickUpInfo::SerLoad(
   gpg::RRef* const
 )
 {
-  auto& storage = *reinterpret_cast<msvc8::vector<moho::SPickUpInfo>*>(objectPtr);
+  auto& storage = *reinterpret_cast<fa::vector<moho::SPickUpInfo>*>(objectPtr);
 
   unsigned int count = 0u;
   archive->ReadUInt(&count);
 
-  msvc8::vector<moho::SPickUpInfo> loaded;
+  fa::vector<moho::SPickUpInfo> loaded;
   loaded.reserve(count);
   for (unsigned int i = 0u; i < count; ++i) {
     moho::SPickUpInfo element;
-    archive->Read(CachedSPickUpInfoType(), &element, gpg::RRef{});
+    archive->Read(gpg::RTypeOf<moho::SPickUpInfo>(), &element, gpg::RRef{});
     loaded.push_back(element);
   }
 
@@ -143,11 +134,11 @@ void gpg::RVectorType_SPickUpInfo::SerSave(
   gpg::RRef* const ownerRef
 )
 {
-  const auto& storage = *reinterpret_cast<const msvc8::vector<moho::SPickUpInfo>*>(objectPtr);
+  const auto& storage = *reinterpret_cast<const fa::vector<moho::SPickUpInfo>*>(objectPtr);
   const unsigned int count = static_cast<unsigned int>(storage.size());
   archive->WriteUInt(count);
   for (unsigned int i = 0u; i < count; ++i) {
-    archive->Write(CachedSPickUpInfoType(), &storage[i], *ownerRef);
+    archive->Write(gpg::RTypeOf<moho::SPickUpInfo>(), &storage[i], *ownerRef);
   }
 }
 
@@ -162,7 +153,7 @@ gpg::RRef gpg::RVectorType_SPickUpInfo::SubscriptIndex(void* const obj, const in
 {
   gpg::RRef out{};
 
-  auto* const storage = static_cast<msvc8::vector<moho::SPickUpInfo>*>(obj);
+  auto* const storage = static_cast<fa::vector<moho::SPickUpInfo>*>(obj);
   if (!storage || ind < 0 || static_cast<std::size_t>(ind) >= storage->size()) {
     return out;
   }
@@ -179,7 +170,7 @@ gpg::RRef gpg::RVectorType_SPickUpInfo::SubscriptIndex(void* const obj, const in
  */
 size_t gpg::RVectorType_SPickUpInfo::GetCount(void* const obj) const
 {
-  const auto* const storage = static_cast<const msvc8::vector<moho::SPickUpInfo>*>(obj);
+  const auto* const storage = static_cast<const fa::vector<moho::SPickUpInfo>*>(obj);
   return storage ? storage->size() : 0u;
 }
 
@@ -192,7 +183,7 @@ size_t gpg::RVectorType_SPickUpInfo::GetCount(void* const obj) const
  */
 void gpg::RVectorType_SPickUpInfo::SetCount(void* const obj, const int count) const
 {
-  static_cast<msvc8::vector<moho::SPickUpInfo>*>(obj)->resize(static_cast<std::size_t>(count), moho::SPickUpInfo());
+  static_cast<fa::vector<moho::SPickUpInfo>*>(obj)->resize(static_cast<std::size_t>(count), moho::SPickUpInfo());
 }
 
 /**
@@ -209,7 +200,7 @@ void gpg::RVectorType_SPickUpInfo::SetCount(void* const obj, const int count) co
 gpg::RType* moho::preregister_VectorSPickUpInfoType()
 {
   auto* const typeInfo = &AcquireSPickUpInfoVectorType();
-  gpg::PreRegisterRType(typeid(msvc8::vector<moho::SPickUpInfo>), typeInfo);
+  gpg::PreRegisterRType(typeid(fa::vector<moho::SPickUpInfo>), typeInfo);
   return typeInfo;
 }
 

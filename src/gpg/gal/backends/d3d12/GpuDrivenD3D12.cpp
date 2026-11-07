@@ -326,7 +326,16 @@ namespace gpg::gal
     // World shapes (ren_GpuShapes): a paused same-process A/B of FAF's shapes plus a 2,000-segment
     // UI_DrawLine stroke against the path off, pixel-identical outside two animated unit glows.
     return kGpuPathStrategicIcons | kGpuPathIconClassify | kGpuPathFogOfWar | kGpuPathSelectBrackets | kGpuPathProjectileIcons |
-      kGpuPathWorldShapes;
+      // MSDF text and the interface's quads: 0 pixels differ in a same-process A/B of a panel of text.
+      kGpuPathWorldShapes | kGpuPathMsdfText | MsdfCookVerified();
+  }
+
+  std::uint32_t DeviceD3D12::MsdfCookVerified() const
+  {
+    // The GPU font cook (ren_GpuFontCook): GPU and CPU atlases compared per font, and a device reset during
+    // a cook, on NVIDIA only; other vendors keep the CPU cook until it has run there (issue #309).
+    const bool nvidia = mAdapterIndex < mFactory.Adapters().size() && mFactory.Adapters()[mAdapterIndex].desc.VendorId == kPciVendorNvidia;
+    return nvidia ? kGpuPathMsdfCook : 0U;
   }
 
   boost::shared_ptr<GpuBuffer> DeviceD3D12::CreateGpuBuffer(const GpuBufferDesc& desc)
@@ -517,7 +526,19 @@ namespace gpg::gal
     D3D12_GPU_DESCRIPTOR_HANDLE& writeTable
   )
   {
-    // Uploads first: an allocation may hand the recorded commands to the GPU.
+    // Both tables first, in one allocation: a full view heap hands the recorded
+    // commands to the GPU, waits, and starts the heap over, which would free
+    // constants already uploaded and a read table already allocated.
+    D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
+    readTable = AllocateTable(kReadSlots + kGpuMaxWriteBuffers, cpu);
+    const UINT increment = mFrames[mFrameIndex].views.Increment();
+    D3D12_CPU_DESCRIPTOR_HANDLE writeCpu = cpu;
+    writeCpu.ptr += static_cast<SIZE_T>(kReadSlots) * increment;
+    writeTable = readTable;
+    writeTable.ptr += static_cast<UINT64>(kReadSlots) * increment;
+
+    // Then the upload, before any barrier: it may hand the recorded commands
+    // to the GPU too, but leaves the view heap alone.
     constants = 0U;
     if (bindings.constants != nullptr && bindings.constantBytes != 0U) {
       const std::uint32_t bytes = std::min(bindings.constantBytes, kGpuMaxConstantBytes);
@@ -531,9 +552,6 @@ namespace gpg::gal
       constants = upload.gpu;
     }
 
-    D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
-    readTable = AllocateTable(kReadSlots, cpu);
-    const UINT increment = mFrames[mFrameIndex].views.Increment();
     const D3D12_RESOURCE_STATES bufferRead = compute ? D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE : kBufferRead;
     for (std::uint32_t slot = 0U; slot < kReadSlots; ++slot) {
       D3D12_CPU_DESCRIPTOR_HANDLE view = (slot < kGpuMaxReadBuffers) ? mNullBufferView : mNullViews[0];
@@ -551,7 +569,7 @@ namespace gpg::gal
       mDevice->CopyDescriptorsSimple(1U, destination, view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
-    writeTable = AllocateTable(kGpuMaxWriteBuffers, cpu);
+    cpu = writeCpu;
     for (std::uint32_t slot = 0U; slot < kGpuMaxWriteBuffers; ++slot) {
       D3D12_CPU_DESCRIPTOR_HANDLE view = mNullWriteView;
       if (auto* const buffer = static_cast<GpuBufferD3D12*>(bindings.writeBuffers[slot]); buffer != nullptr && compute) {

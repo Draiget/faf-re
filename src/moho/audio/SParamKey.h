@@ -39,10 +39,10 @@ namespace moho
 
     inline static gpg::RType* sType = nullptr;
 
-    msvc8::string mCueName;                // +0x00
-    msvc8::string mBankName;               // +0x1C
-    msvc8::string mLodCutoffVariableName;  // +0x38
-    msvc8::string mRpcLoopVariableName;    // +0x54
+    fa::string mCueName;                // +0x00
+    fa::string mBankName;               // +0x1C
+    fa::string mLodCutoffVariableName;  // +0x38
+    fa::string mRpcLoopVariableName;    // +0x54
   };
 
   static_assert(offsetof(SParamKey, mCueName) == 0x00, "SParamKey::mCueName offset must be 0x00");

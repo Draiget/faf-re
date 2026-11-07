@@ -102,7 +102,7 @@ namespace moho
 
     /// Appends `source` to `target` one push_back at a time, as the serial walk does, and empties it.
     template <class T>
-    void AppendInOrder(msvc8::vector<T>& target, msvc8::vector<T>& source)
+    void AppendInOrder(fa::vector<T>& target, fa::vector<T>& source)
     {
       for (const T& value : source) {
         target.push_back(value);
@@ -110,18 +110,18 @@ namespace moho
       source.clear();
     }
 
-    [[nodiscard]] msvc8::string BuildParticleTexturePath(
-      const msvc8::string& textureName,
+    [[nodiscard]] fa::string BuildParticleTexturePath(
+      const fa::string& textureName,
       const char* const defaultPath
     )
     {
       if (textureName.empty()) {
         if (defaultPath == nullptr) {
-          return msvc8::string{};
+          return fa::string{};
         }
-        return msvc8::string(defaultPath);
+        return fa::string(defaultPath);
       }
-      return msvc8::string("/textures/particles/") + textureName + ".dds";
+      return fa::string("/textures/particles/") + textureName + ".dds";
     }
 
     [[nodiscard]] bool IsBlueprintEnabledForCurrentFidelity(const REffectBlueprint* const blueprint)
@@ -444,7 +444,7 @@ namespace moho
     if (effect == nullptr) {
       return nullptr;
     }
-    LinkActiveEffect(mActiveEffects, effect);
+    (void)LinkActiveEffect(mActiveEffects, effect);
 
     effect->SetBone(entity, boneIndex);
 
@@ -612,21 +612,21 @@ namespace moho
    */
   void CEffectManagerImpl::CreateLightParticle(
     Wm3::Vector3<float> position,
-    const msvc8::string& texturePrimary,
-    const msvc8::string& textureSecondary,
+    const fa::string& texturePrimary,
+    const fa::string& textureSecondary,
     const float size,
     const float lifetime,
     const int armyIndex
   )
   {
-    const msvc8::string primaryPath =
+    const fa::string primaryPath =
       BuildParticleTexturePath(texturePrimary, "/textures/particles/beam_white_01.dds");
 
     if (textureSecondary.empty()) {
       return;
     }
 
-    const msvc8::string rampPath = BuildParticleTexturePath(textureSecondary, nullptr);
+    const fa::string rampPath = BuildParticleTexturePath(textureSecondary, nullptr);
 
     SWorldParticle particle{};
     particle.mPos = position;
@@ -670,7 +670,7 @@ namespace moho
     }
 
     // Blend mode and every beam parameter are seeded by the blueprint ctor above.
-    LinkActiveEffect(mActiveEffects, effect);
+    (void)LinkActiveEffect(mActiveEffects, effect);
 
     if (!IsBlueprintEnabledForCurrentFidelity(beamBlueprint)) {
       DestroyEffect(effect);
@@ -701,7 +701,7 @@ namespace moho
       }
     }
 
-    LinkActiveEffect(mActiveEffects, effect);
+    (void)LinkActiveEffect(mActiveEffects, effect);
     return effect;
   }
 
@@ -723,7 +723,7 @@ namespace moho
     }
 
     // Blend mode and every beam parameter are seeded by the blueprint ctor above.
-    LinkActiveEffect(mActiveEffects, effect);
+    (void)LinkActiveEffect(mActiveEffects, effect);
 
     const VTransform sourceTransform = sourceEntity->GetBoneWorldTransform(sourceBoneIndex);
     const float sourceLane[3] = {sourceTransform.pos_.x, sourceTransform.pos_.y, sourceTransform.pos_.z};
@@ -759,7 +759,7 @@ namespace moho
     }
 
     // Blend mode and every beam parameter are seeded by the blueprint ctor above.
-    LinkActiveEffect(mActiveEffects, effect);
+    (void)LinkActiveEffect(mActiveEffects, effect);
 
     effect->AttachEntityToEntity(sourceEntity, sourceBoneIndex, targetEntity, targetBoneIndex);
 

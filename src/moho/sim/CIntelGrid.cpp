@@ -43,8 +43,8 @@ namespace
   template <class TTypeInfo>
   void ResetTypeInfoVectors(TTypeInfo& typeInfo) noexcept
   {
-    typeInfo.fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo.bases_ = msvc8::vector<gpg::RField>{};
+    typeInfo.fields_ = fa::vector<gpg::RField>{};
+    typeInfo.bases_ = fa::vector<gpg::RField>{};
   }
 
   /**
@@ -63,27 +63,18 @@ namespace
     ResetTypeInfoVectors(*typeInfo);
   }
 
-  gpg::RType* CachedIntelGridType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CIntelGrid));
-    }
-    return cached;
-  }
-
   // 0x005BE081..0x005BE0A7: the binary forms `1.0f / gridSize` once (divss)
   // and multiplies every coordinate by that reciprocal (mulss); it never
   // divides the coordinate itself, so the scaled value rounds like `v * (1/g)`.
   // Then the inlined floor (0x005BE0AA, 0x005BE0D6) or ceil (0x005BE103, 0x005BE130).
   [[nodiscard]] std::int32_t FloorScaledToGridCell(const std::int32_t value, const float reciprocal) noexcept
   {
-    return msvc8::FloorToIntX87(static_cast<float>(value) * reciprocal);
+    return fa::FloorToIntX87(static_cast<float>(value) * reciprocal);
   }
 
   [[nodiscard]] std::int32_t CeilScaledToGridCell(const std::int32_t value, const float reciprocal) noexcept
   {
-    return msvc8::CeilToIntX87(static_cast<float>(value) * reciprocal);
+    return fa::CeilToIntX87(static_cast<float>(value) * reciprocal);
   }
 
   /**
@@ -116,7 +107,7 @@ namespace
   {
     gpg::RRef out{};
     out.mObj = object;
-    out.mType = CachedIntelGridType();
+    out.mType = gpg::RTypeOf<moho::CIntelGrid>();
     return out;
   }
 
@@ -269,8 +260,11 @@ namespace moho
     mHeight = static_cast<std::uint32_t>(height);
 
     const std::size_t cellCount = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
-    mGrid.reset(new std::int8_t[cellCount]);
+    // Engine addition: the change flags after the cells (`ChangedChunks`), all set.
+    const std::size_t chunks = (cellCount + kChangeChunkCells - 1u) / kChangeChunkCells;
+    mGrid.reset(new std::int8_t[cellCount + chunks]);
     std::memset(mGrid.get(), 0, cellCount);
+    std::memset(mGrid.get() + cellCount, 1, chunks);
 
     mGridSize = size;
   }
@@ -409,7 +403,7 @@ namespace moho
     update.mLastPos = position;
     update.mRadius = static_cast<float>(radius);
     update.mTicksTilUpdate = 30;
-    // `msvc8::vector<SDelayedSubVizInfo>::push_back` (0x005079C0, cited on Vector.h).
+    // `fa::vector<SDelayedSubVizInfo>::push_back` (0x005079C0, cited on Vector.h).
     mUpdateList.push_back(update);
   }
 
@@ -488,6 +482,21 @@ namespace moho
 
     if (x >= xMax) {
       return;
+    }
+
+    // Engine addition (`ChangedChunks`): every chunk the circle's rows can touch, before the writes
+    // below (each column's rows lie within `gridPos.z +- radius`). Only a server's view code reads them.
+    {
+      const std::int64_t zLo = std::clamp<std::int64_t>(static_cast<std::int64_t>(gridPos.z) - radius, 0, height);
+      const std::int64_t zHi = std::clamp<std::int64_t>(static_cast<std::int64_t>(gridPos.z) + radius, 0, height);
+      if (zLo < zHi) {
+        std::uint8_t* const chunks = ChangedChunks();
+        const auto firstChunk = static_cast<std::size_t>((zLo * width + x) / kChangeChunkCells);
+        const auto lastChunk = static_cast<std::size_t>(((zHi - 1) * width + xMax - 1) / kChangeChunkCells);
+        for (std::size_t chunk = firstChunk; chunk <= lastChunk; ++chunk) {
+          chunks[chunk] = 1u;
+        }
+      }
     }
 
     const std::int32_t radiusSq = radius * radius;

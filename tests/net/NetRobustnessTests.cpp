@@ -20,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include <gtest/gtest.h>
+
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/MemBufferStream.h"
@@ -57,39 +59,7 @@ namespace
 {
   // --- Harness ---------------------------------------------------------------------------
 
-  int gFailures = 0;
-  int gChecks = 0;
-
-#define CHECK(cond)                                                                \
-  do {                                                                             \
-    ++gChecks;                                                                     \
-    if (!(cond)) {                                                                 \
-      ++gFailures;                                                                 \
-      std::printf("  FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond);                \
-    }                                                                              \
-  } while (0)
-
-  struct TestCase
-  {
-    const char* name;
-    void (*body)();
-  };
-
-  void RunTest(const TestCase& test)
-  {
-    const int failuresBefore = gFailures;
-    try {
-      test.body();
-    } catch (const std::exception& e) {
-      ++gFailures;
-      std::printf("  FAIL %s: exception escaped: %s\n", test.name, e.what());
-    } catch (...) {
-      ++gFailures;
-      std::printf("  FAIL %s: non-std exception escaped\n", test.name);
-    }
-    std::printf("%s %s\n", gFailures == failuresBefore ? "ok  " : "FAIL", test.name);
-    std::fflush(stdout);
-  }
+#define CHECK(cond) EXPECT_TRUE(cond)
 
   // --- Byte building -----------------------------------------------------------------------
 
@@ -453,7 +423,7 @@ namespace
   struct DecoderFixture
   {
     CountingSink sink;
-    msvc8::auto_ptr<gpg::Stream> recording;
+    fa::auto_ptr<gpg::Stream> recording;
     CDecoder decoder{&sink, recording, nullptr, &TestLuaState()};
 
     void Feed(const ECmdStreamOp op, const std::string& payload)
@@ -572,7 +542,7 @@ namespace
     float GetTime() override { return 0.0f; }
     void Write(NetDataSpan*) override { ++writes; }
     void Close() override {}
-    msvc8::string ToString() override { return gpg::STR_Printf("fake:%u", static_cast<unsigned>(port)); }
+    fa::string ToString() override { return gpg::STR_Printf("fake:%u", static_cast<unsigned>(port)); }
     void ScheduleDestroy() override { ++destroyRequests; }
   };
 
@@ -936,7 +906,7 @@ namespace
       wire->queue.push_back({toManager, fromIndex, std::string(reinterpret_cast<const char*>(data->start), data->size())});
     }
     void Close() override {}
-    msvc8::string ToString() override { return "wire"; }
+    fa::string ToString() override { return "wire"; }
     void ScheduleDestroy() override {}
   };
 
@@ -1181,7 +1151,7 @@ namespace
       secret = root / "secret.lua";
       WriteText(secret, "return 'outside'");
 
-      msvc8::vector<SVFSMountPoint> mounts;
+      fa::vector<SVFSMountPoint> mounts;
       mounts.push_back(SVFSMountPoint((root / "game").string().c_str(), "/"));
       vfs = new CVFSImpl(mounts, root);
       previous = DISK_ExchangeVFS(vfs);
@@ -1208,7 +1178,7 @@ namespace
 
     bool Finds(const char* const path)
     {
-      msvc8::string found;
+      fa::string found;
       (void)vfs->FindFile(&found, path, nullptr);
       return !found.empty();
     }
@@ -1224,7 +1194,7 @@ namespace
     CHECK(!folder.Finds("/lua/../../secret.lua"));
     CHECK(!folder.Finds("/lua\\..\\..\\secret.lua"));
     CHECK(!folder.vfs->GetFileInfo("/../secret.lua", nullptr));
-    msvc8::vector<msvc8::string> listed;
+    fa::vector<fa::string> listed;
     folder.vfs->EnumerateFiles("/../", "*.lua", false, &listed);
     CHECK(listed.empty());
   }
@@ -1323,7 +1293,7 @@ namespace
       }
       ++tried;
       // Refused, and with a reason the player can be shown.
-      msvc8::string reason;
+      fa::string reason;
       if (VCR_SetupReplaySession(path.c_str(), &reason).get() == nullptr && !reason.empty()) {
         ++refused;
       }
@@ -1348,51 +1318,41 @@ namespace
     CHECK(tried > 0 && refused == tried);
   }
 
-  const TestCase kTests[] = {
-    {"lua: valid values", &TestLuaValidValues},
-    {"files: the mounted file system stays inside its mounts", &TestVfsStaysInsideMounts},
-    {"files: game Lua states read only the game's files", &TestLuaFilesComeFromTheGame},
-    {"files: compiled Lua chunks are refused", &TestLuaCompiledChunksRefused},
-    {"game version: live sessions follow the game data", &TestGameDataVersion},
-    {"lua: nesting limit", &TestLuaNestingLimit},
-    {"lua: deep field keeps its siblings", &TestLuaDeepFieldKeepsSiblings},
-    {"lua: lobby relay depth", &TestLuaLobbyRelayDepth},
-    {"lua: local decode has no nesting limit", &TestLuaLocalDecodeHasNoNestingLimit},
-    {"lua: malformed tables", &TestLuaMalformedTables},
-    {"lua encode: leaves out what it cannot carry", &TestLuaEncoderLeavesOutWhatItCannotCarry},
-    {"lua encode: stops at cycles", &TestLuaEncoderStopsAtCycles},
-    {"lua encode: depth limit", &TestLuaEncoderDepthLimit},
-    {"lua encode: valid data unchanged", &TestLuaEncoderValidDataUnchanged},
-    {"message: framing", &TestMessageFraming},
-    {"decoder: empty payloads", &TestDecoderEmptyPayloads},
-    {"decoder: truncation", &TestDecoderTruncation},
-    {"decoder: counts", &TestDecoderCounts},
-    {"decoder: lua payloads", &TestDecoderLuaPayloads},
-    {"decoder: valid command", &TestDecoderValidCommand},
-    {"client: short messages", &TestClientShortMessages},
-    {"client: speed requests", &TestClientSpeedRequests},
-    {"client: end game from peer ignored", &TestClientEndGameFromPeerIgnored},
-    {"lobby: join handshake", &TestLobbyJoinHandshake},
-    {"lobby: truncated messages", &TestLobbyTruncatedMessages},
-    {"lobby: host messages", &TestLobbyHostMessages},
-    {"lobby: script data", &TestLobbyScriptData},
-    {"lobby: peer events", &TestLobbyPeerEvents},
-    {"replay: damaged header refused", &TestReplayDamagedHeaderRefused},
-    {"order check: sha256 vectors", &TestSha256Vectors},
-    {"order check: reports", &TestStreamCheckReports},
-    {"order check: honest 3-player game", &TestStreamCheckHonestGame},
-    {"order check: lag and reordering find nothing", &TestStreamCheckLagAndReordering},
-    {"order check: a false report proves nothing", &TestStreamCheckFalseReportProvesNothing},
-    {"order check: different orders reported (default)", &TestStreamCheckReportsDifferentOrders},
-    {"order check: different orders stop the game (mode 2)", &TestStreamCheckStopsOnDifferentOrders},
-  };
 } // namespace
 
-int main()
-{
-  for (const TestCase& test : kTests) {
-    RunTest(test);
-  }
-  std::printf("%d checks, %d failures\n", gChecks, gFailures);
-  return gFailures;
-}
+TEST(Existing_NetRobustness, LuaValidValues) { TestLuaValidValues(); }
+TEST(Existing_NetRobustness, VfsStaysInsideMounts) { TestVfsStaysInsideMounts(); }
+TEST(Existing_NetRobustness, LuaFilesComeFromTheGame) { TestLuaFilesComeFromTheGame(); }
+TEST(Existing_NetRobustness, LuaCompiledChunksRefused) { TestLuaCompiledChunksRefused(); }
+TEST(Existing_NetRobustness, GameDataVersion) { TestGameDataVersion(); }
+TEST(Existing_NetRobustness, LuaNestingLimit) { TestLuaNestingLimit(); }
+TEST(Existing_NetRobustness, LuaDeepFieldKeepsSiblings) { TestLuaDeepFieldKeepsSiblings(); }
+TEST(Existing_NetRobustness, LuaLobbyRelayDepth) { TestLuaLobbyRelayDepth(); }
+TEST(Existing_NetRobustness, LuaLocalDecodeHasNoNestingLimit) { TestLuaLocalDecodeHasNoNestingLimit(); }
+TEST(Existing_NetRobustness, LuaMalformedTables) { TestLuaMalformedTables(); }
+TEST(Existing_NetRobustness, LuaEncoderLeavesOutWhatItCannotCarry) { TestLuaEncoderLeavesOutWhatItCannotCarry(); }
+TEST(Existing_NetRobustness, LuaEncoderStopsAtCycles) { TestLuaEncoderStopsAtCycles(); }
+TEST(Existing_NetRobustness, LuaEncoderDepthLimit) { TestLuaEncoderDepthLimit(); }
+TEST(Existing_NetRobustness, LuaEncoderValidDataUnchanged) { TestLuaEncoderValidDataUnchanged(); }
+TEST(Existing_NetRobustness, MessageFraming) { TestMessageFraming(); }
+TEST(Existing_NetRobustness, DecoderEmptyPayloads) { TestDecoderEmptyPayloads(); }
+TEST(Existing_NetRobustness, DecoderTruncation) { TestDecoderTruncation(); }
+TEST(Existing_NetRobustness, DecoderCounts) { TestDecoderCounts(); }
+TEST(Existing_NetRobustness, DecoderLuaPayloads) { TestDecoderLuaPayloads(); }
+TEST(Existing_NetRobustness, DecoderValidCommand) { TestDecoderValidCommand(); }
+TEST(Existing_NetRobustness, ClientShortMessages) { TestClientShortMessages(); }
+TEST(Existing_NetRobustness, ClientSpeedRequests) { TestClientSpeedRequests(); }
+TEST(Existing_NetRobustness, ClientEndGameFromPeerIgnored) { TestClientEndGameFromPeerIgnored(); }
+TEST(Existing_NetRobustness, LobbyJoinHandshake) { TestLobbyJoinHandshake(); }
+TEST(Existing_NetRobustness, LobbyTruncatedMessages) { TestLobbyTruncatedMessages(); }
+TEST(Existing_NetRobustness, LobbyHostMessages) { TestLobbyHostMessages(); }
+TEST(Existing_NetRobustness, LobbyScriptData) { TestLobbyScriptData(); }
+TEST(Existing_NetRobustness, LobbyPeerEvents) { TestLobbyPeerEvents(); }
+TEST(Existing_NetRobustness, ReplayDamagedHeaderRefused) { TestReplayDamagedHeaderRefused(); }
+TEST(Existing_NetRobustness, Sha256Vectors) { TestSha256Vectors(); }
+TEST(Existing_NetRobustness, StreamCheckReports) { TestStreamCheckReports(); }
+TEST(Existing_NetRobustness, StreamCheckHonestGame) { TestStreamCheckHonestGame(); }
+TEST(Existing_NetRobustness, StreamCheckLagAndReordering) { TestStreamCheckLagAndReordering(); }
+TEST(Existing_NetRobustness, StreamCheckFalseReportProvesNothing) { TestStreamCheckFalseReportProvesNothing(); }
+TEST(Existing_NetRobustness, StreamCheckReportsDifferentOrders) { TestStreamCheckReportsDifferentOrders(); }
+TEST(Existing_NetRobustness, StreamCheckStopsOnDifferentOrders) { TestStreamCheckStopsOnDifferentOrders(); }

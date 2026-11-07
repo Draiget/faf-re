@@ -100,7 +100,7 @@ namespace moho
    * What it does:
    * Enumerates breakpoints matching one mounted source path into output storage.
    */
-  void SCR_EnumerateBreakpoints(const msvc8::string& sourcePath, msvc8::vector<ScrBreakpoint>& outBreakpoints);
+  void SCR_EnumerateBreakpoints(const fa::string& sourcePath, fa::vector<ScrBreakpoint>& outBreakpoints);
 
   /**
    * Address: 0x004B4DF0 (FUN_004B4DF0, Moho::SCR_EnumerateCallStack)
@@ -110,7 +110,7 @@ namespace moho
    * What it does:
    * Enumerates call-stack activation frames for the currently paused script state.
    */
-  void SCR_EnumerateCallStack(msvc8::vector<ScrActivation>& outActivations);
+  void SCR_EnumerateCallStack(fa::vector<ScrActivation>& outActivations);
 
   /**
    * Address: 0x004B5140 (FUN_004B5140, Moho::SCR_EnumerateLocals)
@@ -120,7 +120,7 @@ namespace moho
    * What it does:
    * Enumerates locals and closure upvalues from one Lua stack level.
    */
-  void SCR_EnumerateLocals(int level, msvc8::vector<ScrWatch>& outWatches);
+  void SCR_EnumerateLocals(int level, fa::vector<ScrWatch>& outWatches);
 
   /**
    * Address: 0x004B5470 (FUN_004B5470, Moho::SCR_EnumerateGlobals)
@@ -130,7 +130,7 @@ namespace moho
    * What it does:
    * Enumerates global Lua table entries for the currently paused script state.
    */
-  void SCR_EnumerateGlobals(msvc8::vector<ScrWatch>& outWatches);
+  void SCR_EnumerateGlobals(fa::vector<ScrWatch>& outWatches);
 
   /**
    * Address: 0x004B5690 (FUN_004B5690, Moho::SCR_DebugStep)
@@ -227,7 +227,7 @@ namespace moho
    */
   using ScrDebugWindowOpenHook = void (*)(ScrDebugWindow*& runtimeWindow);
   using ScrDebugWindowDestroyHook = void (*)(ScrDebugWindow& window);
-  using ScrDebugWindowPostPauseHook = void (*)(ScrDebugWindow& window, const msvc8::string& source, int line);
+  using ScrDebugWindowPostPauseHook = void (*)(ScrDebugWindow& window, const fa::string& source, int line);
   extern ScrDebugWindowOpenHook sScrDebugWindowOpen;
   extern ScrDebugWindowDestroyHook sScrDebugWindowDestroy;
   extern ScrDebugWindowPostPauseHook sScrDebugWindowPostPause;

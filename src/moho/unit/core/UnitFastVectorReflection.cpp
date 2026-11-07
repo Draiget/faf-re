@@ -37,15 +37,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedWeakPtrEntityType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::Entity>));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RType* CachedReconBlipType()
   {
     static gpg::RType* cached = nullptr;
@@ -68,35 +59,11 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedFastVectorWeakPtrEntityType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(gpg::fastvector<moho::WeakPtr<moho::Entity>>));
-      if (!cached) {
-        cached = moho::register_FastVectorWeakPtrEntityType_00();
-      }
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedFastVectorReconBlipPointerType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(gpg::fastvector<moho::ReconBlip*>));
-      if (!cached) {
-        cached = moho::register_FastVectorReconBlipPtrType_00();
-      }
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeWeakPtrEntityRef(moho::WeakPtr<moho::Entity>* value)
   {
     gpg::RRef out{};
     out.mObj = value;
-    out.mType = CachedWeakPtrEntityType();
+    out.mType = gpg::RTypeOf<moho::WeakPtr<moho::Entity>>();
     return out;
   }
 
@@ -157,7 +124,7 @@ namespace
 
     const char* const expected = CachedReconBlipType() ? CachedReconBlipType()->GetName() : "ReconBlip";
     const char* const actual = source.GetTypeName();
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
       expected ? expected : "ReconBlip",
       actual ? actual : "null"
@@ -179,7 +146,7 @@ namespace
     archive->ReadUInt(&count);
     vec.resize(count, moho::WeakPtr<moho::Entity>{});
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(CachedWeakPtrEntityType(), &vec[i], *ownerRef);
+      archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &vec[i], *ownerRef);
     }
   }
 
@@ -196,7 +163,7 @@ namespace
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(CachedWeakPtrEntityType(), &vec[i], *ownerRef);
+      archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &vec[i], *ownerRef);
     }
   }
 
@@ -272,16 +239,16 @@ namespace gpg
    */
   const char* RFastVectorType<moho::WeakPtr<moho::Entity>>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedWeakPtrEntityType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::WeakPtr<moho::Entity>>()->GetName());
     return sName.c_str();
   }
 
   /**
    * Address: 0x006AE4C0 (FUN_006AE4C0, gpg::RFastVectorType_WeakPtr_Entity::GetLexical)
    */
-  msvc8::string RFastVectorType<moho::WeakPtr<moho::Entity>>::GetLexical(const gpg::RRef& ref) const
+  fa::string RFastVectorType<moho::WeakPtr<moho::Entity>>::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
@@ -355,16 +322,16 @@ namespace gpg
    */
   const char* RFastVectorType<moho::ReconBlip*>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", moho::ReconBlip::GetPointerType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("fastvector<%s>", moho::ReconBlip::GetPointerType()->GetName());
     return sName.c_str();
   }
 
   /**
    * Address: 0x006AE6D0 (FUN_006AE6D0, gpg::RFastVectorType_ReconBlip_P::GetLexical)
    */
-  msvc8::string RFastVectorType<moho::ReconBlip*>::GetLexical(const gpg::RRef& ref) const
+  fa::string RFastVectorType<moho::ReconBlip*>::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 

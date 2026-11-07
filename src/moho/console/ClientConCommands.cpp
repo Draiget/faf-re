@@ -7,6 +7,7 @@
 // after CConCommand.cpp.
 
 #include "moho/console/CConCommand.h"
+#include "moho/console/ConCommandJoin.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -96,70 +97,6 @@ using namespace moho;
 // Engine addition: helpers shared with the file these functions came from.
 namespace
 {
-  /**
-   * Address: 0x00866020 (FUN_00866020, sub_866020)
-   *
-   * Moho::CWldSession *, int
-   *
-   * What it does:
-   * Core of `UI_ExpandCurrentSelection`. Collects every unit in the
-   * session's spatial DB, and for each one that is alive, selectable, and
-   * not in the "WALL" category, checks whether the *current* selection
-   * already contains a unit sharing the same blueprint; if so (and the
-   * candidate is not mid-upgrade - `IUnit::IsUnitState(UNITSTATE_
-   * BeingUpgraded)`, vtable-confirmed via `UserUnit::UserUnit`'s ctor write
-   * of `??_7UserUnit@Moho@@6BIUnit@Moho@@@` at 0x008BF53D), adds it to a
-   * working copy of the selection that starts seeded with the current
-   * selection's own members (both `originalSelection` and
-   * `expandedSelection` below are independent copies of `session->mSelection`
-   * - the binary constructs two, not one, matching `sub_822210`'s citation
-   * as the `WeakEntitySetUserEntity` copy constructor's underlying clone
-   * step). Commits the expanded selection via `CWldSession::SetSelection`.
-   *
-   * The `camera` parameter is only ever null-checked, never dereferenced -
-   * preserved as a real parameter rather than reduced to a bool, since the
-   * binary's caller (`UI_ExpandCurrentSelection` below) always resolves and
-   * passes a real `CameraImpl*` for this exact null-check gate.
-   */
-  void ExpandCurrentSelection(moho::CWldSession* const session, const moho::CameraImpl* const camera)
-  {
-    if (camera == nullptr) {
-      return;
-    }
-
-    gpg::fastvector<moho::UserEntity*> collected{};
-    auto* const spatialDb = session->GetEntitySpatialDbStorage();
-    (void)spatialDb->Collect(collected, moho::ENTITYTYPE_Unit);
-
-    moho::WeakSet<moho::UserEntity> originalSelection(session->mSelection);
-    moho::WeakSet<moho::UserEntity> expandedSelection(session->mSelection);
-
-    const msvc8::string wallCategory("WALL");
-
-    for (moho::UserEntity* const candidateEntity : collected) {
-      moho::UserUnit* const candidate = candidateEntity->IsUserUnit();
-      if (candidate == nullptr || candidate->IsDead() || !session->CanSelectUnit(candidate)) {
-        continue;
-      }
-      if (candidate->IsInCategory(wallCategory)) {
-        continue;
-      }
-
-      bool sharesBlueprintWithSelection = false;
-      for (const moho::UserEntity* const selectedEntity : originalSelection) {
-        if (selectedEntity->mParams.mBlueprint == candidate->mParams.mBlueprint) {
-          sharesBlueprintWithSelection = true;
-          break;
-        }
-      }
-
-      if (sharesBlueprintWithSelection && !candidate->IsUnitState(moho::UNITSTATE_BeingUpgraded)) {
-        (void)expandedSelection.Add(candidate);
-      }
-    }
-
-    session->SetSelection(expandedSelection);
-  }
   // ---- UISelectionByCategory support (FUN_008662B0) ----
 
   [[nodiscard]] const Wm3::Box3f* SelectionEntityMeshBox(moho::UserEntity* const entity)
@@ -173,37 +110,6 @@ namespace
   }
 
   /**
-   * Address: 0x00866970 (FUN_00866970, sub_866970)
-   *
-   * char*
-   *
-   * What it does:
-   * `UI_ExpandCurrentSelection` console command. Resolves the world camera
-   * and dispatches `ExpandCurrentSelection` above. Prints localized "no
-   * session" feedback when no session is active.
-   *
-   * Registrar: FUN_00BE61C0 (`__xc_a` lane), data-xref
-   * `dword_F5B524 = offset sub_866970` is the callsite evidence. Name is
-   * read from the PE `.data` initializer of `stru_F5B518`
-   * ("UI_ExpandCurrentSelection").
-   */
-  void UI_ExpandCurrentSelection(const msvc8::vector<msvc8::string>& args)
-  {
-    (void)args;
-
-    moho::CWldSession* const session = moho::WLD_GetActiveSession();
-    if (session == nullptr) {
-      const msvc8::string noSessionText = moho::Loc(moho::USER_GetLuaState(), "<LOC _No_session>");
-      moho::CON_Printf(noSessionText.c_str());
-      return;
-    }
-
-    moho::RCamManager* const cameraManager = moho::CAM_GetManager();
-    moho::CameraImpl* const camera = cameraManager->GetCamera("WorldCamera");
-
-    ExpandCurrentSelection(session, camera);
-  }
-  /**
    * Address: 0x008662B0 (FUN_008662B0, sub_8662B0, SelectUnitsByCategory)
    *
    * What it does:
@@ -212,7 +118,7 @@ namespace
    * category (+ optional engineer/command exclusion), then either replaces or
    * extends the world selection. Optionally frames the result with the camera.
    */
-  void SelectUnitsByCategory(
+  [[maybe_unused]] void SelectUnitsByCategory(
     moho::CWldSession* const session,
     moho::CameraImpl* const camera,
     const char* const categoryExpr,
@@ -286,8 +192,8 @@ namespace
 
       // Optional engineer/command exclusion (a9).
       if (excludeEngineerCommand) {
-        const msvc8::string engineerCategory("ENGINEER");
-        const msvc8::string commandCategory("COMMAND");
+        const fa::string engineerCategory("ENGINEER");
+        const fa::string commandCategory("COMMAND");
         if (candidate->IsInCategory(engineerCategory) || candidate->IsInCategory(commandCategory)) {
           continue;
         }
@@ -381,35 +287,6 @@ namespace
   }
 
   /**
-   * Address: 0x0047BB90 (FUN_0047BB90, func_AppendStrings)
-   *
-   * What it does:
-   * Resets output string, appends first string in `[begin,end)`, then appends
-   * `separator` + each subsequent item.
-   */
-  [[nodiscard]]
-  msvc8::string AppendJoinedStringRange(
-    const msvc8::string* const begin, const msvc8::string* const end, const char* separator
-  )
-  {
-    std::string joined;
-    if (separator == nullptr) {
-      separator = "";
-    }
-
-    if (begin != nullptr && end != nullptr && begin < end) {
-      joined.append(begin->view());
-      for (const msvc8::string* cursor = begin + 1; cursor < end; ++cursor) {
-        joined.append(separator);
-        joined.append(cursor->view());
-      }
-    }
-
-    msvc8::string out;
-    out.assign_owned(joined);
-    return out;
-  }
-  /**
    * Returns the bitwise `commandCapsMask` flag (UnitAttributes +0x60) for one
    * recovered user-unit selection entry, or 0 when the entity is not a
    * user-unit. Walks the typed `IUnit` bridge subobject the binary stores at
@@ -434,7 +311,7 @@ namespace
   };
   void PrintLocalizedConsoleLine(const char* const locToken)
   {
-    const msvc8::string localizedText = Loc(USER_GetLuaState(), locToken != nullptr ? locToken : "");
+    const fa::string localizedText = Loc(USER_GetLuaState(), locToken != nullptr ? locToken : "");
     CON_Printf("%s", localizedText.c_str());
   }
   /**
@@ -469,7 +346,7 @@ namespace
     }
   }
   [[nodiscard]]
-  const char* TokenDataOrEmpty(const msvc8::string* token) noexcept
+  const char* TokenDataOrEmpty(const fa::string* token) noexcept
   {
     return token != nullptr ? token->c_str() : "";
   }
@@ -514,13 +391,13 @@ namespace
   /**
    * `UserUnit::GetCustomName` (vtable slot +0x60) hands back the address of the
    * unit's in-object custom-name storage; the recovered declaration types that
-   * anchor as `char*`, but the binary reads it as an `msvc8::string` (it tests
+   * anchor as `char*`, but the binary reads it as an `fa::string` (it tests
    * `+0x14` for the size and picks the SSO buffer or heap pointer off `+0x04`).
    * Recover the string the engine actually reads through.
    */
-  [[nodiscard]] const msvc8::string& CustomNameStorage(UserUnit* const userUnit) noexcept
+  [[nodiscard]] const fa::string& CustomNameStorage(UserUnit* const userUnit) noexcept
   {
-    return *reinterpret_cast<const msvc8::string*>(userUnit->GetCustomName());
+    return *reinterpret_cast<const fa::string*>(userUnit->GetCustomName());
   }
   /**
    * The first live selected entity, or `nullptr` when none is left: `begin()`
@@ -547,7 +424,7 @@ namespace
     return *selection.begin();
   }
   [[nodiscard]]
-  msvc8::string JoinConCommandTokens(const msvc8::vector<msvc8::string>& args, const std::size_t firstTokenIndex)
+  fa::string JoinConCommandTokens(const fa::vector<fa::string>& args, const std::size_t firstTokenIndex)
   {
     const std::size_t count = args.size();
     if (firstTokenIndex >= count) {
@@ -761,12 +638,12 @@ namespace
   constexpr const char* kUIRenameSingleSelectionLocToken =
     "<LOC Engine0025>You may only name one unit at a time, please limit your selection to one unit.";
   [[nodiscard]]
-  float ParseFloatToken(const msvc8::string* token) noexcept
+  float ParseFloatToken(const fa::string* token) noexcept
   {
     return static_cast<float>(std::atof(TokenDataOrEmpty(token)));
   }
   [[nodiscard]]
-  int ParseIntToken(const msvc8::string* token) noexcept
+  int ParseIntToken(const fa::string* token) noexcept
   {
     return std::atoi(TokenDataOrEmpty(token));
   }
@@ -782,7 +659,7 @@ namespace
    */
   [[nodiscard]] std::uint32_t RandomIndexBelowExtent(const std::uint32_t extent)
   {
-    boost::mutex::scoped_lock randomLock(math_GlobalRandomMutex);
+    std::lock_guard<std::mutex> randomLock(math_GlobalRandomMutex);
     const std::uint64_t sample = math_GlobalRandomStream.twister.NextUInt32();
     return static_cast<std::uint32_t>((sample * static_cast<std::uint64_t>(extent)) >> 32);
   }
@@ -816,7 +693,7 @@ namespace
     return false;
   }
   [[nodiscard]]
-  bool TokenEq(const msvc8::string* token, const std::string_view text) noexcept
+  bool TokenEq(const fa::string* token, const std::string_view text) noexcept
   {
     return token != nullptr && token->view() == text;
   }
@@ -830,13 +707,13 @@ namespace
  * Joins command tokens from index 1 into one Lua chunk, echoes it to console,
  * and executes it in the user Lua state.
  */
-void moho::CON_LUA(const msvc8::vector<msvc8::string>& args)
+void moho::CON_LUA(const fa::vector<fa::string>& args)
 {
   if (args.size() < 2u) {
     return;
   }
 
-  const msvc8::string scriptText = JoinConCommandTokens(args, 1u);
+  const fa::string scriptText = JoinConCommandTokens(args, 1u);
   CON_Printf("%s", scriptText.c_str());
   (void)SCR_LuaDoString(scriptText.c_str(), USER_GetLuaState());
 }
@@ -848,14 +725,14 @@ void moho::CON_LUA(const msvc8::vector<msvc8::string>& args)
  * Parses `cam_SetLOD <cameraName> <lodScale>` and applies the parsed LOD
  * scale to the named camera view lane.
  */
-void moho::CAM_SetLOD(const msvc8::vector<msvc8::string>& args)
+void moho::CAM_SetLOD(const fa::vector<fa::string>& args)
 {
   if (args.size() < 3u) {
     return;
   }
 
-  const msvc8::string* const cameraName = ConCommandArg(args, 1u);
-  const msvc8::string* const lodScaleToken = ConCommandArg(args, 2u);
+  const fa::string* const cameraName = ConCommandArg(args, 1u);
+  const fa::string* const lodScaleToken = ConCommandArg(args, 2u);
   if (cameraName == nullptr || lodScaleToken == nullptr) {
     return;
   }
@@ -877,7 +754,7 @@ void moho::CAM_SetLOD(const msvc8::vector<msvc8::string>& args)
  * Logs active world-camera target position, heading/far-pitch orientation,
  * and target zoom.
  */
-void moho::CON_DumpCamera(const msvc8::vector<msvc8::string>& args)
+void moho::CON_DumpCamera(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -889,7 +766,7 @@ void moho::CON_DumpCamera(const msvc8::vector<msvc8::string>& args)
 
   gpg::Logf("Camera:");
 
-  const msvc8::string targetPositionText = moho::ToString(camera->mTargetLocation);
+  const fa::string targetPositionText = moho::ToString(camera->mTargetLocation);
   gpg::Logf("  TargetPos: %s", targetPositionText.c_str());
   gpg::Logf("  Orientation: %f, %f, 0.0", camera->mHeading, camera->mFarPitch);
   gpg::Logf("  Zoom: %f", camera->mTargetZoom);
@@ -902,7 +779,7 @@ void moho::CON_DumpCamera(const msvc8::vector<msvc8::string>& args)
  * Imports `uiutil.lua` and invokes `SetCurrentSkin(name)` when a second
  * command token is present.
  */
-void moho::CON_UI_SetSkin(const msvc8::vector<msvc8::string>& args)
+void moho::CON_UI_SetSkin(const fa::vector<fa::string>& args)
 {
   CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
   LuaPlus::LuaState* const state = uiManager != nullptr ? uiManager->mLuaState : nullptr;
@@ -918,7 +795,7 @@ void moho::CON_UI_SetSkin(const msvc8::vector<msvc8::string>& args)
   LuaPlus::LuaObject setCurrentSkinObject = uiUtilModule["SetCurrentSkin"];
   LuaPlus::LuaFunction<void> setCurrentSkin(setCurrentSkinObject);
 
-  const msvc8::string* const skinToken = ConCommandArg(args, 1);
+  const fa::string* const skinToken = ConCommandArg(args, 1);
   setCurrentSkin(skinToken != nullptr ? skinToken->c_str() : "");
 }
 
@@ -929,7 +806,7 @@ void moho::CON_UI_SetSkin(const msvc8::vector<msvc8::string>& args)
  * Imports `uiutil.lua` and invokes `RotateSkin(direction)` where `direction`
  * defaults to `"+"` when no argument token is provided.
  */
-void moho::UI_RotateSkin(const msvc8::vector<msvc8::string>& args)
+void moho::UI_RotateSkin(const fa::vector<fa::string>& args)
 {
   CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
   LuaPlus::LuaState* const state = uiManager != nullptr ? uiManager->mLuaState : nullptr;
@@ -941,8 +818,8 @@ void moho::UI_RotateSkin(const msvc8::vector<msvc8::string>& args)
   LuaPlus::LuaObject rotateSkinObject = uiUtilModule["RotateSkin"];
   LuaPlus::LuaFunction<void> rotateSkin(rotateSkinObject);
 
-  msvc8::string direction("+");
-  if (const msvc8::string* const argDirection = ConCommandArg(args, 1); argDirection != nullptr) {
+  fa::string direction("+");
+  if (const fa::string* const argDirection = ConCommandArg(args, 1); argDirection != nullptr) {
     direction.assign_owned(argDirection->c_str());
   }
 
@@ -956,7 +833,7 @@ void moho::UI_RotateSkin(const msvc8::vector<msvc8::string>& args)
  * Imports `uiutil.lua` and invokes `RotateLayout(direction)` where
  * `direction` defaults to `"+"` when no argument token is provided.
  */
-void moho::UI_RotateLayout(const msvc8::vector<msvc8::string>& args)
+void moho::UI_RotateLayout(const fa::vector<fa::string>& args)
 {
   CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
   LuaPlus::LuaState* const state = uiManager != nullptr ? uiManager->mLuaState : nullptr;
@@ -968,8 +845,8 @@ void moho::UI_RotateLayout(const msvc8::vector<msvc8::string>& args)
   LuaPlus::LuaObject rotateLayoutObject = uiUtilModule["RotateLayout"];
   LuaPlus::LuaFunction<void> rotateLayout(rotateLayoutObject);
 
-  msvc8::string direction("+");
-  if (const msvc8::string* const argDirection = ConCommandArg(args, 1); argDirection != nullptr) {
+  fa::string direction("+");
+  if (const fa::string* const argDirection = ConCommandArg(args, 1); argDirection != nullptr) {
     direction.assign_owned(argDirection->c_str());
   }
 
@@ -982,7 +859,7 @@ void moho::UI_RotateLayout(const msvc8::vector<msvc8::string>& args)
  * What it does:
  * Imports `gamemain.lua` and invokes `HideGameUI()` with no arguments.
  */
-void moho::CON_UI_ToggleGamePanels(const msvc8::vector<msvc8::string>& args)
+void moho::CON_UI_ToggleGamePanels(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -1005,10 +882,10 @@ void moho::CON_UI_ToggleGamePanels(const msvc8::vector<msvc8::string>& args)
  * Validates one selection-set name argument and calls
  * `/lua/ui/game/selection.lua:AddCurrentSelectionSet(name)`.
  */
-void moho::UI_MakeSelectionSet(const msvc8::vector<msvc8::string>& args)
+void moho::UI_MakeSelectionSet(const fa::vector<fa::string>& args)
 {
   if (WLD_GetActiveSession() == nullptr) {
-    const msvc8::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
+    const fa::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
     CON_Printf("%s", noSessionText.c_str());
     return;
   }
@@ -1028,7 +905,7 @@ void moho::UI_MakeSelectionSet(const msvc8::vector<msvc8::string>& args)
   LuaPlus::LuaObject addCurrentSelectionSet = selectionModule["AddCurrentSelectionSet"];
   LuaPlus::LuaFunction<void> addCurrentSelectionSetFn(addCurrentSelectionSet);
 
-  const msvc8::string* const setName = ConCommandArg(args, 1);
+  const fa::string* const setName = ConCommandArg(args, 1);
   addCurrentSelectionSetFn(setName != nullptr ? setName->c_str() : "");
 }
 
@@ -1039,10 +916,10 @@ void moho::UI_MakeSelectionSet(const msvc8::vector<msvc8::string>& args)
  * Validates one selection-set name argument and calls
  * `/lua/ui/game/selection.lua:ApplySelectionSet(name)`.
  */
-void moho::UI_ApplySelectionSet(const msvc8::vector<msvc8::string>& args)
+void moho::UI_ApplySelectionSet(const fa::vector<fa::string>& args)
 {
   if (WLD_GetActiveSession() == nullptr) {
-    const msvc8::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
+    const fa::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
     CON_Printf("%s", noSessionText.c_str());
     return;
   }
@@ -1062,8 +939,8 @@ void moho::UI_ApplySelectionSet(const msvc8::vector<msvc8::string>& args)
   LuaPlus::LuaObject applySelectionSet = selectionModule["ApplySelectionSet"];
   LuaPlus::LuaFunction<void> applySelectionSetFn(applySelectionSet);
 
-  msvc8::string selectionSetName;
-  if (const msvc8::string* const setName = ConCommandArg(args, 1); setName != nullptr) {
+  fa::string selectionSetName;
+  if (const fa::string* const setName = ConCommandArg(args, 1); setName != nullptr) {
     selectionSetName.assign_owned(setName->c_str());
   }
   applySelectionSetFn(selectionSetName.c_str());
@@ -1079,11 +956,11 @@ void moho::UI_ApplySelectionSet(const msvc8::vector<msvc8::string>& args)
  * selection afterward; the other three do not (matches the binary's own
  * asymmetry - not a recovery oversight).
  */
-void moho::CON_IssueCommand(const msvc8::vector<msvc8::string>& args)
+void moho::CON_IssueCommand(const fa::vector<fa::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
-    const msvc8::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
+    const fa::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
     CON_Printf("%s", noSessionText.c_str());
     return;
   }
@@ -1092,7 +969,7 @@ void moho::CON_IssueCommand(const msvc8::vector<msvc8::string>& args)
     return;
   }
 
-  const msvc8::string* const subCommand = ConCommandArg(args, 1);
+  const fa::string* const subCommand = ConCommandArg(args, 1);
   const char* const subCommandText = subCommand != nullptr ? subCommand->c_str() : "";
 
   if (_stricmp(subCommandText, "Stop") == 0) {
@@ -1130,7 +1007,7 @@ void moho::CON_IssueCommand(const msvc8::vector<msvc8::string>& args)
  * What it does:
  * Imports `multihead.lua` and invokes `CreateSecondView()`.
  */
-void moho::CON_UI_CreateHead1Map(const msvc8::vector<msvc8::string>& args)
+void moho::CON_UI_CreateHead1Map(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -1152,7 +1029,7 @@ void moho::CON_UI_CreateHead1Map(const msvc8::vector<msvc8::string>& args)
  * What it does:
  * Shows the escape dialog through UI main callback lane.
  */
-void moho::UI_Quit(const msvc8::vector<msvc8::string>& args)
+void moho::UI_Quit(const fa::vector<fa::string>& args)
 {
   (void)args;
   (void)ShowEscapeDialog(false);
@@ -1165,7 +1042,7 @@ void moho::UI_Quit(const msvc8::vector<msvc8::string>& args)
  * Resolves each camera-name token from argument index 1 onward and resets
  * each camera that exists in the current camera manager.
  */
-void moho::UI_ResetView(const msvc8::vector<msvc8::string>& args)
+void moho::UI_ResetView(const fa::vector<fa::string>& args)
 {
   if (args.size() <= 1u) {
     return;
@@ -1177,7 +1054,7 @@ void moho::UI_ResetView(const msvc8::vector<msvc8::string>& args)
   }
 
   for (std::size_t index = 1u; index < args.size(); ++index) {
-    const msvc8::string* const cameraName = ConCommandArg(args, index);
+    const fa::string* const cameraName = ConCommandArg(args, index);
     if (cameraName == nullptr) {
       continue;
     }
@@ -1196,7 +1073,7 @@ void moho::UI_ResetView(const msvc8::vector<msvc8::string>& args)
  * Parses one focus-army index argument and requests focus update on active
  * world session; otherwise prints syntax/no-session feedback.
  */
-void moho::SetFocusArmy(const msvc8::vector<msvc8::string>& args)
+void moho::SetFocusArmy(const fa::vector<fa::string>& args)
 {
   if (args.size() == 2u) {
     CWldSession* const session = WLD_GetActiveSession();
@@ -1205,12 +1082,12 @@ void moho::SetFocusArmy(const msvc8::vector<msvc8::string>& args)
       return;
     }
 
-    const msvc8::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
+    const fa::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
     CON_Printf("%s", noSessionText.c_str());
     return;
   }
 
-  const msvc8::string* const commandNameToken = ConCommandArg(args, 0);
+  const fa::string* const commandNameToken = ConCommandArg(args, 0);
   const char* const commandName = commandNameToken != nullptr ? commandNameToken->c_str() : "SetFocusArmy";
   CON_Printf("syntax: %s <zero based army index or -1>", commandName);
 }
@@ -1222,13 +1099,13 @@ void moho::SetFocusArmy(const msvc8::vector<msvc8::string>& args)
  * Joins command tokens from index 1 and executes the Lua text in the active
  * UI manager state.
  */
-void moho::UI_Lua(const msvc8::vector<msvc8::string>& args)
+void moho::UI_Lua(const fa::vector<fa::string>& args)
 {
   if (args.size() < 2u) {
     return;
   }
 
-  const msvc8::string scriptText = JoinConCommandTokens(args, 1u);
+  const fa::string scriptText = JoinConCommandTokens(args, 1u);
   CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
   if (uiManager != nullptr && uiManager->mLuaState != nullptr) {
     (void)SCR_LuaDoString(scriptText.c_str(), uiManager->mLuaState);
@@ -1261,7 +1138,7 @@ void moho::UI_ShowRenameDialog()
     return;
   }
 
-  msvc8::vector<UserUnit*> selectedUnits;
+  fa::vector<UserUnit*> selectedUnits;
   session->GetSelectionUnits(selectedUnits);
 
   UserUnit* const selectedUnit = selectedUnits.size() != 0u ? selectedUnits[0] : nullptr;
@@ -1270,7 +1147,7 @@ void moho::UI_ShowRenameDialog()
     return;
   }
 
-  // `GetCustomName` hands back the address of the unit's `msvc8::string`
+  // `GetCustomName` hands back the address of the unit's `fa::string`
   // storage, which the binary copies into a temporary before handing it to the
   // dialog helper; taking it as a `char*` directly would push the string
   // object's own bytes into Lua.
@@ -1283,7 +1160,7 @@ void moho::UI_ShowRenameDialog()
  * What it does:
  * Walks each root UI frame and logs every control via depth-first traversal.
  */
-void moho::UI_DumpControls(const msvc8::vector<msvc8::string>& args)
+void moho::UI_DumpControls(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -1333,13 +1210,13 @@ void moho::WIN_ToggleLogDialog()
  * Parses one boolean visibility token (`"true"` => show, otherwise hide),
  * ensures the log-window runtime exists, and forwards the visibility toggle.
  */
-void moho::WIN_ShowLogDialog(const msvc8::vector<msvc8::string>& args)
+void moho::WIN_ShowLogDialog(const fa::vector<fa::string>& args)
 {
   if (args.size() < 2u) {
     return;
   }
 
-  const msvc8::string* const showToken = ConCommandArg(args, 1u);
+  const fa::string* const showToken = ConCommandArg(args, 1u);
   if (showToken == nullptr) {
     return;
   }
@@ -1364,7 +1241,7 @@ void moho::WIN_ShowLogDialog(const msvc8::vector<msvc8::string>& args)
  */
 void moho::CON_ExecutePasteBuffer()
 {
-  const msvc8::string clipboardText = WIN_GetClipboardText();
+  const fa::string clipboardText = WIN_GetClipboardText();
 
   LuaPlus::LuaState* state = USER_GetLuaState();
   if (CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
@@ -1381,13 +1258,13 @@ void moho::CON_ExecutePasteBuffer()
  * Opens Lua create-unit dialog at current cursor screen coordinates, or prints
  * localized no-session text when no world session is active.
  */
-void moho::CON_PopupCreateUnitMenu(const msvc8::vector<msvc8::string>& args)
+void moho::CON_PopupCreateUnitMenu(const fa::vector<fa::string>& args)
 {
   (void)args;
 
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
-    const msvc8::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
+    const fa::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
     CON_Printf("%s", noSessionText.c_str());
     return;
   }
@@ -1411,16 +1288,16 @@ void moho::CON_PopupCreateUnitMenu(const msvc8::vector<msvc8::string>& args)
  * placeholder path), lowercases it, and dispatches prop creation at active
  * world-session cursor position.
  */
-void moho::CON_CreateProp(const msvc8::vector<msvc8::string>& args)
+void moho::CON_CreateProp(const fa::vector<fa::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
-    const msvc8::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
+    const fa::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
     CON_Printf(noSessionText.c_str());
     return;
   }
 
-  const msvc8::string* const blueprintToken = ConCommandArg(args, 1u);
+  const fa::string* const blueprintToken = ConCommandArg(args, 1u);
 
   const char* const blueprintPath =
     blueprintToken != nullptr ? blueprintToken->c_str() : "/props/rplaceholder/rplaceholder_prop";
@@ -1449,7 +1326,7 @@ void moho::CON_CreateProp(const msvc8::vector<msvc8::string>& args)
  * and asks the sim driver to spawn the unit. An unresolvable blueprint id plays
  * the UI error cue instead.
  */
-void moho::CON_CreateUnit(const msvc8::vector<msvc8::string>& args)
+void moho::CON_CreateUnit(const fa::vector<fa::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -1505,7 +1382,7 @@ void moho::CON_CreateUnit(const msvc8::vector<msvc8::string>& args)
     return;
   }
 
-  msvc8::string requestedBlueprint;
+  fa::string requestedBlueprint;
   requestedBlueprint.assign_owned(TokenDataOrEmpty(ConCommandArg(args, 1u)));
 
   RResId requestedBlueprintId{};
@@ -1515,7 +1392,7 @@ void moho::CON_CreateUnit(const msvc8::vector<msvc8::string>& args)
   requestedBlueprintId.name.clear();
 
   if (blueprint == nullptr) {
-    USER_GetSound()->Play(msvc8::string(kCreateUnitErrorSoundCue), msvc8::string(kCreateUnitErrorSoundBank));
+    USER_GetSound()->Play(fa::string(kCreateUnitErrorSoundCue), fa::string(kCreateUnitErrorSoundBank));
     return;
   }
 
@@ -1544,7 +1421,7 @@ void moho::CON_CreateUnit(const msvc8::vector<msvc8::string>& args)
  * cells, sampling terrain elevation at each cell center and lifting the spawn to
  * the water plane where the map's water sits above the terrain.
  */
-void moho::CON_LotsOfProps(const msvc8::vector<msvc8::string>& args)
+void moho::CON_LotsOfProps(const fa::vector<fa::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -1553,7 +1430,7 @@ void moho::CON_LotsOfProps(const msvc8::vector<msvc8::string>& args)
   }
 
 
-  msvc8::string propBlueprintPath;
+  fa::string propBlueprintPath;
   if (args.size() >= 2u) {
     propBlueprintPath.assign_owned(TokenDataOrEmpty(ConCommandArg(args, 1u)));
 
@@ -1602,7 +1479,7 @@ void moho::CON_LotsOfProps(const msvc8::vector<msvc8::string>& args)
  * death sequence. Prints localized "no session" feedback when no world session
  * is active.
  */
-void moho::CON_KillSelectedUnits(const msvc8::vector<msvc8::string>& args)
+void moho::CON_KillSelectedUnits(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -1625,7 +1502,7 @@ void moho::CON_KillSelectedUnits(const msvc8::vector<msvc8::string>& args)
  * than killing them. Prints localized "no session" feedback when no world
  * session is active.
  */
-void moho::CON_DestroySelectedUnits(const msvc8::vector<msvc8::string>& args)
+void moho::CON_DestroySelectedUnits(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -1656,7 +1533,7 @@ void moho::CON_DestroySelectedUnits(const msvc8::vector<msvc8::string>& args)
  * so this uses the established wrapper for consistency with every sibling
  * command in this file.
  */
-void moho::CON_CopySelectedUnitsToClipboard(const msvc8::vector<msvc8::string>& args)
+void moho::CON_CopySelectedUnitsToClipboard(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -1686,7 +1563,7 @@ void moho::CON_CopySelectedUnitsToClipboard(const msvc8::vector<msvc8::string>& 
   // Second pass: for every selected user-unit, append one
   // `CreateUnitAtMouse` line encoding its position/yaw relative to the
   // centroid, its blueprint id, and its owning army index.
-  msvc8::string commandScript;
+  fa::string commandScript;
   {
     for (UserEntity* const entity : selection) {
       {
@@ -1706,7 +1583,7 @@ void moho::CON_CopySelectedUnitsToClipboard(const msvc8::vector<msvc8::string>& 
           const UserArmy* const army = unit->mArmy;
           const RUnitBlueprint* const blueprint = unit->GetBlueprint();
 
-          const msvc8::string commandLine = gpg::STR_Printf(
+          const fa::string commandLine = gpg::STR_Printf(
             "   CreateUnitAtMouse('%s', %d, %7.2f, %7.2f, %8.5f)\n",
             blueprint->mBlueprintId.c_str(),
             army->mArmyIndex,
@@ -1737,7 +1614,7 @@ void moho::CON_CopySelectedUnitsToClipboard(const msvc8::vector<msvc8::string>& 
  * before honouring an info pair. Prints localized "no session" feedback when no
  * world session is active, and silently ignores short argument vectors.
  */
-void moho::CON_ProcessInfoPair(const msvc8::vector<msvc8::string>& args)
+void moho::CON_ProcessInfoPair(const fa::vector<fa::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -1751,7 +1628,7 @@ void moho::CON_ProcessInfoPair(const msvc8::vector<msvc8::string>& args)
 
   const UserArmy* const focusArmy = session->GetFocusArmy();
 
-  msvc8::vector<UserUnit*> selectedUnits;
+  fa::vector<UserUnit*> selectedUnits;
   session->GetSelectionUnits(selectedUnits);
 
   const char* const infoKey = TokenDataOrEmpty(ConCommandArg(args, 1u));
@@ -1784,7 +1661,7 @@ void moho::CON_ProcessInfoPair(const msvc8::vector<msvc8::string>& args)
  * otherwise it starts tracking the whole selection at the camera's current
  * target zoom with a zero-second transition.
  */
-void moho::UI_TrackUnit(const msvc8::vector<msvc8::string>& args)
+void moho::UI_TrackUnit(const fa::vector<fa::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -1834,7 +1711,7 @@ void moho::UI_TrackUnit(const msvc8::vector<msvc8::string>& args)
  * info pair through the sim driver. Requires exactly one selected user-unit and
  * prints the matching localized rejection otherwise.
  */
-void moho::RenameUnit(const msvc8::vector<msvc8::string>& args)
+void moho::RenameUnit(const fa::vector<fa::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -1861,7 +1738,7 @@ void moho::RenameUnit(const msvc8::vector<msvc8::string>& args)
   }
 
   if (args.size() == 1u) {
-    const msvc8::string& currentName = CustomNameStorage(selectedUnit);
+    const fa::string& currentName = CustomNameStorage(selectedUnit);
     if (currentName.empty()) {
       PrintLocalizedConsoleLine(kRenameUnitNoCustomNameLocToken);
       return;
@@ -1873,8 +1750,8 @@ void moho::RenameUnit(const msvc8::vector<msvc8::string>& args)
 
   // The binary appends `token + " "` for every remaining token and then trims,
   // which leaves exactly the single-space join the shared helper produces.
-  const msvc8::string joinedName = JoinConCommandTokens(args, 1u);
-  const msvc8::string customName = gpg::STR_TrimWhitespace(joinedName.c_str());
+  const fa::string joinedName = JoinConCommandTokens(args, 1u);
+  const fa::string customName = gpg::STR_TrimWhitespace(joinedName.c_str());
 
   UserEntity* const entityView = selectedUnit;
   WLD_GetDriver()->ProcessInfoPair(
@@ -1906,7 +1783,7 @@ void moho::RenameUnit(const msvc8::vector<msvc8::string>& args)
  *     `UI_StartCommandMode` with the new mode data when a matching unit is
  *     found.
  */
-void moho::CON_StartCommandMode(const msvc8::vector<msvc8::string>& args)
+void moho::CON_StartCommandMode(const fa::vector<fa::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -1929,8 +1806,8 @@ void moho::CON_StartCommandMode(const msvc8::vector<msvc8::string>& args)
   // below. Feeding the mode token to `SetLexical` leaves the caps mask at
   // zero, the selection scan then matches nothing and the command mode never
   // starts -- which is every order hotkey silently doing nothing.
-  const msvc8::string* const modeToken = ConCommandArg(args, 1u);
-  const msvc8::string* const nameToken = ConCommandArg(args, 2u);
+  const fa::string* const modeToken = ConCommandArg(args, 1u);
+  const fa::string* const nameToken = ConCommandArg(args, 2u);
   if (modeToken == nullptr || nameToken == nullptr) {
     return;
   }
@@ -1998,7 +1875,7 @@ void moho::CON_StartCommandMode(const msvc8::vector<msvc8::string>& args)
  * Generates build templates from current selection when a world session is
  * active; otherwise prints localized "no session" feedback.
  */
-void moho::CON_DebugGenerateBuildTemplateFromSelection(const msvc8::vector<msvc8::string>& args)
+void moho::CON_DebugGenerateBuildTemplateFromSelection(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -2018,13 +1895,13 @@ void moho::CON_DebugGenerateBuildTemplateFromSelection(const msvc8::vector<msvc8
  * Teleports currently selected units owned by the focused army to cursor world
  * position, preserving orientation and applying spawn-elevation correction.
  */
-void moho::CON_TeleportSelectedUnits(const msvc8::vector<msvc8::string>& args)
+void moho::CON_TeleportSelectedUnits(const fa::vector<fa::string>& args)
 {
   (void)args;
 
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
-    const msvc8::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
+    const fa::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
     CON_Printf(noSessionText.c_str());
     return;
   }
@@ -2040,7 +1917,7 @@ void moho::CON_TeleportSelectedUnits(const msvc8::vector<msvc8::string>& args)
   const STIMap* const terrainMap = ResolveSessionTerrainMap(session);
   ISTIDriver* const simDriver = WLD_GetDriver();
 
-  msvc8::vector<UserUnit*> selectedUnits;
+  fa::vector<UserUnit*> selectedUnits;
   session->GetSelectionUnits(selectedUnits);
 
   for (UserUnit* const userUnit : selectedUnits) {
@@ -2079,7 +1956,7 @@ void moho::CON_TeleportSelectedUnits(const msvc8::vector<msvc8::string>& args)
  * ("WLD_SingleStep" / "Single-step the sim one tick.") read from the PE
  * `.data` initializers of `stru_F5B734`/`dword_F5B740`.
  */
-void moho::WLD_SingleStep(const msvc8::vector<msvc8::string>& args)
+void moho::WLD_SingleStep(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -2107,7 +1984,7 @@ void moho::WLD_SingleStep(const msvc8::vector<msvc8::string>& args)
  * / "Set a new game speed") read from the PE `.data` initializers of
  * `stru_F5B744`/`dword_F5B750`.
  */
-void moho::WLD_GameSpeed(const msvc8::vector<msvc8::string>& args)
+void moho::WLD_GameSpeed(const fa::vector<fa::string>& args)
 {
   if (args.size() != 2u) {
     CON_Printf("WLD_GameSpeed <int> - set current game speed");
@@ -2119,7 +1996,7 @@ void moho::WLD_GameSpeed(const msvc8::vector<msvc8::string>& args)
     return;
   }
 
-  const msvc8::string* const rateToken = ConCommandArg(args, 1u);
+  const fa::string* const rateToken = ConCommandArg(args, 1u);
   int requestedSpeed = static_cast<int>(std::atof(TokenDataOrEmpty(rateToken)));
   if (requestedSpeed > 50) {
     requestedSpeed = 50;
@@ -2166,7 +2043,7 @@ void moho::WLD_GameSpeed(const msvc8::vector<msvc8::string>& args)
  * `dword_F5B760 = offset sub_88E440` is the callsite evidence. Name is read
  * from the PE `.data` initializer of `stru_F5B754` ("DoSimCommand").
  */
-void moho::DoSimCommand(const msvc8::vector<msvc8::string>& args)
+void moho::DoSimCommand(const fa::vector<fa::string>& args)
 {
   if (args.size() <= 1u) {
     CON_Printf("usage: DoSimCommand command args...");
@@ -2182,12 +2059,12 @@ void moho::DoSimCommand(const msvc8::vector<msvc8::string>& args)
   CWldSession* const session = WLD_GetActiveSession();
 
   BVSet<EntId, EntIdUniverse> entities{};
-  msvc8::vector<msvc8::string> remainingArgs;
+  fa::vector<fa::string> remainingArgs;
   Wm3::Vector3f worldPos{};
   std::uint32_t focusArmy = 0u;
 
   if (session != nullptr) {
-    msvc8::vector<UserUnit*> selectedUnits;
+    fa::vector<UserUnit*> selectedUnits;
     session->GetSelectionUnits(selectedUnits);
     for (UserUnit* const userUnit : selectedUnits) {
       UserEntity* const entityView = userUnit;
@@ -2199,12 +2076,12 @@ void moho::DoSimCommand(const msvc8::vector<msvc8::string>& args)
   }
 
   for (std::size_t index = 1u; index < args.size(); ++index) {
-    if (const msvc8::string* const token = ConCommandArg(args, index); token != nullptr) {
+    if (const fa::string* const token = ConCommandArg(args, index); token != nullptr) {
       remainingArgs.push_back(*token);
     }
   }
 
-  const msvc8::string unparsedCommand = CON_UnparseCommand(remainingArgs);
+  const fa::string unparsedCommand = CON_UnparseCommand(remainingArgs);
   (void)simDriver->ExecuteDebugCommand(unparsedCommand.c_str(), worldPos, focusArmy, entities);
 }
 
@@ -2215,7 +2092,7 @@ void moho::DoSimCommand(const msvc8::vector<msvc8::string>& args)
  * Parses one `ren_MipSkipLevels` value argument and applies clamped
  * non-negative mip-skip state to active D3D device resources.
  */
-void moho::CON_ren_MipSkipLevels(const msvc8::vector<msvc8::string>& args)
+void moho::CON_ren_MipSkipLevels(const fa::vector<fa::string>& args)
 {
   if (args.size() != 2u) {
     return;
@@ -2242,7 +2119,7 @@ void moho::CON_ren_MipSkipLevels(const msvc8::vector<msvc8::string>& args)
  * Opens `PreloadedTextures.txt`, asks active D3D resources to dump preloaded
  * texture state into it, then closes the stream.
  */
-void moho::CON_DumpPreloadedTextures(const msvc8::vector<msvc8::string>& args)
+void moho::CON_DumpPreloadedTextures(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -2268,7 +2145,7 @@ void moho::CON_DumpPreloadedTextures(const msvc8::vector<msvc8::string>& args)
  * `mesh_Rebatch <allowInstancing> <allowFloat16>` console command - see the
  * declaration.
  */
-void moho::CON_mesh_Rebatch(const msvc8::vector<msvc8::string>& args)
+void moho::CON_mesh_Rebatch(const fa::vector<fa::string>& args)
 {
   if (args.size() != 3u) {
     CON_Printf("usage: mesh_Rebatch [allowInstancing] [allowFloat16]");
@@ -2296,7 +2173,7 @@ void moho::CON_mesh_Rebatch(const msvc8::vector<msvc8::string>& args)
  * other combination opens the free-standing editor at the same cursor world
  * position.
  */
-void moho::EFX_CreateEmitterWindow(const msvc8::vector<msvc8::string>& args)
+void moho::EFX_CreateEmitterWindow(const fa::vector<fa::string>& args)
 {
   // The editor is held through a weak pointer for the Show call; the
   // WeakPtr<WWinManagedFrame> Set emission is 0x0066A2A0.
@@ -2325,7 +2202,7 @@ void moho::EFX_CreateEmitterWindow(const msvc8::vector<msvc8::string>& args)
  * Dispatches `DumpControlsUnderMouse()` on the active UI manager when one is
  * available.
  */
-void moho::UI_DumpControlsUnderCursor(const msvc8::vector<msvc8::string>& args)
+void moho::UI_DumpControlsUnderCursor(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -2342,7 +2219,7 @@ void moho::UI_DumpControlsUnderCursor(const msvc8::vector<msvc8::string>& args)
  * Imports path debugger UI module and toggles between `CreateUI` and
  * `DestroyUI` based on persisted enable state.
  */
-void moho::CON_PathDebug(const msvc8::vector<msvc8::string>& args)
+void moho::CON_PathDebug(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -2381,7 +2258,7 @@ void moho::CON_PathDebug(const msvc8::vector<msvc8::string>& args)
  * is no active session; silently does nothing when the session has no
  * terrain resource or decal manager.
  */
-void moho::CON_AddSplat(const msvc8::vector<msvc8::string>& args)
+void moho::CON_AddSplat(const fa::vector<fa::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -2389,12 +2266,12 @@ void moho::CON_AddSplat(const msvc8::vector<msvc8::string>& args)
     return;
   }
 
-  msvc8::string texturePath = "/env/common/splats/tank_treads_albedo.dds";
+  fa::string texturePath = "/env/common/splats/tank_treads_albedo.dds";
 
   const std::size_t tokenCount = args.size();
   for (std::size_t i = 1u; i < tokenCount; ++i) {
-    if (const msvc8::string* const token = ConCommandArg(args, i); token != nullptr && *token == "texture") {
-      if (const msvc8::string* const path = ConCommandArg(args, i + 1u); path != nullptr) {
+    if (const fa::string* const token = ConCommandArg(args, i); token != nullptr && *token == "texture") {
+      if (const fa::string* const path = ConCommandArg(args, i + 1u); path != nullptr) {
         texturePath = *path;
       }
     }
@@ -2419,7 +2296,7 @@ void moho::CON_AddSplat(const msvc8::vector<msvc8::string>& args)
  * Clears build-template state when a world session is active; otherwise prints
  * localized "no session" feedback.
  */
-void moho::CON_DebugClearBuildTemplates(const msvc8::vector<msvc8::string>& args)
+void moho::CON_DebugClearBuildTemplates(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -2448,7 +2325,7 @@ void moho::CON_DebugClearBuildTemplates(const msvc8::vector<msvc8::string>& args
  * command validation in UI") are the struct's `.data` initializers, read
  * directly from the shipped PE.
  */
-void moho::SkipUIChecks(const msvc8::vector<msvc8::string>& args)
+void moho::SkipUIChecks(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -2475,7 +2352,7 @@ void moho::SkipUIChecks(const msvc8::vector<msvc8::string>& args)
  * / "Restart rendering the current beat.") read from the PE `.data`
  * initializers of `stru_F5B7B4`/`dword_F5B7C0`.
  */
-void moho::WLD_RestartBeat(const msvc8::vector<msvc8::string>& args)
+void moho::WLD_RestartBeat(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -2501,7 +2378,7 @@ void moho::WLD_RestartBeat(const msvc8::vector<msvc8::string>& args)
  * / "Advance the sim one beat.") read from the PE `.data` initializers of
  * `stru_F5B7C4`/`dword_F5B7D0`.
  */
-void moho::WLD_AdvanceBeat(const msvc8::vector<msvc8::string>& args)
+void moho::WLD_AdvanceBeat(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -2523,7 +2400,7 @@ void moho::WLD_AdvanceBeat(const msvc8::vector<msvc8::string>& args)
  * `FindUnit term...`. Lowercases every argument after the command name into
  * a scratch term list, then walks the active session's rules' unit
  * blueprint map (`RRuleGameRulesImpl::GetUnitBlueprints`, an ordinary
- * `msvc8::map<msvc8::string, void*>` - iterated in place, matching the
+ * `fa::map<fa::string, void*>` - iterated in place, matching the
  * no-defensive-copy idiom `InitializeArmyUnitCategorySets` in
  * CArmyImpl.cpp already established for this exact container). A blueprint
  * matches when every lowercased term is a substring of its (also
@@ -2538,7 +2415,7 @@ void moho::WLD_AdvanceBeat(const msvc8::vector<msvc8::string>& args)
  * from the PE `.data` initializer of `stru_F5BEA0` ("FindUnit"); the
  * description string sits in the same struct.
  */
-void moho::CON_FindUnit(const msvc8::vector<msvc8::string>& args)
+void moho::CON_FindUnit(const fa::vector<fa::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -2549,7 +2426,7 @@ void moho::CON_FindUnit(const msvc8::vector<msvc8::string>& args)
     return;
   }
 
-  msvc8::vector<msvc8::string> searchTermsLower;
+  fa::vector<fa::string> searchTermsLower;
   for (std::size_t index = 1u; index < args.size(); ++index) {
     searchTermsLower.push_back(gpg::STR_ToLower(TokenDataOrEmpty(ConCommandArg(args, index))));
   }
@@ -2562,11 +2439,11 @@ void moho::CON_FindUnit(const msvc8::vector<msvc8::string>& args)
       continue;
     }
 
-    const msvc8::string nameLower = gpg::STR_ToLower(unitBlueprint->Display.DisplayName.c_str());
+    const fa::string nameLower = gpg::STR_ToLower(unitBlueprint->Display.DisplayName.c_str());
     const bool allTermsMatch = std::all_of(
       searchTermsLower.begin(),
       searchTermsLower.end(),
-      [&nameLower](const msvc8::string& term) { return std::strstr(nameLower.c_str(), term.c_str()) != nullptr; }
+      [&nameLower](const fa::string& term) { return std::strstr(nameLower.c_str(), term.c_str()) != nullptr; }
     );
 
     if (allTermsMatch) {
@@ -2577,11 +2454,11 @@ void moho::CON_FindUnit(const msvc8::vector<msvc8::string>& args)
 
   CON_Printf("%d units matching", matchCount);
 
-  // `msvc8::string` has no destructor by design (String.h); release each
+  // `fa::string` has no destructor by design (String.h); release each
   // term's owned heap buffer explicitly, matching the established
   // `.tidy(true, 0u)` cleanup idiom (REntityBlueprintTypeInfo.cpp,
   // LaunchInfoBase.cpp) rather than leaking non-SSO search terms.
-  for (msvc8::string& term : searchTermsLower) {
+  for (fa::string& term : searchTermsLower) {
     term.tidy(true, 0u);
   }
 }
@@ -2601,7 +2478,7 @@ void moho::CON_FindUnit(const msvc8::vector<msvc8::string>& args)
  * `dword_F5BEDC = offset sub_8D4150` is the callsite evidence. Name is read
  * from the PE `.data` initializer of `stru_F5BED0` ("SC_LuaDebugger").
  */
-void moho::SC_LuaDebugger(const msvc8::vector<msvc8::string>& args)
+void moho::SC_LuaDebugger(const fa::vector<fa::string>& args)
 {
   (void)args;
 
@@ -2769,7 +2646,7 @@ namespace moho
 
   extern unsigned int ui_CustomNameColor;
 
-  extern msvc8::string ui_CustomNameFont;
+  extern fa::string ui_CustomNameFont;
 
   extern int ui_CustomNameFontSize;
 
@@ -3068,7 +2945,7 @@ namespace moho
    * Address: 0x00BE5740 (FUN_00BE5740, dynamic initializer for `gTConVar_ui_CustomNameFont`)
    * Address: 0x00C06E10 (FUN_00C06E10, dynamic atexit destructor for `gTConVar_ui_CustomNameFont`)
    */
-  TConVar<msvc8::string> gTConVar_ui_CustomNameFont(
+  TConVar<fa::string> gTConVar_ui_CustomNameFont(
     "ui_CutsomNameFont",
     kConsoleStartupUiCustomNameFontDescription,
     &moho::ui_CustomNameFont
@@ -4275,9 +4152,9 @@ namespace
    * loop already builds).
    */
   void PrintAniSkeletonBoneHierarchy(
-    const msvc8::set<const moho::SAniSkelBone*>& children,
+    const fa::set<const moho::SAniSkelBone*>& children,
     const std::uint32_t indent,
-    msvc8::map<const moho::SAniSkelBone*, msvc8::set<const moho::SAniSkelBone*>>& dedupTree
+    fa::map<const moho::SAniSkelBone*, fa::set<const moho::SAniSkelBone*>>& dedupTree
   )
   {
     for (const moho::SAniSkelBone* const bone : children) {
@@ -4287,12 +4164,12 @@ namespace
       const int rawPadWidth = 50 - static_cast<int>(nameLength) - static_cast<int>(indent);
       const std::size_t namePadWidth = static_cast<std::size_t>(rawPadWidth > 2 ? rawPadWidth : 2);
 
-      msvc8::string indentPad;
+      fa::string indentPad;
       (void)indentPad.assign(static_cast<std::size_t>(indent), ' ');
-      msvc8::string namePad;
+      fa::string namePad;
       (void)namePad.assign(namePadWidth, ' ');
 
-      const msvc8::string line = gpg::STR_Printf(
+      const fa::string line = gpg::STR_Printf(
         "%s%s%sp=<%5.2f,%5.2f,%5.2f> q=<%5.2f,%5.2f,%5.2f,%5.2f>",
         indentPad.c_str(),
         bone->mBoneName,
@@ -4378,7 +4255,7 @@ namespace moho
       skel = skelHandle.get();
     }
 
-    msvc8::map<const SAniSkelBone*, msvc8::set<const SAniSkelBone*>> dedupTree;
+    fa::map<const SAniSkelBone*, fa::set<const SAniSkelBone*>> dedupTree;
     for (const SAniSkelBone& bone : skel->mBones) {
       const SAniSkelBone* const parentBone = skel->GetBone(static_cast<std::uint32_t>(bone.mParentBoneIndex));
       (void)dedupTree[parentBone].insert(&bone);
@@ -4405,7 +4282,7 @@ namespace moho
   /**
    * Address: 0x00834F90 (FUN_00834F90, Moho::ShowStats)
    */
-  void ShowStats(const msvc8::vector<msvc8::string>& args)
+  void ShowStats(const fa::vector<fa::string>& args)
   {
     CUIManager* const uiManager = g_UIManager;
     if (!uiManager || uiManager->mFrames.Empty() || !uiManager->mFrames[0]) {
@@ -4418,10 +4295,10 @@ namespace moho
       LuaPlus::LuaState::Error(state, "failed to load \"/lua/debug/EngineStats.lua\" module");
     }
 
-    msvc8::string mode = "all";
+    fa::string mode = "all";
     if (args.size() > 1u) {
-      if (const msvc8::string* const requestedMode = ConCommandArg(args, 1u); requestedMode != nullptr) {
-        mode.assign(*requestedMode, 0, msvc8::string::npos);
+      if (const fa::string* const requestedMode = ConCommandArg(args, 1u); requestedMode != nullptr) {
+        mode.assign(*requestedMode, 0, fa::string::npos);
       }
     }
 
@@ -4433,7 +4310,7 @@ namespace moho
   /**
    * Address: 0x00835160 (FUN_00835160, Moho::ShowArmyStats)
    */
-  void ShowArmyStats(const msvc8::vector<msvc8::string>& args)
+  void ShowArmyStats(const fa::vector<fa::string>& args)
   {
     CUIManager* const uiManager = g_UIManager;
     if (!uiManager || uiManager->mFrames.Empty() || !uiManager->mFrames[0]) {
@@ -4458,15 +4335,15 @@ namespace moho
 
     int armyIndex = static_cast<int>(focusArmy->mArmyIndex);
     if (args.size() > 1u) {
-      if (const msvc8::string* const requestedArmy = ConCommandArg(args, 1u); requestedArmy != nullptr) {
+      if (const fa::string* const requestedArmy = ConCommandArg(args, 1u); requestedArmy != nullptr) {
         armyIndex = std::atoi(requestedArmy->c_str());
       }
     }
 
-    msvc8::string mode = "all";
+    fa::string mode = "all";
     if (args.size() > 2u) {
-      if (const msvc8::string* const requestedMode = ConCommandArg(args, 2u); requestedMode != nullptr) {
-        mode.assign(*requestedMode, 0, msvc8::string::npos);
+      if (const fa::string* const requestedMode = ConCommandArg(args, 2u); requestedMode != nullptr) {
+        mode.assign(*requestedMode, 0, fa::string::npos);
       }
     }
 

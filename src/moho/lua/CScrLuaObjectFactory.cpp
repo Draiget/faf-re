@@ -1,5 +1,6 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -8,6 +9,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <typeinfo>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -19,24 +21,23 @@
 #include "lua/LuaTableIterator.h"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/FileWaitHandleSet.h"
+#include "moho/lua/ScriptChunkCache.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/sim/CVFSImpl.h"
+
+// The Lua core's own table and string primitives (defined in lua/LuaObject.cpp), for SCR_Copy's
+// table walk.
+extern "C"
+{
+  Table* luaH_new(lua_State* L, int narray, int lnhash);
+  TString* luaS_newlstr(lua_State* L, const char* str, size_t len);
+  int luaO_log2(unsigned int x);
+  void luaV_settable(lua_State* L, const LuaPlus::TObject* t, LuaPlus::TObject* key, LuaPlus::TObject* val);
+}
 
 namespace
 {
   constexpr const char* kFactoryObjectsGlobalName = "__factory_objects";
-  /**
-   * Engine addition: `lua_BlueprintFieldContext`. The log context of each field a blueprint sets; a
-   * warning from a blueprint names its field and type without it. Only the log differs.
-   */
-  bool lua_BlueprintFieldContext = false;
-  moho::TConVar<bool> gTConVar_lua_BlueprintFieldContext(
-    "lua_BlueprintFieldContext",
-    "Keep a log context for each blueprint field while blueprints load (1), or none (0, the default): about half a "
-    "million formatted strings and global locks per session, for log lines that rarely happen.",
-    &lua_BlueprintFieldContext
-  );
-
   bool lua_SessionSharedBlueprints = true;
   moho::TConVar<bool> gTConVar_lua_SessionSharedBlueprints(
     "lua_SessionSharedBlueprints",
@@ -53,7 +54,7 @@ namespace
   constexpr const char* kDefaultHookDirPath = "/hook";
   constexpr const char kConcatSyntheticNewline[] = "\n";
   std::int32_t gRecoveredCScrLuaMetatableFactoryCScriptObjectIndex = 0;
-  msvc8::vector<msvc8::string> gScriptHookDirectories{};
+  fa::vector<fa::string> gScriptHookDirectories{};
 
   struct LuaFileLoaderDat final
   {
@@ -65,7 +66,7 @@ namespace
   struct LuaConcatLoadData final
   {
     gpg::MemBuffer<const char> currentChunk{};
-    const msvc8::vector<msvc8::string>* files{nullptr};
+    const fa::vector<fa::string>* files{nullptr};
     std::uint32_t nextFileIndex{0};
     bool pendingTrailingNewline{false};
   };
@@ -108,6 +109,115 @@ namespace
     }
     lua_settop(lstate, savedTop);
     return convertible;
+  }
+
+  bool sim_BlueprintFieldShortcuts = true;
+  moho::TConVar<bool> gTConVar_sim_BlueprintFieldShortcuts(
+    "sim_BlueprintFieldShortcuts",
+    "Blueprint fields: a number goes straight into a float field, and a plain value is set without the field's "
+    "log context (1, the default), or every value goes through its text with the context built first (0). Same "
+    "values and warnings either way.",
+    &sim_BlueprintFieldShortcuts
+  );
+
+  bool sim_BlueprintCopyDirect = true;
+  moho::TConVar<bool> gTConVar_sim_BlueprintCopyDirect(
+    "sim_BlueprintCopyDirect",
+    "Copy the rules' blueprint tables into a session or sim Lua state by walking them directly (1, the default), or "
+    "through a LuaObject per key and value (0). Same tables, laid out alike, either way.",
+    &sim_BlueprintCopyDirect
+  );
+
+  /**
+   * Engine addition: a Lua number stored into a `float` without its text. The text path prints the
+   * number with tostring's "%.14g" and reads it back with `atof` before narrowing to float; both
+   * CRT calls round correctly and 14 digits are far finer than a float's spacing, so it returns
+   * the same float for every value but a NaN, which keeps the text path.
+   */
+  [[nodiscard]] bool TrySetFloatDirectly(const LuaPlus::LuaObject& value, const gpg::RRef& destination)
+  {
+    static const gpg::RType* const floatType = gpg::LookupRType(typeid(float));
+    if (!sim_BlueprintFieldShortcuts || value.m_object.tt != LUA_TNUMBER || destination.mType != floatType || std::isnan(value.m_object.value.n)) {
+      return false;
+    }
+    *static_cast<float*>(destination.mObj) = value.m_object.value.n;
+    return true;
+  }
+
+  /**
+   * Engine addition: SCR_LuaBuildObject's conversion of a plain value - a string or number through
+   * `SetLexical`, a boolean as "1" or "0" - without its warnings. Neither path logs or writes
+   * anything but the destination, so a failed value can be converted again in full.
+   */
+  [[nodiscard]] bool TrySetPlainValue(const LuaPlus::LuaObject& value, const gpg::RRef& destination)
+  {
+    if (TrySetFloatDirectly(value, destination)) {
+      return true;
+    }
+    std::string lexicalValue;
+    if (LuaObjectTryToString(value, lexicalValue)) {
+      return destination.mType->SetLexical(destination, lexicalValue.c_str());
+    }
+    if (value.IsBoolean()) {
+      return destination.mType->SetLexical(destination, value.GetBoolean() ? "1" : "0");
+    }
+    return false;
+  }
+
+  bool sim_BlueprintTableShortcuts = true;
+  moho::TConVar<bool> gTConVar_sim_BlueprintTableShortcuts(
+    "sim_BlueprintTableShortcuts",
+    "Blueprint fields: a table is first built without the field's log context and set again inside it only if "
+    "something in it cannot be set (1, the default), or always built inside the context (0). Same values and "
+    "warnings either way.",
+    &sim_BlueprintTableShortcuts
+  );
+
+  /**
+   * Engine addition: SCR_LuaBuildObject for a field's table without the log context it formats for
+   * every table field, and without its warnings: it stops at the first value it cannot set and
+   * returns false, and the caller builds the field again in full, inside the context. Every write is
+   * an assignment from the table (array sizes included), so building it again gives the same object
+   * and the same warnings. Enum flag tables keep the full path.
+   */
+  [[nodiscard]] bool TryBuildQuietly(LuaPlus::LuaObject value, const gpg::RRef& destination)
+  {
+    if (!value.IsTable()) {
+      return TrySetPlainValue(value, destination);
+    }
+    if (destination.mType->IsEnumType()) {
+      return false;
+    }
+
+    if (const gpg::RIndexed* const indexedType = destination.mType->IsIndexed()) {
+      const int count = value.GetN();
+      if (static_cast<int>(indexedType->GetCount(destination.mObj)) != count) {
+        indexedType->SetCount(destination.mObj, count);
+      }
+      for (int index = 0; index < count; ++index) {
+        if (!TryBuildQuietly(value[index + 1], indexedType->SubscriptIndex(destination.mObj, index))) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // As SCR_LuaBuildObject with ignoreMissingFields, which every nested table is built with.
+    LuaPlus::LuaTableIterator iter(&value, 1);
+    while (!iter.m_isDone) {
+      std::string keyName;
+      if (!LuaObjectTryToString(LuaPlus::LuaObject(iter.GetKey()), keyName)) {
+        return false;
+      }
+      if (const gpg::RField* const field = destination.mType->GetFieldNamed(keyName.c_str())) {
+        const gpg::RRef fieldDestination{static_cast<std::uint8_t*>(destination.mObj) + field->mOffset, field->mType};
+        if (!TryBuildQuietly(LuaPlus::LuaObject(iter.GetValue()), fieldDestination)) {
+          return false;
+        }
+      }
+      iter.Next();
+    }
+    return true;
   }
 
   /**
@@ -227,7 +337,7 @@ namespace
     return nilObject;
   }
 
-  [[nodiscard]] bool ResolveMountedScriptPath(const char* const sourcePath, msvc8::string& outPath)
+  [[nodiscard]] bool ResolveMountedScriptPath(const char* const sourcePath, fa::string& outPath)
   {
     moho::FILE_EnsureWaitHandleSet();
     moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
@@ -309,11 +419,11 @@ namespace
     }
     auto listing = sListings.find(listingKey);
     if (listing == sListings.end()) {
-      msvc8::vector<msvc8::string> files;
+      fa::vector<fa::string> files;
       waitHandleSet->mHandle->EnumerateFiles(root.c_str(), pattern.c_str(), true, &files);
       std::unordered_set<std::string> names;
       names.reserve(files.size());
-      for (const msvc8::string& file : files) {
+      for (const fa::string& file : files) {
         names.emplace(file.c_str());
       }
       listing = sListings.emplace(listingKey, std::move(names)).first;
@@ -322,16 +432,16 @@ namespace
   }
 
   void TryAppendHookScriptPath(
-    msvc8::vector<msvc8::string>& outFiles,
+    fa::vector<fa::string>& outFiles,
     const char* const scriptPath,
-    const msvc8::string& candidatePath,
+    const fa::string& candidatePath,
     const bool mightExist
   )
   {
     if (!mightExist && !HookProbeVerify()) {
       return;
     }
-    msvc8::string resolvedPath{};
+    fa::string resolvedPath{};
     if (!ResolveMountedScriptPath(candidatePath.c_str(), resolvedPath) || resolvedPath.empty()) {
       return;
     }
@@ -343,13 +453,13 @@ namespace
     outFiles.push_back(resolvedPath);
   }
 
-  [[nodiscard]] msvc8::string BuildHookCandidatePath(
+  [[nodiscard]] fa::string BuildHookCandidatePath(
     const char* const rootPath,
     const char* const hookPath,
     const char* const scriptPath
   )
   {
-    msvc8::string candidate(rootPath != nullptr ? rootPath : "");
+    fa::string candidate(rootPath != nullptr ? rootPath : "");
     candidate.append(hookPath != nullptr ? hookPath : "");
     candidate.append(scriptPath != nullptr ? scriptPath : "");
     return candidate;
@@ -358,7 +468,7 @@ namespace
   void CollectActiveModHookScripts(
     LuaPlus::LuaState* const state,
     const char* const scriptPath,
-    msvc8::vector<msvc8::string>& outFiles
+    fa::vector<fa::string>& outFiles
   )
   {
     const LuaPlus::LuaObject activeMods = state->GetGlobal(kActiveModsGlobalName);
@@ -388,7 +498,7 @@ namespace
         hookDir = kDefaultHookDirPath;
       }
 
-      const msvc8::string candidatePath = BuildHookCandidatePath(modLocation, hookDir, scriptPath);
+      const fa::string candidatePath = BuildHookCandidatePath(modLocation, hookDir, scriptPath);
       TryAppendHookScriptPath(outFiles, scriptPath, candidatePath, HookFileMightExist(modLocation, hookDir, scriptPath));
     }
   }
@@ -437,12 +547,12 @@ namespace
     }
 
     while (true) {
-      const msvc8::vector<msvc8::string>* const files = data->files;
+      const fa::vector<fa::string>* const files = data->files;
       if (files == nullptr || data->nextFileIndex >= files->size()) {
         return nullptr;
       }
 
-      const msvc8::string& filePath = (*files)[data->nextFileIndex];
+      const fa::string& filePath = (*files)[data->nextFileIndex];
       ++data->nextFileIndex;
 
       data->currentChunk = moho::DISK_MemoryMapFile(filePath.c_str());
@@ -576,6 +686,17 @@ namespace moho
   }
 
   /**
+   * Engine addition: see the header.
+   */
+  void SCR_ExpectExactArgs(LuaPlus::LuaState* const state, const int expectedArgs, const char* const helpText)
+  {
+    const int argumentCount = lua_gettop(state->m_state);
+    if (argumentCount != expectedArgs) {
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", helpText, expectedArgs, argumentCount);
+    }
+  }
+
+  /**
    * Address: 0x004D2380 (FUN_004D2380, ?SCR_ExpectArgs@Moho@@YAXPAVLuaState@LuaPlus@@HHPBD@Z)
    *
    * What it does:
@@ -632,7 +753,7 @@ namespace moho
       lua_pushstring(lstate, modulePath);
       lua_call(lstate, 1, 1);
       return LuaPlus::LuaObject(state, -1);
-    } catch (const msvc8::runtime_error& error) {
+    } catch (const fa::runtime_error& error) {
       gpg::Warnf("Error importing %s:\n%s", modulePath, error.what());
       return LuaPlus::LuaObject(state);
     }
@@ -729,11 +850,11 @@ namespace moho
    * Returns one Lua-quoted string literal with escaping for matching quote
    * char, backslash, tab/newline, and non-printable bytes.
    */
-  msvc8::string SCR_QuoteLuaString(const gpg::StrArg text)
+  fa::string SCR_QuoteLuaString(const gpg::StrArg text)
   {
     const char* const source = text != nullptr ? text : "";
 
-    msvc8::string quoted{};
+    fa::string quoted{};
     const char quoteChar = std::strchr(source, '\'') != nullptr ? '"' : '\'';
     quoted.push_back(quoteChar);
 
@@ -771,7 +892,7 @@ namespace moho
   /**
    * Address: 0x004D2F70 (FUN_004D2F70)
    */
-  msvc8::string SCR_ToString(const LuaPlus::LuaObject& object)
+  fa::string SCR_ToString(const LuaPlus::LuaObject& object)
   {
     gpg::MemBufferStream stream(256u);
     LuaPlus::LuaObject copy = object;
@@ -782,7 +903,7 @@ namespace moho
       return {};
     }
 
-    return msvc8::string(stream.mWriteStart, serializedSize);
+    return fa::string(stream.mWriteStart, serializedSize);
   }
 
   /**
@@ -827,6 +948,82 @@ namespace moho
    * cloning userdata with reflected move handlers when crossing root-state
    * boundaries.
    */
+  namespace
+  {
+    /**
+     * Engine addition: SCR_Copy's table case without a LuaObject per key and value. The entries
+     * are visited in LuaTableIterator's order - the array part, then the hash nodes - and created
+     * and inserted through the same luaH_new / luaS_newlstr / luaV_settable calls in the same
+     * sequence, so every copied table is laid out, and iterates, exactly as before. A nested table
+     * is inserted before it is filled, so it is reachable from the anchored root should a userdata
+     * copy run the collector; anything but a boolean, number, string or table goes through SCR_Copy.
+     */
+    void CopyTableEntries(
+      lua_State* const L, const Table* const source, const LuaPlus::TObject& target,
+      LuaPlus::LuaState* const sourceState, LuaPlus::LuaState* const targetState
+    )
+    {
+      // `holder` keeps a value copied through SCR_Copy alive until it is in the table.
+      const auto copy = [&](const LuaPlus::TObject& value, LuaPlus::LuaObject& holder) {
+        LuaPlus::TObject out = value; // a boolean or number is the same value in either universe
+        if (value.tt == LUA_TSTRING) {
+          const char* const text = static_cast<const TString*>(value.value.p)->str;
+          TString* const interned = luaS_newlstr(L, text, std::strlen(text));
+          out.tt = interned->tt;
+          out.value.p = interned;
+        } else if (value.tt != LUA_TBOOLEAN && value.tt != LUA_TNUMBER) {
+          LuaPlus::LuaObject original{};
+          original.AssignTObject(sourceState, const_cast<LuaPlus::TObject*>(&value));
+          holder = SCR_Copy(original, targetState);
+          out = holder.m_object;
+        }
+        return out;
+      };
+      const auto copyEntry = [&](const LuaPlus::TObject& key, const LuaPlus::TObject& value) {
+        LuaPlus::LuaObject keyHolder{};
+        LuaPlus::TObject keyCopy = copy(key, keyHolder);
+        if (value.tt == LUA_TTABLE) {
+          // lua_SessionSharedBlueprints: inside an SCR_CopySharedTablesScope a table reached twice is
+          // copied once, as SCR_Copy's own table case does (keyed, as there, by lua_topointer's answer).
+          const void* const sharedKey = static_cast<const void*>(value.value.p);
+          if (tCopiedTables != nullptr) {
+            if (const auto found = tCopiedTables->find(sharedKey); found != tCopiedTables->end()) {
+              LuaPlus::TObject shared = found->second.m_object;
+              luaV_settable(L, &target, &keyCopy, &shared);
+              return;
+            }
+          }
+          Table* const childTable = luaH_new(L, 0, luaO_log2(0u) + 1);
+          LuaPlus::TObject child{};
+          child.tt = childTable->tt;
+          child.value.p = childTable;
+          luaV_settable(L, &target, &keyCopy, &child);
+          if (tCopiedTables != nullptr) {
+            LuaPlus::LuaObject held{};
+            held.AssignTObject(targetState, &child);
+            tCopiedTables->emplace(sharedKey, held);
+          }
+          CopyTableEntries(L, static_cast<const Table*>(value.value.p), child, sourceState, targetState);
+          return;
+        }
+        LuaPlus::LuaObject valueHolder{};
+        LuaPlus::TObject valueCopy = copy(value, valueHolder);
+        luaV_settable(L, &target, &keyCopy, &valueCopy);
+      };
+
+      for (int index = 0; index < source->sizearray; ++index) {
+        if (source->array[index].tt != LUA_TNIL) {
+          copyEntry(LuaPlus::TObject(index + 1), source->array[index]);
+        }
+      }
+      for (int index = 0; index < (1 << source->lsizenode); ++index) {
+        if (source->node[index].i_val.tt != LUA_TNIL) {
+          copyEntry(source->node[index].Key(), source->node[index].i_val);
+        }
+      }
+    }
+  } // namespace
+
   SCR_CopySharedTablesScope::SCR_CopySharedTablesScope()
   {
     if (lua_SessionSharedBlueprints && tCopiedTables == nullptr) {
@@ -888,6 +1085,15 @@ namespace moho
         out.AssignNewTable(state, 0, 0);
         if (sharedKey != nullptr) {
           tCopiedTables->emplace(sharedKey, out);
+        }
+        // Engine addition (sim_BlueprintCopyDirect): across universes - the rules' blueprints into a
+        // session or sim state - the entries are copied directly (CopyTableEntries), which builds
+        // the same tables.
+        if (sim_BlueprintCopyDirect && source.m_state != state->m_rootState) {
+          CopyTableEntries(
+            out.GetActiveCState(), static_cast<const Table*>(source.m_object.value.p), out.m_object, source.m_state, state
+          );
+          return out;
         }
         LuaPlus::LuaObject mutableSource(source);
         for (LuaPlus::LuaTableIterator iter(mutableSource, 1); !iter.m_isDone; iter.Next()) {
@@ -1029,7 +1235,7 @@ namespace moho
       return;
     }
 
-    const msvc8::string lexicalValue = source.GetLexical();
+    const fa::string lexicalValue = source.GetLexical();
     destination.AssignString(state, lexicalValue.c_str());
   }
 
@@ -1063,15 +1269,15 @@ namespace moho
       return;
     }
 
-    msvc8::string validOptions{};
+    fa::string validOptions{};
     if (const gpg::REnumType* const enumType = ref.mType != nullptr ? ref.mType->IsEnumType() : nullptr; enumType) {
-      const msvc8::vector<gpg::REnumType::ROptionValue>& options = enumType->GetEnumOptions();
+      const fa::vector<gpg::REnumType::ROptionValue>& options = enumType->GetEnumOptions();
       for (const gpg::REnumType::ROptionValue* it = options.begin(); it != options.end(); ++it) {
         validOptions.append(gpg::STR_Printf("   %s\n", it->mName != nullptr ? it->mName : "").view());
       }
     }
 
-    const msvc8::string errorMessage =
+    const fa::string errorMessage =
       gpg::STR_Printf("Invalid enum value %s\nValid Options are:\n%s", lexicalValue, validOptions.c_str());
     LuaPlus::LuaState::Error(state, "%s", errorMessage.c_str());
   }
@@ -1149,7 +1355,7 @@ namespace moho
     loaderData.buf = mappedFile;
     loaderData.done = false;
 
-    const msvc8::string chunkName = gpg::STR_Printf("@%s", filename);
+    const fa::string chunkName = gpg::STR_Printf("@%s", filename);
     const int loadStatus = lua_load(
       rawState,
       reinterpret_cast<lua_Chunkreader>(func_LuaFileLoader),
@@ -1242,7 +1448,7 @@ namespace moho
   void SCR_LuaDoFileConcat(
     LuaPlus::LuaState* const state,
     LuaPlus::LuaObject* const outEnvironment,
-    msvc8::vector<msvc8::string> files
+    fa::vector<fa::string> files
   )
   {
     if (files.empty()) {
@@ -1255,13 +1461,25 @@ namespace moho
     loadData.nextFileIndex = 0;
     loadData.pendingTrailingNewline = false;
 
-    const msvc8::string chunkName = gpg::STR_Printf("@%s", files.front().c_str());
-    const int loadStatus = lua_load(
-      state->m_state,
-      reinterpret_cast<lua_Chunkreader>(func_LoadConcat),
-      &loadData,
-      chunkName.c_str()
-    );
+    const fa::string chunkName = gpg::STR_Printf("@%s", files.front().c_str());
+    int loadStatus = 0;
+    if (SCR_ScriptChunkCacheActive()) {
+      // Engine addition (res_ScriptChunkCache): the text lua_load would stream, then its function
+      // from the script cache when that holds the same text.
+      std::string source;
+      std::size_t blockSize = 0;
+      while (const char* const block = ReadLoadConcatChunk(&loadData, &blockSize)) {
+        source.append(block, blockSize);
+      }
+      loadStatus = SCR_LoadScriptChunk(state->m_state, source, chunkName.c_str());
+    } else {
+      loadStatus = lua_load(
+        state->m_state,
+        reinterpret_cast<lua_Chunkreader>(func_LoadConcat),
+        &loadData,
+        chunkName.c_str()
+      );
+    }
     if (loadStatus != 0) {
       LuaPlus::LuaStackObject errorObject{};
       errorObject.m_state = state;
@@ -1309,17 +1527,17 @@ namespace moho
       return;
     }
 
-    msvc8::string resolvedPath{};
+    fa::string resolvedPath{};
     if (!ResolveMountedScriptPath(scriptPath, resolvedPath) || resolvedPath.empty()) {
-      const msvc8::string errorText = gpg::STR_Printf("Unable to find file %s", scriptPath);
+      const fa::string errorText = gpg::STR_Printf("Unable to find file %s", scriptPath);
       LuaPlus::LuaState::Error(state, "%s", errorText.c_str());
     }
 
-    msvc8::vector<msvc8::string> files{};
+    fa::vector<fa::string> files{};
     files.push_back(resolvedPath);
 
-    for (const msvc8::string& hookDirectory : gScriptHookDirectories) {
-      const msvc8::string candidatePath = BuildHookCandidatePath(hookDirectory.c_str(), "", scriptPath);
+    for (const fa::string& hookDirectory : gScriptHookDirectories) {
+      const fa::string candidatePath = BuildHookCandidatePath(hookDirectory.c_str(), "", scriptPath);
       TryAppendHookScriptPath(files, scriptPath, candidatePath, HookFileMightExist(hookDirectory.c_str(), "", scriptPath));
     }
 
@@ -1335,7 +1553,7 @@ namespace moho
    */
   void SCR_AddHookDirectory(const char* const hookDirectory)
   {
-    gScriptHookDirectories.push_back(msvc8::string(hookDirectory != nullptr ? hookDirectory : ""));
+    gScriptHookDirectories.push_back(fa::string(hookDirectory != nullptr ? hookDirectory : ""));
   }
 
   /**
@@ -1349,6 +1567,9 @@ namespace moho
     LuaPlus::LuaObject valueObject, const gpg::RRef& destination, const bool ignoreMissingFields
   )
   {
+    if (TrySetFloatDirectly(valueObject, destination)) {
+      return true;
+    }
     std::string lexicalValue;
     if (LuaObjectTryToString(valueObject, lexicalValue)) {
       if (destination.mType->SetLexical(destination, lexicalValue.c_str())) {
@@ -1430,27 +1651,31 @@ namespace moho
       } else {
         const gpg::RField* const field = destination.mType->GetFieldNamed(keyName.c_str());
         if (field) {
-          // Engine addition: `lua_BlueprintFieldContext`, up to half a million of these per session.
-          msvc8::string fieldContext;
-          std::optional<gpg::ScopedLogContext> scope;
-          if (lua_BlueprintFieldContext) {
-            fieldContext = gpg::STR_Printf(
-              "Initializing field %s of %s at %p",
-              keyName.c_str(),
-              destination.GetName(),
-              destination.mObj
-            );
-            scope.emplace(fieldContext);
-          }
-
           gpg::RRef fieldDestination{
             static_cast<std::uint8_t*>(destination.mObj) + field->mOffset,
             field->mType,
           };
 
           LuaPlus::LuaObject fieldValue(iter.GetValue());
-          if (!SCR_LuaBuildObject(fieldValue, fieldDestination, true)) {
-            recovered = false;
+          // Engine addition: a plain value (sim_BlueprintFieldShortcuts) or a table
+          // (sim_BlueprintTableShortcuts) is set without the field's log context, whose formatted
+          // text cost a third of blueprint loading; one that fails is set again inside the
+          // context, so its warnings read as before.
+          const bool quietlySet = fieldValue.IsTable()
+            ? sim_BlueprintTableShortcuts && TryBuildQuietly(fieldValue, fieldDestination)
+            : sim_BlueprintFieldShortcuts && TrySetPlainValue(fieldValue, fieldDestination);
+          if (!quietlySet) {
+            const fa::string fieldContext = gpg::STR_Printf(
+              "Initializing field %s of %s at %p",
+              keyName.c_str(),
+              destination.GetName(),
+              destination.mObj
+            );
+            gpg::ScopedLogContext scope(fieldContext);
+
+            if (!SCR_LuaBuildObject(fieldValue, fieldDestination, true)) {
+              recovered = false;
+            }
           }
         } else if (!ignoreMissingFields) {
           gpg::Warnf(

@@ -1,4 +1,5 @@
 #include "moho/misc/StartupHelpers.h"
+#include "moho/lua/CScrLuaInitForm.h"
 
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/Set.h"
@@ -72,7 +73,7 @@ namespace
    * defaults; the CRT destroys it at exit through the `atexit` destructor
    * 0x00BE8B40 registers.
    */
-  msvc8::auto_ptr<moho::IUserPrefs> sPreferences;
+  fa::auto_ptr<moho::IUserPrefs> sPreferences;
 
   constexpr const char* kOptionPrefixes[] = {"/", "-", "+", "\\"};
   constexpr const char* kAdapterAliases[] = {"adapter"};
@@ -159,7 +160,7 @@ namespace
    */
   void SerializePreferenceLuaEntry(
     std::ostream& output,
-    const msvc8::string& indent,
+    const fa::string& indent,
     LuaPlus::LuaObject keyObject,
     LuaPlus::LuaObject valueObject
   )
@@ -169,7 +170,7 @@ namespace
       if (gpg::STR_IsIdent(keyText != nullptr ? keyText : "")) {
         output << (keyText != nullptr ? keyText : "");
       } else {
-        const msvc8::string quotedKey = moho::SCR_QuoteLuaString(keyText != nullptr ? keyText : "");
+        const fa::string quotedKey = moho::SCR_QuoteLuaString(keyText != nullptr ? keyText : "");
         output << '[' << quotedKey.c_str() << ']';
       }
       output << " = ";
@@ -188,14 +189,14 @@ namespace
 
       case LUA_TSTRING: {
         const char* const valueText = valueObject.GetString();
-        const msvc8::string quotedValue = moho::SCR_QuoteLuaString(valueText != nullptr ? valueText : "");
+        const fa::string quotedValue = moho::SCR_QuoteLuaString(valueText != nullptr ? valueText : "");
         output << quotedValue.c_str();
         break;
       }
 
       case LUA_TTABLE: {
         output << "{";
-        msvc8::string nestedIndent = indent;
+        fa::string nestedIndent = indent;
         nestedIndent.append("    ");
 
         int entryIndex = 0;
@@ -243,7 +244,7 @@ namespace
   {
     LuaPlus::LuaTableIterator iter(&preferenceTable, 1);
     while (!iter.m_isDone) {
-      msvc8::string indent;
+      fa::string indent;
       LuaPlus::LuaObject valueObject(iter.GetValue());
       LuaPlus::LuaObject keyObject(iter.GetKey());
       SerializePreferenceLuaEntry(output, indent, keyObject, valueObject);
@@ -301,34 +302,6 @@ namespace
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingLuaState(lua_State* const luaContext) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("User"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("User");
-    return sSet;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Core");
-    return sSet;
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UnsafeLuaInitSet()
@@ -397,6 +370,12 @@ namespace
     }
 
     const auto priorityClass = static_cast<DWORD>(static_cast<std::uint32_t>(luaL_checknumber(state, 1)));
+    // Engine change: the replay viewer's hidden process runs the game's init file, which asks for high priority.
+    // It stays below normal, or it competes with the game it works for.
+    if (moho::CFG_GetArgOption("--keyframe-quiet", 0, nullptr)) {
+      lua_pushboolean(state, 1);
+      return 1;
+    }
     const HMODULE kernelModule = ::GetModuleHandleA("kernel32.dll");
     using SetPriorityClassFn = BOOL(WINAPI*)(HANDLE, DWORD);
     auto* const setPriorityClass = kernelModule != nullptr
@@ -468,22 +447,22 @@ namespace
   }
 
 
-  [[nodiscard]] const msvc8::string& SaveGameExtName()
+  [[nodiscard]] const fa::string& SaveGameExtName()
   {
-    static const msvc8::string kSaveGameExt("SaveGame");
+    static const fa::string kSaveGameExt("SaveGame");
     return kSaveGameExt;
   }
 
 
-  [[nodiscard]] const msvc8::string& ReplayExtName()
+  [[nodiscard]] const fa::string& ReplayExtName()
   {
-    static const msvc8::string kReplayExt("Replay");
+    static const fa::string kReplayExt("Replay");
     return kReplayExt;
   }
 
-  [[nodiscard]] const msvc8::string& CampaignSaveExtName()
+  [[nodiscard]] const fa::string& CampaignSaveExtName()
   {
-    static const msvc8::string kCampaignSaveExt("CampaignSave");
+    static const fa::string kCampaignSaveExt("CampaignSave");
     return kCampaignSaveExt;
   }
 
@@ -505,7 +484,7 @@ namespace
     return canonicalPath;
   }
 
-  void SetIdentityString(msvc8::string& out, const char* const value)
+  void SetIdentityString(fa::string& out, const char* const value)
   {
     out.assign_owned(value != nullptr ? value : "");
   }
@@ -516,7 +495,7 @@ namespace
   }
 
   [[nodiscard]] bool TryGetAliasedArgOption(
-    const std::string& option, const std::uint32_t requiredArgCount, msvc8::vector<msvc8::string>* const outArgs
+    const std::string& option, const std::uint32_t requiredArgCount, fa::vector<fa::string>* const outArgs
   )
   {
     if (option.empty()) {
@@ -529,7 +508,7 @@ namespace
   {
     std::uintptr_t callstack[32]{};
     const std::uint32_t frameCount = moho::PLAT_GetCallStack(nullptr, 32u, callstack);
-    const msvc8::string errorText = gpg::STR_Printf(
+    const fa::string errorText = gpg::STR_Printf(
       "%s: %s", functionName != nullptr ? functionName : "Moho::File", message != nullptr ? message : "File error."
     );
     throw moho::XFileError(errorText.to_std(), callstack, frameCount);
@@ -537,8 +516,8 @@ namespace
 
   [[noreturn]] void ThrowFileDirCrtError(const char* const crtFunctionName)
   {
-    const msvc8::string errnoDescription = moho::FILE_GetErrorFromErrno(errno);
-    const msvc8::string detail =
+    const fa::string errnoDescription = moho::FILE_GetErrorFromErrno(errno);
+    const fa::string detail =
       gpg::STR_Printf("%s error: %s", crtFunctionName != nullptr ? crtFunctionName : "_getcwd", errnoDescription.c_str());
     ThrowStartupFileError("Moho::FILE_Dir", detail.c_str());
   }
@@ -636,9 +615,9 @@ namespace
    * exactly those two keys at 0x0045A211 and 0x0045A1FE and builds one
    * SVFSMountPoint per entry, in table order, which is mount order.
    */
-  [[nodiscard]] msvc8::vector<moho::SVFSMountPoint> CollectMountPointsFromLua(LuaPlus::LuaState* const state)
+  [[nodiscard]] fa::vector<moho::SVFSMountPoint> CollectMountPointsFromLua(LuaPlus::LuaState* const state)
   {
-    msvc8::vector<moho::SVFSMountPoint> mountPoints;
+    fa::vector<moho::SVFSMountPoint> mountPoints;
     if (state == nullptr) {
       return mountPoints;
     }
@@ -700,7 +679,7 @@ namespace
    * does this itself rather than through the init file because the init
    * files belong to the FAF client. Nothing happens when the folder is absent.
    */
-  void AppendEngineHookFolder(msvc8::vector<moho::SVFSMountPoint>& mountPoints)
+  void AppendEngineHookFolder(fa::vector<moho::SVFSMountPoint>& mountPoints)
   {
     std::array<wchar_t, MAX_PATH> modulePath{};
     const DWORD length = ::GetModuleFileNameW(nullptr, modulePath.data(), static_cast<DWORD>(modulePath.size()));
@@ -712,7 +691,7 @@ namespace
     if (!std::filesystem::is_directory(folder, error)) {
       return;
     }
-    const msvc8::string folderUtf8 = gpg::STR_WideToUtf8(folder.wstring().c_str());
+    const fa::string folderUtf8 = gpg::STR_WideToUtf8(folder.wstring().c_str());
     mountPoints.push_back(moho::SVFSMountPoint(folderUtf8.c_str(), "/fafengine"));
     moho::SCR_AddHookDirectory("/fafengine");
     gpg::Logf("engine hooks: %s mounted at /fafengine", folderUtf8.c_str());
@@ -725,7 +704,7 @@ namespace
    * Builds one Lua string object using the preferences Lua state.
    */
   [[nodiscard]] LuaPlus::LuaObject BuildPreferenceStringObject(
-    LuaPlus::LuaState* const state, const msvc8::string& value
+    LuaPlus::LuaState* const state, const fa::string& value
   )
   {
     LuaPlus::LuaObject out;
@@ -741,14 +720,14 @@ namespace
    * `StringObject` element per index starting at 1.
    */
   [[nodiscard]] LuaPlus::LuaObject BuildPreferenceStringArrayObject(
-    LuaPlus::LuaState* const state, const msvc8::list<msvc8::string>& values
+    LuaPlus::LuaState* const state, const fa::list<fa::string>& values
   )
   {
     LuaPlus::LuaObject out;
     out.AssignNewTable(state, 0, 0);
 
     int luaIndex = 1;
-    for (msvc8::list<msvc8::string>::const_iterator it = values.begin(); it != values.end(); ++it, ++luaIndex) {
+    for (fa::list<fa::string>::const_iterator it = values.begin(); it != values.end(); ++it, ++luaIndex) {
       LuaPlus::LuaObject itemObject = BuildPreferenceStringObject(state, *it);
       out.Insert(luaIndex, itemObject);
     }
@@ -820,7 +799,7 @@ namespace
   void SetPreferenceBooleanRecursive(
     LuaPlus::LuaState* const state,
     LuaPlus::LuaObject* const rootTable,
-    const msvc8::string& dottedKey,
+    const fa::string& dottedKey,
     const bool value
   )
   {
@@ -828,15 +807,15 @@ namespace
       return;
     }
 
-    msvc8::vector<msvc8::string> tokens;
-    msvc8::string token;
+    fa::vector<fa::string> tokens;
+    fa::string token;
     const char* cursor = dottedKey.c_str();
     while (gpg::STR_GetToken(cursor, ".", token)) {
       tokens.push_back(token);
     }
 
-    const msvc8::string* const begin = tokens.begin();
-    const msvc8::string* const end = tokens.end();
+    const fa::string* const begin = tokens.begin();
+    const fa::string* const end = tokens.end();
     if (begin == nullptr || end == nullptr || begin == end) {
       return;
     }
@@ -844,7 +823,7 @@ namespace
     LuaPlus::LuaObject current(*rootTable);
     int index = 0;
     const int count = static_cast<int>(tokens.size());
-    for (const msvc8::string* it = begin; it != end; ++it, ++index) {
+    for (const fa::string* it = begin; it != end; ++it, ++index) {
       const char* const keyText = it->c_str() != nullptr ? it->c_str() : "";
       LuaPlus::LuaObject lane = current[keyText];
 
@@ -871,7 +850,7 @@ namespace
   void SetPreferenceIntegerRecursive(
     LuaPlus::LuaState* const state,
     LuaPlus::LuaObject* const rootTable,
-    const msvc8::string& dottedKey,
+    const fa::string& dottedKey,
     const std::int32_t value
   )
   {
@@ -879,15 +858,15 @@ namespace
       return;
     }
 
-    msvc8::vector<msvc8::string> tokens;
-    msvc8::string token;
+    fa::vector<fa::string> tokens;
+    fa::string token;
     const char* cursor = dottedKey.c_str();
     while (gpg::STR_GetToken(cursor, ".", token)) {
       tokens.push_back(token);
     }
 
-    const msvc8::string* const begin = tokens.begin();
-    const msvc8::string* const end = tokens.end();
+    const fa::string* const begin = tokens.begin();
+    const fa::string* const end = tokens.end();
     if (begin == nullptr || end == nullptr || begin == end) {
       return;
     }
@@ -895,7 +874,7 @@ namespace
     LuaPlus::LuaObject current(*rootTable);
     int index = 0;
     const int count = static_cast<int>(tokens.size());
-    for (const msvc8::string* it = begin; it != end; ++it, ++index) {
+    for (const fa::string* it = begin; it != end; ++it, ++index) {
       const char* const keyText = it->c_str() != nullptr ? it->c_str() : "";
       LuaPlus::LuaObject lane = current[keyText];
 
@@ -922,7 +901,7 @@ namespace
   void SetPreferenceNumberRecursive(
     LuaPlus::LuaState* const state,
     LuaPlus::LuaObject* const rootTable,
-    const msvc8::string& dottedKey,
+    const fa::string& dottedKey,
     const float value
   )
   {
@@ -930,15 +909,15 @@ namespace
       return;
     }
 
-    msvc8::vector<msvc8::string> tokens;
-    msvc8::string token;
+    fa::vector<fa::string> tokens;
+    fa::string token;
     const char* cursor = dottedKey.c_str();
     while (gpg::STR_GetToken(cursor, ".", token)) {
       tokens.push_back(token);
     }
 
-    const msvc8::string* const begin = tokens.begin();
-    const msvc8::string* const end = tokens.end();
+    const fa::string* const begin = tokens.begin();
+    const fa::string* const end = tokens.end();
     if (begin == nullptr || end == nullptr || begin == end) {
       return;
     }
@@ -946,7 +925,7 @@ namespace
     LuaPlus::LuaObject current(*rootTable);
     int index = 0;
     const int count = static_cast<int>(tokens.size());
-    for (const msvc8::string* it = begin; it != end; ++it, ++index) {
+    for (const fa::string* it = begin; it != end; ++it, ++index) {
       const char* const keyText = it->c_str() != nullptr ? it->c_str() : "";
       LuaPlus::LuaObject lane = current[keyText];
 
@@ -973,23 +952,23 @@ namespace
   void SetPreferenceStringRecursive(
     LuaPlus::LuaState* const state,
     LuaPlus::LuaObject* const rootTable,
-    const msvc8::string& dottedKey,
-    const msvc8::string& value
+    const fa::string& dottedKey,
+    const fa::string& value
   )
   {
     if (state == nullptr || rootTable == nullptr) {
       return;
     }
 
-    msvc8::vector<msvc8::string> tokens;
-    msvc8::string token;
+    fa::vector<fa::string> tokens;
+    fa::string token;
     const char* cursor = dottedKey.c_str();
     while (gpg::STR_GetToken(cursor, ".", token)) {
       tokens.push_back(token);
     }
 
-    const msvc8::string* const begin = tokens.begin();
-    const msvc8::string* const end = tokens.end();
+    const fa::string* const begin = tokens.begin();
+    const fa::string* const end = tokens.end();
     if (begin == nullptr || end == nullptr || begin == end) {
       return;
     }
@@ -997,7 +976,7 @@ namespace
     LuaPlus::LuaObject current(*rootTable);
     int index = 0;
     const int count = static_cast<int>(tokens.size());
-    for (const msvc8::string* it = begin; it != end; ++it, ++index) {
+    for (const fa::string* it = begin; it != end; ++it, ++index) {
       const char* const keyText = it->c_str() != nullptr ? it->c_str() : "";
       LuaPlus::LuaObject lane = current[keyText];
 
@@ -1024,23 +1003,23 @@ namespace
   void SetPreferenceStringArrayRecursive(
     LuaPlus::LuaState* const state,
     LuaPlus::LuaObject* const rootTable,
-    const msvc8::string& dottedKey,
-    const msvc8::list<msvc8::string>& values
+    const fa::string& dottedKey,
+    const fa::list<fa::string>& values
   )
   {
     if (state == nullptr || rootTable == nullptr) {
       return;
     }
 
-    msvc8::vector<msvc8::string> tokens;
-    msvc8::string token;
+    fa::vector<fa::string> tokens;
+    fa::string token;
     const char* cursor = dottedKey.c_str();
     while (gpg::STR_GetToken(cursor, ".", token)) {
       tokens.push_back(token);
     }
 
-    const msvc8::string* const begin = tokens.begin();
-    const msvc8::string* const end = tokens.end();
+    const fa::string* const begin = tokens.begin();
+    const fa::string* const end = tokens.end();
     if (begin == nullptr || end == nullptr || begin == end) {
       return;
     }
@@ -1048,7 +1027,7 @@ namespace
     LuaPlus::LuaObject current(*rootTable);
     int index = 0;
     const int count = static_cast<int>(tokens.size());
-    for (const msvc8::string* it = begin; it != end; ++it, ++index) {
+    for (const fa::string* it = begin; it != end; ++it, ++index) {
       const char* const keyText = it->c_str() != nullptr ? it->c_str() : "";
       LuaPlus::LuaObject lane = current[keyText];
 
@@ -1075,7 +1054,7 @@ namespace
   void SetPreferenceObjectRecursive(
     LuaPlus::LuaState* const state,
     LuaPlus::LuaObject* const rootTable,
-    const msvc8::string& dottedKey,
+    const fa::string& dottedKey,
     const LuaPlus::LuaObject& value
   )
   {
@@ -1083,15 +1062,15 @@ namespace
       return;
     }
 
-    msvc8::vector<msvc8::string> tokens;
-    msvc8::string token;
+    fa::vector<fa::string> tokens;
+    fa::string token;
     const char* cursor = dottedKey.c_str();
     while (gpg::STR_GetToken(cursor, ".", token)) {
       tokens.push_back(token);
     }
 
-    const msvc8::string* const begin = tokens.begin();
-    const msvc8::string* const end = tokens.end();
+    const fa::string* const begin = tokens.begin();
+    const fa::string* const end = tokens.end();
     if (begin == nullptr || end == nullptr || begin == end) {
       return;
     }
@@ -1099,7 +1078,7 @@ namespace
     LuaPlus::LuaObject current(*rootTable);
     int index = 0;
     const int count = static_cast<int>(tokens.size());
-    for (const msvc8::string* it = begin; it != end; ++it, ++index) {
+    for (const fa::string* it = begin; it != end; ++it, ++index) {
       const char* const keyText = it->c_str() != nullptr ? it->c_str() : "";
       LuaPlus::LuaObject lane = current[keyText];
 
@@ -1178,7 +1157,7 @@ namespace moho
      * What it does:
      * Returns the preferences file name.
      */
-    msvc8::string* GetStr1() override;
+    fa::string* GetStr1() override;
 
     /**
      * Address: 0x008C7550 (FUN_008C7550, Moho::CUserPrefs::GetStr2)
@@ -1186,7 +1165,7 @@ namespace moho
      * What it does:
      * Returns the resolved preferences path.
      */
-    msvc8::string* GetStr2() override;
+    fa::string* GetStr2() override;
 
     /**
      * Address: 0x008C7560 (FUN_008C7560, Moho::CUserPrefs::GetBoolean)
@@ -1195,7 +1174,7 @@ namespace moho
      * Looks up one key from the root preferences table and returns fallback when
      * the key is nil; otherwise returns Lua boolean conversion of that value.
      */
-    bool GetBoolean(const msvc8::string& key, const bool fallback) override
+    bool GetBoolean(const fa::string& key, const bool fallback) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const LuaPlus::LuaObject value = LookupKey(key);
@@ -1213,7 +1192,7 @@ namespace moho
      * Looks up one key from the root preferences table and returns fallback when
      * the key is nil; otherwise returns Lua integer conversion of that value.
      */
-    std::int32_t GetInteger(const msvc8::string& key, const std::int32_t fallback) override
+    std::int32_t GetInteger(const fa::string& key, const std::int32_t fallback) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const LuaPlus::LuaObject value = LookupKey(key);
@@ -1231,7 +1210,7 @@ namespace moho
      * Looks up one key from the root preferences table and returns fallback when
      * the key is nil; otherwise returns Lua number conversion of that value.
      */
-    float GetNumber(const msvc8::string& key, const float fallback) override
+    float GetNumber(const fa::string& key, const float fallback) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const LuaPlus::LuaObject value = LookupKey(key);
@@ -1249,7 +1228,7 @@ namespace moho
      * Reads one preference value as Lua string-convertible text and parses it
      * as hexadecimal (optional `0x` prefix), returning fallback on conversion failure.
      */
-    std::uint32_t GetHex(const msvc8::string& key, const std::uint32_t fallback) override
+    std::uint32_t GetHex(const fa::string& key, const std::uint32_t fallback) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const LuaPlus::LuaObject value = LookupKey(key);
@@ -1276,7 +1255,7 @@ namespace moho
      * Reads one preference value from the local root table and returns either
      * the resolved string value or the provided fallback when key lookup is nil.
      */
-    msvc8::string GetString(const msvc8::string& key, const msvc8::string& fallback) override
+    fa::string GetString(const fa::string& key, const fa::string& fallback) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const LuaPlus::LuaObject value = LookupKey(key);
@@ -1284,7 +1263,7 @@ namespace moho
         return fallback;
       }
 
-      msvc8::string outValue;
+      fa::string outValue;
       outValue.assign_owned(value.GetString());
       return outValue;
     }
@@ -1296,11 +1275,11 @@ namespace moho
      * Starts from one fallback string-array copy, then appends each string from
      * the local root table value when the resolved key is a Lua array-table.
      */
-    msvc8::list<msvc8::string>
-    GetStringArr(const msvc8::string& key, const msvc8::list<msvc8::string>& fallback) override
+    fa::list<fa::string>
+    GetStringArr(const fa::string& key, const fa::list<fa::string>& fallback) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
-      msvc8::list<msvc8::string> outValues = fallback;
+      fa::list<fa::string> outValues = fallback;
 
       const LuaPlus::LuaObject value = LookupKey(key);
       if (value.IsNil() || !value.IsTable()) {
@@ -1309,7 +1288,7 @@ namespace moho
 
       const int count = value.GetN();
       for (int index = 1; index <= count; ++index) {
-        msvc8::string itemValue;
+        fa::string itemValue;
         itemValue.assign_owned(value.GetByIndex(index).GetString());
         outValues.push_back(itemValue);
       }
@@ -1325,7 +1304,7 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceBooleanRecursive` (0x008CBFB0) over `mState`/`mRoot`.
      */
-    void SetBoolean(const msvc8::string& key, const bool value) override
+    void SetBoolean(const fa::string& key, const bool value) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceBooleanRecursive(&mState, &mRoot, key, value);
@@ -1339,7 +1318,7 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceIntegerRecursive` (0x008CC210) over `mState`/`mRoot`.
      */
-    void SetInteger(const msvc8::string& key, const std::int32_t value) override
+    void SetInteger(const fa::string& key, const std::int32_t value) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceIntegerRecursive(&mState, &mRoot, key, value);
@@ -1353,7 +1332,7 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceNumberRecursive` (0x008CC470) over `mState`/`mRoot`.
      */
-    void SetNumber(const msvc8::string& key, const float value) override
+    void SetNumber(const fa::string& key, const float value) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceNumberRecursive(&mState, &mRoot, key, value);
@@ -1366,10 +1345,10 @@ namespace moho
      * Formats one unsigned integer as `0x%08x` and writes it through the
      * recursive string preference setter.
      */
-    void SetHex(const msvc8::string& key, const std::uint32_t value) override
+    void SetHex(const fa::string& key, const std::uint32_t value) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
-      const msvc8::string valueText = gpg::STR_Printf("0x%08x", static_cast<unsigned int>(value));
+      const fa::string valueText = gpg::STR_Printf("0x%08x", static_cast<unsigned int>(value));
       SetPreferenceStringRecursive(&mState, &mRoot, key, valueText);
     }
 
@@ -1381,7 +1360,7 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceStringRecursive` (0x008CC6D0) over `mState`/`mRoot`.
      */
-    void SetString(const msvc8::string& key, const msvc8::string& value) override
+    void SetString(const fa::string& key, const fa::string& value) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceStringRecursive(&mState, &mRoot, key, value);
@@ -1395,7 +1374,7 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceStringArrayRecursive` (0x008CC930) over `mState`/`mRoot`.
      */
-    void SetStringArr(const msvc8::string& key, const msvc8::list<msvc8::string>& values) override
+    void SetStringArr(const fa::string& key, const fa::list<fa::string>& values) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceStringArrayRecursive(&mState, &mRoot, key, values);
@@ -1412,7 +1391,7 @@ namespace moho
      * to the preferences state; it is returned as-is (number, string, table)
      * rather than flattened to text.
      */
-    LuaPlus::LuaObject LookupCurrentOption(const msvc8::string& key) override
+    LuaPlus::LuaObject LookupCurrentOption(const fa::string& key) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       LuaPlus::LuaObject currentProfile = mRoot.Lookup("profile.current");
@@ -1443,7 +1422,7 @@ namespace moho
      * What it does:
      * Resolves one root preference table entry by key from `mRoot`.
      */
-    LuaPlus::LuaObject LookupKey(const msvc8::string& key) override
+    LuaPlus::LuaObject LookupKey(const fa::string& key) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       if (mRoot.IsNil()) {
@@ -1476,7 +1455,7 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceObjectRecursive` (0x008CCBA0) over `mState`/`mRoot`.
      */
-    void SetObject(const msvc8::string& key, void* const valueObject) override
+    void SetObject(const fa::string& key, void* const valueObject) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceObjectRecursive(&mState, &mRoot, key, *static_cast<LuaPlus::LuaObject*>(valueObject));
@@ -1506,8 +1485,8 @@ namespace moho
     }
 
   private:
-    msvc8::string mFileName;  // +0x04 `USER_LoadPreferences`' file name
-    msvc8::string mFilePath;  // +0x20 the full UTF-8 path it resolved to
+    fa::string mFileName;  // +0x04 `USER_LoadPreferences`' file name
+    fa::string mFilePath;  // +0x20 the full UTF-8 path it resolved to
     LuaPlus::LuaState mState; // +0x3C
     LuaPlus::LuaObject mRoot; // +0x70
   };
@@ -1528,7 +1507,7 @@ namespace moho
    * What it does:
    * Returns the preferences file name.
    */
-  msvc8::string* CUserPrefs::GetStr1()
+  fa::string* CUserPrefs::GetStr1()
   {
     return &mFileName;
   }
@@ -1539,7 +1518,7 @@ namespace moho
    * What it does:
    * Returns the resolved preferences path.
    */
-  msvc8::string* CUserPrefs::GetStr2()
+  fa::string* CUserPrefs::GetStr2()
   {
     return &mFilePath;
   }
@@ -1656,7 +1635,7 @@ bool moho::CFG_GetArgOptionComposedAliases(
   const CfgAliasSet& leftAliases,
   const CfgAliasSet& rightAliases,
   const std::uint32_t requiredArgCount,
-  msvc8::vector<msvc8::string>* const outArgs
+  fa::vector<fa::string>* const outArgs
 )
 {
   if (!IsValidAliasSet(leftAliases) || !IsValidAliasSet(rightAliases)) {
@@ -1708,7 +1687,7 @@ bool moho::CFG_GetArgOptionComposedAliases(
  * first command-line option that resolves through `CFG_GetArgOption`.
  */
 bool moho::CFG_GetArgOptionAliases(
-  const CfgAliasSet& aliases, const std::uint32_t requiredArgCount, msvc8::vector<msvc8::string>* const outArgs
+  const CfgAliasSet& aliases, const std::uint32_t requiredArgCount, fa::vector<fa::string>* const outArgs
 )
 {
   if (!IsValidAliasSet(aliases)) {
@@ -1825,8 +1804,8 @@ bool moho::CFG_ParseResolutionTriple(const gpg::StrArg value, ResolutionTriple* 
     return false;
   }
 
-  msvc8::string token;
-  msvc8::vector<msvc8::string> tokens;
+  fa::string token;
+  fa::vector<fa::string> tokens;
   while (gpg::STR_GetToken(cursor, ",", token)) {
     tokens.push_back(token);
   }
@@ -1923,19 +1902,19 @@ void moho::APP_InitializeIdentity()
   });
 }
 
-const msvc8::string& moho::APP_GetCompanyName()
+const fa::string& moho::APP_GetCompanyName()
 {
   APP_InitializeIdentity();
   return gAppIdentity.mCompanyName;
 }
 
-const msvc8::string& moho::APP_GetProductName()
+const fa::string& moho::APP_GetProductName()
 {
   APP_InitializeIdentity();
   return gAppIdentity.mProductName;
 }
 
-const msvc8::string& moho::APP_GetPreferencePrefix()
+const fa::string& moho::APP_GetPreferencePrefix()
 {
   APP_InitializeIdentity();
   return gAppIdentity.mPreferencePrefix;
@@ -1987,7 +1966,7 @@ void moho::USER_LuaFrame()
  * its following positional arguments.
  */
 bool moho::CFG_GetArgOption(
-  const gpg::StrArg option, const std::uint32_t requiredArgCount, msvc8::vector<msvc8::string>* const outArgs
+  const gpg::StrArg option, const std::uint32_t requiredArgCount, fa::vector<fa::string>* const outArgs
 )
 {
   if (option == nullptr || option[0] == '\0') {
@@ -2010,7 +1989,7 @@ bool moho::CFG_GetArgOption(
       outArgs->reserve(requiredArgCount);
       for (std::uint32_t argIndex = 0; argIndex < requiredArgCount; ++argIndex) {
         const char* const value = __argv[index + 1 + static_cast<int>(argIndex)];
-        outArgs->push_back(msvc8::string(value != nullptr ? value : ""));
+        outArgs->push_back(fa::string(value != nullptr ? value : ""));
       }
     }
 
@@ -2064,7 +2043,7 @@ bool moho::P4_DoPrompt()
  * Concatenates process command-line arguments (argv[1..]) with single-space
  * separators and trims the trailing separator.
  */
-msvc8::string moho::CFG_GetArgs()
+fa::string moho::CFG_GetArgs()
 {
   std::string joinedArgs;
   for (int index = 1; index < __argc; ++index) {
@@ -2080,7 +2059,7 @@ msvc8::string moho::CFG_GetArgs()
     joinedArgs.pop_back();
   }
 
-  msvc8::string result;
+  fa::string result;
   result.assign_owned(joinedArgs);
   return result;
 }
@@ -2100,10 +2079,7 @@ int moho::cfunc_SHGetFolderPathL(LuaPlus::LuaState* const state)
   }
 
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSHGetFolderPathHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kSHGetFolderPathHelpText);
 
   LuaPlus::LuaStackObject idArg(state, 1);
   const char* keyText = lua_tostring(rawState, 1);
@@ -2124,7 +2100,7 @@ int moho::cfunc_SHGetFolderPathL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kShGetFolderPathFailedErrorText, status);
   }
 
-  msvc8::string utf8Path = gpg::STR_WideToUtf8(gShGetFolderPathBuffer);
+  fa::string utf8Path = gpg::STR_WideToUtf8(gShGetFolderPathBuffer);
   if (utf8Path.empty() || utf8Path[utf8Path.size() - 1u] != '\\') {
     utf8Path.push_back('\\');
   }
@@ -2176,7 +2152,7 @@ moho::CScrLuaInitForm* moho::func_SHGetFolderPath_LuaFuncDef()
 moho::CScrLuaInitFormSet* moho::register_coreInitFormSet()
 {
   CScrLuaInitFormSet* const previousHead = CScrLuaInitFormSet::sSets;
-  CScrLuaInitFormSet& coreSet = CoreLuaInitSet();
+  CScrLuaInitFormSet& coreSet = moho::SCR_CoreLuaInitSet();
   coreSet.mNextSet = previousHead;
   CScrLuaInitFormSet::sSets = &coreSet;
   return previousHead;
@@ -2192,7 +2168,7 @@ moho::CScrLuaInitFormSet* moho::register_coreInitFormSet()
 moho::CScrLuaInitFormSet* moho::register_userInitFormSet()
 {
   CScrLuaInitFormSet* const previousHead = CScrLuaInitFormSet::sSets;
-  CScrLuaInitFormSet& userSet = UserLuaInitSet();
+  CScrLuaInitFormSet& userSet = moho::SCR_UserLuaInitSet();
   userSet.mNextSet = previousHead;
   CScrLuaInitFormSet::sSets = &userSet;
   return previousHead;
@@ -2283,7 +2259,7 @@ int moho::cfunc_GetMovieDuration(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetMovieDuration_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "GetMovieDuration",
     &moho::cfunc_GetMovieDuration,
     nullptr,
@@ -2303,12 +2279,7 @@ moho::CScrLuaInitForm* moho::func_GetMovieDuration_LuaFuncDef()
 int moho::cfunc_GetMovieDurationL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(
-      state, "%s\n  expected %d args, but got %d", kGetMovieDurationHelpText, 1, argumentCount
-    );
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kGetMovieDurationHelpText);
 
   LuaPlus::LuaStackObject moviePathArg(state, 1);
   const char* moviePath = lua_tostring(rawState, 1);
@@ -2330,8 +2301,8 @@ namespace
 
   struct PathComponentCursor
   {
-    msvc8::string mToken;                 // +0x00
-    const msvc8::string* mPath = nullptr; // +0x1C
+    fa::string mToken;                 // +0x00
+    const fa::string* mPath = nullptr; // +0x1C
     std::uint32_t mOffset = 0;            // +0x20
   };
 
@@ -2345,7 +2316,7 @@ namespace
     return ch == '/' || ch == '\\';
   }
 
-  [[nodiscard]] std::uint32_t ClampPathIndex(const msvc8::string& path, std::uint32_t index) noexcept
+  [[nodiscard]] std::uint32_t ClampPathIndex(const fa::string& path, std::uint32_t index) noexcept
   {
     const std::uint32_t size = static_cast<std::uint32_t>(path.size());
     return index > size ? size : index;
@@ -2357,7 +2328,7 @@ namespace
    * What it does:
    * Appends one trailing `/` separator unless path already ends in `:` or `/`.
    */
-  void func_StringFilenameAppendSlash(msvc8::string* const path)
+  void func_StringFilenameAppendSlash(fa::string* const path)
   {
     if (path == nullptr || path->empty()) {
       return;
@@ -2375,7 +2346,7 @@ namespace
    * What it does:
    * Appends one filename segment, normalizing `\\` separators into `/`.
    */
-  msvc8::string* func_StringAppendFilename(const char* source, msvc8::string* const path)
+  fa::string* func_StringAppendFilename(const char* source, fa::string* const path)
   {
     if (path == nullptr) {
       return nullptr;
@@ -2425,11 +2396,11 @@ namespace
    * Address: 0x008CD160 (FUN_008CD160, func_StringCopyInitFilename)
    *
    * What it does:
-   * Initializes one raw `msvc8::string` lane to empty SSO state, then appends
+   * Initializes one raw `fa::string` lane to empty SSO state, then appends
    * one filename segment using startup filename normalization rules.
    */
-  [[maybe_unused]] msvc8::string*
-  InitializeFilenameBufferWithSegment(msvc8::string* const outPath, const char* const filenameSegment)
+  [[maybe_unused]] fa::string*
+  InitializeFilenameBufferWithSegment(fa::string* const outPath, const char* const filenameSegment)
   {
     if (outPath == nullptr) {
       return nullptr;
@@ -2448,9 +2419,9 @@ namespace
    * Builds one joined path by copying `directoryPath`, appending one filename
    * segment with startup normalization rules, and assigning into `outPath`.
    */
-  [[maybe_unused]] msvc8::string* ComposeDirectoryAndFilenameSegment(
-    msvc8::string* const outPath,
-    const msvc8::string& directoryPath,
+  [[maybe_unused]] fa::string* ComposeDirectoryAndFilenameSegment(
+    fa::string* const outPath,
+    const fa::string& directoryPath,
     const char* const filenameSegment
   )
   {
@@ -2458,10 +2429,10 @@ namespace
       return nullptr;
     }
 
-    msvc8::string normalizedFilename{};
+    fa::string normalizedFilename{};
     (void)InitializeFilenameBufferWithSegment(&normalizedFilename, filenameSegment);
 
-    msvc8::string joinedPath{};
+    fa::string joinedPath{};
     joinedPath.assign_owned(directoryPath.view());
     (void)func_StringAppendFilename(normalizedFilename.c_str(), &joinedPath);
 
@@ -2479,7 +2450,7 @@ namespace
    * Returns root-boundary index for one path prefix window, or `-1` when
    * no root boundary exists.
    */
-  [[nodiscard]] std::uint32_t PathRootBoundaryIndex(const msvc8::string& path, const std::uint32_t upto)
+  [[nodiscard]] std::uint32_t PathRootBoundaryIndex(const fa::string& path, const std::uint32_t upto)
   {
     const std::uint32_t clamped = ClampPathIndex(path, upto);
     const std::size_t size = path.size();
@@ -2504,7 +2475,7 @@ namespace
     if (clamped > 3u && size > 2u) {
       if (path[0] == '/' && path[1] == '/' && path[2] == '/') {
         const std::size_t serverSplit = path.find('/', 2u);
-        if (serverSplit == msvc8::string::npos || serverSplit >= clamped) {
+        if (serverSplit == fa::string::npos || serverSplit >= clamped) {
           return kInvalidPathBoundary;
         }
         return static_cast<std::uint32_t>(serverSplit);
@@ -2527,7 +2498,7 @@ namespace
    */
   [[nodiscard]]
   std::uint32_t func_StringSearchFromEnd(
-    const std::uint32_t max, const msvc8::string& path, const char* const search, const std::uint32_t searchLen
+    const std::uint32_t max, const fa::string& path, const char* const search, const std::uint32_t searchLen
   )
   {
     const std::uint32_t size = static_cast<std::uint32_t>(path.size());
@@ -2568,7 +2539,7 @@ namespace
    * What it does:
    * Returns start index of the final filename segment in one path.
    */
-  [[nodiscard]] std::uint32_t func_PathFilenamePos(const msvc8::string& path, const std::uint32_t upto)
+  [[nodiscard]] std::uint32_t func_PathFilenamePos(const fa::string& path, const std::uint32_t upto)
   {
     const std::uint32_t clamped = ClampPathIndex(path, upto);
     if (clamped == 2u && path.size() > 1u && path[0] == '/' && path[1] == '/') {
@@ -2618,11 +2589,11 @@ namespace
    * Returns one-character root token at current root boundary, or empty
    * token when boundary is absent.
    */
-  [[nodiscard]] msvc8::string PathRootBoundaryToken(const msvc8::string& path)
+  [[nodiscard]] fa::string PathRootBoundaryToken(const fa::string& path)
   {
     const std::uint32_t rootBoundary = PathRootBoundaryIndex(path, static_cast<std::uint32_t>(path.size()));
     if (rootBoundary == kInvalidPathBoundary || rootBoundary >= path.size()) {
-      return msvc8::string{};
+      return fa::string{};
     }
     return path.substr(rootBoundary, 1u);
   }
@@ -2633,7 +2604,7 @@ namespace
    * What it does:
    * Returns true when a path has one root-boundary token.
    */
-  [[nodiscard]] bool PathHasRootBoundaryToken(const msvc8::string& path)
+  [[nodiscard]] bool PathHasRootBoundaryToken(const fa::string& path)
   {
     return !PathRootBoundaryToken(path).empty();
   }
@@ -2644,8 +2615,7 @@ namespace
    * What it does:
    * Parses one leading root token span and reports token start/length.
    */
-  [[nodiscard]]
-  void ParsePathRootTokenSpan(const msvc8::string& path, std::uint32_t* const outStart, std::uint32_t* const outLength)
+  void ParsePathRootTokenSpan(const fa::string& path, std::uint32_t* const outStart, std::uint32_t* const outLength)
   {
     if (outStart != nullptr) {
       *outStart = 0u;
@@ -2723,7 +2693,7 @@ namespace
    * What it does:
    * Extracts one leading root/prefix token and initializes path cursor state.
    */
-  [[nodiscard]] PathComponentCursor InitPathPrefixCursor(const msvc8::string& path)
+  [[nodiscard]] PathComponentCursor InitPathPrefixCursor(const fa::string& path)
   {
     PathComponentCursor cursor{};
     cursor.mPath = &path;
@@ -2743,7 +2713,7 @@ namespace
    * What it does:
    * Returns true when path has one non-empty leading root/prefix token.
    */
-  [[nodiscard]] bool PathHasLeadingPrefixToken(const msvc8::string& path)
+  [[nodiscard]] bool PathHasLeadingPrefixToken(const fa::string& path)
   {
     return !InitPathPrefixCursor(path).mToken.empty();
   }
@@ -2755,21 +2725,21 @@ namespace
    * Returns one leading root token only when token is UNC-like (`//...`) or
    * drive-like (`...:`); otherwise returns empty token.
    */
-  [[nodiscard]] msvc8::string GetDriveOrUncPathPrefixToken(const msvc8::string& path)
+  [[nodiscard]] fa::string GetDriveOrUncPathPrefixToken(const fa::string& path)
   {
     const PathComponentCursor prefixCursor = InitPathPrefixCursor(path);
     if (prefixCursor.mOffset == path.size()) {
-      return msvc8::string{};
+      return fa::string{};
     }
 
-    const msvc8::string& token = prefixCursor.mToken;
+    const fa::string& token = prefixCursor.mToken;
     if (token.size() > 1u && token[0] == '/' && token[1] == '/') {
       return token;
     }
     if (!token.empty() && token[token.size() - 1u] == ':') {
       return token;
     }
-    return msvc8::string{};
+    return fa::string{};
   }
 
   /**
@@ -2779,7 +2749,7 @@ namespace
    * Returns true when path has both a root/prefix token and root-boundary
    * marker token.
    */
-  [[nodiscard]] bool PathHasDriveOrUncRootAndBoundary(const msvc8::string& path)
+  [[nodiscard]] bool PathHasDriveOrUncRootAndBoundary(const fa::string& path)
   {
     return !GetDriveOrUncPathPrefixToken(path).empty() && !PathRootBoundaryToken(path).empty();
   }
@@ -2790,14 +2760,14 @@ namespace
    * What it does:
    * Truncates one path string to directory portion.
    */
-  msvc8::string* TrimPathToDirectory(msvc8::string* const path)
+  fa::string* TrimPathToDirectory(fa::string* const path)
   {
     if (path == nullptr) {
       return nullptr;
     }
 
     const std::uint32_t splitPos = func_PathFilenamePos(*path, static_cast<std::uint32_t>(path->size()));
-    const msvc8::string trimmed = path->substr(0u, splitPos);
+    const fa::string trimmed = path->substr(0u, splitPos);
     path->assign_owned(trimmed.view());
     return path;
   }
@@ -2809,7 +2779,7 @@ namespace
    * Returns true when a slash boundary at `index` can be treated as a
    * collapsible path separator (non-root edge case).
    */
-  [[nodiscard]] bool IsCollapsiblePathSlashBoundary(const msvc8::string& path, const std::uint32_t index)
+  [[nodiscard]] bool IsCollapsiblePathSlashBoundary(const fa::string& path, const std::uint32_t index)
   {
     if (path.empty()) {
       return false;
@@ -2826,7 +2796,7 @@ namespace
 
     if (cursor > 2u && path.size() > 1u && path[1] == '/') {
       const std::size_t split = path.find('/', 2u);
-      if (split != msvc8::string::npos && split == cursor) {
+      if (split != fa::string::npos && split == cursor) {
         return false;
       }
     }
@@ -2843,13 +2813,13 @@ namespace
    * What it does:
    * Returns basename token for one path; emits `.` for root-edge paths.
    */
-  [[nodiscard]] msvc8::string GetPathBasenameOrDot(const msvc8::string& path)
+  [[nodiscard]] fa::string GetPathBasenameOrDot(const fa::string& path)
   {
     const std::uint32_t size = static_cast<std::uint32_t>(path.size());
     std::uint32_t split = func_PathFilenamePos(path, size);
 
     if (size != 0u && split != 0u && split < path.size() && path[split] == '/' && IsCollapsiblePathSlashBoundary(path, split)) {
-      return msvc8::string(".");
+      return fa::string(".");
     }
 
     return path.substr(split);
@@ -2861,7 +2831,7 @@ namespace
    * What it does:
    * Initializes reverse path-component cursor for one source path.
    */
-  [[nodiscard]] PathComponentCursor InitReversePathComponentCursor(const msvc8::string& path)
+  [[nodiscard]] PathComponentCursor InitReversePathComponentCursor(const fa::string& path)
   {
     PathComponentCursor cursor{};
     cursor.mPath = &path;
@@ -2890,7 +2860,7 @@ namespace
    * What it does:
    * Replaces one cursor token with a single-character marker (`/` or `.`).
    */
-  msvc8::string* SetPathTokenMarker(msvc8::string* const outToken, const char marker)
+  fa::string* SetPathTokenMarker(fa::string* const outToken, const char marker)
   {
     if (outToken == nullptr) {
       return nullptr;
@@ -2916,7 +2886,7 @@ namespace
       return cursor;
     }
 
-    const msvc8::string& path = *cursor.mPath;
+    const fa::string& path = *cursor.mPath;
     const std::uint32_t tokenSize = static_cast<std::uint32_t>(cursor.mToken.size());
     const bool keepDoubleSlashMarker =
       tokenSize > 2u && cursor.mToken[0] == '/' && cursor.mToken[1] == '/' && cursor.mToken[2] != '/';
@@ -2948,7 +2918,7 @@ namespace
     const std::size_t split = path.find('/', cursor.mOffset);
     const std::uint32_t tokenStart = cursor.mOffset;
     const std::uint32_t tokenLength =
-      split == msvc8::string::npos ? (pathSize - tokenStart) : static_cast<std::uint32_t>(split - tokenStart);
+      split == fa::string::npos ? (pathSize - tokenStart) : static_cast<std::uint32_t>(split - tokenStart);
     cursor.mToken = path.substr(tokenStart, tokenLength);
     return cursor;
   }
@@ -2967,7 +2937,7 @@ namespace
       return cursor;
     }
 
-    const msvc8::string& path = *cursor.mPath;
+    const fa::string& path = *cursor.mPath;
     std::uint32_t pathIndex = ClampPathIndex(path, cursor.mOffset);
     const std::uint32_t rootBoundary = PathRootBoundaryIndex(path, pathIndex);
     const std::uint32_t size = static_cast<std::uint32_t>(path.size());
@@ -3028,9 +2998,9 @@ namespace
    * What it does:
    * Builds one normalized path from cursor token using filename-append rules.
    */
-  [[nodiscard]] msvc8::string BuildNormalizedCursorPathToken(const PathComponentCursor& cursor)
+  [[nodiscard]] fa::string BuildNormalizedCursorPathToken(const PathComponentCursor& cursor)
   {
-    msvc8::string output{};
+    fa::string output{};
     (void)func_StringAppendFilename(cursor.mToken.c_str(), &output);
     return output;
   }
@@ -3064,9 +3034,9 @@ namespace
    * Appends one relative token onto a base path using filename-append
    * normalization rules.
    */
-  [[nodiscard]] msvc8::string AppendRelativePathToken(const msvc8::string& basePath, const msvc8::string& relativePath)
+  [[nodiscard]] fa::string AppendRelativePathToken(const fa::string& basePath, const fa::string& relativePath)
   {
-    msvc8::string appended = basePath;
+    fa::string appended = basePath;
     (void)func_StringAppendFilename(relativePath.c_str(), &appended);
     return appended;
   }
@@ -3078,9 +3048,9 @@ namespace
    * Copies one path into Windows-style slash form (`/` -> `\\`) while keeping
    * root-boundary collapse semantics for leading-prefix lanes.
    */
-  [[maybe_unused]] msvc8::string* NormalizePathToWindowsSlashes(
-    const msvc8::string& source,
-    msvc8::string* const out
+  [[maybe_unused]] fa::string* NormalizePathToWindowsSlashes(
+    const fa::string& source,
+    fa::string* const out
   )
   {
     if (out == nullptr) {
@@ -3121,9 +3091,9 @@ namespace
    * Builds normalized directory prefix text for one input path using filename
    * split/root-boundary rules from the startup path helper lane.
    */
-  [[maybe_unused]] msvc8::string* BuildNormalizedDirectoryPrefix(
-    const msvc8::string& path,
-    msvc8::string* const out
+  [[maybe_unused]] fa::string* BuildNormalizedDirectoryPrefix(
+    const fa::string& path,
+    fa::string* const out
   )
   {
     if (out == nullptr) {
@@ -3150,11 +3120,11 @@ namespace
       --split;
     }
 
-    msvc8::string prefix;
+    fa::string prefix;
     if (split == 1u && rootBoundary == 0u && splitOnSlash) {
       prefix.clear();
     } else {
-      const msvc8::string slice = path.substr(0u, split);
+      const fa::string slice = path.substr(0u, split);
       (void)func_StringAppendFilename(slice.c_str(), &prefix);
     }
 
@@ -3169,13 +3139,13 @@ namespace
    * Collapses one path in place by resolving `.`/`..` component lanes while
    * preserving root/prefix boundary behavior from the startup filename lane.
    */
-  [[maybe_unused]] msvc8::string* CollapsePathComponentsInPlace(msvc8::string* const path)
+  [[maybe_unused]] fa::string* CollapsePathComponentsInPlace(fa::string* const path)
   {
     if (path == nullptr || path->empty()) {
       return path;
     }
 
-    msvc8::string collapsedPath{};
+    fa::string collapsedPath{};
     const PathComponentCursor prefixCursor = InitPathPrefixCursor(*path);
     PathComponentCursor reverseCursor = InitReversePathComponentCursor(*path);
     const PathComponentCursor endCursor = PostIncrementReversePathComponentCursor(reverseCursor);
@@ -3187,7 +3157,7 @@ namespace
         bool collapsedParent = false;
         const bool isParentToken = current.mToken == "..";
         if (!collapsedPath.empty() && isParentToken) {
-          const msvc8::string baseToken = GetPathBasenameOrDot(collapsedPath);
+          const fa::string baseToken = GetPathBasenameOrDot(collapsedPath);
           bool canCollapse = false;
           if (!baseToken.empty()) {
             if (baseToken.size() == 1u) {
@@ -3246,10 +3216,10 @@ namespace
    * Resolves one path token against a base path, preserving drive/UNC/absolute
    * rules from the startup filename helper chain.
    */
-  [[maybe_unused]] msvc8::string* ResolvePathAgainstBase(
-    const msvc8::string& basePath,
-    const msvc8::string& path,
-    msvc8::string* const out
+  [[maybe_unused]] fa::string* ResolvePathAgainstBase(
+    const fa::string& basePath,
+    const fa::string& path,
+    fa::string* const out
   )
   {
     if (out == nullptr) {
@@ -3267,8 +3237,8 @@ namespace
     }
 
     if (PathHasRootBoundaryToken(path)) {
-      const msvc8::string basePrefix = GetDriveOrUncPathPrefixToken(basePath);
-      msvc8::string normalizedPrefix;
+      const fa::string basePrefix = GetDriveOrUncPathPrefixToken(basePath);
+      fa::string normalizedPrefix;
       (void)func_StringAppendFilename(basePrefix.c_str(), &normalizedPrefix);
       out->assign_owned(AppendRelativePathToken(normalizedPrefix, path).view());
       return out;
@@ -3284,7 +3254,7 @@ namespace
    * What it does:
    * Stores one path pointer lane in a single-word helper wrapper.
    */
-  void SetPathPointerLane(const msvc8::string*& outPath, const msvc8::string* const path) noexcept
+  [[maybe_unused]] void SetPathPointerLane(const fa::string*& outPath, const fa::string* const path) noexcept
   {
     outPath = path;
   }
@@ -3321,10 +3291,10 @@ namespace
  * Wraps startup path resolution with `(path, basePath)` parameter order used
  * by VFS/data-path setup callsites.
  */
-msvc8::string* moho::PATH_ResolveAgainstBase(
-  const msvc8::string& path,
-  const msvc8::string& basePath,
-  msvc8::string* const outPath
+fa::string* moho::PATH_ResolveAgainstBase(
+  const fa::string& path,
+  const fa::string& basePath,
+  fa::string* const outPath
 )
 {
   return ResolvePathAgainstBase(basePath, path, outPath);
@@ -3339,7 +3309,7 @@ msvc8::string* moho::PATH_ResolveAgainstBase(
  * Compares two canonicalized paths by reverse component order. The comparison
  * starts from the leaf token and walks toward each path root.
  */
-bool moho::PATH_ReverseComponentLess(const msvc8::string& lhs, const msvc8::string& rhs)
+bool moho::PATH_ReverseComponentLess(const fa::string& lhs, const fa::string& rhs)
 {
   PathComponentCursor lhsCursor = InitReversePathComponentCursor(lhs);
   PathComponentCursor lhsEnd = InitPathPrefixCursor(lhs);
@@ -3347,8 +3317,8 @@ bool moho::PATH_ReverseComponentLess(const msvc8::string& lhs, const msvc8::stri
   PathComponentCursor rhsEnd = InitPathPrefixCursor(rhs);
 
   while (PathComponentCursorNotEqual(lhsCursor, lhsEnd) && PathComponentCursorNotEqual(rhsCursor, rhsEnd)) {
-    const msvc8::string lhsToken = BuildNormalizedCursorPathToken(lhsCursor);
-    const msvc8::string rhsToken = BuildNormalizedCursorPathToken(rhsCursor);
+    const fa::string lhsToken = BuildNormalizedCursorPathToken(lhsCursor);
+    const fa::string rhsToken = BuildNormalizedCursorPathToken(rhsCursor);
     if (lhsToken.view() < rhsToken.view()) {
       return true;
     }
@@ -3372,9 +3342,9 @@ bool moho::PATH_ReverseComponentLess(const msvc8::string& lhs, const msvc8::stri
  * Returns `inputPath` unchanged when it already has an extension, otherwise
  * appends `suggestedExt` (with leading `.` normalization).
  */
-msvc8::string moho::FILE_SuggestedExt(const gpg::StrArg inputPath, const gpg::StrArg suggestedExt)
+fa::string moho::FILE_SuggestedExt(const gpg::StrArg inputPath, const gpg::StrArg suggestedExt)
 {
-  msvc8::string output;
+  fa::string output;
   output.assign_owned(inputPath != nullptr ? inputPath : "");
   if (output.empty()) {
     return output;
@@ -3430,7 +3400,7 @@ bool moho::FILE_IsLocal(const gpg::StrArg filename)
  * Resolves one resource path against one base directory path, preserving
  * drive/UNC prefixes and validating incompatible base/target combinations.
  */
-msvc8::string moho::FILE_MakeAbsolute(const gpg::StrArg dir, const gpg::StrArg filename)
+fa::string moho::FILE_MakeAbsolute(const gpg::StrArg dir, const gpg::StrArg filename)
 {
   if (dir == nullptr || dir[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_MakeAbsolute", "Null argument.");
@@ -3439,9 +3409,9 @@ msvc8::string moho::FILE_MakeAbsolute(const gpg::StrArg dir, const gpg::StrArg f
     ThrowStartupFileError("Moho::FILE_MakeAbsolute", "Null argument.");
   }
 
-  msvc8::string dirStr;
+  fa::string dirStr;
   dirStr.assign_owned(dir);
-  msvc8::string fileStr;
+  fa::string fileStr;
   fileStr.assign_owned(filename);
   gpg::STR_Replace(dirStr, "\\", "/", std::numeric_limits<unsigned int>::max());
   gpg::STR_Replace(fileStr, "\\", "/", std::numeric_limits<unsigned int>::max());
@@ -3486,7 +3456,7 @@ msvc8::string moho::FILE_MakeAbsolute(const gpg::StrArg dir, const gpg::StrArg f
     return dirStr;
   }
 
-  msvc8::string builder;
+  fa::string builder;
   if (fileUnc || fileDrive) {
     const std::string fileText = fileStr.to_std();
     const std::size_t prefixLen = std::min<std::size_t>(2u, fileText.size());
@@ -3624,13 +3594,13 @@ const char* moho::FILE_Ext(const gpg::StrArg filename)
  * Rebuilds `filename` with forced extension: removes existing extension from
  * last path segment, then appends `.` + `ext` when `ext` is non-empty.
  */
-msvc8::string moho::FILE_ForcedExt(const gpg::StrArg filename, const gpg::StrArg ext)
+fa::string moho::FILE_ForcedExt(const gpg::StrArg filename, const gpg::StrArg ext)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_ForcedExt", "Null argument.");
   }
 
-  msvc8::string output;
+  fa::string output;
   const char* const extension = FILE_Ext(filename);
   const std::size_t baseLength =
     extension != nullptr ? static_cast<std::size_t>(extension - filename - 1) : std::strlen(filename);
@@ -3651,20 +3621,20 @@ msvc8::string moho::FILE_ForcedExt(const gpg::StrArg filename, const gpg::StrArg
  * What it does:
  * Normalizes slash separators and returns path-directory prefix text.
  */
-msvc8::string moho::FILE_DirPrefix(const gpg::StrArg filename, const bool /*unusedFlag*/)
+fa::string moho::FILE_DirPrefix(const gpg::StrArg filename, const bool /*unusedFlag*/)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_DirPrefix", "Null argument.");
   }
 
-  msvc8::string normalized;
+  fa::string normalized;
   normalized.assign_owned(filename);
   gpg::STR_Replace(normalized, "\\", "/", std::numeric_limits<unsigned int>::max());
 
   const std::string normalizedStd = normalized.to_std();
   const std::size_t slashPos = normalizedStd.find_last_of('/');
   if (slashPos == std::string::npos) {
-    msvc8::string out;
+    fa::string out;
     out.assign_owned("");
     return out;
   }
@@ -3680,7 +3650,7 @@ msvc8::string moho::FILE_DirPrefix(const gpg::StrArg filename, const bool /*unus
   }
 
   const std::size_t prefixLen = FILE_HasDrive(normalized.c_str()) && slashPos == 2u ? 3u : slashPos;
-  msvc8::string out;
+  fa::string out;
   out.assign_owned(normalizedStd.substr(0, prefixLen));
   return out;
 }
@@ -3693,7 +3663,7 @@ msvc8::string moho::FILE_DirPrefix(const gpg::StrArg filename, const bool /*unus
  * What it does:
  * Resolves a system-directory path prefix from a potentially relative filename.
  */
-msvc8::string moho::FILE_Dir(const gpg::StrArg filename)
+fa::string moho::FILE_Dir(const gpg::StrArg filename)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_Dir", "Null argument.");
@@ -3702,7 +3672,7 @@ msvc8::string moho::FILE_Dir(const gpg::StrArg filename)
     ThrowStartupFileError("Moho::FILE_Dir", "System path expected, got local.");
   }
 
-  msvc8::string fileStr;
+  fa::string fileStr;
   fileStr.assign_owned(filename);
   gpg::STR_Replace(fileStr, "\\", "/", std::numeric_limits<unsigned int>::max());
 
@@ -3742,7 +3712,7 @@ msvc8::string moho::FILE_Dir(const gpg::StrArg filename)
   }
 
   const char driveChar = static_cast<char>(_getdrive() + 0x60);
-  const msvc8::string absolutePath = gpg::STR_Printf("%c:%s", driveChar, fileStr.c_str());
+  const fa::string absolutePath = gpg::STR_Printf("%c:%s", driveChar, fileStr.c_str());
   return FILE_DirPrefix(absolutePath.c_str());
 }
 
@@ -3754,7 +3724,7 @@ msvc8::string moho::FILE_Dir(const gpg::StrArg filename)
  * What it does:
  * Returns the final path segment and optionally strips extension text.
  */
-msvc8::string moho::FILE_Base(const gpg::StrArg filename, const bool stripExtension)
+fa::string moho::FILE_Base(const gpg::StrArg filename, const bool stripExtension)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_Base", "Null argument.");
@@ -3780,7 +3750,7 @@ msvc8::string moho::FILE_Base(const gpg::StrArg filename, const bool stripExtens
     }
   }
 
-  msvc8::string out;
+  fa::string out;
   out.append(base, baseLength);
   return out;
 }
@@ -3793,13 +3763,13 @@ msvc8::string moho::FILE_Base(const gpg::StrArg filename, const bool stripExtens
  * What it does:
  * Canonicalizes separators and collapses `.` / `..` path components.
  */
-msvc8::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const success)
+fa::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const success)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_CollapsePath", "Null argument.");
   }
 
-  msvc8::string fileStr;
+  fa::string fileStr;
   fileStr.assign_owned(filename);
   gpg::STR_Replace(fileStr, "\\", "/", std::numeric_limits<unsigned int>::max());
 
@@ -3812,9 +3782,9 @@ msvc8::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const su
 
   const bool hasUnc = FILE_HasUNC(filename);
   const bool hasDrive = FILE_HasDrive(filename);
-  msvc8::vector<msvc8::string> components;
+  fa::vector<fa::string> components;
 
-  msvc8::string out;
+  fa::string out;
   if (hasUnc || hasDrive) {
     out.assign_owned(normalized.substr(0, std::min<std::size_t>(2u, normalized.size())));
   }
@@ -3839,7 +3809,7 @@ msvc8::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const su
             const bool isAbsoluteSlashRoot = !normalized.empty() && normalized[0] == '/' && !hasUnc;
             const bool isAbsoluteDriveRoot = hasDrive && normalized.size() > 2u && normalized[2] == '/';
             if (!isAbsoluteSlashRoot && !isAbsoluteDriveRoot) {
-              msvc8::string unresolvedParent;
+              fa::string unresolvedParent;
               unresolvedParent.assign_owned(cursor);
               components.push_back(unresolvedParent);
               if (success != nullptr) {
@@ -3850,7 +3820,7 @@ msvc8::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const su
             components.pop_back();
           }
         } else {
-          msvc8::string component;
+          fa::string component;
           component.assign_owned(cursor);
           components.push_back(component);
         }
@@ -3869,7 +3839,7 @@ msvc8::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const su
   }
 
   for (std::size_t index = 0; index < components.size(); ++index) {
-    const msvc8::string& component = components[index];
+    const fa::string& component = components[index];
     out.append(component.c_str(), component.size());
     if ((index + 1u) < components.size() || FILE_HasDrive(component.c_str())) {
       out.append(1u, '/');
@@ -3887,9 +3857,9 @@ msvc8::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const su
  * What it does:
  * Maps platform errno values from disk helpers to human-readable text.
  */
-msvc8::string moho::FILE_GetErrorFromErrno(const int err)
+fa::string moho::FILE_GetErrorFromErrno(const int err)
 {
-  msvc8::string description;
+  fa::string description;
   switch (err) {
   case 2:
     description.assign_owned("File not found");
@@ -3921,9 +3891,9 @@ msvc8::string moho::FILE_GetErrorFromErrno(const int err)
  * Returns local-appdata path suffix:
  * `<LocalAppData>\\Gas Powered Games\\Supreme Commander Forged Alliance`.
  */
-msvc8::string moho::USER_GetAppLocalDataDir()
+fa::string moho::USER_GetAppLocalDataDir()
 {
-  msvc8::string outDir;
+  fa::string outDir;
 
   wchar_t localAppDataPath[MAX_PATH]{};
   if (::SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, localAppDataPath) < 0) {
@@ -3951,15 +3921,15 @@ msvc8::string moho::USER_GetAppLocalDataDir()
  * effects and die in DevResInitResources. A private directory per instance
  * removes the race. Without the option the behaviour is retail's.
  */
-msvc8::string moho::USER_GetAppCacheDir()
+fa::string moho::USER_GetAppCacheDir()
 {
-  msvc8::string outDir;
+  fa::string outDir;
   std::filesystem::path cachePath;
-  msvc8::vector<msvc8::string> cacheDirArgs;
+  fa::vector<fa::string> cacheDirArgs;
   if (CFG_GetArgOption("/cachedir", 1u, &cacheDirArgs) && !cacheDirArgs.empty()) {
     cachePath = std::filesystem::path(cacheDirArgs[0].c_str());
   } else {
-    const msvc8::string appLocalDir = USER_GetAppLocalDataDir();
+    const fa::string appLocalDir = USER_GetAppLocalDataDir();
     if (appLocalDir.empty()) {
       return outDir;
     }
@@ -3981,7 +3951,7 @@ msvc8::string moho::USER_GetAppCacheDir()
  */
 void moho::USER_PurgeAppCacheDir()
 {
-  const msvc8::string cachePath = USER_GetAppCacheDir();
+  const fa::string cachePath = USER_GetAppCacheDir();
   if (cachePath.empty()) {
     return;
   }
@@ -4018,7 +3988,7 @@ void moho::USER_PurgeAppCacheDir()
  * What it does:
  * Returns `<APP preference prefix> + "SaveGame"`.
  */
-msvc8::string moho::USER_GetSaveGameExt()
+fa::string moho::USER_GetSaveGameExt()
 {
   return APP_GetPreferencePrefix() + SaveGameExtName();
 }
@@ -4030,7 +4000,7 @@ msvc8::string moho::USER_GetSaveGameExt()
  * What it does:
  * Returns `<APP preference prefix> + "Replay"`.
  */
-msvc8::string moho::USER_GetReplayExt()
+fa::string moho::USER_GetReplayExt()
 {
   return APP_GetPreferencePrefix() + ReplayExtName();
 }
@@ -4041,7 +4011,7 @@ msvc8::string moho::USER_GetReplayExt()
  * What it does:
  * Returns `<APP preference prefix> + "CampaignSave"`.
  */
-msvc8::string moho::USER_GetCampaignSaveExt()
+fa::string moho::USER_GetCampaignSaveExt()
 {
   return APP_GetPreferencePrefix() + CampaignSaveExtName();
 }
@@ -4060,7 +4030,7 @@ namespace
  */
 bool moho::USER_DebugFacilitiesEnabled()
 {
-  static const msvc8::string kDebugFacilitiesKey("debug.enable_debug_facilities");
+  static const fa::string kDebugFacilitiesKey("debug.enable_debug_facilities");
   if (IUserPrefs* const preferences = USER_GetPreferences(); preferences != nullptr) {
     return preferences->GetBoolean(kDebugFacilitiesKey, false);
   }
@@ -4074,9 +4044,9 @@ bool moho::USER_DebugFacilitiesEnabled()
  * Returns `/maps/<map>/<map>_scenario.lua` for plain map tokens, or the
  * input unchanged when it is already a path-like scenario reference.
  */
-msvc8::string moho::FindMapScenario(const gpg::StrArg mapName)
+fa::string moho::FindMapScenario(const gpg::StrArg mapName)
 {
-  msvc8::string scenarioPath;
+  fa::string scenarioPath;
   scenarioPath.assign_owned(mapName != nullptr ? mapName : "");
 
   if (scenarioPath.empty()) {
@@ -4103,8 +4073,8 @@ namespace
    */
   void func_FWaitSetError(const int err)
   {
-    const msvc8::string errorDescription = moho::FILE_GetErrorFromErrno(err);
-    if (msvc8::string* const errorSlot = moho::FWaitHandleSet::GetErrorString(); errorSlot != nullptr) {
+    const fa::string errorDescription = moho::FILE_GetErrorFromErrno(err);
+    if (fa::string* const errorSlot = moho::FWaitHandleSet::GetErrorString(); errorSlot != nullptr) {
       errorSlot->assign_owned(errorDescription.view());
     }
   }
@@ -4116,7 +4086,7 @@ namespace
    * Initializes destination string storage and canonicalizes one filesystem
    * path token.
    */
-  msvc8::string* func_StringSetFilename2(msvc8::string* const out, const gpg::StrArg sourcePath)
+  fa::string* func_StringSetFilename2(fa::string* const out, const gpg::StrArg sourcePath)
   {
     return gpg::STR_InitFilename(out, sourcePath != nullptr ? sourcePath : "");
   }
@@ -4128,7 +4098,7 @@ namespace
    * Initializes destination string storage from one source string and
    * canonicalizes it as a filesystem token.
    */
-  msvc8::string* SetCanonicalFilenameFromString(msvc8::string* const out, const msvc8::string& sourcePath)
+  [[maybe_unused]] fa::string* SetCanonicalFilenameFromString(fa::string* const out, const fa::string& sourcePath)
   {
     return func_StringSetFilename2(out, sourcePath.c_str());
   }
@@ -4155,7 +4125,7 @@ std::filesystem::path moho::DISK_GetLaunchDir()
   // through a canonizing helper: this is the launch directory, and the callers
   // want it exactly as _fullpath resolved it.
   //
-  // An earlier note here blamed a 15-character truncation in msvc8::string for
+  // An earlier note here blamed a 15-character truncation in fa::string for
   // "G:\projects\faf-main\output\..." arriving as "gZ\projects\faf". The "gZ"
   // half of that was really gpg::STR_ToLower mapping ':' to 'Z' through a
   // signed range test - see the comment on that function.
@@ -4217,11 +4187,11 @@ void moho::DISK_Recycle(const gpg::StrArg sourcePath)
  * script name (SupComDataPath.lua); the FAF client launches with
  * `/init init_faf.lua`, `/init init_coop.lua` and so on.
  */
-bool moho::DISK_SetupDataAndSearchPaths(msvc8::string dataPathScriptName, const std::filesystem::path& launchDir)
+bool moho::DISK_SetupDataAndSearchPaths(fa::string dataPathScriptName, const std::filesystem::path& launchDir)
 {
   // 0x00459E14..0x00459E4E: the script name is taken by value and overwritten
   // with the `/init` argument when one is given.
-  msvc8::vector<msvc8::string> initArgs;
+  fa::vector<fa::string> initArgs;
   if (CFG_GetArgOption("/init", 1, &initArgs)) {
     dataPathScriptName = initArgs[0];
   }
@@ -4250,7 +4220,7 @@ bool moho::DISK_SetupDataAndSearchPaths(msvc8::string dataPathScriptName, const 
   }
 
   std::vector<std::wstring> allowedProtocols;
-  msvc8::vector<moho::SVFSMountPoint> mountPoints;
+  fa::vector<moho::SVFSMountPoint> mountPoints;
 
   // The binary builds its own state for this on the stack, initialises it, and
   // destroys it before returning - 0x00459ED4 takes the address of a local and
@@ -4305,7 +4275,7 @@ bool moho::DISK_SetupDataAndSearchPaths(msvc8::string dataPathScriptName, const 
     // what it defined. Passing a default-constructed LuaObject instead made
     // SCR_LuaDoFile take the `if (env)` branch and PushStack threw
     // LuaAssertion("state->m_rootState == m_state") on the unbound object.
-    const msvc8::string scriptPathUtf8(absoluteScriptPath.string().c_str());
+    const fa::string scriptPathUtf8(absoluteScriptPath.string().c_str());
     if (!moho::SCR_LuaDoFile(startupState, scriptPathUtf8.c_str(), nullptr)) {
       return false;
     }
@@ -4372,9 +4342,9 @@ std::filesystem::path moho::DISK_GetDataPathScriptFile()
  * requested preference file with version validation, and falls back to
  * `../Installed.Prefs` defaults when primary loading fails.
  */
-void moho::USER_LoadPreferences(const msvc8::string& preferenceFileName)
+void moho::USER_LoadPreferences(const fa::string& preferenceFileName)
 {
-  msvc8::auto_ptr<CUserPrefs> preferences(new CUserPrefs());
+  fa::auto_ptr<CUserPrefs> preferences(new CUserPrefs());
   bool loadedPrimaryPreferences = false;
 
   wchar_t appDataPath[MAX_PATH]{};
@@ -4407,10 +4377,10 @@ void moho::USER_LoadPreferences(const msvc8::string& preferenceFileName)
     preferencePathWide.push_back(L'\\');
     preferencePathWide.append(gpg::STR_Utf8ToWide(preferenceFileName.c_str()));
 
-    preferences->GetStr1()->assign(preferenceFileName, 0, msvc8::string::npos);
+    preferences->GetStr1()->assign(preferenceFileName, 0, fa::string::npos);
 
-    const msvc8::string preferencePathUtf8 = gpg::STR_WideToUtf8(preferencePathWide.c_str());
-    preferences->GetStr2()->assign(preferencePathUtf8, 0, msvc8::string::npos);
+    const fa::string preferencePathUtf8 = gpg::STR_WideToUtf8(preferencePathWide.c_str());
+    preferences->GetStr2()->assign(preferencePathUtf8, 0, fa::string::npos);
 
     PLAT_RegisterFileForErrorReport(preferencePathWide.c_str());
 
@@ -4420,7 +4390,7 @@ void moho::USER_LoadPreferences(const msvc8::string& preferenceFileName)
         SCR_LuaDoFile(preferences->GetStateMutable(), preferences->GetStr2()->c_str(), preferenceRoot);
 
       if (loadedFromFile) {
-        const msvc8::string versionKey("version.major");
+        const fa::string versionKey("version.major");
         loadedPrimaryPreferences = (preferences->GetInteger(versionKey, 0) == 1);
       }
 
@@ -4448,7 +4418,7 @@ void moho::USER_LoadPreferences(const msvc8::string& preferenceFileName)
     }
   }
 
-  const msvc8::string versionKey("version.major");
+  const fa::string versionKey("version.major");
   preferences->SetInteger(versionKey, 1);
 
   sPreferences = preferences;
@@ -4486,7 +4456,7 @@ void moho::USER_SavePreferences()
     return;
   }
 
-  const msvc8::string* const preferencesPathUtf8 = preferences->GetStr2();
+  const fa::string* const preferencesPathUtf8 = preferences->GetStr2();
   const char* const preferencesPathText = preferencesPathUtf8 != nullptr ? preferencesPathUtf8->c_str() : "";
   const std::wstring preferencesPathWide = gpg::STR_Utf8ToWide(preferencesPathText != nullptr ? preferencesPathText : "");
   const std::wstring temporaryPathWide = preferencesPathWide + L".new";
@@ -4494,7 +4464,7 @@ void moho::USER_SavePreferences()
   std::ofstream outputStream(temporaryPathWide.c_str());
   if (!outputStream.is_open()) {
     const std::wstring warningWide = std::wstring(L"Unable to open preference file: ") + temporaryPathWide;
-    const msvc8::string warningUtf8 = gpg::STR_WideToUtf8(warningWide.c_str());
+    const fa::string warningUtf8 = gpg::STR_WideToUtf8(warningWide.c_str());
     gpg::Warnf("%s", warningUtf8.c_str());
     return;
   }
@@ -4534,7 +4504,7 @@ float moho::MOV_GetDuration(const gpg::StrArg sourcePath)
   FILE_EnsureWaitHandleSet();
   FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
 
-  msvc8::string resolvedPath{};
+  fa::string resolvedPath{};
   (void)waitHandleSet->mHandle->FindFile(&resolvedPath, sourcePath, nullptr);
   if (resolvedPath.empty()) {
     gpg::Warnf("Movie file \"%s\" doesn't exist.", sourcePath);

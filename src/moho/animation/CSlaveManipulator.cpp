@@ -1,4 +1,7 @@
+#include "moho/animation/AniPoseBones.h"
 #include "moho/animation/CSlaveManipulator.h"
+#include "gpg/core/reflection/Reflection.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 #include <cmath>
 #include <cstddef>
@@ -25,7 +28,6 @@
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kSlaveLuaClassName = "CSlaveManipulator";
   constexpr const char* kSetMaxRateName = "SetMaxRate";
   constexpr const char* kSetMaxRateHelpText = "SlaveManipulator:SetMaxRate(self, degrees_per_second)";
@@ -65,16 +67,6 @@ namespace
     return out;
   }
 
-  [[nodiscard]] gpg::RType* CachedCSlaveManipulatorType()
-  {
-    gpg::RType* type = moho::CSlaveManipulator::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CSlaveManipulator));
-      moho::CSlaveManipulator::sType = type;
-    }
-    return type;
-  }
-
   /**
    * Address: 0x00646A50 (FUN_00646A50)
    *
@@ -87,27 +79,8 @@ namespace
       return nullptr;
     }
 
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCSlaveManipulatorType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, gpg::RTypeOf<moho::CSlaveManipulator>());
     return upcast.mObj;
-  }
-
-  [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
-  {
-    gpg::RType* type = moho::IAniManipulator::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::IAniManipulator));
-      moho::IAniManipulator::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedQuaternionfType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Quaternionf));
-    }
-    return type;
   }
 
   // Address: 0x00BD31F0 (dynamic initializer for the global
@@ -125,66 +98,6 @@ namespace
   // installed the callbacks on `CSlaveManipulator::sType`; this global's own
   // static initialization fixes that.
   moho::CSlaveManipulatorSerializer gCSlaveManipulatorSerializer;
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
-
-  [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniPose* const pose, const int boneIndex) noexcept
-  {
-    if (pose == nullptr || boneIndex < 0) {
-      return nullptr;
-    }
-
-    moho::CAniPoseBone* const bonesBegin = pose->mBones.begin();
-    moho::CAniPoseBone* const bonesEnd = pose->mBones.end();
-    if (bonesBegin == nullptr || bonesEnd == nullptr || bonesBegin >= bonesEnd) {
-      return nullptr;
-    }
-
-    const std::ptrdiff_t boneCount = bonesEnd - bonesBegin;
-    if (boneIndex >= boneCount) {
-      return nullptr;
-    }
-
-    return &bonesBegin[boneIndex];
-  }
 
   /**
    * Address: 0x00BFB1B0 (FUN_00BFB1B0, atexit destructor of the CSlaveManipulatorTypeInfo object)
@@ -333,9 +246,9 @@ void moho::CSlaveManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
   }
 
   const gpg::RRef owner{};
-  archive->Read(CachedIAniManipulatorType(), static_cast<IAniManipulator*>(this), owner);
+  archive->Read(gpg::RTypeOf<moho::IAniManipulator>(), static_cast<IAniManipulator*>(this), owner);
   archive->ReadInt(&mSourceBoneIndex);
-  archive->Read(CachedQuaternionfType(), &mCurrentRotation, owner);
+  archive->Read(gpg::RTypeOf<Wm3::Quaternionf>(), &mCurrentRotation, owner);
   archive->ReadFloat(&mMaxRate);
 }
 
@@ -353,9 +266,9 @@ void moho::CSlaveManipulator::MemberSerialize(gpg::WriteArchive* const archive) 
   }
 
   const gpg::RRef owner{};
-  archive->Write(CachedIAniManipulatorType(), static_cast<const IAniManipulator*>(this), owner);
+  archive->Write(gpg::RTypeOf<moho::IAniManipulator>(), static_cast<const IAniManipulator*>(this), owner);
   archive->WriteInt(mSourceBoneIndex);
-  archive->Write(CachedQuaternionfType(), &mCurrentRotation, owner);
+  archive->Write(gpg::RTypeOf<Wm3::Quaternionf>(), &mCurrentRotation, owner);
   archive->WriteFloat(mMaxRate);
 }
 
@@ -384,7 +297,7 @@ bool moho::CSlaveManipulator::ManipulatorUpdate()
     return false;
   }
 
-  CAniPoseBone* const sourceBone = ResolvePoseBone(mOwnerActor->mPriorPose.get(), mSourceBoneIndex);
+  CAniPoseBone* const sourceBone = moho::ResolvePoseBone(mOwnerActor->mPriorPose.get(), mSourceBoneIndex);
   if (sourceBone == nullptr) {
     return false;
   }
@@ -415,7 +328,7 @@ bool moho::CSlaveManipulator::ManipulatorUpdate()
     mCurrentRotation = targetRotation;
   }
 
-  if (CAniPoseBone* const destinationBone = ResolvePoseBone(mOwnerActor->mPose.get(), watchedBinding->mBoneIndex);
+  if (CAniPoseBone* const destinationBone = moho::ResolvePoseBone(mOwnerActor->mPose.get(), watchedBinding->mBoneIndex);
       destinationBone != nullptr) {
     destinationBone->Rotate(mCurrentRotation);
   }
@@ -443,10 +356,7 @@ int moho::cfunc_CreateSlaver(lua_State* const luaContext)
  */
 int moho::cfunc_CreateSlaverL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 3) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateSlaverHelpText, 3, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 3, kCreateSlaverHelpText);
 
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   moho::Unit* const unit = SCR_FromLua_Unit(unitObject);
@@ -478,7 +388,7 @@ int moho::cfunc_CreateSlaverL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CreateSlaver_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kCreateSlaverMethodName,
     &moho::cfunc_CreateSlaver,
     nullptr,
@@ -510,7 +420,7 @@ int moho::cfunc_CSlaveManipulatorSetMaxRate(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CSlaveManipulatorSetMaxRate_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kSetMaxRateName,
     &moho::cfunc_CSlaveManipulatorSetMaxRate,
     &CScrLuaMetatableFactory<CSlaveManipulator>::Instance(),
@@ -530,10 +440,7 @@ moho::CScrLuaInitForm* moho::func_CSlaveManipulatorSetMaxRate_LuaFuncDef()
 int moho::cfunc_CSlaveManipulatorSetMaxRateL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetMaxRateHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kSetMaxRateHelpText);
 
   const LuaPlus::LuaObject manipulatorObject(LuaPlus::LuaStackObject(state, 1));
   CSlaveManipulator* const manipulator = SCR_FromLua_CSlaveManipulator(manipulatorObject, state);
@@ -635,13 +542,7 @@ void moho::CSlaveManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const 
     return;
   }
 
-  gpg::RField baseField{};
-  baseField.mName = baseType->GetName();
-  baseField.mType = baseType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBaseType(typeInfo, baseType);
 }
 
 /**
@@ -724,12 +625,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CSlaveManipulator(gpg::RRef* const outRef, moho::CSlaveManipulator* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = MakeDerivedRef(value, CachedCSlaveManipulatorType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 } // namespace gpg
 

@@ -94,12 +94,12 @@ namespace moho
       }
     }
 
-    void RenInfo(const msvc8::vector<msvc8::string>&)
+    void RenInfo(const fa::vector<fa::string>&)
     {
       PrintRuntimeInfo(REN_FormatRuntimeInfo());
     }
 
-    void RenInfoDump(const msvc8::vector<msvc8::string>& args)
+    void RenInfoDump(const fa::vector<fa::string>& args)
     {
       if (args.size() < 2U) {
         CON_Printf("syntax: ren_InfoDump <file>");
@@ -189,7 +189,7 @@ namespace moho
       Megabytes(heap.committed), Megabytes(heap.reserved)
     );
 
-    const msvc8::string cacheDirectory = USER_GetAppCacheDir();
+    const fa::string cacheDirectory = USER_GetAppCacheDir();
     std::uint32_t cacheFiles = 0U;
     std::uint64_t cacheBytes = 0U;
     MeasureDirectory(cacheDirectory.c_str(), cacheFiles, cacheBytes);

@@ -47,6 +47,8 @@ The options entry comes from the engine's own Lua, never from edits to FAF's gam
 - **Source:** `data/fafengine/` holds engine-owned scripts that extend gamedata scripts. The build copies it next to the executable (`src/CMakeLists.txt`), and `build.ps1` copies it into the run folder.
 - **Mount:** at startup the engine mounts `<exe folder>/fafengine` at `/fafengine` and registers it as a hook directory, after the init file's own `path` and `hook` entries (`AppendEngineHookFolder` in `src/moho/misc/StartupHelpers.cpp`). The engine does this itself because the init files (`init_faf.lua` and the rest) belong to the FAF client.
 - **Hook:** a hook file is appended to the gamedata file of the same path, so `fafengine/lua/options/options.lua` runs at the end of `/lua/options/options.lua` and inserts the entry after Vertical Sync. The log says `engine hooks: ... mounted at /fafengine` and `Hooked /lua/options/options.lua with /fafengine/lua/options/options.lua`.
+- **Modules:** files that only the hooks import (the replay timeline and its controls) lie under `data/fafengine/modules/`, a path no gamedata file has. Under `lua/` they would be taken as hooks of a FAF file of the same name and appended to it.
+- **In FAF's Lua:** the same options and screens are to come with FAF's own Lua behind `GetEngineInfo`, which only this engine has (issue #327). When FAF's files carry them, the hooks here leave them out: an option whose key is already in the tab, the timeline when `/lua/ui/game/replay_timeline.lua` exists, the rejoin screen when `uimain.lua` defines `UpdateRejoinScreen`, the Connectivity rows when `disconnect.lua` defines its own `GetSessionClients`.
 
 ## Effects: one source, translated at load time
 
@@ -109,9 +111,11 @@ Each path has a console variable with three values: `-1` (default, auto: on only
 | `ren_GpuProjectileIcons` | `kGpuPathProjectileIcons` | Vertex pulling |
 | `ren_GpuShapes` | `kGpuPathWorldShapes` | Vertex pulling |
 | `ren_GpuRanges` | `kGpuPathRanges` | Vertex pulling |
+| `ren_GpuText` | `kGpuPathMsdfText` | Vertex pulling |
+| `ren_GpuFontCook` | `kGpuPathMsdfCook` | Vertex pulling, compute |
 
 - **Direct3D 9** reports no features, so every path is off there whatever its variable says.
-- **Direct3D 11, 12 and Vulkan** report all features and every verified bit except `kGpuPathParticleBatch`, which stays out until a paused screenshot A/B of `ren_ParticleBatch` is clean at several zooms (one showed extra particle specks with it on), and `kGpuPathRanges`: its paused A/B is pixel-identical on Direct3D 12 and Vulkan (`tools/scenarios/1p-ringgpu-main.yaml`, `1p-ringgpu-vulkan.yaml`), but with `range_ViewCull` on it makes the range pass slower, not faster (see [Switches](SWITCHES.md)).
+- **Direct3D 11, 12 and Vulkan** report all features and every verified bit except `kGpuPathMsdfCook`, which they report only for an NVIDIA adapter (`kPciVendorNvidia`) until its atlases are compared on AMD and Intel GPUs too (issue #309; elsewhere fonts cook on the CPU), `kGpuPathParticleBatch`, which stays out until a paused screenshot A/B of `ren_ParticleBatch` is clean at several zooms (one showed extra particle specks with it on), and `kGpuPathRanges`: its paused A/B is pixel-identical on Direct3D 12 and Vulkan (`tools/scenarios/1p-ringgpu-main.yaml`, `1p-ringgpu-vulkan.yaml`), but with `range_ViewCull` on it makes the range pass slower, not faster (see [Switches](SWITCHES.md)).
 - **Verifying a path:** a backend turns a path on by default by adding its bit to `GetGpuDrivenVerified()` once it passes that path's checks (the self-check readback where one exists, and a same-process screenshot A/B against the variable at 0); no variable or default changes.
 - **Log:** the resolved state is logged once at startup and by `ren_Info`, as `GPU-driven paths: ren_GpuIcons=auto:on, ...`.
 - `ui_IconRecords` and `ren_CacheFogFootprint` are CPU-side and on by default on every backend. All of these variables are also listed in [Switches](SWITCHES.md).
@@ -121,14 +125,14 @@ Each path has a console variable with three values: `-1` (default, auto: on only
 Configuring the CMake build fetches all three into `dependencies/` (`cmake/FafDependencies.cmake`):
 
 - **FX11 (Direct3D 11):** git submodule `dependencies/FX11`, `microsoft/FX11` at `bec3b8fc`. The engine compiles FX11's sources directly (C++17, two-phase lookup off).
-- **DXC (Direct3D 12, Vulkan):** the [DirectXShaderCompiler release](https://github.com/microsoft/DirectXShaderCompiler/releases) v1.9.2609 (`dxc_2026_09_29.zip`, SHA256-pinned), unpacked to `dependencies/dxc`. At run time the game loads `dxcompiler.dll` and `dxil.dll` (the DXIL signer) from its own directory, or from `FAF_DXC_DIR`; copy the DLLs for the right architecture next to the executable.
+- **DXC (Direct3D 12, Vulkan):** the [DirectXShaderCompiler release](https://github.com/microsoft/DirectXShaderCompiler/releases) v1.9.2609 (`dxc_2026_09_29.zip`, SHA256-pinned), unpacked to `dependencies/dxc`. At run time the game loads `dxcompiler.dll` and `dxil.dll` (the DXIL signer) from its own directory, from `FAF_DXC_DIR`, or else from the copy the executable carries (issue #315): the build packs both DLLs into the exe (10.4 MB compressed on x64), and the first start of Direct3D 12 or Vulkan unpacks them into `%LOCALAPPDATA%\FAForeveraf-re\dxc-<hash>\`. DLLs next to the executable win, so a different DXC can be tried without a rebuild.
 - **Vulkan headers (Vulkan):** git submodule `dependencies/vulkan`, `KhronosGroup/Vulkan-Headers` at `v1.4.304`. The game loads `vulkan-1.dll` (installed with the GPU driver) at run time and links no import library, so x86 and x64 both build from the headers alone.
 
 ### Runtime requirements
 
 Both are optional; without them the game falls back to Direct3D 9.
 
-- **D3DX11:** `/d3d11`, `/d3d12` and `/vulkan` decode textures with D3DX11 (`d3dx11_43.dll`, from the DirectX End-User Runtime of June 2010), as the shipped D3D10 path did with D3DX10. Direct3D 12 and Vulkan run it on a private WARP device (`backends/common/ImageCodec`).
+- **D3DX11:** `/d3d11`, `/d3d12` and `/vulkan` decode textures with D3DX11 (`d3dx11_43.dll`, from the DirectX End-User Runtime of June 2010), as the shipped D3D10 path did with D3DX10. Direct3D 12 and Vulkan run it on a private WARP device (`backends/common/ImageCodec`). Without `d3dx11_43.dll`, Direct3D 12 and Vulkan decode with DirectXTex instead (`backends/common/ImageCodecDirectXTex.cpp`, issue #318): the same formats, sizes and mip counts, and every level a file has byte for byte; the levels D3DX11 builds for a file without them come out within about 30-48 dB of D3DX11's (the two filter and BC-encode differently), and screenshots differ less than two D3DX11 runs of the same scene. Wine's own `d3dx11_43.dll` decodes from version 11.0 on and doesn't save; Direct3D 12 and Vulkan write the DDS files they need themselves when it says so. `/d3d11` doesn't start on Wine 11.0 as it comes: Wine's compiler refuses its built-in effect, and that backend calls D3DX11's save directly.
 - **Direct3D 12** needs Windows 10 (d3d12.dll is loaded at run time).
 - **Vulkan** needs a Vulkan 1.3 driver with dynamic rendering, synchronization2, timeline semaphores, scalar block layout (`$Globals` keeps Direct3D's packing) and BC textures. It runs windowed or borderless only (no exclusive full screen).
 
@@ -150,6 +154,8 @@ Both are optional; without them the game falls back to Direct3D 9.
 | `FAF_GAL_UPLOAD_SUBMIT_KB=<n>` | Direct3D 12: submits the recorded commands after every n KB of uploads (default 48 MB on x86, 96 MB on x64), which exercises the mid-frame submission paths |
 | `FAF_CRASH_NO_DIALOG=1` | The crash report and minidump are written, but no dialog waits for a click (unattended test runs) |
 | `FAF_GAL_FAIL_SETUP=1`, `=d3d12,vulkan` | Device creation fails (every newer backend, or the listed ones), which exercises the renderer fallback |
+| `FAF_IMAGECODEC_DIRECTXTEX=1` | Direct3D 12 and Vulkan: textures decode and encode with DirectXTex even when `d3dx11_43.dll` is installed, the route players without the DirectX runtime take (issue #318) |
+| `FAF_IMAGECODEC_OWN_DDS=1` | Direct3D 12 and Vulkan: DDS files are always written by the engine, not D3DX11, which exercises on Windows the route Wine takes |
 | `FAF_GAL_DUMP_DIR`, `FAF_GAL_DUMP_SECONDS` | Writes the back buffer as BMP every N seconds |
 | `FAF_GAL_TRACE_START`, `FAF_GAL_TRACE_FRAMES` | Logs every gal call of those frames |
 | `FAF_GAL_TRACE_FILE` | Direct3D 12: traces the frame after that file appears |

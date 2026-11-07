@@ -41,7 +41,10 @@ expect:
     - { uids: [2], pattern: 'PEERS: client \d+:OursB announced features' }
     - { uids: [3], pattern: 'PEERS: client \d+:OursA announced features' }
     - { uids: [1], pattern: 'Ignoring message type 58' }
+    - { uids: [2], pattern: 'PEERS: client \d+:OursB''s order stream reports are compared' }
+    - { uids: [3], pattern: 'PEERS: client \d+:OursA''s order stream reports are compared' }
   logsAbsent:
     - { uids: [2, 3], pattern: 'PEERS: client \d+:Retail announced' }
     - { uids: [2, 3], pattern: 'PEERS: everyone supports \S+: yes' }
     - { uids: [2, 3], pattern: 'mismatched' }
+    - { uids: [2, 3], pattern: 'Retail''s order stream reports' }

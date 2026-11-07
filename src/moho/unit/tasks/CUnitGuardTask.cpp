@@ -175,65 +175,6 @@ namespace
     return outWord;
   }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    gpg::RType* type = moho::WeakPtr<moho::Unit>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-      moho::WeakPtr<moho::Unit>::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrCUnitCommandType()
-  {
-    gpg::RType* type = moho::WeakPtr<moho::CUnitCommand>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::CUnitCommand>));
-      moho::WeakPtr<moho::CUnitCommand>::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCAiTargetType()
-  {
-    gpg::RType* type = moho::CAiTarget::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CAiTarget));
-      moho::CAiTarget::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSNavGoalType()
-  {
-    gpg::RType* type = moho::SNavGoal::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SNavGoal));
-      moho::SNavGoal::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] const moho::RUnitBlueprint* ResolveUnitBlueprintFromCommand(const moho::CUnitCommand* const command)
   {
     if (command == nullptr || command->mConstDat.blueprint == nullptr) {
@@ -300,19 +241,19 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), ownerRef);
 
     gpg::RRef commandTaskRef{};
     archive->ReadPointer(&mCommandTask, &commandTaskRef);
 
     const gpg::RRef primaryCommandOwnerRef{};
-    archive->Read(CachedWeakPtrCUnitCommandType(), &mPrimaryCommandRef, primaryCommandOwnerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::CUnitCommand>>(), &mPrimaryCommandRef, primaryCommandOwnerRef);
 
     const gpg::RRef commandOwnerRef{};
-    archive->Read(CachedWeakPtrCUnitCommandType(), &mCommandRef, commandOwnerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::CUnitCommand>>(), &mCommandRef, commandOwnerRef);
 
     const gpg::RRef targetOwnerRef{};
-    archive->Read(CachedCAiTargetType(), &mTarget, targetOwnerRef);
+    archive->Read(gpg::RTypeOf<moho::CAiTarget>(), &mTarget, targetOwnerRef);
 
     archive->ReadBool(&mTrackGuardedUnit);
     archive->ReadBool(&mRefreshGuardedUnitFromNearby);
@@ -323,16 +264,16 @@ namespace moho
     archive->ReadBool(&mUnknown7A);
 
     const gpg::RRef secondaryUnitOwnerRef{};
-    archive->Read(CachedWeakPtrUnitType(), &mSecondaryUnit, secondaryUnitOwnerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mSecondaryUnit, secondaryUnitOwnerRef);
 
     const gpg::RRef guardDirectionOwnerRef{};
-    archive->Read(CachedVector3fType(), &mGuardDirection, guardDirectionOwnerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mGuardDirection, guardDirectionOwnerRef);
 
     const gpg::RRef secondaryDirectionOwnerRef{};
-    archive->Read(CachedVector3fType(), &mGuardMoveAnchorPosition, secondaryDirectionOwnerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mGuardMoveAnchorPosition, secondaryDirectionOwnerRef);
 
     const gpg::RRef guardGoalOwnerRef{};
-    archive->Read(CachedSNavGoalType(), &mGuardGoal, guardGoalOwnerRef);
+    archive->Read(gpg::RTypeOf<moho::SNavGoal>(), &mGuardGoal, guardGoalOwnerRef);
   }
 
   /**
@@ -350,15 +291,15 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
 
     gpg::RRef commandTaskRef{};
     (void)gpg::RRef_CCommandTask(&commandTaskRef, mCommandTask);
     gpg::WriteRawPointer(archive, commandTaskRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedWeakPtrCUnitCommandType(), &mPrimaryCommandRef, ownerRef);
-    archive->Write(CachedWeakPtrCUnitCommandType(), &mCommandRef, ownerRef);
-    archive->Write(CachedCAiTargetType(), &mTarget, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::CUnitCommand>>(), &mPrimaryCommandRef, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::CUnitCommand>>(), &mCommandRef, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CAiTarget>(), &mTarget, ownerRef);
 
     archive->WriteBool(mTrackGuardedUnit);
     archive->WriteBool(mRefreshGuardedUnitFromNearby);
@@ -368,12 +309,12 @@ namespace moho
     archive->WriteBool(mAllowFerryBeaconRedirect);
     archive->WriteBool(mUnknown7A);
 
-    archive->Write(CachedWeakPtrUnitType(), &mSecondaryUnit, ownerRef);
-    archive->Write(CachedVector3fType(), &mGuardDirection, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mSecondaryUnit, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mGuardDirection, ownerRef);
 
-    archive->Write(CachedVector3fType(), &mGuardMoveAnchorPosition, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mGuardMoveAnchorPosition, ownerRef);
 
-    archive->Write(CachedSNavGoalType(), &mGuardGoal, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::SNavGoal>(), &mGuardGoal, ownerRef);
   }
 
   // Addresses 0x00614B40/0x00614B90 (the "ThunkA"/"ThunkB" serializer-save
@@ -1343,7 +1284,7 @@ namespace moho
     }
 
     const Wm3::Vector3f candidatePosition = candidateUnit->GetPosition();
-    msvc8::vector<WeakPtr<CUnitCommand>>& builderQueue = mUnit->AiBuilder->BuilderGetFactoryCommandQueue();
+    fa::vector<WeakPtr<CUnitCommand>>& builderQueue = mUnit->AiBuilder->BuilderGetFactoryCommandQueue();
     for (WeakPtr<CUnitCommand>& commandRef : builderQueue) {
       const CUnitCommand* const command = commandRef.GetObjectPtr();
       if (command == nullptr || command->mVarDat.mCmdType != EUnitCommandType::UNITCOMMAND_Guard) {

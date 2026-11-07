@@ -356,8 +356,8 @@ namespace moho
     bool mClosed{false};
     bool mIsPulling{false};
     // Outbound NAT traversal queue and inbound NAT traversal queue.
-    msvc8::deque<SReceivePacket> mOutboundPackets;
-    msvc8::deque<SReceivePacket> mInboundTraversalPackets;
+    fa::deque<SReceivePacket> mOutboundPackets;
+    fa::deque<SReceivePacket> mInboundTraversalPackets;
     // Optional externally provided wake event for select-style polling.
     HANDLE mSelectedEvent{nullptr};
     // Rolling send/recv stamp window for diagnostics/snapshot APIs.

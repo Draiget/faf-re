@@ -64,79 +64,12 @@ namespace
   // with a file-static cache, exactly as the sibling CUnitPatrolTask does for
   // `Wm3::Box3f`.
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCBuildTaskHelperType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CBuildTaskHelper));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3<float>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedQuaternionfType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Quaternion<float>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    gpg::RType* type = moho::WeakPtr<moho::Unit>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-      moho::WeakPtr<moho::Unit>::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrEntityType()
-  {
-    gpg::RType* type = moho::WeakPtr<moho::Entity>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Entity>));
-      moho::WeakPtr<moho::Entity>::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RType* CachedRect2iType()
   {
     gpg::RType* type = gpg::Rect2i::sType;
     if (!type) {
       type = gpg::LookupRType(typeid(gpg::Rect2<int>));
       gpg::Rect2i::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedRect2fType()
-  {
-    gpg::RType* type = gpg::Rect2f::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(gpg::Rect2<float>));
-      gpg::Rect2f::sType = type;
     }
     return type;
   }
@@ -408,7 +341,7 @@ namespace moho
       return nearest;
     }
 
-    for (const msvc8::string& rebuildId : mBlueprint->Economy.RebuildBonusIds) {
+    for (const fa::string& rebuildId : mBlueprint->Economy.RebuildBonusIds) {
       if (_stricmp(associatedBp.GetString(), rebuildId.c_str()) != 0) {
         continue;
       }
@@ -920,10 +853,10 @@ namespace moho
     const gpg::RRef ownerRef{};
 
     // 1. base CCommandTask sub-object (offset 0x00).
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), ownerRef);
 
     // 2. embedded build helper (offset 0x40).
-    archive->Read(CachedCBuildTaskHelperType(), &mBuildHelper, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CBuildTaskHelper>(), &mBuildHelper, ownerRef);
 
     // 3. command pointer lane (offset 0x84).
     archive->ReadPointer(&mCommand, &ownerRef);
@@ -935,20 +868,20 @@ namespace moho
     mBlueprint = blueprint;
 
     // 5-7. build transform payloads (offsets 0x8C / 0x98 / 0xA8).
-    archive->Read(CachedVector3fType(), &mBuildPosition, ownerRef);
-    archive->Read(CachedQuaternionfType(), &mBuildOrientation, ownerRef);
-    archive->Read(CachedVector3fType(), &mBuildDirection, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3<float>>(), &mBuildPosition, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Quaternion<float>>(), &mBuildOrientation, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3<float>>(), &mBuildDirection, ownerRef);
 
     // 8. placement-retry counter (offset 0xB4) via the virtual ReadInt slot.
     archive->ReadInt(&mPlacementRetryCount);
 
     // 9-10. runtime weak links (offsets 0xB8 / 0xC0).
-    archive->Read(CachedWeakPtrUnitType(), &mBuildUnit, ownerRef);
-    archive->Read(CachedWeakPtrEntityType(), &mPendingBuildEntity, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mBuildUnit, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mPendingBuildEntity, ownerRef);
 
     // 11-12. build area / skirt rects (offsets 0xC8 / 0xD8).
     archive->Read(CachedRect2iType(), &mBuildRect, ownerRef);
-    archive->Read(CachedRect2fType(), &mBuildSkirt, ownerRef);
+    archive->Read(gpg::CachedLookup<gpg::Rect2<float>>(gpg::Rect2f::sType), &mBuildSkirt, ownerRef);
   }
 
   /**
@@ -973,10 +906,10 @@ namespace moho
     const gpg::RRef ownerRef{};
 
     // 1. base CCommandTask sub-object (offset 0x00).
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
 
     // 2. embedded build helper (offset 0x40).
-    archive->Write(CachedCBuildTaskHelperType(), &mBuildHelper, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CBuildTaskHelper>(), &mBuildHelper, ownerRef);
 
     // 3. command pointer lane (offset 0x84): typed RRef then unowned raw pointer.
     gpg::RRef pointerRef{};
@@ -988,20 +921,20 @@ namespace moho
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     // 5-7. build transform payloads (offsets 0x8C / 0x98 / 0xA8).
-    archive->Write(CachedVector3fType(), &mBuildPosition, ownerRef);
-    archive->Write(CachedQuaternionfType(), &mBuildOrientation, ownerRef);
-    archive->Write(CachedVector3fType(), &mBuildDirection, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3<float>>(), &mBuildPosition, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Quaternion<float>>(), &mBuildOrientation, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3<float>>(), &mBuildDirection, ownerRef);
 
     // 8. placement-retry counter (offset 0xB4) via the virtual WriteInt slot.
     archive->WriteInt(mPlacementRetryCount);
 
     // 9-10. runtime weak links (offsets 0xB8 / 0xC0).
-    archive->Write(CachedWeakPtrUnitType(), &mBuildUnit, ownerRef);
-    archive->Write(CachedWeakPtrEntityType(), &mPendingBuildEntity, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mBuildUnit, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mPendingBuildEntity, ownerRef);
 
     // 11-12. build area / skirt rects (offsets 0xC8 / 0xD8).
     archive->Write(CachedRect2iType(), &mBuildRect, ownerRef);
-    archive->Write(CachedRect2fType(), &mBuildSkirt, ownerRef);
+    archive->Write(gpg::CachedLookup<gpg::Rect2<float>>(gpg::Rect2f::sType), &mBuildSkirt, ownerRef);
   }
 } // namespace moho
 

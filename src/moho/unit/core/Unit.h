@@ -413,8 +413,8 @@ namespace moho
     float mMinRadius;                       // +0x54
     float mMaxRadius;                       // +0x58
     float mEffectiveRadius;                 // +0x5C
-    msvc8::string mUIMinRangeVisualId;      // +0x60
-    msvc8::string mUIMaxRangeVisualId;      // +0x7C
+    fa::string mUIMinRangeVisualId;      // +0x60
+    fa::string mUIMaxRangeVisualId;      // +0x7C
   };
   static_assert(sizeof(UnitWeaponInfo) == 0x98, "UnitWeaponInfo size must be 0x98");
   static_assert(offsetof(UnitWeaponInfo, mCat1) == 0x00, "UnitWeaponInfo::mCat1 offset must be 0x00");
@@ -556,7 +556,7 @@ namespace moho
     /// resolves the id, adds that entity to the current selection and hands it
     /// this unit's selection-set names. Points the opposite way from `mCreator`.
     EntId mSelectionInheritorId;  // +0x040
-    msvc8::string mCustomName;    // +0x044
+    fa::string mCustomName;    // +0x044
     SSTIUnitEconomyPair mProduced;         // +0x060
     SSTIUnitEconomyPair mResourcesSpent;   // +0x068
     SSTIUnitEconomyPair mMaintainenceCost; // +0x070
@@ -779,7 +779,7 @@ namespace moho
      * What it does:
      * Returns this unit pointer through the const RTTI/downcast lane.
      */
-    virtual Unit const* IsUnit() const;
+    Unit const* IsUnit() const override;
 
     /**
      * Address: 0x006A4BB0 (FUN_006A4BB0)
@@ -787,91 +787,91 @@ namespace moho
      * What it does:
      * Returns this unit pointer through the mutable RTTI/downcast lane.
      */
-    virtual Unit* IsUnit();
+    Unit* IsUnit() override;
 
     /**
      * Address: 0x006A48E0 (FUN_006A48E0)
      * Slot: 2
      * Demangled: public: virtual class moho::UserUnit const near * __thiscall moho::IUnit::IsUserUnit(void)const
      */
-    virtual UserUnit const* IsUserUnit() const;
+    UserUnit const* IsUserUnit() const override;
 
     /**
      * Address: 0x006A48D0 (FUN_006A48D0)
      * Slot: 3
      * Demangled: public: virtual class moho::UserUnit near * __thiscall moho::IUnit::IsUserUnit(void)
      */
-    virtual UserUnit* IsUserUnit();
+    UserUnit* IsUserUnit() override;
 
     /**
      * Address: 0x006A49A0 (FUN_006A49A0)
      * Slot: 4
      * Demangled: public: virtual class moho::EntId __thiscall moho::Unit::GetEntityId(void)const
      */
-    virtual EntId GetEntityId() const;
+    EntId GetEntityId() const override;
 
     /**
      * Address: 0x006A49B0 (FUN_006A49B0)
      * Slot: 5
      * Demangled: public: virtual class Wm3::Vec3f const near & __thiscall moho::Unit::GetPosition(void)const
      */
-    virtual Wm3::Vec3f const& GetPosition() const;
+    Wm3::Vec3f const& GetPosition() const override;
 
     /**
      * Address: 0x006A49C0 (FUN_006A49C0)
      * Slot: 6
      * Demangled: public: virtual class moho::VTransform const near & __thiscall moho::Unit::GetTransform(void)const
      */
-    virtual VTransform const& GetTransform() const;
+    VTransform const& GetTransform() const override;
 
     /**
      * Address: 0x006A8B20 (FUN_006A8B20)
      * Slot: 7
      * Demangled: public: virtual class moho::RUnitBlueprint const near * __thiscall moho::Unit::GetBlueprint(void)const
      */
-    virtual RUnitBlueprint const* GetBlueprint() const;
+    RUnitBlueprint const* GetBlueprint() const override;
 
     /**
      * Address: 0x006A49D0 (FUN_006A49D0)
      * Slot: 8
      * Demangled: public: virtual class LuaPlus::LuaObject __thiscall moho::Unit::GetLuaObject(void)
      */
-    virtual LuaPlus::LuaObject GetLuaObject();
+    LuaPlus::LuaObject GetLuaObject() override;
 
     /**
      * Address: 0x006A8B30 (FUN_006A8B30)
      * Slot: 9
      * Demangled: public: virtual float __thiscall moho::Unit::CalcTransportLoadFactor(void)const
      */
-    virtual float CalcTransportLoadFactor() const;
+    float CalcTransportLoadFactor() const override;
 
     /**
      * Address: 0x006A49F0 (FUN_006A49F0)
      * Slot: 10
      * Demangled: public: virtual bool __thiscall moho::Unit::IsDead(void)const
      */
-    virtual bool IsDead() const;
+    bool IsDead() const override;
 
     /**
      * Address: 0x006A4A00 (FUN_006A4A00)
      * Slot: 11
      * Demangled: public: virtual bool __thiscall moho::Unit::DestroyQueued(void)const
      */
-    virtual bool DestroyQueued() const;
+    bool DestroyQueued() const override;
 
     /**
      * Address: 0x006A4A10 (FUN_006A4A10)
      * Slot: 12
      * Demangled: public: virtual bool __thiscall moho::Unit::IsMobile(void)const
      */
-    virtual bool IsMobile() const;
+    bool IsMobile() const override;
 
     /**
      * Address: 0x006A4A20 (FUN_006A4A20)
      * Slot: 13
      * Demangled: public: virtual bool __thiscall moho::Unit::IsBeingBuilt(void)const
      */
-    virtual bool IsBeingBuilt() const;
+    bool IsBeingBuilt() const override;
 
     /**
      * Address: 0x006A4BD0 (FUN_006A4BD0, Moho::Unit::GetUniformScale)
@@ -1011,7 +1011,7 @@ namespace moho
      * Looks up one armor multiplier by damage-type token and returns scaled
      * damage when a matching lane exists.
      */
-    [[nodiscard]] float ProcessArmorOnDamage(float amount, msvc8::string damageType) const;
+    [[nodiscard]] float ProcessArmorOnDamage(float amount, fa::string damageType) const;
 
     /**
      * Address: 0x006A9E10 (FUN_006A9E10, Moho::Unit::GetArmorMult)
@@ -1024,7 +1024,7 @@ namespace moho
      * Returns this unit's armor multiplier for one damage type, or 1.0 when
      * the type has no entry - i.e. an unlisted damage type is unmodified.
      */
-    [[nodiscard]] float GetArmorMult(const msvc8::string& damageType) const;
+    [[nodiscard]] float GetArmorMult(const fa::string& damageType) const;
 
     /**
      * Address: 0x006A9F40 (FUN_006A9F40, Moho::Unit::Materialize)
@@ -1062,7 +1062,7 @@ namespace moho
      * Slot: 14
      * Demangled: public: virtual bool __thiscall moho::Unit::IsNavigatorIdle(void)const
      */
-    virtual bool IsNavigatorIdle() const;
+    bool IsNavigatorIdle() const override;
 
     /**
      * Address: 0x006A7D10 (FUN_006A7D10, Moho::Unit::IsBusy)
@@ -1185,14 +1185,14 @@ namespace moho
      * Slot: 15
      * Demangled: public: virtual bool __thiscall moho::Unit::IsUnitState(enum moho::EUnitState)const
      */
-    virtual bool IsUnitState(EUnitState) const;
+    bool IsUnitState(EUnitState) const override;
 
     /**
      * Address: 0x006A4990 (FUN_006A4990)
      * Slot: 16
      * Demangled: public: virtual struct moho::UnitAttributes near & __thiscall moho::Unit::GetAttributes(void)
      */
-    virtual UnitAttributes& GetAttributes();
+    UnitAttributes& GetAttributes() override;
 
     /**
      * Address: 0x006A4980 (FUN_006A4980)
@@ -1200,7 +1200,7 @@ namespace moho
      * Demangled: public: virtual struct moho::UnitAttributes const near & __thiscall
      * moho::Unit::GetAttributes(void)const
      */
-    virtual UnitAttributes const& GetAttributes() const;
+    UnitAttributes const& GetAttributes() const override;
 
     /**
      * Address: 0x006A4B90 (FUN_006A4B90)
@@ -1208,8 +1208,8 @@ namespace moho
      * Demangled: public: virtual class moho::StatItem near * __thiscall moho::Unit::GetStat(class gpg::StrArg,class
      * std::basic_string<char,struct std::char_traits<char>,class std::allocator<char>> const near &)
      */
-    virtual StatItem*
-    GetStat(gpg::StrArg, std::basic_string<char, std::char_traits<char>, std::allocator<char>> const&);
+    StatItem*
+    GetStat(gpg::StrArg, std::basic_string<char, std::char_traits<char>, std::allocator<char>> const&) override;
 
     /**
      * Address: 0x006A4B70 (FUN_006A4B70)
@@ -1217,7 +1217,7 @@ namespace moho
      * Demangled: public: virtual class moho::StatItem near * __thiscall moho::Unit::GetStat(class gpg::StrArg,float
      * const near &)
      */
-    virtual StatItem* GetStat(gpg::StrArg, float const&);
+    StatItem* GetStat(gpg::StrArg, float const&) override;
 
     /**
      * Address: 0x006A4B50 (FUN_006A4B50)
@@ -1225,14 +1225,14 @@ namespace moho
      * Demangled: public: virtual class moho::StatItem near * __thiscall moho::Unit::GetStat(class gpg::StrArg,int const
      * near &)
      */
-    virtual StatItem* GetStat(gpg::StrArg, int const&);
+    StatItem* GetStat(gpg::StrArg, int const&) override;
 
     /**
      * Address: 0x006A4B30 (FUN_006A4B30)
      * Slot: 21
      * Demangled: public: virtual class moho::StatItem near * __thiscall moho::Unit::GetStat(class gpg::StrArg)
      */
-    virtual StatItem* GetStat(gpg::StrArg);
+    StatItem* GetStat(gpg::StrArg) override;
 
     /**
      * Address: 0x006A73A0 (FUN_006A73A0)
@@ -2087,7 +2087,7 @@ namespace moho
     float TransportLoadFactor;                       // 0x0564
     /**
      * Per-unit damage-type armor multiplier lookup (`std::map<std::string,
-     * float>` in the shipped binary; modeled here as `msvc8::map`, the
+     * float>` in the shipped binary; modeled here as `fa::map`, the
      * project's MSVC8-ABI-exact `std::map` reimplementation).
      *
      * Evidence:
@@ -2098,14 +2098,14 @@ namespace moho
      *   this same lane; see their bodies below for the real API call sites
      *   (`find()`/`operator[]`) and `legacy/containers/{Map,RbTree}.h` for
      *   the generic template-internal citations for this instantiation.
-     * - Node layout (48 bytes: 12-byte link triplet, 28-byte `msvc8::string`
+     * - Node layout (48 bytes: 12-byte link triplet, 28-byte `fa::string`
      *   key at +0x0C, `float` value at +0x28, color/isNil at +0x2C/+0x2D)
      *   and container layout (12-byte `{proxy,_Myhead,_Mysize}` triplet)
-     *   match `msvc8::map<msvc8::string,float>` exactly -- see
+     *   match `fa::map<fa::string,float>` exactly -- see
      *   `legacy/containers/Map.h`'s class doc comment for the shared layout
      *   derivation (confirmed independently via `Moho::CCommandDB::commands`).
      */
-    msvc8::map<msvc8::string, float> ArmorMultipliers; // 0x0568
+    fa::map<fa::string, float> ArmorMultipliers; // 0x0568
     gpg::DList<CEconomyEvent> mEconomyEventListHead; // 0x0574
     std::uint8_t CurrentTerrainType;                 // 0x057C
     bool mDebugAIStates;                             // 0x057D
@@ -2161,7 +2161,7 @@ namespace moho
   );
   static_assert(offsetof(Unit, ArmorMultipliers) == 0x0568, "Unit::ArmorMultipliers offset must be 0x0568");
   static_assert(
-    sizeof(msvc8::map<msvc8::string, float>) == 0x0C, "Unit::ArmorMultipliers (msvc8::map) size must be 0x0C"
+    sizeof(fa::map<fa::string, float>) == 0x0C, "Unit::ArmorMultipliers (fa::map) size must be 0x0C"
   );
   static_assert(
     offsetof(Unit, TransportLoadFactor) == 0x0564, "Unit::TransportLoadFactor offset must be 0x0564"
@@ -2241,7 +2241,7 @@ namespace moho
    * Loads `/lua/armordefinition.lua`, resolves the row that matches
    * `armorTypeName`, and returns all `<damageType multiplier>` string lanes.
    */
-  [[nodiscard]] msvc8::list<msvc8::string> ARMOR_GetArmorDefinations(LuaPlus::LuaState* state, gpg::StrArg armorTypeName);
+  [[nodiscard]] fa::list<fa::string> ARMOR_GetArmorDefinations(LuaPlus::LuaState* state, gpg::StrArg armorTypeName);
 
   /**
    * Address: 0x006C3AB0 (FUN_006C3AB0, cfunc_UnitGetUnitId)

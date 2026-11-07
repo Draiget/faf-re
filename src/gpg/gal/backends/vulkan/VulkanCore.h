@@ -60,6 +60,8 @@ namespace gpg::gal::vulkan
     /** Throws a gal Error when no memory type fits or the device is out of memory. */
     [[nodiscard]] Allocation Allocate(const VkMemoryRequirements& requirements, VkMemoryPropertyFlags required, bool linear);
     void Free(const Allocation& allocation) noexcept;
+    /** Bytes in device memory blocks (memory diagnostics). */
+    [[nodiscard]] std::uint64_t BlockBytes() const noexcept;
 
   private:
     struct Block
@@ -102,6 +104,9 @@ namespace gpg::gal::vulkan
     void Retire(std::uint64_t completedSerial) noexcept;
     [[nodiscard]] std::uint64_t TakeAllocatedBytes() noexcept;
     [[nodiscard]] std::uint64_t BusyBytes() const noexcept;
+    /** Bytes and count of the pages held (memory diagnostics). */
+    [[nodiscard]] std::uint64_t PageBytes() const noexcept;
+    [[nodiscard]] std::size_t PageCount() const noexcept { return mPages.size(); }
 
   private:
     struct Page

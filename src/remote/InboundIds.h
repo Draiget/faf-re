@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <utility>
 
 #include "moho/command/ICommandSink.h"
 #include "moho/command/SSTICommandIssueData.h"
@@ -28,6 +29,10 @@
 // A renumbered id the view was never given, or one already retired, drops the whole command,
 // which is counted and logged. Inside a sim callback's Lua arguments, the fields the routing
 // policy marks (`kCallbackIdFields`, WP5.11) are translated too; the rest pass as they are.
+//
+// An id that isn't renumbered keeps the sim's number, so anyone can guess one. As a target, it must
+// also be something the view holds (`SetHeldTest`), or a modified client could order an attack on a
+// unit it can't see and learn where it is from the way its own unit sets off.
 
 namespace faf::remote
 {
@@ -127,6 +132,12 @@ namespace faf::remote
     /** The id as `next` gets it, in place; false refuses it (the command is dropped). */
     [[nodiscard]] virtual bool RewriteEntity(std::uint32_t& id) = 0;
     [[nodiscard]] virtual bool RewriteCommand(std::uint32_t& id) = 0;
+    /** Whether a command may name this id, as sent, as its target. */
+    [[nodiscard]] virtual bool AllowTarget(std::uint32_t id)
+    {
+      (void)id;
+      return true;
+    }
     /** Whether an unmarked Lua value is worth logging as an id (none by default). */
     [[nodiscard]] virtual bool LooksRenumbered(std::uint32_t value) const { return false; }
 
@@ -143,6 +154,8 @@ namespace faf::remote
     void CountBlipTarget(const moho::SSTICommandIssueData& data) noexcept;
     [[nodiscard]] bool CallbackIds(const char* name, const LuaPlus::LuaObject& args);
     void LogUnmarked(const char* name, const LuaPlus::LuaObject& value, const std::string& path, int depth);
+
+    static constexpr std::uint64_t kDropsLogged = 32u;
 
     moho::ICommandSink& mNext;
     std::uint64_t mUnmarkedIds = 0;
@@ -175,10 +188,14 @@ namespace faf::remote
 
     /** The view the commands come from (a client's army). */
     void SetMap(const CViewIdMap& map) noexcept { mMap = &map; }
+    /** Asks whether the view holds an id that isn't renumbered, for a target. None: every target goes through. */
+    void SetHeldTest(std::function<bool(std::uint32_t id)> held) { mHeld = std::move(held); }
 
   protected:
     [[nodiscard]] bool RewriteEntity(std::uint32_t& id) override { return mMap->EntityToSim(id, id); }
     [[nodiscard]] bool RewriteCommand(std::uint32_t& id) override { return mMap->CommandToSim(id, id); }
+    /** A renumbered id is the map's to say. */
+    [[nodiscard]] bool AllowTarget(const std::uint32_t id) override { return !mHeld || mMap->MapsEntity(id) || mHeld(id); }
     /** A blip or foreign projectile id of this view, as only a view id can be. */
     [[nodiscard]] bool LooksRenumbered(const std::uint32_t value) const override
     {
@@ -188,5 +205,6 @@ namespace faf::remote
 
   private:
     const CViewIdMap* mMap;
+    std::function<bool(std::uint32_t id)> mHeld;
   };
 } // namespace faf::remote

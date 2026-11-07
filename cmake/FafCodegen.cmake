@@ -23,8 +23,9 @@
 #    keep their builtins.
 #
 #  - x86: sqrt is a CRT call as well, the clang counterpart of
-#    platform/X87SqrtCall.h's `#pragma function(sqrt)` (which clang-cl also
-#    honours; the flags make it hold for every library too). Under the sim's
+#    platform/X87SqrtCall.h's `#pragma function(sqrt)`. These flags are what
+#    hold it: with them, clang reports that pragma as ignored
+#    (-Wignored-pragma-intrinsic). Under the sim's
 #    _PC_24 control word the CRT's fsqrt rounds to 24 bits where an inlined
 #    sqrtsd would not. x64 keeps sqrt inline: MSVC x64 inlines sqrtsd too.
 #

@@ -29,10 +29,6 @@ namespace
     }
   };
 
-  gpg::RType* gEntIdVectorType = nullptr;
-  gpg::RType* gUnitCommandType = nullptr;
-  gpg::RType* gTargetType = nullptr;
-  gpg::RType* gCellVectorType = nullptr;
 
   struct SSTICommandVariableDataSlot
   {
@@ -50,38 +46,6 @@ namespace
     "SSTICommandVariableDataSlot must include 8-byte slot header plus variable payload"
   );
 
-
-  [[nodiscard]] gpg::RType* ResolveEntIdVectorType()
-  {
-    if (gEntIdVectorType == nullptr) {
-      gEntIdVectorType = gpg::LookupRType(typeid(gpg::fastvector<moho::EntId>));
-    }
-    return gEntIdVectorType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEUnitCommandType()
-  {
-    if (gUnitCommandType == nullptr) {
-      gUnitCommandType = gpg::LookupRType(typeid(moho::EUnitCommandType));
-    }
-    return gUnitCommandType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSSTITargetType()
-  {
-    if (gTargetType == nullptr) {
-      gTargetType = gpg::LookupRType(typeid(moho::SSTITarget));
-    }
-    return gTargetType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSOCellPosVectorType()
-  {
-    if (gCellVectorType == nullptr) {
-      gCellVectorType = gpg::LookupRType(typeid(gpg::fastvector<moho::SOCellPos>));
-    }
-    return gCellVectorType;
-  }
 
 
 
@@ -201,20 +165,20 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    gpg::RType* const entIdVectorType = ResolveEntIdVectorType();
+    gpg::RType* const entIdVectorType = gpg::RTypeOf<gpg::fastvector<moho::EntId>>();
     GPG_ASSERT(entIdVectorType != nullptr);
     archive->Read(entIdVectorType, &mEntIds, ownerRef);
 
-    gpg::RType* const unitCommandType = ResolveEUnitCommandType();
+    gpg::RType* const unitCommandType = gpg::RTypeOf<moho::EUnitCommandType>();
     GPG_ASSERT(unitCommandType != nullptr);
     archive->Read(unitCommandType, &mCmdType, ownerRef);
 
-    gpg::RType* const targetType = ResolveSSTITargetType();
+    gpg::RType* const targetType = gpg::RTypeOf<moho::SSTITarget>();
     GPG_ASSERT(targetType != nullptr);
     archive->Read(targetType, &mTarget1, ownerRef);
     archive->Read(targetType, &mTarget2, ownerRef);
 
-    gpg::RType* const cellVectorType = ResolveSOCellPosVectorType();
+    gpg::RType* const cellVectorType = gpg::RTypeOf<gpg::fastvector<moho::SOCellPos>>();
     GPG_ASSERT(cellVectorType != nullptr);
     archive->Read(cellVectorType, &mCells, ownerRef);
 
@@ -234,20 +198,20 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    gpg::RType* const entIdVectorType = ResolveEntIdVectorType();
+    gpg::RType* const entIdVectorType = gpg::RTypeOf<gpg::fastvector<moho::EntId>>();
     GPG_ASSERT(entIdVectorType != nullptr);
     archive->Write(entIdVectorType, &mEntIds, ownerRef);
 
-    gpg::RType* const unitCommandType = ResolveEUnitCommandType();
+    gpg::RType* const unitCommandType = gpg::RTypeOf<moho::EUnitCommandType>();
     GPG_ASSERT(unitCommandType != nullptr);
     archive->Write(unitCommandType, &mCmdType, ownerRef);
 
-    gpg::RType* const targetType = ResolveSSTITargetType();
+    gpg::RType* const targetType = gpg::RTypeOf<moho::SSTITarget>();
     GPG_ASSERT(targetType != nullptr);
     archive->Write(targetType, &mTarget1, ownerRef);
     archive->Write(targetType, &mTarget2, ownerRef);
 
-    gpg::RType* const cellVectorType = ResolveSOCellPosVectorType();
+    gpg::RType* const cellVectorType = gpg::RTypeOf<gpg::fastvector<moho::SOCellPos>>();
     GPG_ASSERT(cellVectorType != nullptr);
     archive->Write(cellVectorType, &mCells, ownerRef);
 

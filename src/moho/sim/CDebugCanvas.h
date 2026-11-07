@@ -198,10 +198,10 @@ namespace moho
     void AddWorldText(const SDebugWorldText& text);
 
   public:
-    msvc8::vector<SDebugLine> lines;
-    msvc8::vector<SDebugWorldText> worldText;
-    msvc8::vector<SDebugScreenText> screenText;
-    msvc8::vector<SDebugDecal> decals;
+    fa::vector<SDebugLine> lines;
+    fa::vector<SDebugWorldText> worldText;
+    fa::vector<SDebugScreenText> screenText;
+    fa::vector<SDebugDecal> decals;
   };
 
   static_assert(sizeof(CDebugCanvas) == 0x40, "CDebugCanvas size must be 0x40");
@@ -210,26 +210,26 @@ namespace moho
    * Address: 0x00452110 (FUN_00452110, sub_452110)
    *
    * What it does:
-   * Out-of-line `size()` thunk for `msvc8::vector<SDebugWorldText>`
+   * Out-of-line `size()` thunk for `fa::vector<SDebugWorldText>`
    * used by `CDebugCanvas::worldText` (element size `0x30`).
    */
-  [[nodiscard]] std::size_t GetDebugWorldTextCount(const msvc8::vector<SDebugWorldText>* worldText) noexcept;
+  [[nodiscard]] std::size_t GetDebugWorldTextCount(const fa::vector<SDebugWorldText>* worldText) noexcept;
 
   /**
    * Address: 0x00452160 (FUN_00452160, sub_452160)
    *
    * What it does:
-   * Out-of-line `size()` thunk for `msvc8::vector<SDebugScreenText>`
+   * Out-of-line `size()` thunk for `fa::vector<SDebugScreenText>`
    * used by `CDebugCanvas::screenText` (element size `0x48`).
    */
-  [[nodiscard]] std::size_t GetDebugScreenTextCount(const msvc8::vector<SDebugScreenText>* screenText) noexcept;
+  [[nodiscard]] std::size_t GetDebugScreenTextCount(const fa::vector<SDebugScreenText>* screenText) noexcept;
 
   /**
    * Address: 0x004521B0 (FUN_004521B0, sub_4521B0)
    *
    * What it does:
-   * Out-of-line `size()` thunk for `msvc8::vector<SDebugDecal>` used
+   * Out-of-line `size()` thunk for `fa::vector<SDebugDecal>` used
    * by `CDebugCanvas::decals` (element size `0x34`).
    */
-  [[nodiscard]] std::size_t GetDebugDecalCount(const msvc8::vector<SDebugDecal>* decals) noexcept;
+  [[nodiscard]] std::size_t GetDebugDecalCount(const fa::vector<SDebugDecal>* decals) noexcept;
 } // namespace moho

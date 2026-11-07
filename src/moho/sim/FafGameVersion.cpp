@@ -39,6 +39,7 @@ namespace moho
     int sim_FixProjectileImpactBelowZero = -1;
     int sim_FixRefuelUndockAboveMaxHealth = -1;
     int sim_FixShieldRepair = -1;
+    int sim_FixProjectileMapEdgeCollision = -1;
 
     TConVar<int> gTConVar_sim_FixAimLeadOncePerTick(
       "sim_FixAimLeadOncePerTick",
@@ -66,6 +67,12 @@ namespace moho
       "version, 0 off, 1 on).",
       &sim_FixShieldRepair
     );
+    TConVar<int> gTConVar_sim_FixProjectileMapEdgeCollision(
+      "sim_FixProjectileMapEdgeCollision",
+      "FA-Binary-Patches #180: a surface-colliding projectile outside the map hits the terrain extended from the "
+      "nearest map edge, instead of #154's impact below height 0 (-1 game version: no release has it yet, 0 off, 1 on).",
+      &sim_FixProjectileMapEdgeCollision
+    );
 
     struct SFafSimFixInfo
     {
@@ -76,13 +83,15 @@ namespace moho
 
     // Game versions from the FAForever/fa changelogs: 3836 (2026-05-16) shipped #143, #145 and
     // #157; 3840 (2026-10-20) shipped every engine patch merged since, #154, #169 and #175 among
-    // them. 3837..3839 changed only Lua.
+    // them. 3837..3839 changed only Lua. #180 was an open PR on 2026-11-06, in no release: when
+    // a release ships it, put that game version here and raise kFafGameVersionLatest.
     const std::array<SFafSimFixInfo, static_cast<std::size_t>(EFafSimFix::Count)> kFafSimFixes{{
       {"sim_FixAimLeadOncePerTick", 3836, &sim_FixAimLeadOncePerTick},
       {"sim_FixTargetPointCollisionCentre", 3836, &sim_FixTargetPointCollisionCentre},
       {"sim_FixProjectileImpactBelowZero", 3840, &sim_FixProjectileImpactBelowZero},
       {"sim_FixRefuelUndockAboveMaxHealth", 3840, &sim_FixRefuelUndockAboveMaxHealth},
       {"sim_FixShieldRepair", 3840, &sim_FixShieldRepair},
+      {"sim_FixProjectileMapEdgeCollision", kFafGameVersionUnreleased, &sim_FixProjectileMapEdgeCollision},
     }};
 
     int sSessionGameVersion = kFafGameVersionLatest;
@@ -131,7 +140,7 @@ namespace moho
 
   int FAF_GetGameDataVersion()
   {
-    msvc8::string diskPath{};
+    fa::string diskPath{};
     if (CVirtualFileSystem* const vfs = DISK_GetVFS(); vfs != nullptr) {
       (void)vfs->FindFile(&diskPath, "/lua/version.lua", nullptr);
     }

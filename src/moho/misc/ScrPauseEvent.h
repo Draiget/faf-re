@@ -36,7 +36,7 @@ namespace moho
      * What it does:
      * `wxEvent(0, EVT_SCR_PAUSE)` carrying the source and line.
      */
-    ScrPauseEvent(const msvc8::string& sourceName, int sourceLine);
+    ScrPauseEvent(const fa::string& sourceName, int sourceLine);
 
     /**
      * Address: 0x004B43F0 (FUN_004B43F0)
@@ -46,7 +46,7 @@ namespace moho
      */
     wxEvent* Clone() const override;
 
-    msvc8::string mSourceName; // +0x20
+    fa::string mSourceName; // +0x20
     int mSourceLine;           // +0x3C
   };
 

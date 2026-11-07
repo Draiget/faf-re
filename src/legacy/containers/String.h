@@ -9,7 +9,7 @@
 
 #include "legacy/containers/Layout.h"
 
-namespace msvc8
+namespace fa
 {
     /**
      * Address: 0x00ABF013 (FUN_00ABF013)
@@ -18,18 +18,15 @@ namespace msvc8
      * IDA signature:
      * void __cdecl __noreturn std::_String_base::_Xlen(void);
      *
-     * What it does:
-     * Dinkumware's shared (non-templated) "requested string length is not
-     * representable" helper - throws std::length_error("string too long")
-     * and never returns. In the binary it is called from every
+     * What it does: Dinkumware's shared (non-templated) "requested string
+     * length is not representable" helper - throws std::length_error("string
+     * too long") and never returns. In the binary it is called from every
      * basic_string<char>/basic_string<wchar_t> growth path: std::string::assign
      * (0x004056FE), std::string::append (0x00405829, 0x00405840), insert,
      * replace, and the wstring equivalents (18 call sites total, decoded from
-     * the raw E8 bytes; see FUN_00ABF013.xrefs.txt). Those STL-internal bodies
-     * are tracked `skip` in recovered_progress.json (generic Dinkumware
-     * library code, not FA engine logic); `msvc8::string::assign_owned_strong`
-     * is this project's higher-level stand-in for their length guard, so that
-     * is where this is wired.
+     * the raw E8 bytes; see FUN_00ABF013.xrefs.txt).
+     * `fa::string::assign_owned_strong` is this project's higher-level
+     * stand-in for their length guard, so that is where this is wired.
      */
     [[noreturn]] void ThrowStringTooLong();
 
@@ -45,7 +42,7 @@ namespace msvc8
      * never returns. In the binary it is called from std::string::assign
      * (0x004056C3), std::string::append (0x00405803), erase, insert, replace,
      * and the wstring equivalents (12 call sites total, decoded from the raw
-     * E8 bytes; see FUN_00ABF052.xrefs.txt). `msvc8::string::assign(other,
+     * E8 bytes; see FUN_00ABF052.xrefs.txt). `fa::string::assign(other,
      * pos, count)` already models FUN_004056B0 (std::string::assign)
      * including its pos-vs-size check, so this is wired there.
      */
@@ -87,9 +84,9 @@ namespace msvc8
          * assign_owned, resize, append and reserve all perform - freed it out
          * from under the other. It showed up as a technique name read back as
          * the contents of an unrelated local: the D3D9 effect loader's
-         * `msvc8::vector<msvc8::string>` grew, relocated its elements
+         * `fa::vector<fa::string>` grew, relocated its elements
          * shallowly, released the originals, and the allocator handed the same
-         * block to the next `msvc8::string` built in the loop.
+         * block to the next `fa::string` built in the loop.
          *
          * Each copy therefore owns a buffer that has to be released again, which
          * is what the destructor below does.
@@ -137,9 +134,9 @@ namespace msvc8
          * reservation.
          *
          * The large multiplier comes from the containers rather than from
-         * scattered locals: `msvc8::vector<T>` guards its element teardown with
+         * scattered locals: `fa::vector<T>` guards its element teardown with
          * `if constexpr (!std::is_trivially_destructible_v<T>)`, so while this
-         * type stayed trivially destructible every `msvc8::vector<msvc8::string>`
+         * type stayed trivially destructible every `fa::vector<fa::string>`
          * released its own block and leaked every element's.
          *
          * `tidy(true, 0)` is the already-recovered lane (0x008846B0 and friends)
@@ -172,7 +169,7 @@ namespace msvc8
          * allocated a fresh buffer for the copy and abandoned the one it
          * displaced.
          *
-         * `msvc8::vector::erase` moves the whole tail down one slot per erased
+         * `fa::vector::erase` moves the whole tail down one slot per erased
          * element. With the log window's committed history at tens of thousands
          * of lines, one capped log write leaked that many blocks, and a busy
          * logging window exhausted the heap - `assign_owned` then memcpy'd
@@ -360,7 +357,7 @@ namespace msvc8
          * If `built` is true and the string is in heap mode, releases the heap buffer.
          *
          * Address: 0x00402740 (FUN_00402740)
-         * Address: 0x0045F3F0 (FUN_0045F3F0 -- `_Tidy(true)` -- free the heap buffer and restore the empty SSO state for `msvc8::string` (the canonical path keys of both wait-handle-set maps); callers 0x0045E870, 0x0045F670, 0x0045F7A0; formerly `ResetLegacyStringStorage` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x0045F3F0 (FUN_0045F3F0 -- `_Tidy(true)` -- free the heap buffer and restore the empty SSO state for `fa::string` (the canonical path keys of both wait-handle-set maps); callers 0x0045E870, 0x0045F670, 0x0045F7A0; formerly `ResetLegacyStringStorage` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
          */
         void tidy(bool built = true, uint32_t newSize = 0U) noexcept;
 
@@ -514,7 +511,7 @@ namespace msvc8
         }
 
         /**
-         * Assign from a substring of another msvc8::string.
+         * Assign from a substring of another fa::string.
          * Semantics modeled after MSVC8 std::string::assign(str, pos, count)
          * (FUN_004056B0), including its out-of-range behavior.
          *
@@ -574,7 +571,7 @@ namespace msvc8
         }
 
         /**
-		 * Return substring [from .. from+maxLen) as a new msvc8::string.
+		 * Return substring [from .. from+maxLen) as a new fa::string.
 		 *
 		 * Always a copy, which is what MSVC8's own `basic_string::substr` is:
 		 * `return basic_string(*this, off, count)`.
@@ -593,7 +590,7 @@ namespace msvc8
 		 *
 		 * @param from   Start position (clamped: if >= size() -> empty string).
 		 * @param maxLen Max number of chars; npos means "to the end".
-		 * @return New msvc8::string instance (copy or non-owning view).
+		 * @return New fa::string instance (copy or non-owning view).
 		 */
         [[nodiscard]]
         string substr(const std::size_t from, const std::size_t maxLen = npos) const noexcept {
@@ -622,7 +619,7 @@ namespace msvc8
             return string(src, len);
         }
 
-        /** Compare with another msvc8::string. */
+        /** Compare with another fa::string. */
         friend bool operator==(const string& a, const string& b) noexcept {
             const bool as = a.basic_sanity();
             const bool bs = b.basic_sanity();
@@ -792,7 +789,7 @@ namespace msvc8
 
 #pragma pack(push, 4)
     /**
-     * Same-size form of `msvc8::string` whose assignment takes the new buffer
+     * Same-size form of `fa::string` whose assignment takes the new buffer
      * before it releases the old one and reports failures.
      */
     class scoped_string final : public string
@@ -813,10 +810,10 @@ namespace msvc8
     static_assert(sizeof(scoped_string) == 28, "MSVC8 scoped string must be 28 bytes on x86");
 
 
-    /** std::string_view + msvc8::string */
+    /** std::string_view + fa::string */
     [[nodiscard]] inline string operator+(std::string_view lhs, const string& rhs) noexcept;
 
-    /** const char* + msvc8::string */
+    /** const char* + fa::string */
     [[nodiscard]] inline string operator+(const char* lhs, const string& rhs) noexcept;
 
     namespace detail {

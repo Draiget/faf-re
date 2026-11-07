@@ -14,34 +14,25 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCTaskThreadType()
-  {
-    gpg::RType* cached = moho::CTaskThread::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CTaskThread));
-      moho::CTaskThread::sType = cached;
-    }
-    return cached;
-  }
 
   [[nodiscard]] gpg::RRef MakeCTaskThreadRef(moho::CTaskThread* thread)
   {
     gpg::RRef out{};
     out.mObj = nullptr;
-    out.mType = CachedCTaskThreadType();
+    out.mType = gpg::RTypeOf<moho::CTaskThread>();
     if (!thread) {
       return out;
     }
 
-    gpg::RType* dynamicType = CachedCTaskThreadType();
+    gpg::RType* dynamicType = gpg::RTypeOf<moho::CTaskThread>();
     try {
       dynamicType = gpg::LookupRType(typeid(*thread));
     } catch (...) {
-      dynamicType = CachedCTaskThreadType();
+      dynamicType = gpg::RTypeOf<moho::CTaskThread>();
     }
 
     std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType->IsDerivedFrom(CachedCTaskThreadType(), &baseOffset);
+    const bool isDerived = dynamicType->IsDerivedFrom(gpg::RTypeOf<moho::CTaskThread>(), &baseOffset);
     GPG_ASSERT(isDerived);
     if (!isDerived) {
       out.mObj = thread;
@@ -67,14 +58,14 @@ namespace
     gpg::RRef source{};
     source.mObj = tracked.object;
     source.mType = tracked.type;
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedCTaskThreadType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::CTaskThread>());
     if (upcast.mObj) {
       return static_cast<moho::CTaskThread*>(upcast.mObj);
     }
 
-    const char* const expected = CachedCTaskThreadType()->GetName();
+    const char* const expected = gpg::RTypeOf<moho::CTaskThread>()->GetName();
     const char* const actual = source.GetTypeName();
-    const msvc8::string msg = gpg::STR_Printf(
+    const fa::string msg = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "CTaskThread",
@@ -133,7 +124,7 @@ moho::RWeakPtrType<moho::CTaskThread>::~RWeakPtrType() = default;
  */
 const char* moho::RWeakPtrType<moho::CTaskThread>::GetName() const
 {
-    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedCTaskThreadType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<moho::CTaskThread>()->GetName());
     return sName.c_str();
 }
 
@@ -152,19 +143,19 @@ void moho::RWeakPtrType<moho::CTaskThread>::Init()
 /**
  * Address: 0x0040A3C0 (FUN_0040A3C0, Moho::RWeakPtrType_CTaskThread::GetLexical)
  */
-msvc8::string moho::RWeakPtrType<moho::CTaskThread>::GetLexical(const gpg::RRef& ref) const
+fa::string moho::RWeakPtrType<moho::CTaskThread>::GetLexical(const gpg::RRef& ref) const
 {
   auto* const weak = static_cast<const moho::WeakPtr<moho::CTaskThread>*>(ref.mObj);
   if (!weak || !weak->HasValue()) {
-    return msvc8::string("NULL");
+    return fa::string("NULL");
   }
 
   const gpg::RRef pointee = MakeCTaskThreadRef(weak->GetObjectPtr());
   if (!pointee.mObj) {
-    return msvc8::string("NULL");
+    return fa::string("NULL");
   }
 
-  const msvc8::string inner = pointee.GetLexical();
+  const fa::string inner = pointee.GetLexical();
   return gpg::STR_Printf("[%s]", inner.c_str());
 }
 
@@ -225,7 +216,7 @@ void moho::WeakPtr_CTaskThread::Deserialize(
   GPG_ASSERT(weak != nullptr);
 
   const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-  RelinkWeakPtrCTaskThread(weak, ReadPointerCTaskThread(archive, owner));
+  (void)RelinkWeakPtrCTaskThread(weak, ReadPointerCTaskThread(archive, owner));
 }
 
 /**

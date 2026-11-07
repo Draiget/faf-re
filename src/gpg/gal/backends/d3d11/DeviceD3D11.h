@@ -54,7 +54,7 @@ namespace gpg::gal
     DeviceContext* GetDeviceContext() override;
     int GetCurThreadId() override;
     void Func1() const override;
-    void GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
+    void GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
     OutputContext* GetHeadOutputContext(unsigned int headIndex) override;
     const OutputContext* GetHeadOutputContext(unsigned int headIndex) const override;
     boost::shared_ptr<PipelineState> GetPipelineState() override;
@@ -81,13 +81,13 @@ namespace gpg::gal
       const RECT* sourceRect,
       const RECT* destinationRect
     ) override;
-    void SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const msvc8::string& filePath) override;
+    void SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
     void SaveRenderTarget(
-      const boost::shared_ptr<RenderTarget>& renderTarget, const msvc8::string& filePath, int fileFormat
+      const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, int fileFormat
     ) override;
     void SaveTexture(
       const boost::shared_ptr<Texture>& texture,
-      const msvc8::string& filePath,
+      const fa::string& filePath,
       int fileFormat,
       gpg::MemBuffer<char>* outBuffer
     ) override;
@@ -130,6 +130,8 @@ namespace gpg::gal
     // GPU-driven additions (gpg/gal/GpuDriven.h), implemented by GpuDrivenD3D11.
     [[nodiscard]] std::uint32_t GetGpuDrivenFeatures() const override;
     [[nodiscard]] std::uint32_t GetGpuDrivenVerified() const override;
+    /** `kGpuPathMsdfCook` for an NVIDIA adapter, else 0 (issue #309). */
+    [[nodiscard]] std::uint32_t MsdfCookVerified() const;
     boost::shared_ptr<GpuBuffer> CreateGpuBuffer(const GpuBufferDesc& desc) override;
     void UpdateGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, const void* data) override;
     boost::shared_ptr<GpuProgram> CreateGpuProgram(const GpuProgramDesc& desc) override;
@@ -228,7 +230,7 @@ namespace gpg::gal
     );
 
     int mCurThreadId = 0;
-    msvc8::vector<msvc8::string> mLog{};
+    fa::vector<fa::string> mLog{};
     DeviceContext mDeviceContext{DeviceApi::Unset};
     dxgi::Factory mFactory;
     std::uint32_t mAdapterIndex = 0;

@@ -50,6 +50,12 @@ namespace gpg::gal
   };
 
   /**
+   * PCI vendor id of NVIDIA, the only GPUs `kGpuPathMsdfCook` has run on (issue #309). AMD and Intel adapters keep
+   * the CPU font cook until it has been checked there.
+   */
+  constexpr std::uint32_t kPciVendorNvidia = 0x10DEU;
+
+  /**
    * The engine's GPU-driven render paths, as `Device::GetGpuDrivenVerified()`
    * reports them: each bit says the backend has passed that path's parity
    * checks (self-check readback, same-process screenshot A/B). A path's
@@ -67,6 +73,8 @@ namespace gpg::gal
     kGpuPathProjectileIcons = 1U << 5U, ///< `ren_GpuProjectileIcons`
     kGpuPathWorldShapes = 1U << 6U,     ///< `ren_GpuShapes`
     kGpuPathRanges = 1U << 7U,          ///< `ren_GpuRanges`
+    kGpuPathMsdfText = 1U << 8U,        ///< `ren_GpuText`
+    kGpuPathMsdfCook = 1U << 9U,        ///< `ren_GpuFontCook`; checked on NVIDIA only, so listed for its adapters alone
   };
 
   enum class GpuBufferKind : std::uint8_t

@@ -46,7 +46,7 @@ namespace
 
   void SkipString(gpg::BinaryReader& reader)
   {
-    msvc8::string scratch;
+    fa::string scratch;
     reader.ReadString(&scratch);
   }
 
@@ -239,15 +239,15 @@ namespace
     moho::Cartographic& GetCartographic() override { DieNoRenderer("GetCartographic"); }
     const moho::SkyDome& GetSkyDome() const override { DieNoRenderer("GetSkyDome"); }
     moho::SkyDome& GetSkyDome() override { DieNoRenderer("GetSkyDome"); }
-    void SetSkycube(const msvc8::string& texturePath) override { mSkycubeFile = texturePath; }
-    const msvc8::string& GetSkycubeFile() const override { return mSkycubeFile; }
+    void SetSkycube(const fa::string& texturePath) override { mSkycubeFile = texturePath; }
+    const fa::string& GetSkycubeFile() const override { return mSkycubeFile; }
     boost::shared_ptr<moho::ID3DTextureSheet> GetSkycube() const override { return {}; }
-    void SetBackground(const msvc8::string& texturePath) override { mBackgroundFile = texturePath; }
-    const msvc8::string& GetBackgroundFile() const override { return mBackgroundFile; }
+    void SetBackground(const fa::string& texturePath) override { mBackgroundFile = texturePath; }
+    const fa::string& GetBackgroundFile() const override { return mBackgroundFile; }
     boost::shared_ptr<moho::ID3DTextureSheet> GetBackground() const override { return {}; }
-    void AddEnvLookup(const msvc8::string&, const msvc8::string&) override {}
-    void RemoveEnvLookup(const msvc8::string&) override {}
-    boost::shared_ptr<moho::ID3DTextureSheet> GetEnvLookup(const msvc8::string&) const override { return {}; }
+    void AddEnvLookup(const fa::string&, const fa::string&) override {}
+    void RemoveEnvLookup(const fa::string&) override {}
+    boost::shared_ptr<moho::ID3DTextureSheet> GetEnvLookup(const fa::string&) const override { return {}; }
     void EnumerateEnvLookup(moho::TerrainEnvironmentLookupPairs&) const override {}
     void ClearEnvLookup() override {}
     void SetTopographicSamples(std::int32_t) override {}
@@ -268,7 +268,7 @@ namespace
     void UpdateNormalMap(const gpg::Rect2i&) override {}
     void NotifyMapChange(const gpg::Rect2i&) override {}
     gpg::BitArray2D* GetDebugDirtyTerrain() override { return nullptr; }
-    const msvc8::list<gpg::Rect2i>& GetDebugDirtyRects() const override { return mDebugDirtyRects; }
+    const fa::list<gpg::Rect2i>& GetDebugDirtyRects() const override { return mDebugDirtyRects; }
     std::int32_t GetNormalMapCount() override { return 0; }
     moho::SNormalMapInfo GetNormalMapInfo(std::int32_t) const override { DieNoRenderer("GetNormalMapInfo"); }
     void UpdateStratumMask(std::int32_t, const std::uint8_t*, std::int32_t, std::int32_t, std::int32_t, std::int32_t) override {}
@@ -340,9 +340,9 @@ namespace
     moho::IDecalManager* GetDecalManager() override { return nullptr; }
 
   private:
-    msvc8::string mSkycubeFile;
-    msvc8::string mBackgroundFile;
-    msvc8::list<gpg::Rect2i> mDebugDirtyRects;
+    fa::string mSkycubeFile;
+    fa::string mBackgroundFile;
+    fa::list<gpg::Rect2i> mDebugDirtyRects;
   };
 
   /**
@@ -404,12 +404,12 @@ namespace
     }
     SkipString(reader);
     {
-      msvc8::string backgroundPath;
+      fa::string backgroundPath;
       reader.ReadString(&backgroundPath);
       mBackgroundFile = backgroundPath;
     }
     {
-      msvc8::string skycubePath;
+      fa::string skycubePath;
       reader.ReadString(&skycubePath);
       mSkycubeFile = skycubePath;
     }

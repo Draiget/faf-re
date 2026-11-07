@@ -17,8 +17,8 @@ namespace moho
   CAniDefaultSkel::CAniDefaultSkel()
   {
     mFile.reset();
-    mBones = msvc8::vector<SAniSkelBone>{};
-    mBoneNameToIndex = msvc8::vector<SAniSkelBoneNameIndex>{};
+    mBones = fa::vector<SAniSkelBone>{};
+    mBoneNameToIndex = fa::vector<SAniSkelBoneNameIndex>{};
 
     SAniSkelBone rootBone{};
     rootBone.mBoneName = "Root";
@@ -49,7 +49,7 @@ namespace moho
 
 namespace moho
 {
-  void CAniDefaultSkel::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CAniDefaultSkel::MemberConstruct(gpg::ReadArchive& /*archive*/, const int, const gpg::RRef&, gpg::SerConstructResult& result)
   {
     result.SetShared(CAniSkel::GetDefaultSkeleton(), 1u);
   }

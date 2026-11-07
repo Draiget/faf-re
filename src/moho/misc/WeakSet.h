@@ -14,7 +14,7 @@ namespace moho
    * `Moho::WeakSet<T>`: a set of objects held by weak reference, which forgets
    * an object once it dies.
    *
-   * It is an `msvc8::set` of `Entry {T*, WeakPtr<T>}` ordered by the object's
+   * It is an `fa::set` of `Entry {T*, WeakPtr<T>}` ordered by the object's
    * address. The tree header is the 12-byte `{proxy, _Myhead, _Mysize}` and a
    * node is 0x1C: links at +0x00/+0x04/+0x08, the address at +0x0C, the
    * `WeakPtr` at +0x10, colour and nil at +0x18/+0x19. The engine
@@ -72,7 +72,7 @@ namespace moho
       WeakPtr<T> mRef; // +0x04 (node +0x10)
     };
 
-    using set_type = msvc8::set<Entry>;
+    using set_type = fa::set<Entry>;
     using tree_iterator = typename set_type::iterator;
     using size_type = std::size_t;
 
@@ -161,7 +161,7 @@ namespace moho
      * Address: 0x00822210 (FUN_00822210 -- the `WeakSet<UserEntity>` copy
      *   constructor: `other.begin()` (0x0066A330 from the leftmost node), then
      *   the set's range constructor 0x00822C50 over `[begin, end)`. Reached per
-     *   element from `msvc8::vector<WeakSet<UserEntity>>`'s `uninit_fill_n`
+     *   element from `fa::vector<WeakSet<UserEntity>>`'s `uninit_fill_n`
      *   0x00868DB0, and inlined into `CWldSession::GetExtraSelectList`
      *   0x00896730.)
      *
@@ -191,7 +191,7 @@ namespace moho
      * Address: 0x007B2650 (FUN_007B2650 -- the same body emitted again; caller
      *   the range constructor's unwind.)
      * Address: 0x00868E50 (FUN_00868E50 -- the same body as
-     *   `msvc8::vector<WeakSet<UserEntity>>`'s per-element destructor.)
+     *   `fa::vector<WeakSet<UserEntity>>`'s per-element destructor.)
      * Address: 0x007ABDE0 (FUN_007ABDE0 -- the same `_Tidy`; callers the
      *   camera Lua targets 0x007ABAE0/0x007ABEC0/0x007AC240,
      *   `SCommandModeData::HandleEvent` 0x0081FCD0, `cfunc_IssueDockCommandL`
@@ -231,7 +231,7 @@ namespace moho
      *
      * What it does:
      * Adds every object in `[first, last)` through the set's range insert
-     * (0x00868AF0, 0x00868A00; see `msvc8::set::insert(first, last)`).
+     * (0x00868AF0, 0x00868A00; see `fa::set::insert(first, last)`).
      */
     template <class InputIt>
     void Add(const InputIt first, const InputIt last)

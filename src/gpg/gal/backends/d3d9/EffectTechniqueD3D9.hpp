@@ -56,7 +56,7 @@ namespace gpg::gal
          * What it does:
          * Returns the technique name.
          */
-        msvc8::string* GetName() override;
+        fa::string* GetName() override;
 
         /**
          * Address: 0x008F3C40 (FUN_008F3C40)
@@ -112,7 +112,7 @@ namespace gpg::gal
          * What it does:
          * Reads the technique's bool annotation `annotationName`.
          */
-        bool GetAnnotationBool(bool* outValue, const msvc8::string& annotationName) override;
+        bool GetAnnotationBool(bool* outValue, const fa::string& annotationName) override;
 
         /**
          * Address: 0x008F4600 (FUN_008F4600)
@@ -121,7 +121,7 @@ namespace gpg::gal
          * What it does:
          * Reads the technique's int annotation `annotationName`.
          */
-        bool GetAnnotationInt(int* outValue, const msvc8::string& annotationName) override;
+        bool GetAnnotationInt(int* outValue, const fa::string& annotationName) override;
 
         /**
          * Address: 0x008F47C0 (FUN_008F47C0)
@@ -130,7 +130,7 @@ namespace gpg::gal
          * What it does:
          * Reads the technique's float annotation `annotationName`.
          */
-        bool GetAnnotationFloat(float* outValue, const msvc8::string& annotationName) override;
+        bool GetAnnotationFloat(float* outValue, const fa::string& annotationName) override;
 
         /**
          * Address: 0x008F4980 (FUN_008F4980)
@@ -139,10 +139,10 @@ namespace gpg::gal
          * What it does:
          * Reads the technique's string annotation `annotationName`.
          */
-        bool GetAnnotationString(msvc8::string* outValue, const msvc8::string& annotationName) override;
+        bool GetAnnotationString(fa::string* outValue, const fa::string& annotationName) override;
 
     public:
-        msvc8::string name_;                 // +0x04
+        fa::string name_;                 // +0x04
         boost::weak_ptr<EffectD3D9> effect_; // +0x20
         D3DXHANDLE handle_ = nullptr;        // +0x28
         bool beginEndActive_ = false;        // +0x2C

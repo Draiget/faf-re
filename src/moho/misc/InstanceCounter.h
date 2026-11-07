@@ -51,8 +51,7 @@ namespace moho
      */
     InstanceCounter() noexcept
     {
-      (void)::_InterlockedExchangeAdd(
-        reinterpret_cast<volatile platform::InterlockedLong*>(&GetStatItem()->mPrimaryValueBits), 1L);
+      (void)GetStatItem()->AddPrimaryBits(1);
     }
 
     /**
@@ -75,8 +74,7 @@ namespace moho
      */
     ~InstanceCounter() noexcept
     {
-      (void)::_InterlockedExchangeAdd(
-        reinterpret_cast<volatile platform::InterlockedLong*>(&GetStatItem()->mPrimaryValueBits), -1L);
+      (void)GetStatItem()->AddPrimaryBits(-1);
     }
 
     /**
@@ -123,7 +121,7 @@ namespace moho
     {
       static StatItem* sStatItem = nullptr;
       if (sStatItem == nullptr) {
-        msvc8::string statPath("Instance Counts_");
+        fa::string statPath("Instance Counts_");
         for (const char* name = typeid(T).name(); *name != '\0'; ++name) {
           if (*name != '_') {
             (void)statPath.append(1u, *name);

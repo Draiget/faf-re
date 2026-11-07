@@ -1,4 +1,6 @@
+#include "moho/lua/ScrLuaUserData.h"
 #include "moho/audio/CSndParams.h"
+#include "moho/lua/CScrLuaInitForm.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -77,16 +79,16 @@ namespace
   std::recursive_mutex gSndParamsRegistryMutex;
 
   /**
-   * Address: 0x010A92AC (`msvc8::list<CSndParams*>`; `_Myhead` 0x010A92B0,
+   * Address: 0x010A92AC (`fa::list<CSndParams*>`; `_Myhead` 0x010A92B0,
    *   `_Mysize` 0x010A92B4). Node `_Buynode` 0x004E2530 over
    *   `allocator<_Node>::allocate` 0x004E4F70 (0x0C bytes), self-linked by the
    *   constructor group at 0x004DFD2F. Reached only by
    *   `RegisterSndParamsInstance` (0x004DFA50).
    */
-  msvc8::list<moho::CSndParams*> gSndParamsRegistry;
+  fa::list<moho::CSndParams*> gSndParamsRegistry;
 
   /**
-   * Address: 0x010A9288 (`msvc8::multimap<std::uint32_t, CSndParams*>`, the
+   * Address: 0x010A9288 (`fa::multimap<std::uint32_t, CSndParams*>`, the
    *   shipped `Moho::sSndParamsCache`; `_Myhead` 0x010A928C, `_Mysize`
    *   0x010A9290). Node `_Buynode` 0x004E3B50 over `allocator<_Node>::allocate`
    *   0x004E5160 (0x18 bytes), initialised by the constructor group at
@@ -97,12 +99,12 @@ namespace
    * equivalence probe at all before linking, which is `insert_equal`. Key at
    * node+0x0C, the descriptor pointer at node+0x10.
    */
-  msvc8::multimap<std::uint32_t, moho::CSndParams*> gSndParamsHashCache;
+  fa::multimap<std::uint32_t, moho::CSndParams*> gSndParamsHashCache;
 
   // The shipped cache is an RB-tree keyed on the descriptor pointer: the
   // mapped handle sits at node+0x10 (0x004DF2B0 reads `[found+0x10]` and
   // compares the result against the header).
-  using SharedAmbientLoopMap = msvc8::map<moho::CSndParams*, moho::HSndEntityLoop*>;
+  using SharedAmbientLoopMap = fa::map<moho::CSndParams*, moho::HSndEntityLoop*>;
 
   /**
    * Address: 0x010A92D0 (`boost::mutex`) -- constructed by the constructor
@@ -118,12 +120,13 @@ namespace
    * Only the CRITICAL_SECTION backing makes that legal, which is why this tree
    * models the two registry lanes with `std::recursive_mutex` instead. Folding
    * the three locks back into this one is a lock-topology change that wants
-   * its own pass.
+   * its own pass. With the two registry lanes on their own lock, this one has
+   * one section and it never re-enters, so a plain mutex is enough here.
    */
-  boost::mutex gSharedAmbientLoopMutex;
+  std::mutex gSharedAmbientLoopMutex;
 
   /**
-   * Address: 0x010A92A0 (`msvc8::map<CSndParams*, HSndEntityLoop*>`; `_Myhead`
+   * Address: 0x010A92A0 (`fa::map<CSndParams*, HSndEntityLoop*>`; `_Myhead`
    *   0x010A92A4, `_Mysize` 0x010A92A8). Node `_Buynode` 0x004E4340 over
    *   `allocator<_Node>::allocate` 0x004E50A0 (0x18 bytes), initialised by the
    *   constructor group at 0x004DFD00. Reached by
@@ -141,10 +144,10 @@ namespace
 
   struct CSndParamsTemp
   {
-    msvc8::string mCue1;      // +0x00
-    msvc8::string mBank;      // +0x1C
-    msvc8::string mLodCutoff; // +0x38
-    msvc8::string mCue2;      // +0x54
+    fa::string mCue1;      // +0x00
+    fa::string mBank;      // +0x1C
+    fa::string mLodCutoff; // +0x38
+    fa::string mCue2;      // +0x54
   };
 
   static_assert(offsetof(CSndParamsTemp, mCue1) == 0x00, "CSndParamsTemp::mCue1 offset must be 0x00");
@@ -175,22 +178,12 @@ namespace
   constexpr const char* kRpcSoundHelpText = "RPCSound( {cue,bank,cutoff} ) - Make a sound parameters object";
   constexpr const char* kGetCueBankHelpText = "cue,bank = GetCueBank(params)";
 
-  [[nodiscard]] gpg::RType* ResolveSParamKeyType()
+  [[nodiscard]] fa::string SndVarNameOrEmpty(const moho::CSndVar* const value)
   {
-    gpg::RType* type = moho::SParamKey::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::SParamKey));
-      moho::SParamKey::sType = type;
-    }
-    return type;
+    return value != nullptr ? value->mName : fa::string("");
   }
 
-  [[nodiscard]] msvc8::string SndVarNameOrEmpty(const moho::CSndVar* const value)
-  {
-    return value != nullptr ? value->mName : msvc8::string("");
-  }
-
-  [[nodiscard]] std::uint32_t HashStringWithSalt(const msvc8::string& value, const std::uint32_t salt)
+  [[nodiscard]] std::uint32_t HashStringWithSalt(const fa::string& value, const std::uint32_t salt)
   {
     const std::string hashInput(value.c_str(), value.size());
     return gpg::Hash(hashInput, salt);
@@ -229,7 +222,7 @@ namespace
    * Copies the four `SParamKey` string lanes (`Cue`, `Bank`, `LodCutoff`,
    * `RpcLoopVar`) from `sourceKey` into `outKey`.
    */
-  [[nodiscard]] moho::SParamKey* CopySParamKeyStringLanes(
+  [[maybe_unused]] [[nodiscard]] moho::SParamKey* CopySParamKeyStringLanes(
     const moho::SParamKey* const sourceKey,
     moho::SParamKey* const outKey
   )
@@ -318,7 +311,7 @@ namespace
    * What it does:
    * Clears one two-word runtime state pair to zero.
    */
-  [[nodiscard]] TwoWordState* ClearTwoWordState(TwoWordState* const state) noexcept
+  [[maybe_unused]] [[nodiscard]] TwoWordState* ClearTwoWordState(TwoWordState* const state) noexcept
   {
     if (state == nullptr) {
       return state;
@@ -343,7 +336,7 @@ namespace
    * What it does:
    * Advances one intrusive cursor slot to its current node's `next` link.
    */
-  [[nodiscard]] IntrusiveLinkNode** AdvanceIntrusiveCursor(IntrusiveLinkNode** const cursorSlot) noexcept
+  [[maybe_unused]] [[nodiscard]] IntrusiveLinkNode** AdvanceIntrusiveCursor(IntrusiveLinkNode** const cursorSlot) noexcept
   {
     if (cursorSlot != nullptr && *cursorSlot != nullptr) {
       *cursorSlot = (*cursorSlot)->mNext;
@@ -380,7 +373,7 @@ namespace
    * What it does:
    * Writes one `(head,tail)` pair from two source value slots.
    */
-  [[nodiscard]] PairHeadTail* CopyPairHeadTail_A(
+  [[maybe_unused]] [[nodiscard]] PairHeadTail* CopyPairHeadTail_A(
     PairHeadTail* const outPair,
     const std::uint32_t* const headValueSlot,
     const std::uint32_t* const tailValueSlot
@@ -395,7 +388,7 @@ namespace
    * What it does:
    * Writes one `(head,tail)` pair from two source value slots.
    */
-  [[nodiscard]] PairHeadTail* CopyPairHeadTail_B(
+  [[maybe_unused]] [[nodiscard]] PairHeadTail* CopyPairHeadTail_B(
     PairHeadTail* const outPair,
     const std::uint32_t* const headValueSlot,
     const std::uint32_t* const tailValueSlot
@@ -410,7 +403,7 @@ namespace
    * What it does:
    * Writes one `(head,tail)` pair from two source value slots.
    */
-  [[nodiscard]] PairHeadTail* CopyPairHeadTail_C(
+  [[maybe_unused]] [[nodiscard]] PairHeadTail* CopyPairHeadTail_C(
     PairHeadTail* const outPair,
     const std::uint32_t* const headValueSlot,
     const std::uint32_t* const tailValueSlot
@@ -459,7 +452,7 @@ namespace
    * What it does:
    * Reads the root-word lane from one owner header slot (`owner->mHeaderSlot[0]`).
    */
-  [[nodiscard]] std::uint32_t* ReadHeaderRootWord_A(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderRootWord_A(
     std::uint32_t* const outWord,
     const HeaderPointerOwner* const owner
   ) noexcept
@@ -473,7 +466,7 @@ namespace
    * What it does:
    * Reads the header-pointer lane (`owner->mHeaderSlot`) as one 32-bit word.
    */
-  [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_A(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_A(
     std::uint32_t* const outWord,
     const HeaderPointerOwner* const owner
   ) noexcept
@@ -487,7 +480,7 @@ namespace
    * What it does:
    * Reads the root-word lane from one owner header slot (`owner->mHeaderSlot[0]`).
    */
-  [[nodiscard]] std::uint32_t* ReadHeaderRootWord_B(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderRootWord_B(
     std::uint32_t* const outWord,
     const HeaderPointerOwner* const owner
   ) noexcept
@@ -501,7 +494,7 @@ namespace
    * What it does:
    * Reads the header-pointer lane (`owner->mHeaderSlot`) as one 32-bit word.
    */
-  [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_B(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_B(
     std::uint32_t* const outWord,
     const HeaderPointerOwner* const owner
   ) noexcept
@@ -515,7 +508,7 @@ namespace
    * What it does:
    * Reads the root-word lane from one owner header slot (`owner->mHeaderSlot[0]`).
    */
-  [[nodiscard]] std::uint32_t* ReadHeaderRootWord_C(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderRootWord_C(
     std::uint32_t* const outWord,
     const HeaderPointerOwner* const owner
   ) noexcept
@@ -529,7 +522,7 @@ namespace
    * What it does:
    * Reads the header-pointer lane (`owner->mHeaderSlot`) as one 32-bit word.
    */
-  [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_C(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_C(
     std::uint32_t* const outWord,
     const HeaderPointerOwner* const owner
   ) noexcept
@@ -562,20 +555,6 @@ namespace
     return created;
   }
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Core");
-    return sSet;
-  }
-
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
   {
     return luaContext != nullptr ? luaContext->stateUserData : nullptr;
@@ -594,7 +573,7 @@ namespace
       return &gDefaultSharedAmbientLoop;
     }
 
-    boost::mutex::scoped_lock lock(gSharedAmbientLoopMutex);
+    std::lock_guard<std::mutex> lock(gSharedAmbientLoopMutex);
 
     const auto existing = gSharedAmbientLoopsByParams.find(params);
     if (existing != gSharedAmbientLoopsByParams.end()) {
@@ -608,31 +587,7 @@ namespace
     return loop;
   }
 
-  /**
-   * The reflected reference is assembled from the userdata HEADER, not read out
-   * of its payload. This fork carries the `gpg::RType*` in `Udata::len`, and the
-   * value itself starts one header past the allocation, which is exactly what
-   * `LuaPlus::LuaObject::GetUserData` (0x00907540) does:
-   *
-   *     lea edx, [ecx+10h]   ; mObj  = payload, laid out after the header
-   *     mov ecx, [ecx+0Ch]   ; mType = Udata::len reinterpreted as RType*
-   *
-   * Reading `*(gpg::RRef*)lua_touserdata(...)` instead - as this helper used to -
-   * takes the first eight payload bytes as if they were a reference. For a
-   * `_c_object` slot those bytes are the `CScriptObject*` value followed by
-   * whatever the allocator left, so every upcast failed and each caller reported
-   * "Expected a game object" for a perfectly good object.
-   */
-  [[nodiscard]] gpg::RRef ExtractLuaUserDataRef(const LuaPlus::LuaObject& userDataObject)
-  {
-    if (!userDataObject.IsUserData()) {
-      return gpg::RRef{};
-    }
-
-    return userDataObject.GetUserData();
-  }
-
-  [[nodiscard]] msvc8::string ReadRequiredTableStringField(
+  [[nodiscard]] fa::string ReadRequiredTableStringField(
     LuaPlus::LuaState* const state,
     const int tableIndex,
     const char* const fieldName
@@ -648,12 +603,12 @@ namespace
       LuaPlus::LuaStackObject::TypeError(&fieldObject, "string");
     }
 
-    const msvc8::string out = fieldValue != nullptr ? msvc8::string(fieldValue) : msvc8::string("");
+    const fa::string out = fieldValue != nullptr ? fa::string(fieldValue) : fa::string("");
     lua_settop(rawState, savedTop);
     return out;
   }
 
-  [[nodiscard]] msvc8::string ReadOptionalTableStringField(
+  [[nodiscard]] fa::string ReadOptionalTableStringField(
     LuaPlus::LuaState* const state,
     const int tableIndex,
     const char* const fieldName
@@ -668,7 +623,7 @@ namespace
     LuaPlus::LuaObject fieldValueObject(fieldObject);
     if (fieldValueObject.IsNil()) {
       lua_settop(rawState, savedTop);
-      return msvc8::string("");
+      return fa::string("");
     }
 
     const char* const fieldValue = lua_tostring(rawState, fieldObject.m_stackIndex);
@@ -676,7 +631,7 @@ namespace
       LuaPlus::LuaStackObject::TypeError(&fieldObject, "string");
     }
 
-    const msvc8::string out = fieldValue != nullptr ? msvc8::string(fieldValue) : msvc8::string("");
+    const fa::string out = fieldValue != nullptr ? fa::string(fieldValue) : fa::string("");
     lua_settop(rawState, savedTop);
     return out;
   }
@@ -697,7 +652,7 @@ namespace
     temp.mCue1 = ReadRequiredTableStringField(tableObject.m_state, tableObject.m_stackIndex, "Cue");
     temp.mBank = ReadRequiredTableStringField(tableObject.m_state, tableObject.m_stackIndex, "Bank");
     temp.mLodCutoff = ReadOptionalTableStringField(tableObject.m_state, tableObject.m_stackIndex, "LodCutoff");
-    temp.mCue2 = hasRpcLoopVar ? temp.mCue1 : msvc8::string("");
+    temp.mCue2 = hasRpcLoopVar ? temp.mCue1 : fa::string("");
 
     moho::SParamKey key{};
     key.mCueName = temp.mCue1;
@@ -811,7 +766,7 @@ namespace moho
       object = object.GetByName("_c_object");
     }
 
-    const gpg::RRef userDataRef = ExtractLuaUserDataRef(object);
+    const gpg::RRef userDataRef = moho::SCR_UserDataRef(object);
     return TryUpcastCSndParamsSlotOrThrow(userDataRef);
   }
 
@@ -824,8 +779,8 @@ namespace moho
    * used by lazy cue resolution.
    */
   CSndParams::CSndParams(
-    const msvc8::string& bankName,
-    const msvc8::string& cueName,
+    const fa::string& bankName,
+    const fa::string& cueName,
     CSndVar* const lodCutoffVar,
     CSndVar* const rpcLoopVar,
     const boost::weak_ptr<AudioEngine>& engine
@@ -918,10 +873,7 @@ namespace moho
       return 0;
     }
 
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSoundHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kSoundHelpText);
 
     LuaPlus::LuaStackObject paramsTable(state, 1);
     CSndParams* const params = BuildSndParamsFromLuaTable(paramsTable, false);
@@ -940,7 +892,7 @@ namespace moho
    */
   CScrLuaInitForm* func_Sound_LuaFuncDef()
   {
-    static CScrLuaBinder binder(CoreLuaInitSet(), "Sound", &cfunc_Sound, nullptr, "<global>", kSoundHelpText);
+    static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), "Sound", &cfunc_Sound, nullptr, "<global>", kSoundHelpText);
     return &binder;
   }
 
@@ -967,10 +919,7 @@ namespace moho
       return 0;
     }
 
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kRpcSoundHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kRpcSoundHelpText);
 
     LuaPlus::LuaStackObject paramsTable(state, 1);
     CSndParams* const params = BuildSndParamsFromLuaTable(paramsTable, true);
@@ -989,7 +938,7 @@ namespace moho
    */
   CScrLuaInitForm* func_RPCSound_LuaFuncDef()
   {
-    static CScrLuaBinder binder(CoreLuaInitSet(), "RPCSound", &cfunc_RPCSound, nullptr, "<global>", kRpcSoundHelpText);
+    static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), "RPCSound", &cfunc_RPCSound, nullptr, "<global>", kRpcSoundHelpText);
     return &binder;
   }
 
@@ -1016,10 +965,7 @@ namespace moho
       return 0;
     }
 
-    const int argumentCount = lua_gettop(state->m_state);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kGetCueBankHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kGetCueBankHelpText);
 
     LuaPlus::LuaStackObject paramsArg(state, 1);
     LuaPlus::LuaObject paramsObject(paramsArg);
@@ -1051,7 +997,7 @@ namespace moho
   CScrLuaInitForm* func_GetCueBank_LuaFuncDef()
   {
     static CScrLuaBinder
-      binder(CoreLuaInitSet(), "GetCueBank", &cfunc_GetCueBank, nullptr, "<global>", kGetCueBankHelpText);
+      binder(moho::SCR_CoreLuaInitSet(), "GetCueBank", &cfunc_GetCueBank, nullptr, "<global>", kGetCueBankHelpText);
     return &binder;
   }
 } // namespace moho
@@ -1072,7 +1018,7 @@ namespace
   moho::CScrLuaInitForm* register_moho_sound_methods()
   {
     static moho::CScrLuaClassBinder binder(
-      CoreLuaInitSet(), "moho.sound_methods", &moho::CScrLuaMetatableFactory<moho::HSound>::Instance(), "HSound", ""
+      moho::SCR_CoreLuaInitSet(), "moho.sound_methods", &moho::CScrLuaMetatableFactory<moho::HSound>::Instance(), "HSound", ""
     );
     return &binder;
   }
@@ -1112,7 +1058,7 @@ namespace moho
   {
     SParamKey key{};
     const gpg::RRef owner{};
-    archive.Read(ResolveSParamKeyType(), &key, owner);
+    archive.Read(gpg::RTypeOf<moho::SParamKey>(), &key, owner);
     result.SetOwned(gpg::MakeRRef(FindOrCreateSndParamsByKey(key)), 1u);
   }
 
@@ -1124,7 +1070,7 @@ namespace moho
   )
   {
     const SParamKey key = BuildSParamKeyFromParams(*this);
-    archive.Write(ResolveSParamKeyType(), &key, gpg::RRef{});
+    archive.Write(gpg::RTypeOf<moho::SParamKey>(), &key, gpg::RRef{});
     result.SetOwned(1u);
   }
 
@@ -1154,8 +1100,8 @@ namespace moho
   // Engine addition, server mode: see the declaration.
 #if FAF_SERVER_MODE
   CSndParams* SND_FindOrCreateParams(
-    const msvc8::string& bankName, const msvc8::string& cueName, const msvc8::string& lodCutoffName,
-    const msvc8::string& rpcLoopName
+    const fa::string& bankName, const fa::string& cueName, const fa::string& lodCutoffName,
+    const fa::string& rpcLoopName
   )
   {
     SParamKey key{};

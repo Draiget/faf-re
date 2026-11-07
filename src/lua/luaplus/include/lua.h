@@ -413,6 +413,6 @@ struct lua_Debug {
 
 #ifdef _WIN32_WCE
 #include "../luace.h"
-#endif _WIN32_WCE
+#endif // _WIN32_WCE
 
 #endif
