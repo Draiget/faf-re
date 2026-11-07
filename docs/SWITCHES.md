@@ -117,6 +117,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `ren_GpuFontCook` | −1 (auto: on for NVIDIA GPUs on Direct3D 11, 12 and Vulkan; other GPUs and Direct3D 9 cook on the CPU until checked, issue #309) | `/con` | next cook | Works out font atlases, the game's and mods', with a compute shader instead of on the CPU; error correction stays on the CPU (0: the CPU) |
 | `ren_GpuFontCookCompare` | 0 | `/con` | next cook | With `ren_GpuFontCook` on, also cooks each font on the CPU, ignoring the cache, and logs how far apart the atlases are and how long each took |
 | `ren_GpuUiQuads` | 1 | `/con` | next UI pass | With `ren_GpuText`, the interface's image quads go in the same list as the text, in submission order, so a pass of the interface is one draw. 0 sends them through the prim batcher, and each change between text and images is a draw |
+| `ren_ParticleLinearUpload` | 0 | `/con` | next upload call | Positive values enable linear consumption of pending particles; 0 or negative retains the original per-batch prefix erase. Same upload order and pool limits; consumed slots can remain visible inside synchronous callbacks until the call returns |
 | `ren_ParticleBatch` | −1 (auto) | `/con` | live | Each particle bucket drawn as one instanced draw |
 | `ren_CacheFogFootprint` | 1 | `/con` | live | The fog pass keeps each camera's terrain footprint until the camera or terrain changes |
 | `ui_IconRecords` | 1 | `/con` | live | Strategic icons classified from per-unit records refreshed only after a sync beat or a view-list rebuild |
