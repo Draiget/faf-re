@@ -302,12 +302,12 @@ buf4:AddOrder('uDead', 'Move', { x = 10, y = 0, z = 10 }, false)
 disp4:OnBeat()
 assert_true(disp4:GetTrackedUnits()['uDead'] ~= nil, "Tracked before death")
 
--- Transport shot down and unit dies
-deadUnit:SetDead(true)
+-- Transport shot down in flight and dies
+t4:SetDead(true)
 disp4:OnBeat()
 
-assert_eq(#issuedUnitCommands, 0, "No commands dispatched for dead unit")
-assert_eq(#buf4:GetOrders('uDead'), 0, "Buffer cleared for dead unit")
+assert_eq(#issuedUnitCommands, 0, "No commands dispatched for unit in shot down transport")
+assert_eq(#buf4:GetOrders('uDead'), 0, "Buffer cleared for shot down transport cargo")
 assert_true(disp4:GetTrackedUnits()['uDead'] == nil, "Removed from tracking")
 print("Test 4 Passed.")
 

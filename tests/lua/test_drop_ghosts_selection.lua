@@ -481,4 +481,58 @@ assert_eq(#dragShiftSel, 2, "Both A and B selected after Shift-drag")
 assert_true(dragShiftSel['u_close_a'] ~= nil, "A still selected after Shift-drag")
 assert_true(dragShiftSel['u_close_b'] ~= nil, "B added via Shift-drag")
 
+-- ========================================================================
+-- Test 11: Left-click empty ground deselects active ghosts
+-- ========================================================================
+assert_true(sel2:IsActive(), "Selection active before empty ground click")
+local groundClickEvent = {
+    Type = 'ButtonPress',
+    MouseX = 999,
+    MouseY = 999,
+    Modifiers = { Left = true, Right = false, Shift = false }
+}
+local handledGround = sel2:HandleWorldClick(wv2, groundClickEvent)
+assert_false(handledGround, "Empty ground click returned false to pass through to engine")
+assert_false(sel2:IsActive(), "Ghost selection cleared on ground click (no longer trapped)")
+assert_eq(#sel2:GetSelection(), 0, "No ghosts selected")
+
+-- ========================================================================
+-- Test 12: In-Game CommandMode Integration (Build & Order Placement)
+-- ========================================================================
+-- Re-select ghost A
+sel2:HandleWorldClick(wv2, {
+    Type = 'ButtonPress',
+    MouseX = 100,
+    MouseY = 100,
+    Modifiers = { Left = true, Right = false, Shift = false }
+})
+assert_true(sel2:IsActive(), "Ghost A re-selected")
+
+-- Mock CommandMode module
+local currentMode = 'build'
+local currentModeData = { name = 'ueb0101' }
+local endModeCalled = false
+
+local MockCommandMode = {
+    GetCommandMode = function() return currentMode, currentModeData end,
+    EndCommandMode = function(isCancel) endModeCalled = true end
+}
+sel2:SetCommandModeModule(MockCommandMode)
+
+-- Player left-clicks world while in 'build' mode
+local buildPlacementClick = {
+    Type = 'ButtonPress',
+    MouseX = 350,
+    MouseY = 450,
+    Modifiers = { Left = true, Right = false, Shift = false }
+}
+local buildHandled = sel2:HandleWorldClick(wv2, buildPlacementClick)
+assert_true(buildHandled, "Build placement click consumed")
+assert_true(endModeCalled, "CommandMode ended after placement")
+
+local ghostOrders = buf2:GetOrders('u_close_a')
+assert_eq(#ghostOrders, 1, "Order placed into buffer for ghost A")
+assert_eq(ghostOrders[1].commandType, 'UNITCOMMAND_BuildMobile', "Order type is BuildMobile")
+assert_eq(ghostOrders[1].targetData.blueprintId, 'ueb0101', "Placed blueprint ID matches modeData")
+
 print("test_drop_ghosts_selection: ALL PASSED")

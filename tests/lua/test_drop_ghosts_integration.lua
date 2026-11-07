@@ -268,7 +268,8 @@ end
 
 print("--- Running Drop Ghosts End-to-End Integration Test ---")
 
-local GamemainHook = dofile("I:/FaforeverFiles/mods/TransportDropGhosts/hook/lua/ui/game/gamemain.lua")
+dofile("I:/FaforeverFiles/mods/TransportDropGhosts/hook/lua/ui/game/gamemain.lua")
+local GamemainHook = _G.DropGhostsGamemain or DropGhostsGamemain
 assert_true(GamemainHook ~= nil, "GamemainHook module loaded successfully")
 
 -- Initialize UI

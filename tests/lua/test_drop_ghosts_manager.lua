@@ -254,4 +254,14 @@ count = 0
 for _ in pairs(staticGhosts) do count = count + 1 end
 assert_eq(count, 0, "All ghosts cleared via static ClearAll")
 
+-- Test 11: Observer POV (focusArmy == -1) sees ghosts for all players
+local uObs = CreateMockUnit('u_obs', 2)
+local transportObs = CreateMockTransport('t_obs', 2, { uObs }, {
+    { type = 'TransportUnloadUnits', position = { x = 120, y = 10, z = 140 } }
+})
+mgr:Update(-1, { transportObs })
+local obsGhosts = mgr:GetActiveGhosts()
+assert_true(obsGhosts['u_obs'] ~= nil, "Observer focusArmy == -1 sees ghosts")
+mgr:ClearAll()
+
 print("test_drop_ghosts_manager: ALL PASSED")
