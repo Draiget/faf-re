@@ -24,8 +24,15 @@ namespace moho
 
     static BOOL CALLBACK InitReserve(PINIT_ONCE, PVOID, PVOID*) noexcept
     {
+#if defined(_WIN32)
       void* const base = ::VirtualAlloc(nullptr, kReserveBytes, MEM_RESERVE, PAGE_NOACCESS);
       gBase = reinterpret_cast<std::uintptr_t>(base);
+#else
+      // POSIX: mmap aligns to 4 KB, not to Windows' 64 KB allocation granularity, and a slab's
+      // header is found by masking an address to 64 KB, so reserve one slab more and align up.
+      void* const base = ::VirtualAlloc(nullptr, kReserveBytes + kSlabBytes, MEM_RESERVE, PAGE_NOACCESS);
+      gBase = base == nullptr ? 0 : AlignUp(reinterpret_cast<std::uintptr_t>(base), kSlabBytes);
+#endif
       return TRUE;
     }
 
