@@ -1468,6 +1468,20 @@ namespace gpg::gal
     barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
     barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     barrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+    // Engine addition (ren_VulkanPreciseBarriers): wait only for the stages that used the image and
+    // hold only the ones that use it next, instead of draining the GPU at every switch.
+    if (gVulkanPreciseBarriers) {
+      VkPipelineStageFlags2 srcStages = 0U;
+      VkAccessFlags2 srcAccess = 0U;
+      VkPipelineStageFlags2 dstStages = 0U;
+      VkAccessFlags2 dstAccess = 0U;
+      if (vulkan::LayoutScope(image.layout, true, srcStages, srcAccess) && vulkan::LayoutScope(layout, false, dstStages, dstAccess)) {
+        barrier.srcStageMask = srcStages;
+        barrier.srcAccessMask = srcAccess;
+        barrier.dstStageMask = dstStages;
+        barrier.dstAccessMask = dstAccess;
+      }
+    }
     barrier.oldLayout = image.layout;
     barrier.newLayout = layout;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
