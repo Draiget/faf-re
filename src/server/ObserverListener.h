@@ -38,6 +38,19 @@ namespace faf::server
 
     /** From any thread: a token an observer may watch with (the match file's, or one the organiser approved). */
     void AllowToken(std::string token);
+    /** Plan WP17.9: the organiser said no: a request held with this token closes, and a later one is refused. */
+    void RefuseToken(std::string token);
+    /**
+     * Plan WP17.9, before `Start`: a request with a token not allowed yet is held, not refused, until the organiser
+     * answers (`AllowToken`, `RefuseToken`) or 5 minutes pass. Each one is reported once (`TakeRequests`).
+     */
+    void HoldUnknownTokens() noexcept { mHoldUnknown = true; }
+    struct SRequest
+    {
+      std::string token;
+      std::string from;
+    };
+    [[nodiscard]] std::vector<SRequest> TakeRequests();
     /** Watching now. */
     [[nodiscard]] std::size_t Observers() const noexcept { return mObservers.load(std::memory_order_relaxed); }
     /** The game's replay is finished and every observer has had all of it (or none is watching). */
@@ -60,6 +73,9 @@ namespace faf::server
     std::atomic<bool> mAllSent{false};
     std::mutex mLock;           // the tokens and the news
     std::set<std::string> mTokens;
+    std::set<std::string> mRefused;
+    std::vector<SRequest> mRequests;
+    bool mHoldUnknown = false;
     std::vector<std::string> mNews;
   };
 } // namespace faf::server

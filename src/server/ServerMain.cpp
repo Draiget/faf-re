@@ -1508,6 +1508,9 @@ namespace
         // `end.error` says why
       } else {
         observers = std::make_unique<faf::server::CObserverListener>(replayLog, &ControlNowUs, matchRules.observerDelaySeconds.value_or(0.0));
+        if (control) {
+          observers->HoldUnknownTokens(); // plan WP17.9: the organiser approves on the web
+        }
         for (std::string& token : tokens) {
           observers->AllowToken(std::move(token));
         }
@@ -1669,6 +1672,21 @@ namespace
             }
           } else if (request.op == "force_start") {
             control->Refuse(request.id, "the game has started");
+          } else if (request.op == "approve_observer" || request.op == "refuse_observer") {
+            // Plan WP17.9: the organiser answers an observer's request (or lets a token in before anyone asks).
+            if (!observers) {
+              control->Refuse(request.id, "this server takes no observers (--observe)");
+            } else if (request.token.empty() || request.token.size() > 1000u) {
+              control->Refuse(request.id, request.op + " needs the observer's token");
+            } else {
+              if (request.op == "approve_observer") {
+                observers->AllowToken(request.token);
+              } else {
+                observers->RefuseToken(request.token);
+              }
+              Say("The control service %s observer token %s", request.op == "approve_observer" ? "approves" : "refuses", request.token.c_str());
+              control->Reply(request.id, {});
+            }
           } else if (request.op == "substitute") {
             // Plan WP15.4 (#200): another person takes a player's seat (army, sources, pauses) from now on.
             if (!net) {
@@ -1740,6 +1758,12 @@ namespace
           }
         }
         controlNews();
+      }
+      // Requests wait in the listener until a control service is connected to hear them.
+      if (control && observers && control->Connected()) {
+        for (const faf::server::CObserverListener::SRequest& asked : observers->TakeRequests()) {
+          controlEvent("observer_request", "\"token\":" + faf::server::JsonString(asked.token) + ",\"from\":" + faf::server::JsonString(asked.from));
+        }
       }
       if (net && net->NobodyCame()) {
         end.stoppedBy = "nobody connected";

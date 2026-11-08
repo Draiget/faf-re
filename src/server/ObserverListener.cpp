@@ -21,6 +21,7 @@ namespace faf::server
     constexpr std::size_t kMaxRequestBytes = 1024;      // 'G', the path, its NUL
     constexpr std::uint64_t kRequestUs = 5'000'000u;     // to send the request
     constexpr std::size_t kChunkBytes = 64u * 1024u;
+    constexpr std::uint64_t kHeldUs = 300'000'000u;     // a request the organiser hasn't answered (plan WP17.9)
 
     [[nodiscard]] bool WouldBlock() noexcept
     {
@@ -34,6 +35,9 @@ namespace faf::server
     std::string peer;
     std::uint64_t acceptedUs = 0;
     std::string request;            // until its NUL
+    std::string token;              // once the request is whole
+    bool held = false;              // waiting for the organiser's answer
+    std::uint64_t heldUs = 0;
     bool watching = false;
     std::size_t offset = 0;         // the log's bytes sent so far
     std::vector<std::uint8_t> pending;
@@ -88,7 +92,21 @@ namespace faf::server
   void CObserverListener::AllowToken(std::string token)
   {
     const std::scoped_lock lock(mLock);
+    mRefused.erase(token);
     mTokens.insert(std::move(token));
+  }
+
+  void CObserverListener::RefuseToken(std::string token)
+  {
+    const std::scoped_lock lock(mLock);
+    mTokens.erase(token);
+    mRefused.insert(std::move(token));
+  }
+
+  std::vector<CObserverListener::SRequest> CObserverListener::TakeRequests()
+  {
+    const std::scoped_lock lock(mLock);
+    return std::exchange(mRequests, {});
   }
 
   std::vector<std::string> CObserverListener::TakeNews()
@@ -146,6 +164,35 @@ namespace faf::server
           ::close(connection.socket);
           connection.socket = -1;
         };
+        if (connection.held) {
+          // Plan WP17.9: waiting for the organiser.
+          bool allowed = false;
+          bool refused = false;
+          {
+            const std::scoped_lock lock(mLock);
+            allowed = mTokens.contains(connection.token);
+            refused = mRefused.contains(connection.token);
+          }
+          char probe = 0;
+          const ssize_t got = ::recv(connection.socket, &probe, 1, MSG_PEEK | MSG_DONTWAIT);
+          if (got == 0 || (got < 0 && !WouldBlock())) {
+            close("left while waiting for the organiser");
+            continue;
+          }
+          if (refused) {
+            close("refused by the organiser");
+            continue;
+          }
+          if (!allowed) {
+            if (now - connection.heldUs > kHeldUs) {
+              close("closed: the organiser didn't answer in 5 minutes");
+            }
+            continue;
+          }
+          connection.held = false;
+          connection.watching = true;
+          Say("observe: " + connection.peer + " approved, watches " + std::to_string(mDelayUs / 1000000u) + " s behind the game");
+        }
         if (!connection.watching) {
           char buffer[256];
           const ssize_t got = ::recv(connection.socket, buffer, sizeof(buffer), 0);
@@ -173,12 +220,26 @@ namespace faf::server
           const std::string path = connection.request.substr(1, nul - 1);
           const std::string token = !path.empty() && path[0] == '/' ? path.substr(1) : path;
           bool allowed = false;
+          bool refused = false;
           {
             const std::scoped_lock lock(mLock);
             allowed = mTokens.contains(token);
+            refused = mRefused.contains(token);
+          }
+          if (!token.empty() && !allowed && !refused && mHoldUnknown) {
+            // Plan WP17.9: the organiser decides; the connection waits, sending nothing.
+            connection.token = token;
+            connection.held = true;
+            connection.heldUs = now;
+            {
+              const std::scoped_lock lock(mLock);
+              mRequests.push_back(SRequest{token, connection.peer});
+            }
+            Say("observe: " + connection.peer + " asks to watch; waiting for the organiser");
+            continue;
           }
           if (token.empty() || !allowed) {
-            close("refused: not an observer's token");
+            close(refused ? "refused: the organiser said no to this token" : "refused: not an observer's token");
             continue;
           }
           connection.watching = true;
@@ -216,7 +277,8 @@ namespace faf::server
       polls.clear();
       polls.push_back(pollfd{mListenSocket, POLLIN, 0});
       for (const SConnection& connection : connections) {
-        polls.push_back(pollfd{connection.socket, static_cast<short>(connection.watching ? (connection.pending.empty() ? 0 : POLLOUT) : POLLIN), 0});
+        polls.push_back(pollfd{connection.socket,
+                               static_cast<short>(connection.watching ? (connection.pending.empty() ? 0 : POLLOUT) : (connection.held ? 0 : POLLIN)), 0});
       }
       (void)::poll(polls.data(), polls.size(), 50);
     }
