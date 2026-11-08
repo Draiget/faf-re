@@ -177,9 +177,11 @@ int main(int argc, char** argv)
   for (int i = 1; i + 1 < argc; ++i) {
     if (std::strcmp(argv[i], "--host") == 0) {
       in_addr address{};
-      if (::inet_pton(AF_INET, argv[i + 1], &address) == 1) {
-        gSocketHost = ::ntohl(address.s_addr);
+      if (::inet_pton(AF_INET, argv[i + 1], &address) != 1) {
+        std::fprintf(stderr, "--host %s is not an IPv4 address\n", argv[i + 1]);
+        return 2;
       }
+      gSocketHost = ::ntohl(address.s_addr);
     }
   }
   return RUN_ALL_TESTS();

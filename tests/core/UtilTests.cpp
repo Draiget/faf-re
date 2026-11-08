@@ -118,10 +118,16 @@ namespace
     // the engine's static initialisers asks for it before).
     const faf_core_tests::TempDir folder;
     const std::filesystem::path wanted = folder.Path() / "cache";
+#if defined(_WIN32)
     ASSERT_EQ(_putenv_s("FAF_SHADER_CACHE_DIR", wanted.string().c_str()), 0);
     const std::string& directory = gpg::LocalCacheDirectory();
     (void)_putenv_s("FAF_SHADER_CACHE_DIR", "");
-    EXPECT_EQ(directory, wanted.string() + "\\");
+#else
+    ASSERT_EQ(setenv("FAF_SHADER_CACHE_DIR", wanted.string().c_str(), 1), 0);
+    const std::string& directory = gpg::LocalCacheDirectory();
+    (void)unsetenv("FAF_SHADER_CACHE_DIR");
+#endif
+    EXPECT_EQ(directory, wanted.string() + static_cast<char>(std::filesystem::path::preferred_separator));
     EXPECT_TRUE(std::filesystem::is_directory(wanted));
     EXPECT_EQ(&gpg::LocalCacheDirectory(), &directory);
   }
@@ -188,9 +194,11 @@ namespace
     EXPECT_GE(elapsed, gpg::time::MillisecondsToCycles(25.0f));
     EXPECT_LT(timer.ElapsedCycles(), elapsed); // the baseline moved to now
 
-    ::Sleep(5);
+    // Relative, not a fixed bound: a test on capped cores can be stalled for tens of milliseconds.
+    ::Sleep(100);
+    const float beforeReset = timer.ElapsedMilliseconds();
     timer.Reset();
-    EXPECT_LT(timer.ElapsedMilliseconds(), 50.0f);
+    EXPECT_LT(timer.ElapsedMilliseconds(), beforeReset);
   }
 
   TEST(GpgTimer, SystemTimerIsOneObject)

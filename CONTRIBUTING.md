@@ -50,7 +50,7 @@ Use **GoogleTest (GTest)** for all unit and integration tests. Do not roll custo
   - Register the executable with `add_test(NAME <name> COMMAND <target>)`.
   - Set IDE grouping: `set_target_properties(<target> PROPERTIES FOLDER "Tests/<Subgroup>")`.
   - Label tests for CTest selection: `set_tests_properties(<name> PROPERTIES LABELS "<Label>")`.
-  - The `faf_tests` target builds every executable that links `gtest` or `gtest_main` ([cmake/FafTests.cmake](cmake/FafTests.cmake)), so a new test needs no list entry.
+  - The `faf_tests` target builds every executable of the engine build that links `gtest` or `gtest_main` ([cmake/FafTests.cmake](cmake/FafTests.cmake)), so a new test needs no list entry. Standalone test projects such as `tests/particles/upload_host` are built on their own.
 - **Existing tests group**: All existing test suites converted from custom harnesses belong to the `Existing` group (suite names prefixed with `Existing_`, CTest label `Existing`, CMake folder `Tests/Existing`, and grouped under the `existing_tests` custom build target). New tests should define clear suite names for their module without the `Existing_` prefix.
 - **Running tests**:
   ```powershell

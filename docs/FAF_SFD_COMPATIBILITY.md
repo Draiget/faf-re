@@ -101,7 +101,7 @@ Build the engine as described in the [README](../README.md#build):
 cmake --preset clang-x64-release && cmake --build --preset clang-x64-release
 ```
 
-The diagnostic and test project is [tools/sfd-inspect](../tools/sfd-inspect/README.md): `main.cpp` supports `--metadata`, `--decode`, `--play` and `--play-sound` on one or more files, and `parser-tests.cpp` is a separate executable for malformed-input and fuzz tests. No commercial assets are copied into the repository.
+The diagnostic and test project is [tools/sfd-inspect](../tools/sfd-inspect/README.md): `main.cpp` supports `--metadata`, `--decode`, `--play` and `--play-sound` on one or more files, and the parser's malformed-input and fuzz tests are GoogleTest in the engine build ([tests/movie/SfdHeaderParserTests.cpp](../tests/movie/SfdHeaderParserTests.cpp)). No commercial assets are copied into the repository.
 
 ## Validation
 

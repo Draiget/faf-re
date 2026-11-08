@@ -461,6 +461,8 @@ TEST(GpgFastVector, RandomOpsMatchStdVectorCopyRelocatedElement)
   RunFastVectorRandomOps<TrackedCopyRelocated>(21, 2500);
 }
 
+// The storage hooks exist on 64-bit builds only (FastVector.h), where SimBlockLane accounts for them.
+#if defined(_M_X64) || defined(__x86_64__)
 TEST(GpgFastVector, UIntStorageHooksSeeEveryBlock)
 {
   using Hook = void (*)(const void*, std::size_t);
@@ -507,6 +509,7 @@ TEST(GpgFastVector, UIntStorageHooksSeeEveryBlock)
   gpg::core::detail::gUIntStorageAllocated = previousAllocated;
   gpg::core::detail::gUIntStorageFreed = previousFreed;
 }
+#endif
 
 // --- FastVectorN -------------------------------------------------------------------------------
 

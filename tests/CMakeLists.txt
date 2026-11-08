@@ -67,6 +67,15 @@ add_test(NAME shadow_stable_fit COMMAND faf_shadow_fit_tests)
 set_tests_properties(shadow_stable_fit PROPERTIES LABELS "Render")
 
 # Engine addition: EffectScan.h against the std::regex patterns it replaced, on generated text.
+# The SFD movie header parser on synthetic headers (moved from tools/sfd-inspect); no engine needed.
+add_executable(faf_sfd_parser_tests EXCLUDE_FROM_ALL movie/SfdHeaderParserTests.cpp
+  ${CMAKE_SOURCE_DIR}/src/moho/movie/sfd/SfdHeaderParser.cpp)
+target_include_directories(faf_sfd_parser_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_sfd_parser_tests PRIVATE gtest_main)
+set_target_properties(faf_sfd_parser_tests PROPERTIES FOLDER "Tests/Movie")
+add_test(NAME sfd_header_parser COMMAND faf_sfd_parser_tests)
+set_tests_properties(sfd_header_parser PROPERTIES LABELS "Movie")
+
 add_executable(faf_effect_scan_tests EXCLUDE_FROM_ALL effect_scan/EffectScanTests.cpp)
 target_include_directories(faf_effect_scan_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(faf_effect_scan_tests PRIVATE gtest_main)

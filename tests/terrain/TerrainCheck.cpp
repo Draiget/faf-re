@@ -189,6 +189,7 @@ TEST(TerrainCheck, ClientAndHeadlessLoadTheSame)
   ASSERT_TRUE(list) << "cannot read " << gMapList;
 
   int maps = 0;
+  int differences = 0;
   std::string path;
   while (std::getline(list, path)) {
     while (!path.empty() && (path.back() == '\r' || path.back() == ' ')) {
@@ -208,6 +209,9 @@ TEST(TerrainCheck, ClientAndHeadlessLoadTheSame)
       // A map neither resource can read is the same result both ways.
       EXPECT_EQ(client.loaded, headless.loaded);
       EXPECT_EQ(client.error, headless.error);
+      if (client.loaded != headless.loaded || client.error != headless.error) {
+        ++differences;
+      }
       verdict = "LOADFAIL client=" + (client.loaded ? std::string("ok") : client.error) +
                 " headless=" + (headless.loaded ? std::string("ok") : headless.error);
     } else {
@@ -222,6 +226,7 @@ TEST(TerrainCheck, ClientAndHeadlessLoadTheSame)
       if (client.props != headless.props) diffs += " props";
       EXPECT_EQ(diffs, "") << "parts that differ between the client and the headless load";
       verdict = diffs.empty() ? "same" : "DIFF" + diffs;
+      differences += diffs.empty() ? 0 : 1;
     }
     std::printf(
       "TERRAINCHECK %s %ux%u terrain-end=%llu/%llu %s\n",
@@ -233,7 +238,7 @@ TEST(TerrainCheck, ClientAndHeadlessLoadTheSame)
       path.c_str()
     );
   }
-  std::printf("TERRAINCHECK maps=%d\n", maps);
+  std::printf("TERRAINCHECK maps=%d differences=%d\n", maps, differences);
   EXPECT_GT(maps, 0) << "the list names no map";
 }
 

@@ -406,6 +406,37 @@ set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
 target_compile_definitions(faf_occupation_manager_tests PRIVATE FAF_OCCUPATION_DELETE_TRACE=1)
 target_link_options(faf_occupation_manager_tests PRIVATE -Wl,--wrap=_Znwm -Wl,--wrap=_Znam -Wl,--wrap=_ZdlPv -Wl,--wrap=_ZdaPv)
 
+# --- Portable unit tests ------------------------------------------------------------------
+# The suites Windows builds that need no Windows API: header-only ones on their own, and the
+# gpg/core and container suites on faf_sim's objects, as Windows runs them on faf_engine.
+# _faf_linux_portable_test(<target> <test name> <source relative to the root>...)
+function(_faf_linux_portable_test target test)
+  list(TRANSFORM ARGN PREPEND "${PROJECT_SOURCE_DIR}/" OUTPUT_VARIABLE sources)
+  add_executable(${target} EXCLUDE_FROM_ALL ${sources})
+  target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/src")
+  target_link_libraries(${target} PRIVATE faf_codegen gtest_main)
+  add_test(NAME ${test} COMMAND ${target})
+endfunction()
+_faf_linux_portable_test(faf_shadow_fit_tests shadow_stable_fit tests/render/ShadowStableFitTests.cpp)
+_faf_linux_portable_test(faf_scripted_decal_tests scripted_decal_placement tests/scripted_decal/PlacementTests.cpp)
+_faf_linux_portable_test(faf_effect_scan_tests effect_scan tests/effect_scan/EffectScanTests.cpp)
+_faf_linux_portable_test(faf_texture_quality_tests texture_quality tests/image_codec/TextureQualityTests.cpp)
+_faf_linux_portable_test(faf_profiler_tests profiler_facade tests/profiling/ProfilerFacadeTests.cpp)
+_faf_linux_portable_test(faf_sfd_parser_tests sfd_header_parser
+  tests/movie/SfdHeaderParserTests.cpp src/moho/movie/sfd/SfdHeaderParser.cpp)
+
+file(GLOB _faf_core_test_sources "${PROJECT_SOURCE_DIR}/tests/core/*.cpp")
+add_executable(faf_core_tests EXCLUDE_FROM_ALL ${_faf_core_test_sources})
+target_link_libraries(faf_core_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_core_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME core COMMAND faf_core_tests)
+
+file(GLOB _faf_container_test_sources "${PROJECT_SOURCE_DIR}/tests/containers/*.cpp")
+add_executable(faf_container_tests EXCLUDE_FROM_ALL ${_faf_container_test_sources})
+target_link_libraries(faf_container_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_container_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME containers COMMAND faf_container_tests)
+
 # --- faf_tests --------------------------------------------------------------------------
 # Every GoogleTest executable of the Linux build (cmake/FafTests.cmake).
 include(FafTests)
