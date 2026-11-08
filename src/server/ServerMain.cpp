@@ -518,6 +518,54 @@ namespace
     return true;
   }
 
+  /** Plan WP15.1: a tournament's rules, the match file's `MatchRules` table; each unset unless the match sets it. */
+  struct SMatchRules
+  {
+    std::optional<double> reconnectSeconds;  // the reconnect window (`--reconnect-seconds`)
+    std::optional<double> awayPauseSeconds;  // each player's pause while away (`--away-pause-seconds`)
+    std::optional<double> lobbyAwaySeconds;  // the logical host's succession (`--lobby-away-seconds`)
+    bool fixedSpeed = false;                 // nobody changes the game speed
+    bool noCheats = false;                   // `CheatsEnabled` is "false", whatever a host or organiser sets
+  };
+
+  [[nodiscard]] bool ReadMatchRules(LuaPlus::LuaState* const state, SMatchRules& matchRules, std::string& error)
+  {
+    const LuaPlus::LuaObject table = state->GetGlobal("MatchRules");
+    if (table.IsNil()) {
+      return true;
+    }
+    if (!table.IsTable()) {
+      error = "MatchRules is a table";
+      return false;
+    }
+    const auto seconds = [&](const char* const key, std::optional<double>& out) {
+      const LuaPlus::LuaObject value = table[key];
+      if (value.IsNil()) {
+        return true;
+      }
+      if (!value.IsNumber() || value.GetNumber() < 0.0 || value.GetNumber() > 86400.0) {
+        error = std::string("MatchRules.") + key + " is seconds, 0 to 86400";
+        return false;
+      }
+      out = value.GetNumber();
+      return true;
+    };
+    const auto flag = [&](const char* const key, bool& out) {
+      const LuaPlus::LuaObject value = table[key];
+      if (value.IsNil()) {
+        return true;
+      }
+      if (!value.IsBoolean()) {
+        error = std::string("MatchRules.") + key + " is true or false";
+        return false;
+      }
+      out = value.GetBoolean();
+      return true;
+    };
+    return seconds("ReconnectSeconds", matchRules.reconnectSeconds) && seconds("AwayPauseSeconds", matchRules.awayPauseSeconds) &&
+           seconds("LobbyAwaySeconds", matchRules.lobbyAwaySeconds) && flag("FixedSpeed", matchRules.fixedSpeed) && flag("NoCheats", matchRules.noCheats);
+  }
+
   /** Plan WP17.1: the match file's `MatchLobbyControl` ("organiser", "player"); "organiser" without one. */
   [[nodiscard]] bool ReadLobbyControl(LuaPlus::LuaState* const state, faf::server::ELobbyControl& control, std::string& error)
   {
@@ -579,7 +627,7 @@ namespace
    * lobby: `ScenarioFile` (the map), `GameSpeed` (the client manager's speed) and `TeamLock` (team views). Returns each
    * option changed, with its value before, so it can be put back.
    */
-  [[nodiscard]] std::vector<STakenOption> TakeHostOptions(LuaPlus::LuaObject& config, LuaPlus::LuaObject& requested)
+  [[nodiscard]] std::vector<STakenOption> TakeHostOptions(LuaPlus::LuaObject& config, LuaPlus::LuaObject& requested, const bool noCheats)
   {
     std::vector<STakenOption> taken;
     LuaPlus::LuaObject options = config["GameOptions"];
@@ -594,7 +642,7 @@ namespace
         continue;
       }
       const std::string name = key.GetString();
-      if (name == "ScenarioFile" || name == "GameSpeed" || name == "TeamLock") {
+      if (name == "ScenarioFile" || name == "GameSpeed" || name == "TeamLock" || (noCheats && name == "CheatsEnabled")) {
         continue;
       }
       const LuaPlus::LuaObject before = options[name.c_str()];
@@ -758,10 +806,12 @@ namespace
     if (ReadOption("--join-seconds", text)) {
       netConfig.joinSeconds = std::atof(text.c_str());
     }
-    if (ReadOption("--reconnect-seconds", text)) {
+    const bool reconnectGiven = ReadOption("--reconnect-seconds", text);
+    if (reconnectGiven) {
       netConfig.reconnectSeconds = std::atof(text.c_str());
     }
-    const double awayPauseSeconds = ReadOption("--away-pause-seconds", text) ? std::atof(text.c_str()) : 0.0;
+    const bool awayPauseGiven = ReadOption("--away-pause-seconds", text);
+    double awayPauseSeconds = awayPauseGiven ? std::atof(text.c_str()) : 0.0;
     // Plan WP2.2: a lobby before the game, the server signalling it. Until launch interception (WP2.14) it stays
     // open this long and then the game starts as the match file says.
     const double lobbySeconds = ReadOption("--lobby-seconds", text) ? std::atof(text.c_str()) : 0.0;
@@ -772,6 +822,46 @@ namespace
     if (!LoadMatch(state, matchPath, config, seed, end.error)) {
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
+    }
+    // Plan WP15.1: the tournament's rules from the match file; a command-line flag given still wins.
+    SMatchRules matchRules;
+    if (!ReadMatchRules(state, matchRules, end.error)) {
+      Say("Can't host: %s", end.error.c_str());
+      return kExitBadInput;
+    }
+    if (!reconnectGiven && matchRules.reconnectSeconds) {
+      netConfig.reconnectSeconds = *matchRules.reconnectSeconds;
+    }
+    if (!awayPauseGiven && matchRules.awayPauseSeconds) {
+      awayPauseSeconds = *matchRules.awayPauseSeconds;
+    }
+    if (matchRules.noCheats) {
+      LuaPlus::LuaObject options = config["GameOptions"];
+      if (options.IsTable()) {
+        options.SetString("CheatsEnabled", "false");
+      }
+    }
+    {
+      std::string said;
+      const auto add = [&said](const std::string& part) { said += (said.empty() ? "" : ", ") + part; };
+      if (matchRules.reconnectSeconds) {
+        add("reconnect " + std::to_string(static_cast<int>(*matchRules.reconnectSeconds)) + " s" + (reconnectGiven ? " (the flag wins)" : ""));
+      }
+      if (matchRules.awayPauseSeconds) {
+        add("away pause " + std::to_string(static_cast<int>(*matchRules.awayPauseSeconds)) + " s" + (awayPauseGiven ? " (the flag wins)" : ""));
+      }
+      if (matchRules.lobbyAwaySeconds) {
+        add("host succession after " + std::to_string(static_cast<int>(*matchRules.lobbyAwaySeconds)) + " s");
+      }
+      if (matchRules.fixedSpeed) {
+        add("fixed speed");
+      }
+      if (matchRules.noCheats) {
+        add("no cheats");
+      }
+      if (!said.empty()) {
+        Say("Match rules: %s", said.c_str());
+      }
     }
     // A sim mod's Lua would run unchecked inside the server's sim; UI mods stay on the players' machines.
     if (const int simMods = CountSimMods(config); simMods > 0) {
@@ -791,6 +881,8 @@ namespace
     }
     if (ReadOption("--lobby-away-seconds", text)) {
       netConfig.lobbyAwaySeconds = std::atof(text.c_str());
+    } else if (matchRules.lobbyAwaySeconds) {
+      netConfig.lobbyAwaySeconds = *matchRules.lobbyAwaySeconds;
     }
     if (!ReadLobbyControl(state, netConfig.lobbyControl, end.error)) {
       Say("Can't host: %s", end.error.c_str());
@@ -833,6 +925,9 @@ namespace
 
     LuaPlus::LuaObject gameOptions = config["GameOptions"];
     moho::SLaunchSpeed launchSpeed = moho::ReadLaunchSpeed(gameOptions);
+    if (matchRules.fixedSpeed) {
+      launchSpeed.adjustable = false; // plan WP15.1: the speed the match sets, whatever a player asks
+    }
     if (speedGiven) {
       launchSpeed.speed = speedOption;
     }
@@ -1088,7 +1183,7 @@ namespace
             }
             // Plan WP17.1: a player-hosted lobby starts with its host's game options, on the seats the server made.
             if (refusal.empty() && netConfig.lobbyControl == faf::server::ELobbyControl::Player) {
-              const std::vector<STakenOption> taken = TakeHostOptions(config, requested);
+              const std::vector<STakenOption> taken = TakeHostOptions(config, requested, matchRules.noCheats);
               if (!taken.empty()) {
                 refusal = relaunch(taken);
                 if (!refusal.empty()) {
@@ -1177,15 +1272,17 @@ namespace
                   }
                   start = comma + 1;
                 }
-                const auto fixed = std::find_if(pairs.begin(), pairs.end(), [](const auto& pair) {
-                  return pair.first == "ScenarioFile" || pair.first == "GameSpeed" || pair.first == "TeamLock";
+                const auto fixed = std::find_if(pairs.begin(), pairs.end(), [&matchRules](const auto& pair) {
+                  return pair.first == "ScenarioFile" || pair.first == "GameSpeed" || pair.first == "TeamLock" ||
+                         (matchRules.noCheats && pair.first == "CheatsEnabled");
                 });
                 if (netConfig.lobbyControl == faf::server::ELobbyControl::Player) {
                   control->Refuse(request.id, "a player-hosted lobby's options are its host's");
                 } else if (pairs.empty()) {
                   control->Refuse(request.id, "set_options needs options: Key=Value,Key=Value");
                 } else if (fixed != pairs.end()) {
-                  control->Refuse(request.id, fixed->first + " is set before the lobby opens; the match file has it");
+                  control->Refuse(request.id, fixed->first == "CheatsEnabled" ? std::string("the match's rules keep cheats off (MatchRules.NoCheats)")
+                                                                               : fixed->first + " is set before the lobby opens; the match file has it");
                 } else {
                   LuaPlus::LuaObject options = config["GameOptions"];
                   std::vector<STakenOption> taken;
