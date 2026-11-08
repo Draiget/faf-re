@@ -31,6 +31,7 @@
 #include "platform/posix/win32/Windows.h"
 #include "legacy/containers/String.cpp"
 #include "gpg/gal/GpuDriven.h"
+#include "moho/particles/ParticlePoolStats.h"
 
 namespace boost { template<class T> using shared_ptr = std::shared_ptr<T>; }
 #ifndef _WIN32
@@ -191,6 +192,8 @@ struct CWorldParticles {
   std::map<Key,STrailRenderBucket*> mTrailBuckets;
   int mBeatsSincePause=0, mBeams=0;
   std::vector<std::unique_ptr<ParticleBuffer>> owned_p;
+  // Actual acquisition reads only the owner-list size; ownership remains this adapter's.
+  const std::vector<std::unique_ptr<ParticleBuffer>>& mParticleBuffers = owned_p;
   std::vector<std::unique_ptr<SParticleRenderBucket>> owned_pb;
   explicit CWorldParticles(std::size_t count=0) {
     for (std::size_t i=0; i<count; ++i) {
@@ -200,6 +203,7 @@ struct CWorldParticles {
   }
   ~CWorldParticles();
   void Init() {}
+  void BeginPoolStatsSession() noexcept;
   ParticleBuffer* AcquireParticleBuffer();
   void ReleaseParticleBuffer(ParticleBuffer*);
   char RenderEffects(GeomCamera3*,char,char,int,float);
@@ -279,6 +283,7 @@ protected:
     beforeLock={}; beforeUnlock={}; beforeMirror={}; beforeAppend={}; failLock=false;
     ASSERT_EQ(std::getenv("FAF_PARTICLE_BATCH_DIAG"), nullptr) << "Unset diagnostics for ordinary batching";
     sParticleGather = {}; sParticleMirror = {};
+    particlePoolStats = {};
     gpg::gal::Device::current = &device;
     const char* linear = std::getenv("PARTICLE_LINEAR_UPLOAD");
     const char* batch = std::getenv("PARTICLE_BATCH");
@@ -513,6 +518,7 @@ TEST_F(ParticleUpload, BenchmarkWarmUploadMatrix) {
 }
 } // namespace
 
+#include "PoolStatsTests.inc"
 #include "BoundaryTests.inc"
 #include "CallbackTests.inc"
 #ifdef PARTICLE_ALLOCATION_TEST

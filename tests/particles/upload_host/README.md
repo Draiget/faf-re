@@ -135,3 +135,20 @@ outside the measured call; work-item/interval allocation is inside. Adapter
 resource operations and host scheduling affect the result. This is not a GPU or
 game frame-time benchmark, and small-load overhead must be reported alongside
 any large-batch improvement.
+
+## Session pool statistics
+
+`PoolStatsTests.inc` exercises the production statistics header and bound
+Begin/acquire/upload/discard functions in both linear-upload modes and batching
+modes. It checks concurrent normal/refraction occupancy, inherited unavailable
+slots, cumulative pool drops, partial tails, consumed-prefix exclusion, null
+buffer/lock pending discards, copy fallback and ordinary cleanup. The allocation
+sweep runs with statistics active. Its serialized states intentionally exclude
+diagnostic counters; it compares allocation requests and selected render state.
+
+The world adapter's owning vector supplies the owner-list size queried by the
+production acquire function; it is not the recovered `CWorldParticles` layout.
+Session creation/teardown and trail coverage live in the separate `stats_host`
+project. Neither project runs a native graphics device or a real game/replay.
+The metric definitions and session boundaries are in
+`docs/PARTICLE_POOL_STATS.md`.

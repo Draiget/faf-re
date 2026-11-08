@@ -102,11 +102,13 @@ AllocationOutcome RunAllocationScenario(gpg::gal::Device& device,int scenario,st
     CWorldParticles world(scenario==2?1:3);auto& bucket=world.P(0);
     if(scenario==1||scenario==4){Seed(bucket,199,texture,5000);EnsureAndFillParticleBucketWorkItems(bucket,0);}
     Seed(bucket,401,texture);
+    world.BeginPoolStatsSession(); // keep statistics active during the allocation sweep
     Arm(failAt);
     try {returned=EnsureAndFillParticleBucketWorkItems(bucket,7);}
     catch(const std::bad_alloc&){threw=true;}
     catch(...){armed=false;throw;}
     armed=false;requests=observed;
+    (void)particlePoolStats.EndSession();
     w.Put(returned);w.Put(threw);w.Put(requests);
     for(std::size_t i=0;i<requests;++i)w.Put(requestSizes[i]);
     WriteState(w,world,bucket,texture,device);

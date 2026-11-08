@@ -1,4 +1,5 @@
 #include "moho/particles/ParticleRenderBuckets.h"
+#include "moho/particles/ParticlePoolStats.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -439,8 +440,14 @@ namespace moho
         consumed += count;
       }
 
-      void Discard() noexcept
+      void Discard(const bool poolExhausted = false) noexcept
       {
+        const std::size_t remaining = particles.size() - consumed;
+        if (poolExhausted) {
+          particlePoolStats.DropParticles(remaining);
+        } else {
+          particlePoolStats.DiscardPendingParticleUpload(remaining);
+        }
         particles.clear();
         consumed = 0U;
       }
@@ -700,7 +707,7 @@ namespace moho
       if (pooledBuffer == nullptr) {
         // FAF hot-patch (FA-Binary-Patches CameraPerf): the "Particle cap exceeded" log call
         // at 0x00493A9B is NOPed out; the excess is still discarded.
-        pending.Discard();
+        pending.Discard(true);
         return false;
       }
 
@@ -1106,6 +1113,7 @@ namespace moho
 
     auto* const segmentBuffer = static_cast<STrailSegmentBuffer*>(workItem.mParticleBuffer);
     if (segmentBuffer == nullptr) {
+      particlePoolStats.DiscardPendingTrailUpload(pendingTrails.size());
       pendingTrails.clear();
       workItem.mIntervalCursor = 0U;
       workItem.mRenderStartIndex = 0U;
@@ -1125,6 +1133,7 @@ namespace moho
     }
 
     if (lockedVertices == nullptr) {
+      particlePoolStats.DiscardPendingTrailUpload(pendingTrails.size());
       pendingTrails.clear();
       workItem.mIntervalCursor = 0U;
       workItem.mRenderStartIndex = 0U;
@@ -1227,6 +1236,7 @@ namespace moho
       if (pooledBuffer == nullptr) {
         // FAF hot-patch (FA-Binary-Patches CameraPerf): the "Ran out of segment buffers" log
         // call at 0x004946F7 is NOPed out; the segments are still discarded.
+        particlePoolStats.DropTrailSegments(bucket.pendingTrails.size());
         bucket.pendingTrails.clear();
         return false;
       }

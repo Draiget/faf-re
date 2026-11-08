@@ -10,6 +10,7 @@
 #include <chrono>
 
 #include "moho/render/GpuPathSettings.h"
+#include "moho/particles/ParticlePoolStats.h"
 #include "moho/render/SkyDome.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
 #include "moho/sim/CWldMap.h"
@@ -1359,6 +1360,7 @@ namespace
       sWldUIProvider = nullptr;
     }
 
+    EndParticlePoolStatsSession();
     sWorldParticles.ClearRenderBuckets();
     (void)g_UIManager->SetNewLuaState(nullptr);
 
@@ -1398,6 +1400,7 @@ namespace
     }
 
     gActiveWldSession = session;
+    sWorldParticles.BeginPoolStatsSession();
     return session;
   }
 
@@ -1424,6 +1427,7 @@ namespace
    */
   void WLD_DestroySession()
   {
+    EndParticlePoolStatsSession();
     CWldSession* const activeSession = gActiveWldSession;
     if (activeSession != nullptr) {
       (void)DeleteWldSessionAndReturn(activeSession);

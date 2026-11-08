@@ -69,7 +69,7 @@ chunks.append('}\nnamespace moho {\n')
 for name in ['ResetParticleRenderWorkItemIntervals', 'DestroyParticleRenderWorkItem',
              'InitializeParticleRenderWorkItem', 'AdvanceParticleRenderWorkItemCursorToFrame']:
     bind(work, r'^  (?:void|bool|SParticleRenderWorkItem\*) ' + name + r'\(')
-for name in ['AcquireParticleBuffer', 'ReleaseParticleBuffer']:
+for name in ['BeginPoolStatsSession', 'AcquireParticleBuffer', 'ReleaseParticleBuffer']:
     bind(world, r'^  [^\n]*\bCWorldParticles::' + name + r'\(')
 # The switch default comes from production, not a test-side constant.
 data = (root / buckets).read_bytes()
@@ -102,7 +102,7 @@ for name in ['RenderEffects', 'RenderRefractingEffects']:
 chunks.append('}\n')
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(''.join(chunks), encoding='utf-8')
-header_paths = ['src/moho/misc/CountedObject.h', 'src/legacy/containers/String.h',
+header_paths = ['src/moho/particles/ParticlePoolStats.h', 'src/moho/misc/CountedObject.h', 'src/legacy/containers/String.h',
                 'src/legacy/containers/String.cpp',
                 'src/legacy/containers/Vector.h', 'src/legacy/containers/Layout.h',
                 'src/gpg/gal/GpuDriven.h', 'src/platform/LayoutAsserts.h']

@@ -146,6 +146,9 @@ namespace moho
      */
     void Init();
 
+    // Render-only diagnostics; starts a session and samples already occupied slots.
+    void BeginPoolStatsSession() noexcept;
+
     /**
      * Pops the next free particle buffer from `mAvailableParticleBuffers`, or
      * returns `nullptr` when the pool is empty. The binary inlines this

@@ -13,6 +13,7 @@
 #include <utility>
 
 #include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Logging.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "legacy/containers/AutoPtr.h"
 #include "gpg/gal/EffectVariable.hpp"
@@ -25,6 +26,7 @@
 #include "moho/render/d3d/CD3DIndexSheet.h"
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/particles/ParticleRenderBuckets.h"
+#include "moho/particles/ParticlePoolStats.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
 
 namespace moho
@@ -1001,6 +1003,39 @@ namespace moho
     // destructors after this body.
   }
 
+  void CWorldParticles::BeginPoolStatsSession() noexcept
+  {
+    particlePoolStats.BeginSession();
+    particlePoolStats.ObserveParticleAcquire(mParticleBuffers.size(), mAvailableParticleBuffers.size());
+    particlePoolStats.ObserveTrailAcquire(mTrailSegmentPool.size());
+  }
+
+  void EndParticlePoolStatsSession() noexcept
+  {
+    const auto stats = particlePoolStats.EndSession();
+    if (!stats) {
+      return;
+    }
+    // No per-drop logging or hot-path formatting. A diagnostic allocation or
+    // log-target failure must not prevent the existing session teardown.
+    try {
+      gpg::Logf(
+        "Particle pools: peak buffers particles=%zu/%zu trails=%zu/%zu; "
+        "pool drops particles=%llu trail_segments=%llu; "
+        "upload discards pending_particles=%llu pending_trail_segments=%llu; saturated=%d",
+        stats->particleBuffersPeak, stats->particleBuffersCapacity,
+        stats->trailBuffersPeak, stats->trailBuffersCapacity,
+        static_cast<unsigned long long>(stats->particlesPoolDropped),
+        static_cast<unsigned long long>(stats->trailSegmentsPoolDropped),
+        static_cast<unsigned long long>(stats->pendingParticlesUploadDiscarded),
+        static_cast<unsigned long long>(stats->pendingTrailSegmentsUploadDiscarded),
+        static_cast<int>(stats->saturated)
+      );
+    } catch (...) {
+      // Best effort at a teardown boundary; do not retry or duplicate a line.
+    }
+  }
+
   ParticleBuffer* CWorldParticles::AcquireParticleBuffer()
   {
     if (mAvailableParticleBuffers.empty()) {
@@ -1009,6 +1044,7 @@ namespace moho
 
     ParticleBuffer* const particleBuffer = mAvailableParticleBuffers.front();
     mAvailableParticleBuffers.pop_front();
+    particlePoolStats.ObserveParticleAcquire(mParticleBuffers.size(), mAvailableParticleBuffers.size());
     return particleBuffer;
   }
 
@@ -1043,6 +1079,7 @@ namespace moho
     const auto first = mTrailSegmentPool.begin();
     STrailSegmentBuffer* const segmentBuffer = *first;
     (void)mTrailSegmentPool.erase(first);
+    particlePoolStats.ObserveTrailAcquire(mTrailSegmentPool.size());
     return segmentBuffer;
   }
 
@@ -1377,6 +1414,7 @@ namespace moho
 
       mAvailableParticleBuffers.push_back(particleBuffer);
       mParticleBuffers.push_back(particleBuffer);
+      particlePoolStats.SetParticleCapacity(mParticleBuffers.size());
     }
 
     for (int bufferIndex = 0; bufferIndex < trailSegmentBufferCount; ++bufferIndex) {
@@ -1396,7 +1434,9 @@ namespace moho
         (void)RebuildSharedTrailQuadIndexSheet();
       }
 
-      (void)mTrailSegmentPool.insert(segmentBuffer);
+      if (mTrailSegmentPool.insert(segmentBuffer).second) {
+        particlePoolStats.AddTrailBuffer();
+      }
     }
   }
 
@@ -1468,6 +1508,7 @@ namespace moho
 
     sWorldParticles.mBeatsSincePause = 0;
     sWorldParticles.mInstantiated = false;
+    particlePoolStats.PoolsDestroyed();
   }
 
   /**
