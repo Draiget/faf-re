@@ -100,11 +100,8 @@ extern "C" void __wrap__ZdaPv(void* pointer) noexcept
 
 namespace
 {
-  class OccupationManager : public ::testing::TestWithParam<int>
-  {};
-
   // These cases execute the actual engine manager and its ordinary allocator.
-  TEST_P(OccupationManager, BucketsChunksAndRepeatedGrowth)
+  void CheckBucketsChunksAndRepeatedGrowth(const int requested)
   {
     moho::EntityOccupationManager manager(128, 256);
     EXPECT_EQ(manager.mWidth, 32);
@@ -119,7 +116,6 @@ namespace
       ASSERT_EQ(manager.mPropBuckets[i], nullptr);
       ASSERT_EQ(manager.mEntityBuckets[i], nullptr);
     }
-    const int requested = GetParam();
     const int expected = ((requested + 8191) / 8192) * 8192;
     manager.EnsureSize(requested);
     EXPECT_EQ(manager.mFreeNodeCount, expected);
@@ -136,7 +132,16 @@ namespace
     EXPECT_EQ(manager.mAllBlocks.size(), expected / 8192);
   }
 
-  INSTANTIATE_TEST_SUITE_P(ChunkCounts, OccupationManager, ::testing::Values(0, 1, 16385, 155649));
+  // A plain loop rather than INSTANTIATE_TEST_SUITE_P: gtest 1.15's macro
+  // declares a tuple it only reads in decltype, which clang reports as
+  // -Wunused-variable on Linux, where gtest's headers are not system headers.
+  TEST(OccupationManagerGrowth, BucketsChunksAndRepeatedGrowth)
+  {
+    for (const int requested : {0, 1, 16385, 155649}) {
+      SCOPED_TRACE(::testing::Message() << "request=" << requested);
+      CheckBucketsChunksAndRepeatedGrowth(requested);
+    }
+  }
 
   TEST(OccupationManagerLifecycle, RepeatedConstructionAndDestruction)
   {
