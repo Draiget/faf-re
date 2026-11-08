@@ -582,6 +582,9 @@ namespace
           const fa::string& gameMods = sessionInfo->mLaunchInfo->mGameMods;
           faf::remote::ReportServerContent(*wldSession->mRules, std::string(gameMods.c_str(), gameMods.size()));
           driver = faf::remote::client::CreateServerSessionDriver(*wldSession->mRules, *sessionInfo->mLaunchInfo, heights);
+          // The driver makes its own client manager, which the session's start never saw (a lockstep session's gets
+          // the UI interface when it begins): chat the server relays reaches the UI through it (plan WP11.4).
+          driver->GetClientManager()->SetUIInterface(&sCWldUiInterface);
 #endif
         } else {
         // Engine addition (issue #275): does nothing unless a save came with this client's seat.

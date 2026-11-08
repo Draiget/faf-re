@@ -19,6 +19,7 @@
 #include <cstring>
 #include <deque>
 #include <map>
+#include <optional>
 #include <random>
 #include <fstream>
 #include <span>
@@ -28,6 +29,7 @@
 #include <vector>
 
 #include "ProbeRebuild.h"
+#include "gpg/core/streams/MemBufferStream.h"
 #include "lua/LuaObject.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -37,6 +39,7 @@
 #include "moho/net/ECmdStreamOp.h"
 #include "remote/net/Datagram.h"
 #include "remote/FrameWindow.h"
+#include "remote/SeatRoster.h"
 #include "remote/ViewLanes.h"
 #include "remote/net/GameLinks.h"
 #include "remote/wire/EntityFrame.h"
@@ -215,6 +218,39 @@ namespace
     // Plan WP2.6: the content report sent before `Loaded`: "rules" (the `--rebuild` match's rules, as the game
     // client reports them), "wrong" (made-up hashes), or none.
     std::string contentReport;
+    // Plan WP11.4: once the server's roster lists other players and this many seconds have gone (`--chat`: 0, `--chat-at`),
+    // send each of them one chat line through the server, as FAF's chat sends one (a Lua table in byte form).
+    double chatAt = -1.0;
+  };
+
+  /** FAF chat.lua's message, `{Chat = true, to = 'all', text = ...}`, as `SessionSendChatMessage` writes it. */
+  [[nodiscard]] std::vector<std::uint8_t> ChatLine(const std::string& text)
+  {
+    LuaPlus::LuaState state(LuaPlus::LuaState::LIB_BASE);
+    LuaPlus::LuaObject message;
+    message.AssignNewTable(&state, 0, 0u);
+    message.SetBoolean("Chat", true);
+    message.SetString("to", "all");
+    message.SetString("text", text.c_str());
+    gpg::MemBufferStream stream(256u);
+    (void)message.ToByteStream(stream);
+    const auto* const bytes = reinterpret_cast<const std::uint8_t*>(stream.mWriteStart);
+    return std::vector<std::uint8_t>(bytes, bytes + stream.BytesWritten());
+  }
+
+  /** Plan WP11.4: the server's rosters and the chat it relayed. */
+  struct SRosterSeen
+  {
+    std::uint64_t messages = 0;
+    std::uint64_t bad = 0;
+    std::size_t entries = 0;
+    std::size_t connected = 0;
+    int localIndex = -1;
+    bool localListed = false; // its own entry carries its uid
+    bool chatted = false;
+    std::uint64_t chatSent = 0;
+    std::uint64_t chatReceived = 0;
+    std::uint64_t chatBad = 0;
   };
 
   [[nodiscard]] double Argument(const char* const text)
@@ -232,6 +268,10 @@ namespace
       }
       if (name == "--no-decode") {
         out.noDecode = true;
+        continue;
+      }
+      if (name == "--chat") {
+        out.chatAt = 0.0;
         continue;
       }
       if (!name.empty() && name[0] == '/') {
@@ -325,6 +365,8 @@ namespace
         out.path.partitionFor = Argument(value);
       } else if (name == "--rebuild") {
         out.rebuild = value;
+      } else if (name == "--chat-at") {
+        out.chatAt = Argument(value);
       } else {
         return false;
       }
@@ -854,6 +896,8 @@ int main(const int argc, char** const argv)
   std::FILE* const saved = options.saveViews.empty() ? nullptr : std::fopen(options.saveViews.c_str(), "wb");
   std::deque<const char*> asked; // what each answer will be about, in order
   std::uint64_t answers[3] = {};
+  SRosterSeen rosterSeen;
+  faf::remote::wire::SRoster lastRoster{};
   std::uint32_t nextCommand = 1u;
   SOrderWatch watch;
   bool orderWanted = false;
@@ -1019,6 +1063,18 @@ int main(const int argc, char** const argv)
       (void)link.SendReliable(frame.data(), frame.size());
       std::printf("probe %d: %.1f s: lobby: script data to uid %d\n", options.uid, elapsed, options.lobbySayTo);
     }
+    if (options.chatAt >= 0.0 && !rosterSeen.chatted && elapsed >= options.chatAt && rosterSeen.connected > 1u) {
+      rosterSeen.chatted = true;
+      const std::vector<std::uint8_t> line = ChatLine("probe " + std::to_string(options.uid));
+      for (const faf::remote::wire::SRosterEntry& entry : lastRoster.entries) {
+        if (entry.index == lastRoster.localIndex || !entry.connected) {
+          continue;
+        }
+        const std::vector<std::uint8_t> chat = faf::remote::EncodeChatMessage(entry.index, line);
+        rosterSeen.chatSent += link.SendReliable(chat.data(), chat.size()) ? 1u : 0u;
+      }
+      std::printf("probe %d: %.1f s: chat sent to %llu clients\n", options.uid, elapsed, static_cast<unsigned long long>(rosterSeen.chatSent));
+    }
     while (link.TakeReliable(message)) {
       if (!message.empty() && message[0] == static_cast<std::uint8_t>(ESeatMessage::Lobby)) {
         TakeLobby(options.uid, elapsed, message, lobby);
@@ -1075,6 +1131,38 @@ int main(const int argc, char** const argv)
                         static_cast<unsigned long long>(beat), views.damagedAt >= 0.0 ? elapsed - views.damagedAt : 0.0);
           }
         }
+        continue;
+      }
+      if (message[0] == static_cast<std::uint8_t>(ESeatMessage::Roster)) {
+        const std::optional<faf::remote::wire::SRoster> roster = faf::remote::DecodeRosterMessage(message);
+        if (!roster) {
+          ++rosterSeen.bad;
+          continue;
+        }
+        ++rosterSeen.messages;
+        rosterSeen.entries = roster->entries.size();
+        rosterSeen.connected = 0;
+        rosterSeen.localIndex = roster->localIndex;
+        rosterSeen.localListed = false;
+        for (const faf::remote::wire::SRosterEntry& entry : roster->entries) {
+          rosterSeen.connected += entry.connected ? 1u : 0u;
+          rosterSeen.localListed = rosterSeen.localListed || (entry.index == roster->localIndex && entry.ownerId == options.uid);
+        }
+        if (rosterSeen.messages == 1u) {
+          std::printf("probe %d: %.1f s: roster: %zu clients, this one %d\n", options.uid, elapsed, roster->entries.size(), roster->localIndex);
+        }
+        lastRoster = *roster;
+        continue;
+      }
+      if (message[0] == static_cast<std::uint8_t>(ESeatMessage::Chat)) {
+        int sender = 0;
+        std::span<const std::uint8_t> payload;
+        if (!faf::remote::DecodeChatMessage(message, sender, payload)) {
+          ++rosterSeen.chatBad;
+          continue;
+        }
+        ++rosterSeen.chatReceived;
+        std::printf("probe %d: %.1f s: chat from client %d, %zu bytes\n", options.uid, elapsed, sender, payload.size());
         continue;
       }
       if (saved != nullptr) {
@@ -1258,6 +1346,12 @@ int main(const int argc, char** const argv)
   std::printf(
     "probe %d: answers: %llu applied, %llu refused, %llu dropped%s\n", options.uid, static_cast<unsigned long long>(answers[0]), static_cast<unsigned long long>(answers[1]),
     static_cast<unsigned long long>(answers[2]), flooding ? (" (flooded)") : ""
+  );
+  std::printf(
+    "probe %d: roster: %llu messages (%llu bad), %zu clients (%zu connected), this one %d (%s); chat: %llu sent, %llu received, %llu bad\n", options.uid,
+    static_cast<unsigned long long>(rosterSeen.messages), static_cast<unsigned long long>(rosterSeen.bad), rosterSeen.entries, rosterSeen.connected,
+    rosterSeen.localIndex, rosterSeen.localListed ? "listed with its uid" : "not listed", static_cast<unsigned long long>(rosterSeen.chatSent),
+    static_cast<unsigned long long>(rosterSeen.chatReceived), static_cast<unsigned long long>(rosterSeen.chatBad)
   );
   if (!options.rebuild.empty()) {
     rebuild.Report(options.uid);

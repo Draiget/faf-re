@@ -110,6 +110,9 @@ namespace faf::remote::client
       std::unique_ptr<CRosterClient>& client = mRoster[entry.index];
       if (client) {
         client->Update(entry);
+        if (relay) {
+          client->SetRelay(relay); // one made before the server's roster (the session's own) had none
+        }
       } else {
         client = std::make_unique<CRosterClient>(*this, entry, relay);
       }
@@ -124,6 +127,11 @@ namespace faf::remote::client
     }
     mLocalIndex = roster.localIndex;
     mHaveRoster = true;
+  }
+
+  std::size_t CRemoteClientManager::RosterCount() const noexcept
+  {
+    return static_cast<std::size_t>(std::count_if(mRoster.begin(), mRoster.end(), [](const auto& client) { return client != nullptr; }));
   }
 
   CRosterClient* CRemoteClientManager::RosterClient(const int index) const noexcept

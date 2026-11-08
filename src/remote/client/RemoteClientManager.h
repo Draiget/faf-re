@@ -17,7 +17,8 @@
 // the sim rate and the connection state through `IClientManager`'s virtuals only (the ~20 call
 // sites, research/WP11.1-command-path.md), so every one of them is answered here. In loopback
 // each is the stand-in's answer (the session's own lockstep client manager); the networked form
-// answers from what the server sends (WP11.4, still to do).
+// answers from the server's `Roster` messages, and chat goes through the server (`Chat`,
+// remote/SeatRoster.h, applied by CNetworkSimDriver).
 
 namespace faf::remote::client
 {
@@ -37,6 +38,8 @@ namespace faf::remote::client
 
     /** The server's latest about this client (name, owner and sources included). */
     void Update(const wire::SRosterEntry& entry);
+    /** Where chat for this client goes from now on. */
+    void SetRelay(ChatRelay relay) { mRelay = std::move(relay); }
     [[nodiscard]] const wire::SRosterEntry& Entry() const noexcept { return mEntry; }
 
     float GetStatusMetricA() override;
@@ -82,6 +85,8 @@ namespace faf::remote::client
      */
     void ApplyRoster(const wire::SRoster& roster, CRosterClient::ChatRelay relay);
     [[nodiscard]] bool HasRoster() const noexcept { return mHaveRoster; }
+    /** The roster's clients, those it dropped (disconnected) included. */
+    [[nodiscard]] std::size_t RosterCount() const noexcept;
     /** The sim rate the server's frames carry (WP11.5): from now on `GetSimRate` answers it. */
     void SetServerSimRate(int rate) noexcept
     {

@@ -95,6 +95,19 @@ namespace faf::remote::net
      * hash, then the mod set's. The server compares them with its own and refuses or warns as the match says.
      */
     ContentReport = 14,
+    /**
+     * Server to player, reliable, once the player's launch has gone and then whenever it changes (plan WP11.4): the
+     * session's clients as `wire::SRoster` (remote/SeatRoster.h), the receiver's own entry named by its `localIndex`.
+     * Who is there, their names, sources and connection go at once; ping and quiet time at most once a second.
+     * Again after a reconnect.
+     */
+    Roster = 15,
+    /**
+     * Both ways, reliable (plan WP11.4): one chat message. Player to server: varint the client index it is for, then
+     * the payload as the game's chat sends it (`IClient::ReceiveChat`). Server to player: varint the sender's client
+     * index, written by the server, then the payload. The server drops one for no player, too large or too many.
+     */
+    Chat = 16,
   };
 
   /** What became of a player's command. */

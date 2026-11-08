@@ -1,5 +1,6 @@
 #include "server/ServerNet.h"
 
+#include <algorithm>
 #include <chrono>
 #include <iterator>
 #include <span>
@@ -20,6 +21,9 @@ namespace faf::server
     constexpr std::uint64_t kMaxUnackedViewBytes = 16u * 1024u * 1024u;
     // Plan WPR.50: a participant counted away is heard again once something came this recently (keepalives: 0.25 s).
     constexpr std::uint64_t kHeardAgainUs = 1'000'000u;
+    // Plan WP11.4: how often the roster is looked at, and how often ping and quiet time alone send it again.
+    constexpr std::uint64_t kRosterCheckUs = 100'000u;
+    constexpr std::uint64_t kRosterTimesUs = 1'000'000u;
 
     [[nodiscard]] std::string Hex(const std::uint64_t value)
     {
@@ -51,6 +55,13 @@ namespace faf::server
     SSeat& entry = mSeats[uid];
     entry.name = name;
     entry.seat = &seat;
+    entry.clientIndex = seat.GetIndex();
+    const moho::BVIntSet* const sources = seat.GetValidCommandSources();
+    for (unsigned int value = sources->GetNext(~0u); value != sources->Max(); value = sources->GetNext(value)) {
+      if (entry.sources.size() < remote::wire::SRosterEntry::kMaxSources) {
+        entry.sources.push_back(static_cast<std::uint8_t>(value));
+      }
+    }
     mIntake.AddSeat(uid, seat);
     mLinks.AddPlayer(uid, remote::net::MakeToken(token));
     mLobby.AddParticipant(uid);
@@ -163,6 +174,10 @@ namespace faf::server
         for (const std::vector<std::uint8_t>& message : startMessages) {
           (void)mLinks.SendReliable(uid, message.data(), message.size());
         }
+        if (!startMessages.empty()) {
+          seat.startSent = true;
+          seat.rosterOwed = true; // its game starts again: the roster with the rest
+        }
         // The session tables again from the first record, less those still to go after the fresh view in the queue.
         std::size_t queuedTables = 0;
         for (std::size_t i = first; i < mViewSending.size(); ++i) {
@@ -177,7 +192,12 @@ namespace faf::server
         Say(seat.name + " has their view again, from beat " + std::to_string(mBeat.load(std::memory_order_relaxed)));
       }
       for (std::size_t i = first; i < mViewSending.size(); ++i) {
-        (void)mLinks.SendReliable(uid, mViewSending[i].bytes.data(), mViewSending[i].bytes.size());
+        const std::vector<std::uint8_t>& bytes = mViewSending[i].bytes;
+        (void)mLinks.SendReliable(uid, bytes.data(), bytes.size());
+        if (!bytes.empty() && bytes[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::LaunchInfo)) {
+          seat.startSent = true;
+          seat.rosterOwed = true;
+        }
       }
       if (mLinks.ReliableUnacked(uid) > kMaxUnackedViewBytes) {
         Remove(uid, seat, "can't keep up with the game");
@@ -328,6 +348,8 @@ namespace faf::server
     }
     mToUnlink.clear();
 
+    SendRosters(nowUs);
+
     if (!mJoinWaitOver && nowUs - mStartUs >= static_cast<std::uint64_t>(mConfig.joinSeconds * 1e6)) {
       mJoinWaitOver = true;
       bool anyone = false;
@@ -341,6 +363,103 @@ namespace faf::server
         mNobodyCame.store(true, std::memory_order_relaxed);
       }
     }
+  }
+
+  remote::wire::SRoster CServerNet::BuildRoster(const std::uint64_t nowUs) const
+  {
+    // The players' seats; the server's own client is no player and isn't listed.
+    remote::wire::SRoster roster{};
+    for (const auto& [uid, seat] : mSeats) {
+      if (seat.clientIndex < 0 || static_cast<std::size_t>(seat.clientIndex) >= remote::wire::SRoster::kMaxEntries) {
+        continue;
+      }
+      remote::wire::SRosterEntry entry{};
+      entry.index = static_cast<std::uint8_t>(seat.clientIndex);
+      entry.name = seat.name.size() > remote::wire::SRosterEntry::kMaxNameBytes ? seat.name.substr(0, remote::wire::SRosterEntry::kMaxNameBytes) : seat.name;
+      entry.ownerId = uid;
+      entry.sources = seat.sources;
+      // Milliseconds, whole: what changes by less isn't worth a message.
+      if (seat.lost) {
+        entry.quiet = static_cast<float>((nowUs - seat.lostAtUs) / 1000u);
+      } else if (seat.joinedEver && !seat.gone) {
+        if (const remote::net::ChannelStats* const stats = mLinks.StatsOf(uid); stats != nullptr) {
+          entry.ping = static_cast<float>(stats->rttSmoothedUs / 1000u);
+        }
+        entry.quiet = static_cast<float>(mLinks.SilentUs(uid, nowUs - mStartUs) / 1000u);
+      }
+      entry.connected = !seat.gone;
+      roster.entries.push_back(std::move(entry));
+    }
+    std::sort(roster.entries.begin(), roster.entries.end(), [](const auto& a, const auto& b) { return a.index < b.index; });
+    return roster;
+  }
+
+  void CServerNet::SendRosters(const std::uint64_t nowUs)
+  {
+    bool owed = false;
+    for (const auto& [uid, seat] : mSeats) {
+      owed = owed || (seat.rosterOwed && seat.startSent && !seat.gone && !seat.lost);
+    }
+    if (!owed && nowUs - mRosterCheckedUs < kRosterCheckUs) {
+      return;
+    }
+    mRosterCheckedUs = nowUs;
+    remote::wire::SRoster roster = BuildRoster(nowUs);
+    const bool changed = !mRosterSentEver || !remote::SameBesidesTimes(roster, mRosterSent);
+    const bool timesDue = mRosterSentEver && nowUs - mRosterSentUs >= kRosterTimesUs && !(roster == mRosterSent);
+    const bool everyone = changed || timesDue;
+    if (!everyone && !owed) {
+      return;
+    }
+    bool anySent = false;
+    for (auto& [uid, seat] : mSeats) {
+      if (!seat.startSent || seat.gone || seat.lost || (!everyone && !seat.rosterOwed)) {
+        continue;
+      }
+      roster.localIndex = seat.clientIndex;
+      const std::vector<std::uint8_t> message = remote::EncodeRosterMessage(roster);
+      if (mLinks.SendReliable(uid, message.data(), message.size())) {
+        ++mRostersSent;
+        seat.rosterOwed = false;
+        anySent = true;
+      }
+    }
+    if (everyone && anySent) {
+      roster.localIndex = -1;
+      mRosterSent = std::move(roster);
+      mRosterSentEver = true;
+      mRosterSentUs = nowUs;
+    }
+  }
+
+  void CServerNet::RelayChat(SSeat& from, const std::vector<std::uint8_t>& message)
+  {
+    int to = 0;
+    std::span<const std::uint8_t> payload;
+    if (!remote::DecodeChatMessage(message, to, payload)) {
+      ++mBadMessages;
+      return;
+    }
+    if (!from.startSent || !from.chatBudget.Take(mNowUs)) {
+      ++mChatDropped;
+      return;
+    }
+    for (auto& [uid, seat] : mSeats) {
+      if (seat.clientIndex != to) {
+        continue;
+      }
+      if (seat.gone || seat.lost || !seat.startSent) {
+        break;
+      }
+      // The sender as the server knows it: no player names whom a line seems to come from.
+      const std::vector<std::uint8_t> relayed = remote::EncodeChatMessage(from.clientIndex, payload);
+      if (mLinks.SendReliable(uid, relayed.data(), relayed.size())) {
+        ++mChatRelayed;
+        return;
+      }
+      break;
+    }
+    ++mChatDropped;
   }
 
   void CServerNet::Remove(const std::int32_t uid, SSeat& seat, const std::string& why)
@@ -387,7 +506,9 @@ namespace faf::server
            std::to_string(mLobby.Count(ELobbyRelayVerdict::EjectIgnored)) + " ejects of participants, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::UnknownSender) + mLobby.Count(ELobbyRelayVerdict::UnknownTarget) +
                           mLobby.Count(ELobbyRelayVerdict::Malformed)) +
-           " malformed or misaddressed; " + std::to_string(mLobby.OptionsPinned()) + " relayed with the match's pinned options written back";
+           " malformed or misaddressed; " + std::to_string(mLobby.OptionsPinned()) + " relayed with the match's pinned options written back; " +
+           std::to_string(mRostersSent) + " rosters sent; chat: " + std::to_string(mChatRelayed) + " relayed, " + std::to_string(mChatDropped) +
+           " dropped";
   }
 
   std::vector<std::int32_t> CServerNet::TakeReturned()
@@ -537,6 +658,10 @@ namespace faf::server
       }
       return; // the relay counts what it drops
     }
+    case remote::net::ESeatMessage::Chat:
+      RelayChat(seat, message); // plan WP11.4
+      return;
+    case remote::net::ESeatMessage::Roster:
     case remote::net::ESeatMessage::Beat:
     case remote::net::ESeatMessage::View:
     case remote::net::ESeatMessage::GameInfo:

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <optional>
 #include <utility>
 
 #include "gpg/core/streams/MemBufferStream.h"
@@ -18,6 +19,8 @@
 #include "moho/sim/SSTIArmyVariableData.h"
 #include "moho/sim/SimDriver.h"
 #include "remote/ArmyRecords.h"
+#include "moho/net/IClientMgrUIInterface.h"
+#include "remote/SeatRoster.h"
 #include "remote/client/ServerConnect.h"
 #include "remote/net/Datagram.h"
 #include "remote/net/GameLinks.h"
@@ -114,7 +117,7 @@ namespace faf::remote::client
       "%llu refused / %llu dropped (issue lead %d beats, largest %d, %llu applied past their beat), %llu Lua lanes bad, "
       "%llu without their LuaSync; session tables: %llu records (%llu bad, %llu resets), "
       "%zu deposits, %llu terrain edits, %llu unknown ids; clock: server rate %+d, %.1f beats/s on its clock, %.1f arriving, "
-      "backlog %lld, skew %.2f",
+      "backlog %lld, skew %.2f; roster: %llu (%llu bad), %zu clients; chat: %llu sent, %llu received, %llu bad",
       when, static_cast<unsigned long long>(mViewsTaken), static_cast<unsigned long long>(views.applied), static_cast<unsigned long long>(mViewsBad),
       static_cast<unsigned long long>(views.frameFailures), static_cast<int>(mLastBeat), static_cast<unsigned long long>(mCommandsSent),
       static_cast<unsigned long long>(mAnswers[0]), static_cast<unsigned long long>(mAnswers[1]), static_cast<unsigned long long>(mAnswers[2]),
@@ -125,8 +128,40 @@ namespace faf::remote::client
       static_cast<unsigned long long>(mViews ? mViews->RebuildStats().terrainEdits : 0u),
       static_cast<unsigned long long>(mViews ? mViews->RebuildStats().unknownTableIds : 0u),
       static_cast<int>(mClock.ServerSimRate()), mClock.ServerBeatsPerSecond(), mClock.ArrivalBeatsPerSecond(),
-      static_cast<long long>(mClock.Backlog()), mClock.Skew()
+      static_cast<long long>(mClock.Backlog()), mClock.Skew(), static_cast<unsigned long long>(mRosters),
+      static_cast<unsigned long long>(mRostersBad), mClientManager.RosterCount(),
+      static_cast<unsigned long long>(mChatSent), static_cast<unsigned long long>(mChatReceived), static_cast<unsigned long long>(mChatBad)
     );
+  }
+
+  void CNetworkSimDriver::SendChat(const int clientIndex, const gpg::MemBuffer<const char>& data)
+  {
+    const moho::IClient* const local = mClientManager.GetLocalClient();
+    if (local != nullptr && local->GetIndex() == clientIndex) {
+      // To itself (a line to everyone includes the sender): as a lockstep game's local client shows it.
+      DeliverChat(clientIndex, std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(data.mBegin), data.Size()));
+      return;
+    }
+    if (data.Size() > kMaxChatBytes) {
+      ++mChatBad;
+      return;
+    }
+    const std::vector<std::uint8_t> message =
+      EncodeChatMessage(clientIndex, std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(data.mBegin), data.Size()));
+    if (SendServerGameMessage(message)) {
+      ++mChatSent;
+    }
+  }
+
+  void CNetworkSimDriver::DeliverChat(const int senderIndex, const std::span<const std::uint8_t> payload)
+  {
+    const CRosterClient* const sender = mClientManager.RosterClient(senderIndex);
+    if (sender == nullptr || mClientManager.mInterface == nullptr) {
+      ++mChatBad;
+      return;
+    }
+    ++mChatReceived;
+    mClientManager.mInterface->ReceiveChat(sender, gpg::CopyMemBuffer(payload.data(), payload.size()));
   }
 
   void CNetworkSimDriver::Take(const std::vector<std::uint8_t>& message)
@@ -235,6 +270,30 @@ namespace faf::remote::client
         mRecentLeads.pop_front();
       }
       mIssueLead = std::max<std::int32_t>(1, *std::max_element(mRecentLeads.begin(), mRecentLeads.end()) + 1);
+      return;
+    }
+    case net::ESeatMessage::Roster: {
+      // Plan WP11.4: from now on the session's roster questions are answered from the server's.
+      const std::optional<wire::SRoster> roster = DecodeRosterMessage(message);
+      if (!roster) {
+        ++mRostersBad;
+        return;
+      }
+      ++mRosters;
+      mClientManager.ApplyRoster(*roster, [this](const int index, const gpg::MemBuffer<const char> data) { SendChat(index, data); });
+      if (mRosters == 1u) {
+        gpg::Logf("server driver: roster from the server, %zu clients, this one %d", roster->entries.size(), static_cast<int>(roster->localIndex));
+      }
+      return;
+    }
+    case net::ESeatMessage::Chat: {
+      int sender = 0;
+      std::span<const std::uint8_t> payload;
+      if (!DecodeChatMessage(message, sender, payload)) {
+        ++mChatBad;
+        return;
+      }
+      DeliverChat(sender, payload);
       return;
     }
     default:

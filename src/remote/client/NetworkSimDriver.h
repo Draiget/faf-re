@@ -123,6 +123,10 @@ namespace faf::remote::client
     /** The beat a command just sent will be applied at, as best this side knows: the newest shown plus one. */
     [[nodiscard]] moho::CmdId IssueBeat() const noexcept;
     void LogSummary(const char* when) const;
+    /** Plan WP11.4: chat for a roster client goes through the server; for this player's own client, straight to its UI. */
+    void SendChat(int clientIndex, const gpg::MemBuffer<const char>& data);
+    /** A chat line the server relayed, from the client `senderIndex`, to the UI as a lockstep peer's would come. */
+    void DeliverChat(int senderIndex, std::span<const std::uint8_t> payload);
 
     moho::RRuleGameRules& mRules;
     CRemoteClientManager mClientManager;
@@ -139,6 +143,11 @@ namespace faf::remote::client
     boost::shared_ptr<moho::CSimResources> mResources;
     const moho::CHeightField* mSeedHeights = nullptr; // copied into the view client when it is made
     std::uint64_t mTablesBad = 0;
+    std::uint64_t mRosters = 0;
+    std::uint64_t mRostersBad = 0;
+    std::uint64_t mChatSent = 0;
+    std::uint64_t mChatReceived = 0;
+    std::uint64_t mChatBad = 0;
     std::deque<std::unique_ptr<moho::SSyncData>> mPackets;
     // Views waiting for their beat's Lua lane (`LuaSync`, sent once the server's `Sync` for the beat is routed).
     struct SPendingView

@@ -29,6 +29,8 @@
 #include "lua/LuaObject.h"
 #include "remote/FrameWindow.h"
 #include "remote/InboundIds.h"
+#include "remote/SeatRoster.h"
+#include "remote/net/GameLinks.h"
 #include "remote/ViewIdMap.h"
 // The command headers bring in <windows.h>, whose `near` and `far` macros the tests below use as names.
 #undef near
@@ -1830,6 +1832,57 @@ namespace
     CHECK(!(other == roster));
   }
 
+  void TestSeatRosterMessages()
+  {
+    // Plan WP11.4: the roster and chat seat messages, as the server, the driver and the probe read them.
+    SRoster roster{};
+    roster.localIndex = 2;
+    SRosterEntry entry{};
+    entry.index = 2;
+    entry.name = "Player";
+    entry.ownerId = 1001;
+    entry.sources = {1};
+    entry.ping = 35.0f;
+    roster.entries = {entry};
+    const std::vector<std::uint8_t> message = faf::remote::EncodeRosterMessage(roster);
+    CHECK(!message.empty() && message[0] == static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::Roster));
+    const std::optional<SRoster> back = faf::remote::DecodeRosterMessage(message);
+    CHECK(back && *back == roster);
+    CHECK(!faf::remote::DecodeRosterMessage(std::span<const std::uint8_t>(message.data(), 1u)));
+
+    SRoster pinged = roster;
+    pinged.entries[0].ping = 80.0f;
+    pinged.entries[0].quiet = 5.0f;
+    CHECK(faf::remote::SameBesidesTimes(roster, pinged) && !(roster == pinged));
+    SRoster dropped = roster;
+    dropped.entries[0].connected = false;
+    CHECK(!faf::remote::SameBesidesTimes(roster, dropped));
+
+    const std::string line = "hello";
+    const std::span<const std::uint8_t> text(reinterpret_cast<const std::uint8_t*>(line.data()), line.size());
+    const std::vector<std::uint8_t> chat = faf::remote::EncodeChatMessage(63, text);
+    int index = -1;
+    std::span<const std::uint8_t> payload;
+    CHECK(faf::remote::DecodeChatMessage(chat, index, payload) && index == 63 && payload.size() == line.size());
+    CHECK(std::equal(payload.begin(), payload.end(), text.begin()));
+    CHECK(!faf::remote::DecodeChatMessage(std::span<const std::uint8_t>(chat.data(), 1u), index, payload));
+    CHECK(!faf::remote::DecodeChatMessage(faf::remote::EncodeChatMessage(64, text), index, payload)); // past the roster's entries
+    const std::vector<std::uint8_t> big(faf::remote::kMaxChatBytes + 1u, std::uint8_t{'x'});
+    CHECK(!faf::remote::DecodeChatMessage(faf::remote::EncodeChatMessage(1, big), index, payload));
+    const std::uint8_t endless[] = {static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::Chat), 0x80u, 0x80u, 0x80u, 0x80u};
+    CHECK(!faf::remote::DecodeChatMessage(endless, index, payload));
+    CHECK(faf::remote::DecodeChatMessage(faf::remote::EncodeChatMessage(0, {}), index, payload) && index == 0 && payload.empty());
+
+    faf::remote::CChatBudget budget;
+    std::size_t taken = 0;
+    for (int i = 0; i < 200; ++i) {
+      taken += budget.Take(1'000'000u) ? 1u : 0u;
+    }
+    CHECK(taken == static_cast<std::size_t>(faf::remote::CChatBudget::kBurst));
+    CHECK(!budget.Take(1'000'000u));
+    CHECK(budget.Take(1'100'000u)); // a tenth of a second later: 4 more
+  }
+
   void TestSoundTable()
   {
     CSoundTableWriter writer;
@@ -2644,6 +2697,7 @@ TEST(Existing_Wire, GridDeltaMatchesCellAtATime) { TestGridDeltaMatchesCellAtATi
 TEST(Existing_Wire, GridDeltaHostile) { TestGridDeltaHostile(); }
 TEST(Existing_Wire, SoundTable) { TestSoundTable(); }
 TEST(Existing_Wire, Roster) { TestRoster(); }
+TEST(Existing_Wire, SeatRosterMessages) { TestSeatRosterMessages(); }
 TEST(Existing_Wire, SessionTables) { TestSessionTables(); }
 TEST(Existing_Wire, SessionTablesFromThreads) { TestSessionTablesFromThreads(); }
 TEST(Existing_Wire, SharedValueShare) { TestSharedValueShare(); }

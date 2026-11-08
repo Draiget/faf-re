@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "remote/ContentCheck.h"
+#include "remote/SeatRoster.h"
 #include "remote/net/GameLinks.h"
 #include "server/LobbyRelay.h"
 #include "server/SeatIntake.h"
@@ -157,6 +158,12 @@ namespace faf::server
       bool reported = false;       // plan WP2.6: its content report came
       remote::SContentReport report;
       bool contentJudged = false;
+      // Plan WP11.4: its client in the session, as every player's roster lists it.
+      int clientIndex = -1;
+      std::vector<std::uint8_t> sources;
+      bool startSent = false;   // its launch has gone: its game takes rosters and chat from now on
+      bool rosterOwed = false;  // the next roster pass sends it the roster, changed or not
+      remote::CChatBudget chatBudget;
     };
 
     void Run();
@@ -170,6 +177,10 @@ namespace faf::server
     void Say(std::string line);
     void SendViews();
     void SendLobby();
+    /** Plan WP11.4: the roster to every player whose launch has gone, when it changed (ping and quiet time once a second). */
+    void SendRosters(std::uint64_t nowUs);
+    [[nodiscard]] remote::wire::SRoster BuildRoster(std::uint64_t nowUs) const;
+    void RelayChat(SSeat& from, const std::vector<std::uint8_t>& message);
 
     void OnJoined(std::int32_t uid, const remote::net::SEndpoint& from, bool returning) override;
     void OnMessage(std::int32_t uid, const std::vector<std::uint8_t>& message) override;
@@ -192,6 +203,13 @@ namespace faf::server
     std::vector<SPresence> mPresence;         // likewise
     std::uint64_t mBadMessages = 0;
     std::uint64_t mViewMismatches = 0;
+    remote::wire::SRoster mRosterSent; // the last sent to everyone, without a local index
+    bool mRosterSentEver = false;
+    std::uint64_t mRosterSentUs = 0;
+    std::uint64_t mRosterCheckedUs = 0;
+    std::uint64_t mRostersSent = 0;
+    std::uint64_t mChatRelayed = 0;
+    std::uint64_t mChatDropped = 0;
     static constexpr double kResyncSeconds = 10.0;
     // `OnMessage` runs inside the links' pass over their players, so they go once it's over.
     std::vector<std::int32_t> mToUnlink;

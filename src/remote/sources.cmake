@@ -12,6 +12,7 @@ set(FAF_REMOTE_SOURCES
   remote/UnderlayPaths.cpp
   remote/ContentTables.cpp
   remote/ContentCheck.cpp
+  remote/SeatRoster.cpp
   remote/VisibilityOracle.cpp
   remote/SpatialOracle.cpp
   remote/BeatChangeSet.cpp
