@@ -18,7 +18,11 @@ if not rawget(getfenv(1), 'UpdateRejoinScreen') then
     local Prefs = import("/lua/user/prefs.lua")
 
     local barWidth = 520
-    local screen = false
+    -- A reload of this module keeps the screen that is up: while the new module loads, /lua/system/import.lua
+    -- hands it the old one as `__moduleinfo.old`. Without that the old cover stayed on top and the next update made
+    -- a second one over it.
+    local screen = __moduleinfo.old and rawget(__moduleinfo.old, 'RejoinScreen') or false
+    RejoinScreen = screen
 
     --- The game's loading screen as `LoadDialog` in gamemain.lua makes it, so the view doesn't
     --- change when the real one takes over for the map.
@@ -99,12 +103,14 @@ if not rawget(getfenv(1), 'UpdateRejoinScreen') then
                 screen:Destroy()
             end
             screen = false
+            RejoinScreen = screen
             return
         end
 
         -- A new Lua state takes over between the loading screen and the game.
         if not screen or IsDestroyed(screen) then
             screen = CreateScreen()
+            RejoinScreen = screen
         end
 
         if screen.stage != stage then
