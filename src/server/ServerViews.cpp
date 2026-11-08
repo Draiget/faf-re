@@ -1,16 +1,20 @@
 #include "server/ServerViews.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <string_view>
 #include <utility>
 #include <vector>
 
+#include "gpg/core/utils/Logging.h"
 #include "moho/sim/Sim.h"
 #include "remote/net/Datagram.h"
 #include "remote/net/GameLinks.h"
 #include "remote/SyncRouting.h"
 #include "remote/wire/BitStream.h"
 #include "remote/wire/LuaSyncLane.h"
+#include "server/LobbyScriptData.h"
 #include "server/ServerNet.h"
 
 namespace faf::server
@@ -200,12 +204,37 @@ namespace faf::server
     // beat's `Sync` for each player, in the order queued after that beat's view unless the views' pipeline is late.
     router.SetPayloadObserver([this, &router](moho::Sim& sim) {
       const auto beat = static_cast<std::uint64_t>(sim.mCurBeat);
+      // Plan WP15.4: the sim's own timeouts are unlimited (the server keeps them), so its `TimeoutsRemaining` reads -1.
+      // FAF's pause button takes the count from the first paused beat (UserSync.lua OnPause, tabs.lua): from then on each
+      // player's `Sync` carries what the pausing player has left after this pause, as the server counts it.
+      const std::int32_t pausedBy = sim.mPausedByCommandSource;
+      if (pausedBy != mPausedSeen) {
+        mPausedSeen = pausedBy;
+        mPauseShown.reset();
+        if (pausedBy >= 0 && mPauseBook) {
+          const auto source = static_cast<std::uint32_t>(pausedBy);
+          const int seen = ++mPausesSeen[source];
+          const std::optional<int> granted = mPauseBook->Granted(source);
+          if (granted && *granted >= 0) {
+            mPauseShown = std::max(*granted - seen, 0);
+          }
+          gpg::Logf("server views: beat %d paused by source %d: granted %d, seen %d, shown %d", static_cast<int>(sim.mCurBeat), static_cast<int>(pausedBy),
+                    granted ? *granted : -99, seen, mPauseShown ? *mPauseShown : -99);
+        }
+      }
+      static constexpr std::string_view kTimeoutsKey = "TimeoutsRemaining";
+      std::vector<std::uint8_t> rewritten;
       for (const auto& [army, uid] : mPlayers) {
         if (army >= router.ViewCount()) {
           continue;
         }
+        std::span<const std::uint8_t> payload = router.Payload(army);
+        if (mPauseShown && std::search(payload.begin(), payload.end(), kTimeoutsKey.begin(), kTimeoutsKey.end()) != payload.end() &&
+            SetTableNumber(payload, kTimeoutsKey, static_cast<float>(*mPauseShown), rewritten)) {
+          payload = rewritten;
+        }
         remote::wire::BitWriter lane;
-        if (!remote::wire::EncodeLuaSyncLane(router.Payload(army), router.Prints(army), lane)) {
+        if (!remote::wire::EncodeLuaSyncLane(payload, router.Prints(army), lane)) {
           continue;
         }
         mLuaBytes.fetch_add(lane.Bytes().size(), std::memory_order_relaxed);

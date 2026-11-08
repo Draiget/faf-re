@@ -692,6 +692,32 @@ TEST(LobbyScriptData, ReadsAndWritesTheLobbysByteForm)
   EXPECT_FALSE(faf::server::ParseLuaBytes(deep, back));
 }
 
+// Plan WP15.4: the server's pause count written into a `Sync` table's bytes, nothing else of it changed.
+TEST(LobbyScriptData, SetTableNumberChangesOneNumber)
+{
+  const std::vector<std::uint8_t> sync = LuaBytes(LuaTable({{LuaString("PausedBy"), LuaNumber(2.0f)},
+                                                            {LuaString("TimeoutsRemaining"), LuaNumber(-1.0f)},
+                                                            {LuaString("Score"), LuaTable({{LuaString("x"), LuaString("y")}})}}));
+  std::vector<std::uint8_t> out;
+  ASSERT_TRUE(faf::server::SetTableNumber(sync, "TimeoutsRemaining", 3.0f, out));
+  EXPECT_EQ(out.size(), sync.size());
+  SLuaBytesValue back;
+  ASSERT_TRUE(faf::server::ParseLuaBytes(out, back));
+  float value = 0.0f;
+  std::memcpy(&value, back.Field("TimeoutsRemaining")->raw, sizeof(value));
+  EXPECT_EQ(value, 3.0f);
+  std::memcpy(&value, back.Field("PausedBy")->raw, sizeof(value));
+  EXPECT_EQ(value, 2.0f);
+  ASSERT_NE(back.Field("Score"), nullptr);
+  EXPECT_TRUE(back.Field("Score")->Field("x")->IsString("y"));
+  // A key that isn't there, or isn't a number, and bytes that don't read: nothing written.
+  std::vector<std::uint8_t> untouched = {7u};
+  EXPECT_FALSE(faf::server::SetTableNumber(sync, "Missing", 1.0f, untouched));
+  EXPECT_FALSE(faf::server::SetTableNumber(sync, "Score", 1.0f, untouched));
+  EXPECT_FALSE(faf::server::SetTableNumber(std::vector<std::uint8_t>{4u, 1u}, "TimeoutsRemaining", 1.0f, untouched));
+  EXPECT_EQ(untouched, (std::vector<std::uint8_t>{7u}));
+}
+
 TEST(LobbyScriptData, PinnedOptionsGetTheMatchsValues)
 {
   const faf::server::SPinnedOptions pinned = {{"Victory", LuaBytes(LuaString("demoralization"))}, {"Share", LuaBytes(LuaString("FullShare"))}};

@@ -82,6 +82,23 @@ namespace faf::server
     return nullptr;
   }
 
+  bool SetTableNumber(const std::span<const std::uint8_t> bytes, const std::string_view key, const float value, std::vector<std::uint8_t>& out)
+  {
+    SLuaBytesValue table;
+    if (!ParseLuaBytes(bytes, table)) {
+      return false;
+    }
+    SLuaBytesValue* const field = table.Field(key);
+    if (field == nullptr || field->kind != SLuaBytesValue::EKind::Number) {
+      return false;
+    }
+    static_assert(sizeof(float) == sizeof(field->raw));
+    std::memcpy(field->raw, &value, sizeof(float)); // as `ToByteStream` writes a number: the float's bytes
+    out.clear();
+    WriteLuaBytes(table, out);
+    return true;
+  }
+
   bool ParseLuaBytes(const std::span<const std::uint8_t> bytes, SLuaBytesValue& out)
   {
     std::size_t at = 0;

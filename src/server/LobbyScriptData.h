@@ -55,4 +55,10 @@ namespace faf::server
    * anything else, unreadable bytes included, stays as it is.
    */
   [[nodiscard]] bool PinGameOptions(std::vector<std::uint8_t>& payload, const SPinnedOptions& pinned);
+
+  /**
+   * Plan WP15.4: `bytes` (one table in the form above) with the number under the string key `key` of the top table set to
+   * `value`, into `out`. False, `out` untouched, when the bytes don't read or the key isn't a number there.
+   */
+  [[nodiscard]] bool SetTableNumber(std::span<const std::uint8_t> bytes, std::string_view key, float value, std::vector<std::uint8_t>& out);
 } // namespace faf::server

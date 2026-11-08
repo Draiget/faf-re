@@ -812,11 +812,16 @@ namespace
     }
     // Plan WP15.4 (#200): each player's pause budget stays with the server, by command source; the sim gets unlimited.
     std::map<std::uint32_t, int> pauseBudgets;
-    const auto takePauseBudgets = [&pauseBudgets](moho::SLaunchBuild& launch) {
+    const auto pauseBook = std::make_shared<faf::server::CPauseBook>(); // what the players are shown (step 5)
+    std::map<std::uint32_t, int> pauseGranted; // what each source was given, for the book
+    const auto takePauseBudgets = [&pauseBudgets, &pauseBook, &pauseGranted](moho::SLaunchBuild& launch) {
       pauseBudgets.clear();
+      pauseGranted.clear();
       for (moho::SSTICommandSource& source : launch.launchInfo->mCommandSources.mSrcs) {
         if (source.mIndex != launch.localSourceId) {
           pauseBudgets[source.mIndex] = source.mTimeouts;
+          pauseGranted[source.mIndex] = source.mTimeouts;
+          pauseBook->SetGranted(source.mIndex, source.mTimeouts);
           source.mTimeouts = -1;
         }
       }
@@ -1316,6 +1321,7 @@ namespace
       if (std::string statsEvery; ReadOption("--stats-every", statsEvery)) {
         views->SetStatsEveryBeats(static_cast<std::uint32_t>(std::max(1, std::atoi(statsEvery.c_str()))));
       }
+      views->SetPauseBook(pauseBook);
       views->Install();
       Say("Views: %s", teamViews ? (teamsLocked ? "one per team, and each player's own units" : "one per team (--team-views), with teams unlocked")
                        : perPlayerViews ? "one per player (--per-player-views)" : "one per player, as teams aren't locked (TeamLock)");
@@ -1489,6 +1495,8 @@ namespace
               control->Refuse(request.id, "that player's pauses are unlimited already");
             } else {
               budget->second += static_cast<int>(request.count);
+              pauseGranted[budget->first] += static_cast<int>(request.count);
+              pauseBook->SetGranted(budget->first, pauseGranted[budget->first]);
               if (const auto seat = pauseSeats.find(budget->first); seat != pauseSeats.end()) {
                 seat->second->SetPauseAllowed(true);
               }
