@@ -1,5 +1,9 @@
 #include "moho/app/WxPrivate.h"
 #include "moho/app/NetworkPanel.h"
+#include "moho/render/AmbientOcclusionRenderer.h"
+#include "moho/render/FxaaRenderer.h"
+#include "moho/render/PostRenderer.h"
+#include "moho/render/WideBloomRenderer.h"
 
 namespace
 {
@@ -93,6 +97,8 @@ namespace moho
   extern bool ren_Select;       // 0x00F57E4C = 0x01
   extern bool ren_fog;          // 0x00F57E4D = 0x01
   extern bool ren_Shadows;      // 0x00F57E53 = 0x01
+  extern float ren_ShadowCoeff;
+  extern std::int32_t shadow_Fidelity;
 }
 
 
@@ -833,7 +839,8 @@ void moho::REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, const int 
 
   // 0x007FA941..0x007FA982: network-stats HUD, right-anchored.
   if (moho::ren_ShowNetworkStats) {
-    if (CSimDriver* const simDriver = static_cast<CSimDriver*>(moho::WLD_GetDriver())) {
+    // Engine addition: only the lockstep driver has these stats (the remote and server drivers draw none).
+    if (CSimDriver* const simDriver = dynamic_cast<CSimDriver*>(moho::WLD_GetDriver())) {
       simDriver->DrawNetworkStats(primBatcher, static_cast<float>(headWidth - 25), 25.0f, 1.0f, 0.0f);
     }
   }
@@ -1938,6 +1945,17 @@ void moho::WRenViewport::RenderWorldView(
     const gpg::gal::RenderProfileScope profileMeshes("Meshes");
     RenderMeshes(0x14, false);
   }
+  // Engine addition (ren_Ao): ambient occlusion from the depth of terrain and the opaque meshes,
+  // before effects and water draw over it.
+  if (moho::AmbientOcclusionRenderer& occlusion = moho::AmbientOcclusionRenderer::Get(); occlusion.IsActive()) {
+    const gpg::gal::RenderProfileScope profileOcclusion("AmbientOcclusion");
+    // How far the shadow map reaches: terrain shadows take over beyond it, and stay off with shadows off.
+    const float shadowReach = (!moho::ren_Shadows || moho::shadow_Fidelity == 0) ? -1.0f
+      : mShadowRenderer.mShadowCameraValid                                      ? moho::ren_ShadowCoeff * worldView->mView->CameraGetTargetZoom()
+                                                                                 : 0.0f;
+    occlusion.Render(*mCam, mScreenPos.x, mScreenPos.y, mScreenSize.x, mScreenSize.y, shadowReach,
+                     shadowReach > 0.0f ? &mShadowRenderer : nullptr);
+  }
   {
     const gpg::gal::RenderProfileScope profileEffects("Effects");
     RenderEffects(true);
@@ -2267,6 +2285,47 @@ void moho::WRenViewport::Render(const int head, fa::vector<SWorldViewInfo>& worl
     static_cast<moho::CDecalManager*>(decalTerrainRes->GetDecalManager())->ClearPendingChanges();
   }
 
+  // Engine addition (ren_Fxaa): anti-aliasing for the world views on Direct3D 12 and Vulkan, which
+  // have no multisampled back buffer. The head is copied into the refraction target (free again
+  // once the views are drawn) and drawn back through FXAA over the whole head, colour only, before
+  // the cartographic views and the interface. Sharpening and grading (ren_Sharpen, ren_Grade) follow
+  // the same way, over FXAA's result.
+  if (begin != end && mPrimaryTargetLocks[mHead] && !RenderAdditionsDisabled()) {
+    const auto overHeadCopy = [&](const char* const profileName, auto&& render) {
+      const gpg::gal::RenderProfileScope profile(profileName);
+      boost::shared_ptr<moho::ID3DRenderTarget> headTarget{};
+      device->GetWriterLock1(headTarget, mHead);
+      device->SetViewRect(headTarget.get(), mPrimaryTargetLocks[mHead].get(), nullptr, nullptr);
+      moho::ID3DRenderTarget::SurfaceHandle copy{};
+      (void)mPrimaryTargetLocks[mHead]->GetSurface(copy);
+      if (!copy) {
+        return;
+      }
+      Wm3::Vector2i savedPos{};
+      Wm3::Vector2i savedSize{};
+      float savedMinZ = 0.0f;
+      float savedMaxZ = 1.0f;
+      device->GetView(&savedPos, &savedSize, &savedMinZ, &savedMaxZ);
+      const int width = device->GetHeadWidth(static_cast<unsigned int>(mHead));
+      const int height = device->GetHeadHeight(static_cast<unsigned int>(mHead));
+      Wm3::Vector2i headPos{0, 0};
+      Wm3::Vector2i headSize{width, height};
+      device->SetViewport(&headPos, &headSize, savedMinZ, savedMaxZ);
+      render(*copy, width, height);
+      device->SetViewport(&savedPos, &savedSize, savedMinZ, savedMaxZ);
+    };
+    if (moho::FxaaRenderer& fxaa = moho::FxaaRenderer::Get(); fxaa.IsActive()) {
+      overHeadCopy("Fxaa", [&](gpg::gal::RenderTarget& copy, const int width, const int height) {
+        fxaa.Render(copy, width, height);
+      });
+    }
+    if (moho::PostRenderer& post = moho::PostRenderer::Get(); post.IsActive()) {
+      overHeadCopy("Post", [&](gpg::gal::RenderTarget& copy, const int width, const int height) {
+        post.Render(copy, width, height);
+      });
+    }
+  }
+
   // Shared tail, reached from the per-view loop, from the empty-list jump
   // (loc_7F9779) and from the ren_Oblivion jump (loc_7F979E) alike. The binary
   // has exactly one call to this at 0x007F97A4, after the loop rather than
@@ -2336,8 +2395,17 @@ void moho::WRenViewport::Render(const int head, fa::vector<SWorldViewInfo>& worl
   if (!moho::ren_Oblivion && moho::ren_Bloom && !moho::ren_ShowNormals) {
     moho::IWldTerrainRes* const bloomTerrainRes = moho::REN_GetTerrainRes();
     const float bloomAmount = bloomTerrainRes != nullptr ? bloomTerrainRes->GetBloom() : 0.0f;
-    const gpg::gal::RenderProfileScope profileBloom("Bloom");
-    mBloomRenderers[mHead].DoBloom(bloomAmount);
+    {
+      const gpg::gal::RenderProfileScope profileBloom("Bloom");
+      mBloomRenderers[mHead].DoBloom(bloomAmount);
+    }
+    // Engine addition (ren_BloomWide): a wide, soft glow from the bloom's own result, on
+    // Direct3D 12 and Vulkan.
+    if (moho::WideBloomRenderer& wide = moho::WideBloomRenderer::Get(mHead); !RenderAdditionsDisabled() && wide.IsActive()) {
+      const gpg::gal::RenderProfileScope profileBloomWide("BloomWide");
+      const moho::CBloomRenderer& bloom = mBloomRenderers[mHead];
+      wide.Render(mHead, bloom.mRenderTargets[0], static_cast<int>(bloom.mWidth), static_cast<int>(bloom.mHeight));
+    }
   }
 
   // UI-overlay + debug-HUD pass (0x007F9845), handed the same world views.

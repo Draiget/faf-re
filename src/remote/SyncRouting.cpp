@@ -753,14 +753,19 @@ namespace faf::remote
         if (!left) {
           continue; // a view moved with `SetFocusArmy` isn't holding its source there
         }
-        // Gone from its army. A defeat just removes it (`lua/sim/Victory.lua:37`); a merge gives it
-        // to another.
+        // Gone from its army. A defeat just removes it (`lua/sim/MatchState.lua` `ObserverAfterDeath`); a merge
+        // gives it to another.
+        bool moved = false;
         for (std::size_t army = 0; army < sim.mArmiesList.size(); ++army) {
           const moho::CArmyImpl* const candidate = sim.mArmiesList[army];
           if (candidate != nullptr && candidate->mVarDat.mValidCommandSources.Contains(source)) {
             MoveView(view, static_cast<std::int32_t>(army));
+            moved = true;
             break;
           }
+        }
+        if (!moved && mSourceGone) {
+          mSourceGone(view); // plan WP13.6
         }
         continue;
       }
@@ -1596,10 +1601,6 @@ namespace faf::remote
       }
     }
 
-    if (mPayloadObserver) {
-      mPayloadObserver(sim);
-    }
-
     // Print lines written with no focus reach every player, as they do every lockstep client, after
     // those written under the player's focus.
     for (SPlayerSync& view : mPlayers) {
@@ -1608,6 +1609,11 @@ namespace faf::remote
       for (const fa::string& line : packet.mPrintField) {
         view.prints.emplace_back(line.c_str());
       }
+    }
+
+    // The beat's payloads and print lines are all there (a server sends them now, plan WP11 `LuaSync`).
+    if (mPayloadObserver) {
+      mPayloadObserver(sim);
     }
 
     // The views' own tables are emptied as `Sync` is, by the game's own function.

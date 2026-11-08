@@ -21,6 +21,7 @@
 #include <d3d11sdklayers.h>
 #include <wrl/client.h>
 
+#include "D3D11VertexLayouts.h"
 #include "GpuDrivenD3D11.h"
 #include "PipelineStateD3D11.h"
 #include "boost/shared_ptr.h"
@@ -245,7 +246,7 @@ namespace gpg::gal
     ID3DX11EffectTechnique* mRttTechnique = nullptr;
     Microsoft::WRL::ComPtr<ID3D11Buffer> mRttQuadVertexBuffer;
     Microsoft::WRL::ComPtr<ID3D11InputLayout> mRttInputLayout;
-    Microsoft::WRL::ComPtr<ID3D11InputLayout> mInputLayouts[24]; // one per gal vertex format
+    Microsoft::WRL::ComPtr<ID3D11InputLayout> mInputLayouts[d3d11::kVertexFormatCount]; // one per gal vertex format
     std::map<ShaderLayoutKey, Microsoft::WRL::ComPtr<ID3D11InputLayout>> mShaderInputLayouts;
     std::uint32_t mBoundFormat = 0xFFFFFFFFU;
     const void* mPassVertexShader = nullptr;

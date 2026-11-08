@@ -4,11 +4,15 @@
 #include <cstdint>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
 
+#include "remote/ContentCheck.h"
+#include "remote/SeatRoster.h"
 #include "remote/net/GameLinks.h"
+#include "server/LobbyRelay.h"
 #include "server/SeatIntake.h"
 
 // Engine addition, dedicated server (plan WP1.1, WP3.5, WP10.1, WP10.5): the players' network. Its own
@@ -37,6 +41,15 @@ namespace faf::server
     double reconnectSeconds = 60.0;
     /** Views wait for a player who hasn't joined yet; off when nobody's expected, as they'd pile up. */
     bool holdViewsForJoin = true;
+    /**
+     * Plan WPR.50: in the lobby, a participant heard from for this long counts as away (`TakeLobbyPresence`), well
+     * before its channel's own 10 s timeout, so a logical host that is gone is succeeded within 10 s. A client sends
+     * a keepalive every quarter second while its game runs; a frozen lobby screen stops them too, so not much shorter.
+     * 0: only the channel's timeout.
+     */
+    double lobbyAwaySeconds = 6.0;
+    /** Plan WP17.1: the match file's `MatchLobbyControl`: organised (WPR.49's rules) or player-hosted. */
+    ELobbyControl lobbyControl = ELobbyControl::Organiser;
   };
 
   class CServerNet final : private remote::net::CServerLinks::IEvents
@@ -81,9 +94,78 @@ namespace faf::server
     {
       std::int32_t uid;
       bool away;
+      bool gone = false; // out of the game: no longer away, and not back either
     };
     /** Who went away or stopped being away since the last call, in order. */
     [[nodiscard]] std::vector<SPresence> TakePresence();
+
+    /**
+     * Plan WP2.13: lobby messages between participants are relayed on the network thread (`CLobbyRelay`); one for
+     * the server itself (uid 0) waits here. From any thread.
+     */
+    struct SLobbyMessage
+    {
+      std::int32_t from = 0;
+      std::vector<std::uint8_t> message;
+    };
+    [[nodiscard]] std::vector<SLobbyMessage> TakeLobbyMessages();
+    /** A lobby signal from the server to a participant, in order, once they've joined. From any thread. */
+    void QueueLobbyFromServer(std::int32_t uid, const std::vector<std::uint8_t>& message);
+    /** Plan WP17.2: a lobby message to `uid` in `from`'s name (`CLobbyRelay::FrameFrom`), queued like the server's own. */
+    void QueueLobbyAs(std::int32_t uid, std::int32_t from, const std::vector<std::uint8_t>& message);
+    /** Plan WP17.2: a new set of pinned options while the lobby is open; applied on the network thread. */
+    void RequestPins(SPinnedOptions pinned);
+    /** Participants whose channel came up for the first time since the last call, for the lobby's signals. */
+    [[nodiscard]] std::vector<std::int32_t> TakeLobbyJoined();
+    /** Participants out of the game since the last call, for the lobby's signals (the game's views read `TakeGone`). */
+    [[nodiscard]] std::vector<std::int32_t> TakeLobbyLeft();
+    /**
+     * Plan WPR.50: while the lobby is open, participants who went quiet (`lobbyAwaySeconds`, or their channel timed
+     * out) or were heard again since the last call, in order.
+     */
+    [[nodiscard]] std::vector<SPresence> TakeLobbyPresence();
+    /** At launch (plan WPR.51): the relay takes nothing more. From any thread. */
+    void CloseLobby() noexcept { mCloseLobby.store(true, std::memory_order_relaxed); }
+
+    /** Plan WP17.2: a seat as the control API reports it, refreshed on the network thread. */
+    struct SSeatState
+    {
+      std::int32_t uid = 0;
+      std::string name;
+      bool joined = false;
+      bool loaded = false;
+      bool lost = false;
+      bool gone = false;
+      bool away = false; // quiet in the lobby
+      std::uint32_t pingMs = 0;
+    };
+    [[nodiscard]] std::vector<SSeatState> Seats();
+    /**
+     * Plan WP17.2: a participant out of the match (the organiser's eject, or a defeat with `DefeatedPlayerView =
+     * "disconnect"`), as one who leaves is; done on the network thread. `reason` goes to the log whole. False: no such seat.
+     */
+    bool RequestEject(std::int32_t uid, std::string reason);
+    /** Plan WP17.2: the organiser adds an address to the handshake allowlist or takes it off; done on the network thread. */
+    void RequestAddress(std::uint32_t ip, bool allow);
+    /**
+     * Plan WP15.4 (#200): another person takes a seat during the game. The seat keeps its uid; its admission token and
+     * name become `token` and `name`, the old player's channel goes, and the substitute joins as a player coming back
+     * (launch info and a whole view again, the reconnect window running). False: no such seat, or it's out of the game.
+     */
+    bool RequestSubstitute(std::int32_t uid, const std::string& token, std::string name);
+    /** Plan WP17.1: the current logical host (0: none), from the lobby's succession; its ejects go through in a player-hosted lobby. */
+    void SetLobbyHost(const std::int32_t uid) noexcept { mLobbyHost.store(uid, std::memory_order_relaxed); }
+    /** Before `Start` (plan WPR.49): the game options the match pins (`CLobbyRelay::PinOptions`). */
+    void PinLobbyOptions(SPinnedOptions pinned) { mLobby.PinOptions(std::move(pinned)); }
+    /** Forwarded lobby messages whose pinned options were written back; after `Stop`. */
+    [[nodiscard]] std::uint64_t LobbyOptionsPinned() const noexcept { return mLobby.OptionsPinned(); }
+
+    /**
+     * Plan WP2.6: the server's own content, once its rules are loaded, and what the match says to do with a player
+     * whose report differs. Reports that came before are judged then; a player who loaded with no report counts as
+     * one whose content differs. From any thread.
+     */
+    void SetContentCheck(remote::EContentCheck mode, const remote::SContentReport& expected);
 
     /** What arrived that wasn't a player's, for the console; after `Stop`. */
     [[nodiscard]] std::string LinkReport() const;
@@ -109,13 +191,34 @@ namespace faf::server
       std::uint64_t lostAtUs = 0;
       std::uint64_t lastResyncUs = 0; // its last view sent whole on a `ViewMismatch`
       std::uint64_t bytesSeen = 0; // its channel's count; a new channel starts again
+      bool lobbyAway = false;      // plan WPR.50: quiet in the lobby
+      bool reported = false;       // plan WP2.6: its content report came
+      remote::SContentReport report;
+      bool contentJudged = false;
+      // Plan WP11.4: its client in the session, as every player's roster lists it.
+      int clientIndex = -1;
+      std::vector<std::uint8_t> sources;
+      bool startSent = false;   // its launch has gone: its game takes rosters and chat from now on
+      bool rosterOwed = false;  // the next roster pass sends it the roster, changed or not
+      bool substituted = false; // plan WP15.4: another person was given the seat; their first join counts as a return
+      remote::CChatBudget chatBudget;
     };
 
     void Run();
+    /** Plan WPR.50: the lobby's view of who is quiet, each pass while it is open. */
+    void WatchLobbyPresence(std::uint64_t nowUs);
+    void NoteLobbyPresence(std::int32_t uid, SSeat& seat, bool away);
+    /** Plan WP2.6: once the server's content is known, a seat with a report, or loaded without one. */
+    void JudgeContent(std::int32_t uid, SSeat& seat);
     void Tick(std::uint64_t nowUs);
     void Remove(std::int32_t uid, SSeat& seat, const std::string& why);
     void Say(std::string line);
     void SendViews();
+    void SendLobby();
+    /** Plan WP11.4: the roster to every player whose launch has gone, when it changed (ping and quiet time once a second). */
+    void SendRosters(std::uint64_t nowUs);
+    [[nodiscard]] remote::wire::SRoster BuildRoster(std::uint64_t nowUs) const;
+    void RelayChat(SSeat& from, const std::vector<std::uint8_t>& message);
 
     void OnJoined(std::int32_t uid, const remote::net::SEndpoint& from, bool returning) override;
     void OnMessage(std::int32_t uid, const std::vector<std::uint8_t>& message) override;
@@ -138,6 +241,13 @@ namespace faf::server
     std::vector<SPresence> mPresence;         // likewise
     std::uint64_t mBadMessages = 0;
     std::uint64_t mViewMismatches = 0;
+    remote::wire::SRoster mRosterSent; // the last sent to everyone, without a local index
+    bool mRosterSentEver = false;
+    std::uint64_t mRosterSentUs = 0;
+    std::uint64_t mRosterCheckedUs = 0;
+    std::uint64_t mRostersSent = 0;
+    std::uint64_t mChatRelayed = 0;
+    std::uint64_t mChatDropped = 0;
     static constexpr double kResyncSeconds = 10.0;
     // `OnMessage` runs inside the links' pass over their players, so they go once it's over.
     std::vector<std::int32_t> mToUnlink;
@@ -150,10 +260,44 @@ namespace faf::server
     std::atomic<std::uint64_t> mBytesSent{0};
     std::mutex mViewLock;
     std::map<std::int32_t, std::vector<SQueuedMessage>> mViewQueue;
-    std::map<std::int32_t, std::vector<std::uint8_t>> mGameInfo; // each player's, to send again on their return
+    // Each player's LaunchInfo and GameInfo, in the order queued, to send again on their return.
+    std::map<std::int32_t, std::vector<std::vector<std::uint8_t>>> mStartMessages;
+    // Each player's session-table records (`SessionTables`), every one queued: a returning player, whose client may
+    // have missed some, gets a reset and all of them again before its whole view (plan WP11 step 4).
+    std::map<std::int32_t, std::vector<std::vector<std::uint8_t>>> mTableLogs;
     std::vector<SQueuedMessage> mViewSending;
 
     std::mutex mNewsLock;
     std::vector<std::string> mNews;
+    std::vector<SSeatState> mSeatStates;                         // under mNewsLock
+    std::vector<std::pair<std::int32_t, std::string>> mEjects;   // likewise: uid, reason
+    std::vector<std::pair<std::uint32_t, bool>> mAddressChanges; // likewise: ip, allow
+    std::optional<SPinnedOptions> mPinsIn;                      // likewise
+    struct SSubstitute
+    {
+      std::int32_t uid;
+      std::string token;
+      std::string name;
+    };
+    std::vector<SSubstitute> mSubstitutes;                      // likewise
+
+    CLobbyRelay mLobby;                        // on the network thread
+    std::vector<std::uint8_t> mLobbyFrame;     // the frame being relayed
+    std::atomic<bool> mCloseLobby{false};
+    std::atomic<std::int32_t> mLobbyHost{0};
+    std::uint64_t mLobbyUndelivered = 0;       // relayed to a participant with no channel
+    std::vector<SLobbyMessage> mLobbyIn;       // for the host; under mNewsLock
+    std::vector<std::int32_t> mLobbyLeft;      // likewise
+    std::vector<std::int32_t> mLobbyJoined;    // likewise
+    std::vector<SPresence> mLobbyPresence;     // likewise
+    std::vector<SLobbyMessage> mLobbyOut;      // from the host, `from` being the participant it's for; under mViewLock
+
+    // Plan WP2.6. Set from any thread under mNewsLock; the network thread takes it over once.
+    bool mContentSet = false;                  // under mNewsLock
+    remote::EContentCheck mContentModeIn = remote::EContentCheck::Off;
+    remote::SContentReport mContentExpectedIn;
+    bool mContentKnown = false;                // on the network thread
+    remote::EContentCheck mContentMode = remote::EContentCheck::Off;
+    remote::SContentReport mContentExpected;
   };
 } // namespace faf::server

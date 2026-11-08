@@ -372,6 +372,12 @@ namespace moho
    * Read by the lobby build label (WxRuntimeTypes.cpp).
    */
   [[nodiscard]] bool LOBBY_IsActive() noexcept;
+
+  /**
+   * Engine addition, server mode (plan WP2.8): the server has launched the match: the server session's lobby, if one
+   * is open, ends as a launched lobby does (its script's `GameLaunched`, which closes its screen and destroys it).
+   */
+  void LOBBY_ServerSessionLaunched();
   static_assert(sizeof(CPushTask<CLobby>) == 0x1C, "CPushTask<CLobby> size must be 0x1C");
   static_assert(sizeof(CPullTask<CLobby>) == 0x18, "CPullTask<CLobby> size must be 0x18");
   static_assert(offsetof(CLobby, connector) == 0x78, "connector offset");

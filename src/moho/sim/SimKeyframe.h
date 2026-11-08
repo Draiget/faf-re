@@ -130,6 +130,8 @@ namespace moho
    * publishes once and a loaded game normally sends again from Lua (`OnPostLoad`, lua/SimSync.lua), which
    * a keyframe skips because that changes the sim: the playable area, unit data, unit enhancements.
    * Read from the sim's tables at the end of the restore, without allocating in its Lua state.
+   * When `replay`, also the 'started' notify message of each ACU upgrading in the restored sim, which the
+   * sim sent before the keyframe, so the UI's upgrade overlay comes back (FAForever/fa#7373).
    */
-  void SIM_AddRestoredUiData(LuaPlus::LuaObject& sync, LuaPlus::LuaState* state);
+  void SIM_AddRestoredUiData(LuaPlus::LuaObject& sync, LuaPlus::LuaState* state, bool replay);
 } // namespace moho

@@ -7,13 +7,17 @@
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
+#include "gpg/gal/DeviceContext.hpp"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DVertexSheet.h"
 #include "moho/render/ScreenQuadVertexSheet.h"
+#include "moho/render/ShadowStableFit.h"
 #include "moho/render/d3d/CD3DDepthStencil.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
 #include "moho/collision/CGeomSolid3.h"
+#include "moho/console/CConCommand.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 #include "moho/terrain/water/WaterSurface.h"
@@ -86,6 +90,44 @@ namespace moho
   // Defined in moho/app/WxRuntimeTypes.cpp (0x007FA170); folds in both the
   // map and terrain null checks.
   [[nodiscard]] IWldTerrainRes* REN_GetTerrainRes();
+
+  namespace
+  {
+    /**
+     * Engine addition: `ren_ShadowStable`. 1 fits the shadow map so its texels stay on the same
+     * world positions while the camera pans, which stops shadow edges crawling (ShadowStableFit.h).
+     * 0 is the binary's fit. -1 (the default) is 1 on every renderer but Direct3D 9, which keeps the
+     * original look.
+     */
+    int ren_ShadowStable = -1;
+
+    TConVar<int> gTConVar_ren_ShadowStable(
+      "ren_ShadowStable",
+      "Keep shadow texels on the same world positions while the camera pans: 1 on, 0 the original "
+      "fit, -1 on except on Direct3D 9.",
+      &ren_ShadowStable
+    );
+
+    /** Direct3D 9 keeps the sizes FAF's options slider had before it reached 4096. */
+    constexpr int kShadowSizeLimitD3D9 = 2048;
+
+    // The box lengths the stable fit used last frame, per axis. Shadow's layout is the binary's,
+    // and the render thread alone reads these; two world views only cost each other the hold.
+    float sShadowStableWidth = 0.0f;
+    float sShadowStableHeight = 0.0f;
+
+    [[nodiscard]] bool RenderingOnD3D9()
+    {
+      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+      const gpg::gal::DeviceContext* const context = device != nullptr ? device->GetDeviceContext() : nullptr;
+      return context == nullptr || context->mDeviceType == gpg::gal::DeviceApi::Direct3D9;
+    }
+
+    [[nodiscard]] bool ShadowStableFitEnabled()
+    {
+      return ren_ShadowStable > 0 || (ren_ShadowStable < 0 && !RenderingOnD3D9());
+    }
+  } // namespace
 
   /**
    * Address: 0x009407D0 (FUN_009407D0, sub_9407D0)
@@ -232,7 +274,7 @@ namespace moho
   {
     // Both tuning values are sampled before the reset below, which zeroes the
     // cached copies.
-    const int shadowSize = ren_ShadowSize;
+    const int shadowSize = RenderingOnD3D9() ? std::min(ren_ShadowSize, kShadowSizeLimitD3D9) : ren_ShadowSize;
     const bool shadowBlur = ren_ShadowBlur;
 
     (void)ReleaseRenderResources();
@@ -323,6 +365,29 @@ namespace moho
    * still reach it. The 8-unit lift on the box top is the same idea for
    * casters standing above the terrain.
    */
+  bool ren_ShadowVolumeCache = true;
+  namespace
+  {
+    struct ShadowVolumeMemo
+    {
+      static constexpr std::uint32_t kPlanes = 8U;
+      bool valid = false;
+      const CHeightField* field = nullptr;
+      std::uint64_t terrainRevision = 0U;
+      std::uint32_t planeCount = 0U;
+      Wm3::Plane3f planes[kPlanes]{};
+      Wm3::AxisAlignedBox3f volume{};
+    };
+    ShadowVolumeMemo sShadowVolume;
+
+    TConVar<bool> gTConVar_ren_ShadowVolumeCache(
+      "ren_ShadowVolumeCache",
+      "The shadow volume's terrain intersection is kept while the frustum and terrain stay the same (1, the default), "
+      "or computed each frame (0). Read each frame.",
+      &ren_ShadowVolumeCache
+    );
+  } // namespace
+
   bool Shadow::PrepareLightCamera(
     const GeomCamera3& viewCamera,
     const Wm3::Vector3f& sunDirection,
@@ -376,7 +441,30 @@ namespace moho
     shadowFrustum.planes_[5].Constant =
       (ren_ShadowCoeff * zoom) - shadowFrustum.planes_[4].Constant;
 
-    Wm3::AxisAlignedBox3f volume = heightField->ConvexIntersection(shadowFrustum);
+    // Engine change (ren_ShadowVolumeCache): the same frustum and terrain give the same box, and this
+    // walk of the height field's tiers was 2 % of a frame at near zoom.
+    Wm3::AxisAlignedBox3f volume{};
+    const std::uint64_t terrainRevision = HeightFieldRevision();
+    const std::uint32_t planeCount = static_cast<std::uint32_t>(shadowFrustum.planes_.Size());
+    bool cached = ren_ShadowVolumeCache && sShadowVolume.valid && sShadowVolume.field == heightField &&
+      sShadowVolume.terrainRevision == terrainRevision && sShadowVolume.planeCount == planeCount &&
+      planeCount <= ShadowVolumeMemo::kPlanes;
+    for (std::uint32_t index = 0U; cached && index < planeCount; ++index) {
+      cached = std::memcmp(&sShadowVolume.planes[index], &shadowFrustum.planes_[index], sizeof(Wm3::Plane3f)) == 0;
+    }
+    if (cached) {
+      volume = sShadowVolume.volume;
+    } else {
+      volume = heightField->ConvexIntersection(shadowFrustum);
+      sShadowVolume.valid = planeCount <= ShadowVolumeMemo::kPlanes;
+      sShadowVolume.field = heightField;
+      sShadowVolume.terrainRevision = terrainRevision;
+      sShadowVolume.planeCount = planeCount;
+      for (std::uint32_t index = 0U; sShadowVolume.valid && index < planeCount; ++index) {
+        sShadowVolume.planes[index] = shadowFrustum.planes_[index];
+      }
+      sShadowVolume.volume = volume;
+    }
     if (volume.Max.X() <= volume.Min.X()) {
       return false;
     }
@@ -384,15 +472,23 @@ namespace moho
     // Lift the top so casters standing above the terrain still fit.
     volume.Max.Y() = volume.Max.Y() + 8.0f;
 
-    const Wm3::Vector3f center(
-      (volume.Min.X() + volume.Max.X()) * 0.5f,
-      (volume.Min.Y() + volume.Max.Y()) * 0.5f,
-      (volume.Min.Z() + volume.Max.Z()) * 0.5f
-    );
+    // Engine addition: the stable fit looks at the world origin rather than the view centre, from
+    // far enough back that the largest map stays in front of the eye. The camera's forward axis
+    // sets the light's up axis above, and panning doesn't change it, so a pan leaves this light
+    // space where it is. Zooming or turning the camera re-fits it, as the original always does.
+    const bool stableFit = ShadowStableFitEnabled();
+    const Wm3::Vector3f center = stableFit
+      ? Wm3::Vector3f(0.0f, 0.0f, 0.0f)
+      : Wm3::Vector3f(
+          (volume.Min.X() + volume.Max.X()) * 0.5f,
+          (volume.Min.Y() + volume.Max.Y()) * 0.5f,
+          (volume.Min.Z() + volume.Max.Z()) * 0.5f
+        );
+    const float eyeDistance = stableFit ? 20000.0f : 10000.0f;
     const Wm3::Vector3f eye(
-      center.X() - (lightDirection.X() * 10000.0f),
-      center.Y() - (lightDirection.Y() * 10000.0f),
-      center.Z() - (lightDirection.Z() * 10000.0f)
+      center.X() - (lightDirection.X() * eyeDistance),
+      center.Y() - (lightDirection.Y() * eyeDistance),
+      center.Z() - (lightDirection.Z() * eyeDistance)
     );
 
     gpg::gal::Matrix lightView{};
@@ -407,17 +503,25 @@ namespace moho
     const float nearDepth = std::min(nearMagnitude, farMagnitude) - 25.0f;
     const float farDepth = std::max(nearMagnitude, farMagnitude);
 
+    ShadowStableBox box{
+      lightSpaceVolume.Min.X(),
+      lightSpaceVolume.Max.X(),
+      lightSpaceVolume.Min.Y(),
+      lightSpaceVolume.Max.Y(),
+    };
+    if (stableFit) {
+      box = FitShadowStableBox(box.minX, box.maxX, box.minY, box.maxY, mShadowSize, sShadowStableWidth, sShadowStableHeight);
+    }
+
     // Orthographic projection fitted to the light-space volume, built by
     // hand rather than through a helper - the binary writes these seven
     // elements and zeroes the rest.
     gpg::gal::Matrix lightProjection{};
-    lightProjection.r[0].x = 2.0f / (lightSpaceVolume.Max.X() - lightSpaceVolume.Min.X());
-    lightProjection.r[1].y = 2.0f / (lightSpaceVolume.Max.Y() - lightSpaceVolume.Min.Y());
+    lightProjection.r[0].x = 2.0f / (box.maxX - box.minX);
+    lightProjection.r[1].y = 2.0f / (box.maxY - box.minY);
     lightProjection.r[2].z = 1.0f / (nearDepth - farDepth);
-    lightProjection.r[3].x = (lightSpaceVolume.Max.X() + lightSpaceVolume.Min.X())
-      / (lightSpaceVolume.Min.X() - lightSpaceVolume.Max.X());
-    lightProjection.r[3].y = (lightSpaceVolume.Min.Y() + lightSpaceVolume.Max.Y())
-      / (lightSpaceVolume.Min.Y() - lightSpaceVolume.Max.Y());
+    lightProjection.r[3].x = (box.maxX + box.minX) / (box.minX - box.maxX);
+    lightProjection.r[3].y = (box.minY + box.maxY) / (box.minY - box.maxY);
     lightProjection.r[3].z = lightProjection.r[2].z * nearDepth;
     lightProjection.r[3].w = 1.0f;
 

@@ -3,11 +3,16 @@
 #include <cstring>
 #include <cstdlib>
 #include <exception>
+#include <mutex>
 #include <new>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <type_traits>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
@@ -203,6 +208,59 @@ technique TMsdfText
       return graphics_Fidelity;
     }
 
+    /**
+     * Engine addition (ren_TechniqueMemo): the techniques each effect's `SetTechnique` resolved. A lookup
+     * built a whole `Technique` (three lanes, each with a string and two maps) as its search key, then had
+     * the gal effect search its techniques by name and allocate a new technique object, for every batch of
+     * every pass. An effect's entry holds its gal effect and the fidelity it was resolved at, and is dropped
+     * when either changes, when the effect loads a file and when it is destroyed - before its gal effect is
+     * released, so no technique outlives the effect it came from. Only successful resolutions are kept, so
+     * an invalid fidelity definition still logs at each call.
+     */
+    bool ren_TechniqueMemo = true;
+    TConVar<bool> gTConVar_ren_TechniqueMemo(
+      "ren_TechniqueMemo",
+      "An effect finds a technique it selected before in a small table (1, the default), or looks it up by name each "
+      "time (0). Read at each selection.",
+      &ren_TechniqueMemo
+    );
+
+    struct EffectTechniqueMemo
+    {
+      static constexpr std::size_t kTechniques = 24U;
+      const gpg::gal::Effect* galEffect = nullptr;
+      std::int32_t fidelity = 0;
+      std::vector<std::pair<std::string, boost::shared_ptr<gpg::gal::EffectTechnique>>> techniques;
+    };
+
+    struct TechniqueMemoTable
+    {
+      std::mutex mutex;
+      std::unordered_map<const CD3DEffect*, EffectTechniqueMemo> effects;
+    };
+
+    [[nodiscard]] TechniqueMemoTable& GetTechniqueMemoTable()
+    {
+      // Never destroyed: an effect still alive at exit would otherwise have its techniques released after
+      // the device is gone.
+      static TechniqueMemoTable* const table = new TechniqueMemoTable();
+      return *table;
+    }
+
+    void ForgetEffectTechniques(const CD3DEffect* const effect)
+    {
+      TechniqueMemoTable& table = GetTechniqueMemoTable();
+      EffectTechniqueMemo dropped;
+      {
+        const std::lock_guard<std::mutex> lock(table.mutex);
+        const auto found = table.effects.find(effect);
+        if (found == table.effects.end()) {
+          return;
+        }
+        dropped = std::move(found->second);
+        table.effects.erase(found);
+      }
+    }
   } // namespace
 
   /**
@@ -429,6 +487,7 @@ technique TMsdfText
     // member with a destructor of its own (`WeakObject`). Until that head is
     // modelled, the walk stays in this body and the handles are dropped here
     // to keep them ahead of it.
+    ForgetEffectTechniques(this); // engine addition (ren_TechniqueMemo): before the gal effect goes
     mCurrentTechnique.reset();
     mEffect.reset();
 
@@ -481,6 +540,7 @@ technique TMsdfText
   bool CD3DEffect::InitEffectFromFile(const char* const effectFilePath)
   {
     const fa::string engineVersion = GetEngineVersion();
+    ForgetEffectTechniques(this); // engine addition (ren_TechniqueMemo): the techniques belong to the old effect
     mEffect.reset();
 
     try {
@@ -674,6 +734,23 @@ technique TMsdfText
    */
   void CD3DEffect::SetTechnique(const char* const techniqueName)
   {
+    // Engine change (ren_TechniqueMemo): a technique this effect selected before is found without building the
+    // search key or a new gal technique.
+    const std::int32_t memoFidelity = ResolveGraphicsFidelityIndex();
+    if (ren_TechniqueMemo && mEffect != nullptr) {
+      TechniqueMemoTable& table = GetTechniqueMemoTable();
+      const std::lock_guard<std::mutex> lock(table.mutex);
+      const auto found = table.effects.find(this);
+      if (found != table.effects.end() && found->second.galEffect == mEffect.get() && found->second.fidelity == memoFidelity) {
+        for (const auto& [name, technique] : found->second.techniques) {
+          if (name == techniqueName) {
+            mCurrentTechnique = technique;
+            return;
+          }
+        }
+      }
+    }
+
     const fa::string lookupName(techniqueName, std::char_traits<char>::length(techniqueName));
     const Technique lookupTechnique(lookupName);
     const TechniqueSet::iterator definition = GetFidelityDefinitions(lookupTechnique);
@@ -701,6 +778,22 @@ technique TMsdfText
     }
 
     mCurrentTechnique = mEffect->GetTechnique(selectedLane.mName.c_str());
+
+    if (ren_TechniqueMemo && mEffect != nullptr && mCurrentTechnique != nullptr) {
+      TechniqueMemoTable& table = GetTechniqueMemoTable();
+      EffectTechniqueMemo stale;
+      const std::lock_guard<std::mutex> lock(table.mutex);
+      EffectTechniqueMemo& memo = table.effects[this];
+      if (memo.galEffect != mEffect.get() || memo.fidelity != memoFidelity) {
+        stale = std::move(memo);
+        memo = EffectTechniqueMemo{};
+        memo.galEffect = mEffect.get();
+        memo.fidelity = memoFidelity;
+      }
+      if (memo.techniques.size() < EffectTechniqueMemo::kTechniques) {
+        memo.techniques.emplace_back(techniqueName, mCurrentTechnique);
+      }
+    }
   }
 
   /**

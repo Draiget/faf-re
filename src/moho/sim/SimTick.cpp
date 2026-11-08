@@ -1205,7 +1205,7 @@ void Sim::AdvanceBeat(const int amt)
         TickTaskStage(&mTaskStageB);
       }
       {
-        // The sim Lua state's m_luaTask is this stage (Sim::Setup), so its Lua threads run here too.
+        // The sim Lua state's m_taskStage is this stage (Sim::Setup), so its Lua threads run here too.
         FAF_PROFILE_ZONE_NAMED("Sim::LuaThreadsAndDiskWatcher");
         TickTaskStage(&mDiskWatcherTaskStage);
       }
@@ -1339,6 +1339,8 @@ void Sim::AdvanceBeat(const int amt)
   }
 
   if (mLuaState && mLuaState->m_state && (mCurTick % 70u) == 0u) {
+    // The sim stays on the shipped 70-tick full cycle while the incremental
+    // collector is being brought up for the user VM.
     FAF_PROFILE_ZONE_NAMED("Sim::LuaGC");
     lua_setgcthreshold(mLuaState->m_state, 0);
   }

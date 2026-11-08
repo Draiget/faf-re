@@ -1090,6 +1090,8 @@ namespace LuaPlus
 		 */
 		explicit LuaState(StandardLibraries initStandardLibrary);
 
+		LuaState(StandardLibraries initStandardLibrary, int collectorRole);
+
 		/**
 		 * Address: 0x0090A520 (FUN_0090A520, LuaPlus::LuaState::LuaState)
 		 *
@@ -1301,7 +1303,12 @@ namespace LuaPlus
 
 	public:
 		lua_State* m_state;                    // Underlying C lua_State*.
-		moho::CLuaTask* m_luaTask;             // Engine CLuaTask owner (if any).
+		// One slot (+0x04), two meanings: a thread state's is the `CLuaTask` running it, a root
+		// state's is the task stage `ForkThread` puts new threads on (Sim::Setup, the session).
+		union {
+			moho::CLuaTask* m_luaTask;         // Thread state: its CLuaTask owner (if any).
+			moho::CTaskStage* m_taskStage;     // Root state: the stage for forked threads.
+		};
 		uint8_t m_ownState;                    // 1 when wrapper owns/destroys lua_State.
 		uint8_t m_pad9[3];
 		LuaObject m_threadObj;                 // LuaObject representing this thread in parent/root state.

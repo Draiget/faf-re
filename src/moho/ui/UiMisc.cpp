@@ -1,5 +1,7 @@
 #include "moho/ui/UiPrivate.h"
 
+#include "lua/LuaIncrementalGc.h"
+
 namespace moho
 {
 }
@@ -1606,7 +1608,10 @@ LuaPlus::LuaState* moho::USER_GetLuaState()
     return state;
   }
 
-  static LuaPlus::LuaState sLuaState(LuaPlus::LuaState::LIB_BASE);
+  static LuaPlus::LuaState sLuaState(
+    LuaPlus::LuaState::LIB_BASE,
+    static_cast<int>(moho::lua_incremental::ELuaVmRole::FrontendUi)
+  );
   static CTaskStage sStage;
 
   sUserStage = &sStage;
@@ -1617,7 +1622,7 @@ LuaPlus::LuaState* moho::USER_GetLuaState()
     lua_sethook(gUserLuaState->m_state, &DebugLuaHook, 4, 0);
   }
 
-  gUserLuaState->m_luaTask = reinterpret_cast<CLuaTask*>(sUserStage);
+  gUserLuaState->m_taskStage = sUserStage;
 
   ScrDiskWatcherTask* const diskWatcherTask = new (std::nothrow) ScrDiskWatcherTask(gUserLuaState);
   AttachTaskToStage(diskWatcherTask, sUserStage, true);

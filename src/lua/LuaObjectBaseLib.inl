@@ -10,6 +10,14 @@
 	{
 		const lua_Number threshold = luaL_optnumber(state, 1, 0.0f);
 		lua_setgcthreshold(state, static_cast<int>(threshold));
+		// Engine addition (lua_IncrementalGC, #278): a frame-driven UI state skips the collection
+		// lua_setgcthreshold asks for, so a script's own request runs the incremental collector's full
+		// cycle, as the binary's collection does when the heap has reached the threshold.
+		global_State* const globalState = state->l_G;
+		if (moho::lua_IncrementalGC && moho::lua_incremental::IsUiState(globalState) &&
+		    globalState->nblocks >= globalState->GCthreshold) {
+			faf_lua51_gc_full(state);
+		}
 		return 0;
 	}
 
@@ -1327,6 +1335,11 @@ namespace LuaPlus
 
 		TString* const loadedSource = LuaLoadTString(loadState);
 		proto->source = (loadedSource != nullptr) ? loadedSource : fallbackSource;
+		faf_lua51_gc_barrier_f(
+			loadState->state,
+			reinterpret_cast<GCObject*>(proto),
+			reinterpret_cast<GCObject*>(proto->source)
+		); // Lua 5.1.5 lparser.c: Proto source barrier
 
 		int lineDefined = 0;
 		LuaLoadBlock(4u, &lineDefined, loadState);
@@ -1438,18 +1451,21 @@ extern "C" void luaV_settable(
 
 			if (slot->tt != LUA_TNIL) {
 				*slot = *val;
+				faf_lua51_gc_barrier_back(state, table); // Lua 5.1.5 lvm.c: luaV_settable()
 				return;
 			}
 
 			Table* const metatable = table->metatable;
 			if ((metatable->flags & kNoNewIndexTagMethodFlag) != 0) {
 				*slot = *val;
+				faf_lua51_gc_barrier_back(state, table); // Lua 5.1.5 lvm.c: luaV_settable()
 				return;
 			}
 
 			handler = luaT_gettm(metatable, kTagMethodNewIndex, state->l_G->tmname[kTagMethodNewIndex]);
 			if (handler == nullptr) {
 				*slot = *val;
+				faf_lua51_gc_barrier_back(state, table); // Lua 5.1.5 lvm.c: luaV_settable()
 				return;
 			}
 		} else {
@@ -1519,6 +1535,18 @@ namespace moho
 	 * `sim_Workers` > 0.
 	 */
 	bool lua_ParallelMark = true;
+
+	// Off until the game's startup copies the convar in (CaptureIncrementalGcStartupSetting, from
+	// CScApp::Init). Headless, the server and the tools never do, so their session states keep the
+	// shipped collector and their sim paths skip the incremental checks.
+	bool lua_IncrementalGC = false;
+	bool lua_IncrementalGCSetting = true;
+
+	TConVar<bool> gTConVar_lua_IncrementalGC(
+		"lua_IncrementalGC",
+		"Use the Lua 5.1-style incremental collector (default on); 0 keeps the shipped full stop-the-world collector.",
+		&lua_IncrementalGCSetting
+	);
 
 	TConVar<bool> gTConVar_lua_ParallelMark(
 		"lua_ParallelMark",

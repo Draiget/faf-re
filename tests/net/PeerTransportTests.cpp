@@ -15,6 +15,8 @@
 #include "moho/net/INetConnector.h"
 #include "moho/net/NetPeerTransport.h"
 
+#include <WS2tcpip.h>
+
 #include <chrono>
 #include <cstdio>
 #include <cstring>
@@ -174,7 +176,12 @@ int main(int argc, char** argv)
   ::testing::InitGoogleTest(&argc, argv);
   for (int i = 1; i + 1 < argc; ++i) {
     if (std::strcmp(argv[i], "--host") == 0) {
-      gSocketHost = ::ntohl(::inet_addr(argv[i + 1]));
+      in_addr address{};
+      if (::inet_pton(AF_INET, argv[i + 1], &address) != 1) {
+        std::fprintf(stderr, "--host %s is not an IPv4 address\n", argv[i + 1]);
+        return 2;
+      }
+      gSocketHost = ::ntohl(address.s_addr);
     }
   }
   return RUN_ALL_TESTS();

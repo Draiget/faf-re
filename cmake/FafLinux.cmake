@@ -66,6 +66,7 @@ endforeach()
 set(FAF_DEPENDENCIES_DIR "${PROJECT_SOURCE_DIR}/dependencies" CACHE PATH
     "Third-party tree (dependencies/ in the repository)")
 
+include(FafCoverage)
 include(FafCodegen)
 include(FafWarnings)
 
@@ -74,8 +75,10 @@ include(FafWarnings)
 # contraction, exceptions through extern "C", threads, default x87 and SSE
 # control words. Run it after a toolchain change; `ldd` on it shows the C++
 # library is linked statically.
+enable_testing()
 add_executable(faf-linux-toolchain-check "${PROJECT_SOURCE_DIR}/tests/linux/ToolchainCheck.cpp")
-target_link_libraries(faf-linux-toolchain-check PRIVATE faf_codegen)
+target_link_libraries(faf-linux-toolchain-check PRIVATE faf_codegen gtest_main)
+add_test(NAME linux_toolchain COMMAND faf-linux-toolchain-check)
 
 # --- Language dialect ---------------------------------------------------------------------
 # clang-cl compiles the Windows build with -fms-extensions -fms-compatibility
@@ -113,6 +116,8 @@ if(TARGET faf_netchannel)
   target_link_libraries(faf_netchannel_tests PRIVATE faf_netchannel faf_monocypher gtest_main)
   add_executable(faf_gamelink_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/GameLinkTests.cpp")
   target_link_libraries(faf_gamelink_tests PRIVATE faf_netchannel faf_monocypher gtest_main)
+  add_test(NAME remote_netchannel COMMAND faf_netchannel_tests)
+  add_test(NAME remote_gamelink COMMAND faf_gamelink_tests)
 endif()
 
 # --- faf_sim ----------------------------------------------------------------------------
@@ -208,6 +213,11 @@ target_include_directories(faf_sim_settings INTERFACE
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_link_libraries(faf_sim_settings INTERFACE faf_codegen)
 target_link_libraries(faf_sim PUBLIC Wm3Headers zlib123 faf_monocypher faf_zstd)
+# The client half of server mode (remote/client/ServerConnect.cpp, /connectserver) holds the channel to the server:
+# every program built from faf_sim links the net channel, as Windows' server-mode faf_main does.
+if(TARGET faf_netchannel)
+  target_link_libraries(faf_sim PUBLIC faf_netchannel)
+endif()
 
 set(_faf_sim_options
   # The recovered tree's x86 layout asserts, off as on Windows x64 (see the
@@ -256,6 +266,7 @@ add_custom_command(TARGET faf_sim_math_tests POST_BUILD
   COMMAND "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args}
   COMMENT "Checking the simulation's arithmetic against tests/sim_math/golden.txt"
   VERBATIM)
+add_test(NAME sim_math COMMAND "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args})
 
 # --- faf_math_dump (plan WPR.21) --------------------------------------------------------
 # The difffuzz targets on every faf_sim object, as Windows builds them on faf_engine,
@@ -286,6 +297,9 @@ endforeach()
 add_executable(headless ${_faf_headless_files}
   "${PROJECT_SOURCE_DIR}/src/headless/ReplayTargetAudit.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbyScriptData.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbySignaller.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
 )
@@ -299,7 +313,15 @@ target_link_options(headless PRIVATE -Wl,--error-limit=0)
 # The dedicated server, Linux only (plan D2): the sim, and what `headless` shares for loading a game.
 add_executable(server
   "${PROJECT_SOURCE_DIR}/src/server/ServerMain.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ControlChannel.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ControlListener.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ReplayLog.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ObserverListener.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LiveReplaySender.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbyScriptData.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbySignaller.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
   "${PROJECT_SOURCE_DIR}/src/headless/SessionLoad.cpp"
@@ -312,13 +334,34 @@ target_link_options(server PRIVATE -Wl,--error-limit=0)
 add_executable(faf_server_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SpeedWatchTests.cpp")
 target_include_directories(faf_server_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
 target_link_libraries(faf_server_tests PRIVATE gtest_main)
+add_test(NAME server_speed_watch COMMAND faf_server_tests)
 
-add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp" "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp")
+add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp" "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
+  "${PROJECT_SOURCE_DIR}/tests/server/ControlChannelTests.cpp"
+  "${PROJECT_SOURCE_DIR}/tests/server/ReplayLogTests.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ControlChannel.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ControlListener.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ReplayLog.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LiveReplaySender.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbyScriptData.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbySignaller.cpp")
 target_link_libraries(faf_seat_tests PRIVATE faf_sim faf_netchannel faf_monocypher gtest_main)
 target_compile_definitions(faf_seat_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_seat_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME server_seat COMMAND faf_seat_tests)
 
-add_executable(faf_server_probe EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeMain.cpp")
+# Plan WP17.2: a client of the control API, for operators and tests.
+add_executable(faf_server_control EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-control/ControlMain.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ControlChannel.cpp")
+target_include_directories(faf_server_control PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(faf_server_control PRIVATE faf_netchannel faf_monocypher)
+
+add_executable(faf_server_probe EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeMain.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbyScriptData.cpp"
+  "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeRebuild.cpp"
+  "${PROJECT_SOURCE_DIR}/src/headless/SessionLoad.cpp"
+  "${PROJECT_SOURCE_DIR}/src/headless/ReplayLuaState.cpp")
 target_link_libraries(faf_server_probe PRIVATE faf_sim faf_netchannel faf_monocypher)
 target_compile_definitions(faf_server_probe PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_server_probe PRIVATE -Wl,--error-limit=0)
@@ -330,6 +373,7 @@ add_executable(faf_remote_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/re
 target_link_libraries(faf_remote_tests PRIVATE faf_sim gtest_main)
 target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_remote_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME remote_wire COMMAND faf_remote_tests)
 
 # The libm gate (plan WPL.13): the faf_sim objects call no host libm transcendental outside
 # tests/linux/libm_allowlist.txt; headless is not built while one does.
@@ -347,3 +391,78 @@ add_dependencies(headless faf_sim_libm_gate)
 # sections must equal Windows' faf_registration_dump_sim (src/CMakeLists.txt).
 add_executable(faf_registration_dump_sim EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/registry/RegistrationDump.cpp")
 target_link_libraries(faf_registration_dump_sim PRIVATE faf_sim)
+
+# Regression for lua damage stack; no game data required.
+add_executable(faf_damage_callback_stack_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/lua/DamageCallbackStackTests.cpp")
+target_link_libraries(faf_damage_callback_stack_tests PRIVATE faf_sim gtest_main)
+set_target_properties(faf_damage_callback_stack_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME damage_callback_stack COMMAND faf_damage_callback_stack_tests)
+set_tests_properties(damage_callback_stack PROPERTIES LABELS "Sim")
+
+# Occupation manager lifecycle, plus a linker-wrap trace of which new/delete
+# overloads it calls; no game data required.
+add_executable(faf_occupation_manager_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/collision_allocator/OccupationManagerTests.cpp")
+target_link_libraries(faf_occupation_manager_tests PRIVATE faf_sim gtest_main)
+set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
+set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
+target_compile_definitions(faf_occupation_manager_tests PRIVATE FAF_OCCUPATION_DELETE_TRACE=1)
+target_link_options(faf_occupation_manager_tests PRIVATE -Wl,--wrap=_Znwm -Wl,--wrap=_Znam -Wl,--wrap=_ZdlPv -Wl,--wrap=_ZdaPv)
+
+# --- Portable unit tests ------------------------------------------------------------------
+# The suites Windows builds that need no Windows API: header-only ones on their own, and the
+# gpg/core and container suites on faf_sim's objects, as Windows runs them on faf_engine.
+# _faf_linux_portable_test(<target> <test name> <source relative to the root>...)
+function(_faf_linux_portable_test target test)
+  list(TRANSFORM ARGN PREPEND "${PROJECT_SOURCE_DIR}/" OUTPUT_VARIABLE sources)
+  add_executable(${target} EXCLUDE_FROM_ALL ${sources})
+  target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/src")
+  target_link_libraries(${target} PRIVATE faf_codegen gtest_main)
+  add_test(NAME ${test} COMMAND ${target})
+endfunction()
+_faf_linux_portable_test(faf_shadow_fit_tests shadow_stable_fit tests/render/ShadowStableFitTests.cpp)
+_faf_linux_portable_test(faf_scripted_decal_tests scripted_decal_placement tests/scripted_decal/PlacementTests.cpp)
+_faf_linux_portable_test(faf_effect_scan_tests effect_scan tests/effect_scan/EffectScanTests.cpp)
+_faf_linux_portable_test(faf_texture_quality_tests texture_quality tests/image_codec/TextureQualityTests.cpp)
+_faf_linux_portable_test(faf_profiler_tests profiler_facade tests/profiling/ProfilerFacadeTests.cpp)
+_faf_linux_portable_test(faf_sfd_parser_tests sfd_header_parser
+  tests/movie/SfdHeaderParserTests.cpp src/moho/movie/sfd/SfdHeaderParser.cpp)
+
+file(GLOB _faf_core_test_sources "${PROJECT_SOURCE_DIR}/tests/core/*.cpp")
+add_executable(faf_core_tests EXCLUDE_FROM_ALL ${_faf_core_test_sources})
+target_link_libraries(faf_core_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_core_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME core COMMAND faf_core_tests)
+
+file(GLOB _faf_container_test_sources "${PROJECT_SOURCE_DIR}/tests/containers/*.cpp")
+add_executable(faf_container_tests EXCLUDE_FROM_ALL ${_faf_container_test_sources})
+target_link_libraries(faf_container_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_container_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME containers COMMAND faf_container_tests)
+
+file(GLOB _faf_reflection_test_sources "${PROJECT_SOURCE_DIR}/tests/reflection/*.cpp")
+add_executable(faf_reflection_tests EXCLUDE_FROM_ALL ${_faf_reflection_test_sources})
+target_link_libraries(faf_reflection_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_reflection_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME reflection COMMAND faf_reflection_tests)
+
+# Recorded games played back by headless (tests/replay/ReplayPlaybackTests.cpp); skipped without FAF_REPLAY_DATA.
+add_executable(faf_replay_playback_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/replay/ReplayPlaybackTests.cpp")
+target_link_libraries(faf_replay_playback_tests PRIVATE faf_codegen gtest_main)
+target_compile_definitions(faf_replay_playback_tests PRIVATE FAF_HEADLESS_EXE="$<TARGET_FILE:headless>")
+add_dependencies(faf_replay_playback_tests headless)
+add_test(NAME replay_playback COMMAND faf_replay_playback_tests)
+set_tests_properties(replay_playback PROPERTIES TIMEOUT 3600)
+
+# The Lua VM, parser, libraries and LuaObject API (tests/lua/Lua*.cpp; the folder's two other
+# files are executables of their own).
+file(GLOB _faf_lua_test_sources "${PROJECT_SOURCE_DIR}/tests/lua/Lua*.cpp")
+add_executable(faf_lua_tests EXCLUDE_FROM_ALL ${_faf_lua_test_sources})
+target_link_libraries(faf_lua_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_lua_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME lua COMMAND faf_lua_tests)
+
+# --- faf_tests --------------------------------------------------------------------------
+# Every GoogleTest executable of the Linux build (cmake/FafTests.cmake).
+include(FafTests)
+faf_add_tests_target("${PROJECT_SOURCE_DIR}")

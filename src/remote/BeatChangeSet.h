@@ -44,6 +44,13 @@ namespace faf::remote
     [[nodiscard]] const std::vector<SChangedEntity>& Entities() const noexcept { return mSealed; }
     /** The sealed beat (`Sim::mCurBeat` when its walk ended). */
     [[nodiscard]] std::uint32_t Beat() const noexcept { return mBeat; }
+    /**
+     * Plan WP13.6: the next beat sealed holds every entity of the sim, as a focus change's walk does, so a view that
+     * starts then learns of what hasn't changed since the game's start. Every view acts on them as on any changed one.
+     */
+    void RequestEveryEntity() noexcept { mEveryEntity = true; }
+    /** Whether the last sealed beat holds every entity (`RequestEveryEntity`). */
+    [[nodiscard]] bool EveryEntitySealed() const noexcept { return mEveryEntitySealed; }
 
   protected:
     /** A beat was sealed: `Entities()` is its change set and `packet` its packet. */
@@ -58,5 +65,7 @@ namespace faf::remote
     std::vector<SChangedEntity> mSealed;  // the last beat's, sorted by id
     bool mPendingRefreshUI = false;        // the entity about to sync
     std::uint32_t mBeat = 0;
+    bool mEveryEntity = false;
+    bool mEveryEntitySealed = false;
   };
 } // namespace faf::remote

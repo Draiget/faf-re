@@ -59,6 +59,55 @@ namespace faf::remote::net
     ViewCheck = 8,
     /** Player to server, reliable: its frames didn't match a `ViewCheck`; it wants its next view whole. */
     ViewMismatch = 9,
+    /**
+     * Both ways, reliable, before the game launches (plan WP2.13): one lobby (`CLobby`) message on the virtual
+     * connection between two participants. Player to server: varint the uid it is for, then the message. Server to
+     * player: varint the uid it is from, then the message; the server writes the sender itself, so no player chooses
+     * whom a message seems to come from. Uid 0 is the server itself, whose messages are lobby signals
+     * (LobbySignals.h), as FAF's lobby server sends a game over GPGNet.
+     */
+    Lobby = 10,
+    /**
+     * Server to player, reliable, before `GameInfo` (plan WPR.55): the game's configuration as the server launched it
+     * (the table `CLobby.LaunchGame` takes: scenario, armies, options, mods), in the lobby's Lua byte form
+     * (`LuaObject::ToByteStream`). A client takes its launch from this, never from the lobby's own Launch message.
+     * Again after a reconnect, with `GameInfo`.
+     */
+    LaunchInfo = 11,
+    /**
+     * Server to player, reliable (plan WP11): varint beat, then that beat's Lua lane (wire/LuaSyncLane.h: the player's
+     * `Sync` table and print lines), sent once `Sim::Sync` has written and routed the beat's table. A `View`'s own Lua
+     * lane is then empty: it is built in `Sim::Sync`'s entity walk, before the table exists. It may come before or
+     * after the beat's `View` (the views' pipeline), never after the next beat's: a client with the next `View` and no
+     * `LuaSync` for a beat has none coming.
+     */
+    LuaSync = 12,
+    /**
+     * Server to player, reliable (plan WP11 step 4): varint beat, a flags byte (1: reset), then a session-table record
+     * (wire/SessionTables.h: new sounds, names, deposits and terrain edits) to the message's end. It comes before
+     * the first `View` that names its entries. Reset: the client forgets its tables; the session's every record
+     * follows, from the first, before the whole view a returning player gets (a reset carries no record itself).
+     */
+    SessionTables = 13,
+    /**
+     * Player to server, reliable, once its game has loaded the launch's rules and before `Loaded` (plan WP2.6): what
+     * its game data and mods are, as remote/ContentCheck.h hashes them: two 64-bit integers, the blueprint tables'
+     * hash, then the mod set's. The server compares them with its own and refuses or warns as the match says.
+     */
+    ContentReport = 14,
+    /**
+     * Server to player, reliable, once the player's launch has gone and then whenever it changes (plan WP11.4): the
+     * session's clients as `wire::SRoster` (remote/SeatRoster.h), the receiver's own entry named by its `localIndex`.
+     * Who is there, their names, sources and connection go at once; ping and quiet time at most once a second.
+     * Again after a reconnect.
+     */
+    Roster = 15,
+    /**
+     * Both ways, reliable (plan WP11.4): one chat message. Player to server: varint the client index it is for, then
+     * the payload as the game's chat sends it (`IClient::ReceiveChat`). Server to player: varint the sender's client
+     * index, written by the server, then the payload. The server drops one for no player, too large or too many.
+     */
+    Chat = 16,
   };
 
   /** What became of a player's command. */
@@ -125,6 +174,8 @@ namespace faf::remote::net
      * every address is treated as listed.
      */
     void AllowAddress(std::uint32_t ip);
+    /** Plan WP17.2: off the allowlist again (it shares the unlisted budget from now on); the list stays on. */
+    void DisallowAddress(std::uint32_t ip);
 
     void AddPlayer(std::int32_t uid, const Token& token);
     /** No more handshakes for this uid, and its channel is gone. */
@@ -142,6 +193,11 @@ namespace faf::remote::net
     [[nodiscard]] const ChannelStats* StatsOf(std::int32_t uid) const;
     /** Reliable bytes the uid hasn't acknowledged. */
     [[nodiscard]] std::uint64_t ReliableUnacked(std::int32_t uid) const;
+    /**
+     * Plan WPR.50: how long nothing has arrived from the uid's channel, at `nowUs` (`Pump`'s clock); 0 without a
+     * channel. A live client's keepalives come every quarter second.
+     */
+    [[nodiscard]] std::uint64_t SilentUs(std::int32_t uid, std::uint64_t nowUs) const;
 
   private:
     struct SPlayer

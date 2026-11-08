@@ -112,6 +112,11 @@ namespace faf::remote
     void SetDumpPrefix(std::string prefix) { mDumpPrefix = std::move(prefix); }
     /** Called when a beat's payloads are ready, with what they were written under still in place. */
     void SetPayloadObserver(std::function<void(moho::Sim&)> observer) { mPayloadObserver = std::move(observer); }
+    /**
+     * Plan WP13.6: called on the sim thread with a view whose command source has left every army (a defeat, once the
+     * whole team is out and the game allows observers: `lua/sim/MatchState.lua` `ObserverAfterDeath`).
+     */
+    void SetSourceGoneHandler(std::function<void(std::size_t view)> handler) { mSourceGone = std::move(handler); }
 
     [[nodiscard]] std::int32_t FocusForLua() const noexcept override;
     void EnterCommand(moho::Sim& sim) override;
@@ -233,6 +238,7 @@ namespace faf::remote
     int mSingleViewRecallStatus = 0;
     bool mForkingRecallVote = false;
     std::function<void(moho::Sim&)> mPayloadObserver;
+    std::function<void(std::size_t)> mSourceGone;
     IdTranslator mTranslate;
     moho::Sim* mSim = nullptr;
     bool mWrappersInstalled = false;

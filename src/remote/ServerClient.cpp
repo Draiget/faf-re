@@ -116,7 +116,9 @@ namespace faf::remote
 
     const std::uint8_t type = message.GetType().raw();
     const auto op = static_cast<moho::ECmdStreamOp>(type);
-    if (type >= kOpCount || !SeatMaySend(op)) {
+    // Plan WP15.4: past its pause budget a player's pause is refused like a command it may not send.
+    const bool pauseSpent = op == moho::ECmdStreamOp::CMDST_RequestPause && !mPauseAllowed.load(std::memory_order_relaxed);
+    if (type >= kOpCount || !SeatMaySend(op) || pauseSpent) {
       const std::size_t slot = type < kOpCount ? type : 0u;
       if (++mRefused[slot] <= kRefusalsLoggedPerOp) {
         gpg::Logf("Seat %d:%s: refused message type %d from its player", mIndex, mNickname.c_str(), static_cast<int>(type));

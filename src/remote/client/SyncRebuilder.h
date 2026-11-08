@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -9,6 +11,7 @@
 #include "moho/entity/SSTIEntityVariableData.h"
 #include "moho/unit/core/Unit.h"
 #include "remote/wire/EntityFrame.h"
+#include "remote/wire/PoseLane.h"
 #include "remote/wire/SessionTables.h"
 
 // Engine addition, server mode (plan WP11.2): the client side of the entities lane. It decodes
@@ -82,6 +85,11 @@ namespace faf::remote::client
     std::uint64_t statsApplied = 0;           // unit stat items written into client trees
     std::uint64_t unitUpdates = 0;            // unit updates built by the client
     std::uint64_t unitPosesBorrowed = 0;      // of them, with the packet's poses (the pose lane is WP8)
+    std::uint64_t posesMade = 0;              // with `SetNoSim`: client poses made (a new unit or skeleton)
+    std::uint64_t poseBeats = 0;              // units given a new pose from the lane's bones
+    std::uint64_t poseBonesApplied = 0;
+    std::uint64_t poseBonesBad = 0;           // an index past the skeleton's bones, or a whole pose of another size
+    std::uint64_t posesWithoutMesh = 0;       // lane bones for a unit with no skeleton yet
     std::uint64_t unitDataMismatches = 0;     // client-built unit data versus the packet's, poses aside
     std::uint64_t depositMismatches = 0;      // beats whose client deposits differ from the sim's
     std::uint64_t terrainEdits = 0;           // terrain edits written into the client's height field
@@ -109,6 +117,12 @@ namespace faf::remote::client
      */
     bool Apply(std::span<const std::uint8_t> frameBytes, moho::SSyncData& packet);
 
+    /**
+     * Plan WP11: rewrites `packet`'s entity lanes from a frame already decoded (a server's view: the player's own
+     * frame and its team's, merged by `CViewFrameMerger`). `wireBytes` is what it took on the wire, for the counts.
+     */
+    bool ApplyFrame(wire::SViewFrame frame, std::size_t wireBytes, moho::SSyncData& packet);
+
     ~CSyncRebuilder();
 
     [[nodiscard]] const SRebuildStats& Stats() const noexcept { return mStats; }
@@ -128,13 +142,25 @@ namespace faf::remote::client
     [[nodiscard]] const wire::SViewFrame* Baseline() const noexcept { return mHasShown ? &mShown : nullptr; }
 
   private:
+    bool ApplyFrame(wire::SViewFrame frame, std::size_t wireBytes, moho::SSyncData& packet, std::chrono::steady_clock::time_point start);
+
     struct SHeldEntity
     {
       bool live = false; // in the session's id map (not orphaned)
       moho::SSTIEntityVariableData data{};
       boost::shared_ptr<moho::Stats<moho::StatItem>> stats; // a unit's stats tree (the client's own)
       std::unique_ptr<moho::SSTIUnitVariableData> unit;     // a unit's data as last given to the session
+      // With `SetNoSim`, plan WP8.3: the unit's current pose, the client's own (each beat with bones a new copy, the
+      // old one becoming the prior pose, as `CAniActor` steps), the skeleton it was made with, and whether last
+      // beat moved it (the next beat without bones gives the session prior == current).
+      boost::shared_ptr<moho::CAniPose> pose;
+      std::vector<wire::SPoseBone> poseBones; // the lane's values as this client holds them (differences add to them)
+      const void* poseSkeleton = nullptr;
+      bool poseMoving = false;
     };
+
+    /** Plan WP8.3: `held`'s poses for this beat from the lane's `bones` (null: none came), into `data`. */
+    void UpdatePoses(const wire::SEntityRecord& record, SHeldEntity& held, const wire::SUnitPose* bones, moho::SSTIUnitVariableData& data);
 
     /** A frame's unit detail into a unit's data, with the client's own blueprints and names. */
     void UnpackUnitDetail(const wire::SUnitDetail& detail, moho::SSTIUnitVariableData& data);
@@ -154,6 +180,17 @@ namespace faf::remote::client
     /** The session tables the frames' sound and name ids refer to (WP7.2). */
   public:
     void SetSessionTables(wire::CSessionTableReaders* session) noexcept { mSession = session; }
+    /**
+     * A client with no sim behind it (a server's player, the probe): its packets carry neither the sim's deposits nor
+     * its height field, so the session tables' deposits are the packet's from the first beat, and its terrain edits
+     * go on the heights `SeedTerrain` gave (without a seed they are only counted).
+     */
+    void SetNoSim() noexcept { mNoSim = true; }
+    /**
+     * Plan WP8.3, with `SetNoSim`: the next `ApplyFrame`'s pose lane (wire/PoseLane.h, ascending ids), or null when
+     * the view had none. Units get poses of the client's own: made from their mesh's skeleton, the lane's bones on them.
+     */
+    void SetPoseLane(const std::vector<wire::SUnitPose>* lane) noexcept { mPoseLane = lane; }
     /** The client's rules (the category universe of unit category sets). */
     void SetRules(moho::RRuleGameRules* rules) noexcept { mRules = rules; }
 
@@ -181,6 +218,8 @@ namespace faf::remote::client
     std::vector<moho::RMeshBlueprint*> mMeshes;
     std::vector<SMeshResource> mMeshResources;
     wire::CSessionTableReaders* mSession = nullptr; // takes the terrain edits
+    bool mNoSim = false;                            // `SetNoSim`
+    const std::vector<wire::SUnitPose>* mPoseLane = nullptr; // `SetPoseLane`
     moho::RRuleGameRules* mRules = nullptr;
     std::vector<moho::CSndParams*> mSounds;   // by sound id, resolved on first use
     std::vector<SUnderlay> mUnderlays;        // by name id

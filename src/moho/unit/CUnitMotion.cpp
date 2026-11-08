@@ -1,4 +1,5 @@
 #include "moho/unit/CUnitMotion.h"
+#include "moho/misc/EconomyRequestRelease.h"
 #include "moho/sim/SimArchiveMode.h"
 #include "legacy/math/X87Math.h"
 
@@ -653,17 +654,6 @@ namespace moho
       return event == UMVE_Bottom || event == UMVE_Hover;
     }
 
-    void DestroyEconomyRequestPointer(CEconRequest*& request) noexcept
-    {
-      if (!request) {
-        return;
-      }
-
-      request->mNode.ListUnlink();
-      delete request;
-      request = nullptr;
-    }
-
     void ReplaceEconomyRequestPointer(CEconRequest*& request, CEconRequest* const replacement) noexcept
     {
       DestroyEconomyRequestPointer(request);
@@ -681,16 +671,6 @@ namespace moho
         request->mNode.ListLinkBefore(&economy->registrationNode);
       }
       return request;
-    }
-
-    [[nodiscard]] SEconValue TakeGrantedResourcesAndReset(CEconRequest* const request) noexcept
-    {
-      SEconValue out{};
-      out.energy = request->mGranted.energy;
-      out.mass = request->mGranted.mass;
-      request->mGranted.energy = 0.0f;
-      request->mGranted.mass = 0.0f;
-      return out;
     }
 
     void ClearMaintenanceCost(Unit* const unit) noexcept

@@ -157,12 +157,7 @@ namespace
    */
   [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
   {
-    gpg::RType* type = moho::IAniManipulator::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::IAniManipulator));
-      moho::IAniManipulator::sType = type;
-    }
-    return type;
+    return gpg::CachedLookup<moho::IAniManipulator>(moho::IAniManipulator::sType);
   }
 
   /**

@@ -7,6 +7,14 @@
 
 namespace moho
 {
+  /**
+   * Engine addition (sim_CategoryLookupCache): every `EntityCategoryLookupTable` built moves
+   * this on, so a name cached against an earlier table, even one at the same address, misses.
+   */
+  void NoteEntityCategoryTableBuilt() noexcept;
+
+  extern bool sim_CategoryLookupCache;
+
   struct SFootprint;
   struct SNamedFootprint;
   struct SRuleFootprintsBlueprint;

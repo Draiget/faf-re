@@ -1,4 +1,5 @@
 #include "moho/unit/tasks/CUnitAttackTargetTask.h"
+#include "moho/unit/tasks/TaskThreadWake.h"
 
 #include <cmath>
 #include <cstddef>
@@ -123,19 +124,6 @@ namespace
   [[nodiscard]] int RoundToCellCoord(const float value) noexcept
   {
     return static_cast<int>(std::lrintf(value));
-  }
-
-  void WakeOwnerThreadForImmediateTick(moho::CCommandTask* const commandTask)
-  {
-    if (commandTask == nullptr || commandTask->mOwnerThread == nullptr) {
-      return;
-    }
-
-    moho::CTaskThread* const ownerThread = commandTask->mOwnerThread;
-    ownerThread->mPendingFrames = 0;
-    if (ownerThread->mStaged) {
-      ownerThread->Unstage();
-    }
   }
 
 

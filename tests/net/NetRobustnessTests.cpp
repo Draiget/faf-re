@@ -59,7 +59,6 @@ namespace
 {
   // --- Harness ---------------------------------------------------------------------------
 
-#define CHECK(cond) EXPECT_TRUE(cond)
 
   // --- Byte building -----------------------------------------------------------------------
 
@@ -153,7 +152,7 @@ namespace
       decoded = false;
     }
 
-    CHECK(lua_gettop(state.GetCState()) == top);
+    EXPECT_EQ(lua_gettop(state.GetCState()), top);
     return decoded;
   }
 
@@ -166,18 +165,18 @@ namespace
   void TestLuaValidValues()
   {
     LuaPlus::LuaObject out;
-    CHECK(Decode(LuaNumber(2.5f), out) && out.IsNumber() && out.GetNumber() == 2.5);
-    CHECK(Decode(LuaString("hello"), out) && out.IsString() && std::strcmp(out.GetString(), "hello") == 0);
+    EXPECT_TRUE(Decode(LuaNumber(2.5f), out) && out.IsNumber() && out.GetNumber() == 2.5);
+    EXPECT_TRUE(Decode(LuaString("hello"), out) && out.IsString() && std::strcmp(out.GetString(), "hello") == 0);
 
     const std::string table = LuaTable(LuaString("Type") + LuaString("Chat") + LuaNumber(1.0f) + LuaNumber(7.0f));
-    CHECK(Decode(table, out) && out.IsTable());
-    CHECK(out["Type"].IsString() && std::strcmp(out["Type"].GetString(), "Chat") == 0);
-    CHECK(out[1].IsNumber() && out[1].GetNumber() == 7.0);
+    EXPECT_TRUE(Decode(table, out) && out.IsTable());
+    EXPECT_TRUE(out["Type"].IsString() && std::strcmp(out["Type"].GetString(), "Chat") == 0);
+    EXPECT_TRUE(out[1].IsNumber() && out[1].GetNumber() == 7.0);
 
     // Top-level nil, stray end tag and unknown tag decode to nil, as in the binary.
-    CHECK(Decode(LuaNil(), out) && out.IsNil());
-    CHECK(Decode(std::string(1, '\x05'), out) && out.IsNil());
-    CHECK(Decode(std::string(1, '\x09'), out) && out.IsNil());
+    EXPECT_TRUE(Decode(LuaNil(), out) && out.IsNil());
+    EXPECT_TRUE(Decode(std::string(1, '\x05'), out) && out.IsNil());
+    EXPECT_TRUE(Decode(std::string(1, '\x09'), out) && out.IsNil());
   }
 
   // Follows key "k" `steps` times.
@@ -192,17 +191,17 @@ namespace
   void TestLuaNestingLimit()
   {
     LuaPlus::LuaObject out;
-    CHECK(Decode(LuaNested(256), out) && out.IsTable());
-    CHECK(Descend(out, 255).IsTable());
+    EXPECT_TRUE(Decode(LuaNested(256), out) && out.IsTable());
+    EXPECT_TRUE(Descend(out, 255).IsTable());
 
     // One level more: the table past the limit is left out, the rest stays.
-    CHECK(Decode(LuaNested(257), out) && out.IsTable());
-    CHECK(Descend(out, 255).IsTable());
-    CHECK(Descend(out, 256).IsNil());
+    EXPECT_TRUE(Decode(LuaNested(257), out) && out.IsTable());
+    EXPECT_TRUE(Descend(out, 255).IsTable());
+    EXPECT_TRUE(Descend(out, 256).IsNil());
 
     // A 64 KB message of table-begin tags: refused, not a stack overflow.
-    CHECK(DecodeFails(std::string(65535, '\x04')));
-    CHECK(DecodeFails(std::string(1, '\x04') + LuaString("k") + std::string(60000, '\x04')));
+    EXPECT_TRUE(DecodeFails(std::string(65535, '\x04')));
+    EXPECT_TRUE(DecodeFails(std::string(1, '\x04') + LuaString("k") + std::string(60000, '\x04')));
   }
 
   void TestLuaDeepFieldKeepsSiblings()
@@ -210,10 +209,10 @@ namespace
     LuaPlus::LuaObject out;
     const std::string table = LuaTable(LuaString("a") + LuaNumber(1.0f) + LuaString("deep") + LuaNested(300) +
                                        LuaString("b") + LuaString("kept"));
-    CHECK(Decode(table, out) && out.IsTable());
-    CHECK(out["a"].IsNumber() && out["a"].GetNumber() == 1.0);
-    CHECK(out["b"].IsString() && std::strcmp(out["b"].GetString(), "kept") == 0);
-    CHECK(out["deep"].IsTable());
+    EXPECT_TRUE(Decode(table, out) && out.IsTable());
+    EXPECT_TRUE(out["a"].IsNumber() && out["a"].GetNumber() == 1.0);
+    EXPECT_TRUE(out["b"].IsString() && std::strcmp(out["b"].GetString(), "kept") == 0);
+    EXPECT_TRUE(out["deep"].IsTable());
   }
 
   void TestLuaLobbyRelayDepth()
@@ -231,32 +230,32 @@ namespace
     );
 
     LuaPlus::LuaObject out;
-    CHECK(Decode(addPlayer, out) && out.IsTable());
-    CHECK(Decode(launch, out) && out.IsTable());
-    CHECK(std::strcmp(out["Type"].GetString(), "Launch") == 0);
-    CHECK(out["GameInfo"]["PlayerOptions"][1]["PlayerName"].IsString());
+    EXPECT_TRUE(Decode(addPlayer, out) && out.IsTable());
+    EXPECT_TRUE(Decode(launch, out) && out.IsTable());
+    EXPECT_EQ(std::strcmp(out["Type"].GetString(), "Launch"), 0);
+    EXPECT_TRUE(out["GameInfo"]["PlayerOptions"][1]["PlayerName"].IsString());
   }
 
   void TestLuaLocalDecodeHasNoNestingLimit()
   {
     // The sim's Sync table can hold a remote table a few levels down.
     LuaPlus::LuaObject out;
-    CHECK(Decode(LuaNested(300), out, DecodeMode::Local) && out.IsTable());
+    EXPECT_TRUE(Decode(LuaNested(300), out, DecodeMode::Local) && out.IsTable());
   }
 
   void TestLuaMalformedTables()
   {
     const float nan = std::numeric_limits<float>::quiet_NaN();
-    CHECK(DecodeFails(LuaTable(LuaNil() + LuaString("v"))));                   // nil key
-    CHECK(DecodeFails(LuaTable(LuaString("k") + LuaNil())));                   // nil value
-    CHECK(DecodeFails(LuaTable(LuaNumber(nan) + LuaString("v"))));             // NaN key
-    CHECK(DecodeFails(LuaTable(LuaString("k") + std::string(1, '\x09'))));     // unknown tag as value
-    CHECK(DecodeFails(LuaTable(std::string(1, '\x09') + LuaString("v"))));     // unknown tag as key
+    EXPECT_TRUE(DecodeFails(LuaTable(LuaNil() + LuaString("v"))));                   // nil key
+    EXPECT_TRUE(DecodeFails(LuaTable(LuaString("k") + LuaNil())));                   // nil value
+    EXPECT_TRUE(DecodeFails(LuaTable(LuaNumber(nan) + LuaString("v"))));             // NaN key
+    EXPECT_TRUE(DecodeFails(LuaTable(LuaString("k") + std::string(1, '\x09'))));     // unknown tag as value
+    EXPECT_TRUE(DecodeFails(LuaTable(std::string(1, '\x09') + LuaString("v"))));     // unknown tag as key
 
     // Truncated anywhere inside a table.
     const std::string table = LuaTable(LuaString("key") + LuaNumber(3.0f));
     for (std::size_t length = 1; length < table.size(); ++length) {
-      CHECK(DecodeFails(table.substr(0, length)));
+      EXPECT_TRUE(DecodeFails(table.substr(0, length)));
     }
   }
 
@@ -282,14 +281,14 @@ namespace
     bool encoded = true;
     const std::string bytes =
       Encode(LuaGlobal("faf_test_t = { a = 1, f = print, b = 'x', [print] = 2 }", "faf_test_t"), encoded);
-    CHECK(!encoded);
+    EXPECT_FALSE(encoded);
 
     // The binary wrote nil for the function, which no decoder accepts.
     LuaPlus::LuaObject out;
-    CHECK(Decode(bytes, out) && out.IsTable());
-    CHECK(out["a"].IsNumber() && out["a"].GetNumber() == 1.0);
-    CHECK(out["b"].IsString());
-    CHECK(out["f"].IsNil());
+    EXPECT_TRUE(Decode(bytes, out) && out.IsTable());
+    EXPECT_TRUE(out["a"].IsNumber() && out["a"].GetNumber() == 1.0);
+    EXPECT_TRUE(out["b"].IsString());
+    EXPECT_TRUE(out["f"].IsNil());
   }
 
   void TestLuaEncoderStopsAtCycles()
@@ -299,13 +298,13 @@ namespace
       LuaGlobal("faf_test_c = { n = 1 } faf_test_c.self = faf_test_c faf_test_c.sub = { up = faf_test_c, v = 2 }", "faf_test_c"),
       encoded
     );
-    CHECK(!encoded);
+    EXPECT_FALSE(encoded);
 
     LuaPlus::LuaObject out;
-    CHECK(Decode(bytes, out) && out.IsTable());
-    CHECK(out["n"].IsNumber());
-    CHECK(out["self"].IsNil());
-    CHECK(out["sub"]["v"].IsNumber() && out["sub"]["up"].IsNil());
+    EXPECT_TRUE(Decode(bytes, out) && out.IsTable());
+    EXPECT_TRUE(out["n"].IsNumber());
+    EXPECT_TRUE(out["self"].IsNil());
+    EXPECT_TRUE(out["sub"]["v"].IsNumber() && out["sub"]["up"].IsNil());
   }
 
   void TestLuaEncoderDepthLimit()
@@ -314,26 +313,26 @@ namespace
     const std::string bytes = Encode(
       LuaGlobal("local t = {} faf_test_d = t for i = 1, 1500 do local n = {} t.k = n t = n end", "faf_test_d"), encoded
     );
-    CHECK(!encoded);
+    EXPECT_FALSE(encoded);
 
     LuaPlus::LuaObject out;
-    CHECK(Decode(bytes, out, DecodeMode::Local) && out.IsTable());
-    CHECK(Descend(out, 1023).IsTable());
-    CHECK(Descend(out, 1024).IsNil());
+    EXPECT_TRUE(Decode(bytes, out, DecodeMode::Local) && out.IsTable());
+    EXPECT_TRUE(Descend(out, 1023).IsTable());
+    EXPECT_TRUE(Descend(out, 1024).IsNil());
   }
 
   void TestLuaEncoderValidDataUnchanged()
   {
     // What the encoder could always write is written byte for byte as before.
     LuaPlus::LuaObject value;
-    CHECK(Decode(LuaNested(300), value, DecodeMode::Local));
+    EXPECT_TRUE(Decode(LuaNested(300), value, DecodeMode::Local));
     bool encoded = false;
-    CHECK(Encode(value, encoded) == LuaNested(300));
-    CHECK(encoded);
+    EXPECT_EQ(Encode(value, encoded), LuaNested(300));
+    EXPECT_TRUE(encoded);
 
     const std::string flat = LuaTable(LuaString("k") + LuaNumber(2.5f));
-    CHECK(Decode(flat, value));
-    CHECK(Encode(value, encoded) == flat && encoded);
+    EXPECT_TRUE(Decode(flat, value));
+    EXPECT_TRUE(Encode(value, encoded) == flat && encoded);
   }
 
   // --- Message framing ---------------------------------------------------------------------
@@ -346,17 +345,17 @@ namespace
       const gpg::MemBuffer<const char> buffer = gpg::CopyMemBuffer(wire.data(), wire.size());
       gpg::MemBufferStream stream(buffer);
       CMessage msg;
-      CHECK(!msg.Read(&stream));
-      CHECK(msg.HasInvalidLength());
+      EXPECT_FALSE(msg.Read(&stream));
+      EXPECT_TRUE(msg.HasInvalidLength());
     }
     {
       const std::string wire = Bytes{}.U8(106).U8(5).U8(0).Raw("ab").data;
       const gpg::MemBuffer<const char> buffer = gpg::CopyMemBuffer(wire.data(), wire.size());
       gpg::MemBufferStream stream(buffer);
       CMessage msg;
-      CHECK(msg.Read(&stream));
-      CHECK(!msg.HasInvalidLength());
-      CHECK(msg.GetMessageSize() == 2);
+      EXPECT_TRUE(msg.Read(&stream));
+      EXPECT_FALSE(msg.HasInvalidLength());
+      EXPECT_EQ(msg.GetMessageSize(), 2);
     }
   }
 
@@ -442,9 +441,9 @@ namespace
     // Only the opcodes without a payload get through.
     const int payloadless[] = {2, 4, 5, 6, 23};
     for (const int op : payloadless) {
-      CHECK(f.sink.calls[op] == 1);
+      EXPECT_EQ(f.sink.calls[op], 1);
     }
-    CHECK(f.sink.total == 5);
+    EXPECT_EQ(f.sink.total, 5);
   }
 
   void TestDecoderTruncation()
@@ -467,9 +466,9 @@ namespace
       for (std::size_t length = 0; length < command.payload.size(); ++length) {
         f.Feed(command.op, command.payload.substr(0, length));
       }
-      CHECK(f.sink.total == 0);
+      EXPECT_EQ(f.sink.total, 0);
       f.Feed(command.op, command.payload);
-      CHECK(f.sink.calls[static_cast<int>(command.op)] == 1);
+      EXPECT_TRUE(f.sink.calls[static_cast<int>(command.op)] == 1);
     }
   }
 
@@ -487,13 +486,13 @@ namespace
     // Cell counts that are negative or larger than the message.
     f.Feed(ECmdStreamOp::CMDST_SetCommandCells, Bytes{}.I32(7).I32(-1).F32(0).F32(0).F32(0).data);
     f.Feed(ECmdStreamOp::CMDST_SetCommandCells, Bytes{}.I32(7).I32(0x7FFFFFFF).F32(0).F32(0).F32(0).data);
-    CHECK(f.sink.total == 0);
+    EXPECT_EQ(f.sink.total, 0);
 
     // The same commands, well formed.
     f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(args).U32(2).U32(1).U32(0x00000009u).data);
     f.Feed(ECmdStreamOp::CMDST_SetCommandCells, Bytes{}.I32(7).I32(0).F32(0).F32(0).F32(0).data);
-    CHECK(f.sink.calls[static_cast<int>(ECmdStreamOp::CMDST_LuaSimCallback)] == 1);
-    CHECK(f.sink.calls[static_cast<int>(ECmdStreamOp::CMDST_SetCommandCells)] == 1);
+    EXPECT_TRUE(f.sink.calls[static_cast<int>(ECmdStreamOp::CMDST_LuaSimCallback)] == 1);
+    EXPECT_TRUE(f.sink.calls[static_cast<int>(ECmdStreamOp::CMDST_SetCommandCells)] == 1);
   }
 
   void TestDecoderLuaPayloads()
@@ -505,20 +504,20 @@ namespace
     f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(LuaTable(LuaNil() + LuaNumber(1))).Raw(none).data);
     f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(LuaTable(LuaNumber(nan) + LuaNumber(1))).Raw(none).data);
     f.Feed(ECmdStreamOp::CMDST_ExecuteLuaInSim, Bytes{}.Str("fn").Raw(std::string(60000, '\x04')).data);
-    CHECK(f.sink.total == 0);
+    EXPECT_EQ(f.sink.total, 0);
 
     // Deep arguments are cut at the nesting limit, not refused.
     f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(LuaNested(200)).Raw(none).data);
     f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(LuaNested(300)).Raw(none).data);
-    CHECK(f.sink.calls[static_cast<int>(ECmdStreamOp::CMDST_LuaSimCallback)] == 2);
+    EXPECT_TRUE(f.sink.calls[static_cast<int>(ECmdStreamOp::CMDST_LuaSimCallback)] == 2);
   }
 
   void TestDecoderValidCommand()
   {
     DecoderFixture f;
     f.Feed(ECmdStreamOp::CMDST_DestroyEntity, Bytes{}.I32(0x00100007).data);
-    CHECK(f.sink.calls[static_cast<int>(ECmdStreamOp::CMDST_DestroyEntity)] == 1);
-    CHECK(f.sink.lastEntity == 0x00100007);
+    EXPECT_TRUE(f.sink.calls[static_cast<int>(ECmdStreamOp::CMDST_DestroyEntity)] == 1);
+    EXPECT_EQ(f.sink.lastEntity, 0x00100007);
   }
 
   // --- Connections -------------------------------------------------------------------------
@@ -615,22 +614,22 @@ namespace
       f->Receive(static_cast<ECmdStreamOp>(type), std::string(1, '\x01'));
     }
     f->Receive(EClientMsg::CLIMSG_ReceiveChat, std::string{});
-    CHECK(true); // reaching here means nothing escaped
+    EXPECT_TRUE(true); // reaching here means nothing escaped
   }
 
   void TestClientSpeedRequests()
   {
     ClientFixture* const f = new ClientFixture();
     f->Receive(EClientMsg::CLIMSG_AdjustSimSpeed, Bytes{}.I32(1).I32(-1000).data);
-    CHECK(f->manager->mGameSpeed == -10);
+    EXPECT_TRUE(f->manager->mGameSpeed == -10);
     f->Receive(EClientMsg::CLIMSG_AdjustSimSpeed, Bytes{}.I32(2).I32(1000).data);
-    CHECK(f->manager->mGameSpeed == 50);
+    EXPECT_TRUE(f->manager->mGameSpeed == 50);
     f->Receive(EClientMsg::CLIMSG_AdjustSimSpeed, Bytes{}.I32(3).I32(4).data);
-    CHECK(f->manager->mGameSpeed == 4);
+    EXPECT_TRUE(f->manager->mGameSpeed == 4);
 
     f->Receive(EClientMsg::CLIMSG_IntParam, Bytes{}.I32(-1000).data);
     const int rate = f->manager->GetSimRate();
-    CHECK(rate >= -10 && rate <= 50);
+    EXPECT_TRUE(rate >= -10 && rate <= 50);
   }
 
   void TestClientEndGameFromPeerIgnored()
@@ -638,11 +637,11 @@ namespace
     ClientFixture* const f = new ClientFixture();
     const auto before = f->remote->mPipe.GetLength();
     f->Receive(ECmdStreamOp::CMDST_EndGame, std::string{});
-    CHECK(f->remote->mPipe.GetLength() == before);
+    EXPECT_TRUE(f->remote->mPipe.GetLength() == before);
 
     // An ordinary command still queues.
     f->Receive(ECmdStreamOp::CMDST_DestroyEntity, Bytes{}.I32(1).data);
-    CHECK(f->remote->mPipe.GetLength() > before);
+    EXPECT_TRUE(f->remote->mPipe.GetLength() > before);
   }
 
   // --- Lobby -------------------------------------------------------------------------------
@@ -700,16 +699,16 @@ namespace
   {
     LobbyFixture* const f = new LobbyFixture();
     SPeer* const host = f->Peer(kHostUid);
-    CHECK(host != nullptr && host->state == ENetworkPlayerState::kConnected);
-    CHECK(f->host->writes == 1); // the Join
+    EXPECT_TRUE(host != nullptr && host->state == ENetworkPlayerState::kConnected);
+    EXPECT_TRUE(f->host->writes == 1); // the Join
 
     // A second connection-made event is the peer's own message: ignored.
     f->Deliver(f->host, ELobbyMsg::LOBMSG_ConnMade, std::string{});
-    CHECK(host->state == ENetworkPlayerState::kConnected);
-    CHECK(f->host->writes == 1);
+    EXPECT_TRUE(host->state == ENetworkPlayerState::kConnected);
+    EXPECT_TRUE(f->host->writes == 1);
 
     f->Deliver(f->host, ELobbyMsg::LOBMSG_Welcome, f->Welcome());
-    CHECK(host->state == ENetworkPlayerState::kEstablished);
+    EXPECT_TRUE(host->state == ENetworkPlayerState::kEstablished);
   }
 
   void TestLobbyTruncatedMessages()
@@ -726,8 +725,8 @@ namespace
     for (int type = 100; type < 210; ++type) {
       f->Deliver(f->host, static_cast<ELobbyMsg>(type), std::string{});
     }
-    CHECK(f->Peer(20) == nullptr);
-    CHECK(f->Peer(kHostUid) != nullptr);
+    EXPECT_TRUE(f->Peer(20) == nullptr);
+    EXPECT_TRUE(f->Peer(kHostUid) != nullptr);
   }
 
   void TestLobbyHostMessages()
@@ -739,18 +738,18 @@ namespace
     f->Deliver(f->host, ELobbyMsg::LOBMSG_NewPeer, f->NewPeer("me", 0x0A000003u, 7002, kLocalUid));
     f->Deliver(f->host, ELobbyMsg::LOBMSG_NewPeer, f->NewPeer("bob", 0x0A000002u, 7001, 20));
     f->Deliver(f->host, ELobbyMsg::LOBMSG_NewPeer, f->NewPeer("bob", 0x0A000002u, 7001, 20));
-    CHECK(f->Peer(kLocalUid) == nullptr);
-    CHECK(f->Peer(20) != nullptr);
+    EXPECT_TRUE(f->Peer(kLocalUid) == nullptr);
+    EXPECT_TRUE(f->Peer(20) != nullptr);
 
     // DeletePeer naming the host itself: ignored.
     f->Deliver(f->host, ELobbyMsg::LOBMSG_DeletePeer, Bytes{}.I32(kHostUid).data);
-    CHECK(f->Peer(kHostUid) != nullptr);
-    CHECK(f->host->destroyRequests == 0);
-    CHECK(f->lobby->peerConnection == f->host);
+    EXPECT_TRUE(f->Peer(kHostUid) != nullptr);
+    EXPECT_TRUE(f->host->destroyRequests == 0);
+    EXPECT_TRUE(f->lobby->peerConnection == f->host);
 
     // DeletePeer naming another peer still works.
     f->Deliver(f->host, ELobbyMsg::LOBMSG_DeletePeer, Bytes{}.I32(20).data);
-    CHECK(f->Peer(20) == nullptr);
+    EXPECT_TRUE(f->Peer(20) == nullptr);
   }
 
   void TestLobbyScriptData()
@@ -766,7 +765,7 @@ namespace
     f->Deliver(f->host, ELobbyMsg::LOBMSG_DirectScriptData, LuaTable(LuaNil() + LuaNumber(1)));
     f->Deliver(f->host, ELobbyMsg::LOBMSG_DirectScriptData, LuaTable(LuaString("Type") + LuaString("Hi")));
 
-    CHECK(lua_gettop(TestLuaState().GetCState()) == top);
+    EXPECT_EQ(lua_gettop(TestLuaState().GetCState()), top);
   }
 
   void TestLobbyPeerEvents()
@@ -778,31 +777,31 @@ namespace
     f->Deliver(f->host, ELobbyMsg::LOBMSG_NewPeer, f->NewPeer("bob", 0x0A000002u, 7001, 20));
     FakeConnection* const bob = f->connector.Last();
     SPeer* const peer = f->Peer(20);
-    CHECK(peer != nullptr && peer->state == ENetworkPlayerState::kPending);
+    EXPECT_TRUE(peer != nullptr && peer->state == ENetworkPlayerState::kPending);
     f->Deliver(bob, ELobbyMsg::LOBMSG_ConnMade, std::string{});
-    CHECK(peer->state == ENetworkPlayerState::kWaitingJoin);
+    EXPECT_TRUE(peer->state == ENetworkPlayerState::kWaitingJoin);
 
     // Connection events sent by the peer itself.
     const int connectsBefore = f->connector.connects;
     f->Deliver(bob, ELobbyMsg::LOBMSG_ConnMade, std::string{});
     f->Deliver(bob, ELobbyMsg::LOBMSG_ConnFailed, std::string{});
-    CHECK(peer->state == ENetworkPlayerState::kWaitingJoin);
-    CHECK(f->connector.connects == connectsBefore);
-    CHECK(peer->peerConnection == bob);
+    EXPECT_TRUE(peer->state == ENetworkPlayerState::kWaitingJoin);
+    EXPECT_TRUE(f->connector.connects == connectsBefore);
+    EXPECT_TRUE(peer->peerConnection == bob);
 
     // Host-only messages from a peer.
     f->Deliver(bob, ELobbyMsg::LOBMSG_NewPeer, f->NewPeer("eve", 0x0A000004u, 7003, 30));
     f->Deliver(bob, ELobbyMsg::LOBMSG_DeletePeer, Bytes{}.I32(kHostUid).data);
     f->Deliver(bob, ELobbyMsg::LOBMSG_Rejected, Bytes{}.Str("nope").data);
-    CHECK(f->Peer(30) == nullptr);
-    CHECK(f->Peer(kHostUid) != nullptr);
+    EXPECT_TRUE(f->Peer(30) == nullptr);
+    EXPECT_TRUE(f->Peer(kHostUid) != nullptr);
 
     // The peer's Join, truncated at every length, then whole.
     const std::string join = Bytes{}.Str("bob").I32(20).data;
     for (std::size_t length = 0; length < join.size(); ++length) {
       f->Deliver(bob, ELobbyMsg::LOBMSG_Join, join.substr(0, length));
     }
-    CHECK(f->Peer(20) != nullptr);
+    EXPECT_TRUE(f->Peer(20) != nullptr);
   }
 
   // --- Order stream check ------------------------------------------------------------------
@@ -825,10 +824,10 @@ namespace
       hash.Update(text.data(), text.size());
       return HexOf(hash.Snapshot());
     };
-    CHECK(hashOf("") == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
-    CHECK(hashOf("abc") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    EXPECT_EQ(hashOf(""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    EXPECT_EQ(hashOf("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     const std::string twoBlocks = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-    CHECK(hashOf(twoBlocks) == "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
+    EXPECT_EQ(hashOf(twoBlocks), "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
 
     // In pieces, and with a snapshot in between, it is the same hash.
     gpg::SHA256 pieces;
@@ -836,7 +835,7 @@ namespace
       pieces.Update(&c, 1);
       (void)pieces.Snapshot();
     }
-    CHECK(HexOf(pieces.Snapshot()) == hashOf(twoBlocks));
+    EXPECT_EQ(HexOf(pieces.Snapshot()), hashOf(twoBlocks));
   }
 
   CMessage CommandMessage(const ECmdStreamOp op, const std::string& payload)
@@ -856,24 +855,24 @@ namespace
     const auto beat2 = check.NoteBoundary(0, 2);
     check.NoteReport(1, 0, 1, beat1);
     check.NoteReport(1, 0, 2, beat2);
-    CHECK(!check.Diverged());
+    EXPECT_FALSE(check.Diverged());
 
     // A reporter ahead of us waits until we get there, then matches.
     check.NoteReport(2, 0, 3, beat2); // wrong hash, but not checkable yet
-    CHECK(!check.Diverged());
+    EXPECT_FALSE(check.Diverged());
     check.Append(0, CommandMessage(ECmdStreamOp::CMDST_DestroyEntity, Bytes{}.I32(5).data));
     check.Append(0, advance);
     (void)check.NoteBoundary(0, 3);
-    CHECK(check.Diverged());
-    CHECK(check.FirstDivergence().sender == 0 && check.FirstDivergence().reporter == 2);
-    CHECK(check.FirstDivergence().beat == 3);
+    EXPECT_TRUE(check.Diverged());
+    EXPECT_TRUE(check.FirstDivergence().sender == 0 && check.FirstDivergence().reporter == 2);
+    EXPECT_EQ(check.FirstDivergence().beat, 3);
 
     // A beat the stream never stopped at is a different stream too.
     CommandStreamCheck other(2, false);
     other.Append(0, CommandMessage(ECmdStreamOp::CMDST_Advance, Bytes{}.I32(2).data));
     const auto twoBeats = other.NoteBoundary(0, 2);
     other.NoteReport(1, 0, 1, twoBeats);
-    CHECK(other.Diverged());
+    EXPECT_TRUE(other.Diverged());
   }
 
   // Three client managers wired together in memory: player m's manager has its
@@ -1019,10 +1018,10 @@ namespace
     }
     game->Pump();
 
-    CHECK(!game->AnyDiverged());
+    EXPECT_FALSE(game->AnyDiverged());
     for (const CClientManagerImpl* const manager : game->managers) {
       for (const CClientBase* const client : manager->mClients) {
-        CHECK(client->mQueuedBeat == static_cast<std::uint32_t>(kBeats));
+        EXPECT_TRUE(client->mQueuedBeat == static_cast<std::uint32_t>(kBeats));
       }
     }
   }
@@ -1043,11 +1042,11 @@ namespace
       CMessage fakeAck = MakeMessage(EClientMsg::CLIMSG_Ack, Bytes{}.U8(0).I32(5).Raw(std::string(16, '\x11')).data);
       game->Deliver(to, 2, fakeAck);
       CClientManagerImpl* const manager = game->managers[to];
-      CHECK(manager->mStreamCheck->Diverged());
-      CHECK(manager->mStreamCheck->FirstDivergence().sender == 0);
-      CHECK(manager->mStreamCheck->FirstDivergence().reporter == 2);
-      CHECK(!manager->mStreamCheck->ProvenAltered(0));
-      CHECK(!manager->OrdersAlteredFrom(0));
+      EXPECT_TRUE(manager->mStreamCheck->Diverged());
+      EXPECT_TRUE(manager->mStreamCheck->FirstDivergence().sender == 0);
+      EXPECT_TRUE(manager->mStreamCheck->FirstDivergence().reporter == 2);
+      EXPECT_FALSE(manager->mStreamCheck->ProvenAltered(0));
+      EXPECT_FALSE(manager->OrdersAlteredFrom(0));
     }
   }
 
@@ -1061,10 +1060,10 @@ namespace
       }
       game->Pump();
     }
-    CHECK(!game->AnyDiverged());
+    EXPECT_FALSE(game->AnyDiverged());
     for (const CClientManagerImpl* const manager : game->managers) {
       for (const CClientBase* const client : manager->mClients) {
-        CHECK(client->mQueuedBeat == 20u);
+        EXPECT_TRUE(client->mQueuedBeat == 20u);
       }
     }
   }
@@ -1080,7 +1079,7 @@ namespace
       }
       game->Pump();
     }
-    CHECK(!game->AnyDiverged());
+    EXPECT_FALSE(game->AnyDiverged());
 
     // Beat 6: player 0's checksum report reaches player 2 altered.
     net_DebugAlterOrdersTo = 2;
@@ -1093,20 +1092,20 @@ namespace
     // Every player notices, and it names player 0's stream at beat 6. Only
     // mode 2 stops the game; by default a false report must not stop anything.
     for (CClientManagerImpl* const manager : game->managers) {
-      CHECK(manager->mStreamCheck->Diverged());
-      CHECK(manager->mStreamCheck->FirstDivergence().sender == 0);
-      CHECK(manager->mStreamCheck->FirstDivergence().beat == 6u);
-      CHECK(manager->mStreamCheck->StopsGame() == (checkMode >= 2));
+      EXPECT_TRUE(manager->mStreamCheck->Diverged());
+      EXPECT_TRUE(manager->mStreamCheck->FirstDivergence().sender == 0);
+      EXPECT_TRUE(manager->mStreamCheck->FirstDivergence().beat == 6u);
+      EXPECT_TRUE(manager->mStreamCheck->StopsGame() == (checkMode >= 2));
     }
 
     // Only player 2, who got the altered report, has player 0's own word
     // against it: its desyncs against player 0 are withheld, nobody else's.
-    CHECK(game->managers[2]->mStreamCheck->ProvenAltered(0));
-    CHECK(game->managers[2]->OrdersAlteredFrom(0));
-    CHECK(!game->managers[2]->OrdersAlteredFrom(1));
+    EXPECT_TRUE(game->managers[2]->mStreamCheck->ProvenAltered(0));
+    EXPECT_TRUE(game->managers[2]->OrdersAlteredFrom(0));
+    EXPECT_FALSE(game->managers[2]->OrdersAlteredFrom(1));
     for (const int m : {0, 1}) {
-      CHECK(!game->managers[m]->mStreamCheck->ProvenAltered(0));
-      CHECK(!game->managers[m]->OrdersAlteredFrom(0));
+      EXPECT_FALSE(game->managers[m]->mStreamCheck->ProvenAltered(0));
+      EXPECT_FALSE(game->managers[m]->OrdersAlteredFrom(0));
     }
   }
 
@@ -1187,16 +1186,16 @@ namespace
   void TestVfsStaysInsideMounts()
   {
     MountedFolder folder;
-    CHECK(folder.Finds("/lua/ok.lua"));
-    CHECK(folder.Finds("/lua/sub/../ok.lua"));
-    CHECK(folder.Finds("/lua/./ok.lua"));
-    CHECK(!folder.Finds("/../secret.lua"));
-    CHECK(!folder.Finds("/lua/../../secret.lua"));
-    CHECK(!folder.Finds("/lua\\..\\..\\secret.lua"));
-    CHECK(!folder.vfs->GetFileInfo("/../secret.lua", nullptr));
+    EXPECT_TRUE(folder.Finds("/lua/ok.lua"));
+    EXPECT_TRUE(folder.Finds("/lua/sub/../ok.lua"));
+    EXPECT_TRUE(folder.Finds("/lua/./ok.lua"));
+    EXPECT_FALSE(folder.Finds("/../secret.lua"));
+    EXPECT_FALSE(folder.Finds("/lua/../../secret.lua"));
+    EXPECT_FALSE(folder.Finds("/lua\\..\\..\\secret.lua"));
+    EXPECT_FALSE(folder.vfs->GetFileInfo("/../secret.lua", nullptr));
     fa::vector<fa::string> listed;
     folder.vfs->EnumerateFiles("/../", "*.lua", false, &listed);
-    CHECK(listed.empty());
+    EXPECT_TRUE(listed.empty());
   }
 
   void TestLuaFilesComeFromTheGame()
@@ -1207,14 +1206,14 @@ namespace
 
     // A game state (opened without io) reads the mounted files only.
     LuaPlus::LuaState game(LuaPlus::LuaState::LIB_BASE);
-    CHECK(RunLua(game, "return dofile('/lua/ok.lua')") == "mounted");
-    CHECK(RunLua(game, "return tostring(loadfile('/../secret.lua'))") == "nil");
-    CHECK(RunLua(game, "return tostring(loadfile('" + secretPath + "'))") == "nil");
-    CHECK(RunLua(game, "return tostring(LuaDumpBinary)") == "nil");
+    EXPECT_EQ(RunLua(game, "return dofile('/lua/ok.lua')"), "mounted");
+    EXPECT_EQ(RunLua(game, "return tostring(loadfile('/../secret.lua'))"), "nil");
+    EXPECT_EQ(RunLua(game, "return tostring(loadfile('" + secretPath + "'))"), "nil");
+    EXPECT_EQ(RunLua(game, "return tostring(LuaDumpBinary)"), "nil");
 
     // The start-up state, which runs the user's own init file, keeps real paths.
     LuaPlus::LuaState startup(LuaPlus::LuaState::LIB_OSIO);
-    CHECK(RunLua(startup, "return dofile('" + secretPath + "')") == "outside");
+    EXPECT_EQ(RunLua(startup, "return dofile('" + secretPath + "')"), "outside");
   }
 
   void TestGameDataVersion()
@@ -1224,19 +1223,19 @@ namespace
       "local GameType = \"FAF\"  -- The use of `'` instead of `\"` is **intentional**\n"
       "local Commit = \"2ae081b063aba82df3c679780f0ba8460e06a63e\"\n\n"
       "local Version = \"3835\"\n---@alias PATCH \"3835\"\n---@alias VERSION \"1.5.3835\"\n";
-    CHECK(FAF_ParseLuaVersionFile(deployed) == 3835);
-    CHECK(FAF_ParseLuaVersionFile("local Version='3839'") == 3839);
-    CHECK(FAF_ParseLuaVersionFile("local Version = \"38x9\"") == 0);
-    CHECK(FAF_ParseLuaVersionFile("local VersionText = \"3839\"") == 0);
-    CHECK(FAF_ParseLuaVersionFile("---@alias VERSION \"1.5.3839\"") == 0);
-    CHECK(FAF_ParseLuaVersionFile("") == 0);
+    EXPECT_EQ(FAF_ParseLuaVersionFile(deployed), 3835);
+    EXPECT_EQ(FAF_ParseLuaVersionFile("local Version='3839'"), 3839);
+    EXPECT_EQ(FAF_ParseLuaVersionFile("local Version = \"38x9\""), 0);
+    EXPECT_EQ(FAF_ParseLuaVersionFile("local VersionText = \"3839\""), 0);
+    EXPECT_EQ(FAF_ParseLuaVersionFile("---@alias VERSION \"1.5.3839\""), 0);
+    EXPECT_EQ(FAF_ParseLuaVersionFile(""), 0);
 
     // Read from the mounted game data; without the file the session gets FAF's oldest patches.
     MountedFolder folder;
-    CHECK(FAF_GetGameDataVersion() == kFafGameVersionOldestSupported);
+    EXPECT_EQ(FAF_GetGameDataVersion(), kFafGameVersionOldestSupported);
     MountedFolder::WriteText(folder.root / "game" / "lua" / "version.lua", deployed + "local Version = \"9999\"\n");
     DISK_InvalidateFileLookups();
-    CHECK(FAF_GetGameDataVersion() == 3835);
+    EXPECT_EQ(FAF_GetGameDataVersion(), 3835);
   }
 
   void TestLuaCompiledChunksRefused()
@@ -1252,9 +1251,9 @@ namespace
     lua_AllowPrecompiledChunks = true;
     const std::string allowed = RunLua(state, load);
     lua_AllowPrecompiledChunks = previous;
-    CHECK(refused.find("compiled Lua chunks are not loaded") != std::string::npos);
-    CHECK(allowed.find("compiled Lua chunks are not loaded") == std::string::npos);
-    CHECK(allowed != "nil");
+    EXPECT_TRUE(refused.find("compiled Lua chunks are not loaded") != std::string::npos);
+    EXPECT_EQ(allowed.find("compiled Lua chunks are not loaded"), std::string::npos);
+    EXPECT_TRUE(allowed != "nil");
   }
 
   // --- Replay files ------------------------------------------------------------------------
@@ -1315,7 +1314,7 @@ namespace
     tryHeader(makeHeader(goodMods, std::string{}, goodArmy) + seed);
 
     std::remove(path.c_str());
-    CHECK(tried > 0 && refused == tried);
+    EXPECT_TRUE(tried > 0 && refused == tried);
   }
 
 } // namespace

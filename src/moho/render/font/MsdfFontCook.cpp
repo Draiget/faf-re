@@ -206,7 +206,7 @@ namespace moho
      * negative. False for a glyph that doesn't load or has an open contour.
      */
     [[nodiscard]] bool LoadGlyph(
-      SourceGlyph& glyph, msdfgen::FontHandle* const font, const unsigned glyphId, const std::uint64_t coloringSeed
+      SourceGlyph& glyph, msdfgen::FontHandle* const font, const unsigned glyphId
     )
     {
       if (!msdfgen::loadGlyph(glyph.mShape, font, msdfgen::GlyphIndex(glyphId), msdfgen::FONT_SCALING_NONE, &glyph.mAdvance)) {
@@ -670,7 +670,7 @@ namespace moho
       if (known == glyphOfId.end()) {
         coloringSeed *= kColoringSeedStep;
         SourceGlyph glyph;
-        if (!LoadGlyph(glyph, plan.mFont->mFont, glyphId, coloringSeed)) {
+        if (!LoadGlyph(glyph, plan.mFont->mFont, glyphId)) {
           ++plan.mAtlas.mMissing;
           continue;
         }

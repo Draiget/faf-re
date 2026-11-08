@@ -875,6 +875,19 @@ namespace moho
      */
     void UpdateNormalMap(CBackgroundTaskControl& loadControl, const gpg::Rect2i& rect);
 
+    // Pieces of Load (0x008A1700), each reading its part of the map stream in the binary's order.
+    void LoadEnvironmentLookups(gpg::BinaryReader& reader, std::uint32_t version);
+    void LoadLightingAndFog(gpg::BinaryReader& reader);
+    void LoadMapPalette(gpg::BinaryReader& reader, std::uint32_t version);
+    void LoadStratumMasks(
+      gpg::BinaryReader& reader,
+      std::uint32_t version,
+      ID3DDeviceResources* maskResources,
+      CBackgroundTaskControl& loadControl
+    );
+    void LoadWaterMapSheets(gpg::BinaryReader& reader, CBackgroundTaskControl& loadControl);
+    void LoadOrDeriveSkyDome(gpg::BinaryReader& reader, std::uint32_t version);
+
   public:
     std::uint8_t mBool;                                    // +0x008
     std::uint8_t mEditMode;                                // +0x009

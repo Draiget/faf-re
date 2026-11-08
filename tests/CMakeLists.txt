@@ -2,8 +2,10 @@
 # (faf_engine, src/CMakeLists.txt). Use GoogleTest (gtest / gtest_main) for all
 # tests instead of custom test harnesses.
 #
-#   cmake --build --preset clang-x64-release --target existing_tests
-#   ctest --test-dir build/clang-x64-release -L Existing
+#   cmake --build --preset clang-x64-release --target faf_tests
+#   ctest --test-dir build/clang-x64-release --output-on-failure
+#
+# faf_tests builds every executable here that links gtest (cmake/FafTests.cmake).
 
 add_executable(faf_net_tests EXCLUDE_FROM_ALL net/NetRobustnessTests.cpp)
 target_link_libraries(faf_net_tests PRIVATE faf_engine gtest_main)
@@ -56,7 +58,24 @@ set_target_properties(faf_profiler_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME profiler_facade COMMAND faf_profiler_tests)
 set_tests_properties(profiler_facade PROPERTIES LABELS "Existing")
 
+# Engine addition: the stable shadow box (ren_ShadowStable), pure maths with no device.
+add_executable(faf_shadow_fit_tests EXCLUDE_FROM_ALL render/ShadowStableFitTests.cpp)
+target_include_directories(faf_shadow_fit_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_shadow_fit_tests PRIVATE gtest_main)
+set_target_properties(faf_shadow_fit_tests PROPERTIES FOLDER "Tests/Render")
+add_test(NAME shadow_stable_fit COMMAND faf_shadow_fit_tests)
+set_tests_properties(shadow_stable_fit PROPERTIES LABELS "Render")
+
 # Engine addition: EffectScan.h against the std::regex patterns it replaced, on generated text.
+# The SFD movie header parser on synthetic headers (moved from tools/sfd-inspect); no engine needed.
+add_executable(faf_sfd_parser_tests EXCLUDE_FROM_ALL movie/SfdHeaderParserTests.cpp
+  ${CMAKE_SOURCE_DIR}/src/moho/movie/sfd/SfdHeaderParser.cpp)
+target_include_directories(faf_sfd_parser_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_sfd_parser_tests PRIVATE gtest_main)
+set_target_properties(faf_sfd_parser_tests PROPERTIES FOLDER "Tests/Movie")
+add_test(NAME sfd_header_parser COMMAND faf_sfd_parser_tests)
+set_tests_properties(sfd_header_parser PROPERTIES LABELS "Movie")
+
 add_executable(faf_effect_scan_tests EXCLUDE_FROM_ALL effect_scan/EffectScanTests.cpp)
 target_include_directories(faf_effect_scan_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(faf_effect_scan_tests PRIVATE gtest_main)
@@ -67,7 +86,10 @@ set_tests_properties(effect_scan PROPERTIES LABELS "Existing")
 # Engine addition: where UserDecal:SetOrientation puts a decal's corner so it stays centred.
 add_executable(faf_scripted_decal_tests EXCLUDE_FROM_ALL scripted_decal/PlacementTests.cpp)
 target_include_directories(faf_scripted_decal_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_scripted_decal_tests PRIVATE gtest_main)
+set_target_properties(faf_scripted_decal_tests PROPERTIES FOLDER "Tests/Render")
 add_test(NAME scripted_decal_placement COMMAND faf_scripted_decal_tests)
+set_tests_properties(scripted_decal_placement PROPERTIES LABELS "Render")
 
 # Engine addition: ImageCodec's DDS writer against the d3dx11_43.dll the process loads, so the
 # same exe checks Microsoft's on Windows and Wine's under Wine.
@@ -126,6 +148,23 @@ set_target_properties(faf_replay_scan_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME replay_scan COMMAND faf_replay_scan_tests)
 set_tests_properties(replay_scan PROPERTIES LABELS "Existing")
 
+# Recorded games played back by headless with every checksum compared (tests/replay); skipped
+# without FAF_REPLAY_DATA. Games take minutes, hence the timeout.
+add_executable(faf_replay_playback_tests EXCLUDE_FROM_ALL replay/ReplayPlaybackTests.cpp)
+target_link_libraries(faf_replay_playback_tests PRIVATE gtest_main)
+target_compile_definitions(faf_replay_playback_tests PRIVATE FAF_HEADLESS_EXE="$<TARGET_FILE:headless>")
+add_dependencies(faf_replay_playback_tests headless)
+set_target_properties(faf_replay_playback_tests PROPERTIES FOLDER "Tests/Replay")
+add_test(NAME replay_playback COMMAND faf_replay_playback_tests)
+set_tests_properties(replay_playback PROPERTIES LABELS "Replay" TIMEOUT 3600)
+
+# CZipFile reads entries whose data starts at or past 2 GiB, as the binary does (tests/zip, PR #291).
+add_executable(faf_zip_offset_tests EXCLUDE_FROM_ALL zip/ZipOffsetTests.cpp)
+target_link_libraries(faf_zip_offset_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_zip_offset_tests PROPERTIES FOLDER "Tests/Existing")
+add_test(NAME zip_offset COMMAND faf_zip_offset_tests)
+set_tests_properties(zip_offset PROPERTIES LABELS "Existing")
+
 # Engine addition (#247): the user preferences from several threads at once
 # (tests/prefs); fails without USER_PreferencesLock.
 add_executable(faf_prefs_thread_tests EXCLUDE_FROM_ALL prefs/PrefsThreadTests.cpp)
@@ -142,9 +181,10 @@ target_link_libraries(faf_registration_dump PRIVATE faf_engine)
 # Engine addition (dedicated-server plan WPL.4, WPR.11): every map in a list
 # loaded with the client's and the headless terrain resource, compared
 # (tests/terrain). Needs the game data: run it from a folder staged like the
-# game's bin folder, with /init.
+# game's bin folder with --maps <list> /init <init.lua>; without them its test is skipped.
 add_executable(faf_terrain_check EXCLUDE_FROM_ALL terrain/TerrainCheck.cpp)
-target_link_libraries(faf_terrain_check PRIVATE faf_engine)
+target_link_libraries(faf_terrain_check PRIVATE faf_engine gtest)
+set_target_properties(faf_terrain_check PROPERTIES FOLDER "Tests/Terrain")
 
 # Engine addition (dedicated-server plan WPR.21): the difffuzz targets on the
 # engine's objects, checked against retail's outputs (tests/math_dump/golden.txt)
@@ -155,6 +195,12 @@ add_subdirectory(remote)
 
 add_subdirectory(memory)
 add_subdirectory(tread_rotation)
+add_subdirectory(core)
+add_subdirectory(containers)
+add_subdirectory(lua)
+add_subdirectory(gal)
+add_subdirectory(reflection)
+add_subdirectory(render_math)
 
 # Entity update scroll snapshots and payload ownership.
 add_executable(faf_recon_scroll_packet_tests EXCLUDE_FROM_ALL sim/ReconScrollPacketTests.cpp)
@@ -224,6 +270,7 @@ set(_faf_existing_test_targets
   faf_sim_math_tests
   faf_replay_scan_tests
   faf_prefs_thread_tests
+  faf_zip_offset_tests
   faf_recon_scroll_packet_tests
   faf_transport_preorder_tests
   faf_coroutine_tests
@@ -244,3 +291,30 @@ if(TARGET faf_msdf_safety_tests)
 endif()
 add_custom_target(existing_tests DEPENDS ${_faf_existing_test_targets})
 set_target_properties(existing_tests PROPERTIES FOLDER "Tests/Existing")
+
+add_subdirectory(vulkan)
+
+# Rendering-only bounded terrain splat output; no game data or renderer required.
+add_executable(faf_splat_budget_tests EXCLUDE_FROM_ALL terrain/splat_budget/SplatBudgetTests.cpp)
+target_link_libraries(faf_splat_budget_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_splat_budget_tests PROPERTIES FOLDER "Tests/Terrain")
+add_test(NAME splat_budget COMMAND faf_splat_budget_tests)
+set_tests_properties(splat_budget PROPERTIES TIMEOUT 120 LABELS "Terrain")
+
+# Regression for lua damage stack; no game data required.
+add_executable(faf_damage_callback_stack_tests EXCLUDE_FROM_ALL "lua/DamageCallbackStackTests.cpp")
+target_link_libraries(faf_damage_callback_stack_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_damage_callback_stack_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME damage_callback_stack COMMAND faf_damage_callback_stack_tests)
+set_tests_properties(damage_callback_stack PROPERTIES LABELS "Sim")
+
+# Regression for collision allocator; no game data required.
+add_executable(faf_occupation_manager_tests EXCLUDE_FROM_ALL "collision_allocator/OccupationManagerTests.cpp")
+target_link_libraries(faf_occupation_manager_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
+set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
+
+# Every GoogleTest executable above and in the subdirectories.
+include(FafTests)
+faf_add_tests_target("${CMAKE_CURRENT_SOURCE_DIR}")

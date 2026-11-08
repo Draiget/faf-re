@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "remote/FrameBuilder.h"
+#include "remote/PoseTracker.h"
 #include "remote/ViewIdMap.h"
 #include "remote/ViewJobs.h"
 #include "gpg/core/containers/ChunkedVector.h"
@@ -60,6 +61,46 @@ namespace faf::remote
         EnableTeams();
       }
     }
+    /**
+     * Plan WP11 step 4, before the first beat: every view's frames name their sounds, underlays, custom names,
+     * range visuals and unit stats in `session`, one table for all of them; each beat's new deposits and terrain
+     * edits are queued there once (`SessionEdits`). Whoever sends the frames sends `session`'s pending record
+     * to every player before the beat's frames (`OnViewFrames`).
+     */
+    void EnableSessionTables(wire::CSessionTableWriters& session, const std::uint32_t statsEveryBeats = kStatsEveryBeats) noexcept
+    {
+      mSession = &session;
+      mSharedRecords.SetSessionTables(&session);
+      mSharedStats.SetReadEvery(statsEveryBeats);
+    }
+    /**
+     * Plan WP11.5 (#178), on the sim thread before a beat's frames are encoded: the sim rate and the server's clock
+     * (ms) the held frames' headers carry, for the client's beat clock.
+     */
+    void SetFrameClock(const std::int32_t simRate, const std::uint32_t serverMs) noexcept
+    {
+      mFrameSimRate = simRate;
+      mFrameServerMs = serverMs;
+    }
+    /** Plan WP8.1, before the first beat: the units' poses are tracked each beat for the views' pose lanes. */
+    void EnablePoses()
+    {
+      mPosesOn = true;
+      mPoses.InstallHook(); // #118: the animation step marks the bones it changed
+    }
+    [[nodiscard]] bool PosesOn() const noexcept { return mPosesOn; }
+    [[nodiscard]] const CPoseTracker& Poses() const noexcept { return mPoses; }
+    /**
+     * The units `army`'s client holds after this beat (its own view's and, with teams, its team's), ascending. In
+     * `OnViewReady` or after `FinishViews`.
+     */
+    void HeldUnitIds(std::size_t army, std::vector<std::uint32_t>& out) const;
+    /** `CSharedUnitStats::SetReadEvery`'s default: a unit's stats at most 0.3 s late (server `--stats-every`). */
+    static constexpr std::uint32_t kStatsEveryBeats = 4;
+    /** `--stats-every <beats>` (server and headless view bench): 1 reads every unit's stats every beat. */
+    void SetStatsEveryBeats(const std::uint32_t beats) noexcept { mSharedStats.SetReadEvery(beats); }
+    [[nodiscard]] wire::CSessionTableWriters* SessionTables() const noexcept { return mSession; }
+    [[nodiscard]] const CSessionEditCollector& SessionEdits() const noexcept { return mEdits; }
     /** The sim of the last beat built (null before it); for checks that run on the sim thread. */
     [[nodiscard]] moho::Sim* LastSim() const noexcept { return mLastSim; }
 
@@ -209,6 +250,14 @@ namespace faf::remote
 
     const wire::SContentTables& mTables;
     wire::SFrameCodec mCodec;
+    wire::CSessionTableWriters* mSession = nullptr; // `EnableSessionTables`
+    CSessionEditCollector mEdits;
+    CSharedUnitStats mSharedStats;
+    std::vector<std::uint32_t> mUnitIds; // this beat's units' ids (the entity index's first entries)
+    bool mPosesOn = false;
+    CPoseTracker mPoses;
+    std::int32_t mFrameSimRate = 0;   // `SetFrameClock`
+    std::uint32_t mFrameServerMs = 0;
     std::vector<std::unique_ptr<CViewFrameBuilder>> mBuilders;
     std::vector<SHeldView> mHeld;
     CSharedEntityRecords mSharedRecords;

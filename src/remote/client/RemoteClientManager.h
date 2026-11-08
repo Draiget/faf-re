@@ -17,7 +17,8 @@
 // the sim rate and the connection state through `IClientManager`'s virtuals only (the ~20 call
 // sites, research/WP11.1-command-path.md), so every one of them is answered here. In loopback
 // each is the stand-in's answer (the session's own lockstep client manager); the networked form
-// answers from what the server sends (WP11.4, still to do).
+// answers from the server's `Roster` messages, and chat goes through the server (`Chat`,
+// remote/SeatRoster.h, applied by CNetworkSimDriver).
 
 namespace faf::remote::client
 {
@@ -37,6 +38,8 @@ namespace faf::remote::client
 
     /** The server's latest about this client (name, owner and sources included). */
     void Update(const wire::SRosterEntry& entry);
+    /** Where chat for this client goes from now on. */
+    void SetRelay(ChatRelay relay) { mRelay = std::move(relay); }
     [[nodiscard]] const wire::SRosterEntry& Entry() const noexcept { return mEntry; }
 
     float GetStatusMetricA() override;
@@ -60,8 +63,15 @@ namespace faf::remote::client
     /** Takes each command message, as `CMarshaller` built it, in order. */
     using CommandHandler = std::function<void(moho::CMessage& message)>;
 
-    /** `standIn`: the client manager whose answers this one gives (loopback); null for none. */
+    /**
+     * `standIn`: the client manager whose answers this one gives (loopback). Null: a server session (plan WP11.4): the
+     * clients the session creates become the roster, the start barrier is the server's (`Cleanup` calls the loaded
+     * handler once and the session counts as ready), and there are no peers to beat, wait for or vote with.
+     */
     CRemoteClientManager(CommandHandler onCommand, moho::IClientManager* standIn);
+
+    /** A server session: told once, when the session has loaded and is ready (`Cleanup`), to tell the server. */
+    void SetLoadedHandler(std::function<void()> onLoaded) { mOnLoaded = std::move(onLoaded); }
     ~CRemoteClientManager() override;
 
     /** A command message for the server (the lockstep form sends it to every client). */
@@ -75,6 +85,8 @@ namespace faf::remote::client
      */
     void ApplyRoster(const wire::SRoster& roster, CRosterClient::ChatRelay relay);
     [[nodiscard]] bool HasRoster() const noexcept { return mHaveRoster; }
+    /** The roster's clients, those it dropped (disconnected) included. */
+    [[nodiscard]] std::size_t RosterCount() const noexcept;
     /** The sim rate the server's frames carry (WP11.5): from now on `GetSimRate` answers it. */
     void SetServerSimRate(int rate) noexcept
     {
@@ -113,8 +125,13 @@ namespace faf::remote::client
     void Disconnect() override;
 
   private:
+    /** A server session's client: an entry of the roster this side keeps until the server sends one. */
+    moho::IClient* AddRosterEntry(const char* name, int idx, int32_t ownerId, unsigned int sourceId, bool local);
+
     CommandHandler mOnCommand;
     moho::IClientManager* mStandIn;
+    std::function<void()> mOnLoaded;
+    bool mReady = false;
     bool mHaveRoster = false;
     bool mHaveServerSimRate = false;
     int mServerSimRate = 0;
