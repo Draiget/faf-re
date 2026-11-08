@@ -329,6 +329,10 @@ namespace
   void TestModLimits(const Bytes& font)
   {
     moho::SMsdfCookOptions options = moho::MSDF_MakeModCookOptions(2);
+#if defined(FAF_COVERAGE_PROFILE)
+    // Coverage counters slow the cook several times over; the wall-clock limit is checked below on its own.
+    options.mMaxSeconds = 0.0;
+#endif
     moho::SMsdfFontAtlas atlas;
     std::string error;
     const auto start = std::chrono::steady_clock::now();
