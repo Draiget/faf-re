@@ -1236,7 +1236,10 @@ namespace
                 gForceStartRequests = gForceStartRequests + 1;
                 control->Reply(request.id, {});
               } else if (!controlCommon(request)) {
-                control->Refuse(request.id, request.op == "pause" || request.op == "resume" || request.op == "end" ? "the game hasn't started" : "unknown op " + request.op);
+                control->Refuse(request.id, request.op == "pause" || request.op == "resume" || request.op == "end" || request.op == "substitute" ||
+                                                  request.op == "extend_timeouts"
+                                              ? "the game hasn't started"
+                                              : "unknown op " + request.op);
               }
             }
             controlNews();
@@ -1483,6 +1486,19 @@ namespace
             }
           } else if (request.op == "force_start") {
             control->Refuse(request.id, "the game has started");
+          } else if (request.op == "substitute") {
+            // Plan WP15.4 (#200): another person takes a player's seat (army, sources, pauses) from now on.
+            if (!net) {
+              control->Refuse(request.id, "this server has no players (--listen)");
+            } else if (request.token.empty() || request.token.size() > 1024u || request.name.empty() || request.name.size() > 256u) {
+              control->Refuse(request.id, "substitute needs a token (1 to 1024 characters) and a name (1 to 256)");
+            } else if (request.uid <= 0 || request.uid > INT32_MAX ||
+                       !net->RequestSubstitute(static_cast<std::int32_t>(request.uid), request.token, request.name)) {
+              control->Refuse(request.id, "no player in the game with uid " + std::to_string(request.uid));
+            } else {
+              control->Reply(request.id, {});
+              controlEvent("substitute", "\"uid\":" + std::to_string(request.uid) + ",\"name\":" + faf::server::JsonString(request.name));
+            }
           } else if (request.op == "extend_timeouts") {
             // Plan WP15.4 (#200): more pauses for one player.
             const auto source = pauseSources.find(static_cast<std::int32_t>(request.uid));

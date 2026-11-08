@@ -314,6 +314,16 @@ namespace faf::server
     mLobbyOut.push_back(SLobbyMessage{uid, CLobbyRelay::FrameFrom(from, message)});
   }
 
+  bool CServerNet::RequestSubstitute(const std::int32_t uid, const std::string& token, std::string name)
+  {
+    const std::scoped_lock lock(mNewsLock);
+    const bool known = std::any_of(mSeatStates.begin(), mSeatStates.end(), [uid](const SSeatState& seat) { return seat.uid == uid && !seat.gone; });
+    if (known) {
+      mSubstitutes.push_back(SSubstitute{uid, token, std::move(name)});
+    }
+    return known;
+  }
+
   void CServerNet::RequestPins(SPinnedOptions pinned)
   {
     const std::scoped_lock lock(mNewsLock);
@@ -375,10 +385,34 @@ namespace faf::server
     // Plan WP17.2: the organiser's ejects and allowlist changes, and the seats as the control API reports them.
     std::vector<std::pair<std::int32_t, std::string>> ejects;
     std::vector<std::pair<std::uint32_t, bool>> addresses;
+    std::vector<SSubstitute> substitutes;
     {
       const std::scoped_lock lock(mNewsLock);
       ejects.swap(mEjects);
       addresses.swap(mAddressChanges);
+      substitutes.swap(mSubstitutes);
+    }
+    for (SSubstitute& substitute : substitutes) {
+      const auto found = mSeats.find(substitute.uid);
+      if (found == mSeats.end() || found->second.gone) {
+        continue;
+      }
+      SSeat& seat = found->second;
+      // The old channel goes with the old token; the seat waits for its new player as for one who lost the connection.
+      mLinks.RemovePlayer(substitute.uid);
+      mLinks.AddPlayer(substitute.uid, remote::net::MakeToken(substitute.token));
+      const std::string before = seat.name;
+      seat.name = std::move(substitute.name);
+      seat.lost = true;
+      seat.lostAtUs = nowUs;
+      seat.substituted = true; // its next join is a return: launch info, game info and a whole view then (OnJoined)
+      seat.rosterOwed = true;
+      {
+        const std::scoped_lock lock(mNewsLock);
+        mPresence.push_back(SPresence{substitute.uid, true});
+      }
+      Say(seat.name + " takes " + before + "'s seat (uid " + std::to_string(substitute.uid) + "): " +
+          std::to_string(static_cast<int>(mConfig.reconnectSeconds)) + " s to join");
     }
     for (const auto& [ip, allow] : addresses) {
       if (allow) {
@@ -616,13 +650,15 @@ namespace faf::server
     return std::exchange(mNews, {});
   }
 
-  void CServerNet::OnJoined(const std::int32_t uid, const remote::net::SEndpoint& from, const bool returning)
+  void CServerNet::OnJoined(const std::int32_t uid, const remote::net::SEndpoint& from, const bool linkReturning)
   {
     const auto found = mSeats.find(uid);
     if (found == mSeats.end()) {
       return;
     }
     SSeat& seat = found->second;
+    // Plan WP15.4: a substitute's first join is the seat's return (the links see a new player: its record is new).
+    const bool returning = linkReturning || std::exchange(seat.substituted, false);
     if (!std::exchange(seat.joinedEver, true) && mLobby.Open()) {
       const std::scoped_lock lock(mNewsLock);
       mLobbyJoined.push_back(uid);

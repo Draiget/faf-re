@@ -196,6 +196,10 @@ namespace faf::server
           request.options = std::move(value);
         } else if (key == "results") {
           request.results = std::move(value);
+        } else if (key == "token") {
+          request.token = std::move(value);
+        } else if (key == "name") {
+          request.name = std::move(value);
         }
       } else {
         std::int64_t number = 0;

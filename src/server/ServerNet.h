@@ -144,6 +144,12 @@ namespace faf::server
     bool RequestEject(std::int32_t uid, std::string reason);
     /** Plan WP17.2: the organiser adds an address to the handshake allowlist or takes it off; done on the network thread. */
     void RequestAddress(std::uint32_t ip, bool allow);
+    /**
+     * Plan WP15.4 (#200): another person takes a seat during the game. The seat keeps its uid; its admission token and
+     * name become `token` and `name`, the old player's channel goes, and the substitute joins as a player coming back
+     * (launch info and a whole view again, the reconnect window running). False: no such seat, or it's out of the game.
+     */
+    bool RequestSubstitute(std::int32_t uid, const std::string& token, std::string name);
     /** Plan WP17.1: the current logical host (0: none), from the lobby's succession; its ejects go through in a player-hosted lobby. */
     void SetLobbyHost(const std::int32_t uid) noexcept { mLobbyHost.store(uid, std::memory_order_relaxed); }
     /** Before `Start` (plan WPR.49): the game options the match pins (`CLobbyRelay::PinOptions`). */
@@ -191,6 +197,7 @@ namespace faf::server
       std::vector<std::uint8_t> sources;
       bool startSent = false;   // its launch has gone: its game takes rosters and chat from now on
       bool rosterOwed = false;  // the next roster pass sends it the roster, changed or not
+      bool substituted = false; // plan WP15.4: another person was given the seat; their first join counts as a return
       remote::CChatBudget chatBudget;
     };
 
@@ -263,6 +270,13 @@ namespace faf::server
     std::vector<std::pair<std::int32_t, std::string>> mEjects;   // likewise: uid, reason
     std::vector<std::pair<std::uint32_t, bool>> mAddressChanges; // likewise: ip, allow
     std::optional<SPinnedOptions> mPinsIn;                      // likewise
+    struct SSubstitute
+    {
+      std::int32_t uid;
+      std::string token;
+      std::string name;
+    };
+    std::vector<SSubstitute> mSubstitutes;                      // likewise
 
     CLobbyRelay mLobby;                        // on the network thread
     std::vector<std::uint8_t> mLobbyFrame;     // the frame being relayed
