@@ -444,8 +444,28 @@ namespace moho
         messages.AssignNewTable(state, static_cast<std::int32_t>(data->enhancing.size()), 0);
         sync.SetObject("EnhanceMessage", messages);
       }
-      std::int32_t index = messages.GetN();
+      const std::int32_t own = messages.GetN();
+      // A message of this beat for the same ACU is newer than the restored state: an upgrade that completed or
+      // was cancelled in it, or one that started (sent already). notify.lua must not see a 'started' after it.
+      const auto hasOwnMessage = [&messages, own](const std::string& id) {
+        for (std::int32_t i = 1; i <= own; ++i) {
+          const LuaPlus::LuaObject message = messages[i];
+          if (!message.IsTable()) {
+            continue;
+          }
+          const LuaPlus::LuaObject messageId = message["id"];
+          if ((messageId.IsString() && id == messageId.GetString()) ||
+              (messageId.IsNumber() && id == std::to_string(static_cast<long long>(messageId.GetNumber())))) {
+            return true;
+          }
+        }
+        return false;
+      };
+      std::int32_t index = own;
       for (const SRestoredEnhancement& entry : data->enhancing) {
+        if (hasOwnMessage(entry.id)) {
+          continue;
+        }
         LuaPlus::LuaObject message;
         message.AssignNewTable(state, 0, 5);
         message.SetString("source", entry.source.c_str());
