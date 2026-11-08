@@ -29,6 +29,8 @@ for ($i = 0; $i -lt $content.Count; $i++) {
     if ($line -match "Error running.*gamemain\.lua" -or
         $line -match "access to nonexistent global variable" -or
         $line -match "transport_holograms\.lua.*error" -or
+        $line -match "invalid effect technique requested" -or
+        $line -match "unknown technique" -or
         $line -match "stack traceback:") {
         
         $start = [Math]::Max(0, $i - 2)
@@ -40,7 +42,7 @@ for ($i = 0; $i -lt $content.Count; $i++) {
 }
 
 if ($errors.Count -gt 0) {
-    Write-Error "Found $($errors.Count) Lua runtime errors in $LogPath:`n`n"
+    Write-Error "Found $($errors.Count) Lua/Shader runtime errors in ${LogPath}:`n`n"
     foreach ($err in $errors) {
         Write-Host "------------------------------------------------------------" -ForegroundColor Red
         Write-Host $err -ForegroundColor Red
@@ -48,5 +50,5 @@ if ($errors.Count -gt 0) {
     exit 1
 }
 
-Write-Host "No Lua runtime errors found in $LogPath. Audit PASSED." -ForegroundColor Green
+Write-Host "No Lua or shader runtime errors found in ${LogPath}. Audit PASSED." -ForegroundColor Green
 exit 0

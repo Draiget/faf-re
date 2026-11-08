@@ -19,13 +19,13 @@ local function SafeGet(tbl, key)
     return ok and val or nil
 end
 
-local function GetSurfaceY(x, z)
-    local getSurf = rawget(_G, 'GetSurfaceHeight')
+local function GetSurfaceY(x, z, defaultY)
+    local getSurf = rawget(_G, 'GetSurfaceHeight') or rawget(_G, 'GetTerrainHeight')
     if getSurf and x and z then
         local ok, h = pcall(getSurf, x, z)
-        if ok and h then return h end
+        if ok and type(h) == 'number' then return h end
     end
-    return 0
+    return defaultY or 0
 end
 
 local function GetCargoUnits(transport)
@@ -53,7 +53,7 @@ local function FindUnloadWaypoint(transport)
     if not queue then return nil end
     for _, cmd in ipairs(queue) do
         local cmdType = cmd.type or cmd.commandType
-        if cmdType == 'Unload' or cmdType == 'TransportUnloadUnits' or cmdType == 'UnitCommandUnload' then
+        if cmdType == 'Unload' or cmdType == 'TransportUnloadUnits' or cmdType == 'TransportUnloadSpecificUnits' or cmdType == 'DetachFromTransport' or cmdType == 'UnitCommandUnload' then
             local pos = cmd.position or cmd.target
             if pos then
                 local px = pos[1] or pos.x
@@ -112,22 +112,32 @@ function TransportHolograms:CreateHologramMesh(unit, worldPos)
     local WM = GetWorldMeshClass()
     if not WM then return nil end
 
-    local bp = (unit.GetBlueprint and unit:GetBlueprint()) or nil
-    if not bp or not bp.Display or not bp.Display.Mesh then return nil end
+    local bpId = nil
+    if unit.GetUnitId then
+        local ok, id = pcall(unit.GetUnitId, unit)
+        if ok and id then bpId = id end
+    end
+    if not bpId and unit.GetBlueprint then
+        local ok, bp = pcall(unit.GetBlueprint, unit)
+        if ok and bp then
+            bpId = bp.BlueprintId or bp.id or bp.Source
+        end
+    end
+    if not bpId then return nil end
 
-    local lod0 = bp.Display.Mesh.LODs and bp.Display.Mesh.LODs[1]
-    if not lod0 or not lod0.MeshName then return nil end
-
-    local scale = bp.Display.UniformScale or 0.1
     local mesh = WM()
     if not mesh then return nil end
 
-    mesh:SetMesh({
-        MeshName = lod0.MeshName,
-        TextureName = lod0.AlbedoName or lod0.SecondaryName,
-        ShaderName = 'AlphaSpec',
-        UniformScale = scale,
-    })
+    local ok, err = pcall(function()
+        mesh:SetMesh({
+            BlueprintID = bpId,
+            Color = '7733ccff',
+        })
+    end)
+    if not ok then
+        pcall(mesh.Destroy, mesh)
+        return nil
+    end
 
     -- Translucent holographic cyan tint (ARGB: 0x7733ccff)
     if mesh.SetColor then
@@ -135,8 +145,6 @@ function TransportHolograms:CreateHologramMesh(unit, worldPos)
     end
     if mesh.SetStance then
         pcall(mesh.SetStance, mesh, worldPos)
-    elseif mesh.SetPosition then
-        pcall(mesh.SetPosition, mesh, worldPos)
     end
     if mesh.SetHidden then
         pcall(mesh.SetHidden, mesh, false)
@@ -222,7 +230,7 @@ function TransportHolograms:SyncHologramsForTransport(tid, transport, cargo, unl
             local angle = (count > 1) and (2.0 * math.pi * (i - 1) / count) or 0.0
             local gx = unloadPos[1] + radius * math.cos(angle)
             local gz = unloadPos[3] + radius * math.sin(angle)
-            local gy = GetSurfaceY(gx, gz) + 0.1
+            local gy = GetSurfaceY(gx, gz, unloadPos[2]) + 0.1
             local worldPos = { gx, gy, gz }
 
             local hid = existing[uid]
@@ -232,8 +240,6 @@ function TransportHolograms:SyncHologramsForTransport(tid, transport, cargo, unl
                 holo.position = worldPos
                 if holo.mesh and holo.mesh.SetStance then
                     pcall(holo.mesh.SetStance, holo.mesh, worldPos)
-                elseif holo.mesh and holo.mesh.SetPosition then
-                    pcall(holo.mesh.SetPosition, holo.mesh, worldPos)
                 end
             else
                 -- Spawn new hologram
