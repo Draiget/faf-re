@@ -316,6 +316,7 @@ add_executable(server
   "${PROJECT_SOURCE_DIR}/src/server/ControlChannel.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ControlListener.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ReplayLog.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ObserverListener.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbyScriptData.cpp"

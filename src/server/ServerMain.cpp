@@ -75,6 +75,8 @@
 #include "remote/net/UdpSocket.h"
 #include "remote/ContentTables.h"
 #include "server/ControlListener.h"
+#include "server/ObserverListener.h"
+#include "server/ReplayLog.h"
 #include "server/LobbySignaller.h"
 #include "server/ServerNet.h"
 #include "server/ServerViews.h"
@@ -524,6 +526,7 @@ namespace
     std::optional<double> reconnectSeconds;  // the reconnect window (`--reconnect-seconds`)
     std::optional<double> awayPauseSeconds;  // each player's pause while away (`--away-pause-seconds`)
     std::optional<double> lobbyAwaySeconds;  // the logical host's succession (`--lobby-away-seconds`)
+    std::optional<double> observerDelaySeconds; // plan WP13.1: how far behind the game observers watch
     bool fixedSpeed = false;                 // nobody changes the game speed
     bool noCheats = false;                   // `CheatsEnabled` is "false", whatever a host or organiser sets
   };
@@ -563,7 +566,31 @@ namespace
       return true;
     };
     return seconds("ReconnectSeconds", matchRules.reconnectSeconds) && seconds("AwayPauseSeconds", matchRules.awayPauseSeconds) &&
-           seconds("LobbyAwaySeconds", matchRules.lobbyAwaySeconds) && flag("FixedSpeed", matchRules.fixedSpeed) && flag("NoCheats", matchRules.noCheats);
+           seconds("LobbyAwaySeconds", matchRules.lobbyAwaySeconds) && seconds("ObserverDelaySeconds", matchRules.observerDelaySeconds) &&
+           flag("FixedSpeed", matchRules.fixedSpeed) && flag("NoCheats", matchRules.noCheats);
+  }
+
+  /** Plan WP13.1: the match file's `MatchObservers`, the tokens observers may watch with (a list, or uid = token). */
+  [[nodiscard]] bool ReadMatchObservers(LuaPlus::LuaState* const state, std::vector<std::string>& tokens, std::string& error)
+  {
+    LuaPlus::LuaObject table = state->GetGlobal("MatchObservers");
+    if (table.IsNil()) {
+      return true;
+    }
+    if (!table.IsTable()) {
+      error = "MatchObservers is a table of tokens";
+      return false;
+    }
+    for (LuaPlus::LuaTableIterator it(&table, 1); !it.m_isDone; it.Next()) {
+      const LuaPlus::LuaObject value = it.GetValue();
+      const std::size_t size = value.IsString() ? std::strlen(value.GetString()) : 0u;
+      if (size == 0u || size > 1000u) {
+        error = "MatchObservers holds tokens: strings of 1 to 1000 characters";
+        return false;
+      }
+      tokens.emplace_back(value.GetString());
+    }
+    return true;
   }
 
   /** Plan WP17.1: the match file's `MatchLobbyControl` ("organiser", "player"); "organiser" without one. */
@@ -1350,9 +1377,15 @@ namespace
     } else if (!roster.Remotes().empty()) {
       Say("%d seats stay empty: this server isn't listening (--listen)", static_cast<int>(roster.Remotes().size()));
     }
-    const auto sayNetNews = [&net] {
+    std::unique_ptr<faf::server::CObserverListener> observers; // plan WP13.1, with the replay below
+    const auto sayNetNews = [&net, &observers] {
       if (net) {
         for (const std::string& line : net->TakeNews()) {
+          Say("%s", line.c_str());
+        }
+      }
+      if (observers) {
+        for (const std::string& line : observers->TakeNews()) {
           Say("%s", line.c_str());
         }
       }
@@ -1434,6 +1467,31 @@ namespace
       end.error = "cannot write " + replayPath;
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
+    }
+    // Plan WP13.1: with observers, the replay goes through a tee into a log they're served from, header included.
+    if (ReadOption("--observe", text)) {
+      faf::remote::net::SEndpoint observeAt;
+      std::vector<std::string> tokens;
+      if (!faf::remote::net::ParseEndpoint(text, observeAt)) {
+        end.error = "--observe takes <ip:port>, not " + text;
+      } else if (!ReadMatchObservers(state, tokens, end.error)) {
+        // `end.error` says why
+      } else {
+        auto log = std::make_shared<faf::server::CReplayLog>();
+        replay = std::make_unique<faf::server::CReplayTee>(std::move(replay), log, &ControlNowUs);
+        observers = std::make_unique<faf::server::CObserverListener>(log, &ControlNowUs, matchRules.observerDelaySeconds.value_or(0.0));
+        for (std::string& token : tokens) {
+          observers->AllowToken(std::move(token));
+        }
+        if (observers->Start(observeAt, end.error)) {
+          Say("Observers on %s: %d tokens, %.0f s behind the game", observeAt.Text().c_str(), static_cast<int>(tokens.size()),
+              matchRules.observerDelaySeconds.value_or(0.0));
+        }
+      }
+      if (!end.error.empty()) {
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      }
     }
     moho::VCR_WriteReplayHeader(*replay, *sessionInfo);
 
@@ -1854,7 +1912,19 @@ namespace
     sessionState.reset();
     rules.reset();
     wldMap.reset();
-    driver.reset();
+    driver.reset(); // the replay closes: the observers' log is finished
+    if (observers) {
+      // Observers are behind the game: they get its last moments before the server goes, for the delay and a little more.
+      const auto waitEnd = Clock::now() + std::chrono::duration_cast<Clock::duration>(
+                                            std::chrono::duration<double>(matchRules.observerDelaySeconds.value_or(0.0) + 10.0)
+                                          );
+      while (!observers->AllSent() && Clock::now() < waitEnd && gStopSignal == 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        sayNetNews();
+      }
+      sayNetNews();
+      observers->Stop();
+    }
 
     WriteResult(resultPath, end);
     controlEvent(
