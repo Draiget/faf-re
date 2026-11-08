@@ -7,6 +7,7 @@
 #include <limits>
 #include <new>
 #include <stdexcept>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
@@ -371,6 +372,177 @@ namespace moho
   void MirrorUploadedParticles(ParticleBuffer& particleBuffer, std::uint32_t first, std::uint32_t count);
   void ForgetMirroredParticles(const ParticleBuffer& particleBuffer);
 
+  int ren_ParticleLinearUpload = 0;
+
+  TConVar<int> gTConVar_ren_ParticleLinearUpload(
+    "ren_ParticleLinearUpload",
+    "Consume pending particle uploads without repeatedly moving the remaining vector. "
+    "0 (the default) keeps the original per-batch erase; 1 enables linear consumption. "
+    "Sampled once per upload call. Render-only; does not change particle pool limits.",
+    &ren_ParticleLinearUpload
+  );
+
+  namespace
+  {
+    // Engine addition: consume a bucket linearly instead of moving its whole
+    // remaining vector after every 200-particle upload. The public one-batch
+    // entry point uses the same guard and keeps its consumed-prefix contract.
+    struct ParticlePendingCursor
+    {
+      fa::vector<SWorldParticle>& particles;
+      // Capture the switch once: a callback cannot change cursor semantics mid-call.
+      const bool linearUpload;
+      std::size_t consumed = 0U;
+
+      // The legacy Vector3<float> assignment is three float assignments but
+      // lacks noexcept. Audit that body if the vector implementation changes;
+      // the whole-particle noexcept trait cannot express this source fact.
+      // A type requirement, unlike the retail-layout static_assert macro,
+      // also checks the owning members in normal x64 builds.
+      using SafeOwnedMembers = std::enable_if_t<
+        std::is_nothrow_move_assignable_v<decltype(SWorldParticle::mTexture)> &&
+        std::is_nothrow_move_assignable_v<decltype(SWorldParticle::mRampTexture)> &&
+        std::is_nothrow_move_assignable_v<decltype(SWorldParticle::mTypeTag)> &&
+        std::is_nothrow_destructible_v<SWorldParticle> &&
+        std::is_same_v<decltype(SWorldParticle::mPos), Wm3::Vector3<float>> &&
+        std::is_same_v<decltype(SWorldParticle::mDir), Wm3::Vector3<float>> &&
+        std::is_same_v<decltype(SWorldParticle::mAccel), Wm3::Vector3<float>>
+      >;
+
+      ~ParticlePendingCursor() noexcept
+      {
+        if (consumed != 0U) {
+          (void)particles.erase(particles.begin(), particles.begin() + consumed);
+        }
+      }
+
+      void Consume(const std::size_t count) noexcept
+      {
+        const std::size_t end = consumed + count;
+        // A short remaining tail is no more work to move than this batch was
+        // to upload. Keep the original erase path there. Across the whole
+        // call these moves total at most the number of uploaded particles.
+        if (!linearUpload || particles.size() - end <= count) {
+          (void)particles.erase(particles.begin(), particles.begin() + end);
+          consumed = 0U;
+          return;
+        }
+        // Keep the batch's texture references and tag allocations released
+        // before Unlock/Mirror, as with the old per-batch erase. Only empty
+        // payload storage remains until the guard compacts once on exit.
+        for (std::size_t index = consumed; index < consumed + count; ++index) {
+          auto& particle = particles[index];
+          particle.mTexture.reset();
+          particle.mRampTexture.reset();
+          particle.mTypeTag = fa::string{};
+        }
+        consumed += count;
+      }
+
+      void Discard() noexcept
+      {
+        particles.clear();
+        consumed = 0U;
+      }
+    };
+
+    void UploadPendingParticleRangeIntoWorkItem(
+      SParticleRenderWorkItem& workItem,
+      const float frameDelta,
+      ParticlePendingCursor& pending
+    )
+    {
+      auto& pendingParticles = pending.particles;
+      const std::size_t pendingCount = pendingParticles.size() - pending.consumed;
+      if (pendingCount == 0U) {
+        return;
+      }
+
+      const std::size_t intervalCount = workItem.mIntervals.size();
+
+      std::size_t maxUploadCount = pendingCount;
+      if (workItem.mIntervalCapacityHint > intervalCount) {
+        maxUploadCount =
+          std::min(maxUploadCount, static_cast<std::size_t>(workItem.mIntervalCapacityHint) - intervalCount);
+      } else {
+        maxUploadCount = 0U;
+      }
+
+      if (maxUploadCount == 0U) {
+        return;
+      }
+
+      auto* const particleBuffer = static_cast<ParticleBuffer*>(workItem.mParticleBuffer);
+      if (particleBuffer == nullptr) {
+        pending.Discard();
+        workItem.mIntervalCursor = 0U;
+        workItem.mRenderStartIndex = 0U;
+        workItem.mIntervals.clear();
+        return;
+      }
+
+      ParticleBuffer::Instanced* lockedInstances = nullptr;
+      if (workItem.mRenderStartIndex != 0U) {
+        lockedInstances =
+          particleBuffer->Lock(static_cast<int>(workItem.mRenderStartIndex), static_cast<int>(maxUploadCount));
+      } else {
+        lockedInstances = particleBuffer->Lock(static_cast<int>(maxUploadCount));
+      }
+
+      if (lockedInstances == nullptr) {
+        pending.Discard();
+        workItem.mIntervalCursor = 0U;
+        workItem.mRenderStartIndex = 0U;
+        workItem.mIntervals.clear();
+        return;
+      }
+
+      for (std::size_t index = 0U; index < maxUploadCount; ++index) {
+        SWorldParticle& particle = pendingParticles[pending.consumed + index];
+        particle.mInterop += frameDelta;
+        (void)AppendInterval(workItem, particle.mInterop, particle.mLifetime);
+
+        auto* const instance = reinterpret_cast<SParticleInstance*>(
+          reinterpret_cast<std::uint8_t*>(lockedInstances) + (index * sizeof(ParticleBuffer::Instanced))
+        );
+
+        instance->posX = particle.mPos.x;
+        instance->posY = particle.mPos.y;
+        instance->posZ = particle.mPos.z;
+        instance->angle = particle.mAngle;
+        instance->beginSize = particle.mBeginSize;
+        instance->sizeDeltaPerFrame = (particle.mEndSize - particle.mBeginSize) * (1.0f / particle.mLifetime);
+        instance->dirX = particle.mDir.x;
+        instance->dirY = particle.mDir.y;
+        instance->dirZ = particle.mDir.z;
+        instance->rotationCurve = particle.mRotationCurve;
+        instance->accelX = particle.mAccel.x;
+        instance->accelY = particle.mAccel.y;
+        instance->accelZ = particle.mAccel.z;
+        instance->interop = particle.mInterop;
+        instance->lifetime = particle.mLifetime;
+        instance->framerate = particle.mFramerate;
+        instance->value1 = particle.mValue1;
+        instance->textureSelection = particle.mTextureSelection;
+        instance->rampSelection = particle.mRampSelection;
+        instance->value3 = particle.mValue3;
+        instance->resistance = particle.mResistance;
+        // Engine change: retail divides with no guard (0x004933FE). A drag emitter with resistance 0
+        // (seraphim_airmoveexhaust_01_emit) then hands the shader an infinity, and Direct3D 12 and Vulkan
+        // turn its particles' positions into NaN and draw nothing; with 0 they stay where they were born.
+        instance->inverseResistance = particle.mResistance != 0.0f ? 1.0f / particle.mResistance : 0.0f;
+        instance->inverseResistanceSq = instance->inverseResistance * instance->inverseResistance;
+      }
+
+      const std::uint32_t uploadFirst = workItem.mRenderStartIndex;
+      workItem.mRenderStartIndex += static_cast<std::uint32_t>(maxUploadCount);
+      pending.Consume(maxUploadCount);
+      particleBuffer->UnlockInstanceBuffer();
+      // Engine addition (`ren_ParticleBatch`): keep a GPU-resident copy of what was just uploaded.
+      MirrorUploadedParticles(*particleBuffer, uploadFirst, static_cast<std::uint32_t>(maxUploadCount));
+    }
+  } // namespace
+
   /**
    * Address: 0x00493210 (FUN_00493210, sub_493210)
    *
@@ -378,100 +550,14 @@ namespace moho
    * Uploads a bounded batch of pending world particles into one particle
    * work-item instance stream for the current frame.
    */
-
   void UploadPendingParticlesIntoWorkItem(
     SParticleRenderWorkItem& workItem,
     const float frameDelta,
     fa::vector<SWorldParticle>& pendingParticles
   )
   {
-    const std::size_t pendingCount = pendingParticles.size();
-    if (pendingCount == 0U) {
-      return;
-    }
-
-    const std::size_t intervalCount =
-      workItem.mIntervals.size();
-
-    std::size_t maxUploadCount = pendingCount;
-    if (workItem.mIntervalCapacityHint > intervalCount) {
-      maxUploadCount = std::min(maxUploadCount, static_cast<std::size_t>(workItem.mIntervalCapacityHint) - intervalCount);
-    } else {
-      maxUploadCount = 0U;
-    }
-
-    if (maxUploadCount == 0U) {
-      return;
-    }
-
-    auto* const particleBuffer = static_cast<ParticleBuffer*>(workItem.mParticleBuffer);
-    if (particleBuffer == nullptr) {
-      pendingParticles.clear();
-      workItem.mIntervalCursor = 0U;
-      workItem.mRenderStartIndex = 0U;
-      workItem.mIntervals.clear();
-      return;
-    }
-
-    ParticleBuffer::Instanced* lockedInstances = nullptr;
-    if (workItem.mRenderStartIndex != 0U) {
-      lockedInstances = particleBuffer->Lock(static_cast<int>(workItem.mRenderStartIndex), static_cast<int>(maxUploadCount));
-    } else {
-      lockedInstances = particleBuffer->Lock(static_cast<int>(maxUploadCount));
-    }
-
-    if (lockedInstances == nullptr) {
-      pendingParticles.clear();
-      workItem.mIntervalCursor = 0U;
-      workItem.mRenderStartIndex = 0U;
-      workItem.mIntervals.clear();
-      return;
-    }
-
-    for (std::size_t index = 0U; index < maxUploadCount; ++index) {
-      SWorldParticle& particle = pendingParticles[index];
-      particle.mInterop += frameDelta;
-      (void)AppendInterval(workItem, particle.mInterop, particle.mLifetime);
-
-      auto* const instance = reinterpret_cast<SParticleInstance*>(
-        reinterpret_cast<std::uint8_t*>(lockedInstances) + (index * sizeof(ParticleBuffer::Instanced))
-      );
-
-      instance->posX = particle.mPos.x;
-      instance->posY = particle.mPos.y;
-      instance->posZ = particle.mPos.z;
-      instance->angle = particle.mAngle;
-      instance->beginSize = particle.mBeginSize;
-      instance->sizeDeltaPerFrame = (particle.mEndSize - particle.mBeginSize) * (1.0f / particle.mLifetime);
-      instance->dirX = particle.mDir.x;
-      instance->dirY = particle.mDir.y;
-      instance->dirZ = particle.mDir.z;
-      instance->rotationCurve = particle.mRotationCurve;
-      instance->accelX = particle.mAccel.x;
-      instance->accelY = particle.mAccel.y;
-      instance->accelZ = particle.mAccel.z;
-      instance->interop = particle.mInterop;
-      instance->lifetime = particle.mLifetime;
-      instance->framerate = particle.mFramerate;
-      instance->value1 = particle.mValue1;
-      instance->textureSelection = particle.mTextureSelection;
-      instance->rampSelection = particle.mRampSelection;
-      instance->value3 = particle.mValue3;
-      instance->resistance = particle.mResistance;
-      // Engine change: retail divides with no guard (0x004933FE). A drag emitter with resistance 0
-      // (seraphim_airmoveexhaust_01_emit) then hands the shader an infinity, and Direct3D 12 and Vulkan
-      // turn its particles' positions into NaN and draw nothing; with 0 they stay where they were born.
-      instance->inverseResistance = particle.mResistance != 0.0f ? 1.0f / particle.mResistance : 0.0f;
-      instance->inverseResistanceSq = instance->inverseResistance * instance->inverseResistance;
-    }
-
-    const std::uint32_t uploadFirst = workItem.mRenderStartIndex;
-    workItem.mRenderStartIndex += static_cast<std::uint32_t>(maxUploadCount);
-    // `erase(first, last)` (0x004956B0, cited on Vector.h): the uploaded prefix goes.
-    (void)pendingParticles.erase(pendingParticles.begin(), pendingParticles.begin() + maxUploadCount);
-    particleBuffer->UnlockInstanceBuffer();
-    // Engine addition (`ren_ParticleBatch`): keep a GPU-resident copy of what was just uploaded.
-    MirrorUploadedParticles(*particleBuffer, uploadFirst, static_cast<std::uint32_t>(maxUploadCount));
+    ParticlePendingCursor pending{pendingParticles, ren_ParticleLinearUpload > 0};
+    UploadPendingParticleRangeIntoWorkItem(workItem, frameDelta, pending);
   }
 
   /**
@@ -600,20 +686,21 @@ namespace moho
    */
   bool EnsureAndFillParticleBucketWorkItems(SParticleRenderBucket& bucket, const float frameDelta)
   {
+    ParticlePendingCursor pending{bucket.pendingParticles, ren_ParticleLinearUpload > 0};
     const std::size_t workItemCount = bucket.activeWorkItems.size();
     if (workItemCount != 0U) {
       SParticleRenderWorkItem* const tailWorkItem = bucket.activeWorkItems.back();
       if (tailWorkItem != nullptr) {
-        UploadPendingParticlesIntoWorkItem(*tailWorkItem, frameDelta, bucket.pendingParticles);
+        UploadPendingParticleRangeIntoWorkItem(*tailWorkItem, frameDelta, pending);
       }
     }
 
-    while (!bucket.pendingParticles.empty()) {
+    while (pending.consumed < bucket.pendingParticles.size()) {
       ParticleBuffer* const pooledBuffer = bucket.owner->AcquireParticleBuffer();
       if (pooledBuffer == nullptr) {
         // FAF hot-patch (FA-Binary-Patches CameraPerf): the "Particle cap exceeded" log call
         // at 0x00493A9B is NOPed out; the excess is still discarded.
-        bucket.pendingParticles.clear();
+        pending.Discard();
         return false;
       }
 
@@ -626,7 +713,7 @@ namespace moho
 
       bucket.activeWorkItems.push_back(newWorkItem);
 
-      UploadPendingParticlesIntoWorkItem(*newWorkItem, frameDelta, bucket.pendingParticles);
+      UploadPendingParticleRangeIntoWorkItem(*newWorkItem, frameDelta, pending);
     }
 
     return true;
