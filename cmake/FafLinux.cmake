@@ -384,3 +384,13 @@ target_link_libraries(faf_damage_callback_stack_tests PRIVATE faf_sim gtest_main
 set_target_properties(faf_damage_callback_stack_tests PROPERTIES FOLDER "Tests/Sim")
 add_test(NAME damage_callback_stack COMMAND faf_damage_callback_stack_tests)
 set_tests_properties(damage_callback_stack PROPERTIES LABELS "Sim")
+
+# Occupation manager lifecycle, plus a linker-wrap trace of which new/delete
+# overloads it calls; no game data required.
+add_executable(faf_occupation_manager_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/collision_allocator/OccupationManagerTests.cpp")
+target_link_libraries(faf_occupation_manager_tests PRIVATE faf_sim gtest_main)
+set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
+set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
+target_compile_definitions(faf_occupation_manager_tests PRIVATE FAF_OCCUPATION_DELETE_TRACE=1)
+target_link_options(faf_occupation_manager_tests PRIVATE -Wl,--wrap=_Znwm -Wl,--wrap=_Znam -Wl,--wrap=_ZdlPv -Wl,--wrap=_ZdaPv)

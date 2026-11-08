@@ -274,3 +274,10 @@ target_link_libraries(faf_particle_pool_reclaim_tests PRIVATE gtest_main)
 set_target_properties(faf_particle_pool_reclaim_tests PROPERTIES FOLDER "Tests/Particles")
 add_test(NAME particle_pool_reclaim COMMAND faf_particle_pool_reclaim_tests)
 set_tests_properties(particle_pool_reclaim PROPERTIES LABELS "Particles")
+
+# Regression for collision allocator; no game data required.
+add_executable(faf_occupation_manager_tests EXCLUDE_FROM_ALL "collision_allocator/OccupationManagerTests.cpp")
+target_link_libraries(faf_occupation_manager_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
+set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
