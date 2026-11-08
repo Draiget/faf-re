@@ -1069,6 +1069,19 @@ namespace moho
      */
     [[nodiscard]] bool ValidateFocusArmyRequest(int index);
 
+    // Pieces of DoBeat (0x00894530), each applying its lanes of the beat in the binary's order.
+    void ApplyBeatEffects(const SSyncData& beat, CameraImpl* worldCamera, IWldTerrainRes* terrainRes);
+    void ApplyBeatArmies(const SSyncData& beat);
+    void CreateBeatEntities(const SSyncData& beat);
+    void PublishBeatCommandDescriptors(const SSyncData& beat);
+    void UpdateBeatEntities(const SSyncData& beat);
+    void ApplyBeatCommandPackets(const SSyncData& beat);
+    void HandSyncToUi(const SSyncData& beat);
+    void ReportBeatDesyncs(const SSyncData& beat);
+    void ExitAtTickIfAsked();
+    void TickBeatUnits(const SSyncData& beat);
+    void UpdateOrphansAndVisibility();
+
 
   public:
     // `SetSelection` (0x00896140) broadcasts with `esi = session`, and the

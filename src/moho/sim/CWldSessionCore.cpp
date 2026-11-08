@@ -1568,16 +1568,8 @@ namespace
 #endif
 
   /**
-   * Address: 0x00894530 (FUN_00894530,
-   * ?DoBeat@CWldSession@Moho@@QAEXV?$auto_ptr@USSyncData@Moho@@@std@@@Z)
-   *
-   * IDA signature:
-   * void __stdcall Moho::CWldSession::DoBeat(Moho::CWldSession *this, std::auto_ptr<SSyncData> sdata);
-   *
-   * What it does:
-   * Applies one sim beat to the client world, in the packet's own lane order.
-   * This is the sole consumer of the driver's sync queue - without it the queue
-   * fills, the issue thread stops issuing, and the game clock never advances.
+   * Engine addition (replay timeline): drops everything the last sim published, just before the
+   * opening sync of the sim that replaces it.
    */
   void CWldSession::ResetForNewReplaySim()
   {
@@ -1624,6 +1616,18 @@ namespace
     terrainRes->NotifyMapChange(gpg::Rect2i{0, 0, field->width - 1, field->height - 1});
   }
 
+  /**
+   * Address: 0x00894530 (FUN_00894530,
+   * ?DoBeat@CWldSession@Moho@@QAEXV?$auto_ptr@USSyncData@Moho@@@std@@@Z)
+   *
+   * IDA signature:
+   * void __stdcall Moho::CWldSession::DoBeat(Moho::CWldSession *this, std::auto_ptr<SSyncData> sdata);
+   *
+   * What it does:
+   * Applies one sim beat to the client world, in the packet's own lane order.
+   * This is the sole consumer of the driver's sync queue - without it the queue
+   * fills, the issue thread stops issuing, and the game clock never advances.
+   */
   void CWldSession::DoBeat(fa::auto_ptr<SSyncData> syncData)
   {
     const CTimeBarSection beatSection("Sync");
@@ -1647,6 +1651,108 @@ namespace
       SetSelection(WeakSet<UserEntity>());
     }
 
+    ApplyBeatEffects(beat, worldCamera, terrainRes);
+
+    ApplyBeatArmies(beat);
+
+    CreateBeatEntities(beat);
+
+    PublishBeatCommandDescriptors(beat);
+
+    UpdateBeatEntities(beat);
+
+    ApplyBeatCommandPackets(beat);
+
+    // The command graph only gets marked here (`DirtyCommandGraph`, inlined:
+    // the `lock()` at 0x00894F02 and the byte store at 0x00894F17); the mesh
+    // rebuild it implies runs back in `SessionFrame`.
+    DirtyCommandGraph();
+
+    if (worldCamera != nullptr) {
+      for (const SCamFollowParams& follow : beat.mFollowCameras) {
+        worldCamera->CameraFollow(follow);
+      }
+    }
+
+    HandSyncToUi(beat);
+    (void)SCR_LuaDoString("OnSync()", mState);
+
+    mSessionPauseStateA = static_cast<std::uint8_t>(beat.mPausedBy != -1);
+    mDebugCanvas.reset_from(beat.mTickDebugCanvas);
+    mBeatDebugCanvas.reset_from(beat.mBeatDebugCanvas);
+    ren_FogOfWar = beat.mFogOfWar;
+    terrainRes->SyncTerrain(beat.mTerrainUpdate.px);
+    mSimResources.reset_from(beat.mSimResources);
+
+    // `fa::vector<SExtraUnitData>::operator=` (0x00895214, FUN_007530C0,
+    // `legacy/containers/Vector.h`). Previously mis-wired through
+    // `AssignSyncInlineVectors` (a per-element `SyncInlineVector` scratch-run
+    // copy) at this exact call site -- `FUN_007530C0`'s callee chain
+    // (`FUN_00755DE0`/`FUN_00750A80`, `>>3` nested 8-byte-pair-vector copy at
+    // +0x00 plus one trailing scalar dword at +0x18) only matches
+    // `SExtraUnitData::pairs`/`unitEntityId`, never a flat `int32_t[4]`
+    // element; removed the wrong helper and call directly.
+    mSyncExtraUnitData = beat.mSyncExtraUnitData;
+
+    for (const fa::string& printLine : beat.mPrintField) {
+      CON_Printf("%s", printLine.c_str());
+    }
+
+    ReportBeatDesyncs(beat);
+
+#if FAF_SERVER_MODE
+    // Engine addition, server mode: `/sessionsummary` (WP11.6 check). Without it, nothing.
+    faf::remote::client::NoteSessionBeat(*this, beat);
+#endif
+
+    if (beat.mGameOver && IsGameOver == 0u) {
+      IsGameOver = 1u;
+      UI_NoteGameOver();
+      if (CFG_GetArgOption("/exitongameover", 0u, nullptr)) {
+        wxTheApp->ExitMainLoop();
+      }
+    }
+
+    ExitAtTickIfAsked();
+
+    if (mPendingSaveData) {
+      ApplyPendingSaveData();
+    }
+
+    TickBeatUnits(beat);
+
+    UpdateOrphansAndVisibility();
+#if FAF_SERVER_MODE
+    if (sBeatObserver != nullptr) {
+      sBeatObserver(*this, beat.mCurBeat, sBeatObserverContext);
+    }
+#endif
+
+    AdvanceCommandIssueHelpersToBeat(*mCommandManager, beat.mCurBeat);
+
+    if (mRequestingPauseState != 0u && beat.mCurBeat - mPauseRequester >= 0) {
+      mRequestingPauseState = 0u;
+    }
+
+    CheckForNecessaryUIRefresh();
+
+    if (IUIManager* const uiManager = UI_GetManager(); uiManager != nullptr) {
+      (void)uiManager->DoBeat();
+    }
+
+    if (!beat.mSubmitArmyStats.empty()) {
+      GPGNET_SubmitArmyStats(beat.mSubmitArmyStats);
+    }
+
+    if (dbg_Metronome && USER_GetSound() != nullptr) {
+      USER_GetSound()->Play(fa::string("Tick", 4u), fa::string("TestBank", 8u));
+    }
+  }
+
+  // Part of DoBeat (0x00894530).
+  // Sounds, particles, decals, camera shakes, waves and playable-area changes.
+  void CWldSession::ApplyBeatEffects(const SSyncData& beat, CameraImpl* const worldCamera, IWldTerrainRes* const terrainRes)
+  {
     USER_GetSound()->UpdateSoundRequests(beat.mAudioRequests);
 
     if (beat.mAdvanced) {
@@ -1680,9 +1786,13 @@ namespace
     for (const gpg::Rect2i& playableRect : beat.mPlayableRectUpdates) {
       terrainRes->NotifyMapChange(playableRect);
     }
+  }
 
-    // A new army grid means new armies; each lands in its own index slot, and
-    // the listener is re-seated afterwards because the focus army may now exist.
+  // Part of DoBeat (0x00894530).
+  // A new army grid means new armies; each lands in its own index slot, and
+  // the listener is re-seated afterwards because the focus army may now exist.
+  void CWldSession::ApplyBeatArmies(const SSyncData& beat)
+  {
     if (!beat.mNewGrids.empty()) {
       for (const SSTIArmyConstantData& armyConstantData : beat.mNewGrids) {
         UserArmy* const army = new UserArmy(this, armyConstantData);
@@ -1699,7 +1809,12 @@ namespace
         ++armyIndex;
       }
     }
+  }
 
+  // Part of DoBeat (0x00894530).
+  // New entities, then new units.
+  void CWldSession::CreateBeatEntities(const SSyncData& beat)
+  {
     for (const SCreateEntityParams& createParams : beat.mNewEntities) {
       AddEntity(new UserEntity(*this, createParams));
     }
@@ -1707,7 +1822,12 @@ namespace
     for (const SCreateUnitParams& createParams : beat.mNewUnits) {
       AddEntity(new UserUnit(this, createParams));
     }
+  }
 
+  // Part of DoBeat (0x00894530).
+  // A helper for every command the sim published this beat.
+  void CWldSession::PublishBeatCommandDescriptors(const SSyncData& beat)
+  {
     for (const SSTICommandConstantData& commandConstantData : beat.mPublishedCommandDescriptors) {
       (void)FindOrCreateCommandIssueHelper(*mCommandManager, commandConstantData, 0u, 0);
     }
@@ -1724,7 +1844,12 @@ namespace
         }
       }
     }
+  }
 
+  // Part of DoBeat (0x00894530).
+  // Unit and entity updates, erases, poses and deletes, in that order.
+  void CWldSession::UpdateBeatEntities(const SSyncData& beat)
+  {
     if (!ApplyUnitUpdatesParallel(*this, beat.mUnitUpdates)) {
       for (const SUnitVariableUpdateEntry& unitUpdate : beat.mUnitUpdates) {
         auto* const unit = static_cast<UserUnit*>(LookupEntityId(unitUpdate.mEntityId));
@@ -1759,7 +1884,12 @@ namespace
       RemoveEntity(entity);
       delete entity;
     }
+  }
 
+  // Part of DoBeat (0x00894530).
+  // Command variable data, then removed and released commands.
+  void CWldSession::ApplyBeatCommandPackets(const SSyncData& beat)
+  {
     for (const SSyncPublishedCommandPacket& commandPacket : beat.mPublishedCommandPackets) {
       UserCommandIssueHelper* const helper = FindCommandIssueHelper(*mCommandManager, commandPacket.commandId);
       helper->mVariableData = commandPacket.variableData;
@@ -1771,63 +1901,37 @@ namespace
     }
 
     DeleteCommandIssueHelpers(*mCommandManager, beat.mPendingReleasedCommandIds);
+  }
 
-    // The command graph only gets marked here (`DirtyCommandGraph`, inlined:
-    // the `lock()` at 0x00894F02 and the byte store at 0x00894F17); the mesh
-    // rebuild it implies runs back in `SessionFrame`.
-    DirtyCommandGraph();
+  // Part of DoBeat (0x00894530).
+  // Hand the sim's Lua payload to the UI: last beat's table becomes
+  // `PreviousSync`, this beat's stream becomes `Sync`, then `OnSync()` runs.
+  void CWldSession::HandSyncToUi(const SSyncData& beat)
+  {
+    const LuaPlus::LuaObject previousSync = SCR_Copy(mState->GetGlobal("Sync"), mState);
+    mState->GetGlobals().SetObject("PreviousSync", previousSync);
 
-    if (worldCamera != nullptr) {
-      for (const SCamFollowParams& follow : beat.mFollowCameras) {
-        worldCamera->CameraFollow(follow);
-      }
-    }
+    // The binary takes the stream by reference and never checks it: every
+    // beat carries one, because `Sim::Sync` installs a fresh
+    // `MemBufferStream` before serialising the table into it. That tail was
+    // an unrecovered gap here, which left `mStream` null and forced a guard
+    // that skipped the deserialize on every single beat - the sim wrote the
+    // `Sync` table and the UI never saw any of it. The tail is recovered
+    // now and `Sim::Sync` is the only producer of an `SSyncData`, so the
+    // guard is dead and the unchecked binary shape is restored.
+    gpg::BinaryReader syncReader(beat.mStream);
+    LuaPlus::LuaObject currentSync;
+    // Engine addition: decoded without the network decode's nesting cap
+    // (see SCR_FromLocalByteStream); the binary calls SCR_FromByteStream.
+    currentSync.SCR_FromLocalByteStream(currentSync, mState, &syncReader);
+    mState->GetGlobals().SetObject("Sync", currentSync);
+    SIM_AddRestoredUiData(currentSync, mState, IsReplay != 0); // engine addition (replay keyframes)
+  }
 
-    // Hand the sim's Lua payload to the UI: last beat's table becomes
-    // `PreviousSync`, this beat's stream becomes `Sync`, then `OnSync()` runs.
-    {
-      const LuaPlus::LuaObject previousSync = SCR_Copy(mState->GetGlobal("Sync"), mState);
-      mState->GetGlobals().SetObject("PreviousSync", previousSync);
-
-      // The binary takes the stream by reference and never checks it: every
-      // beat carries one, because `Sim::Sync` installs a fresh
-      // `MemBufferStream` before serialising the table into it. That tail was
-      // an unrecovered gap here, which left `mStream` null and forced a guard
-      // that skipped the deserialize on every single beat - the sim wrote the
-      // `Sync` table and the UI never saw any of it. The tail is recovered
-      // now and `Sim::Sync` is the only producer of an `SSyncData`, so the
-      // guard is dead and the unchecked binary shape is restored.
-      gpg::BinaryReader syncReader(beat.mStream);
-      LuaPlus::LuaObject currentSync;
-      // Engine addition: decoded without the network decode's nesting cap
-      // (see SCR_FromLocalByteStream); the binary calls SCR_FromByteStream.
-      currentSync.SCR_FromLocalByteStream(currentSync, mState, &syncReader);
-      mState->GetGlobals().SetObject("Sync", currentSync);
-      SIM_AddRestoredUiData(currentSync, mState, IsReplay != 0); // engine addition (replay keyframes)
-    }
-    (void)SCR_LuaDoString("OnSync()", mState);
-
-    mSessionPauseStateA = static_cast<std::uint8_t>(beat.mPausedBy != -1);
-    mDebugCanvas.reset_from(beat.mTickDebugCanvas);
-    mBeatDebugCanvas.reset_from(beat.mBeatDebugCanvas);
-    ren_FogOfWar = beat.mFogOfWar;
-    terrainRes->SyncTerrain(beat.mTerrainUpdate.px);
-    mSimResources.reset_from(beat.mSimResources);
-
-    // `fa::vector<SExtraUnitData>::operator=` (0x00895214, FUN_007530C0,
-    // `legacy/containers/Vector.h`). Previously mis-wired through
-    // `AssignSyncInlineVectors` (a per-element `SyncInlineVector` scratch-run
-    // copy) at this exact call site -- `FUN_007530C0`'s callee chain
-    // (`FUN_00755DE0`/`FUN_00750A80`, `>>3` nested 8-byte-pair-vector copy at
-    // +0x00 plus one trailing scalar dword at +0x18) only matches
-    // `SExtraUnitData::pairs`/`unitEntityId`, never a flat `int32_t[4]`
-    // element; removed the wrong helper and call directly.
-    mSyncExtraUnitData = beat.mSyncExtraUnitData;
-
-    for (const fa::string& printLine : beat.mPrintField) {
-      CON_Printf("%s", printLine.c_str());
-    }
-
+  // Part of DoBeat (0x00894530).
+  // Desyncs the sim found this beat: reported to FAF and shown, unless the orders were altered.
+  void CWldSession::ReportBeatDesyncs(const SSyncData& beat)
+  {
     if (!beat.mDesyncs.empty()) {
       fa::vector<fa::string> desyncArmyNames;
       desyncArmyNames.reserve(beat.mDesyncs.size());
@@ -1867,80 +1971,71 @@ namespace
         UI_ShowDesyncDialog(mGameTick, desyncArmyNames);
       }
     }
+  }
 
-#if FAF_SERVER_MODE
-    // Engine addition, server mode: `/sessionsummary` (WP11.6 check). Without it, nothing.
-    faf::remote::client::NoteSessionBeat(*this, beat);
-#endif
-
-    if (beat.mGameOver && IsGameOver == 0u) {
-      IsGameOver = 1u;
-      UI_NoteGameOver();
-      if (CFG_GetArgOption("/exitongameover", 0u, nullptr)) {
-        wxTheApp->ExitMainLoop();
-      }
+  // Part of DoBeat (0x00894530).
+  // Engine addition (issue #218), test only: `/exitattick N` quits the app at game tick N the
+  // way /exitongameover does, so a scenario ends its games cleanly (the game-end telemetry
+  // record is sent on that path; mpemu's kill would skip it).
+  void CWldSession::ExitAtTickIfAsked()
+  {
+    static int sExitAtTick = -2;
+    if (sExitAtTick == -2) {
+      fa::vector<fa::string> args;
+      sExitAtTick = CFG_GetArgOption("/exitattick", 1u, &args) && !args.empty() ? std::atoi(args[0].c_str()) : -1;
     }
-
-    // Engine addition (issue #218), test only: `/exitattick N` quits the app at game tick N the
-    // way /exitongameover does, so a scenario ends its games cleanly (the game-end telemetry
-    // record is sent on that path; mpemu's kill would skip it).
-    {
-      static int sExitAtTick = -2;
-      if (sExitAtTick == -2) {
-        fa::vector<fa::string> args;
-        sExitAtTick = CFG_GetArgOption("/exitattick", 1u, &args) && !args.empty() ? std::atoi(args[0].c_str()) : -1;
-      }
-      if (sExitAtTick >= 0 && static_cast<int>(mGameTick) >= sExitAtTick) {
-        sExitAtTick = -1;
-        gpg::Logf("exitattick: quitting at game tick %d", static_cast<int>(mGameTick));
-        wxTheApp->ExitMainLoop();
-      }
+    if (sExitAtTick >= 0 && static_cast<int>(mGameTick) >= sExitAtTick) {
+      sExitAtTick = -1;
+      gpg::Logf("exitattick: quitting at game tick %d", static_cast<int>(mGameTick));
+      wxTheApp->ExitMainLoop();
     }
+  }
 
-    if (mPendingSaveData) {
-      ApplyPendingSaveData();
+  // Part of DoBeat (0x00894530).
+  // Every registered unit gets its beat. The stat is what the profiler reads
+  // as "how much work is one beat", so it is published even for an empty list.
+  void CWldSession::TickBeatUnits(const SSyncData& beat)
+  {
+    // Heap-backed on purpose. `Collect` takes the vector by its
+    // `gpg::fastvector<T>` base, and the base's grow path frees `start_`
+    // unconditionally - it has no `originalVec_` word to test against. Hand
+    // it an inline `FastVectorN` and the first push past the inline capacity
+    // calls `delete[]` on the inline buffer, which here would be a stack
+    // address. The binary gets away with an inline lane because its collect
+    // family is templated on the concrete vector type, so the grow helper it
+    // emits (sub_505BA0) reads `originalVec_` at +0x0C and skips the free.
+    // Until that template is restored, the base-typed API must be handed a
+    // vector that really does own its storage.
+    gpg::fastvector<UserEntity*> tickers;
+    auto* const spatialDb = GetEntitySpatialDbStorage();
+    (void)spatialDb->Collect(tickers, ENTITYTYPE_Unit);
+
+    const auto tickerCount = static_cast<std::int32_t>(tickers.size());
+    if (sEngineStat_UserSync_SessionTick_NumTickers == nullptr) {
+      sEngineStat_UserSync_SessionTick_NumTickers =
+        GetEngineStats()->GetItem("UserSync_SessionTick_NumTickers", true);
+      (void)sEngineStat_UserSync_SessionTick_NumTickers->Release(0);
     }
+    (void)sEngineStat_UserSync_SessionTick_NumTickers->SetInt(&tickerCount);
 
-    // Every registered unit gets its beat. The stat is what the profiler reads
-    // as "how much work is one beat", so it is published even for an empty list.
-    {
-      // Heap-backed on purpose. `Collect` takes the vector by its
-      // `gpg::fastvector<T>` base, and the base's grow path frees `start_`
-      // unconditionally - it has no `originalVec_` word to test against. Hand
-      // it an inline `FastVectorN` and the first push past the inline capacity
-      // calls `delete[]` on the inline buffer, which here would be a stack
-      // address. The binary gets away with an inline lane because its collect
-      // family is templated on the concrete vector type, so the grow helper it
-      // emits (sub_505BA0) reads `originalVec_` at +0x0C and skips the free.
-      // Until that template is restored, the base-typed API must be handed a
-      // vector that really does own its storage.
-      gpg::fastvector<UserEntity*> tickers;
-      auto* const spatialDb = GetEntitySpatialDbStorage();
-      (void)spatialDb->Collect(tickers, ENTITYTYPE_Unit);
-
-      const auto tickerCount = static_cast<std::int32_t>(tickers.size());
-      if (sEngineStat_UserSync_SessionTick_NumTickers == nullptr) {
-        sEngineStat_UserSync_SessionTick_NumTickers =
-          GetEngineStats()->GetItem("UserSync_SessionTick_NumTickers", true);
-        (void)sEngineStat_UserSync_SessionTick_NumTickers->Release(0);
-      }
-      (void)sEngineStat_UserSync_SessionTick_NumTickers->SetInt(&tickerCount);
-
-      for (std::int32_t i = 0; i < tickerCount; ++i) {
-        UserEntity* const ticker = tickers[static_cast<std::size_t>(i)];
-        ticker->Tick(beat.mCurBeat);
-      }
+    for (std::int32_t i = 0; i < tickerCount; ++i) {
+      UserEntity* const ticker = tickers[static_cast<std::size_t>(i)];
+      ticker->Tick(beat.mCurBeat);
     }
+  }
 
-    // Both weak-set drains prune as they go. The orphan walk steps the cursor
-    // before it calls out, because `OrphanUpdate` can unlink the entity it was
-    // just handed; the visibility walk steps after, because `UpdateVisibility`
-    // leaves the set alone.
-    //
-    // 0x008955F2..0x00895641: `find` from `mOrphans.mHead->mLeft`, then per
-    // entry decode (0x0066A300), advance (0x007AE7E0) and `OrphanUpdate`.
-    // 0x0089564A..0x008956D8: the same walk over `mVizUpdates`, with the
-    // successor step inlined after the `UpdateVisibility` call.
+  // Part of DoBeat (0x00894530).
+  // Both weak-set drains prune as they go. The orphan walk steps the cursor
+  // before it calls out, because `OrphanUpdate` can unlink the entity it was
+  // just handed; the visibility walk steps after, because `UpdateVisibility`
+  // leaves the set alone.
+  //
+  // 0x008955F2..0x00895641: `find` from `mOrphans.mHead->mLeft`, then per
+  // entry decode (0x0066A300), advance (0x007AE7E0) and `OrphanUpdate`.
+  // 0x0089564A..0x008956D8: the same walk over `mVizUpdates`, with the
+  // successor step inlined after the `UpdateVisibility` call.
+  void CWldSession::UpdateOrphansAndVisibility()
+  {
     for (auto orphan = mOrphans.begin(); orphan != mOrphans.end();) {
       UserEntity* const entity = *orphan;
       ++orphan;
@@ -1953,31 +2048,6 @@ namespace
       if (entity != nullptr) {
         entity->UpdateVisibility();
       }
-    }
-#if FAF_SERVER_MODE
-    if (sBeatObserver != nullptr) {
-      sBeatObserver(*this, beat.mCurBeat, sBeatObserverContext);
-    }
-#endif
-
-    AdvanceCommandIssueHelpersToBeat(*mCommandManager, beat.mCurBeat);
-
-    if (mRequestingPauseState != 0u && beat.mCurBeat - mPauseRequester >= 0) {
-      mRequestingPauseState = 0u;
-    }
-
-    CheckForNecessaryUIRefresh();
-
-    if (IUIManager* const uiManager = UI_GetManager(); uiManager != nullptr) {
-      (void)uiManager->DoBeat();
-    }
-
-    if (!beat.mSubmitArmyStats.empty()) {
-      GPGNET_SubmitArmyStats(beat.mSubmitArmyStats);
-    }
-
-    if (dbg_Metronome && USER_GetSound() != nullptr) {
-      USER_GetSound()->Play(fa::string("Tick", 4u), fa::string("TestBank", 8u));
     }
   }
 
