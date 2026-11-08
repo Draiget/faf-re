@@ -840,6 +840,7 @@ set(FAF_ENGINE_SOURCES
   moho/sim/SConditionTriggerReflection.cpp
   moho/sim/SConditionTriggerTypes.cpp
   moho/sim/STIMap.cpp
+  moho/sim/WaterBodies.cpp
   moho/sim/CArmyStatItemTypeInfo.cpp
   moho/sim/CArmyStats.cpp
   moho/app/SnapshotDirectoryDialog.cpp

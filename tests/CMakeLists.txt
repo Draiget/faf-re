@@ -210,6 +210,14 @@ set_target_properties(faf_recon_scroll_packet_tests PROPERTIES FOLDER "Tests/Exi
 add_test(NAME recon_scroll_packet COMMAND faf_recon_scroll_packet_tests)
 set_tests_properties(recon_scroll_packet PROPERTIES TIMEOUT 120 LABELS "Existing")
 
+# Engine addition: water bodies filled over a height field (.plans/water-levels/PLAN.md).
+add_executable(faf_water_bodies_tests EXCLUDE_FROM_ALL sim/WaterBodiesTests.cpp ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterBodies.cpp)
+target_include_directories(faf_water_bodies_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_water_bodies_tests PRIVATE gtest_main)
+set_target_properties(faf_water_bodies_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME water_bodies COMMAND faf_water_bodies_tests)
+set_tests_properties(water_bodies PROPERTIES LABELS "Sim")
+
 # Lua coroutine tests (coroutine.create / resume / yield / status / wrap).
 add_executable(faf_coroutine_tests EXCLUDE_FROM_ALL lua/CoroutineTests.cpp)
 target_link_libraries(faf_coroutine_tests PRIVATE faf_engine gtest_main)
