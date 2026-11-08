@@ -75,7 +75,9 @@ function OnStart(self)
             IssueMove({ lakeShip }, { 20, 3, 20 })
             WaitSeconds(20)
             local pos = lakeShip:GetPosition()
-            local fromCentre = math.sqrt((pos[1] - 88) ^ 2 + (pos[3] - 104) ^ 2)
+            -- No `^` here: this game's Lua doesn't take it as a power.
+            local dx, dz = pos[1] - 88, pos[3] - 104
+            local fromCentre = math.sqrt(dx * dx + dz * dz)
             Check('frigate stays in its lake', fromCentre < 22 and math.abs(pos[2] - 30) <= 1.0,
                 string.format('after a move to the sea: at (%.1f, %.1f) y %.2f, %.1f from the lake centre', pos[1], pos[3], pos[2], fromCentre))
         end
