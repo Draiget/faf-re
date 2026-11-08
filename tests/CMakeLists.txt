@@ -261,3 +261,11 @@ target_link_libraries(faf_damage_callback_stack_tests PRIVATE faf_engine gtest_m
 set_target_properties(faf_damage_callback_stack_tests PROPERTIES FOLDER "Tests/Sim")
 add_test(NAME damage_callback_stack COMMAND faf_damage_callback_stack_tests)
 set_tests_properties(damage_callback_stack PROPERTIES LABELS "Sim")
+
+# Header-only particle pool reclamation policy; no graphics device required.
+add_executable(faf_particle_pool_reclaim_tests EXCLUDE_FROM_ALL particles/ParticlePoolReclaimTests.cpp)
+target_include_directories(faf_particle_pool_reclaim_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_particle_pool_reclaim_tests PRIVATE gtest_main)
+set_target_properties(faf_particle_pool_reclaim_tests PROPERTIES FOLDER "Tests/Particles")
+add_test(NAME particle_pool_reclaim COMMAND faf_particle_pool_reclaim_tests)
+set_tests_properties(particle_pool_reclaim PROPERTIES LABELS "Particles")
