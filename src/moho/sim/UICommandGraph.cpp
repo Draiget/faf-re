@@ -3108,7 +3108,7 @@ namespace
     }
 
     constexpr std::int32_t kPreviewCreateColor = static_cast<std::int32_t>(0xFF00FF00u);
-    constexpr std::int32_t kPreviewTranslucentGreen = static_cast<std::int32_t>(0xD800D800u);
+    constexpr std::int32_t kPreviewTranslucentGreen = static_cast<std::int32_t>(0x8000D800u);
 
     const bool shiftDown = MAUI_KeyIsDown(MKEY_SHIFT);
     std::unordered_set<std::uint64_t> activeKeys;

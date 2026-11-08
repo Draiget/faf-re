@@ -8,6 +8,7 @@
 #include "moho/lua/SCR_Color.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/resource/ResourceManager.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/sim/CWldSession.h"
@@ -198,9 +199,26 @@ namespace moho
         gameTick = worldSession->mGameTick;
       }
 
+      boost::shared_ptr<MeshMaterial> material;
+      const LuaPlus::LuaObject shaderNameObject = meshDescriptor["ShaderName"];
+      if (!shaderNameObject.IsNil() && meshBlueprint != nullptr && meshBlueprint->mLods.begin() != meshBlueprint->mLods.end()) {
+        const RMeshBlueprintLOD* const lod = meshBlueprint->mLods.begin();
+        const fa::string shaderName(LuaStringOrEmpty(shaderNameObject));
+        const fa::string emptyTextureName{};
+        material = MeshMaterial::Create(
+          shaderName,
+          lod->mAlbedoName,
+          lod->mNormalsName,
+          lod->mSpecularName,
+          emptyTextureName,
+          emptyTextureName,
+          nullptr
+        );
+      }
+
       const Wm3::Vec3f scale{blueprintUniformScale, blueprintUniformScale, blueprintUniformScale};
       mMeshInstance = meshRenderer != nullptr
-        ? meshRenderer->CreateMeshInstance(gameTick, color, meshBlueprint, scale, false, boost::shared_ptr<MeshMaterial>())
+        ? meshRenderer->CreateMeshInstance(gameTick, color, meshBlueprint, scale, false, material)
         : nullptr;
     }
 

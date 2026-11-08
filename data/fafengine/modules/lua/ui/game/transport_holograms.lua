@@ -138,7 +138,8 @@ function TransportHolograms:CreateHologramMesh(unit, worldPos)
     local ok, err = pcall(function()
         mesh:SetMesh({
             BlueprintID = bpId,
-            Color = '7733ccff',
+            ShaderName = 'UnitPlace',
+            Color = '6633ccff',
         })
     end)
     if not ok then
@@ -148,7 +149,7 @@ function TransportHolograms:CreateHologramMesh(unit, worldPos)
 
     -- Translucent holographic cyan tint (ARGB: 0x7733ccff)
     if mesh.SetColor then
-        pcall(mesh.SetColor, mesh, '7733ccff')
+        pcall(mesh.SetColor, mesh, '6633ccff')
     end
     if mesh.SetStance then
         pcall(mesh.SetStance, mesh, worldPos)
@@ -207,9 +208,9 @@ function TransportHolograms:Update()
 
         if holo.mesh and holo.mesh.SetColor then
             if isSel then
-                pcall(holo.mesh.SetColor, holo.mesh, 'ddffff66') -- Bright golden cyan for selected
+                pcall(holo.mesh.SetColor, holo.mesh, '88ffff66') -- Bright golden cyan for selected
             else
-                pcall(holo.mesh.SetColor, holo.mesh, '7733ccff') -- Normal cyan hologram
+                pcall(holo.mesh.SetColor, holo.mesh, '6633ccff') -- Normal cyan hologram
             end
         end
     end
