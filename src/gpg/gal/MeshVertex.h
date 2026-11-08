@@ -108,6 +108,28 @@ namespace gpg::gal
     static_assert(offsetof(PackedHardwareVertex, boneIndices) == 0x20, "PackedHardwareVertex::boneIndices offset must be 0x20");
     static_assert(sizeof(PackedHardwareVertex) == 0x24, "PackedHardwareVertex size must be 0x24");
 
+    /** Engine addition: the gal vertex format of `PackedWideUvHardwareVertex`. Stream 1 is format 14's. */
+    inline constexpr std::uint32_t kPackedWideUvHardwareVertexFormat = 24U;
+
+    /**
+     * Engine addition (ren_MeshPackedVertices): `PackedHardwareVertex` with the texture coordinates kept
+     * as floats, for a mesh with unit directions whose texture coordinates leave 0 to 1 (map borders,
+     * tiled panels). 44 bytes instead of 72, and every texture coordinate exact.
+     */
+    struct PackedWideUvHardwareVertex
+    {
+        float position[3];            // +0x00 POSITION (R32G32B32_FLOAT)
+        std::int8_t normal[4];        // +0x0C NORMAL (R8G8B8A8_SNORM)
+        std::int8_t tangent[4];       // +0x10 TANGENT
+        std::int8_t binormal[4];      // +0x14 BINORMAL
+        float texCoords[4];           // +0x18 TEXCOORD0 (R32G32B32A32_FLOAT)
+        std::uint8_t boneIndices[4];  // +0x28 BLENDINDICES0-3
+    };
+
+    static_assert(offsetof(PackedWideUvHardwareVertex, texCoords) == 0x18, "PackedWideUvHardwareVertex::texCoords offset must be 0x18");
+    static_assert(offsetof(PackedWideUvHardwareVertex, boneIndices) == 0x28, "PackedWideUvHardwareVertex::boneIndices offset must be 0x28");
+    static_assert(sizeof(PackedWideUvHardwareVertex) == 0x2C, "PackedWideUvHardwareVertex size must be 0x2C");
+
     /**
      * Vertex format 14, stream 1: the full-precision per-instance record
      * (stride 0x4C).

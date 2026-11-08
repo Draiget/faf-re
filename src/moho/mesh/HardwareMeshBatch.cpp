@@ -497,28 +497,36 @@ namespace moho
     bool ren_MeshPackedVertices = true;
     TConVar<bool> gTConVar_ren_MeshPackedVertices(
       "ren_MeshPackedVertices",
-      "Direct3D 12 / Vulkan: a static mesh vertex takes 36 bytes where its values fit (1, the default), or 72 (0). Read when "
-      "a mesh's batch is created.",
+      "Direct3D 12 / Vulkan: a static mesh vertex takes 36 bytes where its values fit, 44 where its texture coordinates leave "
+      "0 to 1 (1, the default), or 72 (0). Read when a mesh's batch is created.",
       &ren_MeshPackedVertices
     );
 
-    /// Whether every direction is within a unit's range and every texture coordinate from 0 to 1.
-    [[nodiscard]] bool VerticesFitPacked(const SScmVertex* const vertices, const std::int32_t count)
+    /// The static vertex layout a mesh's values allow.
+    enum class PackedLayout
+    {
+      None,   ///< a direction is longer than one: `HardwareVertex`, 72 bytes
+      Wide,   ///< unit directions, a texture coordinate outside 0 to 1: `PackedWideUvHardwareVertex`, 44 bytes
+      Narrow, ///< unit directions, texture coordinates from 0 to 1: `PackedHardwareVertex`, 36 bytes
+    };
+
+    [[nodiscard]] PackedLayout LayoutVerticesFit(const SScmVertex* const vertices, const std::int32_t count)
     {
       constexpr float kDirectionLimit = 1.001f;
       const auto directionFits = [](const float* const direction) {
         return std::abs(direction[0]) <= kDirectionLimit && std::abs(direction[1]) <= kDirectionLimit && std::abs(direction[2]) <= kDirectionLimit;
       };
       const auto texCoordFits = [](const float value) { return value >= 0.0f && value <= 1.0f; };
+      bool texCoordsFit = true;
       for (std::int32_t index = 0; index < count; ++index) {
         const SScmVertex& vertex = vertices[index];
-        if (!directionFits(vertex.mNormal) || !directionFits(vertex.mTangent) || !directionFits(vertex.mBinormal) ||
-            !texCoordFits(vertex.mTexCoord0[0]) || !texCoordFits(vertex.mTexCoord0[1]) ||
-            !texCoordFits(vertex.mTexCoord1[0]) || !texCoordFits(vertex.mTexCoord1[1])) {
-          return false;
+        if (!directionFits(vertex.mNormal) || !directionFits(vertex.mTangent) || !directionFits(vertex.mBinormal)) {
+          return PackedLayout::None;
         }
+        texCoordsFit = texCoordsFit && texCoordFits(vertex.mTexCoord0[0]) && texCoordFits(vertex.mTexCoord0[1]) &&
+          texCoordFits(vertex.mTexCoord1[0]) && texCoordFits(vertex.mTexCoord1[1]);
       }
-      return true;
+      return texCoordsFit ? PackedLayout::Narrow : PackedLayout::Wide;
     }
 
     void PackDirection(std::int8_t* const packed, const float* const direction)
@@ -535,17 +543,23 @@ namespace moho
     }
 
     /// Every 256 meshes, how many vertices went in which format, for the memory this saves.
-    void NotePackedVertices(const bool packed, const std::int32_t vertexCount)
+    void NotePackedVertices(const PackedLayout layout, const std::int32_t vertexCount)
     {
-      static std::uint32_t meshes[2] = {0U, 0U};
-      static std::uint64_t vertices[2] = {0U, 0U};
-      ++meshes[packed ? 1 : 0];
-      vertices[packed ? 1 : 0] += static_cast<std::uint64_t>(vertexCount);
-      if (((meshes[0] + meshes[1]) & 0xFFU) == 0U) {
+      static std::uint32_t meshes[3] = {0U, 0U, 0U};
+      static std::uint64_t vertices[3] = {0U, 0U, 0U};
+      const auto slot = static_cast<std::size_t>(layout);
+      ++meshes[slot];
+      vertices[slot] += static_cast<std::uint64_t>(vertexCount);
+      if (((meshes[0] + meshes[1] + meshes[2]) & 0xFFU) == 0U) {
+        constexpr double kMegabyte = 1024.0 * 1024.0;
+        const double saved =
+          (static_cast<double>(vertices[2]) * (sizeof(gpg::gal::HardwareVertex) - sizeof(gpg::gal::PackedHardwareVertex)) +
+           static_cast<double>(vertices[1]) * (sizeof(gpg::gal::HardwareVertex) - sizeof(gpg::gal::PackedWideUvHardwareVertex))) /
+          kMegabyte;
         gpg::Logf(
-          "Mesh vertices: %u meshes packed (%llu vertices, %.1f MB saved), %u kept the original format (%llu vertices)", meshes[1],
-          static_cast<unsigned long long>(vertices[1]),
-          static_cast<double>(vertices[1]) * (sizeof(gpg::gal::HardwareVertex) - sizeof(gpg::gal::PackedHardwareVertex)) / (1024.0 * 1024.0),
+          "Mesh vertices: %u meshes packed (%llu vertices), %u packed with float texture coordinates (%llu vertices), %.1f MB saved; "
+          "%u kept the original format (%llu vertices)",
+          meshes[2], static_cast<unsigned long long>(vertices[2]), meshes[1], static_cast<unsigned long long>(vertices[1]), saved,
           meshes[0], static_cast<unsigned long long>(vertices[0])
         );
       }
@@ -691,16 +705,29 @@ namespace moho
     const SScmVertex* const sourceVertices = scm_file::GetVertices(*mesh);
 
     // Engine change (ren_MeshPackedVertices): half the memory on the renderers that take the packed format.
-    // A mesh whose values don't fit it keeps the original format.
+    // A mesh whose texture coordinates leave 0 to 1 keeps them as floats (44 bytes); one with a direction
+    // longer than one keeps the original format.
     const gpg::gal::DeviceApi deviceApi = deviceContext->mDeviceType;
-    const bool packedVertices = ren_MeshPackedVertices &&
-      (deviceApi == gpg::gal::DeviceApi::Direct3D12 || deviceApi == gpg::gal::DeviceApi::Vulkan) &&
-      VerticesFitPacked(sourceVertices, mVertexCount);
-    NotePackedVertices(packedVertices, mVertexCount);
-    mVertexFormat = packedVertices ? device->CreateVertexFormat(gpg::gal::kPackedHardwareVertexFormat) : formatter->CreateVertexFormat(0);
-
-    const std::uint32_t vertexStride =
-      packedVertices ? static_cast<std::uint32_t>(sizeof(gpg::gal::PackedHardwareVertex)) : formatter->GetVertexStride(0, 0);
+    const PackedLayout layout = (ren_MeshPackedVertices &&
+                                 (deviceApi == gpg::gal::DeviceApi::Direct3D12 || deviceApi == gpg::gal::DeviceApi::Vulkan))
+      ? LayoutVerticesFit(sourceVertices, mVertexCount)
+      : PackedLayout::None;
+    NotePackedVertices(layout, mVertexCount);
+    std::uint32_t vertexStride = 0U;
+    switch (layout) {
+    case PackedLayout::Narrow:
+      mVertexFormat = device->CreateVertexFormat(gpg::gal::kPackedHardwareVertexFormat);
+      vertexStride = static_cast<std::uint32_t>(sizeof(gpg::gal::PackedHardwareVertex));
+      break;
+    case PackedLayout::Wide:
+      mVertexFormat = device->CreateVertexFormat(gpg::gal::kPackedWideUvHardwareVertexFormat);
+      vertexStride = static_cast<std::uint32_t>(sizeof(gpg::gal::PackedWideUvHardwareVertex));
+      break;
+    case PackedLayout::None:
+      mVertexFormat = formatter->CreateVertexFormat(0);
+      vertexStride = formatter->GetVertexStride(0, 0);
+      break;
+    }
 
     gpg::gal::VertexBufferContext vertexContext;
     vertexContext.vertexCount_ = static_cast<std::uint32_t>(mVertexCount);
@@ -716,7 +743,26 @@ namespace moho
     for (std::int32_t vertexIndex = 0; vertexIndex < mVertexCount; ++vertexIndex) {
       const SScmVertex& source = sourceVertices[vertexIndex];
 
-      if (packedVertices) {
+      if (layout == PackedLayout::Wide) {
+        auto& packed = *reinterpret_cast<gpg::gal::PackedWideUvHardwareVertex*>(mappedVertices);
+        packed.position[0] = source.mLocalPositionX;
+        packed.position[1] = source.mLocalPositionY;
+        packed.position[2] = source.mLocalPositionZ;
+        PackDirection(packed.normal, source.mNormal);
+        PackDirection(packed.tangent, source.mTangent);
+        PackDirection(packed.binormal, source.mBinormal);
+        packed.texCoords[0] = source.mTexCoord0[0];
+        packed.texCoords[1] = source.mTexCoord0[1];
+        packed.texCoords[2] = source.mTexCoord1[0];
+        packed.texCoords[3] = source.mTexCoord1[1];
+        packed.boneIndices[0] = source.mBoneIndex;
+        packed.boneIndices[1] = source.mBoneIndex1;
+        packed.boneIndices[2] = source.mBoneIndex2;
+        packed.boneIndices[3] = source.mBoneIndex3;
+        mappedVertices += vertexStride;
+        continue;
+      }
+      if (layout == PackedLayout::Narrow) {
         auto& packed = *reinterpret_cast<gpg::gal::PackedHardwareVertex*>(mappedVertices);
         packed.position[0] = source.mLocalPositionX;
         packed.position[1] = source.mLocalPositionY;
