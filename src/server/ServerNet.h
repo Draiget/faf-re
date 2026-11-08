@@ -47,6 +47,8 @@ namespace faf::server
      * 0: only the channel's timeout.
      */
     double lobbyAwaySeconds = 6.0;
+    /** Plan WP17.1: the match file's `MatchLobbyControl`: organised (WPR.49's rules) or player-hosted. */
+    ELobbyControl lobbyControl = ELobbyControl::Organiser;
   };
 
   class CServerNet final : private remote::net::CServerLinks::IEvents
@@ -118,6 +120,8 @@ namespace faf::server
     [[nodiscard]] std::vector<SPresence> TakeLobbyPresence();
     /** At launch (plan WPR.51): the relay takes nothing more. From any thread. */
     void CloseLobby() noexcept { mCloseLobby.store(true, std::memory_order_relaxed); }
+    /** Plan WP17.1: the current logical host (0: none), from the lobby's succession; its ejects go through in a player-hosted lobby. */
+    void SetLobbyHost(const std::int32_t uid) noexcept { mLobbyHost.store(uid, std::memory_order_relaxed); }
     /** Before `Start` (plan WPR.49): the game options the match pins (`CLobbyRelay::PinOptions`). */
     void PinLobbyOptions(SPinnedOptions pinned) { mLobby.PinOptions(std::move(pinned)); }
     /** Forwarded lobby messages whose pinned options were written back; after `Stop`. */
@@ -235,6 +239,7 @@ namespace faf::server
     CLobbyRelay mLobby;                        // on the network thread
     std::vector<std::uint8_t> mLobbyFrame;     // the frame being relayed
     std::atomic<bool> mCloseLobby{false};
+    std::atomic<std::int32_t> mLobbyHost{0};
     std::uint64_t mLobbyUndelivered = 0;       // relayed to a participant with no channel
     std::vector<SLobbyMessage> mLobbyIn;       // for the host; under mNewsLock
     std::vector<std::int32_t> mLobbyLeft;      // likewise

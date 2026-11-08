@@ -740,6 +740,55 @@ TEST(LobbyRelay, EjectsOfParticipantsNeverArrive)
             ELobbyRelayVerdict::Forward);
 }
 
+// Plan WP17.1: a player-hosted lobby's host keeps a host's powers; nobody else gets them.
+TEST(LobbyRelay, PlayerHostedLobbyLetsOnlyTheHostEject)
+{
+  CLobbyRelay relay;
+  relay.SetControl(faf::server::ELobbyControl::Player);
+  relay.AddParticipant(1001);
+  relay.AddParticipant(1002);
+  relay.AddParticipant(1003);
+  const std::vector<std::uint8_t> reason = {'K', 'i', 'c', 'k', 0u};
+  const std::vector<std::uint8_t> kick = LobbyMessage(moho::ELobbyMsg::LOBMSG_Rejected, reason);
+  // No host known yet: dropped.
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, kick), 1u).verdict, ELobbyRelayVerdict::EjectIgnored);
+  relay.SetHost(1001);
+  const SRelayed fromHost = Relay(relay, 1001, LobbyBody(1002, kick), 1u);
+  EXPECT_EQ(fromHost.verdict, ELobbyRelayVerdict::EjectForwarded);
+  EXPECT_EQ(fromHost.to, 1002);
+  EXPECT_EQ(fromHost.message, kick);
+  // Another participant can't eject, the host's notice to the others goes, and after a succession the old host can't.
+  EXPECT_EQ(Relay(relay, 1003, LobbyBody(1002, kick), 1u).verdict, ELobbyRelayVerdict::EjectIgnored);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1003, LobbyMessage(moho::ELobbyMsg::LOBMSG_DeletePeer, {0xEAu, 0x03u, 0u, 0u})), 1u).verdict,
+            ELobbyRelayVerdict::EjectForwarded);
+  relay.SetHost(1003);
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, kick), 1u).verdict, ELobbyRelayVerdict::EjectIgnored);
+  EXPECT_EQ(Relay(relay, 1003, LobbyBody(1002, kick), 1u).verdict, ELobbyRelayVerdict::EjectForwarded);
+  EXPECT_EQ(relay.Count(ELobbyRelayVerdict::EjectIgnored), 3u);
+  EXPECT_EQ(relay.Count(ELobbyRelayVerdict::EjectForwarded), 3u);
+
+  // Nothing is pinned in a player-hosted lobby: the host's options go as sent.
+  relay.PinOptions({{"Victory", LuaBytes(LuaString("demoralization"))}});
+  const std::vector<std::uint8_t> payload = LuaBytes(
+    LuaTable({{LuaString("Type"), LuaString("GameOptions")}, {LuaString("Options"), LuaTable({{LuaString("Victory"), LuaString("sandbox")}})}})
+  );
+  const std::vector<std::uint8_t> options = LobbyMessage(moho::ELobbyMsg::LOBMSG_BroadcastScriptData, payload);
+  const SRelayed sent = Relay(relay, 1003, LobbyBody(1002, options), 1u);
+  ASSERT_EQ(sent.verdict, ELobbyRelayVerdict::Forward);
+  EXPECT_EQ(std::vector<std::uint8_t>(sent.frame.begin() + 3, sent.frame.end()), options);
+  EXPECT_EQ(relay.OptionsPinned(), 0u);
+}
+
+TEST(LobbyRelay, ReadsTheLobbyControl)
+{
+  EXPECT_EQ(faf::server::ReadLobbyControl("organiser"), faf::server::ELobbyControl::Organiser);
+  EXPECT_EQ(faf::server::ReadLobbyControl("player"), faf::server::ELobbyControl::Player);
+  EXPECT_FALSE(faf::server::ReadLobbyControl("Player").has_value());
+  EXPECT_FALSE(faf::server::ReadLobbyControl("").has_value());
+  // Organised is the default: WPR.49's rules hold unless the match says otherwise.
+  EXPECT_EQ(CLobbyRelay().Control(), faf::server::ELobbyControl::Organiser);
+}
+
 TEST(LobbyRelay, ScriptDataCarriesThePinnedOptions)
 {
   CLobbyRelay relay;

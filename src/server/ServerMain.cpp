@@ -504,6 +504,23 @@ namespace
     return true;
   }
 
+  /** Plan WP17.1: the match file's `MatchLobbyControl` ("organiser", "player"); "organiser" without one. */
+  [[nodiscard]] bool ReadLobbyControl(LuaPlus::LuaState* const state, faf::server::ELobbyControl& control, std::string& error)
+  {
+    const LuaPlus::LuaObject text = state->GetGlobal("MatchLobbyControl");
+    control = faf::server::ELobbyControl::Organiser;
+    if (text.IsNil()) {
+      return true;
+    }
+    const std::optional<faf::server::ELobbyControl> read = text.IsString() ? faf::server::ReadLobbyControl(text.GetString()) : std::nullopt;
+    if (!read) {
+      error = "MatchLobbyControl is \"organiser\" or \"player\"";
+      return false;
+    }
+    control = *read;
+    return true;
+  }
+
   /** What to call the game: the match file's `MatchName`, or the map's name without its `<LOC id>`. */
   [[nodiscard]] std::string ReadMatchTitle(const LuaPlus::LuaObject& config, LuaPlus::LuaState* const state)
   {
@@ -656,6 +673,10 @@ namespace
     if (ReadOption("--lobby-away-seconds", text)) {
       netConfig.lobbyAwaySeconds = std::atof(text.c_str());
     }
+    if (!ReadLobbyControl(state, netConfig.lobbyControl, end.error)) {
+      Say("Can't host: %s", end.error.c_str());
+      return kExitBadInput;
+    }
 
     moho::CLaunchRoster roster(kServerUid, kServerName, {});
     // As a lockstep game's host launches it: each player may pause as often as the match's `Timeouts` says
@@ -733,6 +754,9 @@ namespace
       }
       if (lobbySeconds <= 0.0) {
         net->CloseLobby(); // the game starts at once: nothing to relay (plan WPR.51)
+      } else if (netConfig.lobbyControl == faf::server::ELobbyControl::Player) {
+        // Plan WP17.1: a player hosts with a host's powers: nothing pinned, and the host's ejects go through.
+        Say("Lobby: hosted by a player (MatchLobbyControl \"player\"): the host may change game options and eject");
       } else {
         faf::server::SPinnedOptions pinned = ReadPinnedOptions(state, config);
         std::string keys;
@@ -759,6 +783,7 @@ namespace
           signaller.AddParticipant(client.uid, client.name.c_str());
         }
         Say("Lobby open for %.0f s, hosted by uid %d", lobbySeconds, static_cast<int>(signaller.Host()));
+        net->SetLobbyHost(signaller.Host()); // plan WP17.1: whose ejects go through in a player-hosted lobby
         const Clock::time_point lobbyEnd = Clock::now() + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(lobbySeconds));
         std::vector<faf::server::CLobbySignaller::SOutgoing> out;
         std::size_t lastIn = 0;
@@ -832,6 +857,7 @@ namespace
           if (const std::int32_t host = signaller.Host(); host != lastHost && host != 0) {
             Say("Lobby: uid %d hosts now, in place of uid %d (succession %u)", static_cast<int>(host), static_cast<int>(lastHost), signaller.Successions());
             lastHost = host;
+            net->SetLobbyHost(host);
           }
           if (const std::size_t in = signaller.InLobby(); in != lastIn) {
             lastIn = in;

@@ -6,6 +6,7 @@
 #include <span>
 #include <utility>
 
+#include "moho/net/ELobbyMsg.h"
 #include "remote/ServerClient.h"
 #include "remote/net/Datagram.h"
 
@@ -43,7 +44,9 @@ namespace faf::server
 
   CServerNet::CServerNet(const SServerNetConfig& config)
     : mConfig(config)
-  {}
+  {
+    mLobby.SetControl(config.lobbyControl);
+  }
 
   CServerNet::~CServerNet()
   {
@@ -90,6 +93,7 @@ namespace faf::server
     while (!mStop.load(std::memory_order_relaxed)) {
       mNowUs = NowUs();
       // Time since the start, as a cookie's period counts from 0.
+      mLobby.SetHost(mLobbyHost.load(std::memory_order_relaxed));
       if (mLobby.Open() && mCloseLobby.load(std::memory_order_relaxed)) {
         mLobby.Close();
       }
@@ -504,6 +508,7 @@ namespace faf::server
            std::to_string(mLobby.Count(ELobbyRelayVerdict::TooLarge)) + " too large, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::Closed)) + " after launch, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::EjectIgnored)) + " ejects of participants, " +
+           std::to_string(mLobby.Count(ELobbyRelayVerdict::EjectForwarded)) + " ejects by a player host relayed, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::UnknownSender) + mLobby.Count(ELobbyRelayVerdict::UnknownTarget) +
                           mLobby.Count(ELobbyRelayVerdict::Malformed)) +
            " malformed or misaddressed; " + std::to_string(mLobby.OptionsPinned()) + " relayed with the match's pinned options written back; " +
@@ -648,9 +653,16 @@ namespace faf::server
       std::span<const std::uint8_t> lobbyMessage;
       const ELobbyRelayVerdict verdict =
         mLobby.Take(uid, std::span<const std::uint8_t>(message).subspan(1), mNowUs, to, mLobbyFrame, lobbyMessage);
-      if (verdict == ELobbyRelayVerdict::Forward) {
+      if (verdict == ELobbyRelayVerdict::Forward || verdict == ELobbyRelayVerdict::EjectForwarded) {
         if (!mLinks.SendReliable(to, mLobbyFrame.data(), mLobbyFrame.size())) {
           ++mLobbyUndelivered;
+        }
+        // Plan WP17.1: a player-hosted lobby's host rejected a participant (`CLobby::KickPeer`): they're out of the match.
+        // (`LOBMSG_DeletePeer` tells the others; it takes nobody out by itself.)
+        if (verdict == ELobbyRelayVerdict::EjectForwarded && lobbyMessage[0] == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_Rejected)) {
+          if (const auto ejected = mSeats.find(to); ejected != mSeats.end() && !ejected->second.gone) {
+            Remove(to, ejected->second, "ejected by the lobby's host, " + seat.name);
+          }
         }
       } else if (verdict == ELobbyRelayVerdict::ToServer) {
         const std::scoped_lock lock(mNewsLock);
