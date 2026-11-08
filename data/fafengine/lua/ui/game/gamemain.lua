@@ -25,15 +25,20 @@ local Holograms = nil
 local function GetHolograms()
     if not Holograms then
         local ok, mod = pcall(import, '/fafengine/modules/lua/ui/game/transport_holograms.lua')
-        if ok and mod then Holograms = mod end
+        if ok and type(mod) == 'table' then
+            Holograms = mod
+        end
     end
     return Holograms
 end
 
 local function OnHologramBeat()
     local holo = GetHolograms()
-    if holo and holo.Update then
-        pcall(holo.Update, holo)
+    if holo then
+        local updateFn = rawget(holo, 'Update')
+        if updateFn then
+            pcall(updateFn)
+        end
     end
 end
 
@@ -54,10 +59,11 @@ function OnSelectionChanged(oldSelection, newSelection, added, removed)
     end
     if newSelection and table.getn(newSelection) > 0 then
         local holo = GetHolograms()
-        if holo and holo.RegisterTransport then
+        local regFn = holo and rawget(holo, 'RegisterTransport')
+        if regFn then
             for _, u in ipairs(newSelection) do
                 if u and u.IsInCategory and u:IsInCategory('TRANSPORTATION') then
-                    holo:RegisterTransport(u)
+                    pcall(regFn, u)
                 end
             end
         end

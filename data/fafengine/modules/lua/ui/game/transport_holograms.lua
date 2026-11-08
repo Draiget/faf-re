@@ -6,18 +6,12 @@ local WorldMesh = nil
 local function GetWorldMeshClass()
     if not WorldMesh then
         local ok, mod = pcall(import, '/lua/ui/controls/worldmesh.lua')
-        if ok and mod and mod.WorldMesh then
+        if ok and type(mod) == 'table' and rawget(mod, 'WorldMesh') then
             WorldMesh = mod.WorldMesh
         end
     end
     return WorldMesh
 end
-
-local TransportHolograms = {
-    _trackedTransports = {}, -- [entityId] = transport UserUnit
-    _activeHolograms = {},   -- [hologramId] = { mesh, unit, transport, position = {x,y,z}, radius }
-    _nextHologramId = 1,
-}
 
 local function SafeGet(tbl, key)
     if type(tbl) ~= 'table' then return nil end
@@ -73,6 +67,12 @@ local function FindUnloadWaypoint(transport)
     end
     return nil
 end
+
+TransportHolograms = {
+    _trackedTransports = {}, -- [entityId] = transport UserUnit
+    _activeHolograms = {},   -- [hologramId] = { mesh, unit, transport, position = {x,y,z}, radius }
+    _nextHologramId = 1,
+}
 
 function TransportHolograms:RegisterTransport(transport)
     if not transport or not transport.GetEntityId then return end
@@ -352,4 +352,23 @@ function TransportHolograms:HandleWorldDrag(view, minX, minY, maxX, maxY, isShif
     return false
 end
 
-return TransportHolograms
+-- Export module functions directly to module table
+function Update()
+    TransportHolograms:Update()
+end
+
+function HandleWorldClick(view, event)
+    return TransportHolograms:HandleWorldClick(view, event)
+end
+
+function HandleWorldDrag(view, minX, minY, maxX, maxY, isShift)
+    return TransportHolograms:HandleWorldDrag(view, minX, minY, maxX, maxY, isShift)
+end
+
+function RegisterTransport(transport)
+    TransportHolograms:RegisterTransport(transport)
+end
+
+function ClearAll()
+    TransportHolograms:ClearAll()
+end
