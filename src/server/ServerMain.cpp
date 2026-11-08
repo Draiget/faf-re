@@ -810,6 +810,18 @@ namespace
         source.mTimeouts = -1;
       }
     }
+    // Plan WP15.4 (#200): each player's pause budget stays with the server, by command source; the sim gets unlimited.
+    std::map<std::uint32_t, int> pauseBudgets;
+    const auto takePauseBudgets = [&pauseBudgets](moho::SLaunchBuild& launch) {
+      pauseBudgets.clear();
+      for (moho::SSTICommandSource& source : launch.launchInfo->mCommandSources.mSrcs) {
+        if (source.mIndex != launch.localSourceId) {
+          pauseBudgets[source.mIndex] = source.mTimeouts;
+          source.mTimeouts = -1;
+        }
+      }
+    };
+    takePauseBudgets(build);
     end.title = ReadMatchTitle(config, state);
     end.map = build.mapName.c_str();
     end.players = ReadPlayers(config);
@@ -944,10 +956,17 @@ namespace
       }
     };
     const std::map<std::int32_t, std::string> tokens = ReadTokens(state);
+    std::map<std::uint32_t, faf::remote::CServerClient*> pauseSeats; // plan WP15.4: by command source
+    std::map<std::int32_t, std::uint32_t> pauseSources;              // and each uid's source
     for (const moho::SLaunchClient& client : roster.Remotes()) {
       faf::remote::CServerClient& seat = faf::remote::CServerClient::Create(
         *static_cast<moho::CClientManagerImpl*>(sessionInfo->mClientManager), client.name.c_str(), client.clientIndex, client.uid, client.commandSource
       );
+      pauseSeats[client.commandSource] = &seat;
+      pauseSources[client.uid] = client.commandSource;
+      if (const auto budget = pauseBudgets.find(client.commandSource); budget != pauseBudgets.end() && budget->second == 0) {
+        seat.SetPauseAllowed(false);
+      }
       if (!net) {
         seat.MarkLoaded();
         continue;
@@ -1036,7 +1055,12 @@ namespace
             }
           }
           build = std::move(rebuilt);
+          takePauseBudgets(build); // the options may set another `Timeouts`
           sessionInfo->mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
+          for (const auto& [source, seat] : pauseSeats) {
+            const auto budget = pauseBudgets.find(source);
+            seat->SetPauseAllowed(budget == pauseBudgets.end() || budget->second != 0);
+          }
           return {};
         };
         while (!launched && Clock::now() < lobbyEnd && gStopSignal == 0) {
@@ -1453,6 +1477,25 @@ namespace
             }
           } else if (request.op == "force_start") {
             control->Refuse(request.id, "the game has started");
+          } else if (request.op == "extend_timeouts") {
+            // Plan WP15.4 (#200): more pauses for one player.
+            const auto source = pauseSources.find(static_cast<std::int32_t>(request.uid));
+            const auto budget = source == pauseSources.end() ? pauseBudgets.end() : pauseBudgets.find(source->second);
+            if (budget == pauseBudgets.end()) {
+              control->Refuse(request.id, "no player with uid " + std::to_string(request.uid));
+            } else if (request.count <= 0 || request.count > 1000) {
+              control->Refuse(request.id, "extend_timeouts takes a count from 1 to 1000");
+            } else if (budget->second < 0) {
+              control->Refuse(request.id, "that player's pauses are unlimited already");
+            } else {
+              budget->second += static_cast<int>(request.count);
+              if (const auto seat = pauseSeats.find(budget->first); seat != pauseSeats.end()) {
+                seat->second->SetPauseAllowed(true);
+              }
+              Say("The control service gives uid %lld %lld more pause%s: %d left", static_cast<long long>(request.uid),
+                  static_cast<long long>(request.count), request.count == 1 ? "" : "s", budget->second);
+              control->Reply(request.id, "\"left\":" + std::to_string(budget->second));
+            }
           } else if (request.op == "end") {
             // Plan WP15.4 (#200): the organiser ends the game now, with each army's result if given ("1=victory,2=defeat",
             // army numbers from 1 as the sim's `GameResult` has them). With results it counts as ended; without, as stopped.
@@ -1609,6 +1652,19 @@ namespace
             Say("Game paused by %s, at game time %s", sources[static_cast<std::size_t>(packet->mPausedBy)].mName.c_str(), GameClockText(end.lastBeat - pausedBeats).c_str());
           } else {
             Say("Game paused, at game time %s", GameClockText(end.lastBeat - pausedBeats).c_str());
+          }
+          // Plan WP15.4: the pause a player's budget pays for, as the sim would have spent it (only from running to paused).
+          if (pausedBy == -1 && packet->mPausedBy != -1) {
+            const auto source = static_cast<std::uint32_t>(packet->mPausedBy);
+            if (const auto budget = pauseBudgets.find(source); budget != pauseBudgets.end() && budget->second > 0) {
+              --budget->second;
+              if (budget->second == 0) {
+                if (const auto seat = pauseSeats.find(source); seat != pauseSeats.end()) {
+                  seat->second->SetPauseAllowed(false);
+                }
+              }
+              Say("%s has %d pause%s left", source < sources.size() ? sources[static_cast<std::size_t>(source)].mName.c_str() : "a player", budget->second, budget->second == 1 ? "" : "s");
+            }
           }
           pausedBy = packet->mPausedBy;
           if (operatorPauseWanted && *operatorPauseWanted == (pausedBy != -1)) {

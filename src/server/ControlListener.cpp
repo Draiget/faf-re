@@ -207,6 +207,8 @@ namespace faf::server
           request.id = number;
         } else if (isNumber && key == "uid") {
           request.uid = number;
+        } else if (isNumber && key == "count") {
+          request.count = number;
         }
       }
       SkipSpace(text, at);

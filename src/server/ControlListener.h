@@ -27,6 +27,7 @@ namespace faf::server
     std::string address;
     std::string options; // "Key=Value,Key=Value": `set_options`
     std::string results; // "1=victory,2=defeat": `end`, by army number from 1
+    std::int64_t count = 0; // `extend_timeouts`
   };
 
   /** A flat JSON object's request fields; nothing when it isn't one, or has no `op`. */

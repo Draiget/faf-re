@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -63,6 +64,12 @@ namespace faf::remote
 
     void SetBeatHook(BeatHook hook);
 
+    /**
+     * Plan WP15.4 (#200): whether its player may still pause. The server keeps each seat's pause budget (the sim's own is
+     * unlimited, so replays need nothing new) and closes this at 0; `ReceiveCommand` then refuses `CMDST_RequestPause`.
+     */
+    void SetPauseAllowed(const bool allowed) noexcept { mPauseAllowed.store(allowed, std::memory_order_relaxed); }
+
     [[nodiscard]] std::uint64_t Refused(moho::ECmdStreamOp op) const noexcept
     {
       const auto index = static_cast<std::size_t>(op);
@@ -77,5 +84,6 @@ namespace faf::remote
 
     BeatHook mBeatHook;
     std::array<std::uint64_t, kOpCount> mRefused{};
+    std::atomic<bool> mPauseAllowed{true};
   };
 } // namespace faf::remote

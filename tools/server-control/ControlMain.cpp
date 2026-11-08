@@ -2,7 +2,7 @@
 // for operators and tests. Linux.
 //
 //   faf_server_control --server <ip:port> --key <file> --op <status|force_start|pause|resume|eject|allow|disallow>
-//                      [--uid <n>] [--reason <text>] [--address <a.b.c.d>] [--options <Key=Value,...>] [--results <army=victory|defeat|draw,...>] [--watch <seconds>] [--wrong-key]
+//                      [--uid <n>] [--reason <text>] [--address <a.b.c.d>] [--options <Key=Value,...>] [--results <army=victory|defeat|draw,...>] [--count <n>] [--watch <seconds>] [--wrong-key]
 //
 // Prints the reply, then the events (the server's console lines) until --watch seconds have passed. --wrong-key flips
 // one bit of the key, to check the server refuses it. Exit: 0 the request was answered ok, 1 refused, 2 no
@@ -81,6 +81,7 @@ int main(int argc, char** argv)
   std::string optionsText;
   std::string resultsText;
   long long uid = 0;
+  long long count = 0;
   double watch = 0.0;
   bool wrongKey = false;
   for (int i = 1; i < argc; ++i) {
@@ -102,6 +103,8 @@ int main(int argc, char** argv)
       op = value;
     } else if (name == "--uid") {
       uid = std::atoll(value.c_str());
+    } else if (name == "--count") {
+      count = std::atoll(value.c_str());
     } else if (name == "--reason") {
       reason = value;
     } else if (name == "--address") {
@@ -160,6 +163,9 @@ int main(int argc, char** argv)
   std::string request = "{\"id\":1,\"op\":" + Quote(op);
   if (uid != 0) {
     request += ",\"uid\":" + std::to_string(uid);
+  }
+  if (count != 0) {
+    request += ",\"count\":" + std::to_string(count);
   }
   if (!reason.empty()) {
     request += ",\"reason\":" + Quote(reason);
