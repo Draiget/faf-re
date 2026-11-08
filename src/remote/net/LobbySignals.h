@@ -41,6 +41,7 @@ namespace faf::remote::net
   enum ELobbySignalFlags : std::uint8_t
   {
     kLobbySignalAutoLobby = 1u, // `Host`, `Join`: FAF's automatch lobby (autolobby.lua) instead of the custom game lobby
+    kLobbySignalOrganised = 2u, // `Host`, `Join` (plan WP17.6): an organiser-run lobby; the screen shows it and changes nothing
   };
 
   struct SLobbySignal

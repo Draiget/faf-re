@@ -1182,7 +1182,10 @@ namespace
         // match's first participant hosts the lobby in its own FAF lobby; their lobbies talk through the relay.
         // The host's lobby starts on the match's scenario (`HostGame`'s scenario file, not the map file).
         const LuaPlus::LuaObject scenarioFile = gameOptions["ScenarioFile"];
-        faf::server::CLobbySignaller signaller(scenarioFile.IsString() ? scenarioFile.GetString() : "");
+        faf::server::CLobbySignaller signaller(
+          scenarioFile.IsString() ? scenarioFile.GetString() : "",
+          netConfig.lobbyControl == faf::server::ELobbyControl::Organiser ? faf::remote::net::kLobbySignalOrganised : std::uint8_t{0}
+        );
         for (const moho::SLaunchClient& client : roster.Remotes()) {
           signaller.AddParticipant(client.uid, client.name.c_str());
         }
