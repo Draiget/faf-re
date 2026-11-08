@@ -155,10 +155,15 @@ namespace faf::server
 
   std::vector<std::uint8_t> CLobbyRelay::FrameFromServer(const std::span<const std::uint8_t> message)
   {
+    return FrameFrom(0, message);
+  }
+
+  std::vector<std::uint8_t> CLobbyRelay::FrameFrom(const std::int32_t from, const std::span<const std::uint8_t> message)
+  {
     std::vector<std::uint8_t> out;
     remote::net::ByteWriter writer(out);
     writer.Byte(static_cast<std::uint8_t>(remote::net::ESeatMessage::Lobby));
-    writer.Varint(0u);
+    writer.Varint(static_cast<std::uint64_t>(from < 0 ? 0 : from));
     writer.Bytes(message.data(), message.size());
     return out;
   }

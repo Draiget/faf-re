@@ -968,6 +968,7 @@ namespace
         Say("%d addresses from MatchAddresses get a full handshake budget; others share a small one, and a valid token lists them",
             static_cast<int>(allowedAddresses.size()));
       }
+      faf::server::SPinnedOptions lobbyPins; // plan WP17.2: the organised lobby's pins, which set_options adds to
       if (lobbySeconds <= 0.0) {
         net->CloseLobby(); // the game starts at once: nothing to relay (plan WPR.51)
       } else if (netConfig.lobbyControl == faf::server::ELobbyControl::Player) {
@@ -980,6 +981,7 @@ namespace
           keys += (keys.empty() ? "" : ", ") + key;
         }
         Say("Lobby: %d game options pinned%s%s", static_cast<int>(pinned.size()), keys.empty() ? "" : ": ", keys.c_str());
+        lobbyPins = pinned;
         net->PinLobbyOptions(std::move(pinned));
       }
       std::string netError;
@@ -1017,6 +1019,26 @@ namespace
           message.text = std::move(text);
           net->QueueLobbyFromServer(to, faf::remote::net::EncodeLobbySignal(message));
         };
+        // Plan WP17.1, WP17.2: the launch built again once config's GameOptions changed (the host's or the organiser's),
+        // on the seats the server made, so the server's sim starts from what the players' LaunchInfo says. Empty, or why
+        // not (then `taken` is put back).
+        const auto relaunch = [&](const std::vector<STakenOption>& taken) -> std::string {
+          moho::CLaunchRoster rebuiltRoster(kServerUid, kServerName, {});
+          moho::SLaunchBuild rebuilt = moho::BuildLaunchInfo(config, rebuiltRoster, seed, true, state);
+          std::string why = rebuilt.failure != nullptr ? std::string("they don't launch: ") + rebuilt.failure : SeatsDiffer(build, roster, rebuilt, rebuiltRoster);
+          if (!why.empty()) {
+            PutBackOptions(config, taken);
+            return why;
+          }
+          for (moho::SSTICommandSource& source : rebuilt.launchInfo->mCommandSources.mSrcs) {
+            if (source.mIndex == rebuilt.localSourceId) {
+              source.mTimeouts = -1; // as for the match's own launch above
+            }
+          }
+          build = std::move(rebuilt);
+          sessionInfo->mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
+          return {};
+        };
         while (!launched && Clock::now() < lobbyEnd && gStopSignal == 0) {
           for (const faf::server::CServerNet::SLobbyMessage& message : net->TakeLobbyMessages()) {
             ++toServer;
@@ -1039,21 +1061,10 @@ namespace
             if (refusal.empty() && netConfig.lobbyControl == faf::server::ELobbyControl::Player) {
               const std::vector<STakenOption> taken = TakeHostOptions(config, requested);
               if (!taken.empty()) {
-                moho::CLaunchRoster rebuiltRoster(kServerUid, kServerName, {});
-                moho::SLaunchBuild rebuilt = moho::BuildLaunchInfo(config, rebuiltRoster, seed, true, state);
-                refusal = rebuilt.failure != nullptr ? std::string("the host's options don't launch: ") + rebuilt.failure
-                                                     : SeatsDiffer(build, roster, rebuilt, rebuiltRoster);
+                refusal = relaunch(taken);
                 if (!refusal.empty()) {
-                  PutBackOptions(config, taken);
                   refusal = "the host's game options change the match's seats: " + refusal;
                 } else {
-                  for (moho::SSTICommandSource& source : rebuilt.launchInfo->mCommandSources.mSrcs) {
-                    if (source.mIndex == rebuilt.localSourceId) {
-                      source.mTimeouts = -1; // as for the match's own launch above
-                    }
-                  }
-                  build = std::move(rebuilt);
-                  sessionInfo->mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
                   std::string changed;
                   LuaPlus::LuaObject options = config["GameOptions"];
                   for (const STakenOption& option : taken) {
@@ -1126,6 +1137,71 @@ namespace
             for (const faf::server::SControlRequest& request : requests) {
               if (request.op == "status") {
                 control->Reply(request.id, "\"phase\":\"lobby\",\"host\":" + std::to_string(signaller.Host()) + "," + controlSeats());
+              } else if (request.op == "set_options") {
+                // Plan WP17.2: an organised lobby's options from the organiser: the launch, the pins, and the players' screens.
+                std::vector<std::pair<std::string, std::string>> pairs;
+                for (std::size_t start = 0; start < request.options.size();) {
+                  const std::size_t comma = std::min(request.options.find(',', start), request.options.size());
+                  const std::string pair = request.options.substr(start, comma - start);
+                  if (const std::size_t equals = pair.find('='); equals != std::string::npos && equals > 0u) {
+                    pairs.emplace_back(pair.substr(0, equals), pair.substr(equals + 1));
+                  }
+                  start = comma + 1;
+                }
+                const auto fixed = std::find_if(pairs.begin(), pairs.end(), [](const auto& pair) {
+                  return pair.first == "ScenarioFile" || pair.first == "GameSpeed" || pair.first == "TeamLock";
+                });
+                if (netConfig.lobbyControl == faf::server::ELobbyControl::Player) {
+                  control->Refuse(request.id, "a player-hosted lobby's options are its host's");
+                } else if (pairs.empty()) {
+                  control->Refuse(request.id, "set_options needs options: Key=Value,Key=Value");
+                } else if (fixed != pairs.end()) {
+                  control->Refuse(request.id, fixed->first + " is set before the lobby opens; the match file has it");
+                } else {
+                  LuaPlus::LuaObject options = config["GameOptions"];
+                  std::vector<STakenOption> taken;
+                  for (const auto& [key, value] : pairs) {
+                    taken.push_back(STakenOption{key, options[key.c_str()]});
+                    options.SetString(key.c_str(), value.c_str());
+                  }
+                  if (const std::string why = relaunch(taken); !why.empty()) {
+                    control->Refuse(request.id, "those options change the match's seats: " + why);
+                  } else {
+                    LuaPlus::LuaObject table;
+                    table.AssignNewTable(state, 0, static_cast<unsigned>(pairs.size()));
+                    for (const auto& [key, value] : pairs) {
+                      lobbyPins[key] = LuaValueBytes(options[key.c_str()]);
+                      table.SetString(key.c_str(), value.c_str());
+                    }
+                    net->RequestPins(lobbyPins);
+                    // The other participants' lobby screens, in the host's name (lobby.lua takes GameOptions from the host
+                    // alone). The host isn't sent one: a frame in its own uid would look like a new peer to it.
+                    LuaPlus::LuaObject data;
+                    data.AssignNewTable(state, 0, 2u);
+                    data.SetString("Type", "GameOptions");
+                    data.SetObject("Options", table);
+                    moho::CMessage script(moho::ELobbyMsg::LOBMSG_BroadcastScriptData);
+                    bool encoded = false;
+                    {
+                      moho::CMessageStream stream(script, moho::CMessageStream::Access::kReadWrite);
+                      encoded = data.ToByteStream(stream);
+                    }
+                    std::size_t told = 0;
+                    if (encoded) {
+                      const auto* const bytes = reinterpret_cast<const std::uint8_t*>(script.mBuff.start_);
+                      const std::vector<std::uint8_t> message(bytes, bytes + script.mBuff.Size());
+                      for (const std::int32_t uid : signaller.InLobbyUids()) {
+                        if (uid != signaller.Host()) {
+                          net->QueueLobbyAs(uid, signaller.Host(), message);
+                          ++told;
+                        }
+                      }
+                    }
+                    Say("The control service sets the game options: %s", request.options.c_str());
+                    control->Reply(request.id, "\"options\":" + std::to_string(pairs.size()) + ",\"told\":" + std::to_string(told));
+                    controlEvent("options", "\"options\":" + faf::server::JsonString(request.options));
+                  }
+                }
               } else if (request.op == "force_start") {
                 Say("The control service forces the start");
                 gForceStartRequests = gForceStartRequests + 1;

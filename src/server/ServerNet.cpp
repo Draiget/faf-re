@@ -94,6 +94,13 @@ namespace faf::server
       mNowUs = NowUs();
       // Time since the start, as a cookie's period counts from 0.
       mLobby.SetHost(mLobbyHost.load(std::memory_order_relaxed));
+      {
+        const std::scoped_lock lock(mNewsLock);
+        if (mPinsIn) {
+          mLobby.PinOptions(std::move(*mPinsIn)); // plan WP17.2: the organiser's options from now on
+          mPinsIn.reset();
+        }
+      }
       if (mLobby.Open() && mCloseLobby.load(std::memory_order_relaxed)) {
         mLobby.Close();
       }
@@ -299,6 +306,18 @@ namespace faf::server
   {
     const std::scoped_lock lock(mViewLock);
     mLobbyOut.push_back(SLobbyMessage{uid, CLobbyRelay::FrameFromServer(message)});
+  }
+
+  void CServerNet::QueueLobbyAs(const std::int32_t uid, const std::int32_t from, const std::vector<std::uint8_t>& message)
+  {
+    const std::scoped_lock lock(mViewLock);
+    mLobbyOut.push_back(SLobbyMessage{uid, CLobbyRelay::FrameFrom(from, message)});
+  }
+
+  void CServerNet::RequestPins(SPinnedOptions pinned)
+  {
+    const std::scoped_lock lock(mNewsLock);
+    mPinsIn = std::move(pinned);
   }
 
   void CServerNet::SendLobby()

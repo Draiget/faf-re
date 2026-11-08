@@ -25,6 +25,7 @@ namespace faf::server
     std::int64_t uid = 0;
     std::string reason;
     std::string address;
+    std::string options; // "Key=Value,Key=Value": `set_options`
   };
 
   /** A flat JSON object's request fields; nothing when it isn't one, or has no `op`. */

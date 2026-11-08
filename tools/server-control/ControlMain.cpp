@@ -2,7 +2,7 @@
 // for operators and tests. Linux.
 //
 //   faf_server_control --server <ip:port> --key <file> --op <status|force_start|pause|resume|eject|allow|disallow>
-//                      [--uid <n>] [--reason <text>] [--address <a.b.c.d>] [--watch <seconds>] [--wrong-key]
+//                      [--uid <n>] [--reason <text>] [--address <a.b.c.d>] [--options <Key=Value,...>] [--watch <seconds>] [--wrong-key]
 //
 // Prints the reply, then the events (the server's console lines) until --watch seconds have passed. --wrong-key flips
 // one bit of the key, to check the server refuses it. Exit: 0 the request was answered ok, 1 refused, 2 no
@@ -78,6 +78,7 @@ int main(int argc, char** argv)
   std::string op;
   std::string reason;
   std::string addressText;
+  std::string optionsText;
   long long uid = 0;
   double watch = 0.0;
   bool wrongKey = false;
@@ -104,6 +105,8 @@ int main(int argc, char** argv)
       reason = value;
     } else if (name == "--address") {
       addressText = value;
+    } else if (name == "--options") {
+      optionsText = value;
     } else if (name == "--watch") {
       watch = std::atof(value.c_str());
     } else {
@@ -160,6 +163,9 @@ int main(int argc, char** argv)
   }
   if (!addressText.empty()) {
     request += ",\"address\":" + Quote(addressText);
+  }
+  if (!optionsText.empty()) {
+    request += ",\"options\":" + Quote(optionsText);
   }
   request += "}";
   const std::vector<std::uint8_t> frame = channel.Seal(std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(request.data()), request.size()));

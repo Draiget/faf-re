@@ -95,6 +95,9 @@ namespace faf::server
 
     /** The frame for `to` carrying a message from the server itself (uid 0). */
     [[nodiscard]] static std::vector<std::uint8_t> FrameFromServer(std::span<const std::uint8_t> message);
+    /** Plan WP17.2: the frame for a participant carrying a message the server sends in `from`'s name (the lobby's
+     * host, for what only a host may send: FAF lobby.lua takes `GameOptions` from the host alone). */
+    [[nodiscard]] static std::vector<std::uint8_t> FrameFrom(std::int32_t from, std::span<const std::uint8_t> message);
 
     [[nodiscard]] std::uint64_t Count(ELobbyRelayVerdict verdict) const noexcept { return mCounts[static_cast<std::size_t>(verdict)]; }
     /** Forwarded messages whose pinned options were written back. */

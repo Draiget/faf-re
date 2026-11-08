@@ -192,6 +192,8 @@ namespace faf::server
           request.reason = std::move(value);
         } else if (key == "address") {
           request.address = std::move(value);
+        } else if (key == "options") {
+          request.options = std::move(value);
         }
       } else {
         std::int64_t number = 0;

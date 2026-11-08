@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -110,6 +111,10 @@ namespace faf::server
     [[nodiscard]] std::vector<SLobbyMessage> TakeLobbyMessages();
     /** A lobby signal from the server to a participant, in order, once they've joined. From any thread. */
     void QueueLobbyFromServer(std::int32_t uid, const std::vector<std::uint8_t>& message);
+    /** Plan WP17.2: a lobby message to `uid` in `from`'s name (`CLobbyRelay::FrameFrom`), queued like the server's own. */
+    void QueueLobbyAs(std::int32_t uid, std::int32_t from, const std::vector<std::uint8_t>& message);
+    /** Plan WP17.2: a new set of pinned options while the lobby is open; applied on the network thread. */
+    void RequestPins(SPinnedOptions pinned);
     /** Participants whose channel came up for the first time since the last call, for the lobby's signals. */
     [[nodiscard]] std::vector<std::int32_t> TakeLobbyJoined();
     /** Participants out of the game since the last call, for the lobby's signals (the game's views read `TakeGone`). */
@@ -257,6 +262,7 @@ namespace faf::server
     std::vector<SSeatState> mSeatStates;                         // under mNewsLock
     std::vector<std::pair<std::int32_t, std::string>> mEjects;   // likewise: uid, reason
     std::vector<std::pair<std::uint32_t, bool>> mAddressChanges; // likewise: ip, allow
+    std::optional<SPinnedOptions> mPinsIn;                      // likewise
 
     CLobbyRelay mLobby;                        // on the network thread
     std::vector<std::uint8_t> mLobbyFrame;     // the frame being relayed
