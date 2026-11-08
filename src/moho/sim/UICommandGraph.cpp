@@ -1927,6 +1927,7 @@ namespace
 
     // Pass C: waypoint marker billboards.
     (void)batcher.Setup("TAlphaBlendLinearSampleNoDepth");
+    batcher.SetViewProjMatrix(camera);
     for (auto& entry : mMapAB0) {
       DrawWaypointMarker(camera, batcher, entry.second);
     }
@@ -1934,6 +1935,7 @@ namespace
 
     // Pass D: position-node meshes/skirts, over a flat white texture.
     (void)batcher.Setup("TAlphaBlendLinearSample");
+    batcher.SetViewProjMatrix(camera);
     batcher.SetTexture(CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
     for (auto& entry : mMapAB0) {
       DrawPositionNodeMesh(entry.second, batcher);

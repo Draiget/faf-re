@@ -243,6 +243,24 @@ float4 MsdfTextPS(QuadVertex input) : SV_Target
     if (!ren_GpuUiQuads) {
       return false;
     }
+    // Only flat 2D UI quads with uniform depth across all 4 vertices can join the instanced UI quad
+    // list (MsdfUiQuad carries a single scalar mZ). 3D world-space quads (such as waypoint markers
+    // in UICommandGraph) have varying Z coordinates and must be drawn by the prim batcher.
+    if (topLeft.mZ != topRight.mZ || topLeft.mZ != bottomRight.mZ || topLeft.mZ != bottomLeft.mZ) {
+      return false;
+    }
+
+    // UI quads are always submitted with an identity view matrix. If the batcher is carrying a
+    // 3D camera view matrix, this is a world-space pass, not an interface pass.
+    const VMatrix4& vm = batcher.mViewMatrix;
+    const bool isIdentityView = (vm.r[0].x == 1.0f && vm.r[0].y == 0.0f && vm.r[0].z == 0.0f && vm.r[0].w == 0.0f &&
+                                 vm.r[1].x == 0.0f && vm.r[1].y == 1.0f && vm.r[1].z == 0.0f && vm.r[1].w == 0.0f &&
+                                 vm.r[2].x == 0.0f && vm.r[2].y == 0.0f && vm.r[2].z == 1.0f && vm.r[2].w == 0.0f &&
+                                 vm.r[3].x == 0.0f && vm.r[3].y == 0.0f && vm.r[3].z == 0.0f && vm.r[3].w == 1.0f);
+    if (!isIdentityView) {
+      return false;
+    }
+
     CD3DDevice* const device = D3D_GetDevice();
     CD3DEffect* const effect = device != nullptr ? device->GetCurEffect() : nullptr;
     if (effect == nullptr) {
