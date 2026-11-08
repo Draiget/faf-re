@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <exception>
 #include <cstdlib>
 #include <memory>
 #include <span>
@@ -11,9 +12,13 @@
 #include <vector>
 
 #include "gpg/core/containers/String.h"
+#include "gpg/core/utils/Logging.h"
 #include "moho/app/WinApp.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/net/Common.h"
+#include "lua/LuaObject.h"
+#include "lua/LuaTableIterator.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "remote/ContentCheck.h"
 #include "remote/client/ServerRelayConnector.h"
 #include "remote/net/GameLinks.h"
@@ -238,6 +243,38 @@ namespace faf::remote
       "Server session: content reported: blueprints %016llx, mods %016llx", static_cast<unsigned long long>(report.blueprints),
       static_cast<unsigned long long>(report.mods)
     );
+
+    // Plan WP17.8: each mod it runs. The sim mods are the launch's; the UI mods FAF's `lua/mods.lua` `GetUiMods()` lists
+    // (each with `uid` and `version`). A Lua without it reports none.
+    std::vector<SModEntry> mods;
+    for (std::string& uid : ReadModUids(gameMods)) {
+      mods.push_back(SModEntry{false, std::move(uid), {}});
+    }
+    try {
+      LuaPlus::LuaState* const state = moho::USER_GetLuaState();
+      const LuaPlus::LuaObject module = state != nullptr ? moho::SCR_Import(state, "/lua/mods.lua") : LuaPlus::LuaObject{};
+      const LuaPlus::LuaObject getUiMods = module.IsTable() ? module["GetUiMods"] : LuaPlus::LuaObject{};
+      if (getUiMods.IsFunction()) {
+        LuaPlus::LuaFunction<LuaPlus::LuaObject> call(getUiMods);
+        LuaPlus::LuaObject list = call();
+        for (LuaPlus::LuaTableIterator it(&list, 1); list.IsTable() && !it.m_isDone; it.Next()) {
+          LuaPlus::LuaObject info = it.GetValue();
+          if (!info.IsTable()) {
+            continue;
+          }
+          const LuaPlus::LuaObject uid = info["uid"];
+          const LuaPlus::LuaObject version = info["version"];
+          if (uid.IsString()) {
+            mods.push_back(SModEntry{true, uid.GetString(), version.IsString() || version.IsNumber() ? std::string(version.ToString()) : std::string()});
+          }
+        }
+      }
+    } catch (const std::exception& error) {
+      gpg::Warnf("Server session: the UI mods couldn't be read: %s", error.what());
+    }
+    sSession->channel.SendGameMessage(EncodeModReport(mods));
+    const auto ui = static_cast<std::size_t>(std::count_if(mods.begin(), mods.end(), [](const SModEntry& mod) { return mod.ui; }));
+    gpg::Logf("Server session: mods reported: %zu sim, %zu UI", mods.size() - ui, ui);
   }
 
   bool TakeServerLobbySignal(net::SLobbySignal& signal)

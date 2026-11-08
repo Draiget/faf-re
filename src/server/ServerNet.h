@@ -50,6 +50,11 @@ namespace faf::server
     double lobbyAwaySeconds = 6.0;
     /** Plan WP17.1: the match file's `MatchLobbyControl`: organised (WPR.49's rules) or player-hosted. */
     ELobbyControl lobbyControl = ELobbyControl::Organiser;
+    /**
+     * Plan WP17.8: the match file's `MatchUiMods`, the UI mods a player may run (empty: none); unset: any. A player who
+     * runs another is judged under `MatchContentCheck` (warned, or out of the game), as reported by their game.
+     */
+    std::optional<std::vector<std::string>> uiModsAllowed;
   };
 
   class CServerNet final : private remote::net::CServerLinks::IEvents
@@ -195,6 +200,9 @@ namespace faf::server
       bool reported = false;       // plan WP2.6: its content report came
       remote::SContentReport report;
       bool contentJudged = false;
+      bool modsReported = false;   // plan WP17.8: its mod report came
+      std::vector<remote::SModEntry> mods;
+      bool modsJudged = false;
       // Plan WP11.4: its client in the session, as every player's roster lists it.
       int clientIndex = -1;
       std::vector<std::uint8_t> sources;
@@ -210,6 +218,8 @@ namespace faf::server
     void NoteLobbyPresence(std::int32_t uid, SSeat& seat, bool away);
     /** Plan WP2.6: once the server's content is known, a seat with a report, or loaded without one. */
     void JudgeContent(std::int32_t uid, SSeat& seat);
+    /** Plan WP17.8: once the server's content is known and a policy is set, a seat with a mod report, or loaded without one. */
+    void JudgeMods(std::int32_t uid, SSeat& seat);
     void Tick(std::uint64_t nowUs);
     void Remove(std::int32_t uid, SSeat& seat, const std::string& why);
     void Say(std::string line);

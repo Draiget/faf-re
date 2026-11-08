@@ -9,6 +9,7 @@
 #include "lua/LuaTableIterator.h"
 #include "moho/lua/SCR_String.h"
 #include "remote/ContentTables.h"
+#include "remote/net/Datagram.h"
 #include "remote/net/GameLinks.h"
 
 // Engine addition, server mode: see ContentCheck.h.
@@ -97,6 +98,79 @@ namespace faf::remote
     PutU64(message, report.blueprints);
     PutU64(message, report.mods);
     return message;
+  }
+
+  std::vector<std::uint8_t> EncodeModReport(const std::vector<SModEntry>& mods)
+  {
+    std::vector<std::uint8_t> message;
+    net::ByteWriter writer(message);
+    writer.Byte(static_cast<std::uint8_t>(net::ESeatMessage::ModReport));
+    std::vector<const SModEntry*> kept;
+    for (const SModEntry& mod : mods) {
+      if (kept.size() < kMaxReportedMods && !mod.uid.empty() && mod.uid.size() <= kMaxModText && mod.version.size() <= kMaxModText) {
+        kept.push_back(&mod);
+      }
+    }
+    writer.Varint(kept.size());
+    for (const SModEntry* const mod : kept) {
+      writer.Byte(mod->ui ? 1u : 0u);
+      writer.Varint(mod->uid.size());
+      writer.Bytes(reinterpret_cast<const std::uint8_t*>(mod->uid.data()), mod->uid.size());
+      writer.Varint(mod->version.size());
+      writer.Bytes(reinterpret_cast<const std::uint8_t*>(mod->version.data()), mod->version.size());
+    }
+    return message;
+  }
+
+  bool DecodeModReport(const std::span<const std::uint8_t> message, std::vector<SModEntry>& out)
+  {
+    out.clear();
+    if (message.empty() || message[0] != static_cast<std::uint8_t>(net::ESeatMessage::ModReport)) {
+      return false;
+    }
+    net::ByteReader reader(message.data() + 1, message.size() - 1u);
+    const std::uint64_t count = reader.Varint();
+    if (!reader.Ok() || count > kMaxReportedMods) {
+      return false;
+    }
+    const auto text = [&reader](std::string& into) {
+      const std::uint64_t size = reader.Varint();
+      if (!reader.Ok() || size > kMaxModText) {
+        return false;
+      }
+      const std::uint8_t* const bytes = reader.Bytes(static_cast<std::size_t>(size));
+      if (!reader.Ok()) {
+        return false;
+      }
+      into.assign(reinterpret_cast<const char*>(bytes), static_cast<std::size_t>(size));
+      return true;
+    };
+    for (std::uint64_t i = 0; i < count; ++i) {
+      SModEntry mod;
+      const std::uint8_t kind = reader.Byte();
+      if (!reader.Ok() || kind > 1u || !text(mod.uid) || mod.uid.empty() || !text(mod.version)) {
+        out.clear();
+        return false;
+      }
+      mod.ui = kind == 1u;
+      out.push_back(std::move(mod));
+    }
+    if (!reader.AtEnd()) {
+      out.clear();
+      return false;
+    }
+    return true;
+  }
+
+  std::vector<std::string> UiModsOutside(const std::vector<SModEntry>& mods, const std::vector<std::string>& allowed)
+  {
+    std::vector<std::string> outside;
+    for (const SModEntry& mod : mods) {
+      if (mod.ui && std::find(allowed.begin(), allowed.end(), mod.uid) == allowed.end()) {
+        outside.push_back(mod.uid);
+      }
+    }
+    return outside;
   }
 
   bool DecodeContentReport(const std::span<const std::uint8_t> message, SContentReport& out)

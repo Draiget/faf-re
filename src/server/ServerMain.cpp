@@ -524,6 +524,30 @@ namespace
     return true;
   }
 
+  /** Plan WP17.8: the match file's `MatchUiMods`, the UI mods a player may run (`{}`: none); nothing when it isn't set. */
+  [[nodiscard]] bool ReadUiMods(LuaPlus::LuaState* const state, std::optional<std::vector<std::string>>& allowed, std::string& error)
+  {
+    LuaPlus::LuaObject table = state->GetGlobal("MatchUiMods");
+    if (table.IsNil()) {
+      return true;
+    }
+    if (!table.IsTable()) {
+      error = "MatchUiMods is a table of mod uids ({} for none)";
+      return false;
+    }
+    allowed.emplace();
+    for (LuaPlus::LuaTableIterator it(&table, 1); !it.m_isDone; it.Next()) {
+      const LuaPlus::LuaObject value = it.GetValue();
+      const std::size_t size = value.IsString() ? std::strlen(value.GetString()) : 0u;
+      if (size == 0u || size > faf::remote::kMaxModText) {
+        error = "MatchUiMods holds mod uids: strings of 1 to " + std::to_string(faf::remote::kMaxModText) + " characters";
+        return false;
+      }
+      allowed->emplace_back(value.GetString());
+    }
+    return true;
+  }
+
   /** Plan WP15.1: a tournament's rules, the match file's `MatchRules` table; each unset unless the match sets it. */
   struct SMatchRules
   {
@@ -940,9 +964,12 @@ namespace
       return kExitBadInput;
     }
     faf::remote::EContentCheck contentCheck = faf::remote::EContentCheck::Warn;
-    if (!ReadContentCheck(state, contentCheck, end.error)) {
+    if (!ReadContentCheck(state, contentCheck, end.error) || !ReadUiMods(state, netConfig.uiModsAllowed, end.error)) {
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
+    }
+    if (netConfig.uiModsAllowed) {
+      Say("UI mods: %d allowed (MatchUiMods), judged under MatchContentCheck", static_cast<int>(netConfig.uiModsAllowed->size()));
     }
     if (ReadOption("--lobby-away-seconds", text)) {
       netConfig.lobbyAwaySeconds = std::atof(text.c_str());

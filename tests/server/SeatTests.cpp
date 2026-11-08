@@ -930,6 +930,37 @@ TEST(LobbyRelay, ScriptDataCarriesThePinnedOptions)
   EXPECT_EQ(relay.OptionsPinned(), 1u);
 }
 
+// Plan WP17.8: the mods a player's game runs, and the UI mods a match allows.
+TEST(ContentCheck, ModReportsAndTheUiModPolicy)
+{
+  using faf::remote::SModEntry;
+  const std::vector<SModEntry> mods = {{false, "sim-mod-uid", ""}, {true, "ui-allowed", "3"}, {true, "ui-extra", "1.2"}};
+  const std::vector<std::uint8_t> message = faf::remote::EncodeModReport(mods);
+  EXPECT_EQ(message[0], static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::ModReport));
+  std::vector<SModEntry> back;
+  ASSERT_TRUE(faf::remote::DecodeModReport(message, back));
+  EXPECT_EQ(back, mods);
+  // Cut short, a byte left over, a kind that isn't one: not a report.
+  EXPECT_FALSE(faf::remote::DecodeModReport(std::span<const std::uint8_t>(message).first(message.size() - 1u), back));
+  std::vector<std::uint8_t> longer = message;
+  longer.push_back(0u);
+  EXPECT_FALSE(faf::remote::DecodeModReport(longer, back));
+  std::vector<std::uint8_t> badKind = message;
+  badKind[2] = 7u; // the first mod's kind byte (after the message kind and the count)
+  EXPECT_FALSE(faf::remote::DecodeModReport(badKind, back));
+  // None at all is a report too.
+  ASSERT_TRUE(faf::remote::DecodeModReport(faf::remote::EncodeModReport({}), back));
+  EXPECT_TRUE(back.empty());
+  // An empty uid or one past the limit isn't sent.
+  ASSERT_TRUE(faf::remote::DecodeModReport(faf::remote::EncodeModReport({{true, "", "1"}, {true, std::string(201, 'x'), "1"}}), back));
+  EXPECT_TRUE(back.empty());
+
+  // UI mods outside the allowlist; sim mods are the launch's, never judged here.
+  EXPECT_EQ(faf::remote::UiModsOutside(mods, {"ui-allowed"}), (std::vector<std::string>{"ui-extra"}));
+  EXPECT_EQ(faf::remote::UiModsOutside(mods, {}), (std::vector<std::string>{"ui-allowed", "ui-extra"}));
+  EXPECT_TRUE(faf::remote::UiModsOutside(mods, {"ui-allowed", "ui-extra"}).empty());
+}
+
 // Plan WP2.6: content reports (remote/ContentCheck.h).
 TEST(ContentCheck, ReportsAndVerdicts)
 {

@@ -223,6 +223,7 @@ namespace
     // Plan WP2.6: the content report sent before `Loaded`: "rules" (the `--rebuild` match's rules, as the game
     // client reports them), "wrong" (made-up hashes), or none.
     std::string contentReport;
+    std::string uiMods; // plan WP17.8: `--ui-mods uid,uid` (or `none`) sends a mod report with those UI mods
     // Plan WP11.4: once the server's roster lists other players and this many seconds have gone (`--chat`: 0, `--chat-at`),
     // send each of them one chat line through the server, as FAF's chat sends one (a Lua table in byte form).
     double chatAt = -1.0;
@@ -334,6 +335,8 @@ namespace
         out.lobbyEjectAt = Argument(value);
       } else if (name == "--content-report") {
         out.contentReport = value;
+      } else if (name == "--ui-mods") {
+        out.uiMods = value;
       } else if (name == "--save-views") {
         out.saveViews = value;
       } else if (name == "--break-alliance-at") {
@@ -891,7 +894,7 @@ int main(const int argc, char** const argv)
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> [--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
       "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-eject-at <s>]] [--content-report rules|wrong] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--rebuild <match.lua> /init <init.lua>]\n"
+      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-eject-at <s>]] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--rebuild <match.lua> /init <init.lua>]\n"
     );
     return 3;
   }
@@ -1012,6 +1015,17 @@ int main(const int argc, char** const argv)
           std::printf("probe %d: %.1f s: content reported (%s): blueprints %016llx, mods %016llx\n", options.uid, elapsed, fromRules ? "rules" : "made up",
                       static_cast<unsigned long long>(report.blueprints), static_cast<unsigned long long>(report.mods));
         }
+      }
+      if (!options.uiMods.empty() && joins == 1u) {
+        std::vector<faf::remote::SModEntry> mods;
+        for (std::size_t start = 0; options.uiMods != "none" && start < options.uiMods.size();) {
+          const std::size_t comma = std::min(options.uiMods.find(',', start), options.uiMods.size());
+          mods.push_back(faf::remote::SModEntry{true, options.uiMods.substr(start, comma - start), "1"});
+          start = comma + 1;
+        }
+        const std::vector<std::uint8_t> report = faf::remote::EncodeModReport(mods);
+        (void)link.SendReliable(report.data(), report.size());
+        std::printf("probe %d: %.1f s: mods reported: %zu UI (%s)\n", options.uid, elapsed, mods.size(), options.uiMods.c_str());
       }
       if (!options.noLoad && joins == 1u) {
         const auto kind = static_cast<std::uint8_t>(ESeatMessage::Loaded);

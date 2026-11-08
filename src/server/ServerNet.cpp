@@ -115,6 +115,7 @@ namespace faf::server
         if (mContentKnown) {
           for (auto& [uid, seat] : mSeats) {
             JudgeContent(uid, seat);
+            JudgeMods(uid, seat);
           }
         }
       }
@@ -296,6 +297,35 @@ namespace faf::server
                              : "its game content isn't the server's (blueprints " + Hex(seat.report.blueprints) + ", mods " + Hex(seat.report.mods) +
                                  "; the server's " + Hex(mContentExpected.blueprints) + ", " + Hex(mContentExpected.mods) + ")";
     if (remote::RefusesPlayer(mContentMode, verdict)) {
+      Remove(uid, seat, what);
+    } else {
+      Say(seat.name + ": " + what + "; the match only warns");
+    }
+  }
+
+  void CServerNet::JudgeMods(const std::int32_t uid, SSeat& seat)
+  {
+    if (!mConfig.uiModsAllowed || !mContentKnown || mContentMode == remote::EContentCheck::Off || seat.gone || seat.modsJudged) {
+      return;
+    }
+    if (!seat.modsReported && !seat.loaded) {
+      return; // nothing to judge yet
+    }
+    seat.modsJudged = true;
+    std::string what;
+    if (!seat.modsReported) {
+      what = "loaded without reporting its mods";
+    } else if (const std::vector<std::string> outside = remote::UiModsOutside(seat.mods, *mConfig.uiModsAllowed); !outside.empty()) {
+      what = "runs UI mods the match doesn't allow:";
+      for (const std::string& mod : outside) {
+        what += " " + mod;
+      }
+    } else {
+      const auto ui = std::count_if(seat.mods.begin(), seat.mods.end(), [](const remote::SModEntry& mod) { return mod.ui; });
+      Say(seat.name + "'s UI mods are the match's to allow (" + std::to_string(ui) + ")");
+      return;
+    }
+    if (mContentMode == remote::EContentCheck::Refuse) {
       Remove(uid, seat, what);
     } else {
       Say(seat.name + ": " + what + "; the match only warns");
@@ -730,6 +760,7 @@ namespace faf::server
       if (!seat.loaded) {
         seat.loaded = true;
         JudgeContent(uid, seat); // plan WP2.6: one with no report counts once the server's content is known
+        JudgeMods(uid, seat);
         if (seat.gone) {
           return;
         }
@@ -793,6 +824,19 @@ namespace faf::server
     case remote::net::ESeatMessage::Chat:
       RelayChat(seat, message); // plan WP11.4
       return;
+    case remote::net::ESeatMessage::ModReport: {
+      std::vector<remote::SModEntry> mods;
+      if (!remote::DecodeModReport(message, mods)) {
+        ++mBadMessages;
+        return;
+      }
+      if (!seat.modsReported) { // the first counts
+        seat.modsReported = true;
+        seat.mods = std::move(mods);
+        JudgeMods(uid, seat);
+      }
+      return;
+    }
     case remote::net::ESeatMessage::Roster:
     case remote::net::ESeatMessage::Beat:
     case remote::net::ESeatMessage::View:

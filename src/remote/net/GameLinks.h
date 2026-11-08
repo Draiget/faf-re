@@ -108,6 +108,12 @@ namespace faf::remote::net
      * index, written by the server, then the payload. The server drops one for no player, too large or too many.
      */
     Chat = 16,
+    /**
+     * Player to server, reliable, after `ContentReport` (plan WP17.8): varint count, then per mod a kind byte (0 sim,
+     * 1 UI), its uid and its version, each a varint length and its bytes. UI mods load only in the player's own game,
+     * so the server takes them as reported.
+     */
+    ModReport = 17,
   };
 
   /** What became of a player's command. */
