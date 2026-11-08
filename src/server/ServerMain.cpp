@@ -521,6 +521,111 @@ namespace
     return true;
   }
 
+  /** Plan WP17.1: a game option's value as the console shows it. */
+  [[nodiscard]] std::string OptionText(const LuaPlus::LuaObject& value)
+  {
+    if (value.IsString()) {
+      return value.GetString();
+    }
+    if (value.IsNumber()) {
+      char text[32];
+      std::snprintf(text, sizeof(text), "%g", value.GetNumber());
+      return text;
+    }
+    if (value.IsBoolean()) {
+      return value.GetBoolean() ? "true" : "false";
+    }
+    return value.IsNil() ? "nil" : "a table";
+  }
+
+  /** Plan WP17.1: the same option value: strings, numbers and booleans by value; a table is always taken as new. */
+  [[nodiscard]] bool SameOption(const LuaPlus::LuaObject& a, const LuaPlus::LuaObject& b)
+  {
+    if (a.IsString() && b.IsString()) {
+      return std::strcmp(a.GetString(), b.GetString()) == 0;
+    }
+    if (a.IsNumber() && b.IsNumber()) {
+      return a.GetNumber() == b.GetNumber();
+    }
+    if (a.IsBoolean() && b.IsBoolean()) {
+      return a.GetBoolean() == b.GetBoolean();
+    }
+    return a.IsNil() && b.IsNil();
+  }
+
+  struct STakenOption
+  {
+    std::string key;
+    LuaPlus::LuaObject before; // nil when the match didn't set it
+  };
+
+  /**
+   * Plan WP17.1: a player-hosted lobby's launch, already checked against the match (`CheckLaunch`: map, human seats, no
+   * sim mods): the host's game options go over the match's `GameOptions`, but for those the server set up before the
+   * lobby: `ScenarioFile` (the map), `GameSpeed` (the client manager's speed) and `TeamLock` (team views). Returns each
+   * option changed, with its value before, so it can be put back.
+   */
+  [[nodiscard]] std::vector<STakenOption> TakeHostOptions(LuaPlus::LuaObject& config, LuaPlus::LuaObject& requested)
+  {
+    std::vector<STakenOption> taken;
+    LuaPlus::LuaObject options = config["GameOptions"];
+    LuaPlus::LuaObject hostOptions = requested["GameOptions"];
+    if (!options.IsTable() || !hostOptions.IsTable()) {
+      return taken;
+    }
+    for (LuaPlus::LuaTableIterator it(&hostOptions, 1); !it.m_isDone; it.Next()) {
+      const LuaPlus::LuaObject key = it.GetKey();
+      const LuaPlus::LuaObject value = it.GetValue();
+      if (!key.IsString()) {
+        continue;
+      }
+      const std::string name = key.GetString();
+      if (name == "ScenarioFile" || name == "GameSpeed" || name == "TeamLock") {
+        continue;
+      }
+      const LuaPlus::LuaObject before = options[name.c_str()];
+      if (SameOption(before, value)) {
+        continue;
+      }
+      taken.push_back(STakenOption{name, before});
+      options.SetObject(name.c_str(), value);
+    }
+    return taken;
+  }
+
+  void PutBackOptions(LuaPlus::LuaObject& config, const std::vector<STakenOption>& taken)
+  {
+    LuaPlus::LuaObject options = config["GameOptions"];
+    for (const STakenOption& option : taken) {
+      if (option.before.IsNil()) {
+        options.SetNil(option.key.c_str());
+      } else {
+        options.SetObject(option.key.c_str(), option.before);
+      }
+    }
+  }
+
+  /** Plan WP17.1: why a rebuilt launch's seats aren't the ones the server's seats were made for; empty when they are. */
+  [[nodiscard]] std::string SeatsDiffer(
+    const moho::SLaunchBuild& before, const moho::CLaunchRoster& beforeRoster, const moho::SLaunchBuild& after, const moho::CLaunchRoster& afterRoster
+  )
+  {
+    if (after.clientCount != before.clientCount || after.localClientIndex != before.localClientIndex || after.localSourceId != before.localSourceId) {
+      return "the clients or the server's own source differ";
+    }
+    const std::vector<moho::SLaunchClient>& a = beforeRoster.Remotes();
+    const std::vector<moho::SLaunchClient>& b = afterRoster.Remotes();
+    if (a.size() != b.size()) {
+      return "the players differ";
+    }
+    for (std::size_t i = 0; i < a.size(); ++i) {
+      if (a[i].uid != b[i].uid || a[i].clientIndex != b[i].clientIndex || a[i].commandSource != b[i].commandSource) {
+        return std::string(a[i].name.c_str()) + "'s seat differs";
+      }
+    }
+    return {};
+  }
+
   /** What to call the game: the match file's `MatchName`, or the map's name without its `<LOC id>`. */
   [[nodiscard]] std::string ReadMatchTitle(const LuaPlus::LuaObject& config, LuaPlus::LuaState* const state)
   {
@@ -818,6 +923,34 @@ namespace
               refusal = "the launch couldn't be read";
             } else {
               refusal = faf::server::CheckLaunch(ReadLaunchFacts(requested), matchFacts);
+            }
+            // Plan WP17.1: a player-hosted lobby starts with its host's game options, on the seats the server made.
+            if (refusal.empty() && netConfig.lobbyControl == faf::server::ELobbyControl::Player) {
+              const std::vector<STakenOption> taken = TakeHostOptions(config, requested);
+              if (!taken.empty()) {
+                moho::CLaunchRoster rebuiltRoster(kServerUid, kServerName, {});
+                moho::SLaunchBuild rebuilt = moho::BuildLaunchInfo(config, rebuiltRoster, seed, true, state);
+                refusal = rebuilt.failure != nullptr ? std::string("the host's options don't launch: ") + rebuilt.failure
+                                                     : SeatsDiffer(build, roster, rebuilt, rebuiltRoster);
+                if (!refusal.empty()) {
+                  PutBackOptions(config, taken);
+                  refusal = "the host's game options change the match's seats: " + refusal;
+                } else {
+                  for (moho::SSTICommandSource& source : rebuilt.launchInfo->mCommandSources.mSrcs) {
+                    if (source.mIndex == rebuilt.localSourceId) {
+                      source.mTimeouts = -1; // as for the match's own launch above
+                    }
+                  }
+                  build = std::move(rebuilt);
+                  sessionInfo->mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
+                  std::string changed;
+                  LuaPlus::LuaObject options = config["GameOptions"];
+                  for (const STakenOption& option : taken) {
+                    changed += (changed.empty() ? "" : ", ") + option.key + "=" + OptionText(options[option.key.c_str()]);
+                  }
+                  Say("Lobby: the host's game options: %s", changed.c_str());
+                }
+              }
             }
             if (!refusal.empty()) {
               Say("Lobby: launch refused: %s", refusal.c_str());
