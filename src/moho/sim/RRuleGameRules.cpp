@@ -769,6 +769,7 @@ namespace moho
 
     mRules = const_cast<RRuleGameRulesImpl*>(owner);
     mCategoryFallback.ResetToEmpty(EntityCategoryHelper{mRules});
+    NoteEntityCategoryTableBuilt(); // engine addition: sim_CategoryLookupCache
   }
 
   const EntityCategorySet* EntityCategoryLookupTable::TryFind(
