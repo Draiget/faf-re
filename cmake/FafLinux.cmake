@@ -448,6 +448,14 @@ add_dependencies(faf_replay_playback_tests headless)
 add_test(NAME replay_playback COMMAND faf_replay_playback_tests)
 set_tests_properties(replay_playback PROPERTIES TIMEOUT 3600)
 
+# The Lua VM, parser, libraries and LuaObject API (tests/lua/Lua*.cpp; the folder's two other
+# files are executables of their own).
+file(GLOB _faf_lua_test_sources "${PROJECT_SOURCE_DIR}/tests/lua/Lua*.cpp")
+add_executable(faf_lua_tests EXCLUDE_FROM_ALL ${_faf_lua_test_sources})
+target_link_libraries(faf_lua_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_lua_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME lua COMMAND faf_lua_tests)
+
 # --- faf_tests --------------------------------------------------------------------------
 # Every GoogleTest executable of the Linux build (cmake/FafTests.cmake).
 include(FafTests)
