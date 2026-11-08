@@ -834,6 +834,15 @@ namespace moho
     RelinkTo(rect);
   }
 
+  /// Engine addition: the occupation gather loads the next list node and the next cell's first node
+  /// while it handles the current one (same results, same order).
+  bool sim_GatherPrefetch = true;
+  TConVar<bool> gTConVar_sim_GatherPrefetch(
+    "sim_GatherPrefetch",
+    "Occupation-grid gathers load the next cell's nodes ahead of time (same results, same order).",
+    &sim_GatherPrefetch
+  );
+
   /**
    * Address: 0x004FD000 (FUN_004FD000, Moho::EntityOccupationManager::GatherUnmarkedUnitsInRect)
    */
@@ -879,11 +888,18 @@ namespace moho
           const bool includeProps = (flagBits & ENTITYTYPE_Prop) != 0u;
           const bool includeDynamic = (flagBits & (ENTITYTYPE_Projectile | ENTITYTYPE_Entity)) != 0u;
 
+          const bool prefetch = sim_GatherPrefetch;
           do {
             const int bucketIndex = position & mLastIndex;
 
             if (includeUnits && unitBuckets) {
+              if (prefetch && remainingX > 1) {
+                __builtin_prefetch(unitBuckets[(position + 1) & mLastIndex]);
+              }
               for (EntityCollisionCellNode* node = unitBuckets[bucketIndex]; node; node = node->next) {
+                if (prefetch && node->next != nullptr) {
+                  __builtin_prefetch(node->next);
+                }
                 CollisionShapeBase* const shape = node->owner;
                 if (ClaimGatherShape(shape, useSharedMarks)) {
                   outSpans.PushBack(shape);
