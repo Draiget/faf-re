@@ -2,7 +2,7 @@
 // for operators and tests. Linux.
 //
 //   faf_server_control --server <ip:port> --key <file> --op <status|force_start|pause|resume|eject|allow|disallow>
-//                      [--uid <n>] [--reason <text>] [--address <a.b.c.d>] [--options <Key=Value,...>] [--watch <seconds>] [--wrong-key]
+//                      [--uid <n>] [--reason <text>] [--address <a.b.c.d>] [--options <Key=Value,...>] [--results <army=victory|defeat|draw,...>] [--watch <seconds>] [--wrong-key]
 //
 // Prints the reply, then the events (the server's console lines) until --watch seconds have passed. --wrong-key flips
 // one bit of the key, to check the server refuses it. Exit: 0 the request was answered ok, 1 refused, 2 no
@@ -79,6 +79,7 @@ int main(int argc, char** argv)
   std::string reason;
   std::string addressText;
   std::string optionsText;
+  std::string resultsText;
   long long uid = 0;
   double watch = 0.0;
   bool wrongKey = false;
@@ -107,6 +108,8 @@ int main(int argc, char** argv)
       addressText = value;
     } else if (name == "--options") {
       optionsText = value;
+    } else if (name == "--results") {
+      resultsText = value;
     } else if (name == "--watch") {
       watch = std::atof(value.c_str());
     } else {
@@ -166,6 +169,9 @@ int main(int argc, char** argv)
   }
   if (!optionsText.empty()) {
     request += ",\"options\":" + Quote(optionsText);
+  }
+  if (!resultsText.empty()) {
+    request += ",\"results\":" + Quote(resultsText);
   }
   request += "}";
   const std::vector<std::uint8_t> frame = channel.Seal(std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(request.data()), request.size()));
