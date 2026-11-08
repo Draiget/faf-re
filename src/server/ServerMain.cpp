@@ -75,6 +75,7 @@
 #include "remote/net/UdpSocket.h"
 #include "remote/ContentTables.h"
 #include "server/ControlListener.h"
+#include "server/LiveReplaySender.h"
 #include "server/ObserverListener.h"
 #include "server/ReplayLog.h"
 #include "server/LobbySignaller.h"
@@ -1378,7 +1379,8 @@ namespace
       Say("%d seats stay empty: this server isn't listening (--listen)", static_cast<int>(roster.Remotes().size()));
     }
     std::unique_ptr<faf::server::CObserverListener> observers; // plan WP13.1, with the replay below
-    const auto sayNetNews = [&net, &observers] {
+    std::unique_ptr<faf::server::CLiveReplaySender> liveReplay; // plan WP15.3, likewise
+    const auto sayNetNews = [&net, &observers, &liveReplay] {
       if (net) {
         for (const std::string& line : net->TakeNews()) {
           Say("%s", line.c_str());
@@ -1386,6 +1388,11 @@ namespace
       }
       if (observers) {
         for (const std::string& line : observers->TakeNews()) {
+          Say("%s", line.c_str());
+        }
+      }
+      if (liveReplay) {
+        for (const std::string& line : liveReplay->TakeNews()) {
           Say("%s", line.c_str());
         }
       }
@@ -1468,8 +1475,31 @@ namespace
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
     }
-    // Plan WP13.1: with observers, the replay goes through a tee into a log they're served from, header included.
-    if (ReadOption("--observe", text)) {
+    // Plan WP13.1, WP15.3: with observers or a live replay, the replay goes through a tee into a log they're both served
+    // from, header included, each byte `ObserverDelaySeconds` late.
+    std::string observeText;
+    std::string liveText;
+    const bool observeGiven = ReadOption("--observe", observeText);
+    const bool liveGiven = ReadOption("--live-replay", liveText);
+    std::shared_ptr<faf::server::CReplayLog> replayLog;
+    if (observeGiven || liveGiven) {
+      replayLog = std::make_shared<faf::server::CReplayLog>();
+      replay = std::make_unique<faf::server::CReplayTee>(std::move(replay), replayLog, &ControlNowUs);
+    }
+    if (liveGiven) {
+      if (const std::optional<faf::server::SGpgNetAddress> to = faf::server::ParseGpgNetAddress(liveText); !to) {
+        end.error = "--live-replay takes gpgnet://host[:port]/path, not " + liveText;
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      } else {
+        liveReplay = std::make_unique<faf::server::CLiveReplaySender>(replayLog, &ControlNowUs, matchRules.observerDelaySeconds.value_or(0.0), *to);
+        liveReplay->Start();
+        Say("Live replay to %s:%d%s, %.0f s behind the game", to->host.c_str(), static_cast<int>(to->port), to->path.c_str(),
+            matchRules.observerDelaySeconds.value_or(0.0));
+      }
+    }
+    if (observeGiven) {
+      text = observeText;
       faf::remote::net::SEndpoint observeAt;
       std::vector<std::string> tokens;
       if (!faf::remote::net::ParseEndpoint(text, observeAt)) {
@@ -1477,9 +1507,7 @@ namespace
       } else if (!ReadMatchObservers(state, tokens, end.error)) {
         // `end.error` says why
       } else {
-        auto log = std::make_shared<faf::server::CReplayLog>();
-        replay = std::make_unique<faf::server::CReplayTee>(std::move(replay), log, &ControlNowUs);
-        observers = std::make_unique<faf::server::CObserverListener>(log, &ControlNowUs, matchRules.observerDelaySeconds.value_or(0.0));
+        observers = std::make_unique<faf::server::CObserverListener>(replayLog, &ControlNowUs, matchRules.observerDelaySeconds.value_or(0.0));
         for (std::string& token : tokens) {
           observers->AllowToken(std::move(token));
         }
@@ -1913,17 +1941,23 @@ namespace
     rules.reset();
     wldMap.reset();
     driver.reset(); // the replay closes: the observers' log is finished
-    if (observers) {
-      // Observers are behind the game: they get its last moments before the server goes, for the delay and a little more.
+    if (observers || liveReplay) {
+      // Observers and the live replay are behind the game: they get its last moments before the server goes, for the
+      // delay and a little more.
       const auto waitEnd = Clock::now() + std::chrono::duration_cast<Clock::duration>(
                                             std::chrono::duration<double>(matchRules.observerDelaySeconds.value_or(0.0) + 10.0)
                                           );
-      while (!observers->AllSent() && Clock::now() < waitEnd && gStopSignal == 0) {
+      while (((observers && !observers->AllSent()) || (liveReplay && !liveReplay->Done())) && Clock::now() < waitEnd && gStopSignal == 0) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         sayNetNews();
       }
       sayNetNews();
-      observers->Stop();
+      if (observers) {
+        observers->Stop();
+      }
+      if (liveReplay) {
+        liveReplay->Stop();
+      }
     }
 
     WriteResult(resultPath, end);

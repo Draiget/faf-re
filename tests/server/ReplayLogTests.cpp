@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "gpg/core/streams/MemBufferStream.h"
+#include "server/LiveReplaySender.h"
 #include "server/ReplayLog.h"
 
 namespace
@@ -49,6 +50,24 @@ TEST(ReplayLog, AClockThatStepsBackKeepsTheOrder)
   EXPECT_EQ(log.Read(0u, 200u, 10u, out), 0u);
   EXPECT_EQ(log.Read(0u, 300u, 10u, out), 2u);
   EXPECT_EQ(Text(out), "xy");
+}
+
+// Plan WP15.3: the live replay's address, as the engine's `gpgnet://` URIs are written.
+TEST(LiveReplay, ReadsGpgNetAddresses)
+{
+  const auto full = faf::server::ParseGpgNetAddress("gpgnet://replay.example.org:15001/12345/live.scfareplay");
+  ASSERT_TRUE(full.has_value());
+  EXPECT_EQ(full->host, "replay.example.org");
+  EXPECT_EQ(full->port, 15001);
+  EXPECT_EQ(full->path, "/12345/live.scfareplay");
+  const auto noPort = faf::server::ParseGpgNetAddress("gpgnet://10.0.0.5/9");
+  ASSERT_TRUE(noPort.has_value());
+  EXPECT_EQ(noPort->port, 15000); // the engine's default
+  EXPECT_EQ(noPort->path, "/9");
+  EXPECT_EQ(faf::server::ParseGpgNetAddress("gpgnet://host")->path, "/");
+  for (const char* bad : {"http://host/x", "gpgnet://", "gpgnet://:15000/x", "gpgnet://host:0/x", "gpgnet://host:99999/x", "gpgnet://host:12a/x"}) {
+    EXPECT_FALSE(faf::server::ParseGpgNetAddress(bad).has_value()) << bad;
+  }
 }
 
 TEST(ReplayLog, TheTeeWritesTheFileAndTheLog)
