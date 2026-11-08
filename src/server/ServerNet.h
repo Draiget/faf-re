@@ -120,6 +120,22 @@ namespace faf::server
     [[nodiscard]] std::vector<SPresence> TakeLobbyPresence();
     /** At launch (plan WPR.51): the relay takes nothing more. From any thread. */
     void CloseLobby() noexcept { mCloseLobby.store(true, std::memory_order_relaxed); }
+
+    /** Plan WP17.2: a seat as the control API reports it, refreshed on the network thread. */
+    struct SSeatState
+    {
+      std::int32_t uid = 0;
+      std::string name;
+      bool joined = false;
+      bool loaded = false;
+      bool lost = false;
+      bool gone = false;
+      bool away = false; // quiet in the lobby
+      std::uint32_t pingMs = 0;
+    };
+    [[nodiscard]] std::vector<SSeatState> Seats();
+    /** Plan WP17.2: the organiser takes a participant out of the match; done on the network thread. False: no such seat. */
+    bool RequestEject(std::int32_t uid, std::string reason);
     /** Plan WP17.1: the current logical host (0: none), from the lobby's succession; its ejects go through in a player-hosted lobby. */
     void SetLobbyHost(const std::int32_t uid) noexcept { mLobbyHost.store(uid, std::memory_order_relaxed); }
     /** Before `Start` (plan WPR.49): the game options the match pins (`CLobbyRelay::PinOptions`). */
@@ -235,6 +251,8 @@ namespace faf::server
 
     std::mutex mNewsLock;
     std::vector<std::string> mNews;
+    std::vector<SSeatState> mSeatStates;                         // under mNewsLock
+    std::vector<std::pair<std::int32_t, std::string>> mEjects;   // likewise: uid, reason
 
     CLobbyRelay mLobby;                        // on the network thread
     std::vector<std::uint8_t> mLobbyFrame;     // the frame being relayed

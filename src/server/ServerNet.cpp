@@ -327,9 +327,57 @@ namespace faf::server
     }
   }
 
+  std::vector<CServerNet::SSeatState> CServerNet::Seats()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    return mSeatStates;
+  }
+
+  bool CServerNet::RequestEject(const std::int32_t uid, std::string reason)
+  {
+    const std::scoped_lock lock(mNewsLock);
+    const bool known = std::any_of(mSeatStates.begin(), mSeatStates.end(), [uid](const SSeatState& seat) { return seat.uid == uid && !seat.gone; });
+    if (known) {
+      mEjects.emplace_back(uid, std::move(reason));
+    }
+    return known;
+  }
+
   void CServerNet::Tick(const std::uint64_t nowUs)
   {
     WatchLobbyPresence(nowUs);
+
+    // Plan WP17.2: the organiser's ejects, and the seats as the control API reports them.
+    std::vector<std::pair<std::int32_t, std::string>> ejects;
+    {
+      const std::scoped_lock lock(mNewsLock);
+      ejects.swap(mEjects);
+    }
+    for (const auto& [uid, reason] : ejects) {
+      if (const auto found = mSeats.find(uid); found != mSeats.end() && !found->second.gone) {
+        Remove(uid, found->second, "ejected by the organiser" + (reason.empty() ? std::string() : ": " + reason));
+      }
+    }
+    std::vector<SSeatState> states;
+    states.reserve(mSeats.size());
+    for (const auto& [uid, seat] : mSeats) {
+      SSeatState state;
+      state.uid = uid;
+      state.name = seat.name;
+      state.joined = seat.joinedEver;
+      state.loaded = seat.loaded;
+      state.lost = seat.lost;
+      state.gone = seat.gone;
+      state.away = seat.lobbyAway;
+      if (const remote::net::ChannelStats* const stats = mLinks.StatsOf(uid); stats != nullptr && !seat.gone) {
+        state.pingMs = static_cast<std::uint32_t>(stats->rttSmoothedUs / 1000u);
+      }
+      states.push_back(std::move(state));
+    }
+    {
+      const std::scoped_lock lock(mNewsLock);
+      mSeatStates.swap(states);
+    }
 
     if (const std::int32_t beat = mBeat.load(std::memory_order_relaxed); beat != mBeatSent) {
       mBeatSent = beat;

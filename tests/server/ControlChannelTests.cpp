@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "server/ControlChannel.h"
+#include "server/ControlListener.h"
 
 namespace
 {
@@ -152,6 +153,29 @@ TEST(ControlChannel, ChangedReplayedOrHugeFramesEndTheConnection)
     const std::vector<std::uint8_t> big(faf::server::kMaxControlMessageBytes + 1u, std::uint8_t{'x'});
     EXPECT_TRUE(pair.server.Seal(big).empty());
   }
+}
+
+// Plan WP17.2: what the listener reads of a request (server/ControlListener.h).
+TEST(ControlListener, ParsesFlatRequests)
+{
+  const auto eject = faf::server::ParseControlRequest(R"( {"id": 7, "op": "eject", "uid": 1002, "reason": "no \"show\"\n", "extra": true, "n": null} )");
+  ASSERT_TRUE(eject.has_value());
+  EXPECT_EQ(eject->id, 7);
+  EXPECT_EQ(eject->op, "eject");
+  EXPECT_EQ(eject->uid, 1002);
+  EXPECT_EQ(eject->reason, "no \"show\"\n");
+  const auto status = faf::server::ParseControlRequest(R"({"op":"status"})");
+  ASSERT_TRUE(status.has_value());
+  EXPECT_EQ(status->id, 0);
+  EXPECT_EQ(faf::server::ParseControlRequest(R"({"op":"café"})")->op, "caf\xC3\xA9");
+  // Not a request: no op, nested values, fractions, trailing text, truncation, other JSON.
+  for (const std::string_view bad : {std::string_view(R"({"id":1})"), std::string_view(R"({"op":"x","args":{"a":1}})"),
+                                     std::string_view(R"({"op":"x","list":[1]})"), std::string_view(R"({"op":"x","id":1.5})"),
+                                     std::string_view(R"({"op":"x"} tail)"), std::string_view(R"({"op":"x")"), std::string_view("[1]"),
+                                     std::string_view(""), std::string_view(R"({"op":"x",})"), std::string_view(R"({"op":"\q"})")}) {
+    EXPECT_FALSE(faf::server::ParseControlRequest(bad).has_value()) << bad;
+  }
+  EXPECT_EQ(faf::server::JsonString("a\"b\\c\n\x01"), "\"a\\\"b\\\\c\\n\\u0001\"");
 }
 
 TEST(ControlChannel, ReadsTheKeyFile)

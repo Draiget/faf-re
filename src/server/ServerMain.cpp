@@ -24,6 +24,7 @@
 #include <ctime>
 #include <exception>
 #include <filesystem>
+#include <cstdint>
 #include <fstream>
 #include <map>
 #include <memory>
@@ -72,6 +73,7 @@
 #include "platform/X87Precision.h"
 #include "remote/net/UdpSocket.h"
 #include "remote/ContentTables.h"
+#include "server/ControlListener.h"
 #include "server/LobbySignaller.h"
 #include "server/ServerNet.h"
 #include "server/ServerViews.h"
@@ -108,6 +110,7 @@ namespace
   volatile std::sig_atomic_t gStopSignal = 0;
   volatile std::sig_atomic_t gPauseRequests = 0;
   volatile std::sig_atomic_t gForceStartRequests = 0; // plan WPR.49: SIGUSR2, the operator starts the match from the lobby
+  faf::server::CControlListener* gControl = nullptr;    // plan WP17.2: the console's lines also go to the control service
 
   [[nodiscard]] double SecondsSince(const Clock::time_point start)
   {
@@ -140,6 +143,16 @@ namespace
     (void)std::strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", &local);
     std::printf("[%s] %s\n", stamp, text);
     gpg::Logf("server: %s", text);
+    if (gControl != nullptr) {
+      gControl->Event("log", "\"text\":" + faf::server::JsonString(text));
+    }
+  }
+
+  [[nodiscard]] std::uint64_t ControlNowUs()
+  {
+    return static_cast<std::uint64_t>(
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()
+    );
   }
 
   [[nodiscard]] std::string ClockText(const double seconds)
@@ -832,6 +845,78 @@ namespace
     if (listening) {
       net = std::make_unique<faf::server::CServerNet>(netConfig);
     }
+    // Plan WP17.2: the control API, for the control service only (research/WP17.2-control-api.md).
+    std::unique_ptr<faf::server::CControlListener> control;
+    struct SControlUnhook
+    {
+      ~SControlUnhook() { gControl = nullptr; } // before `control` goes: no `Say` reaches it after
+    } controlUnhook;
+    if (ReadOption("--control", text)) {
+      faf::remote::net::SEndpoint controlAt;
+      std::string keyPath;
+      faf::server::ControlKey controlKey{};
+      std::string controlError;
+      if (!faf::remote::net::ParseEndpoint(text, controlAt)) {
+        controlError = "--control takes <ip:port>, not " + text;
+      } else if (!ReadOption("--control-key", keyPath)) {
+        controlError = "--control needs --control-key <file>: 64 hex digits";
+      } else {
+        std::ifstream keyFile(keyPath);
+        std::stringstream keyText;
+        keyText << keyFile.rdbuf();
+        if (!keyFile || !faf::server::ReadControlKey(keyText.str(), controlKey)) {
+          controlError = "--control-key " + keyPath + " isn't 64 hex digits";
+        }
+      }
+      if (controlError.empty()) {
+        control = std::make_unique<faf::server::CControlListener>();
+        if (!control->Open(controlAt, controlKey, controlError)) {
+          control.reset();
+        }
+      }
+      if (!control) {
+        end.error = controlError;
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      }
+      gControl = control.get();
+      Say("Control API on %s", controlAt.Text().c_str());
+    }
+    const auto controlSeats = [&net]() {
+      std::string seats = "\"seats\":[";
+      if (net) {
+        bool first = true;
+        for (const faf::server::CServerNet::SSeatState& seat : net->Seats()) {
+          const auto flag = [](const bool on) { return on ? "true" : "false"; };
+          seats += std::string(first ? "" : ",") + "{\"uid\":" + std::to_string(seat.uid) + ",\"name\":" + faf::server::JsonString(seat.name) +
+                   ",\"joined\":" + flag(seat.joined) + ",\"loaded\":" + flag(seat.loaded) + ",\"lost\":" + flag(seat.lost) +
+                   ",\"gone\":" + flag(seat.gone) + ",\"away\":" + flag(seat.away) + ",\"ping_ms\":" + std::to_string(seat.pingMs) + "}";
+          first = false;
+        }
+      }
+      return seats + "]";
+    };
+    // The requests that mean the same in the lobby and the game; false for one the caller answers.
+    const auto controlCommon = [&net, &control](const faf::server::SControlRequest& request) {
+      if (request.op != "eject") {
+        return false;
+      }
+      if (!net) {
+        control->Refuse(request.id, "this server has no players (--listen)");
+      } else if (request.uid <= 0 || request.uid > INT32_MAX) {
+        control->Refuse(request.id, "eject needs a participant's uid");
+      } else if (!net->RequestEject(static_cast<std::int32_t>(request.uid), request.reason)) {
+        control->Refuse(request.id, "no participant with uid " + std::to_string(request.uid));
+      } else {
+        control->Reply(request.id, {});
+      }
+      return true;
+    };
+    const auto controlNews = [&control] {
+      for (const std::string& line : control->TakeNews()) {
+        Say("%s", line.c_str());
+      }
+    };
     const std::map<std::int32_t, std::string> tokens = ReadTokens(state);
     for (const moho::SLaunchClient& client : roster.Remotes()) {
       faf::remote::CServerClient& seat = faf::remote::CServerClient::Create(
@@ -1002,6 +1087,23 @@ namespace
           for (const std::string& line : net->TakeNews()) {
             Say("%s", line.c_str());
           }
+          // Plan WP17.2: the control service's requests in the lobby.
+          if (control) {
+            std::vector<faf::server::SControlRequest> requests;
+            control->Poll(requests, ControlNowUs());
+            for (const faf::server::SControlRequest& request : requests) {
+              if (request.op == "status") {
+                control->Reply(request.id, "\"phase\":\"lobby\",\"host\":" + std::to_string(signaller.Host()) + "," + controlSeats());
+              } else if (request.op == "force_start") {
+                Say("The control service forces the start");
+                gForceStartRequests = gForceStartRequests + 1;
+                control->Reply(request.id, {});
+              } else if (!controlCommon(request)) {
+                control->Refuse(request.id, request.op == "pause" || request.op == "resume" ? "the game hasn't started" : "unknown op " + request.op);
+              }
+            }
+            controlNews();
+          }
           std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
         net->CloseLobby();
@@ -1140,6 +1242,8 @@ namespace
     // Beats go on while the game is paused, and no game time with them.
     int pausedBeats = 0;
     std::int32_t pausedBy = -1;
+    // The operator's (SIGUSR1, control API) pause or resume asked of the driver, until the game is so: a beat or more.
+    std::optional<bool> operatorPauseWanted;
     int pauseRequestsDone = 0;
     // `--away-pause-seconds`: the game waits for a player who lost the connection, from a budget each has for the game.
     const auto serverSource = static_cast<std::int32_t>(sessionInfo->mSourceId);
@@ -1216,6 +1320,37 @@ namespace
         break;
       }
       sayNetNews();
+      // Plan WP17.2: the control service's requests in the game. Pause and resume take the operator's path (SIGUSR1).
+      if (control) {
+        std::vector<faf::server::SControlRequest> requests;
+        control->Poll(requests, ControlNowUs());
+        for (const faf::server::SControlRequest& request : requests) {
+          const bool pending = gPauseRequests != pauseRequestsDone;
+          if (request.op == "status") {
+            control->Reply(
+              request.id, "\"phase\":\"game\",\"started\":" + std::string(started ? "true" : "false") + ",\"beat\":" + std::to_string(end.lastBeat) +
+                            ",\"paused\":" + std::string(pausedBy != -1 ? "true" : "false") + "," + controlSeats()
+            );
+          } else if (request.op == "pause" || request.op == "resume") {
+            const bool pause = request.op == "pause";
+            if (!started) {
+              control->Refuse(request.id, "the game hasn't started");
+            } else if (pending) {
+              control->Refuse(request.id, "a pause or resume is on its way");
+            } else if (pause == operatorPauseWanted.value_or(pausedBy != -1)) {
+              control->Refuse(request.id, pause ? "the game is paused already" : "the game isn't paused");
+            } else {
+              gPauseRequests = gPauseRequests + 1;
+              control->Reply(request.id, {});
+            }
+          } else if (request.op == "force_start") {
+            control->Refuse(request.id, "the game has started");
+          } else if (!controlCommon(request)) {
+            control->Refuse(request.id, "unknown op " + request.op);
+          }
+        }
+        controlNews();
+      }
       if (net && net->NobodyCame()) {
         end.stoppedBy = "nobody connected";
         Say("Nobody connected in time");
@@ -1223,8 +1358,10 @@ namespace
       }
       if (const int requests = gPauseRequests; started && requests != pauseRequestsDone) {
         pauseRequestsDone = requests;
-        Say("The operator asks to %s the game", pausedBy == -1 ? "pause" : "resume");
-        if (pausedBy == -1) {
+        const bool pause = !operatorPauseWanted.value_or(pausedBy != -1); // against what the game will be, not what it was
+        Say("The operator asks to %s the game", pause ? "pause" : "resume");
+        operatorPauseWanted = pause;
+        if (pause) {
           driver->RequestPause();
         } else {
           driver->Resume();
@@ -1329,6 +1466,9 @@ namespace
             Say("Game paused, at game time %s", GameClockText(end.lastBeat - pausedBeats).c_str());
           }
           pausedBy = packet->mPausedBy;
+          if (operatorPauseWanted && *operatorPauseWanted == (pausedBy != -1)) {
+            operatorPauseWanted.reset(); // the game is where the operator asked
+          }
         }
         if (moho::CClientManagerImpl* const manager = driver->GetClientManager(); manager != nullptr) {
           nextBeatAt = std::max(nextBeatAt, lastBeatAt - kMaxCatchUpSeconds) + faf::server::SecondsPerBeat(manager->GetSimRateRequested());

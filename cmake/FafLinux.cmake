@@ -308,6 +308,7 @@ target_link_options(headless PRIVATE -Wl,--error-limit=0)
 add_executable(server
   "${PROJECT_SOURCE_DIR}/src/server/ServerMain.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ControlChannel.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ControlListener.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbyScriptData.cpp"
@@ -328,12 +329,19 @@ target_link_libraries(faf_server_tests PRIVATE gtest_main)
 add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp" "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
   "${PROJECT_SOURCE_DIR}/tests/server/ControlChannelTests.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ControlChannel.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ControlListener.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbyScriptData.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbySignaller.cpp")
 target_link_libraries(faf_seat_tests PRIVATE faf_sim faf_netchannel faf_monocypher gtest_main)
 target_compile_definitions(faf_seat_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_seat_tests PRIVATE -Wl,--error-limit=0)
+
+# Plan WP17.2: a client of the control API, for operators and tests.
+add_executable(faf_server_control EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-control/ControlMain.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ControlChannel.cpp")
+target_include_directories(faf_server_control PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(faf_server_control PRIVATE faf_netchannel faf_monocypher)
 
 add_executable(faf_server_probe EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeMain.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbyScriptData.cpp"
