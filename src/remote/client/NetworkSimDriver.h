@@ -11,6 +11,7 @@
 #include "boost/shared_ptr.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/sim/ISTIDriver.h"
+#include "remote/client/BeatClock.h"
 #include "remote/client/RemoteClientManager.h"
 #include "remote/client/ServerViewClient.h"
 
@@ -122,6 +123,10 @@ namespace faf::remote::client
     /** The beat a command just sent will be applied at, as best this side knows: the newest shown plus one. */
     [[nodiscard]] moho::CmdId IssueBeat() const noexcept;
     void LogSummary(const char* when) const;
+    /** Plan WP11.4: chat for a roster client goes through the server; for this player's own client, straight to its UI. */
+    void SendChat(int clientIndex, const gpg::MemBuffer<const char>& data);
+    /** A chat line the server relayed, from the client `senderIndex`, to the UI as a lockstep peer's would come. */
+    void DeliverChat(int senderIndex, std::span<const std::uint8_t> payload);
 
     moho::RRuleGameRules& mRules;
     CRemoteClientManager mClientManager;
@@ -138,6 +143,11 @@ namespace faf::remote::client
     boost::shared_ptr<moho::CSimResources> mResources;
     const moho::CHeightField* mSeedHeights = nullptr; // copied into the view client when it is made
     std::uint64_t mTablesBad = 0;
+    std::uint64_t mRosters = 0;
+    std::uint64_t mRostersBad = 0;
+    std::uint64_t mChatSent = 0;
+    std::uint64_t mChatReceived = 0;
+    std::uint64_t mChatBad = 0;
     std::deque<std::unique_ptr<moho::SSyncData>> mPackets;
     // Views waiting for their beat's Lua lane (`LuaSync`, sent once the server's `Sync` for the beat is routed).
     struct SPendingView
@@ -151,6 +161,10 @@ namespace faf::remote::client
     std::map<std::uint32_t, std::vector<std::uint8_t>> mEarlyLua; // a `LuaSync` before its view (the pipeline)
     std::uint64_t mLuaMissing = 0;
     HANDLE mAvailable = nullptr;
+    // Plan WP11.5 (#178): the server's beats as they arrive and as the session shows them; `GetSimSpeed` is its skew,
+    // so the display keeps `kTargetBacklog` beats in hand against arrival jitter, neither ahead of the views nor behind.
+    static constexpr std::int64_t kTargetBacklog = 1;
+    CBeatClock mClock{kTargetBacklog};
     std::int32_t mLastBeat = -1;
     std::int32_t mServerBeat = -1;
     bool mShutDown = false;
@@ -158,6 +172,16 @@ namespace faf::remote::client
     std::uint64_t mViewsBad = 0;
     std::uint64_t mCommandsSent = 0;
     std::uint64_t mAnswers[3] = {};
+    // Plan WP3.7 (#99): the beat a command's UI edits last until is the beat the server applies it in, which its
+    // `CommandAnswer` tells later. Each command sent remembers the beat shown then; each answer gives how far ahead
+    // of it the command went in, and an issued command's beat is the shown beat plus the largest of the last answers'.
+    std::deque<std::int32_t> mSentAtShown;   // per command sent, unanswered: the beat shown when it went
+    std::deque<std::int32_t> mRecentLeads;   // the last answers' beat minus beat shown at sending
+    std::int32_t mIssueLead = kDefaultIssueLead;
+    std::uint64_t mAnswersPastEstimate = 0;  // applied after the beat its command was given (the UI dropped its edit early)
+    std::int32_t mLargestLead = 0;
+    static constexpr std::int32_t kDefaultIssueLead = 10; // a second of beats, until answers say otherwise
+    static constexpr std::size_t kLeadWindow = 32;
     std::uint64_t mLuaLanesBad = 0;
     std::uint64_t mLuaTablesLogged = 0;
   };

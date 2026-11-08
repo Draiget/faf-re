@@ -48,6 +48,8 @@ namespace faf::remote::client
     std::span<const std::uint8_t> armies;
     std::span<const std::uint8_t> grids;
     std::span<const std::uint8_t> lua;
+    std::span<const std::uint8_t> poses; // plan WP8.1: the sixth lane, when the server sends poses
+    bool hasPoses = false;
   };
 
   /** Reads a whole `View` message (its kind byte first); its lanes must end at the message's last byte. */
@@ -77,6 +79,9 @@ namespace faf::remote::client
     std::uint64_t tableRecords = 0;
     std::uint64_t tableFailures = 0;
     std::uint64_t tableResets = 0;
+    std::uint64_t poseLanes = 0;
+    std::uint64_t poseFailures = 0; // pose lanes that didn't decode
+    std::uint64_t poseBytes = 0;
   };
 
   class CServerViewClient
@@ -117,6 +122,7 @@ namespace faf::remote::client
     std::vector<wire::SArmyRecord> mArmies;
     bool mHaveArmies = false;
     std::vector<wire::SGridSlot> mGrids;
+    std::vector<wire::SUnitPose> mPoses; // this view's pose lane, while it's applied
     SServerViewStats mStats;
   };
 } // namespace faf::remote::client

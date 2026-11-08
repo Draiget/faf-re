@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "remote/FrameBuilder.h"
+#include "remote/PoseTracker.h"
 #include "remote/ViewIdMap.h"
 #include "remote/ViewJobs.h"
 #include "gpg/core/containers/ChunkedVector.h"
@@ -72,6 +73,28 @@ namespace faf::remote
       mSharedRecords.SetSessionTables(&session);
       mSharedStats.SetReadEvery(statsEveryBeats);
     }
+    /**
+     * Plan WP11.5 (#178), on the sim thread before a beat's frames are encoded: the sim rate and the server's clock
+     * (ms) the held frames' headers carry, for the client's beat clock.
+     */
+    void SetFrameClock(const std::int32_t simRate, const std::uint32_t serverMs) noexcept
+    {
+      mFrameSimRate = simRate;
+      mFrameServerMs = serverMs;
+    }
+    /** Plan WP8.1, before the first beat: the units' poses are tracked each beat for the views' pose lanes. */
+    void EnablePoses()
+    {
+      mPosesOn = true;
+      mPoses.InstallHook(); // #118: the animation step marks the bones it changed
+    }
+    [[nodiscard]] bool PosesOn() const noexcept { return mPosesOn; }
+    [[nodiscard]] const CPoseTracker& Poses() const noexcept { return mPoses; }
+    /**
+     * The units `army`'s client holds after this beat (its own view's and, with teams, its team's), ascending. In
+     * `OnViewReady` or after `FinishViews`.
+     */
+    void HeldUnitIds(std::size_t army, std::vector<std::uint32_t>& out) const;
     /** `CSharedUnitStats::SetReadEvery`'s default: a unit's stats at most 0.3 s late (server `--stats-every`). */
     static constexpr std::uint32_t kStatsEveryBeats = 4;
     /** `--stats-every <beats>` (server and headless view bench): 1 reads every unit's stats every beat. */
@@ -231,6 +254,10 @@ namespace faf::remote
     CSessionEditCollector mEdits;
     CSharedUnitStats mSharedStats;
     std::vector<std::uint32_t> mUnitIds; // this beat's units' ids (the entity index's first entries)
+    bool mPosesOn = false;
+    CPoseTracker mPoses;
+    std::int32_t mFrameSimRate = 0;   // `SetFrameClock`
+    std::uint32_t mFrameServerMs = 0;
     std::vector<std::unique_ptr<CViewFrameBuilder>> mBuilders;
     std::vector<SHeldView> mHeld;
     CSharedEntityRecords mSharedRecords;

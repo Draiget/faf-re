@@ -56,6 +56,11 @@ set_target_properties(faf_profiler_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME profiler_facade COMMAND faf_profiler_tests)
 set_tests_properties(profiler_facade PROPERTIES LABELS "Existing")
 
+# Engine addition: the stable shadow box (ren_ShadowStable), pure maths with no device.
+add_executable(faf_shadow_fit_tests EXCLUDE_FROM_ALL render/ShadowStableFitTests.cpp)
+target_include_directories(faf_shadow_fit_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME shadow_stable_fit COMMAND faf_shadow_fit_tests)
+
 # Engine addition: EffectScan.h against the std::regex patterns it replaced, on generated text.
 add_executable(faf_effect_scan_tests EXCLUDE_FROM_ALL effect_scan/EffectScanTests.cpp)
 target_include_directories(faf_effect_scan_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
@@ -254,3 +259,17 @@ target_link_libraries(faf_splat_budget_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_splat_budget_tests PROPERTIES FOLDER "Tests/Terrain")
 add_test(NAME splat_budget COMMAND faf_splat_budget_tests)
 set_tests_properties(splat_budget PROPERTIES TIMEOUT 120 LABELS "Terrain")
+
+# Regression for lua damage stack; no game data required.
+add_executable(faf_damage_callback_stack_tests EXCLUDE_FROM_ALL "lua/DamageCallbackStackTests.cpp")
+target_link_libraries(faf_damage_callback_stack_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_damage_callback_stack_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME damage_callback_stack COMMAND faf_damage_callback_stack_tests)
+set_tests_properties(damage_callback_stack PROPERTIES LABELS "Sim")
+
+# Regression for collision allocator; no game data required.
+add_executable(faf_occupation_manager_tests EXCLUDE_FROM_ALL "collision_allocator/OccupationManagerTests.cpp")
+target_link_libraries(faf_occupation_manager_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
+set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")

@@ -10,6 +10,14 @@
 	{
 		const lua_Number threshold = luaL_optnumber(state, 1, 0.0f);
 		lua_setgcthreshold(state, static_cast<int>(threshold));
+		// Engine addition (lua_IncrementalGC, #278): a frame-driven UI state skips the collection
+		// lua_setgcthreshold asks for, so a script's own request runs the incremental collector's full
+		// cycle, as the binary's collection does when the heap has reached the threshold.
+		global_State* const globalState = state->l_G;
+		if (moho::lua_IncrementalGC && moho::lua_incremental::IsUiState(globalState) &&
+		    globalState->nblocks >= globalState->GCthreshold) {
+			faf_lua51_gc_full(state);
+		}
 		return 0;
 	}
 

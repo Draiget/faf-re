@@ -139,6 +139,7 @@ namespace moho
 	class CMessageStream;
 	class Sim;
 	class CLuaTask;
+	class CTaskStage;
 }
 
 void* lua_getglobaluserdata(lua_State* state);

@@ -17,6 +17,7 @@ namespace gpg::gal
   bool gReleaseBufferCopies = true;
   bool gLockedRangeOnly = true;
   int gUploadIdleMB = 32;
+  bool gVulkanScaledPresent = true;
 } // namespace gpg::gal
 
 namespace gpg::gal::backend

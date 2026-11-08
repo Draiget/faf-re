@@ -32,6 +32,7 @@
 namespace gpg::gal
 {
   class IndexBuffer;
+  class RenderTarget;
   class Texture;
 
   /** Capability bits of `Device::GetGpuDrivenFeatures()`. */
@@ -117,6 +118,7 @@ namespace gpg::gal
     Opaque,
     AlphaBlend, ///< src * srcAlpha + dst * (1 - srcAlpha)
     Additive,   ///< src * srcAlpha + dst
+    Multiply,   ///< src * dst in colour; mask alpha off, it takes src
   };
 
   enum class GpuCompare : std::uint8_t
@@ -213,7 +215,14 @@ namespace gpg::gal
     std::uint32_t constantBytes = 0U; ///< a multiple of 16, at most `kGpuMaxConstantBytes`
     GpuBuffer* readBuffers[kGpuMaxReadBuffers]{};   ///< t0..t3
     Texture* textures[kGpuMaxTextures]{};           ///< t4..t5
+    /// t4..t5 where `textures` leaves the slot empty: a colour target's current buffer, read as a
+    /// texture (Direct3D 12 and Vulkan). It must not be the target the call draws into.
+    RenderTarget* targets[kGpuMaxTextures]{};
     GpuBuffer* writeBuffers[kGpuMaxWriteBuffers]{}; ///< u0..u1, compute only
+    /// t6 (Vulkan binding 10): the depth target bound when the call runs, as `Texture2D<float>`.
+    /// Direct3D 12 and Vulkan create their head depth targets readable; anywhere else t6 reads 0.
+    /// For dispatches: a draw would read the target it also writes.
+    bool readBoundDepth = false;
   };
 
   /**

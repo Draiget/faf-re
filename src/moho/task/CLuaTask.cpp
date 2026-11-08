@@ -477,13 +477,13 @@ int moho::cfunc_ForkThreadL(LuaPlus::LuaState* const curState)
   CTaskStage* ownerStage = nullptr;
   LuaPlus::LuaState* const rootState = curState->m_rootState;
   if (rootState == curState) {
-    ownerStage = reinterpret_cast<CTaskStage*>(curState->m_luaTask);
+    ownerStage = curState->m_taskStage;
   } else {
     CLuaTask* const currentTask = curState->m_luaTask;
     if (currentTask && currentTask->mOwnerThread) {
       ownerStage = currentTask->mOwnerThread->mStage;
     } else {
-      ownerStage = rootState ? reinterpret_cast<CTaskStage*>(rootState->m_luaTask) : nullptr;
+      ownerStage = rootState ? rootState->m_taskStage : nullptr;
     }
   }
 

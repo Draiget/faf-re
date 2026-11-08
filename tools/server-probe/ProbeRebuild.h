@@ -6,6 +6,7 @@
 #include <string>
 
 #include "lua/LuaObject.h"
+#include "remote/ContentCheck.h"
 
 // Plan WP11 step 1 (research/WP11-network-client-map.md): the probe as a client that keeps no sim. With
 // `--rebuild <match.lua>` it starts the engine as the server does, loads the match's rules, and rebuilds each beat's
@@ -35,7 +36,7 @@ namespace faf::probe
      */
     void OnView(
       std::span<const std::uint8_t> own, std::span<const std::uint8_t> team, std::span<const std::uint8_t> armies,
-      std::span<const std::uint8_t> grids
+      std::span<const std::uint8_t> grids, std::span<const std::uint8_t> poses = {}, bool hasPoses = false
     );
 
     /** A whole `SessionTables` message (plan WP11 step 4). */
@@ -43,6 +44,8 @@ namespace faf::probe
 
     /** The match's rules are loaded (from the file, or from the server's `LaunchInfo`). */
     [[nodiscard]] bool HasRules() const noexcept;
+    /** Plan WP2.6: the content report for the loaded rules, as the game client sends it. False without rules. */
+    [[nodiscard]] bool Content(remote::SContentReport& out) const;
 
     /** The rebuild's counts, one line each. */
     void Report(int uid) const;

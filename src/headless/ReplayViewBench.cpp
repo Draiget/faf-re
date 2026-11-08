@@ -193,13 +193,19 @@ namespace faf::headless
     summary += "; build+send " + Distribution(total, "ms");
     summary += "; beat interval " + Distribution(interval, "ms");
     summary += "; per client " + Distribution(perSecond, "B/s");
+    if (PosesOn()) {
+      const std::uint64_t beats = Poses().Beats() != 0u ? Poses().Beats() : 1u;
+      summary += "; poses: " + std::to_string(Poses().PosedUnits()) + " units with a pose at the end, "
+               + std::to_string(Poses().TotalChangedBones() / beats) + " bones changed a beat (all units), "
+               + std::to_string(Poses().TotalHookedUnits() / beats) + " units a beat read from the animation hook's marks";
+    }
     if (SessionTables() != nullptr) {
       summary += "; session tables " + std::to_string(mTableRecords) + " records, " + std::to_string(mTableBytes / 1024u) + " KB";
     }
     if (PhaseTimesOn() && mPhaseBeats != 0u) {
       // Per beat, ms: each step's wall time on the sim thread; for a step done a view at a time, the
       // sum over views, the slowest view and the team views' part of the sum.
-      static constexpr const char* kNames[] = {"read", "read blocks", "read blips", "build", "write", "shared", "index", "facts", "keep", "tables", "frames", "release", "grid setup", "grids", "lua"};
+      static constexpr const char* kNames[] = {"read", "read blocks", "read blips", "build", "write", "shared", "index", "facts", "keep", "poses", "tables", "frames", "release", "grid setup", "grids", "lua"};
       static_assert(std::size(kNames) == static_cast<std::size_t>(EViewPhase::Count));
       const double perBeat = 1000.0 / static_cast<double>(mPhaseBeats);
       double wall = 0.0;

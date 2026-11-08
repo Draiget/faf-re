@@ -231,7 +231,21 @@ namespace faf::remote
     }
     client.grids.swap(client.gridsNext);
 
+    // Pose lane (plan WP8.1): the bones of the units its client holds, against what it was sent.
+    wire::BitWriter poseWriter;
+    if (PosesOn()) {
+      HeldUnitIds(army, client.poseUnitsNext);
+      if (Poses().EncodeView(client.poseUnitsNext, client.poseUnits, fresh, poseWriter)) {
+        client.bytes += static_cast<std::uint32_t>(poseWriter.Bytes().size());
+      } else {
+        ++client.failures;
+        ok = false;
+      }
+      client.poseUnits.swap(client.poseUnitsNext);
+    }
+
     SLanes lanes{frameWriter, armyWriter, gridWriter, client.lua, ok};
+    lanes.poses = PosesOn() ? &poseWriter : nullptr;
     lanes.fresh = fresh;
     // A whole view carries its check, so a client that asked for one knows at once that it holds the right frames.
     lanes.check = check || fresh;

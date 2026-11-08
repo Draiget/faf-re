@@ -62,6 +62,7 @@ namespace faf::probe
     std::unique_ptr<remote::client::CServerViewClient> client;
     bool seeded = false;
     std::uint64_t tablesBad = 0;
+    std::string gameMods; // the launch's `GameMods`, in its byte form
   };
 
   CProbeRebuild::CProbeRebuild() = default;
@@ -161,7 +162,17 @@ namespace faf::probe
     mState->sessionState.reset(gameData.mState);
     mState->rules.reset(gameData.mGameRules);
     mState->map.reset(gameData.mWldMap);
+    mState->gameMods.assign(build.launchInfo->mGameMods.c_str(), build.launchInfo->mGameMods.size());
     gameData = moho::SWldGameData{};
+    return true;
+  }
+
+  bool CProbeRebuild::Content(remote::SContentReport& out) const
+  {
+    if (!mState || !mState->rules) {
+      return false;
+    }
+    out = remote::MakeContentReport(*mState->rules, mState->gameMods);
     return true;
   }
 
@@ -196,7 +207,7 @@ namespace faf::probe
 
   void CProbeRebuild::OnView(
     const std::span<const std::uint8_t> own, const std::span<const std::uint8_t> team, const std::span<const std::uint8_t> armies,
-    const std::span<const std::uint8_t> grids
+    const std::span<const std::uint8_t> grids, const std::span<const std::uint8_t> poses, const bool hasPoses
   )
   {
     if (!mState || !mState->client) {
@@ -207,6 +218,8 @@ namespace faf::probe
     view.team = team;
     view.armies = armies;
     view.grids = grids;
+    view.poses = poses;
+    view.hasPoses = hasPoses;
     // A fresh packet each beat: a client with no sim has nothing else to start from.
     moho::SSyncData packet{};
     (void)mState->client->Apply(view, packet);
@@ -267,6 +280,14 @@ namespace faf::probe
       static_cast<unsigned long long>(v.tableResets), tables.Sounds().Size(), tables.Names().Size(), tables.Deposits().size(),
       static_cast<unsigned long long>(s.terrainEdits), mState->seeded ? "applied to the map's heights" : "counted, no heights",
       static_cast<unsigned long long>(s.statsApplied)
+    );
+    std::printf(
+      "probe %d: rebuild: poses: %llu lanes (%llu bad, %llu KB), %llu poses made, %llu unit-beats with bones, %llu bones applied, "
+      "%llu bad, %llu without a mesh\n",
+      uid, static_cast<unsigned long long>(v.poseLanes), static_cast<unsigned long long>(v.poseFailures),
+      static_cast<unsigned long long>(v.poseBytes / 1024u), static_cast<unsigned long long>(s.posesMade),
+      static_cast<unsigned long long>(s.poseBeats), static_cast<unsigned long long>(s.poseBonesApplied),
+      static_cast<unsigned long long>(s.poseBonesBad), static_cast<unsigned long long>(s.posesWithoutMesh)
     );
   }
 } // namespace faf::probe

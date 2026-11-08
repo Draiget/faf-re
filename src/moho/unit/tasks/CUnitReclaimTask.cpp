@@ -1,4 +1,5 @@
 #include "moho/unit/tasks/CUnitReclaimTask.h"
+#include "moho/misc/EconomyRequestRelease.h"
 
 #include <algorithm>
 #include <cmath>
@@ -170,16 +171,6 @@ namespace
   }
 
 
-  void DestroyEconomyRequestPointer(moho::CEconRequest*& request)
-  {
-    if (request == nullptr) {
-      return;
-    }
-
-    request->mNode.ListUnlink();
-    delete request;
-    request = nullptr;
-  }
 } // namespace
 
 namespace moho

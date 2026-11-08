@@ -1,4 +1,5 @@
 #include "moho/misc/CSaveGameRequestImpl.h"
+#include "moho/misc/FileWriteExact.h"
 #include "moho/sim/CVFSImpl.h"
 
 #include <Windows.h>
@@ -80,17 +81,6 @@ namespace
   [[nodiscard]] std::wstring Utf8ToWide(const fa::string& source)
   {
     return gpg::STR_Utf8ToWide(source.c_str());
-  }
-
-  [[nodiscard]] bool WriteExact(std::FILE* const file, const void* const data, const std::size_t byteCount)
-  {
-    if (!file) {
-      return false;
-    }
-    if (byteCount == 0) {
-      return true;
-    }
-    return std::fwrite(data, byteCount, 1, file) == 1;
   }
 
   [[nodiscard]] bool RewriteSaveHeader(std::FILE* const file, const SaveGameFileHeader& header)

@@ -7,6 +7,7 @@
 // after CConCommand.cpp.
 
 #include "moho/console/CConCommand.h"
+#include "moho/entity/UserEntityMeshBox.h"
 #include "moho/console/ConCommandJoin.h"
 #include <algorithm>
 #include <cctype>
@@ -98,16 +99,6 @@ using namespace moho;
 namespace
 {
   // ---- UISelectionByCategory support (FUN_008662B0) ----
-
-  [[nodiscard]] const Wm3::Box3f* SelectionEntityMeshBox(moho::UserEntity* const entity)
-  {
-    moho::MeshInstance* const meshInstance = (entity != nullptr) ? entity->mMeshInstance : nullptr;
-    if (meshInstance != nullptr) {
-      meshInstance->UpdateInterpolatedFields();
-      return &meshInstance->box;
-    }
-    return &moho::Invalid<Wm3::Box3f>();
-  }
 
   /**
    * Address: 0x008662B0 (FUN_008662B0, sub_8662B0, SelectUnitsByCategory)

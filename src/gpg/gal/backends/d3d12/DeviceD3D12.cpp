@@ -698,7 +698,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       auto* const target = new RenderTargetD3D12(std::move(buffers), &swapChain);
       output.surface.reset(target);
       const RenderTargetContext* const targetContext = target->GetContext();
-      const DepthStencilTargetContext depthContext(targetContext->width_, targetContext->height_, 3U, false);
+      // Engine change: readable by shaders, for ren_Ao (GpuBindings::readBoundDepth).
+      const DepthStencilTargetContext depthContext(targetContext->width_, targetContext->height_, 3U, true);
       output.depthStencil = CreateDepthStencilTarget(&depthContext);
       gpg::Logf("D3D12: head %u back buffer target %p (%ux%u)", static_cast<unsigned>(headIndex), target, targetContext->width_,
                 targetContext->height_);

@@ -550,6 +550,72 @@ namespace
     return true;
   }
 
+  // Retail's streaming wave-bank open flags: FILE_FLAG_OVERLAPPED |
+  // FILE_FLAG_NO_BUFFERING (0x004DAE53: push 60000000h).
+  constexpr DWORD kStreamingWaveBankOpenFlags = FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING;
+  static_assert(kStreamingWaveBankOpenFlags == 0x60000000u, "streaming wave-bank open flags must match retail");
+
+  /**
+   * Not in the binary.
+   *
+   * What it does:
+   * Returns the flags to open one streaming wave bank with: retail's
+   * `kStreamingWaveBankOpenFlags`, or `FILE_FLAG_OVERLAPPED` alone when the
+   * bank's wave alignment is not a multiple of the logical sector size of the
+   * drive it is on.
+   *
+   * An unbuffered read must start on a logical sector, and XACT starts each
+   * wave's reads at that wave's own offset in the bank. The shipped banks are
+   * built with 2048-byte alignment (the bank-data field at +0x50), so on a
+   * drive with 4096-byte logical sectors every wave that does not happen to
+   * land on 4096 fails: `Play` reports "XACT: Invalid arg", and the failed cue
+   * later crashes the engine's teardown inside `IXACTWaveBank::Destroy`
+   * (a read of freed memory under 0x004DB004). Through the file cache the
+   * same reads work at any offset. XACT's own reads are a multiple of 4096
+   * already (`packetSize` 0x12 x 2048 bytes), so a bank rebuilt with
+   * 4096-byte alignment keeps retail's unbuffered path.
+   *
+   * Any failure while checking leaves retail's flags, so the result can only
+   * differ from retail on a drive and bank that retail cannot stream.
+   */
+  [[nodiscard]] DWORD ResolveStreamingWaveBankOpenFlags(const char* const resolvedPath, const gpg::StrArg waveBankPath)
+  {
+    const HANDLE file = ::CreateFileA(
+      resolvedPath, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr
+    );
+    if (file == INVALID_HANDLE_VALUE) {
+      return kStreamingWaveBankOpenFlags;
+    }
+
+    DWORD openFlags = kStreamingWaveBankOpenFlags;
+    FILE_STORAGE_INFO storageInfo{};
+    std::array<std::uint32_t, 4> headerWords{}; // 'WBND', version, header version, bank-data offset
+    std::uint32_t alignment = 0u;
+    DWORD bytesRead = 0u;
+    LARGE_INTEGER alignmentOffset{};
+
+    if (::GetFileInformationByHandleEx(file, FileStorageInfo, &storageInfo, sizeof(storageInfo)) &&
+        storageInfo.LogicalBytesPerSector != 0u &&
+        ::ReadFile(file, headerWords.data(), sizeof(headerWords), &bytesRead, nullptr) &&
+        bytesRead == sizeof(headerWords) && headerWords[0] == 0x444E4257u) {
+      alignmentOffset.QuadPart = static_cast<LONGLONG>(headerWords[3]) + 0x50;
+      if (::SetFilePointerEx(file, alignmentOffset, nullptr, FILE_BEGIN) &&
+          ::ReadFile(file, &alignment, sizeof(alignment), &bytesRead, nullptr) && bytesRead == sizeof(alignment) &&
+          alignment % storageInfo.LogicalBytesPerSector != 0u) {
+        openFlags = FILE_FLAG_OVERLAPPED;
+        gpg::Logf(
+          "SND: WaveBank '%s' is aligned to %u bytes and its drive reads %u-byte sectors; streaming it through the file cache",
+          waveBankPath,
+          alignment,
+          static_cast<unsigned>(storageInfo.LogicalBytesPerSector)
+        );
+      }
+    }
+
+    (void)::CloseHandle(file);
+    return openFlags;
+  }
+
   /**
    * Address: 0x004DADF0 (FUN_004DADF0, Moho::RWaveBankResStreaming::LoadBank)
    *
@@ -559,6 +625,10 @@ namespace
    * Resolves one streaming wave-bank path, opens its backing file handle,
    * creates one XACT streaming wave-bank instance, stores base-name metadata,
    * and registers one wave-bank notification payload.
+   *
+   * Differs from retail: the open flags come from
+   * `ResolveStreamingWaveBankOpenFlags`, which drops FILE_FLAG_NO_BUFFERING for
+   * a bank its drive cannot read unbuffered.
    */
   bool AudioStreamingWaveBankLoader::Load(const gpg::StrArg waveBankPath)
   {
@@ -576,7 +646,7 @@ namespace
       FILE_SHARE_READ,
       nullptr,
       OPEN_EXISTING,
-      0x60000000u,
+      ResolveStreamingWaveBankOpenFlags(resolvedPath->c_str(), waveBankPath),
       nullptr
     );
     if (mFileHandle == INVALID_HANDLE_VALUE) {

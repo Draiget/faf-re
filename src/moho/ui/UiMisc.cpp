@@ -1622,7 +1622,7 @@ LuaPlus::LuaState* moho::USER_GetLuaState()
     lua_sethook(gUserLuaState->m_state, &DebugLuaHook, 4, 0);
   }
 
-  gUserLuaState->m_luaTask = reinterpret_cast<CLuaTask*>(sUserStage);
+  gUserLuaState->m_taskStage = sUserStage;
 
   ScrDiskWatcherTask* const diskWatcherTask = new (std::nothrow) ScrDiskWatcherTask(gUserLuaState);
   AttachTaskToStage(diskWatcherTask, sUserStage, true);

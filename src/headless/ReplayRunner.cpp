@@ -727,6 +727,9 @@ namespace faf::headless
       if (options.viewTeams) {
         viewBench->EnableTeamViews();
       }
+      if (options.viewPoses) {
+        viewBench->EnablePoses();
+      }
       if (options.viewTables) {
         viewBench->EnableBenchTables();
         if (options.statsEvery > 0) {

@@ -210,6 +210,14 @@ namespace gpg::gal
       std::uint32_t acquired = 0;
       bool hasImage = false;
       bool acquireWaitPending = false; // the next submission waits for the acquire
+      // Engine addition (`ren_VulkanScaledPresent`): the head draws into an image of its own at the size the
+      // engine made it, and Present copies that into the acquired image, scaled to the window. The swap chain
+      // can then follow the window's size while the engine's targets keep theirs, as on Direct3D 12.
+      bool scaled = false;
+      std::uint32_t headWidth = 0; // the size the engine draws the head at
+      std::uint32_t headHeight = 0;
+      // Out of date or suboptimal for the window: made again at the window's size before the next acquire.
+      bool stale = false;
       void* window = nullptr;
     };
 
@@ -244,6 +252,12 @@ namespace gpg::gal
     void CreateSwapChains(const DeviceContext& context);
     void CreateSwapChain(SwapChain& swapChain, std::uint32_t width, std::uint32_t height);
     void DestroySwapChain(SwapChain& swapChain, bool keepSurface) noexcept;
+    /** A stale scaled swap chain made again at the window's current size; false while the window has no area. */
+    bool RecreateStaleSwapChain(SwapChain& swapChain);
+    /** Copies a scaled head's image into its acquired swap-chain image and leaves that ready to present. */
+    void CopyHeadToSwapChain(vulkan::TrackedImage& head, SwapChain& swapChain);
+    /** A device-local colour image with a view, usable as a target, a texture and a copy source or destination. */
+    RenderTargetVulkan::Buffer CreateColorTargetImage(VkFormat format, std::uint32_t width, std::uint32_t height);
     void CreateRenderTargets();
     void ReleaseRenderTargets() noexcept;
     void CheckAvailableFormats(DeviceContext* context);

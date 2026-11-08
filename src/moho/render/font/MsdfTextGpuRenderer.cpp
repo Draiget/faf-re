@@ -243,9 +243,7 @@ float4 MsdfTextPS(QuadVertex input) : SV_Target
     if (!ren_GpuUiQuads) {
       return false;
     }
-    // Only flat 2D UI quads with uniform depth across all 4 vertices can join the instanced UI quad
-    // list (MsdfUiQuad carries a single scalar mZ). 3D world-space quads (such as waypoint markers
-    // in UICommandGraph) have varying Z coordinates and must be drawn by the prim batcher.
+    // The record holds one Z: a world quad lying on the ground (a build footprint, waypoint markers) would flatten to nothing.
     if (topLeft.mZ != topRight.mZ || topLeft.mZ != bottomRight.mZ || topLeft.mZ != bottomLeft.mZ) {
       return false;
     }
@@ -260,7 +258,6 @@ float4 MsdfTextPS(QuadVertex input) : SV_Target
     if (!isIdentityView) {
       return false;
     }
-
     CD3DDevice* const device = D3D_GetDevice();
     CD3DEffect* const effect = device != nullptr ? device->GetCurEffect() : nullptr;
     if (effect == nullptr) {

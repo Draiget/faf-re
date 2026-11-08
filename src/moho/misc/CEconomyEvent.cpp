@@ -1,4 +1,5 @@
 #include "moho/misc/CEconomyEvent.h"
+#include "moho/misc/EconomyRequestRelease.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "gpg/core/reflection/Reflection.h"
 
@@ -150,11 +151,6 @@ namespace
       reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(value) - static_cast<std::uintptr_t>(baseOffset));
     outRef->mType = runtimeType;
     return outRef;
-  }
-
-  void IntrusiveUnlink(moho::TDatListItem<void, void>& node)
-  {
-    node.ListUnlink();
   }
 
   void IntrusiveLinkBefore(moho::TDatListItem<void, void>& node, moho::TDatListItem<void, void>& listHead)
@@ -327,33 +323,6 @@ namespace
   {
     unit->mUnitVarDat.mMaintainenceCost.ENERGY = 0.0f;
     unit->mUnitVarDat.mMaintainenceCost.MASS = 0.0f;
-  }
-
-  /**
-   * Address: 0x00773740 (FUN_00773740, sub_773740)
-   */
-  [[nodiscard]] moho::SEconValue TakeGrantedResourcesAndReset(moho::CEconRequest* request)
-  {
-    moho::SEconValue out{};
-    out.energy = request->mGranted.energy;
-    out.mass = request->mGranted.mass;
-    request->mGranted.energy = 0.0f;
-    request->mGranted.mass = 0.0f;
-    return out;
-  }
-
-  /**
-   * Address: 0x005CFA20 (sub_5CFA20)
-   */
-  void DestroyEconomyRequestPointer(moho::CEconRequest*& request)
-  {
-    if (!request) {
-      return;
-    }
-
-    IntrusiveUnlink(request->mNode);
-    delete request;
-    request = nullptr;
   }
 
 } // namespace
