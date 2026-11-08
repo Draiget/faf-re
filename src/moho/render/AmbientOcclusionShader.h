@@ -37,6 +37,8 @@ cbuffer AoConstants : register(b0)
     float4 Contact;    // contact ray length and the thickness that counts as a blocker, world units
     float4 TerrainGrid;   // heightfield width and depth, field cells per terrain-shadow cell, strength (0: off)
     float4 TerrainShadowSize; // terrain-shadow cells across and down, shadow map reach (0: none), unused
+    row_major float4x4 ShadowMatrix; // world to the sun's clip space, terrain.fx's ShadowMatrix
+    float4 ShadowParams;  // 1 when ShadowMap holds this frame's sun shadow (contact shadows only where it is sunlit), then unused
 };
 
 #define CONTACT_STEPS 8
@@ -53,6 +55,26 @@ StructuredBuffer<float> TerrainShadow : register(t2);
 [[vk::binding(10, 0)]]
 #endif
 Texture2D<float> SceneDepth : register(t6);
+// The sun's shadow texture the terrain samples: green is 1 in sunlight, 0 in shadow (terrain.fx).
+Texture2D<float4> ShadowMap : register(t4);
+
+// How much sun the shadow map gives this point: 1 when there is no shadow map.
+float SunVisibility(float3 world)
+{
+    if (ShadowParams.x <= 0.0) {
+        return 1.0;
+    }
+    // Clip space to texture space as terrain.fx's vertex shaders do it.
+    const float4 coord = mul(float4(world, 1.0), ShadowMatrix);
+    const float2 uv = float2(coord.x + coord.w, coord.w - coord.y) * 0.5 / coord.w;
+    if (any(uv < 0.0) || any(uv > 1.0)) {
+        return 1.0;
+    }
+    uint width;
+    uint height;
+    ShadowMap.GetDimensions(width, height);
+    return saturate(ShadowMap.Load(int3(int2(uv * float2(width, height)), 0)).g);
+}
 
 float3 WorldPosition(int2 pixel, float depth)
 {
@@ -204,8 +226,11 @@ void AoCS(uint3 id : SV_DispatchThreadID)
 
     // Contact shadow: a short ray towards the sun, blocked where the depth in front of it shows a
     // surface closer to the camera within the blocker thickness. It catches the contact the shadow
-    // map is too coarse for; surfaces facing away from the sun are the shadow map's alone.
-    if (Sun.w > 0.0 && dot(normal, Sun.xyz) > 0.05) {
+    // map is too coarse for; surfaces facing away from the sun are the shadow map's alone, and so
+    // are points the shadow map already shades: darkening them again turned the ground under trees
+    // near-black. Partly lit points (the blurred shadow edge) take the part that is lit.
+    const float sunlit = (Sun.w > 0.0) ? SunVisibility(center) : 0.0;
+    if (Sun.w > 0.0 && sunlit > 0.0 && dot(normal, Sun.xyz) > 0.05) {
         const float3 start = center + normal * 0.03;
         [unroll]
         for (int s = 1; s <= CONTACT_STEPS; ++s) {
@@ -219,7 +244,7 @@ void AoCS(uint3 id : SV_DispatchThreadID)
             const float3 seen = WorldPosition(at, SceneDepth.Load(int3(at, 0)));
             const float gap = length(q - Eye.xyz) - length(seen - Eye.xyz);
             if (gap > 0.02 && gap < Contact.y) {
-                occlusion *= 1.0 - Sun.w;
+                occlusion *= 1.0 - Sun.w * sunlit;
                 break;
             }
         }

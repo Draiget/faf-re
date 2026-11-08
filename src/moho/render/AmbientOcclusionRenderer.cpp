@@ -13,7 +13,10 @@
 #include "moho/console/CConCommand.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/render/AmbientOcclusionShader.h"
+#include "moho/render/ID3DRenderTarget.h"
+#include "moho/render/Shadow.h"
 #include "moho/render/camera/GeomCamera3.h"
+#include "moho/render/d3d/CD3DRenderTarget.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 #include "moho/terrain/StratumMaterial.h"
@@ -90,8 +93,10 @@ namespace moho
       float contact[4];
       float terrainGrid[4];
       float terrainShadowSize[4];
+      VMatrix4 shadowMatrix;
+      float shadowParams[4];
     };
-    static_assert(sizeof(AoConstants) == 272, "AoConstants matches the shader's cbuffer");
+    static_assert(sizeof(AoConstants) == 352, "AoConstants matches the shader's cbuffer");
 
     /** Terrain-shadow cells across the larger side of the map at most. */
     constexpr std::int32_t kTerrainShadowCells = 1024;
@@ -262,7 +267,8 @@ namespace moho
   }
 
   void AmbientOcclusionRenderer::Render(
-    const GeomCamera3& camera, const int x, const int y, const int width, const int height, const float shadowReach
+    const GeomCamera3& camera, const int x, const int y, const int width, const int height, const float shadowReach,
+    const Shadow* const shadow
   )
   {
     if (!mSupported || width < 8 || height < 8 || ren_AoRadius <= 0.0f || ren_AoIntensity <= 0.0f) {
@@ -327,11 +333,26 @@ namespace moho
       }
     }
 
+    // The sun's shadow texture, so contact shadows leave the points it shades alone.
+    ID3DRenderTarget::SurfaceHandle shadowSurface{};
+    if (constants.sun[3] > 0.0f && shadow != nullptr && shadow->mShadowCameraValid) {
+      if (const boost::shared_ptr<CD3DRenderTarget> shadowTexture = shadow->GetShadowTexture(); shadowTexture) {
+        (void)shadowTexture->GetSurface(shadowSurface);
+      }
+      if (shadowSurface) {
+        constants.shadowMatrix = shadow->mCamera.viewProjection;
+        constants.shadowParams[0] = 1.0f;
+      }
+    }
+
     gpg::gal::GpuDispatch dispatch{};
     dispatch.program = mCompute.get();
     dispatch.bindings.constants = &constants;
     dispatch.bindings.constantBytes = sizeof(constants);
     dispatch.bindings.writeBuffers[0] = mTerms.get();
+    if (shadowSurface) {
+      dispatch.bindings.targets[0] = shadowSurface.get();
+    }
     if (constants.terrainGrid[3] > 0.0f) {
       dispatch.bindings.readBuffers[1] = mHeights.get();
       dispatch.bindings.readBuffers[2] = mTerrainShadow.get();

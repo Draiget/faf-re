@@ -1953,7 +1953,8 @@ void moho::WRenViewport::RenderWorldView(
     const float shadowReach = (!moho::ren_Shadows || moho::shadow_Fidelity == 0) ? -1.0f
       : mShadowRenderer.mShadowCameraValid                                      ? moho::ren_ShadowCoeff * worldView->mView->CameraGetTargetZoom()
                                                                                  : 0.0f;
-    occlusion.Render(*mCam, mScreenPos.x, mScreenPos.y, mScreenSize.x, mScreenSize.y, shadowReach);
+    occlusion.Render(*mCam, mScreenPos.x, mScreenPos.y, mScreenSize.x, mScreenSize.y, shadowReach,
+                     shadowReach > 0.0f ? &mShadowRenderer : nullptr);
   }
   {
     const gpg::gal::RenderProfileScope profileEffects("Effects");
