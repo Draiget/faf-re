@@ -691,7 +691,9 @@ namespace moho
     // Engine change (ren_MeshPoseStill): a unit that stands still gets two matching poses from the sim, and
     // blending those gives the same pose every frame. One blend per stance is enough, which also keeps the
     // bones' composite transforms from being rebuilt. The sim never writes a pose it has published.
-    if (isStaticPose != 0u && isLocked == 0u && (poseStill == 0u || !ren_MeshPoseStill)) {
+    // Engine addition, server mode: a server session's client gets no poses until the pose lane (plan WP8.3), so a
+    // unit's start and end pose can be null; it keeps the pose it has.
+    if (isStaticPose != 0u && isLocked == 0u && (poseStill == 0u || !ren_MeshPoseStill) && startPose && endPose && curPose) {
       const std::int32_t skinBoneCount = static_cast<std::int32_t>(resource->mFile->mSkinBoneCount);
       curPose->InterpolatePose(interpolation, startPose.get(), endPose.get(), skinBoneCount);
       poseStill = (ren_MeshPoseStill && PosesMatch(*startPose, *endPose, skinBoneCount)) ? 1u : 0u;

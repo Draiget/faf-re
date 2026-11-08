@@ -58,7 +58,9 @@ All integers are little-endian.
 
 ## Retail clients
 
-A retail client gets one small message per game from each of our clients that has the switch on. From reading the binary: `CNetClient`'s constructor registers the client range up to 60 (`0x0053BBE2` pushes `0x3C`), and `CClientBase::Process` logs `CClientBase::Queue(): Ignoring message type 58` (`0x0053C2E0`) and returns. `net_PeerFeatures` is off by default until the compatibility matrix (#242) has passed with it.
+A retail client gets one small message per game from each of our clients that has the switch on. From reading the binary: `CNetClient`'s constructor registers the client range up to 60 (`0x0053BBE2` pushes `0x3C`), and `CClientBase::Process` logs `CClientBase::Queue(): Ignoring message type 58` (`0x0053C2E0`) and returns. Retail logging that line, once per announcing peer, was confirmed in the compatibility games below.
+
+The compatibility games (#285) put the shipped game, our x86 and our x64 in one game with the switch on for ours, once on direct links (`tools/scenarios/3p-peer-features-matrix.yaml`) and once behind FAF's Java adapter (`3p-peer-features-matrix-adapter.yaml`). Both passed on 2026-11-07 at `0ccf4a8ec`: each of ours listed the other's features and compared only the other's order stream reports, retail logged the ignored message once per peer of ours, nothing desynced, and every player's replay played with matching checksums. `net_PeerFeatures` still stays off by default: the features that need it (rejoin, its order checks) are off by default too, and with it off a retail peer gets no extra message at all.
 
 In the lobby a retail client gets one small message from each of our clients. From reading the binary: the jump table at `0x007C6454` sends type 112 to `LOBBY: Ignoring unrecognized lobby message` (`0x007C6412`), which logs and returns. It never announces, so it gets nothing more.
 

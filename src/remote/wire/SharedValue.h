@@ -46,6 +46,19 @@ namespace faf::remote::wire
       return true;
     }
 
+    /**
+     * Holds `other`'s value, sharing its pointer, so the next call with the same pointer compares nothing;
+     * whether the value differed.
+     */
+    bool Share(const TSharedValue& other)
+    {
+      if (mValue == other.mValue) {
+        return false;
+      }
+      const bool changed = !(**this == *other);
+      mValue = other.mValue;
+      return changed;
+    }
     [[nodiscard]] bool operator==(const TSharedValue& other) const noexcept
     {
       return mValue == other.mValue || **this == *other;

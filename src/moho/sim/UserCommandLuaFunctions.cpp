@@ -8,6 +8,7 @@
 // that file; its bootstrap registers these forms in the order the original
 // bootstraps did, so the user init set keeps its order.
 #include "moho/sim/CCommandLuaFunctionRegistrations.h"
+#include "moho/entity/UserEntityMeshBox.h"
 #include "moho/sim/IdleUnitSelector.h"
 
 #include <algorithm>
@@ -334,16 +335,6 @@ namespace
     session->SetSelection(expandedSelection);
   }
   // ---- UISelectionByCategory support (FUN_008662B0) ----
-
-  [[nodiscard]] const Wm3::Box3f* SelectionEntityMeshBox(moho::UserEntity* const entity)
-  {
-    moho::MeshInstance* const meshInstance = (entity != nullptr) ? entity->mMeshInstance : nullptr;
-    if (meshInstance != nullptr) {
-      meshInstance->UpdateInterpolatedFields();
-      return &meshInstance->box;
-    }
-    return &moho::Invalid<Wm3::Box3f>();
-  }
 
   template <moho::CScrLuaInitForm* (*Target)()>
   [[nodiscard]] moho::CScrLuaInitForm* ForwardCommandLuaRegistrationThunk() noexcept

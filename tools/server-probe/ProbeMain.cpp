@@ -41,6 +41,7 @@
 #include "remote/net/GameLinks.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/net/LobbySignals.h"
+#include "server/LobbyScriptData.h"
 
 using namespace faf::remote::net;
 
@@ -205,6 +206,15 @@ namespace
     // configuration (the host's `CLobby::LaunchGame` sends what FAF's lobby built).
     std::string lobbyLaunch;
     double lobbyLaunchAt = -1.0;
+    // Plan WPR.49: as a logical host would: change game options (`key=value,...`, FAF lobby.lua's
+    // `{Type = 'GameOptions', Options = {...}}` broadcast) and eject a participant (`LOBMSG_Rejected`, as
+    // `CLobby::KickPeer` sends), each to `--lobby-say-to` at a time.
+    std::string lobbyOptions;
+    double lobbyOptionsAt = -1.0;
+    double lobbyEjectAt = -1.0;
+    // Plan WP2.6: the content report sent before `Loaded`: "rules" (the `--rebuild` match's rules, as the game
+    // client reports them), "wrong" (made-up hashes), or none.
+    std::string contentReport;
   };
 
   [[nodiscard]] double Argument(const char* const text)
@@ -263,6 +273,14 @@ namespace
         out.lobbyLaunch = value;
       } else if (name == "--lobby-launch-at") {
         out.lobbyLaunchAt = Argument(value);
+      } else if (name == "--lobby-options") {
+        out.lobbyOptions = value;
+      } else if (name == "--lobby-options-at") {
+        out.lobbyOptionsAt = Argument(value);
+      } else if (name == "--lobby-eject-at") {
+        out.lobbyEjectAt = Argument(value);
+      } else if (name == "--content-report") {
+        out.contentReport = value;
       } else if (name == "--save-views") {
         out.saveViews = value;
       } else if (name == "--break-alliance-at") {
@@ -422,6 +440,8 @@ namespace
     faf::probe::CProbeRebuild* rebuild = nullptr; // `--rebuild`
     int uid = 0;
     std::uint64_t launchInfos = 0;
+    std::uint64_t tableMessages = 0; // `SessionTables`
+    std::uint64_t poseBytes = 0;     // the views' pose lanes
     double beatMs = 0.0;
     double lateBase = 0.0;      // the seconds at which beat 0 would have come
     bool haveLateBase = false;
@@ -475,6 +495,13 @@ namespace
       }
       return;
     }
+    if (message[0] == static_cast<std::uint8_t>(ESeatMessage::SessionTables)) {
+      ++out.tableMessages;
+      if (out.rebuild != nullptr) {
+        out.rebuild->OnTables(message);
+      }
+      return;
+    }
     if (message[0] != static_cast<std::uint8_t>(ESeatMessage::View)) {
       return;
     }
@@ -508,6 +535,19 @@ namespace
         lanes[lane] = std::span<const std::uint8_t>(bytes, size);
       }
     }
+    // Plan WP8.1: a server that sends poses adds them as a sixth lane.
+    std::span<const std::uint8_t> poses;
+    bool hasPoses = false;
+    if (ok && !reader.AtEnd()) {
+      const std::uint64_t size = reader.Varint();
+      const std::uint8_t* const bytes = reader.Bytes(size);
+      ok = reader.Ok();
+      if (ok) {
+        poses = std::span<const std::uint8_t>(bytes, size);
+        hasPoses = true;
+        out.poseBytes += size;
+      }
+    }
     ok = ok && reader.AtEnd();
     if (ok && out.views > 1u && faf::remote::wire::PeekFrameBaseline(std::span<const std::uint8_t>(frame, frameSize)) == faf::remote::wire::kNoBaseline) {
       ++out.whole;
@@ -516,7 +556,9 @@ namespace
     }
     if (ok) {
       if (out.rebuild != nullptr) {
-        out.rebuild->OnView(std::span<const std::uint8_t>(frame, frameSize), std::span<const std::uint8_t>(team, teamSize), lanes[0], lanes[1]);
+        out.rebuild->OnView(
+          std::span<const std::uint8_t>(frame, frameSize), std::span<const std::uint8_t>(team, teamSize), lanes[0], lanes[1], poses, hasPoses
+        );
       }
       faf::remote::wire::SViewFrame decoded;
       ok = out.window.Decode(std::span<const std::uint8_t>(frame, frameSize), out.codec, decoded) && decoded.entities.size() == entities;
@@ -715,10 +757,25 @@ namespace
       break;
     }
     case 106:
-    case 107:
+    case 107: {
       seen.scriptFrom.push_back(from);
-      std::printf("probe %d: %.1f s: lobby: script data from uid %d, %zu bytes\n", uid, elapsed, from, end - at);
+      // Plan WPR.49: FAF lobby's game options as they arrived, after the relay.
+      std::string options;
+      faf::server::SLuaBytesValue value;
+      if (faf::server::ParseLuaBytes(std::span<const std::uint8_t>(frame).subspan(at), value)) {
+        const faf::server::SLuaBytesValue* const type = value.Field("Type");
+        const faf::server::SLuaBytesValue* const table = value.Field("Options");
+        if (type != nullptr && type->IsString("GameOptions") && table != nullptr && table->kind == faf::server::SLuaBytesValue::EKind::Table) {
+          options = ", GameOptions";
+          for (std::size_t i = 0; i < table->keys.size(); ++i) {
+            const faf::server::SLuaBytesValue& option = table->values[i];
+            options += " " + table->keys[i].text + "=" + (option.kind == faf::server::SLuaBytesValue::EKind::String ? option.text : std::string("?"));
+          }
+        }
+      }
+      std::printf("probe %d: %.1f s: lobby: script data from uid %d, %zu bytes%s\n", uid, elapsed, from, end - at, options.c_str());
       break;
+    }
     default:
       std::printf("probe %d: %.1f s: lobby: message %u from uid %d\n", uid, elapsed, type, from);
       break;
@@ -743,7 +800,7 @@ int main(const int argc, char** const argv)
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> [--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
       "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>]] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--rebuild <match.lua> /init <init.lua>]\n"
+      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-eject-at <s>]] [--content-report rules|wrong] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--rebuild <match.lua> /init <init.lua>]\n"
     );
     return 3;
   }
@@ -851,6 +908,18 @@ int main(const int argc, char** const argv)
       joined = true;
       ++joins;
       std::printf("probe %d: %.1f s: connected\n", options.uid, elapsed);
+      if (!options.contentReport.empty() && joins == 1u) {
+        faf::remote::SContentReport report{0x1234u, 0x5678u};
+        const bool fromRules = options.contentReport == "rules";
+        if (fromRules && !rebuild.Content(report)) {
+          std::printf("probe %d: %.1f s: no rules to report the content of (--rebuild <match.lua>)\n", options.uid, elapsed);
+        } else {
+          const std::vector<std::uint8_t> content = faf::remote::EncodeContentReport(report);
+          (void)link.SendReliable(content.data(), content.size());
+          std::printf("probe %d: %.1f s: content reported (%s): blueprints %016llx, mods %016llx\n", options.uid, elapsed, fromRules ? "rules" : "made up",
+                      static_cast<unsigned long long>(report.blueprints), static_cast<unsigned long long>(report.mods));
+        }
+      }
       if (!options.noLoad && joins == 1u) {
         const auto kind = static_cast<std::uint8_t>(ESeatMessage::Loaded);
         (void)link.SendReliable(&kind, 1u);
@@ -885,6 +954,55 @@ int main(const int argc, char** const argv)
         (void)link.SendReliable(frame.data(), frame.size());
         std::printf("probe %d: %.1f s: lobby: launch sent from %s, %zu bytes\n", options.uid, elapsed, options.lobbyLaunch.c_str(), size);
       }
+    }
+    if (Due(options.lobbyOptionsAt, elapsed) && options.lobbySayTo != 0) {
+      // `{Type = 'GameOptions', Options = {key = value, ...}}`, as FAF lobby.lua's `SetGameOptions` broadcasts it.
+      static LuaPlus::LuaState sOptionsState(LuaPlus::LuaState::LIB_BASE);
+      LuaPlus::LuaObject data;
+      data.AssignNewTable(&sOptionsState, 0, 2u);
+      data.SetString("Type", "GameOptions");
+      LuaPlus::LuaObject table;
+      table.AssignNewTable(&sOptionsState, 0, 4u);
+      const std::string& list = options.lobbyOptions;
+      for (std::size_t start = 0; start < list.size();) {
+        const std::size_t comma = std::min(list.find(',', start), list.size());
+        const std::string pair = list.substr(start, comma - start);
+        if (const std::size_t equals = pair.find('='); equals != std::string::npos) {
+          table.SetString(pair.substr(0, equals).c_str(), pair.substr(equals + 1).c_str());
+        }
+        start = comma + 1;
+      }
+      data.SetObject("Options", table);
+      moho::CMessage script(moho::ELobbyMsg::LOBMSG_BroadcastScriptData);
+      bool encoded = false;
+      {
+        moho::CMessageStream stream(script, moho::CMessageStream::Access::kReadWrite);
+        encoded = data.ToByteStream(stream);
+      }
+      if (encoded) {
+        std::vector<std::uint8_t> frame;
+        faf::remote::net::ByteWriter writer(frame);
+        writer.Byte(static_cast<std::uint8_t>(ESeatMessage::Lobby));
+        writer.Varint(static_cast<std::uint64_t>(options.lobbySayTo));
+        writer.Bytes(reinterpret_cast<const std::uint8_t*>(script.mBuff.start_), script.mBuff.Size());
+        (void)link.SendReliable(frame.data(), frame.size());
+        std::printf("probe %d: %.1f s: lobby: game options to uid %d: %s\n", options.uid, elapsed, options.lobbySayTo, options.lobbyOptions.c_str());
+      }
+    }
+    if (Due(options.lobbyEjectAt, elapsed) && options.lobbySayTo != 0) {
+      // `CLobby::KickPeer`: `LOBMSG_Rejected` with the reason, to the participant ejected.
+      const std::string reason = "KickedByHost";
+      const std::size_t size = 3u + reason.size() + 1u;
+      std::vector<std::uint8_t> frame;
+      faf::remote::net::ByteWriter writer(frame);
+      writer.Byte(static_cast<std::uint8_t>(ESeatMessage::Lobby));
+      writer.Varint(static_cast<std::uint64_t>(options.lobbySayTo));
+      writer.Byte(static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_Rejected));
+      writer.Byte(static_cast<std::uint8_t>(size));
+      writer.Byte(static_cast<std::uint8_t>(size >> 8));
+      writer.Bytes(reinterpret_cast<const std::uint8_t*>(reason.c_str()), reason.size() + 1u);
+      (void)link.SendReliable(frame.data(), frame.size());
+      std::printf("probe %d: %.1f s: lobby: eject of uid %d sent\n", options.uid, elapsed, options.lobbySayTo);
     }
     if (Due(options.lobbySayAt, elapsed) && options.lobbySayTo != 0) {
       // A direct script message (`LOBMSG_DirectScriptData`, 107) through the relay; its bytes needn't be a Lua value here.
@@ -1129,12 +1247,13 @@ int main(const int argc, char** const argv)
   std::printf("probe %d: joined %llu times, %llu beat messages, last beat %llu\n", options.uid, static_cast<unsigned long long>(joins), static_cast<unsigned long long>(beatMessages), static_cast<unsigned long long>(lastBeat));
   const double viewSeconds = views.lastAt - views.firstAt;
   std::printf(
-    "probe %d: %llu views, %llu didn't decode, %llu whole after the first, %llu game infos, %llu launch infos, %llu checks (%llu didn't match), last at beat %llu with %llu entities, %.1f KB/s (frames %.1f), largest %llu bytes\n", options.uid,
+    "probe %d: %llu views, %llu didn't decode, %llu whole after the first, %llu game infos, %llu launch infos, %llu session-table messages, %llu checks (%llu didn't match), last at beat %llu with %llu entities, %.1f KB/s (frames %.1f, poses %.1f), largest %llu bytes\n", options.uid,
     static_cast<unsigned long long>(views.views), static_cast<unsigned long long>(views.failed), static_cast<unsigned long long>(views.whole),
-    static_cast<unsigned long long>(views.gameInfos), static_cast<unsigned long long>(views.launchInfos), static_cast<unsigned long long>(views.checks), static_cast<unsigned long long>(views.mismatches),
+    static_cast<unsigned long long>(views.gameInfos), static_cast<unsigned long long>(views.launchInfos), static_cast<unsigned long long>(views.tableMessages), static_cast<unsigned long long>(views.checks), static_cast<unsigned long long>(views.mismatches),
     static_cast<unsigned long long>(views.lastBeat),
     static_cast<unsigned long long>(views.lastEntities), viewSeconds > 0.0 ? static_cast<double>(views.bytes) / 1024.0 / viewSeconds : 0.0,
-    viewSeconds > 0.0 ? static_cast<double>(views.frameBytes) / 1024.0 / viewSeconds : 0.0, static_cast<unsigned long long>(views.maxMessage)
+    viewSeconds > 0.0 ? static_cast<double>(views.frameBytes) / 1024.0 / viewSeconds : 0.0,
+    viewSeconds > 0.0 ? static_cast<double>(views.poseBytes) / 1024.0 / viewSeconds : 0.0, static_cast<unsigned long long>(views.maxMessage)
   );
   std::printf(
     "probe %d: answers: %llu applied, %llu refused, %llu dropped%s\n", options.uid, static_cast<unsigned long long>(answers[0]), static_cast<unsigned long long>(answers[1]),

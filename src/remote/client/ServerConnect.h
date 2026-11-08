@@ -3,12 +3,14 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <vector>
 
 #include "remote/net/LobbySignals.h"
 
 namespace moho
 {
   class INetConnector;
+  class RRuleGameRules;
 }
 
 // Engine addition, server mode (docs/SWITCHES.md, "Server mode"): the client's entry into a
@@ -69,6 +71,18 @@ namespace faf::remote
    * `LuaObject::ToByteStream` writes them). False outside a server session.
    */
   bool SendServerLaunchRequest(std::span<const std::uint8_t> configuration);
+  /**
+   * Plan WP11: the next message from the server for the game's session (`LaunchInfo`, `GameInfo`, `View`, `Beat`,
+   * `CommandAnswer`, `ViewCheck`; not a lobby frame), in arrival order. False when none is waiting or outside a session.
+   */
+  [[nodiscard]] bool TakeServerGameMessage(std::vector<std::uint8_t>& message);
+  /**
+   * The link to the server moves without taking anything from it (keepalives, acknowledgements): every frame while
+   * the map loads, when neither the lobby nor the session's driver reads the channel. Its 10 s timeout would end it.
+   */
+  void KeepServerSessionAlive();
+  /** Plan WP11: one message from the game's session to the server (a `Command`, `Loaded`, `Leaving`...), reliably. */
+  bool SendServerGameMessage(std::span<const std::uint8_t> message);
   /** This player's uid in the server session, or 0 outside one. */
   [[nodiscard]] std::int32_t ServerSessionUid();
   /** The channel to the server is connected or reconnecting. */
@@ -77,7 +91,14 @@ namespace faf::remote
   /**
    * Plan WP2.13, WP12.1: once a server session has its channel, the connector the lobby is made with
    * (`InternalCreateLobby`): every participant a virtual connection over that channel
-   * (ServerRelayConnector.h). Null outside a server session, and after the first call: one lobby per session.
+   * (ServerRelayConnector.h). Null outside a server session, and while the last one handed out is alive: one lobby
+   * at a time, which may be started again once the last is destroyed (a new logical host, plan WPR.50).
    */
   [[nodiscard]] moho::INetConnector* TakeServerLobbyConnector();
+
+  /**
+   * Plan WP2.6: the session's game has loaded its rules: what they hold goes to the server (remote/ContentCheck.h),
+   * ahead of `Loaded`. `gameMods`: the launch's `GameMods` in its byte form (`LaunchInfoBase::mGameMods`).
+   */
+  void ReportServerContent(moho::RRuleGameRules& rules, const std::string& gameMods);
 } // namespace faf::remote

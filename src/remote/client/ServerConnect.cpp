@@ -14,6 +14,7 @@
 #include "moho/app/WinApp.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/net/Common.h"
+#include "remote/ContentCheck.h"
 #include "remote/client/ServerRelayConnector.h"
 #include "remote/net/GameLinks.h"
 #include "remote/net/Datagram.h"
@@ -138,6 +139,15 @@ namespace faf::remote
         mGone.clear();
       }
 
+      void ConnectorGone() override
+      {
+        mConnectorLive = false;
+        mGone.clear(); // the old lobby's; a new one's connections start whole
+      }
+
+      /** One connector at a time: false while the last one handed out is alive. */
+      [[nodiscard]] bool TakeConnectorSlot() { return !std::exchange(mConnectorLive, true); }
+
       [[nodiscard]] bool TakeSignal(net::SLobbySignal& signal)
       {
         Pump();
@@ -145,6 +155,24 @@ namespace faf::remote
       }
 
       void MarkGone(const std::int32_t uid) { mGone.push_back(uid); }
+
+      /** The next message for the game's session (not a lobby frame), in arrival order. */
+      [[nodiscard]] bool TakeGameMessage(std::vector<std::uint8_t>& message)
+      {
+        Pump();
+        if (mForGameNext >= mForGame.size()) {
+          mForGame.clear();
+          mForGameNext = 0;
+          return false;
+        }
+        message = std::move(mForGame[mForGameNext++]);
+        return true;
+      }
+
+      void SendGameMessage(const std::span<const std::uint8_t> message) { (void)mLink.SendReliable(message.data(), message.size()); }
+
+      /** The link moves (keepalives, acknowledgements); what arrives waits in order for its taker. */
+      void KeepAlive() { Pump(); }
 
     private:
       // The lobby pulls every frame, and the session's task too: the link moves here.
@@ -166,9 +194,11 @@ namespace faf::remote
       std::vector<std::uint8_t> mMessage;
       std::vector<std::int32_t> mGone;
       std::vector<std::vector<std::uint8_t>> mForGame;
+      std::size_t mForGameNext = 0;
+      bool mConnectorLive = false;
     };
 
-    /** One server session: the link, the channel the lobby uses over it, the lobby's connector once. */
+    /** One server session: the link, the channel the lobby uses over it. */
     struct SServerSession
     {
       SServerSession(const std::int32_t uid, const net::Token& token, const net::SEndpoint& server)
@@ -180,7 +210,6 @@ namespace faf::remote
       std::int32_t uid;
       net::CClientLink link;
       CLinkRelayChannel channel;
-      bool connectorTaken = false;
     };
 
     std::unique_ptr<SServerSession> sSession;
@@ -191,10 +220,24 @@ namespace faf::remote
 
   moho::INetConnector* TakeServerLobbyConnector()
   {
-    if (sSession == nullptr || std::exchange(sSession->connectorTaken, true)) {
+    if (sSession == nullptr || !sSession->channel.TakeConnectorSlot()) {
       return nullptr;
     }
-    return new CServerRelayConnector(sSession->channel); // `CLobby` destroys it
+    return new CServerRelayConnector(sSession->channel); // `CLobby` destroys it, which frees the slot
+  }
+
+  void ReportServerContent(moho::RRuleGameRules& rules, const std::string& gameMods)
+  {
+    if (sSession == nullptr) {
+      return;
+    }
+    const SContentReport report = MakeContentReport(rules, gameMods);
+    const std::vector<std::uint8_t> message = EncodeContentReport(report);
+    sSession->channel.SendGameMessage(message);
+    gpg::Logf(
+      "Server session: content reported: blueprints %016llx, mods %016llx", static_cast<unsigned long long>(report.blueprints),
+      static_cast<unsigned long long>(report.mods)
+    );
   }
 
   bool TakeServerLobbySignal(net::SLobbySignal& signal)
@@ -221,6 +264,27 @@ namespace faf::remote
     writer.Varint(0u); // the server itself
     writer.Bytes(message.data(), message.size());
     sSession->channel.SendLobbyFrame(frame);
+    return true;
+  }
+
+  bool TakeServerGameMessage(std::vector<std::uint8_t>& message)
+  {
+    return sSession != nullptr && sSession->channel.TakeGameMessage(message);
+  }
+
+  void KeepServerSessionAlive()
+  {
+    if (sSession != nullptr) {
+      sSession->channel.KeepAlive();
+    }
+  }
+
+  bool SendServerGameMessage(const std::span<const std::uint8_t> message)
+  {
+    if (sSession == nullptr) {
+      return false;
+    }
+    sSession->channel.SendGameMessage(message);
     return true;
   }
 

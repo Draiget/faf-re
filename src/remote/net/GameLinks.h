@@ -74,6 +74,27 @@ namespace faf::remote::net
      * Again after a reconnect, with `GameInfo`.
      */
     LaunchInfo = 11,
+    /**
+     * Server to player, reliable (plan WP11): varint beat, then that beat's Lua lane (wire/LuaSyncLane.h: the player's
+     * `Sync` table and print lines), sent once `Sim::Sync` has written and routed the beat's table. A `View`'s own Lua
+     * lane is then empty: it is built in `Sim::Sync`'s entity walk, before the table exists. It may come before or
+     * after the beat's `View` (the views' pipeline), never after the next beat's: a client with the next `View` and no
+     * `LuaSync` for a beat has none coming.
+     */
+    LuaSync = 12,
+    /**
+     * Server to player, reliable (plan WP11 step 4): varint beat, a flags byte (1: reset), then a session-table record
+     * (wire/SessionTables.h: new sounds, names, deposits and terrain edits) to the message's end. It comes before
+     * the first `View` that names its entries. Reset: the client forgets its tables; the session's every record
+     * follows, from the first, before the whole view a returning player gets (a reset carries no record itself).
+     */
+    SessionTables = 13,
+    /**
+     * Player to server, reliable, once its game has loaded the launch's rules and before `Loaded` (plan WP2.6): what
+     * its game data and mods are, as remote/ContentCheck.h hashes them: two 64-bit integers, the blueprint tables'
+     * hash, then the mod set's. The server compares them with its own and refuses or warns as the match says.
+     */
+    ContentReport = 14,
   };
 
   /** What became of a player's command. */
@@ -157,6 +178,11 @@ namespace faf::remote::net
     [[nodiscard]] const ChannelStats* StatsOf(std::int32_t uid) const;
     /** Reliable bytes the uid hasn't acknowledged. */
     [[nodiscard]] std::uint64_t ReliableUnacked(std::int32_t uid) const;
+    /**
+     * Plan WPR.50: how long nothing has arrived from the uid's channel, at `nowUs` (`Pump`'s clock); 0 without a
+     * channel. A live client's keepalives come every quarter second.
+     */
+    [[nodiscard]] std::uint64_t SilentUs(std::int32_t uid, std::uint64_t nowUs) const;
 
   private:
     struct SPlayer

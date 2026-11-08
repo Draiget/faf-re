@@ -2,9 +2,11 @@
 
 #if FAF_SERVER_MODE
 
+#include <cstdlib>
 #include <exception>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
@@ -17,7 +19,19 @@
 #include "moho/ui/IUIManager.h"
 #include "moho/ui/UiStateTypes.h"
 #include "netlink/EngineLinks.h"
+#include "gpg/core/streams/BinaryReader.h"
+#include "lua/LuaTableIterator.h"
+#include "moho/misc/LaunchInfoBase.h"
+#include "moho/net/CLobby.h"
+#include "moho/net/CMessage.h"
+#include "moho/net/CMessageStream.h"
+#include "moho/net/ELobbyMsg.h"
+#include "moho/net/LaunchInfoBuilder.h"
+#include "moho/sim/CWldSession.h"
+#include "moho/sim/WldSessionInfo.h"
+#include "remote/client/NetworkSimDriver.h"
 #include "remote/client/ServerConnect.h"
+#include "remote/net/GameLinks.h"
 #include "remote/net/LobbySignals.h"
 
 // Engine addition, server mode: see ServerLobbyUi.h.
@@ -41,6 +55,8 @@ namespace
 
   private:
     void Apply(const SLobbySignal& signal);
+    /** Plan WP2.8, WPR.55: the server's `LaunchInfo` makes the session: this client's launch comes from it alone. */
+    void Launch(const std::vector<std::uint8_t>& message);
     void CreateLobby(const SLobbySignal& signal);
     [[nodiscard]] LuaPlus::LuaObject LobbyMethod(const char* name) const;
 
@@ -49,6 +65,7 @@ namespace
     LuaPlus::LuaObject* mLobby = nullptr;
     std::int32_t mHostUid = 0;
     bool mLostSaid = false;
+    bool mLaunched = false;
   };
 
   void CServerLobbyTask::PullTask()
@@ -61,7 +78,21 @@ namespace
         gpg::Warnf("SERVER LOBBY: signal %d failed: %s", static_cast<int>(signal.kind), error.what());
       }
     }
-    if (mLobby == nullptr && !mLostSaid && !faf::remote::ServerSessionUp()) {
+    // The server's launch: its first game message is the configuration it launched (with or without a lobby before).
+    if (!mLaunched) {
+      std::vector<std::uint8_t> message;
+      if (faf::remote::TakeServerGameMessage(message)) {
+        if (!message.empty() && message[0] == static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::LaunchInfo)) {
+          Launch(message);
+        } else {
+          gpg::Warnf("SERVER LOBBY: a game message (%d) before the launch; dropped", message.empty() ? -1 : static_cast<int>(message[0]));
+        }
+      }
+    }
+    if (mLaunched) {
+      faf::remote::KeepServerSessionAlive(); // the map loads; the driver reads the channel once the session runs
+    }
+    if (mLobby == nullptr && !mLostSaid && !mLaunched && !faf::remote::ServerSessionUp()) {
       mLostSaid = true;
       gpg::Logf("SERVER LOBBY: the channel to the server is gone before the lobby started.");
       moho::WIN_OkBox("Ack!", "The connection to the game server was lost.");
@@ -79,7 +110,13 @@ namespace
   void CServerLobbyTask::CreateLobby(const SLobbySignal& signal)
   {
     if (mLobby != nullptr) {
-      throw std::runtime_error("Lobby already exists.");
+      // Plan WPR.50: a role while this game has a lobby: the logical host changed (the old one left or went quiet),
+      // and a lobby can't change its host. The lobby script's `GameLaunched` closes the screen and destroys the
+      // lobby (its connector with it) without leaving the game, as a launch does; the new lobby is made below.
+      gpg::Logf("SERVER LOBBY: the lobby starts again with a new host.");
+      moho::LOBBY_ServerSessionLaunched();
+      delete mLobby;
+      mLobby = nullptr;
     }
     // As `CGpgNetInterface::CreateLobby` (0x007B7DE0): the user state to the UI manager, the lobby UI state, then
     // onlineprovider.lua's `CreateLobby(autolaunch, "UDP", port, name, uid, natTraversal, hasSupcom)`.
@@ -101,6 +138,74 @@ namespace
       (signal.flags & faf::remote::net::kLobbySignalAutoLobby) != 0, 0, fa::string(signal.name.c_str()), uidText.c_str(), nullptr, 1
     ));
     gpg::Logf("SERVER LOBBY: lobby made for \"%s\" (uid %s).", signal.name.c_str(), uidText.c_str());
+  }
+
+  void CServerLobbyTask::Launch(const std::vector<std::uint8_t>& message)
+  {
+    mLaunched = true;
+    LuaPlus::LuaState* const state = moho::USER_GetLuaState();
+    LuaPlus::LuaObject config;
+    try {
+      moho::CMessage bytes(moho::ELobbyMsg::LOBMSG_DirectScriptData);
+      (void)bytes.Append(reinterpret_cast<const char*>(message.data() + 1), message.size() - 1u);
+      moho::CMessageStream stream(&bytes, moho::CMessageStream::Access::kReadOnly);
+      const gpg::BinaryReader reader{&stream};
+      LuaPlus::LuaObject codec = state->GetGlobals();
+      codec.SCR_FromByteStream(config, state, &reader);
+    } catch (const std::exception& error) {
+      gpg::Warnf("SERVER LOBBY: the server's launch doesn't read: %s", error.what());
+      return;
+    }
+    if (!config.IsTable()) {
+      gpg::Warnf("SERVER LOBBY: the server's launch isn't a table");
+      return;
+    }
+    // This player's name, from their slot in the launch; the server's own observer entry (uid 0) is left out.
+    const std::int32_t uid = faf::remote::ServerSessionUid();
+    std::string name = "Player";
+    LuaPlus::LuaObject players = config["PlayerOptions"];
+    if (players.IsTable()) {
+      for (LuaPlus::LuaTableIterator it(&players, 1); !it.m_isDone; it.Next()) {
+        LuaPlus::LuaObject player = it.GetValue();
+        const LuaPlus::LuaObject owner = player.IsTable() ? player["OwnerID"] : LuaPlus::LuaObject{};
+        const LuaPlus::LuaObject playerName = player.IsTable() ? player["PlayerName"] : LuaPlus::LuaObject{};
+        if (owner.IsString() && std::atoi(owner.GetString()) == uid && playerName.IsString()) {
+          name = playerName.GetString();
+        }
+      }
+    }
+    LuaPlus::LuaObject noObservers;
+    noObservers.AssignNewTable(state, 0, 0u);
+    config.SetObject("Observers", noObservers);
+    moho::CLaunchRoster roster(uid, fa::string(name.c_str()), {});
+    moho::SLaunchBuild build = moho::BuildLaunchInfo(config, roster, 1, true, state); // the seed is the server's sim's
+    if (build.failure != nullptr) {
+      gpg::Warnf("SERVER LOBBY: the server's launch can't be used: %s", build.failure);
+      return;
+    }
+    faf::remote::client::SServerLaunch launch;
+    launch.playerName = name;
+    launch.clientIndex = build.localClientIndex;
+    launch.uid = uid;
+    launch.source = build.localSourceId;
+    faf::remote::client::SetServerLaunch(launch);
+    gpg::Logf(
+      "SERVER LOBBY: launched by the server: map %s, client %d, source %u", build.mapName.c_str(), static_cast<int>(build.localClientIndex),
+      static_cast<unsigned>(build.localSourceId)
+    );
+
+    auto sessionInfo = fa::auto_ptr<moho::SWldSessionInfo>(new moho::SWldSessionInfo());
+    sessionInfo->mIsBeingRecorded = false; // the server keeps the replay
+    sessionInfo->mIsReplay = false;
+    sessionInfo->mIsMultiplayer = true;
+    sessionInfo->mSourceId = build.localSourceId;
+    sessionInfo->mMapName = build.mapName;
+    sessionInfo->mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
+    sessionInfo->mClientManager = nullptr; // the network driver makes its own (remote/client/NetworkSimDriver.h)
+    moho::LOBBY_ServerSessionLaunched(); // the lobby's screen closes as a launched lobby's does
+    delete mLobby;
+    mLobby = nullptr;
+    moho::WLD_BeginSession(sessionInfo);
   }
 
   void CServerLobbyTask::Apply(const SLobbySignal& signal)

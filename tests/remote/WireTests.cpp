@@ -18,6 +18,7 @@
 #include <map>
 #include <random>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -38,6 +39,7 @@
 #include "remote/wire/IntelGridDelta.h"
 #include "remote/wire/LuaSyncLane.h"
 #include "remote/wire/OrdinalTable.h"
+#include "remote/wire/PoseLane.h"
 #include "remote/wire/NameTable.h"
 #include "remote/wire/Quantize.h"
 #include "remote/wire/Roster.h"
@@ -2528,6 +2530,107 @@ namespace
     CHECK(DecodeGridLane(gridReader2, clientHeld) && clientHeld == beat2);
   }
 
+  void TestPoseLane()
+  {
+    // Plan WP8.1: whole units and changed bones round-trip; ids out of order, too many bones, a cut lane fail.
+    const float movedPosition[3] = {1.5f, -2.0f, 0.25f};
+    const float movedRotation[4] = {0.0f, 0.70710677f, 0.0f, 0.70710677f};
+    const SPoseBone moved = QuantizeBone(movedPosition, movedRotation, false, true);
+    float backPosition[3];
+    float backRotation[4];
+    DequantizeBone(moved, backPosition, backRotation);
+    for (std::size_t i = 0; i < 3; ++i) {
+      CHECK(std::fabs(backPosition[i] - movedPosition[i]) <= 0.5f / kPosePositionSteps);
+    }
+    for (std::size_t i = 0; i < 4; ++i) {
+      CHECK(std::fabs(backRotation[i] - movedRotation[i]) <= 1.0f / kPoseRotationSteps);
+    }
+    SPoseBone step; // a difference: small, and negative
+    step.position = {-1, 0, 3};
+    step.rotation = {0, -2, 0, 1};
+    std::vector<SUnitPose> lane(3);
+    lane[0].id = 0x00100004u;
+    lane[0].whole = true;
+    lane[0].bones = {SPoseBone{}, moved, SPoseBone{}};
+    lane[1].id = 0x00100009u;
+    lane[1].indices = {2u, 7u};
+    lane[1].bones = {step, moved};
+    lane[2].id = 0x00200001u;
+    lane[2].whole = true; // no bones: the client drops its poses
+    BitWriter writer;
+    CHECK(EncodePoseLane(lane, writer));
+    const std::vector<std::uint8_t> bytes = Bytes(writer);
+    BitReader reader(bytes);
+    std::vector<SUnitPose> decoded;
+    CHECK(DecodePoseLane(reader, decoded) && decoded == lane);
+    for (std::size_t length = 0; length < bytes.size(); ++length) {
+      BitReader cut(std::span<const std::uint8_t>(bytes.data(), length));
+      std::vector<SUnitPose> partial;
+      CHECK(!DecodePoseLane(cut, partial)); // the last byte holds a bit of the lane
+    }
+    std::vector<SUnitPose> unordered = {lane[1], lane[0]};
+    BitWriter rejected;
+    CHECK(!EncodePoseLane(unordered, rejected));
+    SUnitPose huge;
+    huge.whole = true;
+    huge.bones.resize(SUnitPose::kMaxBones + 1u);
+    BitWriter tooMany;
+    CHECK(!EncodePoseLane(std::vector<SUnitPose>{huge}, tooMany));
+  }
+
+  void TestSharedValueShare()
+  {
+    // `Share`: the same pointer compares nothing; an equal value is no change but its pointer is taken; a different
+    // value is a change.
+    const TSharedValue<std::vector<SUnitStat>> a(std::vector<SUnitStat>{SUnitStat{3u, 0u, false, 7u, 0u}});
+    const TSharedValue<std::vector<SUnitStat>> equal(std::vector<SUnitStat>{SUnitStat{3u, 0u, false, 7u, 0u}});
+    const TSharedValue<std::vector<SUnitStat>> other(std::vector<SUnitStat>{SUnitStat{3u, 0u, false, 8u, 0u}});
+    TSharedValue<std::vector<SUnitStat>> held;
+    CHECK(held.Share(a));
+    CHECK(!held.Share(a) && &*held == &*a);
+    CHECK(!held.Share(equal) && &*held == &*equal);
+    CHECK(held.Share(other) && *held == *other);
+    CHECK(held.Share(TSharedValue<std::vector<SUnitStat>>()) && held->empty());
+  }
+
+  void TestSessionTablesFromThreads()
+  {
+    // Plan WP11 step 4: a server's views intern on several threads at once into one session; each name gets one id,
+    // and the record read back holds every name under it.
+    CSessionTableWriters server;
+    constexpr int kThreads = 8;
+    constexpr int kNames = 200;
+    std::vector<std::vector<std::uint32_t>> ids(kThreads, std::vector<std::uint32_t>(kNames));
+    std::vector<std::thread> threads;
+    for (int t = 0; t < kThreads; ++t) {
+      threads.emplace_back([&server, &ids, t] {
+        for (int i = 0; i < kNames; ++i) {
+          const int name = (i * 7 + t * 13) % kNames;
+          ids[static_cast<std::size_t>(t)][static_cast<std::size_t>(name)] = server.Name("/stat/" + std::to_string(name));
+          if (i % 10 == 0) {
+            (void)server.Sound(SSoundEntry{"Bank", "Cue" + std::to_string(name % 5), "", ""});
+          }
+        }
+      });
+    }
+    for (std::thread& thread : threads) {
+      thread.join();
+    }
+    for (int t = 1; t < kThreads; ++t) {
+      CHECK(ids[static_cast<std::size_t>(t)] == ids[0]);
+    }
+    BitWriter record;
+    server.WritePending(record);
+    const std::vector<std::uint8_t> bytes = Bytes(record);
+    BitReader in(bytes);
+    CSessionTableReaders client;
+    CHECK(client.Read(in) && client.Names().Size() == static_cast<std::uint32_t>(kNames) && client.Sounds().Size() <= 5u);
+    for (int name = 0; name < kNames; ++name) {
+      const std::string* const text = client.Names().Find(ids[0][static_cast<std::size_t>(name)]);
+      CHECK(text != nullptr && *text == "/stat/" + std::to_string(name));
+    }
+  }
+
 } // namespace
 
 TEST(Existing_Wire, ArmyAndGridLanes) { TestArmyAndGridLanes(); }
@@ -2542,6 +2645,9 @@ TEST(Existing_Wire, GridDeltaHostile) { TestGridDeltaHostile(); }
 TEST(Existing_Wire, SoundTable) { TestSoundTable(); }
 TEST(Existing_Wire, Roster) { TestRoster(); }
 TEST(Existing_Wire, SessionTables) { TestSessionTables(); }
+TEST(Existing_Wire, SessionTablesFromThreads) { TestSessionTablesFromThreads(); }
+TEST(Existing_Wire, SharedValueShare) { TestSharedValueShare(); }
+TEST(Existing_Wire, PoseLane) { TestPoseLane(); }
 TEST(Existing_Wire, BitStreamRoundTrip) { TestBitStreamRoundTrip(); }
 TEST(Existing_Wire, BitStreamOverrun) { TestBitStreamOverrun(); }
 TEST(Existing_Wire, BitStreamMatchesBitAtATime) { TestBitStreamMatchesBitAtATime(); }

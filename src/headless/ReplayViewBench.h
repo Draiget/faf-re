@@ -40,6 +40,8 @@ namespace faf::headless
     void Uninstall();
     /** `--spy` with `--lua-routing`: every Lua key each view receives is checked (ReplaySyncSpy.h). */
     void EnableLuaSpy() noexcept { mLuaSpyOn = true; }
+    /** `--view-tables`: the session tables as a server keeps them, each beat's record written (and counted). */
+    void EnableBenchTables() noexcept { EnableSessionTables(mSessionTables); }
     /** `--lua-move-view` and `--lua-resync`: moves and resyncs at a beat, to test them on replays. */
     void AddLuaMove(const std::int32_t beat, const std::size_t view, const std::int32_t army) { mLuaMoves.push_back({beat, view, army}); }
     void AddLuaResync(const std::int32_t beat, const std::size_t view) { mLuaResyncs.push_back({beat, view, 0}); }
@@ -63,6 +65,9 @@ namespace faf::headless
     };
 
     std::FILE* mFile = nullptr;
+    remote::wire::CSessionTableWriters mSessionTables; // `EnableBenchTables`
+    std::uint64_t mTableBytes = 0;
+    std::uint64_t mTableRecords = 0;
     std::size_t mViews = 0; // views built on the last beat (civilian armies have none)
     std::vector<SBeat> mBeats;
     SBeat mBeat{}; // this beat's, until `OnViewsFinished` adds it to them

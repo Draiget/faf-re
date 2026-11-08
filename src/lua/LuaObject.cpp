@@ -33,6 +33,7 @@
 #include "LuaCrashDump.h"
 #include "LuaError.h"
 #include "LuaGcEventLog.h"
+#include "LuaIncrementalGc.h"
 #include "LuaMemAccounting.h"
 #include "LuaNumberText.h"
 #include "gpg/core/diagnostics/ProbeWatch.h"
@@ -437,6 +438,18 @@ extern "C"
 	static void luaC_checkGC(lua_State* const state)
 	{
 		global_State* const globalState = state->l_G;
+		if (moho::lua_IncrementalGC && moho::lua_incremental::IsUiState(state->l_G)) {
+			if (const moho::lua_incremental::SState* const incremental =
+					moho::lua_incremental::Find(state->l_G);
+				incremental != nullptr && incremental->frameDriven) {
+				return; // UI_ProcessIdleGC owns this state's pacing
+			}
+			if (globalState->nblocks >= globalState->GCthreshold &&
+				globalState->gcTraversalLockDepth == 0) {
+				faf_lua51_gc_step(state); // Lua 5.1.5 lgc.c: luaC_checkGC()/luaC_step()
+			}
+			return;
+		}
 		if (LuaGcThresholdReached(globalState) && globalState->gcTraversalLockDepth == 0) {
 			luaC_collectgarbage(state);
 		}
@@ -567,6 +580,9 @@ extern "C"
 	void lua_setglobaluserdata(lua_State* const state, void* const globalUserData)
 	{
 		state->l_G->globalUserData = static_cast<moho::Sim*>(globalUserData);
+		if (globalUserData != nullptr && moho::lua_IncrementalGC) {
+			faf_lua51_gc_abandon(state->l_G);
+		}
 	}
 
 	/**

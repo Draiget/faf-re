@@ -1,4 +1,6 @@
 #include "moho/terrain/LowFidelityTerrain.h"
+#include "moho/terrain/SplatChunkRenderer.h"
+#include "moho/terrain/SplatBudget.h"
 
 #include <algorithm>
 #include <cmath>
@@ -40,7 +42,6 @@ namespace
   constexpr std::int32_t kSkirtMaxIndexCount = 199998;
   constexpr std::int32_t kTriangleListPrimitiveType = 4;
   constexpr float kMinDecalAlpha = 0.0039215689f; // 1/255
-  constexpr std::int32_t kMaxSplatsPerFrame = 250;
 
   /**
    * x87 "frndint" (round-to-nearest) + correction is the binary's idiom for
@@ -817,6 +818,17 @@ namespace moho
       return;
     }
 
+    // Keep the original single-draw path for ordinary views. Only overflow
+    // uses pass-major chunks, so every existing sheet/index stays in bounds.
+    if (splatVertexCount > 1000U) {
+      D3D_GetDevice()->SelectTechnique("LowFidelitySplat");
+      GetTerrainShaderVars().decalAlbedoTexture.GetTexture(
+        boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture_batcher->GetCompositeTexture()));
+      DrawSplatChunksPassMajor(
+        D3D_GetDevice(), mDynamicVertexSheet, mDynamicIndexSheet, mSplatVertices.data(), splatVertexCount, 250);
+      return;
+    }
+
     void* const lockedVertices =
       mDynamicVertexSheet->GetVertStream(0U)->Lock(0, static_cast<std::int32_t>(splatVertexCount), false, true);
     // Raw GPU upload: splat vertex blob into the locked stream.
@@ -1090,7 +1102,7 @@ namespace moho
       }
     }
 
-    mSplatVertices.ResetStorageToInline();
+    auto splatOutputBudget = PrepareSplatOutput(mSplatVertices, ren_SplatBudgetTier);
 
     if (!minimapPass && ren_Splats) {
       auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
@@ -1104,7 +1116,7 @@ namespace moho
       // the walk runs once more, so only this frame's textures hold places.
       for (bool mayRestart = true;; mayRestart = false) {
         bool restart = false;
-        std::int32_t splatBudget = 0;
+        std::size_t splatBudget = 0;
         for (CWldTerrainDecal* const decalEntry : visibleSplats) {
           auto* const splat = static_cast<CWldSplat*>(decalEntry);
 
@@ -1120,7 +1132,8 @@ namespace moho
           if (worldDistance > splat->mCutoffLOD) {
             continue;
           }
-          if (++splatBudget >= kMaxSplatsPerFrame) {
+          if (splatBudget++ >= splatOutputBudget.available
+            && !TryGrowSplatOutput(mSplatVertices, splatOutputBudget)) {
             break;
           }
 
@@ -1161,7 +1174,9 @@ namespace moho
           break;
         }
         REN_ResetSplatTextureBatcher(texture_batcher);
-        splatVertexLane.ResetStorageToInline();
+        // Rebuild every UV after the atlas reset, retaining capacity and the
+        // per-view budget so restart does not bypass guarded growth.
+        splatVertexLane.Clear();
       }
     }
 

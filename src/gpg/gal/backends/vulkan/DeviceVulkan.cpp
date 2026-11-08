@@ -13,6 +13,7 @@
 #include <d3dcompiler.h>
 #include <wrl/client.h>
 
+#include "VulkanAttachmentBarrier.h"
 #include "VulkanSurface.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/CubeRenderTargetContext.hpp"
@@ -1500,11 +1501,31 @@ namespace gpg::gal
       return;
     }
     EndRendering();
-    if (colorImage != nullptr) {
-      Transition(*colorImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    }
-    if (depthImage != nullptr) {
-      Transition(*depthImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    // A new dynamic-rendering instance has no implicit dependency on the
+    // previous instance. A layout change supplies one through Transition;
+    // an attachment kept in the same layout still needs its stores made
+    // visible to this instance's load, depth tests and blending.
+    VkImageMemoryBarrier2 attachmentBarriers[2]{};
+    std::uint32_t attachmentBarrierCount = 0U;
+    const auto prepareAttachment = [&](vulkan::TrackedImage* image, const VkImageLayout layout) {
+      if (image == nullptr || image->image == VK_NULL_HANDLE) {
+        return;
+      }
+      if (image->layout != layout) {
+        Transition(*image, layout);
+        return;
+      }
+      attachmentBarriers[attachmentBarrierCount++] =
+        vulkan::AttachmentWriteBarrier(image->image, layout, AspectOf(image->format));
+    };
+    prepareAttachment(colorImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    prepareAttachment(depthImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    if (attachmentBarrierCount != 0U) {
+      VkDependencyInfo dependency{};
+      dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+      dependency.imageMemoryBarrierCount = attachmentBarrierCount;
+      dependency.pImageMemoryBarriers = attachmentBarriers;
+      Vk().vkCmdPipelineBarrier2(mCommands, &dependency);
     }
     VkRenderingAttachmentInfo colorAttachment{};
     colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;

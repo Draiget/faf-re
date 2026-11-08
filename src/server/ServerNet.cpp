@@ -18,6 +18,18 @@ namespace faf::server
     constexpr std::size_t kCommandHeaderBytes = 3;
     // About a minute of a big game's views: past this a player isn't keeping up, and holds memory for nothing.
     constexpr std::uint64_t kMaxUnackedViewBytes = 16u * 1024u * 1024u;
+    // Plan WPR.50: a participant counted away is heard again once something came this recently (keepalives: 0.25 s).
+    constexpr std::uint64_t kHeardAgainUs = 1'000'000u;
+
+    [[nodiscard]] std::string Hex(const std::uint64_t value)
+    {
+      static constexpr char kDigits[] = "0123456789abcdef";
+      std::string text(16u, '0');
+      for (int i = 15; i >= 0; --i) {
+        text[static_cast<std::size_t>(i)] = kDigits[(value >> (4u * static_cast<unsigned>(15 - i))) & 0xFu];
+      }
+      return text;
+    }
 
     [[nodiscard]] std::uint64_t NowUs() noexcept
     {
@@ -71,6 +83,19 @@ namespace faf::server
         mLobby.Close();
       }
       mLinks.Pump(mNowUs - mStartUs, *this);
+      if (!mContentKnown) {
+        {
+          const std::scoped_lock lock(mNewsLock);
+          mContentKnown = mContentSet;
+          mContentMode = mContentModeIn;
+          mContentExpected = mContentExpectedIn;
+        }
+        if (mContentKnown) {
+          for (auto& [uid, seat] : mSeats) {
+            JudgeContent(uid, seat);
+          }
+        }
+      }
       SendLobby();
       SendViews();
       Tick(mNowUs);
@@ -85,6 +110,9 @@ namespace faf::server
         && (message[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::GameInfo)
             || message[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::LaunchInfo))) {
       mStartMessages[uid].push_back(message);
+    }
+    if (!message.empty() && message[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::SessionTables)) {
+      mTableLogs[uid].push_back(message);
     }
     mViewQueue[uid].push_back(SQueuedMessage{std::move(message), fresh});
   }
@@ -103,6 +131,7 @@ namespace faf::server
       }
       mViewSending.clear();
       std::vector<std::vector<std::uint8_t>> startMessages;
+      std::vector<std::vector<std::uint8_t>> tableLog;
       {
         const std::scoped_lock lock(mViewLock);
         const auto queue = mViewQueue.find(uid);
@@ -112,6 +141,9 @@ namespace faf::server
         if (seat.viewBroken) {
           if (const auto info = mStartMessages.find(uid); info != mStartMessages.end()) {
             startMessages = info->second;
+          }
+          if (const auto log = mTableLogs.find(uid); log != mTableLogs.end()) {
+            tableLog = log->second; // with the queue's: they were taken together
           }
         }
       }
@@ -130,6 +162,17 @@ namespace faf::server
         seat.viewBroken = false;
         for (const std::vector<std::uint8_t>& message : startMessages) {
           (void)mLinks.SendReliable(uid, message.data(), message.size());
+        }
+        // The session tables again from the first record, less those still to go after the fresh view in the queue.
+        std::size_t queuedTables = 0;
+        for (std::size_t i = first; i < mViewSending.size(); ++i) {
+          const std::vector<std::uint8_t>& bytes = mViewSending[i].bytes;
+          queuedTables += !bytes.empty() && bytes[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::SessionTables) ? 1u : 0u;
+        }
+        const std::uint8_t reset[] = {static_cast<std::uint8_t>(remote::net::ESeatMessage::SessionTables), 0u, 1u};
+        (void)mLinks.SendReliable(uid, reset, sizeof(reset));
+        for (std::size_t i = 0; i + queuedTables < tableLog.size(); ++i) {
+          (void)mLinks.SendReliable(uid, tableLog[i].data(), tableLog[i].size());
         }
         Say(seat.name + " has their view again, from beat " + std::to_string(mBeat.load(std::memory_order_relaxed)));
       }
@@ -158,6 +201,74 @@ namespace faf::server
   {
     const std::scoped_lock lock(mNewsLock);
     return std::exchange(mLobbyJoined, {});
+  }
+
+  std::vector<CServerNet::SPresence> CServerNet::TakeLobbyPresence()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    return std::exchange(mLobbyPresence, {});
+  }
+
+  void CServerNet::NoteLobbyPresence(const std::int32_t uid, SSeat& seat, const bool away)
+  {
+    seat.lobbyAway = away;
+    {
+      const std::scoped_lock lock(mNewsLock);
+      mLobbyPresence.push_back(SPresence{uid, away});
+    }
+    Say(seat.name + (away ? " has gone quiet in the lobby" : " is heard again in the lobby"));
+  }
+
+  void CServerNet::WatchLobbyPresence(const std::uint64_t nowUs)
+  {
+    if (!mLobby.Open() || mConfig.lobbyAwaySeconds <= 0.0) {
+      return;
+    }
+    const auto awayUs = static_cast<std::uint64_t>(mConfig.lobbyAwaySeconds * 1e6);
+    for (auto& [uid, seat] : mSeats) {
+      if (!seat.joinedEver || seat.gone || seat.lost) {
+        continue; // a lost channel counts as away already (`OnLost`)
+      }
+      const std::uint64_t silentUs = mLinks.SilentUs(uid, nowUs - mStartUs);
+      if (!seat.lobbyAway && silentUs >= awayUs) {
+        NoteLobbyPresence(uid, seat, true);
+      } else if (seat.lobbyAway && silentUs < kHeardAgainUs) {
+        NoteLobbyPresence(uid, seat, false);
+      }
+    }
+  }
+
+  void CServerNet::SetContentCheck(const remote::EContentCheck mode, const remote::SContentReport& expected)
+  {
+    const std::scoped_lock lock(mNewsLock);
+    mContentSet = true;
+    mContentModeIn = mode;
+    mContentExpectedIn = expected;
+  }
+
+  void CServerNet::JudgeContent(const std::int32_t uid, SSeat& seat)
+  {
+    if (!mContentKnown || mContentMode == remote::EContentCheck::Off || seat.gone || seat.contentJudged) {
+      return;
+    }
+    if (!seat.reported && !seat.loaded) {
+      return; // nothing to judge yet
+    }
+    seat.contentJudged = true;
+    const remote::EContentVerdict verdict = remote::JudgeContent(mContentExpected, seat.reported ? &seat.report : nullptr);
+    if (verdict == remote::EContentVerdict::Same) {
+      Say(seat.name + "'s game content is the server's");
+      return;
+    }
+    const std::string what = verdict == remote::EContentVerdict::Missing
+                             ? std::string("loaded without reporting its game content")
+                             : "its game content isn't the server's (blueprints " + Hex(seat.report.blueprints) + ", mods " + Hex(seat.report.mods) +
+                                 "; the server's " + Hex(mContentExpected.blueprints) + ", " + Hex(mContentExpected.mods) + ")";
+    if (remote::RefusesPlayer(mContentMode, verdict)) {
+      Remove(uid, seat, what);
+    } else {
+      Say(seat.name + ": " + what + "; the match only warns");
+    }
   }
 
   void CServerNet::QueueLobbyFromServer(const std::int32_t uid, const std::vector<std::uint8_t>& message)
@@ -194,6 +305,8 @@ namespace faf::server
 
   void CServerNet::Tick(const std::uint64_t nowUs)
   {
+    WatchLobbyPresence(nowUs);
+
     if (const std::int32_t beat = mBeat.load(std::memory_order_relaxed); beat != mBeatSent) {
       mBeatSent = beat;
       std::vector<std::uint8_t> message;
@@ -271,9 +384,10 @@ namespace faf::server
            " for the server, dropped " + std::to_string(mLobby.Count(ELobbyRelayVerdict::TooFast)) + " too fast, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::TooLarge)) + " too large, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::Closed)) + " after launch, " +
+           std::to_string(mLobby.Count(ELobbyRelayVerdict::EjectIgnored)) + " ejects of participants, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::UnknownSender) + mLobby.Count(ELobbyRelayVerdict::UnknownTarget) +
                           mLobby.Count(ELobbyRelayVerdict::Malformed)) +
-           " malformed or misaddressed";
+           " malformed or misaddressed; " + std::to_string(mLobby.OptionsPinned()) + " relayed with the match's pinned options written back";
   }
 
   std::vector<std::int32_t> CServerNet::TakeReturned()
@@ -306,6 +420,9 @@ namespace faf::server
       mLobbyJoined.push_back(uid);
     }
     const bool wasLost = std::exchange(seat.lost, false);
+    if (returning && seat.lobbyAway && mLobby.Open()) {
+      NoteLobbyPresence(uid, seat, false);
+    }
     if (returning) {
       seat.viewBroken = true;
       const std::scoped_lock lock(mNewsLock);
@@ -331,6 +448,9 @@ namespace faf::server
       mPresence.push_back(SPresence{uid, true});
     }
     Say(seat.name + " lost the connection: " + std::to_string(static_cast<int>(mConfig.reconnectSeconds)) + " s to come back");
+    if (mLobby.Open() && !seat.lobbyAway) {
+      NoteLobbyPresence(uid, seat, true);
+    }
   }
 
   void CServerNet::OnMessage(const std::int32_t uid, const std::vector<std::uint8_t>& message)
@@ -363,10 +483,27 @@ namespace faf::server
     case remote::net::ESeatMessage::Loaded:
       if (!seat.loaded) {
         seat.loaded = true;
+        JudgeContent(uid, seat); // plan WP2.6: one with no report counts once the server's content is known
+        if (seat.gone) {
+          return;
+        }
         seat.seat->MarkLoaded();
         Say(seat.name + " has loaded the game");
       }
       return;
+    case remote::net::ESeatMessage::ContentReport: {
+      remote::SContentReport report;
+      if (!remote::DecodeContentReport(message, report)) {
+        ++mBadMessages;
+        return;
+      }
+      if (!seat.reported) { // the first counts
+        seat.reported = true;
+        seat.report = report;
+        JudgeContent(uid, seat);
+      }
+      return;
+    }
     case remote::net::ESeatMessage::Leaving:
       Remove(uid, seat, "left");
       return;
@@ -404,6 +541,8 @@ namespace faf::server
     case remote::net::ESeatMessage::View:
     case remote::net::ESeatMessage::GameInfo:
     case remote::net::ESeatMessage::LaunchInfo:
+    case remote::net::ESeatMessage::LuaSync:
+    case remote::net::ESeatMessage::SessionTables:
     case remote::net::ESeatMessage::CommandAnswer:
     case remote::net::ESeatMessage::ViewCheck:
       break; // the server's own to send

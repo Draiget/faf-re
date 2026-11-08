@@ -1,4 +1,5 @@
 #include "moho/lua/CScrLuaInitForm.h"
+#include "moho/misc/FileWriteExact.h"
 #include "moho/misc/SessionStartup.h"
 
 #include <Windows.h>
@@ -78,16 +79,6 @@ namespace
   [[nodiscard]] fa::string MakeTempSavePath(const fa::string& basePath)
   {
     return basePath + ".NEW";
-  }
-  [[nodiscard]] bool WriteExact(std::FILE* const file, const void* const data, const std::size_t byteCount)
-  {
-    if (!file) {
-      return false;
-    }
-    if (byteCount == 0) {
-      return true;
-    }
-    return std::fwrite(data, byteCount, 1, file) == 1;
   }
 } // namespace
 
@@ -884,6 +875,9 @@ namespace moho
 
     for (std::size_t clientIndex = 0; clientIndex < clientCount; ++clientIndex) {
       auto* const client = static_cast<CClientBase*>(clientManager->GetClient(static_cast<int>(clientIndex)));
+      if (client == nullptr) {
+        continue; // engine addition: a server session's roster has no client in a slot nobody holds
+      }
 
       LuaPlus::LuaObject clientEntry{};
       clientEntry.AssignNewTable(state, 0, 0);

@@ -1,4 +1,5 @@
 #include "moho/unit/tasks/CUnitCaptureTask.h"
+#include "moho/misc/EconomyRequestRelease.h"
 
 #include <algorithm>
 #include <cmath>
@@ -65,17 +66,6 @@ namespace
     return static_cast<moho::ETaskState>(static_cast<int>(current) + 1);
   }
 
-  void DestroyEconomyRequestPointer(moho::CEconRequest*& request)
-  {
-    if (request == nullptr) {
-      return;
-    }
-
-    request->mNode.ListUnlink();
-    delete request;
-    request = nullptr;
-  }
-
   void ReplaceEconomyRequestPointer(moho::CEconRequest*& request, moho::CEconRequest* const replacement)
   {
     DestroyEconomyRequestPointer(request);
@@ -96,16 +86,6 @@ namespace
       request->mNode.ListLinkBefore(&economy->registrationNode);
     }
     return request;
-  }
-
-  [[nodiscard]] moho::SEconValue TakeGrantedResourcesAndReset(moho::CEconRequest* const request) noexcept
-  {
-    moho::SEconValue out{};
-    out.energy = request->mGranted.energy;
-    out.mass = request->mGranted.mass;
-    request->mGranted.energy = 0.0f;
-    request->mGranted.mass = 0.0f;
-    return out;
   }
 
   [[nodiscard]] int MaxFootprintExtent(const moho::SFootprint& footprint) noexcept
