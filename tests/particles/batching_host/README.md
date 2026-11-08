@@ -7,10 +7,10 @@ Production files and algorithms are not edited.
 
 ## What actually runs
 
-`bind_production.py` extracts 24 complete definitions verbatim from:
+`bind_production.py` extracts 26 complete definitions verbatim, plus the `ren_ParticleLinearUpload` default, from:
 
 - `CWorldParticles.cpp`: buffer acquire/release and normal/water/refraction render methods.
-- `ParticleRenderBuckets.cpp`: upload, pruning, fill, cleanup, mirror store, gather store, batching selection, gathering, and original-draw fallback.
+- `ParticleRenderBuckets.cpp`: upload (with its pending cursor), pruning, fill, cleanup, mirror store, gather store, batching selection, gathering, and original-draw fallback.
 - `ParticleRenderWorkItem.cpp`: interval initialization, expiry, cleanup, and work-item destruction.
 - `GpuPathSettings.cpp`: production feature/setting selection.
 
@@ -20,7 +20,8 @@ source paths, line numbers, source SHA256 and definition SHA256. Missing or
 ambiguous source definitions fail the build instead of substituting a model.
 
 The fixture uses a synchronous byte-recording graphics device and particle
-buffer locks/draws, `std::map` bucket lookup, simplified particle payload fields,
+buffer locks/draws, `std::map` bucket lookup, simplified particle payload fields
+(stand-in `Wm3::Vector3` and `fa::string`; `tests/particles/upload_host` binds the real payload),
 `std::shared_ptr`, and no-op camera/shader selection. Trail execution fails
 explicitly if reached; the trail map is empty in these tests. These adapters do
 not test real graphics resources, command submission, synchronization, shader
@@ -35,7 +36,7 @@ not fatal in this target. No production source was changed to silence them.
 
 ## Cases
 
-15 GoogleTests cover:
+18 GoogleTests cover (CTest runs them once as they are and once with `PARTICLE_LINEAR_UPLOAD=1`):
 
 - Exhausted pool, early suffix pruning, reused descriptor/mirror slot, and exact drawn bytes for the new contents.
 - Reused slots with a nonzero live interval cursor and exact gather byte offsets.
@@ -45,6 +46,7 @@ not fatal in this target. No production source was changed to silence them.
 - Repeated pruning and repeated `ForgetMirroredParticles` calls without duplicate free slots or pool entries.
 - 32 alternating bucket refill/reclaim cycles with slot uniqueness and draw order checks.
 - Batch-off reuse followed by re-enabling batching, without reviving an old mirror.
+- Three reclaimed buffers feeding one bucket with 601 pending particles: 600 uploaded in order across three work items, the rest discarded. With `PARTICLE_LINEAR_UPLOAD=1` this runs the pending cursor's deferred path and its short-tail erase.
 
 Assertions check 92-byte instance records, not just particle counts. Assertions
 about mirror ownership and free-slot uniqueness also catch omitted cleanup

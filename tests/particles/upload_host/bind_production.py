@@ -105,7 +105,8 @@ args.output.write_text(''.join(chunks), encoding='utf-8')
 header_paths = ['src/moho/misc/CountedObject.h', 'src/legacy/containers/String.h',
                 'src/legacy/containers/String.cpp',
                 'src/legacy/containers/Vector.h', 'src/legacy/containers/Layout.h',
-                'src/gpg/gal/GpuDriven.h', 'src/platform/LayoutAsserts.h']
+                'src/gpg/gal/GpuDriven.h', 'src/platform/LayoutAsserts.h',
+                'src/moho/particles/ParticlePoolReclaim.h']
 # Hash the real WildMagic header closure, with repository-relative identities.
 wm = root / 'dependencies/WildMagic3p8/Foundation'
 wm_paths = {path.name: path for path in wm.rglob('*') if path.is_file()}

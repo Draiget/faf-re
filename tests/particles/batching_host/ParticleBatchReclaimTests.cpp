@@ -27,6 +27,10 @@
 #include "moho/particles/ParticlePoolReclaim.h"
 
 namespace boost { template<class T> using shared_ptr = std::shared_ptr<T>; }
+// The pending-upload cursor names the payload's owned members and vector type.
+// Stand-ins with the same ownership shape; tests/particles/upload_host binds the real ones.
+namespace Wm3 { template<class T> struct Vector3 { T x{}, y{}, z{}; }; }
+namespace fa { struct string { std::string value; }; }
 #ifndef _WIN32
 // Only the diagnostic environment lookup is platform-adapted. Tests require
 // ordinary batching, not either diagnostic render mode.
@@ -107,9 +111,11 @@ struct BackgroundVar {
 inline BackgroundVar shaderVarParticleBackgroundTexture;
 // Data fields used by the unchanged upload function. Resource handles and
 // shader selection are outside this recorder's verification boundary.
-struct Vector3 { float x=0, y=0, z=0; };
+using Vector3 = Wm3::Vector3<float>;
 struct SWorldParticle {
   Vector3 mPos, mDir, mAccel;
+  std::shared_ptr<int> mTexture, mRampTexture;
+  fa::string mTypeTag;
   float mInterop=0, mLifetime=100, mFramerate=0, mValue1=0, mTextureSelection=0;
   float mRampSelection=0, mValue3=0, mResistance=1, mBeginSize=1, mEndSize=2;
   float mAngle=0, mRotationCurve=0;
@@ -198,6 +204,11 @@ inline int ren_ParticleBatch = 1;
 } // namespace moho
 #include "ParticleBatchProduction.inc"
 static_assert(sizeof(SParticleInstance) == sizeof(moho::ParticleBuffer::Instanced));
+// PARTICLE_LINEAR_UPLOAD sets ren_ParticleLinearUpload, so the reclaim cases also run with linear consumption.
+static const bool kLinearUploadFromEnvironment = [] {
+  if (const char* value = std::getenv("PARTICLE_LINEAR_UPLOAD")) moho::ren_ParticleLinearUpload = std::atoi(value);
+  return true;
+}();
 namespace moho {
 inline CWorldParticles::~CWorldParticles() {
   for (auto& bucket : owned_pb) RecycleAndDestroyParticleBucketWorkItems(*bucket);
@@ -428,6 +439,36 @@ TEST_F(ParticleBatchReclaim, BatchOffReuseCannotDrawPreviousMirrorWhenReenabled)
   ASSERT_EQ(device.copies.size(),1U);
   auto* buffer=static_cast<ParticleBuffer*>(early.activeWorkItems[0]->mParticleBuffer);
   EXPECT_EQ(device.copies[0].source,buffer->mInstanceVertexBuffer.get()); ExpectSlotsUnique();
+}
+
+// More than two batches pending in one bucket: with ren_ParticleLinearUpload=1 the first two
+// batches take the cursor's deferred path and the third the short-tail erase. Three expired
+// buckets are reclaimed for it; the 601st particle finds no buffer and is discarded.
+TEST_P(ParticleBatchReclaimLane, ReclaimFeedsAMultiBatchBucketInOrder) {
+  if (const char* linear=std::getenv("PARTICLE_LINEAR_UPLOAD")) ASSERT_EQ(ren_ParticleLinearUpload,std::atoi(linear));
+  CWorldParticles world(3);
+  const bool refract=GetParam()==2;
+  auto& early=world.P(0,0,refract);
+  for (int key=1; key<=3; ++key) Active(world.P(key,0,refract),200,1,1000*key);
+  ASSERT_TRUE(world.mAvailableParticleBuffers.empty());
+  Pending(early,601,9000);
+  ClearTrace(); Pass(world,GetParam());
+  EXPECT_TRUE(early.pendingParticles.empty());
+  ASSERT_EQ(early.activeWorkItems.size(),3U);
+  for (std::size_t k=0; k<3; ++k) {
+    const auto* item=early.activeWorkItems[k];
+    EXPECT_EQ(item->mRenderStartIndex,200U);
+    const auto& bytes=static_cast<ParticleBuffer*>(item->mParticleBuffer)->mInstanceVertexBuffer->bytes;
+    for (int i=0; i<200; ++i) {
+      float id=0; std::memcpy(&id,bytes.data()+static_cast<std::size_t>(i)*kStride,sizeof(id));
+      ASSERT_EQ(static_cast<int>(id),9000+static_cast<int>(k)*200+i) << "work item " << k << " slot " << i;
+    }
+  }
+  auto drawn=DrawnIds(device); std::sort(drawn.begin(),drawn.end());
+  EXPECT_EQ(drawn,Sequence(9000,600));
+  for (const auto& [key,bucket] : (refract ? world.mRefractingParticleBuckets : world.mParticleBuckets))
+    if (bucket!=&early) EXPECT_TRUE(bucket->activeWorkItems.empty());
+  ExpectSlotsUnique();
 }
 
 INSTANTIATE_TEST_SUITE_P(NormalWaterRefraction,ParticleBatchReclaimLane,testing::Values(0,1,2));

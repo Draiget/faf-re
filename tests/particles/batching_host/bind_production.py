@@ -64,6 +64,18 @@ for name in ['ResetParticleRenderWorkItemIntervals', 'DestroyParticleRenderWorkI
     bind(work, r'^  (?:void|bool|SParticleRenderWorkItem\*) ' + name + r'\(')
 for name in ['AcquireParticleBuffer', 'ReleaseParticleBuffer']:
     bind(world, r'^  [^\n]*\bCWorldParticles::' + name + r'\(')
+# The upload entry points share the pending cursor (ren_ParticleLinearUpload, PR #343).
+data = (root / buckets).read_bytes()
+match = re.search(r'^  int ren_ParticleLinearUpload = 0;', data.decode(), re.MULTILINE)
+if match is None:
+    raise ValueError('expected the ren_ParticleLinearUpload default in ' + buckets)
+chunks.append(match.group() + '\n')
+records.append({'path': buckets, 'source_sha256': sha(data),
+                'definition_sha256': sha(match.group().encode()), 'pattern': 'ren_ParticleLinearUpload default'})
+chunks.append('namespace {\n')
+bind(buckets, r'^    struct ParticlePendingCursor\s*', True)
+bind(buckets, r'^    void UploadPendingParticleRangeIntoWorkItem\(')
+chunks.append('}\n')
 for name in ['UploadPendingParticlesIntoWorkItem', 'RecycleAndDestroyParticleBucketWorkItems',
              'PruneExpiredParticleBucketWorkItems', 'EnsureAndFillParticleBucketWorkItems']:
     bind(buckets, r'^  (?:void|bool) ' + name + r'\(')
