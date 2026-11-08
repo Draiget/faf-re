@@ -440,6 +440,14 @@ target_link_libraries(faf_container_tests PRIVATE faf_sim gtest_main)
 target_link_options(faf_container_tests PRIVATE -Wl,--error-limit=0)
 add_test(NAME containers COMMAND faf_container_tests)
 
+# Recorded games played back by headless (tests/replay/ReplayPlaybackTests.cpp); skipped without FAF_REPLAY_DATA.
+add_executable(faf_replay_playback_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/replay/ReplayPlaybackTests.cpp")
+target_link_libraries(faf_replay_playback_tests PRIVATE faf_codegen gtest_main)
+target_compile_definitions(faf_replay_playback_tests PRIVATE FAF_HEADLESS_EXE="$<TARGET_FILE:headless>")
+add_dependencies(faf_replay_playback_tests headless)
+add_test(NAME replay_playback COMMAND faf_replay_playback_tests)
+set_tests_properties(replay_playback PROPERTIES TIMEOUT 3600)
+
 # --- faf_tests --------------------------------------------------------------------------
 # Every GoogleTest executable of the Linux build (cmake/FafTests.cmake).
 include(FafTests)

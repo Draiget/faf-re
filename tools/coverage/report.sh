@@ -48,6 +48,10 @@ while IFS= read -r exe; do
   OBJECTS+=(-object "$exe")
 done < <("$PYTHON" "$HERE/test_executables.py" "$BUILD")
 [ "${#OBJECTS[@]}" -gt 0 ] || { echo "report.sh: ctest lists no executables"; exit 3; }
+# The replay test runs headless as a child process, which writes counters of its own.
+for exe in "$BUILD"/src/headless*.exe "$BUILD/headless"; do
+  [ -f "$exe" ] && OBJECTS+=(-object "$exe")
+done
 
 # Only the engine's own code: no dependencies, tests or generated files.
 IGNORE='([\\/](dependencies|tests|build|_deps|tools)[\\/])|([\\/]gtest[\\/])|([\\/]deps-[^\\/]+[\\/])'

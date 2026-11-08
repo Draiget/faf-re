@@ -59,6 +59,14 @@ ctest --test-dir build/clang-x64-release -L Existing --output-on-failure
 
 `tests/particles/upload_host` is a CMake project of its own (GoogleTest, configured without the engine; its README says how), so `faf_tests` and the engine's ctest don't include them. Programs that need data or a server are not run by ctest: `faf_terrain_check --maps <list> /init <init.lua>` (its test is skipped without `--maps`), and the tools `faf_registration_dump`, `faf_juice_gather` and `faf_datachannel_test`, which print rather than pass or fail.
 
+### Recorded games
+
+`replay_playback` (`tests/replay/ReplayPlaybackTests.cpp`) plays recorded games through headless and fails on any checksum mismatch, crash, or a playback that stops before the game-over beat. It needs the game data and is skipped without it:
+
+```bash
+FAF_REPLAY_DATA=<folder with replays/ and faf/bin/> FAF_REPLAY_INIT=init_replay.lua FAF_REPLAY_IDS=26930624,26902315 ctest -R replay_playback
+```
+
 ## Coverage
 
 Line coverage of `src/` by these tests, from an instrumented build (`cmake/FafCoverage.cmake`):

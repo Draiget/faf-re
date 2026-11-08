@@ -148,6 +148,16 @@ set_target_properties(faf_replay_scan_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME replay_scan COMMAND faf_replay_scan_tests)
 set_tests_properties(replay_scan PROPERTIES LABELS "Existing")
 
+# Recorded games played back by headless with every checksum compared (tests/replay); skipped
+# without FAF_REPLAY_DATA. Games take minutes, hence the timeout.
+add_executable(faf_replay_playback_tests EXCLUDE_FROM_ALL replay/ReplayPlaybackTests.cpp)
+target_link_libraries(faf_replay_playback_tests PRIVATE gtest_main)
+target_compile_definitions(faf_replay_playback_tests PRIVATE FAF_HEADLESS_EXE="$<TARGET_FILE:headless>")
+add_dependencies(faf_replay_playback_tests headless)
+set_target_properties(faf_replay_playback_tests PROPERTIES FOLDER "Tests/Replay")
+add_test(NAME replay_playback COMMAND faf_replay_playback_tests)
+set_tests_properties(replay_playback PROPERTIES LABELS "Replay" TIMEOUT 3600)
+
 # CZipFile reads entries whose data starts at or past 2 GiB, as the binary does (tests/zip, PR #291).
 add_executable(faf_zip_offset_tests EXCLUDE_FROM_ALL zip/ZipOffsetTests.cpp)
 target_link_libraries(faf_zip_offset_tests PRIVATE faf_engine gtest_main)
