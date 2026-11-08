@@ -457,9 +457,12 @@ namespace moho
     const std::size_t bucketCount = static_cast<std::size_t>(mLastIndex + 1);
     const std::size_t bucketBytes = bucketCount * sizeof(void*);
 
-    mUnitBuckets = static_cast<EntityCollisionCellNode**>(::operator new(bucketBytes));
-    mPropBuckets = static_cast<EntityCollisionCellNode**>(::operator new(bucketBytes));
-    mEntityBuckets = static_cast<EntityCollisionCellNode**>(::operator new(bucketBytes));
+    // 0x004FCD60 / 0x004FCD82 / 0x004FCDA4: `call 0x00A82130` (operator new[],
+    // a tail-jump to the scalar form), paired with operator delete[] in the
+    // destructor.
+    mUnitBuckets = static_cast<EntityCollisionCellNode**>(::operator new[](bucketBytes));
+    mPropBuckets = static_cast<EntityCollisionCellNode**>(::operator new[](bucketBytes));
+    mEntityBuckets = static_cast<EntityCollisionCellNode**>(::operator new[](bucketBytes));
 
     std::memset(mUnitBuckets, 0, bucketBytes);
     std::memset(mPropBuckets, 0, bucketBytes);
@@ -509,15 +512,16 @@ namespace moho
    */
   EntityOccupationManager::~EntityOccupationManager()
   {
-    ::operator delete(mUnitBuckets);
-    ::operator delete(mPropBuckets);
-    ::operator delete(mEntityBuckets);
+    // 0x004FCE15 / 0x004FCE1E / 0x004FCE27: `call 0x00A82542` (operator delete[]).
+    ::operator delete[](mUnitBuckets);
+    ::operator delete[](mPropBuckets);
+    ::operator delete[](mEntityBuckets);
 
-    // 0x004FCE2C..0x004FCE59; the vector's own storage is released by
-    // ~vector (the `_Tidy` at 0x004FCE5C).
+    // 0x004FCE2C..0x004FCE59 (`call 0x00A82542` at 0x004FCE4C); the vector's
+    // own storage is released by ~vector (the `_Tidy` at 0x004FCE5C).
     const int blockCount = static_cast<int>(mAllBlocks.size());
     for (int index = 0; index < blockCount; ++index) {
-      ::operator delete(mAllBlocks[index]);
+      ::operator delete[](mAllBlocks[index]);
     }
   }
 
@@ -531,8 +535,9 @@ namespace moho
   void EntityOccupationManager::EnsureSize(const int requiredFreeNodes)
   {
     while (mFreeNodeCount < requiredFreeNodes) {
-      // 0x2000 nodes: 0x10000 bytes on x86.
-      auto* chunk = static_cast<EntityCollisionCellNode*>(::operator new(0x2000u * sizeof(EntityCollisionCellNode)));
+      // 0x2000 nodes: 0x10000 bytes on x86. 0x004FCEA5: `call 0x00A82130`
+      // (operator new[]); the destructor frees each block with delete[].
+      auto* chunk = static_cast<EntityCollisionCellNode*>(::operator new[](0x2000u * sizeof(EntityCollisionCellNode)));
       for (int i = 0; i < 0x1FFF; ++i) {
         chunk[i].next = &chunk[i + 1];
       }

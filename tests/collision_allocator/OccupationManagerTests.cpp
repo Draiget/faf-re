@@ -5,53 +5,96 @@
 #if defined(FAF_OCCUPATION_DELETE_TRACE)
 namespace
 {
-  struct DeallocationTrace;
-  thread_local DeallocationTrace* activeTrace = nullptr;
+  struct AllocationTrace;
+  thread_local AllocationTrace* activeTrace = nullptr;
+  // Only the outermost new/delete entry point counts: the array forms forward
+  // to the scalar ones, and that inner call must not show up as a second one.
+  thread_local int traceDepth = 0;
 
-  struct DeallocationTrace
+  struct AllocationTrace
   {
     struct Entry
     {
       void* pointer = nullptr;
-      int scalarCalls = 0;
-      int arrayCalls = 0;
+      bool arrayNew = false;
+      int scalarDeletes = 0;
+      int arrayDeletes = 0;
     };
-    Entry entries[32]{};
+    Entry entries[256]{};
     int size = 0;
-    DeallocationTrace* previous = activeTrace;
+    bool overflow = false;
+    AllocationTrace* previous = activeTrace;
 
-    DeallocationTrace() { activeTrace = this; }
-    ~DeallocationTrace() { activeTrace = previous; }
+    AllocationTrace() { activeTrace = this; }
+    ~AllocationTrace() { activeTrace = previous; }
 
-    void Watch(void* pointer) { entries[size++].pointer = pointer; }
-    void Record(void* pointer, bool array)
+    void RecordNew(void* pointer, bool array)
     {
-      for (int i = 0; i < size; ++i) {
+      if (size == 256) {
+        overflow = true;
+        return;
+      }
+      entries[size].pointer = pointer;
+      entries[size].arrayNew = array;
+      ++size;
+    }
+
+    void RecordDelete(void* pointer, bool array)
+    {
+      // The newest allocation at this address is the one being freed.
+      for (int i = size - 1; i >= 0; --i) {
         if (entries[i].pointer == pointer) {
-          if (array) {
-            ++entries[i].arrayCalls;
-          } else {
-            ++entries[i].scalarCalls;
-          }
+          ++(array ? entries[i].arrayDeletes : entries[i].scalarDeletes);
+          return;
         }
       }
+    }
+
+    const Entry* Find(const void* pointer) const
+    {
+      for (int i = size - 1; i >= 0; --i) {
+        if (entries[i].pointer == pointer) return &entries[i];
+      }
+      return nullptr;
     }
   };
 }
 
-// GNU/LLVM linker wrapping observes overload selection without replacing the
-// engine's allocator. Delegate every call to its unchanged real implementation.
+// GNU/LLVM linker wrapping observes which overload a call site selects without
+// replacing the engine's allocator. Every call goes on to the real function.
+extern "C" void* __real__Znwm(std::size_t);
+extern "C" void* __real__Znam(std::size_t);
 extern "C" void __real__ZdlPv(void*) noexcept;
 extern "C" void __real__ZdaPv(void*) noexcept;
+extern "C" void* __wrap__Znwm(std::size_t bytes)
+{
+  ++traceDepth;
+  void* const pointer = __real__Znwm(bytes);
+  --traceDepth;
+  if (activeTrace && traceDepth == 0) activeTrace->RecordNew(pointer, false);
+  return pointer;
+}
+extern "C" void* __wrap__Znam(std::size_t bytes)
+{
+  ++traceDepth;
+  void* const pointer = __real__Znam(bytes);
+  --traceDepth;
+  if (activeTrace && traceDepth == 0) activeTrace->RecordNew(pointer, true);
+  return pointer;
+}
 extern "C" void __wrap__ZdlPv(void* pointer) noexcept
 {
-  if (activeTrace) activeTrace->Record(pointer, false);
+  if (activeTrace && traceDepth == 0) activeTrace->RecordDelete(pointer, false);
+  ++traceDepth;
   __real__ZdlPv(pointer);
+  --traceDepth;
 }
 extern "C" void __wrap__ZdaPv(void* pointer) noexcept
 {
-  if (activeTrace) activeTrace->Record(pointer, true);
+  if (activeTrace && traceDepth == 0) activeTrace->RecordDelete(pointer, true);
+  ++traceDepth;
   __real__ZdaPv(pointer);
+  --traceDepth;
 }
 #endif
 
@@ -130,24 +173,33 @@ namespace
   }
 
 #if defined(FAF_OCCUPATION_DELETE_TRACE)
-  TEST(OccupationManagerDeallocation, EveryScalarAllocationUsesScalarDelete)
+  // Retail allocates the three bucket arrays (0x004FCD60/82/A4) and every node
+  // block (0x004FCEA5) with operator new[] (0x00A82130) and frees all four in
+  // the destructor with operator delete[] (0x00A82542, 0x004FCE15..0x004FCE4C).
+  TEST(OccupationManagerDeallocation, EveryArrayAllocationUsesArrayDelete)
   {
     for (const int requested : {0, 1, 16385, 155649}) {
-      DeallocationTrace trace;
+      AllocationTrace trace;
+      void* watched[32]{};
+      int watchedCount = 0;
       {
         moho::EntityOccupationManager manager(128, 256);
         manager.EnsureSize(requested);
-        ASSERT_LE(manager.mAllBlocks.size() + 3, 32);
-        trace.Watch(manager.mUnitBuckets);
-        trace.Watch(manager.mPropBuckets);
-        trace.Watch(manager.mEntityBuckets);
-        for (auto* block : manager.mAllBlocks) trace.Watch(block);
+        ASSERT_LE(manager.mAllBlocks.size() + 3, 32u);
+        watched[watchedCount++] = manager.mUnitBuckets;
+        watched[watchedCount++] = manager.mPropBuckets;
+        watched[watchedCount++] = manager.mEntityBuckets;
+        for (auto* block : manager.mAllBlocks) watched[watchedCount++] = block;
       }
       // Stop observing before assertion reporting can allocate or reuse memory.
       activeTrace = trace.previous;
-      for (int i = 0; i < trace.size; ++i) {
-        EXPECT_EQ(trace.entries[i].scalarCalls, 1) << "request=" << requested << ", allocation=" << i;
-        EXPECT_EQ(trace.entries[i].arrayCalls, 0) << "request=" << requested << ", allocation=" << i;
+      ASSERT_FALSE(trace.overflow) << "request=" << requested;
+      for (int i = 0; i < watchedCount; ++i) {
+        const auto* const entry = trace.Find(watched[i]);
+        ASSERT_NE(entry, nullptr) << "request=" << requested << ", allocation=" << i;
+        EXPECT_TRUE(entry->arrayNew) << "request=" << requested << ", allocation=" << i;
+        EXPECT_EQ(entry->arrayDeletes, 1) << "request=" << requested << ", allocation=" << i;
+        EXPECT_EQ(entry->scalarDeletes, 0) << "request=" << requested << ", allocation=" << i;
       }
     }
   }
