@@ -10,12 +10,12 @@
 
 namespace moho
 {
-  int ren_Fxaa = -1;
+  int ren_Fxaa = 1;
 
   TConVar<int> gTConVar_ren_Fxaa(
     "ren_Fxaa",
-    "FXAA on the world views (Direct3D 12 and Vulkan, which have no multisampled back buffer): 1 on, 0 off, "
-    "-1 (the default) on when the Anti-Aliasing option asks for any.",
+    "FXAA on the world views (Direct3D 12 and Vulkan, which have no multisampled back buffer): 1 (the default) on, "
+    "0 off. -1, the old automatic setting a saved option may still hold, means on.",
     &ren_Fxaa
   );
 
@@ -41,10 +41,6 @@ namespace moho
       const bool modern = context != nullptr
         && (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 || context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
       if (modern && (device->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureVertexPulling) != 0U) {
-        // The option is read when the device is made (CScApp::CreateDevice) and lands on the heads.
-        const gpg::gal::Head& head = context->GetHead(0U);
-        mOptionAsks = head.antialiasingHigh != 0U || head.antialiasingLow != 0U;
-
         gpg::gal::GpuProgramDesc desc{};
         desc.name = "Fxaa";
         desc.source = kFxaaShaderSource;
@@ -61,10 +57,10 @@ namespace moho
       }
       mSupported = mProgram != nullptr;
       if (mSupported) {
-        gpg::Logf("FXAA: available on this renderer (ren_Fxaa; the Anti-Aliasing option %s)", mOptionAsks ? "asks for it" : "is off");
+        gpg::Logf("FXAA: available on this renderer (ren_Fxaa %d)", ren_Fxaa);
       }
     }
-    return mSupported && (ren_Fxaa > 0 || mOptionAsks);
+    return mSupported;
   }
 
   void FxaaRenderer::Render(gpg::gal::RenderTarget& copy, const int width, const int height)
