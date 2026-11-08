@@ -361,3 +361,11 @@ add_dependencies(headless faf_sim_libm_gate)
 # sections must equal Windows' faf_registration_dump_sim (src/CMakeLists.txt).
 add_executable(faf_registration_dump_sim EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/registry/RegistrationDump.cpp")
 target_link_libraries(faf_registration_dump_sim PRIVATE faf_sim)
+
+# Regression for lua damage stack; no game data required.
+enable_testing()
+add_executable(faf_damage_callback_stack_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/lua/DamageCallbackStackTests.cpp")
+target_link_libraries(faf_damage_callback_stack_tests PRIVATE faf_sim gtest_main)
+set_target_properties(faf_damage_callback_stack_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME damage_callback_stack COMMAND faf_damage_callback_stack_tests)
+set_tests_properties(damage_callback_stack PROPERTIES LABELS "Sim")

@@ -181,6 +181,23 @@ namespace
     return scriptObject->mLuaObj;
   }
 
+  // Restore the entry top after normal return or the VM's supported exception unwind.
+  // Use the raw state: a running coroutine need not own a LuaState wrapper.
+  struct CallbackLuaStackScope
+  {
+    explicit CallbackLuaStackScope(lua_State* const stateIn)
+      : state(stateIn), top(lua_gettop(stateIn))
+    {}
+
+    ~CallbackLuaStackScope() { lua_settop(state, top); }
+
+    CallbackLuaStackScope(const CallbackLuaStackScope&) = delete;
+    CallbackLuaStackScope& operator=(const CallbackLuaStackScope&) = delete;
+
+    lua_State* state;
+    int top;
+  };
+
   struct WeakEntityUnlinkScope
   {
     explicit WeakEntityUnlinkScope(WeakPtr<Entity>& linkRef)
@@ -220,7 +237,7 @@ namespace
     WeakEntityUnlinkScope unlinkScope(weakSource);
 
     lua_State* const activeState = function.GetActiveCState();
-    const int savedTop = lua_gettop(activeState);
+    const CallbackLuaStackScope stackScope(activeState);
 
     function.PushStack(activeState);
     selfObject.PushStack(activeState);
@@ -241,9 +258,7 @@ namespace
     lua_pushlstring(activeState, damageType.c_str(), static_cast<size_t>(damageType.size()));
     lua_call(activeState, 4, 1);
 
-    const float result = static_cast<float>(lua_tonumber(activeState, -1));
-    lua_settop(activeState, savedTop);
-    return result;
+    return static_cast<float>(lua_tonumber(activeState, -1));
   }
 
   /**
@@ -265,7 +280,7 @@ namespace
     WeakEntityUnlinkScope unlinkScope(weakSource);
 
     lua_State* const activeState = function.GetActiveCState();
-    const int savedTop = lua_gettop(activeState);
+    const CallbackLuaStackScope stackScope(activeState);
 
     function.PushStack(activeState);
     selfObject.PushStack(activeState);
@@ -286,7 +301,6 @@ namespace
     payloadObject.PushStack(activeState);
     lua_pushlstring(activeState, damageType.c_str(), static_cast<size_t>(damageType.size()));
     lua_call(activeState, 5, 1);
-    lua_settop(activeState, savedTop);
   }
 
   /**

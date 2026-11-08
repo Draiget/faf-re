@@ -15,3 +15,13 @@ endif()
 set_target_properties(faf_vulkan_allocator_tests PROPERTIES FOLDER "Tests/Vulkan")
 add_test(NAME vulkan_allocator COMMAND faf_vulkan_allocator_tests)
 set_tests_properties(vulkan_allocator PROPERTIES LABELS "Vulkan" TIMEOUT 120)
+
+# Attachment barriers between dynamic-rendering instances: header-only, SDK structs only.
+add_executable(faf_vulkan_attachment_tests EXCLUDE_FROM_ALL AttachmentBarrierTests.cpp)
+target_include_directories(faf_vulkan_attachment_tests PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/../../src
+  ${FAF_DEPENDENCIES_DIR}/vulkan/include)
+target_link_libraries(faf_vulkan_attachment_tests PRIVATE gtest_main)
+set_target_properties(faf_vulkan_attachment_tests PROPERTIES FOLDER "Tests/Vulkan")
+add_test(NAME vulkan_attachment_barriers COMMAND faf_vulkan_attachment_tests)
+set_tests_properties(vulkan_attachment_barriers PROPERTIES LABELS "Vulkan" TIMEOUT 120)
