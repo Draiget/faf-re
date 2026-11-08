@@ -2918,9 +2918,17 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       }
     }
 
+    // Engine change (ren_UsedTextureTable): a change only in bindings the pass's shaders don't read keeps the
+    // table. The version is left as it is, so every later pass checks its own registers against the table again.
+    bool keepTable = false;
+    if (gUsedTextureTable && state.tableFrame == mFrameCount && state.tableEpoch == mArenaEpoch &&
+        state.tableSurface == outputContext_.surface.get() && state.textureVersion != parameters.TextureVersion()) {
+      keepTable =
+        UsedTextureBindingsKept(program, parameters, state.tableBindings, PassTextureSlots(bound.vertexShader, bound.pixelShader));
+    }
     // The texture table: rebuilt when a binding changed or the frame moved on.
-    if (state.tableFrame != mFrameCount || state.tableEpoch != mArenaEpoch || state.textureVersion != parameters.TextureVersion() ||
-        state.tableSurface != outputContext_.surface.get()) {
+    if (!keepTable && (state.tableFrame != mFrameCount || state.tableEpoch != mArenaEpoch ||
+                       state.textureVersion != parameters.TextureVersion() || state.tableSurface != outputContext_.surface.get())) {
       const auto& slots = program.Modern().textures;
       const auto& slotParameters = program.TextureSlotParameters();
       std::vector<effects::TextureBinding>& bindings = state.tableBindings;

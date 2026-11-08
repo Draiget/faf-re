@@ -42,6 +42,9 @@ namespace gpg::gal::effects
     bool succeeded = false;
     std::vector<std::uint8_t> code;
     std::vector<ShaderInput> inputs; // vertex shaders, DXIL only
+    /// Engine addition (ren_UsedTextureTable): bit t for each texture register t (0..63) the code reads, from its
+    /// reflection; all bits when that couldn't be read.
+    std::uint64_t textureSlots = ~std::uint64_t{0};
     std::uint64_t key = 0;           // identifies the code (cache key)
     std::string entryName;           // the HLSL entry point (SPIR-V keeps it as the module's entry)
     std::string messages;

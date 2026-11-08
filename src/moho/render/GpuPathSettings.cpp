@@ -58,6 +58,14 @@ namespace moho
       &gpg::gal::gPipelineMemo
     );
 
+    /** Engine addition: `ren_UsedTextureTable` (see gpg/gal/backends/common/PipelineMemo.h). */
+    TConVar<bool> gTConVar_ren_UsedTextureTable(
+      "ren_UsedTextureTable",
+      "Direct3D 12 / Vulkan: an effect pass keeps its texture table when only bindings its shaders don't read changed (1, "
+      "the default), or rebuilds it on any change (0). Read at each pass.",
+      &gpg::gal::gUsedTextureTable
+    );
+
     /** Engine addition: `ren_LockedRangeOnly` (see gpg/gal/PlacedResources.h). */
     TConVar<bool> gTConVar_ren_LockedRangeOnly(
       "ren_LockedRangeOnly",

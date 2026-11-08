@@ -16,6 +16,7 @@
 #include <thread>
 #include <utility>
 
+#include "SpirvReflect.h"
 #include "gpg/core/utils/LocalCache.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/DrawStatistics.h"
@@ -346,6 +347,17 @@ namespace gpg::gal::effects
     }
     if (prepared.succeeded && shaderEntry.stage == ShaderStage::Vertex && mTarget == ShaderTarget::Dxil) {
       prepared.inputs = compiler.ReflectInputs(prepared.code);
+    }
+    // Engine addition (ren_UsedTextureTable): the texture registers the code reads.
+    if (prepared.succeeded) {
+      prepared.textureSlots = (mTarget == ShaderTarget::Dxil) ? compiler.ReflectTextureSlots(prepared.code)
+                                                               : ReflectSpirvTextureSlots(prepared.code);
+      // Diagnostics: FAF_TEXTURE_SLOTS_LOG=1 logs each prepared entry's texture registers.
+      static const bool logSlots = std::getenv("FAF_TEXTURE_SLOTS_LOG") != nullptr;
+      if (logSlots) {
+        gpg::Logf("effects: %s: %s (%s %s) reads textures %016llx", mName.c_str(), shaderEntry.name.c_str(),
+                  shaderEntry.function.c_str(), shaderEntry.arguments.c_str(), static_cast<unsigned long long>(prepared.textureSlots));
+      }
     }
 
     prepared.attempted = true;

@@ -2772,9 +2772,17 @@ namespace gpg::gal
       bound.constantsSerial = state.constantsSerial;
     }
 
+    // Engine change (ren_UsedTextureTable): a change only in bindings the pass's shaders don't read keeps the set.
+    // The version is left as it is, so every later pass checks its own registers against the set again.
+    bool keepTable = false;
+    if (gUsedTextureTable && state.table != VK_NULL_HANDLE && state.tableFrame == mFrameCount &&
+        state.tableSurface == outputContext_.surface.get() && state.textureVersion != parameters.TextureVersion()) {
+      keepTable =
+        UsedTextureBindingsKept(program, parameters, state.tableBindings, PassTextureSlots(bound.vertexShader, bound.pixelShader));
+    }
     // Textures and samplers in set 0, rebuilt when a binding changed or the frame moved on.
-    if (state.table == VK_NULL_HANDLE || state.tableFrame != mFrameCount || state.textureVersion != parameters.TextureVersion() ||
-        state.tableSurface != outputContext_.surface.get()) {
+    if (!keepTable && (state.table == VK_NULL_HANDLE || state.tableFrame != mFrameCount ||
+                       state.textureVersion != parameters.TextureVersion() || state.tableSurface != outputContext_.surface.get())) {
       const auto& slots = program.Modern().textures;
       const auto& slotParameters = program.TextureSlotParameters();
       std::vector<effects::TextureBinding>& bindings = state.tableBindings;

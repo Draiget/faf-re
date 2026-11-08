@@ -14,6 +14,14 @@ namespace gpg::gal
   inline bool gPipelineMemo = true;
 
   /**
+   * Engine addition: `ren_UsedTextureTable` (moho). Direct3D 12 / Vulkan rebuilt an effect pass's texture table (64
+   * descriptors) whenever any texture binding of the effect changed. The mesh depth pass binds each material's albedo
+   * though its `Depth` technique reads none, so it rebuilt the table for every bucket. With this, a change only in
+   * slots the pass's compiled shaders don't read (`effects::CompiledEntry::textureSlots`) keeps the table.
+   */
+  inline bool gUsedTextureTable = true;
+
+  /**
    * A table of recent pipelines by the raw bytes of everything a pipeline depends on. `Inputs` is cleared with memset
    * before it is filled. An entry that gets overwritten is only found the slow way next time, and a pipeline
    * is never returned unless all its inputs match.

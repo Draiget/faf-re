@@ -37,6 +37,7 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/OutputContext.hpp"
 #include "gpg/gal/backends/common/PipelineMemo.h"
+#include "gpg/gal/backends/common/UsedTextureTable.h"
 #include "gpg/gal/backends/common/WindowsCursor.h"
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "gpg/gal/effects/SpirvReflect.h"
