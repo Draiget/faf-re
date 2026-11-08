@@ -1736,6 +1736,99 @@ namespace
       ::SetWindowTextA(topLevel, title.c_str());
     }
   }
+  /**
+   * Part of CScApp::CreateDevice (0x008D0370): the heads and their sizes, from `/window`,
+   * `/fullscreen` or `/windowed` on the command line, else from the adapter options.
+   */
+  void SetUpHeads(
+    gpg::gal::DeviceContext& context,
+    gpg::gal::Head& primaryHead,
+    fa::vector<fa::string>& options,
+    moho::IUserPrefs* const preferences,
+    bool& windowedByCommandLine,
+    bool& secondarySetupMode
+  )
+  {
+    if (TryGetWindowOptionArgs(&options)) {
+      context.AddHead(gpg::gal::Head{});
+      gpg::gal::Head& secondaryHead = context.GetHead(1);
+
+      primaryHead.mWindowed = true;
+      secondaryHead.mWindowed = true;
+      primaryHead.mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[0]));
+      primaryHead.mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[1]));
+
+      if (options.size() == 4) {
+        secondaryHead.mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[2]));
+        secondaryHead.mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[3]));
+      } else {
+        secondaryHead.mWidth = primaryHead.mWidth;
+        secondaryHead.mHeight = primaryHead.mHeight;
+      }
+
+      moho::sAdapterNotCLOverridden = 0;
+    } else if (TryGetFullscreenOptionArgs(&options)) {
+      primaryHead.mWindowed = true;
+      primaryHead.mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[0]));
+      primaryHead.mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[1]));
+      moho::sAdapterNotCLOverridden = 0;
+    } else if (TryGetWindowedOptionArgs(&options)) {
+      primaryHead.mWindowed = false;
+      primaryHead.mWidth = ClampAtLeast(moho::wnd_MinCmdLineWidth, ParseIntegerArg(options[0]));
+      primaryHead.mHeight = ClampAtLeast(moho::wnd_MinCmdLineHeight, ParseIntegerArg(options[1]));
+      moho::sAdapterNotCLOverridden = 0;
+      windowedByCommandLine = true;
+      secondarySetupMode = true;
+    } else {
+      secondarySetupMode = true;
+
+      const fa::string secondaryAdapter = moho::OPTIONS_GetString("secondary_adapter");
+      const fa::string primaryAdapter = moho::OPTIONS_GetString("primary_adapter");
+
+      if (!IsDisabledAdapterToken(secondaryAdapter) && !IsWindowedAdapterToken(primaryAdapter)) {
+        context.AddHead(gpg::gal::Head{});
+        gpg::gal::Head& secondaryHead = context.GetHead(1);
+        primaryHead.mWindowed = true;
+        secondaryHead.mWindowed = true;
+
+        moho::ResolutionTriple primaryResolution{};
+        if (moho::CFG_ParseResolutionTriple(primaryAdapter.c_str(), &primaryResolution)) {
+          primaryHead.mWidth = static_cast<std::uint32_t>(primaryResolution.width);
+          primaryHead.mHeight = static_cast<std::uint32_t>(primaryResolution.height);
+          primaryHead.framesPerSecond = static_cast<std::uint32_t>(primaryResolution.framesPerSecond);
+        }
+
+        moho::ResolutionTriple secondaryResolution{};
+        if (moho::CFG_ParseResolutionTriple(secondaryAdapter.c_str(), &secondaryResolution)) {
+          secondaryHead.mWidth = static_cast<std::uint32_t>(secondaryResolution.width);
+          secondaryHead.mHeight = static_cast<std::uint32_t>(secondaryResolution.height);
+          secondaryHead.framesPerSecond = static_cast<std::uint32_t>(secondaryResolution.framesPerSecond);
+        }
+      } else if (!IsWindowedAdapterToken(primaryAdapter)) {
+        moho::ResolutionTriple primaryResolution{};
+        if (moho::CFG_ParseResolutionTriple(primaryAdapter.c_str(), &primaryResolution)) {
+          primaryHead.mWindowed = true;
+          primaryHead.mWidth = static_cast<std::uint32_t>(primaryResolution.width);
+          primaryHead.mHeight = static_cast<std::uint32_t>(primaryResolution.height);
+          primaryHead.framesPerSecond = static_cast<std::uint32_t>(primaryResolution.framesPerSecond);
+        }
+      } else {
+        primaryHead.mWindowed = false;
+        const fa::string widthKey("Windows.Main.width");
+        const fa::string heightKey("Windows.Main.height");
+        primaryHead.mWidth = static_cast<std::uint32_t>(
+          preferences != nullptr
+            ? preferences->GetInteger(widthKey, moho::wnd_DefaultCreateWidth)
+            : moho::wnd_DefaultCreateWidth
+        );
+        primaryHead.mHeight = static_cast<std::uint32_t>(
+          preferences != nullptr
+            ? preferences->GetInteger(heightKey, moho::wnd_DefaultCreateHeight)
+            : moho::wnd_DefaultCreateHeight
+        );
+      }
+    }
+  }
 } // namespace
 
 /**
@@ -1784,85 +1877,7 @@ bool CScApp::CreateDevice()
   bool windowedByCommandLine = false;
   bool secondarySetupMode = false;
 
-  if (TryGetWindowOptionArgs(&options)) {
-    context.AddHead(gpg::gal::Head{});
-    gpg::gal::Head& secondaryHead = context.GetHead(1);
-
-    primaryHead.mWindowed = true;
-    secondaryHead.mWindowed = true;
-    primaryHead.mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[0]));
-    primaryHead.mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[1]));
-
-    if (options.size() == 4) {
-      secondaryHead.mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[2]));
-      secondaryHead.mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[3]));
-    } else {
-      secondaryHead.mWidth = primaryHead.mWidth;
-      secondaryHead.mHeight = primaryHead.mHeight;
-    }
-
-    moho::sAdapterNotCLOverridden = 0;
-  } else if (TryGetFullscreenOptionArgs(&options)) {
-    primaryHead.mWindowed = true;
-    primaryHead.mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[0]));
-    primaryHead.mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[1]));
-    moho::sAdapterNotCLOverridden = 0;
-  } else if (TryGetWindowedOptionArgs(&options)) {
-    primaryHead.mWindowed = false;
-    primaryHead.mWidth = ClampAtLeast(moho::wnd_MinCmdLineWidth, ParseIntegerArg(options[0]));
-    primaryHead.mHeight = ClampAtLeast(moho::wnd_MinCmdLineHeight, ParseIntegerArg(options[1]));
-    moho::sAdapterNotCLOverridden = 0;
-    windowedByCommandLine = true;
-    secondarySetupMode = true;
-  } else {
-    secondarySetupMode = true;
-
-    const fa::string secondaryAdapter = moho::OPTIONS_GetString("secondary_adapter");
-    const fa::string primaryAdapter = moho::OPTIONS_GetString("primary_adapter");
-
-    if (!IsDisabledAdapterToken(secondaryAdapter) && !IsWindowedAdapterToken(primaryAdapter)) {
-      context.AddHead(gpg::gal::Head{});
-      gpg::gal::Head& secondaryHead = context.GetHead(1);
-      primaryHead.mWindowed = true;
-      secondaryHead.mWindowed = true;
-
-      moho::ResolutionTriple primaryResolution{};
-      if (moho::CFG_ParseResolutionTriple(primaryAdapter.c_str(), &primaryResolution)) {
-        primaryHead.mWidth = static_cast<std::uint32_t>(primaryResolution.width);
-        primaryHead.mHeight = static_cast<std::uint32_t>(primaryResolution.height);
-        primaryHead.framesPerSecond = static_cast<std::uint32_t>(primaryResolution.framesPerSecond);
-      }
-
-      moho::ResolutionTriple secondaryResolution{};
-      if (moho::CFG_ParseResolutionTriple(secondaryAdapter.c_str(), &secondaryResolution)) {
-        secondaryHead.mWidth = static_cast<std::uint32_t>(secondaryResolution.width);
-        secondaryHead.mHeight = static_cast<std::uint32_t>(secondaryResolution.height);
-        secondaryHead.framesPerSecond = static_cast<std::uint32_t>(secondaryResolution.framesPerSecond);
-      }
-    } else if (!IsWindowedAdapterToken(primaryAdapter)) {
-      moho::ResolutionTriple primaryResolution{};
-      if (moho::CFG_ParseResolutionTriple(primaryAdapter.c_str(), &primaryResolution)) {
-        primaryHead.mWindowed = true;
-        primaryHead.mWidth = static_cast<std::uint32_t>(primaryResolution.width);
-        primaryHead.mHeight = static_cast<std::uint32_t>(primaryResolution.height);
-        primaryHead.framesPerSecond = static_cast<std::uint32_t>(primaryResolution.framesPerSecond);
-      }
-    } else {
-      primaryHead.mWindowed = false;
-      const fa::string widthKey("Windows.Main.width");
-      const fa::string heightKey("Windows.Main.height");
-      primaryHead.mWidth = static_cast<std::uint32_t>(
-        preferences != nullptr
-          ? preferences->GetInteger(widthKey, moho::wnd_DefaultCreateWidth)
-          : moho::wnd_DefaultCreateWidth
-      );
-      primaryHead.mHeight = static_cast<std::uint32_t>(
-        preferences != nullptr
-          ? preferences->GetInteger(heightKey, moho::wnd_DefaultCreateHeight)
-          : moho::wnd_DefaultCreateHeight
-      );
-    }
-  }
+  SetUpHeads(context, primaryHead, options, preferences, windowedByCommandLine, secondarySetupMode);
 
   if (context.GetHeadCount() == 1 &&
       moho::CFG_GetArgOptionAliases(moho::CFG_GetAdapterOptionAliases(), 1, &options) &&
