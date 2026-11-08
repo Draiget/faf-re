@@ -418,4 +418,32 @@ namespace
     EXPECT_FALSE(unit1->HasTransportPreOrders());
     EXPECT_FALSE(unit2->HasTransportPreOrders());
   }
+
+  TEST(TransportPreOrdersTests, DisembarkDispatchesGroupPreOrders)
+  {
+    MockUserUnitScope scope1;
+    MockUserUnitScope scope2;
+    UserUnit* unit1 = scope1.GetUnit(801);
+    UserUnit* unit2 = scope2.GetUnit(802);
+
+    gpg::fastvector<UserUnit*> group;
+    group.push_back(unit1);
+    group.push_back(unit2);
+
+    SSTICommandIssueData sharedCmd(EUnitCommandType::UNITCOMMAND_Move);
+    sharedCmd.mTarget.mPos = Wm3::Vector3f(200.0f, 0.0f, 210.0f);
+    UserUnit::QueueTransportPreOrders(group, sharedCmd, false);
+
+    EXPECT_TRUE(unit1->HasTransportPreOrders());
+    EXPECT_TRUE(unit2->HasTransportPreOrders());
+
+    // In unit test environment (session == nullptr), disembarking unit1
+    // immediately dispatches and clears unit1's queue without crashing or leaking.
+    unit1->DispatchDisembarkedPreOrders();
+    EXPECT_FALSE(unit1->HasTransportPreOrders());
+
+    // Disembarking unit2 cleans up its queue as well.
+    unit2->DispatchDisembarkedPreOrders();
+    EXPECT_FALSE(unit2->HasTransportPreOrders());
+  }
 }

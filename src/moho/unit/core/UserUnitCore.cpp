@@ -9,6 +9,7 @@ namespace
   static std::unordered_map<std::uint32_t, std::vector<moho::SSTICommandIssueData>> sTransportPreOrders;
   static std::unordered_map<std::uint32_t, Wm3::Vector3f> sSelectionBracketPositionOverrides;
   static std::unordered_map<std::int32_t, std::uint32_t> sDispatchedPreOrderBuilders;
+  static std::unordered_map<std::uint32_t, std::int32_t> sDisembarkedWaitTicks;
 
   void WarnFocusArmyUnitDamagedCallbackError(const std::exception& exception) noexcept;
   constexpr const char* kOverlayCategoryAntiAir = "OVERLAYANTIAIR";
@@ -901,8 +902,10 @@ void UserUnit::QueueTransportPreOrder(const SSTICommandIssueData& order, bool cl
 void UserUnit::ClearTransportPreOrders()
 {
   sTransportPreOrders.erase(this->mParams.mEntityId);
+  sDisembarkedWaitTicks.erase(this->mParams.mEntityId);
   if (sTransportPreOrders.empty()) {
     sDispatchedPreOrderBuilders.clear();
+    sDisembarkedWaitTicks.clear();
   }
 }
 
@@ -1022,37 +1025,109 @@ void UserUnit::DispatchDisembarkedPreOrders()
     return;
   }
   const auto preOrders = GetTransportPreOrders();
-  ClearTransportPreOrders();
+  if (preOrders.empty()) {
+    ClearTransportPreOrders();
+    return;
+  }
+
+  const std::int32_t groupCommandId = preOrders[0].nextCommandId;
+  const std::uint32_t myEntId = static_cast<std::uint32_t>(this->mParams.mEntityId);
+
+  auto& waitTicks = sDisembarkedWaitTicks[myEntId];
+  constexpr std::int32_t kMaxWaitTicks = 30; // 3 seconds timeout
+  const bool timedOut = (waitTicks >= kMaxWaitTicks);
+
+  CWldSession* const session = this->mSession != nullptr ? this->mSession : WLD_GetActiveSession();
+
+  // Check if any living peers sharing this group command are still attached to the transport.
+  bool hasAttachedLivingPeers = false;
+  if (session != nullptr && groupCommandId > 0 && !timedOut) {
+    for (const auto& [peerEntId, peerOrders] : sTransportPreOrders) {
+      if (peerEntId == myEntId || peerOrders.empty() || peerOrders[0].nextCommandId != groupCommandId) {
+        continue;
+      }
+      UserEntity* const entity = session->LookupEntityId(static_cast<EntId>(peerEntId));
+      if (entity == nullptr || entity->mVariableData.mIsDead != 0) {
+        continue;
+      }
+      const bool isAttached = (entity->GetAttachmentParent() != nullptr) ||
+        (entity->mVariableData.mAttachmentParentRef != 0 &&
+         entity->mVariableData.mAttachmentParentRef != ToRaw(EEntityIdSentinel::Invalid));
+      if (isAttached) {
+        hasAttachedLivingPeers = true;
+        break;
+      }
+    }
+  }
+
+  // Defer dispatch until remaining living units of the squad detach from the transport.
+  if (hasAttachedLivingPeers) {
+    ++waitTicks;
+    return;
+  }
+
+  // All living peers in the group have detached (or timeout expired).
+  // Collect all detached units in this squad so they receive ONE synchronized group command!
+  gpg::fastvector<UserUnit*> groupUnits;
+  std::vector<std::uint32_t> unitsToClear;
+
+  if (session != nullptr && groupCommandId > 0) {
+    for (const auto& [peerEntId, peerOrders] : sTransportPreOrders) {
+      if (peerOrders.empty() || peerOrders[0].nextCommandId != groupCommandId) {
+        continue;
+      }
+      UserEntity* const entity = session->LookupEntityId(static_cast<EntId>(peerEntId));
+      UserUnit* const peerUnit = (entity != nullptr) ? static_cast<UserUnit*>(entity) : (peerEntId == myEntId ? this : nullptr);
+      if (peerUnit == nullptr || peerUnit->mVariableData.mIsDead != 0) {
+        continue;
+      }
+      const bool isAttached = (peerUnit->GetAttachmentParent() != nullptr) ||
+        (peerUnit->mVariableData.mAttachmentParentRef != 0 &&
+         peerUnit->mVariableData.mAttachmentParentRef != ToRaw(EEntityIdSentinel::Invalid));
+      if (!isAttached) {
+        groupUnits.push_back(peerUnit);
+        unitsToClear.push_back(peerEntId);
+      }
+    }
+  }
+
+  if (groupUnits.empty()) {
+    groupUnits.push_back(this);
+    unitsToClear.push_back(myEntId);
+  }
+
+  for (const std::uint32_t id : unitsToClear) {
+    sTransportPreOrders.erase(id);
+    sDisembarkedWaitTicks.erase(id);
+  }
 
   gpg::Warnf(
-    "TransportDropGhosts: Dispatched %zu disembarked pre-orders for unit %u",
+    "TransportDropGhosts: Dispatched %zu disembarked pre-orders for %zu units in group (cmdId %d)",
     preOrders.size(),
-    static_cast<std::uint32_t>(this->mParams.mEntityId)
+    groupUnits.size(),
+    groupCommandId
   );
-
-  gpg::fastvector<UserUnit*> targetUnits;
-  targetUnits.push_back(this);
 
   for (std::size_t i = 0; i < preOrders.size(); ++i) {
     const bool isClear = (i == 0);
     SSTICommandIssueData dispatchOrder = preOrders[i];
 
-    if (dispatchOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && dispatchOrder.nextCommandId > 0) {
+    if (groupUnits.size() == 1 && dispatchOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && dispatchOrder.nextCommandId > 0) {
       auto it = sDispatchedPreOrderBuilders.find(dispatchOrder.nextCommandId);
-      if (it != sDispatchedPreOrderBuilders.end() && it->second != this->mParams.mEntityId) {
-        // A peer unit has already initiated this shared build order.
-        // Convert to Guard/Assist on the primary builder so this unit assists!
+      if (it != sDispatchedPreOrderBuilders.end() && it->second != myEntId) {
         dispatchOrder.mCommandType = EUnitCommandType::UNITCOMMAND_Guard;
         dispatchOrder.mTarget.mType = EAiTargetType::AITARGET_Entity;
         dispatchOrder.mTarget.mEnt = it->second;
         dispatchOrder.mTarget.mEntityId = it->second;
         dispatchOrder.mBlueprint = nullptr;
       } else {
-        sDispatchedPreOrderBuilders[dispatchOrder.nextCommandId] = this->mParams.mEntityId;
+        sDispatchedPreOrderBuilders[dispatchOrder.nextCommandId] = myEntId;
       }
+    } else if (dispatchOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && dispatchOrder.nextCommandId > 0) {
+      sDispatchedPreOrderBuilders[dispatchOrder.nextCommandId] = myEntId;
     }
 
-    moho::ISSUE_Command(targetUnits, dispatchOrder, isClear);
+    moho::ISSUE_Command(groupUnits, dispatchOrder, isClear);
   }
 }
 
