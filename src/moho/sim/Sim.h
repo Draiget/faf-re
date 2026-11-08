@@ -4016,6 +4016,10 @@ namespace moho
    */
   CScrLuaInitForm* func_SelectUnits_LuaFuncDef();
 
+int cfunc_SelectCargoUnits(lua_State* luaContext);
+int cfunc_SelectCargoUnitsL(LuaPlus::LuaState* state);
+CScrLuaInitForm* func_SelectCargoUnits_LuaFuncDef();
+
   /**
    * Address: 0x008BD8F0 (FUN_008BD8F0, cfunc_SelectUnitsL)
    *

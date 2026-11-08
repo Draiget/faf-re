@@ -2246,6 +2246,7 @@ namespace
       (void)::moho::func_GetSelectedUnits_LuaFuncDef();
       (void)::moho::func_GetValidAttackingUnits_LuaFuncDef();
       (void)::moho::func_SelectUnits_LuaFuncDef();
+      (void)::moho::func_SelectCargoUnits_LuaFuncDef();
       (void)::moho::func_AddSelectUnits_LuaFuncDef();
       (void)::moho::func_EngineStartSplashScreens_LuaFuncDef();
       (void)::moho::func_EngineStartFrontEndUI_LuaFuncDef();

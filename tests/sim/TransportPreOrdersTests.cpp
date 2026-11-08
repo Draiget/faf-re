@@ -196,4 +196,79 @@ namespace
     EXPECT_FALSE(unit->HasTransportPreOrders());
     EXPECT_TRUE(unit->GetTransportPreOrders().empty());
   }
+
+  TEST(TransportPreOrdersTests, MultipleChainedOrdersSequence)
+  {
+    MockUserUnitScope scope;
+    UserUnit* unit = scope.GetUnit(401);
+
+    SSTICommandIssueData moveCmd(EUnitCommandType::UNITCOMMAND_Move);
+    moveCmd.mTarget.mType = EAiTargetType::AITARGET_Ground;
+    moveCmd.mTarget.mPos = Wm3::Vec3f(150.0f, 20.0f, 100.0f);
+    unit->QueueTransportPreOrder(moveCmd, false);
+
+    SSTICommandIssueData buildCmd(EUnitCommandType::UNITCOMMAND_BuildMobile);
+    buildCmd.mTarget.mType = EAiTargetType::AITARGET_Ground;
+    buildCmd.mTarget.mPos = Wm3::Vec3f(120.0f, 20.0f, 100.0f);
+    unit->QueueTransportPreOrder(buildCmd, false);
+
+    SSTICommandIssueData patrolCmd(EUnitCommandType::UNITCOMMAND_Patrol);
+    patrolCmd.mTarget.mType = EAiTargetType::AITARGET_Ground;
+    patrolCmd.mTarget.mPos = Wm3::Vec3f(180.0f, 20.0f, 110.0f);
+    unit->QueueTransportPreOrder(patrolCmd, false);
+
+    EXPECT_TRUE(unit->HasTransportPreOrders());
+    const auto orders = unit->GetTransportPreOrders();
+    ASSERT_EQ(orders.size(), 3u);
+
+    EXPECT_EQ(orders[0].mCommandType, EUnitCommandType::UNITCOMMAND_Move);
+    EXPECT_FLOAT_EQ(orders[0].mTarget.mPos.x, 150.0f);
+
+    EXPECT_EQ(orders[1].mCommandType, EUnitCommandType::UNITCOMMAND_BuildMobile);
+    EXPECT_FLOAT_EQ(orders[1].mTarget.mPos.x, 120.0f);
+
+    EXPECT_EQ(orders[2].mCommandType, EUnitCommandType::UNITCOMMAND_Patrol);
+    EXPECT_FLOAT_EQ(orders[2].mTarget.mPos.x, 180.0f);
+
+    unit->DispatchDisembarkedPreOrders();
+    EXPECT_FALSE(unit->HasTransportPreOrders());
+  }
+
+  TEST(TransportPreOrdersTests, ClearQueueDuringQueueing)
+  {
+    MockUserUnitScope scope;
+    UserUnit* unit = scope.GetUnit(402);
+
+    SSTICommandIssueData cmd1(EUnitCommandType::UNITCOMMAND_Move);
+    unit->QueueTransportPreOrder(cmd1, false);
+
+    SSTICommandIssueData cmd2(EUnitCommandType::UNITCOMMAND_Attack);
+    unit->QueueTransportPreOrder(cmd2, false);
+
+    ASSERT_EQ(unit->GetTransportPreOrders().size(), 2u);
+
+    // Now issue order 3 with clearQueue = true (e.g. without Shift)
+    SSTICommandIssueData cmd3(EUnitCommandType::UNITCOMMAND_BuildMobile);
+    unit->QueueTransportPreOrder(cmd3, true);
+
+    const auto orders = unit->GetTransportPreOrders();
+    ASSERT_EQ(orders.size(), 1u);
+    EXPECT_EQ(orders[0].mCommandType, EUnitCommandType::UNITCOMMAND_BuildMobile);
+  }
+
+  TEST(TransportPreOrdersTests, DestructionClearsPreOrdersSafely)
+  {
+    {
+      MockUserUnitScope scope;
+      UserUnit* unit = scope.GetUnit(403);
+      SSTICommandIssueData cmd(EUnitCommandType::UNITCOMMAND_Move);
+      unit->QueueTransportPreOrder(cmd, false);
+      EXPECT_TRUE(unit->HasTransportPreOrders());
+      // Destructor of MockUserUnitScope calls ClearTransportPreOrders()
+    }
+    // Storage has destructed, verify unit 403 has no leftover records
+    MockUserUnitScope scope2;
+    UserUnit* unit2 = scope2.GetUnit(403);
+    EXPECT_FALSE(unit2->HasTransportPreOrders());
+  }
 }

@@ -79,18 +79,77 @@ function Get-RunName([string]$a, [hashtable]$t) {
   return $t.Exe
 }
 
+if (-not (Test-Path $FafDir)) {
+  foreach ($candidate in @('C:\ProgramData\FAForever', 'D:\ProgramData\FAForever')) {
+    if (Test-Path $candidate) { $FafDir = $candidate; break }
+  }
+}
+
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+  foreach ($candidate in @('C:\Program Files\Git\cmd', 'D:\Program Files\Git\cmd')) {
+    if (Test-Path $candidate) { $env:PATH = "$candidate;$env:PATH"; break }
+  }
+}
+
+if (-not $env:LLVM_ROOT) {
+  foreach ($candidate in @('C:\Program Files\LLVM', 'D:\Program Files\LLVM')) {
+    if (Test-Path (Join-Path $candidate 'bin\clang-cl.exe')) { $env:LLVM_ROOT = $candidate; break }
+  }
+}
+
+if (-not $env:WindowsSdkDir) {
+  foreach ($candidate in @('C:\Program Files (x86)\Windows Kits\10', 'D:\Program Files (x86)\Windows Kits\10')) {
+    if (Test-Path (Join-Path $candidate 'Include')) {
+      $env:WindowsSdkDir = "$candidate\"
+      $latest = Get-ChildItem (Join-Path $candidate 'Include') -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like '10.*' } | Sort-Object Name -Descending | Select-Object -First 1
+      if ($latest) { $env:WindowsSDKVersion = "$($latest.Name)\" }
+      break
+    }
+  }
+}
+
 # cmake and ninja from PATH, else the copies Visual Studio 2022 ships with its CMake support.
 function Find-CMake {
   $onPath = Get-Command cmake -ErrorAction SilentlyContinue
-  if ($onPath) { return $onPath.Source }
-  $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-  if (Test-Path $vswhere) {
-    $vs = & $vswhere -latest -products '*' -property installationPath
-    $bundled = Join-Path $vs 'Common7\IDE\CommonExtensions\Microsoft\CMake'
-    $exe = Join-Path $bundled 'CMake\bin\cmake.exe'
-    if ($vs -and (Test-Path $exe)) {
-      if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { $env:PATH = "$(Join-Path $bundled 'Ninja');$env:PATH" }
-      return $exe
+  if ($onPath) {
+    if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
+      $ninjaCandidate = Join-Path (Split-Path (Split-Path $onPath.Source)) 'Ninja\ninja.exe'
+      if (Test-Path $ninjaCandidate) { $env:PATH = "$(Split-Path $ninjaCandidate);$env:PATH" }
+    }
+    return $onPath.Source
+  }
+
+  $candidates = @(${env:ProgramFiles(x86)}, 'C:\Program Files (x86)', 'D:\Program Files (x86)', 'C:\Program Files', 'D:\Program Files')
+  foreach ($pf in $candidates) {
+    if (-not $pf) { continue }
+    $vswhere = Join-Path $pf 'Microsoft Visual Studio\Installer\vswhere.exe'
+    if (Test-Path $vswhere) {
+      $vs = & $vswhere -latest -products '*' -property installationPath
+      if ($vs) {
+        $bundled = Join-Path $vs 'Common7\IDE\CommonExtensions\Microsoft\CMake'
+        $exe = Join-Path $bundled 'CMake\bin\cmake.exe'
+        if (Test-Path $exe) {
+          if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { $env:PATH = "$(Join-Path $bundled 'Ninja');$env:PATH" }
+          return $exe
+        }
+      }
+    }
+    foreach ($edition in @('BuildTools', 'Community', 'Professional', 'Enterprise')) {
+      $vsPath = Join-Path $pf "Microsoft Visual Studio\2022\$edition"
+      $bundled = Join-Path $vsPath 'Common7\IDE\CommonExtensions\Microsoft\CMake'
+      $exe = Join-Path $bundled 'CMake\bin\cmake.exe'
+      if (Test-Path $exe) {
+        if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { $env:PATH = "$(Join-Path $bundled 'Ninja');$env:PATH" }
+        if (-not $env:VCToolsInstallDir) {
+          $defaultTxt = Join-Path $vsPath 'VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt'
+          if (Test-Path $defaultTxt) {
+            $ver = (Get-Content $defaultTxt -TotalCount 1).Trim()
+            $env:VCToolsInstallDir = (Join-Path $vsPath "VC\Tools\MSVC\$ver\")
+          }
+        }
+        return $exe
+      }
     }
   }
   throw "cmake not found: put CMake 3.25+ and Ninja on PATH, or install Visual Studio 2022 with 'C++ CMake tools for Windows'."
