@@ -218,6 +218,13 @@ set_target_properties(faf_water_bodies_tests PROPERTIES FOLDER "Tests/Sim")
 add_test(NAME water_bodies COMMAND faf_water_bodies_tests)
 set_tests_properties(water_bodies PROPERTIES LABELS "Sim")
 
+# Engine addition: the map's water queries with water bodies.
+add_executable(faf_water_bodies_map_tests EXCLUDE_FROM_ALL sim/WaterBodiesMapTests.cpp)
+target_link_libraries(faf_water_bodies_map_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_water_bodies_map_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME water_bodies_map COMMAND faf_water_bodies_map_tests)
+set_tests_properties(water_bodies_map PROPERTIES TIMEOUT 120 LABELS "Sim")
+
 # Lua coroutine tests (coroutine.create / resume / yield / status / wrap).
 add_executable(faf_coroutine_tests EXCLUDE_FROM_ALL lua/CoroutineTests.cpp)
 target_link_libraries(faf_coroutine_tests PRIVATE faf_engine gtest_main)
