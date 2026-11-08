@@ -1,6 +1,7 @@
 -- data/fafengine/modules/lua/ui/game/transport_holograms.lua
 -- Clean, lightweight 3D hologram preview for cargo units at transport unload waypoints.
 -- Directly delegates selection to C++ SelectCargoUnits, preserving native CommandMode and Sim determinism.
+-- Order lines and waypoint markers are rendered natively by the C++ engine UICommandGraph.
 
 local WorldMesh = nil
 local function GetWorldMeshClass()
@@ -90,6 +91,9 @@ end
 function TransportHolograms:ClearHologramsForTransport(transportId)
     for hid, holo in pairs(self._activeHolograms) do
         if holo.transportId == transportId then
+            if holo.unit and holo.unit.ClearSelectionBracketPositionOverride then
+                pcall(holo.unit.ClearSelectionBracketPositionOverride, holo.unit)
+            end
             if holo.mesh and holo.mesh.Destroy then
                 pcall(holo.mesh.Destroy, holo.mesh)
             end
@@ -100,6 +104,9 @@ end
 
 function TransportHolograms:ClearAll()
     for _, holo in pairs(self._activeHolograms) do
+        if holo.unit and holo.unit.ClearSelectionBracketPositionOverride then
+            pcall(holo.unit.ClearSelectionBracketPositionOverride, holo.unit)
+        end
         if holo.mesh and holo.mesh.Destroy then
             pcall(holo.mesh.Destroy, holo.mesh)
         end
@@ -197,6 +204,7 @@ function TransportHolograms:Update()
     for _, holo in pairs(self._activeHolograms) do
         local uid = holo.unit and holo.unit.GetEntityId and holo.unit:GetEntityId()
         local isSel = uid and selectedSet[uid] or false
+
         if holo.mesh and holo.mesh.SetColor then
             if isSel then
                 pcall(holo.mesh.SetColor, holo.mesh, 'ddffff66') -- Bright golden cyan for selected
@@ -233,6 +241,11 @@ function TransportHolograms:SyncHologramsForTransport(tid, transport, cargo, unl
             local gy = GetSurfaceY(gx, gz, unloadPos[2]) + 0.1
             local worldPos = { gx, gy, gz }
 
+            -- Set selection bracket override so C++ SelectionBracketRenderer draws the selection square at worldPos
+            if unit.SetSelectionBracketPositionOverride then
+                pcall(unit.SetSelectionBracketPositionOverride, unit, worldPos)
+            end
+
             local hid = existing[uid]
             if hid and self._activeHolograms[hid] then
                 -- Update position
@@ -264,8 +277,13 @@ function TransportHolograms:SyncHologramsForTransport(tid, transport, cargo, unl
     for uid, hid in pairs(existing) do
         if not currentCargoIds[uid] then
             local holo = self._activeHolograms[hid]
-            if holo and holo.mesh and holo.mesh.Destroy then
-                pcall(holo.mesh.Destroy, holo.mesh)
+            if holo then
+                if holo.unit and holo.unit.ClearSelectionBracketPositionOverride then
+                    pcall(holo.unit.ClearSelectionBracketPositionOverride, holo.unit)
+                end
+                if holo.mesh and holo.mesh.Destroy then
+                    pcall(holo.mesh.Destroy, holo.mesh)
+                end
             end
             self._activeHolograms[hid] = nil
         end

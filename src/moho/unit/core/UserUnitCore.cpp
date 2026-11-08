@@ -7,6 +7,7 @@
 namespace
 {
   static std::unordered_map<std::uint32_t, std::vector<moho::SSTICommandIssueData>> sTransportPreOrders;
+  static std::unordered_map<std::uint32_t, Wm3::Vector3f> sSelectionBracketPositionOverrides;
 
   void WarnFocusArmyUnitDamagedCallbackError(const std::exception& exception) noexcept;
   constexpr const char* kOverlayCategoryAntiAir = "OVERLAYANTIAIR";
@@ -830,6 +831,7 @@ UserUnit::~UserUnit()
   }
 
   mSelectionSets.clear();
+  ClearSelectionBracketPositionOverride();
 
   delete mFactoryManager;
   mFactoryManager = nullptr;
@@ -856,6 +858,31 @@ void UserUnit::ClearTransportPreOrders()
   sTransportPreOrders.erase(this->mParams.mEntityId);
 }
 
+void UserUnit::SetSelectionBracketPositionOverride(const Wm3::Vector3f& pos)
+{
+  sSelectionBracketPositionOverrides[this->mParams.mEntityId] = pos;
+}
+
+void UserUnit::ClearSelectionBracketPositionOverride()
+{
+  sSelectionBracketPositionOverrides.erase(this->mParams.mEntityId);
+}
+
+bool UserUnit::HasSelectionBracketPositionOverride() const
+{
+  const auto it = sSelectionBracketPositionOverrides.find(this->mParams.mEntityId);
+  return it != sSelectionBracketPositionOverrides.end();
+}
+
+Wm3::Vector3f UserUnit::GetSelectionBracketPositionOverride() const
+{
+  const auto it = sSelectionBracketPositionOverrides.find(this->mParams.mEntityId);
+  if (it != sSelectionBracketPositionOverrides.end()) {
+    return it->second;
+  }
+  return Wm3::Vector3f::ZERO;
+}
+
 std::vector<SSTICommandIssueData> UserUnit::GetTransportPreOrders() const
 {
   const auto it = sTransportPreOrders.find(this->mParams.mEntityId);
@@ -869,6 +896,16 @@ bool UserUnit::HasTransportPreOrders() const
 {
   const auto it = sTransportPreOrders.find(this->mParams.mEntityId);
   return it != sTransportPreOrders.end() && !it->second.empty();
+}
+
+bool UserUnit::HasAnyTransportPreOrders()
+{
+  return !sTransportPreOrders.empty();
+}
+
+const std::unordered_map<std::uint32_t, std::vector<moho::SSTICommandIssueData>>& UserUnit::GetAllTransportPreOrders()
+{
+  return sTransportPreOrders;
 }
 
 void UserUnit::DispatchDisembarkedPreOrders()
@@ -1400,6 +1437,7 @@ void UserUnit::UpdateEntityData(const SSTIEntityVariableData& variableData)
   const bool wasAttached = (oldParent != 0 && oldParent != ToRaw(EEntityIdSentinel::Invalid));
   const bool nowDetached = (newParent == 0 || newParent == ToRaw(EEntityIdSentinel::Invalid));
   if (wasAttached && nowDetached) {
+    ClearSelectionBracketPositionOverride();
     if (HasTransportPreOrders()) {
       DispatchDisembarkedPreOrders();
     }

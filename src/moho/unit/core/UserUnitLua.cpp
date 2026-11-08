@@ -1,4 +1,5 @@
 #include "moho/lua/CScrLuaInitForm.h"
+#include "moho/lua/SCR_FromLua.h"
 #include "moho/unit/core/UserUnitPrivate.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 
@@ -85,6 +86,12 @@ namespace
   constexpr const char* kUserUnitGetEconDataHelpText = "GetEconData() - returns a table of economy data";
   constexpr const char* kUserUnitGetCommandQueueName = "GetCommandQueue";
   constexpr const char* kUserUnitGetCommandQueueHelpText = "table GetCommandQueue() - returns table of commands ";
+  constexpr const char* kUserUnitSetSelectionBracketPositionOverrideName = "SetSelectionBracketPositionOverride";
+  constexpr const char* kUserUnitSetSelectionBracketPositionOverrideHelpText =
+    "UserUnit:SetSelectionBracketPositionOverride(position) -- override selection bracket center position";
+  constexpr const char* kUserUnitClearSelectionBracketPositionOverrideName = "ClearSelectionBracketPositionOverride";
+  constexpr const char* kUserUnitClearSelectionBracketPositionOverrideHelpText =
+    "UserUnit:ClearSelectionBracketPositionOverride() -- clear selection bracket center position override";
   constexpr const char* kUserUnitGetMissileInfoName = "GetMissileInfo";
   constexpr const char* kUserUnitGetCargoUnitsName = "GetCargoUnits";
   constexpr const char* kUserUnitGetCargoUnitsHelpText =
@@ -2344,8 +2351,11 @@ int moho::cfunc_UserUnitGetCommandQueueL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
 
-  const gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const commandRange = ResolveUserCommandQueueRange(SelectActiveQueue(userUnit));
-  if (commandRange == nullptr) {
+  const gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const commandRange =
+    ResolveUserCommandQueueRange(SelectActiveQueue(userUnit));
+  const bool hasPreOrders = (userUnit != nullptr && userUnit->HasTransportPreOrders());
+
+  if (commandRange == nullptr && !hasPreOrders) {
     lua_pushnil(rawState);
     (void)lua_gettop(rawState);
     return 1;
@@ -2358,27 +2368,55 @@ int moho::cfunc_UserUnitGetCommandQueueL(LuaPlus::LuaState* const state)
   CWldSession* const session = userEntity ? userEntity->mSession : nullptr;
 
   int tableIndex = 1;
-  for (const WeakPtr<UserCommandIssueHelper>& link : *commandRange) {
-    UserCommandIssueHelper* const helper = link.GetObjectPtr();
-    if (helper == nullptr) {
-      continue;
+  if (commandRange != nullptr) {
+    for (const WeakPtr<UserCommandIssueHelper>& link : *commandRange) {
+      UserCommandIssueHelper* const helper = link.GetObjectPtr();
+      if (helper == nullptr) {
+        continue;
+      }
+
+      LuaPlus::LuaObject row;
+      row.AssignNewTable(state, 0, 0);
+      row.SetInteger(kCommandQueueIdKey, static_cast<int>(helper->mConstantData.cmd));
+
+      EUnitCommandType commandTypeValue = ResolveHelperCommandType(*helper);
+      gpg::RRef commandTypeRef{};
+      commandTypeRef = gpg::MakeRRef<moho::EUnitCommandType>(&commandTypeValue);
+      const fa::string commandTypeLexical = commandTypeRef.GetLexical();
+      row.SetString(kCommandQueueTypeKey, commandTypeLexical.c_str());
+
+      const Wm3::Vector3<float> commandPosition = ResolveHelperTargetPosition(*helper, session);
+      LuaPlus::LuaObject positionObject = SCR_ToLua<Wm3::Vector3<float>>(state, commandPosition);
+      row.SetObject(kCommandQueuePositionKey, positionObject);
+
+      queueTable.SetObject(tableIndex++, row);
     }
+  }
 
-    LuaPlus::LuaObject row;
-    row.AssignNewTable(state, 0, 0);
-    row.SetInteger(kCommandQueueIdKey, static_cast<int>(helper->mConstantData.cmd));
+  if (hasPreOrders) {
+    const std::vector<SSTICommandIssueData> preOrders = userUnit->GetTransportPreOrders();
+    for (const SSTICommandIssueData& order : preOrders) {
+      LuaPlus::LuaObject row;
+      row.AssignNewTable(state, 0, 0);
+      row.SetInteger(kCommandQueueIdKey, static_cast<int>(order.nextCommandId));
 
-    EUnitCommandType commandTypeValue = ResolveHelperCommandType(*helper);
-    gpg::RRef commandTypeRef{};
-    commandTypeRef = gpg::MakeRRef<moho::EUnitCommandType>(&commandTypeValue);
-    const fa::string commandTypeLexical = commandTypeRef.GetLexical();
-    row.SetString(kCommandQueueTypeKey, commandTypeLexical.c_str());
+      EUnitCommandType commandTypeValue = order.mCommandType;
+      gpg::RRef commandTypeRef{};
+      commandTypeRef = gpg::MakeRRef<moho::EUnitCommandType>(&commandTypeValue);
+      const fa::string commandTypeLexical = commandTypeRef.GetLexical();
+      row.SetString(kCommandQueueTypeKey, commandTypeLexical.c_str());
 
-    const Wm3::Vector3<float> commandPosition = ResolveHelperTargetPosition(*helper, session);
-    LuaPlus::LuaObject positionObject = SCR_ToLua<Wm3::Vector3<float>>(state, commandPosition);
-    row.SetObject(kCommandQueuePositionKey, positionObject);
+      Wm3::Vector3<float> commandPosition = order.mTarget.mPos;
+      if (order.mTarget.mType == EAiTargetType::AITARGET_Entity && session != nullptr) {
+        if (UserEntity* const targetEntity = session->LookupEntityId(static_cast<EntId>(order.mTarget.mEntityId))) {
+          commandPosition = targetEntity->mVariableData.mCurTransform.pos_;
+        }
+      }
+      LuaPlus::LuaObject positionObject = SCR_ToLua<Wm3::Vector3<float>>(state, commandPosition);
+      row.SetObject(kCommandQueuePositionKey, positionObject);
 
-    queueTable.SetObject(tableIndex++, row);
+      queueTable.SetObject(tableIndex++, row);
+    }
   }
 
   queueTable.PushStack(state);
@@ -2772,6 +2810,66 @@ int moho::cfunc_GetBlueprintUserL(LuaPlus::LuaState* const state)
   }
   return 1;
 }
+int moho::cfunc_UserUnitSetSelectionBracketPositionOverrideL(LuaPlus::LuaState* const state)
+{
+  moho::SCR_ExpectExactArgs(state, 2, kUserUnitSetSelectionBracketPositionOverrideHelpText);
+  const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
+  UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
+  if (userUnit != nullptr) {
+    const LuaPlus::LuaObject posObject(LuaPlus::LuaStackObject(state, 2));
+    const Wm3::Vector3f pos = moho::SCR_FromLuaCopy<Wm3::Vector3f>(posObject);
+    userUnit->SetSelectionBracketPositionOverride(pos);
+  }
+  return 0;
+}
+
+int moho::cfunc_UserUnitSetSelectionBracketPositionOverride(lua_State* const luaContext)
+{
+  return cfunc_UserUnitSetSelectionBracketPositionOverrideL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+CScrLuaInitForm* moho::func_UserUnitSetSelectionBracketPositionOverride_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    kUserUnitSetSelectionBracketPositionOverrideName,
+    &moho::cfunc_UserUnitSetSelectionBracketPositionOverride,
+    &CScrLuaMetatableFactory<UserUnit>::Instance(),
+    kUserUnitLuaClassName,
+    kUserUnitSetSelectionBracketPositionOverrideHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_UserUnitClearSelectionBracketPositionOverrideL(LuaPlus::LuaState* const state)
+{
+  moho::SCR_ExpectExactArgs(state, 1, kUserUnitClearSelectionBracketPositionOverrideHelpText);
+  const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
+  UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
+  if (userUnit != nullptr) {
+    userUnit->ClearSelectionBracketPositionOverride();
+  }
+  return 0;
+}
+
+int moho::cfunc_UserUnitClearSelectionBracketPositionOverride(lua_State* const luaContext)
+{
+  return cfunc_UserUnitClearSelectionBracketPositionOverrideL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+CScrLuaInitForm* moho::func_UserUnitClearSelectionBracketPositionOverride_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    kUserUnitClearSelectionBracketPositionOverrideName,
+    &moho::cfunc_UserUnitClearSelectionBracketPositionOverride,
+    &CScrLuaMetatableFactory<UserUnit>::Instance(),
+    kUserUnitLuaClassName,
+    kUserUnitClearSelectionBracketPositionOverrideHelpText
+  );
+  return &binder;
+}
+
 namespace
 {
   /**
@@ -2831,6 +2929,8 @@ namespace
       (void)::moho::func_UserUnitGetArmy_LuaFuncDef();
       (void)::moho::func_UserUnitGetEconData_LuaFuncDef();
       (void)::moho::func_UserUnitGetCommandQueue_LuaFuncDef();
+      (void)::moho::func_UserUnitSetSelectionBracketPositionOverride_LuaFuncDef();
+      (void)::moho::func_UserUnitClearSelectionBracketPositionOverride_LuaFuncDef();
       (void)::moho::func_UserUnitGetMissileInfo_LuaFuncDef();
       (void)::moho::func_UserUnitGetCargoUnits_LuaFuncDef();
       (void)::moho::func_SetCurrentFactoryForQueueDisplay_LuaFuncDef();

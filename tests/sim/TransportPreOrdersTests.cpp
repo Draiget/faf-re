@@ -26,6 +26,7 @@ namespace
     {
       if (auto* unit = reinterpret_cast<UserUnit*>(mStorage)) {
         unit->ClearTransportPreOrders();
+        unit->ClearSelectionBracketPositionOverride();
       }
     }
   };
@@ -270,5 +271,30 @@ namespace
     MockUserUnitScope scope2;
     UserUnit* unit2 = scope2.GetUnit(403);
     EXPECT_FALSE(unit2->HasTransportPreOrders());
+  }
+
+  TEST(TransportPreOrdersTests, SelectionBracketPositionOverrideInitialState)
+  {
+    MockUserUnitScope scope;
+    UserUnit* unit = scope.GetUnit(501);
+
+    EXPECT_FALSE(unit->HasSelectionBracketPositionOverride());
+    EXPECT_EQ(unit->GetSelectionBracketPositionOverride(), Wm3::Vector3f::ZERO);
+  }
+
+  TEST(TransportPreOrdersTests, SetAndClearSelectionBracketPositionOverride)
+  {
+    MockUserUnitScope scope;
+    UserUnit* unit = scope.GetUnit(502);
+
+    const Wm3::Vector3f pos(100.5f, 25.0f, 200.5f);
+    unit->SetSelectionBracketPositionOverride(pos);
+
+    EXPECT_TRUE(unit->HasSelectionBracketPositionOverride());
+    EXPECT_EQ(unit->GetSelectionBracketPositionOverride(), pos);
+
+    unit->ClearSelectionBracketPositionOverride();
+    EXPECT_FALSE(unit->HasSelectionBracketPositionOverride());
+    EXPECT_EQ(unit->GetSelectionBracketPositionOverride(), Wm3::Vector3f::ZERO);
   }
 }

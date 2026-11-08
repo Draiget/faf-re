@@ -587,7 +587,14 @@ namespace moho
     void ClearTransportPreOrders();
     [[nodiscard]] std::vector<SSTICommandIssueData> GetTransportPreOrders() const;
     [[nodiscard]] bool HasTransportPreOrders() const;
+    [[nodiscard]] static bool HasAnyTransportPreOrders();
+    [[nodiscard]] static const std::unordered_map<std::uint32_t, std::vector<SSTICommandIssueData>>& GetAllTransportPreOrders();
     void DispatchDisembarkedPreOrders();
+
+    void SetSelectionBracketPositionOverride(const Wm3::Vector3f& pos);
+    void ClearSelectionBracketPositionOverride();
+    [[nodiscard]] bool HasSelectionBracketPositionOverride() const;
+    [[nodiscard]] Wm3::Vector3f GetSelectionBracketPositionOverride() const;
 
   public:
     // The three RTTI base records are real base classes: `UserEntity` is the
@@ -2111,6 +2118,13 @@ namespace moho
    * Publishes the `UserUnit:GetCommandQueue()` Lua binder.
    */
   CScrLuaInitForm* func_UserUnitGetCommandQueue_LuaFuncDef();
+  int cfunc_UserUnitSetSelectionBracketPositionOverride(lua_State* luaContext);
+  int cfunc_UserUnitSetSelectionBracketPositionOverrideL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_UserUnitSetSelectionBracketPositionOverride_LuaFuncDef();
+
+  int cfunc_UserUnitClearSelectionBracketPositionOverride(lua_State* luaContext);
+  int cfunc_UserUnitClearSelectionBracketPositionOverrideL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_UserUnitClearSelectionBracketPositionOverride_LuaFuncDef();
 
   /**
    * Address: 0x008C5480 (FUN_008C5480, cfunc_UserUnitGetCommandQueueL)
