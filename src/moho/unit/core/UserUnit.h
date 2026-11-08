@@ -583,6 +583,8 @@ namespace moho
      * Client-side transport cargo drop pre-orders.
      * Backed by a static registry indexed by mParams.mEntityId so sizeof(UserUnit) remains 0x3E8.
      */
+    static void QueueTransportPreOrders(const gpg::fastvector<UserUnit*>& units, const SSTICommandIssueData& order, bool clearQueue);
+    static void QueueTransportPreOrders(const std::vector<UserUnit*>& units, const SSTICommandIssueData& order, bool clearQueue);
     void QueueTransportPreOrder(const SSTICommandIssueData& order, bool clearQueue);
     void ClearTransportPreOrders();
     bool RemoveTransportPreOrder(std::size_t index);

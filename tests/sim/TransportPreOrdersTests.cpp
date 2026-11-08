@@ -379,4 +379,43 @@ namespace
     EXPECT_TRUE(UserUnit::RemoveTransportPreOrderById(cmdId));
     EXPECT_FALSE(unit->HasTransportPreOrders());
   }
+  TEST(TransportPreOrdersTests, SharedGroupPreOrdersCommonCommandId)
+  {
+    MockUserUnitScope scope1;
+    MockUserUnitScope scope2;
+    UserUnit* unit1 = scope1.GetUnit(701);
+    UserUnit* unit2 = scope2.GetUnit(702);
+
+    gpg::fastvector<UserUnit*> group;
+    group.push_back(unit1);
+    group.push_back(unit2);
+
+    SSTICommandIssueData sharedCmd(EUnitCommandType::UNITCOMMAND_Move);
+    sharedCmd.mTarget.mPos = Wm3::Vector3f(120.0f, 0.0f, 130.0f);
+    UserUnit::QueueTransportPreOrders(group, sharedCmd, false);
+
+    EXPECT_TRUE(unit1->HasTransportPreOrders());
+    EXPECT_TRUE(unit2->HasTransportPreOrders());
+
+    const auto orders1 = unit1->GetTransportPreOrders();
+    const auto orders2 = unit2->GetTransportPreOrders();
+    ASSERT_EQ(orders1.size(), 1u);
+    ASSERT_EQ(orders2.size(), 1u);
+
+    // Both units MUST share the exact same command ID!
+    EXPECT_EQ(orders1[0].nextCommandId, orders2[0].nextCommandId);
+    const std::int32_t sharedId = orders1[0].nextCommandId;
+    EXPECT_GT(sharedId, 0);
+
+    // Dragging the shared command ID must update BOTH units simultaneously!
+    const Wm3::Vector3f newSharedPos(150.0f, 5.0f, 160.0f);
+    EXPECT_TRUE(UserUnit::UpdateTransportPreOrderPositionById(sharedId, newSharedPos));
+    EXPECT_EQ(unit1->GetTransportPreOrders()[0].mTarget.mPos, newSharedPos);
+    EXPECT_EQ(unit2->GetTransportPreOrders()[0].mTarget.mPos, newSharedPos);
+
+    // Cancelling the shared command ID must remove it from BOTH units simultaneously!
+    EXPECT_TRUE(UserUnit::RemoveTransportPreOrderById(sharedId));
+    EXPECT_FALSE(unit1->HasTransportPreOrders());
+    EXPECT_FALSE(unit2->HasTransportPreOrders());
+  }
 }

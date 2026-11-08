@@ -1615,9 +1615,7 @@ namespace moho
       clearQueue = LuaPlus::LuaStackObject(state, 4).GetBoolean();
     }
 
-    for (UserUnit* const unit : units) {
-      unit->QueueTransportPreOrder(data, clearQueue);
-    }
+    UserUnit::QueueTransportPreOrders(units, data, clearQueue);
 
     gpg::Warnf(
       "TransportDropGhosts: Queued pre-order %s for %zu unit(s), clearQueue=%d",

@@ -8,6 +8,7 @@ namespace
 {
   static std::unordered_map<std::uint32_t, std::vector<moho::SSTICommandIssueData>> sTransportPreOrders;
   static std::unordered_map<std::uint32_t, Wm3::Vector3f> sSelectionBracketPositionOverrides;
+  static std::unordered_map<std::int32_t, std::uint32_t> sDispatchedPreOrderBuilders;
 
   void WarnFocusArmyUnitDamagedCallbackError(const std::exception& exception) noexcept;
   constexpr const char* kOverlayCategoryAntiAir = "OVERLAYANTIAIR";
@@ -844,6 +845,40 @@ UserUnit::~UserUnit()
   }
 }
 
+void UserUnit::QueueTransportPreOrders(const gpg::fastvector<UserUnit*>& units, const SSTICommandIssueData& order, const bool clearQueue)
+{
+  if (units.empty()) {
+    return;
+  }
+  SSTICommandIssueData finalOrder = order;
+  if (finalOrder.nextCommandId <= 0 || (static_cast<std::uint32_t>(finalOrder.nextCommandId) & 0xFF000000u) == 0xFF000000u) {
+    static std::int32_t sNextPreOrderId = 0x7F000001;
+    finalOrder.nextCommandId = sNextPreOrderId++;
+  }
+  for (UserUnit* const unit : units) {
+    if (unit != nullptr) {
+      unit->QueueTransportPreOrder(finalOrder, clearQueue);
+    }
+  }
+}
+
+void UserUnit::QueueTransportPreOrders(const std::vector<UserUnit*>& units, const SSTICommandIssueData& order, const bool clearQueue)
+{
+  if (units.empty()) {
+    return;
+  }
+  SSTICommandIssueData finalOrder = order;
+  if (finalOrder.nextCommandId <= 0 || (static_cast<std::uint32_t>(finalOrder.nextCommandId) & 0xFF000000u) == 0xFF000000u) {
+    static std::int32_t sNextPreOrderId = 0x7F000001;
+    finalOrder.nextCommandId = sNextPreOrderId++;
+  }
+  for (UserUnit* const unit : units) {
+    if (unit != nullptr) {
+      unit->QueueTransportPreOrder(finalOrder, clearQueue);
+    }
+  }
+}
+
 void UserUnit::QueueTransportPreOrder(const SSTICommandIssueData& order, bool clearQueue)
 {
   auto& queue = sTransportPreOrders[this->mParams.mEntityId];
@@ -866,6 +901,9 @@ void UserUnit::QueueTransportPreOrder(const SSTICommandIssueData& order, bool cl
 void UserUnit::ClearTransportPreOrders()
 {
   sTransportPreOrders.erase(this->mParams.mEntityId);
+  if (sTransportPreOrders.empty()) {
+    sDispatchedPreOrderBuilders.clear();
+  }
 }
 
 bool UserUnit::RemoveTransportPreOrder(const std::size_t index)
@@ -893,32 +931,39 @@ bool UserUnit::UpdateTransportPreOrderPosition(const std::size_t index, const Wm
 
 bool UserUnit::RemoveTransportPreOrderById(const std::int32_t commandId)
 {
-  for (auto it = sTransportPreOrders.begin(); it != sTransportPreOrders.end(); ++it) {
+  bool removed = false;
+  for (auto it = sTransportPreOrders.begin(); it != sTransportPreOrders.end(); ) {
     auto& orders = it->second;
-    for (auto orderIt = orders.begin(); orderIt != orders.end(); ++orderIt) {
+    for (auto orderIt = orders.begin(); orderIt != orders.end(); ) {
       if (orderIt->nextCommandId == commandId) {
-        orders.erase(orderIt);
-        if (orders.empty()) {
-          sTransportPreOrders.erase(it);
-        }
-        return true;
+        orderIt = orders.erase(orderIt);
+        removed = true;
+      } else {
+        ++orderIt;
       }
     }
+    if (orders.empty()) {
+      it = sTransportPreOrders.erase(it);
+    } else {
+      ++it;
+    }
   }
-  return false;
+  sDispatchedPreOrderBuilders.erase(commandId);
+  return removed;
 }
 
 bool UserUnit::UpdateTransportPreOrderPositionById(const std::int32_t commandId, const Wm3::Vector3f& newPos)
 {
+  bool updated = false;
   for (auto& entry : sTransportPreOrders) {
     for (SSTICommandIssueData& order : entry.second) {
       if (order.nextCommandId == commandId) {
         order.mTarget.mPos = newPos;
-        return true;
+        updated = true;
       }
     }
   }
-  return false;
+  return updated;
 }
 
 void UserUnit::SetSelectionBracketPositionOverride(const Wm3::Vector3f& pos)
@@ -990,7 +1035,24 @@ void UserUnit::DispatchDisembarkedPreOrders()
 
   for (std::size_t i = 0; i < preOrders.size(); ++i) {
     const bool isClear = (i == 0);
-    moho::ISSUE_Command(targetUnits, preOrders[i], isClear);
+    SSTICommandIssueData dispatchOrder = preOrders[i];
+
+    if (dispatchOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && dispatchOrder.nextCommandId > 0) {
+      auto it = sDispatchedPreOrderBuilders.find(dispatchOrder.nextCommandId);
+      if (it != sDispatchedPreOrderBuilders.end() && it->second != this->mParams.mEntityId) {
+        // A peer unit has already initiated this shared build order.
+        // Convert to Guard/Assist on the primary builder so this unit assists!
+        dispatchOrder.mCommandType = EUnitCommandType::UNITCOMMAND_Guard;
+        dispatchOrder.mTarget.mType = EAiTargetType::AITARGET_Entity;
+        dispatchOrder.mTarget.mEnt = it->second;
+        dispatchOrder.mTarget.mEntityId = it->second;
+        dispatchOrder.mBlueprint = nullptr;
+      } else {
+        sDispatchedPreOrderBuilders[dispatchOrder.nextCommandId] = this->mParams.mEntityId;
+      }
+    }
+
+    moho::ISSUE_Command(targetUnits, dispatchOrder, isClear);
   }
 }
 

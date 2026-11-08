@@ -790,9 +790,7 @@ namespace moho
       }
     }
 
-    for (UserUnit* const attachedUnit : attachedUnits) {
-      attachedUnit->QueueTransportPreOrder(data, clearQueue);
-    }
+    UserUnit::QueueTransportPreOrders(attachedUnits, data, clearQueue);
 
     if (simUnits.empty()) {
       UI_OnCommandIssued(units, data, clearQueue);

@@ -1534,6 +1534,7 @@ namespace
     }
 
     if (UserUnit::HasAnyTransportPreOrders() && mSession != nullptr) {
+      std::unordered_set<std::int32_t> testedCommandIds;
       const bool shiftDown = MAUI_KeyIsDown(MKEY_SHIFT);
       for (const auto& entry : UserUnit::GetAllTransportPreOrders()) {
         const auto& orders = entry.second;
@@ -1550,6 +1551,9 @@ namespace
         }
 
         for (const SSTICommandIssueData& order : orders) {
+          if (order.nextCommandId > 0 && !testedCommandIds.insert(order.nextCommandId).second) {
+            continue;
+          }
           Wm3::Vector3f targetPos = order.mTarget.mPos;
           if (order.mTarget.mType == EAiTargetType::AITARGET_Entity) {
             if (UserEntity* const targetEnt = mSession->LookupEntityId(static_cast<EntId>(order.mTarget.mEntityId))) {
@@ -3070,6 +3074,8 @@ namespace
     const GeomCamera3& camera, CD3DPrimBatcher& batcher
   ) const
   {
+    std::unordered_set<std::int32_t> drawnCommandIds;
+
     for (const auto& entry : UserUnit::GetAllTransportPreOrders()) {
       const auto& orders = entry.second;
       if (orders.empty()) {
@@ -3091,6 +3097,9 @@ namespace
       }
 
       for (const SSTICommandIssueData& order : orders) {
+        if (order.nextCommandId > 0 && !drawnCommandIds.insert(order.nextCommandId).second) {
+          continue;
+        }
         const auto commandType = order.mCommandType;
         if (static_cast<std::size_t>(commandType) >= std::size(mNodes)) {
           continue;
@@ -3173,7 +3182,13 @@ namespace
           continue;
         }
 
-        const std::uint64_t key = (static_cast<std::uint64_t>(entry.first) << 32) | static_cast<std::uint64_t>(i);
+        const std::uint64_t key = (order.nextCommandId > 0)
+          ? static_cast<std::uint64_t>(order.nextCommandId)
+          : ((static_cast<std::uint64_t>(entry.first) << 32) | static_cast<std::uint64_t>(i));
+
+        if (activeKeys.find(key) != activeKeys.end()) {
+          continue;
+        }
         activeKeys.insert(key);
 
         Wm3::Quatf orientation = order.mOri;
@@ -3247,6 +3262,7 @@ namespace
 
     CHeightField* const heightField = mSession->mWldMap->mTerrainRes->GetHeightField();
     const bool shiftDown = MAUI_KeyIsDown(MKEY_SHIFT);
+    std::unordered_set<std::int32_t> drawnSkirts;
 
     for (const auto& entry : UserUnit::GetAllTransportPreOrders()) {
       const auto& orders = entry.second;
@@ -3263,6 +3279,9 @@ namespace
       }
 
       for (const SSTICommandIssueData& order : orders) {
+        if (order.nextCommandId > 0 && !drawnSkirts.insert(order.nextCommandId).second) {
+          continue;
+        }
         if (order.mCommandType != EUnitCommandType::UNITCOMMAND_BuildMobile || order.mBlueprint == nullptr) {
           continue;
         }
