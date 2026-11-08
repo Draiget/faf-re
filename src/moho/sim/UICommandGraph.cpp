@@ -1475,10 +1475,6 @@ namespace
     const GeomCamera3& camera, const Wm3::Vector2f& cursorScreenPos
   ) const
   {
-    if (mMapAB0.empty()) {
-      return -1;
-    }
-
     float bestScaledDistance = gpg::pInf;
     CmdId bestCommandId = -1;
 
@@ -1490,26 +1486,6 @@ namespace
         drawNode.mPositionSum.x * invWeight, drawNode.mPositionSum.y * invWeight, drawNode.mPositionSum.z * invWeight
       };
 
-      // Frustum-cull the averaged anchor against the camera's view solid
-      // before spending a projection + hit test on it.
-      //
-      // `CGeomSolid3` carries *outward*-facing plane normals, so a point is
-      // outside the solid when its signed distance is positive - the same
-      // convention `SolidContainsAabb` (moho/mesh/Mesh.cpp) rejects on, and
-      // exactly what 0x008298B2..0x008298BE spells:
-      //
-      //   0x008298B2  subss  xmm0, [edx+0Ch]        ; d = n.X - constant
-      //   0x008298B7  comiss xmm0, ds:dword_E4F6E0  ; the .rdata word is 0.0f
-      //   0x008298BE  ja     loc_829B12             ; d > 0 -> next node
-      //
-      // Testing `<= 0` here instead inverted the whole predicate: every
-      // command node actually on screen was discarded, the walk always fell
-      // through to `bestCommandId == -1`, and so `CUIWorldView::
-      // UpdateSelection` never wrote a real `CmdId` into `MouseInfo::
-      // mIsDragger`. With that sentinel permanently -1, `DefaultModeFromDrag`
-      // only ever answered COMMOD_Move, the "grab this command node" arm that
-      // builds a `UICommandDragger` never ran, and no issued order could be
-      // picked up and dragged anywhere.
       bool culledByFrustum = false;
       for (const Wm3::Plane3f& plane : camera.solid2.planes_) {
         const float signedDistance =
@@ -1542,11 +1518,6 @@ namespace
         scaledDistance -= 0.1f;
       }
 
-      // `ui_CommandClickScale` (the decompiled global name at this read) is
-      // not a real symbol - see the `ui_WaypointLineScale` doc comment in
-      // `UICommandGraph::LoadPathParams` above: both the `ui_WaypointLineScale`
-      // and `ui_CommandClickScale` Lua keys write the same global
-      // (0x00F57CDC), and that is what this address reads.
       if ((ui_WaypointLineScale * scaledTolerance) < scaledDistance) {
         continue;
       }
@@ -1559,6 +1530,67 @@ namespace
       if (bestScaledDistance > scaledDistance || preemptsByLiveSelection) {
         bestScaledDistance = scaledDistance;
         bestCommandId = drawNode.mCommandId;
+      }
+    }
+
+    if (UserUnit::HasAnyTransportPreOrders() && mSession != nullptr) {
+      const bool shiftDown = MAUI_KeyIsDown(MKEY_SHIFT);
+      for (const auto& entry : UserUnit::GetAllTransportPreOrders()) {
+        const auto& orders = entry.second;
+        if (orders.empty()) {
+          continue;
+        }
+        UserEntity* const entity = mSession->LookupEntityId(static_cast<EntId>(entry.first));
+        if (entity == nullptr) {
+          continue;
+        }
+        const bool isSelected = (mSession->mSelection.Find(entity) != mSession->mSelection.end());
+        if (!isSelected && !shiftDown) {
+          continue;
+        }
+
+        for (const SSTICommandIssueData& order : orders) {
+          Wm3::Vector3f targetPos = order.mTarget.mPos;
+          if (order.mTarget.mType == EAiTargetType::AITARGET_Entity) {
+            if (UserEntity* const targetEnt = mSession->LookupEntityId(static_cast<EntId>(order.mTarget.mEntityId))) {
+              targetPos = targetEnt->mVariableData.mCurTransform.pos_;
+            }
+          }
+
+          bool culledByFrustum = false;
+          for (const Wm3::Plane3f& plane : camera.solid2.planes_) {
+            const float signedDistance =
+              ((plane.Normal.x * targetPos.x) + (plane.Normal.y * targetPos.y) + (plane.Normal.z * targetPos.z)) - plane.Constant;
+            if (signedDistance > 0.0f) {
+              culledByFrustum = true;
+              break;
+            }
+          }
+          if (culledByFrustum) {
+            continue;
+          }
+
+          const Wm3::Vector2f screenPos = camera.Project(targetPos);
+          const float dx = screenPos.x - cursorScreenPos.x;
+          const float dy = screenPos.y - cursorScreenPos.y;
+          const float pixelDistance = std::sqrt((dx * dx) + (dy * dy));
+
+          const float depthW = camera.viewport.ProjectViewportWidthRow2(targetPos);
+          float worldTolerance = 1.0f / depthW;
+          worldTolerance = std::clamp(worldTolerance, ui_MinWaypointSize, ui_MaxWaypointSize);
+
+          const float scaledTolerance = worldTolerance * depthW;
+          const float scaledDistance = depthW * pixelDistance;
+
+          if ((ui_WaypointLineScale * scaledTolerance) < scaledDistance) {
+            continue;
+          }
+
+          if (bestScaledDistance > scaledDistance || isSelected) {
+            bestScaledDistance = scaledDistance;
+            bestCommandId = order.nextCommandId;
+          }
+        }
       }
     }
 

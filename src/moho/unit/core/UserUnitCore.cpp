@@ -847,15 +847,78 @@ UserUnit::~UserUnit()
 void UserUnit::QueueTransportPreOrder(const SSTICommandIssueData& order, bool clearQueue)
 {
   auto& queue = sTransportPreOrders[this->mParams.mEntityId];
+  if (order.mCommandType == EUnitCommandType::UNITCOMMAND_Stop) {
+    queue.clear();
+    sTransportPreOrders.erase(this->mParams.mEntityId);
+    return;
+  }
   if (clearQueue) {
     queue.clear();
   }
-  queue.push_back(order);
+  SSTICommandIssueData finalOrder = order;
+  if (finalOrder.nextCommandId <= 0 || (static_cast<std::uint32_t>(finalOrder.nextCommandId) & 0xFF000000u) == 0xFF000000u) {
+    static std::int32_t sNextPreOrderId = 0x7F000001;
+    finalOrder.nextCommandId = sNextPreOrderId++;
+  }
+  queue.push_back(finalOrder);
 }
 
 void UserUnit::ClearTransportPreOrders()
 {
   sTransportPreOrders.erase(this->mParams.mEntityId);
+}
+
+bool UserUnit::RemoveTransportPreOrder(const std::size_t index)
+{
+  const auto it = sTransportPreOrders.find(this->mParams.mEntityId);
+  if (it == sTransportPreOrders.end() || index >= it->second.size()) {
+    return false;
+  }
+  it->second.erase(it->second.begin() + index);
+  if (it->second.empty()) {
+    sTransportPreOrders.erase(it);
+  }
+  return true;
+}
+
+bool UserUnit::UpdateTransportPreOrderPosition(const std::size_t index, const Wm3::Vector3f& newPos)
+{
+  const auto it = sTransportPreOrders.find(this->mParams.mEntityId);
+  if (it == sTransportPreOrders.end() || index >= it->second.size()) {
+    return false;
+  }
+  it->second[index].mTarget.mPos = newPos;
+  return true;
+}
+
+bool UserUnit::RemoveTransportPreOrderById(const std::int32_t commandId)
+{
+  for (auto it = sTransportPreOrders.begin(); it != sTransportPreOrders.end(); ++it) {
+    auto& orders = it->second;
+    for (auto orderIt = orders.begin(); orderIt != orders.end(); ++orderIt) {
+      if (orderIt->nextCommandId == commandId) {
+        orders.erase(orderIt);
+        if (orders.empty()) {
+          sTransportPreOrders.erase(it);
+        }
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+bool UserUnit::UpdateTransportPreOrderPositionById(const std::int32_t commandId, const Wm3::Vector3f& newPos)
+{
+  for (auto& entry : sTransportPreOrders) {
+    for (SSTICommandIssueData& order : entry.second) {
+      if (order.nextCommandId == commandId) {
+        order.mTarget.mPos = newPos;
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 void UserUnit::SetSelectionBracketPositionOverride(const Wm3::Vector3f& pos)

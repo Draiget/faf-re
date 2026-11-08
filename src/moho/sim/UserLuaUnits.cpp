@@ -1,4 +1,5 @@
 #include "moho/lua/ScrLuaUserData.h"
+#include "moho/unit/core/UserUnit.h"
 #include "moho/sim/UserLuaPrivate.h"
 
 using EntId = std::int32_t;
@@ -2103,6 +2104,9 @@ int moho::cfunc_DeleteCommandL(LuaPlus::LuaState* const state)
 
   UserCommandIssueHelper* const commandIssue = FindCommandIssueHelper(session, commandId);
   if (!commandIssue) {
+    if (UserUnit::RemoveTransportPreOrderById(commandId)) {
+      session->DirtyCommandGraph();
+    }
     return 0;
   }
 
@@ -2166,6 +2170,12 @@ int moho::cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState* const state)
 
     UserCommandIssueHelper* const helper = FindCommandIssueHelper(session, commandId);
     if (helper == nullptr) {
+      if (UserUnit::RemoveTransportPreOrderById(commandId)) {
+        session->DirtyCommandGraph();
+        if (--remaining <= 0) {
+          break;
+        }
+      }
       continue;
     }
 

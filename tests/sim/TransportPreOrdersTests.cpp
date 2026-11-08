@@ -297,4 +297,86 @@ namespace
     EXPECT_FALSE(unit->HasSelectionBracketPositionOverride());
     EXPECT_EQ(unit->GetSelectionBracketPositionOverride(), Wm3::Vector3f::ZERO);
   }
+  TEST(TransportPreOrdersTests, StopCommandClearsQueue)
+  {
+    MockUserUnitScope scope;
+    UserUnit* unit = scope.GetUnit(601);
+
+    SSTICommandIssueData cmd1(EUnitCommandType::UNITCOMMAND_Move);
+    unit->QueueTransportPreOrder(cmd1, false);
+    EXPECT_TRUE(unit->HasTransportPreOrders());
+
+    SSTICommandIssueData stopCmd(EUnitCommandType::UNITCOMMAND_Stop);
+    unit->QueueTransportPreOrder(stopCmd, false);
+    EXPECT_FALSE(unit->HasTransportPreOrders());
+    EXPECT_TRUE(unit->GetTransportPreOrders().empty());
+  }
+
+  TEST(TransportPreOrdersTests, RemoveTransportPreOrderByIndex)
+  {
+    MockUserUnitScope scope;
+    UserUnit* unit = scope.GetUnit(602);
+
+    SSTICommandIssueData cmd1(EUnitCommandType::UNITCOMMAND_Move);
+    SSTICommandIssueData cmd2(EUnitCommandType::UNITCOMMAND_Attack);
+    unit->QueueTransportPreOrder(cmd1, false);
+    unit->QueueTransportPreOrder(cmd2, false);
+
+    ASSERT_EQ(unit->GetTransportPreOrders().size(), 2u);
+
+    EXPECT_FALSE(unit->RemoveTransportPreOrder(5)); // Out of bounds
+    EXPECT_TRUE(unit->RemoveTransportPreOrder(0)); // Remove first
+    ASSERT_EQ(unit->GetTransportPreOrders().size(), 1u);
+    EXPECT_EQ(unit->GetTransportPreOrders()[0].mCommandType, EUnitCommandType::UNITCOMMAND_Attack);
+
+    EXPECT_TRUE(unit->RemoveTransportPreOrder(0)); // Remove remaining
+    EXPECT_FALSE(unit->HasTransportPreOrders());
+  }
+
+  TEST(TransportPreOrdersTests, UpdateTransportPreOrderPositionByIndex)
+  {
+    MockUserUnitScope scope;
+    UserUnit* unit = scope.GetUnit(603);
+
+    SSTICommandIssueData cmd1(EUnitCommandType::UNITCOMMAND_Move);
+    cmd1.mTarget.mPos = Wm3::Vector3f(10.0f, 0.0f, 10.0f);
+    unit->QueueTransportPreOrder(cmd1, false);
+
+    const Wm3::Vector3f newPos(20.0f, 5.0f, 30.0f);
+    EXPECT_TRUE(unit->UpdateTransportPreOrderPosition(0, newPos));
+    EXPECT_FALSE(unit->UpdateTransportPreOrderPosition(5, newPos));
+
+    const auto orders = unit->GetTransportPreOrders();
+    ASSERT_EQ(orders.size(), 1u);
+    EXPECT_EQ(orders[0].mTarget.mPos, newPos);
+  }
+
+  TEST(TransportPreOrdersTests, RemoveAndDragTransportPreOrderById)
+  {
+    MockUserUnitScope scope;
+    UserUnit* unit = scope.GetUnit(604);
+
+    SSTICommandIssueData cmd1(EUnitCommandType::UNITCOMMAND_Move);
+    cmd1.mTarget.mPos = Wm3::Vector3f(50.0f, 0.0f, 50.0f);
+    unit->QueueTransportPreOrder(cmd1, false);
+
+    const auto orders = unit->GetTransportPreOrders();
+    ASSERT_EQ(orders.size(), 1u);
+    const std::int32_t cmdId = orders[0].nextCommandId;
+    EXPECT_GT(cmdId, 0);
+
+    // Test dragging / updating position by ID
+    const Wm3::Vector3f draggedPos(75.0f, 2.0f, 85.0f);
+    EXPECT_TRUE(UserUnit::UpdateTransportPreOrderPositionById(cmdId, draggedPos));
+    EXPECT_FALSE(UserUnit::UpdateTransportPreOrderPositionById(999999, draggedPos));
+
+    const auto updatedOrders = unit->GetTransportPreOrders();
+    ASSERT_EQ(updatedOrders.size(), 1u);
+    EXPECT_EQ(updatedOrders[0].mTarget.mPos, draggedPos);
+
+    // Test removing by ID
+    EXPECT_FALSE(UserUnit::RemoveTransportPreOrderById(999999));
+    EXPECT_TRUE(UserUnit::RemoveTransportPreOrderById(cmdId));
+    EXPECT_FALSE(unit->HasTransportPreOrders());
+  }
 }

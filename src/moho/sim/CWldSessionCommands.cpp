@@ -734,6 +734,26 @@ namespace
         helper = found->second;
       }
       if (helper == nullptr) {
+        if (!IsValidVector3f(mouse) || graph.mSession == nullptr) {
+          return;
+        }
+        const STIMap* const map = (graph.mSession->mWldMap && graph.mSession->mWldMap->mTerrainRes)
+          ? graph.mSession->mWldMap->mTerrainRes->mMap : nullptr;
+        Wm3::Vector3f clampedPos = mouse;
+        if (map != nullptr) {
+          clampedPos.x = std::clamp(
+            clampedPos.x, static_cast<float>(map->mPlayableRect.x0 + 1), static_cast<float>(map->mPlayableRect.x1 - 1)
+          );
+          clampedPos.z = std::clamp(
+            clampedPos.z, static_cast<float>(map->mPlayableRect.z0 + 1), static_cast<float>(map->mPlayableRect.z1 - 1)
+          );
+          if (const CHeightField* const hf = graph.mSession->mWldMap->mTerrainRes->GetHeightField()) {
+            clampedPos.y = hf->GetElevation(clampedPos.x, clampedPos.z);
+          }
+        }
+        if (UserUnit::UpdateTransportPreOrderPositionById(cmdId, clampedPos)) {
+          graph.mSession->DirtyCommandGraph();
+        }
         return;
       }
 

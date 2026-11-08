@@ -585,6 +585,10 @@ namespace moho
      */
     void QueueTransportPreOrder(const SSTICommandIssueData& order, bool clearQueue);
     void ClearTransportPreOrders();
+    bool RemoveTransportPreOrder(std::size_t index);
+    bool UpdateTransportPreOrderPosition(std::size_t index, const Wm3::Vector3f& newPos);
+    static bool RemoveTransportPreOrderById(std::int32_t commandId);
+    static bool UpdateTransportPreOrderPositionById(std::int32_t commandId, const Wm3::Vector3f& newPos);
     [[nodiscard]] std::vector<SSTICommandIssueData> GetTransportPreOrders() const;
     [[nodiscard]] bool HasTransportPreOrders() const;
     [[nodiscard]] static bool HasAnyTransportPreOrders();
