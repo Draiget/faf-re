@@ -381,11 +381,11 @@ do
             title = 'Wide glow',
             key = 'bloom_wide_level',
             type = 'toggle',
-            default = 1,
+            default = 0,
             tip = 'A soft, wide halo around lights, explosions and shields, added to the bloom. Needs Bloom Render. '
                 .. 'Direct3D 12 and Vulkan only.',
             set = function(key, value, startup)
-                ConExecute('ren_BloomWide ' .. (strength[value] or strength[1]))
+                ConExecute('ren_BloomWide ' .. (strength[value] or strength[0]))
             end,
             custom = {
                 states = {

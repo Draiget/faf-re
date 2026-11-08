@@ -14,12 +14,12 @@
 
 namespace moho
 {
-  float ren_BloomWide = 1.0f;
+  float ren_BloomWide = 0.0f;
 
   TConVar<float> gTConVar_ren_BloomWide(
     "ren_BloomWide",
     "Wide, soft glow added after the bloom on Direct3D 12 and Vulkan, around lights, explosions and shields: its "
-    "strength, 1 by default, up to 2; 0 off. Needs ren_Bloom.",
+    "strength, 0 (off) by default, 1 normal, up to 2. Needs ren_Bloom.",
     &ren_BloomWide
   );
 
