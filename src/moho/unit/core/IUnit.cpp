@@ -17,7 +17,6 @@ namespace moho
 
 namespace
 {
-  constexpr float kNoWaterElevation = -10000.0f;
   constexpr std::uint32_t kLayerMaskLandOrSeabed = 0x03u;
   constexpr std::uint32_t kLayerMaskSub = 0x04u;
   constexpr std::uint32_t kLayerMaskWater = 0x08u;
@@ -128,11 +127,11 @@ float IUnit::CalcSpawnElevation(
   }
 
   if ((layerMask & kLayerMaskWater) != 0u) {
-    return map->IsWaterEnabled() ? map->GetWaterElevation() : kNoWaterElevation;
+    return map->GetWaterElevationAt(transform.pos_.x, transform.pos_.z); // engine addition: per position
   }
 
   if ((layerMask & kLayerMaskSub) != 0u) {
-    const float waterSurface = map->IsWaterEnabled() ? map->GetWaterElevation() : kNoWaterElevation;
+    const float waterSurface = map->GetWaterElevationAt(transform.pos_.x, transform.pos_.z); // engine addition
     return attributes.spawnElevationOffset + waterSurface;
   }
 

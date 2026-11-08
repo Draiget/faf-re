@@ -2931,10 +2931,11 @@ namespace moho
     const RUnitBlueprintWeapon* const weaponBlueprint = weapon->mWeaponBlueprint;
     if (weaponBlueprint->AboveWaterFireOnly != 0u || weaponBlueprint->BelowWaterFireOnly != 0u) {
       const STIMap* const mapData = (ownerUnit->SimulationRef != nullptr) ? ownerUnit->SimulationRef->mMapData : nullptr;
-      const float waterElevation = (mapData != nullptr && mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
-
       Wm3::Vec3f muzzlePosition{};
       weapon->GetTransform(&muzzlePosition);
+      // Engine addition (water bodies): the level at the muzzle.
+      const float waterElevation =
+        mapData != nullptr ? mapData->GetWaterElevationAt(muzzlePosition.x, muzzlePosition.z) : -10000.0f;
       const bool isAboveWater = muzzlePosition.y > waterElevation;
 
       if (weaponBlueprint->AboveWaterFireOnly != 0u && !isAboveWater) {
@@ -3145,7 +3146,7 @@ namespace moho
     }
     const float terrainElevation =
       GetHeightFieldElevation(mapData->mHeightField, targetPosition.x, targetPosition.z);
-    const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
+    const float waterElevation = mapData->GetWaterElevationAt(targetPosition.x, targetPosition.z); // engine addition
 
     if (terrainElevation > waterElevation) {
       return (weapon->mFireTargetLayerCaps & LAYER_Land) != 0;

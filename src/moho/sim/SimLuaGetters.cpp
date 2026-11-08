@@ -1152,8 +1152,10 @@ int moho::cfunc_GetSurfaceHeightL(LuaPlus::LuaState* const state)
   CHeightField* const field = map ? map->mHeightField.get() : nullptr;
 
   float surfaceHeight = field ? field->GetElevation(x, z) : 0.0f;
-  if (map && map->mWaterEnabled != 0u && map->mWaterElevation > surfaceHeight) {
-    surfaceHeight = map->mWaterElevation;
+  // Engine addition (water bodies): the level at (x, z); -10000 without water.
+  const float waterHeight = map ? map->GetWaterElevationAt(x, z) : -10000.0f;
+  if (waterHeight > surfaceHeight) {
+    surfaceHeight = waterHeight;
   }
 
   lua_pushnumber(rawState, surfaceHeight);

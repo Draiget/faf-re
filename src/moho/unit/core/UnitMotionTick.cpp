@@ -336,7 +336,8 @@ bool Unit::PrepareMove(
       const STIMap* const mapData = sim->mMapData;
       const CHeightField* const heightField = (mapData != nullptr && mapData->mHeightField) ? mapData->mHeightField.get() : nullptr;
       const float terrainElevation = (heightField != nullptr) ? heightField->GetElevation(inOutPos->x, inOutPos->z) : inOutPos->y;
-      const float waterElevation = (mapData != nullptr && mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
+      const float waterElevation =
+        mapData != nullptr ? mapData->GetWaterElevationAt(inOutPos->x, inOutPos->z) : -10000.0f; // engine addition
       if (waterElevation > terrainElevation) {
         const std::uint8_t withWaterCaps = static_cast<std::uint8_t>(
           static_cast<std::uint8_t>(footprint.mOccupancyCaps) | static_cast<std::uint8_t>(EOccupancyCaps::OC_WATER)
