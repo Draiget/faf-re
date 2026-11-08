@@ -214,6 +214,18 @@ if not rawget(getfenv(1), 'GetSessionClients') then
         end
     end
 
+    --- When this module is marked for reload, also through a module it imports (/lua/system/import.lua marks every
+    --- module in used_by): /lua/ui/uimain.lua can be reloaded with it and then not call the old DestroyDialog.
+    local baseOnDirty = __moduleinfo.OnDirty
+    function __moduleinfo.OnDirty()
+        if baseOnDirty then
+            baseOnDirty()
+        end
+        -- Both directly: this module is still in __modules here, so DestroyDialog above would keep the rejoin dialog.
+        baseDestroyDialog()
+        DestroyRejoinDialog()
+    end
+
     local function UpdateSlot(slot, index, client, armies)
         if IsReturning(client) then
             slot.ping:Hide()
