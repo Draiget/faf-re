@@ -74,6 +74,15 @@ namespace moho
       &gpg::gal::gReleaseBufferCopies
     );
 
+    /** Engine addition: `ren_VulkanScaledPresent` (see gpg/gal/PlacedResources.h). */
+    TConVar<bool> gTConVar_ren_VulkanScaledPresent(
+      "ren_VulkanScaledPresent",
+      "Vulkan: each head draws into an image of its own that is copied into the window's image at present, so a "
+      "resized window keeps showing the game (1, the default), or draws straight into the window's images (0), "
+      "which stop presenting after a resize. Read when the device makes its head targets.",
+      &gpg::gal::gVulkanScaledPresent
+    );
+
     /** Engine addition: `d3d_UploadIdleMB` (see gpg/gal/PlacedResources.h). */
     TConVar<int> gTConVar_d3d_UploadIdleMB(
       "d3d_UploadIdleMB",

@@ -448,7 +448,9 @@ namespace
           std::size_t tokenEnd = segment.find_first_of(" \t", tokenBegin);
           const std::string token = segment.substr(tokenBegin, tokenEnd - tokenBegin);
 
-          if (IsCommandName(token, "lua_IncrementalGC")) {
+          // ren_VulkanScaledPresent is read when the device makes its head targets (CreateDevice, after this):
+          // the prologue's pass would be too late for it too.
+          if (IsCommandName(token, "lua_IncrementalGC") || IsCommandName(token, "ren_VulkanScaledPresent")) {
             moho::CON_Execute(segment.c_str());
           }
         }
