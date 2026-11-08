@@ -1,6 +1,7 @@
 #include "moho/terrain/HighFidelityTerrain.h"
 #include "moho/terrain/SplatChunkRenderer.h"
 #include "moho/terrain/SplatBudget.h"
+#include "moho/terrain/TerrainTessellation.h"
 #include <cstdio>
 
 #include <algorithm>
@@ -482,6 +483,7 @@ namespace moho
     SetShaderVarMem(shaderVars.stratum5NormalTile, 4U, &strata.mStratum5NormalTexture.mScaleX);
     SetShaderVarMem(shaderVars.stratum6NormalTile, 4U, &strata.mStratum6NormalTexture.mScaleX);
     SetShaderVarMem(shaderVars.stratum7NormalTile, 4U, &strata.mStratum7NormalTexture.mScaleX);
+    TERRAIN_SetTessellationLayers(strata); // engine addition (ren_TerrainTessellation)
 
     shaderVars.normalTexture.SetRenderTargetTexture(terrainNormalTexture);
 

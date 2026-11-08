@@ -188,6 +188,8 @@ namespace gpg::gal
       effects::EffectProgram* program = nullptr;
       const effects::CompiledEntry* vertexShader = nullptr;
       const effects::CompiledEntry* pixelShader = nullptr;
+      const effects::CompiledEntry* hullShader = nullptr;   // engine addition: a tessellated pass (both set)
+      const effects::CompiledEntry* domainShader = nullptr;
       RenderState state;
       VkDescriptorSet textures = VK_NULL_HANDLE;
       VkDescriptorSet constants = VK_NULL_HANDLE;
@@ -330,6 +332,7 @@ namespace gpg::gal
     std::uint64_t mSubmittedSerial = 0;
     bool mAnisotropy = false;
     bool mWireframeSupported = false;
+    bool mTessellationSupported = false; // engine addition: tessellated passes draw only with it
     bool mMemoryBudget = false; // VK_EXT_memory_budget enabled
     std::string mDriverName;    // VkPhysicalDeviceDriverProperties driverName + driverInfo
     VkFormat mDepthStencilFormat = VK_FORMAT_D24_UNORM_S8_UINT;
@@ -360,6 +363,8 @@ namespace gpg::gal
     {
       std::uint64_t vertexKey;
       std::uint64_t pixelKey;
+      std::uint64_t hullKey;   // 0 when the pass is not tessellated
+      std::uint64_t domainKey;
       std::uint32_t format;
       std::uint32_t sampleMask;
       std::uint32_t strides[16];

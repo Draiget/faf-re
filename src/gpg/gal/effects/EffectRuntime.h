@@ -55,6 +55,8 @@ namespace gpg::gal::effects
   {
     std::int32_t vertex = -1;
     std::int32_t pixel = -1;
+    std::int32_t hull = -1;   // engine addition: both set for a tessellated pass, else both -1
+    std::int32_t domain = -1;
   };
 
   class EffectProgram
@@ -181,6 +183,13 @@ namespace gpg::gal
     boost::shared_ptr<EffectTechnique> GetTechnique(const char* name) override;
     void OnReset() override;
     void OnLost() override;
+
+    /**
+     * Engine addition: compiles every shader of technique `name` now and reports whether all of
+     * them compiled (false for an unknown technique). The effect's shaders share one source, so
+     * a technique that compiles shows the whole source does.
+     */
+    [[nodiscard]] bool TechniqueCompiles(const char* name);
 
   private:
     EffectContext mContext;

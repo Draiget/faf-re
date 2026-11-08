@@ -183,15 +183,33 @@ namespace gpg::gal::effects
     }
 
     const std::wstring entryName = Widen(entry.name);
+    const wchar_t* profile = L"ps_6_0";
+    const wchar_t* stageDefine = L"FAF_PIXEL_STAGE=1";
+    switch (entry.stage) {
+    case ShaderStage::Vertex:
+      profile = L"vs_6_0";
+      stageDefine = L"FAF_VERTEX_STAGE=1";
+      break;
+    case ShaderStage::Hull:
+      profile = L"hs_6_0";
+      stageDefine = L"FAF_HULL_STAGE=1";
+      break;
+    case ShaderStage::Domain:
+      profile = L"ds_6_0";
+      stageDefine = L"FAF_DOMAIN_STAGE=1";
+      break;
+    case ShaderStage::Pixel:
+      break;
+    }
     std::vector<std::wstring> arguments{
       L"-E", entryName,
-      L"-T", entry.stage == ShaderStage::Vertex ? L"vs_6_0" : L"ps_6_0",
+      L"-T", profile,
       // HLSL 2018: the effects predate 2021's stricter vector logic.
       L"-HV", L"2018",
       // Row-major matrices: the parameter store keeps the engine's layout.
       L"-Zpr",
       L"-O3",
-      L"-D", entry.stage == ShaderStage::Vertex ? L"FAF_VERTEX_STAGE=1" : L"FAF_PIXEL_STAGE=1",
+      L"-D", stageDefine,
       // FXC accepted these silently.
       L"-Wno-conversion",
     };
@@ -202,7 +220,9 @@ namespace gpg::gal::effects
       arguments.insert(arguments.end(), {L"-spirv", L"-fvk-use-dx-layout", L"-fspv-reflect", L"-fspv-target-env=vulkan1.1",
                                          L"-fvk-t-shift", L"0", L"0", L"-fvk-s-shift", L"64", L"0", L"-fvk-b-shift", L"0", L"0",
                                          L"-fvk-bind-globals", L"0", L"1"});
-      if (entry.stage == ShaderStage::Vertex) {
+      // SV_Position leaves the vertex shader, or in a tessellated pass the domain
+      // shader (its vertex shader writes control points, which have none).
+      if (entry.stage == ShaderStage::Vertex || entry.stage == ShaderStage::Domain) {
         arguments.push_back(L"-fvk-invert-y");
       }
     }

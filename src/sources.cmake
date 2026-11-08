@@ -328,6 +328,7 @@ set(FAF_ENGINE_SOURCES
   moho/terrain/TerrainDynamicTextureHelpers.cpp
   moho/terrain/TerrainFactory.cpp
   moho/terrain/TerrainShaderVars.cpp
+  moho/terrain/TerrainTessellation.cpp
   moho/terrain/water/CWaterShaderProperties.cpp
   moho/terrain/water/HighFidelityWater.cpp
   moho/terrain/water/LowFidelityWater.cpp

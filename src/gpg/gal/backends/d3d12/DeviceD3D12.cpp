@@ -2902,8 +2902,13 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (entries.pixel >= 0) {
       bound.pixelShader = &program.Shader(static_cast<std::uint32_t>(entries.pixel));
     }
+    if (entries.hull >= 0 && entries.domain >= 0) {
+      bound.hullShader = &program.Shader(static_cast<std::uint32_t>(entries.hull));
+      bound.domainShader = &program.Shader(static_cast<std::uint32_t>(entries.domain));
+    }
     bound.valid = bound.vertexShader != nullptr && bound.vertexShader->succeeded &&
-      (bound.pixelShader == nullptr || bound.pixelShader->succeeded);
+      (bound.pixelShader == nullptr || bound.pixelShader->succeeded) &&
+      (bound.hullShader == nullptr || (bound.hullShader->succeeded && bound.domainShader->succeeded));
 
     ProgramState& state = StateFor(program);
     effects::ParameterStore& parameters = program.Parameters();
@@ -3072,6 +3077,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     std::memset(static_cast<void*>(&inputs), 0, sizeof(inputs));
     inputs.vertexKey = pass.vertexShader->key;
     inputs.pixelKey = (pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL;
+    inputs.hullKey = (pass.hullShader != nullptr) ? pass.hullShader->key : 0ULL;
+    inputs.domainKey = (pass.domainShader != nullptr) ? pass.domainShader->key : 0ULL;
     inputs.format = mBoundFormat;
     inputs.sampleMask = pass.state.sampleMask;
     inputs.blend = pass.state.blend;
@@ -3097,6 +3104,11 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     key.Add(renderFormat);
     key.Add(depthFormat);
     key.Add(topologyType);
+    if (pass.hullShader != nullptr) {
+      // Only tessellated passes extend the key, so every other pipeline keeps its cached one.
+      key.Add(pass.hullShader->key);
+      key.Add(pass.domainShader->key);
+    }
     auto found = mPipelines.find(key.Key());
     if (found != mPipelines.end()) {
       mPipelineMemo.Store(inputs, found->second.Get());
@@ -3145,6 +3157,10 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     }
     if (!mSolidPixelShader.empty()) {
       desc.PS = {mSolidPixelShader.data(), mSolidPixelShader.size()};
+    }
+    if (pass.hullShader != nullptr) {
+      desc.HS = {pass.hullShader->code.data(), pass.hullShader->code.size()};
+      desc.DS = {pass.domainShader->code.data(), pass.domainShader->code.size()};
     }
     desc.BlendState.AlphaToCoverageEnable = blend.alphaToCoverage ? TRUE : FALSE;
     D3D12_RENDER_TARGET_BLEND_DESC& target = desc.BlendState.RenderTarget[0];
@@ -3231,7 +3247,17 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       ++mSkippedDraws;
       return false;
     }
-    const D3D_PRIMITIVE_TOPOLOGY topology = kTopologyByToken[topologyToken];
+    D3D_PRIMITIVE_TOPOLOGY topology = kTopologyByToken[topologyToken];
+    D3D12_PRIMITIVE_TOPOLOGY_TYPE topologyType = TopologyType(topology);
+    if (mPass.hullShader != nullptr) {
+      // A tessellated pass draws each triangle of a list as one 3-point patch.
+      if (topology != D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {
+        ++mSkippedDraws;
+        return false;
+      }
+      topology = D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST;
+      topologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
+    }
     if (mTracing) {
       Trace(
         "draw topology %u format %u rt %p ds %p viewport %lu,%lu %lux%lu z %g..%g", topologyToken, mBoundFormat,
@@ -3243,7 +3269,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (mPass.sampled != nullptr) {
       TransitionSampled(*mPass.sampled);
     }
-    ID3D12PipelineState* const pipeline = PipelineFor(mPass, TopologyType(topology));
+    ID3D12PipelineState* const pipeline = PipelineFor(mPass, topologyType);
     if (pipeline == nullptr) {
       ++mSkippedDraws;
       return false;

@@ -225,6 +225,19 @@ namespace gpg::gal::effects
     std::optional<AlphaTestDesc> alphaTest; // set when the Direct3D 9 pass enables alpha testing
     ShaderReference vertexShader;
     ShaderReference pixelShader;
+    // Engine addition: `HullShader = compile hs_5_0 Factors()` names a plain function
+    // `float4 Factors(T a, T b, T c)` returning the tessellation factors of the edges
+    // opposite a, b and c and of the inside; `DomainShader = compile ds_5_0 Place(...)`
+    // names `R Place(float3 weights, T a, T b, T c, uniform ...)`, which places one
+    // generated point (`weights` are its barycentric weights of a, b and c). T is the
+    // vertex shader's output struct.
+    ShaderReference hullShader;
+    ShaderReference domainShader;
+
+    [[nodiscard]] bool Tessellated() const noexcept
+    {
+      return !hullShader.function.empty() && !domainShader.function.empty();
+    }
   };
 
   struct Technique

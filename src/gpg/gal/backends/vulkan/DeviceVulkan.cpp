@@ -556,8 +556,10 @@ namespace gpg::gal
     features.features.samplerAnisotropy = available.features.samplerAnisotropy;
     features.features.fillModeNonSolid = available.features.fillModeNonSolid;
     features.features.textureCompressionBC = available.features.textureCompressionBC;
+    features.features.tessellationShader = available.features.tessellationShader;
     mAnisotropy = available.features.samplerAnisotropy == VK_TRUE;
     mWireframeSupported = available.features.fillModeNonSolid == VK_TRUE;
+    mTessellationSupported = available.features.tessellationShader == VK_TRUE;
     if (available.features.textureCompressionBC != VK_TRUE) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "the Vulkan device has no BC texture compression");
     }
@@ -631,13 +633,16 @@ namespace gpg::gal
 
   void DeviceVulkan::CreateLayouts()
   {
+    // Tessellated passes (engine addition) read textures and constants in their hull and domain shaders too.
+    const VkShaderStageFlags stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT |
+      (mTessellationSupported ? VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT : 0U);
     std::vector<VkDescriptorSetLayoutBinding> bindings;
     for (std::uint32_t index = 0U; index < kTextureBindings + kSamplerBindings; ++index) {
       VkDescriptorSetLayoutBinding binding{};
       binding.binding = index;
       binding.descriptorType = (index < kTextureBindings) ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE : VK_DESCRIPTOR_TYPE_SAMPLER;
       binding.descriptorCount = 1U;
-      binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+      binding.stageFlags = stages;
       bindings.push_back(binding);
     }
     VkDescriptorSetLayoutCreateInfo layout{};
@@ -650,7 +655,7 @@ namespace gpg::gal
     constants.binding = 0U;
     constants.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     constants.descriptorCount = 1U;
-    constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    constants.stageFlags = stages;
     layout.bindingCount = 1U;
     layout.pBindings = &constants;
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mConstantLayout));
@@ -2737,8 +2742,16 @@ namespace gpg::gal
     if (entries.pixel >= 0) {
       bound.pixelShader = &program.Shader(static_cast<std::uint32_t>(entries.pixel));
     }
+    const bool tessellated = entries.hull >= 0 && entries.domain >= 0;
+    if (tessellated && mTessellationSupported) {
+      bound.hullShader = &program.Shader(static_cast<std::uint32_t>(entries.hull));
+      bound.domainShader = &program.Shader(static_cast<std::uint32_t>(entries.domain));
+    }
+    // A tessellated pass on a device without tessellation draws nothing (its vertex
+    // shader writes control points, not positions).
     bound.valid = bound.vertexShader != nullptr && bound.vertexShader->succeeded &&
-      (bound.pixelShader == nullptr || bound.pixelShader->succeeded);
+      (bound.pixelShader == nullptr || bound.pixelShader->succeeded) && (!tessellated || mTessellationSupported) &&
+      (bound.hullShader == nullptr || (bound.hullShader->succeeded && bound.domainShader->succeeded));
 
     ProgramState& state = StateFor(program);
     effects::ParameterStore& parameters = program.Parameters();
@@ -2958,6 +2971,8 @@ namespace gpg::gal
     std::memset(static_cast<void*>(&inputs), 0, sizeof(inputs));
     inputs.vertexKey = pass.vertexShader->key;
     inputs.pixelKey = (pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL;
+    inputs.hullKey = (pass.hullShader != nullptr) ? pass.hullShader->key : 0ULL;
+    inputs.domainKey = (pass.domainShader != nullptr) ? pass.domainShader->key : 0ULL;
     inputs.format = mBoundFormat;
     inputs.sampleMask = pass.state.sampleMask;
     for (std::uint32_t slot = 0U; slot < 16U; ++slot) {
@@ -3013,6 +3028,10 @@ namespace gpg::gal
     key.Add(colorFormat);
     key.Add(depthFormat);
     key.Add(topology);
+    if (pass.hullShader != nullptr) {
+      key.Add(pass.hullShader->key);
+      key.Add(pass.domainShader->key);
+    }
     auto found = mPipelines.find(key.Key());
     if (found != mPipelines.end()) {
       mPipelineMemo.Store(inputs, found->second);
@@ -3067,19 +3086,38 @@ namespace gpg::gal
       bindingList.push_back(binding);
     }
 
-    VkPipelineShaderStageCreateInfo stages[2]{};
+    VkPipelineShaderStageCreateInfo stages[4]{};
     stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
     stages[0].module = ModuleFor(*pass.vertexShader, nullptr);
     stages[0].pName = pass.vertexShader->entryName.c_str(); // DXC keeps the HLSL entry name
     std::uint32_t stageCount = 1U;
-    if (pass.pixelShader != nullptr) {
+    // Engine addition: a tessellated pass's control points go through its hull and
+    // domain shaders (one struct on both sides, so their locations agree as DXC
+    // assigns them), and its pixel shader reads what the domain shader writes.
+    const bool tessellated = pass.hullShader != nullptr;
+    if (tessellated) {
       stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-      stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-      stages[1].module = ModuleFor(*pass.pixelShader, pass.vertexShader);
-      stages[1].pName = pass.pixelShader->entryName.c_str();
-      stageCount = 2U;
+      stages[1].stage = VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+      stages[1].module = ModuleFor(*pass.hullShader, nullptr);
+      stages[1].pName = pass.hullShader->entryName.c_str();
+      stages[2].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+      stages[2].stage = VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+      stages[2].module = ModuleFor(*pass.domainShader, nullptr);
+      stages[2].pName = pass.domainShader->entryName.c_str();
+      stageCount = 3U;
     }
+    if (pass.pixelShader != nullptr) {
+      VkPipelineShaderStageCreateInfo& pixel = stages[stageCount];
+      pixel.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+      pixel.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+      pixel.module = ModuleFor(*pass.pixelShader, tessellated ? pass.domainShader : pass.vertexShader);
+      pixel.pName = pass.pixelShader->entryName.c_str();
+      ++stageCount;
+    }
+    VkPipelineTessellationStateCreateInfo tessellation{};
+    tessellation.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
+    tessellation.patchControlPoints = 3U;
 
     VkPipelineVertexInputStateCreateInfo vertexInput{};
     vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -3167,6 +3205,7 @@ namespace gpg::gal
     info.pStages = stages;
     info.pVertexInputState = &vertexInput;
     info.pInputAssemblyState = &inputAssembly;
+    info.pTessellationState = tessellated ? &tessellation : nullptr;
     info.pViewportState = &viewport;
     info.pRasterizationState = &raster;
     info.pMultisampleState = &multisample;
@@ -3197,7 +3236,15 @@ namespace gpg::gal
       ++mSkippedDraws;
       return false;
     }
-    const VkPrimitiveTopology topology = kTopologyByToken[topologyToken];
+    VkPrimitiveTopology topology = kTopologyByToken[topologyToken];
+    if (mPass.hullShader != nullptr) {
+      // A tessellated pass draws each triangle of a list as one 3-point patch.
+      if (topology != VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST) {
+        ++mSkippedDraws;
+        return false;
+      }
+      topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+    }
 
     // Buffers first (uploads), then image layouts, then the rendering scope.
     VkBuffer vertexBuffers[16]{};
