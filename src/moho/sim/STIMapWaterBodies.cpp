@@ -86,8 +86,28 @@ namespace moho
       desc.deep = NumberField(entry, "Deep", desc.elevation - deepBelow);
       desc.abyss = NumberField(entry, "Abyss", desc.elevation - abyssBelow);
 
+      // Outline: { {x, z}, {x, z}, ... }, the control points of a closed spline.
+      const LuaPlus::LuaObject outline = entry["Outline"];
+      if (!outline.IsNil()) {
+        bool valid = outline.IsTable();
+        const std::int32_t pointCount = valid ? outline.GetCount() : 0;
+        for (std::int32_t point = 1; valid && point <= pointCount; ++point) {
+          float xz[2] = {0.0f, 0.0f};
+          valid = NumberList(outline[point], xz, 2);
+          desc.outline.push_back(xz[0]);
+          desc.outline.push_back(xz[1]);
+        }
+        if (!valid || pointCount < 3) {
+          log.push_back("water body " + std::to_string(index) + " skipped: Outline is not 3 or more { x, z } points");
+          continue;
+        }
+      }
+
+      const LuaPlus::LuaObject seedObject = entry["Seed"];
       float seed[2] = {0.0f, 0.0f};
-      if (!NumberList(entry["Seed"], seed, 2)) {
+      if (seedObject.IsNil() && !desc.outline.empty()) {
+        desc.hasSeed = false;
+      } else if (!NumberList(seedObject, seed, 2)) {
         log.push_back("water body " + std::to_string(index) + " skipped: Seed is not { x, z }");
         continue;
       }

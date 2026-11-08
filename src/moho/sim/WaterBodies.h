@@ -11,6 +11,19 @@ namespace moho
   /// The water level of a place with no water, as every reader of `STIMap`'s level uses it.
   inline constexpr float kWaterBodyNoWater = -10000.0f;
 
+  /// Segments per span when a body's outline spline is turned into a polygon.
+  inline constexpr std::int32_t kWaterBodyOutlineSteps = 8;
+
+  /**
+   * Engine addition: the polygon of a closed uniform Catmull-Rom spline through `points`
+   * (`x, z` pairs), `kWaterBodyOutlineSteps` points per span, as `x, z` pairs. Empty when there
+   * are fewer than 3 points.
+   */
+  [[nodiscard]] std::vector<float> WaterBodyOutlinePolygon(const std::vector<float>& points);
+
+  /// Engine addition: even-odd test of `(x, z)` against `polygon` (`x, z` pairs).
+  [[nodiscard]] bool WaterBodyPolygonContains(const std::vector<float>& polygon, float x, float z) noexcept;
+
   /**
    * Engine addition, not in the binary: one water body as a map describes it
    * (`ScenarioInfo.WaterBodies`, see .plans/water-levels/PLAN.md). Its water
@@ -26,9 +39,18 @@ namespace moho
     float abyss{0.0f};
     /// The fill admits a height-field vertex whose terrain is below this.
     float fillTo{0.0f};
-    /// World position inside the body; its nearest vertex starts the fill.
+    /// World position inside the body; its nearest vertex starts the fill. Without a seed (only
+    /// allowed with an outline) every vertex inside the outline and below `fillTo` is the body's.
+    bool hasSeed{true};
     float seedX{0.0f};
     float seedZ{0.0f};
+    /**
+     * Optional outline: control points `x0, z0, x1, z1, ...` (world units) of a closed uniform
+     * Catmull-Rom spline, at least 3 points. The fill stays inside the curve. Tessellated with
+     * `kWaterBodyOutlineSteps` segments per span, then tested even-odd, all in float with no
+     * library maths, so every machine gets the same vertices.
+     */
+    std::vector<float> outline;
     /// No water: a dry area below a surrounding level (for example a polder below the sea).
     bool dry{false};
     /// When set, the fill stays inside vertices `[x0, x1] x [z0, z1]`.

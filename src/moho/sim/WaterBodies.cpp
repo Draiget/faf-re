@@ -30,6 +30,56 @@ namespace moho
     }
   } // namespace
 
+  std::vector<float> WaterBodyOutlinePolygon(const std::vector<float>& points)
+  {
+    std::vector<float> polygon;
+    const std::size_t count = points.size() / 2u;
+    if (count < 3u) {
+      return polygon;
+    }
+    polygon.reserve(count * static_cast<std::size_t>(kWaterBodyOutlineSteps) * 2u);
+    const auto at = [&](const std::size_t index, const std::size_t axis) { return points[(index % count) * 2u + axis]; };
+    for (std::size_t span = 0; span < count; ++span) {
+      for (std::int32_t step = 0; step < kWaterBodyOutlineSteps; ++step) {
+        // Steps are a power of two, so t, t^2 and t^3 are exact.
+        const float t = static_cast<float>(step) / static_cast<float>(kWaterBodyOutlineSteps);
+        const float t2 = t * t;
+        const float t3 = t2 * t;
+        for (std::size_t axis = 0; axis < 2u; ++axis) {
+          const float p0 = at(span + count - 1u, axis);
+          const float p1 = at(span, axis);
+          const float p2 = at(span + 1u, axis);
+          const float p3 = at(span + 2u, axis);
+          const float a = 2.0f * p1;
+          const float b = p2 - p0;
+          const float c = ((2.0f * p0) - (5.0f * p1)) + ((4.0f * p2) - p3);
+          const float d = ((3.0f * p1) - p0) + (p3 - (3.0f * p2));
+          polygon.push_back(0.5f * (((a + (b * t)) + (c * t2)) + (d * t3)));
+        }
+      }
+    }
+    return polygon;
+  }
+
+  bool WaterBodyPolygonContains(const std::vector<float>& polygon, const float x, const float z) noexcept
+  {
+    const std::size_t count = polygon.size() / 2u;
+    bool inside = false;
+    for (std::size_t i = 0, j = count - 1u; i < count; j = i++) {
+      const float xi = polygon[i * 2u];
+      const float zi = polygon[i * 2u + 1u];
+      const float xj = polygon[j * 2u];
+      const float zj = polygon[j * 2u + 1u];
+      if ((zi > z) != (zj > z)) {
+        const float crossX = xi + ((z - zi) / (zj - zi)) * (xj - xi);
+        if (x < crossX) {
+          inside = !inside;
+        }
+      }
+    }
+    return inside;
+  }
+
   std::unique_ptr<CWaterBodies> CWaterBodies::Build(
     const std::uint16_t* const heights,
     const std::int32_t width,
@@ -69,6 +119,68 @@ namespace moho
         z1 = std::min(z1, std::max(desc.z0, desc.z1));
       }
 
+      // An outline narrows the fill to the vertices inside its curve.
+      std::vector<float> polygon;
+      if (!desc.outline.empty()) {
+        polygon = WaterBodyOutlinePolygon(desc.outline);
+        if (polygon.empty()) {
+          std::snprintf(line, sizeof(line), "water body %zu skipped: an outline needs at least 3 points", descIndex + 1u);
+          AddLog(log, line);
+          continue;
+        }
+        float minX = polygon[0];
+        float maxX = polygon[0];
+        float minZ = polygon[1];
+        float maxZ = polygon[1];
+        for (std::size_t i = 0; i < polygon.size(); i += 2u) {
+          minX = std::min(minX, polygon[i]);
+          maxX = std::max(maxX, polygon[i]);
+          minZ = std::min(minZ, polygon[i + 1u]);
+          maxZ = std::max(maxZ, polygon[i + 1u]);
+        }
+        const float lastX = static_cast<float>(width - 1);
+        const float lastZ = static_cast<float>(height - 1);
+        x0 = std::max(x0, static_cast<std::int32_t>(std::clamp(std::floor(minX), 0.0f, lastX)));
+        z0 = std::max(z0, static_cast<std::int32_t>(std::clamp(std::floor(minZ), 0.0f, lastZ)));
+        x1 = std::min(x1, static_cast<std::int32_t>(std::clamp(std::ceil(maxX), 0.0f, lastX)));
+        z1 = std::min(z1, static_cast<std::int32_t>(std::clamp(std::ceil(maxZ), 0.0f, lastZ)));
+      }
+      const auto inside = [&](const std::int32_t x, const std::int32_t z) {
+        return polygon.empty() || WaterBodyPolygonContains(polygon, static_cast<float>(x), static_cast<float>(z));
+      };
+
+      if (!desc.hasSeed) {
+        if (polygon.empty()) {
+          std::snprintf(line, sizeof(line), "water body %zu skipped: no Seed and no Outline", descIndex + 1u);
+          AddLog(log, line);
+          continue;
+        }
+        const auto number = static_cast<std::uint8_t>(result->mBodies.size() + 1u);
+        std::uint32_t taken = 0;
+        for (std::int32_t z = z0; z <= z1; ++z) {
+          for (std::int32_t x = x0; x <= x1; ++x) {
+            const std::size_t index = static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x);
+            if (result->mVertexBody[index] == 0u && static_cast<float>(heights[index]) * heightScale < desc.fillTo &&
+                inside(x, z)) {
+              result->mVertexBody[index] = number;
+              ++taken;
+            }
+          }
+        }
+        if (taken == 0u) {
+          std::snprintf(line, sizeof(line), "water body %zu skipped: no terrain inside its outline is below %g",
+                        descIndex + 1u, static_cast<double>(desc.fillTo));
+          AddLog(log, line);
+          continue;
+        }
+        SWaterBody body;
+        body.elevation = desc.dry ? kWaterBodyNoWater : desc.elevation;
+        body.deep = desc.dry ? kWaterBodyNoWater : desc.deep;
+        body.abyss = desc.dry ? kWaterBodyNoWater : desc.abyss;
+        result->mBodies.push_back(body);
+        continue;
+      }
+
       const float seedX = std::floor(desc.seedX + 0.5f);
       const float seedZ = std::floor(desc.seedZ + 0.5f);
       if (!(seedX >= static_cast<float>(x0) && seedX <= static_cast<float>(x1) &&
@@ -87,7 +199,7 @@ namespace moho
       const auto below = [&](const std::size_t index) {
         return static_cast<float>(heights[index]) * heightScale < desc.fillTo;
       };
-      if (result->mVertexBody[seedIndex] != 0u || !below(seedIndex)) {
+      if (result->mVertexBody[seedIndex] != 0u || !below(seedIndex) || !inside(sx, sz)) {
         std::snprintf(
           line, sizeof(line), "water body %zu skipped: terrain at its seed (%g, %g) is not below %g or is another body's",
           descIndex + 1u, static_cast<double>(desc.seedX), static_cast<double>(desc.seedZ), static_cast<double>(desc.fillTo)
@@ -120,7 +232,7 @@ namespace moho
             continue;
           }
           const std::size_t next = static_cast<std::size_t>(nz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(nx);
-          if (result->mVertexBody[next] != 0u || !below(next)) {
+          if (result->mVertexBody[next] != 0u || !below(next) || !inside(nx, nz)) {
             continue;
           }
           result->mVertexBody[next] = number;

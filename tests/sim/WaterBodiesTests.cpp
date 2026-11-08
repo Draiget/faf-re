@@ -196,3 +196,66 @@ TEST(WaterBodies, LookupClampsAndToleratesNaN)
   EXPECT_FLOAT_EQ(bodies->LevelAt(-100.0f, 1e9f, 1.0f), 5.0f);
   EXPECT_FLOAT_EQ(bodies->HighestLevel(), 5.0f);
 }
+
+TEST(WaterBodies, OutlinePolygonPassesThroughItsControlPoints)
+{
+  // A uniform Catmull-Rom spline passes through every control point at t = 0.
+  const std::vector<float> points = {10.0f, 10.0f, 30.0f, 12.0f, 28.0f, 30.0f, 8.0f, 26.0f};
+  const std::vector<float> polygon = moho::WaterBodyOutlinePolygon(points);
+  ASSERT_EQ(polygon.size(), 4u * static_cast<std::size_t>(moho::kWaterBodyOutlineSteps) * 2u);
+  for (std::size_t point = 0; point < 4u; ++point) {
+    const std::size_t at = point * static_cast<std::size_t>(moho::kWaterBodyOutlineSteps) * 2u;
+    EXPECT_FLOAT_EQ(polygon[at], points[point * 2u]);
+    EXPECT_FLOAT_EQ(polygon[at + 1u], points[point * 2u + 1u]);
+  }
+  EXPECT_TRUE(moho::WaterBodyPolygonContains(polygon, 19.0f, 19.0f));
+  EXPECT_FALSE(moho::WaterBodyPolygonContains(polygon, 2.0f, 19.0f));
+  EXPECT_TRUE(moho::WaterBodyOutlinePolygon({1.0f, 2.0f, 3.0f, 4.0f}).empty());
+}
+
+TEST(WaterBodies, OutlinesSplitOneBasinIntoTwoLevels)
+{
+  // One flat basin at 10; two outlines side by side make a pool at 20 and one at 15.
+  Field field(41, 21, 10.0f);
+  SWaterBodyDesc west = Lake(20.0f, 0.0f, 0.0f);
+  west.hasSeed = false;
+  // A closed Catmull-Rom curve through a square's corners bulges out by about 2 units mid-side,
+  // so the outlines leave an 8-unit gap.
+  west.outline = {4.0f, 4.0f, 14.0f, 4.0f, 14.0f, 16.0f, 4.0f, 16.0f};
+  SWaterBodyDesc east = Lake(15.0f, 0.0f, 0.0f);
+  east.hasSeed = false;
+  east.outline = {26.0f, 4.0f, 36.0f, 4.0f, 36.0f, 16.0f, 26.0f, 16.0f};
+  const auto bodies = field.Build({west, east});
+  ASSERT_NE(bodies, nullptr);
+  ASSERT_EQ(bodies->BodyCount(), 2u);
+  EXPECT_FLOAT_EQ(bodies->LevelAt(10.0f, 10.0f, 0.0f), 20.0f);
+  EXPECT_FLOAT_EQ(bodies->LevelAt(30.0f, 10.0f, 0.0f), 15.0f);
+  EXPECT_FLOAT_EQ(bodies->LevelAt(20.0f, 10.0f, 0.0f), 0.0f);
+  EXPECT_EQ(bodies->BodyOfVertex(0, 0), 0u);
+}
+
+TEST(WaterBodies, OutlineWithSeedFillsOnlyItsConnectedPart)
+{
+  // Two basins inside one outline; the seed picks the western one.
+  Field field(41, 21, 30.0f);
+  field.Fill(4, 4, 14, 16, 10.0f);
+  field.Fill(26, 4, 36, 16, 10.0f);
+  SWaterBodyDesc lake = Lake(20.0f, 9.0f, 10.0f);
+  lake.outline = {1.0f, 1.0f, 39.0f, 1.0f, 39.0f, 19.0f, 1.0f, 19.0f};
+  const auto bodies = field.Build({lake});
+  ASSERT_NE(bodies, nullptr);
+  EXPECT_EQ(bodies->BodyOfVertex(9, 10), 1u);
+  EXPECT_EQ(bodies->BodyOfVertex(31, 10), 0u);
+}
+
+TEST(WaterBodies, OutlineWithNothingLowEnoughIsSkipped)
+{
+  Field field(21, 21, 30.0f);
+  SWaterBodyDesc lake = Lake(20.0f, 0.0f, 0.0f);
+  lake.hasSeed = false;
+  lake.outline = {2.0f, 2.0f, 18.0f, 2.0f, 10.0f, 18.0f};
+  std::vector<std::string> log;
+  EXPECT_EQ(field.Build({lake}, &log), nullptr);
+  ASSERT_EQ(log.size(), 1u);
+  EXPECT_NE(log[0].find("outline"), std::string::npos);
+}
