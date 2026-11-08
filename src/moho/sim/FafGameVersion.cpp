@@ -40,6 +40,7 @@ namespace moho
     int sim_FixRefuelUndockAboveMaxHealth = -1;
     int sim_FixShieldRepair = -1;
     int sim_FixProjectileMapEdgeCollision = -1;
+    int sim_FixWaterBodies = -1;
 
     TConVar<int> gTConVar_sim_FixAimLeadOncePerTick(
       "sim_FixAimLeadOncePerTick",
@@ -73,6 +74,12 @@ namespace moho
       "nearest map edge, instead of #154's impact below height 0 (-1 game version: no release has it yet, 0 off, 1 on).",
       &sim_FixProjectileMapEdgeCollision
     );
+    TConVar<int> gTConVar_sim_FixWaterBodies(
+      "sim_FixWaterBodies",
+      "Water bodies: a map's ScenarioInfo.WaterBodies add water levels besides its sea (-1 game version: no release "
+      "has it yet, 0 off, 1 on). Every player of a game must use the same value.",
+      &sim_FixWaterBodies
+    );
 
     struct SFafSimFixInfo
     {
@@ -92,6 +99,7 @@ namespace moho
       {"sim_FixRefuelUndockAboveMaxHealth", 3840, &sim_FixRefuelUndockAboveMaxHealth},
       {"sim_FixShieldRepair", 3840, &sim_FixShieldRepair},
       {"sim_FixProjectileMapEdgeCollision", kFafGameVersionUnreleased, &sim_FixProjectileMapEdgeCollision},
+      {"sim_FixWaterBodies", kFafGameVersionUnreleased, &sim_FixWaterBodies},
     }};
 
     int sSessionGameVersion = kFafGameVersionLatest;

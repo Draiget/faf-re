@@ -668,6 +668,50 @@ namespace
     return static_cast<std::uint8_t>(mask & static_cast<std::uint8_t>(~bitsToClear));
   }
 
+  /// Engine addition (water bodies): the shallowest and deepest water over a block of vertices.
+  struct WaterDepthRange
+  {
+    float minDepth;
+    float maxDepth;
+  };
+
+  /**
+   * Engine addition (water bodies): water level minus terrain over vertices
+   * `[x0, x0 + sizeX] x [z0, z0 + sizeZ]`, each vertex under its own level.
+   * With one level everywhere it gives the single-level checks' `level -
+   * maxHeight` and `level - minHeight`.
+   */
+  [[nodiscard]] WaterDepthRange WaterDepthUnder(
+    const moho::STIMap& map, const std::int32_t x0, const std::int32_t z0, const std::int32_t sizeX, const std::int32_t sizeZ
+  ) noexcept
+  {
+    const moho::CHeightField* const field = map.mHeightField.get();
+    WaterDepthRange range{std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest()};
+    for (std::int32_t z = z0; z <= z0 + sizeZ; ++z) {
+      const std::size_t row = static_cast<std::size_t>(z) * static_cast<std::size_t>(field->width);
+      for (std::int32_t x = x0; x <= x0 + sizeX; ++x) {
+        const float terrain = static_cast<float>(field->data[row + static_cast<std::size_t>(x)]) * kHeightWordScale;
+        const float depth = map.GetWaterElevationAtVertex(x, z) - terrain;
+        range.minDepth = std::min(range.minDepth, depth);
+        range.maxDepth = std::max(range.maxDepth, depth);
+      }
+    }
+    return range;
+  }
+
+  [[nodiscard]] std::uint8_t ApplyWaterDepthRange(
+    std::uint8_t capsMask, const moho::SFootprint& footprint, const WaterDepthRange& depth
+  ) noexcept
+  {
+    if (footprint.mMinWaterDepth > depth.minDepth) {
+      capsMask = RemoveCaps(capsMask, kOccWaterSubSeabed);
+    }
+    if (depth.maxDepth > footprint.mMaxWaterDepth) {
+      capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+    }
+    return capsMask;
+  }
+
   [[nodiscard]] std::uint16_t ClampWordFromFloat(float value) noexcept
   {
     if (value >= 65535.0f) {
@@ -2479,6 +2523,10 @@ namespace moho
       mWaterElevation = src->mWaterElevation;
       mWaterElevationDeep = src->mWaterElevationDeep;
       mWaterElevationAbyss = src->mWaterElevationAbyss;
+      // Engine addition: a clone keeps the source's water bodies.
+      if (src->mWaterBodies) {
+        mWaterBodies = std::make_unique<CWaterBodies>(*src->mWaterBodies);
+      }
     }
 
     CHeightField* const copiedField = new CHeightField(sourceWidth - 1, sourceHeight - 1);
@@ -2699,11 +2747,17 @@ namespace moho
     const std::uint16_t maxHeight = std::max(std::max(h00, h10), std::max(h01, h11));
 
     std::uint8_t capsMask = OccupancyMask(footprint.mOccupancyCaps);
-    if (footprint.mMinWaterDepth > (waterElevation - static_cast<float>(maxHeight) * kHeightWordScale)) {
-      capsMask = RemoveCaps(capsMask, kOccWaterSubSeabed);
-    }
-    if ((waterElevation - static_cast<float>(minHeight) * kHeightWordScale) > footprint.mMaxWaterDepth) {
-      capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+    if (mWaterBodies) {
+      // Engine addition: each corner under its own water level.
+      const WaterDepthRange depth = WaterDepthUnder(*this, static_cast<std::int32_t>(x), static_cast<std::int32_t>(z), 1, 1);
+      capsMask = ApplyWaterDepthRange(capsMask, footprint, depth);
+    } else {
+      if (footprint.mMinWaterDepth > (waterElevation - static_cast<float>(maxHeight) * kHeightWordScale)) {
+        capsMask = RemoveCaps(capsMask, kOccWaterSubSeabed);
+      }
+      if ((waterElevation - static_cast<float>(minHeight) * kHeightWordScale) > footprint.mMaxWaterDepth) {
+        capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+      }
     }
 
     if ((capsMask & kOccLandSeabed) != 0u && footprint.mMaxSlope != 0.0f) {
@@ -2902,6 +2956,10 @@ namespace moho
     if (mWaterEnabled != 0u && mWaterElevation > out.Max.y) {
       out.Max.y = mWaterElevation;
     }
+    // Engine addition: water bodies above the terrain's top.
+    if (mWaterBodies && mWaterBodies->HighestLevel() > out.Max.y) {
+      out.Max.y = mWaterBodies->HighestLevel();
+    }
     return out;
   }
 
@@ -2922,6 +2980,10 @@ namespace moho
     CHeightField* const field = mHeightField.get();
     if (!field) {
       return Wm3::Vec3f::NaN();
+    }
+
+    if (mWaterBodies) {
+      return SurfaceIntersectionWithWaterBodies(line, res);
     }
 
     if (mWaterEnabled == 0u) {
@@ -2978,6 +3040,90 @@ namespace moho
   }
 
   /**
+   * Engine addition (water bodies): `SurfaceIntersection` when water lies at
+   * more than one level. The line hits the first water surface it enters
+   * before the terrain: the sea's or a body's plane, where that plane is the
+   * water level of the place it crosses. A start already under water, a
+   * terrain hit, and the fallback plane below the terrain work as with one level.
+   */
+  Wm3::Vec3f STIMap::SurfaceIntersectionWithWaterBodies(const GeomLine3& line, CColHitResult* const res) const
+  {
+    CHeightField& field = *mHeightField;
+    if (line.closest > -std::numeric_limits<float>::max()) {
+      const Wm3::Vec3f closestPoint = PointOnLine(line, line.closest);
+      if (GetWaterElevationAt(closestPoint.x, closestPoint.z) > closestPoint.y) {
+        if (res) {
+          res->distance = line.closest;
+        }
+        return closestPoint;
+      }
+    }
+
+    CColHitResult terrainResult{};
+    const Wm3::Vec3f terrainHit = IntersectHeightFieldAndMarkTerrainHit(field, line, &terrainResult);
+    const bool terrainFound = Wm3::Vec3f::IsntNaN(terrainHit);
+
+    bool waterFound = false;
+    Wm3::Vec3f waterHit{};
+    CGeomHitResult waterResult{};
+    const auto tryLevel = [&](const float level) {
+      if (!(level > kWaterBodyNoWater)) {
+        return;
+      }
+      VecDist plane{};
+      plane.dir.x = 0.0f;
+      plane.dir.y = 1.0f;
+      plane.dir.z = 0.0f;
+      plane.dist = level;
+      CGeomHitResult hit{};
+      const Wm3::Vec3f point = PlaneIntersection(line, plane, &hit);
+      if (!Wm3::Vec3f::IsntNaN(point) || GetWaterElevationAt(point.x, point.z) != level) {
+        return;
+      }
+      if (terrainFound && !(hit.distance < terrainResult.distance)) {
+        return;
+      }
+      if (!waterFound || hit.distance < waterResult.distance) {
+        waterFound = true;
+        waterHit = point;
+        waterResult = hit;
+      }
+    };
+    tryLevel(mWaterEnabled != 0u ? mWaterElevation : kWaterBodyNoWater);
+    for (std::size_t number = 1; number <= mWaterBodies->BodyCount(); ++number) {
+      tryLevel(mWaterBodies->Body(static_cast<std::uint8_t>(number)).elevation);
+    }
+
+    if (waterFound) {
+      if (res) {
+        res->distance = waterResult.distance;
+        res->hitKind = 3;
+      }
+      return waterHit;
+    }
+    if (terrainFound) {
+      if (res) {
+        *res = terrainResult;
+        res->hitKind = 1;
+      }
+      return terrainHit;
+    }
+
+    // Nothing hit: the plane under the lowest terrain, as the single-level code without water.
+    const std::int32_t tierCount =
+      field.mGrids.begin() ? static_cast<std::int32_t>(field.mGrids.end() - field.mGrids.begin()) : 0;
+    VecDist plane{};
+    plane.dir.x = 0.0f;
+    plane.dir.y = 1.0f;
+    plane.dir.z = 0.0f;
+    plane.dist = field.GetTierBox(0, 0, tierCount).Min.y;
+    if (res) {
+      res->hitKind = 3;
+    }
+    return PlaneIntersection(line, plane, reinterpret_cast<CGeomHitResult*>(res));
+  }
+
+  /**
    * Address: 0x005ADC20 (FUN_005ADC20)
    *
    * Wm3::Vector3<float> const &
@@ -2992,7 +3138,7 @@ namespace moho
   bool STIMap::AboveWater(const Wm3::Vec3f& position) const
   {
     const float terrainElevation = mHeightField->GetElevation(position.x, position.z);
-    const float waterElevation = (mWaterEnabled != 0u) ? mWaterElevation : kNoWaterElevation;
+    const float waterElevation = GetWaterElevationAt(position.x, position.z); // engine addition: per position
     return terrainElevation > waterElevation;
   }
 
@@ -3068,11 +3214,9 @@ namespace moho
   float STIMap::GetSurface(const float x, const float z) const
   {
     const float terrainElevation = mHeightField->GetElevation(x, z);
-    if (mWaterEnabled == 0u) {
-      return terrainElevation;
-    }
-
-    return mWaterElevation > terrainElevation ? mWaterElevation : terrainElevation;
+    // Engine addition: the water level at (x, z); -10000 without water, which no terrain is under.
+    const float waterElevation = GetWaterElevationAt(x, z);
+    return waterElevation > terrainElevation ? waterElevation : terrainElevation;
   }
 
   /**
@@ -3108,11 +3252,9 @@ namespace moho
         return terrainElevation;
       }
 
-      if (mWaterEnabled == 0u) {
-        return terrainElevation;
-      }
-
-      return (mWaterElevation > terrainElevation) ? mWaterElevation : terrainElevation;
+      // Engine addition: the water level at the position; -10000 without water.
+      const float waterElevation = GetWaterElevationAt(position.x, position.z);
+      return (waterElevation > terrainElevation) ? waterElevation : terrainElevation;
     }
 
     // 0x0062D68D..0x0062D6DB: the smaller extent is picked with an unsigned
@@ -3143,7 +3285,7 @@ namespace moho
       return terrainTierMax;
     }
 
-    const float waterElevation = (mWaterEnabled != 0u) ? mWaterElevation : kNoWaterElevation;
+    const float waterElevation = GetWaterElevationAt(position.x, position.z); // engine addition: per position
     return (waterElevation > terrainTierMax) ? waterElevation : terrainTierMax;
   }
 
@@ -3197,11 +3339,17 @@ namespace moho
     }
 
     std::uint8_t capsMask = OccupancyMask(footprint.mOccupancyCaps);
-    if (footprint.mMinWaterDepth > (waterElevation - static_cast<float>(maxHeight) * kHeightWordScale)) {
-      capsMask = RemoveCaps(capsMask, kOccWaterSubSeabed);
-    }
-    if ((waterElevation - static_cast<float>(minHeight) * kHeightWordScale) > footprint.mMaxWaterDepth) {
-      capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+    if (map.mWaterBodies) {
+      // Engine addition: each vertex under its own water level.
+      const WaterDepthRange depth = WaterDepthUnder(map, x0, z0, x1 - x0, z1 - z0);
+      capsMask = ApplyWaterDepthRange(capsMask, footprint, depth);
+    } else {
+      if (footprint.mMinWaterDepth > (waterElevation - static_cast<float>(maxHeight) * kHeightWordScale)) {
+        capsMask = RemoveCaps(capsMask, kOccWaterSubSeabed);
+      }
+      if ((waterElevation - static_cast<float>(minHeight) * kHeightWordScale) > footprint.mMaxWaterDepth) {
+        capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+      }
     }
 
     if ((capsMask & kOccLandSeabed) != 0u && footprint.mMaxSlope != 0.0f) {
@@ -3409,8 +3557,9 @@ namespace moho
       static_cast<std::size_t>(clampedX) + (static_cast<std::size_t>(clampedZ) * static_cast<std::size_t>(field->width));
 
     float terrainElevation = static_cast<float>(field->data[sampleIndex]) * kHeightWordScale;
-    if (mWaterEnabled != 0u && mWaterElevation > terrainElevation) {
-      terrainElevation = mWaterElevation;
+    const float waterElevation = GetWaterElevationAtVertex(clampedX, clampedZ); // engine addition: per vertex
+    if (waterElevation > terrainElevation) {
+      terrainElevation = waterElevation;
     }
     return terrainElevation;
   }
@@ -3714,7 +3863,8 @@ namespace moho
       layerCaps &= ~(static_cast<std::int32_t>(LAYER_Land) | static_cast<std::int32_t>(LAYER_Seabed));
     }
 
-    const float effectiveWaterElevation = map.mWaterEnabled != 0u ? map.mWaterElevation : -10000.0f;
+    // Engine addition: the water level at the structure's position.
+    const float effectiveWaterElevation = map.GetWaterElevationAt(worldPos.x, worldPos.z);
     if (effectiveWaterElevation > skirtMinHeight) {
       layerCaps &= ~static_cast<std::int32_t>(LAYER_Land);
     }
