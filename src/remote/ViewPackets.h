@@ -130,6 +130,7 @@ namespace faf::remote
       Index,   // the entity index
       Facts,   // which views keep each entity
       Keep,    // whose answers changed
+      Poses,   // the units' bones against what their clients hold, once for every view
       Tables,  // the session tables' edits and the units' stats, once for every view
       Frames,  // each view's frame
       Release, // stats trees let go of

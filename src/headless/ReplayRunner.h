@@ -57,6 +57,7 @@ namespace faf::headless
     int viewPipelineThreads = 0; // with `viewBenchPath`: threads that finish the views while the sim goes on
     bool viewTables = false;     // `--view-tables`: the session tables as a server keeps them (plan WP11 step 4)
     int statsEvery = 0;          // `--stats-every <beats>` with `viewTables` (0: the server's default)
+    bool viewPoses = false;      // `--view-poses`: each view's pose lane as a server sends it (plan WP8.1)
     bool viewTeams = false;      // with `viewPipelineThreads`: one view per team and each player's own units
     std::string viewDumpPath;    // with `viewBenchPath`: what each client holds, every 2000 beats, to compare two runs
     bool parallelViews = false;  // with `viewFramesPath`, `viewBenchPath` or `viewPacketsPath`: views built on the sim's workers

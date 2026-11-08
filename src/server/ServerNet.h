@@ -8,6 +8,7 @@
 #include <thread>
 #include <vector>
 
+#include "remote/ContentCheck.h"
 #include "remote/net/GameLinks.h"
 #include "server/LobbyRelay.h"
 #include "server/SeatIntake.h"
@@ -38,6 +39,13 @@ namespace faf::server
     double reconnectSeconds = 60.0;
     /** Views wait for a player who hasn't joined yet; off when nobody's expected, as they'd pile up. */
     bool holdViewsForJoin = true;
+    /**
+     * Plan WPR.50: in the lobby, a participant heard from for this long counts as away (`TakeLobbyPresence`), well
+     * before its channel's own 10 s timeout, so a logical host that is gone is succeeded within 10 s. A client sends
+     * a keepalive every quarter second while its game runs; a frozen lobby screen stops them too, so not much shorter.
+     * 0: only the channel's timeout.
+     */
+    double lobbyAwaySeconds = 6.0;
   };
 
   class CServerNet final : private remote::net::CServerLinks::IEvents
@@ -102,8 +110,24 @@ namespace faf::server
     [[nodiscard]] std::vector<std::int32_t> TakeLobbyJoined();
     /** Participants out of the game since the last call, for the lobby's signals (the game's views read `TakeGone`). */
     [[nodiscard]] std::vector<std::int32_t> TakeLobbyLeft();
+    /**
+     * Plan WPR.50: while the lobby is open, participants who went quiet (`lobbyAwaySeconds`, or their channel timed
+     * out) or were heard again since the last call, in order.
+     */
+    [[nodiscard]] std::vector<SPresence> TakeLobbyPresence();
     /** At launch (plan WPR.51): the relay takes nothing more. From any thread. */
     void CloseLobby() noexcept { mCloseLobby.store(true, std::memory_order_relaxed); }
+    /** Before `Start` (plan WPR.49): the game options the match pins (`CLobbyRelay::PinOptions`). */
+    void PinLobbyOptions(SPinnedOptions pinned) { mLobby.PinOptions(std::move(pinned)); }
+    /** Forwarded lobby messages whose pinned options were written back; after `Stop`. */
+    [[nodiscard]] std::uint64_t LobbyOptionsPinned() const noexcept { return mLobby.OptionsPinned(); }
+
+    /**
+     * Plan WP2.6: the server's own content, once its rules are loaded, and what the match says to do with a player
+     * whose report differs. Reports that came before are judged then; a player who loaded with no report counts as
+     * one whose content differs. From any thread.
+     */
+    void SetContentCheck(remote::EContentCheck mode, const remote::SContentReport& expected);
 
     /** What arrived that wasn't a player's, for the console; after `Stop`. */
     [[nodiscard]] std::string LinkReport() const;
@@ -129,9 +153,18 @@ namespace faf::server
       std::uint64_t lostAtUs = 0;
       std::uint64_t lastResyncUs = 0; // its last view sent whole on a `ViewMismatch`
       std::uint64_t bytesSeen = 0; // its channel's count; a new channel starts again
+      bool lobbyAway = false;      // plan WPR.50: quiet in the lobby
+      bool reported = false;       // plan WP2.6: its content report came
+      remote::SContentReport report;
+      bool contentJudged = false;
     };
 
     void Run();
+    /** Plan WPR.50: the lobby's view of who is quiet, each pass while it is open. */
+    void WatchLobbyPresence(std::uint64_t nowUs);
+    void NoteLobbyPresence(std::int32_t uid, SSeat& seat, bool away);
+    /** Plan WP2.6: once the server's content is known, a seat with a report, or loaded without one. */
+    void JudgeContent(std::int32_t uid, SSeat& seat);
     void Tick(std::uint64_t nowUs);
     void Remove(std::int32_t uid, SSeat& seat, const std::string& why);
     void Say(std::string line);
@@ -188,6 +221,15 @@ namespace faf::server
     std::vector<SLobbyMessage> mLobbyIn;       // for the host; under mNewsLock
     std::vector<std::int32_t> mLobbyLeft;      // likewise
     std::vector<std::int32_t> mLobbyJoined;    // likewise
+    std::vector<SPresence> mLobbyPresence;     // likewise
     std::vector<SLobbyMessage> mLobbyOut;      // from the host, `from` being the participant it's for; under mViewLock
+
+    // Plan WP2.6. Set from any thread under mNewsLock; the network thread takes it over once.
+    bool mContentSet = false;                  // under mNewsLock
+    remote::EContentCheck mContentModeIn = remote::EContentCheck::Off;
+    remote::SContentReport mContentExpectedIn;
+    bool mContentKnown = false;                // on the network thread
+    remote::EContentCheck mContentMode = remote::EContentCheck::Off;
+    remote::SContentReport mContentExpected;
   };
 } // namespace faf::server

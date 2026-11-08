@@ -39,6 +39,7 @@
 #include "remote/wire/IntelGridDelta.h"
 #include "remote/wire/LuaSyncLane.h"
 #include "remote/wire/OrdinalTable.h"
+#include "remote/wire/PoseLane.h"
 #include "remote/wire/NameTable.h"
 #include "remote/wire/Quantize.h"
 #include "remote/wire/Roster.h"
@@ -2529,6 +2530,54 @@ namespace
     CHECK(DecodeGridLane(gridReader2, clientHeld) && clientHeld == beat2);
   }
 
+  void TestPoseLane()
+  {
+    // Plan WP8.1: whole units and changed bones round-trip; ids out of order, too many bones, a cut lane fail.
+    const float movedPosition[3] = {1.5f, -2.0f, 0.25f};
+    const float movedRotation[4] = {0.0f, 0.70710677f, 0.0f, 0.70710677f};
+    const SPoseBone moved = QuantizeBone(movedPosition, movedRotation, false, true);
+    float backPosition[3];
+    float backRotation[4];
+    DequantizeBone(moved, backPosition, backRotation);
+    for (std::size_t i = 0; i < 3; ++i) {
+      CHECK(std::fabs(backPosition[i] - movedPosition[i]) <= 0.5f / kPosePositionSteps);
+    }
+    for (std::size_t i = 0; i < 4; ++i) {
+      CHECK(std::fabs(backRotation[i] - movedRotation[i]) <= 1.0f / kPoseRotationSteps);
+    }
+    SPoseBone step; // a difference: small, and negative
+    step.position = {-1, 0, 3};
+    step.rotation = {0, -2, 0, 1};
+    std::vector<SUnitPose> lane(3);
+    lane[0].id = 0x00100004u;
+    lane[0].whole = true;
+    lane[0].bones = {SPoseBone{}, moved, SPoseBone{}};
+    lane[1].id = 0x00100009u;
+    lane[1].indices = {2u, 7u};
+    lane[1].bones = {step, moved};
+    lane[2].id = 0x00200001u;
+    lane[2].whole = true; // no bones: the client drops its poses
+    BitWriter writer;
+    CHECK(EncodePoseLane(lane, writer));
+    const std::vector<std::uint8_t> bytes = Bytes(writer);
+    BitReader reader(bytes);
+    std::vector<SUnitPose> decoded;
+    CHECK(DecodePoseLane(reader, decoded) && decoded == lane);
+    for (std::size_t length = 0; length < bytes.size(); ++length) {
+      BitReader cut(std::span<const std::uint8_t>(bytes.data(), length));
+      std::vector<SUnitPose> partial;
+      CHECK(!DecodePoseLane(cut, partial)); // the last byte holds a bit of the lane
+    }
+    std::vector<SUnitPose> unordered = {lane[1], lane[0]};
+    BitWriter rejected;
+    CHECK(!EncodePoseLane(unordered, rejected));
+    SUnitPose huge;
+    huge.whole = true;
+    huge.bones.resize(SUnitPose::kMaxBones + 1u);
+    BitWriter tooMany;
+    CHECK(!EncodePoseLane(std::vector<SUnitPose>{huge}, tooMany));
+  }
+
   void TestSharedValueShare()
   {
     // `Share`: the same pointer compares nothing; an equal value is no change but its pointer is taken; a different
@@ -2598,6 +2647,7 @@ TEST(Existing_Wire, Roster) { TestRoster(); }
 TEST(Existing_Wire, SessionTables) { TestSessionTables(); }
 TEST(Existing_Wire, SessionTablesFromThreads) { TestSessionTablesFromThreads(); }
 TEST(Existing_Wire, SharedValueShare) { TestSharedValueShare(); }
+TEST(Existing_Wire, PoseLane) { TestPoseLane(); }
 TEST(Existing_Wire, BitStreamRoundTrip) { TestBitStreamRoundTrip(); }
 TEST(Existing_Wire, BitStreamOverrun) { TestBitStreamOverrun(); }
 TEST(Existing_Wire, BitStreamMatchesBitAtATime) { TestBitStreamMatchesBitAtATime(); }

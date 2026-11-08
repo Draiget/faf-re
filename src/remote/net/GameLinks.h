@@ -89,6 +89,12 @@ namespace faf::remote::net
      * follows, from the first, before the whole view a returning player gets (a reset carries no record itself).
      */
     SessionTables = 13,
+    /**
+     * Player to server, reliable, once its game has loaded the launch's rules and before `Loaded` (plan WP2.6): what
+     * its game data and mods are, as remote/ContentCheck.h hashes them: two 64-bit integers, the blueprint tables'
+     * hash, then the mod set's. The server compares them with its own and refuses or warns as the match says.
+     */
+    ContentReport = 14,
   };
 
   /** What became of a player's command. */
@@ -172,6 +178,11 @@ namespace faf::remote::net
     [[nodiscard]] const ChannelStats* StatsOf(std::int32_t uid) const;
     /** Reliable bytes the uid hasn't acknowledged. */
     [[nodiscard]] std::uint64_t ReliableUnacked(std::int32_t uid) const;
+    /**
+     * Plan WPR.50: how long nothing has arrived from the uid's channel, at `nowUs` (`Pump`'s clock); 0 without a
+     * channel. A live client's keepalives come every quarter second.
+     */
+    [[nodiscard]] std::uint64_t SilentUs(std::int32_t uid, std::uint64_t nowUs) const;
 
   private:
     struct SPlayer

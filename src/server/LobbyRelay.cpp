@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "moho/net/ELobbyMsg.h"
 #include "remote/net/Datagram.h"
 #include "remote/net/GameLinks.h"
 
@@ -11,6 +12,9 @@ namespace faf::server
 {
   namespace
   {
+    // A `CLobby` message: its type, then its whole size in 16 bits (moho/net/CMessage.h), then the payload.
+    constexpr std::size_t kMessageHeaderBytes = 3u;
+
     /** A LEB128 uid at the start of `body`: its value and length, or false for none, one past 31 bits, or a long form. */
     [[nodiscard]] bool ReadUid(const std::span<const std::uint8_t> body, std::uint32_t& uid, std::size_t& length) noexcept
     {
@@ -102,12 +106,34 @@ namespace faf::server
     if (targetUid == from || !mSenders.contains(targetUid)) {
       return verdict(ELobbyRelayVerdict::UnknownTarget);
     }
+
+    // Plan WPR.49: what the relay reads of a `CLobby` message (type, 16-bit whole size, payload): its type.
+    const std::uint8_t type = message[0];
+    if (type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_Rejected) || type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_DeletePeer)) {
+      return verdict(ELobbyRelayVerdict::EjectIgnored);
+    }
+    std::span<const std::uint8_t> forwarded = message;
+    if (!mPinned.empty() && message.size() > kMessageHeaderBytes
+        && (type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_BroadcastScriptData)
+            || type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_DirectScriptData))) {
+      mPayload.assign(message.begin() + kMessageHeaderBytes, message.end());
+      if (PinGameOptions(mPayload, mPinned)) {
+        const std::size_t size = kMessageHeaderBytes + mPayload.size();
+        if (size > 0xFFFFu || size > mLimits.maxMessageBytes) {
+          return verdict(ELobbyRelayVerdict::TooLarge);
+        }
+        mPayload.insert(mPayload.begin(), {type, static_cast<std::uint8_t>(size), static_cast<std::uint8_t>(size >> 8u)});
+        forwarded = mPayload;
+        ++mOptionsPinned;
+      }
+    }
+
     to = targetUid;
     out.clear();
     remote::net::ByteWriter writer(out);
     writer.Byte(static_cast<std::uint8_t>(remote::net::ESeatMessage::Lobby));
     writer.Varint(static_cast<std::uint64_t>(from));
-    writer.Bytes(message.data(), message.size());
+    writer.Bytes(forwarded.data(), forwarded.size());
     return verdict(ELobbyRelayVerdict::Forward);
   }
 
