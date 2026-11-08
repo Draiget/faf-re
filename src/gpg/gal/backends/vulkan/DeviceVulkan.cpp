@@ -13,6 +13,7 @@
 #include <d3dcompiler.h>
 #include <wrl/client.h>
 
+#include "VulkanAttachmentBarrier.h"
 #include "VulkanSurface.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/CubeRenderTargetContext.hpp"
@@ -25,6 +26,7 @@
 #include "gpg/gal/EffectMacro.hpp"
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
+#include "gpg/gal/PlacedResources.h"
 #include "gpg/gal/RenderTargetContext.hpp"
 #include "gpg/gal/TextureContext.h"
 #include "gpg/gal/VertexBufferContext.hpp"
@@ -803,6 +805,7 @@ namespace gpg::gal
       CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateSemaphore(mDevice, &semaphore, nullptr, &finished));
     }
     swapChain.hasImage = false;
+    swapChain.stale = false;
     gpg::Logf("Vulkan: swap chain %ux%u, %u images, %s", extent.width, extent.height, count, modeName(mode));
   }
 
@@ -849,14 +852,109 @@ namespace gpg::gal
     }
   }
 
+  bool DeviceVulkan::RecreateStaleSwapChain(SwapChain& swapChain)
+  {
+    VkSurfaceCapabilitiesKHR capabilities{};
+    if (Vk().vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysical, swapChain.surface, &capabilities) != VK_SUCCESS) {
+      return false;
+    }
+    // A minimised window reports no area, and a swap chain can't be made for it: wait until it has one.
+    if (capabilities.currentExtent.width == 0U || capabilities.currentExtent.height == 0U) {
+      return false;
+    }
+    // The presentation engine may still read the old images, and CreateSwapChain replaces the semaphores the
+    // last presents wait on. A resize is rare: wait for the device.
+    Vk().vkDeviceWaitIdle(mDevice);
+    CollectCompleted();
+    const VkExtent2D before = swapChain.extent;
+    CreateSwapChain(swapChain, swapChain.extent.width, swapChain.extent.height);
+    gpg::Logf(
+      "Vulkan: swap chain made again for the window, %ux%u -> %ux%u (the head stays %ux%u)", before.width, before.height,
+      swapChain.extent.width, swapChain.extent.height, swapChain.headWidth, swapChain.headHeight
+    );
+    return true;
+  }
+
+  void DeviceVulkan::CopyHeadToSwapChain(vulkan::TrackedImage& head, SwapChain& swapChain)
+  {
+    EndRendering();
+    Transition(head, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    // The whole image is written: its old contents don't matter.
+    vulkan::TrackedImage window;
+    window.image = swapChain.images[swapChain.acquired];
+    window.owned = false;
+    window.format = swapChain.format;
+    window.width = swapChain.extent.width;
+    window.height = swapChain.extent.height;
+    window.layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    Transition(window, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VkImageBlit region{};
+    region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, 0U, 1U};
+    region.srcOffsets[1] = {static_cast<std::int32_t>(head.width), static_cast<std::int32_t>(head.height), 1};
+    region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, 0U, 1U};
+    region.dstOffsets[1] = {static_cast<std::int32_t>(window.width), static_cast<std::int32_t>(window.height), 1};
+    const bool sameSize = head.width == window.width && head.height == window.height;
+    Vk().vkCmdBlitImage(
+      mCommands, head.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, window.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1U, &region,
+      sameSize ? VK_FILTER_NEAREST : VK_FILTER_LINEAR
+    );
+    Transition(window, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+  }
+
+  RenderTargetVulkan::Buffer DeviceVulkan::CreateColorTargetImage(const VkFormat format, const std::uint32_t width, const std::uint32_t height)
+  {
+    RenderTargetVulkan::Buffer buffer;
+    VkImageCreateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    info.imageType = VK_IMAGE_TYPE_2D;
+    info.format = format;
+    info.extent = {std::max(width, 1U), std::max(height, 1U), 1U};
+    info.mipLevels = 1U;
+    info.arrayLayers = 1U;
+    info.samples = VK_SAMPLE_COUNT_1_BIT;
+    info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+      VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateImage(mDevice, &info, nullptr, &buffer.image.image));
+    VkMemoryRequirements requirements{};
+    Vk().vkGetImageMemoryRequirements(mDevice, buffer.image.image, &requirements);
+    buffer.image.memory = mMemory.Allocate(requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, false);
+    CheckVk("DeviceVulkan.cpp", __LINE__,
+            Vk().vkBindImageMemory(mDevice, buffer.image.image, buffer.image.memory.memory, buffer.image.memory.offset));
+    buffer.image.format = format;
+    buffer.image.width = info.extent.width;
+    buffer.image.height = info.extent.height;
+    VkImageViewCreateInfo view{};
+    view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view.image = buffer.image.image;
+    view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view.format = format;
+    view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, 1U, 0U, 1U};
+    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateImageView(mDevice, &view, nullptr, &buffer.view));
+    return buffer;
+  }
+
   void DeviceVulkan::CreateRenderTargets()
   {
     mHeadOutputContexts.clear();
     mHeadOutputContexts.resize(mSwapChains.size());
     for (std::size_t headIndex = 0U; headIndex < mSwapChains.size(); ++headIndex) {
       SwapChain& swapChain = mSwapChains[headIndex];
+      // The head keeps the size the window had when the device made it; a resize only remakes the swap chain.
+      swapChain.headWidth = swapChain.extent.width;
+      swapChain.headHeight = swapChain.extent.height;
+      VkFormatProperties properties{};
+      Vk().vkGetPhysicalDeviceFormatProperties(mPhysical, swapChain.format, &properties);
+      constexpr VkFormatFeatureFlags kBlit = VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT;
+      swapChain.scaled = gpg::gal::gVulkanScaledPresent && (properties.optimalTilingFeatures & kBlit) == kBlit;
       std::vector<RenderTargetVulkan::Buffer> buffers;
+      if (swapChain.scaled) {
+        buffers.push_back(CreateColorTargetImage(swapChain.format, swapChain.headWidth, swapChain.headHeight));
+      }
       for (const VkImage image : swapChain.images) {
+        if (swapChain.scaled) {
+          break;
+        }
         RenderTargetVulkan::Buffer buffer;
         buffer.image.image = image;
         buffer.image.owned = false;
@@ -876,10 +974,11 @@ namespace gpg::gal
       OutputContext& output = mHeadOutputContexts[headIndex];
       auto* const target = new RenderTargetVulkan(std::move(buffers), DXGI_FORMAT_B8G8R8A8_UNORM, static_cast<int>(headIndex));
       output.surface.reset(target);
-      const DepthStencilTargetContext depthContext(swapChain.extent.width, swapChain.extent.height, 3U, false);
+      // Engine change: readable by shaders, for ren_Ao (GpuBindings::readBoundDepth).
+      const DepthStencilTargetContext depthContext(swapChain.extent.width, swapChain.extent.height, 3U, true);
       output.depthStencil = CreateDepthStencilTarget(&depthContext);
-      gpg::Logf("Vulkan: head %u back buffer target %p (%ux%u)", static_cast<unsigned>(headIndex), target, swapChain.extent.width,
-                swapChain.extent.height);
+      gpg::Logf("Vulkan: head %u back buffer target %p (%ux%u%s)", static_cast<unsigned>(headIndex), target, swapChain.extent.width,
+                swapChain.extent.height, swapChain.scaled ? ", copied to the window at present" : "");
     }
     if (!mHeadOutputContexts.empty()) {
       ClearTarget(&mHeadOutputContexts.front());
@@ -1193,11 +1292,33 @@ namespace gpg::gal
       if (swapChain.swapchain == VK_NULL_HANDLE) {
         continue;
       }
-      const VkResult result =
-        Vk().vkAcquireNextImageKHR(mDevice, swapChain.swapchain, ~0ULL, frame.acquire[index], VK_NULL_HANDLE, &swapChain.acquired);
+      // A scaled head's swap chain follows the window: made again once it's out of date (only the window's
+      // images change; the engine's targets keep their size). Until the window has an area again, the frame
+      // isn't presented.
+      if (swapChain.scaled && swapChain.stale && !RecreateStaleSwapChain(swapChain)) {
+        continue;
+      }
+      const auto acquire = [&] {
+        return Vk().vkAcquireNextImageKHR(mDevice, swapChain.swapchain, ~0ULL, frame.acquire[index], VK_NULL_HANDLE, &swapChain.acquired);
+      };
+      VkResult result = acquire();
+      if (result == VK_ERROR_OUT_OF_DATE_KHR && swapChain.scaled) {
+        // Nothing was acquired, so the acquire semaphore wasn't signalled and may be used again.
+        swapChain.stale = true;
+        if (!RecreateStaleSwapChain(swapChain)) {
+          continue;
+        }
+        result = acquire();
+      }
       if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
         swapChain.hasImage = true;
         swapChain.acquireWaitPending = true;
+        // Suboptimal still presents this image; the swap chain is made again before the next acquire.
+        if (result == VK_SUBOPTIMAL_KHR && swapChain.scaled) {
+          swapChain.stale = true;
+        }
+      } else if (result == VK_ERROR_OUT_OF_DATE_KHR && swapChain.scaled) {
+        swapChain.stale = true;
       } else {
         gpg::Warnf("Vulkan: acquiring head %u's image failed (%s)", static_cast<unsigned>(index), vulkan::ResultName(result));
       }
@@ -1500,11 +1621,31 @@ namespace gpg::gal
       return;
     }
     EndRendering();
-    if (colorImage != nullptr) {
-      Transition(*colorImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    }
-    if (depthImage != nullptr) {
-      Transition(*depthImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    // A new dynamic-rendering instance has no implicit dependency on the
+    // previous instance. A layout change supplies one through Transition;
+    // an attachment kept in the same layout still needs its stores made
+    // visible to this instance's load, depth tests and blending.
+    VkImageMemoryBarrier2 attachmentBarriers[2]{};
+    std::uint32_t attachmentBarrierCount = 0U;
+    const auto prepareAttachment = [&](vulkan::TrackedImage* image, const VkImageLayout layout) {
+      if (image == nullptr || image->image == VK_NULL_HANDLE) {
+        return;
+      }
+      if (image->layout != layout) {
+        Transition(*image, layout);
+        return;
+      }
+      attachmentBarriers[attachmentBarrierCount++] =
+        vulkan::AttachmentWriteBarrier(image->image, layout, AspectOf(image->format));
+    };
+    prepareAttachment(colorImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    prepareAttachment(depthImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    if (attachmentBarrierCount != 0U) {
+      VkDependencyInfo dependency{};
+      dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+      dependency.imageMemoryBarrierCount = attachmentBarrierCount;
+      dependency.pImageMemoryBarriers = attachmentBarriers;
+      Vk().vkCmdPipelineBarrier2(mCommands, &dependency);
     }
     VkRenderingAttachmentInfo colorAttachment{};
     colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -1753,38 +1894,11 @@ namespace gpg::gal
     if (format.format == VK_FORMAT_UNDEFINED) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "unsupported render target format");
     }
-    RenderTargetVulkan::Buffer buffer;
-    VkImageCreateInfo info{};
-    info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    info.imageType = VK_IMAGE_TYPE_2D;
-    info.format = format.format;
-    info.extent = {std::max(context->width_, 1U), std::max(context->height_, 1U), 1U};
-    info.mipLevels = 1U;
-    info.arrayLayers = 1U;
-    info.samples = VK_SAMPLE_COUNT_1_BIT;
-    info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-      VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateImage(mDevice, &info, nullptr, &buffer.image.image));
-    VkMemoryRequirements requirements{};
-    Vk().vkGetImageMemoryRequirements(mDevice, buffer.image.image, &requirements);
-    buffer.image.memory = mMemory.Allocate(requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, false);
-    CheckVk("DeviceVulkan.cpp", __LINE__,
-            Vk().vkBindImageMemory(mDevice, buffer.image.image, buffer.image.memory.memory, buffer.image.memory.offset));
-    buffer.image.format = format.format;
-    buffer.image.width = info.extent.width;
-    buffer.image.height = info.extent.height;
-    VkImageViewCreateInfo view{};
-    view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    view.image = buffer.image.image;
-    view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view.format = format.format;
-    view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, 1U, 0U, 1U};
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateImageView(mDevice, &view, nullptr, &buffer.view));
+    const RenderTargetVulkan::Buffer buffer = CreateColorTargetImage(format.format, context->width_, context->height_);
 
     D3DVIEWPORT9 viewport{};
-    viewport.Width = info.extent.width;
-    viewport.Height = info.extent.height;
+    viewport.Width = buffer.image.width;
+    viewport.Height = buffer.image.height;
     viewport.MaxZ = 1.0f;
     SetViewport(&viewport);
 
@@ -1816,7 +1930,14 @@ namespace gpg::gal
     info.arrayLayers = 1U;
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | (context->field0x10_ ? VK_IMAGE_USAGE_SAMPLED_BIT : 0U);
+    // A readable target that this format can't sample stays a plain attachment, with no sampled view.
+    bool sampled = context->field0x10_;
+    if (sampled) {
+      VkFormatProperties properties{};
+      Vk().vkGetPhysicalDeviceFormatProperties(mPhysical, format, &properties);
+      sampled = (properties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0U;
+    }
+    info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | (sampled ? VK_IMAGE_USAGE_SAMPLED_BIT : 0U);
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateImage(mDevice, &info, nullptr, &image.image));
     VkMemoryRequirements requirements{};
     Vk().vkGetImageMemoryRequirements(mDevice, image.image, &requirements);
@@ -1834,7 +1955,13 @@ namespace gpg::gal
     view.subresourceRange = {AspectOf(format), 0U, 1U, 0U, 1U};
     VkImageView imageView = VK_NULL_HANDLE;
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateImageView(mDevice, &view, nullptr, &imageView));
-    return boost::shared_ptr<DepthStencilTarget>(new DepthStencilTargetVulkan(*context, image, imageView));
+    // Shaders read depth alone (GpuBindings::readBoundDepth): a view of the depth aspect.
+    VkImageView sampledView = VK_NULL_HANDLE;
+    if (sampled) {
+      view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+      CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateImageView(mDevice, &view, nullptr, &sampledView));
+    }
+    return boost::shared_ptr<DepthStencilTarget>(new DepthStencilTargetVulkan(*context, image, imageView, sampledView));
   }
 
   boost::shared_ptr<VertexFormat> DeviceVulkan::CreateVertexFormat(const std::uint32_t formatCode)
@@ -2198,9 +2325,15 @@ namespace gpg::gal
     LogMemoryIfDue();
 
     for (std::size_t index = 0U; index < mHeadOutputContexts.size(); ++index) {
-      if (mSwapChains[index].hasImage) {
-        Transition(static_cast<RenderTargetVulkan*>(mHeadOutputContexts[index].surface.get())->Current().image,
-                   VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+      SwapChain& swapChain = mSwapChains[index];
+      if (!swapChain.hasImage) {
+        continue;
+      }
+      vulkan::TrackedImage& head = static_cast<RenderTargetVulkan*>(mHeadOutputContexts[index].surface.get())->Current().image;
+      if (swapChain.scaled) {
+        CopyHeadToSwapChain(head, swapChain);
+      } else {
+        Transition(head, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
       }
     }
     EndProfileFrame();
@@ -2221,6 +2354,8 @@ namespace gpg::gal
       const VkResult result = Vk().vkQueuePresentKHR(mQueue, &present);
       if (result == VK_ERROR_DEVICE_LOST) {
         CheckVk("DeviceVulkan.cpp", __LINE__, result);
+      } else if (swapChain.scaled && (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)) {
+        swapChain.stale = true;
       } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         static int logged = 0;
         if (logged++ < 8) {

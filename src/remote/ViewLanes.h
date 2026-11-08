@@ -44,6 +44,11 @@ namespace faf::remote
       mLuaRouting = true;
       mLuaRoutingDump = std::move(dumpPrefix);
     }
+    /**
+     * With Lua routing: a subclass sends each beat's Lua `Sync` itself once the beat's table is routed (a server's
+     * `LuaSync`), so the views' Lua lanes, which would carry the beat before's, stay empty and are not encoded.
+     */
+    void SendLuaSeparately() noexcept { mLuaSeparately = true; }
 
   protected:
     /** One view's beat. `ok`: every lane encoded. */
@@ -55,6 +60,7 @@ namespace faf::remote
       const wire::BitWriter& lua;
       bool ok;
       const wire::BitWriter* team = nullptr; // the player's team's frame, with teams and not cut from it
+      const wire::BitWriter* poses = nullptr; // with `EnablePoses`: the units' bones (wire/PoseLane.h)
       std::size_t teamEntities = 0;
       bool fresh = false; // `RequestFresh`: every lane but Lua's is whole, for a client that holds nothing
       // Plan WPR.30, every `kCheckEveryBeats`: what the client should hold after this beat, by `CViewFrames::HeldFrameHash`.
@@ -115,6 +121,8 @@ namespace faf::remote
       std::vector<std::uint16_t> gridsNext;
       wire::BitWriter lua;              // this beat's Lua lane, which is ready before the others
       wire::BitWriter teamFrame;        // a team's view: this beat's frame, for its players' messages
+      std::vector<std::uint32_t> poseUnits;     // the units it held last beat (`HeldUnitIds`), for the pose lane
+      std::vector<std::uint32_t> poseUnitsNext;
       std::uint64_t teamHash = 0;       // and on a check's beat its hash
       bool fresh = false;               // `RequestFresh`
       std::uint32_t bytes = 0;          // this beat
@@ -139,6 +147,7 @@ namespace faf::remote
     std::vector<SClient> mClients;
     std::vector<SBeatGrid> mBeatGrids; // every army's grids, in army order; they keep their cells from beat to beat
     bool mLuaRouting = false;
+    bool mLuaSeparately = false;
     std::string mLuaRoutingDump;
     std::unique_ptr<CSyncRouter> mRouter; // made once the army count is known
   };

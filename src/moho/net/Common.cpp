@@ -458,12 +458,7 @@ namespace
   template <typename T>
   [[nodiscard]] T* CopyRangeBackward(T* destinationEnd, const T* const sourceBegin, const T* sourceEnd) noexcept
   {
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationEnd;
-      *destinationEnd = *sourceEnd;
-    }
-    return destinationEnd;
+    return std::copy_backward(sourceBegin, sourceEnd, destinationEnd);
   }
 
   template <typename T>

@@ -56,6 +56,11 @@ set_target_properties(faf_profiler_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME profiler_facade COMMAND faf_profiler_tests)
 set_tests_properties(profiler_facade PROPERTIES LABELS "Existing")
 
+# Engine addition: the stable shadow box (ren_ShadowStable), pure maths with no device.
+add_executable(faf_shadow_fit_tests EXCLUDE_FROM_ALL render/ShadowStableFitTests.cpp)
+target_include_directories(faf_shadow_fit_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME shadow_stable_fit COMMAND faf_shadow_fit_tests)
+
 # Engine addition: EffectScan.h against the std::regex patterns it replaced, on generated text.
 add_executable(faf_effect_scan_tests EXCLUDE_FROM_ALL effect_scan/EffectScanTests.cpp)
 target_include_directories(faf_effect_scan_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
@@ -125,6 +130,13 @@ target_link_libraries(faf_replay_scan_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_replay_scan_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME replay_scan COMMAND faf_replay_scan_tests)
 set_tests_properties(replay_scan PROPERTIES LABELS "Existing")
+
+# CZipFile reads entries whose data starts at or past 2 GiB, as the binary does (tests/zip, PR #291).
+add_executable(faf_zip_offset_tests EXCLUDE_FROM_ALL zip/ZipOffsetTests.cpp)
+target_link_libraries(faf_zip_offset_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_zip_offset_tests PROPERTIES FOLDER "Tests/Existing")
+add_test(NAME zip_offset COMMAND faf_zip_offset_tests)
+set_tests_properties(zip_offset PROPERTIES LABELS "Existing")
 
 # Engine addition (#247): the user preferences from several threads at once
 # (tests/prefs); fails without USER_PreferencesLock.
@@ -218,6 +230,7 @@ set(_faf_existing_test_targets
   faf_sim_math_tests
   faf_replay_scan_tests
   faf_prefs_thread_tests
+  faf_zip_offset_tests
   faf_recon_scroll_packet_tests
   faf_coroutine_tests
   faf_msdf_cook_tests
@@ -237,3 +250,34 @@ if(TARGET faf_msdf_safety_tests)
 endif()
 add_custom_target(existing_tests DEPENDS ${_faf_existing_test_targets})
 set_target_properties(existing_tests PROPERTIES FOLDER "Tests/Existing")
+
+add_subdirectory(vulkan)
+
+# Rendering-only bounded terrain splat output; no game data or renderer required.
+add_executable(faf_splat_budget_tests EXCLUDE_FROM_ALL terrain/splat_budget/SplatBudgetTests.cpp)
+target_link_libraries(faf_splat_budget_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_splat_budget_tests PROPERTIES FOLDER "Tests/Terrain")
+add_test(NAME splat_budget COMMAND faf_splat_budget_tests)
+set_tests_properties(splat_budget PROPERTIES TIMEOUT 120 LABELS "Terrain")
+
+# Regression for lua damage stack; no game data required.
+add_executable(faf_damage_callback_stack_tests EXCLUDE_FROM_ALL "lua/DamageCallbackStackTests.cpp")
+target_link_libraries(faf_damage_callback_stack_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_damage_callback_stack_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME damage_callback_stack COMMAND faf_damage_callback_stack_tests)
+set_tests_properties(damage_callback_stack PROPERTIES LABELS "Sim")
+
+# Header-only particle pool reclamation policy; no graphics device required.
+add_executable(faf_particle_pool_reclaim_tests EXCLUDE_FROM_ALL particles/ParticlePoolReclaimTests.cpp)
+target_include_directories(faf_particle_pool_reclaim_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_particle_pool_reclaim_tests PRIVATE gtest_main)
+set_target_properties(faf_particle_pool_reclaim_tests PROPERTIES FOLDER "Tests/Particles")
+add_test(NAME particle_pool_reclaim COMMAND faf_particle_pool_reclaim_tests)
+set_tests_properties(particle_pool_reclaim PROPERTIES LABELS "Particles")
+
+# Regression for collision allocator; no game data required.
+add_executable(faf_occupation_manager_tests EXCLUDE_FROM_ALL "collision_allocator/OccupationManagerTests.cpp")
+target_link_libraries(faf_occupation_manager_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
+set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")

@@ -64,6 +64,9 @@ namespace faf::server
       EnableTeamViews();
     }
     EnableLuaRouting({});
+    SendLuaSeparately(); // `LuaSync` (OnLuaRouterMade)
+    EnableSessionTables(mSessionTables);
+    EnablePoses();
   }
 
   CServerViews::~CServerViews()
@@ -131,7 +134,10 @@ namespace faf::server
     mArmyBytes.fetch_add(lanes.armies.Bytes().size(), std::memory_order_relaxed);
     mGridBytes.fetch_add(lanes.grids.Bytes().size(), std::memory_order_relaxed);
     std::vector<std::uint8_t> message;
-    message.reserve(24u + lanes.frame.Bytes().size() + teamFrame.Bytes().size() + lanes.armies.Bytes().size() + lanes.grids.Bytes().size() + lanes.lua.Bytes().size());
+    message.reserve(
+      30u + lanes.frame.Bytes().size() + teamFrame.Bytes().size() + lanes.armies.Bytes().size() + lanes.grids.Bytes().size()
+      + (lanes.poses != nullptr ? lanes.poses->Bytes().size() : 0u)
+    );
     remote::net::ByteWriter writer(message);
     writer.Byte(static_cast<std::uint8_t>(remote::net::ESeatMessage::View));
     writer.Varint(ViewBeat());
@@ -142,6 +148,11 @@ namespace faf::server
     WriteLane(writer, lanes.armies);
     WriteLane(writer, lanes.grids);
     WriteLane(writer, noFrame); // the Lua lane goes as `LuaSync`, once the beat's `Sync` is routed (OnLuaRouterMade)
+    if (lanes.poses != nullptr) {
+      // Plan WP8.1: the sixth lane, the units' bones (a client reads it when the message goes on past the Lua lane).
+      mPoseBytes.fetch_add(lanes.poses->Bytes().size(), std::memory_order_relaxed);
+      WriteLane(writer, *lanes.poses);
+    }
     mNet.QueueView(player->second, std::move(message), lanes.fresh);
     if (lanes.check) {
       std::vector<std::uint8_t> check;
@@ -154,6 +165,33 @@ namespace faf::server
       checkWriter.Bytes(hashes, sizeof(hashes));
       mNet.QueueView(player->second, std::move(check));
     }
+  }
+
+  void CServerViews::OnViewFrames(moho::Sim& sim)
+  {
+    // #178: the frames' headers carry the game speed and the server's clock for the clients' beat clocks.
+    SetFrameClock(
+      mFrameSimRate.load(std::memory_order_relaxed),
+      static_cast<std::uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - mStart).count())
+    );
+    // The builders are done with the beat (they interned what the frames name); its views go out after this.
+    if (mSessionTables.HasPending()) {
+      remote::wire::BitWriter record;
+      mSessionTables.WritePending(record);
+      std::vector<std::uint8_t> message;
+      message.reserve(8u + record.Bytes().size());
+      remote::net::ByteWriter writer(message);
+      writer.Byte(static_cast<std::uint8_t>(remote::net::ESeatMessage::SessionTables));
+      writer.Varint(ViewBeat());
+      writer.Byte(0u); // no reset
+      writer.Bytes(record.Bytes().data(), record.Bytes().size());
+      mTableBytes.fetch_add(message.size(), std::memory_order_relaxed);
+      mTableRecords.fetch_add(1u, std::memory_order_relaxed);
+      for (const auto& [army, uid] : mPlayers) {
+        mNet.QueueView(uid, message);
+      }
+    }
+    CViewLanes::OnViewFrames(sim);
   }
 
   void CServerViews::OnLuaRouterMade(remote::CSyncRouter& router)
@@ -188,7 +226,9 @@ namespace faf::server
     const auto megabytes = [](const std::atomic<std::uint64_t>& bytes) {
       return std::to_string(bytes.load(std::memory_order_relaxed) / (1024u * 1024u));
     };
-    return "views so far: entities " + megabytes(mFrameBytes) + " MB, armies " + megabytes(mArmyBytes) + " MB, grids " + megabytes(mGridBytes) + " MB, Lua " + megabytes(mLuaBytes) + " MB";
+    return "views so far: entities " + megabytes(mFrameBytes) + " MB, armies " + megabytes(mArmyBytes) + " MB, grids " + megabytes(mGridBytes) + " MB, Lua " + megabytes(mLuaBytes) + " MB, poses " + megabytes(mPoseBytes) + " MB, session tables "
+         + std::to_string(mTableRecords.load(std::memory_order_relaxed)) + " records of "
+         + std::to_string(mTableBytes.load(std::memory_order_relaxed) / 1024u) + " KB to each player";
   }
 
   void CServerViews::OnViewsFinished()

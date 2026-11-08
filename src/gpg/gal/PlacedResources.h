@@ -41,4 +41,14 @@ namespace gpg::gal
    * for each flush were 11 % of an uncapped frame. Console variable `ren_LockedRangeOnly` (moho).
    */
   extern bool gLockedRangeOnly;
+
+  /**
+   * Engine addition: each Vulkan head draws into an image of its own and Present copies it into the
+   * swap chain's image, scaled to the window, so the swap chain can be made again when the window
+   * changes size. Without it a resized window left every acquire out of date and the picture froze
+   * (the engine never resets the device on a resize; Direct3D 12's flip model presents into the
+   * resized window). Costs one copy of the head per frame. Console variable
+   * `ren_VulkanScaledPresent` (moho), read when the device makes its head targets.
+   */
+  extern bool gVulkanScaledPresent;
 } // namespace gpg::gal

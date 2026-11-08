@@ -25,6 +25,7 @@
 #include "moho/sim/FafGameVersion.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/STIMap.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "remote/ContentTables.h"
 #include "remote/FrameBuilder.h"
@@ -59,6 +60,9 @@ namespace faf::probe
     std::unique_ptr<moho::CWldMap> map;
     std::unique_ptr<LuaPlus::LuaState> sessionState;
     std::unique_ptr<remote::client::CServerViewClient> client;
+    bool seeded = false;
+    std::uint64_t tablesBad = 0;
+    std::string gameMods; // the launch's `GameMods`, in its byte form
   };
 
   CProbeRebuild::CProbeRebuild() = default;
@@ -158,7 +162,17 @@ namespace faf::probe
     mState->sessionState.reset(gameData.mState);
     mState->rules.reset(gameData.mGameRules);
     mState->map.reset(gameData.mWldMap);
+    mState->gameMods.assign(build.launchInfo->mGameMods.c_str(), build.launchInfo->mGameMods.size());
     gameData = moho::SWldGameData{};
+    return true;
+  }
+
+  bool CProbeRebuild::Content(remote::SContentReport& out) const
+  {
+    if (!mState || !mState->rules) {
+      return false;
+    }
+    out = remote::MakeContentReport(*mState->rules, mState->gameMods);
     return true;
   }
 
@@ -172,11 +186,28 @@ namespace faf::probe
     info.mapSizeZ = mapSizeZ;
     info.army = army;
     mState->client = std::make_unique<remote::client::CServerViewClient>(*mState->rules, info);
+    // The heights as this client loaded the map: the server's terrain edits go on a copy, as in the game client.
+    if (mState->map && mState->map->mTerrainRes != nullptr && mState->map->mTerrainRes->mMap != nullptr
+        && mState->map->mTerrainRes->mMap->mHeightField) {
+      mState->client->SeedTerrain(*mState->map->mTerrainRes->mMap->mHeightField);
+      mState->seeded = true;
+    }
+  }
+
+  void CProbeRebuild::OnTables(const std::span<const std::uint8_t> message)
+  {
+    if (!mState || !mState->client) {
+      return;
+    }
+    remote::client::STablesMessage tables;
+    if (!remote::client::ReadTablesMessage(message, tables) || !mState->client->ApplyTables(tables)) {
+      ++mState->tablesBad;
+    }
   }
 
   void CProbeRebuild::OnView(
     const std::span<const std::uint8_t> own, const std::span<const std::uint8_t> team, const std::span<const std::uint8_t> armies,
-    const std::span<const std::uint8_t> grids
+    const std::span<const std::uint8_t> grids, const std::span<const std::uint8_t> poses, const bool hasPoses
   )
   {
     if (!mState || !mState->client) {
@@ -187,6 +218,8 @@ namespace faf::probe
     view.team = team;
     view.armies = armies;
     view.grids = grids;
+    view.poses = poses;
+    view.hasPoses = hasPoses;
     // A fresh packet each beat: a client with no sim has nothing else to start from.
     moho::SSyncData packet{};
     (void)mState->client->Apply(view, packet);
@@ -238,6 +271,23 @@ namespace faf::probe
       static_cast<unsigned long long>(v.blueprintsKnown), static_cast<unsigned long long>(s.created), static_cast<unsigned long long>(s.entityUpdates),
       static_cast<unsigned long long>(s.erased), static_cast<unsigned long long>(s.deleted), static_cast<unsigned long long>(s.noBlueprint),
       static_cast<unsigned long long>(s.unknownTableIds), static_cast<unsigned long long>(s.unitUpdates)
+    );
+    const remote::wire::CSessionTableReaders& tables = client.Tables();
+    std::printf(
+      "probe %d: rebuild: session tables %llu records (%llu bad, %llu resets): %u sounds, %u names, %zu deposits, %llu terrain edits "
+      "(%s); unit stat items applied %llu\n",
+      uid, static_cast<unsigned long long>(v.tableRecords), static_cast<unsigned long long>(v.tableFailures + mState->tablesBad),
+      static_cast<unsigned long long>(v.tableResets), tables.Sounds().Size(), tables.Names().Size(), tables.Deposits().size(),
+      static_cast<unsigned long long>(s.terrainEdits), mState->seeded ? "applied to the map's heights" : "counted, no heights",
+      static_cast<unsigned long long>(s.statsApplied)
+    );
+    std::printf(
+      "probe %d: rebuild: poses: %llu lanes (%llu bad, %llu KB), %llu poses made, %llu unit-beats with bones, %llu bones applied, "
+      "%llu bad, %llu without a mesh\n",
+      uid, static_cast<unsigned long long>(v.poseLanes), static_cast<unsigned long long>(v.poseFailures),
+      static_cast<unsigned long long>(v.poseBytes / 1024u), static_cast<unsigned long long>(s.posesMade),
+      static_cast<unsigned long long>(s.poseBeats), static_cast<unsigned long long>(s.poseBonesApplied),
+      static_cast<unsigned long long>(s.poseBonesBad), static_cast<unsigned long long>(s.posesWithoutMesh)
     );
   }
 } // namespace faf::probe

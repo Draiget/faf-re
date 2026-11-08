@@ -114,7 +114,10 @@ namespace faf::remote
     : mChannel(channel)
   {}
 
-  CServerRelayConnector::~CServerRelayConnector() = default;
+  CServerRelayConnector::~CServerRelayConnector()
+  {
+    mChannel.ConnectorGone();
+  }
 
   void CServerRelayConnector::Destroy()
   {

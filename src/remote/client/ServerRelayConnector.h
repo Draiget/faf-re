@@ -37,6 +37,8 @@ namespace faf::remote
     [[nodiscard]] virtual bool Up() const = 0;
     /** Participants whose connection ends now (the server said they left), appended to `uids`. */
     virtual void TakeGone(std::vector<std::int32_t>& uids) = 0;
+    /** The connector on this channel is gone (its lobby was destroyed): a lobby started again may have a new one. */
+    virtual void ConnectorGone() {}
   };
 
   /**

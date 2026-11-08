@@ -253,6 +253,9 @@
 	{
 		const TObject* const source = state->top - 1;
 		*luaA_index(state, idx) = *source;
+		if (source->tt >= LUA_TSTRING) {
+			faf_lua51_gc_mark_object(state->l_G, static_cast<GCObject*>(source->value.p));
+		}
 		--state->top;
 	}
 
@@ -451,6 +454,11 @@
 
 		for (int upvalueIndex = n - 1; upvalueIndex >= 0; --upvalueIndex) {
 			closure->c.upvalue[upvalueIndex] = state->top[upvalueIndex];
+			faf_lua51_gc_barrier_value(
+				state,
+				reinterpret_cast<GCObject*>(closure),
+				&closure->c.upvalue[upvalueIndex]
+			); // Lua 5.1.5 lapi.c: lua_pushcclosure()
 		}
 
 		TObject* const top = state->top;
@@ -685,6 +693,14 @@
 
 		--state->top;
 		*valueSlot = *state->top;
+		if (const TObject* const function = luaA_index(state, functionIndex);
+			function != nullptr && function->tt >= LUA_TSTRING) {
+			faf_lua51_gc_barrier_value(
+				state,
+				static_cast<GCObject*>(function->value.p),
+				state->top
+			); // Lua 5.1.5 lapi.c: lua_setupvalue()
+		}
 
 		return upvalueName;
 	}
@@ -1234,6 +1250,11 @@
 		}
 
 		static_cast<GCObject*>(object->value.p)->cl.l.g = *state->top;
+		faf_lua51_gc_barrier_value(
+			state,
+			static_cast<GCObject*>(object->value.p),
+			state->top
+		); // Lua 5.1.5 lapi.c: lua_replace()/setfenv barrier
 		return 1;
 	}
 
@@ -1523,6 +1544,10 @@
 	 */
 	void luaS_resize(lua_State* const state, const int newsize)
 	{
+		if (faf_lua51_gc_sweep_string_active(state)) {
+			return;
+		}
+
 		GCObject** const newHash = luaM_newvector<GCObject*>(state, static_cast<lu_mem>(newsize));
 		global_State* const globalState = state->l_G;
 		if (newsize > 0) {
@@ -1567,6 +1592,12 @@
 		stringObject->len = length;
 		stringObject->hash = hashValue;
 		stringObject->marked = 0u;
+		if (moho::lua_IncrementalGC && moho::lua_incremental::IsUiState(state->l_G)) {
+			const auto* const incremental = moho::lua_incremental::Find(state->l_G);
+			stringObject->marked = (incremental != nullptr && incremental->initialized)
+				? moho::lua_incremental::White(*incremental)
+				: moho::lua_incremental::kWhite0Bit;
+		}
 		stringObject->tt = LUA_TSTRING;
 		stringObject->reserved = 0;
 

@@ -8,8 +8,11 @@
 
 set(FAF_REMOTE_SOURCES
   remote/FrameBuilder.cpp
+  remote/PoseTracker.cpp
   remote/UnderlayPaths.cpp
   remote/ContentTables.cpp
+  remote/ContentCheck.cpp
+  remote/SeatRoster.cpp
   remote/VisibilityOracle.cpp
   remote/SpatialOracle.cpp
   remote/BeatChangeSet.cpp
@@ -30,6 +33,7 @@ set(FAF_REMOTE_SOURCES
   remote/wire/IntelGridDelta.cpp
   remote/wire/NameTable.cpp
   remote/wire/OrdinalTable.cpp
+  remote/wire/PoseLane.cpp
   remote/wire/Quantize.cpp
   remote/wire/Roster.cpp
   remote/wire/SessionTables.cpp

@@ -1,4 +1,5 @@
 #include "moho/ai/CAiSiloBuildImpl.h"
+#include "moho/misc/EconomyRequestRelease.h"
 
 #include <algorithm>
 #include <bit>
@@ -81,30 +82,6 @@ namespace
   [[nodiscard]] std::size_t ToSiloIndex(const ESiloType type) noexcept
   {
     return static_cast<std::size_t>(static_cast<std::int32_t>(type));
-  }
-
-  [[nodiscard]] SEconValue TakeGrantedResourcesAndReset(CEconRequest* const request)
-  {
-    SEconValue out{};
-    out.energy = request->mGranted.energy;
-    out.mass = request->mGranted.mass;
-    request->mGranted.energy = 0.0f;
-    request->mGranted.mass = 0.0f;
-    return out;
-  }
-
-  /**
-    * Alias of FUN_005CFA20 (non-canonical helper lane).
-   */
-  void DestroyEconomyRequestPointer(CEconRequest*& request)
-  {
-    if (!request) {
-      return;
-    }
-
-    request->mNode.ListUnlink();
-    delete request;
-    request = nullptr;
   }
 
   void ReplaceEconomyRequestPointer(CEconRequest*& request, CEconRequest* const replacement)

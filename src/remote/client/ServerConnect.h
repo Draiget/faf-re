@@ -10,6 +10,7 @@
 namespace moho
 {
   class INetConnector;
+  class RRuleGameRules;
 }
 
 // Engine addition, server mode (docs/SWITCHES.md, "Server mode"): the client's entry into a
@@ -90,7 +91,14 @@ namespace faf::remote
   /**
    * Plan WP2.13, WP12.1: once a server session has its channel, the connector the lobby is made with
    * (`InternalCreateLobby`): every participant a virtual connection over that channel
-   * (ServerRelayConnector.h). Null outside a server session, and after the first call: one lobby per session.
+   * (ServerRelayConnector.h). Null outside a server session, and while the last one handed out is alive: one lobby
+   * at a time, which may be started again once the last is destroyed (a new logical host, plan WPR.50).
    */
   [[nodiscard]] moho::INetConnector* TakeServerLobbyConnector();
+
+  /**
+   * Plan WP2.6: the session's game has loaded its rules: what they hold goes to the server (remote/ContentCheck.h),
+   * ahead of `Loaded`. `gameMods`: the launch's `GameMods` in its byte form (`LaunchInfoBase::mGameMods`).
+   */
+  void ReportServerContent(moho::RRuleGameRules& rules, const std::string& gameMods);
 } // namespace faf::remote

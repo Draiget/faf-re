@@ -81,6 +81,11 @@
 		);
 
 		functionProto->k[functionState->nk] = *valueObject;
+		faf_lua51_gc_barrier_value(
+			functionState->L,
+			reinterpret_cast<GCObject*>(functionProto),
+			valueObject
+		); // Lua 5.1.5 lcode.c: addk() constant barrier
 
 		TObject* const insertedSlot = luaH_set(functionState->L, functionState->h, keyObject);
 		insertedSlot->value.n = static_cast<float>(functionState->nk);
@@ -752,6 +757,7 @@
 		}
 
 		table->flags = 0;
+		faf_lua51_gc_barrier_back(state, table);
 		if (slot == &luaO_nilobject) {
 			if (key->tt == LUA_TNIL) {
 				luaG_runerror(state, "table index is nil");
@@ -777,6 +783,7 @@
 	 */
 	TObject* luaH_setnum(lua_State* const state, Table* const table, const int key)
 	{
+		faf_lua51_gc_barrier_back(state, table);
 		const TObject* slot = luaH_getnum(table, key);
 		if (slot == &luaO_nilobject) {
 			TObject numericKey{};
@@ -874,6 +881,7 @@
 		luaM_growvector<TString*>(fs->L, proto->upvalues, existingUpvalueCount, upvalueCapacity, kLuaIntMaxMinusTwo, "upvalues");
 
 		proto->upvalues[existingUpvalueCount] = name;
+		faf_lua51_gc_barrier_f(fs->L, reinterpret_cast<GCObject*>(proto), reinterpret_cast<GCObject*>(name));
 		fs->upvalues[existingUpvalueCount] = *value;
 		proto->nups = static_cast<lu_byte>(existingUpvalueCount + 1);
 		return existingUpvalueCount;
@@ -956,6 +964,7 @@ namespace
 			userdata->len = 0u;
 			userdata->tt = LUA_TUSERDATA;
 			userdata->marked = 0u;
+			faf_lua51_gc_color_userdata(state, userdata);
 
 			global_State* const globalState = state->l_G;
 			userdata->metatable = DefaultUserdataMetatable(globalState);
@@ -1004,6 +1013,7 @@ extern "C" Udata* luaS_newudata(lua_State* const state, gpg::RType* const type)
 	userdata->len = reinterpret_cast<std::size_t>(type);
 	userdata->tt = LUA_TUSERDATA;
 	userdata->marked = (type->dtrFunc_ != nullptr) ? 2u : 0u;
+	faf_lua51_gc_color_userdata(state, userdata);
 
 	global_State* const globalState = state->l_G;
 	userdata->metatable = DefaultUserdataMetatable(globalState);
@@ -1043,6 +1053,7 @@ namespace
 		userdata->len = reinterpret_cast<std::size_t>(sourceType);
 		userdata->tt = LUA_TUSERDATA;
 		userdata->marked = (sourceType->dtrFunc_ != nullptr) ? 2u : 0u;
+		faf_lua51_gc_color_userdata(state, userdata);
 
 		global_State* const globalState = state->l_G;
 		userdata->metatable = DefaultUserdataMetatable(globalState);

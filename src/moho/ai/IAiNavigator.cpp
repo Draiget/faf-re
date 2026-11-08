@@ -610,12 +610,7 @@ namespace
     const SOCellPos* sourceEnd
   ) noexcept
   {
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationEnd;
-      *destinationEnd = *sourceEnd;
-    }
-    return destinationEnd;
+    return std::copy_backward(sourceBegin, sourceEnd, destinationEnd);
   }
 
   /**

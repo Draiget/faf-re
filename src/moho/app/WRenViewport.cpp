@@ -1,5 +1,7 @@
 #include "moho/app/WxPrivate.h"
 #include "moho/app/NetworkPanel.h"
+#include "moho/render/AmbientOcclusionRenderer.h"
+#include "moho/render/FxaaRenderer.h"
 
 namespace
 {
@@ -93,6 +95,8 @@ namespace moho
   extern bool ren_Select;       // 0x00F57E4C = 0x01
   extern bool ren_fog;          // 0x00F57E4D = 0x01
   extern bool ren_Shadows;      // 0x00F57E53 = 0x01
+  extern float ren_ShadowCoeff;
+  extern std::int32_t shadow_Fidelity;
 }
 
 
@@ -1939,6 +1943,16 @@ void moho::WRenViewport::RenderWorldView(
     const gpg::gal::RenderProfileScope profileMeshes("Meshes");
     RenderMeshes(0x14, false);
   }
+  // Engine addition (ren_Ao): ambient occlusion from the depth of terrain and the opaque meshes,
+  // before effects and water draw over it.
+  if (moho::AmbientOcclusionRenderer& occlusion = moho::AmbientOcclusionRenderer::Get(); occlusion.IsActive()) {
+    const gpg::gal::RenderProfileScope profileOcclusion("AmbientOcclusion");
+    // How far the shadow map reaches: terrain shadows take over beyond it, and stay off with shadows off.
+    const float shadowReach = (!moho::ren_Shadows || moho::shadow_Fidelity == 0) ? -1.0f
+      : mShadowRenderer.mShadowCameraValid                                      ? moho::ren_ShadowCoeff * worldView->mView->CameraGetTargetZoom()
+                                                                                 : 0.0f;
+    occlusion.Render(*mCam, mScreenPos.x, mScreenPos.y, mScreenSize.x, mScreenSize.y, shadowReach);
+  }
   {
     const gpg::gal::RenderProfileScope profileEffects("Effects");
     RenderEffects(true);
@@ -2266,6 +2280,35 @@ void moho::WRenViewport::Render(const int head, fa::vector<SWorldViewInfo>& worl
   // and every view re-tessellates the terrain each frame.
   if (moho::IWldTerrainRes* const decalTerrainRes = moho::REN_GetTerrainRes(); decalTerrainRes != nullptr) {
     static_cast<moho::CDecalManager*>(decalTerrainRes->GetDecalManager())->ClearPendingChanges();
+  }
+
+  // Engine addition (ren_Fxaa): anti-aliasing for the world views on Direct3D 12 and Vulkan, which
+  // have no multisampled back buffer. The head is copied into the refraction target (free again
+  // once the views are drawn) and drawn back through FXAA over the whole head, colour only, before
+  // the cartographic views and the interface.
+  if (begin != end && mPrimaryTargetLocks[mHead] && !RenderAdditionsDisabled()) {
+    if (moho::FxaaRenderer& fxaa = moho::FxaaRenderer::Get(); fxaa.IsActive()) {
+      const gpg::gal::RenderProfileScope profileFxaa("Fxaa");
+      boost::shared_ptr<moho::ID3DRenderTarget> headTarget{};
+      device->GetWriterLock1(headTarget, mHead);
+      device->SetViewRect(headTarget.get(), mPrimaryTargetLocks[mHead].get(), nullptr, nullptr);
+      moho::ID3DRenderTarget::SurfaceHandle copy{};
+      (void)mPrimaryTargetLocks[mHead]->GetSurface(copy);
+      if (copy) {
+        Wm3::Vector2i savedPos{};
+        Wm3::Vector2i savedSize{};
+        float savedMinZ = 0.0f;
+        float savedMaxZ = 1.0f;
+        device->GetView(&savedPos, &savedSize, &savedMinZ, &savedMaxZ);
+        const int width = device->GetHeadWidth(static_cast<unsigned int>(mHead));
+        const int height = device->GetHeadHeight(static_cast<unsigned int>(mHead));
+        Wm3::Vector2i headPos{0, 0};
+        Wm3::Vector2i headSize{width, height};
+        device->SetViewport(&headPos, &headSize, savedMinZ, savedMaxZ);
+        fxaa.Render(*copy, width, height);
+        device->SetViewport(&savedPos, &savedSize, savedMinZ, savedMaxZ);
+      }
+    }
   }
 
   // Shared tail, reached from the per-view loop, from the empty-list jump

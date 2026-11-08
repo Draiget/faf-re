@@ -130,4 +130,23 @@ namespace moho
       safeRhs
     );
   }
+
+  /**
+   * Address: 0x004A1920 (FUN_004A1920, sub_4A1920)
+   *
+   * What it does:
+   * Assigns one zero-terminated wide string into the destination string.
+   */
+  inline std::wstring* AssignWideStringFromNullTerminatedInput(
+    std::wstring* const destination,
+    const wchar_t* const source
+  )
+  {
+    if (destination == nullptr) {
+      return nullptr;
+    }
+    const wchar_t* const safeSource = (source != nullptr) ? source : L"";
+    destination->assign(safeSource, std::wcslen(safeSource));
+    return destination;
+  }
 } // namespace moho

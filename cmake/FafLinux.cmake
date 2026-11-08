@@ -292,6 +292,7 @@ add_executable(headless ${_faf_headless_files}
   "${PROJECT_SOURCE_DIR}/src/headless/ReplayTargetAudit.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbyScriptData.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbySignaller.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
@@ -306,8 +307,11 @@ target_link_options(headless PRIVATE -Wl,--error-limit=0)
 # The dedicated server, Linux only (plan D2): the sim, and what `headless` shares for loading a game.
 add_executable(server
   "${PROJECT_SOURCE_DIR}/src/server/ServerMain.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ControlChannel.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ControlListener.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbyScriptData.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbySignaller.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
@@ -323,13 +327,24 @@ target_include_directories(faf_server_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
 target_link_libraries(faf_server_tests PRIVATE gtest_main)
 
 add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp" "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
+  "${PROJECT_SOURCE_DIR}/tests/server/ControlChannelTests.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ControlChannel.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ControlListener.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbyScriptData.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbySignaller.cpp")
 target_link_libraries(faf_seat_tests PRIVATE faf_sim faf_netchannel faf_monocypher gtest_main)
 target_compile_definitions(faf_seat_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_seat_tests PRIVATE -Wl,--error-limit=0)
 
+# Plan WP17.2: a client of the control API, for operators and tests.
+add_executable(faf_server_control EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-control/ControlMain.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ControlChannel.cpp")
+target_include_directories(faf_server_control PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(faf_server_control PRIVATE faf_netchannel faf_monocypher)
+
 add_executable(faf_server_probe EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeMain.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/LobbyScriptData.cpp"
   "${PROJECT_SOURCE_DIR}/tools/server-probe/ProbeRebuild.cpp"
   "${PROJECT_SOURCE_DIR}/src/headless/SessionLoad.cpp"
   "${PROJECT_SOURCE_DIR}/src/headless/ReplayLuaState.cpp")
@@ -361,3 +376,21 @@ add_dependencies(headless faf_sim_libm_gate)
 # sections must equal Windows' faf_registration_dump_sim (src/CMakeLists.txt).
 add_executable(faf_registration_dump_sim EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/registry/RegistrationDump.cpp")
 target_link_libraries(faf_registration_dump_sim PRIVATE faf_sim)
+
+# Regression for lua damage stack; no game data required.
+enable_testing()
+add_executable(faf_damage_callback_stack_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/lua/DamageCallbackStackTests.cpp")
+target_link_libraries(faf_damage_callback_stack_tests PRIVATE faf_sim gtest_main)
+set_target_properties(faf_damage_callback_stack_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME damage_callback_stack COMMAND faf_damage_callback_stack_tests)
+set_tests_properties(damage_callback_stack PROPERTIES LABELS "Sim")
+
+# Occupation manager lifecycle, plus a linker-wrap trace of which new/delete
+# overloads it calls; no game data required.
+add_executable(faf_occupation_manager_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/collision_allocator/OccupationManagerTests.cpp")
+target_link_libraries(faf_occupation_manager_tests PRIVATE faf_sim gtest_main)
+set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
+set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
+target_compile_definitions(faf_occupation_manager_tests PRIVATE FAF_OCCUPATION_DELETE_TRACE=1)
+target_link_options(faf_occupation_manager_tests PRIVATE -Wl,--wrap=_Znwm -Wl,--wrap=_Znam -Wl,--wrap=_ZdlPv -Wl,--wrap=_ZdaPv)

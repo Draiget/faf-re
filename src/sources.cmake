@@ -101,6 +101,7 @@ set(FAF_ENGINE_SOURCES
   gpg/gal/backends/vulkan/VulkanLoader.cpp
   gpg/gal/backends/vulkan/VulkanSurface.cpp
   gpg/gal/backends/vulkan/VulkanCore.cpp
+  gpg/gal/backends/vulkan/VulkanMemoryAllocator.cpp
   gpg/gal/backends/vulkan/ResourcesVulkan.cpp
   gpg/gal/backends/vulkan/DeviceVulkan.cpp
   gpg/gal/backends/vulkan/GpuDrivenVulkan.cpp
@@ -120,6 +121,7 @@ set(FAF_ENGINE_SOURCES
   lua/LuaDump.cpp
   lua/LuaError.cpp
   lua/LuaObject.cpp
+  lua/LuaIncrementalGc.cpp
   lua/LuaParser.cpp
   lua/LuaObjectTypeInfo.cpp
   lua/LuaRuntimeTypeInfo.cpp
@@ -912,7 +914,9 @@ set(FAF_ENGINE_SOURCES
   moho/render/CDecalBufferTypeInfo.cpp
   moho/render/CWldTerrainDecal.cpp
   moho/render/CDecalHandleTypeInfo.cpp
+  moho/render/AmbientOcclusionRenderer.cpp
   moho/render/BoundaryRenderer.cpp
+  moho/render/FxaaRenderer.cpp
   moho/render/BoxRenderer.cpp
   moho/render/CRenFrame.cpp
   moho/render/CDecalTypes.cpp

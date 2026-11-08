@@ -50,7 +50,35 @@ namespace faf::remote::client
       }
       *lane = std::span<const std::uint8_t>(bytes, static_cast<std::size_t>(size));
     }
+    // Plan WP8.1: a server that sends poses adds them as a sixth lane.
+    out.poses = {};
+    if (!reader.AtEnd()) {
+      const std::uint64_t size = reader.Varint();
+      const std::uint8_t* const bytes = reader.Bytes(static_cast<std::size_t>(size));
+      if (!reader.Ok()) {
+        return false;
+      }
+      out.poses = std::span<const std::uint8_t>(bytes, static_cast<std::size_t>(size));
+      out.hasPoses = true;
+    }
     return reader.AtEnd();
+  }
+
+  bool ReadTablesMessage(const std::span<const std::uint8_t> message, STablesMessage& out)
+  {
+    if (message.empty() || message[0] != static_cast<std::uint8_t>(net::ESeatMessage::SessionTables)) {
+      return false;
+    }
+    net::ByteReader reader(message.data() + 1, message.size() - 1u);
+    out.beat = static_cast<std::uint32_t>(reader.Varint());
+    const std::uint8_t flags = reader.Byte();
+    if (!reader.Ok() || flags > 1u) {
+      return false;
+    }
+    out.reset = flags == 1u;
+    const std::size_t at = message.size() - reader.Remaining();
+    out.record = message.subspan(at);
+    return !out.reset || out.record.empty();
   }
 
   CServerViewClient::CServerViewClient(moho::RRuleGameRules& rules, const SServerGameInfo& info)
@@ -65,7 +93,30 @@ namespace faf::remote::client
     }
     mRebuilder = std::make_unique<CSyncRebuilder>(mCodec, std::move(blueprints), ResolveMeshes(rules, tables));
     mRebuilder->SetRules(&rules);
+    mRebuilder->SetNoSim();
+    mTables = std::make_unique<wire::CSessionTableReaders>();
+    mRebuilder->SetSessionTables(mTables.get());
     mMerger.SetArmy(info.army);
+  }
+
+  bool CServerViewClient::ApplyTables(const STablesMessage& tables)
+  {
+    if (tables.reset) {
+      // Every record follows from the first, before the next view. The ids come out as before (the server's never
+      // change); deposits past those applied are added (`CSyncRebuilder::ApplyDeposits` counts them); the terrain
+      // edits are applied again in order, which leaves the heights the last of them left.
+      ++mStats.tableResets;
+      mTables = std::make_unique<wire::CSessionTableReaders>();
+      mRebuilder->SetSessionTables(mTables.get());
+      return true;
+    }
+    ++mStats.tableRecords;
+    wire::BitReader reader(tables.record);
+    if (!mTables->Read(reader)) {
+      ++mStats.tableFailures;
+      return false;
+    }
+    return true;
   }
 
   bool CServerViewClient::Apply(const SViewMessage& view, moho::SSyncData& packet)
@@ -91,9 +142,23 @@ namespace faf::remote::client
         ++mStats.gridFailures;
       }
     }
+    // Pose lane (plan WP8.1): the bones the rebuilder puts on the units' client poses.
+    mPoses.clear();
+    if (view.hasPoses) {
+      ++mStats.poseLanes;
+      mStats.poseBytes += view.poses.size();
+      wire::BitReader reader(view.poses);
+      if (!wire::DecodePoseLane(reader, mPoses)) {
+        ++mStats.poseFailures;
+        mPoses.clear();
+      }
+    }
+    mRebuilder->SetPoseLane(view.hasPoses ? &mPoses : nullptr);
     wire::SViewFrame merged;
-    if (!mMerger.Decode(view.own, view.team, mCodec, merged)
-        || !mRebuilder->ApplyFrame(std::move(merged), view.own.size() + view.team.size(), packet)) {
+    const bool applied = mMerger.Decode(view.own, view.team, mCodec, merged)
+                      && mRebuilder->ApplyFrame(std::move(merged), view.own.size() + view.team.size(), packet);
+    mRebuilder->SetPoseLane(nullptr);
+    if (!applied) {
       ++mStats.frameFailures;
       return false;
     }
