@@ -1121,4 +1121,27 @@ namespace moho
    * Startup thunk that forwards to `func_UIZoomTo_LuaFuncDef`.
    */
   CScrLuaInitForm* register_UIZoomTo_LuaFuncDef();
+  /**
+   * Address: Unmapped (FA-Binary-Patches addition)
+   *
+   * What it does:
+   * Publishes global Lua binder `IssueTransportPreOrder(unitList, command, [targetData], [clearQueue])`.
+   */
+  CScrLuaInitForm* func_IssueTransportPreOrder_LuaFuncDef();
+
+  /**
+   * Address: Unmapped (FA-Binary-Patches addition)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IssueTransportPreOrderL`.
+   */
+  int cfunc_IssueTransportPreOrder(lua_State* luaContext);
+
+  /**
+   * Address: Unmapped (FA-Binary-Patches addition)
+   *
+   * What it does:
+   * Queues pre-orders for transport cargo units to execute upon disembarkation.
+   */
+  int cfunc_IssueTransportPreOrderL(LuaPlus::LuaState* state);
 } // namespace moho

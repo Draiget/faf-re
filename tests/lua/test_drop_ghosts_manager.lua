@@ -1,11 +1,17 @@
 -- tests/lua/test_drop_ghosts_manager.lua
 table.getn = table.getn or function(t) return #t end
 
-package.path = package.path .. ";I:/FaforeverFiles/mods/TransportDropGhosts/modules/?.lua;modules/?.lua"
+package.path = package.path .. ";data/fafengine/modules/lua/ui/game/?.lua;I:/FaforeverFiles/mods/TransportDropGhosts/modules/?.lua;modules/?.lua"
 
 local function assert_true(cond, msg)
     if not cond then
         error("Assertion failed: " .. tostring(msg))
+    end
+end
+
+local function assert_false(cond, msg)
+    if cond then
+        error("Assertion failed (expected false): " .. tostring(msg))
     end
 end
 
@@ -24,7 +30,8 @@ function MockWorldMesh.New()
     local m = {
         meshDescriptor = nil,
         stance = nil,
-        isDestroyed = false
+        isDestroyed = false,
+        isHidden = false
     }
     table.insert(createdMeshes, m)
     return setmetatable(m, MockWorldMesh)
@@ -37,6 +44,10 @@ end
 function MockWorldMesh:SetStance(pos, ori)
     self.stance = pos
     self.orientation = ori
+end
+
+function MockWorldMesh:SetHidden(hidden)
+    self.isHidden = hidden
 end
 
 function MockWorldMesh:Destroy()
@@ -155,7 +166,8 @@ activeGhosts = mgr:GetActiveGhosts()
 assert_true(activeGhosts['u101'] == nil, "Disembarked unit ghost removed")
 assert_true(activeGhosts['u102'] ~= nil, "Remaining cargo unit ghost remains")
 assert_true(m1.isDestroyed, "Disembarked unit mesh destroyed")
-assert_eq(table.getn(customBuf:GetOrders('u101')), 0, "Buffer orders cleared for dropped unit")
+-- Buffer orders are preserved for Dispatcher to execute upon touchdown
+assert_eq(table.getn(customBuf:GetOrders('u101')), 1, "Buffer orders preserved for dispatcher")
 
 -- Test 5: Dropping all units destroys remaining ghosts
 local m2 = g2.mesh
@@ -263,5 +275,20 @@ mgr:Update(-1, { transportObs })
 local obsGhosts = mgr:GetActiveGhosts()
 assert_true(obsGhosts['u_obs'] ~= nil, "Observer focusArmy == -1 sees ghosts")
 mgr:ClearAll()
+
+-- Test 12: DestroyGhost and ClearAll explicitly hide meshes before destruction
+local uHide = CreateMockUnit('u_hide', 1)
+local transportHide = CreateMockTransport('t_hide', 1, { uHide }, {
+    { type = 'TransportUnloadUnits', position = { x = 50, y = 10, z = 50 } }
+})
+mgr:Update(1, { transportHide })
+local ghostToHide = mgr:GetActiveGhosts()['u_hide']
+assert_true(ghostToHide ~= nil, "Ghost spawned for hide test")
+local meshToHide = ghostToHide.mesh
+assert_false(meshToHide.isHidden, "Mesh initially visible (isHidden == false)")
+
+mgr:DestroyGhost('u_hide')
+assert_true(meshToHide.isHidden, "Mesh explicitly hidden (SetHidden(true)) on DestroyGhost")
+assert_true(meshToHide.isDestroyed, "Mesh destroyed on DestroyGhost")
 
 print("test_drop_ghosts_manager: ALL PASSED")

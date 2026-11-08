@@ -163,6 +163,12 @@ set_target_properties(faf_recon_scroll_packet_tests PROPERTIES FOLDER "Tests/Exi
 add_test(NAME recon_scroll_packet COMMAND faf_recon_scroll_packet_tests)
 set_tests_properties(recon_scroll_packet PROPERTIES TIMEOUT 120 LABELS "Existing")
 
+add_executable(faf_transport_preorder_tests EXCLUDE_FROM_ALL sim/TransportPreOrdersTests.cpp)
+target_link_libraries(faf_transport_preorder_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_transport_preorder_tests PROPERTIES FOLDER "Tests/Existing")
+add_test(NAME transport_preorders COMMAND faf_transport_preorder_tests)
+set_tests_properties(transport_preorders PROPERTIES TIMEOUT 120 LABELS "Existing")
+
 # Lua coroutine tests (coroutine.create / resume / yield / status / wrap).
 add_executable(faf_coroutine_tests EXCLUDE_FROM_ALL lua/CoroutineTests.cpp)
 target_link_libraries(faf_coroutine_tests PRIVATE faf_engine gtest_main)
@@ -219,6 +225,7 @@ set(_faf_existing_test_targets
   faf_replay_scan_tests
   faf_prefs_thread_tests
   faf_recon_scroll_packet_tests
+  faf_transport_preorder_tests
   faf_coroutine_tests
   faf_msdf_cook_tests
   faf_tread_rotation_tests

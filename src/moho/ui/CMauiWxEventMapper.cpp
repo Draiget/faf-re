@@ -234,6 +234,9 @@ void moho::CMauiWxEventMapper::OnMouseMove(
       if (activeDragger != nullptr && buttonSelector == sCurrentDraggerKeycode) {
         activeDragger->DragRelease(&eventPayload);
         func_PostDragger(nullptr, nullptr, &eventPayload);
+        if (trackedControl != nullptr) {
+          trackedControl->PostEvent(eventPayload);
+        }
       } else if (trackedControl != nullptr) {
         trackedControl->PostEvent(eventPayload);
       }

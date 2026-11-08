@@ -1,7 +1,7 @@
 -- tests/lua/test_drop_ghosts_dispatcher.lua
 table.getn = table.getn or function(t) return #t end
 
-package.path = package.path .. ";I:/FaforeverFiles/mods/TransportDropGhosts/modules/?.lua;modules/?.lua"
+package.path = package.path .. ";data/fafengine/modules/lua/ui/game/?.lua;I:/FaforeverFiles/mods/TransportDropGhosts/modules/?.lua;modules/?.lua"
 
 local function assert_true(cond, msg)
     if not cond then
@@ -72,6 +72,25 @@ _G.IssueUnitCommandToUnit = function(unit, command, luaParams, clear)
         luaParams = luaParams,
         clear = clear
     })
+    if unit and unit._commandQueue then
+        table.insert(unit._commandQueue, { type = command })
+    end
+end
+
+_G.IssueUnitCommand = function(units, command, luaParams, clear)
+    if units then
+        for _, u in ipairs(units) do
+            table.insert(issuedUnitCommands, {
+                unit = u,
+                command = command,
+                luaParams = luaParams,
+                clear = clear
+            })
+            if u and u._commandQueue then
+                table.insert(u._commandQueue, { type = command })
+            end
+        end
+    end
 end
 
 _G.IssueBlueprintCommandToUnits = function(units, command, blueprintId, count, clear)
@@ -82,6 +101,13 @@ _G.IssueBlueprintCommandToUnits = function(units, command, blueprintId, count, c
         count = count,
         clear = clear
     })
+    if units then
+        for _, u in ipairs(units) do
+            if u and u._commandQueue then
+                table.insert(u._commandQueue, { type = command, blueprintId = blueprintId })
+            end
+        end
+    end
 end
 
 local function ResetCommandCaptures()
@@ -96,10 +122,12 @@ local function CreateMockUnit(id, army, isAttached)
         _army = army or 1,
         _attached = (isAttached ~= false),
         _dead = false,
+        _commandQueue = {},
         GetEntityId = function(self) return self._id end,
         GetArmy = function(self) return self._army end,
         IsDead = function(self) return self._dead end,
         SetDead = function(self, d) self._dead = d end,
+        GetCommandQueue = function(self) return self._commandQueue end,
         IsUnitState = function(self, state)
             if state == 'Attached' then
                 return self._attached

@@ -9,6 +9,7 @@
 #include "moho/command/CmdDefs.h"
 #include "moho/command/UserTarget.h"
 #include "moho/command/UserCommandQueue.h"
+#include "moho/command/SSTICommandIssueData.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/math/Vector3f.h"
@@ -23,6 +24,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 #include "boost/shared_ptr.h"
 
 struct lua_State;
@@ -576,6 +578,16 @@ namespace moho
     bool HasSelectionSet(const char* selectionSetName) const;
 
     [[nodiscard]] bool IsRepeatQueueEnabled() const;
+
+    /**
+     * Client-side transport cargo drop pre-orders.
+     * Backed by a static registry indexed by mParams.mEntityId so sizeof(UserUnit) remains 0x3E8.
+     */
+    void QueueTransportPreOrder(const SSTICommandIssueData& order, bool clearQueue);
+    void ClearTransportPreOrders();
+    [[nodiscard]] std::vector<SSTICommandIssueData> GetTransportPreOrders() const;
+    [[nodiscard]] bool HasTransportPreOrders() const;
+    void DispatchDisembarkedPreOrders();
 
   public:
     // The three RTTI base records are real base classes: `UserEntity` is the
@@ -2184,5 +2196,30 @@ namespace moho
    * Lua object result.
    */
   int cfunc_GetBlueprintUserL(LuaPlus::LuaState* state);
+
+  /**
+   * Address: Unmapped (FA-Binary-Patches addition)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_UserUnitGetCargoUnitsL`.
+   */
+  int cfunc_UserUnitGetCargoUnits(lua_State* luaContext);
+
+  /**
+   * Address: Unmapped (FA-Binary-Patches addition)
+   *
+   * What it does:
+   * Publishes the `UserUnit:GetCargoUnits()` Lua binder.
+   */
+  CScrLuaInitForm* func_UserUnitGetCargoUnits_LuaFuncDef();
+
+  /**
+   * Address: Unmapped (FA-Binary-Patches addition)
+   *
+   * What it does:
+   * Pushes one Lua table containing all cargo units attached to this transport.
+   */
+  int cfunc_UserUnitGetCargoUnitsL(LuaPlus::LuaState* state);
 
 } // namespace moho

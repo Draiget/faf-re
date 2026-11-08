@@ -405,6 +405,9 @@ namespace moho
   void ISSUE_SetCommandTarget(UserCommandIssueHelper* const helper, const UserTarget& target)
   {
     CWldSession* const session = WLD_GetActiveSession();
+    if (session == nullptr) {
+      return;
+    }
     auto* const playableMap = session->mWldMap->mTerrainRes->mMap;
 
     bool shouldRetarget = (target.targetType == UserTargetType::None);
@@ -707,6 +710,9 @@ namespace moho
   void ISSUE_Command(const gpg::fastvector<UserUnit*>& units, SSTICommandIssueData data, const bool clearQueue)
   {
     CWldSession* const session = WLD_GetActiveSession();
+    if (session == nullptr) {
+      return;
+    }
 
     // mManager == sWldSession->mSessionRes1 in the binary (0x008B01AD/+0x3FC).
     CommandManager* const commandManager = session->mCommandManager;

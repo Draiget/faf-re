@@ -1,7 +1,13 @@
 #include "moho/unit/core/UserUnitPrivate.h"
+#include "moho/command/SSTICommandIssueData.h"
+
+#include <unordered_map>
+#include <vector>
 
 namespace
 {
+  static std::unordered_map<std::uint32_t, std::vector<moho::SSTICommandIssueData>> sTransportPreOrders;
+
   void WarnFocusArmyUnitDamagedCallbackError(const std::exception& exception) noexcept;
   constexpr const char* kOverlayCategoryAntiAir = "OVERLAYANTIAIR";
   constexpr const char* kOverlayCategoryDirectFire = "OVERLAYDIRECTFIRE";
@@ -779,6 +785,8 @@ UserUnit::UserUnit(CWldSession* const session, const SCreateUnitParams& params)
  */
 UserUnit::~UserUnit()
 {
+  ClearTransportPreOrders();
+
   UserEntity* const entityView = this;
   UserArmy* const army = this->mArmy;
   const IUnit* const iunitBridge = GetIUnitBridge(this);
@@ -831,6 +839,58 @@ UserUnit::~UserUnit()
   if (VisionDB::Handle* const handle = GetUserUnitVisionHandle(this); handle != nullptr) {
     delete handle;
     GetUserUnitVisionHandle(this) = nullptr;
+  }
+}
+
+void UserUnit::QueueTransportPreOrder(const SSTICommandIssueData& order, bool clearQueue)
+{
+  auto& queue = sTransportPreOrders[this->mParams.mEntityId];
+  if (clearQueue) {
+    queue.clear();
+  }
+  queue.push_back(order);
+}
+
+void UserUnit::ClearTransportPreOrders()
+{
+  sTransportPreOrders.erase(this->mParams.mEntityId);
+}
+
+std::vector<SSTICommandIssueData> UserUnit::GetTransportPreOrders() const
+{
+  const auto it = sTransportPreOrders.find(this->mParams.mEntityId);
+  if (it != sTransportPreOrders.end()) {
+    return it->second;
+  }
+  return {};
+}
+
+bool UserUnit::HasTransportPreOrders() const
+{
+  const auto it = sTransportPreOrders.find(this->mParams.mEntityId);
+  return it != sTransportPreOrders.end() && !it->second.empty();
+}
+
+void UserUnit::DispatchDisembarkedPreOrders()
+{
+  if (!HasTransportPreOrders()) {
+    return;
+  }
+  const auto preOrders = GetTransportPreOrders();
+  ClearTransportPreOrders();
+
+  gpg::Warnf(
+    "TransportDropGhosts: Dispatched %zu disembarked pre-orders for unit %u",
+    preOrders.size(),
+    static_cast<std::uint32_t>(this->mParams.mEntityId)
+  );
+
+  gpg::fastvector<UserUnit*> targetUnits;
+  targetUnits.push_back(this);
+
+  for (std::size_t i = 0; i < preOrders.size(); ++i) {
+    const bool isClear = (i == 0);
+    moho::ISSUE_Command(targetUnits, preOrders[i], isClear);
   }
 }
 
@@ -1234,6 +1294,7 @@ void UserUnit::Tick(const std::int32_t seqNo)
   const IUnit* const iunitBridge = GetIUnitBridge(this);
   UserArmy* const army = this->mArmy;
   if (iunitBridge->IsDead()) {
+    ClearTransportPreOrders();
     if (army != nullptr) {
       const RUnitBlueprint* const blueprint = iunitBridge->GetBlueprint();
       if (blueprint != nullptr && blueprint->General.QuickSelectPriority > 0) {
@@ -1255,6 +1316,10 @@ void UserUnit::Tick(const std::int32_t seqNo)
       GetUserUnitVisionHandle(this) = nullptr;
     }
     return;
+  }
+
+  if (HasTransportPreOrders() && GetAttachmentParent() == nullptr) {
+    DispatchDisembarkedPreOrders();
   }
 
   const bool isQueueEmpty = this->mUnitVarDat.mIsBusy == 0u && IsUserCommandManagerQueueEmpty(mManager);
@@ -1328,7 +1393,17 @@ void UserUnit::Tick(const std::int32_t seqNo)
  */
 void UserUnit::UpdateEntityData(const SSTIEntityVariableData& variableData)
 {
+  const std::uint32_t oldParent = mVariableData.mAttachmentParentRef;
+  const std::uint32_t newParent = variableData.mAttachmentParentRef;
   UserEntity::UpdateEntityData(variableData);
+
+  const bool wasAttached = (oldParent != 0 && oldParent != ToRaw(EEntityIdSentinel::Invalid));
+  const bool nowDetached = (newParent == 0 || newParent == ToRaw(EEntityIdSentinel::Invalid));
+  if (wasAttached && nowDetached) {
+    if (HasTransportPreOrders()) {
+      DispatchDisembarkedPreOrders();
+    }
+  }
 }
 
 /**

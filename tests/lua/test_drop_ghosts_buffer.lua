@@ -1,7 +1,7 @@
 -- tests/lua/test_drop_ghosts_buffer.lua
 table.getn = table.getn or function(t) return #t end
 
-package.path = package.path .. ";I:/FaforeverFiles/mods/TransportDropGhosts/modules/?.lua;modules/?.lua"
+package.path = package.path .. ";data/fafengine/modules/lua/ui/game/?.lua;I:/FaforeverFiles/mods/TransportDropGhosts/modules/?.lua;modules/?.lua"
 local Buffer = require('drop_ghosts_buffer')
 
 local function assert_eq(actual, expected, msg)

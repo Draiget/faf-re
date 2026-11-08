@@ -11,7 +11,7 @@
 
 table.getn = table.getn or function(t) return #t end
 
-package.path = package.path .. ";I:/FaforeverFiles/mods/TransportDropGhosts/modules/?.lua;I:/FaforeverFiles/mods/TransportDropGhosts/hook/lua/ui/game/?.lua;modules/?.lua"
+package.path = package.path .. ";data/fafengine/modules/lua/ui/game/?.lua;I:/FaforeverFiles/mods/TransportDropGhosts/modules/?.lua;I:/FaforeverFiles/mods/TransportDropGhosts/hook/lua/ui/game/?.lua;modules/?.lua"
 
 local function assert_true(cond, msg)
     if not cond then
@@ -86,6 +86,25 @@ _G.IssueUnitCommandToUnit = function(unit, command, luaParams, clear)
         luaParams = luaParams,
         clear = clear
     })
+    if unit and unit._commandQueue then
+        table.insert(unit._commandQueue, { type = command })
+    end
+end
+
+_G.IssueUnitCommand = function(units, command, luaParams, clear)
+    if units then
+        for _, u in ipairs(units) do
+            table.insert(issuedUnitCommands, {
+                unit = u,
+                command = command,
+                luaParams = luaParams,
+                clear = clear
+            })
+            if u and u._commandQueue then
+                table.insert(u._commandQueue, { type = command })
+            end
+        end
+    end
 end
 
 _G.IssueBlueprintCommandToUnits = function(units, command, blueprintId, count, clear)
@@ -96,6 +115,13 @@ _G.IssueBlueprintCommandToUnits = function(units, command, blueprintId, count, c
         count = count,
         clear = clear
     })
+    if units then
+        for _, u in ipairs(units) do
+            if u and u._commandQueue then
+                table.insert(u._commandQueue, { type = command, blueprintId = blueprintId })
+            end
+        end
+    end
 end
 
 -- Focus Army
@@ -111,6 +137,10 @@ _G.AddBeatFunction = function(fn)
 end
 
 _G.OnDestroyFuncs = {}
+_G.AddOnUIDestroyedFunction = function(fn)
+    table.insert(_G.OnDestroyFuncs, fn)
+end
+_G.CreateUI = function(isReplay) end
 
 -- Mock UI Orders & Construction modules
 local mockOrders
@@ -179,6 +209,8 @@ _G.import = function(path)
         return mockOrders
     elseif path == '/lua/ui/game/construction.lua' then
         return mockConstruction
+    elseif path == '/lua/ui/game/selection.lua' then
+        return { IsHidden = function() return false end }
     elseif path == '/lua/ui/controls/worldmesh.lua' then
         return { WorldMesh = MockWorldMesh.New }
     elseif path == '/lua/ui/game/commandmeshes.lua' then
@@ -223,9 +255,11 @@ local function CreateMockUnit(id, army, bp)
         _army = army or 1,
         _bp = bp,
         _attached = true,
+        _commandQueue = {},
         GetEntityId = function(self) return self._id end,
         GetArmy = function(self) return self._army end,
         GetBlueprint = function(self) return self._bp end,
+        GetCommandQueue = function(self) return self._commandQueue end,
         IsDead = function(self) return false end,
         GetPosition = function(self) return { 100, 20, 100 } end
     }
@@ -376,6 +410,26 @@ local currentSel = SelectionModule.GetSelection()
 assert_true(currentSel[201] ~= nil or currentSel[1] ~= nil, "Tank ghost is in active selection")
 assert_true(mockOrders.lastAvailableOrders ~= nil, "Orders UI was synced")
 print("Step 2 Passed: Tank ghost selected and UI synced with available commands.")
+
+-- ============================================================================
+-- 6b. Player Box-Drag Selects Both Ghosts (Engine Dragger Path)
+-- ============================================================================
+
+print("Step 2b: Box drag selection captures both ghosts via OnSelectionChanged...")
+local dragPressEvent = {
+    Type = 'ButtonPress',
+    MouseX = 0,
+    MouseY = 0,
+    Modifiers = { Left = true }
+}
+mockPrimaryView:HandleEvent(dragPressEvent)
+
+_G.GetMouseScreenPos = function() return { 800, 800, x = 800, y = 800 } end
+GamemainHook.OnSelectionChanged({}, {}, {}, {})
+
+local dragSel = SelectionModule.GetSelection()
+assert_eq(#dragSel, 2, "Box drag selected both tank and engineer ghosts")
+print("Step 2b Passed: Box drag selection successfully captured multiple ghosts.")
 
 -- ============================================================================
 -- 7. Player Issues Move Order to Tank

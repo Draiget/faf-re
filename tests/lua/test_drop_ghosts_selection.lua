@@ -1,7 +1,7 @@
 -- tests/lua/test_drop_ghosts_selection.lua
 table.getn = table.getn or function(t) return #t end
 
-package.path = package.path .. ";I:/FaforeverFiles/mods/TransportDropGhosts/modules/?.lua;modules/?.lua"
+package.path = package.path .. ";data/fafengine/modules/lua/ui/game/?.lua;I:/FaforeverFiles/mods/TransportDropGhosts/modules/?.lua;modules/?.lua"
 
 local function assert_true(cond, msg)
     if not cond then
@@ -534,5 +534,72 @@ local ghostOrders = buf2:GetOrders('u_close_a')
 assert_eq(#ghostOrders, 1, "Order placed into buffer for ghost A")
 assert_eq(ghostOrders[1].commandType, 'UNITCOMMAND_BuildMobile', "Order type is BuildMobile")
 assert_eq(ghostOrders[1].targetData.blueprintId, 'ueb0101', "Placed blueprint ID matches modeData")
+
+-- ========================================================================
+-- Test 13: Runtime Blueprints with String CommandCaps & UniformScale Highlighting
+-- ========================================================================
+local mockMeshScaled = {
+    _scale = nil,
+    _color = nil,
+    SetScale = function(self, s) self._scale = s end,
+    SetColor = function(self, c) self._color = c end
+}
+
+local runtimeUnit = {
+    GetEntityId = function() return 99 end,
+    GetBlueprint = function()
+        return {
+            BlueprintId = 'url0107',
+            Display = { UniformScale = 0.08 },
+            General = {
+                CommandCaps = "RULEUCC_Move|RULEUCC_Attack", -- string/bitmask in runtime FAF!
+                ToggleCaps = "none"
+            }
+        }
+    end
+}
+
+local ghostScaled = {
+    id = 99,
+    ghostId = 99,
+    position = { x = 200, y = 0, z = 200 },
+    realUnit = runtimeUnit,
+    uniformScale = 0.08,
+    mesh = mockMeshScaled
+}
+
+local scaledMgr = MockManager.New()
+scaledMgr._ghosts = { [99] = ghostScaled }
+local scaledSel = DropGhostsSelection.Create(scaledMgr)
+local scaledWv = MockWorldView.New({ ["200.0,0.0,200.0"] = { x = 200, y = 200 } })
+
+-- Click to select runtime unit ghost
+local okClick, clickRes = pcall(function()
+    return scaledSel:HandleWorldClick(scaledWv, {
+        Type = 'ButtonPress',
+        MouseX = 200,
+        MouseY = 200,
+        Modifiers = { Left = true, Right = false, Shift = false }
+    })
+end)
+assert_true(okClick, "Click did not crash with string CommandCaps: " .. tostring(clickRes))
+assert_true(clickRes, "Click was handled")
+assert_true(scaledSel:IsActive(), "Ghost 99 is selected")
+assert_true(mockMeshScaled._scale ~= nil, "Scale was applied")
+assert_true(math.abs(mockMeshScaled._scale[1] - (0.08 * 1.15)) < 0.001, "Scale is uniformScale * 1.15, not hardcoded 1.25!")
+assert_eq(mockMeshScaled._color, "ffffffff", "Selection color is solid white")
+
+-- Deselect
+scaledSel:ClearSelection()
+assert_false(scaledSel:IsActive(), "Selection cleared")
+assert_true(math.abs(mockMeshScaled._scale[1] - 0.08) < 0.001, "Scale restored to unit base uniformScale 0.08, not 1.0!")
+assert_eq(mockMeshScaled._color, "80a0d0ff", "Deselect color restored to hologram cyan")
+
+-- RemoveGhost test
+scaledSel:SetSelection({ [99] = ghostScaled })
+assert_true(scaledSel:IsActive(), "Ghost 99 selected again")
+scaledSel:RemoveGhost(99)
+assert_false(scaledSel:IsActive(), "RemoveGhost cleared selection for ghost 99")
+assert_true(math.abs(mockMeshScaled._scale[1] - 0.08) < 0.001, "Scale restored on RemoveGhost")
 
 print("test_drop_ghosts_selection: ALL PASSED")
