@@ -200,6 +200,7 @@ add_subdirectory(containers)
 add_subdirectory(lua)
 add_subdirectory(gal)
 add_subdirectory(reflection)
+add_subdirectory(render_math)
 
 # Entity update scroll snapshots and payload ownership.
 add_executable(faf_recon_scroll_packet_tests EXCLUDE_FROM_ALL sim/ReconScrollPacketTests.cpp)
