@@ -38,6 +38,8 @@ namespace faf::server
 
     /** From any thread: a token an observer may watch with (the match file's, or one the organiser approved). */
     void AllowToken(std::string token);
+    /** Plan WP13.2: a referee's token (the match file's `MatchReferees`): it watches with no delay. */
+    void AllowReferee(std::string token);
     /** Plan WP17.9: the organiser said no: a request held with this token closes, and a later one is refused. */
     void RefuseToken(std::string token);
     /**
@@ -74,6 +76,7 @@ namespace faf::server
     std::mutex mLock;           // the tokens and the news
     std::set<std::string> mTokens;
     std::set<std::string> mRefused;
+    std::set<std::string> mReferees;
     std::vector<SRequest> mRequests;
     bool mHoldUnknown = false;
     std::vector<std::string> mNews;

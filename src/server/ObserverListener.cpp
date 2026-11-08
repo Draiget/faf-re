@@ -40,6 +40,7 @@ namespace faf::server
     std::uint64_t heldUs = 0;
     bool watching = false;
     std::size_t offset = 0;         // the log's bytes sent so far
+    std::uint64_t delayUs = 0;      // the observers' delay, or 0 for a referee (plan WP13.2)
     std::vector<std::uint8_t> pending;
   };
 
@@ -94,6 +95,14 @@ namespace faf::server
     const std::scoped_lock lock(mLock);
     mRefused.erase(token);
     mTokens.insert(std::move(token));
+  }
+
+  void CObserverListener::AllowReferee(std::string token)
+  {
+    const std::scoped_lock lock(mLock);
+    mRefused.erase(token);
+    mTokens.insert(token);
+    mReferees.insert(std::move(token));
   }
 
   void CObserverListener::RefuseToken(std::string token)
@@ -152,7 +161,6 @@ namespace faf::server
       }
 
       // Requests, then bytes as they come of age.
-      const std::uint64_t until = now > mDelayUs ? now - mDelayUs : 0u;
       const bool finished = mLog->Finished();
       const std::size_t logSize = mLog->Size();
       for (SConnection& connection : connections) {
@@ -191,6 +199,7 @@ namespace faf::server
           }
           connection.held = false;
           connection.watching = true;
+          connection.delayUs = mDelayUs; // an approved observer is no referee
           Say("observe: " + connection.peer + " approved, watches " + std::to_string(mDelayUs / 1000000u) + " s behind the game");
         }
         if (!connection.watching) {
@@ -243,11 +252,19 @@ namespace faf::server
             continue;
           }
           connection.watching = true;
-          Say("observe: " + connection.peer + " watches, " + std::to_string(mDelayUs / 1000000u) + " s behind the game");
+          bool referee = false;
+          {
+            const std::scoped_lock lock(mLock);
+            referee = mReferees.contains(token);
+          }
+          connection.delayUs = referee ? 0u : mDelayUs;
+          Say("observe: " + connection.peer + (referee ? std::string(" referees, with no delay") :
+                                               " watches, " + std::to_string(mDelayUs / 1000000u) + " s behind the game"));
         }
         // What's old enough and not sent yet.
         if (connection.pending.empty()) {
           chunk.clear();
+          const std::uint64_t until = now > connection.delayUs ? now - connection.delayUs : 0u;
           if (mLog->Read(connection.offset, until, kChunkBytes, chunk) > 0u) {
             connection.offset += chunk.size();
             connection.pending = chunk;

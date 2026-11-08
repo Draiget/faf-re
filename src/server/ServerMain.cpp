@@ -572,21 +572,23 @@ namespace
   }
 
   /** Plan WP13.1: the match file's `MatchObservers`, the tokens observers may watch with (a list, or uid = token). */
-  [[nodiscard]] bool ReadMatchObservers(LuaPlus::LuaState* const state, std::vector<std::string>& tokens, std::string& error)
+  [[nodiscard]] bool ReadMatchObservers(
+    LuaPlus::LuaState* const state, std::vector<std::string>& tokens, std::string& error, const char* const name = "MatchObservers"
+  )
   {
-    LuaPlus::LuaObject table = state->GetGlobal("MatchObservers");
+    LuaPlus::LuaObject table = state->GetGlobal(name);
     if (table.IsNil()) {
       return true;
     }
     if (!table.IsTable()) {
-      error = "MatchObservers is a table of tokens";
+      error = std::string(name) + " is a table of tokens";
       return false;
     }
     for (LuaPlus::LuaTableIterator it(&table, 1); !it.m_isDone; it.Next()) {
       const LuaPlus::LuaObject value = it.GetValue();
       const std::size_t size = value.IsString() ? std::strlen(value.GetString()) : 0u;
       if (size == 0u || size > 1000u) {
-        error = "MatchObservers holds tokens: strings of 1 to 1000 characters";
+        error = std::string(name) + " holds tokens: strings of 1 to 1000 characters";
         return false;
       }
       tokens.emplace_back(value.GetString());
@@ -1502,9 +1504,10 @@ namespace
       text = observeText;
       faf::remote::net::SEndpoint observeAt;
       std::vector<std::string> tokens;
+      std::vector<std::string> referees; // plan WP13.2
       if (!faf::remote::net::ParseEndpoint(text, observeAt)) {
         end.error = "--observe takes <ip:port>, not " + text;
-      } else if (!ReadMatchObservers(state, tokens, end.error)) {
+      } else if (!ReadMatchObservers(state, tokens, end.error) || !ReadMatchObservers(state, referees, end.error, "MatchReferees")) {
         // `end.error` says why
       } else {
         observers = std::make_unique<faf::server::CObserverListener>(replayLog, &ControlNowUs, matchRules.observerDelaySeconds.value_or(0.0));
@@ -1514,9 +1517,12 @@ namespace
         for (std::string& token : tokens) {
           observers->AllowToken(std::move(token));
         }
+        for (const std::string& token : referees) {
+          observers->AllowReferee(token);
+        }
         if (observers->Start(observeAt, end.error)) {
-          Say("Observers on %s: %d tokens, %.0f s behind the game", observeAt.Text().c_str(), static_cast<int>(tokens.size()),
-              matchRules.observerDelaySeconds.value_or(0.0));
+          Say("Observers on %s: %d tokens, %.0f s behind the game; %d referees, no delay", observeAt.Text().c_str(), static_cast<int>(tokens.size()),
+              matchRules.observerDelaySeconds.value_or(0.0), static_cast<int>(referees.size()));
         }
       }
       if (!end.error.empty()) {
