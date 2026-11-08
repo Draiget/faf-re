@@ -25,10 +25,15 @@ if not rawget(getfenv(1), 'GetSessionClients') then
 
     local trackWidth = 236
     local dialog = false
-    local stages = {}
-    local stageStarts = {}
-    local returnStarts = {}
-    local announcedBack = {}
+    -- What this dialog keeps about each return, over a reload of this module too: while the new module
+    -- loads, /lua/system/import.lua hands it the old one as `__moduleinfo.old`. Without that a reload would
+    -- start each eject delay again and announce again a player who is already back.
+    local previous = __moduleinfo.old and rawget(__moduleinfo.old, 'RejoinState')
+    RejoinState = previous or {stages = {}, stageStarts = {}, returnStarts = {}, announcedBack = {}}
+    local stages = RejoinState.stages
+    local stageStarts = RejoinState.stageStarts
+    local returnStarts = RejoinState.returnStarts
+    local announcedBack = RejoinState.announcedBack
 
     -- The wait before a lagging player's eject button unlocks in `CreateDialog` above. A returning
     -- player's button waits as long from when their return began, so a click meant for the game
@@ -207,6 +212,18 @@ if not rawget(getfenv(1), 'GetSessionClients') then
         if __modules["/lua/ui/dialogs/disconnect.lua"] != thisModule then
             DestroyRejoinDialog()
         end
+    end
+
+    --- When this module is marked for reload, also through a module it imports (/lua/system/import.lua marks every
+    --- module in used_by): /lua/ui/uimain.lua can be reloaded with it and then not call the old DestroyDialog.
+    local baseOnDirty = __moduleinfo.OnDirty
+    function __moduleinfo.OnDirty()
+        if baseOnDirty then
+            baseOnDirty()
+        end
+        -- Both directly: this module is still in __modules here, so DestroyDialog above would keep the rejoin dialog.
+        baseDestroyDialog()
+        DestroyRejoinDialog()
     end
 
     local function UpdateSlot(slot, index, client, armies)

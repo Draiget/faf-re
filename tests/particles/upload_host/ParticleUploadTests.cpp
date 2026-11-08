@@ -31,7 +31,6 @@
 #include "platform/posix/win32/Windows.h"
 #include "legacy/containers/String.cpp"
 #include "gpg/gal/GpuDriven.h"
-#include "moho/particles/ParticlePoolReclaim.h"
 
 namespace boost { template<class T> using shared_ptr = std::shared_ptr<T>; }
 #ifndef _WIN32

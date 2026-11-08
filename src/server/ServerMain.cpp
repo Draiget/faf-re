@@ -1207,7 +1207,7 @@ namespace
                 gForceStartRequests = gForceStartRequests + 1;
                 control->Reply(request.id, {});
               } else if (!controlCommon(request)) {
-                control->Refuse(request.id, request.op == "pause" || request.op == "resume" ? "the game hasn't started" : "unknown op " + request.op);
+                control->Refuse(request.id, request.op == "pause" || request.op == "resume" || request.op == "end" ? "the game hasn't started" : "unknown op " + request.op);
               }
             }
             controlNews();
@@ -1453,6 +1453,38 @@ namespace
             }
           } else if (request.op == "force_start") {
             control->Refuse(request.id, "the game has started");
+          } else if (request.op == "end") {
+            // Plan WP15.4 (#200): the organiser ends the game now, with each army's result if given ("1=victory,2=defeat",
+            // army numbers from 1 as the sim's `GameResult` has them). With results it counts as ended; without, as stopped.
+            std::vector<std::pair<std::size_t, std::string>> results;
+            std::string bad;
+            for (std::size_t start = 0; start < request.results.size() && bad.empty();) {
+              const std::size_t comma = std::min(request.results.find(',', start), request.results.size());
+              const std::string pair = request.results.substr(start, comma - start);
+              const std::size_t equals = pair.find('=');
+              const int army = equals == std::string::npos ? 0 : std::atoi(pair.substr(0, equals).c_str());
+              const std::string outcome = equals == std::string::npos ? std::string() : pair.substr(equals + 1);
+              if (army < 1 || static_cast<std::size_t>(army) > end.players.size() ||
+                  (outcome != "victory" && outcome != "defeat" && outcome != "draw")) {
+                bad = pair;
+              } else {
+                results.emplace_back(static_cast<std::size_t>(army - 1), outcome);
+              }
+              start = comma + 1;
+            }
+            if (!bad.empty()) {
+              control->Refuse(request.id, "end takes results as army=victory|defeat|draw, armies 1 to " + std::to_string(end.players.size()) + ", not " + bad);
+            } else {
+              for (const auto& [index, outcome] : results) {
+                end.players[index].result = outcome + " 0";
+                Say("%s: %s (set by the organiser)", end.players[index].name.c_str(), outcome.c_str());
+              }
+              end.ended = !results.empty();
+              end.stoppedBy = "the organiser" + (request.reason.empty() ? std::string() : ": " + request.reason);
+              stopped = true;
+              Say("The control service ends the game%s", results.empty() ? "" : " with a result");
+              control->Reply(request.id, "\"results\":" + std::to_string(results.size()));
+            }
           } else if (!controlCommon(request)) {
             control->Refuse(request.id, "unknown op " + request.op);
           }

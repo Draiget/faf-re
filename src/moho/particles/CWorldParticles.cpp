@@ -25,7 +25,6 @@
 #include "moho/render/d3d/CD3DIndexSheet.h"
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/particles/ParticleRenderBuckets.h"
-#include "moho/particles/ParticlePoolReclaim.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
 
 namespace moho
@@ -1271,52 +1270,40 @@ namespace moho
     const float waterSurface = efx_ParticleWaterSurface;
 
     std::optional<gpg::gal::RenderProfileScope> profileStep(std::in_place, "EffParticles"); // FAF instrumentation
-    bool reclaimedParticleBuffers = false;
-    for (auto current = mParticleBuckets.begin(); current != mParticleBuckets.end(); ++current) {
-      const auto& [bucketKey, bucket] = *current;
+    for (const auto& [bucketKey, bucket] : mParticleBuckets) {
       if (renderAboveSurface) {
-        if (!(bucketKey.sortScalar >= waterSurface)) {
-          continue;
+        if (bucketKey.sortScalar >= waterSurface && bucket != nullptr) {
+          (void)moho::RenderParticleBucket(*bucket, static_cast<float>(tick), suppressTLight != 0);
         }
-      } else if (bucketKey.sortScalar > waterSurface) {
-        break;
+      } else {
+        if (bucketKey.sortScalar > waterSurface) {
+          break;
+        }
+        if (bucket != nullptr) {
+          (void)moho::RenderParticleBucket(*bucket, static_cast<float>(tick), suppressTLight != 0);
+        }
       }
-      if (bucket == nullptr) {
-        continue;
-      }
-      if (!reclaimedParticleBuffers && !bucket->pendingParticles.empty()) {
-        reclaimedParticleBuffers = detail::ReclaimRemainingBucketsUnderPressure<kParticleBufferCapacity>(
-          current, mParticleBuckets.end(), mAvailableParticleBuffers.size(), bucket->pendingParticles.size(),
-          true, renderAboveSurface, waterSurface, static_cast<float>(tick),
-          moho::PruneExpiredParticleBucketWorkItems
-        );
-      }
-      (void)moho::RenderParticleBucket(*bucket, static_cast<float>(tick), suppressTLight != 0);
     }
 
     profileStep.reset();
     profileStep.emplace("EffTrails");
-    bool reclaimedTrailBuffers = false;
-    for (auto current = mTrailBuckets.begin(); current != mTrailBuckets.end(); ++current) {
-      const auto& [bucketKey, bucket] = *current;
+    for (const auto& [bucketKey, bucket] : mTrailBuckets) {
       if (renderAboveSurface) {
-        if (!(bucketKey.sortScalar >= waterSurface)) {
-          continue;
+        if (bucketKey.sortScalar >= waterSurface && bucket != nullptr) {
+          renderResult = static_cast<char>(
+            moho::RenderTrailBucket(*bucket, static_cast<float>(tick), suppressTLight != 0)
+          );
         }
-      } else if (bucketKey.sortScalar > waterSurface) {
-        break;
+      } else {
+        if (bucketKey.sortScalar > waterSurface) {
+          break;
+        }
+        if (bucket != nullptr) {
+          renderResult = static_cast<char>(
+            moho::RenderTrailBucket(*bucket, static_cast<float>(tick), suppressTLight != 0)
+          );
+        }
       }
-      if (bucket == nullptr) {
-        continue;
-      }
-      if (!reclaimedTrailBuffers && !bucket->pendingTrails.empty()) {
-        reclaimedTrailBuffers = detail::ReclaimRemainingBucketsUnderPressure<kTrailSegmentCapacity>(
-          current, mTrailBuckets.end(), mTrailSegmentPool.size(), bucket->pendingTrails.size(),
-          true, renderAboveSurface, waterSurface, static_cast<float>(tick),
-          moho::PruneExpiredTrailBucketWorkItems
-        );
-      }
-      renderResult = static_cast<char>(moho::RenderTrailBucket(*bucket, static_cast<float>(tick), suppressTLight != 0));
     }
 
     return renderResult;
@@ -1346,19 +1333,11 @@ namespace moho
       shaderVarParticleBackgroundTexture.SetRenderTargetTexture(backgroundTexture);
     }
 
-    bool reclaimedParticleBuffers = false;
-    for (auto current = mRefractingParticleBuckets.begin(); current != mRefractingParticleBuckets.end(); ++current) {
-      auto* const bucket = current->second;
-      if (bucket == nullptr) {
-        continue;
+    for (const auto& [bucketKey, bucket] : mRefractingParticleBuckets) {
+      (void)bucketKey;
+      if (bucket != nullptr) {
+        (void)moho::RenderParticleBucket(*bucket, static_cast<float>(tick), false);
       }
-      if (!reclaimedParticleBuffers && !bucket->pendingParticles.empty()) {
-        reclaimedParticleBuffers = detail::ReclaimRemainingBucketsUnderPressure<kParticleBufferCapacity>(
-          current, mRefractingParticleBuckets.end(), mAvailableParticleBuffers.size(), bucket->pendingParticles.size(),
-          false, false, 0.0f, static_cast<float>(tick), moho::PruneExpiredParticleBucketWorkItems
-        );
-      }
-      (void)moho::RenderParticleBucket(*bucket, static_cast<float>(tick), false);
     }
 
 

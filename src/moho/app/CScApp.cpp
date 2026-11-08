@@ -524,6 +524,163 @@ namespace
   }
 
   /**
+   * Part of InitializeSessionFromCommandLine (0x008CE3D0), `/rejoin <host> <port> <seat>`: take a seat back in a running game (engine addition, issue #275).
+   * Every path ends startup handling; the caller returns after it.
+   */
+  void StartRejoinFromCommandLine(fa::vector<fa::string>& args)
+  {
+    fa::string failureReason;
+    if (moho::REJOIN_BeginSetup(
+          args[0].c_str(), std::atoi(args[1].c_str()), static_cast<unsigned short>(std::atoi(args[2].c_str())), &failureReason
+        )) {
+      // The launcher, if there is one, still wants this game's results.
+      if (moho::CFG_GetArgOption("/gpgnet", 1, &args) && !args.empty()) {
+        u_long address = 0;
+        u_short port = 0;
+        if (moho::NET_GetAddrInfo(args[0].c_str(), 0, true, address, port) && port != 0) {
+          try {
+            moho::GPGNET_Attach(address, port);
+          } catch (const std::exception& exception) {
+            gpg::Warnf("REJOIN: can't reach the launcher: %s", exception.what());
+          }
+        }
+      }
+      (void)moho::UI_StartRejoinScreen();
+      return;
+    }
+    gpg::Warnf("REJOIN: refused: %s", failureReason.c_str());
+    moho::WIN_OkBox("Ack!", gpg::STR_Printf("Unable to rejoin the game.\n\n%s", failureReason.c_str()).c_str());
+    (void)moho::UI_StartSplashScreens();
+  }
+
+  /**
+   * Part of InitializeSessionFromCommandLine (0x008CE3D0), `/replay <file>`: open the replay viewer, or say why the replay was refused.
+   * Every path ends startup handling; the caller returns after it.
+   */
+  void StartReplayFromCommandLine(fa::vector<fa::string>& args)
+  {
+    if (gEarlyCommandLineSession) {
+      return; // engine addition (wld_EarlyCommandLineSession): begun in CScApp::Init
+    }
+    if (!args.empty()) {
+      SetFrontEndReplayFilename(args[0]);
+      fa::string failureReason;
+      fa::auto_ptr<moho::SWldSessionInfo> sessionInfo =
+        moho::REPLAY_SetupViewerSession(args[0].c_str(), &failureReason);
+      if (sessionInfo.get() != nullptr) {
+        moho::WLD_BeginSession(sessionInfo);
+        return;
+      }
+
+      // Engine addition: the second line says why the replay was refused.
+      const fa::string message =
+        failureReason.empty()
+          ? gpg::STR_Printf("Unable to load game replay from %s", args[0].c_str())
+          : gpg::STR_Printf("Unable to load game replay from %s\n\n%s", args[0].c_str(), failureReason.c_str());
+      moho::WIN_OkBox("Ack!", message.c_str());
+    } else {
+      gpg::Warnf("InitializeSession: /replay specified without a replay path.");
+    }
+    (void)moho::UI_StartSplashScreens();
+  }
+
+  /**
+   * Part of InitializeSessionFromCommandLine (0x008CE3D0), `/load <save>`: start a single-player session from a saved game.
+   * Every path ends startup handling; the caller returns after it.
+   */
+  void LoadSavedGameFromCommandLine(fa::vector<fa::string>& args)
+  {
+    if (!args.empty()) {
+      const fa::string loadPath = ResolveLoadPath(args[0].c_str());
+      try {
+        moho::CSavedGame savedGame(loadPath.c_str());
+        fa::auto_ptr<moho::SWldSessionInfo> sessionInfo = savedGame.CreateSinglePlayerSessionInfo();
+        if (sessionInfo.get() != nullptr) {
+          moho::WLD_BeginSession(sessionInfo);
+          return;
+        }
+
+        const fa::string message = gpg::STR_Printf("Unable to load saved game from %s", loadPath.c_str());
+        moho::WIN_OkBox("Ack!", message.c_str());
+      } catch (const std::exception& exception) {
+        const fa::string message =
+          gpg::STR_Printf("Failed to load saved game from \"%s\":\n%s", loadPath.c_str(), exception.what());
+        moho::WIN_OkBox("Ack!", message.c_str());
+      } catch (...) {
+        const fa::string message = gpg::STR_Printf("Failed to load saved game from \"%s\".", loadPath.c_str());
+        moho::WIN_OkBox("Ack!", message.c_str());
+      }
+    } else {
+      gpg::Warnf("InitializeSession: /load specified without a save path.");
+    }
+    (void)moho::UI_StartSplashScreens();
+  }
+
+  /**
+   * Part of InitializeSessionFromCommandLine (0x008CE3D0), `/gpgnet <host:port>`: attach to the FAF client and start its lobby UI.
+   * Every path ends startup handling; the caller returns after it.
+   */
+  void StartGpgNetFromCommandLine(fa::vector<fa::string>& args)
+  {
+    const fa::string endpoint = args[0];
+    u_long address = 0;
+    u_short port = 0;
+    if (!moho::NET_GetAddrInfo(endpoint.c_str(), 0, true, address, port) || port == 0) {
+      const fa::string message =
+        gpg::STR_Printf("Invalid address:port for connecting to the gpg.net client: \"%s\".", endpoint.c_str());
+      moho::WIN_OkBox("Ack!", message.c_str());
+      if (wxTheApp != nullptr) {
+        wxTheApp->ExitMainLoop();
+      }
+      return;
+    }
+
+    try {
+      moho::GPGNET_Attach(address, port);
+    } catch (const std::exception& exception) {
+      const fa::string message =
+        gpg::STR_Printf("Unable to connect to gpgnet endpoint \"%s\":\n%s", endpoint.c_str(), exception.what());
+      moho::WIN_OkBox("Ack!", message.c_str());
+      if (wxTheApp != nullptr) {
+        wxTheApp->ExitMainLoop();
+      }
+      return;
+    }
+
+    LuaPlus::LuaState* const state = moho::USER_GetLuaState();
+    moho::IUIManager* const uiManager = moho::UI_GetManager();
+    if (state == nullptr || uiManager == nullptr || !uiManager->SetNewLuaState(state)) {
+      moho::WIN_OkBox("Ack!", "UI_GetManager()->SetNewLuaState(state) failed!");
+      if (wxTheApp != nullptr) {
+        wxTheApp->ExitMainLoop();
+      }
+      return;
+    }
+
+    try {
+      const LuaPlus::LuaObject gpgNetModule = moho::SCR_ImportLuaModule(state, "/lua/multiplayer/gpgnet.lua");
+      const LuaPlus::LuaObject createUi = moho::SCR_GetLuaTableField(state, gpgNetModule, "CreateUI");
+      if (createUi.IsNil()) {
+        throw std::runtime_error("Missing CreateUI entrypoint in /lua/multiplayer/gpgnet.lua");
+      }
+
+      LuaPlus::LuaFunction<void> createUiFn(createUi);
+      createUiFn();
+    } catch (const std::exception& exception) {
+      const fa::string message = gpg::STR_Printf("Unable to start gpgnet UI:\n%s", exception.what());
+      moho::WIN_OkBox("Ack!", message.c_str());
+      if (wxTheApp != nullptr) {
+        wxTheApp->ExitMainLoop();
+      }
+    } catch (...) {
+      moho::WIN_OkBox("Ack!", "Unable to start gpgnet UI.");
+      if (wxTheApp != nullptr) {
+        wxTheApp->ExitMainLoop();
+      }
+    }
+  }
+
+  /**
    * Address: 0x008CE3D0 (FUN_008CE3D0, func_InitializeSession)
    *
    * What it does:
@@ -587,83 +744,17 @@ namespace
     // Engine addition (issue #275): take a seat back in a running game. Without
     // the option, every path below runs as before.
     if (moho::CFG_GetArgOption("/rejoin", 3, &args) && args.size() >= 3) {
-      fa::string failureReason;
-      if (moho::REJOIN_BeginSetup(
-            args[0].c_str(), std::atoi(args[1].c_str()), static_cast<unsigned short>(std::atoi(args[2].c_str())), &failureReason
-          )) {
-        // The launcher, if there is one, still wants this game's results.
-        if (moho::CFG_GetArgOption("/gpgnet", 1, &args) && !args.empty()) {
-          u_long address = 0;
-          u_short port = 0;
-          if (moho::NET_GetAddrInfo(args[0].c_str(), 0, true, address, port) && port != 0) {
-            try {
-              moho::GPGNET_Attach(address, port);
-            } catch (const std::exception& exception) {
-              gpg::Warnf("REJOIN: can't reach the launcher: %s", exception.what());
-            }
-          }
-        }
-        (void)moho::UI_StartRejoinScreen();
-        return;
-      }
-      gpg::Warnf("REJOIN: refused: %s", failureReason.c_str());
-      moho::WIN_OkBox("Ack!", gpg::STR_Printf("Unable to rejoin the game.\n\n%s", failureReason.c_str()).c_str());
-      (void)moho::UI_StartSplashScreens();
+      StartRejoinFromCommandLine(args);
       return;
     }
 
     if (moho::CFG_GetArgOption("/replay", 1, &args)) {
-      if (gEarlyCommandLineSession) {
-        return; // engine addition (wld_EarlyCommandLineSession): begun in CScApp::Init
-      }
-      if (!args.empty()) {
-        SetFrontEndReplayFilename(args[0]);
-        fa::string failureReason;
-        fa::auto_ptr<moho::SWldSessionInfo> sessionInfo =
-          moho::REPLAY_SetupViewerSession(args[0].c_str(), &failureReason);
-        if (sessionInfo.get() != nullptr) {
-          moho::WLD_BeginSession(sessionInfo);
-          return;
-        }
-
-        // Engine addition: the second line says why the replay was refused.
-        const fa::string message =
-          failureReason.empty()
-            ? gpg::STR_Printf("Unable to load game replay from %s", args[0].c_str())
-            : gpg::STR_Printf("Unable to load game replay from %s\n\n%s", args[0].c_str(), failureReason.c_str());
-        moho::WIN_OkBox("Ack!", message.c_str());
-      } else {
-        gpg::Warnf("InitializeSession: /replay specified without a replay path.");
-      }
-      (void)moho::UI_StartSplashScreens();
+      StartReplayFromCommandLine(args);
       return;
     }
 
     if (moho::CFG_GetArgOption("/load", 1, &args)) {
-      if (!args.empty()) {
-        const fa::string loadPath = ResolveLoadPath(args[0].c_str());
-        try {
-          moho::CSavedGame savedGame(loadPath.c_str());
-          fa::auto_ptr<moho::SWldSessionInfo> sessionInfo = savedGame.CreateSinglePlayerSessionInfo();
-          if (sessionInfo.get() != nullptr) {
-            moho::WLD_BeginSession(sessionInfo);
-            return;
-          }
-
-          const fa::string message = gpg::STR_Printf("Unable to load saved game from %s", loadPath.c_str());
-          moho::WIN_OkBox("Ack!", message.c_str());
-        } catch (const std::exception& exception) {
-          const fa::string message =
-            gpg::STR_Printf("Failed to load saved game from \"%s\":\n%s", loadPath.c_str(), exception.what());
-          moho::WIN_OkBox("Ack!", message.c_str());
-        } catch (...) {
-          const fa::string message = gpg::STR_Printf("Failed to load saved game from \"%s\".", loadPath.c_str());
-          moho::WIN_OkBox("Ack!", message.c_str());
-        }
-      } else {
-        gpg::Warnf("InitializeSession: /load specified without a save path.");
-      }
-      (void)moho::UI_StartSplashScreens();
+      LoadSavedGameFromCommandLine(args);
       return;
     }
 
@@ -692,63 +783,7 @@ namespace
     }
 
     if (moho::CFG_GetArgOption("/gpgnet", 1, &args) && !args.empty()) {
-      const fa::string endpoint = args[0];
-      u_long address = 0;
-      u_short port = 0;
-      if (!moho::NET_GetAddrInfo(endpoint.c_str(), 0, true, address, port) || port == 0) {
-        const fa::string message =
-          gpg::STR_Printf("Invalid address:port for connecting to the gpg.net client: \"%s\".", endpoint.c_str());
-        moho::WIN_OkBox("Ack!", message.c_str());
-        if (wxTheApp != nullptr) {
-          wxTheApp->ExitMainLoop();
-        }
-        return;
-      }
-
-      try {
-        moho::GPGNET_Attach(address, port);
-      } catch (const std::exception& exception) {
-        const fa::string message =
-          gpg::STR_Printf("Unable to connect to gpgnet endpoint \"%s\":\n%s", endpoint.c_str(), exception.what());
-        moho::WIN_OkBox("Ack!", message.c_str());
-        if (wxTheApp != nullptr) {
-          wxTheApp->ExitMainLoop();
-        }
-        return;
-      }
-
-      LuaPlus::LuaState* const state = moho::USER_GetLuaState();
-      moho::IUIManager* const uiManager = moho::UI_GetManager();
-      if (state == nullptr || uiManager == nullptr || !uiManager->SetNewLuaState(state)) {
-        moho::WIN_OkBox("Ack!", "UI_GetManager()->SetNewLuaState(state) failed!");
-        if (wxTheApp != nullptr) {
-          wxTheApp->ExitMainLoop();
-        }
-        return;
-      }
-
-      try {
-        const LuaPlus::LuaObject gpgNetModule = moho::SCR_ImportLuaModule(state, "/lua/multiplayer/gpgnet.lua");
-        const LuaPlus::LuaObject createUi = moho::SCR_GetLuaTableField(state, gpgNetModule, "CreateUI");
-        if (createUi.IsNil()) {
-          throw std::runtime_error("Missing CreateUI entrypoint in /lua/multiplayer/gpgnet.lua");
-        }
-
-        LuaPlus::LuaFunction<void> createUiFn(createUi);
-        createUiFn();
-      } catch (const std::exception& exception) {
-        const fa::string message = gpg::STR_Printf("Unable to start gpgnet UI:\n%s", exception.what());
-        moho::WIN_OkBox("Ack!", message.c_str());
-        if (wxTheApp != nullptr) {
-          wxTheApp->ExitMainLoop();
-        }
-      } catch (...) {
-        moho::WIN_OkBox("Ack!", "Unable to start gpgnet UI.");
-        if (wxTheApp != nullptr) {
-          wxTheApp->ExitMainLoop();
-        }
-      }
-
+      StartGpgNetFromCommandLine(args);
       return;
     }
 
@@ -1701,6 +1736,99 @@ namespace
       ::SetWindowTextA(topLevel, title.c_str());
     }
   }
+  /**
+   * Part of CScApp::CreateDevice (0x008D0370): the heads and their sizes, from `/window`,
+   * `/fullscreen` or `/windowed` on the command line, else from the adapter options.
+   */
+  void SetUpHeads(
+    gpg::gal::DeviceContext& context,
+    gpg::gal::Head& primaryHead,
+    fa::vector<fa::string>& options,
+    moho::IUserPrefs* const preferences,
+    bool& windowedByCommandLine,
+    bool& secondarySetupMode
+  )
+  {
+    if (TryGetWindowOptionArgs(&options)) {
+      context.AddHead(gpg::gal::Head{});
+      gpg::gal::Head& secondaryHead = context.GetHead(1);
+
+      primaryHead.mWindowed = true;
+      secondaryHead.mWindowed = true;
+      primaryHead.mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[0]));
+      primaryHead.mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[1]));
+
+      if (options.size() == 4) {
+        secondaryHead.mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[2]));
+        secondaryHead.mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[3]));
+      } else {
+        secondaryHead.mWidth = primaryHead.mWidth;
+        secondaryHead.mHeight = primaryHead.mHeight;
+      }
+
+      moho::sAdapterNotCLOverridden = 0;
+    } else if (TryGetFullscreenOptionArgs(&options)) {
+      primaryHead.mWindowed = true;
+      primaryHead.mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[0]));
+      primaryHead.mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[1]));
+      moho::sAdapterNotCLOverridden = 0;
+    } else if (TryGetWindowedOptionArgs(&options)) {
+      primaryHead.mWindowed = false;
+      primaryHead.mWidth = ClampAtLeast(moho::wnd_MinCmdLineWidth, ParseIntegerArg(options[0]));
+      primaryHead.mHeight = ClampAtLeast(moho::wnd_MinCmdLineHeight, ParseIntegerArg(options[1]));
+      moho::sAdapterNotCLOverridden = 0;
+      windowedByCommandLine = true;
+      secondarySetupMode = true;
+    } else {
+      secondarySetupMode = true;
+
+      const fa::string secondaryAdapter = moho::OPTIONS_GetString("secondary_adapter");
+      const fa::string primaryAdapter = moho::OPTIONS_GetString("primary_adapter");
+
+      if (!IsDisabledAdapterToken(secondaryAdapter) && !IsWindowedAdapterToken(primaryAdapter)) {
+        context.AddHead(gpg::gal::Head{});
+        gpg::gal::Head& secondaryHead = context.GetHead(1);
+        primaryHead.mWindowed = true;
+        secondaryHead.mWindowed = true;
+
+        moho::ResolutionTriple primaryResolution{};
+        if (moho::CFG_ParseResolutionTriple(primaryAdapter.c_str(), &primaryResolution)) {
+          primaryHead.mWidth = static_cast<std::uint32_t>(primaryResolution.width);
+          primaryHead.mHeight = static_cast<std::uint32_t>(primaryResolution.height);
+          primaryHead.framesPerSecond = static_cast<std::uint32_t>(primaryResolution.framesPerSecond);
+        }
+
+        moho::ResolutionTriple secondaryResolution{};
+        if (moho::CFG_ParseResolutionTriple(secondaryAdapter.c_str(), &secondaryResolution)) {
+          secondaryHead.mWidth = static_cast<std::uint32_t>(secondaryResolution.width);
+          secondaryHead.mHeight = static_cast<std::uint32_t>(secondaryResolution.height);
+          secondaryHead.framesPerSecond = static_cast<std::uint32_t>(secondaryResolution.framesPerSecond);
+        }
+      } else if (!IsWindowedAdapterToken(primaryAdapter)) {
+        moho::ResolutionTriple primaryResolution{};
+        if (moho::CFG_ParseResolutionTriple(primaryAdapter.c_str(), &primaryResolution)) {
+          primaryHead.mWindowed = true;
+          primaryHead.mWidth = static_cast<std::uint32_t>(primaryResolution.width);
+          primaryHead.mHeight = static_cast<std::uint32_t>(primaryResolution.height);
+          primaryHead.framesPerSecond = static_cast<std::uint32_t>(primaryResolution.framesPerSecond);
+        }
+      } else {
+        primaryHead.mWindowed = false;
+        const fa::string widthKey("Windows.Main.width");
+        const fa::string heightKey("Windows.Main.height");
+        primaryHead.mWidth = static_cast<std::uint32_t>(
+          preferences != nullptr
+            ? preferences->GetInteger(widthKey, moho::wnd_DefaultCreateWidth)
+            : moho::wnd_DefaultCreateWidth
+        );
+        primaryHead.mHeight = static_cast<std::uint32_t>(
+          preferences != nullptr
+            ? preferences->GetInteger(heightKey, moho::wnd_DefaultCreateHeight)
+            : moho::wnd_DefaultCreateHeight
+        );
+      }
+    }
+  }
 } // namespace
 
 /**
@@ -1749,85 +1877,7 @@ bool CScApp::CreateDevice()
   bool windowedByCommandLine = false;
   bool secondarySetupMode = false;
 
-  if (TryGetWindowOptionArgs(&options)) {
-    context.AddHead(gpg::gal::Head{});
-    gpg::gal::Head& secondaryHead = context.GetHead(1);
-
-    primaryHead.mWindowed = true;
-    secondaryHead.mWindowed = true;
-    primaryHead.mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[0]));
-    primaryHead.mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[1]));
-
-    if (options.size() == 4) {
-      secondaryHead.mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[2]));
-      secondaryHead.mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[3]));
-    } else {
-      secondaryHead.mWidth = primaryHead.mWidth;
-      secondaryHead.mHeight = primaryHead.mHeight;
-    }
-
-    moho::sAdapterNotCLOverridden = 0;
-  } else if (TryGetFullscreenOptionArgs(&options)) {
-    primaryHead.mWindowed = true;
-    primaryHead.mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[0]));
-    primaryHead.mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[1]));
-    moho::sAdapterNotCLOverridden = 0;
-  } else if (TryGetWindowedOptionArgs(&options)) {
-    primaryHead.mWindowed = false;
-    primaryHead.mWidth = ClampAtLeast(moho::wnd_MinCmdLineWidth, ParseIntegerArg(options[0]));
-    primaryHead.mHeight = ClampAtLeast(moho::wnd_MinCmdLineHeight, ParseIntegerArg(options[1]));
-    moho::sAdapterNotCLOverridden = 0;
-    windowedByCommandLine = true;
-    secondarySetupMode = true;
-  } else {
-    secondarySetupMode = true;
-
-    const fa::string secondaryAdapter = moho::OPTIONS_GetString("secondary_adapter");
-    const fa::string primaryAdapter = moho::OPTIONS_GetString("primary_adapter");
-
-    if (!IsDisabledAdapterToken(secondaryAdapter) && !IsWindowedAdapterToken(primaryAdapter)) {
-      context.AddHead(gpg::gal::Head{});
-      gpg::gal::Head& secondaryHead = context.GetHead(1);
-      primaryHead.mWindowed = true;
-      secondaryHead.mWindowed = true;
-
-      moho::ResolutionTriple primaryResolution{};
-      if (moho::CFG_ParseResolutionTriple(primaryAdapter.c_str(), &primaryResolution)) {
-        primaryHead.mWidth = static_cast<std::uint32_t>(primaryResolution.width);
-        primaryHead.mHeight = static_cast<std::uint32_t>(primaryResolution.height);
-        primaryHead.framesPerSecond = static_cast<std::uint32_t>(primaryResolution.framesPerSecond);
-      }
-
-      moho::ResolutionTriple secondaryResolution{};
-      if (moho::CFG_ParseResolutionTriple(secondaryAdapter.c_str(), &secondaryResolution)) {
-        secondaryHead.mWidth = static_cast<std::uint32_t>(secondaryResolution.width);
-        secondaryHead.mHeight = static_cast<std::uint32_t>(secondaryResolution.height);
-        secondaryHead.framesPerSecond = static_cast<std::uint32_t>(secondaryResolution.framesPerSecond);
-      }
-    } else if (!IsWindowedAdapterToken(primaryAdapter)) {
-      moho::ResolutionTriple primaryResolution{};
-      if (moho::CFG_ParseResolutionTriple(primaryAdapter.c_str(), &primaryResolution)) {
-        primaryHead.mWindowed = true;
-        primaryHead.mWidth = static_cast<std::uint32_t>(primaryResolution.width);
-        primaryHead.mHeight = static_cast<std::uint32_t>(primaryResolution.height);
-        primaryHead.framesPerSecond = static_cast<std::uint32_t>(primaryResolution.framesPerSecond);
-      }
-    } else {
-      primaryHead.mWindowed = false;
-      const fa::string widthKey("Windows.Main.width");
-      const fa::string heightKey("Windows.Main.height");
-      primaryHead.mWidth = static_cast<std::uint32_t>(
-        preferences != nullptr
-          ? preferences->GetInteger(widthKey, moho::wnd_DefaultCreateWidth)
-          : moho::wnd_DefaultCreateWidth
-      );
-      primaryHead.mHeight = static_cast<std::uint32_t>(
-        preferences != nullptr
-          ? preferences->GetInteger(heightKey, moho::wnd_DefaultCreateHeight)
-          : moho::wnd_DefaultCreateHeight
-      );
-    }
-  }
+  SetUpHeads(context, primaryHead, options, preferences, windowedByCommandLine, secondarySetupMode);
 
   if (context.GetHeadCount() == 1 &&
       moho::CFG_GetArgOptionAliases(moho::CFG_GetAdapterOptionAliases(), 1, &options) &&
