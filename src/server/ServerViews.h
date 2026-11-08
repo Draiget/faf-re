@@ -75,6 +75,15 @@ namespace faf::server
     ~CServerViews() override;
 
     void Install();
+    /**
+     * Plan WP13.6, before `Install`, with team views: a player whose command source leaves every army (defeated, the whole
+     * team out, observers allowed) watches everything from then on, as the original client's `SetFocusArmy(-1)` does.
+     */
+    void EnableObserverViews()
+    {
+      mObserverViews = true;
+      EnableObserverView();
+    }
     /** Call with the sim stopped. */
     void Uninstall();
 
@@ -117,5 +126,6 @@ namespace faf::server
     std::atomic<std::uint64_t> mTableRecords{0};
     remote::wire::CSessionTableWriters mSessionTables; // one for every view (`EnableSessionTables`)
     bool mInstalled = false;
+    bool mObserverViews = false;
   };
 } // namespace faf::server

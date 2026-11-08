@@ -88,6 +88,8 @@ namespace faf::remote
     std::size_t PrepareSideJobs(moho::Sim& sim) override;
     void RunSideJob(std::size_t index) override;
     void OnViewReady(std::size_t army) override { Send(army); }
+    /** Plan WP13.6: a player now watching everything gets their frames whole (with the observer view as their team's). */
+    void OnWatchingEverything(std::size_t army) override { RequestFresh(army); }
 
     /** A view's lanes are encoded. Without a pipeline on a sim worker or the sim thread, with one on its threads. */
     virtual void OnLanesEncoded(std::size_t army, const SLanes& lanes)

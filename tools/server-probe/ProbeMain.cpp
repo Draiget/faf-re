@@ -25,6 +25,7 @@
 #include <span>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -590,7 +591,9 @@ namespace
         out.poseBytes += size;
       }
     }
+    const bool lanesOk = ok;
     ok = ok && reader.AtEnd();
+    const char* why = !lanesOk ? "lanes" : (!ok ? "bytes after the lanes" : nullptr);
     if (ok && out.views > 1u && faf::remote::wire::PeekFrameBaseline(std::span<const std::uint8_t>(frame, frameSize)) == faf::remote::wire::kNoBaseline) {
       ++out.whole;
       std::printf("probe: %.1f s: a whole view at beat %llu, %llu + %llu entities\n", elapsed, static_cast<unsigned long long>(beat),
@@ -603,10 +606,38 @@ namespace
         );
       }
       faf::remote::wire::SViewFrame decoded;
-      ok = out.window.Decode(std::span<const std::uint8_t>(frame, frameSize), out.codec, decoded) && decoded.entities.size() == entities;
+      ok = out.window.Decode(std::span<const std::uint8_t>(frame, frameSize), out.codec, decoded);
+      why = ok ? nullptr : "own frame";
+      if (ok && decoded.entities.size() != entities) {
+        ok = false;
+        why = "own frame's count";
+      }
       faf::remote::wire::SViewFrame teamDecoded;
       if (ok && teamSize != 0u) {
-        ok = out.teamWindow.Decode(std::span<const std::uint8_t>(team, teamSize), out.codec, teamDecoded) && teamDecoded.entities.size() == teamEntities;
+        ok = out.teamWindow.Decode(std::span<const std::uint8_t>(team, teamSize), out.codec, teamDecoded);
+        why = ok ? nullptr : "team frame";
+        if (ok && teamDecoded.entities.size() != teamEntities) {
+          ok = false;
+          why = "team frame's count";
+        }
+      }
+      if (!ok && out.failed < 3u) {
+        const auto frameIdOf = [](const std::uint8_t* const bytes, const std::uint64_t size) -> std::uint32_t {
+          if (size == 0u) {
+            return 0u;
+          }
+          faf::remote::wire::BitReader header(std::span<const std::uint8_t>(bytes, size));
+          (void)header.ReadBits(16);
+          return header.ReadBits(32);
+        };
+        std::printf("probe: %.1f s: team frame %u on base %u, the last team frame decoded %u; own frame %u on base %u, the last own %u\n", elapsed,
+                    frameIdOf(team, teamSize), teamSize != 0u ? faf::remote::wire::PeekFrameBaseline(std::span<const std::uint8_t>(team, teamSize)) : 0u,
+                    out.teamFrame.frameId, frameIdOf(frame, frameSize), faf::remote::wire::PeekFrameBaseline(std::span<const std::uint8_t>(frame, frameSize)),
+                    out.frame.frameId);
+        std::printf("probe: %.1f s: the view of beat %llu didn't decode: %s (own %zu of %llu, team %zu of %llu, %llu + %llu bytes)\n", elapsed,
+                    static_cast<unsigned long long>(beat), why != nullptr ? why : "?", decoded.entities.size(), static_cast<unsigned long long>(entities),
+                    teamDecoded.entities.size(), static_cast<unsigned long long>(teamEntities), static_cast<unsigned long long>(frameSize),
+                    static_cast<unsigned long long>(teamSize));
       }
       out.frameBytes += frameSize + teamSize;
       out.lastEntities = entities + teamEntities;
@@ -614,6 +645,9 @@ namespace
       out.frame = std::move(decoded);
       out.teamFrame = std::move(teamDecoded);
       out.haveFrame = ok;
+    }
+    if (!ok && why != nullptr && out.failed < 3u && (std::string_view(why) == "lanes" || std::string_view(why) == "bytes after the lanes")) {
+      std::printf("probe: %.1f s: the view of beat %llu didn't decode: %s\n", elapsed, static_cast<unsigned long long>(beat), why);
     }
     out.failed += ok ? 0u : 1u;
 

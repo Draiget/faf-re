@@ -1491,6 +1491,9 @@ namespace
       }
       armyUids = viewPlayers;
       views = std::make_unique<faf::server::CServerViews>(contentTables, *rules, mapSizeX, mapSizeZ, *net, std::move(viewPlayers), static_cast<unsigned int>(std::max(viewThreads, 1)), teamViews);
+      if (teamViews && !disconnectDefeated) {
+        views->EnableObserverViews(); // plan WP13.6
+      }
       if (std::string statsEvery; ReadOption("--stats-every", statsEvery)) {
         views->SetStatsEveryBeats(static_cast<std::uint32_t>(std::max(1, std::atoi(statsEvery.c_str()))));
       }

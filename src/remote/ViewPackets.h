@@ -79,6 +79,17 @@ namespace faf::remote
      * real units (see above). Teams are every army with a view that is a mutual ally of all the rest.
      */
     void EnableTeams() noexcept { mWantTeams = true; }
+    /**
+     * Plan WP13.6, before the first beat, with `EnableTeams`: one more view after the teams', of everything as army -1
+     * sees it (no blips), built only while a player watches it (`WatchEverything`). None without room for it.
+     */
+    void EnableObserverView() noexcept { mWantObserver = true; }
+    /**
+     * Plan WP13.6, on the sim thread: from the next beat that holds every entity, `army`'s player gets the observer
+     * view as their team's and their own view empties (`OnWatchingEverything`), for good. False: there is no observer view.
+     */
+    bool WatchEverything(std::size_t army);
+    [[nodiscard]] bool WatchesEverything(const std::size_t army) const noexcept { return army < 32u && ((mWatching >> army) & 1u) != 0u; }
     [[nodiscard]] bool TeamsOn() const noexcept { return mTeamsOn; }
     /** The team view of an army's view; the army's own without teams. */
     [[nodiscard]] std::size_t TeamSlotOf(const std::size_t army) const noexcept
@@ -215,7 +226,13 @@ namespace faf::remote
     {
       std::vector<std::int32_t> members;
       std::uint32_t mask = 0; // `members` not cut from it, one bit each
+      bool observer = false;  // plan WP13.6: the view of everything (army -1); `members` are the players watching it
     };
+    /** Plan WP13.6: the observer view's slot bit, while a player watches it. */
+    [[nodiscard]] std::uint32_t ObserverBit() const noexcept
+    {
+      return mObserverTeam >= 0 && mWatching != 0u ? std::uint32_t{1} << (static_cast<std::size_t>(mArmySlots) + static_cast<std::size_t>(mObserverTeam)) : 0u;
+    }
 
     /** The teams from who's allied with whom now. */
     void BuildTeams(const moho::Sim& sim);
@@ -242,6 +259,8 @@ namespace faf::remote
   protected:
     /** A new beat's views are about to be built. */
     virtual void OnBeatStarting() {}
+    /** Plan WP13.6: `army`'s player watches the observer view from this beat on; their client needs it whole. */
+    virtual void OnWatchingEverything(std::size_t army) { (void)army; }
 
     /** Adds the time from this beat's start to now to `BuildSeconds` (once the views are built). */
     void AddBuildTime() noexcept
@@ -276,7 +295,11 @@ namespace faf::remote
     std::uint32_t mCutArmies = 0;
     std::vector<STeam> mTeams;
     std::vector<std::int32_t> mTeamOfArmy; // -1: none
-    std::uint32_t mTeamBits = 0;           // the team views' slots, one bit each
+    std::uint32_t mTeamBits = 0;           // the team views' slots, one bit each (not the observer view's)
+    bool mWantObserver = false;            // plan WP13.6
+    std::int32_t mObserverTeam = -1;       // the observer view's index in `mTeams`
+    std::uint32_t mWatching = 0;           // the armies whose players watch it
+    std::uint32_t mWatchPending = 0;       // and those who will, once a beat holds every entity
     std::vector<std::uint8_t> mHasView; // per army: its view is built (written on the sim thread)
     std::uint32_t mViewArmies = 0xFFFFFFFFu;
     std::vector<std::vector<SDirectUpdate>> mDirect;

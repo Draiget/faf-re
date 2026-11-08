@@ -202,6 +202,16 @@ namespace faf::server
   {
     // On the sim's thread, at the end of `Sim::Sync` (SimTick.cpp), after the beat's views were encoded: the same
     // beat's `Sync` for each player, in the order queued after that beat's view unless the views' pipeline is late.
+    if (mObserverViews) {
+      router.SetSourceGoneHandler([this, &router](const std::size_t view) {
+        if (WatchEverything(view)) {
+          router.MoveView(view, -1); // its `Sync` as focus -1's, with `NoteFocusArmyChanged`
+          if (const auto player = mPlayers.find(view); player != mPlayers.end()) {
+            gpg::Logf("views: the player of army index %zu (uid %d) has left every army; they watch everything from now on", view, player->second);
+          }
+        }
+      });
+    }
     router.SetPayloadObserver([this, &router](moho::Sim& sim) {
       const auto beat = static_cast<std::uint64_t>(sim.mCurBeat);
       // Plan WP15.4: the sim's own timeouts are unlimited (the server keeps them), so its `TimeoutsRemaining` reads -1.

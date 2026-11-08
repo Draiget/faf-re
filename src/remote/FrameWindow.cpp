@@ -66,6 +66,11 @@ namespace faf::remote
       return false;
     }
     out = decoded;
+    if (baseline == nullptr) {
+      // A whole frame replaces all the client held, and the frames after it are against it or newer. Its id needn't be
+      // above the old ones' (plan WP13.6: a player moved to the observer view gets that view's, which start at 1).
+      mFrames.clear();
+    }
     // Kept in id order: a frame that arrives late still goes before newer ones.
     const auto at = std::upper_bound(
       mFrames.begin(), mFrames.end(), decoded.frameId,

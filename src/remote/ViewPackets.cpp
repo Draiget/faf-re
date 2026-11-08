@@ -109,6 +109,24 @@ namespace faf::remote
     if (mTeamsOn) {
       CheckTeams(sim);
     }
+    if (mWatchPending != 0u && EveryEntitySealed() && mObserverTeam >= 0) {
+      // Plan WP13.6: this beat holds every entity, so the observer view can start (or take one more player) now.
+      STeam& observer = mTeams[static_cast<std::size_t>(mObserverTeam)];
+      for (std::size_t army = 0; army < 32u && army < mTeamOfArmy.size(); ++army) {
+        const std::uint32_t bit = std::uint32_t{1} << army;
+        if ((mWatchPending & bit) == 0u) {
+          continue;
+        }
+        if (const std::int32_t team = mTeamOfArmy[army]; team >= 0) {
+          mTeams[static_cast<std::size_t>(team)].mask &= ~bit; // it stays a member: the team's id map is still the one it had
+        }
+        mTeamOfArmy[army] = mObserverTeam;
+        observer.members.push_back(static_cast<std::int32_t>(army));
+        mWatching |= bit;
+        OnWatchingEverything(army);
+      }
+      mWatchPending = 0u;
+    }
     const std::size_t slots = armyCount + mTeams.size();
     if (mPhaseTimesOn) {
       mPhaseMark = mBuildStart;
@@ -137,7 +155,8 @@ namespace faf::remote
       mDirect[army].clear();
       if (army >= armyCount) {
         // A team's view, while any of its players has one.
-        mHasView[army] = (mTeams[army - armyCount].mask & mViewArmies) != 0u ? 1u : 0u;
+        const STeam& team = mTeams[army - armyCount];
+        mHasView[army] = (team.observer ? mWatching != 0u : (team.mask & mViewArmies) != 0u) ? 1u : 0u;
         continue;
       }
       const moho::CArmyImpl* const owner = sim.mArmiesList[army];
@@ -170,7 +189,7 @@ namespace faf::remote
       // Plan WP5.4: the army lane, positionally as `Sim::Sync` fills it.
       for (std::size_t index = 0; index < packet.mArmyUpdates.size(); ++index) {
         out.mArmyUpdates.push_back(
-          ArmyRecordForView(packet.mArmyUpdates[index], index, static_cast<std::int32_t>(army), packet.mCurBeat == 0)
+          ArmyRecordForView(packet.mArmyUpdates[index], index, WatchesEverything(army) ? -1 : static_cast<std::int32_t>(army), packet.mCurBeat == 0)
         );
       }
     };
@@ -253,7 +272,18 @@ namespace faf::remote
       }
       mTeams.push_back(std::move(team));
     }
+    if (mWantObserver) {
+      if (armies + mTeams.size() + 1u <= kMaxViews) {
+        STeam observer;
+        observer.observer = true;
+        mObserverTeam = static_cast<std::int32_t>(mTeams.size());
+        mTeams.push_back(std::move(observer));
+      } else {
+        gpg::Warnf("views: %zu armies and %zu teams leave no room for an observer view; a defeated player keeps their team's", armies, mTeams.size());
+      }
+    }
     if (armies + mTeams.size() > kMaxViews) {
+      mObserverTeam = -1;
       gpg::Warnf("views: %zu armies and %zu teams don't fit %zu views; each player gets a view of their own", armies, mTeams.size(), kMaxViews);
       mTeams.clear();
       mTeamOfArmy.clear();
@@ -261,7 +291,9 @@ namespace faf::remote
     }
     mTeamBits = 0u;
     for (std::size_t team = 0; team < mTeams.size(); ++team) {
-      mTeamBits |= std::uint32_t{1} << (armies + team);
+      if (!mTeams[team].observer) {
+        mTeamBits |= std::uint32_t{1} << (armies + team);
+      }
     }
     mTeamsOn = true;
   }
@@ -308,7 +340,8 @@ namespace faf::remote
     }
     for (std::size_t a = 0; a < mTeamOfArmy.size(); ++a) {
       for (std::size_t b = a + 1u; b < mTeamOfArmy.size(); ++b) {
-        if (mTeamOfArmy[a] >= 0 && mTeamOfArmy[b] >= 0 && mTeamOfArmy[a] != mTeamOfArmy[b] && !CutFromTeam(a) && !CutFromTeam(b) && mutual(a, b)) {
+        if (mTeamOfArmy[a] >= 0 && mTeamOfArmy[b] >= 0 && mTeamOfArmy[a] != mTeamOfArmy[b] && !CutFromTeam(a) && !CutFromTeam(b) && !WatchesEverything(a) &&
+            !WatchesEverything(b) && mutual(a, b)) {
           mTeamsJoined = true;
           gpg::Warnf("views: army indices %zu and %zu became allies across teams; their teams' views stay apart, so neither sees what the other does", a, b);
           return;
@@ -317,8 +350,25 @@ namespace faf::remote
     }
   }
 
+  bool CViewPackets::WatchEverything(const std::size_t army)
+  {
+    // The teams are made at the first beat; until then nobody can have been defeated.
+    if (mObserverTeam < 0 || army >= 32u || army >= mTeamOfArmy.size()) {
+      return false;
+    }
+    const std::uint32_t bit = std::uint32_t{1} << army;
+    if (((mWatching | mWatchPending) & bit) == 0u) {
+      mWatchPending |= bit;
+      RequestEveryEntity();
+    }
+    return true;
+  }
+
   std::int32_t CViewPackets::TeamLead(const STeam& team) const noexcept
   {
+    if (team.observer) {
+      return -1; // sees everything
+    }
     return team.mask != 0u ? std::countr_zero(team.mask) : team.members.front();
   }
 
@@ -338,13 +388,18 @@ namespace faf::remote
       return ResolveViewVisibility(sim, view, facts);
     }
     if (view < mArmySlots) {
-      // An army's own view: its real units.
-      return facts.kind == SEntityFacts::EKind::Unit ? ResolveViewVisibility(sim, view, facts) : SViewVisibility{};
+      // An army's own view: its real units; nothing once its player watches everything (they come in that view).
+      return facts.kind == SEntityFacts::EKind::Unit && !WatchesEverything(static_cast<std::size_t>(view)) ? ResolveViewVisibility(sim, view, facts)
+                                                                                                          : SViewVisibility{};
+    }
+    const STeam& team = mTeams[static_cast<std::size_t>(view - mArmySlots)];
+    if (team.observer) {
+      // Plan WP13.6: as the canonical (focus -1) packet has it: every unit, no blips.
+      return facts.kind == SEntityFacts::EKind::Blip ? SViewVisibility{} : ResolveViewVisibility(sim, -1, facts);
     }
     if (facts.kind == SEntityFacts::EKind::Unit) {
       return SViewVisibility{};
     }
-    const STeam& team = mTeams[static_cast<std::size_t>(view - mArmySlots)];
     if (facts.kind == SEntityFacts::EKind::Blip) {
       return ResolveViewVisibility(sim, ReconArmyFor(view, facts), facts);
     }
@@ -361,12 +416,17 @@ namespace faf::remote
     if (facts.destroyed) {
       return 0u;
     }
+    const std::uint32_t observer = ObserverBit() != 0u && facts.kind != SEntityFacts::EKind::Blip && CanViewSee(sim, -1, facts) ? ObserverBit() : 0u;
     if (facts.kind == SEntityFacts::EKind::Unit) {
-      return facts.armyIndex >= 0 && facts.armyIndex < mArmySlots ? std::uint32_t{1} << facts.armyIndex : 0u;
+      const bool own = facts.armyIndex >= 0 && facts.armyIndex < mArmySlots && !WatchesEverything(static_cast<std::size_t>(facts.armyIndex));
+      return (own ? std::uint32_t{1} << facts.armyIndex : 0u) | observer;
     }
-    std::uint32_t views = 0u;
+    std::uint32_t views = observer;
     for (std::size_t index = 0; index < mTeams.size(); ++index) {
       const STeam& team = mTeams[index];
+      if (team.observer) {
+        continue;
+      }
       const auto slot = std::uint32_t{1} << (static_cast<std::size_t>(mArmySlots) + index);
       if (facts.kind == SEntityFacts::EKind::Blip) {
         views |= (team.mask & static_cast<std::uint32_t>(facts.blipNeedsFlush)) != 0u ? slot : 0u;
@@ -459,7 +519,7 @@ namespace faf::remote
         if (target.unit != nullptr) {
           // `ResolveViewVisibility`: a unit is published to its own army alone.
           const std::int32_t own = changed.facts.armyIndex;
-          changed.mayAct = changed.before.created | (own >= 0 && static_cast<std::size_t>(own) < kMaxViews ? std::uint32_t{1} << own : 0u);
+          changed.mayAct = changed.before.created | (own >= 0 && static_cast<std::size_t>(own) < kMaxViews ? std::uint32_t{1} << own : 0u) | ObserverBit();
         } else if (target.blip != nullptr) {
           // A blip: to the armies whose recon record needs a flush.
           changed.mayAct = changed.before.created;
@@ -482,7 +542,7 @@ namespace faf::remote
             MatchBlipViews(sim, changed);
           }
         } else {
-          changed.mayAct = mTeamsOn ? mTeamBits | changed.before.created : ~std::uint32_t{0};
+          changed.mayAct = mTeamsOn ? mTeamBits | ObserverBit() | changed.before.created : ~std::uint32_t{0};
         }
       }
     };

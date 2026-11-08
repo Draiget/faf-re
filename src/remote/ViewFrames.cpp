@@ -1060,6 +1060,9 @@ namespace faf::remote
           FinishFrame(teamSlot);
           OnViewReady(teamSlot);
           for (const std::int32_t member : TeamMembers(team)) {
+            if (TeamSlotOf(static_cast<std::size_t>(member)) != teamSlot) {
+              continue; // plan WP13.6: watching everything, so it goes after that view
+            }
             FinishFrame(static_cast<std::size_t>(member));
             OnViewReady(static_cast<std::size_t>(member));
           }

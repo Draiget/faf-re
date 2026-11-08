@@ -753,14 +753,19 @@ namespace faf::remote
         if (!left) {
           continue; // a view moved with `SetFocusArmy` isn't holding its source there
         }
-        // Gone from its army. A defeat just removes it (`lua/sim/Victory.lua:37`); a merge gives it
-        // to another.
+        // Gone from its army. A defeat just removes it (`lua/sim/MatchState.lua` `ObserverAfterDeath`); a merge
+        // gives it to another.
+        bool moved = false;
         for (std::size_t army = 0; army < sim.mArmiesList.size(); ++army) {
           const moho::CArmyImpl* const candidate = sim.mArmiesList[army];
           if (candidate != nullptr && candidate->mVarDat.mValidCommandSources.Contains(source)) {
             MoveView(view, static_cast<std::int32_t>(army));
+            moved = true;
             break;
           }
+        }
+        if (!moved && mSourceGone) {
+          mSourceGone(view); // plan WP13.6
         }
         continue;
       }
