@@ -208,3 +208,38 @@ TEST(ReplayPlayback, KeyframeSeeksKeepTheChecksums)
   std::error_code ignored;
   std::filesystem::remove_all(keyframes, ignored);
 }
+
+// The checks above can fail: with /desynctestbeat this client alone nudges one unit's health at beat 1500
+// (sim_DesyncTestNudgeBeat, docs/SWITCHES.md "Desync recorder"), so the recorded checksums stop matching from
+// there. Headless must report the mismatch with exit code 1, and /desyncdump must write the desync dump for
+// beat 1500 next to the log.
+TEST(ReplayPlayback, DeliberateDesyncIsCaughtAndDumped)
+{
+  const std::vector<SReplay> replays = Replays();
+  if (replays.empty()) {
+    GTEST_SKIP() << "set FAF_REPLAY_DATA to a folder with replays/ and faf/bin/ (see the file's header)";
+  }
+  const SReplay& replay = replays.front();
+  SCOPED_TRACE("replay " + replay.id);
+  std::error_code ignored;
+  for (const auto& entry : std::filesystem::directory_iterator(LogFolder(), ignored)) {
+    if (entry.path().filename().string().rfind("desync_", 0) == 0) {
+      std::filesystem::remove(entry.path(), ignored); // a dump from an earlier run would hide a missing one
+    }
+  }
+
+  const SRun run = PlayReplay(replay, "ctest_desync_" + replay.id, " /desynctestbeat 1500 /desyncdump");
+  EXPECT_EQ(run.exitCode, 1) << "headless exit code 1 is a checksum mismatch\n" << run.tail;
+  EXPECT_EQ(run.verdict.find("mismatches=0"), std::string::npos) << run.verdict;
+  EXPECT_NE(run.verdict.find("crash=False"), std::string::npos) << run.verdict;
+
+  bool dumped = false;
+  for (const auto& entry : std::filesystem::directory_iterator(LogFolder(), ignored)) {
+    const std::string name = entry.path().filename().string();
+    if (name.rfind("desync_", 0) == 0 && name.find("_beat1500_") != std::string::npos && entry.file_size(ignored) > 0) {
+      dumped = true;
+      std::filesystem::remove(entry.path(), ignored);
+    }
+  }
+  EXPECT_TRUE(dumped) << "no desync_*_beat1500_*.zip in " << LogFolder().string();
+}
