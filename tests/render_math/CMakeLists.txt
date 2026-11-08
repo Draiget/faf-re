@@ -9,6 +9,8 @@ add_executable(faf_render_math_tests EXCLUDE_FROM_ALL
   MathTests.cpp
   GeomCameraTests.cpp
   SpatialDbTests.cpp
+  CartographicTests.cpp
+  TesselatorTests.cpp
 )
 target_link_libraries(faf_render_math_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_render_math_tests PROPERTIES FOLDER "Tests/Render")

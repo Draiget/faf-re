@@ -3,7 +3,8 @@
 //
 //   FAF_REPLAY_DATA   folder with replays/vault_<id>.scfareplay and faf/bin/<init>
 //   FAF_REPLAY_INIT   the init file under faf/bin (default init_replay.lua)
-//   FAF_REPLAY_IDS    replays to play, separated by commas (default 26930624, a 2-player core replay)
+//   FAF_REPLAY_IDS    replays to play, separated by commas (default 26930624, a 2-player core replay);
+//                     `id:init` plays one with its own init file under faf/bin (M28AI replays need one)
 //
 // A FAF_COVERAGE build's headless writes its own counters (LLVM_PROFILE_FILE), so these games count in
 // tools/coverage/report.sh.
@@ -107,15 +108,19 @@ TEST(ReplayPlayback, RecordedChecksumsMatch)
     GTEST_SKIP() << "set FAF_REPLAY_DATA to a folder with replays/ and faf/bin/ (see the file's header)";
   }
   const std::filesystem::path root(data);
-  const std::filesystem::path init = root / "faf" / "bin" / Environment("FAF_REPLAY_INIT", "init_replay.lua");
-  ASSERT_TRUE(std::filesystem::exists(init)) << init.string();
+  const std::string defaultInit = Environment("FAF_REPLAY_INIT", "init_replay.lua");
   const std::filesystem::path logs = std::filesystem::temp_directory_path() / "faf_replay_playback";
   std::filesystem::create_directories(logs);
 
-  const std::vector<std::string> ids = Split(Environment("FAF_REPLAY_IDS", "26930624"));
-  ASSERT_FALSE(ids.empty());
-  for (const std::string& id : ids) {
+  const std::vector<std::string> items = Split(Environment("FAF_REPLAY_IDS", "26930624"));
+  ASSERT_FALSE(items.empty());
+  for (const std::string& item : items) {
+    const std::size_t colon = item.find(':');
+    const std::string id = item.substr(0, colon);
+    const std::filesystem::path init =
+      root / "faf" / "bin" / (colon == std::string::npos ? defaultInit : item.substr(colon + 1));
     SCOPED_TRACE("replay " + id);
+    ASSERT_TRUE(std::filesystem::exists(init)) << init.string();
     const std::filesystem::path replay = root / "replays" / ("vault_" + id + ".scfareplay");
     ASSERT_TRUE(std::filesystem::exists(replay)) << replay.string();
 

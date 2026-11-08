@@ -67,6 +67,8 @@ ctest --test-dir build/clang-x64-release -L Existing --output-on-failure
 FAF_REPLAY_DATA=<folder with replays/ and faf/bin/> FAF_REPLAY_INIT=init_replay.lua FAF_REPLAY_IDS=26930624,26902315 ctest -R replay_playback
 ```
 
+A replay that needs its own init file (the M28AI ones) is written `id:init`, for example `26943656:init_replay_noaff_m28_v0294.lua`.
+
 ## Coverage
 
 Line coverage of `src/` by these tests, from an instrumented build (`cmake/FafCoverage.cmake`):
