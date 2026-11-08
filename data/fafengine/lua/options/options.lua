@@ -297,3 +297,103 @@ do
         })
     end
 end
+
+-- Sharpening (ren_Sharpen) and colour grading (ren_Grade) on Direct3D 12 and Vulkan, after FXAA. Shown only by an
+-- engine that has the commands.
+do
+    local function Supported(command)
+        -- The engine's Lua reports C functions as 'cfunction'.
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local video = options and options.video
+    if video and video.items and Supported('ren_Sharpen') and Supported('ren_Grade') then
+        local position = table.getn(video.items) + 1
+        for index, item in ipairs(video.items) do
+            if item.key == 'fxaa_on' then
+                position = index + 1
+            end
+        end
+        -- Option values are levels, not the strength itself, so a saved preference never reaches the command as text.
+        local sharpness = { [0] = '0', [1] = '0.25', [2] = '0.5', [3] = '1' }
+        table.insert(video.items, position, {
+            title = 'Sharpening',
+            key = 'sharpen_level',
+            type = 'toggle',
+            default = 2,
+            tip = 'Brings back edge and texture detail that FXAA and scaling soften. Direct3D 12 and Vulkan only.',
+            set = function(key, value, startup)
+                ConExecute('ren_Sharpen ' .. (sharpness[value] or sharpness[2]))
+            end,
+            custom = {
+                states = {
+                    { text = '<LOC _Off>', key = 0 },
+                    { text = '<LOC _Low>', key = 1 },
+                    { text = '<LOC _Medium>', key = 2 },
+                    { text = '<LOC _High>', key = 3 },
+                },
+            },
+        })
+        table.insert(video.items, position + 1, {
+            title = 'Colour grading',
+            key = 'grade_on',
+            type = 'toggle',
+            default = 1,
+            tip = 'Livelier dull colours and slightly deeper contrast; team colours stay as they are. Direct3D 12 and Vulkan only.',
+            set = function(key, value, startup)
+                if value ~= 0 then
+                    value = 1
+                end
+                ConExecute('ren_Grade ' .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    { text = '<LOC _On>', key = 1 },
+                    { text = '<LOC _Off>', key = 0 },
+                },
+            },
+        })
+    end
+
+    -- Wide glow (ren_BloomWide), after FAF's own bloom options when they are listed (FAF ships Bloom Render off).
+    if video and video.items and Supported('ren_BloomWide') then
+        local position = table.getn(video.items) + 1
+        for index, item in ipairs(video.items) do
+            if item.key == 'bloom_render' or item.key == 'bloom_intensity' or item.key == 'grade_on' then
+                position = index + 1
+            end
+        end
+        local strength = { [0] = '0', [1] = '1', [2] = '2' }
+        table.insert(video.items, position, {
+            title = 'Wide glow',
+            key = 'bloom_wide_level',
+            type = 'toggle',
+            default = 1,
+            tip = 'A soft, wide halo around lights, explosions and shields, added to the bloom. Needs Bloom Render. '
+                .. 'Direct3D 12 and Vulkan only.',
+            set = function(key, value, startup)
+                ConExecute('ren_BloomWide ' .. (strength[value] or strength[1]))
+            end,
+            custom = {
+                states = {
+                    { text = '<LOC _Off>', key = 0 },
+                    { text = 'Normal', key = 1 },
+                    { text = 'Strong', key = 2 },
+                },
+            },
+        })
+    end
+end
