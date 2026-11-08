@@ -286,9 +286,8 @@ namespace
 
     // Session task stage. The binary allocates it, swaps it into `mCurThread`
     // destroying whatever was there, and then publishes it on the session Lua
-    // state: for a root state `LuaState::m_luaTask` carries the owning
-    // `CTaskStage`, not a `CLuaTask`, and `cfunc_ForkThreadL` reads it back
-    // that way. Without this, every session script calling `ForkThread` dies
+    // state (`LuaState::m_taskStage`, the root-state meaning of the slot that
+    // holds a thread's `CLuaTask`), where `cfunc_ForkThreadL` reads it back. Without this, every session script calling `ForkThread` dies
     // with "Lua state has not been set up for multiple threads".
     {
       auto* const sessionStage = new CTaskStage();
@@ -296,7 +295,7 @@ namespace
       mCurThread = sessionStage;
       delete previousStage;
     }
-    mState->m_luaTask = reinterpret_cast<CLuaTask*>(mCurThread);
+    mState->m_taskStage = mCurThread;
 
     // Disk-watcher task, staged on the session task stage so reloaded script
     // files reach the session state's `__diskwatch` callbacks.
@@ -1804,7 +1803,7 @@ namespace
       // (see SCR_FromLocalByteStream); the binary calls SCR_FromByteStream.
       currentSync.SCR_FromLocalByteStream(currentSync, mState, &syncReader);
       mState->GetGlobals().SetObject("Sync", currentSync);
-      SIM_AddRestoredUiData(currentSync, mState); // engine addition (replay keyframes)
+      SIM_AddRestoredUiData(currentSync, mState, IsReplay != 0); // engine addition (replay keyframes)
     }
     (void)SCR_LuaDoString("OnSync()", mState);
 

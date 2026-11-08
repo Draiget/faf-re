@@ -3,7 +3,8 @@
 // Engine addition, not in the shipped binary.
 //
 // HLSL for `ren_Fxaa` (FxaaRenderer): fast approximate anti-aliasing (after
-// Lottes' FXAA 3.11, quality preset 12, with light sub-pixel smoothing) over a copy of the finished world image.
+// Lottes' FXAA 3.11, the search of quality preset 29 and its "high quality" edge thresholds, with a third of its
+// usual sub-pixel smoothing) over a copy of the finished world image.
 // Direct3D 12 and Vulkan have no multisampled back buffer, so this is their
 // anti-aliasing. Luma comes from RGB: alpha holds the glow amount the bloom pass
 // reads next, and the program doesn't write it.
@@ -44,8 +45,9 @@ float4 FxaaPS(float4 position : SV_Position) : SV_Target
     const float lumaMax = max(max(max(lumaN, lumaS), max(lumaE, lumaW)), lumaM);
     const float lumaMin = min(min(min(lumaN, lumaS), min(lumaE, lumaW)), lumaM);
     const float range = lumaMax - lumaMin;
-    // FXAA 3.11's default thresholds: low-contrast texture detail is left alone.
-    if (range < max(0.0833, lumaMax * 0.166)) {
+    // FXAA 3.11's "high quality" thresholds: units against similar ground are smoothed too, while faint texture
+    // detail (under 1/16 of full range) is left alone.
+    if (range < max(0.0625, lumaMax * 0.125)) {
         return float4(colour, 1.0);
     }
 
@@ -64,7 +66,8 @@ float4 FxaaPS(float4 position : SV_Position) : SV_Target
     const float average = (2.0 * (lumaN + lumaS + lumaE + lumaW) + lumaNW + lumaNE + lumaSW + lumaSE) / 12.0;
     const float subpixel = saturate(abs(average - lumaM) / range);
     const float subpixelBlend = (-2.0 * subpixel + 3.0) * subpixel * subpixel;
-    // 0.25 of FXAA's sub-pixel smoothing (its sharpest usual setting) keeps rock and ground texture crisp.
+    // 0.25 of FXAA's sub-pixel smoothing (its sharpest usual setting): at 0.5 the speckle of rock and ground
+    // textures softened visibly, which edge smoothing doesn't need.
     const float subpixelOffset = subpixelBlend * subpixelBlend * 0.25;
 
     if (!horizontal) {
@@ -97,9 +100,11 @@ float4 FxaaPS(float4 position : SV_Position) : SV_Target
     float endP = Luma(positive) - lumaEdge;
     bool doneN = abs(endN) >= threshold;
     bool doneP = abs(endP) >= threshold;
-    const float steps[7] = { 1.5, 2.0, 2.0, 2.0, 2.0, 4.0, 8.0 };
+    // Preset 29's steps: long, nearly level edges (hulls, buildings, the shore) find their ends and blend in a
+    // smooth ramp instead of in short stairs.
+    const float steps[11] = { 1.5, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 4.0, 8.0 };
     [unroll]
-    for (int i = 0; i < 7; ++i) {
+    for (int i = 0; i < 11; ++i) {
         if (doneN && doneP) {
             break;
         }

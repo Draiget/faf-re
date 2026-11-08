@@ -109,11 +109,16 @@ namespace faf::server
 
     // Plan WPR.49: what the relay reads of a `CLobby` message (type, 16-bit whole size, payload): its type.
     const std::uint8_t type = message[0];
+    bool eject = false;
     if (type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_Rejected) || type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_DeletePeer)) {
-      return verdict(ELobbyRelayVerdict::EjectIgnored);
+      // Plan WP17.1: only a player-hosted lobby's current host ejects.
+      if (mControl != ELobbyControl::Player || mHost == 0 || from != mHost) {
+        return verdict(ELobbyRelayVerdict::EjectIgnored);
+      }
+      eject = true;
     }
     std::span<const std::uint8_t> forwarded = message;
-    if (!mPinned.empty() && message.size() > kMessageHeaderBytes
+    if (mControl == ELobbyControl::Organiser && !mPinned.empty() && message.size() > kMessageHeaderBytes
         && (type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_BroadcastScriptData)
             || type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_DirectScriptData))) {
       mPayload.assign(message.begin() + kMessageHeaderBytes, message.end());
@@ -134,15 +139,31 @@ namespace faf::server
     writer.Byte(static_cast<std::uint8_t>(remote::net::ESeatMessage::Lobby));
     writer.Varint(static_cast<std::uint64_t>(from));
     writer.Bytes(forwarded.data(), forwarded.size());
-    return verdict(ELobbyRelayVerdict::Forward);
+    return verdict(eject ? ELobbyRelayVerdict::EjectForwarded : ELobbyRelayVerdict::Forward);
+  }
+
+  std::optional<ELobbyControl> ReadLobbyControl(const std::string_view text) noexcept
+  {
+    if (text == "organiser") {
+      return ELobbyControl::Organiser;
+    }
+    if (text == "player") {
+      return ELobbyControl::Player;
+    }
+    return std::nullopt;
   }
 
   std::vector<std::uint8_t> CLobbyRelay::FrameFromServer(const std::span<const std::uint8_t> message)
   {
+    return FrameFrom(0, message);
+  }
+
+  std::vector<std::uint8_t> CLobbyRelay::FrameFrom(const std::int32_t from, const std::span<const std::uint8_t> message)
+  {
     std::vector<std::uint8_t> out;
     remote::net::ByteWriter writer(out);
     writer.Byte(static_cast<std::uint8_t>(remote::net::ESeatMessage::Lobby));
-    writer.Varint(0u);
+    writer.Varint(static_cast<std::uint64_t>(from < 0 ? 0 : from));
     writer.Bytes(message.data(), message.size());
     return out;
   }

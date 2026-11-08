@@ -1205,7 +1205,7 @@ void Sim::AdvanceBeat(const int amt)
         TickTaskStage(&mTaskStageB);
       }
       {
-        // The sim Lua state's m_luaTask is this stage (Sim::Setup), so its Lua threads run here too.
+        // The sim Lua state's m_taskStage is this stage (Sim::Setup), so its Lua threads run here too.
         FAF_PROFILE_ZONE_NAMED("Sim::LuaThreadsAndDiskWatcher");
         TickTaskStage(&mDiskWatcherTaskStage);
       }

@@ -266,3 +266,10 @@ target_link_libraries(faf_damage_callback_stack_tests PRIVATE faf_engine gtest_m
 set_target_properties(faf_damage_callback_stack_tests PROPERTIES FOLDER "Tests/Sim")
 add_test(NAME damage_callback_stack COMMAND faf_damage_callback_stack_tests)
 set_tests_properties(damage_callback_stack PROPERTIES LABELS "Sim")
+
+# Regression for collision allocator; no game data required.
+add_executable(faf_occupation_manager_tests EXCLUDE_FROM_ALL "collision_allocator/OccupationManagerTests.cpp")
+target_link_libraries(faf_occupation_manager_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
+set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")

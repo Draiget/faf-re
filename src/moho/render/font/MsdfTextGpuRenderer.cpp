@@ -243,6 +243,10 @@ float4 MsdfTextPS(QuadVertex input) : SV_Target
     if (!ren_GpuUiQuads) {
       return false;
     }
+    // The record holds one Z: a world quad lying on the ground (a build footprint) would flatten to nothing.
+    if (topLeft.mZ != topRight.mZ || topLeft.mZ != bottomRight.mZ || topLeft.mZ != bottomLeft.mZ) {
+      return false;
+    }
     CD3DDevice* const device = D3D_GetDevice();
     CD3DEffect* const effect = device != nullptr ? device->GetCurEffect() : nullptr;
     if (effect == nullptr) {

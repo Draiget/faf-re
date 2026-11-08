@@ -3,7 +3,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <span>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -20,9 +22,23 @@
 // participant is one the match names, so an eject (`LOBMSG_Rejected`, which `CLobby::KickPeer` sends, and
 // `LOBMSG_DeletePeer`) never reaches anyone; and the match's pinned game options are written over whatever a message
 // carries for them (LobbyScriptData.h), so nobody's lobby shows other values than the game will be launched with.
+//
+// Plan WP17.1: those rules belong to an organised lobby (`MatchLobbyControl` "organiser", the default). In a lobby a
+// player hosts ("player") the host keeps a host's powers: an eject from the current logical host goes through (and
+// the server takes that participant out of the match), anyone else's is dropped, and nothing is pinned.
 
 namespace faf::server
 {
+  /** Plan WP17.1: who controls a server lobby (the match file's `MatchLobbyControl`). */
+  enum class ELobbyControl : std::uint8_t
+  {
+    Organiser, // nobody in it hosts: the match's options and slots hold (WPR.49)
+    Player,    // the logical host changes options and ejects, as a host does
+  };
+
+  /** "organiser" or "player"; nothing for any other text. */
+  [[nodiscard]] std::optional<ELobbyControl> ReadLobbyControl(std::string_view text) noexcept;
+
   struct SLobbyRelayLimits
   {
     std::size_t maxMessageBytes = 16u * 1024u; // one lobby message; FAF's largest, the game options, is a few KB
@@ -42,7 +58,8 @@ namespace faf::server
     TooLarge,
     TooFast,       // past the sender's rate
     Malformed,     // no uid, or no message after it
-    EjectIgnored,  // plan WPR.49: an eject of a participant of the match
+    EjectIgnored,  // plan WPR.49: an eject of a participant of the match (organised, or not from the host)
+    EjectForwarded, // plan WP17.1: a player-hosted lobby's host ejects a participant: `out` goes to `to`, who is out
     Count
   };
 
@@ -59,6 +76,11 @@ namespace faf::server
     [[nodiscard]] bool Open() const noexcept { return mOpen; }
     /** Plan WPR.49: the game options the match pins, which no participant's message changes. */
     void PinOptions(SPinnedOptions pinned) { mPinned = std::move(pinned); }
+    /** Plan WP17.1: organised (the default) or player-hosted. */
+    void SetControl(const ELobbyControl control) noexcept { mControl = control; }
+    [[nodiscard]] ELobbyControl Control() const noexcept { return mControl; }
+    /** The current logical host (0: none), whose ejects go through in a player-hosted lobby. */
+    void SetHost(const std::int32_t uid) noexcept { mHost = uid; }
 
     /**
      * A `Lobby` frame's body from `from` (varint uid it is for, then the message) at `nowUs`. With `Forward`, `to`
@@ -73,6 +95,9 @@ namespace faf::server
 
     /** The frame for `to` carrying a message from the server itself (uid 0). */
     [[nodiscard]] static std::vector<std::uint8_t> FrameFromServer(std::span<const std::uint8_t> message);
+    /** Plan WP17.2: the frame for a participant carrying a message the server sends in `from`'s name (the lobby's
+     * host, for what only a host may send: FAF lobby.lua takes `GameOptions` from the host alone). */
+    [[nodiscard]] static std::vector<std::uint8_t> FrameFrom(std::int32_t from, std::span<const std::uint8_t> message);
 
     [[nodiscard]] std::uint64_t Count(ELobbyRelayVerdict verdict) const noexcept { return mCounts[static_cast<std::size_t>(verdict)]; }
     /** Forwarded messages whose pinned options were written back. */
@@ -89,6 +114,8 @@ namespace faf::server
     SLobbyRelayLimits mLimits;
     std::map<std::int32_t, SBucket> mSenders;
     bool mOpen = true;
+    ELobbyControl mControl = ELobbyControl::Organiser;
+    std::int32_t mHost = 0;
     SPinnedOptions mPinned;
     std::vector<std::uint8_t> mPayload;
     std::uint64_t mOptionsPinned = 0;

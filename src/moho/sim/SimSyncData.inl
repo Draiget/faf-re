@@ -814,7 +814,7 @@ Sim::Sim(LaunchInfoBase* const info)
   if (SCR_IsDebugWindowActive()) {
     lua_sethook(mLuaState->m_state, &moho::DebugLuaHook, 4, 0);
   }
-  mLuaState->m_luaTask = reinterpret_cast<CLuaTask*>(&mDiskWatcherTaskStage);
+  mLuaState->m_taskStage = &mDiskWatcherTaskStage;
   static_cast<RRuleGameRulesImpl*>(mRules)->OnSimHasBlueprints();
 
   {

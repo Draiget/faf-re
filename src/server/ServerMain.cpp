@@ -24,10 +24,12 @@
 #include <ctime>
 #include <exception>
 #include <filesystem>
+#include <cstdint>
 #include <fstream>
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <span>
 #include <sstream>
 #include <string>
@@ -72,6 +74,7 @@
 #include "platform/X87Precision.h"
 #include "remote/net/UdpSocket.h"
 #include "remote/ContentTables.h"
+#include "server/ControlListener.h"
 #include "server/LobbySignaller.h"
 #include "server/ServerNet.h"
 #include "server/ServerViews.h"
@@ -108,6 +111,7 @@ namespace
   volatile std::sig_atomic_t gStopSignal = 0;
   volatile std::sig_atomic_t gPauseRequests = 0;
   volatile std::sig_atomic_t gForceStartRequests = 0; // plan WPR.49: SIGUSR2, the operator starts the match from the lobby
+  faf::server::CControlListener* gControl = nullptr;    // plan WP17.2: the console's lines also go to the control service
 
   [[nodiscard]] double SecondsSince(const Clock::time_point start)
   {
@@ -140,6 +144,16 @@ namespace
     (void)std::strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", &local);
     std::printf("[%s] %s\n", stamp, text);
     gpg::Logf("server: %s", text);
+    if (gControl != nullptr) {
+      gControl->Event("log", "\"text\":" + faf::server::JsonString(text));
+    }
+  }
+
+  [[nodiscard]] std::uint64_t ControlNowUs()
+  {
+    return static_cast<std::uint64_t>(
+      std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()
+    );
   }
 
   [[nodiscard]] std::string ClockText(const double seconds)
@@ -504,6 +518,128 @@ namespace
     return true;
   }
 
+  /** Plan WP17.1: the match file's `MatchLobbyControl` ("organiser", "player"); "organiser" without one. */
+  [[nodiscard]] bool ReadLobbyControl(LuaPlus::LuaState* const state, faf::server::ELobbyControl& control, std::string& error)
+  {
+    const LuaPlus::LuaObject text = state->GetGlobal("MatchLobbyControl");
+    control = faf::server::ELobbyControl::Organiser;
+    if (text.IsNil()) {
+      return true;
+    }
+    const std::optional<faf::server::ELobbyControl> read = text.IsString() ? faf::server::ReadLobbyControl(text.GetString()) : std::nullopt;
+    if (!read) {
+      error = "MatchLobbyControl is \"organiser\" or \"player\"";
+      return false;
+    }
+    control = *read;
+    return true;
+  }
+
+  /** Plan WP17.1: a game option's value as the console shows it. */
+  [[nodiscard]] std::string OptionText(const LuaPlus::LuaObject& value)
+  {
+    if (value.IsString()) {
+      return value.GetString();
+    }
+    if (value.IsNumber()) {
+      char text[32];
+      std::snprintf(text, sizeof(text), "%g", value.GetNumber());
+      return text;
+    }
+    if (value.IsBoolean()) {
+      return value.GetBoolean() ? "true" : "false";
+    }
+    return value.IsNil() ? "nil" : "a table";
+  }
+
+  /** Plan WP17.1: the same option value: strings, numbers and booleans by value; a table is always taken as new. */
+  [[nodiscard]] bool SameOption(const LuaPlus::LuaObject& a, const LuaPlus::LuaObject& b)
+  {
+    if (a.IsString() && b.IsString()) {
+      return std::strcmp(a.GetString(), b.GetString()) == 0;
+    }
+    if (a.IsNumber() && b.IsNumber()) {
+      return a.GetNumber() == b.GetNumber();
+    }
+    if (a.IsBoolean() && b.IsBoolean()) {
+      return a.GetBoolean() == b.GetBoolean();
+    }
+    return a.IsNil() && b.IsNil();
+  }
+
+  struct STakenOption
+  {
+    std::string key;
+    LuaPlus::LuaObject before; // nil when the match didn't set it
+  };
+
+  /**
+   * Plan WP17.1: a player-hosted lobby's launch, already checked against the match (`CheckLaunch`: map, human seats, no
+   * sim mods): the host's game options go over the match's `GameOptions`, but for those the server set up before the
+   * lobby: `ScenarioFile` (the map), `GameSpeed` (the client manager's speed) and `TeamLock` (team views). Returns each
+   * option changed, with its value before, so it can be put back.
+   */
+  [[nodiscard]] std::vector<STakenOption> TakeHostOptions(LuaPlus::LuaObject& config, LuaPlus::LuaObject& requested)
+  {
+    std::vector<STakenOption> taken;
+    LuaPlus::LuaObject options = config["GameOptions"];
+    LuaPlus::LuaObject hostOptions = requested["GameOptions"];
+    if (!options.IsTable() || !hostOptions.IsTable()) {
+      return taken;
+    }
+    for (LuaPlus::LuaTableIterator it(&hostOptions, 1); !it.m_isDone; it.Next()) {
+      const LuaPlus::LuaObject key = it.GetKey();
+      const LuaPlus::LuaObject value = it.GetValue();
+      if (!key.IsString()) {
+        continue;
+      }
+      const std::string name = key.GetString();
+      if (name == "ScenarioFile" || name == "GameSpeed" || name == "TeamLock") {
+        continue;
+      }
+      const LuaPlus::LuaObject before = options[name.c_str()];
+      if (SameOption(before, value)) {
+        continue;
+      }
+      taken.push_back(STakenOption{name, before});
+      options.SetObject(name.c_str(), value);
+    }
+    return taken;
+  }
+
+  void PutBackOptions(LuaPlus::LuaObject& config, const std::vector<STakenOption>& taken)
+  {
+    LuaPlus::LuaObject options = config["GameOptions"];
+    for (const STakenOption& option : taken) {
+      if (option.before.IsNil()) {
+        options.SetNil(option.key.c_str());
+      } else {
+        options.SetObject(option.key.c_str(), option.before);
+      }
+    }
+  }
+
+  /** Plan WP17.1: why a rebuilt launch's seats aren't the ones the server's seats were made for; empty when they are. */
+  [[nodiscard]] std::string SeatsDiffer(
+    const moho::SLaunchBuild& before, const moho::CLaunchRoster& beforeRoster, const moho::SLaunchBuild& after, const moho::CLaunchRoster& afterRoster
+  )
+  {
+    if (after.clientCount != before.clientCount || after.localClientIndex != before.localClientIndex || after.localSourceId != before.localSourceId) {
+      return "the clients or the server's own source differ";
+    }
+    const std::vector<moho::SLaunchClient>& a = beforeRoster.Remotes();
+    const std::vector<moho::SLaunchClient>& b = afterRoster.Remotes();
+    if (a.size() != b.size()) {
+      return "the players differ";
+    }
+    for (std::size_t i = 0; i < a.size(); ++i) {
+      if (a[i].uid != b[i].uid || a[i].clientIndex != b[i].clientIndex || a[i].commandSource != b[i].commandSource) {
+        return std::string(a[i].name.c_str()) + "'s seat differs";
+      }
+    }
+    return {};
+  }
+
   /** What to call the game: the match file's `MatchName`, or the map's name without its `<LOC id>`. */
   [[nodiscard]] std::string ReadMatchTitle(const LuaPlus::LuaObject& config, LuaPlus::LuaState* const state)
   {
@@ -656,6 +792,10 @@ namespace
     if (ReadOption("--lobby-away-seconds", text)) {
       netConfig.lobbyAwaySeconds = std::atof(text.c_str());
     }
+    if (!ReadLobbyControl(state, netConfig.lobbyControl, end.error)) {
+      Say("Can't host: %s", end.error.c_str());
+      return kExitBadInput;
+    }
 
     moho::CLaunchRoster roster(kServerUid, kServerName, {});
     // As a lockstep game's host launches it: each player may pause as often as the match's `Timeouts` says
@@ -706,6 +846,103 @@ namespace
     if (listening) {
       net = std::make_unique<faf::server::CServerNet>(netConfig);
     }
+    // Plan WP17.2: the control API, for the control service only (research/WP17.2-control-api.md).
+    std::unique_ptr<faf::server::CControlListener> control;
+    struct SControlUnhook
+    {
+      ~SControlUnhook() { gControl = nullptr; } // before `control` goes: no `Say` reaches it after
+    } controlUnhook;
+    if (ReadOption("--control", text)) {
+      faf::remote::net::SEndpoint controlAt;
+      std::string keyPath;
+      faf::server::ControlKey controlKey{};
+      std::string controlError;
+      if (!faf::remote::net::ParseEndpoint(text, controlAt)) {
+        controlError = "--control takes <ip:port>, not " + text;
+      } else if (!ReadOption("--control-key", keyPath)) {
+        controlError = "--control needs --control-key <file>: 64 hex digits";
+      } else {
+        std::ifstream keyFile(keyPath);
+        std::stringstream keyText;
+        keyText << keyFile.rdbuf();
+        if (!keyFile || !faf::server::ReadControlKey(keyText.str(), controlKey)) {
+          controlError = "--control-key " + keyPath + " isn't 64 hex digits";
+        }
+      }
+      if (controlError.empty()) {
+        control = std::make_unique<faf::server::CControlListener>();
+        if (!control->Open(controlAt, controlKey, controlError)) {
+          control.reset();
+        }
+      }
+      if (!control) {
+        end.error = controlError;
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      }
+      gControl = control.get();
+      Say("Control API on %s", controlAt.Text().c_str());
+    }
+    const auto controlSeats = [&net]() {
+      std::string seats = "\"seats\":[";
+      if (net) {
+        bool first = true;
+        for (const faf::server::CServerNet::SSeatState& seat : net->Seats()) {
+          const auto flag = [](const bool on) { return on ? "true" : "false"; };
+          seats += std::string(first ? "" : ",") + "{\"uid\":" + std::to_string(seat.uid) + ",\"name\":" + faf::server::JsonString(seat.name) +
+                   ",\"joined\":" + flag(seat.joined) + ",\"loaded\":" + flag(seat.loaded) + ",\"lost\":" + flag(seat.lost) +
+                   ",\"gone\":" + flag(seat.gone) + ",\"away\":" + flag(seat.away) + ",\"ping_ms\":" + std::to_string(seat.pingMs) + "}";
+          first = false;
+        }
+      }
+      return seats + "]";
+    };
+    // The requests that mean the same in the lobby and the game; false for one the caller answers.
+    const auto controlCommon = [&net, &control](const faf::server::SControlRequest& request) {
+      if (request.op == "allow" || request.op == "disallow") {
+        faf::remote::net::SEndpoint address;
+        if (!net) {
+          control->Refuse(request.id, "this server has no players (--listen)");
+        } else if (!faf::remote::net::ParseEndpoint(request.address + ":1", address)) {
+          control->Refuse(request.id, request.op + " needs an IPv4 address, a.b.c.d");
+        } else {
+          net->RequestAddress(address.ip, request.op == "allow");
+          Say("The control service %s %s", request.op == "allow" ? "allows" : "takes off the allowlist", request.address.c_str());
+          control->Reply(request.id, {});
+        }
+        return true;
+      }
+      if (request.op != "eject") {
+        return false;
+      }
+      if (!net) {
+        control->Refuse(request.id, "this server has no players (--listen)");
+      } else if (request.uid <= 0 || request.uid > INT32_MAX) {
+        control->Refuse(request.id, "eject needs a participant's uid");
+      } else if (!net->RequestEject(static_cast<std::int32_t>(request.uid), request.reason)) {
+        control->Refuse(request.id, "no participant with uid " + std::to_string(request.uid));
+      } else {
+        control->Reply(request.id, {});
+      }
+      return true;
+    };
+    // Plan WP17.2: what happened, as data, beside the console's lines.
+    const auto controlEvent = [&control](const std::string_view name, const std::string& fields) {
+      if (control) {
+        control->Event(name, fields);
+      }
+    };
+    std::set<std::int32_t> controlLeftSaid; // a seat's `left` once, from the lobby or the game
+    const auto controlLeft = [&controlEvent, &controlLeftSaid](const std::int32_t uid) {
+      if (controlLeftSaid.insert(uid).second) {
+        controlEvent("left", "\"uid\":" + std::to_string(uid));
+      }
+    };
+    const auto controlNews = [&control] {
+      for (const std::string& line : control->TakeNews()) {
+        Say("%s", line.c_str());
+      }
+    };
     const std::map<std::int32_t, std::string> tokens = ReadTokens(state);
     for (const moho::SLaunchClient& client : roster.Remotes()) {
       faf::remote::CServerClient& seat = faf::remote::CServerClient::Create(
@@ -731,8 +968,12 @@ namespace
         Say("%d addresses from MatchAddresses get a full handshake budget; others share a small one, and a valid token lists them",
             static_cast<int>(allowedAddresses.size()));
       }
+      faf::server::SPinnedOptions lobbyPins; // plan WP17.2: the organised lobby's pins, which set_options adds to
       if (lobbySeconds <= 0.0) {
         net->CloseLobby(); // the game starts at once: nothing to relay (plan WPR.51)
+      } else if (netConfig.lobbyControl == faf::server::ELobbyControl::Player) {
+        // Plan WP17.1: a player hosts with a host's powers: nothing pinned, and the host's ejects go through.
+        Say("Lobby: hosted by a player (MatchLobbyControl \"player\"): the host may change game options and eject");
       } else {
         faf::server::SPinnedOptions pinned = ReadPinnedOptions(state, config);
         std::string keys;
@@ -740,6 +981,7 @@ namespace
           keys += (keys.empty() ? "" : ", ") + key;
         }
         Say("Lobby: %d game options pinned%s%s", static_cast<int>(pinned.size()), keys.empty() ? "" : ": ", keys.c_str());
+        lobbyPins = pinned;
         net->PinLobbyOptions(std::move(pinned));
       }
       std::string netError;
@@ -759,6 +1001,7 @@ namespace
           signaller.AddParticipant(client.uid, client.name.c_str());
         }
         Say("Lobby open for %.0f s, hosted by uid %d", lobbySeconds, static_cast<int>(signaller.Host()));
+        net->SetLobbyHost(signaller.Host()); // plan WP17.1: whose ejects go through in a player-hosted lobby
         const Clock::time_point lobbyEnd = Clock::now() + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(lobbySeconds));
         std::vector<faf::server::CLobbySignaller::SOutgoing> out;
         std::size_t lastIn = 0;
@@ -775,6 +1018,26 @@ namespace
           message.kind = kind;
           message.text = std::move(text);
           net->QueueLobbyFromServer(to, faf::remote::net::EncodeLobbySignal(message));
+        };
+        // Plan WP17.1, WP17.2: the launch built again once config's GameOptions changed (the host's or the organiser's),
+        // on the seats the server made, so the server's sim starts from what the players' LaunchInfo says. Empty, or why
+        // not (then `taken` is put back).
+        const auto relaunch = [&](const std::vector<STakenOption>& taken) -> std::string {
+          moho::CLaunchRoster rebuiltRoster(kServerUid, kServerName, {});
+          moho::SLaunchBuild rebuilt = moho::BuildLaunchInfo(config, rebuiltRoster, seed, true, state);
+          std::string why = rebuilt.failure != nullptr ? std::string("they don't launch: ") + rebuilt.failure : SeatsDiffer(build, roster, rebuilt, rebuiltRoster);
+          if (!why.empty()) {
+            PutBackOptions(config, taken);
+            return why;
+          }
+          for (moho::SSTICommandSource& source : rebuilt.launchInfo->mCommandSources.mSrcs) {
+            if (source.mIndex == rebuilt.localSourceId) {
+              source.mTimeouts = -1; // as for the match's own launch above
+            }
+          }
+          build = std::move(rebuilt);
+          sessionInfo->mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
+          return {};
         };
         while (!launched && Clock::now() < lobbyEnd && gStopSignal == 0) {
           for (const faf::server::CServerNet::SLobbyMessage& message : net->TakeLobbyMessages()) {
@@ -794,12 +1057,30 @@ namespace
             } else {
               refusal = faf::server::CheckLaunch(ReadLaunchFacts(requested), matchFacts);
             }
+            // Plan WP17.1: a player-hosted lobby starts with its host's game options, on the seats the server made.
+            if (refusal.empty() && netConfig.lobbyControl == faf::server::ELobbyControl::Player) {
+              const std::vector<STakenOption> taken = TakeHostOptions(config, requested);
+              if (!taken.empty()) {
+                refusal = relaunch(taken);
+                if (!refusal.empty()) {
+                  refusal = "the host's game options change the match's seats: " + refusal;
+                } else {
+                  std::string changed;
+                  LuaPlus::LuaObject options = config["GameOptions"];
+                  for (const STakenOption& option : taken) {
+                    changed += (changed.empty() ? "" : ", ") + option.key + "=" + OptionText(options[option.key.c_str()]);
+                  }
+                  Say("Lobby: the host's game options: %s", changed.c_str());
+                }
+              }
+            }
             if (!refusal.empty()) {
               Say("Lobby: launch refused: %s", refusal.c_str());
               signal(message.from, faf::remote::net::ELobbySignal::LaunchRefused, refusal);
               continue;
             }
             Say("Lobby: the host launched; starting the match");
+            controlEvent("launched", "\"by\":\"host\"");
             for (const std::int32_t uid : signaller.InLobbyUids()) {
               signal(uid, faf::remote::net::ELobbySignal::Launching, {});
             }
@@ -809,16 +1090,20 @@ namespace
           // each client starts from the server's LaunchInfo whatever its lobby is doing.
           if (!launched && gForceStartRequests != forceStartsBefore) {
             Say("Lobby: the operator forces the start; the match starts as the match file says");
+            controlEvent("launched", "\"by\":\"operator\"");
             launched = true;
           }
           for (const std::int32_t uid : net->TakeLobbyJoined()) {
             signaller.OnJoined(uid, out);
+            controlEvent("joined", "\"uid\":" + std::to_string(uid));
           }
           for (const std::int32_t uid : net->TakeLobbyLeft()) {
             signaller.OnLeft(uid, out);
+            controlLeft(uid);
           }
           // Plan WPR.50: a logical host gone quiet is succeeded; whoever is heard again gets the role it missed.
           for (const faf::server::CServerNet::SPresence& change : net->TakeLobbyPresence()) {
+            controlEvent(change.away ? "away" : "back", "\"uid\":" + std::to_string(change.uid));
             if (change.away) {
               signaller.OnAway(change.uid, out);
             } else {
@@ -832,6 +1117,8 @@ namespace
           if (const std::int32_t host = signaller.Host(); host != lastHost && host != 0) {
             Say("Lobby: uid %d hosts now, in place of uid %d (succession %u)", static_cast<int>(host), static_cast<int>(lastHost), signaller.Successions());
             lastHost = host;
+            net->SetLobbyHost(host);
+            controlEvent("host", "\"uid\":" + std::to_string(host));
           }
           if (const std::size_t in = signaller.InLobby(); in != lastIn) {
             lastIn = in;
@@ -842,6 +1129,88 @@ namespace
           }
           for (const std::string& line : net->TakeNews()) {
             Say("%s", line.c_str());
+          }
+          // Plan WP17.2: the control service's requests in the lobby.
+          if (control) {
+            std::vector<faf::server::SControlRequest> requests;
+            control->Poll(requests, ControlNowUs());
+            for (const faf::server::SControlRequest& request : requests) {
+              if (request.op == "status") {
+                control->Reply(request.id, "\"phase\":\"lobby\",\"host\":" + std::to_string(signaller.Host()) + "," + controlSeats());
+              } else if (request.op == "set_options") {
+                // Plan WP17.2: an organised lobby's options from the organiser: the launch, the pins, and the players' screens.
+                std::vector<std::pair<std::string, std::string>> pairs;
+                for (std::size_t start = 0; start < request.options.size();) {
+                  const std::size_t comma = std::min(request.options.find(',', start), request.options.size());
+                  const std::string pair = request.options.substr(start, comma - start);
+                  if (const std::size_t equals = pair.find('='); equals != std::string::npos && equals > 0u) {
+                    pairs.emplace_back(pair.substr(0, equals), pair.substr(equals + 1));
+                  }
+                  start = comma + 1;
+                }
+                const auto fixed = std::find_if(pairs.begin(), pairs.end(), [](const auto& pair) {
+                  return pair.first == "ScenarioFile" || pair.first == "GameSpeed" || pair.first == "TeamLock";
+                });
+                if (netConfig.lobbyControl == faf::server::ELobbyControl::Player) {
+                  control->Refuse(request.id, "a player-hosted lobby's options are its host's");
+                } else if (pairs.empty()) {
+                  control->Refuse(request.id, "set_options needs options: Key=Value,Key=Value");
+                } else if (fixed != pairs.end()) {
+                  control->Refuse(request.id, fixed->first + " is set before the lobby opens; the match file has it");
+                } else {
+                  LuaPlus::LuaObject options = config["GameOptions"];
+                  std::vector<STakenOption> taken;
+                  for (const auto& [key, value] : pairs) {
+                    taken.push_back(STakenOption{key, options[key.c_str()]});
+                    options.SetString(key.c_str(), value.c_str());
+                  }
+                  if (const std::string why = relaunch(taken); !why.empty()) {
+                    control->Refuse(request.id, "those options change the match's seats: " + why);
+                  } else {
+                    LuaPlus::LuaObject table;
+                    table.AssignNewTable(state, 0, static_cast<unsigned>(pairs.size()));
+                    for (const auto& [key, value] : pairs) {
+                      lobbyPins[key] = LuaValueBytes(options[key.c_str()]);
+                      table.SetString(key.c_str(), value.c_str());
+                    }
+                    net->RequestPins(lobbyPins);
+                    // The other participants' lobby screens, in the host's name (lobby.lua takes GameOptions from the host
+                    // alone). The host isn't sent one: a frame in its own uid would look like a new peer to it.
+                    LuaPlus::LuaObject data;
+                    data.AssignNewTable(state, 0, 2u);
+                    data.SetString("Type", "GameOptions");
+                    data.SetObject("Options", table);
+                    moho::CMessage script(moho::ELobbyMsg::LOBMSG_BroadcastScriptData);
+                    bool encoded = false;
+                    {
+                      moho::CMessageStream stream(script, moho::CMessageStream::Access::kReadWrite);
+                      encoded = data.ToByteStream(stream);
+                    }
+                    std::size_t told = 0;
+                    if (encoded) {
+                      const auto* const bytes = reinterpret_cast<const std::uint8_t*>(script.mBuff.start_);
+                      const std::vector<std::uint8_t> message(bytes, bytes + script.mBuff.Size());
+                      for (const std::int32_t uid : signaller.InLobbyUids()) {
+                        if (uid != signaller.Host()) {
+                          net->QueueLobbyAs(uid, signaller.Host(), message);
+                          ++told;
+                        }
+                      }
+                    }
+                    Say("The control service sets the game options: %s", request.options.c_str());
+                    control->Reply(request.id, "\"options\":" + std::to_string(pairs.size()) + ",\"told\":" + std::to_string(told));
+                    controlEvent("options", "\"options\":" + faf::server::JsonString(request.options));
+                  }
+                }
+              } else if (request.op == "force_start") {
+                Say("The control service forces the start");
+                gForceStartRequests = gForceStartRequests + 1;
+                control->Reply(request.id, {});
+              } else if (!controlCommon(request)) {
+                control->Refuse(request.id, request.op == "pause" || request.op == "resume" || request.op == "end" ? "the game hasn't started" : "unknown op " + request.op);
+              }
+            }
+            controlNews();
           }
           std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
@@ -981,6 +1350,8 @@ namespace
     // Beats go on while the game is paused, and no game time with them.
     int pausedBeats = 0;
     std::int32_t pausedBy = -1;
+    // The operator's (SIGUSR1, control API) pause or resume asked of the driver, until the game is so: a beat or more.
+    std::optional<bool> operatorPauseWanted;
     int pauseRequestsDone = 0;
     // `--away-pause-seconds`: the game waits for a player who lost the connection, from a budget each has for the game.
     const auto serverSource = static_cast<std::int32_t>(sessionInfo->mSourceId);
@@ -1057,6 +1428,69 @@ namespace
         break;
       }
       sayNetNews();
+      // Plan WP17.2: the control service's requests in the game. Pause and resume take the operator's path (SIGUSR1).
+      if (control) {
+        std::vector<faf::server::SControlRequest> requests;
+        control->Poll(requests, ControlNowUs());
+        for (const faf::server::SControlRequest& request : requests) {
+          const bool pending = gPauseRequests != pauseRequestsDone;
+          if (request.op == "status") {
+            control->Reply(
+              request.id, "\"phase\":\"game\",\"started\":" + std::string(started ? "true" : "false") + ",\"beat\":" + std::to_string(end.lastBeat) +
+                            ",\"paused\":" + std::string(pausedBy != -1 ? "true" : "false") + "," + controlSeats()
+            );
+          } else if (request.op == "pause" || request.op == "resume") {
+            const bool pause = request.op == "pause";
+            if (!started) {
+              control->Refuse(request.id, "the game hasn't started");
+            } else if (pending) {
+              control->Refuse(request.id, "a pause or resume is on its way");
+            } else if (pause == operatorPauseWanted.value_or(pausedBy != -1)) {
+              control->Refuse(request.id, pause ? "the game is paused already" : "the game isn't paused");
+            } else {
+              gPauseRequests = gPauseRequests + 1;
+              control->Reply(request.id, {});
+            }
+          } else if (request.op == "force_start") {
+            control->Refuse(request.id, "the game has started");
+          } else if (request.op == "end") {
+            // Plan WP15.4 (#200): the organiser ends the game now, with each army's result if given ("1=victory,2=defeat",
+            // army numbers from 1 as the sim's `GameResult` has them). With results it counts as ended; without, as stopped.
+            std::vector<std::pair<std::size_t, std::string>> results;
+            std::string bad;
+            for (std::size_t start = 0; start < request.results.size() && bad.empty();) {
+              const std::size_t comma = std::min(request.results.find(',', start), request.results.size());
+              const std::string pair = request.results.substr(start, comma - start);
+              const std::size_t equals = pair.find('=');
+              const int army = equals == std::string::npos ? 0 : std::atoi(pair.substr(0, equals).c_str());
+              const std::string outcome = equals == std::string::npos ? std::string() : pair.substr(equals + 1);
+              if (army < 1 || static_cast<std::size_t>(army) > end.players.size() ||
+                  (outcome != "victory" && outcome != "defeat" && outcome != "draw")) {
+                bad = pair;
+              } else {
+                results.emplace_back(static_cast<std::size_t>(army - 1), outcome);
+              }
+              start = comma + 1;
+            }
+            if (!bad.empty()) {
+              control->Refuse(request.id, "end takes results as army=victory|defeat|draw, armies 1 to " + std::to_string(end.players.size()) + ", not " + bad);
+            } else {
+              for (const auto& [index, outcome] : results) {
+                end.players[index].result = outcome + " 0";
+                Say("%s: %s (set by the organiser)", end.players[index].name.c_str(), outcome.c_str());
+              }
+              end.ended = !results.empty();
+              end.stoppedBy = "the organiser" + (request.reason.empty() ? std::string() : ": " + request.reason);
+              stopped = true;
+              Say("The control service ends the game%s", results.empty() ? "" : " with a result");
+              control->Reply(request.id, "\"results\":" + std::to_string(results.size()));
+            }
+          } else if (!controlCommon(request)) {
+            control->Refuse(request.id, "unknown op " + request.op);
+          }
+        }
+        controlNews();
+      }
       if (net && net->NobodyCame()) {
         end.stoppedBy = "nobody connected";
         Say("Nobody connected in time");
@@ -1064,8 +1498,10 @@ namespace
       }
       if (const int requests = gPauseRequests; started && requests != pauseRequestsDone) {
         pauseRequestsDone = requests;
-        Say("The operator asks to %s the game", pausedBy == -1 ? "pause" : "resume");
-        if (pausedBy == -1) {
+        const bool pause = !operatorPauseWanted.value_or(pausedBy != -1); // against what the game will be, not what it was
+        Say("The operator asks to %s the game", pause ? "pause" : "resume");
+        operatorPauseWanted = pause;
+        if (pause) {
           driver->RequestPause();
         } else {
           driver->Resume();
@@ -1074,6 +1510,11 @@ namespace
       if (net && started) {
         // Plan WP3.5, WP14.2. The reconnect window runs on meanwhile. A pause someone else ends or takes over isn't renewed.
         for (const faf::server::CServerNet::SPresence& change : net->TakePresence()) {
+          if (change.gone) {
+            controlLeft(change.uid);
+          } else {
+            controlEvent(change.away ? "away" : "back", "\"uid\":" + std::to_string(change.uid));
+          }
           if (awayPauseSeconds <= 0.0) {
             continue;
           }
@@ -1170,6 +1611,9 @@ namespace
             Say("Game paused, at game time %s", GameClockText(end.lastBeat - pausedBeats).c_str());
           }
           pausedBy = packet->mPausedBy;
+          if (operatorPauseWanted && *operatorPauseWanted == (pausedBy != -1)) {
+            operatorPauseWanted.reset(); // the game is where the operator asked
+          }
         }
         if (moho::CClientManagerImpl* const manager = driver->GetClientManager(); manager != nullptr) {
           nextBeatAt = std::max(nextBeatAt, lastBeatAt - kMaxCatchUpSeconds) + faf::server::SecondsPerBeat(manager->GetSimRateRequested());
@@ -1182,6 +1626,7 @@ namespace
           // `WLD_DoInitializing`: the first beat is applied, then this client declares itself ready.
           started = true;
           Say("Game started");
+          controlEvent("game_started", "\"beat\":" + std::to_string(end.lastBeat));
           if (moho::CClientManagerImpl* const manager = driver->GetClientManager(); manager != nullptr) {
             manager->Cleanup();
           }
@@ -1235,6 +1680,10 @@ namespace
     driver.reset();
 
     WriteResult(resultPath, end);
+    controlEvent(
+      "game_ended", "\"ended\":" + std::string(end.ended ? "true" : "false") + ",\"beats\":" + std::to_string(end.beats) +
+                      ",\"stopped_by\":" + faf::server::JsonString(end.stoppedBy) + ",\"error\":" + faf::server::JsonString(end.error)
+    );
     if (end.ended) {
       Say("Game ended: game time %s, real time %s", GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(end.seconds).c_str());
     } else if (!end.error.empty()) {

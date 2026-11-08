@@ -277,19 +277,19 @@ do
         end
         table.insert(video.items, position, {
             title = 'Anti-aliasing (FXAA)',
-            key = 'fxaa',
+            -- 'fxaa' held -1 (Automatic, which followed the Anti-Aliasing setting) before FXAA was on by default.
+            key = 'fxaa_on',
             type = 'toggle',
-            default = -1,
-            tip = 'Smooths jagged edges on Direct3D 12 and Vulkan. Automatic follows the Anti-Aliasing setting. Other renderers ignore it.',
+            default = 1,
+            tip = 'Smooths jagged edges on Direct3D 12 and Vulkan. Other renderers ignore it.',
             set = function(key, value, startup)
-                if value ~= 0 and value ~= 1 and value ~= -1 then
-                    value = -1
+                if value ~= 0 then
+                    value = 1
                 end
                 ConExecute(command .. ' ' .. tostring(value))
             end,
             custom = {
                 states = {
-                    { text = 'Automatic', key = -1 },
                     { text = '<LOC _On>', key = 1 },
                     { text = '<LOC _Off>', key = 0 },
                 },

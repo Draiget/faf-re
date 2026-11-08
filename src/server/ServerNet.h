@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -47,6 +48,8 @@ namespace faf::server
      * 0: only the channel's timeout.
      */
     double lobbyAwaySeconds = 6.0;
+    /** Plan WP17.1: the match file's `MatchLobbyControl`: organised (WPR.49's rules) or player-hosted. */
+    ELobbyControl lobbyControl = ELobbyControl::Organiser;
   };
 
   class CServerNet final : private remote::net::CServerLinks::IEvents
@@ -91,6 +94,7 @@ namespace faf::server
     {
       std::int32_t uid;
       bool away;
+      bool gone = false; // out of the game: no longer away, and not back either
     };
     /** Who went away or stopped being away since the last call, in order. */
     [[nodiscard]] std::vector<SPresence> TakePresence();
@@ -107,6 +111,10 @@ namespace faf::server
     [[nodiscard]] std::vector<SLobbyMessage> TakeLobbyMessages();
     /** A lobby signal from the server to a participant, in order, once they've joined. From any thread. */
     void QueueLobbyFromServer(std::int32_t uid, const std::vector<std::uint8_t>& message);
+    /** Plan WP17.2: a lobby message to `uid` in `from`'s name (`CLobbyRelay::FrameFrom`), queued like the server's own. */
+    void QueueLobbyAs(std::int32_t uid, std::int32_t from, const std::vector<std::uint8_t>& message);
+    /** Plan WP17.2: a new set of pinned options while the lobby is open; applied on the network thread. */
+    void RequestPins(SPinnedOptions pinned);
     /** Participants whose channel came up for the first time since the last call, for the lobby's signals. */
     [[nodiscard]] std::vector<std::int32_t> TakeLobbyJoined();
     /** Participants out of the game since the last call, for the lobby's signals (the game's views read `TakeGone`). */
@@ -118,6 +126,26 @@ namespace faf::server
     [[nodiscard]] std::vector<SPresence> TakeLobbyPresence();
     /** At launch (plan WPR.51): the relay takes nothing more. From any thread. */
     void CloseLobby() noexcept { mCloseLobby.store(true, std::memory_order_relaxed); }
+
+    /** Plan WP17.2: a seat as the control API reports it, refreshed on the network thread. */
+    struct SSeatState
+    {
+      std::int32_t uid = 0;
+      std::string name;
+      bool joined = false;
+      bool loaded = false;
+      bool lost = false;
+      bool gone = false;
+      bool away = false; // quiet in the lobby
+      std::uint32_t pingMs = 0;
+    };
+    [[nodiscard]] std::vector<SSeatState> Seats();
+    /** Plan WP17.2: the organiser takes a participant out of the match; done on the network thread. False: no such seat. */
+    bool RequestEject(std::int32_t uid, std::string reason);
+    /** Plan WP17.2: the organiser adds an address to the handshake allowlist or takes it off; done on the network thread. */
+    void RequestAddress(std::uint32_t ip, bool allow);
+    /** Plan WP17.1: the current logical host (0: none), from the lobby's succession; its ejects go through in a player-hosted lobby. */
+    void SetLobbyHost(const std::int32_t uid) noexcept { mLobbyHost.store(uid, std::memory_order_relaxed); }
     /** Before `Start` (plan WPR.49): the game options the match pins (`CLobbyRelay::PinOptions`). */
     void PinLobbyOptions(SPinnedOptions pinned) { mLobby.PinOptions(std::move(pinned)); }
     /** Forwarded lobby messages whose pinned options were written back; after `Stop`. */
@@ -231,10 +259,15 @@ namespace faf::server
 
     std::mutex mNewsLock;
     std::vector<std::string> mNews;
+    std::vector<SSeatState> mSeatStates;                         // under mNewsLock
+    std::vector<std::pair<std::int32_t, std::string>> mEjects;   // likewise: uid, reason
+    std::vector<std::pair<std::uint32_t, bool>> mAddressChanges; // likewise: ip, allow
+    std::optional<SPinnedOptions> mPinsIn;                      // likewise
 
     CLobbyRelay mLobby;                        // on the network thread
     std::vector<std::uint8_t> mLobbyFrame;     // the frame being relayed
     std::atomic<bool> mCloseLobby{false};
+    std::atomic<std::int32_t> mLobbyHost{0};
     std::uint64_t mLobbyUndelivered = 0;       // relayed to a participant with no channel
     std::vector<SLobbyMessage> mLobbyIn;       // for the host; under mNewsLock
     std::vector<std::int32_t> mLobbyLeft;      // likewise

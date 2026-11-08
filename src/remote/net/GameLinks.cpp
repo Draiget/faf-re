@@ -36,6 +36,12 @@ namespace faf::remote::net
     mAllowed.insert(ip);
   }
 
+  void CServerLinks::DisallowAddress(const std::uint32_t ip)
+  {
+    mAllowlistOn = true;
+    mAllowed.erase(ip);
+  }
+
   bool CServerLinks::TakeAddressBudget(const std::uint32_t ip, const std::uint64_t nowUs) noexcept
   {
     // Salted, so a flood can't pick addresses that share a player's bucket.

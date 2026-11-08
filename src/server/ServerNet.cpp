@@ -6,6 +6,7 @@
 #include <span>
 #include <utility>
 
+#include "moho/net/ELobbyMsg.h"
 #include "remote/ServerClient.h"
 #include "remote/net/Datagram.h"
 
@@ -43,7 +44,9 @@ namespace faf::server
 
   CServerNet::CServerNet(const SServerNetConfig& config)
     : mConfig(config)
-  {}
+  {
+    mLobby.SetControl(config.lobbyControl);
+  }
 
   CServerNet::~CServerNet()
   {
@@ -90,6 +93,14 @@ namespace faf::server
     while (!mStop.load(std::memory_order_relaxed)) {
       mNowUs = NowUs();
       // Time since the start, as a cookie's period counts from 0.
+      mLobby.SetHost(mLobbyHost.load(std::memory_order_relaxed));
+      {
+        const std::scoped_lock lock(mNewsLock);
+        if (mPinsIn) {
+          mLobby.PinOptions(std::move(*mPinsIn)); // plan WP17.2: the organiser's options from now on
+          mPinsIn.reset();
+        }
+      }
       if (mLobby.Open() && mCloseLobby.load(std::memory_order_relaxed)) {
         mLobby.Close();
       }
@@ -297,6 +308,18 @@ namespace faf::server
     mLobbyOut.push_back(SLobbyMessage{uid, CLobbyRelay::FrameFromServer(message)});
   }
 
+  void CServerNet::QueueLobbyAs(const std::int32_t uid, const std::int32_t from, const std::vector<std::uint8_t>& message)
+  {
+    const std::scoped_lock lock(mViewLock);
+    mLobbyOut.push_back(SLobbyMessage{uid, CLobbyRelay::FrameFrom(from, message)});
+  }
+
+  void CServerNet::RequestPins(SPinnedOptions pinned)
+  {
+    const std::scoped_lock lock(mNewsLock);
+    mPinsIn = std::move(pinned);
+  }
+
   void CServerNet::SendLobby()
   {
     std::vector<SLobbyMessage> sending;
@@ -323,9 +346,72 @@ namespace faf::server
     }
   }
 
+  std::vector<CServerNet::SSeatState> CServerNet::Seats()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    return mSeatStates;
+  }
+
+  bool CServerNet::RequestEject(const std::int32_t uid, std::string reason)
+  {
+    const std::scoped_lock lock(mNewsLock);
+    const bool known = std::any_of(mSeatStates.begin(), mSeatStates.end(), [uid](const SSeatState& seat) { return seat.uid == uid && !seat.gone; });
+    if (known) {
+      mEjects.emplace_back(uid, std::move(reason));
+    }
+    return known;
+  }
+
+  void CServerNet::RequestAddress(const std::uint32_t ip, const bool allow)
+  {
+    const std::scoped_lock lock(mNewsLock);
+    mAddressChanges.emplace_back(ip, allow);
+  }
+
   void CServerNet::Tick(const std::uint64_t nowUs)
   {
     WatchLobbyPresence(nowUs);
+
+    // Plan WP17.2: the organiser's ejects and allowlist changes, and the seats as the control API reports them.
+    std::vector<std::pair<std::int32_t, std::string>> ejects;
+    std::vector<std::pair<std::uint32_t, bool>> addresses;
+    {
+      const std::scoped_lock lock(mNewsLock);
+      ejects.swap(mEjects);
+      addresses.swap(mAddressChanges);
+    }
+    for (const auto& [ip, allow] : addresses) {
+      if (allow) {
+        mLinks.AllowAddress(ip);
+      } else {
+        mLinks.DisallowAddress(ip);
+      }
+    }
+    for (const auto& [uid, reason] : ejects) {
+      if (const auto found = mSeats.find(uid); found != mSeats.end() && !found->second.gone) {
+        Remove(uid, found->second, "ejected by the organiser" + (reason.empty() ? std::string() : ": " + reason));
+      }
+    }
+    std::vector<SSeatState> states;
+    states.reserve(mSeats.size());
+    for (const auto& [uid, seat] : mSeats) {
+      SSeatState state;
+      state.uid = uid;
+      state.name = seat.name;
+      state.joined = seat.joinedEver;
+      state.loaded = seat.loaded;
+      state.lost = seat.lost;
+      state.gone = seat.gone;
+      state.away = seat.lobbyAway;
+      if (const remote::net::ChannelStats* const stats = mLinks.StatsOf(uid); stats != nullptr && !seat.gone) {
+        state.pingMs = static_cast<std::uint32_t>(stats->rttSmoothedUs / 1000u);
+      }
+      states.push_back(std::move(state));
+    }
+    {
+      const std::scoped_lock lock(mNewsLock);
+      mSeatStates.swap(states);
+    }
 
     if (const std::int32_t beat = mBeat.load(std::memory_order_relaxed); beat != mBeatSent) {
       mBeatSent = beat;
@@ -474,7 +560,7 @@ namespace faf::server
       const std::scoped_lock lock(mNewsLock);
       mGone.push_back(uid);
       mLobbyLeft.push_back(uid);
-      mPresence.push_back(SPresence{uid, false});
+      mPresence.push_back(SPresence{uid, false, true});
     }
     Say(seat.name + " is out of the game: " + why);
   }
@@ -504,6 +590,7 @@ namespace faf::server
            std::to_string(mLobby.Count(ELobbyRelayVerdict::TooLarge)) + " too large, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::Closed)) + " after launch, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::EjectIgnored)) + " ejects of participants, " +
+           std::to_string(mLobby.Count(ELobbyRelayVerdict::EjectForwarded)) + " ejects by a player host relayed, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::UnknownSender) + mLobby.Count(ELobbyRelayVerdict::UnknownTarget) +
                           mLobby.Count(ELobbyRelayVerdict::Malformed)) +
            " malformed or misaddressed; " + std::to_string(mLobby.OptionsPinned()) + " relayed with the match's pinned options written back; " +
@@ -648,9 +735,16 @@ namespace faf::server
       std::span<const std::uint8_t> lobbyMessage;
       const ELobbyRelayVerdict verdict =
         mLobby.Take(uid, std::span<const std::uint8_t>(message).subspan(1), mNowUs, to, mLobbyFrame, lobbyMessage);
-      if (verdict == ELobbyRelayVerdict::Forward) {
+      if (verdict == ELobbyRelayVerdict::Forward || verdict == ELobbyRelayVerdict::EjectForwarded) {
         if (!mLinks.SendReliable(to, mLobbyFrame.data(), mLobbyFrame.size())) {
           ++mLobbyUndelivered;
+        }
+        // Plan WP17.1: a player-hosted lobby's host rejected a participant (`CLobby::KickPeer`): they're out of the match.
+        // (`LOBMSG_DeletePeer` tells the others; it takes nobody out by itself.)
+        if (verdict == ELobbyRelayVerdict::EjectForwarded && lobbyMessage[0] == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_Rejected)) {
+          if (const auto ejected = mSeats.find(to); ejected != mSeats.end() && !ejected->second.gone) {
+            Remove(to, ejected->second, "ejected by the lobby's host, " + seat.name);
+          }
         }
       } else if (verdict == ELobbyRelayVerdict::ToServer) {
         const std::scoped_lock lock(mNewsLock);

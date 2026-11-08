@@ -50,7 +50,9 @@ expect:
     - { uids: [3], pattern: 'PEERS: everyone supports OrderStreamCheck: no' }
     - { uids: [1, 3], pattern: 'Connection dialogue opening due to disconnection' }
   logsAbsent:
-    - { uids: [3], pattern: 'REJOIN' }
+    # The two of ours still trade seat keys ("gave its seat's key"); retail never gets them. Any line
+    # that means rejoin acted fails: a held seat, an offer to the launcher, a seat taken back.
+    - { uids: [3], pattern: 'REJOIN: (link to client|told the launcher|client \d+ proved|client \d+:\S+ came back|client \d+:\S+ is asked|taking source|received a save|caught up)' }
     - { uids: [3], pattern: 'mismatched' }
   logsAgree:
     - { uids: [1, 3], pattern: 'faf_re_lockstep: (status tick=2401 .*)' }
