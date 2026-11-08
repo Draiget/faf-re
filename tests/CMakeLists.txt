@@ -2,8 +2,10 @@
 # (faf_engine, src/CMakeLists.txt). Use GoogleTest (gtest / gtest_main) for all
 # tests instead of custom test harnesses.
 #
-#   cmake --build --preset clang-x64-release --target existing_tests
-#   ctest --test-dir build/clang-x64-release -L Existing
+#   cmake --build --preset clang-x64-release --target faf_tests
+#   ctest --test-dir build/clang-x64-release --output-on-failure
+#
+# faf_tests builds every executable here that links gtest (cmake/FafTests.cmake).
 
 add_executable(faf_net_tests EXCLUDE_FROM_ALL net/NetRobustnessTests.cpp)
 target_link_libraries(faf_net_tests PRIVATE faf_engine gtest_main)
@@ -59,7 +61,10 @@ set_tests_properties(profiler_facade PROPERTIES LABELS "Existing")
 # Engine addition: the stable shadow box (ren_ShadowStable), pure maths with no device.
 add_executable(faf_shadow_fit_tests EXCLUDE_FROM_ALL render/ShadowStableFitTests.cpp)
 target_include_directories(faf_shadow_fit_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_shadow_fit_tests PRIVATE gtest_main)
+set_target_properties(faf_shadow_fit_tests PROPERTIES FOLDER "Tests/Render")
 add_test(NAME shadow_stable_fit COMMAND faf_shadow_fit_tests)
+set_tests_properties(shadow_stable_fit PROPERTIES LABELS "Render")
 
 # Engine addition: EffectScan.h against the std::regex patterns it replaced, on generated text.
 add_executable(faf_effect_scan_tests EXCLUDE_FROM_ALL effect_scan/EffectScanTests.cpp)
@@ -72,7 +77,10 @@ set_tests_properties(effect_scan PROPERTIES LABELS "Existing")
 # Engine addition: where UserDecal:SetOrientation puts a decal's corner so it stays centred.
 add_executable(faf_scripted_decal_tests EXCLUDE_FROM_ALL scripted_decal/PlacementTests.cpp)
 target_include_directories(faf_scripted_decal_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_scripted_decal_tests PRIVATE gtest_main)
+set_target_properties(faf_scripted_decal_tests PROPERTIES FOLDER "Tests/Render")
 add_test(NAME scripted_decal_placement COMMAND faf_scripted_decal_tests)
+set_tests_properties(scripted_decal_placement PROPERTIES LABELS "Render")
 
 # Engine addition: ImageCodec's DDS writer against the d3dx11_43.dll the process loads, so the
 # same exe checks Microsoft's on Windows and Wine's under Wine.
@@ -154,9 +162,10 @@ target_link_libraries(faf_registration_dump PRIVATE faf_engine)
 # Engine addition (dedicated-server plan WPL.4, WPR.11): every map in a list
 # loaded with the client's and the headless terrain resource, compared
 # (tests/terrain). Needs the game data: run it from a folder staged like the
-# game's bin folder, with /init.
+# game's bin folder with --maps <list> /init <init.lua>; without them its test is skipped.
 add_executable(faf_terrain_check EXCLUDE_FROM_ALL terrain/TerrainCheck.cpp)
-target_link_libraries(faf_terrain_check PRIVATE faf_engine)
+target_link_libraries(faf_terrain_check PRIVATE faf_engine gtest)
+set_target_properties(faf_terrain_check PROPERTIES FOLDER "Tests/Terrain")
 
 # Engine addition (dedicated-server plan WPR.21): the difffuzz targets on the
 # engine's objects, checked against retail's outputs (tests/math_dump/golden.txt)
@@ -273,3 +282,7 @@ target_link_libraries(faf_occupation_manager_tests PRIVATE faf_engine gtest_main
 set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim")
 add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
 set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
+
+# Every GoogleTest executable above and in the subdirectories.
+include(FafTests)
+faf_add_tests_target("${CMAKE_CURRENT_SOURCE_DIR}")

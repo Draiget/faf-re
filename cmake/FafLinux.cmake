@@ -66,6 +66,7 @@ endforeach()
 set(FAF_DEPENDENCIES_DIR "${PROJECT_SOURCE_DIR}/dependencies" CACHE PATH
     "Third-party tree (dependencies/ in the repository)")
 
+include(FafCoverage)
 include(FafCodegen)
 include(FafWarnings)
 
@@ -74,8 +75,10 @@ include(FafWarnings)
 # contraction, exceptions through extern "C", threads, default x87 and SSE
 # control words. Run it after a toolchain change; `ldd` on it shows the C++
 # library is linked statically.
+enable_testing()
 add_executable(faf-linux-toolchain-check "${PROJECT_SOURCE_DIR}/tests/linux/ToolchainCheck.cpp")
-target_link_libraries(faf-linux-toolchain-check PRIVATE faf_codegen)
+target_link_libraries(faf-linux-toolchain-check PRIVATE faf_codegen gtest_main)
+add_test(NAME linux_toolchain COMMAND faf-linux-toolchain-check)
 
 # --- Language dialect ---------------------------------------------------------------------
 # clang-cl compiles the Windows build with -fms-extensions -fms-compatibility
@@ -113,6 +116,8 @@ if(TARGET faf_netchannel)
   target_link_libraries(faf_netchannel_tests PRIVATE faf_netchannel faf_monocypher gtest_main)
   add_executable(faf_gamelink_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/GameLinkTests.cpp")
   target_link_libraries(faf_gamelink_tests PRIVATE faf_netchannel faf_monocypher gtest_main)
+  add_test(NAME remote_netchannel COMMAND faf_netchannel_tests)
+  add_test(NAME remote_gamelink COMMAND faf_gamelink_tests)
 endif()
 
 # --- faf_sim ----------------------------------------------------------------------------
@@ -261,6 +266,7 @@ add_custom_command(TARGET faf_sim_math_tests POST_BUILD
   COMMAND "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args}
   COMMENT "Checking the simulation's arithmetic against tests/sim_math/golden.txt"
   VERBATIM)
+add_test(NAME sim_math COMMAND "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args})
 
 # --- faf_math_dump (plan WPR.21) --------------------------------------------------------
 # The difffuzz targets on every faf_sim object, as Windows builds them on faf_engine,
@@ -326,6 +332,7 @@ target_link_options(server PRIVATE -Wl,--error-limit=0)
 add_executable(faf_server_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SpeedWatchTests.cpp")
 target_include_directories(faf_server_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
 target_link_libraries(faf_server_tests PRIVATE gtest_main)
+add_test(NAME server_speed_watch COMMAND faf_server_tests)
 
 add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp" "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
   "${PROJECT_SOURCE_DIR}/tests/server/ControlChannelTests.cpp"
@@ -339,6 +346,7 @@ add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/serv
 target_link_libraries(faf_seat_tests PRIVATE faf_sim faf_netchannel faf_monocypher gtest_main)
 target_compile_definitions(faf_seat_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_seat_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME server_seat COMMAND faf_seat_tests)
 
 # Plan WP17.2: a client of the control API, for operators and tests.
 add_executable(faf_server_control EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/server-control/ControlMain.cpp"
@@ -362,6 +370,7 @@ add_executable(faf_remote_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/re
 target_link_libraries(faf_remote_tests PRIVATE faf_sim gtest_main)
 target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_remote_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME remote_wire COMMAND faf_remote_tests)
 
 # The libm gate (plan WPL.13): the faf_sim objects call no host libm transcendental outside
 # tests/linux/libm_allowlist.txt; headless is not built while one does.
@@ -381,7 +390,6 @@ add_executable(faf_registration_dump_sim EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}
 target_link_libraries(faf_registration_dump_sim PRIVATE faf_sim)
 
 # Regression for lua damage stack; no game data required.
-enable_testing()
 add_executable(faf_damage_callback_stack_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/lua/DamageCallbackStackTests.cpp")
 target_link_libraries(faf_damage_callback_stack_tests PRIVATE faf_sim gtest_main)
 set_target_properties(faf_damage_callback_stack_tests PROPERTIES FOLDER "Tests/Sim")
@@ -397,3 +405,8 @@ add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
 set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
 target_compile_definitions(faf_occupation_manager_tests PRIVATE FAF_OCCUPATION_DELETE_TRACE=1)
 target_link_options(faf_occupation_manager_tests PRIVATE -Wl,--wrap=_Znwm -Wl,--wrap=_Znam -Wl,--wrap=_ZdlPv -Wl,--wrap=_ZdaPv)
+
+# --- faf_tests --------------------------------------------------------------------------
+# Every GoogleTest executable of the Linux build (cmake/FafTests.cmake).
+include(FafTests)
+faf_add_tests_target("${PROJECT_SOURCE_DIR}")

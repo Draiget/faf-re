@@ -83,6 +83,12 @@
       "cacheVariables": { "FAF_PGO_GENERATE": "ON", "FAF_PGO_PROFILE": "" }
     },
     {
+      "name": "clang-x64-release-coverage",
+      "displayName": "clang-cl x64 with llvm-cov coverage counters (tools/coverage/report.sh)",
+      "inherits": "clang-x64-release",
+      "cacheVariables": { "FAF_PGO_PROFILE": "", "FAF_COVERAGE": "ON" }
+    },
+    {
       "name": "linux-clang-x64-release",
       "displayName": "Linux clang x64 Release (headless simulation, profile-guided)",
       "generator": "Ninja",
@@ -99,6 +105,15 @@
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
       "toolchainFile": "${sourceDir}/cmake/toolchains/linux-clang-x64.cmake",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "linux-clang-x64-release-coverage",
+      "displayName": "Linux clang x64 with llvm-cov coverage counters (tools/coverage/report.sh)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+      "toolchainFile": "${sourceDir}/cmake/toolchains/linux-clang-x64.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "FAF_COVERAGE": "ON" }
     },
     {
       "name": "linux-clang-x64-release-pgogen",
@@ -124,6 +139,8 @@
     { "name": "clang-x86-release-server", "configurePreset": "clang-x86-release-server" },
     { "name": "linux-clang-x64-release", "configurePreset": "linux-clang-x64-release" },
     { "name": "linux-clang-x64-release-plain", "configurePreset": "linux-clang-x64-release-plain" },
-    { "name": "linux-clang-x64-release-pgogen", "configurePreset": "linux-clang-x64-release-pgogen" }
+    { "name": "linux-clang-x64-release-pgogen", "configurePreset": "linux-clang-x64-release-pgogen" },
+    { "name": "clang-x64-release-coverage", "configurePreset": "clang-x64-release-coverage" },
+    { "name": "linux-clang-x64-release-coverage", "configurePreset": "linux-clang-x64-release-coverage" }
   ]
 }

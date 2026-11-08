@@ -20,17 +20,6 @@
 
 namespace
 {
-  int gFailures = 0;
-
-  void Check(const bool ok, const char* const what)
-  {
-    EXPECT_TRUE(ok) << what;
-    if (!ok) {
-      std::printf("FAIL: %s\n", what);
-      ++gFailures;
-    }
-  }
-
   std::vector<char> ReadFile(const std::string& path)
   {
     std::ifstream in(path, std::ios::binary);
@@ -61,24 +50,24 @@ namespace
   void CheckGlyphShapes(const moho::SMsdfFontAtlas& atlas)
   {
     const moho::SMsdfGlyph* const letterI = FindGlyph(atlas, 'I');
-    Check(letterI != nullptr, "the atlas has I");
+    EXPECT_TRUE(letterI != nullptr) << "the atlas has I";
     if (letterI != nullptr) {
       // The middle of an I is ink; the corners of its box are past the outline.
       const float middleX = 0.5f * (letterI->mAtlasLeft + letterI->mAtlasRight);
       const float middleY = 0.5f * (letterI->mAtlasTop + letterI->mAtlasBottom);
-      Check(MedianAt(atlas, middleX, middleY) > 127, "the middle of I is inside");
-      Check(MedianAt(atlas, letterI->mAtlasLeft, letterI->mAtlasTop) < 127, "the top-left of I's box is outside");
-      Check(MedianAt(atlas, letterI->mAtlasRight, letterI->mAtlasBottom) < 127, "the bottom-right of I's box is outside");
+      EXPECT_TRUE(MedianAt(atlas, middleX, middleY) > 127) << "the middle of I is inside";
+      EXPECT_TRUE(MedianAt(atlas, letterI->mAtlasLeft, letterI->mAtlasTop) < 127) << "the top-left of I's box is outside";
+      EXPECT_TRUE(MedianAt(atlas, letterI->mAtlasRight, letterI->mAtlasBottom) < 127) << "the bottom-right of I's box is outside";
     }
     const moho::SMsdfGlyph* const space = FindGlyph(atlas, ' ');
-    Check(space != nullptr && space->mAdvance > 0.0f && space->mAtlasRight == 0.0f, "a space advances and has no box");
+    EXPECT_TRUE(space != nullptr && space->mAdvance > 0.0f && space->mAtlasRight == 0.0f) << "a space advances and has no box";
     const moho::SMsdfGlyph* const letterO = FindGlyph(atlas, 'O');
-    Check(letterO != nullptr, "the atlas has O");
+    EXPECT_TRUE(letterO != nullptr) << "the atlas has O";
     if (letterO != nullptr) {
       // The hole of an O is outside, so the winding is right.
       const float middleX = 0.5f * (letterO->mAtlasLeft + letterO->mAtlasRight);
       const float middleY = 0.5f * (letterO->mAtlasTop + letterO->mAtlasBottom);
-      Check(MedianAt(atlas, middleX, middleY) < 127, "the hole of O is outside");
+      EXPECT_TRUE(MedianAt(atlas, middleX, middleY) < 127) << "the hole of O is outside";
     }
     // A blend of two boxes' texels can have a median near the outline, so empty texels keep them apart.
     for (const moho::SMsdfGlyph& glyph : atlas.mGlyphs) {
@@ -91,40 +80,36 @@ namespace
       for (int row = top; left > 0 && row <= bottom; ++row) {
         const std::uint8_t* const texel =
           atlas.mPixels.data() + (static_cast<std::size_t>(row) * static_cast<std::size_t>(atlas.mWidth) + static_cast<std::size_t>(left - 1)) * 4u;
-        Check(texel[0] == 0u && texel[1] == 0u && texel[2] == 0u, "the texels left of a box are empty");
+        EXPECT_TRUE(texel[0] == 0u && texel[1] == 0u && texel[2] == 0u) << "the texels left of a box are empty";
       }
     }
     for (const moho::SMsdfGlyph& glyph : atlas.mGlyphs) {
-      Check(
-        glyph.mAtlasLeft >= 0.0f && glyph.mAtlasRight <= static_cast<float>(atlas.mWidth) && glyph.mAtlasTop >= 0.0f
-          && glyph.mAtlasBottom <= static_cast<float>(atlas.mHeight),
-        "every glyph is inside the atlas"
-      );
+      EXPECT_TRUE(glyph.mAtlasLeft >= 0.0f && glyph.mAtlasRight <= static_cast<float>(atlas.mWidth) && glyph.mAtlasTop >= 0.0f
+          && glyph.mAtlasBottom <= static_cast<float>(atlas.mHeight)) << "every glyph is inside the atlas";
     }
   }
 
   void CheckCache(const moho::SMsdfFontAtlas& atlas)
   {
     const std::vector<std::uint8_t> saved = moho::MSDF_SaveAtlas(atlas);
-    Check(!saved.empty(), "an atlas saves");
+    EXPECT_FALSE(saved.empty()) << "an atlas saves";
 
     moho::SMsdfFontAtlas loaded;
-    Check(moho::MSDF_LoadAtlas(saved.data(), saved.size(), loaded), "a saved atlas loads");
-    Check(loaded.mPixels == atlas.mPixels, "pixels survive the cache");
-    Check(loaded.mGlyphs.size() == atlas.mGlyphs.size(), "glyphs survive the cache");
-    Check(loaded.mMissing == atlas.mMissing, "the missing count survives the cache");
+    EXPECT_TRUE(moho::MSDF_LoadAtlas(saved.data(), saved.size(), loaded)) << "a saved atlas loads";
+    EXPECT_EQ(loaded.mPixels, atlas.mPixels) << "pixels survive the cache";
+    EXPECT_EQ(loaded.mGlyphs.size(), atlas.mGlyphs.size()) << "glyphs survive the cache";
+    EXPECT_EQ(loaded.mMissing, atlas.mMissing) << "the missing count survives the cache";
 
     moho::SMsdfFontAtlas refused;
-    Check(!moho::MSDF_LoadAtlas(nullptr, 0u, refused), "nothing is refused");
-    Check(!moho::MSDF_LoadAtlas(saved.data(), saved.size() / 2u, refused), "a cut-short file is refused");
+    EXPECT_FALSE(moho::MSDF_LoadAtlas(nullptr, 0u, refused)) << "nothing is refused";
+    EXPECT_FALSE(moho::MSDF_LoadAtlas(saved.data(), saved.size() / 2u, refused)) << "a cut-short file is refused";
     std::vector<std::uint8_t> damaged = saved;
     damaged[0] ^= 0xFFu;
-    Check(!moho::MSDF_LoadAtlas(damaged.data(), damaged.size(), refused), "a wrong magic is refused");
+    EXPECT_FALSE(moho::MSDF_LoadAtlas(damaged.data(), damaged.size(), refused)) << "a wrong magic is refused";
     damaged = saved;
     damaged[damaged.size() / 2u] ^= 0xFFu;
     damaged[damaged.size() / 2u + 1u] ^= 0xFFu;
-    Check(!moho::MSDF_LoadAtlas(damaged.data(), damaged.size(), refused) || refused.mPixels.size() == atlas.mPixels.size(),
-      "damaged data is refused, or at least stays in bounds");
+    EXPECT_TRUE(!moho::MSDF_LoadAtlas(damaged.data(), damaged.size(), refused) || refused.mPixels.size() == atlas.mPixels.size()) << "damaged data is refused, or at least stays in bounds";
     std::printf("cache: %zu bytes packed from %zu\n", saved.size(), atlas.mPixels.size());
   }
 
@@ -136,9 +121,9 @@ namespace
     std::string error;
 
     const char notAFont[] = "MZ this is a program, not a font";
-    Check(!moho::MSDF_CookFont(notAFont, sizeof(notAFont), options, atlas, error), "a file that isn't a font is refused");
-    Check(moho::MSDF_ReadFontNames(notAFont, sizeof(notAFont)).empty(), "a file that isn't a font has no names");
-    Check(!moho::MSDF_CookFont(nullptr, 0u, options, atlas, error), "no bytes are refused");
+    EXPECT_FALSE(moho::MSDF_CookFont(notAFont, sizeof(notAFont), options, atlas, error)) << "a file that isn't a font is refused";
+    EXPECT_TRUE(moho::MSDF_ReadFontNames(notAFont, sizeof(notAFont)).empty()) << "a file that isn't a font has no names";
+    EXPECT_FALSE(moho::MSDF_CookFont(nullptr, 0u, options, atlas, error)) << "no bytes are refused";
 
     // Cut short at several points: refused or cooked, but never a crash.
     for (const std::size_t divisor : {2u, 3u, 7u, 50u, 1000u}) {
@@ -148,7 +133,7 @@ namespace
 
     moho::SMsdfCookOptions small = options;
     small.mMaxAtlasHeight = 256;
-    Check(!moho::MSDF_CookFont(font.data(), font.size(), small, atlas, error), "glyphs that don't fit are refused");
+    EXPECT_FALSE(moho::MSDF_CookFont(font.data(), font.size(), small, atlas, error)) << "glyphs that don't fit are refused";
   }
 
   void Dump(const moho::SMsdfFontAtlas& atlas, const std::string& folder)
@@ -184,13 +169,13 @@ TEST(Existing_MsdfFontCook, CookAndValidate)
 
   moho::SMsdfFontAtlas oneThread;
   auto start = std::chrono::steady_clock::now();
-  Check(moho::MSDF_CookFont(font.data(), font.size(), options, oneThread, error), error.c_str());
+  EXPECT_TRUE(moho::MSDF_CookFont(font.data(), font.size(), options, oneThread, error)) << error.c_str();
   const auto oneMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
 
   options.mThreads = 4;
   moho::SMsdfFontAtlas fourThreads;
   start = std::chrono::steady_clock::now();
-  Check(moho::MSDF_CookFont(font.data(), font.size(), options, fourThreads, error), error.c_str());
+  EXPECT_TRUE(moho::MSDF_CookFont(font.data(), font.size(), options, fourThreads, error)) << error.c_str();
   const auto fourMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
 
   std::printf(
@@ -198,7 +183,7 @@ TEST(Existing_MsdfFontCook, CookAndValidate)
     oneThread.mMissing, oneThread.mWidth, oneThread.mHeight, static_cast<long long>(oneMs), static_cast<long long>(fourMs)
   );
 
-  Check(oneThread.mPixels == fourThreads.mPixels, "the thread count doesn't change the pixels");
+  EXPECT_EQ(oneThread.mPixels, fourThreads.mPixels) << "the thread count doesn't change the pixels";
   CheckGlyphShapes(oneThread);
   CheckCache(oneThread);
   CheckBadFiles(font);
@@ -206,7 +191,6 @@ TEST(Existing_MsdfFontCook, CookAndValidate)
     Dump(oneThread, gDumpFolder);
   }
 
-  EXPECT_EQ(gFailures, 0);
 }
 
 int main(int argc, char** argv)

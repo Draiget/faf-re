@@ -118,6 +118,7 @@ if(NOT EXISTS "${FAF_DXSDK_DIR}/Include/d3dx9.h")
 endif()
 
 include(FafPgoWindows)
+include(FafCoverage)
 include(FafCodegen)
 
 # Server-authoritative sessions (docs/SWITCHES.md, "Server mode"): the client's

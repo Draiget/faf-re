@@ -19,8 +19,6 @@
 
 namespace
 {
-#define CHECK(condition) EXPECT_TRUE(condition)
-
   void WriteAdvance(gpg::Stream& stream, const std::int32_t beats)
   {
     moho::CMessage message(moho::ECmdStreamOp::CMDST_Advance);
@@ -45,8 +43,8 @@ namespace
   TEST(Existing_ReplayScan, EmptyStream)
   {
     gpg::MemBufferStream stream(256);
-    CHECK(moho::VCR_ScanReplayBeats(stream) == 0);
-    CHECK(Position(stream) == 0u);
+    EXPECT_EQ(moho::VCR_ScanReplayBeats(stream), 0);
+    EXPECT_EQ(Position(stream), 0u);
   }
 
   TEST(Existing_ReplayScan, OnlyAdvanceMessagesCount)
@@ -57,13 +55,13 @@ namespace
     WriteOther(stream);
     WriteAdvance(stream, 25);
     WriteAdvance(stream, 65);
-    CHECK(moho::VCR_ScanReplayBeats(stream) == 100);
-    CHECK(Position(stream) == 0u);
+    EXPECT_EQ(moho::VCR_ScanReplayBeats(stream), 100);
+    EXPECT_EQ(Position(stream), 0u);
 
     // The stream reads as if nothing had happened.
     moho::CMessage first;
-    CHECK(first.Read(&stream));
-    CHECK(first.GetType().raw() == static_cast<std::uint8_t>(moho::ECmdStreamOp::CMDST_SetCommandSource));
+    EXPECT_TRUE(first.Read(&stream));
+    EXPECT_TRUE(first.GetType().raw() == static_cast<std::uint8_t>(moho::ECmdStreamOp::CMDST_SetCommandSource));
   }
 
   TEST(Existing_ReplayScan, ComesBackToWhereItBegan)
@@ -72,11 +70,11 @@ namespace
     const std::string header = "the replay's header";
     stream.Write(header.data(), header.size());
     char read[32];
-    CHECK(stream.Read(read, header.size()) == header.size());
+    EXPECT_EQ(stream.Read(read, header.size()), header.size());
     WriteAdvance(stream, 15);
     WriteAdvance(stream, 30);
-    CHECK(moho::VCR_ScanReplayBeats(stream) == 45);
-    CHECK(Position(stream) == header.size());
+    EXPECT_EQ(moho::VCR_ScanReplayBeats(stream), 45);
+    EXPECT_EQ(Position(stream), header.size());
   }
 
   TEST(Existing_ReplayScan, TruncatedLastMessage)
@@ -85,8 +83,8 @@ namespace
     WriteAdvance(stream, 50);
     const char partial[] = {'\x00', '\x07'};
     stream.Write(partial, sizeof(partial));
-    CHECK(moho::VCR_ScanReplayBeats(stream) == 50);
-    CHECK(Position(stream) == 0u);
+    EXPECT_EQ(moho::VCR_ScanReplayBeats(stream), 50);
+    EXPECT_EQ(Position(stream), 0u);
   }
 
   TEST(Existing_ReplayScan, NegativeBeatsCountAsNone)
@@ -95,6 +93,6 @@ namespace
     WriteAdvance(stream, 20);
     WriteAdvance(stream, -5);
     WriteAdvance(stream, 1);
-    CHECK(moho::VCR_ScanReplayBeats(stream) == 21);
+    EXPECT_EQ(moho::VCR_ScanReplayBeats(stream), 21);
   }
 } // namespace

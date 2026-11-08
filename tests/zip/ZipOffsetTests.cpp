@@ -179,6 +179,9 @@ namespace
 
   // Below 2 GiB, the first offset with the sign bit set (master marked it invalid), and the
   // highest that leaves room for the payload and the directory under 4 GiB.
+  // GoogleTest 1.15's macro keeps the name generator in a tuple it never reads (-Wunused-variable).
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
   INSTANTIATE_TEST_SUITE_P(
     DataOffsets, ZipOffset, ::testing::Values(0x00000100u, 0x7FFFFF00u, 0x80000000u, 0xFFFFFF00u),
     [](const ::testing::TestParamInfo<std::uint32_t>& info) {
@@ -187,4 +190,5 @@ namespace
       return std::string(text);
     }
   );
+#pragma clang diagnostic pop
 } // namespace
