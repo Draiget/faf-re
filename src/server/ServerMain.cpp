@@ -534,6 +534,7 @@ namespace
     bool fixedSpeed = false;                 // nobody changes the game speed
     bool noCheats = false;                   // `CheatsEnabled` is "false", whatever a host or organiser sets
     std::string defeatedPlayerView;          // plan WP13.4: "observe" (as the original game) or "disconnect" (`--defeated-view`)
+    std::optional<int> gameVersion;          // plan WP15.1: the FAF game version the match is for (`/lua/version.lua`)
   };
 
   [[nodiscard]] bool ReadMatchRules(LuaPlus::LuaState* const state, SMatchRules& matchRules, std::string& error)
@@ -574,6 +575,15 @@ namespace
           seconds("LobbyAwaySeconds", matchRules.lobbyAwaySeconds) && seconds("ObserverDelaySeconds", matchRules.observerDelaySeconds) &&
           flag("FixedSpeed", matchRules.fixedSpeed) && flag("NoCheats", matchRules.noCheats))) {
       return false;
+    }
+    if (const LuaPlus::LuaObject version = table["GameVersion"]; !version.IsNil()) {
+      // A number, or the text FAF's `GetVersion()` returns ("3839").
+      const double number = version.IsNumber() ? version.GetNumber() : (version.IsString() ? std::atof(version.GetString()) : 0.0);
+      if (number < 1.0 || number > 1000000.0 || number != static_cast<double>(static_cast<int>(number))) {
+        error = "MatchRules.GameVersion is FAF's game version, a whole number such as 3839";
+        return false;
+      }
+      matchRules.gameVersion = static_cast<int>(number);
     }
     if (const LuaPlus::LuaObject view = table["DefeatedPlayerView"]; !view.IsNil()) {
       const std::string text = view.IsString() ? view.GetString() : "";
@@ -1438,6 +1448,15 @@ namespace
     // `WLD_DoLoading`: the game version (and with it the engine patches) is fixed before the replay
     // names it and before the driver creates the sim.
     moho::FAF_BeginSession(false);
+    // Plan WP15.1: a match for one FAF release is played on that release's game data, or not at all. The players' data is
+    // the content check's (WP2.6).
+    if (matchRules.gameVersion && *matchRules.gameVersion != moho::FAF_GetSessionGameVersion()) {
+      end.error = "the match is for FAF game version " + std::to_string(*matchRules.gameVersion) + ", and this server's game data is version " +
+                  std::to_string(moho::FAF_GetSessionGameVersion());
+      Say("Can't host: %s", end.error.c_str());
+      WriteResult(resultPath, end);
+      return kExitBadInput;
+    }
 
     std::unique_ptr<LuaPlus::LuaState> sessionState(gameData.mState);
     std::unique_ptr<moho::RRuleGameRules> rules(gameData.mGameRules);
