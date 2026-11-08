@@ -255,6 +255,7 @@ namespace faf::server
   struct CControlListener::SConnection
   {
     int socket = -1;
+    std::uint64_t serial = 0;
     std::string peer;
     std::uint64_t acceptedUs = 0;
     std::unique_ptr<CControlChannel> channel;
@@ -267,7 +268,9 @@ namespace faf::server
 
   CControlListener::~CControlListener()
   {
-    Close(nullptr);
+    for (const std::unique_ptr<SConnection>& connection : mConnections) {
+      Close(*connection, nullptr);
+    }
     if (mListenSocket >= 0) {
       ::close(mListenSocket);
     }
@@ -300,7 +303,9 @@ namespace faf::server
 
   bool CControlListener::Connected() const noexcept
   {
-    return mConnection && mConnection->channel && mConnection->channel->Ready();
+    return std::any_of(mConnections.begin(), mConnections.end(), [](const std::unique_ptr<SConnection>& connection) {
+      return connection->socket >= 0 && connection->channel && connection->channel->Ready();
+    });
   }
 
   std::vector<std::string> CControlListener::TakeNews()
@@ -308,63 +313,87 @@ namespace faf::server
     return std::exchange(mNews, {});
   }
 
-  void CControlListener::Close(const char* const why)
+  void CControlListener::Close(SConnection& connection, const char* const why)
   {
-    if (!mConnection) {
+    if (connection.socket < 0) {
       return;
     }
     if (why != nullptr) {
-      mNews.push_back("control: " + mConnection->peer + " " + why);
+      mNews.push_back("control: " + connection.peer + " " + why);
     }
-    ::close(mConnection->socket);
-    mConnection.reset();
+    ::close(connection.socket);
+    connection.socket = -1;
   }
 
-  void CControlListener::Flush()
+  void CControlListener::DropClosed()
   {
-    while (mConnection && !mConnection->outgoing.empty()) {
-      const ssize_t sent = ::send(mConnection->socket, mConnection->outgoing.data(), mConnection->outgoing.size(), MSG_NOSIGNAL);
+    std::erase_if(mConnections, [](const std::unique_ptr<SConnection>& connection) { return connection->socket < 0; });
+  }
+
+  void CControlListener::Flush(SConnection& connection)
+  {
+    while (connection.socket >= 0 && !connection.outgoing.empty()) {
+      const ssize_t sent = ::send(connection.socket, connection.outgoing.data(), connection.outgoing.size(), MSG_NOSIGNAL);
       if (sent < 0) {
         if (!WouldBlock()) {
-          Close(errno == EPIPE || errno == ECONNRESET ? "disconnected" : "closed (send failed)");
+          Close(connection, errno == EPIPE || errno == ECONNRESET ? "disconnected" : "closed (send failed)");
         }
         return;
       }
-      mConnection->outgoing.erase(mConnection->outgoing.begin(), mConnection->outgoing.begin() + sent);
+      connection.outgoing.erase(connection.outgoing.begin(), connection.outgoing.begin() + sent);
     }
   }
 
-  void CControlListener::Send(const std::string_view json)
+  void CControlListener::Send(SConnection& connection, const std::string_view json)
   {
-    if (!Connected()) {
+    if (connection.socket < 0 || !connection.channel || !connection.channel->Ready()) {
       return;
     }
     const std::vector<std::uint8_t> frame =
-      mConnection->channel->Seal(std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(json.data()), json.size()));
+      connection.channel->Seal(std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(json.data()), json.size()));
     if (frame.empty()) {
       return; // too large for one message
     }
-    if (mConnection->outgoing.size() + frame.size() > kMaxPendingOutBytes) {
-      Close("closed (it doesn't read what the server sends)");
+    if (connection.outgoing.size() + frame.size() > kMaxPendingOutBytes) {
+      Close(connection, "closed (it doesn't read what the server sends)");
       return;
     }
-    mConnection->outgoing.insert(mConnection->outgoing.end(), frame.begin(), frame.end());
-    Flush();
+    connection.outgoing.insert(connection.outgoing.end(), frame.begin(), frame.end());
+    Flush(connection);
+  }
+
+  void CControlListener::Answer(const std::int64_t id, const std::string_view json)
+  {
+    const auto waiting = std::find_if(mWaiting.begin(), mWaiting.end(), [id](const std::pair<std::int64_t, std::uint64_t>& entry) { return entry.first == id; });
+    if (waiting == mWaiting.end()) {
+      return; // no request with this id is waiting: nobody asked
+    }
+    const std::uint64_t serial = waiting->second;
+    mWaiting.erase(waiting);
+    for (const std::unique_ptr<SConnection>& connection : mConnections) {
+      if (connection->serial == serial) {
+        Send(*connection, json);
+        return;
+      }
+    }
   }
 
   void CControlListener::Reply(const std::int64_t id, const std::string_view fields)
   {
-    Send("{\"id\":" + std::to_string(id) + ",\"ok\":true" + (fields.empty() ? std::string() : "," + std::string(fields)) + "}");
+    Answer(id, "{\"id\":" + std::to_string(id) + ",\"ok\":true" + (fields.empty() ? std::string() : "," + std::string(fields)) + "}");
   }
 
   void CControlListener::Refuse(const std::int64_t id, const std::string_view error)
   {
-    Send("{\"id\":" + std::to_string(id) + ",\"ok\":false,\"error\":" + JsonString(error) + "}");
+    Answer(id, "{\"id\":" + std::to_string(id) + ",\"ok\":false,\"error\":" + JsonString(error) + "}");
   }
 
   void CControlListener::Event(const std::string_view name, const std::string_view fields)
   {
-    Send("{\"event\":" + JsonString(name) + (fields.empty() ? std::string() : "," + std::string(fields)) + "}");
+    const std::string json = "{\"event\":" + JsonString(name) + (fields.empty() ? std::string() : "," + std::string(fields)) + "}";
+    for (const std::unique_ptr<SConnection>& connection : mConnections) {
+      Send(*connection, json);
+    }
   }
 
   void CControlListener::Poll(std::vector<SControlRequest>& requests, const std::uint64_t nowUs)
@@ -372,9 +401,12 @@ namespace faf::server
     if (mListenSocket < 0) {
       return;
     }
-    // The open connection first: a service that closed after its reply is gone before the next one is looked at.
-    ReadConnection(requests, nowUs);
-    // New connections: the first is taken, any other while a live one is open is closed at once.
+    // The open connections first: a service that closed after its reply is gone before new ones are counted.
+    for (const std::unique_ptr<SConnection>& connection : mConnections) {
+      ReadConnection(*connection, requests, nowUs);
+    }
+    DropClosed();
+    const std::size_t known = mConnections.size();
     for (;;) {
       sockaddr_in from{};
       socklen_t size = sizeof(from);
@@ -385,11 +417,14 @@ namespace faf::server
       remote::net::SEndpoint peer;
       peer.ip = ntohl(from.sin_addr.s_addr);
       peer.port = ntohs(from.sin_port);
-      if (mConnection && PeerClosed()) {
-        Close(Connected() ? "disconnected" : "disconnected during the handshake");
+      for (const std::unique_ptr<SConnection>& connection : mConnections) {
+        if (PeerClosed(*connection)) {
+          Close(*connection, connection->channel->Ready() ? "disconnected" : "disconnected during the handshake");
+        }
       }
-      if (mConnection) {
-        mNews.push_back("control: " + peer.Text() + " refused: a control connection is open");
+      DropClosed();
+      if (mConnections.size() >= kMaxControlConnections) {
+        mNews.push_back("control: " + peer.Text() + " refused: " + std::to_string(kMaxControlConnections) + " control connections are open");
         ::close(socket);
         continue;
       }
@@ -400,99 +435,111 @@ namespace faf::server
         ::close(socket);
         continue;
       }
-      mConnection = std::make_unique<SConnection>();
-      mConnection->socket = socket;
-      mConnection->peer = peer.Text();
-      mConnection->acceptedUs = nowUs;
-      mConnection->channel = std::make_unique<CControlChannel>(mKey, EControlRole::Server, nonce);
-      mConnection->outgoing.assign(nonce.begin(), nonce.end()); // the server's nonce goes first
-      Flush();
+      auto connection = std::make_unique<SConnection>();
+      connection->socket = socket;
+      connection->serial = mNextSerial++;
+      connection->peer = peer.Text();
+      connection->acceptedUs = nowUs;
+      connection->channel = std::make_unique<CControlChannel>(mKey, EControlRole::Server, nonce);
+      connection->outgoing.assign(nonce.begin(), nonce.end()); // the server's nonce goes first
+      Flush(*connection);
+      mConnections.push_back(std::move(connection));
     }
-    ReadConnection(requests, nowUs);
+    for (std::size_t index = std::min(known, mConnections.size()); index < mConnections.size(); ++index) {
+      ReadConnection(*mConnections[index], requests, nowUs);
+    }
+    DropClosed();
   }
 
-  bool CControlListener::PeerClosed() const
+  bool CControlListener::PeerClosed(const SConnection& connection)
   {
+    if (connection.socket < 0) {
+      return false;
+    }
     std::uint8_t byte = 0;
-    const ssize_t got = ::recv(mConnection->socket, &byte, 1u, MSG_PEEK | MSG_DONTWAIT);
+    const ssize_t got = ::recv(connection.socket, &byte, 1u, MSG_PEEK | MSG_DONTWAIT);
     return got == 0 || (got < 0 && !WouldBlock());
   }
 
-  void CControlListener::ReadConnection(std::vector<SControlRequest>& requests, const std::uint64_t nowUs)
+  void CControlListener::ReadConnection(SConnection& connection, std::vector<SControlRequest>& requests, const std::uint64_t nowUs)
   {
-    if (!mConnection) {
+    if (connection.socket < 0) {
       return;
     }
-    Flush();
+    Flush(connection);
     std::uint8_t buffer[16384];
     for (;;) {
-      if (!mConnection) {
+      if (connection.socket < 0) {
         return;
       }
-      const ssize_t got = ::recv(mConnection->socket, buffer, sizeof(buffer), 0);
+      const ssize_t got = ::recv(connection.socket, buffer, sizeof(buffer), 0);
       if (got == 0) {
-        Close(Connected() ? "disconnected" : "disconnected during the handshake");
+        Close(connection, connection.channel->Ready() ? "disconnected" : "disconnected during the handshake");
         return;
       }
       if (got < 0) {
         if (!WouldBlock()) {
           // A peer that closes with our events unread resets the connection: that's a disconnect too.
-          Close(errno == ECONNRESET ? (Connected() ? "disconnected" : "disconnected during the handshake") : "closed (receive failed)");
+          Close(connection, errno == ECONNRESET ? (connection.channel->Ready() ? "disconnected" : "disconnected during the handshake") : "closed (receive failed)");
         }
         break;
       }
-      CControlChannel& channel = *mConnection->channel;
+      CControlChannel& channel = *connection.channel;
       if (!channel.Ready()) {
-        std::vector<std::uint8_t>& raw = mConnection->raw;
+        std::vector<std::uint8_t>& raw = connection.raw;
         raw.insert(raw.end(), buffer, buffer + got);
-        if (!mConnection->sentProof && raw.size() >= sizeof(ControlNonce)) {
+        if (!connection.sentProof && raw.size() >= sizeof(ControlNonce)) {
           ControlNonce peerNonce{};
           std::copy_n(raw.begin(), peerNonce.size(), peerNonce.begin());
           const ControlProof proof = channel.Proof(peerNonce);
-          mConnection->outgoing.insert(mConnection->outgoing.end(), proof.begin(), proof.end());
-          mConnection->sentProof = true;
-          Flush();
-          if (!mConnection) {
+          connection.outgoing.insert(connection.outgoing.end(), proof.begin(), proof.end());
+          connection.sentProof = true;
+          Flush(connection);
+          if (connection.socket < 0) {
             return;
           }
         }
-        if (mConnection->sentProof && raw.size() >= sizeof(ControlNonce) + sizeof(ControlProof)) {
+        if (connection.sentProof && raw.size() >= sizeof(ControlNonce) + sizeof(ControlProof)) {
           ControlProof peerProof{};
           std::copy_n(raw.begin() + sizeof(ControlNonce), peerProof.size(), peerProof.begin());
           if (!channel.CheckPeerProof(peerProof)) {
-            Close("refused: it doesn't hold the control key");
+            Close(connection, "refused: it doesn't hold the control key");
             return;
           }
-          mNews.push_back("control: " + mConnection->peer + " connected");
+          mNews.push_back("control: " + connection.peer + " connected");
           const std::vector<std::uint8_t> rest(raw.begin() + sizeof(ControlNonce) + sizeof(ControlProof), raw.end());
           raw.clear();
           if (!rest.empty() && !channel.Feed(rest)) {
-            Close("closed (a frame didn't open)");
+            Close(connection, "closed (a frame didn't open)");
             return;
           }
         }
         continue;
       }
       if (!channel.Feed(std::span<const std::uint8_t>(buffer, static_cast<std::size_t>(got)))) {
-        Close("closed (a frame didn't open)");
+        Close(connection, "closed (a frame didn't open)");
         return;
       }
     }
-    if (!mConnection) {
+    if (connection.socket < 0) {
       return;
     }
-    if (!Connected() && nowUs - mConnection->acceptedUs > kHandshakeUs) {
-      Close("closed: no handshake in 5 s");
+    if (!connection.channel->Ready() && nowUs - connection.acceptedUs > kHandshakeUs) {
+      Close(connection, "closed: no handshake in 5 s");
       return;
     }
     std::vector<std::uint8_t> message;
-    while (mConnection && mConnection->channel->Take(message)) {
+    while (connection.socket >= 0 && connection.channel->Take(message)) {
       const std::string_view text(reinterpret_cast<const char*>(message.data()), message.size());
       std::optional<SControlRequest> request = ParseControlRequest(text);
       if (!request) {
-        Refuse(0, "not a request: a flat JSON object with an \"op\"");
+        Send(connection, "{\"id\":0,\"ok\":false,\"error\":" + JsonString("not a request: a flat JSON object with an \"op\"") + "}");
         continue;
       }
+      if (mWaiting.size() >= 1024u) {
+        mWaiting.erase(mWaiting.begin()); // never answered: the main loop answers each request, so this is only a bound
+      }
+      mWaiting.emplace_back(request->id, connection.serial);
       requests.push_back(std::move(*request));
     }
   }
