@@ -27,8 +27,9 @@ namespace moho
 
   TConVar<float> gTConVar_ren_BloomWideThreshold(
     "ren_BloomWideThreshold",
-    "Glow level below which ren_BloomWide spreads nothing (0.2 by default), ramped in up to twice that: the bloom's "
-    "glow holds a faint copy of the whole scene, which would otherwise haze everything.",
+    "Glow level, on the weakest colour channel, below which ren_BloomWide spreads nothing (0.2 by default), ramped "
+    "in up to twice that: the bloom's glow holds a faint copy of the whole scene, which would otherwise haze "
+    "everything, and strongly coloured glow such as green build ghosts keeps only the original bloom.",
     &ren_BloomWideThreshold
   );
 

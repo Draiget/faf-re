@@ -41,9 +41,11 @@ float4 DownPS(float4 position : SV_Position) : SV_Target
         + Tap(uv + float2(d.x, d.y))) * 0.25;
     if (Params.y > 0.0) {
         // The bloom's glow also holds a faint copy of the whole scene (the map's bloom bias in frame.fx's
-        // CopyGlowingPS); only what stands above it, ramped in over one threshold's width, spreads wide.
-        const float peak = max(max(sum.r, sum.g), sum.b);
-        sum *= saturate((peak - Params.y) / Params.y);
+        // CopyGlowingPS); only what stands above it, ramped in over one threshold's width, spreads wide. Measured on
+        // the weakest channel, so near-white glow (lights, explosion cores, the map border) spreads and strongly
+        // coloured glow (green build ghosts and markers) keeps only the original bloom.
+        const float whiteness = min(min(sum.r, sum.g), sum.b);
+        sum *= saturate((whiteness - Params.y) / Params.y);
     }
     return float4(sum, 1.0);
 }
