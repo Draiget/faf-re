@@ -402,9 +402,10 @@ namespace
       gpg::ZLibOutputFilterStream inflater(&pipe, gpg::FLOP_Inflate);
       WriteInPieces(inflater, compressed, {7u, 1500u, 1u, 300u});
       if (std::string_view(zlibVersion()).substr(0, 4) == "1.1.") {
-        // zlib 1.1.x, which the x86 build links as the shipped exe does (cmake/deps/wxwindows), reports the end
-        // of a raw stream only with a byte past it (zlib 1.2.3's ChangeLog: "Raw inflate no longer needs an
-        // extra dummy byte at end"), and this class then calls that byte excess data. Either way the close
+        // zlib 1.1.x, which the x86 build links as the shipped exe does (cmake/deps/wxwindows), decodes the end
+        // code with a 9-bit lookahead, so a raw stream whose end code and padding are shorter than that (this
+        // one) reports its end only with a byte past it (zlib 1.2.3's ChangeLog: "Raw inflate no longer needs
+        // an extra dummy byte at end"), and this class then calls that byte excess data. Either way the close
         // throws; every byte is out already. The game's only inflating stream, the network connection's
         // (CNetUDPConnection), never ends during play.
         EXPECT_THROW(inflater.VirtClose(gpg::Stream::ModeSend), std::runtime_error);
