@@ -440,6 +440,12 @@ target_link_libraries(faf_container_tests PRIVATE faf_sim gtest_main)
 target_link_options(faf_container_tests PRIVATE -Wl,--error-limit=0)
 add_test(NAME containers COMMAND faf_container_tests)
 
+file(GLOB _faf_reflection_test_sources "${PROJECT_SOURCE_DIR}/tests/reflection/*.cpp")
+add_executable(faf_reflection_tests EXCLUDE_FROM_ALL ${_faf_reflection_test_sources})
+target_link_libraries(faf_reflection_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_reflection_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME reflection COMMAND faf_reflection_tests)
+
 # Recorded games played back by headless (tests/replay/ReplayPlaybackTests.cpp); skipped without FAF_REPLAY_DATA.
 add_executable(faf_replay_playback_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/replay/ReplayPlaybackTests.cpp")
 target_link_libraries(faf_replay_playback_tests PRIVATE faf_codegen gtest_main)
