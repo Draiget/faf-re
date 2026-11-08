@@ -343,15 +343,30 @@ namespace faf::server
     return known;
   }
 
+  void CServerNet::RequestAddress(const std::uint32_t ip, const bool allow)
+  {
+    const std::scoped_lock lock(mNewsLock);
+    mAddressChanges.emplace_back(ip, allow);
+  }
+
   void CServerNet::Tick(const std::uint64_t nowUs)
   {
     WatchLobbyPresence(nowUs);
 
-    // Plan WP17.2: the organiser's ejects, and the seats as the control API reports them.
+    // Plan WP17.2: the organiser's ejects and allowlist changes, and the seats as the control API reports them.
     std::vector<std::pair<std::int32_t, std::string>> ejects;
+    std::vector<std::pair<std::uint32_t, bool>> addresses;
     {
       const std::scoped_lock lock(mNewsLock);
       ejects.swap(mEjects);
+      addresses.swap(mAddressChanges);
+    }
+    for (const auto& [ip, allow] : addresses) {
+      if (allow) {
+        mLinks.AllowAddress(ip);
+      } else {
+        mLinks.DisallowAddress(ip);
+      }
     }
     for (const auto& [uid, reason] : ejects) {
       if (const auto found = mSeats.find(uid); found != mSeats.end() && !found->second.gone) {
@@ -526,7 +541,7 @@ namespace faf::server
       const std::scoped_lock lock(mNewsLock);
       mGone.push_back(uid);
       mLobbyLeft.push_back(uid);
-      mPresence.push_back(SPresence{uid, false});
+      mPresence.push_back(SPresence{uid, false, true});
     }
     Say(seat.name + " is out of the game: " + why);
   }

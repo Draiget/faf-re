@@ -174,6 +174,8 @@ namespace faf::remote::net
      * every address is treated as listed.
      */
     void AllowAddress(std::uint32_t ip);
+    /** Plan WP17.2: off the allowlist again (it shares the unlisted budget from now on); the list stays on. */
+    void DisallowAddress(std::uint32_t ip);
 
     void AddPlayer(std::int32_t uid, const Token& token);
     /** No more handshakes for this uid, and its channel is gone. */

@@ -29,6 +29,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <span>
 #include <sstream>
 #include <string>
@@ -898,6 +899,19 @@ namespace
     };
     // The requests that mean the same in the lobby and the game; false for one the caller answers.
     const auto controlCommon = [&net, &control](const faf::server::SControlRequest& request) {
+      if (request.op == "allow" || request.op == "disallow") {
+        faf::remote::net::SEndpoint address;
+        if (!net) {
+          control->Refuse(request.id, "this server has no players (--listen)");
+        } else if (!faf::remote::net::ParseEndpoint(request.address + ":1", address)) {
+          control->Refuse(request.id, request.op + " needs an IPv4 address, a.b.c.d");
+        } else {
+          net->RequestAddress(address.ip, request.op == "allow");
+          Say("The control service %s %s", request.op == "allow" ? "allows" : "takes off the allowlist", request.address.c_str());
+          control->Reply(request.id, {});
+        }
+        return true;
+      }
       if (request.op != "eject") {
         return false;
       }
@@ -911,6 +925,18 @@ namespace
         control->Reply(request.id, {});
       }
       return true;
+    };
+    // Plan WP17.2: what happened, as data, beside the console's lines.
+    const auto controlEvent = [&control](const std::string_view name, const std::string& fields) {
+      if (control) {
+        control->Event(name, fields);
+      }
+    };
+    std::set<std::int32_t> controlLeftSaid; // a seat's `left` once, from the lobby or the game
+    const auto controlLeft = [&controlEvent, &controlLeftSaid](const std::int32_t uid) {
+      if (controlLeftSaid.insert(uid).second) {
+        controlEvent("left", "\"uid\":" + std::to_string(uid));
+      }
     };
     const auto controlNews = [&control] {
       for (const std::string& line : control->TakeNews()) {
@@ -1043,6 +1069,7 @@ namespace
               continue;
             }
             Say("Lobby: the host launched; starting the match");
+            controlEvent("launched", "\"by\":\"host\"");
             for (const std::int32_t uid : signaller.InLobbyUids()) {
               signal(uid, faf::remote::net::ELobbySignal::Launching, {});
             }
@@ -1052,16 +1079,20 @@ namespace
           // each client starts from the server's LaunchInfo whatever its lobby is doing.
           if (!launched && gForceStartRequests != forceStartsBefore) {
             Say("Lobby: the operator forces the start; the match starts as the match file says");
+            controlEvent("launched", "\"by\":\"operator\"");
             launched = true;
           }
           for (const std::int32_t uid : net->TakeLobbyJoined()) {
             signaller.OnJoined(uid, out);
+            controlEvent("joined", "\"uid\":" + std::to_string(uid));
           }
           for (const std::int32_t uid : net->TakeLobbyLeft()) {
             signaller.OnLeft(uid, out);
+            controlLeft(uid);
           }
           // Plan WPR.50: a logical host gone quiet is succeeded; whoever is heard again gets the role it missed.
           for (const faf::server::CServerNet::SPresence& change : net->TakeLobbyPresence()) {
+            controlEvent(change.away ? "away" : "back", "\"uid\":" + std::to_string(change.uid));
             if (change.away) {
               signaller.OnAway(change.uid, out);
             } else {
@@ -1076,6 +1107,7 @@ namespace
             Say("Lobby: uid %d hosts now, in place of uid %d (succession %u)", static_cast<int>(host), static_cast<int>(lastHost), signaller.Successions());
             lastHost = host;
             net->SetLobbyHost(host);
+            controlEvent("host", "\"uid\":" + std::to_string(host));
           }
           if (const std::size_t in = signaller.InLobby(); in != lastIn) {
             lastIn = in;
@@ -1370,6 +1402,11 @@ namespace
       if (net && started) {
         // Plan WP3.5, WP14.2. The reconnect window runs on meanwhile. A pause someone else ends or takes over isn't renewed.
         for (const faf::server::CServerNet::SPresence& change : net->TakePresence()) {
+          if (change.gone) {
+            controlLeft(change.uid);
+          } else {
+            controlEvent(change.away ? "away" : "back", "\"uid\":" + std::to_string(change.uid));
+          }
           if (awayPauseSeconds <= 0.0) {
             continue;
           }
@@ -1481,6 +1518,7 @@ namespace
           // `WLD_DoInitializing`: the first beat is applied, then this client declares itself ready.
           started = true;
           Say("Game started");
+          controlEvent("game_started", "\"beat\":" + std::to_string(end.lastBeat));
           if (moho::CClientManagerImpl* const manager = driver->GetClientManager(); manager != nullptr) {
             manager->Cleanup();
           }
@@ -1534,6 +1572,10 @@ namespace
     driver.reset();
 
     WriteResult(resultPath, end);
+    controlEvent(
+      "game_ended", "\"ended\":" + std::string(end.ended ? "true" : "false") + ",\"beats\":" + std::to_string(end.beats) +
+                      ",\"stopped_by\":" + faf::server::JsonString(end.stoppedBy) + ",\"error\":" + faf::server::JsonString(end.error)
+    );
     if (end.ended) {
       Say("Game ended: game time %s, real time %s", GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(end.seconds).c_str());
     } else if (!end.error.empty()) {

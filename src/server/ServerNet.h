@@ -93,6 +93,7 @@ namespace faf::server
     {
       std::int32_t uid;
       bool away;
+      bool gone = false; // out of the game: no longer away, and not back either
     };
     /** Who went away or stopped being away since the last call, in order. */
     [[nodiscard]] std::vector<SPresence> TakePresence();
@@ -136,6 +137,8 @@ namespace faf::server
     [[nodiscard]] std::vector<SSeatState> Seats();
     /** Plan WP17.2: the organiser takes a participant out of the match; done on the network thread. False: no such seat. */
     bool RequestEject(std::int32_t uid, std::string reason);
+    /** Plan WP17.2: the organiser adds an address to the handshake allowlist or takes it off; done on the network thread. */
+    void RequestAddress(std::uint32_t ip, bool allow);
     /** Plan WP17.1: the current logical host (0: none), from the lobby's succession; its ejects go through in a player-hosted lobby. */
     void SetLobbyHost(const std::int32_t uid) noexcept { mLobbyHost.store(uid, std::memory_order_relaxed); }
     /** Before `Start` (plan WPR.49): the game options the match pins (`CLobbyRelay::PinOptions`). */
@@ -253,6 +256,7 @@ namespace faf::server
     std::vector<std::string> mNews;
     std::vector<SSeatState> mSeatStates;                         // under mNewsLock
     std::vector<std::pair<std::int32_t, std::string>> mEjects;   // likewise: uid, reason
+    std::vector<std::pair<std::uint32_t, bool>> mAddressChanges; // likewise: ip, allow
 
     CLobbyRelay mLobby;                        // on the network thread
     std::vector<std::uint8_t> mLobbyFrame;     // the frame being relayed

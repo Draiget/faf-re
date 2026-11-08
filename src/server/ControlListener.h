@@ -17,13 +17,14 @@
 
 namespace faf::server
 {
-  /** One request: `{"id": n, "op": "...", "uid": n, "reason": "..."}`; other keys are ignored. */
+  /** One request: `{"id": n, "op": "...", "uid": n, "reason": "...", "address": "a.b.c.d"}`; other keys are ignored. */
   struct SControlRequest
   {
     std::int64_t id = 0;
     std::string op;
     std::int64_t uid = 0;
     std::string reason;
+    std::string address;
   };
 
   /** A flat JSON object's request fields; nothing when it isn't one, or has no `op`. */
