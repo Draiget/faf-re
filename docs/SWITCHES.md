@@ -158,6 +158,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `ren_ShadowVolumeCache` | 1 | `/con` | each frame | The shadow volume's terrain intersection is kept while the frustum and terrain stay the same |
 | `ren_TerrainGpuBuffers` | 1 | `/con` | when a terrain is created | Direct3D 12 and Vulkan keep the terrain's vertices and indices in GPU memory and upload them only after a rebuild |
 | `ren_MeshPoseStill` | 1 | `/con` | when a pose is blended | A unit's pose is blended once while its start and end poses match, instead of each frame |
+| `ren_TechniqueMemo` | 1 | `/con` | at each technique selection | An effect keeps the techniques it selected, per fidelity, instead of building a lookup key and a new technique object for every batch; dropped when the effect reloads or goes |
 | `ren_PipelineMemo` | 1 | `/con` | each draw | Direct3D 12 and Vulkan find a draw's pipeline in a small table of recent ones before building its full key |
 | `ren_ShorelineMemo` | 1 | `/con` | each frame; GPU memory when a shoreline is generated | Direct3D 12 and Vulkan keep the shoreline in GPU memory and rewrite it only when the view changes, and then only the vertices it needs |
 | `ren_MeshPackedVertices` | 1 | `/con` | when a mesh's batch is created | Direct3D 12 and Vulkan store a static mesh vertex in 36 bytes instead of 72 where its values fit, in formats the card unpacks, so shaders don't change |
