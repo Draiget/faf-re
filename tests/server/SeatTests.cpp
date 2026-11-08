@@ -751,6 +751,96 @@ TEST(LobbyScriptData, PinnedOptionsGetTheMatchsValues)
   EXPECT_FALSE(faf::server::PinGameOptions(garbage, pinned));
 }
 
+// Plan WP17.6: an organiser-run lobby's player readies up and nothing else.
+namespace
+{
+  SLuaBytesValue LuaBoolean(const bool value)
+  {
+    SLuaBytesValue out;
+    out.kind = SLuaBytesValue::EKind::Boolean;
+    out.raw[0] = value ? 1u : 0u;
+    return out;
+  }
+
+  std::vector<std::uint8_t> PlayerOptions(std::vector<std::pair<SLuaBytesValue, SLuaBytesValue>> options)
+  {
+    return LuaBytes(LuaTable({{LuaString("Type"), LuaString("PlayerOptions")}, {LuaString("Slot"), LuaNumber(1.0f)},
+                              {LuaString("Options"), LuaTable(std::move(options))}}));
+  }
+} // namespace
+
+TEST(LobbyScriptData, APlayersOwnOptionsKeepOnlyReady)
+{
+  using faf::server::EPlayerScript;
+  // Faction and team go; Ready stays, and so does the rest of the message.
+  std::vector<std::uint8_t> mixed = PlayerOptions({{LuaString("Faction"), LuaNumber(3.0f)}, {LuaString("Ready"), LuaBoolean(true)}, {LuaString("Team"), LuaNumber(2.0f)}});
+  EXPECT_EQ(faf::server::LimitPlayerScript(mixed), EPlayerScript::Rewritten);
+  SLuaBytesValue back;
+  ASSERT_TRUE(faf::server::ParseLuaBytes(mixed, back));
+  ASSERT_NE(back.Field("Options"), nullptr);
+  EXPECT_EQ(back.Field("Options")->keys.size(), 1u);
+  ASSERT_NE(back.Field("Options")->Field("Ready"), nullptr);
+  EXPECT_EQ(back.Field("Options")->Field("Ready")->raw[0], 1u);
+  EXPECT_NE(back.Field("Slot"), nullptr);
+  // Ready alone: as it was.
+  std::vector<std::uint8_t> ready = PlayerOptions({{LuaString("Ready"), LuaBoolean(false)}});
+  const std::vector<std::uint8_t> readyBefore = ready;
+  EXPECT_EQ(faf::server::LimitPlayerScript(ready), EPlayerScript::Unchanged);
+  EXPECT_EQ(ready, readyBefore);
+  // Nothing but a colour: nothing left to send.
+  std::vector<std::uint8_t> colour = PlayerOptions({{LuaString("PlayerColor"), LuaNumber(4.0f)}});
+  EXPECT_EQ(faf::server::LimitPlayerScript(colour), EPlayerScript::Refused);
+  // The requests to the host.
+  for (const char* const request : {"MovePlayer", "RequestColor", "RequestConvertToObserver", "RequestConvertToPlayer"}) {
+    std::vector<std::uint8_t> asked = LuaBytes(LuaTable({{LuaString("Type"), LuaString(request)}, {LuaString("RequestedSlot"), LuaNumber(2.0f)}}));
+    EXPECT_EQ(faf::server::LimitPlayerScript(asked), EPlayerScript::Refused) << request;
+  }
+  // Chat, game options, garbage: not this rule's.
+  std::vector<std::uint8_t> chat = LuaBytes(LuaTable({{LuaString("Type"), LuaString("Chat")}, {LuaString("Text"), LuaString("gl hf")}}));
+  EXPECT_EQ(faf::server::LimitPlayerScript(chat), EPlayerScript::Unchanged);
+  std::vector<std::uint8_t> garbage = {104u, 105u, 33u};
+  EXPECT_EQ(faf::server::LimitPlayerScript(garbage), EPlayerScript::Unchanged);
+}
+
+TEST(LobbyRelay, OrganisedLobbysPlayersOnlyReadyUp)
+{
+  CLobbyRelay relay;
+  relay.AddParticipant(1001);
+  relay.AddParticipant(1002);
+  relay.SetHost(1001);
+  const auto script = [](const std::vector<std::uint8_t>& payload) { return LobbyMessage(moho::ELobbyMsg::LOBMSG_BroadcastScriptData, payload); };
+  // A player's move request: dropped and counted.
+  const std::vector<std::uint8_t> move = LuaBytes(LuaTable({{LuaString("Type"), LuaString("MovePlayer")}, {LuaString("RequestedSlot"), LuaNumber(1.0f)}}));
+  EXPECT_EQ(Relay(relay, 1002, LobbyBody(1001, script(move)), 1u).verdict, ELobbyRelayVerdict::Locked);
+  EXPECT_EQ(relay.Count(ELobbyRelayVerdict::Locked), 1u);
+  // A player's faction and ready: on with Ready alone.
+  const SRelayed options = Relay(relay, 1002, LobbyBody(1001, script(PlayerOptions({{LuaString("Faction"), LuaNumber(2.0f)}, {LuaString("Ready"), LuaBoolean(true)}}))), 1u);
+  ASSERT_EQ(options.verdict, ELobbyRelayVerdict::Forward);
+  // The frame: the Lobby kind, the sender's uid (two varint bytes for 1002), then the message as it goes on.
+  const std::vector<std::uint8_t> forwarded(options.frame.begin() + 3, options.frame.end());
+  ASSERT_GT(forwarded.size(), 3u);
+  EXPECT_EQ(forwarded.size(), static_cast<std::size_t>(forwarded[1]) | (static_cast<std::size_t>(forwarded[2]) << 8u));
+  SLuaBytesValue back;
+  ASSERT_TRUE(faf::server::ParseLuaBytes(std::span<const std::uint8_t>(forwarded).subspan(3u), back));
+  EXPECT_EQ(back.Field("Options")->keys.size(), 1u);
+  EXPECT_NE(back.Field("Options")->Field("Ready"), nullptr);
+  EXPECT_EQ(relay.PlayerOptionsLimited(), 1u);
+  // The host's own messages, chat and the rest go as they are.
+  const std::vector<std::uint8_t> hostMove = script(PlayerOptions({{LuaString("Faction"), LuaNumber(2.0f)}}));
+  const SRelayed host = Relay(relay, 1001, LobbyBody(1002, hostMove), 1u);
+  EXPECT_EQ(std::vector<std::uint8_t>(host.frame.begin() + 3, host.frame.end()), hostMove);
+  const std::vector<std::uint8_t> chat = script(LuaBytes(LuaTable({{LuaString("Type"), LuaString("Chat")}})));
+  const SRelayed chatted = Relay(relay, 1002, LobbyBody(1001, chat), 1u);
+  EXPECT_EQ(std::vector<std::uint8_t>(chatted.frame.begin() + 3, chatted.frame.end()), chat);
+  // A player-hosted lobby's players change what they like.
+  CLobbyRelay player;
+  player.SetControl(faf::server::ELobbyControl::Player);
+  player.AddParticipant(1001);
+  player.AddParticipant(1002);
+  player.SetHost(1001);
+  EXPECT_EQ(Relay(player, 1002, LobbyBody(1001, script(move)), 1u).verdict, ELobbyRelayVerdict::Forward);
+}
+
 TEST(LobbyRelay, EjectsOfParticipantsNeverArrive)
 {
   CLobbyRelay relay;

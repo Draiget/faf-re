@@ -60,6 +60,7 @@ namespace faf::server
     Malformed,     // no uid, or no message after it
     EjectIgnored,  // plan WPR.49: an eject of a participant of the match (organised, or not from the host)
     EjectForwarded, // plan WP17.1: a player-hosted lobby's host ejects a participant: `out` goes to `to`, who is out
+    Locked,        // plan WP17.6: an organiser-run lobby's player asked to move, change colour or sides, or set more than Ready
     Count
   };
 
@@ -102,6 +103,8 @@ namespace faf::server
     [[nodiscard]] std::uint64_t Count(ELobbyRelayVerdict verdict) const noexcept { return mCounts[static_cast<std::size_t>(verdict)]; }
     /** Forwarded messages whose pinned options were written back. */
     [[nodiscard]] std::uint64_t OptionsPinned() const noexcept { return mOptionsPinned; }
+    /** Plan WP17.6: a player's own options that went on with only `Ready` left. */
+    [[nodiscard]] std::uint64_t PlayerOptionsLimited() const noexcept { return mPlayerOptionsLimited; }
 
   private:
     struct SBucket
@@ -119,6 +122,7 @@ namespace faf::server
     SPinnedOptions mPinned;
     std::vector<std::uint8_t> mPayload;
     std::uint64_t mOptionsPinned = 0;
+    std::uint64_t mPlayerOptionsLimited = 0;
     std::uint64_t mCounts[static_cast<std::size_t>(ELobbyRelayVerdict::Count)]{};
   };
 } // namespace faf::server

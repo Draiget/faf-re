@@ -1,5 +1,6 @@
 #include "server/LobbyScriptData.h"
 
+#include <cstddef>
 #include <algorithm>
 #include <cstring>
 
@@ -130,6 +131,47 @@ namespace faf::server
       out.push_back(kTableEnd);
       return;
     }
+  }
+
+  EPlayerScript LimitPlayerScript(std::vector<std::uint8_t>& payload)
+  {
+    SLuaBytesValue root;
+    if (!ParseLuaBytes(payload, root) || root.kind != SLuaBytesValue::EKind::Table) {
+      return EPlayerScript::Unchanged;
+    }
+    const SLuaBytesValue* const type = root.Field("Type");
+    if (type == nullptr || type->kind != SLuaBytesValue::EKind::String) {
+      return EPlayerScript::Unchanged;
+    }
+    for (const char* const request : {"MovePlayer", "RequestColor", "RequestConvertToObserver", "RequestConvertToPlayer"}) {
+      if (type->IsString(request)) {
+        return EPlayerScript::Refused;
+      }
+    }
+    if (!type->IsString("PlayerOptions")) {
+      return EPlayerScript::Unchanged;
+    }
+    SLuaBytesValue* const options = root.Field("Options");
+    if (options == nullptr || options->kind != SLuaBytesValue::EKind::Table) {
+      return EPlayerScript::Refused;
+    }
+    bool changed = false;
+    for (std::size_t i = options->keys.size(); i-- > 0;) {
+      if (!options->keys[i].IsString("Ready")) {
+        options->keys.erase(options->keys.begin() + static_cast<std::ptrdiff_t>(i));
+        options->values.erase(options->values.begin() + static_cast<std::ptrdiff_t>(i));
+        changed = true;
+      }
+    }
+    if (options->keys.empty()) {
+      return EPlayerScript::Refused;
+    }
+    if (!changed) {
+      return EPlayerScript::Unchanged;
+    }
+    payload.clear();
+    WriteLuaBytes(root, payload);
+    return EPlayerScript::Rewritten;
   }
 
   bool PinGameOptions(std::vector<std::uint8_t>& payload, const SPinnedOptions& pinned)

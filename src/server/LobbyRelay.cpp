@@ -118,7 +118,23 @@ namespace faf::server
       eject = true;
     }
     std::span<const std::uint8_t> forwarded = message;
-    if (mControl == ELobbyControl::Organiser && !mPinned.empty() && message.size() > kMessageHeaderBytes
+    const bool script = type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_BroadcastScriptData)
+                        || type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_DirectScriptData);
+    if (mControl == ELobbyControl::Organiser && from != mHost && script && message.size() > kMessageHeaderBytes) {
+      // Plan WP17.6: what the organiser set stays; a player chats, readies up and leaves.
+      mPayload.assign(message.begin() + kMessageHeaderBytes, message.end());
+      const EPlayerScript limited = LimitPlayerScript(mPayload);
+      if (limited == EPlayerScript::Refused) {
+        return verdict(ELobbyRelayVerdict::Locked);
+      }
+      if (limited == EPlayerScript::Rewritten) {
+        const std::size_t size = kMessageHeaderBytes + mPayload.size();
+        mPayload.insert(mPayload.begin(), {type, static_cast<std::uint8_t>(size), static_cast<std::uint8_t>(size >> 8u)});
+        forwarded = mPayload;
+        ++mPlayerOptionsLimited;
+      }
+    }
+    if (mControl == ELobbyControl::Organiser && !mPinned.empty() && forwarded.data() == message.data() && message.size() > kMessageHeaderBytes
         && (type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_BroadcastScriptData)
             || type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_DirectScriptData))) {
       mPayload.assign(message.begin() + kMessageHeaderBytes, message.end());

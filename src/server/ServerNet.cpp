@@ -624,6 +624,8 @@ namespace faf::server
            std::to_string(mLobby.Count(ELobbyRelayVerdict::TooLarge)) + " too large, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::Closed)) + " after launch, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::EjectIgnored)) + " ejects of participants, " +
+           std::to_string(mLobby.Count(ELobbyRelayVerdict::Locked)) + " players' changes refused and " +
+           std::to_string(mLobby.PlayerOptionsLimited()) + " cut to Ready in an organised lobby, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::EjectForwarded)) + " ejects by a player host relayed, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::UnknownSender) + mLobby.Count(ELobbyRelayVerdict::UnknownTarget) +
                           mLobby.Count(ELobbyRelayVerdict::Malformed)) +

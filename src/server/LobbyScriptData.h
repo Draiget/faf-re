@@ -56,6 +56,22 @@ namespace faf::server
    */
   [[nodiscard]] bool PinGameOptions(std::vector<std::uint8_t>& payload, const SPinnedOptions& pinned);
 
+  /** What `LimitPlayerScript` did. */
+  enum class EPlayerScript : std::uint8_t
+  {
+    Unchanged,
+    Rewritten, // a `PlayerOptions` message kept only `Ready`
+    Refused,   // a request to move, change colour or change sides, or `PlayerOptions` with nothing but those left
+  };
+
+  /**
+   * Plan WP17.6: FAF's lobby script data from a player who isn't the lobby's host, in an organiser-run lobby, where the
+   * organiser set slots, teams and the rest. `MovePlayer`, `RequestColor`, `RequestConvertToObserver` and
+   * `RequestConvertToPlayer` (lobby.lua's requests to the host) are refused; `{Type = 'PlayerOptions', Options = {...}}`
+   * (`SetPlayerOptions`, the player's own slot) keeps only `Ready`. Anything else, unreadable bytes included, stays.
+   */
+  [[nodiscard]] EPlayerScript LimitPlayerScript(std::vector<std::uint8_t>& payload);
+
   /**
    * Plan WP15.4: `bytes` (one table in the form above) with the number under the string key `key` of the top table set to
    * `value`, into `out`. False, `out` untouched, when the bytes don't read or the key isn't a number there.

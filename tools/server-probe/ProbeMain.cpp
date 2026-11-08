@@ -215,6 +215,10 @@ namespace
     // `CLobby::KickPeer` sends), each to `--lobby-say-to` at a time.
     std::string lobbyOptions;
     double lobbyOptionsAt = -1.0;
+    std::string lobbyPlayerOptions; // plan WP17.6: `{Type = 'PlayerOptions', Slot = 1, Options = {...}}` broadcast
+    double lobbyPlayerOptionsAt = -1.0;
+    std::string lobbyRequest;       // and a request to the host: `{Type = <it>, RequestedSlot = 1}`
+    double lobbyRequestAt = -1.0;
     double lobbyEjectAt = -1.0;
     // Plan WP2.6: the content report sent before `Loaded`: "rules" (the `--rebuild` match's rules, as the game
     // client reports them), "wrong" (made-up hashes), or none.
@@ -316,6 +320,14 @@ namespace
         out.lobbyLaunchAt = Argument(value);
       } else if (name == "--lobby-options") {
         out.lobbyOptions = value;
+      } else if (name == "--lobby-player-options") {
+        out.lobbyPlayerOptions = value;
+      } else if (name == "--lobby-player-options-at") {
+        out.lobbyPlayerOptionsAt = Argument(value);
+      } else if (name == "--lobby-request") {
+        out.lobbyRequest = value;
+      } else if (name == "--lobby-request-at") {
+        out.lobbyRequestAt = Argument(value);
       } else if (name == "--lobby-options-at") {
         out.lobbyOptionsAt = Argument(value);
       } else if (name == "--lobby-eject-at") {
@@ -841,11 +853,14 @@ namespace
       if (faf::server::ParseLuaBytes(std::span<const std::uint8_t>(frame).subspan(at), value)) {
         const faf::server::SLuaBytesValue* const type = value.Field("Type");
         const faf::server::SLuaBytesValue* const table = value.Field("Options");
-        if (type != nullptr && type->IsString("GameOptions") && table != nullptr && table->kind == faf::server::SLuaBytesValue::EKind::Table) {
-          options = ", GameOptions";
-          for (std::size_t i = 0; i < table->keys.size(); ++i) {
+        if (type != nullptr && type->kind == faf::server::SLuaBytesValue::EKind::String) {
+          options = ", " + type->text; // plan WP17.6: every type, so a test sees what a player's requests became
+          for (std::size_t i = 0; table != nullptr && table->kind == faf::server::SLuaBytesValue::EKind::Table && i < table->keys.size(); ++i) {
             const faf::server::SLuaBytesValue& option = table->values[i];
-            options += " " + table->keys[i].text + "=" + (option.kind == faf::server::SLuaBytesValue::EKind::String ? option.text : std::string("?"));
+            const std::string text = option.kind == faf::server::SLuaBytesValue::EKind::String ? option.text
+                                     : option.kind == faf::server::SLuaBytesValue::EKind::Boolean ? (option.raw[0] != 0u ? "true" : "false")
+                                                                                                  : std::string("?");
+            options += " " + table->keys[i].text + "=" + text;
           }
         }
       }
@@ -876,7 +891,7 @@ int main(const int argc, char** const argv)
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> [--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
       "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-eject-at <s>]] [--content-report rules|wrong] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--rebuild <match.lua> /init <init.lua>]\n"
+      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-eject-at <s>]] [--content-report rules|wrong] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--rebuild <match.lua> /init <init.lua>]\n"
     );
     return 3;
   }
@@ -1066,6 +1081,60 @@ int main(const int argc, char** const argv)
         (void)link.SendReliable(frame.data(), frame.size());
         std::printf("probe %d: %.1f s: lobby: game options to uid %d: %s\n", options.uid, elapsed, options.lobbySayTo, options.lobbyOptions.c_str());
       }
+    }
+    // Plan WP17.6: a player's own options, and a request to the host, as FAF lobby.lua sends them.
+    const auto sendScript = [&](const moho::ELobbyMsg kind, LuaPlus::LuaObject& data, const char* const what) {
+      moho::CMessage script(kind);
+      bool encoded = false;
+      {
+        moho::CMessageStream stream(script, moho::CMessageStream::Access::kReadWrite);
+        encoded = data.ToByteStream(stream);
+      }
+      if (encoded) {
+        std::vector<std::uint8_t> frame;
+        faf::remote::net::ByteWriter writer(frame);
+        writer.Byte(static_cast<std::uint8_t>(ESeatMessage::Lobby));
+        writer.Varint(static_cast<std::uint64_t>(options.lobbySayTo));
+        writer.Bytes(reinterpret_cast<const std::uint8_t*>(script.mBuff.start_), script.mBuff.Size());
+        (void)link.SendReliable(frame.data(), frame.size());
+        std::printf("probe %d: %.1f s: lobby: %s to uid %d\n", options.uid, elapsed, what, options.lobbySayTo);
+      }
+    };
+    if (Due(options.lobbyPlayerOptionsAt, elapsed) && options.lobbySayTo != 0) {
+      static LuaPlus::LuaState sPlayerState(LuaPlus::LuaState::LIB_BASE);
+      LuaPlus::LuaObject data;
+      data.AssignNewTable(&sPlayerState, 0, 3u);
+      data.SetString("Type", "PlayerOptions");
+      data.SetInteger("Slot", 1);
+      LuaPlus::LuaObject table;
+      table.AssignNewTable(&sPlayerState, 0, 4u);
+      const std::string& list = options.lobbyPlayerOptions;
+      for (std::size_t start = 0; start < list.size();) {
+        const std::size_t comma = std::min(list.find(',', start), list.size());
+        const std::string pair = list.substr(start, comma - start);
+        if (const std::size_t equals = pair.find('='); equals != std::string::npos) {
+          const std::string key = pair.substr(0, equals);
+          const std::string value = pair.substr(equals + 1);
+          if (value == "true" || value == "false") {
+            table.SetBoolean(key.c_str(), value == "true");
+          } else {
+            table.SetString(key.c_str(), value.c_str());
+          }
+        }
+        start = comma + 1;
+      }
+      data.SetObject("Options", table);
+      const std::string what = "player options " + list;
+      sendScript(moho::ELobbyMsg::LOBMSG_BroadcastScriptData, data, what.c_str());
+    }
+    if (Due(options.lobbyRequestAt, elapsed) && options.lobbySayTo != 0 && !options.lobbyRequest.empty()) {
+      static LuaPlus::LuaState sRequestState(LuaPlus::LuaState::LIB_BASE);
+      LuaPlus::LuaObject data;
+      data.AssignNewTable(&sRequestState, 0, 2u);
+      data.SetString("Type", options.lobbyRequest.c_str());
+      data.SetInteger("RequestedSlot", 1);
+      const std::string what = "request " + options.lobbyRequest;
+      sendScript(moho::ELobbyMsg::LOBMSG_DirectScriptData, data, what.c_str());
     }
     if (Due(options.lobbyEjectAt, elapsed) && options.lobbySayTo != 0) {
       // `CLobby::KickPeer`: `LOBMSG_Rejected` with the reason, to the participant ejected.
