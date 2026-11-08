@@ -98,9 +98,12 @@ namespace
 
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>]\n";
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
+  // Plan WP13.7: how long a defeated player keeps their view with `DefeatedPlayerView = "disconnect"`: the defeat banner
+  // and the commander's explosion (`AIBrain.OnDefeat`, `lua/aibrain.lua`, waits 10 s before it hands the army over).
+  constexpr double kDefeatedLeaveSeconds = 10.0;
   // `net_Lag` is 500 ms in a lockstep game, time for every player's beats to arrive. Here it's only the
   // sim's head start on the next beat, and a player's command waits for all of it.
   constexpr float kDefaultLeadMs = 150.0f;
@@ -530,6 +533,7 @@ namespace
     std::optional<double> observerDelaySeconds; // plan WP13.1: how far behind the game observers watch
     bool fixedSpeed = false;                 // nobody changes the game speed
     bool noCheats = false;                   // `CheatsEnabled` is "false", whatever a host or organiser sets
+    std::string defeatedPlayerView;          // plan WP13.4: "observe" (as the original game) or "disconnect" (`--defeated-view`)
   };
 
   [[nodiscard]] bool ReadMatchRules(LuaPlus::LuaState* const state, SMatchRules& matchRules, std::string& error)
@@ -566,9 +570,20 @@ namespace
       out = value.GetBoolean();
       return true;
     };
-    return seconds("ReconnectSeconds", matchRules.reconnectSeconds) && seconds("AwayPauseSeconds", matchRules.awayPauseSeconds) &&
-           seconds("LobbyAwaySeconds", matchRules.lobbyAwaySeconds) && seconds("ObserverDelaySeconds", matchRules.observerDelaySeconds) &&
-           flag("FixedSpeed", matchRules.fixedSpeed) && flag("NoCheats", matchRules.noCheats);
+    if (!(seconds("ReconnectSeconds", matchRules.reconnectSeconds) && seconds("AwayPauseSeconds", matchRules.awayPauseSeconds) &&
+          seconds("LobbyAwaySeconds", matchRules.lobbyAwaySeconds) && seconds("ObserverDelaySeconds", matchRules.observerDelaySeconds) &&
+          flag("FixedSpeed", matchRules.fixedSpeed) && flag("NoCheats", matchRules.noCheats))) {
+      return false;
+    }
+    if (const LuaPlus::LuaObject view = table["DefeatedPlayerView"]; !view.IsNil()) {
+      const std::string text = view.IsString() ? view.GetString() : "";
+      if (text != "observe" && text != "disconnect") {
+        error = "MatchRules.DefeatedPlayerView is \"observe\" or \"disconnect\"";
+        return false;
+      }
+      matchRules.defeatedPlayerView = text;
+    }
+    return true;
   }
 
   /** Plan WP13.1: the match file's `MatchObservers`, the tokens observers may watch with (a list, or uid = token). */
@@ -842,6 +857,8 @@ namespace
     }
     const bool awayPauseGiven = ReadOption("--away-pause-seconds", text);
     double awayPauseSeconds = awayPauseGiven ? std::atof(text.c_str()) : 0.0;
+    std::string defeatedView; // plan WP13.4
+    const bool defeatedViewGiven = ReadOption("--defeated-view", defeatedView);
     // Plan WP2.2: a lobby before the game, the server signalling it. Until launch interception (WP2.14) it stays
     // open this long and then the game starts as the match file says.
     const double lobbySeconds = ReadOption("--lobby-seconds", text) ? std::atof(text.c_str()) : 0.0;
@@ -865,6 +882,14 @@ namespace
     if (!awayPauseGiven && matchRules.awayPauseSeconds) {
       awayPauseSeconds = *matchRules.awayPauseSeconds;
     }
+    if (!defeatedViewGiven) {
+      defeatedView = matchRules.defeatedPlayerView.empty() ? "observe" : matchRules.defeatedPlayerView;
+    } else if (defeatedView != "observe" && defeatedView != "disconnect") {
+      end.error = "--defeated-view takes observe or disconnect, not " + defeatedView;
+      Say("Can't host: %s", end.error.c_str());
+      return kExitBadInput;
+    }
+    const bool disconnectDefeated = defeatedView == "disconnect";
     if (matchRules.noCheats) {
       LuaPlus::LuaObject options = config["GameOptions"];
       if (options.IsTable()) {
@@ -1061,7 +1086,9 @@ namespace
         control->Refuse(request.id, "this server has no players (--listen)");
       } else if (request.uid <= 0 || request.uid > INT32_MAX) {
         control->Refuse(request.id, "eject needs a participant's uid");
-      } else if (!net->RequestEject(static_cast<std::int32_t>(request.uid), request.reason)) {
+      } else if (!net->RequestEject(
+                   static_cast<std::int32_t>(request.uid), "ejected by the organiser" + (request.reason.empty() ? std::string() : ": " + request.reason)
+                 )) {
         control->Refuse(request.id, "no participant with uid " + std::to_string(request.uid));
       } else {
         control->Reply(request.id, {});
@@ -1424,6 +1451,9 @@ namespace
     // Each player's view, before the driver: the sync walk's observer sees the sim from its first beat.
     const faf::remote::wire::SContentTables contentTables = faf::remote::BuildContentTables(*rules);
     std::unique_ptr<faf::server::CServerViews> views;
+    std::map<std::size_t, std::int32_t> armyUids;                  // each player's army
+    std::set<std::size_t> defeatedArmies;                          // plan WP13.7: defeats seen
+    std::vector<std::pair<double, std::int32_t>> defeatedLeaving;  // and when each such player goes
     if (net) {
       // Plan WP2.6, WP1.4: what each player's report is compared with: the server's own rules, before any player has
       // the launch to load them from.
@@ -1459,6 +1489,7 @@ namespace
         net->QueueView(client.uid, launchInfo);
         net->QueueView(client.uid, faf::server::MakeGameInfo(mapSizeX, mapSizeZ, playerArmy, client.commandSource));
       }
+      armyUids = viewPlayers;
       views = std::make_unique<faf::server::CServerViews>(contentTables, *rules, mapSizeX, mapSizeZ, *net, std::move(viewPlayers), static_cast<unsigned int>(std::max(viewThreads, 1)), teamViews);
       if (std::string statsEvery; ReadOption("--stats-every", statsEvery)) {
         views->SetStatsEveryBeats(static_cast<std::uint32_t>(std::max(1, std::atoi(statsEvery.c_str()))));
@@ -1766,6 +1797,17 @@ namespace
         controlNews();
       }
       // Requests wait in the listener until a control service is connected to hear them.
+      if (net && !defeatedLeaving.empty()) {
+        // Plan WP13.7: out of the match as a player who leaves is (the seat's eject); no view after this.
+        const double now = SecondsSince(playStart);
+        std::erase_if(defeatedLeaving, [&](const std::pair<double, std::int32_t>& leaving) {
+          if (now < leaving.first) {
+            return false;
+          }
+          (void)net->RequestEject(leaving.second, "defeated (DefeatedPlayerView is disconnect)");
+          return true;
+        });
+      }
       if (control && observers && control->Connected()) {
         for (const faf::server::CObserverListener::SRequest& asked : observers->TakeRequests()) {
           controlEvent("observer_request", "\"token\":" + faf::server::JsonString(asked.token) + ",\"from\":" + faf::server::JsonString(asked.from));
@@ -1930,6 +1972,14 @@ namespace
           LuaPlus::LuaObject results = sync["GameResult"];
           if (results.IsTable()) {
             ReadGameResults(results, end.players);
+            // Plan WP13.7: with `DefeatedPlayerView = "disconnect"`, a defeated player goes once they've seen it.
+            for (std::size_t army = 0; disconnectDefeated && army < end.players.size(); ++army) {
+              if (end.players[army].result.starts_with("defeat") && defeatedArmies.insert(army).second) {
+                if (const auto found = armyUids.find(army); found != armyUids.end()) {
+                  defeatedLeaving.emplace_back(SecondsSince(playStart) + kDefeatedLeaveSeconds, found->second);
+                }
+              }
+            }
           }
           const LuaPlus::LuaObject gameEnded = sync["GameEnded"];
           if (!gameEnded.IsNil() && (!gameEnded.IsBoolean() || gameEnded.GetBoolean())) {

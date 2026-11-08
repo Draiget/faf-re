@@ -423,7 +423,7 @@ namespace faf::server
     }
     for (const auto& [uid, reason] : ejects) {
       if (const auto found = mSeats.find(uid); found != mSeats.end() && !found->second.gone) {
-        Remove(uid, found->second, "ejected by the organiser" + (reason.empty() ? std::string() : ": " + reason));
+        Remove(uid, found->second, reason);
       }
     }
     std::vector<SSeatState> states;

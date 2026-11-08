@@ -140,7 +140,10 @@ namespace faf::server
       std::uint32_t pingMs = 0;
     };
     [[nodiscard]] std::vector<SSeatState> Seats();
-    /** Plan WP17.2: the organiser takes a participant out of the match; done on the network thread. False: no such seat. */
+    /**
+     * Plan WP17.2: a participant out of the match (the organiser's eject, or a defeat with `DefeatedPlayerView =
+     * "disconnect"`), as one who leaves is; done on the network thread. `reason` goes to the log whole. False: no such seat.
+     */
     bool RequestEject(std::int32_t uid, std::string reason);
     /** Plan WP17.2: the organiser adds an address to the handshake allowlist or takes it off; done on the network thread. */
     void RequestAddress(std::uint32_t ip, bool allow);
