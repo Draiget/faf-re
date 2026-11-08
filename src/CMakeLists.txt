@@ -481,6 +481,9 @@ add_executable(faf_registration_dump_sim EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}
 target_link_libraries(faf_registration_dump_sim PRIVATE faf_sim)
 
 # --- Map editor -------------------------------------------------------------------------
-# FafEditor_x64.exe / FafEditor.exe (src/editor, .plans/map-editor): its own program on
-# faf_engine's objects, drawing through Direct3D 12 or Vulkan only.
+# FafEditor_x64.exe / FafEditor.exe (src/editor, docs/MAP_EDITOR.md): its own program on
+# faf_engine's objects, drawing through Direct3D 12 or Vulkan only. It carries the same packed
+# DXC archive as faf_main; a custom command's output is only visible to targets in its own
+# directory, so the editor waits for it through this target.
+add_custom_target(faf_dxc_pack DEPENDS "${_faf_embed_dir}/dxc.tar.zst")
 add_subdirectory(editor)
