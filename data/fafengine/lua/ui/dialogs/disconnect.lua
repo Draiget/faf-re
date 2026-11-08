@@ -197,6 +197,18 @@ if not rawget(getfenv(1), 'GetSessionClients') then
         end
     end
 
+    --- A reload of this module closes the rejoin dialog too: /lua/ui/uimain.lua then calls the old
+    --- module's DestroyDialog. FAF's `Update` above calls the same function to close only the
+    --- Connectivity dialog, so the rejoin dialog goes only once this module has been replaced.
+    local thisModule = getfenv(1)
+    local baseDestroyDialog = DestroyDialog
+    function DestroyDialog()
+        baseDestroyDialog()
+        if __modules["/lua/ui/dialogs/disconnect.lua"] != thisModule then
+            DestroyRejoinDialog()
+        end
+    end
+
     local function UpdateSlot(slot, index, client, armies)
         if IsReturning(client) then
             slot.ping:Hide()
