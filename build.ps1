@@ -20,6 +20,8 @@
   .\build.ps1 -Arch x86 -Name main_test    # x86, copied to bin\ as main_test.exe
 .EXAMPLE
   .\build.ps1 -NoBuild              # copy the last build only
+.EXAMPLE
+  .\build.ps1 -Editor               # copy only the map editor, FafEditor_x64.exe, to bin_x64
 #>
 [CmdletBinding()]
 param(
@@ -55,7 +57,11 @@ param(
   [switch]$Rebuild,
 
   # Parallel compile jobs (default: CMake's choice, one per logical CPU).
-  [int]$Jobs
+  [int]$Jobs,
+
+  # Copy only the map editor (FafEditor_x64.exe / FafEditor.exe, src/editor) into the run
+  # folder, with its .pdb and the DXC DLLs; the game's exe and headless stay as they are.
+  [switch]$Editor
 )
 
 if ($Profile) { $Configuration = 'Profile' }
@@ -64,8 +70,8 @@ $ErrorActionPreference = 'Stop'
 $repo = $PSScriptRoot
 
 $targets = @{
-  x64 = @{ Preset = "clang-x64-$($Configuration.ToLower())"; Exe = 'main_x64'; Headless = 'headless_x64'; RunDir = 'bin_x64' }
-  x86 = @{ Preset = "clang-x86-$($Configuration.ToLower())"; Exe = 'main';     Headless = 'headless';     RunDir = 'bin' }
+  x64 = @{ Preset = "clang-x64-$($Configuration.ToLower())"; Exe = 'main_x64'; Headless = 'headless_x64'; Editor = 'FafEditor_x64'; RunDir = 'bin_x64' }
+  x86 = @{ Preset = "clang-x86-$($Configuration.ToLower())"; Exe = 'main';     Headless = 'headless';     Editor = 'FafEditor';     RunDir = 'bin' }
 }
 $archs = if ($Arch -eq 'both') { @('x64', 'x86') } else { @($Arch) }
 
@@ -176,10 +182,42 @@ function Copy-Build([hashtable]$t, [string]$destDir, [string]$exeName) {
   Write-Host "   -> $destExe" -ForegroundColor Green
 }
 
+function Copy-Editor([hashtable]$t, [string]$destDir) {
+  $src = Join-Path $repo "build\$($t.Preset)\src\editor"
+  $exe = Join-Path $src "$($t.Editor).exe"
+  if (-not (Test-Path $exe)) { throw "$exe not found; build it first (drop -NoBuild)." }
+  New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+  $destExe = Join-Path $destDir "$($t.Editor).exe"
+  if (Test-Path $destExe) {
+    try { [IO.File]::Open($destExe, 'Open', 'ReadWrite', 'None').Close() }
+    catch { throw "$destExe is in use (is the editor running?). Close it first." }
+  }
+  Copy-Item $exe $destExe -Force
+  $pdb = Join-Path $src "$($t.Editor).pdb"
+  if (Test-Path $pdb) { Copy-Item $pdb (Join-Path $destDir "$($t.Editor).pdb") -Force }
+  # The DXC runtime the build staged next to the game's exe, as Copy-Build copies it.
+  $engineOut = Join-Path $repo "build\$($t.Preset)\src"
+  foreach ($dll in @('dxcompiler.dll', 'dxil.dll' | ForEach-Object { Get-Item (Join-Path $engineOut $_) -ErrorAction SilentlyContinue })) {
+    $target = Join-Path $destDir $dll.Name
+    if ((Test-Path $target) -and (Get-Item $target).Length -eq $dll.Length -and
+        (Get-Item $target).LastWriteTimeUtc -ge $dll.LastWriteTimeUtc) { continue }
+    # A game running from the same folder holds it open; the editor carries its own copy of DXC
+    # (EmbeddedFiles.rc), so the one there is kept.
+    try { Copy-Item $dll.FullName $target -Force }
+    catch { Write-Warning "$target not replaced (in use by a running game); the editor uses its embedded DXC if needed." }
+  }
+  Write-Host "   -> $destExe" -ForegroundColor Green
+}
+
 foreach ($a in $archs) {
   $t = $targets[$a]
   if (-not $NoBuild) { Invoke-Build $t }
   if ($NoCopy) { continue }
+
+  if ($Editor) {
+    Copy-Editor $t (Join-Path $FafDir $t.RunDir)
+    continue
+  }
 
   Copy-Build $t (Join-Path $FafDir $t.RunDir) (Get-RunName $a $t)
   if ($Out) { Copy-Build $t (Join-Path $repo "out\$a") $t.Exe }
@@ -189,6 +227,12 @@ Write-Host ''
 foreach ($a in $archs) {
   $t = $targets[$a]
   if ($NoCopy) { break }
+  if ($Editor) {
+    Write-Host "Run the map editor ($a):" -ForegroundColor Cyan
+    Write-Host "  cd $(Join-Path $FafDir $t.RunDir)"
+    Write-Host "  .\$($t.Editor).exe /init init_faf.lua /log $(Join-Path $FafDir "logs\$($t.Editor).log")"
+    continue
+  }
   $exeName = Get-RunName $a $t
   Write-Host "Run ($a):" -ForegroundColor Cyan
   Write-Host "  cd $(Join-Path $FafDir $t.RunDir)"

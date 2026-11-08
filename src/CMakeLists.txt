@@ -479,3 +479,8 @@ add_custom_command(TARGET headless POST_BUILD
 # faf_main's (tests/registry/RegistrationDump.cpp), and its sections the Linux faf_sim's.
 add_executable(faf_registration_dump_sim EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/registry/RegistrationDump.cpp")
 target_link_libraries(faf_registration_dump_sim PRIVATE faf_sim)
+
+# --- Map editor -------------------------------------------------------------------------
+# FafEditor_x64.exe / FafEditor.exe (src/editor, .plans/map-editor): its own program on
+# faf_engine's objects, drawing through Direct3D 12 or Vulkan only.
+add_subdirectory(editor)

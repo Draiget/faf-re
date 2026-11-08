@@ -38,6 +38,7 @@ dependencies/freetype/
 dependencies/msdfgen/
 dependencies/googletest/
 dependencies/DirectXTex/
+dependencies/imgui/
 dependencies/*.7z
 *.7z
 *.pdb
