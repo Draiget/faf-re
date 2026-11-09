@@ -117,6 +117,44 @@ do
     end
 end
 
+-- Transport cargo pre-orders and drop ghosts (ui_TransportPreOrders):
+do
+    local gameplay = options and options.gameplay
+    if gameplay and gameplay.items and not HasOptionKey(gameplay.items, 'transport_preorders') then
+        local isRu = (rawget(_G, '__language') == 'RU')
+        local entry = {
+            title = isRu and "Предзаказы десанта из транспорта" or "Transport Cargo Pre-orders",
+            key = 'transport_preorders',
+            type = 'toggle',
+            default = 1,
+            tip = isRu
+                and "Разрешить отдавать предзаказы и отображать призраков высадки и постройки для юнитов внутри транспорта."
+                or "Allow issuing pre-orders and previewing drop ghosts for units inside transports.",
+            set = function(key, value, startup)
+                if value ~= 0 and value ~= 1 then
+                    value = 1
+                end
+                ConExecute("ui_TransportPreOrders " .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    { text = "<LOC _On>", key = 1 },
+                    { text = "<LOC _Off>", key = 0 },
+                },
+            },
+        }
+
+        local position = table.getn(gameplay.items) + 1
+        for index, item in ipairs(gameplay.items) do
+            if item.key == 'assist_to_upgrade' or item.title == '<LOC OPTIONS_0323>Commands' then
+                position = index + 1
+                break
+            end
+        end
+        table.insert(gameplay.items, position, entry)
+    end
+end
+
 
 -- Local rendering only. Older executables must neither show this option nor
 -- receive an unknown command when preferences are applied at startup.

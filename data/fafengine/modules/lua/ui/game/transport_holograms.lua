@@ -162,6 +162,15 @@ function TransportHolograms:CreateHologramMesh(unit, worldPos)
 end
 
 function TransportHolograms:Update()
+    local getPref = rawget(_G, 'GetPreference')
+    if getPref and getPref('transport_preorders') == 0 then
+        for tid, _ in pairs(self._trackedTransports) do
+            self:ClearHologramsForTransport(tid)
+        end
+        self._trackedTransports = {}
+        return
+    end
+
     local focusArmy = -1
     local getFocusArmy = rawget(_G, 'GetFocusArmy')
     if getFocusArmy then
