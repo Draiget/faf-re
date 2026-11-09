@@ -1140,7 +1140,10 @@ namespace moho
     }
 
     const Wm3::Vector3f sunDirection = terrainRes->GetSunDirection();
-    (void)PrepareLightCamera(viewCamera, sunDirection, zoom);
+    if (!PrepareLightCamera(viewCamera, sunDirection, zoom)) {
+      // Engine addition (ren_ShadowCascades): no tiles this frame, so no lookup follows last frame's.
+      PublishNoCascades();
+    }
     RenderShadowMap(terrain, viewCamera);
   }
 

@@ -8,7 +8,7 @@ namespace moho
 {
   /**
    * Engine addition (`ren_ShadowCascades`): where one tile of the shadow atlas sits and what part of the
-   * whole-view map it answers for. Pure maths, so `tests/render/ShadowCascadeFitTests.cpp` can run it
+   * whole-view map it answers for. Pure maths, so `tests/render/ShadowStableFitTests.cpp` can run it
    * without a device.
    *
    * Every tile shares the whole-view map's light view and depth range; only the light-space box differs.
