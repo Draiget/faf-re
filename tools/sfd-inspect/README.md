@@ -14,7 +14,7 @@ ctest --test-dir .tmp/sfd-tests --output-on-failure
 
 - **x64**: use a separate build directory with `cmake/toolchains/clang-cl-x64.cmake`. Release is supported too.
 - **ASan**: add `-DFAF_SFD_ASAN=ON` to instrument backend and test code; run from the developer shell so the ASan runtime DLL is found.
-- **Assets**: the asset directory is optional. Without it, CTest runs only the synthetic parser tests. No game assets are copied or redistributed.
+- **Assets**: the asset directory is optional. Without it this project registers no tests; the synthetic parser tests are GoogleTest in the engine build (`tests/movie/SfdHeaderParserTests.cpp`, ctest `sfd_header_parser`). No game assets are copied or redistributed.
 - **Sound**: the DirectSound test needs an available audio device. `--play-sound` audibly plays part of the selected movie; `--play` exercises the same player with no sound device.
 
 ## Examples

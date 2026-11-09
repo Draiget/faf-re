@@ -42,7 +42,7 @@ namespace moho
      * `source` into destination storage, then tears down constructed elements
      * before rethrowing if construction fails.
      */
-    RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponCountedRangeWithRollback(
+    [[maybe_unused]] RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponCountedRangeWithRollback(
       int count,
       RUnitBlueprintWeapon* destination,
       const RUnitBlueprintWeapon* source
@@ -74,7 +74,7 @@ namespace moho
      * Copy-constructs one contiguous source range into destination storage and
      * destroys already-built destination elements before rethrowing on failure.
      */
-    RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponRangeWithRollback(
+    [[maybe_unused]] RUnitBlueprintWeapon* CopyRUnitBlueprintWeaponRangeWithRollback(
       RUnitBlueprintWeapon* destinationBegin,
       RUnitBlueprintWeapon* destinationEnd,
       const RUnitBlueprintWeapon* sourceBegin
@@ -231,7 +231,7 @@ namespace moho
       return static_cast<EFootprintFlags>(kFootprintFlagsByMotion[ToMotionIndex(motionType)]);
     }
 
-    void AssignNormalizedFilename(msvc8::string& destination, const std::string_view filename)
+    void AssignNormalizedFilename(fa::string& destination, const std::string_view filename)
     {
       std::string normalized{filename};
       gpg::STR_NormalizeFilenameLowerSlash(normalized);
@@ -434,7 +434,7 @@ namespace moho
   {
     // Per-element ~string() then free then null all three lanes is VC8's
     // _Tidy(), which is what move-assigning an empty vector compiles to.
-    TargetBones = msvc8::vector<msvc8::string>{};
+    TargetBones = fa::vector<fa::string>{};
 
     if (BeaconName.myRes >= 0x10U) {
       ::operator delete(BeaconName.bx.ptr);
@@ -658,7 +658,7 @@ namespace moho
    * modeled as a separate function here)
    * Address: 0x00523A40 (FUN_00523A40, the `Weapons.WeaponBlueprints`
    * teardown lane this destructor reaches directly at offset +0x4D4 --
-   * `msvc8::vector<RUnitBlueprintWeapon>::~vector`, modeled once in
+   * `fa::vector<RUnitBlueprintWeapon>::~vector`, modeled once in
    * legacy/containers/Vector.h and not duplicated here)
    * Mangled: ??1RUnitBlueprint@Moho@@QAE@@Z
    *
@@ -695,7 +695,7 @@ namespace moho
     }
 
     if (!Display.MeshBlueprint.name.empty()) {
-      msvc8::string meshPath = RES_CompletePath(Display.MeshBlueprint.name.c_str(), mSource.c_str());
+      fa::string meshPath = RES_CompletePath(Display.MeshBlueprint.name.c_str(), mSource.c_str());
       gpg::STR_NormalizeFilenameLowerSlash(meshPath);
       Display.MeshBlueprint.name.assign_owned(meshPath.view());
     }
@@ -721,7 +721,7 @@ namespace moho
   {
     EntityCategorySet* const economyCategoryCache = &Economy.CategoryCache;
 
-    for (msvc8::string* it = Economy.BuildableCategories.begin();
+    for (fa::string* it = Economy.BuildableCategories.begin();
          it != Economy.BuildableCategories.end();
          ++it) {
       // The binary parses through the free function directly (a1 =
@@ -772,10 +772,7 @@ namespace moho
    */
   gpg::RRef RUnitBlueprint::GetDerivedObjectRef()
   {
-    gpg::RRef out{};
-    out.mObj = this;
-    out.mType = GetClass();
-    return out;
+    return gpg::MakeSelfRef(this);
   }
 
   namespace
@@ -1072,7 +1069,7 @@ namespace moho
     RRuleGameRules* rules = nullptr;
     const gpg::RRef owner{};
     archive.ReadPointer(&rules, &owner);
-    msvc8::string id;
+    fa::string id;
     archive.ReadString(&id);
     RResId resId{};
     gpg::STR_CopyFilename(&resId.name, &id);

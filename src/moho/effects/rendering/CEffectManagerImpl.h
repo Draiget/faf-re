@@ -16,6 +16,14 @@ namespace gpg
 
 namespace moho
 {
+  /**
+   * Engine addition (plan WPR.35): whether effects only run out their lifetime. A program that
+   * draws nothing turns this on before any effect exists: emitters build no curves and spawn no
+   * particles, while scripts still hold them and they still end when they would.
+   */
+  void EFFECT_SetLifetimeOnly(bool lifetimeOnly) noexcept;
+  [[nodiscard]] bool EFFECT_LifetimeOnly() noexcept;
+
   class CEffectManagerImpl : public IEffectManager
   {
   public:
@@ -153,6 +161,15 @@ namespace moho
     void Tick() override;
 
     /**
+     * Engine addition (`sim_ParallelEffects`): `Tick`'s walk with the effects' `OnTick`s on sim
+     * workers, in chunks of consecutive effects. Inside a chunk, particle-buffer appends go to the
+     * chunk's own buffer and `DestroyEffect` is recorded; both are then committed chunk by chunk,
+     * which is list order, so the particle buffer and the destroyed list end up as the serial walk
+     * leaves them. Returns false, having ticked nothing, when the walk has to stay serial.
+     */
+    [[nodiscard]] bool TickParallel();
+
+    /**
      * Address: 0x0066B570 (FUN_0066B570, Moho::CEffectManagerImpl::PurgeDestroyedEffects)
      *
      * What it does:
@@ -169,8 +186,8 @@ namespace moho
      */
     void CreateLightParticle(
       Wm3::Vector3<float> position,
-      const msvc8::string& texturePrimary,
-      const msvc8::string& textureSecondary,
+      const fa::string& texturePrimary,
+      const fa::string& textureSecondary,
       float size,
       float lifetime,
       int armyIndex
@@ -241,4 +258,16 @@ namespace moho
     "CEffectManagerImpl::mDestroyedEffects offset must be 0x10"
   );
   static_assert(sizeof(CEffectManagerImpl) == 0x18, "CEffectManagerImpl size must be 0x18");
+
+  struct SParticleBuffer;
+
+  /// Engine addition: the effect tick on sim workers, and the fewest active effects it is used for.
+  extern bool sim_ParallelEffects;
+  extern int sim_ParallelEffectsMin;
+
+  /**
+   * Engine addition (`sim_ParallelEffects`): the particle buffer of the effect-tick chunk this
+   * thread is running, or null outside one. `Sim::GetParticleBuffer` returns it when set.
+   */
+  [[nodiscard]] SParticleBuffer* EffectTickChunkParticleBuffer() noexcept;
 } // namespace moho

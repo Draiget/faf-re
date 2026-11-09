@@ -1,4 +1,6 @@
 #include "moho/unit/CUnitMotion.h"
+#include "moho/misc/EconomyRequestRelease.h"
+#include "moho/sim/SimArchiveMode.h"
 #include "legacy/math/X87Math.h"
 
 #include <algorithm>
@@ -57,7 +59,6 @@ namespace moho
     constexpr float kRollHackBlend = 0.25f;
     constexpr float kRollHackAxisScale = 4.0f;
     constexpr float kWaterSnapSurfaceBias = 0.25f;
-    constexpr float kNoWaterElevation = -10000.0f;
     constexpr float kCommonMoveNearStopSpeedScale = 0.080000006f;
     // Loaded from 0x00E4F9D0 (0x3BA3D70B): one ulp above the float nearest
     // 0.005, as kCommonMoveNearStopSpeedScale (0x00E4F91C, 0x3DA3D70B) is for 0.08.
@@ -105,12 +106,11 @@ namespace moho
   [[nodiscard]] float RandomInRange(moho::CMersenneTwister& twister, const float lower, const float upper) noexcept
   {
     constexpr float kInvTwoTo32 = 2.3283064365386963e-10f; // 0x2F800000 at 0x00E4F7B0
-    return lower + msvc8::MulTwisterWord(upper - lower, twister.NextUInt32()) * kInvTwoTo32;
+    return lower + fa::MulTwisterWord(upper - lower, twister.NextUInt32()) * kInvTwoTo32;
   }
 
   // Water surface used on maps that have no water at all: far enough below any
   // real terrain that nothing is ever classified as submerged.
-  constexpr float kNoWaterSurfaceElevation = -10000.0f;
   // Ticks of current velocity the water-exit transition endpoint is led by.
   constexpr float kLayerExitLeadTicks = 10.0f;
 
@@ -499,8 +499,10 @@ namespace moho
       const CHeightField* const heightField = map.GetHeightField();
       float sampledElevation = heightField ? heightField->GetElevation(samplePoint.x, samplePoint.z) : samplePoint.y;
 
-      if (includeWaterFloor && map.mWaterEnabled != 0u && map.mWaterElevation > sampledElevation) {
-        sampledElevation = map.mWaterElevation;
+      // Engine addition (water bodies): the level at the sample point.
+      const float waterElevation = map.GetWaterElevationAt(samplePoint.x, samplePoint.z);
+      if (includeWaterFloor && waterElevation > sampledElevation) {
+        sampledElevation = waterElevation;
       }
 
       if (unit != nullptr) {
@@ -528,14 +530,6 @@ namespace moho
         return elevation + unit->DistanceToOccupiedRect(&samplePoint);
       }
       return elevation;
-    }
-
-    [[nodiscard]] gpg::RRef MakeCUnitMotionRef(CUnitMotion* const value) noexcept
-    {
-      gpg::RRef out{};
-      out.mObj = value;
-      out.mType = CUnitMotion::StaticGetClass();
-      return out;
     }
 
     template <class TObject>
@@ -569,7 +563,7 @@ namespace moho
       const char* const expectedName =
         ResolveCachedType<TObject>() ? ResolveCachedType<TObject>()->GetName() : fallbackName;
       const char* const actualName = tracked.type ? tracked.type->GetName() : "null";
-      const msvc8::string message = gpg::STR_Printf(
+      const fa::string message = gpg::STR_Printf(
         "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
         "instead",
         expectedName ? expectedName : fallbackName,
@@ -660,17 +654,6 @@ namespace moho
       return event == UMVE_Bottom || event == UMVE_Hover;
     }
 
-    void DestroyEconomyRequestPointer(CEconRequest*& request) noexcept
-    {
-      if (!request) {
-        return;
-      }
-
-      request->mNode.ListUnlink();
-      delete request;
-      request = nullptr;
-    }
-
     void ReplaceEconomyRequestPointer(CEconRequest*& request, CEconRequest* const replacement) noexcept
     {
       DestroyEconomyRequestPointer(request);
@@ -688,16 +671,6 @@ namespace moho
         request->mNode.ListLinkBefore(&economy->registrationNode);
       }
       return request;
-    }
-
-    [[nodiscard]] SEconValue TakeGrantedResourcesAndReset(CEconRequest* const request) noexcept
-    {
-      SEconValue out{};
-      out.energy = request->mGranted.energy;
-      out.mass = request->mGranted.mass;
-      request->mGranted.energy = 0.0f;
-      request->mGranted.mass = 0.0f;
-      return out;
     }
 
     void ClearMaintenanceCost(Unit* const unit) noexcept
@@ -858,8 +831,9 @@ namespace moho
 
     const STIMap* const map = mUnit->SimulationRef->mMapData;
     float surfaceElevation = map->mHeightField.get()->GetElevation(mPos.x, mPos.z);
-    if (map->mWaterEnabled != 0 && map->mWaterElevation > surfaceElevation) {
-      surfaceElevation = map->mWaterElevation;
+    const float waterElevation = map->GetWaterElevationAt(mPos.x, mPos.z); // engine addition: per position
+    if (waterElevation > surfaceElevation) {
+      surfaceElevation = waterElevation;
     }
     mTargetElevation = surfaceElevation;
 
@@ -986,6 +960,12 @@ namespace moho
     ReplaceEconomyRequestPointer(mEconomyRequest, loadedRequest);
 
     ReadTypedValue(*archive, mRepairConsumption, ownerRef);
+
+    // Engine addition (replay keyframes): rebuilt only while moving, and read by the first move after
+    // a stop, so a keyframe of a unit at rest has to keep it.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->Read(gpg::LookupRType(typeid(gpg::fastvector<WeakPtr<Entity>>)), &mRaisedPlatformCandidates, ownerRef);
+    }
   }
 
   /**
@@ -1072,6 +1052,11 @@ namespace moho
     );
 
     WriteTypedValue(*archive, mRepairConsumption, ownerRef);
+
+    // Engine addition (replay keyframes): see MemberDeserialize.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->Write(gpg::LookupRType(typeid(gpg::fastvector<WeakPtr<Entity>>)), &mRaisedPlatformCandidates, ownerRef);
+    }
   }
 
   /**
@@ -1092,8 +1077,9 @@ namespace moho
       targetElevation = heightField->GetElevation(targetPosition.x, targetPosition.z);
     }
 
-    if (mapData->mWaterEnabled != 0u && mapData->mWaterElevation > targetElevation) {
-      targetElevation = mapData->mWaterElevation;
+    const float targetWaterElevation = mapData->GetWaterElevationAt(targetPosition.x, targetPosition.z); // engine addition
+    if (targetWaterElevation > targetElevation) {
+      targetElevation = targetWaterElevation;
     }
 
     mTargetElevation = targetElevation;
@@ -1823,7 +1809,8 @@ namespace moho
       return ownerElevation * kCarrierRelativeHeightScale;
     }
 
-    if (mHeight <= mUnit->GetPosition().y) {
+    // 0x006BC909 `comiss` + `jbe`: NaN takes this path.
+    if (!(mHeight > mUnit->GetPosition().y)) {
       return ownerElevation * kCarrierRelativeHeightScale;
     }
 
@@ -1843,12 +1830,13 @@ namespace moho
     const float targetElevation = GetElevation();
     const float lift = (wingFactor - 0.5f) * mUnit->GetBlueprint()->Air.LiftFactor;
 
-    if (lift <= 0.0f) {
+    // 0x006BC9DD `comiss` + `jbe`: NaN takes the low-lift path.
+    if (!(lift > 0.0f)) {
       const float halfTargetElevation = targetElevation * 0.5f;
       if (halfTargetElevation > mCurElevation) {
         return halfTargetElevation - mCurElevation;
       }
-    } else if (maxLift <= lift) {
+    } else if (!(maxLift > lift)) { // 0x006BC9ED `comiss` + `ja`
       return maxLift;
     }
 
@@ -2038,7 +2026,6 @@ namespace moho
     constexpr float kSpinIntegrationDt = 0.1f;
     constexpr float kUprightMinCosine = 0.667f;
     constexpr float kFootprintHalfExtentScale = 0.5f;
-    constexpr float kNoWaterElevation = -10000.0f;
     constexpr float kMinMoveDistanceFraction = 0.001f;
 
     Unit* const unit = mUnit;
@@ -2112,8 +2099,8 @@ namespace moho
       hitResult.v1 = surfaceHit.v1;
     }
 
-    const bool waterEnabled = mapData->mWaterEnabled != 0;
-    const float waterElevation = waterEnabled ? mapData->mWaterElevation : kNoWaterElevation;
+    // Engine addition (water bodies): the level where the unit is; a hit point takes its own below.
+    const float waterElevation = mapData->GetWaterElevationAt(currentPos.x, currentPos.z);
     const float groundElevationAtCurrentPos = mapData->GetHeightField()->GetElevation(currentPos.x, currentPos.z);
 
     const ELayer oldLayer = unit->mVarDat.mLayerMask;
@@ -2137,7 +2124,7 @@ namespace moho
       newPos = hitPoint;
       moveDistanceFraction = hitResult.distance / segmentLength;
 
-      if (waterElevation >= hitPoint.y) {
+      if (mapData->GetWaterElevationAt(hitPoint.x, hitPoint.z) >= hitPoint.y) {
         unit->SetCurrentLayer(isAmphibious ? LAYER_Seabed : LAYER_Water);
       } else {
         // This transition bypasses Entity::SetCurrentLayer() - direct field
@@ -2162,8 +2149,8 @@ namespace moho
         const SFootprint& footprint = unit->GetFootprint();
         SOCellPos cellPos{};
         // 0x006C09EB / 0x006C0A11: `fld; fistp` -- rounded, then the low word.
-        cellPos.x = static_cast<std::int16_t>(msvc8::RoundToInt(currentPos.x - (footprint.mSizeX * kFootprintHalfExtentScale)));
-        cellPos.z = static_cast<std::int16_t>(msvc8::RoundToInt(currentPos.z - (footprint.mSizeZ * kFootprintHalfExtentScale)));
+        cellPos.x = static_cast<std::int16_t>(fa::RoundToInt(currentPos.x - (footprint.mSizeX * kFootprintHalfExtentScale)));
+        cellPos.z = static_cast<std::int16_t>(fa::RoundToInt(currentPos.z - (footprint.mSizeZ * kFootprintHalfExtentScale)));
 
         COGrid* const oGrid = unit->SimulationRef->mOGrid;
         EOccupancyCaps mobileCaps = OCCUPY_MobileCheck(footprint, *mapData, cellPos);
@@ -2414,7 +2401,6 @@ namespace moho
   bool CUnitMotion::HandleGroundCollision()
   {
     constexpr float kGroundCheckElevationScale = 2.0f;
-    constexpr float kNoWaterElevation = -10000.0f;
 
     Unit* const unit = mUnit;
     const RUnitBlueprint* const blueprint = unit->GetBlueprint();
@@ -2427,8 +2413,6 @@ namespace moho
     STIMap* const mapData = unit->SimulationRef->mMapData;
     SPhysBody* const physBody = unit->GetPhysBody();
 
-    const bool waterEnabled = mapData->mWaterEnabled != 0;
-    const float waterFloor = waterEnabled ? mapData->mWaterElevation : kNoWaterElevation;
 
     gpg::fastvector_n<Wm3::Sphere3f, 8> collisionSpheres;
     unit->GetTerrainCollisionGeom(collisionSpheres);
@@ -2456,7 +2440,8 @@ namespace moho
       }
 
       if (!blueprint->Air.FlyInWater) {
-        anyBelowWater |= (waterFloor >= worldPoint.y);
+        // Engine addition (water bodies): the level under each sphere.
+        anyBelowWater |= (mapData->GetWaterElevationAt(worldPoint.x, worldPoint.z) >= worldPoint.y);
       }
     }
 
@@ -2529,7 +2514,8 @@ namespace moho
     const Wm3::Vector3f unitPosition = mUnit->GetPosition();
     const float terrainElevation =
       heightField ? heightField->GetElevation(unitPosition.x, unitPosition.z) : unitPosition.y;
-    const float waterElevation = (mapData && mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : kNoWaterElevation;
+    const float waterElevation =
+      mapData ? mapData->GetWaterElevationAt(unitPosition.x, unitPosition.z) : kNoWaterElevation; // engine addition
 
     float surfaceDepthLimit = (terrainElevation + kSurfaceClearance) - waterElevation;
     if (surfaceDepthLimit > 0.0f) {
@@ -2547,8 +2533,9 @@ namespace moho
 
     const float minDiveSpeed = baseDiveSpeed * kDiveSpeedMinFactor;
     // 0x006C336C..0x006C3380: `fld phase; fmul pi; fsin; fmul base; fst` --
-    // the sine is never stored, so only the product rounds to float.
-    const float curveDiveSpeed = msvc8::SinTimes(depthPhase * kPi, baseDiveSpeed);
+    // neither `phase * pi` nor the sine is stored, so only the product rounds
+    // to float (a denormal phase keeps its argument; difffuzz).
+    const float curveDiveSpeed = fa::SinOfProductTimes(depthPhase, kPi, baseDiveSpeed);
     // 0x006C3384..0x006C338F: `comiss min, curve; ja` keeps the minimum only
     // when it is strictly greater, so a NaN curve speed is taken.
     mDivingSpeed = (minDiveSpeed > curveDiveSpeed) ? minDiveSpeed : curveDiveSpeed;
@@ -2604,7 +2591,8 @@ namespace moho
 
     // Maps without water are modelled as having their surface infinitely far
     // below, so nothing ever counts as submerged.
-    float waterSurface = mapData->mWaterEnabled ? mapData->mWaterElevation : kNoWaterSurfaceElevation;
+    // Engine addition (water bodies): the level where the unit is (-10000 without water).
+    float waterSurface = mapData->GetWaterElevationAt(currentTransform.pos_.x, currentTransform.pos_.z);
 
     // Land-capable footprints sit on top of shallow water rather than in it,
     // so their effective surface is raised by the blueprint's layer-change
@@ -2735,7 +2723,7 @@ namespace moho
         const Wm3::Quaternionf& orientation = unit->mVarDat.mCurTransform.orient_;
         const float headingY = ((orientation.z * orientation.x) + (orientation.w * orientation.y)) * 2.0f;
         const float headingX = 1.0f - (((orientation.y * orientation.y) + (orientation.x * orientation.x)) * 2.0f);
-        const float headingDelta = NormalizeAngleSignedRadians(msvc8::Atan2Difference(
+        const float headingDelta = NormalizeAngleSignedRadians(fa::Atan2Difference(
           targetPosition.x - unitPosition.x, targetPosition.z - unitPosition.z, headingY, headingX
         ));
         const Wm3::Vector3f forward = moho::QuatForwardAxis(unit->GetTransform().orient_);
@@ -3122,16 +3110,17 @@ namespace moho
     }
 
     const Wm3::Vector3f referenceVectorQuarterTurn = RotateByQuaternion(referenceVector, kQuatYawPos90);
+    // 0x006BDADB `comiss 0, dot` + `jbe`: NaN gives +1.
     const float turnSign =
-      ((referenceVectorQuarterTurn.z * selectedVector.z) +
-       (referenceVectorQuarterTurn.y * selectedVector.y) +
-       (referenceVectorQuarterTurn.x * selectedVector.x)) >= 0.0f
-        ? 1.0f
-        : -1.0f;
+      0.0f > ((referenceVectorQuarterTurn.z * selectedVector.z) +
+              (referenceVectorQuarterTurn.y * selectedVector.y) +
+              (referenceVectorQuarterTurn.x * selectedVector.x))
+        ? -1.0f
+        : 1.0f;
 
     // 0x006BDB12 spills the first angle; 0x006BDB2A subtracts the second
     // while it still has x87 precision, before the delta is stored as float.
-    float turnDelta = msvc8::Atan2Difference(
+    float turnDelta = fa::Atan2Difference(
       selectedPlanarVector.x, selectedPlanarVector.z, referenceVector.x, referenceVector.z
     );
     if (turnDelta <= 3.1415927f) {
@@ -3144,7 +3133,8 @@ namespace moho
 
     const float maxTurnSpeed = (combatState == kAirCombatStateCombatTurn) ? air.CombatTurnSpeed : air.TurnSpeed;
     const float maxTurnDelta = maxTurnSpeed * 0.1f;
-    if (turnDelta > maxTurnDelta) {
+    // 0x006BDB8B `comiss max, delta` + `jbe`: NaN clamps to the maximum.
+    if (!(maxTurnDelta > turnDelta)) {
       turnDelta = maxTurnDelta;
     }
     if (turnDelta < -maxTurnDelta) {
@@ -3159,10 +3149,10 @@ namespace moho
     // literals: 0x006BDBE7 forms them as `sin * 0.0f`, so they carry the sign
     // of the sine (-0.0f for a turn to the other side).
     const float halfTurnAngle = (turnDelta * 10.0f) * 0.5f;
-    const float sinHalfTurn = msvc8::sin(halfTurnAngle);
+    const float sinHalfTurn = fa::sin(halfTurnAngle);
     const float signedZeroLane = sinHalfTurn * 0.0f;
     const Wm3::Quaternionf turnQuaternion{
-      msvc8::cos(halfTurnAngle),
+      fa::cos(halfTurnAngle),
       signedZeroLane,
       sinHalfTurn,
       signedZeroLane,
@@ -3210,7 +3200,8 @@ namespace moho
       bankFactor = air.BankFactor * 10.0f;
     }
 
-    if (forwardAlignment < 0.0f) {
+    // 0x006BDCD1 `comiss` + `jbe`: NaN and -0 give +0.
+    if (!(forwardAlignment > 0.0f)) {
       forwardAlignment = 0.0f;
     }
 
@@ -3358,8 +3349,8 @@ namespace moho
     // 0x006BE340..0x006BE352 rounds the circling point to an integer
     // height sample in both water modes. The dry-flight path calls the
     // map's water-clamped integer sampler (0x006BE3AF -> 0x006BC400).
-    const std::int32_t sampleX = msvc8::RoundToInt(aimX);
-    const std::int32_t sampleZ = msvc8::RoundToInt(aimZ);
+    const std::int32_t sampleX = fa::RoundToInt(aimX);
+    const std::int32_t sampleZ = fa::RoundToInt(aimZ);
     float terrainElevation;
     if (air.FlyInWater) {
       STIMap* const mapData = sim->mMapData;
@@ -3623,8 +3614,9 @@ namespace moho
 
     const auto rollBreakOff = [&]() {
       mCombatState = ACS_BreakOff;
-      const auto minTicks = static_cast<int>(std::ceil((breakOffDist / maxAirSpeed) * 10.0f));
-      const auto maxTicks = static_cast<int>(static_cast<float>(minTicks) * air.RandomBreakOffDistanceMult);
+      // 0x006BD235..0x006BD27C: inline ceil, then cvttss2si.
+      const auto minTicks = fa::CeilToIntX87((breakOffDist / maxAirSpeed) * 10.0f);
+      const auto maxTicks = fa::TruncateToInt(static_cast<float>(minTicks) * air.RandomBreakOffDistanceMult);
       mCombatStateTimeoutTick = curTick + static_cast<std::uint32_t>(RandomUniformIntRange(minTicks, maxTicks, randomStream));
     };
 
@@ -3667,7 +3659,7 @@ namespace moho
         }
 
         if (!triggerBreakOff) {
-          const auto sustainedTurnThresholdTicks = static_cast<int>(std::floor(air.SustainedTurnThreshold * 10.0f));
+          const auto sustainedTurnThresholdTicks = fa::FloorToIntX87(air.SustainedTurnThreshold * 10.0f); // 0x006BD1A0..0x006BD1C4
           if (mSustainedTurnTicks > sustainedTurnThresholdTicks) {
             triggerBreakOff = true;
           }
@@ -3887,8 +3879,9 @@ namespace moho
     // water, so `(mCurElevation - mNewElevation) < 0.1f` never holds and a
     // flier never settles there.
     float sampleElevation = mapData->GetHeightField()->GetElevation(outTransform.pos_.x, outTransform.pos_.z);
-    if (air.FlyInWater == 0u && mapData->mWaterEnabled != 0u && mapData->mWaterElevation > sampleElevation) {
-      sampleElevation = mapData->mWaterElevation;
+    const float sampleWaterElevation = mapData->GetWaterElevationAt(outTransform.pos_.x, outTransform.pos_.z); // engine addition
+    if (air.FlyInWater == 0u && sampleWaterElevation > sampleElevation) {
+      sampleElevation = sampleWaterElevation;
     }
 
     Wm3::Vector3f desiredVelocity{
@@ -3913,7 +3906,8 @@ namespace moho
     // the UNIT's layer, not the motion's. Unit's Entity base sits at +0x08 and
     // Entity::mCurrentLayer at +0x118, so +0x120 from a Unit* is that field.
     if (!unit->IsDead() || (unit->mVarDat.mLayerMask != LAYER_Air && !ShouldHoverInsteadOfLand())) {
-      if (horizontalDistance <= air.StartTurnDistance || mCarrierEvent == kCarrierEventDescendToDeck) {
+      // 0x006BF3CF `comiss` + `jbe`: a NaN distance (a NaN target) takes the landing path.
+      if (!(horizontalDistance > air.StartTurnDistance) || mCarrierEvent == kCarrierEventDescendToDeck) {
         enteredLandingPhase = (mLayer != LAYER_None && mLayer != LAYER_Air);
         const auto autoLandTicks = static_cast<std::int32_t>(air.AutoLandTime * 10.0f);
 
@@ -3934,8 +3928,9 @@ namespace moho
 
                 enteredLandingPhase = true;
                 const float landElevation = mapData->GetHeightField()->GetElevation(mTargetPosition.x, mTargetPosition.z);
-                const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
-                mLayer = (landElevation <= waterElevation) ? LAYER_Water : LAYER_Land;
+                const float waterElevation = mapData->GetWaterElevationAt(mTargetPosition.x, mTargetPosition.z); // engine addition
+                // 0x006BF64A `comiss` + `jbe`: NaN gives water.
+                mLayer = (landElevation > waterElevation) ? LAYER_Land : LAYER_Water;
               } else {
                 mPreparationTick = static_cast<std::int32_t>(curTick);
                 unit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_CannotFindPlaceToLand);
@@ -4207,7 +4202,7 @@ namespace moho
         );
       } else if (mCombatState == ACS_None) {
         SetMotionHorzEvent(
-          (unit->mInfoCache.mFormationTopSpeed * kMotionStoppingSpeedScale <= groundSpeed) ? kUnitMotionHorzEventStopping : kUnitMotionHorzEventStopped
+          (unit->mInfoCache.mFormationTopSpeed * kMotionStoppingSpeedScale > groundSpeed) ? kUnitMotionHorzEventStopped : kUnitMotionHorzEventStopping
         );
       } else {
         SetMotionHorzEvent(kUnitMotionHorzEventCruising);
@@ -4578,7 +4573,7 @@ namespace moho
       footprintElevation += raisedPlatformUnit->DistanceToOccupiedRect(&snapped.pos_);
     }
 
-    float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : kNoWaterElevation;
+    float waterElevation = mapData->GetWaterElevationAt(snapped.pos_.x, snapped.pos_.z); // engine addition: per position
     if (footprintElevation > terrainElevation) {
       waterElevation += footprintElevation - terrainElevation;
     }

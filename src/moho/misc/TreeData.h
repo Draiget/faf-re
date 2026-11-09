@@ -3,7 +3,6 @@
 #include <cstddef>
 
 #include "moho/misc/ScrWatch.h"
-#include "platform/WxWidgets.h"
 #include <wx/window.h>
 #include <wx/treebase.h>
 

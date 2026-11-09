@@ -1,3 +1,4 @@
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/debug/RDebugOverlayReflectionHelpers.h"
 
 #include "moho/render/RDebugOverlay.h"
@@ -26,23 +27,6 @@ namespace
 
 namespace moho::debug_reflection
 {
-  /**
-   * What it does:
-   * Shared lazy-cache-on-first-use resolver for a reflected `gpg::RType*`
-   * lane: mirrors the identical hand-rolled `if (!sType) { sType =
-   * gpg::LookupRType(typeInfo); }` shape used throughout this subsystem's
-   * `*ReflectionHelpers.cpp` files (e.g. `AudioReflectionHelpers.cpp`'s own
-   * internal-linkage copy of this same helper). `CachedRDebugOverlayType`/
-   * `CachedRTypeType`/`CachedRObjectType` above now call this instead of
-   * duplicating the check inline.
-   */
-  gpg::RType* ResolveCachedType(gpg::RType*& cachedType, const std::type_info& typeInfo)
-  {
-    if (cachedType == nullptr) {
-      cachedType = gpg::LookupRType(typeInfo);
-    }
-    return cachedType;
-  }
 
   gpg::RRef MakeRef(void* object, gpg::RType* const typeInfo)
   {
@@ -58,13 +42,7 @@ namespace moho::debug_reflection
       return;
     }
 
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    owner->AddBase(baseField);
+    gpg::AddReflectedBaseType(owner, baseType);
   }
 
   void AddBaseRDebugOverlay(gpg::RType* const owner)

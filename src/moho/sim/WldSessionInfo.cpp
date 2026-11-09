@@ -1,13 +1,14 @@
 #include "WldSessionInfo.h"
 
-#include <climits>
 #include <cstring>
+#include <limits>
 #include <new>
 
 #include "boost/thread.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/misc/CZipFile.h"
 #include "moho/sim/CBackgroundTaskControl.h"
 #include "lua/LuaObject.h"
 #include "moho/net/IClientManager.h"
@@ -161,7 +162,7 @@ namespace moho
 
   SWldScenarioLoadWakeSet::SWldScenarioLoadWakeSet()
     : mWakeEvent(CreateEventW(nullptr, FALSE, FALSE, nullptr))
-    , mQueueSemaphore(CreateSemaphoreW(nullptr, 0, LONG_MAX, nullptr))
+    , mQueueSemaphore(CreateSemaphoreW(nullptr, 0, std::numeric_limits<LONG>::max(), nullptr))
     , mCountersMutex(CreateMutexW(nullptr, FALSE, nullptr))
     , mGoneCount(0)
     , mBlockedCount(0)
@@ -334,6 +335,7 @@ namespace moho
     CBackgroundTaskControl loadControl{this};
     EWldScenarioLoadControlState finalState = EWldScenarioLoadControlState::kCompleted;
     try {
+      const CZipFileReadScope archives;
       mCallback.Invoke(&loadControl);
     } catch (const std::exception& error) {
       gpg::Warnf("Error in background task: %s", error.what());
@@ -497,7 +499,7 @@ namespace moho
   /**
    * Address: 0x00885530 (FUN_00885530, ??0struct_ScenarioInfo@@QAE@@Z)
    */
-  SWldScenarioInfo::SWldScenarioInfo(const char* const mapName, const msvc8::string& gameMods)
+  SWldScenarioInfo::SWldScenarioInfo(const char* const mapName, const fa::string& gameMods)
   {
     mMapName = gpg::STR_ToLower(mapName ? mapName : "");
     mGameMods = gameMods;

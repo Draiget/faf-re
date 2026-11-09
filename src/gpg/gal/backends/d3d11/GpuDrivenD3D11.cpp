@@ -86,9 +86,12 @@ namespace gpg::gal
       D3D11_BLEND_DESC blend{};
       D3D11_RENDER_TARGET_BLEND_DESC& target = blend.RenderTarget[0];
       target.BlendEnable = desc.blend != GpuBlend::Opaque ? TRUE : FALSE;
-      target.SrcBlend = desc.blend != GpuBlend::Opaque ? D3D11_BLEND_SRC_ALPHA : D3D11_BLEND_ONE;
+      target.SrcBlend = desc.blend == GpuBlend::Opaque ? D3D11_BLEND_ONE
+        : desc.blend == GpuBlend::Multiply             ? D3D11_BLEND_ZERO
+                                                       : D3D11_BLEND_SRC_ALPHA;
       target.DestBlend = desc.blend == GpuBlend::AlphaBlend ? D3D11_BLEND_INV_SRC_ALPHA
         : desc.blend == GpuBlend::Additive                  ? D3D11_BLEND_ONE
+        : desc.blend == GpuBlend::Multiply                  ? D3D11_BLEND_SRC_COLOR
                                                              : D3D11_BLEND_ZERO;
       target.BlendOp = D3D11_BLEND_OP_ADD;
       target.SrcBlendAlpha = D3D11_BLEND_ONE;

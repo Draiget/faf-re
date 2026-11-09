@@ -1,6 +1,7 @@
 // FAF addition, not in the shipped binary: see ShaderCompiler.h.
 
 #include "ShaderCompiler.h"
+#include "gpg/core/utils/EmbeddedFiles.h"
 
 #include <windows.h>
 
@@ -94,6 +95,10 @@ namespace gpg::gal::effects
       }
       directories.push_back(directory);
     }
+    // Last, the copy the executable carries (issue #315): loose DLLs win.
+    if (std::wstring embedded = gpg::EmbeddedDxcDirectory(); !embedded.empty()) {
+      directories.push_back(std::move(embedded));
+    }
 
     auto library = new Library();
     for (const std::wstring& directory : directories) {
@@ -110,7 +115,7 @@ namespace gpg::gal::effects
       }
     }
     if (library->compiler == nullptr) {
-      mLoadError = "dxcompiler.dll not found next to the executable or in FAF_DXC_DIR";
+      mLoadError = "dxcompiler.dll not found next to the executable, in FAF_DXC_DIR or in the executable";
       delete library;
       return;
     }
@@ -268,6 +273,41 @@ namespace gpg::gal::effects
     result.code.assign(bytes, bytes + object->GetBufferSize());
     result.succeeded = true;
     return result;
+  }
+
+  std::uint64_t ShaderCompiler::ReflectTextureSlots(const std::vector<std::uint8_t>& dxil) const
+  {
+    constexpr std::uint64_t kAll = ~std::uint64_t{0};
+    if (mLibrary == nullptr || dxil.empty()) {
+      return kAll;
+    }
+    DxcBuffer buffer{};
+    buffer.Ptr = dxil.data();
+    buffer.Size = dxil.size();
+    ThreadDxc* const dxc = ThisThreadDxc(mLibrary->create);
+    if (dxc == nullptr) {
+      return kAll;
+    }
+    ComPtr<ID3D12ShaderReflection> reflection;
+    D3D12_SHADER_DESC desc{};
+    if (FAILED(dxc->utils->CreateReflection(&buffer, IID_PPV_ARGS(&reflection))) || FAILED(reflection->GetDesc(&desc))) {
+      return kAll;
+    }
+    std::uint64_t slots = 0U;
+    for (UINT index = 0U; index < desc.BoundResources; ++index) {
+      D3D12_SHADER_INPUT_BIND_DESC binding{};
+      if (FAILED(reflection->GetResourceBindingDesc(index, &binding))) {
+        return kAll;
+      }
+      if (binding.Type != D3D_SIT_TEXTURE || binding.Space != 0U) {
+        continue;
+      }
+      const UINT count = (binding.BindCount == 0U) ? 64U : binding.BindCount; // 0: unbounded
+      for (UINT slot = binding.BindPoint; slot < binding.BindPoint + count && slot < 64U; ++slot) {
+        slots |= std::uint64_t{1} << slot;
+      }
+    }
+    return slots;
   }
 
   std::vector<ShaderInput> ShaderCompiler::ReflectInputs(const std::vector<std::uint8_t>& dxil) const

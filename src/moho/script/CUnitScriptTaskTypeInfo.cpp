@@ -23,38 +23,9 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedCUnitScriptTaskType()
-  {
-    gpg::RType* type = CUnitScriptTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(CUnitScriptTask));
-      CUnitScriptTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(CCommandTask));
-      CCommandTask::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RType* CachedCScriptObjectType()
   {
     return CScriptObject::StaticGetClass();
-  }
-
-  [[nodiscard]] gpg::RType* CachedCommandEventListenerType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Listener<ECommandEvent>));
-    }
-    return type;
   }
 
 
@@ -62,7 +33,7 @@ namespace
   {
     gpg::RRef ref{};
     ref.mObj = object;
-    ref.mType = CachedCUnitScriptTaskType();
+    ref.mType = gpg::RTypeOf<CUnitScriptTask>();
     return ref;
   }
 
@@ -167,7 +138,7 @@ void CUnitScriptTaskTypeInfo::Init()
  */
 void CUnitScriptTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
 {
-  AddBaseIfPresent(typeInfo, CachedCCommandTaskType(), 0x00);
+  AddBaseIfPresent(typeInfo, gpg::RTypeOf<CCommandTask>(), 0x00);
 }
 
 /**
@@ -189,7 +160,7 @@ void CUnitScriptTaskTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
  */
 void CUnitScriptTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
 {
-  AddBaseIfPresent(typeInfo, CachedCommandEventListenerType(), gpg::BaseSubobjectOffset<CUnitScriptTask, Listener<ECommandEvent>>());
+  AddBaseIfPresent(typeInfo, gpg::RTypeOf<Listener<ECommandEvent>>(), gpg::BaseSubobjectOffset<CUnitScriptTask, Listener<ECommandEvent>>());
 }
 
 /**

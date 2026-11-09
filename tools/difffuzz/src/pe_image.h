@@ -29,6 +29,10 @@ namespace difffuzz
     /// as `global_mode_sse2`, which the never-run CRT init would have set).
     bool PokeDword(std::uint32_t va, std::uint32_t value) noexcept;
 
+    /// Overwrites the first five bytes at `va` with `jmp target` (used to send
+    /// the retail allocator's entries to the harness's heap).
+    bool PatchJump(std::uint32_t va, const void* target) noexcept;
+
   private:
     std::uint32_t mBase = 0;
     std::uint32_t mSizeOfImage = 0;

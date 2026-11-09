@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -191,8 +192,39 @@ func (l *Launcher) SetLink(from, to int, imp relay.Impairment, both bool) error 
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		return l.hub.client.RelayImpair(ctx, l.hub.run, from, to, imp, both)
+	case l.shapingFile != "":
+		// Issue #242: every link shapes its own sends, on whichever path ICE
+		// picked; from and to are not told apart.
+		if err := writeShaping(l.shapingFile, imp); err != nil {
+			return err
+		}
+		l.j.Note(journal.RelayLink, 0, "impairment on every link's sends", map[string]any{"impairment": imp})
+		return nil
+	case l.turn != nil && l.cfg.Mode == ModeContract:
+		// Issue #242: ICE games on relayed candidates (contract.forceRelay) are
+		// shaped in mpemu's TURN server, every path the same: from and to are
+		// not told apart there.
+		l.turn.SetImpairment(imp)
+		l.j.Note(journal.RelayLink, 0, "impairment on every TURN path", map[string]any{"impairment": imp})
+		return nil
 	}
-	return errors.New("link impairment needs mode relay")
+	return errors.New("link impairment needs mode relay, or mode contract with mpemu's TURN server")
+}
+
+// writeShaping replaces the FAF_NETLINK_TEST_SHAPING file in one step: the
+// line "<latency us> <jitter us> <loss 0-1> <blocked 0|1> <burst> <only>" that
+// netlink reads (src/netlink/Link.cpp, TestShaping). Duplication is not applied there.
+func writeShaping(path string, imp relay.Impairment) error {
+	blocked := 0
+	if imp.Blocked {
+		blocked = 1
+	}
+	line := fmt.Sprintf("%d %d %g %d %d %d\n", imp.Latency.Microseconds(), imp.Jitter.Microseconds(), imp.Loss, blocked, imp.Burst, imp.Only)
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(line), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // Isolate cuts (or restores) all of a player's links. ModeRelay only.

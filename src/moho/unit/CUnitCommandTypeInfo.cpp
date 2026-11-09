@@ -131,12 +131,7 @@ namespace moho
    */
   [[maybe_unused]] void DestroyCUnitCommandTypeInfoBody(CUnitCommandTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**
@@ -181,23 +176,7 @@ namespace moho
    */
   void CUnitCommandTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
   {
-    gpg::RType* baseType = CScriptObject::sType;
-    if (!baseType) {
-      baseType = gpg::LookupRType(typeid(CScriptObject));
-      CScriptObject::sType = baseType;
-    }
-
-    if (!baseType) {
-      return;
-    }
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseViaSlot<CScriptObject>(typeInfo);
   }
 
   /**
@@ -214,13 +193,7 @@ namespace moho
       return;
     }
 
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = gpg::BaseSubobjectOffset<CUnitCommand, Broadcaster<ECommandEvent>>();
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::BaseSubobjectOffset<CUnitCommand, Broadcaster<ECommandEvent>>());
   }
 
   /**

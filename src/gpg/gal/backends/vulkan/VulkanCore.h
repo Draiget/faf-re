@@ -16,6 +16,7 @@
 #include <dxgiformat.h>
 
 #include "VulkanLoader.h"
+#include "VulkanMemoryAllocator.h"
 
 namespace gpg::gal::vulkan
 {
@@ -38,46 +39,6 @@ namespace gpg::gal::vulkan
   [[nodiscard]] VkFormat ToVulkanVertex(DXGI_FORMAT format) noexcept;
   [[nodiscard]] bool IsDepthFormat(VkFormat format) noexcept;
   [[nodiscard]] bool HasStencil(VkFormat format) noexcept;
-
-  /** One sub-allocation of device memory. */
-  struct Allocation
-  {
-    VkDeviceMemory memory = VK_NULL_HANDLE;
-    VkDeviceSize offset = 0;
-    VkDeviceSize size = 0;
-    std::uint8_t* mapped = nullptr; // host-visible memory only
-    std::int32_t block = -1;
-    bool linear = false;            // buffers and images live in separate blocks (bufferImageGranularity)
-  };
-
-  /** Device memory in large blocks per memory type, first fit, with coalescing frees. */
-  class MemoryAllocator
-  {
-  public:
-    void Initialize(VkPhysicalDevice physicalDevice, VkDevice device);
-    void Release() noexcept;
-
-    /** Throws a gal Error when no memory type fits or the device is out of memory. */
-    [[nodiscard]] Allocation Allocate(const VkMemoryRequirements& requirements, VkMemoryPropertyFlags required, bool linear);
-    void Free(const Allocation& allocation) noexcept;
-
-  private:
-    struct Block
-    {
-      VkDeviceMemory memory = VK_NULL_HANDLE;
-      VkDeviceSize size = 0;
-      std::uint32_t type = 0;
-      bool linear = false;
-      std::uint8_t* mapped = nullptr;
-      std::map<VkDeviceSize, VkDeviceSize> free; // offset -> size
-    };
-
-    [[nodiscard]] std::uint32_t FindType(std::uint32_t typeBits, VkMemoryPropertyFlags required) const;
-
-    VkDevice mDevice = VK_NULL_HANDLE;
-    VkPhysicalDeviceMemoryProperties mProperties{};
-    std::vector<std::unique_ptr<Block>> mBlocks;
-  };
 
   /** One upload-memory allocation: written by the CPU, read by the GPU once. */
   struct UploadAllocation
@@ -102,6 +63,9 @@ namespace gpg::gal::vulkan
     void Retire(std::uint64_t completedSerial) noexcept;
     [[nodiscard]] std::uint64_t TakeAllocatedBytes() noexcept;
     [[nodiscard]] std::uint64_t BusyBytes() const noexcept;
+    /** Bytes and count of the pages held (memory diagnostics). */
+    [[nodiscard]] std::uint64_t PageBytes() const noexcept;
+    [[nodiscard]] std::size_t PageCount() const noexcept { return mPages.size(); }
 
   private:
     struct Page

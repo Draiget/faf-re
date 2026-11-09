@@ -20,10 +20,43 @@ namespace LuaPlus
 
 namespace moho
 {
+  class CAniActor;
+
+  /**
+   * Engine addition: without a client (headless, unless `--keep-client-data` is given) the units'
+   * sync blocks and the armies' recon records hold no mesh and pose handles: only a client reads
+   * them. Poses then stay unique and are reused in place (`sim_RecyclePose`).
+   */
+  void POSE_SetKeepClientHandles(bool keep) noexcept;
+  /**
+   * Whether `actor`'s poses are held for a client. Those of 11 bones always are, as each update
+   * has to take a new block from `SimBlockLane`, which decides the block the next formation gets.
+   */
+  [[nodiscard]] bool POSE_HoldClientHandles(const CAniActor& actor) noexcept;
+  /** The mesh handles of the recon records, which no sim code reads. */
+  [[nodiscard]] bool POSE_KeepClientHandles() noexcept;
+
   class CAniPose;
   class CAniSkel;
   class IAniManipulator;
   class VTransform;
+
+  /**
+   * Engine addition, headless `--bone-stats` (dedicated-server plan WP8): when set,
+   * `UpdateManipulators` calls it once per actor update with `manipulatorClass == nullptr` and
+   * `boneIndex == -1` (a fresh pose), then once for every bone whose local transform a
+   * manipulator's update changed, with that manipulator's RTTI class name. Null in the game.
+   */
+  using AniBoneWriteHook = void (*)(const CAniPose* pose, const char* manipulatorClass, int boneIndex);
+  extern AniBoneWriteHook gAniBoneWriteHook;
+
+  /**
+   * Engine addition, server mode (plan WP8.1, #118): when set, `UpdateManipulators` calls it once per actor update,
+   * after its manipulators ran, on whichever thread ran the update (a pose job's worker or the sim thread), while the
+   * pose's bones are still in that thread's cache. It may only read the actor and its pose. Null in the game.
+   */
+  using AniPoseUpdatedHook = void (*)(const CAniActor& actor);
+  extern AniPoseUpdatedHook gAniPoseUpdatedHook;
 
   class CAniActor
   {
@@ -123,6 +156,9 @@ namespace moho
      * manipulator in precedence order.
      */
     void UpdateManipulators(const VTransform& worldTransform);
+
+    /// Engine addition (sim_ParallelPose): true when `test` holds for every enabled manipulator.
+    [[nodiscard]] bool AllEnabledManipulators(bool (*test)(const IAniManipulator& manipulator)) const;
 
     /**
      * Address: 0x0063AD40 (FUN_0063AD40, Moho::CAniActor::ResolveBoneIndex)

@@ -20,6 +20,8 @@
   .\build.ps1 -Arch x86 -Name main_test    # x86, copied to bin\ as main_test.exe
 .EXAMPLE
   .\build.ps1 -NoBuild              # copy the last build only
+.EXAMPLE
+  .\build.ps1 -Editor               # build and copy only the map editor, FafEditor_x64.exe, to bin_x64
 #>
 [CmdletBinding()]
 param(
@@ -27,12 +29,16 @@ param(
   [ValidateSet('x64', 'x86', 'both')]
   [string]$Arch = 'x64',
 
-  [ValidateSet('Release', 'Debug')]
+  [ValidateSet('Release', 'Debug', 'Profile')]
   [string]$Configuration = 'Release',
 
-  # Exe name in the run folder, without .exe (default main_x64 / main). Use another name to
-  # keep the current build alongside, e.g. -Name main_x64_test. With -Arch both it gets a
-  # _x86 suffix for the x86 copy unless it already differs per architecture.
+  # Build with Tracy profiler enabled (shortcut for -Configuration Profile).
+  [switch]$Profile,
+
+  # Exe name in the run folder, without .exe (default main_x64 / main; main_x64_profile /
+  # main_profile for a Profile build, so it never replaces the exe the FAF client launches).
+  # Use another name to keep the current build alongside, e.g. -Name main_x64_test. With
+  # -Arch both it gets a _x86 suffix for the x86 copy unless it already differs per architecture.
   [string]$Name,
 
   # FAF data folder that holds bin\ and bin_x64\.
@@ -51,17 +57,33 @@ param(
   [switch]$Rebuild,
 
   # Parallel compile jobs (default: CMake's choice, one per logical CPU).
-  [int]$Jobs
+  [int]$Jobs,
+
+  # Build and copy only the map editor (FafEditor_x64.exe / FafEditor.exe, src/editor) into the
+  # run folder, with its .pdb; the game's exe and headless stay as they are.
+  [switch]$Editor
 )
+
+if ($Profile) { $Configuration = 'Profile' }
 
 $ErrorActionPreference = 'Stop'
 $repo = $PSScriptRoot
 
 $targets = @{
-  x64 = @{ Preset = "clang-x64-$($Configuration.ToLower())"; Exe = 'main_x64'; RunDir = 'bin_x64' }
-  x86 = @{ Preset = "clang-x86-$($Configuration.ToLower())"; Exe = 'main';     RunDir = 'bin' }
+  x64 = @{ Preset = "clang-x64-$($Configuration.ToLower())"; Exe = 'main_x64'; Headless = 'headless_x64'; Editor = 'FafEditor_x64'; RunDir = 'bin_x64' }
+  x86 = @{ Preset = "clang-x86-$($Configuration.ToLower())"; Exe = 'main';     Headless = 'headless';     Editor = 'FafEditor';     RunDir = 'bin' }
 }
 $archs = if ($Arch -eq 'both') { @('x64', 'x86') } else { @($Arch) }
+
+# The exe name in the run folder.
+function Get-RunName([string]$a, [hashtable]$t) {
+  if ($Name) {
+    if ($archs.Count -gt 1 -and $a -eq 'x86') { return "${Name}_x86" }
+    return $Name
+  }
+  if ($Configuration -eq 'Profile') { return "$($t.Exe)_profile" }
+  return $t.Exe
+}
 
 # cmake and ninja from PATH, else the copies Visual Studio 2022 ships with its CMake support.
 function Find-CMake {
@@ -97,8 +119,12 @@ function Invoke-Build([hashtable]$t) {
     if ($Rebuild) { Invoke-CMake @('--preset', $t.Preset, '--fresh') }
     elseif (-not (Test-Path $cache)) { Invoke-CMake @('--preset', $t.Preset) }
 
-    Write-Host "== Building $($t.Exe).exe ($($t.Preset))" -ForegroundColor Cyan
+    # -Editor builds the editor's target only (and the engine library it links), not the game
+    # or headless.
+    $what = if ($Editor) { $t.Editor } else { $t.Exe }
+    Write-Host "== Building $what.exe ($($t.Preset))" -ForegroundColor Cyan
     $buildArgs = @('--build', '--preset', $t.Preset)
+    if ($Editor) { $buildArgs += @('--target', 'faf_editor') }
     if ($Jobs -gt 0) { $buildArgs += @('-j', "$Jobs") }
     Invoke-CMake $buildArgs
   }
@@ -123,7 +149,30 @@ function Copy-Build([hashtable]$t, [string]$destDir, [string]$exeName) {
   if (Test-Path $pdb) { Copy-Item $pdb (Join-Path $destDir "$exeName.pdb") -Force }
 
   $hooks = Join-Path $src 'fafengine'
-  if (Test-Path $hooks) { Copy-Item $hooks $destDir -Recurse -Force }
+  if (Test-Path $hooks) {
+    # Replaced, not copied over: a hook file left from an older build would still be appended
+    # to the FAF file of its path.
+    $destHooks = Join-Path $destDir 'fafengine'
+    if (Test-Path $destHooks) { Remove-Item $destHooks -Recurse -Force }
+    Copy-Item $hooks $destDir -Recurse -Force
+  }
+
+  # headless (the console replay player, docs/SWITCHES.md) beside it: <name>_headless with
+  # -Name, headless_x64 / headless otherwise (_profile for a Profile build).
+  $headless = Join-Path $src "$($t.Headless).exe"
+  if (Test-Path $headless) {
+    $headlessName = if ($Name) { "${exeName}_headless" }
+                    elseif ($Configuration -eq 'Profile') { "$($t.Headless)_profile" }
+                    else { $t.Headless }
+    $destHeadless = Join-Path $destDir "$headlessName.exe"
+    try {
+      Copy-Item $headless $destHeadless -Force
+      $headlessPdb = Join-Path $src "$($t.Headless).pdb"
+      if (Test-Path $headlessPdb) { Copy-Item $headlessPdb (Join-Path $destDir "$headlessName.pdb") -Force }
+      Write-Host "   -> $destHeadless" -ForegroundColor Green
+    }
+    catch { Write-Warning "$destHeadless not replaced (in use?): $($_.Exception.Message)" }
+  }
 
   # The DXC runtime the build staged next to the exe (named, so leftovers of older
   # builds in the same folder are not copied along).
@@ -132,8 +181,31 @@ function Copy-Build([hashtable]$t, [string]$destDir, [string]$exeName) {
     # A DLL a running game holds open is the same file; skip it rather than fail.
     if ((Test-Path $target) -and (Get-Item $target).Length -eq $dll.Length -and
         (Get-Item $target).LastWriteTimeUtc -ge $dll.LastWriteTimeUtc) { continue }
-    Copy-Item $dll.FullName $target -Force
+    # A game running from the folder keeps an older copy open; the exe carries its own DXC
+    # (EmbeddedFiles.rc), so keep going with the one there.
+    try { Copy-Item $dll.FullName $target -Force }
+    catch { Write-Warning "$target not replaced (in use by a running game)." }
   }
+  Write-Host "   -> $destExe" -ForegroundColor Green
+}
+
+function Copy-Editor([hashtable]$t, [string]$destDir) {
+  $src = Join-Path $repo "build\$($t.Preset)\src\editor"
+  $exe = Join-Path $src "$($t.Editor).exe"
+  if (-not (Test-Path $exe)) { throw "$exe not found; build it first (drop -NoBuild)." }
+  New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+  # A Profile build keeps its own name, as the game's does.
+  $editorName = if ($Configuration -eq 'Profile') { "$($t.Editor)_profile" } else { $t.Editor }
+  $destExe = Join-Path $destDir "$editorName.exe"
+  if (Test-Path $destExe) {
+    try { [IO.File]::Open($destExe, 'Open', 'ReadWrite', 'None').Close() }
+    catch { throw "$destExe is in use (is the editor running?). Close it first." }
+  }
+  Copy-Item $exe $destExe -Force
+  $pdb = Join-Path $src "$($t.Editor).pdb"
+  if (Test-Path $pdb) { Copy-Item $pdb (Join-Path $destDir "$editorName.pdb") -Force }
+  # No DXC DLLs: the ones in the run folder belong to the game. The editor carries its own copy
+  # (EmbeddedFiles.rc) and takes DLLs next to it first, as the game does.
   Write-Host "   -> $destExe" -ForegroundColor Green
 }
 
@@ -142,12 +214,14 @@ foreach ($a in $archs) {
   if (-not $NoBuild) { Invoke-Build $t }
   if ($NoCopy) { continue }
 
-  $exeName = $t.Exe
-  if ($Name) {
-    $exeName = $Name
-    if ($archs.Count -gt 1 -and $a -eq 'x86') { $exeName = "${Name}_x86" }
+  if ($Editor) {
+    if ($Name) { Write-Warning "-Name names the game's exe; -Editor copies only the editor, under its own name." }
+    Copy-Editor $t (Join-Path $FafDir $t.RunDir)
+    if ($Out) { Copy-Editor $t (Join-Path $repo "out\$a") }
+    continue
   }
-  Copy-Build $t (Join-Path $FafDir $t.RunDir) $exeName
+
+  Copy-Build $t (Join-Path $FafDir $t.RunDir) (Get-RunName $a $t)
   if ($Out) { Copy-Build $t (Join-Path $repo "out\$a") $t.Exe }
 }
 
@@ -155,7 +229,13 @@ Write-Host ''
 foreach ($a in $archs) {
   $t = $targets[$a]
   if ($NoCopy) { break }
-  $exeName = if ($Name) { if ($archs.Count -gt 1 -and $a -eq 'x86') { "${Name}_x86" } else { $Name } } else { $t.Exe }
+  if ($Editor) {
+    Write-Host "Run the map editor ($a):" -ForegroundColor Cyan
+    Write-Host "  cd $(Join-Path $FafDir $t.RunDir)"
+    Write-Host "  .\$($t.Editor).exe /init init_faf.lua /log $(Join-Path $FafDir "logs\$($t.Editor).log")"
+    continue
+  }
+  $exeName = Get-RunName $a $t
   Write-Host "Run ($a):" -ForegroundColor Cyan
   Write-Host "  cd $(Join-Path $FafDir $t.RunDir)"
   Write-Host "  .\$exeName.exe /init init_faf.lua /nobugreport /log $(Join-Path $FafDir "logs\$exeName.log")"

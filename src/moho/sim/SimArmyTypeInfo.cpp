@@ -57,13 +57,7 @@ namespace moho
   {
     gpg::RType* const baseType = IArmy::StaticGetClass();
 
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = gpg::BaseSubobjectOffset<SimArmy, IArmy>();
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::BaseSubobjectOffset<SimArmy, IArmy>());
   }
 
   /**

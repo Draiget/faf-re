@@ -73,7 +73,7 @@ namespace gpg::gal
          * Walks the D3DX effect's valid techniques and appends a wrapper for
          * each to `outTechniques`.
          */
-        void GetTechniques(msvc8::vector<boost::shared_ptr<EffectTechnique>>& outTechniques) override;
+        void GetTechniques(fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques) override;
 
         /**
          * Address: 0x00941D70 (FUN_00941D70)

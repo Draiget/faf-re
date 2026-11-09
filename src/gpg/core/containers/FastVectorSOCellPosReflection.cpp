@@ -150,16 +150,16 @@ gpg::RFastVectorType<moho::SOCellPos>::~RFastVectorType() = default;
  */
 const char* gpg::RFastVectorType<moho::SOCellPos>::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSOCellPosType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("fastvector<%s>", CachedSOCellPosType()->GetName());
   return sName.c_str();
 }
 
 /**
  * Address: 0x00553110 (FUN_00553110, gpg::RFastVectorType_SOCellPos::GetLexical)
  */
-msvc8::string gpg::RFastVectorType<moho::SOCellPos>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RFastVectorType<moho::SOCellPos>::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 

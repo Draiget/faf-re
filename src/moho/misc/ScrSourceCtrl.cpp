@@ -16,7 +16,7 @@ namespace
    */
   struct ScrFileCtrlHasPath
   {
-    explicit ScrFileCtrlHasPath(const msvc8::string& sourcePath)
+    explicit ScrFileCtrlHasPath(const fa::string& sourcePath)
       : mSourcePath(sourcePath)
     {
     }
@@ -26,7 +26,7 @@ namespace
       return mSourcePath == page->mSourcePath;
     }
 
-    msvc8::string mSourcePath;
+    fa::string mSourcePath;
   };
 } // namespace
 
@@ -48,9 +48,9 @@ moho::ScrSourceCtrl::~ScrSourceCtrl() = default;
 /**
  * Address: 0x004C3670 (FUN_004C3670)
  */
-bool moho::ScrSourceCtrl::Open(const msvc8::string& fileName)
+bool moho::ScrSourceCtrl::Open(const fa::string& fileName)
 {
-  const msvc8::vector<ScrFileCtrl*>::iterator existing =
+  const fa::vector<ScrFileCtrl*>::iterator existing =
     std::find_if(mPages.begin(), mPages.end(), ScrFileCtrlHasPath(fileName));
   if (existing == mPages.end()) {
     ScrFileCtrl* const page = new ScrFileCtrl(this);
@@ -71,9 +71,9 @@ bool moho::ScrSourceCtrl::Open(const msvc8::string& fileName)
 /**
  * Address: 0x004C38A0 (FUN_004C38A0)
  */
-void moho::ScrSourceCtrl::Close(const msvc8::string& fileName)
+void moho::ScrSourceCtrl::Close(const fa::string& fileName)
 {
-  const msvc8::vector<ScrFileCtrl*>::iterator page =
+  const fa::vector<ScrFileCtrl*>::iterator page =
     std::find_if(mPages.begin(), mPages.end(), ScrFileCtrlHasPath(fileName));
   if (page != mPages.end()) {
     DeletePage(static_cast<int>(page - mPages.begin()));
@@ -98,7 +98,7 @@ void moho::ScrSourceCtrl::CloseCurrent()
  */
 void moho::ScrSourceCtrl::ReloadAll()
 {
-  for (msvc8::vector<ScrFileCtrl*>::iterator page = mPages.begin(); page != mPages.end(); ++page) {
+  for (fa::vector<ScrFileCtrl*>::iterator page = mPages.begin(); page != mPages.end(); ++page) {
     (*page)->Load((*page)->mSourcePath);
   }
 }
@@ -106,19 +106,19 @@ void moho::ScrSourceCtrl::ReloadAll()
 /**
  * Address: 0x004C39E0 (FUN_004C39E0)
  */
-msvc8::string moho::ScrSourceCtrl::GetCurrentFileName() const
+fa::string moho::ScrSourceCtrl::GetCurrentFileName() const
 {
   const int selection = GetSelection();
   if (selection > -1) {
     return mPages[selection]->mSourcePath;
   }
-  return msvc8::string();
+  return fa::string();
 }
 
 /**
  * Address: 0x004C3A40 (FUN_004C3A40)
  */
-void moho::ScrSourceCtrl::FindFirst(const msvc8::string& text)
+void moho::ScrSourceCtrl::FindFirst(const fa::string& text)
 {
   const int selection = GetSelection();
   if (selection > -1) {
@@ -129,7 +129,7 @@ void moho::ScrSourceCtrl::FindFirst(const msvc8::string& text)
 /**
  * Address: 0x004C3A70 (FUN_004C3A70)
  */
-void moho::ScrSourceCtrl::FindNext(const msvc8::string& text)
+void moho::ScrSourceCtrl::FindNext(const fa::string& text)
 {
   const int selection = GetSelection();
   if (selection > -1) {
@@ -140,7 +140,7 @@ void moho::ScrSourceCtrl::FindNext(const msvc8::string& text)
 /**
  * Address: 0x004C3AA0 (FUN_004C3AA0)
  */
-void moho::ScrSourceCtrl::FindPrevious(const msvc8::string& text)
+void moho::ScrSourceCtrl::FindPrevious(const fa::string& text)
 {
   const int selection = GetSelection();
   if (selection > -1) {
@@ -164,7 +164,7 @@ void moho::ScrSourceCtrl::GotoLine(const int line)
  */
 void moho::ScrSourceCtrl::EnableBreakpoints(const bool enable)
 {
-  for (msvc8::vector<ScrFileCtrl*>::iterator page = mPages.begin(); page != mPages.end(); ++page) {
+  for (fa::vector<ScrFileCtrl*>::iterator page = mPages.begin(); page != mPages.end(); ++page) {
     (*page)->EnableBreakpoints(enable);
   }
 }
@@ -172,9 +172,9 @@ void moho::ScrSourceCtrl::EnableBreakpoints(const bool enable)
 /**
  * Address: 0x004C3B30 (FUN_004C3B30)
  */
-void moho::ScrSourceCtrl::RemoveBreakpoint(const msvc8::string& fileName, const int line)
+void moho::ScrSourceCtrl::RemoveBreakpoint(const fa::string& fileName, const int line)
 {
-  const msvc8::vector<ScrFileCtrl*>::iterator page =
+  const fa::vector<ScrFileCtrl*>::iterator page =
     std::find_if(mPages.begin(), mPages.end(), ScrFileCtrlHasPath(fileName));
   if (page != mPages.end()) {
     (*page)->RemoveBreakpoint(line);
@@ -186,7 +186,7 @@ void moho::ScrSourceCtrl::RemoveBreakpoint(const msvc8::string& fileName, const 
  */
 void moho::ScrSourceCtrl::RemoveAllBreakpoints()
 {
-  for (msvc8::vector<ScrFileCtrl*>::iterator page = mPages.begin(); page != mPages.end(); ++page) {
+  for (fa::vector<ScrFileCtrl*>::iterator page = mPages.begin(); page != mPages.end(); ++page) {
     (*page)->RemoveAllBreakpoints();
   }
 }
@@ -194,11 +194,11 @@ void moho::ScrSourceCtrl::RemoveAllBreakpoints()
 /**
  * Address: 0x004C3C00 (FUN_004C3C00)
  */
-bool moho::ScrSourceCtrl::SetCursorLine(const msvc8::string& fileName, const int line)
+bool moho::ScrSourceCtrl::SetCursorLine(const fa::string& fileName, const int line)
 {
   ClearCursor();
 
-  const msvc8::vector<ScrFileCtrl*>::iterator page =
+  const fa::vector<ScrFileCtrl*>::iterator page =
     std::find_if(mPages.begin(), mPages.end(), ScrFileCtrlHasPath(gpg::STR_ToLower(fileName.c_str())));
   if (page == mPages.end()) {
     return false;
@@ -213,7 +213,7 @@ bool moho::ScrSourceCtrl::SetCursorLine(const msvc8::string& fileName, const int
  */
 void moho::ScrSourceCtrl::ClearCursor()
 {
-  for (msvc8::vector<ScrFileCtrl*>::iterator page = mPages.begin(); page != mPages.end(); ++page) {
+  for (fa::vector<ScrFileCtrl*>::iterator page = mPages.begin(); page != mPages.end(); ++page) {
     (*page)->ClearCursor();
   }
 }

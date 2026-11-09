@@ -16,20 +16,11 @@ namespace
     return moho::INetNATTraversalProvider::StaticGetClass();
   }
 
-  [[nodiscard]] gpg::RType* CachedWeakProviderType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(WeakProviderPtr));
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeWeakProviderRef(WeakProviderPtr* weakProvider)
   {
     gpg::RRef out{};
     out.mObj = weakProvider;
-    out.mType = CachedWeakProviderType();
+    out.mType = gpg::RTypeOf<WeakProviderPtr>();
     return out;
   }
 
@@ -42,7 +33,7 @@ namespace
    */
   [[nodiscard]] WeakProviderPtr* TryUpcastWeakProviderOrThrow(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedWeakProviderType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<WeakProviderPtr>());
     if (!upcast.mObj) {
       throw std::bad_cast{};
     }
@@ -203,31 +194,31 @@ gpg::RWeakPointerType<moho::INetNATTraversalProvider>::~RWeakPointerType() = def
  */
 const char* gpg::RWeakPointerType<moho::INetNATTraversalProvider>::GetName() const
 {
-    static const msvc8::string sName = gpg::STR_Printf("boost::weak_ptr<%s>", CachedProviderType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("boost::weak_ptr<%s>", CachedProviderType()->GetName());
     return sName.c_str();
 }
 
 /**
  * Address: 0x00481AE0 (FUN_00481AE0)
  */
-msvc8::string gpg::RWeakPointerType<moho::INetNATTraversalProvider>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RWeakPointerType<moho::INetNATTraversalProvider>::GetLexical(const gpg::RRef& ref) const
 {
   auto* const weakProvider = static_cast<const WeakProviderPtr*>(ref.mObj);
   if (!weakProvider) {
-    return msvc8::string("NULL");
+    return fa::string("NULL");
   }
 
   const boost::shared_ptr<moho::INetNATTraversalProvider> locked = weakProvider->lock();
   if (!locked) {
-    return msvc8::string("NULL");
+    return fa::string("NULL");
   }
 
   const gpg::RRef providerRef = MakeProviderRef(locked.get());
   if (!providerRef.mObj) {
-    return msvc8::string("NULL");
+    return fa::string("NULL");
   }
 
-  const msvc8::string inner = providerRef.GetLexical();
+  const fa::string inner = providerRef.GetLexical();
   return gpg::STR_Printf("[%s]", inner.c_str());
 }
 

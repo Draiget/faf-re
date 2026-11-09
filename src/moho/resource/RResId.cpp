@@ -47,10 +47,10 @@ namespace moho
   /**
    * Address: 0x004A9350 (FUN_004A9350, Moho::RES_CompletePath)
    */
-  msvc8::string RES_CompletePath(const gpg::StrArg resourceName, const gpg::StrArg sourceName)
+  fa::string RES_CompletePath(const gpg::StrArg resourceName, const gpg::StrArg sourceName)
   {
-    const msvc8::string sourceDir = FILE_DirPrefix(sourceName);
-    const msvc8::string absolutePath = FILE_MakeAbsolute(resourceName, sourceDir.c_str());
+    const fa::string sourceDir = FILE_DirPrefix(sourceName);
+    const fa::string absolutePath = FILE_MakeAbsolute(resourceName, sourceDir.c_str());
     return FILE_CollapsePath(absolutePath.c_str(), nullptr);
   }
 
@@ -81,7 +81,7 @@ namespace moho
   /**
    * Address: 0x004A9450 (FUN_004A9450, Moho::RResIdType::GetLexical)
    */
-  msvc8::string RResIdType::GetLexical(const gpg::RRef& ref) const
+  fa::string RResIdType::GetLexical(const gpg::RRef& ref) const
   {
     const auto* const resourceId = static_cast<const RResId*>(ref.mObj);
     if (resourceId == nullptr) {

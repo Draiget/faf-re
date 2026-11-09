@@ -18,11 +18,6 @@ namespace
 {
   constexpr float kTerrainHeightWordScale = 1.0f / 128.0f;
 
-  constexpr const char* kSerializationSourcePath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-  constexpr int kSerializationLoadLine = 84;
-  constexpr int kSerializationSaveLine = 87;
-
   [[nodiscard]] int ClampTerrainSampleIndex(const int value, const int maxInclusive) noexcept
   {
     // Preserve binary clamp order: upper clamp first, then clamp to zero.
@@ -54,25 +49,6 @@ namespace
     bounds.Max.z = std::max(bounds.Max.z, pointZ);
   }
 
-  [[nodiscard]] gpg::RType* CachedRect2iType()
-  {
-    gpg::RType* cached = gpg::Rect2i::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(gpg::Rect2i));
-      gpg::Rect2i::sType = cached;
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEResourceTypeType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::EResourceType));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x00545CC0 (FUN_00545CC0)
    *
@@ -82,12 +58,7 @@ namespace
    */
   [[maybe_unused]] void cleanup_ResourceDepositTypeInfoRTypeBase(moho::ResourceDepositTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   [[nodiscard]] moho::ResourceDepositTypeInfo& AcquireResourceDepositTypeInfo()
@@ -121,8 +92,8 @@ namespace moho
   void ResourceDeposit::MemberDeserialize(gpg::ReadArchive* const archive)
   {
     const gpg::RRef ownerRef{};
-    archive->Read(CachedRect2iType(), this, ownerRef);
-    archive->Read(CachedEResourceTypeType(), &depositType, ownerRef);
+    archive->Read(gpg::RTypeOf<gpg::Rect2i>(), this, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::EResourceType>(), &depositType, ownerRef);
   }
 
   /**
@@ -136,10 +107,10 @@ namespace moho
   void ResourceDeposit::MemberSerialize(gpg::WriteArchive* const archive)
   {
     const gpg::RRef footprintOwnerRef{};
-    archive->Write(CachedRect2iType(), this, footprintOwnerRef);
+    archive->Write(gpg::RTypeOf<gpg::Rect2i>(), this, footprintOwnerRef);
 
     const gpg::RRef depositTypeOwnerRef{};
-    archive->Write(CachedEResourceTypeType(), &depositType, depositTypeOwnerRef);
+    archive->Write(gpg::RTypeOf<moho::EResourceType>(), &depositType, depositTypeOwnerRef);
   }
 
   /**

@@ -1,0 +1,38 @@
+name: 2p-contract-jar
+description: >
+  The FAF client's adapter contract with FAF's own adapter (issue #227):
+  two shipped faf-ice-adapter.jar instances, started and driven as the FAF
+  client does (docs/LAUNCHER_ADAPTER_CONTRACT.md), one retail game and one of
+  ours, autolobby. nativeDir is a read-only copy of the client's natives
+  folder; nothing under C:\Program Files\FAF Client is changed.
+timeout: 10m
+
+mode: contract
+lobby: auto
+map: SCMP_009
+
+contract:
+  nativeDir: '%FAF_ADAPTER_DIR%'   # a folder holding a copy of faf-ice-adapter.jar
+  adapter: jar
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  nosound: true
+  tile: true
+
+players:
+  - { uid: 1, name: Alpha }
+  - { uid: 2, name: Bravo, exe: '%ProgramData%\FAForever\bin_x64\main_x64.exe' }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 5m }
+  - note: both launched through the Java adapters; letting the sim run
+  - wait: 2m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true

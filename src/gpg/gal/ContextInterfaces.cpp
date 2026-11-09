@@ -1,3 +1,6 @@
+#include <memory>
+#include <new>
+
 #include "CubeRenderTargetContext.hpp"
 #include "DepthStencilTarget.hpp"
 #include "DepthStencilTargetContext.hpp"
@@ -37,7 +40,7 @@ namespace gpg::gal
          * Scans one contiguous `[first,last)` effect-macro range and returns
          * the first entry whose key text exactly matches `needleKey`; returns
          * `last` when no exact key match exists. The needle is a free
-         * `msvc8::string`, matching the binary shape used by
+         * `fa::string`, matching the binary shape used by
          * `EffectContext::DefineMacro` where a temporary key string sits on
          * the caller stack before any `EffectMacro` is constructed.
          */
@@ -45,7 +48,7 @@ namespace gpg::gal
             EffectMacro** const outPosition,
             EffectMacro* first,
             EffectMacro* last,
-            const msvc8::string& needleKey
+            const fa::string& needleKey
         ) noexcept
         {
             EffectMacro* cursor = first;
@@ -86,28 +89,10 @@ namespace gpg::gal
             const std::size_t fileLength = (file != nullptr) ? std::strlen(file) : 0U;
             const std::size_t messageLength = (message != nullptr) ? std::strlen(message) : 0U;
             throw Error(
-                msvc8::string((file != nullptr) ? file : "", static_cast<unsigned int>(fileLength)),
+                fa::string((file != nullptr) ? file : "", static_cast<unsigned int>(fileLength)),
                 line,
-                msvc8::string((message != nullptr) ? message : "", static_cast<unsigned int>(messageLength))
+                fa::string((message != nullptr) ? message : "", static_cast<unsigned int>(messageLength))
             );
-        }
-
-        void AssignSharedCount(
-            boost::detail::sp_counted_base*& target,
-            boost::detail::sp_counted_base* const source
-        ) noexcept
-        {
-            if (source != nullptr)
-            {
-                source->add_ref_copy();
-            }
-
-            if (target != nullptr)
-            {
-                target->release();
-            }
-
-            target = source;
         }
 
         /**
@@ -382,7 +367,7 @@ namespace gpg::gal
           height_(other.height_),
           reserved0x50_(other.reserved0x50_)
     {
-        location_.assign(other.location_, 0U, msvc8::string::npos);
+        location_.assign(other.location_, 0U, fa::string::npos);
         dataBuffer_ = other.dataBuffer_;
     }
 
@@ -412,7 +397,7 @@ namespace gpg::gal
     void TextureContext::AssignFrom(const TextureContext& other)
     {
         source_ = other.source_;
-        location_.assign(other.location_, 0U, msvc8::string::npos);
+        location_.assign(other.location_, 0U, fa::string::npos);
         dataBuffer_ = other.dataBuffer_;
         type_ = other.type_;
         usage_ = other.usage_;
@@ -782,8 +767,8 @@ namespace gpg::gal
 
         mSourceType = other.mSourceType;
         mUseCache = other.mUseCache;
-        mSourcePath.assign(other.mSourcePath, 0U, msvc8::string::npos);
-        mCachePath.assign(other.mCachePath, 0U, msvc8::string::npos);
+        mSourcePath.assign(other.mSourcePath, 0U, fa::string::npos);
+        mCachePath.assign(other.mCachePath, 0U, fa::string::npos);
         mSourceBuffer = other.mSourceBuffer;
         mMacros = other.mMacros;
         return *this;
@@ -801,7 +786,7 @@ namespace gpg::gal
         const gpg::StrArg sourcePath,
         const gpg::StrArg cachePath,
         const gpg::MemBuffer<char>& sourceBuffer,
-        const msvc8::vector<EffectMacro>& macros
+        const fa::vector<EffectMacro>& macros
     )
         : mSourceType(2U)
         , mUseCache(useCachePayload)
@@ -848,7 +833,7 @@ namespace gpg::gal
         // function exactly.
         bool isDuplicate = false;
         {
-            const msvc8::string needleKey(
+            const fa::string needleKey(
                 nameText, static_cast<unsigned int>(std::strlen(nameText))
             );
 
@@ -872,7 +857,7 @@ namespace gpg::gal
         }
 
         const EffectMacro newMacro(nameText, valueText);
-        // `msvc8::vector<EffectMacro>::push_back` (0x00940230, cited on Vector.h);
+        // `fa::vector<EffectMacro>::push_back` (0x00940230, cited on Vector.h);
         // its capacity-full path is the single-value `insert` 0x009401C0.
         mMacros.push_back(newMacro);
     }
@@ -972,6 +957,34 @@ namespace gpg::gal
      * declaration order.
      */
     OutputContext::~OutputContext() = default;
+
+    OutputContext* NewOutputContexts(const std::uint32_t count)
+    {
+        if (count == 0U)
+        {
+            return nullptr;
+        }
+        std::allocator<OutputContext> allocator;
+        OutputContext* const contexts = allocator.allocate(count);
+        for (std::uint32_t index = 0U; index < count; ++index)
+        {
+            ::new (static_cast<void*>(contexts + index)) OutputContext();
+        }
+        return contexts;
+    }
+
+    void DeleteOutputContexts(OutputContext* const contexts, const std::uint32_t count) noexcept
+    {
+        if (contexts == nullptr)
+        {
+            return;
+        }
+        for (std::uint32_t index = count; index > 0U; --index)
+        {
+            contexts[index - 1U].~OutputContext();
+        }
+        std::allocator<OutputContext>().deallocate(contexts, count);
+    }
 
     /**
      * Address: 0x008E7A00 (FUN_008E7A00, ??1RenderTargetContext@gal@gpg@@QAE@@Z)

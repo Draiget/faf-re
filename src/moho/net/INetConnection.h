@@ -97,7 +97,7 @@ namespace moho
      * Address: 0x00A82547
      * Slot: 6
      */
-    virtual msvc8::string ToString() = 0;
+    virtual fa::string ToString() = 0;
 
     /**
      * Address: 0x00A82547

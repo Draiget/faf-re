@@ -15,51 +15,18 @@
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/math/QuaternionMath.h"
+#include "moho/console/CConCommand.h"
+#include "moho/sim/SimArchiveMode.h"
+#include "moho/sim/SimKeyframe.h"
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedVTransformType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::VTransform));
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedFastVectorCAniPoseBoneType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(gpg::fastvector<moho::CAniPoseBone>));
-    }
-    return sType;
-  }
-
-  /**
-   * Address: 0x0054D000 (FUN_0054D000)
-   *
-   * What it does:
-   * Resolves and caches the reflected runtime type for `CAniPoseBone`.
-   */
-  [[nodiscard]] gpg::RType* CachedCAniPoseBoneType()
-  {
-    gpg::RType* type = moho::CAniPoseBone::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CAniPoseBone));
-      moho::CAniPoseBone::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCAniSkelType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::CAniSkel));
-    }
-    return sType;
-  }
+  bool sim_FastBoneUpdates = true;
+  moho::TConVar<bool> gTConVar_sim_FastBoneUpdates(
+    "sim_FastBoneUpdates",
+    "Bypasses redundant GetBone lookups and pose hierarchy rebuilds when skeleton matches.",
+    &sim_FastBoneUpdates
+  );
 
   // Address: 0x00BC9960 (FUN_00BC9960, register_CAniPoseSerializer) -- MSVC's
   // own compiler-generated dynamic initializer for this global runs the real
@@ -129,7 +96,7 @@ namespace
     }
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Read(CachedCAniPoseBoneType(), objectStorage, owner);
+    archive->Read(gpg::CachedLookup<moho::CAniPoseBone>(moho::CAniPoseBone::sType), objectStorage, owner);
     return archive;
   }
 
@@ -150,7 +117,7 @@ namespace
     }
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Write(CachedCAniPoseBoneType(), objectSlot, owner);
+    archive->Write(gpg::CachedLookup<moho::CAniPoseBone>(moho::CAniPoseBone::sType), objectSlot, owner);
     return archive;
   }
 
@@ -198,35 +165,6 @@ namespace
 
   [[maybe_unused]] CAniPoseSerializerStartupBootstrap gCAniPoseSerializerStartupBootstrap;
 
-  template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (object == nullptr) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    if (dynamicType != nullptr && staticType != nullptr && dynamicType->IsDerivedFrom(staticType, &baseOffset)) {
-      out.mObj =
-        reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = object;
-    out.mType = dynamicType ? dynamicType : staticType;
-    return out;
-  }
 
   [[nodiscard]] moho::VTransform MakeIdentityPoseTransform() noexcept
   {
@@ -293,31 +231,6 @@ namespace
     laneView->lane38 = 0.0f;
     laneView->lane3C = 0.0f;
     return laneView;
-  }
-
-  [[nodiscard]] constexpr std::intptr_t PoseBoneStrideBytes() noexcept
-  {
-    return static_cast<std::intptr_t>(sizeof(moho::CAniPoseBone));
-  }
-
-  [[nodiscard]] moho::CAniPoseBone* PoseBoneByteOffset(
-    moho::CAniPoseBone* const begin,
-    const std::int32_t elementOffset
-  ) noexcept
-  {
-    const std::intptr_t beginBytes = reinterpret_cast<std::intptr_t>(begin);
-    const std::intptr_t offsetBytes = static_cast<std::intptr_t>(elementOffset) * PoseBoneStrideBytes();
-    return reinterpret_cast<moho::CAniPoseBone*>(beginBytes + offsetBytes);
-  }
-
-  [[nodiscard]] const moho::CAniPoseBone* PoseBoneByteOffset(
-    const moho::CAniPoseBone* const begin,
-    const std::int32_t elementOffset
-  ) noexcept
-  {
-    const std::intptr_t beginBytes = reinterpret_cast<std::intptr_t>(begin);
-    const std::intptr_t offsetBytes = static_cast<std::intptr_t>(elementOffset) * PoseBoneStrideBytes();
-    return reinterpret_cast<const moho::CAniPoseBone*>(beginBytes + offsetBytes);
   }
 
   /**
@@ -621,7 +534,7 @@ namespace moho
         for (std::uint32_t index = 0; index < boneCount; ++index) {
           CAniPoseBone& candidate = bonesBegin[static_cast<std::size_t>(index)];
           if (candidate.mParent == this) {
-            candidate.SetVisibleRecur(visible);
+            (void)candidate.SetVisibleRecur(visible);
           }
         }
       }
@@ -643,7 +556,7 @@ namespace moho
     archive->WriteBool(mCompositeIsLocal);
 
     const gpg::RRef nullOwner{};
-    archive->Write(CachedVTransformType(), &mLocalTransform, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::VTransform>(), &mLocalTransform, nullOwner);
 
     archive->WriteBool(mVisible);
     archive->WriteBool(mSkipNextInterp);
@@ -661,7 +574,7 @@ namespace moho
     mCompositeIsLocal = compositeIsLocal ? 1u : 0u;
 
     const gpg::RRef nullOwner{};
-    archive->Read(CachedVTransformType(), &mLocalTransform, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::VTransform>(), &mLocalTransform, nullOwner);
 
     bool visible = false;
     archive->ReadBool(&visible);
@@ -795,7 +708,7 @@ namespace moho
   CAniPose::~CAniPose()
   {
     if (mBones.mBegin != mBones.mOriginal) {
-      delete[] mBones.mBegin;
+      mBones.FreeHeapBones();
       mBones.mBegin = mBones.mOriginal;
       mBones.mCapacity = mBones.InlineCapacityFromHeader();
     }
@@ -832,11 +745,30 @@ namespace moho
     const std::uint32_t boneCount = (sourceBegin && sourceEnd && sourceEnd >= sourceBegin)
       ? static_cast<std::uint32_t>(sourceEnd - sourceBegin)
       : 0u;
-    mBones.resize(boneCount, fillBone);
 
     if (boneCount == 0u || sourceBegin == nullptr) {
+      mBones.resize(0, fillBone);
       return;
     }
+
+    CAniPoseBone* const existingBegin = mBones.begin();
+    // Fast path: if skeleton and bone count match, we are recycling an existing pose buffer.
+    // The skeleton hierarchy (mParent, mPose, mIdx) is already established and identical.
+    if (sim_FastBoneUpdates && mSkeleton == copy.mSkeleton && mBones.size() == boneCount && existingBegin != nullptr) {
+      for (std::uint32_t index = 0; index < boneCount; ++index) {
+        CAniPoseBone& destinationBone = existingBegin[index];
+        const CAniPoseBone& sourceBone = sourceBegin[index];
+
+        destinationBone.mVisible = sourceBone.mVisible;
+        destinationBone.mSkipNextInterp = sourceBone.mSkipNextInterp;
+        destinationBone.mLocalTransform = sourceBone.mLocalTransform;
+        destinationBone.mCompositeDirty = 1u;
+        destinationBone.mCompositeIsLocal = sourceBone.mCompositeIsLocal;
+      }
+      return;
+    }
+
+    mBones.resize(boneCount, fillBone);
 
     CAniPoseBone* const destinationBegin = mBones.begin();
     if (destinationBegin == nullptr) {
@@ -894,24 +826,61 @@ namespace moho
 
     const std::int32_t destinationBoneCount = static_cast<std::int32_t>(destinationEnd - destinationBegin);
     const float scale = mScale;
-    for (std::int32_t index = 0; index < destinationBoneCount; ++index) {
-      const SAniSkelBone* const skeletonBone = skeleton->GetBone(static_cast<std::uint32_t>(index));
-      if (skeletonBone == nullptr) {
-        continue;
+
+    if (sim_FastBoneUpdates) {
+      const SAniSkelBone* const skeletonBegin = skeleton->mBones.begin();
+      const std::int32_t skeletonCount = static_cast<std::int32_t>(skeleton->mBones.size());
+      if (skeletonBegin == nullptr || skeletonCount <= 0) {
+        return;
       }
+      const std::int32_t count = (destinationBoneCount < skeletonCount) ? destinationBoneCount : skeletonCount;
 
-      // 0x0054B64A..0x0054B679: the skeleton bone's rest transform at +0x08 is copied lane
-      // for lane -- orientation verbatim, position scaled.
-      const VTransform& rest = skeletonBone->mLocalTransform;
-      CAniPoseBone& destinationBone = destinationBegin[index];
-      destinationBone.mLocalTransform.pos_.x = rest.pos_.x * scale;
-      destinationBone.mLocalTransform.pos_.y = rest.pos_.y * scale;
-      destinationBone.mLocalTransform.pos_.z = rest.pos_.z * scale;
-      destinationBone.mLocalTransform.orient_ = rest.orient_;
+      if (scale == 1.0f) {
+        for (std::int32_t index = 0; index < count; ++index) {
+          const SAniSkelBone& skeletonBone = skeletonBegin[index];
+          CAniPoseBone& destinationBone = destinationBegin[index];
 
-      destinationBone.mCompositeDirty = 1u;
-      destinationBone.mSkipNextInterp = 0u;
-      destinationBone.mCompositeIsLocal = 0u;
+          destinationBone.mLocalTransform = skeletonBone.mLocalTransform;
+          destinationBone.mCompositeDirty = 1u;
+          destinationBone.mSkipNextInterp = 0u;
+          destinationBone.mCompositeIsLocal = 0u;
+        }
+      } else {
+        for (std::int32_t index = 0; index < count; ++index) {
+          const SAniSkelBone& skeletonBone = skeletonBegin[index];
+          const VTransform& rest = skeletonBone.mLocalTransform;
+          CAniPoseBone& destinationBone = destinationBegin[index];
+
+          destinationBone.mLocalTransform.pos_.x = rest.pos_.x * scale;
+          destinationBone.mLocalTransform.pos_.y = rest.pos_.y * scale;
+          destinationBone.mLocalTransform.pos_.z = rest.pos_.z * scale;
+          destinationBone.mLocalTransform.orient_ = rest.orient_;
+
+          destinationBone.mCompositeDirty = 1u;
+          destinationBone.mSkipNextInterp = 0u;
+          destinationBone.mCompositeIsLocal = 0u;
+        }
+      }
+    } else {
+      for (std::int32_t index = 0; index < destinationBoneCount; ++index) {
+        const SAniSkelBone* const skeletonBone = skeleton->GetBone(static_cast<std::uint32_t>(index));
+        if (skeletonBone == nullptr) {
+          continue;
+        }
+
+        // 0x0054B64A..0x0054B679: the skeleton bone's rest transform at +0x08 is copied lane
+        // for lane -- orientation verbatim, position scaled.
+        const VTransform& rest = skeletonBone->mLocalTransform;
+        CAniPoseBone& destinationBone = destinationBegin[index];
+        destinationBone.mLocalTransform.pos_.x = rest.pos_.x * scale;
+        destinationBone.mLocalTransform.pos_.y = rest.pos_.y * scale;
+        destinationBone.mLocalTransform.pos_.z = rest.pos_.z * scale;
+        destinationBone.mLocalTransform.orient_ = rest.orient_;
+
+        destinationBone.mCompositeDirty = 1u;
+        destinationBone.mSkipNextInterp = 0u;
+        destinationBone.mCompositeIsLocal = 0u;
+      }
     }
   }
 
@@ -1216,8 +1185,8 @@ namespace moho
     const gpg::RRef nullOwner{};
     archive->ReadPointerShared(&mSkeleton, &nullOwner);
     archive->ReadFloat(&mScale);
-    archive->Read(CachedVTransformType(), &mLocalTransform, nullOwner);
-    archive->Read(CachedFastVectorCAniPoseBoneType(), &mBones, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::VTransform>(), &mLocalTransform, nullOwner);
+    archive->Read(gpg::RTypeOf<gpg::fastvector<moho::CAniPoseBone>>(), &mBones, nullOwner);
 
     CAniPoseBone* const bonesBegin = mBones.begin();
     CAniPoseBone* const bonesEnd = mBones.end();
@@ -1244,6 +1213,13 @@ namespace moho
     }
 
     archive->ReadFloat(&mMaxOffset);
+
+    // Engine addition (replay keyframes): see SIM_NoteKeyframeBlock.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      std::uint64_t saved = 0;
+      archive->ReadUInt64(&saved);
+      SIM_NoteKeyframeBlock(saved, bonesBegin);
+    }
   }
 
   /**
@@ -1253,12 +1229,17 @@ namespace moho
   {
     const gpg::RRef nullOwner{};
     const gpg::RRef skeletonRef =
-      MakeDerivedRef(const_cast<CAniSkel*>(mSkeleton.get()), CachedCAniSkelType());
+      gpg::MakeDerivedRef(const_cast<CAniSkel*>(mSkeleton.get()), gpg::RTypeOf<moho::CAniSkel>());
     gpg::WriteRawPointer(archive, skeletonRef, gpg::TrackedPointerState::Shared, nullOwner);
 
     archive->WriteFloat(mScale);
-    archive->Write(CachedVTransformType(), &mLocalTransform, nullOwner);
-    archive->Write(CachedFastVectorCAniPoseBoneType(), &mBones, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::VTransform>(), &mLocalTransform, nullOwner);
+    archive->Write(gpg::RTypeOf<gpg::fastvector<moho::CAniPoseBone>>(), &mBones, nullOwner);
     archive->WriteFloat(mMaxOffset);
+
+    // Engine addition (replay keyframes): see SIM_NoteKeyframeBlock.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->WriteUInt64(reinterpret_cast<std::uintptr_t>(mBones.begin()));
+    }
   }
 } // namespace moho

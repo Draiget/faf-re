@@ -65,7 +65,7 @@ namespace moho
       return false;
     }
 
-    msvc8::ScaleVectorByMaxLengthX87(vector->x, vector->y, vector->z, maxLength);
+    fa::ScaleVectorByMaxLengthX87(vector->x, vector->y, vector->z, maxLength);
     return true;
   }
 
@@ -142,7 +142,7 @@ namespace moho
    */
   float VEC_HeadingFromXZ(const Wm3::Vector3f* const value) noexcept
   {
-    return msvc8::atan2(value->x, value->z);
+    return fa::atan2(value->x, value->z);
   }
 
   /**
@@ -165,7 +165,7 @@ namespace moho
     // 0x005B1CCF..0x005B1CF7: `targetLength / sqrt(lengthSq)` stays on the
     // x87 stack (extended exponent) across the three multiplies; a float
     // scale overflowed / went denormal for far-apart magnitudes (difffuzz).
-    msvc8::ScaleVectorToLengthX87(&vector->x, &vector->x, lengthSq, targetLength);
+    fa::ScaleVectorToLengthX87(&vector->x, &vector->x, lengthSq, targetLength);
     return true;
   }
 
@@ -223,7 +223,7 @@ namespace moho
     // length and the fsqrt all stay on the x87 stack (extended exponent). In
     // float the ratio overflowed for a short source and returned infinities
     // where the engine returns a vector of the target's length (difffuzz).
-    msvc8::ScaleVectorToLengthOfX87(&destination->x, &sourceVector->x, &targetLengthVector->x, sourceLengthSq);
+    fa::ScaleVectorToLengthOfX87(&destination->x, &sourceVector->x, &targetLengthVector->x, sourceLengthSq);
     return destination;
   }
 
@@ -316,11 +316,11 @@ namespace moho
   Wm3::Quatf* EulerRollToQuat(const Wm3::Vector3f* const axis, Wm3::Quatf* const outQuaternion, const float roll)
   {
     const float halfRoll = roll * 0.5f;
-    const float sinHalfRoll = msvc8::sinf(halfRoll);
-    outQuaternion->w = msvc8::cosf(halfRoll);
+    const float sinHalfRoll = fa::sinf(halfRoll);
+    outQuaternion->w = fa::cosf(halfRoll);
     // 0x0057077E..0x00570796: `axis * sin` multiplies on the x87 stack, one
     // float store per lane (differs from SSE only for a denormal product).
-    msvc8::ScaleVectorX87(&outQuaternion->x, &axis->x, sinHalfRoll);
+    fa::ScaleVectorX87(&outQuaternion->x, &axis->x, sinHalfRoll);
     return outQuaternion;
   }
 } // namespace moho

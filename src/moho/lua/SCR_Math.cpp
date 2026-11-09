@@ -1,4 +1,6 @@
 #include "moho/lua/SCR_Math.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/lua/CScrLuaInitForm.h"
 
 #include <cmath>
 
@@ -36,20 +38,6 @@ namespace
   constexpr const char* kMathLerpHelpText =
     "MATH_Lerp(s, a, b) or MATH_Lerp(s, sMin, sMax, a, b) -> number -- linear interpolation from a (at s=0 or "
     "s=sMin) to b (at s=1 or s=sMax)";
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Core");
-    return sSet;
-  }
 
   /**
    * Address: 0x0128DD44 (FA-Binary-Patches include/utility.h `ToVector`, .exxt)
@@ -100,10 +88,7 @@ int moho::cfunc_OrientFromDir(lua_State* const luaContext)
  */
 int moho::cfunc_OrientFromDirL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kOrientFromDirHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kOrientFromDirHelpText);
 
   LuaPlus::LuaStackObject argument(state, 1);
   LuaPlus::LuaObject directionObject(argument);
@@ -125,7 +110,7 @@ int moho::cfunc_OrientFromDirL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_OrientFromDir_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "OrientFromDir",
     &moho::cfunc_OrientFromDir,
     nullptr,
@@ -167,16 +152,7 @@ int moho::cfunc_EulerToQuaternion(lua_State* const luaContext)
  */
 int moho::cfunc_EulerToQuaternionL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 3) {
-    LuaPlus::LuaState::Error(
-      state,
-      "%s\n  expected %d args, but got %d",
-      kEulerToQuaternionHelpText,
-      3,
-      argumentCount
-    );
-  }
+  moho::SCR_ExpectExactArgs(state, 3, kEulerToQuaternionHelpText);
 
   LuaPlus::LuaStackObject rollArg(state, 1);
   if (lua_type(state->m_state, 1) != LUA_TNUMBER) {
@@ -212,7 +188,7 @@ int moho::cfunc_EulerToQuaternionL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_EulerToQuaternion_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "EulerToQuaternion",
     &moho::cfunc_EulerToQuaternion,
     nullptr,
@@ -254,10 +230,7 @@ int moho::cfunc_MinLerp(lua_State* const luaContext)
  */
 int moho::cfunc_MinLerpL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 3) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kMinLerpHelpText, 3, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 3, kMinLerpHelpText);
 
   LuaPlus::LuaStackObject alphaArg(state, 1);
   if (lua_type(state->m_state, 1) != LUA_TNUMBER) {
@@ -292,7 +265,7 @@ int moho::cfunc_MinLerpL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_MinLerp_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "MinLerp",
     &moho::cfunc_MinLerp,
     nullptr,
@@ -333,10 +306,7 @@ int moho::cfunc_MinSlerp(lua_State* const luaContext)
  */
 int moho::cfunc_MinSlerpL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 3) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kMinSlerpHelpText, 3, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 3, kMinSlerpHelpText);
 
   LuaPlus::LuaStackObject alphaArg(state, 1);
   if (lua_type(state->m_state, 1) != LUA_TNUMBER) {
@@ -371,7 +341,7 @@ int moho::cfunc_MinSlerpL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_MinSlerp_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "MinSlerp",
     &moho::cfunc_MinSlerp,
     nullptr,
@@ -411,10 +381,7 @@ int moho::cfunc_Vector(lua_State* const luaContext)
  */
 int moho::cfunc_VectorL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 3) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kVectorHelpText, 3, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 3, kVectorHelpText);
 
   LuaPlus::LuaStackObject xArg(state, 1);
   if (lua_type(state->m_state, 1) != LUA_TNUMBER) {
@@ -449,7 +416,7 @@ int moho::cfunc_VectorL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_Vector_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "Vector",
     &moho::cfunc_Vector,
     nullptr,
@@ -489,10 +456,7 @@ int moho::cfunc_Vector2(lua_State* const luaContext)
  */
 int moho::cfunc_Vector2L(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kVector2HelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kVector2HelpText);
 
   LuaPlus::LuaStackObject xArg(state, 1);
   if (lua_type(state->m_state, 1) != LUA_TNUMBER) {
@@ -520,7 +484,7 @@ int moho::cfunc_Vector2L(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_Vector2_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "Vector2",
     &moho::cfunc_Vector2,
     nullptr,
@@ -561,10 +525,7 @@ int moho::cfunc_PointVector(lua_State* const luaContext)
  */
 int moho::cfunc_PointVectorL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 6) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kPointVectorHelpText, 6, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 6, kPointVectorHelpText);
 
   moho::SPointVector pointVector{};
   for (int index = 1; index <= 6; ++index) {
@@ -595,7 +556,7 @@ int moho::cfunc_PointVectorL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_PointVector_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "PointVector",
     &moho::cfunc_PointVector,
     nullptr,
@@ -635,10 +596,7 @@ int moho::cfunc_Rect(lua_State* const luaContext)
  */
 int moho::cfunc_RectL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 4) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kRectHelpText, 4, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 4, kRectHelpText);
 
   LuaPlus::LuaStackObject x0Arg(state, 1);
   if (lua_type(state->m_state, 1) != LUA_TNUMBER) {
@@ -681,7 +639,7 @@ int moho::cfunc_RectL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_Rect_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "Rect",
     &moho::cfunc_Rect,
     nullptr,
@@ -757,7 +715,7 @@ int moho::cfunc_VDist3L(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_VDist3_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "VDist3",
     &moho::cfunc_VDist3,
     nullptr,
@@ -797,10 +755,7 @@ int moho::cfunc_VDist3Sq(lua_State* const luaContext)
  */
 int moho::cfunc_VDist3SqL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kVDist3SqHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kVDist3SqHelpText);
 
   LuaPlus::LuaStackObject rightArg(state, 2);
   LuaPlus::LuaObject rightObject(rightArg);
@@ -829,7 +784,7 @@ int moho::cfunc_VDist3SqL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_VDist3Sq_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "VDist3Sq",
     &moho::cfunc_VDist3Sq,
     nullptr,
@@ -870,10 +825,7 @@ int moho::cfunc_VDist2(lua_State* const luaContext)
  */
 int moho::cfunc_VDist2L(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 4) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kVDist2HelpText, 4, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 4, kVDist2HelpText);
 
   LuaPlus::LuaStackObject y1Arg(state, 2);
   if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
@@ -916,7 +868,7 @@ int moho::cfunc_VDist2L(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_VDist2_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "VDist2",
     &moho::cfunc_VDist2,
     nullptr,
@@ -957,10 +909,7 @@ int moho::cfunc_VDist2Sq(lua_State* const luaContext)
  */
 int moho::cfunc_VDist2SqL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 4) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kVDist2SqHelpText, 4, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 4, kVDist2SqHelpText);
 
   LuaPlus::LuaStackObject y1Arg(state, 2);
   if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
@@ -1002,7 +951,7 @@ int moho::cfunc_VDist2SqL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_VDist2Sq_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "VDist2Sq",
     &moho::cfunc_VDist2Sq,
     nullptr,
@@ -1042,10 +991,7 @@ int moho::cfunc_VDot(lua_State* const luaContext)
  */
 int moho::cfunc_VDotL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kVDotHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kVDotHelpText);
 
   LuaPlus::LuaStackObject rightArg(state, 2);
   LuaPlus::LuaObject rightObject(rightArg);
@@ -1074,7 +1020,7 @@ int moho::cfunc_VDotL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_VDot_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "VDot",
     &moho::cfunc_VDot,
     nullptr,
@@ -1114,10 +1060,7 @@ int moho::cfunc_VDiff(lua_State* const luaContext)
  */
 int moho::cfunc_VDiffL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kVDiffHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kVDiffHelpText);
 
   LuaPlus::LuaStackObject rightArg(state, 2);
   LuaPlus::LuaObject rightObject(rightArg);
@@ -1144,7 +1087,7 @@ int moho::cfunc_VDiffL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_VDiff_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "VDiff",
     &moho::cfunc_VDiff,
     nullptr,
@@ -1184,10 +1127,7 @@ int moho::cfunc_VAdd(lua_State* const luaContext)
  */
 int moho::cfunc_VAddL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kVAddHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kVAddHelpText);
 
   LuaPlus::LuaStackObject rightArg(state, 2);
   LuaPlus::LuaObject rightObject(rightArg);
@@ -1214,7 +1154,7 @@ int moho::cfunc_VAddL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_VAdd_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "VAdd",
     &moho::cfunc_VAdd,
     nullptr,
@@ -1254,10 +1194,7 @@ int moho::cfunc_VMult(lua_State* const luaContext)
  */
 int moho::cfunc_VMultL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kVMultHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kVMultHelpText);
 
   LuaPlus::LuaStackObject vectorArg(state, 1);
   LuaPlus::LuaObject vectorObject(vectorArg);
@@ -1284,7 +1221,7 @@ int moho::cfunc_VMultL(LuaPlus::LuaState* const state)
  */
 moho::CScrLuaInitForm* moho::func_VMult_LuaFuncDef()
 {
-  static CScrLuaBinder binder(CoreLuaInitSet(), "VMult", &moho::cfunc_VMult, nullptr, "<global>", kVMultHelpText);
+  static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), "VMult", &moho::cfunc_VMult, nullptr, "<global>", kVMultHelpText);
   return &binder;
 }
 
@@ -1319,10 +1256,7 @@ int moho::cfunc_VPerpDot(lua_State* const luaContext)
  */
 int moho::cfunc_VPerpDotL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kVPerpDotHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kVPerpDotHelpText);
 
   LuaPlus::LuaStackObject secondVectorArg(state, 2);
   LuaPlus::LuaObject secondVectorObject(secondVectorArg);
@@ -1349,7 +1283,7 @@ int moho::cfunc_VPerpDotL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_VPerpDot_LuaFuncDef()
 {
   static CScrLuaBinder
-    binder(CoreLuaInitSet(), "VPerpDot", &moho::cfunc_VPerpDot, nullptr, "<global>", kVPerpDotHelpText);
+    binder(moho::SCR_CoreLuaInitSet(), "VPerpDot", &moho::cfunc_VPerpDot, nullptr, "<global>", kVPerpDotHelpText);
   return &binder;
 }
 
@@ -1384,10 +1318,7 @@ int moho::cfunc_MATH_IRound(lua_State* const luaContext)
  */
 int moho::cfunc_MATH_IRoundL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kMathIRoundHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kMathIRoundHelpText);
 
   LuaPlus::LuaStackObject numberArg(state, 1);
   if (lua_type(state->m_state, 1) != LUA_TNUMBER) {
@@ -1412,7 +1343,7 @@ int moho::cfunc_MATH_IRoundL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_MATH_IRound_LuaFuncDef()
 {
   static CScrLuaBinder
-    binder(CoreLuaInitSet(), "MATH_IRound", &moho::cfunc_MATH_IRound, nullptr, "<global>", kMathIRoundHelpText);
+    binder(moho::SCR_CoreLuaInitSet(), "MATH_IRound", &moho::cfunc_MATH_IRound, nullptr, "<global>", kMathIRoundHelpText);
   return &binder;
 }
 
@@ -1517,7 +1448,7 @@ int moho::cfunc_MATH_lerpL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_MATH_Lerp_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "MATH_Lerp",
     &moho::cfunc_MATH_lerp,
     nullptr,

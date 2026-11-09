@@ -45,7 +45,7 @@
 #include <iterator>
 #include <utility>
 
-namespace msvc8
+namespace fa
 {
     namespace detail
     {
@@ -65,7 +65,7 @@ namespace msvc8
         /**
          * Address: 0x0089C070 (FUN_0089C070, the swap for
          * `Moho::SBuildTemplateInfo` -- 0x2C bytes of
-         * `{Wm3::Vector3f mPos; int mBuildOrder; msvc8::string mBlueprintId;}`.
+         * `{Wm3::Vector3f mPos; int mBuildOrder; fa::string mBlueprintId;}`.
          * The 0x2C stack temp it opens with is the `T temp = lhs` below; the
          * blueprint-id lane moves through `std::string::assign(str, 0, -1)`
          * three times, once per leg of the three-way exchange.)
@@ -116,20 +116,14 @@ namespace msvc8
          * `mBuildOrder`.)
          */
         /**
-         * Address: 0x008D9EE0 (FUN_008D9EE0, `_Med3` for the `gpg::RField`
-         * sort -- `strcmp(*a2,*a1)`/`strcmp(*a3,*a2)`/`strcmp(*a2,*a1)`
-         * against the three `mName` pointers, matching this member exactly
-         * (compares `*a`/`*b`/`*c` pairwise, swapping through `iter_swap`
-         * at 0x008D9E20 -- cited above -- to land the median in `*b`).
-         * Reached with `count <= 41` directly from `_Median`'s (`FUN_008DA410`,
-         * cited on `select_ninther` below) simple path, and always as the
-         * final "median of the three medians" step of the ninther itself.
-         * Previously mis-tagged `external_dependency` ("all-external-callees
-         * thunk... no engine references") -- `strcmp` is CRT, but the
-         * three-way compare-and-swap control flow orchestrating it is this
-         * project's own `_Med3` emission, reached from `gpg::RType::
-         * Finish()`'s `std::sort` (Reflection.cpp) -- not third-party
-         * runtime. DB-integrity fix, corrected to skip/cited-here.)
+         * Address: 0x008D9EE0 (FUN_008D9EE0, `_Med3` for the `gpg::RField` sort
+         * -- `strcmp(*a2,*a1)`/`strcmp(*a3,*a2)`/`strcmp(*a2,*a1)` against the
+         * three `mName` pointers, matching this member exactly (compares
+         * `*a`/`*b`/`*c` pairwise, swapping through `iter_swap` at 0x008D9E20
+         * -- cited above -- to land the median in `*b`). Reached with `count <=
+         * 41` directly from `_Median`'s (`FUN_008DA410`, cited on
+         * `select_ninther` below) simple path, and always as the final "median
+         * of the three medians" step of the ninther itself.)
          */
         /**
          * Address: 0x005751C0 (FUN_005751C0 -- `_Med3` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp).)
@@ -188,8 +182,8 @@ namespace msvc8
          */
         template <class T, class Compare>
         /**
-         * Address: 0x0092E050 (FUN_0092E050 -- `_Median` -- median-of-three under 40 elements, the ninther sample ordering above it -- for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092E6E0; formerly `OrderU16PivotSamples` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0071F870 (FUN_0071F870 -- `_Median` -- median-of-three under 40 elements, the ninther sample ordering above it -- for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; callers 0x0071EFA0; formerly `SelectPivotSamplesForFloat4Sort` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092E050 (FUN_0092E050 -- `_Median` -- median-of-three under 40 elements, the ninther sample ordering above it -- for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092E6E0; formerly `OrderU16PivotSamples` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0071F870 (FUN_0071F870 -- `_Median` -- median-of-three under 40 elements, the ninther sample ordering above it -- for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort` over the collected samples; callers 0x0071EFA0; formerly `SelectPivotSamplesForFloat4Sort` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00629C90 (FUN_00629C90 -- `_Median` for the `moho::SPickUpInfo` (0x0C) instantiation of `CUnitLoadUnits::DoTask`'s pickup-queue sort (CUnitLoadUnits.cpp): `(last' - first) / 12 <= 40` takes one `_Med3` (0x0062A000), else `step = (count + 1) / 8` and the four-`_Med3` ninther; callers 0x006292F0.)
          * Address: 0x0084BA10 (FUN_0084BA10 -- `_Median` for the 0x0C `DockCandidate` by-ascending-`distSq` instantiation of `cfunc_IssueDockCommandL`'s sort (CCommandLuaFunctionRegistrations.cpp), same `<= 40` guard and `(count + 1) / 8` step over `_Med3` 0x0084BE60; callers 0x0084B0F0.)
          * Address: 0x0084BC50 (FUN_0084BC50 -- `_Median` for the second `DockCandidate` instantiation of `cfunc_IssueDockCommandL` (descending `freeCapacity`, then ascending `distSq`), same shape over `_Med3` 0x0084C050; callers 0x0084B470.)
@@ -260,9 +254,9 @@ namespace msvc8
          */
         template <class T>
         /**
-         * Address: 0x005F06C0 (FUN_005F06C0 -- `rotate` -- the gcd-cycle form for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005EEDA0, 0x005EFBE0, 0x005F0480; formerly `RotateAttachPointRangeByGcdCycles` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x005F0480 (FUN_005F0480 -- an adapter over that rotate for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); zero callers, unreachable; formerly `RotateAttachPointRangeByGcdCyclesAdapter` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x005EFBE0 (FUN_005EFBE0 -- the guarded adapter over that rotate for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); zero callers, unreachable; formerly `RotateAttachPointRangeByGcdCyclesGuardedAdapter` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005F06C0 (FUN_005F06C0 -- `rotate` -- the gcd-cycle form for `fa::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005EEDA0, 0x005EFBE0, 0x005F0480; formerly `RotateAttachPointRangeByGcdCycles` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005F0480 (FUN_005F0480 -- an adapter over that rotate for `fa::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); zero callers, unreachable; formerly `RotateAttachPointRangeByGcdCyclesAdapter` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005EFBE0 (FUN_005EFBE0 -- the guarded adapter over that rotate for `fa::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); zero callers, unreachable; formerly `RotateAttachPointRangeByGcdCyclesGuardedAdapter` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
          */
         void rotate(T* const first, T* const middle, T* const last)
         {
@@ -301,8 +295,7 @@ namespace msvc8
          * inlined (this template folds that rotate into the loop below
          * directly; same observable result). Reached from `_Sort`'s
          * (`FUN_008DD790`, cited on `sort_impl` below) small-range fallback,
-         * `<= 32` elements. Was mis-tagged `blocked` (stale, pre-dates
-         * `no_block_guard.py`); corrected to skip/cited-here.)
+         * `<= 32` elements.)
          *
          * Address: 0x008DA5D0 (FUN_008DA5D0, sub_8DA5D0) -- the multi-element
          * rotate `FUN_008DB430` calls out to for this instantiation's `<= 32`
@@ -332,8 +325,8 @@ namespace msvc8
          */
         template <class T, class Compare>
         /**
-         * Address: 0x0071F2C0 (FUN_0071F2C0 -- `_Insertion_sort` for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; callers 0x0071E200; formerly `InsertionSortFloat4LaneRangeByDescendingW` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x005EEDA0 (FUN_005EEDA0 -- `insertion_sort` -- the small-range tail of `msvc8::sort` for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005ED680; formerly `SortSmallAttachPointRangeByDistance` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0071F2C0 (FUN_0071F2C0 -- `_Insertion_sort` for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort` over the collected samples; callers 0x0071E200; formerly `InsertionSortFloat4LaneRangeByDescendingW` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005EEDA0 (FUN_005EEDA0 -- `insertion_sort` -- the small-range tail of `fa::sort` for `fa::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005ED680; formerly `SortSmallAttachPointRangeByDistance` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00629750 (FUN_00629750 -- `_Insertion_sort` for the `moho::SPickUpInfo` (0x0C) instantiation of `CUnitLoadUnits::DoTask`'s pickup-queue sort (CUnitLoadUnits.cpp): the rotate form, `first != middle && middle != last` guard inlined before each `_Rotate` (0x0062A610); callers 0x00628740.)
          * Address: 0x0084B3F0 (FUN_0084B3F0 -- `_Insertion_sort` for the 0x0C `DockCandidate` by-ascending-`distSq` instantiation of `cfunc_IssueDockCommandL`'s sort (CCommandLuaFunctionRegistrations.cpp), rotating through 0x0084C330; callers 0x0084A890.)
          * Address: 0x0084B7E0 (FUN_0084B7E0 -- `_Insertion_sort` for the second `DockCandidate` instantiation (descending `freeCapacity`, then ascending `distSq`), rotating through 0x0084C330; callers 0x0084A9D0.)
@@ -377,7 +370,7 @@ namespace msvc8
         /**
          * Address: 0x0087E850 (FUN_0087E850, the `Moho::UserEntity*`
          * instantiation used by `CDecalManager::EntitiesInView`/`PropsInView`'s
-         * decal-order sort -- `msvc8::sort<UserEntity*, Compare>` falls back to
+         * decal-order sort -- `fa::sort<UserEntity*, Compare>` falls back to
          * heapsort here, so this single body fuses both the sift-down and the
          * settle-upward phase, matching this template's shape exactly rather
          * than the split `0x0089C170`/`0x0089C350` pair. Compares
@@ -392,7 +385,7 @@ namespace msvc8
          * symbol alongside `0x0087E850` but with zero live callers anywhere
          * in the shipped binary (IDA xrefs and the callgraph index both come
          * back empty): the `UserEntity*` collections in `CDecalManager` are
-         * always rebuilt with a full `msvc8::sort`, never incrementally
+         * always rebuilt with a full `fa::sort`, never incrementally
          * pushed. Same citation-only pattern as `0x0089C350` above.)
          * Address: 0x00760590 (FUN_00760590, the 8-byte `DumpUnitsCountEntry`
          * instantiation -- sift-down half only, called recursively from the
@@ -432,10 +425,10 @@ namespace msvc8
          * Address: 0x00734350 (FUN_00734350 -- `_Adjust_heap` (sift-down half, hands the hole to the `_Push_heap` at 0x00734460) for the 8-byte `PlatoonUnitSearchEntry` instantiation of `cfunc_CPlatoonFormPlatoonL`'s nearby-unit sort (CPlatoon.cpp), `comiss` on `+4`; callers 0x007341C0, 0x00734210; formerly `SiftDownPlatoonPriorityEntryAndReinsert` in moho/sim/CPlatoon.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x00734460 (FUN_00734460 -- `_Push_heap` (settle-upward) for that `PlatoonUnitSearchEntry` instantiation; callers 0x00734350; formerly `InsertPlatoonPriorityEntryByPromotingParents` in moho/sim/CPlatoon.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x007CEDB0 (FUN_007CEDB0 -- `_Push_heap` (settle-upward) for the 24-byte `(priority, LuaObject)` element; callers 0x007CE9D0; formerly `InsertLuaHeapPairRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0092D760 (FUN_0092D760 -- `_Adjust_heap` for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092D89F, 0x0092E1C0, 0x0092E2A0; formerly `SiftDownAndInsertU16HeapTail` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x005F05E0 (FUN_005F05E0 -- `push_heap`'s sift-up half of `adjust_heap` for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005F0330; formerly `InsertAttachPointIntoMaxHeapWindow` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x005F0330 (FUN_005F0330 -- `adjust_heap`'s sift-down half for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005EFAD0, 0x005F0810; formerly `SiftDownAttachPointHeapAndInsert` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0092CB10 (FUN_0092CB10 -- `_Push_heap` (settle-upward: `(hole - 1) / 2` parents while `top < hole && first[parent] < value`, unsigned 16-bit compare `cmp dx, di; jae`) for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092D760 (`_Adjust_heap`); formerly `PushUInt16HeapEntryUpRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+         * Address: 0x0092D760 (FUN_0092D760 -- `_Adjust_heap` for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092D89F, 0x0092E1C0, 0x0092E2A0; formerly `SiftDownAndInsertU16HeapTail` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005F05E0 (FUN_005F05E0 -- `push_heap`'s sift-up half of `adjust_heap` for `fa::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005F0330; formerly `InsertAttachPointIntoMaxHeapWindow` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005F0330 (FUN_005F0330 -- `adjust_heap`'s sift-down half for `fa::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005EFAD0, 0x005F0810; formerly `SiftDownAttachPointHeapAndInsert` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092CB10 (FUN_0092CB10 -- `_Push_heap` (settle-upward: `(hole - 1) / 2` parents while `top < hole && first[parent] < value`, unsigned 16-bit compare `cmp dx, di; jae`) for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092D760 (`_Adjust_heap`); formerly `PushUInt16HeapEntryUpRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
          */
         void adjust_heap(T* const first, std::ptrdiff_t hole, const std::ptrdiff_t count, T value, Compare comp)
         {
@@ -471,7 +464,7 @@ namespace msvc8
          */
         /**
          * Address: 0x0087E5B0 (FUN_0087E5B0, the `UserEntity*` instantiation
-         * driving the fused sift at 0x0087E850; called from the `msvc8::sort`
+         * driving the fused sift at 0x0087E850; called from the `fa::sort`
          * heapsort fallback for `CDecalManager::EntitiesInView`/`PropsInView`.)
          */
         /**
@@ -480,8 +473,7 @@ namespace msvc8
          * count, first[hole], comp)`, matching this member's loop exactly
          * (drives the sift-down half at `FUN_008DAF60`, cited above).
          * Reached from `_Sort`'s (`FUN_008DD790`, cited below) ideal-budget-
-         * exhausted heapsort fallback. Was mis-tagged `external_dependency`;
-         * corrected to skip/cited-here.)
+         * exhausted heapsort fallback.)
          */
         /**
          * Address: 0x00574A30 (FUN_00574A30 -- `make_heap` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp).)
@@ -489,12 +481,12 @@ namespace msvc8
          */
         template <class T, class Compare>
         /**
-         * Address: 0x0092E1C0 (FUN_0092E1C0 -- `_Make_heap` for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092E850, 0x0092F4E0; formerly `BuildU16MaxHeapFromRange` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0092E850 (FUN_0092E850 -- `_Make_heap`'s two-element guard for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable; formerly `BuildU16HeapIfWideEnough` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0071F990 (FUN_0071F990 -- `_Make_heap` for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; callers 0x0071E200, 0x0071F280; formerly `BuildFloat4MinHeapRangeFromMiddle` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0071F280 (FUN_0071F280 -- `_Make_heap`'s two-element guard for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; zero callers, unreachable; formerly `BuildFloat4HeapIfRangeHasMultipleElements` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x005EFAD0 (FUN_005EFAD0 -- `make_heap` for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005ED680, 0x005EED50; formerly `BuildAttachPointMaxHeap` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x005EED50 (FUN_005EED50 -- the size-guarded form of `make_heap` for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); zero callers, unreachable; formerly `BuildAttachPointMaxHeapIfMultiElement` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092E1C0 (FUN_0092E1C0 -- `_Make_heap` for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092E850, 0x0092F4E0; formerly `BuildU16MaxHeapFromRange` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092E850 (FUN_0092E850 -- `_Make_heap`'s two-element guard for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable; formerly `BuildU16HeapIfWideEnough` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0071F990 (FUN_0071F990 -- `_Make_heap` for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort` over the collected samples; callers 0x0071E200, 0x0071F280; formerly `BuildFloat4MinHeapRangeFromMiddle` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0071F280 (FUN_0071F280 -- `_Make_heap`'s two-element guard for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort` over the collected samples; zero callers, unreachable; formerly `BuildFloat4HeapIfRangeHasMultipleElements` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005EFAD0 (FUN_005EFAD0 -- `make_heap` for `fa::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005ED680, 0x005EED50; formerly `BuildAttachPointMaxHeap` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005EED50 (FUN_005EED50 -- the size-guarded form of `make_heap` for `fa::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); zero callers, unreachable; formerly `BuildAttachPointMaxHeapIfMultiElement` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00629D80 (FUN_00629D80 -- `_Make_heap` for the `moho::SPickUpInfo` (0x0C) instantiation of `CUnitLoadUnits::DoTask`'s pickup-queue sort (CUnitLoadUnits.cpp), `_Adjust_heap(first, hole, count, T(first[hole]))` per hole; called from `_Sort` 0x00628740 behind its inlined `2 <= count` guard.)
          * Address: 0x0084BB20 (FUN_0084BB20 -- `_Make_heap` for the 0x0C `DockCandidate` by-ascending-`distSq` instantiation of `cfunc_IssueDockCommandL`'s sort (CCommandLuaFunctionRegistrations.cpp); callers 0x0084A890.)
          * Address: 0x0084BD10 (FUN_0084BD10 -- `_Make_heap` for the second `DockCandidate` instantiation (descending `freeCapacity`, then ascending `distSq`); callers 0x0084A9D0.)
@@ -547,8 +539,7 @@ namespace msvc8
          * member's loop exactly (drives the settle-upward half at
          * `FUN_008DB080`, cited above). Reached from `_Sort`'s
          * (`FUN_008DD790`, cited below) heapsort fallback, right after
-         * `make_heap`'s `FUN_008DB2A0`. Was mis-tagged `external_dependency`;
-         * corrected to skip/cited-here.)
+         * `make_heap`'s `FUN_008DB2A0`.)
          */
         /**
          * Address: 0x00574B40 (FUN_00574B40 -- `sort_heap` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp).)
@@ -565,19 +556,19 @@ namespace msvc8
          * Address: 0x00734210 (FUN_00734210 -- `_Sort_heap` for an 8-byte `(id, key)` element; callers 0x00733B40, 0x00733F50; formerly `HeapSortElement8RangeTailPassRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00733F50 (FUN_00733F50 -- `_Sort_heap` for an 8-byte `(id, key)` element; zero callers, unreachable; formerly `HeapSortElement8RangeTailPassRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007608A0 (FUN_007608A0 -- `_Pop_heap` for an 8-byte `(id, key)` element; zero callers, unreachable; formerly `PopElement8TailIntoRootAndSiftRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0092EC40 (FUN_0092EC40 -- `_Sort_heap` for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092EEE0, 0x0092F4E0; formerly `HeapSortU16Range` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0092EEE0 (FUN_0092EEE0 -- the `jmp` thunk into `_Sort_heap` for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable; formerly `HeapSortU16RangeThunk` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0092E2A0 (FUN_0092E2A0 -- `_Pop_heap` for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable; formerly `ReplaceU16HeapRootWithTailAndSift` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0092E8E0 (FUN_0092E8E0 -- `_Pop_heap`'s two-element guard for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable; formerly `ReplaceU16HeapRootIfWideEnough` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x007200D0 (FUN_007200D0 -- `_Pop_heap`'s two-element guard for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; zero callers, unreachable; formerly `PopFloat4HeapRootIfRangeHasMultipleElements` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x00720470 (FUN_00720470 -- `_Pop_heap` for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; zero callers, unreachable; formerly `CopyRootAndSiftFloat4HeapWithReplacement` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0071FA00 (FUN_0071FA00 -- `_Sort_heap` for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; callers 0x0071E200, 0x0071F2B0; formerly `PopFloat4MinHeapToTailUntilSingle` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x007202E0 (FUN_007202E0 -- `_Pop_heap` (one root-to-tail step) for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; callers 0x007200D0 (unreached); formerly `PopFloat4MinHeapRootSingleStepWithFinalize` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0071F2B0 (FUN_0071F2B0 -- a register-shape entry into `_Sort_heap` for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; zero callers, unreachable; formerly `PopFloat4HeapToTailAdapter` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x005F0810 (FUN_005F0810 -- `pop_heap` -- swap the root to the tail, then sift down for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005EFB50, 0x005F0460, 0x005F0680; formerly `PopAttachPointHeapRootAndInsert` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x005F0680 (FUN_005F0680 -- the adapter over that pop for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); zero callers, unreachable; formerly `PopAttachPointHeapRootIntoTailSlotAdapter` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x005EFB50 (FUN_005EFB50 -- `sort_heap` -- pop until the range is ordered for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005ED680, 0x005EED90; formerly `PopAttachPointHeapRootsIntoSortedTail` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x005EED90 (FUN_005EED90 -- the one-jump thunk into that `sort_heap` for `msvc8::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); zero callers, unreachable; formerly `PopAttachPointHeapRootsIntoSortedTailThunk` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092EC40 (FUN_0092EC40 -- `_Sort_heap` for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092EEE0, 0x0092F4E0; formerly `HeapSortU16Range` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092EEE0 (FUN_0092EEE0 -- the `jmp` thunk into `_Sort_heap` for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable; formerly `HeapSortU16RangeThunk` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092E2A0 (FUN_0092E2A0 -- `_Pop_heap` for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable; formerly `ReplaceU16HeapRootWithTailAndSift` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092E8E0 (FUN_0092E8E0 -- `_Pop_heap`'s two-element guard for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable; formerly `ReplaceU16HeapRootIfWideEnough` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007200D0 (FUN_007200D0 -- `_Pop_heap`'s two-element guard for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort` over the collected samples; zero callers, unreachable; formerly `PopFloat4HeapRootIfRangeHasMultipleElements` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00720470 (FUN_00720470 -- `_Pop_heap` for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort` over the collected samples; zero callers, unreachable; formerly `CopyRootAndSiftFloat4HeapWithReplacement` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0071FA00 (FUN_0071FA00 -- `_Sort_heap` for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort` over the collected samples; callers 0x0071E200, 0x0071F2B0; formerly `PopFloat4MinHeapToTailUntilSingle` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007202E0 (FUN_007202E0 -- `_Pop_heap` (one root-to-tail step) for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort` over the collected samples; callers 0x007200D0 (unreached); formerly `PopFloat4MinHeapRootSingleStepWithFinalize` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0071F2B0 (FUN_0071F2B0 -- a register-shape entry into `_Sort_heap` for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort` over the collected samples; zero callers, unreachable; formerly `PopFloat4HeapToTailAdapter` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005F0810 (FUN_005F0810 -- `pop_heap` -- swap the root to the tail, then sift down for `fa::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005EFB50, 0x005F0460, 0x005F0680; formerly `PopAttachPointHeapRootAndInsert` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005F0680 (FUN_005F0680 -- the adapter over that pop for `fa::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); zero callers, unreachable; formerly `PopAttachPointHeapRootIntoTailSlotAdapter` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005EFB50 (FUN_005EFB50 -- `sort_heap` -- pop until the range is ordered for `fa::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers 0x005ED680, 0x005EED90; formerly `PopAttachPointHeapRootsIntoSortedTail` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005EED90 (FUN_005EED90 -- the one-jump thunk into that `sort_heap` for `fa::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); zero callers, unreachable; formerly `PopAttachPointHeapRootsIntoSortedTailThunk` in moho/ai/CAiTransportImpl.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00629E00 (FUN_00629E00 -- `_Sort_heap` for the `moho::SPickUpInfo` (0x0C) instantiation of `CUnitLoadUnits::DoTask`'s pickup-queue sort (CUnitLoadUnits.cpp), one `_Pop_heap` (0x0062A7F0) per shrinking tail; callers 0x00628740.)
          * Address: 0x0062A7F0 (FUN_0062A7F0 -- `_Pop_heap` for that `SPickUpInfo` instantiation: `*dest = *first` through the element `operator=` (0x00628FD0), then `_Adjust_heap(first, 0, count, val)` (0x0062A1A0) -- the three-line pop step in the loop below; callers 0x00629E00.)
          * Address: 0x0084BB90 (FUN_0084BB90 -- `_Sort_heap` for the 0x0C `DockCandidate` by-ascending-`distSq` instantiation of `cfunc_IssueDockCommandL`'s sort (CCommandLuaFunctionRegistrations.cpp), pop step inlined over the `_Adjust_heap` at 0x0084BF30; callers 0x0084A890.)
@@ -641,8 +632,8 @@ namespace msvc8
          */
         template <class T, class Compare>
         /**
-         * Address: 0x0092E6E0 (FUN_0092E6E0 -- `_Unguarded_partition` (the three-way split returning both equal-band boundaries) for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092F4E0; formerly `PartitionU16RangeWithEqualBands` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0071EFA0 (FUN_0071EFA0 -- `_Unguarded_partition` (the three-way split returning both equal-band boundaries) for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; callers 0x0071E200; formerly `PartitionFloat4LaneRangeAroundPivot` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092E6E0 (FUN_0092E6E0 -- `_Unguarded_partition` (the three-way split returning both equal-band boundaries) for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092F4E0; formerly `PartitionU16RangeWithEqualBands` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0071EFA0 (FUN_0071EFA0 -- `_Unguarded_partition` (the three-way split returning both equal-band boundaries) for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort` over the collected samples; callers 0x0071E200; formerly `PartitionFloat4LaneRangeAroundPivot` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x006292F0 (FUN_006292F0 -- `_Unguarded_partition` for the `moho::SPickUpInfo` (0x0C) instantiation of `CUnitLoadUnits::DoTask`'s pickup-queue sort (CUnitLoadUnits.cpp): `_Median(first, mid, last - 1)` (0x00629C90), both equal-run widening loops and both scan loops comparing against the in-place `*_Pfirst` through the by-value predicate 0x006248D0, swaps through 0x0062A130; returns the pair through a hidden pointer; callers 0x00628740.)
          * Address: 0x0084B0F0 (FUN_0084B0F0 -- `_Unguarded_partition` for the 0x0C `DockCandidate` by-ascending-`distSq` instantiation of `cfunc_IssueDockCommandL`'s sort (CCommandLuaFunctionRegistrations.cpp), predicate inlined as `comiss` on `+4`, raw three-dword swaps; callers 0x0084A890.)
          * Address: 0x0084B470 (FUN_0084B470 -- `_Unguarded_partition` for the second `DockCandidate` instantiation, predicate inlined as signed `setg` on `+8` (`freeCapacity`, descending) with a `comiss` `+4` (`distSq`, ascending) tie-break; callers 0x0084A9D0.)
@@ -772,8 +763,8 @@ namespace msvc8
          */
         template <class T, class Compare>
         /**
-         * Address: 0x0092F4E0 (FUN_0092F4E0 -- `_Sort` -- the introsort driver: partition while the budget lasts, `_Insertion_sort` under 32 elements, `_Make_heap` + `_Sort_heap` when the budget runs out -- for the `unsigned short` instantiation of `msvc8::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092FC41, 0x0092FE30, 0x009550E0; formerly `IntroSortU16RangeWithBudget` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0071E200 (FUN_0071E200 -- `_Sort` -- the introsort driver for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; callers 0x007171D0, 0x0071CA80; formerly `SortFloat4LaneRangeDispatcher` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0092F4E0 (FUN_0092F4E0 -- `_Sort` -- the introsort driver: partition while the budget lasts, `_Insertion_sort` under 32 elements, `_Make_heap` + `_Sort_heap` when the budget runs out -- for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092FC41, 0x0092FE30, 0x009550E0; formerly `IntroSortU16RangeWithBudget` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0071E200 (FUN_0071E200 -- `_Sort` -- the introsort driver for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort` over the collected samples; callers 0x007171D0, 0x0071CA80; formerly `SortFloat4LaneRangeDispatcher` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00628740 (FUN_00628740 -- `_Sort` driver for the `moho::SPickUpInfo` (0x0C, `0x2AAAAAAB` divide-by-12 count) instantiation of `CUnitLoadUnits::DoTask`'s pickup-queue sort (CUnitLoadUnits.cpp): `32 < count && 0 < ideal` loop over `_Unguarded_partition` 0x006292F0, `ideal = ideal/2 + ideal/2/2`, recurses into the smaller half, `_Insertion_sort` 0x00629750 at `1 < count`, `_Make_heap` 0x00629D80 + `_Sort_heap` 0x00629E00 once the budget is spent; predicate is an empty function object whose `operator()` is 0x006248D0; callers 0x00625110 (`DoTask`, `ideal = count`), 0x00627FD0.)
          * Address: 0x0084A890 (FUN_0084A890 -- `_Sort` driver for the 0x0C `DockCandidate` `{UserUnit*, float distSq, int32 freeCapacity}` instantiation of `cfunc_IssueDockCommandL`'s sort by ascending `distSq` (CCommandLuaFunctionRegistrations.cpp); same shape as 0x00628740 over 0x0084B0F0 / 0x0084B3F0 / 0x0084BB20 + 0x0084BB90; callers 0x00840A70 (`ideal = count`), 0x0084A2E0.)
          * Address: 0x0084A9D0 (FUN_0084A9D0 -- `_Sort` driver for the second `DockCandidate` instantiation of `cfunc_IssueDockCommandL`, the nearby-platform sort by descending `freeCapacity` then ascending `distSq`; same shape over 0x0084B470 / 0x0084B7E0 / 0x0084BD10 + 0x0084BD80; callers 0x00840A70 (`ideal = count`), 0x0084A320.)
@@ -818,7 +809,7 @@ namespace msvc8
      *
      * For the `gpg::RField` instantiation, this entry point is also inlined
      * into its caller, `gpg::RType::Finish()` (Reflection.cpp), which calls
-     * `msvc8::sort(first, last, comp)` directly on `fields_`. The whole
+     * `fa::sort(first, last, comp)` directly on `fields_`. The whole
      * nine-body instantiation (`_Sort`/`_Unguarded_partition`/`_Median`/
      * `_Med3`/`iter_swap`/`_Insertion_sort`/`make_heap`/`sort_heap`/
      * `_Adjust_heap` x2) is catalogued on the members above.
@@ -834,7 +825,7 @@ namespace msvc8
      * Address: 0x0071FEE0 (FUN_0071FEE0 -- `_Med3` for a float[4] element ordered by lane 3 descending; callers 0x0071F870; formerly `SortThreeFloat4ByLane3DescendingRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x00760690 (FUN_00760690 -- `_Med3` for an `(id, score)` element ordered by score descending; callers 0x007604A0; formerly `SortThreeDwordPairsByScoreDescendingRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x007604A0 (FUN_007604A0 -- `_Median` (the ninther pivot pick) for an `(id, score)` element ordered by score descending; callers 0x007600A0; formerly `SelectDwordPairScoreDescendingNintherPivotRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0071CA80 (FUN_0071CA80 -- `std::sort(first, last, comp)`'s entry (`_Sort(first, last, last - first, comp)`) for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `msvc8::sort` over the collected samples; zero callers, unreachable; formerly `SortFloat4LaneRangeDispatcherWithSpanBudget` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0071CA80 (FUN_0071CA80 -- `std::sort(first, last, comp)`'s entry (`_Sort(first, last, last - first, comp)`) for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort` over the collected samples; zero callers, unreachable; formerly `SortFloat4LaneRangeDispatcherWithSpanBudget` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x00627FD0 (FUN_00627FD0 -- `std::sort` entry (`_Sort(first, last, (last - first) / 12, comp)` into 0x00628740) for the `moho::SPickUpInfo` instantiation of `CUnitLoadUnits::DoTask`'s pickup-queue sort (CUnitLoadUnits.cpp); zero callers, unreachable: `DoTask` inlines this entry and calls the driver directly.)
      * Address: 0x0084A2E0 (FUN_0084A2E0 -- `std::sort` entry into 0x0084A890 for the `DockCandidate` by-`distSq` instantiation of `cfunc_IssueDockCommandL`'s sort (CCommandLuaFunctionRegistrations.cpp); zero callers, unreachable: the caller inlines it.)
      * Address: 0x0084A320 (FUN_0084A320 -- `std::sort` entry into 0x0084A9D0 for the second `DockCandidate` instantiation (descending `freeCapacity`, then ascending `distSq`); zero callers, unreachable: the caller inlines it.)
@@ -843,4 +834,4 @@ namespace msvc8
     {
         detail::sort_impl(first, last, last - first, comp);
     }
-} // namespace msvc8
+} // namespace fa

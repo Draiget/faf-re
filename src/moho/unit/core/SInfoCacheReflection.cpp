@@ -12,6 +12,8 @@
 #include "moho/ai/IFormationInstance.h"
 #include "moho/math/Vector3f.h"
 #include "moho/misc/WeakPtr.h"
+#include "moho/sim/SimArchiveMode.h"
+#include "moho/sim/SimKeyframe.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -47,21 +49,6 @@ namespace
       cached = CachedRType(typeid(TObject));
     }
     return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedIFormationInstanceType()
-  {
-    return CachedRType<moho::IFormationInstance>();
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrIUnitType()
-  {
-    return CachedRType<moho::WeakPtr<moho::IUnit>>();
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    return CachedRType<moho::Vector3f>();
   }
 
   template <class TObject>
@@ -123,7 +110,7 @@ namespace
 
     const char* const expected = expectedType ? expectedType->GetName() : "null";
     const char* const actual = tracked.type ? tracked.type->GetName() : "null";
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
       expected,
       actual
@@ -141,16 +128,6 @@ namespace
   {
     const gpg::RRef objectRef = MakeTrackedRef(object);
     gpg::WriteRawPointer(archive, objectRef, state, ownerRef);
-  }
-
-  [[nodiscard]] moho::SInfoCache* AsSInfoCacheView(std::intptr_t objectPtr) noexcept
-  {
-    return reinterpret_cast<moho::SInfoCache*>(objectPtr);
-  }
-
-  [[nodiscard]] const moho::SInfoCache* AsConstSInfoCacheView(std::intptr_t objectPtr) noexcept
-  {
-    return reinterpret_cast<const moho::SInfoCache*>(objectPtr);
   }
 
   /**
@@ -191,8 +168,8 @@ namespace moho
    */
   SInfoCacheTypeInfo::~SInfoCacheTypeInfo()
   {
-    fields_ = msvc8::vector<gpg::RField>{};
-    bases_ = msvc8::vector<gpg::RField>{};
+    fields_ = fa::vector<gpg::RField>{};
+    bases_ = fa::vector<gpg::RField>{};
   }
 
   /**
@@ -228,15 +205,22 @@ namespace moho
       return;
     }
 
-    mFormationLayer =
-      reinterpret_cast<moho::CFormationInstance*>(ReadTrackedPointer<moho::IFormationInstance>(archive, ownerRef));
+    // Engine addition (replay keyframes): see MemberSerialize.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      std::uint64_t saved = 0;
+      archive->ReadUInt64(&saved);
+      SIM_NoteKeyframeFormationPointer(reinterpret_cast<void**>(&mFormationLayer), saved);
+    } else {
+      mFormationLayer =
+        reinterpret_cast<moho::CFormationInstance*>(ReadTrackedPointer<moho::IFormationInstance>(archive, ownerRef));
+    }
 
-    archive->Read(CachedWeakPtrIUnitType(), &mFormationLeadRef, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::IUnit>>(), &mFormationLeadRef, ownerRef);
     archive->ReadInt(&mFormationPriorityOrder);
     archive->ReadBool(&mHasFormationSpeedData);
     archive->ReadFloat(&mFormationTopSpeed);
     archive->ReadFloat(&mFormationDistanceMetric);
-    archive->Read(CachedVector3fType(), &mFormationHeadingHint, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::Vector3f>(), &mFormationHeadingHint, ownerRef);
   }
 
   /**
@@ -253,19 +237,26 @@ namespace moho
       return;
     }
 
-    WriteTrackedPointer(
-      archive,
-      reinterpret_cast<const moho::IFormationInstance*>(mFormationLayer),
-      gpg::TrackedPointerState::Unowned,
-      ownerRef
-    );
+    // Engine addition (replay keyframes): this cache can name a formation that was freed, whose block
+    // may be free or hold a projectile or pose array by now (SimBlockLane), so there may be no formation
+    // to follow. Only the address counts: a new formation on that block compares equal.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->WriteUInt64(reinterpret_cast<std::uintptr_t>(mFormationLayer));
+    } else {
+      WriteTrackedPointer(
+        archive,
+        reinterpret_cast<const moho::IFormationInstance*>(mFormationLayer),
+        gpg::TrackedPointerState::Unowned,
+        ownerRef
+      );
+    }
 
-    archive->Write(CachedWeakPtrIUnitType(), &mFormationLeadRef, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::IUnit>>(), &mFormationLeadRef, ownerRef);
     archive->WriteInt(mFormationPriorityOrder);
     archive->WriteBool(mHasFormationSpeedData);
     archive->WriteFloat(mFormationTopSpeed);
     archive->WriteFloat(mFormationDistanceMetric);
-    archive->Write(CachedVector3fType(), &mFormationHeadingHint, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::Vector3f>(), &mFormationHeadingHint, ownerRef);
   }
 } // namespace moho
 

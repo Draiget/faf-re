@@ -18,27 +18,12 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedSimType()
-  {
-    if (!moho::Sim::sType) {
-      moho::Sim::sType = gpg::LookupRType(typeid(moho::Sim));
-    }
-    return moho::Sim::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedIAiReconDBType()
-  {
-    if (!moho::IAiReconDB::sType) {
-      moho::IAiReconDB::sType = gpg::LookupRType(typeid(moho::IAiReconDB));
-    }
-    return moho::IAiReconDB::sType;
-  }
 
   [[noreturn]] void ThrowPointerTypeMismatch(gpg::RType* const expectedType, const gpg::RRef& source)
   {
     const char* const expected = expectedType ? expectedType->GetName() : "null";
     const char* const actual = source.mType ? source.mType->GetName() : "null";
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected,
@@ -47,7 +32,7 @@ namespace
     throw std::runtime_error(message.c_str());
   }
 
-  template <class TPointer> [[nodiscard]] gpg::RRef MakeDerivedRef(TPointer* const object, gpg::RType* expectedType)
+  template <class TPointer> [[nodiscard]] gpg::RRef MakeIntelHandleRef(TPointer* const object, gpg::RType* expectedType)
   {
     gpg::RRef out{};
     out.mObj = object;
@@ -225,8 +210,8 @@ CIntelCounterHandle::CIntelCounterHandle(
     }
 
     const gpg::RRef ownerRef{};
-    mSim = ReadTypedPointer<Sim>(archive, CachedSimType(), ownerRef);
-    mReconDB = ReadTypedPointer<IAiReconDB>(archive, CachedIAiReconDBType(), ownerRef);
+    mSim = ReadTypedPointer<Sim>(archive, gpg::RTypeOf<moho::Sim>(), ownerRef);
+    mReconDB = ReadTypedPointer<IAiReconDB>(archive, gpg::RTypeOf<moho::IAiReconDB>(), ownerRef);
 
     int counterType = static_cast<int>(INTELCOUNTER_None);
     archive->ReadInt(&counterType);
@@ -273,10 +258,10 @@ CIntelCounterHandle::CIntelCounterHandle(
 
     const gpg::RRef ownerRef{};
 
-    const gpg::RRef simRef = MakeDerivedRef(mSim, CachedSimType());
+    const gpg::RRef simRef = MakeIntelHandleRef(mSim, gpg::RTypeOf<moho::Sim>());
     gpg::WriteRawPointer(archive, simRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    const gpg::RRef reconDbRef = MakeDerivedRef(mReconDB, CachedIAiReconDBType());
+    const gpg::RRef reconDbRef = MakeIntelHandleRef(mReconDB, gpg::RTypeOf<moho::IAiReconDB>());
     gpg::WriteRawPointer(archive, reconDbRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     archive->WriteInt(static_cast<int>(mType));
@@ -370,7 +355,7 @@ CIntelCounterHandle::CIntelCounterHandle(
    */
   void CIntelCounterHandle::Destroy(const int shouldDelete)
   {
-    this->~CIntelCounterHandle();
+    this->CIntelCounterHandle::~CIntelCounterHandle();
     if ((shouldDelete & 1) != 0) {
       ::operator delete(this);
     }

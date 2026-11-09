@@ -45,6 +45,8 @@ namespace moho
    */
   ShaderVar shaderVarPrimBatcherAlphaMultiplier;
 
+  ShaderVar shaderVarPrimBatcherMsdfPixelRange;
+
   /**
    * Address: 0x00C07480 (FUN_00C07480, dynamic atexit destructor for `shaderVarPrimBatcherTime`)
    *
@@ -119,6 +121,7 @@ namespace
       moho::register_ShaderVarPrimBatcherTexture1();
       moho::register_ShaderVarPrimBatcherAlphaMultiplier();
       moho::register_ShaderVarPrimBatcherTime();
+      moho::register_ShaderVarPrimBatcherMsdfPixelRange();
     }
   };
 
@@ -399,6 +402,11 @@ namespace moho
   void register_ShaderVarPrimBatcherTime()
   {
     RegisterShaderVar("time", &shaderVarPrimBatcherTime, "primbatcher");
+  }
+
+  void register_ShaderVarPrimBatcherMsdfPixelRange()
+  {
+    RegisterShaderVar("MsdfPixelRange", &shaderVarPrimBatcherMsdfPixelRange, "primbatcher");
   }
 
   /**

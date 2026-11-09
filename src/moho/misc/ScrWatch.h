@@ -21,12 +21,12 @@ namespace moho
     /**
      * Address: 0x004D6B30 (FUN_004D6B30, Moho::ScrWatch::ScrWatch)
      *
-     * msvc8::string const &,LuaPlus::LuaObject const &
+     * fa::string const &,LuaPlus::LuaObject const &
      *
      * What it does:
      * Initializes one watch entry from display-name text and Lua value object.
      */
-    ScrWatch(const msvc8::string& watchName, const LuaPlus::LuaObject& valueObject);
+    ScrWatch(const fa::string& watchName, const LuaPlus::LuaObject& valueObject);
 
     /**
      * Address: 0x004BA710 (FUN_004BA710, Moho::ScrWatch::operator=)
@@ -50,7 +50,7 @@ namespace moho
      * What it does:
      * Returns one printable Lua type-name lane for this watch value object.
      */
-    [[nodiscard]] msvc8::string GetType() const;
+    [[nodiscard]] fa::string GetType() const;
 
     /**
      * Address: 0x004D6C30 (FUN_004D6C30, Moho::ScrWatch::GetValue)
@@ -58,10 +58,10 @@ namespace moho
      * What it does:
      * Formats one printable Lua value lane for this watch entry.
      */
-    [[nodiscard]] msvc8::string GetValue() const;
+    [[nodiscard]] fa::string GetValue() const;
 
   public:
-    msvc8::string name; // +0x04
+    fa::string name; // +0x04
     LuaPlus::LuaObject obj; // +0x20
   };
 

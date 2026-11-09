@@ -1,0 +1,60 @@
+name: 3p-peer-features-matrix-adapter
+description: >
+  Issue #285's compatibility check through FAF's Java adapter: the same three
+  games as 3p-peer-features-matrix (shipped game, our x86, our x64, the
+  announcement on for ours), each behind a shipped faf-ice-adapter.jar started
+  and driven as the FAF client does. The announcement rides inside the
+  adapter's game datagrams like any game message (#243). FAF_ADAPTER_DIR holds
+  a copy of the client's faf-ice-adapter.jar; FAF_TEST_BIND: see
+  2p-contract-bridge.yaml. Run with -advertise set to that address. Do not
+  click into the game windows. On 2026-11-07 the client's own jar never
+  connected one of the three links on the isolated test account, also in a
+  game of three shipped exes; a 3.3.15 jar passed there.
+timeout: 15m
+
+mode: contract
+contract:
+  nativeDir: '%FAF_ADAPTER_DIR%'
+  adapter: jar
+  jarBind: '%FAF_TEST_BIND%'
+  exeArgs: [--bind-address, '%FAF_TEST_BIND%', --game-address, '%FAF_TEST_BIND%']
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+  saveReplays: true
+
+players:
+  - { uid: 1, name: Retail, faction: uef }
+  - { uid: 2, name: Ours86, faction: cybran, exe: '%ProgramData%\FAForever\bin\pf285_x86.exe', args: ['/con', 'net_PeerFeatures=1'] }
+  - { uid: 3, name: Ours64, faction: aeon, exe: '%ProgramData%\FAForever\bin_x64\pf285_x64.exe', args: ['/con', 'net_PeerFeatures=1'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 3m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  logsContain:
+    - { uids: [2], pattern: 'PEERS: client \d+:Ours64 announced features' }
+    - { uids: [3], pattern: 'PEERS: client \d+:Ours86 announced features' }
+    - { uids: [1], pattern: 'Ignoring message type 58' }
+    - { uids: [2], pattern: 'PEERS: client \d+:Ours64''s order stream reports are compared' }
+    - { uids: [3], pattern: 'PEERS: client \d+:Ours86''s order stream reports are compared' }
+  logsAbsent:
+    - { uids: [2, 3], pattern: 'PEERS: client \d+:Retail announced' }
+    - { uids: [2, 3], pattern: 'PEERS: everyone supports \S+: yes' }
+    - { uids: [2, 3], pattern: 'mismatched' }
+    - { uids: [2, 3], pattern: 'Retail''s order stream reports' }

@@ -26,21 +26,6 @@ namespace
     return sInstance;
   }
 
-  /**
-   * Address: 0x006831D0 (FUN_006831D0)
-   *
-   * What it does:
-   * Resolves and caches RTTI for the legacy `Moho::Motor` alias lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyMotorAliasType()
-  {
-    gpg::RType* type = moho::Motor::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::Motor));
-      moho::Motor::sType = type;
-    }
-    return type;
-  }
 } // namespace
 
 namespace moho

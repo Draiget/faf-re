@@ -128,14 +128,14 @@ namespace moho
      * Address: 0x008B2500 (FUN_008B2500)
      *
      * IDA signature:
-     * msvc8::vector<WeakPtr<UserUnit>> *__usercall sub_8B2500@<eax>(
-     *     Moho::UserArmy *this@<ecx>, msvc8::vector<WeakPtr<UserUnit>> *out@<esi>);
+     * fa::vector<WeakPtr<UserUnit>> *__usercall sub_8B2500@<eax>(
+     *     Moho::UserArmy *this@<ecx>, fa::vector<WeakPtr<UserUnit>> *out@<esi>);
      *
      * What it does:
      * Returns a copy of `mAvatars` (the vector copy constructor, 0x008B2640).
      * `cfunc_GetArmyAvatarsL` (0x008BCD48) walks the copy.
      */
-    [[nodiscard]] msvc8::vector<WeakPtr<UserUnit>> GetAvatars() const;
+    [[nodiscard]] fa::vector<WeakPtr<UserUnit>> GetAvatars() const;
 
     /**
      * Address: 0x008B2550 (FUN_008B2550)
@@ -190,7 +190,7 @@ namespace moho
 
     /// Quick-select avatars: units whose blueprint `QuickSelectPriority` is
     /// positive register here from `UserUnit::UserUnit` (FUN_008B2300).
-    msvc8::vector<WeakPtr<UserUnit>> mAvatars; // 0x1E8
+    fa::vector<WeakPtr<UserUnit>> mAvatars; // 0x1E8
 
     /// Idle-engineer registry, populated from `UserUnit::Tick` (FUN_008B2520)
     /// and read by `GetIdleEngineers` (FUN_008BCEF0).

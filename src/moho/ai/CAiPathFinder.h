@@ -18,7 +18,7 @@ namespace moho
   class Sim;
   class Unit;
 
-  using SRectList = msvc8::list<gpg::Rect2i>;
+  using SRectList = fa::list<gpg::Rect2i>;
 
   static_assert(sizeof(SRectList) == 0x0C, "SRectList size must be 0x0C");
 
@@ -86,6 +86,16 @@ namespace moho
    */
   struct SPathNeighborSerializer : gpg::SerSaveLoadHelper<SPathNeighbor>
   {};
+
+  /**
+   * Address: 0x005A9D60 (FUN_005A9D60)
+   *
+   * What it does:
+   * Computes the octile-distance core term `max(|a|,|b|) + min(|a|,|b|) *
+   * 0.41421354f` used by AI pathfinder heuristic lanes
+   * (`CAiPathFinder::GetHeuristicCost`).
+   */
+  [[nodiscard]] float ComputeOctileDistanceCore(float a, float b) noexcept;
 
   /**
    * Recovered request mode latch used by CAiPathFinder.

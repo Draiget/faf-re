@@ -1,4 +1,7 @@
 #include "Cluster.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "platform/Interlocked.h"
 #include "legacy/math/X87Math.h"
 
 #include <algorithm>
@@ -30,8 +33,10 @@ namespace
     struct SharedCountControl
     {
         void** vtable;
-        volatile long useCount;
-        volatile long weakCount;
+        // boost::detail::sp_counted_base's counts: Windows' 32-bit long, a 32-bit int in
+        // boost's gcc/x86 implementation on Linux (platform/Interlocked.h).
+        volatile platform::InterlockedLong useCount;
+        volatile platform::InterlockedLong weakCount;
     };
 
     void RetainSharedCount(void* sharedCount)
@@ -52,14 +57,11 @@ namespace
 
         auto* const control = reinterpret_cast<SharedCountControl*>(sharedCount);
         if (_InterlockedExchangeAdd(&control->useCount, -1) == 1) {
-            using ControlFn = void(__thiscall*)(SharedCountControl*);
-            auto* const disposeFn = reinterpret_cast<ControlFn>(control->vtable[1]);
-            disposeFn(control);
-
-            if (_InterlockedExchangeAdd(&control->weakCount, -1) == 1) {
-                auto* const destroyFn = reinterpret_cast<ControlFn>(control->vtable[2]);
-                destroyFn(control);
-            }
+            // By name, not by vtable slot: the virtual destructor before these takes one slot on
+            // Windows and two on Linux.
+            auto* const base = reinterpret_cast<boost::detail::sp_counted_base*>(sharedCount);
+            base->dispose();
+            base->weak_release();
             return true;
         }
 
@@ -320,7 +322,7 @@ namespace
      * What it does:
      * Initializes one inline byte-buffer cursor block and returns `state`.
      */
-    InlineByteCursorBuffer200* InitializeInlineByteCursorBuffer200(
+    [[maybe_unused]] InlineByteCursorBuffer200* InitializeInlineByteCursorBuffer200(
       InlineByteCursorBuffer200* const state
     ) noexcept
     {
@@ -338,7 +340,7 @@ namespace
      * What it does:
      * Returns the current cursor lane from one inline byte-buffer state.
      */
-    [[nodiscard]] std::uint8_t* InlineByteCursorCurrent(
+    [[maybe_unused]] [[nodiscard]] std::uint8_t* InlineByteCursorCurrent(
       const InlineByteCursorBuffer* const state
     ) noexcept
     {
@@ -351,7 +353,7 @@ namespace
      * What it does:
      * Returns used-byte count (`current - begin`) for one inline byte-buffer.
      */
-    [[nodiscard]] std::ptrdiff_t InlineByteCursorUsedBytes(
+    [[maybe_unused]] [[nodiscard]] std::ptrdiff_t InlineByteCursorUsedBytes(
       const InlineByteCursorBuffer* const state
     ) noexcept
     {
@@ -364,7 +366,7 @@ namespace
      * What it does:
      * Returns total capacity in bytes (`end - begin`) for one inline buffer.
      */
-    [[nodiscard]] std::ptrdiff_t InlineByteCursorCapacityBytes(
+    [[maybe_unused]] [[nodiscard]] std::ptrdiff_t InlineByteCursorCapacityBytes(
       const InlineByteCursorBuffer* const state
     ) noexcept
     {
@@ -377,7 +379,7 @@ namespace
      * What it does:
      * Returns `begin + byteOffset` for one inline byte-buffer.
      */
-    [[nodiscard]] std::uint8_t* InlineByteCursorAtOffset(
+    [[maybe_unused]] [[nodiscard]] std::uint8_t* InlineByteCursorAtOffset(
       const InlineByteCursorBuffer* const state,
       const std::ptrdiff_t byteOffset
     ) noexcept
@@ -445,7 +447,7 @@ namespace
      * What it does:
      * Unlinks `node` and inserts it immediately before `anchor`.
      */
-    IntrusiveRingNode* RelinkIntrusiveRingNodeBeforeAnchor(
+    [[maybe_unused]] IntrusiveRingNode* RelinkIntrusiveRingNodeBeforeAnchor(
       IntrusiveRingNode* const node,
       IntrusiveRingNode* const anchor
     ) noexcept
@@ -465,7 +467,7 @@ namespace
      * What it does:
      * Alias lane that unlinks one intrusive ring node and re-self-links it.
      */
-    IntrusiveRingNode* UnlinkIntrusiveRingNode_B(
+    [[maybe_unused]] IntrusiveRingNode* UnlinkIntrusiveRingNode_B(
       IntrusiveRingNode* const node
     ) noexcept
     {
@@ -478,7 +480,7 @@ namespace
      * What it does:
      * Alias lane that initializes one intrusive ring node as self-linked.
      */
-    IntrusiveRingNode* InitializeIntrusiveRingNode_B(
+    [[maybe_unused]] IntrusiveRingNode* InitializeIntrusiveRingNode_B(
       IntrusiveRingNode* const node
     ) noexcept
     {
@@ -491,7 +493,7 @@ namespace
      * What it does:
      * Returns one intrusive node `next` link lane.
      */
-    [[nodiscard]] IntrusiveRingNode* GetIntrusiveRingNodeNext(
+    [[maybe_unused]] [[nodiscard]] IntrusiveRingNode* GetIntrusiveRingNodeNext(
       const IntrusiveRingNode* const node
     ) noexcept
     {
@@ -523,7 +525,7 @@ namespace
      * What it does:
      * Alias lane that unlinks one intrusive ring node and re-self-links it.
      */
-    IntrusiveRingNode* UnlinkIntrusiveRingNode_C(
+    [[maybe_unused]] IntrusiveRingNode* UnlinkIntrusiveRingNode_C(
       IntrusiveRingNode* const node
     ) noexcept
     {
@@ -536,7 +538,7 @@ namespace
      * What it does:
      * Copies one `(4 dword + 1 word)` lane bundle and binds one external tail lane.
      */
-    FourDwordWordAndTail* CopyFourDwordWordBundleWithTailLane(
+    [[maybe_unused]] FourDwordWordAndTail* CopyFourDwordWordBundleWithTailLane(
       FourDwordWordAndTail* const destination,
       const FourDwordWord* const sourceBundle,
       const std::uint32_t* const tailLaneSource
@@ -557,7 +559,7 @@ namespace
      * What it does:
      * Copies one 32-bit lane into destination storage.
      */
-    std::uint32_t* CopyDwordLane_A(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
+    [[maybe_unused]] std::uint32_t* CopyDwordLane_A(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -569,7 +571,7 @@ namespace
      * What it does:
      * Copies one 8-bit lane into destination storage.
      */
-    std::uint8_t* CopyByteLane_A(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
+    [[maybe_unused]] std::uint8_t* CopyByteLane_A(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -581,7 +583,7 @@ namespace
      * What it does:
      * Alias lane that copies one 32-bit value.
      */
-    std::uint32_t* CopyDwordLane_B(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
+    [[maybe_unused]] std::uint32_t* CopyDwordLane_B(std::uint32_t* const destination, const std::uint32_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -593,7 +595,7 @@ namespace
      * What it does:
      * Alias lane that copies one 8-bit value.
      */
-    std::uint8_t* CopyByteLane_B(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
+    [[maybe_unused]] std::uint8_t* CopyByteLane_B(std::uint8_t* const destination, const std::uint8_t* const source) noexcept
     {
       *destination = *source;
       return destination;
@@ -605,7 +607,7 @@ namespace
      * What it does:
      * Writes one `(dword, byte)` lane pair into destination storage.
      */
-    DwordAndByteLanes* WriteDwordAndByteLanes_A(
+    [[maybe_unused]] DwordAndByteLanes* WriteDwordAndByteLanes_A(
       DwordAndByteLanes* const destination,
       const std::uint32_t* const dwordLaneSource,
       const std::uint8_t* const byteLaneSource
@@ -622,7 +624,7 @@ namespace
      * What it does:
      * Alias lane that writes one `(dword, byte)` pair.
      */
-    DwordAndByteLanes* WriteDwordAndByteLanes_B(
+    [[maybe_unused]] DwordAndByteLanes* WriteDwordAndByteLanes_B(
       DwordAndByteLanes* const destination,
       const std::uint32_t* const dwordLaneSource,
       const std::uint8_t* const byteLaneSource
@@ -645,7 +647,7 @@ namespace
      * What it does:
      * Stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLane* StoreSingleDwordLane_A(
+    [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_A(
       SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
@@ -660,7 +662,7 @@ namespace
      * What it does:
      * Alias lane that stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLane* StoreSingleDwordLane_B(
+    [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_B(
       SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
@@ -675,7 +677,7 @@ namespace
      * What it does:
      * Alias lane that stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLane* StoreSingleDwordLane_C(
+    [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_C(
       SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
@@ -690,7 +692,7 @@ namespace
      * What it does:
      * Alias lane that stores one 32-bit input lane into one dword lane object.
      */
-    SingleDwordLane* StoreSingleDwordLane_D(
+    [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_D(
       SingleDwordLane* const lane,
       const std::uint32_t value
     ) noexcept
@@ -711,7 +713,7 @@ namespace
      * What it does:
      * Loads the dword lane at vtable slot index 4.
      */
-    int LoadVtableDwordSlot04(const VtableProbe* const object) noexcept
+    [[maybe_unused]] int LoadVtableDwordSlot04(const VtableProbe* const object) noexcept
     {
       return static_cast<int>(object->vtable[4]);
     }
@@ -722,7 +724,7 @@ namespace
      * What it does:
      * Loads the dword lane at vtable slot index 15.
      */
-    int LoadVtableDwordSlot15(const VtableProbe* const object) noexcept
+    [[maybe_unused]] int LoadVtableDwordSlot15(const VtableProbe* const object) noexcept
     {
       return static_cast<int>(object->vtable[15]);
     }
@@ -752,7 +754,7 @@ namespace
      * handles in (no retain) and would never run their destructors on
      * teardown (no release) - `ClusterInternalCache<SubclusterData>`'s real
      * destructor (`FUN_00934500`) needs those sixteen `~Cluster()` calls to
-     * happen, and typing the key this way is what makes `msvc8::list`'s
+     * happen, and typing the key this way is what makes `fa::list`'s
      * generic node destructor perform them for free.
      */
     struct SubclusterCacheKey
@@ -836,7 +838,7 @@ namespace
 
     /**
      * Address: 0x00932080 (FUN_00932080, sub_932080) - the inlined key-hash
-     *   half; the enclosing bucket fold is `msvc8::hash_map::_Buckno`
+     *   half; the enclosing bucket fold is `fa::hash_map::_Buckno`
      *
      * IDA signature:
      * unsigned int __thiscall sub_932080(vector_OccupationData *this, unsigned __int8 *key);
@@ -845,17 +847,17 @@ namespace
      * MSVC8's `stdext::hash_value` for the 18-byte occupation cache key:
      * `gpg::HashBytes` over the raw key bytes, then the Park-Miller
      * pseudorandomizing step `stdext::hash_compare::operator()(const Key&)`
-     * applies to every key (`msvc8::hash_value`). Found by argument-dependent
-     * lookup, which is how `msvc8::hash_compare` picks this up in place of the
+     * applies to every key (`fa::hash_value`). Found by argument-dependent
+     * lookup, which is how `fa::hash_compare` picks this up in place of the
      * integral default - the same wiring `moho::hash_value(const SOCellPos&)`
      * uses for the pathfinder node table.
      *
      * 0x00932080 is **not** a free hash function. It is the out-of-line
-     * emission of `msvc8::hash_map<OccupationCacheKey, Cluster::Data*>::_Buckno`
+     * emission of `fa::hash_map<OccupationCacheKey, Cluster::Data*>::_Buckno`
      * for this key type, shared by its three call sites (`find` 0x00932B70,
      * `equal_range` 0x00933EF0, `erase` 0x00933F80). The `this` displacements
      * pin the container: `mov ecx,[esi+20h]` is `mMask` and `cmp [esi+24h],eax`
-     * is `mMaxidx`, matching `msvc8::hash_map`'s +0x20 / +0x24 exactly, and the
+     * is `mMaxidx`, matching `fa::hash_map`'s +0x20 / +0x24 exactly, and the
      * tail `or edx,-1; sub edx,ecx; add eax,edx` is `bucket - (mMask >> 1) - 1`.
      * Everything reproduced below is what that body inlines *before* the fold;
      * the fold itself already exists once, in
@@ -869,7 +871,7 @@ namespace
     {
         const std::uint32_t keyHash =
           gpg::HashBytes(key.mBytes.data(), key.mBytes.size(), kOccupationKeySalt);
-        return msvc8::hash_value(static_cast<long>(static_cast<std::int32_t>(keyHash)));
+        return fa::hash_value(static_cast<long>(static_cast<std::int32_t>(keyHash)));
     }
 
     /**
@@ -887,7 +889,7 @@ namespace
      */
     [[nodiscard]] std::size_t hash_value(const SubclusterCacheKey& key)
     {
-        return msvc8::hash_value(static_cast<long>(static_cast<std::int32_t>(HashSubclusterKey(key))));
+        return fa::hash_value(static_cast<long>(static_cast<std::int32_t>(HashSubclusterKey(key))));
     }
 
     /**
@@ -907,7 +909,7 @@ namespace
 
     /**
      * Strict weak ordering half of the subcluster cache's
-     * `stdext::hash_compare` traits: `msvc8::hash_map` keeps each bucket
+     * `stdext::hash_compare` traits: `fa::hash_map` keeps each bucket
      * window sorted by this predicate, which is what lets `insert`
      * (0x00934BE0) scan the window backwards and stop on the first key that
      * does not compare greater.
@@ -928,24 +930,6 @@ namespace
       return lhs + ((rhs * (rhs - 1u)) >> 1u);
     }
 
-    [[nodiscard]] std::uint8_t* CopyByteRangeForward(
-      const std::uint8_t* sourceBegin,
-      const std::uint8_t* sourceEnd,
-      std::uint8_t* destination
-    ) noexcept
-    {
-      const std::uint8_t* sourceCursor = sourceBegin;
-      std::uint8_t* writeCursor = destination;
-      while (sourceCursor != sourceEnd) {
-        if (writeCursor != nullptr) {
-          *writeCursor = *sourceCursor;
-        }
-        ++sourceCursor;
-        ++writeCursor;
-      }
-      return writeCursor;
-    }
-
     // `{start, end, capacity, inline}` at 0x10 is `gpg::core::FastVectorInline`:
     // the reset reads the saved capacity back out of the first word of the
     // inline block, and the append grows by `max(size + 1, capacity * 2)` and
@@ -962,7 +946,7 @@ namespace
      * Gathers boundary nodes from 4x4 child clusters into one packed `uint16`
      * node list, then sorts and de-duplicates that packed node lane in-place.
      */
-    [[nodiscard]] std::uint16_t* BuildSubclusterPackedNodeList(
+    [[maybe_unused]] [[nodiscard]] std::uint16_t* BuildSubclusterPackedNodeList(
       const gpg::HaStar::SubclusterData& subcluster,
       PackedNodeVector& outNodes
     )
@@ -997,7 +981,7 @@ namespace
         }
       }
 
-      msvc8::sort(outNodes.start_, outNodes.end_, std::less<std::uint16_t>{});
+      fa::sort(outNodes.start_, outNodes.end_, std::less<std::uint16_t>{});
 
       std::uint16_t* const end = outNodes.end_;
       std::uint16_t* result = outNodes.start_;
@@ -1029,7 +1013,7 @@ namespace
      * The occupation half of `ClusterCache`, built from the same MSVC8
      * `stdext::hash_map` template as the subcluster half below. The whole
      * member family the binary emits for this key type reads the container
-     * through the layout `msvc8::hash_map` already models:
+     * through the layout `fa::hash_map` already models:
      *
      *   `mov ecx,[edi+14h]` / `[ecx+eax*4]` / `[ecx+eax*4+4]`
      *                       -> `mVec._Myfirst[bucket]` and `[bucket + 1]`,
@@ -1047,14 +1031,14 @@ namespace
      * eviction key at 0x0093506A.
      */
     using OccupationCacheMap =
-        msvc8::hash_map<
+        fa::hash_map<
             OccupationCacheKey,
             gpg::HaStar::Cluster::Data*,
-            msvc8::hash_compare<OccupationCacheKey, OccupationKeyOrder>>;
+            fa::hash_compare<OccupationCacheKey, OccupationKeyOrder>>;
 
     /**
      * The subcluster half of `ClusterCache` as the binary actually builds it:
-     * MSVC8's `stdext::hash_map`, already recovered once as `msvc8::hash_map`
+     * MSVC8's `stdext::hash_map`, already recovered once as `fa::hash_map`
      * (`legacy/containers/HashMap.h`) for the pathfinder node table. The
      * cluster-cache emission is a second instantiation of that same template -
      * every `this` displacement in 0x00934BE0 lines up slot for slot:
@@ -1071,10 +1055,10 @@ namespace
      * container seeds `mVec` with.
      */
     using SubclusterCacheMap =
-        msvc8::hash_map<
+        fa::hash_map<
             SubclusterCacheKey,
             gpg::HaStar::Cluster::Data*,
-            msvc8::hash_compare<SubclusterCacheKey, SubclusterKeyOrder>>;
+            fa::hash_compare<SubclusterCacheKey, SubclusterKeyOrder>>;
 
     void RetainClusterData(gpg::HaStar::Cluster::Data* data)
     {
@@ -1111,7 +1095,7 @@ namespace
      * `gpg::HaStar::Cluster`, handling both vector-destruct (`flags&2`) and
      * optional storage release (`flags&1`).
      */
-    void* DestroyClusterWithDeleteFlags(gpg::HaStar::Cluster* start, const std::uint8_t flags)
+    [[maybe_unused]] void* DestroyClusterWithDeleteFlags(gpg::HaStar::Cluster* start, const std::uint8_t flags)
     {
         if ((flags & 0x02u) != 0u) {
 #if INTPTR_MAX == INT32_MAX
@@ -1175,7 +1159,7 @@ namespace
      * What it does:
      * Stores two source dword lanes into one two-dword destination record.
      */
-    TwoDwordLane* StoreTwoDwordLanesFromSources_A(
+    [[maybe_unused]] TwoDwordLane* StoreTwoDwordLanesFromSources_A(
       TwoDwordLane* const destination,
       const std::uint32_t* const sourceLane00,
       const std::uint32_t* const sourceLane04
@@ -1193,7 +1177,7 @@ namespace
      * Alias lane that stores two source dword lanes into one destination
      * two-dword record.
      */
-    TwoDwordLane* StoreTwoDwordLanesFromSources_B(
+    [[maybe_unused]] TwoDwordLane* StoreTwoDwordLanesFromSources_B(
       TwoDwordLane* const destination,
       const std::uint32_t* const sourceLane00,
       const std::uint32_t* const sourceLane04
@@ -1225,18 +1209,18 @@ namespace
      * side table. `ClusterCache::ClusterCache()` (0x00935580) constructs two
      * of these in place - `mOccupationData` at `this+0x00`, `mSubclusterData`
      * at `this+0x2C` - each `sizeof == 0x2C` (vtable + one
-     * `msvc8::hash_map<Key, Cluster::Data*, hash_compare<Key, Order>>`,
+     * `fa::hash_map<Key, Cluster::Data*, hash_compare<Key, Order>>`,
      * itself `sizeof == 0x28`, matching FUN_00934820/FUN_00934B60's `mMask`/
      * `mMaxidx` writes at `this+0x20`/`this+0x24` and the head/size writes at
      * `this+0x0C`/`this+0x10`).
      *
-     * `msvc8::hash_map`'s own default constructor already reproduces
+     * `fa::hash_map`'s own default constructor already reproduces
      * FUN_00934820/FUN_00934B60 exactly: `_Init()` seeds the same 9 bucket
      * copies of `mList.end()` those functions build by hand via
      * `sub_9327A0`/`sub_9327E0` + `sub_9341A0`/`sub_934250`. Only one binary
      * write is not reproduced - `this->mBool = *cacheEnabledFlag` writes a
      * caller-supplied byte at the container's `+0x00` (the `hash_compare`
-     * traits slot msvc8::hash_map's own layout already reserves there) -
+     * traits slot fa::hash_map's own layout already reserves there) -
      * because both call sites that construct one of these
      * (`ClusterCache::ClusterCache`, 0x0093559B/0x009355A0) pass the address
      * of the *same uninitialized stack byte* to every field that would read
@@ -1302,7 +1286,7 @@ namespace
          * Slot 0 of this class's vtable (0x00D47884): `add ecx, 4` to step
          * from the `ICache` sub-object onto `mVec`, then a tail `jmp` into
          * `hash_map::erase(const key_type&)` (0x00935480, already the
-         * `OccupationCacheKey` instantiation of `msvc8::hash_map::erase`
+         * `OccupationCacheKey` instantiation of `fa::hash_map::erase`
          * cited in `legacy/containers/HashMap.h`).
          */
         void Evict(const void* key) override;
@@ -1487,7 +1471,7 @@ namespace gpg::HaStar
      * (`mOccupationData` at `this+0`, `mSubclusterData` at `this+0x2C`).
      *
      * `ClusterInternalCache<T>`'s two specializations live in this TU's
-     * anonymous namespace (they hold `msvc8::hash_map` instantiations keyed
+     * anonymous namespace (they hold `fa::hash_map` instantiations keyed
      * on equally TU-local `OccupationCacheKey`/`SubclusterCacheKey` types);
      * ordinary unqualified lookup from this namespace still finds them
      * because an anonymous namespace's members are implicitly visible from
@@ -1608,7 +1592,7 @@ namespace
      * Computes geometric node-to-node distance, quantizes traversal cost, and
      * writes one edge-cost byte into `out`.
      */
-    std::uint8_t* QuantizeClusterNodeEdgeCost(
+    [[maybe_unused]] std::uint8_t* QuantizeClusterNodeEdgeCost(
       std::uint8_t* const out,
       const ClusterNodeCoordinate& from,
       const ClusterNodeCoordinate& to,
@@ -2014,8 +1998,16 @@ float Cluster::QuantizeEdgeCost(const float a, const float b)
 {
     // 0x0092D8B0..0x0092D8C4: `fld a; fdiv b; fldln2; fxch; fyl2x; fmul 6.0f`.
     // The logarithm is never rounded to float on its own.
-    const float scaled = msvc8::ScaledLnQuotient(a, b, 6.0f);
-    int quantized = static_cast<int>(std::ceil(scaled));
+    const float scaled = fa::ScaledLnQuotient(a, b, 6.0f);
+    // 0x0092D8C8..0x0092D8E2: ceil as `frndint`, +1 when the value is above its
+    // nearest integer (`cmova`, false when unordered), added to the `fistp`. An
+    // infinite or NaN quotient stores the integer indefinite, which the clamp
+    // below turns into bucket 0; a plain cast of `ceil(+inf)` is undefined, and
+    // clang's x64 code saturated it into bucket 31 (difffuzz, plan WPR.21).
+    const float nearest = std::nearbyint(scaled);
+    int quantized = static_cast<int>(
+        static_cast<std::uint32_t>(fa::RoundToInt(nearest)) + (scaled > nearest ? 1u : 0u)
+    );
     if (quantized > 31) {
         quantized = 31;
     }
@@ -2138,6 +2130,15 @@ int Cluster::cmp(const Cluster& other) const
     }
 
     const unsigned int nodeCount = self->mNodeCount;
+
+    // The binary's inline compare (0x00954057..0x00954072) stops at the first word that differs, and the
+    // node count is the first byte, so it never reads past a smaller cluster. std::memcmp may read ahead
+    // over its whole length, which faulted at the end of a mapping (replay 26904000). Counts that differ
+    // decide the order here, as that first byte does in the binary.
+    if (nodeCount != rhs->mNodeCount) {
+        return (nodeCount < rhs->mNodeCount) ? -1 : 1;
+    }
+
     const std::size_t payloadBytes =
         (nodeCount * (nodeCount - 1u)) / 2u + 2u * nodeCount + 1u;
     const int diff = std::memcmp(&self->mNodeCount, &rhs->mNodeCount, payloadBytes);
@@ -2235,7 +2236,7 @@ namespace
 
     [[nodiscard]] std::size_t hash_value(const SubclusterCell& cell)
     {
-        return msvc8::hash_value(static_cast<long>(PackedSubclusterNodeKey(cell.mNode)));
+        return fa::hash_value(static_cast<long>(PackedSubclusterNodeKey(cell.mNode)));
     }
 
     struct SubclusterCellLess
@@ -2246,7 +2247,7 @@ namespace
         }
     };
 
-    using SubclusterCellTraits = msvc8::hash_compare<SubclusterCell, SubclusterCellLess>;
+    using SubclusterCellTraits = fa::hash_compare<SubclusterCell, SubclusterCellLess>;
 
     /**
      * One neighbour emitted by `SubclusterSearch::ExpandNode` (the 12-byte
@@ -2275,7 +2276,7 @@ namespace
      * Address: 0x00930C80 (FUN_00930C80) -- `AddStartNode` for this
      *   instantiation (`ClusterBuild` seeds it with cost 0).
      * Address: 0x0092DD60 / 0x00930B40 (FUN_0092DD60, FUN_00930B40) --
-     *   `msvc8::hash_map<SubclusterCell, AStarNode>::find` / `clear`.
+     *   `fa::hash_map<SubclusterCell, AStarNode>::find` / `clear`.
      */
     class SubclusterSearch final
         : public gpg::AStarSearch<SubclusterCell, SubclusterSearch, SubclusterCellTraits>
@@ -2584,12 +2585,12 @@ Cluster ClusterBuild(const SubclusterData& subclusterData)
         for (std::uint32_t low = 0u; low < high; ++low) {
             SubclusterCell key{};
             key.mNode = nodes[low];
-            const auto found = search.Nodes().find(key);
-            if (found == search.Nodes().end()) {
+            const auto* const found = search.Nodes().Find(key);
+            if (found == nullptr) {
                 continue;
             }
             edges[low + ((high * (high - 1u)) >> 1u)].cost =
-                Cluster::Node::CostTo(nodes[low], nodes[high], found->second.mCell.mDistance);
+                Cluster::Node::CostTo(nodes[low], nodes[high], found->mCell.mDistance);
         }
     }
 
@@ -2665,7 +2666,7 @@ void InitializeClusterCache(ClusterCache& outCache)
     auto* const control = static_cast<boost::SpCountedImplStorage<void>*>(
         ::operator new(sizeof(boost::SpCountedImplStorage<void>))
     );
-    boost::SpCountedImplPConstructClusterCacheImpl(control, impl);
+    (void)boost::SpCountedImplPConstructClusterCacheImpl(control, impl);
 
     outCache.mCacheTree = impl;
     outCache.mCacheRefs = control;
@@ -3093,6 +3094,79 @@ bool ClusterMap::WorkOnCluster(const int width, const int height, const int leve
     return true;
 }
 
+void ClusterMap::SaveExact(gpg::WriteArchive* const archive) const
+{
+    archive->WriteBool(mIsDone != 0u);
+    archive->WriteUInt(mProgress);
+
+    for (std::uint32_t level = 1u; level <= mNumLevels; ++level) {
+        const gpg::BitArray2D& bits = mCheckLevels[level];
+        archive->WriteBytes(reinterpret_cast<char*>(bits.ptr), static_cast<std::size_t>(bits.size) * sizeof(std::int32_t));
+
+        const Subcluster& clusters = mLevels[level];
+        const int count = clusters.mWidth * clusters.mHeight;
+        for (int index = 0; index < count; ++index) {
+            const Cluster::Data* const data = clusters.mArray[index].mData;
+            if (data == nullptr) {
+                archive->WriteUShort(0xFFFFu);
+                continue;
+            }
+
+            const std::size_t nodes = data->mNodeCount;
+            archive->WriteUShort(static_cast<unsigned short>(nodes));
+            const std::size_t bytes = nodes * sizeof(Cluster::Node) + nodes * (nodes - 1u) / 2u;
+            if (bytes != 0u) {
+                archive->WriteBytes(const_cast<char*>(reinterpret_cast<const char*>(&data->mNodes[0])), bytes);
+            }
+        }
+    }
+}
+
+void ClusterMap::LoadExact(gpg::ReadArchive* const archive, std::unordered_map<std::string, Cluster>& shared)
+{
+    bool isDone = false;
+    archive->ReadBool(&isDone);
+    mIsDone = isDone ? 1u : 0u;
+    archive->ReadUInt(&mProgress);
+
+    std::string payload;
+    for (std::uint32_t level = 1u; level <= mNumLevels; ++level) {
+        gpg::BitArray2D& bits = mCheckLevels[level];
+        archive->ReadBytes(reinterpret_cast<char*>(bits.ptr), static_cast<std::size_t>(bits.size) * sizeof(std::int32_t));
+
+        Subcluster& clusters = mLevels[level];
+        const int count = clusters.mWidth * clusters.mHeight;
+        for (int index = 0; index < count; ++index) {
+            unsigned short nodes = 0u;
+            archive->ReadUShort(&nodes);
+            if (nodes == 0xFFFFu) {
+                clusters.mArray[index] = Cluster{};
+                continue;
+            }
+
+            const std::size_t nodeBytes = static_cast<std::size_t>(nodes) * sizeof(Cluster::Node);
+            const std::size_t bytes = nodeBytes + static_cast<std::size_t>(nodes) * (static_cast<std::size_t>(nodes) - 1u) / 2u;
+            payload.assign(bytes + 1u, '\0');
+            payload[0] = static_cast<char>(nodes);
+            if (bytes != 0u) {
+                archive->ReadBytes(payload.data() + 1, bytes);
+            }
+
+            auto found = shared.find(payload);
+            if (found == shared.end()) {
+                Cluster built{};
+                built.SetData(
+                    reinterpret_cast<const Cluster::Node*>(payload.data() + 1),
+                    reinterpret_cast<const Cluster::Edge*>(payload.data() + 1 + nodeBytes),
+                    nodes
+                );
+                found = shared.emplace(payload, built).first;
+            }
+            clusters.mArray[index] = found->second;
+        }
+    }
+}
+
 /**
  * Address: 0x008E3BC0 (FUN_008E3BC0,
  * ?EnsureClusterExists@ClusterMap@HaStar@gpg@@QAEXHHH@Z)
@@ -3125,7 +3199,7 @@ void ClusterMap::BackgroundWork(int& budget)
                 budget = INT_MAX;
             }
 
-            WorkOnCluster(
+            (void)WorkOnCluster(
                 static_cast<int>(clusterX),
                 static_cast<int>(clusterY),
                 static_cast<int>(mNumLevels),

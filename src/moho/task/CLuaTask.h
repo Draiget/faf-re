@@ -15,6 +15,25 @@ namespace gpg
 
 namespace moho
 {
+  /**
+   * Engine addition, server mode (remote/SyncRouting.h): a Lua thread that belongs to one player runs
+   * under that player's focus. Null by default and in lockstep, where nothing changes. Calls come on
+   * the sim's thread.
+   */
+  class ILuaThreadRouting
+  {
+  public:
+    virtual ~ILuaThreadRouting() = default;
+
+    /** `ForkThread`'s arguments are still on `parent`'s stack. */
+    virtual void OnThreadForked(lua_State* parent, lua_State* thread) = 0;
+    /** `thread` is about to run: true if `LeaveThread` must follow. */
+    virtual bool EnterThread(lua_State* thread) = 0;
+    virtual void LeaveThread() = 0;
+    virtual void OnThreadEnded(lua_State* thread) = 0;
+  };
+  void LUA_SetThreadRouting(ILuaThreadRouting* routing) noexcept;
+
   class CScrLuaInitForm;
 
   /**
@@ -27,7 +46,7 @@ namespace moho
    * Pushes lua traceback text for the provided message and returns it.
    */
   [[nodiscard]]
-  msvc8::string SCR_Traceback(LuaPlus::LuaState* state, gpg::StrArg message);
+  fa::string SCR_Traceback(LuaPlus::LuaState* state, gpg::StrArg message);
 
   class MOHO_CLANG_EMPTY_BASE_LAYOUT CLuaTask : public CTask, public InstanceCounter<CLuaTask>
   {

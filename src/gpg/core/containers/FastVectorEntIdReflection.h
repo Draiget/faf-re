@@ -52,7 +52,7 @@ namespace gpg
     /**
      * Address: 0x00552F30 (FUN_00552F30, gpg::RFastVectorType_EntId::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x00552FC0 (FUN_00552FC0, gpg::RFastVectorType_EntId::IsIndexed)

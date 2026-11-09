@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace msvc8
+namespace fa
 {
   /**
    * Minimal RB-tree node base used only for navigation.
@@ -310,4 +310,4 @@ namespace msvc8
     NodeDeleter deleter_{};
   };
 
-} // namespace msvc8
+} // namespace fa

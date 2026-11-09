@@ -148,7 +148,7 @@ namespace gpg
     const char* const expectedName = expectedType ? expectedType->GetName() : "STIMap";
     const char* const actualName = source.GetTypeName();
 
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expectedName ? expectedName : "STIMap",

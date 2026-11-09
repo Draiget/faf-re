@@ -1,0 +1,44 @@
+name: 2p-retail-x64-w8
+description: >
+  2-player version of 3p-original-x86-x64-ai: the shipped ForgedAlliance.exe
+  (uid 1) and our x64 build staged as bin_x64\main_x64_rt.exe (uid 2) play one
+  match on faf_re_lockstep, where the map script hands every army to FAF's AI.
+  Run B: our x64 with /simworkers 8 (Automatic renderer).
+  Compare the "faf_re_lockstep: status tick=N ..." lines across game-*.log.
+  Needs init_mpemu_localvault.lua. Run with -advertise 192.168.42.77 on the
+  isolated account. Do not click into the game windows.
+timeout: 40m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: demoralization
+  GameSpeed: fast
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+  saveReplays: true
+
+players:
+  - { uid: 1, name: Retail, faction: uef, args: ['/title', 'rt-mpB-retail'] }
+  - { uid: 2, name: FafRe-x64, faction: cybran, exe: '%ProgramData%\FAForever\bin_x64\main_x64_rt.exe', args: ['/simworkers', '8', '/title', 'rt-mpB-x64w8'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 25m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  logsAgree:
+    - { uids: all, pattern: 'faf_re_lockstep: (handover .*|handed \d+ armies to the AI)' }
+    - { uids: all, pattern: 'faf_re_lockstep: (army \d+ \S+ brain=\S+ skirmish=\S+ personality=\S+ faction=\d+)' }

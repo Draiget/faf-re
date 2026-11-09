@@ -71,6 +71,11 @@ namespace moho
      * `IdPool`'s implicit copy constructor (0x00686DF0), which inlines it.
      */
     SimSubRes2& operator=(const SimSubRes2& other);
+
+    // Spelled out because operator= above is user-provided; both stay what the
+    // compiler generated (`IdPool`'s implicit copy relies on this one).
+    SimSubRes2() = default;
+    SimSubRes2(const SimSubRes2&) = default;
   };
   static_assert(offsetof(SimSubRes2, mData) == 0x0000, "SimSubRes2::mData offset must be 0x0000");
   static_assert(offsetof(SimSubRes2, mStart) == 0x0C80, "SimSubRes2::mStart offset must be 0x0C80");
@@ -81,7 +86,7 @@ namespace moho
    * `IdPool` is 8-byte aligned in the shipped binary, through `mReleasedLows`'
    * words (an 8-aligned `gpg::fastvector_n`). Evidence, converging from four
    * independent sites:
-   *   - `EntityDB::mIdPoolTree`'s node (`msvc8::map<std::uint32_t, IdPool>`,
+   *   - `EntityDB::mIdPoolTree`'s node (`fa::map<std::uint32_t, IdPool>`,
    *     `EntityDb.h`) places `IdPool` at node+0x18, one 4-byte word after the
    *     node's `key`+0x10..0x14 -- i.e. a forced pad word between key and
    *     payload that only 8-byte alignment on the payload explains

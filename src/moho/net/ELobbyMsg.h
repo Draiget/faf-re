@@ -12,7 +12,7 @@ namespace moho
      * ASM: 0x64
      *
      * Data payload:
-     *  - msvc8::string - player name
+     *  - fa::string - player name
      *  - int32_t       - requested UUID
      *
      * Referenced in:
@@ -24,7 +24,7 @@ namespace moho
      * ASM: 0x65
      *
      * Data payload:
-     *  - msvc8::string - reason
+     *  - fa::string - reason
      *
      * Referenced in:
      *  - Moho::CLobby::PeerJoined (0x007C64C0)
@@ -35,10 +35,10 @@ namespace moho
      * ASM: 0x66
      *
      * Data payload:
-     *  - msvc8::string - host display name
+     *  - fa::string - host display name
      *  - int32_t       - host UUID
      *  - int32_t       - assigned player UUID
-     *  - msvc8::string - rename self to (new player name)
+     *  - fa::string - rename self to (new player name)
      *  - int32_t       - ? (lobby->v39, 4 bytes)
      *
      * References:
@@ -132,6 +132,16 @@ namespace moho
      * Data payload: <nothing>
      */
     LOBMSG_DiscoveryResponse = 111,
+
+    /**
+     * Engine addition, not in the binary: the peer announcement while in the
+     * lobby, and its feature traffic (docs/PEER_FEATURES.md, LobbyPeerFeatures.h).
+     * A retail client logs it and returns: the jump table at FA 0x007C6454 sends
+     * it to "Ignoring unrecognized lobby message" (0x007C6412).
+     *
+     * Data payload: kind byte, then as that kind says.
+     */
+    LOBMSG_PeerFeatures = 112,
 
     /**
      * Exclusive upper bound for lobby-message receiver range.

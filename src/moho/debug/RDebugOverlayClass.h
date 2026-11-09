@@ -79,8 +79,8 @@ namespace moho
     // behind this word until the compiler's rule is pinned down.
     std::uint32_t mOverlayClassPad0064;                       // +0x64
     TDatListItem<RDebugOverlayClass, void> mOverlayClassLink; // +0x68
-    msvc8::string mOverlayToken;                              // +0x70
-    msvc8::string mOverlayDescription;                        // +0x8C
+    fa::string mOverlayToken;                              // +0x70
+    fa::string mOverlayDescription;                        // +0x8C
   };
 
   /**

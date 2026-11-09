@@ -135,10 +135,10 @@ namespace
    */
   [[maybe_unused]] moho::ScrBreakpoint* ConstructScrBreakpointFromString(
     moho::ScrBreakpoint* const outBreakpoint,
-    const msvc8::string& serializedBreakpoint
+    const fa::string& serializedBreakpoint
   )
   {
-    static const msvc8::string kEmptyName("");
+    static const fa::string kEmptyName("");
     ::new (static_cast<void*>(outBreakpoint)) moho::ScrBreakpoint(kEmptyName, -1);
     outBreakpoint->enabled = false;
     outBreakpoint->FromString(serializedBreakpoint);
@@ -149,7 +149,7 @@ namespace
 /**
  * Address: 0x004B01D0 (FUN_004B01D0, Moho::ScrBreakpoint::ScrBreakpoint)
  *
- * msvc8::string const &,int
+ * fa::string const &,int
  *
  * What it does:
  * Initializes one breakpoint with enabled-state lane set true, copies the
@@ -162,14 +162,14 @@ moho::ScrBreakpoint::ScrBreakpoint()
 {}
 
 moho::ScrBreakpoint::ScrBreakpoint(
-  const msvc8::string& breakpointName,
+  const fa::string& breakpointName,
   const int lineNumber
 )
   : enabled(true),
     name(),
     line(lineNumber)
 {
-  name.assign(breakpointName, 0U, msvc8::string::npos);
+  name.assign(breakpointName, 0U, fa::string::npos);
 }
 
 /**
@@ -195,7 +195,7 @@ moho::ScrBreakpoint::~ScrBreakpoint()
  * What it does:
  * Serializes breakpoint state into `enabled|disabled:line:name`.
  */
-msvc8::string moho::ScrBreakpoint::AsString() const
+fa::string moho::ScrBreakpoint::AsString() const
 {
   std::ostringstream stream(std::ios::out);
   stream << (enabled ? "enabled" : "disabled");
@@ -204,7 +204,7 @@ msvc8::string moho::ScrBreakpoint::AsString() const
   stream << ":";
   stream << name.c_str();
 
-  msvc8::string serialized;
+  fa::string serialized;
   serialized.assign_owned(stream.str());
   return serialized;
 }
@@ -212,28 +212,28 @@ msvc8::string moho::ScrBreakpoint::AsString() const
 /**
  * Address: 0x004B0240 (FUN_004B0240, Moho::ScrBreakpoint::FromString)
  *
- * msvc8::string const &
+ * fa::string const &
  *
  * What it does:
  * Parses one serialized `enabled:line:name` string and applies parsed state
  * when all three lanes are present.
  */
-void moho::ScrBreakpoint::FromString(const msvc8::string& serializedBreakpoint)
+void moho::ScrBreakpoint::FromString(const fa::string& serializedBreakpoint)
 {
   const char* cursor = serializedBreakpoint.c_str();
-  msvc8::string token;
-  msvc8::string token0;
-  msvc8::string token1;
-  msvc8::string token2;
+  fa::string token;
+  fa::string token0;
+  fa::string token1;
+  fa::string token2;
   std::uint32_t tokenCount = 0;
 
   while (gpg::STR_GetToken(cursor, ":", token)) {
     if (tokenCount == 0U) {
-      token0.assign(token, 0U, msvc8::string::npos);
+      token0.assign(token, 0U, fa::string::npos);
     } else if (tokenCount == 1U) {
-      token1.assign(token, 0U, msvc8::string::npos);
+      token1.assign(token, 0U, fa::string::npos);
     } else if (tokenCount == 2U) {
-      token2.assign(token, 0U, msvc8::string::npos);
+      token2.assign(token, 0U, fa::string::npos);
     }
     ++tokenCount;
   }
@@ -241,6 +241,6 @@ void moho::ScrBreakpoint::FromString(const msvc8::string& serializedBreakpoint)
   if (tokenCount == 3U) {
     enabled = (token0.view() == "enabled");
     line = std::atoi(token1.c_str());
-    name.assign(token2, 0U, msvc8::string::npos);
+    name.assign(token2, 0U, fa::string::npos);
   }
 }

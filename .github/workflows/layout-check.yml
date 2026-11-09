@@ -1,0 +1,70 @@
+name: Layout check
+
+# Checks the engine in the form that keeps the 2007 binary's exact container layout
+# (src/legacy/containers/Layout.h, preset clang-x86-retail-layout). That is the one build where the
+# layout static_asserts are on: every other build switches them off (src/platform/LayoutAsserts.h),
+# so without this job they could break unnoticed, wire-format checks among them. It stops after the
+# compiler's front end (FAF_SYNTAX_ONLY), where a static_assert fails, so it writes no objects and
+# links nothing; no game runs. An error only code generation finds shows up in the Replay check's
+# builds instead. A pull request's code runs here with a read-only token and no secrets, and only
+# restores the caches.
+on:
+  push:
+    branches: [master]
+    paths: &paths
+      - "src/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
+      - "CMakePresets.json"
+      - ".github/workflows/layout-check.yml"
+  pull_request:
+    paths: *paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: layout-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.14"
+  # The clang-cl the Windows builds use; the same pin as the Replay check workflow's.
+  LLVM_VERSION: "22.1.7"
+
+jobs:
+  layout:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/cache/restore@v6
+        with:
+          path: |
+            dependencies/.downloads
+            llvm-installer
+          key: windows-downloads-${{ env.LLVM_VERSION }}-${{ hashFiles('cmake/FafDependencies.cmake') }}
+          restore-keys: windows-downloads-${{ env.LLVM_VERSION }}-
+      # Puts its Scripts folder on PATH, for the ninja pip install.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - shell: pwsh
+        run: |
+          $exe = "llvm-installer/LLVM-$env:LLVM_VERSION-win64.exe"
+          if (-not (Test-Path $exe)) {
+            New-Item -ItemType Directory -Force llvm-installer | Out-Null
+            Invoke-WebRequest "https://github.com/llvm/llvm-project/releases/download/llvmorg-$env:LLVM_VERSION/LLVM-$env:LLVM_VERSION-win64.exe" -OutFile $exe
+          }
+          Start-Process -FilePath $exe -ArgumentList "/S", "/D=C:\llvm-$env:LLVM_VERSION" -Wait
+          "LLVM_ROOT=C:\llvm-$env:LLVM_VERSION" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          & "C:\llvm-$env:LLVM_VERSION\bin\clang-cl.exe" --version
+          python -m pip install --disable-pip-version-check ninja
+      # A failed layout assert fails the compile; -k 0 lists every one instead of stopping at the first.
+      - shell: pwsh
+        run: |
+          cmake --preset clang-x86-retail-layout -DFAF_SYNTAX_ONLY=ON
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build --preset clang-x86-retail-layout --target faf_engine -- -k 0

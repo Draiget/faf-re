@@ -43,10 +43,7 @@ namespace moho
    */
   gpg::RRef REmitterCurveKey::GetDerivedObjectRef()
   {
-    gpg::RRef out{};
-    out.mObj = this;
-    out.mType = GetClass();
-    return out;
+    return gpg::MakeSelfRef(this);
   }
 
   /**
@@ -89,10 +86,7 @@ namespace moho
    */
   gpg::RRef REmitterBlueprintCurve::GetDerivedObjectRef()
   {
-    gpg::RRef out{};
-    out.mObj = this;
-    out.mType = GetClass();
-    return out;
+    return gpg::MakeSelfRef(this);
   }
 
   /**
@@ -116,7 +110,7 @@ namespace moho
    * What it does:
    * Default-constructs an emitter blueprint. The base `REffectBlueprint` ctor
    * runs first to install the `RObject` vftable, clear `mOwnerRules`, and
-   * default-construct `BlueprintId` (empty SSO `msvc8::string`); the 21
+   * default-construct `BlueprintId` (empty SSO `fa::string`); the 21
    * `REmitterBlueprintCurve` subobjects each install their `RObject` vftable
    * and zero their key-storage triplets via the curve's default ctor; finally
    * the in-class field initializers set the fidelity flags, emitter behavior
@@ -173,10 +167,7 @@ namespace moho
    */
   gpg::RRef REmitterBlueprint::GetDerivedObjectRef()
   {
-    gpg::RRef out{};
-    out.mObj = this;
-    out.mType = GetClass();
-    return out;
+    return gpg::MakeSelfRef(this);
   }
 
   /**
@@ -198,7 +189,7 @@ namespace moho
     RRuleGameRules* rules = nullptr;
     const gpg::RRef owner{};
     archive.ReadPointer(&rules, &owner);
-    msvc8::string id;
+    fa::string id;
     archive.ReadString(&id);
     RResId resId{};
     gpg::STR_CopyFilename(&resId.name, &id);

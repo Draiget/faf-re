@@ -58,7 +58,7 @@ namespace gpg::gal
          * What it does:
          * Builds an exception payload from source-file, line, and message strings.
          */
-        Error(const msvc8::string& file, int line, const msvc8::string& message);
+        Error(const fa::string& file, int line, const fa::string& message);
 
         /**
          * Address: 0x008A7B10 (FUN_008A7B10)
@@ -94,9 +94,9 @@ namespace gpg::gal
         const char* GetFile() const noexcept;
 
     public:
-        msvc8::string file_; // +0x0C
+        fa::string file_; // +0x0C
         int line_ = 0;                // +0x28
-        msvc8::string message_;        // +0x2C
+        fa::string message_;        // +0x2C
     };
 
     static_assert(offsetof(Error, file_) == 0x0C, "Error::file_ offset must be 0x0C");

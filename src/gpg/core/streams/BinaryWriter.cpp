@@ -29,12 +29,12 @@ void BinaryWriter::Write(const char* const data, const std::size_t size) const
 }
 
 /**
- * Address: <paired with Stream::Write(msvc8::string)>
+ * Address: <paired with Stream::Write(fa::string)>
  *
  * What it does:
  * Writes one NUL-terminated legacy string payload.
  */
-void BinaryWriter::WriteString(const msvc8::string& value) const
+void BinaryWriter::WriteString(const fa::string& value) const
 {
   Write(value.c_str(), value.size() + 1u);
 }
@@ -45,7 +45,7 @@ void BinaryWriter::WriteString(const msvc8::string& value) const
  * What it does:
  * Writes one optional NUL-terminated legacy string payload.
  */
-void BinaryWriter::WriteString(const msvc8::string* const value) const
+void BinaryWriter::WriteString(const fa::string* const value) const
 {
   if (value == nullptr) {
     static constexpr char kEmptyTerminator = '\0';

@@ -81,7 +81,7 @@ namespace moho
    *
    * What it does:
    * Constructs/preregisters reflection metadata for
-   * `msvc8::vector<ReconBlip*>`.
+   * `fa::vector<ReconBlip*>`.
    */
   [[nodiscard]] gpg::RType* preregister_RVectorType_ReconBlipPtr();
 

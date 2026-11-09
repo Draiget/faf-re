@@ -5,7 +5,7 @@
 
 namespace gpg::gal
 {
-	std::uint8_t sMeshAllowFloat16 = 1U;
+	std::uint8_t sMeshAllowFloat16 = 0U;
 	std::uint8_t sMeshAllowInstancing = 1U;
 
 	/**

@@ -10,15 +10,6 @@ using namespace moho;
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedSSiloBuildInfoType()
-  {
-    gpg::RType* type = SSiloBuildInfo::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(SSiloBuildInfo));
-      SSiloBuildInfo::sType = type;
-    }
-    return type;
-  }
 
 } // namespace
 

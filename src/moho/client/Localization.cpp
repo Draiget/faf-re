@@ -28,7 +28,7 @@ namespace
  * Calls Lua global `LOC` with `key` and returns copied string result.
  * On exception, logs warning and returns the original `key`.
  */
-msvc8::string moho::Loc(LuaPlus::LuaState* const state, const gpg::StrArg key)
+fa::string moho::Loc(LuaPlus::LuaState* const state, const gpg::StrArg key)
 {
   const char* const input = key ? key : "";
 
@@ -45,7 +45,7 @@ msvc8::string moho::Loc(LuaPlus::LuaState* const state, const gpg::StrArg key)
     LuaPlus::LuaFunction<const char*> locFunction(locObject);
     const char* const localized = locFunction(input);
     const char* const out = localized ? localized : "";
-    const msvc8::string result(out, std::strlen(out));
+    const fa::string result(out, std::strlen(out));
     return result;
   } catch (const std::exception& ex) {
     gpg::Warnf("Error localizing \"%s\": %s", input, ex.what() ? ex.what() : "<unknown>");
@@ -53,5 +53,5 @@ msvc8::string moho::Loc(LuaPlus::LuaState* const state, const gpg::StrArg key)
     gpg::Warnf("Error localizing \"%s\": %s", input, "<unknown>");
   }
 
-  return msvc8::string(input);
+  return fa::string(input);
 }

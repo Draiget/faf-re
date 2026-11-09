@@ -1,9 +1,11 @@
 #include "moho/misc/CSaveGameRequestImpl.h"
+#include "moho/misc/FileWriteExact.h"
 #include "moho/sim/CVFSImpl.h"
 
 #include <Windows.h>
 
 #include <algorithm>
+#include <string>
 #include <array>
 #include <cstdint>
 #include <exception>
@@ -23,8 +25,6 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/serialization/SaveGameFileHeader.h"
 #include "moho/serialization/SSavedGameHeader.h"
-#include "moho/sim/CWldSession.h"
-#include "moho/sim/UserArmy.h"
 
 /**
  * Address: 0x0087FCE0 (FUN_0087FCE0, ??0ISaveRequest@Moho@@QAE@XZ)
@@ -41,36 +41,46 @@ namespace
 
   constexpr std::size_t kUtf16HeaderTextCopyLimit = 2047;
 
-  [[nodiscard]] msvc8::string MakeTempSavePath(const msvc8::string& basePath)
+  [[nodiscard]] fa::string MakeTempSavePath(const fa::string& basePath)
   {
     return basePath + ".NEW";
   }
 
-  template <std::size_t N>
-  void CopyWideStringTruncated(wchar_t (&outBuffer)[N], const std::wstring& source)
+  /// UTF-16 code units of a wide string: the units themselves where wchar_t is UTF-16
+  /// (Windows), surrogate pairs for code points past U+FFFF where it is UTF-32 (plan WPL.6, C4).
+  [[nodiscard]] std::u16string WideToUtf16(const std::wstring& source)
   {
+    std::u16string out;
+    out.reserve(source.size());
+    for (const wchar_t unit : source) {
+      const auto codePoint = static_cast<std::uint32_t>(unit);
+      if constexpr (sizeof(wchar_t) == 2) {
+        out.push_back(static_cast<char16_t>(codePoint));
+      } else if (codePoint >= 0x10000u && codePoint <= 0x10FFFFu) {
+        out.push_back(static_cast<char16_t>(0xD800u + ((codePoint - 0x10000u) >> 10)));
+        out.push_back(static_cast<char16_t>(0xDC00u + ((codePoint - 0x10000u) & 0x3FFu)));
+      } else {
+        out.push_back(static_cast<char16_t>(codePoint));
+      }
+    }
+    return out;
+  }
+
+  template <std::size_t N>
+  void CopyWideStringTruncated(char16_t (&outBuffer)[N], const std::wstring& wideSource)
+  {
+    const std::u16string source = WideToUtf16(wideSource);
     const std::size_t maxCopy = (std::min)(N - 1, kUtf16HeaderTextCopyLimit);
     const std::size_t charCount = (std::min)(source.size(), maxCopy);
-    std::fill(std::begin(outBuffer), std::end(outBuffer), L'\0');
+    std::fill(std::begin(outBuffer), std::end(outBuffer), u'\0');
     if (charCount != 0) {
       std::copy_n(source.data(), charCount, outBuffer);
     }
   }
 
-  [[nodiscard]] std::wstring Utf8ToWide(const msvc8::string& source)
+  [[nodiscard]] std::wstring Utf8ToWide(const fa::string& source)
   {
     return gpg::STR_Utf8ToWide(source.c_str());
-  }
-
-  [[nodiscard]] bool WriteExact(std::FILE* const file, const void* const data, const std::size_t byteCount)
-  {
-    if (!file) {
-      return false;
-    }
-    if (byteCount == 0) {
-      return true;
-    }
-    return std::fwrite(data, byteCount, 1, file) == 1;
   }
 
   [[nodiscard]] bool RewriteSaveHeader(std::FILE* const file, const SaveGameFileHeader& header)
@@ -94,7 +104,7 @@ namespace
   }
 
   void FillFileHeaderTextFields(
-    SaveGameFileHeader& outHeader, const msvc8::string& appNameUtf8, const msvc8::string& sessionNameUtf8
+    SaveGameFileHeader& outHeader, const fa::string& appNameUtf8, const fa::string& sessionNameUtf8
   )
   {
     CopyWideStringTruncated(outHeader.mAppNameUtf16, Utf8ToWide(appNameUtf8));
@@ -109,31 +119,8 @@ namespace
     outHeader.mGameIdPart4 = moho::APP_GetGameIdPart(3);
   }
 
-  [[nodiscard]] moho::SSavedGameHeader BuildSavedGameHeader(const moho::CWldSession* const session)
-  {
-    moho::SSavedGameHeader header{};
-    if (!session) {
-      return header;
-    }
 
-    header.mMapName = session->mMapName;
-    header.mFocusArmy = session->FocusArmy;
-
-    header.mArmyInfo.resize(session->userArmies.size());
-    for (std::size_t armyIndex = 0; armyIndex < session->userArmies.size(); ++armyIndex) {
-      const moho::UserArmy* const userArmy = session->userArmies[armyIndex];
-      if (userArmy != nullptr) {
-        header.mArmyInfo[armyIndex].mPlayerName = userArmy->mPlayerName;
-      }
-    }
-
-    header.mScenarioInfoText = moho::SCR_ToString(session->GetScenarioInfo());
-
-    header.mLaunchInfo = boost::SharedPtrRawFromSharedRetained(session->mLaunchInfo);
-    return header;
-  }
-
-  [[nodiscard]] bool MoveTempFileIntoSavePath(const msvc8::string& tempPath, const msvc8::string& targetPath)
+  [[nodiscard]] bool MoveTempFileIntoSavePath(const fa::string& tempPath, const fa::string& targetPath)
   {
     const std::wstring wideTargetPath = gpg::STR_Utf8ToWide(targetPath.c_str());
     const std::wstring wideTempPath = gpg::STR_Utf8ToWide(tempPath.c_str());
@@ -142,7 +129,7 @@ namespace
     return moved;
   }
 
-  [[nodiscard]] bool DeleteTempFile(const msvc8::string& tempPath)
+  [[nodiscard]] bool DeleteTempFile(const fa::string& tempPath)
   {
     const std::wstring wideTempPath = gpg::STR_Utf8ToWide(tempPath.c_str());
     const bool deleted = ::DeleteFileW(wideTempPath.c_str()) != FALSE;
@@ -234,7 +221,7 @@ namespace moho
    */
   SaveLoadError::~SaveLoadError() noexcept = default;
 
-  const msvc8::string& SaveLoadError::GetRawMessage() const noexcept
+  const fa::string& SaveLoadError::GetRawMessage() const noexcept
   {
     return mRawMessage;
   }
@@ -246,49 +233,6 @@ namespace moho
     }
   }
 
-  /**
-   * Address: 0x00880F00 (FUN_00880F00)
-   *
-   * gpg::StrArg,gpg::StrArg,LuaPlus::LuaObject const &
-   *
-   * What it does:
-   * Initializes one save request object, opens `<savePath>.NEW`, writes the
-   * placeholder file header block, and serializes `SSavedGameHeader`.
-   */
-  CSaveGameRequestImpl::CSaveGameRequestImpl(
-    const gpg::StrArg savePath, const gpg::StrArg sessionName, const LuaPlus::LuaObject& completionCallback
-  )
-    : mSavePath(savePath != nullptr ? savePath : "")
-    , mSessionName(sessionName != nullptr ? sessionName : "")
-    , mCompletionCallback(completionCallback)
-    , mFile()
-    , mArchive(nullptr)
-  {
-    const SSavedGameHeader header = BuildSavedGameHeader(WLD_GetActiveSession());
-    const msvc8::string tempPath = MakeTempSavePath(mSavePath);
-    const std::wstring wideTempPath = gpg::STR_Utf8ToWide(tempPath.c_str());
-    std::FILE* file = nullptr;
-    if (_wfopen_s(&file, wideTempPath.c_str(), L"wb") != 0) {
-      file = nullptr;
-    }
-    mFile.reset(file, moho::SFileStarCloser{});
-
-    if (!file) {
-      const msvc8::string message = gpg::STR_Printf("Error opening %s for write", tempPath.c_str());
-      throw gpg::SerializationError(message.c_str());
-    }
-
-    std::array<std::uint8_t, moho::kSaveGameFileHeaderSize> blankHeader{};
-    if (!WriteExact(file, blankHeader.data(), blankHeader.size())) {
-      throw gpg::SerializationError("Error writing savegame header.");
-    }
-
-    std::unique_ptr<gpg::WriteArchive> archive(gpg::CreateBinaryWriteArchive(mFile));
-    const gpg::RRef ownerRef{nullptr, nullptr};
-    archive->Write(SSavedGameHeader::StaticGetClass(), &header, ownerRef);
-    archive->EndSection(false);
-    mArchive = archive.release();
-  }
 
   /**
    * Address: 0x008819E0 (FUN_008819E0)
@@ -327,8 +271,8 @@ namespace moho
     mArchive = nullptr;
 
     bool completedSuccessfully = data.useSuggestedName;
-    msvc8::string completionText = data.saveName;
-    const msvc8::string tempPath = MakeTempSavePath(mSavePath);
+    fa::string completionText = data.saveName;
+    const fa::string tempPath = MakeTempSavePath(mSavePath);
 
     if (completedSuccessfully) {
       SaveGameFileHeader fileHeader{};

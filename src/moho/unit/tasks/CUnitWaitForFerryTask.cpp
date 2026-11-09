@@ -31,74 +31,6 @@ namespace
     return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
   }
 
-  [[nodiscard]] gpg::RType* CachedCUnitWaitForFerryTaskType()
-  {
-    gpg::RType* type = moho::CUnitWaitForFerryTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitWaitForFerryTask));
-      moho::CUnitWaitForFerryTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCCommandTaskTypeForFerrySerializer()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitTypeForFerrySerializer()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSNavGoalTypeForFerrySerializer()
-  {
-    gpg::RType* type = moho::SNavGoal::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SNavGoal));
-      moho::SNavGoal::sType = type;
-    }
-    return type;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 }
 
 namespace moho
@@ -321,7 +253,7 @@ namespace moho
 
     const gpg::RRef ownerRef{};
     archive->Write(
-      CachedCCommandTaskTypeForFerrySerializer(),
+      gpg::RTypeOf<moho::CCommandTask>(),
       static_cast<const CCommandTask*>(this),
       ownerRef
     );
@@ -330,8 +262,8 @@ namespace moho
     (void)gpg::RRef_CCommandTask(&dispatchRef, static_cast<CCommandTask*>(mDispatch));
     gpg::WriteRawPointer(archive, dispatchRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedWeakPtrUnitTypeForFerrySerializer(), &mFerryUnit, ownerRef);
-    archive->Write(CachedSNavGoalTypeForFerrySerializer(), &mMoveGoal, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mFerryUnit, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::SNavGoal>(), &mMoveGoal, ownerRef);
   }
 
   /**
@@ -356,7 +288,7 @@ namespace moho
 
     const gpg::RRef ownerRef{};
     archive->Read(
-      CachedCCommandTaskTypeForFerrySerializer(),
+      gpg::RTypeOf<moho::CCommandTask>(),
       static_cast<CCommandTask*>(this),
       ownerRef
     );
@@ -371,8 +303,8 @@ namespace moho
     );
     archive->ReadPointer(reinterpret_cast<CCommandTask**>(&mDispatch), &ownerRef);
 
-    archive->Read(CachedWeakPtrUnitTypeForFerrySerializer(), &mFerryUnit, ownerRef);
-    archive->Read(CachedSNavGoalTypeForFerrySerializer(), &mMoveGoal, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mFerryUnit, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::SNavGoal>(), &mMoveGoal, ownerRef);
   }
 } // namespace moho
 
@@ -391,7 +323,7 @@ namespace
    * body); `version` and the owner-ref lane are unused by the member
    * (mirrors the binary tail-jump).
    */
-  void DeserializeCUnitWaitForFerryTaskSerializerCallback(
+  [[maybe_unused]] void DeserializeCUnitWaitForFerryTaskSerializerCallback(
     gpg::ReadArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -417,7 +349,7 @@ namespace
    * body); `version` and the owner-ref lane are unused by the member
    * (mirrors the binary tail-jump).
    */
-  void SerializeCUnitWaitForFerryTaskSerializerCallback(
+  [[maybe_unused]] void SerializeCUnitWaitForFerryTaskSerializerCallback(
     gpg::WriteArchive* const archive,
     const std::intptr_t objectPtr,
     const int,
@@ -444,12 +376,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitWaitForFerryTask(gpg::RRef* const outRef, moho::CUnitWaitForFerryTask* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = MakeDerivedRef(value, CachedCUnitWaitForFerryTaskType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

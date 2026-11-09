@@ -114,74 +114,6 @@ namespace
     return footprint.ToCellPos(Wm3::Vec3f{placement.x, 0.0f, placement.z});
   }
 
-  [[nodiscard]] gpg::RType* CachedCAiNavigatorImplType()
-  {
-    if (!CAiNavigatorImpl::sType) {
-      CAiNavigatorImpl::sType = gpg::LookupRType(typeid(CAiNavigatorImpl));
-    }
-    return CAiNavigatorImpl::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCAiPathNavigatorType()
-  {
-    if (!CAiPathNavigator::sType) {
-      CAiPathNavigator::sType = gpg::LookupRType(typeid(CAiPathNavigator));
-    }
-    return CAiPathNavigator::sType;
-  }
-
-  /**
-   * The reflected type of the destination lane, read at 0x005A8FCC through the
-   * type descriptor at 0x00F6B8A4: `.?AV?$WeakPtr@VEntity@Moho@@@Moho@@`.
-   */
-  [[nodiscard]] gpg::RType* CachedWeakEntityType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(WeakPtr<Entity>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSAiNavigatorGoalType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(SAiNavigatorGoal));
-    }
-    return cached;
-  }
-
-  template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* const object, gpg::RType* const staticType)
-  {
-    gpg::RRef ref{};
-    ref.mObj = nullptr;
-    ref.mType = staticType;
-    if (!object) {
-      return ref;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType && staticType && dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    if (!derived) {
-      ref.mObj = object;
-      ref.mType = dynamicType ? dynamicType : staticType;
-      return ref;
-    }
-
-    ref.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    ref.mType = dynamicType;
-    return ref;
-  }
 
   template <typename TObject>
   void WritePointerWithType(
@@ -192,7 +124,7 @@ namespace
     const gpg::RRef& ownerRef
   )
   {
-    const gpg::RRef objectRef = MakeTypedRef(object, staticType);
+    const gpg::RRef objectRef = gpg::MakeDerivedRef(object, staticType);
     gpg::WriteRawPointer(archive, objectRef, state, ownerRef);
   }
 } // namespace
@@ -239,7 +171,7 @@ CAiNavigatorLand::~CAiNavigatorLand()
 {
   mDestinationEntity.ResetFromObject(nullptr);
 
-  delete mPathNavigator;
+  GPG_NONVIRTUAL_DESTROY(delete mPathNavigator);
   mPathNavigator = nullptr;
 }
 
@@ -257,34 +189,19 @@ void CAiNavigatorLand::MemberDeserialize(gpg::ReadArchive* const archive)
   }
 
   const gpg::RRef ownerRef{};
-  archive->Read(CachedCAiNavigatorImplType(), this, ownerRef);
+  archive->Read(gpg::RTypeOf<CAiNavigatorImpl>(), this, ownerRef);
 
   CAiPathNavigator* loadedPathNavigator = nullptr;
   archive->ReadPointerOwned(&loadedPathNavigator, &ownerRef);
 
-  if (this) {
-    CAiPathNavigator* const oldPathNavigator = mPathNavigator;
-    mPathNavigator = loadedPathNavigator;
-    if (oldPathNavigator) {
-      delete oldPathNavigator;
-    }
-  } else if (loadedPathNavigator) {
-    delete loadedPathNavigator;
+  CAiPathNavigator* const oldPathNavigator = mPathNavigator;
+  mPathNavigator = loadedPathNavigator;
+  if (oldPathNavigator) {
+    GPG_NONVIRTUAL_DESTROY(delete oldPathNavigator);
   }
 
-  WeakPtr<Entity> destinationEntity{};
-  archive->Read(
-    CachedWeakEntityType(),
-    this ? static_cast<void*>(&mDestinationEntity) : static_cast<void*>(&destinationEntity),
-    ownerRef
-  );
-
-  SAiNavigatorGoal goal{};
-  archive->Read(
-    CachedSAiNavigatorGoalType(),
-    this ? static_cast<void*>(&mGoal) : static_cast<void*>(&goal),
-    ownerRef
-  );
+  archive->Read(gpg::RTypeOf<WeakPtr<Entity>>(), &mDestinationEntity, ownerRef);
+  archive->Read(gpg::RTypeOf<SAiNavigatorGoal>(), &mGoal, ownerRef);
 }
 
 /**
@@ -301,29 +218,11 @@ void CAiNavigatorLand::MemberSerialize(gpg::WriteArchive* const archive) const
   }
 
   const gpg::RRef ownerRef{};
-  archive->Write(CachedCAiNavigatorImplType(), this, ownerRef);
+  archive->Write(gpg::RTypeOf<CAiNavigatorImpl>(), this, ownerRef);
 
-  WritePointerWithType(
-    archive,
-    this ? mPathNavigator : nullptr,
-    CachedCAiPathNavigatorType(),
-    gpg::TrackedPointerState::Owned,
-    ownerRef
-  );
-
-  const WeakPtr<Entity> destinationEntity{};
-  archive->Write(
-    CachedWeakEntityType(),
-    this ? static_cast<const void*>(&mDestinationEntity) : static_cast<const void*>(&destinationEntity),
-    ownerRef
-  );
-
-  const SAiNavigatorGoal goal{};
-  archive->Write(
-    CachedSAiNavigatorGoalType(),
-    this ? static_cast<const void*>(&mGoal) : static_cast<const void*>(&goal),
-    ownerRef
-  );
+  WritePointerWithType(archive, mPathNavigator, gpg::RTypeOf<CAiPathNavigator>(), gpg::TrackedPointerState::Owned, ownerRef);
+  archive->Write(gpg::RTypeOf<WeakPtr<Entity>>(), &mDestinationEntity, ownerRef);
+  archive->Write(gpg::RTypeOf<SAiNavigatorGoal>(), &mGoal, ownerRef);
 }
 
 /**
@@ -614,7 +513,7 @@ int CAiNavigatorLand::Execute()
     // whose ResetPathState forces the path state back to Idle.
     const EAiNavigatorEvent eventCode =
       (mPathNavigator->mState == AIPATHNAVSTATE_Idle) ? AINAVEVENT_Succeeded : AINAVEVENT_Failed;
-    NavigatorMakeIdle();
+    (void)NavigatorMakeIdle();
     BroadcastEvent(eventCode);
   }
 

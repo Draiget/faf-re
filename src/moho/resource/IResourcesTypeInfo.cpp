@@ -25,12 +25,7 @@ namespace
    */
   [[maybe_unused]] void cleanup_IResourcesTypeInfoRTypeBase(moho::IResourcesTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   struct IResourcesTypeInfoStartup

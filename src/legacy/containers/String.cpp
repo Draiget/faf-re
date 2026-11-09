@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <functional>
 #include <limits>
 #include <new>
 #include <stdexcept>
@@ -18,7 +19,7 @@
  * Throws std::length_error("string too long"); never returns. See the
  * declaration in String.h for the full call-site evidence.
  */
-[[noreturn]] void msvc8::ThrowStringTooLong()
+[[noreturn]] void fa::ThrowStringTooLong()
 {
     throw std::length_error("string too long");
 }
@@ -33,7 +34,7 @@
  * Throws std::out_of_range("invalid string position"); never returns. See
  * the declaration in String.h for the full call-site evidence.
  */
-[[noreturn]] void msvc8::ThrowInvalidStringPosition()
+[[noreturn]] void fa::ThrowInvalidStringPosition()
 {
     throw std::out_of_range("invalid string position");
 }
@@ -47,7 +48,7 @@
 // means "heap-backed" to the rest of this class, so `tidy` would
 // `::operator delete` a buffer the string never allocated; and the string
 // stayed valid only as long as the caller's buffer did, which is never true for
-// the common `msvc8::string s(temporary.c_str())` form - the temporary dies at
+// the common `fa::string s(temporary.c_str())` form - the temporary dies at
 // the end of the full expression and the allocator writes its free-list link
 // over the first four bytes. That is exactly what killed startup: the
 // data-path script came back as "\xE0\xB7\x55\x04" + "rogramData\FAForever\bin\
@@ -57,8 +58,14 @@
 // These stay `noexcept`, so an allocation failure terminates rather than
 // unwinding as MSVC8's would. Nothing on these paths catches std::bad_alloc,
 // so the outcome is the same either way.
-msvc8::string::string(const string& other) noexcept {
-    alVal = nullptr;
+void fa::string::InitHeap(const char* const p, const std::size_t n) noexcept {
+    bx.buf[0] = '\0';
+    mySize = 0;
+    myRes = 15;
+    assign_owned(std::string_view(p, n));
+}
+
+void fa::string::CopySlow(const string& other) noexcept {
     bx.buf[0] = '\0';
     mySize = 0;
     myRes = 15;
@@ -67,7 +74,7 @@ msvc8::string::string(const string& other) noexcept {
     }
 }
 
-msvc8::string& msvc8::string::operator=(const string& other) noexcept {
+fa::string& fa::string::AssignSlow(const string& other) noexcept {
     if (this == &other) {
         return *this;
     }
@@ -86,119 +93,7 @@ msvc8::string& msvc8::string::operator=(const string& other) noexcept {
     return *this = string(other);
 }
 
-/**
- * Address: 0x008846B0 (FUN_008846B0, the `tidy(true, 0)` specialisation) is the
- * body MSVC8 emits for `~basic_string`; see the destructor's own comment in
- * `String.h` for why it was missing and what that cost.
- *
- * What it does:
- * Releases the heap buffer when the string is not in its inline small-buffer
- * state, and leaves the object a valid empty inline string so a second tidy
- * (`scoped_string`'s destructor runs one immediately before this one) is a
- * no-op rather than a double free.
- */
-msvc8::string::~string() noexcept {
-    tidy(true, 0U);
-}
-
-msvc8::string::string(string&& other) noexcept {
-    alVal = other.alVal;
-    bx = other.bx;
-    mySize = other.mySize;
-    myRes = other.myRes;
-    other.alVal = nullptr;
-    other.bx.buf[0] = '\0';
-    other.mySize = 0;
-    other.myRes = 15;
-}
-
-msvc8::string& msvc8::string::operator=(string&& other) noexcept {
-    if (this == &other) {
-        return *this;
-    }
-
-    // Release whatever this string owned before taking the source's buffer;
-    // without this the displaced block would leak exactly as the copy
-    // assignment used to.
-    tidy(true, 0U);
-
-    alVal = other.alVal;
-    bx = other.bx;
-    mySize = other.mySize;
-    myRes = other.myRes;
-    other.alVal = nullptr;
-    other.bx.buf[0] = '\0';
-    other.mySize = 0;
-    other.myRes = 15;
-    return *this;
-}
-
-/**
- * Address: 0x00405550 (FUN_00405550, ??0string@std@@QAE@PBD@Z)
- * Mangled: ??0string@std@@QAE@PBD@Z
- *
- * IDA signature:
- * std::string *__thiscall std::string::string(std::string *this, const char *str);
- *
- * What it does:
- * Puts the string in the empty small-buffer state, then assigns the source
- * measured with strlen. The binary delegates to the (pointer, length) ctor
- * for that second step; assign_owned takes the same path here.
- *
- * The binary does not null-check the source - strlen would fault. This
- * reconstruction keeps the guard, which only turns a crash into an empty
- * string and cannot change behaviour on any input the original survived.
- */
-msvc8::string::string(const char* s) noexcept {
-    alVal = nullptr;
-    bx.buf[0] = '\0';
-    mySize = 0;
-    myRes = 15;
-    if (s != nullptr) {
-        assign_owned(std::string_view(s));
-    }
-}
-
-msvc8::string::string(std::string_view sv) noexcept {
-    alVal = nullptr;
-    bx.buf[0] = '\0';
-    mySize = 0;
-    myRes = 15;
-    assign_owned(sv);
-}
-
-msvc8::string::string(const char* p, const std::size_t n) noexcept {
-    alVal = nullptr;
-    bx.buf[0] = '\0';
-    mySize = 0;
-    myRes = 15;
-    if (p != nullptr && n != 0U) {
-        assign_owned(std::string_view(p, n));
-    }
-}
-
-bool msvc8::string::basic_sanity() const noexcept {
-    // Length must fit capacity; capacity must not be absurd.
-    constexpr uint32_t maxCap = 1u << 30; // arbitrary big guard
-
-    if (mySize > myRes) {
-        return false;
-    }
-    if (myRes > maxCap) {
-        return false;
-    }
-    if (is_sso()) {
-        if (myRes != 15) {
-            // MSVC8 used fixed 15 for SSO
-            return false; 
-        }
-    } else {
-        if (bx.ptr == nullptr) return false;
-    }
-    return true;
-}
-
-void msvc8::string::eos(const uint32_t newSize) noexcept {
+void fa::string::eos(const uint32_t newSize) noexcept {
     const uint32_t boundedSize = (newSize <= myRes) ? newSize : myRes;
     mySize = boundedSize;
 
@@ -215,7 +110,7 @@ void msvc8::string::eos(const uint32_t newSize) noexcept {
  *          emission, same shape as FUN_008846B0. 11 real callers across
  *          moho/net/CGpgNetInterface.cpp -- every `SNetCommandArg`/
  *          `SNetCommand` string-payload reset/construct/rollback path
- *          reaches it through normal `msvc8::string` member operations.)
+ *          reaches it through normal `fa::string` member operations.)
  *
  * What it does:
  * Resets string storage to SSO lane and optionally preserves `newSize` bytes
@@ -225,13 +120,13 @@ void msvc8::string::eos(const uint32_t newSize) noexcept {
  * constant arguments `tidy(true, 0)` (the `newSize != 0` memcpy_s branch is
  * dead-code-eliminated): `if (myRes >= 0x10) operator delete(bx.ptr); myRes =
  * 15; mySize = 0; bx.buf[0] = 0;`. Field offsets match exactly against
- * `msvc8::string` (`bx.ptr`@0x04, `mySize`@0x14, `myRes`@0x18,
+ * `fa::string` (`bx.ptr`@0x04, `mySize`@0x14, `myRes`@0x18,
  * `sizeof(string) == 0x1C`, see the `static_assert` below). Reached as the
  * per-element exception-unwind destructor from
  * `wxUninitializedCopyMsvc8StringRange` (FUN_00884FD0) in
  * moho/app/WxRuntimeTypes.cpp.
  */
-void msvc8::string::tidy(const bool built, const uint32_t newSize) noexcept {
+void fa::string::tidy(const bool built, const uint32_t newSize) noexcept {
     // Preserve legacy lane shape:
     // if (built && large) { optional memcpy to SSO; delete(oldHeap); }
     if (built && myRes >= 0x10U) {
@@ -257,7 +152,7 @@ void msvc8::string::tidy(const bool built, const uint32_t newSize) noexcept {
  * Resets each legacy string in `[begin, end)` to empty SSO state and releases
  * heap-backed buffers when present.
  */
-[[maybe_unused]] static void ResetStringRange(msvc8::string* begin, msvc8::string* end) noexcept
+[[maybe_unused]] static void ResetStringRange(fa::string* begin, fa::string* end) noexcept
 {
     while (begin != end) {
         begin->tidy(true, 0U);
@@ -265,7 +160,7 @@ void msvc8::string::tidy(const bool built, const uint32_t newSize) noexcept {
     }
 }
 
-void msvc8::string::assign_owned(const std::string_view value) {
+void fa::string::assign_owned(const std::string_view value) {
     tidy(true, 0U);
 
     const std::size_t boundedSize = std::min<std::size_t>(
@@ -291,11 +186,11 @@ void msvc8::string::assign_owned(const std::string_view value) {
     myRes = static_cast<uint32_t>(boundedSize);
 }
 
-void msvc8::string::assign_owned(const char* const value) {
+void fa::string::assign_owned(const char* const value) {
     assign_owned(std::string_view(value ? value : ""));
 }
 
-void msvc8::string::assign_owned_strong(const std::string_view value) {
+void fa::string::assign_owned_strong(const std::string_view value) {
     if (value.size() > maxCapGuard) {
         ThrowStringTooLong();
     }
@@ -326,39 +221,39 @@ void msvc8::string::assign_owned_strong(const std::string_view value) {
     myRes = static_cast<uint32_t>(value.size());
 }
 
-void msvc8::string::assign_owned_strong(const char* const value) {
+void fa::string::assign_owned_strong(const char* const value) {
     assign_owned_strong(std::string_view(value ? value : ""));
 }
 
-msvc8::scoped_string::scoped_string(const char* const value)
+fa::scoped_string::scoped_string(const char* const value)
   : string()
 {
     assign_owned_strong(value);
 }
 
-msvc8::scoped_string::scoped_string(const std::string_view value)
+fa::scoped_string::scoped_string(const std::string_view value)
   : string()
 {
     assign_owned_strong(value);
 }
 
-msvc8::scoped_string::scoped_string(const string& other)
+fa::scoped_string::scoped_string(const string& other)
   : string()
 {
     assign_owned_strong(other.basic_sanity() ? other.view() : std::string_view{});
 }
 
-msvc8::scoped_string::scoped_string(const scoped_string& other)
+fa::scoped_string::scoped_string(const scoped_string& other)
   : scoped_string(static_cast<const string&>(other))
 {
 }
 
-msvc8::scoped_string::scoped_string(scoped_string&& other) noexcept
+fa::scoped_string::scoped_string(scoped_string&& other) noexcept
   : string(std::move(static_cast<string&>(other)))
 {
 }
 
-msvc8::scoped_string& msvc8::scoped_string::operator=(const string& other)
+fa::scoped_string& fa::scoped_string::operator=(const string& other)
 {
     if (this != &other) {
         assign_owned_strong(other.basic_sanity() ? other.view() : std::string_view{});
@@ -366,23 +261,23 @@ msvc8::scoped_string& msvc8::scoped_string::operator=(const string& other)
     return *this;
 }
 
-msvc8::scoped_string& msvc8::scoped_string::operator=(const scoped_string& other)
+fa::scoped_string& fa::scoped_string::operator=(const scoped_string& other)
 {
     return operator=(static_cast<const string&>(other));
 }
 
-msvc8::scoped_string& msvc8::scoped_string::operator=(scoped_string&& other) noexcept
+fa::scoped_string& fa::scoped_string::operator=(scoped_string&& other) noexcept
 {
     string::operator=(std::move(static_cast<string&>(other)));
     return *this;
 }
 
-msvc8::scoped_string::~scoped_string()
+fa::scoped_string::~scoped_string()
 {
     tidy(true, 0U);
 }
 
-bool msvc8::string::equals_no_case(const std::string_view rhs) const noexcept {
+bool fa::string::equals_no_case(const std::string_view rhs) const noexcept {
     const bool sane = basic_sanity();
     const char* lhs = sane ? raw_data_unsafe() : "";
     const std::size_t lhsSize = sane ? mySize : 0u;
@@ -415,7 +310,7 @@ bool msvc8::string::equals_no_case(const std::string_view rhs) const noexcept {
 // "C:\ProgramData\FAForever\bin\SupComDataPath.lua" into "c:\programdata\", so
 // STR_CanonizeFilename handed CreateFileW a directory, the data-path script
 // could not be opened, and startup died in gpg::Die.
-bool msvc8::string::ensure_capacity(const std::size_t need) noexcept {
+bool fa::string::ensure_capacity(const std::size_t need) noexcept {
     if (!basic_sanity()) {
         return false;
     }
@@ -453,7 +348,7 @@ bool msvc8::string::ensure_capacity(const std::size_t need) noexcept {
     return true;
 }
 
-bool msvc8::string::resize(const std::size_t newSize, const char ch) noexcept {
+bool fa::string::resize(const std::size_t newSize, const char ch) noexcept {
     if (!ensure_capacity(newSize)) {
         return false;
     }
@@ -466,7 +361,7 @@ bool msvc8::string::resize(const std::size_t newSize, const char ch) noexcept {
     return true;
 }
 
-bool msvc8::string::append(const char* s, const std::size_t n) noexcept {
+bool fa::string::AppendSlow(const char* s, const std::size_t n) noexcept {
     if (!basic_sanity() || s == nullptr) {
         return false;
     }
@@ -476,6 +371,14 @@ bool msvc8::string::append(const char* s, const std::size_t n) noexcept {
     if (n == 0) {
         return true;
     }
+
+    // The grow below releases the old buffer, which `s` may point into.
+    const char* const current = raw_data_unsafe();
+    if (!std::less<const char*>{}(s, current) && !std::less<const char*>{}(current + mySize, s)) {
+        const string source(s, n);
+        return AppendSlow(source.raw_data_unsafe(), n);
+    }
+
     if (!ensure_capacity(mySize + n)) {
         return false;
     }
@@ -486,7 +389,7 @@ bool msvc8::string::append(const char* s, const std::size_t n) noexcept {
     return true;
 }
 
-bool msvc8::string::append(const std::size_t count, const char ch) noexcept {
+bool fa::string::AppendSlow(const std::size_t count, const char ch) noexcept {
     if (!basic_sanity()) {
         return false;
     }
@@ -507,7 +410,7 @@ bool msvc8::string::append(const std::size_t count, const char ch) noexcept {
     return true;
 }
 
-void msvc8::string::reverse() noexcept {
+void fa::string::reverse() noexcept {
     if (!basic_sanity() || mySize <= 1) {
         return;
     }
@@ -522,24 +425,22 @@ void msvc8::string::reverse() noexcept {
     // p[mySize] remains '\0'
 }
 
-void msvc8::string::reserve(const std::size_t newCap) noexcept {
+void fa::string::reserve(const std::size_t newCap) noexcept {
     // MSVC8's reserve never shrinks below the current size, and a request that
     // already fits is a no-op; ensure_capacity covers both.
     (void)ensure_capacity(newCap);
 }
 
-std::size_t msvc8::string::find(const char ch, const std::size_t pos) const noexcept {
+std::size_t fa::string::find(const char ch, const std::size_t pos) const noexcept {
     if (!basic_sanity() || pos > mySize) {
         return npos;
     }
-    const char* p = raw_data_unsafe();
-    for (std::size_t i = pos; i < mySize; ++i) {
-        if (p[i] == ch) return i;
-    }
-    return npos;
+    const char* const p = raw_data_unsafe();
+    const void* const hit = (pos < mySize) ? std::memchr(p + pos, static_cast<unsigned char>(ch), mySize - pos) : nullptr;
+    return hit != nullptr ? static_cast<std::size_t>(static_cast<const char*>(hit) - p) : npos;
 }
 
-std::size_t msvc8::string::find(const std::string_view needle, const std::size_t pos) const noexcept {
+std::size_t fa::string::find(const std::string_view needle, const std::size_t pos) const noexcept {
     if (!basic_sanity()) {
         return npos;
     }
@@ -562,7 +463,7 @@ std::size_t msvc8::string::find(const std::string_view needle, const std::size_t
     return npos;
 }
 
-std::size_t msvc8::string::find(const char* s, const std::size_t pos, const std::size_t n) const noexcept {
+std::size_t fa::string::find(const char* s, const std::size_t pos, const std::size_t n) const noexcept {
     if (!basic_sanity()) {
         return npos;
     }
@@ -585,7 +486,7 @@ std::size_t msvc8::string::find(const char* s, const std::size_t pos, const std:
     return npos;
 }
 
-bool msvc8::string::replace(const std::size_t pos, std::size_t count, const std::string_view repl) noexcept {
+bool fa::string::replace(const std::size_t pos, std::size_t count, const std::string_view repl) noexcept {
     if (!basic_sanity()) {
         return false;
     }
@@ -614,7 +515,7 @@ bool msvc8::string::replace(const std::size_t pos, std::size_t count, const std:
     return true;
 }
 
-bool msvc8::string::assign_inplace(const std::string_view src) noexcept {
+bool fa::string::assign_inplace(const std::string_view src) noexcept {
     if (!basic_sanity()) {
         return false;
     }
@@ -630,7 +531,7 @@ bool msvc8::string::assign_inplace(const std::string_view src) noexcept {
     return true;
 }
 
-msvc8::string& msvc8::string::operator=(const char* s) noexcept {
+fa::string& fa::string::operator=(const char* s) noexcept {
     // Accept nullptr as "clear"
     if (!s) {
 	    clear();
@@ -675,7 +576,7 @@ msvc8::string& msvc8::string::operator=(const char* s) noexcept {
  * every `SNetCommandArg::operator=` -- the only caller shape this has -- leaked
  * one allocation per assignment.
  */
-msvc8::string& msvc8::string::reset_and_assign(const string& other) noexcept {
+fa::string& fa::string::reset_and_assign(const string& other) noexcept {
     if (this == &other) {
         return *this;
     }
@@ -684,7 +585,7 @@ msvc8::string& msvc8::string::reset_and_assign(const string& other) noexcept {
     return assign(other, 0U, npos);
 }
 
-msvc8::string& msvc8::string::assign(const string& other, std::size_t pos, const std::size_t count) {
+fa::string& fa::string::assign(const string& other, std::size_t pos, const std::size_t count) {
     // Basic sanity checks: if source is bogus, clear destination.
     if (!other.basic_sanity()) {
         clear();
@@ -753,7 +654,7 @@ msvc8::string& msvc8::string::assign(const string& other, std::size_t pos, const
     return *this;
 }
 
-msvc8::string& msvc8::string::assign(const char* data, const std::size_t size) noexcept {
+fa::string& fa::string::assign(const char* data, const std::size_t size) noexcept {
     if (!data || size == 0) {
         clear();
         return *this;
@@ -775,32 +676,22 @@ msvc8::string& msvc8::string::assign(const char* data, const std::size_t size) n
     return *this;
 }
 
-msvc8::string msvc8::string::operator+(const string& rhs) const noexcept {
+fa::string fa::string::operator+(const string& rhs) const noexcept {
     return detail::concat_impl(view(), rhs.view());
 }
 
-msvc8::string msvc8::string::operator+(const std::string_view rhs) const noexcept {
+fa::string fa::string::operator+(const std::string_view rhs) const noexcept {
     return detail::concat_impl(view(), rhs);
 }
 
-msvc8::string msvc8::string::operator+(const char* rhs) const noexcept {
+fa::string fa::string::operator+(const char* rhs) const noexcept {
     return detail::concat_impl(view(), std::string_view(rhs ? rhs : ""));
 }
 
-// Owning concatenation; see detail::concat_impl in the header for why the
-// thread-local arena path had to go.
-msvc8::string msvc8::string::concat_impl_(const std::string_view a, const std::string_view b) noexcept {
-    string out;
-    out.reserve(a.size() + b.size());
-    (void)out.append(a.data(), a.size());
-    (void)out.append(b.data(), b.size());
-    return out;
-}
-
-msvc8::string msvc8::operator+(const std::string_view lhs, const string& rhs) noexcept {
+fa::string fa::operator+(const std::string_view lhs, const string& rhs) noexcept {
     return detail::concat_impl(lhs, rhs.view());
 }
 
-msvc8::string msvc8::operator+(const char* lhs, const string& rhs) noexcept {
+fa::string fa::operator+(const char* lhs, const string& rhs) noexcept {
     return detail::concat_impl(std::string_view(lhs ? lhs : ""), rhs.view());
 }

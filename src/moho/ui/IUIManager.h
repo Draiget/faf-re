@@ -148,7 +148,7 @@ namespace moho
 
   struct UICommandModeData
   {
-    msvc8::string mMode;          // +0x00
+    fa::string mMode;          // +0x00
     LuaPlus::LuaObject mPayload{}; // +0x1C
 
     /**
@@ -196,6 +196,11 @@ namespace moho
    * Address context: global accessor for DAT_010A6450 (`UI_Manager`).
    */
   [[nodiscard]] IUIManager* UI_GetManager();
+
+  /**
+   * Runs pending periodic UI Lua GC in the post-present frame idle window.
+   */
+  void UI_ProcessIdleGC();
 
   /**
    * Address: 0x0084C680 (FUN_0084C680)
@@ -270,6 +275,14 @@ namespace moho
   [[nodiscard]] bool UI_StartGameUI(LuaPlus::LuaState* state);
 
   /**
+   * Engine addition (the map editor, src/editor): called by `UI_StartGameUI` with the state the UI was
+   * just bound to, before `uimain.lua`'s `StartGameUI` runs in it. A session calls `UI_StartGameUI`
+   * twice: in the front end's state for the loading dialog, then in the session's own state at the
+   * first sync. The editor installs its loading view there. Null in the game.
+   */
+  extern void (*gUIBeforeStartGameUI)(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x0083D340 (FUN_0083D340, Moho::ShowEscapeDialog)
    *
    * What it does:
@@ -285,6 +298,12 @@ namespace moho
    * Lua state.
    */
   [[nodiscard]] bool UI_UpdateDisconnectDialogCallback();
+
+  /// Engine addition (issue #275): the screen of a client started with /rejoin, before it has a session.
+  [[nodiscard]] bool UI_StartRejoinScreen();
+
+  /// Engine addition (issue #275): `/lua/ui/uimain.lua:UpdateRejoinScreen(stage, progress)`.
+  void UI_UpdateRejoinScreen(const char* stage, float progress);
 
   /**
    * Address: 0x0083DDA0 (FUN_0083DDA0, ?UI_GetCommandMode@Moho@@YA?AUUICommandModeData@1@XZ)
@@ -336,5 +355,5 @@ namespace moho
    * Builds one Lua table from desync payload strings and invokes
    * `/lua/ui/uimain.lua:ShowDesyncDialog(sessionTick, payloadTable)`.
    */
-  void UI_ShowDesyncDialog(int sessionTick, const msvc8::vector<msvc8::string>& payloadLines);
+  void UI_ShowDesyncDialog(int sessionTick, const fa::vector<fa::string>& payloadLines);
 } // namespace moho

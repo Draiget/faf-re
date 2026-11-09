@@ -1,4 +1,5 @@
 #include "moho/ui/CUIManager.h"
+#include "gpg/core/profiling/Profiler.h"
 
 #include <Windows.h>
 
@@ -10,17 +11,154 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
+#include "lua/LuaIncrementalGc.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
+#include "moho/console/TConVarbool.h"
+#include "moho/app/UserWorkerPool.h"
+
+namespace moho
+{
+  bool ui_ParallelMark = true;
+  TConVar<bool> gTConVar_ui_ParallelMark(
+    "ui_ParallelMark",
+    "Mark UI Lua objects on CUserWorkerPool worker threads during garbage collection.",
+    &ui_ParallelMark
+  );
+
+  bool ui_ParallelSweep = true;
+  TConVar<bool> gTConVar_ui_ParallelSweep(
+    "ui_ParallelSweep",
+    "Sweep UI Lua objects on CUserWorkerPool worker threads during garbage collection.",
+    &ui_ParallelSweep
+  );
+
+  bool ui_IdleGC = true;
+  TConVar<bool> gTConVar_ui_IdleGC(
+    "ui_IdleGC",
+    "Defer periodic UI Lua GC to the post-present frame idle window.",
+    &ui_IdleGC
+  );
+
+  static bool sPendingUiGc = false;
+  static bool sIncrementalCycleDue = false;
+
+  struct UserGcDispatcherRegistrar
+  {
+    UserGcDispatcherRegistrar()
+    {
+      RegisterUserGcDispatcher({
+        [](std::size_t count, std::size_t grain, void (*fn)(void*, std::size_t, std::size_t), void* context) {
+          CUserWorkerPool::Get().Run(count, grain, fn, context);
+        },
+        // Off the main thread (the scenario loader's blueprint state) the collection runs
+        // serially: it would share the pool and the GC's user-side scratch with the UI's.
+        []() { return CUserWorkerPool::IsDispatcherThread() ? CUserWorkerPool::ConfiguredWorkerCount() : 0u; },
+        &ui_ParallelMark,
+        &ui_ParallelSweep
+      });
+    }
+  } gUserGcDispatcherRegistrar;
+}
 
 namespace
 {
+
   /**
    * Frames whose owning reference was dropped while a MAUI event was being
    * dispatched. Released by `ReleaseRetiredFrames` on the next UI tick.
    */
   std::vector<boost::shared_ptr<moho::CMauiFrame>> gRetiredFrames;
+
+  /**
+   * Pacing state for the incremental (5.1-style) Lua collector that the UI VM
+   * drives once per frame. `sGcWindowFrames` / `sGcWindowSeconds` measure the
+   * real frame rate over the current five-second window; `sGcSecondsPerFrame`
+   * keeps the last completed measurement (a conservative 30 FPS default until
+   * the first window closes).
+   */
+  int sGcWindowFrames = 0;
+  float sGcWindowSeconds = 0.0f;
+  float sGcSecondsPerFrame = 1.0f / 30.0f;
+
+  /**
+   * Work budget for one incremental-GC slice, in 5.1 singlestep work units.
+   *
+   * Units. The collector's work unit is one byte of object payload touched by
+   * the mark phase (`IncrPropagateMark` returns `sizeof(Table) + payload`, so a
+   * full mark phase of a heap costs about as many units as the heap has bytes)
+   * plus a small sweep overhead (10 units per swept object) and 100 units per
+   * finalizer. `global_State::nblocks` is the number of bytes the VM has
+   * allocated, so it is the natural scale for "how much work is one cycle".
+   *
+   * Formula. A cycle must fit into the five-second window in which the shipped
+   * collector would have run (the UI forces a cycle every five seconds), so the
+   * per-cycle work is spread over the frames of that window:
+   *
+   *   cycleWork = (heapBytes + debtBytes) * 2
+   *   budget    = cycleWork * (secondsPerFrame / 5 s)
+   *
+   * The factor 2 covers the sweep and finalizer overhead on top of the mark
+   * phase (mark ~= heapBytes). `debtBytes` is the allocation debt past the
+   * pause threshold (`nblocks - GCthreshold`, or the collector's own
+   * `gcdebt` when it is larger): a heap that grew a lot since the last cycle
+   * gets proportionally more work per frame, so the debt is paid down at the
+   * same rate as it accumulates.
+   *
+   * Because the budget is derived from the measured frame time, the total work
+   * per five-second window is frame-rate independent: `budget * frames =
+   * cycleWork`, and `frames = 5 s / secondsPerFrame`. A cycle therefore
+   * completes inside one five-second window at any frame rate, while a single
+   * frame never does more than its proportional share of it.
+   *
+   * Bounds. The minimum keeps the previous fixed 512 units for small heaps
+   * (a heap of a few hundred KB needs far less than 512 units per frame to
+   * keep up), and the maximum caps a single frame at 65536 units (~64 KB of
+   * mark traversal, tens of microseconds) so a huge heap cannot stall a frame;
+   * a heap too large for the cap simply finishes its cycle over more than one
+   * five-second window instead of hitching the frame.
+   */
+  int ComputeIncrementalGcWorkBudget(global_State* const g)
+  {
+    constexpr int kMinWork = 512;
+    constexpr int kMaxWork = 65536;
+    constexpr double kCycleSeconds = 5.0;
+    constexpr double kWorkPerHeapByte = 2.0;
+
+    if (g == nullptr) {
+      return kMinWork;
+    }
+
+    const lu_mem heapBytes = g->nblocks;
+    const lu_mem thresholdBytes = g->GCthreshold;
+    const lu_mem thresholdDebt =
+      (heapBytes > thresholdBytes) ? (heapBytes - thresholdBytes) : static_cast<lu_mem>(0);
+
+    // The collector's own debt (bytes allocated past the pause threshold) is
+    // only maintained by the allocation-driven path; take the larger of the two
+    // so a burst of allocations is paid down faster.
+    lu_mem debtBytes = thresholdDebt;
+    if (const moho::lua_incremental::SState* const incremental =
+          moho::lua_incremental::Find(g);
+        incremental != nullptr && incremental->gcdebt > debtBytes) {
+      debtBytes = incremental->gcdebt;
+    }
+
+    const double effectiveBytes =
+      static_cast<double>(heapBytes) + static_cast<double>(debtBytes);
+    const double cycleWork = effectiveBytes * kWorkPerHeapByte;
+    const double perFrameWork =
+      cycleWork * (static_cast<double>(sGcSecondsPerFrame) / kCycleSeconds);
+
+    int budget = static_cast<int>(perFrameWork);
+    if (budget < kMinWork) {
+      budget = kMinWork;
+    } else if (budget > kMaxWork) {
+      budget = kMaxWork;
+    }
+    return budget;
+  }
 
   /**
    * Address: 0x0084E6F0 (FUN_0084E6F0, funcReleaseRange_WeakPtrFrame)
@@ -338,11 +476,15 @@ void moho::CUIManager::ClearFrames()
  */
 void moho::CUIManager::UpdateFrameRate(const float deltaSeconds)
 {
+  FAF_PROFILE_ZONE_NAMED("UI");
   ReleaseRetiredFrames();
 
-  for (std::size_t index = 0; index < mFrames.Size(); ++index) {
-    if (mFrames[index]) {
-      mFrames[index]->Frame(deltaSeconds);
+  {
+    FAF_PROFILE_ZONE_NAMED("UI::FrameWindows");
+    for (std::size_t index = 0; index < mFrames.Size(); ++index) {
+      if (mFrames[index]) {
+        mFrames[index]->Frame(deltaSeconds);
+      }
     }
   }
 
@@ -354,9 +496,34 @@ void moho::CUIManager::UpdateFrameRate(const float deltaSeconds)
     PublishEngineStatsToLua(mLuaState);
 
     mGCTime += deltaSeconds;
+
+    // Measure the real frame rate over the five-second GC window so the
+    // incremental slice budget can be spread over the frames that follow.
+    sGcWindowFrames += 1;
+    sGcWindowSeconds += deltaSeconds;
+
     if (mGCTime > 5.0f) {
       mGCTime -= 5.0f;
-      if (mLuaState->m_state != nullptr) {
+      if (sGcWindowFrames > 0) {
+        float secondsPerFrame = sGcWindowSeconds / static_cast<float>(sGcWindowFrames);
+        // Keep the measurement sane: a hitch must not shrink the budget for
+        // the next window, and a very fast frame must not inflate it.
+        if (secondsPerFrame < 1.0f / 240.0f) {
+          secondsPerFrame = 1.0f / 240.0f;
+        } else if (secondsPerFrame > 1.0f / 10.0f) {
+          secondsPerFrame = 1.0f / 10.0f;
+        }
+        sGcSecondsPerFrame = secondsPerFrame;
+      }
+      sGcWindowFrames = 0;
+      sGcWindowSeconds = 0.0f;
+      if (moho::lua_IncrementalGC) {
+        // Keep the five-second cadence of the shipped collector, but spread the
+        // cycle over frames in UI_ProcessIdleGC instead of stopping the world.
+        sIncrementalCycleDue = true;
+      } else if (ui_IdleGC) {
+        sPendingUiGc = true;
+      } else if (mLuaState->m_state != nullptr) {
         lua_setgcthreshold(mLuaState->m_state, 0);
       }
     }
@@ -366,11 +533,50 @@ void moho::CUIManager::UpdateFrameRate(const float deltaSeconds)
   UI_UpdateCommandFeedbackBlips(deltaSeconds);
 }
 
+void moho::UI_ProcessIdleGC()
+{
+  if (moho::lua_IncrementalGC) {
+    if (CUIManager* const uiMgr = static_cast<CUIManager*>(UI_GetManager())) {
+      if (uiMgr->mLuaState != nullptr && uiMgr->mLuaState->m_state != nullptr) {
+        FAF_PROFILE_ZONE_NAMED("UI::LuaGCStep");
+        // Work units are 5.1 singlestep costs (bytes of mark traversal), not
+        // milliseconds. The budget scales with the current heap size and the
+        // allocation debt so that one cycle fits into the five-second window
+        // the shipped collector used, while a single frame stays bounded.
+        const bool forceStart = sIncrementalCycleDue;
+        if (forceStart) {
+          // The due request is consumed by this call. Clear it here, when the
+          // cycle is started, instead of when it finishes: a flag that stays
+          // set for the whole cycle would restart the collector as soon as the
+          // cycle reaches Pause again.
+          sIncrementalCycleDue = false;
+        }
+        const int workBudget =
+          ComputeIncrementalGcWorkBudget(uiMgr->mLuaState->m_state->l_G);
+        [[maybe_unused]] const bool done =
+            faf_lua51_gc_slice(uiMgr->mLuaState->m_state, workBudget, forceStart);
+      }
+    }
+    return;
+  }
+
+  if (!sPendingUiGc) {
+    return;
+  }
+  sPendingUiGc = false;
+  if (CUIManager* const uiMgr = static_cast<CUIManager*>(UI_GetManager())) {
+    if (uiMgr->mLuaState != nullptr && uiMgr->mLuaState->m_state != nullptr) {
+      lua_setgcthreshold(uiMgr->mLuaState->m_state, 0);
+    }
+  }
+}
+
 /**
  * Address: 0x0084D310 (FUN_0084D310)
  */
 bool moho::CUIManager::DoBeat()
 {
+  FAF_PROFILE_ZONE_NAMED("UI::Beat");
   UI_FactoryCommandQueueHandlerBeat();
   return UI_LuaBeat();
 }
@@ -498,6 +704,7 @@ void moho::CUIManager::RenderFrames(const int head, CD3DPrimBatcher* const primB
  */
 void moho::CUIManager::DrawUI(const int head, CD3DPrimBatcher* const primBatcher)
 {
+  FAF_PROFILE_ZONE_NAMED("UI");
   primBatcher->SetToViewport(head, *this);
 
   CD3DDevice* const device = D3D_GetDevice();

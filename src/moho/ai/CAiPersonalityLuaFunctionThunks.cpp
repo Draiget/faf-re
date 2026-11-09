@@ -9,19 +9,6 @@
 
 namespace
 {
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_AiPersonalityStartup = nullptr;
-  moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_AiPersonalityStartup = nullptr;
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindLuaInitFormSetByName(const char* const setName) noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, setName) == 0) {
-        return set;
-      }
-    }
-    return nullptr;
-  }
-
   template <moho::CScrLuaInitForm* (*Target)()>
   [[nodiscard]] moho::CScrLuaInitForm* ForwardAiPersonalityLuaThunk() noexcept
   {
@@ -78,16 +65,6 @@ namespace moho
 {
   class CAiPersonality;
 
-  [[nodiscard]] static CScrLuaInitFormSet& ClassBinderSimLuaInitSet()
-  {
-    if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
-
   /**
    * Address: 0x00BCD730 (FUN_00BCD730)
    *
@@ -98,7 +75,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_aiPersonalityStartupAnchor()
   {
     static CScrLuaClassBinder binder(
-      ClassBinderSimLuaInitSet(), "moho.aipersonality_methods", &CScrLuaMetatableFactory<CAiPersonality>::Instance(), "CAiPersonality", ""
+      moho::SCR_SimLuaInitSet(), "moho.aipersonality_methods", &CScrLuaMetatableFactory<CAiPersonality>::Instance(), "CAiPersonality", ""
     );
     return &binder;
   }

@@ -89,7 +89,7 @@ namespace moho
      * Address: 0x4C70A0
      * VFTable SLOT: 3
      */
-    virtual msvc8::string GetErrorDescription();
+    virtual fa::string GetErrorDescription();
 
     /**
      * Address: 0x004C70D0
@@ -844,4 +844,9 @@ namespace moho
   static_assert(sizeof(CScriptObject) == 0x34, "CScriptObject must be 0x34");
   static_assert(offsetof(CScriptObject, cObject) == 0x0C, "CScriptObject::cObject must be +0x0C");
   static_assert(offsetof(CScriptObject, mLuaObj) == 0x20, "CScriptObject::mLuaObj must be +0x20");
+  /**
+   * Engine addition: the `CScriptObject*` slot of a Lua object, or of its
+   * `_c_object` field when it is a table; null when it holds none.
+   */
+  [[nodiscard]] CScriptObject** SCR_ScriptObjectSlot(const LuaPlus::LuaObject& object);
 } // namespace moho

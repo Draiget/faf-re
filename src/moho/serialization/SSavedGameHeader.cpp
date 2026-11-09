@@ -174,10 +174,10 @@ namespace moho
     }
 
     archive->WriteInt(mVersion);
-    archive->WriteString(const_cast<msvc8::string*>(&mMapName));
+    archive->WriteString(const_cast<fa::string*>(&mMapName));
     archive->WriteInt(mFocusArmy);
     archive->Write(gpg::ResolveSavedGameArmyInfoVectorType(), &mArmyInfo, NullOwnerRef());
-    archive->WriteString(const_cast<msvc8::string*>(&mScenarioInfoText));
+    archive->WriteString(const_cast<fa::string*>(&mScenarioInfoText));
 
     gpg::RRef launchInfoRef{};
     gpg::RRef_LaunchInfoBase(&launchInfoRef, mLaunchInfo.px);

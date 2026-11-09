@@ -5,7 +5,6 @@
 
 #include "gpg/core/reflection/Reflection.h"
 #include "lua/LuaObject.h"
-#include "moho/audio/AudioEngine.h"
 #include "moho/audio/CSndParams.h"
 
 namespace moho
@@ -90,35 +89,6 @@ namespace moho
     return self != nullptr ? self->Destroy(flags) : nullptr;
   }
 
-  /**
-   * Address: 0x004E1260 (FUN_004E1260, sub_4E1260)
-   *
-   * What it does:
-   * Resolves loop-engine state and signals completion when the cue has stopped
-   * or no longer has a valid engine/cue context.
-   */
-  bool HSound::UpdateLoopCompletionState()
-  {
-    if (mTriggered) {
-      return false;
-    }
-
-    bool shouldSignal = true;
-    if (mLoopCue != nullptr && mLoopOwnerContext != nullptr) {
-      boost::shared_ptr<AudioEngine> engine{};
-      mLoopOwnerContext->GetEngine(&engine);
-      if (engine.get() != nullptr) {
-        shouldSignal = engine->IsStopped(mLoopCue);
-      }
-    }
-
-    if (!shouldSignal) {
-      return false;
-    }
-
-    EventSetSignaled(true);
-    return true;
-  }
 
   /**
    * Address: 0x004E4E60 (FUN_004E4E60, func_CreateLuaHSound)

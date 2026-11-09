@@ -76,7 +76,7 @@ namespace moho
     EntityCollisionCellNode** mEntityBuckets;            // +0x18
     EntityCollisionCellNode* mFreeNodeHead;              // +0x1C
     std::int32_t mFreeNodeCount;                         // +0x20
-    msvc8::vector<EntityCollisionCellNode*> mAllBlocks;  // +0x24
+    fa::vector<EntityCollisionCellNode*> mAllBlocks;  // +0x24
 
     /**
      * Address: 0x004FCD20 (FUN_004FCD20, Moho::EntityOccupationManager::EntityOccupationManager)
@@ -117,6 +117,16 @@ namespace moho
      * skipped.
      */
     void AddColShapeAt(CollisionShapeBase* shape, int bucketIndex);
+
+    /**
+     * Engine addition (replay keyframes): every entity's rect and each bucket's list, as entity ids.
+     * A bucket is a list in the order its entities last entered it, and area queries report them in
+     * that order, which decides who is damaged first. A load adds entities in load order, under rects
+     * it computes from their current extents, while a live rect can lag those extents; so
+     * `LoadBucketOrder` drops what the load linked and rebuilds the saved rects and lists.
+     */
+    void SaveBucketOrder(gpg::WriteArchive* archive, const class EntityDB& entities) const;
+    void LoadBucketOrder(gpg::ReadArchive* archive, const class EntityDB& entities);
 
     /**
      * Address: 0x004FCF90 (FUN_004FCF90)

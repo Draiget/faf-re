@@ -21,14 +21,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedRDebugOverlayClassType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (!sType) {
-      sType = gpg::LookupRType(typeid(moho::RDebugOverlayClass));
-    }
-    return sType;
-  }
 
   /**
    * Address: 0x00BFB6A0 (FUN_00BFB6A0, atexit destructor of the RDebugGridTypeInfo object)
@@ -121,7 +113,7 @@ namespace moho
    */
   gpg::RType* RDebugOverlayClass::GetClass() const
   {
-    return CachedRDebugOverlayClassType();
+    return gpg::RTypeOf<moho::RDebugOverlayClass>();
   }
 
   /**
@@ -129,10 +121,7 @@ namespace moho
    */
   gpg::RRef RDebugOverlayClass::GetDerivedObjectRef()
   {
-    gpg::RRef out{};
-    out.mObj = this;
-    out.mType = GetClass();
-    return out;
+    return gpg::MakeSelfRef(this);
   }
 
   /**

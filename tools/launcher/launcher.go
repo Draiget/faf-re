@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"faf-main/tools/fafclient"
 	"faf-main/tools/gpgnet"
 	"faf-main/tools/hub"
 	"faf-main/tools/icebreaker"
@@ -82,6 +83,9 @@ type Launcher struct {
 	ice   *icebreaker.Server
 	turn  *turnsrv.Server
 	hub   *hubSession // players on other machines, or services on a remote hub
+
+	contractBus *seat.ContractBus // ModeContract: IceMsg between the seats
+	shapingFile string            // ModeContract with shaping "links": FAF_NETLINK_TEST_SHAPING
 
 	players map[int]*Player
 	order   []int
@@ -145,7 +149,37 @@ func New(cfg Config, j *journal.Journal) (*Launcher, error) {
 
 	switch {
 	case cfg.Mode == ModeRelay && l.hub == nil:
-		l.relay = relay.New(j, relay.Options{Default: cfg.Link})
+		// The relay listens where the games are: a socket bound to 127.0.0.1
+		// cannot send to -advertise's address (WSAEADDRNOTAVAIL).
+		l.relay = relay.New(j, relay.Options{Default: cfg.Link, ListenIP: net.ParseIP(localHost), Latch: cfg.RelayFollow})
+	case cfg.Mode == ModeContract:
+		if l.hub != nil {
+			job.Close()
+			return nil, fmt.Errorf("mode contract runs local seats only")
+		}
+		l.contractBus = seat.NewContractBus()
+		if cfg.Contract.Shaping == "links" {
+			// Every game and adapter this process starts inherits the variable.
+			dir := cfg.RunDir
+			if dir == "" {
+				dir = os.TempDir()
+			}
+			l.shapingFile = filepath.Join(dir, "link-shaping.txt")
+			if err := writeShaping(l.shapingFile, relay.Impairment{}); err != nil {
+				job.Close()
+				return nil, err
+			}
+			_ = os.Setenv("FAF_NETLINK_TEST_SHAPING", l.shapingFile)
+			j.Note(journal.Note, 0, "link steps shape every netlink link's sends: "+l.shapingFile, nil)
+		}
+		if !cfg.Contract.NoTurn {
+			l.turn, err = turnsrv.Start(turnsrv.Config{Port: cfg.TurnPort, PublicIP: cfg.TurnIP}, j)
+			if err != nil {
+				job.Close()
+				return nil, err
+			}
+			j.Note(journal.Note, 0, "contract mode, TURN at "+l.turn.Addr(), nil)
+		}
 	case cfg.Mode == ModeICE && l.hub == nil:
 		if !cfg.ICE.NoTurn {
 			l.turn, err = turnsrv.Start(turnsrv.Config{Port: cfg.TurnPort, PublicIP: cfg.TurnIP}, j)
@@ -333,6 +367,17 @@ func (l *Launcher) seatConfig(p *Player) seat.Config {
 		idx := sort.SearchInts(l.sortedUIDs(), pc.UID)
 		sc.Position = []int{20 + idx*60, 20 + idx*60}
 	}
+	if c.Mode == ModeContract {
+		choice := pc.Adapter
+		if choice == "" {
+			choice = c.Contract.Adapter
+		}
+		if strings.EqualFold(choice, "native") {
+			sc.Native = l.nativeFor(pc)
+		} else {
+			sc.Contract = l.contractFor(pc)
+		}
+	}
 	if c.Mode == ModeICE {
 		sc.ICE = &seat.ICE{Adapter: c.ICE.Adapter, GameID: c.GameID,
 			ForceRelay: c.ICE.ForceRelay, LogLevel: c.ICE.LogLevel}
@@ -343,6 +388,71 @@ func (l *Launcher) seatConfig(p *Player) seat.Config {
 		}
 	}
 	return sc
+}
+
+// contractFor is one seat's adapter in ModeContract: FAF's jar run as the
+// client runs it, or a native adapter given by path.
+func (l *Launcher) contractFor(pc PlayerConfig) *seat.Contract {
+	c := l.cfg.Contract
+	choice := pc.Adapter
+	if choice == "" {
+		choice = c.Adapter
+	}
+	a := fafclient.Adapter{NativeDir: c.NativeDir, ForceRelay: c.ForceRelay}
+	jarBind := ""
+	if choice == "" || strings.EqualFold(choice, "jar") {
+		a.Java = c.Java
+		jarBind = ExpandPath(c.JarBind)
+		// IceAdapterImpl.getJavaFXClassPathJars: entries whose name contains "javafx-".
+		if entries, err := os.ReadDir(c.ClientLib); err == nil {
+			var fx []string
+			for _, e := range entries {
+				if strings.Contains(e.Name(), "javafx-") {
+					fx = append(fx, filepath.Join(c.ClientLib, e.Name()))
+				}
+			}
+			a.JavaFXClassPath = strings.Join(fx, string(os.PathListSeparator))
+		}
+	} else {
+		a.Exe = choice
+		a.Extra = c.ExeArgs
+	}
+	sc := &seat.Contract{Adapter: a, GameID: l.cfg.GameID, Bus: l.contractBus, JarBind: jarBind, KeepSession: c.KeepSession}
+	if len(c.IceServers) > 0 {
+		sc.IceServers = []map[string]any{}
+		for _, s := range c.IceServers {
+			var urls []string
+			for _, u := range s.URLs {
+				urls = append(urls, ExpandPath(u))
+			}
+			sc.IceServers = append(sc.IceServers, map[string]any{
+				"urls": urls, "username": ExpandPath(s.Username), "credential": ExpandPath(s.Credential),
+			})
+		}
+	} else if l.turn != nil {
+		// The Java adapter reads each URL with java.net.URI and needs its host
+		// part: "turn://h:p", not "turn:h:p" (contract §2).
+		var urls []string
+		for _, u := range l.turn.URLs() {
+			scheme, rest, _ := strings.Cut(u, ":")
+			urls = append(urls, scheme+"://"+rest)
+		}
+		user, pass := l.turn.Credentials(l.cfg.GameID, uint(pc.UID), 24*time.Hour)
+		sc.IceServers = []map[string]any{{"urls": urls, "username": user, "credential": pass}}
+	} else {
+		sc.IceServers = []map[string]any{}
+	}
+	return sc
+}
+
+// nativeFor is one seat's part in ModeContract with adapter "native": no
+// adapter, the game links every peer itself (issue #274) and gets the same ICE
+// servers an adapter would.
+func (l *Launcher) nativeFor(pc PlayerConfig) *seat.Native {
+	c := l.cfg.Contract
+	n := &seat.Native{Bind: c.NativeBind, ForceRelay: c.ForceRelay, Bus: l.contractBus}
+	n.IceServers = l.contractFor(pc).IceServers
+	return n
 }
 
 func (l *Launcher) sortedUIDs() []int {
@@ -515,10 +625,9 @@ func (l *Launcher) addr(viewer, target *Player) (string, error) {
 		if l.hub != nil {
 			return l.hubRelayAddr(viewer.Cfg.UID, target.Cfg.UID)
 		}
-		loop := net.IPv4(127, 0, 0, 1)
 		if _, err := l.relay.Ensure(viewer.Cfg.UID, target.Cfg.UID,
-			&net.UDPAddr{IP: loop, Port: viewer.seat.LobbyPort()},
-			&net.UDPAddr{IP: loop, Port: target.seat.LobbyPort()}); err != nil {
+			&net.UDPAddr{IP: net.ParseIP(viewer.host), Port: viewer.seat.LobbyPort()},
+			&net.UDPAddr{IP: net.ParseIP(target.host), Port: target.seat.LobbyPort()}); err != nil {
 			return "", err
 		}
 		return l.relay.AddrFor(viewer.Cfg.UID, target.Cfg.UID)
@@ -624,6 +733,58 @@ func (l *Launcher) Kill(uid int) error {
 		p.seat.Kill()
 	}
 	return nil
+}
+
+// RejoinPeer is a player still in the game, for Rejoin.
+type RejoinPeer struct {
+	UID    int
+	Source int
+}
+
+// Rejoin starts player uid's game again to take its seat back. It links to every
+// peer and gets the game's recording from the first. Seats on this machine only.
+func (l *Launcher) Rejoin(uid, source, keyOf int, launcher bool, remote bool, peers []RejoinPeer) error {
+	p, err := l.Player(uid)
+	if err != nil {
+		return err
+	}
+	local, ok := p.seat.(*seat.Seat)
+	if !ok {
+		return fmt.Errorf("player %d: rejoin needs a seat on this machine", uid)
+	}
+	if len(peers) == 0 {
+		return fmt.Errorf("player %d: rejoin names no peers", uid)
+	}
+	if local.IsNative() {
+		list := make([]string, 0, len(peers))
+		for _, entry := range peers {
+			list = append(list, fmt.Sprintf("%d=%d", entry.UID, entry.Source))
+		}
+		return local.RejoinNative(strings.Join(list, ","), source, keyOf)
+	}
+	if l.cfg.Mode == ModeContract {
+		sources := make(map[int]int, len(peers))
+		for _, entry := range peers {
+			sources[entry.UID] = entry.Source
+		}
+		return local.RejoinViaAdapter(context.Background(), sources, source)
+	}
+	list := make([]string, 0, len(peers))
+	for _, entry := range peers {
+		peer, err := l.Player(entry.UID)
+		if err != nil {
+			return err
+		}
+		endpoint, err := l.addr(p, peer)
+		if err != nil {
+			return err
+		}
+		list = append(list, fmt.Sprintf("%s=%d", endpoint, entry.Source))
+	}
+	if remote {
+		return local.RejoinElsewhere(strings.Join(list, ","), source)
+	}
+	return local.Rejoin(strings.Join(list, ","), source, keyOf, launcher)
 }
 
 // PlayerSnapshot is one row of Snapshot.

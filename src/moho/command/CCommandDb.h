@@ -48,7 +48,7 @@ namespace moho
      * `_Mysize` - the same split-allocator shape as
      * `AllocateAllUnitsTreeNode`/`InitializeAllUnitsTreeHeadLane` in
      * EntityDb.cpp. Here the split is fused inside `commands`'s own default
-     * construction: `msvc8::map`'s shared `detail::rb_tree` default
+     * construction: `fa::map`'s shared `detail::rb_tree` default
      * constructor (legacy/containers/RbTree.h) calls `rb_tree::buy_head()`,
      * which performs the identical alloc + self-link + isNil=1/color=black
      * sequence, so no separate call is needed in this constructor's body.
@@ -56,7 +56,7 @@ namespace moho
      * `pendingReleasedCmdIds` (binary's `this->vec`):
      * Declared at +0x0CC0, immediately after `pool`'s 0x0CB0-byte `IdPool`
      * span, closing the struct out exactly at the asserted 0xCD0 size.
-     * `msvc8::vector<CmdId>`'s default constructor already zeroes
+     * `fa::vector<CmdId>`'s default constructor already zeroes
      * `_Myfirst`/`_Mylast`/`_Myend`, matching the binary's explicit
      * zero-stores.
      */
@@ -76,7 +76,7 @@ namespace moho
     /**
      * Command id -> owned command lookup.
      *
-     * The binary's node is the standard `msvc8::map` shape `{left,parent,right,
+     * The binary's node is the standard `fa::map` shape `{left,parent,right,
      * key@0x0C, CUnitCommand*@0x10, color@0x14, isnil@0x15}` (0x18 bytes), and
      * the container itself is the shipped 12-byte `{proxy,_Myhead,_Mysize}`
      * triplet ending at +0x0F with the id pool starting at +0x10. The RB-tree
@@ -91,10 +91,10 @@ namespace moho
     // Original insert/find compare packed command ids as unsigned values
     // (0x006E15D0 and 0x006E1955). Script ids have the high bit set and
     // follow player ids when commands publish events or retire.
-    using CommandMap = msvc8::map<CmdId, CUnitCommand*, std::less<std::uint32_t>>;
+    using CommandMap = fa::map<CmdId, CUnitCommand*, std::less<std::uint32_t>>;
     CommandMap commands;                         // +0x0004
     IdPool pool;                                  // +0x0010
-    msvc8::vector<CmdId> pendingReleasedCmdIds;   // +0x0CC0
+    fa::vector<CmdId> pendingReleasedCmdIds;   // +0x0CC0
 
     /**
      * What it does:

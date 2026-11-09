@@ -1,6 +1,7 @@
 // MapImager recovered implementation.
 
 #include "moho/render/MapImager.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 
 #include "gpg/core/containers/String.h"
@@ -28,16 +29,6 @@ namespace
   constexpr const char* kGlobalLuaClassName = "<global>";
 
 
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("User");
-    return fallbackSet;
-  }
 
   [[nodiscard]] moho::MapImager* ActiveViewportMapImager() noexcept
   {
@@ -83,7 +74,7 @@ MapImager::~MapImager()
  */
 void MapImager::VirtualDtor()
 {
-  this->~MapImager();
+  this->MapImager::~MapImager();
 }
 
 /**
@@ -119,7 +110,7 @@ void MapImager::ClearBorder()
  * the requested mesh blueprint name, and appends it to the border instance
  * vector when creation succeeds.
  */
-void MapImager::AddBorder(const msvc8::string& meshBlueprintPath)
+void MapImager::AddBorder(const fa::string& meshBlueprintPath)
 {
   const CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr || session->mRules == nullptr || session->mWldMap == nullptr || session->mWldMap->mTerrainRes == nullptr) {
@@ -147,7 +138,7 @@ void MapImager::AddBorder(const msvc8::string& meshBlueprintPath)
   const Wm3::Quaternionf borderOrientation = Wm3::Quaternionf::Identity();
   const VTransform borderTransform(borderPosition, borderOrientation);
 
-  msvc8::string normalizedBlueprintPath{};
+  fa::string normalizedBlueprintPath{};
   gpg::STR_CopyFilename(&normalizedBlueprintPath, &meshBlueprintPath);
 
   RResId meshBlueprintId{};
@@ -239,7 +230,7 @@ void MapImager::UpdateMeshStances()
  * Adds one map-border blueprint to the active viewport map-imager lane when
  * a render viewport is present.
  */
-void REN_AddBorderToActiveViewport(const msvc8::string& meshBlueprintPath)
+void REN_AddBorderToActiveViewport(const fa::string& meshBlueprintPath)
 {
   if (MapImager* const mapImager = ActiveViewportMapImager(); mapImager != nullptr) {
     mapImager->AddBorder(meshBlueprintPath);
@@ -263,7 +254,7 @@ void REN_RenderShadowDebugOverlay()
  * Console callback that expects exactly two tokens and adds the requested
  * border mesh blueprint to the active viewport's MapImager.
  */
-void REN_MapBorderAdd(const msvc8::vector<msvc8::string>& args)
+void REN_MapBorderAdd(const fa::vector<fa::string>& args)
 {
   if (args.size() != 2u) {
     return;
@@ -283,7 +274,7 @@ void REN_MapBorderAdd(const msvc8::vector<msvc8::string>& args)
  * Console callback that clears the active viewport's MapImager border
  * decoration meshes when a viewport is present.
  */
-void REN_MapBorderClear(const msvc8::vector<msvc8::string>& args)
+void REN_MapBorderClear(const fa::vector<fa::string>& args)
 {
   (void)args;
   ClearActiveViewportMapBorder();
@@ -310,7 +301,7 @@ int cfunc_MapBorderAdd(lua_State* const luaContext)
 CScrLuaInitForm* func_MapBorderAdd_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kMapBorderAddName,
     &moho::cfunc_MapBorderAdd,
     nullptr,
@@ -329,10 +320,7 @@ CScrLuaInitForm* func_MapBorderAdd_LuaFuncDef()
  */
 int cfunc_MapBorderAddL(LuaPlus::LuaState* const state)
 {
-  const int argCount = lua_gettop(state->m_state);
-  if (argCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kMapBorderAddHelpText, 1, argCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kMapBorderAddHelpText);
 
   LuaPlus::LuaStackObject blueprintArg(state, 1);
   const char* const blueprintId = lua_tostring(state->m_state, 1);
@@ -341,7 +329,7 @@ int cfunc_MapBorderAddL(LuaPlus::LuaState* const state)
   }
 
   if (MapImager* const mapImager = ActiveViewportMapImager(); mapImager != nullptr) {
-    mapImager->AddBorder(msvc8::string(blueprintId));
+    mapImager->AddBorder(fa::string(blueprintId));
   }
 
   return 0;
@@ -363,10 +351,7 @@ int cfunc_MapBorderClear(lua_State* rawState)
 
   static constexpr const char* kHelpText = "MapBorderClear()";
 
-  const int argCount = lua_gettop(state->m_state);
-  if (argCount != 0) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kHelpText, 0, argCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 0, kHelpText);
 
   ClearActiveViewportMapBorder();
   return 0;
@@ -382,7 +367,7 @@ int cfunc_MapBorderClear(lua_State* rawState)
 CScrLuaInitForm* func_MapBorderClear_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     kMapBorderClearName,
     &moho::cfunc_MapBorderClear,
     nullptr,

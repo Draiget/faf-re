@@ -1,4 +1,6 @@
 #include "StatItem.h"
+#include "moho/lua/CScrLuaInitForm.h"
+#include "platform/Interlocked.h"
 
 #include <algorithm>
 #include <bit>
@@ -8,6 +10,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <intrin.h>
 #include <new>
 #include <stdexcept>
 #include <string>
@@ -21,15 +24,12 @@
 #include "gpg/core/streams/FileStream.h"
 #include "gpg/core/streams/Stream.h"
 #include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
 #include "moho/app/WinApp.h"
-#include "moho/app/WxRuntimeTypes.h"
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/CScrLuaBinder.h"
-#include "moho/sim/CWldSession.h"
-#include "moho/sim/UserArmy.h"
-#include "moho/ui/CUIManager.h"
 #include "platform/Platform.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -104,73 +104,12 @@ namespace
   moho::StatItemSerializer gStatItemSerializer;
   moho::StatsRType<moho::StatItem> gStatsRTypeStatItem;
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Core");
-    return sSet;
-  }
-
   template <typename TObject>
   void MaterializeReflectionSingleton(TObject& singleton)
   {
     (void)singleton;
   }
 
-  [[nodiscard]] gpg::RType* CachedStatItemType()
-  {
-    if (!moho::StatItem::sType) {
-      moho::StatItem::sType = gpg::LookupRType(typeid(moho::StatItem));
-    }
-    return moho::StatItem::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedStatsStatItemType()
-  {
-    if (!moho::Stats<moho::StatItem>::sType) {
-      moho::Stats<moho::StatItem>::sType = gpg::LookupRType(typeid(moho::Stats<moho::StatItem>));
-    }
-    return moho::Stats<moho::StatItem>::sType;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    int baseOffset = 0;
-    const bool isDerived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    GPG_ASSERT(isDerived);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
 
   /**
    * Address: 0x0041A8B0 (FUN_0041A8B0, gpg::RRef_StatItem)
@@ -180,7 +119,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef MakeStatItemRef(moho::StatItem* object)
   {
-    return MakeTypedRef(object, CachedStatItemType());
+    return gpg::MakeTypedRef(object, gpg::RTypeOf<moho::StatItem>());
   }
 
   /**
@@ -191,7 +130,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef MakeStatsStatItemRef(moho::Stats<moho::StatItem>* object)
   {
-    return MakeTypedRef(object, CachedStatsStatItemType());
+    return gpg::MakeTypedRef(object, gpg::RTypeOf<moho::Stats<moho::StatItem>>());
   }
 
   /**
@@ -202,7 +141,7 @@ namespace
    */
   [[nodiscard]] moho::StatItem* CastStatItemFromRef(const gpg::RRef& source)
   {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedStatItemType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::StatItem>());
     return static_cast<moho::StatItem*>(upcast.mObj);
   }
 
@@ -230,9 +169,9 @@ namespace
 
     moho::StatItem* const item = CastStatItemFromRef(source);
     if (!item) {
-      const char* const expectedName = CachedStatItemType()->GetName();
+      const char* const expectedName = gpg::RTypeOf<moho::StatItem>()->GetName();
       const char* const actualName = tracked.type ? tracked.type->GetName() : "null";
-      const msvc8::string msg = gpg::STR_Printf(
+      const fa::string msg = gpg::STR_Printf(
         "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
         "instead",
         expectedName ? expectedName : "StatItem",
@@ -248,7 +187,7 @@ namespace
   /**
    * Address: 0x00419DE0 (FUN_00419DE0, func_ReadArchive_Stats_StatItem)
    */
-  void DeserializeStatsStatItem(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void DeserializeStatsStatItem(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* /*ownerRef*/)
   {
     auto* const stats = reinterpret_cast<moho::Stats<moho::StatItem>*>(objectPtr);
     GPG_ASSERT(stats != nullptr);
@@ -305,7 +244,7 @@ namespace
    */
   void DeleteStatsStatItem(void* object)
   {
-    delete static_cast<moho::Stats<moho::StatItem>*>(object);
+    GPG_NONVIRTUAL_DESTROY(delete static_cast<moho::Stats<moho::StatItem>*>(object));
   }
 
   /**
@@ -426,7 +365,7 @@ namespace
    * creates missing child nodes segment-by-segment.
    */
   [[nodiscard]] moho::StatItem* WalkStatPath(
-    moho::StatItem* root, const msvc8::vector<msvc8::string>& tokens, const bool allowCreate, bool* const didCreate
+    moho::StatItem* root, const fa::vector<fa::string>& tokens, const bool allowCreate, bool* const didCreate
   )
   {
     if (didCreate != nullptr) {
@@ -475,67 +414,22 @@ namespace
 
   [[nodiscard]] std::int32_t ReadAtomicI32(volatile std::int32_t* value)
   {
-#if defined(_WIN32)
-    return static_cast<std::int32_t>(InterlockedCompareExchange(reinterpret_cast<volatile long*>(value), 0, 0));
-#else
-    return *value;
-#endif
+    return platform::AtomicLoad(value);
   }
 
   void AtomicStoreI32(volatile std::int32_t* value, const std::int32_t wanted)
   {
-#if defined(_WIN32)
-    for (;;) {
-      const std::int32_t observed = ReadAtomicI32(value);
-      const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(value), static_cast<long>(wanted), static_cast<long>(observed)
-      ));
-      if (exchanged == observed) {
-        return;
-      }
-    }
-#else
-    *value = wanted;
-#endif
+    (void)platform::AtomicExchange(value, wanted);
   }
 
   [[nodiscard]] std::int32_t AtomicExchangeI32(volatile std::int32_t* value, const std::int32_t wanted)
   {
-#if defined(_WIN32)
-    for (;;) {
-      const std::int32_t observed = ReadAtomicI32(value);
-      const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(value), static_cast<long>(wanted), static_cast<long>(observed)
-      ));
-      if (exchanged == observed) {
-        return exchanged;
-      }
-    }
-#else
-    const std::int32_t previous = *value;
-    *value = wanted;
-    return previous;
-#endif
+    return platform::AtomicExchange(value, wanted);
   }
 
   [[nodiscard]] std::int32_t AtomicStoreSlotFromPtr(volatile std::int32_t* const slot, const std::int32_t* const wanted)
   {
-    const std::int32_t target = wanted ? *wanted : 0;
-#if defined(_WIN32)
-    for (;;) {
-      const std::int32_t observed = ReadAtomicI32(slot);
-      const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(slot), static_cast<long>(target), static_cast<long>(observed)
-      ));
-      if (exchanged == observed) {
-        return exchanged;
-      }
-    }
-#else
-    const std::int32_t previous = *slot;
-    *slot = target;
-    return previous;
-#endif
+    return platform::AtomicExchange(slot, wanted ? *wanted : 0);
   }
 
   /**
@@ -559,24 +453,15 @@ namespace
    */
   [[nodiscard]] std::int32_t SyncRealtimeValueBitsFromPrimary(moho::StatItem* const item)
   {
-#if defined(_WIN32)
     for (;;) {
-      const std::int32_t observedRealtime = ReadAtomicI32(&item->mRealtimeValueBits);
-      const std::int32_t observedPrimary = ReadAtomicI32(&item->mPrimaryValueBits);
-      const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(&item->mRealtimeValueBits),
-        static_cast<long>(observedPrimary),
-        static_cast<long>(observedRealtime)
-      ));
+      const std::int32_t observedRealtime = platform::AtomicLoad(&item->mRealtimeValueBits);
+      const std::int32_t observedPrimary = platform::AtomicLoad(&item->mPrimaryValueBits);
+      const std::int32_t exchanged =
+        platform::AtomicCompareExchange(&item->mRealtimeValueBits, observedPrimary, observedRealtime);
       if (exchanged == observedRealtime) {
         return exchanged;
       }
     }
-#else
-    const std::int32_t previous = item->mRealtimeValueBits;
-    item->mRealtimeValueBits = item->mPrimaryValueBits;
-    return previous;
-#endif
   }
 
   [[nodiscard]] std::int32_t ReadNumericSlot(moho::StatItem* item, const bool useRealtimeValue)
@@ -930,9 +815,7 @@ namespace moho
      * `_gmtimebuf` field is unset, lazily `malloc(0x24)`s the `struct tm`
      * scratch buffer the `*time64` family fills and returns a pointer into
      * -- textbook CRT internals (`_tiddata`, `_gmtimebuf`, `_errno`), not
-     * engine code. Both were mass-mis-attributed to `CrtRuntimeHelpers.cpp`
-     * by the 2026-08-24 DB-integrity bulk pass (address not present in that
-     * file); classified `external_dependency` here with a real citation.
+     * engine code.
      */
     const std::tm* const localTime = _localtime64(selectedTime);
     if (localTime == nullptr) {
@@ -1060,7 +943,7 @@ namespace moho
     childNode->prev->next = childNode;
   }
 
-  StatItem* StatItem::FindDirectChildByName(const msvc8::string& token)
+  StatItem* StatItem::FindDirectChildByName(const fa::string& token)
   {
     for (StatIntrusiveNode* node = AsChildHead(this)->next; node != nullptr && node != AsChildHead(this); node = node->next) {
       StatItem* const child = node->owner;
@@ -1072,6 +955,17 @@ namespace moho
       }
     }
     return nullptr;
+  }
+
+  void StatItem::VisitChildren(void (*const visit)(StatItem* child, void* context), void* const context)
+  {
+    for (StatIntrusiveNode* node = AsChildHead(this)->next; node != nullptr && node != AsChildHead(this); node = node->next) {
+      StatItem* const child = node->owner;
+      if (child == nullptr) {
+        break;
+      }
+      visit(child, context);
+    }
   }
 
   /**
@@ -1108,7 +1002,7 @@ namespace moho
   {
     boost::mutex::scoped_lock lock(mLock);
 
-    msvc8::vector<msvc8::string> tokens;
+    fa::vector<fa::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
 
     bool didCreate = false;
@@ -1126,7 +1020,7 @@ namespace moho
   {
     boost::mutex::scoped_lock lock(mLock);
 
-    msvc8::vector<msvc8::string> tokens;
+    fa::vector<fa::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
 
     bool didCreate = false;
@@ -1144,7 +1038,7 @@ namespace moho
   {
     boost::mutex::scoped_lock lock(mLock);
 
-    msvc8::vector<msvc8::string> tokens;
+    fa::vector<fa::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
 
     bool didCreate = false;
@@ -1230,7 +1124,7 @@ namespace moho
    * What it does:
    * Builds a local-time filename prefix as `YYYY-MM-DD.HH-MM`.
    */
-  msvc8::string LOG_GenerateFilenamePrefix()
+  fa::string LOG_GenerateFilenamePrefix()
   {
     CTimeStamp timestamp{};
     timestamp.time = static_cast<std::int64_t>(_time64(nullptr));
@@ -1266,7 +1160,7 @@ namespace moho
       return 0.0f;
     }
 
-    const msvc8::string prefix = LOG_GenerateFilenamePrefix();
+    const fa::string prefix = LOG_GenerateFilenamePrefix();
     mResolvedLogFilePath = prefix + "-" + mLogFileName;
 
     gpg::FileStream logFile(mResolvedLogFilePath.c_str(), gpg::Stream::ModeSend, 0u, 0x1000);
@@ -1318,7 +1212,7 @@ namespace moho
     BuildStatReportRecursive(rootItem, reportBody, 0u, depthNameWidths);
     ApplyDepthPlaceholderFormatting(reportBody, depthNameWidths);
 
-    writer.WriteString(msvc8::string(reportBody.c_str()));
+    writer.WriteString(fa::string(reportBody.c_str()));
 
     if (rootItem) {
       CommitStatSampleRangesRecursive(rootItem);
@@ -1378,10 +1272,10 @@ namespace moho
   /**
    * Address: 0x004162C0 (FUN_004162C0, Moho::CON_ClearStats)
    */
-  void CON_ClearStats(const msvc8::vector<msvc8::string>& args)
+  void CON_ClearStats(const fa::vector<fa::string>& args)
   {
 
-    const msvc8::string* targetPath = nullptr;
+    const fa::string* targetPath = nullptr;
     if (args.size() >= 2u) {
       targetPath = ConCommandArg(args, 1u);
     }
@@ -1393,11 +1287,11 @@ namespace moho
   /**
    * Address: 0x004163A0 (FUN_004163A0, Moho::CON_BeginLoggingStats)
    */
-  void CON_BeginLoggingStats(const msvc8::vector<msvc8::string>& args)
+  void CON_BeginLoggingStats(const fa::vector<fa::string>& args)
   {
     EngineStats* const engineStats = GetEngineStats();
 
-    const msvc8::string* requestedPath = nullptr;
+    const fa::string* requestedPath = nullptr;
     if (args.size() >= 2u) {
       requestedPath = ConCommandArg(args, 1u);
     } else {
@@ -1405,7 +1299,7 @@ namespace moho
     }
 
     if (requestedPath && !requestedPath->empty()) {
-      engineStats->mLogFileName.assign(*requestedPath, 0, msvc8::string::npos);
+      engineStats->mLogFileName.assign(*requestedPath, 0, fa::string::npos);
     }
 
     engineStats->mLogFrameCount = 0;
@@ -1431,13 +1325,13 @@ namespace moho
         break;
       }
 
-      msvc8::string valueText;
+      fa::string valueText;
       child->GetString(false, &valueText);
 
-      msvc8::string indent;
+      fa::string indent;
       indent.assign(static_cast<std::size_t>(depth * 4), ' ');
 
-      const msvc8::string line = indent + child->mName + ": " + valueText;
+      const fa::string line = indent + child->mName + ": " + valueText;
       gpg::Logf("%s", line.c_str());
 
       DumpStatsTreeRecursive(child, depth + 1);
@@ -1466,7 +1360,7 @@ namespace moho
    * Populates one debug stats subtree with representative values and emits a
    * recursive text dump to the log sink.
    */
-  void CON_PrintStats(const msvc8::vector<msvc8::string>& /*args*/)
+  void CON_PrintStats(const fa::vector<fa::string>& /*args*/)
   {
     if (!sPrintStatsBoogers) {
       sPrintStatsBoogers = GetEngineStats()->GetItem("Boogers", true);
@@ -1508,7 +1402,7 @@ namespace moho
       }
     }
     if (sPrintStatsDoubleFarts) {
-      const msvc8::string value("Boogers!");
+      const fa::string value("Boogers!");
       sPrintStatsDoubleFarts->SetValue(value);
     }
 
@@ -1541,7 +1435,7 @@ namespace moho
       }
     }
     if (sPrintStatsDeepStuff) {
-      const msvc8::string value("woohoo!");
+      const fa::string value("woohoo!");
       sPrintStatsDeepStuff->SetValue(value);
     }
 
@@ -1552,11 +1446,7 @@ namespace moho
       }
     }
     if (sPrintStatsBoogersSquirt) {
-#if defined(_WIN32)
-      (void)InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&sPrintStatsBoogersSquirt->mPrimaryValueBits), 1L);
-#else
-      ++sPrintStatsBoogersSquirt->mPrimaryValueBits;
-#endif
+      (void)sPrintStatsBoogersSquirt->AddPrimaryBits(1);
     }
 
     if (!sPrintStatsDouble) {
@@ -1574,83 +1464,11 @@ namespace moho
     DumpStatsTreeRecursive(engineStats ? engineStats->mItem.get() : nullptr, 0);
   }
 
-  /**
-   * Address: 0x00834F90 (FUN_00834F90, Moho::ShowStats)
-   */
-  void ShowStats(const msvc8::vector<msvc8::string>& args)
-  {
-    CUIManager* const uiManager = g_UIManager;
-    if (!uiManager || uiManager->mFrames.Empty() || !uiManager->mFrames[0]) {
-      return;
-    }
-
-    LuaPlus::LuaState* const state = uiManager->mLuaState;
-    LuaPlus::LuaObject moduleObject = SCR_Import(state, "/lua/debug/EngineStats.lua");
-    if (!moduleObject.IsTable()) {
-      LuaPlus::LuaState::Error(state, "failed to load \"/lua/debug/EngineStats.lua\" module");
-    }
-
-    msvc8::string mode = "all";
-    if (args.size() > 1u) {
-      if (const msvc8::string* const requestedMode = ConCommandArg(args, 1u); requestedMode != nullptr) {
-        mode.assign(*requestedMode, 0, msvc8::string::npos);
-      }
-    }
-
-    LuaPlus::LuaObject toggleFunction = moduleObject.GetByName("Toggle");
-    LuaPlus::LuaFunction<void> toggleCallable(toggleFunction);
-    toggleCallable(mode.c_str());
-  }
-
-  /**
-   * Address: 0x00835160 (FUN_00835160, Moho::ShowArmyStats)
-   */
-  void ShowArmyStats(const msvc8::vector<msvc8::string>& args)
-  {
-    CUIManager* const uiManager = g_UIManager;
-    if (!uiManager || uiManager->mFrames.Empty() || !uiManager->mFrames[0]) {
-      return;
-    }
-
-    CWldSession* const session = WLD_GetActiveSession();
-    if (!session) {
-      return;
-    }
-
-    UserArmy* const focusArmy = session->GetFocusUserArmy();
-    if (!focusArmy) {
-      return;
-    }
-
-    LuaPlus::LuaState* const state = uiManager->mLuaState;
-    LuaPlus::LuaObject moduleObject = SCR_Import(state, "/lua/debug/ArmyStats.lua");
-    if (!moduleObject.IsTable()) {
-      LuaPlus::LuaState::Error(state, "failed to load \"/lua/debug/ArmyStats.lua\" module");
-    }
-
-    int armyIndex = static_cast<int>(focusArmy->mArmyIndex);
-    if (args.size() > 1u) {
-      if (const msvc8::string* const requestedArmy = ConCommandArg(args, 1u); requestedArmy != nullptr) {
-        armyIndex = std::atoi(requestedArmy->c_str());
-      }
-    }
-
-    msvc8::string mode = "all";
-    if (args.size() > 2u) {
-      if (const msvc8::string* const requestedMode = ConCommandArg(args, 2u); requestedMode != nullptr) {
-        mode.assign(*requestedMode, 0, msvc8::string::npos);
-      }
-    }
-
-    LuaPlus::LuaObject showFunction = moduleObject.GetByName("Show");
-    LuaPlus::LuaFunction<void> showCallable(showFunction);
-    showCallable(armyIndex, mode.c_str());
-  }
 
   /**
    * Address: 0x00416480 (FUN_00416480, Moho::CON_EndLoggingStats)
    */
-  void CON_EndLoggingStats(const msvc8::vector<msvc8::string>& /*args*/)
+  void CON_EndLoggingStats(const fa::vector<fa::string>& /*args*/)
   {
     (void)GetEngineStats()->EndLogging();
   }
@@ -1742,7 +1560,7 @@ namespace moho
   CScrLuaInitForm* func_BeginLoggingStats_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "BeginLoggingStats",
       &moho::cfunc_BeginLoggingStats,
       nullptr,
@@ -1786,7 +1604,7 @@ namespace moho
 
     if (shouldExit) {
       const char* const logPath = GetEngineStats()->mResolvedLogFilePath.c_str();
-      const msvc8::string message = gpg::STR_Printf(
+      const fa::string message = gpg::STR_Printf(
         "Performance test run complete!\n"
         "\n"
         "Your 'SupComMark' composite score is: %7.0f   (higher is better)\n"
@@ -1797,8 +1615,10 @@ namespace moho
       );
       WIN_OkBox("Complete!", message.c_str());
 
-      if (wxTheApp != nullptr) {
-        wxTheApp->ExitMainLoop();
+      // Engine addition (plan WPL.4): `wxTheApp->ExitMainLoop()` when there is
+      // an application object, through the client's hook (WinApp.h).
+      if (sAppExitMainLoop != nullptr) {
+        sAppExitMainLoop();
       }
     }
 
@@ -1819,7 +1639,7 @@ namespace moho
   CScrLuaInitForm* func_EndLoggingStats_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "EndLoggingStats",
       &moho::cfunc_EndLoggingStats,
       nullptr,
@@ -1895,19 +1715,19 @@ namespace moho
   /**
    * Address: 0x00417FE0 (FUN_00417FE0, Moho::StatItem::SetValue_0)
    */
-  void StatItem::SetValueCopy(msvc8::string* outValue)
+  void StatItem::SetValueCopy(fa::string* outValue)
   {
     boost::mutex::scoped_lock lock(mLock);
-    outValue->assign(mValue, 0, msvc8::string::npos);
+    outValue->assign(mValue, 0, fa::string::npos);
   }
 
   /**
    * Address: 0x00415220 (FUN_00415220, Moho::StatItem::SetValue)
    */
-  void StatItem::SetValue(const msvc8::string& value)
+  void StatItem::SetValue(const fa::string& value)
   {
     boost::mutex::scoped_lock lock(mLock);
-    mValue.assign(value, 0, msvc8::string::npos);
+    mValue.assign(value, 0, fa::string::npos);
   }
 
   /**
@@ -2109,15 +1929,15 @@ namespace moho
       archive->WriteInt(mRealtimeValueBits);
       break;
     case EStatType::kString:
-      archive->WriteString(const_cast<msvc8::string*>(&mValue));
-      archive->WriteString(const_cast<msvc8::string*>(&mScratchValue));
+      archive->WriteString(const_cast<fa::string*>(&mValue));
+      archive->WriteString(const_cast<fa::string*>(&mScratchValue));
       break;
     default:
       gpg::HandleAssertFailure("Reached the supposably unreachable.", 360, "c:\\work\\rts\\main\\code\\src\\core\\Stats.cpp");
       break;
     }
 
-    archive->WriteString(const_cast<msvc8::string*>(&mName));
+    archive->WriteString(const_cast<fa::string*>(&mName));
     archive->Write(sEPulseMode, const_cast<std::int32_t*>(&mUseRealtimeSlot), gpg::RRef{});
     SerializeList(archive);
   }
@@ -2125,7 +1945,7 @@ namespace moho
   /**
    * Address: 0x00418750 (FUN_00418750, Moho::StatItem::GetString)
    */
-  msvc8::string* StatItem::GetString(const bool useRealtimeValue, msvc8::string* outValue)
+  fa::string* StatItem::GetString(const bool useRealtimeValue, fa::string* outValue)
   {
     if (mType == EStatType::kFloat) {
       *outValue = gpg::STR_Printf("%.2f", AsFloatBits(ReadNumericSlot(this, useRealtimeValue)));
@@ -2154,7 +1974,7 @@ namespace moho
       return ReadNumericSlot(this, useRealtimeValue);
     }
 
-    msvc8::string value;
+    fa::string value;
     SetValueCopy(&value);
     return std::atoi(value.c_str());
   }
@@ -2172,7 +1992,7 @@ namespace moho
       return static_cast<float>(ReadNumericSlot(this, useRealtimeValue));
     }
 
-    msvc8::string value;
+    fa::string value;
     SetValueCopy(&value);
     return static_cast<float>(std::atof(value.c_str()));
   }
@@ -2198,32 +2018,7 @@ namespace moho
    */
   std::int32_t StatItem::AddFloat(float* const delta)
   {
-    volatile std::int32_t* const pCounter = &mPrimaryValueBits;
-#if defined(_WIN32)
-    do {
-      const std::int32_t observedBits = ReadAtomicI32(pCounter);
-      const float currentValue = AsFloatBits(observedBits);
-      const float nextValue = currentValue + *delta;
-      const std::int32_t nextBits = std::bit_cast<std::int32_t>(nextValue);
-      const std::int32_t exchanged = static_cast<std::int32_t>(InterlockedCompareExchange(
-        reinterpret_cast<volatile long*>(pCounter), static_cast<long>(nextBits), static_cast<long>(observedBits)
-      ));
-      if (exchanged == observedBits) {
-        return exchanged;
-      }
-    } while (true);
-#else
-    for (;;) {
-      const std::int32_t observedBits = *pCounter;
-      const float currentValue = AsFloatBits(observedBits);
-      const float nextValue = currentValue + *delta;
-      const std::int32_t nextBits = std::bit_cast<std::int32_t>(nextValue);
-      if (*pCounter == observedBits) {
-        *pCounter = nextBits;
-        return observedBits;
-      }
-    }
-#endif
+    return platform::AtomicAddFloat(&mPrimaryValueBits, *delta);
   }
 
   /**
@@ -2277,7 +2072,7 @@ namespace moho
       outObject->SetString("Type", "Integer");
       break;
     case EStatType::kString: {
-      msvc8::string value;
+      fa::string value;
       GetString(useRealtimeValue, &value);
       if (!value.empty()) {
         outObject->SetString("Value", value.c_str());
@@ -2432,7 +2227,7 @@ namespace moho
    */
   const char* StatsRType<StatItem>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("Stats<%s>", CachedStatItemType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("Stats<%s>", gpg::RTypeOf<moho::StatItem>()->GetName());
     return sName.c_str();
   }
 
@@ -2562,6 +2357,60 @@ namespace moho
     }
     return stats->GetStringItem(name);
   }
+#if FAF_SERVER_MODE
+  // Engine addition, server mode: see the declaration.
+  void STAT_VisitItems(Stats<StatItem>& stats, const std::function<void(const fa::string& path, StatItem& item)>& visit)
+  {
+    boost::mutex::scoped_lock lock(stats.mLock);
+    const std::function<void(StatItem*, const fa::string&)> walk = [&](StatItem* const parent, const fa::string& prefix) {
+      for (StatIntrusiveNode* node = AsChildHead(parent)->next; node != nullptr && node != AsChildHead(parent);
+           node = node->next) {
+        StatItem* const child = node->owner;
+        if (child == nullptr) {
+          break;
+        }
+        const fa::string path = prefix.empty() ? child->mName : (prefix + "_") + child->mName;
+        visit(path, *child);
+        walk(child, path);
+      }
+    };
+    if (stats.mItem) {
+      walk(stats.mItem.get(), fa::string());
+    }
+  }
+
+  // Engine addition, server mode: see the declaration.
+  void STAT_CollectItems(Stats<StatItem>& stats, std::vector<StatItem*>& out)
+  {
+    out.clear();
+    boost::mutex::scoped_lock lock(stats.mLock);
+    if (!stats.mItem) {
+      return;
+    }
+    // `STAT_VisitItems`' order (each item, then its children), without a path or a recursion.
+    struct SFrame
+    {
+      StatItem* parent;
+      StatIntrusiveNode* node;
+    };
+    thread_local std::vector<SFrame> stack; // a server reads thousands of trees a beat
+    stack.clear();
+    stack.push_back({stats.mItem.get(), AsChildHead(stats.mItem.get())->next});
+    while (!stack.empty()) {
+      SFrame& top = stack.back();
+      StatIntrusiveNode* const node = top.node;
+      if (node == nullptr || node == AsChildHead(top.parent) || node->owner == nullptr) {
+        stack.pop_back();
+        continue;
+      }
+      top.node = node->next;
+      StatItem* const child = node->owner;
+      out.push_back(child);
+      stack.push_back({child, AsChildHead(child)->next});
+    }
+  }
+#endif
+
 } // namespace moho
 
 namespace

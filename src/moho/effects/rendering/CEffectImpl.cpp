@@ -1,4 +1,5 @@
 #include "moho/effects/rendering/CEffectImpl.h"
+#include "moho/effects/rendering/CEffectManagerImpl.h"
 
 #include <algorithm>
 #include <cstring>
@@ -18,7 +19,7 @@ namespace
     }
 
     auto* const counted = static_cast<moho::CountedObject*>(texture);
-    counted->ReleaseReferenceAtomic();
+    (void)counted->ReleaseReferenceAtomic();
     texture = nullptr;
   }
 
@@ -56,7 +57,7 @@ namespace
     while (begin != end) {
       moho::CParticleTexture* const texture = *begin;
       if (texture != nullptr) {
-        static_cast<moho::CountedObject*>(texture)->ReleaseReferenceAtomic();
+        (void)static_cast<moho::CountedObject*>(texture)->ReleaseReferenceAtomic();
       }
       *begin = nullptr;
       ++begin;
@@ -154,7 +155,7 @@ namespace moho
   /**
    * Address: 0x00654550 (FUN_00654550, Moho::CEffectImpl::GetStringParam)
    */
-  msvc8::string* CEffectImpl::GetStringParam(const std::int32_t paramIndex)
+  fa::string* CEffectImpl::GetStringParam(const std::int32_t paramIndex)
   {
     return &mStrings.start_[paramIndex];
   }
@@ -252,7 +253,9 @@ namespace moho
   {
     mNewAttachment = 1;
     mEntityInfo.mAttachTargetWeak.ResetFromObject(entity);
-    entity->InitPositionHistory();
+    if (!EFFECT_LifetimeOnly()) { // nothing else reads the history
+      entity->InitPositionHistory();
+    }
     Interpolate();
   }
 
@@ -264,7 +267,9 @@ namespace moho
     mNewAttachment = 1;
     mEntityInfo.mParentBoneIndex = boneIndex < 0 ? 0 : boneIndex;
     mEntityInfo.mAttachTargetWeak.ResetFromObject(entity);
-    entity->InitPositionHistory();
+    if (!EFFECT_LifetimeOnly()) { // nothing else reads the history
+      entity->InitPositionHistory();
+    }
     Interpolate();
   }
 

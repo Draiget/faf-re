@@ -57,7 +57,7 @@ namespace moho
      * Resolves RD3D texture RTTI on demand and registers the prefetch type key
      * used by the D3D texture resource pipeline.
      */
-    void RegisterTexturePrefetchType()
+    [[maybe_unused]] void RegisterTexturePrefetchType()
     {
       gpg::RType* const textureType = resource_reflection::ResolveRD3DTextureResourceType();
       RES_RegisterPrefetchType("d3d_textures", textureType);
@@ -74,7 +74,7 @@ namespace moho
      * What it does:
      * Returns true when one effect's source file path equals the requested path.
      */
-    [[nodiscard]] bool EffectFilePathMatches(const CD3DEffect* const effect, const msvc8::string& path)
+    [[nodiscard]] bool EffectFilePathMatches(const CD3DEffect* const effect, const fa::string& path)
     {
       return effect != nullptr && effect->mFile == path;
     }
@@ -151,7 +151,7 @@ namespace moho
 
       const PrefetchHandleBase handle = RES_PrefetchResource(path, RD3DTextureResource::sType);
       if (!handle.mPtr) {
-        const msvc8::string errorText = gpg::STR_Printf(
+        const fa::string errorText = gpg::STR_Printf(
           "Prefetch couldn't find file %s",
           path != nullptr ? path : ""
         );
@@ -173,7 +173,7 @@ namespace moho
       CD3DEffect*** const outIteratorSlot,
       CD3DEffect** const begin,
       CD3DEffect** const end,
-      const msvc8::string& path
+      const fa::string& path
     )
     {
       CD3DEffect** it = begin;
@@ -199,10 +199,10 @@ namespace moho
       CD3DEffect*** const outIteratorSlot,
       CD3DEffect** const begin,
       CD3DEffect** const end,
-      msvc8::string path
+      fa::string path
     )
     {
-      msvc8::string localPath(path);
+      fa::string localPath(path);
       return FindEffectPathIteratorCore(outIteratorSlot, begin, end, localPath);
     }
 
@@ -668,7 +668,7 @@ namespace moho
         kTextureFormatRenderTarget,
         false
       );
-      boost::ResetSharedFromRaw(&currentSheet, replacementSheet);
+      (void)boost::ResetSharedFromRaw(&currentSheet, replacementSheet);
       sheet = currentSheet.get();
       if (sheet != nullptr) {
         sheet->mContext.usage_ = kTextureUsageRenderTargetCopy;
@@ -689,7 +689,7 @@ namespace moho
       }
     }
 
-    boost::CopySharedRetain(&outSheet, currentSheet);
+    (void)boost::CopySharedRetain(&outSheet, currentSheet);
     return outSheet;
   }
 
@@ -705,7 +705,7 @@ namespace moho
       return nullptr;
     }
 
-    const msvc8::string query(effectName);
+    const fa::string query(effectName);
     for (CD3DEffect* const effect : mEffects) {
       if (effect != nullptr && effect->mName == query) {
         return effect;
@@ -752,7 +752,7 @@ namespace moho
    * Rebuilds one effect from disk for hot-reload and replaces the previous
    * effect object in the active effect vector.
    */
-  void CD3DDeviceResources::ReloadEffectFile(const msvc8::string& effectPath)
+  void CD3DDeviceResources::ReloadEffectFile(const fa::string& effectPath)
   {
     CD3DEffect** matchedEffect = mEffects.end();
     FindEffectPathIterator(&matchedEffect, mEffects.begin(), mEffects.end(), effectPath);
@@ -782,7 +782,7 @@ namespace moho
    * Address: 0x004424A0 (FUN_004424A0, Moho::CD3DDeviceResources::DevResInitResources)
    *
    * What it does:
-   * Clears existing effects and compiles all `/effects/*.fx` resources.
+   * Clears existing effects and compiles all `/effects/ *.fx` resources.
    */
   void CD3DDeviceResources::DevResInitResources()
   {
@@ -799,16 +799,16 @@ namespace moho
       gpg::Die("Unable to load FX files at local store [/effects/*.fx]");
     }
 
-    msvc8::vector<msvc8::string> effectPaths{};
+    fa::vector<fa::string> effectPaths{};
     waitHandleSet->mHandle->EnumerateFiles(kEffectsDirectory, kEffectsPattern, true, &effectPaths);
     if (effectPaths.empty()) {
       gpg::Die("Unable to load FX files at local store [/effects/*.fx]");
     }
 
-    for (const msvc8::string& effectPath : effectPaths) {
+    for (const fa::string& effectPath : effectPaths) {
       CD3DEffect* const effect = new CD3DEffect();
 
-      msvc8::string mountedPath{};
+      fa::string mountedPath{};
       waitHandleSet->mHandle->FindFile(&mountedPath, effectPath.c_str(), nullptr);
       if (!effect->InitEffectFromFile(mountedPath.c_str())) {
         delete effect;
@@ -846,7 +846,7 @@ namespace moho
         continue;
       }
 
-      const msvc8::string line = gpg::STR_Printf(
+      const fa::string line = gpg::STR_Printf(
         "%12i: %s\n",
         byteCount,
         textureResource->mContext.location_.c_str()
@@ -855,7 +855,7 @@ namespace moho
       totalBytes += byteCount;
     }
 
-    const msvc8::string summary = gpg::STR_Printf("\nTOTAL: %i\n", totalBytes);
+    const fa::string summary = gpg::STR_Printf("\nTOTAL: %i\n", totalBytes);
     stream->Write(summary.c_str(), summary.size());
   }
 
@@ -923,7 +923,7 @@ namespace moho
   void CD3DDeviceResources::ClearCachedVertexFormats()
   {
     for (CD3DVertexFormat* const vertexFormat : mVertexFormats) {
-      delete vertexFormat;
+      GPG_NONVIRTUAL_DESTROY(delete vertexFormat);
     }
     mVertexFormats.clear();
   }

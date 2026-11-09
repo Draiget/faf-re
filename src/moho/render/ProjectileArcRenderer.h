@@ -125,7 +125,7 @@ namespace moho
   static_assert(alignof(ProjectileArcTrack) == 8, "ProjectileArcTrack must be 8-aligned");
 
   /** Arc tracks keyed by entity id. Head node at 0x010C4318, so the map object starts at 0x010C4314. */
-  using ProjectileArcTable = msvc8::map<std::int32_t, ProjectileArcTrack>;
+  using ProjectileArcTable = fa::map<std::int32_t, ProjectileArcTrack>;
 
   /**
    * Address: 0x008600E0 (FUN_008600E0, Moho::RenderProjectileArcs)

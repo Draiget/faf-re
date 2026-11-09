@@ -1,0 +1,39 @@
+name: 2p-contract-bridge
+description: >
+  faf-netbridge for both players (issue #230), started and driven as the FAF
+  client drives its adapter: retail game against ours, autolobby, five
+  minutes of play (about beat 3000). FAF_NETBRIDGE is faf-netbridge.exe;
+  FAF_TEST_BIND is this machine's LAN address on hosts that drop UDP to
+  sockets bound to 0.0.0.0 even over loopback (the game binds its lobby port
+  that way), else 127.0.0.1.
+timeout: 12m
+
+mode: contract
+lobby: auto
+map: SCMP_009
+
+contract:
+  adapter: '%FAF_NETBRIDGE%'
+  exeArgs: [--bind-address, '%FAF_TEST_BIND%', --game-address, '%FAF_TEST_BIND%']
+
+game:
+  exe: '%ProgramData%\FAForever\bin\ForgedAlliance.exe'
+  nosound: true
+  tile: true
+
+players:
+  - { uid: 1, name: Alpha }
+  - { uid: 2, name: Bravo, exe: '%ProgramData%\FAForever\bin_x64\main_x64.exe' }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 5m }
+  - note: launched through two faf-netbridge links; letting the sim run
+  - wait: 5m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true

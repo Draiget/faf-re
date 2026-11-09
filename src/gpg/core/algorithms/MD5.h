@@ -5,7 +5,7 @@
 #include <cstring>
 #include <string>
 
-#include "legacy/containers/String.h" // msvc8::string
+#include "legacy/containers/String.h" // fa::string
 
 namespace gpg
 {
@@ -26,7 +26,7 @@ namespace gpg
      * Address: 0x008E5910
      * Convert digest to 32-character lowercase hexadecimal string.
      */
-    [[nodiscard]] msvc8::string ToString() const;
+    [[nodiscard]] fa::string ToString() const;
   };
 
   struct MD5Block

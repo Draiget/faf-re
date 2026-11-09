@@ -26,7 +26,7 @@ namespace
   constexpr std::int32_t kWaveSpatialRoutingMask = 0x800;
   constexpr float kWaveDefaultDissolveCutoff = 0.0f;
   constexpr float kWaveBoundsHalfHeight = 0.1f;
-  constexpr float kPi = 3.1415925f;
+  [[maybe_unused]] constexpr float kPi = 3.1415925f;
 
   void ReleaseParticleTextureRef(moho::CParticleTexture*& texture) noexcept
   {
@@ -34,7 +34,7 @@ namespace
       return;
     }
 
-    static_cast<moho::CountedObject*>(texture)->ReleaseReferenceAtomic();
+    (void)static_cast<moho::CountedObject*>(texture)->ReleaseReferenceAtomic();
     texture = nullptr;
   }
 
@@ -72,7 +72,7 @@ namespace
    * Runs one deleting-destructor thunk for `WaveGenerator`, forwarding through
    * non-deleting `WaveGenerator::~WaveGenerator` and optional storage release.
    */
-  [[nodiscard]] moho::WaveGenerator* DestroyWaveGeneratorDeleting(
+  [[maybe_unused]] [[nodiscard]] moho::WaveGenerator* DestroyWaveGeneratorDeleting(
     moho::WaveGenerator* const generator,
     const unsigned char deleteFlag
   )
@@ -206,7 +206,7 @@ namespace
       newCapacity = requiredSize;
     }
 
-    Generator* const newBuffer = msvc8::detail::allocate_checked<Generator>(newCapacity);
+    Generator* const newBuffer = fa::detail::allocate_checked<Generator>(newCapacity);
 
     const std::size_t prefixCount = static_cast<std::size_t>(pos - start);
     if (prefixCount != 0u) {
@@ -253,8 +253,8 @@ namespace moho
    * Builds one preset directly from typed engine values.
    */
   WaveParameters::WaveParameters(
-    const msvc8::string& texturePath,
-    const msvc8::string& rampPath,
+    const fa::string& texturePath,
+    const fa::string& rampPath,
     const Wm3::Vec3f& position,
     const float period,
     const float periodVariance,
@@ -365,7 +365,7 @@ namespace moho
    *
    * What it does:
    * Tidies `mPreview` then `mName`. `mWaves` (the last-declared member) is
-   * torn down automatically by `msvc8::vector<WaveParameters>::~vector()`,
+   * torn down automatically by `fa::vector<WaveParameters>::~vector()`,
    * which is the recovered body of `FUN_0088A150` -- per-element destruction
    * dispatches through `WaveParameters`'s own vtable slot 0 (see
    * `legacy/containers/Vector.h`'s `destroy_range`), matching the binary's
@@ -387,7 +387,7 @@ namespace moho
    * present in the binary because this helper is written generically), reads
    * `name`/`preview`, then appends one `WaveParameters` per entry of the
    * `parameters` array table. Each append is the binary's
-   * `msvc8::vector<WaveParameters>::push_back` (`FUN_00889C90`, cited on
+   * `fa::vector<WaveParameters>::push_back` (`FUN_00889C90`, cited on
    * `legacy/containers/Vector.h`'s `push_back` for this 136-byte polymorphic
    * element): the fast path copy-constructs directly into spare capacity,
    * the capacity-full path reallocates through `insert(end(), value)`.
@@ -568,8 +568,8 @@ namespace moho
    */
   WaveGenerator::WaveGenerator(
     SpatialDB<WaveGenerator>* const spatialStorage,
-    const msvc8::string& primaryTexturePath,
-    const msvc8::string& rampTexturePath,
+    const fa::string& primaryTexturePath,
+    const fa::string& rampTexturePath,
     const Wm3::Vec3f& position,
     const float angle,
     const Wm3::Vec3f& direction,
@@ -769,8 +769,8 @@ namespace moho
    * lanes and returns the stored generator pointer.
    */
   WaveGenerator* WaveSystem::CreateWaveGenerator(
-    const msvc8::string& primaryTexturePath,
-    const msvc8::string& rampTexturePath,
+    const fa::string& primaryTexturePath,
+    const fa::string& rampTexturePath,
     const Wm3::Vec3f& position,
     const float angle,
     const Wm3::Vec3f& direction,
@@ -882,7 +882,7 @@ namespace moho
       static_cast<std::uint32_t>(static_cast<std::int64_t>(mTextureSelectionRange));
     std::uint32_t randomSample = 0u;
     {
-      boost::mutex::scoped_lock randomLock(math_GlobalRandomMutex);
+      std::lock_guard<std::mutex> randomLock(math_GlobalRandomMutex);
       randomSample = math_GlobalRandomStream.twister.NextUInt32();
     }
     const std::uint32_t scaledSelection = static_cast<std::uint32_t>(

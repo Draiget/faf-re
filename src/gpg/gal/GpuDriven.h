@@ -32,6 +32,7 @@
 namespace gpg::gal
 {
   class IndexBuffer;
+  class RenderTarget;
   class Texture;
 
   /** Capability bits of `Device::GetGpuDrivenFeatures()`. */
@@ -50,6 +51,12 @@ namespace gpg::gal
   };
 
   /**
+   * PCI vendor id of NVIDIA, the only GPUs `kGpuPathMsdfCook` has run on (issue #309). AMD and Intel adapters keep
+   * the CPU font cook until it has been checked there.
+   */
+  constexpr std::uint32_t kPciVendorNvidia = 0x10DEU;
+
+  /**
    * The engine's GPU-driven render paths, as `Device::GetGpuDrivenVerified()`
    * reports them: each bit says the backend has passed that path's parity
    * checks (self-check readback, same-process screenshot A/B). A path's
@@ -66,6 +73,9 @@ namespace gpg::gal
     kGpuPathParticleBatch = 1U << 4U,   ///< `ren_ParticleBatch`
     kGpuPathProjectileIcons = 1U << 5U, ///< `ren_GpuProjectileIcons`
     kGpuPathWorldShapes = 1U << 6U,     ///< `ren_GpuShapes`
+    kGpuPathRanges = 1U << 7U,          ///< `ren_GpuRanges`
+    kGpuPathMsdfText = 1U << 8U,        ///< `ren_GpuText`
+    kGpuPathMsdfCook = 1U << 9U,        ///< `ren_GpuFontCook`; checked on NVIDIA only, so listed for its adapters alone
   };
 
   enum class GpuBufferKind : std::uint8_t
@@ -108,6 +118,7 @@ namespace gpg::gal
     Opaque,
     AlphaBlend, ///< src * srcAlpha + dst * (1 - srcAlpha)
     Additive,   ///< src * srcAlpha + dst
+    Multiply,   ///< src * dst in colour; mask alpha off, it takes src
   };
 
   enum class GpuCompare : std::uint8_t
@@ -204,7 +215,14 @@ namespace gpg::gal
     std::uint32_t constantBytes = 0U; ///< a multiple of 16, at most `kGpuMaxConstantBytes`
     GpuBuffer* readBuffers[kGpuMaxReadBuffers]{};   ///< t0..t3
     Texture* textures[kGpuMaxTextures]{};           ///< t4..t5
+    /// t4..t5 where `textures` leaves the slot empty: a colour target's current buffer, read as a
+    /// texture (Direct3D 12 and Vulkan). It must not be the target the call draws into.
+    RenderTarget* targets[kGpuMaxTextures]{};
     GpuBuffer* writeBuffers[kGpuMaxWriteBuffers]{}; ///< u0..u1, compute only
+    /// t6 (Vulkan binding 10): the depth target bound when the call runs, as `Texture2D<float>`.
+    /// Direct3D 12 and Vulkan create their head depth targets readable; anywhere else t6 reads 0.
+    /// For dispatches: a draw would read the target it also writes.
+    bool readBoundDepth = false;
   };
 
   /**

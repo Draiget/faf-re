@@ -23,52 +23,31 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedUnitType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Unit));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-      if (!cached) {
-        cached = moho::register_WeakPtr_Unit_Type_00();
-      }
-    }
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeUnitRef(moho::Unit* unit)
   {
     gpg::RRef out{};
     out.mObj = nullptr;
-    out.mType = CachedUnitType();
+    out.mType = gpg::RTypeOf<moho::Unit>();
     if (!unit) {
       return out;
     }
 
-    gpg::RType* dynamicType = CachedUnitType();
+    gpg::RType* dynamicType = gpg::RTypeOf<moho::Unit>();
     try {
       dynamicType = gpg::LookupRType(typeid(*unit));
     } catch (...) {
-      dynamicType = CachedUnitType();
+      dynamicType = gpg::RTypeOf<moho::Unit>();
     }
 
     std::int32_t baseOffset = 0;
-    if (dynamicType && CachedUnitType() && dynamicType->IsDerivedFrom(CachedUnitType(), &baseOffset)) {
+    if (dynamicType && gpg::RTypeOf<moho::Unit>() && dynamicType->IsDerivedFrom(gpg::RTypeOf<moho::Unit>(), &baseOffset)) {
       out.mObj = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(unit) - static_cast<std::uintptr_t>(baseOffset));
       out.mType = dynamicType;
       return out;
     }
 
     out.mObj = unit;
-    out.mType = dynamicType ? dynamicType : CachedUnitType();
+    out.mType = dynamicType ? dynamicType : gpg::RTypeOf<moho::Unit>();
     return out;
   }
 
@@ -83,14 +62,14 @@ namespace
     source.mObj = tracked.object;
     source.mType = tracked.type;
 
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedUnitType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::Unit>());
     if (upcast.mObj) {
       return static_cast<moho::Unit*>(upcast.mObj);
     }
 
-    const char* const expected = CachedUnitType() ? CachedUnitType()->GetName() : "Unit";
+    const char* const expected = gpg::RTypeOf<moho::Unit>() ? gpg::RTypeOf<moho::Unit>()->GetName() : "Unit";
     const char* const actual = source.GetTypeName();
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
       expected ? expected : "Unit",
       actual ? actual : "null"
@@ -145,26 +124,26 @@ namespace moho
    */
   const char* RWeakPtrType<Unit>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("WeakPtr<%s>", CachedUnitType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<moho::Unit>()->GetName());
     return sName.c_str();
   }
 
   /**
    * Address: 0x006AE050 (FUN_006AE050, Moho::RWeakPtrType_Unit::GetLexical)
    */
-  msvc8::string RWeakPtrType<Unit>::GetLexical(const gpg::RRef& ref) const
+  fa::string RWeakPtrType<Unit>::GetLexical(const gpg::RRef& ref) const
   {
     auto* const weak = static_cast<const WeakPtr<Unit>*>(ref.mObj);
     if (!weak || !weak->HasValue()) {
-      return msvc8::string("NULL");
+      return fa::string("NULL");
     }
 
     const gpg::RRef pointeeRef = MakeUnitRef(weak->GetObjectPtr());
     if (!pointeeRef.mObj) {
-      return msvc8::string("NULL");
+      return fa::string("NULL");
     }
 
-    const msvc8::string inner = pointeeRef.GetLexical();
+    const fa::string inner = pointeeRef.GetLexical();
     return gpg::STR_Printf("[%s]", inner.c_str());
   }
 

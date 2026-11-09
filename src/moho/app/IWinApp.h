@@ -44,7 +44,7 @@ namespace moho
      * Default command-line help text provider.
      * FA retail default is a false/nullsub return.
      */
-    virtual bool AppGetHelpText(msvc8::string& outHelpText, bool shortMode);
+    virtual bool AppGetHelpText(fa::string& outHelpText, bool shortMode);
 
     /**
      * Address: 0x004F1BA0 (FUN_004F1BA0)
@@ -98,9 +98,9 @@ namespace moho
 
   public:
     // +0x04
-    msvc8::string shortName;
+    fa::string shortName;
     // +0x20
-    msvc8::string longName;
+    fa::string longName;
     // +0x3C
     std::int32_t exitValue;
   };

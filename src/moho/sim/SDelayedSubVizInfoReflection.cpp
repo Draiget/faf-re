@@ -16,7 +16,7 @@
 
 namespace
 {
-  using DelayedSubVizVector = msvc8::vector<moho::SDelayedSubVizInfo>;
+  using DelayedSubVizVector = fa::vector<moho::SDelayedSubVizInfo>;
   using DelayedSubVizVectorType = gpg::RVectorType<moho::SDelayedSubVizInfo>;
 
   // Address: 0x00BC78E0 (FUN_00BC78E0, register_SDelayedSubVizInfoSerializer)
@@ -34,61 +34,13 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3<float>));
-    }
-    return cached;
-  }
-
-  /**
-   * Address: 0x00508270 (FUN_00508270, delayed-sub-viz RTTI cache resolve)
-   */
-  [[nodiscard]] gpg::RType* ResolveSDelayedSubVizInfoType()
-  {
-    gpg::RType* type = moho::SDelayedSubVizInfo::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SDelayedSubVizInfo));
-      moho::SDelayedSubVizInfo::sType = type;
-    }
-    return type;
-  }
-
-  /**
-   * Address: 0x00508290 (FUN_00508290, intel-grid RTTI cache resolve)
-   *
-   * Orphan: zero xrefs at this address in the IDA export (xrefs_total: 0),
-   * zero callers in the callgraph index, and `moho::CIntelGrid` is not
-   * referenced anywhere else in this file -- `SDelayedSubVizInfo` (this
-   * file's own subject, `{mLastPos, mRadius, mTicksTilUpdate}`) has no
-   * `CIntelGrid`-typed field. A separate, real, actively-used
-   * `ResolveCIntelGridType()` exists in
-   * `moho/ai/CAiReconDBImplSerializer.cpp` (its own anonymous-namespace
-   * copy, called 9x serializing `CAiReconDBImpl`'s grid members) and
-   * `CIntelGrid.cpp` has its own third copy under the name
-   * `CachedIntelGridType()` (used by `RRef_CIntelGrid`/`MakeCIntelGridRef`)
-   * -- both are distinct, independently-evidenced functions at different
-   * addresses, not ODR conflicts with this one. No caller for this specific
-   * copy has been found.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveCIntelGridType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CIntelGrid));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x00508DE0 (FUN_00508DE0, delayed-sub-viz vector-type construct/register)
    */
   [[nodiscard]] gpg::RType* ConstructAndRegisterDelayedSubVizVectorType()
   {
     DelayedSubVizVectorType* const type = AcquireDelayedSubVizVectorType();
-    gpg::PreRegisterRType(typeid(msvc8::vector<moho::SDelayedSubVizInfo>), type);
+    gpg::PreRegisterRType(typeid(fa::vector<moho::SDelayedSubVizInfo>), type);
     return type;
   }
 
@@ -99,7 +51,7 @@ namespace
     gpg::ReadArchive* const archive, void* const object, const gpg::RRef* const ownerRef
   )
   {
-    gpg::RType* const elementType = ResolveSDelayedSubVizInfoType();
+    gpg::RType* const elementType = gpg::CachedLookup<moho::SDelayedSubVizInfo>(moho::SDelayedSubVizInfo::sType);
     if (archive && object && elementType) {
       archive->Read(elementType, object, ownerRef ? *ownerRef : gpg::RRef{});
     }
@@ -109,7 +61,7 @@ namespace
   /**
    * Address: 0x00508E90 (FUN_00508E90, delayed-sub-viz typed read helper duplicate)
    */
-  void ReadDelayedSubVizInfoViaRTypeVariant2(
+  [[maybe_unused]] void ReadDelayedSubVizInfoViaRTypeVariant2(
     gpg::ReadArchive* const archive, void* const object, const gpg::RRef* const ownerRef
   )
   {
@@ -123,7 +75,7 @@ namespace
     gpg::WriteArchive* const archive, const void* const object, const gpg::RRef* const ownerRef
   )
   {
-    gpg::RType* const elementType = ResolveSDelayedSubVizInfoType();
+    gpg::RType* const elementType = gpg::CachedLookup<moho::SDelayedSubVizInfo>(moho::SDelayedSubVizInfo::sType);
     if (archive && object && elementType) {
       archive->Write(elementType, object, ownerRef ? *ownerRef : gpg::RRef{});
     }
@@ -133,7 +85,7 @@ namespace
   /**
    * Address: 0x00508EC0 (FUN_00508EC0, delayed-sub-viz typed write helper duplicate)
    */
-  void WriteDelayedSubVizInfoViaRTypeVariant2(
+  [[maybe_unused]] void WriteDelayedSubVizInfoViaRTypeVariant2(
     gpg::WriteArchive* const archive, const void* const object, const gpg::RRef* const ownerRef
   )
   {
@@ -143,7 +95,7 @@ namespace
   /**
    * Address: 0x00508AD0 (FUN_00508AD0, delayed-sub-viz RRef fill helper)
    */
-  gpg::RRef* FillDelayedSubVizRef(
+  [[maybe_unused]] gpg::RRef* FillDelayedSubVizRef(
     moho::SDelayedSubVizInfo* const value, gpg::RRef* const outRef
   )
   {
@@ -172,7 +124,7 @@ namespace
     DelayedSubVizVector loaded{};
     loaded.reserve(static_cast<std::size_t>(count));
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    gpg::RType* const elementType = ResolveSDelayedSubVizInfoType();
+    gpg::RType* const elementType = gpg::CachedLookup<moho::SDelayedSubVizInfo>(moho::SDelayedSubVizInfo::sType);
 
     for (unsigned int i = 0; i < count; ++i) {
       moho::SDelayedSubVizInfo element{};
@@ -205,7 +157,7 @@ namespace
     const unsigned int count = static_cast<unsigned int>(source->size());
     archive->WriteUInt(count);
 
-    gpg::RType* const elementType = ResolveSDelayedSubVizInfoType();
+    gpg::RType* const elementType = gpg::CachedLookup<moho::SDelayedSubVizInfo>(moho::SDelayedSubVizInfo::sType);
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
 
     for (unsigned int i = 0; i < count; ++i) {
@@ -272,7 +224,7 @@ namespace moho
 
   gpg::RType* SDelayedSubVizInfo::StaticGetClass()
   {
-    return ResolveSDelayedSubVizInfoType();
+    return gpg::CachedLookup<moho::SDelayedSubVizInfo>(moho::SDelayedSubVizInfo::sType);
   }
 
   /**
@@ -285,7 +237,7 @@ namespace moho
       return;
     }
 
-    gpg::RType* const vector3Type = ResolveVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3<float>>();
     gpg::RRef ownerRef{};
     archive->Read(vector3Type, &mLastPos, ownerRef);
     archive->ReadFloat(&mRadius);
@@ -302,7 +254,7 @@ namespace moho
       return;
     }
 
-    gpg::RType* const vector3Type = ResolveVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3<float>>();
     gpg::RRef ownerRef{};
     archive->Write(vector3Type, &mLastPos, ownerRef);
     archive->WriteFloat(mRadius);
@@ -322,7 +274,7 @@ namespace moho
    * (0x00507010 / 0x00507020 / 0x00507CC0) are now
    * `gpg::SerSaveLoadHelper<SDelayedSubVizInfo>`'s own template bodies
    * (Reflection.h); `Init()` caches its `RType*` on
-   * `SDelayedSubVizInfo::sType`, same slot `ResolveSDelayedSubVizInfoType()`
+   * `SDelayedSubVizInfo::sType`, same slot `gpg::CachedLookup<moho::SDelayedSubVizInfo>(moho::SDelayedSubVizInfo::sType)`
    * above already uses.
    */
   void register_SDelayedSubVizInfoSerializer()
@@ -367,7 +319,7 @@ gpg::RRef* gpg::RRef_SDelayedSubVizInfo(gpg::RRef* const outRef, moho::SDelayedS
  */
 const char* gpg::RVectorType<moho::SDelayedSubVizInfo>::GetName() const
 {
-  static const msvc8::string sName =
+  static const fa::string sName =
     gpg::STR_Printf("vector<%s>", moho::SDelayedSubVizInfo::StaticGetClass()->GetName());
   return sName.c_str();
 }
@@ -375,9 +327,9 @@ const char* gpg::RVectorType<moho::SDelayedSubVizInfo>::GetName() const
 /**
  * Address: 0x00507B60 (FUN_00507B60, gpg::RVectorType_SDelayedSubVizInfo::GetLexical)
  */
-msvc8::string gpg::RVectorType<moho::SDelayedSubVizInfo>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType<moho::SDelayedSubVizInfo>::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 
@@ -394,8 +346,8 @@ const gpg::RIndexed* gpg::RVectorType<moho::SDelayedSubVizInfo>::IsIndexed() con
  */
 void gpg::RVectorType<moho::SDelayedSubVizInfo>::Init()
 {
-  static_assert(sizeof(msvc8::vector<moho::SDelayedSubVizInfo>) == 0x10, "msvc8::vector<moho::SDelayedSubVizInfo> is 0x10 bytes on x86");
-  size_ = sizeof(msvc8::vector<moho::SDelayedSubVizInfo>);
+  static_assert(sizeof(fa::vector<moho::SDelayedSubVizInfo>) == 0x10, "fa::vector<moho::SDelayedSubVizInfo> is 0x10 bytes on x86");
+  size_ = sizeof(fa::vector<moho::SDelayedSubVizInfo>);
   version_ = 1;
   serLoadFunc_ = &LoadSDelayedSubVizInfoVector;
   serSaveFunc_ = &SaveSDelayedSubVizInfoVector;

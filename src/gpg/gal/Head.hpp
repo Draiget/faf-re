@@ -29,10 +29,11 @@ namespace gpg::gal
          * owned label text.
          */
         HeadSampleOption(const HeadSampleOption& other);
+        HeadSampleOption& operator=(const HeadSampleOption&) = default;
 
         std::uint32_t sampleType = 0;  // +0x00
         std::uint32_t sampleQuality = 0; // +0x04
-        msvc8::string label{};         // +0x08
+        fa::string label{};         // +0x08
     };
 
     static_assert(sizeof(HeadSampleOption) == 0x24, "HeadSampleOption size must be 0x24");
@@ -127,11 +128,11 @@ namespace gpg::gal
         std::uint32_t framesPerSecond = 0;                   // +0x18
         std::uint32_t antialiasingHigh = 0;                  // +0x1C
         std::uint32_t antialiasingLow = 0;                   // +0x20
-        msvc8::string name{};                                // +0x24
-        msvc8::vector<HeadSampleOption> mStrs{};             // +0x40
-        msvc8::vector<HeadAdapterMode> adapterModes{};       // +0x50
-        msvc8::vector<std::int32_t> validFormats2{};         // +0x60
-        msvc8::vector<std::int32_t> validFormats1{};         // +0x70
+        fa::string name{};                                // +0x24
+        fa::vector<HeadSampleOption> mStrs{};             // +0x40
+        fa::vector<HeadAdapterMode> adapterModes{};       // +0x50
+        fa::vector<std::int32_t> validFormats2{};         // +0x60
+        fa::vector<std::int32_t> validFormats1{};         // +0x70
     };
 
     static_assert(offsetof(Head, mHandle) == 0x04, "Head::mHandle offset must be 0x04");

@@ -25,27 +25,11 @@ using namespace moho;
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedSimType()
-  {
-    if (!Sim::sType) {
-      Sim::sType = gpg::LookupRType(typeid(Sim));
-    }
-    return Sim::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedFormationInstanceVectorType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(gpg::fastvector<IFormationInstance*>));
-    }
-    return type;
-  }
 
   [[nodiscard]] gpg::RRef MakeSimRef(Sim* sim)
   {
     gpg::RRef out{};
-    gpg::RType* const staticType = CachedSimType();
+    gpg::RType* const staticType = gpg::RTypeOf<Sim>();
     out.mObj = nullptr;
     out.mType = staticType;
     if (!sim || !staticType) {
@@ -74,7 +58,7 @@ namespace
       return nullptr;
     }
 
-    gpg::RType* const expectedType = CachedSimType();
+    gpg::RType* const expectedType = gpg::RTypeOf<Sim>();
     if (!expectedType || !tracked.type) {
       return static_cast<Sim*>(tracked.object);
     }
@@ -89,7 +73,7 @@ namespace
 
     const char* const expected = expectedType->GetName();
     const char* const actual = source.GetTypeName();
-    const msvc8::string message = gpg::STR_Printf(
+    const fa::string message = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
       "instead",
       expected ? expected : "Sim",
@@ -220,7 +204,7 @@ namespace
  */
 unsigned int moho::FORMATION_GetNumScripts(LuaPlus::LuaState* const state, const EFormationType formationType)
 {
-  msvc8::string bucketName{kFormationBuckets[ToFormationBucketIndex(formationType)]};
+  fa::string bucketName{kFormationBuckets[ToFormationBucketIndex(formationType)]};
 
   LuaPlus::LuaObject module = SCR_ImportLuaModule(state, kFormationModulePath);
   if (module.IsNil()) {
@@ -254,7 +238,7 @@ const char* moho::FORMATION_GetScriptName(
     return nullptr;
   }
 
-  msvc8::string bucketName{kFormationBuckets[ToFormationBucketIndex(formationType)]};
+  fa::string bucketName{kFormationBuckets[ToFormationBucketIndex(formationType)]};
 
   LuaPlus::LuaObject module = SCR_ImportLuaModule(state, kFormationModulePath);
   if (module.IsNil()) {
@@ -288,7 +272,7 @@ int moho::FORMATION_GetScriptIndex(
   const EFormationType formationType
 )
 {
-  msvc8::string bucketName{kFormationBuckets[ToFormationBucketIndex(formationType)]};
+  fa::string bucketName{kFormationBuckets[ToFormationBucketIndex(formationType)]};
 
   LuaPlus::LuaObject module = SCR_ImportLuaModule(state, kFormationModulePath);
   if (module.IsNil()) {
@@ -594,7 +578,7 @@ void CAiFormationDBImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   gpg::RRef owner{};
   mSim = ReadPointerSim(archive, owner);
 
-  gpg::RType* const vectorType = CachedFormationInstanceVectorType();
+  gpg::RType* const vectorType = gpg::RTypeOf<gpg::fastvector<IFormationInstance*>>();
   gpg::RRef vectorOwner{};
   archive->Read(vectorType, &mFormInstances, vectorOwner);
 }
@@ -610,7 +594,7 @@ void CAiFormationDBImpl::MemberSerialize(gpg::WriteArchive* const archive) const
   gpg::RRef owner{};
   WritePointerSim(archive, mSim, owner);
 
-  gpg::RType* const vectorType = CachedFormationInstanceVectorType();
+  gpg::RType* const vectorType = gpg::RTypeOf<gpg::fastvector<IFormationInstance*>>();
   gpg::RRef vectorOwner{};
   archive->Write(vectorType, &mFormInstances, vectorOwner);
 }

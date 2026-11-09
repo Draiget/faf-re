@@ -1,4 +1,5 @@
 #include "moho/sim/SimWorkerPool.h"
+#include "gpg/core/profiling/Profiler.h"
 
 #include <algorithm>
 #include <atomic>
@@ -22,6 +23,8 @@
 
 namespace moho
 {
+  int gSimDefaultWorkers = 0;
+
   namespace
   {
     // MXCSR bits 0-5 are sticky exception *flags* (status, not control); a job inherits only the
@@ -45,14 +48,15 @@ namespace moho
       return std::max(1u, std::thread::hardware_concurrency());
     }
 
-    /// `/simworkers N` on the command line, otherwise 0: serial until a parallel phase is asked for.
+    /// `/simworkers N` on the command line, otherwise the exe's default, leaving two CPUs for the main and sim threads.
     [[nodiscard]] int CommandLineWorkerCount()
     {
-      msvc8::vector<msvc8::string> args;
+      fa::vector<fa::string> args;
       if (CFG_GetArgOption("/simworkers", 1u, &args) && !args.empty()) {
         return static_cast<int>(std::max(0L, std::strtol(args[0].c_str(), nullptr, 10)));
       }
-      return 0;
+      const unsigned int cpus = UsableCpuCount();
+      return cpus > 2u ? std::min(gSimDefaultWorkers, static_cast<int>(cpus - 2u)) : 0;
     }
 
     /// Clamps a requested worker count to [0, min(usable CPUs, kMaxWorkers)].
@@ -81,6 +85,15 @@ namespace moho
     "sim_ParallelSync",
     "Copy the sync packet's unit updates on sim workers (when sim_Workers > 0).",
     &sim_ParallelSync
+  );
+
+  int sim_WorkerJobDelayUs = 0;
+
+  TConVar<int> gTConVar_sim_WorkerJobDelayUs(
+    "sim_WorkerJobDelayUs",
+    "Debug: microseconds a sim worker waits before each chunk it takes (0 = none). Stress test for "
+    "parallel phases; results are identical with any value.",
+    &sim_WorkerJobDelayUs
   );
 
   TConVar<int> gTConVar_sim_Workers(
@@ -133,15 +146,30 @@ namespace moho
     std::size_t grain = 1;
     std::size_t chunkCount = 0;
     SFpuControlState fpu{};
+    std::int64_t workerDelayTicks = 0; // sim_WorkerJobDelayUs in QueryPerformanceCounter ticks
     std::atomic<std::size_t> nextChunk{0};
     std::atomic<std::size_t> chunksLeft{0};
 
     std::mutex errorMutex;
     std::exception_ptr firstError;
 
+    // StartAsync's dispatch, held until FinishAsync; touched only by the dispatching thread.
+    std::unique_lock<std::mutex> asyncDispatchLock;
+    bool asyncPending = false;
+
     void RunChunks()
     {
+      const bool delayed = workerDelayTicks > 0 && IsSimWorkerThread();
       for (;;) {
+        if (delayed) {
+          LARGE_INTEGER start{};
+          LARGE_INTEGER now{};
+          ::QueryPerformanceCounter(&start);
+          do {
+            _mm_pause();
+            ::QueryPerformanceCounter(&now);
+          } while (now.QuadPart - start.QuadPart < workerDelayTicks);
+        }
         const std::size_t chunk = nextChunk.fetch_add(1u, std::memory_order_relaxed);
         if (chunk >= chunkCount) {
           return;
@@ -150,6 +178,7 @@ namespace moho
         const std::size_t begin = chunk * grain;
         const std::size_t end = std::min(count, begin + grain);
         try {
+          FAF_PROFILE_ZONE_NAMED("SimWorker Task");
           fn(context, begin, end);
         } catch (...) {
           const std::lock_guard<std::mutex> errorLock(errorMutex);
@@ -319,6 +348,12 @@ namespace moho
       impl.grain = grain;
       impl.chunkCount = (count + grain - 1u) / grain;
       impl.fpu = SFpuControlState::Capture();
+      impl.workerDelayTicks = 0;
+      if (sim_WorkerJobDelayUs > 0) {
+        LARGE_INTEGER frequency{};
+        ::QueryPerformanceFrequency(&frequency);
+        impl.workerDelayTicks = frequency.QuadPart * sim_WorkerJobDelayUs / 1000000;
+      }
       impl.nextChunk.store(0u, std::memory_order_relaxed);
       impl.chunksLeft.store(impl.chunkCount, std::memory_order_relaxed);
       impl.firstError = nullptr;
@@ -338,6 +373,80 @@ namespace moho
         return impl.chunksLeft.load(std::memory_order_acquire) == 0u && impl.activeWorkers == 0u;
       });
     }
+
+    if (impl.firstError) {
+      std::rethrow_exception(impl.firstError);
+    }
+  }
+
+  bool CSimWorkerPool::StartAsync(const std::size_t count, std::size_t grain, const RangeFunction fn, void* const context)
+  {
+    if (count == 0u || fn == nullptr) {
+      return false;
+    }
+    if (grain == 0u) {
+      grain = 1u;
+    }
+
+    Impl& impl = *mImpl;
+    if (impl.asyncPending || IsSimWorkerThread() || tIsDispatchingSimJob || impl.workerCount == 0u ||
+        count <= grain || ClampWorkerCount(sim_Workers) != impl.workerCount) {
+      // Serial: the chunks run now, which is where the serial phase would run them.
+      for (std::size_t begin = 0; begin < count; begin += grain) {
+        fn(context, begin, std::min(count, begin + grain));
+      }
+      return false;
+    }
+
+    impl.asyncDispatchLock = std::unique_lock<std::mutex>(impl.dispatchMutex);
+    if (impl.threads.empty()) {
+      impl.Start();
+    }
+    {
+      std::unique_lock<std::mutex> lock(impl.mutex);
+      impl.done.wait(lock, [&] { return impl.activeWorkers == 0u; });
+
+      impl.fn = fn;
+      impl.context = context;
+      impl.count = count;
+      impl.grain = grain;
+      impl.chunkCount = (count + grain - 1u) / grain;
+      impl.fpu = SFpuControlState::Capture();
+      impl.workerDelayTicks = 0;
+      if (sim_WorkerJobDelayUs > 0) {
+        LARGE_INTEGER frequency{};
+        ::QueryPerformanceFrequency(&frequency);
+        impl.workerDelayTicks = frequency.QuadPart * sim_WorkerJobDelayUs / 1000000;
+      }
+      impl.nextChunk.store(0u, std::memory_order_relaxed);
+      impl.chunksLeft.store(impl.chunkCount, std::memory_order_relaxed);
+      impl.firstError = nullptr;
+      ++impl.generation;
+    }
+    impl.wake.notify_all();
+
+    impl.asyncPending = true;
+    tIsDispatchingSimJob = true;
+    return true;
+  }
+
+  void CSimWorkerPool::FinishAsync()
+  {
+    Impl& impl = *mImpl;
+    if (!impl.asyncPending) {
+      return;
+    }
+
+    impl.RunChunks();
+    {
+      std::unique_lock<std::mutex> lock(impl.mutex);
+      impl.done.wait(lock, [&] {
+        return impl.chunksLeft.load(std::memory_order_acquire) == 0u && impl.activeWorkers == 0u;
+      });
+    }
+    impl.asyncPending = false;
+    tIsDispatchingSimJob = false;
+    impl.asyncDispatchLock.unlock();
 
     if (impl.firstError) {
       std::rethrow_exception(impl.firstError);

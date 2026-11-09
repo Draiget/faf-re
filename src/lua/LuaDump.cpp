@@ -1,6 +1,7 @@
 #include "lua/LuaUndump.h"
 
 #include <cstddef>
+#include <cstdint>
 
 // The binary-chunk writer - upstream's `ldump.c`, and the exact mirror of the
 // loader recovered in LuaObject.cpp. Every byte this file emits is read back
@@ -117,12 +118,16 @@ namespace LuaPlus
 			LuaDumpBlock(&value, sizeof(value), dumpState);
 		}
 
-		/// Upstream's `DumpSize`. Same four bytes as `LuaDumpInt` on this
-		/// target, but kept distinct because the format declares `sizeof(int)`
-		/// and `sizeof(size_t)` separately and the loader checks both.
+		/// Upstream's `DumpSize`. Same four bytes as `LuaDumpInt`, but kept
+		/// distinct because the format declares `sizeof(int)` and `sizeof(size_t)`
+		/// separately and the loader checks both. Four bytes on every target: the
+		/// loader reads the binary's 32-bit sizes (`LuaLoadTString`, and it demands
+		/// a declared `size_t` of 4), so an x64 dump of eight-byte sizes was
+		/// refused by its own loader.
 		void LuaDumpSize(const std::size_t value, DumpState* const dumpState)
 		{
-			LuaDumpBlock(&value, sizeof(value), dumpState);
+			const std::uint32_t size = static_cast<std::uint32_t>(value);
+			LuaDumpBlock(&size, sizeof(size), dumpState);
 		}
 
 		/// Upstream's `DumpNumber`; inlined as a `movss` into the scratch slot
@@ -375,7 +380,7 @@ namespace LuaPlus
 			LuaDumpByte(kLuaChunkFormat, dumpState);
 			LuaDumpByte(luaU_endianness(), dumpState);
 			LuaDumpByte(static_cast<int>(sizeof(int)), dumpState);
-			LuaDumpByte(static_cast<int>(sizeof(std::size_t)), dumpState);
+			LuaDumpByte(static_cast<int>(sizeof(std::uint32_t)), dumpState); // LuaDumpSize's width
 			LuaDumpByte(static_cast<int>(sizeof(Instruction)), dumpState);
 			LuaDumpByte(kLuaInstructionSizeOp, dumpState);
 			LuaDumpByte(kLuaInstructionSizeA, dumpState);

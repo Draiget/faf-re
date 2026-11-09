@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/mutex.h"
+#include <mutex>
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/DList.h"
 #include "gpg/core/containers/String.h"
@@ -158,7 +158,17 @@ namespace moho
    */
   void register_sResourceLock();
 
-  extern boost::mutex sResourceLock;
+  extern std::recursive_mutex sResourceLock;
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4): CD3DBatchTexture::FromFile for
+   * simulation code (blueprint strategic icons, entity strategic underlays), whose
+   * textures are the client's. CD3DBatchTexture.cpp sets it during static
+   * initialisation; defined in moho/entity/REntityBlueprint.cpp. Without a client it
+   * is null and the simulation holds no texture.
+   */
+  using BatchTextureFromFileHook = boost::shared_ptr<CD3DBatchTexture> (*)(gpg::StrArg filename, std::uint32_t border);
+  extern BatchTextureFromFileHook sBatchTextureFromFile;
 
   static_assert(offsetof(CD3DBatchTexture, mWidth) == 0x0C, "CD3DBatchTexture::mWidth offset must be 0x0C");
   static_assert(offsetof(CD3DBatchTexture, mHeight) == 0x10, "CD3DBatchTexture::mHeight offset must be 0x10");

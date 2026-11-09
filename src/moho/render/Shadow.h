@@ -207,4 +207,18 @@ namespace moho
   );
   static_assert(sizeof(Shadow) == 0x318, "Shadow size must be 0x318");
   static_assert(alignof(Shadow) == 8, "Shadow must be 8-aligned");
+
+  /**
+   * Engine addition (`ren_ShadowCascades`): the shadow textures' width in texels. With cascades on it is
+   * the 2x2 atlas of `mShadowSize` tiles (gpg/gal/effects/ShadowCascades.h), otherwise `mShadowSize`.
+   * The blur passes step one texel of this.
+   */
+  [[nodiscard]] int ShadowTextureSize(const Shadow& shadow);
+
+  /**
+   * Engine addition (`ren_ShadowCascades`): texels across the whole-view shadow map, the space the
+   * effects' shadow coordinates are in: its atlas tile's viewport with cascades on, otherwise
+   * `mShadowSize`. mesh.fx's filter steps one texel of this.
+   */
+  [[nodiscard]] int ShadowMapTexels(const Shadow& shadow);
 } // namespace moho

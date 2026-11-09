@@ -51,6 +51,13 @@ namespace gpg::gal::effects
    */
   [[nodiscard]] std::vector<std::uint8_t> StripSpirvReflection(const std::vector<std::uint8_t>& code);
 
+  /**
+   * Engine addition (ren_UsedTextureTable): bit b for every image variable of descriptor set 0 at binding b (0..63) the
+   * module declares - DXC removes the resources a shader doesn't read - so with -fvk-t-shift 0 the texture registers it
+   * reads; all bits when the code can't be read.
+   */
+  [[nodiscard]] std::uint64_t ReflectSpirvTextureSlots(const std::vector<std::uint8_t>& code);
+
   /** Returns `code` with each input variable's Location replaced by `locations[id]` where present. */
   [[nodiscard]] std::vector<std::uint8_t> PatchSpirvInputLocations(
     const std::vector<std::uint8_t>& code, const std::map<std::uint32_t, std::uint32_t>& locations

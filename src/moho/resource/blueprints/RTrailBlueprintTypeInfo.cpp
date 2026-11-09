@@ -21,36 +21,11 @@ namespace
     return sInstance;
   }
 
-  /**
-   * Address: 0x005104B0 (FUN_005104B0)
-   *
-   * What it does:
-   * Lazily resolves and caches RTTI metadata for `RTrailBlueprint`.
-   */
-  gpg::RType* CachedTrailBlueprintType()
-  {
-    gpg::RType* cached = moho::RTrailBlueprint::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::RTrailBlueprint));
-      moho::RTrailBlueprint::sType = cached;
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedEffectBlueprintType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::REffectBlueprint));
-    }
-    return cached;
-  }
-
   gpg::RRef MakeTrailBlueprintRef(moho::RTrailBlueprint* object)
   {
     gpg::RRef out{};
     out.mObj = object;
-    out.mType = CachedTrailBlueprintType();
+    out.mType = gpg::RTypeOf<moho::RTrailBlueprint>();
     return out;
   }
 
@@ -143,14 +118,7 @@ namespace moho
  */
 void RTrailBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* typeInfo)
 {
-  gpg::RType* const effectType = CachedEffectBlueprintType();
-  gpg::RField baseField{};
-  baseField.mName = effectType->GetName();
-  baseField.mType = effectType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBase<moho::REffectBlueprint>(typeInfo);
 }
 
 /**
@@ -185,8 +153,8 @@ void RTrailBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* typeInfo)
     typeInfo->AddField<float>("LODCutoff", offsetof(RTrailBlueprint, LODCutoff), 3, "cutoff distance");
     typeInfo->AddField<bool>("EmitIfVisible", offsetof(RTrailBlueprint, EmitIfVisible), 3, "Emit particles ONLY if this is emitter is visible");
     typeInfo->AddField<bool>("CatchupEmit", offsetof(RTrailBlueprint, CatchupEmit), 3, "catchup particles for the ticks that we weren't visible");
-    typeInfo->AddField<msvc8::string>("RepeatTexture", offsetof(RTrailBlueprint, RepeatTexture), 3, "name of texture that repeats");
-    typeInfo->AddField<msvc8::string>("RampTexture", offsetof(RTrailBlueprint, RampTexture), 3, "RampTextureName");
+    typeInfo->AddField<fa::string>("RepeatTexture", offsetof(RTrailBlueprint, RepeatTexture), 3, "name of texture that repeats");
+    typeInfo->AddField<fa::string>("RampTexture", offsetof(RTrailBlueprint, RampTexture), 3, "RampTextureName");
   }
 
   /**

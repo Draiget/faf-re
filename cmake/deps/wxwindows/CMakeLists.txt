@@ -35,7 +35,13 @@ endif()
 add_library(faf_wx_build_flags INTERFACE)
 target_compile_definitions(faf_wx_build_flags INTERFACE
   WIN32 __WIN32__ _WINDOWS WINVER=0x0400 __WIN95__ STRICT
-  __WXMSW__ __WINDOWS__ NOMAIN)
+  __WXMSW__ __WINDOWS__ NOMAIN
+  # FINAL=1 has no __WXDEBUG__ (makevc.env DEBUG_FLAGS is empty, CRT /MD). A
+  # Debug preset compiles against the debug CRT, whose _DEBUG wx/debug.h would
+  # turn into __WXDEBUG__; NDEBUG overrides it there, as platform/WxWidgets.h
+  # does for the engine's own TUs. Otherwise wxApp::CheckBuildOptions aborts
+  # at startup ("library used 2.4 (debug), program used 2.4 (no debug)").
+  NDEBUG)
 target_include_directories(faf_wx_build_flags INTERFACE
   "${WX_ROOT}/lib/mswu"
   "${WX_ROOT}/include"

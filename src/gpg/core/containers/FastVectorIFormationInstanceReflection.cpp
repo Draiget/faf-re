@@ -32,12 +32,12 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::IFormationInstance*>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::IFormationInstance*>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    vec.Resize(count);
+    vec.resize(count);
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
@@ -141,7 +141,7 @@ gpg::RFastVectorType<moho::IFormationInstance*>::~RFastVectorType() = default;
  */
 const char* gpg::RFastVectorType<moho::IFormationInstance*>::GetName() const
 {
-  static const msvc8::string sName =
+  static const fa::string sName =
     gpg::STR_Printf("fastvector<%s>", moho::IFormationInstance::GetPointerType()->GetName());
   return sName.c_str();
 }
@@ -149,9 +149,9 @@ const char* gpg::RFastVectorType<moho::IFormationInstance*>::GetName() const
 /**
  * Address: 0x0059CA40 (FUN_0059CA40, gpg::RFastVectorType_IFormationInstance_P::GetLexical)
  */
-msvc8::string gpg::RFastVectorType<moho::IFormationInstance*>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RFastVectorType<moho::IFormationInstance*>::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 
@@ -185,7 +185,7 @@ void gpg::RFastVectorType<moho::IFormationInstance*>::Init()
  */
 gpg::RRef gpg::RFastVectorType<moho::IFormationInstance*>::SubscriptIndex(void* obj, const int ind) const
 {
-  auto& vec = *static_cast<gpg::fastvector<moho::IFormationInstance*>*>(obj);
+  auto& vec = *static_cast<gpg::core::FastVectorInline<moho::IFormationInstance*>*>(obj);
   gpg::RRef out{};
   out = gpg::MakeRRef<moho::IFormationInstance*>(&vec[static_cast<std::size_t>(ind)]);
   return out;
@@ -211,8 +211,8 @@ size_t gpg::RFastVectorType<moho::IFormationInstance*>::GetCount(void* obj) cons
  */
 void gpg::RFastVectorType<moho::IFormationInstance*>::SetCount(void* obj, const int count) const
 {
-  auto& vec = *static_cast<gpg::fastvector<moho::IFormationInstance*>*>(obj);
-  vec.Resize(static_cast<std::size_t>(count));
+  auto& vec = *static_cast<gpg::core::FastVectorInline<moho::IFormationInstance*>*>(obj);
+  vec.resize(static_cast<std::size_t>(count));
 }
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

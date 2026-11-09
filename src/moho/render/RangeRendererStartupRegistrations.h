@@ -97,6 +97,31 @@ namespace moho
    */
   extern bool range_RenderHoveredAttack;
 
+  /**
+   * NOT PRESENT IN THE ORIGINAL BINARY.
+   *
+   * FAF FA-Binary-Patches #149 (range ring stencil overflow), extended to the
+   * outlines: `func_RenderRings` draws fill rings and outline bands 127 at a
+   * time with a stencil flush after each batch, so 128 or more overlapping
+   * rings merge without ring outlines inside the merged area (#149) and
+   * without gaps in the outer outline (the edge loop #149 left alone). Default
+   * true; false keeps the original 1000-payload batches and single passes.
+   * Render only.
+   */
+  extern bool range_StencilFlush;
+
+  /**
+   * NOT PRESENT IN THE ORIGINAL BINARY.
+   *
+   * Performance switch: `func_RenderRings` drops the ring volumes "Cast" would
+   * draw with no effect on the image - those outside the camera's view of the
+   * ring slab, and, with `range_StencilFlush`, the fills and outlines that only
+   * reach parts of the view another single fill already holds (zoomed in on a
+   * large selection, nearly all of them). Default true; false casts every
+   * volume as the original does. Render only.
+   */
+  extern bool range_ViewCull;
+
   extern bool ren_Ranges;
 
 

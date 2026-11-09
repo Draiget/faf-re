@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include "gpg/core/containers/String.h"
 #include "moho/task/CTaskThread.h"
@@ -20,11 +21,11 @@ namespace moho
     // +0x00
     std::uintptr_t addr;
     // +0x04
-    msvc8::string symbol;
+    fa::string symbol;
     // +0x20
     std::uintptr_t symDis;
     // +0x24
-    msvc8::string filename;
+    fa::string filename;
     // +0x40
     std::uint32_t lineNum;
     // +0x44
@@ -35,7 +36,7 @@ namespace moho
      * Formats one resolved symbol line as:
      * `symbol + symDis bytes (file(lineNum) + lineDis bytes)`.
      */
-    [[nodiscard]] msvc8::string FormatResolvedLine() const;
+    [[nodiscard]] fa::string FormatResolvedLine() const;
   };
 
 #if defined(_WIN64)
@@ -181,6 +182,14 @@ namespace moho
   void PLAT_RegisterFileForErrorReport(const wchar_t* file);
 
   /**
+   * Engine addition (dedicated-server plan WPL.4): the crash-report output
+   * directory PLAT_InitErrorReportOutputDir set (with its trailing `\`), for
+   * the client's crash-report writers; the attachment registry lives with the
+   * platform services (moho/misc/WinPlatform.cpp).
+   */
+  std::wstring PLAT_GetErrorReportOutputDir();
+
+  /**
    * Address: 0x004A1230 (FUN_004A1230)
    * Mangled: ?PLAT_CreateGameLogForReport@Moho@@YAXXZ
    *
@@ -199,7 +208,7 @@ namespace moho
    * Returns UTF-8 text containing recent log-history lines for crash/report
    * output flows.
    */
-  msvc8::string LOG_GetRecentLines(std::uint32_t maxLines);
+  fa::string LOG_GetRecentLines(std::uint32_t maxLines);
 
   /**
    * Address: 0x004A22B0 (FUN_004A22B0)
@@ -228,7 +237,7 @@ namespace moho
    * What it does:
    * Formats callstack entries from `[firstFrame, endFrame)` into text lines.
    */
-  msvc8::string PLAT_FormatCallstack(std::int32_t firstFrame, std::int32_t endFrame, const std::uintptr_t* frames);
+  fa::string PLAT_FormatCallstack(std::int32_t firstFrame, std::int32_t endFrame, const std::uintptr_t* frames);
 
   /**
    * Address: 0x004A25D0 (FUN_004A25D0)
@@ -239,7 +248,7 @@ namespace moho
    * Converts one decorated symbol into undecorated text under the shared
    * symbol-handler mutex, with optional underscore-stripping mode.
    */
-  msvc8::string PLAT_UnDecorateSymbolName(const char* name, bool stripLeadingUnderscore);
+  fa::string PLAT_UnDecorateSymbolName(const char* name, bool stripLeadingUnderscore);
 
   /**
    * Address: 0x004A1F10 (FUN_004A1F10)
@@ -287,7 +296,7 @@ namespace moho
    * Reads UTF-16 clipboard text from `CF_UNICODETEXT`, converts it to UTF-8,
    * and returns empty text when clipboard ownership/data is unavailable.
    */
-  msvc8::string WIN_GetClipboardText();
+  fa::string WIN_GetClipboardText();
 
   /**
    * Address: 0x004F2800 (FUN_004F2800, ?WIN_OkBox@Moho@@YAXVStrArg@gpg@@0@Z)
@@ -297,6 +306,48 @@ namespace moho
    * when available.
    */
   void WIN_OkBox(gpg::StrArg caption, gpg::StrArg text);
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4, WPR.12): shows WIN_OkBox's
+   * box (moho/misc/WinPlatform.cpp). WinApp.cpp sets it during static
+   * initialisation to the message box the binary showed, owned by the client's
+   * main window. A program without the client (headless, the game server) has
+   * no window to show it in: WIN_OkBox then writes the text to stderr.
+   */
+  using OkBoxPresenterHook = void (*)(gpg::StrArg caption, gpg::StrArg text);
+  extern OkBoxPresenterHook sOkBoxPresenter;
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4): ends the client's main loop
+   * (`wxTheApp->ExitMainLoop()` when there is an application object), for
+   * simulation-side callers such as the core Lua set's EndLoggingStats.
+   * WinApp.cpp sets it during static initialisation; defined in
+   * moho/misc/WinPlatform.cpp. Without a client it is null and nothing exits.
+   */
+  using AppExitMainLoopHook = void (*)();
+  extern AppExitMainLoopHook sAppExitMainLoop;
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4): dispatches the client's
+   * pending window events, then runs idle processing until it asks for no
+   * more (wxTheApp's Pending/Dispatch/ProcessIdle), for
+   * CSimDriver::PerformNextEvent. WinApp.cpp sets it during static
+   * initialisation; defined in moho/misc/WinPlatform.cpp. Without a client it
+   * is null and there is nothing to pump.
+   */
+  using AppPumpEventsHook = void (*)();
+  extern AppPumpEventsHook sAppPumpEvents;
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4): one step of the event pump a
+   * Lua thread paused in the script debugger runs (PausedMainThread): when the
+   * client's application object has a pending event, dispatches it and returns
+   * true; otherwise, when `processIdle` is set, runs idle processing and stores
+   * whether it asks for more, and returns false. WinApp.cpp sets it during static
+   * initialisation; defined in moho/misc/WinPlatform.cpp.
+   */
+  using AppPumpStepHook = bool (*)(bool& processIdle);
+  extern AppPumpStepHook sAppPumpStep;
 
   /**
    * Address: 0x004F2900 (FUN_004F2900, ?WIN_YesNoBox@Moho@@YA_NVStrArg@gpg@@0@Z)
@@ -315,7 +366,7 @@ namespace moho
    * What it does:
    * Converts current `GetLastError()` value into readable UTF-8 text.
    */
-  msvc8::string WIN_GetLastError();
+  fa::string WIN_GetLastError();
 
   /**
    * Address: 0x004F1190 (FUN_004F1190)

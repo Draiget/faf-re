@@ -12,6 +12,7 @@
 #include <new>
 #include <typeinfo>
 #include <utility>
+#include <vector>
 
 #include "gpg/core/algorithms/AStarSearch.h"
 #include "legacy/containers/Vector.h"
@@ -23,10 +24,13 @@
 #include "moho/containers/TDatList.h"
 #include "moho/path/ClusterMap.h"
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/core/containers/FlatGenerationMap.h"
 #include "moho/ai/CAiPathFinder.h"
+#include "moho/console/CConCommand.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/path/IPathTraveler.h"
 #include "moho/path/SNamedFootprint.h"
+#include "moho/sim/SimArchiveMode.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/SOCellPos.h"
 #include "moho/sim/SRuleFootprintsBlueprint.h"
@@ -34,8 +38,8 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#include "gpg/core/reflection/StaticInitPhase.h"
 #endif
+#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
@@ -54,7 +58,7 @@ namespace
     }
   };
 
-  using PathQueueCellTraits = msvc8::hash_compare<moho::SOCellPos, PathQueueCellLess>;
+  using PathQueueCellTraits = fa::hash_compare<moho::SOCellPos, PathQueueCellLess>;
 
   /**
    * Address: 0x00E35E84 / 0x00E35E8C / 0x00E35E94 / 0x00E35E9C
@@ -68,10 +72,61 @@ namespace
   constexpr std::int8_t kStepOffsetZ[8] = { -1, 0, 1, 0, -1, 1, 1, -1 };
   constexpr std::uint8_t kStepGate[8] = { 0u, 0u, 0u, 0u, 3u, 6u, 12u, 9u };
   constexpr float kStepCost[8] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.414f, 1.414f, 1.414f, 1.414f };
+
+  /**
+   * Engine addition (`sim_PathTraverseCache`): the traveler's `CanTraverseCell`
+   * answers within one A* pass (`WorkOnce`). A cell is a neighbour of up to
+   * eight expanded cells, and each expansion asked the traveler about it again,
+   * which for a unit is an occupation-grid gather (`COGrid::UnitIsBlocked`)
+   * every time. Nothing moves during a pass and the traveler is the same one
+   * throughout, so a remembered answer is the answer it would give again.
+   *
+   * The cache is emptied when a pass starts and when it ends (a generation
+   * bump), so no answer outlives the pass it was given in, and it is only
+   * consulted inside a pass.
+   */
+  struct TraverseCache
+  {
+    /// 4096 slots: room for 2048 cells before the first growth; the map keeps what it grew to.
+    static constexpr unsigned kCapacityLog2 = 12;
+
+    gpg::core::FlatGenerationMap<bool> answers{kCapacityLog2};
+    int mPassDepth = 0; // > 0 while a WorkOnce pass runs
+  };
+
+  // Path queues run on the sim thread; thread_local keeps any other caller apart.
+  thread_local TraverseCache tTraverseCache;
+
+  /** Brackets one WorkOnce pass for the traverse cache. */
+  class TraversePassScope
+  {
+  public:
+    TraversePassScope() noexcept
+    {
+      tTraverseCache.answers.Clear();
+      ++tTraverseCache.mPassDepth;
+    }
+
+    ~TraversePassScope()
+    {
+      --tTraverseCache.mPassDepth;
+      tTraverseCache.answers.Clear();
+    }
+
+    TraversePassScope(const TraversePassScope&) = delete;
+    TraversePassScope& operator=(const TraversePassScope&) = delete;
+  };
 } // namespace
 
 namespace moho
 {
+  bool sim_PathTraverseCache = true;
+  TConVar<bool> gTConVar_sim_PathTraverseCache(
+    "sim_PathTraverseCache",
+    "Remember a cell's traversability for the rest of one pathfinding pass instead of asking the unit again (same paths).",
+    &sim_PathTraverseCache
+  );
+
   /**
    * `Moho::PathQueue::ImplBase` - one in-flight path query.
    *
@@ -95,7 +150,7 @@ namespace moho
    *   +0x78 : mPathCap        traveler-supplied expansion cap
    */
   struct PathQueue::ImplBase
-    : gpg::AStarSearch<SOCellPos, PathQueue::ImplBase, PathQueueCellTraits>
+    : gpg::AStarSearch<SOCellPos, PathQueue::ImplBase, PathQueueCellTraits, true>
   {
     /** How one expansion ends: `ExpandNode`'s answer, which `WorkOnce` returns. */
     enum class Step : std::int32_t
@@ -157,12 +212,19 @@ namespace moho
     /** Hands the path to the best cell reached back to the traveler. */
     void FinishQuery(bool reachedGoal);
 
+    /**
+     * Engine addition (replay keyframes): the search as it stands. A saved game restarts the
+     * in-flight query (0x00768AA8), which changes when its path arrives; a keyframe continues it.
+     */
+    void SaveExact(gpg::WriteArchive* archive, const PathTables& owner);
+    void LoadExact(gpg::ReadArchive* archive, const PathTables& owner);
+
     gpg::DList<IPathTraveler> mTraveler;    // +0x4C
     SOCellPos mClosestCell;                 // +0x54
     float mClosestDistance;                 // +0x58
     gpg::HaStar::ClusterMap* mClusterMap;   // +0x5C
     std::int32_t mBudget;                   // +0x60
-    msvc8::vector<SOCellPos> mResultCells;  // +0x64
+    fa::vector<SOCellPos> mResultCells;  // +0x64
     std::int32_t mExpandCount;              // +0x74
     std::int32_t mPathCap;                  // +0x78
 
@@ -228,6 +290,27 @@ namespace moho
   }
 
   /**
+   * `traveler.CanTraverseCell(cell)`, through the pass cache when
+   * `sim_PathTraverseCache` is on and a pass is running.
+   */
+  [[nodiscard]] bool CanTraverseCellCached(IPathTraveler& traveler, const SOCellPos& cell)
+  {
+    TraverseCache& cache = tTraverseCache;
+    if (!sim_PathTraverseCache || cache.mPassDepth <= 0) {
+      return traveler.CanTraverseCell(cell);
+    }
+    static_assert(sizeof(SOCellPos) == sizeof(std::uint32_t), "the cell is its own 32-bit key");
+    std::uint32_t key;
+    std::memcpy(&key, &cell, sizeof(key));
+    if (const bool* const known = cache.answers.Find(key)) {
+      return *known;
+    }
+    const bool traversable = traveler.CanTraverseCell(cell);
+    (void)cache.answers.Insert(key, traversable);
+    return traversable;
+  }
+
+  /**
    * What it does:
    * The level-0 arm of `AddNeighbours` (0x00766350): the walkable subset of
    * the eight cells adjacent to `cell`.
@@ -263,7 +346,7 @@ namespace moho
       candidate.x = static_cast<std::int16_t>(candidateX);
       candidate.z = static_cast<std::int16_t>(candidateZ);
 
-      if (!traveler->CanTraverseCell(candidate)) {
+      if (!CanTraverseCellCached(*traveler, candidate)) {
         continue;
       }
 
@@ -1036,6 +1119,11 @@ namespace moho
     gpg::RRef travelerOwner{};
     archive->Read(dlistType, &mBase.mTraveler, travelerOwner);
 
+    if (moho::gSimExactArchive.load(std::memory_order_relaxed)) {
+      mBase.LoadExact(archive, *mOwner);
+      return;
+    }
+
     // The in-flight traveler goes back to the front of the pending list
     // (0x00768AA8), so the query restarts first.
     mPendingTravelers.splice_front(mBase.mTraveler);
@@ -1073,6 +1161,139 @@ namespace moho
 
     gpg::RRef travelerOwner{};
     archive->Write(dlistType, &mBase.mTraveler, travelerOwner);
+
+    if (moho::gSimExactArchive.load(std::memory_order_relaxed)) {
+      const_cast<ImplBase&>(mBase).SaveExact(archive, *mOwner);
+    }
+  }
+
+  void PathQueue::ImplBase::SaveExact(gpg::WriteArchive* const archive, const PathTables& owner)
+  {
+    archive->WriteInt(owner.FootprintOfClusterMap(mClusterMap));
+    archive->WriteShort(mClosestCell.x);
+    archive->WriteShort(mClosestCell.z);
+    archive->WriteFloat(mClosestDistance);
+    archive->WriteInt(mBudget);
+    archive->WriteInt(mExpandCount);
+    archive->WriteInt(mPathCap);
+
+    // Nothing is in flight between queries, and BeginQuery starts the next one clean.
+    const bool inFlight = !mTraveler.empty();
+    archive->WriteBool(inFlight);
+    if (!inFlight) {
+      return;
+    }
+
+    std::uint32_t nodeCount = 0;
+    mNodes.ForEach([&nodeCount](const node_type&) { ++nodeCount; });
+    archive->WriteUInt(nodeCount);
+    mNodes.ForEach([archive](const node_type& node) {
+      archive->WriteShort(node.mCell.x);
+      archive->WriteShort(node.mCell.z);
+      archive->WriteInt(static_cast<std::int32_t>(node.mState));
+      archive->WriteBool(node.mParent != nullptr);
+      if (node.mParent != nullptr) {
+        archive->WriteShort(node.mParent->mCell.x);
+        archive->WriteShort(node.mParent->mCell.z);
+      }
+      archive->WriteFloat(node.mCost);
+      archive->WriteFloat(node.mEstimate);
+      archive->WriteInt(node.mHandle);
+    });
+
+    const auto& entries = mOpen.Entries();
+    archive->WriteUInt(static_cast<std::uint32_t>(entries.size()));
+    for (const auto& entry : entries) {
+      archive->WriteFloat(entry.mPriority);
+      archive->WriteShort(entry.mNode->mCell.x);
+      archive->WriteShort(entry.mNode->mCell.z);
+      archive->WriteInt(entry.mHandle);
+    }
+
+    const auto& indexByHandle = mOpen.IndexByHandle();
+    archive->WriteUInt(static_cast<std::uint32_t>(indexByHandle.size()));
+    for (const std::int32_t index : indexByHandle) {
+      archive->WriteInt(index);
+    }
+    archive->WriteInt(mOpen.FreeHandle());
+  }
+
+  void PathQueue::ImplBase::LoadExact(gpg::ReadArchive* const archive, const PathTables& owner)
+  {
+    std::int32_t footprint = -1;
+    archive->ReadInt(&footprint);
+    mClusterMap = footprint >= 0 ? owner.ClusterMapForFootprint(footprint) : nullptr;
+    archive->ReadShort(&mClosestCell.x);
+    archive->ReadShort(&mClosestCell.z);
+    archive->ReadFloat(&mClosestDistance);
+    archive->ReadInt(&mBudget);
+    archive->ReadInt(&mExpandCount);
+    archive->ReadInt(&mPathCap);
+
+    bool inFlight = false;
+    archive->ReadBool(&inFlight);
+    if (!inFlight) {
+      return;
+    }
+
+    struct SParentLink
+    {
+      node_type* mNode;
+      SOCellPos mParent;
+    };
+    std::vector<SParentLink> parents;
+
+    std::uint32_t nodeCount = 0;
+    archive->ReadUInt(&nodeCount);
+    for (std::uint32_t index = 0; index < nodeCount; ++index) {
+      SOCellPos cell{};
+      archive->ReadShort(&cell.x);
+      archive->ReadShort(&cell.z);
+
+      node_type& node = FindOrCreateNode(cell);
+      std::int32_t state = 0;
+      archive->ReadInt(&state);
+      node.mState = static_cast<gpg::AStarNodeState>(state);
+
+      bool hasParent = false;
+      archive->ReadBool(&hasParent);
+      if (hasParent) {
+        SParentLink link{&node, SOCellPos{}};
+        archive->ReadShort(&link.mParent.x);
+        archive->ReadShort(&link.mParent.z);
+        parents.push_back(link);
+      }
+      archive->ReadFloat(&node.mCost);
+      archive->ReadFloat(&node.mEstimate);
+      archive->ReadInt(&node.mHandle);
+    }
+    for (const SParentLink& link : parents) {
+      link.mNode->mParent = &FindOrCreateNode(link.mParent);
+    }
+
+    std::uint32_t entryCount = 0;
+    archive->ReadUInt(&entryCount);
+    for (std::uint32_t index = 0; index < entryCount; ++index) {
+      heap_type::Entry entry{};
+      archive->ReadFloat(&entry.mPriority);
+      SOCellPos cell{};
+      archive->ReadShort(&cell.x);
+      archive->ReadShort(&cell.z);
+      entry.mNode = &FindOrCreateNode(cell);
+      archive->ReadInt(&entry.mHandle);
+      mOpen.AppendRestored(entry);
+    }
+
+    std::uint32_t indexCount = 0;
+    archive->ReadUInt(&indexCount);
+    for (std::uint32_t index = 0; index < indexCount; ++index) {
+      std::int32_t value = 0;
+      archive->ReadInt(&value);
+      mOpen.AppendRestoredIndex(value);
+    }
+    std::int32_t freeHandle = -1;
+    archive->ReadInt(&freeHandle);
+    mOpen.SetFreeHandle(freeHandle);
   }
 
   /**
@@ -1147,6 +1368,7 @@ namespace moho
      * Copy-constructs one path occupation-source binding owner pair.
      */
     OccupySourceBinding(const OccupySourceBinding& other);
+    OccupySourceBinding& operator=(const OccupySourceBinding&) = default;
 
     /**
      * Address: 0x0076B770 (FUN_0076B770, Moho::OccupySourceBinding::GetOccupyData)
@@ -1188,8 +1410,8 @@ namespace moho
 
     std::int32_t mWidth;                          // +0x00
     std::int32_t mHeight;                         // +0x04
-    msvc8::vector<OccupySourceBinding> mSources;  // +0x08
-    msvc8::vector<ClusterMap*> mMaps;             // +0x18
+    fa::vector<OccupySourceBinding> mSources;  // +0x08
+    fa::vector<ClusterMap*> mMaps;             // +0x18
     gpg::HaStar::ClusterCache mClusterCache;      // +0x28
   };
 
@@ -1341,7 +1563,11 @@ namespace moho
     }
     traveler->ListUnlink();
 
-    const SNavPath& path = *reinterpret_cast<const SNavPath*>(&mResultCells);
+    // The traveler reads the cells through an `SNavPath`, without owning them.
+    SNavPath path{};
+    path.start = mResultCells.begin();
+    path.finish = mResultCells.end();
+    path.capacity = mResultCells.begin() + mResultCells.capacity();
     if (reachedGoal) {
       traveler->OnPathAccepted(path);
     } else {
@@ -1355,6 +1581,35 @@ namespace moho
   gpg::HaStar::ClusterMap* PathTables::ClusterMapForFootprint(const std::int32_t footprintIndex) const
   {
     return mImpl->mMaps[footprintIndex];
+  }
+
+  std::int32_t PathTables::FootprintOfClusterMap(const gpg::HaStar::ClusterMap* const map) const
+  {
+    for (std::size_t index = 0; index < mImpl->mMaps.size(); ++index) {
+      if (mImpl->mMaps[index] == map) {
+        return static_cast<std::int32_t>(index);
+      }
+    }
+    return -1;
+  }
+
+  void PathTables::SaveExact(gpg::WriteArchive* const archive) const
+  {
+    for (const ClusterMap* const map : mImpl->mMaps) {
+      if (map != nullptr) {
+        map->SaveExact(archive);
+      }
+    }
+  }
+
+  void PathTables::LoadExact(gpg::ReadArchive* const archive)
+  {
+    std::unordered_map<std::string, gpg::HaStar::Cluster> shared;
+    for (ClusterMap* const map : mImpl->mMaps) {
+      if (map != nullptr) {
+        map->LoadExact(archive, shared);
+      }
+    }
   }
 
   /**
@@ -1391,7 +1646,11 @@ namespace moho
       assert(!impl.mBase.mTraveler.empty());
 
       impl.mBase.mBudget = budget;
-      const ImplBase::Step step = impl.mBase.WorkOnce(impl.mBase);
+      ImplBase::Step step;
+      {
+        const TraversePassScope traversePass;
+        step = impl.mBase.WorkOnce(impl.mBase);
+      }
       budget = impl.mBase.mBudget;
 
       if (step == ImplBase::Step::BudgetExhausted) {
@@ -1427,7 +1686,11 @@ namespace moho
     assert(!scratch.mTraveler.empty());
 
     scratch.mBudget = budget;
-    const ImplBase::Step step = scratch.WorkOnce(scratch);
+    ImplBase::Step step;
+    {
+      const TraversePassScope traversePass;
+      step = scratch.WorkOnce(scratch);
+    }
     budget = scratch.mBudget;
 
     scratch.FinishQuery(step == ImplBase::Step::GoalReached);

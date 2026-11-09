@@ -1,4 +1,6 @@
 #include "Shield.h"
+#include "moho/lua/CScrLuaInitForm.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 #include <Windows.h>
 
@@ -35,41 +37,12 @@ namespace gpg
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kCreateShieldName = "_c_CreateShield";
   constexpr const char* kCreateShieldHelpText = "_c_CreateShield(spec)";
   constexpr const char* kOwnerFieldName = "Owner";
   constexpr std::uint32_t kShieldCollisionBucketFlags = 0x800u;
   constexpr std::uint32_t kShieldFamilyMaskSourceBits = 0x400u;
   constexpr std::uint32_t kInvalidArmySourceIndex = 0xFFu;
-
-  gpg::RType* CachedShieldType()
-  {
-    static gpg::RType* sShieldType = nullptr;
-    if (!sShieldType) {
-      sShieldType = gpg::LookupRType(typeid(moho::Shield));
-    }
-    return sShieldType;
-  }
-
-  gpg::RType* CachedEntityType()
-  {
-    static gpg::RType* sEntityType = nullptr;
-    if (!sEntityType) {
-      sEntityType = gpg::LookupRType(typeid(moho::Entity));
-    }
-    return sEntityType;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
 
   [[nodiscard]] std::uint32_t BuildShieldFamilySourceBits(const std::uint32_t armySourceIndex) noexcept
   {
@@ -85,14 +58,7 @@ namespace
    */
   void AddEntityBaseToShieldTypeInfo(gpg::RType* const typeInfo)
   {
-    gpg::RType* const entityType = CachedEntityType();
-    gpg::RField baseField{};
-    baseField.mName = entityType->GetName();
-    baseField.mType = entityType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::Entity>(typeInfo);
   }
 
   void UnlinkShieldFromSimList(moho::Shield* const shield)
@@ -101,8 +67,8 @@ namespace
       return;
     }
 
-    msvc8::list<moho::Shield*>& shieldList = shield->SimulationRef->mShields;
-    for (msvc8::list<moho::Shield*>::iterator it = shieldList.begin(); it != shieldList.end();) {
+    fa::list<moho::Shield*>& shieldList = shield->SimulationRef->mShields;
+    for (fa::list<moho::Shield*>::iterator it = shieldList.begin(); it != shieldList.end();) {
       it = (*it == shield) ? shieldList.erase(it) : std::next(it);
     }
   }
@@ -168,12 +134,12 @@ namespace moho
 
   void Shield::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    archive->Read(CachedEntityType(), static_cast<Entity*>(this), gpg::RRef{});
+    archive->Read(gpg::RTypeOf<moho::Entity>(), static_cast<Entity*>(this), gpg::RRef{});
   }
 
   void Shield::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    archive->Write(CachedEntityType(), static_cast<const Entity*>(this), gpg::RRef{});
+    archive->Write(gpg::RTypeOf<moho::Entity>(), static_cast<const Entity*>(this), gpg::RRef{});
   }
 
   /**
@@ -184,7 +150,7 @@ namespace moho
    */
   gpg::RType* Shield::GetClass() const
   {
-    return CachedShieldType();
+    return gpg::RTypeOf<moho::Shield>();
   }
 
   /**
@@ -198,7 +164,7 @@ namespace moho
    */
   gpg::RType* Shield::GetPointerType()
   {
-    (void)CachedShieldType();
+    (void)gpg::RTypeOf<moho::Shield>();
 
     gpg::RType* cached = sPointerType;
     if (!cached) {
@@ -220,10 +186,7 @@ namespace moho
    */
   gpg::RRef Shield::GetDerivedObjectRef()
   {
-    gpg::RRef ref{};
-    ref.mObj = this;
-    ref.mType = GetClass();
-    return ref;
+    return gpg::MakeSelfRef(this);
   }
 
   /**
@@ -270,7 +233,7 @@ namespace moho
   CScrLuaInitForm* func__c_CreateShield_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCreateShieldName,
       &cfunc__c_CreateShield,
       nullptr,
@@ -294,10 +257,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCreateShieldHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kCreateShieldHelpText);
 
     Sim* const sim = lua_getglobaluserdata(rawState);
     std::uint32_t armySourceIndex = kInvalidArmySourceIndex;
@@ -414,7 +374,7 @@ namespace
   moho::CScrLuaInitForm* register_moho_shield_methods()
   {
     static moho::CScrLuaClassBinder binder(
-      SimLuaInitSet(), "moho.shield_methods", &moho::CScrLuaMetatableFactory<moho::Shield>::Instance(), "Shield", ""
+      moho::SCR_SimLuaInitSet(), "moho.shield_methods", &moho::CScrLuaMetatableFactory<moho::Shield>::Instance(), "Shield", ""
     );
     return &binder;
   }
@@ -430,7 +390,7 @@ namespace
   moho::CScrLuaInitForm* register_ShieldLuaBaseClass()
   {
     static moho::CScrLuaBaseClassSpec spec(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &moho::CScrLuaMetatableFactory<moho::Shield>::Instance(),
       &moho::CScrLuaMetatableFactory<moho::Entity>::Instance(),
       "Shield",

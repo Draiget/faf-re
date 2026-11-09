@@ -12,21 +12,6 @@
 
 namespace
 {
-  /**
-   * Address: 0x0050CAB0 (FUN_0050CAB0)
-   *
-   * What it does:
-   * Lazily resolves and caches RTTI metadata for `SCoordsVec2`.
-   */
-  [[nodiscard]] gpg::RType* ResolveSCoordsVec2Type()
-  {
-    gpg::RType* type = moho::SCoordsVec2::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SCoordsVec2));
-      moho::SCoordsVec2::sType = type;
-    }
-    return type;
-  }
 
   /**
    * Address: 0x0050BCC0 (FUN_0050BCC0)
@@ -37,12 +22,7 @@ namespace
    */
   [[maybe_unused]] void cleanup_SCoordsVec2TypeInfoRTypeBase(moho::SCoordsVec2TypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
+    gpg::ClearTypeLists(typeInfo);
   }
 } // namespace
 

@@ -28,7 +28,7 @@ namespace moho
   class Unit;
   struct CEntityDbBoundedPropQueueNode;
 
-  struct CEntityDbAllUnitsNode : msvc8::Tree<CEntityDbAllUnitsNode>
+  struct CEntityDbAllUnitsNode : fa::Tree<CEntityDbAllUnitsNode>
   {
     std::uint32_t key;      // +0x0C
     void* unitListNode;     // +0x10 (points to intrusive unit list node)
@@ -54,8 +54,8 @@ namespace moho
    */
   struct CEntityDbBoundedPropQueue
   {
-    msvc8::vector<CEntityDbBoundedPropQueueNode> heap; // +0x00 (proxy +0x00, first +0x04, last +0x08, end +0x0C)
-    msvc8::vector<std::int32_t> handleSlots;           // +0x10 (proxy +0x10, first +0x14, last +0x18, end +0x1C)
+    fa::vector<CEntityDbBoundedPropQueueNode> heap; // +0x00 (proxy +0x00, first +0x04, last +0x08, end +0x0C)
+    fa::vector<std::int32_t> handleSlots;           // +0x10 (proxy +0x10, first +0x14, last +0x18, end +0x1C)
     std::int32_t lastHandle = -1;                      // +0x20
 
     /**
@@ -427,7 +427,7 @@ namespace moho
     // is `std::map_EntId_Entity::find` (0x006856C0). The node layout is the
     // `CEntityDbAllUnitsNode` view below (`AllUnitsHead()` hands it out for
     // the family-boundary iterators).
-    msvc8::map<std::uint32_t, Entity*> mAllUnits;    // +0x00
+    fa::map<std::uint32_t, Entity*> mAllUnits;    // +0x00
     // `std::map<unsigned int, Moho::IdPool>` (`Moho::EntityDB::mIdPool` in the
     // binary). Confirmed against `gpg/core/containers/ArchiveSerialization.cpp`
     // and `EntityDb.cpp`'s own reflection typing, both of which read this field
@@ -436,7 +436,7 @@ namespace moho
     // `FUN_006881C0` (buy_node), `FUN_006880A0`/`FUN_00688120` (rotate_left/
     // rotate_right) -- all cited on `legacy/containers/RbTree.h`'s shared
     // members, not reimplemented here (RULE ONE).
-    msvc8::map<std::uint32_t, IdPool> mIdPoolTree;  // +0x0C
+    fa::map<std::uint32_t, IdPool> mIdPoolTree;  // +0x0C
     // Every live entity set (`EntitySetBase` and each `EntitySetTemplate<T>`),
     // for `Purge` to drop destroyed entities from and `SerSets` to save.
     TDatList<EntitySetBase, void> mRegisteredEntitySets; // +0x18
@@ -445,12 +445,12 @@ namespace moho
     // appends with `push_back`, `Purge` (0x00684560) drains it, and
     // `MemberSerialize` (0x006897F0) writes it whole at `this + 0x20`. Every
     // live entity is in `mAllUnits`, not here.
-    msvc8::list<Entity*> mEntList;                  // +0x20
+    fa::list<Entity*> mEntList;                  // +0x20
     CEntityDbBoundedPropQueue mBoundedProps; // +0x2C
   };
 
   static_assert(offsetof(EntityDB, mAllUnits) == 0x00, "EntityDB::mAllUnits offset must be 0x00");
-  static_assert(sizeof(msvc8::map<std::uint32_t, Entity*>) == 0x0C, "EntityDB::mAllUnits must be the 12-byte MSVC8 map header");
+  static_assert(sizeof(fa::map<std::uint32_t, Entity*>) == 0x0C, "EntityDB::mAllUnits must be the 12-byte MSVC8 map header");
   static_assert(offsetof(EntityDB, mIdPoolTree) == 0x0C, "EntityDB::mIdPoolTree offset must be 0x0C");
   static_assert(
     offsetof(EntityDB, mRegisteredEntitySets) == 0x18, "EntityDB::mRegisteredEntitySets offset must be 0x18"

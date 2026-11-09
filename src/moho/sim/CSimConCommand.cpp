@@ -16,7 +16,7 @@ namespace
   struct SimConCommandNameLess
   {
     [[nodiscard]]
-    bool operator()(const msvc8::string& lhs, const msvc8::string& rhs) const noexcept
+    bool operator()(const fa::string& lhs, const fa::string& rhs) const noexcept
     {
       return gpg::STR_CompareNoCase(lhs.c_str(), rhs.c_str()) < 0;
     }
@@ -29,7 +29,7 @@ namespace
    * layout), the command pointer at `node+0x28` and colour/nil at
    * `+0x2C`/`+0x2D`.
    */
-  using SimConCommandRegistry = msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>;
+  using SimConCommandRegistry = fa::map<fa::string, moho::CSimConCommand*, SimConCommandNameLess>;
 
   [[nodiscard]] SimConCommandRegistry& GetSimConCommandRegistry()
   {
@@ -45,7 +45,7 @@ namespace
    * sim-command registry tree.
    */
   [[nodiscard]] SimConCommandRegistry::iterator
-  FindSimConLowerBound(SimConCommandRegistry& registry, const msvc8::string& commandName)
+  FindSimConLowerBound(SimConCommandRegistry& registry, const fa::string& commandName)
   {
     return registry.lower_bound(commandName);
   }
@@ -58,7 +58,7 @@ namespace
    * exact case-insensitive match for `commandName`; otherwise returns `end()`.
    */
   [[nodiscard]] SimConCommandRegistry::iterator
-  FindSimConExactOrEnd(SimConCommandRegistry& registry, const msvc8::string& commandName)
+  FindSimConExactOrEnd(SimConCommandRegistry& registry, const fa::string& commandName)
   {
     const auto candidate = FindSimConLowerBound(registry, commandName);
     if (candidate == registry.end()) {
@@ -99,7 +99,7 @@ namespace
    * previously cited as an "armor-map node successor helper" hand-rolled in
    * `moho/unit/core/Unit.cpp` (`AdvanceArmorMultiplierNodeCursor` and its
    * two slot adapters) -- that Unit.cpp code had zero real callers (dead
-   * weight predating the `Unit::ArmorMultipliers` -> `msvc8::map`
+   * weight predating the `Unit::ArmorMultipliers` -> `fa::map`
    * migration) and has been deleted; these addresses' real callers, per the
    * callgraph index, were always here.
    *
@@ -109,7 +109,7 @@ namespace
    */
   int RemoveSimConCommandEntriesByName(
     SimConCommandRegistry& registry,
-    const msvc8::string& commandName
+    const fa::string& commandName
   )
   {
     const auto lowerBound = FindSimConExactOrEnd(registry, commandName);
@@ -191,7 +191,7 @@ namespace moho
       return;
     }
 
-    GetSimConCommandRegistry()[msvc8::string(mName)] = this;
+    GetSimConCommandRegistry()[fa::string(mName)] = this;
   }
 
   /**
@@ -203,7 +203,7 @@ namespace moho
       return;
     }
 
-    (void)RemoveSimConCommandEntriesByName(GetSimConCommandRegistry(), msvc8::string(mName));
+    (void)RemoveSimConCommandEntriesByName(GetSimConCommandRegistry(), fa::string(mName));
   }
 
   /**
@@ -223,7 +223,7 @@ namespace moho
     }
 
     auto& registry = GetSimConCommandRegistry();
-    const auto it = FindSimConExactOrEnd(registry, msvc8::string(commandName.c_str()));
+    const auto it = FindSimConExactOrEnd(registry, fa::string(commandName.c_str()));
     if (it == registry.end()) {
       return nullptr;
     }

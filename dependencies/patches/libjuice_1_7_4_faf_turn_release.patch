@@ -1,0 +1,54 @@
+diff -ruN a/src/agent.c b/src/agent.c
+--- a/src/agent.c
++++ b/src/agent.c
+@@ -157,6 +157,42 @@
+ 	return NULL;
+ }
+ 
++// faf-re (issue #325): without this, every allocation stays on the TURN server until
++// TURN_LIFETIME runs out. RFC 8656 section 7: a Refresh with LIFETIME 0 deletes it.
++// One request each, with a fresh transaction id so no answer is taken for the entry's
++// own Refresh; nothing waits for the answers, since the agent is going away.
++static void agent_release_turn_allocations(juice_agent_t *agent) {
++	conn_lock(agent);
++	for (int i = 0; i < agent->entries_count; ++i) {
++		agent_stun_entry_t *entry = agent->entries + i;
++		if (entry->type != AGENT_STUN_ENTRY_TYPE_RELAY || !entry->turn)
++			continue;
++		if (entry->state != AGENT_STUN_ENTRY_STATE_SUCCEEDED &&
++		    entry->state != AGENT_STUN_ENTRY_STATE_SUCCEEDED_KEEPALIVE)
++			continue; // no allocation
++		if (*entry->turn->credentials.nonce == '\0')
++			continue; // never authenticated, so never allocated
++
++		stun_message_t msg;
++		memset(&msg, 0, sizeof(msg));
++		msg.msg_class = STUN_CLASS_REQUEST;
++		msg.msg_method = STUN_METHOD_REFRESH;
++		juice_random(msg.transaction_id, STUN_TRANSACTION_ID_SIZE);
++		msg.lifetime = 0;
++		msg.lifetime_set = true;
++		msg.credentials = entry->turn->credentials;
++
++		char buffer[BUFFER_SIZE];
++		int size = stun_write(buffer, BUFFER_SIZE, &msg, entry->turn->password);
++		if (size <= 0 || agent_direct_send(agent, &entry->record, buffer, size, 0) < 0) {
++			JLOG_WARN("STUN entry %d: TURN allocation release failed to send", i);
++			continue;
++		}
++		JLOG_DEBUG("STUN entry %d: TURN allocation released (Refresh, lifetime 0)", i);
++	}
++	conn_unlock(agent);
++}
++
+ void agent_destroy(juice_agent_t *agent) {
+ 	JLOG_DEBUG("Destroying agent");
+ 
+@@ -166,6 +202,7 @@
+ 	}
+ 
+ 	if (agent->conn_impl) {
++		agent_release_turn_allocations(agent);
+ 		conn_destroy(agent);
+ 	}
+ 

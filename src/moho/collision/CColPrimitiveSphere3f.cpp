@@ -13,32 +13,6 @@
 
 namespace
 {
-  constexpr const char* kSerializationSourcePath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-  constexpr int kSerializationLoadLine = 84;
-  constexpr int kSerializationSaveLine = 87;
-  constexpr int kSaveConstructArgsLine = 189;
-  constexpr int kConstructLine = 231;
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3<float>));
-    }
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSphere3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Sphere3<float>));
-    }
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
 } // namespace
 
 namespace Wm3
@@ -49,7 +23,7 @@ namespace Wm3
   template <>
   void Sphere3<float>::MemberDeserialize(gpg::ReadArchive* archive)
   {
-    gpg::RType* const vector3Type = CachedVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3<float>>();
     gpg::RRef ownerRef{};
     archive->Read(vector3Type, &Center, ownerRef);
     archive->ReadFloat(&Radius);
@@ -61,7 +35,7 @@ namespace Wm3
   template <>
   void Sphere3<float>::MemberSerialize(gpg::WriteArchive* archive) const
   {
-    gpg::RType* const vector3Type = CachedVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3<float>>();
     gpg::RRef ownerRef{};
     archive->Write(vector3Type, &Center, ownerRef);
     archive->WriteFloat(Radius);
@@ -92,51 +66,11 @@ namespace moho
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedDColPrimSpherePrimitiveType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CColPrimitive<Wm3::Sphere3f>));
-    }
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedDColPrimSphereShapeType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Sphere3f));
-    }
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedDColPrimSphereVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCColPrimitiveBaseType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CColPrimitiveBase));
-    }
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeDColPrimSphereRef(moho::CColPrimitive<Wm3::Sphere3f>* object)
   {
     gpg::RRef ref{};
     ref.mObj = object;
-    ref.mType = CachedDColPrimSpherePrimitiveType();
+    ref.mType = gpg::RTypeOf<moho::CColPrimitive<Wm3::Sphere3f>>();
     return ref;
   }
 
@@ -169,13 +103,7 @@ namespace moho
     GPG_ASSERT(typeInfo != nullptr);
     GPG_ASSERT(!typeInfo->initFinished_);
 
-    gpg::RField baseField{};
-    baseField.mName = CachedCColPrimitiveBaseType()->GetName();
-    baseField.mType = CachedCColPrimitiveBaseType();
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, gpg::RTypeOf<moho::CColPrimitiveBase>());
   }
 
   /**
@@ -243,8 +171,8 @@ namespace moho
     Wm3::Vec3f localCenter{};
     const gpg::RRef ownerRef{};
 
-    archive.Read(CachedDColPrimSphereShapeType(), &shape, ownerRef);
-    archive.Read(CachedDColPrimSphereVector3fType(), &localCenter, ownerRef);
+    archive.Read(gpg::RTypeOf<Wm3::Sphere3f>(), &shape, ownerRef);
+    archive.Read(gpg::RTypeOf<Wm3::Vector3f>(), &localCenter, ownerRef);
 
     auto* object = new CColPrimitive<Wm3::Sphere3f>(localCenter, shape.Radius);
     if (object != nullptr) {
@@ -265,10 +193,10 @@ namespace moho
   {
     Wm3::Vec3f center{};
     gpg::RRef shapeOwnerRef{};
-    archive.Write(CachedDColPrimSphereShapeType(), GetSphere(), shapeOwnerRef);
+    archive.Write(gpg::RTypeOf<Wm3::Sphere3f>(), GetSphere(), shapeOwnerRef);
 
     gpg::RRef centerOwnerRef{};
-    archive.Write(CachedDColPrimSphereVector3fType(), GetCenter(&center), centerOwnerRef);
+    archive.Write(gpg::RTypeOf<Wm3::Vector3f>(), GetCenter(&center), centerOwnerRef);
     result.SetUnowned(0u);
   }
 

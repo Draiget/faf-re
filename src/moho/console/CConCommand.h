@@ -29,8 +29,8 @@ namespace moho
    * binary checked for, so the null return here stands in for what that
    * out-of-bounds read yielded; each such site carries its own note.
    */
-  [[nodiscard]] inline const msvc8::string* ConCommandArg(
-    const msvc8::vector<msvc8::string>& args, const std::size_t index
+  [[nodiscard]] inline const fa::string* ConCommandArg(
+    const fa::vector<fa::string>& args, const std::size_t index
   ) noexcept
   {
     return index < args.size() ? &args[index] : nullptr;
@@ -55,7 +55,7 @@ namespace moho
      * signature out -- `?CON_StartCommandMode@Moho@@YAXAAV?$vector@V?$basic_string@D...`
      * is `void __cdecl(std::vector<std::string>&)`.
      */
-    virtual void Handle(const msvc8::vector<msvc8::string>& args) = 0;
+    virtual void Handle(const fa::vector<fa::string>& args) = 0;
 
     CConCommand(const CConCommand&) = delete;
     CConCommand& operator=(const CConCommand&) = delete;
@@ -98,7 +98,7 @@ namespace moho
   extern int con_TestVar;
   extern std::uint8_t con_TestVarUByte;
   extern float con_TestVarFloat;
-  extern msvc8::string con_TestVarStr;
+  extern fa::string con_TestVarStr;
   extern bool snd_ExtraDoWorkCalls;
   extern int recon_debug;
   extern int rule_Paranoid;
@@ -170,7 +170,7 @@ namespace moho
    * Parses one command lane from `commandText`, emits parsed tokens, and
    * returns the post-`;` remainder for chained execution.
    */
-  void CON_ParseCommand(const char* commandText, msvc8::vector<msvc8::string>& tokens, msvc8::string& remainder);
+  void CON_ParseCommand(const char* commandText, fa::vector<fa::string>& tokens, fa::string& remainder);
 
   /**
    * Address: 0x0041C4D0 (FUN_0041C4D0, ?CON_UnparseCommand@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@3@@Z)
@@ -181,7 +181,7 @@ namespace moho
    * Rebuilds one command line from tokens, quoting/escaping tokens that need
    * protection.
    */
-  [[nodiscard]] msvc8::string CON_UnparseCommand(const msvc8::vector<msvc8::string>& tokens);
+  [[nodiscard]] fa::string CON_UnparseCommand(const fa::vector<fa::string>& tokens);
 
   /**
    * Address: 0x0041C600 (FUN_0041C600, ?CON_GetCommandList@Moho@@YAXAAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@_N@Z)
@@ -191,7 +191,7 @@ namespace moho
    * What it does:
    * Appends the current command table dump to `outText`.
    */
-  void CON_GetCommandList(msvc8::string& outText, bool includeDescriptions);
+  void CON_GetCommandList(fa::string& outText, bool includeDescriptions);
 
   /**
    * Address: 0x0041C770 (FUN_0041C770, ?CON_GetFindTextMatches@Moho@@YA?BV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@PBD@Z)
@@ -202,7 +202,7 @@ namespace moho
    * Returns sorted command-name matches whose prefix case-insensitively
    * matches `prefix`.
    */
-  [[nodiscard]] msvc8::vector<msvc8::string> CON_GetFindTextMatches(const char* prefix);
+  [[nodiscard]] fa::vector<fa::string> CON_GetFindTextMatches(const char* prefix);
 
   /**
    * Address: 0x0041C990 (FUN_0041C990, ?CON_Printf@Moho@@YAXPBDZZ)
@@ -259,7 +259,7 @@ namespace moho
    * What it does:
    * Returns the process-global saved execute command stack.
    */
-  [[nodiscard]] const msvc8::vector<msvc8::string>& CON_GetExecuteStack();
+  [[nodiscard]] const fa::vector<fa::string>& CON_GetExecuteStack();
 
   /**
    * Address: 0x0041D3D0 (FUN_0041D3D0, ?CON_FindCommand@Moho@@YAPAVCConCommand@1@PBD@Z)
@@ -367,7 +367,7 @@ namespace moho
    * Prints the concatenated command arguments (`arg1..argN`) back to the
    * console output channel.
    */
-  void CON_Echo(const msvc8::vector<msvc8::string>& args);
+  void CON_Echo(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0041EF40 (FUN_0041EF40, Moho::CON_ListCommands)
@@ -375,7 +375,7 @@ namespace moho
    * What it does:
    * Emits one formatted line per registered command.
    */
-  void CON_ListCommands(const msvc8::vector<msvc8::string>& args);
+  void CON_ListCommands(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x004D3FC0 (FUN_004D3FC0, Moho::CON_GetVersion)
@@ -383,7 +383,7 @@ namespace moho
    * What it does:
    * Prints the current engine-version string to console output.
    */
-  void CON_GetVersion(const msvc8::vector<msvc8::string>& args);
+  void CON_GetVersion(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x004CDC90 (FUN_004CDC90, Moho::CON_LUADOC)
@@ -391,7 +391,7 @@ namespace moho
    * What it does:
    * Iterates all registered Lua init-form sets and dumps their binder docs.
    */
-  void CON_LUADOC(const msvc8::vector<msvc8::string>& args);
+  void CON_LUADOC(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x008C6740 (FUN_008C6740, Moho::Con_LUA)
@@ -400,7 +400,7 @@ namespace moho
    * Joins command tokens from index 1 into one Lua chunk, echoes it to console,
    * and executes it in the user Lua state.
    */
-  void CON_LUA(const msvc8::vector<msvc8::string>& args);
+  void CON_LUA(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0047A670 (FUN_0047A670, Moho::CON_Log)
@@ -409,7 +409,7 @@ namespace moho
    * Joins command tokens from index 1 with spaces and emits one info-severity
    * log line.
    */
-  void CON_Log(const msvc8::vector<msvc8::string>& args);
+  void CON_Log(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0047A700 (FUN_0047A700, Moho::CON_Debug_Warn)
@@ -418,7 +418,7 @@ namespace moho
    * Joins command tokens from index 1 with spaces and emits one warn-severity
    * log line.
    */
-  void CON_Debug_Warn(const msvc8::vector<msvc8::string>& args);
+  void CON_Debug_Warn(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0047A790 (FUN_0047A790, Moho::CON_Debug_Error)
@@ -427,7 +427,7 @@ namespace moho
    * Joins command tokens from index 1 with spaces and terminates through
    * `gpg::Die("%s", ...)`.
    */
-  void CON_Debug_Error(const msvc8::vector<msvc8::string>& args);
+  void CON_Debug_Error(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0047A810 (FUN_0047A810, Moho::CON_Debug_Assert)
@@ -435,7 +435,7 @@ namespace moho
    * What it does:
    * Debug no-op callback slot.
    */
-  void CON_Debug_Assert(const msvc8::vector<msvc8::string>& args);
+  void CON_Debug_Assert(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0047A820 (FUN_0047A820, Moho::CON_Debug_Crash)
@@ -443,7 +443,7 @@ namespace moho
    * What it does:
    * Intentionally crashes by writing zero to absolute address 0.
    */
-  void CON_Debug_Crash(const msvc8::vector<msvc8::string>& args);
+  void CON_Debug_Crash(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0047A830 (FUN_0047A830, Moho::CON_Debug_Throw)
@@ -451,7 +451,7 @@ namespace moho
    * What it does:
    * Throws `std::exception` with fixed debug text.
    */
-  void CON_Debug_Throw(const msvc8::vector<msvc8::string>& args);
+  void CON_Debug_Throw(const fa::vector<fa::string>& args);
 
 
 
@@ -476,7 +476,7 @@ namespace moho
    * Emits one no-support line when invoked with a filespec argument; otherwise
    * prints p4-edit usage text.
    */
-  void CON_p4_Edit(const msvc8::vector<msvc8::string>& args);
+  void CON_p4_Edit(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00500B60 (FUN_00500B60, Moho::CON_p4_IsOpenedForEdit)
@@ -485,7 +485,7 @@ namespace moho
    * Emits one no-support line when invoked with a filespec argument; otherwise
    * prints p4-is-opened usage text.
    */
-  void CON_p4_IsOpenedForEdit(const msvc8::vector<msvc8::string>& args);
+  void CON_p4_IsOpenedForEdit(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x007ADFC0 (FUN_007ADFC0, Moho::CAM_SetLOD)
@@ -494,7 +494,7 @@ namespace moho
    * Parses `cam_SetLOD <cameraName> <lodScale>` and applies the LOD scale to
    * the named runtime camera when found.
    */
-  void CAM_SetLOD(const msvc8::vector<msvc8::string>& args);
+  void CAM_SetLOD(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x007AE040 (FUN_007AE040, Moho::CON_DumpCamera)
@@ -503,7 +503,7 @@ namespace moho
    * Logs active world-camera target position, heading/far-pitch orientation,
    * and target zoom to the console log output.
    */
-  void CON_DumpCamera(const msvc8::vector<msvc8::string>& args);
+  void CON_DumpCamera(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x007B5A40 (FUN_007B5A40, Moho::CON_PopupCreateUnitMenu)
@@ -512,7 +512,7 @@ namespace moho
    * Opens Lua `createunit` dialog at current cursor screen position, or prints
    * localized no-session text when no world session is active.
    */
-  void CON_PopupCreateUnitMenu(const msvc8::vector<msvc8::string>& args);
+  void CON_PopupCreateUnitMenu(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x007B60F0 (FUN_007B60F0, Moho::CON_PathDebug)
@@ -520,7 +520,7 @@ namespace moho
    * What it does:
    * Toggles path-debugger UI module by calling Lua `CreateUI`/`DestroyUI`.
    */
-  void CON_PathDebug(const msvc8::vector<msvc8::string>& args);
+  void CON_PathDebug(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00833430 (FUN_00833430, Moho::CON_CreateProp)
@@ -529,7 +529,7 @@ namespace moho
    * Spawns one prop at cursor world position using argument #1 as blueprint
    * path (or `/props/rplaceholder/rplaceholder_prop` when omitted).
    */
-  void CON_CreateProp(const msvc8::vector<msvc8::string>& args);
+  void CON_CreateProp(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x008338A0 (FUN_008338A0, Moho::CON_StartCommandMode)
@@ -540,7 +540,7 @@ namespace moho
    * selected user-units. When no session is active, prints localized
    * "no session" console feedback.
    */
-  void CON_StartCommandMode(const msvc8::vector<msvc8::string>& args);
+  void CON_StartCommandMode(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00833E50 (FUN_00833E50, Moho::CON_DebugGenerateBuildTemplateFromSelection)
@@ -549,7 +549,7 @@ namespace moho
    * Runs `CWldSession::GenerateBuildTemplates()` on the active session, or
    * prints localized "no session" feedback.
    */
-  void CON_DebugGenerateBuildTemplateFromSelection(const msvc8::vector<msvc8::string>& args);
+  void CON_DebugGenerateBuildTemplateFromSelection(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00833EF0 (FUN_00833EF0, Moho::CON_DebugClearBuildTemplates)
@@ -558,7 +558,7 @@ namespace moho
    * Runs `CWldSession::ClearBuildTemplates()` on the active session, or prints
    * localized "no session" feedback.
    */
-  void CON_DebugClearBuildTemplates(const msvc8::vector<msvc8::string>& args);
+  void CON_DebugClearBuildTemplates(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00833F90 (FUN_00833F90, Moho::CON_TeleportSelectedUnits)
@@ -567,7 +567,7 @@ namespace moho
    * Teleports currently selected units owned by the focus army to cursor world
    * position, preserving each unit orientation and recomputing spawn elevation.
    */
-  void CON_TeleportSelectedUnits(const msvc8::vector<msvc8::string>& args);
+  void CON_TeleportSelectedUnits(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00897580 (FUN_00897580, Moho::SkipUIChecks)
@@ -577,7 +577,7 @@ namespace moho
    * this command uses as a "skip UI command validation" switch. Prints
    * localized "no session" feedback when no session is active.
    */
-  void SkipUIChecks(const msvc8::vector<msvc8::string>& args);
+  void SkipUIChecks(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00897630 (FUN_00897630, Moho::WLD_RestartBeat)
@@ -587,7 +587,7 @@ namespace moho
    * time-since-last-tick accumulator. Prints localized "no session"
    * feedback when no session is active.
    */
-  void WLD_RestartBeat(const msvc8::vector<msvc8::string>& args);
+  void WLD_RestartBeat(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x008976D0 (FUN_008976D0, Moho::WLD_AdvanceBeat)
@@ -597,7 +597,7 @@ namespace moho
    * accumulator to a full beat interval. Prints localized "no session"
    * feedback when no session is active.
    */
-  void WLD_AdvanceBeat(const msvc8::vector<msvc8::string>& args);
+  void WLD_AdvanceBeat(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0088E0B0 (FUN_0088E0B0, Moho::WLD_SingleStep)
@@ -606,7 +606,7 @@ namespace moho
    * Single-steps the active sim driver one tick. Prints localized "no
    * session" feedback when no sim driver is active.
    */
-  void WLD_SingleStep(const msvc8::vector<msvc8::string>& args);
+  void WLD_SingleStep(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0088E150 (FUN_0088E150, Moho::WLD_GameSpeed)
@@ -616,7 +616,7 @@ namespace moho
    * sim rate, clamped to [-10, 50]. Prints usage text for any other
    * argument count; silently no-ops when no sim driver is active.
    */
-  void WLD_GameSpeed(const msvc8::vector<msvc8::string>& args);
+  void WLD_GameSpeed(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x008D3CC0 (FUN_008D3CC0, Moho::CON_FindUnit)
@@ -629,7 +629,7 @@ namespace moho
    * with no active session or fewer than two arguments (no localized
    * "no session" feedback, matching the binary).
    */
-  void CON_FindUnit(const msvc8::vector<msvc8::string>& args);
+  void CON_FindUnit(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x008D4150 (FUN_008D4150, Moho::SC_LuaDebugger)
@@ -641,7 +641,7 @@ namespace moho
    * active. `SCR_HookState` already reproduces the binary's own
    * `if (sSrcDebugWindow) lua_sethook(...)` guard internally.
    */
-  void SC_LuaDebugger(const msvc8::vector<msvc8::string>& args);
+  void SC_LuaDebugger(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0088E440 (FUN_0088E440, Moho::DoSimCommand)
@@ -655,7 +655,7 @@ namespace moho
    * line with fewer than two arguments and localized "no session" feedback
    * when no sim driver is active.
    */
-  void DoSimCommand(const msvc8::vector<msvc8::string>& args);
+  void DoSimCommand(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00832C50 (FUN_00832C50, Moho::CON_CreateUnit)
@@ -667,7 +667,7 @@ namespace moho
    * cursor world position. Grid-snaps the spawn to the blueprint footprint and
    * plays the UI error cue when the blueprint id does not resolve.
    */
-  void CON_CreateUnit(const msvc8::vector<msvc8::string>& args);
+  void CON_CreateUnit(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x008330B0 (FUN_008330B0, Moho::CON_LotsOfProps)
@@ -678,7 +678,7 @@ namespace moho
    * height-field cells, lifting each spawn to the water plane when the map has
    * water above the sampled terrain elevation.
    */
-  void CON_LotsOfProps(const msvc8::vector<msvc8::string>& args);
+  void CON_LotsOfProps(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00833C70 (FUN_00833C70, Moho::CON_CConFunc_KillSelectedUnits)
@@ -687,7 +687,7 @@ namespace moho
    * Issues `UNITCOMMAND_KillSelf` against the active session's selection with
    * queue-clear set, or prints localized "no session" feedback.
    */
-  void CON_KillSelectedUnits(const msvc8::vector<msvc8::string>& args);
+  void CON_KillSelectedUnits(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00833D60 (FUN_00833D60, Moho::CON_DestroySelectedUnits)
@@ -696,7 +696,7 @@ namespace moho
    * Issues `UNITCOMMAND_DestroySelf` against the active session's selection
    * with queue-clear set, or prints localized "no session" feedback.
    */
-  void CON_DestroySelectedUnits(const msvc8::vector<msvc8::string>& args);
+  void CON_DestroySelectedUnits(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x007B55D0 (FUN_007B55D0, Moho::CON_CopySelectedUnitsToClipboard)
@@ -708,7 +708,7 @@ namespace moho
    * is no active session or the selection is empty (no localized "no
    * session" feedback, unlike the other selection commands in this file).
    */
-  void CON_CopySelectedUnitsToClipboard(const msvc8::vector<msvc8::string>& args);
+  void CON_CopySelectedUnitsToClipboard(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0089E3C0 (FUN_0089E3C0, Moho::CON_AddSplat)
@@ -721,7 +721,7 @@ namespace moho
    * "no session" line when there is no active session; silently does
    * nothing if the session has no terrain resource.
    */
-  void CON_AddSplat(const msvc8::vector<msvc8::string>& args);
+  void CON_AddSplat(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00834240 (FUN_00834240, Moho::CON_ProcessInfoPair)
@@ -731,7 +731,7 @@ namespace moho
    * `ISTIDriver::ProcessInfoPair` for every selected unit owned by the session
    * focus army.
    */
-  void CON_ProcessInfoPair(const msvc8::vector<msvc8::string>& args);
+  void CON_ProcessInfoPair(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00834460 (FUN_00834460, Moho::UI_TrackUnit)
@@ -742,7 +742,7 @@ namespace moho
    * target, otherwise tracks the whole selection at the camera's current target
    * zoom with no transition time.
    */
-  void UI_TrackUnit(const msvc8::vector<msvc8::string>& args);
+  void UI_TrackUnit(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x008354B0 (FUN_008354B0, Moho::RenameUnit)
@@ -752,7 +752,7 @@ namespace moho
    * joins arguments #1.. into one whitespace-trimmed name and publishes it as a
    * `("CustomName", name)` info pair through the sim driver.
    */
-  void RenameUnit(const msvc8::vector<msvc8::string>& args);
+  void RenameUnit(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x008D3810 (FUN_008D3810)
@@ -760,7 +760,7 @@ namespace moho
    * What it does:
    * Legacy startup callback lane for anti-aliasing command wiring.
    */
-  void CON_d3d_AntiAliasingSamplesSeedFromFirstToken(const msvc8::vector<msvc8::string>& args);
+  void CON_d3d_AntiAliasingSamplesSeedFromFirstToken(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00834E50 (FUN_00834E50, Moho::SetFocusArmy)
@@ -769,7 +769,7 @@ namespace moho
    * Parses one focus-army index argument and applies it to the active world
    * session; prints syntax/no-session console feedback when invalid.
    */
-  void SetFocusArmy(const msvc8::vector<msvc8::string>& args);
+  void SetFocusArmy(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00834610 (FUN_00834610, Moho::CON_UI_SetSkin)
@@ -778,7 +778,7 @@ namespace moho
    * Imports `/lua/ui/uiutil.lua` and calls `SetCurrentSkin(arg#1)` when a skin
    * token is provided.
    */
-  void CON_UI_SetSkin(const msvc8::vector<msvc8::string>& args);
+  void CON_UI_SetSkin(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00834700 (FUN_00834700, Moho::UI_RotateSkin)
@@ -787,7 +787,7 @@ namespace moho
    * Imports `/lua/ui/uiutil.lua` and calls `RotateSkin` with arg#1 or default
    * `"+"` when no explicit direction token is provided.
    */
-  void UI_RotateSkin(const msvc8::vector<msvc8::string>& args);
+  void UI_RotateSkin(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00834860 (FUN_00834860, Moho::UI_RotateLayout)
@@ -796,7 +796,7 @@ namespace moho
    * Imports `/lua/ui/uiutil.lua` and calls `RotateLayout` with arg#1 or
    * default `"+"` when no explicit direction token is provided.
    */
-  void UI_RotateLayout(const msvc8::vector<msvc8::string>& args);
+  void UI_RotateLayout(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x008349D0 (FUN_008349D0, Moho::CON_UI_ToggleGamePanels)
@@ -804,7 +804,7 @@ namespace moho
    * What it does:
    * Imports `/lua/ui/game/gamemain.lua` and calls `HideGameUI()`.
    */
-  void CON_UI_ToggleGamePanels(const msvc8::vector<msvc8::string>& args);
+  void CON_UI_ToggleGamePanels(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x008349C0 (FUN_008349C0, Moho::UI_Quit)
@@ -812,7 +812,7 @@ namespace moho
    * What it does:
    * Shows the escape dialog through UI main callback lane.
    */
-  void UI_Quit(const msvc8::vector<msvc8::string>& args);
+  void UI_Quit(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00834A80 (FUN_00834A80, Moho::UI_MakeSelectionSet)
@@ -821,7 +821,7 @@ namespace moho
    * Validates one selection-set name argument and calls
    * `/lua/ui/game/selection.lua:AddCurrentSelectionSet(name)`.
    */
-  void UI_MakeSelectionSet(const msvc8::vector<msvc8::string>& args);
+  void UI_MakeSelectionSet(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00834C10 (FUN_00834C10, Moho::UI_ApplySelectionSet)
@@ -830,7 +830,7 @@ namespace moho
    * Validates one selection-set name argument and calls
    * `/lua/ui/game/selection.lua:ApplySelectionSet(name)`.
    */
-  void UI_ApplySelectionSet(const msvc8::vector<msvc8::string>& args);
+  void UI_ApplySelectionSet(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x008335F0 (FUN_008335F0, Moho::CON_IssueCommand)
@@ -842,7 +842,7 @@ namespace moho
    * selection afterward; the other three do not (matches the binary's own
    * asymmetry - not a recovery oversight).
    */
-  void CON_IssueCommand(const msvc8::vector<msvc8::string>& args);
+  void CON_IssueCommand(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00834DA0 (FUN_00834DA0, Moho::CON_UI_CreateHead1Map)
@@ -850,7 +850,7 @@ namespace moho
    * What it does:
    * Imports `/lua/ui/game/multihead.lua` and calls `CreateSecondView()`.
    */
-  void CON_UI_CreateHead1Map(const msvc8::vector<msvc8::string>& args);
+  void CON_UI_CreateHead1Map(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x007ADF50 (FUN_007ADF50, Moho::UI_ResetView)
@@ -859,7 +859,7 @@ namespace moho
    * Iterates camera-name command tokens starting at index 1, resolves each
    * named camera through `RCamManager`, and resets found cameras.
    */
-  void UI_ResetView(const msvc8::vector<msvc8::string>& args);
+  void UI_ResetView(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00835370 (FUN_00835370, Moho::UI_Lua)
@@ -868,7 +868,7 @@ namespace moho
    * Joins command tokens from index 1 and executes the resulting Lua chunk in
    * the active UI manager Lua state.
    */
-  void UI_Lua(const msvc8::vector<msvc8::string>& args);
+  void UI_Lua(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00835830 (FUN_00835830, Moho::UI_ShowRenameDialog)
@@ -885,7 +885,7 @@ namespace moho
    * What it does:
    * Walks each root UI frame and logs every control via depth-first traversal.
    */
-  void UI_DumpControls(const msvc8::vector<msvc8::string>& args);
+  void UI_DumpControls(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00835AA0 (FUN_00835AA0, Moho::UI_DumpControlsUnderCursor)
@@ -894,7 +894,7 @@ namespace moho
    * Dispatches `DumpControlsUnderMouse()` on the active UI manager when one is
    * available.
    */
-  void UI_DumpControlsUnderCursor(const msvc8::vector<msvc8::string>& args);
+  void UI_DumpControlsUnderCursor(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0043D360 (FUN_0043D360, Moho::CON_ren_MipSkipLevels)
@@ -903,7 +903,7 @@ namespace moho
    * Parses one `ren_MipSkipLevels` value argument and applies clamped
    * non-negative mip-skip state to active D3D device resources.
    */
-  void CON_ren_MipSkipLevels(const msvc8::vector<msvc8::string>& args);
+  void CON_ren_MipSkipLevels(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0043D400 (FUN_0043D400, Moho::CON_DumpPreloadedTextures)
@@ -912,7 +912,7 @@ namespace moho
    * Opens `PreloadedTextures.txt`, asks active D3D resources to dump preloaded
    * texture state into it, then closes the stream.
    */
-  void CON_DumpPreloadedTextures(const msvc8::vector<msvc8::string>& args);
+  void CON_DumpPreloadedTextures(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x007EC220 (FUN_007EC220, Moho::CON_mesh_Rebatch)
@@ -923,7 +923,7 @@ namespace moho
    * `"true"` (anything else clears the flag), forces the hardware vertex
    * formatter to re-resolve, and resets the mesh renderer.
    */
-  void CON_mesh_Rebatch(const msvc8::vector<msvc8::string>& args);
+  void CON_mesh_Rebatch(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x00669EB0 (FUN_00669EB0, Moho::EFX_CreateEmitterWindow)
@@ -939,7 +939,7 @@ namespace moho
    * entity's bone; otherwise it is opened free-standing. The frame is then
    * shown through a scoped managed-window handle.
    */
-  void EFX_CreateEmitterWindow(const msvc8::vector<msvc8::string>& args);
+  void EFX_CreateEmitterWindow(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x007B22B0 (FUN_007B22B0, Moho::ANI_DumpSkeleton)
@@ -979,7 +979,7 @@ namespace moho
    * Parses one show/hide token and applies the requested visibility to the
    * log dialog window.
    */
-  void WIN_ShowLogDialog(const msvc8::vector<msvc8::string>& args);
+  void WIN_ShowLogDialog(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x007B5920 (FUN_007B5920, Moho::CON_ExecutePasteBuffer)
@@ -1004,7 +1004,7 @@ namespace moho
       , mValue(value)
     {}
 
-    void Handle(const msvc8::vector<msvc8::string>& args) override;
+    void Handle(const fa::vector<fa::string>& args) override;
 
     T* mValue; // 0x0C
   };
@@ -1017,7 +1017,7 @@ namespace moho
    * specializations below.
    */
   template <typename T>
-  inline void TConVar<T>::Handle(const msvc8::vector<msvc8::string>& args)
+  inline void TConVar<T>::Handle(const fa::vector<fa::string>& args)
   {
     (void)args;
   }
@@ -1030,7 +1030,7 @@ namespace moho
    * Handles bool console-convar commands.
    */
   template <>
-  void TConVar<bool>::Handle(const msvc8::vector<msvc8::string>& args);
+  void TConVar<bool>::Handle(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0041FA10 (FUN_0041FA10, sub_41FA10)
@@ -1040,7 +1040,7 @@ namespace moho
    * Handles int console-convar commands.
    */
   template <>
-  void TConVar<int>::Handle(const msvc8::vector<msvc8::string>& args);
+  void TConVar<int>::Handle(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0041FAC0 (FUN_0041FAC0, sub_41FAC0)
@@ -1050,7 +1050,7 @@ namespace moho
    * Handles uint8 console-convar commands.
    */
   template <>
-  void TConVar<std::uint8_t>::Handle(const msvc8::vector<msvc8::string>& args);
+  void TConVar<std::uint8_t>::Handle(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0041FB50 (FUN_0041FB50, sub_41FB50)
@@ -1060,7 +1060,7 @@ namespace moho
    * Handles float console-convar commands.
    */
   template <>
-  void TConVar<float>::Handle(const msvc8::vector<msvc8::string>& args);
+  void TConVar<float>::Handle(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x007FDE00 (FUN_007FDE00, Moho::TConVar_uint::Process)
@@ -1070,7 +1070,7 @@ namespace moho
    * Handles uint32 console-convar commands.
    */
   template <>
-  void TConVar<std::uint32_t>::Handle(const msvc8::vector<msvc8::string>& args);
+  void TConVar<std::uint32_t>::Handle(const fa::vector<fa::string>& args);
 
   /**
    * Address: 0x0041FBE0 (FUN_0041FBE0, sub_41FBE0)
@@ -1080,13 +1080,13 @@ namespace moho
    * Handles string console-convar commands.
    */
   template <>
-  void TConVar<msvc8::string>::Handle(const msvc8::vector<msvc8::string>& args);
+  void TConVar<fa::string>::Handle(const fa::vector<fa::string>& args);
 
   static_assert(sizeof(TConVar<bool>) == 0x10, "TConVar<bool> size must be 0x10");
   static_assert(sizeof(TConVar<int>) == 0x10, "TConVar<int> size must be 0x10");
   static_assert(sizeof(TConVar<std::uint8_t>) == 0x10, "TConVar<uint8_t> size must be 0x10");
   static_assert(sizeof(TConVar<float>) == 0x10, "TConVar<float> size must be 0x10");
   static_assert(sizeof(TConVar<std::uint32_t>) == 0x10, "TConVar<uint32_t> size must be 0x10");
-  static_assert(sizeof(TConVar<msvc8::string>) == 0x10, "TConVar<string> size must be 0x10");
+  static_assert(sizeof(TConVar<fa::string>) == 0x10, "TConVar<string> size must be 0x10");
   static_assert(offsetof(TConVar<int>, mValue) == 0x0C, "TConVar<T>::mValue offset must be 0x0C");
 } // namespace moho

@@ -283,7 +283,7 @@ namespace moho
      * What it does:
      * Emits one UTF-8/narrow text fragment as widened output.
      */
-    void WriteUtf8Text(const msvc8::string& text);
+    void WriteUtf8Text(const fa::string& text);
 
     /**
      * Address: 0x004FA2C0 (FUN_004FA2C0)
@@ -323,7 +323,7 @@ namespace moho
     std::uint32_t isReplayEntry = 0;
     std::uint32_t sequenceIndex = 0;
     std::uint32_t categoryMask = 0;
-    msvc8::string text;
+    fa::string text;
 
     [[nodiscard]] bool IsReplayEntry() const noexcept;
     [[nodiscard]] bool IsMessageEntry() const noexcept;
@@ -383,15 +383,15 @@ namespace moho
     /**
      * Address: 0x004F6860 (FUN_004F6860)
      *
-     * gpg::LogSeverity level, msvc8::string const &, msvc8::vector<msvc8::string> const &, int
+     * gpg::LogSeverity level, fa::string const &, fa::vector<fa::string> const &, int
      *
      * What it does:
      * Queues replay/context lines plus the current line into the pending log queue.
      */
     void OnMessage(
       gpg::LogSeverity level,
-      const msvc8::string& message,
-      const msvc8::vector<msvc8::string>& context,
+      const fa::string& message,
+      const fa::vector<fa::string>& context,
       int previousDepth
     ) override;
 
@@ -410,14 +410,14 @@ namespace moho
      * Returns committed line count.
      */
     [[nodiscard]] std::size_t CommittedLineCount() const;
-    [[nodiscard]] const msvc8::vector<CWinLogLine>& CommittedLines() const;
-    void SnapshotCommittedLines(msvc8::vector<CWinLogLine>* outLines);
-    void ResetCommittedLinesFromReplayBuffer(const msvc8::vector<msvc8::string>& replayLines);
+    [[nodiscard]] const fa::vector<CWinLogLine>& CommittedLines() const;
+    void SnapshotCommittedLines(fa::vector<CWinLogLine>* outLines);
+    void ResetCommittedLinesFromReplayBuffer(const fa::vector<fa::string>& replayLines);
 
     WWinLogWindow* dialog = nullptr;
-    msvc8::vector<CWinLogLine> mCommittedLines;
+    fa::vector<CWinLogLine> mCommittedLines;
     boost::mutex lock{};
-    msvc8::vector<CWinLogLine> mPendingLines;
+    fa::vector<CWinLogLine> mPendingLines;
 
   private:
     /**
@@ -426,7 +426,7 @@ namespace moho
      * What it does:
      * Replaces committed-line storage with a copy of `nextCommittedLines`.
      */
-    void ReplaceCommittedLines(const msvc8::vector<CWinLogLine>& nextCommittedLines);
+    void ReplaceCommittedLines(const fa::vector<CWinLogLine>& nextCommittedLines);
 
     /**
      * Address: 0x004F6F40 (FUN_004F6F40)
@@ -630,7 +630,7 @@ namespace moho
   {
   public:
     wxTextCtrl* mTextCtrl;         // +0x170
-    msvc8::string* mResultString;  // +0x174
+    fa::string* mResultString;  // +0x174
 
     /**
      * Address: 0x004FC040 (FUN_004FC040, ??0WWxInputBox@Moho@@QAE@PBDPBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@msvc8@@00PAV40@@Z)
@@ -644,7 +644,7 @@ namespace moho
       const char* dialogTitle,
       const char* defaultValue,
       const char* labelText,
-      msvc8::string* resultString
+      fa::string* resultString
     );
 
     /**
@@ -682,7 +682,7 @@ namespace moho
     const char* dialogTitle,
     const char* defaultValue,
     const char* labelText,
-    msvc8::string* resultString
+    fa::string* resultString
   );
 
   /**
@@ -694,7 +694,7 @@ namespace moho
    * message. Bound to the `WxInputBox` console command (`gCConFunc_WxInputBox`
    * in CConCommand.cpp).
    */
-  void CON_WxInputBox(const msvc8::vector<msvc8::string>& args);
+  void CON_WxInputBox(const fa::vector<fa::string>& args);
 
   /**
    * A dialog the engine keeps a weak reference to in `managedWindows`, so
@@ -885,13 +885,13 @@ namespace moho
     wxTextCtrl* mOutputTextControl;              // +0x17C
     wxTextCtrl* mFilterTextControl;              // +0x180
     std::uint32_t mEnabledCategoriesMask;        // +0x184
-    msvc8::string mFilterText;                   // +0x188
+    fa::string mFilterText;                   // +0x188
     wxCheckBox* mDebugCategoryCheckBox;          // +0x1A4
     wxCheckBox* mInfoCategoryCheckBox;           // +0x1A8
     wxCheckBox* mWarnCategoryCheckBox;           // +0x1AC
     wxCheckBox* mErrorCategoryCheckBox;          // +0x1B0
     wxCheckBox* mCustomCategoryCheckBox;         // +0x1B4
-    msvc8::vector<msvc8::string> mBufferedLines; // +0x1B8
+    fa::vector<fa::string> mBufferedLines; // +0x1B8
     std::uint32_t mFirstVisibleLine;             // +0x1C8
     std::vector<PendingOutputRun> mPendingOutput; // +0x1CC, engine addition (see AppendOutput)
 
@@ -984,8 +984,8 @@ namespace moho
 
   // Every managed dialog / frame still open (elements at 0x010A9B94 /
   // 0x010A9BD8): filled by the constructors, emptied by WINX_Exit.
-  extern msvc8::vector<WeakPtr<WWinManagedDialog>> managedWindows;
-  extern msvc8::vector<WeakPtr<WWinManagedFrame>> managedFrames;
+  extern fa::vector<WeakPtr<WWinManagedDialog>> managedWindows;
+  extern fa::vector<WeakPtr<WWinManagedFrame>> managedFrames;
 
   // The main frame (0x010A63B8): WIN_OkBox parents its message box on it,
   // and CScApp::CreateAppFrame sets it to the WSupComFrame.

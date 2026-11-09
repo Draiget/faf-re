@@ -3,9 +3,11 @@
 #include "moho/sim/RRuleGameRules.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 
 #include "legacy/containers/String.h"
+#include "moho/console/CConCommand.h"
 #include "moho/containers/BVIntSet.h"
 
 namespace
@@ -84,10 +86,48 @@ namespace
 
     return true;
   }
+
+  /// One remembered lookup (sim_CategoryLookupCache). `text` holds the name, so a pointer that
+  /// now names something else, such as a reused buffer, misses.
+  struct SCategoryCacheSlot
+  {
+    const char* name = nullptr;
+    const moho::EntityCategoryLookupTable* table = nullptr;
+    std::uint32_t generation = 0;
+    std::size_t mapSize = 0;
+    const moho::EntityCategorySet* result = nullptr;
+    char text[32] = {};
+  };
+
+  constexpr std::size_t kCategoryCacheSlots = 128;
+
+  // Per thread, so the sim's workers and the UI never share a slot; plain storage, so a lookup
+  // allocates nothing.
+  thread_local SCategoryCacheSlot tCategoryCache[kCategoryCacheSlots];
+
+  std::atomic<std::uint32_t> gCategoryTableGeneration{1u};
+
+  [[nodiscard]] std::size_t CategoryCacheSlotOf(const char* const name, const void* const table) noexcept
+  {
+    const std::uint64_t key = static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(name)) ^
+                              (static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(table)) << 7u);
+    return static_cast<std::size_t>((key * 0x9E3779B97F4A7C15ull) >> 57u) & (kCategoryCacheSlots - 1u);
+  }
 } // namespace
 
 namespace moho
 {
+  bool sim_CategoryLookupCache = true;
+  TConVar<bool> gTConVar_sim_CategoryLookupCache(
+    "sim_CategoryLookupCache",
+    "Category lookups by name remember their results per thread (same results, no tree walk).",
+    &sim_CategoryLookupCache
+  );
+
+  void NoteEntityCategoryTableBuilt() noexcept
+  {
+    gCategoryTableGeneration.fetch_add(1u, std::memory_order_relaxed);
+  }
 
 
   /**
@@ -117,7 +157,33 @@ namespace moho
       return &lookup.mCategoryFallback;
     }
 
-    return lookup.FindOrFallback(msvc8::string(categoryName));
+    if (!sim_CategoryLookupCache) {
+      return lookup.FindOrFallback(fa::string(categoryName));
+    }
+
+    // Engine addition (sim_CategoryLookupCache): a hit is the same name text, against the same
+    // table, built in the same generation and holding the same number of names, so the tree
+    // walk would find the same set. Categories are only added while blueprints load, which
+    // changes the size; the sets found are the table's own and are never moved.
+    SCategoryCacheSlot& slot = tCategoryCache[CategoryCacheSlotOf(categoryName, &lookup)];
+    const std::uint32_t generation = gCategoryTableGeneration.load(std::memory_order_relaxed);
+    const std::size_t mapSize = lookup.mCategoryMap.size();
+    if (slot.name == categoryName && slot.table == &lookup && slot.generation == generation &&
+        slot.mapSize == mapSize && std::strcmp(slot.text, categoryName) == 0) {
+      return slot.result;
+    }
+
+    const EntityCategorySet* const result = lookup.FindOrFallback(fa::string(categoryName));
+    const std::size_t length = std::strlen(categoryName);
+    if (length < sizeof(slot.text)) {
+      std::memcpy(slot.text, categoryName, length + 1u);
+      slot.name = categoryName;
+      slot.table = &lookup;
+      slot.generation = generation;
+      slot.mapSize = mapSize;
+      slot.result = result;
+    }
+    return result;
   }
 
   /**
@@ -163,7 +229,7 @@ namespace moho
       const char* termStart = nullptr;
       const char* termEnd = nullptr;
       while (NextBoundedToken(termCursor, clauseEnd, ' ', termStart, termEnd)) {
-        const msvc8::string termToken(termStart, termEnd);
+        const fa::string termToken(termStart, termEnd);
         const EntityCategorySet* const range = lookupTable->TryFind(termToken);
         if (range == nullptr) {
           continue;

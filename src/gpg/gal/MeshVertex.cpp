@@ -93,9 +93,9 @@ namespace gpg::gal
 			return ChooseHardwareVertexFormatter(sHardwareVertexFormattersD3D10);
 		default:
 			throw Error(
-				msvc8::string("c:\\work\\rts\\main\\code\\src\\libs\\gpggal\\MeshVertex.cpp"),
+				fa::string("c:\\work\\rts\\main\\code\\src\\libs\\gpggal\\MeshVertex.cpp"),
 				92,
-				msvc8::string("unknown graphics API"));
+				fa::string("unknown graphics API"));
 		}
 	}
 }

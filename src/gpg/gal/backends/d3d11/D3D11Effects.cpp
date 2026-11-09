@@ -39,7 +39,7 @@ namespace gpg::gal
 
     /** Reads one annotation of `owner` (a technique or a variable). */
     template <class Owner, class Read>
-    bool ReadAnnotation(Owner* const owner, const msvc8::string& annotationName, Read&& read)
+    bool ReadAnnotation(Owner* const owner, const fa::string& annotationName, Read&& read)
     {
       ID3DX11EffectVariable* const annotation = owner->GetAnnotationByName(annotationName.c_str());
       if (annotation == nullptr || !annotation->IsValid()) {
@@ -69,7 +69,7 @@ namespace gpg::gal
     return &mContext;
   }
 
-  void EffectD3D11::GetTechniques(msvc8::vector<boost::shared_ptr<EffectTechnique>>& outTechniques)
+  void EffectD3D11::GetTechniques(fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques)
   {
     if (mEffect == nullptr) {
       ThrowError("EffectD3D11.cpp", __LINE__, "invalid effect");
@@ -141,7 +141,7 @@ namespace gpg::gal
 
   EffectTechniqueD3D11::~EffectTechniqueD3D11() = default;
 
-  msvc8::string* EffectTechniqueD3D11::GetName()
+  fa::string* EffectTechniqueD3D11::GetName()
   {
     return &mName;
   }
@@ -225,7 +225,7 @@ namespace gpg::gal
     }
   }
 
-  bool EffectTechniqueD3D11::GetAnnotationBool(bool* const outValue, const msvc8::string& annotationName)
+  bool EffectTechniqueD3D11::GetAnnotationBool(bool* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(mTechnique, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       bool value = false;
@@ -234,21 +234,21 @@ namespace gpg::gal
     });
   }
 
-  bool EffectTechniqueD3D11::GetAnnotationInt(int* const outValue, const msvc8::string& annotationName)
+  bool EffectTechniqueD3D11::GetAnnotationInt(int* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(mTechnique, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       CheckHresult("EffectTechniqueD3D11.cpp", __LINE__, annotation->AsScalar()->GetInt(outValue));
     });
   }
 
-  bool EffectTechniqueD3D11::GetAnnotationFloat(float* const outValue, const msvc8::string& annotationName)
+  bool EffectTechniqueD3D11::GetAnnotationFloat(float* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(mTechnique, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       CheckHresult("EffectTechniqueD3D11.cpp", __LINE__, annotation->AsScalar()->GetFloat(outValue));
     });
   }
 
-  bool EffectTechniqueD3D11::GetAnnotationString(msvc8::string* const outValue, const msvc8::string& annotationName)
+  bool EffectTechniqueD3D11::GetAnnotationString(fa::string* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(mTechnique, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       LPCSTR text = nullptr;
@@ -277,7 +277,7 @@ namespace gpg::gal
 
   EffectVariableD3D11::~EffectVariableD3D11() = default;
 
-  msvc8::string* EffectVariableD3D11::GetName()
+  fa::string* EffectVariableD3D11::GetName()
   {
     return &mName;
   }
@@ -460,7 +460,7 @@ namespace gpg::gal
     CheckHresult("EffectVariableD3D11.cpp", __LINE__, mVariable->AsVector()->SetFloatVectorArray(vectors4, 0U, count));
   }
 
-  bool EffectVariableD3D11::GetAnnotationBool(bool* const outValue, const msvc8::string& annotationName)
+  bool EffectVariableD3D11::GetAnnotationBool(bool* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(mVariable, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       bool value = false;
@@ -469,21 +469,21 @@ namespace gpg::gal
     });
   }
 
-  bool EffectVariableD3D11::GetAnnotationInt(int* const outValue, const msvc8::string& annotationName)
+  bool EffectVariableD3D11::GetAnnotationInt(int* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(mVariable, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       CheckHresult("EffectVariableD3D11.cpp", __LINE__, annotation->AsScalar()->GetInt(outValue));
     });
   }
 
-  bool EffectVariableD3D11::GetAnnotationFloat(float* const outValue, const msvc8::string& annotationName)
+  bool EffectVariableD3D11::GetAnnotationFloat(float* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(mVariable, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       CheckHresult("EffectVariableD3D11.cpp", __LINE__, annotation->AsScalar()->GetFloat(outValue));
     });
   }
 
-  bool EffectVariableD3D11::GetAnnotationString(msvc8::string* const outValue, const msvc8::string& annotationName)
+  bool EffectVariableD3D11::GetAnnotationString(fa::string* const outValue, const fa::string& annotationName)
   {
     return ReadAnnotation(mVariable, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       LPCSTR text = nullptr;

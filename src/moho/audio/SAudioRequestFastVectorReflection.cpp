@@ -65,7 +65,7 @@ namespace gpg
     /**
      * Address: 0x00761A90 (FUN_00761A90, gpg::RFastVectorType_SAudioRequest::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x00761B20 (FUN_00761B20, gpg::RFastVectorType_SAudioRequest::IsIndexed)
@@ -113,15 +113,6 @@ namespace
     return &sInstance;
   }
 
-  // Lazily resolves and caches the element RType* (binary Moho::SAudioRequest::sType).
-  [[nodiscard]] gpg::RType* CachedSAudioRequestType()
-  {
-    if (!moho::SAudioRequest::sType) {
-      moho::SAudioRequest::sType = gpg::LookupRType(typeid(moho::SAudioRequest));
-    }
-    return moho::SAudioRequest::sType;
-  }
-
   /**
    * Address: 0x00762220 (FUN_00762220, gpg::RFastVectorType_SAudioRequest::SerLoad)
    *
@@ -139,11 +130,11 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAudioRequest>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SAudioRequest>*>(objectPtr);
     moho::SAudioRequest fill{};
-    vec.Resize(static_cast<std::size_t>(count), fill);
+    vec.resize(static_cast<std::size_t>(count), fill);
 
-    gpg::RType* const elementType = CachedSAudioRequestType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::SAudioRequest>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Read(elementType, &vec[i], owner);
@@ -163,11 +154,11 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAudioRequest>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SAudioRequest>*>(objectPtr);
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
-    gpg::RType* const elementType = CachedSAudioRequestType();
+    gpg::RType* const elementType = gpg::RTypeOf<moho::SAudioRequest>();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Write(elementType, &vec[i], owner);
@@ -208,7 +199,7 @@ namespace gpg
    */
   const char* RFastVectorType<moho::SAudioRequest>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSAudioRequestType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("fastvector<%s>", gpg::RTypeOf<moho::SAudioRequest>()->GetName());
     return sName.c_str();
   }
 
@@ -218,9 +209,9 @@ namespace gpg
    * What it does:
    * Renders `"<base RType lexical>, size=<count>"`.
    */
-  msvc8::string RFastVectorType<moho::SAudioRequest>::GetLexical(const gpg::RRef& ref) const
+  fa::string RFastVectorType<moho::SAudioRequest>::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
@@ -266,7 +257,7 @@ namespace gpg
       return out;
     }
 
-    auto& vec = *static_cast<gpg::fastvector<moho::SAudioRequest>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SAudioRequest>*>(obj);
     if (vec.Data() == nullptr || static_cast<std::size_t>(ind) >= GetCount(obj)) {
       return out;
     }
@@ -287,7 +278,7 @@ namespace gpg
       return 0u;
     }
 
-    auto& vec = *static_cast<gpg::fastvector<moho::SAudioRequest>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SAudioRequest>*>(obj);
     if (vec.Data() == nullptr) {
       return 0u;
     }
@@ -308,9 +299,9 @@ namespace gpg
       return;
     }
 
-    auto& vec = *static_cast<gpg::fastvector<moho::SAudioRequest>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SAudioRequest>*>(obj);
     moho::SAudioRequest fill{};
-    vec.Resize(static_cast<std::size_t>(count), fill);
+    vec.resize(static_cast<std::size_t>(count), fill);
   }
 } // namespace gpg
 

@@ -18,7 +18,7 @@ namespace moho
    * What it does:
    * Owns the shared unit-quad vertex stream (binary global 0x010A792C).
    */
-  msvc8::auto_ptr<CD3DVertexStream> sVertexStream;
+  fa::auto_ptr<CD3DVertexStream> sVertexStream;
 
   /**
    * Address: 0x00BC40D0 (FUN_00BC40D0, dynamic initializer for `sIndexSheet`)
@@ -27,7 +27,7 @@ namespace moho
    * What it does:
    * Owns the shared quad index sheet (binary global 0x010A7928).
    */
-  msvc8::auto_ptr<CD3DIndexSheet> sIndexSheet;
+  fa::auto_ptr<CD3DIndexSheet> sIndexSheet;
 
   /**
    * Address: 0x0043C690 (FUN_0043C690, sub_43C690)
@@ -158,7 +158,7 @@ namespace moho
    * thunk when it differs from the incoming stream. Returns the
    * address of the updated singleton slot.
    */
-  msvc8::auto_ptr<CD3DVertexStream>* func_MoveIntoSharedVertexStream(CD3DVertexStream** const inOutStream)
+  fa::auto_ptr<CD3DVertexStream>* func_MoveIntoSharedVertexStream(CD3DVertexStream** const inOutStream)
   {
     CD3DVertexStream* const incoming = *inOutStream;
     *inOutStream = nullptr;

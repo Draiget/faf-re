@@ -44,6 +44,7 @@ namespace moho
     float x{}, y{}, z{}, w{};
 
     Vector4f() noexcept = default;
+    Vector4f(const Vector4f&) noexcept = default;
 
     /**
      * Address: 0x0046FAB0 (FUN_0046FAB0, Moho::Vector4f::Vector4f)
@@ -165,5 +166,5 @@ namespace moho
    * What it does:
    * Formats one `Vector4f` lane set as `x=%f,y=%f,z=%f,w=%f`.
    */
-  [[nodiscard]] msvc8::string ToString(const Vector4f& value);
+  [[nodiscard]] fa::string ToString(const Vector4f& value);
 } // namespace moho

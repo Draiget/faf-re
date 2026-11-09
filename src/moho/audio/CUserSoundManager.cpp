@@ -1,18 +1,28 @@
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/audio/CUserSoundManager.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 #include <Windows.h>
+#include <objbase.h>
 
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
+#include <mutex>
+#include <thread>
 #include <utility>
+#include <vector>
 
 #include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
 #include "moho/audio/AudioEngine.h"
+#include "moho/console/CConCommand.h"
+#include "moho/entity/Entity.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/StatItem.h"
@@ -56,7 +66,6 @@ namespace
   // the shipped image. Above this listener metric no entity loop is started.
   constexpr float kEntityLoopListenerCutoff = 200.0f;
   constexpr const char* kAngleVariableName = "Angle";
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedArgsRangeWarning = "%s\n  expected between %d and %d args, but got %d";
   constexpr const char* kPlaySoundHelpText = "handle = PlaySound(sndParams,prepareOnly)";
   constexpr const char* kPauseSoundHelpText = "PauseSound(categoryString,bPause)";
@@ -237,25 +246,6 @@ namespace
 
   void EnsureSoundCounterStat(moho::StatItem*& slot, const char* statPath);
 
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
-      return set;
-    }
-
-    return moho::SCR_FindLuaInitFormSet("User");
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = FindUserLuaInitSet(); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("User");
-    return fallbackSet;
-  }
-
 
 
   // The record's three tracked-entity lanes *are* the set object; keep the
@@ -333,10 +323,7 @@ namespace
 
     EnsureSoundCounterStat(gEngineStatSoundActiveEntityLoops, "Sound_ActiveEntityLoops");
     if (gEngineStatSoundActiveEntityLoops != nullptr) {
-      (void)::InterlockedExchangeAdd(
-        reinterpret_cast<volatile long*>(&gEngineStatSoundActiveEntityLoops->mPrimaryValueBits),
-        1L
-      );
+      (void)gEngineStatSoundActiveEntityLoops->AddPrimaryBits(1);
     }
   }
 
@@ -390,7 +377,7 @@ namespace
   }
 
   void WarnCuePlayFailure(
-    const int xactResult, const std::uint16_t cueId, const std::uint16_t bankId, const msvc8::string& bankName
+    const int xactResult, const std::uint16_t cueId, const std::uint16_t bankId, const fa::string& bankName
   )
   {
     if (xactResult >= 0 || xactResult == kXactErrCuePreparedOnly) {
@@ -424,19 +411,20 @@ namespace
       return;
     }
 
-    volatile long* const counter = reinterpret_cast<volatile long*>(&slot->mPrimaryValueBits);
-    long observed = 0;
-    do {
-      observed = ::InterlockedCompareExchange(counter, 0, 0);
-    } while (::InterlockedCompareExchange(counter, static_cast<long>(value), observed) != observed);
+    slot->StorePrimaryBits(value);
   }
 
-  [[nodiscard]] float ComputePitchRadians(const Wm3::Vec3f& value)
-  {
-    const float horizontal = std::sqrt((value.x * value.x) + (value.y * value.y));
-    return std::atan2(value.z, horizontal);
-  }
-
+  /**
+   * The cue's `Angle` variable: degrees between straight down from the
+   * listener and the emitter (0 = right under the camera, 90 = on the horizon).
+   *
+   * Both callers (0x008AA5C9 entity loops, 0x008AC63E one-shots) call
+   * `COORDS_Pitch` (0x0050B710) on `emitter - listener`, which reads Y as up.
+   * A local `atan2(z, hypot(x, y))` stood here and read Z as up, so the angle
+   * tracked how far north or south the sound was rather than its elevation:
+   * sounds south of the camera played as if right under it and on-screen
+   * sounds as if on the horizon (issue #23).
+   */
   [[nodiscard]] float ComputeCueAngleDegrees(const Wm3::Vec3f& worldPos, const Wm3::Vec3f& listenerPos)
   {
     const Wm3::Vec3f delta{
@@ -444,7 +432,7 @@ namespace
       worldPos.y - listenerPos.y,
       worldPos.z - listenerPos.z,
     };
-    return (kHalfPi - ComputePitchRadians(delta)) * kRadToDeg;
+    return (kHalfPi - moho::COORDS_Pitch(delta)) * kRadToDeg;
   }
 
   [[nodiscard]] moho::UserEntity*
@@ -498,7 +486,7 @@ namespace
 
   /**
    * Layout of the 12-byte intrusive tree-node the original MSVC8-era
-   * `msvc8::set<IXACTCue*>` allocates for each insertion. Only the three
+   * `fa::set<IXACTCue*>` allocates for each insertion. Only the three
    * leading link pointers are observable in the binary's initialization
    * routine (`FUN_008AF8D0`); the comparison key is stored through the
    * `leftOrValue` lane because the set is used as a FIFO destroy queue and
@@ -551,19 +539,19 @@ namespace
   /**
    * Inserts one cue pointer into the pending-destroy set using the same
    * node-layout contract the release binary records via
-   * `StorePendingDestroyCueNodeLinks`. The msvc8::set rewrite owns the
+   * `StorePendingDestroyCueNodeLinks`. The fa::set rewrite owns the
    * allocation; we bind the initialized node-links layout alongside it so
    * the insertion retains an explicit invocation of the recovered helper
    * name rather than dropping it through opaque STL internals.
    */
   void EnqueuePendingDestroyCue(
-    msvc8::set<moho::IXACTCue*>& pendingCues, moho::IXACTCue* const cue
+    fa::set<moho::IXACTCue*>& pendingCues, moho::IXACTCue* const cue
   )
   {
     // Build the node-link triplet FUN_008AF8D0 would have written: the
     // left/parent lanes both reference the cue key (the set keys by the
     // pointer value itself), and the `right` lane starts empty just like
-    // the binary stages before `msvc8::set::insert` links the node.
+    // the binary stages before `fa::set::insert` links the node.
     PendingDestroyCueNodeLinks stagedLinks{};
     (void)StorePendingDestroyCueNodeLinks(&stagedLinks, cue, cue, nullptr);
 
@@ -571,7 +559,7 @@ namespace
   }
 
   [[nodiscard]] int DrainFinishedPendingCues(
-    msvc8::set<moho::IXACTCue*>& pendingCues, moho::AudioEngine* const voiceEngine
+    fa::set<moho::IXACTCue*>& pendingCues, moho::AudioEngine* const voiceEngine
   )
   {
     const bool canQueryCueState =
@@ -681,6 +669,114 @@ namespace moho
    */
   CUserSoundManager::~CUserSoundManager() = default;
 
+  bool snd_CreateEarly = true;
+
+  TConVar<bool> gTConVar_snd_CreateEarly(
+    "snd_CreateEarly",
+    "Build the audio engine on a helper thread while the window and graphics device are created (1, the default), or "
+    "on the main thread when the user scripts first need it (0). Read at startup, before /con: /nosndearly sets 0.",
+    &snd_CreateEarly
+  );
+
+  namespace
+  {
+    // Engine addition (snd_CreateEarly): the build USER_StartSoundEarly started, and the work queued
+    // for it. Never destroyed: a builder still joinable at exit would terminate the process.
+    struct SEarlySound
+    {
+      std::mutex lock;
+      std::mutex joinLock; // one thread joins the builder; the builder never takes it
+      std::thread builder;
+      bool accepting = false; // USER_WithSound queues work for the builder
+      std::vector<std::function<void(IUserSoundManager*)>> queued;
+    };
+
+    SEarlySound& EarlySound()
+    {
+      static auto* const early = new SEarlySound();
+      return *early;
+    }
+
+    std::atomic<bool> gEarlySoundPending{false}; // the builder has not been joined
+    thread_local bool tBuildingSound = false;
+  } // namespace
+
+  void USER_StartSoundEarly()
+  {
+    SEarlySound& early = EarlySound();
+    const std::lock_guard<std::mutex> guard(early.lock);
+    if (CFG_GetArgOption("/nosndearly", 0, nullptr)) {
+      snd_CreateEarly = false;
+    }
+    if (!snd_CreateEarly || gUserSoundManager != nullptr || gEarlySoundPending.load()) {
+      return;
+    }
+    early.accepting = true;
+    gEarlySoundPending = true;
+    early.builder = std::thread([&early] {
+      gpg::SetThreadName(0xFFFFFFFFu, "Sound init");
+      // The XACT engine is a free-threaded ("Both") COM object, made here in the process's
+      // multithreaded apartment. The thread ends without CoUninitialize, so its hold keeps the
+      // apartment up after it, for as long as the engines are used.
+      (void)::CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+      tBuildingSound = true;
+      IUserSoundManager* manager = nullptr;
+      try {
+        manager = USER_GetSound();
+      } catch (const std::exception& error) {
+        gpg::Warnf("SND: building the sound manager failed: %s", error.what());
+      } catch (...) {
+        gpg::Warnf("SND: building the sound manager failed");
+      }
+      for (;;) {
+        std::vector<std::function<void(IUserSoundManager*)>> work;
+        {
+          const std::lock_guard<std::mutex> workGuard(early.lock);
+          if (early.queued.empty()) {
+            early.accepting = false;
+            break;
+          }
+          work.swap(early.queued);
+        }
+        for (const auto& item : work) {
+          try {
+            item(manager);
+          } catch (const std::exception& error) {
+            gpg::Warnf("SND: %s", error.what());
+          } catch (...) {
+            gpg::Warnf("SND: queued sound work failed");
+          }
+        }
+      }
+    });
+  }
+
+  void USER_FinishSoundEarly()
+  {
+    if (!gEarlySoundPending.load() || tBuildingSound) {
+      return;
+    }
+    SEarlySound& early = EarlySound();
+    const std::lock_guard<std::mutex> guard(early.joinLock);
+    if (early.builder.joinable()) {
+      early.builder.join();
+    }
+    gEarlySoundPending = false;
+  }
+
+  void USER_WithSound(std::function<void(IUserSoundManager*)> work)
+  {
+    {
+      SEarlySound& early = EarlySound();
+      const std::lock_guard<std::mutex> guard(early.lock);
+      if (early.accepting && !tBuildingSound) {
+        early.queued.push_back(std::move(work));
+        return;
+      }
+    }
+    work(USER_GetSound());
+  }
+
   /**
    * Address: 0x008AB220 (FUN_008AB220, ?USER_GetSound@Moho@@YAPAVIUserSoundManager@1@XZ)
    *
@@ -689,6 +785,9 @@ namespace moho
    */
   IUserSoundManager* USER_GetSound()
   {
+    if (gEarlySoundPending.load(std::memory_order_acquire) && !tBuildingSound) {
+      USER_FinishSoundEarly();
+    }
     if (gUserSoundManager == nullptr) {
       CUserSoundManager* const created = new CUserSoundManager();
       if (created != gUserSoundManager) {
@@ -820,10 +919,7 @@ namespace moho
     }
 
     if (gEngineStatSoundActiveEntityLoops != nullptr) {
-      (void)::InterlockedExchangeAdd(
-        reinterpret_cast<volatile long*>(&gEngineStatSoundActiveEntityLoops->mPrimaryValueBits),
-        -1L
-      );
+      (void)gEngineStatSoundActiveEntityLoops->AddPrimaryBits(-1);
     }
   }
 
@@ -1049,10 +1145,7 @@ namespace moho
 
         EnsureSoundCounterStat(gEngineStatSoundStopEntityLoop, "Sound_StopEntityLoop");
         if (gEngineStatSoundStopEntityLoop != nullptr) {
-          (void)::InterlockedExchangeAdd(
-            reinterpret_cast<volatile long*>(&gEngineStatSoundStopEntityLoop->mPrimaryValueBits),
-            1L
-          );
+          (void)gEngineStatSoundStopEntityLoop->AddPrimaryBits(1);
         }
 
         if (filterResult == EFilterType::DistanceCulled) {
@@ -1209,20 +1302,14 @@ namespace moho
     if (AudioEngine::Play(ReadSndParamsBankId(*params), &cue, voiceEngine, ReadSndParamsCueId(*params), 0) < 0) {
       EnsureSoundCounterStat(gEngineStatSoundLimitedLoop, "Sound_LimitedLoop");
       if (gEngineStatSoundLimitedLoop != nullptr) {
-        (void)::InterlockedExchangeAdd(
-          reinterpret_cast<volatile long*>(&gEngineStatSoundLimitedLoop->mPrimaryValueBits),
-          1L
-        );
+        (void)gEngineStatSoundLimitedLoop->AddPrimaryBits(1);
       }
       return;
     }
 
     EnsureSoundCounterStat(gEngineStatSoundStartEntityLoop, "Sound_StartEntityLoop");
     if (gEngineStatSoundStartEntityLoop != nullptr) {
-      (void)::InterlockedExchangeAdd(
-        reinterpret_cast<volatile long*>(&gEngineStatSoundStartEntityLoop->mPrimaryValueBits),
-        1L
-      );
+      (void)gEngineStatSoundStartEntityLoop->AddPrimaryBits(1);
     }
 
     if (snd_SpewSound) {
@@ -1320,7 +1407,7 @@ namespace moho
         continue;
       }
 
-      const msvc8::string baseLine = gpg::STR_Printf(
+      const fa::string baseLine = gpg::STR_Printf(
         "%4i: %s.%s",
         static_cast<int>(handleIndex),
         record.mParams->mBank.c_str(),
@@ -1328,7 +1415,7 @@ namespace moho
       );
 
       if (record.mPlayingSeconds > 0.0f) {
-        const msvc8::string stoppingLine = gpg::STR_Printf("%s (stopping %2.2f)", baseLine.c_str(), record.mPlayingSeconds);
+        const fa::string stoppingLine = gpg::STR_Printf("%s (stopping %2.2f)", baseLine.c_str(), record.mPlayingSeconds);
         gpg::Logf("%s", stoppingLine.c_str());
         continue;
       }
@@ -1411,17 +1498,17 @@ namespace moho
   /**
    * Address: 0x008AAC50 (FUN_008AAC50)
    *
-   * msvc8::string const&, msvc8::string const&
+   * fa::string const&, fa::string const&
    *
    * IDA signature:
-   * void __thiscall Moho::CUserSoundManager::Play(Moho::CUserSoundManager *this, msvc8::string const& bankName,
-   * msvc8::string const& cueName);
+   * void __thiscall Moho::CUserSoundManager::Play(Moho::CUserSoundManager *this, fa::string const& bankName,
+   * fa::string const& cueName);
    *
    * What it does:
    * Builds transient cue params from bank+cue names and plays a one-shot on
    * the voice engine.
    */
-  void CUserSoundManager::Play(const msvc8::string& bankName, const msvc8::string& cueName)
+  void CUserSoundManager::Play(const fa::string& bankName, const fa::string& cueName)
   {
     CSndParams params(bankName, cueName, nullptr, nullptr, mVoiceEngine);
     if (!ParamsHasResolvedEngine(params)) {
@@ -1850,7 +1937,7 @@ namespace moho
    */
   CScrLuaInitForm* func_PlaySound_LuaFuncDef()
   {
-    static CScrLuaBinder binder(UserLuaInitSet(), "PlaySound", &cfunc_PlaySound, nullptr, "<global>", kPlaySoundHelpText);
+    static CScrLuaBinder binder(moho::SCR_UserLuaInitSet(), "PlaySound", &cfunc_PlaySound, nullptr, "<global>", kPlaySoundHelpText);
     return &binder;
   }
 
@@ -1909,7 +1996,7 @@ namespace moho
    */
   CScrLuaInitForm* func_PauseSound_LuaFuncDef()
   {
-    static CScrLuaBinder binder(UserLuaInitSet(), "PauseSound", &cfunc_PauseSound, nullptr, "<global>", kPauseSoundHelpText);
+    static CScrLuaBinder binder(moho::SCR_UserLuaInitSet(), "PauseSound", &cfunc_PauseSound, nullptr, "<global>", kPauseSoundHelpText);
     return &binder;
   }
 
@@ -1929,17 +2016,14 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kPauseSoundHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kPauseSoundHelpText);
 
     LuaPlus::LuaStackObject categoryArg(state, 1);
     const char* const categoryPtr = lua_tostring(rawState, 1);
     if (!categoryPtr) {
       LuaPlus::LuaStackObject::TypeError(&categoryArg, "string");
     }
-    const msvc8::string category(categoryPtr);
+    const fa::string category(categoryPtr);
 
     LuaPlus::LuaStackObject pausedArg(state, 2);
     const bool paused = LuaPlus::LuaStackObject::GetBoolean(&pausedArg);
@@ -1973,7 +2057,7 @@ namespace moho
    */
   CScrLuaInitForm* func_PauseVoice_LuaFuncDef()
   {
-    static CScrLuaBinder binder(UserLuaInitSet(), "PauseVoice", &cfunc_PauseVoice, nullptr, "<global>", kPauseVoiceHelpText);
+    static CScrLuaBinder binder(moho::SCR_UserLuaInitSet(), "PauseVoice", &cfunc_PauseVoice, nullptr, "<global>", kPauseVoiceHelpText);
     return &binder;
   }
 
@@ -1993,17 +2077,14 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kPauseVoiceHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kPauseVoiceHelpText);
 
     LuaPlus::LuaStackObject categoryArg(state, 1);
     const char* const categoryPtr = lua_tostring(rawState, 1);
     if (!categoryPtr) {
       LuaPlus::LuaStackObject::TypeError(&categoryArg, "string");
     }
-    const msvc8::string category(categoryPtr);
+    const fa::string category(categoryPtr);
 
     LuaPlus::LuaStackObject pausedArg(state, 2);
     const bool paused = LuaPlus::LuaStackObject::GetBoolean(&pausedArg);
@@ -2038,7 +2119,7 @@ namespace moho
   CScrLuaInitForm* func_SoundIsPrepared_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "SoundIsPrepared",
       &cfunc_SoundIsPrepared,
       nullptr,
@@ -2058,10 +2139,7 @@ namespace moho
   int cfunc_SoundIsPreparedL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSoundIsPreparedHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kSoundIsPreparedHelpText);
 
     bool isPrepared = true;
     if (lua_type(rawState, 1) != LUA_TNIL) {
@@ -2096,7 +2174,7 @@ namespace moho
    */
   CScrLuaInitForm* func_StartSound_LuaFuncDef()
   {
-    static CScrLuaBinder binder(UserLuaInitSet(), "StartSound", &cfunc_StartSound, nullptr, "<global>", kStartSoundHelpText);
+    static CScrLuaBinder binder(moho::SCR_UserLuaInitSet(), "StartSound", &cfunc_StartSound, nullptr, "<global>", kStartSoundHelpText);
     return &binder;
   }
 
@@ -2110,10 +2188,7 @@ namespace moho
   int cfunc_StartSoundL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kStartSoundHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kStartSoundHelpText);
 
     if (lua_type(rawState, 1) != LUA_TNIL) {
       const LuaPlus::LuaObject soundObject(LuaPlus::LuaStackObject(state, 1));
@@ -2162,7 +2237,7 @@ namespace moho
   CScrLuaInitForm* func_SetVolume_LuaFuncDef()
   {
     static CScrLuaBinder
-      binder(UserLuaInitSet(), "SetVolume", &cfunc_SetVolume, nullptr, "<global>", kSetVolumeHelpText);
+      binder(moho::SCR_UserLuaInitSet(), "SetVolume", &cfunc_SetVolume, nullptr, "<global>", kSetVolumeHelpText);
     return &binder;
   }
 
@@ -2176,10 +2251,7 @@ namespace moho
   int cfunc_SetVolumeL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetVolumeHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetVolumeHelpText);
 
     CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(USER_GetSound());
     if (userSound != nullptr) {
@@ -2221,7 +2293,7 @@ namespace moho
   CScrLuaInitForm* func_GetVolume_LuaFuncDef()
   {
     static CScrLuaBinder
-      binder(UserLuaInitSet(), "GetVolume", &cfunc_GetVolume, nullptr, "<global>", kGetVolumeHelpText);
+      binder(moho::SCR_UserLuaInitSet(), "GetVolume", &cfunc_GetVolume, nullptr, "<global>", kGetVolumeHelpText);
     return &binder;
   }
 
@@ -2235,10 +2307,7 @@ namespace moho
   int cfunc_GetVolumeL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetVolumeHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kGetVolumeHelpText);
 
     CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(USER_GetSound());
     if (userSound != nullptr) {
@@ -2275,7 +2344,7 @@ namespace moho
   CScrLuaInitForm* func_StopSound_LuaFuncDef()
   {
     static CScrLuaBinder
-      binder(UserLuaInitSet(), "StopSound", &cfunc_StopSound, nullptr, "<global>", kStopSoundHelpText);
+      binder(moho::SCR_UserLuaInitSet(), "StopSound", &cfunc_StopSound, nullptr, "<global>", kStopSoundHelpText);
     return &binder;
   }
 
@@ -2321,11 +2390,7 @@ namespace moho
   int cfunc_StopAllSounds(lua_State* const luaContext)
   {
     LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 0) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kStopAllSoundsHelpText, 0, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 0, kStopAllSoundsHelpText);
 
     if (CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(USER_GetSound()); userSound != nullptr) {
       userSound->StopAllSounds();
@@ -2343,7 +2408,7 @@ namespace moho
   CScrLuaInitForm* func_StopAllSounds_LuaFuncDef()
   {
     static CScrLuaBinder
-      binder(UserLuaInitSet(), "StopAllSounds", &cfunc_StopAllSounds, nullptr, "<global>", kStopAllSoundsHelpText);
+      binder(moho::SCR_UserLuaInitSet(), "StopAllSounds", &cfunc_StopAllSounds, nullptr, "<global>", kStopAllSoundsHelpText);
     return &binder;
   }
 
@@ -2356,11 +2421,7 @@ namespace moho
   int cfunc_DisableWorldSounds(lua_State* const luaContext)
   {
     LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 0) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kDisableWorldSoundsHelpText, 0, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 0, kDisableWorldSoundsHelpText);
 
     if (CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(USER_GetSound()); userSound != nullptr) {
       userSound->EnableWorldSounds(false);
@@ -2378,7 +2439,7 @@ namespace moho
   CScrLuaInitForm* func_DisableWorldSounds_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "DisableWorldSounds",
       &cfunc_DisableWorldSounds,
       nullptr,
@@ -2397,11 +2458,7 @@ namespace moho
   int cfunc_EnableWorldSounds(lua_State* const luaContext)
   {
     LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 0) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kEnableWorldSoundsHelpText, 0, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 0, kEnableWorldSoundsHelpText);
 
     if (CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(USER_GetSound()); userSound != nullptr) {
       userSound->EnableWorldSounds(true);
@@ -2419,7 +2476,7 @@ namespace moho
   CScrLuaInitForm* func_EnableWorldSounds_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "EnableWorldSounds",
       &cfunc_EnableWorldSounds,
       nullptr,
@@ -2449,7 +2506,7 @@ namespace moho
   CScrLuaInitForm* func_PlayTutorialVO_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      UserLuaInitSet(),
+      moho::SCR_UserLuaInitSet(),
       "PlayTutorialVO",
       &cfunc_PlayTutorialVO,
       nullptr,
@@ -2468,10 +2525,7 @@ namespace moho
   int cfunc_PlayTutorialVOL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kPlayTutorialVOHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kPlayTutorialVOHelpText);
 
     const LuaPlus::LuaObject paramsObject(LuaPlus::LuaStackObject(state, 1));
     CSndParams* const params = *func_GetCObj_CSndParams(paramsObject);
@@ -2517,7 +2571,7 @@ namespace moho
   CScrLuaInitForm* func_PlayVoice_LuaFuncDef()
   {
     static CScrLuaBinder
-      binder(UserLuaInitSet(), "PlayVoice", &cfunc_PlayVoice, nullptr, "<global>", kPlayVoiceHelpText);
+      binder(moho::SCR_UserLuaInitSet(), "PlayVoice", &cfunc_PlayVoice, nullptr, "<global>", kPlayVoiceHelpText);
     return &binder;
   }
 

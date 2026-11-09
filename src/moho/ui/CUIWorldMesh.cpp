@@ -1,6 +1,8 @@
 #include "moho/ui/CUIWorldMesh.h"
 
+#include <set>
 #include <typeinfo>
+#include <vector>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -59,10 +61,7 @@ namespace moho
    */
   gpg::RRef CUIWorldMesh::GetDerivedObjectRef()
   {
-    gpg::RRef ref{};
-    ref.mObj = this;
-    ref.mType = GetClass();
-    return ref;
+    return gpg::MakeSelfRef(this);
   }
 
   /**
@@ -73,11 +72,41 @@ namespace moho
    * Initializes one script-visible world-mesh owner and binds the provided
    * Lua object.
    */
+  namespace
+  {
+    /// Engine addition (CUIWorldMesh::DestroyAllOf): every live world mesh. Main thread only, as the UI.
+    std::set<CUIWorldMesh*>& LiveWorldMeshes()
+    {
+      static auto* const live = new std::set<CUIWorldMesh*>();
+      return *live;
+    }
+  } // namespace
+
   CUIWorldMesh::CUIWorldMesh(const LuaPlus::LuaObject& luaObject)
     : CScriptObject()
     , mMeshInstance(nullptr)
   {
     SetLuaObject(luaObject);
+    LiveWorldMeshes().insert(this);
+  }
+
+  int CUIWorldMesh::DestroyAllOf(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr) {
+      return 0;
+    }
+    LuaPlus::LuaState* const root = state->GetRootState();
+    std::vector<CUIWorldMesh*> doomed;
+    for (CUIWorldMesh* const mesh : LiveWorldMeshes()) {
+      LuaPlus::LuaState* const owner = mesh->cObject.m_state;
+      if (owner != nullptr && owner->GetRootState() == root) {
+        doomed.push_back(mesh);
+      }
+    }
+    for (CUIWorldMesh* const mesh : doomed) {
+      delete mesh;
+    }
+    return static_cast<int>(doomed.size());
   }
 
   /**
@@ -90,6 +119,7 @@ namespace moho
    */
   CUIWorldMesh::~CUIWorldMesh()
   {
+    LiveWorldMeshes().erase(this);
     if (mMeshInstance != nullptr && MeshRenderer::GetInstance() != nullptr) {
       delete mMeshInstance;
       mMeshInstance = nullptr;
@@ -146,7 +176,7 @@ namespace moho
     }
 
     if (const LuaPlus::LuaObject colorObject = meshDescriptor["Color"]; !colorObject.IsNil()) {
-      msvc8::string encodedColor(LuaStringOrEmpty(colorObject));
+      fa::string encodedColor(LuaStringOrEmpty(colorObject));
       color = static_cast<int>(SCR_DecodeColor(encodedColor));
     }
 
@@ -165,9 +195,9 @@ namespace moho
 
       // 0x0086B616: the shared `GetModel` lane, same as every other model consumer.
       const boost::shared_ptr<RScmResource> modelResource = GetModel(LuaStringOrEmpty(meshNameObject), nullptr);
-      const msvc8::string textureName(LuaStringOrEmpty(textureNameObject));
-      const msvc8::string shaderName(LuaStringOrEmpty(shaderNameObject));
-      const msvc8::string emptyTextureName{};
+      const fa::string textureName(LuaStringOrEmpty(textureNameObject));
+      const fa::string shaderName(LuaStringOrEmpty(shaderNameObject));
+      const fa::string emptyTextureName{};
       const boost::shared_ptr<MeshMaterial> material =
         MeshMaterial::Create(shaderName, textureName, emptyTextureName, emptyTextureName, emptyTextureName, emptyTextureName, nullptr);
 
@@ -189,7 +219,7 @@ namespace moho
       float blueprintUniformScale = uniformScale;
       int gameTick = 0;
       if (worldSession != nullptr && worldSession->mRules != nullptr) {
-        msvc8::string blueprintId(LuaStringOrEmpty(blueprintIdObject));
+        fa::string blueprintId(LuaStringOrEmpty(blueprintIdObject));
         RResId normalizedBlueprintId{};
         gpg::STR_CopyFilename(&normalizedBlueprintId.name, &blueprintId);
 

@@ -1,0 +1,38 @@
+name: 1p-waterlevels-main
+description: >
+  Water bodies at their own levels (.plans/water-levels/PLAN.md), recovered x64 engine with
+  sim_FixWaterBodies on. The map's script checks the water surface at a crater lake (30), three
+  terraced pools (23, 20, 17), a river (14), the sea bay (3) and a dry polder below the sea,
+  spawns frigates, a hover tank and a tank on them, and orders the lake frigate to the sea; every
+  check is one "WATERTEST PASS|FAIL" line, then "WATERTEST DONE passed N failed M".
+  Setup: python tools/scenarios/water-levels/make_map.py "<game>/maps/SCMP_012" "<vault>/maps"
+  (the vault init_mpemu_localvault.lua reads), and the exe built from the branch copied into
+  bin_x64 as main_x64_water.exe. The bodies are not drawn yet; this checks the sim only. Without
+  /con sim_FixWaterBodies=1 the lake, pool and river checks fail (the control run).
+timeout: 4m
+
+mode: direct
+lobby: auto
+map: faf_re_waterlevels
+gameOptions:
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\main_x64_water.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+
+players:
+  - { uid: 1, name: WaterTest, faction: uef, args: ['/title', 'waterlevels-main', '/con', 'sim_FixWaterBodies=1'] }
+
+steps:
+  - start: all
+  - host: 1
+  - waitState: { uids: all, state: Launching, timeout: 3m }
+  - wait: 75s
+
+expect:
+  allLaunched: true
+  noCrash: true
+  logsContain:
+    - { uids: all, pattern: 'WATERTEST DONE passed 13 failed 0' }

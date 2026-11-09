@@ -27,44 +27,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedSPhysBodyType()
-  {
-    return moho::SPhysBody::StaticGetClass();
-  }
-
-  [[nodiscard]] gpg::RType* CachedSPhysConstantsType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::SPhysConstants));
-    }
-
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vec3f));
-    }
-
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedQuaternionfType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Quaternionf));
-    }
-
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
 } // namespace
 
 namespace moho
@@ -651,12 +613,7 @@ namespace moho
    */
   [[maybe_unused]] void DestroySPhysBodyTypeInfoBody(SPhysBodyTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**
@@ -782,12 +739,12 @@ namespace moho
 
     const gpg::RRef nullOwner{};
     archive->ReadFloat(&mMass);
-    archive->Read(CachedVector3fType(), &mInvInertiaTensor, nullOwner);
-    archive->Read(CachedVector3fType(), &mCollisionOffset, nullOwner);
-    archive->Read(CachedVector3fType(), &mPos, nullOwner);
-    archive->Read(CachedQuaternionfType(), &mOrientation, nullOwner);
-    archive->Read(CachedVector3fType(), &mVelocity, nullOwner);
-    archive->Read(CachedVector3fType(), &mWorldImpulse, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vec3f>(), &mInvInertiaTensor, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vec3f>(), &mCollisionOffset, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vec3f>(), &mPos, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Quaternionf>(), &mOrientation, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vec3f>(), &mVelocity, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vec3f>(), &mWorldImpulse, nullOwner);
   }
 
   /**
@@ -801,12 +758,12 @@ namespace moho
 
     const gpg::RRef nullOwner{};
     archive->WriteFloat(mMass);
-    archive->Write(CachedVector3fType(), &mInvInertiaTensor, nullOwner);
-    archive->Write(CachedVector3fType(), &mCollisionOffset, nullOwner);
-    archive->Write(CachedVector3fType(), &mPos, nullOwner);
-    archive->Write(CachedQuaternionfType(), &mOrientation, nullOwner);
-    archive->Write(CachedVector3fType(), &mVelocity, nullOwner);
-    archive->Write(CachedVector3fType(), &mWorldImpulse, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vec3f>(), &mInvInertiaTensor, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vec3f>(), &mCollisionOffset, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vec3f>(), &mPos, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Quaternionf>(), &mOrientation, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vec3f>(), &mVelocity, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vec3f>(), &mWorldImpulse, nullOwner);
   }
 } // namespace moho
 

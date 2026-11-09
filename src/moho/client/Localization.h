@@ -21,5 +21,5 @@ namespace moho
    * Calls global Lua `LOC(key)` and returns the localized string.
    * If Lua call/type handling throws, logs warning and falls back to `key`.
    */
-  msvc8::string Loc(LuaPlus::LuaState* state, gpg::StrArg key);
+  fa::string Loc(LuaPlus::LuaState* state, gpg::StrArg key);
 } // namespace moho

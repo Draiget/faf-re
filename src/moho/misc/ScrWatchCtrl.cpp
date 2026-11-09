@@ -17,7 +17,7 @@ namespace
    * A table key as a row name: booleans and numbers printed, strings as they
    * are, anything else "<unknown>".
    */
-  msvc8::string FormatWatchKeyForTree(const LuaPlus::LuaObject& key)
+  fa::string FormatWatchKeyForTree(const LuaPlus::LuaObject& key)
   {
     switch (key.Type()) {
       case LUA_TBOOLEAN:
@@ -77,10 +77,10 @@ void moho::ScrWatchCtrl::Clear()
 /**
  * Address: 0x004D7220 (FUN_004D7220, ?Update@ScrWatchCtrl@Moho@@QAEXABV?$vector@VScrWatch@Moho@@V?$allocator@VScrWatch@Moho@@@std@@@std@@@Z)
  */
-void moho::ScrWatchCtrl::Update(const msvc8::vector<ScrWatch>& watches)
+void moho::ScrWatchCtrl::Update(const fa::vector<ScrWatch>& watches)
 {
   Clear();
-  for (msvc8::vector<ScrWatch>::const_iterator watch = watches.begin(); watch != watches.end(); ++watch) {
+  for (fa::vector<ScrWatch>::const_iterator watch = watches.begin(); watch != watches.end(); ++watch) {
     AddWatch(mRoot, *watch);
   }
   SortChildren(mRoot);
@@ -108,7 +108,7 @@ void moho::ScrWatchCtrl::OnItemActivate(wxTreeEvent& event)
 
   if (!HasChildren(item)) {
     for (LuaPlus::LuaTableIterator field(table, true); field; field.Next()) {
-      const msvc8::string name = FormatWatchKeyForTree(field.GetKey());
+      const fa::string name = FormatWatchKeyForTree(field.GetKey());
       AddWatch(item, ScrWatch(name, field.GetValue()));
     }
     SortChildren(item);

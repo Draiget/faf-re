@@ -14,25 +14,7 @@
 
 namespace
 {
-  using ResourceDepositVector = msvc8::vector<moho::ResourceDeposit>;
-
-  [[nodiscard]] gpg::RType* CachedResourceDepositType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::ResourceDeposit));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedResourceDepositVectorFieldType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(ResourceDepositVector));
-    }
-    return cached;
-  }
+  using ResourceDepositVector = fa::vector<moho::ResourceDeposit>;
 
   /**
    * Address: 0x00549850 (FUN_00549850)
@@ -40,10 +22,10 @@ namespace
    * What it does:
    * Lazily resolves `vector<ResourceDeposit>` reflection type and dispatches
    * one archive read for `CSimResources::deposits_` (x86 `+0x0C`, the only
-   * `msvc8::vector<ResourceDeposit>` member at that offset; same body as the
+   * `fa::vector<ResourceDeposit>` member at that offset; same body as the
    * CSimResources serializer's load half).
    */
-  void ReadResourceDepositVectorFieldArchiveAdapter(void* const object, gpg::ReadArchive* const archive)
+  [[maybe_unused]] void ReadResourceDepositVectorFieldArchiveAdapter(void* const object, gpg::ReadArchive* const archive)
   {
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(object != nullptr);
@@ -53,7 +35,7 @@ namespace
 
     auto* const resources = static_cast<moho::CSimResources*>(object);
     gpg::RRef owner{};
-    archive->Read(CachedResourceDepositVectorFieldType(), &resources->deposits_, owner);
+    archive->Read(gpg::RTypeOf<ResourceDepositVector>(), &resources->deposits_, owner);
   }
 
   /**
@@ -63,7 +45,7 @@ namespace
    * Lazily resolves `vector<ResourceDeposit>` reflection type and dispatches
    * one archive write for `CSimResources::deposits_` (x86 `+0x0C`).
    */
-  void WriteResourceDepositVectorFieldArchiveAdapter(void* const object, gpg::WriteArchive* const archive)
+  [[maybe_unused]] void WriteResourceDepositVectorFieldArchiveAdapter(void* const object, gpg::WriteArchive* const archive)
   {
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(object != nullptr);
@@ -73,7 +55,7 @@ namespace
 
     auto* const resources = static_cast<moho::CSimResources*>(object);
     gpg::RRef owner{};
-    archive->Write(CachedResourceDepositVectorFieldType(), &resources->deposits_, owner);
+    archive->Write(gpg::RTypeOf<ResourceDepositVector>(), &resources->deposits_, owner);
   }
 
   [[nodiscard]] gpg::RVectorType_ResourceDeposit& AcquireResourceDepositVectorType()
@@ -101,11 +83,11 @@ gpg::RVectorType_ResourceDeposit::~RVectorType_ResourceDeposit() = default;
  *
  * What it does:
  * Builds and caches lexical reflection name `vector<element>` for
- * `msvc8::vector<moho::ResourceDeposit>`.
+ * `fa::vector<moho::ResourceDeposit>`.
  */
 const char* gpg::RVectorType_ResourceDeposit::GetName() const
 {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedResourceDepositType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::ResourceDeposit>()->GetName());
     return sName.c_str();
 }
 
@@ -114,11 +96,11 @@ const char* gpg::RVectorType_ResourceDeposit::GetName() const
  *
  * What it does:
  * Returns base lexical text plus reflected vector size for one
- * `msvc8::vector<moho::ResourceDeposit>` instance.
+ * `fa::vector<moho::ResourceDeposit>` instance.
  */
-msvc8::string gpg::RVectorType_ResourceDeposit::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_ResourceDeposit::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 
@@ -169,7 +151,7 @@ void gpg::RVectorType_ResourceDeposit::SerLoad(
   ResourceDepositVector loaded{};
   loaded.reserve(static_cast<std::size_t>(count));
 
-  gpg::RType* const elementType = CachedResourceDepositType();
+  gpg::RType* const elementType = gpg::RTypeOf<moho::ResourceDeposit>();
   if (!elementType) {
     *storage = loaded;
     return;
@@ -211,7 +193,7 @@ void gpg::RVectorType_ResourceDeposit::SerSave(
     return;
   }
 
-  gpg::RType* const elementType = CachedResourceDepositType();
+  gpg::RType* const elementType = gpg::RTypeOf<moho::ResourceDeposit>();
   if (!elementType) {
     return;
   }
@@ -229,7 +211,7 @@ void gpg::RVectorType_ResourceDeposit::SerSave(
 gpg::RRef gpg::RVectorType_ResourceDeposit::SubscriptIndex(void* const obj, const int ind) const
 {
   gpg::RRef out{};
-  out.mType = CachedResourceDepositType();
+  out.mType = gpg::RTypeOf<moho::ResourceDeposit>();
   out.mObj = nullptr;
 
   auto* const storage = static_cast<ResourceDepositVector*>(obj);
@@ -268,7 +250,7 @@ void gpg::RVectorType_ResourceDeposit::SetCount(void* const obj, const int count
  *
  * What it does:
  * Constructs/preregisters RTTI metadata for
- * `msvc8::vector<moho::ResourceDeposit>`.
+ * `fa::vector<moho::ResourceDeposit>`.
  */
 gpg::RType* moho::preregister_VectorResourceDepositType()
 {

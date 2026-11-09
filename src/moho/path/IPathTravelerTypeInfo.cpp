@@ -38,7 +38,7 @@ namespace gpg
      * What it does:
      * Returns inherited lexical text for the reflected DList lane.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x00767480 (FUN_00767480, gpg::RDListType_IPathTraveler::SerSave)
@@ -73,8 +73,6 @@ namespace
 {
   using PathTravelerList = gpg::DList<moho::IPathTraveler>;
 
-  gpg::RType* gDListVoidType = nullptr;
-  gpg::RType* gDListIPathTravelerType = nullptr;
 
   template <class TObject>
   [[nodiscard]] TObject* PointerFromArchiveInt(const std::intptr_t objectPtr)
@@ -82,23 +80,6 @@ namespace
     return reinterpret_cast<TObject*>(objectPtr);
   }
 
-  [[nodiscard]] gpg::RType* ResolveDListVoidType()
-  {
-    if (gDListVoidType == nullptr) {
-      gDListVoidType = gpg::LookupRType(typeid(void));
-    }
-
-    return gDListVoidType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveDListIPathTravelerType()
-  {
-    if (gDListIPathTravelerType == nullptr) {
-      gDListIPathTravelerType = gpg::LookupRType(typeid(moho::IPathTraveler));
-    }
-
-    return gDListIPathTravelerType;
-  }
 } // namespace
 
 gpg::RDListType_IPathTraveler::~RDListType_IPathTraveler() = default;
@@ -112,8 +93,8 @@ gpg::RDListType_IPathTraveler::~RDListType_IPathTraveler() = default;
  */
 const char* gpg::RDListType_IPathTraveler::GetName() const
 {
-  static const msvc8::string sName =
-    gpg::STR_Printf("DList<%s,%s>", ResolveDListIPathTravelerType()->GetName(), ResolveDListVoidType()->GetName());
+  static const fa::string sName =
+    gpg::STR_Printf("DList<%s,%s>", gpg::RTypeOf<moho::IPathTraveler>()->GetName(), gpg::RTypeOf<void>()->GetName());
   return sName.c_str();
 }
 
@@ -123,9 +104,9 @@ const char* gpg::RDListType_IPathTraveler::GetName() const
  * What it does:
  * Returns inherited lexical text for the reflected DList lane.
  */
-msvc8::string gpg::RDListType_IPathTraveler::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RDListType_IPathTraveler::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s", base.c_str());
 }
 

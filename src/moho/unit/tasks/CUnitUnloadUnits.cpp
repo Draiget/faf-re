@@ -50,36 +50,6 @@ namespace
     return raw != 0u && raw != kEntitySetInvalidEntry;
   }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSNavGoalType()
-  {
-    gpg::RType* type = moho::SNavGoal::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SNavGoal));
-      moho::SNavGoal::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedUnitEntitySetType()
-  {
-    gpg::RType* type = moho::EntitySetTemplate<moho::Unit>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Unit>));
-      moho::EntitySetTemplate<moho::Unit>::sType = type;
-    }
-    return type;
-  }
-
   // Addresses 0x00628880 ("ThunkB"), 0x00628070 ("ThunkJumpAlias") for
   // deserialize, and 0x00628080 ("ThunkJumpAlias"), 0x00628890 ("ThunkB")
   // for serialize, formerly modeled here as free functions, are dead: zero
@@ -150,11 +120,11 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
-    archive->Read(CachedSNavGoalType(), &mUnloadGoal, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(gpg::RTypeOf<moho::SNavGoal>(), &mUnloadGoal, ownerRef);
     archive->ReadBool(&mIsStagingPlatform);
     archive->ReadBool(&mHasEligibleLoadedUnits);
-    archive->Read(CachedUnitEntitySetType(), &mLoadedUnits, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>(), &mLoadedUnits, ownerRef);
   }
 
   /**
@@ -171,11 +141,11 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
-    archive->Write(CachedSNavGoalType(), &mUnloadGoal, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<moho::SNavGoal>(), &mUnloadGoal, ownerRef);
     archive->WriteBool(mIsStagingPlatform);
     archive->WriteBool(mHasEligibleLoadedUnits);
-    archive->Write(CachedUnitEntitySetType(), &mLoadedUnits, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>(), &mLoadedUnits, ownerRef);
   }
 
   /**
@@ -241,7 +211,7 @@ namespace moho
    */
   int CUnitUnloadUnits::Execute()
   {
-    const msvc8::vector<Entity*>& attachedEntities = mUnit->GetAttachedEntities();
+    const fa::vector<Entity*>& attachedEntities = mUnit->GetAttachedEntities();
     if (attachedEntities.begin() == nullptr || attachedEntities.begin() == attachedEntities.end()) {
       return -1;
     }

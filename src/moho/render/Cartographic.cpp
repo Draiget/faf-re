@@ -1,5 +1,7 @@
 #include "moho/render/Cartographic.h"
 
+#include "gpg/gal/HalfFloat.h"
+
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -40,6 +42,7 @@
 #include "gpg/gal/RenderProfiler.h"
 #include "moho/render/BoundaryRenderer.h"
 #include "moho/render/IRenderWorldView.h"
+#include "moho/terrain/water/WaterBodySurfaces.h"
 #include "moho/render/RangeRenderer.h"
 #include "moho/render/SelectionBracketRenderer.h"
 #include "moho/render/VisionRenderer.h"
@@ -203,7 +206,7 @@ namespace
   [[nodiscard]] moho::CartographicDecalNode* CreateCartographicDecalSentinelNode()
   {
     auto* const sentinel =
-      msvc8::detail::allocate_checked<moho::CartographicDecalNode>(1u);
+      fa::detail::allocate_checked<moho::CartographicDecalNode>(1u);
     sentinel->mNext = sentinel;
     sentinel->mPrev = sentinel;
     return sentinel;
@@ -268,8 +271,7 @@ namespace
    * std::list-equivalent ABI relies on `::operator new` exhaustion
    * to surface allocation failure. Restoring the explicit check
    * would require a typed `RuntimeIncrementListCountWithOverflowCheck`
-   * helper that pairs with the throw lane at
-   * `CrtRuntimeHelpers.cpp:37372`.
+   * helper that pairs with that throw.
    */
   void AppendCartographicDecalListNodeBeforeSentinel(
     moho::CartographicDecalList& destination,
@@ -537,43 +539,6 @@ namespace
   [[nodiscard]] moho::STIMap& CartographicTerrainMap(const moho::IWldTerrainRes& terrain) noexcept
   {
     return *terrain.mMap;
-  }
-
-  /**
-   * Packs one IEEE-754 binary32 value into a binary16 word.
-   *
-   * The shipped elevation-texture fill loop converts each sampled height with
-   * `D3DXFloat32To16Array` (direct call at 0x007D2759). D3DX is an external
-   * runtime and this tree only reaches it through
-   * `gpg::gal::InvokeD3DXFloat32To16Array`, which lives in an anonymous
-   * namespace inside `D3D9Interfaces.cpp` and is therefore not linkable from
-   * another translation unit. This helper reproduces the same conversion
-   * (round-to-nearest, denormal-preserving, saturating to +/-Inf) that the
-   * D3D9 backend falls back to when the D3DX export is unavailable.
-   */
-  [[nodiscard]] std::uint16_t PackFloat32AsHalfFloat(const float value) noexcept
-  {
-    const std::uint32_t bits = std::bit_cast<std::uint32_t>(value);
-
-    const std::uint32_t sign = (bits >> 16U) & 0x8000U;
-    const std::int32_t exponent = static_cast<std::int32_t>((bits >> 23U) & 0xFFU) - 127 + 15;
-    std::uint32_t mantissa = bits & 0x007FFFFFU;
-
-    if (exponent <= 0) {
-      if (exponent < -10) {
-        return static_cast<std::uint16_t>(sign);
-      }
-      mantissa = (mantissa | 0x00800000U) >> static_cast<std::uint32_t>(1 - exponent);
-      return static_cast<std::uint16_t>(sign | ((mantissa + 0x00001000U) >> 13U));
-    }
-
-    if (exponent >= 31) {
-      return static_cast<std::uint16_t>(sign | 0x7C00U);
-    }
-
-    return static_cast<std::uint16_t>(
-      sign | (static_cast<std::uint32_t>(exponent) << 10U) | ((mantissa + 0x00001000U) >> 13U)
-    );
   }
 
   /**
@@ -869,7 +834,7 @@ namespace moho
    * Address: 0x007D4B50 (FUN_007D4B50) is the compiler's out-of-line
    * emission of this constructor's member-initializer-list prologue
    * (`: mTechniqueName(), mTexturePath(), mDecalTexture(), ...,
-   * mDecals{}` below) -- sets the vtable, resets both `msvc8::string`
+   * mDecals{}` below) -- sets the vtable, resets both `fa::string`
    * lanes to empty SSO state, nulls the five `shared_ptr` resource
    * handles, sets `mNeedsVertexUpload = true`, and self-links the decal
    * list sentinel via `sub_7D4300` (already-recovered list-init helper),
@@ -891,7 +856,7 @@ namespace moho
       mPadding65_67{},
       mDecals{}
   {
-    // The member-init list above already places both msvc8::string
+    // The member-init list above already places both fa::string
     // lanes in empty-SSO state (mySize=0, myRes=15, bx.buf[0]='\0'),
     // matching the binary's explicit field writes. Initialize the
     // intrusive decal-list sentinel before forwarding into Read; the
@@ -1178,8 +1143,8 @@ namespace moho
   */
   void CartographicDecalBatch::Write(gpg::BinaryWriter& writer)
   {
-    writer.Write(reinterpret_cast<const char*>(&mTechniqueName), sizeof(mTechniqueName));
-    writer.Write(reinterpret_cast<const char*>(&mTexturePath), sizeof(mTexturePath));
+    writer.WriteString(mTechniqueName);
+    writer.WriteString(mTexturePath);
     writer.Write(mDecals.mDecalCount);
 
     const CartographicDecalNode* const sentinel = mDecals.mDecalSentinel;
@@ -1200,9 +1165,9 @@ namespace moho
    * Deserializes one batch payload from `reader` at the given map
    * version. The wire format is:
    *
-   *   - msvc8::string mTechniqueName  (NUL-terminated; absent in
+   *   - fa::string mTechniqueName  (NUL-terminated; absent in
    *     legacy versions below 0x3C where the field defaults to "Decal")
-   *   - msvc8::string mTexturePath    (NUL-terminated)
+   *   - fa::string mTexturePath    (NUL-terminated)
    *   - int32         decalCount
    *   - for each decal:
    *       - 8 bytes: mVertexData[0..1]
@@ -1234,7 +1199,7 @@ namespace moho
     Shutdown();
 
     // 1. Technique name (defaulted to "Decal" for legacy maps).
-    msvc8::string techniqueName{};
+    fa::string techniqueName{};
     if (version < 0x3Cu) {
       techniqueName.assign("Decal", 5u);
     } else {
@@ -1243,7 +1208,7 @@ namespace moho
     mTechniqueName.assign(techniqueName, 0u, ~0u);
 
     // 2. Texture resource path.
-    msvc8::string texturePath{};
+    fa::string texturePath{};
     reader.ReadString(&texturePath);
     mTexturePath.assign(texturePath, 0u, ~0u);
 
@@ -1577,7 +1542,8 @@ namespace moho
           const float elevation = SampleCartographicHeightKernel(
             heightField, sampleX, sampleZ, mElevMinimum, inverseElevationSpan
           );
-          *texel = PackFloat32AsHalfFloat(elevation);
+          // The binary converts with D3DXFloat32To16Array (direct call at 0x007D2759).
+          *texel = gpg::gal::FloatToHalf(elevation);
           texel += kCartographicElevationTexelWordStride;
         }
         rowCursor += kCartographicElevationTexelWordStride * gridWidth;
@@ -1678,6 +1644,17 @@ namespace moho
     }
   }
 
+  namespace
+  {
+    /// Engine addition: `WaterBodiesGeneration` of the map the textures were last built for.
+    std::uint32_t sCartographicWaterBodies = 0;
+  } // namespace
+
+  bool CartographicWaterBodiesStale(const STIMap& map) noexcept
+  {
+    return WaterBodiesGeneration(map) != sCartographicWaterBodies;
+  }
+
   /**
    * Address: 0x007D20F0 (FUN_007D20F0)
    * Mangled: ?InitializeTerrain@Cartographic@Moho@@AAEXPAVIWldTerrainRes@2@HIIIII@Z
@@ -1763,6 +1740,47 @@ namespace moho
     mHypsometricColors[4] = static_cast<std::int32_t>(hypsometricColor4);
 
     InitializeTerrainTextures(heightField, gridWidth, gridHeight, topographicSamples);
+
+    // Engine addition (water bodies, .plans/water-levels/PLAN.md): the ramp colours water by
+    // elevation below the sea, so a vertex of a body shows the depth below its own level as that
+    // depth below the sea (scaled from the body's deep range to the sea's), and a vertex of a dry
+    // body shows as the lowest land. Needs a sea, which gives the ramp its water colours.
+    if (map.HasWaterBodies() && mHasElevationBounds && mElevTexture) {
+      const float elevationSpan = mElevMaximum - mElevMinimum;
+      const float inverseSpan = elevationSpan > 0.0f ? 1.0f / elevationSpan : 1.0f;
+      const float seaRange = mSurfaceElevation - mWaterElevation;
+      const float stepX = static_cast<float>(heightField.width - 1) / static_cast<float>(gridWidth - 1);
+      const float stepZ = static_cast<float>(heightField.height - 1) / static_cast<float>(gridHeight - 1);
+      const CWaterBodies& bodies = *map.mWaterBodies;
+
+      auto* rowCursor = static_cast<std::uint16_t*>(LockWholeCartographicTexture(*mElevTexture));
+      for (std::int32_t z = 0; z < gridHeight; ++z) {
+        // The sample InitializeTerrainTextures' kernel reads for this texel.
+        const std::int32_t vz = std::clamp(static_cast<std::int32_t>(static_cast<float>(z) * stepZ) - 1, 0, heightField.height - 1);
+        std::uint16_t* texel = rowCursor;
+        for (std::int32_t x = 0; x < gridWidth; ++x, texel += kCartographicElevationTexelWordStride) {
+          const std::int32_t vx = std::clamp(static_cast<std::int32_t>(static_cast<float>(x) * stepX) - 1, 0, heightField.width - 1);
+          const std::uint8_t number = bodies.BodyOfVertex(vx, vz);
+          if (number == 0u) {
+            continue;
+          }
+          const SWaterBody& body = bodies.Body(number);
+          const float terrain = static_cast<float>(heightField.data[(vz * heightField.width) + vx]) * kCartographicHeightWordScale;
+          float shown;
+          if (body.elevation == kWaterBodyNoWater) {
+            shown = std::max(terrain, mSurfaceElevation + 0.01f * elevationSpan);
+          } else {
+            const float below = body.elevation - terrain;
+            const float bodyRange = body.elevation - body.deep;
+            shown = mSurfaceElevation - ((bodyRange > 0.0f && seaRange > 0.0f) ? below * seaRange / bodyRange : below);
+          }
+          *texel = gpg::gal::FloatToHalf((shown - mElevMinimum) * inverseSpan);
+        }
+        rowCursor += kCartographicElevationTexelWordStride * gridWidth;
+      }
+      (void)mElevTexture->Unlock(0);
+    }
+    sCartographicWaterBodies = WaterBodiesGeneration(map);
 
     boost::shared_ptr<gpg::gal::VertexFormat> terrainVertexFormat;
     terrainVertexFormat = device->CreateVertexFormat(kCartographicTerrainVertexFormatToken);

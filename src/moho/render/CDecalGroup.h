@@ -52,7 +52,7 @@ namespace moho
      * What it does:
      * Returns mutable access to the group display-name string lane.
      */
-    [[nodiscard]] msvc8::string* GetName() override;
+    [[nodiscard]] fa::string* GetName() override;
 
     /**
      * Address: 0x00877340 (FUN_00877340, Moho::CDecalGroup::GetName1)
@@ -60,7 +60,7 @@ namespace moho
      * What it does:
      * Duplicate vtable lane for mutable group display-name string access.
      */
-    [[nodiscard]] msvc8::string* GetNameAlias() override;
+    [[nodiscard]] fa::string* GetNameAlias() override;
 
     /**
      * Address: 0x00877350 (FUN_00877350, Moho::CDecalGroup::GetDecals2)
@@ -68,7 +68,7 @@ namespace moho
      * What it does:
      * Returns mutable access to the tracked decal-index vector lane.
      */
-    [[nodiscard]] msvc8::vector<std::int32_t>* GetDecals() override;
+    [[nodiscard]] fa::vector<std::int32_t>* GetDecals() override;
 
     /**
      * Address: 0x00877360 (FUN_00877360, Moho::CDecalGroup::GetDecals1)
@@ -76,7 +76,7 @@ namespace moho
      * What it does:
      * Duplicate vtable lane for mutable tracked decal-index vector access.
      */
-    [[nodiscard]] msvc8::vector<std::int32_t>* GetDecalsAlias() override;
+    [[nodiscard]] fa::vector<std::int32_t>* GetDecalsAlias() override;
 
     /**
      * Address: 0x008773A0 (FUN_008773A0, Moho::CDecalGroup::Func4)
@@ -163,8 +163,8 @@ namespace moho
 
   public:
     std::int32_t mIndex = 0;                // +0x04
-    msvc8::string mName{};                  // +0x08
-    msvc8::vector<std::int32_t> mDecals{};  // +0x24
+    fa::string mName{};                  // +0x08
+    fa::vector<std::int32_t> mDecals{};  // +0x24
   };
 
   static_assert(offsetof(CDecalGroup, mIndex) == 0x04, "CDecalGroup::mIndex offset must be 0x04");

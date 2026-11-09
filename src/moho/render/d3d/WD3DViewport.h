@@ -135,6 +135,13 @@ namespace moho
     void OnPaint(wxPaintEvent& event);
 
     /**
+     * Engine addition (`ren_DirectPaint`): what OnPaint does once the device is ready, with no
+     * message and no wxPaintDC. Only for a frame the device asked for, as nothing validates the
+     * update region here.
+     */
+    void PaintWithoutMessage();
+
+    /**
      * Address: 0x00430B70 (FUN_00430B70)
      *
      * What it does:

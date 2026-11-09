@@ -19,7 +19,7 @@ namespace gpg
    * - 0x00763AC0 (resize) / 0x00764010 (scalar-deleting dtor)
    *
    * What it is:
-   * Reflection/indexing adapter for `msvc8::vector<moho::HPathCell>` — the
+   * Reflection/indexing adapter for `fa::vector<moho::HPathCell>` — the
    * value-element sibling of `RVectorType<moho::SimArmy*>`. `HPathCell` is a
    * 4-byte packed path-grid cell, so the element (de)serialize lanes read/write
    * cell *values* through `moho::HPathCell::sType`.
@@ -36,7 +36,7 @@ namespace gpg
     /**
      * Address: 0x007634A0 (FUN_007634A0, gpg::RVectorType_HPathCell::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x00763530 (FUN_00763530, gpg::RVectorType_HPathCell::IsIndexed)
@@ -65,7 +65,7 @@ namespace gpg
   };
 
   static_assert(sizeof(RVectorType<moho::HPathCell>) == 0x68, "RVectorType<HPathCell> size must be 0x68");
-  static_assert(sizeof(msvc8::vector<moho::HPathCell>) == 0x10, "msvc8::vector<HPathCell> size must be 0x10");
+  static_assert(sizeof(fa::vector<moho::HPathCell>) == 0x10, "fa::vector<HPathCell> size must be 0x10");
 } // namespace gpg
 
 namespace moho

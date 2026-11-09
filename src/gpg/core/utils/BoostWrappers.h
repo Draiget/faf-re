@@ -308,7 +308,7 @@ namespace boost
          * (`destroy()`) - it never calls `dispose()` and never touches +0x04.
          * Every call site that actually invokes FUN_004229B0 must call
          * `release()` on this wrapper, not `weak_release()`; several
-         * `src/**` call sites had this backwards and were corrected in the
+         * `src/ **` call sites had this backwards and were corrected in the
          * same audit (see BoostWrappers.cpp and CWldSession.cpp).
          *
          * What it does:
@@ -1365,11 +1365,11 @@ namespace boost
     );
 
     /**
-    /**
+    / **
 
-    /**
+    / **
 
-    /**
+    / **
      * Address: 0x00446880 (FUN_00446880)
      * Address: 0x00446900 (FUN_00446900)
      * Address: 0x00446A60 (FUN_00446A60)
@@ -1448,7 +1448,7 @@ namespace boost
 
     /**
 
-    /**
+    / **
      * Address: 0x00765720 (FUN_00765720, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::dispose)
      *
      * What it does:
@@ -1505,7 +1505,7 @@ namespace boost
     ) noexcept;
 
     /**
-    /**
+    / **
      * Address: 0x00923920 (FUN_00923920, boost::detail::sp_counted_impl_p<std::basic_stringstream<char, std::char_traits<char>, std::allocator<char>>>::dispose)
      *
      * What it does:
@@ -1611,7 +1611,7 @@ namespace boost
     ) noexcept;
 
     /**
-    /**
+    / **
      * Address: 0x00765770 (FUN_00765770, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::dtr)
      *
      * What it does:
@@ -2268,6 +2268,26 @@ namespace boost
      * Copies one `(px,pi)` pair and retains one shared control-block reference.
      */
     SharedCountPair* AssignSharedPairRetain(SharedCountPair* outPair, const SharedCountPair* sourcePair) noexcept;
+
+    /**
+     * Engine addition: the two functions above for any handle laid out as
+     * `(px,pi)`, so a caller doesn't spell the casts into the binary's pair shape.
+     */
+    template <class Destination, class Source>
+    SharedCountPair* AssignSharedPairRetain(Destination* const outPair, const Source* const sourcePair)
+    {
+        static_assert(sizeof(Destination) == sizeof(SharedCountPair) && sizeof(Source) == sizeof(SharedCountPair));
+        return AssignSharedPairRetain(
+            reinterpret_cast<SharedCountPair*>(outPair), reinterpret_cast<const SharedCountPair*>(sourcePair));
+    }
+
+    template <class Destination, class Source>
+    SharedCountPair* AssignWeakPairFromShared(Destination* const outPair, const Source* const sourcePair)
+    {
+        static_assert(sizeof(Destination) == sizeof(SharedCountPair) && sizeof(Source) == sizeof(SharedCountPair));
+        return AssignWeakPairFromShared(
+            reinterpret_cast<SharedCountPair*>(outPair), reinterpret_cast<const SharedCountPair*>(sourcePair));
+    }
 
     /**
      * Address: 0x0043E3B0 (FUN_0043E3B0)

@@ -50,7 +50,7 @@ namespace moho
    *
    * The argument of those three is a `CWldTerrainDecal*`: that class carries
    * `std::int32_t mIndex` at exactly `+0x18`, and `mDecals` here is a
-   * `msvc8::vector<std::int32_t>` of decal indices, so the object overloads
+   * `fa::vector<std::int32_t>` of decal indices, so the object overloads
    * are just index-extracting conveniences. `CDecalManager::DestroyDecal`
    * already performs that extraction by hand -- `RemoveFromGroup(decal->mIndex)`
    * in `CWldSplat.cpp` -- which is the same pairing spelled out at the caller.
@@ -81,16 +81,16 @@ namespace moho
     [[nodiscard]] virtual std::int32_t* GetIndex() = 0;
 
     /// Slot 2. Duplicate lane for mutable group display-name access.
-    [[nodiscard]] virtual msvc8::string* GetNameAlias() = 0;
+    [[nodiscard]] virtual fa::string* GetNameAlias() = 0;
 
     /// Slot 3. Mutable access to the group display-name string lane.
-    [[nodiscard]] virtual msvc8::string* GetName() = 0;
+    [[nodiscard]] virtual fa::string* GetName() = 0;
 
     /// Slot 4. Duplicate lane for mutable tracked decal-index vector access.
-    [[nodiscard]] virtual msvc8::vector<std::int32_t>* GetDecalsAlias() = 0;
+    [[nodiscard]] virtual fa::vector<std::int32_t>* GetDecalsAlias() = 0;
 
     /// Slot 5. Mutable access to the tracked decal-index vector lane.
-    [[nodiscard]] virtual msvc8::vector<std::int32_t>* GetDecals() = 0;
+    [[nodiscard]] virtual fa::vector<std::int32_t>* GetDecals() = 0;
 
     /// Slot 6. Whether `decal`'s index is tracked by this group.
     [[nodiscard]] virtual bool Contains(CWldTerrainDecal* decal) = 0;

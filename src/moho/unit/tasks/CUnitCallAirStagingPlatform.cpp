@@ -36,35 +36,6 @@ namespace
   constexpr std::uint64_t kUnitStateMaskTaskPending = kUnitStateMaskTransportLoading;
   constexpr std::uint64_t kUnitStateMaskAirStagingPending = kUnitStateMaskLandingOnPlatform;
 
-  [[nodiscard]] gpg::RType* CachedCUnitCallAirStagingPlatformType()
-  {
-    gpg::RType* type = moho::CUnitCallAirStagingPlatform::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitCallAirStagingPlatform));
-      moho::CUnitCallAirStagingPlatform::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-    }
-    return cached;
-  }
-
   [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
   {
     return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
@@ -129,35 +100,7 @@ namespace
     return false;
   }
 
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
 
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 } // namespace
 
 namespace moho
@@ -385,8 +328,8 @@ namespace moho
     }
 
     gpg::RRef nullOwner{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), nullOwner);
-    archive->Read(CachedWeakPtrUnitType(), &mPlatform, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), nullOwner);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mPlatform, nullOwner);
     archive->ReadBool(&mDone);
   }
 
@@ -405,8 +348,8 @@ namespace moho
     }
 
     gpg::RRef nullOwner{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), nullOwner);
-    archive->Write(CachedWeakPtrUnitType(), &mPlatform, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), nullOwner);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mPlatform, nullOwner);
     archive->WriteBool(mDone);
   }
 
@@ -426,12 +369,7 @@ namespace gpg
     moho::CUnitCallAirStagingPlatform* const value
   )
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = MakeDerivedRef(value, CachedCUnitCallAirStagingPlatformType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

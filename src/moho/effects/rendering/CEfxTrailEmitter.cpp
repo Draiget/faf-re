@@ -1,4 +1,5 @@
 #include "moho/effects/rendering/CEfxTrailEmitter.h"
+#include "platform/Interlocked.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -9,6 +10,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/effects/rendering/CEfxEmitter.h"
+#include "moho/effects/rendering/CEffectManagerImpl.h"
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/entity/Entity.h"
 #include "moho/render/ETrailParam.h"
@@ -41,15 +43,6 @@ namespace
   // Engine-stat handle for "Render_ActiveEmitters", resolved once on first tick
   // (mirrors the binary's sEngineStat_Render_ActiveEmitters_1 global).
   moho::StatItem* sEngineStatRenderActiveEmitters = nullptr;
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return type;
-  }
 
   [[nodiscard]] float ProjectViewportDepthRow1(const moho::VMatrix4& viewport, const Wm3::Vec3f& point) noexcept
   {
@@ -178,7 +171,7 @@ namespace moho
     mParams.resize(TRAIL_LASTPARAM, 0.0f);
     mParticleTextures.resize(2, nullptr);
     {
-      const msvc8::string emptyString;
+      const fa::string emptyString;
       mStrings.resize(2, emptyString);
     }
 
@@ -327,7 +320,7 @@ namespace moho
     archive->ReadFloat(&mTotalTicks);
     archive->ReadFloat(&mLife);
     archive->ReadFloat(&mLength);
-    archive->Read(CachedVector3fType(), &mSerializedTrailPosition, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mSerializedTrailPosition, nullOwner);
     archive->ReadBool(&mCreated);
     archive->ReadBool(&mVisible);
     archive->ReadUInt(&mLastUpdate);
@@ -355,7 +348,7 @@ namespace moho
     archive->WriteFloat(mTotalTicks);
     archive->WriteFloat(mLife);
     archive->WriteFloat(mLength);
-    archive->Write(CachedVector3fType(), &mSerializedTrailPosition, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mSerializedTrailPosition, nullOwner);
     archive->WriteBool(mCreated);
     archive->WriteBool(mVisible);
     archive->WriteUInt(mLastUpdate);
@@ -382,7 +375,7 @@ namespace moho
     }
 
     Sim* const sim = mManager->GetSim();
-    const msvc8::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
+    const fa::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
 
     for (const GeomCamera3& camera : cameras) {
       if (CanSeeCam(&camera)
@@ -525,17 +518,18 @@ namespace moho
    */
   void CEfxTrailEmitter::OnTick()
   {
+    if (EFFECT_LifetimeOnly()) {
+      if (!ProcessLifetime()) {
+        ++mTrailLength; // what `CalculateVisible` does for a trail no camera sees
+      }
+      return;
+    }
     if (ProcessLifetime() || !CalculateVisible()) {
       return;
     }
 
-    if (sEngineStatRenderActiveEmitters == nullptr) {
-      EngineStats* const engineStats = GetEngineStats();
-      sEngineStatRenderActiveEmitters = engineStats->GetItem("Render_ActiveEmitters", true);
-      (void)sEngineStatRenderActiveEmitters->Release(0);
-    }
-    _InterlockedExchangeAdd(
-      reinterpret_cast<volatile long*>(&sEngineStatRenderActiveEmitters->mPrimaryValueBits), 1);
+    PrepareTickStats();
+    sEngineStatRenderActiveEmitters->AddPrimaryBits(1);
 
     const std::int32_t pendingTicks = mTrailLength;
     const RTrailBlueprint* const bp = mTrailBlueprint;
@@ -561,6 +555,15 @@ namespace moho
     mTrailLength = 0;
     Tick(0);
     mTotalTicks = mTotalTicks + 1.0f;
+  }
+
+  void CEfxTrailEmitter::PrepareTickStats()
+  {
+    if (sEngineStatRenderActiveEmitters == nullptr) {
+      EngineStats* const engineStats = GetEngineStats();
+      sEngineStatRenderActiveEmitters = engineStats->GetItem("Render_ActiveEmitters", true);
+      (void)sEngineStatRenderActiveEmitters->Release(0);
+    }
   }
 } // namespace moho
 

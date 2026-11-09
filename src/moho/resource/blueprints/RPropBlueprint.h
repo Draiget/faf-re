@@ -125,7 +125,7 @@ namespace moho
      * What it does:
      * Returns cached reflection descriptor for `RPropBlueprint`.
      */
-    [[nodiscard]] gpg::RType* GetClass() const;
+    [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x0051D230 (FUN_0051D230)
@@ -134,7 +134,7 @@ namespace moho
      * What it does:
      * Packs `{this, GetClass()}` as a reflection reference handle.
      */
-    gpg::RRef GetDerivedObjectRef();
+    gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x0051D370 (FUN_0051D370)
@@ -144,7 +144,7 @@ namespace moho
      * Runs base entity-blueprint init and canonicalizes `Display.MeshBlueprint`
      * to a completed, lowercase, slash-normalized resource path.
      */
-    void OnInitBlueprint();
+    void OnInitBlueprint() override;
   };
 
   static_assert(sizeof(RPropBlueprintDisplay) == 0x20, "RPropBlueprintDisplay size must be 0x20");

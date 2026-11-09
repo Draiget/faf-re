@@ -24,7 +24,7 @@ namespace moho
    * buy the header sentinel (0x004247E0), mark it nil, self-link all three
    * links, zero the size and `atexit` the destructor.
    */
-  msvc8::map<msvc8::string, CAnimTexture*> sAnimTextureMap;
+  fa::map<fa::string, CAnimTexture*> sAnimTextureMap;
 } // namespace moho
 
 namespace
@@ -38,27 +38,6 @@ namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00422940 (FUN_00422940)
-   *
-   * What it does:
-   * Computes `value mod range` with the same positive-wrap behavior used by
-   * animation frame sampling paths.
-   *
-   * 0x00422949..0x0042294F: `fld value; fld range; call _CIfmod` -- the MSVC8
-   * CRT, which returns +0 for a zero dividend. 0x00422958..0x00422987 shifts by
-   * `range` when `0 > r` and `0 > range` disagree (both ordered compares). No
-   * zero-range guard: the callers test the range first (0x0063FAB7, 0x0064005D,
-   * and a non-empty frame list in GetFrameAt).
-   */
-  float WrapPositiveModulo(const float value, const float range) noexcept
-  {
-    float wrapped = static_cast<float>(msvc8::fmod(value, range));
-    if ((0.0f > wrapped) != (0.0f > range)) {
-      wrapped += range;
-    }
-    return wrapped;
-  }
 
   /**
    * Address: 0x00422D20 (FUN_00422D20)
@@ -119,7 +98,7 @@ namespace moho
   CAnimTexture* CAnimTexture::FindOrCreate(const char* const baseTextureName)
   {
     const char* const keyText = baseTextureName ? baseTextureName : "";
-    const msvc8::string key(keyText);
+    const fa::string key(keyText);
 
     const auto cached = sAnimTextureMap.find(key);
     if (cached != sAnimTextureMap.end()) {
@@ -168,7 +147,7 @@ namespace moho
     outFrame.add_ref_copy();
   }
 
-  const msvc8::string& CAnimTexture::GetBaseTextureName() const noexcept
+  const fa::string& CAnimTexture::GetBaseTextureName() const noexcept
   {
     return mBaseTextureName;
   }
@@ -184,7 +163,7 @@ namespace moho
     mFrames.clear();
     mBaseTextureName.assign_owned(baseTextureName);
 
-    msvc8::string frameName{};
+    fa::string frameName{};
     frameName.tidy(false, 0U);
     frameName.assign_owned(baseTextureName);
 
@@ -220,7 +199,7 @@ namespace moho
    * Increments the trailing numeric suffix in-place and wraps carries to `0`.
    * Returns false only when no suitable numeric suffix exists.
    */
-  bool CAnimTexture::IncrementFrameNameSuffix(msvc8::string& textureName)
+  bool CAnimTexture::IncrementFrameNameSuffix(fa::string& textureName)
   {
     if (!textureName.basic_sanity() || textureName.empty()) {
       return false;

@@ -164,79 +164,13 @@ void STransportPickUpInfo::MemberSerialize(gpg::WriteArchive* const archive) con
 namespace
 {
   gpg::RType* gIAiTransportType = nullptr;
-  gpg::RType* gCAiTransportImplType = nullptr;
-  gpg::RType* gUnitType = nullptr;
-  gpg::RType* gWeakPtrUnitType = nullptr;
-  gpg::RType* gEntitySetTemplateUnitType = nullptr;
-  gpg::RType* gReservedBoneVectorType = nullptr;
-  gpg::RType* gPickupInfoType = nullptr;
-  gpg::RType* gFormationInstanceType = nullptr;
-  gpg::RType* gVector3fType = nullptr;
-  gpg::RType* gAttachPointVectorType = nullptr;
-
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
 
   [[nodiscard]] gpg::RType* ResolveIAiTransportType()
   {
     if (!IAiTransport::sType) {
-      IAiTransport::sType = CachedType<IAiTransport>(gIAiTransportType);
+      IAiTransport::sType = gpg::CachedLookup<IAiTransport>(gIAiTransportType);
     }
     return IAiTransport::sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCAiTransportImplType()
-  {
-    if (!CAiTransportImpl::sType) {
-      CAiTransportImpl::sType = CachedType<CAiTransportImpl>(gCAiTransportImplType);
-    }
-    return CAiTransportImpl::sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveUnitType()
-  {
-    return CachedType<Unit>(gUnitType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveWeakPtrUnitType()
-  {
-    return CachedType<WeakPtr<Unit>>(gWeakPtrUnitType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEntitySetTemplateUnitType()
-  {
-    return CachedType<EntitySetTemplate<Unit>>(gEntitySetTemplateUnitType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveReservedBoneVectorType()
-  {
-    return CachedType<msvc8::vector<SAiReservedTransportBone>>(gReservedBoneVectorType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolvePickupInfoType()
-  {
-    return CachedType<STransportPickUpInfo>(gPickupInfoType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveFormationInstanceType()
-  {
-    return CachedType<IFormationInstance>(gFormationInstanceType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    return CachedType<Wm3::Vector3<float>>(gVector3fType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveAttachPointVectorType()
-  {
-    return CachedType<msvc8::vector<SAttachPoint>>(gAttachPointVectorType);
   }
 
   [[nodiscard]] bool BlueprintBelongsToCategory(
@@ -388,7 +322,7 @@ namespace
     const unsigned int attachBoneIndex,
     SAiReservedTransportBone* const destination,
     Unit* const reservedUnit,
-    msvc8::vector<int> reservedBones
+    fa::vector<int> reservedBones
   )
   {
     destination->transportBoneIndex = transportBoneIndex;
@@ -523,9 +457,9 @@ void CAiTransportImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   GPG_ASSERT(aiTransportType != nullptr);
   archive->Read(aiTransportType, static_cast<IAiTransport*>(this), ownerRef);
 
-  mUnit = ReadPointerUnowned<Unit>(archive, ownerRef, ResolveUnitType());
+  mUnit = ReadPointerUnowned<Unit>(archive, ownerRef, gpg::RTypeOf<Unit>());
 
-  gpg::RType* const weakUnitType = ResolveWeakPtrUnitType();
+  gpg::RType* const weakUnitType = gpg::RTypeOf<WeakPtr<Unit>>();
   GPG_ASSERT(weakUnitType != nullptr);
   archive->Read(weakUnitType, &mTeleportBeacon, ownerRef);
 
@@ -540,28 +474,28 @@ void CAiTransportImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   archive->ReadInt(&mLaunchAttachIndex);
   archive->ReadInt(&mGenericOverflow);
 
-  gpg::RType* const entitySetType = ResolveEntitySetTemplateUnitType();
+  gpg::RType* const entitySetType = gpg::RTypeOf<EntitySetTemplate<Unit>>();
   GPG_ASSERT(entitySetType != nullptr);
   archive->Read(entitySetType, &mUnitSet30, ownerRef);
   archive->Read(entitySetType, &mStoredUnits, ownerRef);
   archive->Read(entitySetType, &mUnitSet80, ownerRef);
 
-  gpg::RType* const reservedBoneVectorType = ResolveReservedBoneVectorType();
+  gpg::RType* const reservedBoneVectorType = gpg::RTypeOf<fa::vector<SAiReservedTransportBone>>();
   GPG_ASSERT(reservedBoneVectorType != nullptr);
   archive->Read(reservedBoneVectorType, &mReservedBones, ownerRef);
 
-  gpg::RType* const pickupInfoType = ResolvePickupInfoType();
+  gpg::RType* const pickupInfoType = gpg::RTypeOf<STransportPickUpInfo>();
   GPG_ASSERT(pickupInfoType != nullptr);
   archive->Read(pickupInfoType, &mPickupInfo, ownerRef);
 
   mWaitingFormation =
-    ReadPointerUnowned<IFormationInstance>(archive, ownerRef, ResolveFormationInstanceType());
+    ReadPointerUnowned<IFormationInstance>(archive, ownerRef, gpg::RTypeOf<IFormationInstance>());
 
-  gpg::RType* const vector3fType = ResolveVector3fType();
+  gpg::RType* const vector3fType = gpg::RTypeOf<Wm3::Vector3<float>>();
   GPG_ASSERT(vector3fType != nullptr);
   archive->Read(vector3fType, &mPickupFacing, ownerRef);
 
-  gpg::RType* const attachPointVectorType = ResolveAttachPointVectorType();
+  gpg::RType* const attachPointVectorType = gpg::RTypeOf<fa::vector<SAttachPoint>>();
   GPG_ASSERT(attachPointVectorType != nullptr);
   archive->Read(attachPointVectorType, &mGenericAttachPoints, ownerRef);
   archive->Read(attachPointVectorType, &mClass1AttachPoints, ownerRef);
@@ -589,9 +523,9 @@ void CAiTransportImpl::MemberSerialize(gpg::WriteArchive* const archive) const
   GPG_ASSERT(aiTransportType != nullptr);
   archive->Write(aiTransportType, static_cast<const IAiTransport*>(this), ownerRef);
 
-  WritePointerUnowned(archive, mUnit, ResolveUnitType(), ownerRef);
+  WritePointerUnowned(archive, mUnit, gpg::RTypeOf<Unit>(), ownerRef);
 
-  gpg::RType* const weakUnitType = ResolveWeakPtrUnitType();
+  gpg::RType* const weakUnitType = gpg::RTypeOf<WeakPtr<Unit>>();
   GPG_ASSERT(weakUnitType != nullptr);
   archive->Write(weakUnitType, &mTeleportBeacon, ownerRef);
 
@@ -602,27 +536,27 @@ void CAiTransportImpl::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->WriteInt(mLaunchAttachIndex);
   archive->WriteInt(mGenericOverflow);
 
-  gpg::RType* const entitySetType = ResolveEntitySetTemplateUnitType();
+  gpg::RType* const entitySetType = gpg::RTypeOf<EntitySetTemplate<Unit>>();
   GPG_ASSERT(entitySetType != nullptr);
   archive->Write(entitySetType, &mUnitSet30, ownerRef);
   archive->Write(entitySetType, &mStoredUnits, ownerRef);
   archive->Write(entitySetType, &mUnitSet80, ownerRef);
 
-  gpg::RType* const reservedBoneVectorType = ResolveReservedBoneVectorType();
+  gpg::RType* const reservedBoneVectorType = gpg::RTypeOf<fa::vector<SAiReservedTransportBone>>();
   GPG_ASSERT(reservedBoneVectorType != nullptr);
   archive->Write(reservedBoneVectorType, &mReservedBones, ownerRef);
 
-  gpg::RType* const pickupInfoType = ResolvePickupInfoType();
+  gpg::RType* const pickupInfoType = gpg::RTypeOf<STransportPickUpInfo>();
   GPG_ASSERT(pickupInfoType != nullptr);
   archive->Write(pickupInfoType, &mPickupInfo, ownerRef);
 
-  WritePointerUnowned(archive, mWaitingFormation, ResolveFormationInstanceType(), ownerRef);
+  WritePointerUnowned(archive, mWaitingFormation, gpg::RTypeOf<IFormationInstance>(), ownerRef);
 
-  gpg::RType* const vector3fType = ResolveVector3fType();
+  gpg::RType* const vector3fType = gpg::RTypeOf<Wm3::Vector3<float>>();
   GPG_ASSERT(vector3fType != nullptr);
   archive->Write(vector3fType, &mPickupFacing, ownerRef);
 
-  gpg::RType* const attachPointVectorType = ResolveAttachPointVectorType();
+  gpg::RType* const attachPointVectorType = gpg::RTypeOf<fa::vector<SAttachPoint>>();
   GPG_ASSERT(attachPointVectorType != nullptr);
   archive->Write(attachPointVectorType, &mGenericAttachPoints, ownerRef);
   archive->Write(attachPointVectorType, &mClass1AttachPoints, ownerRef);
@@ -659,7 +593,7 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportGetLoadedUnits(const bool inc
     return out;
   }
 
-  const msvc8::vector<Entity*>& attached = mUnit->GetAttachedEntities();
+  const fa::vector<Entity*>& attached = mUnit->GetAttachedEntities();
   for (Entity* const* it = attached.begin(); it != attached.end(); ++it) {
     // 0x005E6180: non-unit attachments are filtered through IsUnit().
     Unit* const attachedUnit = (*it)->IsUnit();
@@ -739,7 +673,7 @@ namespace
    * iterator lane for erase-while-iterating loops.
    */
   [[nodiscard]] SAiReservedTransportBone* EraseReservedTransportBoneAndAdvance(
-    msvc8::vector<SAiReservedTransportBone>& reservations,
+    fa::vector<SAiReservedTransportBone>& reservations,
     SAiReservedTransportBone* const it
   )
   {
@@ -1018,7 +952,7 @@ void CAiTransportImpl::SetUpAttachPoints()
     attachPoint.localPos = localTransform.pos_;
     attachPoint.distSq = 0.0f;
 
-    msvc8::vector<SAttachPoint>* targetList = nullptr;
+    fa::vector<SAttachPoint>* targetList = nullptr;
     if (std::strstr(bone->mBoneName, "Launchpoint")) {
       targetList = &mLaunchAttachPoints;
     } else if (std::strstr(bone->mBoneName, "Attachpoint_Spr")) {
@@ -1149,7 +1083,7 @@ bool CAiTransportImpl::TransportValidateType(const RUnitBlueprint* const unitBlu
  * Address: 0x005EC510 (FUN_005EC510) / 0x005EE110 (FUN_005EE110) /
  *   0x005EF610 (FUN_005EF610) / 0x005EF660 (FUN_005EF660) — the VC8
  *   clear+resize+contiguous-copy emission family for the trivially copyable
- *   `SAttachPoint` element, all cited on the `msvc8::vector<T>` members in
+ *   `SAttachPoint` element, all cited on the `fa::vector<T>` members in
  *   legacy/containers/Vector.h; the per-T lane helpers that stood in for
  *   them are removed.
  *
@@ -1157,9 +1091,9 @@ bool CAiTransportImpl::TransportValidateType(const RUnitBlueprint* const unitBlu
  * Rebuilds one destination attach-point vector from the source vector —
  * the VC8 helper-constructor shape expressed as `operator=`.
  */
-msvc8::vector<SAttachPoint>* CAiTransportImpl::CopyAttachPointVector(
-  const msvc8::vector<SAttachPoint>& source,
-  msvc8::vector<SAttachPoint>& destination
+fa::vector<SAttachPoint>* CAiTransportImpl::CopyAttachPointVector(
+  const fa::vector<SAttachPoint>& source,
+  fa::vector<SAttachPoint>& destination
 )
 {
   destination = source;
@@ -1171,8 +1105,8 @@ msvc8::vector<SAttachPoint>* CAiTransportImpl::CopyAttachPointVector(
  */
 void CAiTransportImpl::TransportFindAttachList(
   const int unitClass,
-  msvc8::vector<SAttachPoint>& attachPoints,
-  msvc8::vector<SAttachPoint>& outAttachPoints,
+  fa::vector<SAttachPoint>& attachPoints,
+  fa::vector<SAttachPoint>& outAttachPoints,
   int& outAttachSize
 )
 {
@@ -1231,7 +1165,7 @@ void CAiTransportImpl::TransportFindAttachList(
   // candidate set, and `TransportAssignSlot` refused every such unit -- so
   // `CUnitLoadUnits::DoTask` assigned no slots, `mReadyUnitCount` stayed 0,
   // and the transport had nothing to pick up.
-  const msvc8::vector<SAttachPoint>* hookSource = &attachPoints;
+  const fa::vector<SAttachPoint>* hookSource = &attachPoints;
   if (outAttachSize != 0) {
     hookSource = mClass1AttachPoints.empty() ? &mGenericAttachPoints : &mClass1AttachPoints;
   }
@@ -1242,13 +1176,13 @@ void CAiTransportImpl::TransportFindAttachList(
 /**
  * Address: 0x005E4D40 (FUN_005E4D40)
  */
-msvc8::vector<int> CAiTransportImpl::GetClosestAttachPointsTo(
-  msvc8::vector<SAttachPoint> attachPoints,
+fa::vector<int> CAiTransportImpl::GetClosestAttachPointsTo(
+  fa::vector<SAttachPoint> attachPoints,
   const int hookIndex,
   int attachSize
 )
 {
-  msvc8::vector<int> result{};
+  fa::vector<int> result{};
   if (attachSize <= 0) {
     return result;
   }
@@ -1269,9 +1203,9 @@ msvc8::vector<int> CAiTransportImpl::GetClosestAttachPointsTo(
   }
 
   // One `sort` call: the small-range insertion pass and the introsort above it
-  // are both inside `msvc8::sort`, which is why the binary emitted them as
+  // are both inside `fa::sort`, which is why the binary emitted them as
   // separate bodies for this element type.
-  msvc8::sort(
+  fa::sort(
     attachPoints.begin(),
     attachPoints.end(),
     [](const SAttachPoint& lhs, const SAttachPoint& rhs) { return lhs.distSq < rhs.distSq; }
@@ -1289,7 +1223,7 @@ msvc8::vector<int> CAiTransportImpl::GetClosestAttachPointsTo(
 /**
  * Address: 0x005E4F00 (FUN_005E4F00)
  */
-bool CAiTransportImpl::IsBoneReserved(msvc8::vector<int> boneIndices)
+bool CAiTransportImpl::IsBoneReserved(fa::vector<int> boneIndices)
 {
   for (const SAiReservedTransportBone* reserved = mReservedBones.begin(); reserved != mReservedBones.end(); ++reserved) {
     for (const int* candidate = boneIndices.begin(); candidate != boneIndices.end(); ++candidate) {
@@ -1311,7 +1245,7 @@ void CAiTransportImpl::ReserveBone(
   const unsigned int bestAttachBoneIndex,
   Unit* const unit,
   const unsigned int transportBoneIndex,
-  msvc8::vector<int> boneIndices
+  fa::vector<int> boneIndices
 )
 {
   // 0x005E4FC4/0x005E5073: one reservation per entry of `boneIndices` (the
@@ -1340,8 +1274,8 @@ bool CAiTransportImpl::TransportHasSpaceFor(const RUnitBlueprint* const unitBlue
     return false;
   }
 
-  msvc8::vector<SAttachPoint> attachVec{};
-  msvc8::vector<SAttachPoint> hookVec{};
+  fa::vector<SAttachPoint> attachVec{};
+  fa::vector<SAttachPoint> hookVec{};
   int attachSize = 1;
   TransportFindAttachList(unitBlueprint->Transport.TransportClass, attachVec, hookVec, attachSize);
   if (attachVec.empty()) {
@@ -1350,7 +1284,7 @@ bool CAiTransportImpl::TransportHasSpaceFor(const RUnitBlueprint* const unitBlue
 
   attachSize = MaxInt(1, attachSize);
   for (const SAttachPoint* it = attachVec.begin(); it != attachVec.end(); ++it) {
-    msvc8::vector<int> candidate = GetClosestAttachPointsTo(hookVec, static_cast<int>(it->index), attachSize);
+    fa::vector<int> candidate = GetClosestAttachPointsTo(hookVec, static_cast<int>(it->index), attachSize);
     if (!candidate.empty() && !IsBoneReserved(candidate)) {
       return true;
     }
@@ -1372,14 +1306,14 @@ bool CAiTransportImpl::TransportAssignSlot(Unit* const unit, const int hookIndex
   // stores it as the raw dword the binary stores, and `AttachUnitToBone`
   // reads it back signed into `mChildBoneIndex`.
   const auto bestAttachBoneIndex = static_cast<unsigned int>(GetBestAttachPoint(unit));
-  msvc8::vector<SAttachPoint> attachVec{};
-  msvc8::vector<SAttachPoint> hookVec{};
+  fa::vector<SAttachPoint> attachVec{};
+  fa::vector<SAttachPoint> hookVec{};
   int attachSize = 1;
   TransportFindAttachList(unit->GetBlueprint()->Transport.TransportClass, attachVec, hookVec, attachSize);
 
   if (hookIndex >= 0) {
     const int normalizedAttachSize = MaxInt(1, attachSize);
-    msvc8::vector<int> candidate = GetClosestAttachPointsTo(hookVec, hookIndex, normalizedAttachSize);
+    fa::vector<int> candidate = GetClosestAttachPointsTo(hookVec, hookIndex, normalizedAttachSize);
     if (candidate.empty() || IsBoneReserved(candidate)) {
       return false;
     }
@@ -1393,7 +1327,7 @@ bool CAiTransportImpl::TransportAssignSlot(Unit* const unit, const int hookIndex
 
   attachSize = MaxInt(1, attachSize);
   for (const SAttachPoint* it = attachVec.begin(); it != attachVec.end(); ++it) {
-    msvc8::vector<int> candidate = GetClosestAttachPointsTo(hookVec, static_cast<int>(it->index), attachSize);
+    fa::vector<int> candidate = GetClosestAttachPointsTo(hookVec, static_cast<int>(it->index), attachSize);
     if (candidate.empty() || IsBoneReserved(candidate)) {
       continue;
     }
@@ -1542,7 +1476,7 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportDetachAllUnits(const bool cle
   Sim* const sim = mUnit->SimulationRef;
   COGrid* const oGrid = sim ? sim->mOGrid : nullptr;
 
-  const msvc8::vector<Entity*>& attachedCopy = mUnit->GetAttachedEntities();
+  const fa::vector<Entity*>& attachedCopy = mUnit->GetAttachedEntities();
   for (Entity* const* it = attachedCopy.begin(); it != attachedCopy.end(); ++it) {
     // 0x005E7483: attachments include non-unit entities (Lua Entity helpers,
     // shields, effect dummies), so the binary filters through IsUnit().
@@ -1776,7 +1710,7 @@ void CAiTransportImpl::TransportRemoveFromStorage(Unit* const unit, VTransform& 
   (void)unit->DetachFrom(static_cast<Entity*>(mUnit), false);
   (void)mStoredUnits.Remove(unit);
 
-  const msvc8::vector<SAttachPoint>* launchPoints = &mLaunchAttachPoints;
+  const fa::vector<SAttachPoint>* launchPoints = &mLaunchAttachPoints;
   if (launchPoints->empty()) {
     launchPoints = &mGenericAttachPoints;
   }

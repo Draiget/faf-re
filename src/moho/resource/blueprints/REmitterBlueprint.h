@@ -73,7 +73,7 @@ namespace moho
    * destructor slot at a 0x10 stride, frees the block, and nulls `+0x04`,
    * `+0x08` and `+0x0C`.
    */
-  using REmitterCurveKeyListStorage = msvc8::vector<REmitterCurveKey>;
+  using REmitterCurveKeyListStorage = fa::vector<REmitterCurveKey>;
 
   /**
    * Address: 0x00515460 (FUN_00515460)
@@ -198,8 +198,8 @@ namespace moho
     float RepeatTime{0.0f};                       // +0x240
     float TextureFrameCount{0.0f};                // +0x244
     std::int32_t BlendMode{0};                    // +0x248
-    msvc8::string TextureName;                    // +0x24C
-    msvc8::string RampTextureName;                // +0x268
+    fa::string TextureName;                    // +0x24C
+    fa::string RampTextureName;                // +0x268
     static gpg::RType* sType;
 
     /**
@@ -225,7 +225,7 @@ namespace moho
      * What it does:
      * Returns cached reflection descriptor for `REmitterBlueprint`.
      */
-    [[nodiscard]] gpg::RType* GetClass() const;
+    [[nodiscard]] gpg::RType* GetClass() const override;
 
     /**
      * Address: 0x0050E730 (FUN_0050E730)
@@ -234,7 +234,7 @@ namespace moho
      * What it does:
      * Packs `{this, GetClass()}` as a reflection reference handle.
      */
-    gpg::RRef GetDerivedObjectRef();
+    gpg::RRef GetDerivedObjectRef() override;
 
     /**
      * Address: 0x0050EAE0 (FUN_0050EAE0)

@@ -68,12 +68,22 @@ namespace moho
   void SCR_ExpectArgs(LuaPlus::LuaState* state, int maxArgs, int minArgs, const char* helpText);
 
   /**
+   * Engine addition: the exact-count check the binary inlines into its Lua
+   * bindings. SCR_ExpectArgs isn't the same check, its message says "between".
+   *
+   * What it does:
+   * Raises LuaState::Error with `helpText` unless the Lua stack holds exactly
+   * `expectedArgs` values.
+   */
+  void SCR_ExpectExactArgs(LuaPlus::LuaState* state, int expectedArgs, const char* helpText);
+
+  /**
    * Address: 0x004D2F70 (FUN_004D2F70, ?SCR_ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVLuaObject@LuaPlus@@@Z)
    *
    * What it does:
-   * Serializes one Lua object with SCR byte-stream encoding and returns the raw encoded bytes as `msvc8::string`.
+   * Serializes one Lua object with SCR byte-stream encoding and returns the raw encoded bytes as `fa::string`.
    */
-  [[nodiscard]] msvc8::string SCR_ToString(const LuaPlus::LuaObject& object);
+  [[nodiscard]] fa::string SCR_ToString(const LuaPlus::LuaObject& object);
 
   /**
    * Address: 0x004D31D0 (FUN_004D31D0, ?SCR_ToBool@Moho@@YA_NABVLuaObject@LuaPlus@@@Z)
@@ -96,13 +106,30 @@ namespace moho
   [[nodiscard]] LuaPlus::LuaObject SCR_Copy(const LuaPlus::LuaObject& source, LuaPlus::LuaState* state);
 
   /**
+   * Engine addition: while one of these lives on a thread, SCR_Copy on that thread gives a table that
+   * is reached twice one copy, as the source has it, instead of two. Only for states the sim never
+   * reads: sharing changes table identity. `lua_SessionSharedBlueprints` 0 turns it off.
+   */
+  class SCR_CopySharedTablesScope
+  {
+  public:
+    SCR_CopySharedTablesScope();
+    ~SCR_CopySharedTablesScope();
+    SCR_CopySharedTablesScope(const SCR_CopySharedTablesScope&) = delete;
+    SCR_CopySharedTablesScope& operator=(const SCR_CopySharedTablesScope&) = delete;
+
+  private:
+    bool mActive = false;
+  };
+
+  /**
    * Address: 0x004D23D0 (FUN_004D23D0, ?SCR_QuoteLuaString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@@Z)
    *
    * What it does:
    * Returns a Lua-quoted/escaped string literal choosing `'` or `"` based on
    * source contents and escaping control/non-printable bytes.
    */
-  [[nodiscard]] msvc8::string SCR_QuoteLuaString(gpg::StrArg text);
+  [[nodiscard]] fa::string SCR_QuoteLuaString(gpg::StrArg text);
 
   /**
    * Address: 0x004CF0B0 (FUN_004CF0B0, ?SCR_RObjectToLuaMerge@Moho@@YAXABVRRef@gpg@@AAVLuaObject@LuaPlus@@@Z)
@@ -183,7 +210,7 @@ namespace moho
   void SCR_LuaDoFileConcat(
     LuaPlus::LuaState* state,
     LuaPlus::LuaObject* outEnvironment,
-    msvc8::vector<msvc8::string> files
+    fa::vector<fa::string> files
   );
 
   /**
@@ -340,6 +367,21 @@ namespace moho
      */
     CScrLuaMetatableFactory() = default;
   };
+
+  /**
+   * Engine addition: a `func_Create*Object` function: the factory's metatable into `object`, unless null.
+   * Instantiated in the file that calls it, where `T`'s factory specialization is visible.
+   */
+  template <class T>
+  LuaPlus::LuaObject* SCR_WriteMetatable(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  {
+    if (object == nullptr) {
+      return nullptr;
+    }
+
+    *object = CScrLuaMetatableFactory<T>::Instance().Get(state);
+    return object;
+  }
 
   template <>
   class CScrLuaMetatableFactory<CScriptObject*> final : public CScrLuaObjectFactory

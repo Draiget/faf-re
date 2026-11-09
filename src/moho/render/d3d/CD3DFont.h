@@ -30,9 +30,9 @@ namespace moho
 
     using SCharInfo = CD3DFontCharInfo;
 
-    using SCharInfoPage = msvc8::vector<SCharInfo>;
-    using SCharInfoPages = msvc8::vector<SCharInfoPage>;
-    using KerningPairVector = msvc8::vector<SKerningPair>;
+    using SCharInfoPage = fa::vector<SCharInfo>;
+    using SCharInfoPages = fa::vector<SCharInfoPage>;
+    using KerningPairVector = fa::vector<SKerningPair>;
 
     /**
      * Address: 0x00425290 (FUN_00425290,
@@ -148,6 +148,10 @@ namespace moho
      */
     [[nodiscard]] std::int32_t GetNearestCharacterIndex(gpg::StrArg text, float targetAdvance);
 
+    /** Engine addition (issue #304): a family from `LoadFont`, whose metrics change when its atlas arrives. */
+    [[nodiscard]] bool IsModFont() const;
+    void PollModFont();
+
   public:
     HFONT mFont;              // +0x08
     bool mIsTruetype;         // +0x0C
@@ -201,4 +205,9 @@ namespace moho
   );
   static_assert(offsetof(CD3DFont, mBitmap) == 0x50, "moho::CD3DFont::mBitmap offset must be 0x50");
   static_assert(sizeof(CD3DFont) == 0x54, "moho::CD3DFont size must be 0x54");
+  /**
+   * Engine addition (ren_GlyphCache): writes the glyphs rasterized since the cache was last written,
+   * once none was added for a few seconds, or at once with `now`. Cheap when there is nothing new.
+   */
+  void REN_SaveGlyphCache(bool now);
 } // namespace moho

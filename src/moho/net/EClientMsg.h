@@ -36,5 +36,11 @@ namespace moho
 
     /** Generic int parameter from client manager. */
     CLIMSG_IntParam = 57,
+
+    /**
+     * Engine addition (issue #285): what this client's engine supports, and any
+     * feature's own traffic. docs/PEER_FEATURES.md. Type 59 stays free.
+     */
+    CLIMSG_PeerFeatures = 58,
   };
 } // namespace moho

@@ -18,7 +18,7 @@
 
 namespace
 {
-  using ArmyLaunchInfoVector = msvc8::vector<moho::ArmyLaunchInfo>;
+  using ArmyLaunchInfoVector = fa::vector<moho::ArmyLaunchInfo>;
 
   class ArmyLaunchInfoVectorTypeInfo final : public gpg::RType, public gpg::RIndexed
   {
@@ -43,7 +43,7 @@ namespace
      * What it does:
      * Formats base lexical text with indexed element count.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x005430B0 (FUN_005430B0)
@@ -106,7 +106,6 @@ namespace
   bool gArmyLaunchInfoTypeRegistered = false;
   bool gArmyLaunchInfoVectorTypeRegistered = false;
   gpg::RType* gArmyLaunchInfoVectorType = nullptr;
-  gpg::RType* gStringVectorType = nullptr;
 
   /**
    * Address: 0x00BF4050 (FUN_00BF4050, atexit destructor of the LaunchInfoNewTypeInfo object)
@@ -139,7 +138,7 @@ namespace
    *
    * What it does:
    * Lazily resolves and caches RTTI metadata for
-   * `msvc8::vector<moho::ArmyLaunchInfo>`.
+   * `fa::vector<moho::ArmyLaunchInfo>`.
    */
   [[nodiscard]] gpg::RType* ResolveArmyLaunchInfoVectorTypeFast()
   {
@@ -170,26 +169,10 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RType* ResolveArmyLaunchInfoType()
-  {
-    if (!moho::ArmyLaunchInfo::sType) {
-      moho::ArmyLaunchInfo::sType = gpg::LookupRType(typeid(moho::ArmyLaunchInfo));
-    }
-    return moho::ArmyLaunchInfo::sType;
-  }
-
   [[nodiscard]] gpg::RType* ResolveLaunchInfoNewType()
   {
     (void)AcquireLaunchInfoNewTypeInfo();
     return gpg::LookupRType(typeid(moho::LaunchInfoNew));
-  }
-
-  [[nodiscard]] gpg::RType* ResolveStringVectorType()
-  {
-    if (!gStringVectorType) {
-      gStringVectorType = gpg::LookupRType(typeid(msvc8::vector<msvc8::string>));
-    }
-    return gStringVectorType;
   }
 
   /**
@@ -309,7 +292,7 @@ namespace
     const gpg::RRef& ownerRef
   )
   {
-    gpg::RType* const type = ResolveStringVectorType();
+    gpg::RType* const type = gpg::RTypeOf<fa::vector<fa::string>>();
     archive->Read(type, object, ownerRef);
   }
 
@@ -326,7 +309,7 @@ namespace
     const gpg::RRef& ownerRef
   )
   {
-    gpg::RType* const type = ResolveStringVectorType();
+    gpg::RType* const type = gpg::RTypeOf<fa::vector<fa::string>>();
     archive->Write(type, object, ownerRef);
   }
 
@@ -337,7 +320,7 @@ namespace
    * Lazily resolves `ArmyLaunchInfo` reflection type and dispatches one archive
    * read for the provided object lane.
    */
-  gpg::ReadArchive* ReadArmyLaunchInfoArchiveAdapter(
+  [[maybe_unused]] gpg::ReadArchive* ReadArmyLaunchInfoArchiveAdapter(
     gpg::ReadArchive* const archive,
     void* const object,
     gpg::RRef* const ownerRef
@@ -359,7 +342,7 @@ namespace
    * Lazily resolves `ArmyLaunchInfo` reflection type and dispatches one archive
    * write for the provided object lane.
    */
-  gpg::WriteArchive* WriteArmyLaunchInfoArchiveAdapter(
+  [[maybe_unused]] gpg::WriteArchive* WriteArmyLaunchInfoArchiveAdapter(
     gpg::WriteArchive* const archive,
     const void* const object,
     const gpg::RRef* const ownerRef
@@ -381,7 +364,7 @@ namespace
    * Lazily resolves `vector<ArmyLaunchInfo>` reflection type and dispatches one
    * archive read for the provided object lane.
    */
-  gpg::ReadArchive* ReadArmyLaunchInfoVectorArchiveAdapter(
+  [[maybe_unused]] gpg::ReadArchive* ReadArmyLaunchInfoVectorArchiveAdapter(
     gpg::ReadArchive* const archive,
     void* const object,
     gpg::RRef* const ownerRef
@@ -404,7 +387,7 @@ namespace
    * Lazily resolves `vector<ArmyLaunchInfo>` reflection type and dispatches one
    * archive write for the provided object lane.
    */
-  gpg::WriteArchive* WriteArmyLaunchInfoVectorArchiveAdapter(
+  [[maybe_unused]] gpg::WriteArchive* WriteArmyLaunchInfoVectorArchiveAdapter(
     gpg::WriteArchive* const archive,
     const void* const object,
     const gpg::RRef* const ownerRef
@@ -427,7 +410,7 @@ namespace
    * Lazily resolves `LaunchInfoBase` reflection type and dispatches one archive
    * read for the provided object lane.
    */
-  gpg::ReadArchive* ReadLaunchInfoBaseArchiveAdapter(
+  [[maybe_unused]] gpg::ReadArchive* ReadLaunchInfoBaseArchiveAdapter(
     gpg::ReadArchive* const archive,
     void* const object,
     gpg::RRef* const ownerRef
@@ -449,7 +432,7 @@ namespace
    * Lazily resolves `LaunchInfoBase` reflection type and dispatches one archive
    * write for the provided object lane.
    */
-  gpg::WriteArchive* WriteLaunchInfoBaseArchiveAdapter(
+  [[maybe_unused]] gpg::WriteArchive* WriteLaunchInfoBaseArchiveAdapter(
     gpg::WriteArchive* const archive,
     const void* const object,
     const gpg::RRef* const ownerRef
@@ -471,7 +454,7 @@ namespace
    * Lazily resolves `vector<string>` reflection type and dispatches one archive
    * read for the provided object lane.
    */
-  gpg::ReadArchive* ReadLaunchInfoStringVectorArchiveAdapter(
+  [[maybe_unused]] gpg::ReadArchive* ReadLaunchInfoStringVectorArchiveAdapter(
     gpg::ReadArchive* const archive,
     void* const object,
     gpg::RRef* const ownerRef
@@ -493,7 +476,7 @@ namespace
    * Lazily resolves `vector<string>` reflection type and dispatches one archive
    * write for the provided object lane.
    */
-  gpg::WriteArchive* WriteLaunchInfoStringVectorArchiveAdapter(
+  [[maybe_unused]] gpg::WriteArchive* WriteLaunchInfoStringVectorArchiveAdapter(
     gpg::WriteArchive* const archive,
     const void* const object,
     const gpg::RRef* const ownerRef
@@ -522,16 +505,16 @@ namespace
    */
   const char* ArmyLaunchInfoVectorTypeInfo::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", ResolveArmyLaunchInfoType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::ArmyLaunchInfo>()->GetName());
     return sName.c_str();
   }
 
   /**
    * Address: 0x00543020 (FUN_00543020)
    */
-  msvc8::string ArmyLaunchInfoVectorTypeInfo::GetLexical(const gpg::RRef& ref) const
+  fa::string ArmyLaunchInfoVectorTypeInfo::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
@@ -610,7 +593,7 @@ namespace
     const std::size_t targetCount = static_cast<std::size_t>(itemCount);
     if (targetCount > 0u) {
       // The binary grows the destination with reserve(count)
-      // (FUN_005437F0, msvc8::vector<ArmyLaunchInfo>::reserve) then fills;
+      // (FUN_005437F0, fa::vector<ArmyLaunchInfo>::reserve) then fills;
       // not resize() (which routes through reallocate_to).
       loaded.reserve(targetCount);
       // reserve() has already sized capacity to exactly targetCount, so this
@@ -648,11 +631,6 @@ namespace
     for (const moho::ArmyLaunchInfo& item : *vectorStorage) {
       WriteArmyLaunchInfoReflectedObject(archive, &item, owner);
     }
-  }
-
-  [[noreturn]] void ThrowSerializationError(const char* message)
-  {
-    throw gpg::SerializationError(message ? message : "");
   }
 
   bool gLaunchInfoBaseTypeRegistered = false;
@@ -697,7 +675,7 @@ namespace
    *
    * What it does:
    * Out-of-line specialization of
-   * `msvc8::vector<ArmyLaunchInfo>::push_back(const ArmyLaunchInfo&)`. When the
+   * `fa::vector<ArmyLaunchInfo>::push_back(const ArmyLaunchInfo&)`. When the
    * vector still has capacity headroom it copy-constructs `entry` into the
    * `last_` slot via the `BVIntSet` copy ctor (FUN_00545130) and bumps
    * `last_`. When the vector is full it forwards into the `_Insert_n`
@@ -711,7 +689,7 @@ namespace
 
 namespace moho
 {
-  void AppendArmyLaunchInfo(msvc8::vector<ArmyLaunchInfo>& armyLaunchInfo,
+  void AppendArmyLaunchInfo(fa::vector<ArmyLaunchInfo>& armyLaunchInfo,
                             const ArmyLaunchInfo& entry)
   {
     armyLaunchInfo.push_back(entry);
@@ -738,7 +716,7 @@ namespace
   // (BVIntSet.cpp) already perform exactly the sequence those thirteen
   // functions open-coded. All of them were `[[maybe_unused]]` orphans with
   // zero real callers. Collapsed into
-  // `msvc8::vector<moho::ArmyLaunchInfo>::uninit_copy_n` /
+  // `fa::vector<moho::ArmyLaunchInfo>::uninit_copy_n` /
   // `copy_or_move_assign` (legacy/containers/Vector.h) per RULE ONE; see the
   // Address: citations on those members for the full evidence chain. The
   // real source-level instantiation site is `LaunchInfoNew`'s clone path
@@ -882,13 +860,7 @@ namespace moho
       return;
     }
 
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType);
   }
 
   /**

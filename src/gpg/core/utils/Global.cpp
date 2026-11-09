@@ -1,4 +1,6 @@
 #include "Global.h"
+#include "gpg/core/profiling/Profiler.h"
+#include "lua/LuaArena.h"
 
 #include <Windows.h>
 
@@ -11,6 +13,9 @@
 #include <cstring>
 #include <cwchar>
 #include <new>
+#if !defined(_WIN32)
+#include <pthread.h>
+#endif
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
@@ -24,14 +29,22 @@ namespace
 {
     constexpr std::uint32_t kPageShift = 12u;
     constexpr std::uint32_t kPageSizeBytes = (1u << kPageShift);
+#if defined(_M_X64) || defined(__x86_64__)
     constexpr std::uint32_t kMaxPageIndex = 0xC0000u;
+    constexpr std::uint32_t kPageOwnerMapBytes = 0x3FF000u;
+#else
+    // One owner per 4 KiB page in the x86 address space, including LAA addresses.
+    // The coalescing limit is exclusive: page 0x100000 is beyond 4 GiB.
+    constexpr std::uint32_t kMaxPageIndex = 0x100000u;
+    constexpr std::uint32_t kPageOwnerMapBytes = 0x400000u;
+    static_assert(kPageOwnerMapBytes / 4u == kMaxPageIndex);
+#endif
     constexpr std::uint32_t kSmallBlockClassCount = 44u;
     constexpr std::uint32_t kFreeRegionBucketCount = 256u;
-    constexpr std::uint32_t kPageOwnerMapBytes = 0x3FF000u;
     constexpr std::uint32_t kPrimaryHeapReserveBytes = 0x20000000u;
     constexpr std::uint32_t kThreadCacheSizeBytes = 0x214u;
     constexpr std::uint32_t kHeapRecordSizeBytes = 0x28u;
-    constexpr std::uint32_t kThreadCacheTrimBytes = 0x200000u;
+    [[maybe_unused]] constexpr std::uint32_t kThreadCacheTrimBytes = 0x200000u;
 
     constexpr std::uintptr_t kRecordTagFree = 0u;
     constexpr std::uintptr_t kRecordTagSmallBlocks = 1u;
@@ -304,7 +317,7 @@ namespace
         return node;
     }
 
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
     // x64 always allocates from a system heap. The engine allocator is the x86
     // binary's: its smallest size classes (4..28 bytes, step 4) cannot hold the
     // 8-byte free-list link a freed block carries, nor give the 16-byte
@@ -340,6 +353,11 @@ namespace
 
     [[nodiscard]] bool ImageIsLargeAddressAware() noexcept
     {
+#if !defined(_WIN32)
+        // Engine addition (dedicated-server plan WPL.5): a 64-bit ELF process has the whole
+        // address space.
+        return true;
+#else
         const HMODULE image = ::GetModuleHandleW(nullptr);
         const auto* const dosHeader = reinterpret_cast<const IMAGE_DOS_HEADER*>(image);
         // PE header walk: the NT headers sit `e_lfanew` bytes into the image.
@@ -347,10 +365,15 @@ namespace
             reinterpret_cast<const std::uint8_t*>(dosHeader) + dosHeader->e_lfanew
         );
         return (ntHeaders->FileHeader.Characteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE) != 0;
+#endif
     }
 
     void ReserveAddressSpaceBelow4Gb() noexcept
     {
+#if INTPTR_MAX != INT32_MAX
+        // Lua's objects live below 4 GB on purpose, so their range goes first.
+        lua::ArenaReserve();
+#endif
         constexpr std::uintptr_t kLowAddressLimit = 0x100000000ull;
         constexpr std::uintptr_t kAllocationGranularity = 0x10000u;
 
@@ -780,14 +803,14 @@ namespace
      * What it does:
      * Pushes one node to the lane head and increments lane count.
      */
-    void PushLaneNode(ThreadSmallBlockLane& lane, SmallBlockNode* const node)
+    [[maybe_unused]] void PushLaneNode(ThreadSmallBlockLane& lane, SmallBlockNode* const node)
     {
         node->next = lane.head;
         lane.head = node;
         ++lane.count;
     }
 
-    [[nodiscard]] ThreadSmallBlockLane& GetLane(ThreadHeapCache* const cache, const std::uint32_t kind)
+    [[maybe_unused]] [[nodiscard]] ThreadSmallBlockLane& GetLane(ThreadHeapCache* const cache, const std::uint32_t kind)
     {
         return cache->lanes[kind];
     }
@@ -1054,7 +1077,7 @@ namespace
      * What it does:
      * Optionally enters allocator critical section and marks lock state.
      */
-    [[nodiscard]] AllocatorLockToken* EnterAllocatorLock(AllocatorLockToken* const token, const bool shouldLock)
+    [[maybe_unused]] [[nodiscard]] AllocatorLockToken* EnterAllocatorLock(AllocatorLockToken* const token, const bool shouldLock)
     {
         token->hasLock = 0;
         if (shouldLock) {
@@ -1070,7 +1093,7 @@ namespace
      * What it does:
      * Leaves allocator critical section if lock token still owns it.
      */
-    void LeaveAllocatorLock(AllocatorLockToken* const token)
+    [[maybe_unused]] void LeaveAllocatorLock(AllocatorLockToken* const token)
     {
         if (ReadAllocatorLockStateLane(token) != 0) {
             ::LeaveCriticalSection(&gAllocatorSentinel);
@@ -1144,7 +1167,7 @@ namespace
         tailRecord->kind = 0;
 
         SetPageOwnerRange(tailAddress, tailPages, tailRecord);
-        InsertRecordIntoFreeBucket(tailRecord);
+        (void)InsertRecordIntoFreeBucket(tailRecord);
 
         record->sizePages = requestedPages;
         if (gNextAvailableHeapRecord == nullptr) {
@@ -1173,7 +1196,7 @@ namespace
         if (pageEnd < kMaxPageIndex) {
             HeapRecord* const right = gPageOwnerByPage[pageEnd];
             if (right != nullptr && right->recordTag == kRecordTagFree && right->reservedBase == record->reservedBase) {
-                PopHeapRecord(right);
+                (void)PopHeapRecord(right);
                 record->sizePages += right->sizePages;
                 SetPageOwnerRange(right->allocation, right->sizePages, record);
                 mergedRight = right;
@@ -1183,7 +1206,7 @@ namespace
         if (pageBegin > 0u) {
             HeapRecord* const left = gPageOwnerByPage[pageBegin - 1u];
             if (left != nullptr && left->recordTag == kRecordTagFree && left->reservedBase == record->reservedBase) {
-                PopHeapRecord(left);
+                (void)PopHeapRecord(left);
                 record->sizePages += left->sizePages;
                 record->allocation = left->allocation;
                 SetPageOwnerRange(left->allocation, left->sizePages, record);
@@ -1233,7 +1256,7 @@ namespace
 
         if (static_cast<std::uint32_t>(owner->blocks) == fullBlockCount) {
             UnlinkRecord(owner);
-            ReleaseHeapRecord(owner);
+            (void)ReleaseHeapRecord(owner);
             gHeapCommitted -= regionBytes;
             gHeapInSmallBlocks -= regionBytes;
         }
@@ -1257,7 +1280,7 @@ namespace
             std::int32_t remainingFlush = initialFlushCount;
             while (remainingFlush > 0) {
                 SmallBlockNode* const node = PopLaneNode(lane);
-                PushHeapBlock(node, static_cast<std::int32_t>(kind));
+                (void)PushHeapBlock(node, static_cast<std::int32_t>(kind));
                 --remainingFlush;
             }
 
@@ -1283,7 +1306,7 @@ namespace
         TrimThreadCache(cache, true);
 
         const std::uint32_t recordKind = GetSmallBlockIndex(kThreadCacheSizeBytes);
-        PushHeapBlock(reinterpret_cast<SmallBlockNode*>(cache), static_cast<std::int32_t>(recordKind));
+        (void)PushHeapBlock(reinterpret_cast<SmallBlockNode*>(cache), static_cast<std::int32_t>(recordKind));
 
         gThreadHeapCache = kThreadCacheDisabled;
         ::LeaveCriticalSection(&gAllocatorSentinel);
@@ -1300,7 +1323,7 @@ namespace
         (void)moduleHandle;
         (void)reserved;
 
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
         // Not in the binary: the x64 FAF_HIGHMEM test mode has to run before
         // the CRT allocates anything, and this callback is the first code the
         // loader runs in the image.
@@ -1312,6 +1335,30 @@ namespace
             FlushCurrentThreadHeapCache();
         }
     }
+
+#if !defined(_WIN32)
+    /**
+     * Engine addition (dedicated-server plan WPL.5): an ELF image has no TLS callback
+     * directory. A pthread key whose destructor runs `TlsCallback_1`'s thread-detach path
+     * stands in for it: the key is given a value on each thread that makes a heap cache, so
+     * every such thread flushes it when it exits. As on Windows, a process that exits does
+     * not (key destructors run for exiting threads only).
+     */
+    void FlushThreadHeapCacheAtThreadExit(void*)
+    {
+        TlsCallback_1(nullptr, DLL_THREAD_DETACH, nullptr);
+    }
+
+    void RegisterThreadHeapCacheExit(ThreadHeapCache* const cache)
+    {
+        static const pthread_key_t exitKey = [] {
+            pthread_key_t key{};
+            (void)::pthread_key_create(&key, &FlushThreadHeapCacheAtThreadExit);
+            return key;
+        }();
+        (void)::pthread_setspecific(exitKey, cache);
+    }
+#endif
 
     /**
      * Address: 0x00958400 (FUN_00958400, func_AllocateNewBlock)
@@ -1356,7 +1403,7 @@ namespace
             if (totalPages <= requiredPages) {
                 if (metadataRecord != nullptr) {
                     const std::uint32_t recordKind = GetSmallBlockIndex(kHeapRecordSizeBytes);
-                    PushHeapBlock(reinterpret_cast<SmallBlockNode*>(metadataRecord), static_cast<std::int32_t>(recordKind));
+                    (void)PushHeapBlock(reinterpret_cast<SmallBlockNode*>(metadataRecord), static_cast<std::int32_t>(recordKind));
                 }
                 return false;
             }
@@ -1382,7 +1429,7 @@ namespace
             metadataRecord->lowWatermark = 0;
 
             SetPageOwnerRange(commitAddress, totalPages, metadataRecord);
-            ReleaseHeapRecord(metadataRecord);
+            (void)ReleaseHeapRecord(metadataRecord);
             return true;
         }
 
@@ -1508,7 +1555,7 @@ namespace
      * What it does:
      * Allocates a free-region record and splits any leftover pages.
      */
-    [[nodiscard]] HeapRecord* AllocateAndSplitFreeRegion(const std::uint32_t pages)
+    [[maybe_unused]] [[nodiscard]] HeapRecord* AllocateAndSplitFreeRegion(const std::uint32_t pages)
     {
         HeapRecord* const block = AllocateFreeRegion(pages, true);
         if (block != nullptr) {
@@ -1523,7 +1570,7 @@ namespace
      * What it does:
      * Allocates a large block (>= 4 KiB) and tracks it in the large-allocation list.
      */
-    [[nodiscard]] void* AllocateLargeRegion(const std::uint32_t bytes)
+    [[maybe_unused]] [[nodiscard]] void* AllocateLargeRegion(const std::uint32_t bytes)
     {
         const std::uint32_t pages = BytesToPages(bytes);
         HeapRecord* const block = AllocateFreeRegion(pages, true);
@@ -1648,7 +1695,7 @@ namespace
      * What it does:
      * Returns current thread heap-cache object, allocating it on first use.
      */
-    [[nodiscard]] ThreadHeapCache* GetOrCreateThreadHeapCache()
+    [[maybe_unused]] [[nodiscard]] ThreadHeapCache* GetOrCreateThreadHeapCache()
     {
         if (gThreadHeapCache != nullptr) {
             return gThreadHeapCache;
@@ -1659,7 +1706,7 @@ namespace
             ::EnterCriticalSection(&gAllocatorSentinel);
             hasLock = 1;
         } else {
-            InitAllocatorSentinel(&hasLock);
+            (void)InitAllocatorSentinel(&hasLock);
         }
 
         SmallBlockRequestLane request{};
@@ -1669,6 +1716,9 @@ namespace
 
         if (request.head != nullptr) {
             gThreadHeapCache = ResetThreadHeapCache(reinterpret_cast<ThreadHeapCache*>(request.head));
+#if !defined(_WIN32)
+            RegisterThreadHeapCacheExit(gThreadHeapCache);
+#endif
             if (hasLock != 0) {
                 ::LeaveCriticalSection(&gAllocatorSentinel);
             }
@@ -1709,6 +1759,7 @@ namespace
  * Registering the real callback fixes both: the reason code is whatever Windows
  * passes, and every thread exit runs it.
  */
+#if defined(_WIN32)
 #if defined(_M_IX86)
 #pragma comment(linker, "/INCLUDE:__tls_used")
 #pragma comment(linker, "/INCLUDE:_gAllocatorTlsCallbackEntry")
@@ -1719,8 +1770,9 @@ namespace
 #pragma const_seg(".CRT$XLB")
 extern "C" const PIMAGE_TLS_CALLBACK gAllocatorTlsCallbackEntry = &TlsCallback_1;
 #pragma const_seg()
+#endif // _WIN32 (POSIX: RegisterThreadHeapCacheExit)
 
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
 void gpg::LogHighMemoryReservation()
 {
     // Plan 7.1: Stage A keeps the image below 4 GB (static addresses still
@@ -1791,7 +1843,7 @@ void gpg::Die(const char* args, ...)
 {
     va_list va;
     va_start(va, args);
-    const msvc8::string msg = STR_Va(args, va);
+    const fa::string msg = STR_Va(args, va);
     va_end(va);
     InvokeDieHandler(msg.c_str());
     __debugbreak();
@@ -1846,7 +1898,7 @@ extern "C" void* __cdecl malloc_crt(size_t size)
  */
 extern "C" void* __cdecl malloc_0(const std::uint32_t size)
 {
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
     void* block = (size <= small_pool::kMaxPooledBytes && small_pool::Enabled()) ? small_pool::Allocate(size) : nullptr;
     if (block == nullptr) {
         block = SystemHeapAlloc(size); // larger blocks, no pool, or the pool's range is used up
@@ -1854,6 +1906,16 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
     if (gMemHook != nullptr) {
         gMemHook(0, static_cast<int>(size), block);
     }
+#if defined(TRACY_ENABLE)
+    if (block != nullptr) {
+        thread_local bool tInMem = false;
+        if (!tInMem) {
+            tInMem = true;
+            FAF_PROFILE_ALLOC(block, size);
+            tInMem = false;
+        }
+    }
+#endif
     return block;
 #else
     ThreadHeapCache* const threadCache = GetOrCreateThreadHeapCache();
@@ -1908,6 +1970,16 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
     if (gMemHook != nullptr) {
         gMemHook(0, static_cast<int>(size), allocation);
     }
+#if defined(TRACY_ENABLE)
+    if (allocation != nullptr) {
+        thread_local bool tInMem = false;
+        if (!tInMem) {
+            tInMem = true;
+            FAF_PROFILE_ALLOC(allocation, size);
+            tInMem = false;
+        }
+    }
+#endif
 
     return allocation;
 #endif
@@ -1928,8 +2000,16 @@ extern "C" void __cdecl free_0(void* ptr)
     if (ptr == nullptr) {
         return;
     }
+#if defined(TRACY_ENABLE)
+    thread_local bool tInMem = false;
+    if (!tInMem) {
+        tInMem = true;
+        FAF_PROFILE_FREE(ptr);
+        tInMem = false;
+    }
+#endif
 
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
     // This has to come before `GetPageOwner`, which is only meaningful for
     // pages the engine allocator owns.
     if (gMemHook != nullptr) {
@@ -1953,7 +2033,7 @@ extern "C" void __cdecl free_0(void* ptr)
         ThreadHeapCache* const threadCache = GetOrCreateThreadHeapCache();
         if (threadCache == kThreadCacheDisabled || threadCache == nullptr) {
             ::EnterCriticalSection(&gAllocatorSentinel);
-            PushHeapBlock(static_cast<SmallBlockNode*>(ptr), static_cast<std::int32_t>(kind));
+            (void)PushHeapBlock(static_cast<SmallBlockNode*>(ptr), static_cast<std::int32_t>(kind));
             ::LeaveCriticalSection(&gAllocatorSentinel);
         } else {
             ThreadSmallBlockLane& lane = GetLane(threadCache, kind);
@@ -1962,7 +2042,7 @@ extern "C" void __cdecl free_0(void* ptr)
 
             if (threadCache->cachedBytes >= static_cast<std::int32_t>(kThreadCacheTrimBytes)) {
                 AllocatorLockToken token{};
-                EnterAllocatorLock(&token, true);
+                (void)EnterAllocatorLock(&token, true);
                 TrimThreadCache(threadCache, false);
                 LeaveAllocatorLock(&token);
             }
@@ -1979,7 +2059,7 @@ extern "C" void __cdecl free_0(void* ptr)
 
         ::EnterCriticalSection(&gAllocatorSentinel);
         UnlinkRecord(record);
-        ReleaseHeapRecord(record);
+        (void)ReleaseHeapRecord(record);
         gHeapCommitted -= byteSize;
         gHeapInUse -= byteSize;
         ::LeaveCriticalSection(&gAllocatorSentinel);
@@ -2000,7 +2080,7 @@ extern "C" size_t __cdecl msize(void* memblock)
         return 0;
     }
 
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
     // `realloc_0` sizes its copy from this, so it has to answer for system-heap
     // blocks; `HeapSize` reports `(SIZE_T)-1` for a pointer it does not own.
     if (small_pool::Owns(memblock)) {
@@ -2175,9 +2255,19 @@ void* __cdecl operator new(const std::size_t size)
             return block;
         }
 
+#if defined(_WIN32)
         if (_callnewh(size) == 0) {
             throw std::bad_alloc{};
         }
+#else
+        // Engine addition (dedicated-server plan WPL.5): `_callnewh` is MSVC's; this is
+        // what it does.
+        const std::new_handler handler = std::get_new_handler();
+        if (handler == nullptr) {
+            throw std::bad_alloc{};
+        }
+        handler();
+#endif
     }
 }
 
@@ -2243,7 +2333,7 @@ void gpg::GetHeapInfo(HeapStats* const outStats)
         return;
     }
 
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
     // On the x64 system heap the engine allocator never starts, and must not
     // be started here just to read its (empty) counters.
     FillSystemHeapStats(*outStats);
@@ -2327,4 +2417,9 @@ bool gpg::ParseNum(const char* start, const char* end, int* dest) noexcept
  */
 void gpg::SetThreadName([[maybe_unused]] const unsigned int id, [[maybe_unused]] const char* const name)
 {
+  FAF_PROFILE_SET_THREAD_NAME(name);
 }
+
+#if defined(_WIN32) && !defined(_M_X64) && !defined(__x86_64__)
+#include "../../../../tests/memory/AllocatorBoundsNative.inl"
+#endif

@@ -86,7 +86,7 @@ namespace gpg
     /**
      * Address: 0x0054C740 (FUN_0054C740, gpg::RFastVectorType_CAniPoseBone::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x0054C7D0 (FUN_0054C7D0, gpg::RFastVectorType_CAniPoseBone::IsIndexed)

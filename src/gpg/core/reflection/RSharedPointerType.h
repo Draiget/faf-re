@@ -68,7 +68,7 @@ namespace gpg
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName = STR_Printf("boost::shared_ptr<%s>", RTypeOf<T>()->GetName());
+      static const fa::string sName = STR_Printf("boost::shared_ptr<%s>", RTypeOf<T>()->GetName());
       return sName.c_str();
     }
 
@@ -77,13 +77,13 @@ namespace gpg
      * `NULL` for an empty pointer, otherwise the pointee's lexical text in
      * brackets.
      */
-    [[nodiscard]] msvc8::string GetLexical(const RRef& ref) const override
+    [[nodiscard]] fa::string GetLexical(const RRef& ref) const override
     {
       const pointer_type& pointer = *static_cast<const pointer_type*>(ref.mObj);
       if (!pointer) {
-        return msvc8::string("NULL");
+        return fa::string("NULL");
       }
-      const msvc8::string pointee = RTypeOf<T>()->GetLexical(MakeRRef(pointer.get()));
+      const fa::string pointee = RTypeOf<T>()->GetLexical(MakeRRef(pointer.get()));
       return STR_Printf("[%s]", pointee.c_str());
     }
 

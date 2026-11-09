@@ -12,7 +12,7 @@
  *
  * The search keeps two structures:
  *
- *   - a node table keyed by cell (`msvc8::hash_map`), holding the per-cell
+ *   - a node table keyed by cell (`fa::hash_map`), holding the per-cell
  *     search record; and
  *   - an *indexed* binary heap of open nodes. "Indexed" because callers hold a
  *     stable handle rather than a heap position: `mIndexByHandle` maps a handle
@@ -29,9 +29,14 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <memory>
+#include <new>
 #include <utility>
+#include <vector>
 
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/core/containers/FlatGenerationMap.h"
 #include "legacy/containers/HashMap.h"
 #include "legacy/containers/Vector.h"
 
@@ -81,8 +86,8 @@ namespace gpg
      * caller-visible handles.
      *
      * Layout (relative to the heap, which lives at `AStarSearch` +0x28):
-     *   +0x00 : mEntries        (msvc8::vector, 4 words)
-     *   +0x10 : mIndexByHandle  (msvc8::vector, 4 words)
+     *   +0x00 : mEntries        (fa::vector, 4 words)
+     *   +0x10 : mIndexByHandle  (fa::vector, 4 words)
      *   +0x20 : mFreeHandle
      *   sizeof == 0x24
      */
@@ -104,8 +109,8 @@ namespace gpg
         };
 
     private:
-        msvc8::vector<Entry> mEntries;              // +0x00
-        msvc8::vector<std::int32_t> mIndexByHandle; // +0x10
+        fa::vector<Entry> mEntries;              // +0x00
+        fa::vector<std::int32_t> mIndexByHandle; // +0x10
         std::int32_t mFreeHandle;                   // +0x20
 
     public:
@@ -119,6 +124,15 @@ namespace gpg
 
         /** The lowest-priority open node. Only valid while the heap is non-empty. */
         [[nodiscard]] node_type* top() const noexcept { return mEntries[0].mNode; }
+
+        // Engine addition (replay keyframes): the heap as it is, entry order and handles included.
+        [[nodiscard]] const fa::vector<Entry>& Entries() const noexcept { return mEntries; }
+        [[nodiscard]] const fa::vector<std::int32_t>& IndexByHandle() const noexcept { return mIndexByHandle; }
+        [[nodiscard]] std::int32_t FreeHandle() const noexcept { return mFreeHandle; }
+
+        void AppendRestored(const Entry& entry) { mEntries.push_back(entry); }
+        void AppendRestoredIndex(const std::int32_t index) { mIndexByHandle.push_back(index); }
+        void SetFreeHandle(const std::int32_t handle) noexcept { mFreeHandle = handle; }
 
         /**
          * Address: 0x007672E0 (FUN_007672E0, first half)
@@ -340,16 +354,200 @@ namespace gpg
      *   Step  ExpandNode(const TCell&, neighbour_list&);  // Step{} = keep going
      *
      * Layout:
-     *   +0x00 : mNodes  (msvc8::hash_map, 0x28)
+     *   +0x00 : mNodes  (fa::hash_map, 0x28; AStarNodeTable keeps the size)
      *   +0x28 : mOpen   (AStarOpenHeap, 0x24)
      *   sizeof == 0x4C
      */
-    template <class TCell, class TTraits, class TCellTraits = msvc8::hash_compare<TCell>>
+    /** False with `/astartable 0` or FAF_ASTARTABLE=0: A* keeps the binary's hash_map node table. */
+    [[nodiscard]] bool AStarFlatNodeTableEnabled() noexcept;
+
+    /**
+     * Engine addition: the A* node table as a FlatGenerationMap from the
+     * cell's 32-bit key to a node in a pool allocated in chunks, so node
+     * addresses stay fixed while a query runs, as the parent links and heap
+     * entries require. Clearing bumps the map's generation and rewinds the
+     * pool instead of freeing every node, which the binary's table does after
+     * each query.
+     *
+     * The search only finds and inserts by cell and never walks the table, so
+     * any table that gives the same answers gives the same paths.
+     */
+    template <class TCell, class TNode>
+    class AStarFlatNodeTable
+    {
+        static_assert(sizeof(TCell) == sizeof(std::uint32_t), "the cell is its own 32-bit key");
+
+    public:
+        [[nodiscard]] TNode* Find(const TCell& cell) noexcept
+        {
+            TNode* const* const found = mIndex.Find(Key(cell));
+            return (found != nullptr) ? *found : nullptr;
+        }
+
+        /** Adds an unvisited node for `cell`, which must not be in the table. */
+        [[nodiscard]] TNode& Insert(const TCell& cell)
+        {
+            if (mPoolUsed == mChunks.size() * kChunkNodes) {
+                mChunks.push_back(std::make_unique<TNode[]>(kChunkNodes));
+            }
+            TNode* const node = &mChunks[mPoolUsed / kChunkNodes][mPoolUsed % kChunkNodes];
+            ++mPoolUsed;
+            *node = TNode();
+            node->mCell = cell;
+            (void)mIndex.Insert(Key(cell), node);
+            return *node;
+        }
+
+        void Clear() noexcept
+        {
+            mPoolUsed = 0;
+            mIndex.Clear();
+        }
+
+        template <class TFn>
+        void ForEach(TFn&& fn)
+        {
+            for (std::size_t used = 0; used < mPoolUsed; ++used) {
+                fn(mChunks[used / kChunkNodes][used % kChunkNodes]);
+            }
+        }
+
+    private:
+        static constexpr std::size_t kChunkNodes = 1024;
+
+        [[nodiscard]] static std::uint32_t Key(const TCell& cell) noexcept
+        {
+            std::uint32_t key;
+            std::memcpy(&key, &cell, sizeof(key));
+            return key;
+        }
+
+        core::FlatGenerationMap<TNode*> mIndex;
+        std::vector<std::unique_ptr<TNode[]>> mChunks;
+        std::size_t mPoolUsed = 0;
+    };
+
+    /**
+     * The search's node table: the binary's `fa::hash_map` in place, or, for
+     * a search that allows it and with AStarFlatNodeTableEnabled(), a pointer
+     * to the flat table in the same bytes, which keeps `AStarSearch`'s layout.
+     * The choice is made once per process, so every table is read the way it
+     * was built.
+     */
+    template <class TCell, class TNode, class TCellTraits, bool kAllowFlat>
+    class AStarNodeTable
+    {
+        using legacy_type = fa::hash_map<TCell, TNode, TCellTraits>;
+        using flat_type = AStarFlatNodeTable<TCell, TNode>;
+
+        [[nodiscard]] static bool UseFlat() noexcept
+        {
+            if constexpr (kAllowFlat) {
+                static_assert(sizeof(flat_type*) <= sizeof(legacy_type), "the flat table's pointer fits the hash_map's bytes");
+                return AStarFlatNodeTableEnabled();
+            } else {
+                return false;
+            }
+        }
+
+    public:
+        AStarNodeTable()
+        {
+            if constexpr (kAllowFlat) {
+                if (UseFlat()) {
+                    ::new (static_cast<void*>(mStorage)) flat_type*(new flat_type());
+                    return;
+                }
+            }
+            ::new (static_cast<void*>(mStorage)) legacy_type();
+        }
+
+        ~AStarNodeTable()
+        {
+            if constexpr (kAllowFlat) {
+                if (UseFlat()) {
+                    delete Flat();
+                    return;
+                }
+            }
+            Legacy().~legacy_type();
+        }
+
+        AStarNodeTable(const AStarNodeTable&) = delete;
+        AStarNodeTable& operator=(const AStarNodeTable&) = delete;
+
+        [[nodiscard]] TNode* Find(const TCell& cell)
+        {
+            if constexpr (kAllowFlat) {
+                if (UseFlat()) {
+                    return Flat()->Find(cell);
+                }
+            }
+            const typename legacy_type::iterator found = Legacy().find(cell);
+            return (found != Legacy().end()) ? &found->second : nullptr;
+        }
+
+        /** Address: 0x00768F40 (FUN_00768F40) on the binary's table. */
+        [[nodiscard]] TNode& FindOrCreate(const TCell& cell)
+        {
+            if constexpr (kAllowFlat) {
+                if (UseFlat()) {
+                    flat_type* const flat = Flat();
+                    TNode* const found = flat->Find(cell);
+                    return (found != nullptr) ? *found : flat->Insert(cell);
+                }
+            }
+            const typename legacy_type::iterator found = Legacy().find(cell);
+            if (found != Legacy().end()) {
+                return found->second;
+            }
+            TNode fresh;
+            fresh.mCell = cell;
+            return Legacy().insert(typename legacy_type::value_type(cell, fresh)).first->second;
+        }
+
+        void clear()
+        {
+            if constexpr (kAllowFlat) {
+                if (UseFlat()) {
+                    Flat()->Clear();
+                    return;
+                }
+            }
+            Legacy().clear();
+        }
+
+        /** Engine addition (replay keyframes): every node, in no particular order. */
+        template <class TFn>
+        void ForEach(TFn&& fn)
+        {
+            if constexpr (kAllowFlat) {
+                if (UseFlat()) {
+                    Flat()->ForEach(fn);
+                    return;
+                }
+            }
+            for (auto& entry : Legacy()) {
+                fn(entry.second);
+            }
+        }
+
+    private:
+        [[nodiscard]] legacy_type& Legacy() noexcept { return *std::launder(reinterpret_cast<legacy_type*>(mStorage)); }
+        [[nodiscard]] flat_type* Flat() const noexcept
+        {
+            return *std::launder(reinterpret_cast<flat_type* const*>(mStorage));
+        }
+
+        alignas(legacy_type) unsigned char mStorage[sizeof(legacy_type)];
+    };
+
+    template <class TCell, class TTraits, class TCellTraits = fa::hash_compare<TCell>, bool kAllowFlatTable = false>
     class AStarSearch
     {
     public:
         using node_type = AStarNode<TCell>;
-        using table_type = msvc8::hash_map<TCell, node_type, TCellTraits>;
+        using table_type = AStarNodeTable<TCell, node_type, TCellTraits, kAllowFlatTable>;
         using heap_type = AStarOpenHeap<TCell>;
         using neighbour_type = AStarNeighbour<TCell>;
 
@@ -393,14 +591,7 @@ namespace gpg
          */
         [[nodiscard]] node_type& FindOrCreateNode(const TCell& cell)
         {
-            const typename table_type::iterator found = mNodes.find(cell);
-            if (found != mNodes.end()) {
-                return found->second;
-            }
-
-            node_type fresh;
-            fresh.mCell = cell;
-            return mNodes.insert(typename table_type::value_type(cell, fresh)).first->second;
+            return mNodes.FindOrCreate(cell);
         }
 
         /**
@@ -467,14 +658,9 @@ namespace gpg
          * written back-to-front in a single pass - the binary does the same, and
          * it avoids reversing afterwards.
          */
-        [[nodiscard]] bool BuildPath(const TCell& cell, msvc8::vector<TCell>& outCells)
+        [[nodiscard]] bool BuildPath(const TCell& cell, fa::vector<TCell>& outCells)
         {
-            const typename table_type::iterator found = mNodes.find(cell);
-            if (found == mNodes.end()) {
-                return false;
-            }
-
-            node_type* const goal = &found->second;
+            node_type* const goal = mNodes.Find(cell);
             if (goal == nullptr) {
                 return false;
             }

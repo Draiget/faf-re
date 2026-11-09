@@ -44,7 +44,7 @@ namespace moho
      * sink/rules/lua decode dependencies.
      */
     CDecoder(
-      ICommandSink* sink, msvc8::auto_ptr<gpg::Stream>& stream, RRuleGameRules* rules, LuaPlus::LuaState* luaState
+      ICommandSink* sink, fa::auto_ptr<gpg::Stream>& stream, RRuleGameRules* rules, LuaPlus::LuaState* luaState
     );
 
     /**
@@ -66,6 +66,16 @@ namespace moho
      * decode by opcode.
      */
     void ReceiveMessage(CMessage* message, CMessageDispatcher* dispatcher) override;
+
+#if FAF_SERVER_MODE
+    /**
+     * Engine addition, server mode (plan WP11.1): a function every decoder calls with each
+     * message it receives, before decoding it, on the thread that decodes it. headless's
+     * command round trip uses it; null (the default) is none.
+     */
+    using MessageObserver = void (*)(const CMessage& message, void* context);
+    static void SetMessageObserver(MessageObserver observer, void* context) noexcept;
+#endif
 
   private:
     /**
@@ -215,7 +225,7 @@ namespace moho
      * What it does:
      * Lowercases and slash-normalizes blueprint/resource identifiers.
      */
-    static void NormalizeFilenameLowerSlash(msvc8::string& inOut);
+    static void NormalizeFilenameLowerSlash(fa::string& inOut);
 
     /**
      * Address: <synthetic host-build helper>
@@ -230,7 +240,7 @@ namespace moho
     // +0x10  the replay recording: every received message is appended to it,
     // flushed at each `CMDST_Advance` and closed at `CMDST_EndGame`. Null when
     // the session does not record.
-    msvc8::auto_ptr<gpg::Stream> mStream;
+    fa::auto_ptr<gpg::Stream> mStream;
     RRuleGameRules* mRules = nullptr;       // +0x14
     LuaPlus::LuaState* mLuaState = nullptr; // +0x18
   };

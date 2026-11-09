@@ -102,8 +102,8 @@ namespace moho
     ShaderVar* SetMatrix4x4(const gpg::gal::Matrix* matrix);
 
   public:
-    msvc8::string mVariableName{};                             // +0x00
-    msvc8::string mEffectFileName{};                           // +0x1C
+    fa::string mVariableName{};                             // +0x00
+    fa::string mEffectFileName{};                           // +0x1C
     CD3DEffect::AttachedLink mEffectLink{};                    // +0x38
     boost::shared_ptr<gpg::gal::EffectVariable> mEffectVariable{}; // +0x40
   };
@@ -170,6 +170,15 @@ namespace moho
   extern ShaderVar shaderVarPrimBatcherTime;
 
   /**
+   * FAF addition, not in the shipped binary (issue #307).
+   *
+   * What it does:
+   * Screen pixels covered by an MSDF atlas's distance range at the text's size. The variable is in
+   * the technique the engine appends to `primbatcher.fx`, so it's absent when that failed to compile.
+   */
+  extern ShaderVar shaderVarPrimBatcherMsdfPixelRange;
+
+  /**
    * Address: 0x00C056A0 (FUN_00C056A0, dynamic atexit destructor for `shaderVarTerrainHeightScale`)
    *
    * What it does:
@@ -222,6 +231,9 @@ namespace moho
    * `.rdata` string).
    */
   void register_ShaderVarPrimBatcherTime();
+
+  /** FAF addition (issue #307): registers `MsdfPixelRange`. */
+  void register_ShaderVarPrimBatcherMsdfPixelRange();
 
   /**
    * Address: 0x00BE2F70 (FUN_00BE2F70, register_ShaderVarTerrainHeightScale)

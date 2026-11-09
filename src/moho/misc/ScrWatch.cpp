@@ -60,16 +60,16 @@ namespace moho
   /**
    * Address: 0x004D6B30 (FUN_004D6B30, Moho::ScrWatch::ScrWatch)
    *
-   * msvc8::string const &,LuaPlus::LuaObject const &
+   * fa::string const &,LuaPlus::LuaObject const &
    *
    * What it does:
    * Initializes one watch entry from copied display-name and Lua object lanes.
    */
-  ScrWatch::ScrWatch(const msvc8::string& watchName, const LuaPlus::LuaObject& valueObject)
+  ScrWatch::ScrWatch(const fa::string& watchName, const LuaPlus::LuaObject& valueObject)
     : name()
     , obj(valueObject)
   {
-    name.assign(watchName, 0U, msvc8::string::npos);
+    name.assign(watchName, 0U, fa::string::npos);
   }
 
   /**
@@ -84,7 +84,7 @@ namespace moho
       return *this;
     }
 
-    name.assign(other.name, 0U, msvc8::string::npos);
+    name.assign(other.name, 0U, fa::string::npos);
     obj = other.obj;
     return *this;
   }
@@ -106,9 +106,9 @@ namespace moho
    * What it does:
    * Returns one printable Lua type-name lane for this watch value object.
    */
-  msvc8::string ScrWatch::GetType() const
+  fa::string ScrWatch::GetType() const
   {
-    msvc8::string typeName{};
+    fa::string typeName{};
     typeName.assign_owned(GetLuaTypeName(GetLuaTypeTag(obj)));
     return typeName;
   }
@@ -119,9 +119,9 @@ namespace moho
    * What it does:
    * Formats one printable Lua value lane for this watch entry.
    */
-  msvc8::string ScrWatch::GetValue() const
+  fa::string ScrWatch::GetValue() const
   {
-    msvc8::string valueText{};
+    fa::string valueText{};
 
     switch (GetLuaTypeTag(obj)) {
       case LUA_TBOOLEAN:

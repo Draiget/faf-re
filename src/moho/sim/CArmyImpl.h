@@ -40,7 +40,7 @@ namespace moho
     // whole struct -- what was previously modeled as a trailing `unknown30`
     // scalar at ArmyPool+0x30 is not part of ArmyPool at all: it is the
     // `myProxy_` (debug-iterator) lane of the adjacent, separate
-    // `CArmyImpl::UnitCategorySets` real `msvc8::vector<EntitySetTemplate<Unit>>`
+    // `CArmyImpl::UnitCategorySets` real `fa::vector<EntitySetTemplate<Unit>>`
     // member that starts immediately after this struct (CArmyImpl+0x258).
     // Evidence: `CArmyImpl::CArmyImpl` (0x006FE690) builds the category-set
     // count/value arguments and calls `sub_702450` (`resize`) at 0x006FF2E1
@@ -48,11 +48,11 @@ namespace moho
     // one dword *before* `UnitCategorySetsBegin` (formerly modeled at
     // CArmyImpl+0x25C). `sub_702450`/`sub_7030C0` (`_Insert_n`) only ever
     // read/write `*(obj+4)`/`*(obj+8)`/`*(obj+0xC)` (first_/last_/end_),
-    // never `*(obj+0)` -- exactly the `msvc8::vector<T>` shape (leading
+    // never `*(obj+0)` -- exactly the `fa::vector<T>` shape (leading
     // unused proxy slot). Independently confirmed by
     // `gpg::RVectorType<EntitySetTemplate<Unit>>::Init()`
     // (ArmyUnitSetVectorReflection.cpp), which sets
-    // `size_ = sizeof(msvc8::vector<EntitySetTemplate<Unit>>)` == 0x10 (16
+    // `size_ = sizeof(fa::vector<EntitySetTemplate<Unit>>)` == 0x10 (16
     // bytes) for the exact same reflected field.
     gpg::fastvector_n<CPlatoon*, 8> platoons;
   };
@@ -115,7 +115,7 @@ namespace moho
     /** Address: 0x006FDC20 (FUN_006FDC20, Moho::CArmyImpl::GetArmyType) */
     const char* GetArmyType() override;
     /** Address: 0x006FDC40 (FUN_006FDC40, Moho::CArmyImpl::SetArmyPlans) */
-    void SetArmyPlans(const msvc8::string& armyPlans) override;
+    void SetArmyPlans(const fa::string& armyPlans) override;
     /** Address: 0x006FDC60 (FUN_006FDC60, Moho::CArmyImpl::GetArmyPlans) */
     const char* GetArmyPlans() override;
     /** Address: 0x006FDC80 (FUN_006FDC80, Moho::CArmyImpl::GetIGrid) */
@@ -189,7 +189,7 @@ namespace moho
     /** Address: 0x006FDE90 (FUN_006FDE90, Moho::CArmyImpl::GetPlatoonsList) */
     void GetPlatoonsList(ArmyPool& outPool) override;
     /** Address: 0x00700410 (FUN_00700410, Moho::CArmyImpl::MakePlatoon) */
-    virtual CPlatoon* MakePlatoon(const char* platoonName, const char* aiPlan) override;
+    CPlatoon* MakePlatoon(const char* platoonName, const char* aiPlan) override;
     /** Address: 0x00700470 (FUN_00700470, Moho::CArmyImpl::GetPlatoonByName) */
     CPlatoon* GetPlatoonByName(const char* platoonName) override;
     /** Address: 0x007004E0 (FUN_007004E0, Moho::CArmyImpl::GetPlatoonFor) */
@@ -238,7 +238,7 @@ namespace moho
     /** Address: 0x00700EB0 (FUN_00700EB0, Moho::CArmyImpl::GetUnits) */
     void* GetUnits(void* outUnits, void* filterBuckets) override;
     /** Address: 0x006FE090 (FUN_006FE090, Moho::CArmyImpl::GetAlliedArmies) */
-    msvc8::vector<CArmyImpl*>* GetAlliedArmies(msvc8::vector<CArmyImpl*>* outArmyList) override;
+    fa::vector<CArmyImpl*>* GetAlliedArmies(fa::vector<CArmyImpl*>* outArmyList) override;
     /** Address: 0x006FDD00 (FUN_006FDD00, Moho::CArmyImpl::GetUnitCap) */
     float GetUnitCap() override;
     /** Address: 0x006FDD10 (FUN_006FDD10, Moho::CArmyImpl::SetUnitCap) */
@@ -310,14 +310,14 @@ namespace moho
     CAiBrain* AiBrain;                                   // 0x01EC
     CAiReconDBImpl* AiReconDb;                           // 0x01F0
     CSimArmyEconomyInfo* EconomyInfo;                    // 0x01F4
-    msvc8::string ArmyPlans;                             // 0x01F8
+    fa::string ArmyPlans;                             // 0x01F8
     CArmyStats* Stats;                                   // 0x0214
     CInfluenceMap* InfluenceMap;                         // 0x0218 (FUN_006FDC80 / mIMmap)
     void* PathFinder;                                    // 0x021C
     boost::SharedPtrRaw<void> UnknownShared220;          // 0x0220
     ArmyPool PlatoonPool;                                // 0x0228
     /**
-     * Real `msvc8::vector<EntitySetTemplate<Unit>>` (0x258: myProxy_,
+     * Real `fa::vector<EntitySetTemplate<Unit>>` (0x258: myProxy_,
      * 0x25C: first_/begin, 0x260: last_/end, 0x264: end_/capacityEnd),
      * one per-category-bit-index cached unit set. Built by
      * `InitializeArmyUnitCategorySets` (FUN_006FE690 tail via
@@ -325,7 +325,7 @@ namespace moho
      * `ResolveCategorySetForUnit`, `~CArmyImpl` (via `TeardownEntitySetRange`),
      * and the `MemberSerialize`/`MemberDeserialize` reflection lanes.
      */
-    msvc8::vector<EntitySetTemplate<Unit>> UnitCategorySets; // 0x0258
+    fa::vector<EntitySetTemplate<Unit>> UnitCategorySets; // 0x0258
     std::uint32_t UnitCategoryBaseIndex;                 // 0x0268
     std::uint32_t UnitCategoryMaxIndex;                  // 0x026C
     float UnitCapacity;                                  // 0x0270

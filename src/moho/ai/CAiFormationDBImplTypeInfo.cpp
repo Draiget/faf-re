@@ -83,13 +83,7 @@ void CAiFormationDBImplTypeInfo::AddBase_IAiFormationDB(gpg::RType* const typeIn
     return;
   }
 
-  gpg::RField baseField{};
-  baseField.mName = baseType->GetName();
-  baseField.mType = baseType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBaseType(typeInfo, baseType);
 }
 
 /**
@@ -144,10 +138,7 @@ gpg::RRef CAiFormationDBImplTypeInfo::NewRef()
  */
 gpg::RRef CAiFormationDBImplTypeInfo::CtrRef(void* const objectStorage)
 {
-  CAiFormationDBImpl* const object = static_cast<CAiFormationDBImpl*>(objectStorage);
-  if (object) {
-    new (object) CAiFormationDBImpl();
-  }
+  auto* const object = gpg::ConstructInStorage<CAiFormationDBImpl>(objectStorage);
 
   return MakeCAiFormationDBImplRef(object);
 }

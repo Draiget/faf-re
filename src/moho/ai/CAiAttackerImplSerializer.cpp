@@ -24,57 +24,8 @@ using namespace moho;
 
 namespace
 {
-  using WeaponPointerVector = msvc8::vector<moho::UnitWeapon*>;
-  using AcquireTargetTaskPointerVector = msvc8::vector<moho::CAcquireTargetTask*>;
-
-  [[nodiscard]] gpg::RType* CachedIAiAttackerType()
-  {
-    gpg::RType* cached = moho::IAiAttacker::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::IAiAttacker));
-      moho::IAiAttacker::sType = cached;
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCTaskStageType()
-  {
-    gpg::RType* cached = moho::CTaskStage::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CTaskStage));
-      moho::CTaskStage::sType = cached;
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrCTaskThreadType()
-  {
-    gpg::RType* cached = moho::WeakPtr<moho::CTaskThread>::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::WeakPtr<moho::CTaskThread>));
-      moho::WeakPtr<moho::CTaskThread>::sType = cached;
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCAiTargetType()
-  {
-    gpg::RType* cached = moho::CAiTarget::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CAiTarget));
-      moho::CAiTarget::sType = cached;
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEAiAttackerEventType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::EAiAttackerEvent));
-    }
-    return cached;
-  }
+  using WeaponPointerVector = fa::vector<moho::UnitWeapon*>;
+  using AcquireTargetTaskPointerVector = fa::vector<moho::CAcquireTargetTask*>;
 
 } // namespace
 
@@ -152,11 +103,11 @@ void CAiAttackerImpl::MemberDeserialize(gpg::ReadArchive* const archive)
     return;
   }
 
-  gpg::RType* const attackerType = CachedIAiAttackerType();
-  gpg::RType* const stageType = CachedCTaskStageType();
-  gpg::RType* const threadType = CachedWeakPtrCTaskThreadType();
-  gpg::RType* const targetType = CachedCAiTargetType();
-  gpg::RType* const reportingType = CachedEAiAttackerEventType();
+  gpg::RType* const attackerType = gpg::RTypeOf<moho::IAiAttacker>();
+  gpg::RType* const stageType = gpg::RTypeOf<moho::CTaskStage>();
+  gpg::RType* const threadType = gpg::RTypeOf<moho::WeakPtr<moho::CTaskThread>>();
+  gpg::RType* const targetType = gpg::RTypeOf<moho::CAiTarget>();
+  gpg::RType* const reportingType = gpg::RTypeOf<moho::EAiAttackerEvent>();
 
   GPG_ASSERT(attackerType != nullptr);
   GPG_ASSERT(stageType != nullptr);
@@ -205,11 +156,11 @@ void CAiAttackerImpl::MemberSerialize(gpg::WriteArchive* const archive) const
   }
 
   auto* const mutableObject = const_cast<CAiAttackerImpl*>(this);
-  gpg::RType* const attackerType = CachedIAiAttackerType();
-  gpg::RType* const stageType = CachedCTaskStageType();
-  gpg::RType* const threadType = CachedWeakPtrCTaskThreadType();
-  gpg::RType* const targetType = CachedCAiTargetType();
-  gpg::RType* const reportingType = CachedEAiAttackerEventType();
+  gpg::RType* const attackerType = gpg::RTypeOf<moho::IAiAttacker>();
+  gpg::RType* const stageType = gpg::RTypeOf<moho::CTaskStage>();
+  gpg::RType* const threadType = gpg::RTypeOf<moho::WeakPtr<moho::CTaskThread>>();
+  gpg::RType* const targetType = gpg::RTypeOf<moho::CAiTarget>();
+  gpg::RType* const reportingType = gpg::RTypeOf<moho::EAiAttackerEvent>();
 
   GPG_ASSERT(attackerType != nullptr);
   GPG_ASSERT(stageType != nullptr);

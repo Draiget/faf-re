@@ -27,10 +27,10 @@ namespace
   // at node+0x24 (0x007F2FA0 frees exactly those), the extractor pointer sits
   // at node+0x28 (0x007ED9A0 reads it and runs the scalar deleting destructor
   // through it), and the colour/nil pair follows at +0x2C/+0x2D. That is
-  // `pair<const msvc8::string, RangeExtractor*>` -- a raw pointer, so the
+  // `pair<const fa::string, RangeExtractor*>` -- a raw pointer, so the
   // `unique_ptr` this file used to hold was not a container substitution
   // forced by the value type, it was an invented ownership model.
-  using BlueprintExtractorRegistry = msvc8::map<msvc8::string, moho::RangeExtractor*>;
+  using BlueprintExtractorRegistry = fa::map<fa::string, moho::RangeExtractor*>;
 
   [[nodiscard]] BlueprintExtractorRegistry& GetBlueprintExtractorRegistry()
   {
@@ -50,7 +50,7 @@ namespace
       return;
     }
 
-    registry[msvc8::string(blueprintRangeName)] = extractor;
+    registry[fa::string(blueprintRangeName)] = extractor;
   }
 
   [[nodiscard]] moho::RangeExtractor* CreateWeaponExtractor(const moho::UnitWeaponRangeCategory rangeCategory)
@@ -241,7 +241,7 @@ namespace moho
     // `CombinedMilitaryExtractor::Extract` (0x007EC3E1..0x007EC419) builds the
     // literal "OVERLAYMISC" and asks the entity, not the blueprint, whether it
     // is in that category; only then does it read the radius.
-    if (!userEntity->IsInCategory(msvc8::string("OVERLAYMISC"))) {
+    if (!userEntity->IsInCategory(fa::string("OVERLAYMISC"))) {
       return false;
     }
 
@@ -289,14 +289,13 @@ namespace moho
    * all known extractor instances by blueprint key.
    *
    * Container substitution note: the real binary's tree-erase/clear core
-   * for `sBlueprintExtractors` (FUN_007F1990, a `msvc8::map`-shaped
+   * for `sBlueprintExtractors` (FUN_007F1990, a `fa::map`-shaped
    * `erase(first,last)`/`clear()` walk) is deliberately NOT cited on
    * `registry.clear()` above. `BlueprintExtractorRegistry` holds
    * `std::unique_ptr<moho::RangeExtractor>` values -- a move-only owning
-   * smart pointer this project's binary-layout-focused `msvc8::map` has no
+   * smart pointer this project's binary-layout-focused `fa::map` has no
    * way to model or store -- so the real `std::map` here is an intentional
-   * substitution, not a fidelity gap to migrate away. `FUN_007F1990` marked
-   * `skip` for this reason.
+   * substitution, not a fidelity gap to migrate away.
    */
   void InitializeBlueprintExtractors()
   {
@@ -333,13 +332,13 @@ namespace moho
   /**
    * Address: 0x007EDA40 (FUN_007EDA40)
    *
-   * msvc8::string const &
+   * fa::string const &
    *
    * What it does:
    * Looks up a registered extractor by blueprint range key and returns
    * the associated instance, or `nullptr` when no mapping exists.
    */
-  RangeExtractor* GetRangeExtractor(const msvc8::string& extractorName)
+  RangeExtractor* GetRangeExtractor(const fa::string& extractorName)
   {
     if (!gBlueprintExtractorsInitialized) {
       InitializeBlueprintExtractors();

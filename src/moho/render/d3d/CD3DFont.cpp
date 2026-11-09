@@ -4,17 +4,35 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <cstdio>
+#include <cstring>
 #include <limits>
+#include <atomic>
 #include <map>
+#include <mutex>
+#include <memory>
 #include <new>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/LocalCache.h"
+#include "gpg/gal/effects/EffectRuntime.h"
+#include "gpg/gal/Effect.hpp"
+#include "gpg/gal/EffectTechnique.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "moho/console/CConCommand.h"
+#include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
+#include "moho/render/d3d/ShaderVar.h"
+#include "moho/render/font/MsdfFontRegistry.h"
+#include "moho/render/font/MsdfTextGpuRenderer.h"
+#include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/render/textures/DXTCodec.h"
 
 namespace moho
@@ -34,6 +52,630 @@ namespace moho
       "GetPixel per pixel (0), which cost tens of ms when a frame met many new characters.",
       &ren_GlyphBitmapRead
     );
+
+    /**
+     * Engine addition: `ren_GlyphCache`. A character's glyph (its DXT5 blocks and metrics), once
+     * rasterized through GDI, is kept in glyph-cache.bin in the local cache directory, so later
+     * launches take it from there instead of rasterizing it again. An entry is keyed by the font
+     * (the face GDI selected, its text metrics and its 'head' table: revision, checksum, dates), the
+     * character, and what else decides GDI's output (the Windows build and its font smoothing
+     * settings) and this executable. The session's first glyph from the cache is rasterized too and
+     * compared; any difference drops the cache for good. (Not one per font: a font's first glyph
+     * makes GDI realize the font, most of a lobby's glyph time when each of ~30 fonts did it.)
+     */
+    bool ren_GlyphCache = true;
+
+    TConVar<bool> gTConVar_ren_GlyphCache(
+      "ren_GlyphCache",
+      "Take a character's glyph from the glyph cache kept with the shaders when an earlier launch rasterized it "
+      "(1, the default), or rasterize every glyph through GDI (0). The same glyphs either way.",
+      &ren_GlyphCache
+    );
+
+    using gpg::gal::effects::Fnv1a64;
+
+    template <class T>
+    void AddValue(Fnv1a64& hash, const T& value) noexcept
+    {
+      hash.Add(&value, sizeof(value));
+    }
+
+    /// What besides the font decides GDI's output, and this executable: hashed once.
+    [[nodiscard]] std::uint64_t GlyphEnvironment()
+    {
+      static const std::uint64_t sEnvironment = [] {
+        Fnv1a64 hash;
+        AddValue(hash, gpg::ExecutableIdentity());
+        using RtlGetVersionFn = LONG(WINAPI*)(OSVERSIONINFOW*);
+        OSVERSIONINFOW version{};
+        version.dwOSVersionInfoSize = sizeof(version);
+        if (const HMODULE ntdll = GetModuleHandleW(L"ntdll.dll"); ntdll != nullptr) {
+          if (const auto rtlGetVersion = reinterpret_cast<RtlGetVersionFn>(GetProcAddress(ntdll, "RtlGetVersion"))) {
+            (void)rtlGetVersion(&version);
+          }
+        }
+        AddValue(hash, version.dwMajorVersion);
+        AddValue(hash, version.dwMinorVersion);
+        AddValue(hash, version.dwBuildNumber);
+        for (const UINT action : {SPI_GETFONTSMOOTHING, SPI_GETFONTSMOOTHINGTYPE, SPI_GETFONTSMOOTHINGCONTRAST,
+                                  SPI_GETFONTSMOOTHINGORIENTATION}) {
+          UINT value = 0;
+          (void)SystemParametersInfoW(action, 0, &value, 0);
+          AddValue(hash, value);
+        }
+        return hash.Value();
+      }();
+      return sEnvironment;
+    }
+
+    /// One cached glyph: what GetCharInfo builds its SCharInfo from.
+    struct SCachedGlyph
+    {
+      std::uint16_t mBlockWidth = 0;
+      std::uint16_t mBlockHeight = 0;
+      float mV2 = 0.0f;
+      float mV3 = 0.0f;
+      float mV4 = 0.0f;
+      float mV5 = 0.0f;
+      float mAdvance = 0.0f;
+      std::vector<std::uint64_t> mBlocks;
+
+      [[nodiscard]] bool operator==(const SCachedGlyph& other) const
+      {
+        return mBlockWidth == other.mBlockWidth && mBlockHeight == other.mBlockHeight && mV2 == other.mV2 &&
+          mV3 == other.mV3 && mV4 == other.mV4 && mV5 == other.mV5 && mAdvance == other.mAdvance &&
+          mBlocks == other.mBlocks;
+      }
+    };
+
+    /**
+     * glyph-cache.bin: "FAFGLYP1", the environment hash, then entries {u64 key, u16 width, u16
+     * height, 5 floats, u32 block count, the blocks}. Read on first use, written whole (to a temporary
+     * file, then moved over the old one) a few seconds after the last glyph was added, and at exit.
+     */
+    class GlyphCacheStore
+    {
+    public:
+      [[nodiscard]] const SCachedGlyph* Find(const std::uint64_t key)
+      {
+        const std::lock_guard<std::mutex> lock(mLock);
+        LoadLocked();
+        const auto found = mGlyphs.find(key);
+        return found != mGlyphs.end() ? &found->second : nullptr;
+      }
+
+      void Add(const std::uint64_t key, SCachedGlyph glyph)
+      {
+        const std::lock_guard<std::mutex> lock(mLock);
+        LoadLocked();
+        mGlyphs.insert_or_assign(key, std::move(glyph));
+        mDirty = true;
+        mLastAdd = GetTickCount64();
+      }
+
+      void Drop()
+      {
+        const std::lock_guard<std::mutex> lock(mLock);
+        mGlyphs.clear();
+        mDirty = false;
+        if (const std::string path = PathLocked(); !path.empty()) {
+          (void)DeleteFileA(path.c_str());
+        }
+      }
+
+      void SaveIfIdle(const bool now)
+      {
+        const std::lock_guard<std::mutex> lock(mLock);
+        if (!mDirty || (!now && GetTickCount64() - mLastAdd < 3000u)) {
+          return;
+        }
+        mDirty = false;
+        const std::string path = PathLocked();
+        if (path.empty()) {
+          return;
+        }
+        // Another process (the other game of a local test, say) may have written glyphs this one
+        // never met since this one read the file: they are kept.
+        ReadFileLocked(path, mGlyphs);
+        const std::string temporary = path + "." + std::to_string(GetCurrentProcessId()) + ".tmp"; // each process its own
+        std::FILE* const out = std::fopen(temporary.c_str(), "wb");
+        if (out == nullptr) {
+          return;
+        }
+        bool written = std::fwrite("FAFGLYP1", 1, 8, out) == 8;
+        const std::uint64_t environment = GlyphEnvironment();
+        written = written && std::fwrite(&environment, sizeof(environment), 1, out) == 1;
+        for (const auto& [key, glyph] : mGlyphs) {
+          const std::uint32_t count = static_cast<std::uint32_t>(glyph.mBlocks.size());
+          const float metrics[] = {glyph.mV2, glyph.mV3, glyph.mV4, glyph.mV5, glyph.mAdvance};
+          written = written && std::fwrite(&key, sizeof(key), 1, out) == 1 &&
+            std::fwrite(&glyph.mBlockWidth, sizeof(glyph.mBlockWidth), 1, out) == 1 &&
+            std::fwrite(&glyph.mBlockHeight, sizeof(glyph.mBlockHeight), 1, out) == 1 &&
+            std::fwrite(metrics, sizeof(metrics), 1, out) == 1 && std::fwrite(&count, sizeof(count), 1, out) == 1 &&
+            (count == 0 || std::fwrite(glyph.mBlocks.data(), sizeof(std::uint64_t), count, out) == count);
+        }
+        written = std::fclose(out) == 0 && written;
+        if (!written || !MoveFileExA(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+          (void)DeleteFileA(temporary.c_str());
+        }
+      }
+
+    private:
+      [[nodiscard]] std::string PathLocked() const
+      {
+        const std::string& directory = gpg::LocalCacheDirectory();
+        return directory.empty() ? std::string{} : directory + "glyph-cache.bin";
+      }
+
+      void LoadLocked()
+      {
+        if (mLoaded) {
+          return;
+        }
+        mLoaded = true;
+        if (const std::string path = PathLocked(); !path.empty()) {
+          ReadFileLocked(path, mGlyphs);
+        }
+      }
+
+      /// A glyph as GetCharInfo makes them: 4 to 128 pixels each way in steps of 4, two blocks per 4x4.
+      [[nodiscard]] static bool IsGlyphShape(const std::uint16_t width, const std::uint16_t height, const std::uint32_t count)
+      {
+        const auto fits = [](const std::uint16_t size) { return size >= 4u && size <= 128u && size % 4u == 0u; };
+        return fits(width) && fits(height) && count == (width / 4u) * (height / 4u) * 2u;
+      }
+
+      /// Adds the file's glyphs that `glyphs` does not hold yet; stops at the first damaged entry.
+      static void ReadFileLocked(const std::string& path, std::unordered_map<std::uint64_t, SCachedGlyph>& glyphs)
+      {
+        std::FILE* const in = std::fopen(path.c_str(), "rb");
+        if (in == nullptr) {
+          return;
+        }
+        char magic[8] = {};
+        std::uint64_t environment = 0;
+        if (std::fread(magic, 1, 8, in) == 8 && std::memcmp(magic, "FAFGLYP1", 8) == 0 &&
+            std::fread(&environment, sizeof(environment), 1, in) == 1 && environment == GlyphEnvironment()) {
+          for (;;) {
+            std::uint64_t key = 0;
+            SCachedGlyph glyph;
+            float metrics[5] = {};
+            std::uint32_t count = 0;
+            if (std::fread(&key, sizeof(key), 1, in) != 1 ||
+                std::fread(&glyph.mBlockWidth, sizeof(glyph.mBlockWidth), 1, in) != 1 ||
+                std::fread(&glyph.mBlockHeight, sizeof(glyph.mBlockHeight), 1, in) != 1 ||
+                std::fread(metrics, sizeof(metrics), 1, in) != 1 || std::fread(&count, sizeof(count), 1, in) != 1 ||
+                !IsGlyphShape(glyph.mBlockWidth, glyph.mBlockHeight, count)) {
+              break;
+            }
+            glyph.mBlocks.resize(count);
+            if (count != 0 && std::fread(glyph.mBlocks.data(), sizeof(std::uint64_t), count, in) != count) {
+              break;
+            }
+            glyph.mV2 = metrics[0];
+            glyph.mV3 = metrics[1];
+            glyph.mV4 = metrics[2];
+            glyph.mV5 = metrics[3];
+            glyph.mAdvance = metrics[4];
+            glyphs.emplace(key, std::move(glyph));
+          }
+        }
+        std::fclose(in);
+      }
+
+      std::mutex mLock;
+      bool mLoaded = false;
+      bool mDirty = false;
+      std::uint64_t mLastAdd = 0;
+      std::unordered_map<std::uint64_t, SCachedGlyph> mGlyphs;
+    };
+
+    // Never destroyed: fonts outlive static destruction order.
+    GlyphCacheStore& GlyphCache()
+    {
+      static auto* const store = new GlyphCacheStore();
+      return *store;
+    }
+
+    std::atomic<bool> gGlyphCacheVerified{false}; // the session's first cached glyph matched its rasterization
+
+    /// Each live font's identity for the glyph cache (0: not cached).
+    std::mutex gFontIdentityLock;
+    std::unordered_map<const void*, std::uint64_t>& FontIdentities()
+    {
+      static auto* const identities = new std::unordered_map<const void*, std::uint64_t>();
+      return *identities;
+    }
+
+    /// The identity of the font selected into `dc`: its face, text metrics and 'head' table.
+    [[nodiscard]] std::uint64_t ComputeFontIdentity(HDC const dc)
+    {
+      constexpr DWORD kHeadTable = 0x64616568u; // 'head'
+      const DWORD headSize = GetFontData(dc, kHeadTable, 0, nullptr, 0);
+      if (headSize == GDI_ERROR || headSize == 0 || headSize > 4096u) {
+        return 0;
+      }
+      std::vector<unsigned char> head(headSize);
+      if (GetFontData(dc, kHeadTable, 0, head.data(), headSize) != headSize) {
+        return 0;
+      }
+      wchar_t face[LF_FACESIZE] = {};
+      const int faceLength = GetTextFaceW(dc, LF_FACESIZE, face);
+      TEXTMETRICW metrics{};
+      if (faceLength <= 0 || !GetTextMetricsW(dc, &metrics)) {
+        return 0;
+      }
+      Fnv1a64 hash;
+      hash.Add(face, static_cast<std::size_t>(faceLength) * sizeof(wchar_t));
+      AddValue(hash, metrics);
+      hash.Add(head.data(), head.size());
+      return hash.Value() | 1u; // never 0
+    }
+
+    [[nodiscard]] std::uint64_t GlyphKey(const std::uint64_t font, const wchar_t character)
+    {
+      Fnv1a64 hash;
+      AddValue(hash, font);
+      AddValue(hash, static_cast<std::uint32_t>(character));
+      return hash.Value();
+    }
+
+    /**
+     * Engine addition: `ren_MsdfText` (issue #307). Screen-space text at `ren_MsdfTextMinSize` pixels or
+     * more draws from an MSDF atlas (a texture of distances to each glyph's outline) when one is ready.
+     * Advances still come from the GDI font, so Lua's layout and word wrapping don't move.
+     */
+    bool ren_MsdfText = true;
+    int ren_MsdfTextMinSize = 1;
+
+    TConVar<bool> gTConVar_ren_MsdfText(
+      "ren_MsdfText",
+      "Draw screen-space text from MSDF atlases where one is ready (1, the default), or always through GDI glyphs (0). "
+      "A mod's font has no GDI version and keeps its atlas either way.",
+      &ren_MsdfText
+    );
+    TConVar<int> gTConVar_ren_MsdfTextMinSize(
+      "ren_MsdfTextMinSize",
+      "The smallest text in pixels ren_MsdfText draws from an atlas; smaller text stays on GDI glyphs. Not for a mod's font.",
+      &ren_MsdfTextMinSize
+    );
+
+    constexpr const char* kMsdfTechnique = "TMsdfText";
+    constexpr const char* kModFontFallbackFace = "Arial";
+    constexpr const char* kScreenTextTechnique = "TAlphaBlendLinearSampleNoDepth";
+    constexpr std::uint32_t kAtlasTextureFormat = 2u; // 32-bit; byte order doesn't matter to the median
+
+    /** What a `CD3DFont` needs for MSDF text. Kept beside it: the class's layout is the binary's. */
+    struct MsdfBinding
+    {
+      std::string mFace;
+      std::int32_t mPointSize = 0;
+      std::shared_ptr<const SMsdfFontAtlas> mAtlas;
+      // A family from `LoadFont` (`mod:<hash>`): GDI never hears of it and draws the default font until the
+      // atlas arrives, and from then on the atlas's metrics and advances replace GDI's.
+      bool mIsMod = false;
+      const SMsdfStrike* mStrike = nullptr; // into mAtlas: this size as a bitmap, when it has one
+      std::shared_ptr<const SMsdfFontAtlas> mFallbackAtlas;
+      // The atlas page had no room for this mod font's atlas: it draws in the default font, with that font's
+      // advances too, rather than GDI's glyphs at the mod font's spacing. Its bitmaps of small sizes still apply.
+      bool mNoPage = false;
+    };
+
+    /**
+     * Many fonts' atlases on one GPU texture, so a change of font doesn't split a draw. A device reset
+     * replaces the sheet's texture and loses its pixels, so they're written again.
+     */
+    struct MsdfAtlasPage
+    {
+      struct PlacedFont
+      {
+        const SMsdfFontAtlas* mAtlas = nullptr;
+        std::int32_t mX = 0;
+        std::int32_t mY = 0;
+      };
+
+      boost::shared_ptr<CD3DDynamicTextureSheet> mSheet;
+      const void* mUploadedTexture = nullptr;
+      std::vector<PlacedFont> mFonts;
+      std::int32_t mShelfX = 0;
+      std::int32_t mShelfY = 0;
+      std::int32_t mShelfHeight = 0;
+    };
+
+    constexpr std::int32_t kMsdfPageWidth = 2048;
+    constexpr std::int32_t kMsdfPageHeight = 4096;
+    constexpr std::int32_t kMsdfPageSpacing = 3; // empty texels between fonts, as between glyph boxes
+
+    std::map<const CD3DFont*, MsdfBinding> sMsdfBindings;
+    bool sHasModFonts = false; // so a game with none pays one load
+    // The game's fonts on one page, mods' fonts on another (with their own copy of the default font for the
+    // characters they lack), so fonts from mods can't take the room the game's text needs.
+    MsdfAtlasPage sMsdfGamePage;
+    MsdfAtlasPage sMsdfModPage;
+
+    [[nodiscard]] const SMsdfGlyph* FindMsdfGlyph(const SMsdfFontAtlas& atlas, const std::uint32_t codepoint)
+    {
+      const auto found = std::lower_bound(
+        atlas.mGlyphs.begin(), atlas.mGlyphs.end(), codepoint,
+        [](const SMsdfGlyph& glyph, const std::uint32_t value) { return glyph.mCodepoint < value; }
+      );
+      return found != atlas.mGlyphs.end() && found->mCodepoint == codepoint ? &*found : nullptr;
+    }
+
+    /** Writes one font's pixels and the empty texels to its right and below it, which keep the next font apart. */
+    [[nodiscard]] bool WriteFontToPage(MsdfAtlasPage& page, const MsdfAtlasPage::PlacedFont& placed)
+    {
+      const SMsdfFontAtlas& atlas = *placed.mAtlas;
+      const std::int32_t right = (std::min)(placed.mX + atlas.mWidth + kMsdfPageSpacing, kMsdfPageWidth);
+      const std::int32_t bottom = (std::min)(placed.mY + atlas.mHeight + kMsdfPageSpacing, kMsdfPageHeight);
+      const RECT rect{placed.mX, placed.mY, right, bottom};
+      std::uint32_t pitch = 0u;
+      void* bits = nullptr;
+      if (!page.mSheet->LockRect(&rect, &pitch, &bits) || bits == nullptr) {
+        return false;
+      }
+      const std::size_t lockedRowBytes = static_cast<std::size_t>(right - placed.mX) * 4u;
+      const std::size_t atlasRowBytes = static_cast<std::size_t>(atlas.mWidth) * 4u;
+      for (std::int32_t row = 0; row < bottom - placed.mY; ++row) {
+        auto* const out = static_cast<std::uint8_t*>(bits) + static_cast<std::size_t>(pitch) * static_cast<std::size_t>(row);
+        std::memset(out, 0, lockedRowBytes);
+        if (row < atlas.mHeight) {
+          std::memcpy(out, atlas.mPixels.data() + atlasRowBytes * static_cast<std::size_t>(row), atlasRowBytes);
+        }
+      }
+      (void)page.mSheet->Unlock();
+      return true;
+    }
+
+    /**
+     * Where an atlas sits on the page, placing it on first use and rewriting the page after a device reset.
+     * False when the page is full or can't be made; that font stays on GDI glyphs. `outFull` says it was full.
+     */
+    [[nodiscard]] bool AcquireMsdfPlacement(
+      MsdfAtlasPage& page, const SMsdfFontAtlas& atlas, std::int32_t& outX, std::int32_t& outY, bool& outFull
+    )
+    {
+      outFull = false;
+      if (!page.mSheet) {
+        CD3DDevice* const device = D3D_GetDevice();
+        ID3DDeviceResources* const resources = device != nullptr ? device->GetResources() : nullptr;
+        if (resources == nullptr) {
+          return false;
+        }
+        (void)resources->NewDynamicTextureSheet(page.mSheet, kMsdfPageWidth, kMsdfPageHeight, kAtlasTextureFormat);
+        if (!page.mSheet) {
+          return false;
+        }
+      }
+
+      CD3DDynamicTextureSheet::TextureHandle texture;
+      page.mSheet->GetTexture(texture);
+      if (texture.get() != page.mUploadedTexture) {
+        for (const MsdfAtlasPage::PlacedFont& placed : page.mFonts) {
+          if (!WriteFontToPage(page, placed)) {
+            return false;
+          }
+        }
+        page.mUploadedTexture = texture.get();
+      }
+
+      for (const MsdfAtlasPage::PlacedFont& placed : page.mFonts) {
+        if (placed.mAtlas == &atlas) {
+          outX = placed.mX;
+          outY = placed.mY;
+          return true;
+        }
+      }
+
+      if (page.mShelfX + atlas.mWidth > kMsdfPageWidth) {
+        page.mShelfY += page.mShelfHeight + kMsdfPageSpacing;
+        page.mShelfX = 0;
+        page.mShelfHeight = 0;
+      }
+      if (atlas.mWidth > kMsdfPageWidth || page.mShelfY + atlas.mHeight > kMsdfPageHeight) {
+        outFull = true;
+        return false;
+      }
+      const MsdfAtlasPage::PlacedFont placed{&atlas, page.mShelfX, page.mShelfY};
+      if (!WriteFontToPage(page, placed)) {
+        return false;
+      }
+      page.mFonts.push_back(placed);
+      page.mShelfX += atlas.mWidth + kMsdfPageSpacing;
+      page.mShelfHeight = (std::max)(page.mShelfHeight, atlas.mHeight);
+      outX = placed.mX;
+      outY = placed.mY;
+      return true;
+    }
+
+    [[nodiscard]] const SMsdfStrike* FindMsdfStrike(const SMsdfFontAtlas& atlas, const std::int32_t pixelSize)
+    {
+      for (const SMsdfStrike& strike : atlas.mStrikes) {
+        if (strike.mPixelSize == pixelSize) {
+          return &strike;
+        }
+      }
+      return nullptr;
+    }
+
+    [[nodiscard]] const SMsdfStrikeGlyph* FindMsdfStrikeGlyph(const SMsdfStrike& strike, const std::uint32_t codepoint)
+    {
+      const auto found = std::lower_bound(
+        strike.mGlyphs.begin(), strike.mGlyphs.end(), codepoint,
+        [](const SMsdfStrikeGlyph& glyph, const std::uint32_t value) { return glyph.mCodepoint < value; }
+      );
+      return found != strike.mGlyphs.end() && found->mCodepoint == codepoint ? &*found : nullptr;
+    }
+
+    void PollModFontBinding(CD3DFont& font, MsdfBinding& binding);
+    void InitializeGlyphPageCache(CD3DFont::SCharInfoPages& pages);
+    void DestroyGlyphPageCache(CD3DFont::SCharInfoPages& pages);
+
+    /**
+     * Draws a string from its font's MSDF atlas, at any uniform scale of the screen plane (the axes' length), so
+     * text that grows or shrinks stays sharp and costs no new font. Returns false, having drawn nothing, when the
+     * old path has to: no atlas yet, small text, text not on the screen plane, a character no atlas has, or a
+     * caller drawing with a technique other than the UI's.
+     */
+    [[nodiscard]] bool RenderMsdfText(
+      CD3DFont& font, const char* const text, CD3DPrimBatcher& primBatcher, const Vector3f& origin, const Vector3f& xAxis,
+      const Vector3f& yAxis, const std::uint32_t color, const float maxAdvance, Vector3f& outCursor
+    )
+    {
+      const auto bound = sMsdfBindings.find(&font);
+      // A mod's font has no GDI version, so the switches for the game's fonts don't send it there.
+      if (bound == sMsdfBindings.end() || (bound->second.mPointSize < ren_MsdfTextMinSize && !bound->second.mIsMod)) {
+        return false;
+      }
+      const float textScale = xAxis.x;
+      if (!(textScale > 0.0f) || xAxis.y != 0.0f || xAxis.z != 0.0f || yAxis.x != 0.0f || yAxis.y != -textScale || yAxis.z != 0.0f) {
+        return false;
+      }
+      MsdfBinding& binding = bound->second;
+      if (binding.mIsMod) {
+        PollModFontBinding(font, binding);
+        // Its small sizes have bitmaps, which GetCharInfo draws; scaled, they'd blur, and the atlas doesn't.
+        if (binding.mStrike != nullptr && textScale == 1.0f) {
+          return false;
+        }
+      } else if (!binding.mAtlas) {
+        binding.mAtlas = MSDF_FindAtlas(binding.mFace.c_str());
+      }
+      if (!binding.mAtlas) {
+        return false;
+      }
+      const SMsdfFontAtlas& atlas = *binding.mAtlas;
+      if (binding.mIsMod && !binding.mFallbackAtlas) {
+        binding.mFallbackAtlas = MSDF_FindAtlas(kModFontFallbackFace);
+      }
+      const SMsdfFontAtlas* const fallback = binding.mIsMod ? binding.mFallbackAtlas.get() : nullptr;
+
+      // A character a mod's font lacks comes from the default font's atlas, on the same page and in the same draw.
+      bool usesFallback = false;
+      wchar_t codepoint = 0;
+      for (const char* encoded = gpg::STR_DecodeUtf8Char(text, codepoint); codepoint != 0;
+           encoded = gpg::STR_DecodeUtf8Char(encoded, codepoint)) {
+        if (FindMsdfGlyph(atlas, static_cast<std::uint32_t>(codepoint)) == nullptr) {
+          if (fallback == nullptr || FindMsdfGlyph(*fallback, static_cast<std::uint32_t>(codepoint)) == nullptr) {
+            return false;
+          }
+          usesFallback = true;
+        }
+      }
+
+      CD3DDevice* const device = D3D_GetDevice();
+      CD3DEffect* const effect = device != nullptr ? device->GetCurEffect() : nullptr;
+      if (effect == nullptr || std::strcmp(effect->mName.c_str(), "primbatcher") != 0
+          || !effect->mCurrentTechnique || std::strcmp(effect->mCurrentTechnique->GetName()->c_str(), kScreenTextTechnique) != 0) {
+        return false;
+      }
+      std::int32_t pageX = 0;
+      std::int32_t pageY = 0;
+      bool pageFull = false;
+      MsdfAtlasPage& page = binding.mIsMod ? sMsdfModPage : sMsdfGamePage;
+      if (!AcquireMsdfPlacement(page, atlas, pageX, pageY, pageFull)) {
+        if (pageFull && binding.mIsMod && !binding.mNoPage) {
+          gpg::Warnf("MSDF: the atlas page is full; %s at %d px draws in the default font", binding.mFace.c_str(), binding.mPointSize);
+          binding.mNoPage = true;
+          DestroyGlyphPageCache(font.mCharInfo); // they hold the mod font's advances
+          InitializeGlyphPageCache(font.mCharInfo);
+        }
+        return false;
+      }
+      std::int32_t fallbackPageX = 0;
+      std::int32_t fallbackPageY = 0;
+      if (usesFallback && !AcquireMsdfPlacement(page, *fallback, fallbackPageX, fallbackPageY, pageFull)) {
+        return false;
+      }
+      const boost::shared_ptr<CD3DDynamicTextureSheet>& sheet = page.mSheet;
+
+      const float size = static_cast<float>(binding.mPointSize) * textScale;
+      const float pixelRange = atlas.mDistanceRange * size / atlas.mEmPixels;
+
+      // One instanced draw from a GPU buffer where the backend has it; through the batcher otherwise.
+      MsdfTextGpuRenderer& instancedText = MsdfTextGpuRenderer::Get();
+      const bool instanced = instancedText.IsActive() && instancedText.BeginString(primBatcher, sheet);
+      CD3DPrimBatcher::TextureBinding previousTexture{};
+      boost::shared_ptr<gpg::gal::EffectTechnique> previousTechnique;
+      if (!instanced) {
+        if (!shaderVarPrimBatcherMsdfPixelRange.Exists()) {
+          return false;
+        }
+        primBatcher.Flush();
+        previousTexture = primBatcher.GetTextureBinding();
+        previousTechnique = effect->mCurrentTechnique;
+        effect->SetTechnique(kMsdfTechnique);
+        shaderVarPrimBatcherMsdfPixelRange.mEffectVariable->SetFloat(pixelRange);
+        primBatcher.SetTexture(boost::static_pointer_cast<ID3DTextureSheet>(sheet));
+      }
+
+      const float inverseWidth = 1.0f / static_cast<float>(kMsdfPageWidth);
+      const float inverseHeight = 1.0f / static_cast<float>(kMsdfPageHeight);
+      const auto corner = [&](const Vector3f& pen, const float x, const float y) {
+        return Vector3f{pen.x + x * size, pen.y - y * size, pen.z};
+      };
+      Vector3f cursor = origin;
+      float totalAdvance = 0.0f;
+      for (const char* encoded = gpg::STR_DecodeUtf8Char(text, codepoint); codepoint != 0;
+           encoded = gpg::STR_DecodeUtf8Char(encoded, codepoint)) {
+        // The clip width is the control's, so it counts unscaled advances: a pop doesn't change what fits.
+        const float advance = font.GetCharInfo(codepoint).mAdvance;
+        totalAdvance += advance;
+        if (std::isfinite(maxAdvance) && totalAdvance > maxAdvance) {
+          break;
+        }
+        const SMsdfGlyph* found = FindMsdfGlyph(atlas, static_cast<std::uint32_t>(codepoint));
+        float glyphPageX = static_cast<float>(pageX);
+        float glyphPageY = static_cast<float>(pageY);
+        if (found == nullptr) {
+          found = FindMsdfGlyph(*fallback, static_cast<std::uint32_t>(codepoint));
+          glyphPageX = static_cast<float>(fallbackPageX);
+          glyphPageY = static_cast<float>(fallbackPageY);
+        }
+        const SMsdfGlyph& glyph = *found;
+        if (glyph.mAtlasRight > glyph.mAtlasLeft) {
+          const Vector3f topLeft = corner(cursor, glyph.mPlaneLeft, glyph.mPlaneTop);
+          const Vector3f bottomRight = corner(cursor, glyph.mPlaneRight, glyph.mPlaneBottom);
+          const float u0 = (glyph.mAtlasLeft + glyphPageX) * inverseWidth;
+          const float u1 = (glyph.mAtlasRight + glyphPageX) * inverseWidth;
+          const float v0 = (glyph.mAtlasTop + glyphPageY) * inverseHeight;
+          const float v1 = (glyph.mAtlasBottom + glyphPageY) * inverseHeight;
+          if (instanced) {
+            MsdfUiQuad quad;
+            const float xs[4] = {topLeft.x, bottomRight.x, bottomRight.x, topLeft.x};
+            const float ys[4] = {topLeft.y, topLeft.y, bottomRight.y, bottomRight.y};
+            const float us[4] = {u0, u1, u1, u0};
+            const float vs[4] = {v0, v0, v1, v1};
+            for (int c = 0; c < 4; ++c) {
+              quad.mX[c] = xs[c];
+              quad.mY[c] = ys[c];
+              quad.mU[c] = us[c];
+              quad.mV[c] = vs[c];
+              quad.mColor[c] = color;
+            }
+            quad.mPixelRange = pixelRange;
+            quad.mZ = topLeft.z;
+            instancedText.AddGlyph(quad);
+          } else {
+            primBatcher.DrawQuad(
+              CD3DPrimBatcher::Vertex{topLeft.x, topLeft.y, topLeft.z, color, u0, v0},
+              CD3DPrimBatcher::Vertex{bottomRight.x, topLeft.y, topLeft.z, color, u1, v0},
+              CD3DPrimBatcher::Vertex{bottomRight.x, bottomRight.y, topLeft.z, color, u1, v1},
+              CD3DPrimBatcher::Vertex{topLeft.x, bottomRight.y, topLeft.z, color, u0, v1}
+            );
+          }
+        }
+        cursor.x += advance * textScale;
+      }
+
+      if (!instanced) {
+        primBatcher.Flush();
+        effect->mCurrentTechnique = previousTechnique;
+        primBatcher.SetTextureBinding(previousTexture);
+      }
+      outCursor = cursor;
+      return true;
+    }
 
     /**
      * The `sampleWidth` x `sampleHeight` corner of the 32-bit scratch bitmap as GetPixel
@@ -340,7 +982,7 @@ namespace moho
      * What it does:
      * Computes element pointer for one indexed glyph-info slot.
      */
-    [[nodiscard]] CD3DFont::SCharInfo* GetGlyphInfoAt(CD3DFont::SCharInfo* const begin, const std::size_t index)
+    [[maybe_unused]] [[nodiscard]] CD3DFont::SCharInfo* GetGlyphInfoAt(CD3DFont::SCharInfo* const begin, const std::size_t index)
     {
       return begin + index;
     }
@@ -515,7 +1157,7 @@ namespace moho
      * What it does:
      * Resizes one DXT scratch lane as zero-filled 8-byte word-pairs.
      */
-    void ResizeDxtWordPairScratchZeroFill(const std::size_t count, DxtWordPairVector& scratch)
+    [[maybe_unused]] void ResizeDxtWordPairScratchZeroFill(const std::size_t count, DxtWordPairVector& scratch)
     {
       const DxtWordPair fill{};
       ResizeDxtWordPairScratch(count, scratch, fill);
@@ -620,7 +1262,57 @@ namespace moho
     {
       SortKerningPairsByPackedKey(pairs);
     }
+
+    /**
+     * Takes a mod's atlas once it has been cooked: from then on the font has that file's metrics and advances, so
+     * what GDI's default font measured is dropped along with its glyphs.
+     */
+    void PollModFontBinding(CD3DFont& font, MsdfBinding& binding)
+    {
+      if (!binding.mIsMod || binding.mAtlas) {
+        return;
+      }
+      binding.mAtlas = MSDF_FindAtlas(binding.mFace.c_str());
+      if (!binding.mAtlas) {
+        return;
+      }
+      const SMsdfFontAtlas& atlas = *binding.mAtlas;
+      const float size = static_cast<float>(binding.mPointSize);
+      binding.mStrike = FindMsdfStrike(atlas, binding.mPointSize);
+      gpg::Logf(
+        "MSDF: %s at %d px drawn from %s", binding.mFace.c_str(), binding.mPointSize,
+        binding.mStrike != nullptr ? "its bitmaps" : "its distance field"
+      );
+      font.mAscent = std::ceil(atlas.mAscent * size);
+      font.mDescent = std::ceil(atlas.mDescent * size);
+      font.mHeight = font.mAscent + font.mDescent;
+      font.mInternalLeading = (std::max)(0.0f, font.mHeight - size);
+      font.mExternalLeading = (std::max)(0.0f, std::round(atlas.mLineGap * size));
+      MSDF_FlushPendingText();
+      DestroyGlyphPageCache(font.mCharInfo);
+      InitializeGlyphPageCache(font.mCharInfo);
+    }
   } // namespace
+
+  bool CD3DFont::IsModFont() const
+  {
+    if (!sHasModFonts) {
+      return false;
+    }
+    const auto bound = sMsdfBindings.find(this);
+    return bound != sMsdfBindings.end() && bound->second.mIsMod;
+  }
+
+  void CD3DFont::PollModFont()
+  {
+    if (!sHasModFonts) {
+      return;
+    }
+    const auto bound = sMsdfBindings.find(this);
+    if (bound != sMsdfBindings.end()) {
+      PollModFontBinding(*this, bound->second);
+    }
+  }
 
   /**
    * Address: 0x00425290 (FUN_00425290, ?Create@CD3DFont@Moho@@SA?AV?$CountedPtr@VCD3DFont@Moho@@@2@HVStrArg@gpg@@@Z)
@@ -642,7 +1334,10 @@ namespace moho
       return MakeFontHandle(existingFont);
     }
 
-    const HFONT createdWin32Font = CreateFontA(-pointSize, 0, 0, 0, 0, 0, 0, 0, 1u, 0, 0, 4u, 0, lookup.mFace.c_str());
+    // A mod's family never reaches GDI; its name means nothing there anyway, and its file was never loaded there.
+    const bool isModFace = lookup.mFace.compare(0u, 4u, "mod:") == 0;
+    const HFONT createdWin32Font =
+      CreateFontA(-pointSize, 0, 0, 0, 0, 0, 0, 0, 1u, 0, 0, 4u, 0, isModFace ? kModFontFallbackFace : lookup.mFace.c_str());
     if (createdWin32Font == nullptr) {
       return {};
     }
@@ -652,6 +1347,13 @@ namespace moho
       DeleteObject(createdWin32Font);
       return {};
     }
+
+    MsdfBinding binding{};
+    binding.mFace = lookup.mFace;
+    binding.mPointSize = pointSize;
+    binding.mIsMod = isModFace;
+    sHasModFonts = sHasModFonts || isModFace;
+    sMsdfBindings[createdFont] = std::move(binding);
 
     ++createdFont->mRefCount; // cache-owned reference
     const auto [insertedIt, inserted] = InsertFontCacheEntry(lookup, createdFont);
@@ -715,6 +1417,13 @@ namespace moho
     mOverhang = static_cast<float>(metrics.tmOverhang);
     mIsTruetype = (metrics.tmPitchAndFamily & TMPF_TRUETYPE) != 0;
 
+    // Engine addition (ren_GlyphCache): which font this is, for the cached glyphs.
+    if (ren_GlyphCache) {
+      const std::uint64_t identity = ComputeFontIdentity(mDeviceContext);
+      const std::lock_guard<std::mutex> lock(gFontIdentityLock);
+      FontIdentities()[this] = identity;
+    }
+
     const int kerningPairCount = GetKerningPairsW(mDeviceContext, 0, nullptr);
     if (kerningPairCount <= 0) {
       return;
@@ -761,6 +1470,12 @@ namespace moho
    */
   CD3DFont::~CD3DFont()
   {
+    {
+      const std::lock_guard<std::mutex> lock(gFontIdentityLock);
+      FontIdentities().erase(this);
+    }
+    sMsdfBindings.erase(this);
+
     // FUN_004272F0: the member-empty `operator=` release of the kerning vector.
     mKerningPairs = CD3DFont::KerningPairVector{};
     DestroyGlyphPageCache(mCharInfo);
@@ -805,13 +1520,66 @@ namespace moho
       return charInfo;
     }
 
+    // Engine addition (ren_GlyphCache): the glyph an earlier launch rasterized; the session's first
+    // one is rasterized below as well and compared.
+    std::uint64_t glyphKey = 0;
+    bool verifyCached = false;
+    SCachedGlyph cachedGlyph;
+    if (ren_GlyphCache) {
+      std::uint64_t fontIdentity = 0;
+      {
+        const std::lock_guard<std::mutex> lock(gFontIdentityLock);
+        const auto found = FontIdentities().find(this);
+        if (found != FontIdentities().end()) {
+          fontIdentity = found->second;
+        }
+      }
+      if (fontIdentity != 0) {
+        glyphKey = GlyphKey(fontIdentity, chText);
+        if (const SCachedGlyph* const cached = GlyphCache().Find(glyphKey); cached != nullptr) {
+          if (gGlyphCacheVerified.load(std::memory_order_relaxed)) {
+            charInfo.mTex = CD3DBatchTexture::FromDXT5(
+              cached->mBlockWidth, cached->mBlockHeight, cached->mBlocks.data(), 16u * (cached->mBlockWidth / 4u)
+            );
+            charInfo.mV2 = cached->mV2;
+            charInfo.mV3 = cached->mV3;
+            charInfo.mV4 = cached->mV4;
+            charInfo.mV5 = cached->mV5;
+            charInfo.mAdvance = cached->mAdvance;
+            return charInfo;
+          }
+          verifyCached = true;
+          cachedGlyph = *cached;
+        }
+      }
+    }
+
     (void)SetTextAlign(mDeviceContext, 0x18u);
     const int baselineAscent = static_cast<int>(std::ceil(mAscent + 1.0f));
     const int baselineDescent = static_cast<int>(std::ceil(mDescent));
 
     RECT textRect{};
     (void)DrawTextW(mDeviceContext, &chText, 1, &textRect, 0xC20u);
-    const float advance = static_cast<float>(textRect.right - textRect.left);
+    float advance = static_cast<float>(textRect.right - textRect.left);
+
+    // Engine addition (issue #304): a mod's font, once its atlas is here, has its own advances and small bitmaps.
+    const SMsdfStrike* modStrike = nullptr;
+    const SMsdfStrikeGlyph* modStrikeGlyph = nullptr;
+    if (sHasModFonts) {
+      const auto bound = sMsdfBindings.find(this);
+      if (bound != sMsdfBindings.end() && bound->second.mIsMod && bound->second.mAtlas) {
+        const MsdfBinding& binding = bound->second;
+        const SMsdfGlyph* const glyph = binding.mNoPage ? nullptr : FindMsdfGlyph(*binding.mAtlas, static_cast<std::uint32_t>(chText));
+        if (glyph != nullptr) {
+          advance = glyph->mAdvance * static_cast<float>(binding.mPointSize);
+        }
+        modStrike = binding.mStrike;
+        modStrikeGlyph = modStrike != nullptr ? FindMsdfStrikeGlyph(*modStrike, static_cast<std::uint32_t>(chText)) : nullptr;
+        if (modStrikeGlyph != nullptr) {
+          advance = modStrikeGlyph->mAdvance;
+        }
+      }
+    }
 
     int glyphWidth = (static_cast<int>((mAveCharWidth * 2.0f) + advance) + 3) & ~3;
     int glyphHeight = (baselineAscent + baselineDescent + 4) & ~3;
@@ -868,6 +1636,23 @@ namespace moho
       }
     } else {
       readWithGetPixel(pixels);
+    }
+
+    if (modStrikeGlyph != nullptr) {
+      // The rest of this function only sees pixels, so a mod's bitmap takes GDI's place here and every
+      // renderer draws it the way it draws any glyph.
+      pixels.fill(0u);
+      const std::uint8_t* const coverage = modStrike->mCoverage.data() + modStrikeGlyph->mOffset;
+      for (int row = 0; row < modStrikeGlyph->mHeight; ++row) {
+        const int y = baselineAscent - modStrikeGlyph->mTop + row;
+        for (int column = 0; column < modStrikeGlyph->mWidth; ++column) {
+          const int x = baselineX + modStrikeGlyph->mLeft + column;
+          if (x >= 0 && x < sampleWidth && y >= 0 && y < sampleHeight) {
+            const std::uint8_t value = coverage[static_cast<std::size_t>(row) * static_cast<std::size_t>(modStrikeGlyph->mWidth) + static_cast<std::size_t>(column)];
+            pixels[static_cast<std::size_t>(y * kGlyphScratchWidth + x)] = RGB(value, value, value);
+          }
+        }
+      }
     }
 
     auto isColumnBlack = [&pixels](const int x, const int yMin, const int yMaxExclusive) noexcept {
@@ -1012,6 +1797,30 @@ namespace moho
     charInfo.mV4 = static_cast<float>((xMin + blockWidth) - baselineX);
     charInfo.mV5 = static_cast<float>(baselineAscent - yMin);
     charInfo.mAdvance = advance;
+
+    if (glyphKey != 0 && ren_GlyphCache) {
+      SCachedGlyph rasterized;
+      rasterized.mBlockWidth = static_cast<std::uint16_t>(blockWidth);
+      rasterized.mBlockHeight = static_cast<std::uint16_t>(blockHeight);
+      rasterized.mV2 = charInfo.mV2;
+      rasterized.mV3 = charInfo.mV3;
+      rasterized.mV4 = charInfo.mV4;
+      rasterized.mV5 = charInfo.mV5;
+      rasterized.mAdvance = charInfo.mAdvance;
+      rasterized.mBlocks = std::move(dxt5Blocks);
+      if (verifyCached) {
+        if (rasterized == cachedGlyph) {
+          gGlyphCacheVerified = true;
+        } else {
+          gpg::Warnf("CD3DFont: a cached glyph (u+%04x) differs from its rasterization; glyphs are rasterized from now on",
+                     static_cast<unsigned int>(chText));
+          ren_GlyphCache = false;
+          GlyphCache().Drop();
+        }
+      } else {
+        GlyphCache().Add(glyphKey, std::move(rasterized));
+      }
+    }
     return charInfo;
   }
 
@@ -1033,7 +1842,12 @@ namespace moho
     const float maxAdvance
   )
   {
+    PollModFont();
     Vector3f cursor = origin;
+    if ((ren_MsdfText || IsModFont()) && RenderMsdfText(*this, text, *primBatcher, origin, xAxis, yAxis, color, maxAdvance, cursor)) {
+      return cursor;
+    }
+
     float totalAdvance = 0.0f;
 
     wchar_t codepoint = 0;
@@ -1097,6 +1911,7 @@ namespace moho
    */
   float CD3DFont::GetAdvance(const gpg::StrArg text, const std::int32_t /*flags*/)
   {
+    PollModFont();
     float advance = 0.0f;
     wchar_t codepoint = 0;
     const char* encoded = gpg::STR_DecodeUtf8Char(text, codepoint);
@@ -1130,6 +1945,13 @@ namespace moho
       encoded = gpg::STR_DecodeUtf8Char(encoded, codepoint);
     }
     return index;
+  }
+
+  void REN_SaveGlyphCache(const bool now)
+  {
+    if (ren_GlyphCache) {
+      GlyphCache().SaveIfIdle(now);
+    }
   }
 
   /**

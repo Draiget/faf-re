@@ -1,0 +1,59 @@
+name: 3p-rejoin-native-host
+description: >
+  3p-rejoin-native with the host crashing. A host got no JoinGame, only the server's ConnectToPeer for
+  each player, and its return must not make a lobby: a host's Idle would turn a live game back into a
+  lobby on the server. FAF_TEST_BIND: see 2p-contract-bridge.yaml. Run with -advertise and -turn-ip
+  set to that address. Uses mpemu-rejoin-orders. Do not click into the game windows.
+timeout: 20m
+
+mode: contract
+contract:
+  adapter: native
+  nativeBind: '%FAF_TEST_BIND%'
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: sandbox
+  DisconnectionDelay02: '90'
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\rejoin_test.exe'
+  init: init_mpemu_rejoin_orders.lua
+  nosound: true
+  tile: true
+  saveReplays: true
+
+players:
+  - { uid: 1, name: Rejoins, faction: uef, args: ['/rejoinoffer', '/title', 'rejoin-orders-back', '/con', 'net_PeerFeatures=1;net_RejoinAccept=1'] }
+  - { uid: 2, name: Stays, faction: cybran, args: ['/rejoinoffer', '/title', 'rejoin-orders-stays', '/con', 'net_PeerFeatures=1;net_RejoinAccept=1'] }
+  - { uid: 3, name: Behind, faction: aeon, args: ['/rejoinoffer', '/title', 'rejoin-orders-behind', '/con', 'net_PeerFeatures=1;net_RejoinAccept=1'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 4m
+  - kill: 1
+  - wait: 15s
+  - note: the host restarts and takes its seat back
+  - rejoin: { uid: 1, source: 0, launcher: true, peers: [{ uid: 2, source: 1 }, { uid: 3, source: 2 }] }
+  - wait: 3m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  logsContain:
+    - { uids: [2, 3], pattern: 'REJOIN: client \d+ proved its seat' }
+    - { uids: [1], suffix: '-rejoin', pattern: 'GPGNET: coming back to a running game' }
+    - { uids: [1], suffix: '-rejoin', pattern: 'NETLINK: native mode' }
+    - { uids: [1], suffix: '-rejoin', pattern: 'REJOIN: caught up' }
+  logsAbsent:
+    - { uids: [1], suffix: '-rejoin', pattern: 'GPGNET: entering idle state' }
+    - { uids: [1], suffix: '-rejoin', pattern: 'GPGNET: entering lobby state' }
+    - { uids: [2, 3], pattern: 'has been abandoned by all players' }
+    - { uids: [2, 3], pattern: 'mismatched' }
+    - { uids: [1], suffix: '-rejoin', pattern: 'mismatched' }
+    - { uids: [1], suffix: '-rejoin', pattern: 'REJOIN: refused' }

@@ -7,6 +7,7 @@
 #include <typeinfo>
 
 #include "Wm3Quaternion.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "Wm3Vector3.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
@@ -52,46 +53,6 @@ namespace
   /// guard variable. `Wm3::Vector3f` is 0x010C6330 and `Wm3::Quaternionf` is
   /// 0x010C6D38; `IAniManipulator`, `WeakPtr<Unit>` and `CThrustManipulator`
   /// each own theirs as a class static (0x010C738C, 0x010C6FB0, 0x010C73E0).
-  gpg::RType* gVector3fType = nullptr;
-  gpg::RType* gQuaternionfType = nullptr;
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    if (!gVector3fType) {
-      gVector3fType = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return gVector3fType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedQuaternionfType()
-  {
-    if (!gQuaternionfType) {
-      gQuaternionfType = gpg::LookupRType(typeid(Wm3::Quaternionf));
-    }
-    return gQuaternionfType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    if (!moho::WeakPtr<moho::Unit>::sType) {
-      moho::WeakPtr<moho::Unit>::sType = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-    }
-    return moho::WeakPtr<moho::Unit>::sType;
-  }
-
-  /**
-   * The shared body behind `CThrustManipulator::GetClass` (0x0064A190): read
-   * the cache at 0x010C73E0, and on a miss pass the type descriptor at
-   * 0x00F73B00 to `gpg::LookupRType` (0x008E0750). It carries no address of
-   * its own -- the address belongs to the member.
-   */
-  [[nodiscard]] gpg::RType* CachedCThrustManipulatorType()
-  {
-    if (!moho::CThrustManipulator::sType) {
-      moho::CThrustManipulator::sType = gpg::LookupRType(typeid(moho::CThrustManipulator));
-    }
-    return moho::CThrustManipulator::sType;
-  }
 
   /**
    * The watched-bone lookup both the constructor (0x0064A654-0x0064A683) and
@@ -186,7 +147,7 @@ namespace moho
    */
   gpg::RType* CThrustManipulator::GetClass() const
   {
-    return CachedCThrustManipulatorType();
+    return gpg::RTypeOf<moho::CThrustManipulator>();
   }
 
   /**
@@ -194,10 +155,7 @@ namespace moho
    */
   gpg::RRef CThrustManipulator::GetDerivedObjectRef()
   {
-    gpg::RRef ref{};
-    ref.mObj = this;
-    ref.mType = GetClass();
-    return ref;
+    return gpg::MakeSelfRef(this);
   }
 
   /**
@@ -298,16 +256,16 @@ namespace moho
 
     const gpg::RRef owner{};
     archive->Read(IAniManipulator::StaticGetClass(), this, owner);
-    archive->Read(CachedWeakPtrUnitType(), &mUnit, owner);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mUnit, owner);
     archive->ReadString(&mLabel);
     archive->ReadInt(&mThrustBoneIndex);
     archive->ReadBool(&mThrusting);
-    archive->Read(CachedVector3fType(), &mCapMin, owner);
-    archive->Read(CachedVector3fType(), &mCapMax, owner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mCapMin, owner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mCapMax, owner);
     archive->ReadFloat(&mTurnForceMult);
     archive->ReadFloat(&mTurnSpeed);
-    archive->Read(CachedVector3fType(), &mRestDirection, owner);
-    archive->Read(CachedQuaternionfType(), &mOrientation, owner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mRestDirection, owner);
+    archive->Read(gpg::RTypeOf<Wm3::Quaternionf>(), &mOrientation, owner);
   }
 
   /**
@@ -321,16 +279,16 @@ namespace moho
 
     const gpg::RRef owner{};
     archive->Write(IAniManipulator::StaticGetClass(), this, owner);
-    archive->Write(CachedWeakPtrUnitType(), &mUnit, owner);
-    archive->WriteString(const_cast<msvc8::string*>(&mLabel));
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mUnit, owner);
+    archive->WriteString(const_cast<fa::string*>(&mLabel));
     archive->WriteInt(mThrustBoneIndex);
     archive->WriteBool(mThrusting);
-    archive->Write(CachedVector3fType(), &mCapMin, owner);
-    archive->Write(CachedVector3fType(), &mCapMax, owner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mCapMin, owner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mCapMax, owner);
     archive->WriteFloat(mTurnForceMult);
     archive->WriteFloat(mTurnSpeed);
-    archive->Write(CachedVector3fType(), &mRestDirection, owner);
-    archive->Write(CachedQuaternionfType(), &mOrientation, owner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mRestDirection, owner);
+    archive->Write(gpg::RTypeOf<Wm3::Quaternionf>(), &mOrientation, owner);
   }
 
   /**
@@ -375,13 +333,7 @@ namespace moho
       return;
     }
 
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType);
   }
 
   /**
@@ -399,12 +351,7 @@ namespace moho
   int cfunc_CreateThrustControllerL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 3) {
-      LuaPlus::LuaState::Error(
-        state, "%s\n  expected %d args, but got %d", "CreateThrustController(unit, label, thrustBone)", 3, argumentCount
-      );
-    }
+    moho::SCR_ExpectExactArgs(state, 3, "CreateThrustController(unit, label, thrustBone)");
 
     const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
     Unit* const unit = SCR_FromLua_Unit(unitObject);
@@ -475,7 +422,7 @@ namespace moho
      * Address: 0x0064A280 (FUN_0064A280, Moho::CThrustManipulatorTypeInfo::dtr)
      *
      * What it does:
-     * Frees the `RType` base's two `msvc8::vector<RField>` storage lanes and
+     * Frees the `RType` base's two `fa::vector<RField>` storage lanes and
      * restores the `gpg::RObject` vftable. Defaulted in source: the
      * compiler-generated `~RType()` reproduces this behavior, matching every
      * other manipulator TypeInfo dtor in this family.

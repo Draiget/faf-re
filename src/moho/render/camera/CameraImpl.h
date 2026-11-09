@@ -359,7 +359,7 @@ namespace moho
      * WinApiImportThunks.cpp) -- see the .cpp definition's doc comment for
      * the full citation. Releases the embedded
      * `GeomCamera3` solid-frustum heap storage, tears down the `mName`
-     * `msvc8::string` SSO buffer, runs the `CScriptEvent` sub-object teardown,
+     * `fa::string` SSO buffer, runs the `CScriptEvent` sub-object teardown,
      * and finally chains into `RCamCamera::~RCamCamera` which forgets this
      * camera from the global manager and rejoins the broadcaster ring to its
      * self-linked idle state.
@@ -503,7 +503,7 @@ namespace moho
      * Applies one acceleration mode token (`Linear`, `FastInSlowOut`,
      * `SlowInOut`) into the camera runtime acceleration lane.
      */
-    void CameraSetAccType(const msvc8::string& accType);
+    void CameraSetAccType(const fa::string& accType);
 
     /**
      * Address: 0x007A69F0 (Moho::CameraImpl::CameraGetName)
@@ -1057,7 +1057,7 @@ namespace moho
     // 0x0C (CScriptEvent base) + 0x10 (CScriptObject base) + 0x20.
     // -------------------------------------------------------------------------
 
-    msvc8::string mName{};                                     // +0x050
+    fa::string mName{};                                     // +0x050
     STIMap* mTerrainMap = nullptr;                             // +0x06C
     GeomCamera3 mCam{};                                        // +0x070
     float mVerticalZoomMetricScale = 0.0f;                     // +0x338
@@ -1083,9 +1083,9 @@ namespace moho
     /// The entities the camera is framing or following. Each node's value is a
     /// `WeakPtr` pushed onto its entity's chain: `push_back` 0x007AE4E0,
     /// `clear` 0x007AE580, the head bought through 0x007AEFA0.
-    msvc8::list<WeakPtr<UserEntity>> mTargetEntities;          // +0x3A4
+    fa::list<WeakPtr<UserEntity>> mTargetEntities;          // +0x3A4
     /// The entity being followed; a default iterator until the first target.
-    msvc8::list<WeakPtr<UserEntity>>::iterator mActiveTarget;  // +0x3B0
+    fa::list<WeakPtr<UserEntity>>::iterator mActiveTarget;  // +0x3B0
     float mTargetTimeLeft = 0.0f;                              // +0x3B4
     std::uint8_t mTargetTime = 0;                              // +0x3B8
     std::uint8_t mPadding0x3B9_[3]{};                          // +0x3B9

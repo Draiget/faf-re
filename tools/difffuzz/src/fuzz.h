@@ -47,6 +47,16 @@ namespace difffuzz
     return f;
   }
 
+  /// A float the generator computes from other lanes (a pair's second vector,
+  /// matrix rows from a quaternion). A NaN result becomes the default quiet
+  /// NaN: the sign and payload arithmetic leaves on a NaN are the compiler's
+  /// choice (clang folds `x * -1.0` to a negation on some versions), and
+  /// faf_math_dump needs the same inputs on every platform.
+  [[nodiscard]] inline float DerivedFloat(const double value) noexcept
+  {
+    return std::isnan(value) ? FromBits(0x7FC00000u) : static_cast<float>(value);
+  }
+
   /// One float drawn from a mix of classes: small, moderate, unit-range,
   /// log-uniform across every exponent, raw bit patterns (NaN payloads, inf,
   /// denormals), and a table of edge values plus their +-k ulp neighbours.
@@ -79,8 +89,16 @@ namespace difffuzz
     const char* outLayout; // e.g. "dest[3] ret"
     void (*gen)(Rng&, std::uint32_t* in);
     void (*retail)(const std::uint32_t* in, std::uint32_t* out);
+    // Null in the standalone difffuzz build for a row whose engine class it
+    // cannot compile (targets_sim.cpp): retail's outputs only, which
+    // faf_math_dump checks.
     void (*ours)(const std::uint32_t* in, std::uint32_t* out);
+    // Integer output words (math_randomseed's seed): a NaN-looking word is a
+    // value, never canonicalised or tallied as a NaN payload.
+    bool rawOutputs = false;
   };
 
   const Target* MathTargets(int& count);
+  /// MathTargets, then the sim rows on engine objects (targets_sim.cpp).
+  const Target* AllTargets(int& count);
 } // namespace difffuzz

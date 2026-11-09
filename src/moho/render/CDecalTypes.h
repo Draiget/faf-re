@@ -45,12 +45,12 @@ namespace moho
       const Wm3::Vec3f& size,
       const Wm3::Vec3f& position,
       const Wm3::Vec3f& rotation,
-      const msvc8::string& textureNamePrimary,
-      const msvc8::string& textureNameSecondary,
+      const fa::string& textureNamePrimary,
+      const fa::string& textureNameSecondary,
       bool isSplat,
       float lodParam,
       std::uint32_t startTick,
-      const msvc8::string& typeName,
+      const fa::string& typeName,
       std::uint32_t armyIndex,
       std::uint32_t fidelity
     );
@@ -62,7 +62,7 @@ namespace moho
      * Destroys one decal-info payload. Compiler-synthesized body destroys
      * trailing string `mType` (deallocating when capacity exceeds the SSO
      * limit of 0x10), then runs the eh-vector destructor lane over the
-     * two texture-name strings (count=2, stride=sizeof(msvc8::string))
+     * two texture-name strings (count=2, stride=sizeof(fa::string))
      * to tear down `mTexName2` and `mTexName1` in reverse declaration
      * order. Aligned `Wm3::Vec3f` lanes are trivial and need no teardown.
      */
@@ -89,13 +89,13 @@ namespace moho
     Wm3::Vec3f mPos;         // +0x00
     Wm3::Vec3f mSize;        // +0x0C
     Wm3::Vec3f mRot;         // +0x18
-    msvc8::string mTexName1; // +0x24
-    msvc8::string mTexName2; // +0x40
+    fa::string mTexName1; // +0x24
+    fa::string mTexName2; // +0x40
     std::uint8_t mIsSplat;   // +0x5C
     std::uint8_t mPad5D[0x03];
     float mLODParam;          // +0x60
     std::uint32_t mStartTick; // +0x64
-    msvc8::string mType;      // +0x68
+    fa::string mType;      // +0x68
     std::uint32_t mObj;       // +0x84
     std::uint32_t mArmy;      // +0x88
     std::uint32_t mFidelity;  // +0x8C

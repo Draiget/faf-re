@@ -50,8 +50,8 @@ namespace moho
 
     virtual void AddDeposit(EDepositType type, gpg::Rect2i* pos) = 0;
     virtual void AddDepositPoint(EDepositType type, Wm3::Vec3f* pos, Wm3::Vec2i* size) = 0;
-    virtual const msvc8::vector<ResourceDeposit>& GetDeposits() const = 0;
-    virtual msvc8::vector<ResourceDeposit>& GetDeposits() = 0;
+    virtual const fa::vector<ResourceDeposit>& GetDeposits() const = 0;
+    virtual fa::vector<ResourceDeposit>& GetDeposits() = 0;
     virtual bool IsDepositAt(gpg::Rect2i* pos, EDepositType type) = 0;
     virtual bool IsDepositAtPoint(Wm3::Vec3f* pos, Wm3::Vec2i* size, EDepositType type) = 0;
     virtual void DepositCollides(
@@ -69,7 +69,7 @@ namespace moho
      * Maps one deposit-type string to its `EDepositType` enum lane (`""`,
      * `"Mass"`, `"Hydrocarbon"`), returning `kNone` when unmatched.
      */
-    [[nodiscard]] static EDepositType Translate(const msvc8::string& depositTypeName);
+    [[nodiscard]] static EDepositType Translate(const fa::string& depositTypeName);
 
     /**
      * Address: 0x00546D10 (FUN_00546D10)
@@ -77,7 +77,7 @@ namespace moho
      * What it does:
      * Returns one deposit-type string table entry by enum index.
      */
-    [[nodiscard]] static const msvc8::string* Translate(EDepositType depositType);
+    [[nodiscard]] static const fa::string* Translate(EDepositType depositType);
   };
 
   /**
@@ -87,7 +87,7 @@ namespace moho
    * Scans one contiguous string array range for an exact match and returns the
    * first matching element or `end` when no match is found.
    */
-  msvc8::string* SearchStringArrayFor(msvc8::string* begin, msvc8::string* end, const msvc8::string* value);
+  fa::string* SearchStringArrayFor(fa::string* begin, fa::string* end, const fa::string* value);
 
   static_assert(sizeof(IResources) == 0x4, "IResources size must be 0x4");
   static_assert(std::is_polymorphic<IResources>::value, "IResources must remain polymorphic");

@@ -43,6 +43,7 @@
 #include "gpg/gal/RenderTargetContext.hpp"
 #include "gpg/gal/TextureContext.h"
 #include "gpg/gal/VertexBufferContext.hpp"
+#include "gpg/gal/backends/common/TextureQuality.h"
 
 namespace gpg::gal
 {
@@ -583,10 +584,12 @@ namespace gpg::gal
       ThrowError("DeviceD3D11.cpp", __LINE__, "internal D3D11 RTT effect error");
     }
 
+    // Dynamic: StretchRectBlit writes the source rect's texture coordinates.
     D3D11_BUFFER_DESC bufferDesc{};
     bufferDesc.ByteWidth = sizeof(kRttFullscreenVertices);
-    bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+    bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
     bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     D3D11_SUBRESOURCE_DATA initialData{};
     initialData.pSysMem = kRttFullscreenVertices;
     CheckHresult("DeviceD3D11.cpp", __LINE__, mDevice->CreateBuffer(&bufferDesc, &initialData, &mRttQuadVertexBuffer));
@@ -763,7 +766,7 @@ namespace gpg::gal
 
   void DeviceD3D11::Func1() const {}
 
-  void DeviceD3D11::GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, const int adapterIndex)
+  void DeviceD3D11::GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, const int adapterIndex)
   {
     outModes.clear();
     const auto& adapters = mFactory.Adapters();
@@ -868,20 +871,7 @@ namespace gpg::gal
       const char* const data = context->dataBuffer_.mBegin;
       const SIZE_T bytes = context->DataSizeBytes();
 
-      // The texture-quality option skips top mip levels (D3D9 passes it as
-      // D3DX_SKIP_DDS_MIP_LEVELS, `reserved0x44_`); a file with too few
-      // levels for that loads whole.
-      const UINT skipLevels = context->reserved0x44_ & 0x1FU;
-      HRESULT result = E_FAIL;
-      if (skipLevels != 0U) {
-        D3DX11_IMAGE_LOAD_INFO loadInfo;
-        loadInfo.FirstMipLevel = skipLevels;
-        result = mD3DX11->createTextureFromMemory(mDevice.Get(), data, bytes, &loadInfo, nullptr, &resource, nullptr);
-      }
-      if (FAILED(result)) {
-        resource.Reset();
-        result = mD3DX11->createTextureFromMemory(mDevice.Get(), data, bytes, nullptr, nullptr, &resource, nullptr);
-      }
+      const HRESULT result = mD3DX11->createTextureFromMemory(mDevice.Get(), data, bytes, nullptr, nullptr, &resource, nullptr);
       if (FAILED(result)) {
         char message[640]{};
         std::snprintf(
@@ -889,6 +879,40 @@ namespace gpg::gal
           static_cast<unsigned long>(result)
         );
         ThrowError("DeviceD3D11.cpp", __LINE__, message);
+      }
+      // Texture quality drops the top levels of a 2D DDS with a mip chain, as the original's
+      // D3DX9 load does; cubes and volumes keep theirs. D3DX11's FirstMipLevel is not that: it
+      // scales the skipped-to level back up to the file's size. So the file loads whole and the
+      // levels below the skip are copied into a smaller texture.
+      ComPtr<ID3D11Texture2D> whole;
+      UINT skip = imaging::TextureQualityMipLevels(data, bytes, context->reserved0x44_ & 0x1FU);
+      if (skip != 0U && SUCCEEDED(resource.As(&whole))) {
+        D3D11_TEXTURE2D_DESC desc{};
+        whole->GetDesc(&desc);
+        skip = (desc.MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE) != 0U ? 0U : std::min(skip, desc.MipLevels - 1U);
+        // A block-compressed top level stays a whole number of blocks.
+        while (skip != 0U && d3d11::IsBlockCompressed(desc.Format) &&
+               (((desc.Width >> skip) % 4U) != 0U || ((desc.Height >> skip) % 4U) != 0U)) {
+          --skip;
+        }
+        if (skip != 0U) {
+          const UINT wholeLevels = desc.MipLevels;
+          desc.Width >>= skip;
+          desc.Height >>= skip;
+          desc.MipLevels -= skip;
+          ComPtr<ID3D11Texture2D> smaller;
+          if (SUCCEEDED(mDevice->CreateTexture2D(&desc, nullptr, &smaller))) {
+            for (UINT slice = 0U; slice < desc.ArraySize; ++slice) {
+              for (UINT level = 0U; level < desc.MipLevels; ++level) {
+                mImmediate->CopySubresourceRegion(
+                  smaller.Get(), D3D11CalcSubresource(level, slice, desc.MipLevels), 0U, 0U, 0U, whole.Get(),
+                  D3D11CalcSubresource(level + skip, slice, wholeLevels), nullptr
+                );
+              }
+            }
+            resource = smaller;
+          }
+        }
       }
     } else {
       ThrowError("DeviceD3D11.cpp", __LINE__, "invalid source specified for texture data");
@@ -1161,42 +1185,59 @@ namespace gpg::gal
     sourceTarget->GetTexture()->GetDesc(&sourceDesc);
     destinationTarget->GetTexture()->GetDesc(&destinationDesc);
 
-    if (sourceContext->width_ == destinationContext->width_ && sourceContext->height_ == destinationContext->height_ &&
-        sourceDesc.Format == destinationDesc.Format) {
-      // As D3D10: a direct copy; only the destination rect's corner is used.
-      UINT destinationX = 0U;
-      UINT destinationY = 0U;
-      if (destinationRect != nullptr) {
-        destinationX = static_cast<UINT>(destinationRect->left);
-        destinationY = static_cast<UINT>(destinationRect->top);
-      }
+    // As D3D9 StretchRect: a null rect is the whole surface, and the source
+    // rect is stretched over the destination rect. The refraction copy of a
+    // split-screen view relies on this: it passes the view's rect and no
+    // destination rect, and the particle shaders sample the copy with
+    // view-relative coordinates.
+    const RECT fromRect =
+      (sourceRect != nullptr) ? *sourceRect
+                              : RECT{0, 0, static_cast<LONG>(sourceContext->width_), static_cast<LONG>(sourceContext->height_)};
+    const RECT toRect =
+      (destinationRect != nullptr)
+        ? *destinationRect
+        : RECT{0, 0, static_cast<LONG>(destinationContext->width_), static_cast<LONG>(destinationContext->height_)};
+
+    if (fromRect.right - fromRect.left == toRect.right - toRect.left &&
+        fromRect.bottom - fromRect.top == toRect.bottom - toRect.top && sourceDesc.Format == destinationDesc.Format) {
+      // Same size: a direct copy.
       D3D11_BOX box{};
-      const D3D11_BOX* boxPointer = nullptr;
-      if (sourceRect != nullptr) {
-        box.left = static_cast<UINT>(sourceRect->left);
-        box.top = static_cast<UINT>(sourceRect->top);
-        box.right = static_cast<UINT>(sourceRect->right);
-        box.bottom = static_cast<UINT>(sourceRect->bottom);
-        box.front = 0U;
-        box.back = 1U;
-        boxPointer = &box;
-      }
+      box.left = static_cast<UINT>(fromRect.left);
+      box.top = static_cast<UINT>(fromRect.top);
+      box.right = static_cast<UINT>(fromRect.right);
+      box.bottom = static_cast<UINT>(fromRect.bottom);
+      box.front = 0U;
+      box.back = 1U;
       mImmediate->CopySubresourceRegion(
-        destinationTarget->GetTexture(), 0U, destinationX, destinationY, 0U, sourceTarget->GetTexture(), 0U, boxPointer
+        destinationTarget->GetTexture(),
+        0U,
+        static_cast<UINT>(toRect.left),
+        static_cast<UINT>(toRect.top),
+        0U,
+        sourceTarget->GetTexture(),
+        0U,
+        &box
       );
       return;
     }
 
     StretchRectBlit(
-      destinationContext->width_,
-      destinationContext->height_,
+      sourceContext->width_,
+      sourceContext->height_,
+      fromRect,
+      toRect,
       destinationTarget->GetRenderTargetView(),
       sourceTarget->GetShaderResourceView()
     );
   }
 
   void DeviceD3D11::StretchRectBlit(
-    const UINT width, const UINT height, ID3D11RenderTargetView* const destination, ID3D11ShaderResourceView* const source
+    const UINT sourceWidth,
+    const UINT sourceHeight,
+    const RECT& sourceRect,
+    const RECT& destinationRect,
+    ID3D11RenderTargetView* const destination,
+    ID3D11ShaderResourceView* const source
   )
   {
     D3D11_VIEWPORT savedViewport{};
@@ -1207,9 +1248,29 @@ namespace gpg::gal
     ComPtr<ID3D11DepthStencilView> savedDepth;
     mImmediate->OMGetRenderTargets(1U, &savedTarget, &savedDepth);
 
+    // The quad covers the viewport, which is the destination rect, and its
+    // texture coordinates cover the source rect. Scaling the viewport instead
+    // would leave the viewport bounds (-32768..32767) for small rects.
+    const float u0 = static_cast<float>(sourceRect.left) / static_cast<float>(sourceWidth);
+    const float u1 = static_cast<float>(sourceRect.right) / static_cast<float>(sourceWidth);
+    const float v0 = static_cast<float>(sourceRect.top) / static_cast<float>(sourceHeight);
+    const float v1 = static_cast<float>(sourceRect.bottom) / static_cast<float>(sourceHeight);
+    const RttVertex vertices[4] = {
+      {-1.0f, -1.0f, 0.0f, u0, v1},
+      {1.0f, -1.0f, 0.0f, u1, v1},
+      {-1.0f, 1.0f, 0.0f, u0, v0},
+      {1.0f, 1.0f, 0.0f, u1, v0},
+    };
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    CheckHresult("DeviceD3D11.cpp", __LINE__, mImmediate->Map(mRttQuadVertexBuffer.Get(), 0U, D3D11_MAP_WRITE_DISCARD, 0U, &mapped));
+    std::memcpy(mapped.pData, vertices, sizeof(vertices));
+    mImmediate->Unmap(mRttQuadVertexBuffer.Get(), 0U);
+
     D3D11_VIEWPORT viewport{};
-    viewport.Width = static_cast<float>(width);
-    viewport.Height = static_cast<float>(height);
+    viewport.TopLeftX = static_cast<float>(destinationRect.left);
+    viewport.TopLeftY = static_cast<float>(destinationRect.top);
+    viewport.Width = static_cast<float>(destinationRect.right - destinationRect.left);
+    viewport.Height = static_cast<float>(destinationRect.bottom - destinationRect.top);
     viewport.MaxDepth = 1.0f;
     mImmediate->RSSetViewports(1U, &viewport);
 
@@ -1332,14 +1393,14 @@ namespace gpg::gal
     destinationTexture->DiscardCpuCopy();
   }
 
-  void DeviceD3D11::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const msvc8::string& filePath)
+  void DeviceD3D11::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath)
   {
     static_cast<void>(cubeTarget);
     static_cast<void>(filePath);
   }
 
   void DeviceD3D11::SaveRenderTarget(
-    const boost::shared_ptr<RenderTarget>& renderTarget, const msvc8::string& filePath, const int fileFormat
+    const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, const int fileFormat
   )
   {
     auto* const target = static_cast<RenderTargetD3D11*>(renderTarget.get());
@@ -1351,17 +1412,20 @@ namespace gpg::gal
 
   void DeviceD3D11::SaveTexture(
     const boost::shared_ptr<Texture>& texture,
-    const msvc8::string& filePath,
+    const fa::string& filePath,
     const int fileFormat,
     gpg::MemBuffer<char>* const outBuffer
   )
   {
     auto* const sourceTexture = static_cast<TextureD3D11*>(texture.get());
     if (outBuffer == nullptr) {
-      CheckHresult(
-        "DeviceD3D11.cpp", __LINE__,
-        mD3DX11->saveTextureToFile(mImmediate.Get(), sourceTexture->GetResource(), ImageFileFormat(fileFormat), filePath.c_str())
-      );
+      const HRESULT saved = mD3DX11->saveTextureToFile(mImmediate.Get(), sourceTexture->GetResource(), ImageFileFormat(fileFormat), filePath.c_str());
+      if (FAILED(saved) && fileFormat == 0) {
+        // D3DX11 answers E_FAIL for a frame as a BMP, which is what dump_Frame asks for.
+        DumpTexture(sourceTexture->GetTexture2D(), filePath.c_str());
+        return;
+      }
+      CheckHresult("DeviceD3D11.cpp", __LINE__, saved);
       return;
     }
 
@@ -1415,6 +1479,10 @@ namespace gpg::gal
     loadInfo.Usage = D3D11_USAGE_STAGING;
     loadInfo.BindFlags = 0U;
     loadInfo.CpuAccessFlags = D3D11_CPU_ACCESS_READ;
+    // Padded to whole blocks, not stretched over them: D3D9 converts with D3DX_FILTER_NONE.
+    loadInfo.Filter = D3DX11_FILTER_NONE;
+    D3DX11_IMAGE_INFO sourceInfo{};
+    loadInfo.pSrcInfo = &sourceInfo;
 
     ComPtr<ID3D11Resource> decoded;
     CheckHresult(
@@ -1424,10 +1492,13 @@ namespace gpg::gal
     ComPtr<ID3D11Texture2D> staging;
     CheckHresult("DeviceD3D11.cpp", __LINE__, decoded.As(&staging));
 
+    // The size is the file's, as D3D9 reports it (0x008ECD20). A BC3 texture
+    // is padded to a multiple of 4, so the desc of a 792x21 image says 792x24;
+    // the blocks below are copied at that padded size.
     D3D11_TEXTURE2D_DESC desc{};
     staging->GetDesc(&desc);
-    *outWidth = desc.Width;
-    *outHeight = static_cast<int>(desc.Height);
+    *outWidth = sourceInfo.Width;
+    *outHeight = static_cast<int>(sourceInfo.Height);
 
     D3D11_MAPPED_SUBRESOURCE mapped{};
     CheckHresult("DeviceD3D11.cpp", __LINE__, mDecodeContext->Map(staging.Get(), 0U, D3D11_MAP_READ, 0U, &mapped));
@@ -2234,7 +2305,16 @@ namespace gpg::gal
     // World shapes (ren_GpuShapes): a paused same-process A/B of FAF's shapes plus a 2,000-segment
     // UI_DrawLine stroke against the path off, pixel-identical outside two animated unit glows.
     return kGpuPathStrategicIcons | kGpuPathIconClassify | kGpuPathFogOfWar | kGpuPathSelectBrackets |
-      kGpuPathProjectileIcons | kGpuPathWorldShapes;
+      // MSDF text and the interface's quads: 0 pixels differ in a same-process A/B of a panel of text.
+      kGpuPathProjectileIcons | kGpuPathWorldShapes | kGpuPathMsdfText | MsdfCookVerified();
+  }
+
+  std::uint32_t DeviceD3D11::MsdfCookVerified() const
+  {
+    // The GPU font cook (ren_GpuFontCook): GPU and CPU atlases compared per font, and a device reset during
+    // a cook, on NVIDIA only; other vendors keep the CPU cook until it has run there (issue #309).
+    const bool nvidia = mAdapterIndex < mFactory.Adapters().size() && mFactory.Adapters()[mAdapterIndex].desc.VendorId == kPciVendorNvidia;
+    return nvidia ? kGpuPathMsdfCook : 0U;
   }
 
   boost::shared_ptr<GpuBuffer> DeviceD3D11::CreateGpuBuffer(const GpuBufferDesc& desc)

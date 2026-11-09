@@ -189,6 +189,18 @@ diff -ruN a/boost/thread/xtime.hpp b/boost/thread/xtime.hpp
  
  } // namespace boost
  
+diff -ruN a/boost/type_traits/intrinsics.hpp b/boost/type_traits/intrinsics.hpp
+--- a/boost/type_traits/intrinsics.hpp
++++ b/boost/type_traits/intrinsics.hpp
+@@ -72,7 +72,7 @@
+ 
+ #if defined(BOOST_MSVC) && defined(_MSC_FULL_VER) && (_MSC_FULL_VER >=140050215)
+ #   define BOOST_IS_UNION(T) __is_union(T)
+-#   define BOOST_IS_POD(T) (__is_pod(T) && __has_trivial_constructor(T))
++#   define BOOST_IS_POD(T) (__is_pod(T) && __is_trivially_constructible(T))
+ #   define BOOST_IS_EMPTY(T) __is_empty(T)
+ #   define BOOST_HAS_TRIVIAL_CONSTRUCTOR(T) __has_trivial_constructor(T)
+ #   define BOOST_HAS_TRIVIAL_COPY(T) __has_trivial_copy(T)
 diff -ruN a/libs/thread/src/once.cpp b/libs/thread/src/once.cpp
 --- a/libs/thread/src/once.cpp
 +++ b/libs/thread/src/once.cpp

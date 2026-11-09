@@ -9,6 +9,14 @@
 
 namespace moho
 {
+  bool sim_SyncFillsOneDispatch = true;
+  TConVar<bool> gTConVar_sim_SyncFillsOneDispatch(
+    "sim_SyncFillsOneDispatch",
+    "With sim_ParallelSync, unit-update and entity-update record copies go to the workers in one "
+    "dispatch instead of one after the other (same packet).",
+    &sim_SyncFillsOneDispatch
+  );
+
   namespace
   {
     /// One deferred record: where it is, and what completes it.
@@ -33,6 +41,7 @@ namespace moho
       std::size_t mIndex;                    // into SSyncData::mEntityUpdates
       const SSTIEntityVariableData* mSource; // the payload passed to the queue call
       std::uint8_t mRequestRefreshUI;        // the source's value when queued
+      bool mHasScrollOverride;              // endpoints captured in the queued record
       const SPerArmyReconInfo* mReconOverrides;
     };
     SEntityUpdateFill sEntityUpdateFills[kMaxUnitUpdateFills];
@@ -79,10 +88,29 @@ namespace moho
     sActiveUnitUpdateFills = nullptr;
     sActiveSyncData = nullptr;
     const std::size_t count = sUnitUpdateFillCount;
+    const std::size_t entityCount = sEntityUpdateFillCount;
+    if (sim_SyncFillsOneDispatch) {
+      // Unit fills first, then entity fills, as one index range. They write different record
+      // vectors and only read their sources, so a chunk may hold the end of one and the start of
+      // the other.
+      CSimWorkerPool::Get().ParallelFor(
+        count + entityCount, kUnitUpdateFillGrain, [this, count](const std::size_t begin, const std::size_t end) {
+          if (begin < count) {
+            FillRange(begin, end < count ? end : count);
+          }
+          if (end > count) {
+            FillEntityRange(begin > count ? begin - count : 0u, end - count);
+          }
+        }
+      );
+      sUnitUpdateFillCount = 0;
+      sEntityUpdateFillCount = 0;
+      mSyncData = nullptr;
+      return;
+    }
     CSimWorkerPool::Get().ParallelFor(
       count, kUnitUpdateFillGrain, [this](const std::size_t begin, const std::size_t end) { FillRange(begin, end); }
     );
-    const std::size_t entityCount = sEntityUpdateFillCount;
     CSimWorkerPool::Get().ParallelFor(
       entityCount, kUnitUpdateFillGrain, [this](const std::size_t begin, const std::size_t end) {
         FillEntityRange(begin, end);
@@ -145,7 +173,17 @@ namespace moho
     for (std::size_t i = begin; i < end; ++i) {
       const SEntityUpdateFill& fill = sEntityUpdateFills[i];
       SSTIEntityVariableData& payload = mSyncData->mEntityUpdates[fill.mIndex].mVariableData;
-      payload = *fill.mSource;
+      // Snapshot only initialized override values; ordinary deferred records do
+      // not need their default scroll lanes read. Queue storage may have moved.
+      if (fill.mHasScrollOverride) {
+        const auto scrollStart = payload.mScrollBeatStart;
+        const auto scrollEnd = payload.mScrollBeatEnd;
+        payload = *fill.mSource;
+        payload.mScrollBeatStart = scrollStart;
+        payload.mScrollBeatEnd = scrollEnd;
+      } else {
+        payload = *fill.mSource;
+      }
       payload.mRequestRefreshUI = fill.mRequestRefreshUI;
       if (const SPerArmyReconInfo* const recon = fill.mReconOverrides; recon != nullptr) {
         payload.mMeshBlueprint = recon->mStiMesh;
@@ -173,9 +211,25 @@ namespace moho
     SEntityVariableUpdateEntry& entry = syncData->mEntityUpdates.back();
     entry.mEntityId = entityId;
     sEntityUpdateFills[sEntityUpdateFillCount++] = SEntityUpdateFill{
-      syncData->mEntityUpdates.size() - 1u, &variableData, variableData.mRequestRefreshUI, nullptr
+      syncData->mEntityUpdates.size() - 1u, &variableData, variableData.mRequestRefreshUI, false, nullptr
     };
     return &entry;
+  }
+
+  void OverrideEntityUpdateScroll(SSyncData* const syncData, const SSTIEntityVariableData& source)
+  {
+    if (syncData == nullptr || syncData->mEntityUpdates.empty()) {
+      return;
+    }
+    SSTIEntityVariableData& payload = syncData->mEntityUpdates.back().mVariableData;
+    payload.mScrollBeatStart = source.mScrollBeatStart;
+    payload.mScrollBeatEnd = source.mScrollBeatEnd;
+    if (syncData == sActiveSyncData && sEntityUpdateFillCount != 0u) {
+      SEntityUpdateFill& last = sEntityUpdateFills[sEntityUpdateFillCount - 1u];
+      if (last.mIndex + 1u == syncData->mEntityUpdates.size()) {
+        last.mHasScrollOverride = true;
+      }
+    }
   }
 
   bool OverrideDeferredEntityUpdateFromRecon(SSyncData* const syncData, const SPerArmyReconInfo* const reconInfo)
@@ -190,6 +244,13 @@ namespace moho
     last.mReconOverrides = reconInfo;
     return true;
   }
+
+  bool sim_SyncInPlace = true;
+  TConVar<bool> gTConVar_sim_SyncInPlace(
+    "sim_SyncInPlace",
+    "The serial unit-update queue builds each record in place, not from a default copy (same packet).",
+    &sim_SyncInPlace
+  );
 
   bool sim_ParallelSyncHeap = true;
   TConVar<bool> gTConVar_sim_ParallelSyncHeap(

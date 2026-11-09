@@ -1,5 +1,8 @@
+#include "moho/lua/ScrLuaUserData.h"
+#include "moho/script/CScriptObject.h"
 #include "CScriptObject.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <exception>
 #include <string>
@@ -31,7 +34,6 @@ gpg::RType* CScriptObject::sPointerType = nullptr;
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kIsDestroyedName = "IsDestroyed";
   constexpr const char* kIsDestroyedHelpText = "Has the c++ object been destroyed?";
   constexpr const char* kPrintUserName = "print";
@@ -47,91 +49,9 @@ namespace
     "doscript(script, [env]) -- run another script. The environment table, if given, will be used for the script's "
     "global variables.";
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Core");
-    return sSet;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("User"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("User");
-    return sSet;
-  }
-
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  /**
-   * The reflected reference is assembled from the userdata HEADER, not read out
-   * of its payload. This fork carries the `gpg::RType*` in `Udata::len`, and the
-   * value itself starts one header past the allocation, which is exactly what
-   * `LuaPlus::LuaObject::GetUserData` (0x00907540) does:
-   *
-   *     lea edx, [ecx+10h]   ; mObj  = payload, laid out after the header
-   *     mov ecx, [ecx+0Ch]   ; mType = Udata::len reinterpreted as RType*
-   *
-   * Reading `*(gpg::RRef*)lua_touserdata(...)` instead - as this helper used to -
-   * takes the first eight payload bytes as if they were a reference. For a
-   * `_c_object` slot those bytes are the `CScriptObject*` value followed by
-   * whatever the allocator left, so every upcast failed and each caller reported
-   * "Expected a game object" for a perfectly good object.
-   */
-  [[nodiscard]] gpg::RRef ExtractUserDataRef(const LuaPlus::LuaObject& userDataObject)
-  {
-    if (!userDataObject.IsUserData()) {
-      return gpg::RRef{};
-    }
-
-    return userDataObject.GetUserData();
-  }
-
-  [[nodiscard]] CScriptObject** ExtractScriptObjectSlotFromLuaObject(const LuaPlus::LuaObject& object)
-  {
-    LuaPlus::LuaObject payload(object);
-    if (payload.IsTable()) {
-      payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
-    }
-
-    if (!payload.IsUserData()) {
-      return nullptr;
-    }
-
-    const gpg::RRef userDataRef = ExtractUserDataRef(payload);
-    if (!userDataRef.mObj) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, CScriptObject::GetPointerType());
-    return static_cast<CScriptObject**>(upcast.mObj);
-  }
-
-  gpg::RType* CachedLuaObjectType()
-  {
-    gpg::RType* cached = LuaPlus::LuaObject::sType;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(LuaPlus::LuaObject));
-      LuaPlus::LuaObject::sType = cached;
-    }
-    return cached;
   }
 
   LuaPlus::LuaObject GetScriptObjectMetatable(LuaPlus::LuaState* state)
@@ -262,6 +182,23 @@ namespace
     return scriptObject->mLuaObj;
   }
 
+  // Restore the entry top after normal return or the VM's supported exception unwind.
+  // Use the raw state: a running coroutine need not own a LuaState wrapper.
+  struct CallbackLuaStackScope
+  {
+    explicit CallbackLuaStackScope(lua_State* const stateIn)
+      : state(stateIn), top(lua_gettop(stateIn))
+    {}
+
+    ~CallbackLuaStackScope() { lua_settop(state, top); }
+
+    CallbackLuaStackScope(const CallbackLuaStackScope&) = delete;
+    CallbackLuaStackScope& operator=(const CallbackLuaStackScope&) = delete;
+
+    lua_State* state;
+    int top;
+  };
+
   struct WeakEntityUnlinkScope
   {
     explicit WeakEntityUnlinkScope(WeakPtr<Entity>& linkRef)
@@ -301,7 +238,7 @@ namespace
     WeakEntityUnlinkScope unlinkScope(weakSource);
 
     lua_State* const activeState = function.GetActiveCState();
-    const int savedTop = lua_gettop(activeState);
+    const CallbackLuaStackScope stackScope(activeState);
 
     function.PushStack(activeState);
     selfObject.PushStack(activeState);
@@ -322,9 +259,7 @@ namespace
     lua_pushlstring(activeState, damageType.c_str(), static_cast<size_t>(damageType.size()));
     lua_call(activeState, 4, 1);
 
-    const float result = static_cast<float>(lua_tonumber(activeState, -1));
-    lua_settop(activeState, savedTop);
-    return result;
+    return static_cast<float>(lua_tonumber(activeState, -1));
   }
 
   /**
@@ -346,7 +281,7 @@ namespace
     WeakEntityUnlinkScope unlinkScope(weakSource);
 
     lua_State* const activeState = function.GetActiveCState();
-    const int savedTop = lua_gettop(activeState);
+    const CallbackLuaStackScope stackScope(activeState);
 
     function.PushStack(activeState);
     selfObject.PushStack(activeState);
@@ -367,7 +302,6 @@ namespace
     payloadObject.PushStack(activeState);
     lua_pushlstring(activeState, damageType.c_str(), static_cast<size_t>(damageType.size()));
     lua_call(activeState, 5, 1);
-    lua_settop(activeState, savedTop);
   }
 
   /**
@@ -562,12 +496,7 @@ namespace
     const LuaPlus::LuaObject* sourceEnd
   )
   {
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationEnd;
-      *destinationEnd = *sourceEnd;
-    }
-    return destinationEnd;
+    return std::copy_backward(sourceBegin, sourceEnd, destinationEnd);
   }
 
 } // namespace
@@ -612,7 +541,7 @@ CScriptObject::CScriptObject(
 CScriptObject::~CScriptObject()
 {
   if (cObject.m_state) {
-    CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(cObject);
+    CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(cObject);
     if (scriptObjectSlot) {
       *scriptObjectSlot = nullptr;
     }
@@ -663,10 +592,10 @@ gpg::RType* CScriptObject::GetPointerType()
 void CScriptObject::MemberDeserialize(gpg::ReadArchive* const archive)
 {
   gpg::RRef ownerRef{};
-  gpg::RType* luaObjectType = CachedLuaObjectType();
+  gpg::RType* luaObjectType = gpg::RTypeOf<LuaPlus::LuaObject>();
   archive->Read(luaObjectType, &cObject, ownerRef);
 
-  luaObjectType = CachedLuaObjectType();
+  luaObjectType = gpg::RTypeOf<LuaPlus::LuaObject>();
   archive->Read(luaObjectType, &mLuaObj, ownerRef);
 }
 
@@ -676,10 +605,10 @@ void CScriptObject::MemberDeserialize(gpg::ReadArchive* const archive)
 void CScriptObject::MemberSerialize(gpg::WriteArchive* const archive)
 {
   gpg::RRef ownerRef{};
-  gpg::RType* luaObjectType = CachedLuaObjectType();
+  gpg::RType* luaObjectType = gpg::RTypeOf<LuaPlus::LuaObject>();
   archive->Write(luaObjectType, &cObject, ownerRef);
 
-  luaObjectType = CachedLuaObjectType();
+  luaObjectType = gpg::RTypeOf<LuaPlus::LuaObject>();
   archive->Write(luaObjectType, &mLuaObj, ownerRef);
 }
 
@@ -690,7 +619,7 @@ void CScriptObject::MemberSerialize(gpg::WriteArchive* const archive)
  * Default `where` text for script-error warnings: `CScriptObject at %08x`
  * (format at 0x00E091C4) of `this` -- lower-case, zero-padded hex, not `%p`.
  */
-msvc8::string CScriptObject::GetErrorDescription()
+fa::string CScriptObject::GetErrorDescription()
 {
   return gpg::STR_Printf("CScriptObject at %08x", reinterpret_cast<std::uintptr_t>(this));
 }
@@ -794,7 +723,7 @@ void CScriptObject::SetLuaObject(const LuaPlus::LuaObject& obj)
 void CScriptObject::LogScriptWarning(CScriptObject* obj, const char* which, const char* message)
 {
   const char* where = "<deleted object>";
-  msvc8::string description;
+  fa::string description;
   if (obj) {
     description = obj->GetErrorDescription();
     where = description.c_str();
@@ -977,7 +906,7 @@ int moho::cfunc_IsDestroyed(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_IsDestroyed_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     kIsDestroyedName,
     &moho::cfunc_IsDestroyed,
     nullptr,
@@ -996,13 +925,10 @@ moho::CScrLuaInitForm* moho::func_IsDestroyed_LuaFuncDef()
 int moho::cfunc_IsDestroyedL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kIsDestroyedHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kIsDestroyedHelpText);
 
   const LuaPlus::LuaObject scriptObjectArg(LuaPlus::LuaStackObject(state, 1));
-  CScriptObject** const scriptObjectSlot = ExtractScriptObjectSlotFromLuaObject(scriptObjectArg);
+  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(scriptObjectArg);
   const bool isDestroyed = (scriptObjectSlot == nullptr) || (*scriptObjectSlot == nullptr);
   lua_pushboolean(rawState, isDestroyed ? 1 : 0);
   (void)lua_gettop(rawState);
@@ -1102,7 +1028,7 @@ int moho::cfunc_printUser(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_printUser_LuaFuncDef()
 {
   static CScrLuaBinder
-    binder(UserLuaInitSet(), kPrintUserName, &moho::cfunc_printUser, nullptr, "<global>", kPrintUserHelpText);
+    binder(moho::SCR_UserLuaInitSet(), kPrintUserName, &moho::cfunc_printUser, nullptr, "<global>", kPrintUserHelpText);
   return &binder;
 }
 
@@ -1126,7 +1052,7 @@ int moho::cfunc_LOG(lua_State* const luaContext)
  */
 moho::CScrLuaInitForm* moho::func_LOG_LuaFuncDef()
 {
-  static CScrLuaBinder binder(CoreLuaInitSet(), kLogName, &moho::cfunc_LOG, nullptr, "<global>", kLogHelpText);
+  static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), kLogName, &moho::cfunc_LOG, nullptr, "<global>", kLogHelpText);
   return &binder;
 }
 
@@ -1150,7 +1076,7 @@ int moho::cfunc_WARN(lua_State* const luaContext)
  */
 moho::CScrLuaInitForm* moho::func_WARN_LuaFuncDef()
 {
-  static CScrLuaBinder binder(CoreLuaInitSet(), kWarnName, &moho::cfunc_WARN, nullptr, "<global>", kWarnHelpText);
+  static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), kWarnName, &moho::cfunc_WARN, nullptr, "<global>", kWarnHelpText);
   return &binder;
 }
 
@@ -1174,7 +1100,7 @@ int moho::cfunc_SPEW(lua_State* const luaContext)
  */
 moho::CScrLuaInitForm* moho::func_SPEW_LuaFuncDef()
 {
-  static CScrLuaBinder binder(CoreLuaInitSet(), kSpewName, &moho::cfunc_SPEW, nullptr, "<global>", kSpewHelpText);
+  static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), kSpewName, &moho::cfunc_SPEW, nullptr, "<global>", kSpewHelpText);
   return &binder;
 }
 
@@ -1198,7 +1124,7 @@ int moho::cfunc_doscript(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_doscript_LuaFuncDef()
 {
   static CScrLuaBinder
-    binder(CoreLuaInitSet(), kDoscriptName, &moho::cfunc_doscript, nullptr, "<global>", kDoscriptHelpText);
+    binder(moho::SCR_CoreLuaInitSet(), kDoscriptName, &moho::cfunc_doscript, nullptr, "<global>", kDoscriptHelpText);
   return &binder;
 }
 
@@ -2825,3 +2751,23 @@ namespace
   // Address: 0x010A8B1C -- process-global `CScriptObjectSerializer` singleton.
   moho::CScriptObjectSerializer gCScriptObjectSerializer;
 } // namespace
+
+moho::CScriptObject** moho::SCR_ScriptObjectSlot(const LuaPlus::LuaObject& object)
+{
+  LuaPlus::LuaObject payload(object);
+  if (payload.IsTable()) {
+    payload = moho::SCR_GetLuaTableField(payload.GetActiveState(), payload, "_c_object");
+  }
+
+  if (!payload.IsUserData()) {
+    return nullptr;
+  }
+
+  const gpg::RRef userDataRef = moho::SCR_UserDataRef(payload);
+  if (!userDataRef.mObj) {
+    return nullptr;
+  }
+
+  const gpg::RRef upcast = gpg::REF_UpcastPtr(userDataRef, CScriptObject::GetPointerType());
+  return static_cast<CScriptObject**>(upcast.mObj);
+}

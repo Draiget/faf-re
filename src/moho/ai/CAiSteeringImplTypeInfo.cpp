@@ -24,69 +24,6 @@ namespace
   }
 
   /**
-   * Address: 0x005D4220 (FUN_005D4220)
-   *
-   * What it does:
-   * Resolves and caches the reflected runtime type for `CAiSteeringImpl`.
-   */
-  [[nodiscard]] gpg::RType* CachedCAiSteeringImplType()
-  {
-    if (!CAiSteeringImpl::sType) {
-      CAiSteeringImpl::sType = gpg::LookupRType(typeid(CAiSteeringImpl));
-    }
-    return CAiSteeringImpl::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedIAiSteeringType()
-  {
-    if (!IAiSteering::sType) {
-      IAiSteering::sType = gpg::LookupRType(typeid(IAiSteering));
-    }
-    return IAiSteering::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CTask));
-    }
-    return cached;
-  }
-
-  template <typename T>
-  [[nodiscard]] gpg::RRef MakeTypedRef(T* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    GPG_ASSERT(derived);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
-
-  /**
    * Address: 0x005D4270 (FUN_005D4270, Moho::CAiSteeringImplTypeInfo::NewRef)
    *
    * What it does:
@@ -95,7 +32,7 @@ namespace
    */
   [[nodiscard]] gpg::RRef CreateAiSteeringImplRefOwned()
   {
-    return MakeTypedRef(new CAiSteeringImpl(), CachedCAiSteeringImplType());
+    return gpg::MakeTypedRef(new CAiSteeringImpl(), gpg::CachedLookup<CAiSteeringImpl>(CAiSteeringImpl::sType));
   }
 
   void DeleteAiSteeringImplOwned(void* object)
@@ -170,7 +107,7 @@ const char* CAiSteeringImplTypeInfo::GetName() const
  */
 void CAiSteeringImplTypeInfo::AddBase_IAiSteering(gpg::RType* const typeInfo)
 {
-  gpg::AddBaseIfPresent(typeInfo, CachedIAiSteeringType(), 0);
+  gpg::AddBaseIfPresent(typeInfo, gpg::RTypeOf<IAiSteering>(), 0);
 }
 
 /**
@@ -180,7 +117,7 @@ void CAiSteeringImplTypeInfo::AddBase_IAiSteering(gpg::RType* const typeInfo)
  */
 void CAiSteeringImplTypeInfo::AddBase_CTask(gpg::RType* const typeInfo)
 {
-  gpg::AddBaseIfPresent(typeInfo, CachedCTaskType(), gpg::BaseSubobjectOffset<CAiSteeringImpl, CTask>());
+  gpg::AddBaseIfPresent(typeInfo, gpg::RTypeOf<CTask>(), gpg::BaseSubobjectOffset<CAiSteeringImpl, CTask>());
 }
 
 /**
@@ -205,11 +142,8 @@ void CAiSteeringImplTypeInfo::Init()
  */
 gpg::RRef CAiSteeringImplTypeInfo::CtrRef(void* const objectStorage)
 {
-  auto* const steering = static_cast<CAiSteeringImpl*>(objectStorage);
-  if (steering) {
-    new (steering) CAiSteeringImpl();
-  }
-  return MakeTypedRef(steering, CachedCAiSteeringImplType());
+  auto* const steering = gpg::ConstructInStorage<CAiSteeringImpl>(objectStorage);
+  return gpg::MakeTypedRef(steering, gpg::CachedLookup<CAiSteeringImpl>(CAiSteeringImpl::sType));
 }
 
 /**

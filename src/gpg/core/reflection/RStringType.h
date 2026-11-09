@@ -6,7 +6,7 @@
 /**
  * VFTABLE: `??_7RStringType@@6B@`
  *
- * Reflection type-info base for `msvc8::string` (legacy `std::string`)
+ * Reflection type-info base for `fa::string` (legacy `std::string`)
  * providing `GetLexical`/`SetLexical` overrides. `stringTypeInfo` inherits
  * and registers under `typeid(std::string)`.
  */
@@ -19,13 +19,13 @@ public:
    * What it does:
    * Returns a copy of the string referenced by `ref.mObj`.
    */
-  [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+  [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
   /**
    * Address: 0x008DF200 (FUN_008DF200)
    *
    * What it does:
-   * Constructs/assigns the null-terminated `str` into the `msvc8::string` at
+   * Constructs/assigns the null-terminated `str` into the `fa::string` at
    * `*ref.mObj`. Always returns `true`.
    */
   bool SetLexical(const gpg::RRef& ref, const char* str) const override;
@@ -39,7 +39,7 @@ public:
 /**
  * VFTABLE: `??_7stringTypeInfo@@6B@`
  *
- * Concrete reflection registration for `std::string`/`msvc8::string`.
+ * Concrete reflection registration for `std::string`/`fa::string`.
  */
 class stringTypeInfo : public RStringType
 {

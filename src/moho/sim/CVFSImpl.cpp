@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <io.h>
@@ -34,6 +35,30 @@ namespace moho
     "Remember where the mounted file system found each file until the mounts or files change (same results, less work).",
     &res_CacheFileLookups
   );
+
+  int res_EnumOrderFuzz = -1;
+
+  TConVar<int> gTConVar_res_EnumOrderFuzz(
+    "res_EnumOrderFuzz",
+    "Test switch: shuffle every directory listing with this seed before the engine sorts it; 0 off. "
+    "Results must not change (seeded from /enumorderfuzz N).",
+    &res_EnumOrderFuzz
+  );
+
+  std::uint32_t DISK_EnumerationOrderFuzzSeed()
+  {
+    if (res_EnumOrderFuzz < 0) {
+      fa::vector<fa::string> args;
+      const int seed = CFG_GetArgOption("/enumorderfuzz", 1u, &args) && !args.empty()
+        ? static_cast<int>(std::max(0L, std::strtol(args[0].c_str(), nullptr, 10)))
+        : 0;
+      if (seed != 0) {
+        gpg::Logf("res_EnumOrderFuzz: directory listings shuffled with seed %d before they are sorted", seed);
+      }
+      res_EnumOrderFuzz = seed;
+    }
+    return static_cast<std::uint32_t>(res_EnumOrderFuzz);
+  }
 } // namespace moho
 
 namespace
@@ -65,6 +90,12 @@ namespace
       Invalidate();
     }
 
+    [[nodiscard]] std::uint64_t Generation()
+    {
+      const std::shared_lock lock(mMutex);
+      return mGeneration;
+    }
+
     void Invalidate()
     {
       const std::unique_lock lock(mMutex);
@@ -79,8 +110,8 @@ namespace
      */
     [[nodiscard]] bool Find(
       const moho::CVFSImpl* const fileSystem,
-      const msvc8::string& loweredPath,
-      msvc8::string& outPath,
+      const fa::string& loweredPath,
+      fa::string& outPath,
       std::uint64_t& outGeneration
     )
     {
@@ -99,8 +130,8 @@ namespace
 
     void Store(
       const moho::CVFSImpl* const fileSystem,
-      const msvc8::string& loweredPath,
-      const msvc8::string& foundPath,
+      const fa::string& loweredPath,
+      const fa::string& foundPath,
       const std::uint64_t generation
     )
     {
@@ -130,6 +161,11 @@ namespace
   }
 } // namespace
 
+std::uint64_t moho::DISK_FileLookupGeneration()
+{
+  return MountedFileLookups().Generation();
+}
+
 void moho::DISK_InvalidateFileLookups()
 {
   MountedFileLookups().Invalidate();
@@ -150,7 +186,7 @@ namespace
    * or mod could read or probe any file. A path with no `..` segment is left
    * exactly as it was.
    */
-  [[nodiscard]] bool ConfineMountedPath(msvc8::string& path)
+  [[nodiscard]] bool ConfineMountedPath(fa::string& path)
   {
     const std::string_view text = path.view();
     const auto isSeparator = [](const char c) { return c == '/' || c == '\\'; };
@@ -195,27 +231,27 @@ namespace
     return true;
   }
 
-  [[nodiscard]] bool ContainsWildcardCharacters(const msvc8::string& pathPattern)
+  [[nodiscard]] bool ContainsWildcardCharacters(const fa::string& pathPattern)
   {
-    return pathPattern.find('*') != msvc8::string::npos || pathPattern.find('?') != msvc8::string::npos;
+    return pathPattern.find('*') != fa::string::npos || pathPattern.find('?') != fa::string::npos;
   }
 
-  [[nodiscard]] msvc8::string ParentDirectoryFromPattern(const msvc8::string& canonicalPattern)
+  [[nodiscard]] fa::string ParentDirectoryFromPattern(const fa::string& canonicalPattern)
   {
     const std::string_view patternView = canonicalPattern.view();
     const std::size_t splitIndex = patternView.find_last_of("\\/");
     if (splitIndex == std::string_view::npos) {
-      return msvc8::string(".");
+      return fa::string(".");
     }
     if (splitIndex == 0u) {
-      return msvc8::string("\\");
+      return fa::string("\\");
     }
     return canonicalPattern.substr(0u, splitIndex);
   }
 
   struct SearchPathCandidate
   {
-    msvc8::string mResolvedPath{};
+    fa::string mResolvedPath{};
     bool mIsDirectory = false;
   };
   static_assert(
@@ -250,7 +286,7 @@ namespace
    * `FindFirstFileA` triad -- matches the same CRT calls already used by
    * `lua::io_dir` (LuaObject.cpp, 0x00915F60).
    */
-  [[nodiscard]] std::vector<SearchPathCandidate> CollectSearchPathCandidates(const msvc8::string& canonicalPattern)
+  [[nodiscard]] std::vector<SearchPathCandidate> CollectSearchPathCandidates(const fa::string& canonicalPattern)
   {
     std::vector<SearchPathCandidate> candidates{};
     if (canonicalPattern.empty()) {
@@ -275,23 +311,38 @@ namespace
     if (findHandle == -1) {
       return candidates;
     }
-
-    const msvc8::string parentDirectory = ParentDirectoryFromPattern(canonicalPattern);
+    std::vector<__finddata64_t> matches{};
     do {
-      if (std::strcmp(findData.name, ".") == 0 || std::strcmp(findData.name, "..") == 0) {
+      matches.push_back(findData);
+    } while (::_findnext64(findHandle, &findData) == 0);
+    (void)::_findclose(findHandle);
+    moho::DISK_FuzzEnumerationOrder(matches.begin(), matches.end(), [](const __finddata64_t& match) {
+      return match.name;
+    });
+
+    // Engine addition (dedicated-server plan WPL.15): the matches in NTFS's order on every
+    // platform and file system, as the shipped game sees them on NTFS. The order is the
+    // mount order, which decides which of two mounted files with one path wins.
+    std::sort(matches.begin(), matches.end(), [](const __finddata64_t& lhs, const __finddata64_t& rhs) {
+      return gpg::STR_FileNameOrderLess(lhs.name, rhs.name);
+    });
+
+    const fa::string parentDirectory = ParentDirectoryFromPattern(canonicalPattern);
+    for (const __finddata64_t& match : matches) {
+      if (std::strcmp(match.name, ".") == 0 || std::strcmp(match.name, "..") == 0) {
         continue;
       }
 
-      msvc8::string candidatePath = parentDirectory;
+      fa::string candidatePath = parentDirectory;
       if (!candidatePath.empty()) {
         const char tail = candidatePath[candidatePath.size() - 1];
         if (tail != '\\' && tail != '/') {
           (void)candidatePath.push_back('\\');
         }
       }
-      (void)candidatePath.append(findData.name, std::strlen(findData.name));
+      (void)candidatePath.append(match.name, std::strlen(match.name));
 
-      msvc8::string canonicalCandidate{};
+      fa::string canonicalCandidate{};
       gpg::STR_CanonizeFilename(&canonicalCandidate, candidatePath.c_str());
       if (canonicalCandidate.empty()) {
         continue;
@@ -299,16 +350,14 @@ namespace
 
       SearchPathCandidate candidate{};
       candidate.mResolvedPath.assign_owned(canonicalCandidate.view());
-      candidate.mIsDirectory = (findData.attrib & _A_SUBDIR) != 0;
+      candidate.mIsDirectory = (match.attrib & _A_SUBDIR) != 0;
       candidates.push_back(std::move(candidate));
-    } while (::_findnext64(findHandle, &findData) == 0);
-
-    (void)::_findclose(findHandle);
+    }
     return candidates;
   }
 
-  [[nodiscard]] msvc8::string CanonicalizeJoinedMountPath(
-    const std::filesystem::path& launchDir, const msvc8::string& sourcePath
+  [[nodiscard]] fa::string CanonicalizeJoinedMountPath(
+    const std::filesystem::path& launchDir, const fa::string& sourcePath
   )
   {
     if (sourcePath.empty()) {
@@ -320,19 +369,19 @@ namespace
       resolvedPath = launchDir / resolvedPath;
     }
 
-    msvc8::string canonicalPath{};
+    fa::string canonicalPath{};
     const std::string resolvedUtf8 = resolvedPath.string();
     gpg::STR_CanonizeFilename(&canonicalPath, resolvedUtf8.c_str());
     return canonicalPath;
   }
 
-  void SortAndUniquePaths(msvc8::vector<msvc8::string>& paths)
+  void SortAndUniquePaths(fa::vector<fa::string>& paths)
   {
-    std::sort(paths.begin(), paths.end(), [](const msvc8::string& lhs, const msvc8::string& rhs) {
+    std::sort(paths.begin(), paths.end(), [](const fa::string& lhs, const fa::string& rhs) {
       return lhs.view() < rhs.view();
     });
 
-    const auto uniqueEnd = std::unique(paths.begin(), paths.end(), [](const msvc8::string& lhs, const msvc8::string& rhs) {
+    const auto uniqueEnd = std::unique(paths.begin(), paths.end(), [](const fa::string& lhs, const fa::string& rhs) {
       return lhs.view() == rhs.view();
     });
     paths.erase(uniqueEnd, paths.end());
@@ -359,6 +408,50 @@ namespace
   }
 
   /**
+   * Engine addition: `res_ZipNameCache`. Each file search lowered every entry name of every mounted
+   * archive, and most searches keep few of them. An archive's names don't change while it is mounted,
+   * so they are lowered once per archive path. Results are the same and the caller sorts them.
+   * `/nozipnamecache` turns it off at startup.
+   */
+  bool res_ZipNameCache = true;
+  moho::TConVar<bool> gTConVar_res_ZipNameCache(
+    "res_ZipNameCache",
+    "Lower each mounted archive's entry names once (1, the default), or on every file search (0). Same results. "
+    "/nozipnamecache turns it off at startup.",
+    &res_ZipNameCache
+  );
+
+  /** The archive's lowered names with forward slashes, one per entry, or null when the cache is off. */
+  [[nodiscard]] const std::vector<std::string>* LoweredZipNames(const moho::CZipFile& zipFile)
+  {
+    static const bool startupOff = moho::CFG_GetArgOption("/nozipnamecache", 0u, nullptr);
+    if (!res_ZipNameCache || startupOff) {
+      return nullptr;
+    }
+    static std::shared_mutex sMutex;
+    static std::unordered_map<std::string, std::vector<std::string>> sNames;
+    const std::string key(zipFile.mPath.c_str());
+    {
+      const std::shared_lock lock(sMutex);
+      const auto found = sNames.find(key);
+      if (found != sNames.end() && found->second.size() == zipFile.mEntries.size()) {
+        return &found->second;
+      }
+    }
+    std::vector<std::string> names;
+    names.reserve(zipFile.mEntries.size());
+    for (std::size_t index = 0; index < zipFile.mEntries.size(); ++index) {
+      fa::string name = gpg::STR_ToLower(zipFile.GetEntryName(static_cast<std::uint32_t>(index)).c_str());
+      gpg::STR_Replace(name, "\\", "/", -1);
+      names.emplace_back(name.c_str());
+    }
+    const std::unique_lock lock(sMutex);
+    auto& stored = sNames[key];
+    stored = std::move(names);
+    return &stored;
+  }
+
+  /**
    * Address: 0x00467380 (FUN_00467380, sub_467380)
    *
    * What it does:
@@ -368,10 +461,10 @@ namespace
   void EnumerateZipFiles(
     moho::CZipFile* const zipFile,
     const char* const relativePrefix,
-    const msvc8::string& mountedRoot,
+    const fa::string& mountedRoot,
     const char* const wildcardPattern,
     const bool recursive,
-    msvc8::vector<msvc8::string>& outPaths
+    fa::vector<fa::string>& outPaths
   )
   {
     if (zipFile == nullptr || relativePrefix == nullptr || wildcardPattern == nullptr) {
@@ -380,12 +473,21 @@ namespace
 
     const std::size_t prefixLength = std::strlen(relativePrefix);
     const std::size_t entryCount = zipFile->mEntries.size();
+    const std::vector<std::string>* const loweredNames = LoweredZipNames(*zipFile);
     for (std::size_t entryIndex = 0; entryIndex < entryCount; ++entryIndex) {
-      msvc8::string entryPath = gpg::STR_ToLower(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)).c_str());
-      gpg::STR_Replace(entryPath, "\\", "/", -1);
+      fa::string entryPath;
+      if (loweredNames != nullptr) {
+        if ((*loweredNames)[entryIndex].compare(0U, prefixLength, relativePrefix) != 0) {
+          continue;
+        }
+        entryPath.assign_owned((*loweredNames)[entryIndex]);
+      } else {
+        entryPath = gpg::STR_ToLower(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)).c_str());
+        gpg::STR_Replace(entryPath, "\\", "/", -1);
 
-      if (!gpg::STR_StartsWith(entryPath.c_str(), relativePrefix)) {
-        continue;
+        if (!gpg::STR_StartsWith(entryPath.c_str(), relativePrefix)) {
+          continue;
+        }
       }
 
       const char* const relativeTail = entryPath.c_str() + prefixLength;
@@ -398,7 +500,7 @@ namespace
         continue;
       }
 
-      msvc8::string mountedPath = mountedRoot;
+      fa::string mountedPath = mountedRoot;
       (void)mountedPath.append(entryPath.c_str(), entryPath.size());
       outPaths.push_back(std::move(mountedPath));
     }
@@ -414,8 +516,8 @@ namespace
   void EnumerateZipChildren(
     moho::CZipFile* const zipFile,
     const char* const relativePrefix,
-    const msvc8::string& mountedRoot,
-    msvc8::vector<msvc8::string>& outPaths
+    const fa::string& mountedRoot,
+    fa::vector<fa::string>& outPaths
   )
   {
     if (zipFile == nullptr || relativePrefix == nullptr) {
@@ -424,12 +526,21 @@ namespace
 
     const std::size_t prefixLength = std::strlen(relativePrefix);
     const std::size_t entryCount = zipFile->mEntries.size();
+    const std::vector<std::string>* const loweredNames = LoweredZipNames(*zipFile);
     for (std::size_t entryIndex = 0; entryIndex < entryCount; ++entryIndex) {
-      msvc8::string entryPath = gpg::STR_ToLower(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)).c_str());
-      gpg::STR_Replace(entryPath, "\\", "/", -1);
+      fa::string entryPath;
+      if (loweredNames != nullptr) {
+        if ((*loweredNames)[entryIndex].compare(0U, prefixLength, relativePrefix) != 0) {
+          continue;
+        }
+        entryPath.assign_owned((*loweredNames)[entryIndex]);
+      } else {
+        entryPath = gpg::STR_ToLower(zipFile->GetEntryName(static_cast<std::uint32_t>(entryIndex)).c_str());
+        gpg::STR_Replace(entryPath, "\\", "/", -1);
 
-      if (!gpg::STR_StartsWith(entryPath.c_str(), relativePrefix)) {
-        continue;
+        if (!gpg::STR_StartsWith(entryPath.c_str(), relativePrefix)) {
+          continue;
+        }
       }
 
       const char* const firstSlash = std::strchr(entryPath.c_str() + prefixLength, '/');
@@ -439,9 +550,9 @@ namespace
 
       const std::size_t childLength =
         static_cast<std::size_t>(firstSlash - entryPath.c_str());
-      msvc8::string childPath = entryPath.substr(0u, childLength);
+      fa::string childPath = entryPath.substr(0u, childLength);
 
-      msvc8::string mountedPath = mountedRoot;
+      fa::string mountedPath = mountedRoot;
       (void)mountedPath.append(childPath.c_str(), childPath.size());
       if (outPaths.empty() || outPaths.back().view() != mountedPath.view()) {
         outPaths.push_back(std::move(mountedPath));
@@ -460,18 +571,18 @@ namespace
    * `__finddata64_t` record, matching the binary exactly.
    */
   void EnumerateDirectoryFiles(
-    const msvc8::string& diskDirectory,
-    const msvc8::string& mountedDirectory,
+    const fa::string& diskDirectory,
+    const fa::string& mountedDirectory,
     const char* const wildcardPattern,
     const bool recursive,
-    msvc8::vector<msvc8::string>& outPaths
+    fa::vector<fa::string>& outPaths
   )
   {
     if (wildcardPattern == nullptr) {
       return;
     }
 
-    msvc8::string searchPattern = diskDirectory;
+    fa::string searchPattern = diskDirectory;
     (void)searchPattern.append("\\*.*", 4u);
 
     __finddata64_t findData{};
@@ -480,19 +591,22 @@ namespace
       return;
     }
 
+    // Engine addition (dedicated-server plan WPR.22): the paths this folder adds, in the order
+    // the file system lists it; the callers sort them (SortAndUniquePaths).
+    const std::size_t firstAdded = outPaths.size();
     do {
-      msvc8::string loweredName = gpg::STR_ToLower(findData.name);
+      fa::string loweredName = gpg::STR_ToLower(findData.name);
       const bool isDirectory = (findData.attrib & _A_SUBDIR) != 0u;
       if (isDirectory) {
         if (!recursive || std::strcmp(findData.name, ".") == 0 || std::strcmp(findData.name, "..") == 0) {
           continue;
         }
 
-        msvc8::string childMountedDirectory = mountedDirectory;
+        fa::string childMountedDirectory = mountedDirectory;
         (void)childMountedDirectory.append(loweredName.c_str(), loweredName.size());
         (void)childMountedDirectory.push_back('/');
 
-        msvc8::string childDiskDirectory = diskDirectory;
+        fa::string childDiskDirectory = diskDirectory;
         (void)childDiskDirectory.push_back('\\');
         (void)childDiskDirectory.append(findData.name, std::strlen(findData.name));
         EnumerateDirectoryFiles(childDiskDirectory, childMountedDirectory, wildcardPattern, true, outPaths);
@@ -503,12 +617,15 @@ namespace
         continue;
       }
 
-      msvc8::string mountedPath = mountedDirectory;
+      fa::string mountedPath = mountedDirectory;
       (void)mountedPath.append(loweredName.c_str(), loweredName.size());
       outPaths.push_back(std::move(mountedPath));
     } while (::_findnext64(findHandle, &findData) == 0);
 
     (void)::_findclose(findHandle);
+    moho::DISK_FuzzEnumerationOrder(outPaths.begin() + firstAdded, outPaths.end(), [](const fa::string& path) {
+      return path.c_str();
+    });
   }
 
   /**
@@ -522,12 +639,12 @@ namespace
    * `__finddata64_t` record, matching the binary exactly.
    */
   void EnumerateDirectoryChildren(
-    const msvc8::string& diskDirectory,
-    const msvc8::string& mountedDirectory,
-    msvc8::vector<msvc8::string>& outPaths
+    const fa::string& diskDirectory,
+    const fa::string& mountedDirectory,
+    fa::vector<fa::string>& outPaths
   )
   {
-    msvc8::string searchPattern = diskDirectory;
+    fa::string searchPattern = diskDirectory;
     (void)searchPattern.append("\\*.*", 4u);
 
     __finddata64_t findData{};
@@ -536,19 +653,23 @@ namespace
       return;
     }
 
+    const std::size_t firstAdded = outPaths.size(); // engine addition (plan WPR.22), as above
     do {
       const bool isDirectory = (findData.attrib & _A_SUBDIR) != 0u;
       if (!isDirectory || std::strcmp(findData.name, ".") == 0 || std::strcmp(findData.name, "..") == 0) {
         continue;
       }
 
-      msvc8::string loweredName = gpg::STR_ToLower(findData.name);
-      msvc8::string mountedPath = mountedDirectory;
+      fa::string loweredName = gpg::STR_ToLower(findData.name);
+      fa::string mountedPath = mountedDirectory;
       (void)mountedPath.append(loweredName.c_str(), loweredName.size());
       outPaths.push_back(std::move(mountedPath));
     } while (::_findnext64(findHandle, &findData) == 0);
 
     (void)::_findclose(findHandle);
+    moho::DISK_FuzzEnumerationOrder(outPaths.begin() + firstAdded, outPaths.end(), [](const fa::string& path) {
+      return path.c_str();
+    });
   }
 
   void RetainMountedZipHandle(moho::SFileWaitHandle* const handle)
@@ -602,12 +723,7 @@ namespace
     const moho::SVFSMountPoint* sourceBegin
   )
   {
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationEnd;
-      *destinationEnd = *sourceEnd;
-    }
-    return destinationEnd;
+    return std::copy_backward(sourceBegin, sourceEnd, destinationEnd);
   }
 
   /**
@@ -729,7 +845,7 @@ namespace moho
    * What it does:
    * Initializes mountpoint storage and expands the configured mount lanes.
    */
-  CVFSImpl::CVFSImpl(const msvc8::vector<SVFSMountPoint>& mountpoints, const std::filesystem::path& launchDir)
+  CVFSImpl::CVFSImpl(const fa::vector<SVFSMountPoint>& mountpoints, const std::filesystem::path& launchDir)
     : mMountpoints()
   {
     for (const SVFSMountPoint& mountpoint : mountpoints) {
@@ -756,7 +872,7 @@ namespace moho
    */
   void CVFSImpl::AddMountPoint(const SVFSMountPoint& mountPoint, const std::filesystem::path& launchDir)
   {
-    const msvc8::string canonicalPattern = CanonicalizeJoinedMountPath(launchDir, mountPoint.mDir);
+    const fa::string canonicalPattern = CanonicalizeJoinedMountPath(launchDir, mountPoint.mDir);
     if (canonicalPattern.empty()) {
       return;
     }
@@ -776,10 +892,10 @@ namespace moho
    * mounted directly and files are mounted through `DISK_MountZipFile`.
    */
   void CVFSImpl::AddSearchPath(
-    const SVFSMountPoint& mountPoint, const msvc8::string& resolvedPath, const bool isDirectory
+    const SVFSMountPoint& mountPoint, const fa::string& resolvedPath, const bool isDirectory
   )
   {
-    msvc8::string canonicalPath{};
+    fa::string canonicalPath{};
     gpg::STR_CanonizeFilename(&canonicalPath, resolvedPath.c_str());
     if (canonicalPath.empty()) {
       return;
@@ -822,13 +938,13 @@ namespace moho
    * Resolves a mounted path to on-disk/zip-backed path and stores the first
    * matching real path into `outPath`.
    */
-  msvc8::string* CVFSImpl::FindFile(msvc8::string* const outPath, const gpg::StrArg sourcePath, SDiskFileInfo* const outInfo)
+  fa::string* CVFSImpl::FindFile(fa::string* const outPath, const gpg::StrArg sourcePath, SDiskFileInfo* const outInfo)
   {
     if (outPath == nullptr) {
       return nullptr;
     }
 
-    msvc8::string loweredPath = gpg::STR_ToLower(SafePathArg(sourcePath));
+    fa::string loweredPath = gpg::STR_ToLower(SafePathArg(sourcePath));
     if (!ConfineMountedPath(loweredPath)) {
       outPath->clear();
       return outPath;
@@ -851,7 +967,7 @@ namespace moho
       const std::size_t mountpointSize = mountpoint.mMountpoint.size();
       const std::size_t suffixStart =
         mountpointSize == 0 ? 0u : std::min(loweredPath.size(), mountpointSize - 1u);
-      msvc8::string diskPath = mountpoint.mDir + (loweredPath.c_str() + suffixStart);
+      fa::string diskPath = mountpoint.mDir + (loweredPath.c_str() + suffixStart);
       for (std::size_t index = mountpoint.mDir.size(); index < diskPath.size(); ++index) {
         if (diskPath[index] == '/') {
           diskPath[index] = '\\';
@@ -884,13 +1000,13 @@ namespace moho
    * What it does:
    * Maps one on-disk path under mounted directories back to VFS mountpoint form.
    */
-  msvc8::string* CVFSImpl::ToMountedPath(msvc8::string* const outPath, const gpg::StrArg sourcePath)
+  fa::string* CVFSImpl::ToMountedPath(fa::string* const outPath, const gpg::StrArg sourcePath)
   {
     if (outPath == nullptr) {
       return nullptr;
     }
 
-    const msvc8::string loweredPath = gpg::STR_ToLower(SafePathArg(sourcePath));
+    const fa::string loweredPath = gpg::STR_ToLower(SafePathArg(sourcePath));
     for (const SVFSMountPoint& mountpoint : mMountpoints) {
       if (!gpg::STR_StartsWith(loweredPath.c_str(), mountpoint.mDir.c_str())) {
         continue;
@@ -901,7 +1017,7 @@ namespace moho
         continue;
       }
 
-      msvc8::string mountedPath = mountpoint.mMountpoint + (loweredPath.c_str() + dirSize + 1u);
+      fa::string mountedPath = mountpoint.mMountpoint + (loweredPath.c_str() + dirSize + 1u);
       for (std::size_t index = mountpoint.mMountpoint.size(); index < mountedPath.size(); ++index) {
         if (mountedPath[index] == '\\') {
           mountedPath[index] = '/';
@@ -925,7 +1041,7 @@ namespace moho
    */
   bool CVFSImpl::GetFileInfo(const gpg::StrArg sourcePath, SDiskFileInfo* const outInfo)
   {
-    msvc8::string loweredPath = gpg::STR_ToLower(SafePathArg(sourcePath));
+    fa::string loweredPath = gpg::STR_ToLower(SafePathArg(sourcePath));
     if (!ConfineMountedPath(loweredPath)) {
       return false;
     }
@@ -937,7 +1053,7 @@ namespace moho
       const std::size_t mountpointSize = mountpoint.mMountpoint.size();
       const std::size_t suffixStart =
         mountpointSize == 0 ? 0u : std::min(loweredPath.size(), mountpointSize - 1u);
-      const msvc8::string diskPath = mountpoint.mDir + (loweredPath.c_str() + suffixStart);
+      const fa::string diskPath = mountpoint.mDir + (loweredPath.c_str() + suffixStart);
 
       FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
       if (waitHandleSet != nullptr &&
@@ -962,21 +1078,21 @@ namespace moho
     const gpg::StrArg mountPrefix,
     const gpg::StrArg queryPath,
     const bool allowPrefixWildcard,
-    msvc8::vector<msvc8::string>* const outPaths
+    fa::vector<fa::string>* const outPaths
   )
   {
     if (outPaths == nullptr) {
       return;
     }
 
-    msvc8::string normalizedPrefix = gpg::STR_ToLower(SafePathArg(mountPrefix));
+    fa::string normalizedPrefix = gpg::STR_ToLower(SafePathArg(mountPrefix));
     if (!ConfineMountedPath(normalizedPrefix)) {
       return;
     }
     if (normalizedPrefix.empty() || normalizedPrefix[normalizedPrefix.size() - 1u] != '/') {
       (void)normalizedPrefix.push_back('/');
     }
-    msvc8::string wildcardPattern = gpg::STR_ToLower(SafePathArg(queryPath));
+    fa::string wildcardPattern = gpg::STR_ToLower(SafePathArg(queryPath));
     if (!ConfineMountedPath(wildcardPattern)) {
       return;
     }
@@ -1005,10 +1121,10 @@ namespace moho
         continue;
       }
 
-      msvc8::string mountedDirectory = mountpoint.mMountpoint;
+      fa::string mountedDirectory = mountpoint.mMountpoint;
       (void)mountedDirectory.append(relativePrefix, std::strlen(relativePrefix));
 
-      msvc8::string diskDirectory = mountpoint.mDir;
+      fa::string diskDirectory = mountpoint.mDir;
       if (sharedPrefixLen > 0u) {
         const char* const diskSuffix = normalizedPrefix.c_str() + (sharedPrefixLen - 1u);
         (void)diskDirectory.append(diskSuffix, std::strlen(diskSuffix));
@@ -1023,6 +1139,16 @@ namespace moho
     }
 
     SortAndUniquePaths(*outPaths);
+    // Engine addition (`DISK_SetAccessTrace`): the query and every path it returned.
+    if (DISK_AccessTraceOn()) {
+      const fa::string query = gpg::STR_Printf(
+        "%s %s%s", normalizedPrefix.c_str(), wildcardPattern.c_str(), allowPrefixWildcard ? " recursive" : ""
+      );
+      DISK_TraceAccess("list", query.c_str());
+      for (const fa::string& path : *outPaths) {
+        DISK_TraceAccess("listed", path.c_str());
+      }
+    }
   }
 
   /**
@@ -1034,13 +1160,13 @@ namespace moho
    * Enumerates child directory paths under one mounted prefix from zip and
    * directory search roots, then sorts and de-duplicates output.
    */
-  void CVFSImpl::EnumerateChildren(const gpg::StrArg mountPrefix, msvc8::vector<msvc8::string>* const outPaths)
+  void CVFSImpl::EnumerateChildren(const gpg::StrArg mountPrefix, fa::vector<fa::string>* const outPaths)
   {
     if (outPaths == nullptr) {
       return;
     }
 
-    msvc8::string normalizedPrefix = gpg::STR_ToLower(SafePathArg(mountPrefix));
+    fa::string normalizedPrefix = gpg::STR_ToLower(SafePathArg(mountPrefix));
     if (!ConfineMountedPath(normalizedPrefix)) {
       return;
     }
@@ -1060,10 +1186,10 @@ namespace moho
         continue;
       }
 
-      msvc8::string mountedDirectory = mountpoint.mMountpoint;
+      fa::string mountedDirectory = mountpoint.mMountpoint;
       (void)mountedDirectory.append(relativePrefix, std::strlen(relativePrefix));
 
-      msvc8::string diskDirectory = mountpoint.mDir;
+      fa::string diskDirectory = mountpoint.mDir;
       if (mountPrefixLen > 0u) {
         const char* const diskSuffix = normalizedPrefix.c_str() + (mountPrefixLen - 1u);
         (void)diskDirectory.append(diskSuffix, std::strlen(diskSuffix));
@@ -1072,6 +1198,13 @@ namespace moho
     }
 
     SortAndUniquePaths(*outPaths);
+    // Engine addition (`DISK_SetAccessTrace`): the query and every path it returned.
+    if (DISK_AccessTraceOn()) {
+      DISK_TraceAccess("children", normalizedPrefix.c_str());
+      for (const fa::string& path : *outPaths) {
+        DISK_TraceAccess("child", path.c_str());
+      }
+    }
   }
 
   /**
@@ -1081,7 +1214,7 @@ namespace moho
    * Creates one `CVFSImpl` and returns it through the base VFS interface.
    */
   CVirtualFileSystem* VFS_Create(
-    const msvc8::vector<SVFSMountPoint>& mountpoints,
+    const fa::vector<SVFSMountPoint>& mountpoints,
     const std::filesystem::path& launchDir
   )
   {

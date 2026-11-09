@@ -30,16 +30,6 @@ namespace
   /// The patch's lower bound on a shape's thickness, in LOD units (`std::max(thickness / lod, 2.f)`).
   constexpr float kMinimumThicknessLodUnits = 2.0f;
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("User"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("User");
-    return fallbackSet;
-  }
-
   /**
    * The patch's globals around one `OnRenderWorld` call.
    *
@@ -284,7 +274,7 @@ int moho::cfunc_UI_DrawRect(lua_State* const L)
 moho::CScrLuaInitForm* moho::func_UI_DrawRect_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "UI_DrawRect",
     &moho::cfunc_UI_DrawRect,
     nullptr,
@@ -336,7 +326,7 @@ int moho::cfunc_UI_DrawCircle(lua_State* const L)
 moho::CScrLuaInitForm* moho::func_UI_DrawCircle_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "UI_DrawCircle",
     &moho::cfunc_UI_DrawCircle,
     nullptr,
@@ -395,7 +385,7 @@ int moho::cfunc_UI_DrawLine(lua_State* const L)
 moho::CScrLuaInitForm* moho::func_UI_DrawLine_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "UI_DrawLine",
     &moho::cfunc_UI_DrawLine,
     nullptr,

@@ -36,9 +36,9 @@ namespace moho
 
     // +0x00 is gpg::RObject's vptr.
     RRuleGameRules* mOwner;         // +0x04
-    msvc8::string mBlueprintId;     // +0x08
-    msvc8::string mDescription;     // +0x24
-    msvc8::string mSource;          // +0x40
+    fa::string mBlueprintId;     // +0x08
+    fa::string mDescription;     // +0x24
+    fa::string mSource;          // +0x40
     std::int32_t mBlueprintOrdinal; // +0x5C
 
     /**
@@ -75,7 +75,7 @@ namespace moho
      * themselves - there is no temporary base object anywhere in this chain.
      */
     static void InitIdentity(
-      RRuleGameRules* owner, const RResId& resId, msvc8::string& outBlueprintId, std::int32_t& outOrdinal
+      RRuleGameRules* owner, const RResId& resId, fa::string& outBlueprintId, std::int32_t& outOrdinal
     );
 
     /**

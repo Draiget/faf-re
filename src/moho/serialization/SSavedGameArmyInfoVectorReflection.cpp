@@ -18,7 +18,7 @@ namespace
   // Forward decls so the append grow-path can route through the
   // recovered resize-with-fill helper below.
   void ResizeSavedGameArmyInfoVectorWithFill(
-    msvc8::vector<moho::SSavedGameArmyInfo>& storage,
+    fa::vector<moho::SSavedGameArmyInfo>& storage,
     std::size_t newSize,
     const moho::SSavedGameArmyInfo& fillValue
   );
@@ -33,7 +33,7 @@ namespace
    * the engine grow path reserves +1 capacity and fills the new tail slot.
    */
   void AppendSavedGameArmyInfo(
-    msvc8::vector<moho::SSavedGameArmyInfo>& destination,
+    fa::vector<moho::SSavedGameArmyInfo>& destination,
     const moho::SSavedGameArmyInfo& value
   )
   {
@@ -52,11 +52,11 @@ namespace
    * Releases backing storage for one saved-game-army-info vector lane and
    * resets begin/end/capacity pointers to null.
    */
-  void ReleaseSavedGameArmyInfoVectorStorage(msvc8::vector<moho::SSavedGameArmyInfo>& storage)
+  [[maybe_unused]] void ReleaseSavedGameArmyInfoVectorStorage(fa::vector<moho::SSavedGameArmyInfo>& storage)
   {
     // Per-element destructor sweep, free, then null all three lanes: VC8
     // _Tidy(), which is what move-assigning an empty vector compiles to.
-    storage = msvc8::vector<moho::SSavedGameArmyInfo>{};
+    storage = fa::vector<moho::SSavedGameArmyInfo>{};
   }
 
   /**
@@ -68,7 +68,7 @@ namespace
    */
   void LoadSavedGameArmyInfoVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
   {
-    auto* const storage = reinterpret_cast<msvc8::vector<moho::SSavedGameArmyInfo>*>(objectPtr);
+    auto* const storage = reinterpret_cast<fa::vector<moho::SSavedGameArmyInfo>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -78,7 +78,7 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    msvc8::vector<moho::SSavedGameArmyInfo> loaded{};
+    fa::vector<moho::SSavedGameArmyInfo> loaded{};
     loaded.reserve(static_cast<std::size_t>(count));
 
     gpg::RType* const elementType = moho::SSavedGameArmyInfo::StaticGetClass();
@@ -96,11 +96,11 @@ namespace
    * Resizes the destination vector to `newSize`, reserving the exact target
    * capacity first on the grow side the way the binary does rather than
    * letting the grow path pick a 1.5x capacity. The per-element fill lane it
-   * used (FUN_00884330) is `msvc8::vector<T>::uninit_fill_n` and is cited
+   * used (FUN_00884330) is `fa::vector<T>::uninit_fill_n` and is cited
    * there.
    */
   void ResizeSavedGameArmyInfoVectorWithFill(
-    msvc8::vector<moho::SSavedGameArmyInfo>& storage,
+    fa::vector<moho::SSavedGameArmyInfo>& storage,
     const std::size_t newSize,
     const moho::SSavedGameArmyInfo& fillValue
   )
@@ -122,7 +122,7 @@ namespace
    */
   void SaveSavedGameArmyInfoVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
   {
-    auto* const storage = reinterpret_cast<msvc8::vector<moho::SSavedGameArmyInfo>*>(objectPtr);
+    auto* const storage = reinterpret_cast<fa::vector<moho::SSavedGameArmyInfo>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -176,18 +176,18 @@ namespace
  *
  * What it does:
  * Constructs/preregisters RTTI metadata for
- * `msvc8::vector<moho::SSavedGameArmyInfo>`.
+ * `fa::vector<moho::SSavedGameArmyInfo>`.
  */
 gpg::RType* gpg::preregister_SSavedGameArmyInfoVectorTypeStartup()
 {
-  gpg::PreRegisterRType(typeid(msvc8::vector<moho::SSavedGameArmyInfo>), &gSavedGameArmyInfoVectorType);
+  gpg::PreRegisterRType(typeid(fa::vector<moho::SSavedGameArmyInfo>), &gSavedGameArmyInfoVectorType);
   return &gSavedGameArmyInfoVectorType;
 }
 
 gpg::RType* gpg::ResolveSavedGameArmyInfoVectorType()
 {
   EnsureSavedGameArmyInfoVectorRegistered();
-  return gpg::LookupRType(typeid(msvc8::vector<moho::SSavedGameArmyInfo>));
+  return gpg::LookupRType(typeid(fa::vector<moho::SSavedGameArmyInfo>));
 }
 
 gpg::RVectorType_SSavedGameArmyInfo::~RVectorType_SSavedGameArmyInfo() = default;
@@ -198,16 +198,16 @@ gpg::RVectorType_SSavedGameArmyInfo::~RVectorType_SSavedGameArmyInfo() = default
  */
 const char* gpg::RVectorType_SSavedGameArmyInfo::GetName() const
 {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", moho::SSavedGameArmyInfo::StaticGetClass()->GetName());
+    static const fa::string sName = gpg::STR_Printf("vector<%s>", moho::SSavedGameArmyInfo::StaticGetClass()->GetName());
     return sName.c_str();
 }
 
 /**
  * Address: 0x008821C0 (FUN_008821C0)
  */
-msvc8::string gpg::RVectorType_SSavedGameArmyInfo::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_SSavedGameArmyInfo::GetLexical(const gpg::RRef& ref) const
 {
-  const msvc8::string base = gpg::RType::GetLexical(ref);
+  const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
 }
 
@@ -224,7 +224,7 @@ const gpg::RIndexed* gpg::RVectorType_SSavedGameArmyInfo::IsIndexed() const
  */
 void gpg::RVectorType_SSavedGameArmyInfo::Init()
 {
-  size_ = sizeof(msvc8::vector<moho::SSavedGameArmyInfo>);
+  size_ = sizeof(fa::vector<moho::SSavedGameArmyInfo>);
   version_ = 1;
   serLoadFunc_ = &LoadSavedGameArmyInfoVector;
   serSaveFunc_ = &SaveSavedGameArmyInfoVector;
@@ -235,7 +235,7 @@ void gpg::RVectorType_SSavedGameArmyInfo::Init()
  */
 gpg::RRef gpg::RVectorType_SSavedGameArmyInfo::SubscriptIndex(void* obj, const int ind) const
 {
-  auto* const storage = static_cast<msvc8::vector<moho::SSavedGameArmyInfo>*>(obj);
+  auto* const storage = static_cast<fa::vector<moho::SSavedGameArmyInfo>*>(obj);
   GPG_ASSERT(storage != nullptr);
   GPG_ASSERT(ind >= 0);
   GPG_ASSERT(static_cast<std::size_t>(ind) < storage->size());
@@ -248,7 +248,7 @@ gpg::RRef gpg::RVectorType_SSavedGameArmyInfo::SubscriptIndex(void* obj, const i
   }
 
   gpg::RRef out{};
-  BuildSavedGameArmyInfoRefLane(&(*storage)[static_cast<std::size_t>(ind)], &out);
+  (void)BuildSavedGameArmyInfoRefLane(&(*storage)[static_cast<std::size_t>(ind)], &out);
   return out;
 }
 
@@ -257,7 +257,7 @@ gpg::RRef gpg::RVectorType_SSavedGameArmyInfo::SubscriptIndex(void* obj, const i
  */
 size_t gpg::RVectorType_SSavedGameArmyInfo::GetCount(void* obj) const
 {
-  auto* const storage = static_cast<msvc8::vector<moho::SSavedGameArmyInfo>*>(obj);
+  auto* const storage = static_cast<fa::vector<moho::SSavedGameArmyInfo>*>(obj);
   return storage ? storage->size() : 0u;
 }
 
@@ -266,7 +266,7 @@ size_t gpg::RVectorType_SSavedGameArmyInfo::GetCount(void* obj) const
  */
 void gpg::RVectorType_SSavedGameArmyInfo::SetCount(void* obj, const int count) const
 {
-  auto* const storage = static_cast<msvc8::vector<moho::SSavedGameArmyInfo>*>(obj);
+  auto* const storage = static_cast<fa::vector<moho::SSavedGameArmyInfo>*>(obj);
   GPG_ASSERT(storage != nullptr);
   GPG_ASSERT(count >= 0);
   if (!storage || count < 0) {

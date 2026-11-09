@@ -536,6 +536,155 @@ namespace gpg::gal::effects
     return nullptr;
   }
 
+  namespace
+  {
+    /** A `struct` item: its members with their types. The name joins `structs`, which ParseType reads. */
+    [[nodiscard]] StructType ParseStruct(const Item& item, std::vector<std::string>& structs)
+    {
+      const std::string& head = item.head;
+      StructType structType;
+      structType.name = Trim(head.substr(6U));
+      structs.push_back(structType.name);
+      for (const std::string& rawMember : SplitTopLevel(item.body, ';')) {
+        std::string member = Squeeze(rawMember);
+        const std::size_t colon = member.find(':');
+        if (colon != std::string::npos) {
+          member = Trim(member.substr(0U, colon));
+        }
+        if (member.empty()) {
+          continue;
+        }
+        StructMember structMember;
+        const std::size_t bracket = member.find('[');
+        if (bracket != std::string::npos) {
+          const std::vector<float> size = ParseNumbers(member.substr(bracket));
+          structMember.elements = size.empty() ? 0U : static_cast<std::uint32_t>(size.front());
+          member = Trim(member.substr(0U, bracket));
+        }
+        const std::size_t space = member.rfind(' ');
+        if (space == std::string::npos) {
+          continue;
+        }
+        structMember.name = member.substr(space + 1U);
+        structMember.typeName = Trim(member.substr(0U, space));
+        const TypeInfo info = ParseType(structMember.typeName, structs);
+        structMember.parameterClass = info.parameterClass;
+        structMember.scalarType = info.scalarType;
+        structMember.rows = info.rows;
+        structMember.columns = info.columns;
+        structType.members.push_back(std::move(structMember));
+      }
+      return structType;
+    }
+
+    /** A sampler declaration with a body: its name, type, source range and states. */
+    [[nodiscard]] SamplerDesc ParseSampler(const Item& item)
+    {
+      const std::string& head = item.head;
+      SamplerDesc sampler;
+      std::string declaration = head;
+      const std::size_t equals = declaration.find('=');
+      if (equals != std::string::npos) {
+        declaration = Trim(declaration.substr(0U, equals));
+      }
+      const std::size_t space = declaration.find(' ');
+      const std::string type = Lower(declaration.substr(0U, space));
+      sampler.name = NameAndAnnotations(declaration.substr(space + 1U)).first;
+      sampler.declaredType = declaration.substr(0U, space);
+      sampler.begin = item.begin;
+      sampler.end = item.end;
+      sampler.kind = (type == "samplercube") ? SamplerDesc::Kind::TextureCube
+        : (type == "sampler3d")              ? SamplerDesc::Kind::Texture3D
+                                             : SamplerDesc::Kind::Texture2D;
+      ParseSamplerState(item.body, sampler);
+      return sampler;
+    }
+
+    /** One `pass` of a technique: its state objects, shaders and assignments; what it can't use goes to `notes`. */
+    [[nodiscard]] Pass ParsePass(
+      const Item& passItem,
+      const std::string& techniqueName,
+      const std::map<std::string, BlendDesc>& blendStates,
+      const std::map<std::string, DepthStencilDesc>& depthStencilStates,
+      const std::map<std::string, RasterizerDesc>& rasterizerStates,
+      std::vector<std::string>& notes
+    )
+    {
+      Pass pass;
+      auto [passName, passAnnotations] = NameAndAnnotations(passItem.head.substr(4U));
+      pass.name = passName;
+      pass.annotations = std::move(passAnnotations);
+
+      for (const std::string& rawStatement : SplitTopLevel(passItem.body, ';')) {
+        const std::string statement = Squeeze(rawStatement);
+        if (statement.empty()) {
+          continue;
+        }
+        const std::size_t open = statement.find('(');
+        const std::string call = Trim(statement.substr(0U, open));
+        if (open != std::string::npos && (call == "SetBlendState" || call == "SetDepthStencilState" || call == "SetRasterizerState" ||
+                                          call == "SetVertexShader" || call == "SetPixelShader" || call == "SetGeometryShader")) {
+          const std::size_t close = Matching(statement, open);
+          const std::vector<std::string> arguments =
+            SplitTopLevel(std::string_view(statement).substr(open + 1U, close - open - 1U), ',');
+          const std::string object = arguments.empty() ? std::string() : Trim(arguments[0]);
+          if (call == "SetBlendState") {
+            const auto found = blendStates.find(object);
+            if (found != blendStates.end()) {
+              pass.blend = found->second;
+            } else {
+              notes.push_back("technique " + techniqueName + ": unknown blend state " + object);
+            }
+            if (arguments.size() > 1U) {
+              const std::vector<float> factor = ParseNumbers(arguments[1]);
+              for (std::size_t index = 0U; index < 4U && index < factor.size(); ++index) {
+                pass.blendFactor[index] = factor[index];
+              }
+            }
+            if (arguments.size() > 2U) {
+              pass.sampleMask = ParseUnsigned(arguments[2], 0xFFFFFFFFU);
+            }
+          } else if (call == "SetDepthStencilState") {
+            const auto found = depthStencilStates.find(object);
+            if (found != depthStencilStates.end()) {
+              pass.depthStencil = found->second;
+            } else {
+              notes.push_back("technique " + techniqueName + ": unknown depth-stencil state " + object);
+            }
+            if (arguments.size() > 1U) {
+              pass.stencilRef = ParseUnsigned(arguments[1], 0U);
+            }
+          } else if (call == "SetRasterizerState") {
+            const auto found = rasterizerStates.find(object);
+            if (found != rasterizerStates.end()) {
+              pass.rasterizer = found->second;
+            } else {
+              notes.push_back("technique " + techniqueName + ": unknown rasterizer state " + object);
+            }
+          } else if (call == "SetVertexShader") {
+            pass.vertexShader = ParseShaderReference(object);
+          } else if (call == "SetPixelShader") {
+            pass.pixelShader = ParseShaderReference(object);
+          }
+          continue;
+        }
+        const std::size_t equals = statement.find('=');
+        if (equals == std::string::npos) {
+          continue;
+        }
+        const std::string target = Lower(Trim(statement.substr(0U, equals)));
+        if (target == "vertexshader") {
+          pass.vertexShader = ParseShaderReference(statement.substr(equals + 1U));
+        } else if (target == "pixelshader") {
+          pass.pixelShader = ParseShaderReference(statement.substr(equals + 1U));
+        } else {
+          notes.push_back("technique " + techniqueName + ": pass statement ignored: " + statement);
+        }
+      }
+      return pass;
+    }
+  } // namespace
+
   EffectDescription ParseEffect(const std::string_view source)
   {
     EffectDescription effect;
@@ -553,39 +702,7 @@ namespace gpg::gal::effects
         continue; // a preprocessor line (ModernHlsl keeps it)
       }
       if (StartsWithWord(head, "struct")) {
-        StructType structType;
-        structType.name = Trim(head.substr(6U));
-        structs.push_back(structType.name);
-        for (const std::string& rawMember : SplitTopLevel(item.body, ';')) {
-          std::string member = Squeeze(rawMember);
-          const std::size_t colon = member.find(':');
-          if (colon != std::string::npos) {
-            member = Trim(member.substr(0U, colon));
-          }
-          if (member.empty()) {
-            continue;
-          }
-          StructMember structMember;
-          const std::size_t bracket = member.find('[');
-          if (bracket != std::string::npos) {
-            const std::vector<float> size = ParseNumbers(member.substr(bracket));
-            structMember.elements = size.empty() ? 0U : static_cast<std::uint32_t>(size.front());
-            member = Trim(member.substr(0U, bracket));
-          }
-          const std::size_t space = member.rfind(' ');
-          if (space == std::string::npos) {
-            continue;
-          }
-          structMember.name = member.substr(space + 1U);
-          structMember.typeName = Trim(member.substr(0U, space));
-          const TypeInfo info = ParseType(structMember.typeName, structs);
-          structMember.parameterClass = info.parameterClass;
-          structMember.scalarType = info.scalarType;
-          structMember.rows = info.rows;
-          structMember.columns = info.columns;
-          structType.members.push_back(std::move(structMember));
-        }
-        effect.structs.push_back(std::move(structType));
+        effect.structs.push_back(ParseStruct(item, structs));
         continue;
       }
       if (StartsWithWord(head, "typedef")) {
@@ -620,23 +737,7 @@ namespace gpg::gal::effects
       if (item.braced && (head.find("sampler_state") != std::string::npos || StartsWithWord(head, "SamplerState") ||
                           StartsWithWord(head, "sampler2D") || StartsWithWord(head, "sampler") || StartsWithWord(head, "samplerCUBE") ||
                           StartsWithWord(head, "sampler3D") || StartsWithWord(head, "sampler1D"))) {
-        SamplerDesc sampler;
-        std::string declaration = head;
-        const std::size_t equals = declaration.find('=');
-        if (equals != std::string::npos) {
-          declaration = Trim(declaration.substr(0U, equals));
-        }
-        const std::size_t space = declaration.find(' ');
-        const std::string type = Lower(declaration.substr(0U, space));
-        sampler.name = NameAndAnnotations(declaration.substr(space + 1U)).first;
-        sampler.declaredType = declaration.substr(0U, space);
-        sampler.begin = item.begin;
-        sampler.end = item.end;
-        sampler.kind = (type == "samplercube") ? SamplerDesc::Kind::TextureCube
-          : (type == "sampler3d")              ? SamplerDesc::Kind::Texture3D
-                                               : SamplerDesc::Kind::Texture2D;
-        ParseSamplerState(item.body, sampler);
-        effect.samplers.push_back(std::move(sampler));
+        effect.samplers.push_back(ParseSampler(item));
         continue;
       }
       const bool initializerList = item.braced && HasTopLevelAssignment(head) && head.find("sampler_state") == std::string::npos;
@@ -724,78 +825,9 @@ namespace gpg::gal::effects
         if (!passItem.braced || !StartsWithWord(passItem.head, "pass")) {
           continue;
         }
-        Pass pass;
-        auto [passName, passAnnotations] = NameAndAnnotations(passItem.head.substr(4U));
-        pass.name = passName;
-        pass.annotations = std::move(passAnnotations);
-
-        for (const std::string& rawStatement : SplitTopLevel(passItem.body, ';')) {
-          const std::string statement = Squeeze(rawStatement);
-          if (statement.empty()) {
-            continue;
-          }
-          const std::size_t open = statement.find('(');
-          const std::string call = Trim(statement.substr(0U, open));
-          if (open != std::string::npos && (call == "SetBlendState" || call == "SetDepthStencilState" || call == "SetRasterizerState" ||
-                                            call == "SetVertexShader" || call == "SetPixelShader" || call == "SetGeometryShader")) {
-            const std::size_t close = Matching(statement, open);
-            const std::vector<std::string> arguments =
-              SplitTopLevel(std::string_view(statement).substr(open + 1U, close - open - 1U), ',');
-            const std::string object = arguments.empty() ? std::string() : Trim(arguments[0]);
-            if (call == "SetBlendState") {
-              const auto found = blendStates.find(object);
-              if (found != blendStates.end()) {
-                pass.blend = found->second;
-              } else {
-                effect.notes.push_back("technique " + technique.name + ": unknown blend state " + object);
-              }
-              if (arguments.size() > 1U) {
-                const std::vector<float> factor = ParseNumbers(arguments[1]);
-                for (std::size_t index = 0U; index < 4U && index < factor.size(); ++index) {
-                  pass.blendFactor[index] = factor[index];
-                }
-              }
-              if (arguments.size() > 2U) {
-                pass.sampleMask = ParseUnsigned(arguments[2], 0xFFFFFFFFU);
-              }
-            } else if (call == "SetDepthStencilState") {
-              const auto found = depthStencilStates.find(object);
-              if (found != depthStencilStates.end()) {
-                pass.depthStencil = found->second;
-              } else {
-                effect.notes.push_back("technique " + technique.name + ": unknown depth-stencil state " + object);
-              }
-              if (arguments.size() > 1U) {
-                pass.stencilRef = ParseUnsigned(arguments[1], 0U);
-              }
-            } else if (call == "SetRasterizerState") {
-              const auto found = rasterizerStates.find(object);
-              if (found != rasterizerStates.end()) {
-                pass.rasterizer = found->second;
-              } else {
-                effect.notes.push_back("technique " + technique.name + ": unknown rasterizer state " + object);
-              }
-            } else if (call == "SetVertexShader") {
-              pass.vertexShader = ParseShaderReference(object);
-            } else if (call == "SetPixelShader") {
-              pass.pixelShader = ParseShaderReference(object);
-            }
-            continue;
-          }
-          const std::size_t equals = statement.find('=');
-          if (equals == std::string::npos) {
-            continue;
-          }
-          const std::string target = Lower(Trim(statement.substr(0U, equals)));
-          if (target == "vertexshader") {
-            pass.vertexShader = ParseShaderReference(statement.substr(equals + 1U));
-          } else if (target == "pixelshader") {
-            pass.pixelShader = ParseShaderReference(statement.substr(equals + 1U));
-          } else {
-            effect.notes.push_back("technique " + technique.name + ": pass statement ignored: " + statement);
-          }
-        }
-        technique.passes.push_back(std::move(pass));
+        technique.passes.push_back(
+          ParsePass(passItem, technique.name, blendStates, depthStencilStates, rasterizerStates, effect.notes)
+        );
       }
       effect.techniques.push_back(std::move(technique));
     }

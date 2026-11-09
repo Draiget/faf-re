@@ -1,5 +1,5 @@
-#include "moho/movie/sfd/IndependentSfdBackend.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/lua/CScrLuaInitForm.h"
 
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/Set.h"
@@ -35,15 +35,8 @@
 
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
-#include "gpg/gal/backends/d3d10/DeviceD3D10.hpp"
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
-#include "gpg/gal/Device.hpp"
-#include "gpg/gal/DeviceContext.hpp"
-#include "gpg/gal/Error.hpp"
 #include "gpg/core/reflection/Reflection.h"
 #include "lua/LuaTableIterator.h"
-#include "moho/app/WinApp.h"
-#include "moho/app/WxRuntimeTypes.h"
 #include "moho/client/Localization.h"
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -51,17 +44,12 @@
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/sim/CVFSImpl.h"
 #include "moho/misc/XFileError.h"
-#include "moho/render/textures/CD3DBatchTexture.h"
-#include "moho/render/d3d/CD3DDevice.h"
-#include "moho/render/RangeRenderer.h"
-#include "moho/render/VisionRenderer.h"
-#include "moho/render/WRenViewport.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/SpecialFileType.h"
+#include "moho/core/ThreadPlacement.h"
 #include "moho/task/CTaskThread.h"
-#include "moho/ui/CUIManager.h"
 #include "lua/LuaCrashDump.h"
 
 extern int __argc;
@@ -76,20 +64,16 @@ namespace
   moho::SAppIdentity gAppIdentity{};
   std::uint8_t gAqtimeInstrumentationMode = 1;
   std::once_flag gAppIdentityInitOnce;
-  /**
-   * The one `CMovieManager` (0x010C4AF0). `SetupBasicMovieManager` is its
-   * `reset(new CMovieManager)` and `DestroyMovieManagerSingleton` its
-   * `reset()`; the CRT destroys it at exit through the `atexit` destructor
-   * 0x00BE6C80 registers.
-   */
-  msvc8::auto_ptr<moho::CMovieManager> sMovieManager;
+  // The one `CMovieManager` (0x010C4AF0) is the client's
+  // (moho/app/StartupClientHelpers.cpp); MOV_GetDuration asks
+  // moho::sMovieManagerPresent for it.
   /**
    * The loaded preferences (0x010C6258). `USER_LoadPreferences` assigns its
    * local `auto_ptr` into it and `USER_GetPreferences` `reset`s it with
    * defaults; the CRT destroys it at exit through the `atexit` destructor
    * 0x00BE8B40 registers.
    */
-  msvc8::auto_ptr<moho::IUserPrefs> sPreferences;
+  fa::auto_ptr<moho::IUserPrefs> sPreferences;
 
   constexpr const char* kOptionPrefixes[] = {"/", "-", "+", "\\"};
   constexpr const char* kAdapterAliases[] = {"adapter"};
@@ -118,55 +102,13 @@ namespace
   constexpr moho::CfgAliasSet kWindowedAliasesSet{
     kWindowedAliases, sizeof(kWindowedAliases) / sizeof(kWindowedAliases[0])
   };
-  constexpr char kUserPrefsModulePath[] = "/lua/user/prefs.lua";
-  constexpr char kOptionsLogicModulePath[] = "/lua/options/optionslogic.lua";
-  constexpr char kGetOptionMethodName[] = "GetOption";
-  constexpr char kGetCurrentProfileMethodName[] = "GetCurrentProfile";
-  constexpr char kProfileProfilesPath[] = "profile.profiles";
-  constexpr char kProfileRootKey[] = "profile";
-  constexpr char kProfileCurrentIndexKey[] = "current";
-  constexpr char kProfileNameFieldName[] = "Name";
-  constexpr char kProfileNetNameFieldName[] = "NetName";
-  constexpr char kProfilesExistMethodName[] = "ProfilesExist";
-  constexpr char kCreateProfileMethodName[] = "CreateProfile";
-  constexpr char kApplyMethodName[] = "Apply";
-  constexpr char kSetCustomDataMethodName[] = "SetCustomData";
-  constexpr char kUserPrefsLuaRunErrorPrefix[] = "Error running '/lua/user/prefs.lua' : %s";
-  constexpr char kUserPrefsGetOptionLuaRunErrorPrefix[] = "Error running '/lua/user/prefs.lua:GetOption' : %s";
-  constexpr char kOptionsApplyLuaRunErrorPrefix[] = "Error running '/lua/options/optionslogic.lua':Apply %s";
-  constexpr char kOptionsSetCustomDataLuaRunErrorPrefix[] =
-    "Error running '/lua/options/optionslogic.lua':OPTIONS_SetCustomData %s";
-  constexpr char kPrimaryAdapterKey[] = "primary_adapter";
-  constexpr char kSecondaryAdapterKey[] = "secondary_adapter";
-  constexpr char kFidelityKey[] = "fidelity";
-  constexpr char kShadowQualityKey[] = "shadow_quality";
-  constexpr char kAntiAliasingKey[] = "antialiasing";
-  constexpr char kWindowedModeKey[] = "windowed";
-  constexpr char kDisabledModeKey[] = "disabled";
-  constexpr char kCommandLineOverrideModeKey[] = "overridden";
-  constexpr char kGetCommandLineArgHelpText[] = "CommandArgTable GetCommandLineArg(option, number)";
-  constexpr char kHasCommandLineArgHelpText[] = "HasCommandLineArg(option)";
   constexpr char kSHGetFolderPathHelpText[] = "(name, create?) -- Interface to Win32 SHGetFolderPath api";
-  constexpr char kGetTextureDimensionsHelpText[] = "width, height GetTextureDimensions(filename, border = 1)";
-  constexpr char kSetMovieVolumeHelpText[] = "SetMovieVolume(volume): 0.0 - 2.0";
-  constexpr char kGetMovieVolumeHelpText[] = "GetMovieVolume()";
   constexpr char kGetMovieDurationHelpText[] = "GetMovieDuration(localFileName)";
-  constexpr char kGetAntiAliasingOptionsHelpText[] = "obj GetAntiAliasingOptions()";
-  constexpr char kGetOptionsHelpText[] = "obj GetOptions()";
-  constexpr char kGetPreferenceHelpText[] = "obj GetPreference(string, [default])";
-  constexpr char kSetPreferenceHelpText[] = "SetPreference(string, obj)";
-  constexpr char kSavePreferencesHelpText[] = "SavePreferences()";
-  constexpr char kDebugFacilitiesEnabledHelpText[] =
-    "bool DebugFacilitiesEnabled() - returns true if debug facilities are enabled.";
   constexpr char kUnknownShGetFolderPathIdErrorText[] = "Unknown id for SHGetFolderPath: %s";
   constexpr char kShGetFolderPathFailedErrorText[] = "SHGetFolderPath failed: %x";
-  constexpr char kLuaExpectedArgRangeWarning[] = "%s\n  expected between %d and %d args, but got %d";
   constexpr char kUnreachableAssertText[] = "Reached the supposably unreachable.";
   constexpr char kScrUnsafeSourcePath[] = "c:\\work\\rts\\main\\code\\src\\core\\ScrUnsafe.cpp";
   constexpr int kScrUnsafeUnknownPathLine = 95;
-  /** The top of `SetMovieVolume`'s "0.0 - 2.0" range (0x00DFEB0C). */
-  constexpr float kMovieVolumeScriptMax = 2.0f;
-  constexpr float kMovieSofdecVideoRefreshHz = 59.939999f;
   constexpr float kWordFloatScale = 65536.0f;
 
   /**
@@ -218,7 +160,7 @@ namespace
    */
   void SerializePreferenceLuaEntry(
     std::ostream& output,
-    const msvc8::string& indent,
+    const fa::string& indent,
     LuaPlus::LuaObject keyObject,
     LuaPlus::LuaObject valueObject
   )
@@ -228,7 +170,7 @@ namespace
       if (gpg::STR_IsIdent(keyText != nullptr ? keyText : "")) {
         output << (keyText != nullptr ? keyText : "");
       } else {
-        const msvc8::string quotedKey = moho::SCR_QuoteLuaString(keyText != nullptr ? keyText : "");
+        const fa::string quotedKey = moho::SCR_QuoteLuaString(keyText != nullptr ? keyText : "");
         output << '[' << quotedKey.c_str() << ']';
       }
       output << " = ";
@@ -247,14 +189,14 @@ namespace
 
       case LUA_TSTRING: {
         const char* const valueText = valueObject.GetString();
-        const msvc8::string quotedValue = moho::SCR_QuoteLuaString(valueText != nullptr ? valueText : "");
+        const fa::string quotedValue = moho::SCR_QuoteLuaString(valueText != nullptr ? valueText : "");
         output << quotedValue.c_str();
         break;
       }
 
       case LUA_TTABLE: {
         output << "{";
-        msvc8::string nestedIndent = indent;
+        fa::string nestedIndent = indent;
         nestedIndent.append("    ");
 
         int entryIndex = 0;
@@ -302,7 +244,7 @@ namespace
   {
     LuaPlus::LuaTableIterator iter(&preferenceTable, 1);
     while (!iter.m_isDone) {
-      msvc8::string indent;
+      fa::string indent;
       LuaPlus::LuaObject valueObject(iter.GetValue());
       LuaPlus::LuaObject keyObject(iter.GetKey());
       SerializePreferenceLuaEntry(output, indent, keyObject, valueObject);
@@ -360,34 +302,6 @@ namespace
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingLuaState(lua_State* const luaContext) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("User"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("User");
-    return sSet;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Core");
-    return sSet;
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UnsafeLuaInitSet()
@@ -456,6 +370,12 @@ namespace
     }
 
     const auto priorityClass = static_cast<DWORD>(static_cast<std::uint32_t>(luaL_checknumber(state, 1)));
+    // Engine change: the replay viewer's hidden process runs the game's init file, which asks for high priority.
+    // It stays below normal, or it competes with the game it works for.
+    if (moho::CFG_GetArgOption("--keyframe-quiet", 0, nullptr)) {
+      lua_pushboolean(state, 1);
+      return 1;
+    }
     const HMODULE kernelModule = ::GetModuleHandleA("kernel32.dll");
     using SetPriorityClassFn = BOOL(WINAPI*)(HANDLE, DWORD);
     auto* const setPriorityClass = kernelModule != nullptr
@@ -480,7 +400,8 @@ namespace
     }
 
     const DWORD_PTR affinityMask = static_cast<DWORD_PTR>(static_cast<std::uint32_t>(luaL_checknumber(state, 1)));
-    const BOOL result = ::SetProcessAffinityMask(::GetCurrentProcess(), affinityMask);
+    // Engine change: a server given its CPUs keeps them (ThreadPlacement.h).
+    const BOOL result = moho::ProcessCpusAreLocked() ? TRUE : ::SetProcessAffinityMask(::GetCurrentProcess(), affinityMask);
     lua_pushboolean(state, result != FALSE ? 1 : 0);
     return 1;
   }
@@ -525,56 +446,26 @@ namespace
     RegisterProcessControlLuaFunction<lua_SetProcessPriority>(state->m_state, "SetProcessPriority");
   }
 
-  [[nodiscard]] const msvc8::string& SaveGameDirName()
-  {
-    static const msvc8::string kSaveGameDir("savegames");
-    return kSaveGameDir;
-  }
 
-  [[nodiscard]] const msvc8::string& SaveGameExtName()
+  [[nodiscard]] const fa::string& SaveGameExtName()
   {
-    static const msvc8::string kSaveGameExt("SaveGame");
+    static const fa::string kSaveGameExt("SaveGame");
     return kSaveGameExt;
   }
 
-  [[nodiscard]] const msvc8::string& ReplayDirName()
-  {
-    static const msvc8::string kReplayDir("replays");
-    return kReplayDir;
-  }
 
-  [[nodiscard]] const msvc8::string& ReplayExtName()
+  [[nodiscard]] const fa::string& ReplayExtName()
   {
-    static const msvc8::string kReplayExt("Replay");
+    static const fa::string kReplayExt("Replay");
     return kReplayExt;
   }
 
-  [[nodiscard]] const msvc8::string& CampaignSaveExtName()
+  [[nodiscard]] const fa::string& CampaignSaveExtName()
   {
-    static const msvc8::string kCampaignSaveExt("CampaignSave");
+    static const fa::string kCampaignSaveExt("CampaignSave");
     return kCampaignSaveExt;
   }
 
-  [[nodiscard]] const msvc8::string& ScreenshotDirName()
-  {
-    static const msvc8::string kScreenshotDir("screenshots");
-    return kScreenshotDir;
-  }
-
-  /**
-   * Address: 0x00874C10 (FUN_00874C10, `func_GpgSofDecError`)
-   *
-   * IDA signature:
-   * int __cdecl func_GpgSofDecError(char* ignored, const char* message);
-   *
-   * What it does:
-   * Routes Sofdec middleware errors into gpg warning logs.
-   */
-  int __cdecl GpgSofDecError(std::uint32_t /*ignored*/, const char* const message)
-  {
-    gpg::Warnf("SofDec error: %s", message);
-    return 0;
-  }
 
   [[nodiscard]]
   std::filesystem::path MakeAbsolutePath(const std::filesystem::path& path)
@@ -593,7 +484,7 @@ namespace
     return canonicalPath;
   }
 
-  void SetIdentityString(msvc8::string& out, const char* const value)
+  void SetIdentityString(fa::string& out, const char* const value)
   {
     out.assign_owned(value != nullptr ? value : "");
   }
@@ -604,7 +495,7 @@ namespace
   }
 
   [[nodiscard]] bool TryGetAliasedArgOption(
-    const std::string& option, const std::uint32_t requiredArgCount, msvc8::vector<msvc8::string>* const outArgs
+    const std::string& option, const std::uint32_t requiredArgCount, fa::vector<fa::string>* const outArgs
   )
   {
     if (option.empty()) {
@@ -617,7 +508,7 @@ namespace
   {
     std::uintptr_t callstack[32]{};
     const std::uint32_t frameCount = moho::PLAT_GetCallStack(nullptr, 32u, callstack);
-    const msvc8::string errorText = gpg::STR_Printf(
+    const fa::string errorText = gpg::STR_Printf(
       "%s: %s", functionName != nullptr ? functionName : "Moho::File", message != nullptr ? message : "File error."
     );
     throw moho::XFileError(errorText.to_std(), callstack, frameCount);
@@ -625,19 +516,10 @@ namespace
 
   [[noreturn]] void ThrowFileDirCrtError(const char* const crtFunctionName)
   {
-    const msvc8::string errnoDescription = moho::FILE_GetErrorFromErrno(errno);
-    const msvc8::string detail =
+    const fa::string errnoDescription = moho::FILE_GetErrorFromErrno(errno);
+    const fa::string detail =
       gpg::STR_Printf("%s error: %s", crtFunctionName != nullptr ? crtFunctionName : "_getcwd", errnoDescription.c_str());
     ThrowStartupFileError("Moho::FILE_Dir", detail.c_str());
-  }
-
-  [[nodiscard]] LuaPlus::LuaState* ResolveStartupLuaState()
-  {
-    if (moho::g_UIManager != nullptr && moho::g_UIManager->mLuaState != nullptr) {
-      return moho::g_UIManager->mLuaState;
-    }
-
-    return moho::USER_GetLuaState();
   }
 
   /**
@@ -733,9 +615,9 @@ namespace
    * exactly those two keys at 0x0045A211 and 0x0045A1FE and builds one
    * SVFSMountPoint per entry, in table order, which is mount order.
    */
-  [[nodiscard]] msvc8::vector<moho::SVFSMountPoint> CollectMountPointsFromLua(LuaPlus::LuaState* const state)
+  [[nodiscard]] fa::vector<moho::SVFSMountPoint> CollectMountPointsFromLua(LuaPlus::LuaState* const state)
   {
-    msvc8::vector<moho::SVFSMountPoint> mountPoints;
+    fa::vector<moho::SVFSMountPoint> mountPoints;
     if (state == nullptr) {
       return mountPoints;
     }
@@ -797,7 +679,7 @@ namespace
    * does this itself rather than through the init file because the init
    * files belong to the FAF client. Nothing happens when the folder is absent.
    */
-  void AppendEngineHookFolder(msvc8::vector<moho::SVFSMountPoint>& mountPoints)
+  void AppendEngineHookFolder(fa::vector<moho::SVFSMountPoint>& mountPoints)
   {
     std::array<wchar_t, MAX_PATH> modulePath{};
     const DWORD length = ::GetModuleFileNameW(nullptr, modulePath.data(), static_cast<DWORD>(modulePath.size()));
@@ -809,319 +691,10 @@ namespace
     if (!std::filesystem::is_directory(folder, error)) {
       return;
     }
-    const msvc8::string folderUtf8 = gpg::STR_WideToUtf8(folder.wstring().c_str());
+    const fa::string folderUtf8 = gpg::STR_WideToUtf8(folder.wstring().c_str());
     mountPoints.push_back(moho::SVFSMountPoint(folderUtf8.c_str(), "/fafengine"));
     moho::SCR_AddHookDirectory("/fafengine");
     gpg::Logf("engine hooks: %s mounted at /fafengine", folderUtf8.c_str());
-  }
-
-  [[nodiscard]] LuaPlus::LuaObject ImportLuaModule(LuaPlus::LuaState* const state, const char* const modulePath)
-  {
-    if (state == nullptr || modulePath == nullptr || modulePath[0] == '\0') {
-      return LuaPlus::LuaObject{};
-    }
-
-    return moho::SCR_ImportLuaModule(state, modulePath);
-  }
-
-  [[nodiscard]]
-  LuaPlus::LuaObject GetLuaModuleFunction(
-    LuaPlus::LuaState* const state, const LuaPlus::LuaObject& moduleObject, const char* const methodName
-  )
-  {
-    if (state == nullptr || methodName == nullptr || methodName[0] == '\0' || moduleObject.IsNil()) {
-      return LuaPlus::LuaObject{};
-    }
-
-    return moho::SCR_GetLuaTableField(state, moduleObject, methodName);
-  }
-
-  [[nodiscard]] LuaPlus::LuaObject QueryOptionValue(const char* const key)
-  {
-    if (key == nullptr || key[0] == '\0') {
-      return LuaPlus::LuaObject{};
-    }
-
-    LuaPlus::LuaState* const state = ResolveStartupLuaState();
-    if (state == nullptr) {
-      return LuaPlus::LuaObject{};
-    }
-
-    const LuaPlus::LuaObject prefsModule = ImportLuaModule(state, kUserPrefsModulePath);
-    const LuaPlus::LuaObject getOptionFn = GetLuaModuleFunction(state, prefsModule, kGetOptionMethodName);
-    if (getOptionFn.IsNil()) {
-      return LuaPlus::LuaObject{};
-    }
-
-    LuaPlus::LuaFunction<LuaPlus::LuaObject> getOptionCallable(getOptionFn);
-    return getOptionCallable(key);
-  }
-
-  [[nodiscard]] bool TryParseBooleanText(const char* const text, bool* const outValue)
-  {
-    if (text == nullptr || outValue == nullptr) {
-      return false;
-    }
-
-    if (
-      gpg::STR_CompareNoCase(text, "true") == 0 || gpg::STR_CompareNoCase(text, "yes") == 0 ||
-      gpg::STR_CompareNoCase(text, "on") == 0 || std::strcmp(text, "1") == 0
-    ) {
-      *outValue = true;
-      return true;
-    }
-
-    if (
-      gpg::STR_CompareNoCase(text, "false") == 0 || gpg::STR_CompareNoCase(text, "no") == 0 ||
-      gpg::STR_CompareNoCase(text, "off") == 0 || std::strcmp(text, "0") == 0
-    ) {
-      *outValue = false;
-      return true;
-    }
-
-    return false;
-  }
-
-  /**
-   * Address: 0x008CD4F0 (FUN_008CD4F0)
-   *
-   * What it does:
-   * Formats one adapter mode label as `"<width>x<height>(<refresh>)"` for
-   * startup option state text.
-   */
-  [[nodiscard]] msvc8::string BuildModeLabel(const gpg::gal::HeadAdapterMode& mode)
-  {
-    std::ostringstream stream;
-    stream << mode.width << 'x' << mode.height << '(' << mode.refreshRate << ')';
-    return msvc8::string(stream.str().c_str());
-  }
-
-  [[nodiscard]] msvc8::string BuildModeKey(const gpg::gal::HeadAdapterMode& mode)
-  {
-    return gpg::STR_Printf("%u,%u,%u", mode.width, mode.height, mode.refreshRate);
-  }
-
-  [[nodiscard]] bool IsModeAboveWindowMinimum(const gpg::gal::HeadAdapterMode& mode)
-  {
-    return mode.width >= static_cast<std::uint32_t>(moho::wnd_DefaultCreateWidth) &&
-      mode.height >= static_cast<std::uint32_t>(moho::wnd_DefaultCreateHeight);
-  }
-
-  /**
-   * Ordering for the adapter-mode dedup tree: width, then height, then refresh
-   * rate. `0x008D6170` walks the tree with exactly this three-step compare.
-   */
-  struct ResolutionLess
-  {
-    [[nodiscard]] bool operator()(const moho::Resolution& lhs, const moho::Resolution& rhs) const noexcept
-    {
-      if (lhs.width != rhs.width) {
-        return lhs.width < rhs.width;
-      }
-      if (lhs.height != rhs.height) {
-        return lhs.height < rhs.height;
-      }
-      return lhs.framesPerSecond < rhs.framesPerSecond;
-    }
-  };
-
-  // The shipped dedup is an RB-tree of `Resolution` (node 0x20: the 0x10
-  // element at +0x0C, colour and nil at +0x1C/+0x1D), built on the stack by
-  // `SetupPrimaryAdapterSettings` and `SetupSecondaryAdapterSettings` and torn
-  // down when they return. The tree only suppresses repeats -- the option
-  // states are published in the adapter's own order as the scan walks it.
-  using AdapterModeDedup = msvc8::set<moho::Resolution, ResolutionLess>;
-
-  /**
-   * The list both adapter option builders publish: the device's display modes
-   * for `adapterIndex` (gal::Device slot 5 - adapter 0 at 0x008D22F7, adapter 1
-   * at 0x008D2807), less the modes under the minimum window size and repeats.
-   * The recovered version read the head's own `adapterModes` copy instead and
-   * gave up when the context had no head at that index; the binary asks the
-   * device and has neither the head lookup nor the guards.
-   */
-  [[nodiscard]] msvc8::vector<gpg::gal::HeadAdapterMode> CollectAdapterModes(const int adapterIndex)
-  {
-    msvc8::vector<gpg::gal::HeadAdapterMode> adapterModes;
-    gpg::gal::Device::GetInstance()->GetModesForAdapter(adapterModes, adapterIndex);
-
-    msvc8::vector<gpg::gal::HeadAdapterMode> modes;
-    AdapterModeDedup published;
-    for (const gpg::gal::HeadAdapterMode& adapterMode : adapterModes) {
-      if (!IsModeAboveWindowMinimum(adapterMode)) {
-        continue;
-      }
-      const moho::Resolution mode(
-        static_cast<std::int32_t>(adapterMode.width),
-        static_cast<std::int32_t>(adapterMode.height),
-        static_cast<std::int32_t>(adapterMode.refreshRate)
-      );
-      if (published.find(mode) != published.end()) {
-        continue;
-      }
-      (void)published.insert(mode);
-      modes.push_back(adapterMode);
-    }
-
-    return modes;
-  }
-
-  [[nodiscard]] LuaPlus::LuaObject BuildOptionRoot(LuaPlus::LuaState* const state)
-  {
-    LuaPlus::LuaObject root(state);
-    root.AssignNewTable(state, 0, 0);
-
-    LuaPlus::LuaObject states(state);
-    states.AssignNewTable(state, 0, 0);
-    root.SetObject("states", states);
-
-    return root;
-  }
-
-  void AddOptionStateString(
-    LuaPlus::LuaState* const state,
-    LuaPlus::LuaObject* const statesTable,
-    const std::int32_t index,
-    const char* const text,
-    const char* const key
-  )
-  {
-    if (state == nullptr || statesTable == nullptr) {
-      return;
-    }
-
-    LuaPlus::LuaObject stateEntry(state);
-    stateEntry.AssignNewTable(state, 0, 0);
-    stateEntry.SetString("text", text != nullptr ? text : "");
-    stateEntry.SetString("key", key != nullptr ? key : "");
-    statesTable->SetObject(index, stateEntry);
-  }
-
-  void AddOptionStateInteger(
-    LuaPlus::LuaState* const state,
-    LuaPlus::LuaObject* const statesTable,
-    const std::int32_t index,
-    const char* const text,
-    const std::int32_t key
-  )
-  {
-    if (state == nullptr || statesTable == nullptr) {
-      return;
-    }
-
-    LuaPlus::LuaObject stateEntry(state);
-    stateEntry.AssignNewTable(state, 0, 0);
-    stateEntry.SetString("text", text != nullptr ? text : "");
-    stateEntry.SetInteger("key", key);
-    statesTable->SetObject(index, stateEntry);
-  }
-
-  void RefreshFidelitySupportLanes(const gpg::gal::DeviceContext* const context)
-  {
-    if (context == nullptr) {
-      return;
-    }
-
-    moho::graphics_FidelitySupported = context->mPixelShaderProfile > 5 ? 2 : 1;
-    moho::shadow_FidelitySupported = context->mPixelShaderProfile > 5 ? 3 : 2;
-  }
-
-  [[nodiscard]] LuaPlus::LuaObject
-  QueryOptionValueWithLocalOverride(LuaPlus::LuaObject* const localOverrideRoot, const msvc8::string& key)
-  {
-    if (localOverrideRoot != nullptr && !localOverrideRoot->IsNil()) {
-      const LuaPlus::LuaObject localValue = localOverrideRoot->GetByName(key.c_str());
-      if (!localValue.IsNil()) {
-        return localValue;
-      }
-    }
-    return QueryOptionValue(key.c_str());
-  }
-
-  [[nodiscard]] bool TryGetBooleanFromLuaValue(const LuaPlus::LuaObject& value, bool* const outValue)
-  {
-    if (outValue == nullptr || value.IsNil()) {
-      return false;
-    }
-
-    if (value.IsBoolean()) {
-      *outValue = value.GetBoolean();
-      return true;
-    }
-    if (value.IsNumber()) {
-      *outValue = value.GetNumber() != 0.0;
-      return true;
-    }
-
-    return TryParseBooleanText(value.GetString(), outValue);
-  }
-
-  [[nodiscard]] bool TryGetIntegerFromLuaValue(const LuaPlus::LuaObject& value, std::int32_t* const outValue)
-  {
-    if (outValue == nullptr || value.IsNil()) {
-      return false;
-    }
-
-    if (value.IsNumber()) {
-      *outValue = static_cast<std::int32_t>(value.GetNumber());
-      return true;
-    }
-    if (value.IsBoolean()) {
-      *outValue = value.GetBoolean() ? 1 : 0;
-      return true;
-    }
-
-    const char* const text = value.GetString();
-    if (text == nullptr || text[0] == '\0') {
-      return false;
-    }
-
-    *outValue = static_cast<std::int32_t>(std::atoi(text));
-    return true;
-  }
-
-  [[nodiscard]] bool TryGetNumberFromLuaValue(const LuaPlus::LuaObject& value, float* const outValue)
-  {
-    if (outValue == nullptr || value.IsNil()) {
-      return false;
-    }
-
-    if (value.IsNumber()) {
-      *outValue = static_cast<float>(value.GetNumber());
-      return true;
-    }
-    if (value.IsBoolean()) {
-      *outValue = value.GetBoolean() ? 1.0f : 0.0f;
-      return true;
-    }
-
-    const char* const text = value.GetString();
-    if (text == nullptr || text[0] == '\0') {
-      return false;
-    }
-
-    *outValue = std::strtof(text, nullptr);
-    return true;
-  }
-
-  [[nodiscard]] bool TryGetHexFromLuaValue(const LuaPlus::LuaObject& value, std::uint32_t* const outValue)
-  {
-    if (outValue == nullptr || value.IsNil()) {
-      return false;
-    }
-
-    if (value.IsNumber()) {
-      *outValue = static_cast<std::uint32_t>(value.GetNumber());
-      return true;
-    }
-
-    const char* const text = value.GetString();
-    if (text == nullptr || text[0] == '\0') {
-      return false;
-    }
-
-    *outValue = static_cast<std::uint32_t>(std::strtoul(text, nullptr, 0));
-    return true;
   }
 
   /**
@@ -1131,7 +704,7 @@ namespace
    * Builds one Lua string object using the preferences Lua state.
    */
   [[nodiscard]] LuaPlus::LuaObject BuildPreferenceStringObject(
-    LuaPlus::LuaState* const state, const msvc8::string& value
+    LuaPlus::LuaState* const state, const fa::string& value
   )
   {
     LuaPlus::LuaObject out;
@@ -1147,14 +720,14 @@ namespace
    * `StringObject` element per index starting at 1.
    */
   [[nodiscard]] LuaPlus::LuaObject BuildPreferenceStringArrayObject(
-    LuaPlus::LuaState* const state, const msvc8::list<msvc8::string>& values
+    LuaPlus::LuaState* const state, const fa::list<fa::string>& values
   )
   {
     LuaPlus::LuaObject out;
     out.AssignNewTable(state, 0, 0);
 
     int luaIndex = 1;
-    for (msvc8::list<msvc8::string>::const_iterator it = values.begin(); it != values.end(); ++it, ++luaIndex) {
+    for (fa::list<fa::string>::const_iterator it = values.begin(); it != values.end(); ++it, ++luaIndex) {
       LuaPlus::LuaObject itemObject = BuildPreferenceStringObject(state, *it);
       out.Insert(luaIndex, itemObject);
     }
@@ -1226,7 +799,7 @@ namespace
   void SetPreferenceBooleanRecursive(
     LuaPlus::LuaState* const state,
     LuaPlus::LuaObject* const rootTable,
-    const msvc8::string& dottedKey,
+    const fa::string& dottedKey,
     const bool value
   )
   {
@@ -1234,15 +807,15 @@ namespace
       return;
     }
 
-    msvc8::vector<msvc8::string> tokens;
-    msvc8::string token;
+    fa::vector<fa::string> tokens;
+    fa::string token;
     const char* cursor = dottedKey.c_str();
     while (gpg::STR_GetToken(cursor, ".", token)) {
       tokens.push_back(token);
     }
 
-    const msvc8::string* const begin = tokens.begin();
-    const msvc8::string* const end = tokens.end();
+    const fa::string* const begin = tokens.begin();
+    const fa::string* const end = tokens.end();
     if (begin == nullptr || end == nullptr || begin == end) {
       return;
     }
@@ -1250,7 +823,7 @@ namespace
     LuaPlus::LuaObject current(*rootTable);
     int index = 0;
     const int count = static_cast<int>(tokens.size());
-    for (const msvc8::string* it = begin; it != end; ++it, ++index) {
+    for (const fa::string* it = begin; it != end; ++it, ++index) {
       const char* const keyText = it->c_str() != nullptr ? it->c_str() : "";
       LuaPlus::LuaObject lane = current[keyText];
 
@@ -1277,7 +850,7 @@ namespace
   void SetPreferenceIntegerRecursive(
     LuaPlus::LuaState* const state,
     LuaPlus::LuaObject* const rootTable,
-    const msvc8::string& dottedKey,
+    const fa::string& dottedKey,
     const std::int32_t value
   )
   {
@@ -1285,15 +858,15 @@ namespace
       return;
     }
 
-    msvc8::vector<msvc8::string> tokens;
-    msvc8::string token;
+    fa::vector<fa::string> tokens;
+    fa::string token;
     const char* cursor = dottedKey.c_str();
     while (gpg::STR_GetToken(cursor, ".", token)) {
       tokens.push_back(token);
     }
 
-    const msvc8::string* const begin = tokens.begin();
-    const msvc8::string* const end = tokens.end();
+    const fa::string* const begin = tokens.begin();
+    const fa::string* const end = tokens.end();
     if (begin == nullptr || end == nullptr || begin == end) {
       return;
     }
@@ -1301,7 +874,7 @@ namespace
     LuaPlus::LuaObject current(*rootTable);
     int index = 0;
     const int count = static_cast<int>(tokens.size());
-    for (const msvc8::string* it = begin; it != end; ++it, ++index) {
+    for (const fa::string* it = begin; it != end; ++it, ++index) {
       const char* const keyText = it->c_str() != nullptr ? it->c_str() : "";
       LuaPlus::LuaObject lane = current[keyText];
 
@@ -1328,7 +901,7 @@ namespace
   void SetPreferenceNumberRecursive(
     LuaPlus::LuaState* const state,
     LuaPlus::LuaObject* const rootTable,
-    const msvc8::string& dottedKey,
+    const fa::string& dottedKey,
     const float value
   )
   {
@@ -1336,15 +909,15 @@ namespace
       return;
     }
 
-    msvc8::vector<msvc8::string> tokens;
-    msvc8::string token;
+    fa::vector<fa::string> tokens;
+    fa::string token;
     const char* cursor = dottedKey.c_str();
     while (gpg::STR_GetToken(cursor, ".", token)) {
       tokens.push_back(token);
     }
 
-    const msvc8::string* const begin = tokens.begin();
-    const msvc8::string* const end = tokens.end();
+    const fa::string* const begin = tokens.begin();
+    const fa::string* const end = tokens.end();
     if (begin == nullptr || end == nullptr || begin == end) {
       return;
     }
@@ -1352,7 +925,7 @@ namespace
     LuaPlus::LuaObject current(*rootTable);
     int index = 0;
     const int count = static_cast<int>(tokens.size());
-    for (const msvc8::string* it = begin; it != end; ++it, ++index) {
+    for (const fa::string* it = begin; it != end; ++it, ++index) {
       const char* const keyText = it->c_str() != nullptr ? it->c_str() : "";
       LuaPlus::LuaObject lane = current[keyText];
 
@@ -1379,23 +952,23 @@ namespace
   void SetPreferenceStringRecursive(
     LuaPlus::LuaState* const state,
     LuaPlus::LuaObject* const rootTable,
-    const msvc8::string& dottedKey,
-    const msvc8::string& value
+    const fa::string& dottedKey,
+    const fa::string& value
   )
   {
     if (state == nullptr || rootTable == nullptr) {
       return;
     }
 
-    msvc8::vector<msvc8::string> tokens;
-    msvc8::string token;
+    fa::vector<fa::string> tokens;
+    fa::string token;
     const char* cursor = dottedKey.c_str();
     while (gpg::STR_GetToken(cursor, ".", token)) {
       tokens.push_back(token);
     }
 
-    const msvc8::string* const begin = tokens.begin();
-    const msvc8::string* const end = tokens.end();
+    const fa::string* const begin = tokens.begin();
+    const fa::string* const end = tokens.end();
     if (begin == nullptr || end == nullptr || begin == end) {
       return;
     }
@@ -1403,7 +976,7 @@ namespace
     LuaPlus::LuaObject current(*rootTable);
     int index = 0;
     const int count = static_cast<int>(tokens.size());
-    for (const msvc8::string* it = begin; it != end; ++it, ++index) {
+    for (const fa::string* it = begin; it != end; ++it, ++index) {
       const char* const keyText = it->c_str() != nullptr ? it->c_str() : "";
       LuaPlus::LuaObject lane = current[keyText];
 
@@ -1430,23 +1003,23 @@ namespace
   void SetPreferenceStringArrayRecursive(
     LuaPlus::LuaState* const state,
     LuaPlus::LuaObject* const rootTable,
-    const msvc8::string& dottedKey,
-    const msvc8::list<msvc8::string>& values
+    const fa::string& dottedKey,
+    const fa::list<fa::string>& values
   )
   {
     if (state == nullptr || rootTable == nullptr) {
       return;
     }
 
-    msvc8::vector<msvc8::string> tokens;
-    msvc8::string token;
+    fa::vector<fa::string> tokens;
+    fa::string token;
     const char* cursor = dottedKey.c_str();
     while (gpg::STR_GetToken(cursor, ".", token)) {
       tokens.push_back(token);
     }
 
-    const msvc8::string* const begin = tokens.begin();
-    const msvc8::string* const end = tokens.end();
+    const fa::string* const begin = tokens.begin();
+    const fa::string* const end = tokens.end();
     if (begin == nullptr || end == nullptr || begin == end) {
       return;
     }
@@ -1454,7 +1027,7 @@ namespace
     LuaPlus::LuaObject current(*rootTable);
     int index = 0;
     const int count = static_cast<int>(tokens.size());
-    for (const msvc8::string* it = begin; it != end; ++it, ++index) {
+    for (const fa::string* it = begin; it != end; ++it, ++index) {
       const char* const keyText = it->c_str() != nullptr ? it->c_str() : "";
       LuaPlus::LuaObject lane = current[keyText];
 
@@ -1481,7 +1054,7 @@ namespace
   void SetPreferenceObjectRecursive(
     LuaPlus::LuaState* const state,
     LuaPlus::LuaObject* const rootTable,
-    const msvc8::string& dottedKey,
+    const fa::string& dottedKey,
     const LuaPlus::LuaObject& value
   )
   {
@@ -1489,15 +1062,15 @@ namespace
       return;
     }
 
-    msvc8::vector<msvc8::string> tokens;
-    msvc8::string token;
+    fa::vector<fa::string> tokens;
+    fa::string token;
     const char* cursor = dottedKey.c_str();
     while (gpg::STR_GetToken(cursor, ".", token)) {
       tokens.push_back(token);
     }
 
-    const msvc8::string* const begin = tokens.begin();
-    const msvc8::string* const end = tokens.end();
+    const fa::string* const begin = tokens.begin();
+    const fa::string* const end = tokens.end();
     if (begin == nullptr || end == nullptr || begin == end) {
       return;
     }
@@ -1505,7 +1078,7 @@ namespace
     LuaPlus::LuaObject current(*rootTable);
     int index = 0;
     const int count = static_cast<int>(tokens.size());
-    for (const msvc8::string* it = begin; it != end; ++it, ++index) {
+    for (const fa::string* it = begin; it != end; ++it, ++index) {
       const char* const keyText = it->c_str() != nullptr ? it->c_str() : "";
       LuaPlus::LuaObject lane = current[keyText];
 
@@ -1526,6 +1099,23 @@ namespace
 
 namespace moho
 {
+  /// See the declaration (#247): one lock for every thread that touches the preferences state.
+  /// FAF_PREFS_NOLOCK=1 (test only, tests/prefs) gives each thread a lock of its own, so the
+  /// threads no longer exclude each other and the race the lock prevents comes back.
+  std::recursive_mutex& USER_PreferencesLock()
+  {
+    static const bool sPerThread = [] {
+      char value[4] = {};
+      return ::GetEnvironmentVariableA("FAF_PREFS_NOLOCK", value, sizeof(value)) == 1u && value[0] == '1';
+    }();
+    if (sPerThread) {
+      thread_local std::recursive_mutex tLock;
+      return tLock;
+    }
+    static std::recursive_mutex sLock;
+    return sLock;
+  }
+
   /**
    * RTTI `.?AVCUserPrefs@Moho@@`, vftable 0x00E4E344 (20 slots), 0x84 bytes:
    * `USER_GetPreferences` allocates it with `operator new(0x84)` (0x008C913A).
@@ -1567,7 +1157,7 @@ namespace moho
      * What it does:
      * Returns the preferences file name.
      */
-    msvc8::string* GetStr1() override;
+    fa::string* GetStr1() override;
 
     /**
      * Address: 0x008C7550 (FUN_008C7550, Moho::CUserPrefs::GetStr2)
@@ -1575,7 +1165,7 @@ namespace moho
      * What it does:
      * Returns the resolved preferences path.
      */
-    msvc8::string* GetStr2() override;
+    fa::string* GetStr2() override;
 
     /**
      * Address: 0x008C7560 (FUN_008C7560, Moho::CUserPrefs::GetBoolean)
@@ -1584,8 +1174,9 @@ namespace moho
      * Looks up one key from the root preferences table and returns fallback when
      * the key is nil; otherwise returns Lua boolean conversion of that value.
      */
-    bool GetBoolean(const msvc8::string& key, const bool fallback) override
+    bool GetBoolean(const fa::string& key, const bool fallback) override
     {
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const LuaPlus::LuaObject value = LookupKey(key);
       if (value.IsNil()) {
         return fallback;
@@ -1601,8 +1192,9 @@ namespace moho
      * Looks up one key from the root preferences table and returns fallback when
      * the key is nil; otherwise returns Lua integer conversion of that value.
      */
-    std::int32_t GetInteger(const msvc8::string& key, const std::int32_t fallback) override
+    std::int32_t GetInteger(const fa::string& key, const std::int32_t fallback) override
     {
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const LuaPlus::LuaObject value = LookupKey(key);
       if (value.IsNil()) {
         return fallback;
@@ -1618,8 +1210,9 @@ namespace moho
      * Looks up one key from the root preferences table and returns fallback when
      * the key is nil; otherwise returns Lua number conversion of that value.
      */
-    float GetNumber(const msvc8::string& key, const float fallback) override
+    float GetNumber(const fa::string& key, const float fallback) override
     {
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const LuaPlus::LuaObject value = LookupKey(key);
       if (value.IsNil()) {
         return fallback;
@@ -1635,8 +1228,9 @@ namespace moho
      * Reads one preference value as Lua string-convertible text and parses it
      * as hexadecimal (optional `0x` prefix), returning fallback on conversion failure.
      */
-    std::uint32_t GetHex(const msvc8::string& key, const std::uint32_t fallback) override
+    std::uint32_t GetHex(const fa::string& key, const std::uint32_t fallback) override
     {
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const LuaPlus::LuaObject value = LookupKey(key);
       if (!value.IsConvertibleToString()) {
         return fallback;
@@ -1661,14 +1255,15 @@ namespace moho
      * Reads one preference value from the local root table and returns either
      * the resolved string value or the provided fallback when key lookup is nil.
      */
-    msvc8::string GetString(const msvc8::string& key, const msvc8::string& fallback) override
+    fa::string GetString(const fa::string& key, const fa::string& fallback) override
     {
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const LuaPlus::LuaObject value = LookupKey(key);
       if (value.IsNil()) {
         return fallback;
       }
 
-      msvc8::string outValue;
+      fa::string outValue;
       outValue.assign_owned(value.GetString());
       return outValue;
     }
@@ -1680,10 +1275,11 @@ namespace moho
      * Starts from one fallback string-array copy, then appends each string from
      * the local root table value when the resolved key is a Lua array-table.
      */
-    msvc8::list<msvc8::string>
-    GetStringArr(const msvc8::string& key, const msvc8::list<msvc8::string>& fallback) override
+    fa::list<fa::string>
+    GetStringArr(const fa::string& key, const fa::list<fa::string>& fallback) override
     {
-      msvc8::list<msvc8::string> outValues = fallback;
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
+      fa::list<fa::string> outValues = fallback;
 
       const LuaPlus::LuaObject value = LookupKey(key);
       if (value.IsNil() || !value.IsTable()) {
@@ -1692,7 +1288,7 @@ namespace moho
 
       const int count = value.GetN();
       for (int index = 1; index <= count; ++index) {
-        msvc8::string itemValue;
+        fa::string itemValue;
         itemValue.assign_owned(value.GetByIndex(index).GetString());
         outValues.push_back(itemValue);
       }
@@ -1708,8 +1304,9 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceBooleanRecursive` (0x008CBFB0) over `mState`/`mRoot`.
      */
-    void SetBoolean(const msvc8::string& key, const bool value) override
+    void SetBoolean(const fa::string& key, const bool value) override
     {
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceBooleanRecursive(&mState, &mRoot, key, value);
     }
 
@@ -1721,8 +1318,9 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceIntegerRecursive` (0x008CC210) over `mState`/`mRoot`.
      */
-    void SetInteger(const msvc8::string& key, const std::int32_t value) override
+    void SetInteger(const fa::string& key, const std::int32_t value) override
     {
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceIntegerRecursive(&mState, &mRoot, key, value);
     }
 
@@ -1734,8 +1332,9 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceNumberRecursive` (0x008CC470) over `mState`/`mRoot`.
      */
-    void SetNumber(const msvc8::string& key, const float value) override
+    void SetNumber(const fa::string& key, const float value) override
     {
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceNumberRecursive(&mState, &mRoot, key, value);
     }
 
@@ -1746,9 +1345,10 @@ namespace moho
      * Formats one unsigned integer as `0x%08x` and writes it through the
      * recursive string preference setter.
      */
-    void SetHex(const msvc8::string& key, const std::uint32_t value) override
+    void SetHex(const fa::string& key, const std::uint32_t value) override
     {
-      const msvc8::string valueText = gpg::STR_Printf("0x%08x", static_cast<unsigned int>(value));
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
+      const fa::string valueText = gpg::STR_Printf("0x%08x", static_cast<unsigned int>(value));
       SetPreferenceStringRecursive(&mState, &mRoot, key, valueText);
     }
 
@@ -1760,8 +1360,9 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceStringRecursive` (0x008CC6D0) over `mState`/`mRoot`.
      */
-    void SetString(const msvc8::string& key, const msvc8::string& value) override
+    void SetString(const fa::string& key, const fa::string& value) override
     {
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceStringRecursive(&mState, &mRoot, key, value);
     }
 
@@ -1773,8 +1374,9 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceStringArrayRecursive` (0x008CC930) over `mState`/`mRoot`.
      */
-    void SetStringArr(const msvc8::string& key, const msvc8::list<msvc8::string>& values) override
+    void SetStringArr(const fa::string& key, const fa::list<fa::string>& values) override
     {
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceStringArrayRecursive(&mState, &mRoot, key, values);
     }
 
@@ -1789,8 +1391,9 @@ namespace moho
      * to the preferences state; it is returned as-is (number, string, table)
      * rather than flattened to text.
      */
-    LuaPlus::LuaObject LookupCurrentOption(const msvc8::string& key) override
+    LuaPlus::LuaObject LookupCurrentOption(const fa::string& key) override
     {
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       LuaPlus::LuaObject currentProfile = mRoot.Lookup("profile.current");
       if (currentProfile.IsNil()) {
         return currentProfile;
@@ -1819,8 +1422,9 @@ namespace moho
      * What it does:
      * Resolves one root preference table entry by key from `mRoot`.
      */
-    LuaPlus::LuaObject LookupKey(const msvc8::string& key) override
+    LuaPlus::LuaObject LookupKey(const fa::string& key) override
     {
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       if (mRoot.IsNil()) {
         return LuaPlus::LuaObject(mRoot);
       }
@@ -1839,6 +1443,7 @@ namespace moho
      */
     LuaPlus::LuaObject GetPreferenceTable() override
     {
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       return mRoot;
     }
 
@@ -1850,8 +1455,9 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceObjectRecursive` (0x008CCBA0) over `mState`/`mRoot`.
      */
-    void SetObject(const msvc8::string& key, void* const valueObject) override
+    void SetObject(const fa::string& key, void* const valueObject) override
     {
+      const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceObjectRecursive(&mState, &mRoot, key, *static_cast<LuaPlus::LuaObject*>(valueObject));
     }
 
@@ -1879,8 +1485,8 @@ namespace moho
     }
 
   private:
-    msvc8::string mFileName;  // +0x04 `USER_LoadPreferences`' file name
-    msvc8::string mFilePath;  // +0x20 the full UTF-8 path it resolved to
+    fa::string mFileName;  // +0x04 `USER_LoadPreferences`' file name
+    fa::string mFilePath;  // +0x20 the full UTF-8 path it resolved to
     LuaPlus::LuaState mState; // +0x3C
     LuaPlus::LuaObject mRoot; // +0x70
   };
@@ -1901,7 +1507,7 @@ namespace moho
    * What it does:
    * Returns the preferences file name.
    */
-  msvc8::string* CUserPrefs::GetStr1()
+  fa::string* CUserPrefs::GetStr1()
   {
     return &mFileName;
   }
@@ -1912,7 +1518,7 @@ namespace moho
    * What it does:
    * Returns the resolved preferences path.
    */
-  msvc8::string* CUserPrefs::GetStr2()
+  fa::string* CUserPrefs::GetStr2()
   {
     return &mFilePath;
   }
@@ -1930,6 +1536,18 @@ namespace moho
 
   static_assert(sizeof(CUserPrefs) == 0x84, "CUserPrefs size must be 0x84");
 } // namespace moho
+
+// Engine addition (dedicated-server plan WPL.4): set by the client before main
+// (moho/app/StartupClientHelpers.cpp); null in a headless build.
+moho::SimCreatedRenderHook moho::sSimCreatedRenderHook = nullptr;
+moho::MovieManagerPresentHook moho::sMovieManagerPresent = nullptr;
+
+// Engine addition (dedicated-server plan WPL.4): the `graphics_Fidelity`
+// option stays with the sim side, whose effect manager gates
+// emitters by it (CEffectManagerImpl.cpp); the client's console variable and
+// fidelity setup write it.
+// Shipped .data 0x00F58E88; device caps and the options apply later.
+std::int32_t moho::graphics_Fidelity = 2;
 
 /**
  * Address: 0x0128E4AC (FUN_0128E4AC, Moho::Sim::Create_exxt)
@@ -1950,34 +1568,12 @@ moho::Sim* moho::Sim_Create_exxt(const boost::SharedPtrRaw<moho::LaunchInfoBase>
 {
   moho::Sim* const sim = moho::Sim::Create(launchInfo);
 
-  // Scan the terrain heightfield for its extreme 16-bit samples.
-  moho::CHeightField* const heightField = sim->mMapData->mHeightField.get();
-  const std::int32_t sampleCount = heightField->height * heightField->width;
-  const std::uint16_t* const samples = heightField->data;
-
-  std::uint16_t minSample = 0xFFFFu;
-  std::uint16_t maxSample = 0u;
-  for (std::int32_t i = 0; i < sampleCount; ++i) {
-    const std::uint16_t sample = samples[i];
-    if (minSample > sample) {
-      minSample = sample;
-    }
-    if (maxSample < sample) {
-      maxSample = sample;
-    }
-  }
-
-  // Binary mapping: the max-height lane is derived from the smallest sample
-  // (minus a 5-unit offset) and the min-height lane from the largest sample.
-  moho::patch_maxMapHeight = (static_cast<float>(minSample) * 0.0078125f) - 5.0f;
-  moho::patch_minMapHeight = static_cast<float>(maxSample) * 0.0078125f;
-
-  // Initialize the active viewport's range/vision renderers.
-  if (moho::CD3DDevice* const device = moho::D3D_GetDevice(); device != nullptr) {
-    if (moho::WRenViewport* const viewport = device->GetViewport(); viewport != nullptr) {
-      viewport->mRangeRenderer.Init();
-      viewport->mVisionRenderer.Init();
-    }
+  // Engine addition (dedicated-server plan WPL.4): the heightfield scan for
+  // the range/vision renderers and their init are the client's
+  // (moho/app/StartupClientHelpers.cpp registers them before main); a
+  // headless build has none.
+  if (sSimCreatedRenderHook != nullptr) {
+    sSimCreatedRenderHook(*sim);
   }
 
   return sim;
@@ -1992,25 +1588,6 @@ moho::Sim* moho::Sim_Create_exxt(const boost::SharedPtrRaw<moho::LaunchInfoBase>
  */
 moho::IUserPrefs::IUserPrefs() = default;
 
-std::int32_t moho::wnd_MinCmdLineWidth = 1024;
-std::int32_t moho::wnd_MinCmdLineHeight = 720;
-std::int32_t moho::wnd_MinDragWidth = 1024;
-std::int32_t moho::wnd_MinDragHeight = 768;
-std::int32_t moho::wnd_DefaultCreateWidth = 1024;
-std::int32_t moho::wnd_DefaultCreateHeight = 768;
-
-// Shipped .data 0x00F58E88..0x00F58E94; device caps and the options apply later.
-std::int32_t moho::graphics_Fidelity = 2;
-std::int32_t moho::graphics_FidelitySupported = 2;
-std::int32_t moho::shadow_Fidelity = 2;
-std::int32_t moho::shadow_FidelitySupported = 3;
-bool moho::d3d_UseRefRast = false;
-bool moho::d3d_ForceSoftwareVP = false;
-bool moho::d3d_NoPureDevice = false;
-bool moho::d3d_ForceDirect3DDebugEnabled = false;
-bool moho::d3d_WindowsCursor = false;
-std::uint32_t moho::sAdapterNotCLOverridden = 1;
-bool moho::sDeviceLock = false;
 
 const moho::CfgAliasSet& moho::CFG_GetOptionPrefixes()
 {
@@ -2058,7 +1635,7 @@ bool moho::CFG_GetArgOptionComposedAliases(
   const CfgAliasSet& leftAliases,
   const CfgAliasSet& rightAliases,
   const std::uint32_t requiredArgCount,
-  msvc8::vector<msvc8::string>* const outArgs
+  fa::vector<fa::string>* const outArgs
 )
 {
   if (!IsValidAliasSet(leftAliases) || !IsValidAliasSet(rightAliases)) {
@@ -2110,7 +1687,7 @@ bool moho::CFG_GetArgOptionComposedAliases(
  * first command-line option that resolves through `CFG_GetArgOption`.
  */
 bool moho::CFG_GetArgOptionAliases(
-  const CfgAliasSet& aliases, const std::uint32_t requiredArgCount, msvc8::vector<msvc8::string>* const outArgs
+  const CfgAliasSet& aliases, const std::uint32_t requiredArgCount, fa::vector<fa::string>* const outArgs
 )
 {
   if (!IsValidAliasSet(aliases)) {
@@ -2227,8 +1804,8 @@ bool moho::CFG_ParseResolutionTriple(const gpg::StrArg value, ResolutionTriple* 
     return false;
   }
 
-  msvc8::string token;
-  msvc8::vector<msvc8::string> tokens;
+  fa::string token;
+  fa::vector<fa::string> tokens;
   while (gpg::STR_GetToken(cursor, ",", token)) {
     tokens.push_back(token);
   }
@@ -2293,63 +1870,6 @@ void moho::USER_SetGameId()
   gAppIdentity.mGameIdParts[3] = kDefaultGameIdParts[3];
 }
 
-/**
- * Address: 0x008C8760 (FUN_008C8760, USER_SetCurrentProfile)
- * Mangled:
- * ?USER_SetCurrentProfile@Moho@@YAXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
- *
- * What it does:
- * Selects one profile by name from `profile.profiles`, updates that profile's
- * `NetName`, and sets `profile.current`; when the profile name is missing,
- * imports `/lua/user/prefs.lua` and invokes `CreateProfile(profileName)`.
- */
-void moho::USER_SetCurrentProfile(const msvc8::string& profileName)
-{
-  try {
-    IUserPrefs* const preferences = USER_GetPreferences();
-    if (preferences == nullptr) {
-      return;
-    }
-
-    LuaPlus::LuaObject rootPreferences = preferences->GetPreferenceTable();
-    LuaPlus::LuaObject profileTable = rootPreferences.Lookup(kProfileProfilesPath);
-
-    int selectedProfileIndex = -1;
-    if (profileTable.IsTable()) {
-      LuaPlus::LuaTableIterator iter(&profileTable, 1);
-      while (!iter.m_isDone) {
-        LuaPlus::LuaObject profileObject = iter.GetValue();
-        LuaPlus::LuaObject nameObject = profileObject[kProfileNameFieldName];
-        if (nameObject.IsString()) {
-          const char* const candidateName = nameObject.GetString();
-          if (profileName == (candidateName != nullptr ? candidateName : "")) {
-            selectedProfileIndex = iter.GetKey().GetInteger();
-            break;
-          }
-        }
-        iter.Next();
-      }
-    }
-
-    if (selectedProfileIndex == -1) {
-      LuaPlus::LuaState* const state = USER_GetLuaState();
-      LuaPlus::LuaObject prefsModule = SCR_Import(state, kUserPrefsModulePath);
-      LuaPlus::LuaObject createProfileFnObject = prefsModule[kCreateProfileMethodName];
-      LuaPlus::LuaFunction<LuaPlus::LuaObject> createProfileFn(createProfileFnObject);
-      LuaPlus::LuaObject createdProfile = createProfileFn(profileName.c_str());
-      (void)createdProfile;
-      return;
-    }
-
-    LuaPlus::LuaObject selectedProfile = profileTable[selectedProfileIndex];
-    selectedProfile.SetString(kProfileNetNameFieldName, profileName.c_str());
-
-    LuaPlus::LuaObject profileRoot = rootPreferences[kProfileRootKey];
-    profileRoot.SetInteger(kProfileCurrentIndexKey, selectedProfileIndex);
-  } catch (const std::exception& exception) {
-    gpg::Warnf(kUserPrefsLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
-  }
-}
 
 /**
  * Address: 0x008CAE10 (FUN_008CAE10, USER_GetGameId)
@@ -2382,19 +1902,19 @@ void moho::APP_InitializeIdentity()
   });
 }
 
-const msvc8::string& moho::APP_GetCompanyName()
+const fa::string& moho::APP_GetCompanyName()
 {
   APP_InitializeIdentity();
   return gAppIdentity.mCompanyName;
 }
 
-const msvc8::string& moho::APP_GetProductName()
+const fa::string& moho::APP_GetProductName()
 {
   APP_InitializeIdentity();
   return gAppIdentity.mProductName;
 }
 
-const msvc8::string& moho::APP_GetPreferencePrefix()
+const fa::string& moho::APP_GetPreferencePrefix()
 {
   APP_InitializeIdentity();
   return gAppIdentity.mPreferencePrefix;
@@ -2446,7 +1966,7 @@ void moho::USER_LuaFrame()
  * its following positional arguments.
  */
 bool moho::CFG_GetArgOption(
-  const gpg::StrArg option, const std::uint32_t requiredArgCount, msvc8::vector<msvc8::string>* const outArgs
+  const gpg::StrArg option, const std::uint32_t requiredArgCount, fa::vector<fa::string>* const outArgs
 )
 {
   if (option == nullptr || option[0] == '\0') {
@@ -2469,7 +1989,7 @@ bool moho::CFG_GetArgOption(
       outArgs->reserve(requiredArgCount);
       for (std::uint32_t argIndex = 0; argIndex < requiredArgCount; ++argIndex) {
         const char* const value = __argv[index + 1 + static_cast<int>(argIndex)];
-        outArgs->push_back(msvc8::string(value != nullptr ? value : ""));
+        outArgs->push_back(fa::string(value != nullptr ? value : ""));
       }
     }
 
@@ -2523,7 +2043,7 @@ bool moho::P4_DoPrompt()
  * Concatenates process command-line arguments (argv[1..]) with single-space
  * separators and trims the trailing separator.
  */
-msvc8::string moho::CFG_GetArgs()
+fa::string moho::CFG_GetArgs()
 {
   std::string joinedArgs;
   for (int index = 1; index < __argc; ++index) {
@@ -2539,150 +2059,11 @@ msvc8::string moho::CFG_GetArgs()
     joinedArgs.pop_back();
   }
 
-  msvc8::string result;
+  fa::string result;
   result.assign_owned(joinedArgs);
   return result;
 }
 
-/**
- * Address: 0x0041B810 (FUN_0041B810, cfunc_GetCommandLineArgL)
- *
- * What it does:
- * Resolves one command-line option with requested argument count. Returns a
- * Lua array table of copied argument strings when found, otherwise returns
- * boolean false.
- */
-int moho::cfunc_GetCommandLineArgL(LuaPlus::LuaState* const state)
-{
-  if (state == nullptr || state->m_state == nullptr) {
-    return 0;
-  }
-
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kGetCommandLineArgHelpText, 2, argumentCount);
-  }
-
-  LuaPlus::LuaStackObject optionArg(state, 1);
-  const char* const optionText = optionArg.GetString();
-  gpg::Logf(optionText != nullptr ? optionText : "");
-
-  LuaPlus::LuaStackObject requestedCountArg(state, 2);
-  const int requestedArgCount = requestedCountArg.GetInteger();
-
-  msvc8::vector<msvc8::string> optionValues;
-  const bool foundOption = CFG_GetArgOption(optionText, static_cast<std::uint32_t>(requestedArgCount), &optionValues);
-
-  LuaPlus::LuaObject result(state);
-  if (foundOption) {
-    result.AssignNewTable(state, requestedArgCount, 0);
-
-    if (requestedArgCount > 0) {
-      const int cappedCount = std::min(requestedArgCount, static_cast<int>(optionValues.size()));
-      for (int index = 0; index < cappedCount; ++index) {
-        LuaPlus::LuaObject value(state);
-        value.AssignString(state, optionValues[static_cast<std::size_t>(index)].c_str());
-        // 0x0041B998: `LuaObject::Insert(i, value)` (Lua `table.insert`), not a raw store.
-        result.Insert(index + 1, value);
-      }
-    }
-  } else {
-    result.AssignBoolean(state, false);
-  }
-
-  result.PushStack(state);
-  return 1;
-}
-
-/**
- * Address: 0x0041B790 (FUN_0041B790, cfunc_GetCommandLineArg)
- *
- * What it does:
- * Lua C callback thunk that unwraps `lua_State*` and forwards to
- * `cfunc_GetCommandLineArgL`.
- */
-int moho::cfunc_GetCommandLineArg(lua_State* const luaContext)
-{
-  return cfunc_GetCommandLineArgL(ResolveBindingLuaState(luaContext));
-}
-
-/**
- * Address: 0x0041B7B0 (FUN_0041B7B0, func_GetCommandLineArg_LuaFuncDef)
- *
- * What it does:
- * Returns/creates the global Lua binder definition for `GetCommandLineArg`.
- */
-moho::CScrLuaInitForm* moho::func_GetCommandLineArg_LuaFuncDef()
-{
-  static CScrLuaBinder binder(
-    UserLuaInitSet(),
-    "GetCommandLineArg",
-    &moho::cfunc_GetCommandLineArg,
-    nullptr,
-    "<global>",
-    kGetCommandLineArgHelpText
-  );
-  return &binder;
-}
-
-/**
- * Address: 0x0041BAA0 (FUN_0041BAA0, cfunc_HasCommandLineArgL)
- *
- * What it does:
- * Resolves one command-line option and pushes whether it is present.
- */
-int moho::cfunc_HasCommandLineArgL(LuaPlus::LuaState* const state)
-{
-  if (state == nullptr || state->m_state == nullptr) {
-    return 0;
-  }
-
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kHasCommandLineArgHelpText, 1, argumentCount);
-  }
-
-  LuaPlus::LuaStackObject optionArg(state, 1);
-  const char* const optionText = optionArg.GetString();
-
-  msvc8::vector<msvc8::string> optionValues;
-  const bool foundOption = CFG_GetArgOption(optionText, 0, &optionValues);
-  lua_pushboolean(rawState, foundOption ? 1 : 0);
-  return 1;
-}
-
-/**
- * Address: 0x0041BA20 (FUN_0041BA20, cfunc_HasCommandLineArg)
- *
- * What it does:
- * Lua C callback thunk that unwraps `lua_State*` and forwards to
- * `cfunc_HasCommandLineArgL`.
- */
-int moho::cfunc_HasCommandLineArg(lua_State* const luaContext)
-{
-  return cfunc_HasCommandLineArgL(ResolveBindingLuaState(luaContext));
-}
-
-/**
- * Address: 0x0041BA40 (FUN_0041BA40, func_HasCommandLineArg_LuaFuncDef)
- *
- * What it does:
- * Returns/creates the global Lua binder definition for `HasCommandLineArg`.
- */
-moho::CScrLuaInitForm* moho::func_HasCommandLineArg_LuaFuncDef()
-{
-  static CScrLuaBinder binder(
-    UserLuaInitSet(),
-    "HasCommandLineArg",
-    &moho::cfunc_HasCommandLineArg,
-    nullptr,
-    "<global>",
-    kHasCommandLineArgHelpText
-  );
-  return &binder;
-}
 
 /**
  * Address: 0x004D6940 (FUN_004D6940, cfunc_SHGetFolderPathL)
@@ -2698,10 +2079,7 @@ int moho::cfunc_SHGetFolderPathL(LuaPlus::LuaState* const state)
   }
 
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSHGetFolderPathHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kSHGetFolderPathHelpText);
 
   LuaPlus::LuaStackObject idArg(state, 1);
   const char* keyText = lua_tostring(rawState, 1);
@@ -2722,7 +2100,7 @@ int moho::cfunc_SHGetFolderPathL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kShGetFolderPathFailedErrorText, status);
   }
 
-  msvc8::string utf8Path = gpg::STR_WideToUtf8(gShGetFolderPathBuffer);
+  fa::string utf8Path = gpg::STR_WideToUtf8(gShGetFolderPathBuffer);
   if (utf8Path.empty() || utf8Path[utf8Path.size() - 1u] != '\\') {
     utf8Path.push_back('\\');
   }
@@ -2763,29 +2141,6 @@ moho::CScrLuaInitForm* moho::func_SHGetFolderPath_LuaFuncDef()
   return &binder;
 }
 
-/**
- * Address: 0x00BC3800 (FUN_00BC3800, register_GetCommandLineArg_LuaFuncDef)
- *
- * What it does:
- * Startup thunk that forwards registration to
- * `func_GetCommandLineArg_LuaFuncDef`.
- */
-moho::CScrLuaInitForm* moho::register_GetCommandLineArg_LuaFuncDef()
-{
-  return func_GetCommandLineArg_LuaFuncDef();
-}
-
-/**
- * Address: 0x00BC3810 (FUN_00BC3810, register_HasCommandLineArg_LuaFuncDef)
- *
- * What it does:
- * Startup thunk that forwards registration to
- * `func_HasCommandLineArg_LuaFuncDef`.
- */
-moho::CScrLuaInitForm* moho::register_HasCommandLineArg_LuaFuncDef()
-{
-  return func_HasCommandLineArg_LuaFuncDef();
-}
 
 /**
  * Address: 0x00BC63D0 (FUN_00BC63D0, register_coreInitFormSet)
@@ -2797,7 +2152,7 @@ moho::CScrLuaInitForm* moho::register_HasCommandLineArg_LuaFuncDef()
 moho::CScrLuaInitFormSet* moho::register_coreInitFormSet()
 {
   CScrLuaInitFormSet* const previousHead = CScrLuaInitFormSet::sSets;
-  CScrLuaInitFormSet& coreSet = CoreLuaInitSet();
+  CScrLuaInitFormSet& coreSet = moho::SCR_CoreLuaInitSet();
   coreSet.mNextSet = previousHead;
   CScrLuaInitFormSet::sSets = &coreSet;
   return previousHead;
@@ -2813,7 +2168,7 @@ moho::CScrLuaInitFormSet* moho::register_coreInitFormSet()
 moho::CScrLuaInitFormSet* moho::register_userInitFormSet()
 {
   CScrLuaInitFormSet* const previousHead = CScrLuaInitFormSet::sSets;
-  CScrLuaInitFormSet& userSet = UserLuaInitSet();
+  CScrLuaInitFormSet& userSet = moho::SCR_UserLuaInitSet();
   userSet.mNextSet = previousHead;
   CScrLuaInitFormSet::sSets = &userSet;
   return previousHead;
@@ -2866,8 +2221,6 @@ namespace
   {
     StartupHelpersLuaFunctionBootstrap()
     {
-      (void)moho::register_GetCommandLineArg_LuaFuncDef();
-      (void)moho::register_HasCommandLineArg_LuaFuncDef();
       (void)moho::register_SHGetFolderPath_LuaFuncDef();
 
       // The rest of this file's binders. These have no register_ thunk, so
@@ -2876,211 +2229,13 @@ namespace
       // is the one that showed: /lua/user/prefs.lua reads it while the splash
       // screen is coming up, and config.lua's __index on _G turns the miss
       // into a raised error.
-      (void)moho::func_GetTextureDimensions_LuaFuncDef();
-      (void)moho::func_SetMovieVolume_LuaFuncDef();
-      (void)moho::func_GetMovieVolume_LuaFuncDef();
       (void)moho::func_GetMovieDuration_LuaFuncDef();
-      (void)moho::func_GetAntiAliasingOptions_LuaFuncDef();
-      (void)moho::func_GetOptions_LuaFuncDef();
-      (void)moho::func_GetPreference_LuaFuncDef();
-      (void)moho::func_SetPreference_LuaFuncDef();
-      (void)moho::func_SavePreferences_LuaFuncDef();
-      (void)moho::func_DebugFacilitiesEnabled_LuaFuncDef();
     }
   };
 
   const StartupHelpersLuaFunctionBootstrap gStartupHelpersLuaFunctionBootstrap{};
 } // namespace
 
-/**
- * Address: 0x00780AF0 (FUN_00780AF0, cfunc_GetTextureDimensionsL)
- *
- * What it does:
- * Loads one texture by filename and optional border and returns
- * `(width, height)` on success, otherwise `nil`.
- */
-int moho::cfunc_GetTextureDimensionsL(LuaPlus::LuaState* const state)
-{
-  if (state == nullptr || state->m_state == nullptr) {
-    return 0;
-  }
-
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount < 1 || argumentCount > 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgRangeWarning, kGetTextureDimensionsHelpText, 1, 2, argumentCount);
-  }
-
-  std::uint32_t border = 1u;
-  if (lua_gettop(rawState) >= 2) {
-    LuaPlus::LuaStackObject borderArg(state, 3);
-    if (lua_type(rawState, 3) != LUA_TNUMBER) {
-      LuaPlus::LuaStackObject::TypeError(&borderArg, "integer");
-    }
-
-    const double borderAsDouble = lua_tonumber(rawState, 3);
-    const auto borderAsSignedInt = static_cast<int>(borderAsDouble);
-    border = static_cast<std::uint32_t>(borderAsSignedInt);
-  }
-
-  LuaPlus::LuaStackObject filenameArg(state, 1);
-  const char* filename = lua_tostring(rawState, 1);
-  if (filename == nullptr) {
-    LuaPlus::LuaStackObject::TypeError(&filenameArg, "string");
-    filename = "";
-  }
-
-  boost::shared_ptr<CD3DBatchTexture> texture = CD3DBatchTexture::FromFile(filename, border);
-  if (texture) {
-    lua_pushnumber(rawState, static_cast<float>(static_cast<int>(texture->mWidth)));
-    (void)lua_gettop(rawState);
-    lua_pushnumber(rawState, static_cast<float>(static_cast<int>(texture->mHeight)));
-    (void)lua_gettop(rawState);
-    return 2;
-  }
-
-  lua_pushnil(rawState);
-  (void)lua_gettop(rawState);
-  return 1;
-}
-
-/**
- * Address: 0x00780A70 (FUN_00780A70, cfunc_GetTextureDimensions)
- *
- * What it does:
- * Lua C callback thunk that unwraps `lua_State*` and forwards to
- * `cfunc_GetTextureDimensionsL`.
- */
-int moho::cfunc_GetTextureDimensions(lua_State* const luaContext)
-{
-  return cfunc_GetTextureDimensionsL(ResolveBindingLuaState(luaContext));
-}
-
-/**
- * Address: 0x00780A90 (FUN_00780A90, func_GetTextureDimensions_LuaFuncDef)
- *
- * What it does:
- * Returns/creates the global Lua binder definition for
- * `GetTextureDimensions` in the user init set.
- */
-moho::CScrLuaInitForm* moho::func_GetTextureDimensions_LuaFuncDef()
-{
-  static CScrLuaBinder binder(
-    UserLuaInitSet(),
-    "GetTextureDimensions",
-    &moho::cfunc_GetTextureDimensions,
-    nullptr,
-    "<global>",
-    kGetTextureDimensionsHelpText
-  );
-  return &binder;
-}
-
-/**
- * Address: 0x00874FA0 (FUN_00874FA0, cfunc_SetMovieVolume)
- *
- * What it does:
- * Lua C callback thunk that unwraps `lua_State*` and forwards to
- * `cfunc_SetMovieVolumeL`.
- */
-int moho::cfunc_SetMovieVolume(lua_State* const luaContext)
-{
-  return cfunc_SetMovieVolumeL(ResolveBindingLuaState(luaContext));
-}
-
-/**
- * Address: 0x00874FC0 (FUN_00874FC0, func_SetMovieVolume_LuaFuncDef)
- *
- * What it does:
- * Returns/creates the global Lua binder definition for `SetMovieVolume`.
- */
-moho::CScrLuaInitForm* moho::func_SetMovieVolume_LuaFuncDef()
-{
-  static CScrLuaBinder binder(
-    UserLuaInitSet(),
-    "SetMovieVolume",
-    &moho::cfunc_SetMovieVolume,
-    nullptr,
-    "<global>",
-    kSetMovieVolumeHelpText
-  );
-  return &binder;
-}
-
-/**
- * Address: 0x00875020 (FUN_00875020, cfunc_SetMovieVolumeL)
- *
- * What it does:
- * Reads one volume argument, validates numeric type, and hands it to
- * `MOV_SetVolume`, which the binary carries inline.
- */
-int moho::cfunc_SetMovieVolumeL(LuaPlus::LuaState* const state)
-{
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSetMovieVolumeHelpText, 1, argumentCount);
-  }
-
-  LuaPlus::LuaStackObject volumeArg(state, 1);
-  if (lua_type(rawState, 1) != LUA_TNUMBER) {
-    volumeArg.TypeError("number");
-  }
-
-  MOV_SetVolume(static_cast<float>(lua_tonumber(rawState, 1)));
-  return 0;
-}
-
-/**
- * Address: 0x00875100 (FUN_00875100, cfunc_GetMovieVolume)
- *
- * What it does:
- * Lua C callback thunk that unwraps `lua_State*` and forwards to
- * `cfunc_GetMovieVolumeL`.
- */
-int moho::cfunc_GetMovieVolume(lua_State* const luaContext)
-{
-  return cfunc_GetMovieVolumeL(ResolveBindingLuaState(luaContext));
-}
-
-/**
- * Address: 0x00875120 (FUN_00875120, func_GetMovieVolume_LuaFuncDef)
- *
- * What it does:
- * Returns/creates the global Lua binder definition for `GetMovieVolume`.
- */
-moho::CScrLuaInitForm* moho::func_GetMovieVolume_LuaFuncDef()
-{
-  static CScrLuaBinder binder(
-    UserLuaInitSet(),
-    "GetMovieVolume",
-    &moho::cfunc_GetMovieVolume,
-    nullptr,
-    "<global>",
-    kGetMovieVolumeHelpText
-  );
-  return &binder;
-}
-
-/**
- * Address: 0x00875180 (FUN_00875180, cfunc_GetMovieVolumeL)
- *
- * What it does:
- * Validates zero-argument call shape and pushes `MOV_GetVolume()`, which the
- * binary carries inline.
- */
-int moho::cfunc_GetMovieVolumeL(LuaPlus::LuaState* const state)
-{
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 0) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kGetMovieVolumeHelpText, 0, argumentCount);
-  }
-
-  lua_pushnumber(rawState, MOV_GetVolume());
-  (void)lua_gettop(rawState);
-  return 1;
-}
 
 /**
  * Address: 0x008753A0 (FUN_008753A0, cfunc_GetMovieDuration)
@@ -3104,7 +2259,7 @@ int moho::cfunc_GetMovieDuration(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetMovieDuration_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "GetMovieDuration",
     &moho::cfunc_GetMovieDuration,
     nullptr,
@@ -3124,12 +2279,7 @@ moho::CScrLuaInitForm* moho::func_GetMovieDuration_LuaFuncDef()
 int moho::cfunc_GetMovieDurationL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(
-      state, "%s\n  expected %d args, but got %d", kGetMovieDurationHelpText, 1, argumentCount
-    );
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kGetMovieDurationHelpText);
 
   LuaPlus::LuaStackObject moviePathArg(state, 1);
   const char* moviePath = lua_tostring(rawState, 1);
@@ -3144,430 +2294,6 @@ int moho::cfunc_GetMovieDurationL(LuaPlus::LuaState* const state)
   return 1;
 }
 
-/**
- * Address: 0x008C9660 (FUN_008C9660, cfunc_GetAntiAliasingOptions)
- *
- * What it does:
- * Lua C callback thunk that unwraps `lua_State*` and forwards to
- * `cfunc_GetAntiAliasingOptionsL`.
- */
-int moho::cfunc_GetAntiAliasingOptions(lua_State* const luaContext)
-{
-  return cfunc_GetAntiAliasingOptionsL(ResolveBindingLuaState(luaContext));
-}
-
-/**
- * Address: 0x008C9680 (FUN_008C9680, func_GetAntiAliasingOptions_LuaFuncDef)
- *
- * What it does:
- * Returns/creates the global Lua binder definition for
- * `GetAntiAliasingOptions` in the user init set.
- */
-moho::CScrLuaInitForm* moho::func_GetAntiAliasingOptions_LuaFuncDef()
-{
-  static CScrLuaBinder binder(
-    UserLuaInitSet(),
-    "GetAntiAliasingOptions",
-    &moho::cfunc_GetAntiAliasingOptions,
-    nullptr,
-    "<global>",
-    kGetAntiAliasingOptionsHelpText
-  );
-  return &binder;
-}
-
-/**
- * Address: 0x008C96E0 (FUN_008C96E0, cfunc_GetAntiAliasingOptionsL)
- *
- * What it does:
- * Builds and returns a Lua array-like table of anti-aliasing option keys from
- * active head sample modes (`0` disabled plus packed mode entries).
- */
-int moho::cfunc_GetAntiAliasingOptionsL(LuaPlus::LuaState* const state)
-{
-  if (state == nullptr || state->m_state == nullptr) {
-    return 0;
-  }
-
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 0) {
-    LuaPlus::LuaState::Error(
-      state, "%s\n  expected %d args, but got %d", kGetAntiAliasingOptionsHelpText, 0, argumentCount
-    );
-  }
-
-  LuaPlus::LuaObject optionsTable(state);
-  optionsTable.AssignNewTable(state, 0, 0);
-  optionsTable.SetInteger(1, 0);
-
-  gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-  gpg::gal::DeviceContext* const context = device ? device->GetDeviceContext() : nullptr;
-  const gpg::gal::Head* const head =
-    (context != nullptr && context->GetHeadCount() > 0) ? &context->GetHead(0) : nullptr;
-
-  if (head != nullptr) {
-    const gpg::gal::HeadSampleOption* const begin = head->mStrs.begin();
-    const gpg::gal::HeadSampleOption* const end = head->mStrs.end();
-    if (begin != nullptr && end != nullptr) {
-      std::int32_t tableIndex = 2;
-      for (const gpg::gal::HeadSampleOption* it = begin; it != end; ++it) {
-        const std::uint32_t packedMode =
-          static_cast<std::uint32_t>(it->sampleType) | (static_cast<std::uint32_t>(it->sampleQuality) << 5u);
-        optionsTable.SetInteger(tableIndex++, static_cast<std::int32_t>(packedMode));
-      }
-    }
-  }
-
-  optionsTable.PushStack(state);
-  return 1;
-}
-
-/**
- * Address: 0x008C9490 (FUN_008C9490, cfunc_GetOptions)
- *
- * What it does:
- * Lua C callback thunk that unwraps `lua_State*` and forwards to
- * `cfunc_GetOptionsL`.
- */
-int moho::cfunc_GetOptions(lua_State* const luaContext)
-{
-  return cfunc_GetOptionsL(ResolveBindingLuaState(luaContext));
-}
-
-/**
- * Address: 0x008C94B0 (FUN_008C94B0, func_GetOptions_LuaFuncDef)
- *
- * What it does:
- * Returns/creates the global Lua binder definition for `GetOptions` in the
- * user init set.
- */
-moho::CScrLuaInitForm* moho::func_GetOptions_LuaFuncDef()
-{
-  static CScrLuaBinder binder(
-    UserLuaInitSet(),
-    "GetOptions",
-    &moho::cfunc_GetOptions,
-    nullptr,
-    "<global>",
-    "obj GetOptions()"
-  );
-  return &binder;
-}
-
-/**
- * Address: 0x008C9510 (FUN_008C9510, cfunc_GetOptionsL)
- *
- * What it does:
- * Reads one options key string and pushes the current preference value.
- */
-int moho::cfunc_GetOptionsL(LuaPlus::LuaState* const state)
-{
-  if (state == nullptr || state->m_state == nullptr) {
-    return 0;
-  }
-
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kGetOptionsHelpText, 1, argumentCount);
-  }
-
-  LuaPlus::LuaStackObject keyArg(state, 1);
-  const char* keyText = lua_tostring(rawState, 1);
-  if (keyText == nullptr) {
-    LuaPlus::LuaStackObject::TypeError(&keyArg, "string");
-    keyText = "";
-  }
-
-  msvc8::string optionKey{};
-  optionKey.assign_owned(keyText);
-
-  // 0x008C95BF..0x008C95DE: the option object lives on the preferences state;
-  // SCR_Copy rebuilds it on the caller's state so numbers stay numbers.
-  const LuaPlus::LuaObject valueObject = SCR_Copy(
-    USER_GetPreferences()->LookupCurrentOption(optionKey), state
-  );
-  valueObject.PushStack(state);
-  return 1;
-}
-
-/**
- * Address: 0x008C9850 (FUN_008C9850, cfunc_GetPreference)
- *
- * What it does:
- * Lua C callback thunk that unwraps `lua_State*` and forwards to
- * `cfunc_GetPreferenceL`.
- */
-int moho::cfunc_GetPreference(lua_State* const luaContext)
-{
-  return cfunc_GetPreferenceL(ResolveBindingLuaState(luaContext));
-}
-
-/**
- * Address: 0x008C9870 (FUN_008C9870, func_GetPreference_LuaFuncDef)
- *
- * What it does:
- * Returns/creates the global Lua binder definition for `GetPreference`
- * in the user init set.
- */
-moho::CScrLuaInitForm* moho::func_GetPreference_LuaFuncDef()
-{
-  static CScrLuaBinder binder(
-    UserLuaInitSet(),
-    "GetPreference",
-    &moho::cfunc_GetPreference,
-    nullptr,
-    "<global>",
-    kGetPreferenceHelpText
-  );
-  return &binder;
-}
-
-/**
- * Address: 0x008C98D0 (FUN_008C98D0, cfunc_GetPreferenceL)
- *
- * What it does:
- * Resolves one preference key and returns its Lua object value, with optional
- * default object fallback from arg #2.
- */
-int moho::cfunc_GetPreferenceL(LuaPlus::LuaState* const state)
-{
-  if (state == nullptr || state->m_state == nullptr) {
-    return 0;
-  }
-
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount < 1 || argumentCount > 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgRangeWarning, kGetPreferenceHelpText, 1, 2, argumentCount);
-  }
-
-  lua_settop(rawState, 2);
-
-  LuaPlus::LuaStackObject keyArg(state, 1);
-  const char* keyText = lua_tostring(rawState, 1);
-  if (keyText == nullptr) {
-    LuaPlus::LuaStackObject::TypeError(&keyArg, "string");
-    keyText = "";
-  }
-
-  msvc8::string key;
-  key.assign_owned(keyText);
-
-  LuaPlus::LuaObject preferenceObject(state);
-  preferenceObject.AssignNil(state);
-
-  if (IUserPrefs* const preferences = USER_GetPreferences(); preferences != nullptr) {
-    // The preferences table lives on the preferences LuaState, so the looked-up
-    // value is bound to that state and cannot be pushed onto the caller's -
-    // PushStack rejects it on `state->l_G == m_state->m_state->l_G`, which is a
-    // check the binary has too. The binary copies across first: 0x008C9991
-    // dispatches vtable slot 16 (LookupKey), then 0x008C99AE calls
-    // SCR_Copy(&result, looked_up, callerState) before the push.
-    preferenceObject = SCR_Copy(preferences->LookupKey(key), state);
-  }
-
-  if (preferenceObject.IsNil()) {
-    preferenceObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 2));
-  }
-
-  preferenceObject.PushStack(state);
-  return 1;
-}
-
-/**
- * Address: 0x008C9A50 (FUN_008C9A50, cfunc_SetPreference)
- *
- * What it does:
- * Lua C callback thunk that unwraps `lua_State*` and forwards to
- * `cfunc_SetPreferenceL`.
- */
-int moho::cfunc_SetPreference(lua_State* const luaContext)
-{
-  return cfunc_SetPreferenceL(ResolveBindingLuaState(luaContext));
-}
-
-/**
- * Address: 0x008C9A70 (FUN_008C9A70, func_SetPreference_LuaFuncDef)
- *
- * What it does:
- * Returns/creates the global Lua binder definition for `SetPreference`
- * in the user init set.
- */
-moho::CScrLuaInitForm* moho::func_SetPreference_LuaFuncDef()
-{
-  static CScrLuaBinder binder(
-    UserLuaInitSet(),
-    "SetPreference",
-    &moho::cfunc_SetPreference,
-    nullptr,
-    "<global>",
-    kSetPreferenceHelpText
-  );
-  return &binder;
-}
-
-/**
- * Address: 0x008C9AD0 (FUN_008C9AD0, cfunc_SetPreferenceL)
- *
- * What it does:
- * Reads `(key, value)` from Lua and stores the preference object under `key`.
- */
-int moho::cfunc_SetPreferenceL(LuaPlus::LuaState* const state)
-{
-  if (state == nullptr || state->m_state == nullptr) {
-    return 0;
-  }
-
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSetPreferenceHelpText, 2, argumentCount);
-  }
-
-  LuaPlus::LuaObject valueObject(LuaPlus::LuaStackObject(state, 2));
-
-  LuaPlus::LuaStackObject keyArg(state, 1);
-  const char* keyText = lua_tostring(rawState, 1);
-  if (keyText == nullptr) {
-    LuaPlus::LuaStackObject::TypeError(&keyArg, "string");
-    keyText = "";
-  }
-
-  msvc8::string key;
-  key.assign_owned(keyText);
-
-  if (IUserPrefs* const preferences = USER_GetPreferences(); preferences != nullptr) {
-    // The value arrives on the caller's Lua state, and the preference tree
-    // lives on the preferences' own one, so it has to be copied across before
-    // it can be stored. LuaObject::SetObject asserts that a table and the
-    // value written into it share a state, and passing the caller's object
-    // straight through tripped that on every SetPreference - which is as far
-    // as userInit.lua got.
-    auto* const prefsState = static_cast<LuaPlus::LuaState*>(preferences->GetState());
-    LuaPlus::LuaObject copiedValue = moho::SCR_Copy(valueObject, prefsState);
-    preferences->SetObject(key, &copiedValue);
-  }
-
-  return 0;
-}
-
-/**
- * Address: 0x008C9C30 (FUN_008C9C30, cfunc_SavePreferences)
- *
- * What it does:
- * Validates zero-argument call shape and persists current user preferences.
- */
-int moho::cfunc_SavePreferences(lua_State* const luaContext)
-{
-  LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 0) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", kSavePreferencesHelpText, 0, argumentCount);
-  }
-
-  USER_SavePreferences();
-  return 0;
-}
-
-/**
- * Address: 0x008C9C70 (FUN_008C9C70, func_SavePreferences_LuaFuncDef)
- *
- * What it does:
- * Returns/creates the global Lua binder definition for `SavePreferences`
- * in the user init set.
- */
-moho::CScrLuaInitForm* moho::func_SavePreferences_LuaFuncDef()
-{
-  static CScrLuaBinder binder(
-    UserLuaInitSet(),
-    "SavePreferences",
-    &moho::cfunc_SavePreferences,
-    nullptr,
-    "<global>",
-    kSavePreferencesHelpText
-  );
-  return &binder;
-}
-
-/**
- * Address: 0x00BE8BF0 (FUN_00BE8BF0, register_SavePreferences_LuaFuncDef)
- *
- * What it does:
- * Startup thunk that forwards registration to
- * `func_SavePreferences_LuaFuncDef`.
- */
-moho::CScrLuaInitForm* moho::register_SavePreferences_LuaFuncDef()
-{
-  return func_SavePreferences_LuaFuncDef();
-}
-
-/**
- * Address: 0x008CAEA0 (FUN_008CAEA0, cfunc_DebugFacilitiesEnabled)
- *
- * What it does:
- * Lua C callback thunk that unwraps `lua_State*` and forwards to
- * `cfunc_DebugFacilitiesEnabledL`.
- */
-int moho::cfunc_DebugFacilitiesEnabled(lua_State* const luaContext)
-{
-  return cfunc_DebugFacilitiesEnabledL(ResolveBindingLuaState(luaContext));
-}
-
-/**
- * Address: 0x008CAEC0 (FUN_008CAEC0, func_DebugFacilitiesEnabled_LuaFuncDef)
- *
- * What it does:
- * Returns/creates the global Lua binder definition for
- * `DebugFacilitiesEnabled` in the user init set.
- */
-moho::CScrLuaInitForm* moho::func_DebugFacilitiesEnabled_LuaFuncDef()
-{
-  static CScrLuaBinder binder(
-    UserLuaInitSet(),
-    "DebugFacilitiesEnabled",
-    &moho::cfunc_DebugFacilitiesEnabled,
-    nullptr,
-    "<global>",
-    kDebugFacilitiesEnabledHelpText
-  );
-  return &binder;
-}
-
-/**
- * Address: 0x00BE8CE0 (FUN_00BE8CE0, j_func_DebugFacilitiesEnabled_LuaFuncDef)
- *
- * What it does:
- * Startup thunk that forwards registration to
- * `func_DebugFacilitiesEnabled_LuaFuncDef`.
- */
-moho::CScrLuaInitForm* moho::j_func_DebugFacilitiesEnabled_LuaFuncDef()
-{
-  return func_DebugFacilitiesEnabled_LuaFuncDef();
-}
-
-/**
- * Address: 0x008CAF20 (FUN_008CAF20, cfunc_DebugFacilitiesEnabledL)
- *
- * What it does:
- * Validates zero-argument call shape and returns whether debug facilities
- * are enabled.
- */
-int moho::cfunc_DebugFacilitiesEnabledL(LuaPlus::LuaState* const state)
-{
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 0) {
-    LuaPlus::LuaState::Error(
-      state, "%s\n  expected %d args, but got %d", kDebugFacilitiesEnabledHelpText, 0, argumentCount
-    );
-  }
-
-  lua_pushboolean(rawState, USER_DebugFacilitiesEnabled() ? 1 : 0);
-  (void)lua_gettop(rawState);
-  return 1;
-}
 
 namespace
 {
@@ -3575,8 +2301,8 @@ namespace
 
   struct PathComponentCursor
   {
-    msvc8::string mToken;                 // +0x00
-    const msvc8::string* mPath = nullptr; // +0x1C
+    fa::string mToken;                 // +0x00
+    const fa::string* mPath = nullptr; // +0x1C
     std::uint32_t mOffset = 0;            // +0x20
   };
 
@@ -3590,7 +2316,7 @@ namespace
     return ch == '/' || ch == '\\';
   }
 
-  [[nodiscard]] std::uint32_t ClampPathIndex(const msvc8::string& path, std::uint32_t index) noexcept
+  [[nodiscard]] std::uint32_t ClampPathIndex(const fa::string& path, std::uint32_t index) noexcept
   {
     const std::uint32_t size = static_cast<std::uint32_t>(path.size());
     return index > size ? size : index;
@@ -3602,7 +2328,7 @@ namespace
    * What it does:
    * Appends one trailing `/` separator unless path already ends in `:` or `/`.
    */
-  void func_StringFilenameAppendSlash(msvc8::string* const path)
+  void func_StringFilenameAppendSlash(fa::string* const path)
   {
     if (path == nullptr || path->empty()) {
       return;
@@ -3620,7 +2346,7 @@ namespace
    * What it does:
    * Appends one filename segment, normalizing `\\` separators into `/`.
    */
-  msvc8::string* func_StringAppendFilename(const char* source, msvc8::string* const path)
+  fa::string* func_StringAppendFilename(const char* source, fa::string* const path)
   {
     if (path == nullptr) {
       return nullptr;
@@ -3670,11 +2396,11 @@ namespace
    * Address: 0x008CD160 (FUN_008CD160, func_StringCopyInitFilename)
    *
    * What it does:
-   * Initializes one raw `msvc8::string` lane to empty SSO state, then appends
+   * Initializes one raw `fa::string` lane to empty SSO state, then appends
    * one filename segment using startup filename normalization rules.
    */
-  [[maybe_unused]] msvc8::string*
-  InitializeFilenameBufferWithSegment(msvc8::string* const outPath, const char* const filenameSegment)
+  [[maybe_unused]] fa::string*
+  InitializeFilenameBufferWithSegment(fa::string* const outPath, const char* const filenameSegment)
   {
     if (outPath == nullptr) {
       return nullptr;
@@ -3693,9 +2419,9 @@ namespace
    * Builds one joined path by copying `directoryPath`, appending one filename
    * segment with startup normalization rules, and assigning into `outPath`.
    */
-  [[maybe_unused]] msvc8::string* ComposeDirectoryAndFilenameSegment(
-    msvc8::string* const outPath,
-    const msvc8::string& directoryPath,
+  [[maybe_unused]] fa::string* ComposeDirectoryAndFilenameSegment(
+    fa::string* const outPath,
+    const fa::string& directoryPath,
     const char* const filenameSegment
   )
   {
@@ -3703,10 +2429,10 @@ namespace
       return nullptr;
     }
 
-    msvc8::string normalizedFilename{};
+    fa::string normalizedFilename{};
     (void)InitializeFilenameBufferWithSegment(&normalizedFilename, filenameSegment);
 
-    msvc8::string joinedPath{};
+    fa::string joinedPath{};
     joinedPath.assign_owned(directoryPath.view());
     (void)func_StringAppendFilename(normalizedFilename.c_str(), &joinedPath);
 
@@ -3724,7 +2450,7 @@ namespace
    * Returns root-boundary index for one path prefix window, or `-1` when
    * no root boundary exists.
    */
-  [[nodiscard]] std::uint32_t PathRootBoundaryIndex(const msvc8::string& path, const std::uint32_t upto)
+  [[nodiscard]] std::uint32_t PathRootBoundaryIndex(const fa::string& path, const std::uint32_t upto)
   {
     const std::uint32_t clamped = ClampPathIndex(path, upto);
     const std::size_t size = path.size();
@@ -3749,7 +2475,7 @@ namespace
     if (clamped > 3u && size > 2u) {
       if (path[0] == '/' && path[1] == '/' && path[2] == '/') {
         const std::size_t serverSplit = path.find('/', 2u);
-        if (serverSplit == msvc8::string::npos || serverSplit >= clamped) {
+        if (serverSplit == fa::string::npos || serverSplit >= clamped) {
           return kInvalidPathBoundary;
         }
         return static_cast<std::uint32_t>(serverSplit);
@@ -3772,7 +2498,7 @@ namespace
    */
   [[nodiscard]]
   std::uint32_t func_StringSearchFromEnd(
-    const std::uint32_t max, const msvc8::string& path, const char* const search, const std::uint32_t searchLen
+    const std::uint32_t max, const fa::string& path, const char* const search, const std::uint32_t searchLen
   )
   {
     const std::uint32_t size = static_cast<std::uint32_t>(path.size());
@@ -3813,7 +2539,7 @@ namespace
    * What it does:
    * Returns start index of the final filename segment in one path.
    */
-  [[nodiscard]] std::uint32_t func_PathFilenamePos(const msvc8::string& path, const std::uint32_t upto)
+  [[nodiscard]] std::uint32_t func_PathFilenamePos(const fa::string& path, const std::uint32_t upto)
   {
     const std::uint32_t clamped = ClampPathIndex(path, upto);
     if (clamped == 2u && path.size() > 1u && path[0] == '/' && path[1] == '/') {
@@ -3863,11 +2589,11 @@ namespace
    * Returns one-character root token at current root boundary, or empty
    * token when boundary is absent.
    */
-  [[nodiscard]] msvc8::string PathRootBoundaryToken(const msvc8::string& path)
+  [[nodiscard]] fa::string PathRootBoundaryToken(const fa::string& path)
   {
     const std::uint32_t rootBoundary = PathRootBoundaryIndex(path, static_cast<std::uint32_t>(path.size()));
     if (rootBoundary == kInvalidPathBoundary || rootBoundary >= path.size()) {
-      return msvc8::string{};
+      return fa::string{};
     }
     return path.substr(rootBoundary, 1u);
   }
@@ -3878,7 +2604,7 @@ namespace
    * What it does:
    * Returns true when a path has one root-boundary token.
    */
-  [[nodiscard]] bool PathHasRootBoundaryToken(const msvc8::string& path)
+  [[nodiscard]] bool PathHasRootBoundaryToken(const fa::string& path)
   {
     return !PathRootBoundaryToken(path).empty();
   }
@@ -3889,8 +2615,7 @@ namespace
    * What it does:
    * Parses one leading root token span and reports token start/length.
    */
-  [[nodiscard]]
-  void ParsePathRootTokenSpan(const msvc8::string& path, std::uint32_t* const outStart, std::uint32_t* const outLength)
+  void ParsePathRootTokenSpan(const fa::string& path, std::uint32_t* const outStart, std::uint32_t* const outLength)
   {
     if (outStart != nullptr) {
       *outStart = 0u;
@@ -3968,7 +2693,7 @@ namespace
    * What it does:
    * Extracts one leading root/prefix token and initializes path cursor state.
    */
-  [[nodiscard]] PathComponentCursor InitPathPrefixCursor(const msvc8::string& path)
+  [[nodiscard]] PathComponentCursor InitPathPrefixCursor(const fa::string& path)
   {
     PathComponentCursor cursor{};
     cursor.mPath = &path;
@@ -3988,7 +2713,7 @@ namespace
    * What it does:
    * Returns true when path has one non-empty leading root/prefix token.
    */
-  [[nodiscard]] bool PathHasLeadingPrefixToken(const msvc8::string& path)
+  [[nodiscard]] bool PathHasLeadingPrefixToken(const fa::string& path)
   {
     return !InitPathPrefixCursor(path).mToken.empty();
   }
@@ -4000,21 +2725,21 @@ namespace
    * Returns one leading root token only when token is UNC-like (`//...`) or
    * drive-like (`...:`); otherwise returns empty token.
    */
-  [[nodiscard]] msvc8::string GetDriveOrUncPathPrefixToken(const msvc8::string& path)
+  [[nodiscard]] fa::string GetDriveOrUncPathPrefixToken(const fa::string& path)
   {
     const PathComponentCursor prefixCursor = InitPathPrefixCursor(path);
     if (prefixCursor.mOffset == path.size()) {
-      return msvc8::string{};
+      return fa::string{};
     }
 
-    const msvc8::string& token = prefixCursor.mToken;
+    const fa::string& token = prefixCursor.mToken;
     if (token.size() > 1u && token[0] == '/' && token[1] == '/') {
       return token;
     }
     if (!token.empty() && token[token.size() - 1u] == ':') {
       return token;
     }
-    return msvc8::string{};
+    return fa::string{};
   }
 
   /**
@@ -4024,7 +2749,7 @@ namespace
    * Returns true when path has both a root/prefix token and root-boundary
    * marker token.
    */
-  [[nodiscard]] bool PathHasDriveOrUncRootAndBoundary(const msvc8::string& path)
+  [[nodiscard]] bool PathHasDriveOrUncRootAndBoundary(const fa::string& path)
   {
     return !GetDriveOrUncPathPrefixToken(path).empty() && !PathRootBoundaryToken(path).empty();
   }
@@ -4035,14 +2760,14 @@ namespace
    * What it does:
    * Truncates one path string to directory portion.
    */
-  msvc8::string* TrimPathToDirectory(msvc8::string* const path)
+  fa::string* TrimPathToDirectory(fa::string* const path)
   {
     if (path == nullptr) {
       return nullptr;
     }
 
     const std::uint32_t splitPos = func_PathFilenamePos(*path, static_cast<std::uint32_t>(path->size()));
-    const msvc8::string trimmed = path->substr(0u, splitPos);
+    const fa::string trimmed = path->substr(0u, splitPos);
     path->assign_owned(trimmed.view());
     return path;
   }
@@ -4054,7 +2779,7 @@ namespace
    * Returns true when a slash boundary at `index` can be treated as a
    * collapsible path separator (non-root edge case).
    */
-  [[nodiscard]] bool IsCollapsiblePathSlashBoundary(const msvc8::string& path, const std::uint32_t index)
+  [[nodiscard]] bool IsCollapsiblePathSlashBoundary(const fa::string& path, const std::uint32_t index)
   {
     if (path.empty()) {
       return false;
@@ -4071,7 +2796,7 @@ namespace
 
     if (cursor > 2u && path.size() > 1u && path[1] == '/') {
       const std::size_t split = path.find('/', 2u);
-      if (split != msvc8::string::npos && split == cursor) {
+      if (split != fa::string::npos && split == cursor) {
         return false;
       }
     }
@@ -4088,13 +2813,13 @@ namespace
    * What it does:
    * Returns basename token for one path; emits `.` for root-edge paths.
    */
-  [[nodiscard]] msvc8::string GetPathBasenameOrDot(const msvc8::string& path)
+  [[nodiscard]] fa::string GetPathBasenameOrDot(const fa::string& path)
   {
     const std::uint32_t size = static_cast<std::uint32_t>(path.size());
     std::uint32_t split = func_PathFilenamePos(path, size);
 
     if (size != 0u && split != 0u && split < path.size() && path[split] == '/' && IsCollapsiblePathSlashBoundary(path, split)) {
-      return msvc8::string(".");
+      return fa::string(".");
     }
 
     return path.substr(split);
@@ -4106,7 +2831,7 @@ namespace
    * What it does:
    * Initializes reverse path-component cursor for one source path.
    */
-  [[nodiscard]] PathComponentCursor InitReversePathComponentCursor(const msvc8::string& path)
+  [[nodiscard]] PathComponentCursor InitReversePathComponentCursor(const fa::string& path)
   {
     PathComponentCursor cursor{};
     cursor.mPath = &path;
@@ -4135,7 +2860,7 @@ namespace
    * What it does:
    * Replaces one cursor token with a single-character marker (`/` or `.`).
    */
-  msvc8::string* SetPathTokenMarker(msvc8::string* const outToken, const char marker)
+  fa::string* SetPathTokenMarker(fa::string* const outToken, const char marker)
   {
     if (outToken == nullptr) {
       return nullptr;
@@ -4161,7 +2886,7 @@ namespace
       return cursor;
     }
 
-    const msvc8::string& path = *cursor.mPath;
+    const fa::string& path = *cursor.mPath;
     const std::uint32_t tokenSize = static_cast<std::uint32_t>(cursor.mToken.size());
     const bool keepDoubleSlashMarker =
       tokenSize > 2u && cursor.mToken[0] == '/' && cursor.mToken[1] == '/' && cursor.mToken[2] != '/';
@@ -4193,7 +2918,7 @@ namespace
     const std::size_t split = path.find('/', cursor.mOffset);
     const std::uint32_t tokenStart = cursor.mOffset;
     const std::uint32_t tokenLength =
-      split == msvc8::string::npos ? (pathSize - tokenStart) : static_cast<std::uint32_t>(split - tokenStart);
+      split == fa::string::npos ? (pathSize - tokenStart) : static_cast<std::uint32_t>(split - tokenStart);
     cursor.mToken = path.substr(tokenStart, tokenLength);
     return cursor;
   }
@@ -4212,7 +2937,7 @@ namespace
       return cursor;
     }
 
-    const msvc8::string& path = *cursor.mPath;
+    const fa::string& path = *cursor.mPath;
     std::uint32_t pathIndex = ClampPathIndex(path, cursor.mOffset);
     const std::uint32_t rootBoundary = PathRootBoundaryIndex(path, pathIndex);
     const std::uint32_t size = static_cast<std::uint32_t>(path.size());
@@ -4273,9 +2998,9 @@ namespace
    * What it does:
    * Builds one normalized path from cursor token using filename-append rules.
    */
-  [[nodiscard]] msvc8::string BuildNormalizedCursorPathToken(const PathComponentCursor& cursor)
+  [[nodiscard]] fa::string BuildNormalizedCursorPathToken(const PathComponentCursor& cursor)
   {
-    msvc8::string output{};
+    fa::string output{};
     (void)func_StringAppendFilename(cursor.mToken.c_str(), &output);
     return output;
   }
@@ -4309,9 +3034,9 @@ namespace
    * Appends one relative token onto a base path using filename-append
    * normalization rules.
    */
-  [[nodiscard]] msvc8::string AppendRelativePathToken(const msvc8::string& basePath, const msvc8::string& relativePath)
+  [[nodiscard]] fa::string AppendRelativePathToken(const fa::string& basePath, const fa::string& relativePath)
   {
-    msvc8::string appended = basePath;
+    fa::string appended = basePath;
     (void)func_StringAppendFilename(relativePath.c_str(), &appended);
     return appended;
   }
@@ -4323,9 +3048,9 @@ namespace
    * Copies one path into Windows-style slash form (`/` -> `\\`) while keeping
    * root-boundary collapse semantics for leading-prefix lanes.
    */
-  [[maybe_unused]] msvc8::string* NormalizePathToWindowsSlashes(
-    const msvc8::string& source,
-    msvc8::string* const out
+  [[maybe_unused]] fa::string* NormalizePathToWindowsSlashes(
+    const fa::string& source,
+    fa::string* const out
   )
   {
     if (out == nullptr) {
@@ -4366,9 +3091,9 @@ namespace
    * Builds normalized directory prefix text for one input path using filename
    * split/root-boundary rules from the startup path helper lane.
    */
-  [[maybe_unused]] msvc8::string* BuildNormalizedDirectoryPrefix(
-    const msvc8::string& path,
-    msvc8::string* const out
+  [[maybe_unused]] fa::string* BuildNormalizedDirectoryPrefix(
+    const fa::string& path,
+    fa::string* const out
   )
   {
     if (out == nullptr) {
@@ -4395,11 +3120,11 @@ namespace
       --split;
     }
 
-    msvc8::string prefix;
+    fa::string prefix;
     if (split == 1u && rootBoundary == 0u && splitOnSlash) {
       prefix.clear();
     } else {
-      const msvc8::string slice = path.substr(0u, split);
+      const fa::string slice = path.substr(0u, split);
       (void)func_StringAppendFilename(slice.c_str(), &prefix);
     }
 
@@ -4414,13 +3139,13 @@ namespace
    * Collapses one path in place by resolving `.`/`..` component lanes while
    * preserving root/prefix boundary behavior from the startup filename lane.
    */
-  [[maybe_unused]] msvc8::string* CollapsePathComponentsInPlace(msvc8::string* const path)
+  [[maybe_unused]] fa::string* CollapsePathComponentsInPlace(fa::string* const path)
   {
     if (path == nullptr || path->empty()) {
       return path;
     }
 
-    msvc8::string collapsedPath{};
+    fa::string collapsedPath{};
     const PathComponentCursor prefixCursor = InitPathPrefixCursor(*path);
     PathComponentCursor reverseCursor = InitReversePathComponentCursor(*path);
     const PathComponentCursor endCursor = PostIncrementReversePathComponentCursor(reverseCursor);
@@ -4432,7 +3157,7 @@ namespace
         bool collapsedParent = false;
         const bool isParentToken = current.mToken == "..";
         if (!collapsedPath.empty() && isParentToken) {
-          const msvc8::string baseToken = GetPathBasenameOrDot(collapsedPath);
+          const fa::string baseToken = GetPathBasenameOrDot(collapsedPath);
           bool canCollapse = false;
           if (!baseToken.empty()) {
             if (baseToken.size() == 1u) {
@@ -4491,10 +3216,10 @@ namespace
    * Resolves one path token against a base path, preserving drive/UNC/absolute
    * rules from the startup filename helper chain.
    */
-  [[maybe_unused]] msvc8::string* ResolvePathAgainstBase(
-    const msvc8::string& basePath,
-    const msvc8::string& path,
-    msvc8::string* const out
+  [[maybe_unused]] fa::string* ResolvePathAgainstBase(
+    const fa::string& basePath,
+    const fa::string& path,
+    fa::string* const out
   )
   {
     if (out == nullptr) {
@@ -4512,8 +3237,8 @@ namespace
     }
 
     if (PathHasRootBoundaryToken(path)) {
-      const msvc8::string basePrefix = GetDriveOrUncPathPrefixToken(basePath);
-      msvc8::string normalizedPrefix;
+      const fa::string basePrefix = GetDriveOrUncPathPrefixToken(basePath);
+      fa::string normalizedPrefix;
       (void)func_StringAppendFilename(basePrefix.c_str(), &normalizedPrefix);
       out->assign_owned(AppendRelativePathToken(normalizedPrefix, path).view());
       return out;
@@ -4529,7 +3254,7 @@ namespace
    * What it does:
    * Stores one path pointer lane in a single-word helper wrapper.
    */
-  void SetPathPointerLane(const msvc8::string*& outPath, const msvc8::string* const path) noexcept
+  [[maybe_unused]] void SetPathPointerLane(const fa::string*& outPath, const fa::string* const path) noexcept
   {
     outPath = path;
   }
@@ -4566,10 +3291,10 @@ namespace
  * Wraps startup path resolution with `(path, basePath)` parameter order used
  * by VFS/data-path setup callsites.
  */
-msvc8::string* moho::PATH_ResolveAgainstBase(
-  const msvc8::string& path,
-  const msvc8::string& basePath,
-  msvc8::string* const outPath
+fa::string* moho::PATH_ResolveAgainstBase(
+  const fa::string& path,
+  const fa::string& basePath,
+  fa::string* const outPath
 )
 {
   return ResolvePathAgainstBase(basePath, path, outPath);
@@ -4584,7 +3309,7 @@ msvc8::string* moho::PATH_ResolveAgainstBase(
  * Compares two canonicalized paths by reverse component order. The comparison
  * starts from the leaf token and walks toward each path root.
  */
-bool moho::PATH_ReverseComponentLess(const msvc8::string& lhs, const msvc8::string& rhs)
+bool moho::PATH_ReverseComponentLess(const fa::string& lhs, const fa::string& rhs)
 {
   PathComponentCursor lhsCursor = InitReversePathComponentCursor(lhs);
   PathComponentCursor lhsEnd = InitPathPrefixCursor(lhs);
@@ -4592,8 +3317,8 @@ bool moho::PATH_ReverseComponentLess(const msvc8::string& lhs, const msvc8::stri
   PathComponentCursor rhsEnd = InitPathPrefixCursor(rhs);
 
   while (PathComponentCursorNotEqual(lhsCursor, lhsEnd) && PathComponentCursorNotEqual(rhsCursor, rhsEnd)) {
-    const msvc8::string lhsToken = BuildNormalizedCursorPathToken(lhsCursor);
-    const msvc8::string rhsToken = BuildNormalizedCursorPathToken(rhsCursor);
+    const fa::string lhsToken = BuildNormalizedCursorPathToken(lhsCursor);
+    const fa::string rhsToken = BuildNormalizedCursorPathToken(rhsCursor);
     if (lhsToken.view() < rhsToken.view()) {
       return true;
     }
@@ -4617,9 +3342,9 @@ bool moho::PATH_ReverseComponentLess(const msvc8::string& lhs, const msvc8::stri
  * Returns `inputPath` unchanged when it already has an extension, otherwise
  * appends `suggestedExt` (with leading `.` normalization).
  */
-msvc8::string moho::FILE_SuggestedExt(const gpg::StrArg inputPath, const gpg::StrArg suggestedExt)
+fa::string moho::FILE_SuggestedExt(const gpg::StrArg inputPath, const gpg::StrArg suggestedExt)
 {
-  msvc8::string output;
+  fa::string output;
   output.assign_owned(inputPath != nullptr ? inputPath : "");
   if (output.empty()) {
     return output;
@@ -4675,7 +3400,7 @@ bool moho::FILE_IsLocal(const gpg::StrArg filename)
  * Resolves one resource path against one base directory path, preserving
  * drive/UNC prefixes and validating incompatible base/target combinations.
  */
-msvc8::string moho::FILE_MakeAbsolute(const gpg::StrArg dir, const gpg::StrArg filename)
+fa::string moho::FILE_MakeAbsolute(const gpg::StrArg dir, const gpg::StrArg filename)
 {
   if (dir == nullptr || dir[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_MakeAbsolute", "Null argument.");
@@ -4684,9 +3409,9 @@ msvc8::string moho::FILE_MakeAbsolute(const gpg::StrArg dir, const gpg::StrArg f
     ThrowStartupFileError("Moho::FILE_MakeAbsolute", "Null argument.");
   }
 
-  msvc8::string dirStr;
+  fa::string dirStr;
   dirStr.assign_owned(dir);
-  msvc8::string fileStr;
+  fa::string fileStr;
   fileStr.assign_owned(filename);
   gpg::STR_Replace(dirStr, "\\", "/", std::numeric_limits<unsigned int>::max());
   gpg::STR_Replace(fileStr, "\\", "/", std::numeric_limits<unsigned int>::max());
@@ -4731,7 +3456,7 @@ msvc8::string moho::FILE_MakeAbsolute(const gpg::StrArg dir, const gpg::StrArg f
     return dirStr;
   }
 
-  msvc8::string builder;
+  fa::string builder;
   if (fileUnc || fileDrive) {
     const std::string fileText = fileStr.to_std();
     const std::size_t prefixLen = std::min<std::size_t>(2u, fileText.size());
@@ -4869,13 +3594,13 @@ const char* moho::FILE_Ext(const gpg::StrArg filename)
  * Rebuilds `filename` with forced extension: removes existing extension from
  * last path segment, then appends `.` + `ext` when `ext` is non-empty.
  */
-msvc8::string moho::FILE_ForcedExt(const gpg::StrArg filename, const gpg::StrArg ext)
+fa::string moho::FILE_ForcedExt(const gpg::StrArg filename, const gpg::StrArg ext)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_ForcedExt", "Null argument.");
   }
 
-  msvc8::string output;
+  fa::string output;
   const char* const extension = FILE_Ext(filename);
   const std::size_t baseLength =
     extension != nullptr ? static_cast<std::size_t>(extension - filename - 1) : std::strlen(filename);
@@ -4896,20 +3621,20 @@ msvc8::string moho::FILE_ForcedExt(const gpg::StrArg filename, const gpg::StrArg
  * What it does:
  * Normalizes slash separators and returns path-directory prefix text.
  */
-msvc8::string moho::FILE_DirPrefix(const gpg::StrArg filename, const bool /*unusedFlag*/)
+fa::string moho::FILE_DirPrefix(const gpg::StrArg filename, const bool /*unusedFlag*/)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_DirPrefix", "Null argument.");
   }
 
-  msvc8::string normalized;
+  fa::string normalized;
   normalized.assign_owned(filename);
   gpg::STR_Replace(normalized, "\\", "/", std::numeric_limits<unsigned int>::max());
 
   const std::string normalizedStd = normalized.to_std();
   const std::size_t slashPos = normalizedStd.find_last_of('/');
   if (slashPos == std::string::npos) {
-    msvc8::string out;
+    fa::string out;
     out.assign_owned("");
     return out;
   }
@@ -4925,7 +3650,7 @@ msvc8::string moho::FILE_DirPrefix(const gpg::StrArg filename, const bool /*unus
   }
 
   const std::size_t prefixLen = FILE_HasDrive(normalized.c_str()) && slashPos == 2u ? 3u : slashPos;
-  msvc8::string out;
+  fa::string out;
   out.assign_owned(normalizedStd.substr(0, prefixLen));
   return out;
 }
@@ -4938,7 +3663,7 @@ msvc8::string moho::FILE_DirPrefix(const gpg::StrArg filename, const bool /*unus
  * What it does:
  * Resolves a system-directory path prefix from a potentially relative filename.
  */
-msvc8::string moho::FILE_Dir(const gpg::StrArg filename)
+fa::string moho::FILE_Dir(const gpg::StrArg filename)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_Dir", "Null argument.");
@@ -4947,7 +3672,7 @@ msvc8::string moho::FILE_Dir(const gpg::StrArg filename)
     ThrowStartupFileError("Moho::FILE_Dir", "System path expected, got local.");
   }
 
-  msvc8::string fileStr;
+  fa::string fileStr;
   fileStr.assign_owned(filename);
   gpg::STR_Replace(fileStr, "\\", "/", std::numeric_limits<unsigned int>::max());
 
@@ -4987,7 +3712,7 @@ msvc8::string moho::FILE_Dir(const gpg::StrArg filename)
   }
 
   const char driveChar = static_cast<char>(_getdrive() + 0x60);
-  const msvc8::string absolutePath = gpg::STR_Printf("%c:%s", driveChar, fileStr.c_str());
+  const fa::string absolutePath = gpg::STR_Printf("%c:%s", driveChar, fileStr.c_str());
   return FILE_DirPrefix(absolutePath.c_str());
 }
 
@@ -4999,7 +3724,7 @@ msvc8::string moho::FILE_Dir(const gpg::StrArg filename)
  * What it does:
  * Returns the final path segment and optionally strips extension text.
  */
-msvc8::string moho::FILE_Base(const gpg::StrArg filename, const bool stripExtension)
+fa::string moho::FILE_Base(const gpg::StrArg filename, const bool stripExtension)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_Base", "Null argument.");
@@ -5025,7 +3750,7 @@ msvc8::string moho::FILE_Base(const gpg::StrArg filename, const bool stripExtens
     }
   }
 
-  msvc8::string out;
+  fa::string out;
   out.append(base, baseLength);
   return out;
 }
@@ -5038,13 +3763,13 @@ msvc8::string moho::FILE_Base(const gpg::StrArg filename, const bool stripExtens
  * What it does:
  * Canonicalizes separators and collapses `.` / `..` path components.
  */
-msvc8::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const success)
+fa::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const success)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_CollapsePath", "Null argument.");
   }
 
-  msvc8::string fileStr;
+  fa::string fileStr;
   fileStr.assign_owned(filename);
   gpg::STR_Replace(fileStr, "\\", "/", std::numeric_limits<unsigned int>::max());
 
@@ -5057,9 +3782,9 @@ msvc8::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const su
 
   const bool hasUnc = FILE_HasUNC(filename);
   const bool hasDrive = FILE_HasDrive(filename);
-  msvc8::vector<msvc8::string> components;
+  fa::vector<fa::string> components;
 
-  msvc8::string out;
+  fa::string out;
   if (hasUnc || hasDrive) {
     out.assign_owned(normalized.substr(0, std::min<std::size_t>(2u, normalized.size())));
   }
@@ -5084,7 +3809,7 @@ msvc8::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const su
             const bool isAbsoluteSlashRoot = !normalized.empty() && normalized[0] == '/' && !hasUnc;
             const bool isAbsoluteDriveRoot = hasDrive && normalized.size() > 2u && normalized[2] == '/';
             if (!isAbsoluteSlashRoot && !isAbsoluteDriveRoot) {
-              msvc8::string unresolvedParent;
+              fa::string unresolvedParent;
               unresolvedParent.assign_owned(cursor);
               components.push_back(unresolvedParent);
               if (success != nullptr) {
@@ -5095,7 +3820,7 @@ msvc8::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const su
             components.pop_back();
           }
         } else {
-          msvc8::string component;
+          fa::string component;
           component.assign_owned(cursor);
           components.push_back(component);
         }
@@ -5114,7 +3839,7 @@ msvc8::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const su
   }
 
   for (std::size_t index = 0; index < components.size(); ++index) {
-    const msvc8::string& component = components[index];
+    const fa::string& component = components[index];
     out.append(component.c_str(), component.size());
     if ((index + 1u) < components.size() || FILE_HasDrive(component.c_str())) {
       out.append(1u, '/');
@@ -5132,9 +3857,9 @@ msvc8::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const su
  * What it does:
  * Maps platform errno values from disk helpers to human-readable text.
  */
-msvc8::string moho::FILE_GetErrorFromErrno(const int err)
+fa::string moho::FILE_GetErrorFromErrno(const int err)
 {
-  msvc8::string description;
+  fa::string description;
   switch (err) {
   case 2:
     description.assign_owned("File not found");
@@ -5166,9 +3891,9 @@ msvc8::string moho::FILE_GetErrorFromErrno(const int err)
  * Returns local-appdata path suffix:
  * `<LocalAppData>\\Gas Powered Games\\Supreme Commander Forged Alliance`.
  */
-msvc8::string moho::USER_GetAppLocalDataDir()
+fa::string moho::USER_GetAppLocalDataDir()
 {
-  msvc8::string outDir;
+  fa::string outDir;
 
   wchar_t localAppDataPath[MAX_PATH]{};
   if (::SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, localAppDataPath) < 0) {
@@ -5196,15 +3921,15 @@ msvc8::string moho::USER_GetAppLocalDataDir()
  * effects and die in DevResInitResources. A private directory per instance
  * removes the race. Without the option the behaviour is retail's.
  */
-msvc8::string moho::USER_GetAppCacheDir()
+fa::string moho::USER_GetAppCacheDir()
 {
-  msvc8::string outDir;
+  fa::string outDir;
   std::filesystem::path cachePath;
-  msvc8::vector<msvc8::string> cacheDirArgs;
+  fa::vector<fa::string> cacheDirArgs;
   if (CFG_GetArgOption("/cachedir", 1u, &cacheDirArgs) && !cacheDirArgs.empty()) {
     cachePath = std::filesystem::path(cacheDirArgs[0].c_str());
   } else {
-    const msvc8::string appLocalDir = USER_GetAppLocalDataDir();
+    const fa::string appLocalDir = USER_GetAppLocalDataDir();
     if (appLocalDir.empty()) {
       return outDir;
     }
@@ -5226,7 +3951,7 @@ msvc8::string moho::USER_GetAppCacheDir()
  */
 void moho::USER_PurgeAppCacheDir()
 {
-  const msvc8::string cachePath = USER_GetAppCacheDir();
+  const fa::string cachePath = USER_GetAppCacheDir();
   if (cachePath.empty()) {
     return;
   }
@@ -5256,84 +3981,6 @@ void moho::USER_PurgeAppCacheDir()
   DISK_InvalidateFileLookups(); // engine addition (res_CacheFileLookups)
 }
 
-/**
- * Address: 0x008CAF70 (FUN_008CAF70, func_OpenDocuments)
- *
- * What it does:
- * Ensures user documents directories exist for:
- * `<Documents>\\My Games\\<Company>\\<Product>`.
- */
-void moho::USER_EnsureDocumentDirectories()
-{
-  wchar_t documentsPath[MAX_PATH]{};
-  if (::SHGetFolderPathW(nullptr, CSIDL_PERSONAL, nullptr, 0, documentsPath) < 0) {
-    gpg::Warnf("Unable to get My Documents root");
-    return;
-  }
-
-  std::wstring documentPath(documentsPath);
-
-  const std::wstring myGamesName = gpg::STR_Utf8ToWide(
-    moho::Loc(moho::USER_GetLuaState(), "<LOC Engine0020>My Games").c_str()
-  );
-  documentPath.append(L"\\");
-  documentPath.append(myGamesName);
-  if (::CreateDirectoryW(documentPath.c_str(), nullptr) == FALSE && ::GetLastError() != ERROR_ALREADY_EXISTS) {
-    gpg::Warnf("Unable to create document path: %s", reinterpret_cast<const char*>(documentPath.c_str()));
-  }
-
-  const std::wstring companyNameWide = gpg::STR_Utf8ToWide(APP_GetCompanyName().c_str());
-  documentPath.append(L"\\");
-  documentPath.append(companyNameWide);
-  if (::CreateDirectoryW(documentPath.c_str(), nullptr) == FALSE && ::GetLastError() != ERROR_ALREADY_EXISTS) {
-    gpg::Warnf("Unable to create document path: %s", reinterpret_cast<const char*>(documentPath.c_str()));
-  }
-
-  const std::wstring productNameWide = gpg::STR_Utf8ToWide(APP_GetProductName().c_str());
-  documentPath.append(L"\\");
-  documentPath.append(productNameWide);
-  if (::CreateDirectoryW(documentPath.c_str(), nullptr) == FALSE && ::GetLastError() != ERROR_ALREADY_EXISTS) {
-    gpg::Warnf("Unable to create document path: %s", reinterpret_cast<const char*>(documentPath.c_str()));
-  }
-}
-
-/**
- * Address: 0x008C9E20 (FUN_008C9E20)
- *
- * What it does:
- * Returns user documents path suffix:
- * `<Documents>\\My Games\\<Company>\\<Product>\\`.
- */
-msvc8::string moho::USER_GetAppDocDir()
-{
-  msvc8::string outDir;
-
-  wchar_t documentsPath[MAX_PATH]{};
-  if (::SHGetFolderPathW(nullptr, CSIDL_PERSONAL, nullptr, 0, documentsPath) < 0) {
-    return outDir;
-  }
-
-  outDir = gpg::STR_WideToUtf8(documentsPath);
-  outDir.push_back('\\');
-  (void)outDir.append(moho::Loc(moho::USER_GetLuaState(), "<LOC Engine0020>My Games").view());
-  outDir.push_back('\\');
-  (void)outDir.append(APP_GetCompanyName().view());
-  outDir.push_back('\\');
-  (void)outDir.append(APP_GetProductName().view());
-  outDir.push_back('\\');
-  return outDir;
-}
-
-/**
- * Address: 0x008CA2D0 (FUN_008CA2D0)
- *
- * What it does:
- * Returns `<USER_GetAppDocDir()> + "savegames\\"`.
- */
-msvc8::string moho::USER_GetSaveGameDir()
-{
-  return USER_GetAppDocDir() + SaveGameDirName() + "\\";
-}
 
 /**
  * Address: 0x008CA380 (FUN_008CA380)
@@ -5341,21 +3988,11 @@ msvc8::string moho::USER_GetSaveGameDir()
  * What it does:
  * Returns `<APP preference prefix> + "SaveGame"`.
  */
-msvc8::string moho::USER_GetSaveGameExt()
+fa::string moho::USER_GetSaveGameExt()
 {
   return APP_GetPreferencePrefix() + SaveGameExtName();
 }
 
-/**
- * Address: 0x008CA3A0 (FUN_008CA3A0)
- *
- * What it does:
- * Returns `<USER_GetAppDocDir()> + "replays\\"`.
- */
-msvc8::string moho::USER_GetReplayDir()
-{
-  return USER_GetAppDocDir() + ReplayDirName() + "\\";
-}
 
 /**
  * Address: 0x008CA450 (FUN_008CA450)
@@ -5363,7 +4000,7 @@ msvc8::string moho::USER_GetReplayDir()
  * What it does:
  * Returns `<APP preference prefix> + "Replay"`.
  */
-msvc8::string moho::USER_GetReplayExt()
+fa::string moho::USER_GetReplayExt()
 {
   return APP_GetPreferencePrefix() + ReplayExtName();
 }
@@ -5374,153 +4011,16 @@ msvc8::string moho::USER_GetReplayExt()
  * What it does:
  * Returns `<APP preference prefix> + "CampaignSave"`.
  */
-msvc8::string moho::USER_GetCampaignSaveExt()
+fa::string moho::USER_GetCampaignSaveExt()
 {
   return APP_GetPreferencePrefix() + CampaignSaveExtName();
 }
 
-/**
- * Address: 0x008CA490 (FUN_008CA490)
- *
- * What it does:
- * Returns `<USER_GetAppDocDir()> + "screenshots\\"` and ensures the
- * screenshot directory exists.
- */
-msvc8::string moho::USER_GetScreenshotDir()
-{
-  msvc8::string outDir = USER_GetAppDocDir() + ScreenshotDirName() + "\\";
-  const std::wstring widePath = gpg::STR_Utf8ToWide(outDir.c_str());
-  if (::CreateDirectoryW(widePath.c_str(), nullptr) == FALSE && ::GetLastError() != ERROR_ALREADY_EXISTS) {
-    throw std::runtime_error(gpg::STR_Printf("Unable to create directory %s", outDir.c_str()).to_std());
-  }
-  return outDir;
-}
 
 namespace
 {
-  /**
-   * Address: 0x008CB600 (FUN_008CB600)
-   *
-   * IDA signature:
-   * _DWORD *__usercall sub_8CB600@<eax>(std::string *key@<ecx>, std::map *map@<ebx>);
-   *
-   * What it does:
-   * Out-of-line specialization of
-   * `std::map<std::string, std::vector<std::string>>::operator[]`. Calls
-   * `_Tree::lower_bound` on the key; when the lookup either returns the
-   * sentinel head or a node whose key compares greater than the requested key,
-   * it allocates a new node (default-constructed value), splices it into the
-   * tree, then returns a reference to the value slot at node offset +0x28.
-   *
-   * Wired here so the linker preserves the binary's per-type
-   * `vector_string::operator[]` symbol shape; the natural `map[key]` idiom
-   * the compiler would inline does not guarantee the out-of-line emission.
-   *
-   * DB-integrity fix: this was originally typed over `std::map`/
-   * `std::vector`/`std::string` (modern STL), which compiles to a
-   * completely different, unrelated set of symbols -- not the
-   * `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` `_Tree`
-   * insert/lower_bound bodies this binary actually links (FUN_008CB860 /
-   * FUN_008CBA70, `legacy/containers/RbTree.h` + `Map.h`). Retyped to the
-   * legacy ABI containers so the template family is instantiated again.
-   */
-  msvc8::vector<msvc8::string>& SubscriptStringToStringVectorMap(
-    msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>& map,
-    const msvc8::string& key
-  )
-  {
-    return map[key];
-  }
 } // namespace
 
-/**
- * Address: 0x008CA650 (FUN_008CA650, USER_GetSpecialFiles)
- *
- * ESpecialFileType, std::string &, std::string &,
- * std::map<std::string,std::vector<std::string>> &
- *
- * What it does:
- * Resolves the special-file directory/extension pair, ensures the root
- * folder exists, then groups profile-scoped files by profile directory.
- */
-void moho::USER_GetSpecialFiles(
-  const ESpecialFileType specialFileType,
-  std::string& outDirectory,
-  std::string& outExtension,
-  msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>& outFilesByProfile
-)
-{
-  switch (specialFileType) {
-    case ESpecialFileType::SaveGame:
-      outDirectory = USER_GetSaveGameDir().to_std();
-      outExtension = USER_GetSaveGameExt().to_std();
-      break;
-    case ESpecialFileType::Replay:
-      outDirectory = USER_GetReplayDir().to_std();
-      outExtension = USER_GetReplayExt().to_std();
-      break;
-    case ESpecialFileType::CampaignSave:
-      outDirectory = USER_GetSaveGameDir().to_std();
-      outExtension = USER_GetCampaignSaveExt().to_std();
-      break;
-    case ESpecialFileType::Screenshot:
-    default:
-      {
-        ESpecialFileType reflectedType = specialFileType;
-        gpg::RRef enumRef{};
-        enumRef = gpg::MakeRRef<moho::ESpecialFileType>(&reflectedType);
-        const msvc8::string lexical = enumRef.GetLexical();
-        throw std::runtime_error(gpg::STR_Printf("Invalid special file type %s", lexical.c_str()).to_std());
-      }
-  }
-
-  const std::wstring wideDirectory = gpg::STR_Utf8ToWide(outDirectory.c_str());
-  if (::CreateDirectoryW(wideDirectory.c_str(), nullptr) == FALSE && ::GetLastError() != ERROR_ALREADY_EXISTS) {
-    throw std::runtime_error(gpg::STR_Printf("Unable to create directory %s", outDirectory.c_str()).to_std());
-  }
-
-  const std::wstring profilePattern = gpg::STR_Utf8ToWide((outDirectory + "*").c_str());
-  WIN32_FIND_DATAW profileFindData{};
-  const HANDLE profileFindHandle = ::FindFirstFileW(profilePattern.c_str(), &profileFindData);
-  if (profileFindHandle == INVALID_HANDLE_VALUE) {
-    return;
-  }
-
-  do {
-    if ((profileFindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0u) {
-      continue;
-    }
-
-    const std::string profileName = gpg::STR_WideToUtf8(profileFindData.cFileName).to_std();
-    const std::string filePattern = outDirectory + profileName + "\\*." + outExtension;
-    const std::wstring wideFilePattern = gpg::STR_Utf8ToWide(filePattern.c_str());
-
-    WIN32_FIND_DATAW fileFindData{};
-    const HANDLE fileFindHandle = ::FindFirstFileW(wideFilePattern.c_str(), &fileFindData);
-    if (fileFindHandle == INVALID_HANDLE_VALUE) {
-      continue;
-    }
-
-    do {
-      const std::string fileName = gpg::STR_WideToUtf8(fileFindData.cFileName).to_std();
-      SubscriptStringToStringVectorMap(outFilesByProfile, profileName.c_str()).push_back(fileName.c_str());
-    } while (::FindNextFileW(fileFindHandle, &fileFindData) != FALSE);
-
-    if (::GetLastError() != ERROR_NO_MORE_FILES) {
-      ::FindClose(fileFindHandle);
-      throw std::runtime_error("Error finding files");
-    }
-
-    ::FindClose(fileFindHandle);
-  } while (::FindNextFileW(profileFindHandle, &profileFindData) != FALSE);
-
-  if (::GetLastError() != ERROR_NO_MORE_FILES) {
-    ::FindClose(profileFindHandle);
-    throw std::runtime_error("Error finding prefs directories");
-  }
-
-  ::FindClose(profileFindHandle);
-}
 
 /**
  * Address: 0x008CAE20 (FUN_008CAE20)
@@ -5530,7 +4030,7 @@ void moho::USER_GetSpecialFiles(
  */
 bool moho::USER_DebugFacilitiesEnabled()
 {
-  static const msvc8::string kDebugFacilitiesKey("debug.enable_debug_facilities");
+  static const fa::string kDebugFacilitiesKey("debug.enable_debug_facilities");
   if (IUserPrefs* const preferences = USER_GetPreferences(); preferences != nullptr) {
     return preferences->GetBoolean(kDebugFacilitiesKey, false);
   }
@@ -5544,9 +4044,9 @@ bool moho::USER_DebugFacilitiesEnabled()
  * Returns `/maps/<map>/<map>_scenario.lua` for plain map tokens, or the
  * input unchanged when it is already a path-like scenario reference.
  */
-msvc8::string moho::FindMapScenario(const gpg::StrArg mapName)
+fa::string moho::FindMapScenario(const gpg::StrArg mapName)
 {
-  msvc8::string scenarioPath;
+  fa::string scenarioPath;
   scenarioPath.assign_owned(mapName != nullptr ? mapName : "");
 
   if (scenarioPath.empty()) {
@@ -5561,48 +4061,6 @@ msvc8::string moho::FindMapScenario(const gpg::StrArg mapName)
   return gpg::STR_Printf("/maps/%s/%s_scenario.lua", rawMapName, rawMapName);
 }
 
-/**
- * Address: 0x008CE2A0 (FUN_008CE2A0, func_StartCommandLineSession)
- *
- * What it does:
- * Imports `/lua/SinglePlayerLaunch.lua` and invokes
- * `StartCommandLineSession(mapName, isPerfTest)`.
- */
-bool moho::StartCommandLineSession(const gpg::StrArg mapName, const bool isPerfTest)
-{
-  const char* const effectiveMapName = mapName != nullptr ? mapName : "";
-
-  try {
-    LuaPlus::LuaState* const state = USER_GetLuaState();
-    if (state == nullptr) {
-      throw std::runtime_error("USER_GetLuaState() returned null.");
-    }
-
-    const LuaPlus::LuaObject launchModule = SCR_ImportLuaModule(state, "/lua/SinglePlayerLaunch.lua");
-    if (launchModule.IsNil()) {
-      throw std::runtime_error("Unable to import '/lua/SinglePlayerLaunch.lua'.");
-    }
-
-    const LuaPlus::LuaObject launchFunction = SCR_GetLuaTableField(state, launchModule, "StartCommandLineSession");
-    if (launchFunction.IsNil()) {
-      throw std::runtime_error("Missing StartCommandLineSession Lua entrypoint.");
-    }
-
-    LuaPlus::LuaFunction<void> startCommandLineSession(launchFunction);
-    startCommandLineSession(effectiveMapName, isPerfTest);
-    return true;
-  } catch (const std::exception& exception) {
-    const msvc8::string message = gpg::STR_Printf(
-      "Unable to launch %s:\n%s", effectiveMapName, exception.what() != nullptr ? exception.what() : ""
-    );
-    WIN_OkBox("Ack!", message.c_str());
-    return false;
-  } catch (...) {
-    const msvc8::string message = gpg::STR_Printf("Unable to launch %s:\nunknown error", effectiveMapName);
-    WIN_OkBox("Ack!", message.c_str());
-    return false;
-  }
-}
 
 namespace
 {
@@ -5615,8 +4073,8 @@ namespace
    */
   void func_FWaitSetError(const int err)
   {
-    const msvc8::string errorDescription = moho::FILE_GetErrorFromErrno(err);
-    if (msvc8::string* const errorSlot = moho::FWaitHandleSet::GetErrorString(); errorSlot != nullptr) {
+    const fa::string errorDescription = moho::FILE_GetErrorFromErrno(err);
+    if (fa::string* const errorSlot = moho::FWaitHandleSet::GetErrorString(); errorSlot != nullptr) {
       errorSlot->assign_owned(errorDescription.view());
     }
   }
@@ -5628,7 +4086,7 @@ namespace
    * Initializes destination string storage and canonicalizes one filesystem
    * path token.
    */
-  msvc8::string* func_StringSetFilename2(msvc8::string* const out, const gpg::StrArg sourcePath)
+  fa::string* func_StringSetFilename2(fa::string* const out, const gpg::StrArg sourcePath)
   {
     return gpg::STR_InitFilename(out, sourcePath != nullptr ? sourcePath : "");
   }
@@ -5640,7 +4098,7 @@ namespace
    * Initializes destination string storage from one source string and
    * canonicalizes it as a filesystem token.
    */
-  msvc8::string* SetCanonicalFilenameFromString(msvc8::string* const out, const msvc8::string& sourcePath)
+  [[maybe_unused]] fa::string* SetCanonicalFilenameFromString(fa::string* const out, const fa::string& sourcePath)
   {
     return func_StringSetFilename2(out, sourcePath.c_str());
   }
@@ -5667,7 +4125,7 @@ std::filesystem::path moho::DISK_GetLaunchDir()
   // through a canonizing helper: this is the launch directory, and the callers
   // want it exactly as _fullpath resolved it.
   //
-  // An earlier note here blamed a 15-character truncation in msvc8::string for
+  // An earlier note here blamed a 15-character truncation in fa::string for
   // "G:\projects\faf-main\output\..." arriving as "gZ\projects\faf". The "gZ"
   // half of that was really gpg::STR_ToLower mapping ':' to 'Z' through a
   // signed range test - see the comment on that function.
@@ -5729,11 +4187,11 @@ void moho::DISK_Recycle(const gpg::StrArg sourcePath)
  * script name (SupComDataPath.lua); the FAF client launches with
  * `/init init_faf.lua`, `/init init_coop.lua` and so on.
  */
-bool moho::DISK_SetupDataAndSearchPaths(msvc8::string dataPathScriptName, const std::filesystem::path& launchDir)
+bool moho::DISK_SetupDataAndSearchPaths(fa::string dataPathScriptName, const std::filesystem::path& launchDir)
 {
   // 0x00459E14..0x00459E4E: the script name is taken by value and overwritten
   // with the `/init` argument when one is given.
-  msvc8::vector<msvc8::string> initArgs;
+  fa::vector<fa::string> initArgs;
   if (CFG_GetArgOption("/init", 1, &initArgs)) {
     dataPathScriptName = initArgs[0];
   }
@@ -5762,7 +4220,7 @@ bool moho::DISK_SetupDataAndSearchPaths(msvc8::string dataPathScriptName, const 
   }
 
   std::vector<std::wstring> allowedProtocols;
-  msvc8::vector<moho::SVFSMountPoint> mountPoints;
+  fa::vector<moho::SVFSMountPoint> mountPoints;
 
   // The binary builds its own state for this on the stack, initialises it, and
   // destroys it before returning - 0x00459ED4 takes the address of a local and
@@ -5817,7 +4275,7 @@ bool moho::DISK_SetupDataAndSearchPaths(msvc8::string dataPathScriptName, const 
     // what it defined. Passing a default-constructed LuaObject instead made
     // SCR_LuaDoFile take the `if (env)` branch and PushStack threw
     // LuaAssertion("state->m_rootState == m_state") on the unbound object.
-    const msvc8::string scriptPathUtf8(absoluteScriptPath.string().c_str());
+    const fa::string scriptPathUtf8(absoluteScriptPath.string().c_str());
     if (!moho::SCR_LuaDoFile(startupState, scriptPathUtf8.c_str(), nullptr)) {
       return false;
     }
@@ -5873,136 +4331,6 @@ std::filesystem::path moho::DISK_GetDataPathScriptFile()
   return gDataPathScriptFile;
 }
 
-/**
- * Address: 0x00874AF0 (FUN_00874AF0, `Moho::CMovieManager::CMovieManager`)
- *
- * What it does:
- * Opens DirectSound, hands it to the ADX middleware along with the default
- * file system and thread setup, routes middleware errors to the log, and
- * initialises Sofdec for a 59.94 Hz display. The volume starts at 0: full
- * volume, in DirectSound's attenuation units.
- */
-moho::CMovieManager::CMovieManager()
-  : mDirectSound(nullptr)
-  , mPrimaryBuffer(nullptr)
-{
-  CreateDirectSound();
-
-  ::ADXPC_SetupSoundDirectSound8(mDirectSound);
-  ::ADXPC_SetupFileSystem(nullptr);
-  ::ADXM_SetupThrd(nullptr);
-
-  MwsfdInitPrm initParams{};
-  initParams.vhz = kMovieSofdecVideoRefreshHz;
-  initParams.disp_cycle = 1;
-  initParams.disp_latency = 1;
-  initParams.dec_svr = MWSFD_DEC_SVR_MAIN;
-
-  ::ADXM_SetCbErr(&GpgSofDecError, 0);
-  ::mwPlyInitSfdFx(&initParams);
-  mVolume = 0.0f;
-}
-
-/**
- * Address: 0x00874990 (FUN_00874990, `func_CreateDirectSound`)
- *
- * What it does:
- * Unless `/nosound` is given, creates the DirectSound device at priority
- * level on the main window and a 48 kHz 16-bit stereo buffer with volume
- * control. Either later failure releases the device again, so the middleware
- * runs without sound.
- */
-void moho::CMovieManager::CreateDirectSound()
-{
-  if (CFG_GetArgOption("/nosound", 0, nullptr)) {
-    return;
-  }
-
-  if (FAILED(::DirectSoundCreate(nullptr, &mDirectSound, nullptr))) {
-    gpg::Logf("Failed to create DirectSound.");
-    return;
-  }
-
-  const HWND mainWindow = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(sMainWindow->GetHandle()));
-  if (FAILED(mDirectSound->SetCooperativeLevel(mainWindow, DSSCL_PRIORITY))) {
-    gpg::Warnf("Failed to set cooperative level.");
-    mDirectSound->Release();
-    mDirectSound = nullptr;
-    return;
-  }
-
-  WAVEFORMATEX waveFormat{};
-  waveFormat.wFormatTag = WAVE_FORMAT_PCM;
-  waveFormat.nChannels = 2;
-  waveFormat.nSamplesPerSec = 48000;
-  waveFormat.nAvgBytesPerSec = 192000;
-  waveFormat.nBlockAlign = 4;
-  waveFormat.wBitsPerSample = 16;
-
-  DSBUFFERDESC bufferDesc{};
-  bufferDesc.dwSize = sizeof(bufferDesc);
-  bufferDesc.dwFlags = DSBCAPS_CTRLVOLUME;
-  bufferDesc.dwBufferBytes = 576000;
-  bufferDesc.lpwfxFormat = &waveFormat;
-  if (FAILED(mDirectSound->CreateSoundBuffer(&bufferDesc, &mPrimaryBuffer, nullptr))) {
-    gpg::Warnf("Failed to create primary sound buffer.");
-    mDirectSound->Release();
-    mDirectSound = nullptr;
-  }
-}
-
-/**
- * Address: 0x00874B90 (FUN_00874B90, ??1CMovieManager@Moho@@QAE@XZ)
- * Address: 0x00875290 (FUN_00875290, the scalar deleting destructor: this
- * body inlined, then `operator delete`)
- *
- * What it does:
- * Shuts Sofdec and the ADX manager down, releases the sound buffer and the
- * DirectSound device, and runs the ADX PC shutdown hook last.
- */
-moho::CMovieManager::~CMovieManager()
-{
-  ::mwPlyFinishSfdFx();
-  ::ADXM_Finish();
-  ReleaseDirectSound();
-  ::ADXPC_NoOpShutdownCallback();
-}
-
-/**
- * Address: 0x00874AC0 (FUN_00874AC0)
- *
- * What it does:
- * Releases the sound buffer, then the DirectSound device, nulling each. The
- * destructor (0x00874B9A) and its deleting copy carry it inline; this is the
- * linker-retained out-of-line copy.
- */
-void moho::CMovieManager::ReleaseDirectSound()
-{
-  ::ADXPC_SetupSoundDirectSound8(nullptr);
-  if (mPrimaryBuffer != nullptr) {
-    mPrimaryBuffer->Release();
-    mPrimaryBuffer = nullptr;
-  }
-  if (mDirectSound != nullptr) {
-    mDirectSound->Release();
-    mDirectSound = nullptr;
-  }
-}
-
-/**
- * Address: 0x00874BD0 (FUN_00874BD0)
- *
- * What it does:
- * Stores a linear volume, capped at 1, as DirectSound attenuation in
- * hundredths of a decibel: `DSBVOLUME_MIN` (-100 dB) for 0 up to 0 for full
- * volume, truncated to a whole unit.
- */
-void moho::CMovieManager::SetVolume(float volume)
-{
-  volume = std::min(1.0f, volume);
-  mVolume = static_cast<float>(static_cast<std::int32_t>(DSBVOLUME_MIN - volume * DSBVOLUME_MIN));
-  moho::sfd::SetVolume(static_cast<long>(mVolume));
-}
 
 /**
  * Address: 0x008C89D0 (FUN_008C89D0, USER_LoadPreferences)
@@ -6014,9 +4342,9 @@ void moho::CMovieManager::SetVolume(float volume)
  * requested preference file with version validation, and falls back to
  * `../Installed.Prefs` defaults when primary loading fails.
  */
-void moho::USER_LoadPreferences(const msvc8::string& preferenceFileName)
+void moho::USER_LoadPreferences(const fa::string& preferenceFileName)
 {
-  msvc8::auto_ptr<CUserPrefs> preferences(new CUserPrefs());
+  fa::auto_ptr<CUserPrefs> preferences(new CUserPrefs());
   bool loadedPrimaryPreferences = false;
 
   wchar_t appDataPath[MAX_PATH]{};
@@ -6049,10 +4377,10 @@ void moho::USER_LoadPreferences(const msvc8::string& preferenceFileName)
     preferencePathWide.push_back(L'\\');
     preferencePathWide.append(gpg::STR_Utf8ToWide(preferenceFileName.c_str()));
 
-    preferences->GetStr1()->assign(preferenceFileName, 0, msvc8::string::npos);
+    preferences->GetStr1()->assign(preferenceFileName, 0, fa::string::npos);
 
-    const msvc8::string preferencePathUtf8 = gpg::STR_WideToUtf8(preferencePathWide.c_str());
-    preferences->GetStr2()->assign(preferencePathUtf8, 0, msvc8::string::npos);
+    const fa::string preferencePathUtf8 = gpg::STR_WideToUtf8(preferencePathWide.c_str());
+    preferences->GetStr2()->assign(preferencePathUtf8, 0, fa::string::npos);
 
     PLAT_RegisterFileForErrorReport(preferencePathWide.c_str());
 
@@ -6062,7 +4390,7 @@ void moho::USER_LoadPreferences(const msvc8::string& preferenceFileName)
         SCR_LuaDoFile(preferences->GetStateMutable(), preferences->GetStr2()->c_str(), preferenceRoot);
 
       if (loadedFromFile) {
-        const msvc8::string versionKey("version.major");
+        const fa::string versionKey("version.major");
         loadedPrimaryPreferences = (preferences->GetInteger(versionKey, 0) == 1);
       }
 
@@ -6090,7 +4418,7 @@ void moho::USER_LoadPreferences(const msvc8::string& preferenceFileName)
     }
   }
 
-  const msvc8::string versionKey("version.major");
+  const fa::string versionKey("version.major");
   preferences->SetInteger(versionKey, 1);
 
   sPreferences = preferences;
@@ -6128,7 +4456,7 @@ void moho::USER_SavePreferences()
     return;
   }
 
-  const msvc8::string* const preferencesPathUtf8 = preferences->GetStr2();
+  const fa::string* const preferencesPathUtf8 = preferences->GetStr2();
   const char* const preferencesPathText = preferencesPathUtf8 != nullptr ? preferencesPathUtf8->c_str() : "";
   const std::wstring preferencesPathWide = gpg::STR_Utf8ToWide(preferencesPathText != nullptr ? preferencesPathText : "");
   const std::wstring temporaryPathWide = preferencesPathWide + L".new";
@@ -6136,12 +4464,15 @@ void moho::USER_SavePreferences()
   std::ofstream outputStream(temporaryPathWide.c_str());
   if (!outputStream.is_open()) {
     const std::wstring warningWide = std::wstring(L"Unable to open preference file: ") + temporaryPathWide;
-    const msvc8::string warningUtf8 = gpg::STR_WideToUtf8(warningWide.c_str());
+    const fa::string warningUtf8 = gpg::STR_WideToUtf8(warningWide.c_str());
     gpg::Warnf("%s", warningUtf8.c_str());
     return;
   }
 
-  SerializePreferenceRootTable(outputStream, preferences->GetPreferenceTable());
+  {
+    const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
+    SerializePreferenceRootTable(outputStream, preferences->GetPreferenceTable());
+  }
 
   if (std::filebuf* const fileBuffer = outputStream.rdbuf(); fileBuffer != nullptr) {
     if (fileBuffer->close() == nullptr) {
@@ -6152,487 +4483,6 @@ void moho::USER_SavePreferences()
   CopyOrReplacePreferenceFile(temporaryPathWide.c_str(), preferencesPathWide.c_str());
 }
 
-/**
- * Address: 0x008C68A0 (FUN_008C68A0)
- * Mangled: ?OPTIONS_GetInt@Moho@@YAHVStrArg@gpg@@@Z
- *
- * What it does:
- * Reads one options value from `/lua/user/prefs.lua:GetOption` and returns it
- * as an integer lane.
- */
-std::int32_t moho::OPTIONS_GetInt(const gpg::StrArg key)
-{
-  // 0x008C68C1-0x008C6939: the option is resolved through the Lua helper, not
-  // read straight off the preference root - `GetOption` looks the key up
-  // inside the *current profile's* `options` table. A direct
-  // `IUserPrefs::GetInteger(key)` used to stand here, which searches the top
-  // level of `Game.prefs` where no option key exists at all, so every engine
-  // option read as 0 (and, in OPTIONS_GetString below, as "") for the whole
-  // session regardless of what the player had configured.
-  try {
-    LuaPlus::LuaState* const state = USER_GetLuaState();
-    LuaPlus::LuaObject prefsModule = SCR_Import(state, kUserPrefsModulePath);
-    LuaPlus::LuaObject getOptionFnObject = prefsModule[kGetOptionMethodName];
-    LuaPlus::LuaFunction<LuaPlus::LuaObject> getOptionFn(getOptionFnObject);
-    LuaPlus::LuaObject optionValue = getOptionFn(key);
-    return optionValue.GetInteger();
-  } catch (const std::exception& exception) {
-    gpg::Warnf(kUserPrefsGetOptionLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
-    return 0;
-  }
-}
-
-/**
- * Address: 0x008C69A0 (FUN_008C69A0)
- * Mangled: ?OPTIONS_GetFloat@Moho@@YAMVStrArg@gpg@@@Z
- *
- * What it does:
- * Invokes `/lua/user/prefs.lua:GetOption(key)` and returns the resulting Lua
- * value as one floating-point lane.
- */
-float moho::OPTIONS_GetFloat(const gpg::StrArg key)
-{
-  try {
-    LuaPlus::LuaState* const state = USER_GetLuaState();
-    LuaPlus::LuaObject prefsModule = SCR_Import(state, kUserPrefsModulePath);
-    LuaPlus::LuaObject getOptionFnObject = prefsModule[kGetOptionMethodName];
-    LuaPlus::LuaFunction<LuaPlus::LuaObject> getOptionFn(getOptionFnObject);
-    LuaPlus::LuaObject optionValue = getOptionFn(key);
-    return optionValue.GetNumber();
-  } catch (const std::exception& exception) {
-    gpg::Warnf(kUserPrefsGetOptionLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
-    return 0.0f;
-  }
-}
-
-/**
- * Address: 0x008C6AB0 (FUN_008C6AB0)
- * Mangled:
- * ?OPTIONS_GetString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@@Z
- *
- * What it does:
- * Reads one options value from `/lua/user/prefs.lua:GetOption` and returns it
- * as an owned `msvc8::string`.
- */
-msvc8::string moho::OPTIONS_GetString(const gpg::StrArg key)
-{
-  // 0x008C6AD9-0x008C6B72: same `/lua/user/prefs.lua:GetOption` bridge as
-  // OPTIONS_GetInt above; the binary takes `LuaObject::GetString()` and builds
-  // the result with an inlined strlen. Reading the preference root directly
-  // instead (what used to be here) never finds an option key, so
-  // `primary_adapter` came back empty and `CScApp` could not tell windowed
-  // mode from a resolution triple - it fell through to the two-head branch
-  // and built the render head at the default size no matter what the player
-  // had chosen.
-  try {
-    LuaPlus::LuaState* const state = USER_GetLuaState();
-    LuaPlus::LuaObject prefsModule = SCR_Import(state, kUserPrefsModulePath);
-    LuaPlus::LuaObject getOptionFnObject = prefsModule[kGetOptionMethodName];
-    LuaPlus::LuaFunction<LuaPlus::LuaObject> getOptionFn(getOptionFnObject);
-    LuaPlus::LuaObject optionValue = getOptionFn(key);
-    const char* const optionText = optionValue.GetString();
-    msvc8::string result;
-    result.assign_owned(optionText != nullptr ? optionText : "");
-    return result;
-  } catch (const std::exception& exception) {
-    gpg::Warnf(kUserPrefsGetOptionLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
-    msvc8::string fallback;
-    fallback.assign_owned("");
-    return fallback;
-  }
-}
-
-/**
- * Address: 0x008C6BF0 (FUN_008C6BF0)
- * Mangled: ?OPTIONS_GetBool@Moho@@YA_NVStrArg@gpg@@@Z
- *
- * What it does:
- * Invokes `/lua/user/prefs.lua:GetOption(key)` and returns the value as one
- * boolean lane; on Lua bridge failure logs a warning and returns `false`.
- */
-bool moho::OPTIONS_GetBool(const gpg::StrArg key)
-{
-  try {
-    LuaPlus::LuaState* const state = USER_GetLuaState();
-    LuaPlus::LuaObject prefsModule = SCR_Import(state, kUserPrefsModulePath);
-    LuaPlus::LuaObject getOptionFnObject = prefsModule[kGetOptionMethodName];
-    LuaPlus::LuaFunction<LuaPlus::LuaObject> getOptionFn(getOptionFnObject);
-    LuaPlus::LuaObject optionValue = getOptionFn(key);
-    return optionValue.GetBoolean();
-  } catch (const std::exception& exception) {
-    gpg::Warnf(kUserPrefsGetOptionLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
-    return false;
-  }
-}
-
-/**
- * Address: 0x008C6CF0 (FUN_008C6CF0)
- * Mangled: ?OPTIONS_Apply@Moho@@YAXXZ
- *
- * What it does:
- * Invokes `/lua/options/optionslogic.lua:Apply(true)` and discards the return
- * object. Lua bridge failures are logged without aborting startup flow.
- */
-void moho::OPTIONS_Apply()
-{
-  try {
-    LuaPlus::LuaState* const state = USER_GetLuaState();
-    LuaPlus::LuaObject optionsModule = SCR_Import(state, kOptionsLogicModulePath);
-    LuaPlus::LuaObject applyFnObject = optionsModule[kApplyMethodName];
-    LuaPlus::LuaFunction<LuaPlus::LuaObject> applyFn(applyFnObject);
-    // 0x008C6D76 `call LuaPlus__LuaFunction__Call_True_Obj`: the single
-    // argument is the boolean `true` - Apply's `startup` flag. Calling it with
-    // no arguments (what used to be here) made `startup` false, and
-    // `/lua/options/options.lua`'s primary_adapter handler is written as
-    //
-    //     set = function(key, value, startup)
-    //         if not startup then ConExecute("SC_PrimaryAdapter " .. value) end
-    //
-    // so every launch re-ran the adapter console command. In windowed mode
-    // that command resizes the frame to `Windows.Main.Previous.width/height`,
-    // a pair of keys nothing in the engine or in lua/ ever writes, so it fell
-    // back to wnd_DefaultCreateWidth/Height and shrank the window to 1024x768
-    // on startup no matter what size the player had saved.
-    LuaPlus::LuaObject callResult = applyFn(true);
-    (void)callResult;
-  } catch (const std::exception& exception) {
-    gpg::Warnf(kOptionsApplyLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
-  }
-}
-
-/**
- * Address: 0x008C6DC0 (FUN_008C6DC0)
- * Mangled: ?OPTIONS_SetCustomData@Moho@@YAXVStrArg@gpg@@ABVLuaObject@LuaPlus@@1@Z
- *
- * What it does:
- * Invokes `/lua/options/optionslogic.lua:SetCustomData` for one option key
- * using `(customData, defaultValue)` Lua object lanes.
- */
-void moho::OPTIONS_SetCustomData(
-  const gpg::StrArg key,
-  const LuaPlus::LuaObject& customData,
-  const LuaPlus::LuaObject& defaultValue
-)
-{
-  try {
-    LuaPlus::LuaState* const state = customData.GetActiveState();
-    LuaPlus::LuaObject optionsModule = SCR_Import(state, kOptionsLogicModulePath);
-    LuaPlus::LuaObject setCustomDataFnObject = optionsModule[kSetCustomDataMethodName];
-    LuaPlus::LuaFunction<LuaPlus::LuaObject> setCustomDataFn(setCustomDataFnObject);
-    LuaPlus::LuaObject callResult = setCustomDataFn(key, customData, defaultValue);
-    (void)callResult;
-  } catch (const std::exception& exception) {
-    gpg::Warnf(kOptionsSetCustomDataLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
-  }
-}
-
-/**
- * Address: 0x008C6EC0 (FUN_008C6EC0)
- * Mangled: ?OPTIONS_CreateInitialProfileIfNeeded@Moho@@YAXVStrArg@gpg@@@Z
- *
- * What it does:
- * Executes `/lua/user/prefs.lua` profile bootstrap:
- * - `ProfilesExist()`
- * - `CreateProfile(profileName)` when profiles are missing.
- */
-void moho::OPTIONS_CreateInitialProfileIfNeeded(const gpg::StrArg profileName)
-{
-  try {
-    LuaPlus::LuaState* const state = USER_GetLuaState();
-    LuaPlus::LuaObject prefsModule = SCR_Import(state, kUserPrefsModulePath);
-    LuaPlus::LuaObject profilesExistFnObject = prefsModule[kProfilesExistMethodName];
-    LuaPlus::LuaFunction<LuaPlus::LuaObject> profilesExistFn(profilesExistFnObject);
-    LuaPlus::LuaObject profilesExistResult = profilesExistFn();
-
-    if (!profilesExistResult.GetBoolean()) {
-      prefsModule = SCR_Import(state, kUserPrefsModulePath);
-      LuaPlus::LuaObject createProfileFnObject = prefsModule[kCreateProfileMethodName];
-      LuaPlus::LuaFunction<LuaPlus::LuaObject> createProfileFn(createProfileFnObject);
-      LuaPlus::LuaObject createProfileResult = createProfileFn(profileName);
-      (void)createProfileResult;
-    }
-  } catch (const std::exception& exception) {
-    gpg::Warnf(kUserPrefsLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
-  }
-}
-
-/**
- * Address: 0x008C7040 (FUN_008C7040)
- * Mangled:
- * ?OPTIONS_GetCurrentProfileName@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
- *
- * What it does:
- * Invokes `/lua/user/prefs.lua:GetCurrentProfile()` and returns the profile
- * `Name` field.
- */
-msvc8::string moho::OPTIONS_GetCurrentProfileName()
-{
-  msvc8::string profileName{};
-  profileName.assign_owned("");
-
-  try {
-    LuaPlus::LuaState* const state = USER_GetLuaState();
-    LuaPlus::LuaObject prefsModule = SCR_Import(state, kUserPrefsModulePath);
-    LuaPlus::LuaObject getCurrentProfileFnObject = prefsModule[kGetCurrentProfileMethodName];
-    LuaPlus::LuaFunction<LuaPlus::LuaObject> getCurrentProfileFn(getCurrentProfileFnObject);
-    LuaPlus::LuaObject currentProfileObject = getCurrentProfileFn();
-    LuaPlus::LuaObject profileNameObject = currentProfileObject[kProfileNameFieldName];
-
-    const char* const profileNameText = profileNameObject.GetString();
-    profileName.assign_owned(profileNameText != nullptr ? profileNameText : "");
-  } catch (const std::exception& exception) {
-    gpg::Warnf(kUserPrefsLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
-  }
-
-  return profileName;
-}
-
-/**
- * Address: 0x008D21E0 (FUN_008D21E0)
- *
- * What it does:
- * Publishes primary-adapter option states and default selection data for the
- * startup options UI.
- */
-void moho::SetupPrimaryAdapterSettings()
-{
-  LuaPlus::LuaState* const state = ResolveStartupLuaState();
-  if (state == nullptr) {
-    return;
-  }
-
-  if (gpg::gal::Device* const device = gpg::gal::Device::GetInstance()) {
-    RefreshFidelitySupportLanes(device->GetDeviceContext());
-  }
-
-  LuaPlus::LuaObject optionRoot = BuildOptionRoot(state);
-  LuaPlus::LuaObject statesTable = optionRoot.GetByName("states");
-
-  if (sAdapterNotCLOverridden != 0) {
-    AddOptionStateString(state, &statesTable, 1, "<LOC OPTIONS_0070>Windowed", kWindowedModeKey);
-
-    msvc8::vector<gpg::gal::HeadAdapterMode> modes = CollectAdapterModes(0);
-    std::int32_t nextStateIndex = 2;
-    const gpg::gal::HeadAdapterMode* const begin = modes.begin();
-    const gpg::gal::HeadAdapterMode* const end = modes.end();
-    if (begin != nullptr && end != nullptr) {
-      for (const gpg::gal::HeadAdapterMode* it = begin; it != end; ++it) {
-        const msvc8::string label = BuildModeLabel(*it);
-        const msvc8::string value = BuildModeKey(*it);
-        AddOptionStateString(state, &statesTable, nextStateIndex, label.c_str(), value.c_str());
-        ++nextStateIndex;
-      }
-    }
-
-    LuaPlus::LuaObject defaultValue(state);
-    defaultValue.AssignString(state, "1024,768,60");
-    OPTIONS_SetCustomData(kPrimaryAdapterKey, optionRoot, defaultValue);
-    return;
-  }
-
-  AddOptionStateString(state, &statesTable, 1, "<LOC _Command_Line_Override>", kCommandLineOverrideModeKey);
-
-  LuaPlus::LuaObject defaultValue(state);
-  defaultValue.AssignString(state, kCommandLineOverrideModeKey);
-  OPTIONS_SetCustomData(kPrimaryAdapterKey, optionRoot, defaultValue);
-}
-
-/**
- * Address: 0x008D26D0 (FUN_008D26D0)
- *
- * What it does:
- * Publishes secondary-adapter option states. When command-line adapter
- * override is active, publishes only the override lane.
- */
-void moho::SetupSecondaryAdapterSettings(const bool adapterNotCommandLineOverridden)
-{
-  LuaPlus::LuaState* const state = ResolveStartupLuaState();
-  if (state == nullptr) {
-    return;
-  }
-
-  LuaPlus::LuaObject optionRoot = BuildOptionRoot(state);
-  LuaPlus::LuaObject statesTable = optionRoot.GetByName("states");
-
-  if (sAdapterNotCLOverridden == 0) {
-    AddOptionStateString(state, &statesTable, 1, "<LOC _Command_Line_Override>", kCommandLineOverrideModeKey);
-
-    LuaPlus::LuaObject defaultValue(state);
-    defaultValue.AssignString(state, kCommandLineOverrideModeKey);
-    OPTIONS_SetCustomData(kSecondaryAdapterKey, optionRoot, defaultValue);
-    return;
-  }
-
-  AddOptionStateString(state, &statesTable, 1, "<LOC _Disabled>", kDisabledModeKey);
-  std::int32_t nextStateIndex = 2;
-
-  if (!adapterNotCommandLineOverridden) {
-    msvc8::vector<gpg::gal::HeadAdapterMode> modes = CollectAdapterModes(1);
-    const gpg::gal::HeadAdapterMode* const begin = modes.begin();
-    const gpg::gal::HeadAdapterMode* const end = modes.end();
-    if (begin != nullptr && end != nullptr) {
-      for (const gpg::gal::HeadAdapterMode* it = begin; it != end; ++it) {
-        const msvc8::string label = BuildModeLabel(*it);
-        const msvc8::string value = BuildModeKey(*it);
-        AddOptionStateString(state, &statesTable, nextStateIndex, label.c_str(), value.c_str());
-        ++nextStateIndex;
-      }
-    }
-  }
-
-  LuaPlus::LuaObject defaultValue(state);
-  defaultValue.AssignString(state, kDisabledModeKey);
-  OPTIONS_SetCustomData(kSecondaryAdapterKey, optionRoot, defaultValue);
-}
-
-/**
- * Address: 0x008D2E20 (FUN_008D2E20)
- *
- * What it does:
- * Publishes fidelity option states and default selection.
- */
-void moho::SetupFidelitySettings()
-{
-  LuaPlus::LuaState* const state = ResolveStartupLuaState();
-  if (state == nullptr) {
-    return;
-  }
-
-  gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-  const gpg::gal::DeviceContext* const context = device != nullptr ? device->GetDeviceContext() : nullptr;
-  RefreshFidelitySupportLanes(context);
-
-  LuaPlus::LuaObject optionRoot = BuildOptionRoot(state);
-  LuaPlus::LuaObject statesTable = optionRoot.GetByName("states");
-
-  AddOptionStateInteger(state, &statesTable, 1, "<LOC _Low>", 0);
-  AddOptionStateInteger(state, &statesTable, 2, "<LOC _Medium>", 1);
-
-  if (graphics_FidelitySupported > 1) {
-    AddOptionStateInteger(state, &statesTable, 3, "<LOC _High>", 2);
-  }
-
-  LuaPlus::LuaObject defaultValue(state);
-  defaultValue.AssignNumber(state, 1.0);
-  OPTIONS_SetCustomData(kFidelityKey, optionRoot, defaultValue);
-}
-
-/**
- * Address: 0x008D3010 (FUN_008D3010)
- *
- * What it does:
- * Publishes shadow-quality option states and default selection.
- */
-void moho::SetupShadowQualitySettings()
-{
-  LuaPlus::LuaState* const state = ResolveStartupLuaState();
-  if (state == nullptr) {
-    return;
-  }
-
-  gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-  const gpg::gal::DeviceContext* const context = device != nullptr ? device->GetDeviceContext() : nullptr;
-  RefreshFidelitySupportLanes(context);
-
-  LuaPlus::LuaObject optionRoot = BuildOptionRoot(state);
-  LuaPlus::LuaObject statesTable = optionRoot.GetByName("states");
-
-  AddOptionStateInteger(state, &statesTable, 1, "<LOC _Off>", 0);
-  AddOptionStateInteger(state, &statesTable, 2, "<LOC _Low>", 1);
-  AddOptionStateInteger(state, &statesTable, 3, "<LOC _Medium>", 2);
-
-  if (shadow_FidelitySupported > 2) {
-    AddOptionStateInteger(state, &statesTable, 4, "<LOC _High>", 3);
-  }
-
-  LuaPlus::LuaObject defaultValue(state);
-  defaultValue.AssignNumber(state, 1.0);
-  OPTIONS_SetCustomData(kShadowQualityKey, optionRoot, defaultValue);
-}
-
-/**
- * Address: 0x008D3250 (FUN_008D3250)
- *
- * What it does:
- * Publishes anti-aliasing option states from active head sample-options list.
- */
-void moho::SetupAntiAliasingSettings()
-{
-  LuaPlus::LuaState* const state = ResolveStartupLuaState();
-  if (state == nullptr) {
-    return;
-  }
-
-  LuaPlus::LuaObject optionRoot = BuildOptionRoot(state);
-  LuaPlus::LuaObject statesTable = optionRoot.GetByName("states");
-  AddOptionStateInteger(state, &statesTable, 1, "<LOC OPTIONS_0029>Off", 0);
-
-  gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-  const gpg::gal::DeviceContext* const context = device != nullptr ? device->GetDeviceContext() : nullptr;
-  if (context != nullptr && context->GetHeadCount() > 0) {
-    const gpg::gal::Head& head = context->GetHead(0);
-    const gpg::gal::HeadSampleOption* const begin = head.mStrs.begin();
-    const gpg::gal::HeadSampleOption* const end = head.mStrs.end();
-    if (begin != nullptr && end != nullptr) {
-      std::int32_t nextStateIndex = 2;
-      for (const gpg::gal::HeadSampleOption* it = begin; it != end; ++it) {
-        const std::uint32_t packedMode = it->sampleType | (it->sampleQuality << 5);
-        AddOptionStateInteger(
-          state, &statesTable, nextStateIndex, it->label.c_str(), static_cast<std::int32_t>(packedMode)
-        );
-        ++nextStateIndex;
-      }
-    }
-  }
-
-  LuaPlus::LuaObject defaultValue(state);
-  defaultValue.AssignNumber(state, 0.0);
-  OPTIONS_SetCustomData(kAntiAliasingKey, optionRoot, defaultValue);
-}
-
-/**
- * Address: 0x008D3FF0 (FUN_008D3FF0, sub_8D3FF0)
- *
- * What it does:
- * Emits one executable build timestamp line to the in-game console.
- */
-namespace moho
-{
-  // Declared in StartupHelpers.h. Derived by Sim::Create_exxt from the loaded
-  // heightmap's sample range and read by RangeRenderer::Init (0x007EE2B8 /
-  // 0x007EE336) and VisionRenderer::Init (0x0081C38A / 0x0081C3C1) when they
-  // build their ring geometry.
-  float patch_maxMapHeight = 0.0f;
-  float patch_minMapHeight = 0.0f;
-
-  void PrintExecutableTimestampToConsole()
-  {
-    CON_Printf("Exe timestamp : %s", "Mon Jun 22 14:06:14 2009");
-  }
-}
-
-/**
- * Address: 0x00874C20 (FUN_00874C20, func_SetupBasicMovieManager)
- *
- * What it does:
- * Creates the movie manager, destroying any previous one first.
- */
-void moho::SetupBasicMovieManager()
-{
-  sMovieManager.reset(new CMovieManager());
-}
-
-/**
- * Address: 0x00874CA0 (FUN_00874CA0)
- *
- * What it does:
- * Destroys the movie manager. `CScApp::Destroy` carries this inline
- * (0x008D0F9C).
- */
-void moho::DestroyMovieManagerSingleton()
-{
-  sMovieManager.reset();
-}
 
 /**
  * Address: 0x00874D30 (FUN_00874D30, `Moho::MOV_GetDuration`)
@@ -6643,7 +4493,10 @@ void moho::DestroyMovieManagerSingleton()
  */
 float moho::MOV_GetDuration(const gpg::StrArg sourcePath)
 {
-  if (sMovieManager.get() == nullptr) {
+  // Engine addition (dedicated-server plan WPL.4): `sMovieManager.get() ==
+  // nullptr`, asked through the client's hook; without a client there is no
+  // movie component.
+  if (sMovieManagerPresent == nullptr || !sMovieManagerPresent()) {
     gpg::Warnf("Movie component not initialized.");
     return 0.0f;
   }
@@ -6651,7 +4504,7 @@ float moho::MOV_GetDuration(const gpg::StrArg sourcePath)
   FILE_EnsureWaitHandleSet();
   FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
 
-  msvc8::string resolvedPath{};
+  fa::string resolvedPath{};
   (void)waitHandleSet->mHandle->FindFile(&resolvedPath, sourcePath, nullptr);
   if (resolvedPath.empty()) {
     gpg::Warnf("Movie file \"%s\" doesn't exist.", sourcePath);
@@ -6673,37 +4526,5 @@ float moho::MOV_GetDuration(const gpg::StrArg sourcePath)
 
   gpg::Warnf("%s is not a valid SFD file.", sourcePath);
   return 0.0f;
-}
-
-/**
- * Address: 0x00874F20 (FUN_00874F20)
- *
- * What it does:
- * Clamps a script volume to [0, 2] and hands it to the movie manager, if
- * there is one. `cfunc_SetMovieVolumeL` (0x00875020) carries this inline.
- */
-void moho::MOV_SetVolume(float volume)
-{
-  volume = std::max(std::min(kMovieVolumeScriptMax, volume), 0.0f);
-  if (CMovieManager* const manager = sMovieManager.get(); manager != nullptr) {
-    manager->SetVolume(volume);
-  }
-}
-
-/**
- * Address: 0x00874F80 (FUN_00874F80)
- *
- * What it does:
- * Returns the movie manager's stored volume, or 1 without a manager.
- * `cfunc_GetMovieVolumeL` (0x00875180) carries this inline.
- *
- * The stored value is DirectSound attenuation (-10000..0), not the 0..2 that
- * `MOV_SetVolume` took, so `GetMovieVolume()` does not return what
- * `SetMovieVolume()` was given. That is the binary's behaviour.
- */
-float moho::MOV_GetVolume()
-{
-  const CMovieManager* const manager = sMovieManager.get();
-  return manager != nullptr ? manager->GetVolume() : 1.0f;
 }
 

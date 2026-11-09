@@ -27,7 +27,7 @@ namespace moho
     mName.myRes = 15u;
     mName.bx.buf[0] = '\0';
 
-    // msvc8::vector's default constructor already null-initialises all three
+    // fa::vector's default constructor already null-initialises all three
     // lanes; the binary's explicit zeroing here IS that constructor inlined.
   }
 
@@ -42,7 +42,7 @@ namespace moho
   CDecalGroup::~CDecalGroup()
   {
     // Free the block and null all three lanes: VC8 _Tidy().
-    mDecals = msvc8::vector<std::int32_t>{};
+    mDecals = fa::vector<std::int32_t>{};
 
     if (mName.myRes >= 0x10u) {
       ::operator delete(mName.bx.ptr);
@@ -69,7 +69,7 @@ namespace moho
    * What it does:
    * Returns mutable access to the group display-name string lane.
    */
-  msvc8::string* CDecalGroup::GetName()
+  fa::string* CDecalGroup::GetName()
   {
     return &mName;
   }
@@ -80,7 +80,7 @@ namespace moho
    * What it does:
    * Duplicate vtable lane for mutable group display-name string access.
    */
-  msvc8::string* CDecalGroup::GetNameAlias()
+  fa::string* CDecalGroup::GetNameAlias()
   {
     return &mName;
   }
@@ -91,7 +91,7 @@ namespace moho
    * What it does:
    * Returns mutable access to the tracked decal-index vector lane.
    */
-  msvc8::vector<std::int32_t>* CDecalGroup::GetDecals()
+  fa::vector<std::int32_t>* CDecalGroup::GetDecals()
   {
     return &mDecals;
   }
@@ -102,7 +102,7 @@ namespace moho
    * What it does:
    * Duplicate vtable lane for mutable tracked decal-index vector access.
    */
-  msvc8::vector<std::int32_t>* CDecalGroup::GetDecalsAlias()
+  fa::vector<std::int32_t>* CDecalGroup::GetDecalsAlias()
   {
     return &mDecals;
   }
@@ -192,7 +192,7 @@ namespace moho
    * What it does:
    * Dispatches slot 7 (`call [vtbl+0x1C]`) to test membership and returns when
    * it reports the index is already tracked; otherwise appends it to `mDecals`
-   * (`sub_686E80`, the `msvc8::vector<std::int32_t>` push_back emission).
+   * (`sub_686E80`, the `fa::vector<std::int32_t>` push_back emission).
    */
   void CDecalGroup::Add(const std::int32_t decalIndex)
   {
@@ -230,7 +230,7 @@ namespace moho
 
     reader.Read(reinterpret_cast<char*>(&mIndex), sizeof(mIndex));
 
-    msvc8::string name;
+    fa::string name;
     reader.ReadString(&name);
     mName = name;
 

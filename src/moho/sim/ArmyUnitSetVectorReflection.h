@@ -14,7 +14,7 @@ namespace gpg
    * - 0x00704B90 / 0x00BFF470 / 0x00BD9C60
    *
    * What it is:
-   * Reflection/indexing adapter for `msvc8::vector<moho::EntitySetTemplate<moho::Unit>>`.
+   * Reflection/indexing adapter for `fa::vector<moho::EntitySetTemplate<moho::Unit>>`.
    */
   template <>
   class RVectorType<moho::EntitySetTemplate<moho::Unit>> final : public gpg::RType, public gpg::RIndexed
@@ -39,7 +39,7 @@ namespace gpg
      * matching the binary's `"%s, size=%d"` formatting of the inherited
      * lexical form.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
 
@@ -50,7 +50,7 @@ namespace gpg
      *
      * What it does:
      * Builds one reflected reference for the `ind`-th element of the
-     * `msvc8::vector<EntitySetTemplate<Unit>>` storage at `obj`
+     * `fa::vector<EntitySetTemplate<Unit>>` storage at `obj`
      * (`&(*storage)[ind]`, matching the binary's own `base + 0x28*ind`
      * stride), via `gpg::MakeUnitSetDerivedRef`.
      */

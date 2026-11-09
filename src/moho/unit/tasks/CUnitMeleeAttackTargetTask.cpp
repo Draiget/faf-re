@@ -1,4 +1,5 @@
 #include "moho/unit/tasks/CUnitMeleeAttackTargetTask.h"
+#include "moho/unit/tasks/TaskThreadWake.h"
 
 #include <cmath>
 #include <cstddef>
@@ -47,85 +48,6 @@ namespace
 {
 
 
-  [[nodiscard]] gpg::RType* CachedCUnitMeleeAttackTargetTaskType()
-  {
-    gpg::RType* type = moho::CUnitMeleeAttackTargetTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitMeleeAttackTargetTask));
-      moho::CUnitMeleeAttackTargetTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCAiTargetType()
-  {
-    gpg::RType* type = moho::CAiTarget::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CAiTarget));
-      moho::CAiTarget::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSOCellPosType()
-  {
-    gpg::RType* type = moho::SOCellPos::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SOCellPos));
-      moho::SOCellPos::sType = type;
-    }
-    return type;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived =
-      dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 
   [[nodiscard]] std::int16_t RoundToCellCoord(const float value) noexcept
   {
@@ -252,41 +174,6 @@ namespace
       (void)unit.RunScript(kOnAssignedFocusEntityScript);
     }
     unit.NeedSyncGameData = true;
-  }
-
-  void WakeOwnerThreadForImmediateTick(moho::CCommandTask* const commandTask)
-  {
-    if (commandTask == nullptr || commandTask->mOwnerThread == nullptr) {
-      return;
-    }
-
-    moho::CTaskThread* const ownerThread = commandTask->mOwnerThread;
-    ownerThread->mPendingFrames = 0;
-    if (ownerThread->mStaged) {
-      ownerThread->Unstage();
-    }
-  }
-
-  void GatherUnitEntitiesAroundPoint(
-    gpg::core::FastVectorN<moho::Entity*, 20>& outEntities,
-    moho::COGrid& ogrid,
-    const Wm3::Vector3f& center,
-    const float radius
-  )
-  {
-    gpg::Rect2f queryRect{};
-    queryRect.x0 = center.x - radius;
-    queryRect.z0 = center.z - radius;
-    queryRect.x1 = center.x + radius;
-    queryRect.z1 = center.z + radius;
-
-    moho::CollisionDBRect collisionRect{};
-    moho::func_Rect2fToInt16(&collisionRect, queryRect);
-    (void)ogrid.mEntityOccupationManager.GatherUnmarkedEntities(
-      outEntities,
-      collisionRect,
-      moho::EEntityType::ENTITYTYPE_Unit
-    );
   }
 
   [[nodiscard]] moho::CUnitCommand* GetCurrentCommand(moho::Unit* const unit) noexcept
@@ -1056,15 +943,14 @@ namespace moho
     CAiReconDBImpl* const reconDb = ownerArmy->GetReconDB();
     const Wm3::Vector3f ownerPosition = ownerUnit->GetPosition();
     const float guardScanRadius = ownerUnit->GetBlueprint()->AI.GuardScanRadius;
-    const float guardScanRadiusSq = guardScanRadius * guardScanRadius;
 
-    gpg::core::FastVectorN<Entity*, 20> nearbyEntities{};
-    GatherUnitEntitiesAroundPoint(nearbyEntities, *ownerUnit->SimulationRef->mOGrid, ownerPosition, guardScanRadius);
+    // 0x00616437: `func_EntitiesAroundPoint`, whose own range test is `r*r > d*d` (0x007224B5).
+    gpg::core::FastVectorN<CollisionResult, 10> nearbyEntities{};
+    EntitiesAroundPoint(nearbyEntities, guardScanRadius, *ownerUnit->SimulationRef->mOGrid, EEntityType::ENTITYTYPE_Unit, ownerPosition);
 
     EntitySetTemplate<Entity> candidateSet{};
-    const int nearbyCount = static_cast<int>(nearbyEntities.end_ - nearbyEntities.start_);
-    for (int index = 0; index < nearbyCount; ++index) {
-      Entity* const candidateEntity = nearbyEntities.start_[index];
+    for (const CollisionResult& nearby : nearbyEntities) {
+      Entity* const candidateEntity = nearby.sourceEntity;
       Unit* const candidateUnit = candidateEntity ? candidateEntity->IsUnit() : nullptr;
       if (candidateUnit == nullptr) {
         continue;
@@ -1088,13 +974,6 @@ namespace moho
       }
 
       if (ownerAttacker != nullptr && !ownerAttacker->CanAttackTarget(&mTarget)) {
-        continue;
-      }
-
-      const Wm3::Vector3f candidatePosition = candidateUnit->GetPosition();
-      const float deltaX = ownerPosition.x - candidatePosition.x;
-      const float deltaZ = ownerPosition.z - candidatePosition.z;
-      if (((deltaX * deltaX) + (deltaZ * deltaZ)) > guardScanRadiusSq) {
         continue;
       }
 
@@ -1385,7 +1264,7 @@ namespace moho
     CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     const gpg::RRef ownerRef{};
 
-    archive->Read(CachedCCommandTaskType(), commandTask, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), commandTask, ownerRef);
     archive->ReadPointer(&mDispatchTask, &ownerRef);
     archive->ReadPointer(&mCommand, &ownerRef);
 
@@ -1393,8 +1272,8 @@ namespace moho
     archive->ReadPointer(&formationBase, &ownerRef);
     mFormation = static_cast<CAiFormationInstance*>(formationBase);
 
-    archive->Read(CachedCAiTargetType(), &mTarget, ownerRef);
-    archive->Read(CachedVector3fType(), &mTargetPosition, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CAiTarget>(), &mTarget, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mTargetPosition, ownerRef);
 
     bool hasMobileTarget = mHasMobileTarget;
     archive->ReadBool(&hasMobileTarget);
@@ -1408,7 +1287,7 @@ namespace moho
     archive->ReadBool(&needsNavigatorGoalUpdate);
     mNeedsNavigatorGoalUpdate = needsNavigatorGoalUpdate;
 
-    archive->Read(CachedSOCellPosType(), &mDestination, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::SOCellPos>(), &mDestination, ownerRef);
 
     bool planted = mPlanted;
     archive->ReadBool(&planted);
@@ -1431,7 +1310,7 @@ namespace moho
     CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     const gpg::RRef ownerRef{};
 
-    archive->Write(CachedCCommandTaskType(), commandTask, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), commandTask, ownerRef);
 
     gpg::RRef pointerRef{};
     (void)gpg::RRef_CCommandTask(&pointerRef, mDispatchTask);
@@ -1443,12 +1322,12 @@ namespace moho
     (void)gpg::RRef_IFormationInstance(&pointerRef, static_cast<IFormationInstance*>(mFormation));
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedCAiTargetType(), &mTarget, ownerRef);
-    archive->Write(CachedVector3fType(), &mTargetPosition, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CAiTarget>(), &mTarget, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mTargetPosition, ownerRef);
     archive->WriteBool(mHasMobileTarget);
     archive->WriteBool(mIgnoreFormationUpdates);
     archive->WriteBool(mNeedsNavigatorGoalUpdate);
-    archive->Write(CachedSOCellPosType(), &mDestination, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::SOCellPos>(), &mDestination, ownerRef);
     archive->WriteBool(mPlanted);
   }
 
@@ -1487,12 +1366,7 @@ namespace gpg
     moho::CUnitMeleeAttackTargetTask* const value
   )
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = MakeDerivedRef(value, CachedCUnitMeleeAttackTargetTaskType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 } // namespace gpg
 

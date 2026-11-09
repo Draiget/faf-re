@@ -22,18 +22,8 @@
 
 namespace
 {
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
 
   moho::CScrLuaInitForm* gSimLuaInitFormPrevStartupLane21 = nullptr;
-  moho::CScrLuaInitForm* gSimLuaInitFormAnchorStartupLane21 = nullptr;
 
   int gRecoveredCScrLuaMetatableFactoryReconBlipIndex = 0;
   int gRecoveredCScrLuaMetatableFactoryEntityIndex = 0;
@@ -233,7 +223,7 @@ namespace moho
   CScrLuaInitForm* register_CollisionBeamEntityLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<CollisionBeamEntity>::Instance(),
       &CScrLuaMetatableFactory<Entity>::Instance(),
       "CollisionBeamEntity",
@@ -252,7 +242,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane23()
   {
     static CScrLuaClassBinder binder(
-      SimLuaInitSet(), "moho.entity_methods", &CScrLuaMetatableFactory<Entity>::Instance(), "Entity", ""
+      moho::SCR_SimLuaInitSet(), "moho.entity_methods", &CScrLuaMetatableFactory<Entity>::Instance(), "Entity", ""
     );
     return &binder;
   }
@@ -266,7 +256,7 @@ namespace moho
   CScrLuaInitForm* register_moho_MotorFallDown()
   {
     static CScrLuaClassBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       "moho.MotorFallDown",
       &CScrLuaMetatableFactory<MotorFallDown>::Instance(),
       "MotorFallDown",
@@ -285,7 +275,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane25()
   {
     static CScrLuaClassBinder binder(
-      SimLuaInitSet(), "moho.projectile_methods", &CScrLuaMetatableFactory<Projectile>::Instance(), "Projectile", ""
+      moho::SCR_SimLuaInitSet(), "moho.projectile_methods", &CScrLuaMetatableFactory<Projectile>::Instance(), "Projectile", ""
     );
     return &binder;
   }
@@ -299,7 +289,7 @@ namespace moho
   CScrLuaInitForm* register_ProjectileLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<Projectile>::Instance(),
       &CScrLuaMetatableFactory<Entity>::Instance(),
       "Projectile",
@@ -318,7 +308,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane27()
   {
     static CScrLuaClassBinder binder(
-      SimLuaInitSet(), "moho.unit_methods", &CScrLuaMetatableFactory<Unit>::Instance(), "Unit", ""
+      moho::SCR_SimLuaInitSet(), "moho.unit_methods", &CScrLuaMetatableFactory<Unit>::Instance(), "Unit", ""
     );
     return &binder;
   }
@@ -335,7 +325,7 @@ namespace moho
   CScrLuaInitForm* register_UnitLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<Unit>::Instance(),
       &CScrLuaMetatableFactory<Entity>::Instance(),
       "Unit",
@@ -379,7 +369,7 @@ namespace moho
   CScrLuaInitForm* register_PropLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<Prop>::Instance(),
       &CScrLuaMetatableFactory<Entity>::Instance(),
       "Prop",
@@ -398,7 +388,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane30()
   {
     static CScrLuaClassBinder binder(
-      SimLuaInitSet(), "moho.prop_methods", &CScrLuaMetatableFactory<Prop>::Instance(), "Prop", ""
+      moho::SCR_SimLuaInitSet(), "moho.prop_methods", &CScrLuaMetatableFactory<Prop>::Instance(), "Prop", ""
     );
     return &binder;
   }
@@ -524,71 +514,6 @@ namespace moho
     return ForwardSimStartupLuaThunk<&func_GetUnitByIdSim_LuaFuncDef>();
   }
 
-  /**
-   * Address: 0x00BE4D10 (FUN_00BE4D10, register_ClearBuildTemplates_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards startup thunk into `func_ClearBuildTemplates_LuaFuncDef`.
-   */
-  CScrLuaInitForm* register_ClearBuildTemplates_LuaFuncDef()
-  {
-    return ForwardSimStartupLuaThunk<&func_ClearBuildTemplates_LuaFuncDef>();
-  }
-
-  /**
-   * Address: 0x00BE4D20 (FUN_00BE4D20, j_func_RenderOverlayMilitary_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards startup thunk into `func_RenderOverlayMilitary_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_RenderOverlayMilitary_LuaFuncDef()
-  {
-    return ForwardSimStartupLuaThunk<&func_RenderOverlayMilitary_LuaFuncDef>();
-  }
-
-  /**
-   * Address: 0x00BE4D30 (FUN_00BE4D30, register_RenderOverlayIntel_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards startup thunk into `func_RenderOverlayIntel_LuaFuncDef`.
-   */
-  CScrLuaInitForm* register_RenderOverlayIntel_LuaFuncDef()
-  {
-    return ForwardSimStartupLuaThunk<&func_RenderOverlayIntel_LuaFuncDef>();
-  }
-
-  /**
-   * Address: 0x00BE4D40 (FUN_00BE4D40, register_RenderOverlayEconomy_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards startup thunk into `func_RenderOverlayEconomy_LuaFuncDef`.
-   */
-  CScrLuaInitForm* register_RenderOverlayEconomy_LuaFuncDef()
-  {
-    return ForwardSimStartupLuaThunk<&func_RenderOverlayEconomy_LuaFuncDef>();
-  }
-
-  /**
-   * Address: 0x00BE4D50 (FUN_00BE4D50, j_func_TeamColorModeUser_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards startup thunk into `func_TeamColorMode_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_TeamColorModeUser_LuaFuncDef()
-  {
-    return ForwardSimStartupLuaThunk<&func_TeamColorMode_LuaFuncDef>();
-  }
-
-  /**
-   * Address: 0x00BE4D60 (FUN_00BE4D60, register_GetUnitByIdUser_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards startup thunk into `func_GetUnitByIdUser_LuaFuncDef`.
-   */
-  CScrLuaInitForm* register_GetUnitByIdUser_LuaFuncDef()
-  {
-    return ForwardSimStartupLuaThunk<&func_GetUnitByIdUser_LuaFuncDef>();
-  }
 
   /**
    * Address: 0x00BDBF00 (FUN_00BDBF00, register_SimConExecute_LuaFuncDef)
@@ -901,7 +826,7 @@ namespace moho
   CScrLuaInitForm* register_moho_weapon_methods()
   {
     static CScrLuaClassBinder binder(
-      SimLuaInitSet(), "moho.weapon_methods", &CScrLuaMetatableFactory<UnitWeapon>::Instance(), "UnitWeapon", ""
+      moho::SCR_SimLuaInitSet(), "moho.weapon_methods", &CScrLuaMetatableFactory<UnitWeapon>::Instance(), "UnitWeapon", ""
     );
     return &binder;
   }
@@ -916,7 +841,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_reconBlipAnchorA()
   {
     static CScrLuaClassBinder binder(
-      SimLuaInitSet(), "moho.blip_methods", &CScrLuaMetatableFactory<ReconBlip>::Instance(), "ReconBlip", ""
+      moho::SCR_SimLuaInitSet(), "moho.blip_methods", &CScrLuaMetatableFactory<ReconBlip>::Instance(), "ReconBlip", ""
     );
     return &binder;
   }
@@ -930,7 +855,7 @@ namespace moho
   CScrLuaInitForm* register_ReconBlipLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<ReconBlip>::Instance(),
       &CScrLuaMetatableFactory<Entity>::Instance(),
       "ReconBlip",
@@ -1119,10 +1044,6 @@ namespace
       (void)::moho::register_IsGameOver_LuaFuncDef();
       (void)::moho::register_GetEntityById_LuaFuncDef();
       (void)::moho::register_GetUnitByIdSim_LuaFuncDef();
-      (void)::moho::register_ClearBuildTemplates_LuaFuncDef();
-      (void)::moho::register_RenderOverlayIntel_LuaFuncDef();
-      (void)::moho::register_RenderOverlayEconomy_LuaFuncDef();
-      (void)::moho::register_GetUnitByIdUser_LuaFuncDef();
       (void)::moho::register_SimConExecute_LuaFuncDef();
       (void)::moho::register_FlattenMapRect_LuaFuncDef();
       (void)::moho::register_EntityCategoryContains_LuaFuncDef();

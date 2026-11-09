@@ -114,15 +114,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RType* CachedBroadcasterEAiNavigatorEventType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Broadcaster<EAiNavigatorEvent>));
-    }
-    return cached;
-  }
-
   struct NavigatorGlueTailWord
   {
     std::uint8_t pad00[0xA8];
@@ -267,25 +258,6 @@ namespace
   // `gpg::RType::~RType()`, which already frees `bases_`/`fields_` in typed
   // form.
 
-  [[nodiscard]] gpg::RType* CachedCAiNavigatorImplTypeForUpcast()
-  {
-    gpg::RType* type = moho::CAiNavigatorImpl::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CAiNavigatorImpl));
-      moho::CAiNavigatorImpl::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedListenerEAiNavigatorEventTypeForUpcast()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Listener<moho::EAiNavigatorEvent>));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x005A8970 (FUN_005A8970)
    *
@@ -299,7 +271,7 @@ namespace
       return nullptr;
     }
 
-    return gpg::REF_UpcastPtr(*source, CachedCAiNavigatorImplTypeForUpcast()).mObj;
+    return gpg::REF_UpcastPtr(*source, gpg::RTypeOf<moho::CAiNavigatorImpl>()).mObj;
   }
 
   /**
@@ -315,7 +287,7 @@ namespace
       return nullptr;
     }
 
-    return gpg::REF_UpcastPtr(*source, CachedListenerEAiNavigatorEventTypeForUpcast()).mObj;
+    return gpg::REF_UpcastPtr(*source, gpg::RTypeOf<moho::Listener<moho::EAiNavigatorEvent>>()).mObj;
   }
 
   /**
@@ -340,7 +312,7 @@ namespace
  */
 const char* moho::RBroadcasterRType_EAiNavigatorEvent::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("Broadcaster<%s>", ResolveEAiNavigatorEventType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("Broadcaster<%s>", ResolveEAiNavigatorEventType()->GetName());
   return sName.c_str();
 }
 
@@ -414,7 +386,7 @@ void moho::RBroadcasterRType_EAiNavigatorEvent::SerSave(
  */
 const char* moho::RListenerRType_EAiNavigatorEvent::GetName() const
 {
-  static const msvc8::string sName = gpg::STR_Printf("Listener<%s>", ResolveEAiNavigatorEventType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("Listener<%s>", ResolveEAiNavigatorEventType()->GetName());
   return sName.c_str();
 }
 
@@ -638,12 +610,7 @@ namespace
     const SOCellPos* sourceEnd
   ) noexcept
   {
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationEnd;
-      *destinationEnd = *sourceEnd;
-    }
-    return destinationEnd;
+    return std::copy_backward(sourceBegin, sourceEnd, destinationEnd);
   }
 
   /**
@@ -753,7 +720,7 @@ namespace
    * What it does:
    * Alias lane for storing one 32-bit value through an output pointer.
    */
-  [[nodiscard]] std::uint32_t* StoreDwordValueAlias(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreDwordValueAlias(
     std::uint32_t* const destination,
     const std::uint32_t value
   ) noexcept
@@ -768,7 +735,7 @@ namespace
    * Secondary alias lane for storing one 32-bit value through an output
    * pointer.
    */
-  [[nodiscard]] std::uint32_t* StoreDwordValueAlias2(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreDwordValueAlias2(
     std::uint32_t* const destination,
     const std::uint32_t value
   ) noexcept
@@ -793,7 +760,7 @@ namespace
    * What it does:
    * Alias lane for loading one 32-bit value from a source pointer.
    */
-  [[nodiscard]] std::uint32_t LoadDwordValueAlias(const std::uint32_t* const source) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint32_t LoadDwordValueAlias(const std::uint32_t* const source) noexcept
   {
     return LoadDwordValue(source);
   }
@@ -804,7 +771,7 @@ namespace
    * What it does:
    * Secondary alias lane for loading one 32-bit value from a source pointer.
    */
-  [[nodiscard]] std::uint32_t LoadDwordValueAlias2(const std::uint32_t* const source) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint32_t LoadDwordValueAlias2(const std::uint32_t* const source) noexcept
   {
     return LoadDwordValue(source);
   }
@@ -816,7 +783,7 @@ namespace
    * Reads one stored 32-bit base value, advances it by `index * 4`, and writes
    * the adjusted value to the destination pointer.
    */
-  [[nodiscard]] std::uint32_t* AdvanceStoredDwordValue(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* AdvanceStoredDwordValue(
     std::uint32_t* const destination,
     const std::uint32_t* const source,
     const std::uint32_t index
@@ -835,7 +802,7 @@ namespace
    * Loads the third 32-bit lane from a source array and stores it through the
    * destination pointer.
    */
-  [[nodiscard]] std::uint32_t* LoadThirdDword(
+  [[maybe_unused]] [[nodiscard]] std::uint32_t* LoadThirdDword(
     std::uint32_t* const destination,
     const std::uint32_t* const source
   ) noexcept
@@ -916,7 +883,7 @@ namespace
    * Zero-length fill bridge that preserves the legacy no-op call shape used by
    * the caller thunk lane.
    */
-  [[nodiscard]] std::uint32_t FillZeroCellsBridge(SOCellPos* const destination) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint32_t FillZeroCellsBridge(SOCellPos* const destination) noexcept
   {
     const SOCellPos zeroCell{};
     return FillCellsWithValue(0u, zeroCell, destination);
@@ -929,7 +896,7 @@ namespace
    * Zero-length copy bridge that preserves the legacy null-tolerant forward
    * copy call shape.
    */
-  [[nodiscard]] SOCellPos* CopyZeroCellRangeBridge(SOCellPos* const destination) noexcept
+  [[maybe_unused]] [[nodiscard]] SOCellPos* CopyZeroCellRangeBridge(SOCellPos* const destination) noexcept
   {
     return CopyCellsForwardAllowNull(destination, nullptr, nullptr);
   }
@@ -940,7 +907,7 @@ namespace
    * What it does:
    * Secondary zero-length copy bridge for the same null-tolerant lane.
    */
-  [[nodiscard]] SOCellPos* CopyZeroCellRangeBridge2(SOCellPos* const destination) noexcept
+  [[maybe_unused]] [[nodiscard]] SOCellPos* CopyZeroCellRangeBridge2(SOCellPos* const destination) noexcept
   {
     return CopyCellsForwardAllowNull(destination, nullptr, nullptr);
   }
@@ -951,7 +918,7 @@ namespace
    * What it does:
    * Extracts the high byte from one 32-bit packed lane value.
    */
-  [[nodiscard]] std::uint8_t ExtractArgumentHighByte(const std::uint32_t value) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint8_t ExtractArgumentHighByte(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
   }
@@ -1060,7 +1027,6 @@ void SNavPath::FreeStorage() noexcept
   if (start) {
     ::operator delete(start);
   }
-  reserved0 = 0;
   start = nullptr;
   finish = nullptr;
   capacity = nullptr;
@@ -1297,11 +1263,7 @@ void IAiNavigator::MemberDeserialize(gpg::ReadArchive* const archive)
   }
 
   const gpg::RRef ownerRef{};
-  archive->Read(
-    CachedBroadcasterEAiNavigatorEventType(),
-    this ? static_cast<void*>(static_cast<Broadcaster<EAiNavigatorEvent>*>(this)) : nullptr,
-    ownerRef
-  );
+  archive->Read(gpg::RTypeOf<Broadcaster<EAiNavigatorEvent>>(), static_cast<Broadcaster<EAiNavigatorEvent>*>(this), ownerRef);
 }
 
 /**
@@ -1319,9 +1281,7 @@ void IAiNavigator::MemberSerialize(gpg::WriteArchive* const archive) const
 
   const gpg::RRef ownerRef{};
   archive->Write(
-    CachedBroadcasterEAiNavigatorEventType(),
-    this ? static_cast<const void*>(static_cast<const Broadcaster<EAiNavigatorEvent>*>(this)) : nullptr,
-    ownerRef
+    gpg::RTypeOf<Broadcaster<EAiNavigatorEvent>>(), static_cast<const Broadcaster<EAiNavigatorEvent>*>(this), ownerRef
   );
 }
 

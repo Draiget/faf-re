@@ -1,4 +1,6 @@
+#include "moho/lua/ScrLuaUserData.h"
 #include "moho/serialization/CPrefetchSet.h"
+#include "moho/lua/CScrLuaInitForm.h"
 
 #include <new>
 #include <typeinfo>
@@ -17,20 +19,6 @@ namespace
     "CPrefetchSet:Update({d3d_textures=..., batch_textures=..., models=..., anims=...})";
   constexpr const char* kPrefetchSetResetHelpText = "CPrefetchSet:Reset()";
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Core"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Core");
-    return sSet;
-  }
-
   template <moho::CScrLuaInitForm* (*Target)()>
   [[nodiscard]] moho::CScrLuaInitForm* ForwardPrefetchSetLuaRegistrationThunk() noexcept
   {
@@ -40,30 +28,6 @@ namespace
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  /**
-   * The reflected reference is assembled from the userdata HEADER, not read out
-   * of its payload. This fork carries the `gpg::RType*` in `Udata::len`, and the
-   * value itself starts one header past the allocation, which is exactly what
-   * `LuaPlus::LuaObject::GetUserData` (0x00907540) does:
-   *
-   *     lea edx, [ecx+10h]   ; mObj  = payload, laid out after the header
-   *     mov ecx, [ecx+0Ch]   ; mType = Udata::len reinterpreted as RType*
-   *
-   * Reading `*(gpg::RRef*)lua_touserdata(...)` instead - as this helper used to -
-   * takes the first eight payload bytes as if they were a reference. For a
-   * `_c_object` slot those bytes are the `CScriptObject*` value followed by
-   * whatever the allocator left, so every upcast failed and each caller reported
-   * "Expected a game object" for a perfectly good object.
-   */
-  [[nodiscard]] gpg::RRef ExtractUserDataRef(const LuaPlus::LuaObject& userDataObject)
-  {
-    if (!userDataObject.IsUserData()) {
-      return gpg::RRef{};
-    }
-
-    return userDataObject.GetUserData();
   }
 
   /**
@@ -117,7 +81,7 @@ namespace moho
    */
   void CPrefetchSet::Update(LuaPlus::LuaObject prefetchTable, LuaPlus::LuaState* const state)
   {
-    msvc8::vector<PrefetchHandleBase> nextHandles{};
+    fa::vector<PrefetchHandleBase> nextHandles{};
 
     LuaPlus::LuaTableIterator kindIterator(&prefetchTable, 1);
     while (!kindIterator.m_isDone) {
@@ -218,7 +182,7 @@ namespace moho
       return nullptr;
     }
 
-    const gpg::RRef userDataRef = ExtractUserDataRef(payload);
+    const gpg::RRef userDataRef = moho::SCR_UserDataRef(payload);
     return TryUpcastCPrefetchSetOrThrow(userDataRef);
   }
 
@@ -252,7 +216,7 @@ namespace moho
   CScrLuaInitForm* func_CreatePrefetchSet_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "CreatePrefetchSet",
       &cfunc_CreatePrefetchSet,
       nullptr,
@@ -311,7 +275,7 @@ namespace moho
   CScrLuaInitForm* func_CPrefetchSetUpdate_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "Update",
       &cfunc_CPrefetchSetUpdate,
       &CScrLuaMetatableFactory<CPrefetchSet>::Instance(),
@@ -369,7 +333,7 @@ namespace moho
   CScrLuaInitForm* func_CPrefetchSetReset_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "Reset",
       &cfunc_CPrefetchSetReset,
       &CScrLuaMetatableFactory<CPrefetchSet>::Instance(),
@@ -453,7 +417,7 @@ namespace
   const CPrefetchSetLuaFuncDefBootstrap gCPrefetchSetLuaFuncDefBootstrap{};
 
   moho::CScrLuaClassBinder gPrefetchSetClassBinder(
-    CoreLuaInitSet(),
+    moho::SCR_CoreLuaInitSet(),
     "moho.CPrefetchSet",
     &moho::CScrLuaMetatableFactory<moho::CPrefetchSet>::Instance(),
     "CPrefetchSet",

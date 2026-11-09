@@ -9,6 +9,7 @@
 #include "gpg/core/reflection/SerializationError.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/ai/CAiReconDBImplTypeInfo.h"
+#include "moho/command/SSTITarget.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityFastVectorReflection.h"
 #include "moho/sim/CArmyImpl.h"
@@ -95,7 +96,7 @@ void SReconKey::MemberDeserialize(gpg::ReadArchive* const archive)
 {
   const gpg::RRef ownerRef{};
   archive->Read(gpg::RTypeOf<WeakPtr<Entity>>(), &sourceEntity, ownerRef);
-  archive->Read(gpg::RTypeOf<EntId>(), &sourceEntityId, ownerRef);
+  archive->Read(gpg::RTypeOf<EntIdValue>(), &sourceEntityId, ownerRef);
 }
 
 /**
@@ -105,7 +106,7 @@ void SReconKey::MemberSerialize(gpg::WriteArchive* const archive) const
 {
   const gpg::RRef ownerRef{};
   archive->Write(gpg::RTypeOf<WeakPtr<Entity>>(), &sourceEntity, ownerRef);
-  archive->Write(gpg::RTypeOf<EntId>(), &sourceEntityId, ownerRef);
+  archive->Write(gpg::RTypeOf<EntIdValue>(), &sourceEntityId, ownerRef);
 }
 
 /**
@@ -157,8 +158,8 @@ namespace moho
     const gpg::RRef ownerRef{};
     archive->Read(gpg::RTypeOf<ReconBlipMap>(), &mBlipMap, ownerRef);
     RECON_DropBlipIndex(this); // engine addition, sim_ReconBlipIndex
-    archive->Read(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &mBblips, ownerRef);
-    archive->Read(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &mTempBlips, ownerRef);
+    archive->Read(gpg::RTypeOf<fa::vector<ReconBlip*>>(), &mBblips, ownerRef);
+    archive->Read(gpg::RTypeOf<fa::vector<ReconBlip*>>(), &mTempBlips, ownerRef);
     archive->ReadPointer(&mArmy, &ownerRef);
     archive->ReadPointer(&mMapData, &ownerRef);
     archive->ReadPointer(&mSim, &ownerRef);
@@ -185,8 +186,8 @@ namespace moho
   {
     const gpg::RRef ownerRef{};
     archive->Write(gpg::RTypeOf<ReconBlipMap>(), &mBlipMap, ownerRef);
-    archive->Write(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &mBblips, ownerRef);
-    archive->Write(gpg::RTypeOf<msvc8::vector<ReconBlip*>>(), &mTempBlips, ownerRef);
+    archive->Write(gpg::RTypeOf<fa::vector<ReconBlip*>>(), &mBblips, ownerRef);
+    archive->Write(gpg::RTypeOf<fa::vector<ReconBlip*>>(), &mTempBlips, ownerRef);
     archive->WritePointer(mArmy, gpg::TrackedPointerState::Unowned, ownerRef);
     archive->WritePointer(mMapData, gpg::TrackedPointerState::Unowned, ownerRef);
     archive->WritePointer(mSim, gpg::TrackedPointerState::Unowned, ownerRef);

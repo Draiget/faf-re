@@ -20,7 +20,7 @@ namespace moho
   struct SSaveGameDispatchData
   {
     bool useSuggestedName = false;
-    msvc8::string saveName;
+    fa::string saveName;
   };
   static_assert(
     offsetof(SSaveGameDispatchData, saveName) == 0x4, "SSaveGameDispatchData::saveName offset must be 0x4"
