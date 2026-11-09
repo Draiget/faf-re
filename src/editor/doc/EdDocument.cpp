@@ -361,6 +361,7 @@ namespace faf::editor
     mRedoOrder.clear();
     mHeights.ClearRedo();
     mMaskHistory.ClearRedo();
+    mLayerRedo.clear();
   }
 
   bool EdDocument::PopUndo(EditKind& kind)
@@ -708,6 +709,8 @@ namespace faf::editor
     mMaskHistory.Reset(0, 0);
     mUndoOrder.clear();
     mRedoOrder.clear();
+    mLayerUndo.clear();
+    mLayerRedo.clear();
     mFileRecords = {};
     mSaveTarget.clear();
     mModified = false;

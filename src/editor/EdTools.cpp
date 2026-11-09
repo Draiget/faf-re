@@ -492,12 +492,149 @@ namespace faf::editor
     }
   }
 
+  void EdTools::DrawLayerSlots()
+  {
+    SectionHeader("LAYERS");
+    if (mSlots.size() != 10) {
+      Note("Open a map to see its layers.");
+      return;
+    }
+    mLibrary.Pump(3);
+    static const char* const kSlotNames[10] = {"Lower", "1", "2", "3", "4", "5", "6", "7", "8", "Upper"};
+    const float thumb = ImGui::GetFrameHeight() * 1.6f;
+    for (int slot = 0; slot < 10; ++slot) {
+      LayerSlot& layer = mSlots[static_cast<std::size_t>(slot)];
+      ImGui::PushID(slot);
+      const std::uint64_t image = mLibrary.Thumbnail(layer.albedo);
+      const ImVec2 at = ImGui::GetCursorScreenPos();
+      if (image != 0U) {
+        ImGui::Image(static_cast<ImTextureID>(image), ImVec2(thumb, thumb));
+      } else {
+        ImGui::Dummy(ImVec2(thumb, thumb));
+        ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + thumb, at.y + thumb), IM_COL32(58, 65, 75, 255));
+      }
+      if (ImGui::IsItemClicked()) {
+        mBrowseSlot = slot;
+        mBrowseOpen = true;
+      }
+      ImGui::SameLine();
+      ImGui::BeginGroup();
+      ImGui::Text("%s  %s", kSlotNames[slot], LayerTextureName(layer.albedo).c_str());
+      if (ImGui::IsItemHovered() && !layer.albedo.empty()) {
+        ImGui::SetTooltip("%s\n%s", layer.albedo.c_str(), layer.normals.empty() ? "(no normal map)" : layer.normals.c_str());
+      }
+      ImGui::SetNextItemWidth(-1.0f);
+      float size = layer.albedoSize;
+      if (ImGui::DragFloat("##size", &size, 0.05f, 0.1f, 1024.0f, "Size %.2f") && size > 0.0f) {
+        // Albedo and normal map keep their ratio (most maps have them equal).
+        const float ratio = layer.albedoSize > 0.0f ? layer.normalsSize / layer.albedoSize : 1.0f;
+        mChangedSlot = slot;
+        mChangedValue = layer;
+        mChangedValue.albedoSize = size;
+        mChangedValue.normalsSize = size * ratio;
+      }
+      ImGui::EndGroup();
+      ImGui::PopID();
+    }
+    Note("Click a thumbnail to choose its texture.");
+    DrawTextureBrowser();
+  }
+
+  void EdTools::DrawTextureBrowser()
+  {
+    constexpr const char* kTitle = "Layer textures";
+    if (mBrowseOpen) {
+      mBrowseOpen = false;
+      ImGui::OpenPopup(kTitle);
+    }
+    ImGui::SetNextWindowSize(ImVec2(760.0f, 560.0f), ImGuiCond_FirstUseEver);
+    if (!ImGui::BeginPopupModal(kTitle, nullptr)) {
+      return;
+    }
+    ImGui::Text("Layer %s", mBrowseSlot == 0 ? "Lower" : (mBrowseSlot == 9 ? "Upper" : std::to_string(mBrowseSlot).c_str()));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(260.0f);
+    ImGui::InputTextWithHint("##filter", "search name or biome", mBrowseFilter, sizeof(mBrowseFilter));
+    ImGui::SameLine();
+    if (mBrowseSlot >= 1 && mBrowseSlot <= 8 && ImGui::Button("Empty")) {
+      mChangedSlot = mBrowseSlot;
+      mChangedValue = mSlots[static_cast<std::size_t>(mBrowseSlot)];
+      mChangedValue.albedo.clear();
+      mChangedValue.normals.clear();
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+      ImGui::CloseCurrentPopup();
+    }
+    std::string filter = mBrowseFilter;
+    for (char& c : filter) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    if (ImGui::BeginChild("##grid", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
+      const float cell = 96.0f;
+      const int columns = std::max(1, static_cast<int>(ImGui::GetContentRegionAvail().x / (cell + 8.0f)));
+      int shown = 0;
+      std::string biome;
+      for (const LayerTexture& texture : mLibrary.Textures()) {
+        std::string key = texture.biome + "/" + texture.name;
+        for (char& c : key) {
+          c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        if (!filter.empty() && key.find(filter) == std::string::npos) {
+          continue;
+        }
+        if (texture.biome != biome) {
+          biome = texture.biome;
+          shown = 0;
+          ImGui::SeparatorText(biome.c_str());
+        }
+        if (shown % columns != 0) {
+          ImGui::SameLine();
+        }
+        ++shown;
+        ImGui::PushID(texture.path.c_str());
+        ImGui::BeginGroup();
+        const std::uint64_t image = mLibrary.Thumbnail(texture.path);
+        bool picked = false;
+        if (image != 0U) {
+          picked = ImGui::ImageButton("##pick", static_cast<ImTextureID>(image), ImVec2(cell, cell));
+        } else {
+          picked = ImGui::Button("...", ImVec2(cell + 6.0f, cell + 6.0f));
+        }
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + cell);
+        ImGui::TextUnformatted(texture.name.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::EndGroup();
+        if (ImGui::IsItemHovered()) {
+          ImGui::SetTooltip("%s\n%s", texture.path.c_str(), texture.normals.empty() ? "(no normal map beside it)" : texture.normals.c_str());
+        }
+        if (picked && mBrowseSlot >= 0 && mBrowseSlot < static_cast<int>(mSlots.size())) {
+          mChangedSlot = mBrowseSlot;
+          mChangedValue = mSlots[static_cast<std::size_t>(mBrowseSlot)];
+          mChangedValue.albedo = texture.path;
+          if (!texture.normals.empty()) {
+            mChangedValue.normals = texture.normals;
+          }
+          ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopID();
+      }
+    }
+    ImGui::EndChild();
+    mLibrary.Pump(6);
+    ImGui::EndPopup();
+  }
+
   void EdTools::DrawTexture()
   {
-    SectionHeader("LAYER");
+    DrawLayerSlots();
+    SectionHeader("PAINT LAYER");
     // Strata 1-8 have masks; the lower layer is under everything and the upper one is blended by its alpha.
     for (int layer = 0; layer < 8; ++layer) {
-      const std::string path = static_cast<std::size_t>(layer + 1) < mLayerNames.size() ? mLayerNames[static_cast<std::size_t>(layer + 1)] : "";
+      // The slots as the terrain has them now (a swapped texture shows at once), else the names read at open.
+      const std::string path = mSlots.size() == 10 ? mSlots[static_cast<std::size_t>(layer + 1)].albedo
+                               : static_cast<std::size_t>(layer + 1) < mLayerNames.size() ? mLayerNames[static_cast<std::size_t>(layer + 1)] : "";
       char label[160];
       (void)std::snprintf(label, sizeof(label), "%d  %s##layer%d", layer + 1, LayerLabel(path).c_str(), layer);
       if (ImGui::Selectable(label, mMaskLayer == layer)) {
@@ -507,7 +644,9 @@ namespace faf::editor
         ImGui::SetTooltip("%s", path.c_str());
       }
     }
-    if (!mLayerNames.empty()) {
+    if (mSlots.size() == 10) {
+      ImGui::TextDisabled("Under all: %s", LayerLabel(mSlots.front().albedo).c_str());
+    } else if (!mLayerNames.empty()) {
       ImGui::TextDisabled("Under all: %s", LayerLabel(mLayerNames.front()).c_str());
     }
     SectionHeader("BRUSH");

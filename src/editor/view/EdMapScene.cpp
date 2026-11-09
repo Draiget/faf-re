@@ -350,7 +350,7 @@ namespace faf::editor
     if (mMap == nullptr || mPainting || mPaintingMask || !mDocument.PopUndo(kind)) {
       return false;
     }
-    const bool done = kind == EdDocument::EditKind::Masks ? UndoMasks(false) : UndoHeights(false);
+    const bool done = kind == EdDocument::EditKind::Masks ? UndoMasks(false) : (kind == EdDocument::EditKind::Layers ? UndoLayers(false) : UndoHeights(false));
     if (done) {
       mDocument.PushRedo(kind);
     }
@@ -363,11 +363,119 @@ namespace faf::editor
     if (mMap == nullptr || mPainting || mPaintingMask || !mDocument.PopRedo(kind)) {
       return false;
     }
-    const bool done = kind == EdDocument::EditKind::Masks ? UndoMasks(true) : UndoHeights(true);
+    const bool done = kind == EdDocument::EditKind::Masks ? UndoMasks(true) : (kind == EdDocument::EditKind::Layers ? UndoLayers(true) : UndoHeights(true));
     if (done) {
       mDocument.PushUndo(kind);
     }
     return done;
+  }
+
+  namespace
+  {
+    /** Slot `slot`'s albedo (or normal map) material: lower, strata 0-7, upper. */
+    moho::CStratumMaterial& SlotMaterial(moho::StratumMaterial& strata, const int slot, const bool normals)
+    {
+      moho::CStratumMaterial* const albedo[10] = {
+        &strata.mLowerAlbedoTexture,    &strata.mStratum0AlbedoTexture, &strata.mStratum1AlbedoTexture, &strata.mStratum2AlbedoTexture,
+        &strata.mStratum3AlbedoTexture, &strata.mStratum4AlbedoTexture, &strata.mStratum5AlbedoTexture, &strata.mStratum6AlbedoTexture,
+        &strata.mStratum7AlbedoTexture, &strata.mUpperAlbedoTexture,
+      };
+      moho::CStratumMaterial* const normal[10] = {
+        &strata.mLowerNormalTexture,    &strata.mStratum0NormalTexture, &strata.mStratum1NormalTexture, &strata.mStratum2NormalTexture,
+        &strata.mStratum3NormalTexture, &strata.mStratum4NormalTexture, &strata.mStratum5NormalTexture, &strata.mStratum6NormalTexture,
+        &strata.mStratum7NormalTexture, &strata.mUpperNormalTexture,
+      };
+      return *(normals ? normal : albedo)[std::clamp(slot, 0, 9)];
+    }
+  } // namespace
+
+  std::vector<EdTools::LayerSlot> EdMapScene::LayerSlots() const
+  {
+    std::vector<EdTools::LayerSlot> slots;
+    if (mMap == nullptr) {
+      return slots;
+    }
+    moho::StratumMaterial& strata = mMap->mTerrainRes->GetStratumMaterial();
+    for (int slot = 0; slot < 10; ++slot) {
+      const moho::CStratumMaterial& albedo = SlotMaterial(strata, slot, false);
+      const moho::CStratumMaterial& normals = SlotMaterial(strata, slot, true);
+      slots.push_back({albedo.mPath.c_str(), normals.mPath.c_str(), albedo.mSize, normals.mSize});
+    }
+    return slots;
+  }
+
+  void EdMapScene::SetLayerSlot(const int slot, const std::string& albedo, const std::string& normals, const float albedoSize,
+                                const float normalsSize)
+  {
+    moho::StratumMaterial& strata = mMap->mTerrainRes->GetStratumMaterial();
+    const auto set = [](moho::CStratumMaterial& material, const std::string& path, const float size) {
+      if (path != material.mPath.c_str()) {
+        material.mPath.assign(path.c_str());
+        // Dropped, so SetSize loads the new file.
+        material.mTextureSheet.release();
+        material.mTextureSheet = {};
+      }
+      material.mSize = size > 0.0f ? size : 1.0f;
+    };
+    set(SlotMaterial(strata, slot, false), albedo, albedoSize);
+    set(SlotMaterial(strata, slot, true), normals, normalsSize);
+    // Loads what has no texture yet and scales every layer to the map (StratumMaterial::SetSizeTo).
+    strata.SetSizeTo(mMap->mTerrainRes);
+    mDocument.SetLayerFact(slot, albedo);
+    mDocument.SetModified(true);
+  }
+
+  void EdMapScene::ChangeLayerSlot(const int slot, const EdTools::LayerSlot& value)
+  {
+    const std::vector<EdTools::LayerSlot> slots = LayerSlots();
+    if (slot < 0 || static_cast<std::size_t>(slot) >= slots.size() || slots[static_cast<std::size_t>(slot)] == value) {
+      return;
+    }
+    const EdTools::LayerSlot& before = slots[static_cast<std::size_t>(slot)];
+    std::vector<EdDocument::LayerEdit>& undo = mDocument.LayerUndo();
+    // Dragging a size makes one undo step: a change of the same slot's size right after the last one joins it.
+    const bool joins = !undo.empty() && undo.back().slot == slot && undo.back().albedoAfter == value.albedo &&
+                       undo.back().normalsAfter == value.normals && undo.back().albedoAfter == before.albedo &&
+                       undo.back().albedoSizeAfter == before.albedoSize && value.albedo == before.albedo && mLayerDragJoin;
+    if (joins) {
+      undo.back().albedoSizeAfter = value.albedoSize;
+      undo.back().normalsSizeAfter = value.normalsSize;
+    } else {
+      EdDocument::LayerEdit edit;
+      edit.slot = slot;
+      edit.albedoBefore = before.albedo;
+      edit.normalsBefore = before.normals;
+      edit.albedoSizeBefore = before.albedoSize;
+      edit.normalsSizeBefore = before.normalsSize;
+      edit.albedoAfter = value.albedo;
+      edit.normalsAfter = value.normals;
+      edit.albedoSizeAfter = value.albedoSize;
+      edit.normalsSizeAfter = value.normalsSize;
+      undo.push_back(edit);
+      mDocument.EditEnded(EdDocument::EditKind::Layers);
+    }
+    mLayerDragJoin = value.albedo == before.albedo && value.normals == before.normals;
+    SetLayerSlot(slot, value.albedo, value.normals, value.albedoSize, value.normalsSize);
+    gpg::Logf("editor: layer %d is %s at size %.2f", slot, value.albedo.empty() ? "(empty)" : value.albedo.c_str(), static_cast<double>(value.albedoSize));
+  }
+
+  bool EdMapScene::UndoLayers(const bool redo)
+  {
+    std::vector<EdDocument::LayerEdit>& from = redo ? mDocument.LayerRedo() : mDocument.LayerUndo();
+    std::vector<EdDocument::LayerEdit>& to = redo ? mDocument.LayerUndo() : mDocument.LayerRedo();
+    if (from.empty() || mMap == nullptr) {
+      return false;
+    }
+    const EdDocument::LayerEdit edit = from.back();
+    from.pop_back();
+    to.push_back(edit);
+    if (redo) {
+      SetLayerSlot(edit.slot, edit.albedoAfter, edit.normalsAfter, edit.albedoSizeAfter, edit.normalsSizeAfter);
+    } else {
+      SetLayerSlot(edit.slot, edit.albedoBefore, edit.normalsBefore, edit.albedoSizeBefore, edit.normalsSizeBefore);
+    }
+    mLayerDragJoin = false;
+    return true;
   }
 
   bool EdMapScene::UndoMasks(const bool redo)
@@ -504,6 +612,7 @@ namespace faf::editor
       }
     }
     mPaintingMask = false;
+    mLayerDragJoin = false;
   }
 
   void EdMapScene::ApplyRules()

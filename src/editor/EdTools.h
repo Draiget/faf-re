@@ -2,6 +2,7 @@
 
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdMaskBrush.h"
+#include "editor/tools/EdTextureLibrary.h"
 
 #include <cmath>
 #include <memory>
@@ -39,6 +40,31 @@ namespace faf::editor
     }
     /** The open map's layer texture paths (lower, strata 1-8, upper), for the layer list. */
     void SetLayerNames(std::vector<std::string> names) { mLayerNames = std::move(names); }
+
+    /** One of the map's ten texture slots (lower, strata 1-8, upper): albedo and normal map, each with its size in game units. */
+    struct LayerSlot
+    {
+      std::string albedo;
+      std::string normals;
+      float albedoSize = 4.0f;
+      float normalsSize = 4.0f;
+      bool operator==(const LayerSlot& other) const
+      {
+        return albedo == other.albedo && normals == other.normals && albedoSize == other.albedoSize && normalsSize == other.normalsSize;
+      }
+    };
+    /** The open map's slots as the terrain has them, each frame. */
+    void SetLayerSlots(std::vector<LayerSlot> slots) { mSlots = std::move(slots); }
+    /** A slot the panel changed (its texture or size): the app applies it. */
+    [[nodiscard]] bool TakeLayerChange(int& slot, LayerSlot& value)
+    {
+      if (mChangedSlot < 0) {
+        return false;
+      }
+      slot = std::exchange(mChangedSlot, -1);
+      value = mChangedValue;
+      return true;
+    }
     /** Apply rules to whole map was pressed; the rules. */
     [[nodiscard]] bool TakeRulesRequest() noexcept { return std::exchange(mRulesRequested, false); }
     [[nodiscard]] const std::vector<MaskRule>& Rules() const noexcept { return mRules; }
@@ -49,6 +75,13 @@ namespace faf::editor
       mRules.push_back(rule);
     }
     void RequestRules() noexcept { mRulesRequested = true; }
+    /** Test runs (`/browse`): the texture browser opened for a slot. */
+    void OpenBrowser(const int slot) noexcept
+    {
+      mTool = 2;
+      mBrowseSlot = slot;
+      mBrowseOpen = true;
+    }
     /** Test runs (`/masklayer`): the Texture tool on this layer. */
     void SetMaskLayer(const int layer) noexcept
     {
@@ -201,6 +234,15 @@ namespace faf::editor
     int mMaskMode = 0;
     bool mLowerAbove = true;
     std::vector<std::string> mLayerNames;
+    std::vector<LayerSlot> mSlots;
+    int mChangedSlot = -1;
+    LayerSlot mChangedValue;
+    EdTextureLibrary mLibrary;
+    void DrawLayerSlots();
+    void DrawTextureBrowser();
+    int mBrowseSlot = -1;
+    bool mBrowseOpen = false;
+    char mBrowseFilter[64]{};
     std::vector<MaskRule> mRules;
     bool mRulesRequested = false;
 

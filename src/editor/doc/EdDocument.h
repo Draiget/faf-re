@@ -163,7 +163,24 @@ namespace faf::editor
     {
       Heights,
       Masks,
+      Layers,
     };
+    /** A texture slot's change (path or size), for undo: its values before and after, as the terrain has them. */
+    struct LayerEdit
+    {
+      int slot = 0;
+      std::string albedoBefore, normalsBefore, albedoAfter, normalsAfter;
+      float albedoSizeBefore = 1.0f, normalsSizeBefore = 1.0f, albedoSizeAfter = 1.0f, normalsSizeAfter = 1.0f;
+    };
+    [[nodiscard]] std::vector<LayerEdit>& LayerUndo() noexcept { return mLayerUndo; }
+    [[nodiscard]] std::vector<LayerEdit>& LayerRedo() noexcept { return mLayerRedo; }
+    /** The slot's albedo path in the facts the Info panel shows. */
+    void SetLayerFact(int slot, const std::string& albedo)
+    {
+      if (slot >= 0 && static_cast<std::size_t>(slot) < mFacts.layers.size()) {
+        mFacts.layers[static_cast<std::size_t>(slot)] = albedo;
+      }
+    }
     /** An edit of `kind` was recorded in its history: it is the newest; what was undone can't be redone. */
     void EditEnded(EditKind kind);
     /** The kind of the edit Undo (Redo) takes back (gives back) next; false when there is none. */
@@ -198,6 +215,8 @@ namespace faf::editor
     HeightHistory mHeights;
     MaskGrid mMasks;
     MaskHistory mMaskHistory;
+    std::vector<LayerEdit> mLayerUndo;
+    std::vector<LayerEdit> mLayerRedo;
     std::vector<EditKind> mUndoOrder;
     std::vector<EditKind> mRedoOrder;
     MapFileRecords mFileRecords;

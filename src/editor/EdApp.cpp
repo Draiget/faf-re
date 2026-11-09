@@ -28,6 +28,7 @@
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/backends/common/ImageCodec.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "imgui_impl_win32.h"
 #include "moho/app/CScApp.h"
 #include "moho/app/WinApp.h"
@@ -313,6 +314,12 @@ namespace faf::editor
       std::string mMaskRuleArg;
       int mMaskRuleFrames = 0;
       std::string mLayerNamesOf;
+      // `/layer <slot>,<albedo path>[,<size>]` with `/open` (test runs): one texture slot changed.
+      std::string mLayerArg;
+      /** The game's view shows nothing while a modal dialog of the panels is open (FitGameView). */
+      bool mViewStepsAside = false;
+      int mBrowseArg = -1;
+      int mBrowseFrames = 0;
       std::string mStampArg;
       /** The Tools panel's height field Import and Export: the file dialog, then the view. */
       void DriveHeightFiles();
@@ -675,6 +682,12 @@ namespace faf::editor
       if (fa::vector<fa::string> layer; moho::CFG_GetArgOption("/masklayer", 1, &layer) && !layer.empty()) {
         mMaskLayerArg = std::atoi(layer[0].c_str()) - 1;
       }
+      if (fa::vector<fa::string> slot; moho::CFG_GetArgOption("/browse", 1, &slot) && !slot.empty()) {
+        mBrowseArg = std::atoi(slot[0].c_str());
+      }
+      if (fa::vector<fa::string> layer; moho::CFG_GetArgOption("/layer", 1, &layer) && !layer.empty()) {
+        mLayerArg = layer[0].c_str();
+      }
       if (fa::vector<fa::string> rule; moho::CFG_GetArgOption("/maskrule", 1, &rule) && !rule.empty()) {
         mMaskRuleArg = rule[0].c_str();
       }
@@ -772,6 +785,34 @@ namespace faf::editor
       if (mDocument.GetState() == EdDocument::State::Open && mLayerNamesOf != mDocument.Path()) {
         mLayerNamesOf = mDocument.Path();
         tools.SetLayerNames(mDocument.Facts().layers);
+      }
+      // The texture slots as the terrain has them, and a change the panel asked for.
+      if (mScene.Attached()) {
+        int slot = -1;
+        EdTools::LayerSlot value;
+        if (tools.TakeLayerChange(slot, value)) {
+          mScene.ChangeLayerSlot(slot, value);
+        }
+        tools.SetLayerSlots(mScene.LayerSlots());
+        if (mBrowseArg >= 0 && ++mBrowseFrames == 60) {
+          tools.OpenBrowser(mBrowseArg);
+          mBrowseArg = -1;
+        }
+        if (!mLayerArg.empty()) {
+          // `/layer <slot>,<albedo path>[,<size>]` (test runs).
+          const std::size_t comma = mLayerArg.find(',');
+          value = mScene.LayerSlots()[static_cast<std::size_t>(std::clamp(std::atoi(mLayerArg.c_str()), 0, 9))];
+          const std::string rest = comma == std::string::npos ? std::string{} : mLayerArg.substr(comma + 1);
+          const std::size_t second = rest.find(',');
+          value.albedo = rest.substr(0, second);
+          if (second != std::string::npos) {
+            value.albedoSize = value.normalsSize = static_cast<float>(std::atof(rest.c_str() + second + 1));
+          }
+          mScene.ChangeLayerSlot(std::clamp(std::atoi(mLayerArg.c_str()), 0, 9), value);
+          mLayerArg.clear();
+        }
+      } else {
+        tools.SetLayerSlots({});
       }
       if (mMaskLayerArg >= 0) {
         tools.SetMaskLayer(mMaskLayerArg);
@@ -1017,6 +1058,16 @@ namespace faf::editor
         y = 0;
         width = clientWidth;
         height = clientHeight;
+      }
+
+      // A modal dialog of the panels (New map, Save as, the texture browser) would be hidden behind the game's
+      // view, which is a window of its own over the panels' window: while one is open the view's window region
+      // is empty, so the dialog shows through. Hiding the window instead would stop its paint, and the panels'
+      // head is presented with it.
+      const bool modal = mImGuiReady && ImGui::GetTopMostPopupModal() != nullptr;
+      if (modal != mViewStepsAside) {
+        mViewStepsAside = modal;
+        ::SetWindowRgn(view, modal ? ::CreateRectRgn(0, 0, 0, 0) : nullptr, TRUE);
       }
 
       RECT panel{};
