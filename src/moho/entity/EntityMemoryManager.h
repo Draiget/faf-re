@@ -23,7 +23,7 @@ namespace moho
     void Clear() noexcept;
 
     [[nodiscard]] void* Allocate(std::size_t size);
-    // A slab block, or nullptr when sim_EntityPools is off or no slab pool has this size.
+    // A slab block, or nullptr when sim_EntityPools is off, no slab pool has this size or the slab region is full.
     [[nodiscard]] void* TryAllocateSlab(std::size_t size);
     // True when ptr lies in the slab reservation, so Deallocate must take it.
     [[nodiscard]] static bool OwnsBlock(const void* ptr) noexcept;

@@ -75,7 +75,11 @@ namespace moho
     if (sim_EntityPools) {
       FixedSlabPool* const pool = FindPoolForSize(size);
       if (pool != nullptr) {
-        return pool->Allocate();
+        try {
+          return pool->Allocate();
+        } catch (const std::bad_alloc&) {
+          return nullptr; // the slab region is full: the caller's fallback takes it
+        }
       }
     }
     return nullptr;

@@ -1,5 +1,6 @@
 #include "moho/entity/FixedSlabPool.h"
 
+#include <atomic>
 #include <cassert>
 #include <new>
 #include <vector>
@@ -17,6 +18,8 @@ namespace moho
   namespace slab_region
   {
     static std::uintptr_t gBase = 0;
+    // Set once the reservation is attempted; Owns reads gBase only after it, without reserving anything itself.
+    static std::atomic<bool> gReserved{false};
     static INIT_ONCE gInitOnce = INIT_ONCE_STATIC_INIT;
     static SRWLOCK gLock = SRWLOCK_INIT;
     static std::vector<std::size_t> gFreeSlabOffsets;
@@ -33,6 +36,7 @@ namespace moho
       void* const base = ::VirtualAlloc(nullptr, kReserveBytes + kSlabBytes, MEM_RESERVE, PAGE_NOACCESS);
       gBase = base == nullptr ? 0 : AlignUp(reinterpret_cast<std::uintptr_t>(base), kSlabBytes);
 #endif
+      gReserved.store(true, std::memory_order_release);
       return TRUE;
     }
 
@@ -43,7 +47,10 @@ namespace moho
 
     bool Owns(const void* const ptr) noexcept
     {
-      EnsureInit();
+      // No reservation yet means no slab block exists, so a free with sim_EntityPools off never reserves the region.
+      if (!gReserved.load(std::memory_order_acquire)) {
+        return false;
+      }
       const std::uintptr_t address = reinterpret_cast<std::uintptr_t>(ptr);
       return gBase != 0 && (address - gBase) < kReserveBytes;
     }
