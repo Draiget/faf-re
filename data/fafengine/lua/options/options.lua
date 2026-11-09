@@ -544,8 +544,8 @@ do
             type = 'toggle',
             default = 2,
             tip = 'Smooth draws interface text from distance-field atlases, sharp at any size. Original draws it with '
-                .. 'the Windows glyphs, as the original game does. Small text original keeps text under 13 px on the '
-                .. 'Windows glyphs.',
+                .. 'the Windows glyphs, as the original game does. Small text original keeps text with a font size under 13 '
+                .. 'on the Windows glyphs.',
             set = function(key, value, startup)
                 local mode = modes[value] or modes[2]
                 ConExecute('ren_MsdfTextMinSize ' .. mode.minSize)
