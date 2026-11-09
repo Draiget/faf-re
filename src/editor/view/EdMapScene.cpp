@@ -5,7 +5,9 @@
 
 #include <windowsx.h>
 
+#include "editor/EdTools.h"
 #include "editor/doc/EdDocument.h"
+#include "editor/tools/EdHeightBrush.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/mesh/Mesh.h"
@@ -80,6 +82,37 @@ namespace faf::editor
     mCamera = nullptr;
     mMap = nullptr;
     mDrag = Drag::None;
+    mPainting = false;
+  }
+
+  void EdMapScene::PaintStroke(const float frameSeconds)
+  {
+    float groundX = 0.0f;
+    float groundZ = 0.0f;
+    moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    if (mTools == nullptr || field == nullptr ||
+        !GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ)) {
+      return;
+    }
+    HeightBrush brush = mTools->CurrentHeightBrush();
+    brush.flattenTo = mFlattenTo;
+    const std::vector<SampleRect> rects =
+      ApplyHeightBrush(field->data, field->width, field->height, groundX, groundZ, brush, std::min(frameSeconds, 0.1f));
+    if (rects.empty()) {
+      return;
+    }
+    // The samples are written in place; the field's own setter, given them back, refreshes its tiers of
+    // min/max heights and its revision (the shadow and vision passes watch it). Then the terrain redraws
+    // those rectangles: tiles and normal map, one sample wider for the normals at their edge.
+    std::vector<gpg::Rect2i> changed;
+    changed.reserve(rects.size());
+    for (const SampleRect& rect : rects) {
+      field->SetElevationRectRaw(gpg::Rect2i{rect.x0, rect.z0, rect.x1, rect.z1},
+                                 field->data + rect.x0 + static_cast<std::ptrdiff_t>(rect.z0) * field->width, field->width);
+      changed.push_back(gpg::Rect2i{std::max(0, rect.x0 - 1), std::max(0, rect.z0 - 1), std::min(field->width - 1, rect.x1 + 1),
+                                    std::min(field->height - 1, rect.z1 + 1)});
+    }
+    mMap->mTerrainRes->NotifyMapChanges(changed.data(), changed.size());
   }
 
   void EdMapScene::Update(const float frameSeconds, const bool playIdle)
@@ -112,6 +145,9 @@ namespace faf::editor
       CreateProps();
     }
     MoveWithKeys(frameSeconds);
+    if (mPainting) {
+      PaintStroke(frameSeconds);
+    }
     // A session runs the camera manager from its own frame; between plays the editor does.
     moho::CAM_GetManager()->Frame(0.0f, frameSeconds);
   }
@@ -248,7 +284,35 @@ namespace faf::editor
       return false;
     }
     const POINT at{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+    if (message == WM_MOUSEMOVE || message == WM_LBUTTONDOWN) {
+      mCursor = at;
+    }
     switch (message) {
+    case WM_LBUTTONDOWN: {
+      if (mTools == nullptr || !mTools->TerrainToolActive()) {
+        return false;
+      }
+      float groundX = 0.0f;
+      float groundZ = 0.0f;
+      if (!GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+        return true;
+      }
+      // Flatten keeps the height under the stroke's first point.
+      mFlattenTo =
+        mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(groundX)), static_cast<std::int32_t>(std::lround(groundZ))) *
+        128.0f;
+      mPainting = true;
+      ::SetCapture(window);
+      ::SetFocus(window);
+      return true;
+    }
+    case WM_LBUTTONUP:
+      if (mPainting) {
+        mPainting = false;
+        ::ReleaseCapture();
+        return true;
+      }
+      return false;
     case WM_RBUTTONDOWN:
     case WM_MBUTTONDOWN:
       // Middle drag orbits, Shift + middle drag pans; the right button pans.
@@ -266,7 +330,7 @@ namespace faf::editor
       return true;
     case WM_MOUSEMOVE: {
       if (mDrag == Drag::None) {
-        return false;
+        return mPainting;
       }
       const float dx = static_cast<float>(at.x - mDragFrom.x);
       const float dy = static_cast<float>(at.y - mDragFrom.y);
@@ -348,6 +412,7 @@ namespace faf::editor
       return false;
     case WM_CAPTURECHANGED:
       mDrag = Drag::None;
+      mPainting = false;
       return false;
     default:
       return false;

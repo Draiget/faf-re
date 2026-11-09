@@ -10,6 +10,7 @@ set(FAF_EDITOR_SOURCES
   EdShell.cpp
   EdTools.cpp
   doc/EdDocument.cpp
+  tools/EdHeightBrush.cpp
   view/EdMapScene.cpp
   ui/EdImGuiRenderer.cpp
 )

@@ -16,6 +16,7 @@ namespace moho
 namespace faf::editor
 {
   class EdDocument;
+  class EdTools;
 
   /**
    * The opened map in the game's viewport between plays (board task WPE.3). The renderer draws the map in
@@ -28,6 +29,10 @@ namespace faf::editor
    * drag or right drag pans (the ground follows the cursor), WASD or the arrows move (Shift faster), the
    * wheel zooms toward the point under the cursor without changing the camera's tilt or turn; Home frames
    * the whole map.
+   *
+   * With the Terrain tool, the left button paints the height brush (EdHeightBrush.cpp) under the cursor
+   * while it is held, with the Tools panel's mode, size, strength, falloff and symmetry; Flatten flattens to
+   * the height under the stroke's first point.
    */
   class EdMapScene
   {
@@ -42,6 +47,9 @@ namespace faf::editor
 
     /** Leaves the viewport (the document is about to drop its map). */
     void Detach();
+
+    /** The tool settings the left mouse button acts with (the Tools panel's). */
+    void SetTools(const EdTools* tools) noexcept { mTools = tools; }
 
     [[nodiscard]] bool Attached() const noexcept { return mMap != nullptr; }
 
@@ -61,6 +69,13 @@ namespace faf::editor
 
     std::vector<moho::MeshInstance*> mProps;
     bool mPropsDone = false;
+
+    /** A terrain stroke in progress: the brush under the cursor each frame while the left button is held. */
+    void PaintStroke(float frameSeconds);
+    const EdTools* mTools = nullptr;
+    bool mPainting = false;
+    float mFlattenTo = 0.0f;
+    POINT mCursor{};
 
     // Held movement keys (WASD and the arrows), and Shift for speed.
     bool mForward = false;

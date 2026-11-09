@@ -332,3 +332,11 @@ set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
 # Every GoogleTest executable above and in the subdirectories.
 include(FafTests)
 faf_add_tests_target("${CMAKE_CURRENT_SOURCE_DIR}")
+
+# The map editor's height brush (src/editor/tools/EdHeightBrush.cpp): exact symmetry after random strokes.
+add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp)
+target_include_directories(faf_editor_brush_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_editor_brush_tests PRIVATE gtest_main)
+set_target_properties(faf_editor_brush_tests PROPERTIES FOLDER "Tests/Editor")
+add_test(NAME editor_height_brush COMMAND faf_editor_brush_tests)
+set_tests_properties(editor_height_brush PROPERTIES LABELS "Editor")

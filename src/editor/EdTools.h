@@ -1,5 +1,7 @@
 #pragma once
 
+#include "editor/tools/EdHeightBrush.h"
+
 namespace faf::editor
 {
   /**
@@ -12,6 +14,21 @@ namespace faf::editor
   public:
     /** Draws the panel's contents into the current ImGui window. */
     void Draw();
+
+    /** Whether the Terrain tool is the chosen one (the viewport's left button paints heights). */
+    [[nodiscard]] bool TerrainToolActive() const noexcept { return mTool == 1; }
+
+    /** The terrain brush as the panel sets it (Flatten's height is the stroke's, set by the viewport). */
+    [[nodiscard]] HeightBrush CurrentHeightBrush() const noexcept
+    {
+      HeightBrush brush;
+      brush.mode = static_cast<HeightBrushMode>(mBrushMode);
+      brush.symmetry = static_cast<Symmetry>(mSymmetry);
+      brush.radius = mRadius;
+      brush.strength = mStrength;
+      brush.falloff = mFalloff;
+      return brush;
+    }
 
   private:
     void DrawStrip();

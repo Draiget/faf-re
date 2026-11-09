@@ -333,6 +333,7 @@ namespace faf::editor
       mPlay.ReadCommandLine();
       mShell = new EdShell(mLog, mPlay, mDocument);
       mDocument.SetBeforeDrop([this] { mScene.Detach(); });
+      mScene.SetTools(&mShell->Tools());
       ReadOpenCommandLine();
       gEditorApp = this;
       BuildMenu(frame);
