@@ -461,6 +461,76 @@ namespace
     }
   }
 
+  // Plan WP10.7: the congestion window. Every case of the reliable matrix still delivers everything in order with it
+  // on; on a clean link it grows from its start towards maxReliableInFlight; on a lossy one it is cut, never under its
+  // floor, and the transfer still completes.
+  void TestCongestionWindow()
+  {
+    struct Case
+    {
+      std::uint64_t latencyMs;
+      std::uint64_t jitterMs;
+      double loss;
+      double duplicate;
+    };
+    ChannelConfig congested;
+    congested.congestionControl = true;
+    const Case cases[] = {
+      {0, 0, 0.0, 0.0},    {25, 0, 0.0, 0.0},    {25, 10, 0.05, 0.02}, {50, 25, 0.10, 0.05},
+      {150, 50, 0.05, 0.0}, {75, 50, 0.20, 0.10}, {25, 5, 0.50, 0.0},
+    };
+    std::uint64_t seed = 40;
+    for (const Case& c : cases) {
+      LinkConfig link;
+      link.latencyUs = c.latencyMs * 1000;
+      link.jitterUs = c.jitterMs * 1000;
+      link.loss = c.loss;
+      link.duplicate = c.duplicate;
+      Pair pair(congested, link, ++seed);
+      EXPECT_TRUE(RunReliable(pair, 300, 300'000)) << c.latencyMs << " ms, loss " << c.loss;
+    }
+    const std::uint64_t start = std::uint64_t{congested.initialWindowDatagrams} * congested.maxDatagramSize;
+    const std::uint64_t floor = std::uint64_t{congested.minWindowDatagrams} * congested.maxDatagramSize;
+    const Bytes big(2'000'000, 0x5A);
+    {
+      LinkConfig clean;
+      clean.latencyUs = 50'000;
+      Pair pair(congested, clean, 91);
+      EXPECT_EQ(pair.a.Stats().congestionWindow, start);
+      EXPECT_TRUE(pair.a.SendReliable(big.data(), big.size()));
+      Bytes got;
+      bool arrived = false;
+      for (int ms = 0; ms < 60'000 && !arrived; ++ms) {
+        pair.Step();
+        arrived = pair.b.TakeReliable(got);
+      }
+      EXPECT_TRUE(arrived && got == big);
+      EXPECT_TRUE(pair.a.Stats().congestionWindow > 4 * start) << pair.a.Stats().congestionWindow;
+      EXPECT_EQ(pair.a.Stats().congestionCuts, 0u);
+    }
+    {
+      LinkConfig lossy;
+      lossy.latencyUs = 50'000;
+      lossy.loss = 0.05;
+      Pair pair(congested, lossy, 92);
+      EXPECT_TRUE(pair.a.SendReliable(big.data(), big.size()));
+      Bytes got;
+      bool arrived = false;
+      std::uint64_t smallest = ~std::uint64_t{0};
+      for (int ms = 0; ms < 300'000 && !arrived; ++ms) {
+        pair.Step();
+        smallest = std::min(smallest, pair.a.Stats().congestionWindow);
+        arrived = pair.b.TakeReliable(got);
+      }
+      EXPECT_TRUE(arrived && got == big);
+      EXPECT_TRUE(pair.a.Stats().congestionCuts > 0u);
+      EXPECT_TRUE(smallest >= floor && smallest < start) << smallest;
+    }
+    // Off (the default): no window kept.
+    Pair plain({}, LinkConfig{}, 93);
+    EXPECT_EQ(plain.a.Stats().congestionWindow, 0u);
+  }
+
   // The sender never has more than maxReliableInFlight bytes past the acked prefix.
   void TestInFlightLimit()
   {
@@ -1087,6 +1157,7 @@ namespace
 } // namespace
 
 TEST(Existing_NetChannel, StyleProof) { TestStyleProof(); }
+TEST(NetChannel, CongestionWindow) { TestCongestionWindow(); }
 TEST(Existing_NetChannel, HeaderRoundTrip) { TestHeaderRoundTrip(); }
 TEST(Existing_NetChannel, Varints) { TestVarints(); }
 TEST(Existing_NetChannel, ReceiveWindowModel) { TestReceiveWindowModel(); }

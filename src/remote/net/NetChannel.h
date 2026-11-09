@@ -77,6 +77,16 @@ namespace faf::remote::net
     std::uint64_t initialRttUs = 100'000;
     std::uint64_t minRtoUs = 50'000;
     std::uint64_t maxRtoUs = 2'000'000;
+    /**
+     * Plan WP10.7: keep a congestion window on the reliable stream (AIMD as TCP Reno, RFC 5681): it starts at
+     * initialWindowDatagrams, grows by the bytes acked until the first loss and by about a datagram an RTT after,
+     * halves on a loss (once for whatever was sent before the cut), never under minWindowDatagrams or over
+     * maxReliableInFlight. Off by default: the lockstep game links keep their behaviour; the server's player channels
+     * turn it on.
+     */
+    bool congestionControl = false;
+    std::uint32_t initialWindowDatagrams = 16;
+    std::uint32_t minWindowDatagrams = 4;
   };
 
   enum class ChannelState
@@ -148,6 +158,9 @@ namespace faf::remote::net
     std::uint64_t rttMinUs = 0;
     std::uint64_t rttSamples = 0;
     std::uint64_t rtoUs = 0;
+    /** Plan WP10.7: the congestion window now (bytes; 0 without congestion control) and its cuts. */
+    std::uint64_t congestionWindow = 0;
+    std::uint64_t congestionCuts = 0;
   };
 
   class NetChannel
@@ -205,6 +218,7 @@ namespace faf::remote::net
       bool lostByTime = false;
       std::uint32_t lostBehind = 0;  // how far behind the largest acked it was counted lost
       std::vector<StreamRange> reliable;
+      std::uint64_t reliableBytes = 0;       // plan WP10.7: the reliable bytes it carried, in flight until resolved
       std::vector<std::uint32_t> redundant;  // lane sequences it carried
     };
 
@@ -272,6 +286,12 @@ namespace faf::remote::net
     std::deque<SentDatagram> mSent;  // ack-eliciting datagrams not yet acked, by sequence
     std::uint32_t mLargestAcked = 0;
     std::uint32_t mBackoff = 0;  // retransmission timeouts in a row
+    // Plan WP10.7 (`ChannelConfig::congestionControl`): the window, the slow-start threshold, and when the last cut
+    // was made (a loss of a datagram sent before it makes no second cut).
+    double mCongestionBytes = 0.0;
+    std::uint64_t mOutstanding = 0; // reliable bytes in datagrams neither acked nor counted lost (the window's measure)
+    double mSlowStartEnd = 1.0e18;
+    std::uint64_t mLastCutUs = 0;
     std::uint64_t mLastElicitingSentUs = 0;
     bool mSentAny = false;
     ReliableSender mSender;

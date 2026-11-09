@@ -101,7 +101,7 @@ namespace
 
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>]\n";
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>] [--congestion-control]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
   // Plan WP13.7: how long a defeated player keeps their view with `DefeatedPlayerView = "disconnect"`: the defeat banner
@@ -928,6 +928,7 @@ namespace
     if (reconnectGiven) {
       netConfig.reconnectSeconds = std::atof(text.c_str());
     }
+    netConfig.congestionControl = moho::CFG_GetArgOption("--congestion-control", 0, nullptr); // plan WP10.7, off by default
     const bool awayPauseGiven = ReadOption("--away-pause-seconds", text);
     double awayPauseSeconds = awayPauseGiven ? std::atof(text.c_str()) : 0.0;
     std::string defeatedView; // plan WP13.4

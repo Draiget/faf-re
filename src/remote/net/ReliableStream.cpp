@@ -140,7 +140,7 @@ namespace faf::remote::net
       budget -= header + static_cast<std::size_t>(size);
     }
 
-    const std::uint64_t limit = std::min<std::uint64_t>(mEnd, mAcked.PrefixEnd() + mMaxInFlight);
+    const std::uint64_t limit = std::min<std::uint64_t>(mEnd, mAcked.PrefixEnd() + std::min<std::uint64_t>(mMaxInFlight, mCongestionWindow));
     while (mNextNew < limit) {
       const std::size_t header = headerSize(mNextNew);
       if (budget <= header) {
@@ -156,7 +156,7 @@ namespace faf::remote::net
 
   bool ReliableSender::HasPending() const noexcept
   {
-    return !mLost.Empty() || mNextNew < std::min<std::uint64_t>(mEnd, mAcked.PrefixEnd() + mMaxInFlight);
+    return !mLost.Empty() || mNextNew < std::min<std::uint64_t>(mEnd, mAcked.PrefixEnd() + std::min<std::uint64_t>(mMaxInFlight, mCongestionWindow));
   }
 
   void ReliableSender::OnAcked(const std::vector<StreamRange>& ranges)

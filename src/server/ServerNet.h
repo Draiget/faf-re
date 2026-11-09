@@ -44,6 +44,12 @@ namespace faf::server
     /** Views wait for a player who hasn't joined yet; off when nobody's expected, as they'd pile up. */
     bool holdViewsForJoin = true;
     /**
+     * Plan WP10.7: each player's channel keeps a congestion window (`ChannelConfig::congestionControl`). Off by default:
+     * on a 30 KB/s line with a 200 ms buffer it ended the resend flood (82 KB/s sent at the start instead of 811) but
+     * delivered 22.2 KB/s of the 30 (Reno's sawtooth on a shallow buffer), less than sending flat out.
+     */
+    bool congestionControl = false;
+    /**
      * Plan WPR.50: in the lobby, a participant heard from for this long counts as away (`TakeLobbyPresence`), well
      * before its channel's own 10 s timeout, so a logical host that is gone is succeeded within 10 s. A client sends
      * a keepalive every quarter second while its game runs; a frozen lobby screen stops them too, so not much shorter.

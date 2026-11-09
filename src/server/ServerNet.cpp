@@ -45,6 +45,11 @@ namespace faf::server
 
   CServerNet::CServerNet(const SServerNetConfig& config)
     : mConfig(config)
+    , mLinks([&config] {
+      remote::net::ChannelConfig channel;
+      channel.congestionControl = config.congestionControl; // plan WP10.7
+      return channel;
+    }())
   {
     mLobby.SetControl(config.lobbyControl);
   }

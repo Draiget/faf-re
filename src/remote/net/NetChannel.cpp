@@ -24,6 +24,11 @@ namespace faf::remote::net
     , mRecentOutcomes(kRecentWindow, false)
     , mReceiver(config.receiveWindow, config.maxMessageSize)
   {
+    if (mConfig.congestionControl) { // plan WP10.7
+      mCongestionBytes = static_cast<double>(mConfig.initialWindowDatagrams) * static_cast<double>(mConfig.maxDatagramSize);
+      mSender.SetWindow(static_cast<std::uint64_t>(mCongestionBytes));
+      mStats.congestionWindow = static_cast<std::uint64_t>(mCongestionBytes);
+    }
     // Until the first sample, RFC 6298's starting point from the configured guess.
     mStats.rttSmoothedUs = mConfig.initialRttUs;
     mStats.rttVarUs = mConfig.initialRttUs / 2;
@@ -544,6 +549,13 @@ namespace faf::remote::net
     std::vector<std::uint8_t> payload;
     std::size_t produced = 0;
     while (produced < mConfig.maxDatagramsPerPoll && mState != ChannelState::Failed) {
+      if (mConfig.congestionControl) {
+        // Plan WP10.7: new reliable bytes only while what is in flight (sent, neither acked nor counted lost) is under
+        // the window. Bytes acked past a hole are out of flight even though the acked prefix hasn't moved, so one loss
+        // doesn't stall the stream until its resend arrives. Set before HasPending is asked.
+        const auto window = static_cast<std::uint64_t>(mCongestionBytes);
+        mSender.SetWindow(mSender.InFlight() + (window > mOutstanding ? window - mOutstanding : 0u));
+      }
       const bool laneNew = std::any_of(mLaneOut.begin(), mLaneOut.end(), [](const LaneMessage& m) { return !m.sent; });
       const bool fresh = laneNew || !mUnreliableOut.empty() || mSender.HasPending();
       const bool repeatDue = HasLaneRepeats() && nowUs - mLastLaneRepeatUs >= mConfig.redundantRepeatUs;
@@ -648,6 +660,10 @@ namespace faf::remote::net
       SentDatagram& sent = mSent.emplace_back();
       sent.sequence = header.sequence;
       sent.sentUs = nowUs;
+      for (const StreamRange& range : reliable) {
+        sent.reliableBytes += range.end - range.begin;
+      }
+      mOutstanding += sent.reliableBytes;
       sent.reliable = std::move(reliable);
       sent.redundant = std::move(redundant);
     }
@@ -656,6 +672,7 @@ namespace faf::remote::net
 
   void NetChannel::Resolve(SentDatagram& sent, const bool acked)
   {
+    mOutstanding -= std::min(mOutstanding, sent.reliableBytes); // plan WP10.7: out of flight either way
     if (acked) {
       sent.acked = true;
       mSender.OnAcked(sent.reliable);
@@ -665,6 +682,28 @@ namespace faf::remote::net
       sent.lost = true;
       mSender.OnLost(sent.reliable);
       ++mStats.datagramsLost;
+    }
+    if (mConfig.congestionControl) {
+      // Plan WP10.7: AIMD on the reliable bytes (RFC 5681). Grow by what was acked: the whole of it below the slow-start
+      // threshold (doubling each RTT), about a datagram an RTT above it; halve on a loss, once for whatever was sent
+      // before the cut (a burst lost to one overflowing buffer is one congestion event).
+      const double datagram = static_cast<double>(mConfig.maxDatagramSize);
+      const double floor = static_cast<double>(mConfig.minWindowDatagrams) * datagram;
+      const double ceiling = static_cast<double>(mConfig.maxReliableInFlight);
+      if (acked) {
+        double bytes = 0.0;
+        for (const StreamRange& range : sent.reliable) {
+          bytes += static_cast<double>(range.end - range.begin);
+        }
+        mCongestionBytes += mCongestionBytes < mSlowStartEnd ? bytes : datagram * bytes / mCongestionBytes;
+      } else if (sent.sentUs > mLastCutUs) {
+        mSlowStartEnd = std::max(mCongestionBytes / 2.0, floor);
+        mCongestionBytes = mSlowStartEnd;
+        mLastCutUs = mLastElicitingSentUs;
+        ++mStats.congestionCuts;
+      }
+      mCongestionBytes = std::clamp(mCongestionBytes, floor, ceiling);
+      mStats.congestionWindow = static_cast<std::uint64_t>(mCongestionBytes);
     }
 
     if (mRecentCount == kRecentWindow) {

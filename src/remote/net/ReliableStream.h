@@ -78,6 +78,8 @@ namespace faf::remote::net
 
     /** Bytes sent past the acked prefix (acked ranges above it included). */
     [[nodiscard]] std::uint64_t InFlight() const noexcept { return mNextNew - mAcked.PrefixEnd(); }
+    /** Plan WP10.7: unacked bytes past the acked prefix at most, under maxInFlight (the channel's congestion window). */
+    void SetWindow(const std::uint64_t bytes) noexcept { mCongestionWindow = bytes; }
     /** Queued bytes not yet acked. */
     [[nodiscard]] std::uint64_t Unacked() const noexcept { return mEnd - mAcked.PrefixEnd(); }
     [[nodiscard]] std::uint64_t BytesResent() const noexcept { return mBytesResent; }
@@ -86,6 +88,7 @@ namespace faf::remote::net
     void Compact();
 
     std::size_t mMaxInFlight;
+    std::uint64_t mCongestionWindow = ~std::uint64_t{0}; // plan WP10.7: the congestion window, when the channel keeps one
     std::size_t mMaxMessage;
     std::vector<std::uint8_t> mBuffer;  // stream bytes from mBase to mEnd
     std::uint64_t mBase = 0;
