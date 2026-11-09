@@ -1310,6 +1310,13 @@ namespace moho
     return true;
   }
 
+  RRuleGameRules* RULE_PeekKept()
+  {
+    KeptRules& state = Kept();
+    const std::lock_guard<std::mutex> guard(state.lock);
+    return state.preparing ? nullptr : state.kept;
+  }
+
   void RULE_DeleteKept()
   {
     KeptRules& state = Kept();
