@@ -22,6 +22,7 @@
 #include "moho/app/CScApp.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
+#include "moho/misc/SessionStartup.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/WRenViewport.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -250,6 +251,8 @@ namespace faf::editor
       moho::gAppWindowed = true;
       // The panels' window and its head (head 1); the game keeps head 0 for its viewport.
       moho::gAppBeforeDeviceCreate = &AddPanelHead;
+      // Plays have cheats on (the whole-map view during play needs them), Game.prefs untouched.
+      moho::gSessionCheats = true;
 
       if (!mGame.Init()) {
         ::MessageBoxW(nullptr, L"Neither Direct3D 12 nor Vulkan started, or the game data could not be read. See the log.",

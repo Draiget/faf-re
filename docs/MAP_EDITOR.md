@@ -7,16 +7,28 @@
 ## Building and running
 
 ```powershell
-.\build.ps1 -Editor        # builds everything, copies only FafEditor_x64.exe (+ .pdb) to bin_x64
+.\build.ps1 -Editor        # builds only the editor's target, copies FafEditor_x64.exe (+ .pdb) to bin_x64
+.\build.ps1 -Editor -Configuration Debug
 cd C:\ProgramData\FAForever\bin_x64
 .\FafEditor_x64.exe /init init_faf.lua /log C:\ProgramData\FAForever\logs\FafEditor_x64.log
 ```
+
+In VS Code, the Run view has "Editor (x64, Debug)" and "Editor (x64, Release)": F5 builds the editor's target of `clang-x64-debug` or `clang-x64-release`, copies it to `bin_x64` and starts it under the debugger with `/init init_local_development.lua` (the Lua of the FA checkout, as the engine's own F5 entries use). "Editor (x64, no build)" starts what is already there. Only running editors are stopped before the copy; the game is left alone. The `.vscode` files are local (not in git).
 
 `-Editor` never replaces the game's `main_x64.exe`, its headless or the DXC DLLs in the run folder (the editor carries its own DXC); a Profile build is copied as `FafEditor_x64_profile.exe`, and `-Out` also copies it to `out\<arch>\`. The editor reads the game data the way the game does: `/init <file>` names the init file (FAF's `init_faf.lua`), else `SupComDataPath.lua` next to the exe.
 
 ## Play
 
-Pick a map in the Map panel (each map by its title, then its folder name; type to filter, double-click to play) or in Play > Map, and press **Play** or F5. The map loads and plays inside the editor's view, between the panels, with the game's own interface, the way `/map` starts it in the game (FAF's `SinglePlayerLaunch.lua`: you and AI armies). **Stop** or F5 returns to the editor. So does the game's own way out of a session: its menu's exit, quitting from the score screen, and "Exit to Windows", which stops the play instead of closing the editor. View > Panels while playing (on by default) hides the panels during play when turned off, so the game takes the whole window. The window's title says what plays.
+Pick a map in the Map panel (each map by its title, then its folder name; type to filter, double-click to play) or in Play > Map, and press **Play** or F5. The map loads and plays inside the editor's view, between the panels, with the game's own interface. **Stop** or F5 returns to the editor. So does the game's own way out of a session: its menu's exit, quitting from the score screen, and "Exit to Windows", which stops the play instead of closing the editor. View > Panels while playing (on by default) hides the panels during play when turned off, so the game takes the whole window. The window's title says what plays.
+
+The Map panel sets the play up, the way FAF's `/map` quick start does (`SinglePlayerLaunch.lua`) but with these choices:
+
+- **Solo** (default) or **Against AI** with one of the game's AI types for every other army. Solo is the faster start: with no AI there is no AI map analysis (SCMP_009, second play: 2.3 s to the game solo, 4.5 s against "rush").
+- **Faction**: random or one of the game's factions.
+- **Fog**: fog of war ("explored") or none. The sim fixes fog when the game starts, so it applies from the next Play.
+- **See the whole map**, during play: the view switches to an observer's (no fog, every army) and back to your army. Editor plays have cheats on for this, without changing the `debug.enable_debug_facilities` preference the game reads.
+
+Campaign maps go through FAF's own campaign setup. No replay is written.
 
 | Switch | Effect |
 |---|---|
@@ -28,6 +40,8 @@ Pick a map in the Map panel (each map by its title, then its folder name; type t
 | `/playseconds <s>` | With `/play`: stops after s seconds of play |
 | `/playcycles <n>` | With `/play`: plays and stops n times |
 | `/playquit` | With `/play`: closes the editor after the last one (test runs) |
+| `/playai <key>` | With `/play`: against that AI (`rush`, `easy`, ...) instead of solo |
+| `/playwholemap` | With `/play` and `/playseconds`: switches to the whole map when play starts and back halfway (test runs) |
 | `/playexitapp` | With `/play` and `/playseconds`: ends each play the way the game's "Exit to Windows" does (`ExitApplication()`), which the editor turns into a Stop (test runs) |
 | `/d3d12debug`, `/vulkandebug` | The API's debug or validation layer, as in the game ([Renderer backends](RENDERER_BACKENDS.md)) |
 
@@ -49,5 +63,5 @@ The Tools panel is laid out as the plan's mockup: a strip of tool icons and the 
 ## Known issues
 
 - Each Play keeps about 15 MB more after it ends (20 cycles of SCMP_009 on Direct3D 12: the lowest point between sessions went from 798 to 1,101 MB). Not yet traced.
-- A play takes about 4 s to load (SCMP_009: about 1.5 s loading the rules and map, 2.5 s creating the sim and the game interface), the same every time, with the game's loading screen. Keeping the rules and preparing the sim while editing is the next step.
+- A solo play takes about 2.3 s to load on SCMP_009 (about 2 s loading the rules and map, 0.3 s creating the sim), the same every time, behind the game's loading screen. Keeping the rules between plays is the next step.
 - A popup of the panels that reaches over the game's view is hidden behind it (the view is its own window).

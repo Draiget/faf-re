@@ -1,5 +1,6 @@
 #include "editor/EdShell.h"
 
+#include <algorithm>
 #include <cstdio>
 
 #include "editor/EdLog.h"
@@ -155,6 +156,61 @@ namespace faf::editor
       ImGui::TextDisabled("%s", MapDisplayName(maps[at]).c_str());
     }
     ImGui::TextDisabled("%s", mPlay.StateText());
+
+    // Play setup: solo (fastest: no AI brains, so no AI map analysis) or against one AI type, the
+    // player's faction, and the fog.
+    PlaySetup& setup = mPlay.Setup();
+    ImGui::BeginDisabled(mPlay.Active());
+    int opponents = setup.withAi ? 1 : 0;
+    ImGui::RadioButton("Solo", &opponents, 0);
+    ImGui::SameLine();
+    ImGui::RadioButton("Against AI", &opponents, 1);
+    setup.withAi = opponents == 1;
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip("Every other army is an AI. The AI's map analysis adds about 2 s to each start.");
+    }
+    const std::vector<PlayChoice>& aiTypes = mPlay.AiTypes();
+    if (setup.withAi && !aiTypes.empty()) {
+      setup.ai = std::clamp(setup.ai, 0, static_cast<int>(aiTypes.size()) - 1);
+      ImGui::SetNextItemWidth(-1.0f);
+      if (ImGui::BeginCombo("##ai", aiTypes[static_cast<std::size_t>(setup.ai)].name.c_str())) {
+        for (int i = 0; i < static_cast<int>(aiTypes.size()); ++i) {
+          if (ImGui::Selectable(aiTypes[static_cast<std::size_t>(i)].name.c_str(), i == setup.ai)) {
+            setup.ai = i;
+          }
+        }
+        ImGui::EndCombo();
+      }
+    }
+    const std::vector<PlayChoice>& factions = mPlay.Factions();
+    setup.faction = std::clamp(setup.faction, 0, static_cast<int>(factions.size()));
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+    if (ImGui::BeginCombo("Faction", setup.faction == 0 ? "Random" : factions[static_cast<std::size_t>(setup.faction - 1)].name.c_str())) {
+      if (ImGui::Selectable("Random", setup.faction == 0)) {
+        setup.faction = 0;
+      }
+      for (int i = 0; i < static_cast<int>(factions.size()); ++i) {
+        if (ImGui::Selectable(factions[static_cast<std::size_t>(i)].name.c_str(), setup.faction == i + 1)) {
+          setup.faction = i + 1;
+        }
+      }
+      ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Fog", &setup.fog);
+    ImGui::EndDisabled();
+
+    // During play: the whole map, as an observer sees it, or the player's own view with its fog.
+    ImGui::BeginDisabled(moho::WLD_GetFrameAction() != moho::EWldFrameAction::Playing);
+    bool wholeMap = mPlay.SeesWholeMap();
+    if (ImGui::Checkbox("See the whole map", &wholeMap)) {
+      mPlay.SetSeesWholeMap(wholeMap);
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip("While playing: view the map as an observer, with no fog,\nthen back to your army. "
+                        "The Fog setting above applies from the next Play.");
+    }
+    ImGui::EndDisabled();
     ImGui::Separator();
 
     // Each map by its title, then its folder name; the filter matches either.

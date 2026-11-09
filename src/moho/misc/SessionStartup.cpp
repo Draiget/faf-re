@@ -321,6 +321,8 @@ namespace moho
     }
   }
 
+  bool gSessionCheats = false; // engine addition, SessionStartup.h
+
   /**
    * Address: 0x0088CBC0 (FUN_0088CBC0)
    * Mangled:
@@ -333,7 +335,7 @@ namespace moho
   {
     boost::shared_ptr<LaunchInfoNew> launchInfo(new LaunchInfoNew());
     launchInfo->mCommandSources.mOriginalSource = 0;
-    launchInfo->mCheatsEnabled = USER_DebugFacilitiesEnabled();
+    launchInfo->mCheatsEnabled = gSessionCheats || USER_DebugFacilitiesEnabled();
 
     const LuaPlus::LuaObject scenarioInfo = launchData["scenarioInfo"];
     launchInfo->mScenarioInfo = SCR_ToString(scenarioInfo);

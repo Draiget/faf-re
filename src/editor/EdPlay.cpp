@@ -4,6 +4,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstdlib>
+#include <stdexcept>
 
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
@@ -16,6 +17,108 @@
 
 namespace faf::editor
 {
+  namespace
+  {
+    /**
+     * The editor's session launcher, run once in the UI's Lua state. It follows FAF's quick start
+     * (SinglePlayerLaunch.lua: SetupCommandLineSkirmish and its default options) with three changes: the
+     * AI armies are optional (aiKey ''), the fog and faction come from the Play setup, and no replay is
+     * written. Campaign scenarios keep FAF's own path, which sets up their objectives.
+     */
+    constexpr const char kLauncher[] = R"lua(
+function EditorStartPlay(mapPath, aiKey, faction, fog)
+    local SPL = import('/lua/singleplayerlaunch.lua')
+    local Prefs = import('/lua/user/prefs.lua')
+    local scenario = import('/lua/ui/maputil.lua').LoadScenario(mapPath)
+    if not scenario then
+        error('Unable to load map ' .. mapPath)
+    end
+    if scenario.type == 'campaign' then
+        SPL.StartCommandLineSession(mapPath, false)
+        return
+    end
+    SPL.VerifyScenarioConfiguration(scenario)
+    scenario.Options = {
+        FogOfWar = fog, NoRushOption = 'Off', PrebuiltUnits = 'Off', Difficulty = 2,
+        DoNotShareUnitCap = true, Timeouts = -1, GameSpeed = 'normal', UnitCap = '500',
+        Victory = 'sandbox', CheatsEnabled = 'true', CivilianAlliance = 'enemy',
+        TeamShareOverflow = 'enabled', Share = 'ShareUntilDeath',
+    }
+    if faction < 1 then
+        faction = SPL.GetRandomFaction()
+    end
+
+    local info = {}
+    info.playerName = Prefs.GetFromCurrentProfile('Name') or 'Player'
+    info.createReplay = false
+    info.scenarioInfo = scenario
+    info.teamInfo = {}
+    info.scenarioMods = import('/lua/mods.lua').GetCampaignMods(scenario)
+
+    local GetDefaultPlayerOptions = import('/lua/ui/lobby/lobbycomm.lua').GetDefaultPlayerOptions
+    local armies = scenario.Configurations.standard.teams[1].armies
+    local numColors = table.getn(import('/lua/gamecolors.lua').GameColors.PlayerColors)
+
+    local player = GetDefaultPlayerOptions(info.playerName)
+    player.PlayerName = info.playerName
+    player.Faction = faction
+    player.Human = true
+    player.ArmyName = armies[1]
+    player.PlayerColor = math.mod(1, numColors)
+    player.ArmyColor = math.mod(1, numColors)
+    info.teamInfo[1] = player
+
+    if aiKey ~= '' then
+        for index = 2, table.getn(armies) do
+            local ai = GetDefaultPlayerOptions(info.playerName)
+            ai.AIPersonality = aiKey
+            ai.Faction = SPL.GetRandomFaction()
+            ai.PlayerName = SPL.GetRandomName(ai.Faction, aiKey)
+            ai.Human = false
+            ai.ArmyName = armies[index]
+            ai.PlayerColor = math.mod(index, numColors)
+            ai.ArmyColor = math.mod(index, numColors)
+            info.teamInfo[index] = ai
+        end
+    end
+
+    local extras = import('/lua/ui/maputil.lua').GetExtraArmies(scenario)
+    if extras then
+        for _, armyName in extras do
+            local index = table.getn(info.teamInfo) + 1
+            info.teamInfo[index] = GetDefaultPlayerOptions('civilian')
+            info.teamInfo[index].PlayerName = 'civilian'
+            info.teamInfo[index].Civilian = true
+            info.teamInfo[index].ArmyName = armyName
+            info.teamInfo[index].Human = false
+        end
+    end
+    for _, armyName in { 'ARMY_17', 'NEUTRAL_CIVILIAN' } do
+        local index = table.getn(info.teamInfo) + 1
+        info.teamInfo[index] = GetDefaultPlayerOptions('Civilian')
+        info.teamInfo[index].Civilian = true
+        info.teamInfo[index].ArmyName = armyName
+        info.teamInfo[index].Human = false
+    end
+
+    Prefs.SetToCurrentProfile('LoadingFaction', faction)
+    LaunchSinglePlayerSession(info)
+end
+)lua";
+
+    /** "AI: Easy" for "<LOC lobui_0347>AI: Easy". */
+    std::string WithoutLocTag(std::string text)
+    {
+      if (text.rfind("<LOC", 0) == 0) {
+        const std::size_t end = text.find('>');
+        if (end != std::string::npos) {
+          text.erase(0, end + 1);
+        }
+      }
+      return text;
+    }
+  } // namespace
+
   std::string MapDisplayName(const std::string& scenarioPath)
   {
     std::string name = scenarioPath;
@@ -95,6 +198,109 @@ namespace faf::editor
     }
     mSelected = 0;
     gpg::Logf("editor: %zu maps in /maps (%d without a title in their scenario)", mMaps.size(), untitled);
+    FindChoices();
+  }
+
+  void EdPlay::FindChoices()
+  {
+    mAiTypes.clear();
+    mFactions.clear();
+    LuaPlus::LuaState* const state = moho::USER_GetLuaState();
+    if (state == nullptr) {
+      return;
+    }
+    // Each list is a Lua array of tables; `keyField` and `nameField` name the two strings taken.
+    const auto read = [&](const char* module, const char* table, const char* keyField, const char* nameField,
+                          std::vector<PlayChoice>& out) {
+      try {
+        const LuaPlus::LuaObject list = moho::SCR_Import(state, module)[table];
+        if (!list.IsTable()) {
+          gpg::Warnf("editor: %s has no %s list", module, table);
+          return;
+        }
+        for (int32_t i = 1; i <= list.GetN(); ++i) {
+          const LuaPlus::LuaObject entry = list[i];
+          if (!entry.IsTable()) {
+            continue;
+          }
+          const LuaPlus::LuaObject key = entry[keyField];
+          const LuaPlus::LuaObject name = entry[nameField];
+          if (key.IsString()) {
+            out.push_back({key.GetString(), WithoutLocTag(name.IsString() ? name.GetString() : key.GetString())});
+          }
+        }
+      } catch (const std::exception& error) {
+        gpg::Warnf("editor: %s: %s", module, error.what());
+      }
+    };
+    read("/lua/ui/lobby/aitypes.lua", "aitypes", "key", "name", mAiTypes);
+    read("/lua/factions.lua", "Factions", "Key", "DisplayName", mFactions);
+    // FAF's quick start plays against "rush".
+    mSetup.ai = 0;
+    for (std::size_t i = 0; i < mAiTypes.size(); ++i) {
+      if (mAiTypes[i].key == "rush") {
+        mSetup.ai = static_cast<int>(i);
+      }
+    }
+    gpg::Logf("editor: %zu AI types, %zu factions", mAiTypes.size(), mFactions.size());
+  }
+
+  bool EdPlay::SeesWholeMap() const
+  {
+    return mWholeMap && moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing;
+  }
+
+  void EdPlay::SetSeesWholeMap(const bool wholeMap)
+  {
+    moho::CWldSession* const session = moho::WLD_GetActiveSession();
+    if (session == nullptr || moho::WLD_GetFrameAction() != moho::EWldFrameAction::Playing || wholeMap == mWholeMap) {
+      return;
+    }
+    // The request goes through the sim driver and lands a frame or more later, so the switch's state is
+    // kept here rather than read back from the session.
+    if (wholeMap) {
+      mPlayerArmy = session->FocusArmy;
+      session->RequestFocusArmy(-1);
+    } else {
+      session->RequestFocusArmy(mPlayerArmy >= 0 ? mPlayerArmy : 0);
+    }
+    mWholeMap = wholeMap;
+    gpg::Logf("editor: the view shows %s", wholeMap ? "the whole map" : "the player's army");
+  }
+
+  bool EdPlay::StartSession(const std::string& scenario)
+  {
+    mPlayerArmy = 0;
+    mWholeMap = false;
+    LuaPlus::LuaState* const state = moho::USER_GetLuaState();
+    if (state == nullptr) {
+      return false;
+    }
+    // Defined again whenever the state lacks it (a new UI Lua state has none).
+    if (state->GetGlobal("EditorStartPlay").IsNil() && !moho::SCR_LuaDoString(kLauncher, state)) {
+      gpg::Warnf("editor: the session launcher did not load; playing with FAF's quick start");
+      return moho::StartCommandLineSession(scenario.c_str(), false);
+    }
+    const bool withAi = mSetup.withAi && mSetup.ai >= 0 && mSetup.ai < static_cast<int>(mAiTypes.size());
+    const std::string aiKey = withAi ? mAiTypes[static_cast<std::size_t>(mSetup.ai)].key : std::string{};
+    const int faction = mSetup.faction >= 1 && mSetup.faction <= static_cast<int>(mFactions.size()) ? mSetup.faction : 0;
+    const char* const fog = mSetup.fog ? "explored" : "none";
+    gpg::Logf("editor: play %s (%s, faction %s, fog %s)", scenario.c_str(), withAi ? aiKey.c_str() : "solo",
+              faction > 0 ? mFactions[static_cast<std::size_t>(faction - 1)].key.c_str() : "random", fog);
+    try {
+      const LuaPlus::LuaObject start = state->GetGlobal("EditorStartPlay");
+      if (start.IsNil()) {
+        throw std::runtime_error("EditorStartPlay is not defined");
+      }
+      LuaPlus::LuaFunction<void> call(start);
+      call(scenario.c_str(), aiKey.c_str(), faction, fog);
+      return true;
+    } catch (const std::exception& error) {
+      gpg::Warnf("editor: the session for %s did not start: %s", scenario.c_str(), error.what());
+    } catch (...) {
+      gpg::Warnf("editor: the session for %s did not start", scenario.c_str());
+    }
+    return false;
   }
 
   bool EdPlay::CanPlay() const
@@ -174,6 +380,19 @@ namespace faf::editor
     if (moho::CFG_GetArgOption("/playseconds", 1, &args) && !args.empty()) {
       mAutoSeconds = static_cast<float>(std::atof(args[0].c_str()));
     }
+    // `/playai <key>`: every other army is that AI ("rush", "easy", ...); solo without it.
+    if (moho::CFG_GetArgOption("/playai", 1, &args) && !args.empty()) {
+      for (std::size_t i = 0; i < mAiTypes.size(); ++i) {
+        if (mAiTypes[i].key == args[0].c_str()) {
+          mSetup.withAi = true;
+          mSetup.ai = static_cast<int>(i);
+        }
+      }
+      if (!mSetup.withAi) {
+        gpg::Warnf("editor: /playai %s: no such AI type", args[0].c_str());
+      }
+    }
+    mAutoWholeMap = moho::CFG_GetArgOption("/playwholemap", 0, nullptr);
     mAutoQuit = moho::CFG_GetArgOption("/playquit", 0, nullptr);
     mAutoExitApp = moho::CFG_GetArgOption("/playexitapp", 0, nullptr);
     gpg::Logf("editor: command-line play of %s, %d cycle(s), %.1f s each", MapDisplayName(mMaps[static_cast<std::size_t>(found)]).c_str(),
@@ -205,7 +424,20 @@ namespace faf::editor
       if (mPlayingSince < 0.0) {
         mPlayingSince = now;
         gpg::Logf("editor: playing");
+        if (mAutoWholeMap) {
+          SetSeesWholeMap(true);
+        }
+      } else if (mAutoWholeMap && mWholeMap && now - mPlayingSince >= static_cast<double>(mAutoSeconds) * 0.5) {
+        if (const moho::CWldSession* const session = moho::WLD_GetActiveSession()) {
+          gpg::Logf("editor: the session's focus army is %d", session->FocusArmy);
+        }
+        SetSeesWholeMap(false);
       } else if (now - mPlayingSince >= static_cast<double>(mAutoSeconds)) {
+        if (mAutoWholeMap && !mExitAppSent) {
+          if (const moho::CWldSession* const session = moho::WLD_GetActiveSession()) {
+            gpg::Logf("editor: the session's focus army is %d", session->FocusArmy);
+          }
+        }
         if (mAutoExitApp) {
           // As the game's own "Exit to Windows" does; the editor turns it into a Stop (EdApp.cpp).
           if (!mExitAppSent) {
@@ -252,11 +484,7 @@ namespace faf::editor
     if (mPlayRequested) {
       mPlayRequested = false;
       if (CanPlay() && mSelected >= 0 && mSelected < static_cast<int>(mMaps.size())) {
-        const std::string& scenario = mMaps[static_cast<std::size_t>(mSelected)];
-        gpg::Logf("editor: play %s", scenario.c_str());
-        if (!moho::StartCommandLineSession(scenario.c_str(), false)) {
-          gpg::Warnf("editor: the session for %s did not start", scenario.c_str());
-        }
+        (void)StartSession(mMaps[static_cast<std::size_t>(mSelected)]);
       }
     }
   }
