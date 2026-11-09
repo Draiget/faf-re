@@ -2876,11 +2876,13 @@ namespace moho
    */
   void CWldTerrainRes::GetStratumMask(const std::int32_t stratumIndex, std::uint8_t* const outMask)
   {
+    // The channel itself (0x00E4BB68), not UpdateStratumMask's keep-the-others masks (0x00E4BB48): with
+    // those every read came back 0.
     static constexpr std::uint32_t kChannelMask[4] = {
-      0xFF00FFFFu,
-      0xFFFF00FFu,
-      0xFFFFFF00u,
-      0x00FFFFFFu,
+      0x00FF0000u,
+      0x0000FF00u,
+      0x000000FFu,
+      0xFF000000u,
     };
     static constexpr std::uint32_t kChannelShift[4] = {16u, 8u, 0u, 24u};
 
