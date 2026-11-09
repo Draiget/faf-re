@@ -2093,6 +2093,11 @@ bool CScApp::CreateAppFrame(
     device->Clear2(true);
 
     context.mValidate = !moho::CFG_GetArgOption("/novalidate", 0, nullptr);
+    // Engine addition (moho::gAppBeforeDeviceCreate): the map editor adds its panels' head here. The game's
+    // viewport already has its head count, so it draws head 0 alone.
+    if (moho::gAppBeforeDeviceCreate != nullptr) {
+      moho::gAppBeforeDeviceCreate(context, primaryHead.mHandle);
+    }
     gpg::gal::Device::Create(&context);
 
     device->SetRenViewport(static_cast<moho::WRenViewport*>(viewport));
@@ -2164,3 +2169,6 @@ std::vector<gpg::gal::DeviceApi> moho::gAppRenderers;
 
 // Engine addition (the map editor, src/editor): false in the game. CScApp.h says what it does.
 bool moho::gAppWindowed = false;
+
+// Engine addition (the map editor, src/editor): null in the game. CScApp.h says what it does.
+void (*moho::gAppBeforeDeviceCreate)(gpg::gal::DeviceContext& context, void* frameWindow) = nullptr;

@@ -24,6 +24,14 @@ namespace moho
    * adapter, `/windowed`, `/fullscreen`). False in the game.
    */
   extern bool gAppWindowed;
+
+  /**
+   * Engine addition (the map editor): called by `CScApp::CreateAppFrame` just before the device is created,
+   * with the context and the top-level frame's window. The editor adds a head there for its own panels (a
+   * child window of the frame); the game's viewport was made for the heads before it, so it draws only those.
+   * Null in the game.
+   */
+  extern void (*gAppBeforeDeviceCreate)(gpg::gal::DeviceContext& context, void* frameWindow);
 } // namespace moho
 
 class CScApp final : public moho::IWinApp

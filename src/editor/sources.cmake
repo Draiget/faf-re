@@ -6,5 +6,6 @@ set(FAF_EDITOR_SOURCES
   EdLog.cpp
   EdPlay.cpp
   EdShell.cpp
+  EdTools.cpp
   ui/EdImGuiRenderer.cpp
 )

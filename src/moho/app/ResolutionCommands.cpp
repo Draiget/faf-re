@@ -6,7 +6,9 @@
 #include <cstdlib>
 
 #include "gpg/gal/Device.hpp"
+#include "gpg/core/utils/Logging.h"
 #include "gpg/gal/DeviceContext.hpp"
+#include "moho/app/CScApp.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/console/CConCommand.h"
 #include "moho/console/CConFunc.h"
@@ -86,6 +88,13 @@ namespace moho
 {
   void SC_PrimaryAdapter(const fa::vector<fa::string>& args)
   {
+    // Engine addition (moho::gAppWindowed): the map editor keeps its own window; the game's display
+    // option (Options, Video, primary adapter) would make it a borderless or fixed-size frame.
+    if (gAppWindowed) {
+      gpg::Logf("SC_PrimaryAdapter: the map editor keeps its window");
+      return;
+    }
+
     gpg::gal::Device* const deviceInstance = gpg::gal::Device::GetInstance();
     CD3DDevice* const device = D3D_GetDevice();
 

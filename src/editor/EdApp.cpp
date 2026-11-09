@@ -11,16 +11,20 @@
 #include "editor/EdPlay.h"
 #include "editor/EdShell.h"
 #include "editor/ui/EdImGuiRenderer.h"
+#include "gpg/core/diagnostics/CrashHooks.h"
+#include "gpg/core/diagnostics/CrashReport.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
+#include "gpg/gal/Error.hpp"
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "moho/app/CScApp.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/misc/StartupHelpers.h"
-#include "moho/render/IEdRenderHook.h"
 #include "moho/render/WRenViewport.h"
+#include "moho/render/d3d/CD3DDevice.h"
 
 // imgui_impl_win32.h leaves this declaration to the application.
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -44,53 +48,99 @@ namespace faf::editor
       return error ? std::filesystem::path{} : folder;
     }
 
-    /** Draws the editor's ImGui frame at the end of the game's UI pass (`WRenViewport::RenderUI`). */
-    class EdRenderHook final : public moho::IEdRenderHook
-    {
-    public:
-      explicit EdRenderHook(EdImGuiRenderer& renderer)
-        : mRenderer(renderer)
-      {}
-
-      void Render() override { mRenderer.Render(ImGui::GetDrawData()); }
-
-    private:
-      EdImGuiRenderer& mRenderer;
-    };
-
     // The window procedures the editor put in front of the game's, and what they replaced.
     WNDPROC gViewportProc = nullptr;
     WNDPROC gFrameProc = nullptr;
     bool gWindowClosing = false;
 
-    [[nodiscard]] bool IsMouseMessage(const UINT message)
-    {
-      return (message >= WM_MOUSEFIRST && message <= WM_MOUSELAST) || message == WM_MOUSEHOVER || message == WM_MOUSELEAVE;
-    }
+    // The editor's panels: a child window of the game's frame under the game's viewport, with its own head on
+    // the device (moho::gAppBeforeDeviceCreate). The game draws its head 0 into the viewport, which the editor
+    // keeps over the middle of the dock layout; ImGui draws head 1 here, around it.
+    constexpr wchar_t kPanelWindowClass[] = L"FafMapEditorPanels";
+    HWND gPanelWindow = nullptr;
+    constexpr std::uint32_t kPanelHead = 1U;
 
-    [[nodiscard]] bool IsKeyboardMessage(const UINT message)
+    // The window's menu bar (File, View, Play): outside the game's picture, so the game's interface keeps its
+    // whole area. Its commands go to the running app.
+    enum EMenuCommand : UINT
     {
-      return (message >= WM_KEYFIRST && message <= WM_KEYLAST) || message == WM_SYSKEYDOWN || message == WM_SYSKEYUP;
-    }
+      kMenuExit = 1001,
+      kMenuTools = 1101,
+      kMenuMap = 1102,
+      kMenuLog = 1103,
+      kMenuPanelsWhilePlaying = 1104,
+      kMenuResetLayout = 1105,
+      kMenuImGuiDemo = 1106,
+      kMenuPlayStop = 1201,
+      kMenuFirstMap = 2000,
+    };
+
+    class EditorApp;
+    EditorApp* gEditorApp = nullptr;
+    void OnMenuCommand(UINT command);
+    void OnMenuOpening(HMENU menu);
+    [[nodiscard]] bool SessionActive();
 
     /**
-     * The game viewport's input goes to ImGui first. What ImGui takes (the mouse over a panel, the keyboard in
-     * a text field) stops there; the rest reaches the game as before.
+     * The game's viewport keeps its own input (mouse and keys reach the game as in the game); only F5, the
+     * editor's Play/Stop, stops here, whatever a player's own key bindings say.
      */
     LRESULT CALLBACK EditorViewportProc(const HWND window, const UINT message, const WPARAM wParam, const LPARAM lParam)
     {
-      if (ImGui::GetCurrentContext() != nullptr) {
-        const ImGuiIO& io = ImGui::GetIO();
-        // The cursor is the game's unless it is over a panel.
-        if (message != WM_SETCURSOR || io.WantCaptureMouse) {
-          (void)ImGui_ImplWin32_WndProcHandler(window, message, wParam, lParam);
+      if ((message == WM_KEYDOWN || message == WM_KEYUP) && wParam == VK_F5) {
+        if (message == WM_KEYDOWN && (lParam & (1 << 30)) == 0) {
+          OnMenuCommand(kMenuPlayStop);
         }
-        if ((IsMouseMessage(message) && io.WantCaptureMouse) || (IsKeyboardMessage(message) && io.WantCaptureKeyboard) ||
-            (message == WM_CHAR && io.WantTextInput) || (message == WM_SETCURSOR && io.WantCaptureMouse)) {
-          return message == WM_SETCURSOR ? TRUE : 0;
-        }
+        return 0;
       }
       return ::CallWindowProcW(gViewportProc, window, message, wParam, lParam);
+    }
+
+    /** The panels' window: its input is ImGui's; a click takes the keyboard focus from the game. */
+    LRESULT CALLBACK PanelWindowProc(const HWND window, const UINT message, const WPARAM wParam, const LPARAM lParam)
+    {
+      if (message == WM_LBUTTONDOWN || message == WM_RBUTTONDOWN || message == WM_MBUTTONDOWN) {
+        ::SetFocus(window);
+      }
+      if (ImGui::GetCurrentContext() != nullptr && ImGui_ImplWin32_WndProcHandler(window, message, wParam, lParam) != 0) {
+        return 1;
+      }
+      if (message == WM_ERASEBKGND) {
+        return 1;
+      }
+      return ::DefWindowProcW(window, message, wParam, lParam);
+    }
+
+    /** moho::gAppBeforeDeviceCreate: the panels' window, under the game's viewport, and its head. */
+    void AddPanelHead(gpg::gal::DeviceContext& context, void* const frameWindow)
+    {
+      const HWND frame = static_cast<HWND>(frameWindow);
+      const HINSTANCE instance = ::GetModuleHandleW(nullptr);
+      WNDCLASSEXW windowClass{};
+      windowClass.cbSize = sizeof(windowClass);
+      windowClass.style = CS_DBLCLKS;
+      windowClass.lpfnWndProc = &PanelWindowProc;
+      windowClass.hInstance = instance;
+      windowClass.hCursor = ::LoadCursorW(nullptr, IDC_ARROW);
+      windowClass.lpszClassName = kPanelWindowClass;
+      (void)::RegisterClassExW(&windowClass);
+
+      RECT client{};
+      ::GetClientRect(frame, &client);
+      const int width = std::max(1L, client.right - client.left);
+      const int height = std::max(1L, client.bottom - client.top);
+      gPanelWindow = ::CreateWindowExW(0, kPanelWindowClass, L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS, 0, 0, width, height,
+                                       frame, nullptr, instance, nullptr);
+      ::SetWindowPos(gPanelWindow, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+
+      gpg::gal::Head head{};
+      head.mWindowed = false; // a window (the flag is the full-screen one)
+      head.mWidth = static_cast<std::uint32_t>(width);
+      head.mHeight = static_cast<std::uint32_t>(height);
+      head.framesPerSecond = 60U;
+      head.mHandle = frame;
+      head.mWindow = gPanelWindow;
+      context.AddHead(head);
     }
 
     /**
@@ -107,7 +157,33 @@ namespace faf::editor
         }
         return 0;
       }
+      if (message == WM_COMMAND && HIWORD(wParam) == 0 && LOWORD(wParam) >= kMenuExit) {
+        OnMenuCommand(LOWORD(wParam));
+        return 0;
+      }
+      if (message == WM_INITMENUPOPUP) {
+        OnMenuOpening(reinterpret_cast<HMENU>(wParam));
+        return 0;
+      }
+      // Alt alone opens the menu bar; during play the game has Alt (its own bindings), so only a click does.
+      if (message == WM_SYSCOMMAND && (wParam & 0xFFF0U) == SC_KEYMENU && lParam == 0 && SessionActive()) {
+        return 0;
+      }
       return ::CallWindowProcW(gFrameProc, window, message, wParam, lParam);
+    }
+
+    /** UTF-8 to the window's text. */
+    [[nodiscard]] std::wstring Widen(const std::string& text)
+    {
+      if (text.empty()) {
+        return {};
+      }
+      const int length = ::MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+      std::wstring wide(static_cast<std::size_t>(length > 0 ? length : 0), L'\0');
+      if (length > 0) {
+        (void)::MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), wide.data(), length);
+      }
+      return wide;
     }
 
     [[nodiscard]] HWND HandleOf(const wxWindow* const window)
@@ -132,13 +208,27 @@ namespace faf::editor
       void Destroy() override;
       bool AppDoSuppressWindowsKeys() const override { return mGame.AppDoSuppressWindowsKeys(); }
 
+      void HandleMenuCommand(UINT command);
+      void UpdateMenu();
+      [[nodiscard]] bool SessionActive() const { return mPlay.Active(); }
+
     private:
       void SetUpImGui();
+      void BuildMenu(HWND frame);
+      void UpdateTitle();
+      void RenderPanels();
+      void FitGameView();
+
+      HMENU mMenuBar = nullptr;
+      HMENU mViewMenu = nullptr;
+      HMENU mPlayMenu = nullptr;
+      HMENU mMapMenu = nullptr;
+      std::wstring mBaseTitle;
+      std::wstring mShownTitle;
 
       CScApp mGame;
       EdLog mLog;
       EdImGuiRenderer mRenderer;
-      EdRenderHook mHook{mRenderer};
       EdPlay mPlay;
       EdShell* mShell = nullptr;
       std::string mIniPath;
@@ -158,6 +248,8 @@ namespace faf::editor
       }
       // One maximized, movable, resizable window, whatever the game's display options say.
       moho::gAppWindowed = true;
+      // The panels' window and its head (head 1); the game keeps head 0 for its viewport.
+      moho::gAppBeforeDeviceCreate = &AddPanelHead;
 
       if (!mGame.Init()) {
         ::MessageBoxW(nullptr, L"Neither Direct3D 12 nor Vulkan started, or the game data could not be read. See the log.",
@@ -170,14 +262,15 @@ namespace faf::editor
 
       const HWND frame = HandleOf(mGame.supcomFrame);
       const HWND viewport = HandleOf(moho::ren_Viewport);
-      if (frame == nullptr || viewport == nullptr) {
-        gpg::Warnf("editor: the game window is missing");
+      const gpg::gal::DeviceContext* const context = gpg::gal::Device::GetInstance()->GetDeviceContext();
+      if (frame == nullptr || viewport == nullptr || gPanelWindow == nullptr || context->GetHeadCount() <= static_cast<int>(kPanelHead)) {
+        gpg::Warnf("editor: the game window, its viewport or the panels' window is missing");
         return false;
       }
-      const gpg::gal::DeviceContext* const context = gpg::gal::Device::GetInstance()->GetDeviceContext();
       const char* const api = context->mDeviceType == DeviceApi::Vulkan ? "Vulkan" : "Direct3D 12";
-      const std::wstring title = std::wstring(kTitle) + L" [" + std::wstring(api, api + std::char_traits<char>::length(api)) + L"]";
-      ::SetWindowTextW(frame, title.c_str());
+      mBaseTitle = std::wstring(kTitle) + L" [" + std::wstring(api, api + std::char_traits<char>::length(api)) + L"]";
+      ::SetWindowTextW(frame, mBaseTitle.c_str());
+      mShownTitle = mBaseTitle;
 
       gViewportProc = reinterpret_cast<WNDPROC>(::SetWindowLongPtrW(viewport, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&EditorViewportProc)));
       gFrameProc = reinterpret_cast<WNDPROC>(::SetWindowLongPtrW(frame, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&EditorFrameProc)));
@@ -188,10 +281,11 @@ namespace faf::editor
         return false;
       }
       mImGuiReady = true;
-      moho::ED_SetHook(&mHook);
       mPlay.FindMaps();
       mPlay.ReadCommandLine();
       mShell = new EdShell(mLog, mPlay);
+      gEditorApp = this;
+      BuildMenu(frame);
       gpg::Logf("editor: ready on %s", api);
       return true;
     }
@@ -222,8 +316,7 @@ namespace faf::editor
       style.Colors[ImGuiCol_CheckMark] = ImVec4(0.89f, 0.58f, 0.26f, 1.0f);
       style.Colors[ImGuiCol_SliderGrab] = ImVec4(0.89f, 0.58f, 0.26f, 1.0f);
 
-      const HWND viewport = HandleOf(moho::ren_Viewport);
-      const float dpiScale = ImGui_ImplWin32_GetDpiScaleForHwnd(viewport);
+      const float dpiScale = ImGui_ImplWin32_GetDpiScaleForHwnd(gPanelWindow);
       style.ScaleAllSizes(dpiScale);
       style.FontScaleDpi = dpiScale;
       io.ConfigDpiScaleFonts = true;
@@ -233,27 +326,153 @@ namespace faf::editor
       if (std::filesystem::exists(segoe, error)) {
         (void)io.Fonts->AddFontFromFileTTF(segoe.string().c_str(), 16.0f);
       }
-      ImGui_ImplWin32_Init(viewport);
+      ImGui_ImplWin32_Init(gPanelWindow);
+    }
+
+    void EditorApp::BuildMenu(const HWND frame)
+    {
+      HMENU file = ::CreatePopupMenu();
+      ::AppendMenuW(file, MF_STRING | MF_GRAYED, 0, L"&New map...\tCtrl+N");
+      ::AppendMenuW(file, MF_STRING | MF_GRAYED, 0, L"&Open map...\tCtrl+O");
+      ::AppendMenuW(file, MF_STRING | MF_GRAYED, 0, L"&Save\tCtrl+S");
+      ::AppendMenuW(file, MF_SEPARATOR, 0, nullptr);
+      ::AppendMenuW(file, MF_STRING, kMenuExit, L"E&xit");
+
+      mViewMenu = ::CreatePopupMenu();
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuTools, L"&Tools");
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuMap, L"&Map");
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuLog, L"&Log");
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuPanelsWhilePlaying, L"&Panels while playing");
+      ::AppendMenuW(mViewMenu, MF_SEPARATOR, 0, nullptr);
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuResetLayout, L"&Reset layout");
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuImGuiDemo, L"ImGui &demo");
+
+      mMapMenu = ::CreatePopupMenu();
+      const std::vector<std::string>& maps = mPlay.Maps();
+      for (std::size_t i = 0; i < maps.size(); ++i) {
+        const std::wstring label = Widen(mPlay.Titles()[i]) + L"  (" + Widen(MapDisplayName(maps[i])) + L")";
+        ::AppendMenuW(mMapMenu, MF_STRING | ((i % 32U == 0U && i != 0U) ? MF_MENUBARBREAK : 0U), kMenuFirstMap + i, label.c_str());
+      }
+      mPlayMenu = ::CreatePopupMenu();
+      ::AppendMenuW(mPlayMenu, MF_STRING, kMenuPlayStop, L"&Play\tF5");
+      ::AppendMenuW(mPlayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(mMapMenu), L"&Map");
+
+      mMenuBar = ::CreateMenu();
+      ::AppendMenuW(mMenuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(file), L"&File");
+      ::AppendMenuW(mMenuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(mViewMenu), L"&View");
+      ::AppendMenuW(mMenuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(mPlayMenu), L"&Play");
+      ::SetMenu(frame, mMenuBar);
+      // The client area loses the menu's height; the game's frame resizes its viewport and the device to it
+      // (WSupComFrame's size handler), so the game's interface lays out below the menu.
+      ::SetWindowPos(frame, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+      ::DrawMenuBar(frame);
+    }
+
+    void EditorApp::UpdateMenu()
+    {
+      const auto check = [&](const UINT id, const bool on) { ::CheckMenuItem(mViewMenu, id, MF_BYCOMMAND | (on ? MF_CHECKED : MF_UNCHECKED)); };
+      check(kMenuTools, mShell->ShowTools());
+      check(kMenuMap, mShell->ShowMap());
+      check(kMenuLog, mShell->ShowLog());
+      check(kMenuPanelsWhilePlaying, mShell->PanelsWhilePlaying());
+      check(kMenuImGuiDemo, mShell->ShowDemo());
+
+      const bool active = mPlay.Active();
+      ::ModifyMenuW(mPlayMenu, kMenuPlayStop, MF_BYCOMMAND | MF_STRING | ((active || mPlay.CanPlay()) ? MF_ENABLED : MF_GRAYED),
+                    kMenuPlayStop, active ? L"&Stop\tF5" : L"&Play\tF5");
+      const int count = static_cast<int>(mPlay.Maps().size());
+      for (int i = 0; i < count; ++i) {
+        ::CheckMenuItem(mMapMenu, kMenuFirstMap + i, MF_BYCOMMAND | (i == mPlay.Selected() ? MF_CHECKED : MF_UNCHECKED));
+        ::EnableMenuItem(mMapMenu, kMenuFirstMap + i, MF_BYCOMMAND | (active ? MF_GRAYED : MF_ENABLED));
+      }
+    }
+
+    void EditorApp::HandleMenuCommand(const UINT command)
+    {
+      switch (command) {
+      case kMenuExit:
+        mShell->RequestExit();
+        return;
+      case kMenuTools:
+        mShell->ShowTools() = !mShell->ShowTools();
+        return;
+      case kMenuMap:
+        mShell->ShowMap() = !mShell->ShowMap();
+        return;
+      case kMenuLog:
+        mShell->ShowLog() = !mShell->ShowLog();
+        return;
+      case kMenuPanelsWhilePlaying:
+        mShell->PanelsWhilePlaying() = !mShell->PanelsWhilePlaying();
+        return;
+      case kMenuResetLayout:
+        mShell->ResetLayout();
+        return;
+      case kMenuImGuiDemo:
+        mShell->ShowDemo() = !mShell->ShowDemo();
+        return;
+      case kMenuPlayStop:
+        if (mPlay.Active()) {
+          mPlay.Stop();
+        } else if (mPlay.CanPlay()) {
+          mPlay.Play();
+        }
+        return;
+      default:
+        if (command >= kMenuFirstMap && command < kMenuFirstMap + mPlay.Maps().size() && !mPlay.Active()) {
+          mPlay.Select(static_cast<int>(command - kMenuFirstMap));
+        }
+        return;
+      }
+    }
+
+    void EditorApp::UpdateTitle()
+    {
+      std::wstring title = mBaseTitle;
+      if (mPlay.Active() && !mPlay.Maps().empty()) {
+        const std::size_t at = static_cast<std::size_t>(mPlay.Selected());
+        title += L" - " + Widen(mPlay.StateText()) + L" " + Widen(mPlay.Titles()[at]) + L" (" + Widen(MapDisplayName(mPlay.Maps()[at])) + L")";
+      }
+      if (title != mShownTitle) {
+        mShownTitle = title;
+        ::SetWindowTextW(HandleOf(mGame.supcomFrame), title.c_str());
+      }
+    }
+
+    void OnMenuCommand(const UINT command)
+    {
+      if (gEditorApp != nullptr) {
+        gEditorApp->HandleMenuCommand(command);
+      }
+    }
+
+    void OnMenuOpening(const HMENU menu)
+    {
+      (void)menu;
+      if (gEditorApp != nullptr) {
+        gEditorApp->UpdateMenu();
+      }
+    }
+
+    bool SessionActive()
+    {
+      return gEditorApp != nullptr && gEditorApp->SessionActive();
     }
 
     void EditorApp::Main()
     {
+      UpdateTitle();
       // Stop, and the game's own way out of a session (its menu's exit, a defeat screen's "exit"), end the
       // session here, before CScApp::Main runs WLD_Frame: the game would go on to its main menu.
       mPlay.BeforeGameFrame();
 
       if (mImGuiReady) {
-        ImGuiIO& io = ImGui::GetIO();
-        // The game owns the cursor's look except over a panel.
-        if (io.WantCaptureMouse) {
-          io.ConfigFlags &= ~ImGuiConfigFlags_NoMouseCursorChange;
-        } else {
-          io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
-        }
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         mShell->Draw();
         ImGui::Render();
+        FitGameView();
+        RenderPanels();
       }
 
       mGame.Main();
@@ -269,9 +488,90 @@ namespace faf::editor
       }
     }
 
+    void EditorApp::RenderPanels()
+    {
+      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+      const gpg::gal::DeviceContext* const context = device->GetDeviceContext();
+      if (context->GetHeadCount() <= static_cast<int>(kPanelHead) || ::IsIconic(HandleOf(mGame.supcomFrame)) != FALSE) {
+        return;
+      }
+      // The panels' head, drawn now and presented with the game's head at the game's next paint
+      // (CD3DDevice::Paint presents every head).
+      const gpg::gal::Head& head = context->GetHead(kPanelHead);
+      device->ClearTarget(device->GetHeadOutputContext(kPanelHead));
+      device->BeginScene();
+      D3DVIEWPORT9 viewport{};
+      viewport.Width = head.mWidth;
+      viewport.Height = head.mHeight;
+      viewport.MaxZ = 1.0f;
+      device->SetViewport(&viewport);
+      device->Clear(true, false, false, 0xFF1C1F25U, 1.0f, 0);
+      mRenderer.Render(ImGui::GetDrawData());
+      device->EndScene();
+    }
+
+    void EditorApp::FitGameView()
+    {
+      const HWND frame = HandleOf(mGame.supcomFrame);
+      const HWND view = HandleOf(moho::ren_Viewport);
+      moho::CD3DDevice* const d3d = moho::D3D_GetDevice();
+      if (frame == nullptr || view == nullptr || d3d == nullptr || ::IsIconic(frame) != FALSE) {
+        return;
+      }
+      RECT client{};
+      ::GetClientRect(frame, &client);
+      const int clientWidth = std::max(1L, client.right);
+      const int clientHeight = std::max(1L, client.bottom);
+
+      // The game's picture fills the dock layout's middle (ImGui's pixels are the panels' window's, which covers
+      // the frame's client area from its corner).
+      const ImVec4 middle = mShell->GameViewRect();
+      int x = static_cast<int>(middle.x);
+      int y = static_cast<int>(middle.y);
+      int width = std::max(64, static_cast<int>(middle.z));
+      int height = std::max(64, static_cast<int>(middle.w));
+      if (middle.z <= 0.0f || middle.w <= 0.0f) {
+        x = 0;
+        y = 0;
+        width = clientWidth;
+        height = clientHeight;
+      }
+
+      RECT panel{};
+      ::GetClientRect(gPanelWindow, &panel);
+      if (panel.right != clientWidth || panel.bottom != clientHeight) {
+        ::MoveWindow(gPanelWindow, 0, 0, clientWidth, clientHeight, FALSE);
+      }
+      RECT viewRect{};
+      ::GetWindowRect(view, &viewRect);
+      ::MapWindowPoints(nullptr, frame, reinterpret_cast<POINT*>(&viewRect), 2);
+      if (viewRect.left != x || viewRect.top != y || viewRect.right - viewRect.left != width || viewRect.bottom - viewRect.top != height) {
+        moho::ren_Viewport->SetSize(x, y, width, height);
+      }
+
+      // The heads follow: the game's head 0 the viewport, the panels' head the client area. The game's own frame
+      // handler sets head 0 to the whole client area when the window is resized; this puts it back.
+      const gpg::gal::DeviceContext* const active = gpg::gal::Device::GetInstance()->GetDeviceContext();
+      if (active->GetHeadCount() <= static_cast<int>(kPanelHead)) {
+        return;
+      }
+      const gpg::gal::Head& gameHead = active->GetHead(0);
+      const gpg::gal::Head& panelHead = active->GetHead(kPanelHead);
+      if (gameHead.mWidth != static_cast<std::uint32_t>(width) || gameHead.mHeight != static_cast<std::uint32_t>(height) ||
+          panelHead.mWidth != static_cast<std::uint32_t>(clientWidth) || panelHead.mHeight != static_cast<std::uint32_t>(clientHeight)) {
+        gpg::gal::DeviceContext context(*active);
+        context.GetHead(0).mWidth = static_cast<std::uint32_t>(width);
+        context.GetHead(0).mHeight = static_cast<std::uint32_t>(height);
+        context.GetHead(kPanelHead).mWidth = static_cast<std::uint32_t>(clientWidth);
+        context.GetHead(kPanelHead).mHeight = static_cast<std::uint32_t>(clientHeight);
+        d3d->Clear();
+        (void)d3d->InitContext(&context);
+      }
+    }
+
     void EditorApp::Destroy()
     {
-      moho::ED_SetHook(nullptr);
+      gEditorApp = nullptr;
       if (mImGuiReady) {
         mRenderer.Shutdown();
         ImGui_ImplWin32_Shutdown();
@@ -291,10 +591,81 @@ namespace faf::editor
     }
   } // namespace
 
+  namespace
+  {
+    /** `gpg::Die` writes the crash report and ends the process, as the game's WinMain sets it up. */
+    void EditorDieHandler(const char* const message)
+    {
+      gpg::diag::CrashReportContext reportContext{};
+      reportContext.reason = (message != nullptr) ? message : "engine Die()";
+      gpg::diag::HandleFatalPath(reportContext);
+    }
+
+    /**
+     * The accessibility hotkeys (sticky, toggle and filter keys) the game turns off while it runs, so holding
+     * Shift doesn't open their dialogs, and puts back when it ends (WinMain's
+     * ConfigureAccessibilitySystemParameters).
+     */
+    class AccessibilityKeys
+    {
+    public:
+      AccessibilityKeys()
+      {
+        (void)::SystemParametersInfoW(SPI_GETSTICKYKEYS, sizeof(STICKYKEYS), &mSticky, 0);
+        (void)::SystemParametersInfoW(SPI_GETTOGGLEKEYS, sizeof(TOGGLEKEYS), &mToggle, 0);
+        (void)::SystemParametersInfoW(SPI_GETFILTERKEYS, sizeof(FILTERKEYS), &mFilter, 0);
+        if ((mSticky.dwFlags & SKF_STICKYKEYSON) == 0) {
+          STICKYKEYS next = mSticky;
+          next.dwFlags &= ~(SKF_HOTKEYACTIVE | SKF_CONFIRMHOTKEY);
+          (void)::SystemParametersInfoW(SPI_SETSTICKYKEYS, sizeof(STICKYKEYS), &next, 0);
+        }
+        if ((mToggle.dwFlags & TKF_TOGGLEKEYSON) == 0) {
+          TOGGLEKEYS next = mToggle;
+          next.dwFlags &= ~(TKF_HOTKEYACTIVE | TKF_CONFIRMHOTKEY);
+          (void)::SystemParametersInfoW(SPI_SETTOGGLEKEYS, sizeof(TOGGLEKEYS), &next, 0);
+        }
+        if ((mFilter.dwFlags & FKF_FILTERKEYSON) == 0) {
+          FILTERKEYS next = mFilter;
+          next.dwFlags &= ~(FKF_HOTKEYACTIVE | FKF_CONFIRMHOTKEY);
+          (void)::SystemParametersInfoW(SPI_SETFILTERKEYS, sizeof(FILTERKEYS), &next, 0);
+        }
+      }
+
+      ~AccessibilityKeys()
+      {
+        (void)::SystemParametersInfoW(SPI_SETSTICKYKEYS, sizeof(STICKYKEYS), &mSticky, 0);
+        (void)::SystemParametersInfoW(SPI_SETTOGGLEKEYS, sizeof(TOGGLEKEYS), &mToggle, 0);
+        (void)::SystemParametersInfoW(SPI_SETFILTERKEYS, sizeof(FILTERKEYS), &mFilter, 0);
+      }
+
+      AccessibilityKeys(const AccessibilityKeys&) = delete;
+      AccessibilityKeys& operator=(const AccessibilityKeys&) = delete;
+
+    private:
+      STICKYKEYS mSticky{sizeof(STICKYKEYS), 0};
+      TOGGLEKEYS mToggle{sizeof(TOGGLEKEYS), 0};
+      FILTERKEYS mFilter{sizeof(FILTERKEYS), 0, 0, 0, 0, 0};
+    };
+  } // namespace
+
   int RunEditor()
   {
-    EditorApp app;
-    moho::WIN_AppExecute(&app);
-    return app.exitValue;
+    // What the game's WinMain does around its app, for the same app inside the editor.
+    gpg::SetThreadName(0xFFFFFFFFU, "Main");
+    gpg::diag::InstallCrtDiagnosticHooks({});
+    (void)gpg::SetDieHandler(&EditorDieHandler);
+    const AccessibilityKeys accessibilityKeys;
+
+    int exitCode = 0;
+    try {
+      EditorApp app;
+      moho::WIN_AppExecute(&app);
+      exitCode = app.exitValue;
+    } catch (const gpg::gal::Error& galError) {
+      gpg::Die("GAL Exception: file : %s(%d)\nerror: %s", galError.GetFile(), galError.GetLine(), galError.what());
+    } catch (const std::exception& error) {
+      gpg::Die("Unhandled exception:\n\n%s", error.what());
+    }
+    return exitCode;
   }
 } // namespace faf::editor

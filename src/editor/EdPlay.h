@@ -19,10 +19,16 @@ namespace faf::editor
   class EdPlay
   {
   public:
-    /** Lists the maps the game data has (`/maps/<name>/<name>_scenario.lua`, as Lua's DiskFindFiles). */
+    /**
+     * Lists the maps the game data has (`/maps/<name>/<name>_scenario.lua`, as Lua's DiskFindFiles), each with
+     * the title its scenario gives it (FAF's `/lua/ui/maputil.lua` LoadScenario, its `name`), sorted by title.
+     */
     void FindMaps();
 
+    /** The scenario paths, in the list's order. */
     [[nodiscard]] const std::vector<std::string>& Maps() const noexcept { return mMaps; }
+    /** Each map's title ("Seton's Clutch"), or its folder name when the scenario gives none. */
+    [[nodiscard]] const std::vector<std::string>& Titles() const noexcept { return mTitles; }
     [[nodiscard]] int Selected() const noexcept { return mSelected; }
     void Select(int index) noexcept { mSelected = index; }
 
@@ -61,14 +67,19 @@ namespace faf::editor
     std::chrono::steady_clock::time_point mSessionStart{};
 
     std::vector<std::string> mMaps;
+    std::vector<std::string> mTitles;
     int mSelected = 0;
     bool mPlayRequested = false;
     bool mStopRequested = false;
 
     bool mAutoRun = false;
+    std::vector<int> mAutoMaps;
+    std::size_t mAutoRunIndex = 0U;
     float mAutoSeconds = 0.0f;
     int mAutoCyclesLeft = 0;
     bool mAutoQuit = false;
+    bool mAutoExitApp = false;
+    bool mExitAppSent = false;
     bool mQuitRequested = false;
     double mPlayingSince = -1.0;
   };

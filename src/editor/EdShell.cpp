@@ -17,9 +17,6 @@ namespace faf::editor
     constexpr const char* kLogWindow = "Log";
     constexpr const char* kDockSpace = "EditorDockSpace";
 
-    // The tools the plan lists, in its order (.plans/map-editor, "Goal").
-    constexpr const char* kTools[] = {"Select", "Terrain", "Texture", "Water", "Props", "Decals", "Markers"};
-
     const ImVec4 kPlayGreen(0.24f, 0.55f, 0.28f, 1.0f);
     const ImVec4 kStopRed(0.62f, 0.22f, 0.20f, 1.0f);
   } // namespace
@@ -35,13 +32,26 @@ namespace faf::editor
     }
   }
 
+  void EdShell::HandleKeys()
+  {
+    // F5 plays the picked map or stops the running one, wherever the focus is (EdApp.cpp keeps it from the game).
+    if (ImGui::IsKeyPressed(ImGuiKey_F5, false)) {
+      if (mPlay.Active()) {
+        mPlay.Stop();
+      } else if (mPlay.CanPlay()) {
+        mPlay.Play();
+      }
+    }
+  }
+
   void EdShell::Draw()
   {
-    DrawMenuBar();
-    const bool panels = !mPlay.Active() || mPanelsWhilePlaying;
+    HandleKeys();
+    const bool playing = mPlay.Active();
+    const bool panels = !playing || mPanelsWhilePlaying;
 
-    // The dock space over the whole window. Its middle stays empty and lets the mouse through, so the game's
-    // picture and input are there.
+    // The dock space over the window. Its middle stays empty: the game's viewport is put over it (EdApp.cpp), so
+    // the game's picture and input are there, inside the panels.
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
     const float statusHeight = ImGui::GetFrameHeight();
     ImGui::SetNextWindowPos(viewport->WorkPos);
@@ -64,6 +74,9 @@ namespace faf::editor
       mResetLayout = false;
     }
     ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+    if (const ImGuiDockNode* const middle = ImGui::DockBuilderGetCentralNode(dockspaceId); middle != nullptr) {
+      mGameView = ImVec4(middle->Pos.x - viewport->Pos.x, middle->Pos.y - viewport->Pos.y, middle->Size.x, middle->Size.y);
+    }
     ImGui::End();
 
     if (panels) {
@@ -93,7 +106,7 @@ namespace faf::editor
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->WorkSize);
     ImGuiID center = dockspaceId;
-    const ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.17f, nullptr, &center);
+    const ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.21f, nullptr, &center);
     const ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.22f, nullptr, &center);
     const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.22f, nullptr, &center);
     ImGui::DockBuilderDockWindow(kToolsWindow, left);
@@ -102,110 +115,79 @@ namespace faf::editor
     ImGui::DockBuilderFinish(dockspaceId);
   }
 
-  void EdShell::DrawMenuBar()
-  {
-    if (!ImGui::BeginMainMenuBar()) {
-      return;
-    }
-    if (ImGui::BeginMenu("File")) {
-      ImGui::BeginDisabled();
-      ImGui::MenuItem("New map...", "Ctrl+N");
-      ImGui::MenuItem("Open map...", "Ctrl+O");
-      ImGui::MenuItem("Save", "Ctrl+S");
-      ImGui::MenuItem("Save as new version...");
-      ImGui::EndDisabled();
-      ImGui::Separator();
-      if (ImGui::MenuItem("Exit")) {
-        mExit = true;
-      }
-      ImGui::EndMenu();
-    }
-    if (ImGui::BeginMenu("View")) {
-      ImGui::MenuItem(kToolsWindow, nullptr, &mShowTools);
-      ImGui::MenuItem(kMapWindow, nullptr, &mShowMap);
-      ImGui::MenuItem(kLogWindow, nullptr, &mShowLog);
-      ImGui::MenuItem("Panels while playing", nullptr, &mPanelsWhilePlaying);
-      ImGui::Separator();
-      if (ImGui::MenuItem("Reset layout")) {
-        mResetLayout = true;
-      }
-      ImGui::MenuItem("ImGui demo", nullptr, &mShowDemo);
-      ImGui::EndMenu();
-    }
-
-    // The play bar: the map, Play or Stop, and what the session is doing.
-    ImGui::Separator();
-    const std::vector<std::string>& maps = mPlay.Maps();
-    const int selected = mPlay.Selected();
-    const std::string current = maps.empty() ? std::string("(no maps found)") : MapDisplayName(maps[static_cast<std::size_t>(selected)]);
-    ImGui::SetNextItemWidth(260.0f);
-    ImGui::BeginDisabled(mPlay.Active());
-    if (ImGui::BeginCombo("##map", current.c_str(), ImGuiComboFlags_HeightLarge)) {
-      static char filter[64] = "";
-      ImGui::SetNextItemWidth(-1.0f);
-      if (ImGui::IsWindowAppearing()) {
-        ImGui::SetKeyboardFocusHere();
-      }
-      ImGui::InputTextWithHint("##mapfilter", "Filter maps", filter, sizeof(filter));
-      for (int i = 0; i < static_cast<int>(maps.size()); ++i) {
-        const std::string name = MapDisplayName(maps[static_cast<std::size_t>(i)]);
-        if (filter[0] != '\0' && ImStristr(name.c_str(), nullptr, filter, nullptr) == nullptr) {
-          continue;
-        }
-        if (ImGui::Selectable(name.c_str(), i == selected)) {
-          mPlay.Select(i);
-        }
-        if (ImGui::IsItemHovered()) {
-          ImGui::SetTooltip("%s", maps[static_cast<std::size_t>(i)].c_str());
-        }
-      }
-      ImGui::EndCombo();
-    }
-    ImGui::EndDisabled();
-
-    if (!mPlay.Active()) {
-      ImGui::BeginDisabled(!mPlay.CanPlay());
-      ImGui::PushStyleColor(ImGuiCol_Button, kPlayGreen);
-      if (ImGui::Button("  Play  ") || (ImGui::IsKeyPressed(ImGuiKey_F5) && mPlay.CanPlay())) {
-        mPlay.Play();
-      }
-      ImGui::PopStyleColor();
-      ImGui::EndDisabled();
-    } else {
-      ImGui::PushStyleColor(ImGuiCol_Button, kStopRed);
-      if (ImGui::Button("  Stop  ") || ImGui::IsKeyPressed(ImGuiKey_F5)) {
-        mPlay.Stop();
-      }
-      ImGui::PopStyleColor();
-    }
-    ImGui::SetItemTooltip("F5");
-    ImGui::TextDisabled("%s", mPlay.StateText());
-    ImGui::EndMainMenuBar();
-  }
-
   void EdShell::DrawToolsPanel()
   {
     if (ImGui::Begin(kToolsWindow, &mShowTools)) {
-      for (int i = 0; i < static_cast<int>(IM_ARRAYSIZE(kTools)); ++i) {
-        if (ImGui::Selectable(kTools[i], mTool == i)) {
-          mTool = i;
-        }
-      }
-      ImGui::Separator();
-      ImGui::TextWrapped("The tools come in stages 3 to 6 of the plan (.plans/map-editor).");
+      mTools.Draw();
     }
     ImGui::End();
   }
 
   void EdShell::DrawMapPanel()
   {
-    if (ImGui::Begin(kMapWindow, &mShowMap)) {
-      ImGui::TextDisabled("No map open for editing.");
-      ImGui::Spacing();
-      ImGui::TextWrapped("Pick a map in the play bar and press Play (F5) to play it here; Stop or F5 returns to the editor.");
-      ImGui::Spacing();
-      ImGui::TextWrapped("Opening and saving FAF maps is stage 2 of the plan.");
+    if (!ImGui::Begin(kMapWindow, &mShowMap)) {
+      ImGui::End();
+      return;
     }
+    // Play: the picked map, Play or Stop, and what the session is doing.
+    const std::vector<std::string>& maps = mPlay.Maps();
+    const int selected = mPlay.Selected();
+    if (!mPlay.Active()) {
+      ImGui::BeginDisabled(!mPlay.CanPlay());
+      ImGui::PushStyleColor(ImGuiCol_Button, kPlayGreen);
+      if (ImGui::Button("Play  (F5)", ImVec2(-1.0f, 0.0f))) {
+        mPlay.Play();
+      }
+      ImGui::PopStyleColor();
+      ImGui::EndDisabled();
+    } else {
+      ImGui::PushStyleColor(ImGuiCol_Button, kStopRed);
+      if (ImGui::Button("Stop  (F5)", ImVec2(-1.0f, 0.0f))) {
+        mPlay.Stop();
+      }
+      ImGui::PopStyleColor();
+    }
+    const std::vector<std::string>& titles = mPlay.Titles();
+    if (!maps.empty()) {
+      const std::size_t at = static_cast<std::size_t>(selected);
+      ImGui::TextUnformatted(titles[at].c_str());
+      ImGui::SameLine();
+      ImGui::TextDisabled("%s", MapDisplayName(maps[at]).c_str());
+    }
+    ImGui::TextDisabled("%s", mPlay.StateText());
+    ImGui::Separator();
+
+    // Each map by its title, then its folder name; the filter matches either.
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::InputTextWithHint("##mapfilter", "Filter maps", mMapFilter, sizeof(mMapFilter));
+    ImGui::BeginDisabled(mPlay.Active());
+    if (ImGui::BeginChild("##maps", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
+      for (int i = 0; i < static_cast<int>(maps.size()); ++i) {
+        const std::size_t at = static_cast<std::size_t>(i);
+        const std::string folder = MapDisplayName(maps[at]);
+        if (mMapFilter[0] != '\0' && ImStristr(titles[at].c_str(), nullptr, mMapFilter, nullptr) == nullptr &&
+            ImStristr(folder.c_str(), nullptr, mMapFilter, nullptr) == nullptr) {
+          continue;
+        }
+        ImGui::PushID(i);
+        if (ImGui::Selectable("##map", i == selected, ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_AllowOverlap)) {
+          mPlay.Select(i);
+          if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && mPlay.CanPlay()) {
+            mPlay.Play();
+          }
+        }
+        if (ImGui::IsItemHovered()) {
+          ImGui::SetTooltip("%s\n%s\nDouble-click to play", titles[at].c_str(), maps[at].c_str());
+        }
+        ImGui::SameLine(ImGui::GetStyle().ItemSpacing.x);
+        ImGui::TextUnformatted(titles[at].c_str());
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", folder.c_str());
+        ImGui::PopID();
+      }
+    }
+    ImGui::EndChild();
+    ImGui::EndDisabled();
     ImGui::End();
   }
 
