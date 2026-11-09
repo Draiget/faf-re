@@ -2991,6 +2991,10 @@ namespace
     const GeomCamera3& camera, CD3DPrimBatcher& batcher, const std::int32_t tick, const float tickFraction, const bool isGlow
   ) const
   {
+    if (!ui_TransportPreOrders || !UserUnit::HasAnyTransportPreOrders()) {
+      return;
+    }
+
     for (const auto& entry : UserUnit::GetAllTransportPreOrders()) {
       const auto& orders = entry.second;
       if (orders.empty()) {
@@ -3074,6 +3078,10 @@ namespace
     const GeomCamera3& camera, CD3DPrimBatcher& batcher
   ) const
   {
+    if (!ui_TransportPreOrders || !UserUnit::HasAnyTransportPreOrders()) {
+      return;
+    }
+
     std::unordered_set<std::int32_t> drawnCommandIds;
 
     for (const auto& entry : UserUnit::GetAllTransportPreOrders()) {
@@ -3139,7 +3147,7 @@ namespace
 
   void UICommandGraph::UpdatePreOrderBuildMeshes()
   {
-    if (!UserUnit::HasAnyTransportPreOrders()) {
+    if (!ui_TransportPreOrders || !UserUnit::HasAnyTransportPreOrders()) {
       sPreOrderGhostMeshes.clear();
       return;
     }
@@ -3268,7 +3276,7 @@ namespace
   {
     const_cast<UICommandGraph*>(this)->UpdatePreOrderBuildMeshes();
 
-    if (!UserUnit::HasAnyTransportPreOrders()) {
+    if (!ui_TransportPreOrders || !UserUnit::HasAnyTransportPreOrders()) {
       return;
     }
 

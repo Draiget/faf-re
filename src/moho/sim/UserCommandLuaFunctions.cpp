@@ -1436,6 +1436,11 @@ namespace moho
       return 0;
     }
 
+    if (!ui_TransportPreOrders) {
+      lua_pushboolean(state->m_state, 0);
+      return 1;
+    }
+
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);
     if (argumentCount < 2 || argumentCount > 4) {

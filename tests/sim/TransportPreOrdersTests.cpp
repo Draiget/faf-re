@@ -470,4 +470,32 @@ namespace
     unit->ClearTransportPreOrders();
     EXPECT_FALSE(unit->HasTransportPreOrders());
   }
+
+  TEST(TransportPreOrdersTests, ConVarSwitchTogglesFeature)
+  {
+    MockUserUnitScope scope;
+    UserUnit* unit = scope.GetUnit(902);
+
+    // Disable feature via switch
+    moho::ui_TransportPreOrders = false;
+
+    SSTICommandIssueData moveCmd(EUnitCommandType::UNITCOMMAND_Move);
+    moveCmd.mTarget.mPos = Wm3::Vector3f(100.0f, 0.0f, 100.0f);
+    unit->QueueTransportPreOrder(moveCmd, false);
+
+    EXPECT_FALSE(unit->HasTransportPreOrders());
+    EXPECT_FALSE(UserUnit::HasAnyTransportPreOrders());
+    EXPECT_TRUE(unit->GetTransportPreOrders().empty());
+
+    // Re-enable feature via switch
+    moho::ui_TransportPreOrders = true;
+
+    unit->QueueTransportPreOrder(moveCmd, false);
+    EXPECT_TRUE(unit->HasTransportPreOrders());
+    EXPECT_TRUE(UserUnit::HasAnyTransportPreOrders());
+    EXPECT_EQ(unit->GetTransportPreOrders().size(), 1u);
+
+    unit->ClearTransportPreOrders();
+    EXPECT_FALSE(unit->HasTransportPreOrders());
+  }
 }

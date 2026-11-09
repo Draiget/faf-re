@@ -37,6 +37,7 @@ namespace LuaPlus
 
 namespace moho
 {
+  extern bool ui_TransportPreOrders;
   struct SSTIEntityVariableData;
   enum class EUnitCommandType : std::int32_t;
   class UserEntity;

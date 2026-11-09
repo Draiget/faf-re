@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include <vector>
 
+bool moho::ui_TransportPreOrders = true;
+
 namespace
 {
   static std::unordered_map<std::uint32_t, std::vector<moho::SSTICommandIssueData>> sTransportPreOrders;
@@ -848,7 +850,7 @@ UserUnit::~UserUnit()
 
 void UserUnit::QueueTransportPreOrders(const gpg::fastvector<UserUnit*>& units, const SSTICommandIssueData& order, const bool clearQueue)
 {
-  if (units.empty()) {
+  if (!ui_TransportPreOrders || units.empty()) {
     return;
   }
   SSTICommandIssueData finalOrder = order;
@@ -865,7 +867,7 @@ void UserUnit::QueueTransportPreOrders(const gpg::fastvector<UserUnit*>& units, 
 
 void UserUnit::QueueTransportPreOrders(const std::vector<UserUnit*>& units, const SSTICommandIssueData& order, const bool clearQueue)
 {
-  if (units.empty()) {
+  if (!ui_TransportPreOrders || units.empty()) {
     return;
   }
   SSTICommandIssueData finalOrder = order;
@@ -882,6 +884,9 @@ void UserUnit::QueueTransportPreOrders(const std::vector<UserUnit*>& units, cons
 
 void UserUnit::QueueTransportPreOrder(const SSTICommandIssueData& order, bool clearQueue)
 {
+  if (!ui_TransportPreOrders) {
+    return;
+  }
   auto& queue = sTransportPreOrders[this->mParams.mEntityId];
   if (order.mCommandType == EUnitCommandType::UNITCOMMAND_Stop) {
     queue.clear();
@@ -1032,6 +1037,9 @@ void UserUnit::ClearSelectionBracketPositionOverride()
 
 bool UserUnit::HasSelectionBracketPositionOverride() const
 {
+  if (!ui_TransportPreOrders) {
+    return false;
+  }
   const auto it = sSelectionBracketPositionOverrides.find(this->mParams.mEntityId);
   return it != sSelectionBracketPositionOverrides.end();
 }
@@ -1047,6 +1055,9 @@ Wm3::Vector3f UserUnit::GetSelectionBracketPositionOverride() const
 
 std::vector<SSTICommandIssueData> UserUnit::GetTransportPreOrders() const
 {
+  if (!ui_TransportPreOrders) {
+    return {};
+  }
   const auto it = sTransportPreOrders.find(this->mParams.mEntityId);
   if (it != sTransportPreOrders.end()) {
     return it->second;
@@ -1056,12 +1067,18 @@ std::vector<SSTICommandIssueData> UserUnit::GetTransportPreOrders() const
 
 bool UserUnit::HasTransportPreOrders() const
 {
+  if (!ui_TransportPreOrders) {
+    return false;
+  }
   const auto it = sTransportPreOrders.find(this->mParams.mEntityId);
   return it != sTransportPreOrders.end() && !it->second.empty();
 }
 
 bool UserUnit::HasAnyTransportPreOrders()
 {
+  if (!ui_TransportPreOrders) {
+    return false;
+  }
   return !sTransportPreOrders.empty();
 }
 
@@ -1072,7 +1089,7 @@ const std::unordered_map<std::uint32_t, std::vector<moho::SSTICommandIssueData>>
 
 void UserUnit::DispatchDisembarkedPreOrders()
 {
-  if (!HasTransportPreOrders()) {
+  if (!ui_TransportPreOrders || !HasTransportPreOrders()) {
     return;
   }
   const auto preOrders = GetTransportPreOrders();
