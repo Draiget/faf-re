@@ -14,6 +14,12 @@ namespace
   struct MockUserUnitScope
   {
     alignas(UserUnit) std::byte mStorage[sizeof(UserUnit)]{};
+    bool mPrevSwitchState{moho::ui_TransportPreOrders};
+
+    MockUserUnitScope()
+    {
+      moho::ui_TransportPreOrders = true;
+    }
 
     UserUnit* GetUnit(std::uint32_t entityId)
     {
@@ -28,6 +34,7 @@ namespace
         unit->ClearTransportPreOrders();
         unit->ClearSelectionBracketPositionOverride();
       }
+      moho::ui_TransportPreOrders = mPrevSwitchState;
     }
   };
 
@@ -497,5 +504,10 @@ namespace
 
     unit->ClearTransportPreOrders();
     EXPECT_FALSE(unit->HasTransportPreOrders());
+  }
+
+  TEST(TransportPreOrdersTests, DefaultSwitchStateIsFalse)
+  {
+    EXPECT_FALSE(moho::ui_TransportPreOrders);
   }
 }

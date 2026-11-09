@@ -1144,4 +1144,27 @@ namespace moho
    * Queues pre-orders for transport cargo units to execute upon disembarkation.
    */
   int cfunc_IssueTransportPreOrderL(LuaPlus::LuaState* state);
+  /**
+   * Address: Unmapped (FA-Binary-Patches addition)
+   *
+   * What it does:
+   * Publishes global Lua binder `IsTransportPreOrdersEnabled() -> bool`.
+   */
+  CScrLuaInitForm* func_IsTransportPreOrdersEnabled_LuaFuncDef();
+
+  /**
+   * Address: Unmapped (FA-Binary-Patches addition)
+   *
+   * What it does:
+   * Unwraps Lua callback context and forwards to `cfunc_IsTransportPreOrdersEnabledL`.
+   */
+  int cfunc_IsTransportPreOrdersEnabled(lua_State* luaContext);
+
+  /**
+   * Address: Unmapped (FA-Binary-Patches addition)
+   *
+   * What it does:
+   * Returns whether transport cargo pre-orders and drop ghosts are enabled.
+   */
+  int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
 } // namespace moho

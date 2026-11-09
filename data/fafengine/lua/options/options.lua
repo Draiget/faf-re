@@ -125,11 +125,11 @@ do
             title = "Transport Cargo Pre-orders",
             key = 'transport_preorders',
             type = 'toggle',
-            default = 1,
+            default = 0,
             tip = "Allow issuing pre-orders and previewing drop ghosts for units inside transports.",
             set = function(key, value, startup)
                 if value ~= 0 and value ~= 1 then
-                    value = 1
+                    value = 0
                 end
                 ConExecute("ui_TransportPreOrders " .. tostring(value))
             end,

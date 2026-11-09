@@ -75,7 +75,42 @@ TransportHolograms = {
     _nextHologramId = 1,
 }
 
+function TransportHolograms:IsEnabled()
+    local fn = rawget(_G, 'IsTransportPreOrdersEnabled')
+    if fn then
+        local ok, val = pcall(fn)
+        if ok and val ~= nil then
+            return (val == true or val == 1)
+        end
+    end
+
+    -- Fallback: check profile preferences options table
+    local getPref = rawget(_G, 'GetPreference')
+    if getPref then
+        local ok, opts = pcall(getPref, 'options')
+        if ok and type(opts) == 'table' and opts.transport_preorders ~= nil then
+            return opts.transport_preorders == 1
+        end
+        local ok2, direct = pcall(getPref, 'transport_preorders')
+        if ok2 and direct ~= nil then
+            return direct == 1
+        end
+    end
+
+    local Prefs = nil
+    pcall(function() Prefs = import('/lua/user/prefs.lua') end)
+    if Prefs and Prefs.GetFromCurrentProfile then
+        local ok, opts = pcall(Prefs.GetFromCurrentProfile, 'options')
+        if ok and type(opts) == 'table' and opts.transport_preorders ~= nil then
+            return opts.transport_preorders == 1
+        end
+    end
+
+    return false
+end
+
 function TransportHolograms:RegisterTransport(transport)
+    if not self:IsEnabled() then return end
     if not transport or not transport.GetEntityId then return end
     local id = transport:GetEntityId()
     if id and not self._trackedTransports[id] then
@@ -162,12 +197,18 @@ function TransportHolograms:CreateHologramMesh(unit, worldPos)
 end
 
 function TransportHolograms:Update()
-    local getPref = rawget(_G, 'GetPreference')
-    if getPref and getPref('transport_preorders') == 0 then
-        for tid, _ in pairs(self._trackedTransports) do
-            self:ClearHologramsForTransport(tid)
+    if not self:IsEnabled() then
+        if next(self._activeHolograms) ~= nil then
+            for hid, holo in pairs(self._activeHolograms) do
+                if holo.unit and holo.unit.ClearSelectionBracketPositionOverride then
+                    pcall(holo.unit.ClearSelectionBracketPositionOverride, holo.unit)
+                end
+                if holo.mesh and holo.mesh.Destroy then
+                    pcall(holo.mesh.Destroy, holo.mesh)
+                end
+            end
+            self._activeHolograms = {}
         end
-        self._trackedTransports = {}
         return
     end
 
@@ -301,6 +342,7 @@ function TransportHolograms:SyncHologramsForTransport(tid, transport, cargo, unl
 end
 
 function TransportHolograms:HandleWorldClick(view, event)
+    if not self:IsEnabled() then return false end
     if not view or not view.Project or not event then return false end
     if event.Type ~= 'ButtonPress' or (event.Modifiers and event.Modifiers.Right) then
         return false
@@ -350,6 +392,7 @@ function TransportHolograms:HandleWorldClick(view, event)
 end
 
 function TransportHolograms:HandleWorldDrag(view, minX, minY, maxX, maxY, isShift)
+    if not self:IsEnabled() then return false end
     if not view or not view.Project then return false end
     if not minX or not minY or not maxX or not maxY then return false end
 
@@ -405,4 +448,8 @@ end
 
 function ClearAll()
     TransportHolograms:ClearAll()
+end
+
+function IsEnabled()
+    return TransportHolograms:IsEnabled()
 end
