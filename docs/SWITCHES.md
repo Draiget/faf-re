@@ -35,6 +35,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_ReconFlatWalk` | 1 | `/con` | live | Recon refresh walks the blip list with prefetches instead of the blip tree (same blips, same order) |
 | `sim_SyncInPlace` | 1 | `/con` | live | The serial unit-update queue builds each record in place, not from a default copy |
 | `sim_IntelRasterRows` | 1 | `/con` | live | Intel circles rastered row by row instead of column by column |
+| `sim_EntityPool` | 1 | `/con` | startup only (first entity) | Units, props, recon blips, collision beams, shields and plain entities come from one free list per object size instead of the global allocator; projectiles keep their own allocator. The value is read at the first entity allocation and logged, so every block is freed the way it was allocated |
 | `sim_IntelSameCellMove` | 1 | `/con` | live | An intel source moving inside its grid cell skips the two rasters that would cancel |
 | `sim_BlueprintNameCache` | 1 | `/con` | live | Emitter, trail and projectile blueprint lookups by name remembered per game rules (positive results only) |
 | `rule_ReleaseScriptBlueprints` | 1 on x64, 0 on x86 | `/con` | next sim | Frees the game rules' Lua copy of the blueprints once the session and the sim have their own. Off on x86, where Lua frees reach the allocator classes that formations and projectiles reuse addresses from |

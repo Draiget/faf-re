@@ -853,14 +853,11 @@ namespace moho
       }
     }
 
-    // The binary allocates raw storage, constructs in place, then pushes the owned
-    // Lua object; keep the explicit new/ctor split for 1:1 behavior.
-    auto* const storage = static_cast<Entity*>(::operator new(sizeof(Entity)));
     const LuaPlus::LuaObject entityLuaObject(specObject);
     const EntId reservedId = static_cast<EntId>(
       sim->mEntityDB->DoReserveId((static_cast<std::uint32_t>(armyIndex) | 0x500u) << moho::kEntityIdSourceShift)
     );
-    Entity* const created = new (storage) Entity(entityLuaObject, sim, reservedId);
+    Entity* const created = new Entity(entityLuaObject, sim, reservedId);
 
     created->mLuaObj.PushStack(state);
     return 1;

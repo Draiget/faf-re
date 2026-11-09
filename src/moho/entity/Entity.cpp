@@ -1,5 +1,6 @@
 #include "moho/lua/ScrLuaUserData.h"
 #include "moho/entity/EntityPrivate.h"
+#include "moho/entity/EntityPool.h"
 
 namespace moho
 {
@@ -899,6 +900,31 @@ namespace moho
     radarStealth = EncodeIntelRangeLane(blueprint->Intel.RadarStealthFieldRadius);
     sonarStealth = EncodeIntelRangeLane(blueprint->Intel.SonarStealthFieldRadius);
     cloak = EncodeIntelRangeLane(blueprint->Intel.CloakFieldRadius);
+  }
+
+
+  // Engine addition (sim_EntityPool): see EntityPool.
+  void* Entity::operator new(
+    std::size_t size
+  )
+  {
+    return EntityPool::sInstance->Allocate(size);
+  }
+
+  void* Entity::operator new(
+      std::size_t size,
+      std::nothrow_t
+  ) noexcept
+  {
+    return EntityPool::sInstance->TryAllocate(size);
+  }
+
+  void Entity::operator delete(
+    void* ptr,
+    std::size_t size
+  ) noexcept
+  {
+    EntityPool::sInstance->Dellocate(ptr, size);
   }
 
   /**

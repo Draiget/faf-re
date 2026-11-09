@@ -683,6 +683,16 @@ namespace moho
     }
     ::operator delete(block);
   }
+#else
+  void* Projectile::operator new(const std::size_t size)
+  {
+    return ::operator new(size);
+  }
+
+  void Projectile::operator delete(void* const block, const std::size_t) noexcept
+  {
+    ::operator delete(block);
+  }
 #endif
 
   /**
