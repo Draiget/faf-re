@@ -52,7 +52,24 @@ namespace faf::editor
     }
     if (level == gpg::LogSeverity::Warn) {
       ++mWarnings;
+      if (mCapturing && mCaptured.size() < 500) {
+        mCaptured.emplace_back(message.c_str());
+      }
     }
+  }
+
+  void EdLog::BeginCapture()
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    mCaptured.clear();
+    mCapturing = true;
+  }
+
+  std::vector<std::string> EdLog::EndCapture()
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    mCapturing = false;
+    return std::move(mCaptured);
   }
 
   int EdLog::WarningCount() const

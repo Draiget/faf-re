@@ -35,6 +35,15 @@ namespace faf::editor
     bool& ShowMarkers() noexcept { return mShowMarkers; }
     bool& ShowCheck() noexcept { return mShowCheck; }
     bool& ShowScript() noexcept { return mShowScript; }
+    /**
+     * A test run: the open map (as saved) played solo for 8 s of game time, then stopped; the Lua errors and other
+     * warnings logged meanwhile join the Check's findings (`/testrun` for test runs).
+     */
+    void RequestTestRun() noexcept
+    {
+      mShowCheck = true;
+      mTestRunStep = 1;
+    }
     /** Runs the check at the next frame (`/check` for test runs). */
     void RequestCheck() noexcept
     {
@@ -98,6 +107,14 @@ namespace faf::editor
     std::vector<CheckIssue> mCheckIssues;
     bool mCheckRan = false;
     bool mRunCheck = false;
+    void UpdateTestRun();
+    /** 0 idle, 1 asked, 2 starting, 3 playing, 4 stopping. */
+    int mTestRunStep = 0;
+    double mTestRunStarted = 0.0;
+    std::string mTestRunMap;
+    std::vector<CheckIssue> mTestRunIssues;
+    bool mTestRunDone = false;
+    std::string mTestRunSummary;
     std::string mCheckedPath;
     bool mShowMarkers = true;
     bool mFocusMarkers = false;

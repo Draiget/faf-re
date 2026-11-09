@@ -53,9 +53,97 @@ namespace faf::editor
     }
   }
 
+  void EdShell::UpdateTestRun()
+  {
+    const double now = ImGui::GetTime();
+    switch (mTestRunStep) {
+    case 1: {
+      // The open map, picked in the Map panel's list, and played.
+      const std::vector<std::string>& maps = mPlay.Maps();
+      const auto at = std::find(maps.begin(), maps.end(), mDocument.Path());
+      if (at == maps.end() || mPlay.Active() || !mPlay.CanPlay()) {
+        gpg::Warnf("editor: test run: %s is not in the map list, or a play is on", mDocument.Path().c_str());
+        mTestRunStep = 0;
+        return;
+      }
+      mPlay.Select(static_cast<int>(at - maps.begin()));
+      mTestRunMap = mDocument.Path();
+      mLog.BeginCapture();
+      mPlay.Play();
+      mTestRunStarted = now;
+      mTestRunStep = 2;
+      gpg::Logf("editor: test run of %s", mTestRunMap.c_str());
+      return;
+    }
+    case 2:
+      if (moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing) {
+        mTestRunStarted = now;
+        mTestRunStep = 3;
+      } else if (now - mTestRunStarted > 120.0) {
+        gpg::Warnf("editor: test run: the session did not start in 2 minutes");
+        mPlay.Stop();
+        mTestRunStep = 4;
+      }
+      return;
+    case 3:
+      if (now - mTestRunStarted >= 8.0 || !mPlay.Active()) {
+        mPlay.Stop();
+        mTestRunStep = 4;
+      }
+      return;
+    case 4:
+      if (!mPlay.Active()) {
+        // The warnings logged meanwhile: Lua errors (their text names a .lua file) first, the map's own files as errors.
+        mTestRunIssues.clear();
+        const std::string folder = MapDisplayName(mTestRunMap);
+        for (const std::string& line : mLog.EndCapture()) {
+          std::string lower = line;
+          for (char& c : lower) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+          }
+          std::string lowerFolder = folder;
+          for (char& c : lowerFolder) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+          }
+          CheckIssue issue;
+          issue.marker = "test run";
+          issue.text = line.size() > 400 ? line.substr(0, 400) + "..." : line;
+          if (!lowerFolder.empty() && lower.find(lowerFolder) != std::string::npos) {
+            issue.level = CheckIssue::Level::Error;
+          } else if (lower.find(".lua") != std::string::npos || lower.find("traceback") != std::string::npos) {
+            issue.level = CheckIssue::Level::Warning;
+          } else {
+            issue.level = CheckIssue::Level::Note;
+          }
+          mTestRunIssues.push_back(std::move(issue));
+        }
+        std::stable_sort(mTestRunIssues.begin(), mTestRunIssues.end(),
+                         [](const CheckIssue& a, const CheckIssue& b) { return static_cast<int>(a.level) < static_cast<int>(b.level); });
+        int counts[3] = {0, 0, 0};
+        for (const CheckIssue& issue : mTestRunIssues) {
+          ++counts[static_cast<int>(issue.level)];
+        }
+        gpg::Logf("editor: test run done: %d errors (the map's files), %d warnings (other Lua), %d notes", counts[0], counts[1], counts[2]);
+        mTestRunSummary = "Last test run: " + std::to_string(counts[0]) + " errors, " + std::to_string(counts[1]) + " warnings, " +
+                          std::to_string(counts[2]) + " notes";
+        for (const CheckIssue& issue : mTestRunIssues) {
+          if (issue.level != CheckIssue::Level::Note) {
+            gpg::Logf("editor: test run %s: %s", CheckLevelName(issue.level), issue.text.c_str());
+          }
+        }
+        mTestRunDone = true;
+        mTestRunStep = 0;
+      }
+      return;
+    default:
+      return;
+    }
+  }
+
   void EdShell::Draw()
   {
     HandleKeys();
+    UpdateTestRun();
     const bool playing = mPlay.Active();
     const bool panels = !playing || mPanelsWhilePlaying;
 

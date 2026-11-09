@@ -1094,6 +1094,9 @@ namespace faf::editor
           if (moho::CFG_GetArgOption("/check", 0, nullptr)) {
             mShell->RequestCheck();
           }
+          if (moho::CFG_GetArgOption("/testrun", 0, nullptr)) {
+            mShell->RequestTestRun();
+          }
           if (fa::vector<fa::string> layer; moho::CFG_GetArgOption("/pathing", 1, &layer)) {
             mShell->Tools().ShowPathing() = true;
             mShell->Tools().PathingLayer() = !layer.empty() && std::string(layer[0].c_str()) == "ships" ? 1 : 0;

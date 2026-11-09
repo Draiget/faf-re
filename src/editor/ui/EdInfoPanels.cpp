@@ -771,6 +771,19 @@ namespace faf::editor
     if (ImGui::Button("Run the check", ImVec2(-1.0f, 0.0f))) {
       RunCheck();
     }
+    // The test run: the map played for a few seconds, its Lua errors collected.
+    ImGui::BeginDisabled(mTestRunStep != 0 || mPlay.Active());
+    if (ImGui::Button(mTestRunStep == 0 ? "Test run" : "Test run: playing...", ImVec2(-1.0f, 0.0f))) {
+      RequestTestRun();
+    }
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
+      ImGui::SetTooltip("Plays the map as saved (solo, the Map panel's setup) for 8 s of game time, then stops; the warnings logged meanwhile "
+                        "join the findings: errors that name the map's folder, warnings from other Lua, the rest as notes. Save first to test edits.");
+    }
+    if (!mTestRunSummary.empty()) {
+      ImGui::TextDisabled("%s", mTestRunSummary.c_str());
+    }
     ImGui::Checkbox("Show pathing", &mTools.ShowPathing());
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
       ImGui::SetTooltip("After a run. Land: red where a T1 tank (uel0201) can't go (too steep, too deep), amber where it can but no start "
@@ -785,6 +798,16 @@ namespace faf::editor
                        "hydrocarbon points: off the playable area, under water, without a partner at their symmetric copies (the Tools "
                        "panel's symmetry), or overlapping; then pathing for a T1 tank: what each start reaches by land.");
     ImGui::PopStyleColor();
+    if (mTestRunDone && !mTestRunIssues.empty()) {
+      // The test run's findings at the top of the list (merged once).
+      for (CheckIssue& issue : mTestRunIssues) {
+        mCheckIssues.insert(mCheckIssues.begin(), std::move(issue));
+      }
+      mTestRunIssues.clear();
+      mTestRunDone = false;
+      mCheckRan = true;
+      mCheckedPath = mDocument.Path();
+    }
     if (!mCheckRan) {
       ImGui::End();
       return;
