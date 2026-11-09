@@ -4,6 +4,8 @@
 #include <thread>
 #include <vector>
 
+#include <gtest/gtest.h>
+
 #include "moho/entity/FixedSlabPool.h"
 #include "moho/entity/EntityMemoryManager.h"
 #include "moho/unit/core/Unit.h"
@@ -219,16 +221,11 @@ static void TestSwitchAndHybridSafety()
   printf("TestSwitchAndHybridSafety passed.\n");
 }
 
-int main()
-{
-  printf("=== Starting Robust Entity Memory Pool Tests ===\n");
-  TestBasicAllocation();
-  TestSlabReclamation();
-  TestConcurrentAllocation();
-  TestEntityMemoryManagerRouting();
-  TestHeapPointerRangeCheckSafety();
-  TestClearWithLiveBlocksSafety();
-  TestSwitchAndHybridSafety();
-  printf("=== All Robust Entity Memory Pool Tests Passed! ===\n");
-  return 0;
-}
+// The checks abort on failure (TEST_ASSERT), worker threads included, which fails the run.
+TEST(FixedSlabPool, BasicAllocation) { TestBasicAllocation(); }
+TEST(FixedSlabPool, SlabReclamation) { TestSlabReclamation(); }
+TEST(FixedSlabPool, ConcurrentAllocation) { TestConcurrentAllocation(); }
+TEST(FixedSlabPool, EntityMemoryManagerRouting) { TestEntityMemoryManagerRouting(); }
+TEST(FixedSlabPool, HeapPointerRangeCheckSafety) { TestHeapPointerRangeCheckSafety(); }
+TEST(FixedSlabPool, ClearWithLiveBlocksSafety) { TestClearWithLiveBlocksSafety(); }
+TEST(FixedSlabPool, SwitchAndHybridSafety) { TestSwitchAndHybridSafety(); }

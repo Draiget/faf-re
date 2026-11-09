@@ -330,10 +330,6 @@ set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim"
 add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
 set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
 
-# Every GoogleTest executable above and in the subdirectories.
-include(FafTests)
-faf_add_tests_target("${CMAKE_CURRENT_SOURCE_DIR}")
-
 # The map editor height brush, symmetry check, height files and undo (src/editor/tools, src/editor/undo): exact symmetry,
 # byte-exact undo, height images read back as written.
 add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.cpp editor/HeightHistoryTests.cpp editor/SymmetryCheckTests.cpp editor/HeightFileTests.cpp
@@ -350,5 +346,13 @@ add_test(NAME editor_height_brush COMMAND faf_editor_brush_tests)
 set_tests_properties(editor_height_brush PROPERTIES LABELS "Editor")
 
 add_executable(faf_slab_tests EXCLUDE_FROM_ALL entity/FixedSlabPoolTests.cpp)
-target_link_libraries(faf_slab_tests PRIVATE faf_engine)
+target_link_libraries(faf_slab_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_slab_tests PROPERTIES FOLDER "Tests/Sim")
 add_test(NAME slab_tests COMMAND faf_slab_tests)
+set_tests_properties(slab_tests PROPERTIES LABELS "Sim")
+
+# Every GoogleTest executable above and in the subdirectories. Keep this last: it sees only the
+# targets defined before it, so a test added below it is never built by faf_tests and ctest
+# reports it as Not Run.
+include(FafTests)
+faf_add_tests_target("${CMAKE_CURRENT_SOURCE_DIR}")
