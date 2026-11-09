@@ -94,7 +94,7 @@ namespace moho
     return ::operator new(size);
   }
 
-  void EntityMemoryManager::Deallocate(void* const ptr, const std::size_t size) noexcept
+  void EntityMemoryManager::Deallocate(void* const ptr, const std::size_t /*size*/) noexcept
   {
     if (ptr == nullptr) {
       return;
