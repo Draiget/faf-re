@@ -158,6 +158,29 @@ namespace moho
       &ren_ShadowCascadeSplit
     );
 
+    /**
+     * Engine addition: `ren_ShadowCasterCull`. The light camera's box is fitted around the shadowed part
+     * of the view, so it also holds meshes whose shadows fall only outside it; at near zoom it held twice
+     * the meshes the view draws. With this on, a mesh is drawn into the shadow map only when its bounding
+     * sphere, moved along the light down to the lowest terrain in view, can reach the shadowed part of
+     * the view (ShadowCasterRegion in Mesh.h). Shadows outside the view, which only a water reflection
+     * might show, can lose casters.
+     */
+    bool ren_ShadowCasterCull = true;
+
+    TConVar<bool> gTConVar_ren_ShadowCasterCull(
+      "ren_ShadowCasterCull",
+      "Draw into the shadow map only the meshes whose shadow can fall in the view (1, the default), or every mesh in "
+      "the light's box (0, the original).",
+      &ren_ShadowCasterCull
+    );
+
+    /** Shadow-map texels around the shadowed region whose casters are kept: the blur's reach and the filter's. */
+    constexpr float kCasterMarginTexels = 6.0f;
+
+    /** This frame's shadowed region, from PrepareLightCamera, for RenderShadowMap's mesh batches. */
+    ShadowCasterRegion sCasterRegion{};
+
     constexpr int kCascadeTiles = static_cast<int>(gpg::gal::effects::kShadowCascadeCount);
     constexpr int kCascadeFiner = kCascadeTiles - 1;
     /** Texels around each tile's viewport the blur may smear into; nothing is drawn there. */
@@ -751,6 +774,32 @@ namespace moho
     // elements and zeroes the rest (BuildShadowLightCamera).
     BuildShadowLightCamera(lightView, nearDepth, farDepth, box, mCamera);
 
+    // Engine addition (ren_ShadowCasterCull): the region the mesh batches keep casters for.
+    sCasterRegion = ShadowCasterRegion{};
+    {
+      const float lightLength = std::sqrt(
+        lightDirection.X() * lightDirection.X() + lightDirection.Y() * lightDirection.Y() +
+        lightDirection.Z() * lightDirection.Z()
+      );
+      if (planeCount <= ShadowCasterRegion::kMaxPlanes && lightLength > 0.0f) {
+        for (std::uint32_t index = 0U; index < planeCount; ++index) {
+          const Wm3::Plane3f& plane = shadowFrustum.planes_[index];
+          sCasterRegion.planes[index][0] = plane.Normal.x;
+          sCasterRegion.planes[index][1] = plane.Normal.y;
+          sCasterRegion.planes[index][2] = plane.Normal.z;
+          sCasterRegion.planes[index][3] = plane.Constant;
+        }
+        sCasterRegion.planeCount = planeCount;
+        sCasterRegion.light[0] = lightDirection.X() / lightLength;
+        sCasterRegion.light[1] = lightDirection.Y() / lightLength;
+        sCasterRegion.light[2] = lightDirection.Z() / lightLength;
+        sCasterRegion.floorY = volume.Min.Y();
+        const float texel = std::max(box.maxX - box.minX, box.maxY - box.minY) / static_cast<float>(content);
+        sCasterRegion.margin = kCasterMarginTexels * texel;
+        sCasterRegion.active = true;
+      }
+    }
+
     mShadowCameraValid = true;
     if (atlas) {
       PrepareCascades(mShadowSize, cameraForward, shadowFrustum, volume, lightView, nearDepth, farDepth, box, content, stableFit);
@@ -967,6 +1016,7 @@ namespace moho
     // Depth pass into the shadow map.
     device->SetRenderTarget1(mShadowMap.get(), mDepthStencil.get(), true, -1, 1.0f, 0);
     MeshRenderer* const meshRenderer = MeshRenderer::GetInstance();
+    gShadowCasterRegion = ren_ShadowCasterCull ? sCasterRegion : ShadowCasterRegion{};
     if (IsCascadeAtlas(*this)) {
       // Engine addition (ren_ShadowCascades): each tile draws into its own viewport of the atlas, with the
       // meshes batched for its own light camera. Drawing the whole-view batch into every tile and leaving
@@ -994,6 +1044,7 @@ namespace moho
       meshRenderer->Batch(REN_GetGameTick(), REN_GetSimDeltaSeconds(), mCamera, viewCamera.viewport.r[1]);
       meshRenderer->RenderDepth(mCamera, meshRenderer->meshes);
     }
+    gShadowCasterRegion.active = false;
 
     restoreViewport();
 

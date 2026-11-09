@@ -19,6 +19,8 @@ namespace moho
   // (?ren_ShadowBias@Moho@@3MA). Byte-verified default from ForgedAlliance.exe:
   // .data VA 0x00F57DFC = 0.005f.
   float ren_ShadowBias = 0.005f;
+
+  ShadowCasterRegion gShadowCasterRegion{};
 }
 
 namespace
@@ -1684,6 +1686,11 @@ namespace
       // only live view camera in this pass is `camera`, so both the collect
       // volume and this cull share it.
       if (!camera.solid2.Intersects(instance->sphere)) {
+        continue;
+      }
+
+      // Engine addition (ren_ShadowCasterCull): in the shadow pass, a mesh whose shadow can't reach the view.
+      if (gShadowCasterRegion.active && !gShadowCasterRegion.MayShadow(instance->sphere)) {
         continue;
       }
 
