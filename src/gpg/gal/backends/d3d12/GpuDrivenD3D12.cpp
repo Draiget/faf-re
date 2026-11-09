@@ -83,8 +83,13 @@ namespace gpg::gal
       const effects::ShaderCompiler& compiler = effects::ShaderCompiler::Instance();
       // HLSL 2018 and no row-major default: the sources are written for FXC
       // (the D3D11 backend compiles them with d3dcompiler).
-      const effects::CompiledShader compiled =
-        compiler.CompileRaw(std::string_view(desc.source, desc.sourceBytes), entry, profile, {L"-HV", L"2018"});
+      // Engine addition (ren_RayTracedShadows): a program with inline ray queries needs shader model 6.5.
+      const std::string_view source(desc.source, desc.sourceBytes);
+      std::wstring rayProfile = profile;
+      if (source.find("RayQuery<") != std::string_view::npos) {
+        rayProfile.back() = L'5';
+      }
+      const effects::CompiledShader compiled = compiler.CompileRaw(source, entry, rayProfile.c_str(), {L"-HV", L"2018"});
       if (!compiled.succeeded) {
         gpg::Warnf("D3D12: GPU program %s, %ls %s does not compile: %s", desc.name, profile, entry, compiled.messages.c_str());
         return {};
@@ -205,7 +210,12 @@ namespace gpg::gal
     D3D12_DESCRIPTOR_RANGE writes{};
     writes.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
     writes.NumDescriptors = kGpuMaxWriteBuffers;
-    D3D12_ROOT_PARAMETER parameters[3]{};
+    D3D12_ROOT_PARAMETER parameters[4]{};
+    // Engine addition (ren_RayTracedShadows): the ray-traced scene at t0, space1, as for the effects.
+    parameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+    parameters[3].Descriptor.ShaderRegister = 0U;
+    parameters[3].Descriptor.RegisterSpace = 1U;
+    parameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     parameters[0].Descriptor.ShaderRegister = 0U;
     parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -234,7 +244,7 @@ namespace gpg::gal
       sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
       D3D12_ROOT_SIGNATURE_DESC desc{};
-      desc.NumParameters = 3U;
+      desc.NumParameters = mRayQuery ? 4U : 3U;
       desc.pParameters = parameters;
       desc.NumStaticSamplers = 1U;
       desc.pStaticSamplers = &sampler;
@@ -664,6 +674,9 @@ namespace gpg::gal
     mList->SetGraphicsRootConstantBufferView(0U, constants);
     mList->SetGraphicsRootDescriptorTable(1U, readTable);
     mList->SetGraphicsRootDescriptorTable(2U, writeTable);
+    if (mRayQuery) {
+      mList->SetGraphicsRootShaderResourceView(3U, mTlasAddress);
+    }
     mList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     mList->OMSetStencilRef(program->mDesc.inheritDepthStencil ? mCurrent.stencilRef : program->mDesc.stencil.reference);
     RecordStateChange();
@@ -709,6 +722,9 @@ namespace gpg::gal
     mList->SetComputeRootConstantBufferView(0U, constants);
     mList->SetComputeRootDescriptorTable(1U, readTable);
     mList->SetComputeRootDescriptorTable(2U, writeTable);
+    if (mRayQuery) {
+      mList->SetComputeRootShaderResourceView(3U, mTlasAddress);
+    }
     MarkDraw(program->mName.c_str());
     mList->Dispatch(dispatch.groupsX, dispatch.groupsY, dispatch.groupsZ);
     FinishDraw();

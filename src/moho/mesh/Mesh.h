@@ -1073,6 +1073,14 @@ namespace moho
   /// Set by Shadow::RenderShadowMap around its mesh batches; inactive otherwise.
   extern ShadowCasterRegion gShadowCasterRegion;
 
+  /**
+   * FAF addition (ren_RayTracedShadows, render/RayScene.cpp): true while the shadow pass leaves materials whose
+   * depth technique is plain "Depth" out of the map, because rays shadow them.
+   */
+  extern bool gMeshDepthSkipsTraced;
+  /** FAF addition: the material takes part in the depth pass with the plain "Depth" technique (opaque). */
+  bool MeshMaterialTraced(MeshMaterial& material);
+
   class MeshRenderer
   {
   public:

@@ -55,6 +55,17 @@ namespace gpg::gal::vulkan
     return complete;
   }
 
+  bool Functions::LoadRay(const VkDevice device)
+  {
+    bool complete = true;
+#define FAF_VK_LOAD_RAY(name)                                                          \
+  name = reinterpret_cast<PFN_##name>(vkGetDeviceProcAddr(device, #name));             \
+  complete = complete && (name != nullptr);
+    FAF_VK_RAY_FUNCTIONS(FAF_VK_LOAD_RAY)
+#undef FAF_VK_LOAD_RAY
+    return complete;
+  }
+
   void Functions::Unload() noexcept
   {
     if (module != nullptr) {

@@ -9,6 +9,7 @@
 #include "gpg/gal/GpuDriven.h"
 #include "gpg/gal/Matrix.h"
 #include "gpg/gal/OutputContext.hpp"
+#include "gpg/gal/RayTracing.h"
 #include "gpg/gal/Texture.hpp"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
@@ -674,6 +675,19 @@ namespace gpg::gal
      */
     virtual void CopyLockedRangeOnly(VertexBuffer& buffer);
     virtual void CopyLockedRangeOnly(IndexBuffer& buffer);
+
+    /**
+     * Engine addition (ren_RayTracedShadows, RayTracing.h; GpuDrivenFeature::kGpuFeatureRayQuery): builds the
+     * ray-tracing structure of one piece of geometry and returns its handle, or 0 (here, and when it fails).
+     */
+    virtual RayGeometryId CreateRayGeometry(const RayGeometryDesc& desc);
+    /** Frees a piece once no frame in flight still reads it; nothing here. */
+    virtual void DestroyRayGeometry(RayGeometryId geometry);
+    /**
+     * The placed pieces the next draws trace against, replacing the last list; `count` 0 empties the scene.
+     * Nothing here.
+     */
+    virtual void SetRayInstances(const RayInstance* instances, std::uint32_t count);
 
   protected:
     OutputContext outputContext_{}; // +0x04 the bound targets (`ClearTarget` / `GetContext`)

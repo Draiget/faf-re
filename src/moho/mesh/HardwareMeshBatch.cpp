@@ -2,6 +2,7 @@
 #include "legacy/math/X87Math.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -1374,4 +1375,79 @@ namespace moho
   {
     Initialize(lod, remapToReferenceResource, referenceResource, currentResource);
   }
+  /**
+   * FAF addition, not in the shipped binary (ren_RayTracedShadows, render/RayScene.cpp).
+   *
+   * The world transforms the mesh effect places `meshInstance` with under `batch`, as row-major 3x4
+   * matrices that take a column vector (the ray scene's form): one per skinned bone, or a single one for
+   * an unskinned batch. A skinned bone is mesh.fx's ComputeMatrix of the bone palette entry
+   * FillInstanceBonePalettes writes (scale, translation, rotation); a hidden bone gets a zero matrix.
+   * False when the instance has no pose or skeleton (FillBatch skips those too).
+   */
+  bool MeshInstanceRayTransforms(const MeshBatch& batch, MeshInstance& meshInstance, std::vector<std::array<float, 12>>& out)
+  {
+    out.clear();
+    const auto store = [&out](const float (&rows)[4][3]) {
+      std::array<float, 12> transform{};
+      for (int row = 0; row < 3; ++row) {
+        for (int column = 0; column < 3; ++column) {
+          transform[static_cast<std::size_t>(row * 4 + column)] = rows[column][row];
+        }
+        transform[static_cast<std::size_t>(row * 4 + 3)] = rows[3][row];
+      }
+      out.push_back(transform);
+    };
+    meshInstance.UpdateInterpolatedFields();
+    if (batch.mUseBoneRemap == 0) {
+      VMatrix4 instanceTransform;
+      instanceTransform.Set(meshInstance.curOrientation, meshInstance.interpolatedPosition);
+      ScaleTransformRows(instanceTransform, meshInstance.scale);
+      const float rows[4][3] = {
+        {instanceTransform.r[0].x, instanceTransform.r[0].y, instanceTransform.r[0].z},
+        {instanceTransform.r[1].x, instanceTransform.r[1].y, instanceTransform.r[1].z},
+        {instanceTransform.r[2].x, instanceTransform.r[2].y, instanceTransform.r[2].z},
+        {instanceTransform.r[3].x, instanceTransform.r[3].y, instanceTransform.r[3].z},
+      };
+      store(rows);
+      return true;
+    }
+    const CAniPose* const pose = meshInstance.curPose.get();
+    const CAniSkel* const skeleton = (pose != nullptr) ? pose->mSkeleton.get() : nullptr;
+    if (pose == nullptr || skeleton == nullptr || batch.mBoneCount <= 0) {
+      return false;
+    }
+    const auto boneCount = static_cast<std::size_t>(batch.mBoneCount);
+    std::vector<SkinPaletteEntry> translations(boneCount);
+    std::vector<SkinPaletteEntry> rotations(boneCount);
+    FillInstanceBonePalettes(
+      meshInstance, *pose, *skeleton, batch.mBoneRemapIndices, batch.mBoneCount, translations.data(), rotations.data(), 1U
+    );
+    for (std::size_t bone = 0U; bone < boneCount; ++bone) {
+      const SkinPaletteEntry& t = translations[bone];
+      const SkinPaletteEntry& q = rotations[bone];
+      const float s = t.w;
+      const float x2 = 2.0f * q.x;
+      const float y2 = 2.0f * q.y;
+      const float z2 = 2.0f * q.z;
+      const float w2 = 2.0f * q.w;
+      const float xx2 = q.x * x2;
+      const float yy2 = q.y * y2;
+      const float zz2 = q.z * z2;
+      const float xy2 = q.x * y2;
+      const float xz2 = q.x * z2;
+      const float xw2 = q.x * w2;
+      const float yz2 = q.y * z2;
+      const float yw2 = q.y * w2;
+      const float zw2 = q.z * w2;
+      const float rows[4][3] = {
+        {s * (1.0f - (yy2 + zz2)), s * (xy2 + zw2), s * (xz2 - yw2)},
+        {s * (xy2 - zw2), s * (1.0f - (xx2 + zz2)), s * (yz2 + xw2)},
+        {s * (xz2 + yw2), s * (yz2 - xw2), s * (1.0f - (xx2 + yy2))},
+        {t.x, t.y, t.z},
+      };
+      store(rows);
+    }
+    return true;
+  }
+
 } // namespace moho

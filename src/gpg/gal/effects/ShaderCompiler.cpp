@@ -201,6 +201,15 @@ namespace gpg::gal::effects
     case ShaderStage::Pixel:
       break;
     }
+    // Engine addition (ren_RayTracedShadows): an effect with inline ray queries needs shader model 6.5 (DXR 1.1)
+    // and, for SPIR-V, Vulkan 1.2's ray query extension. Every stage of it, since they share the declarations.
+    const bool rayQueries = hlsl.find("RayQuery<") != std::string_view::npos;
+    std::wstring rayProfile;
+    if (rayQueries) {
+      rayProfile = profile;
+      rayProfile.replace(rayProfile.size() - 1U, 1U, L"5");
+      profile = rayProfile.c_str();
+    }
     std::vector<std::wstring> arguments{
       L"-E", entryName,
       L"-T", profile,
@@ -217,7 +226,7 @@ namespace gpg::gal::effects
       // The Vulkan backend's descriptor model: textures t<n> and samplers
       // s<n> in set 0 at bindings n and 64+n, $Globals alone in set 1.
       // D3D's clip-space y points the other way.
-      arguments.insert(arguments.end(), {L"-spirv", L"-fvk-use-dx-layout", L"-fspv-reflect", L"-fspv-target-env=vulkan1.1",
+      arguments.insert(arguments.end(), {L"-spirv", L"-fvk-use-dx-layout", L"-fspv-reflect", rayQueries ? L"-fspv-target-env=vulkan1.2" : L"-fspv-target-env=vulkan1.1",
                                          L"-fvk-t-shift", L"0", L"0", L"-fvk-s-shift", L"64", L"0", L"-fvk-b-shift", L"0", L"0",
                                          L"-fvk-bind-globals", L"0", L"1"});
       // SV_Position leaves the vertex shader, or in a tessellated pass the domain

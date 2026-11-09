@@ -117,7 +117,10 @@ namespace gpg::gal
       // packing (scalar block layout is on); the GpuDriven.h registers moved
       // to the set's bindings; D3D's clip-space y.
       std::vector<std::wstring> arguments{
-        L"-HV", L"2018", L"-spirv", L"-fvk-use-dx-layout", L"-fspv-target-env=vulkan1.1",
+        L"-HV", L"2018", L"-spirv", L"-fvk-use-dx-layout",
+        // Engine addition (ren_RayTracedShadows): ray queries need Vulkan 1.2's SPIR-V.
+        (std::string_view(desc.source, desc.sourceBytes).find("RayQuery<") != std::string_view::npos) ? L"-fspv-target-env=vulkan1.2"
+                                                                                                    : L"-fspv-target-env=vulkan1.1",
         L"-fvk-b-shift", L"0", L"0", L"-fvk-t-shift", L"1", L"0", L"-fvk-u-shift", L"7", L"0", L"-fvk-s-shift", L"9", L"0",
       };
       if (vertex) {
@@ -197,8 +200,11 @@ namespace gpg::gal
     CheckVk("GpuDrivenVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mGpuSetLayout));
     VkPipelineLayoutCreateInfo pipelineLayout{};
     pipelineLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayout.setLayoutCount = 1U;
-    pipelineLayout.pSetLayouts = &mGpuSetLayout;
+    // Engine addition (ren_RayTracedShadows): the ray-traced scene as set 2, as for the effects; set 1 is unused
+    // and takes the program set's layout as a stand-in.
+    const VkDescriptorSetLayout sets[3] = {mGpuSetLayout, mGpuSetLayout, mRayLayout};
+    pipelineLayout.setLayoutCount = (mRayLayout != VK_NULL_HANDLE) ? 3U : 1U;
+    pipelineLayout.pSetLayouts = sets;
     CheckVk("GpuDrivenVulkan.cpp", __LINE__, Vk().vkCreatePipelineLayout(mDevice, &pipelineLayout, nullptr, &mGpuPipelineLayout));
 
     for (std::uint32_t kind = 0U; kind < 3U; ++kind) {
@@ -708,6 +714,9 @@ namespace gpg::gal
 
     Vk().vkCmdBindPipeline(mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
     Vk().vkCmdBindDescriptorSets(mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, mGpuPipelineLayout, 0U, 1U, &set, 0U, nullptr);
+    if (mRaySet != VK_NULL_HANDLE) {
+      Vk().vkCmdBindDescriptorSets(mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, mGpuPipelineLayout, 2U, 1U, &mRaySet, 0U, nullptr);
+    }
     // The engine's viewport with Direct3D 9's pixel centres, clipped as an effect draw is.
     VkViewport viewport{
       static_cast<float>(mViewport.X) + backend::Direct3D9PixelCentreShift(),
@@ -758,6 +767,9 @@ namespace gpg::gal
     GpuWriteBarrier();
     Vk().vkCmdBindPipeline(mCommands, VK_PIPELINE_BIND_POINT_COMPUTE, program->mComputePipeline);
     Vk().vkCmdBindDescriptorSets(mCommands, VK_PIPELINE_BIND_POINT_COMPUTE, mGpuPipelineLayout, 0U, 1U, &set, 0U, nullptr);
+    if (mRaySet != VK_NULL_HANDLE) {
+      Vk().vkCmdBindDescriptorSets(mCommands, VK_PIPELINE_BIND_POINT_COMPUTE, mGpuPipelineLayout, 2U, 1U, &mRaySet, 0U, nullptr);
+    }
     Vk().vkCmdDispatch(mCommands, dispatch.groupsX, dispatch.groupsY, dispatch.groupsZ);
     RecordStateChange();
     // What it wrote is visible to the draws (and indirect arguments) after it.

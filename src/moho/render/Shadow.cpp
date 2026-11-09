@@ -12,6 +12,7 @@
 #include "moho/console/CConCommand.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DVertexSheet.h"
+#include "moho/render/RayScene.h"
 #include "moho/render/ScreenQuadVertexSheet.h"
 #include "moho/render/ShadowCascadeFit.h"
 #include "moho/render/ShadowStableFit.h"
@@ -981,6 +982,7 @@ namespace moho
   void Shadow::RenderShadowMap(TerrainCommon* const terrain, const GeomCamera3& viewCamera)
   {
     if (mShadowFidelity == 0) {
+      RayScene::PublishOff();
       return;
     }
 
@@ -988,6 +990,7 @@ namespace moho
     (void)device->GetResources();
 
     if (!mShadowCameraValid) {
+      RayScene::PublishOff();
       // Nothing to draw - just leave the targets bound and cleared.
       device->SetRenderTarget1(mShadowMap.get(), mDepthStencil.get(), true, -1, 1.0f, 0);
       if (mShadowBlurEnabled) {
@@ -1034,6 +1037,24 @@ namespace moho
     device->SetRenderTarget1(mShadowMap.get(), mDepthStencil.get(), true, -1, 1.0f, 0);
     MeshRenderer* const meshRenderer = MeshRenderer::GetInstance();
     gShadowCasterRegion = ren_ShadowCasterCull ? sCasterRegion : ShadowCasterRegion{};
+
+    // Engine addition (ren_RayTracedShadows): with rays, the ground and opaque meshes shadow by ray from the
+    // scene built off the whole-view batch (RayScene.h); the map draws only alpha-tested meshes.
+    const bool rays = RayScene::Instance().Active();
+    IWldTerrainRes* const rayTerrainRes = rays ? REN_GetTerrainRes() : nullptr;
+    const CHeightField* const rayHeightField =
+      (rayTerrainRes != nullptr && rayTerrainRes->mMap != nullptr) ? rayTerrainRes->mMap->mHeightField.get() : nullptr;
+    if (!rays) {
+      RayScene::PublishOff();
+    }
+    const auto submitRays = [&] {
+      if (rays) {
+        // The map's sun direction points towards the sun (PrepareLightCamera's light travels along its negative).
+        const Wm3::Vector3f sun = rayTerrainRes->GetSunDirection();
+        const float sunDirection[3] = {sun.X(), sun.Y(), sun.Z()};
+        RayScene::Instance().Submit(*meshRenderer, meshRenderer->meshes, rayHeightField, mCamera, viewCamera, sunDirection);
+      }
+    };
     if (IsCascadeAtlas(*this)) {
       // Engine addition (ren_ShadowCascades): each tile draws into its own viewport of the atlas, with the
       // meshes batched for its own light camera. Drawing the whole-view batch into every tile and leaving
@@ -1049,7 +1070,9 @@ namespace moho
         Wm3::Vector2i tileSize{content, content};
         device->SetViewport(&tilePos, &tileSize, savedMinDepth, savedMaxDepth);
         const GeomCamera3& camera = (tile == 0) ? mCamera : sCascadeFrame.cameras[tile - 1];
-        terrain->DrawTerrainDepth(camera);
+        if (!rays) {
+          terrain->DrawTerrainDepth(camera);
+        }
         // Engine change (ren_ShadowTileReuse): a finer tile's box lies inside the whole-view tile's, in the same
         // light space and depth range, so its meshes are the whole-view tile's that fall in its box.
         if (tile > 0 && ren_ShadowTileReuse) {
@@ -1060,19 +1083,27 @@ namespace moho
             meshRenderer->SaveBatch(sWholeTileBatch);
           }
         }
+        if (tile == 0) {
+          submitRays();
+        }
         meshRenderer->RenderDepth(camera, meshRenderer->meshes);
       }
     } else {
       bindTargetWithBorder(mShadowMap);
 
-      terrain->DrawTerrainDepth(mCamera);
+      if (!rays) {
+        terrain->DrawTerrainDepth(mCamera);
+      }
 
       meshRenderer->Batch(REN_GetGameTick(), REN_GetSimDeltaSeconds(), mCamera, viewCamera.viewport.r[1]);
+      submitRays();
       meshRenderer->RenderDepth(mCamera, meshRenderer->meshes);
     }
     gShadowCasterRegion.active = false;
 
     restoreViewport();
+    // Engine addition (ren_RayTracedShadows): only the shadow pass leaves the traced meshes out.
+    gMeshDepthSkipsTraced = false;
 
     const auto dumpShadowTargets = [&](const bool includeBlur) {
       static bool sDumped = false;
@@ -1187,6 +1218,7 @@ namespace moho
   void Shadow::RenderFrameShadows(TerrainCommon* const terrain, const GeomCamera3& viewCamera, const float zoom)
   {
     if (!ren_Shadows) {
+      RayScene::PublishOff();
       return;
     }
 

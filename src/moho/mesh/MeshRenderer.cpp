@@ -1,5 +1,7 @@
 #include "moho/mesh/MeshPrivate.h"
 
+#include <string_view>
+
 #include "moho/console/CConCommand.h"
 
 namespace moho
@@ -1199,6 +1201,24 @@ namespace
    * mMat+0x20, mShaderIndex at esi+0x5C = mMat+0x50, mDepthTechniqueResolved at esi+0x99
    * = mMat+0x8D.
    */
+  bool gMeshDepthSkipsTraced = false;
+
+  bool MeshMaterialTraced(MeshMaterial& material)
+  {
+    CD3DDevice* const device = D3D_GetDevice();
+    CD3DEffect* const meshEffect = (device != nullptr) ? device->GetResources()->FindEffect("mesh") : nullptr;
+    if (meshEffect == nullptr || (ResolveMaterialRenderStage(meshEffect, material) & 1) == 0) {
+      return false;
+    }
+    if (!material.mDepthTechniqueResolved) {
+      material.mDepthTechniqueResolved = true;
+      const fa::string depthTechnique =
+        meshEffect->GetStringAnnotation(material.mShaderAnnotation, fa::string("depthTechnique"), fa::string(""));
+      material.mDepthTechnique.assign_owned(depthTechnique.view());
+    }
+    return std::string_view(material.mDepthTechnique.c_str()) == "Depth";
+  }
+
   void MeshRenderer::RenderDepth(const GeomCamera3& camera, MeshBatchBucketTree& meshMap)
   {
     // Nothing to draw when the batch tree is empty (binary: `if (*(arg4+8))`).
@@ -1278,6 +1298,12 @@ namespace
         const fa::string depthTechnique =
           meshEffect->GetStringAnnotation(material.mShaderAnnotation, fa::string("depthTechnique"), fa::string(""));
         material.mDepthTechnique.assign_owned(depthTechnique.view());
+      }
+
+      // Engine addition (ren_RayTracedShadows): with rays on, opaque materials shadow by ray (RayScene.cpp)
+      // and the map keeps only what the scene lacks.
+      if (gMeshDepthSkipsTraced && std::string_view(material.mDepthTechnique.c_str()) == "Depth") {
+        continue;
       }
 
       // Only draw when a depth technique is defined for the material

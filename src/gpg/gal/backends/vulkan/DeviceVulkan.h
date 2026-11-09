@@ -19,6 +19,7 @@
 // CScApp::CreateDevice falls back to Direct3D 9.
 
 #include <cstdint>
+#include <deque>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -146,6 +147,10 @@ namespace gpg::gal
     ) override;
     /** Destroys a GPU program's modules and pipelines once the GPU is done with them. */
     void RetireProgram(GpuProgramVulkan& program);
+    // Ray tracing (RayTracingVulkan.cpp)
+    RayGeometryId CreateRayGeometry(const RayGeometryDesc& desc) override;
+    void DestroyRayGeometry(RayGeometryId geometry) override;
+    void SetRayInstances(const RayInstance* instances, std::uint32_t count) override;
 
     // effects::PassBinder
     void BindPass(effects::EffectProgram& program, std::uint32_t technique, std::uint32_t pass) override;
@@ -433,6 +438,76 @@ namespace gpg::gal
 
     // ---- GPU-driven programs -------------------------------------------------
     std::uint32_t mGpuFeatures = 0U;
+
+    // ---- ray tracing (RayTracingVulkan.cpp) -----------------------------------
+    struct RayBuffer
+    {
+      VkBuffer buffer = VK_NULL_HANDLE;
+      VkDeviceMemory memory = VK_NULL_HANDLE;
+      VkDeviceSize size = 0U;
+      VkDeviceAddress address = 0U;
+      std::uint8_t* mapped = nullptr;
+    };
+    struct RayRange
+    {
+      std::uint32_t chunk = 0U;
+      VkDeviceSize offset = 0U;
+      VkDeviceSize bytes = 0U;
+    };
+    struct RayChunk
+    {
+      RayBuffer buffer;
+      std::map<VkDeviceSize, VkDeviceSize> holes; // offset -> bytes
+    };
+    struct RayInputChunk
+    {
+      RayBuffer buffer;
+      VkDeviceSize used = 0U;
+      std::uint64_t serial = 0U;
+    };
+    struct RayGeometryVulkan
+    {
+      VkAccelerationStructureKHR structure = VK_NULL_HANDLE;
+      VkDeviceAddress address = 0U;
+      RayRange range;
+    };
+    struct RayGarbage
+    {
+      std::uint64_t serial = 0U;
+      VkAccelerationStructureKHR structure = VK_NULL_HANDLE;
+      RayBuffer buffer;
+      RayRange range;
+      VkDescriptorSet set = VK_NULL_HANDLE;
+    };
+    [[nodiscard]] bool CreateRayBuffer(VkDeviceSize bytes, VkBufferUsageFlags usage, bool host, RayBuffer& out);
+    void DestroyRayBuffer(RayBuffer& buffer) noexcept;
+    void RetireRay(VkAccelerationStructureKHR structure, const RayBuffer& buffer, VkDescriptorSet set);
+    void CollectRayGarbage(bool all);
+    [[nodiscard]] bool RayArenaAllocate(VkDeviceSize bytes, RayRange& out);
+    void RayArenaFree(const RayRange& range);
+    [[nodiscard]] std::uint8_t* RayInput(VkDeviceSize bytes, VkDeviceAddress& address);
+    [[nodiscard]] bool EnsureRayScratch(VkDeviceSize bytes);
+    void RayBarrier(VkPipelineStageFlags2 sourceStages, VkAccessFlags2 sourceAccess, VkPipelineStageFlags2 destinationStages,
+                    VkAccessFlags2 destinationAccess);
+    void CreateRayTracingObjects();
+    void ReleaseRayTracingObjects() noexcept;
+    void BuildRayScene();
+
+    bool mRayQuery = false;
+    VkDescriptorSetLayout mRayLayout = VK_NULL_HANDLE;
+    VkDescriptorPool mRayPool = VK_NULL_HANDLE;
+    VkDescriptorSet mRaySet = VK_NULL_HANDLE;
+    VkAccelerationStructureKHR mTlas = VK_NULL_HANDLE;
+    RayBuffer mTlasBuffer;
+    RayBuffer mRayScratch;
+    VkDeviceSize mRayScratchAlignment = 256U;
+    std::vector<RayChunk> mRayChunks;
+    std::deque<RayInputChunk> mRayInputs;
+    RayInputChunk* mRayInputCurrent = nullptr;
+    std::vector<RayGarbage> mRayGarbage;
+    std::unordered_map<RayGeometryId, RayGeometryVulkan> mRayGeometries;
+    RayGeometryId mNextRayGeometry = 1U;
+    std::vector<VkAccelerationStructureInstanceKHR> mRayInstances;
     VkDescriptorSetLayout mGpuSetLayout = VK_NULL_HANDLE;
     VkPipelineLayout mGpuPipelineLayout = VK_NULL_HANDLE;
     VkSampler mGpuSamplers[3]{}; // by GpuSampler

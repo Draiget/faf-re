@@ -1,5 +1,8 @@
 #pragma once
 
+#include <array>
+#include <vector>
+
 #include <cstddef>
 #include <cstdint>
 
@@ -295,4 +298,7 @@ namespace moho
   static_assert(offsetof(HardwareMeshBatch, mScratchVertexData) == 0x64, "HardwareMeshBatch::mScratchVertexData offset must be 0x64");
   static_assert(sizeof(HardwareMeshBatch) == 0x68, "HardwareMeshBatch size must be 0x68");
 
+  class MeshInstance;
+  /** ren_RayTracedShadows: `meshInstance`'s world transform per bone under `batch` (HardwareMeshBatch.cpp). */
+  bool MeshInstanceRayTransforms(const MeshBatch& batch, MeshInstance& meshInstance, std::vector<std::array<float, 12>>& out);
 } // namespace moho

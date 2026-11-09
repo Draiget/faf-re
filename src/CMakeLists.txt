@@ -173,6 +173,7 @@ set_property(SOURCE
     gpg/gal/backends/vulkan/ResourcesVulkan.cpp
     gpg/gal/backends/vulkan/DeviceVulkan.cpp
     gpg/gal/backends/vulkan/GpuDrivenVulkan.cpp
+    gpg/gal/backends/vulkan/RayTracingVulkan.cpp
   APPEND PROPERTY INCLUDE_DIRECTORIES "${FAF_DEPENDENCIES_DIR}/vulkan/include")
 
 # FX11 (Effects 11) compiles into the engine as its own project would build it:

@@ -36,6 +36,7 @@
 #include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/backends/dxgi/DxgiFormats.h"
+#include "gpg/gal/effects/RayTracedShadows.h"
 #include "gpg/gal/effects/ShadowCascades.h"
 #include "gpg/gal/effects/TextureFiltering.h"
 
@@ -261,6 +262,8 @@ namespace gpg::gal
     float lastViewport[4]{-1.0f, -1.0f, -1.0f, -1.0f};
     std::int32_t shadowCascadeParameter = -1; // faf_ShadowCascades (ren_ShadowCascades)
     std::uint64_t shadowCascadeVersion = 0;
+    std::int32_t rayShadowParameter = -1; // faf_RayShadows (ren_RayTracedShadows)
+    std::uint64_t rayShadowVersion = 0;
 
     std::uint64_t constantsVersion = 0;
     std::uint64_t constantsSerial = 0;
@@ -294,6 +297,7 @@ namespace gpg::gal
       Vk().vkDeviceWaitIdle(mDevice);
     }
     ReleaseGpuDrivenObjects();
+    ReleaseRayTracingObjects();
     outputContext_ = OutputContext();
     mHeadOutputContexts.clear();
     mPass = BoundPass{};
@@ -533,6 +537,13 @@ namespace gpg::gal
   {
     VkPhysicalDeviceVulkan13Features available13{};
     available13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    // Engine addition (ren_RayTracedShadows): inline ray queries need these two, and buffer device addresses.
+    VkPhysicalDeviceRayQueryFeaturesKHR availableRayQuery{};
+    availableRayQuery.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR availableAcceleration{};
+    availableAcceleration.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+    availableAcceleration.pNext = &availableRayQuery;
+    available13.pNext = &availableAcceleration;
     VkPhysicalDeviceVulkan12Features available12{};
     available12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
     available12.pNext = &available13;
@@ -588,18 +599,53 @@ namespace gpg::gal
     mMemoryBudget = std::any_of(available_extensions.begin(), available_extensions.end(), [](const VkExtensionProperties& extension) {
       return std::strcmp(extension.extensionName, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME) == 0;
     });
-    const char* const extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME};
+    std::vector<const char*> extensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+    if (mMemoryBudget) {
+      extensions.push_back(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
+    }
+    const auto hasExtension = [&](const char* const name) {
+      return std::any_of(available_extensions.begin(), available_extensions.end(), [name](const VkExtensionProperties& extension) {
+        return std::strcmp(extension.extensionName, name) == 0;
+      });
+    };
+    VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures{};
+    rayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+    rayQueryFeatures.rayQuery = VK_TRUE;
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationFeatures{};
+    accelerationFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+    accelerationFeatures.accelerationStructure = VK_TRUE;
+    accelerationFeatures.pNext = &rayQueryFeatures;
+    mRayQuery = effects::RayTracedShadowsWanted() && hasExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME) &&
+      hasExtension(VK_KHR_RAY_QUERY_EXTENSION_NAME) && hasExtension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME) &&
+      availableAcceleration.accelerationStructure == VK_TRUE && availableRayQuery.rayQuery == VK_TRUE &&
+      available12.bufferDeviceAddress == VK_TRUE;
+    if (mRayQuery) {
+      extensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+      extensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+      extensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+      features12.bufferDeviceAddress = VK_TRUE;
+      features13.pNext = &accelerationFeatures;
+    }
     VkDeviceCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     info.pNext = &features;
     info.queueCreateInfoCount = 1U;
     info.pQueueCreateInfos = &queue;
-    info.enabledExtensionCount = mMemoryBudget ? 2U : 1U;
-    info.ppEnabledExtensionNames = extensions;
+    info.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
+    info.ppEnabledExtensionNames = extensions.data();
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDevice(mPhysical, &info, nullptr, &mDevice));
     if (!Vk().LoadDevice(mDevice)) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "the Vulkan device lacks required functions");
     }
+    if (mRayQuery && !Vk().LoadRay(mDevice)) {
+      mRayQuery = false;
+    }
+    effects::gRayQueryShaders = mRayQuery;
+    gpg::Logf(
+      mRayQuery                              ? "Vulkan: inline ray queries available"
+        : !effects::RayTracedShadowsWanted() ? "Vulkan: ray tracing off (ren_RayTracedShadows -1 at device creation)"
+                                             : "Vulkan: no inline ray queries; ray-traced shadows off"
+    );
     Vk().vkGetDeviceQueue(mDevice, mQueueFamily, 0U, &mQueue);
 
     VkSemaphoreTypeCreateInfo timelineType{};
@@ -669,10 +715,24 @@ namespace gpg::gal
     layout.pBindings = &constants;
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mConstantLayout));
 
-    const VkDescriptorSetLayout sets[2] = {mTextureLayout, mConstantLayout};
+    // Engine addition (ren_RayTracedShadows): the ray-traced scene is set 2 (RayTracingVulkan.cpp).
+    if (mRayQuery) {
+      VkDescriptorSetLayoutBinding scene{};
+      scene.binding = 0U;
+      scene.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+      scene.descriptorCount = 1U;
+      // Compute too: ren_RayAo's dispatch reads the scene (GpuDrivenVulkan.cpp's layouts share this set layout).
+      scene.stageFlags = stages | VK_SHADER_STAGE_COMPUTE_BIT;
+      layout.bindingCount = 1U;
+      layout.pBindings = &scene;
+      CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mRayLayout));
+      layout.pBindings = &constants;
+    }
+    const std::uint32_t setCount = mRayQuery ? 3U : 2U;
+    const VkDescriptorSetLayout sets[3] = {mTextureLayout, mConstantLayout, mRayLayout};
     VkPipelineLayoutCreateInfo pipeline{};
     pipeline.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeline.setLayoutCount = 2U;
+    pipeline.setLayoutCount = setCount;
     pipeline.pSetLayouts = sets;
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreatePipelineLayout(mDevice, &pipeline, nullptr, &mPipelineLayout));
 
@@ -680,7 +740,7 @@ namespace gpg::gal
     // whose constants changed binds the page's one set with an offset instead of allocating and writing a set.
     constants.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mDynamicConstantLayout));
-    const VkDescriptorSetLayout dynamicSets[2] = {mTextureLayout, mDynamicConstantLayout};
+    const VkDescriptorSetLayout dynamicSets[3] = {mTextureLayout, mDynamicConstantLayout, mRayLayout};
     pipeline.pSetLayouts = dynamicSets;
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreatePipelineLayout(mDevice, &pipeline, nullptr, &mDynamicPipelineLayout));
     mDynamicConstants = gVulkanDynamicConstants;
@@ -1069,6 +1129,9 @@ namespace gpg::gal
 
   void DeviceVulkan::Setup(DeviceContext* const context)
   {
+    // Engine addition (ren_RayTracedShadows): no ray queries on this device yet; a Direct3D 12 device made
+    // earlier in the session may have set it.
+    effects::gRayQueryShaders = false;
     mCurThreadId = static_cast<int>(::GetCurrentThreadId());
     mLog.clear();
     if (backend::SetupFailureRequested("vulkan")) {
@@ -1102,6 +1165,7 @@ namespace gpg::gal
     CreateLayouts();
     CreateNullImages();
     CreateGpuDrivenObjects();
+    CreateRayTracingObjects();
     CreateSwapChains(*context);
     AcquireNextImages();
 
@@ -2650,6 +2714,7 @@ namespace gpg::gal
       auto state = std::make_shared<ProgramState>();
       state->viewportParameter = program.FindParameter("faf_ViewportSize");
       state->shadowCascadeParameter = program.FindParameter(effects::kShadowCascadeParameter);
+      state->rayShadowParameter = program.FindParameter(effects::kRayShadowParameter);
       slot = state;
     }
     ProgramState& state = *static_cast<ProgramState*>(slot.get());
@@ -2828,6 +2893,12 @@ namespace gpg::gal
       state.shadowCascadeVersion = effects::gShadowCascades.version;
       parameters.SetVectorArray(
         static_cast<std::uint32_t>(state.shadowCascadeParameter), &effects::gShadowCascades.vectors[0][0], effects::kShadowCascadeVectors
+      );
+    }
+    if (state.rayShadowParameter >= 0 && state.rayShadowVersion != effects::gRayShadows.version) {
+      state.rayShadowVersion = effects::gRayShadows.version;
+      parameters.SetVectorArray(
+        static_cast<std::uint32_t>(state.rayShadowParameter), &effects::gRayShadows.vectors[0][0], effects::kRayShadowVectors
       );
     }
 
@@ -3365,6 +3436,9 @@ namespace gpg::gal
     Vk().vkCmdBindDescriptorSets(
       mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, EffectPipelineLayout(), 0U, 1U, &mPass.textures, 0U, nullptr
     );
+    if (mRaySet != VK_NULL_HANDLE) {
+      Vk().vkCmdBindDescriptorSets(mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, EffectPipelineLayout(), 2U, 1U, &mRaySet, 0U, nullptr);
+    }
     if (mPass.constants != VK_NULL_HANDLE) {
       BindConstantSet(mPass.constants, mPass.constantsOffset);
     }

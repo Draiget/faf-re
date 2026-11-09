@@ -11,6 +11,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/GpuDriven.h"
+#include "gpg/gal/effects/RayTracedShadows.h"
 #include "gpg/gal/effects/ShadowCascades.h"
 #include "moho/console/CConCommand.h"
 #include "moho/math/VMatrix4.h"
@@ -63,6 +64,27 @@ namespace moho
     "ren_AoContactLength", "Contact shadow ray length in world units.", &ren_AoContactLength
   );
 
+  // Engine addition (ren_RayAo): ambient occlusion by rays against the ray-traced scene (RayScene.h) while
+  // ray-traced shadows are on.
+  int ren_RayAo = 1;
+  int ren_RayAoRays = 6;
+  TConVar<int> gTConVar_ren_RayAo(
+    "ren_RayAo",
+    "Direct3D 12 and Vulkan with ray tracing, while ren_RayTracedShadows is on: ambient occlusion by short rays over "
+    "the half-sphere above each point (ren_RayAoRays of them, ren_AoRadius long) instead of from the screen's depth, "
+    "so units, buildings and ground off the screen or behind others shade too. 1 on (default), 0 off.",
+    &ren_RayAo
+  );
+  TConVar<int> gTConVar_ren_RayAoRays("ren_RayAoRays", "Rays per point for ren_RayAo (1-16).", &ren_RayAoRays);
+  // The point a ray leaves from is rebuilt from the depth buffer, whose error grows with camera distance.
+  float ren_RayAoLift = 0.006f;
+  TConVar<float> gTConVar_ren_RayAoLift(
+    "ren_RayAoLift",
+    "ren_RayAo: how far above the surface the rays start, per world unit of camera distance (plus 0.05), so they "
+    "don't start under the ground the depth buffer rebuilds.",
+    &ren_RayAoLift
+  );
+
   float ren_TerrainShadows = 0.45f;
   TConVar<float> gTConVar_ren_TerrainShadows(
     "ren_TerrainShadows",
@@ -98,8 +120,9 @@ namespace moho
       VMatrix4 shadowMatrix;
       float shadowParams[4];
       float shadowCascades[gpg::gal::effects::kShadowCascadeVectors][4];
+      float rayParams[4];
     };
-    static_assert(sizeof(AoConstants) == 496, "AoConstants matches the shader's cbuffer");
+    static_assert(sizeof(AoConstants) == 512, "AoConstants matches the shader's cbuffer");
 
     /** Terrain-shadow cells across the larger side of the map at most. */
     constexpr std::int32_t kTerrainShadowCells = 1024;
@@ -134,8 +157,11 @@ namespace moho
       if (BackendReadsBoundDepth(*device) && (device->GetGpuDrivenFeatures() & kNeeded) == kNeeded) {
         gpg::gal::GpuProgramDesc compute{};
         compute.name = "AmbientOcclusion";
-        compute.source = kAmbientOcclusionShaderSource;
-        compute.sourceBytes = sizeof(kAmbientOcclusionShaderSource) - 1U;
+        // Engine addition (ren_RayAo): with ray queries the source also traces (FAF_RAY_QUERY).
+        mRaySource = ((device->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureRayQuery) != 0U) ? "#define FAF_RAY_QUERY 1\n" : "";
+        mRaySource += kAmbientOcclusionShaderSource;
+        compute.source = mRaySource.c_str();
+        compute.sourceBytes = mRaySource.size();
         compute.computeEntry = "AoCS";
         mCompute = device->CreateGpuProgram(compute);
 
@@ -347,6 +373,20 @@ namespace moho
         constants.shadowParams[0] = 1.0f;
         std::memcpy(constants.shadowCascades, gpg::gal::effects::gShadowCascades.vectors, sizeof(constants.shadowCascades));
       }
+    }
+
+    // Engine addition (ren_RayAo): while the frame's shadows were traced (RayScene published its constants
+    // this frame), occlusion is traced too, and the sun's terms are the lit passes' own.
+    if (ren_RayAo > 0 && gpg::gal::effects::gRayShadows.vectors[4][0] > 0.0f &&
+        (mDevice->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureRayQuery) != 0U) {
+      constants.rayParams[0] = 1.0f;
+      constants.rayParams[1] = static_cast<float>(std::clamp(ren_RayAoRays, 1, 16));
+      constants.rayParams[2] = std::max(ren_RayAoLift, 0.0f);
+      constants.rayParams[3] = gpg::gal::effects::gRayShadows.vectors[7][1];
+      constants.sun[3] = 0.0f;
+      constants.terrainGrid[3] = 0.0f;
+      constants.shadowParams[0] = 0.0f;
+      shadowSurface = {};
     }
 
     gpg::gal::GpuDispatch dispatch{};

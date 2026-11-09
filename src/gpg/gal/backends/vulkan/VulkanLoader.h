@@ -129,6 +129,16 @@
   X(vkCmdWriteTimestamp2)             \
   X(vkGetQueryPoolResults)
 
+// Engine addition (ren_RayTracedShadows): loaded only on a device made with the ray query extensions.
+#define FAF_VK_RAY_FUNCTIONS(X)                    \
+  X(vkCreateAccelerationStructureKHR)              \
+  X(vkDestroyAccelerationStructureKHR)             \
+  X(vkGetAccelerationStructureBuildSizesKHR)       \
+  X(vkCmdBuildAccelerationStructuresKHR)           \
+  X(vkGetAccelerationStructureDeviceAddressKHR)    \
+  X(vkGetBufferDeviceAddress)                      \
+  X(vkFreeDescriptorSets)
+
 namespace gpg::gal::vulkan
 {
   /** The loaded entry points. One instance per process (the backend is a singleton). */
@@ -141,6 +151,7 @@ namespace gpg::gal::vulkan
     FAF_VK_INSTANCE_FUNCTIONS(FAF_VK_DECLARE)
     FAF_VK_DEBUG_FUNCTIONS(FAF_VK_DECLARE)
     FAF_VK_DEVICE_FUNCTIONS(FAF_VK_DECLARE)
+    FAF_VK_RAY_FUNCTIONS(FAF_VK_DECLARE)
 #undef FAF_VK_DECLARE
 
     /** Loads vulkan-1.dll and the global functions; false when there is no Vulkan. */
@@ -149,6 +160,8 @@ namespace gpg::gal::vulkan
     [[nodiscard]] bool LoadInstance(VkInstance instance);
     /** False when a required device function is missing (Vulkan 1.3 core). */
     [[nodiscard]] bool LoadDevice(VkDevice device);
+    /** Engine addition (ren_RayTracedShadows): false when a ray function is missing. */
+    [[nodiscard]] bool LoadRay(VkDevice device);
     void Unload() noexcept;
   };
 

@@ -10,6 +10,7 @@
 #include "gpg/gal/backends/common/PipelineMemo.h"
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/effects/EffectRuntime.h"
+#include "gpg/gal/effects/RayTracedShadows.h"
 #include "gpg/gal/effects/TextureFiltering.h"
 #include "moho/console/CConCommand.h"
 #include "moho/render/ProjectileIconRenderer.h"
@@ -115,6 +116,16 @@ namespace moho
       "terrain layers, unit albedo, normal and specular maps - so ground and hulls seen at a slant stay sharp; 0 keeps "
       "the effects' own filtering. 8 by default. Applies at the next draw of each effect.",
       &gpg::gal::effects::gTextureAnisotropy
+    );
+
+    /** Engine addition: `ren_RayTracedShadows` (see gpg/gal/effects/RayTracedShadows.h, moho/render/RayScene.h). */
+    TConVar<int> gTConVar_ren_RayTracedShadows(
+      "ren_RayTracedShadows",
+      "Direct3D 12 and Vulkan with ray tracing (DXR 1.1 / VK_KHR_ray_query): sun shadows of the ground, units and "
+      "buildings by a ray towards the sun from every lit point, instead of the shadow map (trees and other "
+      "alpha-tested meshes stay in the map). 1 on (default), 0 off (live); -1 at startup keeps the device from "
+      "setting ray tracing up at all.",
+      &gpg::gal::effects::gRayTracedShadows
     );
 
     /** Engine addition: `d3d_UploadIdleMB` (see gpg/gal/PlacedResources.h). */

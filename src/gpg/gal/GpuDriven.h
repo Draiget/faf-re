@@ -50,6 +50,8 @@ namespace gpg::gal
     kGpuFeatureBufferCopy = 1U << 4U,
     /// Effect passes with hull and domain shaders draw (engine addition, ren_TerrainTessellation).
     kGpuFeatureTessellation = 1U << 5U,
+    /** Inline ray queries in pixel and compute shaders against `SetRayInstances`' scene (RayTracing.h). */
+    kGpuFeatureRayQuery = 1U << 6U,
   };
 
   /**

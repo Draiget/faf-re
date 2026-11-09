@@ -159,6 +159,10 @@ namespace gpg::gal
     bool CopyVertexBufferRegion(
       VertexBuffer& destination, std::uint32_t destinationOffset, VertexBuffer& source, std::uint32_t sourceOffset, std::uint32_t byteCount
     ) override;
+    // Ray tracing (RayTracingD3D12.cpp)
+    RayGeometryId CreateRayGeometry(const RayGeometryDesc& desc) override;
+    void DestroyRayGeometry(RayGeometryId geometry) override;
+    void SetRayInstances(const RayInstance* instances, std::uint32_t count) override;
 
     // effects::PassBinder
     void BindPass(effects::EffectProgram& program, std::uint32_t technique, std::uint32_t pass) override;
@@ -280,6 +284,15 @@ namespace gpg::gal
     void CreateDrawMarkers();
     void DumpBackBufferIfDue();
     void LogMemoryIfDue();
+
+    // ---- ray tracing (RayTracingD3D12.cpp) -------------------------------------
+    /** Checks for DXR 1.1 and shader model 6.5 (before the root signature, which then gains the scene). */
+    void CreateRayTracing();
+    void ReleaseRayTracing() noexcept;
+    [[nodiscard]] bool EnsureRayScratch(std::uint64_t bytes);
+    void RayBuildBarrier(ID3D12Resource* resource);
+    void CollectRayFrees();
+    void BuildRayScene();
 
     // ---- GPU-driven programs (GpuDrivenD3D12.cpp) ------------------------------
     void CreateGpuDrivenObjects();
@@ -416,6 +429,54 @@ namespace gpg::gal
     D3D12_CPU_DESCRIPTOR_HANDLE mBoundRenderTarget{};
     D3D12_CPU_DESCRIPTOR_HANDLE mBoundDepthStencil{};
     bool mTargetsDirty = true;
+
+    // ---- ray tracing ------------------------------------------------------------
+    /** Where one bottom-level structure lives inside the arena's buffers. */
+    struct RayRange
+    {
+      std::uint32_t chunk = 0U;
+      std::uint64_t offset = 0U;
+      std::uint64_t bytes = 0U;
+      D3D12_GPU_VIRTUAL_ADDRESS address = 0U;
+    };
+    /** Large buffers holding the bottom-level structures, with first-fit holes. */
+    struct RayArena
+    {
+      struct Chunk
+      {
+        Microsoft::WRL::ComPtr<ID3D12Resource> buffer;
+        std::uint64_t bytes = 0U;
+        std::map<std::uint64_t, std::uint64_t> holes; // offset -> bytes
+      };
+      std::vector<Chunk> chunks;
+      [[nodiscard]] bool Allocate(ID3D12Device* device, std::uint64_t bytes, RayRange& out);
+      void Free(const RayRange& range);
+    };
+    struct RayGeometryD3D12
+    {
+      RayRange range;
+      std::uint32_t triangles = 0U;
+    };
+    struct RayFree
+    {
+      std::uint64_t serial = 0U;
+      RayRange range;
+    };
+    bool mRayQuery = false;
+    Microsoft::WRL::ComPtr<ID3D12Device5> mDevice5;
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> mList4;
+    RayArena mRayArena;
+    std::unordered_map<RayGeometryId, RayGeometryD3D12> mRayGeometries;
+    std::vector<RayFree> mRayFrees;
+    RayGeometryId mNextRayGeometry = 1U;
+    std::uint64_t mRayGeometryBytes = 0U;
+    d3d12::TrackedResource mRayScratch;
+    std::uint64_t mRayScratchBytes = 0U;
+    d3d12::TrackedResource mTlas;
+    std::uint64_t mTlasBytes = 0U;
+    D3D12_GPU_VIRTUAL_ADDRESS mTlasAddress = 0U;
+    std::uint32_t mRayInstanceCount = 0U;
+    std::vector<D3D12_RAYTRACING_INSTANCE_DESC> mRayInstanceDescs;
 
     // ---- GPU-driven programs -------------------------------------------------
     std::uint32_t mGpuFeatures = 0U;

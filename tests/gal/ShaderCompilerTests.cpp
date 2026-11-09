@@ -25,6 +25,7 @@
 #include "gpg/gal/effects/EffectDescription.h"
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "gpg/gal/effects/ModernHlsl.h"
+#include "gpg/gal/effects/RayTracedShadows.h"
 #include "gpg/gal/effects/ShadowCascades.h"
 #include "gpg/gal/effects/ShaderCompiler.h"
 #include "gpg/gal/effects/SpirvReflect.h"
@@ -159,6 +160,92 @@ technique10 Lit
     EXPECT_TRUE(dxil.succeeded) << entry.name << ":\n" << dxil.messages;
     const CompiledShader spirv = compiler.Compile(generated.modern.hlsl, entry, ShaderTarget::Spirv);
     EXPECT_TRUE(spirv.succeeded) << entry.name << ":\n" << spirv.messages;
+  }
+}
+
+// Engine addition (ren_RayTracedShadows): with a device that traces rays, the shadow lookups take the whole
+// shadow coordinate (mesh.fx's five-tap form included) and the effect compiles with inline ray queries for both
+// targets (shader model 6.5, SPIR-V for Vulkan 1.2).
+TEST(GalShaderCompiler, RayTracedShadowLookupsCompileForBothTargets)
+{
+  if (Compiler() == nullptr) {
+    GTEST_SKIP() << Unavailable();
+  }
+  const ShaderCompiler& compiler = *Compiler();
+  gRayQueryShaders = true;
+  const std::string source = std::string(RayShadowDeclaration()) + std::string(ShadowCascadeDeclaration()) + R"fx(
+float4x4 ShadowMatrix;
+float shadowBias;
+texture ShadowTexture;
+sampler2D ShadowSampler = sampler_state { Texture = (ShadowTexture); };
+sampler2D ShadowPCFSampler = sampler_state { Texture = (ShadowTexture); };
+struct VSOut
+{
+    float4 pos : POSITION;
+    float4 shadow : TEXCOORD0;
+};
+VSOut LitVS( float3 position : POSITION )
+{
+    VSOut o;
+    o.pos = float4( position, 1 );
+    o.shadow = mul( float4( position, 1 ), ShadowMatrix );
+    return o;
+}
+float Pcf( float4 shadowCoords )
+{
+    float lit = 0;
+    float texel = 1.0 / 1024;
+    lit += ( tex2D( ShadowPCFSampler, shadowCoords.xy + float2( -texel, 0.0f ) ).r + shadowBias > shadowCoords.z ) ? 1 : 0;
+    lit += ( tex2D( ShadowPCFSampler, shadowCoords.xy + float2( texel, 0.0f ) ).r + shadowBias > shadowCoords.z ) ? 1 : 0;
+    return lit * 0.5;
+}
+float ComputeShadow( float4 vShadowCoord )
+{
+    vShadowCoord.xy /= vShadowCoord.w;
+    return tex2D( ShadowSampler, vShadowCoord ).g;
+}
+float4 LitPS( VSOut i ) : COLOR0
+{
+    float shadow = tex2D( ShadowSampler, i.shadow.xy ).g;
+    return shadow * Pcf( i.shadow ) * ComputeShadow( i.shadow ) * tex2D( ShadowSampler, i.shadow.zw ).g *
+        tex2D ( ShadowSampler , i . shadow . xy ) . g * dot( tex2D( ShadowSampler, i.shadow.xy ), 1 );
+}
+technique10 Lit
+{
+    pass P0
+    {
+        SetVertexShader( CompileShader( vs_4_0, LitVS() ) );
+        SetPixelShader( CompileShader( ps_4_0, LitPS() ) );
+    }
+}
+)fx";
+  const Generated generated = Generate(source);
+  gRayQueryShaders = false;
+  const std::string& hlsl = generated.modern.hlsl;
+  EXPECT_NE(hlsl.find("RayQuery<"), std::string::npos);
+  EXPECT_NE(hlsl.find("faf_shadow_full_g(i.shadow)"), std::string::npos) << hlsl;
+  EXPECT_NE(hlsl.find("float2( -texel, 0.0f ) , faf_shadow_full_r(shadowCoords)"), std::string::npos) << hlsl;
+  // terrain.fx's ComputeShadow passes its whole coordinate; a swizzle other than .xy reads the map alone.
+  EXPECT_NE(hlsl.find("vShadowCoord , faf_shadow_full_g(vShadowCoord)"), std::string::npos) << hlsl;
+  EXPECT_EQ(hlsl.find("faf_shadow_full(i.shadow.zw)"), std::string::npos) << hlsl;
+  // The effect layer's token stream spaces the members (`inV . mShadow . xy`).
+  EXPECT_NE(hlsl.find("i . shadow . xy , faf_shadow_full_g(i.shadow)"), std::string::npos) << hlsl;
+  // A call site that reads the whole texel traces for both readings.
+  EXPECT_NE(hlsl.find("i.shadow.xy , faf_shadow_full(i.shadow)"), std::string::npos) << hlsl;
+  ASSERT_EQ(generated.modern.entries.size(), 2U);
+  for (const ShaderEntry& entry : generated.modern.entries) {
+    const CompiledShader dxil = compiler.Compile(hlsl, entry, ShaderTarget::Dxil);
+    EXPECT_TRUE(dxil.succeeded) << entry.name << ":\n" << dxil.messages;
+    const CompiledShader spirv = compiler.Compile(hlsl, entry, ShaderTarget::Spirv);
+    EXPECT_TRUE(spirv.succeeded) << entry.name << ":\n" << spirv.messages;
+  }
+
+  // Without ray queries the same effect keeps the plain lookups (the coordinate is passed and ignored).
+  const Generated plain = Generate(source);
+  EXPECT_EQ(plain.modern.hlsl.find("RayQuery<"), std::string::npos);
+  for (const ShaderEntry& entry : plain.modern.entries) {
+    const CompiledShader dxil = compiler.Compile(plain.modern.hlsl, entry, ShaderTarget::Dxil);
+    EXPECT_TRUE(dxil.succeeded) << entry.name << ":\n" << dxil.messages;
   }
 }
 

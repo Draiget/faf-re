@@ -248,6 +248,75 @@ do
     end
 end
 
+-- Ray-traced shadows (ren_RayTracedShadows) and ray-traced ambient occlusion (ren_RayAo), on Direct3D 12 and Vulkan
+-- devices that can trace rays. Shown only by an engine that has the commands, as the others.
+do
+    local function Supported(command)
+        -- The engine's Lua reports C functions as 'cfunction'.
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local video = options and options.video
+    if video and video.items and Supported('ren_RayTracedShadows') then
+        local position = table.getn(video.items) + 1
+        for index, item in ipairs(video.items) do
+            if item.key == 'shadow_cascades' or item.key == 'shadow_resolution' then
+                position = index + 1
+            end
+        end
+        table.insert(video.items, position, {
+            title = 'Ray-traced shadows',
+            key = 'ray_traced_shadows',
+            type = 'toggle',
+            default = 1,
+            tip = 'Sun shadows of the ground, units and buildings traced by ray: exact at every distance, and hills '
+                .. 'shade the ground. Needs a graphics card that can trace rays, on Direct3D 12 or Vulkan; '
+                .. 'elsewhere the shadow map stays.',
+            set = function(key, value, startup)
+                ConExecute('ren_RayTracedShadows ' .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    { text = '<LOC _On>', key = 1 },
+                    { text = '<LOC _Off>', key = 0 },
+                },
+            },
+        })
+        if Supported('ren_RayAo') then
+            table.insert(video.items, position + 1, {
+                title = 'Ray-traced ambient light',
+                key = 'ray_traced_ao',
+                type = 'toggle',
+                default = 1,
+                tip = 'With ray-traced shadows on: the shading of nooks, the ground around buildings and units '
+                    .. 'under each other, traced by ray instead of read from the screen.',
+                set = function(key, value, startup)
+                    ConExecute('ren_RayAo ' .. tostring(value))
+                end,
+                custom = {
+                    states = {
+                        { text = '<LOC _On>', key = 1 },
+                        { text = '<LOC _Off>', key = 0 },
+                    },
+                },
+            })
+        end
+    end
+end
+
 -- Texture filtering (ren_TextureAnisotropy), on Direct3D 12 and Vulkan: anisotropic filtering for the tiled ground
 -- and unit textures. Shown only by an engine that has the command, as the ones below.
 do

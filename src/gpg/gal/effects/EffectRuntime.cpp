@@ -16,6 +16,7 @@
 #include <thread>
 #include <utility>
 
+#include "RayTracedShadows.h"
 #include "ShadowCascades.h"
 #include "SpirvReflect.h"
 #include "gpg/core/utils/LocalCache.h"
@@ -197,6 +198,10 @@ namespace gpg::gal::effects
     if (std::any_of(mDescription.samplers.begin(), mDescription.samplers.end(), IsShadowLookupSampler) &&
         FindParameter(kShadowCascadeParameter) < 0) {
       translatedSource.insert(0U, ShadowCascadeDeclaration());
+      // Engine addition (ren_RayTracedShadows): the ray constants ahead of the cascades, whose lookups read them.
+      if (gRayQueryShaders && FindParameter(kRayShadowParameter) < 0) {
+        translatedSource.insert(0U, RayShadowDeclaration());
+      }
       mDescription = ParseEffect(translatedSource);
     }
     if (!originalSource.empty()) {

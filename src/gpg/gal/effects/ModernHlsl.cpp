@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "EffectText.h"
+#include "RayTracedShadows.h"
 #include "ShadowCascades.h"
 #include "TextureFiltering.h"
 
@@ -22,6 +23,14 @@ namespace gpg::gal::effects
   ShadowCascadeConstants gShadowCascades{};
   int gTextureAnisotropy = 8;
   std::atomic<bool> gShadowCascadesBlocked{false};
+  RayShadowConstants gRayShadows{};
+  bool gRayQueryShaders = false;
+  int gRayTracedShadows = 1;
+
+  std::string_view RayShadowDeclaration() noexcept
+  {
+    return "float4 faf_RayShadows[8]; // engine addition (ren_RayTracedShadows), filled by the backend\n";
+  }
 
   bool IsShadowLookupSampler(const SamplerDesc& sampler)
   {
@@ -81,6 +90,281 @@ float4 tex2Dlod(faf_shadow_sampler s, float4 uv) { return faf_shadow_read(s, uv.
 float4 tex2Dgrad(faf_shadow_sampler s, float2 uv, float2 dx, float2 dy) { return faf_shadow_read(s, uv); }
 // ---- end of the cascade lookups ----
 )hlsl";
+
+    static_assert(kRayShadowVectors == 8U,"RayShadowDeclaration's array length");
+
+    // Engine addition (ren_RayTracedShadows): the lookups' third argument, the point's whole shadow
+    // coordinate (RayTracedShadows.h). A call site whose coordinate has no depth passes a z of -1e30,
+    // which the ray code reads as "no point". Its w says which channel the call site reads (the rewrite looks
+    // past the call): 1 red (mesh.fx's depth compare), 2 green (terrain.fx's "1 where sun is"), 3 unknown, so
+    // the lookup traces only for the reading that is used.
+    constexpr const char* kShadowCoordinateHelpers = R"hlsl(
+float4 faf_shadow_full(float4 v) { return float4(v.xyz, 3); }
+float4 faf_shadow_full(float3 v) { return float4(v.xy, -1e30, 3); }
+float4 faf_shadow_full(float2 v) { return float4(v, -1e30, 3); }
+float4 faf_shadow_full_r(float4 v) { return float4(v.xyz, 1); }
+float4 faf_shadow_full_r(float3 v) { return float4(v.xy, -1e30, 1); }
+float4 faf_shadow_full_r(float2 v) { return float4(v, -1e30, 1); }
+float4 faf_shadow_full_g(float4 v) { return float4(v.xyz, 2); }
+float4 faf_shadow_full_g(float3 v) { return float4(v.xy, -1e30, 2); }
+float4 faf_shadow_full_g(float2 v) { return float4(v, -1e30, 2); }
+)hlsl";
+
+    // Without rays: the coordinate is ignored.
+    constexpr const char* kRayShadowFallback = R"hlsl(
+float4 tex2D(faf_shadow_sampler s, float2 uv, float4 full) { return faf_shadow_read(s, uv); }
+)hlsl";
+
+    // With rays. A coordinate names a point two ways: as mesh.fx reads it (at z) and as terrain.fx does (at
+    // z + 0.01, its own 0.01 shift undone). Both lie on one line towards the sun, so one ray along it answers
+    // both: it starts at whichever of the two is further from the sun, and a hit counts for a point only past
+    // that point's own distance along the ray plus its bias. The longer test runs first; the short stretch
+    // between the two only when it found nothing. Meshes and the ground are traced apart, the ground with a
+    // bias that grows with camera distance. mesh.fx's five-tap filter asks for the same point five times, so
+    // the answer is kept for the next call.
+    constexpr const char* kRayShadowHelpers = R"hlsl(
+[[vk::binding(0, 2)]] RaytracingAccelerationStructure faf_RayScene : register(t0, space1);
+static float4 faf_ray_key = float4(-1e31, -1e31, -1e31, -1e31);
+static float2 faf_ray_lit = float2(1, 1);
+float3 faf_ray_point(float2 uv, float z)
+{
+    const float4 clip = float4(uv.x * 2 - 1, 1 - uv.y * 2, z, 1);
+    const float4 p = clip.x * faf_RayShadows[0] + clip.y * faf_RayShadows[1] + clip.z * faf_RayShadows[2] + faf_RayShadows[3];
+    return p.xyz / p.w;
+}
+bool faf_ray_blocked(float3 origin, float3 direction, float tMin, float tMax, uint mask)
+{
+    if (tMax <= tMin) return false;
+    RayDesc ray;
+    ray.Origin = origin;
+    ray.Direction = direction;
+    ray.TMin = tMin;
+    ray.TMax = tMax;
+    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_FORCE_OPAQUE> query;
+    query.TraceRayInline(faf_RayScene, RAY_FLAG_NONE, mask, ray);
+    query.Proceed();
+    return query.CommittedStatus() == COMMITTED_TRIANGLE_HIT;
+}
+bool faf_ray_blocked(float3 origin, float3 direction, float tMin, float tMax)
+{
+    return faf_ray_blocked(origin, direction, tMin, tMax, 0xFF);
+}
+// One ray against the instances in `mask` answering both readings: x lit past meshT, y lit past terrainT.
+float2 faf_ray_pair(float3 start, float3 toSun, float meshT, float terrainT, float tMax, uint mask)
+{
+    const float nearT = min(meshT, terrainT);
+    const float farT = max(meshT, terrainT);
+    if (faf_ray_blocked(start, toSun, farT, tMax, mask)) {
+        return float2(0, 0);
+    }
+    if (faf_ray_blocked(start, toSun, nearT, farT, mask)) {
+        return (meshT < terrainT) ? float2(0, 1) : float2(1, 0);
+    }
+    return float2(1, 1);
+}
+// x: sunlit for a mesh point at full.z; y: sunlit for a terrain point whose z is 0.01 short.
+float2 faf_ray_light(float4 full)
+{
+    if (faf_RayShadows[4].x <= 0 || full.z < -1e29) return float2(1, 1);
+    if (all(full == faf_ray_key)) return faf_ray_lit;
+    const float2 uv = full.xy;
+    const float3 meshPoint = faf_ray_point(uv, full.z);
+    const float3 terrainPoint = faf_ray_point(uv, full.z + 0.01);
+    const float3 toSun = faf_RayShadows[6].xyz;
+    const float ahead = dot(meshPoint - terrainPoint, toSun); // the mesh reading's lead along the ray
+    const float3 start = (ahead >= 0) ? terrainPoint : meshPoint;
+    const float meshT = max(ahead, 0) + faf_RayShadows[4].y;
+    const float terrainT = max(-ahead, 0) + faf_RayShadows[4].z;
+    const float tMax = faf_RayShadows[5].w;
+    // Meshes (mask 2, RayTracing.h's kRayMaskMesh) with the small biases, so units keep their contact
+    // shadows. The ground (mask 1) is drawn coarser with distance than the traced height field, so a ground
+    // point can lie under the traced ground: against the ground, its ray leaves further out.
+    const float terrainOnTerrainT = terrainT + faf_RayShadows[7].x + faf_RayShadows[4].w * distance(terrainPoint, faf_RayShadows[5].xyz);
+    float2 lit;
+    if (full.w < 1.5) {
+        // Red only (mesh.fx): the mesh reading, from its own point.
+        const bool shaded = faf_ray_blocked(meshPoint, toSun, faf_RayShadows[4].y, tMax, 2) ||
+            faf_ray_blocked(meshPoint, toSun, faf_RayShadows[4].y, tMax, 1);
+        lit = shaded ? float2(0, 1) : float2(1, 1);
+    } else if (full.w < 2.5) {
+        // Green only (terrain.fx): the terrain reading, from its own point.
+        const float groundT = faf_RayShadows[4].z;
+        const bool shaded = faf_ray_blocked(terrainPoint, toSun, groundT, tMax, 2) ||
+            faf_ray_blocked(terrainPoint, toSun, terrainOnTerrainT - max(-ahead, 0), tMax, 1);
+        lit = shaded ? float2(1, 0) : float2(1, 1);
+    } else {
+        lit = faf_ray_pair(start, toSun, meshT, terrainT, tMax, 2);
+        if (any(lit > 0)) {
+            lit = min(lit, faf_ray_pair(start, toSun, meshT, terrainOnTerrainT, tMax, 1));
+        }
+    }
+    // Diagnostics (ren_RayShadowDebug): stripes 20 world units apart across x (1) or z (2) from the
+    // rebuilt point, and (3) shade where the rebuilt point lies below the ray scene (a ray straight up hits).
+    const float debugMode = faf_RayShadows[6].w;
+    if (debugMode > 0.5 && debugMode < 1.5) {
+        lit = (frac(terrainPoint.x * 0.05) > 0.5) ? float2(1, 1) : float2(0, 0);
+    } else if (debugMode > 1.5 && debugMode < 2.5) {
+        lit = (frac(terrainPoint.z * 0.05) > 0.5) ? float2(1, 1) : float2(0, 0);
+    } else if (debugMode > 2.5) {
+        lit = faf_ray_blocked(terrainPoint + float3(0, 0.02, 0), float3(0, 1, 0), 0.0, 1000.0) ? float2(0, 0) : float2(1, 1);
+    }
+    faf_ray_key = full;
+    faf_ray_lit = lit;
+    return lit;
+}
+float4 tex2D(faf_shadow_sampler s, float2 uv, float4 full)
+{
+    float4 texel = faf_shadow_read(s, uv);
+    const float2 lit = faf_ray_light(full);
+    texel.r = (lit.x > 0) ? texel.r : -1e4;
+    texel.g *= lit.y;
+    return texel;
+}
+)hlsl";
+
+    /**
+     * Engine addition (ren_RayTracedShadows): gives each `tex2D(<shadow sampler>, <coords>.xy ...)` call in
+     * `body` a third argument, `faf_shadow_full(<coords>)`, when the call has two arguments and the second
+     * starts with a plain name or member chain followed by `.xy`, or is a plain name or member chain alone
+     * (not ending in a swizzle). Other calls keep two arguments and read the map alone.
+     */
+    [[nodiscard]] std::string PassShadowCoordinates(const std::string& body, const std::vector<std::string>& samplers)
+    {
+      std::string out;
+      out.reserve(body.size() + 64U);
+      std::size_t index = 0U;
+      while (index < body.size()) {
+        const std::size_t call = body.find("tex2D", index);
+        if (call == std::string::npos) {
+          break;
+        }
+        std::size_t cursor = call + 5U;
+        const bool whole = (call == 0U || !IsIdentifierChar(body[call - 1U])) && cursor < body.size() && !IsIdentifierChar(body[cursor]);
+        const auto skip = [&] {
+          while (cursor < body.size() && std::isspace(static_cast<unsigned char>(body[cursor])) != 0) {
+            ++cursor;
+          }
+        };
+        bool rewritten = false;
+        if (whole) {
+          skip();
+          if (cursor < body.size() && body[cursor] == '(') {
+            ++cursor;
+            skip();
+            const std::size_t nameStart = cursor;
+            while (cursor < body.size() && IsIdentifierChar(body[cursor])) {
+              ++cursor;
+            }
+            const std::string name = body.substr(nameStart, cursor - nameStart);
+            skip();
+            if (std::find(samplers.begin(), samplers.end(), name) != samplers.end() && cursor < body.size() && body[cursor] == ',') {
+              ++cursor;
+              const std::size_t argumentStart = cursor;
+              int depth = 0;
+              std::size_t end = std::string::npos;
+              bool more = false;
+              for (std::size_t at = cursor; at < body.size(); ++at) {
+                const char c = body[at];
+                if (c == '(' || c == '[') {
+                  ++depth;
+                } else if ((c == ')' || c == ']') && depth > 0) {
+                  --depth;
+                } else if (c == ')' && depth == 0) {
+                  end = at;
+                  break;
+                } else if (c == ',' && depth == 0) {
+                  more = true;
+                  break;
+                }
+              }
+              if (end != std::string::npos && !more) {
+                std::size_t at = argumentStart;
+                while (at < end && std::isspace(static_cast<unsigned char>(body[at])) != 0) {
+                  ++at;
+                }
+                // The member chain's names; the effect layer's token stream spaces them (`inV . mShadow . xy`).
+                std::vector<std::string> names;
+                while (at < end && IsIdentifierChar(body[at])) {
+                  const std::size_t nameAt = at;
+                  while (at < end && IsIdentifierChar(body[at])) {
+                    ++at;
+                  }
+                  names.push_back(body.substr(nameAt, at - nameAt));
+                  std::size_t next = at;
+                  while (next < end && std::isspace(static_cast<unsigned char>(body[next])) != 0) {
+                    ++next;
+                  }
+                  if (next >= end || body[next] != '.') {
+                    at = next;
+                    break;
+                  }
+                  ++next;
+                  while (next < end && std::isspace(static_cast<unsigned char>(body[next])) != 0) {
+                    ++next;
+                  }
+                  at = next;
+                }
+                const bool named = !names.empty() && std::isdigit(static_cast<unsigned char>(names.front().front())) == 0;
+                const bool plainChain = named && at == end;
+                const auto join = [&](const std::size_t count) {
+                  std::string chain;
+                  for (std::size_t k = 0U; k < count; ++k) {
+                    chain += (k == 0U ? "" : ".") + names[k];
+                  }
+                  return chain;
+                };
+                // The last member of the chain, when it is a swizzle (only xyzw / rgba letters).
+                const bool swizzle = names.size() > 1U && names.back().find_first_not_of("xyzwrgba") == std::string::npos;
+                // The channel the call site reads (`tex2D( ... ).g`): the lookup then traces for it alone.
+                std::string channel;
+                {
+                  std::size_t after = end + 1U;
+                  while (after < body.size() && std::isspace(static_cast<unsigned char>(body[after])) != 0) {
+                    ++after;
+                  }
+                  if (after < body.size() && body[after] == '.') {
+                    ++after;
+                    while (after < body.size() && std::isspace(static_cast<unsigned char>(body[after])) != 0) {
+                      ++after;
+                    }
+                    const std::size_t memberAt = after;
+                    while (after < body.size() && IsIdentifierChar(body[after])) {
+                      ++after;
+                    }
+                    const std::string member = body.substr(memberAt, after - memberAt);
+                    if (member == "r" || member == "x") {
+                      channel = "_r";
+                    } else if (member == "g" || member == "y") {
+                      channel = "_g";
+                    }
+                  }
+                }
+                if (named && names.size() > 1U && names.back() == "xy") {
+                  // `<coords>.xy`, maybe offset (a filter's taps): the coordinate is the chain before the swizzle.
+                  out.append(body, index, end - index);
+                  out += ", faf_shadow_full" + channel + "(" + join(names.size() - 1U) + ")";
+                  index = end;
+                  rewritten = true;
+                } else if (plainChain && !swizzle) {
+                  // A whole coordinate (terrain.fx's ComputeShadow passes its float4): faf_shadow_full's overloads
+                  // trace a float4 and leave a float2 or float3 to the map.
+                  out.append(body, index, end - index);
+                  out += ", faf_shadow_full" + channel + "(" + join(names.size()) + ")";
+                  index = end;
+                  rewritten = true;
+                }
+              }
+            }
+          }
+        }
+        if (!rewritten) {
+          out.append(body, index, call + 5U - index);
+          index = call + 5U;
+        }
+      }
+      out.append(body, index, std::string::npos);
+      return out;
+    }
 
     /**
      * Engine addition (ren_ShadowCascades): true when every use of `sampler` in `source`, past its own
@@ -843,6 +1127,8 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     // Engine addition (ren_ShadowCascades): the lighting shadow samplers read through the atlas when the
     // effect carries the cascade parameter (EffectProgram adds it) and only ever looks them up.
     bool shadowCascades = false;
+    bool rayShadows = false;
+    std::vector<std::string> shadowLookupSamplers;
     {
       const bool declared = std::any_of(description.parameters.begin(), description.parameters.end(), [](const Parameter& parameter) {
         return parameter.name == kShadowCascadeParameter && parameter.elements == kShadowCascadeVectors;
@@ -856,6 +1142,17 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
         }
       }
       shadowCascades = declared && any && lookups;
+      if (shadowCascades) {
+        for (const SamplerDesc& sampler : description.samplers) {
+          if (IsShadowLookupSampler(sampler)) {
+            shadowLookupSamplers.push_back(sampler.name);
+          }
+        }
+        // Engine addition (ren_RayTracedShadows): EffectProgram declares faf_RayShadows ahead of the cascades.
+        rayShadows = gRayQueryShaders && std::any_of(description.parameters.begin(), description.parameters.end(), [](const Parameter& parameter) {
+          return parameter.name == kRayShadowParameter && parameter.elements == kRayShadowVectors;
+        });
+      }
       if (declared && any && !lookups) {
         gShadowCascadesBlocked.store(true);
         modern.notes.push_back("a shadow sampler is used other than in a tex2D lookup; shadow cascades are off");
@@ -953,6 +1250,8 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           body += GlobalDeclaration(*parameter) + "\n";
           if (shadowCascades && parameter->name == kShadowCascadeParameter) {
             body += kShadowCascadeHelpers;
+            body += kShadowCoordinateHelpers;
+            body += rayShadows ? kRayShadowHelpers : kRayShadowFallback;
           }
         }
         // Anything else (strings, sampler parameters without state) has no shader-side form.
@@ -1004,6 +1303,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
             " = " + name + ";";
         }
         const std::size_t open = original.find('{', original.find(')'));
+        if (shadowCascades) {
+          functionBody = PassShadowCoordinates(functionBody, shadowLookupSamplers);
+        }
         body += ReplaceSamplerTypes(original.substr(0U, open)) + "{" + copies + ReplaceSamplerTypes(functionBody) + "}";
         continue;
       }

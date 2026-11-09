@@ -39,6 +39,7 @@
 #include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/backends/dxgi/DxgiFormats.h"
+#include "gpg/gal/effects/RayTracedShadows.h"
 #include "gpg/gal/effects/ShadowCascades.h"
 #include "gpg/gal/effects/TextureFiltering.h"
 
@@ -371,6 +372,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     float lastViewport[4]{-1.0f, -1.0f, -1.0f, -1.0f};
     std::int32_t shadowCascadeParameter = -1; // faf_ShadowCascades (ren_ShadowCascades)
     std::uint64_t shadowCascadeVersion = 0;
+    std::int32_t rayShadowParameter = -1; // faf_RayShadows (ren_RayTracedShadows)
+    std::uint64_t rayShadowVersion = 0;
 
     std::uint64_t constantsVersion = 0;
     std::uint64_t constantsSerial = 0;
@@ -434,6 +437,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     }
     mIndexBuffer.reset();
     mSwapChains.clear();
+    ReleaseRayTracing();
     mGarbage.clear();
     mPipelineCache.Close();
     mPipelineMemo.Clear();
@@ -613,7 +617,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     samplers.NumDescriptors = effects::kMaxSamplerSlots;
     samplers.OffsetInDescriptorsFromTableStart = 0U;
 
-    D3D12_ROOT_PARAMETER parameters[3]{};
+    D3D12_ROOT_PARAMETER parameters[4]{};
     parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     parameters[0].Descriptor.ShaderRegister = 0U;
     parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -626,8 +630,14 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     parameters[2].DescriptorTable.pDescriptorRanges = &samplers;
     parameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
+    // Engine addition (ren_RayTracedShadows): the ray-traced scene at t0, space1 (RayTracingD3D12.cpp).
+    parameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+    parameters[3].Descriptor.ShaderRegister = 0U;
+    parameters[3].Descriptor.RegisterSpace = 1U;
+    parameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
     D3D12_ROOT_SIGNATURE_DESC desc{};
-    desc.NumParameters = 3U;
+    desc.NumParameters = mRayQuery ? 4U : 3U;
     desc.pParameters = parameters;
     desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
@@ -867,12 +877,18 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
 
     CreateDevice();
     CreateQueueAndFrames();
+    CreateRayTracing();
     CreateRootSignature();
     mPipelineCache.Open(mDevice.Get(), effects::ShaderCacheDirectory());
     BeginRecording();
     CreateSwapChains(*context);
     CreateBuiltInPipelines();
     CreateGpuDrivenObjects();
+    if (mRayQuery) {
+      // An empty scene, so every effect draw has one to bind until the renderer hands its own.
+      mGpuFeatures |= kGpuFeatureRayQuery;
+      BuildRayScene();
+    }
 
     std::fill(std::begin(mStreamFrequencies), std::end(mStreamFrequencies), 0);
     mPipelineState.reset(new PipelineStateD3D12());
@@ -2254,6 +2270,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mList->SetGraphicsRootConstantBufferView(0U, constants.gpu);
     mList->SetGraphicsRootDescriptorTable(1U, table);
     mList->SetGraphicsRootDescriptorTable(2U, mBlitSamplers);
+    if (mRayQuery) {
+      mList->SetGraphicsRootShaderResourceView(3U, mTlasAddress);
+    }
     mList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     MarkDraw("StretchRect blit");
     mList->DrawInstanced(3U, 1U, 0U, 0U);
@@ -2862,6 +2881,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       auto state = std::make_shared<ProgramState>();
       state->viewportParameter = program.FindParameter("faf_ViewportSize");
       state->shadowCascadeParameter = program.FindParameter(effects::kShadowCascadeParameter);
+      state->rayShadowParameter = program.FindParameter(effects::kRayShadowParameter);
       slot = state;
     }
     ProgramState& state = *static_cast<ProgramState*>(slot.get());
@@ -2946,6 +2966,12 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       state.shadowCascadeVersion = effects::gShadowCascades.version;
       parameters.SetVectorArray(
         static_cast<std::uint32_t>(state.shadowCascadeParameter), &effects::gShadowCascades.vectors[0][0], effects::kShadowCascadeVectors
+      );
+    }
+    if (state.rayShadowParameter >= 0 && state.rayShadowVersion != effects::gRayShadows.version) {
+      state.rayShadowVersion = effects::gRayShadows.version;
+      parameters.SetVectorArray(
+        static_cast<std::uint32_t>(state.rayShadowParameter), &effects::gRayShadows.vectors[0][0], effects::kRayShadowVectors
       );
     }
 
@@ -3319,6 +3345,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mList->SetGraphicsRootConstantBufferView(0U, mPass.constants);
     mList->SetGraphicsRootDescriptorTable(1U, mPass.textures);
     mList->SetGraphicsRootDescriptorTable(2U, mPass.samplers);
+    if (mRayQuery) {
+      mList->SetGraphicsRootShaderResourceView(3U, mTlasAddress);
+    }
     mList->IASetPrimitiveTopology(topology);
     mList->OMSetBlendFactor(mPass.state.blendFactor);
     mList->OMSetStencilRef(mPass.state.stencilRef);
