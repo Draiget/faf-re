@@ -504,3 +504,58 @@ do
         })
     end
 end
+
+-- Interface text (ren_MsdfText, ren_MsdfTextMinSize), on every renderer: smooth text from MSDF atlases, smooth text
+-- with the small sizes on the original Windows (GDI) glyphs, or the original glyphs everywhere. A mod's own font has
+-- no GDI version and keeps its atlas either way. Shown only by an engine that has the commands.
+do
+    local function Supported(command)
+        -- The engine's Lua reports C functions as 'cfunction'.
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local video = options and options.video
+    if video and video.items and Supported('ren_MsdfText') and Supported('ren_MsdfTextMinSize') then
+        -- Option values are levels, so a saved preference never reaches the commands as text.
+        -- 13: the GDI glyphs' hinting matters most below about 13 px, where MSDF text is softer and dimmer.
+        local modes = {
+            [0] = { on = '0', minSize = '1' },
+            [1] = { on = '1', minSize = '13' },
+            [2] = { on = '1', minSize = '1' },
+        }
+        table.insert(video.items, {
+            title = 'Interface text',
+            key = 'interface_text',
+            type = 'toggle',
+            default = 2,
+            tip = 'Smooth draws interface text from distance-field atlases, sharp at any size. Original draws it with '
+                .. 'the Windows glyphs, as the original game does. Small text original keeps text under 13 px on the '
+                .. 'Windows glyphs.',
+            set = function(key, value, startup)
+                local mode = modes[value] or modes[2]
+                ConExecute('ren_MsdfTextMinSize ' .. mode.minSize)
+                ConExecute('ren_MsdfText ' .. mode.on)
+            end,
+            custom = {
+                states = {
+                    { text = 'Smooth', key = 2 },
+                    { text = 'Small text original', key = 1 },
+                    { text = 'Original', key = 0 },
+                },
+            },
+        })
+    end
+end
