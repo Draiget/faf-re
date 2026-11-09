@@ -2939,7 +2939,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (gUsedTextureTable && state.tableFrame == mFrameCount && state.tableEpoch == mArenaEpoch &&
         state.tableSurface == outputContext_.surface.get() && state.textureVersion != parameters.TextureVersion()) {
       keepTable =
-        UsedTextureBindingsKept(program, parameters, state.tableBindings, PassTextureSlots(bound.vertexShader, bound.pixelShader));
+        UsedTextureBindingsKept(program, parameters, state.tableBindings, PassTextureSlots(bound.vertexShader, bound.pixelShader, bound.hullShader, bound.domainShader));
     }
     // The texture table: rebuilt when a binding changed or the frame moved on.
     if (!keepTable && (state.tableFrame != mFrameCount || state.tableEpoch != mArenaEpoch ||

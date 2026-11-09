@@ -48,6 +48,8 @@ namespace gpg::gal
     kGpuFeatureTimestamps = 1U << 3U,
     /// `Device::CopyVertexBufferRegion` copies on the GPU.
     kGpuFeatureBufferCopy = 1U << 4U,
+    /// Effect passes with hull and domain shaders draw (engine addition, ren_TerrainTessellation).
+    kGpuFeatureTessellation = 1U << 5U,
   };
 
   /**

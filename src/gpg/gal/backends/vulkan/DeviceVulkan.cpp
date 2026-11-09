@@ -2801,7 +2801,7 @@ namespace gpg::gal
     if (gUsedTextureTable && state.table != VK_NULL_HANDLE && state.tableFrame == mFrameCount &&
         state.tableSurface == outputContext_.surface.get() && state.textureVersion != parameters.TextureVersion()) {
       keepTable =
-        UsedTextureBindingsKept(program, parameters, state.tableBindings, PassTextureSlots(bound.vertexShader, bound.pixelShader));
+        UsedTextureBindingsKept(program, parameters, state.tableBindings, PassTextureSlots(bound.vertexShader, bound.pixelShader, bound.hullShader, bound.domainShader));
     }
     // Textures and samplers in set 0, rebuilt when a binding changed or the frame moved on.
     if (!keepTable && (state.table == VK_NULL_HANDLE || state.tableFrame != mFrameCount ||

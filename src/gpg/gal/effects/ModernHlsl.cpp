@@ -1017,6 +1017,7 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     for (Technique& technique : description.techniques) {
       for (Pass& pass : technique.passes) {
         const bool tessellated = pass.Tessellated();
+        const bool namedTessellation = !pass.hullShader.function.empty() || !pass.domainShader.function.empty();
         for (const auto& [reference, stage] :
              {std::pair{&pass.vertexShader, ShaderStage::Vertex}, std::pair{&pass.pixelShader, ShaderStage::Pixel},
               std::pair{&pass.hullShader, ShaderStage::Hull}, std::pair{&pass.domainShader, ShaderStage::Domain}}) {
@@ -1233,6 +1234,13 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           modern.entries.push_back(ShaderEntry{stage, function.name, arguments, name});
           entryNames.emplace(key, name);
           reference->entry = name;
+        }
+        // A hull or domain function that couldn't be wrapped, or one named without the other, leaves the pass
+        // with neither, and it says so (ProgramEffect::TechniqueCompiles fails it).
+        if (namedTessellation && (pass.hullShader.function.empty() || pass.domainShader.function.empty())) {
+          pass.hullShader = ShaderReference{};
+          pass.domainShader = ShaderReference{};
+          pass.tessellationDropped = true;
         }
       }
     }

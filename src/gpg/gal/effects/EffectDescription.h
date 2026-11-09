@@ -233,6 +233,9 @@ namespace gpg::gal::effects
     // vertex shader's output struct.
     ShaderReference hullShader;
     ShaderReference domainShader;
+    // Set by GenerateModernHlsl when the pass named a hull or domain function it couldn't wrap: the pass has
+    // neither then, and its vertex shader (which feeds a patch) draws nothing useful on its own.
+    bool tessellationDropped = false;
 
     [[nodiscard]] bool Tessellated() const noexcept
     {

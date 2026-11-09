@@ -22,6 +22,7 @@
 #include "gpg/gal/EffectMacro.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/EffectVariable.hpp"
+#include "gpg/gal/GpuDriven.h"
 #include "gpg/gal/TextureContext.h"
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "moho/console/CConCommand.h"
@@ -40,7 +41,8 @@ namespace moho
     "ren_TerrainTessellation",
     "Direct3D 12 and Vulkan: split the terrain into fine triangles near the camera and sink them where the ground "
     "texture is darker than its surroundings, so cracks and gaps between rocks get real depth "
-    "(fafengine/effects/terrain_tess.fx). Off by default.",
+    "(fafengine/effects/terrain_tess.fx). Read when the terrain effect loads: set it at startup "
+    "(/con) or restart for a change to apply. Off by default.",
     &ren_TerrainTessellation
   );
 
@@ -670,17 +672,26 @@ technique TMsdfText
         }
       }
       // Engine addition (ren_TerrainTessellation): terrain.fx with terrain_tess.fx on its end, on
-      // Direct3D 12 and Vulkan. If it doesn't compile, the terrain is drawn as before.
-      if (!mEffect && std::strcmp(mName.c_str(), "terrain") == 0) {
+      // Direct3D 12 and Vulkan, when the switch is on as the effect loads and the device draws hull
+      // and domain shaders. Otherwise the terrain effect is the original one: the appended source
+      // shares one HLSL file with every terrain shader, and checking it costs a moment of loading.
+      // If it doesn't compile, the terrain is drawn as before.
+      gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
+      const bool tessellationDrawn =
+        galDevice != nullptr && (galDevice->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureTessellation) != 0U;
+      if (!mEffect && ren_TerrainTessellation && tessellationDrawn && std::strcmp(mName.c_str(), "terrain") == 0) {
         terrainTess = TerrainTessellationSource(deviceContext, waitHandleSet);
         if (terrainTess.Size() > 0U) {
           try {
             createEffect(false, false, true);
             // Shaders compile on first use, and all of the effect's come from one source: a
-            // mistake in terrain_tess.fx would take the whole terrain with it. Its techniques
-            // compile here, once (the shader cache keeps them).
+            // mistake in terrain_tess.fx would take the whole terrain with it. Every technique
+            // SetTechnique can redirect to compiles here, once (the shader cache keeps them): a
+            // twin that failed later would draw nothing in place of its pass.
             auto* const program = dynamic_cast<gpg::gal::ProgramEffect*>(mEffect.get());
-            for (const char* const name : {"TTerrainXPTess", "TTerrainGlowTess", "TTerrainNormalsXPTess"}) {
+            for (const char* const name :
+                 {"TTerrainTess", "TTerrainXPTess", "TTerrainGlowTess", "TTerrainNormalsTess", "TTerrainNormalsXPTess",
+                  "TTerrainBasisTess", "TTerrainBasisBiCubicTess"}) {
               if (program == nullptr || !program->TechniqueCompiles(name)) {
                 throw std::runtime_error(std::string("technique ") + name + " of terrain_tess.fx did not compile (see the shader messages above)");
               }

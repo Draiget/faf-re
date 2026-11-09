@@ -220,6 +220,10 @@ namespace gpg::gal
     mGpuNullBuffer = CreateDeviceBuffer(kNullBufferBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     // CopyVertexBufferRegion is vkCmdCopyBuffer between transfer barriers.
     mGpuFeatures = kGpuFeatureVertexPulling | kGpuFeatureCompute | kGpuFeatureIndirectDraw | kGpuFeatureBufferCopy;
+    // Tessellated effect passes draw only with the device's tessellationShader feature (BindPass).
+    if (mTessellationSupported) {
+      mGpuFeatures |= kGpuFeatureTessellation;
+    }
 
     // Timestamps, when the queue supports them in graphics and compute work.
     if (mProperties.limits.timestampComputeAndGraphics == VK_TRUE && mProperties.limits.timestampPeriod > 0.0f) {

@@ -116,4 +116,59 @@ technique10 Draw < string Category = "opaque"; int Order = 2; float Weight = 0.5
     }
 }
 )fx";
+
+  const char* const kTessellatedEffect = R"fx(
+float4x4 WorldViewProj;
+float Lift = 0.25;
+
+struct ControlPoint
+{
+    float4 position : TEXCOORD0;
+};
+
+struct Surface
+{
+    float4 pos : POSITION;
+    float2 uv : TEXCOORD0;
+};
+
+ControlPoint PointVS( float3 position : POSITION )
+{
+    ControlPoint o;
+    o.position = float4( position, 1 );
+    return o;
+}
+
+float4 Factors( ControlPoint a, ControlPoint b, ControlPoint c )
+{
+    float edge = max( distance( a.position.xyz, b.position.xyz ), 1 );
+    return float4( edge, edge, edge, edge );
+}
+
+Surface Place( float3 weights, ControlPoint a, ControlPoint b, ControlPoint c, uniform float scale )
+{
+    Surface o;
+    float4 p = a.position * weights.x + b.position * weights.y + c.position * weights.z;
+    p.y -= Lift * scale;
+    o.pos = mul( p, WorldViewProj );
+    o.uv = p.xz;
+    return o;
+}
+
+float4 FlatPS( Surface i ) : COLOR0
+{
+    return float4( i.uv, 0, 1 );
+}
+
+technique10 Tessellated
+{
+    pass P0
+    {
+        SetVertexShader( CompileShader( vs_4_0, PointVS() ) );
+        SetHullShader( CompileShader( hs_5_0, Factors() ) );
+        SetDomainShader( CompileShader( ds_5_0, Place( 2.0 ) ) );
+        SetPixelShader( CompileShader( ps_4_0, FlatPS() ) );
+    }
+}
+)fx";
 } // namespace faf_gal_tests

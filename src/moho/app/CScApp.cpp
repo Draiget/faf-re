@@ -449,8 +449,10 @@ namespace
           const std::string token = segment.substr(tokenBegin, tokenEnd - tokenBegin);
 
           // ren_VulkanScaledPresent is read when the device makes its head targets (CreateDevice, after this):
-          // the prologue's pass would be too late for it too.
-          if (IsCommandName(token, "lua_IncrementalGC") || IsCommandName(token, "ren_VulkanScaledPresent")) {
+          // the prologue's pass would be too late for it too. ren_TerrainTessellation is read when the terrain
+          // effect loads.
+          if (IsCommandName(token, "lua_IncrementalGC") || IsCommandName(token, "ren_VulkanScaledPresent") ||
+              IsCommandName(token, "ren_TerrainTessellation")) {
             moho::CON_Execute(segment.c_str());
           }
         }

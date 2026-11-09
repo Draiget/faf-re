@@ -541,7 +541,8 @@ namespace gpg::gal
             return false;
           }
         }
-        if (techniques[technique].passes[pass].Tessellated() && (entries.hull < 0 || entries.domain < 0)) {
+        if (techniques[technique].passes[pass].tessellationDropped ||
+            (techniques[technique].passes[pass].Tessellated() && (entries.hull < 0 || entries.domain < 0))) {
           return false;
         }
       }
