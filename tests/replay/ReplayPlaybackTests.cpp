@@ -6,6 +6,7 @@
 //   FAF_REPLAY_IDS    replays to play, separated by commas (default 26930624, a 2-player core replay);
 //                     `id:init` plays one with its own init file under faf/bin (M28AI replays need one)
 //   FAF_REPLAY_SEEK   the beats the keyframe test moves to on the first replay (default 3000,900,6000)
+//   FAF_REPLAY_REJOIN the rejoin rehearsal on the first replay, `source:army:beat` (default 0:0:1500)
 //
 // A FAF_COVERAGE build's headless writes its own counters (LLVM_PROFILE_FILE), so these games count in
 // tools/coverage/report.sh.
@@ -207,6 +208,30 @@ TEST(ReplayPlayback, KeyframeSeeksKeepTheChecksums)
   EXPECT_GE(run.seeks, 3) << run.tail;
   std::error_code ignored;
   std::filesystem::remove_all(keyframes, ignored);
+}
+
+// The rehearsal of a rejoin (issue #275, CRejoinFeed): the first replay played as one command source of a live game,
+// every other client fed from the recording, and this client's own driver issuing its beats after the handover beat.
+// The recorded checksums have to match through the handover to the end.
+TEST(ReplayPlayback, RejoinRehearsalKeepsTheChecksums)
+{
+  const std::vector<SReplay> replays = Replays();
+  if (replays.empty()) {
+    GTEST_SKIP() << "set FAF_REPLAY_DATA to a folder with replays/ and faf/bin/ (see the file's header)";
+  }
+  const SReplay& replay = replays.front();
+  SCOPED_TRACE("replay " + replay.id);
+  std::vector<std::string> plan;
+  std::stringstream stream(Environment("FAF_REPLAY_REJOIN", "0:0:1500"));
+  for (std::string item; std::getline(stream, item, ':');) {
+    plan.push_back(item);
+  }
+  ASSERT_EQ(plan.size(), 3u) << "FAF_REPLAY_REJOIN is source:army:beat";
+  const SRun run = PlayReplay(
+    replay, "ctest_rejoin_" + replay.id,
+    " --rejoin-source " + plan[0] + " --focus " + plan[1] + " --rejoin-beat " + plan[2]
+  );
+  ExpectMatchedToTheEnd(run);
 }
 
 // The checks above can fail: with /desynctestbeat this client alone nudges one unit's health at beat 1500
