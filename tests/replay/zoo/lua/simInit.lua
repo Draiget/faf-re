@@ -427,6 +427,63 @@ do
         Log('fuzz more done')
     end
 
+    -- A platoon of tanks, a transport and an engineer given each platoon order with typed arguments - target units,
+    -- positions, an entity category, each squad name - so the orders' own code runs (the fuzz's patterns stop most of
+    -- them at the argument checks). After the part compared with the original game.
+    function Zoo.PlatoonOrders(ctx)
+        local brainA = GetArmyBrain(Zoo.a)
+        local x = Zoo.cx
+        local z = Zoo.cz + 60
+        local members = {}
+        for i = 1, 4 do
+            local tank = Zoo.Spawn('uel0201', Zoo.a, x + i * 3, z, 0)
+            if tank then TableInsert(members, tank) end
+        end
+        local transport = Zoo.Spawn('uea0107', Zoo.a, x - 6, z, 0)
+        local engineer = Zoo.Spawn('uel0105', Zoo.a, x - 10, z, 0)
+        if transport then TableInsert(members, transport) end
+        if engineer then TableInsert(members, engineer) end
+        local enemy = Zoo.Spawn('uel0201', Zoo.b, x + 30, z + 10, 0)
+        WaitTicks(5)
+        local platoon = Try('MakePlatoon', brainA.MakePlatoon, brainA, 'ZooOrders', '')
+        if not platoon then
+            return
+        end
+        Try('AssignUnitsToPlatoon', brainA.AssignUnitsToPlatoon, brainA, platoon, members, 'Attack', 'GrowthFormation')
+        local land = categories.LAND
+        local there = { x + 20, GetSurfaceHeight(x + 20, z + 20), z + 20 }
+        local squads = { 'Attack', 'Artillery', 'Guard', 'Support', 'Scout', 'Unassigned' }
+        for q = 1, TableGetn(squads) do
+            local squad = squads[q]
+            if enemy and Alive(enemy) then
+                Try('GuardTarget', platoon.GuardTarget, platoon, enemy, squad)
+                Try('MoveToTarget', platoon.MoveToTarget, platoon, enemy, false, squad)
+                Try('AttackTarget', platoon.AttackTarget, platoon, enemy, squad)
+            end
+            Try('Patrol', platoon.Patrol, platoon, there, squad)
+            Try('MoveToLocation', platoon.MoveToLocation, platoon, there, false, squad)
+            if transport and Alive(transport) then
+                Try('UseTeleporter', platoon.UseTeleporter, platoon, transport, squad)
+            end
+            WaitTicks(3)
+        end
+        Try('LoadUnits', platoon.LoadUnits, platoon, land)
+        WaitTicks(30)
+        Try('UnloadUnitsAtLocation', platoon.UnloadUnitsAtLocation, platoon, land, there)
+        WaitTicks(20)
+        Try('UnloadAllAtLocation', platoon.UnloadAllAtLocation, platoon, there)
+        Try('FerryToLocation', platoon.FerryToLocation, platoon, there)
+        if transport and Alive(transport) then
+            Try('UseFerryBeacon', platoon.UseFerryBeacon, platoon, land, transport)
+        end
+        WaitTicks(30)
+        Try('Stop', platoon.Stop, platoon)
+        Try('DisbandPlatoon', brainA.DisbandPlatoon, brainA, platoon)
+        Zoo.DestroyAll(members)
+        if enemy then Zoo.DestroyAll({ enemy }) end
+        Log('platoon orders done')
+    end
+
     -- The fuzz on a unit of every kind, its weapon and navigator, an army brain and a platoon. Last of all: setters
     -- change the game in ways no checksum was checked for.
     function Zoo.FuzzAll()
@@ -455,6 +512,7 @@ do
         Zoo.Fuzz('aibrain_methods', brainA, ctx)
         WaitTicks(10)
         Zoo.DestroyAll(sample)
+        Zoo.PlatoonOrders(ctx)
         Zoo.FuzzMore(ctx)
         Log('fuzz done')
     end
