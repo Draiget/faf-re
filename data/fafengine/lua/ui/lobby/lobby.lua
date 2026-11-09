@@ -26,6 +26,15 @@ do
         Off(GUI.AIClearButton)
         Off(GUI.restrictedUnitsOrPresetsBtn)
         Off(GUI.loadButton)
+        -- The observer panel's lobby-changing buttons (lobby.lua: default options, random map, close empty slots, auto
+        -- teams, auto balance) and the AI fill choosers. The CPU test, Settings, patch notes, briefing and Exit stay.
+        Off(GUI.defaultOptions)
+        Off(GUI.randMap)
+        Off(GUI.closeEmptySlots)
+        Off(GUI.autoTeams)
+        Off(GUI.PenguinAutoBalance)
+        Off(GUI.AIFillCombo)
+        Off(GUI.TeamCountSelector)
         if GUI.slots then
             for _, slot in GUI.slots do
                 Off(slot.name)
@@ -40,6 +49,27 @@ do
         end
     end
 
+    local function Lock()
+        local locked, why = pcall(LockLobbyScreen)
+        if not locked then
+            WARN('faf-re lobby hook (WP17.6): ' .. tostring(why))
+        end
+    end
+
+    -- The host's HostUtils.RefreshButtonEnabledness turns options, map, teams and launch back on whenever someone's
+    -- readiness changes; HostUtils is made when a lobby is, so it's wrapped the first time the lobby refreshes.
+    local function WrapHostRefresh()
+        if HostUtils and type(HostUtils.RefreshButtonEnabledness) == 'function' and not rawget(HostUtils, 'FafReLocked') then
+            local OriginalRefresh = HostUtils.RefreshButtonEnabledness
+            HostUtils.RefreshButtonEnabledness = function(...)
+                local result = OriginalRefresh(unpack(arg))
+                Lock()
+                return result
+            end
+            rawset(HostUtils, 'FafReLocked', true)
+        end
+    end
+
     local hooked, problem = pcall(function()
         local OriginalUpdateGame = UpdateGame
         if type(OriginalUpdateGame) ~= 'function' then
@@ -47,11 +77,18 @@ do
         end
         UpdateGame = function(...)
             local result = OriginalUpdateGame(unpack(arg))
-            local locked, why = pcall(LockLobbyScreen)
-            if not locked then
-                WARN('faf-re lobby hook (WP17.6): ' .. tostring(why))
-            end
+            pcall(WrapHostRefresh)
+            Lock()
             return result
+        end
+        -- SetSlotInfo turns a player's own colour, faction and team back on whenever their slot is drawn.
+        local OriginalSetSlotInfo = SetSlotInfo
+        if type(OriginalSetSlotInfo) == 'function' then
+            SetSlotInfo = function(...)
+                local result = OriginalSetSlotInfo(unpack(arg))
+                Lock()
+                return result
+            end
         end
     end)
     if not hooked then
