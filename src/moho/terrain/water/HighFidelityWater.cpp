@@ -1,4 +1,5 @@
 #include "moho/terrain/water/HighFidelityWater.h"
+#include "moho/render/WRenViewport.h"
 
 #include <algorithm>
 #include <cmath>
@@ -369,8 +370,8 @@ namespace moho
     SetShaderVarMem(GetWater2SunColorShaderVar(), 3U, sunColor);
     GetWater2SunGlowShaderVar().SetFloat(shaderState.mSunGlow);
 
-    CWldSession* const activeSession = WLD_GetActiveSession();
-    IWldTerrainRes* const terrainRes = activeSession->mWldMap->mTerrainRes;
+    // 0x00810D6C: `mov eax, [sWldMap]`, the map the renderer draws (a session's, or the map editor's).
+    IWldTerrainRes* const terrainRes = REN_GetTerrainRes();
     const CHeightField* const heightField = terrainRes->mMap->mHeightField.get();
     const float terrainScale[4] = {
       1.0f / static_cast<float>(heightField->width - 1),
