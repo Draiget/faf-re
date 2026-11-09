@@ -527,8 +527,10 @@ do
         return false
     end
 
+    -- FAF's options.lua may carry this entry too (FAForever/fa#7372); then it shows once, with FAF's text.
     local video = options and options.video
-    if video and video.items and Supported('ren_MsdfText') and Supported('ren_MsdfTextMinSize') then
+    if video and video.items and not HasOptionKey(video.items, 'interface_text')
+        and Supported('ren_MsdfText') and Supported('ren_MsdfTextMinSize') then
         -- Option values are levels, so a saved preference never reaches the commands as text.
         -- 13: the GDI glyphs' hinting matters most below about 13 px, where MSDF text is softer and dimmer.
         local modes = {
