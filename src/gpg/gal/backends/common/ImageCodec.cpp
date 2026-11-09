@@ -4,6 +4,7 @@
 #include "ImageCodecDirectXTex.h"
 #include "TextureQuality.h"
 
+#include <atomic>
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -518,12 +519,19 @@ namespace gpg::gal::imaging
       return verify;
     }
 
+    std::atomic<bool> sOwnDdsPreferred{false};
+
     [[nodiscard]] bool OwnDdsRequested()
     {
       static const bool own = EnvironmentFlag("FAF_IMAGECODEC_OWN_DDS");
-      return own;
+      return own || sOwnDdsPreferred.load(std::memory_order_relaxed);
     }
   } // namespace
+
+  void ImageCodec::PreferOwnDds(const bool prefer) noexcept
+  {
+    sOwnDdsPreferred.store(prefer, std::memory_order_relaxed);
+  }
 
   namespace
   {
