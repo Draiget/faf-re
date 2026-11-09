@@ -83,6 +83,9 @@ namespace faf::editor
     };
     [[nodiscard]] MaskOp TakeMaskOp() noexcept { return std::exchange(mMaskOp, MaskOp::None); }
     [[nodiscard]] int MaskLayer() const noexcept { return mMaskLayer; }
+    /** Whether the view colours the paint layer's weight on the terrain. */
+    [[nodiscard]] bool ShowLayerWeight() const noexcept { return mShowWeight; }
+    void SetShowLayerWeight(const bool show) noexcept { mShowWeight = show; }
     /** The terrain shaders the game data has, and the map's. */
     void SetShaders(std::vector<std::string> shaders, std::string current)
     {
@@ -283,6 +286,7 @@ namespace faf::editor
     bool mCheckedMasks = false;
     float mCoverage[8]{};
     bool mHasCoverage = false;
+    bool mShowWeight = false;
     MaskOp mMaskOp = MaskOp::None;
     std::vector<std::string> mShaders;
     std::string mShader;

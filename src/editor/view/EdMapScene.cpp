@@ -203,6 +203,16 @@ namespace faf::editor
       }
     }
 
+    // The Texture tool: the paint layer's weight, green over the ground where it is full.
+    if (mTools->TextureToolActive() && mTools->ShowLayerWeight() && !mDocument.Masks().texels.empty()) {
+      if (mWeightStale || mWeightLayer != mTools->MaskLayer()) {
+        BuildWeightQuads(mTools->MaskLayer());
+      }
+      if (!mWeightQuads.empty()) {
+        batcher->DrawQuads(mWeightQuads.data(), static_cast<std::uint32_t>(mWeightQuads.size() / 4));
+      }
+    }
+
     // The symmetry check's differing vertices, as red blocks on the ground.
     if (mCheckDone && mTools->ShowDifferences() && mTools->CheckIsCurrent()) {
       constexpr std::uint32_t kDifferenceColor = 0x90FF3030u;
@@ -580,8 +590,59 @@ namespace faf::editor
     }
   }
 
+  void EdMapScene::BuildWeightQuads(const int layer)
+  {
+    mWeightQuads.clear();
+    mWeightLayer = layer;
+    mWeightStale = false;
+    const EdDocument::MaskGrid& masks = mDocument.Masks();
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || masks.texels.empty()) {
+      return;
+    }
+    // Blocks of 4 x 4 texels (16 thousand quads on a 20 km map), coloured by their average weight.
+    constexpr int kBlock = 4;
+    const float perTexel = static_cast<float>(field->width - 1) / static_cast<float>(masks.width);
+    const auto groundAt = [field](const float x, const float z, const std::uint32_t color) {
+      const int sx = std::clamp(static_cast<int>(std::lround(x)), 0, field->width - 1);
+      const int sz = std::clamp(static_cast<int>(std::lround(z)), 0, field->height - 1);
+      moho::CD3DPrimBatcher::Vertex vertex{};
+      vertex.mX = x;
+      vertex.mY = static_cast<float>(field->data[sz * field->width + sx]) / 128.0f + 0.3f;
+      vertex.mZ = z;
+      vertex.mColor = color;
+      return vertex;
+    };
+    for (int bz = 0; bz < masks.height; bz += kBlock) {
+      for (int bx = 0; bx < masks.width; bx += kBlock) {
+        unsigned sum = 0;
+        int count = 0;
+        for (int z = bz; z < std::min(masks.height, bz + kBlock); ++z) {
+          for (int x = bx; x < std::min(masks.width, bx + kBlock); ++x) {
+            sum += MaskByte(masks.texels[static_cast<std::size_t>(z) * static_cast<std::size_t>(masks.width) + static_cast<std::size_t>(x)], layer);
+            ++count;
+          }
+        }
+        const unsigned weight = count > 0 ? sum / static_cast<unsigned>(count) : 0U;
+        if (weight < 8U) {
+          continue;
+        }
+        const std::uint32_t color = ((weight * 150U / 255U) << 24) | 0x0040FF60u;
+        const float x0 = static_cast<float>(bx) * perTexel;
+        const float z0 = static_cast<float>(bz) * perTexel;
+        const float x1 = static_cast<float>(std::min(masks.width, bx + kBlock)) * perTexel;
+        const float z1 = static_cast<float>(std::min(masks.height, bz + kBlock)) * perTexel;
+        mWeightQuads.push_back(groundAt(x0, z0, color));
+        mWeightQuads.push_back(groundAt(x1, z0, color));
+        mWeightQuads.push_back(groundAt(x1, z1, color));
+        mWeightQuads.push_back(groundAt(x0, z1, color));
+      }
+    }
+  }
+
   void EdMapScene::UpdateCoverage()
   {
+    mWeightStale = true;
     const EdDocument::MaskGrid& masks = mDocument.Masks();
     mCoverageValid = !masks.texels.empty();
     if (mCoverageValid) {
@@ -760,6 +821,7 @@ namespace faf::editor
       ApplyMaskBrush(masks.texels.data(), masks.width, masks.height, terrain, groundX, groundZ, brush, std::min(frameSeconds, 0.1f));
     if (!rects.empty()) {
       mDocument.SetModified(true);
+      mWeightStale = true;
       // The painted layer, and those above it when Paint lowers them.
       unsigned layers = 1u << brush.layer;
       if (brush.mode == MaskBrushMode::Paint && brush.lowerAbove) {
@@ -938,6 +1000,7 @@ namespace faf::editor
 
   void EdMapScene::RefreshHeights(const std::vector<SampleRect>& rects)
   {
+    mWeightStale = true; // the overlay lies on the ground
     moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
     // The samples are written in place; the field's own setter, given them back, refreshes its tiers of
     // min/max heights and its revision (the shadow and vision passes watch it). Then the terrain redraws

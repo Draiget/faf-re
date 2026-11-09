@@ -860,6 +860,8 @@ namespace faf::editor
         tools.SetLayerSlots({});
       }
       if (mMaskLayerArg >= 0) {
+        // `/layerweight` (test runs): the paint layer's weight shown.
+        tools.SetShowLayerWeight(moho::CFG_GetArgOption("/layerweight", 0, nullptr));
         tools.SetMaskLayer(mMaskLayerArg);
         mMaskLayerArg = -1;
       }

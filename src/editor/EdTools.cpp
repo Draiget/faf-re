@@ -683,6 +683,7 @@ namespace faf::editor
     static const char* const kMaskModes[] = {"Paint", "Erase", "Smooth"};
     Segmented(kMaskModes, 3, mMaskMode);
     ImGui::Checkbox("Lower the layers above", &mLowerAbove);
+    ImGui::Checkbox("Show the layer's weight", &mShowWeight);
     DrawBrush(false);
     DrawSymmetry(true);
     DrawLimits();

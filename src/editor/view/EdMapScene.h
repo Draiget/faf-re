@@ -8,6 +8,7 @@
 #include <Windows.h>
 
 #include "editor/EdTools.h"
+#include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "editor/tools/EdHeightBrush.h"
 
 namespace moho
@@ -132,6 +133,11 @@ namespace faf::editor
     float mCoverage[8]{};
     bool mCoverageValid = false;
     void UpdateCoverage();
+    /** The paint layer's weight as coloured quads over the ground, in blocks of mask texels; rebuilt when stale. */
+    std::vector<moho::CD3DPrimBatcher::Vertex> mWeightQuads;
+    int mWeightLayer = -1;
+    bool mWeightStale = true;
+    void BuildWeightQuads(int layer);
     /** The map's terrain shader by name; the engine checks it again when it next draws (byte0, its latch). */
     void SetTerrainShaderName(const std::string& shader);
     std::uint32_t mMaskSteps = 0;
