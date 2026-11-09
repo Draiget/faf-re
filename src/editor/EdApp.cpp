@@ -968,6 +968,9 @@ namespace faf::editor
           mScene.FrameMarker(name);
         }
         tools.SetDecalSelectionCount(mScene.DecalSelectionCount());
+        if (tools.PropsToolActive()) {
+          tools.SetPropDetails(mScene.PropDetails(tools.PropBlueprint()));
+        }
         tools.SetDecalPathInfo(mScene.DecalPathPointCount(), mScene.DecalPathDecalCount());
         switch (tools.TakeDecalPathAction()) {
         case EdTools::DecalPathAction::Place:

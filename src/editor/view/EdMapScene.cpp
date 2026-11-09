@@ -23,6 +23,7 @@
 #include "moho/mesh/Mesh.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
+#include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/render/CWldTerrainDecal.h"
 #include "moho/render/IEdRenderHook.h"
@@ -1161,6 +1162,7 @@ namespace faf::editor
     if (!mPropsDone) {
       CreateProps();
     }
+    UpdatePropPreview();
     MoveWithKeys(frameSeconds);
     if (mPainting) {
       PaintStroke(frameSeconds);
@@ -2489,7 +2491,7 @@ namespace faf::editor
     EndObjectStroke();
   }
 
-  void EdMapScene::PlaceProps(const float x, const float z)
+  void EdMapScene::PlaceProps(const float x, const float z, const float fixedYaw)
   {
     const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
     if (mTools == nullptr || field == nullptr || mTools->PropBlueprint().empty()) {
@@ -2499,7 +2501,9 @@ namespace faf::editor
     // The turn: random or none; each copy's heading is the cursor's heading carried through the symmetry
     // (the copies of a point one unit ahead).
     mScatterSeed = mScatterSeed * 1664525U + 1013904223U;
-    const float yaw = mTools->RandomPropTurn() ? static_cast<float>(mScatterSeed >> 8) / 16777216.0f * 6.2831853f : 0.0f;
+    const float yaw = fixedYaw > -100.0f            ? fixedYaw
+                      : mTools->RandomPropTurn() ? static_cast<float>(mScatterSeed >> 8) / 16777216.0f * 6.2831853f
+                                                 : 0.0f;
     float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies], aheadX[kMaxSymmetryCopies], aheadZ[kMaxSymmetryCopies];
     const int copies = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
     (void)HeightBrushCentres(field->width, field->height, x + std::cos(yaw), z + std::sin(yaw), brush.symmetry, brush.turns, aheadX, aheadZ);
@@ -2560,8 +2564,119 @@ namespace faf::editor
     }
   }
 
+  void EdMapScene::RollPropYaw()
+  {
+    mScatterSeed = mScatterSeed * 1664525U + 1013904223U;
+    mNextPropYaw = static_cast<float>(mScatterSeed >> 8) / 16777216.0f * 6.2831853f;
+  }
+
+  void EdMapScene::DeletePropPreview()
+  {
+    if (moho::MeshRenderer::GetInstance() != nullptr) {
+      for (moho::MeshInstance* const instance : mPreview) {
+        delete instance;
+      }
+    }
+    mPreview.clear();
+    mPreviewBlueprint.clear();
+  }
+
+  void EdMapScene::UpdatePropPreview()
+  {
+    const auto hide = [this] {
+      for (moho::MeshInstance* const instance : mPreview) {
+        if (instance != nullptr) {
+          instance->isHidden = 1;
+        }
+      }
+    };
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    float gx = 0.0f;
+    float gz = 0.0f;
+    if (field == nullptr || mTools == nullptr || !mTools->PropsToolActive() || mTools->CurrentPropMode() != EdTools::PropMode::Single ||
+        mTools->PropBlueprint().empty() || (::GetKeyState(VK_SHIFT) & 0x8000) != 0 ||
+        !GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), gx, gz)) {
+      hide();
+      return;
+    }
+    // Where the click would put each copy, as PlaceProps does.
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    const float yaw = mTools->RandomPropTurn() ? mNextPropYaw : 0.0f;
+    float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies], aheadX[kMaxSymmetryCopies], aheadZ[kMaxSymmetryCopies];
+    const int copies = HeightBrushCentres(field->width, field->height, gx, gz, brush.symmetry, brush.turns, centreX, centreZ);
+    (void)HeightBrushCentres(field->width, field->height, gx + std::cos(yaw), gz + std::sin(yaw), brush.symmetry, brush.turns, aheadX, aheadZ);
+    const auto transformOf = [&](const int c) {
+      const float heading = std::atan2(aheadZ[c] - centreZ[c], aheadX[c] - centreX[c]);
+      const float x = SnapToGrid(centreX[c]);
+      const float z = SnapToGrid(centreZ[c]);
+      moho::CWldPropEntry entry;
+      entry.mBlueprintPath.assign(mTools->PropBlueprint().c_str());
+      entry.mTransform.pos_ = Wm3::Vec3f{x, mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))), z};
+      entry.mTransform.orient_ = Wm3::Quatf(std::cos(heading * 0.5f), 0.0f, std::sin(heading * 0.5f), 0.0f);
+      return entry;
+    };
+    if (mPreviewBlueprint != mTools->PropBlueprint() || static_cast<int>(mPreview.size()) != copies) {
+      DeletePropPreview();
+      for (int c = 0; c < copies; ++c) {
+        mPreview.push_back(MakePropInstance(transformOf(c)));
+      }
+      mPreviewBlueprint = mTools->PropBlueprint();
+    }
+    for (int c = 0; c < copies; ++c) {
+      moho::MeshInstance* const instance = mPreview[static_cast<std::size_t>(c)];
+      if (instance == nullptr) {
+        continue;
+      }
+      const bool onMap = centreX[c] >= 0.0f && centreZ[c] >= 0.0f && centreX[c] <= static_cast<float>(field->width - 1) &&
+                         centreZ[c] <= static_cast<float>(field->height - 1);
+      const moho::CWldPropEntry entry = transformOf(c);
+      instance->SetStance(entry.mTransform, entry.mTransform);
+      instance->isHidden = onMap ? 0 : 1;
+    }
+  }
+
+  std::string EdMapScene::PropDetails(const std::string& path) const
+  {
+    if (path == mDetailsFor) {
+      return mDetails;
+    }
+    mDetailsFor = path;
+    mDetails.clear();
+    moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+    if (rules == nullptr || path.empty()) {
+      return mDetails;
+    }
+    const fa::string file(path.c_str());
+    moho::RResId id{};
+    gpg::STR_CopyFilename(&id.name, &file);
+    const moho::RPropBlueprint* const blueprint = rules->GetPropBlueprint(id);
+    if (blueprint == nullptr) {
+      return mDetails;
+    }
+    const moho::RMeshBlueprint* const mesh = rules->GetMeshBlueprint(blueprint->Display.MeshBlueprint);
+    char text[512];
+    std::string lods;
+    if (mesh != nullptr) {
+      for (const moho::RMeshBlueprintLOD& lod : mesh->mLods) {
+        const std::string name = lod.mMeshName.c_str();
+        const std::size_t slash = name.find_last_of('/');
+        char one[160];
+        (void)std::snprintf(one, sizeof(one), "%s%s to %.0f", lods.empty() ? "" : ", ", name.substr(slash == std::string::npos ? 0 : slash + 1).c_str(),
+                            static_cast<double>(lod.mLodCutoff));
+        lods += one;
+      }
+    }
+    (void)std::snprintf(text, sizeof(text), "Reclaim %.0f mass, %.0f energy. Scale %.2f. %zu LOD%s: %s", static_cast<double>(blueprint->Economy.ReclaimMassMax),
+                        static_cast<double>(blueprint->Economy.ReclaimEnergyMax), static_cast<double>(blueprint->Display.UniformScale),
+                        mesh != nullptr ? static_cast<std::size_t>(mesh->mLods.size()) : 0U, mesh != nullptr && mesh->mLods.size() == 1 ? "" : "s",
+                        lods.empty() ? "(no mesh)" : lods.c_str());
+    mDetails = text;
+    return mDetails;
+  }
+
   void EdMapScene::DeleteProps()
   {
+    DeletePropPreview();
     if (moho::MeshRenderer::GetInstance() != nullptr) {
       for (moho::MeshInstance* const instance : mProps) {
         delete instance;
@@ -2859,6 +2974,9 @@ namespace faf::editor
         mScatterDue = 0.0f;
         if ((wParam & MK_SHIFT) != 0 || mTools->CurrentPropMode() == EdTools::PropMode::Erase) {
           EraseProps(groundX, groundZ);
+        } else if (mTools->CurrentPropMode() == EdTools::PropMode::Single) {
+          PlaceProps(groundX, groundZ, mTools->RandomPropTurn() ? mNextPropYaw : 0.0f);
+          RollPropYaw();
         } else {
           PlaceProps(groundX, groundZ);
         }

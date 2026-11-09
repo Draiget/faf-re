@@ -108,6 +108,8 @@ namespace faf::editor
       }
     }
     void ClearDecalPath() { mDecalPath.clear(); }
+    /** A prop blueprint's reclaim, scale and mesh, for the Props panel ("" when the rules don't have it). */
+    [[nodiscard]] std::string PropDetails(const std::string& blueprint) const;
     /** How many decals the Decals tool has selected, for its panel. */
     [[nodiscard]] int DecalSelectionCount() const noexcept { return static_cast<int>(mDecalSelection.size()); }
     /** Selects markers by name (`add` toggles them in the selection instead), for the Markers panel. */
@@ -175,7 +177,20 @@ namespace faf::editor
     /** The prop nearest the ground point (x, z) within reach of the cursor, or -1. */
     [[nodiscard]] int PickProp(float x, float z) const;
     /** Props placed at (x, z) and its symmetric copies, with the Props tool's blueprint and turn. */
-    void PlaceProps(float x, float z);
+    /** Places the Props tool's prop at (x, z) with its copies; `yaw` below -100 takes a random turn (or none). */
+    void PlaceProps(float x, float z, float yaw = -1000.0f);
+    /**
+     * The Props tool's Single mode shows the prop to come under the cursor, with its symmetric copies, at the turn
+     * the next click places it with (a random turn is drawn before the click, so they match).
+     */
+    void UpdatePropPreview();
+    void DeletePropPreview();
+    void RollPropYaw();
+    std::vector<moho::MeshInstance*> mPreview;
+    std::string mPreviewBlueprint;
+    float mNextPropYaw = 0.0f;
+    mutable std::string mDetailsFor;
+    mutable std::string mDetails;
     /** Props inside the brush at (x, z) and its copies removed. */
     void EraseProps(float x, float z);
     void MovePropTo(int index, const Wm3::Vec3f& position);

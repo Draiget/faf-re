@@ -44,6 +44,8 @@ namespace faf::editor
     [[nodiscard]] PropMode CurrentPropMode() const noexcept { return static_cast<PropMode>(mPropMode); }
     [[nodiscard]] float PropDensity() const noexcept { return mPropDensity; }
     [[nodiscard]] bool RandomPropTurn() const noexcept { return mPropRandomTurn; }
+    /** The chosen prop's reclaim, scale and LODs, for the panel. */
+    void SetPropDetails(std::string details) { mPropDetails = std::move(details); }
     /** The prop blueprints the rules have (their ids), for the palette. */
     void SetPropBlueprints(std::vector<std::string> blueprints) { mPropBlueprints = std::move(blueprints); }
     [[nodiscard]] bool HasPropBlueprints() const noexcept { return !mPropBlueprints.empty(); }
@@ -510,6 +512,7 @@ namespace faf::editor
     int mPropMode = 0;
     float mPropDensity = 8.0f;
     bool mPropRandomTurn = true;
+    std::string mPropDetails;
     char mPropFilter[64]{};
     int mSelectionCount = 0;
     std::vector<SaveEntry> mMarkerSelection;

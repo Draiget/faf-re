@@ -805,6 +805,9 @@ namespace faf::editor
     if (!mPropBlueprints.empty()) {
       ImGui::EndChild();
     }
+    if (!mPropDetails.empty()) {
+      Note(mPropDetails.c_str());
+    }
     SectionHeader("PLACE");
     static const char* const kModes[] = {"Single", "Scatter", "Erase"};
     Segmented(kModes, 3, mPropMode);
@@ -815,7 +818,7 @@ namespace faf::editor
     ImGui::Checkbox("Random turn", &mPropRandomTurn);
     DrawBrush(false);
     DrawSymmetry(false);
-    Note("Single places one at a click, Scatter while the button is held, inside the brush; Erase removes those inside it. "
+    Note("Single shows the prop under the cursor and places it at a click, Scatter while the button is held, inside the brush; Erase removes those inside it. "
          "Shift+click erases in any mode. Symmetric copies are placed and removed with them.");
   }
 
