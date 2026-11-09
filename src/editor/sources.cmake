@@ -21,6 +21,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdMarkers.cpp
   tools/EdDecalShape.cpp
   tools/EdDecals.cpp
+  tools/EdChecks.cpp
   tools/EdTextureLibrary.cpp
   tools/EdSymmetryCheck.cpp
   undo/EdHeightHistory.cpp

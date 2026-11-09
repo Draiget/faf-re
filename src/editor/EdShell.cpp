@@ -21,6 +21,7 @@ namespace faf::editor
     constexpr const char* kMapWindow = "Map";
     constexpr const char* kInfoWindow = "Info";
     constexpr const char* kMarkersWindow = "Markers";
+    constexpr const char* kCheckWindow = "Check";
     constexpr const char* kLogWindow = "Log";
     constexpr const char* kDockSpace = "EditorDockSpace";
 
@@ -102,6 +103,9 @@ namespace faf::editor
       if (mShowMarkers) {
         DrawMarkersPanel();
       }
+      if (mShowCheck) {
+        DrawCheckPanel();
+      }
       if (mShowLog) {
         if (ImGui::Begin(kLogWindow, &mShowLog)) {
           mLog.Draw();
@@ -131,6 +135,7 @@ namespace faf::editor
     ImGui::DockBuilderDockWindow(kMapWindow, right);
     ImGui::DockBuilderDockWindow(kInfoWindow, right);
     ImGui::DockBuilderDockWindow(kMarkersWindow, right);
+    ImGui::DockBuilderDockWindow(kCheckWindow, right);
     ImGui::DockBuilderDockWindow(kLogWindow, bottom);
     ImGui::DockBuilderFinish(dockspaceId);
   }

@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "editor/EdTools.h"
+#include "editor/tools/EdChecks.h"
 #include "editor/doc/EdNewMap.h"
 #include "imgui.h"
 
@@ -32,6 +33,13 @@ namespace faf::editor
     bool& ShowMap() noexcept { return mShowMap; }
     bool& ShowInfo() noexcept { return mShowInfo; }
     bool& ShowMarkers() noexcept { return mShowMarkers; }
+    bool& ShowCheck() noexcept { return mShowCheck; }
+    /** Runs the check at the next frame (`/check` for test runs). */
+    void RequestCheck() noexcept
+    {
+      mShowCheck = true;
+      mRunCheck = true;
+    }
     bool& ShowLog() noexcept { return mShowLog; }
     bool& ShowDemo() noexcept { return mShowDemo; }
     bool& PanelsWhilePlaying() noexcept { return mPanelsWhilePlaying; }
@@ -72,6 +80,14 @@ namespace faf::editor
     void DrawInfoPanel();
     /** The map's markers as a tree by group and type: select, go to, hide a type (ui/EdInfoPanels.cpp). */
     void DrawMarkersPanel();
+    /** The Check: runs the map's checks and lists what they found; a click goes to it (ui/EdInfoPanels.cpp). */
+    void DrawCheckPanel();
+    void RunCheck();
+    bool mShowCheck = true;
+    std::vector<CheckIssue> mCheckIssues;
+    bool mCheckRan = false;
+    bool mRunCheck = false;
+    std::string mCheckedPath;
     bool mShowMarkers = true;
     bool mFocusMarkers = false;
     char mMarkerFilter[64]{};

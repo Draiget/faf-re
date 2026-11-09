@@ -9,6 +9,9 @@
 #include <map>
 
 #include "editor/EdPlay.h"
+#include "gpg/core/utils/Logging.h"
+#include "moho/sim/CWldMap.h"
+#include <cmath>
 #include "editor/doc/EdDocument.h"
 #include "editor/tools/EdMarkers.h"
 #include "imgui.h"
@@ -469,6 +472,127 @@ namespace faf::editor
         }
         ImGui::TreePop();
       }
+      ImGui::PopID();
+    }
+    ImGui::EndChild();
+    ImGui::End();
+  }
+  namespace
+  {
+    float CheckGround(const void* const context, const float x, const float z)
+    {
+      auto* const terrain = const_cast<moho::IWldTerrainRes*>(static_cast<const moho::IWldTerrainRes*>(context));
+      return terrain->GetHeightAt(static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z)));
+    }
+  } // namespace
+
+  void EdShell::RunCheck()
+  {
+    mCheckIssues.clear();
+    mCheckRan = true;
+    mCheckedPath = mDocument.Path();
+    moho::CWldMap* const map = mDocument.Map();
+    if (map == nullptr || map->mTerrainRes == nullptr) {
+      return;
+    }
+    const MapFacts& facts = mDocument.Facts();
+    MarkerCheckInput input;
+    input.markers = &mDocument.SaveData().Markers();
+    if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea()) {
+      input.playable = std::array<int, 4>{area->x0, area->z0, area->x1, area->z1};
+    }
+    input.water = facts.water;
+    input.waterLevel = facts.waterElevation;
+    input.groundAt = &CheckGround;
+    input.groundContext = map->mTerrainRes;
+    const HeightBrush brush = mTools.CurrentHeightBrush();
+    input.symmetry = brush.symmetry;
+    input.turns = brush.turns;
+    input.width = facts.fieldWidth;
+    input.height = facts.fieldHeight;
+    mCheckIssues = CheckMarkers(input);
+    std::vector<EdTools::CheckPin> pins;
+    int counts[3] = {0, 0, 0};
+    for (const CheckIssue& issue : mCheckIssues) {
+      pins.push_back({issue.x, issue.z, static_cast<int>(issue.level)});
+      ++counts[static_cast<int>(issue.level)];
+    }
+    mTools.SetCheckPins(std::move(pins));
+    gpg::Logf("editor: check: %d errors, %d warnings, %d notes", counts[0], counts[1], counts[2]);
+    for (const CheckIssue& issue : mCheckIssues) {
+      gpg::Logf("editor: check %s: %s: %s", CheckLevelName(issue.level), issue.marker.c_str(), issue.text.c_str());
+    }
+  }
+
+  void EdShell::DrawCheckPanel()
+  {
+    if (const ImGuiWindow* const map = ImGui::FindWindowByName(kMapWindow); map != nullptr && map->DockId != 0) {
+      ImGui::SetNextWindowDockID(map->DockId, ImGuiCond_FirstUseEver);
+    }
+    // A requested run (`/check`) happens whether or not the tab is in front, and brings it there.
+    if (mRunCheck && mDocument.GetState() == EdDocument::State::Open) {
+      mRunCheck = false;
+      RunCheck();
+      ImGui::SetNextWindowFocus();
+    }
+    if (!ImGui::Begin("Check", &mShowCheck)) {
+      ImGui::End();
+      return;
+    }
+    if (mDocument.GetState() != EdDocument::State::Open) {
+      ImGui::TextDisabled("No map open.");
+      ImGui::End();
+      return;
+    }
+    // A run belongs to the map it ran on.
+    if (mCheckRan && mCheckedPath != mDocument.Path()) {
+      mCheckRan = false;
+      mCheckIssues.clear();
+      mTools.SetCheckPins({});
+    }
+    if (ImGui::Button("Run the check", ImVec2(-1.0f, 0.0f))) {
+      RunCheck();
+    }
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+    ImGui::TextWrapped("Start positions and mass and hydrocarbon points: off the playable area, under water, without a partner at "
+                       "their symmetric copies (the Tools panel's symmetry), or overlapping. Scripts and pathing come next.");
+    ImGui::PopStyleColor();
+    if (!mCheckRan) {
+      ImGui::End();
+      return;
+    }
+    if (mCheckIssues.empty()) {
+      ImGui::TextColored(ImVec4(0.55f, 0.80f, 0.55f, 1.0f), "Nothing found.");
+      ImGui::End();
+      return;
+    }
+    static const ImVec4 kColors[3] = {ImVec4(0.95f, 0.40f, 0.35f, 1.0f), ImVec4(0.95f, 0.75f, 0.30f, 1.0f), ImVec4(0.55f, 0.70f, 0.95f, 1.0f)};
+    int counts[3] = {0, 0, 0};
+    for (const CheckIssue& issue : mCheckIssues) {
+      ++counts[static_cast<int>(issue.level)];
+    }
+    ImGui::Text("%d errors, %d warnings, %d notes", counts[0], counts[1], counts[2]);
+    ImGui::BeginChild("##checkresults", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
+    for (std::size_t i = 0; i < mCheckIssues.size(); ++i) {
+      const CheckIssue& issue = mCheckIssues[i];
+      ImGui::PushID(static_cast<int>(i));
+      const ImVec2 row = ImGui::GetCursorScreenPos();
+      const float line = ImGui::GetTextLineHeight();
+      if (ImGui::Selectable("##issue", false, ImGuiSelectableFlags_SpanAvailWidth, ImVec2(0.0f, line * 2.0f + 2.0f))) {
+        if (!issue.marker.empty()) {
+          mTools.AskMarkerSelect({issue.marker}, false);
+          mTools.AskMarkerFrame(issue.marker);
+        }
+      }
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+        ImGui::SetTooltip("%s: %s\n%s\nClick to go to it", CheckLevelName(issue.level), issue.marker.c_str(), issue.text.c_str());
+      }
+      ImDrawList* const draw = ImGui::GetWindowDrawList();
+      draw->AddCircleFilled(ImVec2(row.x + line * 0.4f, row.y + line * 0.5f), line * 0.28f, ImGui::GetColorU32(kColors[static_cast<int>(issue.level)]));
+      draw->AddText(ImVec2(row.x + line * 1.1f, row.y), ImGui::GetColorU32(ImGuiCol_Text), issue.marker.c_str());
+      draw->PushClipRect(row, ImVec2(ImGui::GetItemRectMax().x, row.y + line * 2.0f + 2.0f), true);
+      draw->AddText(ImVec2(row.x + line * 1.1f, row.y + line), ImGui::GetColorU32(ImGuiCol_TextDisabled), issue.text.c_str());
+      draw->PopClipRect();
       ImGui::PopID();
     }
     ImGui::EndChild();

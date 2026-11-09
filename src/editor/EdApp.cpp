@@ -90,6 +90,7 @@ namespace faf::editor
       kMenuLog = 1103,
       kMenuInfo = 1107,
       kMenuMarkers = 1108,
+      kMenuCheck = 1109,
       kMenuPanelsWhilePlaying = 1104,
       kMenuResetLayout = 1105,
       kMenuImGuiDemo = 1106,
@@ -341,6 +342,8 @@ namespace faf::editor
       std::string mDecalToolArg;
       /** `/grid`, `/snap`, `/gridstep <units>` (test runs): the toolbar's grid settings, set once the map is shown. */
       bool mGridArgsPending = true;
+      /** `/check` (test runs): the Check runs once the map is shown. */
+      bool mCheckArgPending = true;
       /**
        * `/uiclicks "x,y;dx,y;..."` (test runs): clicks fed to the panels through ImGui's input queue, in the panels'
        * pixels, `d` for a double-click, one every half second from frame 300. Posted window messages can't do it:
@@ -515,6 +518,7 @@ namespace faf::editor
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuMap, L"&Map");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuInfo, L"&Info");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuMarkers, L"Mar&kers");
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuCheck, L"&Check");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuLog, L"&Log");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuPanelsWhilePlaying, L"&Panels while playing");
       ::AppendMenuW(mViewMenu, MF_SEPARATOR, 0, nullptr);
@@ -555,6 +559,7 @@ namespace faf::editor
       check(kMenuMap, mShell->ShowMap());
       check(kMenuInfo, mShell->ShowInfo());
       check(kMenuMarkers, mShell->ShowMarkers());
+      check(kMenuCheck, mShell->ShowCheck());
       check(kMenuLog, mShell->ShowLog());
       check(kMenuPanelsWhilePlaying, mShell->PanelsWhilePlaying());
       check(kMenuImGuiDemo, mShell->ShowDemo());
@@ -613,6 +618,9 @@ namespace faf::editor
       case kMenuMap:
         mShell->ShowMap() = !mShell->ShowMap();
         return;
+      case kMenuCheck:
+        mShell->ShowCheck() = !mShell->ShowCheck();
+        break;
       case kMenuMarkers:
         mShell->ShowMarkers() = !mShell->ShowMarkers();
         break;
@@ -1070,6 +1078,12 @@ namespace faf::editor
           const std::string mode = comma == std::string::npos ? std::string() : mDecalToolArg.substr(comma + 1);
           tools.SetDecalTool(mDecalToolArg.substr(0, comma), mode == "select" ? 1 : mode == "path" ? 2 : 0);
           mDecalToolArg.clear();
+        }
+        if (mCheckArgPending) {
+          mCheckArgPending = false;
+          if (moho::CFG_GetArgOption("/check", 0, nullptr)) {
+            mShell->RequestCheck();
+          }
         }
         if (mGridArgsPending) {
           mGridArgsPending = false;

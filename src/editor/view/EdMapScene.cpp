@@ -78,7 +78,8 @@ namespace faf::editor
     const std::optional<EdDocument::PlayableRect> area = mMap != nullptr ? mDocument.PlayableArea() : std::nullopt;
     if (mMap == nullptr || mCamera == nullptr || mTools == nullptr ||
         (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && mSelection.empty() && !area &&
-         mDocument.SaveData().Markers().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive() && !mTools->UnitsToolActive()) ||
+         mDocument.SaveData().Markers().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive() && !mTools->UnitsToolActive() &&
+         mTools->CheckPins().empty()) ||
         moho::ren_Viewport == nullptr) {
       return;
     }
@@ -297,6 +298,21 @@ namespace faf::editor
                             groundVertex(p.x + std::cos(a1) * 1.5f, p.z + std::sin(a1) * 1.5f, 0xF0FFE040u));
         }
       }
+    }
+    // The Check's findings: a ring and a post in its colour (red errors, amber warnings, blue notes).
+    for (const EdTools::CheckPin& pin : mTools->CheckPins()) {
+      const std::uint32_t color = pin.level == 0 ? 0xF0FF5848u : pin.level == 1 ? 0xF0FFC040u : 0xF08CB4F0u;
+      const float r = std::max(3.0f, mDistance * 0.012f);
+      for (int s = 0; s < 24; ++s) {
+        const float a0 = 2.0f * kPi * static_cast<float>(s) / 24.0f;
+        const float a1 = 2.0f * kPi * static_cast<float>(s + 1) / 24.0f;
+        batcher->DrawLine(groundVertex(pin.x + std::cos(a0) * r, pin.z + std::sin(a0) * r, color, 1.0f),
+                          groundVertex(pin.x + std::cos(a1) * r, pin.z + std::sin(a1) * r, color, 1.0f));
+      }
+      moho::CD3DPrimBatcher::Vertex top = groundVertex(pin.x, pin.z, color, 0.0f);
+      moho::CD3DPrimBatcher::Vertex bottom = top;
+      top.mY += r * 3.0f;
+      batcher->DrawLine(bottom, top);
     }
     DrawGizmo(*batcher);
     if (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive()) {

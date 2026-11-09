@@ -52,6 +52,15 @@ namespace faf::editor
     [[nodiscard]] bool HasPropBlueprints() const noexcept { return !mPropBlueprints.empty(); }
     /** The Markers tool. */
     [[nodiscard]] bool MarkersToolActive() const noexcept { return mTool == 6; }
+    /** The Check's results on the map, for the view's pins: where, and how bad (0 error, 1 warning, 2 note). */
+    struct CheckPin
+    {
+      float x;
+      float z;
+      int level;
+    };
+    void SetCheckPins(std::vector<CheckPin> pins) { mCheckPins = std::move(pins); }
+    [[nodiscard]] const std::vector<CheckPin>& CheckPins() const noexcept { return mCheckPins; }
     /** The Water tool's panel: the map's water as it is, and a change it made (`final` when a drag or a click ended). */
     [[nodiscard]] bool WaterToolActive() const noexcept { return mTool == 3; }
     void SetWater(const WaterState& water)
@@ -554,6 +563,7 @@ namespace faf::editor
     int mSelectionCount = 0;
     std::vector<SaveEntry> mMarkerSelection;
     bool mConnectNodes = false;
+    std::vector<CheckPin> mCheckPins;
     WaterState mWater;
     bool mWaterEditing = false;
     bool mWaterChanged = false;
