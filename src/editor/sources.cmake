@@ -11,6 +11,7 @@ set(FAF_EDITOR_SOURCES
   EdTools.cpp
   doc/EdDocument.cpp
   tools/EdHeightBrush.cpp
+  undo/EdHeightHistory.cpp
   view/EdMapScene.cpp
   ui/EdImGuiRenderer.cpp
 )

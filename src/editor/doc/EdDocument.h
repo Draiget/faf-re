@@ -7,6 +7,8 @@
 #include <thread>
 #include <vector>
 
+#include "editor/undo/EdHeightHistory.h"
+
 namespace LuaPlus
 {
   class LuaState;
@@ -95,6 +97,12 @@ namespace faf::editor
     [[nodiscard]] const std::string& Path() const noexcept { return mPath; }
     /** The loaded map, null unless open. */
     [[nodiscard]] moho::CWldMap* Map() const noexcept { return mMap.get(); }
+    /** The height field's undo history, reset when a map opens. */
+    [[nodiscard]] HeightHistory& Heights() noexcept { return mHeights; }
+    /** Whether the map changed since it was opened (or last saved). */
+    [[nodiscard]] bool Modified() const noexcept { return mModified; }
+    void SetModified(bool modified) noexcept { mModified = modified; }
+
     /** The document's Lua state (scripts and objects made for the open map), null unless open. */
     [[nodiscard]] LuaPlus::LuaState* Lua() const noexcept { return mLua.get(); }
 
@@ -112,5 +120,7 @@ namespace faf::editor
     std::unique_ptr<Load> mLoad;
     std::thread mThread;
     std::function<void()> mBeforeDrop;
+    HeightHistory mHeights;
+    bool mModified = false;
   };
 } // namespace faf::editor

@@ -14,7 +14,10 @@
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "moho/render/IEdRenderHook.h"
 #include "moho/render/RCamManager.h"
+#include "moho/render/d3d/CD3DPrimBatcher.h"
+#include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/render/SimpleRenderWorldView.h"
 #include "moho/render/WRenViewport.h"
 #include "moho/render/camera/CameraImpl.h"
@@ -24,6 +27,19 @@
 
 namespace faf::editor
 {
+  /** The renderer's editor hook (IEdRenderHook, called at the end of WRenViewport::RenderUI): the brush rings. */
+  class EdMapScene::RingHook final : public moho::IEdRenderHook
+  {
+  public:
+    explicit RingHook(EdMapScene& scene)
+      : mScene(scene)
+    {}
+    void Render() override { mScene.DrawBrushRings(); }
+
+  private:
+    EdMapScene& mScene;
+  };
+
   namespace
   {
     constexpr float kPi = 3.14159265f;
@@ -38,6 +54,57 @@ namespace faf::editor
   EdMapScene::~EdMapScene()
   {
     Detach();
+  }
+
+  void EdMapScene::DrawBrushRings()
+  {
+    if (mMap == nullptr || mCamera == nullptr || mTools == nullptr || !mTools->TerrainToolActive() || moho::ren_Viewport == nullptr) {
+      return;
+    }
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    float groundX = 0.0f;
+    float groundZ = 0.0f;
+    if (field == nullptr || !GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ)) {
+      return;
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    float centreX[4];
+    float centreZ[4];
+    const int centres = HeightBrushCentres(field->width, field->height, groundX, groundZ, brush.symmetry, centreX, centreZ);
+
+    moho::CD3DPrimBatcher* const batcher = moho::ren_Viewport->GetPrimBatcher();
+    (void)batcher->Setup("TAlphaBlendLinearSampleNoDepth");
+    batcher->SetViewProjMatrix(mCamera->CameraGetView());
+    batcher->SetTexture(moho::CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
+    // On the ground, a little above it so the lines don't sink into slopes between samples.
+    const auto groundVertex = [field](const float x, const float z, const std::uint32_t color) {
+      const int sx = std::clamp(static_cast<int>(std::lround(x)), 0, field->width - 1);
+      const int sz = std::clamp(static_cast<int>(std::lround(z)), 0, field->height - 1);
+      moho::CD3DPrimBatcher::Vertex vertex{};
+      vertex.mX = x;
+      vertex.mY = static_cast<float>(field->data[sz * field->width + sx]) / 128.0f + 0.4f;
+      vertex.mZ = z;
+      vertex.mColor = color;
+      return vertex;
+    };
+    constexpr int kSegments = 64;
+    const float inner = brush.radius * (1.0f - std::clamp(brush.falloff, 0.0f, 1.0f));
+    for (int c = 0; c < centres; ++c) {
+      // The cursor's copy in white, the mirrored ones in the panel's orange; the inner ring where falloff starts.
+      const std::uint32_t outerColor = c == 0 ? 0xF0FFFFFFu : 0xE0FF9A3Cu;
+      const std::uint32_t innerColor = c == 0 ? 0x90FFFFFFu : 0x80FF9A3Cu;
+      for (int ring = 0; ring < (inner > 0.5f ? 2 : 1); ++ring) {
+        const float radius = ring == 0 ? brush.radius : inner;
+        const std::uint32_t color = ring == 0 ? outerColor : innerColor;
+        for (int s = 0; s < kSegments; ++s) {
+          const float a0 = 2.0f * kPi * static_cast<float>(s) / kSegments;
+          const float a1 = 2.0f * kPi * static_cast<float>(s + 1) / kSegments;
+          batcher->DrawLine(groundVertex(centreX[c] + std::cos(a0) * radius, centreZ[c] + std::sin(a0) * radius, color),
+                            groundVertex(centreX[c] + std::cos(a1) * radius, centreZ[c] + std::sin(a1) * radius, color));
+        }
+      }
+    }
+    batcher->Flush();
   }
 
   void EdMapScene::Attach(moho::CWldMap& map)
@@ -60,6 +127,10 @@ namespace faf::editor
     FrameWholeMap();
     mWorldView = std::make_unique<moho::SimpleRenderWorldView>(const_cast<moho::GeomCamera3*>(&mCamera->CameraGetView()));
     moho::ren_Viewport->AddWorldView(mWorldView.get(), 0, 0);
+    if (mRingHook == nullptr) {
+      mRingHook = std::make_unique<RingHook>(*this);
+    }
+    moho::ED_SetHook(mRingHook.get());
     gpg::Logf("editor: the viewport shows %s", mDocument.Path().c_str());
   }
 
@@ -68,8 +139,11 @@ namespace faf::editor
     if (mMap == nullptr) {
       return;
     }
+    // A stroke in progress ends here, so undo has it whole.
+    EndStroke();
     // The props first: their blueprints are the kept rules', which the next play takes.
     DeleteProps();
+    moho::ED_SetHook(nullptr);
     if (moho::ren_Viewport != nullptr && mWorldView != nullptr) {
       moho::ren_Viewport->RemoveWorldView(mWorldView.get());
     }
@@ -96,11 +170,55 @@ namespace faf::editor
     }
     HeightBrush brush = mTools->CurrentHeightBrush();
     brush.flattenTo = mFlattenTo;
+    // Undo keeps the tiles this step writes, as they are, before it writes them.
+    for (const SampleRect& rect : HeightBrushRects(field->width, field->height, groundX, groundZ, brush)) {
+      mDocument.Heights().BeforeWrite(field->data, rect);
+    }
     const std::vector<SampleRect> rects =
       ApplyHeightBrush(field->data, field->width, field->height, groundX, groundZ, brush, std::min(frameSeconds, 0.1f));
-    if (rects.empty()) {
-      return;
+    if (!rects.empty()) {
+      mDocument.SetModified(true);
+      RefreshHeights(rects);
     }
+  }
+
+  void EdMapScene::EndStroke()
+  {
+    if (mMap != nullptr && mDocument.Heights().Stroking()) {
+      if (const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField()) {
+        mDocument.Heights().EndStroke(field->data);
+      }
+    }
+    mPainting = false;
+  }
+
+  bool EdMapScene::Undo()
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    std::vector<SampleRect> rects;
+    if (field == nullptr || mPainting || !mDocument.Heights().Undo(field->data, rects)) {
+      return false;
+    }
+    RefreshHeights(rects);
+    mDocument.SetModified(true);
+    return true;
+  }
+
+  bool EdMapScene::Redo()
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    std::vector<SampleRect> rects;
+    if (field == nullptr || mPainting || !mDocument.Heights().Redo(field->data, rects)) {
+      return false;
+    }
+    RefreshHeights(rects);
+    mDocument.SetModified(true);
+    return true;
+  }
+
+  void EdMapScene::RefreshHeights(const std::vector<SampleRect>& rects)
+  {
+    moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
     // The samples are written in place; the field's own setter, given them back, refreshes its tiers of
     // min/max heights and its revision (the shadow and vision passes watch it). Then the terrain redraws
     // those rectangles: tiles and normal map, one sample wider for the normals at their edge.
@@ -302,13 +420,14 @@ namespace faf::editor
         mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(groundX)), static_cast<std::int32_t>(std::lround(groundZ))) *
         128.0f;
       mPainting = true;
+      mDocument.Heights().BeginStroke();
       ::SetCapture(window);
       ::SetFocus(window);
       return true;
     }
     case WM_LBUTTONUP:
       if (mPainting) {
-        mPainting = false;
+        EndStroke();
         ::ReleaseCapture();
         return true;
       }
@@ -378,6 +497,11 @@ namespace faf::editor
     case WM_KEYDOWN:
     case WM_KEYUP: {
       const bool down = message == WM_KEYDOWN;
+      if (down && (::GetKeyState(VK_CONTROL) & 0x8000) != 0 && (wParam == 'Z' || wParam == 'Y')) {
+        const bool redo = wParam == 'Y' || (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
+        (void)(redo ? Redo() : Undo());
+        return true;
+      }
       mFast = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
       switch (wParam) {
       case 'W':
@@ -412,7 +536,9 @@ namespace faf::editor
       return false;
     case WM_CAPTURECHANGED:
       mDrag = Drag::None;
-      mPainting = false;
+      if (mPainting) {
+        EndStroke();
+      }
       return false;
     default:
       return false;

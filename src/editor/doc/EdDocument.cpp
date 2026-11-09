@@ -240,7 +240,11 @@ namespace faf::editor
     mLua = std::move(load->lua);
     // A missing save keeps the map open: the editor still has its terrain, props and decals.
     mState = mMap != nullptr ? State::Open : State::Failed;
+    mModified = false;
     if (mState == State::Open) {
+      if (const moho::CHeightField* const field = mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr) {
+        mHeights.Reset(field->width, field->height);
+      }
       gpg::Logf("editor: opened %s in %.2f s: %d x %d, %zu layers named, %d props, %d decals, %d markers, %zu armies%s%s",
                 mPath.c_str(), mFacts.loadSeconds, mFacts.fieldWidth, mFacts.fieldHeight,
                 static_cast<std::size_t>(std::count_if(mFacts.layers.begin(), mFacts.layers.end(),
@@ -262,6 +266,8 @@ namespace faf::editor
     }
     mMap.reset();
     mLua.reset();
+    mHeights.Reset(0, 0);
+    mModified = false;
     mFacts = {};
     mError.clear();
     mPath.clear();

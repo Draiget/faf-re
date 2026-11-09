@@ -5,6 +5,8 @@
 
 #include <Windows.h>
 
+#include "editor/tools/EdHeightBrush.h"
+
 namespace moho
 {
   class CameraImpl;
@@ -51,6 +53,10 @@ namespace faf::editor
     /** The tool settings the left mouse button acts with (the Tools panel's). */
     void SetTools(const EdTools* tools) noexcept { mTools = tools; }
 
+    /** Undoes or redoes the newest height stroke (Ctrl+Z, Ctrl+Y); false when there is none. */
+    bool Undo();
+    bool Redo();
+
     [[nodiscard]] bool Attached() const noexcept { return mMap != nullptr; }
 
     /** The game viewport window's messages while attached; true when the scene used one. */
@@ -72,8 +78,16 @@ namespace faf::editor
 
     /** A terrain stroke in progress: the brush under the cursor each frame while the left button is held. */
     void PaintStroke(float frameSeconds);
+    void EndStroke();
+    /** Hands written samples back to the height field (its tiers and revision) and redraws their terrain. */
+    void RefreshHeights(const std::vector<SampleRect>& rects);
     const EdTools* mTools = nullptr;
     bool mPainting = false;
+
+    /** Draws the brush rings on the terrain from the renderer's editor hook (`ED_SetHook`). */
+    void DrawBrushRings();
+    class RingHook;
+    std::unique_ptr<RingHook> mRingHook;
     float mFlattenTo = 0.0f;
     POINT mCursor{};
 

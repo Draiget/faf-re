@@ -81,6 +81,8 @@ namespace faf::editor
       kMenuResetLayout = 1105,
       kMenuImGuiDemo = 1106,
       kMenuPlayStop = 1201,
+      kMenuUndo = 1301,
+      kMenuRedo = 1302,
       kMenuFirstMap = 2000,
     };
 
@@ -241,6 +243,7 @@ namespace faf::editor
 
       HMENU mMenuBar = nullptr;
       HMENU mViewMenu = nullptr;
+      HMENU mEditMenu = nullptr;
       HMENU mPlayMenu = nullptr;
       HMENU mMapMenu = nullptr;
       std::wstring mBaseTitle;
@@ -411,6 +414,10 @@ namespace faf::editor
 
       mMenuBar = ::CreateMenu();
       ::AppendMenuW(mMenuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(file), L"&File");
+      mEditMenu = ::CreatePopupMenu();
+      ::AppendMenuW(mEditMenu, MF_STRING, kMenuUndo, L"&Undo\tCtrl+Z");
+      ::AppendMenuW(mEditMenu, MF_STRING, kMenuRedo, L"&Redo\tCtrl+Y");
+      ::AppendMenuW(mMenuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(mEditMenu), L"&Edit");
       ::AppendMenuW(mMenuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(mViewMenu), L"&View");
       ::AppendMenuW(mMenuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(mPlayMenu), L"&Play");
       ::SetMenu(frame, mMenuBar);
@@ -454,6 +461,12 @@ namespace faf::editor
         return;
       case kMenuInfo:
         mShell->ShowInfo() = !mShell->ShowInfo();
+        break;
+      case kMenuUndo:
+        (void)mScene.Undo();
+        break;
+      case kMenuRedo:
+        (void)mScene.Redo();
         break;
       case kMenuLog:
         mShell->ShowLog() = !mShell->ShowLog();
@@ -537,6 +550,14 @@ namespace faf::editor
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         mShell->Draw();
+        // Undo and redo from the panels too (the viewport's keys go to the scene directly).
+        if (!ImGui::GetIO().WantTextInput) {
+          if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z)) {
+            (void)mScene.Undo();
+          } else if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z)) {
+            (void)mScene.Redo();
+          }
+        }
         ImGui::Render();
         FitGameView();
         RenderPanels();

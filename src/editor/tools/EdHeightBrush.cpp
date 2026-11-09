@@ -112,12 +112,42 @@ namespace faf::editor
     return Copies<int>(Effective(symmetry, width, height), width - 1, height - 1, x, z, outX, outZ);
   }
 
+  int HeightBrushCentres(const int width, const int height, const float x, const float z, const Symmetry symmetry, float (&outX)[4],
+                         float (&outZ)[4])
+  {
+    return Copies<float>(Effective(symmetry, width, height), static_cast<float>(width - 1), static_cast<float>(height - 1), x, z, outX,
+                         outZ);
+  }
+
+  std::vector<SampleRect> HeightBrushRects(const int width, const int height, const float x, const float z, const HeightBrush& brush)
+  {
+    std::vector<SampleRect> rects;
+    if (width < 2 || height < 2 || brush.radius <= 0.0f) {
+      return rects;
+    }
+    const Symmetry symmetry = Effective(brush.symmetry, width, height);
+    float centreX[4];
+    float centreZ[4];
+    const int centres = Copies<float>(symmetry, static_cast<float>(width - 1), static_cast<float>(height - 1), x, z, centreX, centreZ);
+    for (int i = 0; i < centres; ++i) {
+      SampleRect rect{
+        std::max(0, static_cast<int>(std::floor(centreX[i] - brush.radius))),
+        std::max(0, static_cast<int>(std::floor(centreZ[i] - brush.radius))),
+        std::min(width - 1, static_cast<int>(std::ceil(centreX[i] + brush.radius))),
+        std::min(height - 1, static_cast<int>(std::ceil(centreZ[i] + brush.radius))),
+      };
+      if (rect.x0 <= rect.x1 && rect.z0 <= rect.z1) {
+        rects.push_back(rect);
+      }
+    }
+    return rects;
+  }
+
   std::vector<SampleRect> ApplyHeightBrush(std::uint16_t* const heights, const int width, const int height, const float x,
                                            const float z, const HeightBrush& brush, const float seconds)
   {
-    std::vector<SampleRect> rects;
     if (heights == nullptr || width < 2 || height < 2 || brush.radius <= 0.0f || seconds <= 0.0f) {
-      return rects;
+      return {};
     }
     const Symmetry symmetry = Effective(brush.symmetry, width, height);
 
@@ -125,6 +155,7 @@ namespace faf::editor
     float centreX[4];
     float centreZ[4];
     const int centres = Copies<float>(symmetry, static_cast<float>(width - 1), static_cast<float>(height - 1), x, z, centreX, centreZ);
+    std::vector<SampleRect> rects;
     for (int i = 0; i < centres; ++i) {
       SampleRect rect{
         std::max(0, static_cast<int>(std::floor(centreX[i] - brush.radius))),

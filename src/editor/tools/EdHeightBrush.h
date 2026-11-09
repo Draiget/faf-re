@@ -67,6 +67,12 @@ namespace faf::editor
   std::vector<SampleRect>
   ApplyHeightBrush(std::uint16_t* heights, int width, int height, float x, float z, const HeightBrush& brush, float seconds);
 
+  /** The rectangles `ApplyHeightBrush` would write for the same arguments, without writing (undo saves them first). */
+  std::vector<SampleRect> HeightBrushRects(int width, int height, float x, float z, const HeightBrush& brush);
+
+  /** The brush's centre and its symmetric copies (the cursor's first), as the brush paints them. */
+  int HeightBrushCentres(int width, int height, float x, float z, Symmetry symmetry, float (&outX)[4], float (&outZ)[4]);
+
   /** The symmetric copies of sample (x, z), itself first (the group, with repeats where copies coincide). */
   int SymmetricSamples(Symmetry symmetry, int width, int height, int x, int z, int (&outX)[4], int (&outZ)[4]);
 } // namespace faf::editor
