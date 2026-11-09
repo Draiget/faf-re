@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -34,8 +35,11 @@ namespace faf::editor
     const std::vector<LayerTexture>& Textures();
     void Refresh() { mListed = false; }
 
-    /** The thumbnail of a texture for ImGui::Image, or 0 while it waits its turn; asks for it either way. */
-    std::uint64_t Thumbnail(const std::string& path);
+    /**
+     * The thumbnail of a texture for ImGui::Image, or 0 while it waits its turn; asks for it either way. Opaque by
+     * default (a layer's alpha is its specular, not its shape); `withAlpha` keeps it (a decal's alpha is its shape).
+     */
+    std::uint64_t Thumbnail(const std::string& path, bool withAlpha = false);
 
     /** Decodes up to `count` asked-for thumbnails; called once a frame. */
     void Pump(int count);
@@ -48,6 +52,7 @@ namespace faf::editor
     bool mListed = false;
     std::unordered_map<std::string, std::uint64_t> mThumbnails; // 0: asked, not decoded (or failed)
     std::deque<std::string> mWanted;
+    std::set<std::string> mWithAlpha;
   };
 
   /** "grass001" from ".../grass001_albedo.dds"; "(empty)" for none. */

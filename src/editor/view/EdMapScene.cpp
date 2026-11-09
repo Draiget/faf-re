@@ -2116,6 +2116,7 @@ namespace faf::editor
       gpg::Warnf("editor: pick a decal texture first");
       return;
     }
+    const std::string pair = mTools->DecalPairPath();
     const HeightBrush brush = mTools->CurrentHeightBrush();
     float yaw = mTools->DecalTurnDegrees() * kPi / 180.0f;
     if (mTools->RandomDecalTurn()) {
@@ -2147,14 +2148,17 @@ namespace faf::editor
       state.position[2] = footprint.z;
       state.orientation[1] = heading;
       state.cutoff = mTools->DecalCutoff();
+      // An albedo's spec map is its second texture, as the game's maps keep them.
+      state.names[1] = pair;
       if (const moho::CWldTerrainDecal* const decal = AddDecal(*decals, state); decal != nullptr) {
         mDecalSelection.push_back(decal->mIndex);
       }
     }
     if (!mDecalSelection.empty()) {
       mDocument.DecalsEdited(std::move(before));
-      gpg::Logf("editor: %zu decals placed (%s, %.1f x %.1f), %d decals now", mDecalSelection.size(), texture.c_str(),
-                static_cast<double>(mTools->DecalSizeX()), static_cast<double>(mTools->DecalSizeZ()), decals->GetDecalCount());
+      gpg::Logf("editor: %zu decals placed (%s%s%s, %.1f x %.1f), %d decals now", mDecalSelection.size(), texture.c_str(),
+                pair.empty() ? "" : " with ", pair.c_str(), static_cast<double>(mTools->DecalSizeX()),
+                static_cast<double>(mTools->DecalSizeZ()), decals->GetDecalCount());
     }
   }
 

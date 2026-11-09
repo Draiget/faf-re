@@ -60,6 +60,11 @@ namespace faf::editor
     std::string name;
     /** The type it is placed as (DecalTypeForTexture). */
     int type = 1;
+    /**
+     * An albedo texture's spec map when the data has one (`_albedo` to `_spec`): the game's maps put it in the same
+     * decal's second name (SCMP_009: 284 of its 1,233 albedo decals; its 1,003 normal-map decals have none).
+     */
+    std::string pair;
   };
 
   /** Every `.dds` under a `decals` folder of /env the file system can see, by biome, then name. */

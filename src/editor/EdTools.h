@@ -53,6 +53,19 @@ namespace faf::editor
     [[nodiscard]] bool DecalsToolActive() const noexcept { return mTool == 5; }
     [[nodiscard]] bool DecalPlaceMode() const noexcept { return mDecalMode == 0; }
     [[nodiscard]] const std::string& DecalTexturePath() const noexcept { return mDecalTexture; }
+    /** The albedo's spec map, the decal's second texture, or "" when it has none or the option is off. */
+    [[nodiscard]] std::string DecalPairPath() const
+    {
+      if (!mDecalWithPair) {
+        return {};
+      }
+      for (const DecalTexture& texture : mDecalTextures) {
+        if (texture.path == mDecalTexture) {
+          return texture.pair;
+        }
+      }
+      return {};
+    }
     [[nodiscard]] float DecalSizeX() const noexcept { return mDecalSize[0]; }
     [[nodiscard]] float DecalSizeZ() const noexcept { return mDecalSize[1]; }
     /** The heading in radians; a random one when Random turn is on. */
@@ -479,6 +492,7 @@ namespace faf::editor
     float mDecalSize[2] = {32.0f, 32.0f};
     float mDecalTurn = 0.0f;
     bool mDecalRandomTurn = false;
+    bool mDecalWithPair = true;
     float mDecalCutoff = 0.0f;
     int mDecalSelectionCount = 0;
     bool mShowGrid = false;

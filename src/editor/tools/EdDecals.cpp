@@ -170,6 +170,21 @@ namespace faf::editor
       texture.type = DecalTypeForTexture(path);
       textures.push_back(std::move(texture));
     }
+    // An albedo's spec map: the same name with _spec.
+    std::map<std::string, std::string> byLower;
+    for (const DecalTexture& texture : textures) {
+      byLower[Lower(texture.path)] = texture.path;
+    }
+    for (DecalTexture& texture : textures) {
+      const std::string lower = Lower(texture.path);
+      const std::string from = "_albedo.dds";
+      if (lower.size() > from.size() && lower.compare(lower.size() - from.size(), from.size(), from) == 0) {
+        const auto partner = byLower.find(lower.substr(0, lower.size() - from.size()) + "_spec.dds");
+        if (partner != byLower.end()) {
+          texture.pair = partner->second;
+        }
+      }
+    }
     std::sort(textures.begin(), textures.end(), [](const DecalTexture& a, const DecalTexture& b) {
       return Lower(a.biome) != Lower(b.biome) ? Lower(a.biome) < Lower(b.biome) : Lower(a.name) < Lower(b.name);
     });

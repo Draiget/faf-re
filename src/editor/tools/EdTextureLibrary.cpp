@@ -108,7 +108,7 @@ namespace faf::editor
     return mTextures;
   }
 
-  std::uint64_t EdTextureLibrary::Thumbnail(const std::string& path)
+  std::uint64_t EdTextureLibrary::Thumbnail(const std::string& path, const bool withAlpha)
   {
     if (path.empty()) {
       return 0U;
@@ -119,6 +119,9 @@ namespace faf::editor
     }
     mThumbnails.emplace(path, 0U);
     mWanted.push_back(path);
+    if (withAlpha) {
+      mWithAlpha.insert(path);
+    }
     return 0U;
   }
 
@@ -144,6 +147,7 @@ namespace faf::editor
         continue;
       }
       const auto& level = image.subresources.front();
+      const std::uint32_t opaque = mWithAlpha.count(path) != 0 ? 0u : 0xFF000000u;
       std::vector<std::uint32_t> pixels(static_cast<std::size_t>(level.width) * level.height);
       for (std::uint32_t y = 0; y < level.height; ++y) {
         const std::uint8_t* const row = image.bytes.data() + level.offset + static_cast<std::size_t>(y) * level.rowPitch;
@@ -151,7 +155,7 @@ namespace faf::editor
           std::uint32_t pixel = 0;
           std::memcpy(&pixel, row + static_cast<std::size_t>(x) * 4U, 4U);
           // Opaque: a layer's alpha is its specular or the upper layer's blend, not its shape.
-          pixels[static_cast<std::size_t>(y) * level.width + x] = pixel | 0xFF000000u;
+          pixels[static_cast<std::size_t>(y) * level.width + x] = pixel | opaque;
         }
       }
       mThumbnails[path] = EdImGuiRenderer::CreateImage(static_cast<int>(level.width), static_cast<int>(level.height), pixels.data());

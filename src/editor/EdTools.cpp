@@ -882,14 +882,15 @@ namespace faf::editor
           mDecalTexture = texture.path;
           mDecalMode = 0;
         }
-        if (const std::uint64_t image = mLibrary.Thumbnail(texture.path); image != 0U) {
+        if (const std::uint64_t image = mLibrary.Thumbnail(texture.path, true); image != 0U) {
           draw->AddImage(static_cast<ImTextureID>(image), p, ImVec2(p.x + cell, p.y + cell));
         }
         if (texture.path == mDecalTexture) {
           draw->AddRect(p, ImVec2(p.x + cell, p.y + cell), kAccent, 3.0f, 0, 2.0f);
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-          ImGui::SetTooltip("%s\n%s, placed as %s", texture.name.c_str(), texture.biome.c_str(), DecalTypeName(texture.type));
+          ImGui::SetTooltip("%s\n%s, placed as %s%s", texture.name.c_str(), texture.biome.c_str(), DecalTypeName(texture.type),
+                            texture.pair.empty() ? "" : "\nwith a spec map");
         }
         ImGui::PopID();
       }
@@ -901,6 +902,17 @@ namespace faf::editor
     if (!mDecalTexture.empty()) {
       const std::size_t slash = mDecalTexture.find_last_of('/');
       ImGui::TextWrapped("%s (%s)", mDecalTexture.substr(slash + 1).c_str(), DecalTypeName(DecalTypeForTexture(mDecalTexture)));
+      bool hasPair = false;
+      for (const DecalTexture& texture : mDecalTextures) {
+        hasPair = hasPair || (texture.path == mDecalTexture && !texture.pair.empty());
+      }
+      ImGui::BeginDisabled(!hasPair);
+      ImGui::Checkbox("With its spec map", &mDecalWithPair);
+      ImGui::EndDisabled();
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
+        ImGui::SetTooltip(hasPair ? "The decal's second texture is its _spec map, as the game's maps keep albedo decals"
+                                  : "Only an _albedo texture with a _spec next to it has one");
+      }
     } else {
       Note("Pick a texture to place.");
     }
