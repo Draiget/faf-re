@@ -250,6 +250,9 @@ namespace faf::editor
     bool PopRedo(EditKind& kind);
     void PushRedo(EditKind kind) { mRedoOrder.push_back(kind); }
     void PushUndo(EditKind kind) { mUndoOrder.push_back(kind); }
+    /** Whether there is an edit to undo (redo), for the toolbar. */
+    [[nodiscard]] bool CanUndo() const noexcept { return !mUndoOrder.empty(); }
+    [[nodiscard]] bool CanRedo() const noexcept { return !mRedoOrder.empty(); }
     /** Whether the map changed since it was opened (or last saved). */
     [[nodiscard]] bool Modified() const noexcept { return mModified; }
     void SetModified(bool modified) noexcept { mModified = modified; }

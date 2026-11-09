@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 
 #include "editor/EdTools.h"
 #include "editor/doc/EdNewMap.h"
@@ -42,6 +43,16 @@ namespace faf::editor
 
     [[nodiscard]] EdTools& Tools() noexcept { return mTools; }
 
+    /** A toolbar button the app carries out (it owns saving and the scene's undo); taken once per frame. */
+    enum class Command
+    {
+      None,
+      Save,
+      Undo,
+      Redo,
+    };
+    [[nodiscard]] Command TakeCommand() noexcept { return std::exchange(mCommand, Command::None); }
+
     /** File > Exit was chosen. */
     [[nodiscard]] bool ExitRequested() const noexcept { return mExit; }
 
@@ -50,6 +61,9 @@ namespace faf::editor
 
   private:
     void BuildDefaultLayout(unsigned int dockspaceId);
+    /** The toolbar over the panels: Play/Stop (F5) first, then New, Open, Save, Save as, Undo, Redo, and the open map. */
+    void DrawToolbar(float height);
+    Command mCommand = Command::None;
     void HandleKeys();
     void DrawToolsPanel();
     void DrawMapPanel();

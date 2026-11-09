@@ -327,6 +327,20 @@ namespace faf::editor
       std::string mShaderArg;
       std::string mPlayableAreaArg;
       std::string mMarkerToolArg;
+      /**
+       * `/uiclicks "x,y;dx,y;..."` (test runs): clicks fed to the panels through ImGui's input queue, in the panels'
+       * pixels, `d` for a double-click, one every half second from frame 300. Posted window messages can't do it:
+       * ImGui's Win32 backend takes the real cursor's position while the window has focus.
+       */
+      struct UiClick
+      {
+        float x;
+        float y;
+        bool doubleClick;
+      };
+      std::vector<UiClick> mUiClicks;
+      int mUiClickFrame = 0;
+      void FeedUiClicks();
       // `/proptool <mode>,<blueprint>` and `/tool <index>` (test runs).
       std::string mPropToolArg;
       int mToolArg = -1;
@@ -539,6 +553,35 @@ namespace faf::editor
       }
     }
 
+    void EditorApp::FeedUiClicks()
+    {
+      if (mUiClicks.empty()) {
+        return;
+      }
+      // Frame by frame from frame 300: the position, down, up (down and up again for a double-click), then a pause.
+      constexpr int kStart = 300;
+      constexpr int kEach = 30;
+      const int frame = mUiClickFrame++ - kStart;
+      if (frame < 0) {
+        return;
+      }
+      const std::size_t index = static_cast<std::size_t>(frame / kEach);
+      if (index >= mUiClicks.size()) {
+        mUiClicks.clear();
+        return;
+      }
+      const UiClick& click = mUiClicks[index];
+      const int step = frame % kEach;
+      ImGuiIO& io = ImGui::GetIO();
+      io.AddMousePosEvent(click.x, click.y);
+      if (step == 1 || (click.doubleClick && step == 3)) {
+        io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+        gpg::Logf("editor: test click at %.0f,%.0f%s", click.x, click.y, click.doubleClick && step == 3 ? " (second)" : "");
+      } else if (step == 2 || (click.doubleClick && step == 4)) {
+        io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+      }
+    }
+
     void EditorApp::HandleMenuCommand(const UINT command)
     {
       switch (command) {
@@ -652,8 +695,22 @@ namespace faf::editor
 
       if (mImGuiReady) {
         ImGui_ImplWin32_NewFrame();
+        FeedUiClicks();
         ImGui::NewFrame();
         mShell->Draw();
+        switch (mShell->TakeCommand()) {
+        case EdShell::Command::Save:
+          SaveDocument();
+          break;
+        case EdShell::Command::Undo:
+          (void)mScene.Undo();
+          break;
+        case EdShell::Command::Redo:
+          (void)mScene.Redo();
+          break;
+        case EdShell::Command::None:
+          break;
+        }
         // Undo and redo from the panels too (the viewport's keys go to the scene directly).
         if (!ImGui::GetIO().WantTextInput) {
           if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)) {
@@ -708,6 +765,23 @@ namespace faf::editor
       }
       if (fa::vector<fa::string> tool; moho::CFG_GetArgOption("/tool", 1, &tool) && !tool.empty()) {
         mToolArg = std::atoi(tool[0].c_str());
+      }
+      if (fa::vector<fa::string> clicks; moho::CFG_GetArgOption("/uiclicks", 1, &clicks) && !clicks.empty()) {
+        const std::string list = clicks[0].c_str();
+        std::size_t at = 0;
+        while (at < list.size()) {
+          const std::size_t end = std::min(list.find(';', at), list.size());
+          std::string point = list.substr(at, end - at);
+          at = end + 1;
+          const bool twice = !point.empty() && point[0] == 'd';
+          if (twice) {
+            point.erase(0, 1);
+          }
+          const std::size_t comma = point.find(',');
+          if (comma != std::string::npos) {
+            mUiClicks.push_back({static_cast<float>(std::atof(point.c_str())), static_cast<float>(std::atof(point.c_str() + comma + 1)), twice});
+          }
+        }
       }
       if (fa::vector<fa::string> type; moho::CFG_GetArgOption("/markertool", 1, &type) && !type.empty()) {
         mMarkerToolArg = type[0].c_str();
