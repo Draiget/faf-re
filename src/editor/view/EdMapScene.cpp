@@ -62,31 +62,96 @@ namespace faf::editor
       return;
     }
     const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
-    float groundX = 0.0f;
-    float groundZ = 0.0f;
-    if (field == nullptr || !GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ)) {
+    if (field == nullptr) {
       return;
     }
     const HeightBrush brush = mTools->CurrentHeightBrush();
-    float centreX[4];
-    float centreZ[4];
-    const int centres = HeightBrushCentres(field->width, field->height, groundX, groundZ, brush.symmetry, centreX, centreZ);
 
     moho::CD3DPrimBatcher* const batcher = moho::ren_Viewport->GetPrimBatcher();
     (void)batcher->Setup("TAlphaBlendLinearSampleNoDepth");
     batcher->SetViewProjMatrix(mCamera->CameraGetView());
     batcher->SetTexture(moho::CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
     // On the ground, a little above it so the lines don't sink into slopes between samples.
-    const auto groundVertex = [field](const float x, const float z, const std::uint32_t color) {
+    const auto groundVertex = [field](const float x, const float z, const std::uint32_t color, const float lift = 0.4f) {
       const int sx = std::clamp(static_cast<int>(std::lround(x)), 0, field->width - 1);
       const int sz = std::clamp(static_cast<int>(std::lround(z)), 0, field->height - 1);
       moho::CD3DPrimBatcher::Vertex vertex{};
       vertex.mX = x;
-      vertex.mY = static_cast<float>(field->data[sz * field->width + sx]) / 128.0f + 0.4f;
+      vertex.mY = static_cast<float>(field->data[sz * field->width + sx]) / 128.0f + lift;
       vertex.mZ = z;
       vertex.mColor = color;
       return vertex;
     };
+
+    // The mirror lines of the symmetry, along the ground, and the turn centre as a vertical axis.
+    const float w = static_cast<float>(field->width - 1);
+    const float h = static_cast<float>(field->height - 1);
+    constexpr std::uint32_t kMirrorColor = 0xC03CC8FFu;
+    const auto groundLine = [&](const float x0, const float z0, const float x1, const float z1) {
+      const float length = std::hypot(x1 - x0, z1 - z0);
+      const int steps = std::max(1, static_cast<int>(length / 4.0f));
+      for (int s = 0; s < steps; ++s) {
+        const float t0 = static_cast<float>(s) / steps;
+        const float t1 = static_cast<float>(s + 1) / steps;
+        batcher->DrawLine(groundVertex(x0 + (x1 - x0) * t0, z0 + (z1 - z0) * t0, kMirrorColor, 0.6f),
+                          groundVertex(x0 + (x1 - x0) * t1, z0 + (z1 - z0) * t1, kMirrorColor, 0.6f));
+      }
+    };
+    const auto turnAxis = [&]() {
+      moho::CD3DPrimBatcher::Vertex top = groundVertex(w * 0.5f, h * 0.5f, kMirrorColor, 0.0f);
+      moho::CD3DPrimBatcher::Vertex bottom = top;
+      top.mY += std::max(w, h) * 0.15f;
+      batcher->DrawLine(bottom, top);
+    };
+    const bool square = field->width == field->height;
+    switch (brush.symmetry) {
+    case Symmetry::LeftRight:
+      groundLine(w * 0.5f, 0.0f, w * 0.5f, h);
+      break;
+    case Symmetry::TopBottom:
+      groundLine(0.0f, h * 0.5f, w, h * 0.5f);
+      break;
+    case Symmetry::DiagonalBack:
+      if (square) {
+        groundLine(0.0f, 0.0f, w, h);
+      }
+      break;
+    case Symmetry::DiagonalForward:
+      if (square) {
+        groundLine(w, 0.0f, 0.0f, h);
+      }
+      break;
+    case Symmetry::HalfTurn:
+      turnAxis();
+      break;
+    case Symmetry::BothAxes:
+      groundLine(w * 0.5f, 0.0f, w * 0.5f, h);
+      groundLine(0.0f, h * 0.5f, w, h * 0.5f);
+      break;
+    case Symmetry::BothDiagonals:
+      if (square) {
+        groundLine(0.0f, 0.0f, w, h);
+        groundLine(w, 0.0f, 0.0f, h);
+      }
+      break;
+    case Symmetry::QuarterTurns:
+      if (square) {
+        turnAxis();
+      }
+      break;
+    default:
+      break;
+    }
+
+    float groundX = 0.0f;
+    float groundZ = 0.0f;
+    if (!GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ)) {
+      batcher->Flush();
+      return;
+    }
+    float centreX[4];
+    float centreZ[4];
+    const int centres = HeightBrushCentres(field->width, field->height, groundX, groundZ, brush.symmetry, centreX, centreZ);
     constexpr int kSegments = 64;
     const float inner = brush.radius * (1.0f - std::clamp(brush.falloff, 0.0f, 1.0f));
     for (int c = 0; c < centres; ++c) {
