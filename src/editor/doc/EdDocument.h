@@ -9,6 +9,7 @@
 #include <thread>
 #include <vector>
 
+#include "editor/doc/EdPackage.h"
 #include "editor/doc/EdWater.h"
 #include "editor/tools/EdChecks.h"
 #include "editor/tools/EdDecals.h"
@@ -152,6 +153,10 @@ namespace faf::editor
 
     /** The `.scmap` on disk that Save writes over, or empty when there is none. */
     [[nodiscard]] std::filesystem::path MapDiskFile() const;
+    /** The vault package of the map's folder as saved on disk (no folder: an error in the plan). */
+    [[nodiscard]] PackagePlan PlanPackage() const;
+    /** Writes the plan's files as `<vault>/packages/<folder>.zip`, the folder at the zip's top; false with `message`. */
+    bool WritePackage(const PackagePlan& plan, std::filesystem::path& written, std::string& message) const;
 
     /** What the map file stored that a save writes back as it was (the preview, unchanged props). */
     [[nodiscard]] const MapFileRecords& FileRecords() const noexcept { return mFileRecords; }

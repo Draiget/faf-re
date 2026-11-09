@@ -209,6 +209,7 @@ namespace faf::editor
     }
     DrawSaveAsDialog();
     DrawNewMapDialog();
+    DrawPackageDialog();
     DrawStatusBar();
   }
 
@@ -673,6 +674,60 @@ namespace faf::editor
     if (ImGui::Button("Cancel", ImVec2(120.0f, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
       ImGui::CloseCurrentPopup();
     }
+    ImGui::EndPopup();
+  }
+
+  void EdShell::DrawPackageDialog()
+  {
+    constexpr const char* kTitle = "Package for the FAF vault";
+    if (mOpenPackage) {
+      mOpenPackage = false;
+      if (mDocument.GetState() != EdDocument::State::Open) {
+        gpg::Warnf("editor: open a map first");
+        return;
+      }
+      mPackagePlan = mDocument.PlanPackage();
+      mPackageMessage.clear();
+      ImGui::OpenPopup(kTitle);
+    }
+    if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      return;
+    }
+    ImGui::Text("%s", mPackagePlan.folder.empty() ? "(no folder)" : mPackagePlan.folder.c_str());
+    ImGui::TextDisabled("A zip with this folder at its top, as the vault takes maps: %s",
+                        (mDocument.VaultFolder() / "packages" / (mPackagePlan.folder + ".zip")).string().c_str());
+    ImGui::Separator();
+    for (const std::string& error : mPackagePlan.errors) {
+      ImGui::TextColored(ImVec4(0.95f, 0.40f, 0.35f, 1.0f), "error: %s", error.c_str());
+    }
+    for (const std::string& warning : mPackagePlan.warnings) {
+      ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "warning: %s", warning.c_str());
+    }
+    if (mPackagePlan.errors.empty() && mPackagePlan.warnings.empty()) {
+      ImGui::TextColored(ImVec4(0.55f, 0.80f, 0.55f, 1.0f), "The folder's name, version and scenario paths are as the vault wants them.");
+    }
+    ImGui::TextDisabled("%zu files go in:", mPackagePlan.files.size());
+    if (ImGui::BeginChild("##packagefiles", ImVec2(520.0f, ImGui::GetTextLineHeightWithSpacing() * 7.0f), ImGuiChildFlags_Borders)) {
+      for (const std::string& file : mPackagePlan.files) {
+        ImGui::TextUnformatted(file.c_str());
+      }
+    }
+    ImGui::EndChild();
+    ImGui::BeginDisabled(!mPackagePlan.errors.empty());
+    if (ImGui::Button("Package", ImVec2(120.0f, 0.0f))) {
+      std::filesystem::path written;
+      const bool ok = mDocument.WritePackage(mPackagePlan, written, mPackageMessage);
+      (ok ? gpg::Logf : gpg::Warnf)("editor: %s", mPackageMessage.c_str());
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button("Close", ImVec2(120.0f, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+      ImGui::CloseCurrentPopup();
+    }
+    if (!mPackageMessage.empty()) {
+      ImGui::TextWrapped("%s", mPackageMessage.c_str());
+    }
+    ImGui::TextDisabled("Uploading to the vault is done in the FAF client (or its website) for now.");
     ImGui::EndPopup();
   }
 

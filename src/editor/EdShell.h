@@ -6,6 +6,7 @@
 #include "editor/EdTools.h"
 #include "editor/tools/EdChecks.h"
 #include "editor/doc/EdNewMap.h"
+#include "editor/doc/EdPackage.h"
 #include "imgui.h"
 
 namespace faf::editor
@@ -58,6 +59,8 @@ namespace faf::editor
     void OpenSaveAs() noexcept { mOpenSaveAs = true; }
     /** File > New map: the dialog asks for the map's name, size, players, height and sea. */
     void OpenNewMap() noexcept { mOpenNewMap = true; }
+    /** File > Package for the FAF vault: the checks, the file list, then the zip. */
+    void OpenPackage() noexcept { mOpenPackage = true; }
     void RequestExit() noexcept { mExit = true; }
 
     [[nodiscard]] EdTools& Tools() noexcept { return mTools; }
@@ -123,6 +126,10 @@ namespace faf::editor
     bool mOpenSaveAs = false;
     char mSaveAsName[128]{};
     void DrawNewMapDialog();
+    void DrawPackageDialog();
+    bool mOpenPackage = false;
+    PackagePlan mPackagePlan;
+    std::string mPackageMessage;
     bool mOpenNewMap = false;
     NewMapSettings mNewMap;
     char mNewMapTitle[128]{};

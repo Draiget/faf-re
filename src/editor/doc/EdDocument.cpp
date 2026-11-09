@@ -7,6 +7,7 @@
 #include <ctime>
 #include <cstring>
 #include <fstream>
+#include <iterator>
 #include <cstdlib>
 #include <cstdio>
 #include <cctype>
@@ -1051,6 +1052,10 @@ namespace faf::editor
         bytes = ReplaceNoCase(bytes, oldPrefix + oldBase, newPrefix + newBase);
         bytes = ReplaceNoCase(bytes, oldPrefix, newPrefix);
       }
+      // The scenario's map_version is the new folder's version (the vault checks they match).
+      if (Lower(source) == Lower(mFacts.scenarioPath) && FolderVersion(folder) > 0) {
+        bytes = WithMapVersion(bytes, FolderVersion(folder));
+      }
       std::ofstream out(destination, std::ios::binary);
       out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
       if (!out) {
@@ -1088,6 +1093,61 @@ namespace faf::editor
       return {};
     }
     return mSaveTarget.empty() ? DiskFileOf(mFacts.mapPath) : mSaveTarget;
+  }
+
+  PackagePlan EdDocument::PlanPackage() const
+  {
+    const std::filesystem::path file = MapDiskFile();
+    if (file.empty()) {
+      PackagePlan plan;
+      plan.errors.push_back("this map is inside the game's archives: save it as a new map folder in your vault first");
+      return plan;
+    }
+    const std::filesystem::path folder = file.parent_path();
+    std::string scenario;
+    for (const std::string& name : FilesUnder(folder)) {
+      if (name.find('/') == std::string::npos && name.size() > 13 && name.compare(name.size() - 13, 13, "_scenario.lua") == 0) {
+        std::ifstream in(folder / name, std::ios::binary);
+        scenario.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+      }
+    }
+    PackagePlan plan = faf::editor::PlanPackage(folder.filename().string(), scenario, FilesUnder(folder));
+    if (mModified) {
+      plan.warnings.insert(plan.warnings.begin(), "the map has unsaved edits: the package is the folder as saved");
+    }
+    return plan;
+  }
+
+  bool EdDocument::WritePackage(const PackagePlan& plan, std::filesystem::path& written, std::string& message) const
+  {
+    const std::filesystem::path file = MapDiskFile();
+    if (file.empty() || !plan.errors.empty()) {
+      message = plan.errors.empty() ? "no folder to package" : plan.errors.front();
+      return false;
+    }
+    const std::filesystem::path folder = file.parent_path();
+    std::vector<ZipEntry> entries;
+    for (const std::string& name : plan.files) {
+      std::ifstream in(folder / name, std::ios::binary);
+      if (!in) {
+        message = "can't read " + (folder / name).string();
+        return false;
+      }
+      entries.push_back({plan.folder + "/" + name, std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>())});
+    }
+    const std::string zip = WriteZip(entries);
+    std::error_code error;
+    const std::filesystem::path packages = mVault / "packages";
+    std::filesystem::create_directories(packages, error);
+    written = packages / (plan.folder + ".zip");
+    std::ofstream out(written, std::ios::binary | std::ios::trunc);
+    out.write(zip.data(), static_cast<std::streamsize>(zip.size()));
+    if (!out) {
+      message = "can't write " + written.string();
+      return false;
+    }
+    message = "packaged " + std::to_string(entries.size()) + " files, " + std::to_string(zip.size()) + " bytes, as " + written.string();
+    return true;
   }
 
   bool EdDocument::Save(std::string& message)

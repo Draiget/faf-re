@@ -99,6 +99,7 @@ namespace faf::editor
       kMenuSave = 1002,
       kMenuSaveAs = 1003,
       kMenuNew = 1004,
+      kMenuPackage = 1005,
       kMenuUndo = 1301,
       kMenuRedo = 1302,
       kMenuDelete = 1303,
@@ -510,6 +511,7 @@ namespace faf::editor
       ::AppendMenuW(file, MF_STRING | MF_GRAYED, 0, L"&Open map...\tCtrl+O");
       ::AppendMenuW(file, MF_STRING, kMenuSave, L"&Save\tCtrl+S");
       ::AppendMenuW(file, MF_STRING, kMenuSaveAs, L"Save as new map &folder...");
+      ::AppendMenuW(file, MF_STRING, kMenuPackage, L"&Package for the FAF vault...");
       mFileMenu = file;
       ::AppendMenuW(file, MF_SEPARATOR, 0, nullptr);
       ::AppendMenuW(file, MF_STRING, kMenuExit, L"E&xit");
@@ -641,6 +643,9 @@ namespace faf::editor
         break;
       case kMenuSaveAs:
         mShell->OpenSaveAs();
+        break;
+      case kMenuPackage:
+        mShell->OpenPackage();
         break;
       case kMenuUndo:
         (void)mScene.Undo();
@@ -1096,6 +1101,20 @@ namespace faf::editor
           }
           if (moho::CFG_GetArgOption("/testrun", 0, nullptr)) {
             mShell->RequestTestRun();
+          }
+          // `/package` (test runs): the open map packaged for the vault, as the dialog's Package does.
+          if (moho::CFG_GetArgOption("/package", 0, nullptr)) {
+            const PackagePlan plan = mDocument.PlanPackage();
+            for (const std::string& error : plan.errors) {
+              gpg::Warnf("editor: package error: %s", error.c_str());
+            }
+            for (const std::string& warning : plan.warnings) {
+              gpg::Logf("editor: package warning: %s", warning.c_str());
+            }
+            std::filesystem::path written;
+            std::string message;
+            const bool ok = mDocument.WritePackage(plan, written, message);
+            (ok ? gpg::Logf : gpg::Warnf)("editor: %s", message.c_str());
           }
           if (fa::vector<fa::string> layer; moho::CFG_GetArgOption("/pathing", 1, &layer)) {
             mShell->Tools().ShowPathing() = true;
