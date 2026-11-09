@@ -1411,6 +1411,19 @@ namespace faf::editor
           ++count;
         }
       }
+    } else if (mTools->DecalsToolActive() && !mTools->DecalPlaceMode() && !mTools->DecalPathMode()) {
+      if (moho::IDecalManager* const decals = mDocument.Decals(); decals != nullptr) {
+        for (const int index : mDecalSelection) {
+          if (const moho::CWldTerrainDecal* const decal = FindDecal(*decals, index); decal != nullptr) {
+            float cx = 0.0f, cz = 0.0f;
+            DecalCentre(FootprintOf(*decal), cx, cz);
+            sx += cx;
+            sy += decal->mPosition.y;
+            sz += cz;
+            ++count;
+          }
+        }
+      }
     } else if (mTools->SelectToolActive() && mMap->mProps != nullptr) {
       for (const int index : mSelection) {
         const Wm3::Vec3f& p = mMap->mProps->mEntries[static_cast<std::size_t>(index)].mTransform.pos_;
@@ -2742,13 +2755,17 @@ namespace faf::editor
           return true;
         }
         const bool add = (wParam & MK_CONTROL) != 0;
-        if (hit < 0) {
+        const GizmoPart part = mTools->DecalPathMode() ? GizmoPart::None : PickGizmo(at);
+        if (part != GizmoPart::None) {
+          BeginGizmoDrag(part, at);
+        } else if (hit < 0) {
           if (!add) {
             mDecalSelection.clear();
           }
           return true;
         }
-        const auto selected = std::find(mDecalSelection.begin(), mDecalSelection.end(), hit);
+        const auto selected = part != GizmoPart::None ? mDecalSelection.begin() : std::find(mDecalSelection.begin(), mDecalSelection.end(), hit);
+        if (part == GizmoPart::None) {
         if (add && selected != mDecalSelection.end()) {
           mDecalSelection.erase(selected);
           return true;
@@ -2759,7 +2776,8 @@ namespace faf::editor
           }
           mDecalSelection.push_back(hit);
         }
-        // A drag moves the selection, live.
+        }
+        // A drag moves the selection, live (along the gizmo's axis when it started on the gizmo).
         mDragDecals = true;
         mDecalsMoved = false;
         mDecalDragFromX = groundX;
@@ -2938,6 +2956,22 @@ namespace faf::editor
       return true;
     case WM_MOUSEMOVE: {
       if (mDrag == Drag::None) {
+        if (mDragDecals && mGizmoDrag != GizmoPart::None) {
+          moho::IDecalManager* const decals = mDocument.Decals();
+          const Wm3::Vec3f move = GizmoDisplacement(at);
+          if (decals != nullptr && (move.x != 0.0f || move.y != 0.0f || move.z != 0.0f)) {
+            for (std::size_t i = 0; i < mDecalSelection.size() && i < mDecalDragStart.size(); ++i) {
+              if (moho::CWldTerrainDecal* const decal = FindDecal(*decals, mDecalSelection[i]); decal != nullptr) {
+                const float x = mGizmoDrag == GizmoPart::Y ? mDecalDragStart[i][0] : SnapToGrid(mDecalDragStart[i][0] + move.x);
+                const float z = mGizmoDrag == GizmoPart::Y ? mDecalDragStart[i][2] : SnapToGrid(mDecalDragStart[i][2] + move.z);
+                const float ground = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z)));
+                decal->SetPosition(Wm3::Vec3f{x, std::max(mDecalDragStart[i][1] + move.y, ground), z});
+              }
+            }
+            mDecalsMoved = true;
+          }
+          return true;
+        }
         if (mDragDecals) {
           float groundX = 0.0f;
           float groundZ = 0.0f;
