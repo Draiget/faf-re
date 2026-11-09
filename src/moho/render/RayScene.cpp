@@ -247,6 +247,7 @@ namespace moho
       desc.indices = pieceIndices.data();
       desc.indexCount = static_cast<std::uint32_t>(pieceIndices.size());
       mesh.pieces[bone] = mDevice->CreateRayGeometry(desc);
+      mesh.incomplete = mesh.incomplete || mesh.pieces[bone] == 0U;
     }
     return &mMeshes.emplace(key, std::move(mesh)).first->second;
   }
@@ -272,6 +273,10 @@ namespace moho
         continue;
       }
       MeshPieces* const pieces = PiecesFor(batch->mCurrentResource, batch->mUseBoneRemap != 0);
+      if (pieces == nullptr || pieces->incomplete) {
+        // RenderDepth would leave it out of the map too: let the map keep the traced materials this frame.
+        mMeshesMissing = true;
+      }
       if (pieces == nullptr) {
         continue;
       }
@@ -415,7 +420,7 @@ namespace moho
     }
   }
 
-  void RayScene::Submit(
+  bool RayScene::Submit(
     MeshRenderer& meshRenderer, const MeshBatchBucketTree& meshes, const CHeightField* const heightField, const GeomCamera3& lightCamera,
     const GeomCamera3& viewCamera, const float (&sunDirection)[3]
   )
@@ -438,11 +443,15 @@ namespace moho
       SweepMeshes();
     }
     mInstances.clear();
+    mMeshesMissing = false;
     if (heightField != nullptr) {
       AddTerrain(*heightField);
     }
     AddMeshes(meshRenderer, meshes);
-    device->SetRayInstances(mInstances.data(), static_cast<std::uint32_t>(mInstances.size()));
+    if (!device->SetRayInstances(mInstances.data(), static_cast<std::uint32_t>(mInstances.size()))) {
+      PublishOff();
+      return false;
+    }
     if (mLoggedFrames < 3U) {
       ++mLoggedFrames;
       gpg::Logf("Ray-traced shadows: %u instances (%zu meshes known)", static_cast<unsigned>(mInstances.size()), mMeshes.size());
@@ -453,7 +462,7 @@ namespace moho
     float inverse[4][4]{};
     if (!Invert4x4(viewProjection, inverse)) {
       PublishOff();
-      return;
+      return false;
     }
     float vectors[gpg::gal::effects::kRayShadowVectors][4]{};
     std::memcpy(vectors, inverse, sizeof(inverse));
@@ -469,7 +478,7 @@ namespace moho
     const float sunLength = std::sqrt(sunDirection[0] * sunDirection[0] + sunDirection[1] * sunDirection[1] + sunDirection[2] * sunDirection[2]);
     if (sunLength < 1e-6f) {
       PublishOff();
-      return;
+      return false;
     }
     vectors[6][0] = sunDirection[0] / sunLength;
     vectors[6][1] = sunDirection[1] / sunLength;
@@ -482,6 +491,7 @@ namespace moho
     vectors[7][0] = under / std::max(vectors[6][1], 0.2f);
     vectors[7][1] = under; // ren_RayAo's rays (AmbientOcclusionRenderer)
     Publish(vectors);
-    gMeshDepthSkipsTraced = true;
+    gMeshDepthSkipsTraced = !mMeshesMissing;
+    return true;
   }
 } // namespace moho

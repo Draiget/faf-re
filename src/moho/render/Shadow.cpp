@@ -1040,19 +1040,24 @@ namespace moho
 
     // Engine addition (ren_RayTracedShadows): with rays, the ground and opaque meshes shadow by ray from the
     // scene built off the whole-view batch (RayScene.h); the map draws only alpha-tested meshes.
-    const bool rays = RayScene::Instance().Active();
+    bool rays = RayScene::Instance().Active();
     IWldTerrainRes* const rayTerrainRes = rays ? REN_GetTerrainRes() : nullptr;
     const CHeightField* const rayHeightField =
       (rayTerrainRes != nullptr && rayTerrainRes->mMap != nullptr) ? rayTerrainRes->mMap->mHeightField.get() : nullptr;
     if (!rays) {
       RayScene::PublishOff();
     }
-    const auto submitRays = [&] {
+    // Rays can drop out here (the device couldn't build the scene): then this tile draws its terrain depth after
+    // all, and the rest of the pass draws as without rays.
+    const auto submitRays = [&](const GeomCamera3& tileCamera) {
       if (rays) {
         // The map's sun direction points towards the sun (PrepareLightCamera's light travels along its negative).
         const Wm3::Vector3f sun = rayTerrainRes->GetSunDirection();
         const float sunDirection[3] = {sun.X(), sun.Y(), sun.Z()};
-        RayScene::Instance().Submit(*meshRenderer, meshRenderer->meshes, rayHeightField, mCamera, viewCamera, sunDirection);
+        rays = RayScene::Instance().Submit(*meshRenderer, meshRenderer->meshes, rayHeightField, mCamera, viewCamera, sunDirection);
+        if (!rays) {
+          terrain->DrawTerrainDepth(tileCamera);
+        }
       }
     };
     if (IsCascadeAtlas(*this)) {
@@ -1084,7 +1089,7 @@ namespace moho
           }
         }
         if (tile == 0) {
-          submitRays();
+          submitRays(camera);
         }
         meshRenderer->RenderDepth(camera, meshRenderer->meshes);
       }
@@ -1096,7 +1101,7 @@ namespace moho
       }
 
       meshRenderer->Batch(REN_GetGameTick(), REN_GetSimDeltaSeconds(), mCamera, viewCamera.viewport.r[1]);
-      submitRays();
+      submitRays(mCamera);
       meshRenderer->RenderDepth(mCamera, meshRenderer->meshes);
     }
     gShadowCasterRegion.active = false;

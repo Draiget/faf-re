@@ -3259,6 +3259,10 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     // pipeline library on disk instead of a driver compile in this frame.
     effects::Fnv1a64 cacheKey;
     cacheKey.Add(key.Key().data(), key.Key().size());
+    // Engine addition (ren_RayTracedShadows): with ray queries the root signature has the scene's parameter,
+    // and a stored pipeline only loads with the root signature it was made with.
+    const std::uint8_t rootSignature = mRayQuery ? 1U : 0U;
+    cacheKey.Add(&rootSignature, sizeof(rootSignature));
     ComPtr<ID3D12PipelineState> pipeline = mPipelineCache.Load(cacheKey.Value(), desc);
     if (pipeline != nullptr) {
       return mPipelines.emplace(std::move(key.Key()), pipeline).first->second.Get();

@@ -150,7 +150,7 @@ namespace gpg::gal
     // Ray tracing (RayTracingVulkan.cpp)
     RayGeometryId CreateRayGeometry(const RayGeometryDesc& desc) override;
     void DestroyRayGeometry(RayGeometryId geometry) override;
-    void SetRayInstances(const RayInstance* instances, std::uint32_t count) override;
+    bool SetRayInstances(const RayInstance* instances, std::uint32_t count) override;
 
     // effects::PassBinder
     void BindPass(effects::EffectProgram& program, std::uint32_t technique, std::uint32_t pass) override;
@@ -491,7 +491,7 @@ namespace gpg::gal
                     VkAccessFlags2 destinationAccess);
     void CreateRayTracingObjects();
     void ReleaseRayTracingObjects() noexcept;
-    void BuildRayScene();
+    bool BuildRayScene();
 
     bool mRayQuery = false;
     VkDescriptorSetLayout mRayLayout = VK_NULL_HANDLE;

@@ -415,10 +415,10 @@ namespace gpg::gal
     mRayGeometries.erase(found);
   }
 
-  void DeviceVulkan::SetRayInstances(const RayInstance* const instances, const std::uint32_t count)
+  bool DeviceVulkan::SetRayInstances(const RayInstance* const instances, const std::uint32_t count)
   {
     if (!mRayQuery) {
-      return;
+      return false;
     }
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     mRayInstances.clear();
@@ -438,10 +438,10 @@ namespace gpg::gal
       desc.accelerationStructureReference = found->second.address;
       mRayInstances.push_back(desc);
     }
-    BuildRayScene();
+    return BuildRayScene();
   }
 
-  void DeviceVulkan::BuildRayScene()
+  bool DeviceVulkan::BuildRayScene()
   {
     CollectRayGarbage(false);
     const auto count = static_cast<std::uint32_t>(mRayInstances.size());
@@ -449,7 +449,7 @@ namespace gpg::gal
     std::uint8_t* const cpu =
       RayInput(std::max<VkDeviceSize>(1U, count) * sizeof(VkAccelerationStructureInstanceKHR), instanceAddress);
     if (cpu == nullptr) {
-      return;
+      return false;
     }
     if (count != 0U) {
       std::memcpy(cpu, mRayInstances.data(), static_cast<std::size_t>(count) * sizeof(VkAccelerationStructureInstanceKHR));
@@ -480,7 +480,7 @@ namespace gpg::gal
       }
       const VkDeviceSize bytes = AlignUp(sizes.accelerationStructureSize + (sizes.accelerationStructureSize / 2U) + 256U, 65536U);
       if (!CreateRayBuffer(bytes, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, false, mTlasBuffer)) {
-        return;
+        return false;
       }
       VkAccelerationStructureCreateInfoKHR create{};
       create.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
@@ -490,7 +490,7 @@ namespace gpg::gal
       if (Vk().vkCreateAccelerationStructureKHR(mDevice, &create, nullptr, &mTlas) != VK_SUCCESS) {
         DestroyRayBuffer(mTlasBuffer);
         mTlas = VK_NULL_HANDLE;
-        return;
+        return false;
       }
       VkDescriptorSetAllocateInfo allocate{};
       allocate.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -512,7 +512,7 @@ namespace gpg::gal
       Vk().vkUpdateDescriptorSets(mDevice, 1U, &write, 0U, nullptr);
     }
     if (!EnsureRayScratch(sizes.buildScratchSize)) {
-      return;
+      return false;
     }
     build.dstAccelerationStructure = mTlas;
     build.scratchData.deviceAddress = AlignUp(mRayScratch.address, mRayScratchAlignment);
@@ -529,5 +529,6 @@ namespace gpg::gal
     RayBarrier(VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
                VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
                VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR);
+    return mRaySet != VK_NULL_HANDLE;
   }
 } // namespace gpg::gal

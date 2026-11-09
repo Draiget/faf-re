@@ -47,9 +47,11 @@ namespace moho
     /**
      * Builds this frame's scene from the shadow pass's whole-view mesh batch and the height field, hands it
      * to the device, and publishes the lookups' constants for `shadowViewProjection` (the whole-view light
-     * camera) and `viewCamera`; `sunDirection` points towards the sun (the map's, any length).
+     * camera) and `viewCamera`; `sunDirection` points towards the sun (the map's, any length). False when
+     * the lookups won't trace this frame (the device couldn't build the scene): the shadow map must then hold
+     * everything again.
      */
-    void Submit(
+    [[nodiscard]] bool Submit(
       MeshRenderer& meshRenderer, const MeshBatchBucketTree& meshes, const CHeightField* heightField, const GeomCamera3& lightCamera,
       const GeomCamera3& viewCamera, const float (&sunDirection)[3]
     );
@@ -63,6 +65,7 @@ namespace moho
       boost::weak_ptr<RScmResource> resource;
       std::vector<gpg::gal::RayGeometryId> pieces; // per skin bone, or one for an unskinned batch
       bool skinned = false;
+      bool incomplete = false; // a piece with triangles got no geometry (out of memory)
     };
     struct TerrainTile
     {
@@ -91,5 +94,6 @@ namespace moho
     std::vector<gpg::gal::RayInstance> mInstances;
     std::vector<std::array<float, 12>> mTransforms;
     std::uint32_t mLoggedFrames = 0U;
+    bool mMeshesMissing = false; // this frame, a traced material's mesh isn't in the scene
   };
 } // namespace moho

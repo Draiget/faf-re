@@ -162,7 +162,7 @@ namespace gpg::gal
     // Ray tracing (RayTracingD3D12.cpp)
     RayGeometryId CreateRayGeometry(const RayGeometryDesc& desc) override;
     void DestroyRayGeometry(RayGeometryId geometry) override;
-    void SetRayInstances(const RayInstance* instances, std::uint32_t count) override;
+    bool SetRayInstances(const RayInstance* instances, std::uint32_t count) override;
 
     // effects::PassBinder
     void BindPass(effects::EffectProgram& program, std::uint32_t technique, std::uint32_t pass) override;
@@ -292,7 +292,7 @@ namespace gpg::gal
     [[nodiscard]] bool EnsureRayScratch(std::uint64_t bytes);
     void RayBuildBarrier(ID3D12Resource* resource);
     void CollectRayFrees();
-    void BuildRayScene();
+    bool BuildRayScene();
 
     // ---- GPU-driven programs (GpuDrivenD3D12.cpp) ------------------------------
     void CreateGpuDrivenObjects();

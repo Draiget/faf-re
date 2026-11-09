@@ -685,9 +685,10 @@ namespace gpg::gal
     virtual void DestroyRayGeometry(RayGeometryId geometry);
     /**
      * The placed pieces the next draws trace against, replacing the last list; `count` 0 empties the scene.
-     * Nothing here.
+     * False when the scene could not be built (out of memory): the draws then have no scene to trace.
+     * Nothing here (false).
      */
-    virtual void SetRayInstances(const RayInstance* instances, std::uint32_t count);
+    virtual bool SetRayInstances(const RayInstance* instances, std::uint32_t count);
 
   protected:
     OutputContext outputContext_{}; // +0x04 the bound targets (`ClearTarget` / `GetContext`)

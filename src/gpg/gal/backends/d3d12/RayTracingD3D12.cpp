@@ -269,10 +269,10 @@ namespace gpg::gal
     mRayGeometries.erase(found);
   }
 
-  void DeviceD3D12::SetRayInstances(const RayInstance* const instances, const std::uint32_t count)
+  bool DeviceD3D12::SetRayInstances(const RayInstance* const instances, const std::uint32_t count)
   {
     if (!mRayQuery) {
-      return;
+      return false;
     }
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     mRayInstanceDescs.clear();
@@ -291,10 +291,10 @@ namespace gpg::gal
       desc.AccelerationStructure = found->second.range.address;
       mRayInstanceDescs.push_back(desc);
     }
-    BuildRayScene();
+    return BuildRayScene();
   }
 
-  void DeviceD3D12::BuildRayScene()
+  bool DeviceD3D12::BuildRayScene()
   {
     const auto count = static_cast<std::uint32_t>(mRayInstanceDescs.size());
     const std::uint64_t descBytes = std::max<std::uint64_t>(1U, count) * sizeof(D3D12_RAYTRACING_INSTANCE_DESC);
@@ -321,11 +321,11 @@ namespace gpg::gal
       if (mTlas.resource == nullptr) {
         mTlasBytes = 0U;
         mTlasAddress = 0U;
-        return;
+        return false;
       }
     }
     if (!EnsureRayScratch(prebuild.ScratchDataSizeInBytes)) {
-      return;
+      return false;
     }
     build.DestAccelerationStructureData = mTlas.resource->GetGPUVirtualAddress();
     build.ScratchAccelerationStructureData = mRayScratch.resource->GetGPUVirtualAddress();
@@ -340,5 +340,6 @@ namespace gpg::gal
     FlushBarriers();
     mTlasAddress = mTlas.resource->GetGPUVirtualAddress();
     mRayInstanceCount = count;
+    return true;
   }
 } // namespace gpg::gal
