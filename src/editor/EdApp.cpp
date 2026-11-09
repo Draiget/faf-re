@@ -6,11 +6,13 @@
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 #include "editor/EdLog.h"
 #include "editor/EdMemTrace.h"
 #include "editor/EdPlay.h"
 #include "editor/EdShell.h"
+#include "editor/doc/EdDocument.h"
 #include "editor/ui/EdImGuiRenderer.h"
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
@@ -72,6 +74,7 @@ namespace faf::editor
       kMenuTools = 1101,
       kMenuMap = 1102,
       kMenuLog = 1103,
+      kMenuInfo = 1107,
       kMenuPanelsWhilePlaying = 1104,
       kMenuResetLayout = 1105,
       kMenuImGuiDemo = 1106,
@@ -222,6 +225,8 @@ namespace faf::editor
       void UpdateTitle();
       void RenderPanels();
       void FitGameView();
+      void ReadOpenCommandLine();
+      void DriveOpens();
 
       HMENU mMenuBar = nullptr;
       HMENU mViewMenu = nullptr;
@@ -234,7 +239,13 @@ namespace faf::editor
       EdLog mLog;
       EdImGuiRenderer mRenderer;
       EdPlay mPlay;
+      EdDocument mDocument;
       EdShell* mShell = nullptr;
+      // `/openall`: every map opened in turn (the next to open, how many opened, the ones that did not).
+      bool mOpenAll = false;
+      std::size_t mOpenAllNext = 0;
+      int mOpenAllOpened = 0;
+      std::vector<std::string> mOpenAllFailed;
       std::string mIniPath;
       bool mImGuiReady = false;
     };
@@ -307,7 +318,8 @@ namespace faf::editor
       }
       mPlay.FindMaps();
       mPlay.ReadCommandLine();
-      mShell = new EdShell(mLog, mPlay);
+      mShell = new EdShell(mLog, mPlay, mDocument);
+      ReadOpenCommandLine();
       gEditorApp = this;
       BuildMenu(frame);
       gpg::Logf("editor: ready on %s", api);
@@ -365,6 +377,7 @@ namespace faf::editor
       mViewMenu = ::CreatePopupMenu();
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuTools, L"&Tools");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuMap, L"&Map");
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuInfo, L"&Info");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuLog, L"&Log");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuPanelsWhilePlaying, L"&Panels while playing");
       ::AppendMenuW(mViewMenu, MF_SEPARATOR, 0, nullptr);
@@ -397,6 +410,7 @@ namespace faf::editor
       const auto check = [&](const UINT id, const bool on) { ::CheckMenuItem(mViewMenu, id, MF_BYCOMMAND | (on ? MF_CHECKED : MF_UNCHECKED)); };
       check(kMenuTools, mShell->ShowTools());
       check(kMenuMap, mShell->ShowMap());
+      check(kMenuInfo, mShell->ShowInfo());
       check(kMenuLog, mShell->ShowLog());
       check(kMenuPanelsWhilePlaying, mShell->PanelsWhilePlaying());
       check(kMenuImGuiDemo, mShell->ShowDemo());
@@ -423,6 +437,9 @@ namespace faf::editor
       case kMenuMap:
         mShell->ShowMap() = !mShell->ShowMap();
         return;
+      case kMenuInfo:
+        mShell->ShowInfo() = !mShell->ShowInfo();
+        break;
       case kMenuLog:
         mShell->ShowLog() = !mShell->ShowLog();
         return;
@@ -489,6 +506,7 @@ namespace faf::editor
       // Stop, and the game's own way out of a session (its menu's exit, a defeat screen's "exit"), end the
       // session here, before CScApp::Main runs WLD_Frame: the game would go on to its main menu.
       mPlay.BeforeGameFrame();
+      DriveOpens();
 
       if (mImGuiReady) {
         ImGui_ImplWin32_NewFrame();
@@ -510,6 +528,64 @@ namespace faf::editor
       if ((mShell->ExitRequested() || mPlay.QuitRequested()) && wxGetApp().KeepGoing()) {
         wxTheApp->ExitMainLoop();
       }
+    }
+
+    void EditorApp::ReadOpenCommandLine()
+    {
+      // `/openall` (test runs): every map opened in turn, then a summary, then the editor closes.
+      if (moho::CFG_GetArgOption("/openall", 0, nullptr)) {
+        mOpenAll = true;
+        gpg::Logf("editor: opening all %zu maps", mPlay.Maps().size());
+        return;
+      }
+      // `/open <map folder>`: that map opened at start.
+      fa::vector<fa::string> args;
+      if (!moho::CFG_GetArgOption("/open", 1, &args) || args.empty()) {
+        return;
+      }
+      std::string wanted = args[0].c_str();
+      std::transform(wanted.begin(), wanted.end(), wanted.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      const std::vector<std::string>& maps = mPlay.Maps();
+      for (std::size_t i = 0; i < maps.size(); ++i) {
+        std::string folder = MapDisplayName(maps[i]);
+        std::transform(folder.begin(), folder.end(), folder.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (folder == wanted) {
+          mPlay.Select(static_cast<int>(i));
+          (void)mDocument.Open(maps[i]);
+          return;
+        }
+      }
+      gpg::Warnf("editor: /open %s: no such map", args[0].c_str());
+    }
+
+    void EditorApp::DriveOpens()
+    {
+      const bool finished = mDocument.Poll();
+      if (!mOpenAll) {
+        return;
+      }
+      if (finished) {
+        if (mDocument.GetState() == EdDocument::State::Open && mDocument.Error().empty()) {
+          ++mOpenAllOpened;
+        } else {
+          mOpenAllFailed.push_back(MapDisplayName(mDocument.Path()) + ": " + mDocument.Error());
+        }
+      }
+      if (mDocument.GetState() == EdDocument::State::Loading) {
+        return;
+      }
+      const std::vector<std::string>& maps = mPlay.Maps();
+      if (mOpenAllNext < maps.size()) {
+        (void)mDocument.Open(maps[mOpenAllNext++]);
+        return;
+      }
+      mOpenAll = false;
+      gpg::Logf("editor: opened %d of %zu maps fully", mOpenAllOpened, maps.size());
+      for (const std::string& failure : mOpenAllFailed) {
+        gpg::Warnf("editor:   %s", failure.c_str());
+      }
+      mDocument.Close();
+      mShell->RequestExit();
     }
 
     void EditorApp::RenderPanels()
@@ -604,6 +680,8 @@ namespace faf::editor
       }
       delete mShell;
       mShell = nullptr;
+      // The opened map's textures go while the device is up.
+      mDocument.Close();
       if (const HWND viewport = HandleOf(moho::ren_Viewport); viewport != nullptr && gViewportProc != nullptr) {
         (void)::SetWindowLongPtrW(viewport, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(gViewportProc));
       }

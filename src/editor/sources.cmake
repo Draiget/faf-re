@@ -9,5 +9,6 @@ set(FAF_EDITOR_SOURCES
   EdPlay.cpp
   EdShell.cpp
   EdTools.cpp
+  doc/EdDocument.cpp
   ui/EdImGuiRenderer.cpp
 )

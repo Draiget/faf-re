@@ -7,6 +7,7 @@
 
 namespace faf::editor
 {
+  class EdDocument;
   class EdLog;
   class EdPlay;
 
@@ -19,7 +20,7 @@ namespace faf::editor
   class EdShell
   {
   public:
-    EdShell(EdLog& log, EdPlay& play);
+    EdShell(EdLog& log, EdPlay& play, EdDocument& document);
 
     /** Builds this frame's UI. */
     void Draw();
@@ -27,6 +28,7 @@ namespace faf::editor
     // What the window's menu bar shows and changes.
     bool& ShowTools() noexcept { return mShowTools; }
     bool& ShowMap() noexcept { return mShowMap; }
+    bool& ShowInfo() noexcept { return mShowInfo; }
     bool& ShowLog() noexcept { return mShowLog; }
     bool& ShowDemo() noexcept { return mShowDemo; }
     bool& PanelsWhilePlaying() noexcept { return mPanelsWhilePlaying; }
@@ -44,19 +46,24 @@ namespace faf::editor
     void HandleKeys();
     void DrawToolsPanel();
     void DrawMapPanel();
+    void DrawInfoPanel();
     void DrawStatusBar();
 
     EdLog& mLog;
     EdPlay& mPlay;
+    EdDocument& mDocument;
     std::string mApi;
     std::string mAdapter;
     EdTools mTools;
     ImVec4 mGameView{0.0f, 0.0f, 0.0f, 0.0f};
     char mMapFilter[64]{};
+    /** The document path the Info tab was last brought to the front for. */
+    std::string mInfoShownFor;
     bool mExit = false;
     bool mShowDemo = false;
     bool mShowTools = true;
     bool mShowMap = true;
+    bool mShowInfo = true;
     bool mShowLog = true;
     bool mPanelsWhilePlaying = true;
     bool mLayoutBuilt = false;

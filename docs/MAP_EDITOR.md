@@ -51,6 +51,8 @@ How fast a play starts:
 | `/playquit` | With `/play`: closes the editor after the last one (test runs) |
 | `/playai <key>` | With `/play`: against that AI (`rush`, `easy`, ...) instead of solo |
 | `/memtrace` | Records every heap block's call stack (slow) and, after each play, logs the call sites of what the play before it left alive, the largest first. Without it the log still gets, two seconds after each play, the process's private memory split by heap, thread stacks and direct allocations, what grew since the last play, the Lua range's use by size class, and the engine types whose live count changed |
+| `/open <map folder>` | Opens that map for editing at start (the folder name without `_scenario.lua`, any case) |
+| `/openall` | Opens every map in `/maps` in turn, logs each one and a summary of those that did not open fully, then closes the editor (test runs) |
 | `/playsetups <file>` | Reads and writes the remembered play setups in that file instead of `play_setups.ini` (test runs) |
 | `/playwholemap` | With `/play` and `/playseconds`: switches to the whole map when play starts and back halfway (test runs) |
 | `/playexitapp` | With `/play` and `/playseconds`: ends each play the way the game's "Exit to Windows" does (`ExitApplication()`), which the editor turns into a Stop (test runs) |
@@ -59,6 +61,8 @@ How fast a play starts:
 `/play` takes several maps separated by commas; the runs take them in turn.
 
 The window is always one maximized, movable, resizable window with a menu bar (File, View, Play), whatever the game's display options say; the game's own display option doesn't change it either. The panel layout is kept in `%LOCALAPPDATA%\FAForever\Editor\layout.ini`; View > Reset layout restores the default.
+
+**Open for editing** (Map panel) opens the picked map into the editor's document on a thread of its own: the `.scmap` as the game loads it, `_scenario.lua` and `_save.lua`, each in the editor's own Lua state, apart from any play. The Info panel (View > Info; View > Reset layout docks it beside the Map panel) shows what was read: size, height field, water, terrain shader, the ten texture layers, props, decals, markers by type, armies and the map's files. The 3D view of the opened map comes with the viewport stage; until then the game's view shows the last play.
 
 The Tools panel is laid out as the plan's mockup: a strip of tool icons and the chosen tool's settings (brush modes, size, strength, falloff, the symmetry modes with their diagrams). The settings are kept but act on a map only from the tool stages of the plan.
 
