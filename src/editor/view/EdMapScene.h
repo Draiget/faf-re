@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 #include <Windows.h>
 
@@ -8,6 +9,7 @@ namespace moho
 {
   class CameraImpl;
   class CWldMap;
+  class MeshInstance;
   class SimpleRenderWorldView;
 } // namespace moho
 
@@ -23,7 +25,9 @@ namespace faf::editor
    * play's session takes the map over, and before the document drops its map.
    *
    * Camera: middle mouse button drag orbits (turns and tilts around the point looked at), Shift + middle
-   * drag or right drag pans, the wheel zooms; Home frames the whole map.
+   * drag or right drag pans (the ground follows the cursor), WASD or the arrows move (Shift faster), the
+   * wheel zooms toward the point under the cursor without changing the camera's tilt or turn; Home frames
+   * the whole map.
    */
   class EdMapScene
   {
@@ -48,6 +52,22 @@ namespace faf::editor
     void Attach(moho::CWldMap& map);
     void FrameWholeMap();
     void ApplyCamera();
+    /** The ground (terrain or water) under a point of the viewport, in its pixels; false off the map. */
+    bool GroundAt(float x, float y, float& outX, float& outZ) const;
+    void MoveWithKeys(float frameSeconds);
+    /** The map's props as mesh instances, from the kept rules' blueprints once they are ready. */
+    void CreateProps();
+    void DeleteProps();
+
+    std::vector<moho::MeshInstance*> mProps;
+    bool mPropsDone = false;
+
+    // Held movement keys (WASD and the arrows), and Shift for speed.
+    bool mForward = false;
+    bool mBack = false;
+    bool mLeft = false;
+    bool mRight = false;
+    bool mFast = false;
 
     EdDocument& mDocument;
     moho::CWldMap* mMap = nullptr;
