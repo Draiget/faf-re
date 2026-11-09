@@ -58,13 +58,27 @@ namespace
     return ::testing::AssertionSuccess();
   }
 
+  faf::editor::HeightStamp RandomStamp(const unsigned seed)
+  {
+    faf::editor::HeightStamp stamp;
+    stamp.width = 17;
+    stamp.height = 17;
+    std::mt19937 random(seed * 7u + 1u);
+    std::uniform_int_distribution<int> word(0, 65535);
+    for (int i = 0; i < 17 * 17; ++i) {
+      stamp.words.push_back(static_cast<std::uint16_t>(word(random)));
+    }
+    return stamp;
+  }
+
   void RandomStrokes(Field& field, const Symmetry symmetry, const unsigned seed)
   {
     std::mt19937 random(seed);
     std::uniform_real_distribution<float> along(0.0f, static_cast<float>(field.width - 1));
     std::uniform_real_distribution<float> down(0.0f, static_cast<float>(field.height - 1));
-    std::uniform_int_distribution<int> mode(0, 4);
+    std::uniform_int_distribution<int> mode(0, 8);
     std::uniform_real_distribution<float> unit(0.05f, 1.0f);
+    const faf::editor::HeightStamp stamp = RandomStamp(seed);
     for (int stroke = 0; stroke < 200; ++stroke) {
       HeightBrush brush;
       brush.mode = static_cast<HeightBrushMode>(mode(random));
@@ -73,6 +87,18 @@ namespace
       brush.strength = unit(random);
       brush.falloff = unit(random);
       brush.flattenTo = unit(random) * 20000.0f;
+      brush.setTo = unit(random) * 20000.0f;
+      brush.terraceStep = 200.0f + unit(random) * 2000.0f;
+      brush.planeSet = true;
+      brush.planeX = unit(random) * 40.0 - 20.0;
+      brush.planeZ = unit(random) * 40.0 - 20.0;
+      brush.planeC = 8000.0;
+      brush.stamp = &stamp;
+      brush.limitHeight = stroke % 3 == 0;
+      brush.limitLow = 6000.0f;
+      brush.limitHigh = 12000.0f;
+      brush.limitSlope = stroke % 5 == 0;
+      brush.limitMaxSlope = 0.5f;
       (void)ApplyHeightBrush(field.words.data(), field.width, field.height, along(random), down(random), brush, 0.016f + unit(random) * 0.05f);
     }
   }
@@ -158,6 +184,89 @@ namespace
     }
     EXPECT_GT(peak, 300);
     EXPECT_LT(worst, peak * 0.1) << "peak " << peak;
+  }
+
+  /** One step of `brush` at the middle of a 33 x 33 field of `fill`, at full strength with a hard edge. */
+  Field Stepped(HeightBrush brush, const std::uint16_t fill, const float seconds = 1.0f)
+  {
+    Field field(33, 33, fill);
+    brush.strength = 1.0f;
+    brush.falloff = 0.0f;
+    brush.radius = 6.0f;
+    (void)ApplyHeightBrush(field.words.data(), 33, 33, 16.0f, 16.0f, brush, seconds);
+    return field;
+  }
+
+  TEST(HeightBrush, SetHeightTerraceAndPlaneReachTheirTargets)
+  {
+    HeightBrush brush;
+    brush.mode = HeightBrushMode::SetHeight;
+    brush.setTo = 3000.0f;
+    EXPECT_EQ(Stepped(brush, 1000).At(16, 16), 3000);
+    EXPECT_EQ(Stepped(brush, 1000).At(2, 2), 1000); // outside the brush
+
+    brush.mode = HeightBrushMode::Terrace;
+    brush.terraceStep = 640.0f;
+    EXPECT_EQ(Stepped(brush, 1000).At(16, 16), 1280); // 1000 is nearest the step at 1280
+
+    double px[3] = {0.0, 32.0, 0.0};
+    double ph[3] = {1000.0, 1640.0, 1320.0};
+    double pz[3] = {0.0, 0.0, 32.0};
+    brush.mode = HeightBrushMode::Plane;
+    ASSERT_TRUE(faf::editor::PlaneThrough(px, ph, pz, brush.planeX, brush.planeZ, brush.planeC));
+    brush.planeSet = true;
+    EXPECT_NEAR(brush.planeX, 20.0, 1e-9);
+    EXPECT_NEAR(brush.planeZ, 10.0, 1e-9);
+    const Field plane = Stepped(brush, 0);
+    EXPECT_EQ(plane.At(16, 16), 1000 + 20 * 16 + 10 * 16);
+    EXPECT_EQ(plane.At(18, 14), 1000 + 20 * 18 + 10 * 14);
+    double line[3] = {0.0, 1.0, 2.0};
+    EXPECT_FALSE(faf::editor::PlaneThrough(line, ph, line, brush.planeX, brush.planeZ, brush.planeC));
+  }
+
+  TEST(HeightBrush, StampAddsItsImageTimesHeight)
+  {
+    faf::editor::HeightStamp stamp;
+    stamp.width = 2;
+    stamp.height = 2;
+    stamp.words = {65535, 65535, 65535, 65535};
+    HeightBrush brush;
+    brush.mode = HeightBrushMode::Stamp;
+    brush.stamp = &stamp;
+    brush.stampHeight = 1000.0f;
+    EXPECT_EQ(Stepped(brush, 500).At(16, 16), 1500);
+    EXPECT_EQ(Stepped(brush, 500, 0.016f).At(16, 16), 1500); // once per click, whatever the frame's length
+  }
+
+  TEST(HeightBrush, LimitsKeepSamplesOutsideThem)
+  {
+    HeightBrush brush;
+    brush.mode = HeightBrushMode::Raise;
+    brush.limitHeight = true;
+    brush.limitLow = 2000.0f;
+    brush.limitHigh = 4000.0f;
+    EXPECT_EQ(Stepped(brush, 1000).At(16, 16), 1000);
+    EXPECT_GT(Stepped(brush, 3000).At(16, 16), 3000);
+
+    // A ramp rising 2 units per sample: steeper than a slope limit of 1, flatter than 3.
+    Field ramp(33, 33, 0);
+    for (int z = 0; z < 33; ++z) {
+      for (int x = 0; x < 33; ++x) {
+        ramp.words[static_cast<std::size_t>(z * 33 + x)] = static_cast<std::uint16_t>(1000 + x * 256);
+      }
+    }
+    brush = HeightBrush{};
+    brush.mode = HeightBrushMode::Raise;
+    brush.strength = 1.0f;
+    brush.radius = 4.0f;
+    brush.limitSlope = true;
+    brush.limitMaxSlope = 1.0f;
+    Field limited = ramp;
+    (void)ApplyHeightBrush(limited.words.data(), 33, 33, 16.0f, 16.0f, brush, 0.1f);
+    EXPECT_EQ(limited.words, ramp.words);
+    brush.limitMaxSlope = 3.0f;
+    (void)ApplyHeightBrush(limited.words.data(), 33, 33, 16.0f, 16.0f, brush, 0.1f);
+    EXPECT_NE(limited.words, ramp.words);
   }
 
   TEST(HeightBrush, StrokeOnTheMirrorLineAppliesOnce)

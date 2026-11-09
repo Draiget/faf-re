@@ -237,12 +237,54 @@ namespace faf::editor
   {
     SectionHeader("BRUSH");
     if (withModes) {
-      static const char* const kModes[] = {"Raise", "Lower", "Smooth", "Flatten", "Noise"};
-      Segmented(kModes, 3, mBrushMode);
-      int second = mBrushMode - 3;
-      Segmented(kModes + 3, 2, second);
-      if (second >= 0 && second != mBrushMode - 3) {
-        mBrushMode = second + 3;
+      // Three rows of three; each entry is its HeightBrushMode.
+      static const char* const kRows[3][3] = {{"Raise", "Lower", "Smooth"}, {"Flatten", "Set height", "Noise"}, {"Terrace", "Plane", "Stamp"}};
+      static constexpr int kModeOf[3][3] = {{0, 1, 2}, {3, 5, 4}, {6, 7, 8}};
+      for (int row = 0; row < 3; ++row) {
+        int chosen = -1;
+        for (int i = 0; i < 3; ++i) {
+          chosen = kModeOf[row][i] == mBrushMode ? i : chosen;
+        }
+        const int before = chosen;
+        Segmented(kRows[row], 3, chosen);
+        if (chosen != before && chosen >= 0) {
+          mBrushMode = kModeOf[row][chosen];
+        }
+      }
+      switch (static_cast<HeightBrushMode>(mBrushMode)) {
+      case HeightBrushMode::Flatten:
+        Note("Flattens to the height under the stroke's first point.");
+        break;
+      case HeightBrushMode::SetHeight:
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat("##setheight", &mSetHeight, 0.25f, 0.0f, 500.0f, "Height %.1f");
+        break;
+      case HeightBrushMode::Terrace:
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat("##terrace", &mTerraceStep, 0.1f, 0.5f, 100.0f, "Step %.1f");
+        break;
+      case HeightBrushMode::Plane: {
+        char text[120];
+        (void)std::snprintf(text, sizeof(text), "Ctrl+click three points on the terrain; the brush moves the ground towards their plane (%d of 3%s).",
+                            mPlanePoints, mPlanePoints == 3 && !mPlaneSet ? ", on one line" : "");
+        Note(text);
+        if (ImGui::Button("Clear points")) {
+          ClearPlanePoints();
+        }
+        break;
+      }
+      case HeightBrushMode::Stamp:
+        if (ImGui::Button("Stamp image...")) {
+          mStampRequested = true;
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", mStamp != nullptr ? mStampName.c_str() : "none");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat("##stampheight", &mStampHeight, 0.25f, -200.0f, 200.0f, "Stamp height %.1f");
+        Note("Each click adds the image over the brush's square: white adds the stamp height times strength.");
+        break;
+      default:
+        break;
       }
     }
     ImGui::SetNextItemWidth(-1.0f);
@@ -351,7 +393,15 @@ namespace faf::editor
     DrawSymmetry();
     SectionHeader("LIMIT");
     ImGui::Checkbox("Only between heights", &mLimitHeight);
+    if (mLimitHeight) {
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::DragFloatRange2("##limitheights", &mLimitLow, &mLimitHigh, 0.25f, 0.0f, 512.0f, "From %.1f", "to %.1f");
+    }
     ImGui::Checkbox("Only below slope", &mLimitSlope);
+    if (mLimitSlope) {
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::SliderFloat("##limitslope", &mLimitSlopeDegrees, 1.0f, 85.0f, "%.0f degrees");
+    }
     SectionHeader("HEIGHT FIELD");
     if (ImGui::Button("Import...")) {
       mImportRequested = true;
@@ -368,6 +418,41 @@ namespace faf::editor
     ImGui::Combo("##exportsize", &mExportSize, kSizes, IM_ARRAYSIZE(kSizes));
     Note("Import reads .png, .raw, .r16 (World Machine), .bmp or .tif, resampled to the map's size; export writes .png (16-bit grey), "
          ".raw or .r16. Heights are times the scale both ways. An import is one undo step.");
+  }
+
+  void EdTools::AddPlanePoint(const float x, const float height, const float z) noexcept
+  {
+    if (mPlanePoints == 3) {
+      // The oldest goes.
+      for (int i = 0; i < 2; ++i) {
+        mPlanePointX[i] = mPlanePointX[i + 1];
+        mPlanePointH[i] = mPlanePointH[i + 1];
+        mPlanePointZ[i] = mPlanePointZ[i + 1];
+      }
+      mPlanePoints = 2;
+    }
+    mPlanePointX[mPlanePoints] = x;
+    mPlanePointH[mPlanePoints] = height;
+    mPlanePointZ[mPlanePoints] = z;
+    ++mPlanePoints;
+    mPlaneSet = false;
+    if (mPlanePoints == 3) {
+      // In samples and height words, as the brush reads it.
+      const double px[3] = {mPlanePointX[0], mPlanePointX[1], mPlanePointX[2]};
+      const double ph[3] = {mPlanePointH[0] * 128.0, mPlanePointH[1] * 128.0, mPlanePointH[2] * 128.0};
+      const double pz[3] = {mPlanePointZ[0], mPlanePointZ[1], mPlanePointZ[2]};
+      mPlaneSet = PlaneThrough(px, ph, pz, mPlaneX, mPlaneZ, mPlaneC);
+    }
+  }
+
+  int EdTools::PlanePoints(float (&x)[3], float (&height)[3], float (&z)[3]) const noexcept
+  {
+    for (int i = 0; i < mPlanePoints; ++i) {
+      x[i] = mPlanePointX[i];
+      height[i] = mPlanePointH[i];
+      z[i] = mPlanePointZ[i];
+    }
+    return mPlanePoints;
   }
 
   void EdTools::DrawTexture()

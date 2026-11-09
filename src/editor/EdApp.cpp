@@ -18,6 +18,7 @@
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdRoundTrip.h"
 #include "editor/ui/EdImGuiRenderer.h"
+#include "editor/tools/EdHeightFile.h"
 #include "editor/view/EdMapScene.h"
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
@@ -304,6 +305,9 @@ namespace faf::editor
       // `/newmap <folder>[,<size index>,<players>,<height>,<sea level or 0>]` (test runs): that new map made
       // in the vault, mounted and opened; the editor stays open.
       std::string mNewMapSpec;
+      // `/brush <mode>` and `/stamp <file>` (test runs): the terrain brush's mode and stamp image, set once.
+      int mBrushModeArg = -1;
+      std::string mStampArg;
       /** The Tools panel's height field Import and Export: the file dialog, then the view. */
       void DriveHeightFiles();
       int mRoundTripFrames = 0;
@@ -662,6 +666,12 @@ namespace faf::editor
         mHeightExportFile = file[0].c_str();
       }
       mHeightDialog = moho::CFG_GetArgOption("/heightdialog", 0, nullptr);
+      if (fa::vector<fa::string> mode; moho::CFG_GetArgOption("/brush", 1, &mode) && !mode.empty()) {
+        mBrushModeArg = std::atoi(mode[0].c_str());
+      }
+      if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/stamp", 1, &file) && !file.empty()) {
+        mStampArg = file[0].c_str();
+      }
       if (fa::vector<fa::string> spec; moho::CFG_GetArgOption("/newmap", 1, &spec) && !spec.empty()) {
         mNewMapSpec = spec[0].c_str();
       }
@@ -746,8 +756,42 @@ namespace faf::editor
     void EditorApp::DriveHeightFiles()
     {
       EdTools& tools = mShell->Tools();
+      if (mBrushModeArg >= 0) {
+        tools.SetBrushMode(mBrushModeArg);
+        mBrushModeArg = -1;
+      }
+      if (!mStampArg.empty()) {
+        HeightImage image;
+        std::string error;
+        if (ReadHeightImage(mStampArg, 0, 0, image, error)) {
+          HeightStamp stamp;
+          stamp.width = image.width;
+          stamp.height = image.height;
+          stamp.words = std::move(image.words);
+          tools.SetStamp(std::move(stamp), std::filesystem::path(mStampArg).filename().string());
+        } else {
+          gpg::Warnf("editor: /stamp: %s", error.c_str());
+        }
+        mStampArg.clear();
+      }
       if (mHeightDialog && mScene.Attached() && ++mHeightFileFrames == 120) {
         tools.RequestImport();
+      }
+      if (tools.TakeStampRequest()) {
+        if (const std::filesystem::path file = AskHeightFile(HandleOf(mGame.supcomFrame), false); !file.empty()) {
+          HeightImage image;
+          std::string error;
+          if (ReadHeightImage(file, 0, 0, image, error)) {
+            HeightStamp stamp;
+            stamp.width = image.width;
+            stamp.height = image.height;
+            stamp.words = std::move(image.words);
+            gpg::Logf("editor: stamp image %s (%d x %d)", file.string().c_str(), stamp.width, stamp.height);
+            tools.SetStamp(std::move(stamp), file.filename().string());
+          } else {
+            gpg::Warnf("editor: the stamp image didn't load: %s", error.c_str());
+          }
+        }
       }
       const bool importAsked = tools.TakeImportRequest();
       const bool exportAsked = tools.TakeExportRequest();

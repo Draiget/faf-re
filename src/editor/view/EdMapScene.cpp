@@ -89,14 +89,30 @@ namespace faf::editor
     const float w = static_cast<float>(field->width - 1);
     const float h = static_cast<float>(field->height - 1);
     constexpr std::uint32_t kMirrorColor = 0xC03CC8FFu;
+    // A translucent wall stands on each line, so the line reads from any angle. The walls are drawn after
+    // the lines in one call: the batcher keeps one kind of primitive per batch, so a quad after each line
+    // segment made a draw call of every segment (60 fps went to 10).
+    std::vector<moho::CD3DPrimBatcher::Vertex> walls;
+    constexpr std::uint32_t kWallColor = 0x283CC8FFu;
+    const float wallHeight = std::max(w, h) * 0.04f;
     const auto groundLine = [&](const float x0, const float z0, const float x1, const float z1) {
       const float length = std::hypot(x1 - x0, z1 - z0);
       const int steps = std::max(1, static_cast<int>(length / 4.0f));
       for (int s = 0; s < steps; ++s) {
         const float t0 = static_cast<float>(s) / steps;
         const float t1 = static_cast<float>(s + 1) / steps;
-        batcher->DrawLine(groundVertex(x0 + (x1 - x0) * t0, z0 + (z1 - z0) * t0, kMirrorColor, 0.6f),
-                          groundVertex(x0 + (x1 - x0) * t1, z0 + (z1 - z0) * t1, kMirrorColor, 0.6f));
+        const moho::CD3DPrimBatcher::Vertex a = groundVertex(x0 + (x1 - x0) * t0, z0 + (z1 - z0) * t0, kMirrorColor, 0.6f);
+        const moho::CD3DPrimBatcher::Vertex b = groundVertex(x0 + (x1 - x0) * t1, z0 + (z1 - z0) * t1, kMirrorColor, 0.6f);
+        batcher->DrawLine(a, b);
+        moho::CD3DPrimBatcher::Vertex wa = a;
+        moho::CD3DPrimBatcher::Vertex wb = b;
+        wa.mColor = kWallColor;
+        wb.mColor = kWallColor;
+        moho::CD3DPrimBatcher::Vertex ta = wa;
+        moho::CD3DPrimBatcher::Vertex tb = wb;
+        ta.mY += wallHeight;
+        tb.mY += wallHeight;
+        walls.insert(walls.end(), {wa, wb, tb, ta});
       }
     };
     const auto turnAxis = [&]() {
@@ -158,6 +174,27 @@ namespace faf::editor
       break;
     default:
       break;
+    }
+
+    if (!walls.empty()) {
+      batcher->DrawQuads(walls.data(), static_cast<std::uint32_t>(walls.size() / 4));
+    }
+
+    // Plane mode: the picked points as small posts, and the triangle between them.
+    if (brush.mode == HeightBrushMode::Plane) {
+      float px[3], ph[3], pz[3];
+      const int points = mTools->PlanePoints(px, ph, pz);
+      constexpr std::uint32_t kPlaneColor = 0xF0FFD24Au;
+      for (int i = 0; i < points; ++i) {
+        moho::CD3DPrimBatcher::Vertex bottom = groundVertex(px[i], pz[i], kPlaneColor, 0.0f);
+        moho::CD3DPrimBatcher::Vertex top = bottom;
+        top.mY += 6.0f;
+        batcher->DrawLine(bottom, top);
+        if (i > 0 || points == 3) {
+          const int j = i > 0 ? i - 1 : 2;
+          batcher->DrawLine(groundVertex(px[j], pz[j], kPlaneColor, 1.0f), groundVertex(px[i], pz[i], kPlaneColor, 1.0f));
+        }
+      }
     }
 
     // The symmetry check's differing vertices, as red blocks on the ground.
@@ -265,6 +302,13 @@ namespace faf::editor
     }
     HeightBrush brush = mTools->CurrentHeightBrush();
     brush.flattenTo = mFlattenTo;
+    // A stamp goes down once per click.
+    if (brush.mode == HeightBrushMode::Stamp) {
+      if (mStamped || brush.stamp == nullptr) {
+        return;
+      }
+      mStamped = true;
+    }
     // Undo keeps the tiles this step writes, as they are, before it writes them.
     for (const SampleRect& rect : HeightBrushRects(field->width, field->height, groundX, groundZ, brush)) {
       mDocument.Heights().BeforeWrite(field->data, rect);
@@ -624,10 +668,16 @@ namespace faf::editor
       if (!GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
         return true;
       }
+      const float groundHeight =
+        mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(groundX)), static_cast<std::int32_t>(std::lround(groundZ)));
+      // Plane mode: Ctrl+click picks a point of the plane instead of painting.
+      if ((wParam & MK_CONTROL) != 0 && mTools->CurrentHeightBrush().mode == HeightBrushMode::Plane) {
+        mTools->AddPlanePoint(groundX, groundHeight, groundZ);
+        return true;
+      }
       // Flatten keeps the height under the stroke's first point.
-      mFlattenTo =
-        mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(groundX)), static_cast<std::int32_t>(std::lround(groundZ))) *
-        128.0f;
+      mFlattenTo = groundHeight * 128.0f;
+      mStamped = false;
       mPainting = true;
       mDocument.Heights().BeginStroke();
       ::SetCapture(window);

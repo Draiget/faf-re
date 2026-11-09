@@ -2,6 +2,9 @@
 
 #include "editor/tools/EdHeightBrush.h"
 
+#include <cmath>
+#include <memory>
+#include <string>
 #include <utility>
 
 namespace faf::editor
@@ -30,7 +33,38 @@ namespace faf::editor
       brush.strength = mStrength;
       brush.falloff = mFalloff;
       brush.turns = mNWay;
+      brush.setTo = mSetHeight * 128.0f;
+      brush.terraceStep = mTerraceStep * 128.0f;
+      brush.planeSet = mPlaneSet;
+      brush.planeX = mPlaneX;
+      brush.planeZ = mPlaneZ;
+      brush.planeC = mPlaneC;
+      brush.stamp = mStamp.get();
+      brush.stampHeight = mStampHeight * 128.0f;
+      brush.limitHeight = mLimitHeight;
+      brush.limitLow = mLimitLow * 128.0f;
+      brush.limitHigh = mLimitHigh * 128.0f;
+      brush.limitSlope = mLimitSlope;
+      brush.limitMaxSlope = std::tan(mLimitSlopeDegrees * 0.0174532925f);
       return brush;
+    }
+
+    /** Plane mode: a picked point (game units: x, height, z); the plane goes through the last three. */
+    void AddPlanePoint(float x, float height, float z) noexcept;
+    void ClearPlanePoints() noexcept
+    {
+      mPlanePoints = 0;
+      mPlaneSet = false;
+    }
+    /** The picked points, oldest first, for the view to mark. */
+    [[nodiscard]] int PlanePoints(float (&x)[3], float (&height)[3], float (&z)[3]) const noexcept;
+
+    /** Stamp mode: the image the Stamp image button loaded. */
+    [[nodiscard]] bool TakeStampRequest() noexcept { return std::exchange(mStampRequested, false); }
+    void SetStamp(HeightStamp stamp, std::string name)
+    {
+      mStamp = std::make_shared<HeightStamp>(std::move(stamp));
+      mStampName = std::move(name);
     }
 
     /** Test runs (`/symcheck`): the Terrain tool with this symmetry (the panel's index), then Check or Copy. */
@@ -42,6 +76,12 @@ namespace faf::editor
     }
     void RequestCheck() noexcept { mCheckRequested = true; }
     void RequestImport() noexcept { mImportRequested = true; }
+    /** Test runs (`/brush`): the Terrain tool with this brush mode (a HeightBrushMode). */
+    void SetBrushMode(const int mode) noexcept
+    {
+      mTool = 1;
+      mBrushMode = mode;
+    }
     void RequestRepair() noexcept { mRepairRequested = true; }
 
     /** The height field's Import and Export buttons, taken by the app each frame (it asks for the file). */
@@ -94,7 +134,24 @@ namespace faf::editor
     int mSymmetry = 6; // both axes
     int mNWay = 3;
     bool mLimitHeight = false;
+    float mLimitLow = 0.0f;
+    float mLimitHigh = 100.0f;
     bool mLimitSlope = false;
+    float mLimitSlopeDegrees = 30.0f;
+    float mSetHeight = 20.0f;
+    float mTerraceStep = 5.0f;
+    float mPlanePointX[3]{};
+    float mPlanePointH[3]{};
+    float mPlanePointZ[3]{};
+    int mPlanePoints = 0;
+    bool mPlaneSet = false;
+    double mPlaneX = 0.0;
+    double mPlaneZ = 0.0;
+    double mPlaneC = 0.0;
+    std::shared_ptr<HeightStamp> mStamp;
+    std::string mStampName;
+    float mStampHeight = 20.0f;
+    bool mStampRequested = false;
     int mMarkerType = 0;
     int mDecalMode = 1; // spline
     float mWaterLevel = 20.0f;

@@ -99,6 +99,8 @@ namespace faf::editor
     HeightBrush mCheckedWith;
     bool mCheckDone = false;
     bool mPainting = false;
+    /** Stamp mode: the click's stamp is down. */
+    bool mStamped = false;
 
     /** Draws the brush rings on the terrain from the renderer's editor hook (`ED_SetHook`). */
     void DrawBrushRings();
