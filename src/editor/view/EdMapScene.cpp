@@ -8,6 +8,7 @@
 #include "editor/EdTools.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/tools/EdHeightBrush.h"
+#include "editor/tools/EdHeightFile.h"
 #include "editor/tools/EdSymmetryCheck.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
@@ -356,6 +357,64 @@ namespace faf::editor
     mDocument.SetModified(true);
     gpg::Logf("editor: copied the source part of the map to its other copies");
     RunSymmetryCheck();
+  }
+
+  bool EdMapScene::ImportHeights(const std::filesystem::path& file, const float scale, std::string& message)
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mPainting) {
+      message = "No map is open in the view.";
+      return false;
+    }
+    HeightImage image;
+    std::string error;
+    if (!ReadHeightImage(file, field->width, field->height, image, error)) {
+      message = "Import failed: " + error;
+      return false;
+    }
+    const int readWidth = image.width;
+    const int readHeight = image.height;
+    image = ResampleHeights(image, field->width, field->height);
+    ScaleHeights(image, scale);
+    const SampleRect whole{0, 0, field->width - 1, field->height - 1};
+    mDocument.Heights().BeginStroke();
+    mDocument.Heights().BeforeWrite(field->data, whole);
+    std::copy(image.words.begin(), image.words.end(), field->data);
+    mDocument.Heights().EndStroke(field->data);
+    RefreshHeights({whole});
+    mDocument.SetModified(true);
+    if (mCheckDone) {
+      RunSymmetryCheck();
+    }
+    message = "Imported heights from " + file.string() + " (" + std::to_string(readWidth) + " x " + std::to_string(readHeight) +
+              (readWidth != field->width || readHeight != field->height ? ", resampled" : "") + ")";
+    return true;
+  }
+
+  bool EdMapScene::ExportHeights(const std::filesystem::path& file, const int width, const float scale, std::string& message)
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr) {
+      message = "No map is open in the view.";
+      return false;
+    }
+    HeightImage image;
+    image.width = field->width;
+    image.height = field->height;
+    image.words.assign(field->data, field->data + static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height));
+    if (width > 1 && width != field->width) {
+      // The map's proportions kept: a rectangular map's image is as much shorter.
+      const int height = std::max(2, static_cast<int>(std::lround(static_cast<double>(width - 1) * (field->height - 1) / (field->width - 1))) + 1);
+      image = ResampleHeights(image, width, height);
+    }
+    ScaleHeights(image, scale);
+    std::string error;
+    if (!WriteHeightImage(file, image, error)) {
+      message = "Export failed: " + error;
+      return false;
+    }
+    message = "Exported heights to " + file.string() + " (" + std::to_string(image.width) + " x " + std::to_string(image.height) + ")";
+    return true;
   }
 
   void EdMapScene::RefreshHeights(const std::vector<SampleRect>& rects)

@@ -41,7 +41,16 @@ namespace faf::editor
       mNWay = turns;
     }
     void RequestCheck() noexcept { mCheckRequested = true; }
+    void RequestImport() noexcept { mImportRequested = true; }
     void RequestRepair() noexcept { mRepairRequested = true; }
+
+    /** The height field's Import and Export buttons, taken by the app each frame (it asks for the file). */
+    [[nodiscard]] bool TakeImportRequest() noexcept { return std::exchange(mImportRequested, false); }
+    [[nodiscard]] bool TakeExportRequest() noexcept { return std::exchange(mExportRequested, false); }
+    /** Heights times this on import and export. */
+    [[nodiscard]] float HeightScale() const noexcept { return mHeightScale; }
+    /** The exported image's width in samples, 0 for the map's own. */
+    [[nodiscard]] int ExportWidth() const noexcept { return kExportWidths[mExportSize]; }
 
     /** The symmetry check's buttons, taken by the view each frame. */
     [[nodiscard]] bool TakeCheckRequest() noexcept { return std::exchange(mCheckRequested, false); }
@@ -90,6 +99,12 @@ namespace faf::editor
     int mDecalMode = 1; // spline
     float mWaterLevel = 20.0f;
     bool mSea = true;
+
+    static constexpr int kExportWidths[] = {0, 257, 513, 1025, 2049, 4097};
+    bool mImportRequested = false;
+    bool mExportRequested = false;
+    float mHeightScale = 1.0f;
+    int mExportSize = 0;
 
     bool mCheckRequested = false;
     bool mRepairRequested = false;

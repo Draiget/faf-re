@@ -1,6 +1,8 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <Windows.h>
@@ -52,6 +54,11 @@ namespace faf::editor
 
     /** The tool settings the left mouse button acts with (the Tools panel's). */
     void SetTools(EdTools* tools) noexcept { mTools = tools; }
+
+    /** Replaces the map's heights from a height image, resampled to the map's size, as one undo step. */
+    bool ImportHeights(const std::filesystem::path& file, float scale, std::string& message);
+    /** Writes the map's heights as a height image, `width` samples wide (0: the map's own size). */
+    bool ExportHeights(const std::filesystem::path& file, int width, float scale, std::string& message);
 
     /** Undoes or redoes the newest height stroke (Ctrl+Z, Ctrl+Y); false when there is none. */
     bool Undo();

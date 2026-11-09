@@ -2,6 +2,7 @@
 
 #include <Windows.h>
 #include <ShlObj.h>
+#include <commdlg.h>
 
 #include <algorithm>
 #include <chrono>
@@ -286,6 +287,15 @@ namespace faf::editor
       int mSymCheckTurns = 3;
       bool mSymCheckRepair = false;
       int mSymCheckFrames = 0;
+      // `/heightexport <file>`, `/heightimport <file>` with `/open`: the drawn map's heights written to or
+      // read from that file once, as the Tools panel's buttons do; the editor stays open.
+      std::string mHeightExportFile;
+      std::string mHeightImportFile;
+      int mHeightFileFrames = 0;
+      // `/heightdialog` with `/open`: the Import button pressed once (its file dialog), for test runs.
+      bool mHeightDialog = false;
+      /** The Tools panel's height field Import and Export: the file dialog, then the view. */
+      void DriveHeightFiles();
       int mRoundTripFrames = 0;
       void SaveDocument();
       std::string mIniPath;
@@ -633,6 +643,13 @@ namespace faf::editor
       if (fa::vector<fa::string> folder; moho::CFG_GetArgOption("/saveas", 1, &folder) && !folder.empty()) {
         mSaveAsFolder = folder[0].c_str();
       }
+      if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/heightexport", 1, &file) && !file.empty()) {
+        mHeightExportFile = file[0].c_str();
+      }
+      mHeightDialog = moho::CFG_GetArgOption("/heightdialog", 0, nullptr);
+      if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/heightimport", 1, &file) && !file.empty()) {
+        mHeightImportFile = file[0].c_str();
+      }
       if (fa::vector<fa::string> check; moho::CFG_GetArgOption("/symcheck", 1, &check) && !check.empty()) {
         // `<mode>[x<turns>][:repair]`, one argument (the option reader takes whatever follows it).
         const std::string spec = check[0].c_str();
@@ -683,9 +700,77 @@ namespace faf::editor
       }
     }
 
+    namespace
+    {
+      /** The Windows file dialog for a height image; empty when cancelled. */
+      std::filesystem::path AskHeightFile(const HWND owner, const bool save)
+      {
+        wchar_t path[MAX_PATH] = L"";
+        OPENFILENAMEW dialog{};
+        dialog.lStructSize = sizeof(dialog);
+        dialog.hwndOwner = owner;
+        dialog.lpstrFile = path;
+        dialog.nMaxFile = MAX_PATH;
+        if (save) {
+          dialog.lpstrFilter = L"16-bit grey PNG (*.png)\0*.png\0Raw 16-bit (*.raw)\0*.raw\0World Machine (*.r16)\0*.r16\0";
+          dialog.lpstrDefExt = L"png";
+          dialog.lpstrTitle = L"Export the height field";
+          dialog.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+          return ::GetSaveFileNameW(&dialog) != FALSE ? std::filesystem::path(path) : std::filesystem::path{};
+        }
+        dialog.lpstrFilter = L"Height images (*.png;*.raw;*.r16;*.bmp;*.tif;*.tiff)\0*.png;*.raw;*.r16;*.bmp;*.tif;*.tiff\0All files\0*.*\0";
+        dialog.lpstrTitle = L"Import a height field";
+        dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+        return ::GetOpenFileNameW(&dialog) != FALSE ? std::filesystem::path(path) : std::filesystem::path{};
+      }
+    } // namespace
+
+    void EditorApp::DriveHeightFiles()
+    {
+      EdTools& tools = mShell->Tools();
+      if (mHeightDialog && mScene.Attached() && ++mHeightFileFrames == 120) {
+        tools.RequestImport();
+      }
+      const bool importAsked = tools.TakeImportRequest();
+      const bool exportAsked = tools.TakeExportRequest();
+      const auto report = [](const bool ok, const std::string& message) {
+        if (ok) {
+          gpg::Logf("editor: %s", message.c_str());
+        } else {
+          gpg::Warnf("editor: %s", message.c_str());
+        }
+      };
+      if (!mScene.Attached()) {
+        if (importAsked || exportAsked) {
+          gpg::Warnf("editor: open a map first; its heights are imported and exported from the view");
+        }
+        return;
+      }
+      std::string message;
+      if (importAsked) {
+        if (const std::filesystem::path file = AskHeightFile(HandleOf(mGame.supcomFrame), false); !file.empty()) {
+          report(mScene.ImportHeights(file, tools.HeightScale(), message), message);
+        }
+      }
+      if (exportAsked) {
+        if (const std::filesystem::path file = AskHeightFile(HandleOf(mGame.supcomFrame), true); !file.empty()) {
+          report(mScene.ExportHeights(file, tools.ExportWidth(), tools.HeightScale(), message), message);
+        }
+      }
+      if ((!mHeightExportFile.empty() || !mHeightImportFile.empty()) && ++mHeightFileFrames == 120) {
+        if (!mHeightExportFile.empty()) {
+          report(mScene.ExportHeights(mHeightExportFile, tools.ExportWidth(), tools.HeightScale(), message), message);
+        }
+        if (!mHeightImportFile.empty()) {
+          report(mScene.ImportHeights(mHeightImportFile, tools.HeightScale(), message), message);
+        }
+      }
+    }
+
     void EditorApp::DriveOpens()
     {
       const bool finished = mDocument.Poll();
+      DriveHeightFiles();
       if (mSymCheckMode >= 0 && mScene.Attached()) {
         ++mSymCheckFrames;
         if (mSymCheckFrames == 120) {
