@@ -44,9 +44,11 @@ namespace faf::server
     /** Views wait for a player who hasn't joined yet; off when nobody's expected, as they'd pile up. */
     bool holdViewsForJoin = true;
     /**
-     * Plan WP10.7: each player's channel keeps a congestion window (`ChannelConfig::congestionControl`). Off by default:
-     * on a 30 KB/s line with a 200 ms buffer it ended the resend flood (82 KB/s sent at the start instead of 811) but
-     * delivered 22.2 KB/s of the 30 (Reno's sawtooth on a shallow buffer), less than sending flat out.
+     * Plan WP10.7: each player's channel keeps a congestion window (`ChannelConfig::congestionControl`). Off by default.
+     * On a 30 KB/s line with a 200 ms buffer the player got about the same either way (22.2 KB/s with it, 23.2 without),
+     * and it cut what the server sent by about nine tenths (about 60 KB/s instead of about 500; the line dropped 10 % of
+     * datagrams instead of 80 %), but the link held the game two steps lower (+1 instead of +3, two runs each), and the
+     * game's speed is what players feel.
      */
     bool congestionControl = false;
     /**

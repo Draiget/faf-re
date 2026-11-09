@@ -415,7 +415,7 @@ The match file is Lua that sets `MatchConfig`, the table `CLobby.LaunchGame` tak
 |---|---|---|
 | `--match <file>` | required | The match to play |
 | `--out <dir>` | required | Where `game.scfareplay`, `result.json` and `server.log` go; created if missing |
-| `--congestion-control` | off | Plan WP10.7: each player's channel keeps a congestion window on its reliable stream (AIMD as TCP Reno: starts at 16 datagrams, halves on a loss, at least 4, at most 256 KB). Off by default: on a 30 KB/s line with a 200 ms buffer it ended the resend flood (82 KB/s sent at the start instead of 811) but the player received 22.2 KB/s of the 30, less than without it. Without it the server sends up to 256 KB in flight whatever the link |
+| `--congestion-control` | off | Plan WP10.7: each player's channel keeps a congestion window on its reliable stream (AIMD as TCP Reno: starts at 16 datagrams, halves on a loss, at least 4, at most 256 KB). Measured on a 30 KB/s line with a 200 ms buffer (`srvnetlimit.sh`, two runs each): the player received about the same (22.2 KB/s with it, 23.2 without) and the server sent about nine tenths less (about 60 KB/s instead of about 500; 10 % of datagrams dropped instead of 80 %), but the link held the game at +1 instead of +3. Off because the game's speed is what players feel; on where the server's upload matters more |
 | `--speed <n>` | the match's `GameSpeed` (`normal` +0, `fast` +4) | The requested game speed |
 | `--stop-beat <n>` | none | Stop at this beat (a beat is a tenth of a second of game time) |
 | `--timeout <minutes>` | 240 | Give up after this much real time; exit code 3 |
