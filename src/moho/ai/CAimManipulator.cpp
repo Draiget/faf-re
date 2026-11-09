@@ -16,6 +16,7 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
 #include "lua/LuaObject.h"
@@ -23,6 +24,7 @@
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/animation/IAniManipulator.h"
+#include "moho/animation/PoseJobs.h"
 #include "moho/entity/Entity.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
@@ -235,12 +237,8 @@ namespace
 
   [[nodiscard]] const Wm3::Vector3f& InvalidAimVector() noexcept
   {
-    static bool initialized = false;
-    static Wm3::Vector3f invalid{};
-    if (!initialized) {
-      invalid = Wm3::Vector3f::NaN();
-      initialized = true;
-    }
+    // A function-local static: its first use may be on a sim worker (sim_ParallelPose).
+    static const Wm3::Vector3f invalid = Wm3::Vector3f::NaN();
     return invalid;
   }
 
@@ -273,6 +271,45 @@ namespace
     }
 
     return entity->mLastTickProcessed != entity->SimulationRef->mCurTick;
+  }
+
+  /**
+   * The step `CheckTracking` turns one tracked angle by this tick, limited by the arc and the slew
+   * (0x00630B1B..0x00630BB0). Its own function so that `CAimManipulator::IsPoseJobQuiet` predicts
+   * the heading step with the same arithmetic.
+   */
+  [[nodiscard]] float ComputeTrackingStep(
+    const float desiredAngle,
+    const float currentAngle,
+    const float minAngleCenter,
+    const float maxAngleHalfRange,
+    const float maxAngleSlew
+  )
+  {
+    float step = 0.0f;
+    // 0x00630B1B..0x00630B29: `comiss range, 3.1405928; jb` -- an unordered
+    // (NaN) range takes the clamped branch as well.
+    if (!(maxAngleHalfRange >= kAngleNormalizationClamp)) {
+      float constrained = moho::NormalizeAngleSignedRadians(desiredAngle - minAngleCenter);
+      // 0x00630B69..0x00630B7A: two independent clamps, `max > x ? x : max`
+      // then `-max > x ? -max : x`, so an unordered (NaN) angle takes `max`.
+      if (!(maxAngleHalfRange > constrained)) {
+        constrained = maxAngleHalfRange;
+      }
+      if (-maxAngleHalfRange > constrained) {
+        constrained = -maxAngleHalfRange;
+      }
+      step = (constrained + minAngleCenter) - currentAngle;
+    } else {
+      step = moho::NormalizeAngleSignedRadians(desiredAngle - currentAngle);
+    }
+
+    // 0x00630B8E..0x00630BB0: `_copysign(slew, step)` is stored back over the
+    // same local, so the heading-motion test reads the slew-limited step.
+    if (std::fabs(step) > maxAngleSlew) {
+      step = std::copysign(maxAngleSlew, step);
+    }
+    return step;
   }
 
   [[nodiscard]] Wm3::Vector3f ComputeUnitForwardDirection(const moho::Unit& unit) noexcept
@@ -783,7 +820,9 @@ bool moho::CAimManipulator::ManipulatorUpdate()
     return false;
   }
 
-  if (unit->IsBeingBuilt()) {
+  // Engine addition (sim_ParallelPose): inside a queued pose job, the inputs copied at queue time.
+  const SPoseJobInputs* const jobInputs = POSE_JobInputsFor(unit);
+  if (jobInputs != nullptr ? jobInputs->mBeingBuilt : unit->IsBeingBuilt()) {
     return false;
   }
 
@@ -794,7 +833,9 @@ bool moho::CAimManipulator::ManipulatorUpdate()
   }
 
   UnitWeapon* const weapon = this->mWeapon.GetObjectPtr();
-  if (weapon == nullptr || unit->IsDead() || unit->mUnitVarDat.mStunTicks != 0) {
+  const bool dead = jobInputs != nullptr ? jobInputs->mDead : unit->IsDead();
+  const bool stunned = jobInputs != nullptr ? jobInputs->mStunned : unit->mUnitVarDat.mStunTicks != 0;
+  if (weapon == nullptr || dead || stunned) {
     this->mOnTarget = false;
     if (CAniPoseBone* const watchBone0 = ResolveWatchBone(this, 0u); watchBone0 != nullptr) {
       watchBone0->Rotate(this->mHeadingRot);
@@ -811,8 +852,12 @@ bool moho::CAimManipulator::ManipulatorUpdate()
 
   const bool shouldTrackTarget = this->mEnabled || !aimsStraightOnDisable;
   CAiTarget* const target = &weapon->mTarget;
-  if (target->targetType != EAiTargetType::AITARGET_None && shouldTrackTarget) {
-    if (!target->HasTarget()) {
+  // Engine addition (sim_ParallelPose): a queued aim reads the target as copied at queue time, and
+  // never has a live one (IsPoseJobQuiet).
+  const SPoseJobAim* const jobAim = jobInputs != nullptr ? POSE_JobAimFor(this) : nullptr;
+  const bool targetSet = jobAim != nullptr ? jobAim->mTargetSet : target->targetType != EAiTargetType::AITARGET_None;
+  if (targetSet && shouldTrackTarget) {
+    if (jobAim != nullptr || !target->HasTarget()) {
       this->mOnTarget = false;
       RotateHeadingBone(true);
       RotatePitchBone(true);
@@ -876,6 +921,56 @@ bool moho::CAimManipulator::ManipulatorUpdate()
   this->EventSetSignaled(false);
 
   return false;
+}
+
+/**
+ * Engine addition (sim_ParallelPose), not in the binary.
+ *
+ * Follows `ManipulatorUpdate`'s branches on the sim thread before the unit's pose update is queued.
+ * Quiet means the update neither aims at a live target (`Aim` reads the target's pose and velocity,
+ * and the turn depends on this unit's pose) nor makes `Track` call the weapon's OnStartTracking or
+ * OnStopTracking. Without a live target `Track` runs in world space, where the heading step needs
+ * no pose: `ComputeTrackingStep` on the forward direction, as `CheckTracking` computes it.
+ */
+bool moho::CAimManipulator::IsPoseJobQuiet(const Unit& owner, bool& outTargetSet) const
+{
+  outTargetSet = false;
+  const Unit* const unit = this->mUnit.GetObjectPtr();
+  if (unit != &owner) {
+    return false;
+  }
+  if (unit->IsBeingBuilt()) {
+    return true;
+  }
+
+  const bool aimsStraightOnDisable =
+    this->mUnitWepBlueprint != nullptr && this->mUnitWepBlueprint->AimsStraightOnDisable != 0u;
+  if (!this->mEnabled && !aimsStraightOnDisable) {
+    return true;
+  }
+
+  const UnitWeapon* const weapon = this->mWeapon.GetObjectPtr();
+  if (weapon == nullptr || unit->IsDead() || unit->mUnitVarDat.mStunTicks != 0) {
+    return true;
+  }
+
+  outTargetSet = weapon->mTarget.targetType != EAiTargetType::AITARGET_None;
+  if (outTargetSet && (this->mEnabled || !aimsStraightOnDisable)) {
+    return !weapon->mTarget.HasTarget();
+  }
+  if (this->mResetTime > 0) {
+    return true;
+  }
+
+  // `Track(forward, kTrackingModeWorldSpace)`: both of its paths take the heading from watch bone 0.
+  bool headingMotion = false;
+  if (ResolveWatchBone(const_cast<CAimManipulator*>(this), 0u) != nullptr) {
+    const float desiredAngle = fa::Atan2Plus(0.0f, 1.0f, this->mHeadingOffset);
+    const float step =
+      ComputeTrackingStep(desiredAngle, this->mHeading, this->mMinHeading, this->mMaxHeading, this->mHeadingMaxSlew);
+    headingMotion = std::fabs(step) > kTrackingMotionEpsilon;
+  }
+  return headingMotion == this->mIsTracking;
 }
 
 /**
@@ -1265,29 +1360,7 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
   }
 
   const float currentAngle = *currentAngleLane;
-  float step = 0.0f;
-  // 0x00630B1B..0x00630B29: `comiss range, 3.1405928; jb` -- an unordered
-  // (NaN) range takes the clamped branch as well.
-  if (!(maxAngleHalfRange >= kAngleNormalizationClamp)) {
-    float constrained = NormalizeAngleSignedRadians(desiredAngle - minAngleCenter);
-    // 0x00630B69..0x00630B7A: two independent clamps, `max > x ? x : max`
-    // then `-max > x ? -max : x`, so an unordered (NaN) angle takes `max`.
-    if (!(maxAngleHalfRange > constrained)) {
-      constrained = maxAngleHalfRange;
-    }
-    if (-maxAngleHalfRange > constrained) {
-      constrained = -maxAngleHalfRange;
-    }
-    step = (constrained + minAngleCenter) - currentAngle;
-  } else {
-    step = NormalizeAngleSignedRadians(desiredAngle - currentAngle);
-  }
-
-  // 0x00630B8E..0x00630BB0: `_copysign(slew, step)` is stored back over the
-  // same local, so the heading-motion test below reads the slew-limited step.
-  if (std::fabs(step) > maxAngleSlew) {
-    step = std::copysign(maxAngleSlew, step);
-  }
+  const float step = ComputeTrackingStep(desiredAngle, currentAngle, minAngleCenter, maxAngleHalfRange, maxAngleSlew);
 
   // 0x00630BBB..0x00630BF7: `NormalizeAngleSignedRadians` inlined on the x87
   // sum. That sum keeps the extended exponent, so it differs from this float
@@ -1453,6 +1526,10 @@ bool moho::CAimManipulator::Track(const Wm3::Vector3f& targetDirection, const st
 
   const bool onTarget = (trackingResult & kTrackingResultOutsideTolerance) == 0u;
   const bool shouldBeTracking = (trackingResult & kTrackingResultHeadingMotion) != 0u;
+  if (shouldBeTracking != this->mIsTracking && POSE_InJob()) {
+    // Engine addition (sim_ParallelPose): IsPoseJobQuiet queued this update as one without a script call.
+    gpg::Die("sim_ParallelPose: aim manipulator '%s' would call Lua inside a pose job", this->mLabel.c_str());
+  }
   if (shouldBeTracking) {
     if (!this->mIsTracking) {
       weapon->CallString("OnStartTracking", ToStdString(this->mLabel));

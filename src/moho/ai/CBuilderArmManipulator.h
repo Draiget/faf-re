@@ -87,6 +87,13 @@ namespace moho
     bool ManipulatorUpdate() override;
 
     /**
+     * Engine addition (sim_ParallelPose), not in the binary: whether this tick's update of
+     * `owner`'s builder arm can run in a pose job on a sim worker -- no aim target and no
+     * OnStartBuilderTracking / OnStopBuilderTracking call. Sim thread only.
+     */
+    [[nodiscard]] bool IsPoseJobQuiet(const Unit& owner) const;
+
+    /**
      * Address: 0x00637510 (FUN_00637510)
      *
      * What it does:
