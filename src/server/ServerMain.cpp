@@ -1137,6 +1137,7 @@ namespace
                    ",\"ready\":" + faf::server::JsonString(seat.ready) + ",\"slot\":" + std::to_string(seat.lobbySlot) +
                    ",\"speed_limit\":" + (seat.speedLimit ? std::to_string(*seat.speedLimit) : std::string("null")) +
                    ",\"camera_updates\":" + std::to_string(seat.cameraUpdates) +
+                   ",\"backlog_kb\":" + std::to_string(seat.backlogBytes / 1024u) + ",\"behind_beats\":" + std::to_string(seat.behindBeats) +
                    ",\"load\":" + faf::server::JsonString(seat.load) +
                    ",\"content\":" + faf::server::JsonString(seat.content) +
                    ",\"mods\":" + faf::server::JsonString(seat.mods) + ",\"ui_mods\":[";
@@ -1874,11 +1875,25 @@ namespace
       if (statusSeconds > 0.0 && elapsed - lastStatus >= statusSeconds) {
         const double beatsPerSecond = (end.beats - statusBeats) / (elapsed - lastStatus);
         const std::uint64_t netBytes = net ? net->BytesSent() : 0u;
-        Say("Status: game time %s, real time %s, speed %+d (requested %+d%s), %.1f beats/s, a beat takes %.0f ms, memory %ld MB, %.0f KB/s to players, %lu warnings in the log",
+        // Plan WP10.7: the player whose link is furthest behind, when anyone is more than a second behind.
+        std::string behind;
+        if (net) {
+          const faf::server::CServerNet::SSeatState* worst = nullptr;
+          const std::vector<faf::server::CServerNet::SSeatState> seats = net->Seats();
+          for (const faf::server::CServerNet::SSeatState& seat : seats) {
+            if (!seat.gone && (worst == nullptr || seat.behindBeats > worst->behindBeats)) {
+              worst = &seat;
+            }
+          }
+          if (worst != nullptr && worst->behindBeats > 10u) {
+            behind = ", " + worst->name + " " + std::to_string(worst->behindBeats) + " beats behind (" + std::to_string(worst->backlogBytes / 1024u) + " KB)";
+          }
+        }
+        Say("Status: game time %s, real time %s, speed %+d (requested %+d%s), %.1f beats/s, a beat takes %.0f ms, memory %ld MB, %.0f KB/s to players%s, %lu warnings in the log",
             GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(elapsed).c_str(), speed, asked,
             requested < asked ? (", held at " + std::string(requested >= 0 ? "+" : "") + std::to_string(requested) + " by a player's game").c_str() : "",
             beatsPerSecond, beatMs, ResidentMegabytes(),
-            static_cast<double>(netBytes - statusNetBytes) / 1024.0 / (elapsed - lastStatus), warnings.Count());
+            static_cast<double>(netBytes - statusNetBytes) / 1024.0 / (elapsed - lastStatus), behind.c_str(), warnings.Count());
         statusNetBytes = netBytes;
         lastStatus = elapsed;
         statusBeats = end.beats;

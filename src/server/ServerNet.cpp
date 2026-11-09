@@ -197,6 +197,8 @@ namespace faf::server
           const std::vector<std::uint8_t>& bytes = mViewSending[i].bytes;
           queuedTables += !bytes.empty() && bytes[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::SessionTables) ? 1u : 0u;
         }
+        seat.viewBytesQueued = 0; // plan WP10.7: a new channel; its acked prefix starts again
+        seat.viewEnds.clear();
         const std::uint8_t reset[] = {static_cast<std::uint8_t>(remote::net::ESeatMessage::SessionTables), 0u, 1u};
         (void)mLinks.SendReliable(uid, reset, sizeof(reset));
         for (std::size_t i = 0; i + queuedTables < tableLog.size(); ++i) {
@@ -207,6 +209,16 @@ namespace faf::server
       for (std::size_t i = first; i < mViewSending.size(); ++i) {
         const std::vector<std::uint8_t>& bytes = mViewSending[i].bytes;
         (void)mLinks.SendReliable(uid, bytes.data(), bytes.size());
+        // Plan WP10.7: where this view ends in the stream, to tell how many beats the player's link is behind.
+        seat.viewBytesQueued += bytes.size();
+        if (!bytes.empty() && bytes[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::View)) {
+          remote::net::ByteReader reader(bytes.data() + 1, bytes.size() - 1u);
+          const auto beat = static_cast<std::uint32_t>(reader.Varint());
+          if (reader.Ok()) {
+            seat.viewEnds.emplace_back(seat.viewBytesQueued, beat);
+            seat.lastViewBeat = beat;
+          }
+        }
         if (!bytes.empty() && bytes[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::LaunchInfo)) {
           seat.startSent = true;
           seat.rosterOwed = true;
@@ -464,7 +476,7 @@ namespace faf::server
     }
     std::vector<SSeatState> states;
     states.reserve(mSeats.size());
-    for (const auto& [uid, seat] : mSeats) {
+    for (auto& [uid, seat] : mSeats) {
       SSeatState state;
       state.uid = uid;
       state.name = seat.name;
@@ -480,6 +492,13 @@ namespace faf::server
       state.lobbySlot = mLobby.LobbySlotOf(uid);
       state.speedLimit = seat.gone ? std::nullopt : seat.speedLimit;
       state.cameraUpdates = seat.cameraUpdates;
+      // Plan WP10.7: the views the peer has acked whole leave the list; the oldest left is the first it lacks.
+      state.backlogBytes = seat.gone ? 0u : mLinks.ReliableUnacked(uid);
+      const std::uint64_t acked = seat.viewBytesQueued > state.backlogBytes ? seat.viewBytesQueued - state.backlogBytes : 0u;
+      while (!seat.viewEnds.empty() && seat.viewEnds.front().first <= acked) {
+        seat.viewEnds.pop_front();
+      }
+      state.behindBeats = seat.gone || seat.viewEnds.empty() ? 0u : seat.lastViewBeat - seat.viewEnds.front().second + 1u;
       state.load = seat.loaded ? "loaded" : (seat.reported ? "rules" : (mContentKnown && seat.joinedEver ? "loading" : ""));
       state.mods = seat.modsVerdict;
       for (const remote::SModEntry& mod : seat.mods) {

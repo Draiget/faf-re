@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <deque>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -160,6 +161,10 @@ namespace faf::server
       std::optional<int> speedLimit;
       // Plan WP11.1: camera updates its game sent (`SetGeomCams`, at most four a second).
       std::uint64_t cameraUpdates = 0;
+      // Plan WP10.7: how far behind its link is: the reliable bytes it hasn't acked, and the beats between the newest
+      // view queued and the newest it has acked whole (an estimate: other messages share the stream).
+      std::uint64_t backlogBytes = 0;
+      std::uint32_t behindBeats = 0;
     };
     [[nodiscard]] std::vector<SSeatState> Seats();
     /** Plan WP17.2: each verdict made since the last call, as the seat stood then (uid, name and the verdict fields). */
@@ -218,6 +223,11 @@ namespace faf::server
     struct SSeat
     {
       std::string name;
+      // Plan WP10.7: the reliable bytes queued to it from the views' path, and where each view's message ended in
+      // them (with its beat), oldest first; the views behind the peer's acked prefix are dropped as it moves on.
+      std::uint64_t viewBytesQueued = 0;
+      std::deque<std::pair<std::uint64_t, std::uint32_t>> viewEnds;
+      std::uint32_t lastViewBeat = 0;
       remote::CServerClient* seat = nullptr;
       bool joinedEver = false;
       bool loaded = false;
