@@ -5,7 +5,6 @@
 #include "moho/entity/FixedSlabPool.h"
 
 #include "moho/unit/core/Unit.h"
-#include "moho/projectile/Projectile.h"
 #include "moho/entity/CollisionBeamEntity.h"
 #include "moho/entity/Prop.h"
 #include "moho/sim/ReconBlip.h"
@@ -18,7 +17,7 @@ namespace moho
 
   TConVar<bool> gTConVar_sim_EntityPools(
     "sim_EntityPools",
-    "Use 64-KB slab memory pools for Unit, Projectile, and all Entity-derived instances.",
+    "Use 64-KB slab memory pools for Unit and all other Entity-derived instances (projectiles keep their own allocator).",
     &sim_EntityPools
   );
 
@@ -27,7 +26,6 @@ namespace moho
     // Register size classes dynamically via sizeof on the current architecture (x86 or x64)
     RegisterSize(sizeof(Unit));
     RegisterSize(sizeof(ReconBlip));
-    RegisterSize(sizeof(Projectile));
     RegisterSize(sizeof(CollisionBeamEntity));
     RegisterSize(sizeof(Prop));
     RegisterSize(sizeof(Shield));

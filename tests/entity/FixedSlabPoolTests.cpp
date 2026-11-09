@@ -120,7 +120,6 @@ static void TestEntityMemoryManagerRouting()
   // Verify known sizes resolve dynamically to pools via sizeof
   TEST_ASSERT(mgr.FindPoolForSize(sizeof(moho::Unit)) != nullptr);
   TEST_ASSERT(mgr.FindPoolForSize(sizeof(moho::ReconBlip)) != nullptr);
-  TEST_ASSERT(mgr.FindPoolForSize(sizeof(moho::Projectile)) != nullptr);
   TEST_ASSERT(mgr.FindPoolForSize(sizeof(moho::CollisionBeamEntity)) != nullptr);
   TEST_ASSERT(mgr.FindPoolForSize(sizeof(moho::Prop)) != nullptr);
   TEST_ASSERT(mgr.FindPoolForSize(sizeof(moho::Shield)) != nullptr);
@@ -195,24 +194,24 @@ static void TestSwitchAndHybridSafety()
   moho::EntityMemoryManager& mgr = moho::EntityMemoryManager::Instance();
 
   moho::sim_EntityPools = true;
-  void* p1 = mgr.Allocate(sizeof(moho::Projectile));
+  void* p1 = mgr.Allocate(sizeof(moho::Unit));
   TEST_ASSERT(p1 != nullptr);
   TEST_ASSERT(moho::slab_region::Owns(p1));
   TEST_ASSERT(mgr.GetTotalAllocatedCount() == 1);
 
   // Toggle switch off mid-simulation
   moho::sim_EntityPools = false;
-  void* p2 = mgr.Allocate(sizeof(moho::Projectile));
+  void* p2 = mgr.Allocate(sizeof(moho::Unit));
   TEST_ASSERT(p2 != nullptr);
   TEST_ASSERT(!moho::slab_region::Owns(p2));
   TEST_ASSERT(mgr.GetTotalAllocatedCount() == 1); // Pool count didn't increase
 
   // Deallocate p1 (must return to pool via Owns and magic check)
-  mgr.Deallocate(p1, sizeof(moho::Projectile));
+  mgr.Deallocate(p1, sizeof(moho::Unit));
   TEST_ASSERT(mgr.GetTotalAllocatedCount() == 0);
 
   // Deallocate p2 (must return to heap via Owns == false)
-  mgr.Deallocate(p2, sizeof(moho::Projectile));
+  mgr.Deallocate(p2, sizeof(moho::Unit));
   TEST_ASSERT(mgr.GetTotalAllocatedCount() == 0);
 
   // Default is false until replays are checked
