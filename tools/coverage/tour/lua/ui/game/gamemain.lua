@@ -867,9 +867,26 @@ do
         Log('done')
     end
 
+    -- `/tourquitafter <seconds>` quits the game that long after the session starts, so a multiplayer game run by a
+    -- test tool ends cleanly and writes its coverage counters; `/tournone` skips the tour itself.
+    local function QuitLater()
+        local args = GetCommandLineArg('/tourquitafter', 1)
+        local seconds = args and tonumber(args[1])
+        if seconds then
+            WaitSeconds(seconds)
+            Log('quitting after ' .. seconds .. ' s')
+            ExitApplication()
+        end
+    end
+
     local TourOnFirstUpdate = OnFirstUpdate
     OnFirstUpdate = function()
         TourOnFirstUpdate()
-        ForkThread(Tour)
+        if HasCommandLineArg('/tourquitafter') then
+            ForkThread(QuitLater)
+        end
+        if not HasCommandLineArg('/tournone') then
+            ForkThread(Tour)
+        end
     end
 end

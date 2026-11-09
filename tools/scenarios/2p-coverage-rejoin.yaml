@@ -1,0 +1,61 @@
+name: 2p-coverage-rejoin
+description: >
+  Coverage (tools/coverage/tour): the rejoin 1v1 in the instrumented client; both games quit themselves 330 s
+  after their session starts (/tourquitafter), which writes their counters. Player 2 is killed at 2 minutes. Needs init_tour_live.lua (tests/README.md) in the FAF bin folder. Do not click into the game windows. Only player 1 writes
+  counters: mpemu ends the run when it quits, which kills the rejoined player 2.
+timeout: 25m
+
+mode: relay
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: sandbox
+  DisconnectionDelay02: '90'
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\covclient_x64.exe'
+  init: init_tour_live.lua
+  nosound: true
+  tile: true
+  saveReplays: true
+
+players:
+  - { uid: 1, name: Stays, faction: uef, args: ['/title', 'rejoin-stays', '/con', 'net_PeerFeatures=1;net_RejoinAccept=1;net_CheckOrderStreams=0;net_LogShownBeatMs=500', '/tournone', '/tourquitafter', '330'] }
+  - { uid: 2, name: Rejoins, faction: cybran, args: ['/title', 'rejoin-rejoins', '/con', 'net_PeerFeatures=1;net_RejoinAccept=1;net_CheckOrderStreams=0;net_LogShownBeatMs=500', '/tournone', '/tourquitafter', '330'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 2m
+  - kill: 2
+  - wait: 15s
+  - note: player 2 restarts and takes its seat back
+  - rejoin: { uid: 2, source: 1, peers: [{ uid: 1, source: 0 }] }
+  - wait: 8m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
+  logsContain:
+    - { uids: [1], pattern: 'REJOIN: client \d+:\S+ served' }
+    - { uids: [1], pattern: 'REJOIN: client \d+:\S+ is asked to prove its seat' }
+    - { uids: [1], pattern: 'REJOIN: client \d+ proved its seat' }
+    - { uids: [1], pattern: 'REJOIN: client \d+:\S+ came back on a new link' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'REJOIN: caught up' }
+    - { uids: [1], pattern: 'REJOIN: showing Rejoins as lost' }
+    - { uids: [1], pattern: 'REJOIN: showing Rejoins as loading' }
+    - { uids: [1], pattern: 'REJOIN: showing Rejoins as back' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'REJOIN: showing Rejoins as back' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'REJOIN: screen says connecting' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'REJOIN: screen says (catchingUp|loading)' }
+  logsAbsent:
+    - { uids: [1], pattern: 'Error running .*/lua/ui/uimain|Evaluating LazyVar failed' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'Error running .*/lua/ui/uimain|Evaluating LazyVar failed' }
+    - { uids: [1], pattern: 'has been abandoned by all players' }
+    - { uids: [1], pattern: 'mismatched' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'mismatched' }
+    - { uids: [2], suffix: '-rejoin', pattern: 'REJOIN: refused' }
