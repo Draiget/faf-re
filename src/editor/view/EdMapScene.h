@@ -170,6 +170,9 @@ namespace faf::editor
     /** One mesh per prop entry, at the entry's index (null when its blueprint or mesh is missing). */
     std::vector<moho::MeshInstance*> mProps;
     bool mPropsDone = false;
+    /** The armies' units from `_save.lua` (every group's), drawn as the game places them. */
+    std::vector<moho::MeshInstance*> mUnits;
+    void CreateUnits();
     [[nodiscard]] moho::MeshInstance* MakePropInstance(const moho::CWldPropEntry& entry) const;
     /** Deletes and makes again every prop's mesh (after undo). */
     void RebuildProps();

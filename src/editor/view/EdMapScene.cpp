@@ -12,6 +12,9 @@
 #include "editor/EdTools.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdMapFile.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/math/QuaternionMath.h"
+#include "editor/doc/EdUnits.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdHeightFile.h"
 #include "editor/tools/EdMaskBrush.h"
@@ -1221,6 +1224,7 @@ namespace faf::editor
       return;
     }
     mPropsDone = true;
+    CreateUnits();
     if (mMap->mProps == nullptr) {
       return;
     }
@@ -1231,6 +1235,60 @@ namespace faf::editor
       mProps.push_back(instance);
     }
     gpg::Logf("editor: %zu props drawn, %d without a blueprint or mesh", mProps.size() - static_cast<std::size_t>(missing), missing);
+  }
+
+  void EdMapScene::CreateUnits()
+  {
+    moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+    moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
+    if (rules == nullptr || renderer == nullptr) {
+      return;
+    }
+    int drawn = 0;
+    int missing = 0;
+    int unreadable = 0;
+    for (const SaveEntry& army : mDocument.SaveData().Armies()) {
+      UnitGroup group;
+      std::string error;
+      if (!ParseUnitGroup(army.Get("Units"), group, error)) {
+        ++unreadable;
+        gpg::Warnf("editor: %s's units unreadable: %s", army.name.c_str(), error.c_str());
+        continue;
+      }
+      std::vector<const SaveUnit*> units;
+      CollectUnits(group, units);
+      for (const SaveUnit* const unit : units) {
+        // Blueprint ids are lower case (`ueb2101`).
+        std::string lower = unit->type;
+        std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        moho::RResId id{};
+        id.name.assign(lower.c_str());
+        moho::RUnitBlueprint* const blueprint = rules->GetUnitBlueprint(id);
+        moho::RMeshBlueprint* const mesh = blueprint != nullptr ? rules->GetMeshBlueprint(blueprint->Display.MeshBlueprint) : nullptr;
+        if (mesh == nullptr) {
+          ++missing;
+          continue;
+        }
+        const float scale = blueprint->Display.UniformScale;
+        moho::MeshInstance* const instance =
+          renderer->CreateMeshInstance(0, -1, mesh, Wm3::Vec3f{scale, scale, scale}, false, boost::shared_ptr<moho::MeshMaterial>());
+        if (instance == nullptr) {
+          ++missing;
+          continue;
+        }
+        // As CreateUnitHPR turns Orientation's three angles (heading, pitch, roll) into the unit's rotation.
+        moho::VTransform transform{};
+        transform.pos_ = Wm3::Vec3f{unit->position[0], unit->position[1], unit->position[2]};
+        Wm3::Vector3f rows[3];
+        (void)moho::BuildRotationMatrixFromEulerHPR(rows, unit->orientation[0], unit->orientation[1], unit->orientation[2]);
+        (void)moho::MatrixRowsToQuatCanonical(rows, &transform.orient_);
+        instance->SetStance(transform, transform);
+        instance->isHidden = 0;
+        mUnits.push_back(instance);
+        ++drawn;
+      }
+    }
+    gpg::Logf("editor: %d units drawn, %d without a blueprint or mesh, %d armies unreadable", drawn, missing, unreadable);
   }
 
   moho::MeshInstance* EdMapScene::MakePropInstance(const moho::CWldPropEntry& entry) const
@@ -2677,6 +2735,12 @@ namespace faf::editor
   void EdMapScene::DeleteProps()
   {
     DeletePropPreview();
+    if (moho::MeshRenderer::GetInstance() != nullptr) {
+      for (moho::MeshInstance* const instance : mUnits) {
+        delete instance;
+      }
+    }
+    mUnits.clear();
     if (moho::MeshRenderer::GetInstance() != nullptr) {
       for (moho::MeshInstance* const instance : mProps) {
         delete instance;

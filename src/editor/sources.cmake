@@ -13,6 +13,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdMapFile.cpp
   doc/EdNewMap.cpp
   doc/EdSaveFile.cpp
+  doc/EdUnits.cpp
   doc/EdRoundTrip.cpp
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp
