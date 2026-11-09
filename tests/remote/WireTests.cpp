@@ -13,12 +13,14 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <deque>
 #include <exception>
 #include <limits>
 #include <map>
 #include <random>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -46,6 +48,7 @@
 #include "remote/wire/Quantize.h"
 #include "remote/wire/Roster.h"
 #include "remote/wire/SessionTables.h"
+#include "remote/client/ServerLaneMeter.h"
 #include "remote/wire/SoundTable.h"
 #include "remote/wire/WireVersion.h"
 
@@ -511,7 +514,17 @@ namespace
         record.farPosition = fresh.farPosition;
         record.farValue = fresh.farValue;
       }
-      if ((fields & kFieldOrientation) != 0u) {
+      if ((fields & kFieldOrientation) != 0u && !record.yawOnly && !fresh.yawOnly && mRng() % 2u == 0u) {
+        // Entities 13: a full rotation's small step (same largest component), at times to a component's ends.
+        std::uint32_t packed = record.orientation & 3u;
+        for (int i = 0; i < 3; ++i) {
+          const int shift = 2 + i * 10;
+          const auto was = static_cast<std::int32_t>((record.orientation >> shift) & 0x3FFu);
+          const std::int32_t now = std::clamp(was + static_cast<std::int32_t>(mRng() % 41u) - 20, 0, 1023);
+          packed |= static_cast<std::uint32_t>(mRng() % 16u == 0u ? (mRng() % 2u == 0u ? 0 : 1023) : now) << shift;
+        }
+        record.orientation = packed;
+      } else if ((fields & kFieldOrientation) != 0u) {
         record.orientation = fresh.orientation;
         record.yawOnly = fresh.yawOnly;
         record.yawRate = fresh.yawRate;
@@ -1306,6 +1319,38 @@ namespace
     EXPECT_TRUE(Decode(Encode(nearZero, &stepped), &stepped, decoded) && decoded == nearZero);
     EXPECT_TRUE(Decode(Encode(wrapped, &nearZero), &nearZero, decoded) && decoded == wrapped);
     EXPECT_TRUE(PositionFieldBits(stepped.entities[0], &placed.entities[0], kCodec) < PositionFieldBits(stepped.entities[0], nullptr, kCodec));
+
+    // Entities 13 (#312): a full rotation goes as its packed components' steps from the baseline's when both are
+    // full, share their largest component and the steps are shorter; a change of largest component, or a step to a
+    // component's ends, still reads back exactly.
+    {
+      const auto pack = [](const std::uint32_t largest, const std::uint32_t a, const std::uint32_t b, const std::uint32_t c) {
+        return largest | (a << 2u) | (b << 12u) | (c << 22u);
+      };
+      SViewFrame tilted = wrapped;
+      tilted.frameId = 7;
+      tilted.entities[0].yawOnly = false;
+      tilted.entities[0].orientation = pack(3u, 500u, 20u, 1000u);
+      EXPECT_TRUE(Decode(Encode(tilted, &wrapped), &wrapped, decoded) && decoded == tilted);
+      SViewFrame rocked = tilted;
+      rocked.frameId = 8;
+      rocked.entities[0].orientation = pack(3u, 503u, 17u, 1023u);
+      SViewFrame flipped = tilted;
+      flipped.frameId = 8;
+      flipped.entities[0].orientation = pack(1u, 503u, 17u, 1001u);
+      SViewFrame ends = tilted;
+      ends.frameId = 8;
+      ends.entities[0].orientation = pack(3u, 0u, 0u, 1023u);
+      const std::vector<std::uint8_t> rockedBytes = Encode(rocked, &tilted);
+      const std::vector<std::uint8_t> flippedBytes = Encode(flipped, &tilted);
+      EXPECT_TRUE(rockedBytes.size() + 2u <= flippedBytes.size());
+      EXPECT_TRUE(Decode(rockedBytes, &tilted, decoded) && decoded == rocked);
+      EXPECT_TRUE(Decode(flippedBytes, &tilted, decoded) && decoded == flipped);
+      EXPECT_TRUE(Decode(Encode(ends, &tilted), &tilted, decoded) && decoded == ends);
+      EXPECT_TRUE(OrientationFieldBits(rocked.entities[0], &tilted.entities[0]) < OrientationFieldBits(flipped.entities[0], &tilted.entities[0]));
+      EXPECT_EQ(OrientationFieldBits(flipped.entities[0], &tilted.entities[0]), 2 + 32);
+      EXPECT_EQ(OrientationFieldBits(tilted.entities[0], &wrapped.entities[0]), 1 + 32);
+    }
 
     // Entities 12: a change's id gap and mask (CChangeHeaders). Alone: ids close and far apart (to
     // the top of the range), masks from a pool of 40 (more than the 15 kept), repeats; what `Bits`
@@ -2508,6 +2553,65 @@ namespace
     EXPECT_FALSE(fresh.Decode(againstBase.Bytes(), codec, out));
   }
 
+  // Acknowledgements that arrive beats late, as over any real link: until the first one comes back the server sends
+  // whole frames, then encodes against the oldest of them the client acknowledged. The client must still hold it.
+  // A whole frame whose id restarts (plan WP13.6: a player moved to another view) still replaces what was held.
+  void TestFrameWindowLateAcks()
+  {
+    using faf::remote::CClientFrameWindow;
+    using faf::remote::CServerFrameWindow;
+    SFrameCodec codec{};
+    const auto frameAt = [](const std::uint32_t id) {
+      SViewFrame frame{};
+      frame.frameId = id;
+      frame.beat = id;
+      for (std::uint32_t e = 0; e < 3u + id % 4u; ++e) {
+        SEntityRecord record{};
+        record.id = 0x00200000u + e;
+        record.health = static_cast<float>(id * 10u + e);
+        frame.entities.push_back(record);
+      }
+      return frame;
+    };
+    for (const std::uint32_t delay : {1u, 3u, 8u}) {
+      SCOPED_TRACE(testing::Message() << "acknowledgements " << delay << " beats late");
+      CServerFrameWindow server;
+      CClientFrameWindow client;
+      std::deque<std::pair<std::uint32_t, std::uint32_t>> acks; // (beat it arrives, frame id)
+      for (std::uint32_t beat = 1; beat <= 40u; ++beat) {
+        while (!acks.empty() && acks.front().first <= beat) {
+          server.Ack(acks.front().second);
+          acks.pop_front();
+        }
+        const SViewFrame frame = frameAt(beat);
+        BitWriter writer;
+        ASSERT_TRUE(EncodeFrame(frame, server.Baseline(), codec, writer));
+        server.Sent(frame);
+        SViewFrame decoded{};
+        EXPECT_TRUE(client.Decode(writer.Bytes(), codec, decoded) && decoded == frame) << "beat " << beat;
+        acks.emplace_back(beat + delay, client.Newest());
+      }
+    }
+
+    // Ids that restart: the whole frame 1 replaces frames up to 10, so a frame against the old 5 no longer decodes.
+    CClientFrameWindow client;
+    for (std::uint32_t id = 1; id <= 10u; ++id) {
+      BitWriter writer;
+      ASSERT_TRUE(EncodeFrame(frameAt(id), nullptr, codec, writer));
+      SViewFrame decoded{};
+      ASSERT_TRUE(client.Decode(writer.Bytes(), codec, decoded));
+    }
+    BitWriter restart;
+    ASSERT_TRUE(EncodeFrame(frameAt(1), nullptr, codec, restart));
+    SViewFrame decoded{};
+    ASSERT_TRUE(client.Decode(restart.Bytes(), codec, decoded));
+    EXPECT_EQ(client.Newest(), 1u);
+    const SViewFrame oldBase = frameAt(5);
+    BitWriter againstOld;
+    ASSERT_TRUE(EncodeFrame(frameAt(6), &oldBase, codec, againstOld));
+    EXPECT_FALSE(client.Decode(againstOld.Bytes(), codec, decoded));
+  }
+
   // Plan WP5.13: the army lane and the grid lane round-trip; unchanged records cost a bit.
   void TestArmyAndGridLanes()
   {
@@ -2687,6 +2791,7 @@ namespace
 
 TEST(Existing_Wire, ArmyAndGridLanes) { TestArmyAndGridLanes(); }
 TEST(Existing_Wire, FrameWindow) { TestFrameWindow(); }
+TEST(Existing_Wire, FrameWindowLateAcks) { TestFrameWindowLateAcks(); }
 TEST(Existing_Wire, ViewIdMap) { TestViewIdMap(); }
 TEST(Existing_Wire, InboundIds) { TestInboundIds(); }
 TEST(Existing_Wire, GridDeltaRoundTrip) { TestGridDeltaRoundTrip(); }
@@ -2724,3 +2829,42 @@ TEST(Existing_Wire, BlipUpdateHash) { TestBlipUpdateHash(); }
 TEST(Existing_Wire, BitWriterAppend) { TestBitWriterAppend(); }
 TEST(Existing_Wire, LuaSyncLane) { TestLuaSyncLane(); }
 TEST(Existing_Wire, GridDeltaInPlace) { TestGridDeltaInPlace(); }
+
+// Plan WP10.10: the network panel's bytes by lane: totals since the game started, the rate over the last whole
+// seconds (the second under way left out, at most five), and a new game from zero.
+TEST(ServerLaneMeter, RatesOverWholeSecondsAndTotals)
+{
+  using faf::remote::client::CServerLaneMeter;
+  using faf::remote::client::kServerLaneCount;
+  CServerLaneMeter& meter = CServerLaneMeter::Get();
+  meter.Reset();
+  EXPECT_FALSE(meter.Snapshot().active);
+  const CServerLaneMeter::Clock::time_point start{std::chrono::seconds(1000)};
+  const auto at = [&start](const double seconds) {
+    return start + std::chrono::duration_cast<CServerLaneMeter::Clock::duration>(std::chrono::duration<double>(seconds));
+  };
+  const std::array<std::uint64_t, kServerLaneCount> view{1000u, 100u, 50u, 20u, 0u};
+  for (int beat = 0; beat < 80; ++beat) { // 10 views a second for 8 s
+    meter.Record(view, at(beat / 10.0));
+  }
+  const auto snapshot = meter.Snapshot(at(8.5));
+  EXPECT_TRUE(snapshot.active);
+  EXPECT_EQ(snapshot.views, 80u);
+  EXPECT_EQ(snapshot.total[0], 80000u);
+  EXPECT_EQ(snapshot.total[3], 1600u);
+  EXPECT_DOUBLE_EQ(snapshot.seconds, 5.0);
+  EXPECT_DOUBLE_EQ(snapshot.perSecond[0], 10000.0);
+  EXPECT_DOUBLE_EQ(snapshot.perSecond[2], 500.0);
+  // Quiet for 3 s: two of the five seconds still had views.
+  EXPECT_DOUBLE_EQ(meter.Snapshot(at(11.2)).perSecond[0], 4000.0);
+  // Long quiet: nothing a second, the totals stay.
+  const auto quiet = meter.Snapshot(at(30.0));
+  EXPECT_DOUBLE_EQ(quiet.perSecond[0], 0.0);
+  EXPECT_EQ(quiet.total[0], 80000u);
+  // The first second of a game: no whole second yet.
+  meter.Reset();
+  meter.Record(view, at(40.1));
+  EXPECT_DOUBLE_EQ(meter.Snapshot(at(40.6)).seconds, 0.0);
+  EXPECT_DOUBLE_EQ(meter.Snapshot(at(41.6)).perSecond[1], 100.0);
+  meter.Reset();
+}

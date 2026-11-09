@@ -2,6 +2,11 @@
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SimKeyframe.h"
 #include "moho/sim/CWldSessionPrivate.h"
+#include "moho/ui/CUIWorldMesh.h"
+#include "moho/sim/CBackgroundTaskControl.h"
+#include "moho/sim/CWldMap.h"
+#include "moho/sim/STIMap.h"
+#include "moho/render/WRenViewport.h"
 
 namespace moho
 {
@@ -177,6 +182,8 @@ namespace
     // `CFormation::UpdateOrientation`, so leaving it null faults on the first
     // frame after the session starts playing.
     mCurFormation = new CFormation();
+    // 0x00893576/0x00893581: the renderer draws this session's map from here on (`sWldMap = mWldMap`).
+    sWldMap = mWldMap;
     mUnknownShared40C = {};
     mDebugCanvas = {};
     mBeatDebugCanvas = {};
@@ -315,6 +322,23 @@ namespace
       mScenarioInfo = parsedScenario;
     }
 
+    // Engine addition (water bodies, .plans/water-levels/PLAN.md): the session's own map gets
+    // the bodies the sim fills from the same scenario under the same game version
+    // (FAF_BeginSession ran before this), so the water is drawn and queried where the sim has it.
+    // The water map was built at load with the sea only; it is built again with the bodies.
+    if (mWldMap != nullptr && mWldMap->mTerrainRes != nullptr && mWldMap->mTerrainRes->mMap != nullptr) {
+      IWldTerrainRes* const terrainRes = mWldMap->mTerrainRes;
+      const bool hadBodies = terrainRes->mMap->HasWaterBodies();
+      terrainRes->mMap->InstallWaterBodies(mScenarioInfo);
+      if (hadBodies || terrainRes->mMap->HasWaterBodies()) {
+        // As the map load does: edit mode holds the water map's pixel buffer, and entering it
+        // rebuilds the whole water map (now with the bodies); leaving it uploads that.
+        CBackgroundTaskControl loadControl{};
+        terrainRes->EnterEditMode(loadControl);
+        terrainRes->ExitEditMode();
+      }
+    }
+
     // Observers are unconditionally allowed while watching a replay; otherwise
     // the scenario's own Options table decides, and a scenario without one
     // means no observers.
@@ -432,6 +456,8 @@ namespace
     mBeatDebugCanvas.release();
     mDebugCanvas.release();
     mUnknownShared40C.release();
+    // 0x00893BE6: the renderer has no map from here on.
+    sWldMap = nullptr;
     ClearBuildTemplates();
 
     // Drop every formation-preview ghost still parked in the session-global
@@ -447,7 +473,10 @@ namespace
     // 0x0089404E..0x00894078: map ownership ends before the rules that
     // supply its mesh blueprints.
     if (mRules) {
-      delete mRules;
+      // Engine addition (RULE_SetKeepBetweenSessions): the editor keeps them for its next play.
+      if (!RULE_KeepAfterSession(mRules, mState)) {
+        delete mRules;
+      }
       mRules = nullptr;
     }
 
@@ -458,6 +487,10 @@ namespace
     mCurThread = nullptr;
 
     if (mState) {
+      // Engine addition: world meshes the game UI's Lua never destroyed would outlive the state.
+      if (const int meshes = CUIWorldMesh::DestroyAllOf(mState); meshes > 0) {
+        gpg::Logf("Session: %d world meshes the UI left were deleted with its Lua state", meshes);
+      }
       delete mState;
       mState = nullptr;
     }
@@ -1783,9 +1816,9 @@ namespace
       terrainRes->UpdateWaveSystem(worldCamera->CameraGetView(), worldCamera->CameraGetTargetZoom(), mGameTick);
     }
 
-    for (const gpg::Rect2i& playableRect : beat.mPlayableRectUpdates) {
-      terrainRes->NotifyMapChange(playableRect);
-    }
+    // Engine addition: all of the beat's map changes in one call, the same as `NotifyMapChange` for
+    // each in order (IWldTerrainRes::NotifyMapChanges); SCMP_021's first beat carries 3584.
+    terrainRes->NotifyMapChanges(beat.mPlayableRectUpdates.begin(), beat.mPlayableRectUpdates.size());
   }
 
   // Part of DoBeat (0x00894530).

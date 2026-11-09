@@ -581,7 +581,8 @@ namespace moho
       // Initial layer selection from map water level vs launch height (pos.y).
       const float currentHeight = launchTransform.pos_.y;
       STIMap* const mapData = SimulationRef->mMapData;
-      const float waterElevation = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
+      // Engine addition (water bodies): the level at the launch point.
+      const float waterElevation = mapData->GetWaterElevationAt(launchTransform.pos_.x, launchTransform.pos_.z);
       const ELayer previousLayer = mVarDat.mLayerMask;
 
       // 0x0069BC49: `comiss water, posY; jbe` -> Air, so an unordered (NaN)
@@ -680,6 +681,16 @@ namespace moho
       SimBlockLane::Free(block);
       return;
     }
+    ::operator delete(block);
+  }
+#else
+  void* Projectile::operator new(const std::size_t size)
+  {
+    return ::operator new(size);
+  }
+
+  void Projectile::operator delete(void* const block, const std::size_t) noexcept
+  {
     ::operator delete(block);
   }
 #endif
@@ -940,7 +951,7 @@ namespace moho
     // Underwater clamp: keep the projectile just below the surface.
     if (mStayUnderwater && mBelowWater) {
       STIMap* const mapData = SimulationRef->mMapData;
-      const float waterElevation = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
+      const float waterElevation = mapData->GetWaterElevationAt(tran.pos_.x, tran.pos_.z); // engine addition
       const float clampY = waterElevation - 0.0099999998f;
       // 0x0069C4E2: `comiss clampY, posY; ja skip` -- an unordered (NaN)
       // compare also clamps.
@@ -1218,7 +1229,7 @@ namespace moho
 
     // Underwater aim clamp: keep the aim point just below the surface.
     if (mStayUnderwater) {
-      const float waterElevation = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
+      const float waterElevation = mapData->GetWaterElevationAt(aim.x, aim.z); // engine addition
       const float clampY = waterElevation - 0.25f;
       // 0x0069CB7B: `comiss clampY, aim.y; ja skip` -- NaN also clamps.
       if (!(clampY > aim.y)) {
@@ -1306,7 +1317,7 @@ namespace moho
           jitteredY = groundClampedBase;
         }
         if (!mStayUnderwater) {
-          const float waterLine = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
+          const float waterLine = mapData->GetWaterElevationAt(jitteredX, jitteredZ); // engine addition
           const float waterLimit = waterLine + 0.5f;
           const float waterClampedBase = (baseY > waterLimit) ? waterLimit : baseY;
           if (jitteredY < waterClampedBase) {
@@ -1340,7 +1351,7 @@ namespace moho
 
       // Only flatten while pointing upward (asm 0x0069CFFB-0x0069D01D: forward.y > 0).
       if (forwardY > 0.0f) {
-        const float waterLine = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
+        const float waterLine = mapData->GetWaterElevationAt(trn.pos_.x, trn.pos_.z); // engine addition
         const float t = (waterLine - trn.pos_.y) / forwardY;
         // Only when the surface is reached within one forward unit (asm 0x0069D047: t < 1.0).
         if (t < 1.0f) {
@@ -1438,8 +1449,9 @@ namespace moho
       // misses, and is what a terrain hit must beat to cancel the layer change.
       float waterCrossingDistance = 0.0f;
 
-      if (mapData->mWaterEnabled) {
-        waterElevation = mapData->mWaterElevation;
+      // Engine addition (water bodies): the level where the step ends.
+      if (mapData->mWaterEnabled || mapData->HasWaterBodies()) {
+        waterElevation = mapData->GetWaterElevationAt(nextPos.x, nextPos.z);
         if (mBelowWater) {
           if (nextPos.y > waterElevation) {
             crossing = EWaterCrossing::Exit;

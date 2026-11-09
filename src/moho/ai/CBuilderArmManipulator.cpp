@@ -8,11 +8,13 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/utils/Global.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
+#include "moho/animation/PoseJobs.h"
 #include "moho/entity/Entity.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/script/CScriptObject.h"
@@ -60,6 +62,45 @@ namespace
     // frame (`[actor+0]`, CAniActor::mPose).
     moho::CAniActor* const actor = manipulator->mOwnerActor;
     return moho::ResolvePoseBone(actor != nullptr ? actor->mPose.get() : nullptr, manipulator->mWatchBones[watchSlot].mBoneIndex);
+  }
+
+  /**
+   * The step `UpdateTrackingAxis` turns one tracked angle by this tick, limited by the arc and the
+   * slew (0x00636345..0x006363DA). Its own function so that
+   * `CBuilderArmManipulator::IsPoseJobQuiet` predicts the heading step with the same arithmetic.
+   */
+  [[nodiscard]] float ComputeTrackingStep(
+    const float desiredAngle,
+    const float currentAngle,
+    const float angleCenter,
+    const float angleHalfArc,
+    const float maxSlew
+  )
+  {
+    float step = 0.0f;
+    // 0x00636345..0x00636353: `comiss halfArc, 3.1405928; jb` -- an unordered
+    // (NaN) arc takes the clamped branch as well.
+    if (!(angleHalfArc >= kClampAngleLimit)) {
+      float constrained = moho::NormalizeAngleSignedRadians(desiredAngle - angleCenter);
+      // 0x00636393..0x006363A4: two independent clamps, `arc > x ? x : arc`
+      // then `-arc > x ? -arc : x`, so an unordered (NaN) angle takes `arc`.
+      if (!(angleHalfArc > constrained)) {
+        constrained = angleHalfArc;
+      }
+      if (-angleHalfArc > constrained) {
+        constrained = -angleHalfArc;
+      }
+      step = (constrained + angleCenter) - currentAngle;
+    } else {
+      step = moho::NormalizeAngleSignedRadians(desiredAngle - currentAngle);
+    }
+
+    // 0x006363B8..0x006363DA: `_copysign(slew, step)` is stored back over the
+    // same local, so the heading-motion test reads the slew-limited step.
+    if (std::fabs(step) > maxSlew) {
+      step = std::copysign(maxSlew, step);
+    }
+    return step;
   }
 } // namespace
 
@@ -411,29 +452,7 @@ namespace moho
     }
 
     const float currentAngle = *currentAngleLane;
-    float step = 0.0f;
-    // 0x00636345..0x00636353: `comiss halfArc, 3.1405928; jb` -- an unordered
-    // (NaN) arc takes the clamped branch as well.
-    if (!(angleHalfArc >= kClampAngleLimit)) {
-      float constrained = NormalizeAngleSignedRadians(desiredAngle - angleCenter);
-      // 0x00636393..0x006363A4: two independent clamps, `arc > x ? x : arc`
-      // then `-arc > x ? -arc : x`, so an unordered (NaN) angle takes `arc`.
-      if (!(angleHalfArc > constrained)) {
-        constrained = angleHalfArc;
-      }
-      if (-angleHalfArc > constrained) {
-        constrained = -angleHalfArc;
-      }
-      step = (constrained + angleCenter) - currentAngle;
-    } else {
-      step = NormalizeAngleSignedRadians(desiredAngle - currentAngle);
-    }
-
-    // 0x006363B8..0x006363DA: `_copysign(slew, step)` is stored back over the
-    // same local, so the heading-motion test below reads the slew-limited step.
-    if (std::fabs(step) > maxSlew) {
-      step = std::copysign(maxSlew, step);
-    }
+    const float step = ComputeTrackingStep(desiredAngle, currentAngle, angleCenter, angleHalfArc, maxSlew);
 
     // 0x006363E5..0x00636427: `NormalizeAngleSignedRadians` inlined on the x87
     // sum. That sum keeps the extended exponent, so it differs from this float
@@ -521,6 +540,10 @@ namespace moho
     }
 
     const bool isTracking = (trackingResult & kTrackingResultHeadingMotion) != 0u;
+    if (isTracking != mTrackingScriptActive && POSE_InJob()) {
+      // Engine addition (sim_ParallelPose): IsPoseJobQuiet queued this update as one without a script call.
+      gpg::Die("sim_ParallelPose: builder arm would call Lua inside a pose job");
+    }
     if (isTracking) {
       if (!mTrackingScriptActive) {
         if (Unit* const unit = mGoalUnit.GetObjectPtr(); unit != nullptr) {
@@ -547,11 +570,15 @@ namespace moho
   bool CBuilderArmManipulator::ManipulatorUpdate()
   {
     Unit* const unit = mGoalUnit.GetObjectPtr();
-    if (unit == nullptr || unit->AiBuilder == nullptr || unit->IsDead()) {
+    // Engine addition (sim_ParallelPose): inside a queued pose job, the inputs copied at queue time;
+    // a queued builder arm has no aim target (IsPoseJobQuiet).
+    const SPoseJobInputs* const jobInputs = POSE_JobInputsFor(unit);
+    if (unit == nullptr || unit->AiBuilder == nullptr || (jobInputs != nullptr ? jobInputs->mDead : unit->IsDead())) {
       return false;
     }
 
-    const Wm3::Vector3f aimTarget = unit->AiBuilder->BuilderGetAimTarget();
+    const Wm3::Vector3f aimTarget =
+      jobInputs != nullptr ? Wm3::Vector3f::ZERO : unit->AiBuilder->BuilderGetAimTarget();
     // 0x00636616..0x00636626: a 12-byte memcmp against `Vector3<float>::ZERO`
     // (0x00F3D21C) -- Wm3 `operator==` -- so a `-0` lane counts as a target.
     if (!(aimTarget == Wm3::Vector3f::ZERO)) {
@@ -573,6 +600,40 @@ namespace moho
     }
     mTriggered = false;
     return true;
+  }
+
+  /**
+   * Engine addition (sim_ParallelPose), not in the binary.
+   *
+   * Follows `ManipulatorUpdate`'s branches on the sim thread before the unit's pose update is
+   * queued. Quiet means the arm has no aim target (with one, the turn depends on this unit's pose)
+   * and `TrackAimDirection` will not call OnStartBuilderTracking or OnStopBuilderTracking. Without
+   * an aim target the arm turns toward the forward direction in world space with a quarter of its
+   * slew, where the heading step needs no pose: `ComputeTrackingStep`, as `UpdateTrackingAxis`
+   * computes it.
+   */
+  bool CBuilderArmManipulator::IsPoseJobQuiet(const Unit& owner) const
+  {
+    const Unit* const unit = mGoalUnit.GetObjectPtr();
+    if (unit != &owner) {
+      return false;
+    }
+    if (unit->AiBuilder == nullptr || unit->IsDead()) {
+      return true;
+    }
+    if (!(unit->AiBuilder->BuilderGetAimTarget() == Wm3::Vector3f::ZERO)) {
+      return false;
+    }
+
+    bool isTracking = false;
+    if (ResolveWatchBone(const_cast<CBuilderArmManipulator*>(this), 0u) != nullptr) {
+      float headingSlew = mHeadingMaxSlew;
+      headingSlew *= kQuarterScale;
+      const float desiredAngle = fa::atan2(0.0f, 1.0f);
+      const float step = ComputeTrackingStep(desiredAngle, mHeading, mHeadingCenter, mHeadingHalfArc, headingSlew);
+      isTracking = std::fabs(step) > kHeadingMotionEpsilon;
+    }
+    return isTracking == mTrackingScriptActive;
   }
 } // namespace moho
 

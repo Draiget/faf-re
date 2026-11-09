@@ -1,5 +1,10 @@
 #include "moho/sim/SimPrivate.h"
 
+#include <string_view>
+
+#include "moho/lua/SCR_String.h"
+#include "moho/sim/FafGameVersion.h"
+
 namespace
 {
 
@@ -589,6 +594,18 @@ void Sim::SerializeSaveBody(gpg::WriteArchive* archive)
 void Sim::Load(LaunchInfoLoad* const loadInfo)
 {
   gpg::ReadArchive* const archive = loadInfo->mReadArchive;
+
+  // Engine addition (.plans/water-levels/PLAN.md): the water bodies, as Setup builds them for a new
+  // game, from the map's own terrain before a keyframe's flattened rects or the save change it, so
+  // a client loading a game fills them exactly as the others did at its start. Only a session with
+  // them on, for a scenario that names them, parses it here.
+  if (FAF_IsSimFixActive(EFafSimFix::WaterBodies) &&
+      std::string_view(loadInfo->mScenarioInfo.c_str(), loadInfo->mScenarioInfo.size()).find("WaterBodies") !=
+        std::string_view::npos) {
+    LuaPlus::LuaObject scenarioInfo{};
+    (void)SCR_FromString(&scenarioInfo, loadInfo->mScenarioInfo, mLuaState);
+    mMapData->InstallWaterBodies(scenarioInfo);
+  }
 
   // Engine addition (replay keyframes): the archive keeps only the rects of flattened terrain, and
   // the beat count goes on from the recorded game's. The driver's opening sync publishes the beat

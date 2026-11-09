@@ -78,12 +78,11 @@ namespace moho
    */
   EImpactType ENT_GetImpactType(Sim* const sim, Entity* const entity, const Wm3::Vector3f& hitPosition)
   {
-    static constexpr float kNoWaterElevation = -10000.0f;
     static constexpr std::uint32_t kShieldEntityMask = 0xF0000000u;
     static constexpr std::uint32_t kShieldEntityTag = 0x40000000u;
 
     const STIMap* const mapData = sim->mMapData;
-    const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : kNoWaterElevation;
+    const float waterElevation = mapData->GetWaterElevationAt(hitPosition.x, hitPosition.z); // engine addition: per position
 
     if (waterElevation > hitPosition.y) {
       if (entity == nullptr) {

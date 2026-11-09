@@ -116,6 +116,8 @@ namespace gpg::gal::d3d12
     /** False when `count` more do not fit. */
     [[nodiscard]] bool Allocate(std::uint32_t count, D3D12_CPU_DESCRIPTOR_HANDLE& cpu, D3D12_GPU_DESCRIPTOR_HANDLE& gpu);
     void Reset() noexcept { mUsed = 0U; }
+    /** Descriptors still free. */
+    [[nodiscard]] std::uint32_t Remaining() const noexcept { return mCapacity - mUsed; }
 
     [[nodiscard]] ID3D12DescriptorHeap* Heap() const noexcept { return mHeap.Get(); }
     [[nodiscard]] std::uint32_t Increment() const noexcept { return mIncrement; }

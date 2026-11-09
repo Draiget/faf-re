@@ -19,6 +19,7 @@
 #include "moho/render/CWldTerrainDecal.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/WRenViewport.h"
 #include "moho/render/d3d/CD3DIndexSheet.h"
 #include "moho/render/d3d/CD3DTextureBatcher.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
@@ -33,6 +34,7 @@
 #include "moho/terrain/TerrainShaderVars.h"
 #include "moho/terrain/splat/CWldSplat.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
+#include "moho/terrain/water/WaterBodySurfaces.h"
 #include "moho/terrain/water/WaterFactory.h"
 #include "moho/terrain/water/WaterShaderVars.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
@@ -450,8 +452,8 @@ namespace moho
 
     shaderVars.normalTexture.SetRenderTargetTexture(terrainNormalTexture);
 
-    const auto* const activeMap = WLD_GetActiveSession()->mWldMap;
-    const CHeightField* const heightField = activeMap->mTerrainRes->mMap->mHeightField.get();
+    // 0x008052A7: `mov eax, [sWldMap]`, the map the renderer draws (a session's, or the map editor's).
+    const CHeightField* const heightField = REN_GetTerrainRes()->mMap->mHeightField.get();
 
     const float terrainScale[4] = {
       1.0f / static_cast<float>(heightField->width - 1),
@@ -1450,7 +1452,9 @@ namespace moho
     // has no water enabled). The runtime map object at mTerrainResource->mMap is
     // the same object read by the binary at [terrainRes + 4].
     const STIMap& map = *mTerrainResource->mMap;
-    const float waterElevation = map.mWaterEnabled ? map.mWaterElevation : kWaterElevationSentinel;
+    // Engine addition (water bodies): the highest level, as HighFidelityTerrain::DrawNormals.
+    const float waterElevation = map.HasWaterBodies() ? WaterBodyTerrainShaderLevel(map)
+                                                      : (map.mWaterEnabled ? map.mWaterElevation : kWaterElevationSentinel);
     if (shaderVars.waterElevation.Exists()) {
       shaderVars.waterElevation.SetFloat(waterElevation);
     }

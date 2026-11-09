@@ -1094,8 +1094,10 @@ int CAiPathSpline::Update(Unit* const unit, const int updateMode)
       || motionType == RULEUMT_AmphibiousFloating
       || motionType == RULEUMT_Hover) {
       float surface = groundElevation;
-      if (map->mWaterEnabled && map->mWaterElevation > surface) {
-        surface = map->mWaterElevation;
+      // Engine addition (water bodies): the level at the point; -10000 without water.
+      const float waterElevation = map->GetWaterElevationAt(point.mPosition.x, point.mPosition.z);
+      if (waterElevation > surface) {
+        surface = waterElevation;
       }
       point.mPosition.y = surface;
     } else {
@@ -1303,7 +1305,10 @@ void CAiPathSpline::Generate(
     if (physics.LayerChangeOffsetHeight < -0.5f && physics.MotionType == RULEUMT_AmphibiousFloating) {
       const float depthLimit = physics.LayerChangeOffsetHeight * 3.0f;
       const float elevation = map->mHeightField->GetElevation(point.mPosition.x, point.mPosition.z);
-      const float depth = elevation - map->GetWaterElevation();
+      // Engine addition (water bodies): the level at the point. Without bodies, the map's level
+      // even when its water is off, as the binary reads it.
+      const float depth = elevation - (map->HasWaterBodies()
+        ? map->GetWaterElevationAt(point.mPosition.x, point.mPosition.z) : map->GetWaterElevation());
       if (depth > depthLimit && depth < 0.0f) {
         const float depthFraction = depth / depthLimit;
         speedScale = 0.5f;
@@ -1475,8 +1480,9 @@ void CAiPathSpline::Generate(
     if (motionType == RULEUMT_Water || motionType == RULEUMT_AmphibiousFloating || motionType == RULEUMT_Hover) {
       const float elevation = map->mHeightField->GetElevation(point.mPosition.x, point.mPosition.z);
       float surface = elevation;
-      if (map->mWaterEnabled != 0u && map->mWaterElevation > elevation) {
-        surface = map->mWaterElevation;
+      const float waterElevation = map->GetWaterElevationAt(point.mPosition.x, point.mPosition.z); // engine addition
+      if (waterElevation > elevation) {
+        surface = waterElevation;
       }
       point.mPosition.y = surface;
     } else {

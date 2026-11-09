@@ -1,4 +1,5 @@
 #include "server/ServerNet.h"
+#include "remote/SpeedLimit.h"
 
 #include <algorithm>
 #include <chrono>
@@ -115,6 +116,7 @@ namespace faf::server
         if (mContentKnown) {
           for (auto& [uid, seat] : mSeats) {
             JudgeContent(uid, seat);
+            JudgeMods(uid, seat);
           }
         }
       }
@@ -195,6 +197,8 @@ namespace faf::server
           const std::vector<std::uint8_t>& bytes = mViewSending[i].bytes;
           queuedTables += !bytes.empty() && bytes[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::SessionTables) ? 1u : 0u;
         }
+        seat.viewBytesQueued = 0; // plan WP10.7: a new channel; its acked prefix starts again
+        seat.viewEnds.clear();
         const std::uint8_t reset[] = {static_cast<std::uint8_t>(remote::net::ESeatMessage::SessionTables), 0u, 1u};
         (void)mLinks.SendReliable(uid, reset, sizeof(reset));
         for (std::size_t i = 0; i + queuedTables < tableLog.size(); ++i) {
@@ -205,6 +209,16 @@ namespace faf::server
       for (std::size_t i = first; i < mViewSending.size(); ++i) {
         const std::vector<std::uint8_t>& bytes = mViewSending[i].bytes;
         (void)mLinks.SendReliable(uid, bytes.data(), bytes.size());
+        // Plan WP10.7: where this view ends in the stream, to tell how many beats the player's link is behind.
+        seat.viewBytesQueued += bytes.size();
+        if (!bytes.empty() && bytes[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::View)) {
+          remote::net::ByteReader reader(bytes.data() + 1, bytes.size() - 1u);
+          const auto beat = static_cast<std::uint32_t>(reader.Varint());
+          if (reader.Ok()) {
+            seat.viewEnds.emplace_back(seat.viewBytesQueued, beat);
+            seat.lastViewBeat = beat;
+          }
+        }
         if (!bytes.empty() && bytes[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::LaunchInfo)) {
           seat.startSent = true;
           seat.rosterOwed = true;
@@ -287,6 +301,8 @@ namespace faf::server
     }
     seat.contentJudged = true;
     const remote::EContentVerdict verdict = remote::JudgeContent(mContentExpected, seat.reported ? &seat.report : nullptr);
+    seat.contentVerdict = verdict == remote::EContentVerdict::Same ? "same" : (verdict == remote::EContentVerdict::Differs ? "differs" : "missing");
+    NoteJudged(uid, seat);
     if (verdict == remote::EContentVerdict::Same) {
       Say(seat.name + "'s game content is the server's");
       return;
@@ -296,6 +312,38 @@ namespace faf::server
                              : "its game content isn't the server's (blueprints " + Hex(seat.report.blueprints) + ", mods " + Hex(seat.report.mods) +
                                  "; the server's " + Hex(mContentExpected.blueprints) + ", " + Hex(mContentExpected.mods) + ")";
     if (remote::RefusesPlayer(mContentMode, verdict)) {
+      Remove(uid, seat, what);
+    } else {
+      Say(seat.name + ": " + what + "; the match only warns");
+    }
+  }
+
+  void CServerNet::JudgeMods(const std::int32_t uid, SSeat& seat)
+  {
+    if (!mConfig.uiModsAllowed || !mContentKnown || mContentMode == remote::EContentCheck::Off || seat.gone || seat.modsJudged) {
+      return;
+    }
+    if (!seat.modsReported && !seat.loaded) {
+      return; // nothing to judge yet
+    }
+    seat.modsJudged = true;
+    std::string what;
+    const std::vector<std::string> outside = seat.modsReported ? remote::UiModsOutside(seat.mods, *mConfig.uiModsAllowed) : std::vector<std::string>{};
+    seat.modsVerdict = !seat.modsReported ? "missing" : (outside.empty() ? "allowed" : "outside");
+    NoteJudged(uid, seat);
+    if (!seat.modsReported) {
+      what = "loaded without reporting its mods";
+    } else if (!outside.empty()) {
+      what = "runs UI mods the match doesn't allow:";
+      for (const std::string& mod : outside) {
+        what += " " + mod;
+      }
+    } else {
+      const auto ui = std::count_if(seat.mods.begin(), seat.mods.end(), [](const remote::SModEntry& mod) { return mod.ui; });
+      Say(seat.name + "'s UI mods are the match's to allow (" + std::to_string(ui) + ")");
+      return;
+    }
+    if (mContentMode == remote::EContentCheck::Refuse) {
       Remove(uid, seat, what);
     } else {
       Say(seat.name + ": " + what + "; the match only warns");
@@ -428,7 +476,7 @@ namespace faf::server
     }
     std::vector<SSeatState> states;
     states.reserve(mSeats.size());
-    for (const auto& [uid, seat] : mSeats) {
+    for (auto& [uid, seat] : mSeats) {
       SSeatState state;
       state.uid = uid;
       state.name = seat.name;
@@ -437,14 +485,37 @@ namespace faf::server
       state.lost = seat.lost;
       state.gone = seat.gone;
       state.away = seat.lobbyAway;
+      state.content = seat.contentVerdict;
+      if (const std::optional<bool> ready = mLobby.ReadyOf(uid); ready) {
+        state.ready = *ready ? "yes" : "no";
+      }
+      state.lobbySlot = mLobby.LobbySlotOf(uid);
+      state.speedLimit = seat.gone ? std::nullopt : seat.speedLimit;
+      state.cameraUpdates = seat.cameraUpdates;
+      // Plan WP10.7: the views the peer has acked whole leave the list; the oldest left is the first it lacks.
+      state.backlogBytes = seat.gone ? 0u : mLinks.ReliableUnacked(uid);
+      const std::uint64_t acked = seat.viewBytesQueued > state.backlogBytes ? seat.viewBytesQueued - state.backlogBytes : 0u;
+      while (!seat.viewEnds.empty() && seat.viewEnds.front().first <= acked) {
+        seat.viewEnds.pop_front();
+      }
+      state.behindBeats = seat.gone || seat.viewEnds.empty() ? 0u : seat.lastViewBeat - seat.viewEnds.front().second + 1u;
+      state.load = seat.loaded ? "loaded" : (seat.reported ? "rules" : (mContentKnown && seat.joinedEver ? "loading" : ""));
+      state.mods = seat.modsVerdict;
+      for (const remote::SModEntry& mod : seat.mods) {
+        if (mod.ui) {
+          state.uiMods.push_back(mod.uid);
+        }
+      }
       if (const remote::net::ChannelStats* const stats = mLinks.StatsOf(uid); stats != nullptr && !seat.gone) {
         state.pingMs = static_cast<std::uint32_t>(stats->rttSmoothedUs / 1000u);
       }
       states.push_back(std::move(state));
     }
     {
+      const std::vector<std::pair<std::int32_t, bool>> readyChanges = mLobby.TakeReadyChanges();
       const std::scoped_lock lock(mNewsLock);
       mSeatStates.swap(states);
+      mReadyNews.insert(mReadyNews.end(), readyChanges.begin(), readyChanges.end());
     }
 
     if (const std::int32_t beat = mBeat.load(std::memory_order_relaxed); beat != mBeatSent) {
@@ -624,18 +695,72 @@ namespace faf::server
            std::to_string(mLobby.Count(ELobbyRelayVerdict::TooLarge)) + " too large, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::Closed)) + " after launch, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::EjectIgnored)) + " ejects of participants, " +
+           std::to_string(mLobby.Count(ELobbyRelayVerdict::Locked)) + " players' changes refused and " +
+           std::to_string(mLobby.PlayerOptionsLimited()) + " cut to Ready in an organised lobby, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::EjectForwarded)) + " ejects by a player host relayed, " +
            std::to_string(mLobby.Count(ELobbyRelayVerdict::UnknownSender) + mLobby.Count(ELobbyRelayVerdict::UnknownTarget) +
                           mLobby.Count(ELobbyRelayVerdict::Malformed)) +
            " malformed or misaddressed; " + std::to_string(mLobby.OptionsPinned()) + " relayed with the match's pinned options written back; " +
            std::to_string(mRostersSent) + " rosters sent; chat: " + std::to_string(mChatRelayed) + " relayed, " + std::to_string(mChatDropped) +
-           " dropped";
+           " dropped; focus requests refused " + std::to_string(mFocusRefused) + ", camera updates dropped " + std::to_string(mCamerasDropped);
   }
 
   std::vector<std::int32_t> CServerNet::TakeReturned()
   {
     const std::scoped_lock lock(mNewsLock);
     return std::exchange(mReturned, {});
+  }
+
+  void CServerNet::NoteJudged(const std::int32_t uid, const SSeat& seat)
+  {
+    SSeatState state;
+    state.uid = uid;
+    state.name = seat.name;
+    state.content = seat.contentVerdict;
+    state.mods = seat.modsVerdict;
+    for (const remote::SModEntry& mod : seat.mods) {
+      if (mod.ui) {
+        state.uiMods.push_back(mod.uid);
+      }
+    }
+    const std::scoped_lock lock(mNewsLock);
+    mJudged.push_back(std::move(state));
+  }
+
+  std::vector<std::pair<std::int32_t, bool>> CServerNet::TakeReadyChanges()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    return std::exchange(mReadyNews, {});
+  }
+
+  void CServerNet::SetFocusRule(const std::int32_t uid, const int ownArmy)
+  {
+    const std::scoped_lock lock(mNewsLock);
+    mFocusRules[uid].ownArmy = ownArmy;
+  }
+
+  void CServerNet::FreeFocus(const std::int32_t uid)
+  {
+    const std::scoped_lock lock(mNewsLock);
+    mFocusRules[uid].free = true;
+  }
+
+  std::optional<std::pair<int, std::int32_t>> CServerNet::SlowestSpeedLimit()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    std::optional<std::pair<int, std::int32_t>> slowest;
+    for (const SSeatState& seat : mSeatStates) {
+      if (seat.speedLimit && (!slowest || *seat.speedLimit < slowest->first)) {
+        slowest.emplace(*seat.speedLimit, seat.uid);
+      }
+    }
+    return slowest;
+  }
+
+  std::vector<CServerNet::SSeatState> CServerNet::TakeJudged()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    return std::exchange(mJudged, {});
   }
 
   std::vector<CServerNet::SPresence> CServerNet::TakePresence()
@@ -728,6 +853,7 @@ namespace faf::server
       if (!seat.loaded) {
         seat.loaded = true;
         JudgeContent(uid, seat); // plan WP2.6: one with no report counts once the server's content is known
+        JudgeMods(uid, seat);
         if (seat.gone) {
           return;
         }
@@ -791,6 +917,78 @@ namespace faf::server
     case remote::net::ESeatMessage::Chat:
       RelayChat(seat, message); // plan WP11.4
       return;
+    case remote::net::ESeatMessage::ModReport: {
+      std::vector<remote::SModEntry> mods;
+      if (!remote::DecodeModReport(message, mods)) {
+        ++mBadMessages;
+        return;
+      }
+      if (!seat.modsReported) { // the first counts
+        seat.modsReported = true;
+        seat.mods = std::move(mods);
+        JudgeMods(uid, seat);
+      }
+      return;
+    }
+    case remote::net::ESeatMessage::SpeedLimit: {
+      // Plan WP10.7: the player's game says how fast it keeps up; the server runs at the slowest playing seat's.
+      const std::optional<int> limit = remote::DecodeSpeedLimit(message);
+      if (!limit) {
+        ++mBadMessages;
+        return;
+      }
+      if (seat.speedLimit != limit) {
+        seat.speedLimit = limit;
+        Say(seat.name + "'s game keeps up with speed " + (*limit >= 0 ? "+" : "") + std::to_string(*limit));
+      }
+      return;
+    }
+    case remote::net::ESeatMessage::FocusArmy: {
+      // Plan WP11.1: the UI's `SetFocusArmy`; the server answers with the army it grants.
+      const std::optional<int> asked = remote::DecodeFocusArmy(message);
+      if (!asked) {
+        ++mBadMessages;
+        return;
+      }
+      int granted = -1;
+      {
+        const std::scoped_lock lock(mNewsLock);
+        const auto rule = mFocusRules.find(uid);
+        granted = rule == mFocusRules.end() ? -1 : (rule->second.free ? *asked : rule->second.ownArmy);
+      }
+      if (granted != *asked) {
+        ++mFocusRefused;
+        Say(seat.name + " asked to focus on army " + std::to_string(*asked) + "; refused, they keep army " + std::to_string(granted));
+      }
+      QueueView(uid, remote::EncodeFocusArmy(granted));
+      return;
+    }
+    case remote::net::ESeatMessage::Cameras: {
+      // Plan WP11.1: what the player's cameras see, kept for camera-ordered work (WP8.2). A game sends four a second
+      // (kCameraPeriodMs), but they arrive bunched (frame hitches, datagrams carrying two), so a bucket of tokens
+      // refilled at eight a second and holding four takes them all and drops only a sustained flood.
+      std::vector<remote::SCameraReport> cameras;
+      if (!remote::DecodeCameras(message, cameras)) {
+        ++mBadMessages;
+        return;
+      }
+      constexpr double kCameraTokensPerSecond = 8.0;
+      constexpr double kCameraBurst = 4.0;
+      seat.cameraTokens = seat.camerasAtUs == 0u
+                            ? kCameraBurst
+                            : std::min(kCameraBurst, seat.cameraTokens + static_cast<double>(mNowUs - seat.camerasAtUs) * 1e-6 * kCameraTokensPerSecond);
+      seat.camerasAtUs = mNowUs;
+      if (seat.cameraTokens < 1.0) {
+        ++mCamerasDropped;
+        return;
+      }
+      seat.cameraTokens -= 1.0;
+      seat.cameras = std::move(cameras);
+      if (++seat.cameraUpdates == 1u) {
+        Say(seat.name + "'s game sends its cameras");
+      }
+      return;
+    }
     case remote::net::ESeatMessage::Roster:
     case remote::net::ESeatMessage::Beat:
     case remote::net::ESeatMessage::View:

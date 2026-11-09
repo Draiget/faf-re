@@ -66,9 +66,11 @@ namespace faf::remote
       return false;
     }
     out = decoded;
-    if (baseline == nullptr) {
-      // A whole frame replaces all the client held, and the frames after it are against it or newer. Its id needn't be
-      // above the old ones' (plan WP13.6: a player moved to the observer view gets that view's, which start at 1).
+    if (baseline == nullptr && !mFrames.empty() && decoded.frameId <= mFrames.back().frameId) {
+      // A whole frame whose id restarts replaces all the client held (plan WP13.6: a player moved to the observer view
+      // gets that view's frames, which start at 1). One whose id goes on leaves the older frames: the server sends
+      // whole frames until an acknowledgement comes back, then encodes against the frame acknowledged, which arrived
+      // before the whole frames that followed it.
       mFrames.clear();
     }
     // Kept in id order: a frame that arrives late still goes before newer ones.

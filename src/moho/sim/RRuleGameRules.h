@@ -903,4 +903,44 @@ namespace moho
    */
   void RULE_DeferScriptBlueprintRelease(RRuleGameRules* rules) noexcept;
   void RULE_ReleaseDeferredScriptBlueprints(RRuleGameRules* rules);
+
+  /**
+   * Engine addition (the map editor, src/editor): the rules a session ends with are kept for the next
+   * session with the same mods instead of being deleted, so its load skips building them (every
+   * blueprint through /lua/RuleInit.lua, about 1.3 s for FAF). Turning it on also keeps the rules' Lua
+   * copy of the blueprints, which each new session and sim export from (as `gRuleKeepScriptBlueprints`
+   * does for the replay viewer, which clears that flag at every teardown).
+   * Off in the game, which builds the rules for every session.
+   */
+  void RULE_SetKeepBetweenSessions(bool keep);
+
+  /**
+   * The session loader's rules for `gameMods`: the kept ones when their mods match (taken out of the
+   * keep), else newly built. Either way they are marked as lent to the session being loaded.
+   */
+  [[nodiscard]] RRuleGameRules* RULE_TakeOrCreate(const fa::string& gameMods, CBackgroundTaskControl* loadControl);
+
+  /**
+   * `~CWldSession`: keeps the session's rules when keeping is on and they are the ones lent to it, after
+   * dropping the session state's export binding (the state is deleted next). False: the caller deletes them.
+   */
+  [[nodiscard]] bool RULE_KeepAfterSession(RRuleGameRules* rules, LuaPlus::LuaState* sessionState);
+
+  /**
+   * The kept rules, left kept, or null while none are (or they are still being built). For reading
+   * blueprints between sessions on the main thread (the editor's opened map): a session load takes them
+   * with `RULE_TakeOrCreate`, so a caller drops every pointer into them before a session starts.
+   */
+  [[nodiscard]] RRuleGameRules* RULE_PeekKept();
+
+  /** Deletes the kept rules, if any (the editor, before the engine shuts down). */
+  void RULE_DeleteKept();
+
+  /**
+   * Builds the rules for `gameMods` on a thread of its own and keeps them, so that even the first
+   * session takes them (the editor, at startup, with the mods its plays use). A session load that
+   * starts meanwhile waits for them instead of building its own. Only while keeping is on and no
+   * rules are kept or lent; rules for other mods are deleted by the session that finds them.
+   */
+  void RULE_PrepareKept(const fa::string& gameMods);
 } // namespace moho

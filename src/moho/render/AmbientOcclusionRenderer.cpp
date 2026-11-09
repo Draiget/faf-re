@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -10,6 +11,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/GpuDriven.h"
+#include "gpg/gal/effects/ShadowCascades.h"
 #include "moho/console/CConCommand.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/render/AmbientOcclusionShader.h"
@@ -95,8 +97,9 @@ namespace moho
       float terrainShadowSize[4];
       VMatrix4 shadowMatrix;
       float shadowParams[4];
+      float shadowCascades[gpg::gal::effects::kShadowCascadeVectors][4];
     };
-    static_assert(sizeof(AoConstants) == 352, "AoConstants matches the shader's cbuffer");
+    static_assert(sizeof(AoConstants) == 496, "AoConstants matches the shader's cbuffer");
 
     /** Terrain-shadow cells across the larger side of the map at most. */
     constexpr std::int32_t kTerrainShadowCells = 1024;
@@ -342,6 +345,7 @@ namespace moho
       if (shadowSurface) {
         constants.shadowMatrix = shadow->mCamera.viewProjection;
         constants.shadowParams[0] = 1.0f;
+        std::memcpy(constants.shadowCascades, gpg::gal::effects::gShadowCascades.vectors, sizeof(constants.shadowCascades));
       }
     }
 

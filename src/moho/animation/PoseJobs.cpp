@@ -5,8 +5,11 @@
 #include <vector>
 
 #include "gpg/core/profiling/Profiler.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaCallGate.h"
+#include "moho/ai/CAimManipulator.h"
+#include "moho/ai/CBuilderArmManipulator.h"
 #include "moho/ai/EEconResourceTypeInfo.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
@@ -32,6 +35,14 @@ namespace moho
     "Unit pose updates whose manipulators touch only their own unit run on sim workers (when "
     "sim_Workers > 0); same poses, same order of everything else.",
     &sim_ParallelPose
+  );
+
+  bool sim_ParallelPoseQuietAim = true;
+  TConVar<bool> gTConVar_sim_ParallelPoseQuietAim(
+    "sim_ParallelPoseQuietAim",
+    "With sim_ParallelPose, a unit with an aim or builder arm manipulator is also queued on ticks where "
+    "that manipulator has no target and starts or stops no tracking script (same poses).",
+    &sim_ParallelPoseQuietAim
   );
 
   namespace
@@ -162,7 +173,8 @@ namespace moho
     }
 
     /// Rotate, Slide, Slave, Animation and Storage read their own pose plus the inputs
-    /// SPoseJobInputs copies; any other manipulator reads other units or calls Lua.
+    /// SPoseJobInputs copies; Aim and BuilderArm do on the ticks `IsPoseJobQuiet` accepts; any
+    /// other manipulator reads other units or calls Lua.
     [[nodiscard]] bool IsOwnPoseManipulator(const IAniManipulator& manipulator) noexcept
     {
       // Descriptor addresses, not type_info::operator==, which falls back to strcmp on the names
@@ -174,31 +186,59 @@ namespace moho
         type == &typeid(CStorageManipulator);
     }
 
-    // Set by the last CanQueue walk (sim thread only): the actor has a storage manipulator, the one
-    // reader of the army economy inputs.
+    // Set by the last CanQueue walk (sim thread only): the unit walked; whether the actor has a
+    // storage manipulator, the one reader of the army economy inputs; its aim manipulators.
+    const Unit* sQueueUnit = nullptr;
     bool sSawStorage = false;
+    std::uint32_t sAimCount = 0;
+    SPoseJobAim sAims[kPoseJobMaxAims]{};
 
     /**
-     * An own-pose type no thread waits on. With no waiters, a signal only sets the manipulator's
-     * own `mTriggered` (CTaskEvent::EventSetSignaled); waiters are added only by Lua's WaitFor,
-     * which the gate keeps out while jobs are pending.
+     * A manipulator no thread waits on, of an own-pose type or quiet this tick. With no waiters, a
+     * signal only sets the manipulator's own `mTriggered` (CTaskEvent::EventSetSignaled); waiters
+     * are added only by Lua's WaitFor, which the gate keeps out while jobs are pending.
      */
     [[nodiscard]] bool IsQueueable(const IAniManipulator& manipulator)
     {
-      if (&typeid(manipulator) == &typeid(CStorageManipulator)) {
-        sSawStorage = true;
-      }
-      return IsOwnPoseManipulator(manipulator) && manipulator.mWaitLinks.mNext == &manipulator.mWaitLinks;
-    }
-
-    [[nodiscard]] bool CanQueue(const CAniActor& actor)
-    {
-      sSawStorage = false;
-      // An 11-bone pose update allocates from the sim thread's block list in the sim's order (see SimBlockLane).
-      if (const CAniPose* const pose = actor.mPose.get(); pose != nullptr && pose->mBones.size() == CAniPoseBoneArray::kBinaryLaneBones) {
+      if (manipulator.mWaitLinks.mNext != &manipulator.mWaitLinks) {
         return false;
       }
-      return actor.AllEnabledManipulators(&IsQueueable);
+      const std::type_info* const type = &typeid(manipulator);
+      if (type == &typeid(CStorageManipulator)) {
+        sSawStorage = true;
+        return true;
+      }
+      if (!sim_ParallelPoseQuietAim) {
+        return IsOwnPoseManipulator(manipulator);
+      }
+      if (type == &typeid(CAimManipulator)) {
+        if (sAimCount == kPoseJobMaxAims) {
+          return false;
+        }
+        SPoseJobAim& aim = sAims[sAimCount];
+        aim.mManipulator = static_cast<const CAimManipulator*>(&manipulator);
+        if (!aim.mManipulator->IsPoseJobQuiet(*sQueueUnit, aim.mTargetSet)) {
+          return false;
+        }
+        ++sAimCount;
+        return true;
+      }
+      if (type == &typeid(CBuilderArmManipulator)) {
+        return static_cast<const CBuilderArmManipulator&>(manipulator).IsPoseJobQuiet(*sQueueUnit);
+      }
+      return IsOwnPoseManipulator(manipulator);
+    }
+
+    [[nodiscard]] bool CanQueue(const Unit& unit)
+    {
+      sQueueUnit = &unit;
+      sSawStorage = false;
+      // An 11-bone pose update allocates from the sim thread's block list in the sim's order (see SimBlockLane).
+      if (const CAniPose* const pose = unit.AniActor->mPose.get(); pose != nullptr && pose->mBones.size() == CAniPoseBoneArray::kBinaryLaneBones) {
+        return false;
+      }
+      sAimCount = 0;
+      return unit.AniActor->AllEnabledManipulators(&IsQueueable);
     }
 
     void CaptureInputs(const Unit& unit, SPoseJobInputs& inputs)
@@ -209,6 +249,12 @@ namespace moho
       inputs.mCurOrient = unit.mVarDat.mCurTransform.orient_;
       inputs.mLastOrient = unit.mVarDat.mLastTransform.orient_;
       inputs.mBeingBuilt = unit.IsBeingBuilt();
+      inputs.mDead = unit.IsDead();
+      inputs.mStunned = unit.mUnitVarDat.mStunTicks != 0;
+      inputs.mAimCount = sAimCount;
+      for (std::uint32_t i = 0; i < sAimCount; ++i) {
+        inputs.mAims[i] = sAims[i];
+      }
       inputs.mHasEconomy = false;
       if (!sSawStorage) {
         return;
@@ -231,11 +277,31 @@ namespace moho
     return (inputs != nullptr && inputs->mUnit == unit) ? inputs : nullptr;
   }
 
+  const SPoseJobAim* POSE_JobAimFor(const CAimManipulator* const aim) noexcept
+  {
+    const SPoseJobInputs* const inputs = tJobInputs;
+    if (inputs == nullptr) {
+      return nullptr;
+    }
+    for (std::uint32_t i = 0; i < inputs->mAimCount; ++i) {
+      if (inputs->mAims[i].mManipulator == aim) {
+        return &inputs->mAims[i];
+      }
+    }
+    // CanQueue copied every enabled aim manipulator; only Lua enables one, and the gate keeps it out.
+    gpg::Die("sim_ParallelPose: aim manipulator updated in a pose job it was not queued with");
+  }
+
+  bool POSE_InJob() noexcept
+  {
+    return tJobInputs != nullptr;
+  }
+
   void POSE_UpdateManipulators(Unit& unit)
   {
     CAniActor* const actor = unit.AniActor;
     const bool queueable =
-      sim_ParallelPose && !IsSimWorkerThread() && CSimWorkerPool::ParallelEnabled() && CanQueue(*actor);
+      sim_ParallelPose && !IsSimWorkerThread() && CSimWorkerPool::ParallelEnabled() && CanQueue(unit);
     if (!queueable) {
       if (CSimJobStream::Get().IsOpen()) {
         ++sPoseJobs.mInline;

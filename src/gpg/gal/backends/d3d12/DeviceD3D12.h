@@ -41,6 +41,7 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/OutputContext.hpp"
 #include "gpg/gal/backends/common/PipelineMemo.h"
+#include "gpg/gal/backends/common/UsedTextureTable.h"
 #include "gpg/gal/backends/common/WindowsCursor.h"
 #include "gpg/gal/backends/dxgi/DxgiFactory.h"
 #include "gpg/gal/backends/dxgi/DxgiSwapChain.h"
@@ -209,6 +210,8 @@ namespace gpg::gal
       effects::EffectProgram* program = nullptr;
       const effects::CompiledEntry* vertexShader = nullptr;
       const effects::CompiledEntry* pixelShader = nullptr;
+      const effects::CompiledEntry* hullShader = nullptr;   // engine addition: a tessellated pass (both set)
+      const effects::CompiledEntry* domainShader = nullptr;
       BlendState state;
       D3D12_GPU_VIRTUAL_ADDRESS constants = 0;
       const std::uint8_t* constantsCpu = nullptr; // the same snapshot, CPU side (upload memory)
@@ -369,6 +372,8 @@ namespace gpg::gal
     {
       std::uint64_t vertexKey;
       std::uint64_t pixelKey;
+      std::uint64_t hullKey;   // 0 when the pass is not tessellated
+      std::uint64_t domainKey;
       std::uint32_t format;
       std::uint32_t sampleMask;
       effects::BlendDesc blend;

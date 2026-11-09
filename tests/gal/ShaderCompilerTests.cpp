@@ -25,6 +25,7 @@
 #include "gpg/gal/effects/EffectDescription.h"
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "gpg/gal/effects/ModernHlsl.h"
+#include "gpg/gal/effects/ShadowCascades.h"
 #include "gpg/gal/effects/ShaderCompiler.h"
 #include "gpg/gal/effects/SpirvReflect.h"
 
@@ -94,6 +95,83 @@ TEST(GalShaderCompiler, GeneratedEffectCompilesToDxilAndSpirv)
 
   const Generated generated = Generate(faf_gal_tests::kDrawEffect);
   ASSERT_EQ(generated.modern.entries.size(), 3U);
+  for (const ShaderEntry& entry : generated.modern.entries) {
+    const CompiledShader dxil = compiler.Compile(generated.modern.hlsl, entry, ShaderTarget::Dxil);
+    EXPECT_TRUE(dxil.succeeded) << entry.name << ":\n" << dxil.messages;
+    EXPECT_TRUE(IsDxil(dxil.code)) << entry.name;
+    const CompiledShader spirv = compiler.Compile(generated.modern.hlsl, entry, ShaderTarget::Spirv);
+    EXPECT_TRUE(spirv.succeeded) << entry.name << ":\n" << spirv.messages;
+    EXPECT_TRUE(IsSpirv(spirv.code)) << entry.name;
+  }
+}
+
+// Engine addition (ren_ShadowCascades): the cascade lookups compile for both targets next to ordinary
+// samplers. HLSL converts between structs whose members match one for one, so a shadow sampler type built
+// from faf_sampler's members made every tex2D call ambiguous (all of mesh.fx and terrain.fx failed).
+TEST(GalShaderCompiler, ShadowCascadeLookupsCompileBesideOrdinarySamplers)
+{
+  if (Compiler() == nullptr) {
+    GTEST_SKIP() << Unavailable();
+  }
+  const ShaderCompiler& compiler = *Compiler();
+  const std::string source = std::string(ShadowCascadeDeclaration()) + R"fx(
+float4x4 ShadowMatrix;
+texture ShadowTexture;
+texture AlbedoTexture;
+sampler2D ShadowSampler = sampler_state { Texture = (ShadowTexture); };
+sampler2D ShadowHorizontalBlurSampler = sampler_state { Texture = (ShadowTexture); };
+sampler2D AlbedoSampler = sampler_state { Texture = (AlbedoTexture); };
+struct VSOut
+{
+    float4 pos : POSITION;
+    float4 shadow : TEXCOORD0;
+    float2 uv : TEXCOORD1;
+};
+VSOut LitVS( float3 position : POSITION, float2 uv : TEXCOORD0 )
+{
+    VSOut o;
+    o.pos = float4( position, 1 );
+    o.shadow = mul( float4( position, 1 ), ShadowMatrix );
+    o.uv = uv;
+    return o;
+}
+float4 LitPS( VSOut i ) : COLOR0
+{
+    float shadow = tex2D( ShadowSampler, i.shadow.xy ).g;
+    shadow *= tex2Dproj( ShadowSampler, i.shadow ).r;
+    shadow *= tex2D( ShadowSampler, i.shadow ).g;
+    return tex2D( AlbedoSampler, i.uv ) * shadow + tex2D( ShadowHorizontalBlurSampler, i.uv );
+}
+technique10 Lit
+{
+    pass P0
+    {
+        SetVertexShader( CompileShader( vs_4_0, LitVS() ) );
+        SetPixelShader( CompileShader( ps_4_0, LitPS() ) );
+    }
+}
+)fx";
+  const Generated generated = Generate(source);
+  ASSERT_NE(generated.modern.hlsl.find("faf_make_shadow_sampler("), std::string::npos);
+  ASSERT_EQ(generated.modern.entries.size(), 2U);
+  for (const ShaderEntry& entry : generated.modern.entries) {
+    const CompiledShader dxil = compiler.Compile(generated.modern.hlsl, entry, ShaderTarget::Dxil);
+    EXPECT_TRUE(dxil.succeeded) << entry.name << ":\n" << dxil.messages;
+    const CompiledShader spirv = compiler.Compile(generated.modern.hlsl, entry, ShaderTarget::Spirv);
+    EXPECT_TRUE(spirv.succeeded) << entry.name << ":\n" << spirv.messages;
+  }
+}
+
+// Engine addition (tessellation): the generated hull and domain entry points compile for both targets with the
+// vertex and pixel shaders of the same pass.
+TEST(GalShaderCompiler, TessellatedEffectCompilesToDxilAndSpirv)
+{
+  if (Compiler() == nullptr) {
+    GTEST_SKIP() << Unavailable();
+  }
+  const ShaderCompiler& compiler = *Compiler();
+  const Generated generated = Generate(faf_gal_tests::kTessellatedEffect);
+  ASSERT_EQ(generated.modern.entries.size(), 4U);
   for (const ShaderEntry& entry : generated.modern.entries) {
     const CompiledShader dxil = compiler.Compile(generated.modern.hlsl, entry, ShaderTarget::Dxil);
     EXPECT_TRUE(dxil.succeeded) << entry.name << ":\n" << dxil.messages;

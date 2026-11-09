@@ -1800,7 +1800,10 @@ EReconFlags CAiReconDBImpl::DoCounterDetection(const moho::Rect2<int>& rect, ERe
 EReconFlags CAiReconDBImpl::ReconCanDetect(const moho::Rect2<int>& rect, const float y, const int oldFlags) const
 {
   const EReconFlags senseMask = static_cast<EReconFlags>(oldFlags);
-  const float waterElevation = (mMapData && mMapData->mWaterEnabled != 0u) ? mMapData->mWaterElevation : -10000.0f;
+  // Engine addition (water bodies): the level at the rectangle's centre.
+  const float waterElevation = mMapData ? mMapData->GetWaterElevationAt(
+    static_cast<float>(rect.x0 + rect.x1) * 0.5f, static_cast<float>(rect.z0 + rect.z1) * 0.5f
+  ) : -10000.0f;
   const bool isUnderwater = waterElevation > y;
   return GetReconFlagsForRect(rect, senseMask, isUnderwater);
 }
@@ -1823,8 +1826,10 @@ EReconFlags CAiReconDBImpl::ReconCanDetect(const moho::Rect2<int>& rect, const f
     return oldFlags;
   }
 
-  const float waterElevation =
-    (reconDb->mMapData && reconDb->mMapData->mWaterEnabled != 0u) ? reconDb->mMapData->mWaterElevation : -10000.0f;
+  // Engine addition (water bodies): the level at the rectangle's centre.
+  const float waterElevation = reconDb->mMapData ? reconDb->mMapData->GetWaterElevationAt(
+    static_cast<float>(rect.x0 + rect.x1) * 0.5f, static_cast<float>(rect.z0 + rect.z1) * 0.5f
+  ) : -10000.0f;
   return reconDb->GetReconFlagsForRect(rect, oldFlags, waterElevation > y);
 }
 
@@ -1849,7 +1854,7 @@ EReconFlags CAiReconDBImpl::ReconCanDetect(
 ) const
 {
   if (!ent) {
-    const float waterElevation = (mMapData && mMapData->mWaterEnabled != 0u) ? mMapData->mWaterElevation : -10000.0f;
+    const float waterElevation = mMapData ? mMapData->GetWaterElevationAt(pos.x, pos.z) : -10000.0f; // engine addition
     const bool belowWater = waterElevation > pos.y;
     return GetReconFlags(nullptr, pos, oldFlags, belowWater);
   }
@@ -1931,7 +1936,7 @@ bool CAiReconDBImpl::IntelConfirmDead(ReconBlip* const blip)
  */
 EReconFlags CAiReconDBImpl::ReconCanDetect(const Wm3::Vec3f& pos, const int oldFlags) const
 {
-  const float waterElevation = (mMapData && mMapData->mWaterEnabled != 0u) ? mMapData->mWaterElevation : -10000.0f;
+  const float waterElevation = mMapData ? mMapData->GetWaterElevationAt(pos.x, pos.z) : -10000.0f; // engine addition
   const bool belowWater = waterElevation > pos.y;
   return GetReconFlags(nullptr, pos, static_cast<EReconFlags>(oldFlags), belowWater);
 }

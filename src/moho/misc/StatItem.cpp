@@ -957,6 +957,17 @@ namespace moho
     return nullptr;
   }
 
+  void StatItem::VisitChildren(void (*const visit)(StatItem* child, void* context), void* const context)
+  {
+    for (StatIntrusiveNode* node = AsChildHead(this)->next; node != nullptr && node != AsChildHead(this); node = node->next) {
+      StatItem* const child = node->owner;
+      if (child == nullptr) {
+        break;
+      }
+      visit(child, context);
+    }
+  }
+
   /**
    * Address: 0x0040A0A0 (FUN_0040A0A0, Moho::Stats_StatItem::Stats_StatItem)
    */

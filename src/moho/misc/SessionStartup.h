@@ -182,6 +182,14 @@ namespace moho
   [[nodiscard]] fa::auto_ptr<SWldSessionInfo> WLD_SetupSessionInfo(const LuaPlus::LuaObject& launchData);
 
   /**
+   * Engine addition (the map editor, src/editor): when set, `WLD_SetupSessionInfo` turns cheats on for the
+   * single-player session it builds, as the `debug.enable_debug_facilities` preference does, without
+   * writing that preference (the editor shares Game.prefs with the game). The editor's view of the whole
+   * map during play needs it (`CWldSession::ValidateFocusArmyRequest`). False in the game.
+   */
+  extern bool gSessionCheats;
+
+  /**
    * Address: 0x00876DD0 (FUN_00876DD0, cfunc_LaunchReplaySession)
    *
    * What it does:

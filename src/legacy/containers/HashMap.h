@@ -71,8 +71,12 @@ namespace fa
      */
     [[nodiscard]] inline std::size_t hash_value(long key) noexcept
     {
-        const std::ldiv_t parts = std::ldiv(key, 127773L);
-        long scrambled = 16807L * parts.rem - 2836L * parts.quot;
+        // `ldiv`'s quotient and remainder are by definition `key / 127773` and `key % 127773` (both
+        // truncating, C99 7.20.6.2); written out, the compiler turns the constant division into a
+        // multiply instead of a library call on every hash.
+        const long quot = key / 127773L;
+        const long rem = key % 127773L;
+        long scrambled = 16807L * rem - 2836L * quot;
         if (scrambled < 0) {
             scrambled += 2147483647L;
         }

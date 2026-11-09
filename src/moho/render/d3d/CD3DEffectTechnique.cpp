@@ -22,7 +22,9 @@
 #include "gpg/gal/EffectMacro.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/EffectVariable.hpp"
+#include "gpg/gal/GpuDriven.h"
 #include "gpg/gal/TextureContext.h"
+#include "gpg/gal/effects/EffectRuntime.h"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
@@ -32,6 +34,17 @@
 namespace moho
 {
   fa::string GetEngineVersion();
+
+  bool ren_TerrainTessellation = false;
+
+  TConVar<bool> gTConVar_ren_TerrainTessellation(
+    "ren_TerrainTessellation",
+    "Direct3D 12 and Vulkan: split the terrain into fine triangles near the camera and sink them where the ground "
+    "texture is darker than its surroundings, so cracks and gaps between rocks get real depth "
+    "(fafengine/effects/terrain_tess.fx). Read when the terrain effect loads: set it at startup "
+    "(/con) or restart for a change to apply. Off by default.",
+    &ren_TerrainTessellation
+  );
 
   namespace
   {
@@ -97,14 +110,39 @@ technique TMsdfText
 }
 )fx";
 
-    [[nodiscard]] gpg::MemBuffer<char> AppendMsdfTechnique(const gpg::MemBuffer<char>& source)
+    [[nodiscard]] gpg::MemBuffer<char> AppendSource(const gpg::MemBuffer<char>& source, const char* const tail, const std::size_t tailBytes)
     {
       const std::size_t sourceBytes = source.Size();
-      const std::size_t tailBytes = sizeof(kMsdfTechniqueSource) - 1u;
-      gpg::MemBuffer<char> merged = gpg::AllocMemBuffer(sourceBytes + tailBytes);
+      gpg::MemBuffer<char> merged = gpg::AllocMemBuffer(sourceBytes + 1u + tailBytes);
       std::memcpy(merged.data(), source.data(), sourceBytes);
-      std::memcpy(merged.data() + sourceBytes, kMsdfTechniqueSource, tailBytes);
+      merged.data()[sourceBytes] = '\n'; // the source may end without one
+      std::memcpy(merged.data() + sourceBytes + 1u, tail, tailBytes);
       return merged;
+    }
+
+    /**
+     * Engine addition (ren_TerrainTessellation).
+     *
+     * The tessellated terrain techniques, `fafengine/effects/terrain_tess.fx` next to the
+     * executable (data/fafengine in the repository), appended to FAF's `terrain.fx` on Direct3D 12
+     * and Vulkan, the renderers with hull and domain shaders. Empty on any other renderer or when
+     * the file is missing.
+     */
+    [[nodiscard]] gpg::MemBuffer<const char> TerrainTessellationSource(
+      const gpg::gal::DeviceContext* const deviceContext, FWaitHandleSet* const waitHandleSet
+    )
+    {
+      if (deviceContext == nullptr || (deviceContext->mDeviceType != gpg::gal::DeviceApi::Direct3D12 &&
+                                       deviceContext->mDeviceType != gpg::gal::DeviceApi::Vulkan)) {
+        return {};
+      }
+      fa::string mountedPath{};
+      (void)waitHandleSet->mHandle->FindFile(&mountedPath, "/fafengine/effects/terrain_tess.fx", nullptr);
+      if (mountedPath.empty()) {
+        gpg::Logf("terrain: /fafengine/effects/terrain_tess.fx not found; no terrain tessellation");
+        return {};
+      }
+      return DISK_MemoryMapFile(mountedPath.c_str());
     }
 
     /**
@@ -586,9 +624,11 @@ technique TMsdfText
       // least as new as the source. FAF: `boneTexture` compiles the variant
       // with FAF_BONE_TEXTURE defined (see WantsBoneTextureVariant); it turns
       // into different shaders, so it is cached under a name of its own. So
-      // does `msdfText`, the source with the MSDF technique appended.
-      const auto createEffect = [&](const bool boneTexture, const bool msdfText = false) {
-        const char* const variant = boneTexture ? ".bonetex." : (msdfText ? ".msdf." : ".");
+      // does `msdfText`, the source with the MSDF technique appended, and
+      // `terrainTess`, terrain.fx with the tessellated techniques appended.
+      gpg::MemBuffer<const char> terrainTess{};
+      const auto createEffect = [&](const bool boneTexture, const bool msdfText = false, const bool withTerrainTess = false) {
+        const char* const variant = boneTexture ? ".bonetex." : (msdfText ? ".msdf." : (withTerrainTess ? ".tess." : "."));
         const fa::string cachePath = cacheDirectory + "/" + mName + variant + engineVersion;
         SDiskFileInfo cacheInfo{};
         bool useCachePayload = false;
@@ -601,7 +641,11 @@ technique TMsdfText
           effectMacros.push_back(gpg::gal::EffectMacro("FAF_BONE_TEXTURE", "1"));
         }
         const gpg::gal::EffectContext context(
-          useCachePayload, mFile.c_str(), cachePath.c_str(), msdfText ? AppendMsdfTechnique(mergedBuffer) : mergedBuffer, effectMacros
+          useCachePayload, mFile.c_str(), cachePath.c_str(),
+          msdfText          ? AppendSource(mergedBuffer, kMsdfTechniqueSource, sizeof(kMsdfTechniqueSource) - 1u)
+            : withTerrainTess ? AppendSource(mergedBuffer, terrainTess.GetPtr(0U, 0U), terrainTess.Size())
+                              : mergedBuffer,
+          effectMacros
         );
         mEffect = gpg::gal::Effect::Create(context);
       };
@@ -625,6 +669,38 @@ technique TMsdfText
         } catch (const std::exception& exception) {
           gpg::Warnf("%s: %s; building it without MSDF text", effectFilePath, exception.what());
           mEffect.reset();
+        }
+      }
+      // Engine addition (ren_TerrainTessellation): terrain.fx with terrain_tess.fx on its end, on
+      // Direct3D 12 and Vulkan, when the switch is on as the effect loads and the device draws hull
+      // and domain shaders. Otherwise the terrain effect is the original one: the appended source
+      // shares one HLSL file with every terrain shader, and checking it costs a moment of loading.
+      // If it doesn't compile, the terrain is drawn as before.
+      gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
+      const bool tessellationDrawn =
+        galDevice != nullptr && (galDevice->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureTessellation) != 0U;
+      if (!mEffect && ren_TerrainTessellation && tessellationDrawn && std::strcmp(mName.c_str(), "terrain") == 0) {
+        terrainTess = TerrainTessellationSource(deviceContext, waitHandleSet);
+        if (terrainTess.Size() > 0U) {
+          try {
+            createEffect(false, false, true);
+            // Shaders compile on first use, and all of the effect's come from one source: a
+            // mistake in terrain_tess.fx would take the whole terrain with it. Every technique
+            // SetTechnique can redirect to compiles here, once (the shader cache keeps them): a
+            // twin that failed later would draw nothing in place of its pass.
+            auto* const program = dynamic_cast<gpg::gal::ProgramEffect*>(mEffect.get());
+            for (const char* const name :
+                 {"TTerrainTess", "TTerrainXPTess", "TTerrainGlowTess", "TTerrainNormalsTess", "TTerrainNormalsXPTess",
+                  "TTerrainBasisTess", "TTerrainBasisBiCubicTess"}) {
+              if (program == nullptr || !program->TechniqueCompiles(name)) {
+                throw std::runtime_error(std::string("technique ") + name + " of terrain_tess.fx did not compile (see the shader messages above)");
+              }
+            }
+            gpg::Logf("terrain: tessellated techniques loaded (ren_TerrainTessellation %d)", ren_TerrainTessellation ? 1 : 0);
+          } catch (const std::exception& exception) {
+            gpg::Warnf("%s: %s; building it without terrain tessellation", effectFilePath, exception.what());
+            mEffect.reset();
+          }
         }
       }
       if (!mEffect) {
@@ -732,8 +808,19 @@ technique TMsdfText
    * Selects one technique on the backing gal effect, preferring the current
    * fidelity implementation lane when present.
    */
-  void CD3DEffect::SetTechnique(const char* const techniqueName)
+  void CD3DEffect::SetTechnique(const char* techniqueName)
   {
+    // Engine addition (ren_TerrainTessellation): a terrain technique with a tessellated twin
+    // "<name>Tess" (terrain_tess.fx, Direct3D 12 and Vulkan) draws through the twin.
+    fa::string tessellatedName{};
+    if (ren_TerrainTessellation && std::strcmp(mName.c_str(), "terrain") == 0) {
+      tessellatedName.assign(techniqueName, std::char_traits<char>::length(techniqueName));
+      tessellatedName.append("Tess", 4U);
+      if (GetFidelityDefinitions(Technique(tessellatedName)) != mTechniques.end()) {
+        techniqueName = tessellatedName.c_str();
+      }
+    }
+
     // Engine change (ren_TechniqueMemo): a technique this effect selected before is found without building the
     // search key or a new gal technique.
     const std::int32_t memoFidelity = ResolveGraphicsFidelityIndex();

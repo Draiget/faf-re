@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -39,6 +40,26 @@ namespace faf::remote
   [[nodiscard]] std::uint64_t HashModUids(std::vector<std::string> uids) noexcept;
   /** The sim mods' uids in that byte form of `GameMods`: each entry's `uid` field, or its key when the entry has none. */
   [[nodiscard]] std::vector<std::string> ReadModUids(const std::string& gameMods);
+
+  /** Plan WP17.8: one mod a player's game runs, as it reports it. */
+  struct SModEntry
+  {
+    bool ui = false; // a UI mod (`ui_only`): it loads in the player's own game, not the sim
+    std::string uid;
+    std::string version;
+
+    [[nodiscard]] bool operator==(const SModEntry&) const noexcept = default;
+  };
+  /** At most this many mods in one report, each uid and version at most `kMaxModText` bytes. */
+  constexpr std::size_t kMaxReportedMods = 256;
+  constexpr std::size_t kMaxModText = 200;
+
+  /** The `ModReport` message (net/GameLinks.h). Mods past the limits are left out. */
+  [[nodiscard]] std::vector<std::uint8_t> EncodeModReport(const std::vector<SModEntry>& mods);
+  /** False unless `message` is a whole `ModReport` within the limits. */
+  [[nodiscard]] bool DecodeModReport(std::span<const std::uint8_t> message, std::vector<SModEntry>& out);
+  /** The UI mods of `mods` whose uid isn't in `allowed`, in report order. */
+  [[nodiscard]] std::vector<std::string> UiModsOutside(const std::vector<SModEntry>& mods, const std::vector<std::string>& allowed);
 
   /** The `ContentReport` message (net/GameLinks.h): its kind, then the two hashes. */
   [[nodiscard]] std::vector<std::uint8_t> EncodeContentReport(const SContentReport& report);

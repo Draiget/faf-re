@@ -449,8 +449,10 @@ namespace
           const std::string token = segment.substr(tokenBegin, tokenEnd - tokenBegin);
 
           // ren_VulkanScaledPresent is read when the device makes its head targets (CreateDevice, after this):
-          // the prologue's pass would be too late for it too.
-          if (IsCommandName(token, "lua_IncrementalGC") || IsCommandName(token, "ren_VulkanScaledPresent")) {
+          // the prologue's pass would be too late for it too. ren_TerrainTessellation is read when the terrain
+          // effect loads.
+          if (IsCommandName(token, "lua_IncrementalGC") || IsCommandName(token, "ren_VulkanScaledPresent") ||
+              IsCommandName(token, "ren_TerrainTessellation")) {
             moho::CON_Execute(segment.c_str());
           }
         }
@@ -1185,6 +1187,14 @@ namespace
     "clock rushes the next ticks to repay it.",
     &wld_FrameClockOpening
   );
+
+  // Engine addition, debugging aid: tags the frame sampler's stack dump (FrameSampler.h).
+  moho::TConVar<int> gTConVar_dbg_FrameSamplerPhase(
+    "dbg_FrameSamplerPhase",
+    "With FAF_FRAME_SAMPLER and FAF_FRAME_SAMPLER_DUMP set: samples taken while this is not 0 are counted by whole call "
+    "stack and written to <dump>.<phase>.folded when it changes.",
+    &gpg::diag::dbg_FrameSamplerPhase
+  );
 } // namespace
 
 /**
@@ -1642,6 +1652,10 @@ namespace
   [[nodiscard]] std::vector<gpg::gal::DeviceApi> RendererAttemptOrder(const bool logChoice = true)
   {
     using gpg::gal::DeviceApi;
+    // Engine addition (the map editor, moho::gAppRenderers): its own renderers, and only those.
+    if (!moho::gAppRenderers.empty()) {
+      return moho::gAppRenderers;
+    }
     const auto explicitApi = [](const DeviceApi api) {
       return (api == DeviceApi::Direct3D9) ? std::vector<DeviceApi>{api} : std::vector<DeviceApi>{api, DeviceApi::Direct3D9};
     };
@@ -1877,7 +1891,15 @@ bool CScApp::CreateDevice()
   bool windowedByCommandLine = false;
   bool secondarySetupMode = false;
 
-  SetUpHeads(context, primaryHead, options, preferences, windowedByCommandLine, secondarySetupMode);
+  // Engine addition (moho::gAppWindowed): the map editor is always one window. `mWindowed` is the
+  // full-screen flag (CreateAppFrame picks the frame style from it), so false makes a window.
+  if (moho::gAppWindowed) {
+    primaryHead.mWindowed = false;
+    primaryHead.mWidth = static_cast<std::uint32_t>(std::max(moho::wnd_DefaultCreateWidth, 1600));
+    primaryHead.mHeight = static_cast<std::uint32_t>(std::max(moho::wnd_DefaultCreateHeight, 1000));
+  } else {
+    SetUpHeads(context, primaryHead, options, preferences, windowedByCommandLine, secondarySetupMode);
+  }
 
   if (context.GetHeadCount() == 1 &&
       moho::CFG_GetArgOptionAliases(moho::CFG_GetAdapterOptionAliases(), 1, &options) &&
@@ -1892,7 +1914,8 @@ bool CScApp::CreateDevice()
 
   const bool maximizeFromPrefs = preferences != nullptr
                                  && preferences->GetBoolean(fa::string("Windows.Main.maximized"), false);
-  const bool maximized = !windowedByCommandLine && !primaryHead.mWindowed && (hasMaximizeOption || maximizeFromPrefs);
+  const bool maximized = moho::gAppWindowed ||
+                         (!windowedByCommandLine && !primaryHead.mWindowed && (hasMaximizeOption || maximizeFromPrefs));
 
   if (!primaryHead.mWindowed) {
     if (moho::CFG_GetArgOption("/position", 2, &options) && options.size() >= 2) {
@@ -1935,6 +1958,11 @@ bool CScApp::CreateDevice()
   }
   if (!created) {
     moho::d3d_WindowsCursor = useD3D10;
+  }
+
+  // Engine addition (moho::gAppRenderers): the map editor has no Direct3D 9 or 10 fallback.
+  if (!created && !moho::gAppRenderers.empty()) {
+    return false;
   }
 
   if (!created) {
@@ -2075,6 +2103,11 @@ bool CScApp::CreateAppFrame(
     device->Clear2(true);
 
     context.mValidate = !moho::CFG_GetArgOption("/novalidate", 0, nullptr);
+    // Engine addition (moho::gAppBeforeDeviceCreate): the map editor adds its panels' head here. The game's
+    // viewport already has its head count, so it draws head 0 alone.
+    if (moho::gAppBeforeDeviceCreate != nullptr) {
+      moho::gAppBeforeDeviceCreate(context, primaryHead.mHandle);
+    }
     gpg::gal::Device::Create(&context);
 
     device->SetRenViewport(static_cast<moho::WRenViewport*>(viewport));
@@ -2140,3 +2173,12 @@ bool CScApp::AppDoSuppressWindowsKeys() const
 
   return supcomFrame->IsApplicationActive();
 }
+
+// Engine addition (the map editor, src/editor): empty in the game. CScApp.h says what it does.
+std::vector<gpg::gal::DeviceApi> moho::gAppRenderers;
+
+// Engine addition (the map editor, src/editor): false in the game. CScApp.h says what it does.
+bool moho::gAppWindowed = false;
+
+// Engine addition (the map editor, src/editor): null in the game. CScApp.h says what it does.
+void (*moho::gAppBeforeDeviceCreate)(gpg::gal::DeviceContext& context, void* frameWindow) = nullptr;

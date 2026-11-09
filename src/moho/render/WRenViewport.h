@@ -29,6 +29,7 @@ namespace moho
   class CD3DPrimBatcher;
   class CD3DRenderTarget;
   class CD3DTextureBatcher;
+  class CWldMap;
   class CWldSession;
   class ID3DRenderTarget;
   class ID3DTextureSheet;
@@ -411,6 +412,13 @@ namespace moho
      */
     void RenderReflections();
 
+    /// Engine addition (water bodies): the lake reflection after the sea's; `meshes` false
+    /// when reflections are off, which still clears the target lakes sample.
+    void RenderWaterBodyReflection(bool meshes);
+
+    /// Engine addition (water bodies): drops the lake reflection targets with the device.
+    static void ReleaseWaterBodyReflections();
+
     /**
      * Address: 0x007F7ED0 (FUN_007F7ED0)
      * Mangled: ?SetViewportToFullScreen@WRenViewport@Moho@@AAEXXZ
@@ -433,6 +441,12 @@ namespace moho
     void RenderWorldView(
       const SWorldViewInfo* worldView, int head, const SWorldViewInfo* begin, bool regenerateShoreline
     );
+
+    /**
+     * Engine addition: FXAA, sharpening and grading (ren_Fxaa, ren_Sharpen, ren_Grade) over the world
+     * view being drawn, inside its viewport, before its overlay pass.
+     */
+    void RenderWorldViewPostEffects();
 
     void UpdateRenderViewportCoordinates();
 
@@ -554,4 +568,22 @@ namespace moho
    * Returns the loaded map's terrain resource, or null when no map is bound.
    */
   [[nodiscard]] IWldTerrainRes* REN_GetTerrainRes();
+
+  /**
+   * Address: 0x010A6438 (sWldMap)
+   *
+   * The map the renderer draws (`REN_GetTerrainRes`). The world session sets it to its own map when it is
+   * constructed (0x00893581) and clears it when it is destroyed (0x00893BE6); `REN_SetWldMap` sets it
+   * otherwise.
+   */
+  extern CWldMap* sWldMap;
+
+  /**
+   * Address: 0x007FA150 (FUN_007FA150)
+   *
+   * What it does:
+   * Stores `map` in `sWldMap` (`mov [sWldMap], eax`). The game never calls it; the original map editor
+   * drew its own map through it, as the editor here does between plays.
+   */
+  void REN_SetWldMap(CWldMap* map);
 } // namespace moho

@@ -259,6 +259,14 @@ set(_faf_download_DirectXTex
     "DirectXTex-may2026"
     "DirectXTex-may2026.tar.gz")
 
+# Dear ImGui 1.92.4, docking branch (MIT): the map editor's panels (src/editor, .plans/map-editor).
+# The tag's source archive; cmake/deps/imgui builds the core and the Win32 platform backend.
+set(_faf_download_imgui
+    "https://github.com/ocornut/imgui/archive/refs/tags/v1.92.4-docking.tar.gz"
+    "c5e2053afc707c70385431ed85c500b108b521784a3f6a7a31ea17583aab89a2"
+    "imgui-1.92.4-docking"
+    "imgui-v1.92.4-docking.tar.gz")
+
 function(_faf_download_tree name)
   list(GET _faf_download_${name} 0 _url)
   list(GET _faf_download_${name} 1 _sha256)
@@ -427,6 +435,7 @@ faf_dependency_download(plog)
 faf_dependency_download(mbedtls)
 faf_dependency_download(monocypher)
 faf_dependency_download(DirectXTex)
+faf_dependency_download(imgui)
 if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})
   faf_dependency_download(freetype)
 endif()

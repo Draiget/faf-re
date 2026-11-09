@@ -108,6 +108,30 @@ namespace faf::remote::net
      * index, written by the server, then the payload. The server drops one for no player, too large or too many.
      */
     Chat = 16,
+    /**
+     * Player to server, reliable, after `ContentReport` (plan WP17.8): varint count, then per mod a kind byte (0 sim,
+     * 1 UI), its uid and its version, each a varint length and its bytes. UI mods load only in the player's own game,
+     * so the server takes them as reported.
+     */
+    ModReport = 17,
+    /**
+     * Player to server, reliable (plan WP10.7): varint (speed limit + 10). The player's sim-speed limit: the speed step
+     * its game keeps up with, from what applying the server's views costs it (remote/SpeedLimit.h), as a lockstep
+     * client's `CLIMSG_IntParam` reports its sim's. Sent when it changes. The server runs at the slowest playing seat's.
+     */
+    SpeedLimit = 18,
+    /**
+     * Both ways, reliable (plan WP11.1): varint (army + 1). Player to server: the army its UI asks to focus on
+     * (`SetArmyIndex`, from `SetFocusArmy`; -1 none). Server to player: the army the server grants, which the client
+     * shows from then on: the player's own, or with `DefeatedPlayerView = "observe"` after their defeat whatever they
+     * asked (remote/FocusAndCameras.h).
+     */
+    FocusArmy = 19,
+    /**
+     * Player to server, reliable (plan WP11.1): the player's cameras (`SetGeomCams`) at most every 250 ms: varint count,
+     * then per camera its view-projection and LOD scale as 17 floats. Kept per seat for camera-ordered work (WP8.2).
+     */
+    Cameras = 20,
   };
 
   /** What became of a player's command. */

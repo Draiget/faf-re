@@ -9,6 +9,14 @@
 
 namespace moho
 {
+  bool sim_SyncFillsOneDispatch = true;
+  TConVar<bool> gTConVar_sim_SyncFillsOneDispatch(
+    "sim_SyncFillsOneDispatch",
+    "With sim_ParallelSync, unit-update and entity-update record copies go to the workers in one "
+    "dispatch instead of one after the other (same packet).",
+    &sim_SyncFillsOneDispatch
+  );
+
   namespace
   {
     /// One deferred record: where it is, and what completes it.
@@ -80,10 +88,29 @@ namespace moho
     sActiveUnitUpdateFills = nullptr;
     sActiveSyncData = nullptr;
     const std::size_t count = sUnitUpdateFillCount;
+    const std::size_t entityCount = sEntityUpdateFillCount;
+    if (sim_SyncFillsOneDispatch) {
+      // Unit fills first, then entity fills, as one index range. They write different record
+      // vectors and only read their sources, so a chunk may hold the end of one and the start of
+      // the other.
+      CSimWorkerPool::Get().ParallelFor(
+        count + entityCount, kUnitUpdateFillGrain, [this, count](const std::size_t begin, const std::size_t end) {
+          if (begin < count) {
+            FillRange(begin, end < count ? end : count);
+          }
+          if (end > count) {
+            FillEntityRange(begin > count ? begin - count : 0u, end - count);
+          }
+        }
+      );
+      sUnitUpdateFillCount = 0;
+      sEntityUpdateFillCount = 0;
+      mSyncData = nullptr;
+      return;
+    }
     CSimWorkerPool::Get().ParallelFor(
       count, kUnitUpdateFillGrain, [this](const std::size_t begin, const std::size_t end) { FillRange(begin, end); }
     );
-    const std::size_t entityCount = sEntityUpdateFillCount;
     CSimWorkerPool::Get().ParallelFor(
       entityCount, kUnitUpdateFillGrain, [this](const std::size_t begin, const std::size_t end) {
         FillEntityRange(begin, end);

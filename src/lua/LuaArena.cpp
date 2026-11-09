@@ -255,10 +255,21 @@ namespace
         global.batches = taken->nextBatch;
         outCount = BatchBlocks(sizeClass);
       } else if (global.loose != nullptr) {
+        // One batch at most, as from `batches`. Taking the whole list (every block an exited thread gave
+        // back) hid it from the other threads, which carved fresh spans instead; when the taker exited it
+        // gave everything back, fresh spans' worth included, so each Play in the editor grew it again.
+        const std::uint32_t want = BatchBlocks(sizeClass);
         taken = global.loose;
-        outCount = global.looseCount;
-        global.loose = nullptr;
-        global.looseCount = 0;
+        FreeBlock* last = taken;
+        std::uint32_t count = 1;
+        while (count < want && last->next != nullptr) {
+          last = last->next;
+          ++count;
+        }
+        global.loose = last->next;
+        global.looseCount = (global.loose != nullptr) ? global.looseCount - count : 0u;
+        last->next = nullptr;
+        outCount = count;
       }
     }
     return (taken != nullptr) ? taken : CarveSpan(sizeClass, outCount);
@@ -404,10 +415,35 @@ namespace
   void FreeLarge(const std::size_t first) noexcept
   {
     std::lock_guard<std::mutex> guard(gSpanLock);
-    // A valid live allocation contributes at least one span not in the free list,
-    // hence the list has room before its release. Invalid/double frees remain invalid.
-    gFreeRuns[gFreeRunCount++] = LargeRun{first, gLargeSpans[first]};
+    const std::size_t spans = gLargeSpans[first];
+    const std::size_t end = first + spans;
     gFreeRunsChanged = true;
+    // Merged with the free runs it touches, so freed space comes back whole: a run left in pieces
+    // fits no request bigger than its largest piece, and every such request took fresh spans (a Play in
+    // the editor left about 4 MB a time). No two free runs touch, so there is at most one each side.
+    std::size_t before = kSpanCount;
+    std::size_t after = kSpanCount;
+    for (std::size_t index = 0; index < gFreeRunCount; ++index) {
+      const LargeRun& run = gFreeRuns[index];
+      if (run.firstSpan + run.spans == first) {
+        before = index;
+      } else if (run.firstSpan == end) {
+        after = index;
+      }
+    }
+    if (before != kSpanCount && after != kSpanCount) {
+      gFreeRuns[before].spans += spans + gFreeRuns[after].spans;
+      gFreeRuns[after] = gFreeRuns[--gFreeRunCount];
+    } else if (before != kSpanCount) {
+      gFreeRuns[before].spans += spans;
+    } else if (after != kSpanCount) {
+      gFreeRuns[after].firstSpan = first;
+      gFreeRuns[after].spans += spans;
+    } else {
+      // A valid live allocation contributes at least one span not in the free list,
+      // hence the list has room before its release. Invalid/double frees remain invalid.
+      gFreeRuns[gFreeRunCount++] = LargeRun{first, spans};
+    }
   }
 
   [[nodiscard]] std::size_t BlockBytes(const void* const block) noexcept
@@ -525,6 +561,44 @@ namespace lua
       lights.cells.push_back(cell);
     }
     return cell;
+  }
+
+  ArenaUsage ArenaReadUsage() noexcept
+  {
+    ArenaUsage usage;
+    {
+      std::lock_guard<std::mutex> guard(gSpanLock);
+      usage.committedBytes = gCommittedBytes;
+      usage.spanBytes = gNextSpan * kSpanBytes;
+      static_assert(ArenaUsage::kClasses == kClassCount);
+      for (std::size_t span = 0; span < gNextSpan; ++span) {
+        if (gSpanClass[span] < kClassCount) {
+          usage.smallSpanBytes += kSpanBytes;
+          ++usage.classSpans[gSpanClass[span]];
+        }
+      }
+      for (std::size_t index = 0; index < gFreeRunCount; ++index) {
+        usage.freeRunBytes += gFreeRuns[index].spans * kSpanBytes;
+      }
+      usage.freeRuns = gFreeRunCount;
+    }
+    for (std::uint32_t sizeClass = 0; sizeClass < kClassCount; ++sizeClass) {
+      GlobalClassLists& global = gGlobal[sizeClass];
+      std::lock_guard<std::mutex> guard(global.lock);
+      std::size_t blocks = global.looseCount;
+      for (const FreeBlock* batch = global.batches; batch != nullptr; batch = batch->nextBatch) {
+        blocks += BatchBlocks(sizeClass);
+      }
+      usage.smallFreeBytes += blocks * ClassBytes(sizeClass);
+      usage.classBytes[sizeClass] = ClassBytes(sizeClass);
+      usage.classFreeBlocks[sizeClass] = static_cast<std::uint32_t>(blocks);
+    }
+    {
+      LightCells& lights = Lights();
+      std::lock_guard<std::mutex> guard(lights.lock);
+      usage.lightCells = lights.cells.size();
+    }
+    return usage;
   }
 } // namespace lua
 

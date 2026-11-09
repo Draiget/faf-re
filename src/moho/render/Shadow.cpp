@@ -8,10 +8,12 @@
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
+#include "gpg/gal/effects/ShadowCascades.h"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DVertexSheet.h"
 #include "moho/render/ScreenQuadVertexSheet.h"
+#include "moho/render/ShadowCascadeFit.h"
 #include "moho/render/ShadowStableFit.h"
 #include "moho/render/d3d/CD3DDepthStencil.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -34,6 +36,7 @@ namespace gpg::gal
 
 #include <algorithm>
 #include <cmath>
+#include <vector>
 #include "moho/render/d3d/CD3DVertexSheet.h"
 
 namespace
@@ -127,7 +130,195 @@ namespace moho
     {
       return ren_ShadowStable > 0 || (ren_ShadowStable < 0 && !RenderingOnD3D9());
     }
+
+    /**
+     * Engine addition: `ren_ShadowCascades`. On Direct3D 12 and Vulkan the shadow textures become a
+     * 2x2 atlas of `ren_ShadowSize` tiles: one holds the map the original fits over the whole shadowed
+     * view, and up to this many hold the same light space over the near part of the view at more texels
+     * per world unit (gpg/gal/effects/ShadowCascades.h). 0 keeps the single map. A tile that would cover
+     * nearly as much as the whole-view map both ways is skipped, so a top-down view draws only that one.
+     */
+    int ren_ShadowCascades = 3;
+
+    TConVar<int> gTConVar_ren_ShadowCascades(
+      "ren_ShadowCascades",
+      "Finer shadow map tiles near the camera on Direct3D 12 and Vulkan (0-3, 0 the single original map).",
+      &ren_ShadowCascades
+    );
+
+    /**
+     * Engine addition: `ren_ShadowCascadeSplit`. Tile k of n (0 the finest) reaches this fraction to the
+     * power n - k of the shadowed depth range, so with 3 tiles and 0.5 they reach 1/8, 1/4 and 1/2 of it.
+     */
+    float ren_ShadowCascadeSplit = 0.5f;
+
+    TConVar<float> gTConVar_ren_ShadowCascadeSplit(
+      "ren_ShadowCascadeSplit",
+      "How far each finer shadow tile reaches: tile k of n covers this to the power n - k of the shadowed depth.",
+      &ren_ShadowCascadeSplit
+    );
+
+    /**
+     * Engine addition: `ren_ShadowCasterCull`. The light camera's box is fitted around the shadowed part
+     * of the view, so it also holds meshes whose shadows fall only outside it; at near zoom it held twice
+     * the meshes the view draws. With this on, a mesh is drawn into the shadow map only when its bounding
+     * sphere, moved along the light down to the lowest terrain in view, can reach the shadowed part of
+     * the view (ShadowCasterRegion in Mesh.h). Shadows outside the view, which only a water reflection
+     * might show, can lose casters.
+     */
+    bool ren_ShadowCasterCull = true;
+
+    TConVar<bool> gTConVar_ren_ShadowCasterCull(
+      "ren_ShadowCasterCull",
+      "Draw into the shadow map only the meshes whose shadow can fall in the view (1, the default), or every mesh in "
+      "the light's box (0, the original).",
+      &ren_ShadowCasterCull
+    );
+
+    /** Shadow-map texels around the shadowed region whose casters are kept: the blur's reach and the filter's. */
+    constexpr float kCasterMarginTexels = 6.0f;
+
+    /** This frame's shadowed region, from PrepareLightCamera, for RenderShadowMap's mesh batches. */
+    ShadowCasterRegion sCasterRegion{};
+
+    constexpr int kCascadeTiles = static_cast<int>(gpg::gal::effects::kShadowCascadeCount);
+    constexpr int kCascadeFiner = kCascadeTiles - 1;
+    /** Texels around each tile's viewport the blur may smear into; nothing is drawn there. */
+    constexpr int kCascadeGutter = 4;
+    /** Texels inside a tile's edge a lookup keeps clear of: the blur's reach and the filter's footprint. */
+    constexpr float kCascadeMargin = 5.0f;
+    /** A finer tile covering more than this share of the whole-view map on both axes isn't worth drawing. */
+    constexpr float kCascadeWorthIt = 0.75f;
+
+    [[nodiscard]] bool RenderingOnModern()
+    {
+      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+      const gpg::gal::DeviceContext* const context = device != nullptr ? device->GetDeviceContext() : nullptr;
+      return context != nullptr &&
+        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 || context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
+    }
+
+    [[nodiscard]] bool CascadeAtlasWanted()
+    {
+      return ren_ShadowCascades > 0 && RenderingOnModern() && !gpg::gal::effects::gShadowCascadesBlocked.load();
+    }
+
+    // The shadow renderers whose targets are the atlas. Shadow's layout is the binary's.
+    // Each also holds two more blur quads: the blur covers only the tiles a frame draws, tile 0 alone or
+    // the top row, and these read just that part of the atlas (the shadow renderer's own quad reads all).
+    struct CascadeAtlas
+    {
+      const Shadow* shadow = nullptr;
+      boost::shared_ptr<ID3DVertexSheet> firstTileQuad;
+      boost::shared_ptr<ID3DVertexSheet> topRowQuad;
+    };
+    std::vector<CascadeAtlas> sAtlasShadows;
+
+    [[nodiscard]] CascadeAtlas* FindCascadeAtlas(const Shadow& shadow)
+    {
+      for (CascadeAtlas& atlas : sAtlasShadows) {
+        if (atlas.shadow == &shadow) {
+          return &atlas;
+        }
+      }
+      return nullptr;
+    }
+
+    [[nodiscard]] bool IsCascadeAtlas(const Shadow& shadow)
+    {
+      return FindCascadeAtlas(shadow) != nullptr;
+    }
+
+    /** Texels across one atlas tile's viewport. */
+    [[nodiscard]] int CascadeContent(const int tileSize)
+    {
+      return tileSize - (2 * kCascadeGutter);
+    }
+
+    // This frame's finer tiles, built by PrepareLightCamera and drawn by RenderShadowMap right after it,
+    // and the box lengths each one's stable fit held last frame (as sShadowStableWidth for the whole map).
+    struct CascadeFrame
+    {
+      int finer = 0;
+      GeomCamera3 cameras[kCascadeFiner];
+    };
+    CascadeFrame sCascadeFrame;
+    float sCascadeHeldWidth[kCascadeFiner]{};
+    float sCascadeHeldHeight[kCascadeFiner]{};
+
+    /** Atlas tile `index`'s top-left texel: tiles go left to right, then down. */
+    void CascadeTileOrigin(const int index, const int tileSize, int& x, int& y)
+    {
+      x = (index % 2) * tileSize;
+      y = (index / 2) * tileSize;
+    }
+
+    /** Publishes what the effects' shadow lookups read (ShadowCascades.h); `count` 0 is the plain map. */
+    void PublishCascades(const float (&vectors)[gpg::gal::effects::kShadowCascadeVectors][4])
+    {
+      gpg::gal::effects::ShadowCascadeConstants& constants = gpg::gal::effects::gShadowCascades;
+      if (std::memcmp(constants.vectors, vectors, sizeof(constants.vectors)) != 0) {
+        std::memcpy(constants.vectors, vectors, sizeof(constants.vectors));
+        ++constants.version;
+      }
+    }
+
+    void PublishNoCascades()
+    {
+      const float none[gpg::gal::effects::kShadowCascadeVectors][4]{};
+      PublishCascades(none);
+    }
+
+    /**
+     * The corners of the convex region inside every plane (normal . x <= constant, CGeomSolid3's
+     * convention): each point three planes meet at that no plane excludes. Empty when the region is.
+     */
+    void ConvexRegionCorners(const Wm3::Plane3f* const planes, const std::size_t count, std::vector<Wm3::Vector3f>& corners)
+    {
+      corners.clear();
+      const auto cross = [](const Wm3::Vector3f& a, const Wm3::Vector3f& b) {
+        return Wm3::Vector3f(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+      };
+      const auto dot = [](const Wm3::Vector3f& a, const Wm3::Vector3f& b) { return a.x * b.x + a.y * b.y + a.z * b.z; };
+      for (std::size_t a = 0U; a < count; ++a) {
+        for (std::size_t b = a + 1U; b < count; ++b) {
+          const Wm3::Vector3f bc = cross(planes[a].Normal, planes[b].Normal);
+          for (std::size_t c = b + 1U; c < count; ++c) {
+            const Wm3::Vector3f cb = cross(planes[b].Normal, planes[c].Normal);
+            const float determinant = dot(planes[a].Normal, cb);
+            if (std::fabs(determinant) < 1.0e-6f) {
+              continue;
+            }
+            const Wm3::Vector3f ca = cross(planes[c].Normal, planes[a].Normal);
+            const float scale = 1.0f / determinant;
+            const Wm3::Vector3f point(
+              (planes[a].Constant * cb.x + planes[b].Constant * ca.x + planes[c].Constant * bc.x) * scale,
+              (planes[a].Constant * cb.y + planes[b].Constant * ca.y + planes[c].Constant * bc.y) * scale,
+              (planes[a].Constant * cb.z + planes[b].Constant * ca.z + planes[c].Constant * bc.z) * scale
+            );
+            bool inside = true;
+            for (std::size_t other = 0U; inside && other < count; ++other) {
+              const float tolerance = 0.01f + 1.0e-5f * std::fabs(planes[other].Constant);
+              inside = dot(planes[other].Normal, point) - planes[other].Constant <= tolerance;
+            }
+            if (inside) {
+              corners.push_back(point);
+            }
+          }
+        }
+      }
+    }
   } // namespace
+
+  int ShadowTextureSize(const Shadow& shadow)
+  {
+    return IsCascadeAtlas(shadow) ? 2 * shadow.mShadowSize : shadow.mShadowSize;
+  }
+
+  int ShadowMapTexels(const Shadow& shadow)
+  {
+    return IsCascadeAtlas(shadow) ? CascadeContent(shadow.mShadowSize) : shadow.mShadowSize;
+  }
 
   /**
    * Address: 0x009407D0 (FUN_009407D0, sub_9407D0)
@@ -217,6 +408,11 @@ namespace moho
     }
 
     mShadowSize = 0;
+    // Engine addition (ren_ShadowCascades): the targets that were the atlas are gone.
+    sAtlasShadows.erase(
+      std::remove_if(sAtlasShadows.begin(), sAtlasShadows.end(), [this](const CascadeAtlas& atlas) { return atlas.shadow == this; }),
+      sAtlasShadows.end()
+    );
     return 0;
   }
 
@@ -298,13 +494,17 @@ namespace moho
 
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
 
-    resources->CreateRenderTarget(mShadowMap, shadowSize, shadowSize, targetFormat);
+    // Engine addition (ren_ShadowCascades): every target is the 2x2 atlas of shadowSize tiles.
+    const bool atlas = CascadeAtlasWanted() && CascadeContent(shadowSize) > 64;
+    const int textureSize = atlas ? 2 * shadowSize : shadowSize;
+
+    resources->CreateRenderTarget(mShadowMap, textureSize, textureSize, targetFormat);
     if (mShadowBlurEnabled) {
-      resources->CreateRenderTarget(mBlurTargetA, shadowSize, shadowSize, targetFormat);
-      resources->CreateRenderTarget(mBlurTargetB, shadowSize, shadowSize, targetFormat);
+      resources->CreateRenderTarget(mBlurTargetA, textureSize, textureSize, targetFormat);
+      resources->CreateRenderTarget(mBlurTargetB, textureSize, textureSize, targetFormat);
     }
 
-    resources->CreateDepthStencil(mDepthStencil, shadowSize, shadowSize, kShadowDepthStencilFormat);
+    resources->CreateDepthStencil(mDepthStencil, textureSize, textureSize, kShadowDepthStencilFormat);
     if (!mDepthStencil) {
       gpg::Warnf("unable to create depth sheet used by the shadow map");
       (void)ReleaseRenderResources();
@@ -324,8 +524,19 @@ namespace moho
     // The template is a unit quad; scale it out to the shadow-map resolution.
     // The binary leaves the texture coordinates alone, which is what passing
     // 1.0f for both texture scales does here.
-    const float shadowSizeF = static_cast<float>(shadowSize);
+    const float shadowSizeF = static_cast<float>(textureSize);
     FillScreenQuadVertexSheet(*mQuadVertexSheet, shadowSizeF, shadowSizeF, 1.0f, 1.0f);
+    if (atlas) {
+      CascadeAtlas entry{};
+      entry.shadow = this;
+      entry.firstTileQuad.reset(resources->NewVertexSheet(kScreenQuadStreamUsage, kScreenQuadVertexCount, vertexFormat));
+      entry.topRowQuad.reset(resources->NewVertexSheet(kScreenQuadStreamUsage, kScreenQuadVertexCount, vertexFormat));
+      if (entry.firstTileQuad && entry.topRowQuad) {
+        FillScreenQuadVertexSheet(*entry.firstTileQuad, shadowSizeF, shadowSizeF, 0.5f, 0.5f);
+        FillScreenQuadVertexSheet(*entry.topRowQuad, shadowSizeF, shadowSizeF, 1.0f, 0.5f);
+      }
+      sAtlasShadows.push_back(entry);
+    }
     return 1;
   }
 
@@ -385,6 +596,47 @@ namespace moho
       "The shadow volume's terrain intersection is kept while the frustum and terrain stay the same (1, the default), "
       "or computed each frame (0). Read each frame.",
       &ren_ShadowVolumeCache
+    );
+  } // namespace
+
+  namespace
+  {
+    /** The light camera for a light-space box: PrepareLightCamera's projection, also each cascade tile's. */
+    void BuildShadowLightCamera(
+      const gpg::gal::Matrix& lightView,
+      const float nearDepth,
+      const float farDepth,
+      const ShadowStableBox& box,
+      GeomCamera3& camera
+    )
+    {
+      gpg::gal::Matrix lightProjection{};
+      lightProjection.r[0].x = 2.0f / (box.maxX - box.minX);
+      lightProjection.r[1].y = 2.0f / (box.maxY - box.minY);
+      lightProjection.r[2].z = 1.0f / (nearDepth - farDepth);
+      lightProjection.r[3].x = (box.maxX + box.minX) / (box.minX - box.maxX);
+      lightProjection.r[3].y = (box.minY + box.maxY) / (box.minY - box.maxY);
+      lightProjection.r[3].z = lightProjection.r[2].z * nearDepth;
+      lightProjection.r[3].w = 1.0f;
+
+      gpg::gal::Matrix lightViewProjection{};
+      (void)gpg::gal::Math::mul(&lightViewProjection, &lightView, &lightProjection);
+
+      const VTransform identityTransform{VMatrix4::Identity()};
+      camera.Init(identityTransform, lightViewProjection);
+    }
+
+    void PrepareCascades(
+      int shadowSize,
+      const Wm3::Vector3f& cameraForward,
+      const CGeomSolid3& shadowFrustum,
+      const Wm3::AxisAlignedBox3f& volume,
+      const gpg::gal::Matrix& lightView,
+      float nearDepth,
+      float farDepth,
+      const ShadowStableBox& base,
+      int content,
+      bool stableFit
     );
   } // namespace
 
@@ -509,31 +761,188 @@ namespace moho
       lightSpaceVolume.Min.Y(),
       lightSpaceVolume.Max.Y(),
     };
+    // Engine addition (ren_ShadowCascades): in the atlas the whole-view map is one tile, drawn into a
+    // viewport the gutters inset (the stable fit's size argument is that viewport plus its usual border).
+    const bool atlas = IsCascadeAtlas(*this);
+    const int content = atlas ? CascadeContent(mShadowSize) : mShadowSize - 2;
     if (stableFit) {
-      box = FitShadowStableBox(box.minX, box.maxX, box.minY, box.maxY, mShadowSize, sShadowStableWidth, sShadowStableHeight);
+      box = FitShadowStableBox(box.minX, box.maxX, box.minY, box.maxY, content + 2, sShadowStableWidth, sShadowStableHeight);
     }
 
     // Orthographic projection fitted to the light-space volume, built by
     // hand rather than through a helper - the binary writes these seven
-    // elements and zeroes the rest.
-    gpg::gal::Matrix lightProjection{};
-    lightProjection.r[0].x = 2.0f / (box.maxX - box.minX);
-    lightProjection.r[1].y = 2.0f / (box.maxY - box.minY);
-    lightProjection.r[2].z = 1.0f / (nearDepth - farDepth);
-    lightProjection.r[3].x = (box.maxX + box.minX) / (box.minX - box.maxX);
-    lightProjection.r[3].y = (box.minY + box.maxY) / (box.minY - box.maxY);
-    lightProjection.r[3].z = lightProjection.r[2].z * nearDepth;
-    lightProjection.r[3].w = 1.0f;
+    // elements and zeroes the rest (BuildShadowLightCamera).
+    BuildShadowLightCamera(lightView, nearDepth, farDepth, box, mCamera);
 
-    gpg::gal::Matrix lightViewProjection{};
-    (void)gpg::gal::Math::mul(&lightViewProjection, &lightView, &lightProjection);
-
-    const VTransform identityTransform{VMatrix4::Identity()};
-    mCamera.Init(identityTransform, lightViewProjection);
+    // Engine addition (ren_ShadowCasterCull): the region the mesh batches keep casters for.
+    sCasterRegion = ShadowCasterRegion{};
+    {
+      const float lightLength = std::sqrt(
+        lightDirection.X() * lightDirection.X() + lightDirection.Y() * lightDirection.Y() +
+        lightDirection.Z() * lightDirection.Z()
+      );
+      if (planeCount <= ShadowCasterRegion::kMaxPlanes && lightLength > 0.0f) {
+        for (std::uint32_t index = 0U; index < planeCount; ++index) {
+          const Wm3::Plane3f& plane = shadowFrustum.planes_[index];
+          sCasterRegion.planes[index][0] = plane.Normal.x;
+          sCasterRegion.planes[index][1] = plane.Normal.y;
+          sCasterRegion.planes[index][2] = plane.Normal.z;
+          sCasterRegion.planes[index][3] = plane.Constant;
+        }
+        sCasterRegion.planeCount = planeCount;
+        sCasterRegion.light[0] = lightDirection.X() / lightLength;
+        sCasterRegion.light[1] = lightDirection.Y() / lightLength;
+        sCasterRegion.light[2] = lightDirection.Z() / lightLength;
+        sCasterRegion.floorY = volume.Min.Y();
+        const float texel = std::max(box.maxX - box.minX, box.maxY - box.minY) / static_cast<float>(content);
+        sCasterRegion.margin = kCasterMarginTexels * texel;
+        sCasterRegion.active = true;
+      }
+    }
 
     mShadowCameraValid = true;
+    if (atlas) {
+      PrepareCascades(mShadowSize, cameraForward, shadowFrustum, volume, lightView, nearDepth, farDepth, box, content, stableFit);
+    } else {
+      PublishNoCascades();
+    }
     return mShadowCameraValid;
   }
+
+  namespace
+  {
+  /**
+   * Engine addition (ren_ShadowCascades): fits this frame's finer atlas tiles and publishes where every
+   * tile sits. Tile k covers the part of the shadowed view frustum, above the lowest terrain it shows and
+   * below the volume's top, nearer than the split of the depth range (ren_ShadowCascadeSplit), in the
+   * whole-view map's light space and cut to its box. RenderShadowMap batches the meshes for each tile.
+   */
+  void PrepareCascades(
+    const int shadowSize,
+    const Wm3::Vector3f& cameraForward,
+    const CGeomSolid3& shadowFrustum,
+    const Wm3::AxisAlignedBox3f& volume,
+    const gpg::gal::Matrix& lightView,
+    const float nearDepth,
+    const float farDepth,
+    const ShadowStableBox& base,
+    const int content,
+    const bool stableFit
+  )
+  {
+    sCascadeFrame.finer = 0;
+
+    // The frustum the map shadows, between the terrain's lowest and highest point in it.
+    constexpr std::size_t kMaxPlanes = 16U;
+    Wm3::Plane3f planes[kMaxPlanes]{};
+    std::size_t planeCount = 0U;
+    for (std::size_t index = 0U; index < shadowFrustum.planes_.Size() && planeCount + 3U < kMaxPlanes; ++index) {
+      planes[planeCount++] = shadowFrustum.planes_[index];
+    }
+    planes[planeCount].Normal = Wm3::Vector3f(0.0f, 1.0f, 0.0f);
+    planes[planeCount++].Constant = volume.Max.Y();
+    planes[planeCount].Normal = Wm3::Vector3f(0.0f, -1.0f, 0.0f);
+    planes[planeCount++].Constant = -volume.Min.Y();
+
+    std::vector<Wm3::Vector3f> corners;
+    ConvexRegionCorners(planes, planeCount, corners);
+    const auto depthOf = [&](const Wm3::Vector3f& point) {
+      return point.x * cameraForward.x + point.y * cameraForward.y + point.z * cameraForward.z;
+    };
+    float nearest = 0.0f;
+    float farthest = 0.0f;
+    for (std::size_t index = 0U; index < corners.size(); ++index) {
+      const float depth = depthOf(corners[index]);
+      nearest = (index == 0U) ? depth : std::min(nearest, depth);
+      farthest = (index == 0U) ? depth : std::max(farthest, depth);
+    }
+
+    const int wanted = std::clamp(ren_ShadowCascades, 0, kCascadeFiner);
+    const float split = std::clamp(ren_ShadowCascadeSplit, 0.05f, 0.95f);
+    const float baseWidth = base.maxX - base.minX;
+    const float baseHeight = base.maxY - base.minY;
+    ShadowStableBox boxes[kCascadeFiner]{};
+    if (!corners.empty() && farthest > nearest) {
+      for (int finest = 0; finest < wanted; ++finest) {
+        const float reach = nearest + (farthest - nearest) * std::pow(split, static_cast<float>(wanted - finest));
+        planes[planeCount].Normal = cameraForward;
+        planes[planeCount].Constant = reach;
+        ConvexRegionCorners(planes, planeCount + 1U, corners);
+        if (corners.empty()) {
+          continue;
+        }
+        ShadowStableBox raw{};
+        for (std::size_t index = 0U; index < corners.size(); ++index) {
+          const Wm3::Vector3f& p = corners[index];
+          const float x = p.x * lightView.r[0].x + p.y * lightView.r[1].x + p.z * lightView.r[2].x + lightView.r[3].x;
+          const float y = p.x * lightView.r[0].y + p.y * lightView.r[1].y + p.z * lightView.r[2].y + lightView.r[3].y;
+          raw.minX = (index == 0U) ? x : std::min(raw.minX, x);
+          raw.maxX = (index == 0U) ? x : std::max(raw.maxX, x);
+          raw.minY = (index == 0U) ? y : std::min(raw.minY, y);
+          raw.maxY = (index == 0U) ? y : std::max(raw.maxY, y);
+        }
+        raw.minX = std::max(raw.minX, base.minX);
+        raw.maxX = std::min(raw.maxX, base.maxX);
+        raw.minY = std::max(raw.minY, base.minY);
+        raw.maxY = std::min(raw.maxY, base.maxY);
+        if (raw.maxX - raw.minX < 1.0f || raw.maxY - raw.minY < 1.0f ||
+            (raw.maxX - raw.minX > kCascadeWorthIt * baseWidth && raw.maxY - raw.minY > kCascadeWorthIt * baseHeight)) {
+          continue;
+        }
+        ShadowStableBox fitted = raw;
+        if (stableFit) {
+          fitted = FitShadowStableBox(
+            raw.minX, raw.maxX, raw.minY, raw.maxY, content + 2, sCascadeHeldWidth[finest], sCascadeHeldHeight[finest]
+          );
+        } else {
+          // One texel of room for the rasteriser at the edge, as the stable fit's margin gives.
+          const float padX = (raw.maxX - raw.minX) / static_cast<float>(content);
+          const float padY = (raw.maxY - raw.minY) / static_cast<float>(content);
+          fitted = ShadowStableBox{raw.minX - padX, raw.maxX + padX, raw.minY - padY, raw.maxY + padY};
+        }
+        const int tile = sCascadeFrame.finer;
+        boxes[tile] = fitted;
+        BuildShadowLightCamera(lightView, nearDepth, farDepth, fitted, sCascadeFrame.cameras[tile]);
+        ++sCascadeFrame.finer;
+      }
+    }
+
+    // Diagnostics: FAF_SHADOW_CASCADE_LOG=1 logs the finer tiles drawn whenever their number changes.
+    static const bool sLogTiles = [] {
+      char value[8] = {};
+      std::size_t length = 0;
+      return ::getenv_s(&length, value, sizeof(value), "FAF_SHADOW_CASCADE_LOG") == 0 && value[0] == '1';
+    }();
+    static int sLoggedTiles = -1;
+    if (sLogTiles && sCascadeFrame.finer != sLoggedTiles) {
+      sLoggedTiles = sCascadeFrame.finer;
+      gpg::Logf("shadow cascades: %d finer tiles (depth %.0f to %.0f)", sCascadeFrame.finer, nearest, farthest);
+    }
+
+    // What the effects read: the finer tiles finest first, then the whole-view map. Tile 0 of the atlas
+    // is the whole-view map and tile 1 + k the k-th finer one.
+    const float atlasSize = static_cast<float>(2 * shadowSize);
+    float vectors[gpg::gal::effects::kShadowCascadeVectors][4]{};
+    const int tiles = sCascadeFrame.finer + 1;
+    vectors[0][0] = static_cast<float>(tiles);
+    vectors[0][2] = 0.5f / atlasSize; // texel (0, 0): outside every viewport and the blur's, so cleared
+    vectors[0][3] = 0.5f / atlasSize;
+    for (int entry = 0; entry < tiles; ++entry) {
+      const bool whole = entry == sCascadeFrame.finer;
+      const int atlasTile = whole ? 0 : entry + 1;
+      int originX = 0;
+      int originY = 0;
+      CascadeTileOrigin(atlasTile, shadowSize, originX, originY);
+      const ShadowCascadeLookup lookup = FitShadowCascadeLookup(
+        base, whole ? base : boxes[entry], static_cast<float>(originX + kCascadeGutter), static_cast<float>(originY + kCascadeGutter),
+        static_cast<float>(content), atlasSize, kCascadeMargin
+      );
+      std::memcpy(vectors[1 + 2 * entry], lookup.box, sizeof(lookup.box));
+      std::memcpy(vectors[2 + 2 * entry], lookup.map, sizeof(lookup.map));
+    }
+    PublishCascades(vectors);
+  }
+  } // namespace
 
   /**
    * Address: 0x007FEEA0 (FUN_007FEEA0, sub_7FEEA0)
@@ -606,13 +1015,36 @@ namespace moho
 
     // Depth pass into the shadow map.
     device->SetRenderTarget1(mShadowMap.get(), mDepthStencil.get(), true, -1, 1.0f, 0);
-    bindTargetWithBorder(mShadowMap);
-
-    terrain->DrawTerrainDepth(mCamera);
-
     MeshRenderer* const meshRenderer = MeshRenderer::GetInstance();
-    meshRenderer->Batch(REN_GetGameTick(), REN_GetSimDeltaSeconds(), mCamera, viewCamera.viewport.r[1]);
-    meshRenderer->RenderDepth(mCamera, meshRenderer->meshes);
+    gShadowCasterRegion = ren_ShadowCasterCull ? sCasterRegion : ShadowCasterRegion{};
+    if (IsCascadeAtlas(*this)) {
+      // Engine addition (ren_ShadowCascades): each tile draws into its own viewport of the atlas, with the
+      // meshes batched for its own light camera. Drawing the whole-view batch into every tile and leaving
+      // the rest to clipping cost four times the mesh depth work (Vulkan top view: +0.48 ms with it,
+      // +0.10 ms without meshes in the finer tiles, tmp/claude/csm/split).
+      device->GetView(&savedPos, &savedSize, &savedMinDepth, &savedMaxDepth);
+      const int content = CascadeContent(mShadowSize);
+      for (int tile = 0; tile <= sCascadeFrame.finer; ++tile) {
+        int originX = 0;
+        int originY = 0;
+        CascadeTileOrigin(tile, mShadowSize, originX, originY);
+        Wm3::Vector2i tilePos{originX + kCascadeGutter, originY + kCascadeGutter};
+        Wm3::Vector2i tileSize{content, content};
+        device->SetViewport(&tilePos, &tileSize, savedMinDepth, savedMaxDepth);
+        const GeomCamera3& camera = (tile == 0) ? mCamera : sCascadeFrame.cameras[tile - 1];
+        terrain->DrawTerrainDepth(camera);
+        meshRenderer->Batch(REN_GetGameTick(), REN_GetSimDeltaSeconds(), camera, viewCamera.viewport.r[1]);
+        meshRenderer->RenderDepth(camera, meshRenderer->meshes);
+      }
+    } else {
+      bindTargetWithBorder(mShadowMap);
+
+      terrain->DrawTerrainDepth(mCamera);
+
+      meshRenderer->Batch(REN_GetGameTick(), REN_GetSimDeltaSeconds(), mCamera, viewCamera.viewport.r[1]);
+      meshRenderer->RenderDepth(mCamera, meshRenderer->meshes);
+    }
+    gShadowCasterRegion.active = false;
 
     restoreViewport();
 
@@ -662,6 +1094,20 @@ namespace moho
 
     auto& shaderVars = GetTerrainShaderVars();
 
+    // Engine addition (ren_ShadowCascades): the atlas blurs only the tiles this frame drew - tile 0, the
+    // top row, or all four - with a quad that reads just that part. The viewport is that part exactly, so
+    // each blurred texel lines up with the texel it came from; the gutters keep the edge taps off the
+    // tiles' content. The original's whole-map quad over a viewport inset one texel shifts its result by
+    // up to two texels at the far edge.
+    const CascadeAtlas* const atlas = FindCascadeAtlas(*this);
+    ID3DVertexSheet* blurQuad = mQuadVertexSheet.get();
+    Wm3::Vector2i blurSize{ShadowTextureSize(*this), ShadowTextureSize(*this)};
+    if (atlas != nullptr && atlas->firstTileQuad && atlas->topRowQuad && sCascadeFrame.finer < 2) {
+      blurQuad = (sCascadeFrame.finer == 0) ? atlas->firstTileQuad.get() : atlas->topRowQuad.get();
+      blurSize.x = (sCascadeFrame.finer == 0) ? mShadowSize : 2 * mShadowSize;
+      blurSize.y = mShadowSize;
+    }
+
     // Separable variance blur: shadow map -> A (horizontal) -> B (vertical).
     const auto blurPass = [&](
       const boost::shared_ptr<CD3DRenderTarget>& target,
@@ -669,15 +1115,21 @@ namespace moho
       const char* const technique
     ) {
       device->SetRenderTarget1(target.get(), mDepthStencil.get(), true, -1, 1.0f, 0);
-      bindTargetWithBorder(target);
+      if (atlas != nullptr) {
+        device->GetView(&savedPos, &savedSize, &savedMinDepth, &savedMaxDepth);
+        Wm3::Vector2i blurPos{0, 0};
+        device->SetViewport(&blurPos, &blurSize, savedMinDepth, savedMaxDepth);
+      } else {
+        bindTargetWithBorder(target);
+      }
 
       device->SelectFxFile("terrain");
       device->SelectTechnique(technique);
-      (void)shaderVars.shadowSize.SetFloat(static_cast<float>(mShadowSize));
+      (void)shaderVars.shadowSize.SetFloat(static_cast<float>(ShadowTextureSize(*this)));
       (void)shaderVars.shadowTexture.SetRenderTargetTexture(source);
 
       SD3DVertexRange quadView{};
-      quadView.sheet = mQuadVertexSheet.get();
+      quadView.sheet = blurQuad;
       quadView.startVertex = 0;
       quadView.baseVertex = 0;
       quadView.endVertex = 3;
@@ -718,9 +1170,13 @@ namespace moho
     }
     shadow_Fidelity = fidelity;
 
+    // Engine addition (ren_ShadowCascades): turning the atlas on or off rebuilds the targets too.
+    const bool atlasChanged = mShadowFidelity != 0 &&
+      (CascadeAtlasWanted() && CascadeContent(mShadowSize) > 64) != IsCascadeAtlas(*this);
     if (fidelity != mShadowFidelity
       || ren_ShadowSize != mShadowSize
-      || ren_ShadowBlur != mShadowBlurEnabled) {
+      || ren_ShadowBlur != mShadowBlurEnabled
+      || atlasChanged) {
       (void)Init(fidelity);
 
       // Init settles what could actually be allocated; publish that back.
@@ -735,7 +1191,10 @@ namespace moho
     }
 
     const Wm3::Vector3f sunDirection = terrainRes->GetSunDirection();
-    (void)PrepareLightCamera(viewCamera, sunDirection, zoom);
+    if (!PrepareLightCamera(viewCamera, sunDirection, zoom)) {
+      // Engine addition (ren_ShadowCascades): no tiles this frame, so no lookup follows last frame's.
+      PublishNoCascades();
+    }
     RenderShadowMap(terrain, viewCamera);
   }
 

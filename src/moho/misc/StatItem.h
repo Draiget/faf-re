@@ -302,6 +302,12 @@ namespace moho
     void AttachChild(StatItem* child);
     [[nodiscard]] StatItem* FindDirectChildByName(const fa::string& token);
 
+    /** Engine addition: calls `visit` with each direct child (the editor's per-play instance counts). */
+    void VisitChildren(void (*visit)(StatItem* child, void* context), void* context);
+
+    /** Engine addition: the item's name (the last part of its stat path). */
+    [[nodiscard]] const fa::string& Name() const noexcept { return mName; }
+
     static gpg::RType* sType;
 
   private:

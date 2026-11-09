@@ -328,6 +328,7 @@ set(FAF_ENGINE_SOURCES
   moho/terrain/TerrainDynamicTextureHelpers.cpp
   moho/terrain/TerrainFactory.cpp
   moho/terrain/TerrainShaderVars.cpp
+  moho/terrain/TerrainTessellation.cpp
   moho/terrain/water/CWaterShaderProperties.cpp
   moho/terrain/water/HighFidelityWater.cpp
   moho/terrain/water/LowFidelityWater.cpp
@@ -335,6 +336,7 @@ set(FAF_ENGINE_SOURCES
   moho/terrain/water/WaterShaderVars.cpp
   moho/terrain/water/WaveSystem.cpp
   moho/terrain/water/Shoreline.cpp
+  moho/terrain/water/WaterBodySurfaces.cpp
   moho/ui/CUIWorldView.cpp
   moho/ui/CUIManager.cpp
   moho/lua/SCR_Math.cpp
@@ -474,6 +476,8 @@ set(FAF_ENGINE_SOURCES
   moho/command/SSTICommandVariableData.cpp
   moho/entity/EntityCategoryTypeInfo.cpp
   moho/entity/CTextureScroller.cpp
+  moho/entity/FixedSlabPool.cpp
+  moho/entity/EntityMemoryManager.cpp
   moho/entity/Entity.cpp
   moho/entity/EntityLuaFunctions.cpp
   moho/command/SSTITarget.cpp
@@ -758,6 +762,7 @@ set(FAF_ENGINE_SOURCES
   moho/projectile/ProjectileStartupRegistrations.cpp
   moho/entity/Prop.cpp
   moho/entity/EntityDb.cpp
+  moho/entity/EntityPool.cpp
   moho/entity/Motor.cpp
   moho/entity/EntityLuaFunctionThunks.cpp
   moho/entity/REntityBlueprint.cpp
@@ -840,6 +845,8 @@ set(FAF_ENGINE_SOURCES
   moho/sim/SConditionTriggerReflection.cpp
   moho/sim/SConditionTriggerTypes.cpp
   moho/sim/STIMap.cpp
+  moho/sim/WaterBodies.cpp
+  moho/sim/STIMapWaterBodies.cpp
   moho/sim/CArmyStatItemTypeInfo.cpp
   moho/sim/CArmyStats.cpp
   moho/app/SnapshotDirectoryDialog.cpp
@@ -1123,4 +1130,5 @@ set(FAF_ENGINE_SOURCES
   moho/movie/sfd/FfmpegSfdDecoder.cpp
   moho/movie/sfd/DirectSoundMovieSink.cpp
   moho/movie/sfd/SfdMetadata.cpp
+  faf/memory/MemoryPool.cpp
 )

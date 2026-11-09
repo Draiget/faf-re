@@ -32,6 +32,37 @@ namespace moho
     constexpr std::size_t kRectLookupMask = 0x1FFu;
     constexpr std::size_t kRectLimit = 65000u;
 
+    /// Engine addition (water bodies): the map the last `Rebuild` tessellated, for its bodies.
+    const STIMap* sTesselatorMap = nullptr;
+
+    /**
+     * Engine addition (water bodies): whether a water body's surface crosses the tile
+     * `[x0, x1) x [z0, z1)` with terrain in `[minY, maxY]`, and the highest such level in
+     * `*highest`. The binary tests the sea only; this adds every lake whose cells overlap the tile.
+     */
+    [[nodiscard]] bool WaterBodyCrossesTile(
+      const std::int32_t x0, const std::int32_t z0, const std::int32_t x1, const std::int32_t z1,
+      const float minY, const float maxY, float* const highest
+    ) noexcept
+    {
+      if (sTesselatorMap == nullptr || !sTesselatorMap->HasWaterBodies()) {
+        return false;
+      }
+      const CWaterBodies& bodies = *sTesselatorMap->mWaterBodies;
+      bool crosses = false;
+      for (std::size_t number = 1; number <= bodies.BodyCount(); ++number) {
+        const SWaterBody& body = bodies.Body(static_cast<std::uint8_t>(number));
+        if (body.elevation == kWaterBodyNoWater || body.x1 <= x0 || body.x0 >= x1 || body.z1 <= z0 || body.z0 >= z1) {
+          continue;
+        }
+        if (body.elevation >= minY && maxY >= body.elevation) {
+          crosses = true;
+        }
+        *highest = std::max(*highest, body.elevation);
+      }
+      return crosses;
+    }
+
     [[nodiscard]] std::size_t LookupIndex(const std::int32_t x, const std::int32_t z) noexcept
     {
       const std::size_t maskedX = static_cast<std::size_t>(x) & kRectLookupMask;
@@ -862,8 +893,13 @@ namespace moho
     bounds.Max.y = tierBounds.y;
     bounds.Max.z = static_cast<float>(cellZ + (1 << tier));
 
-    const float waterElevation = mWaterElevation;
-    const bool crossesWaterSurface = (waterElevation >= tierBounds.x) && (tierBounds.y >= waterElevation);
+    float waterElevation = mWaterElevation;
+    bool crossesWaterSurface = (waterElevation >= tierBounds.x) && (tierBounds.y >= waterElevation);
+    // Engine addition (water bodies): a lake's shore is refined as the sea's, and a tile under a
+    // lake is kept by the frustum test up to the lake's surface.
+    if (WaterBodyCrossesTile(cellX, cellZ, cellX + (1 << tier), cellZ + (1 << tier), tierBounds.x, tierBounds.y, &waterElevation)) {
+      crossesWaterSurface = true;
+    }
 
     if (*activePlaneMask != 0u) {
       float clippedMaxY = tierBounds.y;
@@ -1503,6 +1539,7 @@ namespace moho
 
     CHeightField* const field = terrainResource->GetHeightField();
     mWaterElevation = terrainResource->IsWaterEnabled() ? terrainResource->GetWaterElevation() : -10000.0f;
+    sTesselatorMap = terrainResource->mMap;
 
     const std::int32_t tierCount = HeightFieldTierCount(*field);
     const Wm3::AxisAlignedBox3f terrainBounds = field->GetTierBox(0, 0, tierCount);

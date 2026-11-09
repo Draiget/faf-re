@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <deque>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -10,6 +11,7 @@
 #include <vector>
 
 #include "remote/ContentCheck.h"
+#include "remote/FocusAndCameras.h"
 #include "remote/SeatRoster.h"
 #include "remote/net/GameLinks.h"
 #include "server/LobbyRelay.h"
@@ -50,6 +52,11 @@ namespace faf::server
     double lobbyAwaySeconds = 6.0;
     /** Plan WP17.1: the match file's `MatchLobbyControl`: organised (WPR.49's rules) or player-hosted. */
     ELobbyControl lobbyControl = ELobbyControl::Organiser;
+    /**
+     * Plan WP17.8: the match file's `MatchUiMods`, the UI mods a player may run (empty: none); unset: any. A player who
+     * runs another is judged under `MatchContentCheck` (warned, or out of the game), as reported by their game.
+     */
+    std::optional<std::vector<std::string>> uiModsAllowed;
   };
 
   class CServerNet final : private remote::net::CServerLinks::IEvents
@@ -138,8 +145,43 @@ namespace faf::server
       bool gone = false;
       bool away = false; // quiet in the lobby
       std::uint32_t pingMs = 0;
+      // Plan WP17.2, WP17.8: the server's verdicts on what the player's game reported ("" until judged): content
+      // "same", "differs" or "missing"; UI mods "allowed", "outside" or "missing"; and the UI mods it reported.
+      std::string content;
+      std::string mods;
+      std::vector<std::string> uiMods;
+      // Plan WP12.1: how far its game has loaded: "" before the launch, "loading", "rules" (its content report came, so
+      // the rules are loaded), "loaded" (at the start barrier).
+      std::string load;
+      // Plan WP17.2: in the lobby, the ready state its own PlayerOptions last set: "yes", "no", or "" before it did.
+      std::string ready;
+      // Plan WP17.2: the lobby slot the host's lobby put it in (lobby.lua's slot, not the match's army); 0 before.
+      int lobbySlot = 0;
+      // Plan WP10.7: the sim-speed limit its game last reported (remote/SpeedLimit.h); nothing before it did.
+      std::optional<int> speedLimit;
+      // Plan WP11.1: camera updates its game sent (`SetGeomCams`, at most four a second).
+      std::uint64_t cameraUpdates = 0;
+      // Plan WP10.7: how far behind its link is: the reliable bytes it hasn't acked, and the beats between the newest
+      // view queued and the newest it has acked whole (an estimate: other messages share the stream).
+      std::uint64_t backlogBytes = 0;
+      std::uint32_t behindBeats = 0;
     };
     [[nodiscard]] std::vector<SSeatState> Seats();
+    /** Plan WP17.2: each verdict made since the last call, as the seat stood then (uid, name and the verdict fields). */
+    [[nodiscard]] std::vector<SSeatState> TakeJudged();
+    /**
+     * Plan WP10.7: the lowest sim-speed limit of the seats still in the game (not gone) that reported one, and whose;
+     * nothing when none did. As `CClientManagerImpl::GetSimRate` takes the lowest client's. Any thread.
+     */
+    [[nodiscard]] std::optional<std::pair<int, std::int32_t>> SlowestSpeedLimit();
+    /**
+     * Plan WP11.1: a player's own army, the focus the server grants their `SetFocusArmy` requests; `FreeFocus` lets
+     * them pick any (defeated, with `DefeatedPlayerView = "observe"`). Any thread.
+     */
+    void SetFocusRule(std::int32_t uid, int ownArmy);
+    void FreeFocus(std::int32_t uid);
+    /** Plan WP17.2: lobby ready states that changed since the last call (uid, ready), in order. */
+    [[nodiscard]] std::vector<std::pair<std::int32_t, bool>> TakeReadyChanges();
     /**
      * Plan WP17.2: a participant out of the match (the organiser's eject, or a defeat with `DefeatedPlayerView =
      * "disconnect"`), as one who leaves is; done on the network thread. `reason` goes to the log whole. False: no such seat.
@@ -181,6 +223,11 @@ namespace faf::server
     struct SSeat
     {
       std::string name;
+      // Plan WP10.7: the reliable bytes queued to it from the views' path, and where each view's message ended in
+      // them (with its beat), oldest first; the views behind the peer's acked prefix are dropped as it moves on.
+      std::uint64_t viewBytesQueued = 0;
+      std::deque<std::pair<std::uint64_t, std::uint32_t>> viewEnds;
+      std::uint32_t lastViewBeat = 0;
       remote::CServerClient* seat = nullptr;
       bool joinedEver = false;
       bool loaded = false;
@@ -195,6 +242,16 @@ namespace faf::server
       bool reported = false;       // plan WP2.6: its content report came
       remote::SContentReport report;
       bool contentJudged = false;
+      bool modsReported = false;   // plan WP17.8: its mod report came
+      std::vector<remote::SModEntry> mods;
+      bool modsJudged = false;
+      std::string contentVerdict; // plan WP17.2: as SSeatState's
+      std::string modsVerdict;
+      std::optional<int> speedLimit; // plan WP10.7: the last its game reported
+      std::vector<remote::SCameraReport> cameras; // plan WP11.1: its cameras, as last reported
+      std::uint64_t cameraUpdates = 0;
+      std::uint64_t camerasAtUs = 0;
+      double cameraTokens = 0.0; // plan WP11.1: the camera updates it may still send now (refilled at eight a second)
       // Plan WP11.4: its client in the session, as every player's roster lists it.
       int clientIndex = -1;
       std::vector<std::uint8_t> sources;
@@ -210,6 +267,10 @@ namespace faf::server
     void NoteLobbyPresence(std::int32_t uid, SSeat& seat, bool away);
     /** Plan WP2.6: once the server's content is known, a seat with a report, or loaded without one. */
     void JudgeContent(std::int32_t uid, SSeat& seat);
+    /** Plan WP17.8: once the server's content is known and a policy is set, a seat with a mod report, or loaded without one. */
+    void JudgeMods(std::int32_t uid, SSeat& seat);
+    /** The seat's verdicts so far, queued for `TakeJudged`. */
+    void NoteJudged(std::int32_t uid, const SSeat& seat);
     void Tick(std::uint64_t nowUs);
     void Remove(std::int32_t uid, SSeat& seat, const std::string& why);
     void Say(std::string line);
@@ -239,7 +300,11 @@ namespace faf::server
     std::vector<std::int32_t> mGone;          // under mNewsLock
     std::vector<std::int32_t> mReturned;      // likewise
     std::vector<SPresence> mPresence;         // likewise
+    std::vector<SSeatState> mJudged;
+    std::vector<std::pair<std::int32_t, bool>> mReadyNews; // plan WP17.2 (`TakeReadyChanges`)          // plan WP17.2: each seat's verdicts as they were made (`TakeJudged`)
     std::uint64_t mBadMessages = 0;
+    std::uint64_t mFocusRefused = 0;   // plan WP11.1
+    std::uint64_t mCamerasDropped = 0; // plan WP11.1: camera updates past the bucket (eight a second, four at once)
     std::uint64_t mViewMismatches = 0;
     remote::wire::SRoster mRosterSent; // the last sent to everyone, without a local index
     bool mRosterSentEver = false;
@@ -268,6 +333,12 @@ namespace faf::server
     std::vector<SQueuedMessage> mViewSending;
 
     std::mutex mNewsLock;
+    struct SFocusRule
+    {
+      int ownArmy = -1;
+      bool free = false;
+    };
+    std::map<std::int32_t, SFocusRule> mFocusRules; // plan WP11.1, under mNewsLock
     std::vector<std::string> mNews;
     std::vector<SSeatState> mSeatStates;                         // under mNewsLock
     std::vector<std::pair<std::int32_t, std::string>> mEjects;   // likewise: uid, reason

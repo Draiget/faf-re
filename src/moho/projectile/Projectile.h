@@ -112,13 +112,13 @@ namespace moho
      */
     ~Projectile() override;
 
-#if defined(_M_X64) || defined(__x86_64__)
-    // The free list shared with formations; see SimBlockLane.
+    // Projectiles share their blocks with formations, whose addresses are sim state (see SimBlockLane). x64 takes
+    // them from SimBlockLane; x86 from the engine allocator's 896-byte class, as the binary does. Either way they
+    // stay out of Entity's own operator new, so no entity pool can take them.
     [[nodiscard]] static void* operator new(std::size_t size);
     [[nodiscard]] static void* operator new(std::size_t, void* const place) noexcept { return place; }
     static void operator delete(void* block, std::size_t size) noexcept;
     static void operator delete(void*, void*) noexcept {}
-#endif
 
     /**
      * Address: 0x0069A610 (FUN_0069A610, Moho::Projectile::IsProjectile)

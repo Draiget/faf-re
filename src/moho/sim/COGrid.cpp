@@ -834,6 +834,15 @@ namespace moho
     RelinkTo(rect);
   }
 
+  /// Engine addition: the occupation gather loads the next list node and the next cell's first node
+  /// while it handles the current one (same results, same order).
+  bool sim_GatherPrefetch = true;
+  TConVar<bool> gTConVar_sim_GatherPrefetch(
+    "sim_GatherPrefetch",
+    "Occupation-grid gathers load the next cell's nodes ahead of time (same results, same order).",
+    &sim_GatherPrefetch
+  );
+
   /**
    * Address: 0x004FD000 (FUN_004FD000, Moho::EntityOccupationManager::GatherUnmarkedUnitsInRect)
    */
@@ -879,11 +888,18 @@ namespace moho
           const bool includeProps = (flagBits & ENTITYTYPE_Prop) != 0u;
           const bool includeDynamic = (flagBits & (ENTITYTYPE_Projectile | ENTITYTYPE_Entity)) != 0u;
 
+          const bool prefetch = sim_GatherPrefetch;
           do {
             const int bucketIndex = position & mLastIndex;
 
             if (includeUnits && unitBuckets) {
+              if (prefetch && remainingX > 1) {
+                __builtin_prefetch(unitBuckets[(position + 1) & mLastIndex]);
+              }
               for (EntityCollisionCellNode* node = unitBuckets[bucketIndex]; node; node = node->next) {
+                if (prefetch && node->next != nullptr) {
+                  __builtin_prefetch(node->next);
+                }
                 CollisionShapeBase* const shape = node->owner;
                 if (ClaimGatherShape(shape, useSharedMarks)) {
                   outSpans.PushBack(shape);
@@ -1177,6 +1193,29 @@ namespace moho
    * and `comiss entity.Min, boundsMax; ja` reject. Written as `!(a > b)`, not `a <= b`, so that a
    * NaN bound compares unordered and passes, as the `ja` lets it.
    */
+  /// Engine addition: a collect loop loads ahead what it reads per candidate: the bounds four
+  /// candidates on, the collision primitive two on (same results, same order).
+  bool sim_CollectPrefetch = true;
+  TConVar<bool> gTConVar_sim_CollectPrefetch(
+    "sim_CollectPrefetch",
+    "Entity collision collects load each candidate's bounds and primitive ahead of time (same results).",
+    &sim_CollectPrefetch
+  );
+
+  static void PrefetchCollectCandidates(Entity* const* const candidates, const int index, const int count) noexcept
+  {
+    if (index + 4 < count) {
+      if (const Entity* const ahead = candidates[index + 4]; ahead != nullptr) {
+        __builtin_prefetch(&ahead->mAABox);
+      }
+    }
+    if (index + 2 < count) {
+      if (const Entity* const closer = candidates[index + 2]; closer != nullptr) {
+        __builtin_prefetch(closer->CollisionExtents);
+      }
+    }
+  }
+
   [[nodiscard]] static bool AxisAlignedBoundsOverlapEntityBounds(
     const Wm3::AxisAlignedBox3f& bounds,
     const Entity& entity
@@ -1243,7 +1282,11 @@ namespace moho
     CollisionResult collisionResult{};
     collisionResult.sourceEntity = source;
 
+    const bool prefetch = sim_CollectPrefetch;
     for (int index = 0; index < gatheredCount; ++index) {
+      if (prefetch) {
+        PrefetchCollectCandidates(gatheredEntities.start_, index, gatheredCount);
+      }
       Entity* const candidate = gatheredEntities.start_[index];
       if (candidate == nullptr || candidate == source) {
         continue;
@@ -1301,7 +1344,11 @@ namespace moho
     // The original initializes this result once before traversing candidates.
     // A primitive that leaves a lane unwritten retains the preceding value.
     CollisionResult collisionResult{};
+    const bool prefetch = sim_CollectPrefetch;
     for (int index = 0; index < gatheredCount; ++index) {
+      if (prefetch) {
+        PrefetchCollectCandidates(gatheredEntities.start_, index, gatheredCount);
+      }
       Entity* const candidate = gatheredEntities.start_[index];
       if (candidate == nullptr || !AxisAlignedBoundsOverlapEntityBounds(queryBounds, *candidate)) {
         continue;

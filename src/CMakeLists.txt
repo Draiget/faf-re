@@ -462,6 +462,8 @@ endif()
 target_link_libraries(headless PRIVATE faf_sim)
 if(FAF_SERVER_MODE)
   target_compile_definitions(headless PRIVATE FAF_SERVER_MODE=1)
+  # The server-mode objects (remote/ContentCheck.cpp) read and write with the channel's ByteReader/ByteWriter.
+  target_link_libraries(headless PRIVATE faf_netchannel)
   # The channel to the server (CClientLink) for /connectserver, in the client's objects.
   target_link_libraries(faf_main PRIVATE faf_netchannel faf_monocypher)
   # The client's own sources (the replay player's checks among them) read the server-mode declarations too.
@@ -479,3 +481,11 @@ add_custom_command(TARGET headless POST_BUILD
 # faf_main's (tests/registry/RegistrationDump.cpp), and its sections the Linux faf_sim's.
 add_executable(faf_registration_dump_sim EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/registry/RegistrationDump.cpp")
 target_link_libraries(faf_registration_dump_sim PRIVATE faf_sim)
+
+# --- Map editor -------------------------------------------------------------------------
+# FafEditor_x64.exe / FafEditor.exe (src/editor, docs/MAP_EDITOR.md): its own program on
+# faf_engine's objects, drawing through Direct3D 12 or Vulkan only. It carries the same packed
+# DXC archive as faf_main; a custom command's output is only visible to targets in its own
+# directory, so the editor waits for it through this target.
+add_custom_target(faf_dxc_pack DEPENDS "${_faf_embed_dir}/dxc.tar.zst")
+add_subdirectory(editor)

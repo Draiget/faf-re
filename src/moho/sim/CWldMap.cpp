@@ -798,6 +798,13 @@ namespace moho
     delete mMap;
   }
 
+  void IWldTerrainRes::NotifyMapChanges(const gpg::Rect2i* const rects, const std::size_t count)
+  {
+    for (std::size_t i = 0; i < count; ++i) {
+      NotifyMapChange(rects[i]);
+    }
+  }
+
 
   /**
    * Address: 0x008A0A20 (FUN_008A0A20, ??0struct_Env@@QAE@@Z)

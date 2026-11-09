@@ -15,7 +15,13 @@
 
 cmake_minimum_required(VERSION 3.20)
 
-set(_allowed_dlls kernel32.dll advapi32.dll ole32.dll shell32.dll shlwapi.dll ws2_32.dll dbghelp.dll)
+#
+# api-ms-win-core-synch-l1-2-0.dll is kernel32's WaitOnAddress/WakeByAddress* API set, not UI.
+# From MSVC Build Tools 14.50 (Visual Studio 2026) the STL links synchronization.lib for
+# its wait/notify functions, so a headless built with it imports this DLL; 14.44 and older
+# reached WaitOnAddress through the STL's own __std_atomic_wait_* functions instead.
+set(_allowed_dlls kernel32.dll advapi32.dll ole32.dll shell32.dll shlwapi.dll ws2_32.dll dbghelp.dll
+  api-ms-win-core-synch-l1-2-0.dll)
 if(TRACY)
   list(APPEND _allowed_dlls user32.dll secur32.dll)
 endif()

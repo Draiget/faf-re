@@ -125,6 +125,12 @@ namespace
     if (state == nullptr || !moho::UI_GetManager()->SetNewLuaState(state)) {
       throw std::runtime_error("UI_GetManager()->SetNewLuaState() failed.");
     }
+    // Plan WP17.6: the lobby screen's hook (data/fafengine/lua/ui/lobby/lobby.lua) reads who runs this lobby.
+    if ((signal.flags & faf::remote::net::kLobbySignalOrganised) != 0) {
+      state->GetGlobals().SetString("ServerLobbyControl", "organiser");
+    } else {
+      state->GetGlobals().SetNil("ServerLobbyControl");
+    }
     constexpr const char* kOnlineProviderModule = "/lua/multiplayer/onlineprovider.lua";
     const LuaPlus::LuaObject provider = moho::SCR_Import(state, gpg::StrArg(kOnlineProviderModule));
     if (!provider.IsTable()) {

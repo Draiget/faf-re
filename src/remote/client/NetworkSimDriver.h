@@ -1,6 +1,10 @@
 #pragma once
 
+#include <array>
+#include <atomic>
+#include <chrono>
 #include <cstdint>
+#include <optional>
 #include <deque>
 #include <map>
 #include <memory>
@@ -11,6 +15,7 @@
 #include "boost/shared_ptr.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/sim/ISTIDriver.h"
+#include "remote/SpeedLimit.h"
 #include "remote/client/BeatClock.h"
 #include "remote/client/RemoteClientManager.h"
 #include "remote/client/ServerViewClient.h"
@@ -132,6 +137,12 @@ namespace faf::remote::client
     CRemoteClientManager mClientManager;
     moho::CMarshaller mMarshaller;
     std::unique_ptr<CServerViewClient> mViews;
+    CSpeedMeter mSpeedMeter;              // plan WP10.7: what applying a view costs
+    static constexpr int kNoFocusGranted = -1000;
+    std::atomic<int> mFocusGranted{kNoFocusGranted};  // plan WP11.1: the army the server granted; none: GameInfo's
+    std::chrono::steady_clock::time_point mCamerasSentAt{};
+    std::uint64_t mCamerasSent = 0;
+    std::array<std::uint64_t, 5> mLaneBytes{}; // plan WP10.10: bytes taken by lane (EServerLane order)
     std::unique_ptr<LuaPlus::LuaState> mEmptySyncLua; // makes the `Sync` table's bytes for a view with no Lua lane
     std::vector<std::uint8_t> mEmptySync;
     // Every army's constants (index, names, civilian), as the sim's first packet gives them (`Sim::Sync`

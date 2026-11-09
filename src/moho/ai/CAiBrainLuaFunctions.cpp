@@ -1088,9 +1088,11 @@ int moho::cfunc_CAiBrainCreateResourceBuildingNearestL(LuaPlus::LuaState* const 
     float elevation = mapData->GetHeightField()->GetElevation(candidate.centerX, candidate.centerZ);
     const bool occupiesSeabed = (static_cast<std::uint8_t>(structureBlueprint->mFootprint.mOccupancyCaps) &
                                  static_cast<std::uint8_t>(EOccupancyCaps::OC_SEABED)) != 0u;
-    if (!occupiesSeabed && mapData->mWaterEnabled) {
-      if (mapData->mWaterElevation > elevation) {
-        elevation = mapData->mWaterElevation;
+    if (!occupiesSeabed) {
+      // Engine addition (water bodies): the level at the candidate; -10000 without water.
+      const float waterElevation = mapData->GetWaterElevationAt(candidate.centerX, candidate.centerZ);
+      if (waterElevation > elevation) {
+        elevation = waterElevation;
       }
     }
 

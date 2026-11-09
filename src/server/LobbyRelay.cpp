@@ -118,7 +118,23 @@ namespace faf::server
       eject = true;
     }
     std::span<const std::uint8_t> forwarded = message;
-    if (mControl == ELobbyControl::Organiser && !mPinned.empty() && message.size() > kMessageHeaderBytes
+    const bool script = type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_BroadcastScriptData)
+                        || type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_DirectScriptData);
+    if (mControl == ELobbyControl::Organiser && from != mHost && script && message.size() > kMessageHeaderBytes) {
+      // Plan WP17.6: what the organiser set stays; a player chats, readies up and leaves.
+      mPayload.assign(message.begin() + kMessageHeaderBytes, message.end());
+      const EPlayerScript limited = LimitPlayerScript(mPayload);
+      if (limited == EPlayerScript::Refused) {
+        return verdict(ELobbyRelayVerdict::Locked);
+      }
+      if (limited == EPlayerScript::Rewritten) {
+        const std::size_t size = kMessageHeaderBytes + mPayload.size();
+        mPayload.insert(mPayload.begin(), {type, static_cast<std::uint8_t>(size), static_cast<std::uint8_t>(size >> 8u)});
+        forwarded = mPayload;
+        ++mPlayerOptionsLimited;
+      }
+    }
+    if (mControl == ELobbyControl::Organiser && !mPinned.empty() && forwarded.data() == message.data() && message.size() > kMessageHeaderBytes
         && (type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_BroadcastScriptData)
             || type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_DirectScriptData))) {
       mPayload.assign(message.begin() + kMessageHeaderBytes, message.end());
@@ -133,6 +149,32 @@ namespace faf::server
       }
     }
 
+    // Plan WP17.2: who sits in which lobby slot, as the host says it, and who is ready, as the PlayerOptions (after
+    // this relay's limits) say it.
+    if (script && forwarded.size() > kMessageHeaderBytes) {
+      const SLobbyFacts facts = ReadLobbyFacts(forwarded.subspan(kMessageHeaderBytes));
+      if (from == mHost) {
+        for (const auto& [owner, slot] : facts.seats) {
+          mLobbySlots[owner] = slot;
+        }
+      }
+      if (facts.ready) {
+        // A player sets only their own slot (lobby.lua refuses the rest); the host sets any (everyone's Ready goes
+        // false when the options change), so its message counts for the slot's owner.
+        std::int32_t owner = from;
+        if (from == mHost && facts.slot) {
+          const auto seated = std::find_if(mLobbySlots.begin(), mLobbySlots.end(), [&facts](const auto& entry) { return entry.second == *facts.slot; });
+          owner = seated == mLobbySlots.end() ? 0 : seated->first;
+        }
+        if (owner != 0) {
+          const auto [entry, added] = mReady.try_emplace(owner, *facts.ready);
+          if (added || entry->second != *facts.ready) {
+            entry->second = *facts.ready;
+            mReadyChanges.emplace_back(owner, *facts.ready);
+          }
+        }
+      }
+    }
     to = targetUid;
     out.clear();
     remote::net::ByteWriter writer(out);

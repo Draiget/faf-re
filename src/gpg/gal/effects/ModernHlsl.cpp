@@ -12,13 +12,131 @@
 #include <utility>
 
 #include "EffectText.h"
+#include "ShadowCascades.h"
+#include "TextureFiltering.h"
 
 namespace gpg::gal::effects
 {
   using namespace text;
 
+  ShadowCascadeConstants gShadowCascades{};
+  int gTextureAnisotropy = 8;
+  std::atomic<bool> gShadowCascadesBlocked{false};
+
+  bool IsShadowLookupSampler(const SamplerDesc& sampler)
+  {
+    return Lower(sampler.texture) == "shadowtexture" && Lower(sampler.name).find("blur") == std::string::npos;
+  }
+
+  std::string_view ShadowCascadeDeclaration() noexcept
+  {
+    return "float4 faf_ShadowCascades[9]; // engine addition (ren_ShadowCascades), filled by the backend\n";
+  }
+
   namespace
   {
+    static_assert(kShadowCascadeVectors == 9U, "ShadowCascadeDeclaration's array length");
+
+    // Engine addition (ren_ShadowCascades): the lighting shadow samplers' own type; see ShadowCascades.h.
+    // The shadow targets have one mip, so every lookup reads level 0 and needs no derivatives: a pixel's
+    // neighbours may sit in another tile.
+    constexpr const char* kShadowCascadeHelpers = R"hlsl(
+// ---- engine addition (ren_ShadowCascades): shadow lookups through the cascade atlas ----
+// HLSL converts between structs whose members match one for one, which would make every tex2D on this
+// type ambiguous with faf_sampler's. The sampler comes first here and the texture first there, so
+// neither converts to the other.
+struct faf_shadow_sampler
+{
+    SamplerState s;
+    Texture2D t2;
+};
+faf_shadow_sampler faf_make_shadow_sampler(Texture2D t2, TextureCube tc, Texture3D t3, SamplerState s)
+{
+    faf_shadow_sampler r;
+    r.s = s;
+    r.t2 = t2;
+    return r;
+}
+float2 faf_shadow_uv(float2 uv)
+{
+    const int count = (int)faf_ShadowCascades[0].x;
+    if (count <= 0) return uv;
+    [unroll] for (int k = 0; k < 4; ++k) {
+        if (k < count) {
+            const float4 box = faf_ShadowCascades[1 + 2 * k];
+            if (all(uv >= box.xy) && all(uv <= box.zw)) {
+                const float4 map = faf_ShadowCascades[2 + 2 * k];
+                return uv * map.xy + map.zw;
+            }
+        }
+    }
+    return faf_ShadowCascades[0].zw;
+}
+float4 faf_shadow_read(faf_shadow_sampler s, float2 uv) { return s.t2.SampleLevel(s.s, faf_shadow_uv(uv), 0); }
+float4 tex2D(faf_shadow_sampler s, float2 uv) { return faf_shadow_read(s, uv); }
+float4 tex2D(faf_shadow_sampler s, float2 uv, float2 dx, float2 dy) { return faf_shadow_read(s, uv); }
+float4 tex2Dbias(faf_shadow_sampler s, float4 uv) { return faf_shadow_read(s, uv.xy); }
+float4 tex2Dproj(faf_shadow_sampler s, float4 uv) { return faf_shadow_read(s, uv.xy / uv.w); }
+float4 tex2Dlod(faf_shadow_sampler s, float4 uv) { return faf_shadow_read(s, uv.xy); }
+float4 tex2Dgrad(faf_shadow_sampler s, float2 uv, float2 dx, float2 dy) { return faf_shadow_read(s, uv); }
+// ---- end of the cascade lookups ----
+)hlsl";
+
+    /**
+     * Engine addition (ren_ShadowCascades): true when every use of `sampler` in `source`, past its own
+     * declaration and outside comments, is the first argument of a tex2D-family call. Those are the
+     * calls faf_shadow_sampler answers; anything else (passing it to a function) needs a faf_sampler.
+     */
+    [[nodiscard]] bool ShadowSamplerOnlyLookedUp(const std::string_view source, const SamplerDesc& sampler)
+    {
+      static constexpr std::string_view kCalls[] = {"tex2D", "tex2Dbias", "tex2Dproj", "tex2Dlod", "tex2Dgrad"};
+      const std::string_view name = sampler.name;
+      std::size_t index = 0U;
+      while (index < source.size()) {
+        if (source.compare(index, 2U, "//") == 0) {
+          const std::size_t end = source.find('\n', index);
+          index = (end == std::string_view::npos) ? source.size() : end;
+          continue;
+        }
+        if (source.compare(index, 2U, "/*") == 0) {
+          const std::size_t end = source.find("*/", index + 2U);
+          index = (end == std::string_view::npos) ? source.size() : end + 2U;
+          continue;
+        }
+        if (index >= sampler.begin && index < sampler.end) {
+          index = sampler.end;
+          continue;
+        }
+        const bool whole = (index == 0U || !IsIdentifierChar(source[index - 1U])) && source.compare(index, name.size(), name) == 0 &&
+          (index + name.size() >= source.size() || !IsIdentifierChar(source[index + name.size()]));
+        if (!whole) {
+          ++index;
+          continue;
+        }
+        std::size_t before = index;
+        const auto skipSpace = [&] {
+          while (before > 0U && std::isspace(static_cast<unsigned char>(source[before - 1U])) != 0) {
+            --before;
+          }
+        };
+        skipSpace();
+        if (before == 0U || source[before - 1U] != '(') {
+          return false;
+        }
+        --before;
+        skipSpace();
+        std::size_t start = before;
+        while (start > 0U && IsIdentifierChar(source[start - 1U])) {
+          --start;
+        }
+        const std::string_view call = source.substr(start, before - start);
+        if (std::find(std::begin(kCalls), std::end(kCalls), call) == std::end(kCalls)) {
+          return false;
+        }
+        index += name.size();
+      }
+      return true;
+    }
     // Register numbers of the placeholder views a faf_sampler carries for the
     // dimensions its texture is never sampled in. The compiler removes them
     // with the dead fields; ModernEffect consumers can check none survive.
@@ -43,8 +161,19 @@ faf_sampler faf_make_sampler(Texture2D t2, TextureCube tc, Texture3D t3, Sampler
 Texture2D faf_null2D : register(t125);
 TextureCube faf_nullCube : register(t126);
 Texture3D faf_null3D : register(t127);
-#ifdef FAF_VERTEX_STAGE
-// Vertex shaders have no derivatives: Direct3D 9 sampled mip 0.
+// The patch constants of a tessellated pass (engine addition): the factors of the
+// edges opposite control points 0, 1 and 2, and of the inside.
+struct faf_tess_factors
+{
+    float edges[3] : SV_TessFactor;
+    float inside : SV_InsideTessFactor;
+};
+#ifndef FAF_TESS_TOPOLOGY
+#define FAF_TESS_TOPOLOGY "triangle_cw"
+#endif
+#if defined(FAF_VERTEX_STAGE) || defined(FAF_HULL_STAGE) || defined(FAF_DOMAIN_STAGE)
+// Vertex shaders have no derivatives: Direct3D 9 sampled mip 0 (hull and domain
+// shaders have none either).
 float4 tex2D(faf_sampler s, float2 uv) { return s.t2.SampleLevel(s.s, uv, 0); }
 float4 tex2Dbias(faf_sampler s, float4 uv) { return s.t2.SampleLevel(s.s, uv.xy, 0); }
 float4 tex2Dproj(faf_sampler s, float4 uv) { return s.t2.SampleLevel(s.s, uv.xy / uv.w, 0); }
@@ -643,6 +772,14 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       };
       for (const Technique& technique : description.techniques) {
         for (const Pass& pass : technique.passes) {
+          // A domain function's result goes to the rasterizer, as a vertex shader's does.
+          // Its control-point parameters are the vertex shader's output struct.
+          if (pass.Tessellated()) {
+            const auto domain = functions.find(pass.domainShader.function);
+            if (domain != functions.end() && isStruct(domain->second.returnType)) {
+              structRoles.emplace(baseStruct(domain->second.returnType), SemanticRole::VertexOutput);
+            }
+          }
           for (const auto& [reference, stage] :
                {std::pair{&pass.vertexShader, ShaderStage::Vertex}, std::pair{&pass.pixelShader, ShaderStage::Pixel}}) {
             const auto found = functions.find(reference->function);
@@ -703,6 +840,28 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     TextureViews textureViews = BuildTextureViews(source, description, modern);
     std::vector<std::vector<TextureDimension>>& samplerDimensions = textureViews.samplerDimensions;
 
+    // Engine addition (ren_ShadowCascades): the lighting shadow samplers read through the atlas when the
+    // effect carries the cascade parameter (EffectProgram adds it) and only ever looks them up.
+    bool shadowCascades = false;
+    {
+      const bool declared = std::any_of(description.parameters.begin(), description.parameters.end(), [](const Parameter& parameter) {
+        return parameter.name == kShadowCascadeParameter && parameter.elements == kShadowCascadeVectors;
+      });
+      bool lookups = true;
+      bool any = false;
+      for (const SamplerDesc& sampler : description.samplers) {
+        if (IsShadowLookupSampler(sampler)) {
+          any = true;
+          lookups = lookups && ShadowSamplerOnlyLookedUp(source, sampler);
+        }
+      }
+      shadowCascades = declared && any && lookups;
+      if (declared && any && !lookups) {
+        gShadowCascadesBlocked.store(true);
+        modern.notes.push_back("a shadow sampler is used other than in a tex2D lookup; shadow cascades are off");
+      }
+    }
+
     // ---- parameters a function writes -------------------------------------------
     std::map<std::string, const Parameter*> numericParameters;
     for (const Parameter& parameter : description.parameters) {
@@ -748,7 +907,7 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       if (StartsWithWord(head, "technique") || StartsWithWord(head, "technique10") || StartsWithWord(head, "technique11") ||
           StartsWithWord(head, "BlendState") || StartsWithWord(head, "DepthStencilState") || StartsWithWord(head, "RasterizerState") ||
           StartsWithWord(head, "VertexShader") || StartsWithWord(head, "PixelShader") || StartsWithWord(head, "GeometryShader") ||
-          StartsWithWord(head, "string")) {
+          StartsWithWord(head, "HullShader") || StartsWithWord(head, "DomainShader") || StartsWithWord(head, "string")) {
         continue; // the effect description carries these
       }
 
@@ -769,7 +928,8 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
         std::snprintf(declaration, sizeof(declaration), "SamplerState faf_smp_%s : register(s%u);\n", sampler->name.c_str(),
                       static_cast<unsigned>(index));
         body += declaration;
-        body += "#define " + sampler->name + " faf_make_sampler(" + view(TextureDimension::Texture2D, "faf_null2D") + ", " +
+        const char* const maker = (shadowCascades && IsShadowLookupSampler(*sampler)) ? "faf_make_shadow_sampler(" : "faf_make_sampler(";
+        body += "#define " + sampler->name + " " + maker + view(TextureDimension::Texture2D, "faf_null2D") + ", " +
           view(TextureDimension::TextureCube, "faf_nullCube") + ", " + view(TextureDimension::Texture3D, "faf_null3D") +
           ", faf_smp_" + sampler->name + ")\n";
         continue;
@@ -791,6 +951,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           }
         } else if (numericParameters.count(parameter->name) != 0U || parameter->parameterClass == ParameterClass::Struct) {
           body += GlobalDeclaration(*parameter) + "\n";
+          if (shadowCascades && parameter->name == kShadowCascadeParameter) {
+            body += kShadowCascadeHelpers;
+          }
         }
         // Anything else (strings, sampler parameters without state) has no shader-side form.
         continue;
@@ -855,9 +1018,100 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     std::string wrappers;
     for (Technique& technique : description.techniques) {
       for (Pass& pass : technique.passes) {
+        const bool tessellated = pass.Tessellated();
+        const bool namedTessellation = !pass.hullShader.function.empty() || !pass.domainShader.function.empty();
         for (const auto& [reference, stage] :
-             {std::pair{&pass.vertexShader, ShaderStage::Vertex}, std::pair{&pass.pixelShader, ShaderStage::Pixel}}) {
+             {std::pair{&pass.vertexShader, ShaderStage::Vertex}, std::pair{&pass.pixelShader, ShaderStage::Pixel},
+              std::pair{&pass.hullShader, ShaderStage::Hull}, std::pair{&pass.domainShader, ShaderStage::Domain}}) {
           if (reference->function.empty()) {
+            continue;
+          }
+          if (stage == ShaderStage::Hull || stage == ShaderStage::Domain) {
+            if (!tessellated) {
+              modern.notes.push_back("technique " + technique.name + ": a hull shader needs a domain shader and the reverse; ignored");
+              reference->function.clear();
+              continue;
+            }
+            const std::string arguments = Squeeze(reference->arguments);
+            const auto key = std::make_tuple(stage, reference->function, arguments);
+            const auto known = entryNames.find(key);
+            if (known != entryNames.end()) {
+              reference->entry = known->second;
+              continue;
+            }
+            const auto found = functions.find(reference->function);
+            if (found == functions.end()) {
+              modern.notes.push_back("technique " + technique.name + ": shader function " + reference->function + " not found");
+              reference->function.clear();
+              continue;
+            }
+            const Function& function = found->second;
+            const unsigned index = static_cast<unsigned>(modern.entries.size());
+            char name[64]{};
+            std::snprintf(name, sizeof(name), "faf_entry_%s_%u", stage == ShaderStage::Hull ? "hs" : "ds", index);
+
+            // The call: varying parameters take `varying` in order, uniform ones the
+            // pass's arguments or their defaults. The control-point type is the type of
+            // the first (hull) or second (domain) varying parameter.
+            std::vector<std::string> uniformArguments;
+            if (!arguments.empty()) {
+              for (const std::string& argument : SplitTopLevel(arguments, ',')) {
+                uniformArguments.push_back(Trim(argument));
+              }
+            }
+            const std::vector<std::string> varying = (stage == ShaderStage::Hull)
+              ? std::vector<std::string>{"faf_patch[0]", "faf_patch[1]", "faf_patch[2]"}
+              : std::vector<std::string>{"faf_weights", "faf_patch[0]", "faf_patch[1]", "faf_patch[2]"};
+            std::string callArguments;
+            std::string pointType;
+            std::size_t nextVarying = 0U;
+            std::size_t nextUniform = 0U;
+            for (const std::string& parameterText : function.parameters) {
+              const ParameterParts parts = SplitParameter(parameterText);
+              if (!callArguments.empty()) {
+                callArguments += ", ";
+              }
+              if (parts.isUniform) {
+                if (nextUniform < uniformArguments.size()) {
+                  callArguments += uniformArguments[nextUniform++];
+                } else {
+                  const std::size_t equals = parameterText.find('=');
+                  callArguments += (equals != std::string::npos) ? Trim(parameterText.substr(equals + 1U)) : std::string("0");
+                }
+                continue;
+              }
+              if (nextVarying == (stage == ShaderStage::Hull ? 0U : 1U)) {
+                pointType = parts.type;
+              }
+              callArguments += (nextVarying < varying.size()) ? varying[nextVarying] : std::string("0");
+              ++nextVarying;
+            }
+            if (nextVarying != varying.size() || pointType.empty()) {
+              modern.notes.push_back("technique " + technique.name + ": " + function.name + " needs " +
+                                     std::to_string(varying.size()) + " varying parameters");
+              reference->function.clear();
+              continue;
+            }
+            const std::string call = function.name + "(" + callArguments + ")";
+            const std::string patch = "InputPatch<" + pointType + ", 3> faf_patch";
+            if (stage == ShaderStage::Hull) {
+              char constants[64]{};
+              std::snprintf(constants, sizeof(constants), "faf_hsconst_%u", index);
+              wrappers += std::string("faf_tess_factors ") + constants + "(" + patch + ")\n{\n    float4 faf_f = " + call +
+                ";\n    faf_tess_factors faf_r;\n    faf_r.edges[0] = faf_f.x;\n    faf_r.edges[1] = faf_f.y;\n"
+                "    faf_r.edges[2] = faf_f.z;\n    faf_r.inside = faf_f.w;\n    return faf_r;\n}\n";
+              wrappers += std::string("[domain(\"tri\")]\n[partitioning(\"fractional_odd\")]\n[outputtopology(FAF_TESS_TOPOLOGY)]\n"
+                                      "[outputcontrolpoints(3)]\n[patchconstantfunc(\"") +
+                constants + "\")]\n[maxtessfactor(64.0)]\n" + pointType + " " + name + "(" + patch +
+                ", uint faf_id : SV_OutputControlPointID)\n{\n    return faf_patch[faf_id];\n}\n";
+            } else {
+              wrappers += "[domain(\"tri\")]\n" + function.returnType + " " + name +
+                "(faf_tess_factors faf_factors, float3 faf_weights : SV_DomainLocation, const OutputPatch<" + pointType +
+                ", 3> faf_patch)\n{\n    return " + call + ";\n}\n";
+            }
+            modern.entries.push_back(ShaderEntry{stage, function.name, arguments, name});
+            entryNames.emplace(key, name);
+            reference->entry = name;
             continue;
           }
           const std::string arguments = Squeeze(reference->arguments);
@@ -982,6 +1236,13 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           modern.entries.push_back(ShaderEntry{stage, function.name, arguments, name});
           entryNames.emplace(key, name);
           reference->entry = name;
+        }
+        // A hull or domain function that couldn't be wrapped, or one named without the other, leaves the pass
+        // with neither, and it says so (ProgramEffect::TechniqueCompiles fails it).
+        if (namedTessellation && (pass.hullShader.function.empty() || pass.domainShader.function.empty())) {
+          pass.hullShader = ShaderReference{};
+          pass.domainShader = ShaderReference{};
+          pass.tessellationDropped = true;
         }
       }
     }

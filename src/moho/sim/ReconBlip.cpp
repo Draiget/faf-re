@@ -914,8 +914,9 @@ bool ReconBlip::PickTargetPointAboveWater(std::int32_t& outTargetPoint) const
 
   outTargetPoint = -1;
   const STIMap* const mapData = SimulationRef->mMapData;
-  const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
-  return GetPositionWm3().y > waterElevation;
+  const Wm3::Vec3f position = GetPositionWm3();
+  const float waterElevation = mapData->GetWaterElevationAt(position.x, position.z); // engine addition: per position
+  return position.y > waterElevation;
 }
 
 /**
@@ -933,10 +934,11 @@ bool ReconBlip::PickTargetPointBelowWater(std::int32_t& outTargetPoint) const
 
   outTargetPoint = -1;
   const STIMap* const mapData = SimulationRef->mMapData;
-  const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
+  const Wm3::Vec3f position = GetPositionWm3();
+  const float waterElevation = mapData->GetWaterElevationAt(position.x, position.z); // engine addition: per position
   // 0x005BF5D6: `comiss y,water` / `jbe` -> true, so an unordered (NaN) height
   // reads as below water.
-  return !(GetPositionWm3().y > waterElevation);
+  return !(position.y > waterElevation);
 }
 
 /**

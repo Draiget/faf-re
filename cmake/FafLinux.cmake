@@ -434,6 +434,11 @@ target_link_libraries(faf_core_tests PRIVATE faf_sim gtest_main)
 target_link_options(faf_core_tests PRIVATE -Wl,--error-limit=0)
 add_test(NAME core COMMAND faf_core_tests)
 
+add_executable(faf_netcore_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/netcore/NetCoreTests.cpp")
+target_link_libraries(faf_netcore_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_netcore_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME netcore COMMAND faf_netcore_tests /rejoinkeyfile "${CMAKE_CURRENT_BINARY_DIR}/rejoin_test_seat.key")
+
 file(GLOB _faf_container_test_sources "${PROJECT_SOURCE_DIR}/tests/containers/*.cpp")
 add_executable(faf_container_tests EXCLUDE_FROM_ALL ${_faf_container_test_sources})
 target_link_libraries(faf_container_tests PRIVATE faf_sim gtest_main)
@@ -449,10 +454,11 @@ add_test(NAME reflection COMMAND faf_reflection_tests)
 # Recorded games played back by headless (tests/replay/ReplayPlaybackTests.cpp); skipped without FAF_REPLAY_DATA.
 add_executable(faf_replay_playback_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/replay/ReplayPlaybackTests.cpp")
 target_link_libraries(faf_replay_playback_tests PRIVATE faf_codegen gtest_main)
-target_compile_definitions(faf_replay_playback_tests PRIVATE FAF_HEADLESS_EXE="$<TARGET_FILE:headless>")
+target_compile_definitions(faf_replay_playback_tests PRIVATE FAF_HEADLESS_EXE="$<TARGET_FILE:headless>" FAF_HEADLESS_SERVER_MODE=1
+  FAF_REPLAY_ZOO_DIR="${PROJECT_SOURCE_DIR}/tests/replay/zoo")
 add_dependencies(faf_replay_playback_tests headless)
 add_test(NAME replay_playback COMMAND faf_replay_playback_tests)
-set_tests_properties(replay_playback PROPERTIES TIMEOUT 3600)
+set_tests_properties(replay_playback PROPERTIES TIMEOUT 7200)
 
 # The Lua VM, parser, libraries and LuaObject API (tests/lua/Lua*.cpp; the folder's two other
 # files are executables of their own).

@@ -154,7 +154,8 @@ bool Unit::PickTargetPointAboveWater(std::int32_t& outTargetPoint) const
   outTargetPoint = -1;
 
   const STIMap* const mapData = SimulationRef->mMapData;
-  const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
+  // Engine addition (water bodies): the level where the unit is.
+  const float waterElevation = mapData->GetWaterElevationAt(GetPosition().x, GetPosition().z);
 
   const RUnitBlueprint* const blueprint = GetBlueprint();
   const fa::vector<fa::string>& targetBones = blueprint->AI.TargetBones;
@@ -192,7 +193,8 @@ bool Unit::PickTargetPointBelowWater(std::int32_t& outTargetPoint) const
   outTargetPoint = -1;
 
   const STIMap* const mapData = SimulationRef->mMapData;
-  const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
+  // Engine addition (water bodies): the level where the unit is.
+  const float waterElevation = mapData->GetWaterElevationAt(GetPosition().x, GetPosition().z);
 
   const RUnitBlueprint* const blueprint = GetBlueprint();
   const fa::vector<fa::string>& targetBones = blueprint->AI.TargetBones;

@@ -9,11 +9,28 @@
 #include <immintrin.h>
 
 #include "gpg/core/profiling/Profiler.h"
+#include "moho/console/CConCommand.h"
 #include "moho/sim/SimThreadRole.h"
 #include "moho/sim/SimWorkerPool.h"
 
 namespace moho
 {
+  bool sim_JobStreamPrefetch = true;
+  TConVar<bool> gTConVar_sim_JobStreamPrefetch(
+    "sim_JobStreamPrefetch",
+    "Queueing a sim stream job loads the next slots for writing ahead of time; same jobs, same "
+    "results. Read when the stream opens.",
+    &sim_JobStreamPrefetch
+  );
+
+  int sim_JobStreamPublishBatch = 4;
+  TConVar<int> gTConVar_sim_JobStreamPublishBatch(
+    "sim_JobStreamPublishBatch",
+    "Sim stream jobs are shown to the workers this many at a time (1 = each one at once); a wait "
+    "or a close shows the rest first. Same jobs, same results. Read when the stream opens.",
+    &sim_JobStreamPublishBatch
+  );
+
   namespace
   {
     // Jobs the stream holds before it closes and opens again (a beat queues one per moving unit).
@@ -61,9 +78,12 @@ namespace moho
     std::uint32_t epoch = 0; // bumped by every Open; a ticket is (epoch << 16) | index
     std::uint32_t finishedPrefix = 0; // every job below this index is done
     std::int64_t workerDelayTicks = 0; // sim_WorkerJobDelayUs, read when the stream opens
+    std::uint32_t written = 0; // slots filled; `published` trails it by less than `publishBatch`
+    std::uint32_t publishBatch = 1; // sim_JobStreamPublishBatch, read when the stream opens
+    bool prefetchSlots = false; // sim_JobStreamPrefetch, read when the stream opens
 
     // Separate lines: the sim thread writes `published`, the workers fight over `next`.
-    alignas(kCacheLine) std::atomic<std::uint32_t> published{0}; // jobs queued so far
+    alignas(kCacheLine) std::atomic<std::uint32_t> published{0}; // jobs the workers may take
     std::atomic<bool> closing{false};
     alignas(kCacheLine) std::atomic<std::uint32_t> next{0}; // next job a worker claims
     // A worker about to sleep counts itself in `sleepers`, then looks at `published` once more; the
@@ -148,6 +168,16 @@ namespace moho
       }
     }
 
+    /// Shows the workers every filled slot.
+    void PublishWritten()
+    {
+      if (published.load(std::memory_order_relaxed) == written) {
+        return;
+      }
+      published.store(written, std::memory_order_seq_cst);
+      WakeSleepers(false);
+    }
+
     /// After a store to `published` or `closing`: wakes sleeping workers, if there are any.
     void WakeSleepers(const bool all)
     {
@@ -172,9 +202,12 @@ namespace moho
         ::QueryPerformanceFrequency(&frequency);
         workerDelayTicks = frequency.QuadPart * sim_WorkerJobDelayUs / 1000000;
       }
+      publishBatch = sim_JobStreamPublishBatch > 1 ? static_cast<std::uint32_t>(sim_JobStreamPublishBatch) : 1u;
+      prefetchSlots = sim_JobStreamPrefetch;
       closing.store(false, std::memory_order_relaxed);
       published.store(0u, std::memory_order_relaxed);
       next.store(0u, std::memory_order_relaxed);
+      written = 0;
       finishedPrefix = 0;
       // One chunk per worker plus one the dispatcher returns from at once, so the pool never takes
       // its serial path (count <= grain) for a pool of one worker.
@@ -193,6 +226,8 @@ namespace moho
       if (slot.state.load(std::memory_order_acquire) == kDone) {
         return;
       }
+      // A slot no worker can see yet runs here; the ones before it go to the workers first.
+      PublishWritten();
       if (RunSlot(index)) {
         ++stats.mStolen;
         return; // no worker had taken it: ran here, as the serial code would have
@@ -211,7 +246,8 @@ namespace moho
 
     void FinishAll()
     {
-      const std::uint32_t end = published.load(std::memory_order_relaxed);
+      PublishWritten();
+      const std::uint32_t end = written;
       for (std::uint32_t index = finishedPrefix; index < end; ++index) {
         Finish(index);
       }
@@ -261,7 +297,7 @@ namespace moho
       fn(context);
       return kRanInline;
     }
-    if (impl.open && impl.published.load(std::memory_order_relaxed) == kCapacity) {
+    if (impl.open && impl.written == kCapacity) {
       impl.Close();
     }
     if (!impl.open && !impl.Open()) {
@@ -269,13 +305,20 @@ namespace moho
       return kRanInline;
     }
 
-    const std::uint32_t index = impl.published.load(std::memory_order_relaxed);
+    const std::uint32_t index = impl.written;
+    if (impl.prefetchSlots && index + 2u < kCapacity) {
+      // The slot two ahead was last written by the worker that ran it: fetch it for writing now.
+      __builtin_prefetch(&impl.slots[index + 2u], 1);
+    }
     Slot& slot = impl.slots[index];
     slot.fn = fn;
     slot.context = context;
     slot.state.store(kQueued, std::memory_order_relaxed);
-    impl.published.store(index + 1u, std::memory_order_seq_cst);
-    impl.WakeSleepers(false);
+    impl.written = index + 1u;
+    if (impl.written - impl.published.load(std::memory_order_relaxed) >= impl.publishBatch) {
+      impl.published.store(impl.written, std::memory_order_seq_cst);
+      impl.WakeSleepers(false);
+    }
     ++impl.stats.mQueued;
     return static_cast<std::int32_t>((impl.epoch << 16) | index);
   }

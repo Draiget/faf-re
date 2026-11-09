@@ -424,9 +424,14 @@ bool moho::UI_StartJoinLobbyUI(
  * Rebinds UI to the provided Lua state and runs
  * `/lua/ui/uimain.lua:StartGameUI()`.
  */
+void (*moho::gUIBeforeStartGameUI)(LuaPlus::LuaState* state) = nullptr; // engine addition, IUIManager.h
+
 bool moho::UI_StartGameUI(LuaPlus::LuaState* const state)
 {
-  return StartUIMainEntryWithState(state, UIS_game, "StartGameUI", [](const LuaPlus::LuaFunction<void>& entryPointFn) {
+  return StartUIMainEntryWithState(state, UIS_game, "StartGameUI", [state](const LuaPlus::LuaFunction<void>& entryPointFn) {
+    if (gUIBeforeStartGameUI != nullptr) {
+      gUIBeforeStartGameUI(state);
+    }
     entryPointFn();
   });
 }

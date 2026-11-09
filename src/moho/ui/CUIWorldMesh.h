@@ -52,6 +52,14 @@ namespace moho
     ~CUIWorldMesh() override;
 
     /**
+     * Engine addition: deletes every world mesh whose Lua object lives in `state` (its root), as Lua's
+     * `Destroy` does for one. The engine has no `__gc` for script objects, so a mesh the UI's Lua never
+     * destroys outlives its state, mesh instance included; `~CWldSession` calls this before it deletes the
+     * session's state (FAF's game UI leaves 13 per session). Returns how many it deleted.
+     */
+    static int DestroyAllOf(LuaPlus::LuaState* state);
+
+    /**
      * Address: 0x0086AE00 (FUN_0086AE00)
      *
      * What it does:

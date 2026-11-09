@@ -33,7 +33,10 @@ namespace moho
     RefuelUndockAboveMaxHealth = 3, ///< #169: aircraft undock when health >= max health (3840)
     ShieldRepair = 4,               ///< #175: shield repair scales with resources, and needs the shield on (3840)
     ProjectileMapEdgeCollision = 5, ///< #180: terrain extends past the map edge; replaces #154 (not released yet)
-    Count = 6,
+    /// Engine feature, not an FA-Binary-Patches one: a map's `ScenarioInfo.WaterBodies` add water levels
+    /// besides its sea (.plans/water-levels/PLAN.md). In no release yet: on only by `sim_FixWaterBodies`.
+    WaterBodies = 6,
+    Count = 7,
   };
 
   /// `SFafSimFixInfo::mFirstGameVersion` of a fix no FAF release carries yet: on only by its switch.

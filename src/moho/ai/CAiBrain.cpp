@@ -162,7 +162,6 @@ namespace moho
     int widthBucketCount = static_cast<int>((static_cast<std::uint32_t>(mapWidth - 1) >> 3) - 1u);
     int heightBucketCount = static_cast<int>((static_cast<std::uint32_t>(mapHeight - 1) >> 3) - 1u);
 
-    const float waterElevation = (map.mWaterEnabled != 0u) ? map.mWaterElevation : -10000.0f;
     constexpr float kHeightToWorldScale = 0.0078125f;
     constexpr float kSampleUnit = 1.0f;
 
@@ -189,6 +188,11 @@ namespace moho
       return static_cast<float>(heightValue) * kHeightToWorldScale;
     };
 
+    // Engine addition (water bodies): each sample under its own water level.
+    auto UnderWater = [&](const int x, const int z) noexcept -> bool {
+      return map.GetWaterElevationAtVertex(ClampX(x), ClampZ(z)) > SampleElevation(x, z);
+    };
+
     float underwaterSampleCount = 0.0f;
     float totalSampleCount = 0.0f;
 
@@ -203,22 +207,22 @@ namespace moho
 
           int sampleZ = 24;
           while (zBlockLoopCount != 0) {
-            if (waterElevation > SampleElevation(sampleX, sampleZ - 16)) {
+            if (UnderWater(sampleX, sampleZ - 16)) {
               underwaterSampleCount += kSampleUnit;
             }
             totalSampleCount += kSampleUnit;
 
-            if (waterElevation > SampleElevation(sampleX, sampleZ - 8)) {
+            if (UnderWater(sampleX, sampleZ - 8)) {
               underwaterSampleCount += kSampleUnit;
             }
             totalSampleCount += kSampleUnit;
 
-            if (waterElevation > SampleElevation(sampleX, sampleZ)) {
+            if (UnderWater(sampleX, sampleZ)) {
               underwaterSampleCount += kSampleUnit;
             }
             totalSampleCount += kSampleUnit;
 
-            if (waterElevation > SampleElevation(sampleX, sampleZ + 8)) {
+            if (UnderWater(sampleX, sampleZ + 8)) {
               underwaterSampleCount += kSampleUnit;
             }
             totalSampleCount += kSampleUnit;
@@ -232,7 +236,7 @@ namespace moho
           int sampleZ = zBlockBase * 8;
           int zTailCount = heightBucketCount - zBlockBase;
           while (zTailCount != 0) {
-            if (waterElevation > SampleElevation(sampleX, sampleZ)) {
+            if (UnderWater(sampleX, sampleZ)) {
               underwaterSampleCount += kSampleUnit;
             }
             totalSampleCount += kSampleUnit;

@@ -183,15 +183,33 @@ namespace gpg::gal::effects
     }
 
     const std::wstring entryName = Widen(entry.name);
+    const wchar_t* profile = L"ps_6_0";
+    const wchar_t* stageDefine = L"FAF_PIXEL_STAGE=1";
+    switch (entry.stage) {
+    case ShaderStage::Vertex:
+      profile = L"vs_6_0";
+      stageDefine = L"FAF_VERTEX_STAGE=1";
+      break;
+    case ShaderStage::Hull:
+      profile = L"hs_6_0";
+      stageDefine = L"FAF_HULL_STAGE=1";
+      break;
+    case ShaderStage::Domain:
+      profile = L"ds_6_0";
+      stageDefine = L"FAF_DOMAIN_STAGE=1";
+      break;
+    case ShaderStage::Pixel:
+      break;
+    }
     std::vector<std::wstring> arguments{
       L"-E", entryName,
-      L"-T", entry.stage == ShaderStage::Vertex ? L"vs_6_0" : L"ps_6_0",
+      L"-T", profile,
       // HLSL 2018: the effects predate 2021's stricter vector logic.
       L"-HV", L"2018",
       // Row-major matrices: the parameter store keeps the engine's layout.
       L"-Zpr",
       L"-O3",
-      L"-D", entry.stage == ShaderStage::Vertex ? L"FAF_VERTEX_STAGE=1" : L"FAF_PIXEL_STAGE=1",
+      L"-D", stageDefine,
       // FXC accepted these silently.
       L"-Wno-conversion",
     };
@@ -202,7 +220,9 @@ namespace gpg::gal::effects
       arguments.insert(arguments.end(), {L"-spirv", L"-fvk-use-dx-layout", L"-fspv-reflect", L"-fspv-target-env=vulkan1.1",
                                          L"-fvk-t-shift", L"0", L"0", L"-fvk-s-shift", L"64", L"0", L"-fvk-b-shift", L"0", L"0",
                                          L"-fvk-bind-globals", L"0", L"1"});
-      if (entry.stage == ShaderStage::Vertex) {
+      // SV_Position leaves the vertex shader, or in a tessellated pass the domain
+      // shader (its vertex shader writes control points, which have none).
+      if (entry.stage == ShaderStage::Vertex || entry.stage == ShaderStage::Domain) {
         arguments.push_back(L"-fvk-invert-y");
       }
     }
@@ -273,6 +293,41 @@ namespace gpg::gal::effects
     result.code.assign(bytes, bytes + object->GetBufferSize());
     result.succeeded = true;
     return result;
+  }
+
+  std::uint64_t ShaderCompiler::ReflectTextureSlots(const std::vector<std::uint8_t>& dxil) const
+  {
+    constexpr std::uint64_t kAll = ~std::uint64_t{0};
+    if (mLibrary == nullptr || dxil.empty()) {
+      return kAll;
+    }
+    DxcBuffer buffer{};
+    buffer.Ptr = dxil.data();
+    buffer.Size = dxil.size();
+    ThreadDxc* const dxc = ThisThreadDxc(mLibrary->create);
+    if (dxc == nullptr) {
+      return kAll;
+    }
+    ComPtr<ID3D12ShaderReflection> reflection;
+    D3D12_SHADER_DESC desc{};
+    if (FAILED(dxc->utils->CreateReflection(&buffer, IID_PPV_ARGS(&reflection))) || FAILED(reflection->GetDesc(&desc))) {
+      return kAll;
+    }
+    std::uint64_t slots = 0U;
+    for (UINT index = 0U; index < desc.BoundResources; ++index) {
+      D3D12_SHADER_INPUT_BIND_DESC binding{};
+      if (FAILED(reflection->GetResourceBindingDesc(index, &binding))) {
+        return kAll;
+      }
+      if (binding.Type != D3D_SIT_TEXTURE || binding.Space != 0U) {
+        continue;
+      }
+      const UINT count = (binding.BindCount == 0U) ? 64U : binding.BindCount; // 0: unbounded
+      for (UINT slot = binding.BindPoint; slot < binding.BindPoint + count && slot < 64U; ++slot) {
+        slots |= std::uint64_t{1} << slot;
+      }
+    }
+    return slots;
   }
 
   std::vector<ShaderInput> ShaderCompiler::ReflectInputs(const std::vector<std::uint8_t>& dxil) const

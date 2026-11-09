@@ -47,4 +47,11 @@ namespace faf_gal_tests
    * technique whose passes share and differ in entry points.
    */
   extern const char* const kDrawEffect;
+
+  /**
+   * Engine addition (tessellation): an effect whose pass names a hull function returning the edge and inside
+   * factors of a 3-point patch and a domain function placing each generated point, as terrain_tess.fx does: the
+   * vertex shader only hands its position on, the domain function takes a compile-time argument.
+   */
+  extern const char* const kTessellatedEffect;
 } // namespace faf_gal_tests

@@ -1564,9 +1564,6 @@ Entity* CAiAttackerImpl::TrackToTarget(UnitWeapon* const weapon)
   STIMap* const mapData = sim->mMapData;
   RUnitBlueprintWeapon* const weaponBlueprint = weapon->mWeaponBlueprint;
 
-  // Effective vertical filter: water elevation when the map has water enabled,
-  // otherwise an unbounded floor.
-  const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
 
   const Wm3::Vector3f unitPosition = unit->GetPosition();
 
@@ -1608,6 +1605,9 @@ Entity* CAiAttackerImpl::TrackToTarget(UnitWeapon* const weapon)
     const float projectileX = projectile->mVarDat.mCurTransform.pos_.x;
     const float projectileY = projectile->mVarDat.mCurTransform.pos_.y;
     const float projectileZ = projectile->mVarDat.mCurTransform.pos_.z;
+    // Effective vertical filter: the water level under the projectile (engine addition: per
+    // position), or an unbounded floor where there is no water.
+    const float waterElevation = mapData->GetWaterElevationAt(projectileX, projectileZ);
 
     // Layer/height caps: bit 0x08 permits below-water, bit 0x10 permits above-water.
     // 0x005D8218 `comiss water, y; jae` and 0x005D8221 `comiss y, water; ja`

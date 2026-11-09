@@ -42,6 +42,9 @@ namespace gpg::gal::effects
     bool succeeded = false;
     std::vector<std::uint8_t> code;
     std::vector<ShaderInput> inputs; // vertex shaders, DXIL only
+    /// Engine addition (ren_UsedTextureTable): bit t for each texture register t (0..63) the code reads, from its
+    /// reflection; all bits when that couldn't be read.
+    std::uint64_t textureSlots = ~std::uint64_t{0};
     std::uint64_t key = 0;           // identifies the code (cache key)
     std::string entryName;           // the HLSL entry point (SPIR-V keeps it as the module's entry)
     std::string messages;
@@ -52,6 +55,8 @@ namespace gpg::gal::effects
   {
     std::int32_t vertex = -1;
     std::int32_t pixel = -1;
+    std::int32_t hull = -1;   // engine addition: both set for a tessellated pass, else both -1
+    std::int32_t domain = -1;
   };
 
   class EffectProgram
@@ -178,6 +183,13 @@ namespace gpg::gal
     boost::shared_ptr<EffectTechnique> GetTechnique(const char* name) override;
     void OnReset() override;
     void OnLost() override;
+
+    /**
+     * Engine addition: compiles every shader of technique `name` now and reports whether all of
+     * them compiled (false for an unknown technique). The effect's shaders share one source, so
+     * a technique that compiles shows the whole source does.
+     */
+    [[nodiscard]] bool TechniqueCompiles(const char* name);
 
   private:
     EffectContext mContext;

@@ -10,6 +10,7 @@
 #include "gpg/gal/backends/common/PipelineMemo.h"
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/effects/EffectRuntime.h"
+#include "gpg/gal/effects/TextureFiltering.h"
 #include "moho/console/CConCommand.h"
 #include "moho/render/ProjectileIconRenderer.h"
 #include "moho/render/RangeGpuRenderer.h"
@@ -58,6 +59,22 @@ namespace moho
       &gpg::gal::gPipelineMemo
     );
 
+    /** Engine addition: `ren_UsedTextureTable` (see gpg/gal/backends/common/PipelineMemo.h). */
+    TConVar<bool> gTConVar_ren_UsedTextureTable(
+      "ren_UsedTextureTable",
+      "Direct3D 12 / Vulkan: an effect pass keeps its texture table when only bindings its shaders don't read changed (1, "
+      "the default), or rebuilds it on any change (0). Read at each pass.",
+      &gpg::gal::gUsedTextureTable
+    );
+
+    /** Engine addition: `ren_VulkanDynamicConstants` (see gpg/gal/backends/common/PipelineMemo.h). */
+    TConVar<bool> gTConVar_ren_VulkanDynamicConstants(
+      "ren_VulkanDynamicConstants",
+      "Vulkan: a draw whose shader constants changed binds one set per upload buffer with its constants' offset (1, the "
+      "default), or allocates and writes a new set (0). Read between frames.",
+      &gpg::gal::gVulkanDynamicConstants
+    );
+
     /** Engine addition: `ren_LockedRangeOnly` (see gpg/gal/PlacedResources.h). */
     TConVar<bool> gTConVar_ren_LockedRangeOnly(
       "ren_LockedRangeOnly",
@@ -89,6 +106,15 @@ namespace moho
       "Vulkan: a target switching between being drawn into, sampled and copied waits only for the work that used it "
       "(1, the default), or for all earlier work on the GPU (0). Read at each switch.",
       &gpg::gal::gVulkanPreciseBarriers
+    );
+
+    /** Engine addition: `ren_TextureAnisotropy` (see gpg/gal/effects/TextureFiltering.h). */
+    TConVar<int> gTConVar_ren_TextureAnisotropy(
+      "ren_TextureAnisotropy",
+      "Direct3D 12 and Vulkan: anisotropic filtering (2-16) for the tiled textures the effects sample trilinearly - "
+      "terrain layers, unit albedo, normal and specular maps - so ground and hulls seen at a slant stay sharp; 0 keeps "
+      "the effects' own filtering. 8 by default. Applies at the next draw of each effect.",
+      &gpg::gal::effects::gTextureAnisotropy
     );
 
     /** Engine addition: `d3d_UploadIdleMB` (see gpg/gal/PlacedResources.h). */

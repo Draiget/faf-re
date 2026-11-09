@@ -152,11 +152,16 @@ set_tests_properties(replay_scan PROPERTIES LABELS "Existing")
 # without FAF_REPLAY_DATA. Games take minutes, hence the timeout.
 add_executable(faf_replay_playback_tests EXCLUDE_FROM_ALL replay/ReplayPlaybackTests.cpp)
 target_link_libraries(faf_replay_playback_tests PRIVATE gtest_main)
-target_compile_definitions(faf_replay_playback_tests PRIVATE FAF_HEADLESS_EXE="$<TARGET_FILE:headless>")
+target_compile_definitions(faf_replay_playback_tests PRIVATE FAF_HEADLESS_EXE="$<TARGET_FILE:headless>"
+  FAF_REPLAY_ZOO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/replay/zoo")
+if(FAF_SERVER_MODE)
+  # The server's checks (--seats, --oracle-check, --view-frames, ...) exist only in a server-mode headless.
+  target_compile_definitions(faf_replay_playback_tests PRIVATE FAF_HEADLESS_SERVER_MODE=1)
+endif()
 add_dependencies(faf_replay_playback_tests headless)
 set_target_properties(faf_replay_playback_tests PROPERTIES FOLDER "Tests/Replay")
 add_test(NAME replay_playback COMMAND faf_replay_playback_tests)
-set_tests_properties(replay_playback PROPERTIES LABELS "Replay" TIMEOUT 3600)
+set_tests_properties(replay_playback PROPERTIES LABELS "Replay" TIMEOUT 7200)
 
 # CZipFile reads entries whose data starts at or past 2 GiB, as the binary does (tests/zip, PR #291).
 add_executable(faf_zip_offset_tests EXCLUDE_FROM_ALL zip/ZipOffsetTests.cpp)
@@ -201,6 +206,8 @@ add_subdirectory(lua)
 add_subdirectory(gal)
 add_subdirectory(reflection)
 add_subdirectory(render_math)
+add_subdirectory(startup)
+add_subdirectory(netcore)
 
 # Entity update scroll snapshots and payload ownership.
 add_executable(faf_recon_scroll_packet_tests EXCLUDE_FROM_ALL sim/ReconScrollPacketTests.cpp)
@@ -214,6 +221,21 @@ target_link_libraries(faf_transport_preorder_tests PRIVATE faf_engine gtest_main
 set_target_properties(faf_transport_preorder_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME transport_preorders COMMAND faf_transport_preorder_tests)
 set_tests_properties(transport_preorders PROPERTIES TIMEOUT 120 LABELS "Existing")
+
+# Engine addition: water bodies filled over a height field (.plans/water-levels/PLAN.md).
+add_executable(faf_water_bodies_tests EXCLUDE_FROM_ALL sim/WaterBodiesTests.cpp ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterBodies.cpp)
+target_include_directories(faf_water_bodies_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_water_bodies_tests PRIVATE gtest_main)
+set_target_properties(faf_water_bodies_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME water_bodies COMMAND faf_water_bodies_tests)
+set_tests_properties(water_bodies PROPERTIES LABELS "Sim")
+
+# Engine addition: the map's water queries with water bodies.
+add_executable(faf_water_bodies_map_tests EXCLUDE_FROM_ALL sim/WaterBodiesMapTests.cpp)
+target_link_libraries(faf_water_bodies_map_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_water_bodies_map_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME water_bodies_map COMMAND faf_water_bodies_map_tests)
+set_tests_properties(water_bodies_map PROPERTIES TIMEOUT 120 LABELS "Sim")
 
 # Lua coroutine tests (coroutine.create / resume / yield / status / wrap).
 add_executable(faf_coroutine_tests EXCLUDE_FROM_ALL lua/CoroutineTests.cpp)
@@ -315,6 +337,30 @@ set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim"
 add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
 set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
 
-# Every GoogleTest executable above and in the subdirectories.
+# The map editor height brush, symmetry check, height files and undo (src/editor/tools, src/editor/undo): exact symmetry,
+# byte-exact undo, height images read back as written.
+add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.cpp editor/HeightHistoryTests.cpp editor/SymmetryCheckTests.cpp editor/HeightFileTests.cpp
+  editor/NewMapTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdNewMap.cpp
+  editor/MaskBrushTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMaskBrush.cpp
+  editor/SaveFileTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdSaveFile.cpp
+  editor/MarkerTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMarkers.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryCheck.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightFile.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)
+target_include_directories(faf_editor_brush_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_editor_brush_tests PRIVATE gtest_main ole32 windowscodecs)
+set_target_properties(faf_editor_brush_tests PROPERTIES FOLDER "Tests/Editor")
+add_test(NAME editor_height_brush COMMAND faf_editor_brush_tests)
+set_tests_properties(editor_height_brush PROPERTIES LABELS "Editor")
+
+add_executable(faf_slab_tests EXCLUDE_FROM_ALL entity/FixedSlabPoolTests.cpp)
+target_link_libraries(faf_slab_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_slab_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME slab_tests COMMAND faf_slab_tests)
+set_tests_properties(slab_tests PROPERTIES LABELS "Sim")
+
+# Every GoogleTest executable above and in the subdirectories. Keep this last: it sees only the
+# targets defined before it, so a test added below it is never built by faf_tests and ctest
+# reports it as Not Run.
 include(FafTests)
 faf_add_tests_target("${CMAKE_CURRENT_SOURCE_DIR}")

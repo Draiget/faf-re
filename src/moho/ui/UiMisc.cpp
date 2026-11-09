@@ -1683,13 +1683,6 @@ void moho::MAUI_ToggleConsole()
   );
 }
 
-void moho::MAUI_ReleaseCursor(
-  CMauiCursor* const cursor
-)
-{
-  (void)cursor;
-}
-
 /**
  * Address: 0x0083D670 (FUN_0083D670)
  *
@@ -3093,7 +3086,10 @@ namespace
     const gpg::Rect2f skirt = blueprint->GetSkirtRect(groundPosition);
 
     const STIMap* const map = session->GetSTIMap();
-    const float waterElevation = map->mWaterEnabled != 0 ? map->mWaterElevation : kNoWaterElevation;
+    // Engine addition (water bodies): the level of the water under the skirt.
+    const float waterElevation =
+      map->HasWaterBodies() ? map->GetWaterElevationAt(position.x, position.z)
+                            : (map->mWaterEnabled != 0 ? map->mWaterElevation : kNoWaterElevation);
 
     float skirtY = position.y;
     if (heightField != nullptr) {

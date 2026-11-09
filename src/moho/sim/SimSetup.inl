@@ -78,6 +78,10 @@ void Sim::Setup(LaunchInfoNew* const info)
   scenarioInfo.SetObject("ArmySetup", armySetupTable);
   mLuaState->GetGlobals().SetObject("ScenarioInfo", scenarioInfo);
 
+  // Engine addition (.plans/water-levels/PLAN.md): the map's water bodies, before any script asks
+  // for a water level. Sea only unless the session has EFafSimFix::WaterBodies on.
+  mMapData->InstallWaterBodies(scenarioInfo);
+
   // SetupSession() Lua callback. Only the call is guarded (runtime_error,
   // FuncInfo 0x00F29640 try state 12, handler 0x00744414).
   {
@@ -297,6 +301,7 @@ Sim::~Sim()
   if (mEntityDB) {
     delete mEntityDB;
     mEntityDB = nullptr;
+    EntityMemoryManager::Instance().Clear();
   }
 
   // Random stream (raw storage; no destructor in the binary).

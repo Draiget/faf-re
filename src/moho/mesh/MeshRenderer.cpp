@@ -19,6 +19,8 @@ namespace moho
   // (?ren_ShadowBias@Moho@@3MA). Byte-verified default from ForgedAlliance.exe:
   // .data VA 0x00F57DFC = 0.005f.
   float ren_ShadowBias = 0.005f;
+
+  ShadowCasterRegion gShadowCasterRegion{};
 }
 
 namespace
@@ -69,7 +71,17 @@ namespace moho
 namespace
 {
     MeshRenderer* gMeshRendererInstance = nullptr;
+
+    /// Engine addition (water bodies): the level the next mirrored passes reflect at, when set.
+    bool sMirrorElevationSet = false;
+    float sMirrorElevation = 0.0f;
 }
+
+  void MESH_SetMirrorElevation(const bool set, const float elevation) noexcept
+  {
+    sMirrorElevationSet = set;
+    sMirrorElevation = elevation;
+  }
 
 
   /**
@@ -652,6 +664,10 @@ namespace
     } else {
       surfaceElevation = -1000.0f;
     }
+    // Engine addition (water bodies): a reflection pass for a lake mirrors at the lake's level.
+    if (mirrored && sMirrorElevationSet) {
+      surfaceElevation = sMirrorElevation;
+    }
 
     // Global lookup textures + the three per-frame texture binds.
     LoadGlobalTextures();
@@ -820,7 +836,8 @@ namespace
       if (sv.shadowBias.Exists()) {
         sv.shadowBias.SetFloat(shadowBias);
       }
-      const int shadowSize = shadow->mShadowSize;
+      // Engine change (ren_ShadowCascades): the whole-view map's texels, which is mShadowSize without the atlas.
+      const int shadowSize = ShadowMapTexels(*shadow);
       if (sv.shadowSize.Exists()) {
         sv.shadowSize.SetFloat(static_cast<float>(shadowSize));
       }
@@ -1669,6 +1686,11 @@ namespace
       // only live view camera in this pass is `camera`, so both the collect
       // volume and this cull share it.
       if (!camera.solid2.Intersects(instance->sphere)) {
+        continue;
+      }
+
+      // Engine addition (ren_ShadowCasterCull): in the shadow pass, a mesh whose shadow can't reach the view.
+      if (gShadowCasterRegion.active && !gShadowCasterRegion.MayShadow(instance->sphere)) {
         continue;
       }
 

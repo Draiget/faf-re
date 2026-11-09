@@ -275,6 +275,14 @@ namespace moho
   [[nodiscard]] bool UI_StartGameUI(LuaPlus::LuaState* state);
 
   /**
+   * Engine addition (the map editor, src/editor): called by `UI_StartGameUI` with the state the UI was
+   * just bound to, before `uimain.lua`'s `StartGameUI` runs in it. A session calls `UI_StartGameUI`
+   * twice: in the front end's state for the loading dialog, then in the session's own state at the
+   * first sync. The editor installs its loading view there. Null in the game.
+   */
+  extern void (*gUIBeforeStartGameUI)(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x0083D340 (FUN_0083D340, Moho::ShowEscapeDialog)
    *
    * What it does:

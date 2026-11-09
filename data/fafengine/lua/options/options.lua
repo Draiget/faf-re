@@ -32,7 +32,7 @@ do
             .. "Takes effect after a restart; if the chosen renderer cannot start, the game uses Direct3D 9.",
         custom = {
             states = {
-                { text = "Automatic (newest available)", key = 'auto' },
+                { text = "<LOC OPTIONS_GRAPHICS_API_AUTO>Automatic (newest available)", key = 'auto' },
                 { text = "Direct3D 9", key = 'd3d9' },
                 { text = "Direct3D 11", key = 'd3d11' },
                 { text = "Direct3D 12", key = 'd3d12' },
@@ -56,7 +56,8 @@ do
     end
 end
 
--- The replay viewer's keyframes: saved game states it moves back to. Compressed, in replay_keyframes next to the exe.
+-- The replay viewer's keyframes: saved game states it moves back to. Compressed, in replay_keyframes next to the exe
+-- (faf_replay_keyframes in the temporary folder when the exe's folder can't be written).
 do
     local gameplay = options and options.gameplay
     if gameplay and gameplay.items then
@@ -70,7 +71,8 @@ do
             key = 'replay_keyframe_budget',
             type = 'slider',
             default = 2048,
-            tip = "Disk space a replay may use for its saved positions, in the replay_keyframes folder next to the game. "
+            tip = "Disk space a replay may use for its saved positions, in the replay_keyframes folder next to the game, or in "
+                .. "faf_replay_keyframes in the system's temporary folder when the game's folder can't be written. "
                 .. "Over this, the oldest are thinned out, and moving far back takes longer. Cleared when the next replay starts.",
             set = function(key, value, startup)
                 ConExecute("replay_KeyframeMaxMB " .. tostring(value))
@@ -225,6 +227,113 @@ do
                 break
             end
         end
+    end
+end
+
+-- Finer shadows near the camera (ren_ShadowCascades), on Direct3D 12 and Vulkan. Shown only by an engine that
+-- has the command, as the ones below.
+do
+    local command = 'ren_ShadowCascades'
+    local function Supported()
+        -- The engine's Lua reports C functions as 'cfunction'.
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local video = options and options.video
+    if video and video.items and Supported() then
+        local position = table.getn(video.items) + 1
+        for index, item in ipairs(video.items) do
+            if item.key == 'shadow_resolution' then
+                position = index + 1
+            end
+        end
+        table.insert(video.items, position, {
+            title = 'Sharper near shadows',
+            key = 'shadow_cascades',
+            type = 'toggle',
+            default = 3,
+            tip = 'Extra shadow detail close to the camera when it is tilted. Direct3D 12 and Vulkan only; '
+                .. 'other renderers keep the original shadows.',
+            set = function(key, value, startup)
+                if value ~= 0 then
+                    value = 3
+                end
+                ConExecute(command .. ' ' .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    { text = '<LOC _On>', key = 3 },
+                    { text = '<LOC _Off>', key = 0 },
+                },
+            },
+        })
+    end
+end
+
+-- Texture filtering (ren_TextureAnisotropy), on Direct3D 12 and Vulkan: anisotropic filtering for the tiled ground
+-- and unit textures. Shown only by an engine that has the command, as the ones below.
+do
+    local command = 'ren_TextureAnisotropy'
+    local function Supported()
+        -- The engine's Lua reports C functions as 'cfunction'.
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local video = options and options.video
+    if video and video.items and Supported() then
+        local position = table.getn(video.items) + 1
+        for index, item in ipairs(video.items) do
+            if item.key == 'texture_level' then
+                position = index + 1
+            end
+        end
+        -- Option values are levels, so a saved preference never reaches the command as text.
+        local levels = { [0] = '0', [1] = '4', [2] = '8', [3] = '16' }
+        table.insert(video.items, position, {
+            title = 'Texture filtering',
+            key = 'texture_anisotropy',
+            type = 'toggle',
+            default = 2,
+            tip = 'Keeps ground and unit textures sharp when seen at a slant (anisotropic filtering). '
+                .. 'Direct3D 12 and Vulkan only.',
+            set = function(key, value, startup)
+                ConExecute(command .. ' ' .. (levels[value] or levels[2]))
+            end,
+            custom = {
+                states = {
+                    { text = 'Trilinear', key = 0 },
+                    { text = '4x', key = 1 },
+                    { text = '8x', key = 2 },
+                    { text = '16x', key = 3 },
+                },
+            },
+        })
     end
 end
 
@@ -427,6 +536,63 @@ do
                     { text = '<LOC _Off>', key = 0 },
                     { text = 'Normal', key = 1 },
                     { text = 'Strong', key = 2 },
+                },
+            },
+        })
+    end
+end
+
+-- Interface text (ren_MsdfText, ren_MsdfTextMinSize), on every renderer: smooth text from MSDF atlases, smooth text
+-- with the small sizes on the original Windows (GDI) glyphs, or the original glyphs everywhere. A mod's own font has
+-- no GDI version and keeps its atlas either way. Shown only by an engine that has the commands.
+do
+    local function Supported(command)
+        -- The engine's Lua reports C functions as 'cfunction'.
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    -- FAF's options.lua may carry this entry too (FAForever/fa#7372); then it shows once, with FAF's text.
+    local video = options and options.video
+    if video and video.items and not HasOptionKey(video.items, 'interface_text')
+        and Supported('ren_MsdfText') and Supported('ren_MsdfTextMinSize') then
+        -- Option values are levels, so a saved preference never reaches the commands as text.
+        -- 13: the GDI glyphs' hinting matters most below about 13 px, where MSDF text is softer and dimmer.
+        local modes = {
+            [0] = { on = '0', minSize = '1' },
+            [1] = { on = '1', minSize = '13' },
+            [2] = { on = '1', minSize = '1' },
+        }
+        table.insert(video.items, {
+            title = 'Interface text',
+            key = 'interface_text',
+            type = 'toggle',
+            default = 2,
+            tip = 'Smooth draws interface text from distance-field atlases, sharp at any size. Original draws it with '
+                .. 'the Windows glyphs, as the original game does. Small text original keeps text with a font size under 13 '
+                .. 'on the Windows glyphs.',
+            set = function(key, value, startup)
+                local mode = modes[value] or modes[2]
+                ConExecute('ren_MsdfTextMinSize ' .. mode.minSize)
+                ConExecute('ren_MsdfText ' .. mode.on)
+            end,
+            custom = {
+                states = {
+                    { text = '<LOC OPTIONS_INTERFACE_TEXT_SMOOTH>Smooth', key = 2 },
+                    { text = '<LOC OPTIONS_INTERFACE_TEXT_SMALL_ORIGINAL>Small text original', key = 1 },
+                    { text = '<LOC OPTIONS_INTERFACE_TEXT_ORIGINAL>Original', key = 0 },
                 },
             },
         })

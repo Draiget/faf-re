@@ -14,6 +14,7 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
+#include "moho/terrain/water/WaterBodySurfaces.h"
 #include "moho/terrain/water/WaterShaderVars.h"
 
 namespace moho
@@ -249,6 +250,17 @@ namespace moho
     BindTextureShaderVar(GetWater2UtilityTextureCShaderVar(), terrainRes->GetWaterMap());
 
     std::int32_t primitiveType = 4;
+    // Engine addition (water bodies): each water at its own level.
+    if (const auto* const levels = WaterBodySurfaces::For(terrainRes); levels != nullptr) {
+      bool drawn = true;
+      for (const WaterBodySurfaces::Level& level : *levels) {
+        GetWater2WaterElevationShaderVar().SetFloat(level.elevation);
+        for (const WaterBodySurfaces::Chunk& chunk : level.chunks) {
+          drawn = device->DrawIndexedSheetPrimitive(chunk.vertices, chunk.indices, &primitiveType) && drawn;
+        }
+      }
+      return drawn;
+    }
     return device->DrawIndexedSheetPrimitive(mVertexSheet, mIndexSheet, &primitiveType);
   }
 } // namespace moho

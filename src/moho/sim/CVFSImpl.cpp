@@ -884,6 +884,12 @@ namespace moho
     }
   }
 
+  void CVFSImpl::MountDirectoryLate(const std::filesystem::path& directory, const gpg::StrArg mountpoint)
+  {
+    const SVFSMountPoint point(directory.string().c_str(), mountpoint);
+    AddSearchPath(point, fa::string(directory.string().c_str()), true);
+  }
+
   /**
    * Address: 0x004666A0 (FUN_004666A0, Moho::CVFSImpl::AddSearchPath)
    *

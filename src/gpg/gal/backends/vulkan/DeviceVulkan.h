@@ -37,6 +37,7 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/OutputContext.hpp"
 #include "gpg/gal/backends/common/PipelineMemo.h"
+#include "gpg/gal/backends/common/UsedTextureTable.h"
 #include "gpg/gal/backends/common/WindowsCursor.h"
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "gpg/gal/effects/SpirvReflect.h"
@@ -187,9 +188,12 @@ namespace gpg::gal
       effects::EffectProgram* program = nullptr;
       const effects::CompiledEntry* vertexShader = nullptr;
       const effects::CompiledEntry* pixelShader = nullptr;
+      const effects::CompiledEntry* hullShader = nullptr;   // engine addition: a tessellated pass (both set)
+      const effects::CompiledEntry* domainShader = nullptr;
       RenderState state;
       VkDescriptorSet textures = VK_NULL_HANDLE;
       VkDescriptorSet constants = VK_NULL_HANDLE;
+      std::uint32_t constantsOffset = 0;          // ren_VulkanDynamicConstants: the bind offset in `constants`
       const std::uint8_t* constantsCpu = nullptr; // the same snapshot, CPU side (upload memory)
       std::uint32_t constantsBytes = 0;
       std::uint64_t constantsSerial = 0;          // the submission whose upload memory holds it
@@ -232,6 +236,14 @@ namespace gpg::gal
       std::vector<VkSemaphore> acquire; // one per swap chain
       std::vector<VkDescriptorPool> gpuPools; // GPU-driven sets (GpuDrivenVulkan.cpp)
       std::uint32_t gpuPool = 0;
+      /// ren_VulkanDynamicConstants: one dynamic constant set per (upload buffer, range), from this frame's pools.
+      struct ConstantSetEntry
+      {
+        VkBuffer buffer = VK_NULL_HANDLE;
+        VkDeviceSize range = 0;
+        VkDescriptorSet set = VK_NULL_HANDLE;
+      };
+      std::vector<ConstantSetEntry> constantSets;
     };
 
     struct Garbage
@@ -282,7 +294,14 @@ namespace gpg::gal
     [[nodiscard]] VkDescriptorSet AllocateSet(VkDescriptorSetLayout layout);
     [[nodiscard]] VkDeviceSize ConstantAlignment() const noexcept;
     /** A set 1 ($Globals) descriptor set reading `bytes` of `upload`. */
-    [[nodiscard]] VkDescriptorSet ConstantSet(const vulkan::UploadAllocation& upload, VkDeviceSize bytes);
+    /** A set for $Globals in `upload`; with dynamic constants `offset` is the bind offset, otherwise 0. */
+    [[nodiscard]] VkDescriptorSet ConstantSet(const vulkan::UploadAllocation& upload, VkDeviceSize bytes, std::uint32_t& offset);
+    /** Binds set 1 (the pass's $Globals) with the layout and offset of the frame's constant mode. */
+    void BindConstantSet(VkDescriptorSet set, std::uint32_t offset);
+    [[nodiscard]] VkPipelineLayout EffectPipelineLayout() const noexcept
+    {
+      return mDynamicConstants ? mDynamicPipelineLayout : mPipelineLayout;
+    }
     /**
      * Copies the bound pass's constant snapshot into the submission now being
      * recorded; called after a submission, before CollectCompleted can hand
@@ -329,6 +348,7 @@ namespace gpg::gal
     std::uint64_t mSubmittedSerial = 0;
     bool mAnisotropy = false;
     bool mWireframeSupported = false;
+    bool mTessellationSupported = false; // engine addition: tessellated passes draw only with it
     bool mMemoryBudget = false; // VK_EXT_memory_budget enabled
     std::string mDriverName;    // VkPhysicalDeviceDriverProperties driverName + driverInfo
     VkFormat mDepthStencilFormat = VK_FORMAT_D24_UNORM_S8_UINT;
@@ -344,6 +364,10 @@ namespace gpg::gal
     VkDescriptorSetLayout mTextureLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout mConstantLayout = VK_NULL_HANDLE;
     VkPipelineLayout mPipelineLayout = VK_NULL_HANDLE;
+    // Engine addition (ren_VulkanDynamicConstants): set 1 as a dynamic uniform buffer, bound with an offset.
+    VkDescriptorSetLayout mDynamicConstantLayout = VK_NULL_HANDLE;
+    VkPipelineLayout mDynamicPipelineLayout = VK_NULL_HANDLE;
+    bool mDynamicConstants = false; ///< latched from gVulkanDynamicConstants between frames
     VkPipelineCache mPipelineCache = VK_NULL_HANDLE;
     vulkan::TrackedImage mNullImages[3];   // 2D, cube, 3D
     VkImageView mNullViews[3]{};
@@ -359,6 +383,8 @@ namespace gpg::gal
     {
       std::uint64_t vertexKey;
       std::uint64_t pixelKey;
+      std::uint64_t hullKey;   // 0 when the pass is not tessellated
+      std::uint64_t domainKey;
       std::uint32_t format;
       std::uint32_t sampleMask;
       std::uint32_t strides[16];
@@ -368,6 +394,7 @@ namespace gpg::gal
       VkFormat colorFormat;
       VkFormat depthFormat;
       VkPrimitiveTopology topology;
+      VkPipelineLayout layout;
     };
     PipelineMemo<PipelineInputs, VkPipeline> mPipelineMemo;
 
