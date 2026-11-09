@@ -1094,6 +1094,9 @@ namespace faf::editor
           if (moho::CFG_GetArgOption("/check", 0, nullptr)) {
             mShell->RequestCheck();
           }
+          if (moho::CFG_GetArgOption("/pathing", 0, nullptr)) {
+            mShell->Tools().ShowPathing() = true;
+          }
         }
         if (mGridArgsPending) {
           mGridArgsPending = false;

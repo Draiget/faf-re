@@ -60,6 +60,19 @@ namespace faf::editor
       int level;
     };
     void SetCheckPins(std::vector<CheckPin> pins) { mCheckPins = std::move(pins); }
+    /** The Check's pathing on the ground: blocks of cells in a colour (ARGB), drawn while the switch is on. */
+    struct PathQuad
+    {
+      float x0;
+      float z0;
+      float x1;
+      float z1;
+      std::uint32_t color;
+    };
+    void SetPathing(std::vector<PathQuad> quads) { mPathQuads = std::move(quads); }
+    [[nodiscard]] const std::vector<PathQuad>& PathingQuads() const noexcept { return mPathQuads; }
+    [[nodiscard]] bool& ShowPathing() noexcept { return mShowPathing; }
+    [[nodiscard]] bool ShowingPathing() const noexcept { return mShowPathing && !mPathQuads.empty(); }
     [[nodiscard]] const std::vector<CheckPin>& CheckPins() const noexcept { return mCheckPins; }
     /** The Water tool's panel: the map's water as it is, and a change it made (`final` when a drag or a click ended). */
     [[nodiscard]] bool WaterToolActive() const noexcept { return mTool == 3; }
@@ -564,6 +577,8 @@ namespace faf::editor
     std::vector<SaveEntry> mMarkerSelection;
     bool mConnectNodes = false;
     std::vector<CheckPin> mCheckPins;
+    std::vector<PathQuad> mPathQuads;
+    bool mShowPathing = false;
     WaterState mWater;
     bool mWaterEditing = false;
     bool mWaterChanged = false;

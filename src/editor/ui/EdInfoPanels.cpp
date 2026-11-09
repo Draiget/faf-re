@@ -9,6 +9,11 @@
 #include <map>
 
 #include "editor/EdPlay.h"
+#include "moho/terrain/CWldTerrainRes.h"
+#include "moho/sim/SFootprint.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/RRuleGameRules.h"
+#include "editor/tools/EdPathing.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/sim/CWldMap.h"
 #include <cmath>
@@ -486,6 +491,138 @@ namespace faf::editor
     }
   } // namespace
 
+  void EdShell::CheckPathing(const MarkerCheckInput& input)
+  {
+    moho::CWldMap* const map = mDocument.Map();
+    const moho::CHeightField* const field = map != nullptr && map->mTerrainRes != nullptr ? map->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr) {
+      return;
+    }
+    // The land unit's footprint from its blueprint (a T1 tank unless the rules lack it).
+    const char* const unitId = "uel0201";
+    PathFootprint land;
+    land.caps = 0x1;
+    land.maxSlope = 0.75f;
+    if (moho::RRuleGameRules* const rules = moho::RULE_PeekKept(); rules != nullptr) {
+      moho::RResId id{};
+      id.name.assign(unitId);
+      if (const moho::RUnitBlueprint* const blueprint = rules->GetUnitBlueprint(id);
+          blueprint != nullptr && blueprint->Physics.ResolvedFootprint != nullptr) {
+        const moho::SFootprint& footprint = *blueprint->Physics.ResolvedFootprint;
+        land.caps = static_cast<std::uint8_t>(footprint.mOccupancyCaps);
+        land.maxSlope = footprint.mMaxSlope;
+        land.minWaterDepth = footprint.mMinWaterDepth;
+        land.maxWaterDepth = footprint.mMaxWaterDepth;
+      }
+    }
+    gpg::Logf("editor: pathing as %s: caps 0x%02x, max slope %.2f, water depth %.2f to %.2f", unitId, land.caps, static_cast<double>(land.maxSlope),
+              static_cast<double>(land.minWaterDepth), static_cast<double>(land.maxWaterDepth));
+    const int cellsX = field->width - 1;
+    const int cellsZ = field->height - 1;
+    const std::vector<std::uint8_t> cells = PassableCells(field->data, field->width, field->height, input.water, input.waterLevel, land);
+    std::vector<int> areas;
+    const int areaCount = ConnectAreas(cells, cellsX, cellsZ, areas);
+
+    // Each start's land area, and the resources reached in it.
+    struct Start
+    {
+      const SaveEntry* marker;
+      float x;
+      float z;
+      int area;
+      int mass;
+      int hydro;
+    };
+    std::vector<Start> starts;
+    int massTotal = 0;
+    int hydroTotal = 0;
+    for (const SaveEntry& marker : *input.markers) {
+      const std::string type = MarkerTypeOf(marker);
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if (!MarkerPosition(marker, x, y, z)) {
+        continue;
+      }
+      if (type == "Blank Marker") {
+        starts.push_back({&marker, x, z, AreaNear(areas, cellsX, cellsZ, x, z, 1), 0, 0});
+      }
+      massTotal += type == "Mass" ? 1 : 0;
+      hydroTotal += type == "Hydrocarbon" ? 1 : 0;
+    }
+    for (const SaveEntry& marker : *input.markers) {
+      const std::string type = MarkerTypeOf(marker);
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if ((type != "Mass" && type != "Hydrocarbon") || !MarkerPosition(marker, x, y, z)) {
+        continue;
+      }
+      const int area = AreaNear(areas, cellsX, cellsZ, x, z, 3);
+      for (Start& start : starts) {
+        if (area != 0 && area == start.area) {
+          ++(type == "Mass" ? start.mass : start.hydro);
+        }
+      }
+    }
+    int bestMass = 0;
+    std::vector<int> startAreas;
+    for (const Start& start : starts) {
+      bestMass = std::max(bestMass, start.mass);
+      if (start.area != 0 && std::find(startAreas.begin(), startAreas.end(), start.area) == startAreas.end()) {
+        startAreas.push_back(start.area);
+      }
+    }
+    for (const Start& start : starts) {
+      CheckIssue issue;
+      issue.marker = start.marker->name;
+      issue.x = start.x;
+      issue.z = start.z;
+      if (start.area == 0) {
+        issue.level = CheckIssue::Level::Error;
+        issue.text = std::string("start position is on ground a ") + unitId + " can't stand on";
+        mCheckIssues.push_back(issue);
+        continue;
+      }
+      char text[200];
+      (void)std::snprintf(text, sizeof(text), "reaches %d of %d mass and %d of %d hydrocarbon points by land%s", start.mass, massTotal, start.hydro,
+                          hydroTotal, startAreas.size() > 1 ? " (the starts are on more than one land area)" : "");
+      issue.level = start.mass < bestMass ? CheckIssue::Level::Warning : CheckIssue::Level::Note;
+      issue.text = text;
+      mCheckIssues.push_back(issue);
+    }
+
+    // The overlay: blocks of up to 256 a side, red where the land unit can't go, amber where it can but no start reaches.
+    const int block = std::max(1, (std::max(cellsX, cellsZ) + 255) / 256);
+    std::vector<EdTools::PathQuad> quads;
+    for (int bz = 0; bz < cellsZ; bz += block) {
+      for (int bx = 0; bx < cellsX; bx += block) {
+        int blocked = 0;
+        int lone = 0;
+        int total = 0;
+        for (int z = bz; z < std::min(bz + block, cellsZ); ++z) {
+          for (int x = bx; x < std::min(bx + block, cellsX); ++x) {
+            const int area = areas[static_cast<std::size_t>(z) * static_cast<std::size_t>(cellsX) + static_cast<std::size_t>(x)];
+            ++total;
+            if (area == 0) {
+              ++blocked;
+            } else if (std::find(startAreas.begin(), startAreas.end(), area) == startAreas.end()) {
+              ++lone;
+            }
+          }
+        }
+        const float x0 = static_cast<float>(bx);
+        const float z0 = static_cast<float>(bz);
+        const float x1 = static_cast<float>(std::min(bx + block, cellsX));
+        const float z1 = static_cast<float>(std::min(bz + block, cellsZ));
+        if (blocked * 2 >= total) {
+          quads.push_back({x0, z0, x1, z1, 0x60FF3020u});
+        } else if (lone * 2 >= total) {
+          quads.push_back({x0, z0, x1, z1, 0x50FFB020u});
+        }
+      }
+    }
+    mTools.SetPathing(std::move(quads));
+    gpg::Logf("editor: pathing: %d land areas, starts on %zu of them; %zu overlay blocks of %d cells", areaCount, startAreas.size(),
+              mTools.PathingQuads().size(), block);
+  }
+
   void EdShell::RunCheck()
   {
     mCheckIssues.clear();
@@ -511,6 +648,7 @@ namespace faf::editor
     input.width = facts.fieldWidth;
     input.height = facts.fieldHeight;
     mCheckIssues = CheckMarkers(input);
+    CheckPathing(input);
     // The scripts' syntax, as the files are now (edits included).
     for (CheckIssue& issue : mDocument.CheckScripts()) {
       mCheckIssues.insert(mCheckIssues.begin(), std::move(issue));
@@ -563,10 +701,14 @@ namespace faf::editor
     if (ImGui::Button("Run the check", ImVec2(-1.0f, 0.0f))) {
       RunCheck();
     }
+    ImGui::Checkbox("Show pathing", &mTools.ShowPathing());
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+      ImGui::SetTooltip("After a run: red where a T1 tank (uel0201) can't go (too steep, too deep), amber where it can but no start reaches");
+    }
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     ImGui::TextWrapped("The scripts' syntax (_scenario.lua, _save.lua, _script.lua as edited), then start positions and mass and "
                        "hydrocarbon points: off the playable area, under water, without a partner at their symmetric copies (the Tools "
-                       "panel's symmetry), or overlapping. Pathing comes next.");
+                       "panel's symmetry), or overlapping; then pathing for a T1 tank: what each start reaches by land.");
     ImGui::PopStyleColor();
     if (!mCheckRan) {
       ImGui::End();

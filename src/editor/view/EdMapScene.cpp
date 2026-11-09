@@ -79,7 +79,7 @@ namespace faf::editor
     if (mMap == nullptr || mCamera == nullptr || mTools == nullptr ||
         (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && mSelection.empty() && !area &&
          mDocument.SaveData().Markers().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive() && !mTools->UnitsToolActive() &&
-         mTools->CheckPins().empty()) ||
+         mTools->CheckPins().empty() && !mTools->ShowingPathing()) ||
         moho::ren_Viewport == nullptr) {
       return;
     }
@@ -297,6 +297,20 @@ namespace faf::editor
           batcher->DrawLine(groundVertex(p.x + std::cos(a0) * 1.5f, p.z + std::sin(a0) * 1.5f, 0xF0FFE040u),
                             groundVertex(p.x + std::cos(a1) * 1.5f, p.z + std::sin(a1) * 1.5f, 0xF0FFE040u));
         }
+      }
+    }
+    // The Check's pathing: where the land unit can't go, and where no start reaches.
+    if (mTools->ShowingPathing()) {
+      std::vector<moho::CD3DPrimBatcher::Vertex> quads;
+      quads.reserve(mTools->PathingQuads().size() * 4);
+      for (const EdTools::PathQuad& q : mTools->PathingQuads()) {
+        quads.push_back(groundVertex(q.x0, q.z0, q.color, 0.3f));
+        quads.push_back(groundVertex(q.x1, q.z0, q.color, 0.3f));
+        quads.push_back(groundVertex(q.x1, q.z1, q.color, 0.3f));
+        quads.push_back(groundVertex(q.x0, q.z1, q.color, 0.3f));
+      }
+      if (!quads.empty()) {
+        batcher->DrawQuads(quads.data(), static_cast<std::uint32_t>(quads.size() / 4));
       }
     }
     // The Check's findings: a ring and a post in its colour (red errors, amber warnings, blue notes).

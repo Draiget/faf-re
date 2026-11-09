@@ -92,6 +92,8 @@ namespace faf::editor
     std::string mScriptMessage;
     int mScriptErrorLine = 0;
     void RunCheck();
+    /** The pathing part of the Check: what each start reaches by land, and the overlay. */
+    void CheckPathing(const MarkerCheckInput& input);
     bool mShowCheck = true;
     std::vector<CheckIssue> mCheckIssues;
     bool mCheckRan = false;
