@@ -33,6 +33,8 @@ namespace faf::editor
     bool& ShowDemo() noexcept { return mShowDemo; }
     bool& PanelsWhilePlaying() noexcept { return mPanelsWhilePlaying; }
     void ResetLayout() noexcept { mResetLayout = true; }
+    /** File > Save as new map folder: the dialog asks for the folder's name. */
+    void OpenSaveAs() noexcept { mOpenSaveAs = true; }
     void RequestExit() noexcept { mExit = true; }
 
     [[nodiscard]] const EdTools& Tools() const noexcept { return mTools; }
@@ -49,6 +51,9 @@ namespace faf::editor
     void DrawToolsPanel();
     void DrawMapPanel();
     void DrawInfoPanel();
+    void DrawSaveAsDialog();
+    bool mOpenSaveAs = false;
+    char mSaveAsName[128]{};
     void DrawStatusBar();
 
     EdLog& mLog;

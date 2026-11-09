@@ -1,6 +1,7 @@
 #include "editor/EdApp.h"
 
 #include <Windows.h>
+#include <ShlObj.h>
 
 #include <algorithm>
 #include <chrono>
@@ -14,6 +15,7 @@
 #include "editor/EdPlay.h"
 #include "editor/EdShell.h"
 #include "editor/doc/EdDocument.h"
+#include "editor/doc/EdRoundTrip.h"
 #include "editor/ui/EdImGuiRenderer.h"
 #include "editor/view/EdMapScene.h"
 #include "gpg/core/diagnostics/CrashHooks.h"
@@ -22,6 +24,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/Error.hpp"
+#include "gpg/gal/backends/common/ImageCodec.h"
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "moho/app/CScApp.h"
@@ -81,6 +84,8 @@ namespace faf::editor
       kMenuResetLayout = 1105,
       kMenuImGuiDemo = 1106,
       kMenuPlayStop = 1201,
+      kMenuSave = 1002,
+      kMenuSaveAs = 1003,
       kMenuUndo = 1301,
       kMenuRedo = 1302,
       kMenuFirstMap = 2000,
@@ -228,6 +233,10 @@ namespace faf::editor
       void UpdateMenu();
       bool HandleViewportMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
       {
+        if (message == WM_KEYDOWN && wParam == 'S' && (::GetKeyState(VK_CONTROL) & 0x8000) != 0) {
+          SaveDocument();
+          return true;
+        }
         return mScene.OnWindowMessage(window, message, wParam, lParam);
       }
       [[nodiscard]] bool SessionActive() const { return mPlay.Active(); }
@@ -244,6 +253,7 @@ namespace faf::editor
       HMENU mMenuBar = nullptr;
       HMENU mViewMenu = nullptr;
       HMENU mEditMenu = nullptr;
+      HMENU mFileMenu = nullptr;
       HMENU mPlayMenu = nullptr;
       HMENU mMapMenu = nullptr;
       std::wstring mBaseTitle;
@@ -262,6 +272,16 @@ namespace faf::editor
       std::size_t mOpenAllNext = 0;
       int mOpenAllOpened = 0;
       std::vector<std::string> mOpenAllFailed;
+      // `/roundtrip <folder>`: with every map opened, the save round trip into that folder.
+      std::filesystem::path mRoundTripFolder;
+      int mRoundTripOk = 0;
+      int mRoundTripSameBytes = 0;
+      int mRoundTripDiskFiles = 0;
+      bool mRoundTripShown = false;
+      // `/saveas <folder>` with `/open`: the drawn map saved as that new folder, then the editor closes.
+      std::string mSaveAsFolder;
+      int mRoundTripFrames = 0;
+      void SaveDocument();
       std::string mIniPath;
       bool mImGuiReady = false;
     };
@@ -283,6 +303,9 @@ namespace faf::editor
       moho::gAppBeforeDeviceCreate = &AddPanelHead;
       // Plays have cheats on (the whole-map view during play needs them), Game.prefs untouched.
       moho::gSessionCheats = true;
+      // Textures saved into maps (the stratum masks) get the classic DDS header, which the retail game's
+      // D3D9 texture loader reads; D3DX11's saver would write the DX10 one.
+      gpg::gal::imaging::ImageCodec::PreferOwnDds(true);
       // `/memtrace`: every block's call stack, to find what a play leaves behind (slow).
       if (moho::CFG_GetArgOption("/memtrace", 0, nullptr)) {
         memtrace::Start();
@@ -336,6 +359,15 @@ namespace faf::editor
       mPlay.ReadCommandLine();
       mShell = new EdShell(mLog, mPlay, mDocument);
       mDocument.SetBeforeDrop([this] { mScene.Detach(); });
+      // The vault, as init_faf.lua finds it without the client's custom path: Documents\My Games\...;
+      // `/vault <folder>` sets another (the FAF client's custom vault, or a test folder).
+      if (fa::vector<fa::string> vault; moho::CFG_GetArgOption("/vault", 1, &vault) && !vault.empty()) {
+        mDocument.SetVaultFolder(vault[0].c_str());
+      } else if (PWSTR documents = nullptr; SUCCEEDED(::SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &documents))) {
+        mDocument.SetVaultFolder(std::filesystem::path(documents) / "My Games" / "Gas Powered Games" / "Supreme Commander Forged Alliance");
+        ::CoTaskMemFree(documents);
+      }
+      gpg::Logf("editor: the vault is %s", mDocument.VaultFolder().string().c_str());
       mScene.SetTools(&mShell->Tools());
       ReadOpenCommandLine();
       gEditorApp = this;
@@ -388,7 +420,9 @@ namespace faf::editor
       HMENU file = ::CreatePopupMenu();
       ::AppendMenuW(file, MF_STRING | MF_GRAYED, 0, L"&New map...\tCtrl+N");
       ::AppendMenuW(file, MF_STRING | MF_GRAYED, 0, L"&Open map...\tCtrl+O");
-      ::AppendMenuW(file, MF_STRING | MF_GRAYED, 0, L"&Save\tCtrl+S");
+      ::AppendMenuW(file, MF_STRING, kMenuSave, L"&Save\tCtrl+S");
+      ::AppendMenuW(file, MF_STRING, kMenuSaveAs, L"Save as new map &folder...");
+      mFileMenu = file;
       ::AppendMenuW(file, MF_SEPARATOR, 0, nullptr);
       ::AppendMenuW(file, MF_STRING, kMenuExit, L"E&xit");
 
@@ -461,6 +495,12 @@ namespace faf::editor
         return;
       case kMenuInfo:
         mShell->ShowInfo() = !mShell->ShowInfo();
+        break;
+      case kMenuSave:
+        SaveDocument();
+        break;
+      case kMenuSaveAs:
+        mShell->OpenSaveAs();
         break;
       case kMenuUndo:
         (void)mScene.Undo();
@@ -552,7 +592,9 @@ namespace faf::editor
         mShell->Draw();
         // Undo and redo from the panels too (the viewport's keys go to the scene directly).
         if (!ImGui::GetIO().WantTextInput) {
-          if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z)) {
+          if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)) {
+            SaveDocument();
+          } else if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z)) {
             (void)mScene.Undo();
           } else if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z)) {
             (void)mScene.Redo();
@@ -578,8 +620,20 @@ namespace faf::editor
 
     void EditorApp::ReadOpenCommandLine()
     {
+      // `/roundtrip <folder>` (test runs): as /openall, and each map's save round trip into that folder.
+      if (fa::vector<fa::string> folder; moho::CFG_GetArgOption("/roundtrip", 1, &folder) && !folder.empty()) {
+        mRoundTripFolder = folder[0].c_str();
+      }
+      if (fa::vector<fa::string> folder; moho::CFG_GetArgOption("/saveas", 1, &folder) && !folder.empty()) {
+        mSaveAsFolder = folder[0].c_str();
+      }
+      // With `/open`, the round trip runs on that one map once it has been drawn for a while (its terrain
+      // finalized, normal map built), then the editor closes.
+      if (!mRoundTripFolder.empty() && moho::CFG_GetArgOption("/open", 1, nullptr)) {
+        mRoundTripShown = true;
+      }
       // `/openall` (test runs): every map opened in turn, then a summary, then the editor closes.
-      if (moho::CFG_GetArgOption("/openall", 0, nullptr)) {
+      if (moho::CFG_GetArgOption("/openall", 0, nullptr) || (!mRoundTripFolder.empty() && !mRoundTripShown)) {
         mOpenAll = true;
         gpg::Logf("editor: opening all %zu maps", mPlay.Maps().size());
         return;
@@ -604,15 +658,50 @@ namespace faf::editor
       gpg::Warnf("editor: /open %s: no such map", args[0].c_str());
     }
 
+    void EditorApp::SaveDocument()
+    {
+      std::string message;
+      if (mDocument.Save(message)) {
+        gpg::Logf("editor: %s", message.c_str());
+      } else {
+        gpg::Warnf("editor: %s", message.c_str());
+      }
+    }
+
     void EditorApp::DriveOpens()
     {
       const bool finished = mDocument.Poll();
+      if (!mSaveAsFolder.empty() && mScene.Attached() && ++mRoundTripFrames == 180) {
+        std::string message;
+        const bool saved = mDocument.SaveAsNewFolder(mSaveAsFolder, message);
+        if (saved) {
+          gpg::Logf("editor: %s", message.c_str());
+        } else {
+          gpg::Warnf("editor: %s", message.c_str());
+        }
+        mShell->RequestExit();
+      }
+      if (mRoundTripShown && mScene.Attached() && ++mRoundTripFrames == 180) {
+        const RoundTripResult trip = RoundTripMap(mDocument, mRoundTripFolder);
+        gpg::Logf("editor: round trip of the drawn %s: %s%s", MapDisplayName(mDocument.Path()).c_str(),
+                  trip.ok ? "same data, stable" : trip.differences.c_str(), trip.sameAsOriginal ? ", same bytes as the original" : "");
+        mShell->RequestExit();
+      }
       if (!mOpenAll) {
         return;
       }
       if (finished) {
         if (mDocument.GetState() == EdDocument::State::Open && mDocument.Error().empty()) {
           ++mOpenAllOpened;
+          if (!mRoundTripFolder.empty()) {
+            const RoundTripResult trip = RoundTripMap(mDocument, mRoundTripFolder);
+            mRoundTripOk += trip.ok ? 1 : 0;
+            mRoundTripDiskFiles += trip.hasDiskFile ? 1 : 0;
+            mRoundTripSameBytes += trip.sameAsOriginal ? 1 : 0;
+            gpg::Logf("editor: round trip %s: %s%s%s", MapDisplayName(mDocument.Path()).c_str(), trip.ok ? "same data" : trip.differences.c_str(),
+                      trip.hasDiskFile ? (trip.sameAsOriginal ? ", same bytes as the original" : ", other bytes than the original") : "",
+                      trip.stable ? "" : ", NOT stable");
+          }
         } else {
           mOpenAllFailed.push_back(MapDisplayName(mDocument.Path()) + ": " + mDocument.Error());
         }
@@ -627,6 +716,11 @@ namespace faf::editor
       }
       mOpenAll = false;
       gpg::Logf("editor: opened %d of %zu maps fully", mOpenAllOpened, maps.size());
+      if (!mRoundTripFolder.empty()) {
+        gpg::Logf("editor: round trip: %d of %d maps read back with the same data; %d of the %d with a file of their own "
+                  "saved to the same bytes",
+                  mRoundTripOk, mOpenAllOpened, mRoundTripSameBytes, mRoundTripDiskFiles);
+      }
       for (const std::string& failure : mOpenAllFailed) {
         gpg::Warnf("editor:   %s", failure.c_str());
       }

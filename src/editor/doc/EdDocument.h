@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <memory>
@@ -7,6 +8,7 @@
 #include <thread>
 #include <vector>
 
+#include "editor/doc/EdMapFile.h"
 #include "editor/undo/EdHeightHistory.h"
 
 namespace LuaPlus
@@ -97,6 +99,40 @@ namespace faf::editor
     [[nodiscard]] const std::string& Path() const noexcept { return mPath; }
     /** The loaded map, null unless open. */
     [[nodiscard]] moho::CWldMap* Map() const noexcept { return mMap.get(); }
+    /**
+     * Saves the map's `.scmap` over its own file, when it has one on disk (a map in the game's archives has
+     * none; it is saved as a new folder instead). Before the first overwrite of a session the old file is
+     * copied to `<map folder>/.editor_backup/<time>/`. The scenario, save and script files are left as they
+     * are: nothing edits them yet. `message` says what happened, for the log and the status bar.
+     */
+    bool Save(std::string& message);
+
+    /**
+     * The FAF vault (its `maps` folder holds the mapper's maps). Save writes over a map only there: the
+     * game's own maps (its install folder) are saved as a new map folder instead.
+     */
+    void SetVaultFolder(std::filesystem::path folder) { mVault = std::move(folder); }
+    [[nodiscard]] const std::filesystem::path& VaultFolder() const noexcept { return mVault; }
+
+    /**
+     * Saves the map as a new map folder `<vault>/maps/<folder>` (FAF names them `name.vNNNN`): every file
+     * of the map's folder copied, renamed to the new base name (the folder name without its version) where
+     * they started with the old one, `/maps/<old folder>/...` paths rewritten in its Lua files (scenario,
+     * save, script), and the edited `.scmap` written there. Later saves go to the new folder. The game sees
+     * the new folder from its next start (its file system is mounted at startup).
+     */
+    bool SaveAsNewFolder(const std::string& folder, std::string& message);
+
+    /** The map's folder name (`scmp_009`, `seton.v0003`) and the suggestion for a new version of it. */
+    [[nodiscard]] std::string FolderName() const;
+    [[nodiscard]] std::string NextVersionFolder() const;
+
+    /** The `.scmap` on disk that Save writes over, or empty when there is none. */
+    [[nodiscard]] std::filesystem::path MapDiskFile() const;
+
+    /** What the map file stored that a save writes back as it was (the preview, unchanged props). */
+    [[nodiscard]] const MapFileRecords& FileRecords() const noexcept { return mFileRecords; }
+
     /** The height field's undo history, reset when a map opens. */
     [[nodiscard]] HeightHistory& Heights() noexcept { return mHeights; }
     /** Whether the map changed since it was opened (or last saved). */
@@ -121,6 +157,11 @@ namespace faf::editor
     std::thread mThread;
     std::function<void()> mBeforeDrop;
     HeightHistory mHeights;
+    MapFileRecords mFileRecords;
     bool mModified = false;
+    bool mBackedUp = false;
+    std::filesystem::path mVault;
+    /** Set by SaveAsNewFolder: where Save writes from then on (else the map's own file). */
+    std::filesystem::path mSaveTarget;
   };
 } // namespace faf::editor

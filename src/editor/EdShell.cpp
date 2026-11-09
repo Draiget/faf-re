@@ -7,6 +7,7 @@
 #include "editor/EdPlay.h"
 #include "editor/doc/EdDocument.h"
 #include "gpg/gal/Device.hpp"
+#include "gpg/core/utils/Logging.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 
@@ -103,6 +104,7 @@ namespace faf::editor
     if (mShowDemo) {
       ImGui::ShowDemoWindow(&mShowDemo);
     }
+    DrawSaveAsDialog();
     DrawStatusBar();
   }
 
@@ -385,6 +387,42 @@ namespace faf::editor
       ImGui::TextWrapped("%s", facts.scriptPath.c_str());
     }
     ImGui::End();
+  }
+
+  void EdShell::DrawSaveAsDialog()
+  {
+    constexpr const char* kTitle = "Save as new map folder";
+    if (mOpenSaveAs) {
+      mOpenSaveAs = false;
+      if (mDocument.GetState() != EdDocument::State::Open) {
+        gpg::Warnf("editor: open a map first");
+        return;
+      }
+      (void)std::snprintf(mSaveAsName, sizeof(mSaveAsName), "%s", mDocument.NextVersionFolder().c_str());
+      ImGui::OpenPopup(kTitle);
+    }
+    if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      return;
+    }
+    ImGui::TextUnformatted("The new folder goes into your vault's maps folder:");
+    ImGui::TextDisabled("%s", (mDocument.VaultFolder() / "maps").string().c_str());
+    ImGui::SetNextItemWidth(420.0f);
+    const bool enter = ImGui::InputText("Folder", mSaveAsName, sizeof(mSaveAsName), ImGuiInputTextFlags_EnterReturnsTrue);
+    ImGui::TextDisabled("FAF names map folders name.vNNNN; the files take the name without the version.");
+    if (ImGui::Button("Save", ImVec2(120.0f, 0.0f)) || enter) {
+      std::string message;
+      if (mDocument.SaveAsNewFolder(mSaveAsName, message)) {
+        gpg::Logf("editor: %s", message.c_str());
+        ImGui::CloseCurrentPopup();
+      } else {
+        gpg::Warnf("editor: %s", message.c_str());
+      }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(120.0f, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
   }
 
   void EdShell::DrawStatusBar()

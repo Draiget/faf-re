@@ -641,6 +641,8 @@ end
       mAutoMaps.push_back(found);
     }
     if (mAutoMaps.empty()) {
+      // Nothing to play: a test run that asked to quit after its plays quits now instead of waiting forever.
+      mQuitRequested = moho::CFG_GetArgOption("/playquit", 0, nullptr);
       return;
     }
     const int found = mAutoMaps.front();

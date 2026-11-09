@@ -3,12 +3,24 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <ctime>
+#include <cstring>
+#include <fstream>
+#include <cstdlib>
+#include <cstdio>
+#include <cctype>
 #include <exception>
+#include <system_error>
+
+#include "editor/doc/EdMapFile.h"
 
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/lua/CScrLuaInitForm.h"
+#include "moho/misc/CVirtualFileSystem.h"
+#include "moho/misc/FileWaitHandleSet.h"
+#include "gpg/core/streams/Stream.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/sim/CBackgroundTaskControl.h"
 #include "moho/sim/CWldMap.h"
@@ -27,6 +39,7 @@ namespace faf::editor
     std::unique_ptr<moho::CWldMap> map;
     MapFacts facts;
     std::string error;
+    MapFileRecords records;
     /** Set last by the worker; the main thread reads the rest only after seeing it. */
     std::atomic<bool> done{false};
   };
@@ -187,6 +200,9 @@ namespace faf::editor
         return;
       }
       ReadMap(*load.map, facts);
+      // Each prop as the file stores it (the game keeps only a quaternion of its rotation).
+      load.records.preview = ReadPreviewRecord(facts.mapPath);
+      load.records.props = ReadPropRecords(facts.mapPath, *load.map);
 
       if (!facts.savePath.empty()) {
         const LuaPlus::LuaObject save = RunInTable(state, facts.savePath);
@@ -237,6 +253,7 @@ namespace faf::editor
     mFacts = std::move(load->facts);
     mError = std::move(load->error);
     mMap = std::move(load->map);
+    mFileRecords = std::move(load->records);
     mLua = std::move(load->lua);
     // A missing save keeps the map open: the editor still has its terrain, props and decals.
     mState = mMap != nullptr ? State::Open : State::Failed;
@@ -257,6 +274,243 @@ namespace faf::editor
     return true;
   }
 
+
+  namespace
+  {
+    [[nodiscard]] std::string Lower(std::string text)
+    {
+      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      return text;
+    }
+
+    /** `text` with every `from` replaced by `to`, ignoring case. */
+    [[nodiscard]] std::string ReplaceNoCase(const std::string& text, const std::string& from, const std::string& to)
+    {
+      if (from.empty()) {
+        return text;
+      }
+      const std::string lowerText = Lower(text);
+      const std::string lowerFrom = Lower(from);
+      std::string out;
+      std::size_t at = 0;
+      for (std::size_t found = lowerText.find(lowerFrom); found != std::string::npos; found = lowerText.find(lowerFrom, at)) {
+        out.append(text, at, found - at);
+        out += to;
+        at = found + from.size();
+      }
+      out.append(text, at, std::string::npos);
+      return out;
+    }
+
+    /** The folder name without FAF's version suffix (`seton.v0003` -> `seton`). */
+    [[nodiscard]] std::string WithoutVersion(const std::string& folder)
+    {
+      const std::size_t dot = Lower(folder).rfind(".v");
+      if (dot != std::string::npos && dot + 2 < folder.size() &&
+          std::all_of(folder.begin() + static_cast<std::ptrdiff_t>(dot + 2), folder.end(), [](const unsigned char c) { return std::isdigit(c) != 0; })) {
+        return folder.substr(0, dot);
+      }
+      return folder;
+    }
+
+  } // namespace
+
+  std::string EdDocument::FolderName() const
+  {
+    const std::string& path = mFacts.scenarioPath;
+    const std::size_t slash = path.find_last_of('/');
+    if (slash == std::string::npos || slash == 0) {
+      return {};
+    }
+    const std::size_t parent = path.find_last_of('/', slash - 1);
+    return parent == std::string::npos ? std::string{} : path.substr(parent + 1, slash - parent - 1);
+  }
+
+  std::string EdDocument::NextVersionFolder() const
+  {
+    const std::string folder = FolderName();
+    const std::string base = WithoutVersion(folder);
+    int version = 0;
+    if (base.size() < folder.size()) {
+      version = std::atoi(folder.c_str() + base.size() + 2);
+    }
+    char suffix[16];
+    (void)std::snprintf(suffix, sizeof(suffix), ".v%04d", version + 1);
+    return base + suffix;
+  }
+
+  bool EdDocument::SaveAsNewFolder(const std::string& folder, std::string& message)
+  {
+    if (mState != State::Open || mMap == nullptr) {
+      message = "No map is open.";
+      return false;
+    }
+    if (mMap->mTerrainRes == nullptr || !mMap->mTerrainRes->GetBool()) {
+      message = "The map isn't ready yet (its terrain is still being prepared); save again in a moment.";
+      return false;
+    }
+    if (folder.empty() || folder.find_first_of("\\/:*?\"<>|") != std::string::npos) {
+      message = "\"" + folder + "\" can't be a folder name.";
+      return false;
+    }
+    if (mVault.empty()) {
+      message = "There is no vault folder to save into.";
+      return false;
+    }
+    const std::filesystem::path target = mVault / "maps" / folder;
+    std::error_code error;
+    if (std::filesystem::exists(target, error)) {
+      message = target.string() + " already exists; pick another name.";
+      return false;
+    }
+
+    const std::string oldFolder = FolderName();
+    std::string oldBase = mFacts.scenarioPath.substr(mFacts.scenarioPath.find_last_of('/') + 1);
+    oldBase = oldBase.substr(0, oldBase.size() - std::min(oldBase.size(), std::string("_scenario.lua").size()));
+    const std::string newBase = WithoutVersion(folder);
+    const std::string oldPrefix = "/maps/" + oldFolder + "/";
+    const std::string newPrefix = "/maps/" + folder + "/";
+
+    moho::CVirtualFileSystem* const vfs = moho::DISK_GetVFS();
+    fa::vector<fa::string> files;
+    if (vfs != nullptr) {
+      // By file type: the engine's wildcard match never matches a pattern that ends in '*' ("*", "*.*";
+      // gpg::STR_MatchWildcard's case-sensitive lane, which the file system uses).
+      static constexpr const char* kTypes[] = {"*.lua", "*.scmap", "*.dds", "*.png", "*.jpg", "*.jpeg", "*.txt", "*.md",
+                                               "*.bp", "*.scm", "*.sca", "*.json", "*.xwb", "*.xsb", "*.sfx"};
+      for (const char* const type : kTypes) {
+        fa::vector<fa::string> found;
+        vfs->EnumerateFiles(("/maps/" + oldFolder).c_str(), type, true, &found);
+        for (fa::string& path : found) {
+          files.push_back(std::move(path));
+        }
+      }
+    }
+    if (files.empty()) {
+      message = "The map's folder " + oldPrefix + " lists no files.";
+      return false;
+    }
+    std::filesystem::create_directories(target, error);
+    if (error) {
+      message = "Can't make " + target.string() + ": " + error.message();
+      return false;
+    }
+
+    std::filesystem::path newMapFile;
+    int copied = 0;
+    for (const fa::string& file : files) {
+      const std::string source = file.c_str();
+      if (Lower(source).rfind(Lower(oldPrefix), 0) != 0) {
+        continue;
+      }
+      std::string relative = source.substr(oldPrefix.size());
+      // The file's own name takes the new base name where it had the old one.
+      const std::size_t lastSlash = relative.find_last_of('/');
+      const std::size_t nameAt = lastSlash == std::string::npos ? 0 : lastSlash + 1;
+      if (Lower(relative.substr(nameAt)).rfind(Lower(oldBase), 0) == 0) {
+        relative = relative.substr(0, nameAt) + newBase + relative.substr(nameAt + oldBase.size());
+      }
+      const std::filesystem::path destination = target / std::filesystem::path(relative).make_preferred();
+      std::filesystem::create_directories(destination.parent_path(), error);
+      if (Lower(source) == Lower(mFacts.mapPath)) {
+        newMapFile = destination; // written below, edits included
+        continue;
+      }
+      std::string bytes;
+      if (!ReadGameFile(source, bytes)) {
+        message = "Can't read " + source;
+        return false;
+      }
+      if (Lower(destination.extension().string()) == ".lua") {
+        // Paths into the old folder point into the new one, with the new base name.
+        bytes = ReplaceNoCase(bytes, oldPrefix + oldBase, newPrefix + newBase);
+        bytes = ReplaceNoCase(bytes, oldPrefix, newPrefix);
+      }
+      std::ofstream out(destination, std::ios::binary);
+      out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+      if (!out) {
+        message = "Can't write " + destination.string();
+        return false;
+      }
+      ++copied;
+    }
+    if (newMapFile.empty()) {
+      message = "The map file " + mFacts.mapPath + " isn't in its folder " + oldPrefix;
+      return false;
+    }
+    std::string failure;
+    if (!WriteMapFile(*mMap, mFileRecords, newMapFile, failure)) {
+      message = "Saving " + newMapFile.string() + " failed: " + failure;
+      return false;
+    }
+    mSaveTarget = newMapFile;
+    mBackedUp = true; // a new folder has nothing to back up
+    mModified = false;
+    message = "Saved as " + target.string() + " (" + std::to_string(copied + 1) + " files); the game lists it from its next start";
+    return true;
+  }
+
+  std::filesystem::path EdDocument::MapDiskFile() const
+  {
+    if (mState != State::Open) {
+      return {};
+    }
+    return mSaveTarget.empty() ? DiskFileOf(mFacts.mapPath) : mSaveTarget;
+  }
+
+  bool EdDocument::Save(std::string& message)
+  {
+    if (mState != State::Open || mMap == nullptr) {
+      message = "No map is open.";
+      return false;
+    }
+    const std::filesystem::path file = MapDiskFile();
+    if (file.empty()) {
+      message = "This map is inside the game's archives and has no file of its own to save over; save it as a new map folder.";
+      return false;
+    }
+    // Only a map in the vault's maps folder is written over; the game's own maps stay as installed.
+    std::error_code ignored;
+    const std::filesystem::path vaultMaps = std::filesystem::weakly_canonical(mVault / "maps", ignored);
+    const std::filesystem::path relative = std::filesystem::relative(std::filesystem::weakly_canonical(file, ignored), vaultMaps, ignored);
+    if (mVault.empty() || relative.empty() || relative.native().rfind(L"..", 0) == 0) {
+      message = "This map isn't in your vault (" + (mVault / "maps").string() + "); save it as a new map folder there.";
+      return false;
+    }
+    // Until the terrain is ready for drawing (Finalize builds its normal map, which the file carries) the
+    // writer would write leftover memory there.
+    if (mMap->mTerrainRes == nullptr || !mMap->mTerrainRes->GetBool()) {
+      message = "The map isn't ready yet (its terrain is still being prepared); save again in a moment.";
+      return false;
+    }
+    std::error_code error;
+    if (!mBackedUp) {
+      char stamp[32];
+      const std::time_t now = std::time(nullptr);
+      std::tm local{};
+      (void)localtime_s(&local, &now);
+      (void)std::strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", &local);
+      const std::filesystem::path backup = file.parent_path() / ".editor_backup" / stamp;
+      std::filesystem::create_directories(backup, error);
+      if (!error) {
+        std::filesystem::copy_file(file, backup / file.filename(), std::filesystem::copy_options::overwrite_existing, error);
+      }
+      if (error) {
+        message = "The backup of " + file.string() + " failed (" + error.message() + "); nothing was saved.";
+        return false;
+      }
+      mBackedUp = true;
+    }
+    std::string failure;
+    if (!WriteMapFile(*mMap, mFileRecords, file, failure)) {
+      message = "Saving " + file.string() + " failed: " + failure;
+      return false;
+    }
+    mModified = false;
+    message = "Saved " + file.string();
+    return true;
+  }
+
   void EdDocument::Close()
   {
     Wait();
@@ -267,7 +521,10 @@ namespace faf::editor
     mMap.reset();
     mLua.reset();
     mHeights.Reset(0, 0);
+    mFileRecords = {};
+    mSaveTarget.clear();
     mModified = false;
+    mBackedUp = false;
     mFacts = {};
     mError.clear();
     mPath.clear();
