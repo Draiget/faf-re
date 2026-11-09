@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <deque>
@@ -67,6 +68,9 @@ namespace gpg::diag
       std::mutex windowsLock;
       std::deque<Window> windows;
       std::unordered_map<std::uintptr_t, std::pair<std::uintptr_t, std::string>> symbols; // address -> function start, name
+      std::string dumpPath;                                 // FAF_FRAME_SAMPLER_DUMP, empty when off
+      int dumpPhase = 0;                                    // the phase `folded` counts belong to
+      std::unordered_map<std::string, std::uint32_t> folded; // whole stack, root first -> samples
     };
 
     SamplerState& State()
@@ -235,9 +239,63 @@ namespace gpg::diag
       }
     }
 
+    /** Adds the newest sample's stack to the phase's counts, root first, one entry per function. */
+    void FoldLastSample(SamplerState& state)
+    {
+      const std::uint64_t written = state.written.load(std::memory_order_acquire);
+      if (written == 0U) {
+        return;
+      }
+      const Sample& sample = state.ring[(written - 1U) % kRingSamples];
+      if (sample.depth == 0U) {
+        return;
+      }
+      std::string stack;
+      std::uintptr_t previous = 0;
+      for (std::uint32_t depth = sample.depth; depth-- > 0U;) {
+        const auto& resolved = Resolve(state, sample.frames[depth]);
+        if (resolved.first == previous) {
+          continue; // a second return address in the same function
+        }
+        previous = resolved.first;
+        if (!stack.empty()) {
+          stack += ';';
+        }
+        for (const char c : resolved.second) {
+          stack += c == ';' ? ':' : c;
+        }
+      }
+      ++state.folded[stack];
+    }
+
+    /** Appends the finished phase's counts to `<path>.<phase>.folded` and clears them. */
+    void FlushFolded(SamplerState& state)
+    {
+      if (state.folded.empty()) {
+        return;
+      }
+      const std::string path = state.dumpPath + "." + std::to_string(state.dumpPhase) + ".folded";
+      std::FILE* file = nullptr;
+      if (::fopen_s(&file, path.c_str(), "ab") == 0 && file != nullptr) {
+        for (const auto& [stack, count] : state.folded) {
+          std::fprintf(file, "%s %u\n", stack.c_str(), count);
+        }
+        std::fclose(file);
+      }
+      gpg::Logf("[FRAMESAMPLE] phase %d: %zu stacks written to %s", state.dumpPhase, state.folded.size(), path.c_str());
+      state.folded.clear();
+    }
+
     DWORD WINAPI SamplerThread(LPVOID)
     {
       SamplerState& state = State();
+      {
+        char value[MAX_PATH]{};
+        std::size_t length = 0U;
+        if (::getenv_s(&length, value, sizeof(value), "FAF_FRAME_SAMPLER_DUMP") == 0 && length > 1U) {
+          state.dumpPath = value;
+        }
+      }
       (void)::SetThreadPriority(::GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
       // A one-millisecond sleep needs the one-millisecond timer resolution.
       using TimeBeginPeriod = UINT(WINAPI*)(UINT);
@@ -256,6 +314,18 @@ namespace gpg::diag
           for (const Window& window : pending) {
             Report(state, window);
           }
+        }
+        if (!state.dumpPath.empty()) {
+          const int phase = *static_cast<volatile const int*>(&dbg_FrameSamplerPhase);
+          if (phase != state.dumpPhase) {
+            FlushFolded(state);
+            state.dumpPhase = phase;
+          }
+          TakeSample(state);
+          if (phase != 0) {
+            FoldLastSample(state);
+          }
+          continue;
         }
         TakeSample(state);
       }

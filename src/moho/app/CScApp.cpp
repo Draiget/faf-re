@@ -1187,6 +1187,14 @@ namespace
     "clock rushes the next ticks to repay it.",
     &wld_FrameClockOpening
   );
+
+  // Engine addition, debugging aid: tags the frame sampler's stack dump (FrameSampler.h).
+  moho::TConVar<int> gTConVar_dbg_FrameSamplerPhase(
+    "dbg_FrameSamplerPhase",
+    "With FAF_FRAME_SAMPLER and FAF_FRAME_SAMPLER_DUMP set: samples taken while this is not 0 are counted by whole call "
+    "stack and written to <dump>.<phase>.folded when it changes.",
+    &gpg::diag::dbg_FrameSamplerPhase
+  );
 } // namespace
 
 /**
