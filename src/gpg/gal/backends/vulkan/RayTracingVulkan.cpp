@@ -472,26 +472,29 @@ namespace gpg::gal
     Vk().vkGetAccelerationStructureBuildSizesKHR(mDevice, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &build, &count, &sizes);
 
     if (mTlas == VK_NULL_HANDLE || mTlasBuffer.size < sizes.accelerationStructureSize) {
-      if (mTlas != VK_NULL_HANDLE || mTlasBuffer.buffer != VK_NULL_HANDLE) {
-        RetireRay(mTlas, mTlasBuffer, mRaySet);
-        mTlas = VK_NULL_HANDLE;
-        mTlasBuffer = RayBuffer{};
-        mRaySet = VK_NULL_HANDLE;
-      }
+      // The new structure first: when it can't be made, the old one and its set stay bound (the lookups don't
+      // trace it), so no draw runs with set 2 unbound.
       const VkDeviceSize bytes = AlignUp(sizes.accelerationStructureSize + (sizes.accelerationStructureSize / 2U) + 256U, 65536U);
-      if (!CreateRayBuffer(bytes, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, false, mTlasBuffer)) {
+      RayBuffer grownBuffer;
+      if (!CreateRayBuffer(bytes, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, false, grownBuffer)) {
         return false;
       }
       VkAccelerationStructureCreateInfoKHR create{};
       create.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
-      create.buffer = mTlasBuffer.buffer;
+      create.buffer = grownBuffer.buffer;
       create.size = bytes;
       create.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-      if (Vk().vkCreateAccelerationStructureKHR(mDevice, &create, nullptr, &mTlas) != VK_SUCCESS) {
-        DestroyRayBuffer(mTlasBuffer);
-        mTlas = VK_NULL_HANDLE;
+      VkAccelerationStructureKHR grown = VK_NULL_HANDLE;
+      if (Vk().vkCreateAccelerationStructureKHR(mDevice, &create, nullptr, &grown) != VK_SUCCESS) {
+        DestroyRayBuffer(grownBuffer);
         return false;
       }
+      if (mTlas != VK_NULL_HANDLE || mTlasBuffer.buffer != VK_NULL_HANDLE) {
+        RetireRay(mTlas, mTlasBuffer, mRaySet);
+      }
+      mTlas = grown;
+      mTlasBuffer = grownBuffer;
+      mRaySet = VK_NULL_HANDLE;
       VkDescriptorSetAllocateInfo allocate{};
       allocate.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
       allocate.descriptorPool = mRayPool;

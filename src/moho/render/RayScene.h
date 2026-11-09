@@ -56,6 +56,12 @@ namespace moho
       const GeomCamera3& viewCamera, const float (&sunDirection)[3]
     );
 
+    /**
+     * Every ground tile is in the scene. While one is missing (being built in the first frames, or its geometry
+     * failed) the shadow map must draw the ground's depth again.
+     */
+    [[nodiscard]] bool TerrainTraced() const;
+
     /** Tells the lookups not to trace (rays off, or no light camera this frame). */
     static void PublishOff();
 
@@ -91,6 +97,7 @@ namespace moho
     std::vector<TerrainTile> mTerrainTiles;
     std::size_t mTerrainScan = 0U;     // the next tile to rehash
     std::size_t mTerrainScanLeft = 0U; // tiles still to rehash since the heights last changed
+    bool mTerrainComplete = false;     // every tile has its geometry
     std::vector<gpg::gal::RayInstance> mInstances;
     std::vector<std::array<float, 12>> mTransforms;
     std::uint32_t mLoggedFrames = 0U;

@@ -1047,16 +1047,19 @@ namespace moho
     if (!rays) {
       RayScene::PublishOff();
     }
-    // Rays can drop out here (the device couldn't build the scene): then this tile draws its terrain depth after
-    // all, and the rest of the pass draws as without rays.
+    // Rays can drop out here (the device couldn't build the scene), or leave the ground uncovered (a tile still
+    // being built, or one whose geometry failed): then this tile draws its terrain depth after all, and so do the
+    // rest.
+    bool terrainInMap = !rays;
     const auto submitRays = [&](const GeomCamera3& tileCamera) {
       if (rays) {
         // The map's sun direction points towards the sun (PrepareLightCamera's light travels along its negative).
         const Wm3::Vector3f sun = rayTerrainRes->GetSunDirection();
         const float sunDirection[3] = {sun.X(), sun.Y(), sun.Z()};
         rays = RayScene::Instance().Submit(*meshRenderer, meshRenderer->meshes, rayHeightField, mCamera, viewCamera, sunDirection);
-        if (!rays) {
+        if (!terrainInMap && (!rays || !RayScene::Instance().TerrainTraced())) {
           terrain->DrawTerrainDepth(tileCamera);
+          terrainInMap = true;
         }
       }
     };
@@ -1075,7 +1078,7 @@ namespace moho
         Wm3::Vector2i tileSize{content, content};
         device->SetViewport(&tilePos, &tileSize, savedMinDepth, savedMaxDepth);
         const GeomCamera3& camera = (tile == 0) ? mCamera : sCascadeFrame.cameras[tile - 1];
-        if (!rays) {
+        if (terrainInMap) {
           terrain->DrawTerrainDepth(camera);
         }
         // Engine change (ren_ShadowTileReuse): a finer tile's box lies inside the whole-view tile's, in the same
@@ -1096,7 +1099,7 @@ namespace moho
     } else {
       bindTargetWithBorder(mShadowMap);
 
-      if (!rays) {
+      if (terrainInMap) {
         terrain->DrawTerrainDepth(mCamera);
       }
 

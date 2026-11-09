@@ -26,6 +26,7 @@ namespace moho
   float ren_RayShadowReach = 1500.0f;
   int ren_RayShadowDebug = 0;
   int ren_RayShadowTerrainStep = 0;
+  int ren_RayShadowFailTest = 0;
 
   namespace
   {
@@ -54,6 +55,12 @@ namespace moho
     );
     TConVar<float> gTConVar_ren_RayShadowReach(
       "ren_RayShadowReach", "Ray-traced shadows: the longest shadow ray, in world units.", &ren_RayShadowReach
+    );
+    TConVar<int> gTConVar_ren_RayShadowFailTest(
+      "ren_RayShadowFailTest",
+      "Ray-traced shadows test: acts as if 1 the device couldn't build the scene, 2 a ground tile were missing, "
+      "3 a mesh were missing, so the shadow map's fallbacks can be seen; 0 off.",
+      &ren_RayShadowFailTest
     );
     TConVar<int> gTConVar_ren_RayShadowTerrainStep(
       "ren_RayShadowTerrainStep",
@@ -153,6 +160,11 @@ namespace moho
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     return gpg::gal::effects::gRayTracedShadows > 0 && device != nullptr &&
       (device->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureRayQuery) != 0U;
+  }
+
+  bool RayScene::TerrainTraced() const
+  {
+    return mTerrainComplete && ren_RayShadowFailTest != 2;
   }
 
   void RayScene::PublishOff()
@@ -273,7 +285,7 @@ namespace moho
         continue;
       }
       MeshPieces* const pieces = PiecesFor(batch->mCurrentResource, batch->mUseBoneRemap != 0);
-      if (pieces == nullptr || pieces->incomplete) {
+      if (pieces == nullptr || pieces->incomplete || ren_RayShadowFailTest == 3) {
         // RenderDepth would leave it out of the map too: let the map keep the traced materials this frame.
         mMeshesMissing = true;
       }
@@ -398,13 +410,18 @@ namespace moho
           desc.indices = indices.data();
           desc.indexCount = static_cast<std::uint32_t>(indices.size());
           tile.geometry = mDevice->CreateRayGeometry(desc);
-          tile.hash = hash;
+          // A tile that got no geometry is tried again on the next pass.
+          tile.hash = (tile.geometry != 0U) ? hash : 0U;
           ++rebuilt;
         }
       }
       if (rebuilt != 0) {
         gpg::Logf("Ray-traced shadows: %d terrain tiles built (%dx%d heights, every %d)", rebuilt, field.width, field.height, step);
       }
+    }
+    mTerrainComplete = std::all_of(mTerrainTiles.begin(), mTerrainTiles.end(), [](const TerrainTile& tile) { return tile.geometry != 0U; });
+    if (!mTerrainComplete && mTerrainScanLeft == 0U) {
+      mTerrainScanLeft = mTerrainTiles.size(); // retry the missing ones (built tiles hash the same and are kept)
     }
     for (const TerrainTile& tile : mTerrainTiles) {
       if (tile.geometry == 0U) {
@@ -444,11 +461,12 @@ namespace moho
     }
     mInstances.clear();
     mMeshesMissing = false;
+    mTerrainComplete = false;
     if (heightField != nullptr) {
       AddTerrain(*heightField);
     }
     AddMeshes(meshRenderer, meshes);
-    if (!device->SetRayInstances(mInstances.data(), static_cast<std::uint32_t>(mInstances.size()))) {
+    if (!device->SetRayInstances(mInstances.data(), static_cast<std::uint32_t>(mInstances.size())) || ren_RayShadowFailTest == 1) {
       PublishOff();
       return false;
     }

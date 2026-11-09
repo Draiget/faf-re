@@ -312,17 +312,18 @@ namespace gpg::gal
     mDevice5->GetRaytracingAccelerationStructurePrebuildInfo(&build.Inputs, &prebuild);
     const std::uint64_t needed = AlignUp(std::max<std::uint64_t>(prebuild.ResultDataMaxSizeInBytes, 256U), 256U);
     if (mTlas.resource == nullptr || mTlasBytes < needed) {
+      // The new buffer first: when it can't be made, the old scene stays bound (the lookups don't trace it).
+      const std::uint64_t bytes = AlignUp(needed + (needed / 2U), 65536U);
+      ComPtr<ID3D12Resource> grown = CreateRayBuffer(mDevice.Get(), bytes, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"ray scene");
+      if (grown == nullptr) {
+        return false;
+      }
       if (mTlas.resource != nullptr) {
         Retire(mTlas.resource);
       }
-      mTlasBytes = AlignUp(needed + (needed / 2U), 65536U);
-      mTlas.resource = CreateRayBuffer(mDevice.Get(), mTlasBytes, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"ray scene");
+      mTlas.resource = std::move(grown);
       mTlas.state = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-      if (mTlas.resource == nullptr) {
-        mTlasBytes = 0U;
-        mTlasAddress = 0U;
-        return false;
-      }
+      mTlasBytes = bytes;
     }
     if (!EnsureRayScratch(prebuild.ScratchDataSizeInBytes)) {
       return false;
