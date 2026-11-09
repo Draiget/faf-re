@@ -155,10 +155,17 @@ namespace faf::server
       std::string ready;
       // Plan WP17.2: the lobby slot the host's lobby put it in (lobby.lua's slot, not the match's army); 0 before.
       int lobbySlot = 0;
+      // Plan WP10.7: the sim-speed limit its game last reported (remote/SpeedLimit.h); nothing before it did.
+      std::optional<int> speedLimit;
     };
     [[nodiscard]] std::vector<SSeatState> Seats();
     /** Plan WP17.2: each verdict made since the last call, as the seat stood then (uid, name and the verdict fields). */
     [[nodiscard]] std::vector<SSeatState> TakeJudged();
+    /**
+     * Plan WP10.7: the lowest sim-speed limit of the seats still in the game (not gone) that reported one, and whose;
+     * nothing when none did. As `CClientManagerImpl::GetSimRate` takes the lowest client's. Any thread.
+     */
+    [[nodiscard]] std::optional<std::pair<int, std::int32_t>> SlowestSpeedLimit();
     /** Plan WP17.2: lobby ready states that changed since the last call (uid, ready), in order. */
     [[nodiscard]] std::vector<std::pair<std::int32_t, bool>> TakeReadyChanges();
     /**
@@ -221,6 +228,7 @@ namespace faf::server
       bool modsJudged = false;
       std::string contentVerdict; // plan WP17.2: as SSeatState's
       std::string modsVerdict;
+      std::optional<int> speedLimit; // plan WP10.7: the last its game reported
       // Plan WP11.4: its client in the session, as every player's roster lists it.
       int clientIndex = -1;
       std::vector<std::uint8_t> sources;

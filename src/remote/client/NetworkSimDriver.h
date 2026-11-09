@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <deque>
 #include <map>
 #include <memory>
@@ -12,6 +13,7 @@
 #include "boost/shared_ptr.h"
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/sim/ISTIDriver.h"
+#include "remote/SpeedLimit.h"
 #include "remote/client/BeatClock.h"
 #include "remote/client/RemoteClientManager.h"
 #include "remote/client/ServerViewClient.h"
@@ -133,6 +135,7 @@ namespace faf::remote::client
     CRemoteClientManager mClientManager;
     moho::CMarshaller mMarshaller;
     std::unique_ptr<CServerViewClient> mViews;
+    CSpeedMeter mSpeedMeter;              // plan WP10.7: what applying a view costs
     std::array<std::uint64_t, 5> mLaneBytes{}; // plan WP10.10: bytes taken by lane (EServerLane order)
     std::unique_ptr<LuaPlus::LuaState> mEmptySyncLua; // makes the `Sync` table's bytes for a view with no Lua lane
     std::vector<std::uint8_t> mEmptySync;

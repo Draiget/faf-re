@@ -1,4 +1,5 @@
 #include "remote/client/NetworkSimDriver.h"
+#include "remote/SpeedLimit.h"
 #include "remote/client/ServerLaneMeter.h"
 
 #include <algorithm>
@@ -351,9 +352,17 @@ namespace faf::remote::client
         packet->mNewGrids.push_back(army);
       }
     }
+    const auto applyStart = std::chrono::steady_clock::now();
     if (!mViews->Apply(view, *packet)) {
       ++mViewsBad;
       return;
+    }
+    // Plan WP10.7: what applying a view costs this machine is its share of a beat, as a lockstep client's sim beat is;
+    // the speed step it allows goes to the server whenever it changes (lockstep's `CLIMSG_IntParam`).
+    mSpeedMeter.Add(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - applyStart).count());
+    if (const std::optional<int> limit = mSpeedMeter.Settled(); limit) {
+      const bool sent = SendServerGameMessage(EncodeSpeedLimit(*limit));
+      gpg::Logf("server driver: this game keeps up with speed %+d%s", *limit, sent ? "" : " (not sent: no server link)");
     }
     // #178: the frame's header carries the server's sim rate and clock; the session paces by them.
     if (const wire::SViewFrame* const shown = mViews->Shown(); shown != nullptr) {

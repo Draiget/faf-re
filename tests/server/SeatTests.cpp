@@ -29,6 +29,7 @@
 #include "moho/net/IMessageReceiver.h"
 #include "moho/net/ELobbyMsg.h"
 #include "netlink/EngineLinks.h"
+#include "remote/SpeedLimit.h"
 #include "remote/ContentCheck.h"
 #include "remote/ServerClient.h"
 #include "remote/client/ServerRelayConnector.h"
@@ -1583,4 +1584,56 @@ TEST(ViewMerge, OwnAndTeamLessBlipsOfOwnUnits)
   // No team frame (cut from the team): the own frame alone.
   CViewFrameMerger::Merge(own, nullptr, 5, merged, leftOut);
   EXPECT_EQ(merged.entities.size(), 2u);
+}
+
+// Plan WP10.7: a server-mode player's sim-speed limit: lockstep's formula over the median view cost, and its message.
+TEST(SpeedLimit, LockstepsFormulaAndTheMessage)
+{
+  using faf::remote::SpeedLimitOfBeatMs;
+  EXPECT_EQ(SpeedLimitOfBeatMs(100.0), 0);   // ten beats a second: +0
+  EXPECT_EQ(SpeedLimitOfBeatMs(10.0), 10);   // a hundred: +10
+  EXPECT_EQ(SpeedLimitOfBeatMs(50.0), 3);    // twenty: 10 log10(2) = 3.01, rounded down
+  EXPECT_EQ(SpeedLimitOfBeatMs(200.0), -4);  // five: -3.01, rounded down as RATE_GameRateToSpeed does
+  EXPECT_EQ(SpeedLimitOfBeatMs(0.0), faf::remote::kMaxSpeedLimit);
+  EXPECT_EQ(SpeedLimitOfBeatMs(100000.0), faf::remote::kMinSpeedLimit);
+  faf::remote::CSpeedMeter meter;
+  for (std::size_t i = 0; i + 1 < faf::remote::CSpeedMeter::kWindow; ++i) {
+    meter.Add(i % 8 == 0 ? 400.0 : 20.0); // a slow beat now and then
+  }
+  EXPECT_FALSE(meter.Limit().has_value()); // not before a full window
+  meter.Add(20.0);
+  EXPECT_EQ(meter.Limit(), std::optional<int>(6)); // the median, 20 ms: fifty beats a second, +6
+  // A machine at a step's edge: reported once it holds for a window, not at every flip.
+  faf::remote::CSpeedMeter edge;
+  int reports = 0;
+  std::optional<int> last;
+  for (int view = 0; view < 400; ++view) {
+    edge.Add(view % 2 == 0 ? 20.0 : 19.0); // +6 and +7 views alternate; the median holds +6 or +7
+    if (const std::optional<int> settled = edge.Settled(); settled) {
+      ++reports;
+      last = settled;
+    }
+  }
+  EXPECT_EQ(reports, 1);
+  EXPECT_TRUE(last == std::optional<int>(6) || last == std::optional<int>(7));
+  for (int view = 0; view < 100; ++view) {
+    edge.Add(200.0); // the machine slows: -4, reported once it holds
+    if (const std::optional<int> settled = edge.Settled(); settled) {
+      ++reports;
+      last = settled;
+    }
+  }
+  EXPECT_EQ(reports, 2);
+  EXPECT_EQ(last, std::optional<int>(-4));
+  for (const int limit : {-10, -3, 0, 7, 50}) {
+    EXPECT_EQ(faf::remote::DecodeSpeedLimit(faf::remote::EncodeSpeedLimit(limit)), std::optional<int>(limit)) << limit;
+  }
+  EXPECT_EQ(faf::remote::DecodeSpeedLimit(faf::remote::EncodeSpeedLimit(99)), std::optional<int>(50)); // clamped when sent
+  std::vector<std::uint8_t> past = faf::remote::EncodeSpeedLimit(0);
+  past[1] = 61u; // 51
+  EXPECT_FALSE(faf::remote::DecodeSpeedLimit(past).has_value());
+  std::vector<std::uint8_t> longer = faf::remote::EncodeSpeedLimit(0);
+  longer.push_back(0u);
+  EXPECT_FALSE(faf::remote::DecodeSpeedLimit(longer).has_value());
+  EXPECT_FALSE(faf::remote::DecodeSpeedLimit(std::vector<std::uint8_t>{static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::Chat), 10u}).has_value());
 }
