@@ -173,9 +173,25 @@ namespace gpg::gal
     }
   }
 
-  // Programs are created once by their renderers and live as long as the
-  // device; their pipelines are released with them.
-  GpuProgramD3D12::~GpuProgramD3D12() = default;
+  // A program can go while the command list being recorded still draws with it (the map editor
+  // drops its UI program before the device shuts down, with the last frame recorded and not yet
+  // submitted). Its pipelines wait in the garbage until the GPU is past that list, as a buffer's
+  // resource does and as the Vulkan backend's programs do (DeviceVulkan::RetireProgram); released
+  // at once, closing the list touched the freed pipeline state in the driver.
+  GpuProgramD3D12::~GpuProgramD3D12()
+  {
+    if (DeviceD3D12* const device = ActiveDevice()) {
+      if (mCompute != nullptr) {
+        device->RetireSharedRange(Microsoft::WRL::ComPtr<IUnknown>(mCompute));
+      }
+      for (auto& [key, pipeline] : mPipelines) {
+        (void)key;
+        if (pipeline != nullptr) {
+          device->RetireSharedRange(Microsoft::WRL::ComPtr<IUnknown>(pipeline));
+        }
+      }
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Device set-up
