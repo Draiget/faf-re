@@ -21,6 +21,7 @@ add_executable(faf_lua_tests EXCLUDE_FROM_ALL
   LuaObjectApiTests.cpp
   LuaSerializeTests.cpp
   LuaGcTests.cpp
+  ScrDebugHooksTests.cpp
 )
 target_link_libraries(faf_lua_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_lua_tests PROPERTIES FOLDER "Tests/Lua")
