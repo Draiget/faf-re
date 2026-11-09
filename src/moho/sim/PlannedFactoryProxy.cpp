@@ -1,8 +1,18 @@
 #include "moho/sim/PlannedFactoryProxy.h"
 
+#include "gpg/core/containers/FastVector.h"
+#include "gpg/core/containers/String.h"
+#include "moho/command/CmdDefs.h"
+#include "moho/command/SSTICommandIssueData.h"
 #include "moho/console/CConCommand.h"
 #include "moho/render/camera/GeomCamera3.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/CWldSession.h"
+#include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/SimDriver.h"
+#include "moho/sim/UserArmy.h"
 #include "moho/ui/UiRuntimeTypes.h"
+#include "moho/unit/core/UserUnit.h"
 
 namespace moho
 {
@@ -559,6 +569,124 @@ namespace moho
   const std::vector<std::unique_ptr<PlannedUnitProxy>>& PlannedFactoryManager::GetAllProxies() const noexcept
   {
     return mProxies;
+  }
+
+  bool PlannedFactoryManager::DispatchPreOrdersForUnit(UserUnit* const unit)
+  {
+    if (unit == nullptr) {
+      return false;
+    }
+    const Wm3::Vec3f& uPos = unit->GetPosition();
+    return DispatchPreOrdersForUnit(unit, Vector3f{uPos.x, uPos.y, uPos.z});
+  }
+
+  bool PlannedFactoryManager::DispatchPreOrdersForUnit(UserUnit* const unit, const Vector3f& unitPos)
+  {
+    if (unit == nullptr || !IsFactoryPreOrdersEnabled()) {
+      return false;
+    }
+
+    CWldSession* const session = WLD_GetActiveSession();
+    if (session != nullptr) {
+      const UserArmy* const focusArmy = session->GetFocusUserArmy();
+      if (focusArmy != nullptr && unit->mArmy != nullptr && unit->mArmy != focusArmy) {
+        return false;
+      }
+    }
+
+    PlannedUnitProxy* proxy = FindByPosition(unitPos, 3.0f);
+    if (proxy == nullptr) {
+      float bestDistSq = 9.0f; // 3.0f * 3.0f
+      for (const auto& p : mProxies) {
+        const float dx = p->mPosition.x - unitPos.x;
+        const float dz = p->mPosition.z - unitPos.z;
+        const float distSq = (dx * dx) + (dz * dz);
+        if (distSq <= bestDistSq) {
+          bestDistSq = distSq;
+          proxy = p.get();
+        }
+      }
+    }
+
+    if (proxy == nullptr) {
+      return false;
+    }
+
+    if (mDispatchHook) {
+      mDispatchHook(unit, *proxy);
+      (void)RemoveProxy(proxy->mProxyId);
+      return true;
+    }
+
+    gpg::fastvector<UserUnit*> targetUnits;
+    targetUnits.push_back(unit);
+
+    if (session != nullptr && session->mRules != nullptr) {
+      for (const auto& order : proxy->mPreOrders) {
+        RResId bpResId{};
+        (void)gpg::STR_InitFilename(&bpResId.name, order.blueprintId.c_str());
+        REntityBlueprint* const bp = session->mRules->GetEntityBlueprint(bpResId);
+        if (bp != nullptr) {
+          SSTICommandIssueData factoryCommand(EUnitCommandType::UNITCOMMAND_BuildMobile);
+          factoryCommand.mBlueprint = static_cast<RUnitBlueprint*>(bp);
+          for (int i = 0; i < order.count; ++i) {
+            ISSUE_Command(targetUnits, factoryCommand, false);
+          }
+        }
+      }
+    }
+
+    if (proxy->mHasRallyPoint) {
+      SSTICommandIssueData rallyCommand(EUnitCommandType::UNITCOMMAND_Move);
+      rallyCommand.mTarget.mType = EAiTargetType::AITARGET_Ground;
+      rallyCommand.mTarget.mPos = proxy->mRallyPoint;
+      ISSUE_Command(targetUnits, rallyCommand, false);
+    }
+
+    if (proxy->mRepeatBuild) {
+      if (ISTIDriver* const driver = WLD_GetDriver(); driver != nullptr) {
+        driver->ProcessInfoPair(unit->mParams.mEntityId, "SetRepeatQueue", "true");
+      }
+    }
+
+    (void)RemoveProxy(proxy->mProxyId);
+    return true;
+  }
+
+  bool PlannedFactoryManager::OnUnitCreatedOrProgress(
+    const Vector3f& pos,
+    const float progress,
+    const std::function<void(const std::vector<PlannedUnitProxy::PreOrder>&, const Vector3f&, bool)>& callback,
+    const float tolerance)
+  {
+    if (!IsFactoryPreOrdersEnabled() || progress <= 0.0f) {
+      return false;
+    }
+
+    PlannedUnitProxy* proxy = FindByPosition(pos, tolerance);
+    if (proxy == nullptr) {
+      float bestDistSq = tolerance * tolerance;
+      for (const auto& p : mProxies) {
+        const float dx = p->mPosition.x - pos.x;
+        const float dz = p->mPosition.z - pos.z;
+        const float distSq = (dx * dx) + (dz * dz);
+        if (distSq <= bestDistSq) {
+          bestDistSq = distSq;
+          proxy = p.get();
+        }
+      }
+    }
+
+    if (proxy == nullptr) {
+      return false;
+    }
+
+    if (callback) {
+      callback(proxy->mPreOrders, proxy->mRallyPoint, proxy->mRepeatBuild);
+    }
+
+    (void)RemoveProxy(proxy->mProxyId);
+    return true;
   }
 
   PlannedFactoryManager& PlannedFactoryManager::Instance()

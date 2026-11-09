@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <algorithm>
+#include <functional>
 #include <cmath>
 #include <limits>
 
@@ -16,6 +17,7 @@ namespace moho
   struct GeomCamera3;
   using CCamera = GeomCamera3;
   class CUIWorldView;
+  class UserUnit;
 
   /**
    * 3D Ray representation used for picking and hit testing.
@@ -193,11 +195,26 @@ namespace moho
 
     [[nodiscard]] const std::vector<std::unique_ptr<PlannedUnitProxy>>& GetAllProxies() const noexcept;
 
+    // Dispatch pre-orders to a newly constructed factory unit (progress > 0)
+    using DispatchHook = std::function<void(UserUnit* unit, const PlannedUnitProxy& proxy)>;
+    void SetDispatchHook(DispatchHook hook) noexcept { mDispatchHook = std::move(hook); }
+    void ResetDispatchHook() noexcept { mDispatchHook = nullptr; }
+
+    bool DispatchPreOrdersForUnit(UserUnit* unit);
+    bool DispatchPreOrdersForUnit(UserUnit* unit, const Vector3f& unitPos);
+
+    bool OnUnitCreatedOrProgress(
+      const Vector3f& pos,
+      float progress,
+      const std::function<void(const std::vector<PlannedUnitProxy::PreOrder>&, const Vector3f&, bool)>& callback = nullptr,
+      float tolerance = 3.0f);
+
     static PlannedFactoryManager& Instance();
     static PlannedFactoryManager& Get() noexcept { return Instance(); }
 
   private:
     std::uint32_t mNextProxyId{1};
     std::vector<std::unique_ptr<PlannedUnitProxy>> mProxies;
+    DispatchHook mDispatchHook{nullptr};
   };
 }

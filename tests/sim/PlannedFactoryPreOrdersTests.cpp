@@ -614,3 +614,153 @@ TEST(PlannedFactoryPreOrdersTest, LuaBindersQueueRallyRepeatAndDecrease)
 
   mgr.ClearAll();
 }
+
+TEST(PlannedFactoryPreOrdersTest, DispatchOnCreationProgressGreaterThanZero)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(1, 0, nullptr, {200.0f, 0.0f, 200.0f});
+  ASSERT_NE(proxy, nullptr);
+  proxy->AddPreOrder("uel0201", 3);
+  proxy->SetRallyPoint({250.0f, 0.0f, 250.0f});
+  proxy->SetRepeatBuild(true);
+
+  // If progress <= 0, dispatch must not trigger
+  bool dispatched = false;
+  EXPECT_FALSE(mgr.OnUnitCreatedOrProgress({200.0f, 0.0f, 200.0f}, 0.0f, [&](const auto&, const auto&, bool) {
+    dispatched = true;
+  }));
+  EXPECT_FALSE(dispatched);
+  EXPECT_NE(mgr.FindByPosition({200.0f, 0.0f, 200.0f}, 1.0f), nullptr);
+
+  // When progress > 0 (e.g. 0.05f), dispatch triggers and proxy retires
+  EXPECT_TRUE(mgr.OnUnitCreatedOrProgress(
+    {200.0f, 0.0f, 200.0f},
+    0.05f,
+    [&](const std::vector<moho::PlannedUnitProxy::PreOrder>& orders, const moho::Vector3f& rally, bool repeat) {
+      dispatched = true;
+      ASSERT_EQ(orders.size(), 1u);
+      EXPECT_EQ(orders[0].blueprintId, "uel0201");
+      EXPECT_EQ(orders[0].count, 3);
+      EXPECT_FLOAT_EQ(rally.x, 250.0f);
+      EXPECT_FLOAT_EQ(rally.z, 250.0f);
+      EXPECT_TRUE(repeat);
+    }));
+
+  EXPECT_TRUE(dispatched);
+  // Proxy has been retired
+  EXPECT_EQ(mgr.FindByPosition({200.0f, 0.0f, 200.0f}, 1.0f), nullptr);
+
+  // Calling again returns false (once-only)
+  dispatched = false;
+  EXPECT_FALSE(mgr.OnUnitCreatedOrProgress({200.0f, 0.0f, 200.0f}, 0.10f, [&](const auto&, const auto&, bool) {
+    dispatched = true;
+  }));
+  EXPECT_FALSE(dispatched);
+
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersForUnitWithHookAndOnceOnlySuppression)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(10, 0, nullptr, {100.0f, 0.0f, 100.0f});
+  ASSERT_NE(proxy, nullptr);
+  proxy->AddPreOrder("uel0201", 3);
+  proxy->AddPreOrder("uel0202", 2);
+  proxy->SetRallyPoint({120.0f, 0.0f, 150.0f});
+  proxy->SetRepeatBuild(true);
+
+  auto* dummyUnit = reinterpret_cast<moho::UserUnit*>(0xDEADBEEF);
+  bool hookInvoked = false;
+  moho::UserUnit* receivedUnit = nullptr;
+  std::size_t receivedOrdersCount = 0;
+  bool receivedRepeat = false;
+
+  mgr.SetDispatchHook([&](moho::UserUnit* unit, const moho::PlannedUnitProxy& p) {
+    hookInvoked = true;
+    receivedUnit = unit;
+    receivedOrdersCount = p.mPreOrders.size();
+    receivedRepeat = p.mRepeatBuild;
+  });
+
+  // Dispatch within tolerance (position 101, 0, 100.5 is ~1.1 units away)
+  EXPECT_TRUE(mgr.DispatchPreOrdersForUnit(dummyUnit, {101.0f, 0.0f, 100.5f}));
+  EXPECT_TRUE(hookInvoked);
+  EXPECT_EQ(receivedUnit, dummyUnit);
+  EXPECT_EQ(receivedOrdersCount, 2u);
+  EXPECT_TRUE(receivedRepeat);
+
+  // Proxy must be removed from manager
+  EXPECT_EQ(mgr.FindByPosition({100.0f, 0.0f, 100.0f}, 1.0f), nullptr);
+
+  // Calling a second time must return false (once-only suppression)
+  hookInvoked = false;
+  EXPECT_FALSE(mgr.DispatchPreOrdersForUnit(dummyUnit, {101.0f, 0.0f, 100.5f}));
+  EXPECT_FALSE(hookInvoked);
+
+  mgr.ResetDispatchHook();
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersGatedByConvar)
+{
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(5, 0, nullptr, {50.0f, 0.0f, 50.0f});
+  ASSERT_NE(proxy, nullptr);
+  proxy->AddPreOrder("xrl0305", 1);
+
+  auto* dummyUnit = reinterpret_cast<moho::UserUnit*>(0xCAFE);
+
+  // Feature disabled
+  moho::SetFactoryPreOrdersEnabled(false);
+  EXPECT_FALSE(mgr.DispatchPreOrdersForUnit(dummyUnit, {50.0f, 0.0f, 50.0f}));
+  EXPECT_NE(mgr.FindByPosition({50.0f, 0.0f, 50.0f}, 1.0f), nullptr);
+
+  // Feature re-enabled
+  moho::SetFactoryPreOrdersEnabled(true);
+  bool dispatched = false;
+  mgr.SetDispatchHook([&](moho::UserUnit*, const moho::PlannedUnitProxy&) {
+    dispatched = true;
+  });
+
+  EXPECT_TRUE(mgr.DispatchPreOrdersForUnit(dummyUnit, {50.0f, 0.0f, 50.0f}));
+  EXPECT_TRUE(dispatched);
+  EXPECT_EQ(mgr.FindByPosition({50.0f, 0.0f, 50.0f}, 1.0f), nullptr);
+
+  mgr.ResetDispatchHook();
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersToleranceAndPositionMiss)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(7, 0, nullptr, {300.0f, 0.0f, 300.0f});
+  ASSERT_NE(proxy, nullptr);
+  proxy->AddPreOrder("uel0106", 5);
+
+  auto* dummyUnit = reinterpret_cast<moho::UserUnit*>(0xBEEF);
+
+  // Position miss (50 units away)
+  EXPECT_FALSE(mgr.DispatchPreOrdersForUnit(dummyUnit, {350.0f, 0.0f, 350.0f}));
+  EXPECT_NE(mgr.FindByPosition({300.0f, 0.0f, 300.0f}, 1.0f), nullptr);
+
+  // Position hit within tolerance
+  EXPECT_TRUE(mgr.DispatchPreOrdersForUnit(dummyUnit, {301.5f, 0.0f, 301.5f}));
+  EXPECT_EQ(mgr.FindByPosition({300.0f, 0.0f, 300.0f}, 1.0f), nullptr);
+
+  // Null unit safety
+  EXPECT_FALSE(mgr.DispatchPreOrdersForUnit(nullptr, {300.0f, 0.0f, 300.0f}));
+
+  mgr.ClearAll();
+}

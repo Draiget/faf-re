@@ -737,6 +737,7 @@ UserUnit::UserUnit(CWldSession* const session, const SCreateUnitParams& params)
   , mQueueEmptyCached(false)
   , mIsEngineer(false)
   , mIsFactory(false)
+  , mPreOrdersDispatched(false)
 {
   mManager = new UserCommandQueue(this);
 
@@ -749,6 +750,11 @@ UserUnit::UserUnit(CWldSession* const session, const SCreateUnitParams& params)
     if (IsInCategory(fa::string("STRUCTURE", 9u))) {
       mIsFactory = true;
     }
+  }
+
+  if (mIsFactory && !mPreOrdersDispatched && mVariableData.mFractionComplete > 0.0f) {
+    mPreOrdersDispatched = true;
+    (void)PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this);
   }
 
   // 0x008BF7B7: a unit the blueprint gives a quick-select priority goes into
@@ -1226,6 +1232,11 @@ void UserUnit::Tick(const std::int32_t seqNo)
     AdvanceUserCommandManagerBySeq(mFactoryManager, seqNo);
   }
 
+  if (mIsFactory && !mPreOrdersDispatched && mVariableData.mFractionComplete > 0.0f) {
+    mPreOrdersDispatched = true;
+    (void)PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this);
+  }
+
   if (IsBeingBuilt()) {
     return;
   }
@@ -1329,6 +1340,11 @@ void UserUnit::Tick(const std::int32_t seqNo)
 void UserUnit::UpdateEntityData(const SSTIEntityVariableData& variableData)
 {
   UserEntity::UpdateEntityData(variableData);
+
+  if (mIsFactory && !mPreOrdersDispatched && mVariableData.mFractionComplete > 0.0f) {
+    mPreOrdersDispatched = true;
+    (void)PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this);
+  }
 }
 
 /**
