@@ -2087,6 +2087,24 @@ int moho::cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState* const state)
   }
   std::int32_t remaining = static_cast<std::int32_t>(lua_tonumber(state->m_state, 2));
 
+  if (moho::IsFactoryPreOrdersEnabled()) {
+    UserUnit* const activeFactory = sCurrentBuildFactory.GetObjectPtr();
+    if (activeFactory != nullptr && moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(activeFactory)) {
+      auto* proxy = moho::PlannedFactoryManager::Get().FindByUserUnit(activeFactory);
+      if (proxy != nullptr) {
+        if (oneBasedQueueIndex >= 1 && static_cast<std::size_t>(oneBasedQueueIndex) <= proxy->mPreOrders.size()) {
+          auto& order = proxy->mPreOrders[oneBasedQueueIndex - 1];
+          if (remaining >= order.count) {
+            proxy->mPreOrders.erase(proxy->mPreOrders.begin() + (oneBasedQueueIndex - 1));
+          } else {
+            order.count -= remaining;
+          }
+        }
+        return 0;
+      }
+    }
+  }
+
   const CmdId* commandBegin = nullptr;
   const CmdId* commandEnd = nullptr;
   CurrentBuildQueueItemCommands(oneBasedQueueIndex, &commandBegin, &commandEnd);

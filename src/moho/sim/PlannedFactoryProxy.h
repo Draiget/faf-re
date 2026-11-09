@@ -13,6 +13,9 @@
 
 namespace moho
 {
+  [[nodiscard]] bool IsFactoryPreOrdersEnabled();
+  void SetFactoryPreOrdersEnabled(bool enabled);
+
   struct REntityBlueprint;
   struct GeomCamera3;
   using CCamera = GeomCamera3;
@@ -78,6 +81,10 @@ namespace moho
     std::vector<BuilderKey> mBuilders{};
     bool mIsSelected{false};
     float mBoundingRadius{5.0f};
+    UserUnit* mUserUnit{nullptr};
+
+    PlannedUnitProxy();
+    ~PlannedUnitProxy();
 
     void AddPreOrder(const std::string& bpId, std::int32_t count = 1);
     bool RemovePreOrder(const std::string& bpId, std::int32_t count = 1);
@@ -130,6 +137,10 @@ namespace moho
 
     [[nodiscard]] PlannedUnitProxy* FindByProxyId(std::uint32_t proxyId);
     [[nodiscard]] const PlannedUnitProxy* FindByProxyId(std::uint32_t proxyId) const;
+
+    [[nodiscard]] bool IsPlannedProxyUnit(const UserUnit* unit) const;
+    [[nodiscard]] PlannedUnitProxy* FindByUserUnit(const UserUnit* unit);
+    [[nodiscard]] const PlannedUnitProxy* FindByUserUnit(const UserUnit* unit) const;
 
     void RemoveByBuilder(std::uint32_t builderId);
     void RemoveByBuilderAndIndex(std::uint32_t builderId, std::uint32_t cmdIndex);

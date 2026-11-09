@@ -743,9 +743,22 @@ namespace moho
         }
       }
 
-      if (units.empty()) {
-        return; // Zero Sim Stream: Do not dispatch network commands when no real units are selected
+    }
+
+    gpg::fastvector<UserUnit*> realUnits;
+    if (moho::IsFactoryPreOrdersEnabled()) {
+      auto& mgr = moho::PlannedFactoryManager::Get();
+      for (UserUnit* const u : units) {
+        if (!mgr.IsPlannedProxyUnit(u)) {
+          realUnits.push_back(u);
+        }
       }
+    } else {
+      realUnits = units;
+    }
+
+    if (realUnits.empty()) {
+      return; // Zero Sim Stream: Do not dispatch network commands when no real units are selected
     }
 
     // mManager == sWldSession->mSessionRes1 in the binary (0x008B01AD/+0x3FC).
@@ -806,7 +819,7 @@ namespace moho
     // and the helper's retirement use that beat (0x008B0405/0x008B0451),
     // while the published command keeps its packed source/id identity.
     BVSet<EntId, EntIdUniverse> issuedEntitySet{};
-    func_DecodeEntIdSet(issuedEntitySet, units);
+    func_DecodeEntIdSet(issuedEntitySet, realUnits);
 
     const CmdId issueBeat = WLD_GetDriver()->IssueCommand(issuedEntitySet, data, clearQueue);
 
@@ -852,7 +865,7 @@ namespace moho
     // construction panel - even though this call already had the right
     // answer: the run's own log shows twenty `BuildMobile` orders issued with
     // `clear=0` while the notification said otherwise.
-    for (UserUnit* const unit : units) {
+    for (UserUnit* const unit : realUnits) {
       UserCommandQueue* const unitManager = unit->GetCommandQueue();
       if (unitManager == nullptr) {
         continue;

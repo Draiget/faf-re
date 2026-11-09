@@ -1275,6 +1275,9 @@ namespace moho
         const moho::IUnit* const factoryUnit = moho::GetIUnitBridge(selectedUnit);
         if (selectedUnit != nullptr && factoryUnit != nullptr && !factoryUnit->IsDead()
             && selectedEntity->IsInCategory(factoryCategory)) {
+          if (moho::IsFactoryPreOrdersEnabled() && PlannedFactoryManager::Get().IsPlannedProxyUnit(selectedUnit)) {
+            continue;
+          }
           WeakSet<UserEntity> oneUnit;
           (void)oneUnit.Add(selectedEntity);
           for (int remaining = repeatCount; remaining > 0; --remaining) {

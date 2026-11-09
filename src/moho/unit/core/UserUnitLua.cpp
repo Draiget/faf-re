@@ -650,7 +650,14 @@ int moho::cfunc_UserUnitIsRepeatQueueL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
-  lua_pushboolean(rawState, userUnit->IsRepeatQueueEnabled() ? 1 : 0);
+  bool repeat = userUnit ? userUnit->IsRepeatQueueEnabled() : false;
+  if (moho::IsFactoryPreOrdersEnabled() && userUnit != nullptr &&
+      moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(userUnit)) {
+    if (const auto* proxy = moho::PlannedFactoryManager::Get().FindByUserUnit(userUnit)) {
+      repeat = proxy->mRepeatBuild;
+    }
+  }
+  lua_pushboolean(rawState, repeat ? 1 : 0);
   (void)lua_gettop(rawState);
   return 1;
 }
@@ -821,6 +828,17 @@ int moho::cfunc_UserUnitProcessInfoL(LuaPlus::LuaState* const state)
   if (infoValue == nullptr) {
     valueArg.TypeError("string");
     infoValue = "";
+  }
+
+  if (moho::IsFactoryPreOrdersEnabled() && userUnit != nullptr &&
+      moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(userUnit)) {
+    if (std::strcmp(infoKey, "SetRepeatQueue") == 0) {
+      const bool repeat = (std::strcmp(infoValue, "true") == 0);
+      if (auto* proxy = moho::PlannedFactoryManager::Get().FindByUserUnit(userUnit)) {
+        proxy->mRepeatBuild = repeat;
+      }
+    }
+    return 0;
   }
 
   if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
@@ -2503,6 +2521,22 @@ void moho::RebuildFactoryQueueDisplaySnapshot(
   }
 
   UserUnit* const userUnit = factoryLink.GetObjectPtr();
+  if (userUnit != nullptr && moho::IsFactoryPreOrdersEnabled() &&
+      moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(userUnit)) {
+    if (const auto* proxy = moho::PlannedFactoryManager::Get().FindByUserUnit(userUnit)) {
+      sCurrentBuildFactory = factoryLink;
+      for (const auto& order : proxy->mPreOrders) {
+        if (!queue.empty() && queue.back().blueprintId == order.blueprintId.c_str()) {
+          queue.back().count += order.count;
+        } else {
+          FactoryQueueDisplayItem item(fa::string(order.blueprintId.c_str()), order.count);
+          queue.push_back(item);
+        }
+      }
+      return;
+    }
+  }
+
   if (userUnit != nullptr && IsFactoryQueueDisplayEnabledForUnit(userUnit)) {
     UserCommandQueue* const commandQueue = userUnit->GetCommandQueue();
     if (commandQueue != nullptr) {

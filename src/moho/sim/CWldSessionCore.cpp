@@ -7,6 +7,7 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 #include "moho/render/WRenViewport.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 
 namespace moho
 {
@@ -424,6 +425,10 @@ namespace
    */
   CWldSession::~CWldSession()
   {
+    if (moho::IsFactoryPreOrdersEnabled()) {
+      moho::PlannedFactoryManager::Get().ClearAll();
+    }
+
     // Partial lift of 0x00893A60: core owner releases + recovered shared/weak cleanup.
 
     // 0x00893A88..0x00893A99: viewport-owned border meshes borrow the

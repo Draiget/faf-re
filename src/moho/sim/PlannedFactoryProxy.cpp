@@ -5,6 +5,7 @@
 #include "moho/command/CmdDefs.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/console/CConCommand.h"
+#include "moho/entity/EntityId.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CWldSession.h"
@@ -16,6 +17,27 @@
 
 namespace moho
 {
+  PlannedUnitProxy::PlannedUnitProxy() = default;
+
+  PlannedUnitProxy::~PlannedUnitProxy()
+  {
+    if (mUserUnit != nullptr) {
+      CWldSession* const session = WLD_GetActiveSession();
+      if (session != nullptr) {
+        if (static_cast<std::uint32_t>(mUserUnit->mUnitVarDat.mSelectionInheritorId) == ToRaw(EEntityIdSentinel::Invalid)) {
+          if (session->mSelection.Find(mUserUnit) != session->mSelection.end()) {
+            WeakSet<UserEntity> sel = session->GetSelection();
+            (void)sel.Remove(mUserUnit);
+            session->SetSelection(sel);
+          }
+        }
+        session->RemoveEntity(mUserUnit);
+      }
+      delete mUserUnit;
+      mUserUnit = nullptr;
+    }
+  }
+
   void PlannedUnitProxy::AddPreOrder(const std::string& bpId, const std::int32_t count)
   {
     if (bpId.empty() || count <= 0) {
@@ -148,6 +170,20 @@ namespace moho
       if (bp != nullptr) {
         existing->mBlueprint = bp;
       }
+      if (existing->mUserUnit != nullptr) {
+        existing->mUserUnit->mTransform.pos_ = { pos.x, pos.y, pos.z };
+        existing->mUserUnit->mVariableData.mCurTransform.pos_ = { pos.x, pos.y, pos.z };
+        float halfSizeX = 3.5f;
+        float halfSizeZ = 3.5f;
+        if (const auto* rbp = dynamic_cast<const RUnitBlueprint*>(existing->mBlueprint)) {
+          if (rbp->Physics.SkirtSizeX > 0.0f) halfSizeX = rbp->Physics.SkirtSizeX * 0.5f;
+          if (rbp->Physics.SkirtSizeZ > 0.0f) halfSizeZ = rbp->Physics.SkirtSizeZ * 0.5f;
+        }
+        Wm3::AxisAlignedBox3f bounds;
+        bounds.Min = { pos.x - halfSizeX, pos.y - 1.0f, pos.z - halfSizeZ };
+        bounds.Max = { pos.x + halfSizeX, pos.y + 4.0f, pos.z + halfSizeZ };
+        existing->mUserUnit->mSpatialDbEntry.UpdateBounds(bounds);
+      }
       return existing;
     }
 
@@ -168,6 +204,43 @@ namespace moho
     newProxy->mBlueprint = bp;
     newProxy->mPosition = pos;
     newProxy->AddBuilder(builderId, cmdIndex);
+
+    CWldSession* const session = WLD_GetActiveSession();
+    if (session != nullptr && bp != nullptr) {
+      SCreateUnitParams createParams{};
+      createParams.mBlueprint = bp;
+      const auto armyIndex = session->GetFocusUserArmy() ? session->GetFocusUserArmy()->mArmyIndex : 0;
+      createParams.mEntityId = MakeEntityId(EEntityIdFamily::Unit, armyIndex, 0x7000u | (newProxy->mProxyId & 0x0FFFu));
+      createParams.mTickCreated = session->mGameTick;
+
+      auto* userUnit = new UserUnit(session, createParams);
+      userUnit->mTransform.pos_ = { pos.x, pos.y, pos.z };
+      userUnit->mTransform.orient_ = { 0.0f, 0.0f, 0.0f, 1.0f };
+      userUnit->mVariableData.mCurTransform.pos_ = { pos.x, pos.y, pos.z };
+      userUnit->mVariableData.mCurTransform.orient_ = { 0.0f, 0.0f, 0.0f, 1.0f };
+      userUnit->mVariableData.mFractionComplete = 0.0f;
+      userUnit->mVariableData.mHealth = 1.0f;
+      userUnit->mVariableData.mMaxHealth = 1.0f;
+
+      const auto* unitBp = dynamic_cast<const RUnitBlueprint*>(bp);
+      if (unitBp != nullptr && session->mRules != nullptr) {
+        userUnit->mUnitVarDat.mAttributes = UnitAttributes(unitBp, session->mRules);
+      }
+
+      float halfSizeX = 3.5f;
+      float halfSizeZ = 3.5f;
+      if (unitBp != nullptr) {
+        if (unitBp->Physics.SkirtSizeX > 0.0f) halfSizeX = unitBp->Physics.SkirtSizeX * 0.5f;
+        if (unitBp->Physics.SkirtSizeZ > 0.0f) halfSizeZ = unitBp->Physics.SkirtSizeZ * 0.5f;
+      }
+      Wm3::AxisAlignedBox3f bounds;
+      bounds.Min = { pos.x - halfSizeX, pos.y - 1.0f, pos.z - halfSizeZ };
+      bounds.Max = { pos.x + halfSizeX, pos.y + 4.0f, pos.z + halfSizeZ };
+      userUnit->mSpatialDbEntry.UpdateBounds(bounds);
+
+      session->AddEntity(userUnit);
+      newProxy->mUserUnit = userUnit;
+    }
 
     mProxies.push_back(std::move(newProxy));
     return mProxies.back().get();
@@ -229,6 +302,37 @@ namespace moho
   const PlannedUnitProxy* PlannedFactoryManager::FindByProxyId(const std::uint32_t proxyId) const
   {
     return const_cast<PlannedFactoryManager*>(this)->FindByProxyId(proxyId);
+  }
+
+  bool PlannedFactoryManager::IsPlannedProxyUnit(const UserUnit* unit) const
+  {
+    if (unit == nullptr) {
+      return false;
+    }
+    for (const auto& proxy : mProxies) {
+      if (proxy && proxy->mUserUnit == unit) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  PlannedUnitProxy* PlannedFactoryManager::FindByUserUnit(const UserUnit* unit)
+  {
+    if (unit == nullptr) {
+      return nullptr;
+    }
+    for (const auto& proxy : mProxies) {
+      if (proxy && proxy->mUserUnit == unit) {
+        return proxy.get();
+      }
+    }
+    return nullptr;
+  }
+
+  const PlannedUnitProxy* PlannedFactoryManager::FindByUserUnit(const UserUnit* unit) const
+  {
+    return const_cast<PlannedFactoryManager*>(this)->FindByUserUnit(unit);
   }
 
   void PlannedFactoryManager::RemoveByBuilder(const std::uint32_t builderId)
@@ -647,6 +751,10 @@ namespace moho
       if (ISTIDriver* const driver = WLD_GetDriver(); driver != nullptr) {
         driver->ProcessInfoPair(unit->mParams.mEntityId, "SetRepeatQueue", "true");
       }
+    }
+
+    if (proxy->mUserUnit != nullptr && unit != nullptr) {
+      proxy->mUserUnit->mUnitVarDat.mSelectionInheritorId = unit->mParams.mEntityId;
     }
 
     (void)RemoveProxy(proxy->mProxyId);

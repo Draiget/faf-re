@@ -340,33 +340,48 @@ namespace moho
       if (moho::IsFactoryPreOrdersEnabled()) {
         auto& pfm = moho::PlannedFactoryManager::Get();
         PlannedUnitProxy* hitProxy = nullptr;
-        if (mCam != nullptr) {
+        if (mSess != nullptr && mSess->mCursorWorldState[0] != 0u) {
+          const Vector3f cursorWorldPos{mSess->CursorWorldPos.x, mSess->CursorWorldPos.y, mSess->CursorWorldPos.z};
+          for (const auto& proxy : pfm.GetAllProxies()) {
+            if (!proxy) continue;
+            float halfX = 3.5f;
+            float halfZ = 3.5f;
+            if (const auto* rbp = dynamic_cast<const RUnitBlueprint*>(proxy->mBlueprint)) {
+              if (rbp->Physics.SkirtSizeX > 0.0f) halfX = rbp->Physics.SkirtSizeX * 0.5f;
+              if (rbp->Physics.SkirtSizeZ > 0.0f) halfZ = rbp->Physics.SkirtSizeZ * 0.5f;
+            }
+            if (std::abs(cursorWorldPos.x - proxy->mPosition.x) <= halfX &&
+                std::abs(cursorWorldPos.z - proxy->mPosition.z) <= halfZ) {
+              hitProxy = proxy.get();
+              break;
+            }
+          }
+        }
+        if (hitProxy == nullptr && mCam != nullptr) {
           const GeomCamera3& cameraView = mCam->CameraGetView();
           const float mouseX = eventData != nullptr ? static_cast<float>(eventData->mMousePos.x) : mX0;
           const float mouseY = eventData != nullptr ? static_cast<float>(eventData->mMousePos.y) : mY0;
-          hitProxy = pfm.HitTestScreenPoint(&cameraView, mouseX, mouseY, 30.0f);
-        }
-        if (hitProxy == nullptr && mSess != nullptr) {
-          hitProxy = pfm.FindByPosition(
-            Vector3f{mSess->CursorInfo().mMouseWorldPos.x, mSess->CursorInfo().mMouseWorldPos.y, mSess->CursorInfo().mMouseWorldPos.z},
-            3.0f
-          );
+          hitProxy = pfm.HitTestScreenPoint(&cameraView, mouseX, mouseY, 40.0f);
         }
 
-        if (hitProxy != nullptr) {
+        if (hitProxy != nullptr && hitProxy->mUserUnit != nullptr) {
           const bool isShift = eventData != nullptr && (eventData->mModifiers & MEM_Shift) != 0u;
+          WeakSet<UserEntity> newSelection;
           if (isShift) {
-            if (hitProxy->IsSelected()) {
+            newSelection = mSess->GetSelection();
+            if (newSelection.Find(hitProxy->mUserUnit) != newSelection.end()) {
+              (void)newSelection.Remove(hitProxy->mUserUnit);
               pfm.DeselectProxy(hitProxy->mProxyId);
             } else {
+              (void)newSelection.Add(hitProxy->mUserUnit);
               pfm.SelectProxy(hitProxy->mProxyId, true);
             }
           } else {
-            WeakSet<UserEntity> emptySelection;
-            mSess->SetSelection(emptySelection);
             pfm.ClearSelection();
+            (void)newSelection.Add(hitProxy->mUserUnit);
             pfm.SelectProxy(hitProxy->mProxyId, false);
           }
+          mSess->SetSelection(newSelection);
           return;
         } else {
           const bool isShift = eventData != nullptr && (eventData->mModifiers & (MEM_Shift | MEM_Ctrl)) != 0u;
@@ -414,6 +429,14 @@ namespace moho
 
     WeakSet<UserEntity> draggedSelection;
     CollectSelectionDraggerEntities(draggedSelection, *this);
+    if (moho::IsFactoryPreOrdersEnabled()) {
+      auto& pfm = moho::PlannedFactoryManager::Get();
+      for (const auto& proxy : pfm.GetAllProxies()) {
+        if (proxy && proxy->IsSelected() && proxy->mUserUnit != nullptr) {
+          (void)draggedSelection.Add(proxy->mUserUnit);
+        }
+      }
+    }
 
 
     if ((eventData->mModifiers & MEM_Shift) != 0u) {
@@ -455,15 +478,24 @@ namespace moho
           continue;
         }
 
+        const RUnitBlueprint* const blueprint = unitBridge ? unitBridge->GetBlueprint() : nullptr;
+
         MeshInstance* const meshInstance = unit->mMeshInstance;
         if (meshInstance == nullptr) {
+          if (moho::IsFactoryPreOrdersEnabled() && moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(unit)) {
+            const std::int32_t priority = (blueprint != nullptr && blueprint->General.SelectionPriority > 0)
+              ? blueprint->General.SelectionPriority : 2;
+            const std::uint32_t bucketIndex = (priority > 1) ? static_cast<std::uint32_t>(priority) : 1u;
+            if (priorityBuckets.size() < bucketIndex) {
+              priorityBuckets.resize(bucketIndex);
+            }
+            (void)priorityBuckets[bucketIndex - 1u].Add(unit);
+          }
           continue;
         }
 
         meshInstance->UpdateInterpolatedFields();
         Wm3::Box3f scoredBox = meshInstance->box;
-
-        const RUnitBlueprint* const blueprint = unitBridge->GetBlueprint();
         scoredBox.Extent[1] *= blueprint->mSelectionMeshScaleX;
         scoredBox.Extent[2] *= blueprint->mSelectionMeshScaleY;
         scoredBox.Extent[0] *= blueprint->mSelectionMeshScaleZ;
