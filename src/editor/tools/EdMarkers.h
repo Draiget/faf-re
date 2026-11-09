@@ -44,4 +44,18 @@ namespace faf::editor
   std::string MarkerTypeOf(const SaveEntry& marker);
   /** A path node's neighbours (`adjacentTo`, names split on spaces). */
   std::vector<std::string> MarkerLinks(const SaveEntry& marker);
+
+  /** Whether a marker is a path node (it has a `graph`). */
+  bool IsPathNode(const SaveEntry& marker);
+  /** Whether path nodes `a` and `b` are linked (either one names the other). */
+  bool MarkersLinked(const std::vector<SaveEntry>& markers, const std::string& a, const std::string& b);
+  /**
+   * Links or unlinks path nodes `a` and `b`, both ways, as the game's saves keep them. Nodes of different graphs
+   * (land and water) aren't linked. Returns whether anything changed.
+   */
+  bool SetMarkerLink(std::vector<SaveEntry>& markers, const std::string& a, const std::string& b, bool linked);
+  /** Drops every link naming `name` (the marker is being deleted); returns how many markers changed. */
+  int RemoveLinksTo(std::vector<SaveEntry>& markers, const std::string& name);
+  /** The nearest marker of `type` within `reach` of (x, z), or -1. */
+  int MarkerNear(const std::vector<SaveEntry>& markers, const std::string& type, float x, float z, float reach);
 } // namespace faf::editor

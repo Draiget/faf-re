@@ -4,6 +4,7 @@
 #include <cmath>
 #include <functional>
 #include <map>
+#include <set>
 #include <cstring>
 
 #include <windowsx.h>
@@ -1316,6 +1317,12 @@ namespace faf::editor
     }
   }
 
+  namespace
+  {
+    /** How far a marker's symmetric copy may sit from the exact mirrored point (placement rounds copies to the half unit). */
+    constexpr float kCopyReach = 1.5f;
+  } // namespace
+
   int EdMapScene::PickMarker(const float x, const float z) const
   {
     const std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
@@ -1387,6 +1394,91 @@ namespace faf::editor
     }
   }
 
+  void EdMapScene::LinkSelectionTo(const std::string& target)
+  {
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+    const auto position = [&](const std::string& name, float& x, float& z, std::string& type) {
+      for (const SaveEntry& marker : markers) {
+        float y = 0.0f;
+        if (marker.name == name && IsPathNode(marker) && MarkerPosition(marker, x, y, z)) {
+          type = MarkerTypeOf(marker);
+          return true;
+        }
+      }
+      return false;
+    };
+    float targetX = 0.0f, targetZ = 0.0f;
+    std::string targetType;
+    if (field == nullptr || mTools == nullptr || !position(target, targetX, targetZ, targetType)) {
+      mMarkerSelection = {target};
+      return;
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    float targetCopyX[kMaxSymmetryCopies], targetCopyZ[kMaxSymmetryCopies];
+    const int copies =
+      HeightBrushCentres(field->width, field->height, targetX, targetZ, brush.symmetry, brush.turns, targetCopyX, targetCopyZ);
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    int made = 0;
+    int removed = 0;
+    // Selected nodes that are symmetric copies of each other (a placement selects all its copies) count once: the copy
+    // nearest the target pairs with it, and the other copies pair with the target's copies.
+    std::set<std::string> covered;
+    for (const std::string& selected : mMarkerSelection) {
+      float sourceX = 0.0f, sourceZ = 0.0f;
+      std::string sourceType;
+      if (selected == target || covered.count(selected) != 0 || !position(selected, sourceX, sourceZ, sourceType)) {
+        continue;
+      }
+      std::string source = selected;
+      covered.insert(selected);
+      float groupX[kMaxSymmetryCopies], groupZ[kMaxSymmetryCopies];
+      const int members = HeightBrushCentres(field->width, field->height, sourceX, sourceZ, brush.symmetry, brush.turns, groupX, groupZ);
+      float nearest = std::hypot(sourceX - targetX, sourceZ - targetZ);
+      for (int m = 1; m < members; ++m) {
+        const int i = MarkerNear(markers, sourceType, groupX[m], groupZ[m], kCopyReach);
+        if (i < 0) {
+          continue;
+        }
+        const std::string& name = markers[static_cast<std::size_t>(i)].name;
+        if (name == target || std::find(mMarkerSelection.begin(), mMarkerSelection.end(), name) == mMarkerSelection.end()) {
+          continue;
+        }
+        covered.insert(name);
+        const float d = std::hypot(groupX[m] - targetX, groupZ[m] - targetZ);
+        if (d < nearest) {
+          nearest = d;
+          source = name;
+        }
+      }
+      (void)position(source, sourceX, sourceZ, sourceType);
+      // One click toggles the pair; its symmetric copies follow it (each copy of the source to the same copy of the target).
+      const bool link = !MarkersLinked(markers, source, target);
+      float sourceCopyX[kMaxSymmetryCopies], sourceCopyZ[kMaxSymmetryCopies];
+      (void)HeightBrushCentres(field->width, field->height, sourceX, sourceZ, brush.symmetry, brush.turns, sourceCopyX, sourceCopyZ);
+      for (int c = 0; c < copies; ++c) {
+        const int a = c == 0 ? -1 : MarkerNear(markers, sourceType, sourceCopyX[c], sourceCopyZ[c], kCopyReach);
+        const int b = c == 0 ? -1 : MarkerNear(markers, targetType, targetCopyX[c], targetCopyZ[c], kCopyReach);
+        if (c != 0 && (a < 0 || b < 0)) {
+          continue;
+        }
+        const std::string from = c == 0 ? source : markers[static_cast<std::size_t>(a)].name;
+        const std::string to = c == 0 ? target : markers[static_cast<std::size_t>(b)].name;
+        if (SetMarkerLink(markers, from, to, link)) {
+          ++(link ? made : removed);
+        }
+      }
+    }
+    const std::size_t sources = mMarkerSelection.size();
+    mMarkerSelection = {target};
+    if (made + removed > 0) {
+      mDocument.SaveDataEdited(std::move(before));
+      gpg::Logf("editor: path links to %s: %d made, %d removed", target.c_str(), made, removed);
+    } else {
+      gpg::Logf("editor: %s selected (no path links changed from %zu selected)", target.c_str(), sources);
+    }
+  }
+
   void EdMapScene::ChangeExtraArmies(const std::string& armies)
   {
     std::vector<std::string> names;
@@ -1408,7 +1500,7 @@ namespace faf::editor
     gpg::Logf("editor: extra armies %s", armies.c_str());
   }
 
-  void EdMapScene::PlaceMarkers(const float x, const float z)
+  void EdMapScene::PlaceMarkers(const float x, const float z, const bool connect)
   {
     const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
     if (mTools == nullptr || field == nullptr) {
@@ -1420,6 +1512,29 @@ namespace faf::editor
     const int copies = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
     EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
     std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+    // Laying a path: the selected node of this type and its symmetric copies, which the new copies link to.
+    // Of the selected nodes (a placement selects all its copies) the one nearest the click.
+    std::string previous;
+    float previousX[kMaxSymmetryCopies], previousZ[kMaxSymmetryCopies];
+    if (connect) {
+      float nearest = 0.0f;
+      for (const SaveEntry& marker : markers) {
+        float px = 0.0f, py = 0.0f, pz = 0.0f;
+        if (!IsPathNode(marker) || MarkerTypeOf(marker) != type.type || !MarkerPosition(marker, px, py, pz) ||
+            std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) == mMarkerSelection.end()) {
+          continue;
+        }
+        const float d = std::hypot(px - x, pz - z);
+        if (previous.empty() || d < nearest) {
+          nearest = d;
+          previous = marker.name;
+          (void)HeightBrushCentres(field->width, field->height, px, pz, brush.symmetry, brush.turns, previousX, previousZ);
+        }
+      }
+    }
+    int linked = 0;
+    // A click that places nothing (off the map) keeps the selection, so a path being laid isn't lost.
+    std::vector<std::string> selectedBefore = std::move(mMarkerSelection);
     mMarkerSelection.clear();
     for (int c = 0; c < copies; ++c) {
       if (centreX[c] < 0.0f || centreZ[c] < 0.0f || centreX[c] > static_cast<float>(field->width - 1) ||
@@ -1442,16 +1557,29 @@ namespace faf::editor
         }
       }
       SaveEntry marker = NewMarker(type, NextMarkerName(taken, type), px, py, pz);
-      mMarkerSelection.push_back(marker.name);
+      const std::string name = marker.name;
+      mMarkerSelection.push_back(name);
       // A start position is an army: the scenario's list and the save's Armies get it.
       if (std::string(type.type) == "Blank Marker") {
         mDocument.AddArmy(marker.name);
       }
       markers.push_back(std::move(marker));
+      if (!previous.empty()) {
+        const int from = c == 0 ? -1 : MarkerNear(markers, type.type, previousX[c], previousZ[c], kCopyReach);
+        const std::string fromName = c == 0 ? previous : (from >= 0 ? markers[static_cast<std::size_t>(from)].name : std::string());
+        if (!fromName.empty() && fromName != name && SetMarkerLink(markers, fromName, name, true)) {
+          ++linked;
+        }
+      }
+    }
+    if (linked > 0) {
+      gpg::Logf("editor: %d path links made", linked);
     }
     if (!mMarkerSelection.empty()) {
       mDocument.SaveDataEdited(std::move(before));
       gpg::Logf("editor: %zu %s markers placed, %zu markers now", mMarkerSelection.size(), type.type, markers.size());
+    } else {
+      mMarkerSelection = std::move(selectedBefore);
     }
   }
 
@@ -1474,6 +1602,11 @@ namespace faf::editor
                                    return std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end();
                                  }),
                   markers.end());
+    if (markers.size() != count) {
+      for (const std::string& name : mMarkerSelection) {
+        (void)RemoveLinksTo(markers, name);
+      }
+    }
     mMarkerSelection.clear();
     if (markers.size() != count) {
       mDocument.SaveDataEdited(std::move(before));
@@ -1505,18 +1638,24 @@ namespace faf::editor
           positions[marker.name] = {x, y, z};
         }
       }
+      std::set<std::pair<std::string, std::string>> drawn;
+      const auto selected = [&](const std::string& name) {
+        return std::find(mMarkerSelection.begin(), mMarkerSelection.end(), name) != mMarkerSelection.end();
+      };
       for (const SaveEntry& marker : markers) {
         const auto from = positions.find(marker.name);
         if (from == positions.end()) {
           continue;
         }
-        const std::uint32_t color = (MarkerColor(marker) & 0x00FFFFFFu) | 0x70000000u;
         for (const std::string& link : MarkerLinks(marker)) {
           const auto to = positions.find(link);
-          if (to != positions.end() && marker.name < link) {
-            batcher.DrawLine(vertex(from->second[0], from->second[1] + 2.0f, from->second[2], color),
-                             vertex(to->second[0], to->second[1] + 2.0f, to->second[2], color));
+          if (to == positions.end() || !drawn.insert(std::minmax(marker.name, link)).second) {
+            continue;
           }
+          const std::uint32_t alpha = selected(marker.name) || selected(link) ? 0xF0000000u : 0x70000000u;
+          const std::uint32_t color = (MarkerColor(marker) & 0x00FFFFFFu) | alpha;
+          batcher.DrawLine(vertex(from->second[0], from->second[1] + 2.0f, from->second[2], color),
+                           vertex(to->second[0], to->second[1] + 2.0f, to->second[2], color));
         }
       }
     }
@@ -1834,14 +1973,14 @@ namespace faf::editor
         }
         // The edges within reach of the cursor (a corner takes two).
         const float reach = std::max(4.0f, mDistance * 0.015f);
-        const bool alongZ = groundZ > static_cast<float>(area->z0) - reach && groundZ < static_cast<float>(area->z1) + reach;
-        const bool alongX = groundX > static_cast<float>(area->x0) - reach && groundX < static_cast<float>(area->x1) + reach;
         mBorderEdges = 0;
         if (area) {
-        mBorderEdges |= alongZ && std::fabs(groundX - static_cast<float>(area->x0)) < reach ? 1 : 0;
-        mBorderEdges |= alongX && std::fabs(groundZ - static_cast<float>(area->z0)) < reach ? 2 : 0;
-        mBorderEdges |= alongZ && std::fabs(groundX - static_cast<float>(area->x1)) < reach ? 4 : 0;
-        mBorderEdges |= alongX && std::fabs(groundZ - static_cast<float>(area->z1)) < reach ? 8 : 0;
+          const bool alongZ = groundZ > static_cast<float>(area->z0) - reach && groundZ < static_cast<float>(area->z1) + reach;
+          const bool alongX = groundX > static_cast<float>(area->x0) - reach && groundX < static_cast<float>(area->x1) + reach;
+          mBorderEdges |= alongZ && std::fabs(groundX - static_cast<float>(area->x0)) < reach ? 1 : 0;
+          mBorderEdges |= alongX && std::fabs(groundZ - static_cast<float>(area->z0)) < reach ? 2 : 0;
+          mBorderEdges |= alongZ && std::fabs(groundX - static_cast<float>(area->x1)) < reach ? 4 : 0;
+          mBorderEdges |= alongX && std::fabs(groundZ - static_cast<float>(area->z1)) < reach ? 8 : 0;
         }
         if (mBorderEdges != 0) {
           mBorderBefore = mDocument.SaveDataNow();
@@ -1849,16 +1988,21 @@ namespace faf::editor
           ::SetFocus(window);
           return true;
         }
-        // Markers: pick, delete, or place.
+        // Markers: link, pick, delete, or place.
         const int hit = PickMarker(groundX, groundZ);
         std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+        const bool connect = mTools->ConnectPathNodes() || ((wParam & MK_CONTROL) != 0 && (wParam & MK_SHIFT) != 0);
+        if (hit >= 0 && connect) {
+          LinkSelectionTo(markers[static_cast<std::size_t>(hit)].name);
+          return true;
+        }
         if (hit >= 0 && (wParam & MK_SHIFT) != 0) {
           mMarkerSelection = {markers[static_cast<std::size_t>(hit)].name};
           DeleteSelectedMarkers();
           return true;
         }
         if (hit < 0) {
-          PlaceMarkers(groundX, groundZ);
+          PlaceMarkers(groundX, groundZ, connect);
           return true;
         }
         const std::string& name = markers[static_cast<std::size_t>(hit)].name;

@@ -96,6 +96,9 @@ namespace faf::editor
       return true;
     }
 
+    /** The Markers tool's connect mode: a click on a path node links it to the selection. */
+    [[nodiscard]] bool ConnectPathNodes() const noexcept { return mConnectNodes; }
+    void SetConnectPathNodes(const bool connect) noexcept { mConnectNodes = connect; }
     /** Test runs (`/markertool`): the Markers tool placing this type. */
     void SetMarkerTool(const std::string& type) noexcept
     {
@@ -388,6 +391,7 @@ namespace faf::editor
     char mPropFilter[64]{};
     int mSelectionCount = 0;
     std::vector<SaveEntry> mMarkerSelection;
+    bool mConnectNodes = false;
     std::vector<std::string> mArmies;
     std::vector<std::string> mExtraArmies;
     char mExtraBuffer[256]{};

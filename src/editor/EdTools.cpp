@@ -874,6 +874,9 @@ namespace faf::editor
     }
     Note("Click the ground to place one (with its symmetric copies), click a marker to select it (Ctrl adds), drag to move, "
          "Shift+click or Delete removes. Start positions are named ARMY_1, ARMY_2... (the scenario's army list is edited with the armies).");
+    ImGui::Checkbox("Connect path nodes", &mConnectNodes);
+    Note("Clicking a path node links it to the selected nodes of its graph, or unlinks them; Ctrl+Shift+click does the same "
+         "without the mode. Placing a path node links it to the selected one, so clicks lay a path. Symmetric copies follow.");
     DrawSymmetry(false);
 
     SectionHeader("SELECTED");

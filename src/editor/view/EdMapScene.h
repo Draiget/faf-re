@@ -89,8 +89,16 @@ namespace faf::editor
     void EditMarker(const std::string& marker, const std::string& key, const std::string& value);
     /** Sets the scenario's extra armies (names split on spaces), as one undo step. */
     void ChangeExtraArmies(const std::string& armies);
-    /** Places markers of the Markers tool's type at (x, z) and its symmetric copies, as one undo step. */
-    void PlaceMarkers(float x, float z);
+    /**
+     * Places markers of the Markers tool's type at (x, z) and its symmetric copies, as one undo step. With `connect`,
+     * a path node placed while a node of its type is selected is linked to it (each copy to its copy), so clicks lay a path.
+     */
+    void PlaceMarkers(float x, float z, bool connect = false);
+    /**
+     * Links each selected path node to `target`, or unlinks it when they are linked, with the symmetric copies of the
+     * pair, as one undo step; `target` becomes the selection, so the next click continues from it.
+     */
+    void LinkSelectionTo(const std::string& target);
 
     /** Sets or removes the playable area as one undo step. */
     void ChangePlayableArea(const std::optional<EdDocument::PlayableRect>& area);

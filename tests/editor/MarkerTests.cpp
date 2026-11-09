@@ -40,4 +40,52 @@ namespace
     ASSERT_EQ(links.size(), 2u);
     EXPECT_EQ(links[1], "LandPN02");
   }
+
+  TEST(Markers, PathNodesLinkBothWaysAndUnlink)
+  {
+    const faf::editor::MarkerType* const land = faf::editor::FindMarkerType("Land Path Node");
+    const faf::editor::MarkerType* const water = faf::editor::FindMarkerType("Water Path Node");
+    const faf::editor::MarkerType* const mass = faf::editor::FindMarkerType("Mass");
+    ASSERT_NE(land, nullptr);
+    std::vector<SaveEntry> markers = {
+      faf::editor::NewMarker(*land, "LandPN00", 10.5f, 0.0f, 10.5f),
+      faf::editor::NewMarker(*land, "LandPN01", 30.5f, 0.0f, 10.5f),
+      faf::editor::NewMarker(*land, "LandPN02", 50.5f, 0.0f, 10.5f),
+      faf::editor::NewMarker(*water, "WaterPN00", 70.5f, 0.0f, 10.5f),
+      faf::editor::NewMarker(*mass, "Mass 00", 90.5f, 0.0f, 10.5f),
+    };
+    EXPECT_TRUE(faf::editor::IsPathNode(markers[0]));
+    EXPECT_FALSE(faf::editor::IsPathNode(markers[4]));
+    EXPECT_TRUE(faf::editor::SetMarkerLink(markers, "LandPN00", "LandPN01", true));
+    EXPECT_TRUE(faf::editor::SetMarkerLink(markers, "LandPN01", "LandPN02", true));
+    EXPECT_FALSE(faf::editor::SetMarkerLink(markers, "LandPN01", "LandPN00", true)); // already linked
+    EXPECT_EQ(markers[1].Get("adjacentTo"), "STRING( 'LandPN00 LandPN02' )");
+    EXPECT_EQ(markers[0].Get("adjacentTo"), "STRING( 'LandPN01' )");
+    EXPECT_TRUE(faf::editor::MarkersLinked(markers, "LandPN02", "LandPN01"));
+    // Different graphs and non-nodes don't link.
+    EXPECT_FALSE(faf::editor::SetMarkerLink(markers, "LandPN00", "WaterPN00", true));
+    EXPECT_FALSE(faf::editor::SetMarkerLink(markers, "Mass 00", "LandPN00", true));
+    // A one-sided link (as some maps have) still counts and unlinks both ways.
+    markers[2].Set("adjacentTo", faf::editor::StringValue("LandPN01 LandPN00"));
+    EXPECT_TRUE(faf::editor::MarkersLinked(markers, "LandPN00", "LandPN02"));
+    EXPECT_TRUE(faf::editor::SetMarkerLink(markers, "LandPN00", "LandPN02", false));
+    EXPECT_FALSE(faf::editor::MarkersLinked(markers, "LandPN00", "LandPN02"));
+    // Deleting LandPN01 drops the links that name it.
+    EXPECT_EQ(faf::editor::RemoveLinksTo(markers, "LandPN01"), 2);
+    EXPECT_EQ(markers[0].Get("adjacentTo"), "STRING( '' )");
+    EXPECT_TRUE(faf::editor::MarkerLinks(markers[2]).empty());
+  }
+
+  TEST(Markers, NearestOfATypeWithinReach)
+  {
+    const faf::editor::MarkerType* const land = faf::editor::FindMarkerType("Land Path Node");
+    const faf::editor::MarkerType* const mass = faf::editor::FindMarkerType("Mass");
+    const std::vector<SaveEntry> markers = {
+      faf::editor::NewMarker(*mass, "Mass 00", 10.5f, 0.0f, 10.5f),
+      faf::editor::NewMarker(*land, "LandPN00", 11.5f, 0.0f, 10.5f),
+    };
+    EXPECT_EQ(faf::editor::MarkerNear(markers, "Land Path Node", 10.5f, 10.5f, 1.5f), 1);
+    EXPECT_EQ(faf::editor::MarkerNear(markers, "Mass", 11.5f, 10.5f, 1.5f), 0);
+    EXPECT_EQ(faf::editor::MarkerNear(markers, "Land Path Node", 20.5f, 10.5f, 1.5f), -1);
+  }
 } // namespace

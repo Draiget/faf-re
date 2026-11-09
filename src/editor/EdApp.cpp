@@ -866,8 +866,9 @@ namespace faf::editor
           mScene.EditMarker(marker, key, value);
         }
         if (!mMarkerToolArg.empty()) {
-          // `/markertool <type>` (test runs).
+          // `/markertool <type>` (test runs), `/connectnodes` with it for the connect mode.
           tools.SetMarkerTool(mMarkerToolArg);
+          tools.SetConnectPathNodes(moho::CFG_GetArgOption("/connectnodes", 0, nullptr));
           mMarkerToolArg.clear();
         }
         // The playable area: the panel shows it and asks for changes; `/playablearea x0,z0,x1,z1` (or `none`) for test runs.

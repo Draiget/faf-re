@@ -1,5 +1,7 @@
 #include "editor/tools/EdMarkers.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <set>
@@ -143,5 +145,104 @@ namespace faf::editor
       links.push_back(word);
     }
     return links;
+  }
+
+  namespace
+  {
+    SaveEntry* Find(std::vector<SaveEntry>& markers, const std::string& name)
+    {
+      for (SaveEntry& marker : markers) {
+        if (marker.name == name) {
+          return &marker;
+        }
+      }
+      return nullptr;
+    }
+
+    void WriteLinks(SaveEntry& marker, const std::vector<std::string>& links)
+    {
+      std::string joined;
+      for (const std::string& link : links) {
+        joined += (joined.empty() ? "" : " ") + link;
+      }
+      marker.Set("adjacentTo", StringValue(joined));
+    }
+  } // namespace
+
+  bool IsPathNode(const SaveEntry& marker)
+  {
+    return !ValueString(marker.Get("graph")).empty();
+  }
+
+  bool MarkersLinked(const std::vector<SaveEntry>& markers, const std::string& a, const std::string& b)
+  {
+    for (const SaveEntry& marker : markers) {
+      if (marker.name != a && marker.name != b) {
+        continue;
+      }
+      const std::vector<std::string> links = MarkerLinks(marker);
+      if (std::find(links.begin(), links.end(), marker.name == a ? b : a) != links.end()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool SetMarkerLink(std::vector<SaveEntry>& markers, const std::string& a, const std::string& b, const bool linked)
+  {
+    SaveEntry* const first = Find(markers, a);
+    SaveEntry* const second = Find(markers, b);
+    if (first == nullptr || second == nullptr || first == second || !IsPathNode(*first) ||
+        ValueString(first->Get("graph")) != ValueString(second->Get("graph"))) {
+      return false;
+    }
+    bool changed = false;
+    for (auto [from, to] : {std::pair{first, b}, std::pair{second, a}}) {
+      std::vector<std::string> links = MarkerLinks(*from);
+      const auto at = std::find(links.begin(), links.end(), to);
+      if (linked && at == links.end()) {
+        links.push_back(to);
+      } else if (!linked && at != links.end()) {
+        links.erase(std::remove(links.begin(), links.end(), to), links.end());
+      } else {
+        continue;
+      }
+      WriteLinks(*from, links);
+      changed = true;
+    }
+    return changed;
+  }
+
+  int RemoveLinksTo(std::vector<SaveEntry>& markers, const std::string& name)
+  {
+    int changed = 0;
+    for (SaveEntry& marker : markers) {
+      std::vector<std::string> links = MarkerLinks(marker);
+      const std::size_t count = links.size();
+      links.erase(std::remove(links.begin(), links.end(), name), links.end());
+      if (links.size() != count) {
+        WriteLinks(marker, links);
+        ++changed;
+      }
+    }
+    return changed;
+  }
+
+  int MarkerNear(const std::vector<SaveEntry>& markers, const std::string& type, const float x, const float z, const float reach)
+  {
+    int best = -1;
+    float bestDistance = reach;
+    for (std::size_t i = 0; i < markers.size(); ++i) {
+      float mx = 0.0f, my = 0.0f, mz = 0.0f;
+      if (MarkerTypeOf(markers[i]) != type || !MarkerPosition(markers[i], mx, my, mz)) {
+        continue;
+      }
+      const float d = std::hypot(mx - x, mz - z);
+      if (d <= bestDistance) {
+        bestDistance = d;
+        best = static_cast<int>(i);
+      }
+    }
+    return best;
   }
 } // namespace faf::editor
