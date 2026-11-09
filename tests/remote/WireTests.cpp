@@ -513,7 +513,17 @@ namespace
         record.farPosition = fresh.farPosition;
         record.farValue = fresh.farValue;
       }
-      if ((fields & kFieldOrientation) != 0u) {
+      if ((fields & kFieldOrientation) != 0u && !record.yawOnly && !fresh.yawOnly && mRng() % 2u == 0u) {
+        // Entities 13: a full rotation's small step (same largest component), at times to a component's ends.
+        std::uint32_t packed = record.orientation & 3u;
+        for (int i = 0; i < 3; ++i) {
+          const int shift = 2 + i * 10;
+          const auto was = static_cast<std::int32_t>((record.orientation >> shift) & 0x3FFu);
+          const std::int32_t now = std::clamp(was + static_cast<std::int32_t>(mRng() % 41u) - 20, 0, 1023);
+          packed |= static_cast<std::uint32_t>(mRng() % 16u == 0u ? (mRng() % 2u == 0u ? 0 : 1023) : now) << shift;
+        }
+        record.orientation = packed;
+      } else if ((fields & kFieldOrientation) != 0u) {
         record.orientation = fresh.orientation;
         record.yawOnly = fresh.yawOnly;
         record.yawRate = fresh.yawRate;
@@ -1308,6 +1318,38 @@ namespace
     EXPECT_TRUE(Decode(Encode(nearZero, &stepped), &stepped, decoded) && decoded == nearZero);
     EXPECT_TRUE(Decode(Encode(wrapped, &nearZero), &nearZero, decoded) && decoded == wrapped);
     EXPECT_TRUE(PositionFieldBits(stepped.entities[0], &placed.entities[0], kCodec) < PositionFieldBits(stepped.entities[0], nullptr, kCodec));
+
+    // Entities 13 (#312): a full rotation goes as its packed components' steps from the baseline's when both are
+    // full, share their largest component and the steps are shorter; a change of largest component, or a step to a
+    // component's ends, still reads back exactly.
+    {
+      const auto pack = [](const std::uint32_t largest, const std::uint32_t a, const std::uint32_t b, const std::uint32_t c) {
+        return largest | (a << 2u) | (b << 12u) | (c << 22u);
+      };
+      SViewFrame tilted = wrapped;
+      tilted.frameId = 7;
+      tilted.entities[0].yawOnly = false;
+      tilted.entities[0].orientation = pack(3u, 500u, 20u, 1000u);
+      EXPECT_TRUE(Decode(Encode(tilted, &wrapped), &wrapped, decoded) && decoded == tilted);
+      SViewFrame rocked = tilted;
+      rocked.frameId = 8;
+      rocked.entities[0].orientation = pack(3u, 503u, 17u, 1023u);
+      SViewFrame flipped = tilted;
+      flipped.frameId = 8;
+      flipped.entities[0].orientation = pack(1u, 503u, 17u, 1001u);
+      SViewFrame ends = tilted;
+      ends.frameId = 8;
+      ends.entities[0].orientation = pack(3u, 0u, 0u, 1023u);
+      const std::vector<std::uint8_t> rockedBytes = Encode(rocked, &tilted);
+      const std::vector<std::uint8_t> flippedBytes = Encode(flipped, &tilted);
+      EXPECT_TRUE(rockedBytes.size() + 2u <= flippedBytes.size());
+      EXPECT_TRUE(Decode(rockedBytes, &tilted, decoded) && decoded == rocked);
+      EXPECT_TRUE(Decode(flippedBytes, &tilted, decoded) && decoded == flipped);
+      EXPECT_TRUE(Decode(Encode(ends, &tilted), &tilted, decoded) && decoded == ends);
+      EXPECT_TRUE(OrientationFieldBits(rocked.entities[0], &tilted.entities[0]) < OrientationFieldBits(flipped.entities[0], &tilted.entities[0]));
+      EXPECT_EQ(OrientationFieldBits(flipped.entities[0], &tilted.entities[0]), 2 + 32);
+      EXPECT_EQ(OrientationFieldBits(tilted.entities[0], &wrapped.entities[0]), 1 + 32);
+    }
 
     // Entities 12: a change's id gap and mask (CChangeHeaders). Alone: ids close and far apart (to
     // the top of the range), masks from a pool of 40 (more than the 15 kept), repeats; what `Bits`

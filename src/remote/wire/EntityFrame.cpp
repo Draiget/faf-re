@@ -53,6 +53,11 @@ namespace faf::remote::wire
     constexpr int kStepOrderXZ = 3;
     constexpr int kStepOrderY = 1;
     constexpr int kStepOrderYaw = 3;
+    // Entities 13 (#312): a full rotation's three 10-bit packed components (Quantize.cpp's PackQuaternion: the
+    // largest component's index in the low 2 bits, then the other three) step by a few units a beat.
+    constexpr int kStepOrderQuaternion = 1;
+    constexpr int kQuaternionComponentBits = 10;
+    constexpr std::uint32_t kQuaternionComponentMask = (1u << kQuaternionComponentBits) - 1u;
     constexpr int kMaxGolombZeros = 26; // more than any step a field this wide can take
 
     [[nodiscard]] int ExpGolombBits(const std::uint32_t value, const int order) noexcept
@@ -123,6 +128,34 @@ namespace faf::remote::wire
     [[nodiscard]] std::uint32_t YawStep(const SEntityRecord& record, const SEntityRecord& before) noexcept
     {
       return ZigZag(static_cast<std::int16_t>(static_cast<std::uint16_t>(record.orientation - before.orientation)));
+    }
+
+    /** Whether a changed full orientation is sent with its stepped bit: full at both ends. */
+    [[nodiscard]] bool FullMayStep(const SEntityRecord& record, const SEntityRecord* const before) noexcept
+    {
+      return before != nullptr && !before->yawOnly && !record.yawOnly;
+    }
+
+    /** A full orientation's packed components' steps from `before`'s, zigzagged; false when the largest component
+     * differs (the components then aren't the same three). */
+    [[nodiscard]] bool FullSteps(const std::uint32_t orientation, const std::uint32_t before, std::array<std::uint32_t, 3>& steps) noexcept
+    {
+      if ((orientation & 3u) != (before & 3u)) {
+        return false;
+      }
+      for (int i = 0; i < 3; ++i) {
+        const int shift = 2 + i * kQuaternionComponentBits;
+        const auto now = static_cast<std::int32_t>((orientation >> shift) & kQuaternionComponentMask);
+        const auto was = static_cast<std::int32_t>((before >> shift) & kQuaternionComponentMask);
+        steps[static_cast<std::size_t>(i)] = ZigZag(now - was);
+      }
+      return true;
+    }
+
+    /** The bits of `steps`, or 32 or more when they aren't shorter than the whole orientation. */
+    [[nodiscard]] int FullStepBits(const std::array<std::uint32_t, 3>& steps) noexcept
+    {
+      return ExpGolombBits(steps[0], kStepOrderQuaternion) + ExpGolombBits(steps[1], kStepOrderQuaternion) + ExpGolombBits(steps[2], kStepOrderQuaternion);
     }
 
     /** `beat` is the frame's: a dead-reckoned anchor cannot lie in its future. */
@@ -278,6 +311,15 @@ namespace faf::remote::wire
           writer.WriteBool(turned);
           if (turned) {
             WriteExpGolomb(writer, turn, kStepOrderYaw);
+          }
+        } else if (FullMayStep(record, before)) {
+          std::array<std::uint32_t, 3> steps{};
+          turned = FullSteps(record.orientation, before->orientation, steps) && FullStepBits(steps) < 32;
+          writer.WriteBool(turned);
+          if (turned) {
+            for (const std::uint32_t step : steps) {
+              WriteExpGolomb(writer, step, kStepOrderQuaternion);
+            }
           }
         }
         if (!turned) {
@@ -463,6 +505,7 @@ namespace faf::remote::wire
       const bool positionFromBaseline = change && !record.farPosition;
       const QuantizedPosition baselinePosition = record.position;
       const bool yawFromBaseline = change && record.yawOnly;
+      const bool fullFromBaseline = change && !record.yawOnly;
       const std::uint32_t baselineOrientation = record.orientation;
       if ((fields & kFieldKind) != 0u) {
         record.isUnit = reader.ReadBool();
@@ -524,6 +567,20 @@ namespace faf::remote::wire
             return false;
           }
           record.orientation = static_cast<std::uint16_t>(baselineOrientation + static_cast<std::uint32_t>(UnZigZag(turn)));
+        } else if (fullFromBaseline && !record.yawOnly && reader.ReadBool()) {
+          // Entities 13: the baseline's largest component, its three others each stepped.
+          std::uint32_t packed = baselineOrientation & 3u;
+          for (int i = 0; i < 3; ++i) {
+            const int shift = 2 + i * kQuaternionComponentBits;
+            const std::uint32_t step = ReadExpGolomb(reader, kStepOrderQuaternion);
+            const std::int64_t value = static_cast<std::int64_t>((baselineOrientation >> shift) & kQuaternionComponentMask) + UnZigZag(step);
+            if (!reader.Ok() || step > 2u * kQuaternionComponentMask || value < 0 || value > kQuaternionComponentMask) {
+              reader.Fail();
+              return false;
+            }
+            packed |= static_cast<std::uint32_t>(value) << shift;
+          }
+          record.orientation = packed;
         } else {
           record.orientation = reader.ReadBits(record.yawOnly ? kYawBits : 32);
         }
@@ -1554,7 +1611,11 @@ namespace faf::remote::wire
   int OrientationFieldBits(const SEntityRecord& record, const SEntityRecord* const before) noexcept
   {
     if (!record.yawOnly) {
-      return 1 + 32;
+      if (!FullMayStep(record, before)) {
+        return 1 + 32;
+      }
+      std::array<std::uint32_t, 3> steps{};
+      return 2 + (FullSteps(record.orientation, before->orientation, steps) ? std::min(FullStepBits(steps), 32) : 32);
     }
     if (!YawMayStep(record, before)) {
       return 1 + kYawBits;
