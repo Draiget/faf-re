@@ -181,6 +181,23 @@ namespace moho
     /** This frame's shadowed region, from PrepareLightCamera, for RenderShadowMap's mesh batches. */
     ShadowCasterRegion sCasterRegion{};
 
+    /**
+     * Engine addition: `ren_ShadowTileReuse`. The finer cascade tiles take their meshes from the
+     * whole-view tile's batch, filtered by their own box (MeshRenderer::BatchFromSaved), instead of a
+     * full Batch each: a second spatial query, LOD walk and bucket build per tile.
+     */
+    bool ren_ShadowTileReuse = true;
+
+    TConVar<bool> gTConVar_ren_ShadowTileReuse(
+      "ren_ShadowTileReuse",
+      "Finer shadow tiles reuse the whole-view tile's mesh batch, filtered by their box (1, the default), or batch the "
+      "meshes again (0).",
+      &ren_ShadowTileReuse
+    );
+
+    /** The whole-view tile's buckets this frame, while finer tiles follow. */
+    std::vector<MeshRenderer::SavedBucket> sWholeTileBatch;
+
     constexpr int kCascadeTiles = static_cast<int>(gpg::gal::effects::kShadowCascadeCount);
     constexpr int kCascadeFiner = kCascadeTiles - 1;
     /** Texels around each tile's viewport the blur may smear into; nothing is drawn there. */
@@ -1033,7 +1050,16 @@ namespace moho
         device->SetViewport(&tilePos, &tileSize, savedMinDepth, savedMaxDepth);
         const GeomCamera3& camera = (tile == 0) ? mCamera : sCascadeFrame.cameras[tile - 1];
         terrain->DrawTerrainDepth(camera);
-        meshRenderer->Batch(REN_GetGameTick(), REN_GetSimDeltaSeconds(), camera, viewCamera.viewport.r[1]);
+        // Engine change (ren_ShadowTileReuse): a finer tile's box lies inside the whole-view tile's, in the same
+        // light space and depth range, so its meshes are the whole-view tile's that fall in its box.
+        if (tile > 0 && ren_ShadowTileReuse) {
+          meshRenderer->BatchFromSaved(REN_GetGameTick(), REN_GetSimDeltaSeconds(), camera, sWholeTileBatch);
+        } else {
+          meshRenderer->Batch(REN_GetGameTick(), REN_GetSimDeltaSeconds(), camera, viewCamera.viewport.r[1]);
+          if (tile == 0 && ren_ShadowTileReuse && sCascadeFrame.finer > 0) {
+            meshRenderer->SaveBatch(sWholeTileBatch);
+          }
+        }
         meshRenderer->RenderDepth(camera, meshRenderer->meshes);
       }
     } else {

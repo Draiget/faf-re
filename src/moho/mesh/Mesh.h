@@ -1210,6 +1210,24 @@ namespace moho
      */
     void Batch(std::int32_t gameTick, float deltaFrame, const GeomCamera3& camera, const Vector4f& fadePlane);
 
+    /// Engine addition (ren_ShadowTileReuse): one bucket of a saved batch.
+    struct SavedBucket
+    {
+      MeshBatchKey key;
+      std::vector<MeshInstance*> instances;
+    };
+
+    /// Engine addition (ren_ShadowTileReuse): copies the non-empty buckets of `meshes`.
+    void SaveBatch(std::vector<SavedBucket>& out) const;
+
+    /**
+     * Engine addition (ren_ShadowTileReuse): what Batch gives for `camera` when an earlier Batch of the
+     * same frame used a camera volume holding all of `camera`'s and the same fade plane. Every gate in
+     * Batch but the last sphere test is the same for both, so the saved buckets filtered by that test
+     * (and the clutter's camera) are the same instances, without a second spatial query or LOD walk.
+     */
+    void BatchFromSaved(std::int32_t gameTick, float deltaFrame, const GeomCamera3& camera, const std::vector<SavedBucket>& saved);
+
     /**
      * Address: 0x007E11C0 (FUN_007E11C0,
      * ?RenderThumbnail@MeshRenderer@Moho@@QAEXABVGeomCamera3@2@PAVMeshInstance@2@PAVID3DRenderTarget@2@PAVID3DDepthStencil@2@@Z)

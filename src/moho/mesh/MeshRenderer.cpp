@@ -1771,6 +1771,54 @@ namespace
    * effect reads its skinning palette from there. Each Batch call starts the
    * texture over: the draws of the previous map have all been issued by then.
    */
+  void MeshRenderer::SaveBatch(std::vector<SavedBucket>& out) const
+  {
+    std::size_t used = 0U;
+    for (const MeshBatchBucket& bucket : meshes) {
+      if (bucket.second.empty()) {
+        continue;
+      }
+      if (used == out.size()) {
+        out.emplace_back();
+      }
+      SavedBucket& saved = out[used++];
+      saved.key = bucket.first;
+      saved.instances.assign(bucket.second.begin(), bucket.second.end());
+    }
+    out.resize(used);
+  }
+
+  void MeshRenderer::BatchFromSaved(
+    const std::int32_t gameTick, const float deltaFrameArg, const GeomCamera3& camera, const std::vector<SavedBucket>& saved
+  )
+  {
+    RecycleBatchBuckets(meshes);
+    instanceListSize = gameTick;
+    instanceListStateFlags = 0u;
+    deltaFrame = deltaFrameArg;
+    for (const SavedBucket& source : saved) {
+      MeshBatchInstanceVector* bucket = nullptr;
+      for (MeshInstance* const instance : source.instances) {
+        if (instance->visibilityCamera != nullptr && instance->visibilityCamera != &camera) {
+          continue;
+        }
+        if (!camera.solid2.Intersects(instance->sphere)) {
+          continue;
+        }
+        if (bucket == nullptr) {
+          MeshBatchKey key = source.key;
+          bucket = MeshBatchBucketTreeFindOrCreateInstances(key, meshes);
+          if (bucket == nullptr) {
+            break;
+          }
+        }
+        bucket->push_back(instance);
+        ++instanceListStateFlags;
+      }
+    }
+    PrepareBonePalettes();
+  }
+
   void MeshRenderer::PrepareBonePalettes()
   {
     if (!HardwareMeshBatch::UsesBoneTexture()) {
