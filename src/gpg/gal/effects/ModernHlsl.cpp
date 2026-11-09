@@ -183,8 +183,10 @@ float2 faf_ray_light(float4 full)
     float2 lit;
     if (full.w < 1.5) {
         // Red only (mesh.fx): the mesh reading, from its own point.
+        // Against the traced ground with its allowance: it can lie above the drawn ground (a coarse field,
+        // tessellation), up into a unit's base.
         const bool shaded = faf_ray_blocked(meshPoint, toSun, faf_RayShadows[4].y, tMax, 2) ||
-            faf_ray_blocked(meshPoint, toSun, faf_RayShadows[4].y, tMax, 1);
+            faf_ray_blocked(meshPoint, toSun, faf_RayShadows[4].y + faf_RayShadows[7].x, tMax, 1);
         lit = shaded ? float2(0, 1) : float2(1, 1);
     } else if (full.w < 2.5) {
         // Green only (terrain.fx): the terrain reading, from its own point.
@@ -195,7 +197,7 @@ float2 faf_ray_light(float4 full)
     } else {
         lit = faf_ray_pair(start, toSun, meshT, terrainT, tMax, 2);
         if (any(lit > 0)) {
-            lit = min(lit, faf_ray_pair(start, toSun, meshT, terrainOnTerrainT, tMax, 1));
+            lit = min(lit, faf_ray_pair(start, toSun, meshT + faf_RayShadows[7].x, terrainOnTerrainT, tMax, 1));
         }
     }
     // Diagnostics (ren_RayShadowDebug): stripes 20 world units apart across x (1) or z (2) from the

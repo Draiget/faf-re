@@ -471,6 +471,10 @@ namespace gpg::gal
     sizes.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
     Vk().vkGetAccelerationStructureBuildSizesKHR(mDevice, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &build, &count, &sizes);
 
+    // Scratch first: a failure after the old structure was retired would leave set 2 unbound.
+    if (!EnsureRayScratch(sizes.buildScratchSize)) {
+      return false;
+    }
     if (mTlas == VK_NULL_HANDLE || mTlasBuffer.size < sizes.accelerationStructureSize) {
       // The new structure first: when it can't be made, the old one and its set stay bound (the lookups don't
       // trace it), so no draw runs with set 2 unbound.
@@ -513,9 +517,6 @@ namespace gpg::gal
       write.descriptorCount = 1U;
       write.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
       Vk().vkUpdateDescriptorSets(mDevice, 1U, &write, 0U, nullptr);
-    }
-    if (!EnsureRayScratch(sizes.buildScratchSize)) {
-      return false;
     }
     build.dstAccelerationStructure = mTlas;
     build.scratchData.deviceAddress = AlignUp(mRayScratch.address, mRayScratchAlignment);

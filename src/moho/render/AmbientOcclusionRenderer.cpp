@@ -375,18 +375,21 @@ namespace moho
       }
     }
 
-    // Engine addition (ren_RayAo): while the frame's shadows were traced (RayScene published its constants
-    // this frame), occlusion is traced too, and the sun's terms are the lit passes' own.
-    if (ren_RayAo > 0 && gpg::gal::effects::gRayShadows.vectors[4][0] > 0.0f &&
-        (mDevice->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureRayQuery) != 0U) {
-      constants.rayParams[0] = 1.0f;
-      constants.rayParams[1] = static_cast<float>(std::clamp(ren_RayAoRays, 1, 16));
-      constants.rayParams[2] = std::max(ren_RayAoLift, 0.0f);
-      constants.rayParams[3] = gpg::gal::effects::gRayShadows.vectors[7][1];
+    // Engine addition (ren_RayTracedShadows / ren_RayAo): while the frame's shadows are traced (RayScene published
+    // its constants this frame), the sun's terms are the lit passes' own: no contact shadows (they read a shadow map
+    // that no longer holds the ground and opaque meshes) and no terrain-shadow bake (the rays shade hills), with or
+    // without ren_RayAo. With it, occlusion is traced too.
+    if (gpg::gal::effects::gRayShadows.vectors[4][0] > 0.0f) {
       constants.sun[3] = 0.0f;
       constants.terrainGrid[3] = 0.0f;
       constants.shadowParams[0] = 0.0f;
       shadowSurface = {};
+      if (ren_RayAo > 0 && (mDevice->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureRayQuery) != 0U) {
+        constants.rayParams[0] = 1.0f;
+        constants.rayParams[1] = static_cast<float>(std::clamp(ren_RayAoRays, 1, 16));
+        constants.rayParams[2] = std::max(ren_RayAoLift, 0.0f);
+        constants.rayParams[3] = gpg::gal::effects::gRayShadows.vectors[7][1];
+      }
     }
 
     gpg::gal::GpuDispatch dispatch{};
