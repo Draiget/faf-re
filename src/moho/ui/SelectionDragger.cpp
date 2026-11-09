@@ -22,6 +22,8 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/console/CConCommand.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 #include "moho/terrain/splat/CWldSplat.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/UserUnit.h"
@@ -335,8 +337,79 @@ namespace moho
 
 
     if (!HasActiveSelectionDrag()) {
+      if (moho::IsFactoryPreOrdersEnabled()) {
+        auto& pfm = moho::PlannedFactoryManager::Get();
+        PlannedUnitProxy* hitProxy = nullptr;
+        if (mCam != nullptr) {
+          const GeomCamera3& cameraView = mCam->CameraGetView();
+          const float mouseX = eventData != nullptr ? static_cast<float>(eventData->mMousePos.x) : mX0;
+          const float mouseY = eventData != nullptr ? static_cast<float>(eventData->mMousePos.y) : mY0;
+          hitProxy = pfm.HitTestScreenPoint(&cameraView, mouseX, mouseY, 30.0f);
+        }
+        if (hitProxy == nullptr && mSess != nullptr) {
+          hitProxy = pfm.FindByPosition(
+            Vector3f{mSess->CursorInfo().mMouseWorldPos.x, mSess->CursorInfo().mMouseWorldPos.y, mSess->CursorInfo().mMouseWorldPos.z},
+            3.0f
+          );
+        }
+
+        if (hitProxy != nullptr) {
+          const bool isShift = eventData != nullptr && (eventData->mModifiers & MEM_Shift) != 0u;
+          if (isShift) {
+            if (hitProxy->IsSelected()) {
+              pfm.DeselectProxy(hitProxy->mProxyId);
+            } else {
+              pfm.SelectProxy(hitProxy->mProxyId, true);
+            }
+          } else {
+            WeakSet<UserEntity> emptySelection;
+            mSess->SetSelection(emptySelection);
+            pfm.ClearSelection();
+            pfm.SelectProxy(hitProxy->mProxyId, false);
+          }
+          return;
+        } else {
+          const bool isShift = eventData != nullptr && (eventData->mModifiers & (MEM_Shift | MEM_Ctrl)) != 0u;
+          if (!isShift) {
+            pfm.ClearSelection();
+          }
+        }
+      }
+
       mSess->ReleaseDrag(eventData->mModifiers);
       return;
+    }
+
+    if (moho::IsFactoryPreOrdersEnabled() && mCam != nullptr) {
+      auto& pfm = moho::PlannedFactoryManager::Get();
+      float x1 = eventData != nullptr ? static_cast<float>(eventData->mMousePos.x) : mX0;
+      float y1 = eventData != nullptr ? static_cast<float>(eventData->mMousePos.y) : mY0;
+      if (const auto* d2d = dynamic_cast<const SelectionDragger2D*>(this)) {
+        x1 = d2d->mX1;
+        y1 = d2d->mY1;
+      }
+      const float minX = std::min(mX0, x1);
+      const float maxX = std::max(mX0, x1);
+      const float minY = std::min(mY0, y1);
+      const float maxY = std::max(mY0, y1);
+
+      const GeomCamera3& cameraView = mCam->CameraGetView();
+      const auto hitProxies = pfm.HitTestScreenRect(&cameraView, minX, minY, maxX, maxY);
+
+      if ((eventData->mModifiers & MEM_Shift) != 0u) {
+        for (auto* proxy : hitProxies) {
+          if (proxy != nullptr) {
+            pfm.SelectProxy(proxy->mProxyId, true);
+          }
+        }
+      } else {
+        pfm.ClearSelection();
+        for (auto* proxy : hitProxies) {
+          if (proxy != nullptr) {
+            pfm.SelectProxy(proxy->mProxyId, true);
+          }
+        }
+      }
     }
 
     WeakSet<UserEntity> draggedSelection;

@@ -1236,6 +1236,9 @@ namespace moho
       }
     }
 
+    // Suppress redundant secondary buffering in ISSUE_Command during this issue batch
+    PlannedFactoryManager::ScopedBufferingSuppression suppressBuffering;
+
     // Silo builds bypass the command-issue pipeline (mirrors cfunc_IssueCommandL):
     // forward each selected entity id to the sync-driver as an "add" info-pair.
     if (commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical

@@ -11,6 +11,9 @@
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/PlannedFactoryProxy.h"
+#include "moho/entity/EntityCategoryReflection.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/sim/RRuleGameRules.h"
 
 #include <algorithm>
 #include <array>
@@ -715,7 +718,7 @@ namespace moho
       if (!selectedProxies.empty()) {
         if (data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile
             || data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildFactory) {
-          if (units.empty() && data.mBlueprint != nullptr && !data.mBlueprint->mBlueprintId.empty()) {
+          if (!mgr.IsBufferingSuppressed() && data.mBlueprint != nullptr && !data.mBlueprint->mBlueprintId.empty()) {
             const std::string bpId = data.mBlueprint->mBlueprintId.c_str();
             mgr.QueuePlannedFactoryOrders(bpId, 1, clearQueue);
           }
@@ -861,11 +864,44 @@ namespace moho
 
       if (clearQueue) {
         ResetUserUnitManagerState(unitManager, issueBeat);
+        if (moho::IsFactoryPreOrdersEnabled()) {
+          PlannedFactoryManager::Get().RemoveByBuilder(unit->mParams.mEntityId);
+        }
       }
       // The add's last argument is `data.mIndex` (`[esp+0x148]`, i.e. data+0x08
       // once LTCG's `units, clearQueue, data` stack order is accounted for),
       // not the clear flag; -1 appends.
+      const std::uint32_t cmdIndex = static_cast<std::uint32_t>(GetUserUnitManagerQueueSize(unitManager));
       UserUnitManagerAdd(unitManager, commandHelper, issueBeat, data.mIndex);
+
+      if (moho::IsFactoryPreOrdersEnabled()) {
+        if (data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile) {
+          bool isFactory = false;
+          if (data.mBlueprint != nullptr) {
+            for (const auto& cat : data.mBlueprint->mCategories) {
+              if (cat == "FACTORY") {
+                isFactory = true;
+                break;
+              }
+            }
+            if (!isFactory && session != nullptr && session->mRules != nullptr) {
+              const EntityCategorySet* const factoryCat = session->mRules->GetEntityCategory("FACTORY");
+              if (factoryCat != nullptr && EntityCategory::HasBlueprint(data.mBlueprint, factoryCat)) {
+                isFactory = true;
+              }
+            }
+          }
+          if (isFactory) {
+            const Vector3f targetPos{data.mTarget.mPos.x, data.mTarget.mPos.y, data.mTarget.mPos.z};
+            PlannedFactoryManager::Get().RegisterOrUpdatePlannedFactory(
+              unit->mParams.mEntityId,
+              cmdIndex,
+              data.mBlueprint,
+              targetPos
+            );
+          }
+        }
+      }
     }
 
     UI_OnCommandIssued(units, data, clearQueue);

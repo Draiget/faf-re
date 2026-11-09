@@ -764,3 +764,44 @@ TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersToleranceAndPositionMiss)
 
   mgr.ClearAll();
 }
+
+TEST(PlannedFactoryPreOrdersTest, BufferingSuppressionScopeDeDuplicatesOrders)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  EXPECT_FALSE(mgr.IsBufferingSuppressed());
+
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(100, 0, nullptr, {10.0f, 0.0f, 10.0f});
+  ASSERT_NE(proxy, nullptr);
+  mgr.SelectProxy(proxy->mProxyId, false);
+
+  {
+    moho::PlannedFactoryManager::ScopedBufferingSuppression suppression;
+    EXPECT_TRUE(mgr.IsBufferingSuppressed());
+  }
+
+  EXPECT_FALSE(mgr.IsBufferingSuppressed());
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, BuilderQueueRemovalAndDeathCleanup)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  // Builder 50 issues construct order for factory at (20, 0, 30)
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(50, 0, nullptr, {20.0f, 0.0f, 30.0f});
+  ASSERT_NE(proxy, nullptr);
+  proxy->AddPreOrder("uel0201", 3);
+  EXPECT_EQ(mgr.GetCount(), 1u);
+
+  // Builder dies or queue is cleared -> RemoveByBuilder cleans up proxy
+  mgr.RemoveByBuilder(50);
+  EXPECT_EQ(mgr.GetCount(), 0u);
+  EXPECT_EQ(mgr.FindByPosition({20.0f, 0.0f, 30.0f}, 1.0f), nullptr);
+
+  mgr.ClearAll();
+}

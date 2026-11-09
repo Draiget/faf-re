@@ -627,10 +627,10 @@ namespace moho
         (void)gpg::STR_InitFilename(&bpResId.name, order.blueprintId.c_str());
         REntityBlueprint* const bp = session->mRules->GetEntityBlueprint(bpResId);
         if (bp != nullptr) {
-          SSTICommandIssueData factoryCommand(EUnitCommandType::UNITCOMMAND_BuildMobile);
+          SSTICommandIssueData factoryCommand(EUnitCommandType::UNITCOMMAND_BuildFactory);
           factoryCommand.mBlueprint = static_cast<RUnitBlueprint*>(bp);
           for (int i = 0; i < order.count; ++i) {
-            ISSUE_Command(targetUnits, factoryCommand, false);
+            ISSUE_FactoryCommand(targetUnits, factoryCommand, false);
           }
         }
       }
@@ -640,7 +640,7 @@ namespace moho
       SSTICommandIssueData rallyCommand(EUnitCommandType::UNITCOMMAND_Move);
       rallyCommand.mTarget.mType = EAiTargetType::AITARGET_Ground;
       rallyCommand.mTarget.mPos = proxy->mRallyPoint;
-      ISSUE_Command(targetUnits, rallyCommand, false);
+      ISSUE_FactoryCommand(targetUnits, rallyCommand, false);
     }
 
     if (proxy->mRepeatBuild) {

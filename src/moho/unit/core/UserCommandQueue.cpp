@@ -1,4 +1,6 @@
 #include "moho/unit/core/UserUnitPrivate.h"
+#include "moho/console/CConCommand.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 
 namespace
 {
@@ -135,6 +137,9 @@ namespace moho
     }
 
     auto& manager = *managerPtr;
+    if (manager.ownerUnit != nullptr && moho::IsFactoryPreOrdersEnabled()) {
+      moho::PlannedFactoryManager::Get().RemoveByBuilder(manager.ownerUnit->mParams.mEntityId);
+    }
     manager.issueQueue.clear();
     manager.issueQueue.push_back(UserManagerHelperEntry(commandType, EUserQueueEdit::Reset, nullptr, -1));
 
@@ -152,6 +157,22 @@ namespace moho
     const std::int32_t tag
   ) noexcept
   {
+    if (manager != nullptr && manager->ownerUnit != nullptr && helper != nullptr && moho::IsFactoryPreOrdersEnabled()) {
+      if (helper->mVariableData.mCmdType == EUnitCommandType::UNITCOMMAND_BuildMobile) {
+        const Vector3f targetPos{
+          helper->mVariableData.mTarget1.mPos.x,
+          helper->mVariableData.mTarget1.mPos.y,
+          helper->mVariableData.mTarget1.mPos.z
+        };
+        if (auto* proxy = moho::PlannedFactoryManager::Get().FindByPosition(targetPos, 2.0f)) {
+          proxy->RemoveAllBuildersFor(manager->ownerUnit->mParams.mEntityId);
+          if (proxy->mBuilders.empty()) {
+            (void)moho::PlannedFactoryManager::Get().RemoveProxy(proxy->mProxyId);
+          }
+        }
+      }
+    }
+
     manager->issueQueue.push_back(UserManagerHelperEntry(tag, EUserQueueEdit::Remove, helper, -1));
 
     QueueCommandIssueDeselectUnitEvent(helper, static_cast<CmdId>(tag), manager->ownerUnit);

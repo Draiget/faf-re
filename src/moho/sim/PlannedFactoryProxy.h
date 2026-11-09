@@ -150,6 +150,15 @@ namespace moho
     void SetSelectedPlannedFactoriesRallyPoint(const Vector3f& pos);
     void SetSelectedPlannedFactoriesRepeat(bool repeat);
 
+    void SetBufferingSuppressed(bool suppressed) noexcept { mBufferingSuppressed = suppressed; }
+    [[nodiscard]] bool IsBufferingSuppressed() const noexcept { return mBufferingSuppressed; }
+
+    struct ScopedBufferingSuppression
+    {
+      ScopedBufferingSuppression() { PlannedFactoryManager::Get().SetBufferingSuppressed(true); }
+      ~ScopedBufferingSuppression() { PlannedFactoryManager::Get().SetBufferingSuppressed(false); }
+    };
+
     // 3D Ray hit test
     [[nodiscard]] PlannedUnitProxy* HitTestRay(const Ray3f& ray, float radius = 5.0f);
     [[nodiscard]] const PlannedUnitProxy* HitTestRay(const Ray3f& ray, float radius = 5.0f) const;
@@ -216,5 +225,6 @@ namespace moho
     std::uint32_t mNextProxyId{1};
     std::vector<std::unique_ptr<PlannedUnitProxy>> mProxies;
     DispatchHook mDispatchHook{nullptr};
+    bool mBufferingSuppressed{false};
   };
 }
