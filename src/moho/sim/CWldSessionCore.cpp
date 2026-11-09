@@ -2,6 +2,7 @@
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SimKeyframe.h"
 #include "moho/sim/CWldSessionPrivate.h"
+#include "moho/sim/CBackgroundTaskControl.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 
@@ -326,7 +327,11 @@ namespace
       const bool hadBodies = terrainRes->mMap->HasWaterBodies();
       terrainRes->mMap->InstallWaterBodies(mScenarioInfo);
       if (hadBodies || terrainRes->mMap->HasWaterBodies()) {
-        terrainRes->UpdateWaterMap();
+        // As the map load does: edit mode holds the water map's pixel buffer, and entering it
+        // rebuilds the whole water map (now with the bodies); leaving it uploads that.
+        CBackgroundTaskControl loadControl{};
+        terrainRes->EnterEditMode(loadControl);
+        terrainRes->ExitEditMode();
       }
     }
 

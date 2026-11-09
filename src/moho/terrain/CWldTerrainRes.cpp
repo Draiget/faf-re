@@ -385,6 +385,14 @@ namespace
     const std::int32_t halfX1 = std::min(updateRect.x1, field.width - 1) >> 1;
     const std::int32_t halfZ1 = std::min(updateRect.z1, field.height - 1) >> 1;
     const auto halfMapWidth = static_cast<std::uint32_t>(static_cast<std::uint32_t>(field.width - 1) >> 1u);
+    // The pixel buffer exists only between EnterEditMode and the end of the load; outside it
+    // there is nothing to write into (the caller enters edit mode first).
+    const auto texelCount = static_cast<std::size_t>(halfMapWidth) * static_cast<std::size_t>((field.height - 1) >> 1);
+    if (terrainRes.mEditWordBuffer.begin == nullptr || terrainRes.mWaterFoam == nullptr || terrainRes.mWaterFlatness == nullptr ||
+        static_cast<std::size_t>(terrainRes.mEditWordBuffer.capacityEnd - terrainRes.mEditWordBuffer.begin) < texelCount) {
+      gpg::Warnf("Water bodies: the water map has no pixel buffer to rebuild");
+      return;
+    }
 
     for (std::int32_t halfZ = halfZ0; halfZ < halfZ1; ++halfZ) {
       const std::int32_t worldZ = halfZ * 2;
