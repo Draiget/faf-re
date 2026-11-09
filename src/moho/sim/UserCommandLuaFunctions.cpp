@@ -367,10 +367,7 @@ namespace
   constexpr const char* kIssueDockCommandName = "IssueDockCommand";
   constexpr const char* kIssueUnitCommandHelpText = "IssueUnitCommand(unitList,command,[string],[clear])";
   constexpr const char* kIssueUnitCommandName = "IssueUnitCommand";
-  constexpr const char* kIssueTransportPreOrderName = "IssueTransportPreOrder";
-  constexpr const char* kIssueTransportPreOrderHelpText =
-    "IssueTransportPreOrder(unitList, command, [targetData], [clearQueue])";
-  constexpr const char* kIsTransportPreOrdersEnabledName = "IsTransportPreOrdersEnabled";
+constexpr const char* kIsTransportPreOrdersEnabledName = "IsTransportPreOrdersEnabled";
   constexpr const char* kIsTransportPreOrdersEnabledHelpText =
     "IsTransportPreOrdersEnabled() -> bool - returns whether transport cargo pre-orders and drop ghosts are enabled";
   constexpr const char* kOpenURLHelpText =
@@ -723,8 +720,7 @@ namespace
 namespace moho
 {
   int cfunc_IssueUnitCommandL(LuaPlus::LuaState* state);
-  int cfunc_IssueTransportPreOrderL(LuaPlus::LuaState* state);
-  int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
+int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
 
   int cfunc_IssueBlueprintCommandL(LuaPlus::LuaState* state);
 
@@ -905,27 +901,7 @@ namespace moho
    * Publishes global Lua binder
    * `IssueBlueprintCommand(command, blueprintid, count, clear = false)`.
    */
-  /**
-   * Address: Unmapped (FA-Binary-Patches addition)
-   *
-   * What it does:
-   * Publishes global Lua binder
-   * `IssueTransportPreOrder(unitList, command, [targetData], [clearQueue])`.
-   */
-  CScrLuaInitForm* func_IssueTransportPreOrder_LuaFuncDef()
-  {
-    static CScrLuaBinder binder(
-      moho::SCR_UserLuaInitSet(),
-      kIssueTransportPreOrderName,
-      &moho::cfunc_IssueTransportPreOrder,
-      nullptr,
-      "<global>",
-      kIssueTransportPreOrderHelpText
-    );
-    return &binder;
-  }
-
-  /**
+/**
    * Address: Unmapped (FA-Binary-Patches addition)
    *
    * What it does:
@@ -1448,243 +1424,7 @@ namespace moho
     return static_cast<UserUnit*>(upcast.mObj);
   }
 
-  /**
-   * Address: Unmapped (FA-Binary-Patches addition)
-   *
-   * What it does:
-   * Queues pre-orders for transport cargo units to execute upon disembarkation.
-   */
-  int cfunc_IssueTransportPreOrderL(LuaPlus::LuaState* const state)
-  {
-    if (state == nullptr || state->m_state == nullptr) {
-      return 0;
-    }
-
-    if (!ui_TransportPreOrders) {
-      lua_pushboolean(state->m_state, 0);
-      return 1;
-    }
-
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount < 2 || argumentCount > 4) {
-      LuaPlus::LuaState::Error(
-        state,
-        "%s\n  expected between %d and %d args, but got %d",
-        kIssueTransportPreOrderHelpText,
-        2,
-        4,
-        argumentCount
-      );
-      return 0;
-    }
-
-    std::vector<UserUnit*> units{};
-    CWldSession* const session = WLD_GetActiveSession();
-
-    auto tryAddUnit = [&](const LuaPlus::LuaObject& obj) {
-      if (UserUnit* const unit = TryFromLua_UserUnit(obj)) {
-        units.push_back(unit);
-        return;
-      }
-      if (session != nullptr) {
-        EntId entId = 0;
-        if (obj.IsNumber()) {
-          entId = static_cast<EntId>(obj.GetInteger());
-        } else if (obj.IsString()) {
-          entId = static_cast<EntId>(std::atoi(obj.GetString()));
-        } else if (obj.IsTable()) {
-          const LuaPlus::LuaObject idObj = obj["id"];
-          if (idObj.IsNumber()) {
-            entId = static_cast<EntId>(idObj.GetInteger());
-          } else {
-            const LuaPlus::LuaObject entIdObj = obj["EntityId"];
-            if (entIdObj.IsNumber()) {
-              entId = static_cast<EntId>(entIdObj.GetInteger());
-            }
-          }
-        }
-        if (entId != 0) {
-          if (UserEntity* const e = session->LookupEntityId(entId)) {
-            if (UserUnit* const u = e->IsUserUnit()) {
-              units.push_back(u);
-            }
-          }
-        }
-      }
-    };
-
-    if (lua_type(rawState, 1) == LUA_TTABLE) {
-      const LuaPlus::LuaObject unitListObject(LuaPlus::LuaStackObject(state, 1));
-      for (LuaPlus::LuaTableIterator iter(unitListObject, 1); !iter.m_isDone; iter.Next()) {
-        tryAddUnit(iter.m_valueObj);
-      }
-    } else {
-      const LuaPlus::LuaObject singleUnitObject(LuaPlus::LuaStackObject(state, 1));
-      tryAddUnit(singleUnitObject);
-    }
-
-    if (units.empty()) {
-      gpg::Warnf("TransportDropGhosts: IssueTransportPreOrder called with 0 valid units!");
-      lua_pushboolean(rawState, 0);
-      return 1;
-    }
-
-    const LuaPlus::LuaStackObject commandArg(state, 2);
-    const char* const commandLexical = lua_tostring(rawState, 2);
-    if (commandLexical == nullptr) {
-      commandArg.TypeError("string");
-      return 0;
-    }
-
-    EUnitCommandType commandType = EUnitCommandType::UNITCOMMAND_None;
-    if (!TryParseUnitCommandTypeLexical(commandLexical, commandType)
-        || commandType == EUnitCommandType::UNITCOMMAND_None) {
-      lua_pushboolean(rawState, 0);
-      return 1;
-    }
-
-    SSTICommandIssueData data(commandType);
-
-    if (argumentCount >= 3 && !LuaPlus::LuaStackObject(state, 3).IsNil()) {
-      const LuaPlus::LuaObject targetArg(LuaPlus::LuaStackObject(state, 3));
-      data.mObject = targetArg;
-
-      // 1. Try entity target
-      UserEntity* targetEntity = nullptr;
-      if (UserEntity* const directEntity = TryFromLua_UserEntity(targetArg)) {
-        targetEntity = directEntity;
-      } else if (targetArg.IsTable()) {
-        const LuaPlus::LuaObject entObj = targetArg["targetEntity"];
-        if (!entObj.IsNil()) {
-          targetEntity = TryFromLua_UserEntity(entObj);
-        } else {
-          const LuaPlus::LuaObject entObj2 = targetArg["entity"];
-          if (!entObj2.IsNil()) {
-            targetEntity = TryFromLua_UserEntity(entObj2);
-          }
-        }
-      }
-
-      // 2. Extract ground position
-      LuaPlus::LuaObject posObj = targetArg;
-      if (targetArg.IsTable() && !targetArg["Position"].IsNil()) {
-        posObj = targetArg["Position"];
-      }
-
-      float posX = 0.0f, posY = 0.0f, posZ = 0.0f;
-      bool hasPos = false;
-
-      if (posObj.IsTable()) {
-        if (posObj[1].IsNumber() && posObj[3].IsNumber()) {
-          posX = static_cast<float>(posObj[1].GetNumber());
-          posY = posObj[2].IsNumber() ? static_cast<float>(posObj[2].GetNumber()) : 0.0f;
-          posZ = static_cast<float>(posObj[3].GetNumber());
-          hasPos = true;
-        } else if (posObj["x"].IsNumber() && posObj["z"].IsNumber()) {
-          posX = static_cast<float>(posObj["x"].GetNumber());
-          posY = posObj["y"].IsNumber() ? static_cast<float>(posObj["y"].GetNumber()) : 0.0f;
-          posZ = static_cast<float>(posObj["z"].GetNumber());
-          hasPos = true;
-        }
-      }
-
-      if (!hasPos && targetEntity != nullptr) {
-        posX = targetEntity->mTransform.pos_.x;
-        posY = targetEntity->mTransform.pos_.y;
-        posZ = targetEntity->mTransform.pos_.z;
-        hasPos = true;
-      }
-
-      constexpr std::uint32_t kGroundTargetEntityIdTag = 0xF0000000u;
-      if (commandType == EUnitCommandType::UNITCOMMAND_BuildMobile) {
-        data.mTarget.mType = EAiTargetType::AITARGET_Ground;
-        data.mTarget.mEntityId = (targetEntity != nullptr)
-          ? static_cast<std::uint32_t>(targetEntity->mParams.mEntityId)
-          : kGroundTargetEntityIdTag;
-        data.mTarget.mPos = Wm3::Vec3f(posX, posY, posZ);
-      } else if (targetEntity != nullptr) {
-        data.mTarget.mType = EAiTargetType::AITARGET_Entity;
-        data.mTarget.mEntityId = static_cast<std::uint32_t>(targetEntity->mParams.mEntityId);
-        data.mTarget.mPos = Wm3::Vec3f(0.0f, 0.0f, 0.0f);
-      } else if (targetArg.IsTable() && targetArg["EntityId"].IsNumber()) {
-        data.mTarget.mType = EAiTargetType::AITARGET_Entity;
-        data.mTarget.mEntityId = static_cast<std::uint32_t>(targetArg["EntityId"].GetInteger());
-        data.mTarget.mPos = Wm3::Vec3f(0.0f, 0.0f, 0.0f);
-      } else if (hasPos) {
-        data.mTarget.mType = EAiTargetType::AITARGET_Ground;
-        data.mTarget.mEntityId = kGroundTargetEntityIdTag;
-        data.mTarget.mPos = Wm3::Vec3f(posX, posY, posZ);
-      }
-
-      // 3. Blueprint lookup for Build/Construct commands
-      if (session != nullptr && session->mRules != nullptr && targetArg.IsTable()) {
-        const char* bpName = nullptr;
-        if (targetArg["blueprintId"].IsString()) {
-          bpName = targetArg["blueprintId"].GetString();
-        } else if (targetArg["blueprint"].IsString()) {
-          bpName = targetArg["blueprint"].GetString();
-        } else if (targetArg["BlueprintId"].IsString()) {
-          bpName = targetArg["BlueprintId"].GetString();
-        }
-
-        if (bpName != nullptr && bpName[0] != '\0') {
-          RResId blueprintResId{};
-          gpg::STR_InitFilename(&blueprintResId.name, bpName);
-          REntityBlueprint* const bp = session->mRules->GetEntityBlueprint(blueprintResId);
-          if (bp != nullptr) {
-            data.mBlueprint = static_cast<RUnitBlueprint*>(bp);
-          }
-        }
-      }
-    }
-
-    bool clearQueue = false;
-    if (argumentCount >= 4) {
-      clearQueue = LuaPlus::LuaStackObject(state, 4).GetBoolean();
-    }
-
-    if (session != nullptr && data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && data.mBlueprint != nullptr) {
-      const SCoordsVec2 buildPos{data.mTarget.mPos.x, data.mTarget.mPos.z};
-      SOccupationResult buildInfo{};
-      if (!USERUNIT_CanBeBuiltAt(*session, data.mBlueprint, buildPos, false, &buildInfo, nullptr)) {
-        gpg::Warnf(
-          "TransportDropGhosts: IssueTransportPreOrder BuildMobile rejected: invalid terrain or overlapping building at (%.1f, %.1f)",
-          data.mTarget.mPos.x,
-          data.mTarget.mPos.z
-        );
-        lua_pushboolean(rawState, 0);
-        return 1;
-      }
-      data.mTarget.mPos = buildInfo.pos;
-    }
-
-    UserUnit::QueueTransportPreOrders(units, data, clearQueue);
-
-    gpg::Warnf(
-      "TransportDropGhosts: Queued pre-order %s for %zu unit(s), clearQueue=%d",
-      commandLexical,
-      units.size(),
-      clearQueue ? 1 : 0
-    );
-
-    lua_pushboolean(rawState, 1);
-    return 1;
-  }
-
-  /**
-   * Address: Unmapped (FA-Binary-Patches addition)
-   *
-   * What it does:
-   * Unwraps raw Lua callback context and forwards to
-   * `cfunc_IssueTransportPreOrderL`.
-   */
-  int cfunc_IssueTransportPreOrder(lua_State* const luaContext)
-  {
-    return cfunc_IssueTransportPreOrderL(moho::SCR_ResolveBindingState(luaContext));
-  }
-
-  /**
+/**
    * Address: Unmapped (FA-Binary-Patches addition)
    *
    * What it does:
@@ -2870,8 +2610,7 @@ namespace
       (void)::moho::func_IssueDockCommand_LuaFuncDef();
       (void)::moho::func_IssueCommand_LuaFuncDef();
       (void)::moho::func_IssueUnitCommand_LuaFuncDef();
-      (void)::moho::func_IssueTransportPreOrder_LuaFuncDef();
-      (void)::moho::func_IsTransportPreOrdersEnabled_LuaFuncDef();
+(void)::moho::func_IsTransportPreOrdersEnabled_LuaFuncDef();
       (void)::moho::func_IssueBlueprintCommand_LuaFuncDef();
       (void)::moho::func_GetRolloverInfo_LuaFuncDef();
       (void)::moho::func_UISelectionByCategory_LuaFuncDef();

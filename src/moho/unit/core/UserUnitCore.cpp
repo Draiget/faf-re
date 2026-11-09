@@ -919,7 +919,7 @@ void UserUnit::QueueTransportPreOrder(const SSTICommandIssueData& order, bool cl
       );
       if (!placeable) {
         gpg::Warnf(
-          "TransportDropGhosts: Pre-order build rejected (cannot be built at %.1f, %.1f)",
+          "TransportPreOrders: Pre-order build rejected (cannot be built at %.1f, %.1f)",
           finalOrder.mTarget.mPos.x,
           finalOrder.mTarget.mPos.z
         );
@@ -940,29 +940,6 @@ void UserUnit::ClearTransportPreOrders()
     sDispatchedPreOrderBuilders.clear();
     sDisembarkedWaitTicks.clear();
   }
-}
-
-bool UserUnit::RemoveTransportPreOrder(const std::size_t index)
-{
-  const auto it = sTransportPreOrders.find(this->mParams.mEntityId);
-  if (it == sTransportPreOrders.end() || index >= it->second.size()) {
-    return false;
-  }
-  it->second.erase(it->second.begin() + index);
-  if (it->second.empty()) {
-    sTransportPreOrders.erase(it);
-  }
-  return true;
-}
-
-bool UserUnit::UpdateTransportPreOrderPosition(const std::size_t index, const Wm3::Vector3f& newPos)
-{
-  const auto it = sTransportPreOrders.find(this->mParams.mEntityId);
-  if (it == sTransportPreOrders.end() || index >= it->second.size()) {
-    return false;
-  }
-  it->second[index].mTarget.mPos = newPos;
-  return true;
 }
 
 bool UserUnit::RemoveTransportPreOrderById(const std::int32_t commandId)
@@ -1170,7 +1147,7 @@ void UserUnit::DispatchDisembarkedPreOrders()
   }
 
   gpg::Warnf(
-    "TransportDropGhosts: Dispatched %zu disembarked pre-orders for %zu units in group (cmdId %d)",
+    "TransportPreOrders: Dispatched %zu disembarked pre-orders for %zu units in group (cmdId %d)",
     preOrders.size(),
     groupUnits.size(),
     groupCommandId

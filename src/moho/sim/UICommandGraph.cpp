@@ -1950,7 +1950,7 @@ namespace
         DrawCommandOrderline(camera, batcher, tick, tickFraction, *edge, /*isGlow=*/false);
       }
     }
-    DrawPreOrderlines(camera, batcher, tick, tickFraction, /*isGlow=*/false);
+    DrawPreOrderLines(camera, batcher, tick, tickFraction, /*isGlow=*/false);
     batcher.Flush();
 
     // Pass B: glow overlay for the same orderlines.
@@ -1964,7 +1964,7 @@ namespace
         DrawCommandOrderline(camera, batcher, tick, tickFraction, *edge, /*isGlow=*/true);
       }
     }
-    DrawPreOrderlines(camera, batcher, tick, tickFraction, /*isGlow=*/true);
+    DrawPreOrderLines(camera, batcher, tick, tickFraction, /*isGlow=*/true);
     batcher.Flush();
 
     // Pass C: waypoint marker billboards.
@@ -2987,7 +2987,7 @@ namespace
     sPreOrderGhostMeshes.clear();
   }
 
-  void UICommandGraph::DrawPreOrderlines(
+  void UICommandGraph::DrawPreOrderLines(
     const GeomCamera3& camera, CD3DPrimBatcher& batcher, const std::int32_t tick, const float tickFraction, const bool isGlow
   ) const
   {
