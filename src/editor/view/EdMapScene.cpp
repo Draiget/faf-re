@@ -78,7 +78,7 @@ namespace faf::editor
     const std::optional<EdDocument::PlayableRect> area = mMap != nullptr ? mDocument.PlayableArea() : std::nullopt;
     if (mMap == nullptr || mCamera == nullptr || mTools == nullptr ||
         (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && mSelection.empty() && !area &&
-         mDocument.SaveData().Markers().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive()) ||
+         mDocument.SaveData().Markers().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive() && !mTools->UnitsToolActive()) ||
         moho::ren_Viewport == nullptr) {
       return;
     }
@@ -281,6 +281,22 @@ namespace faf::editor
     }
     if (mTools->DecalsToolActive()) {
       DrawDecalOutlines(*batcher, *field);
+    }
+    // The selected units, ringed in yellow.
+    if (mTools->UnitsToolActive()) {
+      for (const auto& [army, name] : mUnitSelection) {
+        const int index = UnitRefIndex(army, name);
+        if (index < 0) {
+          continue;
+        }
+        const Wm3::Vec3f& p = mUnitRefs[static_cast<std::size_t>(index)].position;
+        for (int s = 0; s < 24; ++s) {
+          const float a0 = 2.0f * kPi * static_cast<float>(s) / 24.0f;
+          const float a1 = 2.0f * kPi * static_cast<float>(s + 1) / 24.0f;
+          batcher->DrawLine(groundVertex(p.x + std::cos(a0) * 1.5f, p.z + std::sin(a0) * 1.5f, 0xF0FFE040u),
+                            groundVertex(p.x + std::cos(a1) * 1.5f, p.z + std::sin(a1) * 1.5f, 0xF0FFE040u));
+        }
+      }
     }
     DrawGizmo(*batcher);
     if (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive()) {
@@ -1285,6 +1301,8 @@ namespace faf::editor
         instance->SetStance(transform, transform);
         instance->isHidden = 0;
         mUnits.push_back(instance);
+        UnitRef ref{army.name, unit->name, transform.pos_, {unit->orientation[0], unit->orientation[1], unit->orientation[2]}};
+        mUnitRefs.push_back(std::move(ref));
         ++drawn;
       }
     }
@@ -1373,7 +1391,9 @@ namespace faf::editor
     mDocument.RestoreSaveData(redo ? step.second : step.first);
     to.push_back(std::move(step));
     mOutsideStale = true;
-    gpg::Logf("editor: %s a markers/areas edit: %zu markers", redo ? "redid" : "undid", mDocument.SaveData().Markers().size());
+    ReloadUnits();
+    gpg::Logf("editor: %s a save edit (markers, areas, armies, units): %zu markers, %zu units", redo ? "redid" : "undid",
+              mDocument.SaveData().Markers().size(), mUnitRefs.size());
     return true;
   }
 
@@ -1468,6 +1488,17 @@ namespace faf::editor
           sx += x;
           sy += y;
           sz += z;
+          ++count;
+        }
+      }
+    } else if (mTools->UnitsToolActive() && !mTools->UnitPlaceMode()) {
+      for (const auto& [army, name] : mUnitSelection) {
+        const int index = UnitRefIndex(army, name);
+        if (index >= 0) {
+          const Wm3::Vec3f& p = mUnitRefs[static_cast<std::size_t>(index)].position;
+          sx += p.x;
+          sy += p.y;
+          sz += p.z;
           ++count;
         }
       }
@@ -2732,15 +2763,205 @@ namespace faf::editor
     return mDetails;
   }
 
-  void EdMapScene::DeleteProps()
+  void EdMapScene::DeleteUnits()
   {
-    DeletePropPreview();
     if (moho::MeshRenderer::GetInstance() != nullptr) {
       for (moho::MeshInstance* const instance : mUnits) {
         delete instance;
       }
     }
     mUnits.clear();
+    mUnitRefs.clear();
+  }
+
+  void EdMapScene::ReloadUnits()
+  {
+    DeleteUnits();
+    CreateUnits();
+    mUnitSelection.erase(std::remove_if(mUnitSelection.begin(), mUnitSelection.end(),
+                                        [&](const auto& unit) { return UnitRefIndex(unit.first, unit.second) < 0; }),
+                         mUnitSelection.end());
+  }
+
+  int EdMapScene::UnitRefIndex(const std::string& army, const std::string& name) const
+  {
+    for (std::size_t i = 0; i < mUnitRefs.size(); ++i) {
+      if (mUnitRefs[i].name == name && mUnitRefs[i].army == army) {
+        return static_cast<int>(i);
+      }
+    }
+    return -1;
+  }
+
+  int EdMapScene::PickUnit(const float x, const float z) const
+  {
+    const float reach = std::max(3.0f, mDistance * 0.01f);
+    int best = -1;
+    float bestDistance = reach;
+    for (std::size_t i = 0; i < mUnitRefs.size(); ++i) {
+      const float d = std::hypot(mUnitRefs[i].position.x - x, mUnitRefs[i].position.z - z);
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = static_cast<int>(i);
+      }
+    }
+    return best;
+  }
+
+  bool EdMapScene::EditArmyUnits(const std::string& army, const std::function<void(UnitGroup&)>& change)
+  {
+    for (SaveEntry& entry : mDocument.SaveData().Armies()) {
+      if (entry.name != army) {
+        continue;
+      }
+      UnitGroup group;
+      std::string error;
+      if (!ParseUnitGroup(entry.Get("Units"), group, error)) {
+        gpg::Warnf("editor: %s's units unreadable, not changed: %s", army.c_str(), error.c_str());
+        return false;
+      }
+      change(group);
+      entry.Set("Units", FormatUnitGroup(group, 12));
+      return true;
+    }
+    gpg::Warnf("editor: _save.lua has no army %s", army.c_str());
+    return false;
+  }
+
+  namespace
+  {
+    /** A unit's transform as CreateUnitHPR makes it from its position and Orientation (heading, pitch, roll). */
+    moho::VTransform UnitTransform(const Wm3::Vec3f& position, const float (&orientation)[3])
+    {
+      moho::VTransform transform{};
+      transform.pos_ = position;
+      Wm3::Vector3f rows[3];
+      (void)moho::BuildRotationMatrixFromEulerHPR(rows, orientation[0], orientation[1], orientation[2]);
+      (void)moho::MatrixRowsToQuatCanonical(rows, &transform.orient_);
+      return transform;
+    }
+  } // namespace
+
+  void EdMapScene::PlaceUnits(const float x, const float z)
+  {
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    if (mTools == nullptr || field == nullptr) {
+      return;
+    }
+    const std::string type = mTools->UnitType();
+    const std::string army = mTools->UnitArmy();
+    if (type.empty() || army.empty()) {
+      gpg::Warnf("editor: pick a unit type and an army first");
+      return;
+    }
+    // The next free UNIT_n over every army.
+    int highest = 0;
+    for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
+      UnitGroup group;
+      std::string error;
+      if (ParseUnitGroup(entry.Get("Units"), group, error)) {
+        highest = std::max(highest, HighestUnitNumber(group));
+      }
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    float yaw = 0.0f;
+    if (mTools->RandomUnitTurn()) {
+      mUnitSeed = mUnitSeed * 1664525U + 1013904223U;
+      yaw = static_cast<float>(mUnitSeed >> 8) / 16777216.0f * 2.0f * kPi;
+    }
+    float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies], aheadX[kMaxSymmetryCopies], aheadZ[kMaxSymmetryCopies];
+    const int copies = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
+    (void)HeightBrushCentres(field->width, field->height, x + std::cos(yaw), z + std::sin(yaw), brush.symmetry, brush.turns, aheadX, aheadZ);
+    // Each copy's army: a player army's copy goes to the army whose start position is nearest its start's copy (the
+    // symmetric player); an army without a start position (civilians) keeps its copies.
+    std::string armyOf[kMaxSymmetryCopies];
+    for (int c = 0; c < copies; ++c) {
+      armyOf[c] = army;
+    }
+    {
+      std::vector<std::pair<std::string, std::array<float, 2>>> starts;
+      for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+        float mx = 0.0f, my = 0.0f, mz = 0.0f;
+        if (MarkerTypeOf(marker) == "Blank Marker" && MarkerPosition(marker, mx, my, mz)) {
+          starts.push_back({marker.name, {mx, mz}});
+        }
+      }
+      for (const auto& [name, position] : starts) {
+        if (name != army) {
+          continue;
+        }
+        float startX[kMaxSymmetryCopies], startZ[kMaxSymmetryCopies];
+        (void)HeightBrushCentres(field->width, field->height, position[0], position[1], brush.symmetry, brush.turns, startX, startZ);
+        for (int c = 1; c < copies; ++c) {
+          float nearest = 1e30f;
+          for (const auto& [other, at] : starts) {
+            const float d = std::hypot(at[0] - startX[c], at[1] - startZ[c]);
+            if (d < nearest) {
+              nearest = d;
+              armyOf[c] = other;
+            }
+          }
+        }
+      }
+    }
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    std::vector<std::pair<std::string, std::string>> placed;
+    for (int c = 0; c < copies; ++c) {
+      if (centreX[c] < 0.0f || centreZ[c] < 0.0f || centreX[c] > static_cast<float>(field->width - 1) ||
+          centreZ[c] > static_cast<float>(field->height - 1)) {
+        continue;
+      }
+      SaveUnit unit;
+      unit.name = "UNIT_" + std::to_string(++highest);
+      unit.type = type;
+      unit.position[0] = SnapToGrid(centreX[c]);
+      unit.position[2] = SnapToGrid(centreZ[c]);
+      unit.position[1] = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(unit.position[0])),
+                                                        static_cast<std::int32_t>(std::lround(unit.position[2])));
+      // The saves keep a unit's turn in Orientation's second value.
+      unit.orientation[1] = std::atan2(aheadZ[c] - centreZ[c], aheadX[c] - centreX[c]);
+      const std::string name = unit.name;
+      if (EditArmyUnits(armyOf[c], [&](UnitGroup& group) { AddUnit(group, unit); })) {
+        placed.emplace_back(armyOf[c], name);
+      }
+    }
+    if (!placed.empty()) {
+      mDocument.SaveDataEdited(std::move(before));
+      ReloadUnits();
+      mUnitSelection = placed;
+      std::string where;
+      for (const auto& [owner, name] : placed) {
+        where += (where.empty() ? "" : ", ") + name + " in " + owner;
+      }
+      gpg::Logf("editor: %zu %s units placed (%s), %zu units now", placed.size(), type.c_str(), where.c_str(), mUnitRefs.size());
+    }
+  }
+
+  void EdMapScene::DeleteSelectedUnits()
+  {
+    if (mUnitSelection.empty()) {
+      return;
+    }
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    int deleted = 0;
+    for (const auto& [army, name] : mUnitSelection) {
+      bool removed = false;
+      if (EditArmyUnits(army, [&](UnitGroup& group) { removed = RemoveUnit(group, name); }) && removed) {
+        ++deleted;
+      }
+    }
+    mUnitSelection.clear();
+    if (deleted > 0) {
+      mDocument.SaveDataEdited(std::move(before));
+      ReloadUnits();
+      gpg::Logf("editor: %d units deleted, %zu now", deleted, mUnitRefs.size());
+    }
+  }
+
+  void EdMapScene::DeleteProps()
+  {
+    DeletePropPreview();
+    DeleteUnits();
     if (moho::MeshRenderer::GetInstance() != nullptr) {
       for (moho::MeshInstance* const instance : mProps) {
         delete instance;
@@ -2926,6 +3147,63 @@ namespace faf::editor
         ::SetFocus(window);
         return true;
       }
+      if (mTools != nullptr && mTools->UnitsToolActive()) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        const GizmoPart part = mTools->UnitPlaceMode() ? GizmoPart::None : PickGizmo(at);
+        if (part == GizmoPart::None && !GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+          return true;
+        }
+        const int hit = part == GizmoPart::None ? PickUnit(groundX, groundZ) : -1;
+        if (part == GizmoPart::None && (wParam & MK_SHIFT) != 0) {
+          if (hit >= 0) {
+            mUnitSelection = {{mUnitRefs[static_cast<std::size_t>(hit)].army, mUnitRefs[static_cast<std::size_t>(hit)].name}};
+            DeleteSelectedUnits();
+          }
+          return true;
+        }
+        if (mTools->UnitPlaceMode()) {
+          PlaceUnits(groundX, groundZ);
+          return true;
+        }
+        if (part != GizmoPart::None) {
+          BeginGizmoDrag(part, at);
+        } else {
+          const bool add = (wParam & MK_CONTROL) != 0;
+          if (hit < 0) {
+            if (!add) {
+              mUnitSelection.clear();
+            }
+            return true;
+          }
+          const std::pair<std::string, std::string> key{mUnitRefs[static_cast<std::size_t>(hit)].army, mUnitRefs[static_cast<std::size_t>(hit)].name};
+          const auto selected = std::find(mUnitSelection.begin(), mUnitSelection.end(), key);
+          if (add && selected != mUnitSelection.end()) {
+            mUnitSelection.erase(selected);
+            return true;
+          }
+          if (selected == mUnitSelection.end()) {
+            if (!add) {
+              mUnitSelection.clear();
+            }
+            mUnitSelection.push_back(key);
+          }
+        }
+        // A drag moves the selection, live (along an axis when it started on the gizmo).
+        mDragUnits = true;
+        mUnitsMoved = false;
+        mUnitDragFromX = groundX;
+        mUnitDragFromZ = groundZ;
+        mUnitBefore = mDocument.SaveDataNow();
+        mUnitDragStart.clear();
+        for (const auto& [army, name] : mUnitSelection) {
+          const int index = UnitRefIndex(army, name);
+          mUnitDragStart.push_back(index >= 0 ? mUnitRefs[static_cast<std::size_t>(index)].position : Wm3::Vec3f{0.0f, 0.0f, 0.0f});
+        }
+        ::SetCapture(window);
+        ::SetFocus(window);
+        return true;
+      }
       if (mTools != nullptr && mTools->DecalsToolActive()) {
         float groundX = 0.0f;
         float groundZ = 0.0f;
@@ -3082,6 +3360,37 @@ namespace faf::editor
     }
     case WM_LBUTTONUP:
       mGizmoDrag = GizmoPart::None;
+      if (mDragUnits) {
+        mDragUnits = false;
+        ::ReleaseCapture();
+        if (mUnitsMoved) {
+          for (const auto& [army, name] : mUnitSelection) {
+            const int index = UnitRefIndex(army, name);
+            if (index < 0) {
+              continue;
+            }
+            const Wm3::Vec3f position = mUnitRefs[static_cast<std::size_t>(index)].position;
+            (void)EditArmyUnits(army, [&, name = name](UnitGroup& group) {
+              if (SaveUnit* const unit = FindUnit(group, name); unit != nullptr) {
+                unit->position[0] = position.x;
+                unit->position[1] = position.y;
+                unit->position[2] = position.z;
+              }
+            });
+          }
+          mDocument.SaveDataEdited(std::move(mUnitBefore));
+          if (!mUnitSelection.empty()) {
+            const int index = UnitRefIndex(mUnitSelection.front().first, mUnitSelection.front().second);
+            if (index >= 0) {
+              const Wm3::Vec3f& p = mUnitRefs[static_cast<std::size_t>(index)].position;
+              gpg::Logf("editor: %zu units moved, %s to %.2f, %.2f, %.2f", mUnitSelection.size(), mUnitSelection.front().second.c_str(),
+                        static_cast<double>(p.x), static_cast<double>(p.y), static_cast<double>(p.z));
+            }
+          }
+        }
+        mUnitBefore = {};
+        return true;
+      }
       if (mDragDecals) {
         mDragDecals = false;
         ::ReleaseCapture();
@@ -3153,6 +3462,33 @@ namespace faf::editor
       return true;
     case WM_MOUSEMOVE: {
       if (mDrag == Drag::None) {
+        if (mDragUnits) {
+          Wm3::Vec3f move{0.0f, 0.0f, 0.0f};
+          float groundX = 0.0f;
+          float groundZ = 0.0f;
+          if (mGizmoDrag != GizmoPart::None) {
+            move = GizmoDisplacement(at);
+          } else if (GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ) &&
+                     std::hypot(groundX - mUnitDragFromX, groundZ - mUnitDragFromZ) > 0.05f) {
+            move = Wm3::Vec3f{groundX - mUnitDragFromX, 0.0f, groundZ - mUnitDragFromZ};
+          }
+          if (move.x != 0.0f || move.y != 0.0f || move.z != 0.0f) {
+            for (std::size_t i = 0; i < mUnitSelection.size() && i < mUnitDragStart.size(); ++i) {
+              const int index = UnitRefIndex(mUnitSelection[i].first, mUnitSelection[i].second);
+              if (index < 0) {
+                continue;
+              }
+              UnitRef& ref = mUnitRefs[static_cast<std::size_t>(index)];
+              ref.position = GizmoPlace(mUnitDragStart[i], move, false);
+              if (moho::MeshInstance* const instance = mUnits[static_cast<std::size_t>(index)]; instance != nullptr) {
+                const moho::VTransform transform = UnitTransform(ref.position, ref.orientation);
+                instance->SetStance(transform, transform);
+              }
+            }
+            mUnitsMoved = true;
+          }
+          return true;
+        }
         if (mDragDecals && mGizmoDrag != GizmoPart::None) {
           moho::IDecalManager* const decals = mDocument.Decals();
           const Wm3::Vec3f move = GizmoDisplacement(at);
@@ -3340,6 +3676,10 @@ namespace faf::editor
         } else {
           ClearDecalPath();
         }
+        return true;
+      }
+      if (down && wParam == VK_DELETE && mTools != nullptr && mTools->UnitsToolActive() && !mUnitSelection.empty()) {
+        DeleteSelectedUnits();
         return true;
       }
       if (down && wParam == VK_DELETE && mTools != nullptr && mTools->DecalsToolActive() && !mDecalSelection.empty()) {

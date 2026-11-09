@@ -1,4 +1,5 @@
 #include "editor/EdApp.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 
 #include <Windows.h>
 #include <ShlObj.h>
@@ -330,6 +331,8 @@ namespace faf::editor
       std::string mMarkerToolArg;
       /** `/framemarker <name>[@distance]` (test runs): the camera goes to that marker once the map is shown. */
       std::string mFrameMarkerArg;
+      /** `/unittool <type>,<army>[,select]` (test runs). */
+      std::string mUnitToolArg;
       /** `/decaltool <texture>[,select]` (test runs): the Decals tool with this texture. */
       std::string mDecalToolArg;
       /** `/grid`, `/snap`, `/gridstep <units>` (test runs): the toolbar's grid settings, set once the map is shown. */
@@ -806,6 +809,9 @@ namespace faf::editor
       if (fa::vector<fa::string> decal; moho::CFG_GetArgOption("/decaltool", 1, &decal) && !decal.empty()) {
         mDecalToolArg = decal[0].c_str();
       }
+      if (fa::vector<fa::string> unit; moho::CFG_GetArgOption("/unittool", 1, &unit) && !unit.empty()) {
+        mUnitToolArg = unit[0].c_str();
+      }
       if (fa::vector<fa::string> marker; moho::CFG_GetArgOption("/framemarker", 1, &marker) && !marker.empty()) {
         mFrameMarkerArg = marker[0].c_str();
       }
@@ -924,6 +930,25 @@ namespace faf::editor
           gpg::Warnf("editor: %s", message.c_str());
         }
       };
+      // The unit list, once the kept rules are built: id, and the name without its <LOC> tag.
+      if (!tools.HasUnitTypes()) {
+        if (moho::RRuleGameRules* const rules = moho::RULE_PeekKept(); rules != nullptr) {
+          std::vector<std::pair<std::string, std::string>> types;
+          for (const auto& [id, entry] : rules->GetUnitBlueprints()) {
+            moho::RResId resId{};
+            resId.name.assign(id.c_str());
+            const moho::RUnitBlueprint* const blueprint = rules->GetUnitBlueprint(resId);
+            std::string name = blueprint != nullptr ? blueprint->mBlueprintLabel.c_str() : "";
+            if (name.rfind("<LOC", 0) == 0) {
+              const std::size_t close = name.find('>');
+              name = close == std::string::npos ? std::string() : name.substr(close + 1);
+            }
+            types.emplace_back(id.c_str(), name);
+          }
+          std::sort(types.begin(), types.end());
+          tools.SetUnitTypes(std::move(types));
+        }
+      }
       // The prop palette, once the kept rules are built.
       if (!tools.HasPropBlueprints()) {
         if (moho::RRuleGameRules* const rules = moho::RULE_PeekKept(); rules != nullptr) {
@@ -968,6 +993,14 @@ namespace faf::editor
           mScene.FrameMarker(name);
         }
         tools.SetDecalSelectionCount(mScene.DecalSelectionCount());
+        tools.SetUnitSelectionCount(mScene.UnitSelectionCount());
+        if (!mUnitToolArg.empty()) {
+          const std::size_t first = mUnitToolArg.find(',');
+          const std::size_t second = first == std::string::npos ? std::string::npos : mUnitToolArg.find(',', first + 1);
+          tools.SetUnitTool(mUnitToolArg.substr(0, first), first == std::string::npos ? std::string() : mUnitToolArg.substr(first + 1, second - first - 1),
+                            second != std::string::npos && mUnitToolArg.substr(second + 1) == "select");
+          mUnitToolArg.clear();
+        }
         if (tools.PropsToolActive()) {
           tools.SetPropDetails(mScene.PropDetails(tools.PropBlueprint()));
         }

@@ -64,6 +64,41 @@ namespace
     EXPECT_EQ(faf::editor::FormatUnitGroup(group, 12), kGroup);
   }
 
+  TEST(Units, AddedAndRemovedUnitsWriteAndReadBack)
+  {
+    faf::editor::UnitGroup group;
+    std::string error;
+    ASSERT_TRUE(faf::editor::ParseUnitGroup(kGroup, group, error)) << error;
+    faf::editor::SaveUnit tank;
+    tank.name = "UNIT_335";
+    tank.type = "uel0201";
+    tank.position[0] = 400.5f;
+    tank.position[1] = 20.0f;
+    tank.position[2] = 410.5f;
+    tank.orientation[1] = 0.5f;
+    faf::editor::AddUnit(group, tank);
+    // UNIT_328 goes: UNIT_334 stays in GROUP_1, the tank sits at INITIAL's end.
+    ASSERT_TRUE(faf::editor::RemoveUnit(group, "UNIT_328"));
+    EXPECT_FALSE(faf::editor::RemoveUnit(group, "UNIT_328"));
+    faf::editor::UnitGroup back;
+    ASSERT_TRUE(faf::editor::ParseUnitGroup(faf::editor::FormatUnitGroup(group, 12), back, error)) << error;
+    std::vector<const faf::editor::SaveUnit*> units;
+    faf::editor::CollectUnits(back, units);
+    ASSERT_EQ(units.size(), 2u);
+    EXPECT_EQ(units[0]->name, "UNIT_334");
+    EXPECT_EQ(units[1]->type, "uel0201");
+    EXPECT_FLOAT_EQ(units[1]->position[2], 410.5f);
+    EXPECT_EQ(faf::editor::HighestUnitNumber(back), 335);
+    ASSERT_NE(faf::editor::FindUnit(back, "UNIT_335"), nullptr);
+    // An army without INITIAL gets one.
+    faf::editor::UnitGroup empty;
+    ASSERT_TRUE(faf::editor::ParseUnitGroup("GROUP { orders = '', platoon = '', Units = { } }", empty, error)) << error;
+    faf::editor::AddUnit(empty, tank);
+    ASSERT_EQ(empty.groups.size(), 1u);
+    EXPECT_EQ(empty.groups[0].name, "INITIAL");
+    EXPECT_EQ(empty.groups[0].units.size(), 1u);
+  }
+
   TEST(Units, AnEmptyGroupAndBadText)
   {
     faf::editor::UnitGroup group;

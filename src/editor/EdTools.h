@@ -51,6 +51,24 @@ namespace faf::editor
     [[nodiscard]] bool HasPropBlueprints() const noexcept { return !mPropBlueprints.empty(); }
     /** The Markers tool. */
     [[nodiscard]] bool MarkersToolActive() const noexcept { return mTool == 6; }
+    /** The Units tool: Place (the chosen unit type in the chosen army, with symmetric copies) or Select. */
+    [[nodiscard]] bool UnitsToolActive() const noexcept { return mTool == 7; }
+    [[nodiscard]] bool UnitPlaceMode() const noexcept { return mUnitMode == 0; }
+    [[nodiscard]] const std::string& UnitType() const noexcept { return mUnitType; }
+    [[nodiscard]] const std::string& UnitArmy() const noexcept { return mUnitArmy; }
+    [[nodiscard]] bool RandomUnitTurn() const noexcept { return mUnitRandomTurn; }
+    /** The unit blueprints the rules have: id and name. */
+    void SetUnitTypes(std::vector<std::pair<std::string, std::string>> types) { mUnitTypes = std::move(types); }
+    [[nodiscard]] bool HasUnitTypes() const noexcept { return !mUnitTypes.empty(); }
+    void SetUnitSelectionCount(const int count) noexcept { mUnitSelectionCount = count; }
+    /** Test runs (`/unittool <type>,<army>[,select]`). */
+    void SetUnitTool(std::string type, std::string army, const bool select)
+    {
+      mTool = 7;
+      mUnitType = std::move(type);
+      mUnitArmy = std::move(army);
+      mUnitMode = select ? 1 : 0;
+    }
     /** The Decals tool: Place (a click places the chosen texture with its symmetric copies) or Select (pick, drag, delete). */
     [[nodiscard]] bool DecalsToolActive() const noexcept { return mTool == 5; }
     [[nodiscard]] bool DecalPlaceMode() const noexcept { return mDecalMode == 0; }
@@ -445,6 +463,7 @@ namespace faf::editor
     void DrawProps();
     void DrawDecals();
     void DrawMarkers();
+    void DrawUnits();
     void DrawSelect();
     void DrawBrush(bool withModes);
     void DrawSymmetry(bool withCheck = true);
@@ -517,6 +536,13 @@ namespace faf::editor
     int mSelectionCount = 0;
     std::vector<SaveEntry> mMarkerSelection;
     bool mConnectNodes = false;
+    std::vector<std::pair<std::string, std::string>> mUnitTypes;
+    std::string mUnitType;
+    std::string mUnitArmy;
+    int mUnitMode = 0;
+    bool mUnitRandomTurn = false;
+    char mUnitFilter[64]{};
+    int mUnitSelectionCount = 0;
     std::vector<DecalTexture> mDecalTextures;
     bool mDecalTexturesListed = false;
     std::string mDecalTexture;

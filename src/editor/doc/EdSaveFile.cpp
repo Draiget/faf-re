@@ -125,15 +125,23 @@ namespace faf::editor
     }
 
     /** The entries `['name'] = { ['key'] = value, ... },` between `open` ('{') and `close`. */
-    bool ParseEntries(const std::string& text, const std::size_t open, const std::size_t close, std::vector<SaveEntry>& out, std::string& error)
+    bool ParseEntries(const std::string& text, const std::size_t open, const std::size_t close, std::vector<SaveEntry>& out, std::string& error,
+                      std::vector<SaveEntrySpan>* spans = nullptr)
     {
       out.clear();
+      if (spans != nullptr) {
+        spans->clear();
+      }
       std::size_t at = open + 1;
       for (;;) {
+        const std::size_t lead = at;
         at = SkipSpace(text, at);
         if (at >= close) {
           return true;
         }
+        SaveEntrySpan span;
+        span.lead = lead;
+        span.start = at;
         SaveEntry entry;
         if (!ReadKey(text, at, entry.name)) {
           error = "an entry without a name at offset " + std::to_string(at);
@@ -171,16 +179,24 @@ namespace faf::editor
             return false;
           }
           ++inner;
+          const std::size_t valueStart = SkipSpace(text, inner);
           entry.properties.emplace_back(key, ReadValue(text, inner));
+          span.values.emplace_back(valueStart, valueStart + entry.properties.back().second.size());
           inner = SkipSpace(text, inner);
           if (inner < entryClose && text[inner] == ',') {
             ++inner;
           }
         }
         out.push_back(std::move(entry));
-        at = SkipSpace(text, entryClose + 1);
-        if (at < close && text[at] == ',') {
-          ++at;
+        // The entry ends after its comma (when it has one); what follows belongs to the next one.
+        at = entryClose + 1;
+        const std::size_t comma = SkipSpace(text, at);
+        if (comma < close && text[comma] == ',') {
+          at = comma + 1;
+        }
+        span.end = at;
+        if (spans != nullptr) {
+          spans->push_back(std::move(span));
         }
       }
     }
@@ -330,21 +346,21 @@ namespace faf::editor
     if (chain != std::string::npos &&
         FindBlock(mText, std::regex(R"(Markers\s*=\s*\{)"), chain, mMarkerBlock.open, mMarkerBlock.close, mMarkerBlock.indent)) {
       mMarkerBlock.found = true;
-      if (!ParseEntries(mText, mMarkerBlock.open, mMarkerBlock.close, mMarkers, error)) {
+      if (!ParseEntries(mText, mMarkerBlock.open, mMarkerBlock.close, mMarkers, error, &mMarkerBlock.spans)) {
         error = "markers: " + error;
         return false;
       }
     }
     if (FindBlock(mText, std::regex(R"(Areas\s*=\s*\{)"), 0, mAreaBlock.open, mAreaBlock.close, mAreaBlock.indent)) {
       mAreaBlock.found = true;
-      if (!ParseEntries(mText, mAreaBlock.open, mAreaBlock.close, mAreas, error)) {
+      if (!ParseEntries(mText, mAreaBlock.open, mAreaBlock.close, mAreas, error, &mAreaBlock.spans)) {
         error = "areas: " + error;
         return false;
       }
     }
     if (FindBlock(mText, std::regex(R"(\bArmies\s*=\s*\{)"), 0, mArmyBlock.open, mArmyBlock.close, mArmyBlock.indent)) {
       mArmyBlock.found = true;
-      if (!ParseEntries(mText, mArmyBlock.open, mArmyBlock.close, mArmies, error)) {
+      if (!ParseEntries(mText, mArmyBlock.open, mArmyBlock.close, mArmies, error, &mArmyBlock.spans)) {
         error = "armies: " + error;
         return false;
       }
@@ -376,13 +392,13 @@ namespace faf::editor
     };
     std::vector<Replace> replaces;
     if (mMarkerBlock.found && mMarkers != mMarkersRead) {
-      replaces.push_back({&mMarkerBlock, FormatEntries(mMarkers, mMarkerBlock.indent)});
+      replaces.push_back({&mMarkerBlock, Rebuild(mMarkerBlock, mMarkers, mMarkersRead)});
     }
     if (mAreaBlock.found && mAreas != mAreasRead) {
-      replaces.push_back({&mAreaBlock, FormatEntries(mAreas, mAreaBlock.indent)});
+      replaces.push_back({&mAreaBlock, Rebuild(mAreaBlock, mAreas, mAreasRead)});
     }
     if (mArmyBlock.found && mArmies != mArmiesRead) {
-      replaces.push_back({&mArmyBlock, FormatEntries(mArmies, mArmyBlock.indent)});
+      replaces.push_back({&mArmyBlock, Rebuild(mArmyBlock, mArmies, mArmiesRead)});
     }
     std::sort(replaces.begin(), replaces.end(), [](const Replace& a, const Replace& b) { return a.block->open > b.block->open; });
     std::string out = mText;
@@ -390,6 +406,72 @@ namespace faf::editor
       out.replace(replace.block->open + 1, replace.block->close - replace.block->open - 1, replace.text);
     }
     return out;
+  }
+
+  std::string SaveFile::Rebuild(const Block& block, const std::vector<SaveEntry>& now, const std::vector<SaveEntry>& read) const
+  {
+    const std::string nl = mText.find("\r\n") != std::string::npos ? "\r\n" : "\n";
+    // A value written by the editor in the file's line ends.
+    const auto lineEnds = [&nl](const std::string& value) {
+      if (nl == "\n") {
+        return value;
+      }
+      std::string out;
+      for (std::size_t i = 0; i < value.size(); ++i) {
+        if (value[i] == '\n' && (i == 0 || value[i - 1] != '\r')) {
+          out += '\r';
+        }
+        out += value[i];
+      }
+      return out;
+    };
+    const std::string pad(static_cast<std::size_t>(block.indent), ' ');
+    const std::string inner(static_cast<std::size_t>(block.indent + 4), ' ');
+    const auto format = [&](const SaveEntry& entry) {
+      std::string out = "[" + Quote(entry.name) + "] = {" + nl;
+      for (const auto& [key, value] : entry.properties) {
+        out += inner + "[" + Quote(key) + "] = " + lineEnds(value) + "," + nl;
+      }
+      return out + pad + "},";
+    };
+    std::string body;
+    std::vector<bool> used(read.size(), false);
+    for (const SaveEntry& entry : now) {
+      std::size_t found = read.size();
+      for (std::size_t i = 0; i < read.size() && i < block.spans.size(); ++i) {
+        if (!used[i] && read[i].name == entry.name) {
+          found = i;
+          break;
+        }
+      }
+      if (found == read.size()) {
+        body += nl + pad + format(entry);
+        continue;
+      }
+      used[found] = true;
+      const SaveEntrySpan& span = block.spans[found];
+      std::string piece = mText.substr(span.start, span.end - span.start);
+      if (!(entry == read[found])) {
+        bool sameKeys = entry.properties.size() == read[found].properties.size() && span.values.size() == entry.properties.size();
+        for (std::size_t k = 0; sameKeys && k < entry.properties.size(); ++k) {
+          sameKeys = entry.properties[k].first == read[found].properties[k].first;
+        }
+        if (sameKeys) {
+          for (std::size_t k = entry.properties.size(); k-- > 0;) {
+            if (entry.properties[k].second != read[found].properties[k].second) {
+              const auto [from, to] = span.values[k];
+              piece.replace(from - span.start, to - from, lineEnds(entry.properties[k].second));
+            }
+          }
+        } else {
+          piece = format(entry);
+        }
+      }
+      body += mText.substr(span.lead, span.start - span.lead) + piece;
+    }
+    const std::size_t tail = block.spans.empty() ? block.open + 1 : block.spans.back().end;
+    body += mText.substr(tail, block.close - tail);
+    return body;
   }
 
   SaveEntry NewArmyEntry(const std::string& name)

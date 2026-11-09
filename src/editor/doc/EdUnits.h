@@ -58,4 +58,13 @@ namespace faf::editor
 
   /** The highest `n` of the `UNIT_n` names in the groups (0 when none), for the next unit's name. */
   int HighestUnitNumber(const UnitGroup& group);
+
+  /** The unit of this name in the group or its groups, or null. */
+  SaveUnit* FindUnit(UnitGroup& group, const std::string& name);
+
+  /** Removes the unit of this name from whichever group holds it; the others keep their order. False when none. */
+  bool RemoveUnit(UnitGroup& group, const std::string& name);
+
+  /** Adds a unit at the end of the army's INITIAL group (made when the army has none), as the game's units start. */
+  void AddUnit(UnitGroup& root, SaveUnit unit);
 } // namespace faf::editor

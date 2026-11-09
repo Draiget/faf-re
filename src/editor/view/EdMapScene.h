@@ -2,6 +2,7 @@
 
 #include <array>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -11,6 +12,7 @@
 
 #include "editor/EdTools.h"
 #include "editor/doc/EdDocument.h"
+#include "editor/doc/EdUnits.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdMarkers.h"
@@ -110,6 +112,8 @@ namespace faf::editor
     void ClearDecalPath() { mDecalPath.clear(); }
     /** A prop blueprint's reclaim, scale and mesh, for the Props panel ("" when the rules don't have it). */
     [[nodiscard]] std::string PropDetails(const std::string& blueprint) const;
+    /** How many units the Units tool has selected, for its panel. */
+    [[nodiscard]] int UnitSelectionCount() const noexcept { return static_cast<int>(mUnitSelection.size()); }
     /** How many decals the Decals tool has selected, for its panel. */
     [[nodiscard]] int DecalSelectionCount() const noexcept { return static_cast<int>(mDecalSelection.size()); }
     /** Selects markers by name (`add` toggles them in the selection instead), for the Markers panel. */
@@ -138,7 +142,9 @@ namespace faf::editor
     /** Edit > Delete: the active tool's selection (decals, markers, or props). */
     void DeleteSelected()
     {
-      if (mTools != nullptr && mTools->DecalsToolActive()) {
+      if (mTools != nullptr && mTools->UnitsToolActive()) {
+        DeleteSelectedUnits();
+      } else if (mTools != nullptr && mTools->DecalsToolActive()) {
         DeleteSelectedDecals();
       } else if (mTools != nullptr && mTools->MarkersToolActive()) {
         DeleteSelectedMarkers();
@@ -170,9 +176,36 @@ namespace faf::editor
     /** One mesh per prop entry, at the entry's index (null when its blueprint or mesh is missing). */
     std::vector<moho::MeshInstance*> mProps;
     bool mPropsDone = false;
-    /** The armies' units from `_save.lua` (every group's), drawn as the game places them. */
+    /** The armies' units from `_save.lua` (every group's), drawn as the game places them, and which unit each is. */
+    struct UnitRef
+    {
+      std::string army;
+      std::string name;
+      Wm3::Vec3f position;
+      float orientation[3];
+    };
     std::vector<moho::MeshInstance*> mUnits;
+    std::vector<UnitRef> mUnitRefs;
     void CreateUnits();
+    void DeleteUnits();
+    /** After an edit or undo of the armies' units: drawn again from the save. */
+    void ReloadUnits();
+    /** The Units tool's selection (army and unit name), a drag of it and its starts. */
+    std::vector<std::pair<std::string, std::string>> mUnitSelection;
+    bool mDragUnits = false;
+    bool mUnitsMoved = false;
+    float mUnitDragFromX = 0.0f;
+    float mUnitDragFromZ = 0.0f;
+    std::vector<Wm3::Vec3f> mUnitDragStart;
+    EdDocument::SaveSnapshot mUnitBefore;
+    std::uint32_t mUnitSeed = 0x2545F491u;
+    /** The nearest unit to (x, z) within reach of the cursor (an index of mUnitRefs), or -1. */
+    [[nodiscard]] int PickUnit(float x, float z) const;
+    [[nodiscard]] int UnitRefIndex(const std::string& army, const std::string& name) const;
+    /** Changes an army's unit groups in `_save.lua` (read, `change`, written back); false when it can't read them. */
+    bool EditArmyUnits(const std::string& army, const std::function<void(UnitGroup&)>& change);
+    void PlaceUnits(float x, float z);
+    void DeleteSelectedUnits();
     [[nodiscard]] moho::MeshInstance* MakePropInstance(const moho::CWldPropEntry& entry) const;
     /** Deletes and makes again every prop's mesh (after undo). */
     void RebuildProps();

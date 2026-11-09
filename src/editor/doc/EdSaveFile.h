@@ -38,6 +38,15 @@ namespace faf::editor
    * areas parsed out. Text writes the file again: unchanged, or with only the blocks whose entries
    * changed written anew in the game's own layout, everything else as it was.
    */
+  /** Where a save entry was in the text: what came before it (space, banners), itself with its comma, its values. */
+  struct SaveEntrySpan
+  {
+    std::size_t lead = 0;
+    std::size_t start = 0;
+    std::size_t end = 0;
+    std::vector<std::pair<std::size_t, std::size_t>> values;
+  };
+
   class SaveFile
   {
   public:
@@ -66,7 +75,14 @@ namespace faf::editor
       std::size_t close = 0; // the matching '}'
       int indent = 0;        // the entries' indent
       bool found = false;
+      std::vector<SaveEntrySpan> spans; // the entries as read
     };
+    /**
+     * A changed block's new text: unchanged entries as they were read (with the space and banners before them), a
+     * changed entry with the same keys as its old text with only the changed values replaced, other entries written
+     * in the game's layout with the file's line ends.
+     */
+    std::string Rebuild(const Block& block, const std::vector<SaveEntry>& now, const std::vector<SaveEntry>& read) const;
     std::string mText;
     Block mMarkerBlock;
     Block mAreaBlock;

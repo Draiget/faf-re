@@ -26,6 +26,7 @@ namespace faf::editor
     };
     constexpr ToolInfo kTools[] = {
       {"Select", "S"}, {"Terrain", "T"}, {"Texture", "P"}, {"Water", "W"}, {"Props", "O"}, {"Decals", "D"}, {"Markers", "M"},
+      {"Units", "U"},
     };
 
     /** Draws tool `index`'s icon in the square at `p`, `s` wide. */
@@ -65,10 +66,15 @@ namespace faf::editor
         draw->AddRect(at(0.15f, 0.15f), at(0.85f, 0.85f), color, s * 0.08f, ImDrawFlags_None, s * 0.08f);
         draw->AddCircleFilled(at(0.5f, 0.5f), s * 0.17f, color);
         break;
-      default: // marker pin
+      case 6: // marker pin
         draw->AddCircleFilled(at(0.5f, 0.38f), s * 0.28f, color);
         draw->AddTriangleFilled(at(0.25f, 0.5f), at(0.75f, 0.5f), at(0.5f, 0.94f), color);
         draw->AddCircleFilled(at(0.5f, 0.38f), s * 0.11f, kCellBack);
+        break;
+      default: // a tank: hull, turret, barrel
+        draw->AddRectFilled(at(0.1f, 0.55f), at(0.9f, 0.85f), color, s * 0.06f);
+        draw->AddCircleFilled(at(0.45f, 0.48f), s * 0.16f, color);
+        draw->AddLine(at(0.5f, 0.45f), at(0.92f, 0.3f), color, s * 0.08f);
         break;
       }
     }
@@ -195,7 +201,8 @@ namespace faf::editor
       case 3: DrawWater(); break;
       case 4: DrawProps(); break;
       case 5: DrawDecals(); break;
-      default: DrawMarkers(); break;
+      case 6: DrawMarkers(); break;
+      default: DrawUnits(); break;
       }
     }
     ImGui::EndChild();
@@ -956,6 +963,71 @@ namespace faf::editor
     DrawSymmetry(false);
     Note("Place: a click puts the texture there, centred, with its symmetric copies (turned with the symmetry). "
          "Size is along and across its heading, in game units.");
+  }
+
+  void EdTools::DrawUnits()
+  {
+    SectionHeader("MODE");
+    static const char* const kModes[] = {"Place", "Select"};
+    mUnitMode = std::clamp(mUnitMode, 0, 1);
+    Segmented(kModes, 2, mUnitMode);
+    if (mUnitMode == 1) {
+      char count[64];
+      (void)std::snprintf(count, sizeof(count), "%d unit%s selected", mUnitSelectionCount, mUnitSelectionCount == 1 ? "" : "s");
+      ImGui::TextUnformatted(count);
+      Note("Click a unit to select it (Ctrl adds), drag it or its arrows to move, Shift+click or Delete removes. Each edit is one undo step.");
+    }
+
+    // The army new units join: the players' and the extra armies.
+    SectionHeader("ARMY");
+    std::vector<std::string> armies = mArmies;
+    armies.insert(armies.end(), mExtraArmies.begin(), mExtraArmies.end());
+    if (!armies.empty() && std::find(armies.begin(), armies.end(), mUnitArmy) == armies.end()) {
+      mUnitArmy = armies.back();
+    }
+    ImGui::SetNextItemWidth(-1.0f);
+    if (ImGui::BeginCombo("##unitarmy", mUnitArmy.empty() ? "(none)" : mUnitArmy.c_str())) {
+      for (const std::string& army : armies) {
+        if (ImGui::Selectable(army.c_str(), army == mUnitArmy)) {
+          mUnitArmy = army;
+        }
+      }
+      ImGui::EndCombo();
+    }
+
+    SectionHeader("UNIT");
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::InputTextWithHint("##unitfilter", "search id or name", mUnitFilter, sizeof(mUnitFilter));
+    std::string filter = mUnitFilter;
+    for (char& c : filter) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    if (mUnitTypes.empty()) {
+      Note("The unit list comes once the game's rules are built after startup.");
+    } else if (ImGui::BeginChild("##unittypes", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 12.0f), ImGuiChildFlags_Borders)) {
+      for (const auto& [id, name] : mUnitTypes) {
+        std::string lower = id + " " + name;
+        for (char& c : lower) {
+          c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        if (!filter.empty() && lower.find(filter) == std::string::npos) {
+          continue;
+        }
+        if (ImGui::Selectable(id.c_str(), id == mUnitType)) {
+          mUnitType = id;
+          mUnitMode = 0;
+        }
+        ImGui::SameLine(ImGui::GetFontSize() * 5.5f);
+        ImGui::TextDisabled("%s", name.c_str());
+      }
+    }
+    if (!mUnitTypes.empty()) {
+      ImGui::EndChild();
+    }
+    ImGui::Checkbox("Random turn", &mUnitRandomTurn);
+    DrawSymmetry(false);
+    Note("Place: a click puts the unit there with its symmetric copies, in the army above, in its INITIAL group (the units the "
+         "army starts with); names are UNIT_n, as the game's saves name them.");
   }
 
   void EdTools::DrawPlayableArea()

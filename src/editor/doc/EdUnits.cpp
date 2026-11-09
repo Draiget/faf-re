@@ -349,4 +349,66 @@ namespace faf::editor
   {
     return Highest(group);
   }
+
+  SaveUnit* FindUnit(UnitGroup& group, const std::string& name)
+  {
+    for (SaveUnit& unit : group.units) {
+      if (unit.name == name) {
+        return &unit;
+      }
+    }
+    for (UnitGroup& child : group.groups) {
+      if (SaveUnit* const found = FindUnit(child, name); found != nullptr) {
+        return found;
+      }
+    }
+    return nullptr;
+  }
+
+  bool RemoveUnit(UnitGroup& group, const std::string& name)
+  {
+    for (std::size_t i = 0; i < group.units.size(); ++i) {
+      if (group.units[i].name != name) {
+        continue;
+      }
+      const int removed = static_cast<int>(i);
+      group.units.erase(group.units.begin() + static_cast<std::ptrdiff_t>(i));
+      // Its place in the order goes, and the units after it move down one.
+      group.order.erase(std::remove_if(group.order.begin(), group.order.end(),
+                                       [&](const UnitGroup::Member& member) { return member.unit == removed; }),
+                        group.order.end());
+      for (UnitGroup::Member& member : group.order) {
+        if (member.unit > removed) {
+          --member.unit;
+        }
+      }
+      return true;
+    }
+    for (UnitGroup& child : group.groups) {
+      if (RemoveUnit(child, name)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void AddUnit(UnitGroup& root, SaveUnit unit)
+  {
+    UnitGroup* initial = nullptr;
+    for (UnitGroup& child : root.groups) {
+      if (child.name == "INITIAL") {
+        initial = &child;
+      }
+    }
+    if (initial == nullptr) {
+      UnitGroup group;
+      group.name = "INITIAL";
+      group.newline = root.newline;
+      root.order.push_back({static_cast<int>(root.groups.size()), -1});
+      root.groups.push_back(std::move(group));
+      initial = &root.groups.back();
+    }
+    initial->order.push_back({-1, static_cast<int>(initial->units.size())});
+    initial->units.push_back(std::move(unit));
+  }
 } // namespace faf::editor

@@ -176,6 +176,45 @@ Scenario = {
     EXPECT_EQ(faf::editor::ScenarioArmies(fewer).size(), 3u);
   }
 
+  TEST(SaveFile, AChangedEntryKeepsTheRestAsItWas)
+  {
+    // CR LF line ends, a banner between the entries, bare keys: what the game's saves look like.
+    const std::string text = "Scenario = {\r\n    MasterChain = {\r\n        ['_MASTERCHAIN_'] = {\r\n            Markers = {\r\n"
+                             "                --[[ the first ]]--\r\n"
+                             "                ['A'] = {\r\n                    ['type'] = STRING( 'Mass' ),\r\n"
+                             "                    ['position'] = VECTOR3( 1, 2, 3 ),\r\n                },\r\n"
+                             "                --[[ the second ]]--\r\n"
+                             "                ['B'] = {\r\n                    ['type'] = STRING( 'Mass' ),\r\n"
+                             "                    ['position'] = VECTOR3( 4, 5, 6 ),\r\n                },\r\n"
+                             "            },\r\n        },\r\n    },\r\n}\r\n";
+    SaveFile save;
+    std::string error;
+    ASSERT_TRUE(save.Parse(text, error)) << error;
+    ASSERT_EQ(save.Markers().size(), 2u);
+    // B moves: only its position's text changes.
+    save.Markers()[1].Set("position", "VECTOR3( 7, 8, 9 )");
+    std::string expected = text;
+    expected.replace(expected.find("VECTOR3( 4, 5, 6 )"), std::string("VECTOR3( 4, 5, 6 )").size(), "VECTOR3( 7, 8, 9 )");
+    EXPECT_EQ(save.Text(), expected);
+    // A new marker comes at the end in the file's line ends; A and the banners stay.
+    faf::editor::SaveEntry c{"C", {{"type", "STRING( 'Mass' )"}, {"position", "VECTOR3( 0, 0, 0 )"}}};
+    save.Markers().push_back(c);
+    const std::string more = save.Text();
+    EXPECT_NE(more.find("--[[ the second ]]--"), std::string::npos);
+    EXPECT_NE(more.find("['C'] = {\r\n"), std::string::npos);
+    EXPECT_EQ(more.find("\n") , more.find("\r\n") + 1);
+    std::size_t bare = 0;
+    for (std::size_t i = 0; i < more.size(); ++i) {
+      bare += more[i] == '\n' && (i == 0 || more[i - 1] != '\r') ? 1 : 0;
+    }
+    EXPECT_EQ(bare, 0u);
+    // A deleted marker takes its banner with it.
+    save.Markers().erase(save.Markers().begin());
+    const std::string fewer = save.Text();
+    EXPECT_EQ(fewer.find("--[[ the first ]]--"), std::string::npos);
+    EXPECT_NE(fewer.find("['B']"), std::string::npos);
+  }
+
   TEST(SaveFile, ScenarioTeamsAreReadAndWritten)
   {
     // As the game's scenarios write them (SCMP_009): one team on one line.
