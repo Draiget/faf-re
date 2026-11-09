@@ -40,6 +40,29 @@ namespace faf::editor
       } else if (std::memcmp(fa->data, fb->data, static_cast<std::size_t>(fa->width) * static_cast<std::size_t>(fa->height) * 2u) != 0) {
         Note(differences, "heights");
       }
+      // The eight stratum masks, texel for texel, once both maps are ready for drawing (Finalize sets the
+      // masks' size and makes them the textures the masks are read from, as drawing a map first does).
+      if (!b.mTerrainRes->GetBool()) {
+        (void)b.mTerrainRes->Finalize();
+      }
+      if (a.mTerrainRes->GetBool() && b.mTerrainRes->GetBool()) {
+        const moho::StratumMaterial& sa = a.mTerrainRes->GetStratumMaterial();
+        const moho::StratumMaterial& sb = b.mTerrainRes->GetStratumMaterial();
+        if (sa.mStratumMaskWidth != sb.mStratumMaskWidth || sa.mStratumMaskHeight != sb.mStratumMaskHeight) {
+          Note(differences, "mask size " + std::to_string(sa.mStratumMaskWidth) + "x" + std::to_string(sa.mStratumMaskHeight) + " vs " + std::to_string(sb.mStratumMaskWidth) + "x" + std::to_string(sb.mStratumMaskHeight));
+        } else {
+          const std::size_t count = static_cast<std::size_t>(sa.mStratumMaskWidth) * sa.mStratumMaskHeight;
+          std::vector<std::uint8_t> ma(count, 1);
+          std::vector<std::uint8_t> mb(count, 2);
+          for (int layer = 0; layer < 8; ++layer) {
+            a.mTerrainRes->GetStratumMask(layer, ma.data());
+            b.mTerrainRes->GetStratumMask(layer, mb.data());
+            if (ma != mb) {
+              Note(differences, "mask of stratum " + std::to_string(layer + 1));
+            }
+          }
+        }
+      }
       if (a.mTerrainRes->IsWaterEnabled() != b.mTerrainRes->IsWaterEnabled() ||
           a.mTerrainRes->GetWaterElevation() != b.mTerrainRes->GetWaterElevation()) {
         Note(differences, "water");

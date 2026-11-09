@@ -1,6 +1,9 @@
 #include "editor/EdTools.h"
 
 #include <cmath>
+#include <string>
+#include <cctype>
+#include <algorithm>
 #include <cstdio>
 
 #include "imgui.h"
@@ -295,7 +298,7 @@ namespace faf::editor
     ImGui::SliderFloat("##falloff", &mFalloff, 0.0f, 1.0f, "Falloff %.2f");
   }
 
-  void EdTools::DrawSymmetry()
+  void EdTools::DrawSymmetry(const bool withCheck)
   {
     SectionHeader("SYMMETRY");
     const float available = ImGui::GetContentRegionAvail().x;
@@ -346,6 +349,9 @@ namespace faf::editor
                           copies);
     }
     Note(note);
+    if (!withCheck) {
+      return;
+    }
 
     SectionHeader("SYMMETRY CHECK");
     if (mSymmetry == 0) {
@@ -391,17 +397,7 @@ namespace faf::editor
   {
     DrawBrush(true);
     DrawSymmetry();
-    SectionHeader("LIMIT");
-    ImGui::Checkbox("Only between heights", &mLimitHeight);
-    if (mLimitHeight) {
-      ImGui::SetNextItemWidth(-1.0f);
-      ImGui::DragFloatRange2("##limitheights", &mLimitLow, &mLimitHigh, 0.25f, 0.0f, 512.0f, "From %.1f", "to %.1f");
-    }
-    ImGui::Checkbox("Only below slope", &mLimitSlope);
-    if (mLimitSlope) {
-      ImGui::SetNextItemWidth(-1.0f);
-      ImGui::SliderFloat("##limitslope", &mLimitSlopeDegrees, 1.0f, 85.0f, "%.0f degrees");
-    }
+    DrawLimits();
     SectionHeader("HEIGHT FIELD");
     if (ImGui::Button("Import...")) {
       mImportRequested = true;
@@ -455,16 +451,127 @@ namespace faf::editor
     return mPlanePoints;
   }
 
+  namespace
+  {
+    /** "grass001" from "/env/evergreen/layers/grass001_albedo.dds"; "(empty)" for none. */
+    std::string LayerLabel(const std::string& path)
+    {
+      if (path.empty()) {
+        return "(empty)";
+      }
+      std::string name = path.substr(path.find_last_of('/') + 1);
+      for (const char* const suffix : {"_albedo.dds", ".dds"}) {
+        const std::string tail = suffix;
+        if (name.size() > tail.size()) {
+          std::string lower = name.substr(name.size() - tail.size());
+          for (char& c : lower) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+          }
+          if (lower == tail) {
+            name.resize(name.size() - tail.size());
+            break;
+          }
+        }
+      }
+      return name;
+    }
+  } // namespace
+
+  void EdTools::DrawLimits()
+  {
+    SectionHeader("LIMIT");
+    ImGui::Checkbox("Only between heights", &mLimitHeight);
+    if (mLimitHeight) {
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::DragFloatRange2("##limitheights", &mLimitLow, &mLimitHigh, 0.25f, 0.0f, 512.0f, "From %.1f", "to %.1f");
+    }
+    ImGui::Checkbox("Only below slope", &mLimitSlope);
+    if (mLimitSlope) {
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::SliderFloat("##limitslope", &mLimitSlopeDegrees, 1.0f, 85.0f, "%.0f degrees");
+    }
+  }
+
   void EdTools::DrawTexture()
   {
+    SectionHeader("LAYER");
+    // Strata 1-8 have masks; the lower layer is under everything and the upper one is blended by its alpha.
+    for (int layer = 0; layer < 8; ++layer) {
+      const std::string path = static_cast<std::size_t>(layer + 1) < mLayerNames.size() ? mLayerNames[static_cast<std::size_t>(layer + 1)] : "";
+      char label[160];
+      (void)std::snprintf(label, sizeof(label), "%d  %s##layer%d", layer + 1, LayerLabel(path).c_str(), layer);
+      if (ImGui::Selectable(label, mMaskLayer == layer)) {
+        mMaskLayer = layer;
+      }
+      if (!path.empty() && ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", path.c_str());
+      }
+    }
+    if (!mLayerNames.empty()) {
+      ImGui::TextDisabled("Under all: %s", LayerLabel(mLayerNames.front()).c_str());
+    }
+    SectionHeader("BRUSH");
+    static const char* const kMaskModes[] = {"Paint", "Erase", "Smooth"};
+    Segmented(kMaskModes, 3, mMaskMode);
+    ImGui::Checkbox("Lower the layers above", &mLowerAbove);
     DrawBrush(false);
-    DrawSymmetry();
+    DrawSymmetry(false);
+    DrawLimits();
+
     SectionHeader("RULES");
-    Note("Sand below sea + 4, rock above slope 0.3, snow above 72.");
-    ImGui::BeginDisabled();
-    ImGui::Button("Apply rules to whole map", ImVec2(-1.0f, 0.0f));
+    Note("Each rule sets its layer to full where the ground is in its height and slope range; they run in order over the whole map.");
+    int remove = -1;
+    for (std::size_t i = 0; i < mRules.size(); ++i) {
+      MaskRule& rule = mRules[i];
+      ImGui::PushID(static_cast<int>(i));
+      ImGui::SetNextItemWidth(70.0f);
+      int layer = rule.layer + 1;
+      if (ImGui::InputInt("##layer", &layer)) {
+        rule.layer = std::clamp(layer - 1, 0, 7);
+      }
+      ImGui::SameLine();
+      ImGui::TextUnformatted("layer");
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Remove")) {
+        remove = static_cast<int>(i);
+      }
+      ImGui::Checkbox("Height", &rule.useHeight);
+      if (rule.useHeight) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloatRange2("##heights", &rule.low, &rule.high, 0.25f, 0.0f, 512.0f, "%.1f", "%.1f");
+      }
+      ImGui::Checkbox("Slope", &rule.useSlope);
+      if (rule.useSlope) {
+        float lowDegrees = std::atan(rule.minSlope) * 57.29578f;
+        float highDegrees = std::atan(std::min(rule.maxSlope, 1000.0f)) * 57.29578f;
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::DragFloatRange2("##slopes", &lowDegrees, &highDegrees, 0.5f, 0.0f, 90.0f, "%.0f deg", "%.0f deg")) {
+          rule.minSlope = std::tan(lowDegrees * 0.0174532925f);
+          rule.maxSlope = highDegrees >= 89.9f ? 1000.0f : std::tan(highDegrees * 0.0174532925f);
+        }
+      }
+      ImGui::Separator();
+      ImGui::PopID();
+    }
+    if (remove >= 0) {
+      mRules.erase(mRules.begin() + remove);
+    }
+    if (ImGui::Button("Add rule")) {
+      MaskRule rule;
+      rule.layer = mMaskLayer;
+      rule.useSlope = true;
+      rule.minSlope = std::tan(30.0f * 0.0174532925f);
+      rule.maxSlope = 1000.0f;
+      mRules.push_back(rule);
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(mRules.empty());
+    if (ImGui::Button("Apply rules to whole map")) {
+      mRulesRequested = true;
+    }
     ImGui::EndDisabled();
-    Note("Layer painting, previews and names come in stage 4.");
   }
 
   void EdTools::DrawWater()

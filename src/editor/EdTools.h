@@ -1,11 +1,13 @@
 #pragma once
 
 #include "editor/tools/EdHeightBrush.h"
+#include "editor/tools/EdMaskBrush.h"
 
 #include <cmath>
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace faf::editor
 {
@@ -22,6 +24,37 @@ namespace faf::editor
 
     /** Whether the Terrain tool is the chosen one (the viewport's left button paints heights). */
     [[nodiscard]] bool TerrainToolActive() const noexcept { return mTool == 1; }
+    /** Whether the Texture tool is the chosen one (the viewport's left button paints a layer's mask). */
+    [[nodiscard]] bool TextureToolActive() const noexcept { return mTool == 2; }
+
+    /** The texture brush as the panel sets it: the brush's shape, the layer, the mode. */
+    [[nodiscard]] MaskBrush CurrentMaskBrush() const noexcept
+    {
+      MaskBrush brush;
+      brush.shape = CurrentHeightBrush();
+      brush.mode = static_cast<MaskBrushMode>(mMaskMode);
+      brush.layer = mMaskLayer;
+      brush.lowerAbove = mLowerAbove;
+      return brush;
+    }
+    /** The open map's layer texture paths (lower, strata 1-8, upper), for the layer list. */
+    void SetLayerNames(std::vector<std::string> names) { mLayerNames = std::move(names); }
+    /** Apply rules to whole map was pressed; the rules. */
+    [[nodiscard]] bool TakeRulesRequest() noexcept { return std::exchange(mRulesRequested, false); }
+    [[nodiscard]] const std::vector<MaskRule>& Rules() const noexcept { return mRules; }
+    /** Test runs (`/maskrule`): one more rule, then Apply. */
+    void AddRule(const MaskRule& rule)
+    {
+      mTool = 2;
+      mRules.push_back(rule);
+    }
+    void RequestRules() noexcept { mRulesRequested = true; }
+    /** Test runs (`/masklayer`): the Texture tool on this layer. */
+    void SetMaskLayer(const int layer) noexcept
+    {
+      mTool = 2;
+      mMaskLayer = layer;
+    }
 
     /** The terrain brush as the panel sets it (Flatten's height is the stroke's, set by the viewport). */
     [[nodiscard]] HeightBrush CurrentHeightBrush() const noexcept
@@ -124,7 +157,8 @@ namespace faf::editor
     void DrawMarkers();
     void DrawSelect();
     void DrawBrush(bool withModes);
-    void DrawSymmetry();
+    void DrawSymmetry(bool withCheck = true);
+    void DrawLimits();
 
     int mTool = 1;
     int mBrushMode = 0;
@@ -162,6 +196,13 @@ namespace faf::editor
     bool mExportRequested = false;
     float mHeightScale = 1.0f;
     int mExportSize = 0;
+
+    int mMaskLayer = 0;
+    int mMaskMode = 0;
+    bool mLowerAbove = true;
+    std::vector<std::string> mLayerNames;
+    std::vector<MaskRule> mRules;
+    bool mRulesRequested = false;
 
     bool mCheckRequested = false;
     bool mRepairRequested = false;

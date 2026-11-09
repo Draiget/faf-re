@@ -9,6 +9,9 @@
 #include "editor/doc/EdDocument.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdHeightFile.h"
+#include "editor/tools/EdMaskBrush.h"
+#include "moho/terrain/StratumMaterial.h"
+#include "moho/sim/CBackgroundTaskControl.h"
 #include "editor/tools/EdSymmetryCheck.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
@@ -60,7 +63,8 @@ namespace faf::editor
 
   void EdMapScene::DrawBrushRings()
   {
-    if (mMap == nullptr || mCamera == nullptr || mTools == nullptr || !mTools->TerrainToolActive() || moho::ren_Viewport == nullptr) {
+    if (mMap == nullptr || mCamera == nullptr || mTools == nullptr || (!mTools->TerrainToolActive() && !mTools->TextureToolActive()) ||
+        moho::ren_Viewport == nullptr) {
       return;
     }
     const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
@@ -273,6 +277,7 @@ namespace faf::editor
     }
     // A stroke in progress ends here, so undo has it whole.
     EndStroke();
+    EndMaskStroke();
     // The props first: their blueprints are the kept rules', which the next play takes.
     DeleteProps();
     moho::ED_SetHook(nullptr);
@@ -325,7 +330,11 @@ namespace faf::editor
   {
     if (mMap != nullptr && mDocument.Heights().Stroking()) {
       if (const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField()) {
+        const std::size_t before = mDocument.Heights().UndoCount();
         mDocument.Heights().EndStroke(field->data);
+        if (mDocument.Heights().UndoCount() > before) {
+          mDocument.EditEnded(EdDocument::EditKind::Heights);
+        }
         // A check that was made is kept up to date as the map changes.
         if (mCheckDone) {
           RunSymmetryCheck();
@@ -337,9 +346,48 @@ namespace faf::editor
 
   bool EdMapScene::Undo()
   {
+    EdDocument::EditKind kind{};
+    if (mMap == nullptr || mPainting || mPaintingMask || !mDocument.PopUndo(kind)) {
+      return false;
+    }
+    const bool done = kind == EdDocument::EditKind::Masks ? UndoMasks(false) : UndoHeights(false);
+    if (done) {
+      mDocument.PushRedo(kind);
+    }
+    return done;
+  }
+
+  bool EdMapScene::Redo()
+  {
+    EdDocument::EditKind kind{};
+    if (mMap == nullptr || mPainting || mPaintingMask || !mDocument.PopRedo(kind)) {
+      return false;
+    }
+    const bool done = kind == EdDocument::EditKind::Masks ? UndoMasks(true) : UndoHeights(true);
+    if (done) {
+      mDocument.PushUndo(kind);
+    }
+    return done;
+  }
+
+  bool EdMapScene::UndoMasks(const bool redo)
+  {
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    std::vector<SampleRect> rects;
+    if (masks.texels.empty() ||
+        !(redo ? mDocument.MaskUndo().Redo(masks.texels.data(), rects) : mDocument.MaskUndo().Undo(masks.texels.data(), rects))) {
+      return false;
+    }
+    UploadMasks(rects, 0xFFu);
+    mDocument.SetModified(true);
+    return true;
+  }
+
+  bool EdMapScene::UndoHeights(const bool redo)
+  {
     moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
     std::vector<SampleRect> rects;
-    if (field == nullptr || mPainting || !mDocument.Heights().Undo(field->data, rects)) {
+    if (field == nullptr || mPainting || !(redo ? mDocument.Heights().Redo(field->data, rects) : mDocument.Heights().Undo(field->data, rects))) {
       return false;
     }
     RefreshHeights(rects);
@@ -350,19 +398,131 @@ namespace faf::editor
     return true;
   }
 
-  bool EdMapScene::Redo()
+  void EdMapScene::LoadMasks()
   {
-    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
-    std::vector<SampleRect> rects;
-    if (field == nullptr || mPainting || !mDocument.Heights().Redo(field->data, rects)) {
-      return false;
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    if (!masks.texels.empty() || mMap == nullptr) {
+      return;
     }
-    RefreshHeights(rects);
+    moho::IWldTerrainRes* const terrain = mMap->mTerrainRes;
+    // Edit mode, as the original editor ran: the masks become textures that can be written (and the water
+    // map is rebuilt from the heights).
+    if (!terrain->IsInEditMode()) {
+      moho::CBackgroundTaskControl control{nullptr};
+      terrain->EnterEditMode(control);
+    }
+    const moho::StratumMaterial& strata = terrain->GetStratumMaterial();
+    masks.width = static_cast<int>(strata.mStratumMaskWidth);
+    masks.height = static_cast<int>(strata.mStratumMaskHeight);
+    if (masks.width < 1 || masks.height < 1) {
+      return;
+    }
+    const std::size_t count = static_cast<std::size_t>(masks.width) * static_cast<std::size_t>(masks.height);
+    masks.texels.assign(count, 0);
+    mMaskPlane.assign(count, 0);
+    for (int layer = 0; layer < 8; ++layer) {
+      terrain->GetStratumMask(layer, mMaskPlane.data());
+      for (std::size_t i = 0; i < count; ++i) {
+        masks.texels[i] |= static_cast<std::uint64_t>(mMaskPlane[i]) << (8 * layer);
+      }
+    }
+    mDocument.MaskUndo().Reset(masks.width, masks.height);
+    // How much of the map each layer covers (the share of full weight), for the log.
+    std::string cover;
+    for (int layer = 0; layer < 8; ++layer) {
+      std::uint64_t sum = 0;
+      for (const std::uint64_t texel : masks.texels) {
+        sum += MaskByte(texel, layer);
+      }
+      char part[32];
+      (void)std::snprintf(part, sizeof(part), "%s%d: %.1f%%", layer == 0 ? "" : ", ", layer + 1, 100.0 * static_cast<double>(sum) / (255.0 * static_cast<double>(count)));
+      cover += part;
+    }
+    gpg::Logf("editor: stratum masks %d x %d read for painting (cover %s)", masks.width, masks.height, cover.c_str());
+  }
+
+  void EdMapScene::UploadMasks(const std::vector<SampleRect>& rects, const unsigned layers)
+  {
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    if (masks.texels.empty() || mMap == nullptr) {
+      return;
+    }
+    mMaskPlane.resize(masks.texels.size());
+    for (int layer = 0; layer < 8; ++layer) {
+      if ((layers & (1u << layer)) == 0) {
+        continue;
+      }
+      for (const SampleRect& rect : rects) {
+        for (int z = rect.z0; z <= rect.z1; ++z) {
+          const std::size_t row = static_cast<std::size_t>(z) * static_cast<std::size_t>(masks.width);
+          for (int x = rect.x0; x <= rect.x1; ++x) {
+            mMaskPlane[row + static_cast<std::size_t>(x)] = MaskByte(masks.texels[row + static_cast<std::size_t>(x)], layer);
+          }
+        }
+        mMap->mTerrainRes->UpdateStratumMask(layer, mMaskPlane.data(), rect.x0, rect.z0, rect.x1 + 1, rect.z1 + 1);
+      }
+    }
+  }
+
+  void EdMapScene::PaintMask(const float frameSeconds)
+  {
+    float groundX = 0.0f;
+    float groundZ = 0.0f;
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    if (mTools == nullptr || field == nullptr || masks.texels.empty() ||
+        !GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ)) {
+      return;
+    }
+    MaskBrush brush = mTools->CurrentMaskBrush();
+    brush.step = ++mMaskSteps;
+    const MaskTerrain terrain{field->data, field->width, field->height};
+    for (const SampleRect& rect : MaskBrushRects(masks.width, masks.height, terrain, groundX, groundZ, brush)) {
+      mDocument.MaskUndo().BeforeWrite(masks.texels.data(), rect);
+    }
+    const std::vector<SampleRect> rects =
+      ApplyMaskBrush(masks.texels.data(), masks.width, masks.height, terrain, groundX, groundZ, brush, std::min(frameSeconds, 0.1f));
+    if (!rects.empty()) {
+      mDocument.SetModified(true);
+      // The painted layer, and those above it when Paint lowers them.
+      unsigned layers = 1u << brush.layer;
+      if (brush.mode == MaskBrushMode::Paint && brush.lowerAbove) {
+        layers |= 0xFFu & ~((2u << brush.layer) - 1u);
+      }
+      UploadMasks(rects, layers);
+    }
+  }
+
+  void EdMapScene::EndMaskStroke()
+  {
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    if (mDocument.MaskUndo().Stroking() && !masks.texels.empty()) {
+      const std::size_t before = mDocument.MaskUndo().UndoCount();
+      mDocument.MaskUndo().EndStroke(masks.texels.data());
+      if (mDocument.MaskUndo().UndoCount() > before) {
+        mDocument.EditEnded(EdDocument::EditKind::Masks);
+      }
+    }
+    mPaintingMask = false;
+  }
+
+  void EdMapScene::ApplyRules()
+  {
+    LoadMasks();
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (mTools == nullptr || field == nullptr || masks.texels.empty() || mPaintingMask || mTools->Rules().empty()) {
+      return;
+    }
+    const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
+    mDocument.MaskUndo().BeginStroke();
+    mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
+    (void)ApplyMaskRules(masks.texels.data(), masks.width, masks.height, MaskTerrain{field->data, field->width, field->height}, mTools->Rules());
+    mDocument.MaskUndo().EndStroke(masks.texels.data());
+    mDocument.EditEnded(EdDocument::EditKind::Masks);
+    UploadMasks({whole}, 0xFFu);
     mDocument.SetModified(true);
-    if (mCheckDone) {
-      RunSymmetryCheck();
-    }
-    return true;
+    gpg::Logf("editor: %zu texture rules applied to the whole map", mTools->Rules().size());
   }
 
   void EdMapScene::RunSymmetryCheck()
@@ -397,6 +557,7 @@ namespace faf::editor
     mDocument.Heights().BeforeWrite(field->data, whole);
     (void)MakeSymmetric(field->data, field->width, field->height, brush.symmetry, brush.turns);
     mDocument.Heights().EndStroke(field->data);
+    mDocument.EditEnded(EdDocument::EditKind::Heights);
     RefreshHeights({whole});
     mDocument.SetModified(true);
     gpg::Logf("editor: copied the source part of the map to its other copies");
@@ -425,6 +586,7 @@ namespace faf::editor
     mDocument.Heights().BeforeWrite(field->data, whole);
     std::copy(image.words.begin(), image.words.end(), field->data);
     mDocument.Heights().EndStroke(field->data);
+    mDocument.EditEnded(EdDocument::EditKind::Heights);
     RefreshHeights({whole});
     mDocument.SetModified(true);
     if (mCheckDone) {
@@ -510,6 +672,15 @@ namespace faf::editor
     MoveWithKeys(frameSeconds);
     if (mPainting) {
       PaintStroke(frameSeconds);
+    }
+    if (mPaintingMask) {
+      PaintMask(frameSeconds);
+    }
+    if (mTools != nullptr && mTools->TextureToolActive()) {
+      LoadMasks();
+    }
+    if (mTools != nullptr && mTools->TakeRulesRequest()) {
+      ApplyRules();
     }
     if (mTools != nullptr) {
       if (mTools->TakeCheckRequest()) {
@@ -660,6 +831,16 @@ namespace faf::editor
     }
     switch (message) {
     case WM_LBUTTONDOWN: {
+      if (mTools != nullptr && mTools->TextureToolActive()) {
+        LoadMasks();
+        if (!mDocument.Masks().texels.empty()) {
+          mPaintingMask = true;
+          mDocument.MaskUndo().BeginStroke();
+          ::SetCapture(window);
+          ::SetFocus(window);
+        }
+        return true;
+      }
       if (mTools == nullptr || !mTools->TerrainToolActive()) {
         return false;
       }
@@ -685,6 +866,11 @@ namespace faf::editor
       return true;
     }
     case WM_LBUTTONUP:
+      if (mPaintingMask) {
+        EndMaskStroke();
+        ::ReleaseCapture();
+        return true;
+      }
       if (mPainting) {
         EndStroke();
         ::ReleaseCapture();
@@ -708,7 +894,7 @@ namespace faf::editor
       return true;
     case WM_MOUSEMOVE: {
       if (mDrag == Drag::None) {
-        return mPainting;
+        return mPainting || mPaintingMask;
       }
       const float dx = static_cast<float>(at.x - mDragFrom.x);
       const float dy = static_cast<float>(at.y - mDragFrom.y);

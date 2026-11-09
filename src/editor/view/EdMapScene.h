@@ -99,6 +99,19 @@ namespace faf::editor
     HeightBrush mCheckedWith;
     bool mCheckDone = false;
     bool mPainting = false;
+
+    /** The Texture tool: the masks read into the document once, edit mode on (the original editor's). */
+    void LoadMasks();
+    void PaintMask(float frameSeconds);
+    void EndMaskStroke();
+    /** Writes texels of `layers` (bit k: stratum k) in the rectangles back into the map's mask textures. */
+    void UploadMasks(const std::vector<SampleRect>& rects, unsigned layers);
+    void ApplyRules();
+    bool mPaintingMask = false;
+    std::uint32_t mMaskSteps = 0;
+    std::vector<std::uint8_t> mMaskPlane;
+    bool UndoHeights(bool redo);
+    bool UndoMasks(bool redo);
     /** Stamp mode: the click's stamp is down. */
     bool mStamped = false;
 

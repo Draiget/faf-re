@@ -10,12 +10,13 @@
 namespace faf::editor
 {
   /**
-   * Undo and redo for the height field (board task WPE.6), by tiles: during a stroke, the first write to a
-   * 32 x 32 tile saves that tile's heights from before; the stroke's end saves the same tiles' heights
-   * after. Undo writes the befores back, redo the afters. Byte-exact, and only the tiles a stroke touched
-   * are kept. The oldest strokes go when the history passes its memory budget.
+   * Undo and redo for a grid of `T` (the height field's words, WPE.6; the stratum masks' texels, WPE.7), by
+   * tiles: during a stroke, the first write to a 32 x 32 tile saves that tile from before; the stroke's end
+   * saves the same tiles after. Undo writes the befores back, redo the afters. Byte-exact, and only the
+   * tiles a stroke touched are kept. The oldest strokes go when the history passes its memory budget.
    */
-  class HeightHistory
+  template <typename T>
+  class TileHistory
   {
   public:
     static constexpr int kTile = 32;
@@ -27,27 +28,29 @@ namespace faf::editor
     void BeginStroke();
 
     /** Before the stroke writes `rect` of `heights`: keeps the tiles it covers as they are, once each. */
-    void BeforeWrite(const std::uint16_t* heights, const SampleRect& rect);
+    void BeforeWrite(const T* heights, const SampleRect& rect);
 
     /** The stroke ended: keeps its tiles' new heights and makes it the newest undo step (redo is cleared). */
-    void EndStroke(const std::uint16_t* heights);
+    void EndStroke(const T* heights);
 
     /** Writes the newest stroke's old heights back; the rectangles it wrote go to `changed`. */
-    bool Undo(std::uint16_t* heights, std::vector<SampleRect>& changed);
+    bool Undo(T* heights, std::vector<SampleRect>& changed);
 
     /** Writes the newest undone stroke's new heights back. */
-    bool Redo(std::uint16_t* heights, std::vector<SampleRect>& changed);
+    bool Redo(T* heights, std::vector<SampleRect>& changed);
 
     [[nodiscard]] std::size_t UndoCount() const noexcept { return mUndo.size(); }
     [[nodiscard]] std::size_t RedoCount() const noexcept { return mRedo.size(); }
     [[nodiscard]] bool Stroking() const noexcept { return mStroking; }
+    /** Forgets the undone strokes (another kind of edit came after them). */
+    void ClearRedo() { mRedo.clear(); }
 
   private:
     struct Tile
     {
       int index = 0;
-      std::vector<std::uint16_t> before;
-      std::vector<std::uint16_t> after;
+      std::vector<T> before;
+      std::vector<T> after;
     };
     struct Step
     {
@@ -56,8 +59,8 @@ namespace faf::editor
     };
 
     [[nodiscard]] SampleRect TileRect(int index) const;
-    void Copy(const std::uint16_t* heights, const SampleRect& rect, std::vector<std::uint16_t>& out) const;
-    void Paste(std::uint16_t* heights, const SampleRect& rect, const std::vector<std::uint16_t>& in) const;
+    void Copy(const T* heights, const SampleRect& rect, std::vector<T>& out) const;
+    void Paste(T* heights, const SampleRect& rect, const std::vector<T>& in) const;
     void Trim();
 
     int mWidth = 0;
@@ -70,4 +73,11 @@ namespace faf::editor
     std::deque<Step> mUndo;
     std::vector<Step> mRedo;
   };
+
+  extern template class TileHistory<std::uint16_t>;
+  extern template class TileHistory<std::uint64_t>;
+  /** The height field's history: its 16-bit words. */
+  using HeightHistory = TileHistory<std::uint16_t>;
+  /** The stratum masks' history: one texel's eight layer weights as one 64-bit word (byte k is stratum k). */
+  using MaskHistory = TileHistory<std::uint64_t>;
 } // namespace faf::editor

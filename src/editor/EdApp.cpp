@@ -307,6 +307,12 @@ namespace faf::editor
       std::string mNewMapSpec;
       // `/brush <mode>` and `/stamp <file>` (test runs): the terrain brush's mode and stamp image, set once.
       int mBrushModeArg = -1;
+      // `/masklayer <1-8>` and `/maskrule <layer>,<low>,<high>` (test runs): the Texture tool on that layer;
+      // a height rule applied to the whole map once the map has been shown for 120 frames.
+      int mMaskLayerArg = -1;
+      std::string mMaskRuleArg;
+      int mMaskRuleFrames = 0;
+      std::string mLayerNamesOf;
       std::string mStampArg;
       /** The Tools panel's height field Import and Export: the file dialog, then the view. */
       void DriveHeightFiles();
@@ -666,6 +672,12 @@ namespace faf::editor
         mHeightExportFile = file[0].c_str();
       }
       mHeightDialog = moho::CFG_GetArgOption("/heightdialog", 0, nullptr);
+      if (fa::vector<fa::string> layer; moho::CFG_GetArgOption("/masklayer", 1, &layer) && !layer.empty()) {
+        mMaskLayerArg = std::atoi(layer[0].c_str()) - 1;
+      }
+      if (fa::vector<fa::string> rule; moho::CFG_GetArgOption("/maskrule", 1, &rule) && !rule.empty()) {
+        mMaskRuleArg = rule[0].c_str();
+      }
       if (fa::vector<fa::string> mode; moho::CFG_GetArgOption("/brush", 1, &mode) && !mode.empty()) {
         mBrushModeArg = std::atoi(mode[0].c_str());
       }
@@ -756,6 +768,29 @@ namespace faf::editor
     void EditorApp::DriveHeightFiles()
     {
       EdTools& tools = mShell->Tools();
+      // The open map's layers for the Texture tool's list.
+      if (mDocument.GetState() == EdDocument::State::Open && mLayerNamesOf != mDocument.Path()) {
+        mLayerNamesOf = mDocument.Path();
+        tools.SetLayerNames(mDocument.Facts().layers);
+      }
+      if (mMaskLayerArg >= 0) {
+        tools.SetMaskLayer(mMaskLayerArg);
+        mMaskLayerArg = -1;
+      }
+      if (!mMaskRuleArg.empty() && mScene.Attached() && ++mMaskRuleFrames == 120) {
+        MaskRule rule;
+        rule.layer = std::clamp(std::atoi(mMaskRuleArg.c_str()) - 1, 0, 7);
+        rule.useHeight = true;
+        if (const std::size_t comma = mMaskRuleArg.find(','); comma != std::string::npos) {
+          rule.low = static_cast<float>(std::atof(mMaskRuleArg.c_str() + comma + 1));
+          if (const std::size_t second = mMaskRuleArg.find(',', comma + 1); second != std::string::npos) {
+            rule.high = static_cast<float>(std::atof(mMaskRuleArg.c_str() + second + 1));
+          }
+        }
+        tools.AddRule(rule);
+        tools.RequestRules();
+        mMaskRuleArg.clear();
+      }
       if (mBrushModeArg >= 0) {
         tools.SetBrushMode(mBrushModeArg);
         mBrushModeArg = -1;
