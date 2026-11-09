@@ -498,25 +498,30 @@ namespace faf::editor
     if (field == nullptr) {
       return;
     }
-    // The land unit's footprint from its blueprint (a T1 tank unless the rules lack it).
-    const char* const unitId = "uel0201";
-    PathFootprint land;
-    land.caps = 0x1;
-    land.maxSlope = 0.75f;
-    if (moho::RRuleGameRules* const rules = moho::RULE_PeekKept(); rules != nullptr) {
-      moho::RResId id{};
-      id.name.assign(unitId);
-      if (const moho::RUnitBlueprint* const blueprint = rules->GetUnitBlueprint(id);
-          blueprint != nullptr && blueprint->Physics.ResolvedFootprint != nullptr) {
-        const moho::SFootprint& footprint = *blueprint->Physics.ResolvedFootprint;
-        land.caps = static_cast<std::uint8_t>(footprint.mOccupancyCaps);
-        land.maxSlope = footprint.mMaxSlope;
-        land.minWaterDepth = footprint.mMinWaterDepth;
-        land.maxWaterDepth = footprint.mMaxWaterDepth;
+    // The units' footprints from their blueprints (a T1 tank and a T1 frigate; fallbacks when the rules lack them).
+    const auto footprintOf = [](const char* const unitId, PathFootprint fallback) {
+      const char* from = "a fallback: the rules aren't built yet or lack it";
+      if (moho::RRuleGameRules* const rules = moho::RULE_PeekKept(); rules != nullptr) {
+        moho::RResId id{};
+        id.name.assign(unitId);
+        if (const moho::RUnitBlueprint* const blueprint = rules->GetUnitBlueprint(id);
+            blueprint != nullptr && blueprint->Physics.ResolvedFootprint != nullptr) {
+          const moho::SFootprint& footprint = *blueprint->Physics.ResolvedFootprint;
+          fallback.caps = static_cast<std::uint8_t>(footprint.mOccupancyCaps);
+          fallback.maxSlope = footprint.mMaxSlope;
+          fallback.minWaterDepth = footprint.mMinWaterDepth;
+          fallback.maxWaterDepth = footprint.mMaxWaterDepth;
+          from = "its blueprint";
+        }
       }
-    }
-    gpg::Logf("editor: pathing as %s: caps 0x%02x, max slope %.2f, water depth %.2f to %.2f", unitId, land.caps, static_cast<double>(land.maxSlope),
-              static_cast<double>(land.minWaterDepth), static_cast<double>(land.maxWaterDepth));
+      gpg::Logf("editor: pathing as %s (%s): caps 0x%02x, max slope %.2f, water depth %.2f to %.2f", unitId, from, fallback.caps,
+                static_cast<double>(fallback.maxSlope), static_cast<double>(fallback.minWaterDepth), static_cast<double>(fallback.maxWaterDepth));
+      return fallback;
+    };
+    const char* const unitId = "uel0201";
+    const char* const shipId = "ues0103";
+    const PathFootprint land = footprintOf(unitId, PathFootprint{0x1, 0.75f, 0.0f, 0.0f});
+    const PathFootprint ship = footprintOf(shipId, PathFootprint{0x8, 0.0f, 1.5f, 0.0f});
     const int cellsX = field->width - 1;
     const int cellsZ = field->height - 1;
     const std::vector<std::uint8_t> cells = PassableCells(field->data, field->width, field->height, input.water, input.waterLevel, land);
@@ -588,6 +593,39 @@ namespace faf::editor
       mCheckIssues.push_back(issue);
     }
 
+    // Naval: the ship water nearest each start (within 64 units), and whether the starts' waters meet.
+    const std::vector<std::uint8_t> shipCells = PassableCells(field->data, field->width, field->height, input.water, input.waterLevel, ship);
+    std::vector<int> shipAreas;
+    const int shipAreaCount = ConnectAreas(shipCells, cellsX, cellsZ, shipAreas);
+    std::vector<int> startWaters;
+    std::vector<int> waterOfStart;
+    for (const Start& start : starts) {
+      const int water = AreaNear(shipAreas, cellsX, cellsZ, start.x, start.z, 64);
+      waterOfStart.push_back(water);
+      if (water != 0 && std::find(startWaters.begin(), startWaters.end(), water) == startWaters.end()) {
+        startWaters.push_back(water);
+      }
+    }
+    const std::size_t withWater = static_cast<std::size_t>(std::count_if(waterOfStart.begin(), waterOfStart.end(), [](const int w) { return w != 0; }));
+    if (withWater > 0) {
+      for (std::size_t i = 0; i < starts.size(); ++i) {
+        CheckIssue issue;
+        issue.marker = starts[i].marker->name;
+        issue.x = starts[i].x;
+        issue.z = starts[i].z;
+        if (waterOfStart[i] == 0) {
+          issue.level = CheckIssue::Level::Warning;
+          issue.text = std::string("no water a ") + shipId + " can use within 64 units, while " + std::to_string(withWater) + " of " +
+                       std::to_string(starts.size()) + " starts have some";
+        } else {
+          issue.level = startWaters.size() > 1 ? CheckIssue::Level::Warning : CheckIssue::Level::Note;
+          issue.text = std::string("has water a ") + shipId + " can use within 64 units" +
+                       (startWaters.size() > 1 ? "; the starts' waters don't all meet (" + std::to_string(startWaters.size()) + " separate)" : ", joined with the other starts'");
+        }
+        mCheckIssues.push_back(issue);
+      }
+    }
+
     // The overlay: blocks of up to 256 a side, red where the land unit can't go, amber where it can but no start reaches.
     const int block = std::max(1, (std::max(cellsX, cellsZ) + 255) / 256);
     std::vector<EdTools::PathQuad> quads;
@@ -618,9 +656,40 @@ namespace faf::editor
         }
       }
     }
-    mTools.SetPathing(std::move(quads));
-    gpg::Logf("editor: pathing: %d land areas, starts on %zu of them; %zu overlay blocks of %d cells", areaCount, startAreas.size(),
-              mTools.PathingQuads().size(), block);
+    // Ships: blue where they can go in a start's water, purple where they can go but no start's ships get to.
+    std::vector<EdTools::PathQuad> shipQuads;
+    for (int bz = 0; bz < cellsZ; bz += block) {
+      for (int bx = 0; bx < cellsX; bx += block) {
+        int used = 0;
+        int lone = 0;
+        int total = 0;
+        for (int z = bz; z < std::min(bz + block, cellsZ); ++z) {
+          for (int x = bx; x < std::min(bx + block, cellsX); ++x) {
+            const int area = shipAreas[static_cast<std::size_t>(z) * static_cast<std::size_t>(cellsX) + static_cast<std::size_t>(x)];
+            ++total;
+            if (area == 0) {
+              continue;
+            }
+            ++(std::find(startWaters.begin(), startWaters.end(), area) != startWaters.end() ? used : lone);
+          }
+        }
+        const float x0 = static_cast<float>(bx);
+        const float z0 = static_cast<float>(bz);
+        const float x1 = static_cast<float>(std::min(bx + block, cellsX));
+        const float z1 = static_cast<float>(std::min(bz + block, cellsZ));
+        if (used * 2 >= total) {
+          shipQuads.push_back({x0, z0, x1, z1, 0x503C8CFFu});
+        } else if (lone * 2 >= total) {
+          shipQuads.push_back({x0, z0, x1, z1, 0x50B048E0u});
+        }
+      }
+    }
+    const std::size_t landBlocks = quads.size();
+    const std::size_t shipBlocks = shipQuads.size();
+    mTools.SetPathing(std::move(quads), std::move(shipQuads));
+    gpg::Logf("editor: pathing: %d land areas, starts on %zu of them; %d ship areas, %zu starts with ship water in %zu of them; %zu land and %zu ship overlay "
+              "blocks of %d cells",
+              areaCount, startAreas.size(), shipAreaCount, withWater, startWaters.size(), landBlocks, shipBlocks, block);
   }
 
   void EdShell::RunCheck()
@@ -678,7 +747,8 @@ namespace faf::editor
       ImGui::SetNextWindowDockID(map->DockId, ImGuiCond_FirstUseEver);
     }
     // A requested run (`/check`) happens whether or not the tab is in front, and brings it there.
-    if (mRunCheck && mDocument.GetState() == EdDocument::State::Open) {
+    // ... once the rules are built, so the pathing goes by the units' own footprints.
+    if (mRunCheck && mDocument.GetState() == EdDocument::State::Open && moho::RULE_PeekKept() != nullptr) {
       mRunCheck = false;
       RunCheck();
       ImGui::SetNextWindowFocus();
@@ -703,8 +773,13 @@ namespace faf::editor
     }
     ImGui::Checkbox("Show pathing", &mTools.ShowPathing());
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-      ImGui::SetTooltip("After a run: red where a T1 tank (uel0201) can't go (too steep, too deep), amber where it can but no start reaches");
+      ImGui::SetTooltip("After a run. Land: red where a T1 tank (uel0201) can't go (too steep, too deep), amber where it can but no start "
+                        "reaches. Ships: blue where a T1 frigate (ues0103) can go in a start's water, purple where it can but no start's ships get to.");
     }
+    ImGui::SameLine();
+    ImGui::RadioButton("Land", &mTools.PathingLayer(), 0);
+    ImGui::SameLine();
+    ImGui::RadioButton("Ships", &mTools.PathingLayer(), 1);
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     ImGui::TextWrapped("The scripts' syntax (_scenario.lua, _save.lua, _script.lua as edited), then start positions and mass and "
                        "hydrocarbon points: off the playable area, under water, without a partner at their symmetric copies (the Tools "

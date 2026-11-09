@@ -69,10 +69,16 @@ namespace faf::editor
       float z1;
       std::uint32_t color;
     };
-    void SetPathing(std::vector<PathQuad> quads) { mPathQuads = std::move(quads); }
-    [[nodiscard]] const std::vector<PathQuad>& PathingQuads() const noexcept { return mPathQuads; }
+    void SetPathing(std::vector<PathQuad> land, std::vector<PathQuad> ships)
+    {
+      mPathQuads = std::move(land);
+      mShipQuads = std::move(ships);
+    }
+    /** The layer shown: the land unit's (0) or the ship's (1). */
+    [[nodiscard]] const std::vector<PathQuad>& PathingQuads() const noexcept { return mPathingLayer == 1 ? mShipQuads : mPathQuads; }
     [[nodiscard]] bool& ShowPathing() noexcept { return mShowPathing; }
-    [[nodiscard]] bool ShowingPathing() const noexcept { return mShowPathing && !mPathQuads.empty(); }
+    [[nodiscard]] int& PathingLayer() noexcept { return mPathingLayer; }
+    [[nodiscard]] bool ShowingPathing() const noexcept { return mShowPathing && !PathingQuads().empty(); }
     [[nodiscard]] const std::vector<CheckPin>& CheckPins() const noexcept { return mCheckPins; }
     /** The Water tool's panel: the map's water as it is, and a change it made (`final` when a drag or a click ended). */
     [[nodiscard]] bool WaterToolActive() const noexcept { return mTool == 3; }
@@ -579,6 +585,8 @@ namespace faf::editor
     std::vector<CheckPin> mCheckPins;
     std::vector<PathQuad> mPathQuads;
     bool mShowPathing = false;
+    std::vector<PathQuad> mShipQuads;
+    int mPathingLayer = 0;
     WaterState mWater;
     bool mWaterEditing = false;
     bool mWaterChanged = false;
