@@ -12,6 +12,9 @@ namespace moho
   namespace
   {
     constexpr float kHeightWordScale = 0.0078125f;
+    /// A body's Deep and Abyss below its level when neither the body nor the sea gives them.
+    constexpr float kDefaultDeepBelow = 2.5f;
+    constexpr float kDefaultAbyssBelow = 15.0f;
 
     /// A number field of `table`, or `fallback` when it is missing or not a number.
     [[nodiscard]] float NumberField(const LuaPlus::LuaObject& table, const char* const name, const float fallback, bool* const present = nullptr)
@@ -56,9 +59,11 @@ namespace moho
       return;
     }
 
-    // Shading depths default to the sea's distances below its level.
-    const float deepBelow = mWaterElevation - mWaterElevationDeep;
-    const float abyssBelow = mWaterElevation - mWaterElevationAbyss;
+    // Shading depths default to the sea's distances below its level, or without a sea to the
+    // original maps' usual ones (Seton's Clutch: 17.5, 15, 2.5).
+    const bool seaShading = mWaterEnabled != 0u && mWaterElevation > mWaterElevationDeep && mWaterElevation > mWaterElevationAbyss;
+    const float deepBelow = seaShading ? mWaterElevation - mWaterElevationDeep : kDefaultDeepBelow;
+    const float abyssBelow = seaShading ? mWaterElevation - mWaterElevationAbyss : kDefaultAbyssBelow;
 
     std::vector<SWaterBodyDesc> descs;
     std::vector<std::string> log;
@@ -85,6 +90,12 @@ namespace moho
       }
       desc.deep = NumberField(entry, "Deep", desc.elevation - deepBelow);
       desc.abyss = NumberField(entry, "Abyss", desc.elevation - abyssBelow);
+      // Shading only (drawing divides by Elevation - Abyss): keep both below the level.
+      if (!desc.dry && (desc.deep >= desc.elevation || desc.abyss >= desc.elevation)) {
+        log.push_back("water body " + std::to_string(index) + ": Deep and Abyss must be below Elevation; using 2.5 and 15 below it");
+        desc.deep = desc.elevation - kDefaultDeepBelow;
+        desc.abyss = desc.elevation - kDefaultAbyssBelow;
+      }
 
       // Outline: { {x, z}, {x, z}, ... }, the control points of a closed spline.
       const LuaPlus::LuaObject outline = entry["Outline"];
