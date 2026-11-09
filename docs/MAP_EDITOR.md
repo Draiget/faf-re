@@ -36,6 +36,7 @@ Campaign maps go through FAF's own campaign setup. No replay is written. The gam
 | `/vulkan` | Vulkan only |
 | (neither) | Direct3D 12, then Vulkan; if neither starts, the editor says so and exits |
 | `/log <file>` | The engine log, as in the game; the Log panel shows it too |
+| `/logtimes <file>` | Also writes every log line with its time in seconds since the editor started (the Log panel's "Times" box shows the same), for timing where a play's start goes |
 | `/play <map>` | Plays that map (its folder or scenario name, e.g. `SCMP_009`) once the editor is up |
 | `/playseconds <s>` | With `/play`: stops after s seconds of play |
 | `/playcycles <n>` | With `/play`: plays and stops n times |
@@ -63,5 +64,5 @@ The Tools panel is laid out as the plan's mockup: a strip of tool icons and the 
 ## Known issues
 
 - Each Play keeps about 15 MB more after it ends (20 cycles of SCMP_009 on Direct3D 12: the lowest point between sessions went from 798 to 1,101 MB). Not yet traced.
-- The first play builds the game's rules (every blueprint, about 1.3 s for FAF) and later plays reuse them, so a solo play of SCMP_009 reaches the game in about 2.8 s the first time and 1.0 s after (Direct3D 12 and Vulkan alike). Large maps take longer to start: Alpha 7 Quarantine (SCMP_021, 40 km) about 5.5 s on later plays, 4 s of it creating the sim and its terrain, not yet traced. The game's loading screen still shows.
+- The first play builds the game's rules (every blueprint, about 1.3 s for FAF) and later plays reuse them, so a solo play of SCMP_009 reaches the game in about 2.8 s the first time and 1.0 s after (Direct3D 12 and Vulkan alike). Large maps take longer to start: Alpha 7 Quarantine (SCMP_021, 40 km) about 5 s on later plays: 3.4 s of it is the session applying the sim's first sync (`CWldSession::DoBeat`), against about 0.1 s on SCMP_009; not yet traced further. The game's loading screen still shows.
 - A popup of the panels that reaches over the game's view is hidden behind it (the view is its own window).

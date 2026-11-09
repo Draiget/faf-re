@@ -254,6 +254,10 @@ namespace faf::editor
       moho::gAppBeforeDeviceCreate = &AddPanelHead;
       // Plays have cheats on (the whole-map view during play needs them), Game.prefs untouched.
       moho::gSessionCheats = true;
+      // `/logtimes <file>`: every log line with its time, for timing a play's start.
+      if (fa::vector<fa::string> args; moho::CFG_GetArgOption("/logtimes", 1, &args) && !args.empty()) {
+        mLog.WriteTimesTo(args[0].c_str());
+      }
       // Each play's rules (every blueprint) are kept for the next play with the same mods.
       moho::RULE_SetKeepBetweenSessions(true);
 

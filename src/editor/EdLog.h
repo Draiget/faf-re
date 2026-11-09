@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+#include <cstdio>
 #include <deque>
 #include <mutex>
 #include <string>
@@ -16,6 +18,13 @@ namespace faf::editor
   {
   public:
     EdLog();
+    ~EdLog() override;
+
+    /**
+     * Also writes every line from now on to `path`, each with the seconds since the editor started (the
+     * `/logtimes <file>` switch, for timing where a play spends its time).
+     */
+    void WriteTimesTo(const std::string& path);
 
     void OnMessage(
       gpg::LogSeverity level,
@@ -35,12 +44,17 @@ namespace faf::editor
     {
       gpg::LogSeverity level;
       std::string text;
+      /** Seconds since the editor started. */
+      double seconds;
     };
 
     mutable std::mutex mMutex;
     std::deque<Line> mLines;
+    const std::chrono::steady_clock::time_point mStart = std::chrono::steady_clock::now();
+    std::FILE* mTimesFile = nullptr;
     int mWarnings = 0;
     bool mAutoScroll = true;
+    bool mShowTimes = false;
     char mFilter[128]{};
   };
 } // namespace faf::editor
