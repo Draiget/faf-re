@@ -347,3 +347,7 @@ target_link_libraries(faf_editor_brush_tests PRIVATE gtest_main ole32 windowscod
 set_target_properties(faf_editor_brush_tests PROPERTIES FOLDER "Tests/Editor")
 add_test(NAME editor_height_brush COMMAND faf_editor_brush_tests)
 set_tests_properties(editor_height_brush PROPERTIES LABELS "Editor")
+
+add_executable(faf_slab_tests EXCLUDE_FROM_ALL entity/FixedSlabPoolTests.cpp)
+target_link_libraries(faf_slab_tests PRIVATE faf_engine)
+add_test(NAME slab_tests COMMAND faf_slab_tests)

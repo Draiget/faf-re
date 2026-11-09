@@ -301,6 +301,7 @@ Sim::~Sim()
   if (mEntityDB) {
     delete mEntityDB;
     mEntityDB = nullptr;
+    EntityMemoryManager::Instance().Clear();
   }
 
   // Random stream (raw storage; no destructor in the binary).

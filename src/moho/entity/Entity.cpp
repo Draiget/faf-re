@@ -1,5 +1,6 @@
 #include "moho/lua/ScrLuaUserData.h"
 #include "moho/entity/EntityPrivate.h"
+#include "moho/entity/EntityMemoryManager.h"
 #include "moho/entity/EntityPool.h"
 
 namespace moho
@@ -903,11 +904,17 @@ namespace moho
   }
 
 
-  // Engine addition (sim_EntityPool): see EntityPool.
+  // Engine addition (sim_EntityPool, sim_EntityPools): see EntityPool and EntityMemoryManager. With sim_EntityPools
+  // on, a size that has a slab pool comes from a 64 KB slab; everything else goes through EntityPool. A block is
+  // freed by its address (slab addresses to their slab, all others to EntityPool), so sim_EntityPools can change
+  // during a game.
   void* Entity::operator new(
     std::size_t size
   )
   {
+    if (void* const block = EntityMemoryManager::Instance().TryAllocateSlab(size)) {
+      return block;
+    }
     return EntityPool::sInstance->Allocate(size);
   }
 
@@ -916,7 +923,11 @@ namespace moho
       std::nothrow_t
   ) noexcept
   {
-    return EntityPool::sInstance->TryAllocate(size);
+    try {
+      return Entity::operator new(size);
+    } catch (...) {
+      return nullptr;
+    }
   }
 
   void Entity::operator delete(
@@ -924,6 +935,10 @@ namespace moho
     std::size_t size
   ) noexcept
   {
+    if (EntityMemoryManager::OwnsBlock(ptr)) {
+      EntityMemoryManager::Instance().Deallocate(ptr, size);
+      return;
+    }
     EntityPool::sInstance->Dellocate(ptr, size);
   }
 

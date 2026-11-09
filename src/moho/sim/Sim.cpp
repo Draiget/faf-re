@@ -1,5 +1,6 @@
 #include "moho/lua/ScrLuaUserData.h"
 #include "moho/sim/SimPrivate2.h"
+#include "moho/entity/EntityMemoryManager.h"
 #include "moho/sim/SimBlockLane.h"
 
 #include <mutex>
