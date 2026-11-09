@@ -310,7 +310,8 @@ do
     -- Every method of moho[tableName] on `object` with each argument pattern: nothing, an enemy unit, a position, a
     -- unit blueprint id, 1, true, two numbers, a position and a number, a unit and a number. The wrong patterns stop
     -- at the engine's argument checks; the right ones run the method. Errors are expected and counted.
-    function Zoo.Fuzz(tableName, object, ctx)
+    function Zoo.Fuzz(tableName, object, ctx, label)
+        local key = label or tableName
         local methods = rawget(moho, tableName)
         if not methods or not object then
             return
@@ -331,10 +332,10 @@ do
         local failed = 0
         for i = 1, TableGetn(names) do
             local name = names[i]
-            if not FuzzSkip[name] and not SkipGetters[tableName .. '.' .. name] and not FuzzCrashes[tableName .. '.' .. name] then
+            if not FuzzSkip[name] and not SkipGetters[key .. '.' .. name] and not FuzzCrashes[key .. '.' .. name] then
                 local fn = methods[name]
                 for p = 1, TableGetn(patterns) do
-                    if Zoo.trace then Log('fuzz ' .. tableName .. '.' .. name .. ' #' .. p) end
+                    if Zoo.trace then Log('fuzz ' .. key .. '.' .. name .. ' #' .. p) end
                     local args = patterns[p]
                     local ok
                     if TableGetn(args) == 0 then
@@ -349,7 +350,81 @@ do
                 end
             end
         end
-        Log('fuzz ' .. tableName .. ': ' .. calls .. ' calls, ' .. failed .. ' errors')
+        Log('fuzz ' .. key .. ': ' .. calls .. ' calls, ' .. failed .. ' errors')
+    end
+
+    -- The same calls on any object, through its metatable's methods (the engine's classes whose method table has no
+    -- moho.<name>_methods entry: manipulators, effects, economy events, decals, projectiles, props).
+    function Zoo.FuzzObject(label, object, ctx)
+        if not object then
+            Log('fuzz ' .. label .. ': no object')
+            return
+        end
+        local methods = getmetatable(object)
+        if type(methods) == 'table' and type(rawget(methods, '__index')) == 'table' then
+            methods = rawget(methods, '__index')
+        end
+        if type(methods) ~= 'table' then
+            Log('fuzz ' .. label .. ': no methods')
+            return
+        end
+        local saved = moho['zoo_fuzz']
+        moho['zoo_fuzz'] = methods
+        Zoo.Fuzz('zoo_fuzz', object, ctx, label)
+        moho['zoo_fuzz'] = saved
+    end
+
+    -- Projectiles, props, a shield, every kind of manipulator, effects, an economy event, a decal and a blip, each
+    -- made here and given the same calls.
+    function Zoo.FuzzMore(ctx)
+        -- A global the engine may not register: FAF's Lua errors on reading a missing global, rawget doesn't.
+        local function G(name)
+            return rawget(getfenv(0), name) or function() error(name .. ' is not registered') end
+        end
+        local a = Zoo.a
+        local x = Zoo.cx
+        local z = Zoo.cz - 70
+        local tank = Zoo.Spawn('uel0201', a, x, z, 0)
+        local shieldGen = Zoo.Spawn('ueb4202', a, x + 10, z, 0)
+        local engineer = Zoo.Spawn('uel0105', a, x - 10, z, 0)
+        WaitTicks(5)
+        if not Alive(tank) then
+            Log('fuzz more: no tank')
+            return
+        end
+        local weapon = Try('GetWeapon', tank.GetWeapon, tank, 1)
+        local made = {
+            { 'projectile', Try('CreateProjectile', tank.CreateProjectile, tank,
+                '/projectiles/TDFGauss01/TDFGauss01_proj.bp', 0, 1, 0, 0, 0, 1) },
+            { 'rotator', Try('CreateRotator', G('CreateRotator'), tank, 0, 'y') },
+            { 'animator', Try('CreateAnimator', G('CreateAnimator'), tank) },
+            { 'slider', Try('CreateSlider', G('CreateSlider'), tank, 0, 0, 1, 0, 1) },
+            { 'aim', weapon and Try('CreateAimController', G('CreateAimController'), weapon, 'Zoo', 0, 0, 0) },
+            { 'footplant', Try('CreateFootPlantController', G('CreateFootPlantController'), tank, 0, 0, 0, true, 1) },
+            { 'collision', Try('CreateCollisionDetector', G('CreateCollisionDetector'), tank) },
+            { 'storage', Try('CreateStorageManip', G('CreateStorageManip'), tank, 0, 'MASS', 0, 0, 0, 0, 1, 0) },
+            { 'thrust', Try('CreateThrustController', G('CreateThrustController'), tank, 'Zoo', 0) },
+            { 'builderarm', engineer and Try('CreateBuilderArmController', G('CreateBuilderArmController'), engineer, 0, 0, 0) },
+            { 'slave', Try('CreateSlaveManipulator', G('CreateSlaveManipulator'), tank, 0, 0) },
+            { 'emitter', Try('CreateEmitterAtEntity', G('CreateEmitterAtEntity'), tank, a,
+                '/effects/emitters/destruction_explosion_fire_01_emit.bp') },
+            { 'attached emitter', Try('CreateAttachedEmitter', G('CreateAttachedEmitter'), tank, 0, a,
+                '/effects/emitters/destruction_explosion_fire_01_emit.bp') },
+            { 'economy event', engineer and Try('CreateEconomyEvent', G('CreateEconomyEvent'), engineer, 10, 10, 1) },
+            { 'decal', Try('CreateDecal', G('CreateDecal'), { x, 0, z }, 0, 'scorch_001_albedo', '', 'Albedo', 4, 4, 100, 10, a) },
+            { 'blip', Try('GetBlip', tank.GetBlip, tank, 2) },
+            { 'shield', shieldGen and shieldGen.MyShield },
+        }
+        local wrecks = Try('GetReclaimablesInRect', G('GetReclaimablesInRect'), Rect(Zoo.cx - 60, Zoo.cz - 60, Zoo.cx + 60, Zoo.cz + 60))
+        if wrecks and wrecks[1] then
+            TableInsert(made, { 'prop', wrecks[1] })
+        end
+        for i = 1, TableGetn(made) do
+            Zoo.FuzzObject(made[i][1], made[i][2], ctx)
+        end
+        WaitTicks(10)
+        Zoo.DestroyAll({ tank, shieldGen, engineer })
+        Log('fuzz more done')
     end
 
     -- The fuzz on a unit of every kind, its weapon and navigator, an army brain and a platoon. Last of all: setters
@@ -380,6 +455,7 @@ do
         Zoo.Fuzz('aibrain_methods', brainA, ctx)
         WaitTicks(10)
         Zoo.DestroyAll(sample)
+        Zoo.FuzzMore(ctx)
         Log('fuzz done')
     end
 
