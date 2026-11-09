@@ -317,6 +317,48 @@ do
         Try('UseSystemClock', camera.UseSystemClock, camera)
     end
 
+    -- The user-side unit functions (UserLuaUnits.cpp), each with patterns built from the selection: nothing, the
+    -- units, a category and the units, a category name, the units and true, the units and a toggle name, one unit,
+    -- 1, a string. EntityCategoryFilterDown/FilterOut get only a category and the units: they count their second
+    -- argument with lua_getn, which reads any value as a table, unchecked in the original game too.
+    local UnitFunctionNames = {
+        'ParseEntityCategory', 'GetUnitCommandFromCommandCap', 'EntityCategoryContains', 'SetAutoMode',
+        'SetAutoSurfaceMode', 'ToggleScriptBit', 'SetPaused', 'GetAttachedUnitsList', 'ValidateUnitsList',
+        'GetAssistingUnitsList', 'GetIdleEngineers', 'GetIdleFactories', 'GetSelectedUnits', 'GetValidAttackingUnits',
+        'SelectUnits', 'AddSelectUnits', 'GetHighlightCommand', 'DeleteCommand', 'GenerateBuildTemplateFromSelection',
+        'ClearBuildTemplates', 'GetUnitById', 'SimCallback', 'ExecLuaInSim', 'CreateUnitAtMouse',
+    }
+
+    local function UnitFunctions(units)
+        local globals = getfenv(0)
+        local cat = rawget(globals, 'categories') and rawget(categories, 'ALLUNITS')
+        local one = units[1]
+        local patterns = { {}, { units }, { cat, units }, { 'ALLUNITS' }, { units, true }, { units, 'RULEUTC_ShieldToggle' },
+                           { one }, { 1 }, { 'zoo' }, { '1' }, { { Func = 'zoo', Args = {} } } }
+        local calls = 0
+        local failed = 0
+        for i = 1, table.getn(UnitFunctionNames) do
+            local fn = rawget(globals, UnitFunctionNames[i])
+            if fn then
+                for p = 1, table.getn(patterns) do
+                    local args = patterns[p]
+                    local ok
+                    if table.getn(args) == 0 then ok = pcall(fn)
+                    elseif table.getn(args) == 1 then ok = pcall(fn, args[1])
+                    else ok = pcall(fn, args[1], args[2]) end
+                    calls = calls + 1
+                    if not ok then failed = failed + 1 end
+                end
+            end
+        end
+        local filterDown = rawget(globals, 'EntityCategoryFilterDown')
+        local filterOut = rawget(globals, 'EntityCategoryFilterOut')
+        if cat and filterDown then pcall(filterDown, cat, units) end
+        if cat and filterOut then pcall(filterOut, cat, units) end
+        Try('select again', SelectUnits, units)
+        Log('unit functions: ' .. calls .. ' calls, ' .. failed .. ' errors')
+    end
+
     local function UnitTour()
         -- A replay starts as an observer, and category selection only takes the focus army's own units.
         Try('focus army', ConExecute, 'SetFocusArmy 0')
@@ -335,6 +377,7 @@ do
         for i = 1, math.min(3, table.getn(units)) do
             FuzzControl('user unit ' .. i, units[i], units[table.getn(units)])
         end
+        UnitFunctions(units)
         Try('select land', UISelectionByCategory, 'LAND', false, false, false, false)
         WaitSeconds(2)
         Try('select air', UISelectionByCategory, 'AIR', false, false, false, false)
