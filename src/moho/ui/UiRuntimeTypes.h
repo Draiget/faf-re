@@ -4592,7 +4592,6 @@ namespace moho
    * the cursor default/show flags have changed.
    */
   void MAUI_UpdateCursor(CMauiCursor* cursor);
-  void MAUI_ReleaseCursor(CMauiCursor* cursor);
 
   /**
    * Address: 0x0078CFD0 (FUN_0078CFD0, cfunc__c_CreateCursor)

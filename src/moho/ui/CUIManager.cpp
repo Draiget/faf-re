@@ -374,7 +374,9 @@ bool moho::CUIManager::SetNewLuaState(LuaPlus::LuaState* const state)
     mFrames.ResetStorageToInline();
   }
 
-  MAUI_ReleaseCursor(GetCursor());
+  // 0x0084CD5D-0x0084CD72: the old state's cursor is deleted (`[mCursor - 4]`, vtable +0x08, the
+  // deleting destructor, with 1); the new state's `SetupUI` makes its own. Its weak link clears itself.
+  delete GetCursor();
   mLuaState = state;
 
   if (mLuaState == nullptr) {
