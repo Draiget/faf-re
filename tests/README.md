@@ -86,6 +86,14 @@ The renderers, UI and sound run only in the game client, so they count only when
 FAF_COVERAGE_EXTRA_RAW=<folder> FAF_COVERAGE_SKIP_CTEST=1 tools/coverage/report.sh build/clang-x64-release-coverage tmp/coverage
 ```
 
+The client tour, `tools/coverage/tour`, drives the parts of the client a replay leaves alone. It is a hook folder that the engine appends to FAF's `/lua/ui/game/gamemain.lua`. An init file next to the client turns it on:
+```lua
+dofile(InitFileDir .. '/init_parity.lua')
+table.insert(path, { dir = '<repository>/tools/coverage/tour', mountpoint = '/covtour' })
+table.insert(hook, '/covtour')
+```
+With it, a replay played by the client selects the first army's units and calls the getters of the user-side objects. It also moves the camera, builds one of each UI control, calls every global getter and runs the console commands. With `/tourvars` on the command line, it instead sets every console variable to 1, then to 0, and leaves each at a working value. Both runs take about as long as the replay. Console commands that quit, crash on purpose, pause the sim, reset the device, open a modal window or write `Game.prefs` are left out. So are a few calls that crash the original game the same way; the script names them with their addresses.
+
 Run a specific test executable with GTest filter:
 ```powershell
 .\build\clang-x64-release\tests\faf_net_tests.exe --gtest_filter=Existing_NetRobustness.*
