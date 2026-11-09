@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iterator>
 #include <system_error>
+#include <cstdio>
 #include <vector>
 
 #include "editor/doc/EdDocument.h"
@@ -99,9 +100,16 @@ namespace faf::editor
         Note(differences, "prop count");
       } else {
         for (std::size_t i = 0; i < pa.size(); ++i) {
-          if (std::strcmp(pa[i].mBlueprintPath.c_str(), pb[i].mBlueprintPath.c_str()) != 0 ||
-              std::memcmp(&pa[i].mTransform, &pb[i].mTransform, sizeof(pa[i].mTransform)) != 0) {
-            Note(differences, "prop " + std::to_string(i));
+          const bool path = std::strcmp(pa[i].mBlueprintPath.c_str(), pb[i].mBlueprintPath.c_str()) != 0;
+          const bool position = std::memcmp(&pa[i].mTransform.pos_, &pb[i].mTransform.pos_, sizeof(pa[i].mTransform.pos_)) != 0;
+          const bool orientation = std::memcmp(&pa[i].mTransform.orient_, &pb[i].mTransform.orient_, sizeof(pa[i].mTransform.orient_)) != 0;
+          if (path || position || orientation) {
+            char values[200];
+            const Wm3::Quatf& qa = pa[i].mTransform.orient_;
+            const Wm3::Quatf& qb = pb[i].mTransform.orient_;
+            (void)std::snprintf(values, sizeof(values), " (%.9g %.9g %.9g %.9g vs %.9g %.9g %.9g %.9g)", qa.w, qa.x, qa.y, qa.z, qb.w, qb.x, qb.y, qb.z);
+            Note(differences, "prop " + std::to_string(i) + (path ? " path" : "") + (position ? " position" : "") + (orientation ? " rotation" : "") +
+                                (orientation ? values : ""));
             break;
           }
         }

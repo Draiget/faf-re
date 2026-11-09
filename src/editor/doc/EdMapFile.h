@@ -79,6 +79,15 @@ namespace faf::editor
    */
   std::filesystem::path DiskFileOf(const std::string& virtualPath);
 
+  /**
+   * The file record of a new or turned prop: its position, its rotation as a matrix (VAxes3) and scale 1,
+   * with `loaded` as the engine's own CWldProps::Load (0x008918E0) reads those floats back. The prop takes
+   * `loaded` as its transform and the writer writes the record's floats, so saving and reading it again
+   * gives the same bits (a rotation passed through the file again and again can swing between two
+   * neighbouring floats instead of settling).
+   */
+  PropRecord PropRecordFor(const std::string& path, const moho::VTransform& transform);
+
   /** A whole game file (`/maps/...`, from a folder or an archive), resolved as MapLoad does; false if it can't be read. */
   bool ReadGameFile(const std::string& virtualPath, std::string& out);
 } // namespace faf::editor

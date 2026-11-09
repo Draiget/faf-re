@@ -391,9 +391,11 @@ namespace faf::editor
 
   void EdTools::DrawSelect()
   {
-    Note("Pick props, decals, markers or water-body seeds to move, rotate or delete them. Linked symmetric copies move together.");
-    DrawSymmetry();
-    Note("Selection comes with the objects, stage 6 of the plan.");
+    Note("Click a prop to select it (Ctrl adds), drag to move the selection over the ground, Q and E turn it by 15 degrees, "
+         "Delete removes it. Each is one undo step.");
+    char count[64];
+    (void)std::snprintf(count, sizeof(count), "%d selected", mSelectionCount);
+    ImGui::TextUnformatted(count);
   }
 
   void EdTools::DrawTerrain()
@@ -757,9 +759,51 @@ namespace faf::editor
 
   void EdTools::DrawProps()
   {
+    SectionHeader("PROP");
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::InputTextWithHint("##propfilter", "search", mPropFilter, sizeof(mPropFilter));
+    std::string filter = mPropFilter;
+    for (char& c : filter) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    if (mPropBlueprints.empty()) {
+      Note("The prop list comes once the game's rules are built after startup.");
+    } else if (ImGui::BeginChild("##props", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 12.0f), ImGuiChildFlags_Borders)) {
+      for (const std::string& blueprint : mPropBlueprints) {
+        if (!filter.empty() && blueprint.find(filter) == std::string::npos) {
+          continue;
+        }
+        // "/env/evergreen/props/trees/pine06_s1_prop.bp" shows as "trees/pine06_s1".
+        std::string label = blueprint;
+        if (const std::size_t props = label.find("/props/"); props != std::string::npos) {
+          label = label.substr(props + 7);
+        }
+        if (label.size() > 8 && label.compare(label.size() - 8, 8, "_prop.bp") == 0) {
+          label.resize(label.size() - 8);
+        }
+        if (ImGui::Selectable(label.c_str(), blueprint == mPropBlueprint)) {
+          mPropBlueprint = blueprint;
+        }
+        if (ImGui::IsItemHovered()) {
+          ImGui::SetTooltip("%s", blueprint.c_str());
+        }
+      }
+    }
+    if (!mPropBlueprints.empty()) {
+      ImGui::EndChild();
+    }
+    SectionHeader("PLACE");
+    static const char* const kModes[] = {"Single", "Scatter", "Erase"};
+    Segmented(kModes, 3, mPropMode);
+    if (mPropMode == 1) {
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::SliderFloat("##density", &mPropDensity, 0.5f, 60.0f, "%.1f props a second");
+    }
+    ImGui::Checkbox("Random turn", &mPropRandomTurn);
     DrawBrush(false);
-    DrawSymmetry();
-    Note("Props with 3D previews and the scatter brush come in stage 6.");
+    DrawSymmetry(false);
+    Note("Single places one at a click, Scatter while the button is held, inside the brush; Erase removes those inside it. "
+         "Shift+click erases in any mode. Symmetric copies are placed and removed with them.");
   }
 
   void EdTools::DrawDecals()

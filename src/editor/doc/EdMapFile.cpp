@@ -1,15 +1,19 @@
 #include "editor/doc/EdMapFile.h"
 
+#include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <exception>
 #include <system_error>
 
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
+#include "gpg/core/streams/PipeStream.h"
 #include "gpg/core/streams/Stream.h"
 #include "legacy/containers/String.h"
 #include "moho/math/MathReflection.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/misc/CVirtualFileSystem.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/sim/CBackgroundTaskControl.h"
@@ -198,6 +202,17 @@ namespace faf::editor
           }
           continue;
         }
+        // Moved but not turned: the new position with the rotation and scale floats as read.
+        if (i < props.size() && props[i].path == entry.mBlueprintPath.c_str() &&
+            std::memcmp(&props[i].loaded.orient_, &entry.mTransform.orient_, sizeof(entry.mTransform.orient_)) == 0) {
+          writer.Write(entry.mTransform.pos_.x);
+          writer.Write(entry.mTransform.pos_.y);
+          writer.Write(entry.mTransform.pos_.z);
+          for (std::size_t value = 3; value < kPropFloats; ++value) {
+            writer.Write(props[i].values[value]);
+          }
+          continue;
+        }
         writer.Write(entry.mTransform.pos_.x);
         writer.Write(entry.mTransform.pos_.y);
         writer.Write(entry.mTransform.pos_.z);
@@ -265,6 +280,36 @@ namespace faf::editor
     std::error_code ignored;
     const std::filesystem::path path(Resolved(virtualPath));
     return std::filesystem::is_regular_file(path, ignored) ? path : std::filesystem::path{};
+  }
+
+  PropRecord PropRecordFor(const std::string& path, const moho::VTransform& transform)
+  {
+    PropRecord record;
+    record.path = path;
+    const moho::VAxes3 matrix(transform.orient_);
+    const float values[15] = {transform.pos_.x, transform.pos_.y, transform.pos_.z, matrix.vX.x, matrix.vX.y, matrix.vX.z, matrix.vY.x,
+                              matrix.vY.y,      matrix.vY.z,      matrix.vZ.x,      matrix.vZ.y, matrix.vZ.z, 1.0f,          1.0f,
+                              1.0f};
+    std::copy(std::begin(values), std::end(values), record.values);
+    record.loaded = transform;
+    // Read back by the engine's own loader, from the same floats the writer will write.
+    gpg::PipeStream pipe;
+    {
+      gpg::BinaryWriter writer(&pipe);
+      writer.Write(std::int32_t{1});
+      writer.Write("p", 2u);
+      for (const float value : record.values) {
+        writer.Write(value);
+      }
+    }
+    pipe.VirtFlush();
+    gpg::BinaryReader reader(&pipe);
+    std::unique_ptr<moho::CWldProps> props(moho::WLD_CreateProps());
+    moho::CBackgroundTaskControl control{nullptr};
+    if (props != nullptr && props->Load(reader, control) && !props->mEntries.empty()) {
+      record.loaded = props->mEntries[0].mTransform;
+    }
+    return record;
   }
 
   bool ReadGameFile(const std::string& virtualPath, std::string& out)

@@ -355,6 +355,72 @@ namespace faf::editor
     return true;
   }
 
+  EdDocument::PropSnapshot EdDocument::PropsNow() const
+  {
+    PropSnapshot snapshot;
+    if (mMap != nullptr && mMap->mProps != nullptr) {
+      snapshot.entries.assign(mMap->mProps->mEntries.begin(), mMap->mProps->mEntries.end());
+    }
+    snapshot.records = mFileRecords.props;
+    return snapshot;
+  }
+
+  void EdDocument::RestoreProps(const PropSnapshot& props)
+  {
+    if (mMap == nullptr || mMap->mProps == nullptr) {
+      return;
+    }
+    mMap->mProps->mEntries.clear();
+    for (const moho::CWldPropEntry& entry : props.entries) {
+      mMap->mProps->mEntries.push_back(entry);
+    }
+    mFileRecords.props = props.records;
+    mModified = true;
+  }
+
+  void EdDocument::PropsEdited(PropSnapshot before)
+  {
+    mPropUndo.emplace_back(std::move(before), PropsNow());
+    // A long session keeps the newest 200 prop edits (a 5000-prop map is about 0.3 MB a step, twice).
+    if (mPropUndo.size() > 200) {
+      mPropUndo.erase(mPropUndo.begin());
+    }
+    EditEnded(EditKind::Props);
+    mModified = true;
+  }
+
+  void EdDocument::SetPropRecord(const std::size_t index, const PropRecord& record)
+  {
+    if (mMap == nullptr || mMap->mProps == nullptr || index >= mMap->mProps->mEntries.size()) {
+      return;
+    }
+    mFileRecords.props.resize(mMap->mProps->mEntries.size());
+    mFileRecords.props[index] = record;
+  }
+
+  void EdDocument::AddProp(const moho::CWldPropEntry& entry, const PropRecord& record)
+  {
+    if (mMap == nullptr || mMap->mProps == nullptr) {
+      return;
+    }
+    // The records follow the entries index for index; a new prop's record is empty, so it is written from
+    // its transform.
+    mFileRecords.props.resize(mMap->mProps->mEntries.size());
+    mMap->mProps->mEntries.push_back(entry);
+    mFileRecords.props.push_back(record);
+  }
+
+  void EdDocument::DeletePropAt(const std::size_t index)
+  {
+    if (mMap == nullptr || mMap->mProps == nullptr || index >= mMap->mProps->mEntries.size()) {
+      return;
+    }
+    mMap->mProps->mEntries.erase(mMap->mProps->mEntries.begin() + static_cast<std::ptrdiff_t>(index));
+    if (index < mFileRecords.props.size()) {
+      mFileRecords.props.erase(mFileRecords.props.begin() + static_cast<std::ptrdiff_t>(index));
+    }
+  }
+
   void EdDocument::EditEnded(const EditKind kind)
   {
     mUndoOrder.push_back(kind);
@@ -362,6 +428,7 @@ namespace faf::editor
     mHeights.ClearRedo();
     mMaskHistory.ClearRedo();
     mLayerRedo.clear();
+    mPropRedo.clear();
   }
 
   bool EdDocument::PopUndo(EditKind& kind)
@@ -711,6 +778,8 @@ namespace faf::editor
     mRedoOrder.clear();
     mLayerUndo.clear();
     mLayerRedo.clear();
+    mPropUndo.clear();
+    mPropRedo.clear();
     mFileRecords = {};
     mSaveTarget.clear();
     mModified = false;

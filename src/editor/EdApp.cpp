@@ -94,6 +94,7 @@ namespace faf::editor
       kMenuNew = 1004,
       kMenuUndo = 1301,
       kMenuRedo = 1302,
+      kMenuDelete = 1303,
       kMenuFirstMap = 2000,
     };
 
@@ -321,11 +322,16 @@ namespace faf::editor
       int mBrowseArg = -1;
       // `/shader <name>` with `/open` (test runs): the map's terrain shader changed once it is shown.
       std::string mShaderArg;
+      // `/proptool <mode>,<blueprint>` and `/tool <index>` (test runs).
+      std::string mPropToolArg;
+      int mToolArg = -1;
       int mBrowseFrames = 0;
       std::string mStampArg;
       /** The Tools panel's height field Import and Export: the file dialog, then the view. */
       void DriveHeightFiles();
       int mRoundTripFrames = 0;
+      // `/roundtripframes <n>` (test runs): /roundtrip and /saveas wait this many frames of the drawn map (180).
+      int mRoundTripAfter = 180;
       void SaveDocument();
       std::string mIniPath;
       bool mImGuiReady = false;
@@ -496,6 +502,8 @@ namespace faf::editor
       mEditMenu = ::CreatePopupMenu();
       ::AppendMenuW(mEditMenu, MF_STRING, kMenuUndo, L"&Undo\tCtrl+Z");
       ::AppendMenuW(mEditMenu, MF_STRING, kMenuRedo, L"&Redo\tCtrl+Y");
+      ::AppendMenuW(mEditMenu, MF_SEPARATOR, 0, nullptr);
+      ::AppendMenuW(mEditMenu, MF_STRING, kMenuDelete, L"&Delete selection\tDel");
       ::AppendMenuW(mMenuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(mEditMenu), L"&Edit");
       ::AppendMenuW(mMenuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(mViewMenu), L"&View");
       ::AppendMenuW(mMenuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(mPlayMenu), L"&Play");
@@ -555,6 +563,9 @@ namespace faf::editor
         break;
       case kMenuRedo:
         (void)mScene.Redo();
+        break;
+      case kMenuDelete:
+        mScene.DeleteSelected();
         break;
       case kMenuLog:
         mShell->ShowLog() = !mShell->ShowLog();
@@ -684,6 +695,15 @@ namespace faf::editor
       if (fa::vector<fa::string> layer; moho::CFG_GetArgOption("/masklayer", 1, &layer) && !layer.empty()) {
         mMaskLayerArg = std::atoi(layer[0].c_str()) - 1;
       }
+      if (fa::vector<fa::string> frames; moho::CFG_GetArgOption("/roundtripframes", 1, &frames) && !frames.empty()) {
+        mRoundTripAfter = std::max(1, std::atoi(frames[0].c_str()));
+      }
+      if (fa::vector<fa::string> prop; moho::CFG_GetArgOption("/proptool", 1, &prop) && !prop.empty()) {
+        mPropToolArg = prop[0].c_str();
+      }
+      if (fa::vector<fa::string> tool; moho::CFG_GetArgOption("/tool", 1, &tool) && !tool.empty()) {
+        mToolArg = std::atoi(tool[0].c_str());
+      }
       if (fa::vector<fa::string> shader; moho::CFG_GetArgOption("/shader", 1, &shader) && !shader.empty()) {
         mShaderArg = shader[0].c_str();
       }
@@ -793,6 +813,26 @@ namespace faf::editor
           gpg::Warnf("editor: %s", message.c_str());
         }
       };
+      // The prop palette, once the kept rules are built.
+      if (!tools.HasPropBlueprints()) {
+        if (moho::RRuleGameRules* const rules = moho::RULE_PeekKept(); rules != nullptr) {
+          std::vector<std::string> blueprints;
+          for (const auto& [id, blueprint] : rules->GetPropBlueprints()) {
+            blueprints.emplace_back(id.c_str());
+          }
+          tools.SetPropBlueprints(std::move(blueprints));
+        }
+      }
+      if (!mPropToolArg.empty() && tools.HasPropBlueprints()) {
+        // `/proptool <mode>,<blueprint>` (test runs): 0 Single, 1 Scatter, 2 Erase.
+        const std::size_t comma = mPropToolArg.find(',');
+        tools.SetPropTool(comma == std::string::npos ? std::string{} : mPropToolArg.substr(comma + 1), std::atoi(mPropToolArg.c_str()));
+        mPropToolArg.clear();
+      }
+      if (mToolArg >= 0) {
+        tools.SetTool(mToolArg);
+        mToolArg = -1;
+      }
       // The open map's layers for the Texture tool's list.
       if (mDocument.GetState() == EdDocument::State::Open && mLayerNamesOf != mDocument.Path()) {
         mLayerNamesOf = mDocument.Path();
@@ -994,7 +1034,7 @@ namespace faf::editor
           mShell->Tools().RequestRepair();
         }
       }
-      if (!mSaveAsFolder.empty() && mScene.Attached() && ++mRoundTripFrames == 180) {
+      if (!mSaveAsFolder.empty() && mScene.Attached() && ++mRoundTripFrames == mRoundTripAfter) {
         std::string message;
         const bool saved = mDocument.SaveAsNewFolder(mSaveAsFolder, message);
         if (saved) {
@@ -1004,7 +1044,7 @@ namespace faf::editor
         }
         mShell->RequestExit();
       }
-      if (mRoundTripShown && mScene.Attached() && ++mRoundTripFrames == 180) {
+      if (mRoundTripShown && mScene.Attached() && ++mRoundTripFrames == mRoundTripAfter) {
         const RoundTripResult trip = RoundTripMap(mDocument, mRoundTripFolder);
         gpg::Logf("editor: round trip of the drawn %s: %s%s", MapDisplayName(mDocument.Path()).c_str(),
                   trip.ok ? "same data, stable" : trip.differences.c_str(), trip.sameAsOriginal ? ", same bytes as the original" : "");

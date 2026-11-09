@@ -11,6 +11,7 @@
 #include "editor/doc/EdMapFile.h"
 #include "editor/doc/EdNewMap.h"
 #include "editor/undo/EdHeightHistory.h"
+#include "moho/sim/CWldMap.h"
 
 namespace LuaPlus
 {
@@ -164,7 +165,25 @@ namespace faf::editor
       Heights,
       Masks,
       Layers,
+      Props,
     };
+    /** The map's props as a whole, for undo: the entries and the records they were read with (same order). */
+    struct PropSnapshot
+    {
+      std::vector<moho::CWldPropEntry> entries;
+      std::vector<PropRecord> records;
+    };
+    [[nodiscard]] PropSnapshot PropsNow() const;
+    /** Puts a snapshot back as the map's props (the view rebuilds their meshes). */
+    void RestoreProps(const PropSnapshot& props);
+    /** A prop edit ended: its before and the props now become the newest undo step. */
+    void PropsEdited(PropSnapshot before);
+    [[nodiscard]] std::vector<std::pair<PropSnapshot, PropSnapshot>>& PropUndo() noexcept { return mPropUndo; }
+    [[nodiscard]] std::vector<std::pair<PropSnapshot, PropSnapshot>>& PropRedo() noexcept { return mPropRedo; }
+    /** A prop added at the end (with an empty record: it is saved from its transform) or removed at `index`. */
+    void AddProp(const moho::CWldPropEntry& entry, const PropRecord& record);
+    void SetPropRecord(std::size_t index, const PropRecord& record);
+    void DeletePropAt(std::size_t index);
     /** A texture slot's change (path or size), for undo: its values before and after, as the terrain has them. */
     struct LayerEdit
     {
@@ -215,6 +234,8 @@ namespace faf::editor
     HeightHistory mHeights;
     MaskGrid mMasks;
     MaskHistory mMaskHistory;
+    std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropUndo;
+    std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropRedo;
     std::vector<LayerEdit> mLayerUndo;
     std::vector<LayerEdit> mLayerRedo;
     std::vector<EditKind> mUndoOrder;

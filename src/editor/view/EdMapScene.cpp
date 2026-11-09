@@ -2,12 +2,14 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <cstring>
 
 #include <windowsx.h>
 
 #include "editor/EdTools.h"
 #include "editor/doc/EdDocument.h"
+#include "editor/doc/EdMapFile.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdHeightFile.h"
 #include "editor/tools/EdMaskBrush.h"
@@ -65,7 +67,8 @@ namespace faf::editor
 
   void EdMapScene::DrawBrushRings()
   {
-    if (mMap == nullptr || mCamera == nullptr || mTools == nullptr || (!mTools->TerrainToolActive() && !mTools->TextureToolActive()) ||
+    if (mMap == nullptr || mCamera == nullptr || mTools == nullptr ||
+        (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && mSelection.empty()) ||
         moho::ren_Viewport == nullptr) {
       return;
     }
@@ -186,6 +189,24 @@ namespace faf::editor
       batcher->DrawQuads(walls.data(), static_cast<std::uint32_t>(walls.size() / 4));
     }
 
+    // The selected props, ringed in yellow.
+    if (!mSelection.empty() && mMap->mProps != nullptr) {
+      constexpr std::uint32_t kSelectedColor = 0xF0FFE040u;
+      for (const int index : mSelection) {
+        const Wm3::Vec3f& p = mMap->mProps->mEntries[static_cast<std::size_t>(index)].mTransform.pos_;
+        for (int s = 0; s < 24; ++s) {
+          const float a0 = 2.0f * kPi * static_cast<float>(s) / 24.0f;
+          const float a1 = 2.0f * kPi * static_cast<float>(s + 1) / 24.0f;
+          batcher->DrawLine(groundVertex(p.x + std::cos(a0) * 2.0f, p.z + std::sin(a0) * 2.0f, kSelectedColor),
+                            groundVertex(p.x + std::cos(a1) * 2.0f, p.z + std::sin(a1) * 2.0f, kSelectedColor));
+        }
+      }
+    }
+    if (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive()) {
+      batcher->Flush();
+      return;
+    }
+
     // Plane mode: the picked points as small posts, and the triangle between them.
     if (brush.mode == HeightBrushMode::Plane) {
       float px[3], ph[3], pz[3];
@@ -290,6 +311,8 @@ namespace faf::editor
     // A stroke in progress ends here, so undo has it whole.
     EndStroke();
     EndMaskStroke();
+    EndObjectStroke();
+    mSelection.clear();
     // The props first: their blueprints are the kept rules', which the next play takes.
     DeleteProps();
     moho::ED_SetHook(nullptr);
@@ -359,10 +382,13 @@ namespace faf::editor
   bool EdMapScene::Undo()
   {
     EdDocument::EditKind kind{};
-    if (mMap == nullptr || mPainting || mPaintingMask || !mDocument.PopUndo(kind)) {
+    if (mMap == nullptr || mPainting || mPaintingMask || mObjectStroke || !mDocument.PopUndo(kind)) {
       return false;
     }
-    const bool done = kind == EdDocument::EditKind::Masks ? UndoMasks(false) : (kind == EdDocument::EditKind::Layers ? UndoLayers(false) : UndoHeights(false));
+    const bool done = kind == EdDocument::EditKind::Masks    ? UndoMasks(false)
+                      : kind == EdDocument::EditKind::Layers ? UndoLayers(false)
+                      : kind == EdDocument::EditKind::Props  ? UndoProps(false)
+                                                             : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
     }
@@ -372,10 +398,13 @@ namespace faf::editor
   bool EdMapScene::Redo()
   {
     EdDocument::EditKind kind{};
-    if (mMap == nullptr || mPainting || mPaintingMask || !mDocument.PopRedo(kind)) {
+    if (mMap == nullptr || mPainting || mPaintingMask || mObjectStroke || !mDocument.PopRedo(kind)) {
       return false;
     }
-    const bool done = kind == EdDocument::EditKind::Masks ? UndoMasks(true) : (kind == EdDocument::EditKind::Layers ? UndoLayers(true) : UndoHeights(true));
+    const bool done = kind == EdDocument::EditKind::Masks    ? UndoMasks(true)
+                      : kind == EdDocument::EditKind::Layers ? UndoLayers(true)
+                      : kind == EdDocument::EditKind::Props  ? UndoProps(true)
+                                                             : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);
     }
@@ -1052,6 +1081,30 @@ namespace faf::editor
     if (mPaintingMask) {
       PaintMask(frameSeconds);
     }
+    if (mObjectStroke && mTools != nullptr && mTools->PropsToolActive() && mTools->CurrentPropMode() != EdTools::PropMode::Single) {
+      float groundX = 0.0f;
+      float groundZ = 0.0f;
+      if (GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ)) {
+        if (mTools->CurrentPropMode() == EdTools::PropMode::Erase || (::GetKeyState(VK_SHIFT) & 0x8000) != 0) {
+          EraseProps(groundX, groundZ);
+        } else {
+          // Scatter: props a second at random points inside the brush.
+          mScatterDue += mTools->PropDensity() * std::min(frameSeconds, 0.1f);
+          const float radius = mTools->CurrentHeightBrush().radius;
+          while (mScatterDue >= 1.0f) {
+            mScatterDue -= 1.0f;
+            mScatterSeed = mScatterSeed * 1664525U + 1013904223U;
+            const float angle = static_cast<float>(mScatterSeed >> 8) / 16777216.0f * 6.2831853f;
+            mScatterSeed = mScatterSeed * 1664525U + 1013904223U;
+            const float distance = std::sqrt(static_cast<float>(mScatterSeed >> 8) / 16777216.0f) * radius;
+            PlaceProps(groundX + std::cos(angle) * distance, groundZ + std::sin(angle) * distance);
+          }
+        }
+      }
+    }
+    if (mTools != nullptr) {
+      mTools->SetSelectionCount(static_cast<int>(mSelection.size()));
+    }
     if (mTools != nullptr && mTools->TextureToolActive()) {
       LoadMasks();
     }
@@ -1084,27 +1137,233 @@ namespace faf::editor
     }
     int missing = 0;
     for (const moho::CWldPropEntry& entry : mMap->mProps->mEntries) {
-      // The blueprint as a prop's entity finds it: the file name normalized into a resource id.
-      moho::RResId id{};
-      gpg::STR_CopyFilename(&id.name, &entry.mBlueprintPath);
-      moho::RPropBlueprint* const blueprint = rules->GetPropBlueprint(id);
-      moho::RMeshBlueprint* const mesh = blueprint != nullptr ? rules->GetMeshBlueprint(blueprint->Display.MeshBlueprint) : nullptr;
-      if (mesh == nullptr) {
-        ++missing;
-        continue;
-      }
-      const float scale = blueprint->Display.UniformScale;
-      moho::MeshInstance* const instance =
-        renderer->CreateMeshInstance(0, -1, mesh, Wm3::Vec3f{scale, scale, scale}, false, boost::shared_ptr<moho::MeshMaterial>());
-      if (instance == nullptr) {
-        ++missing;
-        continue;
-      }
-      instance->SetStance(entry.mTransform, entry.mTransform);
-      instance->isHidden = 0;
+      moho::MeshInstance* const instance = MakePropInstance(entry);
+      missing += instance == nullptr ? 1 : 0;
       mProps.push_back(instance);
     }
-    gpg::Logf("editor: %zu props drawn, %d without a blueprint or mesh", mProps.size(), missing);
+    gpg::Logf("editor: %zu props drawn, %d without a blueprint or mesh", mProps.size() - static_cast<std::size_t>(missing), missing);
+  }
+
+  moho::MeshInstance* EdMapScene::MakePropInstance(const moho::CWldPropEntry& entry) const
+  {
+    moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+    moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
+    if (rules == nullptr || renderer == nullptr) {
+      return nullptr;
+    }
+    // The blueprint as a prop's entity finds it: the file name normalized into a resource id.
+    moho::RResId id{};
+    gpg::STR_CopyFilename(&id.name, &entry.mBlueprintPath);
+    moho::RPropBlueprint* const blueprint = rules->GetPropBlueprint(id);
+    moho::RMeshBlueprint* const mesh = blueprint != nullptr ? rules->GetMeshBlueprint(blueprint->Display.MeshBlueprint) : nullptr;
+    if (mesh == nullptr) {
+      return nullptr;
+    }
+    const float scale = blueprint->Display.UniformScale;
+    moho::MeshInstance* const instance =
+      renderer->CreateMeshInstance(0, -1, mesh, Wm3::Vec3f{scale, scale, scale}, false, boost::shared_ptr<moho::MeshMaterial>());
+    if (instance != nullptr) {
+      instance->SetStance(entry.mTransform, entry.mTransform);
+      instance->isHidden = 0;
+    }
+    return instance;
+  }
+
+  void EdMapScene::RebuildProps()
+  {
+    DeleteProps();
+    CreateProps();
+    const int count = mMap != nullptr && mMap->mProps != nullptr ? static_cast<int>(mMap->mProps->mEntries.size()) : 0;
+    mSelection.erase(std::remove_if(mSelection.begin(), mSelection.end(), [count](const int index) { return index >= count; }), mSelection.end());
+  }
+
+  bool EdMapScene::UndoProps(const bool redo)
+  {
+    auto& from = redo ? mDocument.PropRedo() : mDocument.PropUndo();
+    auto& to = redo ? mDocument.PropUndo() : mDocument.PropRedo();
+    if (from.empty() || mMap == nullptr) {
+      return false;
+    }
+    auto step = std::move(from.back());
+    from.pop_back();
+    mDocument.RestoreProps(redo ? step.second : step.first);
+    to.push_back(std::move(step));
+    mSelection.clear();
+    RebuildProps();
+    return true;
+  }
+
+  int EdMapScene::PickProp(const float x, const float z) const
+  {
+    if (mMap == nullptr || mMap->mProps == nullptr) {
+      return -1;
+    }
+    // Within a few units of the ground point, more when the camera is far.
+    const float reach = std::max(2.5f, mDistance * 0.012f);
+    int best = -1;
+    float bestDistance = reach;
+    const auto& entries = mMap->mProps->mEntries;
+    for (std::size_t i = 0; i < entries.size(); ++i) {
+      const float d = std::hypot(entries[i].mTransform.pos_.x - x, entries[i].mTransform.pos_.z - z);
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = static_cast<int>(i);
+      }
+    }
+    return best;
+  }
+
+  void EdMapScene::BeginObjectStroke()
+  {
+    mObjectBefore = mDocument.PropsNow();
+    mObjectStroke = true;
+    mObjectsChanged = false;
+  }
+
+  void EdMapScene::EndObjectStroke()
+  {
+    if (mObjectStroke && mObjectsChanged) {
+      const std::size_t before = mObjectBefore.entries.size();
+      mDocument.PropsEdited(std::move(mObjectBefore));
+      gpg::Logf("editor: prop edit: %zu props before, %zu now", before, mMap != nullptr && mMap->mProps != nullptr ? mMap->mProps->mEntries.size() : 0U);
+    }
+    mObjectBefore = {};
+    mObjectStroke = false;
+    mObjectsChanged = false;
+    mDragSelection = false;
+  }
+
+  void EdMapScene::MovePropTo(const int index, const Wm3::Vec3f& position)
+  {
+    auto& entries = mMap->mProps->mEntries;
+    if (index < 0 || static_cast<std::size_t>(index) >= entries.size()) {
+      return;
+    }
+    moho::CWldPropEntry& entry = entries[static_cast<std::size_t>(index)];
+    if (std::memcmp(&entry.mTransform.pos_, &position, sizeof(position)) == 0) {
+      return; // a click without a move changes nothing
+    }
+    entry.mTransform.pos_ = position;
+    if (static_cast<std::size_t>(index) < mProps.size() && mProps[static_cast<std::size_t>(index)] != nullptr) {
+      mProps[static_cast<std::size_t>(index)]->SetStance(entry.mTransform, entry.mTransform);
+    }
+    mObjectsChanged = true;
+    mDocument.SetModified(true);
+  }
+
+  void EdMapScene::TurnSelection(const float radians)
+  {
+    if (mSelection.empty() || mMap == nullptr) {
+      return;
+    }
+    BeginObjectStroke();
+    const Wm3::Quatf turn(std::cos(radians * 0.5f), 0.0f, std::sin(radians * 0.5f), 0.0f);
+    auto& entries = mMap->mProps->mEntries;
+    for (const int index : mSelection) {
+      moho::CWldPropEntry& entry = entries[static_cast<std::size_t>(index)];
+      entry.mTransform.orient_ = turn * entry.mTransform.orient_;
+      const PropRecord record = PropRecordFor(entry.mBlueprintPath.c_str(), entry.mTransform);
+      entry.mTransform = record.loaded;
+      mDocument.SetPropRecord(static_cast<std::size_t>(index), record);
+      if (static_cast<std::size_t>(index) < mProps.size() && mProps[static_cast<std::size_t>(index)] != nullptr) {
+        mProps[static_cast<std::size_t>(index)]->SetStance(entry.mTransform, entry.mTransform);
+      }
+    }
+    mObjectsChanged = true;
+    mDocument.SetModified(true);
+    EndObjectStroke();
+  }
+
+  void EdMapScene::DeleteSelection()
+  {
+    if (mSelection.empty() || mMap == nullptr) {
+      return;
+    }
+    BeginObjectStroke();
+    std::vector<int> doomed = mSelection;
+    std::sort(doomed.begin(), doomed.end(), std::greater<>());
+    doomed.erase(std::unique(doomed.begin(), doomed.end()), doomed.end());
+    for (const int index : doomed) {
+      if (static_cast<std::size_t>(index) < mProps.size()) {
+        delete mProps[static_cast<std::size_t>(index)];
+        mProps.erase(mProps.begin() + index);
+      }
+      mDocument.DeletePropAt(static_cast<std::size_t>(index));
+    }
+    mSelection.clear();
+    mObjectsChanged = true;
+    mDocument.SetModified(true);
+    gpg::Logf("editor: %zu props deleted", doomed.size());
+    EndObjectStroke();
+  }
+
+  void EdMapScene::PlaceProps(const float x, const float z)
+  {
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    if (mTools == nullptr || field == nullptr || mTools->PropBlueprint().empty()) {
+      return;
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    // The turn: random or none; each copy's heading is the cursor's heading carried through the symmetry
+    // (the copies of a point one unit ahead).
+    mScatterSeed = mScatterSeed * 1664525U + 1013904223U;
+    const float yaw = mTools->RandomPropTurn() ? static_cast<float>(mScatterSeed >> 8) / 16777216.0f * 6.2831853f : 0.0f;
+    float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies], aheadX[kMaxSymmetryCopies], aheadZ[kMaxSymmetryCopies];
+    const int copies = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
+    (void)HeightBrushCentres(field->width, field->height, x + std::cos(yaw), z + std::sin(yaw), brush.symmetry, brush.turns, aheadX, aheadZ);
+    for (int c = 0; c < copies; ++c) {
+      if (centreX[c] < 0.0f || centreZ[c] < 0.0f || centreX[c] > static_cast<float>(field->width - 1) ||
+          centreZ[c] > static_cast<float>(field->height - 1)) {
+        continue;
+      }
+      const float heading = std::atan2(aheadZ[c] - centreZ[c], aheadX[c] - centreX[c]);
+      moho::CWldPropEntry entry;
+      entry.mBlueprintPath.assign(mTools->PropBlueprint().c_str());
+      entry.mTransform.pos_ = Wm3::Vec3f{centreX[c],
+                                         mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(centreX[c])),
+                                                                        static_cast<std::int32_t>(std::lround(centreZ[c]))),
+                                         centreZ[c]};
+      entry.mTransform.orient_ = Wm3::Quatf(std::cos(heading * 0.5f), 0.0f, std::sin(heading * 0.5f), 0.0f);
+      // The prop as the file will give it back (its record is what gets saved).
+      const PropRecord record = PropRecordFor(mTools->PropBlueprint(), entry.mTransform);
+      entry.mTransform = record.loaded;
+      mDocument.AddProp(entry, record);
+      mProps.push_back(MakePropInstance(entry));
+      // Only a prop really placed makes the stroke an undo step (copies off the map are skipped).
+      mObjectsChanged = true;
+      mDocument.SetModified(true);
+    }
+  }
+
+  void EdMapScene::EraseProps(const float x, const float z)
+  {
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    if (mTools == nullptr || field == nullptr || mMap->mProps == nullptr) {
+      return;
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies];
+    const int copies = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
+    auto& entries = mMap->mProps->mEntries;
+    for (std::size_t i = entries.size(); i-- > 0;) {
+      bool inside = false;
+      for (int c = 0; c < copies && !inside; ++c) {
+        inside = std::hypot(entries[i].mTransform.pos_.x - centreX[c], entries[i].mTransform.pos_.z - centreZ[c]) < brush.radius;
+      }
+      if (!inside) {
+        continue;
+      }
+      if (i < mProps.size()) {
+        delete mProps[i];
+        mProps.erase(mProps.begin() + static_cast<std::ptrdiff_t>(i));
+      }
+      mDocument.DeletePropAt(i);
+      mObjectsChanged = true;
+    }
+    mSelection.clear();
+    if (mObjectsChanged) {
+      mDocument.SetModified(true);
+    }
   }
 
   void EdMapScene::DeleteProps()
@@ -1207,6 +1466,46 @@ namespace faf::editor
     }
     switch (message) {
     case WM_LBUTTONDOWN: {
+      if (mTools != nullptr && (mTools->SelectToolActive() || mTools->PropsToolActive())) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        if (!GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ) || mMap->mProps == nullptr) {
+          return true;
+        }
+        BeginObjectStroke();
+        ::SetCapture(window);
+        ::SetFocus(window);
+        if (mTools->SelectToolActive()) {
+          const int hit = PickProp(groundX, groundZ);
+          const bool add = (wParam & MK_CONTROL) != 0;
+          if (hit < 0) {
+            if (!add) {
+              mSelection.clear();
+            }
+          } else if (std::find(mSelection.begin(), mSelection.end(), hit) == mSelection.end()) {
+            if (!add) {
+              mSelection.clear();
+            }
+            mSelection.push_back(hit);
+          }
+          // A drag moves the selection over the ground.
+          mDragSelection = hit >= 0;
+          mDragFromX = groundX;
+          mDragFromZ = groundZ;
+          mDragStart.clear();
+          for (const int index : mSelection) {
+            mDragStart.push_back(mMap->mProps->mEntries[static_cast<std::size_t>(index)].mTransform.pos_);
+          }
+          return true;
+        }
+        mScatterDue = 0.0f;
+        if ((wParam & MK_SHIFT) != 0 || mTools->CurrentPropMode() == EdTools::PropMode::Erase) {
+          EraseProps(groundX, groundZ);
+        } else {
+          PlaceProps(groundX, groundZ);
+        }
+        return true;
+      }
       if (mTools != nullptr && mTools->TextureToolActive()) {
         LoadMasks();
         if (!mDocument.Masks().texels.empty()) {
@@ -1242,6 +1541,11 @@ namespace faf::editor
       return true;
     }
     case WM_LBUTTONUP:
+      if (mObjectStroke) {
+        EndObjectStroke();
+        ::ReleaseCapture();
+        return true;
+      }
       if (mPaintingMask) {
         EndMaskStroke();
         ::ReleaseCapture();
@@ -1270,7 +1574,21 @@ namespace faf::editor
       return true;
     case WM_MOUSEMOVE: {
       if (mDrag == Drag::None) {
-        return mPainting || mPaintingMask;
+        if (mDragSelection && mObjectStroke) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        // Not until the cursor has moved: a click alone leaves the props where (and as high as) they are.
+        if (GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ) &&
+            std::hypot(groundX - mDragFromX, groundZ - mDragFromZ) > 0.05f) {
+          for (std::size_t i = 0; i < mSelection.size() && i < mDragStart.size(); ++i) {
+            const float x = mDragStart[i].x + groundX - mDragFromX;
+            const float z = mDragStart[i].z + groundZ - mDragFromZ;
+            MovePropTo(mSelection[i], Wm3::Vec3f{x, mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))), z});
+          }
+        }
+        return true;
+      }
+      return mPainting || mPaintingMask || mObjectStroke;
       }
       const float dx = static_cast<float>(at.x - mDragFrom.x);
       const float dy = static_cast<float>(at.y - mDragFrom.y);
@@ -1324,6 +1642,16 @@ namespace faf::editor
         return true;
       }
       mFast = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
+      if (down && mTools != nullptr && mTools->SelectToolActive() && !mSelection.empty()) {
+        if (wParam == VK_DELETE) {
+          DeleteSelection();
+          return true;
+        }
+        if (wParam == 'Q' || wParam == 'E') {
+          TurnSelection(wParam == 'Q' ? -0.2617994f : 0.2617994f);
+          return true;
+        }
+      }
       switch (wParam) {
       case 'W':
       case VK_UP:

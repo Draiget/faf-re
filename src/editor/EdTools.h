@@ -25,6 +25,34 @@ namespace faf::editor
 
     /** Whether the Terrain tool is the chosen one (the viewport's left button paints heights). */
     [[nodiscard]] bool TerrainToolActive() const noexcept { return mTool == 1; }
+    /** The Select tool (the viewport's left button picks and moves objects) and the Props tool. */
+    [[nodiscard]] bool SelectToolActive() const noexcept { return mTool == 0; }
+    [[nodiscard]] bool PropsToolActive() const noexcept { return mTool == 4; }
+    /** The Props tool's settings: the blueprint placed, Single / Scatter / Erase, props a second, random turn. */
+    enum class PropMode
+    {
+      Single,
+      Scatter,
+      Erase,
+    };
+    [[nodiscard]] const std::string& PropBlueprint() const noexcept { return mPropBlueprint; }
+    [[nodiscard]] PropMode CurrentPropMode() const noexcept { return static_cast<PropMode>(mPropMode); }
+    [[nodiscard]] float PropDensity() const noexcept { return mPropDensity; }
+    [[nodiscard]] bool RandomPropTurn() const noexcept { return mPropRandomTurn; }
+    /** The prop blueprints the rules have (their ids), for the palette. */
+    void SetPropBlueprints(std::vector<std::string> blueprints) { mPropBlueprints = std::move(blueprints); }
+    [[nodiscard]] bool HasPropBlueprints() const noexcept { return !mPropBlueprints.empty(); }
+    /** How many objects the view has selected, for the Select tool's panel. */
+    void SetSelectionCount(const int count) noexcept { mSelectionCount = count; }
+    /** Test runs (`/proptool`): the Props tool with this blueprint and mode. */
+    void SetPropTool(std::string blueprint, const int mode) noexcept
+    {
+      mTool = 4;
+      mPropBlueprint = std::move(blueprint);
+      mPropMode = mode;
+    }
+    void SetTool(const int tool) noexcept { mTool = tool; }
+
     /** Whether the Texture tool is the chosen one (the viewport's left button paints a layer's mask). */
     [[nodiscard]] bool TextureToolActive() const noexcept { return mTool == 2; }
 
@@ -287,6 +315,13 @@ namespace faf::editor
     float mCoverage[8]{};
     bool mHasCoverage = false;
     bool mShowWeight = false;
+    std::vector<std::string> mPropBlueprints;
+    std::string mPropBlueprint;
+    int mPropMode = 0;
+    float mPropDensity = 8.0f;
+    bool mPropRandomTurn = true;
+    char mPropFilter[64]{};
+    int mSelectionCount = 0;
     MaskOp mMaskOp = MaskOp::None;
     std::vector<std::string> mShaders;
     std::string mShader;

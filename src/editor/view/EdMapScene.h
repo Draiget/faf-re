@@ -8,6 +8,7 @@
 #include <Windows.h>
 
 #include "editor/EdTools.h"
+#include "editor/doc/EdDocument.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "editor/tools/EdHeightBrush.h"
 
@@ -79,6 +80,9 @@ namespace faf::editor
     /** Changes one slot as the Tools panel asked, as one undo step. */
     void ChangeLayerSlot(int slot, const EdTools::LayerSlot& value);
 
+    /** Removes the selected props (Edit > Delete selection, the Delete key), as one undo step. */
+    void DeleteSelected() { DeleteSelection(); }
+
     /** Undoes or redoes the newest height stroke (Ctrl+Z, Ctrl+Y); false when there is none. */
     bool Undo();
     bool Redo();
@@ -99,8 +103,35 @@ namespace faf::editor
     void CreateProps();
     void DeleteProps();
 
+    /** One mesh per prop entry, at the entry's index (null when its blueprint or mesh is missing). */
     std::vector<moho::MeshInstance*> mProps;
     bool mPropsDone = false;
+    [[nodiscard]] moho::MeshInstance* MakePropInstance(const moho::CWldPropEntry& entry) const;
+    /** Deletes and makes again every prop's mesh (after undo). */
+    void RebuildProps();
+    bool UndoProps(bool redo);
+    /** The prop nearest the ground point (x, z) within reach of the cursor, or -1. */
+    [[nodiscard]] int PickProp(float x, float z) const;
+    /** Props placed at (x, z) and its symmetric copies, with the Props tool's blueprint and turn. */
+    void PlaceProps(float x, float z);
+    /** Props inside the brush at (x, z) and its copies removed. */
+    void EraseProps(float x, float z);
+    void MovePropTo(int index, const Wm3::Vec3f& position);
+    void TurnSelection(float radians);
+    void DeleteSelection();
+    std::vector<int> mSelection;
+    /** A Select-tool drag or a Props-tool stroke in progress: the props before it, for its undo step. */
+    bool mObjectStroke = false;
+    bool mObjectsChanged = false;
+    EdDocument::PropSnapshot mObjectBefore;
+    bool mDragSelection = false;
+    float mDragFromX = 0.0f;
+    float mDragFromZ = 0.0f;
+    std::vector<Wm3::Vec3f> mDragStart;
+    float mScatterDue = 0.0f;
+    std::uint32_t mScatterSeed = 12345U;
+    void BeginObjectStroke();
+    void EndObjectStroke();
 
     /** A terrain stroke in progress: the brush under the cursor each frame while the left button is held. */
     void PaintStroke(float frameSeconds);
