@@ -4,8 +4,8 @@
 # so every engine object is linked in the same order as faf_main's; the game's WinMain is
 # among them, so the editor starts at its own main() (mainCRTStartup) instead.
 #
-# It draws through Direct3D 12 or Vulkan only (editor/EdDevice.cpp); the other backends are
-# linked but never created.
+# The editor runs the game's own app (CScApp) inside its own (editor/EdApp.cpp), limited to
+# Direct3D 12 and Vulkan (moho::gAppRenderers); the other backends are linked but never created.
 
 if(NOT TARGET faf_imgui)
   message(STATUS "faf_editor: Dear ImGui not found; the map editor is not built")
@@ -22,6 +22,13 @@ else()
 endif()
 target_link_libraries(faf_editor PRIVATE faf_engine faf_imgui)
 target_link_options(faf_editor PRIVATE "/ENTRY:mainCRTStartup")
+
+# The game's window resources (wx's cursors and bitmaps, the icon) and manifest, as faf_main has
+# them (src/CMakeLists.txt): the game's frame and viewport are the editor's window.
+set(_faf_editor_app_dir "${CMAKE_CURRENT_SOURCE_DIR}/../moho/app")
+target_sources(faf_editor PRIVATE "${_faf_editor_app_dir}/MohoResources.rc" "${_faf_editor_app_dir}/MohoManifest.rc")
+set_source_files_properties("${_faf_editor_app_dir}/MohoResources.rc" PROPERTIES INCLUDE_DIRECTORIES "${FAF_WX_INCLUDE_DIR}")
+target_link_options(faf_editor PRIVATE /MANIFEST:NO)
 
 # The older renderers' DLLs load only if something calls into them, which the editor never
 # does: it starts on a machine without the June 2010 DirectX runtime (d3dx9_43.dll, as

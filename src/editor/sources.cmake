@@ -3,8 +3,8 @@
 set(FAF_EDITOR_SOURCES
   EdMain.cpp
   EdApp.cpp
-  EdDevice.cpp
   EdLog.cpp
+  EdPlay.cpp
   EdShell.cpp
   ui/EdImGuiRenderer.cpp
 )

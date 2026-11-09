@@ -1642,6 +1642,10 @@ namespace
   [[nodiscard]] std::vector<gpg::gal::DeviceApi> RendererAttemptOrder(const bool logChoice = true)
   {
     using gpg::gal::DeviceApi;
+    // Engine addition (the map editor, moho::gAppRenderers): its own renderers, and only those.
+    if (!moho::gAppRenderers.empty()) {
+      return moho::gAppRenderers;
+    }
     const auto explicitApi = [](const DeviceApi api) {
       return (api == DeviceApi::Direct3D9) ? std::vector<DeviceApi>{api} : std::vector<DeviceApi>{api, DeviceApi::Direct3D9};
     };
@@ -1877,7 +1881,15 @@ bool CScApp::CreateDevice()
   bool windowedByCommandLine = false;
   bool secondarySetupMode = false;
 
-  SetUpHeads(context, primaryHead, options, preferences, windowedByCommandLine, secondarySetupMode);
+  // Engine addition (moho::gAppWindowed): the map editor is always one window. `mWindowed` is the
+  // full-screen flag (CreateAppFrame picks the frame style from it), so false makes a window.
+  if (moho::gAppWindowed) {
+    primaryHead.mWindowed = false;
+    primaryHead.mWidth = static_cast<std::uint32_t>(std::max(moho::wnd_DefaultCreateWidth, 1600));
+    primaryHead.mHeight = static_cast<std::uint32_t>(std::max(moho::wnd_DefaultCreateHeight, 1000));
+  } else {
+    SetUpHeads(context, primaryHead, options, preferences, windowedByCommandLine, secondarySetupMode);
+  }
 
   if (context.GetHeadCount() == 1 &&
       moho::CFG_GetArgOptionAliases(moho::CFG_GetAdapterOptionAliases(), 1, &options) &&
@@ -1892,7 +1904,8 @@ bool CScApp::CreateDevice()
 
   const bool maximizeFromPrefs = preferences != nullptr
                                  && preferences->GetBoolean(fa::string("Windows.Main.maximized"), false);
-  const bool maximized = !windowedByCommandLine && !primaryHead.mWindowed && (hasMaximizeOption || maximizeFromPrefs);
+  const bool maximized = moho::gAppWindowed ||
+                         (!windowedByCommandLine && !primaryHead.mWindowed && (hasMaximizeOption || maximizeFromPrefs));
 
   if (!primaryHead.mWindowed) {
     if (moho::CFG_GetArgOption("/position", 2, &options) && options.size() >= 2) {
@@ -1935,6 +1948,11 @@ bool CScApp::CreateDevice()
   }
   if (!created) {
     moho::d3d_WindowsCursor = useD3D10;
+  }
+
+  // Engine addition (moho::gAppRenderers): the map editor has no Direct3D 9 or 10 fallback.
+  if (!created && !moho::gAppRenderers.empty()) {
+    return false;
   }
 
   if (!created) {
@@ -2140,3 +2158,9 @@ bool CScApp::AppDoSuppressWindowsKeys() const
 
   return supcomFrame->IsApplicationActive();
 }
+
+// Engine addition (the map editor, src/editor): empty in the game. CScApp.h says what it does.
+std::vector<gpg::gal::DeviceApi> moho::gAppRenderers;
+
+// Engine addition (the map editor, src/editor): false in the game. CScApp.h says what it does.
+bool moho::gAppWindowed = false;

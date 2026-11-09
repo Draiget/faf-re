@@ -177,7 +177,10 @@ function Copy-Build([hashtable]$t, [string]$destDir, [string]$exeName) {
     # A DLL a running game holds open is the same file; skip it rather than fail.
     if ((Test-Path $target) -and (Get-Item $target).Length -eq $dll.Length -and
         (Get-Item $target).LastWriteTimeUtc -ge $dll.LastWriteTimeUtc) { continue }
-    Copy-Item $dll.FullName $target -Force
+    # A game running from the folder keeps an older copy open; the exe carries its own DXC
+    # (EmbeddedFiles.rc), so keep going with the one there.
+    try { Copy-Item $dll.FullName $target -Force }
+    catch { Write-Warning "$target not replaced (in use by a running game)." }
   }
   Write-Host "   -> $destExe" -ForegroundColor Green
 }

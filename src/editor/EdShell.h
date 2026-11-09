@@ -4,41 +4,44 @@
 
 namespace faf::editor
 {
-  class EdDevice;
   class EdLog;
+  class EdPlay;
 
   /**
-   * The editor's window layout: the menu bar, the docked panels (tools, 3D viewport, map, log)
-   * and the status bar. Stage 0 of .plans/map-editor: the panels are in place; the viewport,
-   * tools and map panels get their content in the later stages.
+   * The editor's layout over the game's frame: the menu bar with the play bar (map, Play/Stop, state), the
+   * docked panels (tools, map, log) around an empty middle where the game's picture shows through, and the
+   * status bar. While a session runs the panels step aside unless "Panels while playing" is on.
    */
   class EdShell
   {
   public:
-    EdShell(EdDevice& device, EdLog& log);
+    EdShell(EdLog& log, EdPlay& play);
 
-    /** Builds this frame's UI. Returns false when the user chose File > Exit. */
-    [[nodiscard]] bool Draw();
+    /** Builds this frame's UI. */
+    void Draw();
+
+    /** File > Exit was chosen. */
+    [[nodiscard]] bool ExitRequested() const noexcept { return mExit; }
 
   private:
     void BuildDefaultLayout(unsigned int dockspaceId);
     void DrawMenuBar();
     void DrawToolsPanel();
-    void DrawViewportPanel();
     void DrawMapPanel();
     void DrawStatusBar();
 
-    EdDevice& mDevice;
     EdLog& mLog;
+    EdPlay& mPlay;
+    std::string mApi;
     std::string mAdapter;
-    std::string mSwapChain;
     int mTool = 1;
     bool mExit = false;
     bool mShowDemo = false;
     bool mShowTools = true;
-    bool mShowViewport = true;
     bool mShowMap = true;
     bool mShowLog = true;
+    bool mPanelsWhilePlaying = false;
     bool mLayoutBuilt = false;
+    bool mResetLayout = false;
   };
 } // namespace faf::editor

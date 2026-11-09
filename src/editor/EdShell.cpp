@@ -2,8 +2,8 @@
 
 #include <cstdio>
 
-#include "editor/EdDevice.h"
 #include "editor/EdLog.h"
+#include "editor/EdPlay.h"
 #include "gpg/gal/Device.hpp"
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -13,29 +13,35 @@ namespace faf::editor
   namespace
   {
     constexpr const char* kToolsWindow = "Tools";
-    constexpr const char* kViewportWindow = "Viewport";
     constexpr const char* kMapWindow = "Map";
     constexpr const char* kLogWindow = "Log";
+    constexpr const char* kDockSpace = "EditorDockSpace";
 
     // The tools the plan lists, in its order (.plans/map-editor, "Goal").
     constexpr const char* kTools[] = {"Select", "Terrain", "Texture", "Water", "Props", "Decals", "Markers"};
+
+    const ImVec4 kPlayGreen(0.24f, 0.55f, 0.28f, 1.0f);
+    const ImVec4 kStopRed(0.62f, 0.22f, 0.20f, 1.0f);
   } // namespace
 
-  EdShell::EdShell(EdDevice& device, EdLog& log)
-    : mDevice(device)
-    , mLog(log)
+  EdShell::EdShell(EdLog& log, EdPlay& play)
+    : mLog(log)
+    , mPlay(play)
   {
     gpg::gal::DeviceRuntimeInfo info;
-    if (gpg::gal::Device* const gal = device.Gal(); gal != nullptr && gal->GetRuntimeInfo(info)) {
+    if (gpg::gal::Device::IsReady() && gpg::gal::Device::GetInstance()->GetRuntimeInfo(info)) {
+      mApi = info.api.c_str();
       mAdapter = info.adapter.c_str();
-      mSwapChain = info.swapChain.c_str();
     }
   }
 
-  bool EdShell::Draw()
+  void EdShell::Draw()
   {
     DrawMenuBar();
+    const bool panels = !mPlay.Active() || mPanelsWhilePlaying;
 
+    // The dock space over the whole window. Its middle stays empty and lets the mouse through, so the game's
+    // picture and input are there.
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
     const float statusHeight = ImGui::GetFrameHeight();
     ImGui::SetNextWindowPos(viewport->WorkPos);
@@ -49,36 +55,35 @@ namespace faf::editor
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::Begin("##EditorDockHost", nullptr, kHostFlags);
     ImGui::PopStyleVar(3);
-    const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpace");
-    if (!mLayoutBuilt) {
-      mLayoutBuilt = true;
-      if (ImGui::DockBuilderGetNode(dockspaceId) == nullptr) {
+    const ImGuiID dockspaceId = ImGui::GetID(kDockSpace);
+    if (!mLayoutBuilt || mResetLayout) {
+      if (mResetLayout || ImGui::DockBuilderGetNode(dockspaceId) == nullptr) {
         BuildDefaultLayout(dockspaceId);
       }
+      mLayoutBuilt = true;
+      mResetLayout = false;
     }
     ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
     ImGui::End();
 
-    if (mShowTools) {
-      DrawToolsPanel();
-    }
-    if (mShowViewport) {
-      DrawViewportPanel();
-    }
-    if (mShowMap) {
-      DrawMapPanel();
-    }
-    if (mShowLog) {
-      if (ImGui::Begin(kLogWindow, &mShowLog)) {
-        mLog.Draw();
+    if (panels) {
+      if (mShowTools) {
+        DrawToolsPanel();
       }
-      ImGui::End();
+      if (mShowMap) {
+        DrawMapPanel();
+      }
+      if (mShowLog) {
+        if (ImGui::Begin(kLogWindow, &mShowLog)) {
+          mLog.Draw();
+        }
+        ImGui::End();
+      }
     }
     if (mShowDemo) {
       ImGui::ShowDemoWindow(&mShowDemo);
     }
     DrawStatusBar();
-    return !mExit;
   }
 
   void EdShell::BuildDefaultLayout(const unsigned int dockspaceId)
@@ -88,13 +93,12 @@ namespace faf::editor
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->WorkSize);
     ImGuiID center = dockspaceId;
-    const ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.18f, nullptr, &center);
-    const ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.24f, nullptr, &center);
-    const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.24f, nullptr, &center);
+    const ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.17f, nullptr, &center);
+    const ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.22f, nullptr, &center);
+    const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.22f, nullptr, &center);
     ImGui::DockBuilderDockWindow(kToolsWindow, left);
     ImGui::DockBuilderDockWindow(kMapWindow, right);
     ImGui::DockBuilderDockWindow(kLogWindow, bottom);
-    ImGui::DockBuilderDockWindow(kViewportWindow, center);
     ImGui::DockBuilderFinish(dockspaceId);
   }
 
@@ -111,23 +115,71 @@ namespace faf::editor
       ImGui::MenuItem("Save as new version...");
       ImGui::EndDisabled();
       ImGui::Separator();
-      if (ImGui::MenuItem("Exit", "Alt+F4")) {
+      if (ImGui::MenuItem("Exit")) {
         mExit = true;
       }
       ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("View")) {
       ImGui::MenuItem(kToolsWindow, nullptr, &mShowTools);
-      ImGui::MenuItem(kViewportWindow, nullptr, &mShowViewport);
       ImGui::MenuItem(kMapWindow, nullptr, &mShowMap);
       ImGui::MenuItem(kLogWindow, nullptr, &mShowLog);
+      ImGui::MenuItem("Panels while playing", nullptr, &mPanelsWhilePlaying);
       ImGui::Separator();
       if (ImGui::MenuItem("Reset layout")) {
-        BuildDefaultLayout(ImGui::GetID("EditorDockSpace"));
+        mResetLayout = true;
       }
       ImGui::MenuItem("ImGui demo", nullptr, &mShowDemo);
       ImGui::EndMenu();
     }
+
+    // The play bar: the map, Play or Stop, and what the session is doing.
+    ImGui::Separator();
+    const std::vector<std::string>& maps = mPlay.Maps();
+    const int selected = mPlay.Selected();
+    const std::string current = maps.empty() ? std::string("(no maps found)") : MapDisplayName(maps[static_cast<std::size_t>(selected)]);
+    ImGui::SetNextItemWidth(260.0f);
+    ImGui::BeginDisabled(mPlay.Active());
+    if (ImGui::BeginCombo("##map", current.c_str(), ImGuiComboFlags_HeightLarge)) {
+      static char filter[64] = "";
+      ImGui::SetNextItemWidth(-1.0f);
+      if (ImGui::IsWindowAppearing()) {
+        ImGui::SetKeyboardFocusHere();
+      }
+      ImGui::InputTextWithHint("##mapfilter", "Filter maps", filter, sizeof(filter));
+      for (int i = 0; i < static_cast<int>(maps.size()); ++i) {
+        const std::string name = MapDisplayName(maps[static_cast<std::size_t>(i)]);
+        if (filter[0] != '\0' && ImStristr(name.c_str(), nullptr, filter, nullptr) == nullptr) {
+          continue;
+        }
+        if (ImGui::Selectable(name.c_str(), i == selected)) {
+          mPlay.Select(i);
+        }
+        if (ImGui::IsItemHovered()) {
+          ImGui::SetTooltip("%s", maps[static_cast<std::size_t>(i)].c_str());
+        }
+      }
+      ImGui::EndCombo();
+    }
+    ImGui::EndDisabled();
+
+    if (!mPlay.Active()) {
+      ImGui::BeginDisabled(!mPlay.CanPlay());
+      ImGui::PushStyleColor(ImGuiCol_Button, kPlayGreen);
+      if (ImGui::Button("  Play  ") || (ImGui::IsKeyPressed(ImGuiKey_F5) && mPlay.CanPlay())) {
+        mPlay.Play();
+      }
+      ImGui::PopStyleColor();
+      ImGui::EndDisabled();
+    } else {
+      ImGui::PushStyleColor(ImGuiCol_Button, kStopRed);
+      if (ImGui::Button("  Stop  ") || ImGui::IsKeyPressed(ImGuiKey_F5)) {
+        mPlay.Stop();
+      }
+      ImGui::PopStyleColor();
+    }
+    ImGui::SetItemTooltip("F5");
+    ImGui::TextDisabled("%s", mPlay.StateText());
     ImGui::EndMainMenuBar();
   }
 
@@ -145,31 +197,12 @@ namespace faf::editor
     ImGui::End();
   }
 
-  void EdShell::DrawViewportPanel()
-  {
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-    const bool open = ImGui::Begin(kViewportWindow, &mShowViewport);
-    ImGui::PopStyleVar();
-    if (open) {
-      const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const ImVec2 size = ImGui::GetContentRegionAvail();
-      ImDrawList* const draw = ImGui::GetWindowDrawList();
-      draw->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y), IM_COL32(13, 15, 18, 255));
-      const char* const line1 = "3D viewport";
-      const char* const line2 = "The game's terrain, water, decal and mesh renderers draw here from stage 1.";
-      const ImVec2 size1 = ImGui::CalcTextSize(line1);
-      const ImVec2 size2 = ImGui::CalcTextSize(line2);
-      const float middleY = origin.y + size.y * 0.5f;
-      draw->AddText(ImVec2(origin.x + (size.x - size1.x) * 0.5f, middleY - size1.y), IM_COL32(220, 220, 225, 255), line1);
-      draw->AddText(ImVec2(origin.x + (size.x - size2.x) * 0.5f, middleY + 4.0f), IM_COL32(140, 147, 157, 255), line2);
-    }
-    ImGui::End();
-  }
-
   void EdShell::DrawMapPanel()
   {
     if (ImGui::Begin(kMapWindow, &mShowMap)) {
-      ImGui::TextDisabled("No map open.");
+      ImGui::TextDisabled("No map open for editing.");
+      ImGui::Spacing();
+      ImGui::TextWrapped("Pick a map in the play bar and press Play (F5) to play it here; Stop or F5 returns to the editor.");
       ImGui::Spacing();
       ImGui::TextWrapped("Opening and saving FAF maps is stage 2 of the plan.");
     }
@@ -189,24 +222,20 @@ namespace faf::editor
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 2.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     if (ImGui::Begin("##StatusBar", nullptr, kFlags)) {
-      ImGui::Text("%s", mDevice.ApiName());
-      if (!mSwapChain.empty()) {
-        ImGui::SetItemTooltip("Swap chain: %s", mSwapChain.c_str());
-      }
+      ImGui::Text("%s", mApi.empty() ? "?" : mApi.c_str());
       if (!mAdapter.empty()) {
         ImGui::SameLine();
         ImGui::TextDisabled("| %s", mAdapter.c_str());
       }
       ImGui::SameLine();
-      ImGui::TextDisabled("| %ux%u", mDevice.Width(), mDevice.Height());
+      ImGui::TextDisabled("| %s", mPlay.StateText());
       const int warnings = mLog.WarningCount();
       if (warnings > 0) {
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "| %d warnings in the log", warnings);
       }
-      const char* const fps = "%.0f fps";
       char text[32];
-      (void)std::snprintf(text, sizeof(text), fps, ImGui::GetIO().Framerate);
+      (void)std::snprintf(text, sizeof(text), "%.0f fps", ImGui::GetIO().Framerate);
       ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize(text).x - 12.0f);
       ImGui::TextUnformatted(text);
     }
