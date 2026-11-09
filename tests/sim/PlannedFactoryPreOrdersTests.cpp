@@ -3,6 +3,8 @@
 #include "moho/console/CConCommand.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/sim/PlannedFactoryProxy.h"
+#include "moho/sim/Sim.h"
+#include "lua/LuaObject.h"
 
 namespace moho
 {
@@ -372,6 +374,243 @@ TEST(PlannedFactoryPreOrdersTest, WorldViewNullSafetyAndBoundingRadius)
   const moho::CUIWorldView* nullView = nullptr;
   EXPECT_EQ(mgr.HitTestScreenPoint(nullView, 100.0f, 100.0f, 30.0f), nullptr);
   EXPECT_TRUE(mgr.HitTestScreenRect(nullView, 0.0f, 0.0f, 100.0f, 100.0f).empty());
+
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, QueueOrdersDuplicateToAllSelectedProxies)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxy1 = mgr.RegisterOrUpdatePlannedFactory(1, 0, nullptr, {10.0f, 0.0f, 10.0f});
+  auto* proxy2 = mgr.RegisterOrUpdatePlannedFactory(2, 0, nullptr, {50.0f, 0.0f, 50.0f});
+  auto* proxy3 = mgr.RegisterOrUpdatePlannedFactory(3, 0, nullptr, {90.0f, 0.0f, 90.0f});
+  ASSERT_NE(proxy1, nullptr);
+  ASSERT_NE(proxy2, nullptr);
+  ASSERT_NE(proxy3, nullptr);
+
+  // Select proxy1 and proxy2; proxy3 remains unselected
+  mgr.SelectProxy(proxy1->mProxyId, false);
+  mgr.SelectProxy(proxy2->mProxyId, true);
+
+  // Queue 5 tanks of "uel0201"
+  mgr.QueuePlannedFactoryOrders("uel0201", 5, false);
+
+  // Verify duplication: both proxy1 and proxy2 receive all 5 tanks (no round-robin)
+  ASSERT_EQ(proxy1->mPreOrders.size(), 1u);
+  EXPECT_EQ(proxy1->mPreOrders[0].blueprintId, "uel0201");
+  EXPECT_EQ(proxy1->mPreOrders[0].count, 5);
+
+  ASSERT_EQ(proxy2->mPreOrders.size(), 1u);
+  EXPECT_EQ(proxy2->mPreOrders[0].blueprintId, "uel0201");
+  EXPECT_EQ(proxy2->mPreOrders[0].count, 5);
+
+  // Unselected proxy3 receives nothing
+  EXPECT_TRUE(proxy3->mPreOrders.empty());
+
+  // Queue 2 more units of "uel0202"
+  mgr.QueuePlannedFactoryOrders("uel0202", 2, false);
+  ASSERT_EQ(proxy1->mPreOrders.size(), 2u);
+  EXPECT_EQ(proxy1->mPreOrders[1].blueprintId, "uel0202");
+  EXPECT_EQ(proxy1->mPreOrders[1].count, 2);
+
+  ASSERT_EQ(proxy2->mPreOrders.size(), 2u);
+  EXPECT_EQ(proxy2->mPreOrders[1].blueprintId, "uel0202");
+  EXPECT_EQ(proxy2->mPreOrders[1].count, 2);
+
+  // Queue with clearQueue = true replaces the queues
+  mgr.QueuePlannedFactoryOrders("uel0203", 1, true);
+  ASSERT_EQ(proxy1->mPreOrders.size(), 1u);
+  EXPECT_EQ(proxy1->mPreOrders[0].blueprintId, "uel0203");
+  EXPECT_EQ(proxy1->mPreOrders[0].count, 1);
+
+  ASSERT_EQ(proxy2->mPreOrders.size(), 1u);
+  EXPECT_EQ(proxy2->mPreOrders[0].blueprintId, "uel0203");
+  EXPECT_EQ(proxy2->mPreOrders[0].count, 1);
+
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, SetRallyPointAndRepeatToAllSelectedProxies)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxy1 = mgr.RegisterOrUpdatePlannedFactory(1, 0, nullptr, {10.0f, 0.0f, 10.0f});
+  auto* proxy2 = mgr.RegisterOrUpdatePlannedFactory(2, 0, nullptr, {50.0f, 0.0f, 50.0f});
+  ASSERT_NE(proxy1, nullptr);
+  ASSERT_NE(proxy2, nullptr);
+
+  mgr.SelectProxy(proxy1->mProxyId, false);
+  mgr.SelectProxy(proxy2->mProxyId, true);
+
+  // Rally point setting across selected proxies
+  const moho::Vector3f rallyTarget{123.0f, 0.0f, 456.0f};
+  mgr.SetSelectedPlannedFactoriesRallyPoint(rallyTarget);
+
+  EXPECT_TRUE(proxy1->mHasRallyPoint);
+  EXPECT_FLOAT_EQ(proxy1->mRallyPoint.x, 123.0f);
+  EXPECT_FLOAT_EQ(proxy1->mRallyPoint.z, 456.0f);
+
+  EXPECT_TRUE(proxy2->mHasRallyPoint);
+  EXPECT_FLOAT_EQ(proxy2->mRallyPoint.x, 123.0f);
+  EXPECT_FLOAT_EQ(proxy2->mRallyPoint.z, 456.0f);
+
+  // Repeat toggle across selected proxies
+  mgr.SetSelectedPlannedFactoriesRepeat(true);
+  EXPECT_TRUE(proxy1->mRepeatBuild);
+  EXPECT_TRUE(proxy2->mRepeatBuild);
+
+  mgr.SetSelectedPlannedFactoriesRepeat(false);
+  EXPECT_FALSE(proxy1->mRepeatBuild);
+  EXPECT_FALSE(proxy2->mRepeatBuild);
+
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, QueueInspectionAndDecrement)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(1, 0, nullptr, {10.0f, 0.0f, 10.0f});
+  ASSERT_NE(proxy, nullptr);
+
+  proxy->AddPreOrder("uel0201", 3);
+  proxy->AddPreOrder("uel0202", 2);
+  ASSERT_EQ(proxy->mPreOrders.size(), 2u);
+
+  // Partial decrement at index 0 (uel0201: 3 -> 2)
+  EXPECT_TRUE(proxy->RemovePreOrderByIndex(0, 1));
+  ASSERT_EQ(proxy->mPreOrders.size(), 2u);
+  EXPECT_EQ(proxy->mPreOrders[0].count, 2);
+
+  // Full decrement of index 0 removes it (uel0201: 2 -> 0 removed, uel0202 shifts to index 0)
+  EXPECT_TRUE(proxy->RemovePreOrderByIndex(0, 2));
+  ASSERT_EQ(proxy->mPreOrders.size(), 1u);
+  EXPECT_EQ(proxy->mPreOrders[0].blueprintId, "uel0202");
+  EXPECT_EQ(proxy->mPreOrders[0].count, 2);
+
+  // Remove by blueprint ID
+  EXPECT_TRUE(proxy->RemovePreOrder("uel0202", 5));
+  EXPECT_TRUE(proxy->mPreOrders.empty());
+
+  // Decrement on empty returns false
+  EXPECT_FALSE(proxy->RemovePreOrderByIndex(0, 1));
+  EXPECT_FALSE(proxy->RemovePreOrder("uel0202", 1));
+
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, MixedSelectionDuplicationSimulation)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  // 1 planned factory proxy selected
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(1, 0, nullptr, {100.0f, 0.0f, 100.0f});
+  ASSERT_NE(proxy, nullptr);
+  mgr.SelectProxy(proxy->mProxyId, false);
+
+  // Simulate ordering 5 tanks for 2 real factories and 1 planned proxy:
+  // User requirement: "если заказываю N юнитов, то все N должны быть на всех выделенных заводах"
+  struct MockRealFactory
+  {
+    int ordersReceived{0};
+    std::string orderedBp{};
+  };
+  std::vector<MockRealFactory> realFactories(2);
+
+  const std::string tankBp = "uel0201";
+  const int count = 5;
+
+  // Real factories receive `count` in Sim
+  for (auto& realFac : realFactories) {
+    realFac.ordersReceived += count;
+    realFac.orderedBp = tankBp;
+  }
+  // Planned factory receives `count` via QueuePlannedFactoryOrders
+  mgr.QueuePlannedFactoryOrders(tankBp, count, false);
+
+  // Verify real factories both have 5
+  EXPECT_EQ(realFactories[0].ordersReceived, 5);
+  EXPECT_EQ(realFactories[0].orderedBp, "uel0201");
+  EXPECT_EQ(realFactories[1].ordersReceived, 5);
+  EXPECT_EQ(realFactories[1].orderedBp, "uel0201");
+
+  // Verify planned proxy received full 5 (duplicated, NOT round-robin divided)
+  ASSERT_EQ(proxy->mPreOrders.size(), 1u);
+  EXPECT_EQ(proxy->mPreOrders[0].blueprintId, "uel0201");
+  EXPECT_EQ(proxy->mPreOrders[0].count, 5);
+
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, LuaBindersQueueRallyRepeatAndDecrease)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(10, 0, nullptr, {20.0f, 0.0f, 30.0f});
+  ASSERT_NE(proxy, nullptr);
+
+  LuaPlus::LuaState state{LuaPlus::LuaState::LIB_BASE};
+  lua_State* L = state.GetCState();
+
+  // 1. IssuePlannedFactoryBuildOrder(proxyId, "uel0201", 4)
+  lua_pushnumber(L, proxy->mProxyId);
+  lua_pushstring(L, "uel0201");
+  lua_pushnumber(L, 4);
+  EXPECT_EQ(moho::cfunc_IssuePlannedFactoryBuildOrderL(&state), 0);
+  lua_settop(L, 0);
+
+  ASSERT_EQ(proxy->mPreOrders.size(), 1u);
+  EXPECT_EQ(proxy->mPreOrders[0].blueprintId, "uel0201");
+  EXPECT_EQ(proxy->mPreOrders[0].count, 4);
+
+  // 2. GetPlannedFactoryQueue(proxyId) -> returns table
+  lua_pushnumber(L, proxy->mProxyId);
+  EXPECT_EQ(moho::cfunc_GetPlannedFactoryQueueL(&state), 1);
+  LuaPlus::LuaObject queueObj(LuaPlus::LuaStackObject(&state, -1));
+  EXPECT_TRUE(queueObj.IsTable());
+  LuaPlus::LuaObject firstOrder = queueObj.GetByIndex(1);
+  EXPECT_TRUE(firstOrder.IsTable());
+  EXPECT_STREQ(firstOrder.GetByName("blueprintId").GetString(), "uel0201");
+  EXPECT_EQ(firstOrder.GetByName("count").GetInteger(), 4);
+  lua_settop(L, 0);
+
+  // 3. DecreasePlannedFactoryBuildCount(proxyId, 1, 2)
+  lua_pushnumber(L, proxy->mProxyId);
+  lua_pushnumber(L, 1);
+  lua_pushnumber(L, 2);
+  EXPECT_EQ(moho::cfunc_DecreasePlannedFactoryBuildCountL(&state), 1);
+  EXPECT_EQ(lua_toboolean(L, -1), 1);
+  EXPECT_EQ(proxy->mPreOrders[0].count, 2);
+  lua_settop(L, 0);
+
+  // 4. SetPlannedFactoryRallyPoint(proxyId, 50, 0, 75)
+  lua_pushnumber(L, proxy->mProxyId);
+  lua_pushnumber(L, 50.0);
+  lua_pushnumber(L, 0.0);
+  lua_pushnumber(L, 75.0);
+  EXPECT_EQ(moho::cfunc_SetPlannedFactoryRallyPointL(&state), 0);
+  EXPECT_TRUE(proxy->mHasRallyPoint);
+  EXPECT_FLOAT_EQ(proxy->mRallyPoint.x, 50.0f);
+  EXPECT_FLOAT_EQ(proxy->mRallyPoint.z, 75.0f);
+  lua_settop(L, 0);
+
+  // 5. SetPlannedFactoryRepeat(proxyId, true)
+  lua_pushnumber(L, proxy->mProxyId);
+  lua_pushboolean(L, 1);
+  EXPECT_EQ(moho::cfunc_SetPlannedFactoryRepeatL(&state), 0);
+  EXPECT_TRUE(proxy->mRepeatBuild);
+  lua_settop(L, 0);
 
   mgr.ClearAll();
 }

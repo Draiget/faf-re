@@ -143,6 +143,11 @@ namespace moho
     [[nodiscard]] std::vector<PlannedUnitProxy*> GetSelectedProxies();
     [[nodiscard]] std::vector<const PlannedUnitProxy*> GetSelectedProxies() const;
 
+    // Pre-order command routing and buffering across selected proxies
+    void QueuePlannedFactoryOrders(const std::string& bpId, int count = 1, bool clearQueue = false);
+    void SetSelectedPlannedFactoriesRallyPoint(const Vector3f& pos);
+    void SetSelectedPlannedFactoriesRepeat(bool repeat);
+
     // 3D Ray hit test
     [[nodiscard]] PlannedUnitProxy* HitTestRay(const Ray3f& ray, float radius = 5.0f);
     [[nodiscard]] const PlannedUnitProxy* HitTestRay(const Ray3f& ray, float radius = 5.0f) const;

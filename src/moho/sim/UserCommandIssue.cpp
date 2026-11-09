@@ -10,6 +10,7 @@
 #include "moho/sim/CSimConCommand.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 
 #include <algorithm>
 #include <array>
@@ -707,6 +708,42 @@ namespace moho
   void ISSUE_Command(const gpg::fastvector<UserUnit*>& units, SSTICommandIssueData data, const bool clearQueue)
   {
     CWldSession* const session = WLD_GetActiveSession();
+
+    if (moho::IsFactoryPreOrdersEnabled()) {
+      auto& mgr = moho::PlannedFactoryManager::Get();
+      const auto selectedProxies = mgr.GetSelectedProxies();
+      if (!selectedProxies.empty()) {
+        if (data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile
+            || data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildFactory) {
+          if (units.empty() && data.mBlueprint != nullptr && !data.mBlueprint->mBlueprintId.empty()) {
+            const std::string bpId = data.mBlueprint->mBlueprintId.c_str();
+            mgr.QueuePlannedFactoryOrders(bpId, 1, clearQueue);
+          }
+        } else if (data.mCommandType == EUnitCommandType::UNITCOMMAND_Move) {
+          Vector3f rallyPos{Vector3f::ZERO};
+          if (data.mTarget.mType == EAiTargetType::AITARGET_Ground) {
+            rallyPos = Vector3f{data.mTarget.mPos.x, data.mTarget.mPos.y, data.mTarget.mPos.z};
+            mgr.SetSelectedPlannedFactoriesRallyPoint(rallyPos);
+          } else if (data.mTarget.mType == EAiTargetType::AITARGET_Entity) {
+            CWldSession* const currentSession = WLD_GetActiveSession();
+            if (currentSession != nullptr) {
+              if (UserEntity* const targetEntity = currentSession->LookupEntityId(static_cast<EntId>(data.mTarget.mEnt))) {
+                rallyPos = Vector3f{
+                  targetEntity->mVariableData.mCurTransform.pos_.x,
+                  targetEntity->mVariableData.mCurTransform.pos_.y,
+                  targetEntity->mVariableData.mCurTransform.pos_.z
+                };
+                mgr.SetSelectedPlannedFactoriesRallyPoint(rallyPos);
+              }
+            }
+          }
+        }
+      }
+
+      if (units.empty()) {
+        return; // Zero Sim Stream: Do not dispatch network commands when no real units are selected
+      }
+    }
 
     // mManager == sWldSession->mSessionRes1 in the binary (0x008B01AD/+0x3FC).
     CommandManager* const commandManager = session->mCommandManager;

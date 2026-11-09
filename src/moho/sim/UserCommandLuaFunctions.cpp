@@ -36,6 +36,7 @@
 #include "moho/app/WxUrl.h"
 #include "moho/client/Localization.h"
 #include "moho/command/SSTICommandIssueData.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 #include "moho/console/CConCommand.h"
 #include "moho/console/CConFunc.h"
 #include "moho/sim/SOCellPos.h"
@@ -1222,6 +1223,17 @@ namespace moho
     // gates on == 0.0 (a null-pointer test); an unparsable command type is None.
     if (blueprint == nullptr || commandType == EUnitCommandType::UNITCOMMAND_None) {
       return 0;
+    }
+
+    if (moho::IsFactoryPreOrdersEnabled()) {
+      if (commandType == EUnitCommandType::UNITCOMMAND_BuildFactory
+          || commandType == EUnitCommandType::UNITCOMMAND_BuildMobile) {
+        if (!blueprint->mBlueprintId.empty()) {
+          PlannedFactoryManager::Get().QueuePlannedFactoryOrders(
+            blueprint->mBlueprintId.c_str(), repeatCount, clearQueue
+          );
+        }
+      }
     }
 
     // Silo builds bypass the command-issue pipeline (mirrors cfunc_IssueCommandL):

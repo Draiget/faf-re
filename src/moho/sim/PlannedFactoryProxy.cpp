@@ -326,6 +326,45 @@ namespace moho
     return result;
   }
 
+  void PlannedFactoryManager::QueuePlannedFactoryOrders(const std::string& bpId, const int count, const bool clearQueue)
+  {
+    if (!IsFactoryPreOrdersEnabled() || bpId.empty() || count <= 0) {
+      return;
+    }
+    for (auto* const proxy : GetSelectedProxies()) {
+      if (proxy != nullptr) {
+        if (clearQueue) {
+          proxy->ClearPreOrders();
+        }
+        proxy->AddPreOrder(bpId, count);
+      }
+    }
+  }
+
+  void PlannedFactoryManager::SetSelectedPlannedFactoriesRallyPoint(const Vector3f& pos)
+  {
+    if (!IsFactoryPreOrdersEnabled()) {
+      return;
+    }
+    for (auto* const proxy : GetSelectedProxies()) {
+      if (proxy != nullptr) {
+        proxy->SetRallyPoint(pos);
+      }
+    }
+  }
+
+  void PlannedFactoryManager::SetSelectedPlannedFactoriesRepeat(const bool repeat)
+  {
+    if (!IsFactoryPreOrdersEnabled()) {
+      return;
+    }
+    for (auto* const proxy : GetSelectedProxies()) {
+      if (proxy != nullptr) {
+        proxy->SetRepeatBuild(repeat);
+      }
+    }
+  }
+
   PlannedUnitProxy* PlannedFactoryManager::HitTestRay(const Ray3f& ray, const float radius)
   {
     if (!IsFactoryPreOrdersEnabled()) {

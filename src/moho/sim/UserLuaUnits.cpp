@@ -2488,6 +2488,71 @@ namespace
   constexpr const char* kSelectPlannedFactoryHelpText = "SelectPlannedFactory(proxyId, [addToSelection])";
   constexpr const char* kClearPlannedFactorySelectionHelpText = "ClearPlannedFactorySelection()";
   constexpr const char* kGetSelectedPlannedFactoriesHelpText = "GetSelectedPlannedFactories()";
+  constexpr const char* kIssuePlannedFactoryBuildOrderHelpText =
+    "IssuePlannedFactoryBuildOrder([proxyIdOrList], blueprintId, [count], [clearQueue])";
+  constexpr const char* kSetPlannedFactoryRallyPointHelpText =
+    "SetPlannedFactoryRallyPoint([proxyIdOrList], x, y, z) or SetPlannedFactoryRallyPoint([proxyIdOrList], {x, y, z})";
+  constexpr const char* kSetPlannedFactoryRepeatHelpText =
+    "SetPlannedFactoryRepeat([proxyIdOrList], repeat)";
+  constexpr const char* kGetPlannedFactoryQueueHelpText =
+    "GetPlannedFactoryQueue(proxyId)";
+  constexpr const char* kDecreasePlannedFactoryBuildCountHelpText =
+    "DecreasePlannedFactoryBuildCount(proxyId, [orderIndex, count])";
+
+  std::vector<moho::PlannedUnitProxy*> ResolveTargetProxies(LuaPlus::LuaState* const state, const int argIndex)
+  {
+    std::vector<moho::PlannedUnitProxy*> targets;
+    lua_State* const rawState = state->m_state;
+    const int argCount = lua_gettop(rawState);
+
+    auto& mgr = moho::PlannedFactoryManager::Instance();
+    if (argIndex > argCount || lua_isnil(rawState, argIndex)) {
+      return mgr.GetSelectedProxies();
+    }
+
+    if (lua_type(rawState, argIndex) == LUA_TNUMBER) {
+      const auto proxyId = static_cast<std::uint32_t>(lua_tonumber(rawState, argIndex));
+      if (auto* proxy = mgr.FindByProxyId(proxyId)) {
+        targets.push_back(proxy);
+      }
+      return targets;
+    }
+
+    if (lua_type(rawState, argIndex) == LUA_TTABLE) {
+      LuaPlus::LuaObject obj(LuaPlus::LuaStackObject(state, argIndex));
+      LuaPlus::LuaObject idObj = obj.GetByName("proxyId");
+      if (idObj.IsNumber()) {
+        if (auto* proxy = mgr.FindByProxyId(static_cast<std::uint32_t>(idObj.GetInteger()))) {
+          targets.push_back(proxy);
+          return targets;
+        }
+      }
+
+      for (LuaPlus::LuaTableIterator it(obj, 1); !it.m_isDone; it.Next()) {
+        if (it.m_valueObj.IsNumber()) {
+          const auto proxyId = static_cast<std::uint32_t>(it.m_valueObj.GetInteger());
+          if (auto* proxy = mgr.FindByProxyId(proxyId)) {
+            if (std::find(targets.begin(), targets.end(), proxy) == targets.end()) {
+              targets.push_back(proxy);
+            }
+          }
+        } else if (it.m_valueObj.IsTable()) {
+          LuaPlus::LuaObject subId = it.m_valueObj.GetByName("proxyId");
+          if (subId.IsNumber()) {
+            const auto proxyId = static_cast<std::uint32_t>(subId.GetInteger());
+            if (auto* proxy = mgr.FindByProxyId(proxyId)) {
+              if (std::find(targets.begin(), targets.end(), proxy) == targets.end()) {
+                targets.push_back(proxy);
+              }
+            }
+          }
+        }
+      }
+      return targets;
+    }
+
+    return mgr.GetSelectedProxies();
+  }
 
   LuaPlus::LuaObject CreatePlannedProxyTable(LuaPlus::LuaState* const state, const moho::PlannedUnitProxy* const proxy)
   {
@@ -2797,5 +2862,379 @@ int moho::cfunc_GetSelectedPlannedFactoriesL(LuaPlus::LuaState* const state)
   }
 
   resultTable.PushStack(state);
+  return 1;
+}
+
+// 1. IssuePlannedFactoryBuildOrder
+int moho::cfunc_IssuePlannedFactoryBuildOrder(lua_State* const luaContext)
+{
+  return cfunc_IssuePlannedFactoryBuildOrderL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_IssuePlannedFactoryBuildOrder_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "IssuePlannedFactoryBuildOrder",
+    &moho::cfunc_IssuePlannedFactoryBuildOrder,
+    nullptr,
+    "<global>",
+    kIssuePlannedFactoryBuildOrderHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_IssuePlannedFactoryBuildOrderL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+  if (!moho::IsFactoryPreOrdersEnabled()) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argCount = lua_gettop(rawState);
+  if (argCount < 1) {
+    return 0;
+  }
+
+  int targetArg = 1;
+  int bpArg = 2;
+  int countArg = 3;
+  int clearArg = 4;
+
+  if (lua_type(rawState, 1) == LUA_TSTRING) {
+    targetArg = 0;
+    bpArg = 1;
+    countArg = 2;
+    clearArg = 3;
+  }
+
+  const char* const bpId = lua_tostring(rawState, bpArg);
+  if (bpId == nullptr || bpId[0] == '\0') {
+    return 0;
+  }
+
+  int count = 1;
+  if (countArg <= argCount && lua_type(rawState, countArg) == LUA_TNUMBER) {
+    count = static_cast<int>(lua_tonumber(rawState, countArg));
+  }
+  if (count <= 0) {
+    return 0;
+  }
+
+  bool clearQueue = false;
+  if (clearArg <= argCount && lua_type(rawState, clearArg) == LUA_TBOOLEAN) {
+    clearQueue = (lua_toboolean(rawState, clearArg) != 0);
+  }
+
+  const auto targets = (targetArg > 0)
+    ? ResolveTargetProxies(state, targetArg)
+    : PlannedFactoryManager::Instance().GetSelectedProxies();
+
+  for (auto* const proxy : targets) {
+    if (proxy != nullptr) {
+      if (clearQueue) {
+        proxy->ClearPreOrders();
+      }
+      proxy->AddPreOrder(bpId, count);
+    }
+  }
+  return 0;
+}
+
+// 2. SetPlannedFactoryRallyPoint
+int moho::cfunc_SetPlannedFactoryRallyPoint(lua_State* const luaContext)
+{
+  return cfunc_SetPlannedFactoryRallyPointL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_SetPlannedFactoryRallyPoint_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "SetPlannedFactoryRallyPoint",
+    &moho::cfunc_SetPlannedFactoryRallyPoint,
+    nullptr,
+    "<global>",
+    kSetPlannedFactoryRallyPointHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_SetPlannedFactoryRallyPointL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+  if (!moho::IsFactoryPreOrdersEnabled()) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argCount = lua_gettop(rawState);
+  if (argCount < 1) {
+    return 0;
+  }
+
+  std::vector<PlannedUnitProxy*> targets;
+  Vector3f rallyPos{Vector3f::ZERO};
+  bool posFound = false;
+
+  auto readPosFromTable = [](const LuaPlus::LuaObject& obj) -> Vector3f {
+    Vector3f v{Vector3f::ZERO};
+    if (obj.IsTable()) {
+      LuaPlus::LuaObject xObj = obj.GetByName("x");
+      LuaPlus::LuaObject yObj = obj.GetByName("y");
+      LuaPlus::LuaObject zObj = obj.GetByName("z");
+      if (xObj.IsNumber()) v.x = static_cast<float>(xObj.GetNumber());
+      else if (obj.GetByIndex(1).IsNumber()) v.x = static_cast<float>(obj.GetByIndex(1).GetNumber());
+
+      if (yObj.IsNumber()) v.y = static_cast<float>(yObj.GetNumber());
+      else if (obj.GetByIndex(2).IsNumber()) v.y = static_cast<float>(obj.GetByIndex(2).GetNumber());
+
+      if (zObj.IsNumber()) v.z = static_cast<float>(zObj.GetNumber());
+      else if (obj.GetByIndex(3).IsNumber()) v.z = static_cast<float>(obj.GetByIndex(3).GetNumber());
+    }
+    return v;
+  };
+
+  if (argCount == 1 && lua_type(rawState, 1) == LUA_TTABLE) {
+    targets = PlannedFactoryManager::Instance().GetSelectedProxies();
+    rallyPos = readPosFromTable(LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 1)));
+    posFound = true;
+  } else if (argCount == 3 && lua_type(rawState, 1) == LUA_TNUMBER && lua_type(rawState, 2) == LUA_TNUMBER && lua_type(rawState, 3) == LUA_TNUMBER) {
+    targets = PlannedFactoryManager::Instance().GetSelectedProxies();
+    rallyPos.x = static_cast<float>(lua_tonumber(rawState, 1));
+    rallyPos.y = static_cast<float>(lua_tonumber(rawState, 2));
+    rallyPos.z = static_cast<float>(lua_tonumber(rawState, 3));
+    posFound = true;
+  } else if (argCount >= 2 && lua_type(rawState, 2) == LUA_TTABLE) {
+    targets = ResolveTargetProxies(state, 1);
+    rallyPos = readPosFromTable(LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 2)));
+    posFound = true;
+  } else if (argCount >= 4) {
+    targets = ResolveTargetProxies(state, 1);
+    rallyPos.x = static_cast<float>(lua_tonumber(rawState, 2));
+    rallyPos.y = static_cast<float>(lua_tonumber(rawState, 3));
+    rallyPos.z = static_cast<float>(lua_tonumber(rawState, 4));
+    posFound = true;
+  }
+
+  if (posFound) {
+    for (auto* const proxy : targets) {
+      if (proxy != nullptr) {
+        proxy->SetRallyPoint(rallyPos);
+      }
+    }
+  }
+  return 0;
+}
+
+// 3. SetPlannedFactoryRepeat
+int moho::cfunc_SetPlannedFactoryRepeat(lua_State* const luaContext)
+{
+  return cfunc_SetPlannedFactoryRepeatL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_SetPlannedFactoryRepeat_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "SetPlannedFactoryRepeat",
+    &moho::cfunc_SetPlannedFactoryRepeat,
+    nullptr,
+    "<global>",
+    kSetPlannedFactoryRepeatHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_SetPlannedFactoryRepeatL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+  if (!moho::IsFactoryPreOrdersEnabled()) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  const int argCount = lua_gettop(rawState);
+  if (argCount < 1) {
+    return 0;
+  }
+
+  std::vector<PlannedUnitProxy*> targets;
+  bool repeat = false;
+
+  if (argCount == 1) {
+    targets = PlannedFactoryManager::Instance().GetSelectedProxies();
+    repeat = (lua_toboolean(rawState, 1) != 0);
+  } else {
+    targets = ResolveTargetProxies(state, 1);
+    repeat = (lua_toboolean(rawState, 2) != 0);
+  }
+
+  for (auto* const proxy : targets) {
+    if (proxy != nullptr) {
+      proxy->SetRepeatBuild(repeat);
+    }
+  }
+  return 0;
+}
+
+// 4. GetPlannedFactoryQueue
+int moho::cfunc_GetPlannedFactoryQueue(lua_State* const luaContext)
+{
+  return cfunc_GetPlannedFactoryQueueL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_GetPlannedFactoryQueue_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "GetPlannedFactoryQueue",
+    &moho::cfunc_GetPlannedFactoryQueue,
+    nullptr,
+    "<global>",
+    kGetPlannedFactoryQueueHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_GetPlannedFactoryQueueL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  LuaPlus::LuaObject resultTable(state);
+
+  if (!moho::IsFactoryPreOrdersEnabled()) {
+    resultTable.AssignNewTable(state, 0, 0u);
+    resultTable.PushStack(state);
+    return 1;
+  }
+
+  const int argCount = lua_gettop(rawState);
+  PlannedUnitProxy* targetProxy = nullptr;
+
+  if (argCount >= 1 && lua_type(rawState, 1) == LUA_TNUMBER) {
+    const auto proxyId = static_cast<std::uint32_t>(lua_tonumber(rawState, 1));
+    targetProxy = PlannedFactoryManager::Instance().FindByProxyId(proxyId);
+  } else {
+    const auto selected = PlannedFactoryManager::Instance().GetSelectedProxies();
+    if (!selected.empty()) {
+      targetProxy = selected[0];
+    }
+  }
+
+  if (targetProxy == nullptr || targetProxy->mPreOrders.empty()) {
+    resultTable.AssignNewTable(state, 0, 0u);
+    resultTable.PushStack(state);
+    return 1;
+  }
+
+  resultTable.AssignNewTable(state, static_cast<std::int32_t>(targetProxy->mPreOrders.size()), 0u);
+  std::int32_t idx = 1;
+  for (const auto& order : targetProxy->mPreOrders) {
+    LuaPlus::LuaObject orderObj(state);
+    orderObj.AssignNewTable(state, 0, 2u);
+    orderObj.SetString("blueprintId", order.blueprintId.c_str());
+    orderObj.SetInteger("count", order.count);
+    resultTable.SetObject(idx++, orderObj);
+  }
+
+  resultTable.PushStack(state);
+  return 1;
+}
+
+// 5. DecreasePlannedFactoryBuildCount
+int moho::cfunc_DecreasePlannedFactoryBuildCount(lua_State* const luaContext)
+{
+  return cfunc_DecreasePlannedFactoryBuildCountL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_DecreasePlannedFactoryBuildCount_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "DecreasePlannedFactoryBuildCount",
+    &moho::cfunc_DecreasePlannedFactoryBuildCount,
+    nullptr,
+    "<global>",
+    kDecreasePlannedFactoryBuildCountHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_DecreasePlannedFactoryBuildCountL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  if (!moho::IsFactoryPreOrdersEnabled()) {
+    lua_pushboolean(rawState, 0);
+    return 1;
+  }
+
+  const int argCount = lua_gettop(rawState);
+  if (argCount < 1) {
+    lua_pushboolean(rawState, 0);
+    return 1;
+  }
+
+  PlannedUnitProxy* targetProxy = nullptr;
+  int currentArg = 1;
+  if (lua_type(rawState, 1) == LUA_TNUMBER && argCount >= 2) {
+    const auto proxyId = static_cast<std::uint32_t>(lua_tonumber(rawState, 1));
+    targetProxy = PlannedFactoryManager::Instance().FindByProxyId(proxyId);
+    currentArg = 2;
+  } else if (lua_type(rawState, 1) == LUA_TNUMBER && argCount == 1) {
+    const auto proxyId = static_cast<std::uint32_t>(lua_tonumber(rawState, 1));
+    targetProxy = PlannedFactoryManager::Instance().FindByProxyId(proxyId);
+    currentArg = 2;
+  } else {
+    const auto selected = PlannedFactoryManager::Instance().GetSelectedProxies();
+    if (!selected.empty()) {
+      targetProxy = selected[0];
+    }
+  }
+
+  if (targetProxy == nullptr || targetProxy->mPreOrders.empty()) {
+    lua_pushboolean(rawState, 0);
+    return 1;
+  }
+
+  std::int32_t count = 1;
+  bool success = false;
+
+  if (currentArg <= argCount && lua_type(rawState, currentArg) == LUA_TSTRING) {
+    const char* const bpId = lua_tostring(rawState, currentArg);
+    if (currentArg + 1 <= argCount && lua_type(rawState, currentArg + 1) == LUA_TNUMBER) {
+      count = static_cast<std::int32_t>(lua_tonumber(rawState, currentArg + 1));
+    }
+    success = targetProxy->RemovePreOrder(bpId ? bpId : "", count);
+  } else if (currentArg <= argCount && lua_type(rawState, currentArg) == LUA_TNUMBER) {
+    const int oneBasedIndex = static_cast<int>(lua_tonumber(rawState, currentArg));
+    if (currentArg + 1 <= argCount && lua_type(rawState, currentArg + 1) == LUA_TNUMBER) {
+      count = static_cast<std::int32_t>(lua_tonumber(rawState, currentArg + 1));
+    }
+    if (oneBasedIndex >= 1 && static_cast<std::size_t>(oneBasedIndex) <= targetProxy->mPreOrders.size()) {
+      success = targetProxy->RemovePreOrderByIndex(static_cast<std::size_t>(oneBasedIndex - 1), count);
+    }
+  } else {
+    if (currentArg <= argCount && lua_type(rawState, currentArg) == LUA_TNUMBER) {
+      count = static_cast<std::int32_t>(lua_tonumber(rawState, currentArg));
+    }
+    success = targetProxy->RemovePreOrderByIndex(targetProxy->mPreOrders.size() - 1, count);
+  }
+
+  lua_pushboolean(rawState, success ? 1 : 0);
   return 1;
 }
