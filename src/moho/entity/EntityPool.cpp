@@ -2,6 +2,7 @@
 
 #include <new>
 
+#include "gpg/core/utils/Logging.h"
 #include "moho/console/CConCommand.h"
 #include "moho/entity/CollisionBeamEntity.h"
 #include "moho/entity/Prop.h"
@@ -21,17 +22,26 @@ namespace moho
   EntityPool::EntityPool()
     : mPool{6}
   {
-    mPool.AddPool(sizeof(moho::Unit), 1024);
-    mPool.AddPool(sizeof(moho::Prop), 1024);
-    mPool.AddPool(sizeof(moho::ReconBlip), 1024);
-    mPool.AddPool(sizeof(moho::CollisionBeamEntity), 128);
-    mPool.AddPool(sizeof(moho::Shield), 128);
-    mPool.AddPool(sizeof(moho::Entity), 128);
+    // One pool per size: on x86 Shield and Entity are both 0x270 bytes and share one.
+    const auto add = [this](const std::size_t size, const std::size_t chunk) {
+      if (!mPool.Has(size)) {
+        mPool.AddPool(size, chunk);
+      }
+    };
+    add(sizeof(moho::Unit), 1024);
+    add(sizeof(moho::Prop), 1024);
+    add(sizeof(moho::ReconBlip), 1024);
+    add(sizeof(moho::CollisionBeamEntity), 128);
+    add(sizeof(moho::Shield), 128);
+    add(sizeof(moho::Entity), 128);
   }
 
   bool EntityPool::Active() noexcept
   {
-    static const bool active = sim_EntityPool;
+    static const bool active = [] {
+      gpg::Logf("sim_EntityPool: %s (read at the first entity allocation)", sim_EntityPool ? "on" : "off");
+      return sim_EntityPool;
+    }();
     return active;
   }
 
