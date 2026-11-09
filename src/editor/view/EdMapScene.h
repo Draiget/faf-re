@@ -353,6 +353,7 @@ namespace faf::editor
     /** The selected decals' outlines, the one under the cursor, and in Place mode the decal to come. */
     void DrawDecalOutlines(moho::CD3DPrimBatcher& batcher, const moho::CHeightField& field);
     bool UndoDecals(bool redo);
+    bool UndoWater(bool redo);
     /** Whether the Markers panel hides this marker's type. */
     [[nodiscard]] bool MarkerHidden(const SaveEntry& marker) const;
     void DeleteSelectedMarkers();

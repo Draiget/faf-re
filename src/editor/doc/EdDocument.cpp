@@ -143,6 +143,10 @@ namespace faf::editor
       }
       facts.water = terrain->IsWaterEnabled();
       facts.waterElevation = terrain->GetWaterElevation();
+      if (terrain->mMap != nullptr) {
+        facts.waterDeep = terrain->mMap->mWaterElevationDeep;
+        facts.waterAbyss = terrain->mMap->mWaterElevationAbyss;
+      }
       moho::StratumMaterial& strata = terrain->GetStratumMaterial();
       facts.terrainShader = strata.mShaderName.c_str();
       const moho::CStratumMaterial* const albedo[] = {
@@ -603,6 +607,63 @@ namespace faf::editor
     mModified = true;
   }
 
+  WaterState EdDocument::WaterNow() const
+  {
+    WaterState water;
+    if (mMap == nullptr || mMap->mTerrainRes == nullptr || mMap->mTerrainRes->mMap == nullptr) {
+      return water;
+    }
+    const moho::STIMap& map = *mMap->mTerrainRes->mMap;
+    water.enabled = map.mWaterEnabled != 0u;
+    water.elevation = map.mWaterElevation;
+    water.deep = map.mWaterElevationDeep;
+    water.abyss = map.mWaterElevationAbyss;
+    if (const moho::CWaterShaderProperties* const shader = mMap->mTerrainRes->GetWaterShaderProperties(); shader != nullptr) {
+      water.shader = shader->mNumericState;
+      water.textures[0] = shader->mWaterCubemap.c_str();
+      water.textures[1] = shader->mWaterRamp.c_str();
+      for (int i = 0; i < 4; ++i) {
+        water.textures[2 + i] = shader->mShaderNames[i].c_str();
+      }
+    }
+    return water;
+  }
+
+  void EdDocument::ApplyWater(const WaterState& water)
+  {
+    if (mMap == nullptr || mMap->mTerrainRes == nullptr || mMap->mTerrainRes->mMap == nullptr) {
+      return;
+    }
+    moho::IWldTerrainRes* const terrain = mMap->mTerrainRes;
+    const WaterState now = WaterNow();
+    terrain->WaterEnabled(water.enabled);
+    terrain->SetWaterElevation(water.elevation);
+    terrain->SetWaterElevationDeep(water.deep);
+    terrain->SetWaterElevationAbyss(water.abyss);
+    if (moho::CWaterShaderProperties* const shader = terrain->GetWaterShaderProperties(); shader != nullptr) {
+      shader->mNumericState = water.shader;
+    }
+    // The water map (depth below the sea, for the shore and the water's colour) follows the levels.
+    if (now.enabled != water.enabled || now.elevation != water.elevation || now.deep != water.deep || now.abyss != water.abyss) {
+      terrain->UpdateWaterMap();
+    }
+    mFacts.water = water.enabled;
+    mFacts.waterElevation = water.elevation;
+    mFacts.waterDeep = water.deep;
+    mFacts.waterAbyss = water.abyss;
+    mModified = true;
+  }
+
+  void EdDocument::WaterEdited(WaterState before)
+  {
+    mWaterUndo.emplace_back(std::move(before), WaterNow());
+    if (mWaterUndo.size() > 200) {
+      mWaterUndo.erase(mWaterUndo.begin());
+    }
+    EditEnded(EditKind::Water);
+    mModified = true;
+  }
+
   moho::IDecalManager* EdDocument::Decals() const
   {
     return mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetDecalManager() : nullptr;
@@ -675,6 +736,7 @@ namespace faf::editor
     mPropRedo.clear();
     mSaveRedo.clear();
     mDecalRedo.clear();
+    mWaterRedo.clear();
   }
 
   bool EdDocument::PopUndo(EditKind& kind)
@@ -767,6 +829,8 @@ namespace faf::editor
                                                        [](const std::string& layer) { return !layer.empty(); })),
                 mFacts.props, mFacts.decals, mFacts.markerCount, mFacts.armies.size(), mError.empty() ? "" : "; ",
                 mError.c_str());
+      gpg::Logf("editor: water: %s, level %.2f, deep %.2f, abyss %.2f", mFacts.water ? "on" : "off",
+                static_cast<double>(mFacts.waterElevation), static_cast<double>(mFacts.waterDeep), static_cast<double>(mFacts.waterAbyss));
       gpg::Logf("editor: symmetry from the heights: mode %d, %d turns (%.1f%% of points match)", static_cast<int>(mFacts.symmetry.symmetry),
                 mFacts.symmetry.turns, static_cast<double>(mFacts.symmetry.matched) * 100.0);
     } else {

@@ -331,6 +331,10 @@ namespace faf::editor
       std::string mMarkerToolArg;
       /** `/framemarker <name>[@distance]` (test runs): the camera goes to that marker once the map is shown. */
       std::string mFrameMarkerArg;
+      /** `/waterset <on>,<level>,<deep>,<abyss>` (test runs): the sea set as one edit once the map is shown. */
+      std::string mWaterSetArg;
+      bool mWaterDragging = false;
+      WaterState mWaterBefore;
       /** `/unittool <type>,<army>[,select]` (test runs). */
       std::string mUnitToolArg;
       /** `/decaltool <texture>[,select]` (test runs): the Decals tool with this texture. */
@@ -812,6 +816,9 @@ namespace faf::editor
       if (fa::vector<fa::string> unit; moho::CFG_GetArgOption("/unittool", 1, &unit) && !unit.empty()) {
         mUnitToolArg = unit[0].c_str();
       }
+      if (fa::vector<fa::string> water; moho::CFG_GetArgOption("/waterset", 1, &water) && !water.empty()) {
+        mWaterSetArg = water[0].c_str();
+      }
       if (fa::vector<fa::string> marker; moho::CFG_GetArgOption("/framemarker", 1, &marker) && !marker.empty()) {
         mFrameMarkerArg = marker[0].c_str();
       }
@@ -993,6 +1000,46 @@ namespace faf::editor
           mScene.FrameMarker(name);
         }
         tools.SetDecalSelectionCount(mScene.DecalSelectionCount());
+        // The Water panel: its change on the map at once, one undo step when the drag ends.
+        tools.SetWater(mDocument.WaterNow());
+        if (WaterState water; true) {
+          bool final = false;
+          if (tools.TakeWaterChange(water, final)) {
+            if (!mWaterDragging) {
+              mWaterBefore = mDocument.WaterNow();
+              mWaterDragging = true;
+            }
+            mDocument.ApplyWater(water);
+            if (final) {
+              mWaterDragging = false;
+              if (!(mWaterBefore == mDocument.WaterNow())) {
+                mDocument.WaterEdited(mWaterBefore);
+                gpg::Logf("editor: water: %s, level %.2f, deep %.2f, abyss %.2f", water.enabled ? "on" : "off", static_cast<double>(water.elevation),
+                          static_cast<double>(water.deep), static_cast<double>(water.abyss));
+              }
+            }
+          }
+        }
+        if (!mWaterSetArg.empty()) {
+          WaterState water = mDocument.WaterNow();
+          float values[4] = {water.enabled ? 1.0f : 0.0f, water.elevation, water.deep, water.abyss};
+          std::size_t at = 0;
+          for (int i = 0; i < 4 && at <= mWaterSetArg.size(); ++i) {
+            const std::size_t comma = mWaterSetArg.find(',', at);
+            values[i] = static_cast<float>(std::atof(mWaterSetArg.substr(at, comma - at).c_str()));
+            at = comma == std::string::npos ? mWaterSetArg.size() + 1 : comma + 1;
+          }
+          const WaterState before = water;
+          water.enabled = values[0] != 0.0f;
+          water.elevation = values[1];
+          water.deep = values[2];
+          water.abyss = values[3];
+          mDocument.ApplyWater(water);
+          mDocument.WaterEdited(before);
+          gpg::Logf("editor: water set: %s, level %.2f, deep %.2f, abyss %.2f", water.enabled ? "on" : "off", static_cast<double>(water.elevation),
+                    static_cast<double>(water.deep), static_cast<double>(water.abyss));
+          mWaterSetArg.clear();
+        }
         tools.SetUnitSelectionCount(mScene.UnitSelectionCount());
         if (!mUnitToolArg.empty()) {
           const std::size_t first = mUnitToolArg.find(',');

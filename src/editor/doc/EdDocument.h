@@ -9,6 +9,7 @@
 #include <thread>
 #include <vector>
 
+#include "editor/doc/EdWater.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdSymmetryCheck.h"
 #include "editor/doc/EdMapFile.h"
@@ -50,6 +51,8 @@ namespace faf::editor
     DetectedSymmetry symmetry;
     bool water = false;
     float waterElevation = 0.0f;
+    float waterDeep = 0.0f;
+    float waterAbyss = 0.0f;
     std::string terrainShader;
     /** The albedo texture of each layer: lower, strata 1 to 8, upper ("" when the slot is empty). */
     std::vector<std::string> layers;
@@ -174,7 +177,16 @@ namespace faf::editor
       Props,
       SaveData,
       Decals,
+      Water,
     };
+    /** The map's sea now (on or off, its levels, the water shader's numbers). */
+    [[nodiscard]] WaterState WaterNow() const;
+    /** Puts a water state on the map at once (no undo step: a drag applies it many times, then WaterEdited records it). */
+    void ApplyWater(const WaterState& water);
+    /** A water edit ended: its before and the water now become the newest undo step. */
+    void WaterEdited(WaterState before);
+    [[nodiscard]] std::vector<std::pair<WaterState, WaterState>>& WaterUndo() noexcept { return mWaterUndo; }
+    [[nodiscard]] std::vector<std::pair<WaterState, WaterState>>& WaterRedo() noexcept { return mWaterRedo; }
     /** The map's decals as a snapshot (every decal's saved fields), for undo. */
     using DecalSnapshot = std::vector<DecalState>;
     [[nodiscard]] DecalSnapshot DecalsNow() const;
@@ -312,6 +324,8 @@ namespace faf::editor
     std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropRedo;
     std::vector<LayerEdit> mLayerUndo;
     std::vector<LayerEdit> mLayerRedo;
+    std::vector<std::pair<WaterState, WaterState>> mWaterUndo;
+    std::vector<std::pair<WaterState, WaterState>> mWaterRedo;
     std::vector<std::pair<DecalSnapshot, DecalSnapshot>> mDecalUndo;
     std::vector<std::pair<DecalSnapshot, DecalSnapshot>> mDecalRedo;
     std::vector<EditKind> mUndoOrder;

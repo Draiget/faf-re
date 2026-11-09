@@ -492,6 +492,7 @@ namespace faf::editor
                       : kind == EdDocument::EditKind::Props  ? UndoProps(false)
                       : kind == EdDocument::EditKind::SaveData ? UndoSaveData(false)
                       : kind == EdDocument::EditKind::Decals   ? UndoDecals(false)
+                      : kind == EdDocument::EditKind::Water    ? UndoWater(false)
                                                              : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
@@ -510,6 +511,7 @@ namespace faf::editor
                       : kind == EdDocument::EditKind::Props  ? UndoProps(true)
                       : kind == EdDocument::EditKind::SaveData ? UndoSaveData(true)
                       : kind == EdDocument::EditKind::Decals   ? UndoDecals(true)
+                      : kind == EdDocument::EditKind::Water    ? UndoWater(true)
                                                              : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);
@@ -1355,6 +1357,22 @@ namespace faf::editor
     to.push_back(std::move(step));
     mSelection.clear();
     RebuildProps();
+    return true;
+  }
+
+  bool EdMapScene::UndoWater(const bool redo)
+  {
+    auto& from = redo ? mDocument.WaterRedo() : mDocument.WaterUndo();
+    auto& to = redo ? mDocument.WaterUndo() : mDocument.WaterRedo();
+    if (from.empty()) {
+      return false;
+    }
+    auto step = std::move(from.back());
+    from.pop_back();
+    mDocument.ApplyWater(redo ? step.second : step.first);
+    to.push_back(std::move(step));
+    const WaterState now = mDocument.WaterNow();
+    gpg::Logf("editor: %s a water edit: level %.2f", redo ? "redid" : "undid", static_cast<double>(now.elevation));
     return true;
   }
 

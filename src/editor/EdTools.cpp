@@ -768,13 +768,90 @@ namespace faf::editor
 
   void EdTools::DrawWater()
   {
-    Note("Click a basin to add a water body: it fills the terrain connected to the click that lies below its level.");
+    // Each control edits the panel's copy; the app puts it on the map at once and records one undo step when the
+    // drag (or the click) ends.
+    bool active = false;
+    const auto changed = [&](const bool edited) {
+      active = active || ImGui::IsItemActive();
+      if (edited) {
+        mWaterChanged = true;
+      }
+      if (ImGui::IsItemDeactivatedAfterEdit()) {
+        mWaterChanged = true;
+        mWaterFinal = true;
+      }
+    };
     SectionHeader("SEA");
-    ImGui::Checkbox("Sea", &mSea);
+    if (ImGui::Checkbox("The map has a sea", &mWater.enabled)) {
+      mWaterChanged = true;
+      mWaterFinal = true;
+    }
+    ImGui::BeginDisabled(!mWater.enabled);
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::SliderFloat("##sea", &mWaterLevel, 0.0f, 128.0f, "Level %.1f");
-    DrawSymmetry();
-    Note("Water bodies at their own levels come in stage 5.");
+    changed(ImGui::DragFloat("##level", &mWater.elevation, 0.1f, 0.0f, 512.0f, "Level %.2f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    changed(ImGui::DragFloat("##deep", &mWater.deep, 0.1f, 0.0f, 512.0f, "Deep %.2f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    changed(ImGui::DragFloat("##abyss", &mWater.abyss, 0.1f, 0.0f, 512.0f, "Abyss %.2f"));
+    if (mWater.enabled && (mWater.deep >= mWater.elevation || mWater.abyss >= mWater.deep)) {
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.30f, 1.0f));
+      ImGui::TextWrapped("Deep should be below the level and abyss below deep: the water's colour runs from the level down to them.");
+      ImGui::PopStyleColor();
+    }
+    Note("The level is where the sea's surface is; deep and abyss are the heights the water's colour darkens towards. "
+         "Units, the shore and the minimap all follow the level.");
+
+    SectionHeader("LOOK");
+    moho::WaterShaderNumericState& s = mWater.shader;
+    ImGui::SetNextItemWidth(-1.0f);
+    changed(ImGui::ColorEdit3("##watercolor", s.mWaterColor, ImGuiColorEditFlags_Float));
+    ImGui::SetNextItemWidth(-1.0f);
+    changed(ImGui::DragFloat2("##waterlerp", s.mWaterLerp, 0.005f, 0.0f, 1.0f, "Lerp %.3f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    changed(ImGui::DragFloat("##refraction", &s.mRefractionScale, 0.005f, 0.0f, 2.0f, "Refraction %.3f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    changed(ImGui::DragFloat("##fresnelbias", &s.mFresnelBias, 0.005f, 0.0f, 1.0f, "Fresnel bias %.3f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    changed(ImGui::DragFloat("##fresnelpower", &s.mFresnelPower, 0.01f, 0.0f, 10.0f, "Fresnel power %.2f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    changed(ImGui::DragFloat("##unitreflection", &s.mUnitReflectionAmount, 0.005f, 0.0f, 1.0f, "Unit reflection %.3f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    changed(ImGui::DragFloat("##skyreflection", &s.mSkyReflectionAmount, 0.005f, 0.0f, 3.0f, "Sky reflection %.3f"));
+
+    SectionHeader("SUN ON THE WATER");
+    ImGui::SetNextItemWidth(-1.0f);
+    changed(ImGui::ColorEdit3("##suncolor", s.mSunColor, ImGuiColorEditFlags_Float));
+    ImGui::SetNextItemWidth(-1.0f);
+    changed(ImGui::DragFloat3("##sundirection", s.mSunDirection, 0.01f, -1.0f, 1.0f, "%.2f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    changed(ImGui::DragFloat("##sunshininess", &s.mSunShininess, 0.5f, 0.0f, 500.0f, "Shininess %.1f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    changed(ImGui::DragFloat("##sunreflection", &s.mSunReflectionAmount, 0.01f, 0.0f, 10.0f, "Reflection %.2f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    changed(ImGui::DragFloat("##sunglow", &s.mSunGlow, 0.01f, 0.0f, 10.0f, "Glow %.2f"));
+
+    SectionHeader("WAVES");
+    ImGui::SetNextItemWidth(-1.0f);
+    changed(ImGui::DragFloat4("##repeat", s.mNormalRepeatRate, 0.0005f, 0.0f, 1.0f, "%.4f"));
+    float* const movements[4] = {s.mNormal1Movement, s.mNormal2Movement, s.mNormal3Movement, s.mNormal4Movement};
+    for (int i = 0; i < 4; ++i) {
+      ImGui::PushID(i);
+      ImGui::SetNextItemWidth(-1.0f);
+      changed(ImGui::DragFloat2("##movement", movements[i], 0.0005f, -1.0f, 1.0f, "%.4f"));
+      ImGui::PopID();
+    }
+    Note("The four normal maps' repeat, then each one's movement (x, z per second).");
+    ImGui::EndDisabled();
+
+    SectionHeader("TEXTURES");
+    static const char* const kTextureNames[6] = {"Cubemap", "Ramp", "Normals 1", "Normals 2", "Normals 3", "Normals 4"};
+    for (int i = 0; i < 6; ++i) {
+      ImGui::TextDisabled("%s", kTextureNames[i]);
+      ImGui::SameLine(90.0f);
+      ImGui::TextUnformatted(mWater.textures[i].empty() ? "(none)" : mWater.textures[i].c_str());
+    }
+    mWaterEditing = active;
+    Note("Water bodies at their own levels come with the water-levels work (docs/WATER_BODIES.md on feat/water-levels).");
   }
 
   void EdTools::DrawProps()

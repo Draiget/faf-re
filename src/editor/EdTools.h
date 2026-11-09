@@ -2,6 +2,7 @@
 
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdMaskBrush.h"
+#include "editor/doc/EdWater.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdMarkers.h"
 #include "editor/tools/EdTextureLibrary.h"
@@ -51,6 +52,25 @@ namespace faf::editor
     [[nodiscard]] bool HasPropBlueprints() const noexcept { return !mPropBlueprints.empty(); }
     /** The Markers tool. */
     [[nodiscard]] bool MarkersToolActive() const noexcept { return mTool == 6; }
+    /** The Water tool's panel: the map's water as it is, and a change it made (`final` when a drag or a click ended). */
+    [[nodiscard]] bool WaterToolActive() const noexcept { return mTool == 3; }
+    void SetWater(const WaterState& water)
+    {
+      if (!mWaterEditing) {
+        mWater = water;
+      }
+    }
+    [[nodiscard]] bool TakeWaterChange(WaterState& water, bool& final)
+    {
+      if (!mWaterChanged) {
+        return false;
+      }
+      water = mWater;
+      final = mWaterFinal;
+      mWaterChanged = false;
+      mWaterFinal = false;
+      return true;
+    }
     /** The Units tool: Place (the chosen unit type in the chosen army, with symmetric copies) or Select. */
     [[nodiscard]] bool UnitsToolActive() const noexcept { return mTool == 7; }
     [[nodiscard]] bool UnitPlaceMode() const noexcept { return mUnitMode == 0; }
@@ -497,8 +517,6 @@ namespace faf::editor
     bool mStampRequested = false;
     int mMarkerType = 0;
     int mDecalMode = 0; // 0 Place, 1 Select
-    float mWaterLevel = 20.0f;
-    bool mSea = true;
 
     static constexpr int kExportWidths[] = {0, 257, 513, 1025, 2049, 4097};
     bool mImportRequested = false;
@@ -536,6 +554,10 @@ namespace faf::editor
     int mSelectionCount = 0;
     std::vector<SaveEntry> mMarkerSelection;
     bool mConnectNodes = false;
+    WaterState mWater;
+    bool mWaterEditing = false;
+    bool mWaterChanged = false;
+    bool mWaterFinal = false;
     std::vector<std::pair<std::string, std::string>> mUnitTypes;
     std::string mUnitType;
     std::string mUnitArmy;

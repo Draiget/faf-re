@@ -238,23 +238,6 @@ namespace faf::editor
       return out + "'";
     }
 
-    /** Entries in the game's layout: `['name'] = {`, one `['key'] = value,` a line, `},`. */
-    std::string FormatEntries(const std::vector<SaveEntry>& entries, const int indent)
-    {
-      const std::string pad(static_cast<std::size_t>(indent), ' ');
-      const std::string inner(static_cast<std::size_t>(indent + 4), ' ');
-      std::string out = "\n";
-      for (const SaveEntry& entry : entries) {
-        out += pad + "[" + Quote(entry.name) + "] = {\n";
-        for (const auto& [key, value] : entry.properties) {
-          out += inner + "[" + Quote(key) + "] = " + value + ",\n";
-        }
-        out += pad + "},\n";
-      }
-      out += std::string(static_cast<std::size_t>(std::max(0, indent - 4)), ' ');
-      return out;
-    }
-
     std::string Number(const double value)
     {
       char text[48];
