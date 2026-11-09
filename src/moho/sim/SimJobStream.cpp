@@ -23,7 +23,7 @@ namespace moho
     &sim_JobStreamPrefetch
   );
 
-  int sim_JobStreamPublishBatch = 1;
+  int sim_JobStreamPublishBatch = 4;
   TConVar<int> gTConVar_sim_JobStreamPublishBatch(
     "sim_JobStreamPublishBatch",
     "Sim stream jobs are shown to the workers this many at a time (1 = each one at once); a wait "
