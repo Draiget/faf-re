@@ -96,6 +96,8 @@ namespace faf::editor
       Z,
       Free,
     };
+    /** How many decals the Decals tool has selected, for its panel. */
+    [[nodiscard]] int DecalSelectionCount() const noexcept { return static_cast<int>(mDecalSelection.size()); }
     /** Selects markers by name (`add` toggles them in the selection instead), for the Markers panel. */
     void SelectMarkers(const std::vector<std::string>& names, bool add);
     /** Moves the camera over a marker, at most `distance` away. */
@@ -117,7 +119,17 @@ namespace faf::editor
     void ChangePlayableArea(const std::optional<EdDocument::PlayableRect>& area);
 
     /** Removes the selected props (Edit > Delete selection, the Delete key), as one undo step. */
-    void DeleteSelected() { DeleteSelection(); }
+    /** Edit > Delete: the active tool's selection (decals, markers, or props). */
+    void DeleteSelected()
+    {
+      if (mTools != nullptr && mTools->DecalsToolActive()) {
+        DeleteSelectedDecals();
+      } else if (mTools != nullptr && mTools->MarkersToolActive()) {
+        DeleteSelectedMarkers();
+      } else {
+        DeleteSelection();
+      }
+    }
 
     /** Undoes or redoes the newest height stroke (Ctrl+Z, Ctrl+Y); false when there is none. */
     bool Undo();
@@ -254,6 +266,23 @@ namespace faf::editor
     float mGizmoGroundZ = 0.0f;
     /** The middle of the grid cell holding `value` when the toolbar's Snap is on, else `value`. */
     [[nodiscard]] float SnapToGrid(float value) const;
+    /** The Decals tool: selected decals by their map index, a drag of them, its starts. */
+    std::vector<int> mDecalSelection;
+    bool mDragDecals = false;
+    bool mDecalsMoved = false;
+    float mDecalDragFromX = 0.0f;
+    float mDecalDragFromZ = 0.0f;
+    std::vector<std::array<float, 3>> mDecalDragStart;
+    EdDocument::DecalSnapshot mDecalBefore;
+    std::uint32_t mDecalSeed = 0x9E3779B9u;
+    /** The topmost decal at (x, z) (the last drawn), by its map index, or -1. */
+    [[nodiscard]] int PickDecal(float x, float z) const;
+    /** Places the Decals tool's texture centred at (x, z), with its symmetric copies, as one undo step. */
+    void PlaceDecals(float x, float z);
+    void DeleteSelectedDecals();
+    /** The selected decals' outlines, the one under the cursor, and in Place mode the decal to come. */
+    void DrawDecalOutlines(moho::CD3DPrimBatcher& batcher, const moho::CHeightField& field);
+    bool UndoDecals(bool redo);
     /** Whether the Markers panel hides this marker's type. */
     [[nodiscard]] bool MarkerHidden(const SaveEntry& marker) const;
     void DeleteSelectedMarkers();

@@ -9,6 +9,7 @@
 #include <thread>
 #include <vector>
 
+#include "editor/tools/EdDecals.h"
 #include "editor/tools/EdSymmetryCheck.h"
 #include "editor/doc/EdMapFile.h"
 #include "editor/doc/EdNewMap.h"
@@ -172,7 +173,19 @@ namespace faf::editor
       Layers,
       Props,
       SaveData,
+      Decals,
     };
+    /** The map's decals as a snapshot (every decal's saved fields), for undo. */
+    using DecalSnapshot = std::vector<DecalState>;
+    [[nodiscard]] DecalSnapshot DecalsNow() const;
+    /** Puts a snapshot back as the map's decals. */
+    void RestoreDecals(const DecalSnapshot& decals);
+    /** A decal edit ended: its before and the decals now become the newest undo step. */
+    void DecalsEdited(DecalSnapshot before);
+    [[nodiscard]] std::vector<std::pair<DecalSnapshot, DecalSnapshot>>& DecalUndo() noexcept { return mDecalUndo; }
+    [[nodiscard]] std::vector<std::pair<DecalSnapshot, DecalSnapshot>>& DecalRedo() noexcept { return mDecalRedo; }
+    /** The terrain's decal manager, or null. */
+    [[nodiscard]] moho::IDecalManager* Decals() const;
     /** The map's `_save.lua` (markers, areas) and `_script.lua` as the editor keeps them. */
     [[nodiscard]] SaveFile& SaveData() noexcept { return mSave; }
     [[nodiscard]] std::string& Script() noexcept { return mScript; }
@@ -296,6 +309,8 @@ namespace faf::editor
     std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropRedo;
     std::vector<LayerEdit> mLayerUndo;
     std::vector<LayerEdit> mLayerRedo;
+    std::vector<std::pair<DecalSnapshot, DecalSnapshot>> mDecalUndo;
+    std::vector<std::pair<DecalSnapshot, DecalSnapshot>> mDecalRedo;
     std::vector<EditKind> mUndoOrder;
     std::vector<EditKind> mRedoOrder;
     MapFileRecords mFileRecords;

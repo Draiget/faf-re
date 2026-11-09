@@ -821,11 +821,101 @@ namespace faf::editor
 
   void EdTools::DrawDecals()
   {
-    SectionHeader("PLACEMENT");
-    static const char* const kModes[] = {"Single", "Spline"};
+    SectionHeader("MODE");
+    static const char* const kModes[] = {"Place", "Select"};
+    mDecalMode = std::clamp(mDecalMode, 0, 1);
     Segmented(kModes, 2, mDecalMode);
-    DrawSymmetry();
-    Note("The decal texture browser and spline decals come in stage 6.");
+    if (mDecalMode == 1) {
+      char count[64];
+      (void)std::snprintf(count, sizeof(count), "%d decal%s selected", mDecalSelectionCount, mDecalSelectionCount == 1 ? "" : "s");
+      ImGui::TextUnformatted(count);
+      Note("Click a decal to select it (Ctrl adds), drag to move, Shift+click or Delete removes. Each edit is one undo step.");
+    }
+
+    // The textures: each as itself on a checkerboard, filtered by name and type.
+    SectionHeader("TEXTURE");
+    if (!mDecalTexturesListed) {
+      mDecalTexturesListed = true;
+      mDecalTextures = ListDecalTextures();
+    }
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::InputTextWithHint("##decalfilter", "search", mDecalFilter, sizeof(mDecalFilter));
+    static const char* const kTypes[] = {"All", "Albedo", "Normals", "Glow"};
+    Segmented(kTypes, 4, mDecalTypeFilter);
+    std::string filter = mDecalFilter;
+    for (char& c : filter) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    mLibrary.Pump(4);
+    const float cell = ImGui::GetFrameHeight() * 2.6f;
+    if (ImGui::BeginChild("##decaltextures", ImVec2(0.0f, cell * 4.6f), ImGuiChildFlags_Borders)) {
+      const int columns = std::max(1, static_cast<int>(ImGui::GetContentRegionAvail().x / (cell + 4.0f)));
+      int column = 0;
+      static constexpr int kTypeOf[] = {0, 1, 2, 6};
+      for (const DecalTexture& texture : mDecalTextures) {
+        if (mDecalTypeFilter != 0 && texture.type != kTypeOf[mDecalTypeFilter]) {
+          continue;
+        }
+        std::string lowerPath = texture.path;
+        for (char& c : lowerPath) {
+          c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        if (!filter.empty() && lowerPath.find(filter) == std::string::npos) {
+          continue;
+        }
+        if (column > 0) {
+          ImGui::SameLine(0.0f, 4.0f);
+        }
+        column = (column + 1) % columns;
+        ImGui::PushID(texture.path.c_str());
+        const ImVec2 p = ImGui::GetCursorScreenPos();
+        ImDrawList* const draw = ImGui::GetWindowDrawList();
+        // A checkerboard under it, so transparent parts show as such.
+        const float square = cell / 4.0f;
+        for (int y = 0; y < 4; ++y) {
+          for (int x = 0; x < 4; ++x) {
+            draw->AddRectFilled(ImVec2(p.x + x * square, p.y + y * square), ImVec2(p.x + (x + 1) * square, p.y + (y + 1) * square),
+                                (x + y) % 2 == 0 ? IM_COL32(70, 74, 80, 255) : IM_COL32(52, 55, 60, 255));
+          }
+        }
+        if (ImGui::InvisibleButton("##decal", ImVec2(cell, cell))) {
+          mDecalTexture = texture.path;
+          mDecalMode = 0;
+        }
+        if (const std::uint64_t image = mLibrary.Thumbnail(texture.path); image != 0U) {
+          draw->AddImage(static_cast<ImTextureID>(image), p, ImVec2(p.x + cell, p.y + cell));
+        }
+        if (texture.path == mDecalTexture) {
+          draw->AddRect(p, ImVec2(p.x + cell, p.y + cell), kAccent, 3.0f, 0, 2.0f);
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+          ImGui::SetTooltip("%s\n%s, placed as %s", texture.name.c_str(), texture.biome.c_str(), DecalTypeName(texture.type));
+        }
+        ImGui::PopID();
+      }
+      if (mDecalTextures.empty()) {
+        Note("No decal textures found under /env/*/decals/.");
+      }
+    }
+    ImGui::EndChild();
+    if (!mDecalTexture.empty()) {
+      const std::size_t slash = mDecalTexture.find_last_of('/');
+      ImGui::TextWrapped("%s (%s)", mDecalTexture.substr(slash + 1).c_str(), DecalTypeName(DecalTypeForTexture(mDecalTexture)));
+    } else {
+      Note("Pick a texture to place.");
+    }
+
+    SectionHeader("SIZE AND TURN");
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::DragFloat2("##decalsize", mDecalSize, 0.25f, 0.5f, 1024.0f, "%.1f");
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::SliderFloat("##decalturn", &mDecalTurn, -180.0f, 180.0f, "Turn %.0f deg");
+    ImGui::Checkbox("Random turn", &mDecalRandomTurn);
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::DragFloat("##decalcutoff", &mDecalCutoff, 5.0f, 0.0f, 5000.0f, mDecalCutoff <= 0.0f ? "Fade distance: from its size" : "Fade at %.0f");
+    DrawSymmetry(false);
+    Note("Place: a click puts the texture there, centred, with its symmetric copies (turned with the symmetry). "
+         "Size is along and across its heading, in game units.");
   }
 
   void EdTools::DrawPlayableArea()

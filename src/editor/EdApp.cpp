@@ -330,6 +330,8 @@ namespace faf::editor
       std::string mMarkerToolArg;
       /** `/framemarker <name>[@distance]` (test runs): the camera goes to that marker once the map is shown. */
       std::string mFrameMarkerArg;
+      /** `/decaltool <texture>[,select]` (test runs): the Decals tool with this texture. */
+      std::string mDecalToolArg;
       /** `/grid`, `/snap`, `/gridstep <units>` (test runs): the toolbar's grid settings, set once the map is shown. */
       bool mGridArgsPending = true;
       /**
@@ -579,6 +581,9 @@ namespace faf::editor
       }
       const UiClick& click = mUiClicks[index];
       const int step = frame % kEach;
+      if (click.x < 0.0f) {
+        return;
+      }
       ImGuiIO& io = ImGui::GetIO();
       io.AddMousePosEvent(click.x, click.y);
       if (step == 1 || (click.doubleClick && step == 3)) {
@@ -783,6 +788,11 @@ namespace faf::editor
           const std::size_t end = std::min(list.find(';', at), list.size());
           std::string point = list.substr(at, end - at);
           at = end + 1;
+          // "w": a slot with no click, to wait half a second.
+          if (point == "w") {
+            mUiClicks.push_back({-1.0f, -1.0f, false});
+            continue;
+          }
           const bool twice = !point.empty() && point[0] == 'd';
           if (twice) {
             point.erase(0, 1);
@@ -792,6 +802,9 @@ namespace faf::editor
             mUiClicks.push_back({static_cast<float>(std::atof(point.c_str())), static_cast<float>(std::atof(point.c_str() + comma + 1)), twice});
           }
         }
+      }
+      if (fa::vector<fa::string> decal; moho::CFG_GetArgOption("/decaltool", 1, &decal) && !decal.empty()) {
+        mDecalToolArg = decal[0].c_str();
       }
       if (fa::vector<fa::string> marker; moho::CFG_GetArgOption("/framemarker", 1, &marker) && !marker.empty()) {
         mFrameMarkerArg = marker[0].c_str();
@@ -953,6 +966,12 @@ namespace faf::editor
         }
         if (std::string name; tools.TakeMarkerFrame(name)) {
           mScene.FrameMarker(name);
+        }
+        tools.SetDecalSelectionCount(mScene.DecalSelectionCount());
+        if (!mDecalToolArg.empty()) {
+          const std::size_t comma = mDecalToolArg.find(',');
+          tools.SetDecalTool(mDecalToolArg.substr(0, comma), comma != std::string::npos && mDecalToolArg.substr(comma + 1) == "select");
+          mDecalToolArg.clear();
         }
         if (mGridArgsPending) {
           mGridArgsPending = false;

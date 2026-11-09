@@ -2,6 +2,7 @@
 
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdMaskBrush.h"
+#include "editor/tools/EdDecals.h"
 #include "editor/tools/EdMarkers.h"
 #include "editor/tools/EdTextureLibrary.h"
 
@@ -48,6 +49,26 @@ namespace faf::editor
     [[nodiscard]] bool HasPropBlueprints() const noexcept { return !mPropBlueprints.empty(); }
     /** The Markers tool. */
     [[nodiscard]] bool MarkersToolActive() const noexcept { return mTool == 6; }
+    /** The Decals tool: Place (a click places the chosen texture with its symmetric copies) or Select (pick, drag, delete). */
+    [[nodiscard]] bool DecalsToolActive() const noexcept { return mTool == 5; }
+    [[nodiscard]] bool DecalPlaceMode() const noexcept { return mDecalMode == 0; }
+    [[nodiscard]] const std::string& DecalTexturePath() const noexcept { return mDecalTexture; }
+    [[nodiscard]] float DecalSizeX() const noexcept { return mDecalSize[0]; }
+    [[nodiscard]] float DecalSizeZ() const noexcept { return mDecalSize[1]; }
+    /** The heading in radians; a random one when Random turn is on. */
+    [[nodiscard]] float DecalTurnDegrees() const noexcept { return mDecalTurn; }
+    [[nodiscard]] bool RandomDecalTurn() const noexcept { return mDecalRandomTurn; }
+    /** The far cutoff distance (0: the decal works one out from its size). */
+    [[nodiscard]] float DecalCutoff() const noexcept { return mDecalCutoff; }
+    /** How many decals the view has selected, for the panel. */
+    void SetDecalSelectionCount(const int count) noexcept { mDecalSelectionCount = count; }
+    /** Test runs (`/decaltool <texture>[,select]`): the Decals tool with this texture and mode. */
+    void SetDecalTool(std::string texture, const bool select)
+    {
+      mTool = 5;
+      mDecalTexture = std::move(texture);
+      mDecalMode = select ? 1 : 0;
+    }
     /** The map's playable area (x0, z0, x1, z1) as it is, and the map's size, for the panel. */
     void SetPlayableArea(const std::optional<std::array<int, 4>>& area, const int width, const int height)
     {
@@ -411,7 +432,7 @@ namespace faf::editor
     float mStampHeight = 20.0f;
     bool mStampRequested = false;
     int mMarkerType = 0;
-    int mDecalMode = 1; // spline
+    int mDecalMode = 0; // 0 Place, 1 Select
     float mWaterLevel = 20.0f;
     bool mSea = true;
 
@@ -450,6 +471,16 @@ namespace faf::editor
     int mSelectionCount = 0;
     std::vector<SaveEntry> mMarkerSelection;
     bool mConnectNodes = false;
+    std::vector<DecalTexture> mDecalTextures;
+    bool mDecalTexturesListed = false;
+    std::string mDecalTexture;
+    char mDecalFilter[64]{};
+    int mDecalTypeFilter = 0;
+    float mDecalSize[2] = {32.0f, 32.0f};
+    float mDecalTurn = 0.0f;
+    bool mDecalRandomTurn = false;
+    float mDecalCutoff = 0.0f;
+    int mDecalSelectionCount = 0;
     bool mShowGrid = false;
     bool mSnap = false;
     float mGridStep = 1.0f;

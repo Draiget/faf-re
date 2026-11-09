@@ -24,7 +24,9 @@
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "moho/render/CWldTerrainDecal.h"
 #include "moho/render/IEdRenderHook.h"
+#include "moho/terrain/splat/CWldSplat.h"
 #include "moho/render/RCamManager.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
@@ -72,7 +74,7 @@ namespace faf::editor
     const std::optional<EdDocument::PlayableRect> area = mMap != nullptr ? mDocument.PlayableArea() : std::nullopt;
     if (mMap == nullptr || mCamera == nullptr || mTools == nullptr ||
         (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && mSelection.empty() && !area &&
-         mDocument.SaveData().Markers().empty() && !mTools->ShowGrid()) ||
+         mDocument.SaveData().Markers().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive()) ||
         moho::ren_Viewport == nullptr) {
       return;
     }
@@ -273,6 +275,9 @@ namespace faf::editor
         }
       }
     }
+    if (mTools->DecalsToolActive()) {
+      DrawDecalOutlines(*batcher, *field);
+    }
     DrawGizmo(*batcher);
     if (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive()) {
       batcher->Flush();
@@ -466,6 +471,7 @@ namespace faf::editor
                       : kind == EdDocument::EditKind::Layers ? UndoLayers(false)
                       : kind == EdDocument::EditKind::Props  ? UndoProps(false)
                       : kind == EdDocument::EditKind::SaveData ? UndoSaveData(false)
+                      : kind == EdDocument::EditKind::Decals   ? UndoDecals(false)
                                                              : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
@@ -483,6 +489,7 @@ namespace faf::editor
                       : kind == EdDocument::EditKind::Layers ? UndoLayers(true)
                       : kind == EdDocument::EditKind::Props  ? UndoProps(true)
                       : kind == EdDocument::EditKind::SaveData ? UndoSaveData(true)
+                      : kind == EdDocument::EditKind::Decals   ? UndoDecals(true)
                                                              : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);
@@ -1273,6 +1280,27 @@ namespace faf::editor
     return true;
   }
 
+  bool EdMapScene::UndoDecals(const bool redo)
+  {
+    auto& from = redo ? mDocument.DecalRedo() : mDocument.DecalUndo();
+    auto& to = redo ? mDocument.DecalUndo() : mDocument.DecalRedo();
+    if (from.empty()) {
+      return false;
+    }
+    auto step = std::move(from.back());
+    from.pop_back();
+    mDocument.RestoreDecals(redo ? step.second : step.first);
+    to.push_back(std::move(step));
+    // Selected decals that no longer exist leave the selection.
+    if (moho::IDecalManager* const decals = mDocument.Decals(); decals != nullptr) {
+      mDecalSelection.erase(std::remove_if(mDecalSelection.begin(), mDecalSelection.end(),
+                                           [&](const int index) { return FindDecal(*decals, index) == nullptr; }),
+                            mDecalSelection.end());
+      gpg::Logf("editor: %s a decal edit: %d decals", redo ? "redid" : "undid", decals->GetDecalCount());
+    }
+    return true;
+  }
+
   bool EdMapScene::UndoSaveData(const bool redo)
   {
     auto& from = redo ? mDocument.SaveDataRedo() : mDocument.SaveDataUndo();
@@ -2060,6 +2088,153 @@ namespace faf::editor
     batcher.SetTextureBinding(before);
   }
 
+  int EdMapScene::PickDecal(const float x, const float z) const
+  {
+    moho::IDecalManager* const decals = mDocument.Decals();
+    if (decals == nullptr) {
+      return -1;
+    }
+    // From the last: later decals are drawn over earlier ones.
+    for (std::int32_t i = decals->GetDecalCount(); i-- > 0;) {
+      const moho::CWldTerrainDecal* const decal = decals->GetDecal(i);
+      if (decal != nullptr && DecalContains(FootprintOf(*decal), x, z)) {
+        return decal->mIndex;
+      }
+    }
+    return -1;
+  }
+
+  void EdMapScene::PlaceDecals(const float x, const float z)
+  {
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    moho::IDecalManager* const decals = mDocument.Decals();
+    if (mTools == nullptr || field == nullptr || decals == nullptr) {
+      return;
+    }
+    const std::string& texture = mTools->DecalTexturePath();
+    if (texture.empty()) {
+      gpg::Warnf("editor: pick a decal texture first");
+      return;
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    float yaw = mTools->DecalTurnDegrees() * kPi / 180.0f;
+    if (mTools->RandomDecalTurn()) {
+      mDecalSeed = mDecalSeed * 1664525U + 1013904223U;
+      yaw = static_cast<float>(mDecalSeed >> 8) / 16777216.0f * 2.0f * kPi;
+    }
+    // Each copy's heading is the cursor's carried through the symmetry (the copies of a point one unit ahead).
+    float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies], aheadX[kMaxSymmetryCopies], aheadZ[kMaxSymmetryCopies];
+    const int copies = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
+    (void)HeightBrushCentres(field->width, field->height, x + std::cos(yaw), z + std::sin(yaw), brush.symmetry, brush.turns, aheadX, aheadZ);
+    EdDocument::DecalSnapshot before = mDocument.DecalsNow();
+    mDecalSelection.clear();
+    for (int c = 0; c < copies; ++c) {
+      if (centreX[c] < 0.0f || centreZ[c] < 0.0f || centreX[c] > static_cast<float>(field->width - 1) ||
+          centreZ[c] > static_cast<float>(field->height - 1)) {
+        continue;
+      }
+      const float heading = std::atan2(aheadZ[c] - centreZ[c], aheadX[c] - centreX[c]);
+      const DecalFootprint footprint = DecalAround(centreX[c], centreZ[c], mTools->DecalSizeX(), mTools->DecalSizeZ(), heading);
+      DecalState state;
+      state.type = DecalTypeForTexture(texture);
+      state.names[0] = texture;
+      state.scale[0] = footprint.sizeX;
+      state.scale[1] = std::max(footprint.sizeX, footprint.sizeZ);
+      state.scale[2] = footprint.sizeZ;
+      state.position[0] = footprint.x;
+      state.position[1] = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(centreX[c])),
+                                                         static_cast<std::int32_t>(std::lround(centreZ[c])));
+      state.position[2] = footprint.z;
+      state.orientation[1] = heading;
+      state.cutoff = mTools->DecalCutoff();
+      if (const moho::CWldTerrainDecal* const decal = AddDecal(*decals, state); decal != nullptr) {
+        mDecalSelection.push_back(decal->mIndex);
+      }
+    }
+    if (!mDecalSelection.empty()) {
+      mDocument.DecalsEdited(std::move(before));
+      gpg::Logf("editor: %zu decals placed (%s, %.1f x %.1f), %d decals now", mDecalSelection.size(), texture.c_str(),
+                static_cast<double>(mTools->DecalSizeX()), static_cast<double>(mTools->DecalSizeZ()), decals->GetDecalCount());
+    }
+  }
+
+  void EdMapScene::DeleteSelectedDecals()
+  {
+    moho::IDecalManager* const decals = mDocument.Decals();
+    if (decals == nullptr || mDecalSelection.empty()) {
+      return;
+    }
+    EdDocument::DecalSnapshot before = mDocument.DecalsNow();
+    int deleted = 0;
+    for (const int index : mDecalSelection) {
+      if (moho::CWldTerrainDecal* const decal = FindDecal(*decals, index); decal != nullptr) {
+        decals->DestroyDecal(decal);
+        ++deleted;
+      }
+    }
+    mDecalSelection.clear();
+    if (deleted > 0) {
+      mDocument.DecalsEdited(std::move(before));
+      gpg::Logf("editor: %d decals deleted, %d now", deleted, decals->GetDecalCount());
+    }
+  }
+
+  void EdMapScene::DrawDecalOutlines(moho::CD3DPrimBatcher& batcher, const moho::CHeightField& field)
+  {
+    moho::IDecalManager* const decals = mDocument.Decals();
+    if (decals == nullptr || mTools == nullptr) {
+      return;
+    }
+    // An outline along the ground: each side in short pieces that follow the terrain.
+    const auto outline = [&](const DecalFootprint& footprint, const std::uint32_t color) {
+      float x[4], z[4];
+      DecalCorners(footprint, x, z);
+      for (int side = 0; side < 4; ++side) {
+        const int next = (side + 1) % 4;
+        const int steps = std::clamp(static_cast<int>(std::hypot(x[next] - x[side], z[next] - z[side]) / 2.0f), 1, 64);
+        for (int s = 0; s < steps; ++s) {
+          const auto at = [&](const float t) {
+            moho::CD3DPrimBatcher::Vertex v{};
+            v.mX = x[side] + (x[next] - x[side]) * t;
+            v.mZ = z[side] + (z[next] - z[side]) * t;
+            const int sx = std::clamp(static_cast<int>(std::lround(v.mX)), 0, field.width - 1);
+            const int sz = std::clamp(static_cast<int>(std::lround(v.mZ)), 0, field.height - 1);
+            v.mY = static_cast<float>(field.data[sz * field.width + sx]) / 128.0f + 0.5f;
+            v.mColor = color;
+            return v;
+          };
+          batcher.DrawLine(at(static_cast<float>(s) / steps), at(static_cast<float>(s + 1) / steps));
+        }
+      }
+    };
+    for (const int index : mDecalSelection) {
+      if (const moho::CWldTerrainDecal* const decal = FindDecal(*decals, index); decal != nullptr) {
+        outline(FootprintOf(*decal), 0xF0FFE040u);
+      }
+    }
+    float gx = 0.0f;
+    float gz = 0.0f;
+    if (mDragDecals || !GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), gx, gz)) {
+      return;
+    }
+    if (mTools->DecalPlaceMode()) {
+      // The decal to come, and its symmetric copies.
+      const HeightBrush brush = mTools->CurrentHeightBrush();
+      const float yaw = mTools->DecalTurnDegrees() * kPi / 180.0f;
+      float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies], aheadX[kMaxSymmetryCopies], aheadZ[kMaxSymmetryCopies];
+      const int copies = HeightBrushCentres(field.width, field.height, gx, gz, brush.symmetry, brush.turns, centreX, centreZ);
+      (void)HeightBrushCentres(field.width, field.height, gx + std::cos(yaw), gz + std::sin(yaw), brush.symmetry, brush.turns, aheadX, aheadZ);
+      for (int c = 0; c < copies; ++c) {
+        const float heading = std::atan2(aheadZ[c] - centreZ[c], aheadX[c] - centreX[c]);
+        outline(DecalAround(centreX[c], centreZ[c], mTools->DecalSizeX(), mTools->DecalSizeZ(), heading), c == 0 ? 0xF0FFFFFFu : 0xE0FF9A3Cu);
+      }
+    } else if (const int hover = PickDecal(gx, gz); hover >= 0) {
+      if (const moho::CWldTerrainDecal* const decal = FindDecal(*decals, hover); decal != nullptr) {
+        outline(FootprintOf(*decal), 0xC0FFFFFFu);
+      }
+    }
+  }
+
   int EdMapScene::PickProp(const float x, const float z) const
   {
     if (mMap == nullptr || mMap->mProps == nullptr) {
@@ -2422,6 +2597,60 @@ namespace faf::editor
         ::SetFocus(window);
         return true;
       }
+      if (mTools != nullptr && mTools->DecalsToolActive()) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        if (!GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ) || mDocument.Decals() == nullptr) {
+          return true;
+        }
+        const int hit = PickDecal(groundX, groundZ);
+        if ((wParam & MK_SHIFT) != 0) {
+          if (hit >= 0) {
+            mDecalSelection = {hit};
+            DeleteSelectedDecals();
+          }
+          return true;
+        }
+        if (mTools->DecalPlaceMode()) {
+          PlaceDecals(groundX, groundZ);
+          return true;
+        }
+        const bool add = (wParam & MK_CONTROL) != 0;
+        if (hit < 0) {
+          if (!add) {
+            mDecalSelection.clear();
+          }
+          return true;
+        }
+        const auto selected = std::find(mDecalSelection.begin(), mDecalSelection.end(), hit);
+        if (add && selected != mDecalSelection.end()) {
+          mDecalSelection.erase(selected);
+          return true;
+        }
+        if (selected == mDecalSelection.end()) {
+          if (!add) {
+            mDecalSelection.clear();
+          }
+          mDecalSelection.push_back(hit);
+        }
+        // A drag moves the selection, live.
+        mDragDecals = true;
+        mDecalsMoved = false;
+        mDecalDragFromX = groundX;
+        mDecalDragFromZ = groundZ;
+        mDecalBefore = mDocument.DecalsNow();
+        mDecalDragStart.clear();
+        for (const int index : mDecalSelection) {
+          std::array<float, 3> start{};
+          if (const moho::CWldTerrainDecal* const decal = FindDecal(*mDocument.Decals(), index); decal != nullptr) {
+            start = {decal->mPosition.x, decal->mPosition.y, decal->mPosition.z};
+          }
+          mDecalDragStart.push_back(start);
+        }
+        ::SetCapture(window);
+        ::SetFocus(window);
+        return true;
+      }
       if (mTools != nullptr && mTools->SelectToolActive() && mMap->mProps != nullptr) {
         if (const GizmoPart part = PickGizmo(at); part != GizmoPart::None) {
           BeginObjectStroke();
@@ -2512,6 +2741,16 @@ namespace faf::editor
     }
     case WM_LBUTTONUP:
       mGizmoDrag = GizmoPart::None;
+      if (mDragDecals) {
+        mDragDecals = false;
+        ::ReleaseCapture();
+        if (mDecalsMoved) {
+          mDocument.DecalsEdited(std::move(mDecalBefore));
+          gpg::Logf("editor: %zu decals moved", mDecalSelection.size());
+        }
+        mDecalBefore = {};
+        return true;
+      }
       if (mDragMarkers) {
         mDragMarkers = false;
         ::ReleaseCapture();
@@ -2573,6 +2812,23 @@ namespace faf::editor
       return true;
     case WM_MOUSEMOVE: {
       if (mDrag == Drag::None) {
+        if (mDragDecals) {
+          float groundX = 0.0f;
+          float groundZ = 0.0f;
+          moho::IDecalManager* const decals = mDocument.Decals();
+          if (decals != nullptr && GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ) &&
+              std::hypot(groundX - mDecalDragFromX, groundZ - mDecalDragFromZ) > 0.05f) {
+            for (std::size_t i = 0; i < mDecalSelection.size() && i < mDecalDragStart.size(); ++i) {
+              if (moho::CWldTerrainDecal* const decal = FindDecal(*decals, mDecalSelection[i]); decal != nullptr) {
+                const float x = SnapToGrid(mDecalDragStart[i][0] + groundX - mDecalDragFromX);
+                const float z = SnapToGrid(mDecalDragStart[i][2] + groundZ - mDecalDragFromZ);
+                decal->SetPosition(Wm3::Vec3f{x, mDecalDragStart[i][1], z});
+              }
+            }
+            mDecalsMoved = true;
+          }
+          return true;
+        }
         if (mDragMarkers && mGizmoDrag != GizmoPart::None) {
           const Wm3::Vec3f move = GizmoDisplacement(at);
           std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
@@ -2718,6 +2974,10 @@ namespace faf::editor
         return true;
       }
       mFast = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
+      if (down && wParam == VK_DELETE && mTools != nullptr && mTools->DecalsToolActive() && !mDecalSelection.empty()) {
+        DeleteSelectedDecals();
+        return true;
+      }
       if (down && wParam == VK_DELETE && mTools != nullptr && mTools->MarkersToolActive() && !mMarkerSelection.empty()) {
         DeleteSelectedMarkers();
         return true;

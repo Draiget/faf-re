@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <map>
 #include <chrono>
 #include <ctime>
 #include <cstring>
@@ -27,6 +28,7 @@
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/STIMap.h"
 #include "moho/terrain/StratumMaterial.h"
+#include "moho/render/CWldTerrainDecal.h"
 #include "moho/terrain/splat/CWldSplat.h"
 
 namespace faf::editor
@@ -154,6 +156,23 @@ namespace faf::editor
       }
       if (moho::IDecalManager* const decals = terrain->GetDecalManager(); decals != nullptr) {
         facts.decals = decals->GetDecalCount();
+        // By type, and one of them as the file holds it, in the log: what new decals are measured against.
+        std::map<int, int> types;
+        for (std::int32_t i = 0; i < facts.decals; ++i) {
+          if (const moho::CWldTerrainDecal* const decal = decals->GetDecal(i); decal != nullptr) {
+            ++types[static_cast<int>(decal->mType)];
+          }
+        }
+        std::string counts;
+        for (const auto& [type, count] : types) {
+          counts += (counts.empty() ? "" : ", ") + std::to_string(count) + " " + DecalTypeName(type);
+        }
+        if (facts.decals > 0) {
+          const DecalState first = CaptureDecal(*decals->GetDecal(0));
+          gpg::Logf("editor: decals: %s; the first: %s, scale %.1f %.1f %.1f, turn %.2f, cutoff %.0f, near %.0f", counts.c_str(),
+                    first.names[0].c_str(), first.scale[0], first.scale[1], first.scale[2], first.orientation[1], first.cutoff,
+                    first.nearCutoff);
+        }
       }
       if (map.mProps != nullptr) {
         facts.props = static_cast<int>(map.mProps->mEntries.size());
@@ -566,6 +585,36 @@ namespace faf::editor
     mModified = true;
   }
 
+  moho::IDecalManager* EdDocument::Decals() const
+  {
+    return mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetDecalManager() : nullptr;
+  }
+
+  EdDocument::DecalSnapshot EdDocument::DecalsNow() const
+  {
+    moho::IDecalManager* const decals = Decals();
+    return decals != nullptr ? CaptureDecals(*decals) : DecalSnapshot{};
+  }
+
+  void EdDocument::RestoreDecals(const DecalSnapshot& decals)
+  {
+    if (moho::IDecalManager* const manager = Decals(); manager != nullptr) {
+      faf::editor::RestoreDecals(*manager, decals);
+      mModified = true;
+    }
+  }
+
+  void EdDocument::DecalsEdited(DecalSnapshot before)
+  {
+    mDecalUndo.emplace_back(std::move(before), DecalsNow());
+    // About 120 bytes a decal: a 2,000-decal map is about half a megabyte a step, twice.
+    if (mDecalUndo.size() > 100) {
+      mDecalUndo.erase(mDecalUndo.begin());
+    }
+    EditEnded(EditKind::Decals);
+    mModified = true;
+  }
+
   void EdDocument::SetPropRecord(const std::size_t index, const PropRecord& record)
   {
     if (mMap == nullptr || mMap->mProps == nullptr || index >= mMap->mProps->mEntries.size()) {
@@ -607,6 +656,7 @@ namespace faf::editor
     mLayerRedo.clear();
     mPropRedo.clear();
     mSaveRedo.clear();
+    mDecalRedo.clear();
   }
 
   bool EdDocument::PopUndo(EditKind& kind)
