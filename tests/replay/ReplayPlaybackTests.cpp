@@ -452,13 +452,33 @@ TEST(ReplayPlaybackServer, ChangeSetRebuildsTheSimsOwnPacket)
   ExpectMatchedToTheEnd(focused);
   EXPECT_NE(focused.output.find("the sim's own packet"), std::string::npos) << focused.output;
 
-  std::ifstream a(rebuilt, std::ios::binary);
-  std::ifstream b(own, std::ios::binary);
-  const std::string rebuiltText((std::istreambuf_iterator<char>(a)), std::istreambuf_iterator<char>());
-  const std::string ownText((std::istreambuf_iterator<char>(b)), std::istreambuf_iterator<char>());
-  EXPECT_FALSE(rebuiltText.empty());
-  EXPECT_TRUE(rebuiltText == ownText) << "the change set's packet differs from the sim's: compare " << rebuilt.string()
-                                      << " with " << own.string();
+  // The beats up to the run's last one: the sim runs on past it while headless finishes (ReplayRunner.cpp), so a beat
+  // after it may or may not reach either file.
+  const std::size_t at = unfocused.beats.find("last-beat=");
+  ASSERT_NE(at, std::string::npos) << unfocused.beats;
+  const long lastBeat = std::atol(unfocused.beats.c_str() + at + 10);
+  const auto beatsUpToLast = [lastBeat](const std::filesystem::path& path) {
+    std::vector<std::string> lines;
+    std::ifstream file(path);
+    for (std::string line; std::getline(file, line);) {
+      if (!line.empty() && std::atol(line.c_str()) <= lastBeat) {
+        lines.push_back(line);
+      }
+    }
+    return lines;
+  };
+  const std::vector<std::string> rebuiltLines = beatsUpToLast(rebuilt);
+  const std::vector<std::string> ownLines = beatsUpToLast(own);
+  EXPECT_EQ(rebuiltLines.size(), static_cast<std::size_t>(lastBeat + 1));
+  EXPECT_EQ(ownLines.size(), static_cast<std::size_t>(lastBeat + 1));
+  std::size_t differing = 0;
+  for (std::size_t i = 0; i < rebuiltLines.size() && i < ownLines.size(); ++i) {
+    if (rebuiltLines[i] != ownLines[i] && differing++ == 0) {
+      ADD_FAILURE() << "the change set's packet differs from the sim's first at\n  " << rebuiltLines[i] << "\n  "
+                    << ownLines[i] << "\n(" << rebuilt.string() << " against " << own.string() << ")";
+    }
+  }
+  EXPECT_EQ(differing, 0u);
   EXPECT_GT(std::filesystem::file_size(entries, ignored), 0u);
 }
 
