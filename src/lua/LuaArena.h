@@ -35,5 +35,27 @@ namespace lua
    * freed: the engine pushes a handful of pointers.
    */
   [[nodiscard]] void* const* ArenaLightCell(void* pointer) noexcept;
+
+  /** What the range holds, for memory diagnostics. */
+  struct ArenaUsage
+  {
+    std::size_t committedBytes = 0;
+    /** Spans handed out so far, the range's high-water mark. */
+    std::size_t spanBytes = 0;
+    /** Spans carved into small blocks (never given back). */
+    std::size_t smallSpanBytes = 0;
+    /** Small blocks free on the shared lists (not the per-thread ones). */
+    std::size_t smallFreeBytes = 0;
+    /** Freed large blocks' spans, waiting for a large request. */
+    std::size_t freeRunBytes = 0;
+    std::size_t freeRuns = 0;
+    std::size_t lightCells = 0;
+    /** Per size class: its block size, spans carved for it, and its blocks free on the shared lists. */
+    static constexpr std::size_t kClasses = 67;
+    std::uint32_t classBytes[kClasses]{};
+    std::uint32_t classSpans[kClasses]{};
+    std::uint32_t classFreeBlocks[kClasses]{};
+  };
+  [[nodiscard]] ArenaUsage ArenaReadUsage() noexcept;
 } // namespace lua
 #endif
