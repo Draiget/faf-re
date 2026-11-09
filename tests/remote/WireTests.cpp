@@ -13,12 +13,14 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <deque>
 #include <exception>
 #include <limits>
 #include <map>
 #include <random>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -2508,6 +2510,65 @@ namespace
     EXPECT_FALSE(fresh.Decode(againstBase.Bytes(), codec, out));
   }
 
+  // Acknowledgements that arrive beats late, as over any real link: until the first one comes back the server sends
+  // whole frames, then encodes against the oldest of them the client acknowledged. The client must still hold it.
+  // A whole frame whose id restarts (plan WP13.6: a player moved to another view) still replaces what was held.
+  void TestFrameWindowLateAcks()
+  {
+    using faf::remote::CClientFrameWindow;
+    using faf::remote::CServerFrameWindow;
+    SFrameCodec codec{};
+    const auto frameAt = [](const std::uint32_t id) {
+      SViewFrame frame{};
+      frame.frameId = id;
+      frame.beat = id;
+      for (std::uint32_t e = 0; e < 3u + id % 4u; ++e) {
+        SEntityRecord record{};
+        record.id = 0x00200000u + e;
+        record.health = static_cast<float>(id * 10u + e);
+        frame.entities.push_back(record);
+      }
+      return frame;
+    };
+    for (const std::uint32_t delay : {1u, 3u, 8u}) {
+      SCOPED_TRACE(testing::Message() << "acknowledgements " << delay << " beats late");
+      CServerFrameWindow server;
+      CClientFrameWindow client;
+      std::deque<std::pair<std::uint32_t, std::uint32_t>> acks; // (beat it arrives, frame id)
+      for (std::uint32_t beat = 1; beat <= 40u; ++beat) {
+        while (!acks.empty() && acks.front().first <= beat) {
+          server.Ack(acks.front().second);
+          acks.pop_front();
+        }
+        const SViewFrame frame = frameAt(beat);
+        BitWriter writer;
+        ASSERT_TRUE(EncodeFrame(frame, server.Baseline(), codec, writer));
+        server.Sent(frame);
+        SViewFrame decoded{};
+        EXPECT_TRUE(client.Decode(writer.Bytes(), codec, decoded) && decoded == frame) << "beat " << beat;
+        acks.emplace_back(beat + delay, client.Newest());
+      }
+    }
+
+    // Ids that restart: the whole frame 1 replaces frames up to 10, so a frame against the old 5 no longer decodes.
+    CClientFrameWindow client;
+    for (std::uint32_t id = 1; id <= 10u; ++id) {
+      BitWriter writer;
+      ASSERT_TRUE(EncodeFrame(frameAt(id), nullptr, codec, writer));
+      SViewFrame decoded{};
+      ASSERT_TRUE(client.Decode(writer.Bytes(), codec, decoded));
+    }
+    BitWriter restart;
+    ASSERT_TRUE(EncodeFrame(frameAt(1), nullptr, codec, restart));
+    SViewFrame decoded{};
+    ASSERT_TRUE(client.Decode(restart.Bytes(), codec, decoded));
+    EXPECT_EQ(client.Newest(), 1u);
+    const SViewFrame oldBase = frameAt(5);
+    BitWriter againstOld;
+    ASSERT_TRUE(EncodeFrame(frameAt(6), &oldBase, codec, againstOld));
+    EXPECT_FALSE(client.Decode(againstOld.Bytes(), codec, decoded));
+  }
+
   // Plan WP5.13: the army lane and the grid lane round-trip; unchanged records cost a bit.
   void TestArmyAndGridLanes()
   {
@@ -2687,6 +2748,7 @@ namespace
 
 TEST(Existing_Wire, ArmyAndGridLanes) { TestArmyAndGridLanes(); }
 TEST(Existing_Wire, FrameWindow) { TestFrameWindow(); }
+TEST(Existing_Wire, FrameWindowLateAcks) { TestFrameWindowLateAcks(); }
 TEST(Existing_Wire, ViewIdMap) { TestViewIdMap(); }
 TEST(Existing_Wire, InboundIds) { TestInboundIds(); }
 TEST(Existing_Wire, GridDeltaRoundTrip) { TestGridDeltaRoundTrip(); }

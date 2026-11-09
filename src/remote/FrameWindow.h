@@ -13,7 +13,8 @@
 // freshness, never consistency. The server keeps the frames it sent from that acknowledged one
 // on, at most `kMaxFrames` of them; when the acknowledged frame falls out (or none was
 // acknowledged yet) the next frame goes in full. The client keeps the frames it decoded, as many,
-// and decodes each new one against the frame its header names.
+// and decodes each new one against the frame its header names; a whole frame drops the older ones
+// only when its id restarts, as acknowledgements arrive late and can name a frame before it.
 
 namespace faf::remote
 {
