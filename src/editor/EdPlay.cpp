@@ -15,6 +15,7 @@
 #include <stdexcept>
 
 #include "gpg/core/utils/Logging.h"
+#include "lua/LuaArena.h"
 #include "lua/LuaObject.h"
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -785,7 +786,8 @@ end
         std::map<std::string, int> now;
         counts->VisitChildren(
           [](moho::StatItem* const child, void* const context) {
-            (*static_cast<std::map<std::string, int>*>(context))[child->Name().c_str()] = child->GetInt(true);
+            // The primary slot: instance counters never write the realtime one.
+            (*static_cast<std::map<std::string, int>*>(context))[child->Name().c_str()] = child->GetInt(false);
           },
           &now
         );
@@ -802,6 +804,30 @@ end
         }
         mInstanceCounts = std::move(now);
       }
+      // Which heap, stack or direct allocation holds the rest (the engine heap is only one of them).
+      memmap::Snapshot map = memmap::Take();
+      memmap::LogChanges(mLastMemoryMap, map);
+      mLastMemoryMap = std::move(map);
+      // Lua's own range (every Lua state's memory): where it is, and what the editor's UI state holds.
+      // Other states open and close on other threads (the rules for the next play), so only this one.
+#if INTPTR_MAX != INT32_MAX
+      const lua::ArenaUsage arena = lua::ArenaReadUsage();
+      static lua::ArenaUsage lastArena;
+      for (std::size_t c = 0; c < lua::ArenaUsage::kClasses && lastArena.committedBytes != 0; ++c) {
+        if (arena.classSpans[c] != lastArena.classSpans[c]) {
+          gpg::Logf("editor:   Lua blocks of %u bytes: %u -> %u spans, %u -> %u blocks free on the shared lists", arena.classBytes[c],
+                    lastArena.classSpans[c], arena.classSpans[c], lastArena.classFreeBlocks[c], arena.classFreeBlocks[c]);
+        }
+      }
+      lastArena = arena;
+      constexpr double kMB = 1048576.0;
+      const LuaPlus::LuaState* const ui = moho::USER_GetLuaState();
+      gpg::Logf("editor: Lua range: %.1f MB committed, %.1f MB in spans (%.1f MB small-block spans, %.1f MB of them free on "
+                "the shared lists; %.1f MB in %zu freed large runs), %zu light cells; the UI state counts %d KB",
+                arena.committedBytes / kMB, arena.spanBytes / kMB, arena.smallSpanBytes / kMB, arena.smallFreeBytes / kMB,
+                arena.freeRunBytes / kMB, arena.freeRuns, arena.lightCells,
+                ui != nullptr ? lua_getgccount(ui->m_state) : 0);
+#endif
     }
 
     if (mPlayRequested) {

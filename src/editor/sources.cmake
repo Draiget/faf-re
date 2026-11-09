@@ -4,6 +4,7 @@ set(FAF_EDITOR_SOURCES
   EdMain.cpp
   EdApp.cpp
   EdLog.cpp
+  EdMemMap.cpp
   EdMemTrace.cpp
   EdPlay.cpp
   EdShell.cpp
