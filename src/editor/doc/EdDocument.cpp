@@ -257,6 +257,9 @@ namespace faf::editor
   {
     Wait();
     mLoad.reset();
+    if (mMap != nullptr && mBeforeDrop) {
+      mBeforeDrop();
+    }
     mMap.reset();
     mLua.reset();
     mFacts = {};

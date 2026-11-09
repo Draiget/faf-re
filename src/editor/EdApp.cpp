@@ -3,6 +3,7 @@
 #include <Windows.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <string>
@@ -14,6 +15,7 @@
 #include "editor/EdShell.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/ui/EdImGuiRenderer.h"
+#include "editor/view/EdMapScene.h"
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/utils/Global.h"
@@ -85,6 +87,7 @@ namespace faf::editor
     class EditorApp;
     EditorApp* gEditorApp = nullptr;
     void OnMenuCommand(UINT command);
+    bool OnViewportMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
     void OnMenuOpening(HMENU menu);
     [[nodiscard]] bool SessionActive();
 
@@ -98,6 +101,10 @@ namespace faf::editor
         if (message == WM_KEYDOWN && (lParam & (1 << 30)) == 0) {
           OnMenuCommand(kMenuPlayStop);
         }
+        return 0;
+      }
+      // Between plays the opened map's camera takes the mouse (EdMapScene).
+      if (OnViewportMessage(window, message, wParam, lParam)) {
         return 0;
       }
       return ::CallWindowProcW(gViewportProc, window, message, wParam, lParam);
@@ -217,6 +224,10 @@ namespace faf::editor
 
       void HandleMenuCommand(UINT command);
       void UpdateMenu();
+      bool HandleViewportMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
+      {
+        return mScene.OnWindowMessage(window, message, wParam, lParam);
+      }
       [[nodiscard]] bool SessionActive() const { return mPlay.Active(); }
 
     private:
@@ -240,6 +251,8 @@ namespace faf::editor
       EdImGuiRenderer mRenderer;
       EdPlay mPlay;
       EdDocument mDocument;
+      EdMapScene mScene{mDocument};
+      std::chrono::steady_clock::time_point mLastFrame = std::chrono::steady_clock::now();
       EdShell* mShell = nullptr;
       // `/openall`: every map opened in turn (the next to open, how many opened, the ones that did not).
       bool mOpenAll = false;
@@ -319,6 +332,7 @@ namespace faf::editor
       mPlay.FindMaps();
       mPlay.ReadCommandLine();
       mShell = new EdShell(mLog, mPlay, mDocument);
+      mDocument.SetBeforeDrop([this] { mScene.Detach(); });
       ReadOpenCommandLine();
       gEditorApp = this;
       BuildMenu(frame);
@@ -480,6 +494,11 @@ namespace faf::editor
       }
     }
 
+    bool OnViewportMessage(const HWND window, const UINT message, const WPARAM wParam, const LPARAM lParam)
+    {
+      return gEditorApp != nullptr && gEditorApp->HandleViewportMessage(window, message, wParam, lParam);
+    }
+
     void OnMenuCommand(const UINT command)
     {
       if (gEditorApp != nullptr) {
@@ -507,6 +526,11 @@ namespace faf::editor
       // session here, before CScApp::Main runs WLD_Frame: the game would go on to its main menu.
       mPlay.BeforeGameFrame();
       DriveOpens();
+      // The opened map in the viewport while no play runs (a play's start sets the state off Inactive at once).
+      const auto now = std::chrono::steady_clock::now();
+      const float frameSeconds = std::chrono::duration<float>(now - mLastFrame).count();
+      mLastFrame = now;
+      mScene.Update(frameSeconds, moho::WLD_GetFrameAction() == moho::EWldFrameAction::Inactive);
 
       if (mImGuiReady) {
         ImGui_ImplWin32_NewFrame();

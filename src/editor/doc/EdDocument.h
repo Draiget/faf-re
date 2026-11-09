@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -84,6 +85,9 @@ namespace faf::editor
     /** Drops the map. */
     void Close();
 
+    /** Called just before the map is deleted (the viewport stops drawing it first). */
+    void SetBeforeDrop(std::function<void()> beforeDrop) { mBeforeDrop = std::move(beforeDrop); }
+
     [[nodiscard]] State GetState() const noexcept { return mState; }
     [[nodiscard]] const MapFacts& Facts() const noexcept { return mFacts; }
     [[nodiscard]] const std::string& Error() const noexcept { return mError; }
@@ -91,6 +95,8 @@ namespace faf::editor
     [[nodiscard]] const std::string& Path() const noexcept { return mPath; }
     /** The loaded map, null unless open. */
     [[nodiscard]] moho::CWldMap* Map() const noexcept { return mMap.get(); }
+    /** The document's Lua state (scripts and objects made for the open map), null unless open. */
+    [[nodiscard]] LuaPlus::LuaState* Lua() const noexcept { return mLua.get(); }
 
   private:
     struct Load;
@@ -105,5 +111,6 @@ namespace faf::editor
     std::unique_ptr<moho::CWldMap> mMap;
     std::unique_ptr<Load> mLoad;
     std::thread mThread;
+    std::function<void()> mBeforeDrop;
   };
 } // namespace faf::editor
