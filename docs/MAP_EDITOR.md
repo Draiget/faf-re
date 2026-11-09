@@ -26,6 +26,7 @@ The Map panel sets the play up, the way FAF's `/map` quick start does (`SinglePl
 - **Solo** (default) or **Against AI** with one of the game's AI types for every other army. Solo is the faster start: with no AI there is no AI map analysis (SCMP_009, second play: 2.3 s to the game solo, 4.5 s against "rush").
 - **Faction**: random or one of the game's factions.
 - **Fog**: fog of war ("explored") or none. The sim fixes fog when the game starts, so it applies from the next Play.
+- **Keep this setup for this map**: on, the map keeps its own setup, saved at each Play; off, it plays with the setup of the last Play on any map. Picking a map takes its own setup or the last one. Kept in `%LOCALAPPDATA%\FAForever\Editor\play_setups.ini` by map folder name without its `.vNNNN` version, AI and faction by their keys. Test runs from the command line read it but don't write it.
 - **See the whole map**, during play: the view switches to an observer's (no fog, every army) and back to your army. Editor plays have cheats on for this, without changing the `debug.enable_debug_facilities` preference the game reads.
 
 Campaign maps go through FAF's own campaign setup. No replay is written.
@@ -49,6 +50,7 @@ How fast a play starts:
 | `/playafter <s>` | With `/play`: waits s seconds after the editor is up before the first play (timing a first play as a user would start it) |
 | `/playquit` | With `/play`: closes the editor after the last one (test runs) |
 | `/playai <key>` | With `/play`: against that AI (`rush`, `easy`, ...) instead of solo |
+| `/playsetups <file>` | Reads and writes the remembered play setups in that file instead of `play_setups.ini` (test runs) |
 | `/playwholemap` | With `/play` and `/playseconds`: switches to the whole map when play starts and back halfway (test runs) |
 | `/playexitapp` | With `/play` and `/playseconds`: ends each play the way the game's "Exit to Windows" does (`ExitApplication()`), which the editor turns into a Stop (test runs) |
 | `/d3d12debug`, `/vulkandebug` | The API's debug or validation layer, as in the game ([Renderer backends](RENDERER_BACKENDS.md)) |

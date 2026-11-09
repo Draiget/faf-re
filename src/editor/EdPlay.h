@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -52,7 +53,17 @@ namespace faf::editor
     /** Each map's title ("Seton's Clutch"), or its folder name when the scenario gives none. */
     [[nodiscard]] const std::vector<std::string>& Titles() const noexcept { return mTitles; }
     [[nodiscard]] int Selected() const noexcept { return mSelected; }
-    void Select(int index) noexcept { mSelected = index; }
+    /** Picks a map and takes the setup remembered for it, or the last one used. */
+    void Select(int index);
+
+    /**
+     * Where play setups are remembered (`play_setups.ini` in the editor's settings folder): the last
+     * one used, and one per map for the maps that keep their own. Read now and written at each Play.
+     */
+    void SetSetupsFile(std::string path);
+    /** The selected map keeps its own setup (else it plays with the last one used). */
+    [[nodiscard]] bool KeepsOwnSetup() const noexcept { return mKeepOwnSetup; }
+    void SetKeepsOwnSetup(bool keep);
 
     /** A session can start: none is loading or running. */
     [[nodiscard]] bool CanPlay() const;
@@ -97,7 +108,24 @@ namespace faf::editor
     [[nodiscard]] bool QuitRequested() const noexcept { return mQuitRequested; }
 
   private:
+    /** A setup as remembered: AI and faction by key, so they survive a change of the game's lists. */
+    struct StoredSetup
+    {
+      bool withAi = false;
+      std::string ai;
+      std::string faction; // empty: random
+      bool fog = true;
+    };
+
     void FindChoices();
+    void ReadSetups();
+    void WriteSetups() const;
+    /** At a Play started by the user: the setup becomes the last one, and the map's own if it keeps one. */
+    void RememberSetup();
+    [[nodiscard]] StoredSetup Store(const PlaySetup& setup) const;
+    [[nodiscard]] PlaySetup Restore(const StoredSetup& stored) const;
+    /** "scmp_009" for the selected map (its folder name, lower case, without a .vNNNN version). */
+    [[nodiscard]] std::string SelectedKey() const;
     /** Starts the session for one scenario with `mSetup`; false (and a warning) when it did not start. */
     bool StartSession(const std::string& scenario);
     void DriveCommandLineRuns();
@@ -113,6 +141,11 @@ namespace faf::editor
     std::vector<PlayChoice> mAiTypes;
     std::vector<PlayChoice> mFactions;
     PlaySetup mSetup;
+    std::string mSetupsFile;
+    StoredSetup mLastSetup;
+    bool mHaveLastSetup = false;
+    std::map<std::string, StoredSetup> mMapSetups;
+    bool mKeepOwnSetup = false;
     /** The army the view had before it switched to the whole map. */
     int mPlayerArmy = 0;
     bool mWholeMap = false;
@@ -128,6 +161,7 @@ namespace faf::editor
     bool mAutoQuit = false;
     bool mAutoWholeMap = false;
     float mAutoDelay = 0.0f;
+    int mAutoAi = -1; // `/playai`: this AI for every test play, over the map's remembered setup
     double mAutoStartAt = -1.0;
     bool mAutoExitApp = false;
     bool mExitAppSent = false;

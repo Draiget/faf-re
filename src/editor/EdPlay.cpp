@@ -4,6 +4,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstdlib>
+#include <fstream>
 #include <stdexcept>
 
 #include "gpg/core/utils/Logging.h"
@@ -320,6 +321,8 @@ end
       }
     }
     gpg::Logf("editor: %zu AI types, %zu factions", mAiTypes.size(), mFactions.size());
+    ReadSetups();
+    Select(mSelected);
 
     // The game rules for the mods a skirmish play uses (FAF's GetCampaignMods: GetGameMods for any
     // non-campaign map), built now on a thread so that the first Play takes them too. The session
@@ -332,6 +335,169 @@ end
       }
     } catch (const std::exception& error) {
       gpg::Warnf("editor: the game's mods for the rules built ahead: %s", error.what());
+    }
+  }
+
+  void EdPlay::Select(const int index)
+  {
+    mSelected = index;
+    const auto own = mMapSetups.find(SelectedKey());
+    mKeepOwnSetup = own != mMapSetups.end();
+    if (mKeepOwnSetup) {
+      mSetup = Restore(own->second);
+    } else if (mHaveLastSetup) {
+      mSetup = Restore(mLastSetup);
+    }
+  }
+
+  void EdPlay::SetKeepsOwnSetup(const bool keep)
+  {
+    mKeepOwnSetup = keep;
+    if (keep) {
+      mMapSetups[SelectedKey()] = Store(mSetup);
+    } else {
+      mMapSetups.erase(SelectedKey());
+    }
+    WriteSetups();
+  }
+
+  void EdPlay::SetSetupsFile(std::string path)
+  {
+    mSetupsFile = std::move(path);
+  }
+
+  std::string EdPlay::SelectedKey() const
+  {
+    if (mSelected < 0 || mSelected >= static_cast<int>(mMaps.size())) {
+      return {};
+    }
+    std::string key = MapDisplayName(mMaps[static_cast<std::size_t>(mSelected)]);
+    std::transform(key.begin(), key.end(), key.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    // FAF vault folders carry a version (scmp_009.v0003); every version shares one setup.
+    if (key.size() > 6 && key[key.size() - 6] == '.' && key[key.size() - 5] == 'v' &&
+        std::all_of(key.end() - 4, key.end(), [](const unsigned char c) { return std::isdigit(c) != 0; })) {
+      key.erase(key.size() - 6);
+    }
+    return key;
+  }
+
+  EdPlay::StoredSetup EdPlay::Store(const PlaySetup& setup) const
+  {
+    StoredSetup stored;
+    stored.withAi = setup.withAi;
+    if (setup.ai >= 0 && setup.ai < static_cast<int>(mAiTypes.size())) {
+      stored.ai = mAiTypes[static_cast<std::size_t>(setup.ai)].key;
+    }
+    if (setup.faction >= 1 && setup.faction <= static_cast<int>(mFactions.size())) {
+      stored.faction = mFactions[static_cast<std::size_t>(setup.faction - 1)].key;
+    }
+    stored.fog = setup.fog;
+    return stored;
+  }
+
+  PlaySetup EdPlay::Restore(const StoredSetup& stored) const
+  {
+    PlaySetup setup = mSetup; // an AI the game no longer has keeps the current choice
+    setup.withAi = stored.withAi;
+    for (std::size_t i = 0; i < mAiTypes.size(); ++i) {
+      if (mAiTypes[i].key == stored.ai) {
+        setup.ai = static_cast<int>(i);
+      }
+    }
+    setup.faction = 0;
+    for (std::size_t i = 0; i < mFactions.size(); ++i) {
+      if (mFactions[i].key == stored.faction) {
+        setup.faction = static_cast<int>(i) + 1;
+      }
+    }
+    setup.fog = stored.fog;
+    return setup;
+  }
+
+  void EdPlay::RememberSetup()
+  {
+    mLastSetup = Store(mSetup);
+    mHaveLastSetup = true;
+    if (mKeepOwnSetup) {
+      mMapSetups[SelectedKey()] = mLastSetup;
+    }
+    WriteSetups();
+  }
+
+  // play_setups.ini: a [last] section and a [map <key>] section per map that keeps its own setup,
+  // each with opponents=solo|ai, ai=<key>, faction=<key>|random, fog=0|1.
+  void EdPlay::ReadSetups()
+  {
+    mMapSetups.clear();
+    mHaveLastSetup = false;
+    std::ifstream in(mSetupsFile);
+    if (!in) {
+      return;
+    }
+    StoredSetup* current = nullptr;
+    std::string line;
+    while (std::getline(in, line)) {
+      while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) {
+        line.pop_back();
+      }
+      if (line.empty() || line[0] == ';') {
+        continue;
+      }
+      if (line.front() == '[' && line.back() == ']') {
+        const std::string section = line.substr(1, line.size() - 2);
+        if (section == "last") {
+          current = &mLastSetup;
+          mHaveLastSetup = true;
+        } else if (section.rfind("map ", 0) == 0 && section.size() > 4) {
+          current = &mMapSetups[section.substr(4)];
+        } else {
+          current = nullptr;
+        }
+        continue;
+      }
+      const std::size_t equals = line.find('=');
+      if (current == nullptr || equals == std::string::npos) {
+        continue;
+      }
+      const std::string key = line.substr(0, equals);
+      const std::string value = line.substr(equals + 1);
+      if (key == "opponents") {
+        current->withAi = value == "ai";
+      } else if (key == "ai") {
+        current->ai = value;
+      } else if (key == "faction") {
+        current->faction = value == "random" ? std::string{} : value;
+      } else if (key == "fog") {
+        current->fog = value != "0";
+      }
+    }
+    gpg::Logf("editor: play setups from %s (%s last, %zu maps of their own)", mSetupsFile.c_str(),
+              mHaveLastSetup ? "a" : "no", mMapSetups.size());
+  }
+
+  void EdPlay::WriteSetups() const
+  {
+    if (mSetupsFile.empty()) {
+      return;
+    }
+    std::ofstream out(mSetupsFile, std::ios::trunc);
+    if (!out) {
+      gpg::Warnf("editor: %s could not be written", mSetupsFile.c_str());
+      return;
+    }
+    const auto write = [&out](const char* header, const std::string& name, const StoredSetup& setup) {
+      out << '[' << header << name << "]\n"
+          << "opponents=" << (setup.withAi ? "ai" : "solo") << '\n'
+          << "ai=" << setup.ai << '\n'
+          << "faction=" << (setup.faction.empty() ? "random" : setup.faction) << '\n'
+          << "fog=" << (setup.fog ? 1 : 0) << "\n\n";
+    };
+    out << "; FAF Map Editor: the last play setup, and the maps that keep their own (written by the editor)\n\n";
+    if (mHaveLastSetup) {
+      write("last", "", mLastSetup);
+    }
+    for (const auto& [key, setup] : mMapSetups) {
+      write("map ", key, setup);
     }
   }
 
@@ -362,6 +528,9 @@ end
   {
     mPlayerArmy = 0;
     mWholeMap = false;
+    if (!mAutoRun) {
+      RememberSetup(); // test runs from the command line leave the remembered setups alone
+    }
     LuaPlus::LuaState* const state = moho::USER_GetLuaState();
     if (state == nullptr) {
       return false;
@@ -461,7 +630,7 @@ end
       return;
     }
     const int found = mAutoMaps.front();
-    mSelected = found;
+    Select(found);
     mAutoRun = true;
     mAutoCyclesLeft = 1;
     if (moho::CFG_GetArgOption("/playcycles", 1, &args) && !args.empty()) {
@@ -474,11 +643,10 @@ end
     if (moho::CFG_GetArgOption("/playai", 1, &args) && !args.empty()) {
       for (std::size_t i = 0; i < mAiTypes.size(); ++i) {
         if (mAiTypes[i].key == args[0].c_str()) {
-          mSetup.withAi = true;
-          mSetup.ai = static_cast<int>(i);
+          mAutoAi = static_cast<int>(i);
         }
       }
-      if (!mSetup.withAi) {
+      if (mAutoAi < 0) {
         gpg::Warnf("editor: /playai %s: no such AI type", args[0].c_str());
       }
     }
@@ -510,7 +678,11 @@ end
       }
       if (mAutoCyclesLeft > 0) {
         --mAutoCyclesLeft;
-        mSelected = mAutoMaps[mAutoRunIndex++ % mAutoMaps.size()];
+        Select(mAutoMaps[mAutoRunIndex++ % mAutoMaps.size()]); // with the map's remembered setup
+        if (mAutoAi >= 0) {
+          mSetup.withAi = true;
+          mSetup.ai = mAutoAi;
+        }
         mPlayRequested = true;
       } else {
         mAutoRun = false;

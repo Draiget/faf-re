@@ -198,6 +198,14 @@ namespace faf::editor
     }
     ImGui::SameLine();
     ImGui::Checkbox("Fog", &setup.fog);
+    bool keepOwn = mPlay.KeepsOwnSetup();
+    if (ImGui::Checkbox("Keep this setup for this map", &keepOwn)) {
+      mPlay.SetKeepsOwnSetup(keepOwn);
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip("On: this map plays with its own setup, saved at each Play.\n"
+                        "Off: it plays with the setup of the last Play on any map.");
+    }
     ImGui::EndDisabled();
 
     // During play: the whole map, as an observer sees it, or the player's own view with its fog.

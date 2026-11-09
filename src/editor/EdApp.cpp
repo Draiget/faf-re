@@ -294,6 +294,12 @@ namespace faf::editor
         return false;
       }
       mImGuiReady = true;
+      // `/playsetups <file>` (test runs) reads and writes the play setups there instead.
+      if (fa::vector<fa::string> args; moho::CFG_GetArgOption("/playsetups", 1, &args) && !args.empty()) {
+        mPlay.SetSetupsFile(args[0].c_str());
+      } else if (const std::filesystem::path folder = EditorSettingsFolder(); !folder.empty()) {
+        mPlay.SetSetupsFile((folder / "play_setups.ini").string());
+      }
       mPlay.FindMaps();
       mPlay.ReadCommandLine();
       mShell = new EdShell(mLog, mPlay);
