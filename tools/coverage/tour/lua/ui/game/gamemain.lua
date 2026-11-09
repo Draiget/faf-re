@@ -287,6 +287,58 @@ do
     end
 
     -- One of each Maui control on the top frame, its getters swept, then destroyed.
+    -- Methods the control fuzz leaves out: they end the control, take the input focus for good, or are callbacks the
+    -- engine calls itself.
+    local ControlFuzzSkip = {
+        Destroy = true, OnDestroy = true, AcquireKeyboardFocus = true, AbandonKeyboardFocus = true, AcquireFocus = true,
+        SetNeedsFrameUpdate = true, OnFrame = true, HandleEvent = true, OnKeyboardFocusChange = true,
+        -- ItemList:GetItem and the movie getters crash the original game the same way (see Skip above).
+        GetItem = true, GetFrameRate = true, GetNumFrames = true,
+    }
+
+    -- Every method of a control (the engine's and FAF's Lua class's) with each argument pattern: nothing, 1, a
+    -- string, true, two numbers, the parent control, an empty table. The wrong patterns stop at the argument checks.
+    local function FuzzControl(label, control, parent)
+        if Skip[label] == 'all' then
+            return
+        end
+        local methods = getmetatable(control)
+        if type(methods) == 'table' and type(rawget(methods, '__index')) == 'table' then
+            methods = rawget(methods, '__index')
+        end
+        if type(methods) ~= 'table' then
+            return
+        end
+        local names = {}
+        for name, value in methods do
+            if type(name) == 'string' and (type(value) == 'cfunction' or type(value) == 'function')
+                and not ControlFuzzSkip[name] then
+                table.insert(names, name)
+            end
+        end
+        table.sort(names)
+        local calls = 0
+        local failed = 0
+        for i = 1, table.getn(names) do
+            local fn = methods[names[i]]
+            local patterns = { {}, { 1 }, { 'zoo' }, { true }, { 1, 1 }, { parent }, { {} } }
+            for p = 1, table.getn(patterns) do
+                local args = patterns[p]
+                local ok
+                if table.getn(args) == 0 then
+                    ok = pcall(fn, control)
+                elseif table.getn(args) == 1 then
+                    ok = pcall(fn, control, args[1])
+                else
+                    ok = pcall(fn, control, args[1], args[2])
+                end
+                calls = calls + 1
+                if not ok then failed = failed + 1 end
+            end
+        end
+        Log('fuzz ' .. label .. ': ' .. calls .. ' calls, ' .. failed .. ' errors')
+    end
+
     local function ControlTour()
         local parent = GetFrame(0)
         local made = {}
@@ -299,6 +351,7 @@ do
             local control = Try('make ' .. label, module[class], parent, a)
             if control then
                 SweepObject(label, control)
+                FuzzControl(label, control, parent)
                 table.insert(made, control)
             end
         end
