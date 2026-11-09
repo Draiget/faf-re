@@ -1095,7 +1095,13 @@ namespace
           const auto flag = [](const bool on) { return on ? "true" : "false"; };
           seats += std::string(first ? "" : ",") + "{\"uid\":" + std::to_string(seat.uid) + ",\"name\":" + faf::server::JsonString(seat.name) +
                    ",\"joined\":" + flag(seat.joined) + ",\"loaded\":" + flag(seat.loaded) + ",\"lost\":" + flag(seat.lost) +
-                   ",\"gone\":" + flag(seat.gone) + ",\"away\":" + flag(seat.away) + ",\"ping_ms\":" + std::to_string(seat.pingMs) + "}";
+                   ",\"gone\":" + flag(seat.gone) + ",\"away\":" + flag(seat.away) + ",\"ping_ms\":" + std::to_string(seat.pingMs) +
+                   ",\"load\":" + faf::server::JsonString(seat.load) + ",\"content\":" + faf::server::JsonString(seat.content) +
+                   ",\"mods\":" + faf::server::JsonString(seat.mods) + ",\"ui_mods\":[";
+          for (std::size_t i = 0; i < seat.uiMods.size(); ++i) {
+            seats += (i == 0 ? "" : ",") + faf::server::JsonString(seat.uiMods[i]);
+          }
+          seats += "]}";
           first = false;
         }
       }
@@ -1859,6 +1865,18 @@ namespace
           (void)net->RequestEject(leaving.second, "defeated (DefeatedPlayerView is disconnect)");
           return true;
         });
+      }
+      if (control && net) {
+        // Plan WP17.2, WP17.8: a seat's content or mod verdict as it is made: who differs, for the web.
+        for (const faf::server::CServerNet::SSeatState& seat : net->TakeJudged()) {
+          std::string fields = "\"uid\":" + std::to_string(seat.uid) + ",\"name\":" + faf::server::JsonString(seat.name) +
+                               ",\"content\":" + faf::server::JsonString(seat.content) + ",\"mods\":" + faf::server::JsonString(seat.mods) +
+                               ",\"ui_mods\":[";
+          for (std::size_t i = 0; i < seat.uiMods.size(); ++i) {
+            fields += (i == 0 ? "" : ",") + faf::server::JsonString(seat.uiMods[i]);
+          }
+          controlEvent("content", fields + "]");
+        }
       }
       if (control && observers && control->Connected()) {
         for (const faf::server::CObserverListener::SRequest& asked : observers->TakeRequests()) {

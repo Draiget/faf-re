@@ -143,8 +143,18 @@ namespace faf::server
       bool gone = false;
       bool away = false; // quiet in the lobby
       std::uint32_t pingMs = 0;
+      // Plan WP17.2, WP17.8: the server's verdicts on what the player's game reported ("" until judged): content
+      // "same", "differs" or "missing"; UI mods "allowed", "outside" or "missing"; and the UI mods it reported.
+      std::string content;
+      std::string mods;
+      std::vector<std::string> uiMods;
+      // Plan WP12.1: how far its game has loaded: "" before the launch, "loading", "rules" (its content report came, so
+      // the rules are loaded), "loaded" (at the start barrier).
+      std::string load;
     };
     [[nodiscard]] std::vector<SSeatState> Seats();
+    /** Plan WP17.2: each verdict made since the last call, as the seat stood then (uid, name and the verdict fields). */
+    [[nodiscard]] std::vector<SSeatState> TakeJudged();
     /**
      * Plan WP17.2: a participant out of the match (the organiser's eject, or a defeat with `DefeatedPlayerView =
      * "disconnect"`), as one who leaves is; done on the network thread. `reason` goes to the log whole. False: no such seat.
@@ -203,6 +213,8 @@ namespace faf::server
       bool modsReported = false;   // plan WP17.8: its mod report came
       std::vector<remote::SModEntry> mods;
       bool modsJudged = false;
+      std::string contentVerdict; // plan WP17.2: as SSeatState's
+      std::string modsVerdict;
       // Plan WP11.4: its client in the session, as every player's roster lists it.
       int clientIndex = -1;
       std::vector<std::uint8_t> sources;
@@ -220,6 +232,8 @@ namespace faf::server
     void JudgeContent(std::int32_t uid, SSeat& seat);
     /** Plan WP17.8: once the server's content is known and a policy is set, a seat with a mod report, or loaded without one. */
     void JudgeMods(std::int32_t uid, SSeat& seat);
+    /** The seat's verdicts so far, queued for `TakeJudged`. */
+    void NoteJudged(std::int32_t uid, const SSeat& seat);
     void Tick(std::uint64_t nowUs);
     void Remove(std::int32_t uid, SSeat& seat, const std::string& why);
     void Say(std::string line);
@@ -249,6 +263,7 @@ namespace faf::server
     std::vector<std::int32_t> mGone;          // under mNewsLock
     std::vector<std::int32_t> mReturned;      // likewise
     std::vector<SPresence> mPresence;         // likewise
+    std::vector<SSeatState> mJudged;          // plan WP17.2: each seat's verdicts as they were made (`TakeJudged`)
     std::uint64_t mBadMessages = 0;
     std::uint64_t mViewMismatches = 0;
     remote::wire::SRoster mRosterSent; // the last sent to everyone, without a local index

@@ -288,6 +288,8 @@ namespace faf::server
     }
     seat.contentJudged = true;
     const remote::EContentVerdict verdict = remote::JudgeContent(mContentExpected, seat.reported ? &seat.report : nullptr);
+    seat.contentVerdict = verdict == remote::EContentVerdict::Same ? "same" : (verdict == remote::EContentVerdict::Differs ? "differs" : "missing");
+    NoteJudged(uid, seat);
     if (verdict == remote::EContentVerdict::Same) {
       Say(seat.name + "'s game content is the server's");
       return;
@@ -313,9 +315,12 @@ namespace faf::server
     }
     seat.modsJudged = true;
     std::string what;
+    const std::vector<std::string> outside = seat.modsReported ? remote::UiModsOutside(seat.mods, *mConfig.uiModsAllowed) : std::vector<std::string>{};
+    seat.modsVerdict = !seat.modsReported ? "missing" : (outside.empty() ? "allowed" : "outside");
+    NoteJudged(uid, seat);
     if (!seat.modsReported) {
       what = "loaded without reporting its mods";
-    } else if (const std::vector<std::string> outside = remote::UiModsOutside(seat.mods, *mConfig.uiModsAllowed); !outside.empty()) {
+    } else if (!outside.empty()) {
       what = "runs UI mods the match doesn't allow:";
       for (const std::string& mod : outside) {
         what += " " + mod;
@@ -467,6 +472,14 @@ namespace faf::server
       state.lost = seat.lost;
       state.gone = seat.gone;
       state.away = seat.lobbyAway;
+      state.content = seat.contentVerdict;
+      state.load = seat.loaded ? "loaded" : (seat.reported ? "rules" : (mContentKnown && seat.joinedEver ? "loading" : ""));
+      state.mods = seat.modsVerdict;
+      for (const remote::SModEntry& mod : seat.mods) {
+        if (mod.ui) {
+          state.uiMods.push_back(mod.uid);
+        }
+      }
       if (const remote::net::ChannelStats* const stats = mLinks.StatsOf(uid); stats != nullptr && !seat.gone) {
         state.pingMs = static_cast<std::uint32_t>(stats->rttSmoothedUs / 1000u);
       }
@@ -668,6 +681,28 @@ namespace faf::server
   {
     const std::scoped_lock lock(mNewsLock);
     return std::exchange(mReturned, {});
+  }
+
+  void CServerNet::NoteJudged(const std::int32_t uid, const SSeat& seat)
+  {
+    SSeatState state;
+    state.uid = uid;
+    state.name = seat.name;
+    state.content = seat.contentVerdict;
+    state.mods = seat.modsVerdict;
+    for (const remote::SModEntry& mod : seat.mods) {
+      if (mod.ui) {
+        state.uiMods.push_back(mod.uid);
+      }
+    }
+    const std::scoped_lock lock(mNewsLock);
+    mJudged.push_back(std::move(state));
+  }
+
+  std::vector<CServerNet::SSeatState> CServerNet::TakeJudged()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    return std::exchange(mJudged, {});
   }
 
   std::vector<CServerNet::SPresence> CServerNet::TakePresence()
