@@ -1374,6 +1374,9 @@ namespace faf::editor
           }
           other.Set("adjacentTo", StringValue(joined));
         }
+        if (MarkerTypeOf(marker) == "Blank Marker") {
+          mDocument.RenameArmy(name, value);
+        }
         marker.name = value;
         std::replace(mMarkerSelection.begin(), mMarkerSelection.end(), name, value);
       } else {
@@ -1382,6 +1385,27 @@ namespace faf::editor
       mDocument.SaveDataEdited(std::move(before));
       return;
     }
+  }
+
+  void EdMapScene::ChangeExtraArmies(const std::string& armies)
+  {
+    std::vector<std::string> names;
+    std::size_t at = 0;
+    while (at < armies.size()) {
+      const std::size_t space = armies.find(' ', at);
+      const std::string word = armies.substr(at, space == std::string::npos ? std::string::npos : space - at);
+      if (!word.empty()) {
+        names.push_back(word);
+      }
+      at = space == std::string::npos ? armies.size() : space + 1;
+    }
+    if (names == mDocument.ExtraArmies()) {
+      return;
+    }
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    mDocument.SetExtraArmies(names);
+    mDocument.SaveDataEdited(std::move(before));
+    gpg::Logf("editor: extra armies %s", armies.c_str());
   }
 
   void EdMapScene::PlaceMarkers(const float x, const float z)
@@ -1406,8 +1430,23 @@ namespace faf::editor
       const float px = std::floor(centreX[c]) + 0.5f;
       const float pz = std::floor(centreZ[c]) + 0.5f;
       const float py = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(px), static_cast<std::int32_t>(pz));
-      SaveEntry marker = NewMarker(type, NextMarkerName(markers, type), px, py, pz);
+      // Names in use: the markers', and for a start position also every army the scenario lists (an extra army
+      // such as ARMY_9 has no marker but its name is taken).
+      std::vector<SaveEntry> taken = markers;
+      if (std::string(type.type) == "Blank Marker") {
+        for (const std::string& army : mDocument.Armies()) {
+          taken.push_back({army, {}});
+        }
+        for (const std::string& army : mDocument.ExtraArmies()) {
+          taken.push_back({army, {}});
+        }
+      }
+      SaveEntry marker = NewMarker(type, NextMarkerName(taken, type), px, py, pz);
       mMarkerSelection.push_back(marker.name);
+      // A start position is an army: the scenario's list and the save's Armies get it.
+      if (std::string(type.type) == "Blank Marker") {
+        mDocument.AddArmy(marker.name);
+      }
       markers.push_back(std::move(marker));
     }
     if (!mMarkerSelection.empty()) {
@@ -1424,6 +1463,12 @@ namespace faf::editor
     EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
     std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
     const std::size_t count = markers.size();
+    for (const SaveEntry& marker : markers) {
+      if (MarkerTypeOf(marker) == "Blank Marker" &&
+          std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end()) {
+        mDocument.RemoveArmy(marker.name);
+      }
+    }
     markers.erase(std::remove_if(markers.begin(), markers.end(),
                                  [&](const SaveEntry& marker) {
                                    return std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end();

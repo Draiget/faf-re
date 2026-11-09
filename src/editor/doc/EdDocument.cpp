@@ -42,6 +42,7 @@ namespace faf::editor
     MapFileRecords records;
     SaveFile save;
     std::string script;
+    std::string scenario;
     /** CreateNew: what to make and where; the scenario's game path once made. */
     bool create = false;
     NewMapSettings settings;
@@ -301,6 +302,7 @@ namespace faf::editor
       if (!facts.scriptPath.empty()) {
         (void)ReadGameFile(facts.scriptPath, load.script);
       }
+      (void)ReadGameFile(load.scenarioPath, load.scenario);
       if (!facts.savePath.empty()) {
         const LuaPlus::LuaObject save = RunInTable(state, facts.savePath);
         if (save.IsTable() && save["Scenario"].IsTable()) {
@@ -412,9 +414,70 @@ namespace faf::editor
     mModified = true;
   }
 
+  void EdDocument::SetExtraArmies(const std::vector<std::string>& armies)
+  {
+    mScenario = WithScenarioExtraArmies(mScenario, armies);
+    for (const std::string& army : armies) {
+      bool known = false;
+      for (const SaveEntry& entry : mSave.Armies()) {
+        known = known || entry.name == army;
+      }
+      if (!known) {
+        mSave.Armies().push_back(NewArmyEntry(army));
+      }
+    }
+    mModified = true;
+  }
+
+  void EdDocument::AddArmy(const std::string& name)
+  {
+    std::vector<std::string> armies = Armies();
+    if (std::find(armies.begin(), armies.end(), name) == armies.end()) {
+      armies.push_back(name);
+      mScenario = WithScenarioArmies(mScenario, armies);
+    }
+    bool known = false;
+    for (const SaveEntry& entry : mSave.Armies()) {
+      known = known || entry.name == name;
+    }
+    if (!known) {
+      mSave.Armies().push_back(NewArmyEntry(name));
+    }
+    mFacts.armies = Armies();
+    mModified = true;
+  }
+
+  void EdDocument::RemoveArmy(const std::string& name)
+  {
+    std::vector<std::string> armies = Armies();
+    armies.erase(std::remove(armies.begin(), armies.end(), name), armies.end());
+    mScenario = WithScenarioArmies(mScenario, armies);
+    const std::vector<std::string> extra = ExtraArmies();
+    if (std::find(extra.begin(), extra.end(), name) == extra.end()) {
+      auto& entries = mSave.Armies();
+      entries.erase(std::remove_if(entries.begin(), entries.end(), [&](const SaveEntry& entry) { return entry.name == name; }), entries.end());
+    }
+    mFacts.armies = Armies();
+    mModified = true;
+  }
+
+  void EdDocument::RenameArmy(const std::string& from, const std::string& to)
+  {
+    std::vector<std::string> armies = Armies();
+    std::replace(armies.begin(), armies.end(), from, to);
+    mScenario = WithScenarioArmies(mScenario, armies);
+    for (SaveEntry& entry : mSave.Armies()) {
+      if (entry.name == from) {
+        entry.name = to;
+      }
+    }
+    mFacts.armies = Armies();
+    mModified = true;
+  }
+
   EdDocument::SaveSnapshot EdDocument::SaveDataNow() const
   {
-    return {mSave.Markers(), mSave.Areas(), mScript};
+    return {mSave.Markers(), mSave.Areas(), mScript, mSave.Armies(), mScenario};
   }
 
   void EdDocument::RestoreSaveData(const SaveSnapshot& snapshot)
@@ -422,6 +485,9 @@ namespace faf::editor
     mSave.Markers() = snapshot.markers;
     mSave.Areas() = snapshot.areas;
     mScript = snapshot.script;
+    mSave.Armies() = snapshot.armies;
+    mScenario = snapshot.scenario;
+    mFacts.armies = Armies();
     mModified = true;
   }
 
@@ -455,6 +521,12 @@ namespace faf::editor
         return false;
       }
       mScriptRead = mScript;
+    }
+    if (mScenario != mScenarioRead && !mFacts.scenarioPath.empty()) {
+      if (!write(mFacts.scenarioPath, mScenario)) {
+        return false;
+      }
+      mScenarioRead = mScenario;
     }
     return true;
   }
@@ -605,6 +677,8 @@ namespace faf::editor
     mSave = std::move(load->save);
     mScript = std::move(load->script);
     mScriptRead = mScript;
+    mScenario = std::move(load->scenario);
+    mScenarioRead = mScenario;
     // The markers the save's text gives, against those its Lua gave (every map should agree).
     if (mSave.Loaded() && static_cast<int>(mSave.Markers().size()) != load->facts.markerCount) {
       gpg::Warnf("editor: %s: %zu markers in the save's text, %d in its Lua", load->facts.savePath.c_str(), mSave.Markers().size(),
@@ -785,6 +859,8 @@ namespace faf::editor
         bytes = mSave.Text(); // the edited markers and areas
       } else if (Lower(source) == Lower(mFacts.scriptPath) && mScript != mScriptRead) {
         bytes = mScript; // the edited script (its playable area)
+      } else if (Lower(source) == Lower(mFacts.scenarioPath) && mScenario != mScenarioRead) {
+        bytes = mScenario; // the edited army list (its paths are moved below, as the copy's)
       } else if (!ReadGameFile(source, bytes)) {
         message = "Can't read " + source;
         return false;
@@ -817,6 +893,7 @@ namespace faf::editor
     // From now on the map's files are the new folder's: a later Save writes there, under the new names.
     mSave.MarkSaved();
     mScriptRead = mScript;
+    mScenarioRead = mScenario;
     for (std::string* const path : {&mFacts.mapPath, &mFacts.savePath, &mFacts.scriptPath, &mFacts.scenarioPath}) {
       *path = ReplaceNoCase(ReplaceNoCase(*path, oldPrefix + oldBase, newPrefix + newBase), oldPrefix, newPrefix);
     }
@@ -910,6 +987,8 @@ namespace faf::editor
     mSave = {};
     mScript.clear();
     mScriptRead.clear();
+    mScenario.clear();
+    mScenarioRead.clear();
     mSaveUndo.clear();
     mSaveRedo.clear();
     mFileRecords = {};

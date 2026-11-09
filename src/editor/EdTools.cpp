@@ -915,6 +915,32 @@ namespace faf::editor
         field(key, value);
       }
     }
+
+    SectionHeader("ARMIES");
+    {
+      std::string list;
+      for (const std::string& army : mArmies) {
+        list += (list.empty() ? "" : ", ") + army;
+      }
+      ImGui::TextWrapped("%zu players: %s", mArmies.size(), list.empty() ? "(none)" : list.c_str());
+      if (!mExtraEditing) {
+        std::string extra;
+        for (const std::string& army : mExtraArmies) {
+          extra += (extra.empty() ? "" : " ") + army;
+        }
+        (void)std::snprintf(mExtraBuffer, sizeof(mExtraBuffer), "%s", extra.c_str());
+      }
+      ImGui::TextDisabled("Extra armies");
+      ImGui::SetNextItemWidth(-1.0f);
+      if (ImGui::InputText("##extra", mExtraBuffer, sizeof(mExtraBuffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
+        mExtraChanged = true;
+        mExtraEditing = false;
+      } else {
+        mExtraEditing = ImGui::IsItemActive();
+      }
+      Note("Placing a start position adds its army (ARMY_n) to the scenario's team list and to _save.lua's armies; deleting or "
+           "renaming it follows. Extra armies (ARMY_17, NEUTRAL_CIVILIAN...) hold the map's neutral and civilian units.");
+    }
     DrawPlayableArea();
   }
 } // namespace faf::editor

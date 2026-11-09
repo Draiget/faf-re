@@ -87,6 +87,8 @@ namespace faf::editor
     [[nodiscard]] std::vector<SaveEntry> SelectedMarkers() const;
     /** Changes a property of a marker ("name" renames it), as one undo step. */
     void EditMarker(const std::string& marker, const std::string& key, const std::string& value);
+    /** Sets the scenario's extra armies (names split on spaces), as one undo step. */
+    void ChangeExtraArmies(const std::string& armies);
     /** Places markers of the Markers tool's type at (x, z) and its symmetric copies, as one undo step. */
     void PlaceMarkers(float x, float z);
 

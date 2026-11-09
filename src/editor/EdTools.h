@@ -80,6 +80,22 @@ namespace faf::editor
       value = std::exchange(mMarkerEditValue, {});
       return true;
     }
+    /** The scenario's armies and extra armies, for the panel; an extra-armies change it asks for. */
+    void SetArmies(std::vector<std::string> armies, std::vector<std::string> extra)
+    {
+      mArmies = std::move(armies);
+      mExtraArmies = std::move(extra);
+    }
+    [[nodiscard]] bool TakeExtraArmiesChange(std::string& extra)
+    {
+      if (!mExtraChanged) {
+        return false;
+      }
+      mExtraChanged = false;
+      extra = mExtraBuffer;
+      return true;
+    }
+
     /** Test runs (`/markertool`): the Markers tool placing this type. */
     void SetMarkerTool(const std::string& type) noexcept
     {
@@ -372,6 +388,11 @@ namespace faf::editor
     char mPropFilter[64]{};
     int mSelectionCount = 0;
     std::vector<SaveEntry> mMarkerSelection;
+    std::vector<std::string> mArmies;
+    std::vector<std::string> mExtraArmies;
+    char mExtraBuffer[256]{};
+    bool mExtraEditing = false;
+    bool mExtraChanged = false;
     std::string mMarkerEditName;
     std::string mMarkerEditKey;
     std::string mMarkerEditValue;

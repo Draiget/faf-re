@@ -858,6 +858,10 @@ namespace faf::editor
         }
         tools.SetLayerSlots(mScene.LayerSlots());
         tools.SetMarkerSelection(mScene.SelectedMarkers());
+        tools.SetArmies(mDocument.Armies(), mDocument.ExtraArmies());
+        if (std::string extra; tools.TakeExtraArmiesChange(extra)) {
+          mScene.ChangeExtraArmies(extra);
+        }
         if (std::string marker, key, value; tools.TakeMarkerEdit(marker, key, value)) {
           mScene.EditMarker(marker, key, value);
         }

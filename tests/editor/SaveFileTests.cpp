@@ -54,7 +54,33 @@ Scenario = {
             },
         },
     },
-    Armies = {
+    Armies =
+    {
+        --[[  Army  ]]--
+        ['ARMY_1'] =
+        {
+            personality = '',
+            plans = '',
+            color = 0,
+            faction = 0,
+            Economy = {
+                mass = 0,
+                energy = 0,
+            },
+            Alliances = {
+            },
+            ['Units'] = GROUP {
+                orders = '',
+                platoon = '',
+                Units = {
+                },
+            },
+            PlatoonBuilders = {
+                next_platoon_builder_id = '0',
+                Builders = {
+                },
+            },
+        },
     },
 }
 )";
@@ -113,6 +139,41 @@ Scenario = {
     SaveFile again;
     ASSERT_TRUE(again.Parse(text, error)) << error;
     EXPECT_EQ(again.Markers(), save.Markers());
+  }
+
+  TEST(SaveFile, ArmiesAreParsedAndAdded)
+  {
+    SaveFile save;
+    std::string error;
+    ASSERT_TRUE(save.Parse(kSave, error)) << error;
+    ASSERT_EQ(save.Armies().size(), 1u);
+    EXPECT_EQ(save.Armies()[0].name, "ARMY_1");
+    EXPECT_EQ(save.Armies()[0].Get("plans"), "''");
+    EXPECT_EQ(save.Text(), kSave);
+    save.Armies().push_back(faf::editor::NewArmyEntry("ARMY_2"));
+    SaveFile again;
+    ASSERT_TRUE(again.Parse(save.Text(), error)) << error;
+    ASSERT_EQ(again.Armies().size(), 2u);
+    EXPECT_EQ(again.Armies()[1].name, "ARMY_2");
+    EXPECT_EQ(again.Markers(), save.Markers());
+  }
+
+  TEST(SaveFile, ScenarioArmiesAreReadAndWritten)
+  {
+    const std::string scenario = "Configurations = {\n ['standard'] = {\n teams = {\n { name = 'FFA', armies = {'ARMY_1','ARMY_2',} },\n },\n"
+                                 " customprops = {\n ['ExtraArmies'] = STRING( 'ARMY_9 NEUTRAL_CIVILIAN' ),\n },\n },\n}\n";
+    const std::vector<std::string> armies = faf::editor::ScenarioArmies(scenario);
+    ASSERT_EQ(armies.size(), 2u);
+    EXPECT_EQ(armies[1], "ARMY_2");
+    const std::string more = faf::editor::WithScenarioArmies(scenario, {"ARMY_1", "ARMY_2", "ARMY_3"});
+    EXPECT_EQ(faf::editor::ScenarioArmies(more).size(), 3u);
+    EXPECT_NE(more.find("name = 'FFA'"), std::string::npos);
+    const std::vector<std::string> extra = faf::editor::ScenarioExtraArmies(scenario);
+    ASSERT_EQ(extra.size(), 2u);
+    EXPECT_EQ(extra[1], "NEUTRAL_CIVILIAN");
+    const std::string fewer = faf::editor::WithScenarioExtraArmies(more, {"NEUTRAL_CIVILIAN"});
+    ASSERT_EQ(faf::editor::ScenarioExtraArmies(fewer).size(), 1u);
+    EXPECT_EQ(faf::editor::ScenarioArmies(fewer).size(), 3u);
   }
 
   TEST(SaveFile, ScriptPlayableAreaIsSetAndRemoved)

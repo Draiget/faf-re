@@ -173,6 +173,15 @@ namespace faf::editor
     /** The map's `_save.lua` (markers, areas) and `_script.lua` as the editor keeps them. */
     [[nodiscard]] SaveFile& SaveData() noexcept { return mSave; }
     [[nodiscard]] std::string& Script() noexcept { return mScript; }
+    [[nodiscard]] const std::string& Scenario() const noexcept { return mScenario; }
+    /** The armies of the scenario's team list, in order, and its extra armies. */
+    [[nodiscard]] std::vector<std::string> Armies() const { return ScenarioArmies(mScenario); }
+    [[nodiscard]] std::vector<std::string> ExtraArmies() const { return ScenarioExtraArmies(mScenario); }
+    void SetExtraArmies(const std::vector<std::string>& armies);
+    /** An army added to the scenario's list and to `_save.lua`'s Armies (when it isn't there), removed, renamed. */
+    void AddArmy(const std::string& name);
+    void RemoveArmy(const std::string& name);
+    void RenameArmy(const std::string& from, const std::string& to);
     /** A playable area: the rectangle FAF's SetPlayableArea makes of it (each edge down to a multiple of 4). */
     struct PlayableRect
     {
@@ -192,6 +201,8 @@ namespace faf::editor
       std::vector<SaveEntry> markers;
       std::vector<SaveEntry> areas;
       std::string script;
+      std::vector<SaveEntry> armies;
+      std::string scenario;
     };
     [[nodiscard]] SaveSnapshot SaveDataNow() const;
     void RestoreSaveData(const SaveSnapshot& snapshot);
@@ -269,6 +280,8 @@ namespace faf::editor
     SaveFile mSave;
     std::string mScript;
     std::string mScriptRead;
+    std::string mScenario;
+    std::string mScenarioRead;
     std::vector<std::pair<SaveSnapshot, SaveSnapshot>> mSaveUndo;
     std::vector<std::pair<SaveSnapshot, SaveSnapshot>> mSaveRedo;
     /** Writes `_save.lua` and `_script.lua` beside the map file when they changed (Save). */

@@ -321,8 +321,10 @@ namespace faf::editor
     mText = std::move(text);
     mMarkerBlock = {};
     mAreaBlock = {};
+    mArmyBlock = {};
     mMarkers.clear();
     mAreas.clear();
+    mArmies.clear();
     // The master chain's markers (the chains below it list marker names in `Markers = {` blocks of their own).
     const std::size_t chain = mText.find("_MASTERCHAIN_");
     if (chain != std::string::npos &&
@@ -340,8 +342,16 @@ namespace faf::editor
         return false;
       }
     }
+    if (FindBlock(mText, std::regex(R"(\bArmies\s*=\s*\{)"), 0, mArmyBlock.open, mArmyBlock.close, mArmyBlock.indent)) {
+      mArmyBlock.found = true;
+      if (!ParseEntries(mText, mArmyBlock.open, mArmyBlock.close, mArmies, error)) {
+        error = "armies: " + error;
+        return false;
+      }
+    }
     mMarkersRead = mMarkers;
     mAreasRead = mAreas;
+    mArmiesRead = mArmies;
     return true;
   }
 
@@ -353,7 +363,7 @@ namespace faf::editor
 
   bool SaveFile::Changed() const
   {
-    return mMarkers != mMarkersRead || mAreas != mAreasRead;
+    return mMarkers != mMarkersRead || mAreas != mAreasRead || mArmies != mArmiesRead;
   }
 
   std::string SaveFile::Text() const
@@ -371,12 +381,88 @@ namespace faf::editor
     if (mAreaBlock.found && mAreas != mAreasRead) {
       replaces.push_back({&mAreaBlock, FormatEntries(mAreas, mAreaBlock.indent)});
     }
+    if (mArmyBlock.found && mArmies != mArmiesRead) {
+      replaces.push_back({&mArmyBlock, FormatEntries(mArmies, mArmyBlock.indent)});
+    }
     std::sort(replaces.begin(), replaces.end(), [](const Replace& a, const Replace& b) { return a.block->open > b.block->open; });
     std::string out = mText;
     for (const Replace& replace : replaces) {
       out.replace(replace.block->open + 1, replace.block->close - replace.block->open - 1, replace.text);
     }
     return out;
+  }
+
+  SaveEntry NewArmyEntry(const std::string& name)
+  {
+    SaveEntry army;
+    army.name = name;
+    army.properties = {
+      {"personality", "''"},
+      {"plans", "''"},
+      {"color", "0"},
+      {"faction", "0"},
+      {"Economy", "{\n                mass = 0,\n                energy = 0,\n            }"},
+      {"Alliances", "{\n            }"},
+      {"Units", "GROUP {\n                orders = '',\n                platoon = '',\n                Units = {\n                    ['INITIAL'] = GROUP {\n"
+                "                        orders = '',\n                        platoon = '',\n                        Units = {\n                        },\n"
+                "                    },\n                },\n            }"},
+      {"PlatoonBuilders", "{\n                next_platoon_builder_id = '0',\n                Builders = {\n                },\n            }"},
+    };
+    return army;
+  }
+
+  std::vector<std::string> ScenarioArmies(const std::string& scenario)
+  {
+    std::vector<std::string> armies;
+    std::smatch match;
+    if (!std::regex_search(scenario, match, std::regex(R"(armies\s*=\s*\{([^}]*)\})"))) {
+      return armies;
+    }
+    const std::string list = match[1].str();
+    const std::regex name(R"(['"]([^'"]+)['"])");
+    for (auto it = std::sregex_iterator(list.begin(), list.end(), name); it != std::sregex_iterator(); ++it) {
+      armies.push_back((*it)[1].str());
+    }
+    return armies;
+  }
+
+  std::string WithScenarioArmies(const std::string& scenario, const std::vector<std::string>& armies)
+  {
+    std::string list;
+    for (const std::string& army : armies) {
+      list += Quote(army) + ",";
+    }
+    return std::regex_replace(scenario, std::regex(R"(armies\s*=\s*\{[^}]*\})"), "armies = {" + list + "}",
+                              std::regex_constants::format_first_only);
+  }
+
+  std::vector<std::string> ScenarioExtraArmies(const std::string& scenario)
+  {
+    std::vector<std::string> armies;
+    std::smatch match;
+    if (std::regex_search(scenario, match, std::regex(R"(\['ExtraArmies'\]\s*=\s*STRING\(\s*'([^']*)'\s*\))"))) {
+      const std::string list = match[1].str();
+      std::size_t at = 0;
+      while (at < list.size()) {
+        const std::size_t space = list.find(' ', at);
+        const std::string word = list.substr(at, space == std::string::npos ? std::string::npos : space - at);
+        if (!word.empty()) {
+          armies.push_back(word);
+        }
+        at = space == std::string::npos ? list.size() : space + 1;
+      }
+    }
+    return armies;
+  }
+
+  std::string WithScenarioExtraArmies(const std::string& scenario, const std::vector<std::string>& armies)
+  {
+    std::string list;
+    for (const std::string& army : armies) {
+      list += (list.empty() ? "" : " ") + army;
+    }
+    return std::regex_replace(scenario, std::regex(R"(\['ExtraArmies'\]\s*=\s*STRING\(\s*'[^']*'\s*\))"),
+                              "['ExtraArmies'] = STRING( '" + list + "' )", std::regex_constants::format_first_only);
   }
 
   std::optional<std::string> ScriptPlayableArea(const std::string& script)

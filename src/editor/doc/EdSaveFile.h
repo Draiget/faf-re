@@ -46,8 +46,10 @@ namespace faf::editor
 
     [[nodiscard]] std::vector<SaveEntry>& Markers() noexcept { return mMarkers; }
     [[nodiscard]] std::vector<SaveEntry>& Areas() noexcept { return mAreas; }
+    [[nodiscard]] std::vector<SaveEntry>& Armies() noexcept { return mArmies; }
     [[nodiscard]] const std::vector<SaveEntry>& Markers() const noexcept { return mMarkers; }
     [[nodiscard]] const std::vector<SaveEntry>& Areas() const noexcept { return mAreas; }
+    [[nodiscard]] const std::vector<SaveEntry>& Armies() const noexcept { return mArmies; }
 
     /** The file's text with the current markers and areas. */
     [[nodiscard]] std::string Text() const;
@@ -68,11 +70,25 @@ namespace faf::editor
     std::string mText;
     Block mMarkerBlock;
     Block mAreaBlock;
+    Block mArmyBlock;
+    std::vector<SaveEntry> mArmies;
+    std::vector<SaveEntry> mArmiesRead;
     std::vector<SaveEntry> mMarkers;
     std::vector<SaveEntry> mAreas;
     std::vector<SaveEntry> mMarkersRead;
     std::vector<SaveEntry> mAreasRead;
   };
+
+  /** A new army's entry for `_save.lua`'s Armies, as the game's saves write one (no units, no plans). */
+  SaveEntry NewArmyEntry(const std::string& name);
+
+  /** The armies of a `_scenario.lua`'s first team (`armies = {'ARMY_1', ...}`), in order. */
+  std::vector<std::string> ScenarioArmies(const std::string& scenario);
+  /** The scenario with its first team's armies replaced. */
+  std::string WithScenarioArmies(const std::string& scenario, const std::vector<std::string>& armies);
+  /** The scenario's extra armies (`customprops`' `ExtraArmies`, names split on spaces). */
+  std::vector<std::string> ScenarioExtraArmies(const std::string& scenario);
+  std::string WithScenarioExtraArmies(const std::string& scenario, const std::vector<std::string>& armies);
 
   /**
    * The playable area a map's `_script.lua` sets (`ScenarioFramework.SetPlayableArea('AREA_1', ...)`, FAF's
