@@ -193,6 +193,7 @@ namespace gpg::gal
       RenderState state;
       VkDescriptorSet textures = VK_NULL_HANDLE;
       VkDescriptorSet constants = VK_NULL_HANDLE;
+      std::uint32_t constantsOffset = 0;          // ren_VulkanDynamicConstants: the bind offset in `constants`
       const std::uint8_t* constantsCpu = nullptr; // the same snapshot, CPU side (upload memory)
       std::uint32_t constantsBytes = 0;
       std::uint64_t constantsSerial = 0;          // the submission whose upload memory holds it
@@ -235,6 +236,14 @@ namespace gpg::gal
       std::vector<VkSemaphore> acquire; // one per swap chain
       std::vector<VkDescriptorPool> gpuPools; // GPU-driven sets (GpuDrivenVulkan.cpp)
       std::uint32_t gpuPool = 0;
+      /// ren_VulkanDynamicConstants: one dynamic constant set per (upload buffer, range), from this frame's pools.
+      struct ConstantSetEntry
+      {
+        VkBuffer buffer = VK_NULL_HANDLE;
+        VkDeviceSize range = 0;
+        VkDescriptorSet set = VK_NULL_HANDLE;
+      };
+      std::vector<ConstantSetEntry> constantSets;
     };
 
     struct Garbage
@@ -285,7 +294,14 @@ namespace gpg::gal
     [[nodiscard]] VkDescriptorSet AllocateSet(VkDescriptorSetLayout layout);
     [[nodiscard]] VkDeviceSize ConstantAlignment() const noexcept;
     /** A set 1 ($Globals) descriptor set reading `bytes` of `upload`. */
-    [[nodiscard]] VkDescriptorSet ConstantSet(const vulkan::UploadAllocation& upload, VkDeviceSize bytes);
+    /** A set for $Globals in `upload`; with dynamic constants `offset` is the bind offset, otherwise 0. */
+    [[nodiscard]] VkDescriptorSet ConstantSet(const vulkan::UploadAllocation& upload, VkDeviceSize bytes, std::uint32_t& offset);
+    /** Binds set 1 (the pass's $Globals) with the layout and offset of the frame's constant mode. */
+    void BindConstantSet(VkDescriptorSet set, std::uint32_t offset);
+    [[nodiscard]] VkPipelineLayout EffectPipelineLayout() const noexcept
+    {
+      return mDynamicConstants ? mDynamicPipelineLayout : mPipelineLayout;
+    }
     /**
      * Copies the bound pass's constant snapshot into the submission now being
      * recorded; called after a submission, before CollectCompleted can hand
@@ -348,6 +364,10 @@ namespace gpg::gal
     VkDescriptorSetLayout mTextureLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout mConstantLayout = VK_NULL_HANDLE;
     VkPipelineLayout mPipelineLayout = VK_NULL_HANDLE;
+    // Engine addition (ren_VulkanDynamicConstants): set 1 as a dynamic uniform buffer, bound with an offset.
+    VkDescriptorSetLayout mDynamicConstantLayout = VK_NULL_HANDLE;
+    VkPipelineLayout mDynamicPipelineLayout = VK_NULL_HANDLE;
+    bool mDynamicConstants = false; ///< latched from gVulkanDynamicConstants between frames
     VkPipelineCache mPipelineCache = VK_NULL_HANDLE;
     vulkan::TrackedImage mNullImages[3];   // 2D, cube, 3D
     VkImageView mNullViews[3]{};
@@ -374,6 +394,7 @@ namespace gpg::gal
       VkFormat colorFormat;
       VkFormat depthFormat;
       VkPrimitiveTopology topology;
+      VkPipelineLayout layout;
     };
     PipelineMemo<PipelineInputs, VkPipeline> mPipelineMemo;
 

@@ -264,6 +264,7 @@ namespace gpg::gal
     std::uint64_t constantsSerial = 0;
     std::uint64_t constantsFrame = ~0ULL;
     VkDescriptorSet constants = VK_NULL_HANDLE;
+    std::uint32_t constantsOffset = 0; // ren_VulkanDynamicConstants
     const std::uint8_t* constantsCpu = nullptr;
 
     std::uint64_t tableFrame = ~0ULL;
@@ -367,6 +368,12 @@ namespace gpg::gal
       }
       if (mConstantLayout != VK_NULL_HANDLE) {
         Vk().vkDestroyDescriptorSetLayout(mDevice, mConstantLayout, nullptr);
+      }
+      if (mDynamicPipelineLayout != VK_NULL_HANDLE) {
+        Vk().vkDestroyPipelineLayout(mDevice, mDynamicPipelineLayout, nullptr);
+      }
+      if (mDynamicConstantLayout != VK_NULL_HANDLE) {
+        Vk().vkDestroyDescriptorSetLayout(mDevice, mDynamicConstantLayout, nullptr);
       }
       if (mTimeline != VK_NULL_HANDLE) {
         Vk().vkDestroySemaphore(mDevice, mTimeline, nullptr);
@@ -666,6 +673,15 @@ namespace gpg::gal
     pipeline.setLayoutCount = 2U;
     pipeline.pSetLayouts = sets;
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreatePipelineLayout(mDevice, &pipeline, nullptr, &mPipelineLayout));
+
+    // Engine addition (ren_VulkanDynamicConstants): the same with $Globals as a dynamic uniform buffer, so a draw
+    // whose constants changed binds the page's one set with an offset instead of allocating and writing a set.
+    constants.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mDynamicConstantLayout));
+    const VkDescriptorSetLayout dynamicSets[2] = {mTextureLayout, mDynamicConstantLayout};
+    pipeline.pSetLayouts = dynamicSets;
+    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreatePipelineLayout(mDevice, &pipeline, nullptr, &mDynamicPipelineLayout));
+    mDynamicConstants = gVulkanDynamicConstants;
 
     VkPipelineCacheCreateInfo cache{};
     cache.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
@@ -1239,6 +1255,10 @@ namespace gpg::gal
     }
     if (wait) {
       WaitForSerial(serial);
+    }
+    // ren_VulkanDynamicConstants changes only between frames, before the carried pass takes its set.
+    if (present) {
+      mDynamicConstants = gVulkanDynamicConstants;
     }
     // A submission in the middle of a pass (an upload between BeginPass and
     // the draw) leaves the pass's draws for the next command buffer.
@@ -2398,6 +2418,7 @@ namespace gpg::gal
       Vk().vkResetDescriptorPool(mDevice, pool, 0U);
     }
     frame.descriptorPool = 0U;
+    frame.constantSets.clear(); // their sets came from the pools just reset
     for (VkDescriptorPool pool : frame.gpuPools) {
       Vk().vkResetDescriptorPool(mDevice, pool, 0U);
     }
@@ -2640,15 +2661,16 @@ namespace gpg::gal
     Frame& frame = mFrames[mFrameIndex];
     for (;;) {
       if (frame.descriptorPool == frame.descriptorPools.size()) {
-        const VkDescriptorPoolSize sizes[3] = {
+        const VkDescriptorPoolSize sizes[4] = {
           {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4096U},
           {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 4096U * 8U},
           {VK_DESCRIPTOR_TYPE_SAMPLER, 4096U * 8U},
+          {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256U}, // ren_VulkanDynamicConstants
         };
         VkDescriptorPoolCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         info.maxSets = 4096U;
-        info.poolSizeCount = 3U;
+        info.poolSizeCount = 4U;
         info.pPoolSizes = sizes;
         VkDescriptorPool pool = VK_NULL_HANDLE;
         CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorPool(mDevice, &info, nullptr, &pool));
@@ -2676,19 +2698,42 @@ namespace gpg::gal
     return std::max<VkDeviceSize>(mProperties.limits.minUniformBufferOffsetAlignment, 16U);
   }
 
-  VkDescriptorSet DeviceVulkan::ConstantSet(const vulkan::UploadAllocation& upload, const VkDeviceSize bytes)
+  VkDescriptorSet DeviceVulkan::ConstantSet(
+    const vulkan::UploadAllocation& upload, const VkDeviceSize bytes, std::uint32_t& offset
+  )
   {
-    const VkDescriptorSet set = AllocateSet(mConstantLayout);
-    VkDescriptorBufferInfo buffer{upload.buffer, upload.offset, bytes};
+    offset = 0U;
+    Frame& frame = mFrames[mFrameIndex];
+    if (mDynamicConstants) {
+      // Engine change (ren_VulkanDynamicConstants): one set per upload buffer and range for the frame.
+      offset = static_cast<std::uint32_t>(upload.offset);
+      for (const Frame::ConstantSetEntry& entry : frame.constantSets) {
+        if (entry.buffer == upload.buffer && entry.range == bytes) {
+          return entry.set;
+        }
+      }
+    }
+    const VkDescriptorSet set = AllocateSet(mDynamicConstants ? mDynamicConstantLayout : mConstantLayout);
+    VkDescriptorBufferInfo buffer{upload.buffer, mDynamicConstants ? 0U : upload.offset, bytes};
     VkWriteDescriptorSet write{};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write.dstSet = set;
     write.dstBinding = 0U;
     write.descriptorCount = 1U;
-    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    write.descriptorType = mDynamicConstants ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     write.pBufferInfo = &buffer;
     Vk().vkUpdateDescriptorSets(mDevice, 1U, &write, 0U, nullptr);
+    if (mDynamicConstants) {
+      frame.constantSets.push_back({upload.buffer, bytes, set});
+    }
     return set;
+  }
+
+  void DeviceVulkan::BindConstantSet(const VkDescriptorSet set, const std::uint32_t offset)
+  {
+    Vk().vkCmdBindDescriptorSets(
+      mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, EffectPipelineLayout(), 1U, 1U, &set, mDynamicConstants ? 1U : 0U, &offset
+    );
   }
 
   void DeviceVulkan::CarryBoundPass()
@@ -2703,7 +2748,7 @@ namespace gpg::gal
     }
     const vulkan::UploadAllocation upload = mUpload.Allocate(mPass.constantsBytes, ConstantAlignment(), RecordingSerial());
     std::memcpy(upload.cpu, mPass.constantsCpu, mPass.constantsBytes);
-    mPass.constants = ConstantSet(upload, mPass.constantsBytes);
+    mPass.constants = ConstantSet(upload, mPass.constantsBytes, mPass.constantsOffset);
     mPass.constantsCpu = upload.cpu;
     mPass.constantsSerial = RecordingSerial();
   }
@@ -2783,13 +2828,14 @@ namespace gpg::gal
           state.constantsSerial != RecordingSerial() || state.constantsFrame != mFrameCount) {
         const vulkan::UploadAllocation upload = AllocateUpload(constants.size(), ConstantAlignment());
         std::memcpy(upload.cpu, constants.data(), constants.size());
-        state.constants = ConstantSet(upload, constants.size());
+        state.constants = ConstantSet(upload, constants.size(), state.constantsOffset);
         state.constantsCpu = upload.cpu;
         state.constantsVersion = parameters.Version();
         state.constantsSerial = RecordingSerial();
         state.constantsFrame = mFrameCount;
       }
       bound.constants = state.constants;
+      bound.constantsOffset = state.constantsOffset;
       bound.constantsCpu = state.constantsCpu;
       bound.constantsBytes = static_cast<std::uint32_t>(constants.size());
       bound.constantsSerial = state.constantsSerial;
@@ -2984,6 +3030,7 @@ namespace gpg::gal
     inputs.colorFormat = colorFormat;
     inputs.depthFormat = depthFormat;
     inputs.topology = topology;
+    inputs.layout = EffectPipelineLayout();
     if (gPipelineMemo) {
       const VkPipeline known = mPipelineMemo.Find(inputs);
       if (known != VK_NULL_HANDLE) {
@@ -2995,6 +3042,7 @@ namespace gpg::gal
     key.Add(pass.vertexShader->key);
     key.Add((pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL);
     key.Add(mBoundFormat);
+    key.Add(static_cast<std::uint32_t>(mDynamicConstants ? 1U : 0U)); // the pipeline layout (ren_VulkanDynamicConstants)
     for (std::uint32_t slot = 0U; slot < 16U; ++slot) {
       key.Add(mStreams[slot].stride);
     }
@@ -3212,7 +3260,7 @@ namespace gpg::gal
     info.pDepthStencilState = &depthStencil;
     info.pColorBlendState = &colorBlend;
     info.pDynamicState = &dynamic;
-    info.layout = mPipelineLayout;
+    info.layout = EffectPipelineLayout();
     VkPipeline pipeline = VK_NULL_HANDLE;
     const VkResult result = Vk().vkCreateGraphicsPipelines(mDevice, mPipelineCache, 1U, &info, nullptr, &pipeline);
     if (result != VK_SUCCESS) {
@@ -3304,9 +3352,11 @@ namespace gpg::gal
     BeginRendering();
 
     Vk().vkCmdBindPipeline(mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-    Vk().vkCmdBindDescriptorSets(mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0U, 1U, &mPass.textures, 0U, nullptr);
+    Vk().vkCmdBindDescriptorSets(
+      mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, EffectPipelineLayout(), 0U, 1U, &mPass.textures, 0U, nullptr
+    );
     if (mPass.constants != VK_NULL_HANDLE) {
-      Vk().vkCmdBindDescriptorSets(mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 1U, 1U, &mPass.constants, 0U, nullptr);
+      BindConstantSet(mPass.constants, mPass.constantsOffset);
     }
     Vk().vkCmdBindVertexBuffers(mCommands, 0U, 16U, vertexBuffers, vertexOffsets);
     if (indexed) {

@@ -66,6 +66,14 @@ namespace moho
       &gpg::gal::gUsedTextureTable
     );
 
+    /** Engine addition: `ren_VulkanDynamicConstants` (see gpg/gal/backends/common/PipelineMemo.h). */
+    TConVar<bool> gTConVar_ren_VulkanDynamicConstants(
+      "ren_VulkanDynamicConstants",
+      "Vulkan: a draw whose shader constants changed binds one set per upload buffer with its constants' offset (1, the "
+      "default), or allocates and writes a new set (0). Read between frames.",
+      &gpg::gal::gVulkanDynamicConstants
+    );
+
     /** Engine addition: `ren_LockedRangeOnly` (see gpg/gal/PlacedResources.h). */
     TConVar<bool> gTConVar_ren_LockedRangeOnly(
       "ren_LockedRangeOnly",
