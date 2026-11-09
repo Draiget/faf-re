@@ -1136,6 +1136,7 @@ namespace
                    ",\"gone\":" + flag(seat.gone) + ",\"away\":" + flag(seat.away) + ",\"ping_ms\":" + std::to_string(seat.pingMs) +
                    ",\"ready\":" + faf::server::JsonString(seat.ready) + ",\"slot\":" + std::to_string(seat.lobbySlot) +
                    ",\"speed_limit\":" + (seat.speedLimit ? std::to_string(*seat.speedLimit) : std::string("null")) +
+                   ",\"camera_updates\":" + std::to_string(seat.cameraUpdates) +
                    ",\"load\":" + faf::server::JsonString(seat.load) +
                    ",\"content\":" + faf::server::JsonString(seat.content) +
                    ",\"mods\":" + faf::server::JsonString(seat.mods) + ",\"ui_mods\":[";
@@ -1633,6 +1634,7 @@ namespace
     std::unique_ptr<faf::server::CServerViews> views;
     std::map<std::size_t, std::int32_t> armyUids;                  // each player's army
     std::set<std::size_t> defeatedArmies;                          // plan WP13.7: defeats seen
+    std::set<std::size_t> focusFreed;                              // plan WP11.1: defeated players free to focus
     std::vector<std::pair<double, std::int32_t>> defeatedLeaving;  // and when each such player goes
     if (net) {
       // Plan WP2.6, WP1.4: what each player's report is compared with: the server's own rules, before any player has
@@ -1668,6 +1670,7 @@ namespace
         }
         net->QueueView(client.uid, launchInfo);
         net->QueueView(client.uid, faf::server::MakeGameInfo(mapSizeX, mapSizeZ, playerArmy, client.commandSource));
+        net->SetFocusRule(client.uid, playerArmy); // plan WP11.1: their SetFocusArmy keeps them on it
       }
       armyUids = viewPlayers;
       views = std::make_unique<faf::server::CServerViews>(contentTables, *rules, mapSizeX, mapSizeZ, *net, std::move(viewPlayers), static_cast<unsigned int>(std::max(viewThreads, 1)), teamViews);
@@ -2198,6 +2201,15 @@ namespace
           LuaPlus::LuaObject results = sync["GameResult"];
           if (results.IsTable()) {
             ReadGameResults(results, end.players);
+            // Plan WP11.1: with `DefeatedPlayerView = "observe"`, a defeated player may focus on any army (the original
+            // client's `SetFocusArmy(-1)` on defeat); they see only what their view (WP13.6) was sent.
+            for (std::size_t army = 0; net && !disconnectDefeated && army < end.players.size(); ++army) {
+              if (end.players[army].result.starts_with("defeat") && focusFreed.insert(army).second) {
+                if (const auto found = armyUids.find(army); found != armyUids.end()) {
+                  net->FreeFocus(found->second);
+                }
+              }
+            }
             // Plan WP13.7: with `DefeatedPlayerView = "disconnect"`, a defeated player goes once they've seen it.
             for (std::size_t army = 0; disconnectDefeated && army < end.players.size(); ++army) {
               if (end.players[army].result.starts_with("defeat") && defeatedArmies.insert(army).second) {

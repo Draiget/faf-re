@@ -29,6 +29,7 @@
 #include "moho/net/IMessageReceiver.h"
 #include "moho/net/ELobbyMsg.h"
 #include "netlink/EngineLinks.h"
+#include "remote/FocusAndCameras.h"
 #include "remote/SpeedLimit.h"
 #include "remote/ContentCheck.h"
 #include "remote/ServerClient.h"
@@ -1636,4 +1637,27 @@ TEST(SpeedLimit, LockstepsFormulaAndTheMessage)
   longer.push_back(0u);
   EXPECT_FALSE(faf::remote::DecodeSpeedLimit(longer).has_value());
   EXPECT_FALSE(faf::remote::DecodeSpeedLimit(std::vector<std::uint8_t>{static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::Chat), 10u}).has_value());
+}
+
+// Plan WP11.1: SetArmyIndex's request and answer, and the cameras SetGeomCams sends.
+TEST(FocusAndCameras, MessagesRoundTrip)
+{
+  for (const int army : {-1, 0, 2, 15, faf::remote::kMaxFocusArmy}) {
+    EXPECT_EQ(faf::remote::DecodeFocusArmy(faf::remote::EncodeFocusArmy(army)), std::optional<int>(army)) << army;
+  }
+  std::vector<std::uint8_t> past = faf::remote::EncodeFocusArmy(0);
+  past[1] = static_cast<std::uint8_t>(faf::remote::kMaxFocusArmy + 2);
+  EXPECT_FALSE(faf::remote::DecodeFocusArmy(past).has_value());
+  std::vector<faf::remote::SCameraReport> cameras(2);
+  cameras[0].viewProjection[5] = 1.5f;
+  cameras[1].lodScale = 0.25f;
+  std::vector<faf::remote::SCameraReport> back;
+  ASSERT_TRUE(faf::remote::DecodeCameras(faf::remote::EncodeCameras(cameras), back));
+  EXPECT_EQ(back, cameras);
+  std::vector<faf::remote::SCameraReport> many(9);
+  ASSERT_TRUE(faf::remote::DecodeCameras(faf::remote::EncodeCameras(many), back));
+  EXPECT_EQ(back.size(), faf::remote::kMaxCameras); // at most four go
+  std::vector<std::uint8_t> cut = faf::remote::EncodeCameras(cameras);
+  cut.pop_back();
+  EXPECT_FALSE(faf::remote::DecodeCameras(cut, back));
 }

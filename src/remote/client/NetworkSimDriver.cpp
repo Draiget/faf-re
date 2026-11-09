@@ -1,9 +1,12 @@
 #include "remote/client/NetworkSimDriver.h"
+#include "remote/FocusAndCameras.h"
+#include "moho/render/camera/GeomCamera3.h"
 #include "remote/SpeedLimit.h"
 #include "remote/client/ServerLaneMeter.h"
 
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <optional>
 #include <utility>
 
@@ -301,6 +304,14 @@ namespace faf::remote::client
       DeliverChat(sender, payload);
       return;
     }
+    case net::ESeatMessage::FocusArmy: {
+      // Plan WP11.1: the army the server grants; the client shows it from the next view on.
+      if (const std::optional<int> granted = DecodeFocusArmy(message); granted) {
+        mFocusGranted.store(*granted, std::memory_order_relaxed);
+        gpg::Logf("server driver: the server grants focus on army %d", *granted);
+      }
+      return;
+    }
     default:
       return; // LaunchInfo (the session was made from it), ViewCheck (the probe compares; not yet here)
     }
@@ -345,7 +356,7 @@ namespace faf::remote::client
     packet->mCurBeat = static_cast<std::int32_t>(view.beat);
     packet->mCurTick = static_cast<std::int32_t>(view.beat);
     packet->mAdvanced = true;
-    packet->mFocusArmy = mViews->Info().army;
+    packet->mFocusArmy = mFocusGranted.load(std::memory_order_relaxed) == kNoFocusGranted ? mViews->Info().army : mFocusGranted.load(std::memory_order_relaxed);
     if (!mArmiesGiven) {
       mArmiesGiven = true;
       for (const moho::SSTIArmyConstantData& army : mArmyConstants) {
@@ -491,10 +502,43 @@ namespace faf::remote::client
     return mClock.HasFrames() ? mClock.Skew() : 0.0;
   }
 
-  // Session requests the server has no message for yet: the view's army is the server's, the cameras and filters
-  // don't change what it sends (a later plan item).
-  void CNetworkSimDriver::SetArmyIndex(const int) {}
-  void CNetworkSimDriver::SetGeomCams(const fa::vector<moho::GeomCamera3>&) {}
+  void CNetworkSimDriver::SetArmyIndex(const int army)
+  {
+    // Plan WP11.1: a request; the server answers with the army it grants (`FocusArmy`), which the views then carry.
+    const int shown = mFocusGranted.load(std::memory_order_relaxed);
+    if (army == shown || (shown == kNoFocusGranted && mViews && army == mViews->Info().army)) {
+      return;
+    }
+    const bool sent = SendServerGameMessage(EncodeFocusArmy(army));
+    gpg::Logf("server driver: focus on army %d asked of the server%s", army, sent ? "" : " (not sent: no server link)");
+  }
+
+  void CNetworkSimDriver::SetGeomCams(const fa::vector<moho::GeomCamera3>& cameras)
+  {
+    // Plan WP11.1: what the cameras see goes to the server at most every kCameraPeriodMs (for WP8.2's camera order).
+    const auto now = std::chrono::steady_clock::now();
+    if (now - mCamerasSentAt < std::chrono::milliseconds(kCameraPeriodMs)) {
+      return;
+    }
+    std::vector<SCameraReport> reports;
+    for (const moho::GeomCamera3& camera : cameras) {
+      if (reports.size() == kMaxCameras) {
+        break;
+      }
+      static_assert(sizeof(camera.viewProjection) == sizeof(float) * 16, "a 4x4 float matrix");
+      SCameraReport report;
+      std::memcpy(report.viewProjection.data(), &camera.viewProjection, sizeof(float) * 16);
+      report.lodScale = camera.lodScale;
+      reports.push_back(report);
+    }
+    if (SendServerGameMessage(EncodeCameras(reports))) {
+      mCamerasSentAt = now;
+      ++mCamerasSent;
+    }
+  }
+
+  // The sync filters choose what a local sim passes to the UI; a server game's views are the server's (plan WP4), so
+  // nothing here changes what it sends.
   void CNetworkSimDriver::SetSyncFilterMaskA(const moho::SSyncFilterMaskBlock&) {}
   void CNetworkSimDriver::SetSyncFilterMaskB(const moho::SSyncFilterMaskBlock&) {}
   void CNetworkSimDriver::SetSyncFilterOptionFlag(const bool) {}

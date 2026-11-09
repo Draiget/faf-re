@@ -120,6 +120,18 @@ namespace faf::remote::net
      * client's `CLIMSG_IntParam` reports its sim's. Sent when it changes. The server runs at the slowest playing seat's.
      */
     SpeedLimit = 18,
+    /**
+     * Both ways, reliable (plan WP11.1): varint (army + 1). Player to server: the army its UI asks to focus on
+     * (`SetArmyIndex`, from `SetFocusArmy`; -1 none). Server to player: the army the server grants, which the client
+     * shows from then on: the player's own, or with `DefeatedPlayerView = "observe"` after their defeat whatever they
+     * asked (remote/FocusAndCameras.h).
+     */
+    FocusArmy = 19,
+    /**
+     * Player to server, reliable (plan WP11.1): the player's cameras (`SetGeomCams`) at most every 250 ms: varint count,
+     * then per camera its view-projection and LOD scale as 17 floats. Kept per seat for camera-ordered work (WP8.2).
+     */
+    Cameras = 20,
   };
 
   /** What became of a player's command. */

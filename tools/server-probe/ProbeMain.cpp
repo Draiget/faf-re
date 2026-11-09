@@ -38,6 +38,7 @@
 #include "moho/net/CMessageStream.h"
 #include "moho/net/ELobbyMsg.h"
 #include "moho/net/ECmdStreamOp.h"
+#include "remote/FocusAndCameras.h"
 #include "remote/SpeedLimit.h"
 #include "remote/net/Datagram.h"
 #include "remote/FrameWindow.h"
@@ -230,6 +231,9 @@ namespace
     // Plan WP11.4: once the server's roster lists other players and this many seconds have gone (`--chat`: 0, `--chat-at`),
     // send each of them one chat line through the server, as FAF's chat sends one (a Lua table in byte form).
     double chatAt = -1.0;
+    int focusArmy = 0;            // plan WP11.1: the army asked for with SetFocusArmy
+    double focusArmyAt = -1.0;
+    double camerasEvery = 0.0;    // plan WP11.1: a camera update this often (s); 0: none
     int speedLimit = 0;           // plan WP10.7: reported as this player's game's sim-speed limit
     double speedLimitAt = -1.0;
   };
@@ -392,6 +396,12 @@ namespace
         out.rebuild = value;
       } else if (name == "--chat-at") {
         out.chatAt = Argument(value);
+      } else if (name == "--focus-army") {
+        out.focusArmy = std::atoi(value);
+      } else if (name == "--focus-army-at") {
+        out.focusArmyAt = Argument(value);
+      } else if (name == "--cameras-every") {
+        out.camerasEvery = Argument(value);
       } else if (name == "--speed-limit") {
         out.speedLimit = std::atoi(value);
       } else if (name == "--speed-limit-at") {
@@ -910,7 +920,7 @@ int main(const int argc, char** const argv)
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> [--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
       "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> --lobby-assign-at <s>] [--lobby-eject-at <s>]] [--speed-limit <step> --speed-limit-at <s>] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--rebuild <match.lua> /init <init.lua>]\n"
+      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> --lobby-assign-at <s>] [--lobby-eject-at <s>]] [--speed-limit <step> --speed-limit-at <s>] [--focus-army <army> --focus-army-at <s>] [--cameras-every <s>] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--rebuild <match.lua> /init <init.lua>]\n"
     );
     return 3;
   }
@@ -965,6 +975,8 @@ int main(const int argc, char** const argv)
   std::deque<const char*> asked; // what each answer will be about, in order
   std::uint64_t answers[3] = {};
   SRosterSeen rosterSeen;
+  double nextCameraAt = 0.0;      // plan WP11.1
+  std::uint64_t camerasSent = 0;
   faf::remote::wire::SRoster lastRoster{};
   std::uint32_t nextCommand = 1u;
   SOrderWatch watch;
@@ -1211,6 +1223,18 @@ int main(const int argc, char** const argv)
       (void)link.SendReliable(frame.data(), frame.size());
       std::printf("probe %d: %.1f s: lobby: script data to uid %d\n", options.uid, elapsed, options.lobbySayTo);
     }
+    if (Due(options.focusArmyAt, elapsed)) {
+      const std::vector<std::uint8_t> focus = faf::remote::EncodeFocusArmy(options.focusArmy);
+      (void)link.SendReliable(focus.data(), focus.size());
+      std::printf("probe %d: %.1f s: focus on army %d asked\n", options.uid, elapsed, options.focusArmy);
+    }
+    if (options.camerasEvery > 0.0 && elapsed >= nextCameraAt) {
+      nextCameraAt = elapsed + options.camerasEvery;
+      faf::remote::SCameraReport camera;
+      camera.viewProjection[0] = static_cast<float>(elapsed);
+      const std::vector<std::uint8_t> cameras = faf::remote::EncodeCameras(std::span<const faf::remote::SCameraReport>(&camera, 1u));
+      camerasSent += link.SendReliable(cameras.data(), cameras.size()) ? 1u : 0u;
+    }
     if (Due(options.speedLimitAt, elapsed)) {
       // Plan WP10.7: as a server-mode game reports what it keeps up with.
       const std::vector<std::uint8_t> limit = faf::remote::EncodeSpeedLimit(options.speedLimit);
@@ -1232,6 +1256,12 @@ int main(const int argc, char** const argv)
     while (link.TakeReliable(message)) {
       if (!message.empty() && message[0] == static_cast<std::uint8_t>(ESeatMessage::Lobby)) {
         TakeLobby(options.uid, elapsed, message, lobby);
+        continue;
+      }
+      if (!message.empty() && message[0] == static_cast<std::uint8_t>(ESeatMessage::FocusArmy)) {
+        if (const std::optional<int> granted = faf::remote::DecodeFocusArmy(message); granted) {
+          std::printf("probe %d: %.1f s: focus granted on army %d\n", options.uid, elapsed, *granted);
+        }
         continue;
       }
       if (!message.empty() && message[0] == static_cast<std::uint8_t>(ESeatMessage::CommandAnswer)) {
@@ -1521,6 +1551,9 @@ int main(const int argc, char** const argv)
     std::printf("probe %d: lobby: %llu messages, role %s, host %d, peers %s, script data from %s, left %s\n", options.uid,
                 static_cast<unsigned long long>(lobby.messages), lobby.role.c_str(), lobby.hostUid, list(lobby.peers).c_str(), list(lobby.scriptFrom).c_str(),
                 list(lobby.deleted).c_str());
+  }
+  if (options.camerasEvery > 0.0) {
+    std::printf("probe %d: %llu camera updates sent\n", options.uid, static_cast<unsigned long long>(camerasSent));
   }
   if (!views.lateMs.empty()) {
     std::sort(views.lateMs.begin(), views.lateMs.end());

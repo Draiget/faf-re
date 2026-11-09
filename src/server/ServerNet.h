@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "remote/ContentCheck.h"
+#include "remote/FocusAndCameras.h"
 #include "remote/SeatRoster.h"
 #include "remote/net/GameLinks.h"
 #include "server/LobbyRelay.h"
@@ -157,6 +158,8 @@ namespace faf::server
       int lobbySlot = 0;
       // Plan WP10.7: the sim-speed limit its game last reported (remote/SpeedLimit.h); nothing before it did.
       std::optional<int> speedLimit;
+      // Plan WP11.1: camera updates its game sent (`SetGeomCams`, at most four a second).
+      std::uint64_t cameraUpdates = 0;
     };
     [[nodiscard]] std::vector<SSeatState> Seats();
     /** Plan WP17.2: each verdict made since the last call, as the seat stood then (uid, name and the verdict fields). */
@@ -166,6 +169,12 @@ namespace faf::server
      * nothing when none did. As `CClientManagerImpl::GetSimRate` takes the lowest client's. Any thread.
      */
     [[nodiscard]] std::optional<std::pair<int, std::int32_t>> SlowestSpeedLimit();
+    /**
+     * Plan WP11.1: a player's own army, the focus the server grants their `SetFocusArmy` requests; `FreeFocus` lets
+     * them pick any (defeated, with `DefeatedPlayerView = "observe"`). Any thread.
+     */
+    void SetFocusRule(std::int32_t uid, int ownArmy);
+    void FreeFocus(std::int32_t uid);
     /** Plan WP17.2: lobby ready states that changed since the last call (uid, ready), in order. */
     [[nodiscard]] std::vector<std::pair<std::int32_t, bool>> TakeReadyChanges();
     /**
@@ -229,6 +238,9 @@ namespace faf::server
       std::string contentVerdict; // plan WP17.2: as SSeatState's
       std::string modsVerdict;
       std::optional<int> speedLimit; // plan WP10.7: the last its game reported
+      std::vector<remote::SCameraReport> cameras; // plan WP11.1: its cameras, as last reported
+      std::uint64_t cameraUpdates = 0;
+      std::uint64_t camerasAtUs = 0;
       // Plan WP11.4: its client in the session, as every player's roster lists it.
       int clientIndex = -1;
       std::vector<std::uint8_t> sources;
@@ -280,6 +292,8 @@ namespace faf::server
     std::vector<SSeatState> mJudged;
     std::vector<std::pair<std::int32_t, bool>> mReadyNews; // plan WP17.2 (`TakeReadyChanges`)          // plan WP17.2: each seat's verdicts as they were made (`TakeJudged`)
     std::uint64_t mBadMessages = 0;
+    std::uint64_t mFocusRefused = 0;   // plan WP11.1
+    std::uint64_t mCamerasDropped = 0; // plan WP11.1: camera updates faster than five a second
     std::uint64_t mViewMismatches = 0;
     remote::wire::SRoster mRosterSent; // the last sent to everyone, without a local index
     bool mRosterSentEver = false;
@@ -308,6 +322,12 @@ namespace faf::server
     std::vector<SQueuedMessage> mViewSending;
 
     std::mutex mNewsLock;
+    struct SFocusRule
+    {
+      int ownArmy = -1;
+      bool free = false;
+    };
+    std::map<std::int32_t, SFocusRule> mFocusRules; // plan WP11.1, under mNewsLock
     std::vector<std::string> mNews;
     std::vector<SSeatState> mSeatStates;                         // under mNewsLock
     std::vector<std::pair<std::int32_t, std::string>> mEjects;   // likewise: uid, reason

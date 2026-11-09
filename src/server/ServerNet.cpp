@@ -479,6 +479,7 @@ namespace faf::server
       }
       state.lobbySlot = mLobby.LobbySlotOf(uid);
       state.speedLimit = seat.gone ? std::nullopt : seat.speedLimit;
+      state.cameraUpdates = seat.cameraUpdates;
       state.load = seat.loaded ? "loaded" : (seat.reported ? "rules" : (mContentKnown && seat.joinedEver ? "loading" : ""));
       state.mods = seat.modsVerdict;
       for (const remote::SModEntry& mod : seat.mods) {
@@ -682,7 +683,7 @@ namespace faf::server
                           mLobby.Count(ELobbyRelayVerdict::Malformed)) +
            " malformed or misaddressed; " + std::to_string(mLobby.OptionsPinned()) + " relayed with the match's pinned options written back; " +
            std::to_string(mRostersSent) + " rosters sent; chat: " + std::to_string(mChatRelayed) + " relayed, " + std::to_string(mChatDropped) +
-           " dropped";
+           " dropped; focus requests refused " + std::to_string(mFocusRefused) + ", camera updates dropped " + std::to_string(mCamerasDropped);
   }
 
   std::vector<std::int32_t> CServerNet::TakeReturned()
@@ -711,6 +712,18 @@ namespace faf::server
   {
     const std::scoped_lock lock(mNewsLock);
     return std::exchange(mReadyNews, {});
+  }
+
+  void CServerNet::SetFocusRule(const std::int32_t uid, const int ownArmy)
+  {
+    const std::scoped_lock lock(mNewsLock);
+    mFocusRules[uid].ownArmy = ownArmy;
+  }
+
+  void CServerNet::FreeFocus(const std::int32_t uid)
+  {
+    const std::scoped_lock lock(mNewsLock);
+    mFocusRules[uid].free = true;
   }
 
   std::optional<std::pair<int, std::int32_t>> CServerNet::SlowestSpeedLimit()
@@ -908,6 +921,44 @@ namespace faf::server
       if (seat.speedLimit != limit) {
         seat.speedLimit = limit;
         Say(seat.name + "'s game keeps up with speed " + (*limit >= 0 ? "+" : "") + std::to_string(*limit));
+      }
+      return;
+    }
+    case remote::net::ESeatMessage::FocusArmy: {
+      // Plan WP11.1: the UI's `SetFocusArmy`; the server answers with the army it grants.
+      const std::optional<int> asked = remote::DecodeFocusArmy(message);
+      if (!asked) {
+        ++mBadMessages;
+        return;
+      }
+      int granted = -1;
+      {
+        const std::scoped_lock lock(mNewsLock);
+        const auto rule = mFocusRules.find(uid);
+        granted = rule == mFocusRules.end() ? -1 : (rule->second.free ? *asked : rule->second.ownArmy);
+      }
+      if (granted != *asked) {
+        ++mFocusRefused;
+        Say(seat.name + " asked to focus on army " + std::to_string(*asked) + "; refused, they keep army " + std::to_string(granted));
+      }
+      QueueView(uid, remote::EncodeFocusArmy(granted));
+      return;
+    }
+    case remote::net::ESeatMessage::Cameras: {
+      // Plan WP11.1: what the player's cameras see, kept for camera-ordered work (WP8.2); faster than 5 a second dropped.
+      std::vector<remote::SCameraReport> cameras;
+      if (!remote::DecodeCameras(message, cameras)) {
+        ++mBadMessages;
+        return;
+      }
+      if (seat.camerasAtUs != 0u && mNowUs - seat.camerasAtUs < 200'000u) {
+        ++mCamerasDropped;
+        return;
+      }
+      seat.camerasAtUs = mNowUs;
+      seat.cameras = std::move(cameras);
+      if (++seat.cameraUpdates == 1u) {
+        Say(seat.name + "'s game sends its cameras");
       }
       return;
     }

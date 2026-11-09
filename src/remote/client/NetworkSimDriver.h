@@ -1,6 +1,8 @@
 #pragma once
 
 #include <array>
+#include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <deque>
@@ -136,6 +138,10 @@ namespace faf::remote::client
     moho::CMarshaller mMarshaller;
     std::unique_ptr<CServerViewClient> mViews;
     CSpeedMeter mSpeedMeter;              // plan WP10.7: what applying a view costs
+    static constexpr int kNoFocusGranted = -1000;
+    std::atomic<int> mFocusGranted{kNoFocusGranted};  // plan WP11.1: the army the server granted; none: GameInfo's
+    std::chrono::steady_clock::time_point mCamerasSentAt{};
+    std::uint64_t mCamerasSent = 0;
     std::array<std::uint64_t, 5> mLaneBytes{}; // plan WP10.10: bytes taken by lane (EServerLane order)
     std::unique_ptr<LuaPlus::LuaState> mEmptySyncLua; // makes the `Sync` table's bytes for a view with no Lua lane
     std::vector<std::uint8_t> mEmptySync;
