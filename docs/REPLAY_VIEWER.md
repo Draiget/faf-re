@@ -49,7 +49,7 @@ The limit also moves with each measurement: a slow run after a load lowers it, a
 
 ## Where keyframes come from
 
-A hidden copy of the game's exe (no window, below normal priority) writes a replay's keyframes ahead of the viewer, so a first move forward can load one. They are compressed with zstd and kept in `replay_keyframes\<process id>` next to the exe, and removed when the replay ends or the next one starts. A keyframe only loads in the exe that wrote it.
+A hidden copy of the game's exe (no window, below normal priority) writes a replay's keyframes ahead of the viewer, so a first move forward can load one. They are compressed with zstd and kept in `replay_keyframes\<process id>` next to the exe (in the temporary folder's `faf_replay_keyframes` when the exe's folder can't be written), and removed when the replay ends or the next one starts. A keyframe only loads in the exe that wrote it.
 
 While the hidden process hasn't reached a time yet, there is no keyframe to load there, and a forward click plays through. New lines appear on the bar as keyframes get written.
 
