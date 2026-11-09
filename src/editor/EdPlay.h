@@ -135,6 +135,9 @@ namespace faf::editor
     moho::EWldFrameAction mLastAction = moho::EWldFrameAction::Inactive;
     std::chrono::steady_clock::time_point mPhaseStart{};
     std::chrono::steady_clock::time_point mSessionStart{};
+    std::chrono::steady_clock::time_point mMemoryCheckAt{};
+    std::map<std::string, int> mInstanceCounts;
+    std::uint32_t mTracePlay = 0; // `/memtrace`: the current play's number
 
     std::vector<std::string> mMaps;
     std::vector<std::string> mTitles;

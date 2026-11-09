@@ -1,4 +1,11 @@
 #include "editor/EdPlay.h"
+#include "editor/EdMemTrace.h"
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#include <psapi.h>
 
 #include <algorithm>
 #include <cctype>
@@ -16,6 +23,9 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "moho/misc/StatItem.h"
+#include "moho/misc/Stats.h"
+
 
 namespace faf::editor
 {
@@ -528,6 +538,9 @@ end
   {
     mPlayerArmy = 0;
     mWholeMap = false;
+    if (memtrace::Running()) {
+      mTracePlay = memtrace::NextPlay();
+    }
     if (!mAutoRun) {
       RememberSetup(); // test runs from the command line leave the remembered setups alone
     }
@@ -673,8 +686,8 @@ end
       if (mAutoStartAt < 0.0) {
         mAutoStartAt = now + static_cast<double>(mAutoDelay);
       }
-      if (now < mAutoStartAt) {
-        return;
+      if (now < mAutoStartAt || mMemoryCheckAt != std::chrono::steady_clock::time_point{}) {
+        return; // the delay before the first play, or the memory reading after the last one
       }
       if (mAutoCyclesLeft > 0) {
         --mAutoCyclesLeft;
@@ -749,8 +762,47 @@ end
     if ((mStopRequested && action != moho::EWldFrameAction::Inactive) || action == moho::EWldFrameAction::Exit) {
       gpg::Logf("editor: play ended (%s)", action == moho::EWldFrameAction::Exit ? "the session's exit" : "Stop");
       moho::WLD_Teardown();
+      mMemoryCheckAt = std::chrono::steady_clock::now() + std::chrono::seconds(2);
     }
     mStopRequested = false;
+
+    // Two seconds after a play ends: what the process keeps (WPE.16, memory given back after a play).
+    if (mMemoryCheckAt != std::chrono::steady_clock::time_point{} && std::chrono::steady_clock::now() >= mMemoryCheckAt &&
+        action == moho::EWldFrameAction::Inactive) {
+      mMemoryCheckAt = {};
+      PROCESS_MEMORY_COUNTERS_EX counters{};
+      counters.cb = sizeof(counters);
+      if (::GetProcessMemoryInfo(::GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters))) {
+        gpg::Logf("editor: after the play, %.1f MB private, %.1f MB working set", static_cast<double>(counters.PrivateUsage) / 1048576.0,
+                  static_cast<double>(counters.WorkingSetSize) / 1048576.0);
+      }
+      // `/memtrace`: what the play before last left (its caches are warm by now, so this is what stays).
+      if (memtrace::Running() && mTracePlay >= 2) {
+        memtrace::Report(mTracePlay - 1, 12);
+      }
+      // The engine's live object counts by type (InstanceCounter), and which changed since the last play.
+      if (moho::StatItem* const counts = moho::GetEngineStats()->GetItem("Instance Counts", false); counts != nullptr) {
+        std::map<std::string, int> now;
+        counts->VisitChildren(
+          [](moho::StatItem* const child, void* const context) {
+            (*static_cast<std::map<std::string, int>*>(context))[child->Name().c_str()] = child->GetInt(true);
+          },
+          &now
+        );
+        std::string changed;
+        for (const auto& [name, count] : now) {
+          const auto before = mInstanceCounts.find(name);
+          const int previous = before != mInstanceCounts.end() ? before->second : 0;
+          if (count != previous) {
+            changed += " " + name + " " + std::to_string(previous) + "->" + std::to_string(count) + ";";
+          }
+        }
+        if (!changed.empty()) {
+          gpg::Logf("editor: instance counts changed since the last play:%s", changed.c_str());
+        }
+        mInstanceCounts = std::move(now);
+      }
+    }
 
     if (mPlayRequested) {
       mPlayRequested = false;

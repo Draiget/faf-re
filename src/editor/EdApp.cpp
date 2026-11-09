@@ -8,6 +8,7 @@
 #include <string>
 
 #include "editor/EdLog.h"
+#include "editor/EdMemTrace.h"
 #include "editor/EdPlay.h"
 #include "editor/EdShell.h"
 #include "editor/ui/EdImGuiRenderer.h"
@@ -255,6 +256,10 @@ namespace faf::editor
       moho::gAppBeforeDeviceCreate = &AddPanelHead;
       // Plays have cheats on (the whole-map view during play needs them), Game.prefs untouched.
       moho::gSessionCheats = true;
+      // `/memtrace`: every block's call stack, to find what a play leaves behind (slow).
+      if (moho::CFG_GetArgOption("/memtrace", 0, nullptr)) {
+        memtrace::Start();
+      }
       // `/logtimes <file>`: every log line with its time, for timing a play's start.
       if (fa::vector<fa::string> args; moho::CFG_GetArgOption("/logtimes", 1, &args) && !args.empty()) {
         mLog.WriteTimesTo(args[0].c_str());

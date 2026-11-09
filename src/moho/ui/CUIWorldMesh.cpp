@@ -1,6 +1,8 @@
 #include "moho/ui/CUIWorldMesh.h"
 
+#include <set>
 #include <typeinfo>
+#include <vector>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -70,11 +72,41 @@ namespace moho
    * Initializes one script-visible world-mesh owner and binds the provided
    * Lua object.
    */
+  namespace
+  {
+    /// Engine addition (CUIWorldMesh::DestroyAllOf): every live world mesh. Main thread only, as the UI.
+    std::set<CUIWorldMesh*>& LiveWorldMeshes()
+    {
+      static auto* const live = new std::set<CUIWorldMesh*>();
+      return *live;
+    }
+  } // namespace
+
   CUIWorldMesh::CUIWorldMesh(const LuaPlus::LuaObject& luaObject)
     : CScriptObject()
     , mMeshInstance(nullptr)
   {
     SetLuaObject(luaObject);
+    LiveWorldMeshes().insert(this);
+  }
+
+  int CUIWorldMesh::DestroyAllOf(LuaPlus::LuaState* const state)
+  {
+    if (state == nullptr) {
+      return 0;
+    }
+    LuaPlus::LuaState* const root = state->GetRootState();
+    std::vector<CUIWorldMesh*> doomed;
+    for (CUIWorldMesh* const mesh : LiveWorldMeshes()) {
+      LuaPlus::LuaState* const owner = mesh->cObject.m_state;
+      if (owner != nullptr && owner->GetRootState() == root) {
+        doomed.push_back(mesh);
+      }
+    }
+    for (CUIWorldMesh* const mesh : doomed) {
+      delete mesh;
+    }
+    return static_cast<int>(doomed.size());
   }
 
   /**
@@ -87,6 +119,7 @@ namespace moho
    */
   CUIWorldMesh::~CUIWorldMesh()
   {
+    LiveWorldMeshes().erase(this);
     if (mMeshInstance != nullptr && MeshRenderer::GetInstance() != nullptr) {
       delete mMeshInstance;
       mMeshInstance = nullptr;

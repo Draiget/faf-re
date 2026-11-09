@@ -50,6 +50,7 @@ How fast a play starts:
 | `/playafter <s>` | With `/play`: waits s seconds after the editor is up before the first play (timing a first play as a user would start it) |
 | `/playquit` | With `/play`: closes the editor after the last one (test runs) |
 | `/playai <key>` | With `/play`: against that AI (`rush`, `easy`, ...) instead of solo |
+| `/memtrace` | Records every heap block's call stack (slow) and, after each play, logs the call sites of what the play before it left alive, the largest first; the log also gets the process's private memory two seconds after each play |
 | `/playsetups <file>` | Reads and writes the remembered play setups in that file instead of `play_setups.ini` (test runs) |
 | `/playwholemap` | With `/play` and `/playseconds`: switches to the whole map when play starts and back halfway (test runs) |
 | `/playexitapp` | With `/play` and `/playseconds`: ends each play the way the game's "Exit to Windows" does (`ExitApplication()`), which the editor turns into a Stop (test runs) |
@@ -72,5 +73,5 @@ The Tools panel is laid out as the plan's mockup: a strip of tool icons and the 
 
 ## Known issues
 
-- Each Play keeps about 15 MB more after it ends (20 cycles of SCMP_009 on Direct3D 12: the lowest point between sessions went from 798 to 1,101 MB). Not yet traced.
+- Each Play still keeps about 6 MB of private memory after it ends, on Direct3D 12 and Vulkan alike, outside the process heap (GPU or driver memory, not yet traced). What it left on the heap is down to the caches (0.2-0.8 MB a play, textures and file lookups): a sync packet's shared references (the sim's height field, 4 MB on SCMP_009) and the world meshes the game UI never destroys (13 a play) are freed now. `/memtrace` lists what a play leaves on the heap by call site.
 - A popup of the panels that reaches over the game's view is hidden behind it (the view is its own window).

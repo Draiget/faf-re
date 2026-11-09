@@ -21,6 +21,8 @@ else()
   set_target_properties(faf_editor PROPERTIES OUTPUT_NAME FafEditor)
 endif()
 target_link_libraries(faf_editor PRIVATE faf_engine faf_imgui)
+# /memtrace names the call sites of what a play leaves behind (EdMemTrace.cpp).
+target_link_libraries(faf_editor PRIVATE dbghelp)
 target_link_options(faf_editor PRIVATE "/ENTRY:mainCRTStartup")
 
 # The game's window resources (wx's cursors and bitmaps, the icon) and manifest, as faf_main has

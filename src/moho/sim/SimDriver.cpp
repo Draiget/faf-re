@@ -524,13 +524,25 @@ SSyncData::SSyncData() = default;
  * void __stdcall Moho::SSyncData::~SSyncData(Moho::SSyncData *a1);
  *
  * What it does:
- * Releases the owned stream pointer explicitly, then lets the compiler-
- * generated member teardown destroy every other owning lane (vectors,
- * strings, shared pointers) in reverse declaration order via their own real
- * destructors -- exactly what the binary's inlined per-lane teardown does.
+ * Releases the owned stream pointer and the four shared-pointer lanes
+ * explicitly, then lets the compiler-generated member teardown destroy the
+ * vectors and strings.
+ *
+ * The binary's members are real `boost::shared_ptr`s, whose inlined
+ * destructors open the body: `lock xadd -1` on the control block at +0x2B0
+ * (`mBeatDebugCanvas`, 0x0073FC94..0x0073FCC8), then +0x2A8
+ * (`mTickDebugCanvas`, 0x0073FCCF..0x0073FD01), and later +0x280
+ * (`mSimResources`, 0x0073FD75) and +0x278 (`mTerrainUpdate`, 0x0073FDAE). Here they are
+ * `SharedPtrRaw` layout mirrors, which have no destructor, so without these
+ * calls every packet kept its references: the sim's height field (4 MB on a
+ * 20 km map), its resources and debug canvases outlived every session.
  */
 SSyncData::~SSyncData()
 {
+  mBeatDebugCanvas.release();
+  mTickDebugCanvas.release();
+  mSimResources.release();
+  mTerrainUpdate.release();
   delete mStream;
   mStream = nullptr;
 }

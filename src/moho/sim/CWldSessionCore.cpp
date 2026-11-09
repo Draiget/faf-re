@@ -2,6 +2,7 @@
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SimKeyframe.h"
 #include "moho/sim/CWldSessionPrivate.h"
+#include "moho/ui/CUIWorldMesh.h"
 #include "moho/sim/CBackgroundTaskControl.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
@@ -481,6 +482,10 @@ namespace
     mCurThread = nullptr;
 
     if (mState) {
+      // Engine addition: world meshes the game UI's Lua never destroyed would outlive the state.
+      if (const int meshes = CUIWorldMesh::DestroyAllOf(mState); meshes > 0) {
+        gpg::Logf("Session: %d world meshes the UI left were deleted with its Lua state", meshes);
+      }
       delete mState;
       mState = nullptr;
     }
