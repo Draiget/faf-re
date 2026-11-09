@@ -89,8 +89,8 @@ namespace faf::editor
     void EditMarker(const std::string& marker, const std::string& key, const std::string& value);
     /** Selects markers by name (`add` toggles them in the selection instead), for the Markers panel. */
     void SelectMarkers(const std::vector<std::string>& names, bool add);
-    /** Moves the camera over a marker, closer if it was far. */
-    void FrameMarker(const std::string& name);
+    /** Moves the camera over a marker, at most `distance` away. */
+    void FrameMarker(const std::string& name, float distance = 140.0f);
     /** Sets the scenario's extra armies (names split on spaces), as one undo step. */
     void ChangeExtraArmies(const std::string& armies);
     /**
@@ -224,6 +224,15 @@ namespace faf::editor
     [[nodiscard]] bool MarkerHidden(const SaveEntry& marker) const;
     void DeleteSelectedMarkers();
     void DrawMarkers(moho::CD3DPrimBatcher& batcher, bool all);
+    /**
+     * Mass and hydrocarbon points as the game marks them: its splat textures draped on the ground, drawn from the
+     * markers each frame (so they follow a drag). ScenarioUtilities.lua's CreateResources: `mass_marker.dds`
+     * 2 x 2, `hydrocarbon_marker.dds` 6 x 6, heading 0.
+     */
+    void DrawResourceSplats(moho::CD3DPrimBatcher& batcher, const moho::CHeightField& field);
+    boost::shared_ptr<moho::CD3DBatchTexture> mMassSplat;
+    boost::shared_ptr<moho::CD3DBatchTexture> mHydroSplat;
+    bool mSplatsLoaded = false;
     EdDocument::SaveSnapshot mBorderBefore;
     /** A size drag on one slot keeps adding to its undo step until something else happens. */
     bool mLayerDragJoin = false;

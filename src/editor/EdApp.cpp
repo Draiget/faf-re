@@ -328,6 +328,8 @@ namespace faf::editor
       std::string mShaderArg;
       std::string mPlayableAreaArg;
       std::string mMarkerToolArg;
+      /** `/framemarker <name>[@distance]` (test runs): the camera goes to that marker once the map is shown. */
+      std::string mFrameMarkerArg;
       /**
        * `/uiclicks "x,y;dx,y;..."` (test runs): clicks fed to the panels through ImGui's input queue, in the panels'
        * pixels, `d` for a double-click, one every half second from frame 300. Posted window messages can't do it:
@@ -789,6 +791,9 @@ namespace faf::editor
           }
         }
       }
+      if (fa::vector<fa::string> marker; moho::CFG_GetArgOption("/framemarker", 1, &marker) && !marker.empty()) {
+        mFrameMarkerArg = marker[0].c_str();
+      }
       if (fa::vector<fa::string> type; moho::CFG_GetArgOption("/markertool", 1, &type) && !type.empty()) {
         mMarkerToolArg = type[0].c_str();
       }
@@ -946,6 +951,12 @@ namespace faf::editor
         }
         if (std::string name; tools.TakeMarkerFrame(name)) {
           mScene.FrameMarker(name);
+        }
+        if (!mFrameMarkerArg.empty()) {
+          const std::size_t at = mFrameMarkerArg.find('@');
+          mScene.FrameMarker(mFrameMarkerArg.substr(0, at),
+                             at == std::string::npos ? 140.0f : static_cast<float>(std::atof(mFrameMarkerArg.c_str() + at + 1)));
+          mFrameMarkerArg.clear();
         }
         tools.SetMarkerSelection(mScene.SelectedMarkers());
         tools.SetArmies(mDocument.Armies(), mDocument.ExtraArmies());

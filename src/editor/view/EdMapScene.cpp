@@ -221,7 +221,9 @@ namespace faf::editor
       border(x0, z1, x0, z0);
     }
 
-    // Markers: all of them with the Markers tool, the start positions and resources otherwise.
+    // Resource splats under the markers, then the markers: all of them with the Markers tool, the start positions
+    // and resources otherwise.
+    DrawResourceSplats(*batcher, *field);
     DrawMarkers(*batcher, mTools->MarkersToolActive());
 
     // The selected props, ringed in yellow.
@@ -1368,14 +1370,14 @@ namespace faf::editor
     }
   }
 
-  void EdMapScene::FrameMarker(const std::string& name)
+  void EdMapScene::FrameMarker(const std::string& name, const float distance)
   {
     for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
       float x = 0.0f, y = 0.0f, z = 0.0f;
       if (marker.name == name && MarkerPosition(marker, x, y, z)) {
         mTargetX = x;
         mTargetZ = z;
-        mDistance = std::min(mDistance, 140.0f);
+        mDistance = std::min(mDistance, distance);
         ApplyCamera();
         gpg::Logf("editor: the view goes to %s at %.0f, %.0f", name.c_str(), static_cast<double>(x), static_cast<double>(z));
         return;
@@ -1729,6 +1731,79 @@ namespace faf::editor
         }
       }
     }
+  }
+
+  void EdMapScene::DrawResourceSplats(moho::CD3DPrimBatcher& batcher, const moho::CHeightField& field)
+  {
+    if (!mSplatsLoaded) {
+      mSplatsLoaded = true;
+      mMassSplat = moho::CD3DBatchTexture::FromFile("/env/common/splats/mass_marker.dds", 0);
+      mHydroSplat = moho::CD3DBatchTexture::FromFile("/env/common/splats/hydrocarbon_marker.dds", 0);
+      gpg::Logf("editor: resource splats %s, %s", mMassSplat ? "mass loaded" : "mass missing", mHydroSplat ? "hydrocarbon loaded" : "hydrocarbon missing");
+    }
+    // The ground's height between samples, a little above it so the splat doesn't sink into the terrain's mesh.
+    const auto height = [&field](const float x, const float z) {
+      const float cx = std::clamp(x, 0.0f, static_cast<float>(field.width - 1));
+      const float cz = std::clamp(z, 0.0f, static_cast<float>(field.height - 1));
+      const int x0 = std::min(static_cast<int>(cx), field.width - 2);
+      const int z0 = std::min(static_cast<int>(cz), field.height - 2);
+      const float fx = cx - static_cast<float>(x0);
+      const float fz = cz - static_cast<float>(z0);
+      const auto at = [&](const int sx, const int sz) { return static_cast<float>(field.data[sz * field.width + sx]) / 128.0f; };
+      const float top = at(x0, z0) + (at(x0 + 1, z0) - at(x0, z0)) * fx;
+      const float bottom = at(x0, z0 + 1) + (at(x0 + 1, z0 + 1) - at(x0, z0 + 1)) * fx;
+      return top + (bottom - top) * fz + 0.12f;
+    };
+    std::vector<moho::CD3DPrimBatcher::Vertex> mass;
+    std::vector<moho::CD3DPrimBatcher::Vertex> hydro;
+    for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+      const std::string type = MarkerTypeOf(marker);
+      const bool isMass = type == "Mass";
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if ((!isMass && type != "Hydrocarbon") || MarkerHidden(marker) || !MarkerPosition(marker, x, y, z)) {
+        continue;
+      }
+      // A grid of one-unit cells, so the splat follows the ground's shape.
+      const int cells = isMass ? 2 : 6;
+      const float half = static_cast<float>(cells) * 0.5f;
+      std::vector<moho::CD3DPrimBatcher::Vertex>& out = isMass ? mass : hydro;
+      for (int j = 0; j < cells; ++j) {
+        for (int i = 0; i < cells; ++i) {
+          const auto corner = [&](const int ci, const int cj) {
+            moho::CD3DPrimBatcher::Vertex v{};
+            v.mX = x - half + static_cast<float>(ci);
+            v.mZ = z - half + static_cast<float>(cj);
+            v.mY = height(v.mX, v.mZ);
+            v.mColor = 0xFFFFFFFFu;
+            v.mU = static_cast<float>(ci) / static_cast<float>(cells);
+            v.mV = static_cast<float>(cj) / static_cast<float>(cells);
+            return v;
+          };
+          out.insert(out.end(), {corner(i, j), corner(i + 1, j), corner(i + 1, j + 1), corner(i, j + 1)});
+        }
+      }
+    }
+    if (mass.empty() && hydro.empty()) {
+      return;
+    }
+    // Depth-tested, so a hill hides the splats behind it; then back to the overlay's own setup.
+    batcher.Flush();
+    const moho::CD3DPrimBatcher::TextureBinding before = batcher.GetTextureBinding();
+    (void)batcher.Setup("TAlphaBlendLinearSample");
+    batcher.SetViewProjMatrix(mCamera->CameraGetView());
+    if (mMassSplat && !mass.empty()) {
+      batcher.SetTexture(mMassSplat);
+      batcher.DrawQuads(mass.data(), static_cast<std::uint32_t>(mass.size() / 4));
+      batcher.Flush();
+    }
+    if (mHydroSplat && !hydro.empty()) {
+      batcher.SetTexture(mHydroSplat);
+      batcher.DrawQuads(hydro.data(), static_cast<std::uint32_t>(hydro.size() / 4));
+      batcher.Flush();
+    }
+    (void)batcher.Setup("TAlphaBlendLinearSampleNoDepth");
+    batcher.SetViewProjMatrix(mCamera->CameraGetView());
+    batcher.SetTextureBinding(before);
   }
 
   int EdMapScene::PickProp(const float x, const float z) const
