@@ -36,6 +36,8 @@
 #include "moho/render/WRenViewport.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "moho/misc/FileWaitHandleSet.h"
+#include "moho/sim/CVFSImpl.h"
 #include "moho/ui/IUIManager.h"
 
 // imgui_impl_win32.h leaves this declaration to the application.
@@ -87,6 +89,7 @@ namespace faf::editor
       kMenuPlayStop = 1201,
       kMenuSave = 1002,
       kMenuSaveAs = 1003,
+      kMenuNew = 1004,
       kMenuUndo = 1301,
       kMenuRedo = 1302,
       kMenuFirstMap = 2000,
@@ -238,6 +241,10 @@ namespace faf::editor
           SaveDocument();
           return true;
         }
+        if (message == WM_KEYDOWN && wParam == 'N' && (::GetKeyState(VK_CONTROL) & 0x8000) != 0) {
+          mShell->OpenNewMap();
+          return true;
+        }
         return mScene.OnWindowMessage(window, message, wParam, lParam);
       }
       [[nodiscard]] bool SessionActive() const { return mPlay.Active(); }
@@ -294,6 +301,9 @@ namespace faf::editor
       int mHeightFileFrames = 0;
       // `/heightdialog` with `/open`: the Import button pressed once (its file dialog), for test runs.
       bool mHeightDialog = false;
+      // `/newmap <folder>[,<size index>,<players>,<height>,<sea level or 0>]` (test runs): that new map made
+      // in the vault, mounted and opened; the editor stays open.
+      std::string mNewMapSpec;
       /** The Tools panel's height field Import and Export: the file dialog, then the view. */
       void DriveHeightFiles();
       int mRoundTripFrames = 0;
@@ -434,7 +444,7 @@ namespace faf::editor
     void EditorApp::BuildMenu(const HWND frame)
     {
       HMENU file = ::CreatePopupMenu();
-      ::AppendMenuW(file, MF_STRING | MF_GRAYED, 0, L"&New map...\tCtrl+N");
+      ::AppendMenuW(file, MF_STRING, kMenuNew, L"&New map...\tCtrl+N");
       ::AppendMenuW(file, MF_STRING | MF_GRAYED, 0, L"&Open map...\tCtrl+O");
       ::AppendMenuW(file, MF_STRING, kMenuSave, L"&Save\tCtrl+S");
       ::AppendMenuW(file, MF_STRING, kMenuSaveAs, L"Save as new map &folder...");
@@ -514,6 +524,9 @@ namespace faf::editor
         break;
       case kMenuSave:
         SaveDocument();
+        break;
+      case kMenuNew:
+        mShell->OpenNewMap();
         break;
       case kMenuSaveAs:
         mShell->OpenSaveAs();
@@ -610,6 +623,8 @@ namespace faf::editor
         if (!ImGui::GetIO().WantTextInput) {
           if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)) {
             SaveDocument();
+          } else if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_N)) {
+            mShell->OpenNewMap();
           } else if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z)) {
             (void)mScene.Undo();
           } else if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z)) {
@@ -647,6 +662,9 @@ namespace faf::editor
         mHeightExportFile = file[0].c_str();
       }
       mHeightDialog = moho::CFG_GetArgOption("/heightdialog", 0, nullptr);
+      if (fa::vector<fa::string> spec; moho::CFG_GetArgOption("/newmap", 1, &spec) && !spec.empty()) {
+        mNewMapSpec = spec[0].c_str();
+      }
       if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/heightimport", 1, &file) && !file.empty()) {
         mHeightImportFile = file[0].c_str();
       }
@@ -769,7 +787,43 @@ namespace faf::editor
 
     void EditorApp::DriveOpens()
     {
+      if (!mNewMapSpec.empty() && mDocument.GetState() != EdDocument::State::Loading && mPlay.Maps().size() > 0) {
+        NewMapSettings settings;
+        std::vector<std::string> parts;
+        for (std::size_t at = 0; at <= mNewMapSpec.size();) {
+          const std::size_t comma = std::min(mNewMapSpec.find(',', at), mNewMapSpec.size());
+          parts.push_back(mNewMapSpec.substr(at, comma - at));
+          at = comma + 1;
+        }
+        settings.folder = parts[0];
+        settings.title = parts[0];
+        if (parts.size() >= 5) {
+          settings.size = std::atoi(parts[1].c_str());
+          settings.players = std::atoi(parts[2].c_str());
+          settings.height = static_cast<float>(std::atof(parts[3].c_str()));
+          settings.seaLevel = static_cast<float>(std::atof(parts[4].c_str()));
+          settings.sea = settings.seaLevel > 0.0f;
+        }
+        mNewMapSpec.clear();
+        std::string message;
+        if (mDocument.CreateNew(settings, message)) {
+          gpg::Logf("editor: %s", message.c_str());
+        } else {
+          gpg::Warnf("editor: %s", message.c_str());
+        }
+      }
       const bool finished = mDocument.Poll();
+      // A new map folder made: mounted at /maps/<folder> as the game's init mounts the vault's, listed, opened.
+      std::filesystem::path folder;
+      std::string scenario;
+      if (finished && mDocument.TakeCreated(folder, scenario)) {
+        // The game's file system is always a CVFSImpl (VFS_Create, 0x00467F90).
+        if (auto* const vfs = static_cast<moho::CVFSImpl*>(moho::DISK_GetVFS()); vfs != nullptr) {
+          vfs->MountDirectoryLate(folder, ("/maps/" + folder.filename().string()).c_str());
+        }
+        mPlay.FindMaps();
+        (void)mDocument.Open(scenario);
+      }
       DriveHeightFiles();
       if (mSymCheckMode >= 0 && mScene.Attached()) {
         ++mSymCheckFrames;

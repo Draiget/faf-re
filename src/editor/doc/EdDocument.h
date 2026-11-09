@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "editor/doc/EdMapFile.h"
+#include "editor/doc/EdNewMap.h"
 #include "editor/undo/EdHeightHistory.h"
 
 namespace LuaPlus
@@ -83,6 +84,17 @@ namespace faf::editor
     /** The main thread's turn, each frame: takes a finished open. Returns true on the frame it finished. */
     bool Poll();
 
+    /**
+     * Starts making a new map folder `<vault>/maps/<settings.folder>` on the worker thread: the engine's empty
+     * map of that size (CWldMap::MapNew, 0x00890D40) at the settings' height and sea, a preview, and the
+     * scenario, save and script files with the start positions. Poll finishes it; the app then mounts the
+     * folder and opens it (TakeCreated). False, with `message`, when it can't start.
+     */
+    bool CreateNew(const NewMapSettings& settings, std::string& message);
+
+    /** After Poll finished a CreateNew: the folder it wrote and its scenario's game path (once). */
+    bool TakeCreated(std::filesystem::path& folder, std::string& scenarioPath);
+
     /** Waits for an open in progress to finish (the command-line checks). */
     void Wait();
 
@@ -146,6 +158,9 @@ namespace faf::editor
     struct Load;
     static void Run(Load& load);
     static void RunSteps(Load& load);
+    static void RunCreate(Load& load);
+    std::filesystem::path mCreatedFolder;
+    std::string mCreatedScenario;
 
     State mState = State::Empty;
     std::string mPath;

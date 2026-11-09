@@ -3,6 +3,7 @@
 #include <string>
 
 #include "editor/EdTools.h"
+#include "editor/doc/EdNewMap.h"
 #include "imgui.h"
 
 namespace faf::editor
@@ -35,6 +36,8 @@ namespace faf::editor
     void ResetLayout() noexcept { mResetLayout = true; }
     /** File > Save as new map folder: the dialog asks for the folder's name. */
     void OpenSaveAs() noexcept { mOpenSaveAs = true; }
+    /** File > New map: the dialog asks for the map's name, size, players, height and sea. */
+    void OpenNewMap() noexcept { mOpenNewMap = true; }
     void RequestExit() noexcept { mExit = true; }
 
     [[nodiscard]] EdTools& Tools() noexcept { return mTools; }
@@ -54,6 +57,12 @@ namespace faf::editor
     void DrawSaveAsDialog();
     bool mOpenSaveAs = false;
     char mSaveAsName[128]{};
+    void DrawNewMapDialog();
+    bool mOpenNewMap = false;
+    NewMapSettings mNewMap;
+    char mNewMapTitle[128]{};
+    char mNewMapFolder[128]{};
+    bool mNewMapFolderEdited = false;
     void DrawStatusBar();
 
     EdLog& mLog;

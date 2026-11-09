@@ -1,5 +1,7 @@
 #include "editor/EdShell.h"
 
+#include <cctype>
+
 #include <algorithm>
 #include <cstdio>
 
@@ -105,6 +107,7 @@ namespace faf::editor
       ImGui::ShowDemoWindow(&mShowDemo);
     }
     DrawSaveAsDialog();
+    DrawNewMapDialog();
     DrawStatusBar();
   }
 
@@ -412,6 +415,101 @@ namespace faf::editor
     if (ImGui::Button("Save", ImVec2(120.0f, 0.0f)) || enter) {
       std::string message;
       if (mDocument.SaveAsNewFolder(mSaveAsName, message)) {
+        gpg::Logf("editor: %s", message.c_str());
+        ImGui::CloseCurrentPopup();
+      } else {
+        gpg::Warnf("editor: %s", message.c_str());
+      }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(120.0f, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+  }
+
+  namespace
+  {
+    /** The folder FAF would give a map of this title: lower case, letters and digits, `_` between words, `.v0001`. */
+    std::string FolderForTitle(const char* const title)
+    {
+      std::string folder;
+      for (const char* c = title; *c != '\0'; ++c) {
+        const unsigned char ch = static_cast<unsigned char>(*c);
+        if (std::isalnum(ch) != 0) {
+          folder += static_cast<char>(std::tolower(ch));
+        } else if (!folder.empty() && folder.back() != '_') {
+          folder += '_';
+        }
+      }
+      while (!folder.empty() && folder.back() == '_') {
+        folder.pop_back();
+      }
+      return (folder.empty() ? std::string("new_map") : folder) + ".v0001";
+    }
+  } // namespace
+
+  void EdShell::DrawNewMapDialog()
+  {
+    constexpr const char* kTitle = "New map";
+    if (mOpenNewMap) {
+      mOpenNewMap = false;
+      mNewMap = NewMapSettings{};
+      (void)std::snprintf(mNewMapTitle, sizeof(mNewMapTitle), "%s", mNewMap.title.c_str());
+      (void)std::snprintf(mNewMapFolder, sizeof(mNewMapFolder), "%s", FolderForTitle(mNewMapTitle).c_str());
+      mNewMapFolderEdited = false;
+      ImGui::OpenPopup(kTitle);
+    }
+    if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      return;
+    }
+    constexpr float kWidth = 300.0f;
+    ImGui::SetNextItemWidth(kWidth);
+    if (ImGui::InputText("Title", mNewMapTitle, sizeof(mNewMapTitle)) && !mNewMapFolderEdited) {
+      (void)std::snprintf(mNewMapFolder, sizeof(mNewMapFolder), "%s", FolderForTitle(mNewMapTitle).c_str());
+    }
+    ImGui::SetNextItemWidth(kWidth);
+    if (ImGui::InputText("Folder", mNewMapFolder, sizeof(mNewMapFolder))) {
+      mNewMapFolderEdited = true;
+    }
+    ImGui::TextDisabled("In %s", (mDocument.VaultFolder() / "maps").string().c_str());
+    ImGui::Separator();
+    ImGui::TextUnformatted("Type");
+    ImGui::SameLine(110.0f);
+    if (ImGui::RadioButton("Skirmish", !mNewMap.campaign)) {
+      mNewMap.campaign = false;
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Campaign", mNewMap.campaign)) {
+      mNewMap.campaign = true;
+    }
+    ImGui::TextUnformatted("Size");
+    ImGui::SameLine(110.0f);
+    for (int i = 0; i < kNewMapSizeCount; ++i) {
+      if (i > 0) {
+        ImGui::SameLine();
+      }
+      if (ImGui::RadioButton(kNewMapSizes[i].name, mNewMap.size == i)) {
+        mNewMap.size = i;
+      }
+    }
+    ImGui::SetNextItemWidth(kWidth);
+    ImGui::SliderInt("Players", &mNewMap.players, 1, kNewMapMaxPlayers);
+    ImGui::SetNextItemWidth(kWidth);
+    ImGui::DragFloat("Ground height", &mNewMap.height, 0.25f, 0.0f, 500.0f, "%.1f");
+    ImGui::Checkbox("Sea", &mNewMap.sea);
+    if (mNewMap.sea) {
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(kWidth - 60.0f);
+      ImGui::DragFloat("Sea level", &mNewMap.seaLevel, 0.25f, 0.0f, 500.0f, "%.1f");
+    }
+    ImGui::TextDisabled("Start positions ARMY_1 to ARMY_%d in a ring; ARMY_17 and NEUTRAL_CIVILIAN as extra armies.", mNewMap.players);
+    ImGui::Separator();
+    if (ImGui::Button("Create", ImVec2(120.0f, 0.0f))) {
+      mNewMap.title = mNewMapTitle;
+      mNewMap.folder = mNewMapFolder;
+      std::string message;
+      if (mDocument.CreateNew(mNewMap, message)) {
         gpg::Logf("editor: %s", message.c_str());
         ImGui::CloseCurrentPopup();
       } else {

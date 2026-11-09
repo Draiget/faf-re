@@ -336,6 +336,7 @@ faf_add_tests_target("${CMAKE_CURRENT_SOURCE_DIR}")
 # The map editor height brush, symmetry check, height files and undo (src/editor/tools, src/editor/undo): exact symmetry,
 # byte-exact undo, height images read back as written.
 add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.cpp editor/HeightHistoryTests.cpp editor/SymmetryCheckTests.cpp editor/HeightFileTests.cpp
+  editor/NewMapTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdNewMap.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryCheck.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightFile.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)

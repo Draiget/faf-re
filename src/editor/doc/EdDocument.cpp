@@ -40,6 +40,11 @@ namespace faf::editor
     MapFacts facts;
     std::string error;
     MapFileRecords records;
+    /** CreateNew: what to make and where; the scenario's game path once made. */
+    bool create = false;
+    NewMapSettings settings;
+    std::filesystem::path createFolder;
+    std::string createdScenario;
     /** Set last by the worker; the main thread reads the rest only after seeing it. */
     std::atomic<bool> done{false};
   };
@@ -162,22 +167,95 @@ namespace faf::editor
   void EdDocument::Run(Load& load)
   {
     const auto start = std::chrono::steady_clock::now();
-    RunSteps(load);
+    if (load.create) {
+      RunCreate(load);
+    } else {
+      RunSteps(load);
+    }
     load.facts.loadSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
     load.done.store(true, std::memory_order_release);
+  }
+
+  namespace
+  {
+    /** A state of its own with the engine's bindings, as a session's (CWldSessionLoaderImpl.cpp). */
+    std::unique_ptr<LuaPlus::LuaState> NewDocumentState()
+    {
+      auto lua = std::make_unique<LuaPlus::LuaState>(LuaPlus::LuaState::LIB_BASE);
+      for (const char* const set : {"Core", "User"}) {
+        if (moho::CScrLuaInitFormSet* const forms = moho::SCR_FindLuaInitFormSet(set); forms != nullptr) {
+          forms->RunInits(lua.get());
+        }
+      }
+      return lua;
+    }
+
+    bool WriteText(const std::filesystem::path& file, const std::string& text, std::string& error)
+    {
+      std::ofstream out(file, std::ios::binary);
+      out.write(text.data(), static_cast<std::streamsize>(text.size()));
+      if (!out) {
+        error = "can't write " + file.string();
+        return false;
+      }
+      return true;
+    }
+
+    /** The folder name without FAF's version suffix (`seton.v0003` -> `seton`). */
+    [[nodiscard]] std::string BaseOfFolder(const std::string& folder);
+  } // namespace
+
+  void EdDocument::RunCreate(Load& load)
+  {
+    try {
+      load.lua = NewDocumentState();
+      LuaPlus::LuaState* const state = load.lua.get();
+      const NewMapSettings& settings = load.settings;
+      const int units = kNewMapSizes[std::clamp(settings.size, 0, kNewMapSizeCount - 1)].units;
+
+      // The engine's empty map: terrain (default layers, cleared masks, water off), no props.
+      auto map = std::make_unique<moho::CWldMap>();
+      (void)map->MapNew(units, units, state);
+      moho::CHeightField* const field = map->mTerrainRes != nullptr ? map->mTerrainRes->GetHeightField() : nullptr;
+      if (field == nullptr) {
+        load.error = "the engine made no terrain";
+        return;
+      }
+      const auto word = static_cast<std::uint16_t>(std::clamp(std::lround(settings.height * 128.0f), 0L, 65535L));
+      std::fill(field->data, field->data + static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height), word);
+      field->SetElevationRectRaw(gpg::Rect2i{0, 0, field->width - 1, field->height - 1}, field->data, field->width);
+      moho::STIMap& terrain = *map->mTerrainRes->mMap;
+      terrain.mWaterEnabled = settings.sea ? 1u : 0u;
+      terrain.mWaterElevation = settings.seaLevel;
+      terrain.mWaterElevationDeep = settings.seaLevel - 2.5f;
+      terrain.mWaterElevationAbyss = settings.seaLevel - 15.0f;
+      // The preview is written from its record; the chunk object only has to be there.
+      map->mMapPreviewChunk = new moho::RWldMapPreviewChunk();
+      MapFileRecords records;
+      records.preview = NewMapPreviewRecord(settings);
+
+      const std::string base = BaseOfFolder(settings.folder);
+      std::string error;
+      if (!WriteMapFile(*map, records, load.createFolder / (base + ".scmap"), error) ||
+          !WriteText(load.createFolder / (base + "_scenario.lua"), NewMapScenarioText(settings, base), error) ||
+          !WriteText(load.createFolder / (base + "_save.lua"), NewMapSaveText(settings), error) ||
+          !WriteText(load.createFolder / (base + "_script.lua"), NewMapScriptText(), error)) {
+        load.error = error;
+        return;
+      }
+      load.createdScenario = "/maps/" + settings.folder + "/" + base + "_scenario.lua";
+    } catch (const std::exception& error) {
+      load.error = error.what();
+    } catch (...) {
+      load.error = "an unknown error";
+    }
   }
 
   void EdDocument::RunSteps(Load& load)
   {
     try {
-      // A state of its own with the engine's bindings, as a session's (CWldSessionLoaderImpl.cpp).
-      load.lua = std::make_unique<LuaPlus::LuaState>(LuaPlus::LuaState::LIB_BASE);
+      load.lua = NewDocumentState();
       LuaPlus::LuaState* const state = load.lua.get();
-      for (const char* const set : {"Core", "User"}) {
-        if (moho::CScrLuaInitFormSet* const forms = moho::SCR_FindLuaInitFormSet(set); forms != nullptr) {
-          forms->RunInits(state);
-        }
-      }
 
       MapFacts& facts = load.facts;
       facts.scenarioPath = load.scenarioPath;
@@ -233,6 +311,55 @@ namespace faf::editor
     return true;
   }
 
+  bool EdDocument::CreateNew(const NewMapSettings& settings, std::string& message)
+  {
+    if (mState == State::Loading) {
+      message = "A map is still opening.";
+      return false;
+    }
+    if (settings.folder.empty() || settings.folder.find_first_of("\\/:*?\"<>|") != std::string::npos || settings.folder[0] == '.') {
+      message = "\"" + settings.folder + "\" can't be a folder name.";
+      return false;
+    }
+    if (mVault.empty()) {
+      message = "There is no vault folder to make the map in.";
+      return false;
+    }
+    const std::filesystem::path target = mVault / "maps" / settings.folder;
+    std::error_code error;
+    if (std::filesystem::exists(target, error)) {
+      message = target.string() + " already exists; pick another name.";
+      return false;
+    }
+    std::filesystem::create_directories(target, error);
+    if (error) {
+      message = "Can't make " + target.string() + ": " + error.message();
+      return false;
+    }
+    Close();
+    mPath.clear();
+    mState = State::Loading;
+    mLoad = std::make_unique<Load>();
+    mLoad->create = true;
+    mLoad->settings = settings;
+    mLoad->createFolder = target;
+    mThread = std::thread([load = mLoad.get()] { Run(*load); });
+    message = "Making " + target.string();
+    return true;
+  }
+
+  bool EdDocument::TakeCreated(std::filesystem::path& folder, std::string& scenarioPath)
+  {
+    if (mCreatedScenario.empty()) {
+      return false;
+    }
+    folder = std::move(mCreatedFolder);
+    scenarioPath = std::move(mCreatedScenario);
+    mCreatedFolder.clear();
+    mCreatedScenario.clear();
+    return true;
+  }
+
   void EdDocument::Wait()
   {
     if (mThread.joinable()) {
@@ -250,6 +377,19 @@ namespace faf::editor
     }
     mThread.join();
     std::unique_ptr<Load> load = std::move(mLoad);
+    if (load->create) {
+      // The new folder is on disk; the app mounts it and opens it like any map.
+      mState = load->error.empty() ? State::Empty : State::Failed;
+      mError = std::move(load->error);
+      if (mState == State::Empty) {
+        mCreatedFolder = load->createFolder;
+        mCreatedScenario = load->createdScenario;
+        gpg::Logf("editor: made the new map %s in %.2f s", mCreatedFolder.string().c_str(), load->facts.loadSeconds);
+      } else {
+        gpg::Warnf("editor: the new map %s was not made: %s", load->createFolder.string().c_str(), mError.c_str());
+      }
+      return true;
+    }
     mFacts = std::move(load->facts);
     mError = std::move(load->error);
     mMap = std::move(load->map);
@@ -313,6 +453,14 @@ namespace faf::editor
       return folder;
     }
 
+  } // namespace
+
+  namespace
+  {
+    std::string BaseOfFolder(const std::string& folder)
+    {
+      return WithoutVersion(folder);
+    }
   } // namespace
 
   std::string EdDocument::FolderName() const
