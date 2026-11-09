@@ -367,6 +367,17 @@ TEST(ReplayPlaybackServer, ViewFramesSurviveALossyLateAckChannel)
   );
 }
 
+// Every packet through the wire format and the game client's rebuild of it (remote/client), with dead reckoning in
+// 1/64-unit steps: what the client builds must be what the sim published.
+TEST(ReplayPlaybackServer, LoopbackClientRebuildsEveryPacket)
+{
+  ExpectServerCheck(
+    "loopback", " --loopback --loopback-dr 4 --loopback-turns 64",
+    {"loopback end:", "encode failures 0, decode failures 0, rebuild failures 0", "packet creations not rebuilt 0",
+     "erase mismatches 0, delete mismatches 0", "army lane", "(failures 0, records other than sent 0)"}
+  );
+}
+
 // The server's view work as a bench: every view's kept frame against one built whole, the Lua lane routed, the
 // session tables and pose lane, two pipeline threads and team views.
 TEST(ReplayPlaybackServer, ViewBenchFramesMatchWholeFrames)
