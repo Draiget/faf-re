@@ -201,6 +201,27 @@ do
         Log('sweep ' .. tableName .. ': ' .. called .. ' calls, ' .. failed .. ' errors')
     end
 
+    -- Every global getter the engine registers in the sim's Lua (a C function whose name says it reads), without an
+    -- argument and with 1.
+    function Zoo.SweepGlobals()
+        local globals = getfenv(0)
+        local names = {}
+        for name, value in globals do
+            if type(name) == 'string' and type(value) == 'cfunction' and IsGetter(name) and not SkipGetters['_G.' .. name] then
+                TableInsert(names, name)
+            end
+        end
+        table.sort(names)
+        local failed = 0
+        for i = 1, TableGetn(names) do
+            if Zoo.trace then Log('call _G.' .. names[i]) end
+            local fn = globals[names[i]]
+            if not pcall(fn) then failed = failed + 1 end
+            if not pcall(fn, 1) then failed = failed + 1 end
+        end
+        Log('sweep globals: ' .. TableGetn(names) .. ' getters, ' .. failed .. ' errors')
+    end
+
     function Zoo.SweepUnit(unit)
         if not Alive(unit) then
             return
@@ -266,6 +287,7 @@ do
             Try('DisbandPlatoon', brainA.DisbandPlatoon, brainA, platoon)
         end
         Zoo.DestroyAll(sample)
+        Zoo.SweepGlobals()
         Log('sweeps done')
     end
 
