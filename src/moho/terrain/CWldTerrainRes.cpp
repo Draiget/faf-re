@@ -62,6 +62,7 @@
 #include "moho/terrain/StratumMaterial.h"
 #include "moho/terrain/splat/CWldSplat.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
+#include "moho/terrain/water/WaterBodySurfaces.h"
 #include "moho/terrain/water/WaveSystem.h"
 #include "platform/X87Precision.h"
 
@@ -369,10 +370,60 @@ namespace
    * preview chunk (0x008A30D8 writes the version, 0x008A3176 the sample scale).
    */
   constexpr std::int32_t kTerrainSaveVersion = 60;
+  /**
+   * Engine addition (water bodies, .plans/water-levels/PLAN.md): `RebuildWaterMapRect` for a map
+   * with bodies. Each texel takes the level and abyss of its own water (`WaterOfBlock`), so a
+   * lake gets its depth and shoreline as the sea does, and a dry body none. Only the texels
+   * `RebuildWaterMapRect` would write are written, with the same packing.
+   */
+  void RebuildWaterMapRectWithBodies(moho::CWldTerrainRes& terrainRes, const gpg::Rect2i& updateRect)
+  {
+    const moho::STIMap& map = *terrainRes.mMap;
+    const moho::CHeightField& field = *map.mHeightField.get();
+    const std::int32_t halfX0 = std::max(updateRect.x0, 0) >> 1;
+    const std::int32_t halfZ0 = std::max(updateRect.z0, 0) >> 1;
+    const std::int32_t halfX1 = std::min(updateRect.x1, field.width - 1) >> 1;
+    const std::int32_t halfZ1 = std::min(updateRect.z1, field.height - 1) >> 1;
+    const auto halfMapWidth = static_cast<std::uint32_t>(static_cast<std::uint32_t>(field.width - 1) >> 1u);
+
+    for (std::int32_t halfZ = halfZ0; halfZ < halfZ1; ++halfZ) {
+      const std::int32_t worldZ = halfZ * 2;
+      for (std::int32_t halfX = halfX0; halfX < halfX1; ++halfX) {
+        const std::int32_t worldX = halfX * 2;
+        const std::uint32_t pixelIndex = static_cast<std::uint32_t>(halfX) + static_cast<std::uint32_t>(halfZ) * halfMapWidth;
+        const moho::SWaterOfBlock water = moho::WaterOfBlock(map, worldX, worldZ);
+
+        const float h00 = SampleTerrainHeightWordScaled(field, worldX, worldZ);
+        const float h10 = SampleTerrainHeightWordScaled(field, worldX + 2, worldZ);
+        const float h01 = SampleTerrainHeightWordScaled(field, worldX, worldZ + 2);
+        const float h11 = SampleTerrainHeightWordScaled(field, worldX + 2, worldZ + 2);
+
+        std::uint32_t packedSample = 0;
+        packedSample |= static_cast<std::uint32_t>(terrainRes.mWaterFoam[pixelIndex]) << 24u;
+        packedSample |= static_cast<std::uint32_t>(terrainRes.mWaterFlatness[pixelIndex]) << 16u;
+        const float level = water.level;
+        if (level > h00 || level > h10 || level > h01 || level > h11) {
+          const float depthByte = std::clamp(((level - h00) / (level - water.abyss)) * 255.0f, 0.0f, 255.0f);
+          packedSample |= static_cast<std::uint32_t>(static_cast<std::uint8_t>(depthByte)) << 8u;
+        }
+        if (level < h00 || level < h10 || level < h01 || level < h11) {
+          packedSample |= 0xFFu;
+        }
+        terrainRes.mEditWordBuffer.begin[pixelIndex] = packedSample;
+      }
+    }
+
+    terrainRes.UpdateTexture(terrainRes.mWaterMapTexture, terrainRes.mEditWordBuffer.begin);
+  }
+
   void RebuildWaterMapRect(moho::CWldTerrainRes& terrainRes, const gpg::Rect2i& updateRect)
   {
     constexpr float kNoWaterElevation = -10000.0f;
     moho::STIMap* const map = terrainRes.mMap;
+    if (map->HasWaterBodies()) {
+      RebuildWaterMapRectWithBodies(terrainRes, updateRect);
+      return;
+    }
     moho::CHeightField* const field = map->mHeightField.get();
 
     const std::int32_t maxZ = field->height - 1;

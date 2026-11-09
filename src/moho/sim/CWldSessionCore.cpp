@@ -2,6 +2,8 @@
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/SimKeyframe.h"
 #include "moho/sim/CWldSessionPrivate.h"
+#include "moho/sim/CWldMap.h"
+#include "moho/sim/STIMap.h"
 
 namespace moho
 {
@@ -313,6 +315,19 @@ namespace
       LuaPlus::LuaObject parsedScenario;
       (void)SCR_FromString(&parsedScenario, launchInfo->mScenarioInfo, mState);
       mScenarioInfo = parsedScenario;
+    }
+
+    // Engine addition (water bodies, .plans/water-levels/PLAN.md): the session's own map gets
+    // the bodies the sim fills from the same scenario under the same game version
+    // (FAF_BeginSession ran before this), so the water is drawn and queried where the sim has it.
+    // The water map was built at load with the sea only; it is built again with the bodies.
+    if (mWldMap != nullptr && mWldMap->mTerrainRes != nullptr && mWldMap->mTerrainRes->mMap != nullptr) {
+      IWldTerrainRes* const terrainRes = mWldMap->mTerrainRes;
+      const bool hadBodies = terrainRes->mMap->HasWaterBodies();
+      terrainRes->mMap->InstallWaterBodies(mScenarioInfo);
+      if (hadBodies || terrainRes->mMap->HasWaterBodies()) {
+        terrainRes->UpdateWaterMap();
+      }
     }
 
     // Observers are unconditionally allowed while watching a replay; otherwise

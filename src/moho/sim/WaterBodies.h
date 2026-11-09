@@ -129,9 +129,20 @@ namespace moho
     /// The highest water level of any body.
     [[nodiscard]] float HighestLevel() const noexcept;
 
+    /**
+     * The body of the 2 x 2 cells whose first corner is vertex `(x, z)`, one texel of the
+     * terrain's half-resolution water map: the lowest body number among them, else 0.
+     */
+    [[nodiscard]] std::uint8_t BodyOfBlock(std::int32_t x, std::int32_t z) const noexcept;
+
+    /// Different for every `Build` in this process (a copy keeps it), so a renderer can tell
+    /// that the bodies it drew are no longer the map's.
+    [[nodiscard]] std::uint32_t Generation() const noexcept { return mGeneration; }
+
   private:
     CWaterBodies() = default;
 
+    std::uint32_t mGeneration{0};
     std::int32_t mVertexWidth{0};
     std::int32_t mVertexHeight{0};
     std::vector<std::uint8_t> mVertexBody;

@@ -4,6 +4,11 @@
 #include "moho/render/FxaaRenderer.h"
 #include "moho/render/PostRenderer.h"
 #include "moho/render/WideBloomRenderer.h"
+#include "moho/sim/STIMap.h"
+#include "moho/terrain/water/WaterBodySurfaces.h"
+
+#include <array>
+#include <cstdlib>
 
 namespace
 {
@@ -1193,7 +1198,8 @@ unsigned int moho::WRenViewport::RenderCartographic(
   }
 
   moho::Cartographic& cartographic = terrain->GetCartographic();
-  if (!cartographic.IsInitialized()) {
+  // Engine addition (water bodies): built again once the session has installed the map's bodies.
+  if (!cartographic.IsInitialized() || (terrain->mMap != nullptr && moho::CartographicWaterBodiesStale(*terrain->mMap))) {
     // The five hypsometric-color lanes the mangled Initialize() declares are
     // never read by its shipped body (it re-reads them off the terrain
     // itself) - see Cartographic::Initialize's own doc comment.
@@ -1457,9 +1463,11 @@ void moho::WRenViewport::D3DWindowOnDeviceExit(const bool fullShutdown)
     // each group is released by a named helper in its own translation unit and
     // REN_ReleaseTerrainSharedResources walks the three in the binary's order.
     moho::REN_ReleaseTerrainSharedResources();
+    moho::WaterBodySurfaces::Release();
   } else {
     meshRenderer->Reset();
   }
+  ReleaseWaterBodyReflections();
 
   mFrame.ResetTransientResources();
 
@@ -2785,6 +2793,7 @@ void moho::WRenViewport::RenderReflections()
     }
   }
   if (!moho::ren_Reflection || sReflectionDisabled) {
+    RenderWaterBodyReflection(false);
     return;
   }
   SetViewportToLocalScreen();
@@ -2792,6 +2801,118 @@ void moho::WRenViewport::RenderReflections()
 
   moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
   renderer->Render(2, *mCam, nullptr, renderer->meshes);
+
+  RenderWaterBodyReflection(true);
+}
+
+namespace
+{
+  /// Engine addition (water bodies): a head's lake reflection and the cleared target other lakes sample.
+  struct SWaterBodyReflection
+  {
+    boost::shared_ptr<moho::CD3DRenderTarget> body;
+    boost::shared_ptr<moho::CD3DRenderTarget> empty;
+    boost::shared_ptr<moho::CD3DDepthStencil> emptyDepth;
+    int width = 0;
+    int height = 0;
+  };
+  std::array<SWaterBodyReflection, 2> sWaterBodyReflections;
+
+  /**
+   * The wet body most seen through a 5 x 5 grid of view rays, ties to the one nearer the
+   * centre; 0 when the rays see none.
+   */
+  [[nodiscard]] std::uint8_t MostVisibleWaterBody(const moho::GeomCamera3& camera, const moho::STIMap& map)
+  {
+    const moho::CWaterBodies& bodies = *map.mWaterBodies;
+    std::array<std::int32_t, 256> score{};
+    for (std::int32_t row = 0; row < 5; ++row) {
+      for (std::int32_t column = 0; column < 5; ++column) {
+        const Wm3::Vector2f point{0.1f + 0.2f * static_cast<float>(column), 0.1f + 0.2f * static_cast<float>(row)};
+        const moho::GeomLine3 ray = camera.Unproject(point, 0.0f, 1.0f, 0.0f, 1.0f);
+        const Wm3::Vec3f hit = map.SurfaceIntersection(ray, nullptr);
+        if (!Wm3::Vec3f::IsntNaN(hit)) {
+          continue;
+        }
+        const std::uint8_t number = bodies.BodyOfCell(static_cast<std::int32_t>(hit.x), static_cast<std::int32_t>(hit.z));
+        if (number != 0u && bodies.Body(number).elevation != moho::kWaterBodyNoWater) {
+          // 4 for each hit, plus 1 more the nearer the ray is to the centre (at most 2 away).
+          score[number] += 4 + (2 - std::max(std::abs(row - 2), std::abs(column - 2)));
+        }
+      }
+    }
+    std::uint8_t best = 0u;
+    for (std::size_t number = 1; number < score.size(); ++number) {
+      if (score[number] > score[best]) {
+        best = static_cast<std::uint8_t>(number);
+      }
+    }
+    return score[best] > 0 ? best : 0u;
+  }
+} // namespace
+
+/**
+ * Engine addition (water bodies, .plans/water-levels/PLAN.md). The planar reflection is mirrored
+ * at the sea, so a lake at another level would show units mirrored at the sea. When the map has
+ * bodies this renders the meshes once more, mirrored at the level of the lake the view sees most,
+ * into a target of its own, and clears a small target for every other lake to sample (so they
+ * reflect the sky). `WaterBodySurfaces::ReflectionFor` hands each lake its target. Without bodies
+ * it does nothing.
+ */
+void moho::WRenViewport::RenderWaterBodyReflection(const bool meshes)
+{
+  const std::size_t head = static_cast<std::size_t>(mHead);
+  moho::IWldTerrainRes* const terrainRes = moho::REN_GetTerrainRes();
+  const moho::STIMap* const map = terrainRes != nullptr ? terrainRes->mMap : nullptr;
+  if (map == nullptr || !map->HasWaterBodies() || head >= sWaterBodyReflections.size()) {
+    moho::WaterBodySurfaces::SetBodyReflection(false, 0.0f, {}, {});
+    return;
+  }
+
+  moho::CD3DDevice* const device = moho::D3D_GetDevice();
+  SWaterBodyReflection& targets = sWaterBodyReflections[head];
+  const int width = device->GetHeadWidth(mHead);
+  const int height = device->GetHeadHeight(mHead);
+  moho::ID3DDeviceResources* const resources = device->GetResources();
+  if (!targets.empty || !targets.emptyDepth) {
+    resources->CreateRenderTarget(targets.empty, 4, 4, kViewportHeadTargetFormat);
+    resources->CreateDepthStencil(targets.emptyDepth, 4, 4, kViewportHeadDepthStencilFormat);
+  }
+  if (!targets.body || targets.width != width || targets.height != height) {
+    targets.body.reset();
+    resources->CreateRenderTarget(targets.body, width, height, kViewportHeadTargetFormat);
+    targets.width = width;
+    targets.height = height;
+  }
+
+  if (!targets.empty || !targets.emptyDepth || !mDepthStencilLocks[head]) {
+    moho::WaterBodySurfaces::SetBodyReflection(false, 0.0f, {}, {});
+    return;
+  }
+  device->SetRenderTarget1(targets.empty.get(), targets.emptyDepth.get(), true, 0, 1.0f, 0);
+
+  const std::uint8_t body = meshes ? MostVisibleWaterBody(*mCam, *map) : 0u;
+  if (body == 0u || !targets.body) {
+    moho::WaterBodySurfaces::SetBodyReflection(false, 0.0f, targets.body, targets.empty);
+    return;
+  }
+  const float level = map->mWaterBodies->Body(body).elevation;
+  device->SetRenderTarget1(targets.body.get(), mDepthStencilLocks[head].get(), true, 0, 1.0f, 0);
+  SetViewportToLocalScreen();
+  device->SetColorWriteState(true, true);
+  moho::MESH_SetMirrorElevation(true, level);
+  moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
+  renderer->Render(2, *mCam, nullptr, renderer->meshes);
+  moho::MESH_SetMirrorElevation(false, 0.0f);
+  moho::WaterBodySurfaces::SetBodyReflection(true, level, targets.body, targets.empty);
+}
+
+void moho::WRenViewport::ReleaseWaterBodyReflections()
+{
+  for (SWaterBodyReflection& targets : sWaterBodyReflections) {
+    targets = SWaterBodyReflection{};
+  }
+  moho::WaterBodySurfaces::SetBodyReflection(false, 0.0f, {}, {});
 }
 
 /**

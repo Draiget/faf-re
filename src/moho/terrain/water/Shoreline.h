@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 #include "boost/shared_ptr.h"
 #include "legacy/containers/Vector.h"
@@ -29,6 +30,15 @@ namespace moho
    * Dissolve-cutoff value propagated into generated shoreline spatial-db cells.
    */
   extern float ren_ShorelineCutoff;
+
+  /// Engine addition (water bodies): vertices `[firstVertex, firstVertex + vertexCount)` of the
+  /// shoreline sheet whose water is at `level`.
+  struct SShorelineLevelRun
+  {
+    float level;
+    std::int32_t firstVertex;
+    std::int32_t vertexCount;
+  };
 
   /**
    * Terrain-water shoreline runtime owner.
@@ -100,6 +110,13 @@ namespace moho
      * publishes the final vertex/triangle counts to the engine stats.
      */
     void Update(const GeomCamera3& camera);
+
+    /**
+     * Engine addition (water bodies, .plans/water-levels/PLAN.md): the vertices the last
+     * `Update` wrote, grouped by the level of their water, in sheet order. Null when the map has
+     * no bodies: then every vertex is at the map's one level, as in the binary.
+     */
+    [[nodiscard]] const std::vector<SShorelineLevelRun>* LevelRuns() const;
 
   public:
     // The shoreline owns the database its cells register into: 0x90 bytes at

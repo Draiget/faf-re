@@ -1,6 +1,7 @@
 #include "moho/sim/WaterBodies.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 
@@ -289,7 +290,23 @@ namespace moho
     if (!anyCell) {
       return nullptr;
     }
+    static std::atomic<std::uint32_t> sGenerations{0};
+    result->mGeneration = ++sGenerations;
     return result;
+  }
+
+  std::uint8_t CWaterBodies::BodyOfBlock(const std::int32_t x, const std::int32_t z) const noexcept
+  {
+    std::uint8_t owner = 0u;
+    for (std::int32_t dz = 0; dz < 2; ++dz) {
+      for (std::int32_t dx = 0; dx < 2; ++dx) {
+        const std::uint8_t body = BodyOfCell(x + dx, z + dz);
+        if (body != 0u && (owner == 0u || body < owner)) {
+          owner = body;
+        }
+      }
+    }
+    return owner;
   }
 
   std::uint8_t CWaterBodies::BodyOfCell(const std::int32_t x, const std::int32_t z) const noexcept

@@ -69,7 +69,17 @@ namespace moho
 namespace
 {
     MeshRenderer* gMeshRendererInstance = nullptr;
+
+    /// Engine addition (water bodies): the level the next mirrored passes reflect at, when set.
+    bool sMirrorElevationSet = false;
+    float sMirrorElevation = 0.0f;
 }
+
+  void MESH_SetMirrorElevation(const bool set, const float elevation) noexcept
+  {
+    sMirrorElevationSet = set;
+    sMirrorElevation = elevation;
+  }
 
 
   /**
@@ -651,6 +661,10 @@ namespace
       surfaceElevation = (map->mWaterEnabled != 0) ? map->mWaterElevation : -10000.0f;
     } else {
       surfaceElevation = -1000.0f;
+    }
+    // Engine addition (water bodies): a reflection pass for a lake mirrors at the lake's level.
+    if (mirrored && sMirrorElevationSet) {
+      surfaceElevation = sMirrorElevation;
     }
 
     // Global lookup textures + the three per-frame texture binds.

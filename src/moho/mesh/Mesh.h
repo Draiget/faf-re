@@ -1017,6 +1017,13 @@ namespace moho
   static_assert(offsetof(MeshShaderPaletteVar, mPalette) == 0x48, "MeshShaderPaletteVar::mPalette offset must be 0x48");
   static_assert(sizeof(MeshShaderPaletteVar) == 0x58, "MeshShaderPaletteVar size must be 0x58");
 
+  /**
+   * Engine addition (water bodies, .plans/water-levels/PLAN.md): with `set`, mirrored mesh passes
+   * (`MeshRenderer::Render` with flags 2) reflect at `elevation` instead of the sea, for a lake's
+   * reflection; without, at the sea as in the binary.
+   */
+  void MESH_SetMirrorElevation(bool set, float elevation) noexcept;
+
   class MeshRenderer
   {
   public:

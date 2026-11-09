@@ -33,6 +33,7 @@
 #include "moho/terrain/TerrainShaderVars.h"
 #include "moho/terrain/splat/CWldSplat.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
+#include "moho/terrain/water/WaterBodySurfaces.h"
 #include "moho/terrain/water/WaterFactory.h"
 #include "moho/terrain/water/WaterShaderVars.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
@@ -1450,7 +1451,9 @@ namespace moho
     // has no water enabled). The runtime map object at mTerrainResource->mMap is
     // the same object read by the binary at [terrainRes + 4].
     const STIMap& map = *mTerrainResource->mMap;
-    const float waterElevation = map.mWaterEnabled ? map.mWaterElevation : kWaterElevationSentinel;
+    // Engine addition (water bodies): the highest level, as HighFidelityTerrain::DrawNormals.
+    const float waterElevation = map.HasWaterBodies() ? WaterBodyTerrainShaderLevel(map)
+                                                      : (map.mWaterEnabled ? map.mWaterElevation : kWaterElevationSentinel);
     if (shaderVars.waterElevation.Exists()) {
       shaderVars.waterElevation.SetFloat(waterElevation);
     }

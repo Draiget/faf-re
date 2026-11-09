@@ -411,6 +411,13 @@ namespace moho
      */
     void RenderReflections();
 
+    /// Engine addition (water bodies): the lake reflection after the sea's; `meshes` false
+    /// when reflections are off, which still clears the target lakes sample.
+    void RenderWaterBodyReflection(bool meshes);
+
+    /// Engine addition (water bodies): drops the lake reflection targets with the device.
+    static void ReleaseWaterBodyReflections();
+
     /**
      * Address: 0x007F7ED0 (FUN_007F7ED0)
      * Mangled: ?SetViewportToFullScreen@WRenViewport@Moho@@AAEXXZ

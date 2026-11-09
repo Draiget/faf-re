@@ -44,6 +44,7 @@
 #include "moho/terrain/StratumMaterial.h"
 #include "moho/terrain/TerrainDynamicTextureHelpers.h"
 #include "moho/terrain/TerrainShaderVars.h"
+#include "moho/terrain/water/WaterBodySurfaces.h"
 #include "moho/terrain/water/WaterFactory.h"
 #include "moho/terrain/water/WaterShaderVars.h"
 #include "moho/terrain/water/WaterSurface.h"
@@ -665,8 +666,13 @@ namespace moho
       return;
     }
 
-    if (forceRegenerate != 0) {
+    // Engine addition (water bodies): the session installs the bodies after this terrain was
+    // created, so the shoreline is generated again when the map's bodies are not the ones it has.
+    static std::uint32_t sShorelineWaterBodies = 0;
+    const std::uint32_t waterBodies = WaterBodiesGeneration(*mTerrainResource->mMap);
+    if (forceRegenerate != 0 || waterBodies != sShorelineWaterBodies) {
       mShoreline.Generate(mTerrainResource);
+      sShorelineWaterBodies = waterBodies;
     }
 
     mCamera = camera;
@@ -1361,9 +1367,12 @@ namespace moho
     constexpr float kNoWaterElevation = -10000.0F;
     const STIMap& map = *mTerrainResource->mMap;
 
+    // Engine addition (water bodies): the highest level, so every lake bed is shaded as under
+    // water (WaterBodyTerrainShaderLevel); exactly the sea's level on a map without bodies.
     if (shaderVars.waterElevation.Exists()) {
       shaderVars.waterElevation.SetFloat(
-        map.mWaterEnabled ? map.mWaterElevation : kNoWaterElevation);
+        map.HasWaterBodies() ? WaterBodyTerrainShaderLevel(map)
+                             : (map.mWaterEnabled ? map.mWaterElevation : kNoWaterElevation));
     }
     if (shaderVars.waterElevationDeep.Exists()) {
       shaderVars.waterElevationDeep.SetFloat(
@@ -1432,6 +1441,14 @@ namespace moho
       CWldTerrainDecal& decal = *command.decal;
       if (decal.mType != WldTerrainDecalType_WaterAlbedo) {
         continue;
+      }
+
+      // Engine addition (water bodies): the shader lifts a water decal to `WaterElevation`, so a
+      // decal takes the level of the water at its centre rather than the terrain pass's highest.
+      if (const STIMap& map = *mTerrainResource->mMap; map.HasWaterBodies() && shaderVars.waterElevation.Exists()) {
+        shaderVars.waterElevation.SetFloat(map.GetWaterElevationAt(
+          (decal.mBoundsMinX + decal.mBoundsMaxX) * 0.5F, (decal.mBoundsMinZ + decal.mBoundsMaxZ) * 0.5F
+        ));
       }
 
       if (shaderVars.decalMatrix.Exists()) {
@@ -1852,6 +1869,26 @@ namespace moho
     GetWater2ProjectionShorelineShaderVar().SetMatrix4x4(&camera->projection);
 
     const STIMap* const map = terrainRes->mMap;
+    std::int32_t primitiveType = kTriangleListPrimitiveToken;
+
+    // Engine addition (water bodies): each group of cells at its own water's level.
+    if (const std::vector<SShorelineLevelRun>* const runs = shoreline->LevelRuns(); runs != nullptr) {
+      for (const SShorelineLevelRun& run : *runs) {
+        if (run.vertexCount <= 0) {
+          continue;
+        }
+        GetWater2WaterElevationTShorelineShaderVar().SetFloat(run.level);
+        SD3DVertexRange runView{};
+        runView.sheet = shoreline->mVertexSheet.get();
+        // DrawPrimitiveList draws `endVertex - startVertex + 1` vertices from `baseVertex`.
+        runView.startVertex = 0;
+        runView.baseVertex = run.firstVertex;
+        runView.endVertex = run.vertexCount - 1;
+        (void)device->DrawPrimitiveList(&runView, &primitiveType);
+      }
+      return;
+    }
+
     const float waterElevation = (map->mWaterEnabled != 0) ? map->mWaterElevation : kDisabledWaterElevation;
     GetWater2WaterElevationTShorelineShaderVar().SetFloat(waterElevation);
 
@@ -1861,7 +1898,6 @@ namespace moho
     shorelineView.baseVertex = 0;
     shorelineView.endVertex = shoreline->mShorelineTris * 3 - 1;
 
-    std::int32_t primitiveType = kTriangleListPrimitiveToken;
     (void)device->DrawPrimitiveList(&shorelineView, &primitiveType);
   }
 

@@ -335,6 +335,7 @@ set(FAF_ENGINE_SOURCES
   moho/terrain/water/WaterShaderVars.cpp
   moho/terrain/water/WaveSystem.cpp
   moho/terrain/water/Shoreline.cpp
+  moho/terrain/water/WaterBodySurfaces.cpp
   moho/ui/CUIWorldView.cpp
   moho/ui/CUIManager.cpp
   moho/lua/SCR_Math.cpp

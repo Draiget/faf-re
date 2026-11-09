@@ -16,6 +16,7 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
+#include "moho/terrain/water/WaterBodySurfaces.h"
 #include "moho/terrain/water/WaterShaderVars.h"
 
 namespace
@@ -263,6 +264,17 @@ namespace moho
     GetWater2UtilityTextureCShaderVar().GetTexture(utilityTexture);
 
     std::int32_t primitiveType = kTriangleListPrimitiveToken;
+    // Engine addition (water bodies): the mask is laid at each water's own level.
+    if (const auto* const levels = WaterBodySurfaces::For(terrainRes); levels != nullptr) {
+      bool drawn = true;
+      for (const WaterBodySurfaces::Level& level : *levels) {
+        GetWater2WaterElevationShaderVar().SetFloat(level.elevation);
+        for (const WaterBodySurfaces::Chunk& chunk : level.chunks) {
+          drawn = device->DrawIndexedSheetPrimitive(chunk.vertices, chunk.indices, &primitiveType) && drawn;
+        }
+      }
+      return drawn;
+    }
     return device->DrawIndexedSheetPrimitive(mVertexSheet, mIndexSheet, &primitiveType);
   }
 
@@ -369,6 +381,21 @@ namespace moho
     (void)SetWater2TerrainScaleShaderVarData(terrainScale);
 
     std::int32_t primitiveType = kTriangleListPrimitiveToken;
+    // Engine addition (water bodies): each water at its own level. Only the sea samples the
+    // planar reflection, which is mirrored at the sea; a body samples its own (see ReflectionFor).
+    if (const auto* const levels = WaterBodySurfaces::For(mTerrainRes); levels != nullptr) {
+      bool drawn = true;
+      for (const WaterBodySurfaces::Level& level : *levels) {
+        GetWater2WaterElevationShaderVar().SetFloat(level.elevation);
+        GetWater2ReflectionMapShaderVar().SetRenderTargetTexture(
+          level.sea ? reflectionTexture : WaterBodySurfaces::ReflectionFor(level.elevation)
+        );
+        for (const WaterBodySurfaces::Chunk& chunk : level.chunks) {
+          drawn = device->DrawIndexedSheetPrimitive(chunk.vertices, chunk.indices, &primitiveType) && drawn;
+        }
+      }
+      return drawn;
+    }
     return device->DrawIndexedSheetPrimitive(mVertexSheet, mIndexSheet, &primitiveType);
   }
 

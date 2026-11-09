@@ -42,6 +42,7 @@
 #include "gpg/gal/RenderProfiler.h"
 #include "moho/render/BoundaryRenderer.h"
 #include "moho/render/IRenderWorldView.h"
+#include "moho/terrain/water/WaterBodySurfaces.h"
 #include "moho/render/RangeRenderer.h"
 #include "moho/render/SelectionBracketRenderer.h"
 #include "moho/render/VisionRenderer.h"
@@ -1643,6 +1644,17 @@ namespace moho
     }
   }
 
+  namespace
+  {
+    /// Engine addition: `WaterBodiesGeneration` of the map the textures were last built for.
+    std::uint32_t sCartographicWaterBodies = 0;
+  } // namespace
+
+  bool CartographicWaterBodiesStale(const STIMap& map) noexcept
+  {
+    return WaterBodiesGeneration(map) != sCartographicWaterBodies;
+  }
+
   /**
    * Address: 0x007D20F0 (FUN_007D20F0)
    * Mangled: ?InitializeTerrain@Cartographic@Moho@@AAEXPAVIWldTerrainRes@2@HIIIII@Z
@@ -1728,6 +1740,47 @@ namespace moho
     mHypsometricColors[4] = static_cast<std::int32_t>(hypsometricColor4);
 
     InitializeTerrainTextures(heightField, gridWidth, gridHeight, topographicSamples);
+
+    // Engine addition (water bodies, .plans/water-levels/PLAN.md): the ramp colours water by
+    // elevation below the sea, so a vertex of a body shows the depth below its own level as that
+    // depth below the sea (scaled from the body's deep range to the sea's), and a vertex of a dry
+    // body shows as the lowest land. Needs a sea, which gives the ramp its water colours.
+    if (map.HasWaterBodies() && mHasElevationBounds && mElevTexture) {
+      const float elevationSpan = mElevMaximum - mElevMinimum;
+      const float inverseSpan = elevationSpan > 0.0f ? 1.0f / elevationSpan : 1.0f;
+      const float seaRange = mSurfaceElevation - mWaterElevation;
+      const float stepX = static_cast<float>(heightField.width - 1) / static_cast<float>(gridWidth - 1);
+      const float stepZ = static_cast<float>(heightField.height - 1) / static_cast<float>(gridHeight - 1);
+      const CWaterBodies& bodies = *map.mWaterBodies;
+
+      auto* rowCursor = static_cast<std::uint16_t*>(LockWholeCartographicTexture(*mElevTexture));
+      for (std::int32_t z = 0; z < gridHeight; ++z) {
+        // The sample InitializeTerrainTextures' kernel reads for this texel.
+        const std::int32_t vz = std::clamp(static_cast<std::int32_t>(static_cast<float>(z) * stepZ) - 1, 0, heightField.height - 1);
+        std::uint16_t* texel = rowCursor;
+        for (std::int32_t x = 0; x < gridWidth; ++x, texel += kCartographicElevationTexelWordStride) {
+          const std::int32_t vx = std::clamp(static_cast<std::int32_t>(static_cast<float>(x) * stepX) - 1, 0, heightField.width - 1);
+          const std::uint8_t number = bodies.BodyOfVertex(vx, vz);
+          if (number == 0u) {
+            continue;
+          }
+          const SWaterBody& body = bodies.Body(number);
+          const float terrain = static_cast<float>(heightField.data[(vz * heightField.width) + vx]) * kCartographicHeightWordScale;
+          float shown;
+          if (body.elevation == kWaterBodyNoWater) {
+            shown = std::max(terrain, mSurfaceElevation + 0.01f * elevationSpan);
+          } else {
+            const float below = body.elevation - terrain;
+            const float bodyRange = body.elevation - body.deep;
+            shown = mSurfaceElevation - ((bodyRange > 0.0f && seaRange > 0.0f) ? below * seaRange / bodyRange : below);
+          }
+          *texel = gpg::gal::FloatToHalf((shown - mElevMinimum) * inverseSpan);
+        }
+        rowCursor += kCartographicElevationTexelWordStride * gridWidth;
+      }
+      (void)mElevTexture->Unlock(0);
+    }
+    sCartographicWaterBodies = WaterBodiesGeneration(map);
 
     boost::shared_ptr<gpg::gal::VertexFormat> terrainVertexFormat;
     terrainVertexFormat = device->CreateVertexFormat(kCartographicTerrainVertexFormatToken);
