@@ -273,6 +273,7 @@ namespace faf::editor
         }
       }
     }
+    DrawGizmo(*batcher);
     if (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive()) {
       batcher->Flush();
       return;
@@ -1364,6 +1365,208 @@ namespace faf::editor
     constexpr float kCopyReach = 1.5f;
   } // namespace
 
+  bool EdMapScene::GizmoOrigin(Wm3::Vec3f& origin) const
+  {
+    if (mTools == nullptr || mMap == nullptr) {
+      return false;
+    }
+    float sx = 0.0f, sy = 0.0f, sz = 0.0f;
+    int count = 0;
+    if (mTools->MarkersToolActive()) {
+      for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+        float x = 0.0f, y = 0.0f, z = 0.0f;
+        if (std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end() &&
+            MarkerPosition(marker, x, y, z)) {
+          sx += x;
+          sy += y;
+          sz += z;
+          ++count;
+        }
+      }
+    } else if (mTools->SelectToolActive() && mMap->mProps != nullptr) {
+      for (const int index : mSelection) {
+        const Wm3::Vec3f& p = mMap->mProps->mEntries[static_cast<std::size_t>(index)].mTransform.pos_;
+        sx += p.x;
+        sy += p.y;
+        sz += p.z;
+        ++count;
+      }
+    }
+    if (count == 0) {
+      return false;
+    }
+    origin = Wm3::Vec3f{sx / static_cast<float>(count), sy / static_cast<float>(count), sz / static_cast<float>(count)};
+    return true;
+  }
+
+  namespace
+  {
+    Wm3::Vec3f GizmoAxis(const EdMapScene::GizmoPart part)
+    {
+      switch (part) {
+      case EdMapScene::GizmoPart::X:
+        return Wm3::Vec3f{1.0f, 0.0f, 0.0f};
+      case EdMapScene::GizmoPart::Y:
+        return Wm3::Vec3f{0.0f, 1.0f, 0.0f};
+      case EdMapScene::GizmoPart::Z:
+        return Wm3::Vec3f{0.0f, 0.0f, 1.0f};
+      default:
+        return Wm3::Vec3f{0.0f, 0.0f, 0.0f};
+      }
+    }
+
+    /** The distance on screen from `p` to the segment a-b. */
+    float SegmentDistance(const Wm3::Vector2f& p, const Wm3::Vector2f& a, const Wm3::Vector2f& b)
+    {
+      const float dx = b.x - a.x;
+      const float dy = b.y - a.y;
+      const float length2 = dx * dx + dy * dy;
+      const float t = length2 > 0.0f ? std::clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / length2, 0.0f, 1.0f) : 0.0f;
+      return std::hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t));
+    }
+  } // namespace
+
+  EdMapScene::GizmoPart EdMapScene::PickGizmo(const POINT at) const
+  {
+    Wm3::Vec3f origin;
+    if (mCamera == nullptr || !GizmoOrigin(origin)) {
+      return GizmoPart::None;
+    }
+    const float length = GizmoLength();
+    const Wm3::Vector2f cursor(static_cast<float>(at.x), static_cast<float>(at.y));
+    const Wm3::Vector2f centre = mCamera->Project(origin);
+    if (std::hypot(cursor.x - centre.x, cursor.y - centre.y) < 12.0f) {
+      return GizmoPart::Free;
+    }
+    GizmoPart best = GizmoPart::None;
+    float bestDistance = 9.0f;
+    for (const GizmoPart part : {GizmoPart::X, GizmoPart::Y, GizmoPart::Z}) {
+      const Wm3::Vec3f axis = GizmoAxis(part);
+      const Wm3::Vector2f tip = mCamera->Project(Wm3::Vec3f{origin.x + axis.x * length, origin.y + axis.y * length, origin.z + axis.z * length});
+      // The arm from a quarter of its length, so the middle stays the free square's.
+      const Wm3::Vector2f from(centre.x + (tip.x - centre.x) * 0.25f, centre.y + (tip.y - centre.y) * 0.25f);
+      const float d = SegmentDistance(cursor, from, tip);
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = part;
+      }
+    }
+    return best;
+  }
+
+  void EdMapScene::DrawGizmo(moho::CD3DPrimBatcher& batcher)
+  {
+    Wm3::Vec3f origin;
+    if (mCamera == nullptr || !GizmoOrigin(origin)) {
+      return;
+    }
+    const GizmoPart hot = mGizmoDrag != GizmoPart::None ? mGizmoDrag : PickGizmo(mCursor);
+    const float length = GizmoLength();
+    const auto vertex = [](const Wm3::Vec3f& p, const std::uint32_t color) {
+      moho::CD3DPrimBatcher::Vertex v{};
+      v.mX = p.x;
+      v.mY = p.y;
+      v.mZ = p.z;
+      v.mColor = color;
+      return v;
+    };
+    const auto add = [](const Wm3::Vec3f& a, const Wm3::Vec3f& d, const float s) { return Wm3::Vec3f{a.x + d.x * s, a.y + d.y * s, a.z + d.z * s}; };
+    constexpr std::uint32_t kHot = 0xFFFFE040u;
+    const std::pair<GizmoPart, std::uint32_t> arms[] = {{GizmoPart::X, 0xFFFF4848u}, {GizmoPart::Y, 0xFF48E048u}, {GizmoPart::Z, 0xFF4880FFu}};
+    for (const auto& [part, color] : arms) {
+      const std::uint32_t c = part == hot ? kHot : color;
+      const Wm3::Vec3f axis = GizmoAxis(part);
+      const Wm3::Vec3f tip = add(origin, axis, length);
+      batcher.DrawLine(vertex(add(origin, axis, length * 0.15f), c), vertex(tip, c));
+      // The arrow's head: four lines back from the tip, around the arm.
+      const Wm3::Vec3f across1 = part == GizmoPart::Y ? Wm3::Vec3f{1.0f, 0.0f, 0.0f} : Wm3::Vec3f{0.0f, 1.0f, 0.0f};
+      const Wm3::Vec3f across2 = part == GizmoPart::Z ? Wm3::Vec3f{1.0f, 0.0f, 0.0f} : Wm3::Vec3f{0.0f, 0.0f, part == GizmoPart::X ? 1.0f : 1.0f};
+      const Wm3::Vec3f back = add(origin, axis, length * 0.78f);
+      for (const Wm3::Vec3f& side : {across1, across2}) {
+        batcher.DrawLine(vertex(tip, c), vertex(add(back, side, length * 0.07f), c));
+        batcher.DrawLine(vertex(tip, c), vertex(add(back, side, -length * 0.07f), c));
+      }
+    }
+    // The free square, on the ground plane through the middle.
+    const std::uint32_t free = hot == GizmoPart::Free ? kHot : 0xFFF0F0F0u;
+    const float s = length * 0.1f;
+    const Wm3::Vec3f corners[4] = {{origin.x - s, origin.y, origin.z - s}, {origin.x + s, origin.y, origin.z - s},
+                                   {origin.x + s, origin.y, origin.z + s}, {origin.x - s, origin.y, origin.z + s}};
+    for (int i = 0; i < 4; ++i) {
+      batcher.DrawLine(vertex(corners[i], free), vertex(corners[(i + 1) % 4], free));
+    }
+  }
+
+  void EdMapScene::BeginGizmoDrag(const GizmoPart part, const POINT at)
+  {
+    mGizmoDrag = part;
+    mGizmoFrom = at;
+    (void)GizmoOrigin(mGizmoStart);
+    mGizmoDragLength = GizmoLength();
+    if (!GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), mGizmoGroundX, mGizmoGroundZ)) {
+      mGizmoGroundX = mGizmoStart.x;
+      mGizmoGroundZ = mGizmoStart.z;
+    }
+    gpg::Logf("editor: move gizmo %s drag from %.2f, %.2f, %.2f",
+              part == GizmoPart::X ? "X" : part == GizmoPart::Y ? "Y" : part == GizmoPart::Z ? "Z" : "free",
+              static_cast<double>(mGizmoStart.x), static_cast<double>(mGizmoStart.y), static_cast<double>(mGizmoStart.z));
+  }
+
+  Wm3::Vec3f EdMapScene::GizmoDisplacement(const POINT at) const
+  {
+    if (mGizmoDrag == GizmoPart::Free) {
+      float x = 0.0f;
+      float z = 0.0f;
+      if (!GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), x, z)) {
+        return Wm3::Vec3f{0.0f, 0.0f, 0.0f};
+      }
+      return Wm3::Vec3f{x - mGizmoGroundX, 0.0f, z - mGizmoGroundZ};
+    }
+    // The arm on screen at the drag's start; the cursor's move along it, in world units.
+    const Wm3::Vec3f axis = GizmoAxis(mGizmoDrag);
+    const Wm3::Vector2f from = mCamera->Project(mGizmoStart);
+    const Wm3::Vector2f to = mCamera->Project(Wm3::Vec3f{mGizmoStart.x + axis.x * mGizmoDragLength, mGizmoStart.y + axis.y * mGizmoDragLength,
+                                                         mGizmoStart.z + axis.z * mGizmoDragLength});
+    const float sx = to.x - from.x;
+    const float sy = to.y - from.y;
+    const float length2 = sx * sx + sy * sy;
+    if (length2 < 4.0f) {
+      return Wm3::Vec3f{0.0f, 0.0f, 0.0f}; // the arm points at the camera: no usable direction
+    }
+    const float dx = static_cast<float>(at.x - mGizmoFrom.x);
+    const float dy = static_cast<float>(at.y - mGizmoFrom.y);
+    const float t = (dx * sx + dy * sy) / length2 * mGizmoDragLength;
+    return Wm3::Vec3f{axis.x * t, axis.y * t, axis.z * t};
+  }
+
+  Wm3::Vec3f EdMapScene::GizmoPlace(const Wm3::Vec3f& start, const Wm3::Vec3f& move, const bool resource) const
+  {
+    float x = start.x + move.x;
+    float z = start.z + move.z;
+    if (mGizmoDrag != GizmoPart::Y) {
+      if (resource) {
+        x = std::floor(x) + 0.5f;
+        z = std::floor(z) + 0.5f;
+      } else {
+        x = SnapToGrid(x);
+        z = SnapToGrid(z);
+      }
+    }
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    x = std::clamp(x, 0.0f, static_cast<float>(field->width - 1));
+    z = std::clamp(z, 0.0f, static_cast<float>(field->height - 1));
+    const float ground = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z)));
+    float y = 0.0f;
+    if (mGizmoDrag == GizmoPart::Y) {
+      y = std::max(start.y + move.y, ground);
+    } else if (mTools != nullptr && mTools->KeepOnGround()) {
+      y = ground;
+    } else {
+      y = std::max(start.y, ground);
+    }
+    return Wm3::Vec3f{x, y, z};
+  }
+
   float EdMapScene::SnapToGrid(const float value) const
   {
     if (mTools == nullptr || !mTools->SnapToGrid()) {
@@ -2140,6 +2343,26 @@ namespace faf::editor
           return true;
         }
         // The edges within reach of the cursor (a corner takes two).
+        // The move gizmo first: a drag of the selected markers along an axis or freely.
+        if (const GizmoPart part = PickGizmo(at); part != GizmoPart::None) {
+          BeginGizmoDrag(part, at);
+          mDragMarkers = true;
+          mMarkersMoved = false;
+          mMarkerBefore = mDocument.SaveDataNow();
+          mMarkerDragStart.clear();
+          for (const std::string& selected : mMarkerSelection) {
+            std::array<float, 3> start{};
+            for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+              if (marker.name == selected) {
+                (void)MarkerPosition(marker, start[0], start[1], start[2]);
+              }
+            }
+            mMarkerDragStart.push_back(start);
+          }
+          ::SetCapture(window);
+          ::SetFocus(window);
+          return true;
+        }
         const float reach = std::max(4.0f, mDistance * 0.015f);
         mBorderEdges = 0;
         if (area) {
@@ -2198,6 +2421,20 @@ namespace faf::editor
         ::SetCapture(window);
         ::SetFocus(window);
         return true;
+      }
+      if (mTools != nullptr && mTools->SelectToolActive() && mMap->mProps != nullptr) {
+        if (const GizmoPart part = PickGizmo(at); part != GizmoPart::None) {
+          BeginObjectStroke();
+          BeginGizmoDrag(part, at);
+          mDragSelection = true;
+          mDragStart.clear();
+          for (const int index : mSelection) {
+            mDragStart.push_back(mMap->mProps->mEntries[static_cast<std::size_t>(index)].mTransform.pos_);
+          }
+          ::SetCapture(window);
+          ::SetFocus(window);
+          return true;
+        }
       }
       if (mTools != nullptr && (mTools->SelectToolActive() || mTools->PropsToolActive())) {
         float groundX = 0.0f;
@@ -2274,6 +2511,7 @@ namespace faf::editor
       return true;
     }
     case WM_LBUTTONUP:
+      mGizmoDrag = GizmoPart::None;
       if (mDragMarkers) {
         mDragMarkers = false;
         ::ReleaseCapture();
@@ -2282,8 +2520,8 @@ namespace faf::editor
           for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
             float x = 0.0f, y = 0.0f, z = 0.0f;
             if (!mMarkerSelection.empty() && marker.name == mMarkerSelection.front() && MarkerPosition(marker, x, y, z)) {
-              gpg::Logf("editor: %zu markers moved, %s to %.2f, %.2f", mMarkerSelection.size(), marker.name.c_str(),
-                        static_cast<double>(x), static_cast<double>(z));
+              gpg::Logf("editor: %zu markers moved, %s to %.2f, %.2f (height %.2f)", mMarkerSelection.size(), marker.name.c_str(),
+                        static_cast<double>(x), static_cast<double>(z), static_cast<double>(y));
             }
           }
         }
@@ -2335,6 +2573,23 @@ namespace faf::editor
       return true;
     case WM_MOUSEMOVE: {
       if (mDrag == Drag::None) {
+        if (mDragMarkers && mGizmoDrag != GizmoPart::None) {
+          const Wm3::Vec3f move = GizmoDisplacement(at);
+          std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+          for (std::size_t i = 0; i < mMarkerSelection.size() && i < mMarkerDragStart.size(); ++i) {
+            for (SaveEntry& marker : markers) {
+              if (marker.name != mMarkerSelection[i]) {
+                continue;
+              }
+              const std::string type = MarkerTypeOf(marker);
+              const Wm3::Vec3f start{mMarkerDragStart[i][0], mMarkerDragStart[i][1], mMarkerDragStart[i][2]};
+              const Wm3::Vec3f place = GizmoPlace(start, move, type == "Mass" || type == "Hydrocarbon");
+              marker.Set("position", Vector3Value(place.x, place.y, place.z));
+            }
+          }
+          mMarkersMoved = mMarkersMoved || move.x != 0.0f || move.y != 0.0f || move.z != 0.0f;
+          return true;
+        }
         if (mDragMarkers) {
         float groundX = 0.0f;
         float groundZ = 0.0f;
@@ -2382,6 +2637,15 @@ namespace faf::editor
           if (!(next == *area)) {
             mDocument.SetPlayableArea(next);
             mOutsideStale = true;
+          }
+        }
+        return true;
+      }
+      if (mDragSelection && mObjectStroke && mGizmoDrag != GizmoPart::None) {
+        const Wm3::Vec3f move = GizmoDisplacement(at);
+        if (move.x != 0.0f || move.y != 0.0f || move.z != 0.0f) {
+          for (std::size_t i = 0; i < mSelection.size() && i < mDragStart.size(); ++i) {
+            MovePropTo(mSelection[i], GizmoPlace(mDragStart[i], move, false));
           }
         }
         return true;

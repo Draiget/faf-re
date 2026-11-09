@@ -137,6 +137,9 @@ namespace faf::editor
     [[nodiscard]] bool SnapToGrid() const noexcept { return mSnap; }
     void SetSnapToGrid(const bool snap) noexcept { mSnap = snap; }
     [[nodiscard]] float GridStep() const noexcept { return mGridStep; }
+    /** The move gizmo keeps objects on the ground (X, Z and free moves); off, they keep their height. Never below it. */
+    [[nodiscard]] bool KeepOnGround() const noexcept { return mKeepOnGround; }
+    void SetKeepOnGround(const bool keep) noexcept { mKeepOnGround = keep; }
     void SetGridStep(const float step) noexcept { mGridStep = step; }
 
     /** The Markers tool's connect mode: a click on a path node links it to the selection. */
@@ -450,6 +453,7 @@ namespace faf::editor
     bool mShowGrid = false;
     bool mSnap = false;
     float mGridStep = 1.0f;
+    bool mKeepOnGround = true;
     std::set<std::string> mHiddenMarkerTypes;
     std::vector<std::string> mAskSelect;
     bool mAskSelectAdd = false;

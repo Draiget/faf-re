@@ -87,6 +87,15 @@ namespace faf::editor
     [[nodiscard]] std::vector<SaveEntry> SelectedMarkers() const;
     /** Changes a property of a marker ("name" renames it), as one undo step. */
     void EditMarker(const std::string& marker, const std::string& key, const std::string& value);
+    /** The move gizmo's parts: an arrow per axis and the free square in its middle. */
+    enum class GizmoPart
+    {
+      None,
+      X,
+      Y,
+      Z,
+      Free,
+    };
     /** Selects markers by name (`add` toggles them in the selection instead), for the Markers panel. */
     void SelectMarkers(const std::vector<std::string>& names, bool add);
     /** Moves the camera over a marker, at most `distance` away. */
@@ -220,6 +229,29 @@ namespace faf::editor
     EdDocument::SaveSnapshot mMarkerBefore;
     /** The marker nearest (x, z) within reach of the cursor, or -1. */
     [[nodiscard]] int PickMarker(float x, float z) const;
+    /**
+     * The move gizmo over the selection (markers with the Markers tool, props with the Select tool): arrows along X,
+     * Y (up) and Z, and a square in the middle for a free move over the ground. Dragging an arrow moves along it by
+     * the cursor's move projected on the arrow on screen.
+     */
+    /** The selection's middle, where the gizmo stands; false when nothing it moves is selected. */
+    [[nodiscard]] bool GizmoOrigin(Wm3::Vec3f& origin) const;
+    /** The arms' length in world units: about the same on screen at any zoom. */
+    [[nodiscard]] float GizmoLength() const noexcept { return mDistance * 0.07f; }
+    [[nodiscard]] GizmoPart PickGizmo(POINT at) const;
+    void DrawGizmo(moho::CD3DPrimBatcher& batcher);
+    /** Starts a gizmo drag of `part` from the cursor at `at`. */
+    void BeginGizmoDrag(GizmoPart part, POINT at);
+    /** The drag's move so far, as a displacement in the world. */
+    [[nodiscard]] Wm3::Vec3f GizmoDisplacement(POINT at) const;
+    /** Where an object that started at `start` goes for `move`: snapped, on or above the ground. */
+    [[nodiscard]] Wm3::Vec3f GizmoPlace(const Wm3::Vec3f& start, const Wm3::Vec3f& move, bool resource) const;
+    GizmoPart mGizmoDrag = GizmoPart::None;
+    POINT mGizmoFrom{};
+    Wm3::Vec3f mGizmoStart{};
+    float mGizmoDragLength = 1.0f;
+    float mGizmoGroundX = 0.0f;
+    float mGizmoGroundZ = 0.0f;
     /** The middle of the grid cell holding `value` when the toolbar's Snap is on, else `value`. */
     [[nodiscard]] float SnapToGrid(float value) const;
     /** Whether the Markers panel hides this marker's type. */

@@ -267,6 +267,12 @@ namespace faf::editor
       }
       tip("Markers and props placed or dragged go to the middle of a grid cell (mass and hydrocarbon points always sit on half units, as the game's saves place them)");
       ImGui::SameLine();
+      if (toggle("On ground", mTools.KeepOnGround())) {
+        mTools.SetKeepOnGround(!mTools.KeepOnGround());
+      }
+      tip("The move arrows keep markers and props on the ground when they move across it; off, they keep their height. "
+          "Nothing is moved under the ground either way.");
+      ImGui::SameLine();
       {
         static constexpr float kSteps[] = {0.5f, 1.0f, 2.0f, 4.0f, 8.0f};
         static constexpr const char* kStepNames[] = {"0.5", "1", "2", "4", "8"};
