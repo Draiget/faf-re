@@ -112,4 +112,77 @@ namespace faf::editor
     }
     return {0, 0, width - 1, height - 1};
   }
+
+  DetectedSymmetry DetectSymmetry(const std::uint16_t* heights, const int width, const int height)
+  {
+    DetectedSymmetry best;
+    if (heights == nullptr || width < 8 || height < 8) {
+      return best;
+    }
+    const std::size_t count = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
+    const auto [low, high] = std::minmax_element(heights, heights + count);
+    constexpr int kFlat = 2 * 128;      // 2 game units
+    constexpr int kTolerance = 64;      // half a game unit
+    constexpr float kNeeded = 0.97f;
+    if (*high - *low < kFlat) {
+      return best;
+    }
+    struct Candidate
+    {
+      Symmetry symmetry;
+      int turns;
+      int copies;
+    };
+    static constexpr Candidate kCandidates[] = {
+      {Symmetry::LeftRight, 0, 2},    {Symmetry::TopBottom, 0, 2},  {Symmetry::DiagonalBack, 0, 2}, {Symmetry::DiagonalForward, 0, 2},
+      {Symmetry::HalfTurn, 0, 2},     {Symmetry::BothAxes, 0, 4},   {Symmetry::BothDiagonals, 0, 4}, {Symmetry::QuarterTurns, 0, 4},
+      {Symmetry::NWay, 3, 3},         {Symmetry::NWay, 5, 5},       {Symmetry::NWay, 6, 6},         {Symmetry::NWay, 8, 8},
+    };
+    // About 128 x 128 points.
+    const int step = std::max(1, std::min(width, height) / 128);
+    int bestCopies = 1;
+    for (const Candidate& candidate : kCandidates) {
+      if (EffectiveSymmetry(candidate.symmetry, width, height) != candidate.symmetry) {
+        continue; // a mode for square maps on a map that isn't
+      }
+      int compared = 0;
+      int matched = 0;
+      for (int z = 0; z < height; z += step) {
+        for (int x = 0; x < width; x += step) {
+          float copyX[kMaxSymmetryCopies], copyZ[kMaxSymmetryCopies];
+          const int copies = HeightBrushCentres(width, height, static_cast<float>(x), static_cast<float>(z), candidate.symmetry,
+                                                candidate.turns, copyX, copyZ);
+          const int here = heights[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)];
+          bool any = false;
+          bool same = true;
+          for (int c = 1; c < copies; ++c) {
+            const int cx = static_cast<int>(std::lround(copyX[c]));
+            const int cz = static_cast<int>(std::lround(copyZ[c]));
+            if (cx < 0 || cz < 0 || cx >= width || cz >= height) {
+              continue; // a turned point off the map
+            }
+            any = true;
+            const int there = heights[static_cast<std::size_t>(cz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(cx)];
+            if (std::abs(there - here) > kTolerance) {
+              same = false;
+              break;
+            }
+          }
+          if (any) {
+            ++compared;
+            matched += same ? 1 : 0;
+          }
+        }
+      }
+      if (compared == 0) {
+        continue;
+      }
+      const float share = static_cast<float>(matched) / static_cast<float>(compared);
+      if (share >= kNeeded && (candidate.copies > bestCopies || (candidate.copies == bestCopies && share > best.matched))) {
+        best = {candidate.symmetry, candidate.turns, share};
+        bestCopies = candidate.copies;
+      }
+    }
+    return best;
+  }
 } // namespace faf::editor

@@ -9,6 +9,7 @@
 #include <thread>
 #include <vector>
 
+#include "editor/tools/EdSymmetryCheck.h"
 #include "editor/doc/EdMapFile.h"
 #include "editor/doc/EdNewMap.h"
 #include "editor/doc/EdSaveFile.h"
@@ -44,6 +45,8 @@ namespace faf::editor
     /** The height field's size in samples (a 1024-cell map has 1025 each way). */
     int fieldWidth = 0;
     int fieldHeight = 0;
+    /** The symmetry the heights were made with (DetectSymmetry), found while the map loads. */
+    DetectedSymmetry symmetry;
     bool water = false;
     float waterElevation = 0.0f;
     std::string terrainShader;

@@ -336,6 +336,11 @@ namespace faf::editor
     }
     moho::ED_SetHook(mRingHook.get());
     gpg::Logf("editor: the viewport shows %s", mDocument.Path().c_str());
+    // The symmetry the map was made with, from its heights, for the brushes and the object tools.
+    if (mTools != nullptr) {
+      const DetectedSymmetry& found = mDocument.Facts().symmetry;
+      mTools->SetDetectedSymmetry(found.symmetry == Symmetry::None ? -1 : static_cast<int>(found.symmetry), found.turns, found.matched);
+    }
   }
 
   void EdMapScene::Detach()

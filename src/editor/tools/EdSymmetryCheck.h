@@ -37,4 +37,22 @@ namespace faf::editor
    * whole map) for undo, or an empty one when there is no symmetry.
    */
   SampleRect MakeSymmetric(std::uint16_t* heights, int width, int height, Symmetry symmetry, int turns);
+
+  /** The symmetry a height field was made with, as DetectSymmetry finds it. */
+  struct DetectedSymmetry
+  {
+    Symmetry symmetry = Symmetry::None;
+    /** For N-way turns, how many. */
+    int turns = 0;
+    /** The share of sampled points whose copies are within the tolerance (0 to 1). */
+    float matched = 0.0f;
+  };
+
+  /**
+   * Finds the symmetry a map was made with from its heights: points on a grid are compared with their copies under
+   * each mode (within half a game unit), and of the modes where at least 97% match, the one with the most copies wins
+   * (the closest match among equals). A field with less than 2 units between its lowest and highest point (a new,
+   * flat map) fits every mode, so it gets none.
+   */
+  DetectedSymmetry DetectSymmetry(const std::uint16_t* heights, int width, int height);
 } // namespace faf::editor

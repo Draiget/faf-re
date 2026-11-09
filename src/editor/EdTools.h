@@ -272,6 +272,18 @@ namespace faf::editor
       mSymmetry = index;
       mNWay = turns;
     }
+    /** A newly opened map's symmetry as DetectSymmetry found it (the panel's index and turns; -1: none found). */
+    void SetDetectedSymmetry(const int index, const int turns, const float matched) noexcept
+    {
+      mDetectedSymmetry = index;
+      mDetectedMatch = matched;
+      if (index >= 0) {
+        mSymmetry = index;
+        mNWay = index == 9 ? turns : mNWay;
+      } else {
+        mSymmetry = 0;
+      }
+    }
     void RequestCheck() noexcept { mCheckRequested = true; }
     void RequestImport() noexcept { mImportRequested = true; }
     /** Test runs (`/brush`): the Terrain tool with this brush mode (a HeightBrushMode). */
@@ -392,6 +404,8 @@ namespace faf::editor
     int mSelectionCount = 0;
     std::vector<SaveEntry> mMarkerSelection;
     bool mConnectNodes = false;
+    int mDetectedSymmetry = -2; // -2: no map opened yet
+    float mDetectedMatch = 0.0f;
     std::vector<std::string> mArmies;
     std::vector<std::string> mExtraArmies;
     char mExtraBuffer[256]{};

@@ -137,6 +137,7 @@ namespace faf::editor
       if (const moho::CHeightField* const field = terrain->GetHeightField(); field != nullptr) {
         facts.fieldWidth = field->width;
         facts.fieldHeight = field->height;
+        facts.symmetry = DetectSymmetry(field->data, field->width, field->height);
       }
       facts.water = terrain->IsWaterEnabled();
       facts.waterElevation = terrain->GetWaterElevation();
@@ -698,6 +699,8 @@ namespace faf::editor
                                                        [](const std::string& layer) { return !layer.empty(); })),
                 mFacts.props, mFacts.decals, mFacts.markerCount, mFacts.armies.size(), mError.empty() ? "" : "; ",
                 mError.c_str());
+      gpg::Logf("editor: symmetry from the heights: mode %d, %d turns (%.1f%% of points match)", static_cast<int>(mFacts.symmetry.symmetry),
+                mFacts.symmetry.turns, static_cast<double>(mFacts.symmetry.matched) * 100.0);
     } else {
       gpg::Warnf("editor: %s did not open: %s", mPath.c_str(), mError.c_str());
     }

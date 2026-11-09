@@ -334,6 +334,19 @@ namespace faf::editor
       ImGui::SetNextItemWidth(-1.0f);
       ImGui::SliderInt("##nway", &mNWay, 3, 8, "Copies %d");
     }
+    if (mDetectedSymmetry >= 0) {
+      char found[120];
+      if (mDetectedSymmetry == 9) {
+        (void)std::snprintf(found, sizeof(found), "The map's heights: %d-way turn (%.1f%% of points match).", mNWay,
+                            static_cast<double>(mDetectedMatch) * 100.0);
+      } else {
+        (void)std::snprintf(found, sizeof(found), "The map's heights: %s (%.1f%% of points match).", kSymmetry[mDetectedSymmetry].name,
+                            static_cast<double>(mDetectedMatch) * 100.0);
+      }
+      ImGui::TextColored(ImVec4(0.55f, 0.80f, 0.55f, 1.0f), "%s", found);
+    } else if (mDetectedSymmetry == -1) {
+      ImGui::TextDisabled("The map's heights fit no symmetry.");
+    }
     const int copies = mSymmetry == 9 ? mNWay : kSymmetry[mSymmetry].copies;
     char note[300];
     if (mSymmetry == 9) {
