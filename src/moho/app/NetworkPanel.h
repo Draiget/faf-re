@@ -26,6 +26,11 @@ namespace moho
   // head's screen space (REN_DebugStuff sets it). Render thread.
   void NETPANEL_Draw(CD3DPrimBatcher* batcher, float headWidth, float headHeight);
 
+  // Plan WP10.10: a server-mode game's bytes from the server by lane, right-aligned to `right` from `top`, where
+  // the lockstep driver draws its network stats (ren_ShowNetworkStats). Nothing before the game's first view.
+  // Render thread.
+  void NETPANEL_DrawServerLanes(CD3DPrimBatcher* batcher, float right, float top);
+
   // Flips net_ShowPanel (the key). Any thread.
   void NETPANEL_Toggle();
 

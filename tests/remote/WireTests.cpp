@@ -48,6 +48,7 @@
 #include "remote/wire/Quantize.h"
 #include "remote/wire/Roster.h"
 #include "remote/wire/SessionTables.h"
+#include "remote/client/ServerLaneMeter.h"
 #include "remote/wire/SoundTable.h"
 #include "remote/wire/WireVersion.h"
 
@@ -2828,3 +2829,42 @@ TEST(Existing_Wire, BlipUpdateHash) { TestBlipUpdateHash(); }
 TEST(Existing_Wire, BitWriterAppend) { TestBitWriterAppend(); }
 TEST(Existing_Wire, LuaSyncLane) { TestLuaSyncLane(); }
 TEST(Existing_Wire, GridDeltaInPlace) { TestGridDeltaInPlace(); }
+
+// Plan WP10.10: the network panel's bytes by lane: totals since the game started, the rate over the last whole
+// seconds (the second under way left out, at most five), and a new game from zero.
+TEST(ServerLaneMeter, RatesOverWholeSecondsAndTotals)
+{
+  using faf::remote::client::CServerLaneMeter;
+  using faf::remote::client::kServerLaneCount;
+  CServerLaneMeter& meter = CServerLaneMeter::Get();
+  meter.Reset();
+  EXPECT_FALSE(meter.Snapshot().active);
+  const CServerLaneMeter::Clock::time_point start{std::chrono::seconds(1000)};
+  const auto at = [&start](const double seconds) {
+    return start + std::chrono::duration_cast<CServerLaneMeter::Clock::duration>(std::chrono::duration<double>(seconds));
+  };
+  const std::array<std::uint64_t, kServerLaneCount> view{1000u, 100u, 50u, 20u, 0u};
+  for (int beat = 0; beat < 80; ++beat) { // 10 views a second for 8 s
+    meter.Record(view, at(beat / 10.0));
+  }
+  const auto snapshot = meter.Snapshot(at(8.5));
+  EXPECT_TRUE(snapshot.active);
+  EXPECT_EQ(snapshot.views, 80u);
+  EXPECT_EQ(snapshot.total[0], 80000u);
+  EXPECT_EQ(snapshot.total[3], 1600u);
+  EXPECT_DOUBLE_EQ(snapshot.seconds, 5.0);
+  EXPECT_DOUBLE_EQ(snapshot.perSecond[0], 10000.0);
+  EXPECT_DOUBLE_EQ(snapshot.perSecond[2], 500.0);
+  // Quiet for 3 s: two of the five seconds still had views.
+  EXPECT_DOUBLE_EQ(meter.Snapshot(at(11.2)).perSecond[0], 4000.0);
+  // Long quiet: nothing a second, the totals stay.
+  const auto quiet = meter.Snapshot(at(30.0));
+  EXPECT_DOUBLE_EQ(quiet.perSecond[0], 0.0);
+  EXPECT_EQ(quiet.total[0], 80000u);
+  // The first second of a game: no whole second yet.
+  meter.Reset();
+  meter.Record(view, at(40.1));
+  EXPECT_DOUBLE_EQ(meter.Snapshot(at(40.6)).seconds, 0.0);
+  EXPECT_DOUBLE_EQ(meter.Snapshot(at(41.6)).perSecond[1], 100.0);
+  meter.Reset();
+}
