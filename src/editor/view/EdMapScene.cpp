@@ -523,6 +523,7 @@ namespace faf::editor
                       : kind == EdDocument::EditKind::SaveData ? UndoSaveData(false)
                       : kind == EdDocument::EditKind::Decals   ? UndoDecals(false)
                       : kind == EdDocument::EditKind::Water    ? UndoWater(false)
+                      : kind == EdDocument::EditKind::Lighting ? UndoLighting(false)
                                                              : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
@@ -542,6 +543,7 @@ namespace faf::editor
                       : kind == EdDocument::EditKind::SaveData ? UndoSaveData(true)
                       : kind == EdDocument::EditKind::Decals   ? UndoDecals(true)
                       : kind == EdDocument::EditKind::Water    ? UndoWater(true)
+                      : kind == EdDocument::EditKind::Lighting ? UndoLighting(true)
                                                              : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);
@@ -1387,6 +1389,21 @@ namespace faf::editor
     to.push_back(std::move(step));
     mSelection.clear();
     RebuildProps();
+    return true;
+  }
+
+  bool EdMapScene::UndoLighting(const bool redo)
+  {
+    auto& from = redo ? mDocument.LightingRedo() : mDocument.LightingUndo();
+    auto& to = redo ? mDocument.LightingUndo() : mDocument.LightingRedo();
+    if (from.empty()) {
+      return false;
+    }
+    auto step = std::move(from.back());
+    from.pop_back();
+    mDocument.ApplyLighting(redo ? step.second : step.first);
+    to.push_back(std::move(step));
+    gpg::Logf("editor: %s a lighting edit: multiplier %.2f", redo ? "redid" : "undid", static_cast<double>(mDocument.LightingNow().multiplier));
     return true;
   }
 

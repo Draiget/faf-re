@@ -655,6 +655,78 @@ namespace faf::editor
     return issues;
   }
 
+  LightingState EdDocument::LightingNow() const
+  {
+    LightingState lighting;
+    if (mMap == nullptr || mMap->mTerrainRes == nullptr) {
+      return lighting;
+    }
+    const moho::IWldTerrainRes& terrain = *mMap->mTerrainRes;
+    const auto three = [](const Wm3::Vector3f& v, float (&out)[3]) {
+      out[0] = v.x;
+      out[1] = v.y;
+      out[2] = v.z;
+    };
+    lighting.multiplier = terrain.GetLightingMultiplier();
+    three(terrain.GetSunDirection(), lighting.sunDirection);
+    three(terrain.GetSunAmbience(), lighting.sunAmbience);
+    three(terrain.GetSunColor(), lighting.sunColor);
+    three(terrain.GetShadowFillColor(), lighting.shadowFill);
+    const moho::Vector4f specular = terrain.GetSpecularColor();
+    lighting.specular[0] = specular.x;
+    lighting.specular[1] = specular.y;
+    lighting.specular[2] = specular.z;
+    lighting.specular[3] = specular.w;
+    lighting.bloom = terrain.GetBloom();
+    // The fog as WRenViewport::FogOn reads it: the colour from the first three floats, start and end from the next two.
+    const moho::SFogInfo& fog = terrain.GetFogInfo();
+    lighting.fogColor[0] = fog.mStartDistance;
+    lighting.fogColor[1] = fog.mCutoffDistance;
+    lighting.fogColor[2] = fog.mMinClamp;
+    lighting.fogStart = fog.mMaxClamp;
+    lighting.fogEnd = fog.mCurveExponent;
+    return lighting;
+  }
+
+  void EdDocument::ApplyLighting(const LightingState& lighting)
+  {
+    if (mMap == nullptr || mMap->mTerrainRes == nullptr) {
+      return;
+    }
+    moho::IWldTerrainRes& terrain = *mMap->mTerrainRes;
+    const auto vec = [](const float (&v)[3]) { return Wm3::Vector3f(v[0], v[1], v[2]); };
+    terrain.SetLightingMultiplier(lighting.multiplier);
+    terrain.SetSunDirection(vec(lighting.sunDirection));
+    terrain.SetSunAmbience(vec(lighting.sunAmbience));
+    terrain.SetSunColor(vec(lighting.sunColor));
+    terrain.SetShadowFillColor(vec(lighting.shadowFill));
+    moho::Vector4f specular = terrain.GetSpecularColor();
+    specular.x = lighting.specular[0];
+    specular.y = lighting.specular[1];
+    specular.z = lighting.specular[2];
+    specular.w = lighting.specular[3];
+    terrain.SetSpecularColor(specular);
+    terrain.SetBloom(lighting.bloom);
+    moho::SFogInfo fog = terrain.GetFogInfo();
+    fog.mStartDistance = lighting.fogColor[0];
+    fog.mCutoffDistance = lighting.fogColor[1];
+    fog.mMinClamp = lighting.fogColor[2];
+    fog.mMaxClamp = lighting.fogStart;
+    fog.mCurveExponent = lighting.fogEnd;
+    terrain.SetFogInfo(fog);
+    mModified = true;
+  }
+
+  void EdDocument::LightingEdited(LightingState before)
+  {
+    mLightingUndo.emplace_back(before, LightingNow());
+    if (mLightingUndo.size() > 200) {
+      mLightingUndo.erase(mLightingUndo.begin());
+    }
+    EditEnded(EditKind::Lighting);
+    mModified = true;
+  }
+
   WaterState EdDocument::WaterNow() const
   {
     WaterState water;
@@ -786,6 +858,7 @@ namespace faf::editor
     mSaveRedo.clear();
     mDecalRedo.clear();
     mWaterRedo.clear();
+    mLightingRedo.clear();
   }
 
   bool EdDocument::PopUndo(EditKind& kind)

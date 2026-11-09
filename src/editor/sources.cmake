@@ -16,6 +16,8 @@ set(FAF_EDITOR_SOURCES
   doc/EdUnits.cpp
   doc/EdPackage.cpp
   doc/EdWaterPreset.cpp
+  doc/EdJson.cpp
+  doc/EdLighting.cpp
   doc/EdRoundTrip.cpp
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp

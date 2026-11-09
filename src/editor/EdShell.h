@@ -5,6 +5,7 @@
 
 #include "editor/EdTools.h"
 #include "editor/tools/EdChecks.h"
+#include "editor/doc/EdLighting.h"
 #include "editor/doc/EdNewMap.h"
 #include "editor/doc/EdPackage.h"
 #include "imgui.h"
@@ -36,6 +37,10 @@ namespace faf::editor
     bool& ShowMarkers() noexcept { return mShowMarkers; }
     bool& ShowCheck() noexcept { return mShowCheck; }
     bool& ShowScript() noexcept { return mShowScript; }
+    bool& ShowLighting() noexcept { return mShowLighting; }
+    /** The Lighting panel's Import / Export buttons, taken by the app (it asks for the file). */
+    [[nodiscard]] bool TakeLightingImport() noexcept { return std::exchange(mLightingImport, false); }
+    [[nodiscard]] bool TakeLightingExport() noexcept { return std::exchange(mLightingExport, false); }
     /**
      * A test run: the open map (as saved) played solo for 8 s of game time, then stopped; the Lua errors and other
      * warnings logged meanwhile join the Check's findings (`/testrun` for test runs).
@@ -97,6 +102,14 @@ namespace faf::editor
     void DrawCheckPanel();
     /** The map's `_script.lua`, edited: Apply makes the change one undo step, Check compiles it (ui/EdInfoPanels.cpp). */
     void DrawScriptPanel();
+    /** The map's lighting, edited live; Import / Export of FAFME's `.scmlighting` (ui/EdInfoPanels.cpp). */
+    void DrawLightingPanel();
+    bool mShowLighting = false;
+    LightingState mLighting;
+    LightingState mLightingBefore;
+    bool mLightingEditing = false;
+    bool mLightingImport = false;
+    bool mLightingExport = false;
     bool mShowScript = false;
     bool mFocusScript = false;
     std::string mScriptBuffer;

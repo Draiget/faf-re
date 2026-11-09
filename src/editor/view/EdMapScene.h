@@ -354,6 +354,7 @@ namespace faf::editor
     void DrawDecalOutlines(moho::CD3DPrimBatcher& batcher, const moho::CHeightField& field);
     bool UndoDecals(bool redo);
     bool UndoWater(bool redo);
+    bool UndoLighting(bool redo);
     /** Whether the Markers panel hides this marker's type. */
     [[nodiscard]] bool MarkerHidden(const SaveEntry& marker) const;
     void DeleteSelectedMarkers();

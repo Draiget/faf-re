@@ -197,6 +197,9 @@ namespace faf::editor
       if (mShowScript) {
         DrawScriptPanel();
       }
+      if (mShowLighting) {
+        DrawLightingPanel();
+      }
       if (mShowLog) {
         if (ImGui::Begin(kLogWindow, &mShowLog)) {
           mLog.Draw();

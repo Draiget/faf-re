@@ -951,4 +951,86 @@ namespace faf::editor
                               ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize, &GrowString, &mScriptBuffer);
     ImGui::End();
   }
+  void EdShell::DrawLightingPanel()
+  {
+    if (const ImGuiWindow* const map = ImGui::FindWindowByName(kMapWindow); map != nullptr && map->DockId != 0) {
+      ImGui::SetNextWindowDockID(map->DockId, ImGuiCond_FirstUseEver);
+    }
+    if (!ImGui::Begin("Lighting", &mShowLighting)) {
+      ImGui::End();
+      return;
+    }
+    if (mDocument.GetState() != EdDocument::State::Open) {
+      ImGui::TextDisabled("No map open.");
+      ImGui::End();
+      return;
+    }
+    // The panel's copy follows the map until a control is held; a change is on the map at once, and one undo step
+    // when the drag (or the edit) ends.
+    if (!mLightingEditing) {
+      mLighting = mDocument.LightingNow();
+    }
+    bool active = false;
+    bool changed = false;
+    bool finished = false;
+    const auto watch = [&](const bool edited) {
+      active = active || ImGui::IsItemActive();
+      changed = changed || edited;
+      finished = finished || ImGui::IsItemDeactivatedAfterEdit();
+    };
+    ImGui::SeparatorText("Sun");
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(ImGui::DragFloat("##multiplier", &mLighting.multiplier, 0.01f, 0.0f, 10.0f, "Light multiplier %.2f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(ImGui::DragFloat3("##sundirection", mLighting.sunDirection, 0.005f, -1.0f, 1.0f, "%.3f"));
+    ImGui::TextDisabled("Direction (x, y, z)");
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(ImGui::ColorEdit3("##suncolor", mLighting.sunColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR));
+    ImGui::TextDisabled("Sun colour");
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(ImGui::ColorEdit3("##ambience", mLighting.sunAmbience, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR));
+    ImGui::TextDisabled("Ambience");
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(ImGui::ColorEdit3("##shadow", mLighting.shadowFill, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR));
+    ImGui::TextDisabled("Shadow fill");
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(ImGui::ColorEdit4("##specular", mLighting.specular, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR));
+    ImGui::TextDisabled("Specular");
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(ImGui::DragFloat("##bloom", &mLighting.bloom, 0.005f, 0.0f, 5.0f, "Bloom %.3f"));
+    ImGui::SeparatorText("Fog");
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(ImGui::ColorEdit3("##fogcolor", mLighting.fogColor, ImGuiColorEditFlags_Float));
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(ImGui::DragFloat("##fogstart", &mLighting.fogStart, 1.0f, -1000.0f, 10000.0f, "Start %.0f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(ImGui::DragFloat("##fogend", &mLighting.fogEnd, 1.0f, -1000.0f, 10000.0f, "End %.0f"));
+    if (changed) {
+      if (!mLightingEditing) {
+        mLightingBefore = mDocument.LightingNow();
+      }
+      mLightingEditing = true;
+      mDocument.ApplyLighting(mLighting);
+    }
+    if (finished || (mLightingEditing && !active)) {
+      mLightingEditing = false;
+      if (!(mLightingBefore == mDocument.LightingNow())) {
+        mDocument.LightingEdited(mLightingBefore);
+        gpg::Logf("editor: lighting: multiplier %.2f, bloom %.3f, fog %.0f to %.0f", static_cast<double>(mLighting.multiplier),
+                  static_cast<double>(mLighting.bloom), static_cast<double>(mLighting.fogStart), static_cast<double>(mLighting.fogEnd));
+      }
+    }
+    ImGui::SeparatorText("Settings file");
+    if (ImGui::Button("Import .scmlighting...")) {
+      mLightingImport = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Export...")) {
+      mLightingExport = true;
+    }
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+    ImGui::TextWrapped("FAForeverMapEditor's lighting settings file: the sun, ambience, shadow, specular, bloom and fog.");
+    ImGui::PopStyleColor();
+    ImGui::End();
+  }
 } // namespace faf::editor

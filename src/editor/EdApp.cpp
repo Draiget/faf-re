@@ -95,6 +95,7 @@ namespace faf::editor
       kMenuMarkers = 1108,
       kMenuCheck = 1109,
       kMenuScript = 1110,
+      kMenuLighting = 1111,
       kMenuPanelsWhilePlaying = 1104,
       kMenuResetLayout = 1105,
       kMenuImGuiDemo = 1106,
@@ -338,6 +339,7 @@ namespace faf::editor
       /** `/framemarker <name>[@distance]` (test runs): the camera goes to that marker once the map is shown. */
       std::string mFrameMarkerArg;
       bool mWaterFilesDone = false;
+      bool mLightingFilesDone = false;
       /** `/waterset <on>,<level>,<deep>,<abyss>` (test runs): the sea set as one edit once the map is shown. */
       std::string mWaterSetArg;
       bool mWaterDragging = false;
@@ -527,6 +529,7 @@ namespace faf::editor
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuMarkers, L"Mar&kers");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuCheck, L"&Check");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuScript, L"&Script");
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuLighting, L"&Lighting");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuLog, L"&Log");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuPanelsWhilePlaying, L"&Panels while playing");
       ::AppendMenuW(mViewMenu, MF_SEPARATOR, 0, nullptr);
@@ -569,6 +572,7 @@ namespace faf::editor
       check(kMenuMarkers, mShell->ShowMarkers());
       check(kMenuCheck, mShell->ShowCheck());
       check(kMenuScript, mShell->ShowScript());
+      check(kMenuLighting, mShell->ShowLighting());
       check(kMenuLog, mShell->ShowLog());
       check(kMenuPanelsWhilePlaying, mShell->PanelsWhilePlaying());
       check(kMenuImGuiDemo, mShell->ShowDemo());
@@ -627,6 +631,9 @@ namespace faf::editor
       case kMenuMap:
         mShell->ShowMap() = !mShell->ShowMap();
         return;
+      case kMenuLighting:
+        mShell->ShowLighting() = !mShell->ShowLighting();
+        break;
       case kMenuScript:
         mShell->ShowScript() = !mShell->ShowScript();
         break;
@@ -1366,6 +1373,50 @@ namespace faf::editor
           } else {
             gpg::Warnf("editor: can't write %s", exportFile.string().c_str());
           }
+        }
+      }
+      // The Lighting panel's settings file, or `/lightingimport <file>`, `/lightingexport <file>` for test runs.
+      {
+        std::filesystem::path importFile;
+        std::filesystem::path exportFile;
+        if (mShell->TakeLightingImport()) {
+          importFile = AskFile(HandleOf(mGame.supcomFrame), false, L"Lighting settings (*.scmlighting)\0*.scmlighting\0All files\0*.*\0",
+                               L"scmlighting", L"Import lighting settings");
+        }
+        if (mShell->TakeLightingExport()) {
+          exportFile = AskFile(HandleOf(mGame.supcomFrame), true, L"Lighting settings (*.scmlighting)\0*.scmlighting\0", L"scmlighting",
+                               L"Export lighting settings");
+        }
+        if (mScene.Attached() && !mLightingFilesDone) {
+          mLightingFilesDone = true;
+          if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/lightingimport", 1, &file) && !file.empty()) {
+            importFile = file[0].c_str();
+          }
+          if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/lightingexport", 1, &file) && !file.empty()) {
+            exportFile = file[0].c_str();
+          }
+        }
+        if (!importFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
+          std::ifstream in(importFile, std::ios::binary);
+          const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+          const LightingState before = mDocument.LightingNow();
+          LightingState lighting = before;
+          std::string error;
+          if (!in || !LightingFromScmlighting(text, lighting, error)) {
+            gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? error.c_str() : "can't read it");
+          } else {
+            mDocument.ApplyLighting(lighting);
+            mDocument.LightingEdited(before);
+            gpg::Logf("editor: lighting imported from %s: multiplier %.2f, sun colour %.2f %.2f %.2f, fog %.0f to %.0f", importFile.string().c_str(),
+                      static_cast<double>(lighting.multiplier), static_cast<double>(lighting.sunColor[0]), static_cast<double>(lighting.sunColor[1]),
+                      static_cast<double>(lighting.sunColor[2]), static_cast<double>(lighting.fogStart), static_cast<double>(lighting.fogEnd));
+          }
+        }
+        if (!exportFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
+          std::ofstream out(exportFile, std::ios::binary | std::ios::trunc);
+          const std::string text = LightingToScmlighting(mDocument.LightingNow());
+          out.write(text.data(), static_cast<std::streamsize>(text.size()));
+          (out ? gpg::Logf : gpg::Warnf)("editor: lighting exported to %s", exportFile.string().c_str());
         }
       }
       const bool importAsked = tools.TakeImportRequest();

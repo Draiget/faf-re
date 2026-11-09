@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "editor/doc/EdPackage.h"
+#include "editor/doc/EdLighting.h"
 #include "editor/doc/EdWater.h"
 #include "editor/tools/EdChecks.h"
 #include "editor/tools/EdDecals.h"
@@ -184,7 +185,15 @@ namespace faf::editor
       SaveData,
       Decals,
       Water,
+      Lighting,
     };
+    /** The map's lighting now (sun, ambience, shadow, specular, bloom, fog). */
+    [[nodiscard]] LightingState LightingNow() const;
+    /** Puts a lighting state on the map at once (no undo step; LightingEdited records one). */
+    void ApplyLighting(const LightingState& lighting);
+    void LightingEdited(LightingState before);
+    [[nodiscard]] std::vector<std::pair<LightingState, LightingState>>& LightingUndo() noexcept { return mLightingUndo; }
+    [[nodiscard]] std::vector<std::pair<LightingState, LightingState>>& LightingRedo() noexcept { return mLightingRedo; }
     /** The map's sea now (on or off, its levels, the water shader's numbers). */
     [[nodiscard]] WaterState WaterNow() const;
     /** Puts a water state on the map at once (no undo step: a drag applies it many times, then WaterEdited records it). */
@@ -335,6 +344,8 @@ namespace faf::editor
     std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropRedo;
     std::vector<LayerEdit> mLayerUndo;
     std::vector<LayerEdit> mLayerRedo;
+    std::vector<std::pair<LightingState, LightingState>> mLightingUndo;
+    std::vector<std::pair<LightingState, LightingState>> mLightingRedo;
     std::vector<std::pair<WaterState, WaterState>> mWaterUndo;
     std::vector<std::pair<WaterState, WaterState>> mWaterRedo;
     std::vector<std::pair<DecalSnapshot, DecalSnapshot>> mDecalUndo;
