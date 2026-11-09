@@ -291,6 +291,98 @@ do
         Log('sweeps done')
     end
 
+    -- Methods the fuzz leaves out: they end the object, or wait (a yield inside pcall only errors).
+    local FuzzSkip = {
+        Destroy = true, Kill = true, KillSelf = true, DestroyIntel = true, PlayCommanderWarpInEffect = true,
+    }
+    -- Calls that crash the original game the same way, left out of the fuzz:
+    -- unit:CanPathTo on a unit with no navigator (a structure): 0x006CB960 calls through [unit+0x54C] unchecked;
+    -- a number where a table goes: lua_getn (0x0090AD30) reads any value as a table, and these count such an argument
+    -- with no type check first: platoon:FormPlatoon (0x0072D8F0), brain:FindUpgradeBP (0x00588C90),
+    -- brain:BuildStructure (0x0058B690).
+    local FuzzCrashes = {
+        ['unit_methods.CanPathTo'] = true,
+        ['platoon_methods.FormPlatoon'] = true,
+        ['aibrain_methods.FindUpgradeBP'] = true,
+        ['aibrain_methods.BuildStructure'] = true,
+    }
+
+    -- Every method of moho[tableName] on `object` with each argument pattern: nothing, an enemy unit, a position, a
+    -- unit blueprint id, 1, true, two numbers, a position and a number, a unit and a number. The wrong patterns stop
+    -- at the engine's argument checks; the right ones run the method. Errors are expected and counted.
+    function Zoo.Fuzz(tableName, object, ctx)
+        local methods = rawget(moho, tableName)
+        if not methods or not object then
+            return
+        end
+        local patterns = {
+            {},
+            { ctx.enemy },
+            { ctx.pos },
+            { 'uel0201' },
+            { 1 },
+            { true },
+            { 1, 1 },
+            { ctx.pos, 1 },
+            { ctx.enemy, 1 },
+        }
+        local names = SortedFunctionNames(methods)
+        local calls = 0
+        local failed = 0
+        for i = 1, TableGetn(names) do
+            local name = names[i]
+            if not FuzzSkip[name] and not SkipGetters[tableName .. '.' .. name] and not FuzzCrashes[tableName .. '.' .. name] then
+                local fn = methods[name]
+                for p = 1, TableGetn(patterns) do
+                    if Zoo.trace then Log('fuzz ' .. tableName .. '.' .. name .. ' #' .. p) end
+                    local args = patterns[p]
+                    local ok
+                    if TableGetn(args) == 0 then
+                        ok = pcall(fn, object)
+                    elseif TableGetn(args) == 1 then
+                        ok = pcall(fn, object, args[1])
+                    else
+                        ok = pcall(fn, object, args[1], args[2])
+                    end
+                    calls = calls + 1
+                    if not ok then failed = failed + 1 end
+                end
+            end
+        end
+        Log('fuzz ' .. tableName .. ': ' .. calls .. ' calls, ' .. failed .. ' errors')
+    end
+
+    -- The fuzz on a unit of every kind, its weapon and navigator, an army brain and a platoon. Last of all: setters
+    -- change the game in ways no checksum was checked for.
+    function Zoo.FuzzAll()
+        local brainA = GetArmyBrain(Zoo.a)
+        local enemy = Zoo.Spawn('uel0201', Zoo.b, Zoo.cx + 10, Zoo.cz - 50, 0)
+        local ctx = { enemy = enemy, pos = { Zoo.cx, GetSurfaceHeight(Zoo.cx, Zoo.cz), Zoo.cz } }
+        local sample = Zoo.SpawnSample(Zoo.a, Zoo.cz - 60)
+        WaitTicks(10)
+        for i = 1, TableGetn(sample) do
+            local unit = sample[i]
+            if Alive(unit) then
+                local weapon = Try('GetWeapon', unit.GetWeapon, unit, 1)
+                local navigator = Try('GetNavigator', unit.GetNavigator, unit)
+                Zoo.Fuzz('unit_methods', unit, ctx)
+                if Alive(unit) then Zoo.Fuzz('entity_methods', unit, ctx) end
+                if weapon and Alive(unit) then Zoo.Fuzz('weapon_methods', weapon, ctx) end
+                if navigator and Alive(unit) then Zoo.Fuzz('navigator_methods', navigator, ctx) end
+            end
+            WaitTicks(1)
+        end
+        local platoon = Try('MakePlatoon', brainA.MakePlatoon, brainA, 'ZooFuzz', '')
+        if platoon then
+            Try('AssignUnitsToPlatoon', brainA.AssignUnitsToPlatoon, brainA, platoon, sample, 'Attack', 'GrowthFormation')
+            Zoo.Fuzz('platoon_methods', platoon, ctx)
+        end
+        Zoo.Fuzz('aibrain_methods', brainA, ctx)
+        WaitTicks(10)
+        Zoo.DestroyAll(sample)
+        Log('fuzz done')
+    end
+
     -- The calls ordinary games make rarely: an AI platoon, building, factories, upgrades, transports, missiles,
     -- reclaim, repair, capture and squad orders. Units are UEF's unless a faction's own kind is the point.
     function Zoo.Scenarios()
@@ -428,6 +520,7 @@ do
         Log('waves done, ' .. total .. ' units spawned')
         Zoo.Scenarios()
         Zoo.Sweeps()
+        Zoo.FuzzAll()
     end
 
     local ZooBeginSession = BeginSession
