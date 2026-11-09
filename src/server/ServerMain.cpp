@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <charconv>
 #include <exception>
 #include <filesystem>
 #include <cstdint>
@@ -734,6 +735,42 @@ namespace
     return taken;
   }
 
+  /** Plan WP17.2: a request's "Key=Value,Key=Value"; pairs without a key are skipped. */
+  [[nodiscard]] std::vector<std::pair<std::string, std::string>> OptionPairs(const std::string& text)
+  {
+    std::vector<std::pair<std::string, std::string>> pairs;
+    for (std::size_t start = 0; start < text.size();) {
+      const std::size_t comma = std::min(text.find(',', start), text.size());
+      const std::string pair = text.substr(start, comma - start);
+      if (const std::size_t equals = pair.find('='); equals != std::string::npos && equals > 0u) {
+        pairs.emplace_back(pair.substr(0, equals), pair.substr(equals + 1));
+      }
+      start = comma + 1;
+    }
+    return pairs;
+  }
+
+  /** Plan WP17.2: the match's `PlayerOptions` entry of the human with this uid as `OwnerID`; nothing when there is none. */
+  [[nodiscard]] std::optional<LuaPlus::LuaObject> MatchPlayerOf(const LuaPlus::LuaObject& config, const std::int64_t uid)
+  {
+    LuaPlus::LuaObject players = config["PlayerOptions"];
+    if (players.IsTable()) {
+      for (LuaPlus::LuaTableIterator it(&players, 1); !it.m_isDone; it.Next()) {
+        LuaPlus::LuaObject player = it.GetValue();
+        if (!player.IsTable()) {
+          continue;
+        }
+        const LuaPlus::LuaObject human = player["Human"];
+        const LuaPlus::LuaObject owner = player["OwnerID"];
+        const std::int64_t id = owner.IsString() ? std::atoll(owner.GetString()) : (owner.IsNumber() ? static_cast<std::int64_t>(owner.GetNumber()) : -1);
+        if (human.IsBoolean() && human.GetBoolean() && id == uid) {
+          return player;
+        }
+      }
+    }
+    return std::nullopt;
+  }
+
   void PutBackOptions(LuaPlus::LuaObject& config, const std::vector<STakenOption>& taken)
   {
     LuaPlus::LuaObject options = config["GameOptions"];
@@ -1096,7 +1133,9 @@ namespace
           seats += std::string(first ? "" : ",") + "{\"uid\":" + std::to_string(seat.uid) + ",\"name\":" + faf::server::JsonString(seat.name) +
                    ",\"joined\":" + flag(seat.joined) + ",\"loaded\":" + flag(seat.loaded) + ",\"lost\":" + flag(seat.lost) +
                    ",\"gone\":" + flag(seat.gone) + ",\"away\":" + flag(seat.away) + ",\"ping_ms\":" + std::to_string(seat.pingMs) +
-                   ",\"load\":" + faf::server::JsonString(seat.load) + ",\"content\":" + faf::server::JsonString(seat.content) +
+                   ",\"ready\":" + faf::server::JsonString(seat.ready) + ",\"slot\":" + std::to_string(seat.lobbySlot) +
+                   ",\"load\":" + faf::server::JsonString(seat.load) +
+                   ",\"content\":" + faf::server::JsonString(seat.content) +
                    ",\"mods\":" + faf::server::JsonString(seat.mods) + ",\"ui_mods\":[";
           for (std::size_t i = 0; i < seat.uiMods.size(); ++i) {
             seats += (i == 0 ? "" : ",") + faf::server::JsonString(seat.uiMods[i]);
@@ -1366,15 +1405,7 @@ namespace
                 control->Reply(request.id, "\"phase\":\"lobby\",\"host\":" + std::to_string(signaller.Host()) + "," + controlSeats());
               } else if (request.op == "set_options") {
                 // Plan WP17.2: an organised lobby's options from the organiser: the launch, the pins, and the players' screens.
-                std::vector<std::pair<std::string, std::string>> pairs;
-                for (std::size_t start = 0; start < request.options.size();) {
-                  const std::size_t comma = std::min(request.options.find(',', start), request.options.size());
-                  const std::string pair = request.options.substr(start, comma - start);
-                  if (const std::size_t equals = pair.find('='); equals != std::string::npos && equals > 0u) {
-                    pairs.emplace_back(pair.substr(0, equals), pair.substr(equals + 1));
-                  }
-                  start = comma + 1;
-                }
+                const std::vector<std::pair<std::string, std::string>> pairs = OptionPairs(request.options);
                 const auto fixed = std::find_if(pairs.begin(), pairs.end(), [&matchRules](const auto& pair) {
                   return pair.first == "ScenarioFile" || pair.first == "GameSpeed" || pair.first == "TeamLock" ||
                          (matchRules.noCheats && pair.first == "CheatsEnabled");
@@ -1431,6 +1462,92 @@ namespace
                     controlEvent("options", "\"options\":" + faf::server::JsonString(request.options));
                   }
                 }
+              } else if (request.op == "set_player") {
+                // Plan WP17.2: a participant's team, faction and colours from the organiser: the match's launch, then
+                // the lobby screens' slot (in the host's name, as `set_options`).
+                const std::vector<std::pair<std::string, std::string>> pairs = OptionPairs(request.options);
+                std::optional<LuaPlus::LuaObject> player = MatchPlayerOf(config, request.uid);
+                std::vector<std::pair<std::string, int>> values;
+                std::string bad;
+                for (const auto& [key, text] : pairs) {
+                  int value = 0;
+                  const auto [last, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+                  if (key != "Team" && key != "Faction" && key != "PlayerColor" && key != "ArmyColor") {
+                    bad = key + " isn't the organiser's to set here (Team, Faction, PlayerColor, ArmyColor)";
+                  } else if (error != std::errc{} || last != text.data() + text.size() || value < 1 || value > 64) {
+                    bad = key + " takes a whole number from 1 to 64";
+                  } else {
+                    values.emplace_back(key, value);
+                    continue;
+                  }
+                  break;
+                }
+                if (netConfig.lobbyControl == faf::server::ELobbyControl::Player) {
+                  control->Refuse(request.id, "a player-hosted lobby's slots are its host's");
+                } else if (!player) {
+                  control->Refuse(request.id, "no player of the match has uid " + std::to_string(request.uid));
+                } else if (!bad.empty()) {
+                  control->Refuse(request.id, bad);
+                } else if (values.empty()) {
+                  control->Refuse(request.id, "set_player needs a uid and options: Team=2,Faction=1");
+                } else {
+                  std::vector<std::pair<std::string, LuaPlus::LuaObject>> before;
+                  for (const auto& [key, value] : values) {
+                    before.emplace_back(key, (*player)[key.c_str()]);
+                    player->SetInteger(key.c_str(), value);
+                  }
+                  if (const std::string why = relaunch({}); !why.empty()) {
+                    for (const auto& [key, value] : before) {
+                      if (value.IsNil()) {
+                        player->SetNil(key.c_str());
+                      } else {
+                        player->SetObject(key.c_str(), value);
+                      }
+                    }
+                    control->Refuse(request.id, "that changes the match's seats: " + why);
+                  } else {
+                    int slot = 0;
+                    for (const faf::server::CServerNet::SSeatState& seat : net->Seats()) {
+                      if (seat.uid == request.uid) {
+                        slot = seat.lobbySlot;
+                      }
+                    }
+                    std::size_t told = 0;
+                    if (slot > 0) {
+                      LuaPlus::LuaObject table;
+                      table.AssignNewTable(state, 0, static_cast<unsigned>(values.size()));
+                      for (const auto& [key, value] : values) {
+                        table.SetInteger(key.c_str(), value);
+                      }
+                      LuaPlus::LuaObject data;
+                      data.AssignNewTable(state, 0, 3u);
+                      data.SetString("Type", "PlayerOptions");
+                      data.SetInteger("Slot", slot);
+                      data.SetObject("Options", table);
+                      moho::CMessage script(moho::ELobbyMsg::LOBMSG_BroadcastScriptData);
+                      bool encoded = false;
+                      {
+                        moho::CMessageStream stream(script, moho::CMessageStream::Access::kReadWrite);
+                        encoded = data.ToByteStream(stream);
+                      }
+                      if (encoded) {
+                        const auto* const bytes = reinterpret_cast<const std::uint8_t*>(script.mBuff.start_);
+                        const std::vector<std::uint8_t> message(bytes, bytes + script.mBuff.Size());
+                        for (const std::int32_t uid : signaller.InLobbyUids()) {
+                          if (uid != signaller.Host()) {
+                            net->QueueLobbyAs(uid, signaller.Host(), message);
+                            ++told;
+                          }
+                        }
+                      }
+                    }
+                    Say("The control service sets uid %d's %s (lobby slot %d)", static_cast<int>(request.uid), request.options.c_str(), slot);
+                    control->Reply(request.id, "\"options\":" + std::to_string(values.size()) + ",\"slot\":" + std::to_string(slot) + ",\"told\":" + std::to_string(told));
+                    controlEvent(
+                      "player", "\"uid\":" + std::to_string(request.uid) + ",\"options\":" + faf::server::JsonString(request.options) + ",\"slot\":" + std::to_string(slot)
+                    );
+                  }
+                }
               } else if (request.op == "force_start") {
                 Say("The control service forces the start");
                 gForceStartRequests = gForceStartRequests + 1;
@@ -1443,6 +1560,12 @@ namespace
               }
             }
             controlNews();
+          }
+          if (control) {
+            // Plan WP17.2: who readied up or stood down in the lobby.
+            for (const auto& [uid, ready] : net->TakeReadyChanges()) {
+              controlEvent("ready", "\"uid\":" + std::to_string(uid) + ",\"ready\":" + (ready ? "true" : "false"));
+            }
           }
           std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
@@ -1849,7 +1972,7 @@ namespace
               control->Reply(request.id, "\"results\":" + std::to_string(results.size()));
             }
           } else if (!controlCommon(request)) {
-            control->Refuse(request.id, "unknown op " + request.op);
+            control->Refuse(request.id, request.op == "set_options" || request.op == "set_player" || request.op == "force_start" ? "the game has started" : "unknown op " + request.op);
           }
         }
         controlNews();

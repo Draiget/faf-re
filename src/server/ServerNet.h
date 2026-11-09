@@ -151,10 +151,16 @@ namespace faf::server
       // Plan WP12.1: how far its game has loaded: "" before the launch, "loading", "rules" (its content report came, so
       // the rules are loaded), "loaded" (at the start barrier).
       std::string load;
+      // Plan WP17.2: in the lobby, the ready state its own PlayerOptions last set: "yes", "no", or "" before it did.
+      std::string ready;
+      // Plan WP17.2: the lobby slot the host's lobby put it in (lobby.lua's slot, not the match's army); 0 before.
+      int lobbySlot = 0;
     };
     [[nodiscard]] std::vector<SSeatState> Seats();
     /** Plan WP17.2: each verdict made since the last call, as the seat stood then (uid, name and the verdict fields). */
     [[nodiscard]] std::vector<SSeatState> TakeJudged();
+    /** Plan WP17.2: lobby ready states that changed since the last call (uid, ready), in order. */
+    [[nodiscard]] std::vector<std::pair<std::int32_t, bool>> TakeReadyChanges();
     /**
      * Plan WP17.2: a participant out of the match (the organiser's eject, or a defeat with `DefeatedPlayerView =
      * "disconnect"`), as one who leaves is; done on the network thread. `reason` goes to the log whole. False: no such seat.
@@ -263,7 +269,8 @@ namespace faf::server
     std::vector<std::int32_t> mGone;          // under mNewsLock
     std::vector<std::int32_t> mReturned;      // likewise
     std::vector<SPresence> mPresence;         // likewise
-    std::vector<SSeatState> mJudged;          // plan WP17.2: each seat's verdicts as they were made (`TakeJudged`)
+    std::vector<SSeatState> mJudged;
+    std::vector<std::pair<std::int32_t, bool>> mReadyNews; // plan WP17.2 (`TakeReadyChanges`)          // plan WP17.2: each seat's verdicts as they were made (`TakeJudged`)
     std::uint64_t mBadMessages = 0;
     std::uint64_t mViewMismatches = 0;
     remote::wire::SRoster mRosterSent; // the last sent to everyone, without a local index

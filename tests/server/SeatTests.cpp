@@ -841,6 +841,59 @@ TEST(LobbyRelay, OrganisedLobbysPlayersOnlyReadyUp)
   EXPECT_EQ(Relay(player, 1002, LobbyBody(1001, script(move)), 1u).verdict, ELobbyRelayVerdict::Forward);
 }
 
+// Plan WP17.2: where each participant sits (as the host's lobby says) and who is ready, for the control service.
+TEST(LobbyRelay, ReadsSlotsAndReadyForTheControlService)
+{
+  CLobbyRelay relay;
+  relay.AddParticipant(1001);
+  relay.AddParticipant(1002);
+  relay.SetHost(1001);
+  const auto script = [](const std::vector<std::uint8_t>& payload) { return LobbyMessage(moho::ELobbyMsg::LOBMSG_BroadcastScriptData, payload); };
+  const auto readyAt = [](const float slot, const bool ready) {
+    return LuaBytes(LuaTable({{LuaString("Type"), LuaString("PlayerOptions")}, {LuaString("Slot"), LuaNumber(slot)},
+                              {LuaString("Options"), LuaTable({{LuaString("Ready"), LuaBoolean(ready)}})}}));
+  };
+  EXPECT_EQ(relay.LobbySlotOf(1002), 0);
+  EXPECT_FALSE(relay.ReadyOf(1002).has_value());
+  // The host seats 1002 (`SlotAssigned`, OwnerID as lobby.lua's string) and tells it the whole game (`GameInfo`).
+  const std::vector<std::uint8_t> assigned = LuaBytes(LuaTable(
+    {{LuaString("Type"), LuaString("SlotAssigned")}, {LuaString("Slot"), LuaNumber(3.0f)}, {LuaString("Options"), LuaTable({{LuaString("OwnerID"), LuaString("1002")}})}}
+  ));
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, script(assigned)), 1u).verdict, ELobbyRelayVerdict::Forward);
+  EXPECT_EQ(relay.LobbySlotOf(1002), 3);
+  const std::vector<std::uint8_t> info = LuaBytes(LuaTable(
+    {{LuaString("Type"), LuaString("GameInfo")},
+     {LuaString("GameInfo"),
+      LuaTable({{LuaString("PlayerOptions"),
+                 LuaTable({{LuaNumber(1.0f), LuaTable({{LuaString("OwnerID"), LuaString("1001")}})},
+                           {LuaNumber(2.0f), LuaTable({{LuaString("OwnerID"), LuaString("1002")}})}})}})}}
+  ));
+  EXPECT_EQ(Relay(relay, 1001, LobbyBody(1002, LobbyMessage(moho::ELobbyMsg::LOBMSG_DirectScriptData, info)), 2u).verdict, ELobbyRelayVerdict::Forward);
+  EXPECT_EQ(relay.LobbySlotOf(1001), 1);
+  EXPECT_EQ(relay.LobbySlotOf(1002), 2);
+  // A player can't seat anyone.
+  const std::vector<std::uint8_t> claimed = LuaBytes(LuaTable(
+    {{LuaString("Type"), LuaString("SlotMove")}, {LuaString("NewSlot"), LuaNumber(1.0f)}, {LuaString("Options"), LuaTable({{LuaString("OwnerID"), LuaString("1002")}})}}
+  ));
+  (void)Relay(relay, 1002, LobbyBody(1001, script(claimed)), 3u);
+  EXPECT_EQ(relay.LobbySlotOf(1002), 2);
+  // 1002 readies up (its own options; the Slot it names doesn't matter); the host sets 1002's slot back to not ready
+  // and readies itself; the same state again is no change.
+  (void)Relay(relay, 1002, LobbyBody(1001, script(readyAt(7.0f, true))), 4u);
+  EXPECT_EQ(relay.ReadyOf(1002), std::optional<bool>(true));
+  (void)Relay(relay, 1001, LobbyBody(1002, script(readyAt(2.0f, false))), 5u);
+  (void)Relay(relay, 1001, LobbyBody(1002, script(readyAt(1.0f, true))), 6u);
+  (void)Relay(relay, 1001, LobbyBody(1002, script(readyAt(1.0f, true))), 7u);
+  // The host's message for a slot nobody sits in counts for nobody.
+  (void)Relay(relay, 1001, LobbyBody(1002, script(readyAt(5.0f, true))), 8u);
+  EXPECT_EQ(relay.ReadyOf(1002), std::optional<bool>(false));
+  EXPECT_EQ(relay.ReadyOf(1001), std::optional<bool>(true));
+  const std::vector<std::pair<std::int32_t, bool>> changes = relay.TakeReadyChanges();
+  const std::vector<std::pair<std::int32_t, bool>> expected = {{1002, true}, {1002, false}, {1001, true}};
+  EXPECT_EQ(changes, expected);
+  EXPECT_TRUE(relay.TakeReadyChanges().empty());
+}
+
 TEST(LobbyRelay, EjectsOfParticipantsNeverArrive)
 {
   CLobbyRelay relay;

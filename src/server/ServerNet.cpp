@@ -473,6 +473,10 @@ namespace faf::server
       state.gone = seat.gone;
       state.away = seat.lobbyAway;
       state.content = seat.contentVerdict;
+      if (const std::optional<bool> ready = mLobby.ReadyOf(uid); ready) {
+        state.ready = *ready ? "yes" : "no";
+      }
+      state.lobbySlot = mLobby.LobbySlotOf(uid);
       state.load = seat.loaded ? "loaded" : (seat.reported ? "rules" : (mContentKnown && seat.joinedEver ? "loading" : ""));
       state.mods = seat.modsVerdict;
       for (const remote::SModEntry& mod : seat.mods) {
@@ -486,8 +490,10 @@ namespace faf::server
       states.push_back(std::move(state));
     }
     {
+      const std::vector<std::pair<std::int32_t, bool>> readyChanges = mLobby.TakeReadyChanges();
       const std::scoped_lock lock(mNewsLock);
       mSeatStates.swap(states);
+      mReadyNews.insert(mReadyNews.end(), readyChanges.begin(), readyChanges.end());
     }
 
     if (const std::int32_t beat = mBeat.load(std::memory_order_relaxed); beat != mBeatSent) {
@@ -697,6 +703,12 @@ namespace faf::server
     }
     const std::scoped_lock lock(mNewsLock);
     mJudged.push_back(std::move(state));
+  }
+
+  std::vector<std::pair<std::int32_t, bool>> CServerNet::TakeReadyChanges()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    return std::exchange(mReadyNews, {});
   }
 
   std::vector<CServerNet::SSeatState> CServerNet::TakeJudged()

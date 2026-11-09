@@ -133,6 +133,81 @@ namespace faf::server
     }
   }
 
+  namespace
+  {
+    /** A number's value (the float `ToByteStream` wrote) as a whole number; nothing for anything else. */
+    [[nodiscard]] std::optional<int> WholeNumber(const SLuaBytesValue* const value)
+    {
+      if (value == nullptr || value->kind != SLuaBytesValue::EKind::Number) {
+        return std::nullopt;
+      }
+      float number = 0.0f;
+      std::memcpy(&number, value->raw, sizeof(float));
+      if (!(number >= -1.0e6f && number <= 1.0e6f) || number != static_cast<float>(static_cast<int>(number))) {
+        return std::nullopt;
+      }
+      return static_cast<int>(number);
+    }
+
+    /** A player's `OwnerID` (lobby.lua keeps peer ids as strings); nothing when it isn't a uid. */
+    [[nodiscard]] std::optional<std::int32_t> OwnerOf(SLuaBytesValue* const options)
+    {
+      if (options == nullptr || options->kind != SLuaBytesValue::EKind::Table) {
+        return std::nullopt;
+      }
+      SLuaBytesValue* const owner = options->Field("OwnerID");
+      if (owner != nullptr && owner->kind == SLuaBytesValue::EKind::String) {
+        if (owner->text.empty() || owner->text.size() > 10u || owner->text.find_first_not_of("0123456789") != std::string::npos) {
+          return std::nullopt;
+        }
+        const long long uid = std::stoll(owner->text);
+        return uid > 0 && uid <= 0x7fffffffLL ? std::optional<std::int32_t>(static_cast<std::int32_t>(uid)) : std::nullopt;
+      }
+      if (const std::optional<int> uid = WholeNumber(owner); uid && *uid > 0) {
+        return *uid;
+      }
+      return std::nullopt;
+    }
+  } // namespace
+
+  SLobbyFacts ReadLobbyFacts(const std::span<const std::uint8_t> payload)
+  {
+    SLobbyFacts facts;
+    SLuaBytesValue root;
+    if (!ParseLuaBytes(payload, root) || root.kind != SLuaBytesValue::EKind::Table) {
+      return facts;
+    }
+    const SLuaBytesValue* const type = root.Field("Type");
+    if (type == nullptr || type->kind != SLuaBytesValue::EKind::String) {
+      return facts;
+    }
+    if (type->IsString("PlayerOptions")) {
+      SLuaBytesValue* const options = root.Field("Options");
+      const SLuaBytesValue* const ready = options != nullptr && options->kind == SLuaBytesValue::EKind::Table ? options->Field("Ready") : nullptr;
+      if (ready != nullptr && ready->kind == SLuaBytesValue::EKind::Boolean) {
+        facts.ready = ready->raw[0] != 0u;
+      }
+      facts.slot = WholeNumber(root.Field("Slot"));
+    } else if (type->IsString("SlotAssigned") || type->IsString("SlotMove")) {
+      const std::optional<int> slot = WholeNumber(root.Field(type->IsString("SlotMove") ? "NewSlot" : "Slot"));
+      if (const std::optional<std::int32_t> owner = OwnerOf(root.Field("Options")); owner && slot) {
+        facts.seats.emplace_back(*owner, *slot);
+      }
+    } else if (type->IsString("GameInfo")) {
+      SLuaBytesValue* const info = root.Field("GameInfo");
+      SLuaBytesValue* const players = info != nullptr && info->kind == SLuaBytesValue::EKind::Table ? info->Field("PlayerOptions") : nullptr;
+      if (players != nullptr && players->kind == SLuaBytesValue::EKind::Table) {
+        for (std::size_t i = 0; i < players->keys.size(); ++i) {
+          const std::optional<int> slot = WholeNumber(&players->keys[i]);
+          if (const std::optional<std::int32_t> owner = OwnerOf(&players->values[i]); owner && slot) {
+            facts.seats.emplace_back(*owner, *slot);
+          }
+        }
+      }
+    }
+    return facts;
+  }
+
   EPlayerScript LimitPlayerScript(std::vector<std::uint8_t>& payload)
   {
     SLuaBytesValue root;

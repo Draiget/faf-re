@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -71,6 +72,21 @@ namespace faf::server
    * (`SetPlayerOptions`, the player's own slot) keeps only `Ready`. Anything else, unreadable bytes included, stays.
    */
   [[nodiscard]] EPlayerScript LimitPlayerScript(std::vector<std::uint8_t>& payload);
+
+  /** Plan WP17.2: what the control service reads from one lobby message (who sits where, who is ready). */
+  struct SLobbyFacts
+  {
+    std::optional<bool> ready; // `{Type = 'PlayerOptions', Slot = n, Options = {Ready = ...}}`
+    std::optional<int> slot;   // that message's `Slot`
+    // (OwnerID, lobby slot) from the host's `SlotAssigned` (`Slot`), `SlotMove` (`NewSlot`) and `GameInfo`
+    // (`GameInfo.PlayerOptions`, keyed by slot); lobby.lua `HostUtils.TryAddPlayer`, `MovePlayerToEmptySlot`,
+    // `SendCompleteGameStateToPeer`. Each says where a player sits, so reading it once per recipient (a broadcast comes
+    // as one message to each) says the same. `SwapPlayers` isn't read: applied once per recipient it would swap back,
+    // and an organised lobby's host has no swap (plan WP17.6's screen); only an organised lobby's slots are the
+    // control service's.
+    std::vector<std::pair<std::int32_t, int>> seats;
+  };
+  [[nodiscard]] SLobbyFacts ReadLobbyFacts(std::span<const std::uint8_t> payload);
 
   /**
    * Plan WP15.4: `bytes` (one table in the form above) with the number under the string key `key` of the top table set to

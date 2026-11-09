@@ -149,6 +149,32 @@ namespace faf::server
       }
     }
 
+    // Plan WP17.2: who sits in which lobby slot, as the host says it, and who is ready, as the PlayerOptions (after
+    // this relay's limits) say it.
+    if (script && forwarded.size() > kMessageHeaderBytes) {
+      const SLobbyFacts facts = ReadLobbyFacts(forwarded.subspan(kMessageHeaderBytes));
+      if (from == mHost) {
+        for (const auto& [owner, slot] : facts.seats) {
+          mLobbySlots[owner] = slot;
+        }
+      }
+      if (facts.ready) {
+        // A player sets only their own slot (lobby.lua refuses the rest); the host sets any (everyone's Ready goes
+        // false when the options change), so its message counts for the slot's owner.
+        std::int32_t owner = from;
+        if (from == mHost && facts.slot) {
+          const auto seated = std::find_if(mLobbySlots.begin(), mLobbySlots.end(), [&facts](const auto& entry) { return entry.second == *facts.slot; });
+          owner = seated == mLobbySlots.end() ? 0 : seated->first;
+        }
+        if (owner != 0) {
+          const auto [entry, added] = mReady.try_emplace(owner, *facts.ready);
+          if (added || entry->second != *facts.ready) {
+            entry->second = *facts.ready;
+            mReadyChanges.emplace_back(owner, *facts.ready);
+          }
+        }
+      }
+    }
     to = targetUid;
     out.clear();
     remote::net::ByteWriter writer(out);
