@@ -121,15 +121,12 @@ end
 do
     local gameplay = options and options.gameplay
     if gameplay and gameplay.items and not HasOptionKey(gameplay.items, 'transport_preorders') then
-        local isRu = (rawget(_G, '__language') == 'RU')
         local entry = {
-            title = isRu and "Предзаказы десанта из транспорта" or "Transport Cargo Pre-orders",
+            title = "Transport Cargo Pre-orders",
             key = 'transport_preorders',
             type = 'toggle',
             default = 1,
-            tip = isRu
-                and "Разрешить отдавать предзаказы и отображать призраков высадки и постройки для юнитов внутри транспорта."
-                or "Allow issuing pre-orders and previewing drop ghosts for units inside transports.",
+            tip = "Allow issuing pre-orders and previewing drop ghosts for units inside transports.",
             set = function(key, value, startup)
                 if value ~= 0 and value ~= 1 then
                     value = 1
