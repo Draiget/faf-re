@@ -500,6 +500,11 @@ TEST(GalTextureFiltering, OnlyTiledTrilinearSamplersTurnAnisotropic)
   EXPECT_EQ(WithTextureAnisotropy(clamped).filter, 0x15U) << "clamped textures keep their filter";
   EXPECT_EQ(WithTextureAnisotropy(point).filter, 0x00U);
   EXPECT_EQ(WithTextureAnisotropy(noMips).filter, 0x14U);
+  SamplerDesc lookup = tiled;
+  lookup.texture = "lookupTexture";
+  EXPECT_EQ(WithTextureAnisotropy(lookup).filter, 0x15U) << "lookup tables read by computed coordinates keep theirs";
+  tiled.texture = "Stratum0AlbedoTexture";
+  EXPECT_EQ(WithTextureAnisotropy(tiled).filter, 0x55U);
 
   gTextureAnisotropy = 32;
   EXPECT_EQ(WithTextureAnisotropy(tiled).maxAnisotropy, 16U) << "capped at what the APIs allow";

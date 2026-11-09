@@ -1677,12 +1677,17 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (found != mSamplerTables.end()) {
       return found->second;
     }
+    // Engine change (ren_TextureAnisotropy): a table takes only its effect's samplers. Each value of the switch
+    // adds tables, and 64 slots apiece filled the 2048-slot heap after about 32. The root signature's range is
+    // 64 wide, so a table starts only where those 64 lie inside the heap; tables may overlap, as each reads only
+    // its own effect's slots.
+    const std::uint32_t used = std::clamp<std::uint32_t>(static_cast<std::uint32_t>(samplers.size()), 1U, effects::kMaxSamplerSlots);
     D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
     D3D12_GPU_DESCRIPTOR_HANDLE gpu{};
-    if (!mSamplerHeap.Allocate(effects::kMaxSamplerSlots, cpu, gpu)) {
+    if (mSamplerHeap.Remaining() < effects::kMaxSamplerSlots || !mSamplerHeap.Allocate(used, cpu, gpu)) {
       ThrowError("DeviceD3D12.cpp", __LINE__, "sampler heap exhausted");
     }
-    for (std::uint32_t index = 0U; index < effects::kMaxSamplerSlots; ++index) {
+    for (std::uint32_t index = 0U; index < used; ++index) {
       D3D12_CPU_DESCRIPTOR_HANDLE handle = cpu;
       handle.ptr += static_cast<SIZE_T>(index) * mSamplerHeap.Increment();
       mDevice->CreateSampler(&descs[index], handle);
