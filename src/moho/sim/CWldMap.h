@@ -521,6 +521,15 @@ namespace moho
     [[nodiscard]] virtual bool Finalize() = 0;
     [[nodiscard]] virtual IDecalManager* GetDecalManager() = 0;
 
+    /**
+     * Engine addition, after the binary's 76 slots: the map changes of one sim beat
+     * (`SSyncData::mPlayableRectUpdates`, the rectangles `FlattenMapRect` flattened), with the result
+     * of calling `NotifyMapChange` for each in order, which is what this default does.
+     * `CWldTerrainRes` updates each normal-map tile once for all of them: a map whose start flattens
+     * thousands of building skirts (SCMP_021: 3584) otherwise uploads a tile per skirt.
+     */
+    virtual void NotifyMapChanges(const gpg::Rect2i* rects, std::size_t count);
+
   protected:
     /**
      * Address: 0x008A74D0 (FUN_008A74D0, IWldTerrainRes ctor lane)

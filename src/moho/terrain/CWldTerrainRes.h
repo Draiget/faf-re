@@ -351,6 +351,14 @@ namespace moho
     void NotifyMapChange(const gpg::Rect2i& rect) override;
 
     /**
+     * Engine addition: as `NotifyMapChange` for each rectangle in order, with one lock and upload
+     * of each normal-map tile for all the rectangles the terrain takes after it is finalized,
+     * instead of one per rectangle. The blocks come out the same: each is encoded from the
+     * heights, which no rectangle changes.
+     */
+    void NotifyMapChanges(const gpg::Rect2i* rects, std::size_t count) override;
+
+    /**
      * Address: 0x008A54B0 (FUN_008A54B0, ?GetDebugDirtyTerrain@CWldTerrainRes@Moho@@EAEPAVBitArray2D@gpg@@XZ)
      *
      * What it does:
@@ -874,6 +882,14 @@ namespace moho
      * encodes per-texel normal lanes into DXT payload blocks.
      */
     void UpdateNormalMap(CBackgroundTaskControl& loadControl, const gpg::Rect2i& rect);
+
+    /**
+     * Engine addition (`NotifyMapChanges`): `UpdateNormalMap(rect)` for each rectangle, each tile
+     * locked once over the rectangles that reach it. Only the rectangles' blocks are written; the
+     * rest of the locked area keeps its contents on every backend (D3D9 locks without discard,
+     * the others keep the level's CPU copy).
+     */
+    void UpdateNormalMapRects(const gpg::Rect2i* rects, std::size_t count);
 
     // Pieces of Load (0x008A1700), each reading its part of the map stream in the binary's order.
     void LoadEnvironmentLookups(gpg::BinaryReader& reader, std::uint32_t version);

@@ -2434,6 +2434,124 @@ namespace moho
     mDebugDirtyTerrain->FillRect(halfX0, halfZ0, halfX1 - halfX0, halfZ1 - halfZ0, true);
   }
 
+  void CWldTerrainRes::NotifyMapChanges(const gpg::Rect2i* const rects, const std::size_t count)
+  {
+    // Until the terrain is finalized, each change goes the original way (the first one finalizes).
+    std::size_t next = 0;
+    while (next < count && !GetBool()) {
+      NotifyMapChange(rects[next]);
+      ++next;
+    }
+    if (count - next < 2u) {
+      for (; next < count; ++next) {
+        NotifyMapChange(rects[next]);
+      }
+      return;
+    }
+
+    // A whole-map rectangle keeps UpdateNormalMap's own path, which can take the loader's encoding.
+    const CHeightField* const field = mMap->mHeightField.get();
+    std::vector<gpg::Rect2i> batch;
+    batch.reserve(count - next);
+    for (std::size_t i = next; i < count; ++i) {
+      const gpg::Rect2i& rect = rects[i];
+      if (field != nullptr && rect.x0 <= 0 && rect.z0 <= 0 && rect.x1 >= field->width - 1 && rect.z1 >= field->height - 1) {
+        UpdateNormalMap(rect);
+      } else {
+        batch.push_back(rect);
+      }
+    }
+    UpdateNormalMapRects(batch.data(), batch.size());
+
+    for (std::size_t i = next; i < count; ++i) {
+      const gpg::Rect2i& rect = rects[i];
+      mDebugDirtyRects.push_back(rect);
+      const std::int32_t halfX0 = FloorHalfCoordinate(rect.x0);
+      const std::int32_t halfX1 = CeilHalfCoordinate(rect.x1);
+      const std::int32_t halfZ0 = FloorHalfCoordinate(rect.z0);
+      const std::int32_t halfZ1 = CeilHalfCoordinate(rect.z1);
+      mDebugDirtyTerrain->FillRect(halfX0, halfZ0, halfX1 - halfX0, halfZ1 - halfZ0, true);
+    }
+  }
+
+  void CWldTerrainRes::UpdateNormalMapRects(const gpg::Rect2i* const rects, const std::size_t count)
+  {
+    const std::int32_t tileWidth = mNormalMapWidth;
+    const std::int32_t tileHeight = mNormalMapHeight;
+    CHeightField* const field = mMap->mHeightField.get();
+    if (count == 0u || tileWidth <= 0 || tileHeight <= 0 || field == nullptr || field->width <= 1 || field->height <= 1) {
+      return;
+    }
+
+    // As UpdateNormalMap: the same tiles, clips and 4x4 alignment, per rectangle.
+    std::vector<gpg::Rect2i> local; // a tile's rectangles, in its own block-aligned coordinates
+    const std::size_t tileCount = mNormalMap.size();
+    std::size_t tileIndex = 0u;
+    for (std::int32_t tileZBase = 0; tileZBase < field->height - 1; tileZBase += tileHeight) {
+      const std::int32_t tileZEnd = tileZBase + tileHeight;
+      for (std::int32_t tileXBase = 0; tileXBase < field->width - 1; tileXBase += tileWidth, ++tileIndex) {
+        if (tileIndex >= tileCount) {
+          return;
+        }
+        const std::int32_t tileXEnd = tileXBase + tileWidth;
+
+        local.clear();
+        gpg::Rect2i lockRect{};
+        for (std::size_t i = 0; i < count; ++i) {
+          const gpg::Rect2i& rect = rects[i];
+          const std::int32_t clippedX0 = std::max(tileXBase, rect.x0);
+          const std::int32_t clippedX1 = std::min(tileXEnd, rect.x1);
+          const std::int32_t clippedZ0 = std::max(tileZBase, rect.z0);
+          const std::int32_t clippedZ1 = std::min(tileZEnd, rect.z1);
+          if (clippedX0 >= clippedX1 || clippedZ0 >= clippedZ1) {
+            continue;
+          }
+          gpg::Rect2i blocks{};
+          blocks.x0 = AlignDownTo4(clippedX0 - tileXBase);
+          blocks.z0 = AlignDownTo4(clippedZ0 - tileZBase);
+          blocks.x1 = AlignUpTo4(clippedX1 - tileXBase);
+          blocks.z1 = AlignUpTo4(clippedZ1 - tileZBase);
+          if (local.empty()) {
+            lockRect = blocks;
+          } else {
+            lockRect.x0 = std::min(lockRect.x0, blocks.x0);
+            lockRect.z0 = std::min(lockRect.z0, blocks.z0);
+            lockRect.x1 = std::max(lockRect.x1, blocks.x1);
+            lockRect.z1 = std::max(lockRect.z1, blocks.z1);
+          }
+          local.push_back(blocks);
+        }
+        if (local.empty()) {
+          continue;
+        }
+
+        boost::shared_ptr<CD3DDynamicTextureSheet> texture = mNormalMap[tileIndex];
+        CD3DDynamicTextureSheet* const sheet = texture.get();
+        if (sheet == nullptr) {
+          continue;
+        }
+        std::uint32_t pitchBytes = 0;
+        void* mappedBits = nullptr;
+        if (!sheet->LockRect(reinterpret_cast<const RECT*>(&lockRect), &pitchBytes, &mappedBits)) {
+          continue;
+        }
+        auto* const lockBase = static_cast<std::uint8_t*>(mappedBits);
+        for (const gpg::Rect2i& blocks : local) {
+          for (std::int32_t localZ = blocks.z0; localZ < blocks.z1; localZ += 4) {
+            auto* blockOutput = reinterpret_cast<std::uint64_t*>(
+              lockBase + static_cast<std::size_t>((localZ - lockRect.z0) / 4) * pitchBytes
+            ) + static_cast<std::size_t>((blocks.x0 - lockRect.x0) / 4) * 2u;
+            for (std::int32_t localX = blocks.x0; localX < blocks.x1; localX += 4) {
+              EncodeNormalBlock(*field, tileXBase + localX, tileZBase + localZ, blockOutput);
+              blockOutput += 2;
+            }
+          }
+        }
+        (void)sheet->Unlock();
+      }
+    }
+  }
+
   /**
    * Address: 0x008A4CB0 (FUN_008A4CB0, ?UpdateTexture@CWldTerrainRes@Moho@@QAEXV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@PAI@Z)
    *

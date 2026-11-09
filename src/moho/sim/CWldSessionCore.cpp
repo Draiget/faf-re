@@ -1786,9 +1786,9 @@ namespace
       terrainRes->UpdateWaveSystem(worldCamera->CameraGetView(), worldCamera->CameraGetTargetZoom(), mGameTick);
     }
 
-    for (const gpg::Rect2i& playableRect : beat.mPlayableRectUpdates) {
-      terrainRes->NotifyMapChange(playableRect);
-    }
+    // Engine addition: all of the beat's map changes in one call, the same as `NotifyMapChange` for
+    // each in order (IWldTerrainRes::NotifyMapChanges); SCMP_021's first beat carries 3584.
+    terrainRes->NotifyMapChanges(beat.mPlayableRectUpdates.begin(), beat.mPlayableRectUpdates.size());
   }
 
   // Part of DoBeat (0x00894530).
