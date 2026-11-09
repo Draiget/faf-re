@@ -447,7 +447,10 @@ namespace
     // 0x0089404E..0x00894078: map ownership ends before the rules that
     // supply its mesh blueprints.
     if (mRules) {
-      delete mRules;
+      // Engine addition (RULE_SetKeepBetweenSessions): the editor keeps them for its next play.
+      if (!RULE_KeepAfterSession(mRules, mState)) {
+        delete mRules;
+      }
       mRules = nullptr;
     }
 

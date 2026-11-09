@@ -26,6 +26,7 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/WRenViewport.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/sim/RRuleGameRules.h"
 
 // imgui_impl_win32.h leaves this declaration to the application.
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -253,6 +254,8 @@ namespace faf::editor
       moho::gAppBeforeDeviceCreate = &AddPanelHead;
       // Plays have cheats on (the whole-map view during play needs them), Game.prefs untouched.
       moho::gSessionCheats = true;
+      // Each play's rules (every blueprint) are kept for the next play with the same mods.
+      moho::RULE_SetKeepBetweenSessions(true);
 
       if (!mGame.Init()) {
         ::MessageBoxW(nullptr, L"Neither Direct3D 12 nor Vulkan started, or the game data could not be read. See the log.",
@@ -589,6 +592,8 @@ namespace faf::editor
       if (const HWND frame = HandleOf(mGame.supcomFrame); frame != nullptr && gFrameProc != nullptr) {
         (void)::SetWindowLongPtrW(frame, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(gFrameProc));
       }
+      // Kept rules go while the engine is up, and a session still playing deletes its own.
+      moho::RULE_SetKeepBetweenSessions(false);
       mGame.Destroy();
       exitValue = mGame.exitValue;
     }

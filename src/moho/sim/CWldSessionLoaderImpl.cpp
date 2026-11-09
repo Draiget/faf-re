@@ -266,7 +266,8 @@ namespace moho
         earlyMap.emplace(scenario, loadControl);
       }
 
-      RRuleGameRules* const createdRules = RRuleGameRules::Create(scenario->mGameMods, loadControl);
+      // Engine addition (RULE_SetKeepBetweenSessions): the last session's rules when the editor keeps them.
+      RRuleGameRules* const createdRules = RULE_TakeOrCreate(scenario->mGameMods, loadControl);
       if (RRuleGameRules* const previousRules = scenario->mGameRules;
           createdRules != previousRules && previousRules != nullptr) {
         delete previousRules;

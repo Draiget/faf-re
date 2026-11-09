@@ -28,7 +28,7 @@ The Map panel sets the play up, the way FAF's `/map` quick start does (`SinglePl
 - **Fog**: fog of war ("explored") or none. The sim fixes fog when the game starts, so it applies from the next Play.
 - **See the whole map**, during play: the view switches to an observer's (no fog, every army) and back to your army. Editor plays have cheats on for this, without changing the `debug.enable_debug_facilities` preference the game reads.
 
-Campaign maps go through FAF's own campaign setup. No replay is written.
+Campaign maps go through FAF's own campaign setup. No replay is written. The game's rules (every unit, projectile and effect blueprint) are built by the first play and kept for the next ones with the same mods (`RULE_SetKeepBetweenSessions`; the game builds them for every session).
 
 | Switch | Effect |
 |---|---|
@@ -63,5 +63,5 @@ The Tools panel is laid out as the plan's mockup: a strip of tool icons and the 
 ## Known issues
 
 - Each Play keeps about 15 MB more after it ends (20 cycles of SCMP_009 on Direct3D 12: the lowest point between sessions went from 798 to 1,101 MB). Not yet traced.
-- A solo play takes about 2.3 s to load on SCMP_009 (about 2 s loading the rules and map, 0.3 s creating the sim), the same every time, behind the game's loading screen. Keeping the rules between plays is the next step.
+- The first play builds the game's rules (every blueprint, about 1.3 s for FAF) and later plays reuse them, so a solo play of SCMP_009 reaches the game in about 2.8 s the first time and 1.0 s after (Direct3D 12 and Vulkan alike). Large maps take longer to start: Alpha 7 Quarantine (SCMP_021, 40 km) about 5.5 s on later plays, 4 s of it creating the sim and its terrain, not yet traced. The game's loading screen still shows.
 - A popup of the panels that reaches over the game's view is hidden behind it (the view is its own window).

@@ -9,6 +9,7 @@
 #include <cstring>
 #include <intrin.h>
 #include <limits>
+#include <mutex>
 #include <new>
 #include <string>
 #include <string_view>
@@ -817,6 +818,48 @@ namespace moho
   {
     /// Engine addition: changes whenever a rules object is built or destroyed (see BlueprintNameCache).
     std::atomic<std::uint64_t> gRulesGeneration{0u};
+
+    /**
+     * Engine addition (RULE_SetKeepBetweenSessions): the rules kept from the last session, and the ones
+     * lent to the session being loaded or played, each with the mods they were built from. The loader
+     * thread lends, the main thread keeps, hence the lock.
+     */
+    struct KeptRules
+    {
+      std::mutex lock;
+      /// Also read without the lock, by the Lua-blueprint release checks.
+      std::atomic<bool> enabled{false};
+      RRuleGameRules* kept = nullptr;
+      fa::string keptMods;
+      const RRuleGameRules* lent = nullptr;
+      fa::string lentMods;
+    };
+
+    KeptRules& Kept()
+    {
+      static KeptRules kept;
+      return kept;
+    }
+
+    /**
+     * The rules' Lua copy of the blueprints stays: the replay viewer starts more sims from one set of
+     * rules, and the editor's kept rules export it to every later session and sim. The keep has its own
+     * flag because the replay viewer clears `gRuleKeepScriptBlueprints` at every teardown.
+     */
+    [[nodiscard]] bool KeepsScriptBlueprints() noexcept
+    {
+      return gRuleKeepScriptBlueprints || Kept().enabled.load(std::memory_order_relaxed);
+    }
+
+    /// Rules being destroyed are no longer lent (a cancelled load deletes them without a session).
+    void RULE_ForgetLent(const RRuleGameRules* const rules)
+    {
+      KeptRules& state = Kept();
+      const std::lock_guard<std::mutex> guard(state.lock);
+      if (state.lent == rules) {
+        state.lent = nullptr;
+      }
+    }
   } // namespace
 
   RRuleGameRulesImpl::RRuleGameRulesImpl(const fa::string& activeMods, CBackgroundTaskControl* const initHandler)
@@ -987,6 +1030,7 @@ namespace moho
     // Engine addition: a sim Lua state prepared for these rules that no sim took holds an export
     // binding into them; it goes first.
     SIM_DiscardPreparedLuaState(this);
+    RULE_ForgetLent(this); // engine addition: a later rules object may get this address
     const RRuleGameRules* expected = this; // engine addition (wld_StartSimEarly): a later rules object may get this address
     (void)gLoaderReleasesBlueprints.compare_exchange_strong(expected, nullptr);
     gRulesGeneration.fetch_add(1u, std::memory_order_relaxed); // engine addition, see BlueprintNameCache
@@ -1110,7 +1154,7 @@ namespace moho
 
   void RRuleGameRulesImpl::OnSimHasBlueprints()
   {
-    if (rule_ReleaseScriptBlueprints && !gRuleKeepScriptBlueprints && gLoaderReleasesBlueprints.load(std::memory_order_acquire) != this) {
+    if (rule_ReleaseScriptBlueprints && !KeepsScriptBlueprints() && gLoaderReleasesBlueprints.load(std::memory_order_acquire) != this) {
       ReleaseScriptBlueprints();
     }
   }
@@ -1122,9 +1166,84 @@ namespace moho
 
   void RULE_ReleaseDeferredScriptBlueprints(RRuleGameRules* const rules)
   {
-    if (rule_ReleaseScriptBlueprints && !gRuleKeepScriptBlueprints && rules != nullptr && gLoaderReleasesBlueprints.load(std::memory_order_acquire) == rules) {
+    if (rule_ReleaseScriptBlueprints && !KeepsScriptBlueprints() && rules != nullptr && gLoaderReleasesBlueprints.load(std::memory_order_acquire) == rules) {
       static_cast<RRuleGameRulesImpl*>(rules)->ReleaseScriptBlueprints();
     }
+  }
+
+  void RULE_SetKeepBetweenSessions(const bool keep)
+  {
+    KeptRules& state = Kept();
+    {
+      const std::lock_guard<std::mutex> guard(state.lock);
+      state.enabled = keep; // also keeps the rules' Lua copy of the blueprints (KeepsScriptBlueprints)
+    }
+    if (!keep) {
+      RULE_DeleteKept();
+    }
+  }
+
+  RRuleGameRules* RULE_TakeOrCreate(const fa::string& gameMods, CBackgroundTaskControl* const loadControl)
+  {
+    KeptRules& state = Kept();
+    RRuleGameRules* reused = nullptr;
+    RRuleGameRules* stale = nullptr;
+    bool enabled = false;
+    {
+      const std::lock_guard<std::mutex> guard(state.lock);
+      enabled = state.enabled;
+      if (state.kept != nullptr) {
+        (state.keptMods == gameMods ? reused : stale) = state.kept;
+        state.kept = nullptr;
+      }
+    }
+    delete stale; // other mods: their blueprints differ
+    RRuleGameRules* const rules = reused != nullptr ? reused : RRuleGameRules::Create(gameMods, loadControl);
+    if (reused != nullptr) {
+      gpg::Logf("RULE: the last session's rules are used again");
+    }
+    if (enabled) {
+      const std::lock_guard<std::mutex> guard(state.lock);
+      state.lent = rules;
+      state.lentMods = gameMods;
+    }
+    return rules;
+  }
+
+  bool RULE_KeepAfterSession(RRuleGameRules* const rules, LuaPlus::LuaState* const sessionState)
+  {
+    KeptRules& state = Kept();
+    RRuleGameRules* replaced = nullptr;
+    {
+      const std::lock_guard<std::mutex> guard(state.lock);
+      if (!state.enabled || rules == nullptr || rules != state.lent) {
+        return false;
+      }
+      if (sessionState != nullptr) {
+        rules->CancelExport(sessionState); // the session's state is deleted right after
+      }
+      if (state.kept != rules) {
+        replaced = state.kept;
+      }
+      state.kept = rules;
+      state.keptMods = state.lentMods;
+      state.lent = nullptr;
+    }
+    SIM_DiscardPreparedLuaState(rules); // a sim state prepared for the session but never taken
+    delete replaced;
+    return true;
+  }
+
+  void RULE_DeleteKept()
+  {
+    KeptRules& state = Kept();
+    RRuleGameRules* kept = nullptr;
+    {
+      const std::lock_guard<std::mutex> guard(state.lock);
+      kept = state.kept;
+      state.kept = nullptr;
+    }
+    delete kept;
   }
 
   void RRuleGameRulesImpl::UpdateLuaState(LuaPlus::LuaState* luaState)
