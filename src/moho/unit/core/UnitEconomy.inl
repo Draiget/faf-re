@@ -235,6 +235,20 @@ void Unit::Sync(SSyncData* const syncData)
   Entity::Sync(syncData);
 }
 
+namespace moho
+{
+  /// Engine addition: RefreshSyncBlock assigns the two pose handles from the actor's fields instead of
+  /// through a getter's copy. The copy only held a pose the actor still holds, so dropping it frees
+  /// nothing earlier; an unchanged handle then costs no reference-count change at all. It still waits
+  /// for the actor's queued pose update first, as the getter does.
+  bool sim_UnitSyncHandleAssign = true;
+  TConVar<bool> gTConVar_sim_UnitSyncHandleAssign(
+    "sim_UnitSyncHandleAssign",
+    "Unit sync refreshes assign pose handles from the animation actor's fields, without a getter's copy (same sim).",
+    &sim_UnitSyncHandleAssign
+  );
+} // namespace moho
+
 void Unit::RefreshSyncBlock(
   boost::shared_ptr<CAniPose>* const releasedPose, boost::shared_ptr<CAniPose>* const releasedPriorPose
 )
@@ -330,12 +344,23 @@ void Unit::RefreshSyncBlock(
     }
     return;
   }
+  if (sim_UnitSyncHandleAssign) {
+    POSE_WaitFor(AniActor); // what GetPoseShared did first (sim_ParallelPose): this tick's queued update is done
+  }
   if (releasedPose != nullptr) {
     releasedPose->swap(VarDat().mSharedPose);
   }
-  VarDat().mSharedPose = AniActor->GetPoseShared();
+  if (sim_UnitSyncHandleAssign) {
+    VarDat().mSharedPose = AniActor->mPose;
+  } else {
+    VarDat().mSharedPose = AniActor->GetPoseShared();
+  }
   if (releasedPriorPose != nullptr) {
     releasedPriorPose->swap(VarDat().mPriorSharedPose);
   }
-  VarDat().mPriorSharedPose = AniActor->GetPriorPoseShared();
+  if (sim_UnitSyncHandleAssign) {
+    VarDat().mPriorSharedPose = AniActor->mPriorPose;
+  } else {
+    VarDat().mPriorSharedPose = AniActor->GetPriorPoseShared();
+  }
 }
