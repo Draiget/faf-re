@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "moho/console/CConCommand.h"
+#include "moho/render/camera/GeomCamera3.h"
 #include "moho/sim/PlannedFactoryProxy.h"
 
 namespace moho
@@ -202,4 +203,175 @@ TEST(PlannedFactoryPreOrdersTest, SpatialLookupAndRayHitTest)
   // HitTestRay - ray points away
   moho::Ray awayRay{moho::Vector3f{100.0f, 50.0f, 100.0f}, moho::Vector3f{0.0f, 1.0f, 0.0f}};
   EXPECT_EQ(mgr.HitTestRay(awayRay, 5.0f), nullptr);
+}
+
+TEST(PlannedFactoryPreOrdersTest, ProxySelectionStateAndManagerSelectionTracking)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxy1 = mgr.RegisterOrUpdatePlannedFactory(1, 0, nullptr, {10.0f, 0.0f, 10.0f});
+  auto* proxy2 = mgr.RegisterOrUpdatePlannedFactory(2, 0, nullptr, {50.0f, 0.0f, 50.0f});
+  ASSERT_NE(proxy1, nullptr);
+  ASSERT_NE(proxy2, nullptr);
+
+  EXPECT_FALSE(proxy1->IsSelected());
+  EXPECT_FALSE(proxy2->IsSelected());
+  EXPECT_TRUE(mgr.GetSelectedProxies().empty());
+
+  // Select single proxy
+  mgr.SelectProxy(proxy1->mProxyId, false);
+  EXPECT_TRUE(proxy1->IsSelected());
+  EXPECT_FALSE(proxy2->IsSelected());
+  ASSERT_EQ(mgr.GetSelectedProxies().size(), 1u);
+  EXPECT_EQ(mgr.GetSelectedProxies()[0], proxy1);
+
+  // Select another without addToSelection -> replaces selection
+  mgr.SelectProxy(proxy2->mProxyId, false);
+  EXPECT_FALSE(proxy1->IsSelected());
+  EXPECT_TRUE(proxy2->IsSelected());
+  ASSERT_EQ(mgr.GetSelectedProxies().size(), 1u);
+  EXPECT_EQ(mgr.GetSelectedProxies()[0], proxy2);
+
+  // Add proxy1 to selection -> multi-select
+  mgr.SelectProxy(proxy1->mProxyId, true);
+  EXPECT_TRUE(proxy1->IsSelected());
+  EXPECT_TRUE(proxy2->IsSelected());
+  EXPECT_EQ(mgr.GetSelectedProxies().size(), 2u);
+
+  // Deselect proxy1
+  mgr.DeselectProxy(proxy1->mProxyId);
+  EXPECT_FALSE(proxy1->IsSelected());
+  EXPECT_TRUE(proxy2->IsSelected());
+  ASSERT_EQ(mgr.GetSelectedProxies().size(), 1u);
+
+  // Clear selection
+  mgr.ClearSelection();
+  EXPECT_FALSE(proxy1->IsSelected());
+  EXPECT_FALSE(proxy2->IsSelected());
+  EXPECT_TRUE(mgr.GetSelectedProxies().empty());
+
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, ScreenHitTestPointAndMarqueeRect)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxyCenter = mgr.RegisterOrUpdatePlannedFactory(1, 0, nullptr, {0.0f, 0.0f, 0.0f});
+  auto* proxyOffset = mgr.RegisterOrUpdatePlannedFactory(2, 0, nullptr, {10.0f, 10.0f, 0.0f});
+  ASSERT_NE(proxyCenter, nullptr);
+  ASSERT_NE(proxyOffset, nullptr);
+
+  // Setup camera with scaled projection and 1920x1080 viewport
+  moho::GeomCamera3 camera;
+  camera.viewport.r[3].x = 0.0f;
+  camera.viewport.r[3].y = 0.0f;
+  camera.viewport.r[3].z = 1920.0f;
+  camera.viewport.r[3].w = 1080.0f;
+
+  camera.viewProjection.r[0] = {0.01f, 0.0f, 0.0f, 0.0f};
+  camera.viewProjection.r[1] = {0.0f, 0.01f, 0.0f, 0.0f};
+  camera.viewProjection.r[2] = {0.0f, 0.0f, 0.01f, 0.0f};
+  camera.viewProjection.r[3] = {0.0f, 0.0f, 0.0f, 1.0f};
+
+  // Center (0,0,0) projects to (960, 540)
+  auto* hitCenter = mgr.HitTestScreenPoint(&camera, 960.0f, 540.0f, 30.0f);
+  ASSERT_NE(hitCenter, nullptr);
+  EXPECT_EQ(hitCenter, proxyCenter);
+
+  // Small offset within 30px pickRadius still hits proxyCenter
+  auto* hitNear = mgr.HitTestScreenPoint(&camera, 965.0f, 545.0f, 30.0f);
+  ASSERT_NE(hitNear, nullptr);
+  EXPECT_EQ(hitNear, proxyCenter);
+
+  // Distant click misses
+  EXPECT_EQ(mgr.HitTestScreenPoint(&camera, 100.0f, 100.0f, 30.0f), nullptr);
+
+  // Null camera returns nullptr
+  EXPECT_EQ(mgr.HitTestScreenPoint(static_cast<const moho::GeomCamera3*>(nullptr), 960.0f, 540.0f, 30.0f), nullptr);
+
+  // HitTestScreenRect: Box containing only center proxy
+  auto rectOnlyCenter = mgr.HitTestScreenRect(&camera, 900.0f, 500.0f, 1000.0f, 600.0f);
+  ASSERT_EQ(rectOnlyCenter.size(), 1u);
+  EXPECT_EQ(rectOnlyCenter[0], proxyCenter);
+
+  // Inverted coordinates box (dragged backwards) produces identical result
+  auto rectInverted = mgr.HitTestScreenRect(&camera, 1000.0f, 600.0f, 900.0f, 500.0f);
+  ASSERT_EQ(rectInverted.size(), 1u);
+  EXPECT_EQ(rectInverted[0], proxyCenter);
+
+  // Box enclosing both
+  auto rectBoth = mgr.HitTestScreenRect(&camera, 0.0f, 0.0f, 1920.0f, 1080.0f);
+  EXPECT_EQ(rectBoth.size(), 2u);
+
+  // Box outside both
+  auto rectMiss = mgr.HitTestScreenRect(&camera, 10.0f, 10.0f, 50.0f, 50.0f);
+  EXPECT_TRUE(rectMiss.empty());
+
+  // Null camera returns empty
+  EXPECT_TRUE(mgr.HitTestScreenRect(static_cast<const moho::GeomCamera3*>(nullptr), 0.0f, 0.0f, 1920.0f, 1080.0f).empty());
+
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, HitTestingGatedByConvar)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(1, 0, nullptr, {0.0f, 0.0f, 0.0f});
+  ASSERT_NE(proxy, nullptr);
+
+  moho::GeomCamera3 camera;
+  camera.viewport.r[3].x = 0.0f;
+  camera.viewport.r[3].y = 0.0f;
+  camera.viewport.r[3].z = 1920.0f;
+  camera.viewport.r[3].w = 1080.0f;
+  camera.viewProjection.r[0] = {1.0f, 0.0f, 0.0f, 0.0f};
+  camera.viewProjection.r[1] = {0.0f, 1.0f, 0.0f, 0.0f};
+  camera.viewProjection.r[2] = {0.0f, 0.0f, 1.0f, 0.0f};
+  camera.viewProjection.r[3] = {0.0f, 0.0f, 0.0f, 1.0f};
+
+  // With feature enabled, hit tests work
+  EXPECT_NE(mgr.HitTestScreenPoint(&camera, 960.0f, 540.0f, 30.0f), nullptr);
+  EXPECT_FALSE(mgr.HitTestScreenRect(&camera, 0.0f, 0.0f, 1920.0f, 1080.0f).empty());
+  EXPECT_NE(mgr.HitTestRay({moho::Vector3f{0.0f, 10.0f, 0.0f}, moho::Vector3f{0.0f, -1.0f, 0.0f}}, 5.0f), nullptr);
+
+  // Disable convar
+  moho::SetFactoryPreOrdersEnabled(false);
+  EXPECT_EQ(mgr.HitTestScreenPoint(&camera, 960.0f, 540.0f, 30.0f), nullptr);
+  EXPECT_TRUE(mgr.HitTestScreenRect(&camera, 0.0f, 0.0f, 1920.0f, 1080.0f).empty());
+  EXPECT_EQ(mgr.HitTestRay({moho::Vector3f{0.0f, 10.0f, 0.0f}, moho::Vector3f{0.0f, -1.0f, 0.0f}}, 5.0f), nullptr);
+
+  // Restore convar
+  moho::SetFactoryPreOrdersEnabled(true);
+  EXPECT_NE(mgr.HitTestScreenPoint(&camera, 960.0f, 540.0f, 30.0f), nullptr);
+
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, WorldViewNullSafetyAndBoundingRadius)
+{
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(1, 0, nullptr, {10.0f, 0.0f, 10.0f});
+  ASSERT_NE(proxy, nullptr);
+
+  // Default bounding radius
+  EXPECT_FLOAT_EQ(proxy->GetBoundingRadius(), 5.0f);
+  proxy->SetBoundingRadius(12.5f);
+  EXPECT_FLOAT_EQ(proxy->GetBoundingRadius(), 12.5f);
+
+  // Calling CUIWorldView overloads with nullptr view is safe and returns null/empty
+  const moho::CUIWorldView* nullView = nullptr;
+  EXPECT_EQ(mgr.HitTestScreenPoint(nullView, 100.0f, 100.0f, 30.0f), nullptr);
+  EXPECT_TRUE(mgr.HitTestScreenRect(nullView, 0.0f, 0.0f, 100.0f, 100.0f).empty());
+
+  mgr.ClearAll();
 }

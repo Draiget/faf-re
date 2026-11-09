@@ -1,5 +1,9 @@
 #include "moho/sim/PlannedFactoryProxy.h"
 
+#include "moho/console/CConCommand.h"
+#include "moho/render/camera/GeomCamera3.h"
+#include "moho/ui/UiRuntimeTypes.h"
+
 namespace moho
 {
   void PlannedUnitProxy::AddPreOrder(const std::string& bpId, const std::int32_t count)
@@ -274,8 +278,60 @@ namespace moho
     return mProxies.size();
   }
 
+  void PlannedFactoryManager::SelectProxy(const std::uint32_t proxyId, const bool addToSelection)
+  {
+    if (!addToSelection) {
+      ClearSelection();
+    }
+    if (auto* proxy = FindByProxyId(proxyId)) {
+      proxy->SetSelected(true);
+    }
+  }
+
+  void PlannedFactoryManager::DeselectProxy(const std::uint32_t proxyId)
+  {
+    if (auto* proxy = FindByProxyId(proxyId)) {
+      proxy->SetSelected(false);
+    }
+  }
+
+  void PlannedFactoryManager::ClearSelection()
+  {
+    for (const auto& proxy : mProxies) {
+      if (proxy) {
+        proxy->SetSelected(false);
+      }
+    }
+  }
+
+  std::vector<PlannedUnitProxy*> PlannedFactoryManager::GetSelectedProxies()
+  {
+    std::vector<PlannedUnitProxy*> result;
+    for (const auto& proxy : mProxies) {
+      if (proxy && proxy->IsSelected()) {
+        result.push_back(proxy.get());
+      }
+    }
+    return result;
+  }
+
+  std::vector<const PlannedUnitProxy*> PlannedFactoryManager::GetSelectedProxies() const
+  {
+    std::vector<const PlannedUnitProxy*> result;
+    for (const auto& proxy : mProxies) {
+      if (proxy && proxy->IsSelected()) {
+        result.push_back(proxy.get());
+      }
+    }
+    return result;
+  }
+
   PlannedUnitProxy* PlannedFactoryManager::HitTestRay(const Ray3f& ray, const float radius)
   {
+    if (!IsFactoryPreOrdersEnabled()) {
+      return nullptr;
+    }
+
     const float dirLenSq = (ray.direction.x * ray.direction.x) +
                            (ray.direction.y * ray.direction.y) +
                            (ray.direction.z * ray.direction.z);
@@ -315,6 +371,150 @@ namespace moho
   const PlannedUnitProxy* PlannedFactoryManager::HitTestRay(const Ray3f& ray, const float radius) const
   {
     return const_cast<PlannedFactoryManager*>(this)->HitTestRay(ray, radius);
+  }
+
+  PlannedUnitProxy* PlannedFactoryManager::HitTestScreenPoint(
+    const GeomCamera3* const camera,
+    const float screenX,
+    const float screenY,
+    const float pickRadius)
+  {
+    if (!IsFactoryPreOrdersEnabled() || camera == nullptr || pickRadius <= 0.0f) {
+      return nullptr;
+    }
+
+    PlannedUnitProxy* bestHit = nullptr;
+    float bestDistSq = pickRadius * pickRadius;
+    float bestW = std::numeric_limits<float>::max();
+
+    for (const auto& proxy : mProxies) {
+      if (!proxy) {
+        continue;
+      }
+
+      const float w = (camera->viewProjection.r[0].w * proxy->mPosition.x) +
+                      (camera->viewProjection.r[1].w * proxy->mPosition.y) +
+                      (camera->viewProjection.r[2].w * proxy->mPosition.z) +
+                      camera->viewProjection.r[3].w;
+      if (w <= 0.001f) {
+        continue;
+      }
+
+      const Wm3::Vector3f wpos{proxy->mPosition.x, proxy->mPosition.y, proxy->mPosition.z};
+      Wm3::Vector2f screenPos;
+      if (camera->viewport.r[3].z > 0.0f && camera->viewport.r[3].w > 0.0f) {
+        screenPos = camera->Project(wpos);
+      } else {
+        screenPos = camera->Project(wpos, 0.0f, 1920.0f, 1080.0f, 0.0f);
+      }
+
+      const float dx = screenPos.x - screenX;
+      const float dy = screenPos.y - screenY;
+      const float distSq = (dx * dx) + (dy * dy);
+
+      if (distSq <= bestDistSq) {
+        if (distSq < bestDistSq || w < bestW) {
+          bestDistSq = distSq;
+          bestW = w;
+          bestHit = proxy.get();
+        }
+      }
+    }
+
+    return bestHit;
+  }
+
+  const PlannedUnitProxy* PlannedFactoryManager::HitTestScreenPoint(
+    const GeomCamera3* const camera,
+    const float screenX,
+    const float screenY,
+    const float pickRadius) const
+  {
+    return const_cast<PlannedFactoryManager*>(this)->HitTestScreenPoint(camera, screenX, screenY, pickRadius);
+  }
+
+  PlannedUnitProxy* PlannedFactoryManager::HitTestScreenPoint(
+    const CUIWorldView* const view,
+    const float screenX,
+    const float screenY,
+    const float pickRadius)
+  {
+    if (view == nullptr) {
+      return nullptr;
+    }
+    const GeomCamera3* camera = const_cast<CUIWorldView*>(view)->GetCameraView();
+    return HitTestScreenPoint(camera, screenX, screenY, pickRadius);
+  }
+
+  std::vector<PlannedUnitProxy*> PlannedFactoryManager::HitTestScreenRect(
+    const GeomCamera3* const camera,
+    const float minX,
+    const float minY,
+    const float maxX,
+    const float maxY)
+  {
+    if (!IsFactoryPreOrdersEnabled() || camera == nullptr) {
+      return {};
+    }
+
+    const float x0 = std::min(minX, maxX);
+    const float x1 = std::max(minX, maxX);
+    const float y0 = std::min(minY, maxY);
+    const float y1 = std::max(minY, maxY);
+
+    std::vector<PlannedUnitProxy*> results;
+    for (const auto& proxy : mProxies) {
+      if (!proxy) {
+        continue;
+      }
+
+      const float w = (camera->viewProjection.r[0].w * proxy->mPosition.x) +
+                      (camera->viewProjection.r[1].w * proxy->mPosition.y) +
+                      (camera->viewProjection.r[2].w * proxy->mPosition.z) +
+                      camera->viewProjection.r[3].w;
+      if (w <= 0.001f) {
+        continue;
+      }
+
+      const Wm3::Vector3f wpos{proxy->mPosition.x, proxy->mPosition.y, proxy->mPosition.z};
+      Wm3::Vector2f screenPos;
+      if (camera->viewport.r[3].z > 0.0f && camera->viewport.r[3].w > 0.0f) {
+        screenPos = camera->Project(wpos);
+      } else {
+        screenPos = camera->Project(wpos, 0.0f, 1920.0f, 1080.0f, 0.0f);
+      }
+
+      if (screenPos.x >= x0 && screenPos.x <= x1 && screenPos.y >= y0 && screenPos.y <= y1) {
+        results.push_back(proxy.get());
+      }
+    }
+
+    return results;
+  }
+
+  std::vector<const PlannedUnitProxy*> PlannedFactoryManager::HitTestScreenRect(
+    const GeomCamera3* const camera,
+    const float minX,
+    const float minY,
+    const float maxX,
+    const float maxY) const
+  {
+    auto mutableResults = const_cast<PlannedFactoryManager*>(this)->HitTestScreenRect(camera, minX, minY, maxX, maxY);
+    return {mutableResults.begin(), mutableResults.end()};
+  }
+
+  std::vector<PlannedUnitProxy*> PlannedFactoryManager::HitTestScreenRect(
+    const CUIWorldView* const view,
+    const float minX,
+    const float minY,
+    const float maxX,
+    const float maxY)
+  {
+    if (view == nullptr) {
+      return {};
+    }
+    const GeomCamera3* camera = const_cast<CUIWorldView*>(view)->GetCameraView();
+    return HitTestScreenRect(camera, minX, minY, maxX, maxY);
   }
 
   const std::vector<std::unique_ptr<PlannedUnitProxy>>& PlannedFactoryManager::GetAllProxies() const noexcept

@@ -13,6 +13,9 @@
 namespace moho
 {
   struct REntityBlueprint;
+  struct GeomCamera3;
+  using CCamera = GeomCamera3;
+  class CUIWorldView;
 
   /**
    * 3D Ray representation used for picking and hit testing.
@@ -71,6 +74,8 @@ namespace moho
     bool mRepeatBuild{false};
 
     std::vector<BuilderKey> mBuilders{};
+    bool mIsSelected{false};
+    float mBoundingRadius{5.0f};
 
     void AddPreOrder(const std::string& bpId, std::int32_t count = 1);
     bool RemovePreOrder(const std::string& bpId, std::int32_t count = 1);
@@ -82,6 +87,12 @@ namespace moho
 
     void SetRepeatBuild(bool repeat);
     void ToggleRepeatBuild();
+
+    void SetSelected(bool selected) noexcept { mIsSelected = selected; }
+    [[nodiscard]] bool IsSelected() const noexcept { return mIsSelected; }
+
+    void SetBoundingRadius(float radius) noexcept { mBoundingRadius = radius; }
+    [[nodiscard]] float GetBoundingRadius() const noexcept { return mBoundingRadius; }
 
     [[nodiscard]] bool HasBuilder(std::uint32_t builderId, std::uint32_t cmdIndex) const noexcept;
     void AddBuilder(std::uint32_t builderId, std::uint32_t cmdIndex);
@@ -125,12 +136,60 @@ namespace moho
 
     [[nodiscard]] std::size_t GetCount() const noexcept;
 
+    // Selection management
+    void SelectProxy(std::uint32_t proxyId, bool addToSelection = false);
+    void DeselectProxy(std::uint32_t proxyId);
+    void ClearSelection();
+    [[nodiscard]] std::vector<PlannedUnitProxy*> GetSelectedProxies();
+    [[nodiscard]] std::vector<const PlannedUnitProxy*> GetSelectedProxies() const;
+
+    // 3D Ray hit test
     [[nodiscard]] PlannedUnitProxy* HitTestRay(const Ray3f& ray, float radius = 5.0f);
     [[nodiscard]] const PlannedUnitProxy* HitTestRay(const Ray3f& ray, float radius = 5.0f) const;
+
+    // Screen point hit test (mouse pick)
+    [[nodiscard]] PlannedUnitProxy* HitTestScreenPoint(
+      const GeomCamera3* camera,
+      float screenX,
+      float screenY,
+      float pickRadius = 30.0f);
+    [[nodiscard]] const PlannedUnitProxy* HitTestScreenPoint(
+      const GeomCamera3* camera,
+      float screenX,
+      float screenY,
+      float pickRadius = 30.0f) const;
+
+    [[nodiscard]] PlannedUnitProxy* HitTestScreenPoint(
+      const CUIWorldView* view,
+      float screenX,
+      float screenY,
+      float pickRadius = 30.0f);
+
+    // Screen rectangle hit test (drag box selection)
+    [[nodiscard]] std::vector<PlannedUnitProxy*> HitTestScreenRect(
+      const GeomCamera3* camera,
+      float minX,
+      float minY,
+      float maxX,
+      float maxY);
+    [[nodiscard]] std::vector<const PlannedUnitProxy*> HitTestScreenRect(
+      const GeomCamera3* camera,
+      float minX,
+      float minY,
+      float maxX,
+      float maxY) const;
+
+    [[nodiscard]] std::vector<PlannedUnitProxy*> HitTestScreenRect(
+      const CUIWorldView* view,
+      float minX,
+      float minY,
+      float maxX,
+      float maxY);
 
     [[nodiscard]] const std::vector<std::unique_ptr<PlannedUnitProxy>>& GetAllProxies() const noexcept;
 
     static PlannedFactoryManager& Instance();
+    static PlannedFactoryManager& Get() noexcept { return Instance(); }
 
   private:
     std::uint32_t mNextProxyId{1};

@@ -1,5 +1,10 @@
 #include "moho/lua/ScrLuaUserData.h"
 #include "moho/sim/UserLuaPrivate.h"
+#include "moho/console/CConCommand.h"
+#include "moho/render/camera/GeomCamera3.h"
+#include "moho/script/CScriptEvent.h"
+#include "moho/sim/PlannedFactoryProxy.h"
+#include "moho/ui/UiRuntimeTypes.h"
 
 using EntId = std::int32_t;
 namespace
@@ -2470,4 +2475,327 @@ int moho::cfunc_CreateUnitAtMouseL(LuaPlus::LuaState* const state)
   }
 
   return 0;
+}
+
+
+// --- Planned Factory Pre-Orders Lua Binders ---
+
+namespace
+{
+  constexpr const char* kGetPlannedFactoriesHelpText = "Get all active planned factories: GetPlannedFactories()";
+  constexpr const char* kGetPlannedFactoryAtHelpText = "Get planned factory under cursor: GetPlannedFactoryAt(view, screenX, screenY, [radius])";
+  constexpr const char* kGetPlannedFactoriesInRectHelpText = "Get planned factories in marquee: GetPlannedFactoriesInRect(view, minX, minY, maxX, maxY)";
+  constexpr const char* kSelectPlannedFactoryHelpText = "SelectPlannedFactory(proxyId, [addToSelection])";
+  constexpr const char* kClearPlannedFactorySelectionHelpText = "ClearPlannedFactorySelection()";
+  constexpr const char* kGetSelectedPlannedFactoriesHelpText = "GetSelectedPlannedFactories()";
+
+  LuaPlus::LuaObject CreatePlannedProxyTable(LuaPlus::LuaState* const state, const moho::PlannedUnitProxy* const proxy)
+  {
+    LuaPlus::LuaObject obj(state);
+    obj.AssignNewTable(state, 0, 5u);
+    if (proxy == nullptr) {
+      return obj;
+    }
+
+    obj.SetInteger("proxyId", static_cast<std::int32_t>(proxy->mProxyId));
+    obj.SetInteger("builderId", static_cast<std::int32_t>(proxy->mBuilderEntityId));
+    obj.SetInteger("cmdIndex", static_cast<std::int32_t>(proxy->mBuilderCmdIndex));
+    if (proxy->mBlueprint != nullptr) {
+      obj.SetString("blueprintId", proxy->mBlueprint->mBlueprintId.c_str());
+    } else {
+      obj.SetString("blueprintId", "");
+    }
+    obj.SetBoolean("isSelected", proxy->IsSelected());
+
+    LuaPlus::LuaObject posObj(state);
+    posObj.AssignNewTable(state, 3, 3u);
+    posObj.SetNumber(1, proxy->mPosition.x);
+    posObj.SetNumber(2, proxy->mPosition.y);
+    posObj.SetNumber(3, proxy->mPosition.z);
+    posObj.SetNumber("x", proxy->mPosition.x);
+    posObj.SetNumber("y", proxy->mPosition.y);
+    posObj.SetNumber("z", proxy->mPosition.z);
+    obj.SetObject("position", posObj);
+
+    return obj;
+  }
+}
+
+int moho::cfunc_GetPlannedFactories(lua_State* const luaContext)
+{
+  return cfunc_GetPlannedFactoriesL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_GetPlannedFactories_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "GetPlannedFactories",
+    &moho::cfunc_GetPlannedFactories,
+    nullptr,
+    "<global>",
+    kGetPlannedFactoriesHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_GetPlannedFactoriesL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  moho::SCR_ExpectExactArgs(state, 0, kGetPlannedFactoriesHelpText);
+
+  LuaPlus::LuaObject resultTable(state);
+  if (!moho::IsFactoryPreOrdersEnabled()) {
+    resultTable.AssignNewTable(state, 0, 0u);
+    resultTable.PushStack(state);
+    return 1;
+  }
+
+  const auto& proxies = PlannedFactoryManager::Instance().GetAllProxies();
+  resultTable.AssignNewTable(state, static_cast<std::int32_t>(proxies.size()), 0u);
+
+  std::int32_t idx = 1;
+  for (const auto& proxy : proxies) {
+    if (proxy) {
+      LuaPlus::LuaObject proxyTable = CreatePlannedProxyTable(state, proxy.get());
+      resultTable.SetObject(idx++, proxyTable);
+    }
+  }
+
+  resultTable.PushStack(state);
+  return 1;
+}
+
+int moho::cfunc_GetPlannedFactoryAt(lua_State* const luaContext)
+{
+  return cfunc_GetPlannedFactoryAtL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_GetPlannedFactoryAt_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "GetPlannedFactoryAt",
+    &moho::cfunc_GetPlannedFactoryAt,
+    nullptr,
+    "<global>",
+    kGetPlannedFactoryAtHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_GetPlannedFactoryAtL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  moho::SCR_ExpectArgs(state, 4, 3, kGetPlannedFactoryAtHelpText);
+
+  if (!moho::IsFactoryPreOrdersEnabled()) {
+    lua_pushnil(rawState);
+    return 1;
+  }
+
+  LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
+  CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
+  if (worldView == nullptr) {
+    lua_pushnil(rawState);
+    return 1;
+  }
+
+  const float screenX = static_cast<float>(lua_tonumber(rawState, 2));
+  const float screenY = static_cast<float>(lua_tonumber(rawState, 3));
+  const float pickRadius = lua_gettop(rawState) >= 4 ? static_cast<float>(lua_tonumber(rawState, 4)) : 30.0f;
+
+  PlannedUnitProxy* const hit = PlannedFactoryManager::Instance().HitTestScreenPoint(worldView, screenX, screenY, pickRadius);
+  if (hit == nullptr) {
+    lua_pushnil(rawState);
+    return 1;
+  }
+
+  LuaPlus::LuaObject proxyTable = CreatePlannedProxyTable(state, hit);
+  proxyTable.PushStack(state);
+  return 1;
+}
+
+int moho::cfunc_GetPlannedFactoriesInRect(lua_State* const luaContext)
+{
+  return cfunc_GetPlannedFactoriesInRectL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_GetPlannedFactoriesInRect_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "GetPlannedFactoriesInRect",
+    &moho::cfunc_GetPlannedFactoriesInRect,
+    nullptr,
+    "<global>",
+    kGetPlannedFactoriesInRectHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_GetPlannedFactoriesInRectL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  moho::SCR_ExpectExactArgs(state, 5, kGetPlannedFactoriesInRectHelpText);
+
+  LuaPlus::LuaObject resultTable(state);
+  if (!moho::IsFactoryPreOrdersEnabled()) {
+    resultTable.AssignNewTable(state, 0, 0u);
+    resultTable.PushStack(state);
+    return 1;
+  }
+
+  LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
+  CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
+  if (worldView == nullptr) {
+    resultTable.AssignNewTable(state, 0, 0u);
+    resultTable.PushStack(state);
+    return 1;
+  }
+
+  const float minX = static_cast<float>(lua_tonumber(rawState, 2));
+  const float minY = static_cast<float>(lua_tonumber(rawState, 3));
+  const float maxX = static_cast<float>(lua_tonumber(rawState, 4));
+  const float maxY = static_cast<float>(lua_tonumber(rawState, 5));
+
+  const auto hits = PlannedFactoryManager::Instance().HitTestScreenRect(worldView, minX, minY, maxX, maxY);
+  resultTable.AssignNewTable(state, static_cast<std::int32_t>(hits.size()), 0u);
+
+  std::int32_t idx = 1;
+  for (const auto* const proxy : hits) {
+    if (proxy != nullptr) {
+      LuaPlus::LuaObject proxyTable = CreatePlannedProxyTable(state, proxy);
+      resultTable.SetObject(idx++, proxyTable);
+    }
+  }
+
+  resultTable.PushStack(state);
+  return 1;
+}
+
+int moho::cfunc_SelectPlannedFactory(lua_State* const luaContext)
+{
+  return cfunc_SelectPlannedFactoryL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_SelectPlannedFactory_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "SelectPlannedFactory",
+    &moho::cfunc_SelectPlannedFactory,
+    nullptr,
+    "<global>",
+    kSelectPlannedFactoryHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_SelectPlannedFactoryL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  lua_State* const rawState = state->m_state;
+  moho::SCR_ExpectArgs(state, 2, 1, kSelectPlannedFactoryHelpText);
+
+  if (!moho::IsFactoryPreOrdersEnabled()) {
+    return 0;
+  }
+
+  const auto proxyId = static_cast<std::uint32_t>(lua_tonumber(rawState, 1));
+  const bool addToSelection = lua_gettop(rawState) >= 2 ? (lua_toboolean(rawState, 2) != 0) : false;
+
+  PlannedFactoryManager::Instance().SelectProxy(proxyId, addToSelection);
+  return 0;
+}
+
+int moho::cfunc_ClearPlannedFactorySelectionL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  moho::SCR_ExpectExactArgs(state, 0, kClearPlannedFactorySelectionHelpText);
+  PlannedFactoryManager::Instance().ClearSelection();
+  return 0;
+}
+
+int moho::cfunc_ClearPlannedFactorySelection(lua_State* const luaContext)
+{
+  return cfunc_ClearPlannedFactorySelectionL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_ClearPlannedFactorySelection_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "ClearPlannedFactorySelection",
+    &moho::cfunc_ClearPlannedFactorySelection,
+    nullptr,
+    "<global>",
+    kClearPlannedFactorySelectionHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_GetSelectedPlannedFactories(lua_State* const luaContext)
+{
+  return cfunc_GetSelectedPlannedFactoriesL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+moho::CScrLuaInitForm* moho::func_GetSelectedPlannedFactories_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    moho::SCR_UserLuaInitSet(),
+    "GetSelectedPlannedFactories",
+    &moho::cfunc_GetSelectedPlannedFactories,
+    nullptr,
+    "<global>",
+    kGetSelectedPlannedFactoriesHelpText
+  );
+  return &binder;
+}
+
+int moho::cfunc_GetSelectedPlannedFactoriesL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  moho::SCR_ExpectExactArgs(state, 0, kGetSelectedPlannedFactoriesHelpText);
+
+  LuaPlus::LuaObject resultTable(state);
+  if (!moho::IsFactoryPreOrdersEnabled()) {
+    resultTable.AssignNewTable(state, 0, 0u);
+    resultTable.PushStack(state);
+    return 1;
+  }
+
+  const auto selected = PlannedFactoryManager::Instance().GetSelectedProxies();
+  resultTable.AssignNewTable(state, static_cast<std::int32_t>(selected.size()), 0u);
+
+  std::int32_t idx = 1;
+  for (const auto* const proxy : selected) {
+    if (proxy != nullptr) {
+      LuaPlus::LuaObject proxyTable = CreatePlannedProxyTable(state, proxy);
+      resultTable.SetObject(idx++, proxyTable);
+    }
+  }
+
+  resultTable.PushStack(state);
+  return 1;
 }
