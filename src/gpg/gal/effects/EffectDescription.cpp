@@ -623,7 +623,8 @@ namespace gpg::gal::effects
         const std::size_t open = statement.find('(');
         const std::string call = Trim(statement.substr(0U, open));
         if (open != std::string::npos && (call == "SetBlendState" || call == "SetDepthStencilState" || call == "SetRasterizerState" ||
-                                          call == "SetVertexShader" || call == "SetPixelShader" || call == "SetGeometryShader")) {
+                                          call == "SetVertexShader" || call == "SetPixelShader" || call == "SetGeometryShader" ||
+                                          call == "SetHullShader" || call == "SetDomainShader")) {
           const std::size_t close = Matching(statement, open);
           const std::vector<std::string> arguments =
             SplitTopLevel(std::string_view(statement).substr(open + 1U, close - open - 1U), ',');
@@ -665,6 +666,10 @@ namespace gpg::gal::effects
             pass.vertexShader = ParseShaderReference(object);
           } else if (call == "SetPixelShader") {
             pass.pixelShader = ParseShaderReference(object);
+          } else if (call == "SetHullShader") {
+            pass.hullShader = ParseShaderReference(object);
+          } else if (call == "SetDomainShader") {
+            pass.domainShader = ParseShaderReference(object);
           }
           continue;
         }
@@ -677,6 +682,10 @@ namespace gpg::gal::effects
           pass.vertexShader = ParseShaderReference(statement.substr(equals + 1U));
         } else if (target == "pixelshader") {
           pass.pixelShader = ParseShaderReference(statement.substr(equals + 1U));
+        } else if (target == "hullshader") {
+          pass.hullShader = ParseShaderReference(statement.substr(equals + 1U));
+        } else if (target == "domainshader") {
+          pass.domainShader = ParseShaderReference(statement.substr(equals + 1U));
         } else {
           notes.push_back("technique " + techniqueName + ": pass statement ignored: " + statement);
         }

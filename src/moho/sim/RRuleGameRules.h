@@ -926,6 +926,13 @@ namespace moho
    */
   [[nodiscard]] bool RULE_KeepAfterSession(RRuleGameRules* rules, LuaPlus::LuaState* sessionState);
 
+  /**
+   * The kept rules, left kept, or null while none are (or they are still being built). For reading
+   * blueprints between sessions on the main thread (the editor's opened map): a session load takes them
+   * with `RULE_TakeOrCreate`, so a caller drops every pointer into them before a session starts.
+   */
+  [[nodiscard]] RRuleGameRules* RULE_PeekKept();
+
   /** Deletes the kept rules, if any (the editor, before the engine shuts down). */
   void RULE_DeleteKept();
 

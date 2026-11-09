@@ -36,6 +36,11 @@ namespace gpg::gal::effects
   {
     Vertex,
     Pixel,
+    // Engine addition (tessellation, Direct3D 12 and Vulkan): a pass that names a
+    // hull and a domain function draws its triangles as 3-point patches. Both are
+    // plain functions; GenerateModernHlsl writes the attributed entry points.
+    Hull,
+    Domain,
   };
 
   enum class TextureDimension : std::uint8_t

@@ -40,6 +40,7 @@
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/backends/dxgi/DxgiFormats.h"
 #include "gpg/gal/effects/ShadowCascades.h"
+#include "gpg/gal/effects/TextureFiltering.h"
 
 namespace gpg::gal
 {
@@ -365,6 +366,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   struct DeviceD3D12::ProgramState
   {
     D3D12_GPU_DESCRIPTOR_HANDLE samplers{};
+    int samplerAnisotropy = -1; // effects::gTextureAnisotropy the table was made for (ren_TextureAnisotropy)
     std::int32_t viewportParameter = -1;
     float lastViewport[4]{-1.0f, -1.0f, -1.0f, -1.0f};
     std::int32_t shadowCascadeParameter = -1; // faf_ShadowCascades (ren_ShadowCascades)
@@ -1675,12 +1677,17 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (found != mSamplerTables.end()) {
       return found->second;
     }
+    // Engine change (ren_TextureAnisotropy): a table takes only its effect's samplers. Each value of the switch
+    // adds tables, and 64 slots apiece filled the 2048-slot heap after about 32. The root signature's range is
+    // 64 wide, so a table starts only where those 64 lie inside the heap; tables may overlap, as each reads only
+    // its own effect's slots.
+    const std::uint32_t used = std::clamp<std::uint32_t>(static_cast<std::uint32_t>(samplers.size()), 1U, effects::kMaxSamplerSlots);
     D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
     D3D12_GPU_DESCRIPTOR_HANDLE gpu{};
-    if (!mSamplerHeap.Allocate(effects::kMaxSamplerSlots, cpu, gpu)) {
+    if (mSamplerHeap.Remaining() < effects::kMaxSamplerSlots || !mSamplerHeap.Allocate(used, cpu, gpu)) {
       ThrowError("DeviceD3D12.cpp", __LINE__, "sampler heap exhausted");
     }
-    for (std::uint32_t index = 0U; index < effects::kMaxSamplerSlots; ++index) {
+    for (std::uint32_t index = 0U; index < used; ++index) {
       D3D12_CPU_DESCRIPTOR_HANDLE handle = cpu;
       handle.ptr += static_cast<SIZE_T>(index) * mSamplerHeap.Increment();
       mDevice->CreateSampler(&descs[index], handle);
@@ -2853,12 +2860,21 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     std::shared_ptr<void>& slot = program.BackendState();
     if (slot == nullptr) {
       auto state = std::make_shared<ProgramState>();
-      state->samplers = SamplerTable(program.Description().samplers);
       state->viewportParameter = program.FindParameter("faf_ViewportSize");
       state->shadowCascadeParameter = program.FindParameter(effects::kShadowCascadeParameter);
       slot = state;
     }
-    return *static_cast<ProgramState*>(slot.get());
+    ProgramState& state = *static_cast<ProgramState*>(slot.get());
+    // Engine addition (ren_TextureAnisotropy): the sampler table follows the switch (tables are cached by content).
+    if (state.samplerAnisotropy != effects::gTextureAnisotropy) {
+      state.samplerAnisotropy = effects::gTextureAnisotropy;
+      std::vector<effects::SamplerDesc> samplers = program.Description().samplers;
+      for (effects::SamplerDesc& sampler : samplers) {
+        sampler = effects::WithTextureAnisotropy(sampler);
+      }
+      state.samplers = SamplerTable(samplers);
+    }
+    return state;
   }
 
   void DeviceD3D12::BindPass(effects::EffectProgram& program, const std::uint32_t technique, const std::uint32_t pass)
@@ -2902,8 +2918,13 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (entries.pixel >= 0) {
       bound.pixelShader = &program.Shader(static_cast<std::uint32_t>(entries.pixel));
     }
+    if (entries.hull >= 0 && entries.domain >= 0) {
+      bound.hullShader = &program.Shader(static_cast<std::uint32_t>(entries.hull));
+      bound.domainShader = &program.Shader(static_cast<std::uint32_t>(entries.domain));
+    }
     bound.valid = bound.vertexShader != nullptr && bound.vertexShader->succeeded &&
-      (bound.pixelShader == nullptr || bound.pixelShader->succeeded);
+      (bound.pixelShader == nullptr || bound.pixelShader->succeeded) &&
+      (bound.hullShader == nullptr || (bound.hullShader->succeeded && bound.domainShader->succeeded));
 
     ProgramState& state = StateFor(program);
     effects::ParameterStore& parameters = program.Parameters();
@@ -2934,7 +2955,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (gUsedTextureTable && state.tableFrame == mFrameCount && state.tableEpoch == mArenaEpoch &&
         state.tableSurface == outputContext_.surface.get() && state.textureVersion != parameters.TextureVersion()) {
       keepTable =
-        UsedTextureBindingsKept(program, parameters, state.tableBindings, PassTextureSlots(bound.vertexShader, bound.pixelShader));
+        UsedTextureBindingsKept(program, parameters, state.tableBindings, PassTextureSlots(bound.vertexShader, bound.pixelShader, bound.hullShader, bound.domainShader));
     }
     // The texture table: rebuilt when a binding changed or the frame moved on.
     if (!keepTable && (state.tableFrame != mFrameCount || state.tableEpoch != mArenaEpoch ||
@@ -3072,6 +3093,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     std::memset(static_cast<void*>(&inputs), 0, sizeof(inputs));
     inputs.vertexKey = pass.vertexShader->key;
     inputs.pixelKey = (pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL;
+    inputs.hullKey = (pass.hullShader != nullptr) ? pass.hullShader->key : 0ULL;
+    inputs.domainKey = (pass.domainShader != nullptr) ? pass.domainShader->key : 0ULL;
     inputs.format = mBoundFormat;
     inputs.sampleMask = pass.state.sampleMask;
     inputs.blend = pass.state.blend;
@@ -3097,6 +3120,11 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     key.Add(renderFormat);
     key.Add(depthFormat);
     key.Add(topologyType);
+    if (pass.hullShader != nullptr) {
+      // Only tessellated passes extend the key, so every other pipeline keeps its cached one.
+      key.Add(pass.hullShader->key);
+      key.Add(pass.domainShader->key);
+    }
     auto found = mPipelines.find(key.Key());
     if (found != mPipelines.end()) {
       mPipelineMemo.Store(inputs, found->second.Get());
@@ -3145,6 +3173,10 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     }
     if (!mSolidPixelShader.empty()) {
       desc.PS = {mSolidPixelShader.data(), mSolidPixelShader.size()};
+    }
+    if (pass.hullShader != nullptr) {
+      desc.HS = {pass.hullShader->code.data(), pass.hullShader->code.size()};
+      desc.DS = {pass.domainShader->code.data(), pass.domainShader->code.size()};
     }
     desc.BlendState.AlphaToCoverageEnable = blend.alphaToCoverage ? TRUE : FALSE;
     D3D12_RENDER_TARGET_BLEND_DESC& target = desc.BlendState.RenderTarget[0];
@@ -3231,7 +3263,17 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       ++mSkippedDraws;
       return false;
     }
-    const D3D_PRIMITIVE_TOPOLOGY topology = kTopologyByToken[topologyToken];
+    D3D_PRIMITIVE_TOPOLOGY topology = kTopologyByToken[topologyToken];
+    D3D12_PRIMITIVE_TOPOLOGY_TYPE topologyType = TopologyType(topology);
+    if (mPass.hullShader != nullptr) {
+      // A tessellated pass draws each triangle of a list as one 3-point patch.
+      if (topology != D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {
+        ++mSkippedDraws;
+        return false;
+      }
+      topology = D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST;
+      topologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
+    }
     if (mTracing) {
       Trace(
         "draw topology %u format %u rt %p ds %p viewport %lu,%lu %lux%lu z %g..%g", topologyToken, mBoundFormat,
@@ -3243,7 +3285,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (mPass.sampled != nullptr) {
       TransitionSampled(*mPass.sampled);
     }
-    ID3D12PipelineState* const pipeline = PipelineFor(mPass, TopologyType(topology));
+    ID3D12PipelineState* const pipeline = PipelineFor(mPass, topologyType);
     if (pipeline == nullptr) {
       ++mSkippedDraws;
       return false;

@@ -70,7 +70,7 @@ namespace moho
     return nullptr;
   }
 
-  void* EntityMemoryManager::Allocate(const std::size_t size)
+  void* EntityMemoryManager::TryAllocateSlab(const std::size_t size)
   {
     if (sim_EntityPools) {
       FixedSlabPool* const pool = FindPoolForSize(size);
@@ -78,7 +78,19 @@ namespace moho
         return pool->Allocate();
       }
     }
+    return nullptr;
+  }
 
+  bool EntityMemoryManager::OwnsBlock(const void* const ptr) noexcept
+  {
+    return ptr != nullptr && slab_region::Owns(ptr);
+  }
+
+  void* EntityMemoryManager::Allocate(const std::size_t size)
+  {
+    if (void* const block = TryAllocateSlab(size)) {
+      return block;
+    }
     return ::operator new(size);
   }
 

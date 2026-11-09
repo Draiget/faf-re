@@ -1,5 +1,9 @@
 #pragma once
 
+#include "editor/tools/EdHeightBrush.h"
+
+#include <utility>
+
 namespace faf::editor
 {
   /**
@@ -12,6 +16,63 @@ namespace faf::editor
   public:
     /** Draws the panel's contents into the current ImGui window. */
     void Draw();
+
+    /** Whether the Terrain tool is the chosen one (the viewport's left button paints heights). */
+    [[nodiscard]] bool TerrainToolActive() const noexcept { return mTool == 1; }
+
+    /** The terrain brush as the panel sets it (Flatten's height is the stroke's, set by the viewport). */
+    [[nodiscard]] HeightBrush CurrentHeightBrush() const noexcept
+    {
+      HeightBrush brush;
+      brush.mode = static_cast<HeightBrushMode>(mBrushMode);
+      brush.symmetry = static_cast<Symmetry>(mSymmetry);
+      brush.radius = mRadius;
+      brush.strength = mStrength;
+      brush.falloff = mFalloff;
+      brush.turns = mNWay;
+      return brush;
+    }
+
+    /** Test runs (`/symcheck`): the Terrain tool with this symmetry (the panel's index), then Check or Copy. */
+    void SetSymmetry(const int index, const int turns) noexcept
+    {
+      mTool = 1;
+      mSymmetry = index;
+      mNWay = turns;
+    }
+    void RequestCheck() noexcept { mCheckRequested = true; }
+    void RequestImport() noexcept { mImportRequested = true; }
+    void RequestRepair() noexcept { mRepairRequested = true; }
+
+    /** The height field's Import and Export buttons, taken by the app each frame (it asks for the file). */
+    [[nodiscard]] bool TakeImportRequest() noexcept { return std::exchange(mImportRequested, false); }
+    [[nodiscard]] bool TakeExportRequest() noexcept { return std::exchange(mExportRequested, false); }
+    /** Heights times this on import and export. */
+    [[nodiscard]] float HeightScale() const noexcept { return mHeightScale; }
+    /** The exported image's width in samples, 0 for the map's own. */
+    [[nodiscard]] int ExportWidth() const noexcept { return kExportWidths[mExportSize]; }
+
+    /** The symmetry check's buttons, taken by the view each frame. */
+    [[nodiscard]] bool TakeCheckRequest() noexcept { return std::exchange(mCheckRequested, false); }
+    [[nodiscard]] bool TakeRepairRequest() noexcept { return std::exchange(mRepairRequested, false); }
+    /** Whether the view marks the vertices whose copies differ. */
+    [[nodiscard]] bool ShowDifferences() const noexcept { return mShowDifferences; }
+
+    /** The check's result for the panel, for the symmetry it checked (`checked` 0: nothing to show). */
+    void SetCheckResult(const int checked, const int differing, const int largestWords, const HeightBrush& checkedWith) noexcept
+    {
+      mChecked = checked;
+      mDiffering = differing;
+      mLargest = largestWords;
+      mCheckedSymmetry = static_cast<int>(checkedWith.symmetry);
+      mCheckedTurns = checkedWith.turns;
+    }
+
+    /** True if the last check was made with the panel's current symmetry. */
+    [[nodiscard]] bool CheckIsCurrent() const noexcept
+    {
+      return mChecked > 0 && mCheckedSymmetry == mSymmetry && (mSymmetry != 9 || mCheckedTurns == mNWay);
+    }
 
   private:
     void DrawStrip();
@@ -38,5 +99,20 @@ namespace faf::editor
     int mDecalMode = 1; // spline
     float mWaterLevel = 20.0f;
     bool mSea = true;
+
+    static constexpr int kExportWidths[] = {0, 257, 513, 1025, 2049, 4097};
+    bool mImportRequested = false;
+    bool mExportRequested = false;
+    float mHeightScale = 1.0f;
+    int mExportSize = 0;
+
+    bool mCheckRequested = false;
+    bool mRepairRequested = false;
+    bool mShowDifferences = true;
+    int mChecked = 0;
+    int mDiffering = 0;
+    int mLargest = 0;
+    int mCheckedSymmetry = -1;
+    int mCheckedTurns = 0;
   };
 } // namespace faf::editor

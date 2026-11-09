@@ -1311,6 +1311,7 @@ namespace gpg::gal::d3d11
         bool relinked = false;
         {
           std::size_t vertexIndex = kept.size();
+          std::size_t domainIndex = kept.size();
           std::size_t pixelIndex = kept.size();
           for (std::size_t index = 0U; index < kept.size(); ++index) {
             const std::size_t equals = kept[index].find('=');
@@ -1320,9 +1321,16 @@ namespace gpg::gal::d3d11
             const std::string name = Lower(Trim(kept[index].substr(0U, equals)));
             if (name == "vertexshader") {
               vertexIndex = index;
+            } else if (name == "domainshader") {
+              domainIndex = index;
             } else if (name == "pixelshader") {
               pixelIndex = index;
             }
+          }
+          // Engine addition: in a tessellated pass the pixel shader reads what the
+          // domain shader writes.
+          if (domainIndex < kept.size()) {
+            vertexIndex = domainIndex;
           }
           if (vertexIndex < kept.size() && pixelIndex < kept.size()) {
             const std::string& vertex = kept[vertexIndex];

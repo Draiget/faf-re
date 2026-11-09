@@ -19,6 +19,7 @@
 #include "moho/render/CWldTerrainDecal.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/WRenViewport.h"
 #include "moho/render/d3d/CD3DIndexSheet.h"
 #include "moho/render/d3d/CD3DTextureBatcher.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
@@ -451,8 +452,8 @@ namespace moho
 
     shaderVars.normalTexture.SetRenderTargetTexture(terrainNormalTexture);
 
-    const auto* const activeMap = WLD_GetActiveSession()->mWldMap;
-    const CHeightField* const heightField = activeMap->mTerrainRes->mMap->mHeightField.get();
+    // 0x008052A7: `mov eax, [sWldMap]`, the map the renderer draws (a session's, or the map editor's).
+    const CHeightField* const heightField = REN_GetTerrainRes()->mMap->mHeightField.get();
 
     const float terrainScale[4] = {
       1.0f / static_cast<float>(heightField->width - 1),

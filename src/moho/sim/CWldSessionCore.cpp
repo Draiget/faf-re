@@ -6,6 +6,7 @@
 #include "moho/sim/CBackgroundTaskControl.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
+#include "moho/render/WRenViewport.h"
 
 namespace moho
 {
@@ -181,6 +182,8 @@ namespace
     // `CFormation::UpdateOrientation`, so leaving it null faults on the first
     // frame after the session starts playing.
     mCurFormation = new CFormation();
+    // 0x00893576/0x00893581: the renderer draws this session's map from here on (`sWldMap = mWldMap`).
+    sWldMap = mWldMap;
     mUnknownShared40C = {};
     mDebugCanvas = {};
     mBeatDebugCanvas = {};
@@ -453,6 +456,8 @@ namespace
     mBeatDebugCanvas.release();
     mDebugCanvas.release();
     mUnknownShared40C.release();
+    // 0x00893BE6: the renderer has no map from here on.
+    sWldMap = nullptr;
     ClearBuildTemplates();
 
     // Drop every formation-preview ghost still parked in the session-global

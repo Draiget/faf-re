@@ -1,4 +1,5 @@
 #include "remote/client/NetworkSimDriver.h"
+#include "remote/client/ServerLaneMeter.h"
 
 #include <algorithm>
 #include <chrono>
@@ -117,7 +118,8 @@ namespace faf::remote::client
       "%llu refused / %llu dropped (issue lead %d beats, largest %d, %llu applied past their beat), %llu Lua lanes bad, "
       "%llu without their LuaSync; session tables: %llu records (%llu bad, %llu resets), "
       "%zu deposits, %llu terrain edits, %llu unknown ids; clock: server rate %+d, %.1f beats/s on its clock, %.1f arriving, "
-      "backlog %lld, skew %.2f; roster: %llu (%llu bad), %zu clients; chat: %llu sent, %llu received, %llu bad",
+      "backlog %lld, skew %.2f; roster: %llu (%llu bad), %zu clients; chat: %llu sent, %llu received, %llu bad; "
+      "KB by lane: entities %.0f, armies %.0f, grids %.0f, Lua %.0f, poses %.0f",
       when, static_cast<unsigned long long>(mViewsTaken), static_cast<unsigned long long>(views.applied), static_cast<unsigned long long>(mViewsBad),
       static_cast<unsigned long long>(views.frameFailures), static_cast<int>(mLastBeat), static_cast<unsigned long long>(mCommandsSent),
       static_cast<unsigned long long>(mAnswers[0]), static_cast<unsigned long long>(mAnswers[1]), static_cast<unsigned long long>(mAnswers[2]),
@@ -130,7 +132,9 @@ namespace faf::remote::client
       static_cast<int>(mClock.ServerSimRate()), mClock.ServerBeatsPerSecond(), mClock.ArrivalBeatsPerSecond(),
       static_cast<long long>(mClock.Backlog()), mClock.Skew(), static_cast<unsigned long long>(mRosters),
       static_cast<unsigned long long>(mRostersBad), mClientManager.RosterCount(),
-      static_cast<unsigned long long>(mChatSent), static_cast<unsigned long long>(mChatReceived), static_cast<unsigned long long>(mChatBad)
+      static_cast<unsigned long long>(mChatSent), static_cast<unsigned long long>(mChatReceived), static_cast<unsigned long long>(mChatBad),
+      static_cast<double>(mLaneBytes[0]) / 1024.0, static_cast<double>(mLaneBytes[1]) / 1024.0, static_cast<double>(mLaneBytes[2]) / 1024.0,
+      static_cast<double>(mLaneBytes[3]) / 1024.0, static_cast<double>(mLaneBytes[4]) / 1024.0
     );
   }
 
@@ -322,6 +326,20 @@ namespace faf::remote::client
   void CNetworkSimDriver::QueueView(const SViewMessage& view, const std::span<const std::uint8_t> lua)
   {
     ++mViewsTaken;
+    // Plan WP10.10: this view's bytes by lane, for the network panel and the summary.
+    std::array<std::uint64_t, kServerLaneCount> laneBytes{};
+    laneBytes[static_cast<std::size_t>(EServerLane::Entities)] = view.own.size() + view.team.size();
+    laneBytes[static_cast<std::size_t>(EServerLane::Armies)] = view.armies.size();
+    laneBytes[static_cast<std::size_t>(EServerLane::Grids)] = view.grids.size();
+    laneBytes[static_cast<std::size_t>(EServerLane::Lua)] = lua.size();
+    laneBytes[static_cast<std::size_t>(EServerLane::Poses)] = view.hasPoses ? view.poses.size() : 0u;
+    if (mViewsTaken == 1u) {
+      CServerLaneMeter::Get().Reset(); // a new game
+    }
+    CServerLaneMeter::Get().Record(laneBytes);
+    for (std::size_t lane = 0; lane < kServerLaneCount; ++lane) {
+      mLaneBytes[lane] += laneBytes[lane];
+    }
     auto packet = std::make_unique<moho::SSyncData>();
     packet->mCurBeat = static_cast<std::int32_t>(view.beat);
     packet->mCurTick = static_cast<std::int32_t>(view.beat);

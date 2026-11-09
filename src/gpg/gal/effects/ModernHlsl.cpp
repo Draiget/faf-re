@@ -13,12 +13,14 @@
 
 #include "EffectText.h"
 #include "ShadowCascades.h"
+#include "TextureFiltering.h"
 
 namespace gpg::gal::effects
 {
   using namespace text;
 
   ShadowCascadeConstants gShadowCascades{};
+  int gTextureAnisotropy = 8;
   std::atomic<bool> gShadowCascadesBlocked{false};
 
   bool IsShadowLookupSampler(const SamplerDesc& sampler)
@@ -159,8 +161,19 @@ faf_sampler faf_make_sampler(Texture2D t2, TextureCube tc, Texture3D t3, Sampler
 Texture2D faf_null2D : register(t125);
 TextureCube faf_nullCube : register(t126);
 Texture3D faf_null3D : register(t127);
-#ifdef FAF_VERTEX_STAGE
-// Vertex shaders have no derivatives: Direct3D 9 sampled mip 0.
+// The patch constants of a tessellated pass (engine addition): the factors of the
+// edges opposite control points 0, 1 and 2, and of the inside.
+struct faf_tess_factors
+{
+    float edges[3] : SV_TessFactor;
+    float inside : SV_InsideTessFactor;
+};
+#ifndef FAF_TESS_TOPOLOGY
+#define FAF_TESS_TOPOLOGY "triangle_cw"
+#endif
+#if defined(FAF_VERTEX_STAGE) || defined(FAF_HULL_STAGE) || defined(FAF_DOMAIN_STAGE)
+// Vertex shaders have no derivatives: Direct3D 9 sampled mip 0 (hull and domain
+// shaders have none either).
 float4 tex2D(faf_sampler s, float2 uv) { return s.t2.SampleLevel(s.s, uv, 0); }
 float4 tex2Dbias(faf_sampler s, float4 uv) { return s.t2.SampleLevel(s.s, uv.xy, 0); }
 float4 tex2Dproj(faf_sampler s, float4 uv) { return s.t2.SampleLevel(s.s, uv.xy / uv.w, 0); }
@@ -759,6 +772,14 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       };
       for (const Technique& technique : description.techniques) {
         for (const Pass& pass : technique.passes) {
+          // A domain function's result goes to the rasterizer, as a vertex shader's does.
+          // Its control-point parameters are the vertex shader's output struct.
+          if (pass.Tessellated()) {
+            const auto domain = functions.find(pass.domainShader.function);
+            if (domain != functions.end() && isStruct(domain->second.returnType)) {
+              structRoles.emplace(baseStruct(domain->second.returnType), SemanticRole::VertexOutput);
+            }
+          }
           for (const auto& [reference, stage] :
                {std::pair{&pass.vertexShader, ShaderStage::Vertex}, std::pair{&pass.pixelShader, ShaderStage::Pixel}}) {
             const auto found = functions.find(reference->function);
@@ -886,7 +907,7 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       if (StartsWithWord(head, "technique") || StartsWithWord(head, "technique10") || StartsWithWord(head, "technique11") ||
           StartsWithWord(head, "BlendState") || StartsWithWord(head, "DepthStencilState") || StartsWithWord(head, "RasterizerState") ||
           StartsWithWord(head, "VertexShader") || StartsWithWord(head, "PixelShader") || StartsWithWord(head, "GeometryShader") ||
-          StartsWithWord(head, "string")) {
+          StartsWithWord(head, "HullShader") || StartsWithWord(head, "DomainShader") || StartsWithWord(head, "string")) {
         continue; // the effect description carries these
       }
 
@@ -997,9 +1018,100 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     std::string wrappers;
     for (Technique& technique : description.techniques) {
       for (Pass& pass : technique.passes) {
+        const bool tessellated = pass.Tessellated();
+        const bool namedTessellation = !pass.hullShader.function.empty() || !pass.domainShader.function.empty();
         for (const auto& [reference, stage] :
-             {std::pair{&pass.vertexShader, ShaderStage::Vertex}, std::pair{&pass.pixelShader, ShaderStage::Pixel}}) {
+             {std::pair{&pass.vertexShader, ShaderStage::Vertex}, std::pair{&pass.pixelShader, ShaderStage::Pixel},
+              std::pair{&pass.hullShader, ShaderStage::Hull}, std::pair{&pass.domainShader, ShaderStage::Domain}}) {
           if (reference->function.empty()) {
+            continue;
+          }
+          if (stage == ShaderStage::Hull || stage == ShaderStage::Domain) {
+            if (!tessellated) {
+              modern.notes.push_back("technique " + technique.name + ": a hull shader needs a domain shader and the reverse; ignored");
+              reference->function.clear();
+              continue;
+            }
+            const std::string arguments = Squeeze(reference->arguments);
+            const auto key = std::make_tuple(stage, reference->function, arguments);
+            const auto known = entryNames.find(key);
+            if (known != entryNames.end()) {
+              reference->entry = known->second;
+              continue;
+            }
+            const auto found = functions.find(reference->function);
+            if (found == functions.end()) {
+              modern.notes.push_back("technique " + technique.name + ": shader function " + reference->function + " not found");
+              reference->function.clear();
+              continue;
+            }
+            const Function& function = found->second;
+            const unsigned index = static_cast<unsigned>(modern.entries.size());
+            char name[64]{};
+            std::snprintf(name, sizeof(name), "faf_entry_%s_%u", stage == ShaderStage::Hull ? "hs" : "ds", index);
+
+            // The call: varying parameters take `varying` in order, uniform ones the
+            // pass's arguments or their defaults. The control-point type is the type of
+            // the first (hull) or second (domain) varying parameter.
+            std::vector<std::string> uniformArguments;
+            if (!arguments.empty()) {
+              for (const std::string& argument : SplitTopLevel(arguments, ',')) {
+                uniformArguments.push_back(Trim(argument));
+              }
+            }
+            const std::vector<std::string> varying = (stage == ShaderStage::Hull)
+              ? std::vector<std::string>{"faf_patch[0]", "faf_patch[1]", "faf_patch[2]"}
+              : std::vector<std::string>{"faf_weights", "faf_patch[0]", "faf_patch[1]", "faf_patch[2]"};
+            std::string callArguments;
+            std::string pointType;
+            std::size_t nextVarying = 0U;
+            std::size_t nextUniform = 0U;
+            for (const std::string& parameterText : function.parameters) {
+              const ParameterParts parts = SplitParameter(parameterText);
+              if (!callArguments.empty()) {
+                callArguments += ", ";
+              }
+              if (parts.isUniform) {
+                if (nextUniform < uniformArguments.size()) {
+                  callArguments += uniformArguments[nextUniform++];
+                } else {
+                  const std::size_t equals = parameterText.find('=');
+                  callArguments += (equals != std::string::npos) ? Trim(parameterText.substr(equals + 1U)) : std::string("0");
+                }
+                continue;
+              }
+              if (nextVarying == (stage == ShaderStage::Hull ? 0U : 1U)) {
+                pointType = parts.type;
+              }
+              callArguments += (nextVarying < varying.size()) ? varying[nextVarying] : std::string("0");
+              ++nextVarying;
+            }
+            if (nextVarying != varying.size() || pointType.empty()) {
+              modern.notes.push_back("technique " + technique.name + ": " + function.name + " needs " +
+                                     std::to_string(varying.size()) + " varying parameters");
+              reference->function.clear();
+              continue;
+            }
+            const std::string call = function.name + "(" + callArguments + ")";
+            const std::string patch = "InputPatch<" + pointType + ", 3> faf_patch";
+            if (stage == ShaderStage::Hull) {
+              char constants[64]{};
+              std::snprintf(constants, sizeof(constants), "faf_hsconst_%u", index);
+              wrappers += std::string("faf_tess_factors ") + constants + "(" + patch + ")\n{\n    float4 faf_f = " + call +
+                ";\n    faf_tess_factors faf_r;\n    faf_r.edges[0] = faf_f.x;\n    faf_r.edges[1] = faf_f.y;\n"
+                "    faf_r.edges[2] = faf_f.z;\n    faf_r.inside = faf_f.w;\n    return faf_r;\n}\n";
+              wrappers += std::string("[domain(\"tri\")]\n[partitioning(\"fractional_odd\")]\n[outputtopology(FAF_TESS_TOPOLOGY)]\n"
+                                      "[outputcontrolpoints(3)]\n[patchconstantfunc(\"") +
+                constants + "\")]\n[maxtessfactor(64.0)]\n" + pointType + " " + name + "(" + patch +
+                ", uint faf_id : SV_OutputControlPointID)\n{\n    return faf_patch[faf_id];\n}\n";
+            } else {
+              wrappers += "[domain(\"tri\")]\n" + function.returnType + " " + name +
+                "(faf_tess_factors faf_factors, float3 faf_weights : SV_DomainLocation, const OutputPatch<" + pointType +
+                ", 3> faf_patch)\n{\n    return " + call + ";\n}\n";
+            }
+            modern.entries.push_back(ShaderEntry{stage, function.name, arguments, name});
+            entryNames.emplace(key, name);
+            reference->entry = name;
             continue;
           }
           const std::string arguments = Squeeze(reference->arguments);
@@ -1124,6 +1236,13 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           modern.entries.push_back(ShaderEntry{stage, function.name, arguments, name});
           entryNames.emplace(key, name);
           reference->entry = name;
+        }
+        // A hull or domain function that couldn't be wrapped, or one named without the other, leaves the pass
+        // with neither, and it says so (ProgramEffect::TechniqueCompiles fails it).
+        if (namedTessellation && (pass.hullShader.function.empty() || pass.domainShader.function.empty())) {
+          pass.hullShader = ShaderReference{};
+          pass.domainShader = ShaderReference{};
+          pass.tessellationDropped = true;
         }
       }
     }

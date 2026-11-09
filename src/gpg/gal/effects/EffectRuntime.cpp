@@ -32,7 +32,7 @@ namespace gpg::gal::effects
   namespace
   {
     // Bump when the generated HLSL or the compile options change meaning.
-    constexpr const char* kLayerVersion = "faf effect layer 1";
+    constexpr const char* kLayerVersion = "faf effect layer 2"; // 2: hull and domain stages
 
     struct CacheHeader
     {
@@ -217,6 +217,16 @@ namespace gpg::gal::effects
           if (!pass.pixelShader.entry.empty() && mModern.entries[entry].name == pass.pixelShader.entry) {
             entries.pixel = static_cast<std::int32_t>(entry);
           }
+          if (!pass.hullShader.entry.empty() && mModern.entries[entry].name == pass.hullShader.entry) {
+            entries.hull = static_cast<std::int32_t>(entry);
+          }
+          if (!pass.domainShader.entry.empty() && mModern.entries[entry].name == pass.domainShader.entry) {
+            entries.domain = static_cast<std::int32_t>(entry);
+          }
+        }
+        if (entries.hull < 0 || entries.domain < 0) {
+          entries.hull = -1;
+          entries.domain = -1;
         }
         mPassEntries[technique].push_back(entries);
       }
@@ -516,6 +526,30 @@ namespace gpg::gal
   void ProgramEffect::OnReset() {}
 
   void ProgramEffect::OnLost() {}
+
+  bool ProgramEffect::TechniqueCompiles(const char* const name)
+  {
+    const auto& techniques = mProgram->Description().techniques;
+    for (std::size_t technique = 0U; technique < techniques.size(); ++technique) {
+      if (name == nullptr || techniques[technique].name != name) {
+        continue;
+      }
+      for (std::uint32_t pass = 0U; pass < techniques[technique].passes.size(); ++pass) {
+        const effects::PassEntries& entries = mProgram->Entries(static_cast<std::uint32_t>(technique), pass);
+        for (const std::int32_t entry : {entries.vertex, entries.hull, entries.domain, entries.pixel}) {
+          if (entry >= 0 && !mProgram->Shader(static_cast<std::uint32_t>(entry)).succeeded) {
+            return false;
+          }
+        }
+        if (techniques[technique].passes[pass].tessellationDropped ||
+            (techniques[technique].passes[pass].Tessellated() && (entries.hull < 0 || entries.domain < 0))) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
+  }
 
   // ---------------------------------------------------------------------------
   // ProgramEffectTechnique

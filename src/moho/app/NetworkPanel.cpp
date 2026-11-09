@@ -25,6 +25,7 @@
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/font/MsdfFontRegistry.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
+#include "remote/client/ServerLaneMeter.h"
 
 namespace moho
 {
@@ -265,8 +266,46 @@ namespace moho
       std::vector<Line> mLines;
     };
 
+    /** Plan WP10.10: a server-mode game's bytes from the server by lane: the last seconds' rate and the total. */
+    [[nodiscard]] bool BuildServerLanes(Builder& b)
+    {
+      using faf::remote::client::CServerLaneMeter;
+      using faf::remote::client::EServerLane;
+      const faf::remote::client::SServerLaneSnapshot lanes = CServerLaneMeter::Get().Snapshot();
+      if (!lanes.active) {
+        return false;
+      }
+      char text[160];
+      double rate = 0.0;
+      std::uint64_t total = 0;
+      for (std::size_t lane = 0; lane < faf::remote::client::kServerLaneCount; ++lane) {
+        rate += lanes.perSecond[lane];
+        total += lanes.total[lane];
+      }
+      b.NewLine();
+      std::snprintf(text, sizeof(text), "Server: %llu views, %.1f KB/s, %.1f MB in all", static_cast<unsigned long long>(lanes.views),
+                    rate / 1024.0, static_cast<double>(total) / 1048576.0);
+      b.Text(text, kHeading);
+      b.NewLine();
+      std::snprintf(text, sizeof(text), "  %-10s %10s %10s %7s", "lane", "KB/s", "MB", "share");
+      b.Text(text, kDim);
+      for (std::size_t lane = 0; lane < faf::remote::client::kServerLaneCount; ++lane) {
+        b.NewLine();
+        std::snprintf(text, sizeof(text), "  %-10s %10.1f %10.2f %6.1f%%", faf::remote::client::ServerLaneName(static_cast<EServerLane>(lane)),
+                      lanes.perSecond[lane] / 1024.0, static_cast<double>(lanes.total[lane]) / 1048576.0,
+                      total != 0u ? 100.0 * static_cast<double>(lanes.total[lane]) / static_cast<double>(total) : 0.0);
+        b.Text(text);
+      }
+      b.NewLine();
+      return true;
+    }
+
     void BuildPeers(Builder& b, const SNetlinkSnapshot& view, const std::optional<std::int64_t> selected)
     {
+      const bool serverGame = BuildServerLanes(b);
+      if (view.mode.empty() && serverGame) {
+        return; // a server game: its one link is the server's, above
+      }
       if (view.mode.empty()) {
         b.NewLine();
         b.Text("The launcher's ICE adapter runs the links, not this game: nothing to act on here.", kDim);
@@ -534,6 +573,59 @@ namespace moho
     }
     const bool relayed = p.localType == "relay" || p.remoteType == "relay";
     return std::string(relayed ? "relayed" : "direct") + " (" + p.localType + "/" + p.remoteType + ")";
+  }
+
+  void NETPANEL_DrawServerLanes(CD3DPrimBatcher* const batcher, const float right, const float top)
+  {
+    using faf::remote::client::CServerLaneMeter;
+    using faf::remote::client::EServerLane;
+    const faf::remote::client::SServerLaneSnapshot lanes = CServerLaneMeter::Get().Snapshot();
+    if (batcher == nullptr || !lanes.active) {
+      return;
+    }
+    const int points = std::max(1, static_cast<int>(std::lround(10.0f * UiScale())));
+    boost::SharedPtrRaw<CD3DFont> rawFont = CD3DFont::Create(points, PanelFace());
+    CD3DFont* const font = rawFont.px;
+    if (font == nullptr) {
+      return;
+    }
+    double rate = 0.0;
+    for (const double lane : lanes.perSecond) {
+      rate += lane;
+    }
+    std::vector<std::string> lines;
+    char text[96];
+    std::snprintf(text, sizeof(text), "server %.1f KB/s", rate / 1024.0);
+    lines.emplace_back(text);
+    for (std::size_t lane = 0; lane < faf::remote::client::kServerLaneCount; ++lane) {
+      std::snprintf(text, sizeof(text), "%s %.1f KB/s", faf::remote::client::ServerLaneName(static_cast<EServerLane>(lane)),
+                    lanes.perSecond[lane] / 1024.0);
+      lines.emplace_back(text);
+    }
+    const float rowStep = font->mHeight + font->mExternalLeading;
+    float widest = 0.0f;
+    for (const std::string& line : lines) {
+      widest = std::max(widest, font->GetAdvance(line.c_str(), -1));
+    }
+    constexpr float kPad = 4.0f;
+    const float left = right - widest - kPad;
+    const float bottom = top + rowStep * static_cast<float>(lines.size()) + kPad;
+    constexpr std::uint32_t kBackdrop = 0xC0000000u;
+    batcher->SetTexture(CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
+    batcher->DrawQuad(
+      {left, top - kPad, 0.0f, kBackdrop, 0.0f, 0.0f}, {right + kPad, top - kPad, 0.0f, kBackdrop, 0.0f, 0.0f},
+      {right + kPad, bottom, 0.0f, kBackdrop, 0.0f, 0.0f}, {left, bottom, 0.0f, kBackdrop, 0.0f, 0.0f}
+    );
+    const Vector3f xAxis{1.0f, 0.0f, 0.0f};
+    const Vector3f yAxis{0.0f, -1.0f, 0.0f};
+    for (std::size_t r = 0; r < lines.size(); ++r) {
+      const float x = right - font->GetAdvance(lines[r].c_str(), -1);
+      (void)font->Render(
+        lines[r].c_str(), batcher, {x, top + rowStep * static_cast<float>(r) + font->mAscent, 0.0f}, xAxis, yAxis,
+        r == 0 ? kHeading : kText, 0.0f, gpg::NaN
+      );
+    }
+    rawFont.release();
   }
 
   void NETPANEL_Toggle()

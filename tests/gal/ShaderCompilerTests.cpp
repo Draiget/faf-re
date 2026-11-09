@@ -162,6 +162,26 @@ technique10 Lit
   }
 }
 
+// Engine addition (tessellation): the generated hull and domain entry points compile for both targets with the
+// vertex and pixel shaders of the same pass.
+TEST(GalShaderCompiler, TessellatedEffectCompilesToDxilAndSpirv)
+{
+  if (Compiler() == nullptr) {
+    GTEST_SKIP() << Unavailable();
+  }
+  const ShaderCompiler& compiler = *Compiler();
+  const Generated generated = Generate(faf_gal_tests::kTessellatedEffect);
+  ASSERT_EQ(generated.modern.entries.size(), 4U);
+  for (const ShaderEntry& entry : generated.modern.entries) {
+    const CompiledShader dxil = compiler.Compile(generated.modern.hlsl, entry, ShaderTarget::Dxil);
+    EXPECT_TRUE(dxil.succeeded) << entry.name << ":\n" << dxil.messages;
+    EXPECT_TRUE(IsDxil(dxil.code)) << entry.name;
+    const CompiledShader spirv = compiler.Compile(generated.modern.hlsl, entry, ShaderTarget::Spirv);
+    EXPECT_TRUE(spirv.succeeded) << entry.name << ":\n" << spirv.messages;
+    EXPECT_TRUE(IsSpirv(spirv.code)) << entry.name;
+  }
+}
+
 TEST(GalShaderCompiler, VertexInputsAreReflectedFromBothTargets)
 {
   if (Compiler() == nullptr) {

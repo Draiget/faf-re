@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -238,6 +239,37 @@ TEST(ReplayPlayback, RejoinRehearsalKeepsTheChecksums)
   ExpectMatchedToTheEnd(run);
 }
 
+// A rejoin from a save (issue #275: a client that lost a heavy game loads one instead of running from beat 0): the
+// first replay saved every 3000 beats, then played again from the beat-3000 save as command source 0, its own
+// driver issuing beats after 4500. The recorded checksums after the save have to match.
+TEST(ReplayPlayback, RejoinFromAKeyframeKeepsTheChecksums)
+{
+  const std::vector<SReplay> replays = Replays();
+  if (replays.empty()) {
+    GTEST_SKIP() << "set FAF_REPLAY_DATA to a folder with replays/ and faf/bin/ (see the file's header)";
+  }
+  const SReplay& replay = replays.front();
+  SCOPED_TRACE("replay " + replay.id);
+  const std::filesystem::path keyframes = LogFolder() / ("rejoin_keyframes_" + replay.id);
+  std::error_code ignored;
+  std::filesystem::remove_all(keyframes, ignored);
+  std::filesystem::create_directories(keyframes);
+  const std::string saver = "ctest_kfsave_" + replay.id;
+  const SRun saved =
+    PlayReplay(replay, saver, " --keyframe-every 3000 --keyframe-keep --keyframe-dir " + Quoted(keyframes));
+  ExpectMatchedToTheEnd(saved);
+  const std::filesystem::path save = keyframes / (saver + "_keyframe_3000.bin");
+  ASSERT_TRUE(std::filesystem::exists(save)) << "no " << save.string();
+
+  const SRun run = PlayReplay(
+    replay, "ctest_rejoinkf_" + replay.id,
+    " --resume-from " + Quoted(save) + " --rejoin-source 0 --focus 0 --rejoin-beat 4500"
+  );
+  ExpectMatchedToTheEnd(run);
+  EXPECT_NE(run.output.find("resuming from beat"), std::string::npos) << run.output;
+  std::filesystem::remove_all(keyframes, ignored);
+}
+
 // The analysis modes (docs/SWITCHES.md, headless --help) on the first replay, all in one run: the sim builds army 0's
 // view and moves it to army 1 at beat 3000, as a player's client does, keeps what only a client reads, and writes
 // the checksum digests, the published state, the Sync keys, the sync lanes, the bones, the blueprint order, the Lua
@@ -257,7 +289,7 @@ TEST(ReplayPlayback, AnalysisModesWriteTheirFilesAndKeepTheChecksums)
   const std::vector<std::pair<std::string, std::string>> files = {
     {"--digests", "digests.txt"},     {"--state-digests", "state.txt"}, {"--sync-keys", "keys.txt"},
     {"--lane-sizes", "lanes.csv"},    {"--bone-stats", "bones.csv"},    {"--blueprint-order", "blueprints.txt"},
-    {"--lua-pairs", "pairs.txt"},     {"--disk-trace", "disk.txt"},
+    {"--lua-pairs", "pairs.txt"},     {"--disk-trace", "disk.txt"},     {"--sync-dump", "sync.bin"},
   };
   std::string arguments = " --focus 0 --focus-switch 3000:1 --keep-client-data --fpu-report";
   for (const auto& [option, name] : files) {
@@ -378,16 +410,86 @@ TEST(ReplayPlaybackServer, LoopbackClientRebuildsEveryPacket)
   );
 }
 
-// The server's view work as a bench: every view's kept frame against one built whole, the Lua lane routed, the
-// session tables and pose lane, two pipeline threads and team views.
+// The server's view work as a bench: every view's kept frame against one built whole, the Lua lane routed (view 0
+// moved to army 1 at beat 2000, view 1 resynced as after a reconnect at 3000, each view's Sync written), the session
+// tables and pose lane, two pipeline threads and team views.
 TEST(ReplayPlaybackServer, ViewBenchFramesMatchWholeFrames)
 {
   ExpectServerCheck(
     "bench",
     " --view-bench " + OutputFile("ctest_bench.csv") +
-      " --view-bench-check --lua-routing --view-tables --view-poses --view-pipeline 2 --view-teams --spy",
+      " --view-bench-check --lua-routing --lua-routing-dump " + OutputFile("ctest_routing") +
+      " --lua-move-view 2000:0:1 --lua-resync 3000:1 --view-tables --view-poses --view-pipeline 2 --view-teams --spy",
     {"view bench:", " 0 encode failures, 0 check differences"}
   );
+}
+
+// Army 0's packet digests twice: rebuilt from the sync walk's change set (unfocused) and the sim's own packet (focused
+// on army 0). The server's rebuild must be byte for byte what the sim sends.
+TEST(ReplayPlaybackServer, ChangeSetRebuildsTheSimsOwnPacket)
+{
+  const std::vector<SReplay> replays = Replays();
+  if (replays.empty()) {
+    GTEST_SKIP() << "set FAF_REPLAY_DATA to a folder with replays/ and faf/bin/ (see the file's header)";
+  }
+  const SReplay& replay = replays.front();
+  SCOPED_TRACE("replay " + replay.id);
+  const std::filesystem::path rebuilt = LogFolder() / "ctest_packets_rebuilt.txt";
+  const std::filesystem::path own = LogFolder() / "ctest_packets_own.txt";
+  const std::filesystem::path entries = LogFolder() / "ctest_packets_entries.txt";
+  std::error_code ignored;
+  for (const auto& path : {rebuilt, own, entries}) {
+    std::filesystem::remove(path, ignored);
+  }
+  const SRun unfocused = PlayReplay(
+    replay, "ctest_packets_" + replay.id,
+    " --view-packets 0 " + Quoted(rebuilt) + " --view-packets-entries " + Quoted(entries) +
+      " --view-packets-entries-every 50"
+  );
+  ExpectMatchedToTheEnd(unfocused);
+  EXPECT_NE(unfocused.output.find("rebuilt from the change set"), std::string::npos) << unfocused.output;
+  const SRun focused = PlayReplay(replay, "ctest_packetsf_" + replay.id, " --focus 0 --view-packets 0 " + Quoted(own));
+  ExpectMatchedToTheEnd(focused);
+  EXPECT_NE(focused.output.find("the sim's own packet"), std::string::npos) << focused.output;
+
+  // The beats up to the run's last one: the sim runs on past it while headless finishes (ReplayRunner.cpp), so a beat
+  // after it may or may not reach either file.
+  const std::size_t at = unfocused.beats.find("last-beat=");
+  ASSERT_NE(at, std::string::npos) << unfocused.beats;
+  const long lastBeat = std::atol(unfocused.beats.c_str() + at + 10);
+  const auto beatsUpToLast = [lastBeat](const std::filesystem::path& path) {
+    std::vector<std::string> lines;
+    std::ifstream file(path);
+    for (std::string line; std::getline(file, line);) {
+      if (!line.empty() && std::atol(line.c_str()) <= lastBeat) {
+        lines.push_back(line);
+      }
+    }
+    return lines;
+  };
+  const std::vector<std::string> rebuiltLines = beatsUpToLast(rebuilt);
+  const std::vector<std::string> ownLines = beatsUpToLast(own);
+  EXPECT_EQ(rebuiltLines.size(), static_cast<std::size_t>(lastBeat + 1));
+  EXPECT_EQ(ownLines.size(), static_cast<std::size_t>(lastBeat + 1));
+  std::size_t differing = 0;
+  for (std::size_t i = 0; i < rebuiltLines.size() && i < ownLines.size(); ++i) {
+    if (rebuiltLines[i] != ownLines[i] && differing++ == 0) {
+      ADD_FAILURE() << "the change set's packet differs from the sim's first at\n  " << rebuiltLines[i] << "\n  "
+                    << ownLines[i] << "\n(" << rebuilt.string() << " against " << own.string() << ")";
+    }
+  }
+  EXPECT_EQ(differing, 0u);
+  EXPECT_GT(std::filesystem::file_size(entries, ignored), 0u);
+}
+
+// The wire format's entities lane run on every beat beside the sim.
+TEST(ReplayPlaybackServer, WireStatsRunOnEveryBeat)
+{
+  const std::filesystem::path stats = LogFolder() / "ctest_wire.csv";
+  std::error_code ignored;
+  std::filesystem::remove(stats, ignored);
+  ExpectServerCheck("wire", " --wire-stats " + Quoted(stats), {});
+  EXPECT_GT(std::filesystem::file_size(stats, ignored), 0u);
 }
 #endif
 

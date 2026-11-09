@@ -29,6 +29,7 @@ namespace moho
   class CD3DPrimBatcher;
   class CD3DRenderTarget;
   class CD3DTextureBatcher;
+  class CWldMap;
   class CWldSession;
   class ID3DRenderTarget;
   class ID3DTextureSheet;
@@ -561,4 +562,22 @@ namespace moho
    * Returns the loaded map's terrain resource, or null when no map is bound.
    */
   [[nodiscard]] IWldTerrainRes* REN_GetTerrainRes();
+
+  /**
+   * Address: 0x010A6438 (sWldMap)
+   *
+   * The map the renderer draws (`REN_GetTerrainRes`). The world session sets it to its own map when it is
+   * constructed (0x00893581) and clears it when it is destroyed (0x00893BE6); `REN_SetWldMap` sets it
+   * otherwise.
+   */
+  extern CWldMap* sWldMap;
+
+  /**
+   * Address: 0x007FA150 (FUN_007FA150)
+   *
+   * What it does:
+   * Stores `map` in `sWldMap` (`mov [sWldMap], eax`). The game never calls it; the original map editor
+   * drew its own map through it, as the editor here does between plays.
+   */
+  void REN_SetWldMap(CWldMap* map);
 } // namespace moho

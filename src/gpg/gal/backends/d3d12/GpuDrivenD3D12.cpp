@@ -280,6 +280,8 @@ namespace gpg::gal
 
     // CopyVertexBufferRegion is CopyBufferRegion on the direct list.
     mGpuFeatures = kGpuFeatureVertexPulling | kGpuFeatureCompute | kGpuFeatureIndirectDraw | kGpuFeatureBufferCopy;
+    // Hull and domain shaders are part of every feature level this device is created at (11_0 and up).
+    mGpuFeatures |= kGpuFeatureTessellation;
 
     // Timestamps: two per region (and two for the frame) in each of kProfileFrames frames.
     UINT64 frequency = 0U;

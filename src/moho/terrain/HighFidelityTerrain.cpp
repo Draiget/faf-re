@@ -1,6 +1,8 @@
 #include "moho/terrain/HighFidelityTerrain.h"
+#include "moho/render/WRenViewport.h"
 #include "moho/terrain/SplatChunkRenderer.h"
 #include "moho/terrain/SplatBudget.h"
+#include "moho/terrain/TerrainTessellation.h"
 #include <cstdio>
 
 #include <algorithm>
@@ -482,11 +484,12 @@ namespace moho
     SetShaderVarMem(shaderVars.stratum5NormalTile, 4U, &strata.mStratum5NormalTexture.mScaleX);
     SetShaderVarMem(shaderVars.stratum6NormalTile, 4U, &strata.mStratum6NormalTexture.mScaleX);
     SetShaderVarMem(shaderVars.stratum7NormalTile, 4U, &strata.mStratum7NormalTexture.mScaleX);
+    TERRAIN_SetTessellationLayers(strata); // engine addition (ren_TerrainTessellation)
 
     shaderVars.normalTexture.SetRenderTargetTexture(terrainNormalTexture);
 
-    const auto* const activeMap = WLD_GetActiveSession()->mWldMap;
-    const CHeightField* const heightField = activeMap->mTerrainRes->mMap->mHeightField.get();
+    // 0x00801277: `mov eax, [sWldMap]`, the map the renderer draws (a session's, or the map editor's).
+    const CHeightField* const heightField = REN_GetTerrainRes()->mMap->mHeightField.get();
 
     const float terrainScale[4] = {
       1.0f / static_cast<float>(heightField->width - 1),
@@ -1793,11 +1796,7 @@ namespace moho
     batcher->SetProjectionMatrix(camera.projection);
     batcher->SetViewMatrix(camera.view);
 
-    IWldTerrainRes* heightFieldSource = nullptr;
-    if (CWldSession* const activeSession = WLD_GetActiveSession();
-        activeSession != nullptr && activeSession->mWldMap != nullptr) {
-      heightFieldSource = activeSession->mWldMap->mTerrainRes;
-    }
+    IWldTerrainRes* const heightFieldSource = REN_GetTerrainRes();
 
     const CHeightField* const heightField = heightFieldSource->mMap->mHeightField.get();
 
@@ -1816,11 +1815,7 @@ namespace moho
     // after the bind (0x00801FE6-0x00802023), not at end of scope.
     batcher->SetTexture(CD3DBatchTexture::FromSolidColor(kDirtyRectOverlayColor));
 
-    IWldTerrainRes* dirtyRectSource = nullptr;
-    if (CWldSession* const activeSession = WLD_GetActiveSession();
-        activeSession != nullptr && activeSession->mWldMap != nullptr) {
-      dirtyRectSource = activeSession->mWldMap->mTerrainRes;
-    }
+    IWldTerrainRes* const dirtyRectSource = REN_GetTerrainRes();
 
     for (const gpg::Rect2i& dirtyRect : dirtyRectSource->GetDebugDirtyRects()) {
       if (!DirtyRectVisibleInCameraFootprint(cameraFootprint, dirtyRect)) {
@@ -1855,11 +1850,8 @@ namespace moho
       return;
     }
 
-    IWldTerrainRes* terrainRes = nullptr;
-    if (CWldSession* const activeSession = WLD_GetActiveSession();
-        activeSession != nullptr && activeSession->mWldMap != nullptr) {
-      terrainRes = activeSession->mWldMap->mTerrainRes;
-    }
+    // `sWldMap`, as DrawDirtyTerrain above notes.
+    IWldTerrainRes* const terrainRes = REN_GetTerrainRes();
 
     CD3DDevice* const device = D3D_GetDevice();
     device->SelectFxFile("water2");

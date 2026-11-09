@@ -17,6 +17,7 @@
 #include "gpg/gal/effects/EffectDescription.h"
 #include "gpg/gal/effects/ModernHlsl.h"
 #include "gpg/gal/effects/ShadowCascades.h"
+#include "gpg/gal/effects/TextureFiltering.h"
 
 using namespace gpg::gal::effects;
 using faf_gal_tests::Count;
@@ -413,6 +414,105 @@ float4 PassPS( float2 uv : TEXCOORD0 ) : COLOR0 { return Look( shadowSampler, uv
   EXPECT_TRUE(HasNote(blocked.modern.notes, "a shadow sampler is used other than in a tex2D lookup; shadow cascades are off"));
   EXPECT_TRUE(gShadowCascadesBlocked.load());
   gShadowCascadesBlocked.store(false);
+}
+
+// Engine addition (tessellation): a pass naming a hull and a domain function gets attributed entry points around
+// them, with the vertex shader's output as the patch's control point.
+TEST(GalModernHlsl, TessellatedPassesGetHullAndDomainEntries)
+{
+  Generated generated = Generate(faf_gal_tests::kTessellatedEffect);
+  ASSERT_EQ(generated.description.techniques.size(), 1U);
+  const Pass& pass = generated.description.techniques[0].passes[0];
+  EXPECT_TRUE(pass.Tessellated());
+  EXPECT_FALSE(pass.tessellationDropped);
+  EXPECT_FALSE(pass.hullShader.entry.empty());
+  EXPECT_FALSE(pass.domainShader.entry.empty());
+  std::uint32_t hulls = 0U;
+  std::uint32_t domains = 0U;
+  for (const ShaderEntry& entry : generated.modern.entries) {
+    hulls += (entry.stage == ShaderStage::Hull) ? 1U : 0U;
+    domains += (entry.stage == ShaderStage::Domain) ? 1U : 0U;
+  }
+  EXPECT_EQ(hulls, 1U);
+  EXPECT_EQ(domains, 1U);
+  const std::string& hlsl = generated.modern.hlsl;
+  EXPECT_TRUE(Contains(hlsl, "InputPatch<ControlPoint, 3> faf_patch"));
+  EXPECT_TRUE(Contains(hlsl, "OutputPatch<ControlPoint, 3> faf_patch"));
+  EXPECT_TRUE(Contains(hlsl, "Place(faf_weights, faf_patch[0], faf_patch[1], faf_patch[2], 2.0)")) << "the pass's argument";
+  EXPECT_TRUE(Contains(hlsl, "Factors(faf_patch[0], faf_patch[1], faf_patch[2])"));
+}
+
+// A hull shader without its domain shader (or the reverse) is not a tessellated pass: the pass keeps neither
+// and is marked, so the engine's load check refuses it rather than drawing patch points as triangles.
+TEST(GalModernHlsl, AHullShaderWithoutItsDomainShaderDropsBoth)
+{
+  std::string source = faf_gal_tests::kTessellatedEffect;
+  const std::string domain = "        SetDomainShader( CompileShader( ds_5_0, Place( 2.0 ) ) );\n";
+  const std::size_t at = source.find(domain);
+  ASSERT_NE(at, std::string::npos);
+  source.erase(at, domain.size());
+  Generated generated = Generate(source);
+  const Pass& pass = generated.description.techniques[0].passes[0];
+  EXPECT_FALSE(pass.Tessellated());
+  EXPECT_TRUE(pass.tessellationDropped);
+  EXPECT_TRUE(pass.hullShader.entry.empty());
+  EXPECT_TRUE(HasNote(generated.modern.notes, "technique Tessellated: a hull shader needs a domain shader and the reverse; ignored"));
+}
+
+// A domain function that doesn't take the weights and three points can't be wrapped: both stages go.
+TEST(GalModernHlsl, ADomainFunctionWithTheWrongParametersDropsTheTessellation)
+{
+  std::string source = faf_gal_tests::kTessellatedEffect;
+  const std::string head = "Surface Place( float3 weights, ControlPoint a, ControlPoint b, ControlPoint c, uniform float scale )";
+  const std::size_t at = source.find(head);
+  ASSERT_NE(at, std::string::npos);
+  source.replace(at, head.size(), "Surface Place( float3 weights, ControlPoint a, ControlPoint b, uniform float scale )");
+  const std::string body = "a.position * weights.x + b.position * weights.y + c.position * weights.z";
+  const std::size_t bodyAt = source.find(body);
+  ASSERT_NE(bodyAt, std::string::npos);
+  source.replace(bodyAt, body.size(), "a.position * weights.x + b.position * weights.y");
+  Generated generated = Generate(source);
+  const Pass& pass = generated.description.techniques[0].passes[0];
+  EXPECT_TRUE(pass.tessellationDropped);
+  EXPECT_TRUE(pass.hullShader.entry.empty());
+  EXPECT_TRUE(pass.domainShader.entry.empty());
+  EXPECT_TRUE(HasNote(generated.modern.notes, "technique Tessellated: Place needs 4 varying parameters"));
+}
+
+// Engine addition (ren_TextureAnisotropy): only a trilinear sampler that wraps both ways turns anisotropic.
+TEST(GalTextureFiltering, OnlyTiledTrilinearSamplersTurnAnisotropic)
+{
+  const int saved = gTextureAnisotropy;
+  SamplerDesc tiled{};
+  tiled.filter = 0x15U; // MIN_MAG_MIP_LINEAR
+  tiled.addressU = 1U;  // WRAP
+  tiled.addressV = 1U;
+  SamplerDesc clamped = tiled;
+  clamped.addressU = 3U; // CLAMP
+  SamplerDesc point = tiled;
+  point.filter = 0x00U; // MIN_MAG_MIP_POINT
+  SamplerDesc noMips = tiled;
+  noMips.filter = 0x14U; // MIN_MAG_LINEAR_MIP_POINT
+
+  gTextureAnisotropy = 8;
+  EXPECT_EQ(WithTextureAnisotropy(tiled).filter, 0x55U);
+  EXPECT_EQ(WithTextureAnisotropy(tiled).maxAnisotropy, 8U);
+  EXPECT_EQ(WithTextureAnisotropy(clamped).filter, 0x15U) << "clamped textures keep their filter";
+  EXPECT_EQ(WithTextureAnisotropy(point).filter, 0x00U);
+  EXPECT_EQ(WithTextureAnisotropy(noMips).filter, 0x14U);
+  SamplerDesc lookup = tiled;
+  lookup.texture = "lookupTexture";
+  EXPECT_EQ(WithTextureAnisotropy(lookup).filter, 0x15U) << "lookup tables read by computed coordinates keep theirs";
+  tiled.texture = "Stratum0AlbedoTexture";
+  EXPECT_EQ(WithTextureAnisotropy(tiled).filter, 0x55U);
+
+  gTextureAnisotropy = 32;
+  EXPECT_EQ(WithTextureAnisotropy(tiled).maxAnisotropy, 16U) << "capped at what the APIs allow";
+  gTextureAnisotropy = 1;
+  EXPECT_EQ(WithTextureAnisotropy(tiled).filter, 0x15U) << "1 leaves every sampler as written";
+  gTextureAnisotropy = 0;
+  EXPECT_EQ(WithTextureAnisotropy(tiled).filter, 0x15U);
+  gTextureAnisotropy = saved;
 }
 
 TEST(GalModernHlsl, Direct3D9AlphaTestIsEmulatedInThePixelEntry)

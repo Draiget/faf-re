@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "editor/EdMemMap.h"
 #include "moho/sim/CWldSession.h"
 
 namespace faf::editor
@@ -137,6 +138,8 @@ namespace faf::editor
     std::chrono::steady_clock::time_point mSessionStart{};
     std::chrono::steady_clock::time_point mMemoryCheckAt{};
     std::map<std::string, int> mInstanceCounts;
+    /** The memory map after the last play, to diff the next one against. */
+    memmap::Snapshot mLastMemoryMap;
     std::uint32_t mTracePlay = 0; // `/memtrace`: the current play's number
 
     std::vector<std::string> mMaps;

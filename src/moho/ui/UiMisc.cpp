@@ -1683,13 +1683,6 @@ void moho::MAUI_ToggleConsole()
   );
 }
 
-void moho::MAUI_ReleaseCursor(
-  CMauiCursor* const cursor
-)
-{
-  (void)cursor;
-}
-
 /**
  * Address: 0x0083D670 (FUN_0083D670)
  *

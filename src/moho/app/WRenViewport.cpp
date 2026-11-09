@@ -124,20 +124,26 @@ void moho::REN_ShowSkeletons()
   }
 }
 
+moho::CWldMap* moho::sWldMap = nullptr;
+
+/**
+ * Address: 0x007FA150 (FUN_007FA150)
+ */
+void moho::REN_SetWldMap(CWldMap* const map)
+{
+  sWldMap = map;
+}
+
 /**
  * Address: 0x007FA170 (FUN_007FA170, ?REN_GetTerrainRes@Moho@@YAPAVIWldTerrainRes@1@XZ)
  *
  * What it does:
- * Returns the active world-map terrain resource when one is available.
+ * Returns the terrain of the map the renderer draws: `sWldMap ? sWldMap->mTerrainRes : 0`
+ * (0x007FA170 `mov eax, [0x010A6438]`, `mov eax, [eax+4]`).
  */
 moho::IWldTerrainRes* moho::REN_GetTerrainRes()
 {
-  moho::CWldSession* const session = moho::WLD_GetActiveSession();
-  if (session == nullptr || session->mWldMap == nullptr) {
-    return nullptr;
-  }
-
-  return session->mWldMap->mTerrainRes;
+  return sWldMap != nullptr ? sWldMap->mTerrainRes : nullptr;
 }
 
 /**
@@ -844,9 +850,12 @@ void moho::REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, const int 
 
   // 0x007FA941..0x007FA982: network-stats HUD, right-anchored.
   if (moho::ren_ShowNetworkStats) {
-    // Engine addition: only the lockstep driver has these stats (the remote and server drivers draw none).
+    // Engine addition: only the lockstep driver has these stats; a server-mode game shows its bytes by lane
+    // instead (plan WP10.10).
     if (CSimDriver* const simDriver = dynamic_cast<CSimDriver*>(moho::WLD_GetDriver())) {
       simDriver->DrawNetworkStats(primBatcher, static_cast<float>(headWidth - 25), 25.0f, 1.0f, 0.0f);
+    } else {
+      moho::NETPANEL_DrawServerLanes(primBatcher, static_cast<float>(headWidth - 25), 25.0f);
     }
   }
 
@@ -1801,10 +1810,12 @@ void moho::WRenViewport::RenderWorldView(
   // sane transform. CameraGetView() is the real, correctly-offset
   // accessor for the embedded GeomCamera3 (CameraImpl.cpp:2007-2010:
   // `return As(this)->mCam;`).
-  moho::CameraImpl* const cameraImpl = worldView->mView->GetCamera();
-  mCam = cameraImpl != nullptr
-    ? const_cast<moho::GeomCamera3*>(&cameraImpl->CameraGetView())
-    : nullptr;
+  //
+  // The binary takes the view's camera from slot 4, `GetCameraView` (0x007F92A4: `mov eax, [edx+10h]`,
+  // `call eax`, stored at [esp+10h] and handed to the clutter pass at 0x007F9329), not from slot 3. For
+  // `CUIWorldView` that is the same `&mCamera->CameraGetView()` (0x0086EBE0); a `SimpleRenderWorldView`
+  // (the strategic preview render, the map editor's view) has a view but no `CameraImpl`, and is drawn.
+  mCam = worldView->mView->GetCameraView();
   if (mCam == nullptr) {
     return;
   }

@@ -1,11 +1,15 @@
 #include "editor/EdShell.h"
 
+#include <cctype>
+
 #include <algorithm>
 #include <cstdio>
 
 #include "editor/EdLog.h"
 #include "editor/EdPlay.h"
+#include "editor/doc/EdDocument.h"
 #include "gpg/gal/Device.hpp"
+#include "gpg/core/utils/Logging.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 
@@ -15,6 +19,7 @@ namespace faf::editor
   {
     constexpr const char* kToolsWindow = "Tools";
     constexpr const char* kMapWindow = "Map";
+    constexpr const char* kInfoWindow = "Info";
     constexpr const char* kLogWindow = "Log";
     constexpr const char* kDockSpace = "EditorDockSpace";
 
@@ -22,9 +27,10 @@ namespace faf::editor
     const ImVec4 kStopRed(0.62f, 0.22f, 0.20f, 1.0f);
   } // namespace
 
-  EdShell::EdShell(EdLog& log, EdPlay& play)
+  EdShell::EdShell(EdLog& log, EdPlay& play, EdDocument& document)
     : mLog(log)
     , mPlay(play)
+    , mDocument(document)
   {
     gpg::gal::DeviceRuntimeInfo info;
     if (gpg::gal::Device::IsReady() && gpg::gal::Device::GetInstance()->GetRuntimeInfo(info)) {
@@ -87,6 +93,9 @@ namespace faf::editor
       if (mShowMap) {
         DrawMapPanel();
       }
+      if (mShowInfo) {
+        DrawInfoPanel();
+      }
       if (mShowLog) {
         if (ImGui::Begin(kLogWindow, &mShowLog)) {
           mLog.Draw();
@@ -97,6 +106,8 @@ namespace faf::editor
     if (mShowDemo) {
       ImGui::ShowDemoWindow(&mShowDemo);
     }
+    DrawSaveAsDialog();
+    DrawNewMapDialog();
     DrawStatusBar();
   }
 
@@ -112,6 +123,7 @@ namespace faf::editor
     const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.22f, nullptr, &center);
     ImGui::DockBuilderDockWindow(kToolsWindow, left);
     ImGui::DockBuilderDockWindow(kMapWindow, right);
+    ImGui::DockBuilderDockWindow(kInfoWindow, right);
     ImGui::DockBuilderDockWindow(kLogWindow, bottom);
     ImGui::DockBuilderFinish(dockspaceId);
   }
@@ -156,6 +168,13 @@ namespace faf::editor
       ImGui::TextDisabled("%s", MapDisplayName(maps[at]).c_str());
     }
     ImGui::TextDisabled("%s", mPlay.StateText());
+    // Open: the picked map into the editor's document (the Info panel shows what it read).
+    ImGui::BeginDisabled(maps.empty() || mDocument.GetState() == EdDocument::State::Loading);
+    if (ImGui::Button("Open for editing", ImVec2(-1.0f, 0.0f)) && !maps.empty()) {
+      (void)mDocument.Open(maps[static_cast<std::size_t>(selected)]);
+    }
+    ImGui::EndDisabled();
+    ImGui::Separator();
 
     // Play setup: solo (fastest: no AI brains, so no AI map analysis) or against one AI type, the
     // player's faction, and the fog.
@@ -253,6 +272,255 @@ namespace faf::editor
     ImGui::EndChild();
     ImGui::EndDisabled();
     ImGui::End();
+  }
+
+  void EdShell::DrawInfoPanel()
+  {
+    // A layout saved before this panel existed has no place for it: it goes beside the Map panel.
+    if (const ImGuiWindow* const map = ImGui::FindWindowByName(kMapWindow); map != nullptr && map->DockId != 0) {
+      ImGui::SetNextWindowDockID(map->DockId, ImGuiCond_FirstUseEver);
+    }
+    // A map that starts opening (the Map panel's button, `/open`) brings this tab to the front once, after the
+    // first frames: on those the saved layout picks each dock's front tab and would override it.
+    if (!mDocument.Path().empty() && mDocument.Path() != mInfoShownFor && ImGui::GetFrameCount() > 3) {
+      mInfoShownFor = mDocument.Path();
+      mShowInfo = true;
+      ImGui::SetNextWindowFocus();
+    }
+    if (!ImGui::Begin(kInfoWindow, &mShowInfo)) {
+      ImGui::End();
+      return;
+    }
+    switch (mDocument.GetState()) {
+    case EdDocument::State::Empty:
+      ImGui::TextDisabled("No map open. Pick one in the Map panel and press Open for editing.");
+      ImGui::End();
+      return;
+    case EdDocument::State::Loading:
+      ImGui::Text("Opening %s ...", MapDisplayName(mDocument.Path()).c_str());
+      ImGui::End();
+      return;
+    case EdDocument::State::Failed:
+      ImGui::TextColored(ImVec4(0.95f, 0.45f, 0.40f, 1.0f), "%s did not open", MapDisplayName(mDocument.Path()).c_str());
+      ImGui::TextWrapped("%s", mDocument.Error().c_str());
+      ImGui::End();
+      return;
+    case EdDocument::State::Open:
+      break;
+    }
+
+    const MapFacts& facts = mDocument.Facts();
+    ImGui::TextUnformatted(facts.name.empty() ? MapDisplayName(facts.scenarioPath).c_str() : facts.name.c_str());
+    if (facts.mapVersion > 0) {
+      ImGui::TextDisabled("%s, version %d, opened in %.2f s", MapDisplayName(facts.scenarioPath).c_str(), facts.mapVersion,
+                          facts.loadSeconds);
+    } else {
+      ImGui::TextDisabled("%s, opened in %.2f s", MapDisplayName(facts.scenarioPath).c_str(), facts.loadSeconds);
+    }
+    if (!mDocument.Error().empty()) {
+      ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "%s", mDocument.Error().c_str());
+    }
+    if (!facts.description.empty()) {
+      ImGui::TextWrapped("%s", facts.description.c_str());
+    }
+    ImGui::Separator();
+
+    constexpr ImGuiTableFlags kTable = ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg;
+    const auto row = [](const char* const label, const char* const format, auto... values) {
+      ImGui::TableNextRow();
+      ImGui::TableSetColumnIndex(0);
+      ImGui::TextDisabled("%s", label);
+      ImGui::TableSetColumnIndex(1);
+      ImGui::Text(format, values...);
+    };
+    if (ImGui::BeginTable("##facts", 2, kTable)) {
+      ImGui::TableSetupColumn("##label", ImGuiTableColumnFlags_WidthFixed);
+      ImGui::TableSetupColumn("##value", ImGuiTableColumnFlags_WidthStretch);
+      row("Size", "%d x %d (%.0f x %.0f km)", facts.sizeX, facts.sizeZ, facts.sizeX / 51.2, facts.sizeZ / 51.2);
+      row("Height field", "%d x %d samples", facts.fieldWidth, facts.fieldHeight);
+      if (facts.water) {
+        row("Water", "at %.2f", static_cast<double>(facts.waterElevation));
+      } else {
+        row("Water", "%s", "none");
+      }
+      row("Type", "%s", facts.type.c_str());
+      row("Terrain shader", "%s", facts.terrainShader.c_str());
+      row("Props", "%d", facts.props);
+      row("Decals", "%d", facts.decals);
+      row("Markers", "%d", facts.markerCount);
+      row("Armies", "%zu", facts.armies.size());
+      ImGui::EndTable();
+    }
+
+    if (ImGui::CollapsingHeader("Texture layers", ImGuiTreeNodeFlags_DefaultOpen)) {
+      static constexpr const char* kSlots[] = {"Lower", "1", "2", "3", "4", "5", "6", "7", "8", "Upper"};
+      if (ImGui::BeginTable("##layers", 2, kTable)) {
+        ImGui::TableSetupColumn("##slot", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("##texture", ImGuiTableColumnFlags_WidthStretch);
+        for (std::size_t i = 0; i < facts.layers.size() && i < std::size(kSlots); ++i) {
+          ImGui::TableNextRow();
+          ImGui::TableSetColumnIndex(0);
+          ImGui::TextDisabled("%s", kSlots[i]);
+          ImGui::TableSetColumnIndex(1);
+          if (facts.layers[i].empty()) {
+            ImGui::TextDisabled("(empty)");
+          } else {
+            ImGui::TextUnformatted(facts.layers[i].c_str());
+          }
+        }
+        ImGui::EndTable();
+      }
+    }
+    if (ImGui::CollapsingHeader("Markers")) {
+      for (const auto& [type, count] : facts.markers) {
+        ImGui::Text("%d", count);
+        ImGui::SameLine(48.0f);
+        ImGui::TextUnformatted(type.c_str());
+      }
+    }
+    if (ImGui::CollapsingHeader("Armies")) {
+      for (const std::string& army : facts.armies) {
+        ImGui::BulletText("%s", army.c_str());
+      }
+    }
+    if (ImGui::CollapsingHeader("Files")) {
+      ImGui::TextWrapped("%s", facts.scenarioPath.c_str());
+      ImGui::TextWrapped("%s", facts.mapPath.c_str());
+      ImGui::TextWrapped("%s", facts.savePath.c_str());
+      ImGui::TextWrapped("%s", facts.scriptPath.c_str());
+    }
+    ImGui::End();
+  }
+
+  void EdShell::DrawSaveAsDialog()
+  {
+    constexpr const char* kTitle = "Save as new map folder";
+    if (mOpenSaveAs) {
+      mOpenSaveAs = false;
+      if (mDocument.GetState() != EdDocument::State::Open) {
+        gpg::Warnf("editor: open a map first");
+        return;
+      }
+      (void)std::snprintf(mSaveAsName, sizeof(mSaveAsName), "%s", mDocument.NextVersionFolder().c_str());
+      ImGui::OpenPopup(kTitle);
+    }
+    if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      return;
+    }
+    ImGui::TextUnformatted("The new folder goes into your vault's maps folder:");
+    ImGui::TextDisabled("%s", (mDocument.VaultFolder() / "maps").string().c_str());
+    ImGui::SetNextItemWidth(420.0f);
+    const bool enter = ImGui::InputText("Folder", mSaveAsName, sizeof(mSaveAsName), ImGuiInputTextFlags_EnterReturnsTrue);
+    ImGui::TextDisabled("FAF names map folders name.vNNNN; the files take the name without the version.");
+    if (ImGui::Button("Save", ImVec2(120.0f, 0.0f)) || enter) {
+      std::string message;
+      if (mDocument.SaveAsNewFolder(mSaveAsName, message)) {
+        gpg::Logf("editor: %s", message.c_str());
+        ImGui::CloseCurrentPopup();
+      } else {
+        gpg::Warnf("editor: %s", message.c_str());
+      }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(120.0f, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+  }
+
+  namespace
+  {
+    /** The folder FAF would give a map of this title: lower case, letters and digits, `_` between words, `.v0001`. */
+    std::string FolderForTitle(const char* const title)
+    {
+      std::string folder;
+      for (const char* c = title; *c != '\0'; ++c) {
+        const unsigned char ch = static_cast<unsigned char>(*c);
+        if (std::isalnum(ch) != 0) {
+          folder += static_cast<char>(std::tolower(ch));
+        } else if (!folder.empty() && folder.back() != '_') {
+          folder += '_';
+        }
+      }
+      while (!folder.empty() && folder.back() == '_') {
+        folder.pop_back();
+      }
+      return (folder.empty() ? std::string("new_map") : folder) + ".v0001";
+    }
+  } // namespace
+
+  void EdShell::DrawNewMapDialog()
+  {
+    constexpr const char* kTitle = "New map";
+    if (mOpenNewMap) {
+      mOpenNewMap = false;
+      mNewMap = NewMapSettings{};
+      (void)std::snprintf(mNewMapTitle, sizeof(mNewMapTitle), "%s", mNewMap.title.c_str());
+      (void)std::snprintf(mNewMapFolder, sizeof(mNewMapFolder), "%s", FolderForTitle(mNewMapTitle).c_str());
+      mNewMapFolderEdited = false;
+      ImGui::OpenPopup(kTitle);
+    }
+    if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      return;
+    }
+    constexpr float kWidth = 300.0f;
+    ImGui::SetNextItemWidth(kWidth);
+    if (ImGui::InputText("Title", mNewMapTitle, sizeof(mNewMapTitle)) && !mNewMapFolderEdited) {
+      (void)std::snprintf(mNewMapFolder, sizeof(mNewMapFolder), "%s", FolderForTitle(mNewMapTitle).c_str());
+    }
+    ImGui::SetNextItemWidth(kWidth);
+    if (ImGui::InputText("Folder", mNewMapFolder, sizeof(mNewMapFolder))) {
+      mNewMapFolderEdited = true;
+    }
+    ImGui::TextDisabled("In %s", (mDocument.VaultFolder() / "maps").string().c_str());
+    ImGui::Separator();
+    ImGui::TextUnformatted("Type");
+    ImGui::SameLine(110.0f);
+    if (ImGui::RadioButton("Skirmish", !mNewMap.campaign)) {
+      mNewMap.campaign = false;
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Campaign", mNewMap.campaign)) {
+      mNewMap.campaign = true;
+    }
+    ImGui::TextUnformatted("Size");
+    ImGui::SameLine(110.0f);
+    for (int i = 0; i < kNewMapSizeCount; ++i) {
+      if (i > 0) {
+        ImGui::SameLine();
+      }
+      if (ImGui::RadioButton(kNewMapSizes[i].name, mNewMap.size == i)) {
+        mNewMap.size = i;
+      }
+    }
+    ImGui::SetNextItemWidth(kWidth);
+    ImGui::SliderInt("Players", &mNewMap.players, 1, kNewMapMaxPlayers);
+    ImGui::SetNextItemWidth(kWidth);
+    ImGui::DragFloat("Ground height", &mNewMap.height, 0.25f, 0.0f, 500.0f, "%.1f");
+    ImGui::Checkbox("Sea", &mNewMap.sea);
+    if (mNewMap.sea) {
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(kWidth - 60.0f);
+      ImGui::DragFloat("Sea level", &mNewMap.seaLevel, 0.25f, 0.0f, 500.0f, "%.1f");
+    }
+    ImGui::TextDisabled("Start positions ARMY_1 to ARMY_%d in a ring; ARMY_17 and NEUTRAL_CIVILIAN as extra armies.", mNewMap.players);
+    ImGui::Separator();
+    if (ImGui::Button("Create", ImVec2(120.0f, 0.0f))) {
+      mNewMap.title = mNewMapTitle;
+      mNewMap.folder = mNewMapFolder;
+      std::string message;
+      if (mDocument.CreateNew(mNewMap, message)) {
+        gpg::Logf("editor: %s", message.c_str());
+        ImGui::CloseCurrentPopup();
+      } else {
+        gpg::Warnf("editor: %s", message.c_str());
+      }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(120.0f, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
   }
 
   void EdShell::DrawStatusBar()

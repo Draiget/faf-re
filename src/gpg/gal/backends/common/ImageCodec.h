@@ -137,6 +137,14 @@ namespace gpg::gal::imaging
     /** The image's levels (one 2D slice or six cube faces) as a DDS file, without D3DX11. */
     static HRESULT WriteDds(const Image& image, std::vector<std::uint8_t>& outBytes);
 
+    /**
+     * Every DDS this process encodes goes through `WriteDds`, as with `FAF_IMAGECODEC_OWN_DDS`: the classic
+     * header wherever the format has one, where D3DX11's saver writes the DX10 extension header that
+     * D3D9's D3DX (the retail game's texture loader) can't read. The map editor sets it, so the texture
+     * masks it saves into a `.scmap` load in every game version.
+     */
+    static void PreferOwnDds(bool prefer) noexcept;
+
     /** gal image file format (BMP, JPG, PNG, PNG, DDS) -> FileFormat. */
     [[nodiscard]] static FileFormat FromGalFormat(int galFormat) noexcept;
 

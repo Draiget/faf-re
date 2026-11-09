@@ -175,6 +175,12 @@ namespace moho
     void AddSearchPath(const SVFSMountPoint& mountPoint, const fa::string& resolvedPath, bool isDirectory);
 
   public:
+    /**
+     * Engine addition (map editor): mounts one more directory at `mountpoint`, after the others, as an init
+     * file's MountDirectory does at startup. The editor mounts the map folders it makes this way.
+     */
+    void MountDirectoryLate(const std::filesystem::path& directory, gpg::StrArg mountpoint);
+
     fa::vector<SVFSMountPoint> mMountpoints; // +0x04
   };
 

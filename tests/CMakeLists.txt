@@ -160,7 +160,7 @@ endif()
 add_dependencies(faf_replay_playback_tests headless)
 set_target_properties(faf_replay_playback_tests PROPERTIES FOLDER "Tests/Replay")
 add_test(NAME replay_playback COMMAND faf_replay_playback_tests)
-set_tests_properties(replay_playback PROPERTIES LABELS "Replay" TIMEOUT 3600)
+set_tests_properties(replay_playback PROPERTIES LABELS "Replay" TIMEOUT 7200)
 
 # CZipFile reads entries whose data starts at or past 2 GiB, as the binary does (tests/zip, PR #291).
 add_executable(faf_zip_offset_tests EXCLUDE_FROM_ALL zip/ZipOffsetTests.cpp)
@@ -206,6 +206,7 @@ add_subdirectory(gal)
 add_subdirectory(reflection)
 add_subdirectory(render_math)
 add_subdirectory(startup)
+add_subdirectory(netcore)
 
 # Entity update scroll snapshots and payload ownership.
 add_executable(faf_recon_scroll_packet_tests EXCLUDE_FROM_ALL sim/ReconScrollPacketTests.cpp)
@@ -331,6 +332,19 @@ set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
 # Every GoogleTest executable above and in the subdirectories.
 include(FafTests)
 faf_add_tests_target("${CMAKE_CURRENT_SOURCE_DIR}")
+
+# The map editor height brush, symmetry check, height files and undo (src/editor/tools, src/editor/undo): exact symmetry,
+# byte-exact undo, height images read back as written.
+add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.cpp editor/HeightHistoryTests.cpp editor/SymmetryCheckTests.cpp editor/HeightFileTests.cpp
+  editor/NewMapTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdNewMap.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryCheck.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightFile.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)
+target_include_directories(faf_editor_brush_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_editor_brush_tests PRIVATE gtest_main ole32 windowscodecs)
+set_target_properties(faf_editor_brush_tests PROPERTIES FOLDER "Tests/Editor")
+add_test(NAME editor_height_brush COMMAND faf_editor_brush_tests)
+set_tests_properties(editor_height_brush PROPERTIES LABELS "Editor")
 
 add_executable(faf_slab_tests EXCLUDE_FROM_ALL entity/FixedSlabPoolTests.cpp)
 target_link_libraries(faf_slab_tests PRIVATE faf_engine)

@@ -303,6 +303,14 @@ namespace moho
       mOnTarget = false;
     }
 
+    /**
+     * Engine addition (sim_ParallelPose), not in the binary: whether this tick's update of
+     * `owner`'s aim can run in a pose job on a sim worker -- no live target and no
+     * OnStartTracking / OnStopTracking call. `outTargetSet` is the weapon target's type test the
+     * job reads instead of the live target. Sim thread only.
+     */
+    [[nodiscard]] bool IsPoseJobQuiet(const Unit& owner, bool& outTargetSet) const;
+
   private:
     /**
      * Address: 0x006317B0 (FUN_006317B0, Moho::CAimManipulator::Aim)

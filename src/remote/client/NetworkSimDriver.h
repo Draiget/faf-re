@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <deque>
 #include <map>
@@ -132,6 +133,7 @@ namespace faf::remote::client
     CRemoteClientManager mClientManager;
     moho::CMarshaller mMarshaller;
     std::unique_ptr<CServerViewClient> mViews;
+    std::array<std::uint64_t, 5> mLaneBytes{}; // plan WP10.10: bytes taken by lane (EServerLane order)
     std::unique_ptr<LuaPlus::LuaState> mEmptySyncLua; // makes the `Sync` table's bytes for a view with no Lua lane
     std::vector<std::uint8_t> mEmptySync;
     // Every army's constants (index, names, civilian), as the sim's first packet gives them (`Sim::Sync`

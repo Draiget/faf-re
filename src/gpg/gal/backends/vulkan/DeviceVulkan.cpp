@@ -37,6 +37,7 @@
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/backends/dxgi/DxgiFormats.h"
 #include "gpg/gal/effects/ShadowCascades.h"
+#include "gpg/gal/effects/TextureFiltering.h"
 
 namespace gpg::gal
 {
@@ -255,6 +256,7 @@ namespace gpg::gal
   struct DeviceVulkan::ProgramState
   {
     std::vector<VkSampler> samplers;
+    int samplerAnisotropy = -1; // effects::gTextureAnisotropy the samplers were made for (ren_TextureAnisotropy)
     std::int32_t viewportParameter = -1;
     float lastViewport[4]{-1.0f, -1.0f, -1.0f, -1.0f};
     std::int32_t shadowCascadeParameter = -1; // faf_ShadowCascades (ren_ShadowCascades)
@@ -264,6 +266,7 @@ namespace gpg::gal
     std::uint64_t constantsSerial = 0;
     std::uint64_t constantsFrame = ~0ULL;
     VkDescriptorSet constants = VK_NULL_HANDLE;
+    std::uint32_t constantsOffset = 0; // ren_VulkanDynamicConstants
     const std::uint8_t* constantsCpu = nullptr;
 
     std::uint64_t tableFrame = ~0ULL;
@@ -367,6 +370,12 @@ namespace gpg::gal
       }
       if (mConstantLayout != VK_NULL_HANDLE) {
         Vk().vkDestroyDescriptorSetLayout(mDevice, mConstantLayout, nullptr);
+      }
+      if (mDynamicPipelineLayout != VK_NULL_HANDLE) {
+        Vk().vkDestroyPipelineLayout(mDevice, mDynamicPipelineLayout, nullptr);
+      }
+      if (mDynamicConstantLayout != VK_NULL_HANDLE) {
+        Vk().vkDestroyDescriptorSetLayout(mDevice, mDynamicConstantLayout, nullptr);
       }
       if (mTimeline != VK_NULL_HANDLE) {
         Vk().vkDestroySemaphore(mDevice, mTimeline, nullptr);
@@ -556,8 +565,10 @@ namespace gpg::gal
     features.features.samplerAnisotropy = available.features.samplerAnisotropy;
     features.features.fillModeNonSolid = available.features.fillModeNonSolid;
     features.features.textureCompressionBC = available.features.textureCompressionBC;
+    features.features.tessellationShader = available.features.tessellationShader;
     mAnisotropy = available.features.samplerAnisotropy == VK_TRUE;
     mWireframeSupported = available.features.fillModeNonSolid == VK_TRUE;
+    mTessellationSupported = available.features.tessellationShader == VK_TRUE;
     if (available.features.textureCompressionBC != VK_TRUE) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "the Vulkan device has no BC texture compression");
     }
@@ -631,13 +642,16 @@ namespace gpg::gal
 
   void DeviceVulkan::CreateLayouts()
   {
+    // Tessellated passes (engine addition) read textures and constants in their hull and domain shaders too.
+    const VkShaderStageFlags stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT |
+      (mTessellationSupported ? VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT : 0U);
     std::vector<VkDescriptorSetLayoutBinding> bindings;
     for (std::uint32_t index = 0U; index < kTextureBindings + kSamplerBindings; ++index) {
       VkDescriptorSetLayoutBinding binding{};
       binding.binding = index;
       binding.descriptorType = (index < kTextureBindings) ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE : VK_DESCRIPTOR_TYPE_SAMPLER;
       binding.descriptorCount = 1U;
-      binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+      binding.stageFlags = stages;
       bindings.push_back(binding);
     }
     VkDescriptorSetLayoutCreateInfo layout{};
@@ -650,7 +664,7 @@ namespace gpg::gal
     constants.binding = 0U;
     constants.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     constants.descriptorCount = 1U;
-    constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    constants.stageFlags = stages;
     layout.bindingCount = 1U;
     layout.pBindings = &constants;
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mConstantLayout));
@@ -661,6 +675,15 @@ namespace gpg::gal
     pipeline.setLayoutCount = 2U;
     pipeline.pSetLayouts = sets;
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreatePipelineLayout(mDevice, &pipeline, nullptr, &mPipelineLayout));
+
+    // Engine addition (ren_VulkanDynamicConstants): the same with $Globals as a dynamic uniform buffer, so a draw
+    // whose constants changed binds the page's one set with an offset instead of allocating and writing a set.
+    constants.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mDynamicConstantLayout));
+    const VkDescriptorSetLayout dynamicSets[2] = {mTextureLayout, mDynamicConstantLayout};
+    pipeline.pSetLayouts = dynamicSets;
+    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreatePipelineLayout(mDevice, &pipeline, nullptr, &mDynamicPipelineLayout));
+    mDynamicConstants = gVulkanDynamicConstants;
 
     VkPipelineCacheCreateInfo cache{};
     cache.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
@@ -1234,6 +1257,10 @@ namespace gpg::gal
     }
     if (wait) {
       WaitForSerial(serial);
+    }
+    // ren_VulkanDynamicConstants changes only between frames, before the carried pass takes its set.
+    if (present) {
+      mDynamicConstants = gVulkanDynamicConstants;
     }
     // A submission in the middle of a pass (an upload between BeginPass and
     // the draw) leaves the pass's draws for the next command buffer.
@@ -2393,6 +2420,7 @@ namespace gpg::gal
       Vk().vkResetDescriptorPool(mDevice, pool, 0U);
     }
     frame.descriptorPool = 0U;
+    frame.constantSets.clear(); // their sets came from the pools just reset
     for (VkDescriptorPool pool : frame.gpuPools) {
       Vk().vkResetDescriptorPool(mDevice, pool, 0U);
     }
@@ -2620,14 +2648,22 @@ namespace gpg::gal
     std::shared_ptr<void>& slot = program.BackendState();
     if (slot == nullptr) {
       auto state = std::make_shared<ProgramState>();
-      for (const effects::SamplerDesc& sampler : program.Description().samplers) {
-        state->samplers.push_back(SamplerFor(sampler));
-      }
       state->viewportParameter = program.FindParameter("faf_ViewportSize");
       state->shadowCascadeParameter = program.FindParameter(effects::kShadowCascadeParameter);
       slot = state;
     }
-    return *static_cast<ProgramState*>(slot.get());
+    ProgramState& state = *static_cast<ProgramState*>(slot.get());
+    // Engine addition (ren_TextureAnisotropy): the samplers follow the switch; the descriptor table holding the
+    // old ones is rebuilt on the next bind.
+    if (state.samplerAnisotropy != effects::gTextureAnisotropy) {
+      state.samplerAnisotropy = effects::gTextureAnisotropy;
+      state.samplers.clear();
+      for (const effects::SamplerDesc& sampler : program.Description().samplers) {
+        state.samplers.push_back(SamplerFor(effects::WithTextureAnisotropy(sampler)));
+      }
+      state.tableFrame = ~0ULL;
+    }
+    return state;
   }
 
   VkDescriptorSet DeviceVulkan::AllocateSet(const VkDescriptorSetLayout layout)
@@ -2635,15 +2671,16 @@ namespace gpg::gal
     Frame& frame = mFrames[mFrameIndex];
     for (;;) {
       if (frame.descriptorPool == frame.descriptorPools.size()) {
-        const VkDescriptorPoolSize sizes[3] = {
+        const VkDescriptorPoolSize sizes[4] = {
           {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4096U},
           {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 4096U * 8U},
           {VK_DESCRIPTOR_TYPE_SAMPLER, 4096U * 8U},
+          {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256U}, // ren_VulkanDynamicConstants
         };
         VkDescriptorPoolCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         info.maxSets = 4096U;
-        info.poolSizeCount = 3U;
+        info.poolSizeCount = 4U;
         info.pPoolSizes = sizes;
         VkDescriptorPool pool = VK_NULL_HANDLE;
         CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorPool(mDevice, &info, nullptr, &pool));
@@ -2671,19 +2708,42 @@ namespace gpg::gal
     return std::max<VkDeviceSize>(mProperties.limits.minUniformBufferOffsetAlignment, 16U);
   }
 
-  VkDescriptorSet DeviceVulkan::ConstantSet(const vulkan::UploadAllocation& upload, const VkDeviceSize bytes)
+  VkDescriptorSet DeviceVulkan::ConstantSet(
+    const vulkan::UploadAllocation& upload, const VkDeviceSize bytes, std::uint32_t& offset
+  )
   {
-    const VkDescriptorSet set = AllocateSet(mConstantLayout);
-    VkDescriptorBufferInfo buffer{upload.buffer, upload.offset, bytes};
+    offset = 0U;
+    Frame& frame = mFrames[mFrameIndex];
+    if (mDynamicConstants) {
+      // Engine change (ren_VulkanDynamicConstants): one set per upload buffer and range for the frame.
+      offset = static_cast<std::uint32_t>(upload.offset);
+      for (const Frame::ConstantSetEntry& entry : frame.constantSets) {
+        if (entry.buffer == upload.buffer && entry.range == bytes) {
+          return entry.set;
+        }
+      }
+    }
+    const VkDescriptorSet set = AllocateSet(mDynamicConstants ? mDynamicConstantLayout : mConstantLayout);
+    VkDescriptorBufferInfo buffer{upload.buffer, mDynamicConstants ? 0U : upload.offset, bytes};
     VkWriteDescriptorSet write{};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write.dstSet = set;
     write.dstBinding = 0U;
     write.descriptorCount = 1U;
-    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    write.descriptorType = mDynamicConstants ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     write.pBufferInfo = &buffer;
     Vk().vkUpdateDescriptorSets(mDevice, 1U, &write, 0U, nullptr);
+    if (mDynamicConstants) {
+      frame.constantSets.push_back({upload.buffer, bytes, set});
+    }
     return set;
+  }
+
+  void DeviceVulkan::BindConstantSet(const VkDescriptorSet set, const std::uint32_t offset)
+  {
+    Vk().vkCmdBindDescriptorSets(
+      mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, EffectPipelineLayout(), 1U, 1U, &set, mDynamicConstants ? 1U : 0U, &offset
+    );
   }
 
   void DeviceVulkan::CarryBoundPass()
@@ -2698,7 +2758,7 @@ namespace gpg::gal
     }
     const vulkan::UploadAllocation upload = mUpload.Allocate(mPass.constantsBytes, ConstantAlignment(), RecordingSerial());
     std::memcpy(upload.cpu, mPass.constantsCpu, mPass.constantsBytes);
-    mPass.constants = ConstantSet(upload, mPass.constantsBytes);
+    mPass.constants = ConstantSet(upload, mPass.constantsBytes, mPass.constantsOffset);
     mPass.constantsCpu = upload.cpu;
     mPass.constantsSerial = RecordingSerial();
   }
@@ -2737,8 +2797,16 @@ namespace gpg::gal
     if (entries.pixel >= 0) {
       bound.pixelShader = &program.Shader(static_cast<std::uint32_t>(entries.pixel));
     }
+    const bool tessellated = entries.hull >= 0 && entries.domain >= 0;
+    if (tessellated && mTessellationSupported) {
+      bound.hullShader = &program.Shader(static_cast<std::uint32_t>(entries.hull));
+      bound.domainShader = &program.Shader(static_cast<std::uint32_t>(entries.domain));
+    }
+    // A tessellated pass on a device without tessellation draws nothing (its vertex
+    // shader writes control points, not positions).
     bound.valid = bound.vertexShader != nullptr && bound.vertexShader->succeeded &&
-      (bound.pixelShader == nullptr || bound.pixelShader->succeeded);
+      (bound.pixelShader == nullptr || bound.pixelShader->succeeded) && (!tessellated || mTessellationSupported) &&
+      (bound.hullShader == nullptr || (bound.hullShader->succeeded && bound.domainShader->succeeded));
 
     ProgramState& state = StateFor(program);
     effects::ParameterStore& parameters = program.Parameters();
@@ -2770,13 +2838,14 @@ namespace gpg::gal
           state.constantsSerial != RecordingSerial() || state.constantsFrame != mFrameCount) {
         const vulkan::UploadAllocation upload = AllocateUpload(constants.size(), ConstantAlignment());
         std::memcpy(upload.cpu, constants.data(), constants.size());
-        state.constants = ConstantSet(upload, constants.size());
+        state.constants = ConstantSet(upload, constants.size(), state.constantsOffset);
         state.constantsCpu = upload.cpu;
         state.constantsVersion = parameters.Version();
         state.constantsSerial = RecordingSerial();
         state.constantsFrame = mFrameCount;
       }
       bound.constants = state.constants;
+      bound.constantsOffset = state.constantsOffset;
       bound.constantsCpu = state.constantsCpu;
       bound.constantsBytes = static_cast<std::uint32_t>(constants.size());
       bound.constantsSerial = state.constantsSerial;
@@ -2788,7 +2857,7 @@ namespace gpg::gal
     if (gUsedTextureTable && state.table != VK_NULL_HANDLE && state.tableFrame == mFrameCount &&
         state.tableSurface == outputContext_.surface.get() && state.textureVersion != parameters.TextureVersion()) {
       keepTable =
-        UsedTextureBindingsKept(program, parameters, state.tableBindings, PassTextureSlots(bound.vertexShader, bound.pixelShader));
+        UsedTextureBindingsKept(program, parameters, state.tableBindings, PassTextureSlots(bound.vertexShader, bound.pixelShader, bound.hullShader, bound.domainShader));
     }
     // Textures and samplers in set 0, rebuilt when a binding changed or the frame moved on.
     if (!keepTable && (state.table == VK_NULL_HANDLE || state.tableFrame != mFrameCount ||
@@ -2958,6 +3027,8 @@ namespace gpg::gal
     std::memset(static_cast<void*>(&inputs), 0, sizeof(inputs));
     inputs.vertexKey = pass.vertexShader->key;
     inputs.pixelKey = (pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL;
+    inputs.hullKey = (pass.hullShader != nullptr) ? pass.hullShader->key : 0ULL;
+    inputs.domainKey = (pass.domainShader != nullptr) ? pass.domainShader->key : 0ULL;
     inputs.format = mBoundFormat;
     inputs.sampleMask = pass.state.sampleMask;
     for (std::uint32_t slot = 0U; slot < 16U; ++slot) {
@@ -2969,6 +3040,7 @@ namespace gpg::gal
     inputs.colorFormat = colorFormat;
     inputs.depthFormat = depthFormat;
     inputs.topology = topology;
+    inputs.layout = EffectPipelineLayout();
     if (gPipelineMemo) {
       const VkPipeline known = mPipelineMemo.Find(inputs);
       if (known != VK_NULL_HANDLE) {
@@ -2980,6 +3052,7 @@ namespace gpg::gal
     key.Add(pass.vertexShader->key);
     key.Add((pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL);
     key.Add(mBoundFormat);
+    key.Add(static_cast<std::uint32_t>(mDynamicConstants ? 1U : 0U)); // the pipeline layout (ren_VulkanDynamicConstants)
     for (std::uint32_t slot = 0U; slot < 16U; ++slot) {
       key.Add(mStreams[slot].stride);
     }
@@ -3013,6 +3086,10 @@ namespace gpg::gal
     key.Add(colorFormat);
     key.Add(depthFormat);
     key.Add(topology);
+    if (pass.hullShader != nullptr) {
+      key.Add(pass.hullShader->key);
+      key.Add(pass.domainShader->key);
+    }
     auto found = mPipelines.find(key.Key());
     if (found != mPipelines.end()) {
       mPipelineMemo.Store(inputs, found->second);
@@ -3067,19 +3144,38 @@ namespace gpg::gal
       bindingList.push_back(binding);
     }
 
-    VkPipelineShaderStageCreateInfo stages[2]{};
+    VkPipelineShaderStageCreateInfo stages[4]{};
     stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
     stages[0].module = ModuleFor(*pass.vertexShader, nullptr);
     stages[0].pName = pass.vertexShader->entryName.c_str(); // DXC keeps the HLSL entry name
     std::uint32_t stageCount = 1U;
-    if (pass.pixelShader != nullptr) {
+    // Engine addition: a tessellated pass's control points go through its hull and
+    // domain shaders (one struct on both sides, so their locations agree as DXC
+    // assigns them), and its pixel shader reads what the domain shader writes.
+    const bool tessellated = pass.hullShader != nullptr;
+    if (tessellated) {
       stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-      stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-      stages[1].module = ModuleFor(*pass.pixelShader, pass.vertexShader);
-      stages[1].pName = pass.pixelShader->entryName.c_str();
-      stageCount = 2U;
+      stages[1].stage = VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+      stages[1].module = ModuleFor(*pass.hullShader, nullptr);
+      stages[1].pName = pass.hullShader->entryName.c_str();
+      stages[2].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+      stages[2].stage = VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+      stages[2].module = ModuleFor(*pass.domainShader, nullptr);
+      stages[2].pName = pass.domainShader->entryName.c_str();
+      stageCount = 3U;
     }
+    if (pass.pixelShader != nullptr) {
+      VkPipelineShaderStageCreateInfo& pixel = stages[stageCount];
+      pixel.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+      pixel.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+      pixel.module = ModuleFor(*pass.pixelShader, tessellated ? pass.domainShader : pass.vertexShader);
+      pixel.pName = pass.pixelShader->entryName.c_str();
+      ++stageCount;
+    }
+    VkPipelineTessellationStateCreateInfo tessellation{};
+    tessellation.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
+    tessellation.patchControlPoints = 3U;
 
     VkPipelineVertexInputStateCreateInfo vertexInput{};
     vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -3167,13 +3263,14 @@ namespace gpg::gal
     info.pStages = stages;
     info.pVertexInputState = &vertexInput;
     info.pInputAssemblyState = &inputAssembly;
+    info.pTessellationState = tessellated ? &tessellation : nullptr;
     info.pViewportState = &viewport;
     info.pRasterizationState = &raster;
     info.pMultisampleState = &multisample;
     info.pDepthStencilState = &depthStencil;
     info.pColorBlendState = &colorBlend;
     info.pDynamicState = &dynamic;
-    info.layout = mPipelineLayout;
+    info.layout = EffectPipelineLayout();
     VkPipeline pipeline = VK_NULL_HANDLE;
     const VkResult result = Vk().vkCreateGraphicsPipelines(mDevice, mPipelineCache, 1U, &info, nullptr, &pipeline);
     if (result != VK_SUCCESS) {
@@ -3197,7 +3294,15 @@ namespace gpg::gal
       ++mSkippedDraws;
       return false;
     }
-    const VkPrimitiveTopology topology = kTopologyByToken[topologyToken];
+    VkPrimitiveTopology topology = kTopologyByToken[topologyToken];
+    if (mPass.hullShader != nullptr) {
+      // A tessellated pass draws each triangle of a list as one 3-point patch.
+      if (topology != VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST) {
+        ++mSkippedDraws;
+        return false;
+      }
+      topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+    }
 
     // Buffers first (uploads), then image layouts, then the rendering scope.
     VkBuffer vertexBuffers[16]{};
@@ -3257,9 +3362,11 @@ namespace gpg::gal
     BeginRendering();
 
     Vk().vkCmdBindPipeline(mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-    Vk().vkCmdBindDescriptorSets(mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 0U, 1U, &mPass.textures, 0U, nullptr);
+    Vk().vkCmdBindDescriptorSets(
+      mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, EffectPipelineLayout(), 0U, 1U, &mPass.textures, 0U, nullptr
+    );
     if (mPass.constants != VK_NULL_HANDLE) {
-      Vk().vkCmdBindDescriptorSets(mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout, 1U, 1U, &mPass.constants, 0U, nullptr);
+      BindConstantSet(mPass.constants, mPass.constantsOffset);
     }
     Vk().vkCmdBindVertexBuffers(mCommands, 0U, 16U, vertexBuffers, vertexOffsets);
     if (indexed) {

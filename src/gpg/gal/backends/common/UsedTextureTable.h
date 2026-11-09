@@ -12,13 +12,27 @@
 
 namespace gpg::gal
 {
-  /// The texture registers a bound pass's shaders read; all of them when a stage is missing or unknown.
-  [[nodiscard]] inline std::uint64_t PassTextureSlots(const effects::CompiledEntry* const vertex, const effects::CompiledEntry* const pixel)
+  /// The texture registers a bound pass's shaders read; all of them when a stage is missing or unknown. A
+  /// tessellated pass's hull and domain shaders count too: the terrain's domain shader samples albedo layers its
+  /// pixel shader doesn't, and leaving them out kept a table with old bindings for them.
+  [[nodiscard]] inline std::uint64_t PassTextureSlots(
+    const effects::CompiledEntry* const vertex,
+    const effects::CompiledEntry* const pixel,
+    const effects::CompiledEntry* const hull = nullptr,
+    const effects::CompiledEntry* const domain = nullptr
+  )
   {
     if (vertex == nullptr) {
       return ~std::uint64_t{0};
     }
-    return vertex->textureSlots | ((pixel != nullptr) ? pixel->textureSlots : 0U);
+    std::uint64_t slots = vertex->textureSlots | ((pixel != nullptr) ? pixel->textureSlots : 0U);
+    if (hull != nullptr) {
+      slots |= hull->textureSlots;
+    }
+    if (domain != nullptr) {
+      slots |= domain->textureSlots;
+    }
+    return slots;
   }
 
   /**

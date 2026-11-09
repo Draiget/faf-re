@@ -1,9 +1,12 @@
 #pragma once
 
+#include <cstdint>
+
 #include "moho/render/camera/VTransform.h"
 
 namespace moho
 {
+  class CAimManipulator;
   class CAniActor;
   class Unit;
 
@@ -12,9 +15,21 @@ namespace moho
    * (`CAniActor::UpdateManipulators`, from `Unit::MotionTick` in task stage A) runs on a sim worker
    * while the sim thread goes on with the next units, when every enabled manipulator of the unit
    * touches only its own pose and inputs copied at the moment the serial code would have run it.
-   * User-side like `sim_Workers`; matters only while `sim_Workers > 0`.
+   * Aim and builder arm manipulators qualify on ticks they have no target and start or stop no
+   * tracking script (`IsPoseJobQuiet`). User-side like `sim_Workers`; matters only while
+   * `sim_Workers > 0`.
    */
   extern bool sim_ParallelPose;
+
+  /// One aim manipulator of a queued unit: its weapon target's type test, copied at queue time.
+  struct SPoseJobAim
+  {
+    const CAimManipulator* mManipulator = nullptr;
+    bool mTargetSet = false; // weapon->mTarget.targetType != AITARGET_None
+  };
+
+  /// Aim manipulators a queued unit may have; a unit with more updates on the sim thread.
+  constexpr std::uint32_t kPoseJobMaxAims = 8;
 
   /**
    * What a queued pose update reads that other units can change later in task stage A, copied
@@ -29,15 +44,25 @@ namespace moho
     Wm3::Quatf mCurOrient{};          // mVarDat.mCurTransform.orient_
     Wm3::Quatf mLastOrient{};         // mVarDat.mLastTransform.orient_
     bool mBeingBuilt = false;         // IsBeingBuilt()
+    bool mDead = false;               // IsDead()
+    bool mStunned = false;            // mUnitVarDat.mStunTicks != 0
     bool mHasEconomy = false;         // ArmyRef and its economy exist
     double mMaxStorageEnergy = 0.0;   // economy.MaxStorageOf(ECON_ENERGY)
     double mMaxStorageMass = 0.0;     // economy.MaxStorageOf(ECON_MASS)
     float mStoredEnergy = 0.0f;       // economy.mStored.ENERGY
     float mStoredMass = 0.0f;         // economy.mStored.MASS
+    std::uint32_t mAimCount = 0;
+    SPoseJobAim mAims[kPoseJobMaxAims]{};
   };
 
   /// The copied inputs of `unit`'s pose job while the calling thread runs it; null otherwise.
   [[nodiscard]] const SPoseJobInputs* POSE_JobInputsFor(const Unit* unit) noexcept;
+
+  /// The copied inputs of `aim` in the pose job the calling thread runs; null outside a job.
+  [[nodiscard]] const SPoseJobAim* POSE_JobAimFor(const CAimManipulator* aim) noexcept;
+
+  /// Whether the calling thread is running a pose job (where no Lua may be called).
+  [[nodiscard]] bool POSE_InJob() noexcept;
 
   /**
    * `Unit::MotionTick`'s pose update: queues it on the sim workers when sim_ParallelPose allows it
