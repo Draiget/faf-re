@@ -96,6 +96,18 @@ namespace faf::editor
       Z,
       Free,
     };
+    /** The Decals tool's path: its points, and how many decals it would place (the cursor as its next point). */
+    [[nodiscard]] int DecalPathPointCount() const noexcept { return static_cast<int>(mDecalPath.size()); }
+    [[nodiscard]] int DecalPathDecalCount() const noexcept { return mDecalPathPreview; }
+    /** Lays the path's decals with their symmetric copies as one undo step, and starts a new path. */
+    void PlaceDecalPath();
+    void RemoveLastDecalPathPoint()
+    {
+      if (!mDecalPath.empty()) {
+        mDecalPath.pop_back();
+      }
+    }
+    void ClearDecalPath() { mDecalPath.clear(); }
     /** How many decals the Decals tool has selected, for its panel. */
     [[nodiscard]] int DecalSelectionCount() const noexcept { return static_cast<int>(mDecalSelection.size()); }
     /** Selects markers by name (`add` toggles them in the selection instead), for the Markers panel. */
@@ -275,6 +287,11 @@ namespace faf::editor
     std::vector<std::array<float, 3>> mDecalDragStart;
     EdDocument::DecalSnapshot mDecalBefore;
     std::uint32_t mDecalSeed = 0x9E3779B9u;
+    std::vector<std::pair<float, float>> mDecalPath;
+    int mDecalPathPreview = 0;
+    /** The path's copy `c` under the symmetry, or empty when a point of it is off the map. */
+    [[nodiscard]] std::vector<std::pair<float, float>> DecalPathCopy(const std::vector<std::pair<float, float>>& path, int c,
+                                                                    int& copies) const;
     /** The topmost decal at (x, z) (the last drawn), by its map index, or -1. */
     [[nodiscard]] int PickDecal(float x, float z) const;
     /** Places the Decals tool's texture centred at (x, z), with its symmetric copies, as one undo step. */

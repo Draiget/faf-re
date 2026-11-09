@@ -60,6 +60,47 @@ namespace
     }
   }
 
+  TEST(DecalShape, PathPassesThroughItsPoints)
+  {
+    const std::vector<std::pair<float, float>> points = {{0.0f, 0.0f}, {50.0f, 20.0f}, {100.0f, 0.0f}, {120.0f, 60.0f}};
+    for (std::size_t i = 0; i < points.size(); ++i) {
+      const auto p = faf::editor::PathPoint(points, static_cast<float>(i));
+      EXPECT_NEAR(p.first, points[i].first, 1e-3f) << i;
+      EXPECT_NEAR(p.second, points[i].second, 1e-3f) << i;
+    }
+  }
+
+  TEST(DecalShape, DecalsAlongAStraightPath)
+  {
+    // A 100-unit line along x, decals 20 long without overlap: five, centred at 10, 30, ..., 90, turned along x.
+    const std::vector<std::pair<float, float>> line = {{0.0f, 5.0f}, {100.0f, 5.0f}};
+    const std::vector<DecalFootprint> decals = faf::editor::DecalsAlongPath(line, 20.0f, 6.0f, 0.0f);
+    ASSERT_EQ(decals.size(), 5u);
+    for (std::size_t i = 0; i < decals.size(); ++i) {
+      float cx = 0.0f, cz = 0.0f;
+      faf::editor::DecalCentre(decals[i], cx, cz);
+      EXPECT_NEAR(cx, 10.0f + 20.0f * static_cast<float>(i), 1e-2f) << i;
+      EXPECT_NEAR(cz, 5.0f, 1e-2f) << i;
+      EXPECT_NEAR(decals[i].yaw, 0.0f, 1e-4f) << i;
+      EXPECT_FLOAT_EQ(decals[i].sizeX, 20.0f);
+      EXPECT_FLOAT_EQ(decals[i].sizeZ, 6.0f);
+    }
+    // Half overlap: one every 10 units, ten of them.
+    EXPECT_EQ(faf::editor::DecalsAlongPath(line, 20.0f, 6.0f, 0.5f).size(), 10u);
+    // Fewer than two points: none.
+    EXPECT_TRUE(faf::editor::DecalsAlongPath({{0.0f, 0.0f}}, 20.0f, 6.0f, 0.0f).empty());
+  }
+
+  TEST(DecalShape, DecalsTurnWithTheCurve)
+  {
+    // Up along z, then right along x: the first decals point along +z, the last along +x.
+    const std::vector<std::pair<float, float>> corner = {{0.0f, 0.0f}, {0.0f, 100.0f}, {100.0f, 100.0f}};
+    const std::vector<DecalFootprint> decals = faf::editor::DecalsAlongPath(corner, 10.0f, 4.0f, 0.0f);
+    ASSERT_GE(decals.size(), 15u);
+    EXPECT_NEAR(decals.front().yaw, 1.5707963f, 0.15f);
+    EXPECT_NEAR(decals.back().yaw, 0.0f, 0.15f);
+  }
+
   TEST(DecalShape, TypeFromTheTexturesName)
   {
     EXPECT_EQ(faf::editor::DecalTypeForTexture("/env/Evergreen/decals/eg_rock01_albedo.dds"), 1);

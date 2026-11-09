@@ -822,9 +822,34 @@ namespace faf::editor
   void EdTools::DrawDecals()
   {
     SectionHeader("MODE");
-    static const char* const kModes[] = {"Place", "Select"};
-    mDecalMode = std::clamp(mDecalMode, 0, 1);
-    Segmented(kModes, 2, mDecalMode);
+    static const char* const kModes[] = {"Place", "Select", "Path"};
+    mDecalMode = std::clamp(mDecalMode, 0, 2);
+    Segmented(kModes, 3, mDecalMode);
+    if (mDecalMode == 2) {
+      char text[96];
+      (void)std::snprintf(text, sizeof(text), "%d points, %d decals", mDecalPathPoints, mDecalPathDecals);
+      ImGui::TextUnformatted(text);
+      ImGui::BeginDisabled(mDecalPathPoints < 2);
+      if (ImGui::Button("Place")) {
+        mDecalPathAction = DecalPathAction::Place;
+      }
+      ImGui::EndDisabled();
+      ImGui::SameLine();
+      ImGui::BeginDisabled(mDecalPathPoints == 0);
+      if (ImGui::Button("Last point")) {
+        mDecalPathAction = DecalPathAction::RemoveLast;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Clear")) {
+        mDecalPathAction = DecalPathAction::Clear;
+      }
+      ImGui::EndDisabled();
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::SliderFloat("##decaloverlap", &mDecalOverlap, 0.0f, 0.9f, "Overlap %.2f");
+      Note("Click the ground to lay the curve's points; the decals follow it end to end, each its length along the curve "
+           "and its width across, turned with it. Enter or Place lays them (one undo step), Backspace drops the last point, "
+           "Escape clears. Symmetric copies follow.");
+    }
     if (mDecalMode == 1) {
       char count[64];
       (void)std::snprintf(count, sizeof(count), "%d decal%s selected", mDecalSelectionCount, mDecalSelectionCount == 1 ? "" : "s");

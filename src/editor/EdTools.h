@@ -52,6 +52,25 @@ namespace faf::editor
     /** The Decals tool: Place (a click places the chosen texture with its symmetric copies) or Select (pick, drag, delete). */
     [[nodiscard]] bool DecalsToolActive() const noexcept { return mTool == 5; }
     [[nodiscard]] bool DecalPlaceMode() const noexcept { return mDecalMode == 0; }
+    /** Path mode: clicks lay a curve's points; decals follow it end to end when placed. */
+    [[nodiscard]] bool DecalPathMode() const noexcept { return mDecalMode == 2; }
+    /** How much each decal along a path overlaps the next (0 to 0.9 of its length). */
+    [[nodiscard]] float DecalOverlap() const noexcept { return mDecalOverlap; }
+    /** What the panel's path buttons asked for, taken once. */
+    enum class DecalPathAction
+    {
+      None,
+      Place,
+      RemoveLast,
+      Clear,
+    };
+    [[nodiscard]] DecalPathAction TakeDecalPathAction() noexcept { return std::exchange(mDecalPathAction, DecalPathAction::None); }
+    /** The path's points and the decals it would place, for the panel. */
+    void SetDecalPathInfo(const int points, const int decals) noexcept
+    {
+      mDecalPathPoints = points;
+      mDecalPathDecals = decals;
+    }
     [[nodiscard]] const std::string& DecalTexturePath() const noexcept { return mDecalTexture; }
     /** The albedo's spec map, the decal's second texture, or "" when it has none or the option is off. */
     [[nodiscard]] std::string DecalPairPath() const
@@ -76,11 +95,11 @@ namespace faf::editor
     /** How many decals the view has selected, for the panel. */
     void SetDecalSelectionCount(const int count) noexcept { mDecalSelectionCount = count; }
     /** Test runs (`/decaltool <texture>[,select]`): the Decals tool with this texture and mode. */
-    void SetDecalTool(std::string texture, const bool select)
+    void SetDecalTool(std::string texture, const int mode)
     {
       mTool = 5;
       mDecalTexture = std::move(texture);
-      mDecalMode = select ? 1 : 0;
+      mDecalMode = mode;
     }
     /** The map's playable area (x0, z0, x1, z1) as it is, and the map's size, for the panel. */
     void SetPlayableArea(const std::optional<std::array<int, 4>>& area, const int width, const int height)
@@ -493,6 +512,10 @@ namespace faf::editor
     float mDecalTurn = 0.0f;
     bool mDecalRandomTurn = false;
     bool mDecalWithPair = true;
+    float mDecalOverlap = 0.1f;
+    DecalPathAction mDecalPathAction = DecalPathAction::None;
+    int mDecalPathPoints = 0;
+    int mDecalPathDecals = 0;
     float mDecalCutoff = 0.0f;
     int mDecalSelectionCount = 0;
     bool mShowGrid = false;

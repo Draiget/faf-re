@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace faf::editor
 {
@@ -34,6 +36,20 @@ namespace faf::editor
    * (`..._normals.dds`, `..._normal.dds`) as Normals (2), a glow map as Glow (6), anything else as Albedo (1).
    */
   int DecalTypeForTexture(const std::string& path);
+
+  /**
+   * A point on the uniform Catmull-Rom curve through `points` (the ends repeated), at `t` from 0 (the first point) to
+   * points.size() - 1 (the last). The curve passes through every point.
+   */
+  std::pair<float, float> PathPoint(const std::vector<std::pair<float, float>>& points, float t);
+
+  /**
+   * Decals laid end to end along the curve through `points`: each `length` long along the curve and `width` across,
+   * turned along it, the next starting `length * (1 - overlap)` further on, until the curve ends (the last one may
+   * pass its end). Empty for fewer than two points.
+   */
+  std::vector<DecalFootprint> DecalsAlongPath(const std::vector<std::pair<float, float>>& points, float length, float width,
+                                              float overlap);
 
   /** A short name for a decal type number ("albedo", "normals"...). */
   const char* DecalTypeName(int type);

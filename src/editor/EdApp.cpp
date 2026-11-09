@@ -968,9 +968,24 @@ namespace faf::editor
           mScene.FrameMarker(name);
         }
         tools.SetDecalSelectionCount(mScene.DecalSelectionCount());
+        tools.SetDecalPathInfo(mScene.DecalPathPointCount(), mScene.DecalPathDecalCount());
+        switch (tools.TakeDecalPathAction()) {
+        case EdTools::DecalPathAction::Place:
+          mScene.PlaceDecalPath();
+          break;
+        case EdTools::DecalPathAction::RemoveLast:
+          mScene.RemoveLastDecalPathPoint();
+          break;
+        case EdTools::DecalPathAction::Clear:
+          mScene.ClearDecalPath();
+          break;
+        case EdTools::DecalPathAction::None:
+          break;
+        }
         if (!mDecalToolArg.empty()) {
           const std::size_t comma = mDecalToolArg.find(',');
-          tools.SetDecalTool(mDecalToolArg.substr(0, comma), comma != std::string::npos && mDecalToolArg.substr(comma + 1) == "select");
+          const std::string mode = comma == std::string::npos ? std::string() : mDecalToolArg.substr(comma + 1);
+          tools.SetDecalTool(mDecalToolArg.substr(0, comma), mode == "select" ? 1 : mode == "path" ? 2 : 0);
           mDecalToolArg.clear();
         }
         if (mGridArgsPending) {
