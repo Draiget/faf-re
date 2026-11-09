@@ -1159,7 +1159,9 @@ namespace moho
     const SCoordsVec2& buildPosition,
     bool allowCommandOverlap,
     SOccupationResult* buildInfo,
-    const UserCommand* ignoredCommand
+    const UserCommand* ignoredCommand = nullptr,
+    std::int32_t ignoredPreOrderId = 0,
+    std::int32_t candidateCommandId = 0
   );
 
   /**

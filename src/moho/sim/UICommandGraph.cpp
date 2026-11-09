@@ -3150,6 +3150,7 @@ namespace
 
     constexpr std::int32_t kPreviewCreateColor = static_cast<std::int32_t>(0xFF00FF00u);
     constexpr std::int32_t kPreviewTranslucentGreen = static_cast<std::int32_t>(0x8000D800u);
+    constexpr std::int32_t kPreviewTranslucentRed = static_cast<std::int32_t>(0x80D80000u);
 
     const bool shiftDown = MAUI_KeyIsDown(MKEY_SHIFT);
     std::unordered_set<std::uint64_t> activeKeys;
@@ -3198,8 +3199,23 @@ namespace
         }
         const VTransform stance{order.mTarget.mPos, orientation};
 
+        const SCoordsVec2 buildPos{order.mTarget.mPos.x, order.mTarget.mPos.z};
+        SOccupationResult buildInfo{};
+        const bool canBuild = USERUNIT_CanBeBuiltAt(
+          *mSession,
+          unitBlueprint,
+          buildPos,
+          false,
+          &buildInfo,
+          nullptr,
+          order.nextCommandId,
+          order.nextCommandId
+        );
+        const std::int32_t previewColor = canBuild ? kPreviewTranslucentGreen : kPreviewTranslucentRed;
+
         auto it = sPreOrderGhostMeshes.find(key);
         if (it != sPreOrderGhostMeshes.end() && it->second != nullptr) {
+          it->second->color = previewColor;
           it->second->SetStance(stance, stance);
           it->second->Cull(false);
           continue;
@@ -3230,7 +3246,7 @@ namespace
         );
         if (meshInstance != nullptr) {
           boost::shared_ptr<MeshInstance> meshPtr(meshInstance);
-          meshPtr->color = kPreviewTranslucentGreen;
+          meshPtr->color = previewColor;
           meshPtr->SetStance(stance, stance);
           sPreOrderGhostMeshes[key] = meshPtr;
         }
@@ -3291,8 +3307,23 @@ namespace
           continue;
         }
 
-        constexpr std::uint32_t kPreviewSkirtColor = 0xD800D800u;
-        DrawUnitSkirt(heightField, unitBlueprint, camera, order.mTarget.mPos, mSession, &batcher, kPreviewSkirtColor);
+        constexpr std::uint32_t kPreviewSkirtGreen = 0xD800D800u;
+        constexpr std::uint32_t kPreviewSkirtRed = 0xD8D80000u;
+
+        const SCoordsVec2 buildPos{order.mTarget.mPos.x, order.mTarget.mPos.z};
+        SOccupationResult buildInfo{};
+        const bool canBuild = USERUNIT_CanBeBuiltAt(
+          *mSession,
+          unitBlueprint,
+          buildPos,
+          false,
+          &buildInfo,
+          nullptr,
+          order.nextCommandId,
+          order.nextCommandId
+        );
+        const std::uint32_t skirtColor = canBuild ? kPreviewSkirtGreen : kPreviewSkirtRed;
+        DrawUnitSkirt(heightField, unitBlueprint, camera, order.mTarget.mPos, mSession, &batcher, skirtColor);
       }
     }
   }

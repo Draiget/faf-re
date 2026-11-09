@@ -1615,6 +1615,21 @@ namespace moho
       clearQueue = LuaPlus::LuaStackObject(state, 4).GetBoolean();
     }
 
+    if (session != nullptr && data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && data.mBlueprint != nullptr) {
+      const SCoordsVec2 buildPos{data.mTarget.mPos.x, data.mTarget.mPos.z};
+      SOccupationResult buildInfo{};
+      if (!USERUNIT_CanBeBuiltAt(*session, data.mBlueprint, buildPos, false, &buildInfo, nullptr)) {
+        gpg::Warnf(
+          "TransportDropGhosts: IssueTransportPreOrder BuildMobile rejected: invalid terrain or overlapping building at (%.1f, %.1f)",
+          data.mTarget.mPos.x,
+          data.mTarget.mPos.z
+        );
+        lua_pushboolean(rawState, 0);
+        return 1;
+      }
+      data.mTarget.mPos = buildInfo.pos;
+    }
+
     UserUnit::QueueTransportPreOrders(units, data, clearQueue);
 
     gpg::Warnf(

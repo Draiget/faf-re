@@ -446,4 +446,28 @@ namespace
     unit2->DispatchDisembarkedPreOrders();
     EXPECT_FALSE(unit2->HasTransportPreOrders());
   }
+
+  TEST(TransportPreOrdersTests, BuildMobilePreOrderQueueing)
+  {
+    MockUserUnitScope scope;
+    UserUnit* unit = scope.GetUnit(901);
+
+    SSTICommandIssueData buildCmd(EUnitCommandType::UNITCOMMAND_BuildMobile);
+    buildCmd.mTarget.mPos = Wm3::Vector3f(300.0f, 10.0f, 320.0f);
+    unit->QueueTransportPreOrder(buildCmd, false);
+
+    EXPECT_TRUE(unit->HasTransportPreOrders());
+    const auto orders = unit->GetTransportPreOrders();
+    ASSERT_EQ(orders.size(), 1u);
+    EXPECT_EQ(orders[0].mCommandType, EUnitCommandType::UNITCOMMAND_BuildMobile);
+    EXPECT_EQ(orders[0].mTarget.mPos, Wm3::Vector3f(300.0f, 10.0f, 320.0f));
+
+    // Position drag updates cleanly
+    const Wm3::Vector3f draggedPos(350.0f, 15.0f, 360.0f);
+    EXPECT_TRUE(UserUnit::UpdateTransportPreOrderPositionById(orders[0].nextCommandId, draggedPos));
+    EXPECT_EQ(unit->GetTransportPreOrders()[0].mTarget.mPos, draggedPos);
+
+    unit->ClearTransportPreOrders();
+    EXPECT_FALSE(unit->HasTransportPreOrders());
+  }
 }
